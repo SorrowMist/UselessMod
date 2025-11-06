@@ -1,0 +1,13 @@
+{
+  "parent": "useless_mod:block/plastic/glow",
+  "textures": {
+    "all": "useless_mod:block/plastic_glow_block"
+  },
+  "display": {
+    "gui": {
+      "rotation": [30, 225, 0],
+      "translation": [0, 0, 0],
+      "scale": [0.625, 0.625, 0.625]
+    }
+  }
+}

@@ -1,0 +1,6 @@
+{
+  "parent": "item/generated",
+  "textures": {
+    "layer0": "useless_mod:item/augment/augment_parallel_1"
+  }
+}

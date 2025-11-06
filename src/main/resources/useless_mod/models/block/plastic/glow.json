@@ -1,0 +1,6 @@
+{
+  "parent": "useless_mod:block/colored_cube",
+  "textures": {
+    "all": "useless_mod:block/plastic_glow_block"
+  }
+}

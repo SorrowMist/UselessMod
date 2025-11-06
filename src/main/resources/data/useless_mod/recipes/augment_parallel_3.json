@@ -1,0 +1,23 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    "AAA",
+    "BBB",
+    "CCC"
+  ],
+  "key": {
+    "A": {
+      "item": "useless_mod:augment_parallel_2"
+    },
+    "B": {
+      "item": "useless_mod:useless_integral_component_tier_6"
+    },
+    "C": {
+      "item": "useless_mod:useless_integral_component_tier_7"
+    }
+  },
+  "result": {
+    "item": "useless_mod:augment_parallel_3",
+    "count": 1
+  }
+}

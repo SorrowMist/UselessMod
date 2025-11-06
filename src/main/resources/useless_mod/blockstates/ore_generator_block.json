@@ -1,0 +1,7 @@
+{
+  "variants": {
+    "": {
+      "model": "useless_mod:block/ore_generator_block"
+    }
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    " # ",
+    "# #",
+    " # "
+  ],
+  "key": {
+    "#": {
+      "item": "useless_mod:useless_integral_component_tier_8"
+    }
+  },
+  "result": {
+    "item": "useless_mod:useless_integral_component_tier_9",
+    "count": 1
+  }
+}

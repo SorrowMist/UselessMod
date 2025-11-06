@@ -1,0 +1,8 @@
+{
+  "parent": "minecraft:item/generated",
+  "textures": {
+    "layer0": "useless_mod:item/augment/useless_integral_component_tier_5",
+    "layer1": "useless_mod:item/augment/upgrade_augment_2_lights",
+    "layer2": "useless_mod:item/augment/upgrade_augment_2_anim"
+  }
+}

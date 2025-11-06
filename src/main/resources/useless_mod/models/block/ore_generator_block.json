@@ -1,0 +1,6 @@
+{
+  "parent": "minecraft:block/cube_all",
+  "textures": {
+    "all": "useless_mod:block/ore_generator_block"
+  }
+}

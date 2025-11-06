@@ -1,10 +1,13 @@
 package com.sorrowmist.useless;
 
 import com.mojang.logging.LogUtils;
+import com.sorrowmist.useless.blocks.ModMenuTypes;
+import com.sorrowmist.useless.blocks.advancedalloyfurnace.AdvancedAlloyFurnaceScreen;
 import com.sorrowmist.useless.config.ConfigManager;
 import com.sorrowmist.useless.items.EndlessBeafItem;
 import com.sorrowmist.useless.networking.ModMessages;
 import com.sorrowmist.useless.registry.RegistryHandler;
+import net.minecraft.client.gui.screens.MenuScreens;
 import net.minecraft.client.renderer.item.ItemProperties;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
@@ -22,7 +25,6 @@ import net.minecraftforge.fml.event.lifecycle.FMLCommonSetupEvent;
 import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
 import org.slf4j.Logger;
 import org.spongepowered.asm.mixin.Mixins;
-
 // The value here should match an entry in the META-INF/mods.toml file
 @Mod(UselessMod.MOD_ID)
 public class UselessMod {
@@ -113,6 +115,12 @@ public class UselessMod {
             event.enqueueWork(() -> {
                 registerItemModelProperties();
             });
+
+
+            // 注册屏幕
+            event.enqueueWork(() -> {
+                MenuScreens.register(ModMenuTypes.ADVANCED_ALLOY_FURNACE_MENU.get(), AdvancedAlloyFurnaceScreen::new);
+            });
         }
         private static void registerItemModelProperties() {
             // 注册 EndlessBeafItem 的模型属性
@@ -127,6 +135,14 @@ public class UselessMod {
                     });
 
             LOGGER.info("已注册物品模型属性");
+        }
+    }
+    // 调试模式
+    public static final boolean DEBUG = true;
+
+    public static void logDebug(String message) {
+        if (DEBUG) {
+            LOGGER.debug("[USELESS DEBUG] " + message);
         }
     }
 }

@@ -1,5 +1,6 @@
-package com.sorrowmist.useless.blocks;
+package com.sorrowmist.useless.blocks.oregenerator;
 
+import com.sorrowmist.useless.blocks.ModBlockEntities;
 import net.minecraft.world.Containers;
 import net.minecraft.world.SimpleContainer;
 import net.minecraft.world.level.block.entity.BlockEntity;

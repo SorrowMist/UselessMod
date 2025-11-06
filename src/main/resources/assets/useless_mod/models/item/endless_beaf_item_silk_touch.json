@@ -1,6 +1,0 @@
-{
-  "parent": "item/handheld",
-  "textures": {
-    "layer0": "useless_mod:item/endless_beaf_item_silk_touch"
-  }
-}

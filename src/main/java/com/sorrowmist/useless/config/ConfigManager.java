@@ -1,9 +1,10 @@
 package com.sorrowmist.useless.config;
 
+import com.sorrowmist.useless.utils.ThermalDependencyHelper;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
-import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraftforge.common.ForgeConfigSpec;
 import net.minecraftforge.fml.common.Mod;
 
@@ -29,7 +30,7 @@ public class ConfigManager {
     public static final ForgeConfigSpec.IntValue CAPACITY_MULTIPLIER;
     public static final ForgeConfigSpec.IntValue MAX_UPGRADE;
 
-    // Thermal Parallel 配置
+    // Thermal Parallel 配置 - 只在热力系列安装时注册
     public static final ForgeConfigSpec.BooleanValue PARALLEL_INCREASE_ITEM_CAPACITY;
     public static final ForgeConfigSpec.BooleanValue PARALLEL_INCREASE_FLUID_CAPACITY;
     public static final ForgeConfigSpec.BooleanValue PARALLEL_INCREASE_ENERGY_CAPACITY;
@@ -89,45 +90,59 @@ public class ConfigManager {
 
         BUILDER.pop();
 
-        BUILDER.push("Thermal Parallel 设置");
+        // 只在热力系列安装时添加 Thermal Parallel 配置
+        if (ThermalDependencyHelper.isAnyThermalModLoaded()) {
+            BUILDER.push("Thermal Parallel 设置");
 
-        PARALLEL_INCREASE_ENERGY_CONSUMPTION = BUILDER
-                .comment("如果设置为true，则机器的能耗会随并行增多而成倍增加")
-                .define("并行增加能耗", false);
+            PARALLEL_INCREASE_ENERGY_CONSUMPTION = BUILDER
+                    .comment("如果设置为true，则机器的能耗会随并行增多而成倍增加")
+                    .define("并行增加能耗", false);
 
-        BASE_MOD_AFFECT_PARALLEL = BUILDER
-                .comment("如果设置为true，则机器的并行数量会被整合组件带来的基础倍率增幅")
-                .define("基础倍率影响并行", false);
+            BASE_MOD_AFFECT_PARALLEL = BUILDER
+                    .comment("如果设置为true，则机器的并行数量会被整合组件带来的基础倍率增幅")
+                    .define("基础倍率影响并行", false);
 
-        ADD_EXTRA_PARALLEL_AUGMENTS_TO_TAB = BUILDER
-                .comment("如果设置为true，则更高等级的并行插件会被加进创造模式物品栏")
-                .define("添加额外并行增强到标签", false);
+            ADD_EXTRA_PARALLEL_AUGMENTS_TO_TAB = BUILDER
+                    .comment("如果设置为true，则更高等级的并行插件会被加进创造模式物品栏")
+                    .define("添加额外并行增强到标签", false);
 
-        PARALLEL_INCREASE_ITEM_CAPACITY = BUILDER
-                .comment("如果设置为true，则并行升级会同步提高机器的输入/输出物品存储上限")
-                .define("并行增加物品容量", true);
+            PARALLEL_INCREASE_ITEM_CAPACITY = BUILDER
+                    .comment("如果设置为true，则并行升级会同步提高机器的输入/输出物品存储上限")
+                    .define("并行增加物品容量", true);
 
-        PARALLEL_INCREASE_FLUID_CAPACITY = BUILDER
-                .comment("如果设置为true，则并行升级会同步提高机器的流体存储上限")
-                .define("并行增加流体容量", true);
+            PARALLEL_INCREASE_FLUID_CAPACITY = BUILDER
+                    .comment("如果设置为true，则并行升级会同步提高机器的流体存储上限")
+                    .define("并行增加流体容量", true);
 
-        PARALLEL_INCREASE_ENERGY_CAPACITY = BUILDER
-                .comment("如果设置为true，则并行升级会同步提高机器的能量存储上限")
-                .define("并行增加能量容量", false);
+            PARALLEL_INCREASE_ENERGY_CAPACITY = BUILDER
+                    .comment("如果设置为true，则并行升级会同步提高机器的能量存储上限")
+                    .define("并行增加能量容量", false);
 
-        PARALLEL_INCREASE_ITEM_TRANSFER = BUILDER
-                .comment("如果设置为true，则并行升级会同步提高机器进行自动提取/弹出物品的速率上限")
-                .define("并行增加物品传输", true);
+            PARALLEL_INCREASE_ITEM_TRANSFER = BUILDER
+                    .comment("如果设置为true，则并行升级会同步提高机器进行自动提取/弹出物品的速率上限")
+                    .define("并行增加物品传输", true);
 
-        PARALLEL_INCREASE_FLUID_TRANSFER = BUILDER
-                .comment("如果设置为true，则并行升级会同步提高机器进行自动提取/弹出流体的速率上限")
-                .define("并行增加流体传输", true);
+            PARALLEL_INCREASE_FLUID_TRANSFER = BUILDER
+                    .comment("如果设置为true，则并行升级会同步提高机器进行自动提取/弹出流体的速率上限")
+                    .define("并行增加流体传输", true);
 
-        PARALLEL_INCREASE_ENERGY_TRANSFER = BUILDER
-                .comment("如果设置为true，则并行升级会同步提高机器的能量传输上限")
-                .define("并行增加能量传输", true);
+            PARALLEL_INCREASE_ENERGY_TRANSFER = BUILDER
+                    .comment("如果设置为true，则并行升级会同步提高机器的能量传输上限")
+                    .define("并行增加能量传输", true);
 
-        BUILDER.pop();
+            BUILDER.pop();
+        } else {
+            // 如果热力系列未安装，设置默认值
+            PARALLEL_INCREASE_ENERGY_CONSUMPTION = null;
+            BASE_MOD_AFFECT_PARALLEL = null;
+            ADD_EXTRA_PARALLEL_AUGMENTS_TO_TAB = null;
+            PARALLEL_INCREASE_ITEM_CAPACITY = null;
+            PARALLEL_INCREASE_FLUID_CAPACITY = null;
+            PARALLEL_INCREASE_ENERGY_CAPACITY = null;
+            PARALLEL_INCREASE_ITEM_TRANSFER = null;
+            PARALLEL_INCREASE_FLUID_TRANSFER = null;
+            PARALLEL_INCREASE_ENERGY_TRANSFER = null;
+        }
 
         SPEC = BUILDER.build();
     }
@@ -170,42 +185,6 @@ public class ConfigManager {
         return MAX_UPGRADE.get();
     }
 
-    // Thermal Parallel 配置获取方法
-    public static boolean isParallelIncreaseItemCapacity() {
-        return PARALLEL_INCREASE_ITEM_CAPACITY.get();
-    }
-
-    public static boolean isParallelIncreaseFluidCapacity() {
-        return PARALLEL_INCREASE_FLUID_CAPACITY.get();
-    }
-
-    public static boolean isParallelIncreaseEnergyCapacity() {
-        return PARALLEL_INCREASE_ENERGY_CAPACITY.get();
-    }
-
-    public static boolean isParallelIncreaseItemTransfer() {
-        return PARALLEL_INCREASE_ITEM_TRANSFER.get();
-    }
-
-    public static boolean isParallelIncreaseFluidTransfer() {
-        return PARALLEL_INCREASE_FLUID_TRANSFER.get();
-    }
-
-    public static boolean isParallelIncreaseEnergyTransfer() {
-        return PARALLEL_INCREASE_ENERGY_TRANSFER.get();
-    }
-
-    public static boolean isParallelIncreaseEnergyConsumption() {
-        return PARALLEL_INCREASE_ENERGY_CONSUMPTION.get();
-    }
-
-    public static boolean isBaseModAffectParallel() {
-        return BASE_MOD_AFFECT_PARALLEL.get();
-    }
-
-    public static boolean shouldAddExtraParallelAugmentsToTab() {
-        return ADD_EXTRA_PARALLEL_AUGMENTS_TO_TAB.get();
-    }
 
     private static Block getBlockFromString(String blockId, Block fallback) {
         try {

@@ -51,7 +51,7 @@ public abstract class AugmentableBlockEntityMixin implements IAugmentableBlockEn
             parallel = (int) ((float) (parallel + 1) * baseMod - 1.0F);
         }
 
-        this.useless_mod$parallel = parallel;
+        this.useless_mod$parallel = Math.max(1, parallel);
 
         // 创建 final 变量用于 lambda 表达式
         final int finalParallel = parallel;

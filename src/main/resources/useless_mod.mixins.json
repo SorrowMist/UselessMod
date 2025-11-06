@@ -11,15 +11,15 @@
     "defaultRequire": 1
   },
   "mixins": [
-    "botanypots.BlockEntityBotanyPotMixin",
     "BlockTravelAnchorMixin",
-    "botanypots.BotanyPotsForgeClientMixin",
     "PatternSlotTrackerMixin",
     "TileAssemblerMatrixPatternMixin",
     "TileComponentEjectorMixin",
     "TileEntityDigitalMinerMixin",
     "accessor.BlockEntityBotanyPotAccessor",
     "accessor.DelayAccessor",
+    "botanypots.BlockEntityBotanyPotMixin",
+    "botanypots.BotanyPotsForgeClientMixin",
     "mek.CachedRecipeMixin",
     "mek.DigitalMinerMixin",
     "mek.ElectricPumpMixin",

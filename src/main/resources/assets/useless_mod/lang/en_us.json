@@ -67,5 +67,6 @@
   "config.useless_mod.parallel_increase_energy_cap": "并行增加能量容量",
   "config.useless_mod.parallel_increase_item_transfer": "并行增加物品传输",
   "config.useless_mod.parallel_increase_fluid_transfer": "并行增加流体传输",
-  "config.useless_mod.parallel_increase_energy_transfer": "并行增加能量传输"
+  "config.useless_mod.parallel_increase_energy_transfer": "并行增加能量传输",
+  "block.useless_mod.advanced_alloy_furnace_block": "高级合金炉"
 }

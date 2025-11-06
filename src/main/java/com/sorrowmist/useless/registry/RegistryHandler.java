@@ -1,9 +1,18 @@
 package com.sorrowmist.useless.registry;
 
 import com.sorrowmist.useless.UselessMod;
-import com.sorrowmist.useless.blocks.*;
+import com.sorrowmist.useless.blocks.GlowPlasticBlock;
+import com.sorrowmist.useless.blocks.ModBlockEntities;
+import com.sorrowmist.useless.blocks.ModMenuTypes;
+import com.sorrowmist.useless.blocks.advancedalloyfurnace.AdvancedAlloyFurnaceBlock;
+import com.sorrowmist.useless.blocks.oregenerator.OreGeneratorBlock;
+import com.sorrowmist.useless.blocks.teleport.TeleportBlock;
+import com.sorrowmist.useless.blocks.teleport.TeleportBlock2;
 import com.sorrowmist.useless.inventories.UselessTab;
 import com.sorrowmist.useless.items.EndlessBeafItem;
+import com.sorrowmist.useless.recipes.ModRecipeSerializers;
+import com.sorrowmist.useless.recipes.ModRecipeTypes;
+import com.sorrowmist.useless.utils.ThermalDependencyHelper;
 import com.sorrowmist.useless.worldgen.dimension.UselessDimension;
 import com.sorrowmist.useless.worldgen.dimension.UselessDimension2;
 import net.minecraftforge.eventbus.api.IEventBus;
@@ -43,6 +52,7 @@ public class RegistryHandler {
     /**
      * 收集所有需要注册的DeferredRegister
      */
+    // 在 RegistryHandler.java 的 collectAllRegistries() 方法中添加
     private static void collectAllRegistries() {
         // 物品注册
         addRegistry(EndlessBeafItem.ITEMS);
@@ -60,6 +70,9 @@ public class RegistryHandler {
         addRegistry(GlowPlasticBlock.BLOCKS);
         addRegistry(GlowPlasticBlock.ITEMS);
 
+
+        addRegistry(AdvancedAlloyFurnaceBlock.BLOCKS);
+        addRegistry(AdvancedAlloyFurnaceBlock.ITEMS);
         // 方块实体注册
         addRegistry(ModBlockEntities.BLOCK_ENTITIES);
 
@@ -67,11 +80,21 @@ public class RegistryHandler {
         addRegistry(UselessDimension.CHUNK_GENERATORS);
         addRegistry(UselessDimension2.CHUNK_GENERATORS);
 
-        // 添加 ThermalMore 物品注册
-        addOtherRegistry(() -> ThermalMoreItems.ITEMS.register(FMLJavaModLoadingContext.get().getModEventBus()));
+        // 菜单注册
+        addRegistry(ModMenuTypes.MENUS);
 
-        // 添加 ThermalParallel 物品注册
-        addOtherRegistry(() -> ThermalParallelItems.ITEMS.register(FMLJavaModLoadingContext.get().getModEventBus()));
+        addRegistry(ModRecipeTypes.RECIPE_TYPES);
+        addRegistry(ModRecipeSerializers.RECIPE_SERIALIZERS);
+        // 添加其他注册器
+        if (ThermalDependencyHelper.isAnyThermalModLoaded()) {
+            addOtherRegistry(() -> ThermalMoreItems.ITEMS.register(FMLJavaModLoadingContext.get().getModEventBus()));
+            addOtherRegistry(() -> ThermalParallelItems.ITEMS.register(FMLJavaModLoadingContext.get().getModEventBus()));
+
+
+            UselessMod.LOGGER.info("检测到热力系列模组，已注册 ThermalMore、ThermalParallel 和高级机器");
+        } else {
+            UselessMod.LOGGER.info("未检测到热力系列模组，跳过 Thermal 相关物品注册");
+        }
     }
 
     /**

@@ -5,7 +5,9 @@ import com.sorrowmist.useless.blocks.GlowPlasticBlock;
 import com.sorrowmist.useless.config.ConfigManager;
 import com.sorrowmist.useless.dimension.UselessDimension;
 import com.sorrowmist.useless.dimension.UselessDimension2;
+import com.sorrowmist.useless.init.ModBlocks;
 import com.sorrowmist.useless.init.ModCreativeTabs;
+import com.sorrowmist.useless.init.ModItems;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.level.block.Blocks;
@@ -39,8 +41,8 @@ public class UselessMod {
 //        modEventBus.addListener(ModCapabilities::onRegisterCapabilities);
 
 //        // 注册本模组方块/物品/创造物品栏
-//        ModBlocks.BLOCKS.register(modEventBus);
-//        ModItems.ITEMS.register(modEventBus);
+        ModBlocks.BLOCKS.register(modEventBus);
+        ModItems.ITEMS.register(modEventBus);
 //        ModBlockEntities.BLOCK_ENTITY_TYPES.register(modEventBus);
         ModCreativeTabs.CREATIVE_TAB.register(modEventBus);
 //        // Register the Deferred Register to the mod event bus so menu types get registered

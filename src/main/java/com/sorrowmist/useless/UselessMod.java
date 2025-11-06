@@ -2,6 +2,8 @@ package com.sorrowmist.useless;
 
 import com.mojang.logging.LogUtils;
 import com.sorrowmist.useless.config.ConfigManager;
+import com.sorrowmist.useless.dimension.UselessDimension;
+import com.sorrowmist.useless.dimension.UselessDimension2;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.level.block.Blocks;
@@ -51,6 +53,10 @@ public class UselessMod {
         modContainer.registerConfig(ModConfig.Type.COMMON, ConfigManager.SPEC, "useless_mod-common.toml");
 //        modContainer.registerConfig(ModConfig.Type.CLIENT, ConfigManager.CLIENT_SPEC, "useless_mod-client.toml");
 //        modContainer.registerConfig(ModConfig.Type.SERVER, ConfigManager.SERVER_SPEC, "useless_mod-server.toml");
+
+        // 纬度注册
+        UselessDimension.CHUNK_GENERATORS.register(modEventBus);
+        UselessDimension2.CHUNK_GENERATORS.register(modEventBus);
     }
 
     // 便捷 ResourceLocation 工具

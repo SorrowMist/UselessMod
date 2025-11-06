@@ -1,9 +1,11 @@
 package com.sorrowmist.useless;
 
 import com.mojang.logging.LogUtils;
+import com.sorrowmist.useless.blocks.GlowPlasticBlock;
 import com.sorrowmist.useless.config.ConfigManager;
 import com.sorrowmist.useless.dimension.UselessDimension;
 import com.sorrowmist.useless.dimension.UselessDimension2;
+import com.sorrowmist.useless.init.ModCreativeTabs;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.level.block.Blocks;
@@ -18,10 +20,10 @@ import net.neoforged.neoforge.event.server.ServerStartingEvent;
 import org.slf4j.Logger;
 
 // The value here should match an entry in the META-INF/neoforge.mods.toml file
-@Mod(UselessMod.MOD_ID)
+@Mod(UselessMod.MODID)
 public class UselessMod {
     // Define mod id in a common place for everything to reference
-    public static final String MOD_ID = "useless_mod";
+    public static final String MODID = "useless_mod";
     // Directly reference a slf4j logger
     public static final Logger LOGGER = LogUtils.getLogger();
     // 移除 MDK 示例注册，改为使用实际模组的方块/物品/创造物品栏注册见 ModBlocks、ModItems、ModCreativeTabs
@@ -40,7 +42,7 @@ public class UselessMod {
 //        ModBlocks.BLOCKS.register(modEventBus);
 //        ModItems.ITEMS.register(modEventBus);
 //        ModBlockEntities.BLOCK_ENTITY_TYPES.register(modEventBus);
-//        ModCreativeTabs.TABS.register(modEventBus);
+        ModCreativeTabs.CREATIVE_TAB.register(modEventBus);
 //        // Register the Deferred Register to the mod event bus so menu types get registered
 //        ModMenuTypes.MENUS.register(modEventBus);
 
@@ -54,6 +56,9 @@ public class UselessMod {
 //        modContainer.registerConfig(ModConfig.Type.CLIENT, ConfigManager.CLIENT_SPEC, "useless_mod-client.toml");
 //        modContainer.registerConfig(ModConfig.Type.SERVER, ConfigManager.SERVER_SPEC, "useless_mod-server.toml");
 
+        GlowPlasticBlock.BLOCKS.register(modEventBus);
+        GlowPlasticBlock.ITEMS.register(modEventBus);
+
         // 纬度注册
         UselessDimension.CHUNK_GENERATORS.register(modEventBus);
         UselessDimension2.CHUNK_GENERATORS.register(modEventBus);
@@ -61,7 +66,7 @@ public class UselessMod {
 
     // 便捷 ResourceLocation 工具
     public static ResourceLocation id(String path) {
-        return ResourceLocation.fromNamespaceAndPath(MOD_ID, path);
+        return ResourceLocation.fromNamespaceAndPath(MODID, path);
     }
 
     private void commonSetup(FMLCommonSetupEvent event) {

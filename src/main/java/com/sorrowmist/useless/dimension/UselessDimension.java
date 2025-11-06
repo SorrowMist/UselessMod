@@ -11,7 +11,7 @@ import java.util.function.Supplier;
 public class UselessDimension {
 
     public static final DeferredRegister<MapCodec<? extends ChunkGenerator>> CHUNK_GENERATORS =
-            DeferredRegister.create(Registries.CHUNK_GENERATOR, UselessMod.MOD_ID);
+            DeferredRegister.create(Registries.CHUNK_GENERATOR, UselessMod.MODID);
 
     public static final Supplier<MapCodec<? extends ChunkGenerator>> USELESSDIM_GEN_CODEC =
             CHUNK_GENERATORS.register("uselessdim_gen", () -> UselessDimGen.CODEC);

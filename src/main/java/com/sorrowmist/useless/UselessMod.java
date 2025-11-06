@@ -1,6 +1,7 @@
 package com.sorrowmist.useless;
 
 import com.mojang.logging.LogUtils;
+import com.sorrowmist.useless.config.ConfigManager;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.level.block.Blocks;
@@ -8,16 +9,17 @@ import net.neoforged.bus.api.IEventBus;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.ModContainer;
 import net.neoforged.fml.common.Mod;
+import net.neoforged.fml.config.ModConfig;
 import net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent;
 import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.event.server.ServerStartingEvent;
 import org.slf4j.Logger;
 
 // The value here should match an entry in the META-INF/neoforge.mods.toml file
-@Mod(UselessMod.MODID)
+@Mod(UselessMod.MOD_ID)
 public class UselessMod {
     // Define mod id in a common place for everything to reference
-    public static final String MODID = "useless_mod";
+    public static final String MOD_ID = "useless_mod";
     // Directly reference a slf4j logger
     public static final Logger LOGGER = LogUtils.getLogger();
     // 移除 MDK 示例注册，改为使用实际模组的方块/物品/创造物品栏注册见 ModBlocks、ModItems、ModCreativeTabs
@@ -46,14 +48,14 @@ public class UselessMod {
         NeoForge.EVENT_BUS.register(this);
 
         // 注册配置：接入自定义的 ModConfigs
-//        modContainer.registerConfig(ModConfig.Type.COMMON, ModConfigs.COMMON_SPEC, "useless_mod-common.toml");
-//        modContainer.registerConfig(ModConfig.Type.CLIENT, ModConfigs.CLIENT_SPEC, "useless_mod-client.toml");
-//        modContainer.registerConfig(ModConfig.Type.SERVER, ModConfigs.SERVER_SPEC, "useless_mod-server.toml");
+        modContainer.registerConfig(ModConfig.Type.COMMON, ConfigManager.SPEC, "useless_mod-common.toml");
+//        modContainer.registerConfig(ModConfig.Type.CLIENT, ConfigManager.CLIENT_SPEC, "useless_mod-client.toml");
+//        modContainer.registerConfig(ModConfig.Type.SERVER, ConfigManager.SERVER_SPEC, "useless_mod-server.toml");
     }
 
     // 便捷 ResourceLocation 工具
     public static ResourceLocation id(String path) {
-        return ResourceLocation.fromNamespaceAndPath(MODID, path);
+        return ResourceLocation.fromNamespaceAndPath(MOD_ID, path);
     }
 
     private void commonSetup(FMLCommonSetupEvent event) {

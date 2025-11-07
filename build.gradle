@@ -154,6 +154,8 @@ configurations {
 }
 
 dependencies {
+    implementation "curse.maven:BotanyPots-353928:6895762"
+
     // --- Added dependencies for target mods ---
     implementation "curse.maven:glodium-957920:5821676"
     implementation "org.appliedenergistics:appliedenergistics2:19.2.15"

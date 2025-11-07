@@ -3,16 +3,21 @@
   "package": "com.sorrowmist.useless.mixin",
   "compatibilityLevel": "JAVA_21",
   "mixins": [
+    "eae.PatternSlotTrackerMixin",
+    "eae.TileAssemblerMatrixPatternMixin",
     "mek.CachedRecipeMixin",
     "mek.DigitalMinerMixin",
     "mek.ElectricPumpMixin",
     "mek.FluidicPlenisherMixin",
     "mek.FormulaicAssemblicatorMixin",
     "mek.MekanismUtilsMixin",
+    "mek.TileComponentEjectorMixin",
+    "mek.TileEntityDigitalMinerMixin",
     "mek.UpgradeMixin",
     "mek.UpgradeUtilsMixin"
   ],
   "client": [
+    "eae.GuiAssemblerMatrixPatternInfoMixin"
   ],
   "injectors": {
     "defaultRequire": 1

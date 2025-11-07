@@ -3,10 +3,16 @@
   "package": "com.sorrowmist.useless.mixin",
   "compatibilityLevel": "JAVA_21",
   "mixins": [
-
+    "mek.CachedRecipeMixin",
+    "mek.DigitalMinerMixin",
+    "mek.ElectricPumpMixin",
+    "mek.FluidicPlenisherMixin",
+    "mek.FormulaicAssemblicatorMixin",
+    "mek.MekanismUtilsMixin",
+    "mek.UpgradeMixin",
+    "mek.UpgradeUtilsMixin"
   ],
   "client": [
-
   ],
   "injectors": {
     "defaultRequire": 1

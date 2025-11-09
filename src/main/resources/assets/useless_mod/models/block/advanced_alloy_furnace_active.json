@@ -1,0 +1,12 @@
+{
+  "parent": "block/cube",
+  "textures": {
+    "particle": "useless_mod:block/advanced_alloy_furnace_front_active",
+    "north": "useless_mod:block/advanced_alloy_furnace_front_active",
+    "south": "useless_mod:block/advanced_alloy_furnace_side",
+    "east": "useless_mod:block/advanced_alloy_furnace_side",
+    "west": "useless_mod:block/advanced_alloy_furnace_side",
+    "up": "useless_mod:block/advanced_alloy_furnace_top",
+    "down": "useless_mod:block/advanced_alloy_furnace_bottom"
+  }
+}

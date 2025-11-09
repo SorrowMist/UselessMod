@@ -1,0 +1,49 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    "ABC",
+    "DEF",
+    "IGH"
+  ],
+  "key": {
+    "A": {
+      "item": "useless_mod:useless_ingot_tier_5"
+    },
+    "B": {
+      "item": "useless_mod:useless_ingot_tier_4"
+    },
+    "C": {
+      "item": "useless_mod:useless_ingot_tier_3"
+    },
+    "D": {
+      "type": "forge:partial_nbt",
+      "item": "minecraft:enchanted_book",
+      "nbt": "{StoredEnchantments:[{id:\"minecraft:silk_touch\",lvl:1}]}"
+    },
+    "E": {
+      "item": "useless_mod:useless_ingot_tier_2"
+    },
+    "F": {
+      "type": "forge:partial_nbt",
+      "item": "minecraft:enchanted_book",
+      "nbt": "{StoredEnchantments:[{id:\"minecraft:fortune\",lvl:3}]}"
+    },
+    "G": {
+      "item": "useless_mod:useless_ingot_tier_1"
+    },
+    "H": {
+      "type": "forge:partial_nbt",
+      "item": "minecraft:potion",
+      "nbt": "{Potion:\"minecraft:night_vision\"}"
+    },
+    "I": {
+      "type": "forge:partial_nbt",
+      "item": "minecraft:potion",
+      "nbt": "{Potion:\"minecraft:regeneration\"}"
+    }
+  },
+  "result": {
+    "item": "useless_mod:endless_beaf_item",
+    "count": 1
+  }
+}

@@ -1,0 +1,30 @@
+{
+  "type": "useless_mod:advanced_alloy_furnace",
+  "ingredients": [
+    {
+      "ingredient": {
+        "tag":"mekanism:alloys/reinforced",
+        "count": 64
+      }
+    },
+    {
+      "ingredient": {
+        "item": "minecraft:obsidian",
+        "count": 8
+      }
+    },
+    {
+      "ingredient": {
+        "item": "minecraft:diamond",
+        "count": 4
+      }
+    }
+  ],
+  "results": [
+    {"item": "mekanism:alloy_atomic",
+      "count": 64
+    }
+  ],
+  "energy": 2000,
+  "process_time": 1
+}

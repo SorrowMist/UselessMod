@@ -1,14 +1,16 @@
-// AdvancedAlloyFurnaceBlock.java
+// AdvancedAlloyFurnaceBlock.java - 修改部分
 package com.sorrowmist.useless.blocks.advancedalloyfurnace;
 
 import com.sorrowmist.useless.UselessMod;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.MenuProvider;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.Item;
+import net.minecraft.world.item.context.BlockPlaceContext;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.EntityBlock;
@@ -17,6 +19,10 @@ import net.minecraft.world.level.block.entity.BlockEntityTicker;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.state.BlockBehaviour;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.state.StateDefinition;
+import net.minecraft.world.level.block.state.properties.BlockStateProperties;
+import net.minecraft.world.level.block.state.properties.BooleanProperty;
+import net.minecraft.world.level.block.state.properties.DirectionProperty;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraftforge.registries.DeferredRegister;
 import net.minecraftforge.registries.ForgeRegistries;
@@ -27,6 +33,10 @@ public class AdvancedAlloyFurnaceBlock extends Block implements EntityBlock {
     // 注册器
     public static final DeferredRegister<Block> BLOCKS = DeferredRegister.create(ForgeRegistries.BLOCKS, UselessMod.MOD_ID);
     public static final DeferredRegister<Item> ITEMS = DeferredRegister.create(ForgeRegistries.ITEMS, UselessMod.MOD_ID);
+
+    // 状态属性 - 添加ACTIVE属性
+    public static final DirectionProperty FACING = BlockStateProperties.HORIZONTAL_FACING;
+    public static final BooleanProperty ACTIVE = BooleanProperty.create("active");
 
     // 注册方块和物品
     public static final RegistryObject<Block> ADVANCED_ALLOY_FURNACE_BLOCK = BLOCKS.register("advanced_alloy_furnace_block",
@@ -40,7 +50,23 @@ public class AdvancedAlloyFurnaceBlock extends Block implements EntityBlock {
         super(BlockBehaviour.Properties.of()
                 .strength(5.0F, 32768.0F)
                 .requiresCorrectToolForDrops()
-                .lightLevel(state -> 7)); // 发光效果
+                .lightLevel(state -> state.getValue(ACTIVE) ? 15 : 7)); // 活动时更亮
+        // 注册默认状态
+        this.registerDefaultState(this.stateDefinition.any()
+                .setValue(FACING, Direction.NORTH)
+                .setValue(ACTIVE, false));
+    }
+
+    // 添加状态定义
+    @Override
+    protected void createBlockStateDefinition(StateDefinition.Builder<Block, BlockState> builder) {
+        builder.add(FACING, ACTIVE);
+    }
+
+    // 放置时设置朝向
+    @Override
+    public BlockState getStateForPlacement(BlockPlaceContext context) {
+        return this.defaultBlockState().setValue(FACING, context.getHorizontalDirection().getOpposite());
     }
 
     @Override

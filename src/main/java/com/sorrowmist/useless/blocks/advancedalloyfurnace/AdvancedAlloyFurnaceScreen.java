@@ -1,7 +1,11 @@
-// AdvancedAlloyFurnaceScreen.java
 package com.sorrowmist.useless.blocks.advancedalloyfurnace;
 
 import com.mojang.blaze3d.systems.RenderSystem;
+import com.sorrowmist.useless.UselessMod;
+import com.sorrowmist.useless.networking.ClearFluidPacket;
+import com.sorrowmist.useless.networking.FluidInteractionPacket;
+import net.minecraft.ChatFormatting;
+import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
@@ -18,47 +22,184 @@ import java.util.List;
 
 public class AdvancedAlloyFurnaceScreen extends AbstractContainerScreen<AdvancedAlloyFurnaceMenu> {
     private static final ResourceLocation TEXTURE =
-            ResourceLocation.fromNamespaceAndPath("useless_mod", "textures/gui/advanced_alloy_furnace.png");
+            ResourceLocation.fromNamespaceAndPath("useless_mod", "textures/gui/advanced_alloy_furnace_gui.png");
 
-    // 添加字段来跟踪上次渲染状态
-    private int lastEnergy = -1;
-    private int lastProgress = -1;
-    private boolean lastActive = false;
-    private FluidStack lastInputFluid = FluidStack.EMPTY;
-    private FluidStack lastOutputFluid = FluidStack.EMPTY;
+    private static final ResourceLocation COMPONENTS_TEXTURE =
+            ResourceLocation.fromNamespaceAndPath("useless_mod", "textures/gui/advanced_alloy_furnace_zu_jian.png");
 
-    // 修改：调整进度条的位置和尺寸，使其纵向居中
-    private static final int PROGRESS_ARROW_X = 26;
-    private static final int PROGRESS_ARROW_Y = 40; // 调整Y坐标使其在输入和输出槽中间
-    private static final int PROGRESS_ARROW_WIDTH = 108; // 与能量条同宽
-    private static final int PROGRESS_ARROW_HEIGHT = 5;  // 更细的高度
+    // 新增：提示图片纹理
+    private static final ResourceLocation TIPS_TEXTURE =
+            ResourceLocation.fromNamespaceAndPath("useless_mod", "textures/gui/advanced_alloy_furnace_tips.png");
+
+    // GUI显示尺寸（新贴图尺寸）
+    private static final int DISPLAY_WIDTH = 177;
+    private static final int DISPLAY_HEIGHT = 274;
+
+    // 贴图实际尺寸（与显示尺寸相同）
+    private static final int TEXTURE_WIDTH = 256;
+    private static final int TEXTURE_HEIGHT = 512;
+
+    // 进度条位置和尺寸 - 根据新贴图调整
+    private static final int PROGRESS_PART1_X = 25;
+    private static final int PROGRESS_PART1_Y = 31;
+    private static final int PROGRESS_PART1_WIDTH = 17;
+    private static final int PROGRESS_PART1_HEIGHT = 111;
+
+    private static final int PROGRESS_PART2_X = 80;
+    private static final int PROGRESS_PART2_Y = 116;
+    private static final int PROGRESS_PART2_WIDTH = 15;
+    private static final int PROGRESS_PART2_HEIGHT = 2;
+
+    private static final int PROGRESS_PART3_X = 132;
+    private static final int PROGRESS_PART3_Y = 31;
+    private static final int PROGRESS_PART3_WIDTH = 22;
+    private static final int PROGRESS_PART3_HEIGHT = 111;
+
+    // 能量条位置和尺寸 - 根据新贴图调整
+    private static final int ENERGY_BAR_X = 58;
+    private static final int ENERGY_BAR_Y = 4;
+    private static final int ENERGY_BAR_WIDTH = 66;
+    private static final int ENERGY_BAR_HEIGHT = 6;
+
+    // 能量条遮罩位置
+    private static final int ENERGY_MASK_X = 57;
+    private static final int ENERGY_MASK_Y = 4;
+    private static final int ENERGY_MASK_WIDTH = 68;
+    private static final int ENERGY_MASK_HEIGHT = 7;
+
+    // 流体槽位置和尺寸 - 根据新贴图调整
+    private static final int FLUID_INPUT_X = 10;
+    private static final int FLUID_OUTPUT_X = 154;
+    private static final int FLUID_Y = 143;
+    private static final int FLUID_WIDTH = 15;
+    private static final int FLUID_HEIGHT = 31;
+
+    // 新增：催化剂和模具槽位位置
+    private static final int CATALYST_SLOT_X = 60;
+    private static final int CATALYST_SLOT_Y = 150;
+    private static final int MOLD_SLOT_X = 100;
+    private static final int MOLD_SLOT_Y = 150;
+
+    // 流体遮罩位置
+    private static final int FLUID_MASK_INPUT_X = 8;
+    private static final int FLUID_MASK_INPUT_Y = 140;
+    private static final int FLUID_MASK_OUTPUT_X = 152;
+    private static final int FLUID_MASK_OUTPUT_Y = 140;
+    private static final int FLUID_MASK_WIDTH = 19;
+    private static final int FLUID_MASK_HEIGHT = 36;
+
+    // 清空按钮位置 - 重新定位
+    private static final int CLEAR_FLUID_BUTTON_X = 29;
+    private static final int CLEAR_FLUID_BUTTON_Y = 150;
+    private static final int CLEAR_FLUID_BUTTON_WIDTH = 17;
+    private static final int CLEAR_FLUID_BUTTON_HEIGHT = 17;
+
+    // 新增：催化剂和模具信息区域位置
+    private static final int CATALYST_MOLD_INFO_X = 138;
+    private static final int CATALYST_MOLD_INFO_Y = 154;
+    private static final int CATALYST_MOLD_INFO_WIDTH = 7;
+    private static final int CATALYST_MOLD_INFO_HEIGHT = 10;
+
+    // 标题位置 - 根据新要求添加
+    private static final int TITLE_LABEL_X = 66;
+    private static final int TITLE_LABEL_Y = 52;
+    private static final int INVENTORY_LABEL_X = 17;
+    private static final int INVENTORY_LABEL_Y = 179;
+
+    // 组件纹理坐标 - 根据新素材图调整
+    private static final int ENERGY_MASK_U = 162;
+    private static final int ENERGY_MASK_V = 0;
+    private static final int ENERGY_BAR_U = 163;
+    private static final int ENERGY_BAR_V = 12;
+
+    private static final int PROGRESS_PART1_U = 0;
+    private static final int PROGRESS_PART1_V = 0;
+    private static final int PROGRESS_PART2_MASK_U = 130;
+    private static final int PROGRESS_PART2_MASK_V = 39;
+    private static final int PROGRESS_PART2_BAR_U = 132;
+    private static final int PROGRESS_PART2_BAR_V = 46;
+    private static final int PROGRESS_PART3_U = 18;
+    private static final int PROGRESS_PART3_V = 0;
+
+    private static final int FLUID_MASK_INPUT_U = 44;
+    private static final int FLUID_MASK_INPUT_V = 39;
+    private static final int FLUID_MASK_OUTPUT_U = 64;
+    private static final int FLUID_MASK_OUTPUT_V = 39;
+
+    // 新增：催化剂和模具槽位纹理
+    private static final int CATALYST_SLOT_U = 63;
+    private static final int CATALYST_SLOT_V = 0;
+    private static final int MOLD_SLOT_U = 120;
+    private static final int MOLD_SLOT_V = 0;
+
+    // 新增：指示灯纹理坐标
+    private static final int BLUE_INDICATOR_U = 44;
+    private static final int BLUE_INDICATOR_V = 26;
+    private static final int YELLOW_INDICATOR_U = 49;
+    private static final int YELLOW_INDICATOR_V = 26;
+
+    private static final int CLEAR_BUTTON_DEFAULT_U = 88;
+    private static final int CLEAR_BUTTON_DEFAULT_V = 39;
+    private static final int CLEAR_BUTTON_PRESSED_U = 88;
+    private static final int CLEAR_BUTTON_PRESSED_V = 57;
+
+    // 清空按钮状态
+    private boolean clearButtonPressed = false;
 
     public AdvancedAlloyFurnaceScreen(AdvancedAlloyFurnaceMenu menu, Inventory playerInventory, Component title) {
         super(menu, playerInventory, title);
-        this.imageWidth = 256;
-        this.imageHeight = 256;
+        this.imageWidth = DISPLAY_WIDTH;
+        this.imageHeight = DISPLAY_HEIGHT;
+
+        // 设置标题位置
+        this.titleLabelX = TITLE_LABEL_X;
+        this.titleLabelY = TITLE_LABEL_Y;
+        this.inventoryLabelX = INVENTORY_LABEL_X;
+        this.inventoryLabelY = INVENTORY_LABEL_Y;
     }
 
     @Override
     protected void renderBg(GuiGraphics guiGraphics, float partialTick, int mouseX, int mouseY) {
         RenderSystem.setShaderColor(1.0F, 1.0F, 1.0F, 1.0F);
-        RenderSystem.setShaderTexture(0, TEXTURE);
         int x = (width - imageWidth) / 2;
         int y = (height - imageHeight) / 2;
-        guiGraphics.blit(TEXTURE, x, y, 0, 0, imageWidth, imageHeight);
 
-        // 渲染能量条和进度箭头
+        // 渲染GUI主贴图
+        guiGraphics.blit(TEXTURE, x, y, 0, 0, DISPLAY_WIDTH, DISPLAY_HEIGHT, TEXTURE_WIDTH, TEXTURE_HEIGHT);
+
+        // 渲染能量条
         renderEnergyBar(guiGraphics, x, y);
-        renderProgressArrow(guiGraphics, x, y);
 
-        // 修改：使用自定义渲染方法渲染所有槽位
-        renderAllSlotsCustom(guiGraphics, x, y);
+        // 渲染进度条
+        renderProgressBar(guiGraphics, x, y);
 
-        // 渲染流体槽（使用真实流体纹理）
+        // 渲染流体槽
         renderFluidTanks(guiGraphics, x, y);
+
+        // 渲染催化剂和模具槽位
+        renderCatalystAndMoldSlots(guiGraphics, x, y);
+
+        // 渲染指示灯
+        renderIndicators(guiGraphics, x, y);
+
+        // 渲染清空按钮
+        renderClearButton(guiGraphics, x, y);
+
+        // 新增：渲染提示图片
+        renderTipsImage(guiGraphics, x, y);
     }
 
-    // 修改：将能量条改为底部横向渲染
+    // 新增：渲染提示图片
+    private void renderTipsImage(GuiGraphics guiGraphics, int x, int y) {
+        // 在指定位置渲染提示图片
+        guiGraphics.blit(TIPS_TEXTURE,
+                x + CATALYST_MOLD_INFO_X, y + CATALYST_MOLD_INFO_Y,
+                0, 0,
+                CATALYST_MOLD_INFO_WIDTH, CATALYST_MOLD_INFO_HEIGHT,
+                CATALYST_MOLD_INFO_WIDTH, CATALYST_MOLD_INFO_HEIGHT);
+    }
+
+    // 渲染能量条
     private void renderEnergyBar(GuiGraphics guiGraphics, int x, int y) {
         if (menu == null) return;
 
@@ -66,216 +207,169 @@ public class AdvancedAlloyFurnaceScreen extends AbstractContainerScreen<Advanced
         int maxEnergy = menu.getMaxEnergy();
 
         if (maxEnergy > 0) {
-            // 新的能量条位置：在输出槽下方，横向渲染
-            int energyBarX = x + 26;  // 与输出槽左对齐
-            int energyBarY = y + 75;  // 在输出槽下方
-            int energyBarWidth = 108; // 与6个输出槽总宽度相同
-            int energyBarHeight = 8;  // 适当的高度
+            // 渲染能量填充条
+            float energyRatio = (float) energyStored / maxEnergy;
+            int energyWidth = (int) (ENERGY_BAR_WIDTH * energyRatio);
 
-            // 计算能量填充宽度
-            int energyWidth = (int) (energyBarWidth * ((float) energyStored / maxEnergy));
+            if (energyWidth > 0) {
+                // 从组件贴图渲染能量填充条
+                guiGraphics.blit(COMPONENTS_TEXTURE,
+                        x + ENERGY_BAR_X, y + ENERGY_BAR_Y,
+                        ENERGY_BAR_U, ENERGY_BAR_V,
+                        energyWidth, ENERGY_BAR_HEIGHT);
+            }
 
-            // 绘制能量填充（根据能量比例改变颜色）
-            int color = getEnergyBarColor((float) energyStored / maxEnergy);
-            guiGraphics.fill(energyBarX, energyBarY, energyBarX + energyWidth, energyBarY + energyBarHeight, color);
-
-            // 绘制能量条边框
-            guiGraphics.renderOutline(energyBarX, energyBarY, energyBarWidth, energyBarHeight, 0xFF000000);
+            // 渲染能量条遮罩
+            guiGraphics.blit(COMPONENTS_TEXTURE,
+                    x + ENERGY_MASK_X, y + ENERGY_MASK_Y,
+                    ENERGY_MASK_U, ENERGY_MASK_V,
+                    ENERGY_MASK_WIDTH, ENERGY_MASK_HEIGHT);
         }
     }
 
-    private int getEnergyBarColor(float energyRatio) {
-        if (energyRatio > 0.7f) return 0xFF00FF00; // 绿色
-        if (energyRatio > 0.3f) return 0xFFFFFF00; // 黄色
-        return 0xFFFF0000; // 红色
-    }
-
-    // 修改：渲染进度条，从右到左减少（兼容进度获取逻辑）
-    private void renderProgressArrow(GuiGraphics guiGraphics, int x, int y) {
+    // 渲染进度条
+    private void renderProgressBar(GuiGraphics guiGraphics, int x, int y) {
         if (menu == null) return;
 
         int progress = menu.getProgress();
         int maxProgress = menu.getMaxProgress();
 
-        if (maxProgress > 0) {
-            // 修改：假设进度获取是反的（初始为满，处理完为0），所以进度比例是 progress/maxProgress
-            float progressRatio = (float) progress / maxProgress;
+        if (maxProgress > 0 && progress > 0) {
+            float progressRatio = 1 - (float) progress / maxProgress;
 
-            // 根据进度比例计算颜色
-            int arrowColor = getProgressArrowColor(progressRatio);
+            // 计算总进度宽度（三部分总宽度）
+            int totalProgressWidth = PROGRESS_PART1_WIDTH + PROGRESS_PART2_WIDTH + PROGRESS_PART3_WIDTH;
+            int currentProgressWidth = (int) Math.ceil(totalProgressWidth * progressRatio);
 
-            // 绘制进度条背景（灰色）
-            guiGraphics.fill(x + PROGRESS_ARROW_X, y + PROGRESS_ARROW_Y,
-                    x + PROGRESS_ARROW_X + PROGRESS_ARROW_WIDTH,
-                    y + PROGRESS_ARROW_Y + PROGRESS_ARROW_HEIGHT,
-                    0xFF888888);
-
-            // 修改：根据进度从右到左绘制填充部分（初始为满，处理完为0）
-            int progressWidth = (int) (PROGRESS_ARROW_WIDTH * progressRatio);
-            if (progressWidth > 0) {
-                // 使用颜色填充来显示进度，从右到左减少
-                guiGraphics.fill(x + PROGRESS_ARROW_X + (PROGRESS_ARROW_WIDTH - progressWidth),
-                        y + PROGRESS_ARROW_Y,
-                        x + PROGRESS_ARROW_X + PROGRESS_ARROW_WIDTH,
-                        y + PROGRESS_ARROW_Y + PROGRESS_ARROW_HEIGHT,
-                        arrowColor);
+            // 渲染第一部分
+            if (currentProgressWidth > 0) {
+                int part1Width = Math.min(currentProgressWidth, PROGRESS_PART1_WIDTH);
+                guiGraphics.blit(COMPONENTS_TEXTURE,
+                        x + PROGRESS_PART1_X, y + PROGRESS_PART1_Y,
+                        PROGRESS_PART1_U, PROGRESS_PART1_V,
+                        part1Width, PROGRESS_PART1_HEIGHT);
+                currentProgressWidth -= part1Width;
             }
 
-            // 绘制进度条边框
-            guiGraphics.renderOutline(x + PROGRESS_ARROW_X, y + PROGRESS_ARROW_Y,
-                    PROGRESS_ARROW_WIDTH, PROGRESS_ARROW_HEIGHT,
-                    0xFF000000);
+            // 渲染第二部分（包括遮罩和进度条本体）
+            if (currentProgressWidth > 0) {
+                // 先渲染进度条本体
+                int part2Width = Math.min(currentProgressWidth, PROGRESS_PART2_WIDTH);
+                if (part2Width > 0) {
+                    guiGraphics.blit(COMPONENTS_TEXTURE,
+                            x + PROGRESS_PART2_X, y + PROGRESS_PART2_Y,
+                            PROGRESS_PART2_BAR_U, PROGRESS_PART2_BAR_V,
+                            part2Width, PROGRESS_PART2_HEIGHT);
+                }
 
-            // 更新缓存
-            lastProgress = progress;
-        }
-    }
+                // 始终渲染第二部分遮罩
+                guiGraphics.blit(COMPONENTS_TEXTURE,
+                        x + PROGRESS_PART2_X - 2, y + PROGRESS_PART2_Y - 2,
+                        PROGRESS_PART2_MASK_U, PROGRESS_PART2_MASK_V,
+                        19, 6);
 
-    // 修改：根据进度比例获取颜色（现在进度是反的，所以颜色逻辑也要反过来）
-    private int getProgressArrowColor(float progressRatio) {
-        if (progressRatio > 0.75f) return 0xFF0000FF; // 蓝色（刚开始）
-        if (progressRatio > 0.5f) return 0xFF00FF00;  // 绿色（进行中）
-        if (progressRatio > 0.25f) return 0xFFFFFF00; // 黄色（接近完成）
-        return 0xFFFF0000; // 红色（即将完成）
-    }
-
-    // 新增：自定义渲染所有槽位，支持大数量堆叠
-    private void renderAllSlotsCustom(GuiGraphics guiGraphics, int x, int y) {
-        if (menu == null || menu.getBlockEntity() == null) return;
-
-        // 渲染输入槽 (0-5)
-        for (int i = 0; i < 6; i++) {
-            ItemStack currentStack = menu.getBlockEntity().getItemInSlot(i);
-            int slotX = x + 26 + i * 18;
-            int slotY = y + 17;
-
-            // 绘制槽位背景
-            guiGraphics.blit(TEXTURE, slotX, slotY, 26 + i * 18, 17, 16, 16);
-
-            // 绘制物品
-            renderItemStackCustom(guiGraphics, currentStack, slotX + 1, slotY + 1);
-        }
-
-        // 渲染输出槽 (6-11)
-        for (int i = 6; i < 12; i++) {
-            ItemStack currentStack = menu.getBlockEntity().getItemInSlot(i);
-            int slotX = x + 26 + (i - 6) * 18;
-            int slotY = y + 53;
-
-            // 绘制槽位背景
-            guiGraphics.blit(TEXTURE, slotX, slotY, 26 + (i - 6) * 18, 53, 16, 16);
-
-            // 绘制物品
-            renderItemStackCustom(guiGraphics, currentStack, slotX + 1, slotY + 1);
-        }
-    }
-
-    // 新增：自定义物品堆叠渲染，支持大数量
-    private void renderItemStackCustom(GuiGraphics guiGraphics, ItemStack stack, int x, int y) {
-        if (!stack.isEmpty()) {
-            // 渲染物品图标
-            guiGraphics.renderFakeItem(stack, x, y);
-
-            // 渲染数量文本（使用自定义格式）
-            if (stack.getCount() > 1) {
-                String countText = getCountText(stack.getCount());
-
-                // 保存当前颜色状态
-                guiGraphics.pose().pushPose();
-
-                // 根据数量大小调整文本缩放
-                float scale = getTextScale(stack.getCount());
-                guiGraphics.pose().scale(scale, scale, 1.0F);
-
-                // 计算缩放后的位置
-                int scaledX = (int) (x / scale);
-                int scaledY = (int) (y / scale);
-
-                // 渲染数量文本
-                guiGraphics.drawString(this.font, countText,
-                        scaledX + 19 - (int)(this.font.width(countText) * scale),
-                        scaledY + 9, 0xFFFFFF, true);
-
-                // 恢复颜色状态
-                guiGraphics.pose().popPose();
+                currentProgressWidth -= PROGRESS_PART2_WIDTH;
             }
 
-            // 渲染耐久条等其他装饰（如果需要）
-            guiGraphics.renderItemDecorations(this.font, stack, x, y, "");
-        }
-    }
-
-    // 新增：根据数量获取合适的文本缩放比例
-    private float getTextScale(int count) {
-        if (count < 1000) return 0.8f;
-        if (count < 10000) return 0.7f;
-        if (count < 100000) return 0.6f;
-        return 0.5f;
-    }
-
-    // 新增：处理大数量的文本显示
-    private String getCountText(int count) {
-        if (count < 1000) {
-            return String.valueOf(count);
-        } else if (count < 1000000) {
-            // 使用k表示千
-            int thousands = count / 1000;
-            int remainder = (count % 1000) / 100;
-            if (remainder > 0) {
-                return String.format("%d.%dk", thousands, remainder);
-            } else {
-                return String.format("%dk", thousands);
+            // 渲染第三部分
+            if (currentProgressWidth > 0) {
+                int part3Width = Math.min(currentProgressWidth, PROGRESS_PART3_WIDTH);
+                guiGraphics.blit(COMPONENTS_TEXTURE,
+                        x + PROGRESS_PART3_X, y + PROGRESS_PART3_Y,
+                        PROGRESS_PART3_U, PROGRESS_PART3_V,
+                        part3Width, PROGRESS_PART3_HEIGHT);
             }
         } else {
-            // 使用M表示百万
-            int millions = count / 1000000;
-            int remainder = (count % 1000000) / 100000;
-            if (remainder > 0) {
-                return String.format("%d.%dM", millions, remainder);
-            } else {
-                return String.format("%dM", millions);
-            }
+            // 即使没有进度，也渲染第二部分遮罩
+            guiGraphics.blit(COMPONENTS_TEXTURE,
+                    x + PROGRESS_PART2_X - 2, y + PROGRESS_PART2_Y - 2,
+                    PROGRESS_PART2_MASK_U, PROGRESS_PART2_MASK_V,
+                    19, 6);
         }
     }
 
-    // 修改：使用真实流体纹理渲染流体槽
+    // 渲染流体槽
     private void renderFluidTanks(GuiGraphics guiGraphics, int x, int y) {
         if (menu == null || menu.getBlockEntity() == null) return;
 
-        // 获取流体数据
         FluidStack inputFluid = menu.getBlockEntity().getInputFluidTank().getFluid();
         FluidStack outputFluid = menu.getBlockEntity().getOutputFluidTank().getFluid();
 
-        // 输入流体槽位置：x=8, y=17, 宽度=16, 高度=40
-        renderFluidTankWithTexture(guiGraphics, x + 8, y + 17, 16, 40, inputFluid, menu.getBlockEntity().getInputFluidTank().getCapacity());
+        // 渲染输入流体
+        renderFluidTank(guiGraphics, x + FLUID_INPUT_X, y + FLUID_Y, inputFluid,
+                menu.getBlockEntity().getInputFluidTank().getCapacity());
 
-        // 输出流体槽位置：x=152, y=17, 宽度=16, 高度=40
-        renderFluidTankWithTexture(guiGraphics, x + 152, y + 17, 16, 40, outputFluid, menu.getBlockEntity().getOutputFluidTank().getCapacity());
+        // 渲染输出流体
+        renderFluidTank(guiGraphics, x + FLUID_OUTPUT_X, y + FLUID_Y, outputFluid,
+                menu.getBlockEntity().getOutputFluidTank().getCapacity());
 
-        // 更新缓存
-        lastInputFluid = inputFluid.copy();
-        lastOutputFluid = outputFluid.copy();
+        // 渲染流体遮罩
+        guiGraphics.blit(COMPONENTS_TEXTURE,
+                x + FLUID_MASK_INPUT_X, y + FLUID_MASK_INPUT_Y,
+                FLUID_MASK_INPUT_U, FLUID_MASK_INPUT_V,
+                FLUID_MASK_WIDTH, FLUID_MASK_HEIGHT);
+
+        guiGraphics.blit(COMPONENTS_TEXTURE,
+                x + FLUID_MASK_OUTPUT_X, y + FLUID_MASK_OUTPUT_Y,
+                FLUID_MASK_OUTPUT_U, FLUID_MASK_OUTPUT_V,
+                FLUID_MASK_WIDTH, FLUID_MASK_HEIGHT);
     }
 
-    // 新增：使用真实流体纹理渲染流体槽
-    private void renderFluidTankWithTexture(GuiGraphics guiGraphics, int x, int y, int width, int height, FluidStack fluid, int capacity) {
-        // 绘制流体槽背景
-        guiGraphics.blit(TEXTURE, x, y, 8, 17, width, height);
+    // 新增：渲染催化剂和模具槽位
+    private void renderCatalystAndMoldSlots(GuiGraphics guiGraphics, int x, int y) {
+        // 渲染催化剂槽位
+        guiGraphics.blit(COMPONENTS_TEXTURE,
+                x + CATALYST_SLOT_X, y + CATALYST_SLOT_Y,
+                CATALYST_SLOT_U, CATALYST_SLOT_V,
+                18, 18);
 
-        // 如果有流体，绘制流体纹理
+        // 渲染模具槽位
+        guiGraphics.blit(COMPONENTS_TEXTURE,
+                x + MOLD_SLOT_X, y + MOLD_SLOT_Y,
+                MOLD_SLOT_U, MOLD_SLOT_V,
+                18, 18);
+    }
+
+    // 新增：渲染指示灯
+    private void renderIndicators(GuiGraphics guiGraphics, int x, int y) {
+        if (menu == null) return;
+
+        // 渲染催化剂指示灯
+        int catalystIndicatorX = x + menu.getCatalystSlotX() + (18 - menu.getIndicatorSize()) / 2;
+        int catalystIndicatorY = y + menu.getCatalystSlotY() + menu.getIndicatorYOffset();
+
+        int catalystIndicatorU = menu.isCatalystRequired() ? YELLOW_INDICATOR_U : BLUE_INDICATOR_U;
+        int catalystIndicatorV = menu.isCatalystRequired() ? YELLOW_INDICATOR_V : BLUE_INDICATOR_V;
+
+        guiGraphics.blit(COMPONENTS_TEXTURE,
+                catalystIndicatorX, catalystIndicatorY,
+                catalystIndicatorU, catalystIndicatorV,
+                menu.getIndicatorSize(), menu.getIndicatorSize());
+
+        // 渲染模具指示灯
+        int moldIndicatorX = x + menu.getMoldSlotX() + (18 - menu.getIndicatorSize()) / 2;
+        int moldIndicatorY = y + menu.getMoldSlotY() + menu.getIndicatorYOffset();
+
+        int moldIndicatorU = menu.isMoldRequired() ? YELLOW_INDICATOR_U : BLUE_INDICATOR_U;
+        int moldIndicatorV = menu.isMoldRequired() ? YELLOW_INDICATOR_V : BLUE_INDICATOR_V;
+
+        guiGraphics.blit(COMPONENTS_TEXTURE,
+                moldIndicatorX, moldIndicatorY,
+                moldIndicatorU, moldIndicatorV,
+                menu.getIndicatorSize(), menu.getIndicatorSize());
+    }
+
+    private void renderFluidTank(GuiGraphics guiGraphics, int x, int y, FluidStack fluid, int capacity) {
         if (!fluid.isEmpty() && capacity > 0) {
-            int fluidHeight = (int) (height * ((float) fluid.getAmount() / capacity));
+            int fluidHeight = (int) (FLUID_HEIGHT * ((float) fluid.getAmount() / capacity));
             if (fluidHeight > 0) {
-                // 获取流体纹理和颜色
                 IClientFluidTypeExtensions fluidAttributes = IClientFluidTypeExtensions.of(fluid.getFluid());
                 ResourceLocation fluidStillTexture = fluidAttributes.getStillTexture(fluid);
                 int fluidColor = fluidAttributes.getTintColor(fluid);
 
                 if (fluidStillTexture != null) {
-                    // 绑定流体纹理
                     TextureAtlasSprite fluidSprite = minecraft.getTextureAtlas(InventoryMenu.BLOCK_ATLAS).apply(fluidStillTexture);
 
-                    // 设置渲染颜色（使用流体的颜色）
                     float r = ((fluidColor >> 16) & 0xFF) / 255.0F;
                     float g = ((fluidColor >> 8) & 0xFF) / 255.0F;
                     float b = (fluidColor & 0xFF) / 255.0F;
@@ -284,40 +378,76 @@ public class AdvancedAlloyFurnaceScreen extends AbstractContainerScreen<Advanced
                     RenderSystem.setShaderColor(r, g, b, a);
                     RenderSystem.setShaderTexture(0, InventoryMenu.BLOCK_ATLAS);
 
-                    // 计算流体在槽内的位置（从底部开始）
-                    int fluidY = y + height - fluidHeight;
+                    int fluidY = y + FLUID_HEIGHT - fluidHeight;
 
-                    // 绘制流体纹理（平铺）
-                    int textureSize = 16; // 流体纹理通常是16x16
-                    int repeatX = (int) Math.ceil((double) width / textureSize);
-                    int repeatY = (int) Math.ceil((double) fluidHeight / textureSize);
+                    // 修复：使用正确的流体渲染方法
+                    for (int i = 0; i < Math.ceil((double) FLUID_WIDTH / 16); i++) {
+                        for (int j = 0; j < Math.ceil((double) fluidHeight / 16); j++) {
+                            int texWidth = Math.min(16, FLUID_WIDTH - i * 16);
+                            int texHeight = Math.min(16, fluidHeight - j * 16);
 
-                    for (int i = 0; i < repeatX; i++) {
-                        for (int j = 0; j < repeatY; j++) {
-                            int texX = x + i * textureSize;
-                            int texY = fluidY + j * textureSize;
-                            int texWidth = Math.min(textureSize, width - i * textureSize);
-                            int texHeight = Math.min(textureSize, fluidHeight - j * textureSize);
-
-                            guiGraphics.blit(texX, texY, 0, texWidth, texHeight, fluidSprite);
+                            if (texWidth > 0 && texHeight > 0) {
+                                guiGraphics.blit(
+                                        x + i * 16,
+                                        fluidY + j * 16,
+                                        0,
+                                        texWidth,
+                                        texHeight,
+                                        fluidSprite
+                                );
+                            }
                         }
                     }
 
-                    // 重置颜色
                     RenderSystem.setShaderColor(1.0F, 1.0F, 1.0F, 1.0F);
                 }
             }
         }
+    }
 
-        // 绘制流体槽边框
-        guiGraphics.renderOutline(x, y, width, height, 0xFF000000);
+    // 渲染清空按钮
+    private void renderClearButton(GuiGraphics guiGraphics, int x, int y) {
+        int buttonX = x + CLEAR_FLUID_BUTTON_X;
+        int buttonY = y + CLEAR_FLUID_BUTTON_Y;
+
+        // 根据按钮状态选择纹理
+        int u = clearButtonPressed ? CLEAR_BUTTON_PRESSED_U : CLEAR_BUTTON_DEFAULT_U;
+        int v = clearButtonPressed ? CLEAR_BUTTON_PRESSED_V : CLEAR_BUTTON_DEFAULT_V;
+
+        guiGraphics.blit(COMPONENTS_TEXTURE, buttonX, buttonY, u, v,
+                CLEAR_FLUID_BUTTON_WIDTH, CLEAR_FLUID_BUTTON_HEIGHT);
     }
 
     @Override
     protected void renderLabels(GuiGraphics guiGraphics, int mouseX, int mouseY) {
-        // 只保留标题和玩家物品栏标题，移除所有状态文本
-        guiGraphics.drawString(this.font, this.title, this.titleLabelX, this.titleLabelY, 0x404040, false);
-        guiGraphics.drawString(this.font, this.playerInventoryTitle, this.inventoryLabelX, this.inventoryLabelY, 0x404040, false);
+        // 机器名字渲染为彩虹渐变
+        renderRainbowText(guiGraphics, this.font, this.title, this.titleLabelX, this.titleLabelY);
+
+        // 物品栏文字渲染为金色并缩小为0.9倍
+        guiGraphics.pose().pushPose();
+        guiGraphics.pose().scale(0.8f, 0.8f, 1.0f);
+        guiGraphics.drawString(this.font, this.playerInventoryTitle,
+                (int)(this.inventoryLabelX / 0.8f),
+                (int)(this.inventoryLabelY / 0.8f+1),
+                0xFFD700, false);
+        guiGraphics.pose().popPose();
+    }
+
+    private void renderRainbowText(GuiGraphics guiGraphics, Font font, Component text, int x, int y) {
+        String string = text.getString();
+        int currentX = x;
+
+        for (int i = 0; i < string.length(); i++) {
+            char c = string.charAt(i);
+            int color = getRainbowColor(i, string.length());
+            guiGraphics.drawString(font, String.valueOf(c), currentX, y, color, false);
+            currentX += font.width(String.valueOf(c));
+        }
+    }
+
+    private int getRainbowColor(int index, int total) {
+        float hue = (float) index / total;
+        return java.awt.Color.HSBtoRGB(hue, 1.0f, 1.0f) | 0xFF000000;
     }
 
     @Override
@@ -330,106 +460,191 @@ public class AdvancedAlloyFurnaceScreen extends AbstractContainerScreen<Advanced
             int x = (width - imageWidth) / 2;
             int y = (height - imageHeight) / 2;
 
-            // 新增：进度条悬停提示（汉化）
-            if (isMouseOverArea(mouseX, mouseY, x + PROGRESS_ARROW_X, y + PROGRESS_ARROW_Y,
-                    PROGRESS_ARROW_WIDTH, PROGRESS_ARROW_HEIGHT)) {
+            // 能量条悬停提示
+            if (isMouseOverArea(mouseX, mouseY, x + ENERGY_BAR_X, y + ENERGY_BAR_Y,
+                    ENERGY_BAR_WIDTH, ENERGY_BAR_HEIGHT)) {
+                List<Component> tooltip = new ArrayList<>();
+                tooltip.add(Component.literal("能量: " + menu.getEnergy() + " / " + menu.getMaxEnergy() + " FE"));
+                tooltip.add(Component.literal("消耗: " + menu.getProcessTick() + " FE/t"));
+                guiGraphics.renderComponentTooltip(this.font, tooltip, mouseX, mouseY);
+            }
+
+            // 进度条悬停提示
+            if (isMouseOverProgressArea(mouseX, mouseY, x, y)) {
                 List<Component> tooltip = new ArrayList<>();
                 int progress = menu.getProgress();
                 int maxProgress = menu.getMaxProgress();
 
                 if (maxProgress > 0) {
-                    // 修改：计算剩余进度（因为进度获取是反的）
-                    int remainingProgress = progress;
-                    int completedProgress = maxProgress - progress;
-                    float progressPercent = (float) completedProgress / maxProgress * 100;
-
-                    tooltip.add(Component.literal("进度: " + completedProgress + "/" + maxProgress + " (" + String.format("%.1f", progressPercent) + "%)"));
+                    float progressPercent = (float) progress / maxProgress * 100;
+                    tooltip.add(Component.literal("进度: " + progress + "/" + maxProgress + " (" + String.format("%.1f", progressPercent) + "%)"));
                     tooltip.add(Component.literal("状态: " + (menu.isActive() ? "工作中" : "空闲")));
-
-                    // 根据进度显示不同的状态信息
-                    if (completedProgress > 0 && completedProgress < maxProgress) {
-                        tooltip.add(Component.literal("正在处理中..."));
-                    } else if (completedProgress >= maxProgress) {
-                        tooltip.add(Component.literal("准备输出"));
-                    }
                 } else {
                     tooltip.add(Component.literal("没有活动进程"));
                 }
-
                 guiGraphics.renderComponentTooltip(this.font, tooltip, mouseX, mouseY);
             }
 
-            // 新的能量条悬停区域（底部横向）- 汉化
-            if (isMouseOverArea(mouseX, mouseY, x + 26, y + 75, 108, 8)) {
+            // 清空按钮悬停提示
+            if (isMouseOverArea(mouseX, mouseY,
+                    x + CLEAR_FLUID_BUTTON_X, y + CLEAR_FLUID_BUTTON_Y,
+                    CLEAR_FLUID_BUTTON_WIDTH, CLEAR_FLUID_BUTTON_HEIGHT)) {
                 List<Component> tooltip = new ArrayList<>();
-                tooltip.add(Component.literal("能量: " + menu.getEnergy() + " / " + menu.getMaxEnergy() + " FE"));
-                tooltip.add(Component.literal("消耗: " +
-                        (menu.getBlockEntity() != null ? menu.getBlockEntity().getProcessTick() : 0) + " FE/t"));
+                tooltip.add(Component.literal("清空输入流体"));
+                tooltip.add(Component.literal("点击清空输入流体槽"));
                 guiGraphics.renderComponentTooltip(this.font, tooltip, mouseX, mouseY);
             }
 
-            // 输入流体槽悬停提示 - 汉化
-            if (isMouseOverArea(mouseX, mouseY, x + 8, y + 17, 16, 40)) {
-                if (menu.getBlockEntity() != null) {
-                    FluidStack inputFluid = menu.getBlockEntity().getInputFluidTank().getFluid();
-                    if (!inputFluid.isEmpty()) {
-                        List<Component> tooltip = new ArrayList<>();
-                        tooltip.add(Component.literal("输入流体: " + inputFluid.getDisplayName().getString()));
-                        tooltip.add(Component.literal("数量: " + inputFluid.getAmount() + " / " +
-                                menu.getBlockEntity().getInputFluidTank().getCapacity() + " mB"));
-                        tooltip.add(Component.literal("温度: " + inputFluid.getFluid().getFluidType().getTemperature() + " K"));
-                        guiGraphics.renderComponentTooltip(this.font, tooltip, mouseX, mouseY);
-                    }
+            // 新增：催化剂和模具信息区域悬停提示
+            if (isMouseOverArea(mouseX, mouseY,
+                    x + CATALYST_MOLD_INFO_X, y + CATALYST_MOLD_INFO_Y,
+                    CATALYST_MOLD_INFO_WIDTH, CATALYST_MOLD_INFO_HEIGHT)) {
+                List<Component> tooltip = new ArrayList<>();
+
+                // 催化剂信息
+                if (menu.isCatalystRequired()) {
+                    tooltip.add(Component.literal("催化剂: 需要").withStyle(ChatFormatting.YELLOW));
+                } else {
+                    tooltip.add(Component.literal("催化剂: 不需要").withStyle(ChatFormatting.BLUE));
                 }
+
+// 修改后
+                tooltip.add(Component.literal("催化剂在合成中")
+                        .append(Component.literal("会").withStyle(style -> style.withColor(0xFFD700)))
+                        .append(Component.literal("被消耗")).withStyle(ChatFormatting.GRAY));
+
+                // 模具信息
+                if (menu.isMoldRequired()) {
+                    tooltip.add(Component.literal("模具: 需要").withStyle(ChatFormatting.YELLOW));
+                } else {
+                    tooltip.add(Component.literal("模具: 不需要").withStyle(ChatFormatting.BLUE));
+                }
+
+                tooltip.add(Component.literal("模具在合成中")
+                        .append(Component.literal("不会").withStyle(style -> style.withColor(0xFFD700)))
+                        .append(Component.literal("被消耗")).withStyle(ChatFormatting.GRAY));
+
+                guiGraphics.renderComponentTooltip(this.font, tooltip, mouseX, mouseY);
             }
 
-            // 输出流体槽悬停提示 - 汉化
-            if (isMouseOverArea(mouseX, mouseY, x + 152, y + 17, 16, 40)) {
-                if (menu.getBlockEntity() != null) {
-                    FluidStack outputFluid = menu.getBlockEntity().getOutputFluidTank().getFluid();
-                    if (!outputFluid.isEmpty()) {
-                        List<Component> tooltip = new ArrayList<>();
-                        tooltip.add(Component.literal("输出流体: " + outputFluid.getDisplayName().getString()));
-                        tooltip.add(Component.literal("数量: " + outputFluid.getAmount() + " / " +
-                                menu.getBlockEntity().getOutputFluidTank().getCapacity() + " mB"));
-                        tooltip.add(Component.literal("温度: " + outputFluid.getFluid().getFluidType().getTemperature() + " K"));
-                        guiGraphics.renderComponentTooltip(this.font, tooltip, mouseX, mouseY);
-                    }
-                }
-            }
-
-            // 新增：物品槽悬停提示，显示实际数量
-            renderItemStackTooltips(guiGraphics, mouseX, mouseY, x, y);
+            // 流体槽悬停提示
+            renderFluidInteractions(guiGraphics, mouseX, mouseY, x, y);
         }
     }
 
-    // 新增：物品槽悬停提示
-    private void renderItemStackTooltips(GuiGraphics guiGraphics, int mouseX, int mouseY, int x, int y) {
+    private boolean isMouseOverProgressArea(int mouseX, int mouseY, int x, int y) {
+        return isMouseOverArea(mouseX, mouseY, x + PROGRESS_PART1_X, y + PROGRESS_PART1_Y, PROGRESS_PART1_WIDTH, PROGRESS_PART1_HEIGHT) ||
+                isMouseOverArea(mouseX, mouseY, x + PROGRESS_PART2_X, y + PROGRESS_PART2_Y, PROGRESS_PART2_WIDTH, PROGRESS_PART2_HEIGHT) ||
+                isMouseOverArea(mouseX, mouseY, x + PROGRESS_PART3_X, y + PROGRESS_PART3_Y, PROGRESS_PART3_WIDTH, PROGRESS_PART3_HEIGHT);
+    }
+
+    private void renderFluidInteractions(GuiGraphics guiGraphics, int mouseX, int mouseY, int x, int y) {
         if (menu == null || menu.getBlockEntity() == null) return;
 
-        // 检查输入槽
-        for (int i = 0; i < 6; i++) {
-            ItemStack stack = menu.getBlockEntity().getItemInSlot(i);
-            if (!stack.isEmpty() && isMouseOverArea(mouseX, mouseY, x + 26 + i * 18, y + 17, 16, 16)) {
-                List<Component> tooltip = new ArrayList<>();
-                tooltip.add(stack.getHoverName());
-                tooltip.add(Component.literal("数量: " + stack.getCount()));
-                guiGraphics.renderComponentTooltip(this.font, tooltip, mouseX, mouseY);
-                return;
+        // 输入流体槽交互区域
+        if (isMouseOverArea(mouseX, mouseY, x + FLUID_INPUT_X, y + FLUID_Y, FLUID_WIDTH, FLUID_HEIGHT)) {
+            FluidStack inputFluid = menu.getBlockEntity().getInputFluidTank().getFluid();
+            List<Component> tooltip = new ArrayList<>();
+
+            if (!inputFluid.isEmpty()) {
+                tooltip.add(Component.literal("输入流体: " + inputFluid.getDisplayName().getString()));
+                tooltip.add(Component.literal("数量: " + inputFluid.getAmount() + " / " +
+                        menu.getBlockEntity().getInputFluidTank().getCapacity() + " mB"));
+                tooltip.add(Component.literal("右键: 倒入流体"));
+            } else {
+                tooltip.add(Component.literal("输入流体槽"));
+                tooltip.add(Component.literal("右键倒入流体"));
+            }
+
+            guiGraphics.renderComponentTooltip(this.font, tooltip, mouseX, mouseY);
+        }
+
+        // 输出流体槽交互区域
+        if (isMouseOverArea(mouseX, mouseY, x + FLUID_OUTPUT_X, y + FLUID_Y, FLUID_WIDTH, FLUID_HEIGHT)) {
+            FluidStack outputFluid = menu.getBlockEntity().getOutputFluidTank().getFluid();
+            List<Component> tooltip = new ArrayList<>();
+
+            if (!outputFluid.isEmpty()) {
+                tooltip.add(Component.literal("输出流体: " + outputFluid.getDisplayName().getString()));
+                tooltip.add(Component.literal("数量: " + outputFluid.getAmount() + " / " +
+                        menu.getBlockEntity().getOutputFluidTank().getCapacity() + " mB"));
+                tooltip.add(Component.literal("左键: 抽取流体"));
+            } else {
+                tooltip.add(Component.literal("输出流体槽"));
+                tooltip.add(Component.literal("左键抽取流体"));
+            }
+
+            guiGraphics.renderComponentTooltip(this.font, tooltip, mouseX, mouseY);
+        }
+    }
+
+    @Override
+    public boolean mouseClicked(double mouseX, double mouseY, int button) {
+        if (menu != null && menu.getBlockEntity() != null) {
+            int x = (width - imageWidth) / 2;
+            int y = (height - imageHeight) / 2;
+
+            // 检查是否点击了清空按钮
+            if (isMouseOverArea((int)mouseX, (int)mouseY,
+                    x + CLEAR_FLUID_BUTTON_X, y + CLEAR_FLUID_BUTTON_Y,
+                    CLEAR_FLUID_BUTTON_WIDTH, CLEAR_FLUID_BUTTON_HEIGHT)) {
+                clearButtonPressed = true;
+                handleClearFluidButton();
+                return true;
+            }
+
+            // 检查是否点击了输入流体槽
+            if (isMouseOverArea((int)mouseX, (int)mouseY, x + FLUID_INPUT_X, y + FLUID_Y, FLUID_WIDTH, FLUID_HEIGHT)) {
+                handleFluidInteraction(true, button);
+                return true;
+            }
+
+            // 检查是否点击了输出流体槽
+            if (isMouseOverArea((int)mouseX, (int)mouseY, x + FLUID_OUTPUT_X, y + FLUID_Y, FLUID_WIDTH, FLUID_HEIGHT)) {
+                handleFluidInteraction(false, button);
+                return true;
             }
         }
 
-        // 检查输出槽
-        for (int i = 6; i < 12; i++) {
-            ItemStack stack = menu.getBlockEntity().getItemInSlot(i);
-            if (!stack.isEmpty() && isMouseOverArea(mouseX, mouseY, x + 26 + (i - 6) * 18, y + 53, 16, 16)) {
-                List<Component> tooltip = new ArrayList<>();
-                tooltip.add(stack.getHoverName());
-                tooltip.add(Component.literal("数量: " + stack.getCount()));
-                guiGraphics.renderComponentTooltip(this.font, tooltip, mouseX, mouseY);
-                return;
-            }
+        return super.mouseClicked(mouseX, mouseY, button);
+    }
+
+    @Override
+    public boolean mouseReleased(double mouseX, double mouseY, int button) {
+        if (clearButtonPressed) {
+            clearButtonPressed = false;
+            return true;
         }
+        return super.mouseReleased(mouseX, mouseY, button);
+    }
+
+    private void handleClearFluidButton() {
+        if (minecraft == null || minecraft.player == null) return;
+
+        UselessMod.NETWORK.sendToServer(new ClearFluidPacket(
+                menu.getBlockEntity().getBlockPos(),
+                true
+        ));
+    }
+
+    private void handleFluidInteraction(boolean isInputTank, int button) {
+        if (minecraft == null || minecraft.player == null) return;
+
+        ItemStack carried = menu.getCarried();
+        if (carried.isEmpty()) return;
+
+        boolean isFill = (button == 1);
+
+        if (!isInputTank && isFill) {
+            return;
+        }
+
+        UselessMod.NETWORK.sendToServer(new FluidInteractionPacket(
+                menu.getBlockEntity().getBlockPos(),
+                isInputTank,
+                isFill,
+                button
+        ));
     }
 
     private boolean isMouseOverArea(int mouseX, int mouseY, int x, int y, int width, int height) {

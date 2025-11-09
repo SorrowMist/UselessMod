@@ -19,36 +19,54 @@ public class AdvancedAlloyFurnaceRecipeManager {
 
     private AdvancedAlloyFurnaceRecipeManager() {}
 
+    // 新增：优先查找使用催化剂或模具的配方
     @Nullable
-    public AdvancedAlloyFurnaceRecipe getRecipe(Level level, List<ItemStack> inputItems, FluidStack inputFluid) {
+    public AdvancedAlloyFurnaceRecipe getRecipeWithCatalystOrMold(Level level, List<ItemStack> inputItems,
+                                                                  FluidStack inputFluid, ItemStack catalyst,
+                                                                  ItemStack mold) {
         if (level == null) return null;
 
-        String cacheKey = generateCacheKey(inputItems, inputFluid);
-
-        // 检查缓存
-        if (recipeCache.containsKey(cacheKey)) {
-            for (AdvancedAlloyFurnaceRecipe recipe : recipeCache.get(cacheKey)) {
-                if (recipe.matches(inputItems, inputFluid)) {
-                    return recipe;
-                }
-            }
-        }
-
-        // 从原版配方系统查找
         RecipeManager recipeManager = level.getRecipeManager();
         Collection<AdvancedAlloyFurnaceRecipe> allRecipes = recipeManager.getAllRecipesFor(
                 com.sorrowmist.useless.recipes.ModRecipeTypes.ADVANCED_ALLOY_FURNACE_TYPE.get()
         );
 
+        // 优先查找需要催化剂或模具的配方
+        List<AdvancedAlloyFurnaceRecipe> prioritizedRecipes = new ArrayList<>();
+        List<AdvancedAlloyFurnaceRecipe> normalRecipes = new ArrayList<>();
+
         for (AdvancedAlloyFurnaceRecipe recipe : allRecipes) {
+            if (recipe.requiresCatalyst() || recipe.requiresMold()) {
+                prioritizedRecipes.add(recipe);
+            } else {
+                normalRecipes.add(recipe);
+            }
+        }
+
+        // 先检查需要催化剂或模具的配方
+        for (AdvancedAlloyFurnaceRecipe recipe : prioritizedRecipes) {
+            if (recipe.matches(inputItems, inputFluid, catalyst, mold)) {
+                com.sorrowmist.useless.UselessMod.LOGGER.debug("Found prioritized recipe with catalyst/mold: {}", recipe.getId());
+                return recipe;
+            }
+        }
+
+        // 如果没有找到优先配方，检查普通配方
+        for (AdvancedAlloyFurnaceRecipe recipe : normalRecipes) {
             if (recipe.matches(inputItems, inputFluid)) {
-                // 添加到缓存
-                recipeCache.computeIfAbsent(cacheKey, k -> new ArrayList<>()).add(recipe);
+                com.sorrowmist.useless.UselessMod.LOGGER.debug("Found normal recipe: {}", recipe.getId());
                 return recipe;
             }
         }
 
         return null;
+    }
+
+    // 修改原有的getRecipe方法，使用新的优先级逻辑
+    @Nullable
+    public AdvancedAlloyFurnaceRecipe getRecipe(Level level, List<ItemStack> inputItems, FluidStack inputFluid) {
+        // 使用空的催化剂和模具槽位来调用新方法
+        return getRecipeWithCatalystOrMold(level, inputItems, inputFluid, ItemStack.EMPTY, ItemStack.EMPTY);
     }
 
     private String generateCacheKey(List<ItemStack> inputItems, FluidStack inputFluid) {

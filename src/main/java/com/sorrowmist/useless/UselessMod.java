@@ -5,6 +5,8 @@ import com.sorrowmist.useless.blocks.ModMenuTypes;
 import com.sorrowmist.useless.blocks.advancedalloyfurnace.AdvancedAlloyFurnaceScreen;
 import com.sorrowmist.useless.config.ConfigManager;
 import com.sorrowmist.useless.items.EndlessBeafItem;
+import com.sorrowmist.useless.networking.ClearFluidPacket;
+import com.sorrowmist.useless.networking.FluidInteractionPacket;
 import com.sorrowmist.useless.networking.ModMessages;
 import com.sorrowmist.useless.registry.RegistryHandler;
 import net.minecraft.client.gui.screens.MenuScreens;
@@ -23,6 +25,8 @@ import net.minecraftforge.fml.config.ModConfig;
 import net.minecraftforge.fml.event.lifecycle.FMLClientSetupEvent;
 import net.minecraftforge.fml.event.lifecycle.FMLCommonSetupEvent;
 import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
+import net.minecraftforge.network.NetworkRegistry;
+import net.minecraftforge.network.simple.SimpleChannel;
 import org.slf4j.Logger;
 import org.spongepowered.asm.mixin.Mixins;
 // The value here should match an entry in the META-INF/mods.toml file
@@ -41,7 +45,7 @@ public class UselessMod {
 
         // 注册配置
         registerConfig();
-
+        modEventBus.addListener(this::onCommonSetup);
         // 注册网络消息
         ModMessages.register();
 
@@ -67,7 +71,26 @@ public class UselessMod {
         LOGGER.info("已注册 TOML 配置文件");
     }
 
+    // 在模组主类中添加网络注册
+    public static final SimpleChannel NETWORK = NetworkRegistry.newSimpleChannel(
+            ResourceLocation.fromNamespaceAndPath(MOD_ID, "main"),
+            () -> "1.0",
+            "1.0"::equals,
+            "1.0"::equals
+    );
 
+
+    public void onCommonSetup(FMLCommonSetupEvent event) {
+        event.enqueueWork(() -> {
+            int packetId = 0;
+            NETWORK.registerMessage(packetId++, FluidInteractionPacket.class,
+                    FluidInteractionPacket::encode, FluidInteractionPacket::decode,
+                    FluidInteractionPacket::handle);
+            NETWORK.registerMessage(packetId++, ClearFluidPacket.class,
+                    ClearFluidPacket::encode, ClearFluidPacket::decode,
+                    ClearFluidPacket::handle);
+        });
+    }
     /**
      * 通用设置
      */
@@ -139,6 +162,8 @@ public class UselessMod {
     }
     // 调试模式
     public static final boolean DEBUG = true;
+
+
 
     public static void logDebug(String message) {
         if (DEBUG) {

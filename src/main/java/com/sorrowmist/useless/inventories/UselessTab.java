@@ -7,6 +7,8 @@ import com.sorrowmist.useless.blocks.oregenerator.OreGeneratorBlock;
 import com.sorrowmist.useless.blocks.teleport.TeleportBlock;
 import com.sorrowmist.useless.blocks.teleport.TeleportBlock2;
 import com.sorrowmist.useless.items.EndlessBeafItem;
+import com.sorrowmist.useless.registry.ModIngots;
+import com.sorrowmist.useless.registry.ModMolds;
 import com.sorrowmist.useless.registry.ThermalMoreItems;
 import com.sorrowmist.useless.registry.ThermalParallelItems;
 import com.sorrowmist.useless.utils.ThermalDependencyHelper;
@@ -39,6 +41,23 @@ public class UselessTab {
                         for (RegistryObject<Item> item : GlowPlasticBlock.GLOW_PLASTIC_BLOCK_ITEMS.values()) {
                             pOutput.accept(item.get());
                         }
+
+
+                        pOutput.accept(ModIngots.USELESS_INGOT_TIER_1.get());
+                        pOutput.accept(ModIngots.USELESS_INGOT_TIER_2.get());
+                        pOutput.accept(ModIngots.USELESS_INGOT_TIER_3.get());
+                        pOutput.accept(ModIngots.USELESS_INGOT_TIER_4.get());
+                        pOutput.accept(ModIngots.USELESS_INGOT_TIER_5.get());
+                        pOutput.accept(ModIngots.USELESS_INGOT_TIER_6.get());
+                        pOutput.accept(ModIngots.USELESS_INGOT_TIER_7.get());
+                        pOutput.accept(ModIngots.USELESS_INGOT_TIER_8.get());
+                        pOutput.accept(ModIngots.USELESS_INGOT_TIER_9.get());
+
+                        // 添加金属模具到创造标签
+                        pOutput.accept(ModMolds.METAL_MOLD_PLATE.get());
+                        pOutput.accept(ModMolds.METAL_MOLD_ROD.get());
+                        pOutput.accept(ModMolds.METAL_MOLD_GEAR.get());
+                        pOutput.accept(ModMolds.METAL_MOLD_WIRE.get());
 
                         // 只在热力系列安装时添加 ThermalMore 整合的物品
                         if (ThermalDependencyHelper.isAnyThermalModLoaded()) {

@@ -1,0 +1,49 @@
+{
+  "type": "useless_mod:advanced_alloy_furnace",
+  "ingredients": [
+    {
+      "ingredient": {
+        "item": "minecraft:dragon_head",
+        "count": 2
+      }
+    },
+    {
+      "ingredient": {
+        "item": "minecraft:echo_shard",
+        "count": 2
+      }
+    },
+    {
+      "ingredient": {
+        "item": "minecraft:conduit",
+        "count": 2
+      }
+    },
+    {
+      "ingredient": {
+        "item": "useless_mod:useless_ingot_tier_7",
+        "count": 2
+      }
+    },
+    {
+      "ingredient": {
+        "item": "minecraft:diamond_block",
+        "count": 2
+      }
+    },
+    {
+      "ingredient": {
+        "item": "minecraft:netherite_ingot",
+        "count": 2
+      }
+    }
+  ],
+  "results": [
+    {
+      "item": "useless_mod:useless_ingot_tier_8",
+      "count": 1
+    }
+  ],
+  "energy": 8000000,
+  "process_time": 1
+}

@@ -28,7 +28,6 @@
     "mek.MekanismUtilsMixin",
     "mek.UpgradeMixin",
     "mek.UpgradeUtilsMixin",
-    "thermal.AugmentableBlockEntityMixin",
     "thermal.ItemStorageCoFHMixin",
     "thermal.MachineBlockEntityMixin",
     "thermal.Reconfigurable4WayBlockEntityMixin",

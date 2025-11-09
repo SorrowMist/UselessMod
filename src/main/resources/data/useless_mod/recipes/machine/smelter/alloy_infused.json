@@ -1,0 +1,24 @@
+{
+  "type": "useless_mod:advanced_alloy_furnace",
+  "ingredients": [
+    {
+      "ingredient": {
+        "tag": "forge:ingots/iron",
+        "count": 64
+      }
+    },
+    {
+      "ingredient": {
+        "tag":"forge:dusts/redstone",
+        "count": 8
+      }
+    }
+  ],
+  "results": [
+    {"item": "mekanism:alloy_infused",
+      "count": 64
+    }
+  ],
+  "energy": 2000,
+  "process_time": 1
+}

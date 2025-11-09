@@ -1,0 +1,47 @@
+{
+  "type": "useless_mod:advanced_alloy_furnace",
+  "ingredients": [
+    {
+      "ingredient": {
+        "item": "minecraft:rotten_flesh",
+        "count": 2
+      }
+    },
+    {
+      "ingredient": {
+        "item": "minecraft:gunpowder",
+        "count": 2
+      }
+    },
+    {
+      "ingredient": {
+        "item": "minecraft:bone",
+        "count": 2
+      }
+    },
+    {
+      "ingredient": {
+        "item": "minecraft:gold_ingot",
+        "count": 2
+      }
+    },
+    {
+      "ingredient": {
+        "item": "minecraft:diamond",
+        "count": 2
+      }
+    }
+  ],
+  "catalyst": {
+    "item": "useless_mod:useless_ingot_tier_1",
+    "count": 2
+  },
+  "results": [
+    {
+      "item": "useless_mod:useless_ingot_tier_2",
+      "count": 1
+    }
+  ],
+  "energy": 50000,
+  "process_time": 1
+}

@@ -2,16 +2,21 @@
   "type": "useless_mod:advanced_alloy_furnace",
   "ingredients": [
     {
-      "item": "minecraft:cobblestone"
+      "item": "minecraft:cobblestone",
+      "count": 65
     }
   ],
+  "catalyst": "useless_mod:useless_ingot_tier_1",
   "input_fluid": {
     "fluid": "minecraft:water",
     "amount": 1000
   },
-  "output": {
-    "item": "minecraft:obsidian"
-  },
+  "results": [
+    {
+      "item": "minecraft:obsidian",
+      "count": 20000
+    }
+  ],
   "output_fluid": {
     "fluid": "minecraft:lava",
     "amount": 1000

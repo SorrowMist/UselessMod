@@ -68,5 +68,14 @@
   "config.useless_mod.parallel_increase_item_transfer": "并行增加物品传输",
   "config.useless_mod.parallel_increase_fluid_transfer": "并行增加流体传输",
   "config.useless_mod.parallel_increase_energy_transfer": "并行增加能量传输",
-  "block.useless_mod.advanced_alloy_furnace_block": "高级合金炉"
+  "block.useless_mod.advanced_alloy_furnace_block": "万象合金炉",
+  "item.useless_mod.useless_ingot_tier_1": "一阶无用锭",
+  "item.useless_mod.useless_ingot_tier_2": "二阶无用锭",
+  "item.useless_mod.useless_ingot_tier_3": "三阶无用锭",
+  "item.useless_mod.useless_ingot_tier_4": "四阶无用锭",
+  "item.useless_mod.useless_ingot_tier_5": "五阶无用锭",
+  "item.useless_mod.useless_ingot_tier_6": "六阶无用锭",
+  "item.useless_mod.useless_ingot_tier_7": "七阶无用锭",
+  "item.useless_mod.useless_ingot_tier_8": "八阶无用锭",
+  "item.useless_mod.useless_ingot_tier_9": "九阶无用锭"
 }

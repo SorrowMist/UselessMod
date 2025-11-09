@@ -83,6 +83,13 @@ public class RegistryHandler {
         // 菜单注册
         addRegistry(ModMenuTypes.MENUS);
 
+        // 添加锭的注册
+        addRegistry(ModIngots.ITEMS);
+        // 添加金属模具的注册
+        addRegistry(ModMolds.ITEMS);
+
+
+
         addRegistry(ModRecipeTypes.RECIPE_TYPES);
         addRegistry(ModRecipeSerializers.RECIPE_SERIALIZERS);
         // 添加其他注册器

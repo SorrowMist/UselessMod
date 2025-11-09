@@ -1,0 +1,49 @@
+{
+  "type": "useless_mod:advanced_alloy_furnace",
+  "ingredients": [
+    {
+      "ingredient": {
+        "item": "minecraft:wither_skeleton_skull",
+        "count": 2
+      }
+    },
+    {
+      "ingredient": {
+        "item": "minecraft:phantom_membrane",
+        "count": 2
+      }
+    },
+    {
+      "ingredient": {
+        "item": "minecraft:sea_lantern",
+        "count": 2
+      }
+    },
+    {
+      "ingredient": {
+        "item": "useless_mod:useless_ingot_tier_4",
+        "count": 2
+      }
+    },
+    {
+      "ingredient": {
+        "item": "minecraft:gold_block",
+        "count": 2
+      }
+    },
+    {
+      "ingredient": {
+        "item": "minecraft:diamond_block",
+        "count": 2
+      }
+    }
+  ],
+  "results": [
+    {
+      "item": "useless_mod:useless_ingot_tier_5",
+      "count": 1
+    }
+  ],
+  "energy": 500000,
+  "process_time": 1
+}

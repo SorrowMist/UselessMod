@@ -1,0 +1,24 @@
+{
+  "type": "useless_mod:advanced_alloy_furnace",
+  "ingredients": [
+    {
+      "ingredient": {
+        "tag": "mekanism:alloys/infused",
+        "count": 64
+      }
+    },
+    {
+      "ingredient": {
+        "item": "minecraft:diamond",
+        "count": 16
+      }
+    }
+  ],
+  "results": [
+    {"item": "mekanism:alloy_reinforced",
+      "count": 64
+    }
+  ],
+  "energy": 2000,
+  "process_time": 1
+}

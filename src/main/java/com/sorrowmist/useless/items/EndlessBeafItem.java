@@ -587,7 +587,7 @@ public class EndlessBeafItem extends PickaxeItem {
     @Override
     public float getDestroySpeed(ItemStack stack, BlockState state) {
         // 获取基础破坏速度
-        float baseSpeed = 20.0f;
+        float baseSpeed = 10.0f;
 
         // 只对有效方块应用速度加成
         if (state.getDestroySpeed(null, null) > 0) {

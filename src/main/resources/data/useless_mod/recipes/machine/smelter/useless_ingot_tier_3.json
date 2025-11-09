@@ -1,0 +1,49 @@
+{
+  "type": "useless_mod:advanced_alloy_furnace",
+  "ingredients": [
+    {
+      "ingredient": {
+        "item": "minecraft:nether_wart",
+        "count": 2
+      }
+    },
+    {
+      "ingredient": {
+        "item": "minecraft:blaze_rod",
+        "count": 2
+      }
+    },
+    {
+      "ingredient": {
+        "item": "minecraft:nether_brick",
+        "count": 2
+      }
+    },
+    {
+      "ingredient": {
+        "item": "useless_mod:useless_ingot_tier_2",
+        "count": 2
+      }
+    },
+    {
+      "ingredient": {
+        "item": "minecraft:gold_ingot",
+        "count": 2
+      }
+    },
+    {
+      "ingredient": {
+        "item": "minecraft:diamond",
+        "count": 2
+      }
+    }
+  ],
+  "results": [
+    {
+      "item": "useless_mod:useless_ingot_tier_3",
+      "count": 1
+    }
+  ],
+  "energy": 100000,
+  "process_time": 1
+}

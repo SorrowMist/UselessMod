@@ -1,0 +1,29 @@
+{
+  "type": "useless_mod:advanced_alloy_furnace",
+  "ingredients": [
+    {
+      "ingredient": {
+        "tag": "forge:ingots/iron",
+        "count": 419904
+      }
+    },
+    {
+      "ingredient": {
+        "tag": "minecraft:coals",
+        "count": 104976
+      }
+    }
+  ],
+  "catalyst": {
+    "item": "useless_mod:useless_ingot_tier_8",
+    "count": 1
+  },
+  "results": [
+    {
+      "item": "mekanism:ingot_steel",
+      "count": 419904
+    }
+  ],
+  "energy": 512000,
+  "process_time": 40
+}

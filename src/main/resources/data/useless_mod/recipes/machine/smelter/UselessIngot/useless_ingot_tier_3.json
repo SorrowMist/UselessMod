@@ -3,47 +3,45 @@
   "ingredients": [
     {
       "ingredient": {
-        "item": "minecraft:dragon_head",
+        "item": "minecraft:nether_wart",
         "count": 2
       }
     },
     {
       "ingredient": {
-        "item": "minecraft:echo_shard",
+        "item": "minecraft:blaze_rod",
         "count": 2
       }
     },
     {
       "ingredient": {
-        "item": "minecraft:conduit",
+        "item": "minecraft:nether_brick",
         "count": 2
       }
     },
     {
       "ingredient": {
-        "item": "useless_mod:useless_ingot_tier_7",
+        "item": "minecraft:gold_ingot",
         "count": 2
       }
     },
     {
       "ingredient": {
-        "item": "minecraft:diamond_block",
-        "count": 2
-      }
-    },
-    {
-      "ingredient": {
-        "item": "minecraft:netherite_ingot",
+        "item": "minecraft:diamond",
         "count": 2
       }
     }
   ],
+  "catalyst": {
+    "item": "useless_mod:useless_ingot_tier_2",
+    "count": 2
+  },
   "results": [
     {
-      "item": "useless_mod:useless_ingot_tier_8",
+      "item": "useless_mod:useless_ingot_tier_3",
       "count": 1
     }
   ],
-  "energy": 8000000,
+  "energy": 100000,
   "process_time": 1
 }

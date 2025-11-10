@@ -3,25 +3,19 @@
   "ingredients": [
     {
       "ingredient": {
-        "item": "minecraft:nether_star",
+        "item": "minecraft:turtle_helmet",
         "count": 2
       }
     },
     {
       "ingredient": {
-        "item": "minecraft:wither_rose",
+        "item": "minecraft:goat_horn",
         "count": 2
       }
     },
     {
       "ingredient": {
-        "item": "minecraft:ghast_tear",
-        "count": 2
-      }
-    },
-    {
-      "ingredient": {
-        "item": "useless_mod:useless_ingot_tier_6",
+        "item": "minecraft:rabbit_foot",
         "count": 2
       }
     },
@@ -33,17 +27,21 @@
     },
     {
       "ingredient": {
-        "item": "minecraft:netherite_ingot",
+        "item": "minecraft:netherite_block",
         "count": 2
       }
     }
   ],
+  "catalyst": {
+    "item": "useless_mod:useless_ingot_tier_8",
+    "count": 2
+  },
   "results": [
     {
-      "item": "useless_mod:useless_ingot_tier_7",
+      "item": "useless_mod:useless_ingot_tier_9",
       "count": 1
     }
   ],
-  "energy": 4000000,
+  "energy": 16000000,
   "process_time": 1
 }

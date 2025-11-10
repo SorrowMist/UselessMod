@@ -3,47 +3,45 @@
   "ingredients": [
     {
       "ingredient": {
-        "item": "minecraft:nether_wart",
+        "item": "minecraft:dragon_breath",
         "count": 2
       }
     },
     {
       "ingredient": {
-        "item": "minecraft:blaze_rod",
+        "item": "minecraft:totem_of_undying",
         "count": 2
       }
     },
     {
       "ingredient": {
-        "item": "minecraft:nether_brick",
+        "item": "minecraft:enchanted_golden_apple",
         "count": 2
       }
     },
     {
       "ingredient": {
-        "item": "useless_mod:useless_ingot_tier_2",
+        "item": "minecraft:gold_block",
         "count": 2
       }
     },
     {
       "ingredient": {
-        "item": "minecraft:gold_ingot",
-        "count": 2
-      }
-    },
-    {
-      "ingredient": {
-        "item": "minecraft:diamond",
+        "item": "minecraft:diamond_block",
         "count": 2
       }
     }
   ],
+  "catalyst": {
+    "item": "useless_mod:useless_ingot_tier_5",
+    "count": 2
+  },
   "results": [
     {
-      "item": "useless_mod:useless_ingot_tier_3",
+      "item": "useless_mod:useless_ingot_tier_6",
       "count": 1
     }
   ],
-  "energy": 100000,
+  "energy": 2000000,
   "process_time": 1
 }

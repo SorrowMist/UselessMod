@@ -4,21 +4,26 @@
     {
       "ingredient": {
         "tag": "forge:ingots/iron",
-        "count": 64
+        "count": 46656
       }
     },
     {
       "ingredient": {
         "tag": "minecraft:coals",
-        "count": 16
+        "count": 11664
       }
     }
   ],
+  "catalyst": {
+    "item": "useless_mod:useless_ingot_tier_6",
+    "count": 1
+  },
   "results": [
-    {"item": "mekanism:ingot_steel",
-      "count": 64
+    {
+      "item": "mekanism:ingot_steel",
+      "count": 46656
     }
   ],
-  "energy": 2000,
-  "process_time": 1
+  "energy": 128000,
+  "process_time": 40
 }

@@ -21,12 +21,6 @@
     },
     {
       "ingredient": {
-        "item": "useless_mod:useless_ingot_tier_3",
-        "count": 2
-      }
-    },
-    {
-      "ingredient": {
         "item": "minecraft:gold_block",
         "count": 2
       }
@@ -38,6 +32,10 @@
       }
     }
   ],
+  "catalyst": {
+    "item": "useless_mod:useless_ingot_tier_3",
+    "count": 2
+  },
   "results": [
     {
       "item": "useless_mod:useless_ingot_tier_4",

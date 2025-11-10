@@ -1,15 +1,19 @@
 package com.sorrowmist.useless.compat.jei;
 
+import com.mojang.blaze3d.systems.RenderSystem;
 import com.sorrowmist.useless.UselessMod;
 import com.sorrowmist.useless.blocks.advancedalloyfurnace.AdvancedAlloyFurnaceBlock;
 import com.sorrowmist.useless.recipes.advancedalloyfurnace.AdvancedAlloyFurnaceRecipe;
+import mezz.jei.api.constants.VanillaTypes;
 import mezz.jei.api.gui.builder.IRecipeLayoutBuilder;
 import mezz.jei.api.gui.builder.ITooltipBuilder;
 import mezz.jei.api.gui.drawable.IDrawable;
 import mezz.jei.api.gui.ingredient.IRecipeSlotsView;
 import mezz.jei.api.gui.widgets.IRecipeExtrasBuilder;
 import mezz.jei.api.helpers.IGuiHelper;
+import mezz.jei.api.ingredients.IIngredientRenderer;
 import mezz.jei.api.recipe.IFocusGroup;
+import mezz.jei.api.recipe.RecipeIngredientRole;
 import mezz.jei.api.recipe.RecipeType;
 import mezz.jei.api.recipe.category.IRecipeCategory;
 import net.minecraft.client.Minecraft;
@@ -17,7 +21,10 @@ import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.TooltipFlag;
 import net.minecraft.world.item.crafting.Ingredient;
+
+import java.util.List;
 
 public class AdvancedAlloyFurnaceRecipeCategory implements IRecipeCategory<AdvancedAlloyFurnaceRecipe> {
     public static final RecipeType<AdvancedAlloyFurnaceRecipe> TYPE =
@@ -138,7 +145,6 @@ public class AdvancedAlloyFurnaceRecipeCategory implements IRecipeCategory<Advan
 
     @Override
     public void setRecipe(IRecipeLayoutBuilder builder, AdvancedAlloyFurnaceRecipe recipe, IFocusGroup focuses) {
-        // 输入物品槽位 (6个) - 3行2列排列
         for (int i = 0; i < Math.min(recipe.getInputItems().size(), 6); i++) {
             Ingredient ingredient = recipe.getInputItems().get(i);
             int count = recipe.getInputItemCounts().get(i);
@@ -154,67 +160,55 @@ public class AdvancedAlloyFurnaceRecipeCategory implements IRecipeCategory<Advan
 
                 Ingredient displayIngredient = Ingredient.of(displayStacks);
 
-                // 计算槽位位置：3行2列
                 int row = i / 2;
                 int col = i % 2;
                 int x = INPUT_SLOTS_START_X + col * INPUT_SLOT_SPACING_X;
                 int y = INPUT_SLOTS_START_Y + row * INPUT_SLOT_SPACING_Y;
 
-                builder.addSlot(mezz.jei.api.recipe.RecipeIngredientRole.INPUT, x, y)
-                        .addIngredients(displayIngredient);
+                builder.addSlot(RecipeIngredientRole.INPUT, x, y)
+                        .addIngredients(displayIngredient)
+                        .setCustomRenderer(VanillaTypes.ITEM_STACK, new IIngredientRenderer<>() {
+                            @Override
+                            public void render(GuiGraphics guiGraphics, ItemStack stack) {
+                                if (stack == null || stack.isEmpty()) return;
+
+                                // 启用深度测试
+                                RenderSystem.enableDepthTest();
+
+                                // 渲染物品图标
+                                guiGraphics.renderFakeItem(stack, 0, 0);
+                                // 渲染数量文本
+                                guiGraphics.renderItemDecorations(
+                                        Minecraft.getInstance().font,
+                                        stack,
+                                        0,
+                                        0,
+                                        formatNumber(stack.getCount())
+                                );
+                                RenderSystem.disableBlend();
+                            }
+
+
+                            @Override
+                            public List<Component> getTooltip(ItemStack stack, TooltipFlag flag) {
+                                return stack.getTooltipLines(Minecraft.getInstance().player, flag);
+                            }
+
+                            // 以下两个方法可以省略如果你不需要自定义尺寸
+                            @Override
+                            public int getWidth() {
+                                return 16;
+                            }
+
+                            @Override
+                            public int getHeight() {
+                                return 16;
+                            }
+                        })
+                ;
+
             }
-        }
 
-        // 输入流体槽 - 满格显示
-        if (!recipe.getInputFluid().isEmpty()) {
-            builder.addSlot(mezz.jei.api.recipe.RecipeIngredientRole.INPUT,
-                            FLUID_INPUT_X, FLUID_INPUT_Y)
-                    .addFluidStack(recipe.getInputFluid().getFluid(), recipe.getInputFluid().getAmount())
-                    .setFluidRenderer(recipe.getInputFluid().getAmount(), true, SLOT_SIZE, SLOT_SIZE);
-        }
-
-        // 输出物品槽位 (6个) - 3行2列排列
-        for (int i = 0; i < Math.min(recipe.getOutputItems().size(), 6); i++) {
-            // 计算槽位位置：3行2列
-            int row = i / 2;
-            int col = i % 2;
-            int x = OUTPUT_SLOTS_START_X + col * INPUT_SLOT_SPACING_X;
-            int y = OUTPUT_SLOTS_START_Y + row * INPUT_SLOT_SPACING_Y;
-
-            builder.addSlot(mezz.jei.api.recipe.RecipeIngredientRole.OUTPUT, x, y)
-                    .addItemStack(recipe.getOutputItems().get(i));
-        }
-
-        // 输出流体槽 - 满格显示
-        if (!recipe.getOutputFluid().isEmpty()) {
-            builder.addSlot(mezz.jei.api.recipe.RecipeIngredientRole.OUTPUT,
-                            FLUID_OUTPUT_X, FLUID_OUTPUT_Y)
-                    .addFluidStack(recipe.getOutputFluid().getFluid(), recipe.getOutputFluid().getAmount())
-                    .setFluidRenderer(recipe.getOutputFluid().getAmount(), true, SLOT_SIZE, SLOT_SIZE);
-        }
-
-        // 催化剂槽位
-        if (recipe.requiresCatalyst()) {
-            ItemStack[] catalystStacks = recipe.getCatalyst().getItems();
-            if (catalystStacks.length > 0) {
-                ItemStack[] displayCatalystStacks = new ItemStack[catalystStacks.length];
-                for (int j = 0; j < catalystStacks.length; j++) {
-                    ItemStack displayStack = catalystStacks[j].copy();
-                    displayStack.setCount(recipe.getCatalystCount());
-                    displayCatalystStacks[j] = displayStack;
-                }
-
-                builder.addSlot(mezz.jei.api.recipe.RecipeIngredientRole.CATALYST,
-                                CATALYST_SLOT_X, CATALYST_SLOT_Y)
-                        .addIngredients(Ingredient.of(displayCatalystStacks));
-            }
-        }
-
-        // 模具槽位
-        if (recipe.requiresMold()) {
-            builder.addSlot(mezz.jei.api.recipe.RecipeIngredientRole.CATALYST,
-                            MOLD_SLOT_X, MOLD_SLOT_Y)
-                    .addIngredients(recipe.getMold());
         }
     }
 

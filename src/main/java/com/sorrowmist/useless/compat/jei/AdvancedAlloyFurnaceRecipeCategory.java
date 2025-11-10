@@ -157,75 +157,51 @@ public class AdvancedAlloyFurnaceRecipeCategory implements IRecipeCategory<Advan
 
                 builder.addSlot(RecipeIngredientRole.INPUT, x, y)
                         .addIngredients(displayIngredient)
-                        .setCustomRenderer(VanillaTypes.ITEM_STACK, new IIngredientRenderer<>() {
-                            @Override
-                            public void render(GuiGraphics guiGraphics, ItemStack stack) {
-                                if (stack == null || stack.isEmpty()) return;
-
-                                // 启用深度测试
-                                RenderSystem.enableDepthTest();
-
-                                // 渲染物品图标
-                                guiGraphics.renderFakeItem(stack, 0, 0);
-                                Minecraft mc = Minecraft.getInstance();
-                                Font font = mc.font;
-                                PoseStack pose = guiGraphics.pose();
-
-                                // 数量文本缩放
-                                String text = formatNumber(stack.getCount());
-                                if (stack.getCount() != 1 || text != null) {
-                                    pose.pushPose();
-                                    float scale = 0.75f;
-                                    pose.translate(0, 0, 200.0F);
-                                    pose.scale(scale, scale, 1.0F);
-
-                                    int x = Math.round(16.0f / scale) - font.width(text);
-                                    int y = Math.round(10.0f / scale);
-
-                                    guiGraphics.drawString(font, text, x, y, 0xFFFFFF, true);
-                                    pose.popPose();
-                                }
-
-                                // 原版逻辑（耐久条 + 冷却 + 装饰）
-                                if (stack.isBarVisible()) {
-                                    int l = stack.getBarWidth();
-                                    int i = stack.getBarColor();
-                                    int j = 2;
-                                    int k = 13;
-                                    guiGraphics.fill(RenderType.guiOverlay(), j, k, j + 13, k + 2, 0xFF000000);
-                                    guiGraphics.fill(RenderType.guiOverlay(), j, k, j + l, k + 1, i | 0xFF000000);
-                                }
-
-                                LocalPlayer player = mc.player;
-                                float f = player == null ? 0.0F :
-                                        player.getCooldowns().getCooldownPercent(stack.getItem(), mc.getFrameTime());
-                                if (f > 0.0F) {
-                                    int i1 = Mth.floor(16.0F * (1.0F - f));
-                                    int j1 = i1 + Mth.ceil(16.0F * f);
-                                    guiGraphics.fill(RenderType.guiOverlay(), 0, i1, 16, j1, Integer.MAX_VALUE);
-                                }
-
-                                ItemDecoratorHandler.of(stack).render(guiGraphics, font, stack, 0, 0);
-                                RenderSystem.disableBlend();
-                            }
-
-                            @Override
-                            public List<Component> getTooltip(ItemStack stack, TooltipFlag flag) {
-                                return stack.getTooltipLines(Minecraft.getInstance().player, flag);
-                            }
-
-                            // 以下两个方法可以省略如果你不需要自定义尺寸
-                            @Override
-                            public int getWidth() {
-                                return 16;
-                            }
-
-                            @Override
-                            public int getHeight() {
-                                return 16;
-                            }
-                        });
+                        .setCustomRenderer(VanillaTypes.ITEM_STACK, new ItemStackRenderer());
             }
+        }
+
+        // 输出物品槽位 (6个) - 3行2列排列
+        for (int i = 0; i < Math.min(recipe.getOutputItems().size(), 6); i++) {
+            // 计算槽位位置：3行2列
+            int row = i / 2;
+            int col = i % 2;
+            int x = OUTPUT_SLOTS_START_X + col * INPUT_SLOT_SPACING_X;
+            int y = OUTPUT_SLOTS_START_Y + row * INPUT_SLOT_SPACING_Y;
+
+            builder.addSlot(mezz.jei.api.recipe.RecipeIngredientRole.OUTPUT, x, y)
+                    .addItemStack(recipe.getOutputItems().get(i))
+                    .setCustomRenderer(VanillaTypes.ITEM_STACK, new ItemStackRenderer());
+        }
+
+        // 输出流体槽 - 满格显示
+        if (!recipe.getOutputFluid().isEmpty()) {
+            builder.addSlot(mezz.jei.api.recipe.RecipeIngredientRole.OUTPUT,
+                            FLUID_OUTPUT_X, FLUID_OUTPUT_Y)
+                    .addFluidStack(recipe.getOutputFluid().getFluid(), recipe.getOutputFluid().getAmount())
+                    .setFluidRenderer(recipe.getOutputFluid().getAmount(), true, SLOT_SIZE, SLOT_SIZE);
+        }
+
+        // 催化剂槽位
+        if (recipe.requiresCatalyst()) {
+            ItemStack[] catalystStacks = recipe.getCatalyst().getItems();
+            if (catalystStacks.length > 0) {
+                ItemStack[] displayCatalystStacks = new ItemStack[catalystStacks.length];
+                for (int j = 0; j < catalystStacks.length; j++) {
+                    ItemStack displayStack = catalystStacks[j].copy();
+                    displayStack.setCount(recipe.getCatalystCount());
+                    displayCatalystStacks[j] = displayStack;
+                }
+                builder.addSlot(mezz.jei.api.recipe.RecipeIngredientRole.CATALYST,
+                                CATALYST_SLOT_X, CATALYST_SLOT_Y)
+                        .addIngredients(Ingredient.of(displayCatalystStacks));
+            }
+        }
+        // 模具槽位
+        if (recipe.requiresMold()) {
+            builder.addSlot(mezz.jei.api.recipe.RecipeIngredientRole.CATALYST,
+                            MOLD_SLOT_X, MOLD_SLOT_Y)
+                    .addIngredients(recipe.getMold());
         }
     }
 
@@ -308,7 +284,7 @@ public class AdvancedAlloyFurnaceRecipeCategory implements IRecipeCategory<Advan
     }
 
     // 格式化数字显示（能量）
-    private String formatNumber(int number) {
+    private static String formatNumber(int number) {
         if (number >= 1000000000) {
             return (number / 1000000000) + "G";
         } else if (number >= 1000000) {
@@ -317,6 +293,74 @@ public class AdvancedAlloyFurnaceRecipeCategory implements IRecipeCategory<Advan
             return (number / 1000) + "K";
         } else {
             return String.valueOf(number);
+        }
+    }
+
+    private static class ItemStackRenderer implements IIngredientRenderer<ItemStack> {
+        @Override
+        public void render(GuiGraphics guiGraphics, ItemStack stack) {
+            if (stack == null || stack.isEmpty()) return;
+
+            // 启用深度测试
+            RenderSystem.enableDepthTest();
+
+            // 渲染物品图标
+            guiGraphics.renderFakeItem(stack, 0, 0);
+            Minecraft mc = Minecraft.getInstance();
+            Font font = mc.font;
+            PoseStack pose = guiGraphics.pose();
+
+            // 数量文本缩放
+            String text = formatNumber(stack.getCount());
+            if (stack.getCount() != 1 || text != null) {
+                pose.pushPose();
+                float scale = 0.75f;
+                pose.translate(0, 0, 200.0F);
+                pose.scale(scale, scale, 1.0F);
+
+                int x = Math.round(16.0f / scale) - font.width(text);
+                int y = Math.round(10.0f / scale);
+
+                guiGraphics.drawString(font, text, x, y, 0xFFFFFF, true);
+                pose.popPose();
+            }
+
+            // 原版逻辑（耐久条 + 冷却 + 装饰）
+            if (stack.isBarVisible()) {
+                int l = stack.getBarWidth();
+                int i = stack.getBarColor();
+                int j = 2;
+                int k = 13;
+                guiGraphics.fill(RenderType.guiOverlay(), j, k, j + 13, k + 2, 0xFF000000);
+                guiGraphics.fill(RenderType.guiOverlay(), j, k, j + l, k + 1, i | 0xFF000000);
+            }
+
+            LocalPlayer player = mc.player;
+            float f = player == null ? 0.0F :
+                    player.getCooldowns().getCooldownPercent(stack.getItem(), mc.getFrameTime());
+            if (f > 0.0F) {
+                int i1 = Mth.floor(16.0F * (1.0F - f));
+                int j1 = i1 + Mth.ceil(16.0F * f);
+                guiGraphics.fill(RenderType.guiOverlay(), 0, i1, 16, j1, Integer.MAX_VALUE);
+            }
+
+            ItemDecoratorHandler.of(stack).render(guiGraphics, font, stack, 0, 0);
+            RenderSystem.disableBlend();
+        }
+
+        @Override
+        public List<Component> getTooltip(ItemStack stack, TooltipFlag flag) {
+            return stack.getTooltipLines(Minecraft.getInstance().player, flag);
+        }
+
+        @Override
+        public int getWidth() {
+            return 16;
+        }
+
+        @Override
+        public int getHeight() {
+            return 16;
         }
     }
 }

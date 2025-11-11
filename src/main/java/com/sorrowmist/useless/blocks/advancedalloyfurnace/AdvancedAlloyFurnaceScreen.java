@@ -2,8 +2,11 @@ package com.sorrowmist.useless.blocks.advancedalloyfurnace;
 
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.sorrowmist.useless.UselessMod;
+import com.sorrowmist.useless.menu.slot.HighStackSlot;
 import com.sorrowmist.useless.networking.ClearFluidPacket;
 import com.sorrowmist.useless.networking.FluidInteractionPacket;
+import com.sorrowmist.useless.utils.NumberFormatUtil;
+import com.sorrowmist.useless.utils.SlotRendererUtil;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
@@ -13,6 +16,7 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.inventory.InventoryMenu;
+import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemStack;
 import net.minecraftforge.client.extensions.common.IClientFluidTypeExtensions;
 import net.minecraftforge.fluids.FluidStack;
@@ -185,7 +189,7 @@ public class AdvancedAlloyFurnaceScreen extends AbstractContainerScreen<Advanced
         // 渲染清空按钮
         renderClearButton(guiGraphics, x, y);
 
-        // 新增：渲染提示图片
+        // 渲染提示图片
         renderTipsImage(guiGraphics, x, y);
     }
 
@@ -359,6 +363,7 @@ public class AdvancedAlloyFurnaceScreen extends AbstractContainerScreen<Advanced
                 menu.getIndicatorSize(), menu.getIndicatorSize());
     }
 
+    // 修改流体渲染方法，使用完整单位
     private void renderFluidTank(GuiGraphics guiGraphics, int x, int y, FluidStack fluid, int capacity) {
         if (!fluid.isEmpty() && capacity > 0) {
             int fluidHeight = (int) (FLUID_HEIGHT * ((float) fluid.getAmount() / capacity));
@@ -402,6 +407,9 @@ public class AdvancedAlloyFurnaceScreen extends AbstractContainerScreen<Advanced
                     RenderSystem.setShaderColor(1.0F, 1.0F, 1.0F, 1.0F);
                 }
             }
+
+            // 渲染流体数量文本 - 使用完整单位
+            SlotRendererUtil.renderFluidAmount(guiGraphics, fluid.getAmount(), x, y, FLUID_WIDTH, FLUID_HEIGHT);
         }
     }
 
@@ -453,83 +461,128 @@ public class AdvancedAlloyFurnaceScreen extends AbstractContainerScreen<Advanced
     @Override
     public void render(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
         renderBackground(guiGraphics);
+
+        // 使用父类的渲染逻辑（这会正常渲染所有槽位，包括玩家物品栏）
         super.render(guiGraphics, mouseX, mouseY, partialTick);
-        renderTooltip(guiGraphics, mouseX, mouseY);
 
-        if (menu != null) {
-            int x = (width - imageWidth) / 2;
-            int y = (height - imageHeight) / 2;
+        // 为HighStackSlot添加自定义数量渲染
+        renderHighStackSlotCounts(guiGraphics);
 
-            // 能量条悬停提示
-            if (isMouseOverArea(mouseX, mouseY, x + ENERGY_BAR_X, y + ENERGY_BAR_Y,
-                    ENERGY_BAR_WIDTH, ENERGY_BAR_HEIGHT)) {
-                List<Component> tooltip = new ArrayList<>();
-                tooltip.add(Component.literal("能量: " + menu.getEnergy() + " / " + menu.getMaxEnergy() + " FE"));
-                tooltip.add(Component.literal("消耗: " + menu.getProcessTick() + " FE/t"));
-                guiGraphics.renderComponentTooltip(this.font, tooltip, mouseX, mouseY);
+        // 渲染自定义工具提示
+        renderCustomTooltips(guiGraphics, mouseX, mouseY);
+    }
+
+    /**
+     * 为HighStackSlot渲染自定义数量文本
+     */
+    private void renderHighStackSlotCounts(GuiGraphics guiGraphics) {
+        int x = (width - imageWidth) / 2;
+        int y = (height - imageHeight) / 2;
+
+        for (Slot slot : this.menu.slots) {
+            if (slot instanceof HighStackSlot && slot.hasItem() && slot.getItem().getCount() > 1) {
+                renderHighStackCount(guiGraphics, slot, x, y);
             }
-
-            // 进度条悬停提示
-            if (isMouseOverProgressArea(mouseX, mouseY, x, y)) {
-                List<Component> tooltip = new ArrayList<>();
-                int progress = menu.getProgress();
-                int maxProgress = menu.getMaxProgress();
-
-                if (maxProgress > 0) {
-                    float progressPercent = (float) progress / maxProgress * 100;
-                    tooltip.add(Component.literal("进度: " + progress + "/" + maxProgress + " (" + String.format("%.1f", progressPercent) + "%)"));
-                    tooltip.add(Component.literal("状态: " + (menu.isActive() ? "工作中" : "空闲")));
-                } else {
-                    tooltip.add(Component.literal("没有活动进程"));
-                }
-                guiGraphics.renderComponentTooltip(this.font, tooltip, mouseX, mouseY);
-            }
-
-            // 清空按钮悬停提示
-            if (isMouseOverArea(mouseX, mouseY,
-                    x + CLEAR_FLUID_BUTTON_X, y + CLEAR_FLUID_BUTTON_Y,
-                    CLEAR_FLUID_BUTTON_WIDTH, CLEAR_FLUID_BUTTON_HEIGHT)) {
-                List<Component> tooltip = new ArrayList<>();
-                tooltip.add(Component.literal("清空输入流体"));
-                tooltip.add(Component.literal("点击清空输入流体槽"));
-                guiGraphics.renderComponentTooltip(this.font, tooltip, mouseX, mouseY);
-            }
-
-            // 新增：催化剂和模具信息区域悬停提示
-            if (isMouseOverArea(mouseX, mouseY,
-                    x + CATALYST_MOLD_INFO_X, y + CATALYST_MOLD_INFO_Y,
-                    CATALYST_MOLD_INFO_WIDTH, CATALYST_MOLD_INFO_HEIGHT)) {
-                List<Component> tooltip = new ArrayList<>();
-
-                // 催化剂信息
-                if (menu.isCatalystRequired()) {
-                    tooltip.add(Component.literal("催化剂: 需要").withStyle(ChatFormatting.YELLOW));
-                } else {
-                    tooltip.add(Component.literal("催化剂: 不需要").withStyle(ChatFormatting.BLUE));
-                }
-
-// 修改后
-                tooltip.add(Component.literal("催化剂在合成中")
-                        .append(Component.literal("会").withStyle(style -> style.withColor(0xFFD700)))
-                        .append(Component.literal("被消耗")).withStyle(ChatFormatting.GRAY));
-
-                // 模具信息
-                if (menu.isMoldRequired()) {
-                    tooltip.add(Component.literal("模具: 需要").withStyle(ChatFormatting.YELLOW));
-                } else {
-                    tooltip.add(Component.literal("模具: 不需要").withStyle(ChatFormatting.BLUE));
-                }
-
-                tooltip.add(Component.literal("模具在合成中")
-                        .append(Component.literal("不会").withStyle(style -> style.withColor(0xFFD700)))
-                        .append(Component.literal("被消耗")).withStyle(ChatFormatting.GRAY));
-
-                guiGraphics.renderComponentTooltip(this.font, tooltip, mouseX, mouseY);
-            }
-
-            // 流体槽悬停提示
-            renderFluidInteractions(guiGraphics, mouseX, mouseY, x, y);
         }
+    }
+
+    /**
+     * 渲染单个HighStackSlot的数量文本
+     */
+    private void renderHighStackCount(GuiGraphics guiGraphics, Slot slot, int x, int y) {
+        ItemStack stack = slot.getItem();
+        String text = NumberFormatUtil.formatItemCount(stack.getCount());
+        Font font = minecraft.font;
+
+        guiGraphics.pose().pushPose();
+        float scale = 0.65f;
+        guiGraphics.pose().translate(0, 0, 300.0F);
+        guiGraphics.pose().scale(scale, scale, 1.0F);
+
+        int textX = Math.round((x + slot.x + 16 - font.width(text) * scale) / scale);
+        int textY = Math.round((y + slot.y + 16 - 8 * scale) / scale);
+
+        guiGraphics.drawString(font, text, textX, textY, 0xFFFFFF, true);
+        guiGraphics.pose().popPose();
+    }
+
+    /**
+     * 渲染自定义工具提示
+     */
+    private void renderCustomTooltips(GuiGraphics guiGraphics, int mouseX, int mouseY) {
+        if (menu == null) return;
+
+        int x = (width - imageWidth) / 2;
+        int y = (height - imageHeight) / 2;
+
+        // 能量条悬停提示
+        if (isMouseOverArea(mouseX, mouseY, x + ENERGY_BAR_X, y + ENERGY_BAR_Y,
+                ENERGY_BAR_WIDTH, ENERGY_BAR_HEIGHT)) {
+            List<Component> tooltip = new ArrayList<>();
+            tooltip.add(Component.literal("能量: " + menu.getEnergy() + " / " + menu.getMaxEnergy() + " FE"));
+            tooltip.add(Component.literal("消耗: " + menu.getProcessTick() + " FE/t"));
+            guiGraphics.renderComponentTooltip(this.font, tooltip, mouseX, mouseY);
+        }
+
+        // 进度条悬停提示
+        if (isMouseOverProgressArea(mouseX, mouseY, x, y)) {
+            List<Component> tooltip = new ArrayList<>();
+            int progress = menu.getProgress();
+            int maxProgress = menu.getMaxProgress();
+
+            if (maxProgress > 0) {
+                float progressPercent = (float) progress / maxProgress * 100;
+                tooltip.add(Component.literal("进度: " + progress + "/" + maxProgress + " (" + String.format("%.1f", progressPercent) + "%)"));
+                tooltip.add(Component.literal("状态: " + (menu.isActive() ? "工作中" : "空闲")));
+            } else {
+                tooltip.add(Component.literal("没有活动进程"));
+            }
+            guiGraphics.renderComponentTooltip(this.font, tooltip, mouseX, mouseY);
+        }
+
+        // 清空按钮悬停提示
+        if (isMouseOverArea(mouseX, mouseY,
+                x + CLEAR_FLUID_BUTTON_X, y + CLEAR_FLUID_BUTTON_Y,
+                CLEAR_FLUID_BUTTON_WIDTH, CLEAR_FLUID_BUTTON_HEIGHT)) {
+            List<Component> tooltip = new ArrayList<>();
+            tooltip.add(Component.literal("清空输入流体"));
+            tooltip.add(Component.literal("点击清空输入流体槽"));
+            guiGraphics.renderComponentTooltip(this.font, tooltip, mouseX, mouseY);
+        }
+
+        // 新增：催化剂和模具信息区域悬停提示
+        if (isMouseOverArea(mouseX, mouseY,
+                x + CATALYST_MOLD_INFO_X, y + CATALYST_MOLD_INFO_Y,
+                CATALYST_MOLD_INFO_WIDTH, CATALYST_MOLD_INFO_HEIGHT)) {
+            List<Component> tooltip = new ArrayList<>();
+
+            // 催化剂信息
+            if (menu.isCatalystRequired()) {
+                tooltip.add(Component.literal("催化剂: 需要").withStyle(ChatFormatting.YELLOW));
+            } else {
+                tooltip.add(Component.literal("催化剂: 不需要").withStyle(ChatFormatting.BLUE));
+            }
+
+            tooltip.add(Component.literal("催化剂在合成中")
+                    .append(Component.literal("会").withStyle(style -> style.withColor(0xFFD700)))
+                    .append(Component.literal("被消耗")).withStyle(ChatFormatting.GRAY));
+
+            // 模具信息
+            if (menu.isMoldRequired()) {
+                tooltip.add(Component.literal("模具: 需要").withStyle(ChatFormatting.YELLOW));
+            } else {
+                tooltip.add(Component.literal("模具: 不需要").withStyle(ChatFormatting.BLUE));
+            }
+
+            tooltip.add(Component.literal("模具在合成中")
+                    .append(Component.literal("不会").withStyle(style -> style.withColor(0xFFD700)))
+                    .append(Component.literal("被消耗")).withStyle(ChatFormatting.GRAY));
+
+            guiGraphics.renderComponentTooltip(this.font, tooltip, mouseX, mouseY);
+        }
+
+        // 流体槽悬停提示
+        renderFluidInteractions(guiGraphics, mouseX, mouseY, x, y);
     }
 
     private boolean isMouseOverProgressArea(int mouseX, int mouseY, int x, int y) {
@@ -548,8 +601,8 @@ public class AdvancedAlloyFurnaceScreen extends AbstractContainerScreen<Advanced
 
             if (!inputFluid.isEmpty()) {
                 tooltip.add(Component.literal("输入流体: " + inputFluid.getDisplayName().getString()));
-                tooltip.add(Component.literal("数量: " + inputFluid.getAmount() + " / " +
-                        menu.getBlockEntity().getInputFluidTank().getCapacity() + " mB"));
+                tooltip.add(Component.literal("数量: " + NumberFormatUtil.formatFluidAmount(inputFluid.getAmount()) + " / " +
+                        NumberFormatUtil.formatFluidAmount(menu.getBlockEntity().getInputFluidTank().getCapacity())));
                 tooltip.add(Component.literal("右键: 倒入流体"));
             } else {
                 tooltip.add(Component.literal("输入流体槽"));
@@ -566,8 +619,8 @@ public class AdvancedAlloyFurnaceScreen extends AbstractContainerScreen<Advanced
 
             if (!outputFluid.isEmpty()) {
                 tooltip.add(Component.literal("输出流体: " + outputFluid.getDisplayName().getString()));
-                tooltip.add(Component.literal("数量: " + outputFluid.getAmount() + " / " +
-                        menu.getBlockEntity().getOutputFluidTank().getCapacity() + " mB"));
+                tooltip.add(Component.literal("数量: " + NumberFormatUtil.formatFluidAmount(outputFluid.getAmount()) + " / " +
+                        NumberFormatUtil.formatFluidAmount(menu.getBlockEntity().getOutputFluidTank().getCapacity())));
                 tooltip.add(Component.literal("左键: 抽取流体"));
             } else {
                 tooltip.add(Component.literal("输出流体槽"));

@@ -2,6 +2,7 @@ package com.sorrowmist.useless.blocks.advancedalloyfurnace;
 
 import com.sorrowmist.useless.UselessMod;
 import com.sorrowmist.useless.blocks.ModMenuTypes;
+import com.sorrowmist.useless.menu.slot.HighStackSlot;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.AbstractContainerMenu;
@@ -82,15 +83,16 @@ public class AdvancedAlloyFurnaceMenu extends AbstractContainerMenu {
 
         // 只有在方块实体存在时才添加物品槽位
         if (this.blockEntity != null) {
+            // 在添加机器槽位时使用HighStackSlot
             this.blockEntity.getCapability(ForgeCapabilities.ITEM_HANDLER).ifPresent(handler -> {
-                // 输入槽位 (0-5) - 垂直排列
+                // 输入槽位 (0-5) - 使用HighStackSlot
                 for (int i = 0; i < 6; i++) {
-                    this.addSlot(new HighStackSlotItemHandler(handler, i, INPUT_SLOTS_X+1, INPUT_SLOTS_FIRST_Y + i * INPUT_SLOT_SPACING+1));
+                    this.addSlot(new HighStackSlot(handler, i, INPUT_SLOTS_X+1, INPUT_SLOTS_FIRST_Y + i * INPUT_SLOT_SPACING+1));
                 }
 
-                // 输出槽位 (6-11) - 垂直排列
+                // 输出槽位 (6-11) - 使用HighStackSlot
                 for (int i = 6; i < 12; i++) {
-                    this.addSlot(new HighStackSlotItemHandler(handler, i, OUTPUT_SLOTS_X+1, OUTPUT_SLOTS_FIRST_Y + (i-6) * OUTPUT_SLOT_SPACING+1) {
+                    this.addSlot(new HighStackSlot(handler, i, OUTPUT_SLOTS_X+1, OUTPUT_SLOTS_FIRST_Y + (i-6) * OUTPUT_SLOT_SPACING+1) {
                         @Override
                         public boolean mayPlace(ItemStack stack) {
                             return false; // 输出槽不能手动放置物品
@@ -98,11 +100,10 @@ public class AdvancedAlloyFurnaceMenu extends AbstractContainerMenu {
                     });
                 }
 
-                // 新增：催化剂槽 (12)
-                this.addSlot(new HighStackSlotItemHandler(handler, 12, CATALYST_SLOT_X+1, CATALYST_SLOT_Y+1) {
+                // 催化剂槽 (12) - 使用HighStackSlot
+                this.addSlot(new HighStackSlot(handler, 12, CATALYST_SLOT_X+1, CATALYST_SLOT_Y+1) {
                     @Override
                     public boolean mayPlace(ItemStack stack) {
-                        // 只能放置无用锭
                         if (blockEntity instanceof AdvancedAlloyFurnaceBlockEntity furnace) {
                             return furnace.isUselessIngot(stack);
                         }
@@ -110,11 +111,10 @@ public class AdvancedAlloyFurnaceMenu extends AbstractContainerMenu {
                     }
                 });
 
-                // 新增：模具槽 (13)
-                this.addSlot(new HighStackSlotItemHandler(handler, 13, MOLD_SLOT_X+1, MOLD_SLOT_Y+1) {
+                // 模具槽 (13) - 使用HighStackSlot
+                this.addSlot(new HighStackSlot(handler, 13, MOLD_SLOT_X+1, MOLD_SLOT_Y+1) {
                     @Override
                     public boolean mayPlace(ItemStack stack) {
-                        // 只能放置金属模具
                         if (blockEntity instanceof AdvancedAlloyFurnaceBlockEntity furnace) {
                             return furnace.isMetalMold(stack);
                         }
@@ -437,7 +437,7 @@ public class AdvancedAlloyFurnaceMenu extends AbstractContainerMenu {
     }
 
     // 修复：自定义槽位类，支持高堆叠
-    private static class HighStackSlotItemHandler extends SlotItemHandler {
+    public static class HighStackSlotItemHandler extends SlotItemHandler {
         public HighStackSlotItemHandler(net.minecraftforge.items.IItemHandler itemHandler, int index, int xPosition, int yPosition) {
             super(itemHandler, index, xPosition, yPosition);
         }

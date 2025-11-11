@@ -4,13 +4,13 @@
     {
       "ingredient": {
         "tag": "forge:ingots/iron",
-        "count": 1259712
+        "count": 1260000
       }
     },
     {
       "ingredient": {
         "tag": "minecraft:coals",
-        "count": 314928
+        "count": 315000
       }
     }
   ],
@@ -21,7 +21,7 @@
   "results": [
     {
       "item": "mekanism:ingot_steel",
-      "count": 1259712
+      "count": 1260000
     }
   ],
   "energy": 1024000,

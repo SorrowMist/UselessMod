@@ -5,6 +5,8 @@ import com.sorrowmist.useless.UselessMod;
 import com.sorrowmist.useless.menu.slot.HighStackSlot;
 import com.sorrowmist.useless.networking.ClearFluidPacket;
 import com.sorrowmist.useless.networking.FluidInteractionPacket;
+import com.sorrowmist.useless.recipes.advancedalloyfurnace.AdvancedAlloyFurnaceRecipe;
+import com.sorrowmist.useless.registry.CatalystManager;
 import com.sorrowmist.useless.utils.NumberFormatUtil;
 import com.sorrowmist.useless.utils.SlotRendererUtil;
 import net.minecraft.ChatFormatting;
@@ -334,32 +336,33 @@ public class AdvancedAlloyFurnaceScreen extends AbstractContainerScreen<Advanced
                 18, 18);
     }
 
-    // 新增：渲染指示灯
+    // 修改：渲染指示灯，现在显示并行数状态
     private void renderIndicators(GuiGraphics guiGraphics, int x, int y) {
         if (menu == null) return;
 
-        // 渲染催化剂指示灯
+        int currentParallel = menu.getCurrentParallel();
+        int maxParallel = menu.getMaxParallel();
+
+        // 渲染催化剂指示灯 - 根据并行数状态显示不同颜色
         int catalystIndicatorX = x + menu.getCatalystSlotX() + (18 - menu.getIndicatorSize()) / 2;
         int catalystIndicatorY = y + menu.getCatalystSlotY() + menu.getIndicatorYOffset();
 
-        int catalystIndicatorU = menu.isCatalystRequired() ? YELLOW_INDICATOR_U : BLUE_INDICATOR_U;
-        int catalystIndicatorV = menu.isCatalystRequired() ? YELLOW_INDICATOR_V : BLUE_INDICATOR_V;
+        int catalystIndicatorU = (currentParallel > 1) ? YELLOW_INDICATOR_U : BLUE_INDICATOR_U;
+        int catalystIndicatorV = (currentParallel > 1) ? YELLOW_INDICATOR_V : BLUE_INDICATOR_V;
 
         guiGraphics.blit(COMPONENTS_TEXTURE,
                 catalystIndicatorX, catalystIndicatorY,
                 catalystIndicatorU, catalystIndicatorV,
                 menu.getIndicatorSize(), menu.getIndicatorSize());
 
-        // 渲染模具指示灯
+        // 模具指示灯保持不变（如果需要的话）
         int moldIndicatorX = x + menu.getMoldSlotX() + (18 - menu.getIndicatorSize()) / 2;
         int moldIndicatorY = y + menu.getMoldSlotY() + menu.getIndicatorYOffset();
 
-        int moldIndicatorU = menu.isMoldRequired() ? YELLOW_INDICATOR_U : BLUE_INDICATOR_U;
-        int moldIndicatorV = menu.isMoldRequired() ? YELLOW_INDICATOR_V : BLUE_INDICATOR_V;
-
+        // 模具不需要并行数指示，保持蓝色
         guiGraphics.blit(COMPONENTS_TEXTURE,
                 moldIndicatorX, moldIndicatorY,
-                moldIndicatorU, moldIndicatorV,
+                BLUE_INDICATOR_U, BLUE_INDICATOR_V,
                 menu.getIndicatorSize(), menu.getIndicatorSize());
     }
 
@@ -509,6 +512,8 @@ public class AdvancedAlloyFurnaceScreen extends AbstractContainerScreen<Advanced
     /**
      * 渲染自定义工具提示
      */
+    // 修改工具提示渲染方法，实时显示并行数
+    // 在 renderCustomTooltips 方法中修改催化剂和模具信息区域悬停提示
     private void renderCustomTooltips(GuiGraphics guiGraphics, int mouseX, int mouseY) {
         if (menu == null) return;
 
@@ -534,6 +539,9 @@ public class AdvancedAlloyFurnaceScreen extends AbstractContainerScreen<Advanced
                 float progressPercent = (float) progress / maxProgress * 100;
                 tooltip.add(Component.literal("进度: " + progress + "/" + maxProgress + " (" + String.format("%.1f", progressPercent) + "%)"));
                 tooltip.add(Component.literal("状态: " + (menu.isActive() ? "工作中" : "空闲")));
+                // 添加并行数信息
+                tooltip.add(Component.literal("本次并行数: " + menu.getCurrentParallel()));
+                tooltip.add(Component.literal("当前最大并行数: " + menu.getMaxParallel()));
             } else {
                 tooltip.add(Component.literal("没有活动进程"));
             }
@@ -550,33 +558,61 @@ public class AdvancedAlloyFurnaceScreen extends AbstractContainerScreen<Advanced
             guiGraphics.renderComponentTooltip(this.font, tooltip, mouseX, mouseY);
         }
 
-        // 新增：催化剂和模具信息区域悬停提示
+        // 修复：催化剂和模具信息区域悬停提示，始终显示并行数信息
         if (isMouseOverArea(mouseX, mouseY,
                 x + CATALYST_MOLD_INFO_X, y + CATALYST_MOLD_INFO_Y,
                 CATALYST_MOLD_INFO_WIDTH, CATALYST_MOLD_INFO_HEIGHT)) {
             List<Component> tooltip = new ArrayList<>();
 
-            // 催化剂信息
-            if (menu.isCatalystRequired()) {
-                tooltip.add(Component.literal("催化剂: 需要").withStyle(ChatFormatting.YELLOW));
-            } else {
-                tooltip.add(Component.literal("催化剂: 不需要").withStyle(ChatFormatting.BLUE));
+            int currentParallel = menu.getCurrentParallel();
+            int maxParallel = menu.getMaxParallel();
+
+            tooltip.add(Component.literal("本次并行数: " + currentParallel).withStyle(ChatFormatting.YELLOW));
+            tooltip.add(Component.literal("当前最大并行数: " + maxParallel).withStyle(ChatFormatting.BLUE));
+
+            // 检查配方是否允许催化剂
+            if (menu.getBlockEntity() != null) {
+                ItemStack catalyst = menu.getBlockEntity().getItemInSlot(12); // 催化剂槽位
+
+                // 获取当前配方（需要添加获取方法）
+                AdvancedAlloyFurnaceRecipe currentRecipe = menu.getBlockEntity().getCurrentRecipe();
+                boolean catalystAllowed = currentRecipe == null || currentRecipe.isCatalystAllowed();
+
+                if (menu.getBlockEntity().hasCatalyst() && catalystAllowed) {
+                    String catalystName = CatalystManager.getCatalystName(catalyst);
+                    int catalystParallel = CatalystManager.getCatalystParallel(catalyst);
+                    tooltip.add(Component.literal("催化剂: " + catalystName + " (" + catalystParallel + "倍)").withStyle(ChatFormatting.GREEN));
+                } else if (!catalystAllowed) {
+                    tooltip.add(Component.literal("该配方不支持催化剂并行").withStyle(ChatFormatting.RED));
+                }
             }
 
-            tooltip.add(Component.literal("催化剂在合成中")
-                    .append(Component.literal("会").withStyle(style -> style.withColor(0xFFD700)))
-                    .append(Component.literal("被消耗")).withStyle(ChatFormatting.GRAY));
+            tooltip.add(Component.literal(""));
+            tooltip.add(Component.literal("并行数说明:").withStyle(ChatFormatting.GOLD));
+            tooltip.add(Component.literal("• 消耗和产出乘以并行数").withStyle(ChatFormatting.GRAY));
+            tooltip.add(Component.literal("• 处理时间保持不变").withStyle(ChatFormatting.GRAY));
+            tooltip.add(Component.literal("• 能量消耗乘以并行数").withStyle(ChatFormatting.GRAY));
+            tooltip.add(Component.literal("• 催化剂为可选项，可提高并行数").withStyle(ChatFormatting.GRAY));
+            tooltip.add(Component.literal("⚠ 催化剂会被消耗").withStyle(ChatFormatting.RED));
 
-            // 模具信息
-            if (menu.isMoldRequired()) {
-                tooltip.add(Component.literal("模具: 需要").withStyle(ChatFormatting.YELLOW));
-            } else {
-                tooltip.add(Component.literal("模具: 不需要").withStyle(ChatFormatting.BLUE));
-            }
+            guiGraphics.renderComponentTooltip(this.font, tooltip, mouseX, mouseY);
+        }
 
-            tooltip.add(Component.literal("模具在合成中")
-                    .append(Component.literal("不会").withStyle(style -> style.withColor(0xFFD700)))
-                    .append(Component.literal("被消耗")).withStyle(ChatFormatting.GRAY));
+        // 催化剂槽位悬停提示
+        if (isMouseOverArea(mouseX, mouseY,
+                x + menu.getCatalystSlotX(), y + menu.getCatalystSlotY(), 18, 18)) {
+            List<Component> tooltip = new ArrayList<>();
+
+            tooltip.add(Component.literal("催化剂槽位").withStyle(ChatFormatting.GOLD));
+            tooltip.add(Component.literal("放入无用锭可提高并行数").withStyle(ChatFormatting.GRAY));
+
+            // 使用 CatalystManager 获取格式化的催化剂列表
+            tooltip.addAll(CatalystManager.getFormattedCatalystList());
+
+            tooltip.add(Component.literal(""));
+            tooltip.add(Component.literal("催化剂为可选项，不放入时并行数为1").withStyle(ChatFormatting.YELLOW));
+            tooltip.add(Component.literal("注意: 合成无用锭时催化剂无效").withStyle(ChatFormatting.RED));
+            tooltip.add(Component.literal("⚠ 催化剂会被消耗").withStyle(ChatFormatting.RED));
 
             guiGraphics.renderComponentTooltip(this.font, tooltip, mouseX, mouseY);
         }

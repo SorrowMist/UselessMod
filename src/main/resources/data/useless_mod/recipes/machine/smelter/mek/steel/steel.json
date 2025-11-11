@@ -14,8 +14,13 @@
       }
     }
   ],
+  "catalyst": {
+    "tag": "useless_mod:useless_ingots",
+    "count": 1
+  },
   "results": [
-    {"item": "mekanism:ingot_steel",
+    {
+      "item": "mekanism:ingot_steel",
       "count": 64
     }
   ],

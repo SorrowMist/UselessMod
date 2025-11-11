@@ -5,6 +5,7 @@ import com.mojang.blaze3d.vertex.PoseStack;
 import com.sorrowmist.useless.UselessMod;
 import com.sorrowmist.useless.blocks.advancedalloyfurnace.AdvancedAlloyFurnaceBlock;
 import com.sorrowmist.useless.recipes.advancedalloyfurnace.AdvancedAlloyFurnaceRecipe;
+import com.sorrowmist.useless.registry.CatalystManager;
 import com.sorrowmist.useless.utils.NumberFormatUtil;
 import mezz.jei.api.constants.VanillaTypes;
 import mezz.jei.api.gui.builder.IRecipeLayoutBuilder;
@@ -18,6 +19,7 @@ import mezz.jei.api.recipe.IFocusGroup;
 import mezz.jei.api.recipe.RecipeIngredientRole;
 import mezz.jei.api.recipe.RecipeType;
 import mezz.jei.api.recipe.category.IRecipeCategory;
+import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
@@ -83,12 +85,18 @@ public class AdvancedAlloyFurnaceRecipeCategory implements IRecipeCategory<Advan
     private static final int TIME_DISPLAY_WIDTH = 33;
     private static final int TIME_DISPLAY_HEIGHT = 6;
     // 文字提示位置 - 向左移动5像素
-    private static final int CATALYST_TEXT_X = 57; // 62 - 5
+
     private static final int CATALYST_TEXT_Y = 13;
-    private static final int MOLD_TEXT_X = 57; // 62 - 5
+
     private static final int MOLD_TEXT_Y = 32;
+    // 并行数显示位置
+    private static final int PARALLEL_TEXT_X = 57;
+    private static final int PARALLEL_TEXT_Y = 5;
     // 槽位实际渲染尺寸（MC默认）
     private static final int SLOT_SIZE = 16;
+
+
+
     private final IDrawable background;
     private final IDrawable icon;
     private final Component title;
@@ -261,47 +269,86 @@ public class AdvancedAlloyFurnaceRecipeCategory implements IRecipeCategory<Advan
         int timeX = TIME_DISPLAY_X + (TIME_DISPLAY_WIDTH - timeTextWidth) / 2;
         guiGraphics.drawString(minecraft.font, timeText, timeX, TIME_DISPLAY_Y, 0x00FF00, false);
 
-        // 绘制需求状态文字提示（红色）- 缩小字体
-        if (recipe.requiresCatalyst()) {
+        // 修改：只有当配方允许催化剂时才显示提示
+        if (recipe.requiresCatalyst() && recipe.isCatalystAllowed()) {
             guiGraphics.pose().pushPose();
-            guiGraphics.pose().scale(0.7f, 0.7f, 1.0f);
-            guiGraphics.drawString(minecraft.font, "需要催化剂（会被消耗）",
-                    (int) (CATALYST_TEXT_X / 0.7f+7), (int) (CATALYST_TEXT_Y / 0.7f), 0xFF0000, false);
+            float scale = 0.7f;
+            guiGraphics.pose().scale(scale, scale, 1.0f);
+
+            String catalystText = "无用锭为可选催化剂";
+            int textWidth = minecraft.font.width(catalystText);
+            // 在整张 JEI 背景宽度内居中
+            int centeredX = (int) ((DISPLAY_WIDTH / 2.0f - textWidth * scale / 2) / scale);
+            int y = (int) (CATALYST_TEXT_Y / scale);
+
+            guiGraphics.drawString(minecraft.font, catalystText, centeredX, y, 0xFF0000, false);
             guiGraphics.pose().popPose();
         }
 
+// 模具提示
         if (recipe.requiresMold()) {
             guiGraphics.pose().pushPose();
-            guiGraphics.pose().scale(0.7f, 0.7f, 1.0f);
-            guiGraphics.drawString(minecraft.font, "需要模具（不会被消耗）",
-                    (int) (MOLD_TEXT_X / 0.7f+7), (int) (MOLD_TEXT_Y / 0.7f), 0xFF0000, false);
+            float scale = 0.7f;
+            guiGraphics.pose().scale(scale, scale, 1.0f);
+
+            String moldText = "需要模具（不会被消耗）";
+            int textWidth = minecraft.font.width(moldText);
+            int centeredX = (int) ((DISPLAY_WIDTH / 2.0f - textWidth * scale / 2) / scale);
+            int y = (int) (MOLD_TEXT_Y / scale);
+
+            guiGraphics.drawString(minecraft.font, moldText, centeredX, y, 0xFF0000, false);
             guiGraphics.pose().popPose();
         }
 
         // 注意：已取消流体数量显示
     }
 
-    @Override
-    public void getTooltip(ITooltipBuilder tooltip, AdvancedAlloyFurnaceRecipe recipe, IRecipeSlotsView recipeSlotsView, double mouseX, double mouseY) {
-        // 取消催化槽、流体槽和模具槽的悬停提示
-
-        // 只保留能量和时间显示的悬停提示
-        // 检查鼠标是否在能量显示区域
-        if (mouseX >= ENERGY_DISPLAY_X && mouseX <= ENERGY_DISPLAY_X + ENERGY_DISPLAY_WIDTH &&
-                mouseY >= ENERGY_DISPLAY_Y && mouseY <= ENERGY_DISPLAY_Y + ENERGY_DISPLAY_HEIGHT) {
-            tooltip.add(Component.literal("能量消耗: " + NumberFormatUtil.formatEnergy(recipe.getEnergy())));
+    // 移除旧的 CATALYST_PARALLEL_MAP，使用统一的 CatalystManager
+    private int getCatalystParallel(AdvancedAlloyFurnaceRecipe recipe) {
+        if (!recipe.requiresCatalyst()) {
+            return 1;
         }
 
-        // 检查鼠标是否在时间显示区域
+        // 获取催化剂的第一个物品作为代表
+        ItemStack[] catalystStacks = recipe.getCatalyst().getItems();
+        if (catalystStacks.length > 0) {
+            return CatalystManager.getCatalystParallel(catalystStacks[0]);
+        }
+
+        return 1;
+    }
+
+    // 修改工具提示方法，添加并行数信息
+    @Override
+    public void getTooltip(ITooltipBuilder tooltip, AdvancedAlloyFurnaceRecipe recipe, IRecipeSlotsView recipeSlotsView, double mouseX, double mouseY) {
+        // 能量和时间显示的悬停提示
+        if (mouseX >= ENERGY_DISPLAY_X && mouseX <= ENERGY_DISPLAY_X + ENERGY_DISPLAY_WIDTH &&
+                mouseY >= ENERGY_DISPLAY_Y && mouseY <= ENERGY_DISPLAY_Y + ENERGY_DISPLAY_HEIGHT) {
+            tooltip.add(Component.literal("基础能量消耗: " + NumberFormatUtil.formatEnergy(recipe.getEnergy())));
+            tooltip.add(Component.literal("实际能量 = 基础能量 × 并行数"));
+        }
+
+        // 时间显示区域
         if (mouseX >= TIME_DISPLAY_X && mouseX <= TIME_DISPLAY_X + TIME_DISPLAY_WIDTH &&
                 mouseY >= TIME_DISPLAY_Y && mouseY <= TIME_DISPLAY_Y + TIME_DISPLAY_HEIGHT) {
             tooltip.add(Component.literal("处理时间: " + recipe.getProcessTime() + " ticks"));
+            tooltip.add(Component.literal("处理时间不受并行数影响"));
+        }
+
+
+        // 并行数效果说明区域
+        if (mouseX >= PARALLEL_TEXT_X && mouseX <= PARALLEL_TEXT_X + 120 &&
+                mouseY >= PARALLEL_TEXT_Y && mouseY <= PARALLEL_TEXT_Y + 10) {
+            tooltip.add(Component.literal("并行数效果说明").withStyle(ChatFormatting.GOLD));
+            tooltip.add(Component.literal("• 输入物品消耗 × 并行数").withStyle(ChatFormatting.GRAY));
+            tooltip.add(Component.literal("• 输出物品数量 × 并行数").withStyle(ChatFormatting.GRAY));
+            tooltip.add(Component.literal("• 能量消耗 × 并行数").withStyle(ChatFormatting.GRAY));
+            tooltip.add(Component.literal("• 处理时间保持不变").withStyle(ChatFormatting.GRAY));
+            tooltip.add(Component.literal("⚠ 催化剂会被消耗").withStyle(ChatFormatting.RED));
         }
     }
 
     private static class ItemStackRenderer implements IIngredientRenderer<ItemStack> {
-
-
 
         @Override
         public void render(GuiGraphics guiGraphics, ItemStack stack) {

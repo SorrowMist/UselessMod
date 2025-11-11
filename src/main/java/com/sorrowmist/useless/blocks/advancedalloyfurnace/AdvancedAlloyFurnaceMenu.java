@@ -401,14 +401,14 @@ public class AdvancedAlloyFurnaceMenu extends AbstractContainerMenu {
         return data.get(5);
     }
 
-    // 新增：获取催化剂需求状态
-    public boolean isCatalystRequired() {
-        return data.get(6) == 1;
+    // 修改：获取当前并行数
+    public int getCurrentParallel() {
+        return data.get(6);
     }
 
-    // 新增：获取模具需求状态
-    public boolean isMoldRequired() {
-        return data.get(7) == 1;
+    // 修改：获取最大并行数
+    public int getMaxParallel() {
+        return data.get(7);
     }
 
     // 新增：获取催化剂和模具槽位位置信息

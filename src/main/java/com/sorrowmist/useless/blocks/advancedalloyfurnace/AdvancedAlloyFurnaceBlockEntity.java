@@ -5,6 +5,7 @@ import com.sorrowmist.useless.blocks.ModBlockEntities;
 import com.sorrowmist.useless.common.inventory.MultiSlotItemHandler;
 import com.sorrowmist.useless.recipes.advancedalloyfurnace.AdvancedAlloyFurnaceRecipe;
 import com.sorrowmist.useless.recipes.advancedalloyfurnace.AdvancedAlloyFurnaceRecipeManager;
+import com.sorrowmist.useless.registry.CatalystManager;
 import com.sorrowmist.useless.registry.ModIngots;
 import com.sorrowmist.useless.registry.ModMolds;
 import net.minecraft.core.BlockPos;
@@ -23,6 +24,7 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.inventory.ContainerData;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.crafting.Ingredient;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraftforge.common.capabilities.Capability;
@@ -42,7 +44,7 @@ import java.util.List;
 public class AdvancedAlloyFurnaceBlockEntity extends BlockEntity implements MenuProvider {
 
     // 能量系统
-    private final CustomEnergyStorage energyStorage = new CustomEnergyStorage(500000000, 500000000, 0);
+    private final CustomEnergyStorage energyStorage = new CustomEnergyStorage(Integer.MAX_VALUE, Integer.MAX_VALUE, 0);
     private final LazyOptional<IEnergyStorage> lazyEnergyHandler = LazyOptional.of(() -> energyStorage);
 
     // 状态管理
@@ -55,9 +57,10 @@ public class AdvancedAlloyFurnaceBlockEntity extends BlockEntity implements Menu
     private int processMax = 200;
     private int processTick = 10;
 
-    // 在类中添加两个字段来存储需求状态
-    private boolean catalystRequired = false;
-    private boolean moldRequired = false;
+    // 并行数相关
+    private int currentParallel = 1;
+    private int maxParallel = 1;
+    private boolean hasCatalyst = false;
 
     // 配方管理
     private AdvancedAlloyFurnaceRecipe currentRecipe;
@@ -73,8 +76,7 @@ public class AdvancedAlloyFurnaceBlockEntity extends BlockEntity implements Menu
     // 总槽位数从12增加到14
     private static final int TOTAL_SLOTS = 14;
 
-    // 容器数据同步 - 修改计数为8（增加2个指示灯状态）
-    // 修改 ContainerData 的 get 方法
+    // 容器数据同步 - 修改为并行数
     private final ContainerData data = new ContainerData() {
         @Override
         public int get(int index) {
@@ -85,8 +87,8 @@ public class AdvancedAlloyFurnaceBlockEntity extends BlockEntity implements Menu
                 case 3 -> getMaxProgress();
                 case 4 -> isActive() ? 1 : 0;
                 case 5 -> getProcessTick();
-                case 6 -> catalystRequired ? 1 : 0;  // 使用存储的状态
-                case 7 -> moldRequired ? 1 : 0;      // 使用存储的状态
+                case 6 -> getCurrentParallel();  // 当前并行数
+                case 7 -> getMaxParallel();      // 最大并行数
                 default -> 0;
             };
         }
@@ -98,8 +100,8 @@ public class AdvancedAlloyFurnaceBlockEntity extends BlockEntity implements Menu
                 case 2 -> process = value;
                 case 4 -> isActive = value == 1;
                 case 5 -> processTick = value;
-                case 6 -> catalystRequired = value == 1;  // 允许设置状态
-                case 7 -> moldRequired = value == 1;      // 允许设置状态
+                case 6 -> currentParallel = value;
+                case 7 -> maxParallel = value;
             }
         }
 
@@ -109,12 +111,30 @@ public class AdvancedAlloyFurnaceBlockEntity extends BlockEntity implements Menu
         }
     };
 
+    // 修复催化剂状态检测方法
+    public boolean hasCatalyst() {
+        // 检查是否有配方需要催化剂
+        if (currentRecipe == null || !currentRecipe.requiresCatalyst()) {
+            return false;
+        }
+
+        // 检查催化剂槽位是否有匹配的催化剂
+        ItemStack catalyst = itemHandler.getStackInSlot(CATALYST_SLOT);
+        if (catalyst.isEmpty()) {
+            return false;
+        }
+
+        // 检查催化剂是否匹配配方要求
+        return currentRecipe.getCatalyst().test(catalyst) && catalyst.getCount() >= currentRecipe.getCatalystCount();
+    }
+
+
     // 修复：使用自定义的高堆叠物品处理器，不再使用匿名内部类
     private final MultiSlotItemHandler itemHandler;
     private final LazyOptional<IItemHandler> lazyItemHandler;
 
     // 修复流体槽
-    private final FluidTank inputFluidTank = new FluidTank(16000) {
+    private final FluidTank inputFluidTank = new FluidTank(Integer.MAX_VALUE) {
         @Override
         protected void onContentsChanged() {
             setChanged();
@@ -129,7 +149,7 @@ public class AdvancedAlloyFurnaceBlockEntity extends BlockEntity implements Menu
         }
     };
 
-    private final FluidTank outputFluidTank = new FluidTank(16000) {
+    private final FluidTank outputFluidTank = new FluidTank(Integer.MAX_VALUE) {
         @Override
         protected void onContentsChanged() {
             setChanged();
@@ -232,7 +252,7 @@ public class AdvancedAlloyFurnaceBlockEntity extends BlockEntity implements Menu
     // 数据同步管理
     private boolean needsClientUpdate = false;
 
-    // 在tick方法中更新活动状态
+    // 在tick方法中实时更新并行数
     public void tick() {
         if (level == null) return;
 
@@ -240,6 +260,20 @@ public class AdvancedAlloyFurnaceBlockEntity extends BlockEntity implements Menu
 
         if (!level.isClientSide) {
             // 服务端逻辑
+
+            // 实时更新并行数（无论是否激活）
+            List<ItemStack> inputItems = new ArrayList<>();
+            for (int i = 0; i < 6; i++) {
+                inputItems.add(itemHandler.getStackInSlot(i));
+            }
+            FluidStack inputFluid = inputFluidTank.getFluid();
+            ItemStack catalyst = itemHandler.getStackInSlot(CATALYST_SLOT);
+            updateParallelNumbers(catalyst, currentRecipe, inputItems, inputFluid);
+
+            // 始终查找匹配的配方来更新并行数
+            AdvancedAlloyFurnaceRecipe foundRecipe = findMatchingRecipe();
+            updateParallelNumbers(catalyst, foundRecipe, inputItems, inputFluid);
+
             if (isActive) {
                 processTick();
                 if (canProcessFinish()) {
@@ -395,40 +429,99 @@ public class AdvancedAlloyFurnaceBlockEntity extends BlockEntity implements Menu
     // 配方处理逻辑
     protected boolean canProcessStart() {
         if (energyStorage.getEnergyStored() < processTick) {
+            UselessMod.LOGGER.debug("Cannot start process: insufficient energy. Have: {}, Need: {}",
+                    energyStorage.getEnergyStored(), processTick);
             return false;
         }
 
         currentRecipe = findMatchingRecipe();
         if (currentRecipe == null) {
+            UselessMod.LOGGER.debug("Cannot start process: no matching recipe found");
             return false;
         }
 
-        return validateOutputs(currentRecipe);
+        boolean canValidate = validateOutputs(currentRecipe, currentParallel);
+        UselessMod.LOGGER.debug("Output validation result: {}", canValidate);
+
+        return canValidate;
     }
 
     protected boolean canProcessFinish() {
-        return process <= 0;
+        boolean canFinish = process <= 0;
+        UselessMod.LOGGER.debug("Can process finish: {} (progress: {}/{})", canFinish, process, processMax);
+        return canFinish;
     }
 
     protected void processStart() {
         if (currentRecipe != null) {
             processMax = currentRecipe.getProcessTime();
-            processTick = Math.max(1, currentRecipe.getEnergy() / currentRecipe.getProcessTime());
+            processTick = Math.max(1, (currentRecipe.getEnergy() * currentParallel) / currentRecipe.getProcessTime());
             process = processMax;
+
+            UselessMod.LOGGER.debug("Process started - Recipe: {}, Parallel: {}, ProcessTime: {}, Energy/t: {}",
+                    currentRecipe.getId(), currentParallel, processMax, processTick);
+
             setChanged();
             markForClientUpdate();
+        } else {
+            UselessMod.LOGGER.error("processStart called but currentRecipe is null!");
         }
     }
 
     protected void processFinish() {
-        if (currentRecipe == null || !validateInputs(currentRecipe)) {
+        if (currentRecipe == null) {
+            UselessMod.LOGGER.error("processFinish called but currentRecipe is null!");
             processOff();
             return;
         }
 
+        if (!validateInputs(currentRecipe)) {
+            UselessMod.LOGGER.warn("Input validation failed in processFinish for recipe: {}", currentRecipe.getId());
+            processOff();
+            return;
+        }
+
+        UselessMod.LOGGER.debug("Processing recipe: {} with parallel: {}", currentRecipe.getId(), currentParallel);
+
+        // 记录处理前的状态
+        UselessMod.LOGGER.debug("Before processing - Input items: {}, Fluid: {}",
+                getInputItemsDebugString(), inputFluidTank.getFluid().getAmount());
+        UselessMod.LOGGER.debug("Before processing - Output items: {}, Fluid: {}",
+                getOutputItemsDebugString(), outputFluidTank.getFluid().getAmount());
+
         resolveRecipe(currentRecipe);
+
+        // 记录处理后的状态
+        UselessMod.LOGGER.debug("After processing - Input items: {}, Fluid: {}",
+                getInputItemsDebugString(), inputFluidTank.getFluid().getAmount());
+        UselessMod.LOGGER.debug("After processing - Output items: {}, Fluid: {}",
+                getOutputItemsDebugString(), outputFluidTank.getFluid().getAmount());
+
         setChanged();
         markForClientUpdate();
+    }
+
+    // 添加调试方法
+    private String getInputItemsDebugString() {
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < 6; i++) {
+            ItemStack stack = itemHandler.getStackInSlot(i);
+            if (!stack.isEmpty()) {
+                sb.append(stack.getItem()).append("x").append(stack.getCount()).append(" ");
+            }
+        }
+        return sb.toString().isEmpty() ? "empty" : sb.toString();
+    }
+
+    private String getOutputItemsDebugString() {
+        StringBuilder sb = new StringBuilder();
+        for (int i = 6; i < 12; i++) {
+            ItemStack stack = itemHandler.getStackInSlot(i);
+            if (!stack.isEmpty()) {
+                sb.append(stack.getItem()).append("x").append(stack.getCount()).append(" ");
+            }
+        }
+        return sb.toString().isEmpty() ? "empty" : sb.toString();
     }
 
     protected void processOff() {
@@ -451,7 +544,8 @@ public class AdvancedAlloyFurnaceBlockEntity extends BlockEntity implements Menu
     }
 
     // 配方查找和验证
-    // 在 findMatchingRecipe 方法中更新需求状态
+    // 修改配方查找方法，计算并行数
+    // 修改配方查找方法，确保正确更新并行数
     private AdvancedAlloyFurnaceRecipe findMatchingRecipe() {
         List<ItemStack> inputItems = new ArrayList<>();
         for (int i = 0; i < 6; i++) {
@@ -465,16 +559,86 @@ public class AdvancedAlloyFurnaceBlockEntity extends BlockEntity implements Menu
         AdvancedAlloyFurnaceRecipe recipe = AdvancedAlloyFurnaceRecipeManager.getInstance()
                 .getRecipeWithCatalystOrMold(level, inputItems, inputFluid, catalyst, mold);
 
-        // 更新需求状态
-        if (recipe != null) {
-            catalystRequired = recipe.requiresCatalyst();
-            moldRequired = recipe.requiresMold();
-        } else {
-            catalystRequired = false;
-            moldRequired = false;
-        }
+        // 更新当前配方引用
+        currentRecipe = recipe;
 
         return recipe;
+    }
+    // 修复并行数更新逻辑
+    // 修复并行数更新逻辑
+    // 修改并行数更新方法，确保正确更新催化剂状态
+    // 在 AdvancedAlloyFurnaceBlockEntity.java 的 updateParallelNumbers 方法中修改并行数计算
+    private void updateParallelNumbers(ItemStack catalyst, AdvancedAlloyFurnaceRecipe recipe, List<ItemStack> inputItems, FluidStack inputFluid) {
+        // 检查配方是否允许催化剂
+        boolean catalystAllowed = recipe != null && recipe.isCatalystAllowed();
+
+        // 计算最大并行数（基于催化剂和黑名单）
+        maxParallel = catalystAllowed ? CatalystManager.getCatalystParallel(catalyst) : 1;
+
+        // 如果有配方，计算实际并行数
+        if (recipe != null) {
+            currentParallel = calculateActualParallel(recipe, inputItems, inputFluid, maxParallel);
+        } else {
+            currentParallel = 1;
+        }
+
+        // 更新催化剂状态（仅当配方允许催化剂时）
+        if (recipe != null && recipe.requiresCatalyst() && catalystAllowed) {
+            hasCatalyst = !catalyst.isEmpty() && recipe.getCatalyst().test(catalyst) && catalyst.getCount() >= recipe.getCatalystCount();
+        } else {
+            hasCatalyst = false;
+        }
+
+        // 标记需要客户端更新
+        markForClientUpdate();
+    }
+
+
+    // 在 AdvancedAlloyFurnaceBlockEntity.java 中添加
+    public AdvancedAlloyFurnaceRecipe getCurrentRecipe() {
+        return currentRecipe;
+    }
+
+    // 计算实际并行数
+    private int calculateActualParallel(AdvancedAlloyFurnaceRecipe recipe, List<ItemStack> inputItems,
+                                        FluidStack inputFluid, int maxParallel) {
+        if (maxParallel <= 1) {
+            return 1;
+        }
+
+        // 计算输入物品支持的并行数
+        int itemParallel = Integer.MAX_VALUE;
+        for (int i = 0; i < recipe.getInputItems().size(); i++) {
+            Ingredient ingredient = recipe.getInputItems().get(i);
+            int requiredCount = recipe.getInputItemCounts().get(i);
+
+            int availableCount = 0;
+            for (ItemStack stack : inputItems) {
+                if (ingredient.test(stack)) {
+                    availableCount += stack.getCount();
+                }
+            }
+
+            if (requiredCount > 0) {
+                int possibleParallel = availableCount / requiredCount;
+                itemParallel = Math.min(itemParallel, possibleParallel);
+            }
+        }
+
+        // 计算输入流体支持的并行数
+        int fluidParallel = Integer.MAX_VALUE;
+        FluidStack requiredFluid = recipe.getInputFluid();
+        if (!requiredFluid.isEmpty() && requiredFluid.getAmount() > 0) {
+            if (inputFluid.getFluid().isSame(requiredFluid.getFluid())) {
+                fluidParallel = inputFluid.getAmount() / requiredFluid.getAmount();
+            } else {
+                fluidParallel = 0;
+            }
+        }
+
+        // 取最小并行数，但不超过最大并行数
+        int actualParallel = Math.min(Math.min(itemParallel, fluidParallel), maxParallel);
+        return Math.max(1, actualParallel);
     }
 
     private boolean validateInputs(AdvancedAlloyFurnaceRecipe recipe) {
@@ -487,57 +651,78 @@ public class AdvancedAlloyFurnaceBlockEntity extends BlockEntity implements Menu
         ItemStack catalyst = itemHandler.getStackInSlot(CATALYST_SLOT);
         ItemStack mold = itemHandler.getStackInSlot(MOLD_SLOT);
 
-        return recipe.matches(inputItems, inputFluid, catalyst, mold);
+        // 修改：使用新的匹配逻辑，使催化剂为可选项
+        boolean matches = recipe.matches(inputItems, inputFluid, catalyst, mold);
+        UselessMod.LOGGER.debug("Input validation for recipe {}: {}", recipe.getId(), matches);
+
+        return matches;
     }
 
-    private boolean validateOutputs(AdvancedAlloyFurnaceRecipe recipe) {
+    private boolean validateOutputs(AdvancedAlloyFurnaceRecipe recipe, int parallel) {
         // 首先检查周围容器是否有空间（优先外部输出）
-        if (hasExternalOutputSpace(recipe)) {
+        if (hasExternalOutputSpace(recipe, parallel)) {
             return true;
         }
 
         // 如果没有外部空间，检查自身输出空间
-        return hasInternalOutputSpace(recipe);
+        return hasInternalOutputSpace(recipe, parallel);
     }
 
     // 检查外部容器是否有输出空间
-    private boolean hasExternalOutputSpace(AdvancedAlloyFurnaceRecipe recipe) {
+    private boolean hasExternalOutputSpace(AdvancedAlloyFurnaceRecipe recipe, int parallel) {
         // 检查输出物品在外部容器的空间
         for (ItemStack output : recipe.getOutputItems()) {
-            if (!output.isEmpty() && !canOutputItemToExternal(output.copy())) {
-                return false;
+            if (!output.isEmpty()) {
+                ItemStack testOutput = output.copy();
+                testOutput.setCount(testOutput.getCount() * parallel);
+                if (!canOutputItemToExternal(testOutput)) {
+                    return false;
+                }
             }
         }
 
         // 检查输出流体在外部容器的空间
         FluidStack outputFluid = recipe.getOutputFluid();
-        if (!outputFluid.isEmpty() && !canOutputFluidToExternal(outputFluid.copy())) {
-            return false;
+        if (!outputFluid.isEmpty()) {
+            FluidStack testOutput = outputFluid.copy();
+            testOutput.setAmount(testOutput.getAmount() * parallel);
+            if (!canOutputFluidToExternal(testOutput)) {
+                return false;
+            }
         }
 
         return true;
     }
 
     // 检查自身输出空间
-    private boolean hasInternalOutputSpace(AdvancedAlloyFurnaceRecipe recipe) {
+    private boolean hasInternalOutputSpace(AdvancedAlloyFurnaceRecipe recipe, int parallel) {
         // 检查输出物品空间 - 修改：不再检查堆叠限制，只检查是否有空槽位
         for (ItemStack output : recipe.getOutputItems()) {
-            boolean hasSpace = false;
-            for (int i = 6; i < 12; i++) {
-                ItemStack slot = itemHandler.getStackInSlot(i);
-                // 修改：允许堆叠到已有相同物品的槽位，或者使用空槽位
-                if (slot.isEmpty() || ItemStack.isSameItemSameTags(slot, output)) {
-                    hasSpace = true;
-                    break;
+            if (!output.isEmpty()) {
+                ItemStack testOutput = output.copy();
+                testOutput.setCount(testOutput.getCount() * parallel);
+                boolean hasSpace = false;
+                for (int i = 6; i < 12; i++) {
+                    ItemStack slot = itemHandler.getStackInSlot(i);
+                    // 修改：允许堆叠到已有相同物品的槽位，或者使用空槽位
+                    if (slot.isEmpty() || (ItemStack.isSameItemSameTags(slot, testOutput) &&
+                            slot.getCount() + testOutput.getCount() <= Integer.MAX_VALUE)) {
+                        hasSpace = true;
+                        break;
+                    }
                 }
+                if (!hasSpace) return false;
             }
-            if (!hasSpace) return false;
         }
 
         // 检查输出流体空间
         FluidStack outputFluid = recipe.getOutputFluid();
-        if (!outputFluid.isEmpty() && outputFluidTank.getSpace() < outputFluid.getAmount()) {
-            return false;
+        if (!outputFluid.isEmpty()) {
+            FluidStack testOutput = outputFluid.copy();
+            testOutput.setAmount(testOutput.getAmount() * parallel);
+            if (outputFluidTank.getSpace() < testOutput.getAmount()) {
+                return false;
+            }
         }
 
         return true;
@@ -587,9 +772,14 @@ public class AdvancedAlloyFurnaceBlockEntity extends BlockEntity implements Menu
         return false;
     }
 
-    // 修复的配方处理方法 - 现在优先外部输出
+    // 修复配方处理方法
     private void resolveRecipe(AdvancedAlloyFurnaceRecipe recipe) {
-        if (recipe == null) return;
+        if (recipe == null) {
+            UselessMod.LOGGER.warn("resolveRecipe called with null recipe");
+            return;
+        }
+
+        UselessMod.LOGGER.debug("Resolving recipe: {} with parallel: {}", recipe.getId(), currentParallel);
 
         // 创建输入物品的副本用于消耗计算
         List<ItemStack> inputItems = new ArrayList<>();
@@ -600,8 +790,8 @@ public class AdvancedAlloyFurnaceBlockEntity extends BlockEntity implements Menu
         FluidStack inputFluid = inputFluidTank.getFluid().copy();
         ItemStack catalystSlot = itemHandler.getStackInSlot(CATALYST_SLOT).copy();
 
-        // 使用新的消耗方法，传入催化剂槽位（模具不会被消耗）
-        recipe.consumeInputs(inputItems, inputFluid, catalystSlot);
+        // 使用并行数消耗输入
+        recipe.consumeInputs(inputItems, inputFluid, catalystSlot, currentParallel);
 
         // 更新实际的输入槽位
         for (int i = 0; i < 6; i++) {
@@ -618,8 +808,10 @@ public class AdvancedAlloyFurnaceBlockEntity extends BlockEntity implements Menu
         // 更新输入流体
         inputFluidTank.setFluid(inputFluid);
 
-        // 优先尝试外部输出，剩余部分放入自身
-        outputRecipeResults(recipe);
+        // 输出配方结果
+        outputRecipeResults(recipe, currentParallel);
+
+        UselessMod.LOGGER.debug("Recipe resolution completed");
 
         // 强制立即同步到客户端
         setChanged();
@@ -627,11 +819,13 @@ public class AdvancedAlloyFurnaceBlockEntity extends BlockEntity implements Menu
     }
 
     // 优先外部输出的配方结果处理方法
-    private void outputRecipeResults(AdvancedAlloyFurnaceRecipe recipe) {
+    private void outputRecipeResults(AdvancedAlloyFurnaceRecipe recipe, int parallel) {
         // 输出物品到外部容器，剩余部分放入自身
         for (ItemStack output : recipe.getOutputItems()) {
             if (!output.isEmpty()) {
-                ItemStack remaining = tryOutputItemToExternal(output.copy());
+                ItemStack outputStack = output.copy();
+                outputStack.setCount(outputStack.getCount() * parallel);
+                ItemStack remaining = tryOutputItemToExternal(outputStack);
                 if (!remaining.isEmpty()) {
                     addOutputItem(remaining);
                 }
@@ -641,7 +835,9 @@ public class AdvancedAlloyFurnaceBlockEntity extends BlockEntity implements Menu
         // 输出流体到外部容器，剩余部分放入自身
         FluidStack outputFluid = recipe.getOutputFluid();
         if (!outputFluid.isEmpty()) {
-            FluidStack remaining = tryOutputFluidToExternal(outputFluid.copy());
+            FluidStack outputStack = outputFluid.copy();
+            outputStack.setAmount(outputStack.getAmount() * parallel);
+            FluidStack remaining = tryOutputFluidToExternal(outputStack);
             if (!remaining.isEmpty()) {
                 outputFluidTank.fill(remaining, IFluidHandler.FluidAction.EXECUTE);
             }
@@ -871,6 +1067,15 @@ public class AdvancedAlloyFurnaceBlockEntity extends BlockEntity implements Menu
         return processTick;
     }
 
+    // 新增：获取并行数
+    public int getCurrentParallel() {
+        return currentParallel;
+    }
+
+    public int getMaxParallel() {
+        return maxParallel;
+    }
+
     // 新增：检查是否为无用锭
     public boolean isUselessIngot(ItemStack stack) {
         if (stack.isEmpty()) return false;
@@ -898,16 +1103,6 @@ public class AdvancedAlloyFurnaceBlockEntity extends BlockEntity implements Menu
                 stack.is(ModMolds.METAL_MOLD_WIRE.get());
     }
 
-    // 新增：检查当前配方是否需要催化剂
-    public boolean isCatalystRequired() {
-        return currentRecipe != null && currentRecipe.requiresCatalyst();
-    }
-
-    // 新增：检查当前配方是否需要模具
-    public boolean isMoldRequired() {
-        return currentRecipe != null && currentRecipe.requiresMold();
-    }
-
     // 公共访问方法
     public MultiSlotItemHandler getItemHandler() {
         return itemHandler;
@@ -933,7 +1128,6 @@ public class AdvancedAlloyFurnaceBlockEntity extends BlockEntity implements Menu
     }
 
     // 数据持久化
-    // 修改 load 方法，添加状态加载
     @Override
     public void load(CompoundTag tag) {
         super.load(tag);
@@ -949,12 +1143,11 @@ public class AdvancedAlloyFurnaceBlockEntity extends BlockEntity implements Menu
         isActive = tag.getBoolean("IsActive");
         wasActive = tag.getBoolean("WasActive");
         autoOutputCounter = tag.getInt("AutoOutputCounter");
-        // 新增：加载需求状态
-        catalystRequired = tag.getBoolean("CatalystRequired");
-        moldRequired = tag.getBoolean("MoldRequired");
+        // 新增：加载并行数
+        currentParallel = tag.getInt("CurrentParallel");
+        maxParallel = tag.getInt("MaxParallel");
     }
 
-    // 修改 saveAdditional 方法，添加状态保存
     @Override
     protected void saveAdditional(CompoundTag tag) {
         super.saveAdditional(tag);
@@ -968,9 +1161,9 @@ public class AdvancedAlloyFurnaceBlockEntity extends BlockEntity implements Menu
         tag.putBoolean("IsActive", isActive);
         tag.putBoolean("WasActive", wasActive);
         tag.putInt("AutoOutputCounter", autoOutputCounter);
-        // 新增：保存需求状态
-        tag.putBoolean("CatalystRequired", catalystRequired);
-        tag.putBoolean("MoldRequired", moldRequired);
+        // 新增：保存并行数
+        tag.putInt("CurrentParallel", currentParallel);
+        tag.putInt("MaxParallel", maxParallel);
     }
 
     // Capabilities - 修复方向处理
@@ -1022,7 +1215,6 @@ public class AdvancedAlloyFurnaceBlockEntity extends BlockEntity implements Menu
             }
             return energyReceived;
         }
-
 
         @Override
         public int extractEnergy(int maxExtract, boolean simulate) {

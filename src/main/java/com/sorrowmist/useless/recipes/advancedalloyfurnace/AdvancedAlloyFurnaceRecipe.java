@@ -77,14 +77,32 @@ public class AdvancedAlloyFurnaceRecipe implements Recipe<Container> {
         return false;
     }
 
-    // 修复匹配逻辑
-    public boolean matches(List<ItemStack> inputSlots, FluidStack inputTank) {
-        // 检查流体
-        if (!inputFluid.isEmpty()) {
-            if (inputTank.isEmpty() || inputTank.getAmount() < inputFluid.getAmount() ||
-                    !inputTank.getFluid().isSame(inputFluid.getFluid())) {
+
+    // 在 AdvancedAlloyFurnaceRecipe.java 中添加黑名单检查方法
+    public boolean isCatalystAllowed() {
+        // 检查输出物品是否在黑名单中
+        for (ItemStack output : outputItems) {
+            if (com.sorrowmist.useless.registry.BlacklistManager.isOutputBlacklisted(output)) {
                 return false;
             }
+        }
+        return true;
+    }
+
+    // 修复匹配逻辑，添加详细调试
+    public boolean matches(List<ItemStack> inputSlots, FluidStack inputTank) {
+        UselessMod.LOGGER.debug("  Matching recipe: {}", id);
+
+        // 检查流体
+        if (!inputFluid.isEmpty()) {
+            UselessMod.LOGGER.debug("    Recipe requires fluid: {} x {}", inputFluid.getFluid(), inputFluid.getAmount());
+            if (inputTank.isEmpty() || inputTank.getAmount() < inputFluid.getAmount() ||
+                    !inputTank.getFluid().isSame(inputFluid.getFluid())) {
+                UselessMod.LOGGER.debug("    Fluid mismatch - Have: {} x {}, Need: {} x {}",
+                        inputTank.getFluid(), inputTank.getAmount(), inputFluid.getFluid(), inputFluid.getAmount());
+                return false;
+            }
+            UselessMod.LOGGER.debug("    Fluid matches");
         }
 
         // 创建可用物品的副本用于匹配计算
@@ -95,10 +113,13 @@ public class AdvancedAlloyFurnaceRecipe implements Recipe<Container> {
             }
         }
 
+        UselessMod.LOGGER.debug("    Available items count: {}", availableItems.size());
+
         // 为每个配方输入创建需求映射
         Map<Ingredient, Integer> requiredItems = new HashMap<>();
         for (int i = 0; i < inputItems.size(); i++) {
             requiredItems.put(inputItems.get(i), inputItemCounts.get(i));
+            UselessMod.LOGGER.debug("    Requires: {} x {}", inputItems.get(i), inputItemCounts.get(i));
         }
 
         // 尝试匹配所有要求的物品
@@ -113,6 +134,7 @@ public class AdvancedAlloyFurnaceRecipe implements Recipe<Container> {
                     int takeAmount = Math.min(available.getCount(), requiredCount - foundCount);
                     foundCount += takeAmount;
                     available.shrink(takeAmount);
+                    UselessMod.LOGGER.debug("    Found match: {} x {}", available.getItem(), takeAmount);
 
                     if (foundCount >= requiredCount) {
                         break;
@@ -122,32 +144,37 @@ public class AdvancedAlloyFurnaceRecipe implements Recipe<Container> {
 
             // 如果没有找到足够的物品，返回不匹配
             if (foundCount < requiredCount) {
-                UselessMod.LOGGER.debug("Recipe {} failed: needed {} of {}, found {}",
-                        id, requiredCount, ingredient, foundCount);
+                UselessMod.LOGGER.debug("    Ingredient insufficient - Needed: {}, Found: {}", requiredCount, foundCount);
                 return false;
             }
+            UselessMod.LOGGER.debug("    Ingredient satisfied - Needed: {}, Found: {}", requiredCount, foundCount);
         }
 
+        UselessMod.LOGGER.debug("    All ingredients satisfied");
         return true;
     }
 
-    // 新增匹配逻辑，考虑催化剂和模具
+    // 修复匹配逻辑，使催化剂真正成为可选项
     public boolean matches(List<ItemStack> inputSlots, FluidStack inputTank,
                            ItemStack catalystSlot, ItemStack moldSlot) {
-        // 检查催化剂
-        if (requiresCatalyst()) {
-            if (catalystSlot.isEmpty() || !catalyst.test(catalystSlot) || catalystSlot.getCount() < catalystCount) {
-                UselessMod.LOGGER.debug("Recipe {} failed: catalyst required but not present or insufficient", id);
+        UselessMod.LOGGER.debug("  Matching recipe with catalyst and mold: {}", id);
+
+        // 检查模具匹配（如果配方需要模具）- 模具仍然是必须的
+        if (requiresMold()) {
+            UselessMod.LOGGER.debug("    Recipe requires mold");
+            if (moldSlot.isEmpty() || !mold.test(moldSlot)) {
+                UselessMod.LOGGER.debug("    Mold not present or not matching");
                 return false;
             }
+            UselessMod.LOGGER.debug("    Mold matches");
         }
 
-        // 检查模具
-        if (requiresMold()) {
-            if (moldSlot.isEmpty() || !mold.test(moldSlot)) {
-                UselessMod.LOGGER.debug("Recipe {} failed: mold required but not present", id);
-                return false;
-            }
+        // 修改：催化剂现在是可选的，不检查催化剂状态
+        // 即使配方需要催化剂但没有放入，也允许匹配（并行数为1）
+        if (requiresCatalyst()) {
+            UselessMod.LOGGER.debug("    Recipe requires catalyst (optional)");
+            // 如果有催化剂且匹配，会使用催化剂的并行数
+            // 如果没有催化剂，仍然允许配方运行（并行数为1）
         }
 
         // 然后检查输入物品和流体
@@ -216,28 +243,31 @@ public class AdvancedAlloyFurnaceRecipe implements Recipe<Container> {
         return mold;
     }
 
-    // 修改消耗逻辑，考虑催化剂
-    public void consumeInputs(List<ItemStack> inputSlots, FluidStack inputTank, ItemStack catalystSlot) {
-        UselessMod.LOGGER.debug("Consuming inputs for recipe {} with catalyst", id);
+    // 修改消耗逻辑，考虑催化剂和并行数
+    public void consumeInputs(List<ItemStack> inputSlots, FluidStack inputTank, ItemStack catalystSlot, int parallel) {
+        UselessMod.LOGGER.debug("Consuming inputs for recipe {} with parallel {}", id, parallel);
 
-        // 消耗流体
+        // 消耗流体，乘以并行数
         if (!inputFluid.isEmpty()) {
-            int consumed = Math.min(inputTank.getAmount(), inputFluid.getAmount());
+            int fluidToConsume = inputFluid.getAmount() * parallel;
+            int consumed = Math.min(inputTank.getAmount(), fluidToConsume);
             inputTank.shrink(consumed);
-            UselessMod.LOGGER.debug("Consumed {} fluid", consumed);
+            UselessMod.LOGGER.debug("Consumed {} fluid ({} required)", consumed, fluidToConsume);
         }
 
-        // 消耗催化剂（如果存在）
-        if (requiresCatalyst() && !catalystSlot.isEmpty() && catalyst.test(catalystSlot)) {
+        // 修改：只有当有催化剂且匹配时才消耗催化剂
+        if (requiresCatalyst() && !catalystSlot.isEmpty() && catalyst.test(catalystSlot) && catalystSlot.getCount() >= catalystCount) {
             int consumed = Math.min(catalystSlot.getCount(), catalystCount);
             catalystSlot.shrink(consumed);
             UselessMod.LOGGER.debug("Consumed {} catalyst", consumed);
+        } else if (requiresCatalyst()) {
+            UselessMod.LOGGER.debug("No catalyst consumed (not present or not matching)");
         }
 
-        // 为每个配方输入创建消耗计数器
+        // 为每个配方输入创建消耗计数器，乘以并行数
         int[] remainingToConsume = new int[inputItems.size()];
         for (int i = 0; i < inputItems.size(); i++) {
-            remainingToConsume[i] = inputItemCounts.get(i);
+            remainingToConsume[i] = inputItemCounts.get(i) * parallel;
             UselessMod.LOGGER.debug("Need to consume {} of ingredient {}", remainingToConsume[i], inputItems.get(i));
         }
 
@@ -278,8 +308,12 @@ public class AdvancedAlloyFurnaceRecipe implements Recipe<Container> {
     }
 
     // 原有的consumeInputs方法，用于向后兼容
+    public void consumeInputs(List<ItemStack> inputSlots, FluidStack inputTank, ItemStack catalystSlot) {
+        consumeInputs(inputSlots, inputTank, catalystSlot, 1);
+    }
+
     public void consumeInputs(List<ItemStack> inputSlots, FluidStack inputTank) {
-        consumeInputs(inputSlots, inputTank, ItemStack.EMPTY);
+        consumeInputs(inputSlots, inputTank, ItemStack.EMPTY, 1);
     }
 
     // Getters

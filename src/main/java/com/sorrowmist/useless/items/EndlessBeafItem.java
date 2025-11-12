@@ -31,6 +31,7 @@ import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.storage.loot.LootParams;
 import net.minecraft.world.level.storage.loot.parameters.LootContextParams;
+import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.common.ToolAction;
 import net.minecraftforge.common.ToolActions;
@@ -45,6 +46,7 @@ import org.jetbrains.annotations.NotNull;
 
 import javax.annotation.Nullable;
 import java.util.*;
+import java.util.stream.Collectors;
 
 public class EndlessBeafItem extends PickaxeItem {
     public static final DeferredRegister<Item> ITEMS = DeferredRegister.create(ForgeRegistries.ITEMS, UselessMod.MOD_ID);
@@ -360,45 +362,140 @@ public class EndlessBeafItem extends PickaxeItem {
             return;
         }
 
-        // 获取方块的掉落物
+        // 尝试获取方块的掉落物
         List<ItemStack> drops = getBlockDrops(state, level, pos, player, stack);
 
-        // 尝试将掉落物放入玩家背包
+        // 检查是否成功获取到掉落物
+        if (drops == null || drops.isEmpty() || hasInvalidDrops(drops)) {
+            // 如果没有获取到有效的掉落物，回退到原版破坏逻辑
+            // 不取消事件，让方块正常破坏
+            handleFallbackBlockBreak(level, pos, state, player, stack);
+            return;
+        }
+
+        // 对于能正常获取掉落物的方块，使用自动收集逻辑
+        handleNormalBlockBreak(event, level, pos, state, player, stack, drops);
+    }
+
+    // 检查掉落物列表是否有效
+    private boolean hasInvalidDrops(List<ItemStack> drops) {
+        // 检查所有掉落物是否都是空气或无效物品
         for (ItemStack drop : drops) {
-            if (!addItemToPlayerInventory(player, drop)) {
-                // 如果背包满了，掉落在玩家脚下
-                ItemEntity itemEntity = new ItemEntity(level,
-                        player.getX(), player.getY(), player.getZ(),
-                        drop);
-                level.addFreshEntity(itemEntity);
+            if (!drop.isEmpty() && drop.getItem() != Items.AIR) {
+                return false; // 至少有一个有效掉落物
+            }
+        }
+        return true; // 所有掉落物都无效
+    }
+
+    // 回退到原版破坏逻辑的处理
+    private void handleFallbackBlockBreak(Level level, BlockPos pos, BlockState state, Player player, ItemStack tool) {
+        // 记录破坏前已有的物品实体
+        List<ItemEntity> existingItems = level.getEntitiesOfClass(ItemEntity.class,
+                new AABB(pos).inflate(3.0));
+        Set<UUID> existingItemIds = new HashSet<>();
+        for (ItemEntity item : existingItems) {
+            existingItemIds.add(item.getUUID());
+        }
+
+        // 让方块正常破坏（不取消事件）
+        // 使用延迟任务来收集新生成的掉落物
+        level.getServer().execute(() -> {
+            // 等待一小段时间让掉落物生成
+            try {
+                Thread.sleep(10); // 10ms通常足够
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                return;
+            }
+
+            // 获取新生成的物品实体
+            List<ItemEntity> newItems = level.getEntitiesOfClass(ItemEntity.class,
+                    new AABB(pos).inflate(3.0));
+
+            for (ItemEntity itemEntity : newItems) {
+                // 只处理新生成的物品
+                if (!existingItemIds.contains(itemEntity.getUUID())) {
+                    ItemStack itemStack = itemEntity.getItem().copy();
+
+                    if (!itemStack.isEmpty()) {
+                        // 尝试将物品添加到玩家背包
+                        if (addItemToPlayerInventory(player, itemStack)) {
+                            // 如果成功添加到背包，移除原物品实体
+                            itemEntity.discard();
+                        }
+                        // 如果背包满了，物品会保留在原地
+                    }
+                }
+            }
+        });
+
+        // 播放破坏音效
+        playBreakSoundWithCooldown(level, pos, state, player);
+    }
+
+    // 处理普通方块的自动收集
+    private void handleNormalBlockBreak(BlockEvent.BreakEvent event, Level level, BlockPos pos, BlockState state, Player player, ItemStack stack, List<ItemStack> drops) {
+        // 尝试将掉落物放入玩家背包
+        boolean allCollected = true;
+        for (ItemStack drop : drops) {
+            if (!drop.isEmpty() && drop.getItem() != Items.AIR) {
+                if (!addItemToPlayerInventory(player, drop.copy())) {
+                    // 如果背包满了，标记为未完全收集
+                    allCollected = false;
+                    // 掉落在玩家脚下
+                    ItemEntity itemEntity = new ItemEntity(level,
+                            player.getX(), player.getY(), player.getZ(),
+                            drop.copy());
+                    level.addFreshEntity(itemEntity);
+                }
             }
         }
 
-        // 取消原版掉落物生成
-        event.setCanceled(true);
-
-        // 破坏方块
-        level.setBlock(pos, Blocks.AIR.defaultBlockState(), 3);
+        // 只有成功收集所有物品时才取消原版事件
+        if (allCollected) {
+            event.setCanceled(true);
+            level.setBlock(pos, Blocks.AIR.defaultBlockState(), 3);
+        } else {
+            // 如果没有完全收集，回退到原版逻辑
+            handleFallbackBlockBreak(level, pos, state, player, stack);
+            return;
+        }
 
         // 使用带冷却的音效播放
         playBreakSoundWithCooldown(level, pos, state, player);
     }
 
-    // 获取方块的掉落物列表 - 针对 1.20.1 的 API
+
+
+    // 改进的getBlockDrops方法，增加更完善的异常处理
     private List<ItemStack> getBlockDrops(BlockState state, Level level, BlockPos pos, Player player, ItemStack tool) {
         if (!(level instanceof ServerLevel serverLevel)) {
             return Collections.emptyList();
         }
 
-        // 创建LootParams来获取正确的掉落物 - 1.20.1 使用 LootParams
-        LootParams.Builder lootParamsBuilder = new LootParams.Builder(serverLevel)
-                .withParameter(LootContextParams.ORIGIN, Vec3.atCenterOf(pos))
-                .withParameter(LootContextParams.TOOL, tool)
-                .withParameter(LootContextParams.THIS_ENTITY, player)
-                .withParameter(LootContextParams.BLOCK_STATE, state)
-                .withOptionalParameter(LootContextParams.BLOCK_ENTITY, level.getBlockEntity(pos));
+        try {
+            // 创建LootParams来获取正确的掉落物
+            LootParams.Builder lootParamsBuilder = new LootParams.Builder(serverLevel)
+                    .withParameter(LootContextParams.ORIGIN, Vec3.atCenterOf(pos))
+                    .withParameter(LootContextParams.TOOL, tool)
+                    .withParameter(LootContextParams.THIS_ENTITY, player)
+                    .withParameter(LootContextParams.BLOCK_STATE, state)
+                    .withOptionalParameter(LootContextParams.BLOCK_ENTITY, level.getBlockEntity(pos));
 
-        return state.getDrops(lootParamsBuilder);
+            List<ItemStack> drops = state.getDrops(lootParamsBuilder);
+
+            // 过滤掉空气和空堆叠
+            return drops.stream()
+                    .filter(drop -> !drop.isEmpty() && drop.getItem() != Items.AIR)
+                    .collect(Collectors.toList());
+
+        } catch (Exception e) {
+            // 记录错误但不崩溃
+            UselessMod.LOGGER.debug("Failed to get drops for block {} at {}: {}",
+                    ForgeRegistries.BLOCKS.getKey(state.getBlock()), pos, e.getMessage());
+            return Collections.emptyList();
+        }
     }
 
     // 将物品添加到玩家背包

@@ -177,6 +177,7 @@ dependencies {
     implementation fg.deobf("curse.maven:Modern-UI-352491:6956345") // Modern UI
     implementation fg.deobf("curse.maven:Observable-509575:5643037") // Observable
     implementation fg.deobf("curse.maven:Kotlin-for-Forge-4.11.0-351264:5402061") // Kotlin for Forge 4.11.0
+    implementation fg.deobf("curse.maven:mob_grinding_utils-1.20.1-1.1.0-254241:5131447") // mob_grinding_utils-1.20.1-1.1.0
 
 
 

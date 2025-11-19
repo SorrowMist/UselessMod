@@ -58,21 +58,4 @@ public class ModCreativeTabs {
                         }
                     }))
                     .build());
-
-    /**
-     * 安全地添加物品到创造标签
-     * 防止在物品未注册时出现异常
-     */
-//    private static void safelyAddItem(CreativeModeTab.Output output, RegistryObject<? extends Item> itemRegistryObject) {
-//        try {
-//            if (itemRegistryObject != null && itemRegistryObject.isPresent()) {
-//                Item item = itemRegistryObject.get();
-//                if (item != null) {
-//                    output.accept(item);
-//                }
-//            }
-//        } catch (Exception e) {
-//            UselessMod.LOGGER.warn("无法添加物品到创造标签: {}", itemRegistryObject.getId(), e);
-//        }
-//    }
 }

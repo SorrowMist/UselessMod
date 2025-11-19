@@ -8,6 +8,7 @@ import com.sorrowmist.useless.dimension.UselessDimension2;
 import com.sorrowmist.useless.init.ModBlocks;
 import com.sorrowmist.useless.init.ModCreativeTabs;
 import com.sorrowmist.useless.init.ModItems;
+import com.sorrowmist.useless.init.ModNetwork;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.level.block.Blocks;
@@ -52,7 +53,7 @@ public class UselessMod {
         // Note that this is necessary if and only if we want *this* class (UselessMod) to respond directly to events.
         // Do not add this line if there are no @SubscribeEvent-annotated functions in this class, like onServerStarting() below.
         NeoForge.EVENT_BUS.register(this);
-
+        modEventBus.addListener(ModNetwork::registerPayloadHandlers);
         // 注册配置：接入自定义的 ModConfigs
         modContainer.registerConfig(ModConfig.Type.COMMON, ConfigManager.SPEC, "useless_mod-common.toml");
 //        modContainer.registerConfig(ModConfig.Type.CLIENT, ConfigManager.CLIENT_SPEC, "useless_mod-client.toml");

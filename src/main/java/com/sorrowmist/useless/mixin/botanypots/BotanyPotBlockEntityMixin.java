@@ -69,30 +69,40 @@ public abstract class BotanyPotBlockEntityMixin {
                 BlockEntityContext context = pot.getRecipeContext();
                 int baseRolls = Helpers.getLootRolls(context, level, crop, soil);
 
-                // 按倍率生成所有产物
+                // ========== 增量插入，防止 stack overflow ==========
                 for (int i = 0; i < baseRolls; i++) {
-                    crop.onHarvest(context, level, stack -> {
-                        ItemStack copy = stack.copy();
-                        copy.setCount(stack.copy().getCount() * harvestTimes);
+                    crop.onHarvest(context, level, singleStack -> {
+                        // singleStack 是单次掉落（count 通常 1）
+                        int totalCountNeeded = singleStack.getCount() * harvestTimes; // 比如 1 * 5 = 5
 
-                        // 优先向下插入容器
-                        if (pot.isHopper() && !serverLevel.getBlockState(pos.below()).isAir()) {
-                            ItemStack remainder = Services.GAMEPLAY.inventoryInsert(serverLevel, pos.below(), Direction.UP, copy);
-                            if (!remainder.isEmpty()) {
-                                // 插不下的放回花盆产出格
-                                Services.GAMEPLAY.addItem(remainder, ((AbstractBotanyPotBlockEntityAccessor) pot).items(), STORAGE_SLOTS);
+                        ItemStack toInsert = singleStack.copy();
+                        while (totalCountNeeded > 0) {
+                            // 每次只取安全数量（不超过 64 或物品 maxStackSize）
+                            int thisBatch = Math.min(totalCountNeeded, 64); // 或者 singleStack.getMaxStackSize()
+                            toInsert.setCount(thisBatch);
+
+                            totalCountNeeded -= thisBatch;
+
+                            // 优先向下插入容器
+                            if (pot.isHopper() && !serverLevel.getBlockState(pos.below()).isAir()) {
+                                ItemStack remainder = Services.GAMEPLAY.inventoryInsert(
+                                        serverLevel, pos.below(), Direction.UP, toInsert.copy());
+                                if (!remainder.isEmpty()) {
+                                    // 插不下的放回花盆产出格
+                                    Services.GAMEPLAY.addItem(remainder, ((AbstractBotanyPotBlockEntityAccessor) pot).items(), STORAGE_SLOTS);
+                                }
+                            } else {
+                                // 不是漏斗花盆 → 放回产出格
+                                Services.GAMEPLAY.addItem(toInsert.copy(), ((AbstractBotanyPotBlockEntityAccessor) pot).items(), STORAGE_SLOTS);
                             }
-                        } else {
-                            // 不是漏斗花盆 → 放回产出格
-                            Services.GAMEPLAY.addItem(copy, ((AbstractBotanyPotBlockEntityAccessor) pot).items(), STORAGE_SLOTS);
                         }
                     });
                 }
 
-                // 每次完整收获损坏工具
+                // 工具耐久：按完整收获次数扣
                 if (BotanyPotsMod.CONFIG.get().gameplay.damage_harvest_tool
                         && EnchantmentLevel.FIRST.get(Helpers.NEGATE_HARVEST_DAMAGE_TAG, pot.getHarvestItem()) <= 0) {
-                    pot.getHarvestItem().hurtAndBreak(1, serverLevel, null, item -> {});
+                    pot.getHarvestItem().hurtAndBreak(harvestTimes, serverLevel, null, item -> {});
                 }
 
                 // 触发方块变化事件
@@ -104,7 +114,7 @@ public abstract class BotanyPotBlockEntityMixin {
 
             // 设置满信号 + 收获冷却
             pot.updateComparatorLevel(15);
-            ((BotanyPotBlockEntityAccessor) pot).getGrowCooldown().setTicks(1.0F);
+            ((BotanyPotBlockEntityAccessor) pot).getGrowCooldown().setTicks(5.0F);
 
             pot.markUpdated();
             return;

@@ -3,6 +3,10 @@
   "package": "com.sorrowmist.useless.mixin",
   "compatibilityLevel": "JAVA_21",
   "mixins": [
+    "botanypots.AbstractBotanyPotBlockEntityAccessor",
+    "botanypots.BotanyPotBlockEntityAccessor",
+    "botanypots.BotanyPotBlockEntityMixin",
+    "botanypots.BotanyPotsContentMixin",
     "eae.PatternSlotTrackerMixin",
     "eae.TileAssemblerMatrixPatternMixin",
     "mek.CachedRecipeMixin",

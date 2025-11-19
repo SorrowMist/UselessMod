@@ -26,10 +26,10 @@ public class ModCreativeTabs {
                     .title(Component.translatable("itemGroup." + UselessMod.MODID + ".main"))
                     .displayItems(((pParameters, pOutput) -> {
                         // 基础物品 - 始终添加
-//                        pOutput.accept(EndlessBeafItem.ENDLESS_BEAF_ITEM.get());
+                        pOutput.accept(ModItems.ENDLESS_BEAF_ITEM.get());
                         pOutput.accept(ModItems.TELEPORT_BLOCK_ITEM.get());
                         pOutput.accept(ModItems.TELEPORT_BLOCK_ITEM_2.get());
-//                        pOutput.accept(OreGeneratorBlock.ORE_GENERATOR_BLOCK_ITEM.get());
+//                        pOutput.accept(ModItems.ORE_GENERATOR_BLOCK_ITEM.get());
 //
 //                        pOutput.accept(AdvancedAlloyFurnaceBlock.ADVANCED_ALLOY_FURNACE_BLOCK_ITEM.get());
 //

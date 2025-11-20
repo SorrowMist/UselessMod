@@ -1,6 +1,7 @@
 package com.sorrowmist.useless.init;
 
 import com.sorrowmist.useless.UselessMod;
+import com.sorrowmist.useless.blocks.oregenerator.OreGeneratorBlock;
 import com.sorrowmist.useless.blocks.teleport.TeleportBlock;
 import com.sorrowmist.useless.blocks.teleport.TeleportBlock2;
 import net.minecraft.core.BlockPos;
@@ -57,5 +58,10 @@ public final class ModBlocks {
                 }
             }
     );
+
+    public static final DeferredBlock<Block> ORE_GENERATOR_BLOCK = BLOCKS.register(
+            "ore_generator_block", OreGeneratorBlock::new
+    );
+
     private ModBlocks() {}
 }

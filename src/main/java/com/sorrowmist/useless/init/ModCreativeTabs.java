@@ -29,7 +29,7 @@ public class ModCreativeTabs {
                         pOutput.accept(ModItems.ENDLESS_BEAF_ITEM.get());
                         pOutput.accept(ModItems.TELEPORT_BLOCK_ITEM.get());
                         pOutput.accept(ModItems.TELEPORT_BLOCK_ITEM_2.get());
-//                        pOutput.accept(ModItems.ORE_GENERATOR_BLOCK_ITEM.get());
+                        pOutput.accept(ModItems.ORE_GENERATOR_BLOCK.get());
 //
 //                        pOutput.accept(AdvancedAlloyFurnaceBlock.ADVANCED_ALLOY_FURNACE_BLOCK_ITEM.get());
 //

@@ -5,9 +5,7 @@
   },
   "overrides": [
     {
-      "predicate": {
-        "useless_mod:silk_touch_mode": 1.0
-      },
+      "predicate": { "custom_model_data": 1 },
       "model": "useless_mod:item/endless_beaf_item_silk_touch"
     }
   ]

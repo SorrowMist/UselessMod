@@ -156,7 +156,8 @@ public class EndlessBeafItem extends AxeItem {
     @Override
     public void onCraftedBy(@NotNull ItemStack stack, @NotNull Level level, @NotNull Player player) {
         super.onCraftedBy(stack, level, player);
-        stack.enchant(EnchantmentUtil.getEnchantmentHolder(level, Enchantments.FORTUNE), 5);
+        stack.enchant(EnchantmentUtil.getEnchantmentHolder(level, Enchantments.FORTUNE), 10);
+        stack.enchant(EnchantmentUtil.getEnchantmentHolder(level, Enchantments.LOOTING), 10);
     }
 
     @Override

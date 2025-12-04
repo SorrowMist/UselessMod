@@ -3,7 +3,7 @@
   "minVersion": "0.8",
   "package": "com.sorrowmist.useless.mixin",
   "compatibilityLevel": "JAVA_17",
-  "refmap": "useless_mod.mixins.json",
+  "refmap": "useless_mod.refmap.json",
   "client": [
     "AbstractContainerScreenMixin",
     "GuiAssemblerMatrixPatternInfoMixin"

@@ -1,30 +1,47 @@
 {
-  "type": "useless_mod:advanced_alloy_furnace",
-  "ingredients": [
+  "type": "forge:conditional",
+  "recipes": [
     {
-      "ingredient": {
-        "tag":"mekanism:alloys/reinforced",
-        "count": 64
-      }
-    },
-    {
-      "ingredient": {
-        "item": "minecraft:obsidian",
-        "count": 8
-      }
-    },
-    {
-      "ingredient": {
-        "item": "minecraft:diamond",
-        "count": 4
+      "conditions": [
+        {
+          "type": "forge:mod_loaded",
+          "modid": "mekanism"
+        }
+      ],
+      "recipe": {
+        "type": "useless_mod:advanced_alloy_furnace",
+        "ingredients": [
+          {
+            "ingredient": {
+              "tag":"mekanism:alloys/reinforced"
+            },
+            "count": 64
+          },
+          {
+            "ingredient": {
+              "item": "minecraft:obsidian"
+            },
+            "count": 8
+          },
+          {
+            "ingredient": {
+              "item": "minecraft:diamond"
+            },
+            "count": 4
+          }
+        ],
+        "catalyst": {
+          "tag": "useless_mod:useless_ingots",
+          "count": 1
+        },
+        "results": [
+          {"item": "mekanism:alloy_atomic",
+            "count": 64
+          }
+        ],
+        "energy": 200000,
+        "process_time": 40
       }
     }
-  ],
-  "results": [
-    {"item": "mekanism:alloy_atomic",
-      "count": 64
-    }
-  ],
-  "energy": 2000,
-  "process_time": 1
+  ]
 }

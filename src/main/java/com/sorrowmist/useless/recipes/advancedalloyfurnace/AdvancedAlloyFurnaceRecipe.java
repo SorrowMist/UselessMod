@@ -113,13 +113,11 @@ public class AdvancedAlloyFurnaceRecipe implements Recipe<Container> {
             }
         }
 
-        UselessMod.LOGGER.debug("    Available items count: {}", availableItems.size());
 
         // 为每个配方输入创建需求映射
         Map<Ingredient, Integer> requiredItems = new HashMap<>();
         for (int i = 0; i < inputItems.size(); i++) {
             requiredItems.put(inputItems.get(i), inputItemCounts.get(i));
-            UselessMod.LOGGER.debug("    Requires: {} x {}", inputItems.get(i), inputItemCounts.get(i));
         }
 
         // 尝试匹配所有要求的物品
@@ -134,7 +132,6 @@ public class AdvancedAlloyFurnaceRecipe implements Recipe<Container> {
                     int takeAmount = Math.min(available.getCount(), requiredCount - foundCount);
                     foundCount += takeAmount;
                     available.shrink(takeAmount);
-                    UselessMod.LOGGER.debug("    Found match: {} x {}", available.getItem(), takeAmount);
 
                     if (foundCount >= requiredCount) {
                         break;
@@ -144,29 +141,24 @@ public class AdvancedAlloyFurnaceRecipe implements Recipe<Container> {
 
             // 如果没有找到足够的物品，返回不匹配
             if (foundCount < requiredCount) {
-                UselessMod.LOGGER.debug("    Ingredient insufficient - Needed: {}, Found: {}", requiredCount, foundCount);
                 return false;
             }
-            UselessMod.LOGGER.debug("    Ingredient satisfied - Needed: {}, Found: {}", requiredCount, foundCount);
         }
-
-        UselessMod.LOGGER.debug("    All ingredients satisfied");
         return true;
     }
 
     // 修复匹配逻辑，使催化剂真正成为可选项
     public boolean matches(List<ItemStack> inputSlots, FluidStack inputTank,
                            ItemStack catalystSlot, ItemStack moldSlot) {
-        UselessMod.LOGGER.debug("  Matching recipe with catalyst and mold: {}", id);
+
+
+
 
         // 检查模具匹配（如果配方需要模具）- 模具仍然是必须的
         if (requiresMold()) {
-            UselessMod.LOGGER.debug("    Recipe requires mold");
             if (moldSlot.isEmpty() || !mold.test(moldSlot)) {
-                UselessMod.LOGGER.debug("    Mold not present or not matching");
                 return false;
             }
-            UselessMod.LOGGER.debug("    Mold matches");
         }
 
         // 修改：催化剂现在是可选的，不检查催化剂状态
@@ -334,6 +326,7 @@ public class AdvancedAlloyFurnaceRecipe implements Recipe<Container> {
             List<Ingredient> inputItems = new ArrayList<>();
             List<Integer> inputCounts = new ArrayList<>();
 
+            // 在 Serializer.fromJson 方法中修改这部分
             if (json.has("ingredients")) {
                 JsonArray ingredients = GsonHelper.getAsJsonArray(json, "ingredients");
                 for (JsonElement element : ingredients) {
@@ -344,10 +337,17 @@ public class AdvancedAlloyFurnaceRecipe implements Recipe<Container> {
 
                     // 检查是否存在嵌套的 ingredient 对象
                     if (ingredientObj.has("ingredient")) {
-                        // 格式1: {"ingredient": {"item": "...", "count": N}}
-                        JsonObject innerIngredient = ingredientObj.getAsJsonObject("ingredient");
-                        ingredient = Ingredient.fromJson(innerIngredient);
-                        count = GsonHelper.getAsInt(innerIngredient, "count", 1);
+                        JsonElement innerElement = ingredientObj.get("ingredient");
+
+                        // 支持数组格式的 ingredient
+                        if (innerElement.isJsonArray()) {
+                            // 数组格式: {"ingredient": [{"tag": "a"}, {"tag": "b"}], "count": N}
+                            ingredient = Ingredient.fromJson(innerElement);
+                        } else {
+                            // 对象格式: {"ingredient": {"tag": "a"}, "count": N}
+                            ingredient = Ingredient.fromJson(innerElement.getAsJsonObject());
+                        }
+                        count = GsonHelper.getAsInt(ingredientObj, "count", 1);
                     } else {
                         // 格式2: 直接是原料对象，count作为属性
                         ingredient = Ingredient.fromJson(ingredientObj);

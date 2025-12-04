@@ -5,6 +5,7 @@ import com.sorrowmist.useless.blocks.ModBlockEntities;
 import com.sorrowmist.useless.common.inventory.MultiSlotItemHandler;
 import com.sorrowmist.useless.recipes.advancedalloyfurnace.AdvancedAlloyFurnaceRecipe;
 import com.sorrowmist.useless.recipes.advancedalloyfurnace.AdvancedAlloyFurnaceRecipeManager;
+import com.sorrowmist.useless.utils.MoldIdentifier;
 import com.sorrowmist.useless.registry.CatalystManager;
 import com.sorrowmist.useless.registry.ModIngots;
 import com.sorrowmist.useless.registry.ModMolds;
@@ -214,8 +215,8 @@ public class AdvancedAlloyFurnaceBlockEntity extends BlockEntity implements Menu
             @Override
             public boolean isItemValid(int slot, @Nonnull ItemStack stack) {
                 // 检查是否为无用锭或模具
-                boolean isUselessIngot = isUselessIngot(stack);
-                boolean isMetalMold = isMetalMold(stack);
+                boolean isUselessIngot = MoldIdentifier.isUselessIngot(stack);
+                boolean isMetalMold = MoldIdentifier.isMetalMold(stack);
 
                 if (slot < 6) {
                     // 输入槽（0-5）不能接受无用锭和模具
@@ -226,10 +227,10 @@ public class AdvancedAlloyFurnaceBlockEntity extends BlockEntity implements Menu
                     return false;
                 } else if (slot == CATALYST_SLOT) {
                     // 催化剂槽只能接受无用锭
-                    return isUselessIngot(stack);
+                    return MoldIdentifier.isUselessIngot(stack);
                 } else if (slot == MOLD_SLOT) {
-                    // 模具槽只能接受金属模具
-                    return isMetalMold(stack);
+                    // 模具槽可以接受金属模具或其他模组的机器标志物
+                    return MoldIdentifier.isAcceptableMarker(stack);
                 }
                 return false;
             }
@@ -1076,31 +1077,19 @@ public class AdvancedAlloyFurnaceBlockEntity extends BlockEntity implements Menu
         return maxParallel;
     }
 
-    // 新增：检查是否为无用锭
+    // 暴露给菜单的方法：检查是否为无用锭
     public boolean isUselessIngot(ItemStack stack) {
-        if (stack.isEmpty()) return false;
-
-        // 检查物品是否在无用锭列表中
-        return stack.is(ModIngots.USELESS_INGOT_TIER_1.get()) ||
-                stack.is(ModIngots.USELESS_INGOT_TIER_2.get()) ||
-                stack.is(ModIngots.USELESS_INGOT_TIER_3.get()) ||
-                stack.is(ModIngots.USELESS_INGOT_TIER_4.get()) ||
-                stack.is(ModIngots.USELESS_INGOT_TIER_5.get()) ||
-                stack.is(ModIngots.USELESS_INGOT_TIER_6.get()) ||
-                stack.is(ModIngots.USELESS_INGOT_TIER_7.get()) ||
-                stack.is(ModIngots.USELESS_INGOT_TIER_8.get()) ||
-                stack.is(ModIngots.USELESS_INGOT_TIER_9.get());
+        return MoldIdentifier.isUselessIngot(stack);
     }
 
-    // 新增：检查是否为金属模具
+    // 暴露给菜单的方法：检查是否为金属模具
     public boolean isMetalMold(ItemStack stack) {
-        if (stack.isEmpty()) return false;
-
-        // 检查物品是否在金属模具列表中
-        return stack.is(ModMolds.METAL_MOLD_PLATE.get()) ||
-                stack.is(ModMolds.METAL_MOLD_ROD.get()) ||
-                stack.is(ModMolds.METAL_MOLD_GEAR.get()) ||
-                stack.is(ModMolds.METAL_MOLD_WIRE.get());
+        return MoldIdentifier.isMetalMold(stack);
+    }
+    
+    // 暴露给菜单的方法：检查是否为可接受的标志物
+    public boolean isAcceptableMarker(ItemStack stack) {
+        return MoldIdentifier.isAcceptableMarker(stack);
     }
 
     // 公共访问方法

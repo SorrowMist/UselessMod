@@ -20,6 +20,7 @@ import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.inventory.InventoryMenu;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.TooltipFlag;
 import net.minecraftforge.client.extensions.common.IClientFluidTypeExtensions;
 import net.minecraftforge.fluids.FluidStack;
 
@@ -520,6 +521,17 @@ public class AdvancedAlloyFurnaceScreen extends AbstractContainerScreen<Advanced
         int x = (width - imageWidth) / 2;
         int y = (height - imageHeight) / 2;
 
+        // 首先渲染物品的工具提示
+        for (Slot slot : menu.slots) {
+            if (isHovering(slot.x, slot.y, 16, 16, mouseX, mouseY)) {
+                ItemStack stack = slot.getItem();
+                if (!stack.isEmpty()) {
+                    // 渲染物品的工具提示
+                    guiGraphics.renderComponentTooltip(this.font, stack.getTooltipLines(minecraft.player, minecraft.options.advancedItemTooltips ? TooltipFlag.Default.ADVANCED : TooltipFlag.Default.NORMAL), mouseX, mouseY);
+                }
+            }
+        }
+
         // 能量条悬停提示
         if (isMouseOverArea(mouseX, mouseY, x + ENERGY_BAR_X, y + ENERGY_BAR_Y,
                 ENERGY_BAR_WIDTH, ENERGY_BAR_HEIGHT)) {
@@ -598,23 +610,32 @@ public class AdvancedAlloyFurnaceScreen extends AbstractContainerScreen<Advanced
             guiGraphics.renderComponentTooltip(this.font, tooltip, mouseX, mouseY);
         }
 
-        // 催化剂槽位悬停提示
+        // 催化剂槽位悬停提示 - 当槽内有物品时不再显示
         if (isMouseOverArea(mouseX, mouseY,
                 x + menu.getCatalystSlotX(), y + menu.getCatalystSlotY(), 18, 18)) {
-            List<Component> tooltip = new ArrayList<>();
+            // 检查催化剂槽是否有物品
+            boolean hasCatalyst = false;
+            if (menu.getBlockEntity() != null) {
+                ItemStack catalyst = menu.getBlockEntity().getItemInSlot(12); // 催化剂槽位
+                hasCatalyst = !catalyst.isEmpty();
+            }
+            
+            // 只有当槽内没有物品时才显示提示
+            if (!hasCatalyst) {
+                List<Component> tooltip = new ArrayList<>();
+                tooltip.add(Component.literal("催化剂槽位").withStyle(ChatFormatting.GOLD));
+                tooltip.add(Component.literal("放入无用锭可提高并行数").withStyle(ChatFormatting.GRAY));
 
-            tooltip.add(Component.literal("催化剂槽位").withStyle(ChatFormatting.GOLD));
-            tooltip.add(Component.literal("放入无用锭可提高并行数").withStyle(ChatFormatting.GRAY));
+                // 使用 CatalystManager 获取格式化的催化剂列表
+                tooltip.addAll(CatalystManager.getFormattedCatalystList());
 
-            // 使用 CatalystManager 获取格式化的催化剂列表
-            tooltip.addAll(CatalystManager.getFormattedCatalystList());
+                tooltip.add(Component.literal(""));
+                tooltip.add(Component.literal("催化剂为可选项，不放入时并行数为1").withStyle(ChatFormatting.YELLOW));
+                tooltip.add(Component.literal("注意: 合成无用锭时催化剂无效").withStyle(ChatFormatting.RED));
+                tooltip.add(Component.literal("⚠ 催化剂会被消耗").withStyle(ChatFormatting.RED));
 
-            tooltip.add(Component.literal(""));
-            tooltip.add(Component.literal("催化剂为可选项，不放入时并行数为1").withStyle(ChatFormatting.YELLOW));
-            tooltip.add(Component.literal("注意: 合成无用锭时催化剂无效").withStyle(ChatFormatting.RED));
-            tooltip.add(Component.literal("⚠ 催化剂会被消耗").withStyle(ChatFormatting.RED));
-
-            guiGraphics.renderComponentTooltip(this.font, tooltip, mouseX, mouseY);
+                guiGraphics.renderComponentTooltip(this.font, tooltip, mouseX, mouseY);
+            }
         }
 
         // 流体槽悬停提示

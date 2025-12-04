@@ -116,7 +116,7 @@ public class AdvancedAlloyFurnaceMenu extends AbstractContainerMenu {
                     @Override
                     public boolean mayPlace(ItemStack stack) {
                         if (blockEntity instanceof AdvancedAlloyFurnaceBlockEntity furnace) {
-                            return furnace.isMetalMold(stack);
+                            return furnace.isAcceptableMarker(stack);
                         }
                         return false;
                     }
@@ -210,7 +210,7 @@ public class AdvancedAlloyFurnaceMenu extends AbstractContainerMenu {
             // 从玩家物品栏转移到机器
             else if (index >= PLAYER_INVENTORY_START && index <= PLAYER_HOTBAR_END) {
                 boolean isUselessIngot = blockEntity.isUselessIngot(stackInSlot);
-                boolean isMetalMold = blockEntity.isMetalMold(stackInSlot);
+                boolean isAcceptableMarker = blockEntity.isAcceptableMarker(stackInSlot);
 
                 // 根据物品类型决定转移目标
                 if (isUselessIngot) {
@@ -218,8 +218,8 @@ public class AdvancedAlloyFurnaceMenu extends AbstractContainerMenu {
                     if (!this.moveItemStackTo(stackInSlot, CATALYST_SLOT, CATALYST_SLOT + 1, false)) {
                         return ItemStack.EMPTY;
                     }
-                } else if (isMetalMold) {
-                    // 模具只能转移到模具槽
+                } else if (isAcceptableMarker) {
+                    // 可接受的标志物(模具或机器标志物)只能转移到模具槽
                     if (!this.moveItemStackTo(stackInSlot, MOLD_SLOT, MOLD_SLOT + 1, false)) {
                         return ItemStack.EMPTY;
                     }

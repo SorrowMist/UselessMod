@@ -1,0 +1,52 @@
+{
+  "type": "forge:conditional",
+  "recipes": [
+    {
+      "conditions": [
+        {
+          "type": "forge:mod_loaded",
+          "modid": "thermal_foundation"
+        }
+      ],
+      "recipe": {
+        "type": "useless_mod:advanced_alloy_furnace",
+        "ingredients": [
+          {
+            "ingredient": [
+              {
+                "tag": "forge:ingots/iron"
+              },
+              {
+                "tag": "forge:dusts/iron"
+              }
+            ],
+            "count": 42
+          },
+          {
+            "ingredient":  [
+              {
+                "tag": "forge:ingots/nickel"
+              },
+              {
+                "tag": "forge:dusts/nickel"
+              }
+            ],
+            "count": 21
+          }
+        ],
+        "catalyst": {
+          "tag": "useless_mod:useless_ingots",
+          "count": 1
+        },
+        "results": [
+          {
+            "item": "thermal:invar_ingot",
+            "count": 63
+          }
+        ],
+        "energy": 100800,
+        "process_time": 40
+      }
+    }
+  ]
+}

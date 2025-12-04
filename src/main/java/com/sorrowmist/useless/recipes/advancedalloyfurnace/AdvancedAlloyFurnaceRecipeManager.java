@@ -1,6 +1,5 @@
 package com.sorrowmist.useless.recipes.advancedalloyfurnace;
 
-import com.sorrowmist.useless.UselessMod;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.crafting.RecipeManager;
 import net.minecraft.world.level.Level;
@@ -26,7 +25,6 @@ public class AdvancedAlloyFurnaceRecipeManager {
                                                                   FluidStack inputFluid, ItemStack catalyst,
                                                                   ItemStack mold) {
         if (level == null) {
-            UselessMod.LOGGER.debug("Level is null, returning null");
             return null;
         }
 
@@ -35,48 +33,26 @@ public class AdvancedAlloyFurnaceRecipeManager {
                 com.sorrowmist.useless.recipes.ModRecipeTypes.ADVANCED_ALLOY_FURNACE_TYPE.get()
         );
 
-        UselessMod.LOGGER.debug("=== Recipe Search Started ===");
-        UselessMod.LOGGER.debug("Input items count: {}, Fluid: {}mb, Catalyst: {}, Mold: {}",
-                inputItems.size(), inputFluid.getAmount(),
-                catalyst.isEmpty() ? "none" : catalyst.getItem().toString(),
-                mold.isEmpty() ? "none" : mold.getItem().toString());
 
-        // 记录输入物品详情
-        for (int i = 0; i < inputItems.size(); i++) {
-            ItemStack stack = inputItems.get(i);
-            if (!stack.isEmpty()) {
-                UselessMod.LOGGER.debug("Input slot {}: {} x {}", i, stack.getItem(), stack.getCount());
-            }
-        }
-
-        // 创建三个优先级的列表
+// 创建三个优先级的列表
         List<AdvancedAlloyFurnaceRecipe> catalystRecipes = new ArrayList<>();
         List<AdvancedAlloyFurnaceRecipe> moldRecipes = new ArrayList<>();
         List<AdvancedAlloyFurnaceRecipe> normalRecipes = new ArrayList<>();
 
         for (AdvancedAlloyFurnaceRecipe recipe : allRecipes) {
-            UselessMod.LOGGER.debug("Checking recipe: {}", recipe.getId());
-
             // 首先检查输入物品和流体是否匹配
             boolean inputsMatch = recipe.matches(inputItems, inputFluid);
-
-            UselessMod.LOGGER.debug("  Inputs match: {}", inputsMatch);
 
             if (!inputsMatch) {
                 continue;
             }
 
             boolean moldMatch = true;
-            boolean catalystCompatible = true;
 
             // 检查模具匹配（如果配方需要模具）- 模具是必须的
             if (recipe.requiresMold()) {
-                UselessMod.LOGGER.debug("  Recipe requires mold");
                 if (mold.isEmpty() || !recipe.getMold().test(mold)) {
                     moldMatch = false;
-                    UselessMod.LOGGER.debug("  Mold not present or not matching");
-                } else {
-                    UselessMod.LOGGER.debug("  Mold matches");
                 }
             }
 
@@ -101,36 +77,28 @@ public class AdvancedAlloyFurnaceRecipeManager {
             if (moldMatch) {
                 if (recipe.requiresCatalyst()) {
                     catalystRecipes.add(recipe);
-                    UselessMod.LOGGER.debug("  -> Added to catalyst recipes");
                 } else if (recipe.requiresMold()) {
                     moldRecipes.add(recipe);
-                    UselessMod.LOGGER.debug("  -> Added to mold recipes");
                 } else {
                     normalRecipes.add(recipe);
-                    UselessMod.LOGGER.debug("  -> Added to normal recipes");
                 }
             }
         }
 
-        // 选择要返回的配方
+// 选择要返回的配方
         AdvancedAlloyFurnaceRecipe selectedRecipe = null;
 
         if (!catalystRecipes.isEmpty()) {
             selectedRecipe = catalystRecipes.get(0);
-            UselessMod.LOGGER.debug("Selected catalyst recipe: {}", selectedRecipe.getId());
         } else if (!moldRecipes.isEmpty()) {
             selectedRecipe = moldRecipes.get(0);
-            UselessMod.LOGGER.debug("Selected mold recipe: {}", selectedRecipe.getId());
         } else if (!normalRecipes.isEmpty()) {
             selectedRecipe = normalRecipes.get(0);
-            UselessMod.LOGGER.debug("Selected normal recipe: {}", selectedRecipe.getId());
-        } else {
-            UselessMod.LOGGER.debug("No matching recipe found");
         }
 
-        UselessMod.LOGGER.debug("=== Recipe Search Finished ===");
         return selectedRecipe;
     }
+
 
     // 修改原有的getRecipe方法，使用新的优先级逻辑
     @Nullable

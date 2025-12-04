@@ -24,6 +24,12 @@ public class ConfigManager {
     // 矩阵样板数量配置
     public static final ForgeConfigSpec.IntValue MATRIX_PATTERN_COUNT;
 
+    // 牛排工具连锁挖掘配置
+    public static final ForgeConfigSpec.IntValue CHAIN_MINING_RANGE_X;
+    public static final ForgeConfigSpec.IntValue CHAIN_MINING_RANGE_Y;
+    public static final ForgeConfigSpec.IntValue CHAIN_MINING_RANGE_Z;
+    public static final ForgeConfigSpec.IntValue CHAIN_MINING_MAX_BLOCKS;
+
     // Mekanism 升级配置
     public static final ForgeConfigSpec.IntValue TIME_MULTIPLIER;
     public static final ForgeConfigSpec.IntValue ELECTRICITY_MULTIPLIER;
@@ -67,6 +73,27 @@ public class ConfigManager {
         MATRIX_PATTERN_COUNT = BUILDER
                 .comment("矩阵样板槽位倍数 - 减少数量时请保持槽位空！否则可能会造成样板丢失")
                 .defineInRange("矩阵样板槽位倍数", 1, 1, 100);
+
+        // 牛排工具连锁挖掘配置
+        BUILDER.push("牛排工具连锁挖掘设置");
+
+        CHAIN_MINING_RANGE_X = BUILDER
+                .comment("连锁挖掘的X轴范围半径")
+                .defineInRange("连锁挖掘X轴范围", 8, 1, 32);
+
+        CHAIN_MINING_RANGE_Y = BUILDER
+                .comment("连锁挖掘的Y轴范围半径")
+                .defineInRange("连锁挖掘Y轴范围", 8, 1, 32);
+
+        CHAIN_MINING_RANGE_Z = BUILDER
+                .comment("连锁挖掘的Z轴范围半径")
+                .defineInRange("连锁挖掘Z轴范围", 8, 1, 32);
+        
+        CHAIN_MINING_MAX_BLOCKS = BUILDER
+                .comment("连锁挖掘的最大方块数量")
+                .defineInRange("连锁挖掘最大方块数量", 1000, 1, 10000);
+
+        BUILDER.pop();
 
         BUILDER.pop();
 
@@ -176,6 +203,10 @@ public class ConfigManager {
     public static int getElectricityMultiplier() {
         return ELECTRICITY_MULTIPLIER.get();
     }
+    
+    public static int getChainMiningMaxBlocks() {
+        return CHAIN_MINING_MAX_BLOCKS.get();
+    }
 
     public static int getCapacityMultiplier() {
         return CAPACITY_MULTIPLIER.get();
@@ -183,6 +214,19 @@ public class ConfigManager {
 
     public static int getMaxUpgrade() {
         return MAX_UPGRADE.get();
+    }
+
+    // 获取连锁挖掘范围配置
+    public static int getChainMiningRangeX() {
+        return CHAIN_MINING_RANGE_X.get();
+    }
+
+    public static int getChainMiningRangeY() {
+        return CHAIN_MINING_RANGE_Y.get();
+    }
+
+    public static int getChainMiningRangeZ() {
+        return CHAIN_MINING_RANGE_Z.get();
     }
 
 

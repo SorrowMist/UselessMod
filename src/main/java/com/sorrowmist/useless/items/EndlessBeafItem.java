@@ -2,10 +2,16 @@ package com.sorrowmist.useless.items;
 
 import com.sorrowmist.useless.UselessMod;
 import com.sorrowmist.useless.blocks.GlowPlasticBlock;
+import com.sorrowmist.useless.client.KeyBindings;
+import com.sorrowmist.useless.config.ConfigManager;
 import net.minecraft.ChatFormatting;
 import net.minecraft.advancements.CriteriaTriggers;
+import net.minecraft.client.KeyMapping;
+import net.minecraft.client.Minecraft;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.IntTag;
+import net.minecraft.nbt.Tag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -33,6 +39,8 @@ import net.minecraft.world.level.storage.loot.LootParams;
 import net.minecraft.world.level.storage.loot.parameters.LootContextParams;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
+import net.minecraftforge.api.distmarker.Dist;
+import net.minecraftforge.api.distmarker.OnlyIn;
 import net.minecraftforge.common.ToolAction;
 import net.minecraftforge.common.ToolActions;
 import net.minecraftforge.event.entity.living.LivingDropsEvent;
@@ -54,6 +62,14 @@ public class EndlessBeafItem extends PickaxeItem {
     // 音效冷却系统
     private static final Map<UUID, Long> lastSoundTime = new HashMap<>();
     private static final long SOUND_COOLDOWN = 50; // 50毫秒冷却时间
+    
+    // 移除了连锁挖掘模式枚举，现在只根据按键状态判断是否启用连锁挖掘
+    
+    // 按键状态跟踪
+    private static final Map<UUID, Long> lastKeyPressTime = new HashMap<>();
+// 不再需要防抖动处理，已移除 防抖动超时时间
+    
+
 
     public EndlessBeafItem(Tier pTier, int pAttackDamageModifier, float pAttackSpeedModifier, Properties pProperties) {
         super(pTier, pAttackDamageModifier, pAttackSpeedModifier, pProperties);
@@ -86,60 +102,116 @@ public class EndlessBeafItem extends PickaxeItem {
         return tag != null && tag.getBoolean("SilkTouchMode");
     }
 
+    
+    // 设置连锁挖掘按键按下状态
+    public void setChainMiningPressedState(ItemStack stack, boolean isPressed) {
+        // 保存当前的增强连锁模式状态
+        boolean enhancedMode = isEnhancedChainMiningMode(stack);
+        
+        // 设置连锁挖掘按键按下状态
+        CompoundTag tag = stack.getOrCreateTag();
+        tag.putBoolean("ChainMiningPressed", isPressed);
+        
+        // 恢复增强连锁模式状态，确保不会被意外修改
+        tag.putBoolean("EnhancedChainMining", enhancedMode);
+        
+        // 更新标签
+        stack.setTag(tag);
+    }
+    
+    // 获取连锁挖掘按键按下状态
+    public boolean isChainMiningPressed(ItemStack stack) {
+        CompoundTag tag = stack.getTag();
+        return tag != null && tag.getBoolean("ChainMiningPressed");
+    }
+    
+    // 检查是否应该启用连锁挖掘（只根据按键状态）
+    public boolean shouldUseChainMining(ItemStack stack) {
+        return isChainMiningPressed(stack);
+    }
+    
+    // 获取强化连锁模式
+    public boolean isEnhancedChainMiningMode(ItemStack stack) {
+        CompoundTag tag = stack.getTag();
+        return tag != null && tag.getBoolean("EnhancedChainMining");
+    }
+    
+    // 设置强化连锁模式
+    public void setEnhancedChainMiningMode(ItemStack stack, boolean enabled) {
+        CompoundTag tag = stack.getOrCreateTag();
+        tag.putBoolean("EnhancedChainMining", enabled);
+    }
+    
+    // 切换强化连锁模式
+    public boolean toggleEnhancedChainMiningMode(ItemStack stack) {
+        boolean currentMode = isEnhancedChainMiningMode(stack);
+        boolean newMode = !currentMode;
+        setEnhancedChainMiningMode(stack, newMode);
+        return newMode;
+    }
+    
+    // 处理增强连锁模式切换按键
+    private void handleEnhancedChainMiningKey(ItemStack stack, Player player) {
+        // 发送数据包到服务器，由服务器处理增强连锁模式切换
+        // 客户端不再直接修改状态，而是等待服务器的响应
+        com.sorrowmist.useless.networking.ModMessages.sendToServer(new com.sorrowmist.useless.networking.EnhancedChainMiningTogglePacket());
+    }
+
     // 更新实际的附魔NBT
     public void updateEnchantments(ItemStack stack) {
+        // 保存关键状态（使用局部变量存储，确保不会丢失）
+        boolean enhancedChainMining = isEnhancedChainMiningMode(stack);
+        boolean silkTouchMode = isSilkTouchMode(stack);
+        boolean chainMiningPressed = isChainMiningPressed(stack); // 新增：保存按键状态
+        
         // 获取现有的所有附魔
         Map<Enchantment, Integer> enchantments = new HashMap<>(EnchantmentHelper.getEnchantments(stack));
-        CompoundTag tag = stack.getOrCreateTag();
         enchantments.put(Enchantments.MOB_LOOTING, 10);
 
-        if (isSilkTouchMode(stack)) {
-            // 精准采集模式 → 移除时运，确保有精准采集
-
-            // 1. 保存外部时运等级（如果有）
-            int currentFortune = enchantments.getOrDefault(Enchantments.BLOCK_FORTUNE, 0);
-            if (currentFortune > 10) { // 只保存超过默认10级的附魔
-                tag.putInt("SavedFortuneLevel", currentFortune);
-            }
-
-            // 2. 移除时运附魔
-            enchantments.remove(Enchantments.BLOCK_FORTUNE);
-
-            // 3. 确保有精准采集附魔
-            int currentSilkTouch = enchantments.getOrDefault(Enchantments.SILK_TOUCH, 0);
-            int savedSilkTouch = tag.getInt("SavedSilkTouchLevel");
-            int finalSilkTouchLevel = Math.max(1, Math.max(currentSilkTouch, savedSilkTouch));
-
-            enchantments.put(Enchantments.SILK_TOUCH, finalSilkTouchLevel);
-
+        if (silkTouchMode) {
+            // 精准采集模式
+            enchantments.remove(Enchantments.BLOCK_FORTUNE); // 移除时运
+            // 确保有精准采集，使用最高等级
+            int silkTouchLevel = Math.max(1, enchantments.getOrDefault(Enchantments.SILK_TOUCH, 0));
+            enchantments.put(Enchantments.SILK_TOUCH, silkTouchLevel);
         } else {
-            // 时运模式 → 移除精准采集，确保有时运
-
-            // 1. 保存外部精准采集等级（如果有）
-            int currentSilkTouch = enchantments.getOrDefault(Enchantments.SILK_TOUCH, 0);
-            if (currentSilkTouch > 1) { // 只保存超过默认1级的附魔
-                tag.putInt("SavedSilkTouchLevel", currentSilkTouch);
-            }
-
-            // 2. 移除精准采集附魔
-            enchantments.remove(Enchantments.SILK_TOUCH);
-
-            // 3. 确保有时运附魔
-            int currentFortune = enchantments.getOrDefault(Enchantments.BLOCK_FORTUNE, 0);
-            int savedFortune = tag.getInt("SavedFortuneLevel");
-            int finalFortuneLevel = Math.max(10, Math.max(currentFortune, savedFortune));
-
-            enchantments.put(Enchantments.BLOCK_FORTUNE, finalFortuneLevel);
+            // 时运模式
+            enchantments.remove(Enchantments.SILK_TOUCH); // 移除精准采集
+            // 确保有时运，使用最高等级（最低10级）
+            int fortuneLevel = Math.max(10, enchantments.getOrDefault(Enchantments.BLOCK_FORTUNE, 0));
+            enchantments.put(Enchantments.BLOCK_FORTUNE, fortuneLevel);
         }
 
         // 应用更新后的附魔
         EnchantmentHelper.setEnchantments(enchantments, stack);
+        
+        // 强制恢复关键状态标签（即使setEnchantments替换了整个NBT也能恢复）
+        // 使用getOrCreateTag确保标签存在
+        CompoundTag finalTag = stack.getOrCreateTag();
+        finalTag.putBoolean("EnhancedChainMining", enhancedChainMining);
+        finalTag.putBoolean("SilkTouchMode", silkTouchMode);
+        finalTag.putBoolean("ChainMiningPressed", chainMiningPressed); // 新增：恢复按键状态
+        
+        // 确保标签被正确应用到物品上
+        stack.setTag(finalTag);
     }
 
     // 切换模式的方法（供数据包调用）
     public void switchEnchantmentMode(ItemStack stack, boolean silkTouchMode) {
+        // 保存当前的增强连锁模式状态和连锁挖掘按键状态
+        boolean enhancedChainMining = isEnhancedChainMiningMode(stack);
+        boolean chainMiningPressed = isChainMiningPressed(stack);
+        
+        // 切换附魔模式
         stack.getOrCreateTag().putBoolean("SilkTouchMode", silkTouchMode);
+        
+        // 更新实际的附魔NBT
         updateEnchantments(stack);
+        
+        // 再次确保所有关键状态被正确恢复
+        setEnhancedChainMiningMode(stack, enhancedChainMining);
+        setChainMiningPressedState(stack, chainMiningPressed);
+        
         // 强制客户端更新物品渲染
         if (!stack.isEmpty()) {
             // 通过修改NBT强制更新
@@ -149,6 +221,7 @@ public class EndlessBeafItem extends PickaxeItem {
         }
     }
 
+    @OnlyIn(Dist.CLIENT)
     @Override
     public void appendHoverText(ItemStack stack, @Nullable Level level, List<Component> tooltip, TooltipFlag flag) {
         super.appendHoverText(stack, level, tooltip, flag);
@@ -170,13 +243,45 @@ public class EndlessBeafItem extends PickaxeItem {
                 }
             }
         }
+        
+        
+        
+        // 增强连锁模式提示
+        tooltip.add(Component.literal(isEnhancedChainMiningMode(stack) ? "增强连锁模式: 已开启" : "增强连锁模式: 已关闭").withStyle(isEnhancedChainMiningMode(stack) ? ChatFormatting.BLUE : ChatFormatting.GRAY));
 
-        // 功能提示
+        // 功能提示 - 动态显示按键绑定
+        // 尝试获取实际按键绑定（仅在客户端）
+        String silkTouchKey = "Page Down";
+        String fortuneKey = "Page Up";
+        String chainMiningKey = "Numpad 7";
+        String enhancedChainMiningKey = "Numpad 8";
+        
+        try {
+            // 获取精准采集/时运切换按键
+            KeyMapping silkTouchMapping = KeyBindings.SWITCH_SILK_TOUCH_KEY;
+            silkTouchKey = silkTouchMapping.getTranslatedKeyMessage().getString();
+
+            KeyMapping fortuneMapping = KeyBindings.SWITCH_FORTUNE_KEY;
+            fortuneKey = fortuneMapping.getTranslatedKeyMessage().getString();
+
+            // 获取连锁挖掘切换按键
+            chainMiningKey = KeyBindings.SWITCH_CHAIN_MINING_KEY.getTranslatedKeyMessage().getString();
+
+            // 获取增强连锁模式切换按键
+            enhancedChainMiningKey = KeyBindings.SWITCH_ENHANCED_CHAIN_MINING_KEY.getTranslatedKeyMessage().getString();
+        } catch (Exception e) {
+            // 如果获取失败，使用默认按键名称
+        }
+        
+        // 添加动态按键提示
         tooltip.add(Component.translatable("tooltip.useless_mod.switch_enchantment").withStyle(ChatFormatting.LIGHT_PURPLE));
+        tooltip.add(Component.literal("按住 " + chainMiningKey + "开启连锁挖掘").withStyle(ChatFormatting.LIGHT_PURPLE));
+        tooltip.add(Component.literal("按下 " + enhancedChainMiningKey + "切换增强连锁挖掘").withStyle(ChatFormatting.LIGHT_PURPLE));
         tooltip.add(Component.translatable("tooltip.useless_mod.wrench_function").withStyle(ChatFormatting.YELLOW));
         tooltip.add(Component.translatable("tooltip.useless_mod.fast_break_plastic").withStyle(ChatFormatting.GREEN));
         tooltip.add(Component.translatable("tooltip.useless_mod.festive_affix").withStyle(ChatFormatting.BLUE));
         tooltip.add(Component.translatable("tooltip.useless_mod.auto_collect").withStyle(ChatFormatting.GREEN)); // 新增提示
+        tooltip.add(Component.translatable("tooltip.useless_mod.enhanced_chain_description").withStyle(ChatFormatting.BLUE));
     }
 
     @Override
@@ -219,6 +324,7 @@ public class EndlessBeafItem extends PickaxeItem {
             // 确保已有抢夺附魔
             updateEnchantments(stack);
         }
+        // 移除了连锁挖掘模式的默认设置，现在只根据按键状态控制
     }
 
     public static final RegistryObject<Item> ENDLESS_BEAF_ITEM = ITEMS.register("endless_beaf_item",
@@ -298,6 +404,25 @@ public class EndlessBeafItem extends PickaxeItem {
                 endlessBeaf.onBlockBreak(event, mainHandItem, player);
             }
         }
+
+        @OnlyIn(Dist.CLIENT)
+        @SubscribeEvent
+        public static void onClientTick(net.minecraftforge.event.TickEvent.ClientTickEvent event) {
+            if (event.phase != net.minecraftforge.event.TickEvent.Phase.END) return;
+
+            Minecraft minecraft = Minecraft.getInstance();
+            Player player = minecraft.player;
+            if (player == null) return;
+
+            // 只检查增强连锁模式切换按键（数字键8）
+            while (KeyBindings.SWITCH_ENHANCED_CHAIN_MINING_KEY.consumeClick()) {
+                ItemStack mainHandItem = player.getMainHandItem();
+                if (mainHandItem.getItem() instanceof EndlessBeafItem endlessBeaf) {
+                    // 处理增强模式切换按键逻辑
+                    endlessBeaf.handleEnhancedChainMiningKey(mainHandItem, player);
+                }
+            }
+        }
     }
 
     // 处理掉落物事件的方法
@@ -362,19 +487,256 @@ public class EndlessBeafItem extends PickaxeItem {
             return;
         }
 
-        // 尝试获取方块的掉落物
-        List<ItemStack> drops = getBlockDrops(state, level, pos, player, stack);
+        // 检查是否应该执行连锁挖掘
+        boolean shouldChainMine = shouldUseChainMining(stack);
+        
+        if (shouldChainMine) {
+            // 执行连锁挖掘
+            performChainMining(event, level, pos, state, player, stack);
+        } else {
+            // 普通挖掘
+            // 尝试获取方块的掉落物
+            List<ItemStack> drops = getBlockDrops(state, level, pos, player, stack);
 
-        // 检查是否成功获取到掉落物
-        if (drops == null || drops.isEmpty() || hasInvalidDrops(drops)) {
-            // 如果没有获取到有效的掉落物，回退到原版破坏逻辑
-            // 不取消事件，让方块正常破坏
-            handleFallbackBlockBreak(level, pos, state, player, stack);
-            return;
+            // 检查是否成功获取到掉落物
+            if (drops == null || drops.isEmpty() || hasInvalidDrops(drops)) {
+                // 如果没有获取到有效的掉落物，回退到原版破坏逻辑
+                // 不取消事件，让方块正常破坏
+                handleFallbackBlockBreak(level, pos, state, player, stack);
+                return;
+            }
+
+            // 对于能正常获取掉落物的方块，使用自动收集逻辑
+            handleNormalBlockBreak(event, level, pos, state, player, stack, drops);
         }
+    }
+    
+    // 执行连锁挖掘
+    private void performChainMining(BlockEvent.BreakEvent event, Level level, BlockPos originPos, BlockState originState, Player player, ItemStack stack) {
+        // 获取连锁挖掘范围
+        int rangeX = ConfigManager.getChainMiningRangeX();
+        int rangeY = ConfigManager.getChainMiningRangeY();
+        int rangeZ = ConfigManager.getChainMiningRangeZ();
+        
+        // 获取原点方块类型
+        Block originBlock = originState.getBlock();
+        
 
-        // 对于能正常获取掉落物的方块，使用自动收集逻辑
-        handleNormalBlockBreak(event, level, pos, state, player, stack, drops);
+        
+        // 获取连锁挖掘最大方块数量
+        int maxBlocks = ConfigManager.getChainMiningMaxBlocks();
+        int blocksMined = 0;
+        
+        // 根据增强连锁设置使用不同的连锁逻辑
+        boolean enhancedMode = isEnhancedChainMiningMode(stack);
+        if (enhancedMode) {
+            // 增强连锁模式：范围挖掘，无需相邻
+            for (int x = -rangeX; x <= rangeX && blocksMined < maxBlocks; x++) {
+                for (int y = -rangeY; y <= rangeY && blocksMined < maxBlocks; y++) {
+                    for (int z = -rangeZ; z <= rangeZ && blocksMined < maxBlocks; z++) {
+                        // 计算当前方块位置
+                        BlockPos currentPos = originPos.offset(x, y, z);
+                        
+                        // 检查是否已经挖掘过
+                        if (level.isEmptyBlock(currentPos)) {
+                            continue;
+                        }
+                        
+                        // 获取当前方块状态
+                        BlockState currentState = level.getBlockState(currentPos);
+                        Block currentBlock = currentState.getBlock();
+                        
+                        // 检查是否是相同类型的方块
+                        if (currentBlock != originBlock) {
+                            continue;
+                        }
+                        
+                        // 检查是否可以被该工具挖掘
+                        if (!isCorrectToolForDrops(stack, currentState)) {
+                            continue;
+                        }
+                        
+                        // 处理原点方块
+                if (currentPos.equals(originPos)) {
+                    // 收集掉落物
+                    List<ItemStack> drops = getBlockDrops(currentState, level, currentPos, player, stack);
+                    if (drops != null && !drops.isEmpty() && !hasInvalidDrops(drops)) {
+                        // 尝试将掉落物放入玩家背包
+                        boolean allCollected = true;
+                        for (ItemStack drop : drops) {
+                            if (!drop.isEmpty() && drop.getItem() != Items.AIR) {
+                                if (!addItemToPlayerInventory(player, drop.copy())) {
+                                    // 如果背包满了，标记为未完全收集
+                                    allCollected = false;
+                                    // 掉落在玩家脚下
+                                    ItemEntity itemEntity = new ItemEntity(level,
+                                            player.getX(), player.getY(), player.getZ(),
+                                            drop.copy());
+                                    level.addFreshEntity(itemEntity);
+                                }
+                            }
+                        }
+
+                        // 取消原版事件并手动设置方块为空气
+                        event.setCanceled(true);
+                        level.setBlock(currentPos, Blocks.AIR.defaultBlockState(), 3);
+                    } else {
+                        // 回退到原版逻辑
+                        handleFallbackBlockBreak(level, currentPos, currentState, player, stack);
+                    }
+                    
+                    // 播放破坏音效
+                    playBreakSoundWithCooldown(level, currentPos, currentState, player);
+                } else {
+                            // 处理非原点方块
+                            // 收集掉落物
+                            List<ItemStack> drops = getBlockDrops(currentState, level, currentPos, player, stack);
+                            if (drops != null && !drops.isEmpty() && !hasInvalidDrops(drops)) {
+                                // 将方块添加到待挖掘队列
+                                UselessMod.MiningTask task = new UselessMod.MiningTask(
+                                        (ServerLevel) level, 
+                                        player, 
+                                        stack.copy(), 
+                                        currentPos, 
+                                        currentState, 
+                                        drops
+                                );
+                                UselessMod.pendingMiningTasks.offer(task);
+                            } else {
+                                // 回退到原版逻辑
+                                handleFallbackBlockBreak(level, currentPos, currentState, player, stack);
+                            }
+                            
+                            // 播放破坏音效
+                            playBreakSoundWithCooldown(level, currentPos, currentState, player);
+                            
+                            // 增加挖掘计数
+                            blocksMined++;
+                        }
+                    }
+                }
+            }
+        } else {
+            // 传统连锁模式：相邻挖掘
+            // 创建待挖掘方块集合
+            Set<BlockPos> toMine = new HashSet<>();
+            Set<BlockPos> visited = new HashSet<>();
+            
+            // 添加原点方块
+            toMine.add(originPos);
+            visited.add(originPos);
+            
+            // 遍历周围方块
+            while (!toMine.isEmpty() && blocksMined < maxBlocks) {
+                BlockPos currentPos = toMine.iterator().next();
+                toMine.remove(currentPos);
+                
+                // 检查是否已经挖掘过
+                if (level.isEmptyBlock(currentPos)) {
+                    continue;
+                }
+                
+                // 获取当前方块状态
+                BlockState currentState = level.getBlockState(currentPos);
+                Block currentBlock = currentState.getBlock();
+                
+                // 检查是否是相同类型的方块
+                if (currentBlock != originBlock) {
+                    continue;
+                }
+                
+                // 检查是否可以被该工具挖掘
+                if (!isCorrectToolForDrops(stack, currentState)) {
+                    continue;
+                }
+                
+                // 处理原点方块
+                if (currentPos.equals(originPos)) {
+                    // 收集掉落物
+                    List<ItemStack> drops = getBlockDrops(currentState, level, currentPos, player, stack);
+                    if (drops != null && !drops.isEmpty() && !hasInvalidDrops(drops)) {
+                        // 尝试将掉落物放入玩家背包
+                        boolean allCollected = true;
+                        for (ItemStack drop : drops) {
+                            if (!drop.isEmpty() && drop.getItem() != Items.AIR) {
+                                if (!addItemToPlayerInventory(player, drop.copy())) {
+                                    // 如果背包满了，标记为未完全收集
+                                    allCollected = false;
+                                    // 掉落在玩家脚下
+                                    ItemEntity itemEntity = new ItemEntity(level,
+                                            player.getX(), player.getY(), player.getZ(),
+                                            drop.copy());
+                                    level.addFreshEntity(itemEntity);
+                                }
+                            }
+                        }
+
+                        // 取消原版事件并手动设置方块为空气
+                        event.setCanceled(true);
+                        level.setBlock(currentPos, Blocks.AIR.defaultBlockState(), 3);
+                    } else {
+                        // 回退到原版逻辑
+                        handleFallbackBlockBreak(level, currentPos, currentState, player, stack);
+                    }
+                    
+                    // 播放破坏音效
+                    playBreakSoundWithCooldown(level, currentPos, currentState, player);
+                } else {
+                    // 处理非原点方块
+                    // 收集掉落物
+                    List<ItemStack> drops = getBlockDrops(currentState, level, currentPos, player, stack);
+                    if (drops != null && !drops.isEmpty() && !hasInvalidDrops(drops)) {
+                        // 将方块添加到待挖掘队列
+                        UselessMod.MiningTask task = new UselessMod.MiningTask(
+                                (ServerLevel) level, 
+                                player, 
+                                stack.copy(), 
+                                currentPos, 
+                                currentState, 
+                                drops
+                        );
+                        UselessMod.pendingMiningTasks.offer(task);
+                        
+                        // 增加挖掘计数
+                        blocksMined++;
+                    } else {
+                        // 回退到原版逻辑
+                        handleFallbackBlockBreak(level, currentPos, currentState, player, stack);
+                    }
+                    
+                    // 播放破坏音效
+                    playBreakSoundWithCooldown(level, currentPos, currentState, player);
+                }
+                
+                // 遍历相邻方块
+                for (int x = -1; x <= 1; x++) {
+                    for (int y = -1; y <= 1; y++) {
+                        for (int z = -1; z <= 1; z++) {
+                            if (x == 0 && y == 0 && z == 0) continue;
+                            
+                            BlockPos neighborPos = currentPos.offset(x, y, z);
+                            
+                            // 检查是否在范围内
+                            int dx = Math.abs(neighborPos.getX() - originPos.getX());
+                            int dy = Math.abs(neighborPos.getY() - originPos.getY());
+                            int dz = Math.abs(neighborPos.getZ() - originPos.getZ());
+                            
+                            if (dx <= rangeX && dy <= rangeY && dz <= rangeZ) {
+                                if (!visited.contains(neighborPos)) {
+                                    toMine.add(neighborPos);
+                                    visited.add(neighborPos);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        // 移除了连锁挖掘后的模式切换逻辑，现在完全由按键控制
+        
+        // 取消原版事件
+        event.setCanceled(true);
     }
 
     // 检查掉落物列表是否有效

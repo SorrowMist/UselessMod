@@ -28,6 +28,12 @@ public class ModMessages {
                 .encoder(EnchantmentSwitchPacket::toBytes)
                 .consumerMainThread(EnchantmentSwitchPacket::handle)
                 .add();
+
+        net.messageBuilder(EnhancedChainMiningTogglePacket.class, id(), NetworkDirection.PLAY_TO_SERVER)
+                .decoder(EnhancedChainMiningTogglePacket::decode)
+                .encoder(EnhancedChainMiningTogglePacket::encode)
+                .consumerMainThread(EnhancedChainMiningTogglePacket::handle)
+                .add();
     }
 
     public static <MSG> void sendToServer(MSG message) {

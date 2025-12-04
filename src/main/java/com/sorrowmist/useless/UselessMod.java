@@ -7,15 +7,22 @@ import com.sorrowmist.useless.config.ConfigManager;
 import com.sorrowmist.useless.items.EndlessBeafItem;
 import com.sorrowmist.useless.networking.ClearFluidPacket;
 import com.sorrowmist.useless.networking.FluidInteractionPacket;
+
+import com.sorrowmist.useless.networking.ChainMiningTogglePacket;
 import com.sorrowmist.useless.networking.ModMessages;
 import com.sorrowmist.useless.registry.RegistryHandler;
 import net.minecraft.client.gui.screens.MenuScreens;
 import net.minecraft.client.renderer.item.ItemProperties;
+import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.block.state.BlockState;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.event.BuildCreativeModeTabContentsEvent;
+import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.event.server.ServerStartingEvent;
 import net.minecraftforge.eventbus.api.IEventBus;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
@@ -29,11 +36,46 @@ import net.minecraftforge.network.NetworkRegistry;
 import net.minecraftforge.network.simple.SimpleChannel;
 import org.slf4j.Logger;
 import org.spongepowered.asm.mixin.Mixins;
+
+import java.util.*;
+import java.util.concurrent.PriorityBlockingQueue;
+
 // The value here should match an entry in the META-INF/mods.toml file
 @Mod(UselessMod.MOD_ID)
 public class UselessMod {
     // Define mod id in a common place for everything to reference
     public static final String MOD_ID = "useless_mod";
+    
+    // 存储待挖掘的方块任务
+    public static class MiningTask implements Comparable<MiningTask> {
+        public ServerLevel level;
+        public Player player;
+        public ItemStack stack;
+        public BlockPos pos;
+        public BlockState state;
+        public List<ItemStack> drops;
+        public double distanceToPlayer; // 缓存到玩家的距离，避免重复计算
+        
+        public MiningTask(ServerLevel level, Player player, ItemStack stack, BlockPos pos, BlockState state, List<ItemStack> drops) {
+            this.level = level;
+            this.player = player;
+            this.stack = stack;
+            this.pos = pos;
+            this.state = state;
+            this.drops = drops;
+            // 计算并缓存到玩家的距离平方（避免开方运算，提高性能）
+            this.distanceToPlayer = pos.distSqr(player.blockPosition());
+        }
+        
+        @Override
+        public int compareTo(MiningTask other) {
+            // 按距离玩家的远近排序，近的在前
+            return Double.compare(this.distanceToPlayer, other.distanceToPlayer);
+        }
+    }
+    
+    // 待挖掘的方块队列 - 使用 PriorityBlockingQueue 实现线程安全的优先队列
+    public static Queue<MiningTask> pendingMiningTasks = new PriorityBlockingQueue<>();
     // Directly reference a slf4j logger
     public static final Logger LOGGER = LogUtils.getLogger();
 
@@ -89,6 +131,10 @@ public class UselessMod {
             NETWORK.registerMessage(packetId++, ClearFluidPacket.class,
                     ClearFluidPacket::encode, ClearFluidPacket::decode,
                     ClearFluidPacket::handle);
+    
+        NETWORK.registerMessage(packetId++, ChainMiningTogglePacket.class,
+                ChainMiningTogglePacket::encode, ChainMiningTogglePacket::decode,
+                ChainMiningTogglePacket::handle);
         });
     }
     /**
@@ -121,6 +167,28 @@ public class UselessMod {
         LOGGER.info("服务器配置 - 植物盆生长倍率: {}", ConfigManager.getBotanyPotGrowthMultiplier());
         // 添加矩阵样板数量到日志
         LOGGER.info("服务器配置 - 矩阵样板数量: {}", ConfigManager.getMatrixPatternCount());
+    }
+
+    /**
+     * 服务器Tick事件
+     */
+    @SubscribeEvent
+    public void onServerTick(TickEvent.ServerTickEvent event) {
+        // 处理待挖掘的方块任务
+        if (event.phase == TickEvent.Phase.END) {
+            MiningTask task;
+            while ((task = pendingMiningTasks.poll()) != null) {
+                // 处理挖掘任务 - 使用setBlockToAir而不是destroyBlock，避免重复处理掉落物
+                task.level.setBlock(task.pos, net.minecraft.world.level.block.Blocks.AIR.defaultBlockState(), 2);
+                // 给予玩家掉落物
+                for (ItemStack drop : task.drops) {
+                    if (!task.player.addItem(drop)) {
+                        // 如果玩家物品栏满了，将物品掉落
+                        task.level.addFreshEntity(new net.minecraft.world.entity.item.ItemEntity(task.level, task.player.getX(), task.player.getY(), task.player.getZ(), drop));
+                    }
+                }
+            }
+        }
     }
 
     /**

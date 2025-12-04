@@ -2,8 +2,9 @@ package com.sorrowmist.useless.client;
 
 import com.sorrowmist.useless.UselessMod;
 import com.sorrowmist.useless.items.EndlessBeafItem;
-import com.sorrowmist.useless.networking.ModMessages;
+import com.sorrowmist.useless.networking.ChainMiningTogglePacket;
 import com.sorrowmist.useless.networking.EnchantmentSwitchPacket;
+import com.sorrowmist.useless.networking.ModMessages;
 import net.minecraft.client.Minecraft;
 import net.minecraft.world.item.ItemStack;
 import net.minecraftforge.api.distmarker.Dist;
@@ -36,6 +37,18 @@ public class ClientEventBusSubscriber {
                 }
             }
         }
+
+        // 处理连锁挖掘按键的按下和松开事件
+        if (KeyBindings.SWITCH_CHAIN_MINING_KEY.isDown() != KeyBindings.SWITCH_CHAIN_MINING_KEY_WAS_DOWN) {
+            KeyBindings.SWITCH_CHAIN_MINING_KEY_WAS_DOWN = KeyBindings.SWITCH_CHAIN_MINING_KEY.isDown();
+            Minecraft minecraft = Minecraft.getInstance();
+            if (minecraft.player != null) {
+                ItemStack mainHandItem = minecraft.player.getMainHandItem();
+                if (mainHandItem.getItem() instanceof EndlessBeafItem) {
+                    UselessMod.NETWORK.sendToServer(new ChainMiningTogglePacket(KeyBindings.SWITCH_CHAIN_MINING_KEY.isDown()));
+                }
+            }
+        }
     }
 }
 
@@ -45,5 +58,7 @@ class ClientModBusSubscriber {
     public static void onKeyRegister(RegisterKeyMappingsEvent event) {
         event.register(KeyBindings.SWITCH_SILK_TOUCH_KEY);
         event.register(KeyBindings.SWITCH_FORTUNE_KEY);
+        event.register(KeyBindings.SWITCH_CHAIN_MINING_KEY);
+        event.register(KeyBindings.SWITCH_ENHANCED_CHAIN_MINING_KEY);
     }
 }

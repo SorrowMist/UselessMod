@@ -34,6 +34,9 @@
             "count": 21
           }
         ],
+        "mold": {
+          "item": "thermal:machine_smelter"
+        },
         "catalyst": {
           "tag": "useless_mod:useless_ingots",
           "count": 1

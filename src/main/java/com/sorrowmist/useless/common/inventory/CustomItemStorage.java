@@ -133,20 +133,32 @@ public class CustomItemStorage implements IItemHandler {
             return count >= stack.getCount() ? ItemStack.EMPTY : copyStackWithSize(stack, stack.getCount() - count);
         }
         else if (ItemStack.isSameItemSameTags(this.item, stack)) {
-            int totalCount = this.item.getCount() + stack.getCount();
+            int currentCount = this.item.getCount();
             int limit = this.getSlotLimit(0);
-
-            if (totalCount <= limit) {
-                if (!simulate) {
-                    this.item.setCount(totalCount);
-                }
-                return ItemStack.EMPTY;
+            
+            // 计算剩余空间，避免整数溢出
+            int availableSpace = limit - currentCount;
+            if (availableSpace <= 0) {
+                // 没有空间，返回所有物品
+                return stack;
             }
-            else {
-                if (!simulate) {
-                    this.item.setCount(limit);
-                }
-                return copyStackWithSize(stack, totalCount - limit);
+            
+            // 计算可添加的数量
+            int addAmount = Math.min(stack.getCount(), availableSpace);
+            if (addAmount <= 0) {
+                return stack;
+            }
+            
+            // 更新物品数量
+            if (!simulate) {
+                this.item.setCount(currentCount + addAmount);
+            }
+            
+            // 计算剩余物品
+            if (addAmount >= stack.getCount()) {
+                return ItemStack.EMPTY;
+            } else {
+                return copyStackWithSize(stack, stack.getCount() - addAmount);
             }
         }
         else {

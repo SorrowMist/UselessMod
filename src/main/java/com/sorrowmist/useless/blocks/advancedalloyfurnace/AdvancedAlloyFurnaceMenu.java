@@ -134,7 +134,7 @@ public class AdvancedAlloyFurnaceMenu extends AbstractContainerMenu {
     public AdvancedAlloyFurnaceMenu(int windowId, Inventory playerInventory, BlockEntity blockEntity) {
         this(windowId, playerInventory, blockEntity,
                 blockEntity instanceof AdvancedAlloyFurnaceBlockEntity furnace ?
-                        furnace.getContainerData() : new SimpleContainerData(8)); // 修改：从6改为8
+                        furnace.getContainerData() : new SimpleContainerData(9)); // 修改：从8改为9
     }
 
     private void addPlayerInventory(Inventory playerInventory) {
@@ -409,6 +409,11 @@ public class AdvancedAlloyFurnaceMenu extends AbstractContainerMenu {
     // 修改：获取最大并行数
     public int getMaxParallel() {
         return data.get(7);
+    }
+    
+    // 添加获取需要模具状态的方法
+    public boolean requiresMold() {
+        return data.get(8) == 1;
     }
 
     // 新增：获取催化剂和模具槽位位置信息

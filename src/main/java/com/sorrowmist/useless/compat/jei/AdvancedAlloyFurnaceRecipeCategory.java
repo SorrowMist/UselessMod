@@ -291,7 +291,7 @@ public class AdvancedAlloyFurnaceRecipeCategory implements IRecipeCategory<Advan
             float scale = 0.7f;
             guiGraphics.pose().scale(scale, scale, 1.0f);
 
-            String moldText = "需要模具（不会被消耗）";
+            String moldText = "需要标志物（不会被消耗）";
             int textWidth = minecraft.font.width(moldText);
             int centeredX = (int) ((DISPLAY_WIDTH / 2.0f - textWidth * scale / 2) / scale);
             int y = (int) (MOLD_TEXT_Y / scale);

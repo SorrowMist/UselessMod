@@ -51,11 +51,9 @@ public class AdvancedAlloyFurnaceRecipe implements Recipe<Container> {
     }
 
     // 新增构造函数
-    public AdvancedAlloyFurnaceRecipe(ResourceLocation id, List<Ingredient> inputItems,
-                                      List<Integer> inputItemCounts, FluidStack inputFluid,
-                                      List<ItemStack> outputItems, FluidStack outputFluid,
-                                      int energy, int processTime,
-                                      Ingredient catalyst, int catalystCount, Ingredient mold) {
+    public AdvancedAlloyFurnaceRecipe(ResourceLocation id, List<Ingredient> inputItems, List<Integer> inputItemCounts, 
+                                      FluidStack inputFluid, List<ItemStack> outputItems, FluidStack outputFluid,
+                                      int energy, int processTime, Ingredient catalyst, int catalystCount, Ingredient mold) {
         this.id = id;
         this.inputItems = inputItems;
         this.inputItemCounts = inputItemCounts;
@@ -67,9 +65,6 @@ public class AdvancedAlloyFurnaceRecipe implements Recipe<Container> {
         this.catalyst = catalyst;
         this.catalystCount = catalystCount;
         this.mold = mold;
-
-        UselessMod.LOGGER.debug("Created recipe {} with catalyst: {}, mold: {}", id,
-                catalyst.isEmpty() ? "none" : "present", mold.isEmpty() ? "none" : "present");
     }
 
     @Override
@@ -89,20 +84,14 @@ public class AdvancedAlloyFurnaceRecipe implements Recipe<Container> {
         return true;
     }
 
-    // 修复匹配逻辑，添加详细调试
+    // 修复匹配逻辑
     public boolean matches(List<ItemStack> inputSlots, FluidStack inputTank) {
-        UselessMod.LOGGER.debug("  Matching recipe: {}", id);
-
         // 检查流体
         if (!inputFluid.isEmpty()) {
-            UselessMod.LOGGER.debug("    Recipe requires fluid: {} x {}", inputFluid.getFluid(), inputFluid.getAmount());
             if (inputTank.isEmpty() || inputTank.getAmount() < inputFluid.getAmount() ||
                     !inputTank.getFluid().isSame(inputFluid.getFluid())) {
-                UselessMod.LOGGER.debug("    Fluid mismatch - Have: {} x {}, Need: {} x {}",
-                        inputTank.getFluid(), inputTank.getAmount(), inputFluid.getFluid(), inputFluid.getAmount());
                 return false;
             }
-            UselessMod.LOGGER.debug("    Fluid matches");
         }
 
         // 创建可用物品的副本用于匹配计算

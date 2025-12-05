@@ -24,6 +24,9 @@
             "count": 8
           }
         ],
+        "mold": {
+          "item": "mekanism:metallurgic_infuser"
+        },
         "catalyst": {
           "tag": "useless_mod:useless_ingots",
           "count": 1

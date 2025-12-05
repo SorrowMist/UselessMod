@@ -356,14 +356,18 @@ public class AdvancedAlloyFurnaceScreen extends AbstractContainerScreen<Advanced
                 catalystIndicatorU, catalystIndicatorV,
                 menu.getIndicatorSize(), menu.getIndicatorSize());
 
-        // 模具指示灯保持不变（如果需要的话）
+        // 模具指示灯 - 使用menu中的方法获取需要模具的状态
         int moldIndicatorX = x + menu.getMoldSlotX() + (18 - menu.getIndicatorSize()) / 2;
         int moldIndicatorY = y + menu.getMoldSlotY() + menu.getIndicatorYOffset();
 
-        // 模具不需要并行数指示，保持蓝色
+        // 使用menu中的方法获取需要模具的状态
+        boolean requiresMold = menu.requiresMold();
+        int moldIndicatorU = requiresMold ? YELLOW_INDICATOR_U : BLUE_INDICATOR_U;
+        int moldIndicatorV = requiresMold ? YELLOW_INDICATOR_V : BLUE_INDICATOR_V;
+
         guiGraphics.blit(COMPONENTS_TEXTURE,
                 moldIndicatorX, moldIndicatorY,
-                BLUE_INDICATOR_U, BLUE_INDICATOR_V,
+                moldIndicatorU, moldIndicatorV,
                 menu.getIndicatorSize(), menu.getIndicatorSize());
     }
 

@@ -1000,6 +1000,9 @@ public class AdvancedAlloyFurnaceBlockEntity extends BlockEntity implements Menu
 
         UselessMod.LOGGER.debug("Resolving recipe: {} with parallel: {}", recipe.getId(), currentParallel);
 
+        // 保存当前并行数到局部变量，避免后续更新槽位时被修改
+        int parallel = currentParallel;
+
         // 创建输入物品的副本用于消耗计算
         List<ItemStack> inputItems = new ArrayList<>();
         for (int i = 0; i < 6; i++) {
@@ -1010,9 +1013,12 @@ public class AdvancedAlloyFurnaceBlockEntity extends BlockEntity implements Menu
         ItemStack catalystSlot = itemHandler.getStackInSlot(CATALYST_SLOT).copy();
 
         // 使用并行数消耗输入
-        recipe.consumeInputs(inputItems, inputFluid, catalystSlot, currentParallel);
+        recipe.consumeInputs(inputItems, inputFluid, catalystSlot, parallel);
 
-        // 更新实际的输入槽位
+        // 先输出配方结果，使用保存的并行数
+        outputRecipeResults(recipe, parallel);
+
+        // 然后更新实际的输入槽位
         for (int i = 0; i < 6; i++) {
             itemHandler.setStackInSlot(i, inputItems.get(i));
         }
@@ -1026,9 +1032,6 @@ public class AdvancedAlloyFurnaceBlockEntity extends BlockEntity implements Menu
 
         // 更新输入流体
         inputFluidTank.setFluid(inputFluid);
-
-        // 输出配方结果
-        outputRecipeResults(recipe, currentParallel);
 
         // 强制立即同步到客户端
         setChanged();

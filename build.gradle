@@ -181,7 +181,7 @@ dependencies {
     implementation fg.deobf("curse.maven:ftb-ultimine-386134:6899418") // ftb-ultimine-forge-2001.1.7
     implementation fg.deobf("curse.maven:Architectury-API-419699:5137938") // Architectury API
     implementation fg.deobf("curse.maven:ftb-library-API-404465:6807424") // ftb-library-forge-2001.2.10
-//    implementation fg.deobf("curse.maven:thermal_parallel-1.0.0-1350169:7013612") // thermal_parallel-1.0.0
+    //implementation fg.deobf("curse.maven:thermal_parallel-1.0.0-1350169:7013612") // thermal_parallel-1.0.0
     implementation fg.deobf("curse.maven:spark-361579:4738952") // spark
     implementation fg.deobf("curse.maven:Modern-UI-352491:6956345") // Modern UI
     implementation fg.deobf("curse.maven:Observable-509575:5643037") // Observable

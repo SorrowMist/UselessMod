@@ -1,0 +1,39 @@
+{
+  "type": "forge:conditional",
+  "recipes": [
+    {
+      "conditions": [
+        {
+          "type": "forge:mod_loaded",
+          "modid": "thermal_foundation"
+        }
+      ],
+      "recipe": {
+        "type": "useless_mod:advanced_alloy_furnace",
+        "ingredients": [
+          {
+            "ingredient": {
+              "tag": "forge:ingots/tin"
+            },
+            "count": 256
+          }
+        ],
+        "mold": {
+          "item": "useless_mod:metal_mold_gear"
+        },
+        "catalyst": {
+          "tag": "useless_mod:useless_ingots",
+          "count": 1
+        },
+        "results": [
+          {
+            "item": "thermal:tin_gear",
+            "count": 64
+          }
+        ],
+        "energy": 64000,
+        "process_time": 40
+      }
+    }
+  ]
+}

@@ -1,0 +1,55 @@
+{
+  "type": "forge:conditional",
+  "recipes": [
+    {
+      "conditions": [
+        {
+          "type": "forge:mod_loaded",
+          "modid": "ae2"
+        }
+      ],
+      "recipe": {
+        "type": "useless_mod:advanced_alloy_furnace",
+        "ingredients": [
+          {
+            "ingredient": {
+              "item": "ae2:charged_certus_quartz_crystal"
+            },
+            "count": 16
+          },
+          {
+            "ingredient": {
+              "tag": "forge:gems/quartz"
+            },
+            "count": 16
+          },
+          {
+            "ingredient": {
+              "tag": "forge:dusts/redstone"
+            },
+            "count": 16
+          }
+        ],
+        "mold": {
+          "item": "ae2:inscriber"
+        },
+        "catalyst": {
+          "tag": "useless_mod:useless_ingots",
+          "count": 1
+        },
+        "input_fluid": {
+          "fluid": "minecraft:water",
+          "amount": 16000
+        },
+        "results": [
+          {
+            "item": "ae2:fluix_crystal",
+            "count": 64
+          }
+        ],
+        "energy": 10000,
+        "process_time": 40
+      }
+    }
+  ]
+}

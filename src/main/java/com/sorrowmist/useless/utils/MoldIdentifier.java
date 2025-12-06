@@ -85,12 +85,22 @@ public class MoldIdentifier {
     }
     
     /**
-     * 检查物品是否为可接受的标志物（模具或机器标志物）
+     * 检查物品是否为原版熔炉
+     * @param stack 要检查的物品堆叠
+     * @return 如果是原版熔炉则返回true，否则返回false
+     */
+    public static boolean isVanillaFurnace(ItemStack stack) {
+        if (stack.isEmpty()) return false;
+        return stack.is(net.minecraft.world.item.Items.FURNACE);
+    }
+    
+    /**
+     * 检查物品是否为可接受的标志物（模具、机器标志物或原版熔炉）
      * @param stack 要检查的物品堆叠
      * @return 如果是可接受的标志物则返回true，否则返回false
      */
     public static boolean isAcceptableMarker(ItemStack stack) {
-        return isMetalMold(stack) || isMachineMarker(stack);
+        return isMetalMold(stack) || isMachineMarker(stack) || isVanillaFurnace(stack);
     }
     
     /**

@@ -1,6 +1,7 @@
 package com.sorrowmist.useless.recipes.advancedalloyfurnace;
 
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.crafting.Ingredient;
 import net.minecraft.world.item.crafting.RecipeManager;
 import net.minecraft.world.level.Level;
 import net.minecraftforge.fluids.FluidStack;
@@ -58,6 +59,7 @@ public class AdvancedAlloyFurnaceRecipeManager {
         AdvancedAlloyFurnaceRecipe catalystRecipe = null;
         AdvancedAlloyFurnaceRecipe moldRecipe = null;
         AdvancedAlloyFurnaceRecipe normalRecipe = null;
+        AdvancedAlloyFurnaceRecipe smeltingRecipe = null;
 
         for (AdvancedAlloyFurnaceRecipe recipe : allRecipes) {
             // 首先检查输入物品和流体是否匹配
@@ -86,6 +88,77 @@ public class AdvancedAlloyFurnaceRecipeManager {
                 break;
             }
         }
+        
+        // 检查原版熔炉配方
+        if (normalRecipe == null && inputFluid.isEmpty() && hasMold) {
+            // 检查模具是否为原版熔炉
+            boolean isFurnaceMold = mold.getItem() == net.minecraft.world.item.Items.FURNACE;
+            if (isFurnaceMold) {
+                // 创建一个只包含非空输入物品的列表
+                List<ItemStack> nonEmptyInputs = new ArrayList<>();
+                for (ItemStack stack : inputItems) {
+                    if (!stack.isEmpty()) {
+                        nonEmptyInputs.add(stack);
+                    }
+                }
+                
+                // 只处理有非空输入物品的情况
+                if (!nonEmptyInputs.isEmpty()) {
+                    // 获取所有熔炉配方
+                    Collection<net.minecraft.world.item.crafting.SmeltingRecipe> smeltingRecipes = recipeManager.getAllRecipesFor(
+                            net.minecraft.world.item.crafting.RecipeType.SMELTING
+                    );
+                    
+                    for (ItemStack stack : nonEmptyInputs) {
+                        for (net.minecraft.world.item.crafting.SmeltingRecipe recipe : smeltingRecipes) {
+                            if (recipe.getIngredients().get(0).test(stack)) {
+                                // 将原版熔炉配方转换为高级合金炉配方
+                                List<net.minecraft.world.item.crafting.Ingredient> inputIngredients = new ArrayList<>();
+                                List<Integer> inputCounts = new ArrayList<>();
+                                
+                                // 只添加配方中定义的输入物品
+                                inputIngredients.add(recipe.getIngredients().get(0));
+                                inputCounts.add(1);
+                                
+                                List<ItemStack> outputItems = new ArrayList<>();
+                                outputItems.add(recipe.getResultItem(null));
+                                
+                                FluidStack emptyFluid = FluidStack.EMPTY;
+                                
+                                // 创建临时的高级合金炉配方，使用原版熔炉作为模具
+                                Ingredient furnaceIngredient = Ingredient.of(net.minecraft.world.item.Items.FURNACE);
+                                
+                                // 创建无用锭标签的催化剂，允许使用所有无用锭
+                                net.minecraft.tags.TagKey<net.minecraft.world.item.Item> uselessIngotTag = 
+                                        net.minecraft.tags.TagKey.create(
+                                                net.minecraft.core.registries.Registries.ITEM,
+                                                new net.minecraft.resources.ResourceLocation("useless_mod", "useless_ingots")
+                                        );
+                                Ingredient uselessIngotCatalyst = Ingredient.of(uselessIngotTag);
+                                
+                                smeltingRecipe = new AdvancedAlloyFurnaceRecipe(
+                                        recipe.getId(),
+                                        inputIngredients,
+                                        inputCounts,
+                                        emptyFluid,
+                                        outputItems,
+                                        emptyFluid,
+                                        1000, // 能量消耗
+                                        40, // 处理时间：熔炉配方为40tick
+                                        uselessIngotCatalyst, // 催化剂：无用锭标签
+                                        1, // 催化剂数量
+                                        furnaceIngredient // 模具：原版熔炉
+                                );
+                                break;
+                            }
+                        }
+                        if (smeltingRecipe != null) {
+                            break;
+                        }
+                    }
+                }
+            }
+        }
 
         // 选择要返回的配方
         AdvancedAlloyFurnaceRecipe selectedRecipe = null;
@@ -95,6 +168,8 @@ public class AdvancedAlloyFurnaceRecipeManager {
             selectedRecipe = moldRecipe;
         } else if (normalRecipe != null) {
             selectedRecipe = normalRecipe;
+        } else if (smeltingRecipe != null) {
+            selectedRecipe = smeltingRecipe;
         }
 
         // 更新缓存

@@ -6,6 +6,7 @@ import com.sorrowmist.useless.UselessMod;
 import com.sorrowmist.useless.blocks.advancedalloyfurnace.AdvancedAlloyFurnaceBlock;
 import com.sorrowmist.useless.recipes.advancedalloyfurnace.AdvancedAlloyFurnaceRecipe;
 import com.sorrowmist.useless.registry.CatalystManager;
+import com.sorrowmist.useless.registry.ModIngots;
 import com.sorrowmist.useless.utils.NumberFormatUtil;
 import mezz.jei.api.constants.VanillaTypes;
 import mezz.jei.api.gui.builder.IRecipeLayoutBuilder;
@@ -204,7 +205,7 @@ public class AdvancedAlloyFurnaceRecipeCategory implements IRecipeCategory<Advan
                             new FluidStackRenderer(recipe.getOutputFluid().getAmount(), true, SLOT_SIZE, SLOT_SIZE));
         }
 
-        // 催化剂槽位
+        // 催化剂槽位：只在配方需要催化剂时显示
         if (recipe.requiresCatalyst()) {
             ItemStack[] catalystStacks = recipe.getCatalyst().getItems();
             if (catalystStacks.length > 0) {
@@ -305,16 +306,14 @@ public class AdvancedAlloyFurnaceRecipeCategory implements IRecipeCategory<Advan
 
     // 移除旧的 CATALYST_PARALLEL_MAP，使用统一的 CatalystManager
     private int getCatalystParallel(AdvancedAlloyFurnaceRecipe recipe) {
-        if (!recipe.requiresCatalyst()) {
-            return 1;
-        }
-
+        // 即使配方不需要催化剂，也可以使用催化剂提高并行数
         // 获取催化剂的第一个物品作为代表
         ItemStack[] catalystStacks = recipe.getCatalyst().getItems();
         if (catalystStacks.length > 0) {
             return CatalystManager.getCatalystParallel(catalystStacks[0]);
         }
 
+        // 如果配方没有定义催化剂，返回默认值1
         return 1;
     }
 
@@ -335,7 +334,6 @@ public class AdvancedAlloyFurnaceRecipeCategory implements IRecipeCategory<Advan
             tooltip.add(Component.literal("处理时间不受并行数影响"));
         }
 
-
         // 并行数效果说明区域
         if (mouseX >= PARALLEL_TEXT_X && mouseX <= PARALLEL_TEXT_X + 120 &&
                 mouseY >= PARALLEL_TEXT_Y && mouseY <= PARALLEL_TEXT_Y + 10) {
@@ -345,6 +343,15 @@ public class AdvancedAlloyFurnaceRecipeCategory implements IRecipeCategory<Advan
             tooltip.add(Component.literal("• 能量消耗 × 并行数").withStyle(ChatFormatting.GRAY));
             tooltip.add(Component.literal("• 处理时间保持不变").withStyle(ChatFormatting.GRAY));
             tooltip.add(Component.literal("⚠ 催化剂会被消耗").withStyle(ChatFormatting.RED));
+        }
+        
+        // 催化剂提示：所有配方都可以使用无用锭作为催化剂
+        if (mouseX >= CATALYST_SLOT_X && mouseX <= CATALYST_SLOT_X + SLOT_SIZE &&
+                mouseY >= CATALYST_SLOT_Y && mouseY <= CATALYST_SLOT_Y + SLOT_SIZE) {
+            tooltip.add(Component.literal("催化剂").withStyle(ChatFormatting.GOLD));
+            tooltip.add(Component.literal("• 可以使用无用锭提高并行数").withStyle(ChatFormatting.GRAY));
+            tooltip.add(Component.literal("• 催化剂会被消耗").withStyle(ChatFormatting.RED));
+            tooltip.add(Component.literal("• 不同等级的无用锭提供不同的并行数").withStyle(ChatFormatting.GRAY));
         }
     }
 

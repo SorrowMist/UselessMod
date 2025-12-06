@@ -236,13 +236,11 @@ public class AdvancedAlloyFurnaceRecipe implements Recipe<Container> {
             UselessMod.LOGGER.debug("Consumed {} fluid ({} required)", consumed, fluidToConsume);
         }
 
-        // 修改：只有当有催化剂且匹配时才消耗催化剂
-        if (requiresCatalyst() && !catalystSlot.isEmpty() && catalyst.test(catalystSlot) && catalystSlot.getCount() >= catalystCount) {
-            int consumed = Math.min(catalystSlot.getCount(), catalystCount);
-            catalystSlot.shrink(consumed);
-            UselessMod.LOGGER.debug("Consumed {} catalyst", consumed);
-        } else if (requiresCatalyst()) {
-            UselessMod.LOGGER.debug("No catalyst consumed (not present or not matching)");
+        // 修改：如果催化剂槽有物品且是有效的催化剂，就消耗催化剂，无论配方是否明确要求
+        if (!catalystSlot.isEmpty() && com.sorrowmist.useless.registry.CatalystManager.getCatalystParallel(catalystSlot) > 1) {
+            // 消耗一个催化剂
+            catalystSlot.shrink(1);
+            UselessMod.LOGGER.debug("Consumed 1 catalyst");
         }
 
         // 为每个配方输入创建消耗计数器，乘以并行数

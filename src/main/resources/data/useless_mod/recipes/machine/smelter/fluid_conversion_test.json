@@ -3,23 +3,26 @@
   "ingredients": [
     {
       "item": "minecraft:cobblestone",
-      "count": 65
+      "count": 64
     }
   ],
-  "catalyst": "useless_mod:useless_ingot_tier_1",
+  "catalyst": {
+          "tag": "useless_mod:useless_ingots",
+          "count": 1
+        },
   "input_fluid": {
     "fluid": "minecraft:water",
-    "amount": 1000
+    "amount": 64000
   },
   "results": [
     {
       "item": "minecraft:obsidian",
-      "count": 20000
+      "count": 64
     }
   ],
   "output_fluid": {
     "fluid": "minecraft:lava",
-    "amount": 1000
+    "amount": 64000
   },
   "energy": 2000,
   "process_time": 40

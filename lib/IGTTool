@@ -1,0 +1,873 @@
+//
+// Source code recreated from a .class file by IntelliJ IDEA
+// (powered by FernFlower decompiler)
+//
+
+package com.gregtechceu.gtceu.api.item;
+
+import com.google.common.collect.HashMultimap;
+import com.google.common.collect.Multimap;
+import com.gregtechceu.gtceu.api.GTValues;
+import com.gregtechceu.gtceu.api.capability.CombinedCapabilityProvider;
+import com.gregtechceu.gtceu.api.capability.GTCapabilityHelper;
+import com.gregtechceu.gtceu.api.data.chemical.ChemicalHelper;
+import com.gregtechceu.gtceu.api.data.chemical.material.Material;
+import com.gregtechceu.gtceu.api.data.chemical.material.properties.DustProperty;
+import com.gregtechceu.gtceu.api.data.chemical.material.properties.PropertyKey;
+import com.gregtechceu.gtceu.api.data.chemical.material.properties.ToolProperty;
+import com.gregtechceu.gtceu.api.data.chemical.material.stack.UnificationEntry;
+import com.gregtechceu.gtceu.api.data.tag.TagPrefix;
+import com.gregtechceu.gtceu.api.gui.GuiTextures;
+import com.gregtechceu.gtceu.api.item.capability.ElectricItem;
+import com.gregtechceu.gtceu.api.item.component.ElectricStats;
+import com.gregtechceu.gtceu.api.item.component.forge.IComponentCapability;
+import com.gregtechceu.gtceu.api.item.tool.GTToolType;
+import com.gregtechceu.gtceu.api.item.tool.IGTToolDefinition;
+import com.gregtechceu.gtceu.api.item.tool.ToolHelper;
+import com.gregtechceu.gtceu.api.item.tool.TreeFellingHelper;
+import com.gregtechceu.gtceu.api.item.tool.aoe.AoESymmetrical;
+import com.gregtechceu.gtceu.api.item.tool.behavior.IToolBehavior;
+import com.gregtechceu.gtceu.api.sound.SoundEntry;
+import com.gregtechceu.gtceu.common.data.GTMaterials;
+import com.gregtechceu.gtceu.config.ConfigHolder;
+import com.gregtechceu.gtceu.data.recipe.VanillaRecipeHelper;
+import com.gregtechceu.gtceu.utils.FormattingUtil;
+import com.gregtechceu.gtceu.utils.GTUtil;
+import com.lowdragmc.lowdraglib.gui.factory.HeldItemUIFactory;
+import com.lowdragmc.lowdraglib.gui.modular.ModularUI;
+import com.lowdragmc.lowdraglib.gui.texture.IGuiTexture;
+import com.lowdragmc.lowdraglib.gui.texture.TextTexture;
+import com.lowdragmc.lowdraglib.gui.widget.ButtonWidget;
+import com.lowdragmc.lowdraglib.gui.widget.LabelWidget;
+import it.unimi.dsi.fastutil.objects.Object2IntMap;
+import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Objects;
+import java.util.Set;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
+import net.minecraft.client.color.item.ItemColor;
+import net.minecraft.client.resources.language.I18n;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.core.NonNullList;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.network.chat.Component;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.sounds.SoundSource;
+import net.minecraft.tags.BlockTags;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.InteractionResultHolder;
+import net.minecraft.world.entity.EquipmentSlot;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.ai.attributes.Attribute;
+import net.minecraft.world.entity.ai.attributes.AttributeModifier;
+import net.minecraft.world.entity.ai.attributes.Attributes;
+import net.minecraft.world.entity.ai.attributes.AttributeModifier.Operation;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.CreativeModeTab;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.TooltipFlag;
+import net.minecraft.world.item.context.UseOnContext;
+import net.minecraft.world.item.enchantment.DigDurabilityEnchantment;
+import net.minecraft.world.item.enchantment.Enchantment;
+import net.minecraft.world.item.enchantment.MendingEnchantment;
+import net.minecraft.world.level.BlockGetter;
+import net.minecraft.world.level.ItemLike;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraftforge.api.distmarker.Dist;
+import net.minecraftforge.api.distmarker.OnlyIn;
+import net.minecraftforge.common.ForgeHooks;
+import net.minecraftforge.common.capabilities.Capability;
+import net.minecraftforge.common.capabilities.ICapabilityProvider;
+import net.minecraftforge.common.util.LazyOptional;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+
+public interface IGTTool extends HeldItemUIFactory.IHeldItemUIHolder, ItemLike {
+    GTToolType getToolType();
+
+    Material getMaterial();
+
+    boolean isElectric();
+
+    int getElectricTier();
+
+    IGTToolDefinition getToolStats();
+
+    @Nullable SoundEntry getSound();
+
+    boolean playSoundOnBlockDestroy();
+
+    default Item asItem() {
+        return (Item)this;
+    }
+
+    default ItemStack getRaw() {
+        ItemStack stack = new ItemStack(this.asItem());
+        ToolHelper.getBehaviorsTag(stack);
+        return stack;
+    }
+
+    default ItemStack get() {
+        ItemStack stack = new ItemStack(this.asItem());
+        CompoundTag stackCompound = stack.getOrCreateTag();
+        stackCompound.putBoolean("DisallowContainerItem", false);
+        CompoundTag toolTag = ToolHelper.getToolTag(stack);
+        IGTToolDefinition toolStats = this.getToolStats();
+        stackCompound.putInt("HideFlags", 2);
+        AoESymmetrical aoeDefinition = this.getToolStats().getAoEDefinition(stack);
+        ToolProperty toolProperty = (ToolProperty)this.getMaterial().getProperty(PropertyKey.TOOL);
+        int durability = toolProperty.getDurability() * toolProperty.getDurabilityMultiplier();
+        if (toolStats.getBaseDurability(stack) == 0) {
+            durability = (int)((float)durability * toolStats.getDurabilityMultiplier(stack));
+        } else {
+            durability = (int)((float)durability + (float)toolStats.getBaseDurability(stack) * toolStats.getDurabilityMultiplier(stack));
+        }
+
+        toolTag.putInt("MaxDamage", durability - 1);
+        toolTag.putInt("Damage", 0);
+        if (toolProperty.isUnbreakable()) {
+            stackCompound.putBoolean("Unbreakable", true);
+        }
+
+        Object2IntMap<Enchantment> enchantments = new Object2IntOpenHashMap(toolProperty.getEnchantments());
+        enchantments.putAll(toolStats.getDefaultEnchantments(stack));
+        enchantments.forEach((enchantment, level) -> {
+            if (enchantment.canEnchant(stack)) {
+                stack.enchant(enchantment, level);
+            }
+
+        });
+        CompoundTag behaviourTag = ToolHelper.getBehaviorsTag(stack);
+        this.getToolStats().getBehaviors().forEach((behavior) -> behavior.addBehaviorNBT(stack, behaviourTag));
+        if (aoeDefinition != AoESymmetrical.none()) {
+            behaviourTag.putInt("MaxAoEColumn", aoeDefinition.column);
+            behaviourTag.putInt("MaxAoERow", aoeDefinition.row);
+            behaviourTag.putInt("MaxAoELayer", aoeDefinition.layer);
+            behaviourTag.putInt("AoEColumn", aoeDefinition.column);
+            behaviourTag.putInt("AoERow", aoeDefinition.row);
+            behaviourTag.putInt("AoELayer", aoeDefinition.layer);
+        }
+
+        if (toolProperty.isMagnetic()) {
+            behaviourTag.putBoolean("RelocateMinedBlocks", true);
+            behaviourTag.putBoolean("RelocateMobDrops", true);
+        }
+
+        return stack;
+    }
+
+    default ItemStack get(long defaultCharge, long defaultMaxCharge) {
+        ItemStack stack = this.get();
+        if (this.isElectric()) {
+            ElectricItem electricItem = (ElectricItem)GTCapabilityHelper.getElectricItem(stack);
+            if (electricItem != null) {
+                electricItem.setMaxChargeOverride(defaultMaxCharge);
+                electricItem.setCharge(defaultCharge);
+            }
+        }
+
+        return stack;
+    }
+
+    default ItemStack get(long defaultMaxCharge) {
+        return this.get(defaultMaxCharge, defaultMaxCharge);
+    }
+
+    default Material getToolMaterial(ItemStack stack) {
+        Item var3 = stack.getItem();
+        if (var3 instanceof IGTTool tool) {
+            return tool.getMaterial();
+        } else {
+            return GTMaterials.Iron;
+        }
+    }
+
+    default @Nullable ToolProperty getToolProperty(ItemStack stack) {
+        return (ToolProperty)this.getToolMaterial(stack).getProperty(PropertyKey.TOOL);
+    }
+
+    default @Nullable DustProperty getDustProperty(ItemStack stack) {
+        return (DustProperty)this.getToolMaterial(stack).getProperty(PropertyKey.DUST);
+    }
+
+    default float getMaterialToolSpeed(ItemStack stack) {
+        ToolProperty toolProperty = this.getToolProperty(stack);
+        return toolProperty == null ? 0.0F : toolProperty.getHarvestSpeed();
+    }
+
+    default float getMaterialAttackDamage(ItemStack stack) {
+        ToolProperty toolProperty = this.getToolProperty(stack);
+        return toolProperty == null ? 0.0F : toolProperty.getAttackDamage();
+    }
+
+    default float getMaterialAttackSpeed(ItemStack stack) {
+        ToolProperty toolProperty = this.getToolProperty(stack);
+        return toolProperty == null ? 0.0F : toolProperty.getAttackSpeed();
+    }
+
+    default int getMaterialDurability(ItemStack stack) {
+        ToolProperty toolProperty = this.getToolProperty(stack);
+        return toolProperty == null ? 0 : toolProperty.getDurability() * toolProperty.getDurabilityMultiplier();
+    }
+
+    default int getMaterialEnchantability(ItemStack stack) {
+        ToolProperty toolProperty = this.getToolProperty(stack);
+        return toolProperty == null ? 0 : toolProperty.getEnchantability();
+    }
+
+    default int getMaterialHarvestLevel(ItemStack stack) {
+        ToolProperty toolProperty = this.getToolProperty(stack);
+        return toolProperty == null ? 0 : toolProperty.getHarvestLevel();
+    }
+
+    default long getMaxCharge(ItemStack stack) {
+        if (this.isElectric()) {
+            CompoundTag tag = stack.getTag();
+            if (tag != null && tag.contains("MaxCharge", 4)) {
+                return tag.getLong("MaxCharge");
+            }
+        }
+
+        return -1L;
+    }
+
+    default long getCharge(ItemStack stack) {
+        if (this.isElectric()) {
+            CompoundTag tag = stack.getTag();
+            if (tag != null && tag.contains("Charge", 4)) {
+                return tag.getLong("Charge");
+            }
+        }
+
+        return -1L;
+    }
+
+    default float getTotalToolSpeed(ItemStack stack) {
+        CompoundTag toolTag = ToolHelper.getToolTag(stack);
+        if (toolTag.contains("ToolSpeed", 5)) {
+            return toolTag.getFloat("ToolSpeed");
+        } else {
+            float toolSpeed = this.getToolStats().getEfficiencyMultiplier(stack) * this.getMaterialToolSpeed(stack) + this.getToolStats().getBaseEfficiency(stack);
+            toolTag.putFloat("ToolSpeed", toolSpeed);
+            return toolSpeed;
+        }
+    }
+
+    default float getTotalAttackDamage(ItemStack stack) {
+        CompoundTag toolTag = ToolHelper.getToolTag(stack);
+        if (toolTag.contains("AttackDamage", 5)) {
+            return toolTag.getFloat("AttackDamage");
+        } else {
+            float baseDamage = this.getToolStats().getBaseDamage(stack);
+            float attackDamage = 0.0F;
+            if (baseDamage != Float.MIN_VALUE) {
+                attackDamage = this.getMaterialAttackDamage(stack) + baseDamage;
+            }
+
+            toolTag.putFloat("AttackDamage", attackDamage);
+            return attackDamage;
+        }
+    }
+
+    default float getTotalAttackSpeed(ItemStack stack) {
+        CompoundTag toolTag = ToolHelper.getToolTag(stack);
+        if (toolTag.contains("AttackSpeed", 5)) {
+            return toolTag.getFloat("AttackSpeed");
+        } else {
+            float attackSpeed = this.getMaterialAttackSpeed(stack) + this.getToolStats().getAttackSpeed(stack);
+            toolTag.putFloat("AttackSpeed", attackSpeed);
+            return attackSpeed;
+        }
+    }
+
+    default int getTotalMaxDurability(ItemStack stack) {
+        CompoundTag toolTag = ToolHelper.getToolTag(stack);
+        if (toolTag.contains("MaxDamage", 3)) {
+            return toolTag.getInt("MaxDamage");
+        } else {
+            IGTToolDefinition toolStats = this.getToolStats();
+            int maxDurability = this.getMaterialDurability(stack);
+            int builderDurability = (int)((float)toolStats.getBaseDurability(stack) * toolStats.getDurabilityMultiplier(stack));
+            maxDurability = builderDurability == 0 ? (int)((float)maxDurability * toolStats.getDurabilityMultiplier(stack)) : maxDurability + builderDurability;
+            toolTag.putInt("MaxDamage", maxDurability);
+            return maxDurability;
+        }
+    }
+
+    default int getTotalEnchantability(ItemStack stack) {
+        CompoundTag toolTag = ToolHelper.getToolTag(stack);
+        if (toolTag.contains("Enchantability", 3)) {
+            return toolTag.getInt("Enchantability");
+        } else {
+            int enchantability = this.getMaterialEnchantability(stack);
+            toolTag.putInt("Enchantability", enchantability);
+            return enchantability;
+        }
+    }
+
+    default int getTotalHarvestLevel(ItemStack stack) {
+        CompoundTag toolTag = ToolHelper.getToolTag(stack);
+        if (toolTag.contains("HarvestLevel", 3)) {
+            return toolTag.getInt("HarvestLevel");
+        } else {
+            int harvestLevel = this.getMaterialHarvestLevel(stack) + this.getToolStats().getBaseQuality(stack);
+            toolTag.putInt("HarvestLevel", harvestLevel);
+            return harvestLevel;
+        }
+    }
+
+    default float definition$getDestroySpeed(ItemStack stack, BlockState state) {
+        float specialValue = ToolHelper.getDestroySpeed(state, this.getToolClasses(stack));
+        if (specialValue != -1.0F) {
+            return specialValue;
+        } else if (ToolHelper.isToolEffective(state, this.getToolClasses(stack), this.getTotalHarvestLevel(stack))) {
+            return this.getTotalToolSpeed(stack);
+        } else {
+            return this.getToolStats().isToolEffective(state) ? this.getTotalToolSpeed(stack) : 1.0F;
+        }
+    }
+
+    default boolean definition$hurtEnemy(ItemStack stack, LivingEntity target, LivingEntity attacker) {
+        this.getToolStats().getBehaviors().forEach((behavior) -> behavior.hitEntity(stack, target, attacker));
+        ToolHelper.damageItem(stack, attacker, this.getToolStats().getToolDamagePerAttack(stack));
+        return true;
+    }
+
+    default boolean definition$onBlockStartBreak(ItemStack stack, BlockPos pos, Player player) {
+        if (player.level().isClientSide) {
+            return false;
+        } else {
+            this.getToolStats().getBehaviors().forEach((behavior) -> behavior.onBlockStartBreak(stack, pos, player));
+            if (!player.isShiftKeyDown()) {
+                ServerPlayer playerMP = (ServerPlayer)player;
+                int result = -1;
+                if (ToolHelper.isTool(stack, new GTToolType[]{GTToolType.SHEARS})) {
+                    result = ToolHelper.shearBlockRoutine(playerMP, stack, pos);
+                }
+
+                if (result != 0) {
+                    BlockState state = player.level().getBlockState(pos);
+                    boolean effective = false;
+
+                    for(GTToolType type : this.getToolClasses(stack)) {
+                        Stream var10000 = type.harvestTags.stream();
+                        Objects.requireNonNull(state);
+                        if (var10000.anyMatch(state::is)) {
+                            effective = true;
+                            break;
+                        }
+                    }
+
+                    effective |= ToolHelper.isToolEffective(state, this.getToolClasses(stack), this.getTotalHarvestLevel(stack));
+                    if (effective) {
+                        if (ToolHelper.areaOfEffectBlockBreakRoutine(stack, playerMP)) {
+                            if (this.playSoundOnBlockDestroy()) {
+                                this.playSound(player);
+                            }
+                        } else {
+                            if (result != -1) {
+                                return true;
+                            }
+
+                            if (ToolHelper.getBehaviorsTag(stack).getBoolean("TreeFelling") && state.is(BlockTags.LOGS)) {
+                                TreeFellingHelper.fellTree(stack, player.level(), state, pos, player);
+                            }
+
+                            if (this.playSoundOnBlockDestroy()) {
+                                this.playSound(player);
+                            }
+                        }
+                    }
+                }
+            }
+
+            return false;
+        }
+    }
+
+    default boolean definition$mineBlock(ItemStack stack, Level worldIn, BlockState state, BlockPos pos, LivingEntity entityLiving) {
+        if (!worldIn.isClientSide) {
+            this.getToolStats().getBehaviors().forEach((behavior) -> behavior.onBlockDestroyed(stack, worldIn, state, pos, entityLiving));
+            if ((double)state.getDestroySpeed(worldIn, pos) != (double)0.0F) {
+                ToolHelper.damageItem(stack, entityLiving, this.getToolStats().getToolDamagePerBlockBreak(stack));
+            }
+
+            if (entityLiving instanceof Player && this.playSoundOnBlockDestroy() && entityLiving.isShiftKeyDown()) {
+                this.playSound((Player)entityLiving);
+            }
+        }
+
+        return true;
+    }
+
+    default boolean definition$isValidRepairItem(ItemStack toRepair, ItemStack repair) {
+        if (toRepair.getDamageValue() == 0) {
+            return false;
+        } else {
+            Item var4 = repair.getItem();
+            if (var4 instanceof IGTTool) {
+                IGTTool gtTool = (IGTTool)var4;
+                return this.getToolMaterial(toRepair) == gtTool.getToolMaterial(repair);
+            } else {
+                UnificationEntry entry = ChemicalHelper.getUnificationEntry(repair.getItem());
+                if (entry != null && entry.material != null) {
+                    if (entry.material == this.getToolMaterial(toRepair)) {
+                        if (VanillaRecipeHelper.isMaterialWood(entry.material)) {
+                            return entry.tagPrefix == TagPrefix.planks;
+                        }
+
+                        if (entry.tagPrefix == TagPrefix.plate) {
+                            return true;
+                        }
+
+                        if (entry.material.hasProperty(PropertyKey.INGOT)) {
+                            return entry.tagPrefix == TagPrefix.ingot;
+                        }
+
+                        if (entry.material.hasProperty(PropertyKey.GEM)) {
+                            return entry.tagPrefix == TagPrefix.gem;
+                        }
+                    }
+
+                    return false;
+                } else {
+                    return false;
+                }
+            }
+        }
+    }
+
+    default Multimap<Attribute, AttributeModifier> definition$getDefaultAttributeModifiers(EquipmentSlot equipmentSlot, ItemStack stack) {
+        Multimap<Attribute, AttributeModifier> multimap = HashMultimap.create();
+        if (equipmentSlot == EquipmentSlot.MAINHAND) {
+            multimap.put(Attributes.ATTACK_DAMAGE, new AttributeModifier(Item.BASE_ATTACK_DAMAGE_UUID, "Weapon modifier", (double)this.getTotalAttackDamage(stack), Operation.ADDITION));
+            multimap.put(Attributes.ATTACK_SPEED, new AttributeModifier(Item.BASE_ATTACK_SPEED_UUID, "Weapon modifier", Math.max(-3.9, (double)this.getTotalAttackSpeed(stack)), Operation.ADDITION));
+        }
+
+        return multimap;
+    }
+
+    default int definition$getHarvestLevel(ItemStack stack, GTToolType toolClass, @Nullable Player player, @Nullable BlockState blockState) {
+        return this.getToolClasses(stack).contains(toolClass) ? this.getTotalHarvestLevel(stack) : -1;
+    }
+
+    default boolean definition$canDisableShield(ItemStack stack, ItemStack shield, LivingEntity entity, LivingEntity attacker) {
+        return this.getToolStats().getBehaviors().stream().anyMatch((behavior) -> behavior.canDisableShield(stack, shield, entity, attacker));
+    }
+
+    default boolean definition$doesSneakBypassUse(@NotNull ItemStack stack, @NotNull BlockGetter world, @NotNull BlockPos pos, @NotNull Player player) {
+        return this.getToolStats().doesSneakBypassUse();
+    }
+
+    default boolean definition$shouldCauseBlockBreakReset(ItemStack oldStack, ItemStack newStack) {
+        return oldStack.getItem() != newStack.getItem() || oldStack.getDamageValue() < newStack.getDamageValue();
+    }
+
+    default boolean definition$hasCraftingRemainingItem(ItemStack stack) {
+        return stack.getTag() == null || !stack.getTag().getBoolean("DisallowContainerItem");
+    }
+
+    default ItemStack definition$getCraftingRemainingItem(ItemStack stack) {
+        if (!this.definition$hasCraftingRemainingItem(stack)) {
+            return ItemStack.EMPTY;
+        } else {
+            stack = stack.copy();
+            Player player = ForgeHooks.getCraftingPlayer();
+            ToolHelper.damageItemWhenCrafting(stack, player);
+            this.playCraftingSound(player, stack);
+            return stack.isEmpty() ? this.getToolStats().getBrokenStack() : stack;
+        }
+    }
+
+    default boolean definition$shouldCauseReequipAnimation(ItemStack oldStack, ItemStack newStack, boolean slotChanged) {
+        if (this.getCharge(oldStack) != this.getCharge(newStack)) {
+            return slotChanged;
+        } else {
+            return !oldStack.equals(newStack);
+        }
+    }
+
+    default boolean definition$onEntitySwing(LivingEntity entityLiving, ItemStack stack) {
+        this.getToolStats().getBehaviors().forEach((behavior) -> behavior.onEntitySwing(entityLiving, stack));
+        return false;
+    }
+
+    default boolean definition$canDestroyBlockInCreative(Level world, BlockPos pos, ItemStack stack, Player player) {
+        return true;
+    }
+
+    default boolean definition$isDamaged(ItemStack stack) {
+        return this.definition$getDamage(stack) > 0;
+    }
+
+    default int definition$getDamage(ItemStack stack) {
+        CompoundTag toolTag = ToolHelper.getToolTag(stack);
+        if (toolTag.contains("Damage", 3)) {
+            return toolTag.getInt("Damage");
+        } else {
+            toolTag.putInt("Damage", 0);
+            return 0;
+        }
+    }
+
+    default int definition$getMaxDamage(ItemStack stack) {
+        return this.getTotalMaxDurability(stack);
+    }
+
+    default void definition$setDamage(ItemStack stack, int durability) {
+        CompoundTag toolTag = ToolHelper.getToolTag(stack);
+        toolTag.putInt("Damage", durability);
+    }
+
+    default double definition$getDurabilityForDisplay(ItemStack stack) {
+        int damage = stack.getDamageValue();
+        int maxDamage = stack.getMaxDamage();
+        return damage == 0 ? (double)1.0F : (double)(maxDamage - damage) / (double)maxDamage;
+    }
+
+    default void definition$init() {
+        this.getToolStats().getBehaviors().forEach((behavior) -> behavior.init(this));
+    }
+
+    default InteractionResult definition$onItemUseFirst(ItemStack stack, UseOnContext context) {
+        for(IToolBehavior behavior : this.getToolStats().getBehaviors()) {
+            if (behavior.onItemUseFirst(stack, context) == InteractionResult.SUCCESS) {
+                return InteractionResult.SUCCESS;
+            }
+        }
+
+        return InteractionResult.PASS;
+    }
+
+    default InteractionResult definition$onItemUse(UseOnContext context) {
+        for(IToolBehavior behavior : this.getToolStats().getBehaviors()) {
+            if (behavior.onItemUse(context) == InteractionResult.SUCCESS) {
+                return InteractionResult.SUCCESS;
+            }
+        }
+
+        return InteractionResult.PASS;
+    }
+
+    default InteractionResultHolder<ItemStack> definition$use(Level world, Player player, InteractionHand hand) {
+        ItemStack stack = player.getItemInHand(hand);
+        if (player.isShiftKeyDown() && ToolHelper.getMaxAoEDefinition(stack) != AoESymmetrical.none()) {
+            ItemStack heldItem = player.getItemInHand(hand);
+            if (player instanceof ServerPlayer) {
+                ServerPlayer serverPlayer = (ServerPlayer)player;
+                HeldItemUIFactory.INSTANCE.openUI(serverPlayer, hand);
+            }
+
+            return InteractionResultHolder.success(heldItem);
+        } else {
+            for(IToolBehavior behavior : this.getToolStats().getBehaviors()) {
+                if (behavior.onItemRightClick(world, player, hand).getResult() == InteractionResult.SUCCESS) {
+                    return InteractionResultHolder.success(stack);
+                }
+            }
+
+            return InteractionResultHolder.pass(stack);
+        }
+    }
+
+    default boolean definition$shouldOpenUIAfterUse(UseOnContext context) {
+        for(IToolBehavior behavior : this.getToolStats().getBehaviors()) {
+            if (!behavior.shouldOpenUIAfterUse(context)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    default void definition$fillItemCategory(CreativeModeTab category, @NotNull NonNullList<ItemStack> items) {
+        if (this.isElectric()) {
+            items.add(this.get(2147483647L));
+        } else {
+            items.add(this.get());
+        }
+
+    }
+
+    @OnlyIn(Dist.CLIENT)
+    default void definition$appendHoverText(@NotNull ItemStack stack, @Nullable Level world, @NotNull List<Component> tooltip, TooltipFlag flag) {
+        Item var6 = stack.getItem();
+        if (var6 instanceof IGTTool tool) {
+            CompoundTag tagCompound = stack.getTag();
+            if (tagCompound != null) {
+                IGTToolDefinition toolStats = tool.getToolStats();
+                if (this.isElectric()) {
+                    tooltip.add(Component.translatable("metaitem.generic.electric_item.tooltip", new Object[]{FormattingUtil.formatNumbers(this.getCharge(stack)), FormattingUtil.formatNumbers(this.getMaxCharge(stack)), GTValues.VNF[this.getElectricTier()]}));
+                    ElectricStats.addCurrentChargeTooltip(tooltip, this.getCharge(stack), this.getMaxCharge(stack), this.getElectricTier());
+                }
+
+                if (!tagCompound.getBoolean("Unbreakable")) {
+                    int damageRemaining = tool.getTotalMaxDurability(stack) - stack.getDamageValue() + 1;
+                    if (toolStats.isSuitableForCrafting(stack)) {
+                        tooltip.add(Component.translatable("item.gtceu.tool.tooltip.crafting_uses", new Object[]{FormattingUtil.formatNumbers(damageRemaining / Math.max(1, toolStats.getToolDamagePerCraft(stack)))}));
+                    }
+
+                    tooltip.add(Component.translatable("item.gtceu.tool.tooltip.max_uses", new Object[]{FormattingUtil.formatNumbers(tool.getTotalMaxDurability(stack))}));
+                    tooltip.add(Component.translatable("item.gtceu.tool.tooltip.general_uses", new Object[]{FormattingUtil.formatNumbers(damageRemaining)}));
+                }
+
+                if (toolStats.isSuitableForAttacking(stack)) {
+                    tooltip.add(Component.translatable("item.gtceu.tool.tooltip.attack_damage", new Object[]{FormattingUtil.formatNumbers((double)(2.0F + tool.getTotalAttackDamage(stack)))}));
+                    tooltip.add(Component.translatable("item.gtceu.tool.tooltip.attack_speed", new Object[]{FormattingUtil.formatNumbers((double)(4.0F + tool.getTotalAttackSpeed(stack)))}));
+                }
+
+                if (toolStats.isSuitableForBlockBreak(stack)) {
+                    tooltip.add(Component.translatable("item.gtceu.tool.tooltip.mining_speed", new Object[]{FormattingUtil.formatNumbers((double)tool.getTotalToolSpeed(stack))}));
+                    int harvestLevel = tool.getTotalHarvestLevel(stack);
+                    String harvestName = "item.gtceu.tool.harvest_level." + harvestLevel;
+                    if (I18n.exists(harvestName)) {
+                        tooltip.add(Component.translatable("item.gtceu.tool.tooltip.harvest_level_extra", new Object[]{harvestLevel, Component.translatable(harvestName)}));
+                    } else {
+                        tooltip.add(Component.translatable("item.gtceu.tool.tooltip.harvest_level", new Object[]{harvestLevel}));
+                    }
+                }
+
+                boolean addedBehaviorNewLine = false;
+                AoESymmetrical aoeDefinition = ToolHelper.getAoEDefinition(stack);
+                if (aoeDefinition != AoESymmetrical.none()) {
+                    addedBehaviorNewLine = tooltip.add(Component.literal(""));
+                    tooltip.add(Component.translatable("item.gtceu.tool.behavior.aoe_mining", new Object[]{aoeDefinition.column * 2 + 1, aoeDefinition.row * 2 + 1, aoeDefinition.layer + 1}));
+                }
+
+                CompoundTag behaviorsTag = ToolHelper.getBehaviorsTag(stack);
+                if (behaviorsTag.getBoolean("RelocateMinedBlocks")) {
+                    if (!addedBehaviorNewLine) {
+                        addedBehaviorNewLine = true;
+                        tooltip.add(Component.literal(""));
+                    }
+
+                    tooltip.add(Component.translatable("item.gtceu.tool.behavior.relocate_mining"));
+                }
+
+                if (!addedBehaviorNewLine && !toolStats.getBehaviors().isEmpty()) {
+                    tooltip.add(Component.literal(""));
+                }
+
+                toolStats.getBehaviors().forEach((behavior) -> behavior.addInformation(stack, world, tooltip, flag));
+                String var10000 = BuiltInRegistries.ITEM.getKey(this.asItem()).getPath();
+                String uniqueTooltip = "item.gtceu.tool." + var10000 + ".tooltip";
+                if (I18n.exists(uniqueTooltip)) {
+                    tooltip.add(Component.literal(""));
+                    tooltip.add(Component.translatable(uniqueTooltip));
+                }
+
+                tooltip.add(Component.literal(""));
+                tooltip.add(Component.translatable("item.gtceu.tool.usable_as", new Object[]{this.getToolClassNames(stack).stream().filter((s) -> I18n.exists("gtceu.tool.class." + s)).map((s) -> Component.translatable("gtceu.tool.class." + s)).collect(Component::empty, FormattingUtil::combineComponents, FormattingUtil::combineComponents)}));
+                if (!tagCompound.getBoolean("Unbreakable")) {
+                    if (GTUtil.isShiftDown()) {
+                        Material material = this.getToolMaterial(stack);
+                        Collection<Component> repairItems = new ArrayList();
+                        if (!VanillaRecipeHelper.isMaterialWood(material)) {
+                            if (material.hasProperty(PropertyKey.INGOT)) {
+                                repairItems.add(TagPrefix.ingot.getLocalizedName(material));
+                            } else if (material.hasProperty(PropertyKey.GEM)) {
+                                repairItems.add(TagPrefix.gem.getLocalizedName(material));
+                            }
+                        }
+
+                        if (!ChemicalHelper.get(TagPrefix.plate, material).isEmpty()) {
+                            repairItems.add(TagPrefix.plate.getLocalizedName(material));
+                        }
+
+                        if (!repairItems.isEmpty()) {
+                            tooltip.add(Component.translatable("item.gtceu.tool.tooltip.repair_material", new Object[]{repairItems.stream().collect(Component::empty, FormattingUtil::combineComponents, FormattingUtil::combineComponents)}));
+                        }
+                    } else {
+                        tooltip.add(Component.translatable("item.gtceu.tool.tooltip.repair_info"));
+                    }
+                }
+
+                if (this.isElectric()) {
+                    tooltip.add(Component.translatable("item.gtceu.tool.replace_tool_head"));
+                }
+
+            }
+        }
+    }
+
+    default boolean definition$canApplyAtEnchantingTable(@NotNull ItemStack stack, Enchantment enchantment) {
+        if (stack.isEmpty()) {
+            return false;
+        } else {
+            switch (enchantment.getDescriptionId()) {
+                case "enchantment.cofhcore.smashing":
+                    return false;
+                case "enchantment.autosmelt":
+                case "enchantment.cofhcore.smelting":
+                case "enchantment.as.smelting":
+                    return this.getToolStats().getAoEDefinition(stack) == AoESymmetrical.none() && !ToolHelper.getBehaviorsTag(stack).contains("TreeFelling");
+                default:
+                    if (!this.isElectric() || !(enchantment instanceof MendingEnchantment) && !(enchantment instanceof DigDurabilityEnchantment)) {
+                        if (enchantment.category == null) {
+                            return true;
+                        } else {
+                            switch (enchantment.category) {
+                                case DIGGER:
+                                    return this.getToolStats().isSuitableForBlockBreak(stack);
+                                case WEAPON:
+                                    return this.getToolStats().isSuitableForAttacking(stack);
+                                case BREAKABLE:
+                                    return stack.getTag() != null && !stack.getTag().getBoolean("Unbreakable");
+                                default:
+                                    ToolProperty property = this.getToolProperty(stack);
+                                    if (property == null) {
+                                        return false;
+                                    } else if (!property.getEnchantments().isEmpty() && property.getEnchantments().containsKey(enchantment)) {
+                                        return true;
+                                    } else {
+                                        return this.getToolStats().isEnchantable(stack) && this.getToolStats().canApplyEnchantment(stack, enchantment);
+                                    }
+                            }
+                        }
+                    } else {
+                        return false;
+                    }
+            }
+        }
+    }
+
+    @OnlyIn(Dist.CLIENT)
+    default int getColor(ItemStack stack, int tintIndex) {
+        return tintIndex % 2 == 1 ? this.getToolMaterial(stack).getMaterialRGB() : 16777215;
+    }
+
+    default void playCraftingSound(Player player, ItemStack stack) {
+        if (ConfigHolder.INSTANCE.client.toolCraftingSounds && this.getSound() != null && player != null && this.canPlaySound(stack)) {
+            this.setLastCraftingSoundTime(stack);
+            this.playSound(player);
+        }
+
+    }
+
+    default void setLastCraftingSoundTime(ItemStack stack) {
+        ToolHelper.getToolTag(stack).putInt("LastCraftingUse", (int)System.currentTimeMillis());
+    }
+
+    default boolean canPlaySound(ItemStack stack) {
+        return Math.abs((int)System.currentTimeMillis() - ToolHelper.getToolTag(stack).getInt("LastCraftingUse")) > 1000;
+    }
+
+    default void playSound(Player player) {
+        if (ConfigHolder.INSTANCE.client.toolUseSounds && this.getSound() != null) {
+            player.level().playSound((Player)null, player.position().x, player.position().y, player.position().z, this.getSound().getMainEvent(), SoundSource.PLAYERS, 1.0F, 1.0F);
+        }
+
+    }
+
+    default ModularUI createUI(Player entityPlayer, HeldItemUIFactory.HeldItemHolder holder) {
+        CompoundTag tag = ToolHelper.getBehaviorsTag(holder.getHeld());
+        AoESymmetrical defaultDefinition = ToolHelper.getMaxAoEDefinition(holder.getHeld());
+        return (new ModularUI(120, 80, holder, entityPlayer)).background(new IGuiTexture[]{GuiTextures.BACKGROUND}).widget(new LabelWidget(6, 10, "item.gtceu.tool.aoe.columns")).widget(new LabelWidget(49, 10, "item.gtceu.tool.aoe.rows")).widget(new LabelWidget(79, 10, "item.gtceu.tool.aoe.layers")).widget(new ButtonWidget(15, 24, 20, 20, new TextTexture("+"), (data) -> {
+            AoESymmetrical.increaseColumn(tag, defaultDefinition);
+            holder.markAsDirty();
+        })).widget(new ButtonWidget(15, 44, 20, 20, new TextTexture("-"), (data) -> {
+            AoESymmetrical.decreaseColumn(tag, defaultDefinition);
+            holder.markAsDirty();
+        })).widget(new ButtonWidget(50, 24, 20, 20, new TextTexture("+"), (data) -> {
+            AoESymmetrical.increaseRow(tag, defaultDefinition);
+            holder.markAsDirty();
+        })).widget(new ButtonWidget(50, 44, 20, 20, new TextTexture("-"), (data) -> {
+            AoESymmetrical.decreaseRow(tag, defaultDefinition);
+            holder.markAsDirty();
+        })).widget(new ButtonWidget(85, 24, 20, 20, new TextTexture("+"), (data) -> {
+            AoESymmetrical.increaseLayer(tag, defaultDefinition);
+            holder.markAsDirty();
+        })).widget(new ButtonWidget(85, 44, 20, 20, new TextTexture("-"), (data) -> {
+            AoESymmetrical.decreaseLayer(tag, defaultDefinition);
+            holder.markAsDirty();
+        })).widget(new LabelWidget(23, 65, () -> Integer.toString(1 + 2 * AoESymmetrical.getColumn(ToolHelper.getBehaviorsTag(holder.getHeld()), defaultDefinition)))).widget(new LabelWidget(58, 65, () -> Integer.toString(1 + 2 * AoESymmetrical.getRow(ToolHelper.getBehaviorsTag(holder.getHeld()), defaultDefinition)))).widget(new LabelWidget(93, 65, () -> Integer.toString(1 + AoESymmetrical.getLayer(ToolHelper.getBehaviorsTag(holder.getHeld()), defaultDefinition))));
+    }
+
+    default Set<GTToolType> getToolClasses(ItemStack stack) {
+        return new HashSet(this.getToolType().toolClasses);
+    }
+
+    default Set<String> getToolClassNames(ItemStack stack) {
+        return (Set)this.getToolClasses(stack).stream().flatMap((type) -> type.toolClassNames.stream()).collect(Collectors.toSet());
+    }
+
+    default @Nullable ICapabilityProvider definition$initCapabilities(final ItemStack stack, @Nullable CompoundTag nbt) {
+        List<ICapabilityProvider> providers = new ArrayList();
+        if (this.isElectric()) {
+            final ElectricStats item = ElectricStats.createElectricItem(0L, this.getElectricTier());
+            providers.add(new ICapabilityProvider() {
+                public <T> @NotNull LazyOptional<T> getCapability(@NotNull Capability<T> capability, @Nullable Direction arg) {
+                    return item.getCapability(stack, capability);
+                }
+            });
+        }
+
+        for(IToolBehavior behavior : this.getToolStats().getBehaviors()) {
+            if (behavior instanceof final IComponentCapability componentCapability) {
+                providers.add(new ICapabilityProvider() {
+                    public <T> @NotNull LazyOptional<T> getCapability(@NotNull Capability<T> capability, @Nullable Direction arg) {
+                        return componentCapability.getCapability(stack, capability);
+                    }
+                });
+            }
+        }
+
+        if (providers.isEmpty()) {
+            return null;
+        } else if (providers.size() == 1) {
+            return (ICapabilityProvider)providers.get(0);
+        } else {
+            return new CombinedCapabilityProvider(providers);
+        }
+    }
+
+    default boolean definition$isCorrectToolForDrops(ItemStack stack, BlockState state) {
+        Item var4 = stack.getItem();
+        if (var4 instanceof IGTTool gtTool) {
+            return ToolHelper.isToolEffective(state, gtTool.getToolClasses(stack), gtTool.getTotalHarvestLevel(stack));
+        } else {
+            return stack.getItem().isCorrectToolForDrops(state);
+        }
+    }
+
+    @OnlyIn(Dist.CLIENT)
+    static ItemColor tintColor() {
+        return (itemStack, index) -> {
+            Item patt41670$temp = itemStack.getItem();
+            if (!(patt41670$temp instanceof IGTTool)) {
+                return -1;
+            } else {
+                IGTTool item = (IGTTool)patt41670$temp;
+                Material material = item.getMaterial();
+                int var10000;
+                switch (index) {
+                    case -121:
+                    case 2:
+                        var10000 = material.getMaterialSecondaryARGB() != -1 ? material.getMaterialSecondaryARGB() : material.getMaterialARGB();
+                        break;
+                    case -111:
+                    case 1:
+                        var10000 = material.getMaterialARGB();
+                        break;
+                    case -101:
+                    case 0:
+                        var10000 = item.getToolClasses(itemStack).contains(GTToolType.CROWBAR) && itemStack.hasTag() && ToolHelper.getToolTag(itemStack).contains("TintColor", 3) ? ToolHelper.getToolTag(itemStack).getInt("TintColor") : -1;
+                        break;
+                    default:
+                        var10000 = -1;
+                }
+
+                return var10000;
+            }
+        };
+    }
+}

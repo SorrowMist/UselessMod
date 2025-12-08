@@ -1,0 +1,387 @@
+// Source code is decompiled from a .class file using FernFlower decompiler (from Intellij IDEA).
+package com.gregtechceu.gtceu.api.item.tool;
+
+import com.gregtechceu.gtceu.GTCEu;
+import com.gregtechceu.gtceu.api.data.chemical.material.Material;
+import com.gregtechceu.gtceu.api.data.tag.TagUtil;
+import com.gregtechceu.gtceu.api.item.IGTTool;
+import com.gregtechceu.gtceu.api.item.tool.behavior.IToolBehavior;
+import com.gregtechceu.gtceu.api.sound.ExistingSoundEntry;
+import com.gregtechceu.gtceu.api.sound.SoundEntry;
+import com.gregtechceu.gtceu.common.data.GTSoundEntries;
+import com.gregtechceu.gtceu.common.item.tool.behavior.BlockRotatingBehavior;
+import com.gregtechceu.gtceu.common.item.tool.behavior.DisableShieldBehavior;
+import com.gregtechceu.gtceu.common.item.tool.behavior.EntityDamageBehavior;
+import com.gregtechceu.gtceu.common.item.tool.behavior.GrassPathBehavior;
+import com.gregtechceu.gtceu.common.item.tool.behavior.HarvestCropsBehavior;
+import com.gregtechceu.gtceu.common.item.tool.behavior.HarvestIceBehavior;
+import com.gregtechceu.gtceu.common.item.tool.behavior.HoeGroundBehavior;
+import com.gregtechceu.gtceu.common.item.tool.behavior.LogStripBehavior;
+import com.gregtechceu.gtceu.common.item.tool.behavior.PlungerBehavior;
+import com.gregtechceu.gtceu.common.item.tool.behavior.RotateRailBehavior;
+import com.gregtechceu.gtceu.common.item.tool.behavior.ScrapeBehavior;
+import com.gregtechceu.gtceu.common.item.tool.behavior.ToolModeSwitchBehavior;
+import com.gregtechceu.gtceu.common.item.tool.behavior.TorchPlaceBehavior;
+import com.gregtechceu.gtceu.common.item.tool.behavior.TreeFellingBehavior;
+import com.gregtechceu.gtceu.common.item.tool.behavior.WaxOffBehavior;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.function.UnaryOperator;
+import lombok.Generated;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.sounds.SoundEvents;
+import net.minecraft.sounds.SoundSource;
+import net.minecraft.tags.ItemTags;
+import net.minecraft.tags.TagKey;
+import net.minecraft.world.entity.animal.IronGolem;
+import net.minecraft.world.entity.monster.Spider;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.enchantment.EnchantmentCategory;
+import net.minecraft.world.item.enchantment.Enchantments;
+import net.minecraft.world.level.block.Block;
+import org.jetbrains.annotations.Nullable;
+
+public class GTToolType {
+   private static final Map<String, GTToolType> types = new HashMap();
+   public static final GTToolType SWORD = builder("sword").toolTag(TagUtil.createItemTag("swords", true)).harvestTag(TagUtil.createBlockTag("mineable/sword")).toolStats((b) -> {
+      return b.attacking().attackDamage(3.0F).attackSpeed(-2.4F);
+   }).constructor(GTSwordItem::create).toolClassNames("sword").materialAmount(7257600L).build();
+   public static final GTToolType PICKAXE;
+   public static final GTToolType SHOVEL;
+   public static final GTToolType AXE;
+   public static final GTToolType HOE;
+   public static final GTToolType MINING_HAMMER;
+   public static final GTToolType SPADE;
+   public static final GTToolType SCYTHE;
+   public static final GTToolType SAW;
+   public static final GTToolType HARD_HAMMER;
+   public static final GTToolType SOFT_MALLET;
+   public static final GTToolType WRENCH;
+   public static final GTToolType FILE;
+   public static final GTToolType CROWBAR;
+   public static final GTToolType SCREWDRIVER;
+   public static final GTToolType MORTAR;
+   public static final GTToolType WIRE_CUTTER;
+   public static final GTToolType KNIFE;
+   public static final GTToolType BUTCHERY_KNIFE;
+   public static final GTToolType PLUNGER;
+   public static final GTToolType SHEARS;
+   public static final GTToolType DRILL_LV;
+   public static final GTToolType DRILL_MV;
+   public static final GTToolType DRILL_HV;
+   public static final GTToolType DRILL_EV;
+   public static final GTToolType DRILL_IV;
+   public static final GTToolType CHAINSAW_LV;
+   public static final GTToolType WRENCH_LV;
+   public static final GTToolType WRENCH_HV;
+   public static final GTToolType WRENCH_IV;
+   public static final GTToolType WIRE_CUTTER_LV;
+   public static final GTToolType WIRE_CUTTER_HV;
+   public static final GTToolType WIRE_CUTTER_IV;
+   public static final GTToolType BUZZSAW;
+   public static final GTToolType SCREWDRIVER_LV;
+   public final String name;
+   public final String idFormat;
+   public final List<TagKey<Item>> itemTags;
+   public final List<TagKey<Block>> harvestTags;
+   public final ResourceLocation modelLocation;
+   public final Set<String> toolClassNames;
+   public final Set<GTToolType> toolClasses;
+   public final @Nullable SoundEntry soundEntry;
+   public final boolean playSoundOnBlockDestroy;
+   public final Character symbol;
+   public final long materialAmount;
+   public final IGTToolDefinition toolDefinition;
+   public final ToolConstructor constructor;
+   public final int electricTier;
+
+   public GTToolType(String name, String idFormat, Character symbol, Set<GTToolType> toolClasses, IGTToolDefinition toolDefinition, ToolConstructor constructor, List<TagKey<Block>> harvestTags, List<TagKey<Item>> itemTags, ResourceLocation modelLocation, Set<String> toolClassNames, @Nullable SoundEntry soundEntry, boolean playSoundOnBlockDestroy, int electricTier, long materialAmount) {
+      this.name = name;
+      this.idFormat = idFormat;
+      this.symbol = symbol;
+      toolClasses.add(this);
+      this.toolClasses = toolClasses;
+      this.toolDefinition = toolDefinition;
+      this.constructor = constructor;
+      this.itemTags = itemTags;
+      this.harvestTags = harvestTags;
+      this.modelLocation = modelLocation;
+      this.toolClassNames = toolClassNames;
+      this.soundEntry = soundEntry;
+      this.playSoundOnBlockDestroy = playSoundOnBlockDestroy;
+      this.electricTier = electricTier;
+      this.materialAmount = materialAmount;
+      types.put(name, this);
+   }
+
+   public boolean is(ItemStack itemStack) {
+      return ToolHelper.is(itemStack, this);
+   }
+
+   public String getUnlocalizedName() {
+      return "item.gtceu.tool." + this.name;
+   }
+
+   public static Builder builder(String name) {
+      return new Builder(name);
+   }
+
+   @Generated
+   public static Map<String, GTToolType> getTypes() {
+      return types;
+   }
+
+   static {
+      PICKAXE = builder("pickaxe").toolTag(TagUtil.createItemTag("pickaxes", true)).toolTag(ItemTags.CLUSTER_MAX_HARVESTABLES).harvestTag(TagUtil.createBlockTag("mineable/pickaxe", true)).toolStats((b) -> {
+         return b.blockBreaking().attackDamage(1.0F).attackSpeed(-2.8F).behaviors(new IToolBehavior[]{TorchPlaceBehavior.INSTANCE});
+      }).toolClassNames("pickaxe").materialAmount(10886400L).build();
+      SHOVEL = builder("shovel").toolTag(TagUtil.createItemTag("shovels", true)).harvestTag(TagUtil.createBlockTag("mineable/shovel", true)).toolStats((b) -> {
+         return b.blockBreaking().attackDamage(1.5F).attackSpeed(-3.0F).behaviors(new IToolBehavior[]{GrassPathBehavior.INSTANCE});
+      }).constructor(GTShovelItem::create).toolClassNames("shovel").materialAmount(3628800L).build();
+      AXE = builder("axe").toolTag(TagUtil.createItemTag("axes", true)).harvestTag(TagUtil.createBlockTag("mineable/axe", true)).toolStats((b) -> {
+         return b.blockBreaking().attackDamage(5.0F).attackSpeed(-3.2F).baseEfficiency(2.0F).behaviors(new IToolBehavior[]{DisableShieldBehavior.INSTANCE, TreeFellingBehavior.INSTANCE, LogStripBehavior.INSTANCE, ScrapeBehavior.INSTANCE, WaxOffBehavior.INSTANCE});
+      }).constructor(GTAxeItem::create).toolClassNames("axe").materialAmount(10886400L).build();
+      HOE = builder("hoe").toolTag(TagUtil.createItemTag("hoes", true)).harvestTag(TagUtil.createBlockTag("mineable/hoe", true)).toolStats((b) -> {
+         return b.cannotAttack().attackSpeed(-1.0F).behaviors(new IToolBehavior[]{HoeGroundBehavior.INSTANCE});
+      }).constructor(GTHoeItem::create).toolClassNames("hoe").materialAmount(7257600L).build();
+      MINING_HAMMER = builder("mining_hammer").toolTag(TagUtil.createItemTag("tools/mining_hammers", false)).harvestTag(TagUtil.createBlockTag("mineable/pickaxe", true)).toolStats((b) -> {
+         return b.blockBreaking().aoe(1, 1, 0).efficiencyMultiplier(0.4F).attackDamage(1.5F).attackSpeed(-3.2F).durabilityMultiplier(3.0F).behaviors(new IToolBehavior[]{TorchPlaceBehavior.INSTANCE});
+      }).toolClasses(PICKAXE).materialAmount(21772800L).build();
+      SPADE = builder("spade").toolTag(TagUtil.createItemTag("tools/spades", false)).harvestTag(TagUtil.createBlockTag("mineable/shovel", true)).toolStats((b) -> {
+         return b.blockBreaking().aoe(1, 1, 0).efficiencyMultiplier(0.4F).attackDamage(1.5F).attackSpeed(-3.2F).durabilityMultiplier(3.0F).behaviors(new IToolBehavior[]{GrassPathBehavior.INSTANCE});
+      }).toolClasses(SHOVEL).materialAmount(10886400L).build();
+      SCYTHE = builder("scythe").toolTag(TagUtil.createItemTag("tools/scythes", false)).harvestTag(TagUtil.createBlockTag("mineable/hoe", true)).toolStats((b) -> {
+         return b.blockBreaking().attacking().attackDamage(5.0F).attackSpeed(-3.0F).durabilityMultiplier(3.0F).aoe(2, 2, 2).behaviors(new IToolBehavior[]{HoeGroundBehavior.INSTANCE, HarvestCropsBehavior.INSTANCE}).canApplyEnchantment(new EnchantmentCategory[]{EnchantmentCategory.DIGGER});
+      }).constructor(GTHoeItem::create).toolClassNames("scythe").toolClasses(HOE).materialAmount(10886400L).build();
+      SAW = builder("saw").toolTag(TagUtil.createItemTag("tools/saws", false)).harvestTag(TagUtil.createBlockTag("mineable/saw", false)).toolStats((b) -> {
+         return b.crafting().damagePerCraftingAction(2).attackDamage(-1.0F).attackSpeed(-2.6F).behaviors(new IToolBehavior[]{HarvestIceBehavior.INSTANCE});
+      }).sound(GTSoundEntries.SAW_TOOL).symbol('s').materialAmount(7257600L).build();
+      HARD_HAMMER = builder("hammer").toolTag(TagUtil.createItemTag("tools/hammers", false)).harvestTag(TagUtil.createBlockTag("mineable/hammer", false)).harvestTag(TagUtil.createBlockTag("mineable/pickaxe", true)).toolStats((b) -> {
+         return b.blockBreaking().crafting().damagePerCraftingAction(2).attackDamage(1.0F).attackSpeed(-2.8F).behaviors(new IToolBehavior[]{new EntityDamageBehavior(2.0F, new Class[]{IronGolem.class})});
+      }).sound(GTSoundEntries.FORGE_HAMMER).symbol('h').toolClasses(PICKAXE).materialAmount(21772800L).build();
+      SOFT_MALLET = builder("mallet").toolTag(TagUtil.createItemTag("tools/mallets", false)).toolStats((b) -> {
+         return b.crafting().cannotAttack().attackSpeed(-2.4F).sneakBypassUse().behaviors(new IToolBehavior[]{ToolModeSwitchBehavior.INSTANCE});
+      }).sound(GTSoundEntries.SOFT_MALLET_TOOL).symbol('r').materialAmount(21772800L).build();
+      WRENCH = builder("wrench").toolTag(TagUtil.createItemTag("tools/wrenches", false)).toolTag(TagUtil.createItemTag("tools/wrench", false)).harvestTag(TagUtil.createBlockTag("mineable/wrench", false)).toolStats((b) -> {
+         return b.blockBreaking().crafting().sneakBypassUse().attackDamage(1.0F).attackSpeed(-2.8F).behaviors(new IToolBehavior[]{BlockRotatingBehavior.INSTANCE, new EntityDamageBehavior(3.0F, new Class[]{IronGolem.class}), ToolModeSwitchBehavior.INSTANCE});
+      }).sound(GTSoundEntries.WRENCH_TOOL, true).symbol('w').materialAmount(14515200L).build();
+      FILE = builder("file").toolTag(TagUtil.createItemTag("tools/files", false)).toolStats((b) -> {
+         return b.crafting().damagePerCraftingAction(4).cannotAttack().attackSpeed(-2.4F);
+      }).sound(GTSoundEntries.FILE_TOOL).symbol('f').materialAmount(7257600L).build();
+      CROWBAR = builder("crowbar").toolTag(TagUtil.createItemTag("tools/crowbars", false)).harvestTag(TagUtil.createBlockTag("mineable/crowbar", false)).toolStats((b) -> {
+         return b.blockBreaking().crafting().attackDamage(2.0F).attackSpeed(-2.4F).sneakBypassUse().behaviors(new IToolBehavior[]{RotateRailBehavior.INSTANCE});
+      }).sound(new ExistingSoundEntry(SoundEvents.ITEM_BREAK, SoundSource.BLOCKS), true).symbol('c').materialAmount(5443200L).build();
+      SCREWDRIVER = builder("screwdriver").toolTag(TagUtil.createItemTag("tools/screwdrivers", false)).toolStats((b) -> {
+         return b.crafting().damagePerCraftingAction(4).sneakBypassUse().attackDamage(-1.0F).attackSpeed(3.0F).behaviors(new IToolBehavior[]{new EntityDamageBehavior(3.0F, new Class[]{Spider.class})});
+      }).sound(GTSoundEntries.SCREWDRIVER_TOOL).symbol('d').materialAmount(3628800L).build();
+      MORTAR = builder("mortar").toolTag(TagUtil.createItemTag("tools/mortars", false)).toolStats((b) -> {
+         return b.crafting().damagePerCraftingAction(2).cannotAttack().attackSpeed(-2.4F);
+      }).sound(GTSoundEntries.MORTAR_TOOL).symbol('m').materialAmount(7257600L).build();
+      WIRE_CUTTER = builder("wire_cutter").toolTag(TagUtil.createItemTag("tools/wire_cutters", false)).harvestTag(TagUtil.createBlockTag("mineable/wire_cutter", false)).toolStats((b) -> {
+         return b.blockBreaking().crafting().sneakBypassUse().damagePerCraftingAction(4).attackDamage(-1.0F).attackSpeed(-2.4F);
+      }).sound(GTSoundEntries.WIRECUTTER_TOOL, true).symbol('x').materialAmount(14515200L).build();
+      KNIFE = builder("knife").toolTag(TagUtil.createItemTag("tools/knives", false)).harvestTag(TagUtil.createBlockTag("mineable/knife", false)).toolStats((b) -> {
+         return b.crafting().attacking().attackSpeed(3.0F);
+      }).constructor(GTSwordItem::create).symbol('k').toolClasses(SWORD).materialAmount(3628800L).build();
+      BUTCHERY_KNIFE = builder("butchery_knife").toolTag(TagUtil.createItemTag("tools/butchery_knives", false)).toolStats((b) -> {
+         return b.attacking().attackDamage(1.5F).attackSpeed(-1.3F).defaultEnchantment(Enchantments.MOB_LOOTING, 3);
+      }).constructor(GTSwordItem::create).materialAmount(14515200L).build();
+      PLUNGER = builder("plunger").toolTag(TagUtil.createItemTag("tools/plungers", false)).toolStats((b) -> {
+         return b.cannotAttack().attackSpeed(-2.4F).sneakBypassUse().behaviors(new IToolBehavior[]{PlungerBehavior.INSTANCE});
+      }).sound(GTSoundEntries.PLUNGER_TOOL).build();
+      SHEARS = builder("shears").toolTag(TagUtil.createItemTag("tools/shears", false)).harvestTag(TagUtil.createBlockTag("mineable/shears", false)).toolStats((b) -> {
+         return b;
+      }).build();
+      DRILL_LV = builder("lv_drill").idFormat("lv_%s_drill").toolTag(TagUtil.createItemTag("tools/drills", false)).toolTag(TagUtil.createItemTag("pickaxes", true)).toolTag(TagUtil.createItemTag("shovels", true)).toolTag(ItemTags.CLUSTER_MAX_HARVESTABLES).harvestTag(TagUtil.createBlockTag("mineable/pickaxe", true)).harvestTag(TagUtil.createBlockTag("mineable/shovel", true)).toolStats((b) -> {
+         return b.blockBreaking().aoe(1, 1, 0).attackDamage(1.0F).attackSpeed(-3.2F).durabilityMultiplier(3.0F).brokenStack(ToolHelper.SUPPLY_POWER_UNIT_LV).behaviors(new IToolBehavior[]{TorchPlaceBehavior.INSTANCE});
+      }).sound(GTSoundEntries.DRILL_TOOL, true).electric(1).toolClassNames("drill").build();
+      DRILL_MV = builder("mv_drill").idFormat("mv_%s_drill").toolTag(TagUtil.createItemTag("tools/drills", false)).toolTag(TagUtil.createItemTag("pickaxes", true)).toolTag(TagUtil.createItemTag("shovels", true)).toolTag(ItemTags.CLUSTER_MAX_HARVESTABLES).harvestTag(TagUtil.createBlockTag("mineable/pickaxe", true)).harvestTag(TagUtil.createBlockTag("mineable/shovel", true)).toolStats((b) -> {
+         return b.blockBreaking().aoe(1, 1, 2).attackDamage(1.0F).attackSpeed(-3.2F).durabilityMultiplier(4.0F).brokenStack(ToolHelper.SUPPLY_POWER_UNIT_MV).behaviors(new IToolBehavior[]{TorchPlaceBehavior.INSTANCE});
+      }).sound(GTSoundEntries.DRILL_TOOL, true).electric(2).toolClassNames("drill").build();
+      DRILL_HV = builder("hv_drill").idFormat("hv_%s_drill").toolTag(TagUtil.createItemTag("tools/drills", false)).toolTag(TagUtil.createItemTag("pickaxes", true)).toolTag(TagUtil.createItemTag("shovels", true)).toolTag(ItemTags.CLUSTER_MAX_HARVESTABLES).harvestTag(TagUtil.createBlockTag("mineable/pickaxe", true)).harvestTag(TagUtil.createBlockTag("mineable/shovel", true)).toolStats((b) -> {
+         return b.blockBreaking().aoe(2, 2, 4).attackDamage(1.0F).attackSpeed(-3.2F).durabilityMultiplier(5.0F).brokenStack(ToolHelper.SUPPLY_POWER_UNIT_HV).behaviors(new IToolBehavior[]{TorchPlaceBehavior.INSTANCE});
+      }).sound(GTSoundEntries.DRILL_TOOL, true).electric(3).toolClassNames("drill").build();
+      DRILL_EV = builder("ev_drill").idFormat("ev_%s_drill").toolTag(TagUtil.createItemTag("tools/drills", false)).toolTag(TagUtil.createItemTag("pickaxes", true)).toolTag(TagUtil.createItemTag("shovels", true)).toolTag(ItemTags.CLUSTER_MAX_HARVESTABLES).harvestTag(TagUtil.createBlockTag("mineable/pickaxe", true)).harvestTag(TagUtil.createBlockTag("mineable/shovel", true)).toolStats((b) -> {
+         return b.blockBreaking().aoe(3, 3, 6).attackDamage(1.0F).attackSpeed(-3.2F).durabilityMultiplier(6.0F).brokenStack(ToolHelper.SUPPLY_POWER_UNIT_EV).behaviors(new IToolBehavior[]{TorchPlaceBehavior.INSTANCE});
+      }).sound(GTSoundEntries.DRILL_TOOL, true).electric(4).toolClassNames("drill").build();
+      DRILL_IV = builder("iv_drill").idFormat("iv_%s_drill").toolTag(TagUtil.createItemTag("tools/drills", false)).toolTag(TagUtil.createItemTag("pickaxes", true)).toolTag(TagUtil.createItemTag("shovels", true)).toolTag(ItemTags.CLUSTER_MAX_HARVESTABLES).harvestTag(TagUtil.createBlockTag("mineable/pickaxe", true)).harvestTag(TagUtil.createBlockTag("mineable/shovel", true)).toolStats((b) -> {
+         return b.blockBreaking().aoe(4, 4, 8).attackDamage(1.0F).attackSpeed(-3.2F).durabilityMultiplier(7.0F).brokenStack(ToolHelper.SUPPLY_POWER_UNIT_IV).behaviors(new IToolBehavior[]{TorchPlaceBehavior.INSTANCE});
+      }).sound(GTSoundEntries.DRILL_TOOL, true).electric(5).toolClassNames("drill").build();
+      CHAINSAW_LV = builder("lv_chainsaw").idFormat("lv_%s_chainsaw").toolTag(TagUtil.createItemTag("axes", true)).toolTag(TagUtil.createItemTag("tools/chainsaws", false)).harvestTag(TagUtil.createBlockTag("mineable/axe", true)).toolStats((b) -> {
+         return b.blockBreaking().efficiencyMultiplier(2.0F).attackDamage(5.0F).attackSpeed(-3.2F).brokenStack(ToolHelper.SUPPLY_POWER_UNIT_LV).behaviors(new IToolBehavior[]{HarvestIceBehavior.INSTANCE, DisableShieldBehavior.INSTANCE, TreeFellingBehavior.INSTANCE});
+      }).sound(GTSoundEntries.CHAINSAW_TOOL, true).electric(1).toolClasses(AXE).build();
+      WRENCH_LV = builder("lv_wrench").idFormat("lv_%s_wrench").toolTag(TagUtil.createItemTag("tools/wrenches", false)).toolTag(TagUtil.createItemTag("tools/wrench", false)).harvestTag(TagUtil.createBlockTag("mineable/wrench", false)).toolStats((b) -> {
+         return b.blockBreaking().crafting().sneakBypassUse().efficiencyMultiplier(2.0F).attackDamage(1.0F).attackSpeed(-2.8F).behaviors(new IToolBehavior[]{BlockRotatingBehavior.INSTANCE, new EntityDamageBehavior(3.0F, new Class[]{IronGolem.class}), ToolModeSwitchBehavior.INSTANCE}).brokenStack(ToolHelper.SUPPLY_POWER_UNIT_LV);
+      }).sound(GTSoundEntries.WRENCH_TOOL, true).electric(1).toolClasses(WRENCH).build();
+      WRENCH_HV = builder("hv_wrench").idFormat("hv_%s_wrench").toolTag(TagUtil.createItemTag("tools/wrenches", false)).toolTag(TagUtil.createItemTag("tools/wrench", false)).harvestTag(TagUtil.createBlockTag("mineable/wrench", false)).toolStats((b) -> {
+         return b.blockBreaking().crafting().sneakBypassUse().efficiencyMultiplier(3.0F).attackDamage(1.0F).attackSpeed(-2.8F).behaviors(new IToolBehavior[]{BlockRotatingBehavior.INSTANCE, new EntityDamageBehavior(3.0F, new Class[]{IronGolem.class}), ToolModeSwitchBehavior.INSTANCE}).brokenStack(ToolHelper.SUPPLY_POWER_UNIT_HV);
+      }).sound(GTSoundEntries.WRENCH_TOOL, true).electric(3).toolClasses(WRENCH).build();
+      WRENCH_IV = builder("iv_wrench").idFormat("iv_%s_wrench").toolTag(TagUtil.createItemTag("tools/wrenches", false)).toolTag(TagUtil.createItemTag("tools/wrench", false)).harvestTag(TagUtil.createBlockTag("mineable/wrench", false)).toolStats((b) -> {
+         return b.blockBreaking().crafting().sneakBypassUse().efficiencyMultiplier(4.0F).attackDamage(1.0F).attackSpeed(-2.8F).behaviors(new IToolBehavior[]{BlockRotatingBehavior.INSTANCE, new EntityDamageBehavior(3.0F, new Class[]{IronGolem.class}), ToolModeSwitchBehavior.INSTANCE}).brokenStack(ToolHelper.SUPPLY_POWER_UNIT_IV);
+      }).sound(GTSoundEntries.WRENCH_TOOL, true).electric(5).toolClasses(WRENCH).build();
+      WIRE_CUTTER_LV = builder("lv_wirecutter").idFormat("lv_%s_wirecutter").toolTag(TagUtil.createItemTag("tools/wire_cutters", false)).harvestTag(TagUtil.createBlockTag("mineable/wire_cutter", false)).toolStats((b) -> {
+         return b.blockBreaking().crafting().sneakBypassUse().damagePerCraftingAction(4).attackDamage(-1.0F).attackSpeed(-2.4F).brokenStack(ToolHelper.SUPPLY_POWER_UNIT_LV);
+      }).sound(GTSoundEntries.WIRECUTTER_TOOL, true).electric(1).toolClasses(WIRE_CUTTER).build();
+      WIRE_CUTTER_HV = builder("hv_wirecutter").idFormat("hv_%s_wirecutter").toolTag(TagUtil.createItemTag("tools/wire_cutters", false)).harvestTag(TagUtil.createBlockTag("mineable/wire_cutter", false)).toolStats((b) -> {
+         return b.blockBreaking().crafting().sneakBypassUse().damagePerCraftingAction(4).attackDamage(-1.0F).attackSpeed(-2.4F).brokenStack(ToolHelper.SUPPLY_POWER_UNIT_HV);
+      }).sound(GTSoundEntries.WIRECUTTER_TOOL, true).electric(3).toolClasses(WIRE_CUTTER).build();
+      WIRE_CUTTER_IV = builder("iv_wirecutter").idFormat("iv_%s_wirecutter").toolTag(TagUtil.createItemTag("tools/wire_cutters", false)).harvestTag(TagUtil.createBlockTag("mineable/wire_cutter", false)).toolStats((b) -> {
+         return b.blockBreaking().crafting().sneakBypassUse().damagePerCraftingAction(4).attackDamage(-1.0F).attackSpeed(-2.4F).brokenStack(ToolHelper.SUPPLY_POWER_UNIT_IV);
+      }).sound(GTSoundEntries.WIRECUTTER_TOOL, true).electric(5).toolClasses(WIRE_CUTTER).build();
+      BUZZSAW = builder("buzzsaw").toolTag(TagUtil.createItemTag("tools/saws", false)).toolTag(TagUtil.createItemTag("tools/buzzsaws", false)).toolStats((b) -> {
+         return b.crafting().attackDamage(1.5F).attackSpeed(-3.2F).brokenStack(ToolHelper.SUPPLY_POWER_UNIT_LV);
+      }).sound(GTSoundEntries.CHAINSAW_TOOL, true).electric(1).toolClasses(SAW).build();
+      SCREWDRIVER_LV = builder("lv_screwdriver").idFormat("lv_%s_screwdriver").toolTag(TagUtil.createItemTag("tools/screwdrivers", false)).toolStats((b) -> {
+         return b.crafting().sneakBypassUse().attackDamage(-1.0F).attackSpeed(3.0F).behaviors(new IToolBehavior[]{new EntityDamageBehavior(3.0F, new Class[]{Spider.class})}).brokenStack(ToolHelper.SUPPLY_POWER_UNIT_LV);
+      }).sound(GTSoundEntries.SCREWDRIVER_TOOL).electric(1).toolClasses(SCREWDRIVER).build();
+   }
+
+   @FunctionalInterface
+   public interface ToolConstructor {
+      IGTTool apply(GTToolType var1, MaterialToolTier var2, Material var3, IGTToolDefinition var4, Item.Properties var5);
+   }
+
+   public static class Builder {
+      private final String name;
+      private String idFormat;
+      private final List<TagKey<Item>> itemTags = new ArrayList();
+      private final List<TagKey<Block>> harvestTags = new ArrayList();
+      private Set<String> toolClassNames = new HashSet();
+      private Set<GTToolType> toolClasses = new HashSet();
+      private IGTToolDefinition toolStats;
+      private long materialAmount;
+      private int tier = -1;
+      private Character symbol = null;
+      private ToolConstructor constructor = GTToolItem::create;
+      private ResourceLocation modelLocation;
+      private SoundEntry sound;
+      private boolean playSoundOnBlockDestroy;
+
+      public Builder(String name) {
+         this.name = name;
+         this.idFormat = "%s_" + name;
+         this.modelLocation = GTCEu.id("item/tools/" + name);
+      }
+
+      @SafeVarargs
+      public final Builder toolTag(TagKey<Item>... tags) {
+         this.itemTags.addAll(Arrays.stream(tags).toList());
+         return this;
+      }
+
+      @SafeVarargs
+      public final Builder harvestTag(TagKey<Block>... tags) {
+         this.harvestTags.addAll(Arrays.stream(tags).toList());
+         return this;
+      }
+
+      public Builder toolClasses(GTToolType... classes) {
+         this.toolClasses.addAll(Arrays.stream(classes).toList());
+         this.toolClassNames.addAll(Arrays.stream(classes).map((type) -> {
+            return type.name;
+         }).toList());
+         return this;
+      }
+
+      public Builder toolClassNames(String... classes) {
+         this.toolClassNames.addAll(Arrays.stream(classes).toList());
+         return this;
+      }
+
+      public Builder toolStats(UnaryOperator<ToolDefinitionBuilder> builder) {
+         this.toolStats = ((ToolDefinitionBuilder)builder.apply(new ToolDefinitionBuilder())).build();
+         return this;
+      }
+
+      public Builder sound(SoundEntry sound) {
+         return this.sound(sound, false);
+      }
+
+      public Builder sound(SoundEntry sound, boolean playSoundOnBlockDestroy) {
+         this.sound = sound;
+         this.playSoundOnBlockDestroy = playSoundOnBlockDestroy;
+         return this;
+      }
+
+      public Builder electric(int tier) {
+         return this.tier(tier);
+      }
+
+      private GTToolType get() {
+         return new GTToolType(this.name, this.idFormat, this.symbol, this.toolClasses, this.toolStats, this.constructor, this.harvestTags, this.itemTags, this.modelLocation, this.toolClassNames, this.sound, this.playSoundOnBlockDestroy, this.tier, this.materialAmount);
+      }
+
+      public GTToolType build() {
+         if (this.toolClassNames.isEmpty()) {
+            this.toolClassNames.add(this.name);
+         }
+
+         if (this.symbol == null) {
+            return this.get();
+         } else {
+            GTToolType existing = ToolHelper.getToolFromSymbol(this.symbol);
+            if (existing != null) {
+               throw new IllegalArgumentException(String.format("Symbol %s has been taken by %s already!", this.symbol, existing));
+            } else {
+               GTToolType supplied = this.get();
+               ToolHelper.registerToolSymbol(this.symbol, supplied);
+               return supplied;
+            }
+         }
+      }
+
+      @Generated
+      public Builder idFormat(String idFormat) {
+         this.idFormat = idFormat;
+         return this;
+      }
+
+      @Generated
+      public Builder toolClassNames(Set<String> toolClassNames) {
+         this.toolClassNames = toolClassNames;
+         return this;
+      }
+
+      @Generated
+      public Builder toolStats(IGTToolDefinition toolStats) {
+         this.toolStats = toolStats;
+         return this;
+      }
+
+      @Generated
+      public Builder materialAmount(long materialAmount) {
+         this.materialAmount = materialAmount;
+         return this;
+      }
+
+      @Generated
+      public Builder tier(int tier) {
+         this.tier = tier;
+         return this;
+      }
+
+      @Generated
+      public Builder symbol(Character symbol) {
+         this.symbol = symbol;
+         return this;
+      }
+
+      @Generated
+      public Builder constructor(ToolConstructor constructor) {
+         this.constructor = constructor;
+         return this;
+      }
+
+      @Generated
+      public Builder modelLocation(ResourceLocation modelLocation) {
+         this.modelLocation = modelLocation;
+         return this;
+      }
+   }
+}

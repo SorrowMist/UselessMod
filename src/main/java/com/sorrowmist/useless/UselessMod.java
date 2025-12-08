@@ -214,18 +214,70 @@ public class UselessMod {
             });
         }
         private static void registerItemModelProperties() {
-            // 注册 EndlessBeafItem 的模型属性
+            // 为所有EndlessBeafItem注册模型属性，包括主物品和所有子物品
+            ResourceLocation silkTouchMode = ResourceLocation.fromNamespaceAndPath(UselessMod.MOD_ID, "silk_touch_mode");
+            
+            // 注册主物品模型属性
             ItemProperties.register(EndlessBeafItem.ENDLESS_BEAF_ITEM.get(),
-                    ResourceLocation.fromNamespaceAndPath(UselessMod.MOD_ID, "silk_touch_mode"),
-                    (ItemStack stack, net.minecraft.client.multiplayer.ClientLevel level,
-                     net.minecraft.world.entity.LivingEntity entity, int seed) -> {
+                    silkTouchMode,
+                    (stack, level, entity, seed) -> {
+                        if (stack.getItem() instanceof EndlessBeafItem item) {
+                            return item.isSilkTouchMode(stack) ? 1.0F : 0.0F;
+                        }
+                        return 0.0F;
+                    });
+            
+            // 注册扳手模型属性
+            ItemProperties.register(EndlessBeafItem.ENDLESS_BEAF_WRENCH.get(),
+                    silkTouchMode,
+                    (stack, level, entity, seed) -> {
+                        if (stack.getItem() instanceof EndlessBeafItem item) {
+                            return item.isSilkTouchMode(stack) ? 1.0F : 0.0F;
+                        }
+                        return 0.0F;
+                    });
+            
+            // 注册螺丝刀模型属性
+            ItemProperties.register(EndlessBeafItem.ENDLESS_BEAF_SCREWDRIVER.get(),
+                    silkTouchMode,
+                    (stack, level, entity, seed) -> {
+                        if (stack.getItem() instanceof EndlessBeafItem item) {
+                            return item.isSilkTouchMode(stack) ? 1.0F : 0.0F;
+                        }
+                        return 0.0F;
+                    });
+            
+            // 注册锤子模型属性
+            ItemProperties.register(EndlessBeafItem.ENDLESS_BEAF_MALLET.get(),
+                    silkTouchMode,
+                    (stack, level, entity, seed) -> {
+                        if (stack.getItem() instanceof EndlessBeafItem item) {
+                            return item.isSilkTouchMode(stack) ? 1.0F : 0.0F;
+                        }
+                        return 0.0F;
+                    });
+            
+            // 注册撬棍模型属性
+            ItemProperties.register(EndlessBeafItem.ENDLESS_BEAF_CROWBAR.get(),
+                    silkTouchMode,
+                    (stack, level, entity, seed) -> {
+                        if (stack.getItem() instanceof EndlessBeafItem item) {
+                            return item.isSilkTouchMode(stack) ? 1.0F : 0.0F;
+                        }
+                        return 0.0F;
+                    });
+            
+            // 注册铁锤模型属性
+            ItemProperties.register(EndlessBeafItem.ENDLESS_BEAF_HAMMER.get(),
+                    silkTouchMode,
+                    (stack, level, entity, seed) -> {
                         if (stack.getItem() instanceof EndlessBeafItem item) {
                             return item.isSilkTouchMode(stack) ? 1.0F : 0.0F;
                         }
                         return 0.0F;
                     });
 
-            LOGGER.info("已注册物品模型属性");
+            LOGGER.info("已注册所有EndlessBeafItem模型属性");
         }
     }
     // 调试模式

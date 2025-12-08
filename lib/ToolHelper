@@ -1,0 +1,804 @@
+// Source code is decompiled from a .class file using FernFlower decompiler (from Intellij IDEA).
+package com.gregtechceu.gtceu.api.item.tool;
+
+import com.google.common.collect.BiMap;
+import com.google.common.collect.HashBiMap;
+import com.google.common.collect.Table;
+import com.google.common.collect.Tables;
+import com.gregtechceu.gtceu.api.GTValues;
+import com.gregtechceu.gtceu.api.capability.GTCapabilityHelper;
+import com.gregtechceu.gtceu.api.capability.IElectricItem;
+import com.gregtechceu.gtceu.api.capability.recipe.EURecipeCapability;
+import com.gregtechceu.gtceu.api.capability.recipe.IO;
+import com.gregtechceu.gtceu.api.capability.recipe.IRecipeHandler;
+import com.gregtechceu.gtceu.api.capability.recipe.ItemRecipeCapability;
+import com.gregtechceu.gtceu.api.capability.recipe.RecipeCapability;
+import com.gregtechceu.gtceu.api.data.chemical.ChemicalHelper;
+import com.gregtechceu.gtceu.api.data.chemical.material.Material;
+import com.gregtechceu.gtceu.api.data.chemical.material.properties.PropertyKey;
+import com.gregtechceu.gtceu.api.data.chemical.material.properties.ToolProperty;
+import com.gregtechceu.gtceu.api.data.tag.TagPrefix;
+import com.gregtechceu.gtceu.api.item.ComponentItem;
+import com.gregtechceu.gtceu.api.item.IGTTool;
+import com.gregtechceu.gtceu.api.item.tool.aoe.AoESymmetrical;
+import com.gregtechceu.gtceu.api.machine.trait.NotifiableItemStackHandler;
+import com.gregtechceu.gtceu.api.recipe.GTRecipe;
+import com.gregtechceu.gtceu.api.recipe.content.Content;
+import com.gregtechceu.gtceu.api.recipe.ingredient.SizedIngredient;
+import com.gregtechceu.gtceu.api.transfer.item.CustomItemStackHandler;
+import com.gregtechceu.gtceu.common.data.GTItems;
+import com.gregtechceu.gtceu.common.data.GTMaterialItems;
+import com.gregtechceu.gtceu.common.data.GTMaterials;
+import com.gregtechceu.gtceu.common.data.GTRecipeTypes;
+import com.gregtechceu.gtceu.common.data.machines.GTMachineUtils;
+import com.gregtechceu.gtceu.config.ConfigHolder;
+import com.gregtechceu.gtceu.utils.DummyMachineBlockEntity;
+import com.gregtechceu.gtceu.utils.InfiniteEnergyContainer;
+import com.tterrag.registrate.util.entry.ItemProviderEntry;
+import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
+import java.util.Collections;
+import java.util.EnumMap;
+import java.util.HashSet;
+import java.util.IdentityHashMap;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Objects;
+import java.util.Set;
+import java.util.function.Supplier;
+import java.util.stream.Stream;
+import net.minecraft.advancements.CriteriaTriggers;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.core.Direction.Axis;
+import net.minecraft.core.Direction.AxisDirection;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.sounds.SoundSource;
+import net.minecraft.stats.Stat;
+import net.minecraft.stats.Stats;
+import net.minecraft.tags.BlockTags;
+import net.minecraft.util.RandomSource;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.item.ItemEntity;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Tier;
+import net.minecraft.world.item.Tiers;
+import net.minecraft.world.item.context.UseOnContext;
+import net.minecraft.world.item.crafting.Ingredient;
+import net.minecraft.world.item.enchantment.DigDurabilityEnchantment;
+import net.minecraft.world.item.enchantment.EnchantmentHelper;
+import net.minecraft.world.item.enchantment.Enchantments;
+import net.minecraft.world.level.GameType;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.BaseRailBlock;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.GameMasterBlock;
+import net.minecraft.world.level.block.IronBarsBlock;
+import net.minecraft.world.level.block.LiquidBlock;
+import net.minecraft.world.level.block.WebBlock;
+import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.storage.loot.LootParams;
+import net.minecraft.world.level.storage.loot.parameters.LootContextParams;
+import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.world.phys.HitResult;
+import net.minecraft.world.phys.Vec3;
+import net.minecraftforge.common.ForgeHooks;
+import net.minecraftforge.common.IForgeShearable;
+import net.minecraftforge.common.TierSortingRegistry;
+import net.minecraftforge.event.ForgeEventFactory;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+
+public class ToolHelper {
+   public static final String TOOL_TAG_KEY = "GT.Tool";
+   public static final String BEHAVIOURS_TAG_KEY = "GT.Behaviours";
+   public static final String MAX_CHARGE_KEY = "MaxCharge";
+   public static final String CHARGE_KEY = "Charge";
+   public static final String UNBREAKABLE_KEY = "Unbreakable";
+   public static final String HIDE_FLAGS = "HideFlags";
+   public static final String DISALLOW_CONTAINER_ITEM_KEY = "DisallowContainerItem";
+   public static final String TINT_COLOR_KEY = "TintColor";
+   public static final String DURABILITY_KEY = "Damage";
+   public static final String MAX_DURABILITY_KEY = "MaxDamage";
+   public static final String TOOL_SPEED_KEY = "ToolSpeed";
+   public static final String ATTACK_DAMAGE_KEY = "AttackDamage";
+   public static final String ATTACK_SPEED_KEY = "AttackSpeed";
+   public static final String ENCHANTABILITY_KEY = "Enchantability";
+   public static final String HARVEST_LEVEL_KEY = "HarvestLevel";
+   public static final String LAST_CRAFTING_USE_KEY = "LastCraftingUse";
+   public static final String MAX_AOE_COLUMN_KEY = "MaxAoEColumn";
+   public static final String MAX_AOE_ROW_KEY = "MaxAoERow";
+   public static final String MAX_AOE_LAYER_KEY = "MaxAoELayer";
+   public static final String AOE_COLUMN_KEY = "AoEColumn";
+   public static final String AOE_ROW_KEY = "AoERow";
+   public static final String AOE_LAYER_KEY = "AoELayer";
+   public static final String HARVEST_ICE_KEY = "HarvestIce";
+   public static final String TORCH_PLACING_KEY = "TorchPlacing";
+   public static final String TORCH_PLACING_CACHE_SLOT_KEY = "TorchPlacing$Slot";
+   public static final String TREE_FELLING_KEY = "TreeFelling";
+   public static final String DISABLE_SHIELDS_KEY = "DisableShields";
+   public static final String RELOCATE_MINED_BLOCKS_KEY = "RelocateMinedBlocks";
+   public static final String RELOCATE_MOB_DROPS_KEY = "RelocateMobDrops";
+   private static final BiMap<Character, GTToolType> symbols = HashBiMap.create();
+   public static final Supplier<ItemStack> SUPPLY_POWER_UNIT_LV = () -> {
+      return ((ComponentItem)GTItems.POWER_UNIT_LV.get()).getDefaultInstance();
+   };
+   public static final Supplier<ItemStack> SUPPLY_POWER_UNIT_MV = () -> {
+      return ((ComponentItem)GTItems.POWER_UNIT_MV.get()).getDefaultInstance();
+   };
+   public static final Supplier<ItemStack> SUPPLY_POWER_UNIT_HV = () -> {
+      return ((ComponentItem)GTItems.POWER_UNIT_HV.get()).getDefaultInstance();
+   };
+   public static final Supplier<ItemStack> SUPPLY_POWER_UNIT_EV = () -> {
+      return ((ComponentItem)GTItems.POWER_UNIT_EV.get()).getDefaultInstance();
+   };
+   public static final Supplier<ItemStack> SUPPLY_POWER_UNIT_IV = () -> {
+      return ((ComponentItem)GTItems.POWER_UNIT_IV.get()).getDefaultInstance();
+   };
+
+   private ToolHelper() {
+   }
+
+   public static Character getSymbolFromTool(GTToolType tool) {
+      return (Character)symbols.inverse().get(tool);
+   }
+
+   public static GTToolType getToolFromSymbol(Character symbol) {
+      return (GTToolType)symbols.get(symbol);
+   }
+
+   public static Set<Character> getToolSymbols() {
+      return symbols.keySet();
+   }
+
+   public static void registerToolSymbol(Character symbol, GTToolType tool) {
+      symbols.put(symbol, tool);
+   }
+
+   public static CompoundTag getToolTag(ItemStack stack) {
+      return stack.getOrCreateTagElement("GT.Tool");
+   }
+
+   public static CompoundTag getBehaviorsTag(ItemStack stack) {
+      return stack.getOrCreateTagElement("GT.Behaviours");
+   }
+
+   public static boolean hasBehaviorsTag(ItemStack stack) {
+      return stack.getTagElement("GT.Behaviours") != null;
+   }
+
+   public static ItemStack get(GTToolType toolType, Material material) {
+      if (material.hasProperty(PropertyKey.TOOL)) {
+         ItemProviderEntry<IGTTool> entry = (ItemProviderEntry)GTMaterialItems.TOOL_ITEMS.get(material, toolType);
+         if (entry != null) {
+            return ((IGTTool)entry.get()).get();
+         }
+      }
+
+      return ItemStack.EMPTY;
+   }
+
+   public static boolean is(ItemStack stack, GTToolType toolType) {
+      return getToolTypes(stack).contains(toolType);
+   }
+
+   public static boolean canUse(ItemStack stack) {
+      return stack.getDamageValue() <= stack.getMaxDamage();
+   }
+
+   public static void damageItem(@NotNull ItemStack stack, @Nullable LivingEntity user, int damage) {
+      Item var4 = stack.getItem();
+      if (var4 instanceof IGTTool tool) {
+         if (stack.getTag() != null && stack.getTag().getBoolean("Unbreakable")) {
+            return;
+         }
+
+         if (user instanceof Player player) {
+            if (player.isCreative()) {
+               return;
+            }
+         }
+
+         RandomSource random = user == null ? GTValues.RNG : user.getRandom();
+         int unbreakingLevel;
+         if (tool.isElectric()) {
+            unbreakingLevel = damage * ConfigHolder.INSTANCE.machines.energyUsageMultiplier;
+            IElectricItem electricItem = GTCapabilityHelper.getElectricItem(stack);
+            if (electricItem == null) {
+               throw new IllegalStateException("Electric tool does not have an attached electric item capability.");
+            }
+
+            electricItem.discharge((long)unbreakingLevel, tool.getElectricTier(), true, false, false);
+            if (electricItem.getCharge() > 0L && random.nextInt(100) >= ConfigHolder.INSTANCE.tools.rngDamageElectricTools) {
+               return;
+            }
+         }
+
+         unbreakingLevel = EnchantmentHelper.getItemEnchantmentLevel(Enchantments.UNBREAKING, stack);
+         int negated = 0;
+
+         int newDurability;
+         for(newDurability = 0; unbreakingLevel > 0 && newDurability < damage; ++newDurability) {
+            if (DigDurabilityEnchantment.shouldIgnoreDurabilityDrop(stack, unbreakingLevel, random)) {
+               ++negated;
+            }
+         }
+
+         damage -= negated;
+         if (damage <= 0) {
+            return;
+         }
+
+         newDurability = stack.getDamageValue() + damage;
+         if (user instanceof ServerPlayer serverPlayer) {
+            CriteriaTriggers.ITEM_DURABILITY_CHANGED.trigger(serverPlayer, stack, newDurability);
+         }
+
+         stack.setDamageValue(newDurability);
+         if (newDurability > stack.getMaxDamage()) {
+            if (user instanceof Player) {
+               Player player = (Player)user;
+               Stat<?> stat = Stats.ITEM_BROKEN.get(stack.getItem());
+               player.awardStat(stat);
+            }
+
+            if (user != null) {
+               user.breakItem(stack);
+            }
+
+            stack.shrink(1);
+         }
+      } else if (user != null) {
+         stack.hurtAndBreak(damage, user, (p) -> {
+         });
+      }
+
+   }
+
+   public static void playToolSound(GTToolType toolType, ServerPlayer player) {
+      if (toolType != null && toolType.soundEntry != null) {
+         toolType.soundEntry.playOnServer(player.level(), player.blockPosition());
+      }
+
+   }
+
+   public static ItemStack getAndSetToolData(GTToolType toolType, Material material, int maxDurability, int harvestLevel, float toolSpeed, float attackDamage) {
+      ItemProviderEntry<IGTTool> entry = (ItemProviderEntry)GTMaterialItems.TOOL_ITEMS.get(material, toolType);
+      if (entry == null) {
+         return ItemStack.EMPTY;
+      } else {
+         ItemStack stack = ((IGTTool)entry.get()).getRaw();
+         stack.getOrCreateTag().putInt("HideFlags", 2);
+         CompoundTag toolTag = getToolTag(stack);
+         toolTag.putInt("MaxDamage", maxDurability);
+         toolTag.putInt("HarvestLevel", harvestLevel);
+         toolTag.putFloat("ToolSpeed", toolSpeed);
+         toolTag.putFloat("AttackDamage", attackDamage);
+         ToolProperty toolProperty = (ToolProperty)material.getProperty(PropertyKey.TOOL);
+         if (toolProperty != null) {
+            toolProperty.getEnchantments().forEach((enchantment, level) -> {
+               if (((IGTTool)entry.get()).definition$canApplyAtEnchantingTable(stack, enchantment)) {
+                  stack.enchant(enchantment, level);
+               }
+
+            });
+         }
+
+         return stack;
+      }
+   }
+
+   public static boolean areaOfEffectBlockBreakRoutine(ItemStack stack, ServerPlayer player) {
+      int currentDurability = stack.getDamageValue();
+      int maximumDurability = stack.getMaxDamage();
+      int remainingUses = maximumDurability - currentDurability;
+      Set<BlockPos> harvestableBlocks = getHarvestableBlocks(stack, player);
+      if (!harvestableBlocks.isEmpty()) {
+         int blocksBroken = 0;
+         Iterator var7 = harvestableBlocks.iterator();
+
+         do {
+            if (!var7.hasNext()) {
+               return true;
+            }
+
+            BlockPos pos = (BlockPos)var7.next();
+            if (!breakBlockRoutine(player, stack, pos, blocksBroken++ == 0)) {
+               return true;
+            }
+
+            --remainingUses;
+            Item var10 = stack.getItem();
+            if (var10 instanceof IGTTool) {
+               IGTTool gtTool = (IGTTool)var10;
+               if (!gtTool.isElectric() && remainingUses == 0) {
+                  return true;
+               }
+            }
+         } while(ItemStack.isSameItem(player.getMainHandItem(), stack));
+
+         return true;
+      } else {
+         return false;
+      }
+   }
+
+   public static AoESymmetrical getMaxAoEDefinition(ItemStack stack) {
+      return AoESymmetrical.readMax(getBehaviorsTag(stack));
+   }
+
+   public static AoESymmetrical getAoEDefinition(ItemStack stack) {
+      return AoESymmetrical.read(getBehaviorsTag(stack), getMaxAoEDefinition(stack));
+   }
+
+   public static Set<BlockPos> iterateAoE(ItemStack stack, AoESymmetrical aoeDefinition, Level world, Player player, HitResult rayTraceResult, AOEFunction function) {
+      if (aoeDefinition != AoESymmetrical.none() && rayTraceResult instanceof BlockHitResult blockHit) {
+         if (blockHit.getDirection() != null) {
+            int column = aoeDefinition.column;
+            int row = aoeDefinition.row;
+            int layer = aoeDefinition.layer;
+            Direction playerFacing = player.getDirection();
+            Direction.Axis playerAxis = playerFacing.getAxis();
+            Direction.Axis sideHitAxis = blockHit.getDirection().getAxis();
+            Direction.AxisDirection sideHitAxisDir = blockHit.getDirection().getAxisDirection();
+            Set<BlockPos> validPositions = new ObjectOpenHashSet();
+            boolean isX;
+            boolean isDown;
+            int y;
+            int x;
+            int z;
+            BlockPos pos;
+            if (sideHitAxis.isVertical()) {
+               isX = playerAxis == Axis.X;
+               isDown = sideHitAxisDir == AxisDirection.NEGATIVE;
+
+               for(y = 0; y <= layer; ++y) {
+                  for(x = isX ? -row : -column; x <= (isX ? row : column); ++x) {
+                     for(z = isX ? -column : -row; z <= (isX ? column : row); ++z) {
+                        if (x != 0 || y != 0 || z != 0) {
+                           pos = blockHit.getBlockPos().offset(x, isDown ? y : -y, z);
+                           if (player.mayUseItemAt(pos.relative(blockHit.getDirection()), blockHit.getDirection(), stack) && function.apply(stack, world, player, pos, new UseOnContext(player.level(), player, player.getUsedItemHand(), stack, blockHit))) {
+                              validPositions.add(pos);
+                           }
+                        }
+                     }
+                  }
+               }
+            } else {
+               isX = sideHitAxis == Axis.X;
+               isDown = sideHitAxisDir == AxisDirection.NEGATIVE;
+
+               for(y = 0; y <= layer; ++y) {
+                  for(x = row == 0 ? 0 : -1; x <= (row == 0 ? 0 : row * 2 - 1); ++x) {
+                     for(z = -column; z <= column; ++z) {
+                        if (y != 0 || x != 0 || z != 0) {
+                           pos = blockHit.getBlockPos().offset(isX ? (isDown ? y : -y) : (isDown ? z : -z), x, isX ? (isDown ? z : -z) : (isDown ? y : -y));
+                           if (function.apply(stack, world, player, pos, new UseOnContext(player.level(), player, player.getUsedItemHand(), stack, blockHit))) {
+                              validPositions.add(pos);
+                           }
+                        }
+                     }
+                  }
+               }
+            }
+
+            return validPositions;
+         }
+      }
+
+      return Collections.emptySet();
+   }
+
+   public static Set<BlockPos> getHarvestableBlocks(ItemStack stack, AoESymmetrical aoeDefinition, Level world, Player player, HitResult rayTraceResult) {
+      return iterateAoE(stack, aoeDefinition, world, player, rayTraceResult, ToolHelper::isBlockAoEHarvestable);
+   }
+
+   private static boolean isBlockAoEHarvestable(ItemStack stack, Level world, Player player, BlockPos pos, UseOnContext context) {
+      if (world.getBlockState(pos).isAir()) {
+         return false;
+      } else {
+         BlockState state = world.getBlockState(pos);
+         if (state.getBlock() instanceof LiquidBlock) {
+            return false;
+         } else {
+            BlockPos hitBlockPos = context.getClickedPos();
+            BlockState hitBlockState = world.getBlockState(hitBlockPos);
+            return !(state.getDestroySpeed(world, pos) < 0.0F) && !(state.getDestroySpeed(world, pos) - hitBlockState.getDestroySpeed(world, hitBlockPos) > 8.0F) ? stack.getItem().isCorrectToolForDrops(stack, state) : false;
+         }
+      }
+   }
+
+   public static void applyHammerDropConversion(ServerLevel world, BlockPos pos, ItemStack tool, BlockState state, List<ItemStack> drops, int fortune, float dropChance, RandomSource random) {
+      if (is(tool, GTToolType.HARD_HAMMER)) {
+         List<ItemStack> silktouchDrops = getSilkTouchDrop(world, pos, state);
+         Iterator var9 = silktouchDrops.iterator();
+
+         while(true) {
+            label74:
+            while(true) {
+               ItemStack silktouchDrop;
+               DummyMachineBlockEntity be;
+               GTRecipe hammerRecipe;
+               do {
+                  do {
+                     do {
+                        if (!var9.hasNext()) {
+                           return;
+                        }
+
+                        silktouchDrop = (ItemStack)var9.next();
+                     } while(silktouchDrop.isEmpty());
+
+                     Table<IO, RecipeCapability<?>, List<IRecipeHandler<?>>> caps = Tables.newCustomTable(new EnumMap(IO.class), IdentityHashMap::new);
+                     be = new DummyMachineBlockEntity(1, GTRecipeTypes.FORGE_HAMMER_RECIPES, GTMachineUtils.defaultTankSizeFunction, caps, new Object[0]);
+                     caps.put(IO.IN, EURecipeCapability.CAP, List.of(new InfiniteEnergyContainer(be.getMetaMachine(), GTValues.V[1], GTValues.V[1], 1L, GTValues.V[1], 1L)));
+                     caps.put(IO.IN, ItemRecipeCapability.CAP, List.of(new NotifiableItemStackHandler(be.getMetaMachine(), 1, IO.IN, IO.IN, (slots) -> {
+                        return new CustomItemStackHandler(silktouchDrop);
+                     })));
+                     caps.put(IO.OUT, ItemRecipeCapability.CAP, List.of(new NotifiableItemStackHandler(be.getMetaMachine(), 2, IO.OUT)));
+                     be.getMetaMachine().reinitializeCapabilities(caps);
+                     Iterator<GTRecipe> hammerRecipes = GTRecipeTypes.FORGE_HAMMER_RECIPES.searchRecipe(be.metaMachine);
+                     hammerRecipe = hammerRecipes != null && hammerRecipes.hasNext() ? (GTRecipe)hammerRecipes.next() : null;
+                  } while(hammerRecipe == null);
+               } while(!hammerRecipe.handleRecipeIO(IO.IN, be.metaMachine, be.getMetaMachine().recipeLogic.getChanceCaches()));
+
+               drops.clear();
+               TagPrefix prefix = ChemicalHelper.getPrefix(silktouchDrop.getItem());
+               Iterator var16;
+               Content content;
+               if (prefix == null) {
+                  var16 = hammerRecipe.getOutputContents(ItemRecipeCapability.CAP).iterator();
+
+                  while(true) {
+                     do {
+                        if (!var16.hasNext()) {
+                           continue label74;
+                        }
+
+                        content = (Content)var16.next();
+                     } while(!(dropChance >= 1.0F) && !(random.nextFloat() <= dropChance));
+
+                     drops.add(SizedIngredient.copy((Ingredient)ItemRecipeCapability.CAP.of(content.content)).getItems()[0]);
+                  }
+               } else if (TagPrefix.ORES.containsKey(prefix)) {
+                  var16 = hammerRecipe.getOutputContents(ItemRecipeCapability.CAP).iterator();
+
+                  while(true) {
+                     do {
+                        if (!var16.hasNext()) {
+                           continue label74;
+                        }
+
+                        content = (Content)var16.next();
+                     } while(!(dropChance >= 1.0F) && !(random.nextFloat() <= dropChance));
+
+                     ItemStack output = ((Ingredient)ItemRecipeCapability.CAP.of(content.content)).getItems()[0];
+                     if (ChemicalHelper.getPrefix(output.getItem()) == TagPrefix.crushed) {
+                        output = output.copy();
+                        if (fortune > 0) {
+                           output.grow(random.nextInt(fortune));
+                        }
+
+                        drops.add(output);
+                     }
+                  }
+               }
+            }
+         }
+      }
+   }
+
+   public static boolean breakBlockRoutine(ServerPlayer player, ItemStack tool, BlockPos pos, boolean playSound) {
+      if (isTool(tool, GTToolType.SHEARS) && shearBlockRoutine(player, tool, pos) == 0) {
+         return false;
+      } else {
+         Level world = player.level();
+         boolean canBreak = onBlockBreakEvent(world, player.gameMode.getGameModeForPlayer(), player, pos);
+         if (!canBreak) {
+            return false;
+         } else {
+            BlockState state = world.getBlockState(pos);
+            Block block = state.getBlock();
+            BlockEntity tile = world.getBlockEntity(pos);
+            if (block instanceof GameMasterBlock && !player.canUseGameMasterBlocks()) {
+               world.sendBlockUpdated(pos, state, state, 3);
+               return false;
+            } else if (player.blockActionRestricted(world, pos, player.gameMode.getGameModeForPlayer())) {
+               return false;
+            } else if (player.isCreative()) {
+               return removeBlockRoutine(state, world, player, pos, playSound);
+            } else {
+               world.levelEvent(player, 2001, pos, Block.getId(state));
+               ItemStack copiedTool = tool.copy();
+               boolean canHarvest = player.hasCorrectToolForDrops(state);
+               if (!tool.isEmpty()) {
+                  tool.mineBlock(world, state, pos, player);
+                  if (tool.isEmpty() && !copiedTool.isEmpty()) {
+                     onPlayerDestroyItem(player, copiedTool, InteractionHand.MAIN_HAND);
+                  }
+               }
+
+               boolean successful = removeBlockRoutine((BlockState)null, world, player, pos, playSound);
+               if (successful && canHarvest) {
+                  block.playerDestroy(world, player, pos, state, tile, copiedTool);
+               }
+
+               return successful;
+            }
+         }
+      }
+   }
+
+   public static boolean onBlockBreakEvent(Level level, GameType gameType, ServerPlayer player, BlockPos pos) {
+      return ForgeHooks.onBlockBreakEvent(level, gameType, player, pos) != -1;
+   }
+
+   public static void onPlayerDestroyItem(Player player, ItemStack stack, InteractionHand hand) {
+      ForgeEventFactory.onPlayerDestroyItem(player, stack, hand);
+   }
+
+   public static double getPlayerBlockReach(@NotNull Player player) {
+      return player.getBlockReach();
+   }
+
+   public static boolean isCorrectTierForDrops(BlockState state, int tier) {
+      return TierSortingRegistry.isCorrectTierForDrops(getTier(tier), state);
+   }
+
+   private static Tier getTier(int harvestLevel) {
+      List<Tier> tiers = TierSortingRegistry.getSortedTiers().stream().filter((tier) -> {
+         return tier.getLevel() == harvestLevel;
+      }).toList();
+      return (Tier)(!tiers.isEmpty() ? (Tier)tiers.get(tiers.size() - 1) : Tiers.WOOD);
+   }
+
+   public static boolean onBlockStartBreak(ItemStack itemstack, BlockPos pos, Player player) {
+      return itemstack.onBlockStartBreak(pos, player);
+   }
+
+   public static boolean removeBlockRoutine(@Nullable BlockState state, Level world, ServerPlayer player, BlockPos pos, boolean playSound) {
+      state = state == null ? world.getBlockState(pos) : state;
+      state.getBlock().playerWillDestroy(world, pos, state, player);
+      boolean successful = world.removeBlock(pos, false);
+      if (playSound) {
+         world.levelEvent(2001, pos, Block.getId(state));
+      }
+
+      if (successful) {
+         state.getBlock().destroy(world, pos, state);
+      }
+
+      return successful;
+   }
+
+   public static Set<BlockPos> getHarvestableBlocks(ItemStack stack, Level world, Player player, HitResult rayTraceResult) {
+      return getHarvestableBlocks(stack, getAoEDefinition(stack), world, player, rayTraceResult);
+   }
+
+   public static Set<BlockPos> getHarvestableBlocks(ItemStack stack, Player player) {
+      if (!hasBehaviorsTag(stack)) {
+         return Collections.emptySet();
+      } else {
+         AoESymmetrical aoeDefiniton = getAoEDefinition(stack);
+         if (aoeDefiniton == AoESymmetrical.none()) {
+            return Collections.emptySet();
+         } else {
+            HitResult rayTraceResult = getPlayerDefaultRaytrace(player);
+            return getHarvestableBlocks(stack, aoeDefiniton, player.level(), player, rayTraceResult);
+         }
+      }
+   }
+
+   public static HitResult getPlayerDefaultRaytrace(@NotNull Player player) {
+      return player.pick(getPlayerBlockReach(player), 1.0F, false);
+   }
+
+   public static void onActionDone(@NotNull Player player, @NotNull Level world, @NotNull InteractionHand hand) {
+      ItemStack stack = player.getItemInHand(hand);
+      IGTTool tool = (IGTTool)stack.getItem();
+      damageItem(stack, player);
+      if (tool.getSound() != null) {
+         world.playSound((Player)null, player.getX(), player.getY(), player.getZ(), tool.getSound().getMainEvent(), SoundSource.PLAYERS, 1.0F, 1.0F);
+      }
+
+      player.swing(hand);
+   }
+
+   public static @NotNull Set<GTToolType> getToolTypes(ItemStack tool) {
+      Set<GTToolType> types = new HashSet();
+      Item var3 = tool.getItem();
+      if (var3 instanceof IGTTool gtTool) {
+         return gtTool.getToolClasses(tool);
+      } else {
+         Iterator var2 = GTToolType.getTypes().values().iterator();
+
+         while(var2.hasNext()) {
+            GTToolType toolType = (GTToolType)var2.next();
+            Stream var10000 = toolType.itemTags.stream();
+            Objects.requireNonNull(tool);
+            if (var10000.anyMatch(tool::is)) {
+               types.add(toolType);
+            }
+         }
+
+         return types;
+      }
+   }
+
+   public static boolean isTool(ItemStack tool, GTToolType... toolClasses) {
+      GTToolType[] var2 = toolClasses;
+      int var3 = toolClasses.length;
+
+      for(int var4 = 0; var4 < var3; ++var4) {
+         GTToolType toolType = var2[var4];
+         Stream var10000 = toolType.itemTags.stream();
+         Objects.requireNonNull(tool);
+         if (var10000.anyMatch(tool::is)) {
+            return true;
+         }
+      }
+
+      Item var10 = tool.getItem();
+      if (var10 instanceof IGTTool igtTool) {
+         if (toolClasses.length == 1) {
+            return igtTool.getToolClasses(tool).contains(toolClasses[0]);
+         }
+
+         Iterator var11 = igtTool.getToolClasses(tool).iterator();
+
+         while(var11.hasNext()) {
+            GTToolType toolClass = (GTToolType)var11.next();
+            GTToolType[] var13 = toolClasses;
+            int var6 = toolClasses.length;
+
+            for(int var7 = 0; var7 < var6; ++var7) {
+               GTToolType specified = var13[var7];
+               if (toolClass.equals(specified)) {
+                  return true;
+               }
+            }
+         }
+      }
+
+      return false;
+   }
+
+   public static boolean isToolEffective(BlockState state, Set<GTToolType> toolClasses, int harvestLevel) {
+      Block block = state.getBlock();
+      if (toolClasses.stream().anyMatch((type) -> {
+         Stream var10000 = type.harvestTags.stream();
+         Objects.requireNonNull(state);
+         return var10000.anyMatch(state::is);
+      })) {
+         return isCorrectTierForDrops(state, harvestLevel);
+      } else {
+         if (toolClasses.contains(GTToolType.PICKAXE)) {
+            if (Blocks.OBSIDIAN == block && harvestLevel >= 3) {
+               return true;
+            }
+
+            if (state.is(BlockTags.NEEDS_IRON_TOOL) && harvestLevel >= 2) {
+               return true;
+            }
+
+            if (state.is(BlockTags.NEEDS_STONE_TOOL) && harvestLevel >= 1) {
+               return true;
+            }
+
+            if (state.is(BlockTags.MINEABLE_WITH_PICKAXE)) {
+               return true;
+            }
+         }
+
+         if (toolClasses.contains(GTToolType.SHOVEL)) {
+            if (state.is(BlockTags.MINEABLE_WITH_SHOVEL)) {
+               return true;
+            }
+
+            if (block == Blocks.SNOW_BLOCK || block == Blocks.SNOW) {
+               return true;
+            }
+         }
+
+         if (toolClasses.contains(GTToolType.AXE) && state.is(BlockTags.MINEABLE_WITH_AXE)) {
+            return true;
+         } else if (toolClasses.contains(GTToolType.SWORD) && block instanceof WebBlock) {
+            return true;
+         } else {
+            if (toolClasses.contains(GTToolType.SCYTHE)) {
+            }
+
+            if (toolClasses.contains(GTToolType.FILE) && block instanceof IronBarsBlock) {
+               return true;
+            } else {
+               return toolClasses.contains(GTToolType.CROWBAR) ? block instanceof BaseRailBlock : false;
+            }
+         }
+      }
+   }
+
+   public static void damageItemWhenCrafting(@NotNull ItemStack stack, @Nullable LivingEntity entity) {
+      int damage = 2;
+      if (stack.getItem() instanceof IGTTool) {
+         damage = ((IGTTool)stack.getItem()).getToolStats().getToolDamagePerCraft(stack);
+      } else if (stack.getTags().anyMatch((s) -> {
+         return s.location().getPath().startsWith("tool") || s.location().getPath().startsWith("crafting_tool");
+      })) {
+         damage = 1;
+      }
+
+      damageItem(stack, entity, damage);
+   }
+
+   public static void damageItem(@NotNull ItemStack stack, @Nullable LivingEntity entity) {
+      damageItem(stack, entity, 1);
+   }
+
+   public static float getDestroySpeed(BlockState state, Set<GTToolType> toolClasses) {
+      if (toolClasses.contains(GTToolType.SWORD)) {
+         Block block = state.getBlock();
+         if (block instanceof WebBlock) {
+            return 15.0F;
+         }
+      }
+
+      return -1.0F;
+   }
+
+   public static int shearBlockRoutine(ServerPlayer player, ItemStack tool, BlockPos pos) {
+      if (!player.isCreative()) {
+         Level world = player.serverLevel();
+         BlockState state = world.getBlockState(pos);
+         Block var6 = state.getBlock();
+         if (var6 instanceof IForgeShearable) {
+            IForgeShearable shearable = (IForgeShearable)var6;
+            if (shearable.isShearable(tool, world, pos)) {
+               List<ItemStack> shearedDrops = shearable.onSheared(player, tool, world, pos, tool.getEnchantmentLevel(Enchantments.BLOCK_FORTUNE));
+               boolean relocateMinedBlocks = hasBehaviorsTag(tool) && getBehaviorsTag(tool).getBoolean("RelocateMinedBlocks");
+               Iterator<ItemStack> iter = shearedDrops.iterator();
+
+               while(true) {
+                  while(iter.hasNext()) {
+                     ItemStack stack = (ItemStack)iter.next();
+                     if (relocateMinedBlocks && player.addItem(stack)) {
+                        iter.remove();
+                     } else {
+                        float f = 0.7F;
+                        double xo = (double)(world.random.nextFloat() * f) + 0.15;
+                        double yo = (double)(world.random.nextFloat() * f) + 0.15;
+                        double zo = (double)(world.random.nextFloat() * f) + 0.15;
+                        ItemEntity entityItem = new ItemEntity(world, (double)pos.getX() + xo, (double)pos.getY() + yo, (double)pos.getZ() + zo, stack);
+                        entityItem.setDefaultPickUpDelay();
+                        world.addFreshEntity(entityItem);
+                     }
+                  }
+
+                  damageItem(tool, player, 1);
+                  player.awardStat(Stats.BLOCK_MINED.get((Block)shearable));
+                  world.setBlock(pos, Blocks.AIR.defaultBlockState(), 11);
+                  return tool.isEmpty() ? 0 : 1;
+               }
+            }
+         }
+      }
+
+      return -1;
+   }
+
+   public static @NotNull List<ItemStack> getSilkTouchDrop(ServerLevel world, BlockPos origin, @NotNull BlockState state) {
+      ItemStack tool = ((IGTTool)((ItemProviderEntry)GTMaterialItems.TOOL_ITEMS.get(GTMaterials.Neutronium, GTToolType.PICKAXE)).get()).get();
+      tool.enchant(Enchantments.SILK_TOUCH, 1);
+      return state.getDrops((new LootParams.Builder(world)).withParameter(LootContextParams.BLOCK_STATE, state).withParameter(LootContextParams.ORIGIN, Vec3.atCenterOf(origin)).withParameter(LootContextParams.TOOL, tool));
+   }
+
+   @FunctionalInterface
+   public interface AOEFunction {
+      boolean apply(ItemStack var1, Level var2, Player var3, BlockPos var4, UseOnContext var5);
+   }
+}

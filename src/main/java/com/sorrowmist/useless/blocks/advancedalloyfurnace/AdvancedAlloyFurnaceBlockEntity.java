@@ -76,6 +76,10 @@ public class AdvancedAlloyFurnaceBlockEntity extends BlockEntity implements Menu
     // 自动输出相关
     private int autoOutputCounter = 0;
     private static final int AUTO_OUTPUT_INTERVAL = 20; // 每20tick尝试输出一次，主动检测输出槽
+    
+    // 输出暂存相关
+    private List<ItemStack> pendingOutputs = new ArrayList<>();
+    private boolean isOutputPending = false;
 
     // 新增槽位索引定义
     private static final int CATALYST_SLOT = 12;  // 无用锭催化槽
@@ -329,6 +333,11 @@ public class AdvancedAlloyFurnaceBlockEntity extends BlockEntity implements Menu
             syncCounter++;
             boolean shouldSync = false;
 
+            // 处理暂存输出
+            if (isOutputPending) {
+                processPendingOutputs();
+            }
+            
             // 主动检测输出槽并尝试自动输出 - 每20tick执行一次
             autoOutputCounter++;
             if (autoOutputCounter >= AUTO_OUTPUT_INTERVAL) {
@@ -605,6 +614,11 @@ public class AdvancedAlloyFurnaceBlockEntity extends BlockEntity implements Menu
 
     // 配方处理逻辑
     protected boolean canProcessStart() {
+        // 如果有暂存输出，不允许开始新的合成
+        if (isOutputPending) {
+            return false;
+        }
+        
         if (energyStorage.getEnergyStored() < processTick) {
             return false;
         }
@@ -647,7 +661,16 @@ public class AdvancedAlloyFurnaceBlockEntity extends BlockEntity implements Menu
     protected void processStart() {
         if (currentRecipe != null) {
             processMax = currentRecipe.getProcessTime();
-            processTick = Math.max(1, (currentRecipe.getEnergy() * currentParallel) / currentRecipe.getProcessTime());
+            
+            // 检查催化剂是否为有用的锭（USEFUL_INGOT），如果是，能量消耗不会被倍增
+            ItemStack catalyst = itemHandler.getStackInSlot(CATALYST_SLOT);
+            String catalystId = net.minecraftforge.registries.ForgeRegistries.ITEMS.getKey(catalyst.getItem()).toString();
+            boolean isUsefulIngot = catalystId.equals("useless_mod:useful_ingot");
+            
+            // 计算能量消耗：如果是有用的锭，能量消耗不乘以并行数；否则正常计算
+            int energyToUse = isUsefulIngot ? currentRecipe.getEnergy() : currentRecipe.getEnergy() * currentParallel;
+            processTick = Math.max(1, energyToUse / currentRecipe.getProcessTime());
+            
             process = processMax;
 
             setChanged();
@@ -809,7 +832,7 @@ public class AdvancedAlloyFurnaceBlockEntity extends BlockEntity implements Menu
         // 计算输入物品支持的并行数
         int itemParallel = Integer.MAX_VALUE;
         List<Ingredient> inputIngredients = recipe.getInputItems();
-        List<Integer> inputCounts = recipe.getInputItemCounts();
+        List<Long> inputCounts = recipe.getInputItemCounts();
         
         // 提前检查是否有输入物品
         boolean hasItems = false;
@@ -823,20 +846,23 @@ public class AdvancedAlloyFurnaceBlockEntity extends BlockEntity implements Menu
         if (hasItems) {
             for (int i = 0; i < inputIngredients.size(); i++) {
                 Ingredient ingredient = inputIngredients.get(i);
-                int requiredCount = inputCounts.get(i);
+                long requiredCount = inputCounts.get(i);
 
                 if (requiredCount <= 0) {
                     continue;
                 }
 
-                int availableCount = 0;
+                // 使用long类型存储可用数量，避免整数溢出
+                long availableCount = 0;
                 for (ItemStack stack : inputItems) {
                     if (!stack.isEmpty() && ingredient.test(stack)) {
                         availableCount += stack.getCount();
                     }
                 }
 
-                int possibleParallel = availableCount / requiredCount;
+                // 计算可能的并行数，确保结果不会超过Integer.MAX_VALUE
+                long possibleParallelLong = availableCount / requiredCount;
+                int possibleParallel = (int) Math.min(possibleParallelLong, Integer.MAX_VALUE);
                 itemParallel = Math.min(itemParallel, possibleParallel);
                 
                 // 如果已经是0，提前返回
@@ -853,7 +879,11 @@ public class AdvancedAlloyFurnaceBlockEntity extends BlockEntity implements Menu
         FluidStack requiredFluid = recipe.getInputFluid();
         if (!requiredFluid.isEmpty() && requiredFluid.getAmount() > 0) {
             if (!inputFluid.isEmpty() && inputFluid.getFluid().isSame(requiredFluid.getFluid())) {
-                fluidParallel = inputFluid.getAmount() / requiredFluid.getAmount();
+                // 使用long类型计算流体并行数，避免整数溢出
+                long fluidAvailable = inputFluid.getAmount();
+                long fluidRequired = requiredFluid.getAmount();
+                long fluidParallelLong = fluidAvailable / fluidRequired;
+                fluidParallel = (int) Math.min(fluidParallelLong, Integer.MAX_VALUE);
             } else {
                 fluidParallel = 0;
             }
@@ -1043,22 +1073,46 @@ public class AdvancedAlloyFurnaceBlockEntity extends BlockEntity implements Menu
         // 直接输出物品到自身容器
         for (ItemStack output : recipe.getOutputItems()) {
             if (!output.isEmpty()) {
-                ItemStack outputStack = output.copy();
-                outputStack.setCount(outputStack.getCount() * parallel);
-                addOutputItem(outputStack);
-                // 输出物品到自身后，触发自动输出
-                tryAutoOutput();
+                // 使用long类型计算总输出数量，避免整数溢出
+                long totalOutputCount = (long) output.getCount() * parallel;
+                
+                // 如果总输出数量超过Integer.MAX_VALUE，分多次创建ItemStack
+                ItemStack baseOutputStack = output.copy();
+                long remainingCount = totalOutputCount;
+                
+                while (remainingCount > 0) {
+                    ItemStack outputStack = baseOutputStack.copy();
+                    // 每次输出不超过Integer.MAX_VALUE
+                    int stackCount = (int) Math.min(remainingCount, Integer.MAX_VALUE);
+                    outputStack.setCount(stackCount);
+                    addOutputItem(outputStack);
+                    remainingCount -= stackCount;
+                    // 输出物品到自身后，触发自动输出
+                    tryAutoOutput();
+                }
             }
         }
 
         // 直接输出流体到自身容器
         FluidStack outputFluid = recipe.getOutputFluid();
         if (!outputFluid.isEmpty()) {
-            FluidStack outputStack = outputFluid.copy();
-            outputStack.setAmount(outputStack.getAmount() * parallel);
-            outputFluidTank.fill(outputStack, IFluidHandler.FluidAction.EXECUTE);
-            // 输出流体到自身后，触发自动输出
-            tryAutoOutput();
+            // 使用long类型计算总输出数量，避免整数溢出
+            long totalFluidAmount = (long) outputFluid.getAmount() * parallel;
+            
+            // 如果总流体数量超过Integer.MAX_VALUE，分多次填充
+            FluidStack baseOutputStack = outputFluid.copy();
+            long remainingAmount = totalFluidAmount;
+            
+            while (remainingAmount > 0) {
+                FluidStack outputStack = baseOutputStack.copy();
+                // 每次输出不超过Integer.MAX_VALUE
+                int stackAmount = (int) Math.min(remainingAmount, Integer.MAX_VALUE);
+                outputStack.setAmount(stackAmount);
+                outputFluidTank.fill(outputStack, IFluidHandler.FluidAction.EXECUTE);
+                remainingAmount -= stackAmount;
+                // 输出流体到自身后，触发自动输出
+                tryAutoOutput();
+            }
         }
     }
 
@@ -1138,33 +1192,71 @@ public class AdvancedAlloyFurnaceBlockEntity extends BlockEntity implements Menu
         syncToClient();
     }
 
-    // 修改：改进的输出物品添加方法，支持高堆叠且不拆分到多个槽位
+    // 修改：改进的输出物品添加方法，将物品添加到暂存列表
     private void addOutputItem(ItemStack output) {
         ItemStack outputStack = output.copy();
-
-        // 首先尝试堆叠到已有相同物品的槽位
-        for (int i = 6; i < 12; i++) {
-            ItemStack slotStack = itemHandler.getStackInSlot(i);
-            if (ItemStack.isSameItemSameTags(slotStack, outputStack)) {
-                // 直接堆叠到已有槽位，不检查堆叠限制（因为支持高堆叠）
-                slotStack.grow(outputStack.getCount());
-                itemHandler.setStackInSlot(i, slotStack);
-                return; // 成功堆叠，直接返回
+        pendingOutputs.add(outputStack);
+        isOutputPending = true;
+    }
+    
+    // 处理暂存物品的输出
+    private void processPendingOutputs() {
+        if (pendingOutputs.isEmpty()) {
+            isOutputPending = false;
+            return;
+        }
+        
+        // 遍历暂存物品列表，尝试输出
+        List<ItemStack> remainingOutputs = new ArrayList<>();
+        
+        for (ItemStack pendingItem : pendingOutputs) {
+            ItemStack outputStack = pendingItem.copy();
+            boolean outputProcessed = false;
+            
+            // 首先尝试堆叠到已有相同物品的槽位，但避免整数溢出
+            for (int i = 6; i < 12; i++) {
+                ItemStack slotStack = itemHandler.getStackInSlot(i);
+                if (ItemStack.isSameItemSameTags(slotStack, outputStack)) {
+                    // 检查当前数量加上要添加的数量是否会超过Integer.MAX_VALUE
+                    if ((long) slotStack.getCount() + (long) outputStack.getCount() <= (long) Integer.MAX_VALUE) {
+                        // 安全堆叠，不会导致溢出
+                        slotStack.grow(outputStack.getCount());
+                        itemHandler.setStackInSlot(i, slotStack);
+                        outputProcessed = true;
+                        break;
+                    }
+                    // 如果会导致溢出，就尝试下一个槽位
+                }
+            }
+            
+            // 如果没有堆叠成功，尝试放入空槽位
+            if (!outputProcessed) {
+                for (int i = 6; i < 12; i++) {
+                    ItemStack slotStack = itemHandler.getStackInSlot(i);
+                    if (slotStack.isEmpty()) {
+                        itemHandler.setStackInSlot(i, outputStack.copy());
+                        outputProcessed = true;
+                        break;
+                    }
+                }
+            }
+            
+            // 如果还是没有成功输出，将物品保留在暂存列表中
+            if (!outputProcessed) {
+                remainingOutputs.add(outputStack);
             }
         }
-
-        // 如果没有相同物品，则放入第一个空槽位
-        for (int i = 6; i < 12; i++) {
-            ItemStack slotStack = itemHandler.getStackInSlot(i);
-            if (slotStack.isEmpty()) {
-                itemHandler.setStackInSlot(i, outputStack.copy());
-                return; // 成功放入空槽位，直接返回
-            }
+        
+        // 保存原始大小
+        int originalSize = pendingOutputs.size();
+        // 更新暂存列表
+        pendingOutputs = remainingOutputs;
+        isOutputPending = !pendingOutputs.isEmpty();
+        
+        // 如果有物品被输出，触发自动输出
+        if (pendingOutputs.size() < originalSize) {
+            tryAutoOutput();
         }
-
-        // 如果所有输出槽位都被不同物品占满，记录警告
-        UselessMod.LOGGER.warn("No space for output item in advanced alloy furnace: {} x {}",
-                outputStack.getDisplayName().getString(), outputStack.getCount());
     }
 
     // 修复的流体交互方法

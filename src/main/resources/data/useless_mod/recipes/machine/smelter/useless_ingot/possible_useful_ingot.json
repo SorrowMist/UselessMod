@@ -1,0 +1,42 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    "123",
+    "456",
+    "789"
+  ],
+  "key": {
+    "1": {
+      "item": "useless_mod:useless_ingot_tier_1"
+    },
+    "2": {
+      "item": "useless_mod:useless_ingot_tier_2"
+    },
+    "3": {
+      "item": "useless_mod:useless_ingot_tier_3"
+    },
+    "4": {
+      "item": "useless_mod:useless_ingot_tier_4"
+    },
+    "5": {
+      "item": "useless_mod:useless_ingot_tier_5"
+    },
+    "6": {
+      "item": "useless_mod:useless_ingot_tier_6"
+    },
+    "7": {
+      "item": "useless_mod:useless_ingot_tier_7"
+    },
+    "8": {
+      "item": "useless_mod:useless_ingot_tier_8"
+    },
+    "9": {
+      "item": "useless_mod:useless_ingot_tier_9"
+    }
+  },
+  "result": {
+    "item": "useless_mod:possible_useful_ingot",
+    "count": 1
+  },
+  "group": "useless_ingots"
+}

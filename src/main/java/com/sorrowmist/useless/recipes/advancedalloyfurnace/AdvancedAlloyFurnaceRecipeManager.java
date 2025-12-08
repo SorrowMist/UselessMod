@@ -136,10 +136,16 @@ public class AdvancedAlloyFurnaceRecipeManager {
                                         );
                                 Ingredient uselessIngotCatalyst = Ingredient.of(uselessIngotTag);
                                 
+                                // 将List<Integer>转换为List<Long>
+                                List<Long> longInputCounts = new ArrayList<>();
+                                for (Integer count : inputCounts) {
+                                    longInputCounts.add(count.longValue());
+                                }
+                                
                                 smeltingRecipe = new AdvancedAlloyFurnaceRecipe(
                                         recipe.getId(),
                                         inputIngredients,
-                                        inputCounts,
+                                        longInputCounts,
                                         emptyFluid,
                                         outputItems,
                                         emptyFluid,

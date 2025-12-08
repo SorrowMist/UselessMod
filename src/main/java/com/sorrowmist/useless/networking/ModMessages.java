@@ -34,6 +34,12 @@ public class ModMessages {
                 .encoder(EnhancedChainMiningTogglePacket::encode)
                 .consumerMainThread(EnhancedChainMiningTogglePacket::handle)
                 .add();
+        
+        net.messageBuilder(ToolModeSwitchPacket.class, id(), NetworkDirection.PLAY_TO_SERVER)
+                .decoder(ToolModeSwitchPacket::new)
+                .encoder(ToolModeSwitchPacket::encode)
+                .consumerMainThread(ToolModeSwitchPacket::handle)
+                .add();
     }
 
     public static <MSG> void sendToServer(MSG message) {

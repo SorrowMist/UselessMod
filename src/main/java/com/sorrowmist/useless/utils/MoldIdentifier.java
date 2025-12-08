@@ -17,14 +17,14 @@ public class MoldIdentifier {
     private MoldIdentifier() {}
     
     /**
-     * 检查物品是否为无用锭（催化剂）
+     * 检查物品是否为无用锭或有用锭（催化剂）
      * @param stack 要检查的物品堆叠
-     * @return 如果是无用锭则返回true，否则返回false
+     * @return 如果是无用锭或有用锭则返回true，否则返回false
      */
     public static boolean isUselessIngot(ItemStack stack) {
         if (stack.isEmpty()) return false;
 
-        // 检查物品是否在无用锭列表中
+        // 检查物品是否在无用锭或有用锭列表中
         return stack.is(ModIngots.USELESS_INGOT_TIER_1.get()) ||
                 stack.is(ModIngots.USELESS_INGOT_TIER_2.get()) ||
                 stack.is(ModIngots.USELESS_INGOT_TIER_3.get()) ||
@@ -33,7 +33,8 @@ public class MoldIdentifier {
                 stack.is(ModIngots.USELESS_INGOT_TIER_6.get()) ||
                 stack.is(ModIngots.USELESS_INGOT_TIER_7.get()) ||
                 stack.is(ModIngots.USELESS_INGOT_TIER_8.get()) ||
-                stack.is(ModIngots.USELESS_INGOT_TIER_9.get());
+                stack.is(ModIngots.USELESS_INGOT_TIER_9.get()) ||
+                stack.is(ModIngots.USEFUL_INGOT.get());
     }
     
     /**

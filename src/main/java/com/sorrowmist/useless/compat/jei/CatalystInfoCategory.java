@@ -51,7 +51,7 @@ public class CatalystInfoCategory implements IRecipeCategory<CatalystInfoCategor
         this.guiHelper = guiHelper;
         // 创建一个空白的背景，尺寸与显示尺寸相同
         this.background = guiHelper.createBlankDrawable(DISPLAY_WIDTH, DISPLAY_HEIGHT);
-        this.icon = guiHelper.createDrawableItemStack(new ItemStack(ModIngots.USELESS_INGOT_TIER_1.get()));
+        this.icon = guiHelper.createDrawableItemStack(new ItemStack(ModIngots.USEFUL_INGOT.get()));
         this.title = Component.translatable("jei.useless_mod.catalyst_info");
 
         // 从 CatalystManager 获取所有催化剂数据
@@ -67,7 +67,8 @@ public class CatalystInfoCategory implements IRecipeCategory<CatalystInfoCategor
                 new ItemStack(ModIngots.USELESS_INGOT_TIER_6.get()),
                 new ItemStack(ModIngots.USELESS_INGOT_TIER_7.get()),
                 new ItemStack(ModIngots.USELESS_INGOT_TIER_8.get()),
-                new ItemStack(ModIngots.USELESS_INGOT_TIER_9.get())
+                new ItemStack(ModIngots.USELESS_INGOT_TIER_9.get()),
+                new ItemStack(ModIngots.USEFUL_INGOT.get())
         };
     }
 
@@ -93,18 +94,17 @@ public class CatalystInfoCategory implements IRecipeCategory<CatalystInfoCategor
 
     @Override
     public void setRecipe(IRecipeLayoutBuilder builder, CatalystInfo recipe, IFocusGroup focuses) {
-        // 3x3网格布局 - 居中显示
-        int totalCatalystWidth = 3 * 18; // 3个槽位，每个18像素宽
-        int startX = (DISPLAY_WIDTH - totalCatalystWidth) / 2; // 居中计算
-        int startY = 25;
-        int spacing = 18;
+        // 2行5列网格布局
+        int startX = 29; // 第一个格子左上角起点X坐标
+        int startY = 24; // 第一个格子左上角起点Y坐标
+        int spacing = 18; // 每个格子18*18像素
 
-        // 总共9个催化剂，按3x3网格排列
+        // 总共10个催化剂，按2行5列排列
         for (int i = 0; i < catalystStacks.length; i++) {
             final int index = i;
             // 计算行和列
-            int row = i / 3; // 0, 0, 0, 1, 1, 1, 2, 2, 2
-            int col = i % 3; // 0, 1, 2, 0, 1, 2, 0, 1, 2
+            int row = i / 5; // 0, 0, 0, 0, 0, 1, 1, 1, 1, 1
+            int col = i % 5; // 0, 1, 2, 3, 4, 0, 1, 2, 3, 4
 
             int x = startX + col * spacing;
             int y = startY + row * spacing;
@@ -136,7 +136,7 @@ public class CatalystInfoCategory implements IRecipeCategory<CatalystInfoCategor
 
         // 调整说明文字的位置，并居中显示
         String[] explanationLines = {
-                "• 催化剂为可选项，且会被消耗",
+                "• 催化剂为可选项，除有用锭外会被消耗",
                 "• 放入催化剂可大幅提高并行数",
                 "• 并行数影响消耗、产出和能量",
                 "• 合成无用锭时催化剂无效"
@@ -169,16 +169,29 @@ public class CatalystInfoCategory implements IRecipeCategory<CatalystInfoCategor
                 // 清空原有工具提示，添加自定义工具提示
                 tooltip.clear();
                 tooltip.add(Component.literal(catalystName).withStyle(ChatFormatting.GOLD));
-                tooltip.add(Component.literal("并行数: " + parallel + "倍").withStyle(ChatFormatting.GREEN));
-                tooltip.add(Component.literal(""));
-                tooltip.add(Component.literal("效果说明:").withStyle(ChatFormatting.YELLOW));
-                tooltip.add(Component.literal("• 输入物品消耗 × " + parallel).withStyle(ChatFormatting.GRAY));
-                tooltip.add(Component.literal("• 输出物品数量 × " + parallel).withStyle(ChatFormatting.GRAY));
-                tooltip.add(Component.literal("• 能量消耗 × " + parallel).withStyle(ChatFormatting.GRAY));
-                tooltip.add(Component.literal("• 处理时间保持不变").withStyle(ChatFormatting.GRAY));
-                // 添加黑名单说明
-                tooltip.add(Component.literal("⚠ 催化剂会被消耗").withStyle(ChatFormatting.RED));
-                tooltip.add(Component.literal("注意: 合成无用锭时催化剂无效").withStyle(ChatFormatting.RED));
+                
+                // 检查是否为USEFUL_INGOT
+                if (stack.getItem() == ModIngots.USEFUL_INGOT.get()) {
+                    tooltip.add(Component.literal("并行数: 无上限").withStyle(ChatFormatting.GREEN));
+                    tooltip.add(Component.literal(""));
+                    tooltip.add(Component.literal("效果说明:").withStyle(ChatFormatting.YELLOW));
+                    tooltip.add(Component.literal("• 催化剂不会被消耗").withStyle(ChatFormatting.GREEN));
+                    tooltip.add(Component.literal("• 无并行数上限").withStyle(ChatFormatting.GREEN));
+                    tooltip.add(Component.literal("• 能量消耗不会倍增").withStyle(ChatFormatting.GREEN));
+                    tooltip.add(Component.literal("• 处理时间保持不变").withStyle(ChatFormatting.GRAY));
+                    tooltip.add(Component.literal("注意: 合成无用锭时催化剂无效").withStyle(ChatFormatting.RED));
+                } else {
+                    tooltip.add(Component.literal("并行数: " + parallel + "倍").withStyle(ChatFormatting.GREEN));
+                    tooltip.add(Component.literal(""));
+                    tooltip.add(Component.literal("效果说明:").withStyle(ChatFormatting.YELLOW));
+                    tooltip.add(Component.literal("• 输入物品消耗 × " + parallel).withStyle(ChatFormatting.GRAY));
+                    tooltip.add(Component.literal("• 输出物品数量 × " + parallel).withStyle(ChatFormatting.GRAY));
+                    tooltip.add(Component.literal("• 能量消耗 × " + parallel).withStyle(ChatFormatting.GRAY));
+                    tooltip.add(Component.literal("• 处理时间保持不变").withStyle(ChatFormatting.GRAY));
+                    // 添加黑名单说明
+                    tooltip.add(Component.literal("⚠ 催化剂会被消耗").withStyle(ChatFormatting.RED));
+                    tooltip.add(Component.literal("注意: 合成无用锭时催化剂无效").withStyle(ChatFormatting.RED));
+                }
             }
         }
     }
@@ -198,13 +211,21 @@ public class CatalystInfoCategory implements IRecipeCategory<CatalystInfoCategor
             // 启用深度测试
             RenderSystem.enableDepthTest();
 
-            // 渲染物品图标
-            guiGraphics.renderFakeItem(stack, 0, 0);
+            // 渲染物品图标 - 在18*18的栏位内居中显示
+            guiGraphics.renderFakeItem(stack, 1, 1);
 
             // 渲染并行数文本
             Minecraft mc = Minecraft.getInstance();
             int parallel = CatalystManager.getCatalystParallel(stack);
-            String parallelText = parallel + "x";
+            String parallelText;
+            
+            // 检查是否为USEFUL_INGOT
+            if (stack.getItem() == ModIngots.USEFUL_INGOT.get()) {
+                parallelText = "∞";
+            } else {
+                parallelText = parallel + "x";
+            }
+            
             int textWidth = mc.font.width(parallelText);
 
             guiGraphics.pose().pushPose();
@@ -228,16 +249,29 @@ public class CatalystInfoCategory implements IRecipeCategory<CatalystInfoCategor
                 String catalystName = CatalystManager.getCatalystName(ingredient);
 
                 tooltip.add(Component.literal(catalystName).withStyle(ChatFormatting.GOLD));
-                tooltip.add(Component.literal("并行数: " + parallel + "倍").withStyle(ChatFormatting.GREEN));
-                tooltip.add(Component.literal(""));
-                tooltip.add(Component.literal("效果说明:").withStyle(ChatFormatting.YELLOW));
-                tooltip.add(Component.literal("• 输入物品消耗 × " + parallel).withStyle(ChatFormatting.GRAY));
-                tooltip.add(Component.literal("• 输出物品数量 × " + parallel).withStyle(ChatFormatting.GRAY));
-                tooltip.add(Component.literal("• 能量消耗 × " + parallel).withStyle(ChatFormatting.GRAY));
-                tooltip.add(Component.literal("• 处理时间保持不变").withStyle(ChatFormatting.GRAY));
-                // 添加黑名单说明
-                tooltip.add(Component.literal("⚠ 催化剂会被消耗").withStyle(ChatFormatting.RED));
-                tooltip.add(Component.literal("注意: 合成无用锭时催化剂无效").withStyle(ChatFormatting.RED));
+                
+                // 检查是否为USEFUL_INGOT
+                if (ingredient.getItem() == ModIngots.USEFUL_INGOT.get()) {
+                    tooltip.add(Component.literal("并行数: 无上限").withStyle(ChatFormatting.GREEN));
+                    tooltip.add(Component.literal(""));
+                    tooltip.add(Component.literal("效果说明:").withStyle(ChatFormatting.YELLOW));
+                    tooltip.add(Component.literal("• 催化剂不会被消耗").withStyle(ChatFormatting.GREEN));
+                    tooltip.add(Component.literal("• 无并行数上限").withStyle(ChatFormatting.GREEN));
+                    tooltip.add(Component.literal("• 能量消耗不会倍增").withStyle(ChatFormatting.GREEN));
+                    tooltip.add(Component.literal("• 处理时间保持不变").withStyle(ChatFormatting.GRAY));
+                    tooltip.add(Component.literal("注意: 合成无用锭时催化剂无效").withStyle(ChatFormatting.RED));
+                } else {
+                    tooltip.add(Component.literal("并行数: " + parallel + "倍").withStyle(ChatFormatting.GREEN));
+                    tooltip.add(Component.literal(""));
+                    tooltip.add(Component.literal("效果说明:").withStyle(ChatFormatting.YELLOW));
+                    tooltip.add(Component.literal("• 输入物品消耗 × " + parallel).withStyle(ChatFormatting.GRAY));
+                    tooltip.add(Component.literal("• 输出物品数量 × " + parallel).withStyle(ChatFormatting.GRAY));
+                    tooltip.add(Component.literal("• 能量消耗 × " + parallel).withStyle(ChatFormatting.GRAY));
+                    tooltip.add(Component.literal("• 处理时间保持不变").withStyle(ChatFormatting.GRAY));
+                    // 添加黑名单说明
+                    tooltip.add(Component.literal("⚠ 催化剂会被消耗").withStyle(ChatFormatting.RED));
+                    tooltip.add(Component.literal("注意: 合成无用锭时催化剂无效").withStyle(ChatFormatting.RED));
+                }
             }
         }
 
@@ -251,16 +285,29 @@ public class CatalystInfoCategory implements IRecipeCategory<CatalystInfoCategor
                 String catalystName = CatalystManager.getCatalystName(ingredient);
 
                 tooltip.add(Component.literal(catalystName).withStyle(ChatFormatting.GOLD));
-                tooltip.add(Component.literal("并行数: " + parallel + "倍").withStyle(ChatFormatting.GREEN));
-                tooltip.add(Component.literal(""));
-                tooltip.add(Component.literal("效果说明:").withStyle(ChatFormatting.YELLOW));
-                tooltip.add(Component.literal("• 输入物品消耗 × " + parallel).withStyle(ChatFormatting.GRAY));
-                tooltip.add(Component.literal("• 输出物品数量 × " + parallel).withStyle(ChatFormatting.GRAY));
-                tooltip.add(Component.literal("• 能量消耗 × " + parallel).withStyle(ChatFormatting.GRAY));
-                tooltip.add(Component.literal("• 处理时间保持不变").withStyle(ChatFormatting.GRAY));
-                // 添加黑名单说明
-                tooltip.add(Component.literal("⚠ 催化剂会被消耗").withStyle(ChatFormatting.RED));
-                tooltip.add(Component.literal("注意: 合成无用锭时催化剂无效").withStyle(ChatFormatting.RED));
+                
+                // 检查是否为USEFUL_INGOT
+                if (ingredient.getItem() == ModIngots.USEFUL_INGOT.get()) {
+                    tooltip.add(Component.literal("并行数: 无上限").withStyle(ChatFormatting.GREEN));
+                    tooltip.add(Component.literal(""));
+                    tooltip.add(Component.literal("效果说明:").withStyle(ChatFormatting.YELLOW));
+                    tooltip.add(Component.literal("• 催化剂不会被消耗").withStyle(ChatFormatting.GREEN));
+                    tooltip.add(Component.literal("• 无并行数上限").withStyle(ChatFormatting.GREEN));
+                    tooltip.add(Component.literal("• 能量消耗不会倍增").withStyle(ChatFormatting.GREEN));
+                    tooltip.add(Component.literal("• 处理时间保持不变").withStyle(ChatFormatting.GRAY));
+                    tooltip.add(Component.literal("注意: 合成无用锭时催化剂无效").withStyle(ChatFormatting.RED));
+                } else {
+                    tooltip.add(Component.literal("并行数: " + parallel + "倍").withStyle(ChatFormatting.GREEN));
+                    tooltip.add(Component.literal(""));
+                    tooltip.add(Component.literal("效果说明:").withStyle(ChatFormatting.YELLOW));
+                    tooltip.add(Component.literal("• 输入物品消耗 × " + parallel).withStyle(ChatFormatting.GRAY));
+                    tooltip.add(Component.literal("• 输出物品数量 × " + parallel).withStyle(ChatFormatting.GRAY));
+                    tooltip.add(Component.literal("• 能量消耗 × " + parallel).withStyle(ChatFormatting.GRAY));
+                    tooltip.add(Component.literal("• 处理时间保持不变").withStyle(ChatFormatting.GRAY));
+                    // 添加黑名单说明
+                    tooltip.add(Component.literal("⚠ 催化剂会被消耗").withStyle(ChatFormatting.RED));
+                    tooltip.add(Component.literal("注意: 合成无用锭时催化剂无效").withStyle(ChatFormatting.RED));
+                }
             }
             return tooltip;
         }

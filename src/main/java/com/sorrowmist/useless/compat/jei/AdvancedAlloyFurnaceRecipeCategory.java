@@ -150,14 +150,15 @@ public class AdvancedAlloyFurnaceRecipeCategory implements IRecipeCategory<Advan
     public void setRecipe(IRecipeLayoutBuilder builder, AdvancedAlloyFurnaceRecipe recipe, IFocusGroup focuses) {
         for (int i = 0; i < Math.min(recipe.getInputItems().size(), 6); i++) {
             Ingredient ingredient = recipe.getInputItems().get(i);
-            int count = recipe.getInputItemCounts().get(i);
+            long count = recipe.getInputItemCounts().get(i);
 
             ItemStack[] matchingStacks = ingredient.getItems();
             if (matchingStacks.length > 0) {
                 ItemStack[] displayStacks = new ItemStack[matchingStacks.length];
                 for (int j = 0; j < matchingStacks.length; j++) {
                     ItemStack displayStack = matchingStacks[j].copy();
-                    displayStack.setCount(count);
+                    // 将long转换为int，因为ItemStack的count字段是int类型
+                    displayStack.setCount((int) Math.min(count, Integer.MAX_VALUE));
                     displayStacks[j] = displayStack;
                 }
 

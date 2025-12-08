@@ -4,6 +4,8 @@ import com.sorrowmist.useless.UselessMod;
 import com.sorrowmist.useless.blocks.GlowPlasticBlock;
 import com.sorrowmist.useless.client.KeyBindings;
 import com.sorrowmist.useless.config.ConfigManager;
+import com.sorrowmist.useless.modes.ModeManager;
+import com.sorrowmist.useless.modes.ToolMode;
 import net.minecraft.ChatFormatting;
 import net.minecraft.advancements.CriteriaTriggers;
 import net.minecraft.client.KeyMapping;
@@ -96,26 +98,19 @@ public class EndlessBeafItem extends PickaxeItem {
         super.setDamage(stack, 0);
     }
 
+    // 模式管理器实例
+    private final ModeManager modeManager = new ModeManager();
+    
     // 检查是否处于精准采集模式
     public boolean isSilkTouchMode(ItemStack stack) {
-        CompoundTag tag = stack.getTag();
-        return tag != null && tag.getBoolean("SilkTouchMode");
+        modeManager.loadFromStack(stack);
+        return modeManager.isModeActive(com.sorrowmist.useless.modes.ToolMode.SILK_TOUCH);
     }
-
     
     // 设置连锁挖掘按键按下状态
     public void setChainMiningPressedState(ItemStack stack, boolean isPressed) {
-        // 保存当前的增强连锁模式状态
-        boolean enhancedMode = isEnhancedChainMiningMode(stack);
-        
-        // 设置连锁挖掘按键按下状态
         CompoundTag tag = stack.getOrCreateTag();
         tag.putBoolean("ChainMiningPressed", isPressed);
-        
-        // 恢复增强连锁模式状态，确保不会被意外修改
-        tag.putBoolean("EnhancedChainMining", enhancedMode);
-        
-        // 更新标签
         stack.setTag(tag);
     }
     
@@ -125,29 +120,32 @@ public class EndlessBeafItem extends PickaxeItem {
         return tag != null && tag.getBoolean("ChainMiningPressed");
     }
     
-    // 检查是否应该启用连锁挖掘（只根据按键状态）
+    // 检查是否应该启用连锁挖掘（根据按键状态和模式）
     public boolean shouldUseChainMining(ItemStack stack) {
+        modeManager.loadFromStack(stack);
+        // 简化连锁挖掘激活条件：只要按住连锁挖掘按键就启用
         return isChainMiningPressed(stack);
     }
     
     // 获取强化连锁模式
     public boolean isEnhancedChainMiningMode(ItemStack stack) {
-        CompoundTag tag = stack.getTag();
-        return tag != null && tag.getBoolean("EnhancedChainMining");
+        modeManager.loadFromStack(stack);
+        return modeManager.isModeActive(com.sorrowmist.useless.modes.ToolMode.ENHANCED_CHAIN_MINING);
     }
     
     // 设置强化连锁模式
     public void setEnhancedChainMiningMode(ItemStack stack, boolean enabled) {
-        CompoundTag tag = stack.getOrCreateTag();
-        tag.putBoolean("EnhancedChainMining", enabled);
+        modeManager.loadFromStack(stack);
+        modeManager.setModeActive(com.sorrowmist.useless.modes.ToolMode.ENHANCED_CHAIN_MINING, enabled);
+        modeManager.saveToStack(stack);
     }
     
     // 切换强化连锁模式
     public boolean toggleEnhancedChainMiningMode(ItemStack stack) {
-        boolean currentMode = isEnhancedChainMiningMode(stack);
-        boolean newMode = !currentMode;
-        setEnhancedChainMiningMode(stack, newMode);
-        return newMode;
+        modeManager.loadFromStack(stack);
+        modeManager.toggleMode(com.sorrowmist.useless.modes.ToolMode.ENHANCED_CHAIN_MINING);
+        modeManager.saveToStack(stack);
+        return modeManager.isModeActive(com.sorrowmist.useless.modes.ToolMode.ENHANCED_CHAIN_MINING);
     }
     
     // 处理增强连锁模式切换按键
@@ -160,9 +158,12 @@ public class EndlessBeafItem extends PickaxeItem {
     // 更新实际的附魔NBT
     public void updateEnchantments(ItemStack stack) {
         // 保存关键状态（使用局部变量存储，确保不会丢失）
+        ModeManager modeManager = new ModeManager();
+        modeManager.loadFromStack(stack);
+        
         boolean enhancedChainMining = isEnhancedChainMiningMode(stack);
         boolean silkTouchMode = isSilkTouchMode(stack);
-        boolean chainMiningPressed = isChainMiningPressed(stack); // 新增：保存按键状态
+        boolean chainMiningPressed = isChainMiningPressed(stack);
         
         // 获取现有的所有附魔
         Map<Enchantment, Integer> enchantments = new HashMap<>(EnchantmentHelper.getEnchantments(stack));
@@ -190,26 +191,132 @@ public class EndlessBeafItem extends PickaxeItem {
         CompoundTag finalTag = stack.getOrCreateTag();
         finalTag.putBoolean("EnhancedChainMining", enhancedChainMining);
         finalTag.putBoolean("SilkTouchMode", silkTouchMode);
-        finalTag.putBoolean("ChainMiningPressed", chainMiningPressed); // 新增：恢复按键状态
+        finalTag.putBoolean("ChainMiningPressed", chainMiningPressed);
+        
+        // 设置模型切换谓词值
+        if (silkTouchMode) {
+            finalTag.putFloat("useless_mod:silk_touch_mode", 1.0f);
+        } else {
+            finalTag.remove("useless_mod:silk_touch_mode");
+        }
         
         // 确保标签被正确应用到物品上
         stack.setTag(finalTag);
+        
+        // 更新工具模式标签
+        updateToolModeTags(stack, modeManager);
+    }
+    
+    // 更新工具模式，通过NBT标签跟踪激活的工具模式
+    private void updateToolModeTags(ItemStack stack, ModeManager modeManager) {
+        // 在NBT中存储激活的工具模式，以便在游戏逻辑中使用
+        CompoundTag tag = stack.getOrCreateTag();
+        CompoundTag toolModesTag = tag.getCompound("ToolModes");
+        
+        // 保存工具模式状态，这些状态将在游戏逻辑中用于判断工具行为
+        // 实际的标签处理将在物品交互时根据这些状态进行判断
+        
+        // 清除旧的工具模式标签（如果存在）
+        tag.remove("ActiveToolTag");
+        
+        // 根据激活的模式设置活动工具标签
+        if (modeManager.isModeActive(ToolMode.WRENCH_MODE)) {
+            tag.putString("ActiveToolTag", "forge:tools/wrenches");
+        } else if (modeManager.isModeActive(ToolMode.SCREWDRIVER_MODE)) {
+            tag.putString("ActiveToolTag", "forge:tools/screwdrivers");
+        } else if (modeManager.isModeActive(ToolMode.MALLET_MODE)) {
+            tag.putString("ActiveToolTag", "forge:tools/mallets");
+        } else if (modeManager.isModeActive(ToolMode.MEK_CONFIGURATOR)) {
+            // 添加兼容性检查，确保mek模组已安装
+            net.minecraft.resources.ResourceLocation configuratorId = new net.minecraft.resources.ResourceLocation("mekanism:configurator");
+            if (net.minecraftforge.registries.ForgeRegistries.ITEMS.containsKey(configuratorId)) {
+                tag.putString("ActiveToolTag", "forge:tools/configurators");
+            } else {
+                // 如果mek模组未安装，移除MEK_CONFIGURATOR模式
+                tag.remove("ActiveToolTag");
+            }
+        }
+        
+        // 将更新后的标签放回stack
+        stack.setTag(tag);
+    }
+    
+    // 根据激活的模式切换物品实例
+    public ItemStack switchToolModeItem(ItemStack oldStack, ModeManager modeManager) {
+        // 创建新的物品实例，根据激活的模式选择对应的子类
+        ItemStack newStack = ItemStack.EMPTY;
+        
+        // 检查激活的工具模式
+        boolean hasWrenchMode = modeManager.isModeActive(ToolMode.WRENCH_MODE);
+        boolean hasScrewdriverMode = modeManager.isModeActive(ToolMode.SCREWDRIVER_MODE);
+        boolean hasMalletMode = modeManager.isModeActive(ToolMode.MALLET_MODE);
+        boolean hasCrowbarMode = modeManager.isModeActive(ToolMode.CROWBAR_MODE);
+        boolean hasHammerMode = modeManager.isModeActive(ToolMode.HAMMER_MODE);
+        boolean hasMekConfiguratorMode = modeManager.isModeActive(ToolMode.MEK_CONFIGURATOR);
+        
+        if (hasWrenchMode) {
+            // 创建扳手实例
+            newStack = new ItemStack(ENDLESS_BEAF_WRENCH.get());
+        } else if (hasScrewdriverMode) {
+            // 创建螺丝刀实例
+            newStack = new ItemStack(ENDLESS_BEAF_SCREWDRIVER.get());
+        } else if (hasMalletMode) {
+            // 创建锤子实例
+            newStack = new ItemStack(ENDLESS_BEAF_MALLET.get());
+        } else if (hasCrowbarMode) {
+            // 创建撬棍实例
+            newStack = new ItemStack(ENDLESS_BEAF_CROWBAR.get());
+        } else if (hasHammerMode) {
+            // 创建铁锤实例
+            newStack = new ItemStack(ENDLESS_BEAF_HAMMER.get());
+        } else if (hasMekConfiguratorMode) {
+            // 创建Mekanism配置器实例 - 这里需要获取Mekanism配置器物品的实例
+            // 由于我们不能直接访问Mekanism的物品注册，需要通过物品ID获取
+            // 添加兼容性检查，确保mek模组已安装
+            net.minecraft.resources.ResourceLocation configuratorId = new net.minecraft.resources.ResourceLocation("mekanism:configurator");
+            if (net.minecraftforge.registries.ForgeRegistries.ITEMS.containsKey(configuratorId)) {
+                newStack = new ItemStack(net.minecraftforge.registries.ForgeRegistries.ITEMS.getValue(configuratorId));
+            } else {
+                // 如果mek模组未安装，使用基础实例
+                newStack = new ItemStack(ENDLESS_BEAF_ITEM.get());
+                // 禁用MEK_CONFIGURATOR模式
+                modeManager.setModeActive(ToolMode.MEK_CONFIGURATOR, false);
+                modeManager.saveToStack(oldStack);
+            }
+        } else {
+            // 如果没有激活的工具模式，使用基础实例（具有所有标签）
+            newStack = new ItemStack(ENDLESS_BEAF_ITEM.get());
+        }
+        
+        // 复制原有物品的所有NBT数据到新实例
+        if (oldStack.hasTag() && !newStack.isEmpty()) {
+            newStack.setTag(oldStack.getTag().copy());
+        }
+        
+        // 更新新实例的附魔NBT，确保模型切换谓词值被正确设置
+        updateEnchantments(newStack);
+        
+        return newStack;
     }
 
     // 切换模式的方法（供数据包调用）
     public void switchEnchantmentMode(ItemStack stack, boolean silkTouchMode) {
-        // 保存当前的增强连锁模式状态和连锁挖掘按键状态
-        boolean enhancedChainMining = isEnhancedChainMiningMode(stack);
+        // 保存当前的连锁挖掘按键状态
         boolean chainMiningPressed = isChainMiningPressed(stack);
         
-        // 切换附魔模式
-        stack.getOrCreateTag().putBoolean("SilkTouchMode", silkTouchMode);
+        // 使用模式管理器切换模式
+        modeManager.loadFromStack(stack);
+        if (silkTouchMode) {
+            modeManager.setModeActive(com.sorrowmist.useless.modes.ToolMode.SILK_TOUCH, true);
+        } else {
+            modeManager.setModeActive(com.sorrowmist.useless.modes.ToolMode.FORTUNE, true);
+        }
+        modeManager.saveToStack(stack);
         
         // 更新实际的附魔NBT
         updateEnchantments(stack);
         
-        // 再次确保所有关键状态被正确恢复
-        setEnhancedChainMiningMode(stack, enhancedChainMining);
+        // 恢复连锁挖掘按键状态
         setChainMiningPressedState(stack, chainMiningPressed);
         
         // 强制客户端更新物品渲染
@@ -313,6 +420,10 @@ public class EndlessBeafItem extends PickaxeItem {
     public int getEnchantmentLevel(ItemStack stack, Enchantment enchantment) {
         return EnchantmentHelper.getTagEnchantmentLevel(enchantment, stack);
     }
+    
+    // 移除了getTags方法，因为Forge中物品标签是在注册时静态定义的
+    // 改为在物品注册时创建多个具有不同标签的物品实例
+    // 这里我们使用更灵活的方式处理工具模式：通过NBT标签来跟踪激活的工具模式
 
     @Override
     public void onCraftedBy(ItemStack stack, Level level, Player player) {
@@ -327,7 +438,108 @@ public class EndlessBeafItem extends PickaxeItem {
         // 移除了连锁挖掘模式的默认设置，现在只根据按键状态控制
     }
 
+    // 基础物品注册
     public static final RegistryObject<Item> ENDLESS_BEAF_ITEM = ITEMS.register("endless_beaf_item",
+            () -> new EndlessBeafItem(
+                    Tiers.NETHERITE,  // Tier - 可根据需要调整
+                    50,               // Attack damage modifier
+                    2.0f,            // Attack speed modifier
+                    new Item.Properties()
+                            .stacksTo(1)
+                            .rarity(Rarity.EPIC)
+                            .durability(0)
+            ) {
+                @Override
+                public boolean isCorrectToolForDrops(ItemStack stack, BlockState state) {
+                    return state.is(BlockTags.MINEABLE_WITH_PICKAXE) ||
+                            state.is(BlockTags.MINEABLE_WITH_AXE) ||
+                            state.is(BlockTags.MINEABLE_WITH_SHOVEL) ||
+                            state.is(BlockTags.MINEABLE_WITH_HOE);
+                }
+            });
+    
+    // 扳手子类物品注册
+    public static final RegistryObject<Item> ENDLESS_BEAF_WRENCH = ITEMS.register("endless_beaf_wrench",
+            () -> new EndlessBeafItem(
+                    Tiers.NETHERITE,  // Tier - 可根据需要调整
+                    50,               // Attack damage modifier
+                    2.0f,            // Attack speed modifier
+                    new Item.Properties()
+                            .stacksTo(1)
+                            .rarity(Rarity.EPIC)
+                            .durability(0)
+            ) {
+                @Override
+                public boolean isCorrectToolForDrops(ItemStack stack, BlockState state) {
+                    return state.is(BlockTags.MINEABLE_WITH_PICKAXE) ||
+                            state.is(BlockTags.MINEABLE_WITH_AXE) ||
+                            state.is(BlockTags.MINEABLE_WITH_SHOVEL) ||
+                            state.is(BlockTags.MINEABLE_WITH_HOE);
+                }
+            });
+    
+    // 螺丝刀子类物品注册
+    public static final RegistryObject<Item> ENDLESS_BEAF_SCREWDRIVER = ITEMS.register("endless_beaf_screwdriver",
+            () -> new EndlessBeafItem(
+                    Tiers.NETHERITE,  // Tier - 可根据需要调整
+                    50,               // Attack damage modifier
+                    2.0f,            // Attack speed modifier
+                    new Item.Properties()
+                            .stacksTo(1)
+                            .rarity(Rarity.EPIC)
+                            .durability(0)
+            ) {
+                @Override
+                public boolean isCorrectToolForDrops(ItemStack stack, BlockState state) {
+                    return state.is(BlockTags.MINEABLE_WITH_PICKAXE) ||
+                            state.is(BlockTags.MINEABLE_WITH_AXE) ||
+                            state.is(BlockTags.MINEABLE_WITH_SHOVEL) ||
+                            state.is(BlockTags.MINEABLE_WITH_HOE);
+                }
+            });
+    
+    // 锤子子类物品注册
+    public static final RegistryObject<Item> ENDLESS_BEAF_MALLET = ITEMS.register("endless_beaf_mallet",
+            () -> new EndlessBeafItem(
+                    Tiers.NETHERITE,  // Tier - 可根据需要调整
+                    50,               // Attack damage modifier
+                    2.0f,            // Attack speed modifier
+                    new Item.Properties()
+                            .stacksTo(1)
+                            .rarity(Rarity.EPIC)
+                            .durability(0)
+            ) {
+                @Override
+                public boolean isCorrectToolForDrops(ItemStack stack, BlockState state) {
+                    return state.is(BlockTags.MINEABLE_WITH_PICKAXE) ||
+                            state.is(BlockTags.MINEABLE_WITH_AXE) ||
+                            state.is(BlockTags.MINEABLE_WITH_SHOVEL) ||
+                            state.is(BlockTags.MINEABLE_WITH_HOE);
+                }
+            });
+    
+    // 撬棍子类物品注册
+    public static final RegistryObject<Item> ENDLESS_BEAF_CROWBAR = ITEMS.register("endless_beaf_crowbar",
+            () -> new EndlessBeafItem(
+                    Tiers.NETHERITE,  // Tier - 可根据需要调整
+                    50,               // Attack damage modifier
+                    2.0f,            // Attack speed modifier
+                    new Item.Properties()
+                            .stacksTo(1)
+                            .rarity(Rarity.EPIC)
+                            .durability(0)
+            ) {
+                @Override
+                public boolean isCorrectToolForDrops(ItemStack stack, BlockState state) {
+                    return state.is(BlockTags.MINEABLE_WITH_PICKAXE) ||
+                            state.is(BlockTags.MINEABLE_WITH_AXE) ||
+                            state.is(BlockTags.MINEABLE_WITH_SHOVEL) ||
+                            state.is(BlockTags.MINEABLE_WITH_HOE);
+                }
+            });
+    
+    // 铁锤子类物品注册
+    public static final RegistryObject<Item> ENDLESS_BEAF_HAMMER = ITEMS.register("endless_beaf_hammer",
             () -> new EndlessBeafItem(
                     Tiers.NETHERITE,  // Tier - 可根据需要调整
                     50,               // Attack damage modifier
@@ -557,37 +769,37 @@ public class EndlessBeafItem extends PickaxeItem {
                         }
                         
                         // 处理原点方块
-                if (currentPos.equals(originPos)) {
-                    // 收集掉落物
-                    List<ItemStack> drops = getBlockDrops(currentState, level, currentPos, player, stack);
-                    if (drops != null && !drops.isEmpty() && !hasInvalidDrops(drops)) {
-                        // 尝试将掉落物放入玩家背包
-                        boolean allCollected = true;
-                        for (ItemStack drop : drops) {
-                            if (!drop.isEmpty() && drop.getItem() != Items.AIR) {
-                                if (!addItemToPlayerInventory(player, drop.copy())) {
-                                    // 如果背包满了，标记为未完全收集
-                                    allCollected = false;
-                                    // 掉落在玩家脚下
-                                    ItemEntity itemEntity = new ItemEntity(level,
-                                            player.getX(), player.getY(), player.getZ(),
-                                            drop.copy());
-                                    level.addFreshEntity(itemEntity);
+                        if (currentPos.equals(originPos)) {
+                            // 收集掉落物
+                            List<ItemStack> drops = getBlockDrops(currentState, level, currentPos, player, stack);
+                            if (drops != null && !drops.isEmpty() && !hasInvalidDrops(drops)) {
+                                // 尝试将掉落物放入玩家背包
+                                boolean allCollected = true;
+                                for (ItemStack drop : drops) {
+                                    if (!drop.isEmpty() && drop.getItem() != Items.AIR) {
+                                        if (!addItemToPlayerInventory(player, drop.copy())) {
+                                            // 如果背包满了，标记为未完全收集
+                                            allCollected = false;
+                                            // 掉落在玩家脚下
+                                            ItemEntity itemEntity = new ItemEntity(level,
+                                                    player.getX(), player.getY(), player.getZ(),
+                                                    drop.copy());
+                                            level.addFreshEntity(itemEntity);
+                                        }
+                                    }
                                 }
-                            }
-                        }
 
-                        // 取消原版事件并手动设置方块为空气
-                        event.setCanceled(true);
-                        level.setBlock(currentPos, Blocks.AIR.defaultBlockState(), 3);
-                    } else {
-                        // 回退到原版逻辑
-                        handleFallbackBlockBreak(level, currentPos, currentState, player, stack);
-                    }
-                    
-                    // 播放破坏音效
-                    playBreakSoundWithCooldown(level, currentPos, currentState, player);
-                } else {
+                                // 取消原版事件并手动设置方块为空气
+                                event.setCanceled(true);
+                                level.setBlock(currentPos, Blocks.AIR.defaultBlockState(), 3);
+                            } else {
+                                // 回退到原版逻辑
+                                handleFallbackBlockBreak(level, currentPos, currentState, player, stack);
+                            }
+                            
+                            // 播放破坏音效
+                            playBreakSoundWithCooldown(level, currentPos, currentState, player);
+                        } else {
                             // 处理非原点方块
                             // 收集掉落物
                             List<ItemStack> drops = getBlockDrops(currentState, level, currentPos, player, stack);
@@ -938,6 +1150,18 @@ public class EndlessBeafItem extends PickaxeItem {
                 net.minecraftforge.common.ToolActions.DEFAULT_PICKAXE_ACTIONS.contains(toolAction) ||
                 super.canPerformAction(stack, toolAction)||
                 toolAction.equals(ToolActions.HOE_TILL);
+    }
+    
+    @Override
+    public boolean doesSneakBypassUse(ItemStack stack, net.minecraft.world.level.LevelReader world, BlockPos pos, Player player) {
+        // 检查是否是塑料块，如果是则不跳过useOn方法，这样快速拆塑料块功能才能生效
+        Block block = world.getBlockState(pos).getBlock();
+        if (block instanceof GlowPlasticBlock) {
+            // 对于塑料块，不绕过useOn方法，以便执行快速破坏逻辑
+            return false;
+        }
+        // 对于其他方块，允许Shift+右键事件传递到方块/机器，这对于格雷机器的边缘选择框功能至关重要
+        return true;
     }
 
     private boolean isPlasticBlock(Block block) {

@@ -52,6 +52,10 @@ public class UselessTab {
                         pOutput.accept(ModIngots.USELESS_INGOT_TIER_7.get());
                         pOutput.accept(ModIngots.USELESS_INGOT_TIER_8.get());
                         pOutput.accept(ModIngots.USELESS_INGOT_TIER_9.get());
+                        
+                        // 添加新的锭到创造标签
+                        pOutput.accept(ModIngots.POSSIBLE_USEFUL_INGOT.get());
+                        pOutput.accept(ModIngots.USEFUL_INGOT.get());
 
                         // 添加金属模具到创造标签
                         pOutput.accept(ModMolds.METAL_MOLD_PLATE.get());

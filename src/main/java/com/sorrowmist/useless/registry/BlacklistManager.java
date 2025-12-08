@@ -20,6 +20,8 @@ public class BlacklistManager {
         BLACKLISTED_OUTPUTS.add("useless_mod:useless_ingot_tier_7");
         BLACKLISTED_OUTPUTS.add("useless_mod:useless_ingot_tier_8");
         BLACKLISTED_OUTPUTS.add("useless_mod:useless_ingot_tier_9");
+        // 添加新的锭到黑名单，防止它们被催化剂影响
+        BLACKLISTED_OUTPUTS.add("useless_mod:useful_ingot");
     }
 
     public static boolean isOutputBlacklisted(ItemStack stack) {

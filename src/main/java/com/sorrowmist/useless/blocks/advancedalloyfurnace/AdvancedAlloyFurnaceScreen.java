@@ -607,9 +607,10 @@ public class AdvancedAlloyFurnaceScreen extends AbstractContainerScreen<Advanced
             tooltip.add(Component.literal("并行数说明:").withStyle(ChatFormatting.GOLD));
             tooltip.add(Component.literal("• 消耗和产出乘以并行数").withStyle(ChatFormatting.GRAY));
             tooltip.add(Component.literal("• 处理时间保持不变").withStyle(ChatFormatting.GRAY));
-            tooltip.add(Component.literal("• 能量消耗乘以并行数").withStyle(ChatFormatting.GRAY));
+            tooltip.add(Component.literal("• 能量消耗乘以并行数（有用锭除外）").withStyle(ChatFormatting.GRAY));
             tooltip.add(Component.literal("• 催化剂为可选项，可提高并行数").withStyle(ChatFormatting.GRAY));
-            tooltip.add(Component.literal("⚠ 催化剂会被消耗").withStyle(ChatFormatting.RED));
+            tooltip.add(Component.literal("• 有用锭作为催化剂时不会被消耗").withStyle(ChatFormatting.GRAY));
+            tooltip.add(Component.literal("⚠ 普通催化剂会被消耗").withStyle(ChatFormatting.RED));
 
             guiGraphics.renderComponentTooltip(this.font, tooltip, mouseX, mouseY);
         }

@@ -70,11 +70,17 @@ public class JEIPlugin implements IModPlugin {
                     );
             net.minecraft.world.item.crafting.Ingredient uselessIngotCatalyst = net.minecraft.world.item.crafting.Ingredient.of(uselessIngotTag);
             
+            // 将List<Integer>转换为List<Long>
+            List<Long> longInputCounts = new ArrayList<>();
+            for (Integer count : inputCounts) {
+                longInputCounts.add(count.longValue());
+            }
+            
             // 创建临时的高级合金炉配方，使用原版熔炉作为模具
             com.sorrowmist.useless.recipes.advancedalloyfurnace.AdvancedAlloyFurnaceRecipe convertedRecipe = new com.sorrowmist.useless.recipes.advancedalloyfurnace.AdvancedAlloyFurnaceRecipe(
                     recipe.getId(),
                     inputIngredients,
-                    inputCounts,
+                    longInputCounts,
                     emptyFluid,
                     outputItems,
                     emptyFluid,

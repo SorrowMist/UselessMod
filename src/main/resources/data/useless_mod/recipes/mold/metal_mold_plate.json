@@ -1,0 +1,16 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    "XXX"
+  ],
+  "key": {
+    "X": {
+      "item": "useless_mod:useless_ingot_tier_1"
+    }
+  },
+  "result": {
+    "item": "useless_mod:metal_mold_plate",
+    "count": 1
+  },
+  "group": "metal_molds"
+}

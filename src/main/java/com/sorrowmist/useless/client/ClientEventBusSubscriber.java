@@ -60,5 +60,6 @@ class ClientModBusSubscriber {
         event.register(KeyBindings.SWITCH_FORTUNE_KEY);
         event.register(KeyBindings.SWITCH_CHAIN_MINING_KEY);
         event.register(KeyBindings.SWITCH_ENHANCED_CHAIN_MINING_KEY);
+        event.register(KeyBindings.SWITCH_MODE_WHEEL_KEY);
     }
 }

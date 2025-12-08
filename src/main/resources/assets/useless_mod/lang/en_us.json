@@ -93,5 +93,15 @@
   "tooltip.useless_mod.chain_mining_enhanced": "Enhanced Chain Mode",
   "tooltip.useless_mod.chain_mining_normal": "Normal Chain Mode",
   "tooltip.useless_mod.switch_enhanced_chain": "Toggle Enhanced Chain Mining: %s",
-  "tooltip.useless_mod.enhanced_chain_description": "Enhanced Chain Mining: Removes the adjacent-only limitation for chain mining"
+  "tooltip.useless_mod.enhanced_chain_description": "Enhanced Chain Mining: Removes the adjacent-only limitation for chain mining",
+  "tooltip.useless_mod.mek_configurator_mode": "Mode: Mekanism Configurator",
+  "text.useless_mod.mek_configurator": "Mekanism Configurator",
+  "tooltip.useless_mod.mek_configurator": "Can be used as a Mekanism Configurator",
+  "jei.useless_mod.catalyst_info": "Catalyst Parallel Info",
+  "item.useless_mod.possible_useful_ingot": "Possible Useful Ingot",
+  "item.useless_mod.useful_ingot": "Useful Ingot",
+  "item.useless_mod.metal_mold_plate": "Metal Mold (Plate)",
+  "item.useless_mod.metal_mold_rod": "Metal Mold (Rod)",
+  "item.useless_mod.metal_mold_gear": "Metal Mold (Gear)",
+  "item.useless_mod.metal_mold_wire": "Metal Mold (Wire)"
 }

@@ -30,7 +30,7 @@ import java.util.Map;
 public class AdvancedAlloyFurnaceRecipe implements Recipe<Container> {
     private final ResourceLocation id;
     private final List<Ingredient> inputItems;
-    private final List<Integer> inputItemCounts;
+    private final List<Long> inputItemCounts;
     private final FluidStack inputFluid;
     private final List<ItemStack> outputItems;
     private final FluidStack outputFluid;
@@ -43,7 +43,7 @@ public class AdvancedAlloyFurnaceRecipe implements Recipe<Container> {
     private final Ingredient mold;
 
     public AdvancedAlloyFurnaceRecipe(ResourceLocation id, List<Ingredient> inputItems,
-                                      List<Integer> inputItemCounts, FluidStack inputFluid,
+                                      List<Long> inputItemCounts, FluidStack inputFluid,
                                       List<ItemStack> outputItems, FluidStack outputFluid,
                                       int energy, int processTime) {
         this(id, inputItems, inputItemCounts, inputFluid, outputItems, outputFluid,
@@ -51,7 +51,7 @@ public class AdvancedAlloyFurnaceRecipe implements Recipe<Container> {
     }
 
     // 新增构造函数
-    public AdvancedAlloyFurnaceRecipe(ResourceLocation id, List<Ingredient> inputItems, List<Integer> inputItemCounts, 
+    public AdvancedAlloyFurnaceRecipe(ResourceLocation id, List<Ingredient> inputItems, List<Long> inputItemCounts, 
                                       FluidStack inputFluid, List<ItemStack> outputItems, FluidStack outputFluid,
                                       int energy, int processTime, Ingredient catalyst, int catalystCount, Ingredient mold) {
         this.id = id;
@@ -104,21 +104,21 @@ public class AdvancedAlloyFurnaceRecipe implements Recipe<Container> {
 
 
         // 为每个配方输入创建需求映射
-        Map<Ingredient, Integer> requiredItems = new HashMap<>();
+        Map<Ingredient, Long> requiredItems = new HashMap<>();
         for (int i = 0; i < inputItems.size(); i++) {
             requiredItems.put(inputItems.get(i), inputItemCounts.get(i));
         }
 
         // 尝试匹配所有要求的物品
-        for (Map.Entry<Ingredient, Integer> entry : requiredItems.entrySet()) {
+        for (Map.Entry<Ingredient, Long> entry : requiredItems.entrySet()) {
             Ingredient ingredient = entry.getKey();
-            int requiredCount = entry.getValue();
-            int foundCount = 0;
+            long requiredCount = entry.getValue();
+            long foundCount = 0;
 
             // 在所有可用物品中查找匹配
             for (ItemStack available : availableItems) {
                 if (!available.isEmpty() && ingredient.test(available)) {
-                    int takeAmount = Math.min(available.getCount(), requiredCount - foundCount);
+                    int takeAmount = (int) Math.min(available.getCount(), requiredCount - foundCount);
                     foundCount += takeAmount;
                     available.shrink(takeAmount);
 
@@ -237,14 +237,17 @@ public class AdvancedAlloyFurnaceRecipe implements Recipe<Container> {
         }
 
         // 修改：如果催化剂槽有物品且是有效的催化剂，就消耗催化剂，无论配方是否明确要求
-        if (!catalystSlot.isEmpty() && com.sorrowmist.useless.registry.CatalystManager.getCatalystParallel(catalystSlot) > 1) {
+        // 但有用的锭（USEFUL_INGOT）作为终极催化剂不会被消耗
+        String catalystId = net.minecraftforge.registries.ForgeRegistries.ITEMS.getKey(catalystSlot.getItem()).toString();
+        if (!catalystSlot.isEmpty() && com.sorrowmist.useless.registry.CatalystManager.getCatalystParallel(catalystSlot) > 1 &&
+            !catalystId.equals("useless_mod:useful_ingot")) {
             // 消耗一个催化剂
             catalystSlot.shrink(1);
             UselessMod.LOGGER.debug("Consumed 1 catalyst");
         }
 
         // 为每个配方输入创建消耗计数器，乘以并行数
-        int[] remainingToConsume = new int[inputItems.size()];
+        long[] remainingToConsume = new long[inputItems.size()];
         for (int i = 0; i < inputItems.size(); i++) {
             remainingToConsume[i] = inputItemCounts.get(i) * parallel;
             UselessMod.LOGGER.debug("Need to consume {} of ingredient {}", remainingToConsume[i], inputItems.get(i));
@@ -261,7 +264,7 @@ public class AdvancedAlloyFurnaceRecipe implements Recipe<Container> {
 
                 Ingredient ingredient = inputItems.get(ingredientIndex);
                 if (ingredient.test(slotStack)) {
-                    int consumeAmount = Math.min(slotStack.getCount(), remainingToConsume[ingredientIndex]);
+                    int consumeAmount = (int) Math.min(slotStack.getCount(), remainingToConsume[ingredientIndex]);
                     slotStack.shrink(consumeAmount);
                     remainingToConsume[ingredientIndex] -= consumeAmount;
 
@@ -297,7 +300,7 @@ public class AdvancedAlloyFurnaceRecipe implements Recipe<Container> {
 
     // Getters
     public List<Ingredient> getInputItems() { return inputItems; }
-    public List<Integer> getInputItemCounts() { return inputItemCounts; }
+    public List<Long> getInputItemCounts() { return inputItemCounts; }
     public FluidStack getInputFluid() { return inputFluid; }
     public List<ItemStack> getOutputItems() { return outputItems; }
     public FluidStack getOutputFluid() { return outputFluid; }
@@ -311,7 +314,7 @@ public class AdvancedAlloyFurnaceRecipe implements Recipe<Container> {
 
             // 解析输入物品
             List<Ingredient> inputItems = new ArrayList<>();
-            List<Integer> inputCounts = new ArrayList<>();
+            List<Long> inputCounts = new ArrayList<>();
 
             // 在 Serializer.fromJson 方法中修改这部分
             if (json.has("ingredients")) {
@@ -320,7 +323,7 @@ public class AdvancedAlloyFurnaceRecipe implements Recipe<Container> {
                     JsonObject ingredientObj = element.getAsJsonObject();
 
                     Ingredient ingredient;
-                    int count;
+                    long count;
 
                     // 检查是否存在嵌套的 ingredient 对象
                     if (ingredientObj.has("ingredient")) {
@@ -334,11 +337,11 @@ public class AdvancedAlloyFurnaceRecipe implements Recipe<Container> {
                             // 对象格式: {"ingredient": {"tag": "a"}, "count": N}
                             ingredient = Ingredient.fromJson(innerElement.getAsJsonObject());
                         }
-                        count = GsonHelper.getAsInt(ingredientObj, "count", 1);
+                        count = GsonHelper.getAsLong(ingredientObj, "count", 1L);
                     } else {
                         // 格式2: 直接是原料对象，count作为属性
                         ingredient = Ingredient.fromJson(ingredientObj);
-                        count = GsonHelper.getAsInt(ingredientObj, "count", 1);
+                        count = GsonHelper.getAsLong(ingredientObj, "count", 1L);
                     }
 
                     inputItems.add(ingredient);
@@ -430,11 +433,11 @@ public class AdvancedAlloyFurnaceRecipe implements Recipe<Container> {
         public AdvancedAlloyFurnaceRecipe fromNetwork(ResourceLocation recipeId, FriendlyByteBuf buffer) {
             int inputCount = buffer.readVarInt();
             List<Ingredient> inputItems = new ArrayList<>();
-            List<Integer> inputCounts = new ArrayList<>();
+            List<Long> inputCounts = new ArrayList<>();
 
             for (int i = 0; i < inputCount; i++) {
                 inputItems.add(Ingredient.fromNetwork(buffer));
-                inputCounts.add(buffer.readVarInt());
+                inputCounts.add(buffer.readVarLong());
             }
 
             FluidStack inputFluid = buffer.readFluidStack();
@@ -464,7 +467,7 @@ public class AdvancedAlloyFurnaceRecipe implements Recipe<Container> {
             buffer.writeVarInt(recipe.inputItems.size());
             for (int i = 0; i < recipe.inputItems.size(); i++) {
                 recipe.inputItems.get(i).toNetwork(buffer);
-                buffer.writeVarInt(recipe.inputItemCounts.get(i));
+                buffer.writeVarLong(recipe.inputItemCounts.get(i));
             }
 
             buffer.writeFluidStack(recipe.inputFluid);

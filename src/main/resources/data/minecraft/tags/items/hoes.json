@@ -1,6 +1,11 @@
 {
   "replace": false,
   "values": [
-    "useless_mod:endless_beaf_item"
+    "useless_mod:endless_beaf_item",
+    "useless_mod:endless_beaf_wrench",
+    "useless_mod:endless_beaf_screwdriver",
+    "useless_mod:endless_beaf_mallet",
+    "useless_mod:endless_beaf_crowbar",
+    "useless_mod:endless_beaf_hammer"
   ]
 }

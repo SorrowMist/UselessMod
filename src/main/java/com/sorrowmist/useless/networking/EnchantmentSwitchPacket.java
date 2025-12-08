@@ -31,19 +31,8 @@ public class EnchantmentSwitchPacket {
             if (player != null) {
                 ItemStack mainHandItem = player.getMainHandItem();
                 if (mainHandItem.getItem() instanceof EndlessBeafItem endlessBeaf) {
-                    // 保存当前的增强连锁模式和连锁挖掘状态
-                    boolean enhancedChainMining = endlessBeaf.isEnhancedChainMiningMode(mainHandItem);
-                    boolean chainMiningPressed = endlessBeaf.isChainMiningPressed(mainHandItem);
-                    
-                    // 切换附魔模式
-                    mainHandItem.getOrCreateTag().putBoolean("SilkTouchMode", switchToSilkTouch);
-                    
-                    // 更新实际的附魔NBT
-                    endlessBeaf.updateEnchantments(mainHandItem);
-                    
-                    // 恢复所有关键状态
-                    endlessBeaf.setEnhancedChainMiningMode(mainHandItem, enhancedChainMining);
-                    endlessBeaf.setChainMiningPressedState(mainHandItem, chainMiningPressed);
+                    // 使用专门的方法切换附魔模式，确保模式管理器状态和NBT标签一致
+                    endlessBeaf.switchEnchantmentMode(mainHandItem, switchToSilkTouch);
                     
                     if (switchToSilkTouch) {
                         player.displayClientMessage(Component.translatable("message.useless_mod.switched_to_silk_touch"), true);

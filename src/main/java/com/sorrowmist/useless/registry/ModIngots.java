@@ -48,4 +48,12 @@ public final class ModIngots {
 
     public static final RegistryObject<Item> USELESS_INGOT_TIER_9 = ITEMS.register("useless_ingot_tier_9",
             () -> new Item(new Item.Properties().rarity(LEGENDARY)));
+
+    // 新增：可能有用的锭，仅作为合成中间材料
+    public static final RegistryObject<Item> POSSIBLE_USEFUL_INGOT = ITEMS.register("possible_useful_ingot",
+            () -> new Item(new Item.Properties().rarity(LEGENDARY)));
+
+    // 新增：有用的锭，作为终极催化剂
+    public static final RegistryObject<Item> USEFUL_INGOT = ITEMS.register("useful_ingot",
+            () -> new Item(new Item.Properties().rarity(LEGENDARY)));
 }

@@ -31,13 +31,9 @@ public class HighStackSlot extends SlotItemHandler {
             return ItemStack.EMPTY;
         }
 
-        // 如果数量大于1，创建一个显示用的堆叠（数量为1，实际数量通过工具提示显示）
-        if (stack.getCount() > 1) {
-            ItemStack displayStack = stack.copy();
-            displayStack.setCount(1);
-            return displayStack;
-        }
-
-        return stack;
+        // 总是创建一个显示用的堆叠（数量为1，实际数量通过工具提示显示）
+        ItemStack displayStack = stack.copy();
+        displayStack.setCount(1);
+        return displayStack;
     }
 }

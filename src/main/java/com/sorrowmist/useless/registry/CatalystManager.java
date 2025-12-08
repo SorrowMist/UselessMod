@@ -21,6 +21,8 @@ public class CatalystManager {
         CATALYST_PARALLEL_MAP.put("useless_mod:useless_ingot_tier_7", 2187);
         CATALYST_PARALLEL_MAP.put("useless_mod:useless_ingot_tier_8", 6561);
         CATALYST_PARALLEL_MAP.put("useless_mod:useless_ingot_tier_9", 19683);
+        // 新增：有用的锭，无并行数上限
+        CATALYST_PARALLEL_MAP.put("useless_mod:useful_ingot", Integer.MAX_VALUE);
     }
 
     public static int getCatalystParallel(ItemStack stack) {
@@ -51,6 +53,8 @@ public class CatalystManager {
             case "useless_mod:useless_ingot_tier_7": return "七阶无用锭";
             case "useless_mod:useless_ingot_tier_8": return "八阶无用锭";
             case "useless_mod:useless_ingot_tier_9": return "九阶无用锭";
+            case "useless_mod:possible_useful_ingot": return "可能有用锭";
+            case "useless_mod:useful_ingot": return "有用锭";
             default: return "";
         }
     }
@@ -70,15 +74,23 @@ public class CatalystManager {
                 new ItemStack(ModIngots.USELESS_INGOT_TIER_6.get()),
                 new ItemStack(ModIngots.USELESS_INGOT_TIER_7.get()),
                 new ItemStack(ModIngots.USELESS_INGOT_TIER_8.get()),
-                new ItemStack(ModIngots.USELESS_INGOT_TIER_9.get())
+                new ItemStack(ModIngots.USELESS_INGOT_TIER_9.get()),
+                new ItemStack(ModIngots.USEFUL_INGOT.get()) // 添加有用锭
         };
 
         // 按照顺序添加催化剂信息
         for (ItemStack catalyst : orderedCatalysts) {
             int parallel = getCatalystParallel(catalyst);
             String catalystName = getCatalystName(catalyst);
-            list.add(Component.literal("• " + catalystName + ": " + parallel + "倍并行").withStyle(ChatFormatting.GREEN));
+            String parallelText = parallel == Integer.MAX_VALUE ? "无限" : String.valueOf(parallel);
+            list.add(Component.literal("• " + catalystName + ": " + parallelText + "倍并行").withStyle(ChatFormatting.GREEN));
         }
+        
+        // 添加有用的锭的特殊属性说明
+        list.add(Component.literal("• 有用锭特殊属性:").withStyle(ChatFormatting.GOLD));
+        list.add(Component.literal("  - 作为催化剂时不会被消耗").withStyle(ChatFormatting.AQUA));
+        list.add(Component.literal("  - 并行时能量消耗不会被倍增").withStyle(ChatFormatting.AQUA));
+        list.add(Component.literal("  - 没有并行数上限限制").withStyle(ChatFormatting.AQUA));
 
         return list;
     }

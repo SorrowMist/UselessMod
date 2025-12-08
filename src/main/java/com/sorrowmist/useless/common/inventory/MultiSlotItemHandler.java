@@ -30,14 +30,14 @@ public class MultiSlotItemHandler implements IItemHandlerModifiable {
         }
     }
 
-    public MultiSlotItemHandler setSlotCapacity(int slot, int capacity) {
+    public MultiSlotItemHandler setSlotCapacity(int slot, long capacity) {
         if (slot >= 0 && slot < slotCount) {
             this.slots[slot].setCapacity(capacity);
         }
         return this;
     }
 
-    public MultiSlotItemHandler setAllSlotCapacity(int capacity) {
+    public MultiSlotItemHandler setAllSlotCapacity(long capacity) {
         for (CustomItemStorage slot : slots) {
             slot.setCapacity(capacity);
         }
@@ -149,15 +149,15 @@ public class MultiSlotItemHandler implements IItemHandlerModifiable {
         return getStackInSlot(slot).isEmpty();
     }
 
-    public int getSlotStored(int slot) {
+    public long getSlotStored(int slot) {
         return slots[slot].getStored();
     }
 
-    public int getSlotCapacity(int slot) {
+    public long getSlotCapacity(int slot) {
         return slots[slot].getCapacity();
     }
 
-    public int getSlotSpace(int slot) {
+    public long getSlotSpace(int slot) {
         return slots[slot].getSpace();
     }
 }

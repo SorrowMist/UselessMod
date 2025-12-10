@@ -3,33 +3,33 @@
   "ingredients": [
     {
       "ingredient": {
-        "item": "minecraft:dragon_breath",
+        "item": "minecraft:dragon_breath"
+      },
         "count": 2
-      }
     },
     {
       "ingredient": {
-        "item": "minecraft:totem_of_undying",
+        "item": "minecraft:totem_of_undying"
+      },
         "count": 2
-      }
     },
     {
       "ingredient": {
-        "item": "minecraft:enchanted_golden_apple",
+        "item": "minecraft:enchanted_golden_apple"
+      },
         "count": 2
-      }
     },
     {
       "ingredient": {
-        "item": "minecraft:gold_block",
+        "item": "minecraft:gold_block"
+      },
         "count": 2
-      }
     },
     {
       "ingredient": {
-        "item": "minecraft:diamond_block",
+        "item": "minecraft:diamond_block"
+      },
         "count": 2
-      }
     }
   ],
   "catalyst": {

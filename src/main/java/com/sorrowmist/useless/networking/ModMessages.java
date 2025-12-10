@@ -40,6 +40,12 @@ public class ModMessages {
                 .encoder(ToolModeSwitchPacket::encode)
                 .consumerMainThread(ToolModeSwitchPacket::handle)
                 .add();
+        
+        net.messageBuilder(ForceMiningTogglePacket.class, id(), NetworkDirection.PLAY_TO_SERVER)
+                .decoder(ForceMiningTogglePacket::decode)
+                .encoder(ForceMiningTogglePacket::encode)
+                .consumerMainThread(ForceMiningTogglePacket::handle)
+                .add();
     }
 
     public static <MSG> void sendToServer(MSG message) {

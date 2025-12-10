@@ -3,33 +3,33 @@
   "ingredients": [
     {
       "ingredient": {
-        "item": "minecraft:turtle_helmet",
+        "item": "minecraft:turtle_helmet"
+      },
         "count": 2
-      }
     },
     {
       "ingredient": {
-        "item": "minecraft:goat_horn",
+        "item": "minecraft:goat_horn"
+      },
         "count": 2
-      }
     },
     {
       "ingredient": {
-        "item": "minecraft:rabbit_foot",
+        "item": "minecraft:rabbit_foot"
+      },
         "count": 2
-      }
     },
     {
       "ingredient": {
-        "item": "minecraft:diamond_block",
+        "item": "minecraft:diamond_block"
+      },
         "count": 2
-      }
     },
     {
       "ingredient": {
-        "item": "minecraft:netherite_block",
+        "item": "minecraft:netherite_block"
+      },
         "count": 2
-      }
     }
   ],
   "catalyst": {

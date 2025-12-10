@@ -69,8 +69,9 @@ public class OreGeneratorBlockEntity extends BlockEntity {
 
         TagKey<net.minecraft.world.item.Item> rawMaterialsTag = TagKey.create(ForgeRegistries.ITEMS.getRegistryKey(),ResourceLocation.fromNamespaceAndPath("forge", "raw_materials"));
         TagKey<net.minecraft.world.item.Item> oresTag = TagKey.create(ForgeRegistries.ITEMS.getRegistryKey(), ResourceLocation.fromNamespaceAndPath("forge", "ores"));
+        TagKey<net.minecraft.world.item.Item> GTTag = TagKey.create(ForgeRegistries.ITEMS.getRegistryKey(), ResourceLocation.fromNamespaceAndPath("gt", "raw_materials"));
 
-        return stack.is(rawMaterialsTag) || stack.is(oresTag);
+        return stack.is(rawMaterialsTag) || stack.is(oresTag) || stack.is(GTTag);
     }
 
     private boolean tryExportItem(ItemStack stack) {
@@ -81,6 +82,11 @@ public class OreGeneratorBlockEntity extends BlockEntity {
             BlockEntity adjacentBE = level.getBlockEntity(adjacentPos);
 
             if (adjacentBE != null) {
+                // 黑名单检查：跳过相邻的OreGeneratorBlockEntity，防止物品在矿石生成器之间无限循环
+                if (adjacentBE instanceof OreGeneratorBlockEntity) {
+                    continue;
+                }
+                
                 Optional<IItemHandler> handler = adjacentBE.getCapability(ForgeCapabilities.ITEM_HANDLER, direction.getOpposite()).resolve();
                 if (handler.isPresent()) {
                     IItemHandler targetHandler = handler.get();

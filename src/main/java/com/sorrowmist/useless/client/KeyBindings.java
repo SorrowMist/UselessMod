@@ -12,6 +12,7 @@ public class KeyBindings {
     public static final String KEY_SWITCH_CHAIN_MINING = "key.useless_mod.chain_mining";
     public static final String KEY_SWITCH_ENHANCED_CHAIN_MINING = "key.useless_mod.enhanced_chain_mining";
     public static final String KEY_SWITCH_MODE_WHEEL = "key.useless_mod.switch_mode_wheel";
+    public static final String KEY_SWITCH_FORCE_MINING = "key.useless_mod.force_mining";
 
     public static final KeyMapping SWITCH_SILK_TOUCH_KEY = new KeyMapping(KEY_SWITCH_SILK_TOUCH,
             KeyConflictContext.IN_GAME,
@@ -28,7 +29,7 @@ public class KeyBindings {
     public static final KeyMapping SWITCH_CHAIN_MINING_KEY = new KeyMapping(KEY_SWITCH_CHAIN_MINING,
             KeyConflictContext.IN_GAME,
             InputConstants.Type.KEYSYM,
-            GLFW.GLFW_KEY_KP_7,
+            GLFW.GLFW_KEY_TAB,
             KEY_CATEGORY_USELESS);
 
     public static final KeyMapping SWITCH_ENHANCED_CHAIN_MINING_KEY = new KeyMapping(KEY_SWITCH_ENHANCED_CHAIN_MINING,
@@ -41,6 +42,12 @@ public class KeyBindings {
             KeyConflictContext.IN_GAME,
             InputConstants.Type.KEYSYM,
             GLFW.GLFW_KEY_G,
+            KEY_CATEGORY_USELESS);
+    
+    public static final KeyMapping SWITCH_FORCE_MINING_KEY = new KeyMapping(KEY_SWITCH_FORCE_MINING,
+            KeyConflictContext.IN_GAME,
+            InputConstants.Type.KEYSYM,
+            GLFW.GLFW_KEY_KP_9,
             KEY_CATEGORY_USELESS);
     
     // 跟踪连锁挖掘按键的按下状态

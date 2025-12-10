@@ -181,24 +181,33 @@ public class AdvancedAlloyFurnaceMenu extends AbstractContainerMenu {
             // 从机器输出槽转移到玩家物品栏
             if (index >= MACHINE_OUTPUT_START && index <= MACHINE_OUTPUT_END) {
                 // 输出槽可以转移到玩家物品栏的任何位置
+                ItemStack originalStack = stackInSlot.copy();
                 if (!this.moveItemStackTo(stackInSlot, PLAYER_INVENTORY_START, PLAYER_HOTBAR_END + 1, true)) {
                     return ItemStack.EMPTY;
                 }
-                slot.onQuickCraft(stackInSlot, itemstack);
+                // 修复：根据转移后的剩余数量更新实际槽位
+                slot.set(stackInSlot);
+                slot.onQuickCraft(originalStack, itemstack);
             }
             // 从催化剂槽转移到玩家物品栏
             else if (index == CATALYST_SLOT) {
+                ItemStack originalStack = stackInSlot.copy();
                 if (!this.moveItemStackTo(stackInSlot, PLAYER_INVENTORY_START, PLAYER_HOTBAR_END + 1, true)) {
                     return ItemStack.EMPTY;
                 }
-                slot.onQuickCraft(stackInSlot, itemstack);
+                // 修复：根据转移后的剩余数量更新实际槽位
+                slot.set(stackInSlot);
+                slot.onQuickCraft(originalStack, itemstack);
             }
             // 从模具槽转移到玩家物品栏
             else if (index == MOLD_SLOT) {
+                ItemStack originalStack = stackInSlot.copy();
                 if (!this.moveItemStackTo(stackInSlot, PLAYER_INVENTORY_START, PLAYER_HOTBAR_END + 1, true)) {
                     return ItemStack.EMPTY;
                 }
-                slot.onQuickCraft(stackInSlot, itemstack);
+                // 修复：根据转移后的剩余数量更新实际槽位
+                slot.set(stackInSlot);
+                slot.onQuickCraft(originalStack, itemstack);
             }
             // 从机器输入槽转移到玩家物品栏
             else if (index >= MACHINE_INPUT_START && index <= MACHINE_INPUT_END) {

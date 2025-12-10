@@ -25,7 +25,9 @@ public enum ToolMode {
     // 铁锤模式
     HAMMER_MODE("hammer_mode", "tooltip.useless_mod.hammer_mode", 8),
     // Mekanism配置器模式
-    MEK_CONFIGURATOR("mek_configurator", "tooltip.useless_mod.mek_configurator_mode", 9);
+    MEK_CONFIGURATOR("mek_configurator", "tooltip.useless_mod.mek_configurator_mode", 9),
+    // 强制挖掘模式
+    FORCE_MINING("force_mining", "tooltip.useless_mod.force_mining_mode", 10);
     
     private final String name;
     private final String tooltipKey;

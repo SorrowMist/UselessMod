@@ -3,33 +3,33 @@
   "ingredients": [
     {
       "ingredient": {
-        "item": "minecraft:wither_skeleton_skull",
+        "item": "minecraft:wither_skeleton_skull"
+      },
         "count": 2
-      }
     },
     {
       "ingredient": {
-        "item": "minecraft:phantom_membrane",
+        "item": "minecraft:phantom_membrane"
+      },
         "count": 2
-      }
     },
     {
       "ingredient": {
-        "item": "minecraft:sea_lantern",
+        "item": "minecraft:sea_lantern"
+      },
         "count": 2
-      }
     },
     {
       "ingredient": {
-        "item": "minecraft:gold_block",
+        "item": "minecraft:gold_block"
+      },
         "count": 2
-      }
     },
     {
       "ingredient": {
-        "item": "minecraft:diamond_block",
+        "item": "minecraft:diamond_block"
+      },
         "count": 2
-      }
     }
   ],
   "catalyst": {

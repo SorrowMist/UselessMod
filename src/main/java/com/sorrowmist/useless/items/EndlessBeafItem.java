@@ -1,5 +1,29 @@
 package com.sorrowmist.useless.items;
 
+/*
+ * This file is based on Apotheosis.
+ * 
+ * Copyright (c) 2023 Brennan Ward
+ * 
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ * 
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ * 
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ */
+
 import com.sorrowmist.useless.UselessMod;
 import com.sorrowmist.useless.blocks.GlowPlasticBlock;
 import com.sorrowmist.useless.client.KeyBindings;
@@ -12,8 +36,6 @@ import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.IntTag;
-import net.minecraft.nbt.Tag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -36,6 +58,7 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.level.LevelAccessor;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.storage.loot.LootParams;
 import net.minecraft.world.level.storage.loot.parameters.LootContextParams;
@@ -43,9 +66,12 @@ import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.api.distmarker.OnlyIn;
+import net.minecraftforge.client.event.InputEvent;
 import net.minecraftforge.common.ToolAction;
 import net.minecraftforge.common.ToolActions;
+import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.event.entity.living.LivingDropsEvent;
+import net.minecraftforge.event.entity.player.PlayerInteractEvent;
 import net.minecraftforge.event.level.BlockEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
@@ -70,6 +96,11 @@ public class EndlessBeafItem extends PickaxeItem {
     // 按键状态跟踪
     private static final Map<UUID, Long> lastKeyPressTime = new HashMap<>();
 // 不再需要防抖动处理，已移除 防抖动超时时间
+    
+    // 强制挖掘模式相关
+    private static final Map<UUID, Long> miningStartTime = new HashMap<>(); // 跟踪玩家开始挖掘的时间
+    private static final Map<UUID, BlockPos> currentMiningPos = new HashMap<>(); // 跟踪玩家当前挖掘的方块位置
+    private static final long FORCE_MINING_THRESHOLD = 1000; // 强制挖掘阈值（毫秒）
     
 
 
@@ -148,11 +179,32 @@ public class EndlessBeafItem extends PickaxeItem {
         return modeManager.isModeActive(com.sorrowmist.useless.modes.ToolMode.ENHANCED_CHAIN_MINING);
     }
     
+    // 检查是否处于强制挖掘模式
+    public boolean isForceMiningMode(ItemStack stack) {
+        modeManager.loadFromStack(stack);
+        return modeManager.isModeActive(com.sorrowmist.useless.modes.ToolMode.FORCE_MINING);
+    }
+    
+    // 切换强制挖掘模式
+    public boolean toggleForceMiningMode(ItemStack stack) {
+        modeManager.loadFromStack(stack);
+        modeManager.toggleMode(com.sorrowmist.useless.modes.ToolMode.FORCE_MINING);
+        modeManager.saveToStack(stack);
+        return modeManager.isModeActive(com.sorrowmist.useless.modes.ToolMode.FORCE_MINING);
+    }
+    
     // 处理增强连锁模式切换按键
     private void handleEnhancedChainMiningKey(ItemStack stack, Player player) {
         // 发送数据包到服务器，由服务器处理增强连锁模式切换
         // 客户端不再直接修改状态，而是等待服务器的响应
         com.sorrowmist.useless.networking.ModMessages.sendToServer(new com.sorrowmist.useless.networking.EnhancedChainMiningTogglePacket());
+    }
+    
+    // 处理强制挖掘模式切换按键
+    private void handleForceMiningKey(ItemStack stack, Player player) {
+        // 发送数据包到服务器，由服务器处理强制挖掘模式切换
+        // 客户端不再直接修改状态，而是等待服务器的响应
+        com.sorrowmist.useless.networking.ModMessages.sendToServer(new com.sorrowmist.useless.networking.ForceMiningTogglePacket());
     }
 
     // 更新实际的附魔NBT
@@ -167,7 +219,8 @@ public class EndlessBeafItem extends PickaxeItem {
         
         // 获取现有的所有附魔
         Map<Enchantment, Integer> enchantments = new HashMap<>(EnchantmentHelper.getEnchantments(stack));
-        enchantments.put(Enchantments.MOB_LOOTING, 10);
+        // 使用配置中的抢夺等级
+        enchantments.put(Enchantments.MOB_LOOTING, ConfigManager.getLootingLevel());
 
         if (silkTouchMode) {
             // 精准采集模式
@@ -178,8 +231,8 @@ public class EndlessBeafItem extends PickaxeItem {
         } else {
             // 时运模式
             enchantments.remove(Enchantments.SILK_TOUCH); // 移除精准采集
-            // 确保有时运，使用最高等级（最低10级）
-            int fortuneLevel = Math.max(10, enchantments.getOrDefault(Enchantments.BLOCK_FORTUNE, 0));
+            // 确保有时运，使用配置中的等级
+            int fortuneLevel = Math.max(ConfigManager.getFortuneLevel(), enchantments.getOrDefault(Enchantments.BLOCK_FORTUNE, 0));
             enchantments.put(Enchantments.BLOCK_FORTUNE, fortuneLevel);
         }
 
@@ -345,7 +398,7 @@ public class EndlessBeafItem extends PickaxeItem {
             int fortuneLevel = EnchantmentHelper.getTagEnchantmentLevel(Enchantments.BLOCK_FORTUNE, stack);
             if (fortuneLevel > 0) {
                 tooltip.add(Component.translatable("tooltip.useless_mod.fortune_level", fortuneLevel).withStyle(ChatFormatting.GREEN));
-                if (fortuneLevel > 10) {
+                if (fortuneLevel > ConfigManager.getFortuneLevel()) {
                     tooltip.add(Component.translatable("tooltip.useless_mod.external_enchantment").withStyle(ChatFormatting.RED));
                 }
             }
@@ -355,13 +408,18 @@ public class EndlessBeafItem extends PickaxeItem {
         
         // 增强连锁模式提示
         tooltip.add(Component.literal(isEnhancedChainMiningMode(stack) ? "增强连锁模式: 已开启" : "增强连锁模式: 已关闭").withStyle(isEnhancedChainMiningMode(stack) ? ChatFormatting.BLUE : ChatFormatting.GRAY));
+        
+        // 强制挖掘模式提示
+        tooltip.add(Component.literal(isForceMiningMode(stack) ? "强制挖掘模式: 已开启" : "强制挖掘模式: 已关闭").withStyle(isForceMiningMode(stack) ? ChatFormatting.RED : ChatFormatting.GRAY));
 
         // 功能提示 - 动态显示按键绑定
         // 尝试获取实际按键绑定（仅在客户端）
         String silkTouchKey = "Page Down";
         String fortuneKey = "Page Up";
-        String chainMiningKey = "Numpad 7";
+        String chainMiningKey = "Tab";
         String enhancedChainMiningKey = "Numpad 8";
+        String forceMiningKey = "Numpad 9";
+        String modeWheelKey = "G";
         
         try {
             // 获取精准采集/时运切换按键
@@ -376,6 +434,13 @@ public class EndlessBeafItem extends PickaxeItem {
 
             // 获取增强连锁模式切换按键
             enhancedChainMiningKey = KeyBindings.SWITCH_ENHANCED_CHAIN_MINING_KEY.getTranslatedKeyMessage().getString();
+            
+            // 获取强制挖掘模式切换按键
+            forceMiningKey = KeyBindings.SWITCH_FORCE_MINING_KEY.getTranslatedKeyMessage().getString();
+            
+            // 获取模式选择轮盘按键
+            KeyMapping modeWheelMapping = KeyBindings.SWITCH_MODE_WHEEL_KEY;
+            modeWheelKey = modeWheelMapping.getTranslatedKeyMessage().getString();
         } catch (Exception e) {
             // 如果获取失败，使用默认按键名称
         }
@@ -384,7 +449,9 @@ public class EndlessBeafItem extends PickaxeItem {
         tooltip.add(Component.translatable("tooltip.useless_mod.switch_enchantment").withStyle(ChatFormatting.LIGHT_PURPLE));
         tooltip.add(Component.literal("按住 " + chainMiningKey + "开启连锁挖掘").withStyle(ChatFormatting.LIGHT_PURPLE));
         tooltip.add(Component.literal("按下 " + enhancedChainMiningKey + "切换增强连锁挖掘").withStyle(ChatFormatting.LIGHT_PURPLE));
-        tooltip.add(Component.translatable("tooltip.useless_mod.wrench_function").withStyle(ChatFormatting.YELLOW));
+        tooltip.add(Component.literal("按下 " + forceMiningKey + "切换强制挖掘模式").withStyle(ChatFormatting.LIGHT_PURPLE));
+        tooltip.add(Component.literal("可作为扳手使用（兼容其他模组）").withStyle(ChatFormatting.YELLOW));
+        tooltip.add(Component.literal("按下 " + modeWheelKey + " 打开模式选择界面").withStyle(ChatFormatting.YELLOW));
         tooltip.add(Component.translatable("tooltip.useless_mod.fast_break_plastic").withStyle(ChatFormatting.GREEN));
         tooltip.add(Component.translatable("tooltip.useless_mod.festive_affix").withStyle(ChatFormatting.BLUE));
         tooltip.add(Component.translatable("tooltip.useless_mod.auto_collect").withStyle(ChatFormatting.GREEN)); // 新增提示
@@ -616,6 +683,21 @@ public class EndlessBeafItem extends PickaxeItem {
                 endlessBeaf.onBlockBreak(event, mainHandItem, player);
             }
         }
+        
+        @SubscribeEvent
+        public static void onLeftClickBlock(PlayerInteractEvent.LeftClickBlock event) {
+            // 获取触发事件的玩家
+            Player player = event.getEntity();
+            if (player == null) return;
+            
+            ItemStack mainHandItem = player.getMainHandItem();
+            
+            // 检查主手物品是否是EndlessBeafItem
+            if (mainHandItem.getItem() instanceof EndlessBeafItem endlessBeaf) {
+                // 处理左键点击事件，用于跟踪强制挖掘
+                endlessBeaf.onLeftClickBlock(event, mainHandItem, player);
+            }
+        }
 
         @OnlyIn(Dist.CLIENT)
         @SubscribeEvent
@@ -633,6 +715,115 @@ public class EndlessBeafItem extends PickaxeItem {
                     // 处理增强模式切换按键逻辑
                     endlessBeaf.handleEnhancedChainMiningKey(mainHandItem, player);
                 }
+            }
+            
+            // 检查强制挖掘模式切换按键（数字键9）
+            while (KeyBindings.SWITCH_FORCE_MINING_KEY.consumeClick()) {
+                ItemStack mainHandItem = player.getMainHandItem();
+                if (mainHandItem.getItem() instanceof EndlessBeafItem endlessBeaf) {
+                    // 处理强制挖掘模式切换按键逻辑
+                    endlessBeaf.handleForceMiningKey(mainHandItem, player);
+                }
+            }
+        }
+        
+        @OnlyIn(Dist.CLIENT)
+        @SubscribeEvent
+        public static void onMouseButton(InputEvent.MouseButton event) {
+            // 只处理左键事件
+            if (event.getButton() != 0) {
+                return;
+            }
+            
+            Minecraft minecraft = Minecraft.getInstance();
+            Player player = minecraft.player;
+            if (player == null) {
+                return;
+            }
+            
+            ItemStack mainHandItem = player.getMainHandItem();
+            if (!(mainHandItem.getItem() instanceof EndlessBeafItem endlessBeaf)) {
+                return;
+            }
+            
+            // 检查是否处于强制挖掘模式
+            if (!endlessBeaf.isForceMiningMode(mainHandItem)) {
+                return;
+            }
+            
+            // 获取玩家视线内的方块
+            double reachDistance = 4.5D; // 1.20.1中的默认交互范围
+            net.minecraft.world.phys.HitResult hitResult = player.pick(reachDistance, 0.0F, false);
+            
+            UUID playerId = player.getUUID();
+            long currentTime = System.currentTimeMillis();
+            
+            if (event.getAction() == org.lwjgl.glfw.GLFW.GLFW_PRESS) {
+                // 左键按下，开始计时
+                if (hitResult.getType() == net.minecraft.world.phys.HitResult.Type.BLOCK) {
+                    net.minecraft.world.phys.BlockHitResult blockHitResult = (net.minecraft.world.phys.BlockHitResult) hitResult;
+                    BlockPos hitPos = blockHitResult.getBlockPos();
+                    miningStartTime.put(playerId, currentTime);
+                    currentMiningPos.put(playerId, hitPos);
+                }
+            } else if (event.getAction() == org.lwjgl.glfw.GLFW.GLFW_RELEASE) {
+                // 左键松开，重置计时
+                miningStartTime.remove(playerId);
+                currentMiningPos.remove(playerId);
+            }
+        }
+        
+        @SubscribeEvent
+        public static void onPlayerTick(TickEvent.PlayerTickEvent event) {
+            // 只在服务器端执行
+            if (event.player.level().isClientSide()) {
+                return;
+            }
+            
+            // 只在tick结束时执行
+            if (event.phase != TickEvent.Phase.END) {
+                return;
+            }
+            
+            Player player = event.player;
+            ItemStack mainHandItem = player.getMainHandItem();
+            
+            // 检查主手物品是否是EndlessBeafItem
+            if (!(mainHandItem.getItem() instanceof EndlessBeafItem endlessBeaf)) {
+                return;
+            }
+            
+            // 检查是否处于强制挖掘模式
+            if (!endlessBeaf.isForceMiningMode(mainHandItem)) {
+                // 如果强制挖掘模式已关闭，清除挖掘状态
+                UUID playerId = player.getUUID();
+                miningStartTime.remove(playerId);
+                currentMiningPos.remove(playerId);
+                return;
+            }
+            
+            UUID playerId = player.getUUID();
+            long currentTime = System.currentTimeMillis();
+            
+            // 检查是否正在挖掘方块
+            // 由于Forge没有直接获取玩家正在挖掘的方块的API，我们需要使用之前记录的位置
+            BlockPos miningPos = currentMiningPos.get(playerId);
+            if (miningPos == null) {
+                return;
+            }
+            
+            // 检查是否持续挖掘同一个方块超过1秒
+            Long startTime = miningStartTime.get(playerId);
+            
+            if (startTime != null && currentTime - startTime >= FORCE_MINING_THRESHOLD) {
+                Level level = player.level();
+                BlockState state = level.getBlockState(miningPos);
+                
+                // 执行强制挖掘
+                BlockEvent.BreakEvent breakEvent = new BlockEvent.BreakEvent(
+                        level, miningPos, state, player
+                );
+                endlessBeaf.performForceMining(breakEvent, level, miningPos, state, player, mainHandItem);
             }
         }
     }
@@ -683,6 +874,34 @@ public class EndlessBeafItem extends PickaxeItem {
         }
     }
 
+    // 处理玩家左键点击方块事件（用于强制挖掘）
+    public void onLeftClickBlock(PlayerInteractEvent.LeftClickBlock event, ItemStack stack, Player player) {
+        // 确保我们在服务器端
+        if (event.getLevel().isClientSide()) {
+            return;
+        }
+        
+        // 检查是否处于强制挖掘模式
+        if (!isForceMiningMode(stack)) {
+            return;
+        }
+        
+        LevelAccessor levelAccessor = event.getLevel();
+        BlockPos pos = event.getPos();
+        
+        // 检查点击的方块是否存在（不是空气）
+        if (levelAccessor.isEmptyBlock(pos)) {
+            // 点击的是空气，说明原方块已经被破坏，重置挖掘状态
+            UUID playerId = player.getUUID();
+            miningStartTime.remove(playerId);
+            currentMiningPos.remove(playerId);
+            return;
+        }
+        
+        // 计时逻辑已经移到鼠标按钮事件中，这里只需要处理服务器端的逻辑
+        // 服务器端的计时和强制挖掘由PlayerTickEvent处理
+    }
+    
     // 处理方块破坏事件的方法 - 新增功能
     public void onBlockBreak(BlockEvent.BreakEvent event, ItemStack stack, Player player) {
         // 修复：创造模式下不处理自动收集
@@ -697,6 +916,28 @@ public class EndlessBeafItem extends PickaxeItem {
         // 确保我们在服务器端并且 LevelAccessor 可以转换为 Level
         if (levelAccessor.isClientSide() || !(levelAccessor instanceof Level level)) {
             return;
+        }
+        
+        // 处理强制挖掘模式
+        if (isForceMiningMode(stack)) {
+            UUID playerId = player.getUUID();
+            long currentTime = System.currentTimeMillis();
+            
+            // 检查是否是同一个方块
+            BlockPos lastPos = currentMiningPos.getOrDefault(playerId, null);
+            if (lastPos == null || !lastPos.equals(pos)) {
+                // 新的挖掘目标，重置时间
+                miningStartTime.put(playerId, currentTime);
+                currentMiningPos.put(playerId, pos);
+            } else {
+                // 同一个方块，检查挖掘时间
+                long startTime = miningStartTime.getOrDefault(playerId, currentTime);
+                if (currentTime - startTime >= FORCE_MINING_THRESHOLD) {
+                    // 超过阈值，执行强制挖掘
+                    performForceMining(event, level, pos, state, player, stack);
+                    return;
+                }
+            }
         }
 
         // 检查是否应该执行连锁挖掘
@@ -720,6 +961,139 @@ public class EndlessBeafItem extends PickaxeItem {
 
             // 对于能正常获取掉落物的方块，使用自动收集逻辑
             handleNormalBlockBreak(event, level, pos, state, player, stack, drops);
+        }
+    }
+    
+    // 执行强制挖掘
+    private void performForceMining(BlockEvent.BreakEvent event, Level level, BlockPos pos, BlockState state, Player player, ItemStack stack) {
+        UUID playerId = player.getUUID();
+        
+        try {
+            // 特殊处理混沌水晶：绕过击败混沌龙检查
+            boolean isChaosCrystal = false;
+            try {
+                // 使用反射检查并处理混沌水晶
+                Class<?> chaosCrystalClass = Class.forName("com.brandon3055.draconicevolution.blocks.ChaosCrystal");
+                Class<?> tileChaosCrystalClass = Class.forName("com.brandon3055.draconicevolution.blocks.tileentity.TileChaosCrystal");
+                
+                // 检查当前方块是否是混沌水晶
+                if (chaosCrystalClass.isInstance(state.getBlock())) {
+                    isChaosCrystal = true;
+                    // 获取方块实体
+                    BlockEntity tileEntity = level.getBlockEntity(pos);
+                    if (tileChaosCrystalClass.isInstance(tileEntity)) {
+                        // 直接调用setDefeated方法，这会正确设置guardianDefeated并触发状态更新
+                        try {
+                            java.lang.reflect.Method setDefeatedMethod = tileChaosCrystalClass.getMethod("setDefeated");
+                            setDefeatedMethod.invoke(tileEntity);
+                        } catch (Exception e) {
+                            // 如果setDefeated方法不可用，尝试直接设置字段
+                            java.lang.reflect.Field guardianDefeatedField = tileChaosCrystalClass.getDeclaredField("guardianDefeated");
+                            guardianDefeatedField.setAccessible(true);
+                            Object managedBool = guardianDefeatedField.get(tileEntity);
+                            
+                            Class<?> managedBoolClass = managedBool.getClass();
+                            java.lang.reflect.Method setMethod = managedBoolClass.getMethod("set", boolean.class);
+                            setMethod.invoke(managedBool, true);
+                        }
+                        
+                        // 调用tick方法确保状态更新
+                        java.lang.reflect.Method tickMethod = tileChaosCrystalClass.getMethod("tick");
+                        tickMethod.invoke(tileEntity);
+                    }
+                }
+            } catch (Exception e) {
+                // 如果Draconic Evolution模组没有安装，忽略此处理
+            }
+            
+            // 如果是混沌水晶，直接生成掉落物并破坏方块，绕过detonate方法的重生逻辑
+            if (isChaosCrystal) {
+                try {
+                    // 获取DEConfig.chaosDropCount的值
+                    Class<?> deConfigClass = Class.forName("com.brandon3055.draconicevolution.DEConfig");
+                    java.lang.reflect.Field chaosDropCountField = deConfigClass.getDeclaredField("chaosDropCount");
+                    chaosDropCountField.setAccessible(true);
+                    int chaosDropCount = chaosDropCountField.getInt(null);
+                    
+                    // 获取DEContent.CHAOS_SHARD
+                    Class<?> deContentClass = Class.forName("com.brandon3055.draconicevolution.init.DEContent");
+                    java.lang.reflect.Field chaosShardField = deContentClass.getDeclaredField("CHAOS_SHARD");
+                    chaosShardField.setAccessible(true);
+                    Object chaosShardObject = chaosShardField.get(null);
+                    
+                    // 确保CHAOS_SHARD是一个RegistryObject
+                    Class<?> registryObjectClass = Class.forName("net.minecraftforge.registries.RegistryObject");
+                    if (registryObjectClass.isInstance(chaosShardObject)) {
+                        // 调用get方法获取实际物品
+                        java.lang.reflect.Method getMethod = registryObjectClass.getMethod("get");
+                        Object chaosShardItem = getMethod.invoke(chaosShardObject);
+                        
+                        // 创建掉落物
+                        ItemStack chaosShardStack = new ItemStack((net.minecraft.world.item.Item) chaosShardItem, chaosDropCount);
+                        
+                        // 直接掉落物品
+                        Block.popResource(level, pos, chaosShardStack);
+                        
+                        // 清除周围的水晶部分
+                        level.setBlock(pos.above(), Blocks.AIR.defaultBlockState(), 3);
+                        level.setBlock(pos.above(2), Blocks.AIR.defaultBlockState(), 3);
+                        level.setBlock(pos.below(), Blocks.AIR.defaultBlockState(), 3);
+                        level.setBlock(pos.below(2), Blocks.AIR.defaultBlockState(), 3);
+                        
+                        // 直接设置方块为空气，绕过onRemove方法的detonate调用
+                        level.setBlock(pos, Blocks.AIR.defaultBlockState(), 3);
+                        
+                        // 播放破坏音效
+                        playBreakSoundWithCooldown(level, pos, state, player);
+                        
+                        // 清除挖掘状态
+                        miningStartTime.remove(playerId);
+                        currentMiningPos.remove(playerId);
+                        
+                        return;
+                    }
+                } catch (Exception e) {
+                    // 如果任何步骤失败，回退到正常的强制挖掘逻辑
+                }
+            }
+            
+            // 1. 尝试获取方块的掉落物（使用正常逻辑，包括战利品表和时运）
+            List<ItemStack> drops = getBlockDrops(state, level, pos, player, stack);
+            
+            // 2. 如果没有有效的掉落物，强制掉落一个方块
+            if (drops == null || drops.isEmpty() || hasInvalidDrops(drops)) {
+                // 强制掉落一个目标方块
+                ItemStack forcedDrop = new ItemStack(state.getBlock().asItem(), 1);
+                drops = Collections.singletonList(forcedDrop);
+            }
+            
+            // 3. 收集掉落物
+            boolean allCollected = true;
+            for (ItemStack drop : drops) {
+                if (!drop.isEmpty() && drop.getItem() != Items.AIR) {
+                    if (!addItemToPlayerInventory(player, drop.copy())) {
+                        // 如果背包满了，标记为未完全收集
+                        allCollected = false;
+                        // 掉落在玩家脚下
+                        ItemEntity itemEntity = new ItemEntity(level,
+                                player.getX(), player.getY(), player.getZ(),
+                                drop.copy());
+                        level.addFreshEntity(itemEntity);
+                    }
+                }
+            }
+            
+            // 4. 强制破坏方块
+            event.setCanceled(true);
+            level.setBlock(pos, Blocks.AIR.defaultBlockState(), 3);
+            
+            // 5. 播放破坏音效
+            playBreakSoundWithCooldown(level, pos, state, player);
+            
+        } finally {
+            // 清除挖掘时间跟踪
+            miningStartTime.remove(playerId);
+            currentMiningPos.remove(playerId);
         }
     }
     
@@ -1131,6 +1505,36 @@ public class EndlessBeafItem extends PickaxeItem {
                 MobEffectInstance yeshi = player.getEffect(MobEffects.NIGHT_VISION);
                 if (yeshi == null || (yeshi.getDuration() < 2000)) {
                     player.addEffect(new MobEffectInstance(MobEffects.NIGHT_VISION, 20000, 0, true, false, true));
+                }
+                
+                // 新增：给予抗火效果（不显示粒子，但显示图标）
+                MobEffectInstance kanghuo = player.getEffect(MobEffects.FIRE_RESISTANCE);
+                if (kanghuo == null || kanghuo.getDuration() < 200) {
+                    player.addEffect(new MobEffectInstance(MobEffects.FIRE_RESISTANCE, 2000, 0, true, false, true));
+                }
+                
+                // 新增：给予水下呼吸效果（不显示粒子，但显示图标）
+                MobEffectInstance shuixiabreath = player.getEffect(MobEffects.WATER_BREATHING);
+                if (shuixiabreath == null || shuixiabreath.getDuration() < 200) {
+                    player.addEffect(new MobEffectInstance(MobEffects.WATER_BREATHING, 2000, 0, true, false, true));
+                }
+                
+                // 新增：给予抗性提升效果（不显示粒子，但显示图标）
+                MobEffectInstance kangxing = player.getEffect(MobEffects.DAMAGE_RESISTANCE);
+                if (kangxing == null || kangxing.getDuration() < 200) {
+                    player.addEffect(new MobEffectInstance(MobEffects.DAMAGE_RESISTANCE, 2000, 5, true, false, true));
+                }
+                
+                
+                // 新增：当物品在玩家物品栏内允许飞行（无论游戏模式）
+                player.getAbilities().mayfly = true;
+                player.onUpdateAbilities();
+            } else {
+                // 物品不在物品栏时，对于非创造模式的玩家，关闭飞行权限
+                if (!player.isCreative()) {
+                    player.getAbilities().mayfly = false;
+                    player.getAbilities().flying = false;
+                    player.onUpdateAbilities();
                 }
             }
         }

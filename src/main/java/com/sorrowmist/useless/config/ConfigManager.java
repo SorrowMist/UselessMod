@@ -29,6 +29,9 @@ public class ConfigManager {
     public static final ForgeConfigSpec.IntValue CHAIN_MINING_RANGE_Y;
     public static final ForgeConfigSpec.IntValue CHAIN_MINING_RANGE_Z;
     public static final ForgeConfigSpec.IntValue CHAIN_MINING_MAX_BLOCKS;
+    // 牛排工具附魔等级配置
+    public static final ForgeConfigSpec.IntValue FORTUNE_LEVEL;
+    public static final ForgeConfigSpec.IntValue LOOTING_LEVEL;
 
     // Mekanism 升级配置
     public static final ForgeConfigSpec.IntValue TIME_MULTIPLIER;
@@ -68,14 +71,14 @@ public class ConfigManager {
 
         BOTANY_POT_GROWTH_MULTIPLIER = BUILDER
                 .comment("植物盆生长倍率 - 1.0为原版速度，2.0为2倍速度")
-                .defineInRange("植物盆生长倍率", 1, 1, Integer.MAX_VALUE);
+                .defineInRange("植物盆生长倍率（仅限非附属的植物盆）", 1, 1, Integer.MAX_VALUE);
 
         MATRIX_PATTERN_COUNT = BUILDER
                 .comment("矩阵样板槽位倍数 - 减少数量时请保持槽位空！否则可能会造成样板丢失")
                 .defineInRange("矩阵样板槽位倍数", 1, 1, 100);
 
         // 牛排工具连锁挖掘配置
-        BUILDER.push("牛排工具连锁挖掘设置");
+        BUILDER.push("牛排工具设置");
 
         CHAIN_MINING_RANGE_X = BUILDER
                 .comment("连锁挖掘的X轴范围半径")
@@ -87,11 +90,20 @@ public class ConfigManager {
 
         CHAIN_MINING_RANGE_Z = BUILDER
                 .comment("连锁挖掘的Z轴范围半径")
-                .defineInRange("连锁挖掘Z轴范围", 8, 1, 32);
+                .defineInRange("连锁挖掘Z轴范围", 8, 1, 255);
         
         CHAIN_MINING_MAX_BLOCKS = BUILDER
                 .comment("连锁挖掘的最大方块数量")
                 .defineInRange("连锁挖掘最大方块数量", 1000, 1, 10000);
+
+        // 牛排工具附魔等级配置
+        FORTUNE_LEVEL = BUILDER
+                .comment("牛排工具时运附魔等级")
+                .defineInRange("牛排工具时运等级", 10, 1, 127);
+
+        LOOTING_LEVEL = BUILDER
+                .comment("牛排工具抢夺附魔等级")
+                .defineInRange("牛排工具抢夺等级", 10, 1, 127);
 
         BUILDER.pop();
 
@@ -227,6 +239,15 @@ public class ConfigManager {
 
     public static int getChainMiningRangeZ() {
         return CHAIN_MINING_RANGE_Z.get();
+    }
+    
+    // 获取牛排工具附魔等级配置
+    public static int getFortuneLevel() {
+        return FORTUNE_LEVEL.get();
+    }
+    
+    public static int getLootingLevel() {
+        return LOOTING_LEVEL.get();
     }
 
 

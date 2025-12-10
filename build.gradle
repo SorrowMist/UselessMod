@@ -188,6 +188,7 @@ dependencies {
     implementation fg.deobf("curse.maven:Kotlin-for-Forge-4.11.0-351264:5402061") // Kotlin for Forge 4.11.0
     implementation fg.deobf("curse.maven:mob_grinding_utils-1.20.1-1.1.0-254241:5131447") // mob_grinding_utils-1.20.1-1.1.0
     implementation fg.deobf("curse.maven:biggerstacks-1.20.1-1.0.4-all-564896:6458432") // biggerstacks-1.20.1-1.0.4-all
+    implementation fg.deobf("curse.maven:SkyBreaker-1.20.1-1.0.8-1109012:6645990") // SkyBreaker-1.20.1-1.0.8
 
 
 

@@ -3,33 +3,33 @@
   "ingredients": [
     {
       "ingredient": {
-        "item": "minecraft:dragon_head",
+        "item": "minecraft:dragon_head"
+      },
         "count": 2
-      }
     },
     {
       "ingredient": {
-        "item": "minecraft:echo_shard",
+        "item": "minecraft:echo_shard"
+      },
         "count": 2
-      }
     },
     {
       "ingredient": {
-        "item": "minecraft:conduit",
+        "item": "minecraft:conduit"
+      },
         "count": 2
-      }
     },
     {
       "ingredient": {
-        "item": "minecraft:diamond_block",
+        "item": "minecraft:diamond_block"
+      },
         "count": 2
-      }
     },
     {
       "ingredient": {
-        "item": "minecraft:netherite_ingot",
+        "item": "minecraft:netherite_ingot"
+      },
         "count": 2
-      }
     }
   ],
   "catalyst": {

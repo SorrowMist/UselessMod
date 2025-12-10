@@ -3,33 +3,33 @@
   "ingredients": [
     {
       "ingredient": {
-        "item": "minecraft:ender_pearl",
+        "item": "minecraft:ender_pearl"
+      },
         "count": 2
-      }
     },
     {
       "ingredient": {
-        "item": "minecraft:chorus_fruit",
+        "item": "minecraft:chorus_fruit"
+      },
         "count": 2
-      }
     },
     {
       "ingredient": {
-        "item": "minecraft:shulker_shell",
+        "item": "minecraft:shulker_shell"
+      },
         "count": 2
-      }
     },
     {
       "ingredient": {
-        "item": "minecraft:gold_block",
+        "item": "minecraft:gold_block"
+      },
         "count": 2
-      }
     },
     {
       "ingredient": {
-        "item": "minecraft:diamond_block",
+        "item": "minecraft:diamond_block"
+      },
         "count": 2
-      }
     }
   ],
   "catalyst": {

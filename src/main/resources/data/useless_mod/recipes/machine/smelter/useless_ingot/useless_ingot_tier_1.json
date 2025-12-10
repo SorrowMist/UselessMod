@@ -3,39 +3,39 @@
   "ingredients": [
     {
       "ingredient": {
-        "item": "minecraft:mutton",
+        "item": "minecraft:mutton"
+      },
         "count": 2
-      }
     },
     {
       "ingredient": {
-        "item": "minecraft:beef",
+        "item": "minecraft:beef"
+      },
         "count": 2
-      }
     },
     {
       "ingredient": {
-        "item": "minecraft:chicken",
+        "item": "minecraft:chicken"
+      },
         "count": 2
-      }
     },
     {
       "ingredient": {
-        "item": "minecraft:iron_ingot",
+        "item": "minecraft:iron_ingot"
+      },
         "count": 2
-      }
     },
     {
       "ingredient": {
-        "item": "minecraft:gold_ingot",
+        "item": "minecraft:gold_ingot"
+      },
         "count": 2
-      }
     },
     {
       "ingredient": {
-        "item": "minecraft:diamond",
-        "count": 1
-      }
+        "item": "minecraft:diamond"
+      },
+        "count": 2
     }
   ],
   "results": [

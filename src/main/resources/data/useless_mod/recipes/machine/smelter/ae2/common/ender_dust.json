@@ -1,0 +1,44 @@
+{
+  "type": "forge:conditional",
+  "recipes": [
+    {
+      "conditions": [
+        {
+          "type": "forge:mod_loaded",
+          "modid": "ae2"
+        }
+      ],
+      "recipe": {
+        "type": "useless_mod:advanced_alloy_furnace",
+        "ingredients": [
+          {
+            "ingredient": [
+              {
+                "tag": "forge:gems/ender_pearl"
+              },
+              {
+                "tag": "forge:ender_pearls"
+              }
+            ],
+            "count": 64
+          }
+        ],
+        "mold": {
+          "item": "ae2:certus_quartz_cutting_knife"
+        },
+        "catalyst": {
+          "tag": "useless_mod:useless_ingots",
+          "count": 1
+        },
+        "results": [
+          {
+            "item": "ae2:ender_dust",
+            "count": 64
+          }
+        ],
+        "energy": 10000,
+        "process_time": 40
+      }
+    }
+  ]
+}

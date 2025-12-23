@@ -1,0 +1,122 @@
+package com.sorrowmist.useless.compat.emi;
+
+import com.sorrowmist.useless.UselessMod;
+import com.sorrowmist.useless.blocks.advancedalloyfurnace.AdvancedAlloyFurnaceBlock;
+import com.sorrowmist.useless.recipes.ModRecipeTypes;
+import com.sorrowmist.useless.registry.ModIngots;
+import dev.emi.emi.api.EmiEntrypoint;
+import dev.emi.emi.api.EmiPlugin;
+import dev.emi.emi.api.EmiRegistry;
+import dev.emi.emi.api.stack.EmiStack;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.crafting.RecipeManager;
+
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
+import java.util.Objects;
+
+// 只有在EMI存在时才会被加载
+@EmiEntrypoint
+public class EMIPlugin implements EmiPlugin {
+    @Override
+    public void register(EmiRegistry registry) {
+        // 注册配方类别
+        registry.addCategory(new AdvancedAlloyFurnaceRecipeCategory());
+        registry.addCategory(new CatalystInfoCategory());
+
+        RecipeManager recipeManager = Objects.requireNonNull(registry.getRecipeManager());
+
+        // 获取所有高级合金炉配方
+        List<com.sorrowmist.useless.recipes.advancedalloyfurnace.AdvancedAlloyFurnaceRecipe> recipes = new ArrayList<>();
+        recipes.addAll(recipeManager.getAllRecipesFor(ModRecipeTypes.ADVANCED_ALLOY_FURNACE_TYPE.get()));
+        
+        // 添加所有原版熔炉配方，转换为高级合金炉配方格式
+        Collection<net.minecraft.world.item.crafting.SmeltingRecipe> smeltingRecipes = recipeManager.getAllRecipesFor(
+                net.minecraft.world.item.crafting.RecipeType.SMELTING
+        );
+        
+        for (net.minecraft.world.item.crafting.SmeltingRecipe recipe : smeltingRecipes) {
+            // 将原版熔炉配方转换为高级合金炉配方
+            List<net.minecraft.world.item.crafting.Ingredient> smeltingIngredients = recipe.getIngredients();
+            List<net.minecraft.world.item.crafting.Ingredient> inputIngredients = new ArrayList<>();
+            List<Integer> inputCounts = new ArrayList<>();
+            
+            for (net.minecraft.world.item.crafting.Ingredient ingredient : smeltingIngredients) {
+                inputIngredients.add(ingredient);
+                inputCounts.add(1);
+            }
+            
+            List<ItemStack> outputItems = new ArrayList<>();
+            outputItems.add(recipe.getResultItem(null));
+            
+            net.minecraftforge.fluids.FluidStack emptyFluid = net.minecraftforge.fluids.FluidStack.EMPTY;
+            net.minecraft.world.item.crafting.Ingredient furnaceIngredient = net.minecraft.world.item.crafting.Ingredient.of(net.minecraft.world.item.Items.FURNACE);
+            
+            // 创建无用锭标签的催化剂，允许使用所有无用锭
+            net.minecraft.tags.TagKey<net.minecraft.world.item.Item> uselessIngotTag = 
+                    net.minecraft.tags.TagKey.create(
+                            net.minecraft.core.registries.Registries.ITEM,
+                            new net.minecraft.resources.ResourceLocation("useless_mod", "useless_ingots")
+                    );
+            net.minecraft.world.item.crafting.Ingredient uselessIngotCatalyst = net.minecraft.world.item.crafting.Ingredient.of(uselessIngotTag);
+            
+            // 将List<Integer>转换为List<Long>
+            List<Long> longInputCounts = new ArrayList<>();
+            for (Integer count : inputCounts) {
+                longInputCounts.add(count.longValue());
+            }
+            
+            // 创建临时的高级合金炉配方，使用原版熔炉作为模具
+            com.sorrowmist.useless.recipes.advancedalloyfurnace.AdvancedAlloyFurnaceRecipe convertedRecipe = new com.sorrowmist.useless.recipes.advancedalloyfurnace.AdvancedAlloyFurnaceRecipe(
+                    recipe.getId(),
+                    inputIngredients,
+                    longInputCounts,
+                    emptyFluid,
+                    outputItems,
+                    emptyFluid,
+                    1000, // 能量消耗
+                    40, // 处理时间：熔炉配方为40tick
+                    uselessIngotCatalyst, // 催化剂：无用锭标签
+                    1, // 催化剂数量
+                    furnaceIngredient // 模具：原版熔炉
+            );
+            
+            recipes.add(convertedRecipe);
+        }
+
+        // 注册高级合金炉配方
+        for (var recipe : recipes) {
+            registry.addRecipe(new AdvancedAlloyFurnaceEmiRecipe(recipe));
+        }
+
+        // 注册催化剂信息
+        registry.addRecipe(new CatalystInfoEmiRecipe());
+
+        // 注册配方催化剂
+        registry.addWorkstation(AdvancedAlloyFurnaceRecipeCategory.CATEGORY,
+                EmiStack.of(new ItemStack(AdvancedAlloyFurnaceBlock.ADVANCED_ALLOY_FURNACE_BLOCK.get())));
+        registry.addWorkstation(CatalystInfoCategory.CATEGORY,
+                EmiStack.of(new ItemStack(AdvancedAlloyFurnaceBlock.ADVANCED_ALLOY_FURNACE_BLOCK.get())));
+
+        // 添加各个等级的催化剂作为配方催化剂
+        registry.addWorkstation(CatalystInfoCategory.CATEGORY,
+                EmiStack.of(new ItemStack(ModIngots.USELESS_INGOT_TIER_1.get())));
+        registry.addWorkstation(CatalystInfoCategory.CATEGORY,
+                EmiStack.of(new ItemStack(ModIngots.USELESS_INGOT_TIER_2.get())));
+        registry.addWorkstation(CatalystInfoCategory.CATEGORY,
+                EmiStack.of(new ItemStack(ModIngots.USELESS_INGOT_TIER_3.get())));
+        registry.addWorkstation(CatalystInfoCategory.CATEGORY,
+                EmiStack.of(new ItemStack(ModIngots.USELESS_INGOT_TIER_4.get())));
+        registry.addWorkstation(CatalystInfoCategory.CATEGORY,
+                EmiStack.of(new ItemStack(ModIngots.USELESS_INGOT_TIER_5.get())));
+        registry.addWorkstation(CatalystInfoCategory.CATEGORY,
+                EmiStack.of(new ItemStack(ModIngots.USELESS_INGOT_TIER_6.get())));
+        registry.addWorkstation(CatalystInfoCategory.CATEGORY,
+                EmiStack.of(new ItemStack(ModIngots.USELESS_INGOT_TIER_7.get())));
+        registry.addWorkstation(CatalystInfoCategory.CATEGORY,
+                EmiStack.of(new ItemStack(ModIngots.USELESS_INGOT_TIER_8.get())));
+        registry.addWorkstation(CatalystInfoCategory.CATEGORY,
+                EmiStack.of(new ItemStack(ModIngots.USELESS_INGOT_TIER_9.get())));
+    }
+}

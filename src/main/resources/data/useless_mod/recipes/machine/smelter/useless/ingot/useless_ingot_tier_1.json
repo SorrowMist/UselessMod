@@ -1,0 +1,49 @@
+{
+  "type": "useless_mod:advanced_alloy_furnace",
+  "ingredients": [
+    {
+      "ingredient": {
+        "item": "minecraft:mutton"
+      },
+        "count": 2
+    },
+    {
+      "ingredient": {
+        "item": "minecraft:beef"
+      },
+        "count": 2
+    },
+    {
+      "ingredient": {
+        "item": "minecraft:chicken"
+      },
+        "count": 2
+    },
+    {
+      "ingredient": {
+        "item": "minecraft:iron_ingot"
+      },
+        "count": 2
+    },
+    {
+      "ingredient": {
+        "item": "minecraft:gold_ingot"
+      },
+        "count": 2
+    },
+    {
+      "ingredient": {
+        "item": "minecraft:diamond"
+      },
+        "count": 2
+    }
+  ],
+  "results": [
+    {
+      "item": "useless_mod:useless_ingot_tier_1",
+      "count": 1
+    }
+  ],
+  "energy": 10000,
+  "process_time": 1
+}

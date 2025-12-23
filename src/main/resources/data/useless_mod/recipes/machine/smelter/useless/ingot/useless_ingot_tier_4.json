@@ -1,0 +1,47 @@
+{
+  "type": "useless_mod:advanced_alloy_furnace",
+  "ingredients": [
+    {
+      "ingredient": {
+        "item": "minecraft:ender_pearl"
+      },
+        "count": 2
+    },
+    {
+      "ingredient": {
+        "item": "minecraft:chorus_fruit"
+      },
+        "count": 2
+    },
+    {
+      "ingredient": {
+        "item": "minecraft:shulker_shell"
+      },
+        "count": 2
+    },
+    {
+      "ingredient": {
+        "item": "minecraft:gold_block"
+      },
+        "count": 2
+    },
+    {
+      "ingredient": {
+        "item": "minecraft:diamond_block"
+      },
+        "count": 2
+    }
+  ],
+  "catalyst": {
+    "item": "useless_mod:useless_ingot_tier_3",
+    "count": 1
+  },
+  "results": [
+    {
+      "item": "useless_mod:useless_ingot_tier_4",
+      "count": 1
+    }
+  ],
+  "energy": 200000,
+  "process_time": 1
+}

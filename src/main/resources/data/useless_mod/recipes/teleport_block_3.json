@@ -1,0 +1,20 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    "BBB",
+    "AAA",
+    "BBB"
+  ],
+  "key": {
+    "B": {
+      "tag": "minecraft:planks"
+    },
+    "A": {
+      "item": "minecraft:dirt"
+    }
+  },
+  "result": {
+    "item": "useless_mod:teleport_block_3",
+    "count": 1
+  }
+}

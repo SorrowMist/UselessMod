@@ -1,0 +1,32 @@
+{
+  "type": "useless_mod:advanced_alloy_furnace",
+  "ingredients": [
+    {
+      "ingredient": {
+        "item": "useless_mod:useless_glass_tier_4"
+      },
+      "count": 2
+    },
+    {
+      "ingredient": {
+        "item": "useless_mod:useless_ingot_tier_5"
+      },
+      "count": 1
+    }
+  ],
+  "mold": {
+    "tag": "forge:glass_panes"
+  },
+  "catalyst": {
+        "tag": "useless_mod:useless_ingots",
+        "count": 1
+      },
+  "results": [
+    {
+      "item": "useless_mod:useless_glass_tier_5",
+      "count": 1
+    }
+  ],
+  "energy": 1000,
+  "process_time": 40
+}

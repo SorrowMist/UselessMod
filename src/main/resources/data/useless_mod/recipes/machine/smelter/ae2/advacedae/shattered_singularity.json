@@ -1,0 +1,55 @@
+{
+  "type": "forge:conditional",
+  "recipes": [
+    {
+      "conditions": [
+        {
+          "type": "forge:mod_loaded",
+          "modid": "advanced_ae"
+        }
+      ],
+      "recipe": {
+        "type": "useless_mod:advanced_alloy_furnace",
+        "ingredients": [
+          {
+            "ingredient": {
+              "item": "ae2:singularity"
+            },
+            "count": 64
+          },
+          {
+            "ingredient": {
+              "tag": "forge:dusts/ender_pearl"
+            },
+            "count": 128
+          },
+          {
+            "ingredient": {
+              "item": "ae2:sky_dust"
+            },
+            "count": 64
+          }
+        ],
+        "mold": {
+          "item": "ae2:inscriber"
+        },
+        "catalyst": {
+          "tag": "useless_mod:useless_ingots",
+          "count": 1
+        },
+        "input_fluid": {
+          "fluid": "minecraft:lava",
+          "amount": 64000
+        },
+        "results": [
+          {
+            "item": "advanced_ae:shattered_singularity",
+            "count": 64
+          }
+        ],
+        "energy": 10000,
+        "process_time": 40
+      }
+    }
+  ]
+}

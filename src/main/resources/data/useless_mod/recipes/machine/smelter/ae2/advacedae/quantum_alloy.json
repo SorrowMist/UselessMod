@@ -1,0 +1,55 @@
+{
+  "type": "forge:conditional",
+  "recipes": [
+    {
+      "conditions": [
+        {
+          "type": "forge:mod_loaded",
+          "modid": "advanced_ae"
+        }
+      ],
+      "recipe": {
+        "type": "useless_mod:advanced_alloy_furnace",
+        "ingredients": [
+          {
+            "ingredient": {
+              "tag": "forge:ingots/copper"
+            },
+            "count": 256
+          },
+          {
+            "ingredient": {
+              "item": "advanced_ae:shattered_singularity"
+            },
+            "count": 256
+          },
+          {
+            "ingredient": {
+              "item": "ae2:singularity"
+            },
+            "count": 256
+          }
+        ],
+        "mold": {
+          "item": "ae2:inscriber"
+        },
+        "catalyst": {
+          "tag": "useless_mod:useless_ingots",
+          "count": 1
+        },
+        "input_fluid": {
+          "fluid": "advanced_ae:quantum_infusion_source",
+          "amount": 64000
+        },
+        "results": [
+          {
+            "item": "advanced_ae:quantum_alloy",
+            "count": 64
+          }
+        ],
+        "energy": 10000,
+        "process_time": 40
+      }
+    }
+  ]
+}

@@ -1,0 +1,26 @@
+{
+  "type": "useless_mod:advanced_alloy_furnace",
+  "ingredients": [
+    {
+      "ingredient": {
+        "item": "useless_mod:useless_ingot_tier_6"
+      },
+      "count": 4
+    }
+  ],
+  "mold": {
+    "item": "useless_mod:metal_mold_gear"
+  },
+        "catalyst": {
+          "tag": "useless_mod:useless_ingots",
+          "count": 1
+        },
+  "results": [
+    {
+      "item": "useless_mod:useless_gear_tier_6",
+      "count": 1
+    }
+  ],
+  "energy": 1000,
+  "process_time": 40
+}

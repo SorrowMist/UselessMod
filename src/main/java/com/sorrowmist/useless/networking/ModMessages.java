@@ -46,6 +46,31 @@ public class ModMessages {
                 .encoder(ForceMiningTogglePacket::encode)
                 .consumerMainThread(ForceMiningTogglePacket::handle)
                 .add();
+
+        net.messageBuilder(TriggerForceMiningPacket.class, id(), NetworkDirection.PLAY_TO_SERVER)
+                .decoder(TriggerForceMiningPacket::decode)
+                .encoder(TriggerForceMiningPacket::encode)
+                .consumerMainThread(TriggerForceMiningPacket::handle)
+                .add();
+
+        net.messageBuilder(SetMasterPatternPacket.class, id(), NetworkDirection.PLAY_TO_SERVER)
+                .decoder(SetMasterPatternPacket::decode)
+                .encoder(SetMasterPatternPacket::encode)
+                .consumerMainThread(SetMasterPatternPacket::handle)
+                .add();
+
+        net.messageBuilder(SetSlavePatternPacket.class, id(), NetworkDirection.PLAY_TO_SERVER)
+                .decoder(SetSlavePatternPacket::decode)
+                .encoder(SetSlavePatternPacket::encode)
+                .consumerMainThread(SetSlavePatternPacket::handle)
+                .add();
+
+        net.messageBuilder(ResetMasterPatternPacket.class, id(), NetworkDirection.PLAY_TO_SERVER)
+                .decoder(ResetMasterPatternPacket::decode)
+                .encoder(ResetMasterPatternPacket::encode)
+                .consumerMainThread(ResetMasterPatternPacket::handle)
+                .add();
+
     }
 
     public static <MSG> void sendToServer(MSG message) {

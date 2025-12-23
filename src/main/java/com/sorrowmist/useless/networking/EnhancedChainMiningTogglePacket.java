@@ -25,10 +25,24 @@ public class EnhancedChainMiningTogglePacket {
         context.get().enqueueWork(() -> {
             ServerPlayer player = context.get().getSender();
             if (player != null) {
+                // 检查主手和副手物品
                 ItemStack mainHandItem = player.getMainHandItem();
-                if (mainHandItem.getItem() instanceof EndlessBeafItem endlessBeaf) {
+                ItemStack offHandItem = player.getOffhandItem();
+                
+                ItemStack targetItem = null;
+                
+                // 检查主手
+                if (mainHandItem.getItem() instanceof EndlessBeafItem) {
+                    targetItem = mainHandItem;
+                } 
+                // 检查副手
+                else if (offHandItem.getItem() instanceof EndlessBeafItem) {
+                    targetItem = offHandItem;
+                }
+                
+                if (targetItem != null && targetItem.getItem() instanceof EndlessBeafItem endlessBeaf) {
                     // 在服务端切换增强连锁模式
-                    boolean newMode = endlessBeaf.toggleEnhancedChainMiningMode(mainHandItem);
+                    boolean newMode = endlessBeaf.toggleEnhancedChainMiningMode(targetItem);
                     
                     // 发送消息给玩家（只在服务端发送，确保一致性）
                     String messageKey = newMode ? "message.useless_mod.enhanced_chain_on" : "message.useless_mod.enhanced_chain_off";

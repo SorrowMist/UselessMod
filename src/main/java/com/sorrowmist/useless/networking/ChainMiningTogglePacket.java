@@ -27,16 +27,30 @@ public class ChainMiningTogglePacket {
         context.get().enqueueWork(() -> {
             ServerPlayer player = context.get().getSender();
             if (player != null) {
+                // 检查主手和副手物品
                 ItemStack mainHandItem = player.getMainHandItem();
-                if (mainHandItem.getItem() instanceof EndlessBeafItem endlessBeaf) {
+                ItemStack offHandItem = player.getOffhandItem();
+                
+                ItemStack targetItem = null;
+                
+                // 检查主手
+                if (mainHandItem.getItem() instanceof EndlessBeafItem) {
+                    targetItem = mainHandItem;
+                } 
+                // 检查副手
+                else if (offHandItem.getItem() instanceof EndlessBeafItem) {
+                    targetItem = offHandItem;
+                }
+                
+                if (targetItem != null && targetItem.getItem() instanceof EndlessBeafItem endlessBeaf) {
                     // 保存当前的增强连锁模式状态
-                    boolean enhancedChainMining = endlessBeaf.isEnhancedChainMiningMode(mainHandItem);
+                    boolean enhancedChainMining = endlessBeaf.isEnhancedChainMiningMode(targetItem);
                     
                     // 在服务端设置连锁挖掘的临时状态
-                    endlessBeaf.setChainMiningPressedState(mainHandItem, packet.isPressed);
+                    endlessBeaf.setChainMiningPressedState(targetItem, packet.isPressed);
                     
                     // 确保增强连锁模式状态被保留
-                    endlessBeaf.setEnhancedChainMiningMode(mainHandItem, enhancedChainMining);
+                    endlessBeaf.setEnhancedChainMiningMode(targetItem, enhancedChainMining);
                 }
             }
         });

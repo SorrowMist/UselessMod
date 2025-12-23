@@ -212,9 +212,13 @@ public class AdvancedAlloyFurnaceMenu extends AbstractContainerMenu {
             // 从机器输入槽转移到玩家物品栏
             else if (index >= MACHINE_INPUT_START && index <= MACHINE_INPUT_END) {
                 // 输入槽转移到玩家物品栏的任何位置
+                ItemStack originalStack = stackInSlot.copy();
                 if (!this.moveItemStackTo(stackInSlot, PLAYER_INVENTORY_START, PLAYER_HOTBAR_END + 1, true)) {
                     return ItemStack.EMPTY;
                 }
+                // 修复：根据转移后的剩余数量更新实际槽位
+                slot.set(stackInSlot);
+                slot.onQuickCraft(originalStack, itemstack);
             }
             // 从玩家物品栏转移到机器
             else if (index >= PLAYER_INVENTORY_START && index <= PLAYER_HOTBAR_END) {
@@ -291,13 +295,18 @@ public class AdvancedAlloyFurnaceMenu extends AbstractContainerMenu {
                     int j = itemstack.getCount() + stack.getCount();
 
                     if (j <= maxStackSize) {
-                        stack.setCount(0);
+                        // 将所有物品堆叠到已有物品上
                         itemstack.setCount(j);
+                        stack.setCount(0);
+                        slot.set(itemstack); // 修复：必须调用set方法来更新槽位
                         slot.setChanged();
                         flag = true;
                     } else if (itemstack.getCount() < maxStackSize) {
-                        stack.shrink(maxStackSize - itemstack.getCount());
+                        // 只堆叠部分物品到已有物品上
+                        int transferAmount = maxStackSize - itemstack.getCount();
                         itemstack.setCount(maxStackSize);
+                        stack.shrink(transferAmount);
+                        slot.set(itemstack); // 修复：必须调用set方法来更新槽位
                         slot.setChanged();
                         flag = true;
                     }

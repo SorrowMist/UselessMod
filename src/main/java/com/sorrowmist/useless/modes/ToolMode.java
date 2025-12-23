@@ -24,10 +24,12 @@ public enum ToolMode {
     CROWBAR_MODE("crowbar_mode", "tooltip.useless_mod.crowbar_mode", 7),
     // 铁锤模式
     HAMMER_MODE("hammer_mode", "tooltip.useless_mod.hammer_mode", 8),
-    // Mekanism配置器模式
-    MEK_CONFIGURATOR("mek_configurator", "tooltip.useless_mod.mek_configurator_mode", 9),
+    // Omnitool模式
+    OMNITOOL_MODE("omnitool_mode", "tooltip.useless_mod.omnitool_mode", 9),
     // 强制挖掘模式
-    FORCE_MINING("force_mining", "tooltip.useless_mod.force_mining_mode", 10);
+    FORCE_MINING("force_mining", "tooltip.useless_mod.force_mining_mode", 10),
+    // AE存储优先模式
+    AE_STORAGE_PRIORITY("ae_storage_priority", "tooltip.useless_mod.ae_storage_priority_mode", 11);
     
     private final String name;
     private final String tooltipKey;

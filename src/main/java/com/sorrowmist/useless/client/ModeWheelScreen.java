@@ -39,12 +39,12 @@ public class ModeWheelScreen extends Screen {
         for (ToolMode mode : ToolMode.values()) {
             if (mode != ToolMode.CHAIN_MINING) {
                 // 检查是否是MEK_CONFIGURATOR模式，如果是，添加兼容性检查
-                if (mode == ToolMode.MEK_CONFIGURATOR) {
-                    net.minecraft.resources.ResourceLocation configuratorId = new net.minecraft.resources.ResourceLocation("mekanism:configurator");
-                    if (net.minecraftforge.registries.ForgeRegistries.ITEMS.containsKey(configuratorId)) {
-                        buttonCount++;
-                    }
-                } else {
+                if (mode == ToolMode.OMNITOOL_MODE) {
+                net.minecraft.resources.ResourceLocation omnitoolId = new net.minecraft.resources.ResourceLocation("omnitools:omni_wrench");
+                if (net.minecraftforge.registries.ForgeRegistries.ITEMS.containsKey(omnitoolId)) {
+                    buttonCount++;
+                }
+            } else {
                     buttonCount++;
                 }
             }
@@ -67,11 +67,11 @@ public class ModeWheelScreen extends Screen {
         int buttonIndex = 0;
         for (ToolMode mode : ToolMode.values()) {
             if (mode != ToolMode.CHAIN_MINING) {
-                // 检查是否是MEK_CONFIGURATOR模式，如果是，添加兼容性检查
+                // 检查是否是OMNITOOL_MODE模式，如果是，添加兼容性检查
                 boolean shouldAddButton = true;
-                if (mode == ToolMode.MEK_CONFIGURATOR) {
-                    net.minecraft.resources.ResourceLocation configuratorId = new net.minecraft.resources.ResourceLocation("mekanism:configurator");
-                    shouldAddButton = net.minecraftforge.registries.ForgeRegistries.ITEMS.containsKey(configuratorId);
+                if (mode == ToolMode.OMNITOOL_MODE) {
+                    net.minecraft.resources.ResourceLocation omnitoolId = new net.minecraft.resources.ResourceLocation("omnitools:omni_wrench");
+                    shouldAddButton = net.minecraftforge.registries.ForgeRegistries.ITEMS.containsKey(omnitoolId);
                 }
                 
                 if (shouldAddButton) {
@@ -163,11 +163,11 @@ public class ModeWheelScreen extends Screen {
         int buttonIndex = 0;
         for (ToolMode mode : ToolMode.values()) {
             if (mode != ToolMode.CHAIN_MINING) {
-                // 检查是否是MEK_CONFIGURATOR模式，如果是，添加兼容性检查
+                // 检查是否是OMNITOOL_MODE模式，如果是，添加兼容性检查
                 boolean shouldUpdateButton = true;
-                if (mode == ToolMode.MEK_CONFIGURATOR) {
-                    net.minecraft.resources.ResourceLocation configuratorId = new net.minecraft.resources.ResourceLocation("mekanism:configurator");
-                    shouldUpdateButton = net.minecraftforge.registries.ForgeRegistries.ITEMS.containsKey(configuratorId);
+                if (mode == ToolMode.OMNITOOL_MODE) {
+                    net.minecraft.resources.ResourceLocation omnitoolId = new net.minecraft.resources.ResourceLocation("omnitools:omni_wrench");
+                    shouldUpdateButton = net.minecraftforge.registries.ForgeRegistries.ITEMS.containsKey(omnitoolId);
                 }
                 
                 if (shouldUpdateButton) {

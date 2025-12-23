@@ -36,6 +36,7 @@ import net.minecraftforge.fluids.FluidStack;
 import net.minecraftforge.fluids.capability.IFluidHandler;
 import net.minecraftforge.fluids.capability.templates.FluidTank;
 import net.minecraftforge.items.IItemHandler;
+import net.minecraftforge.items.IItemHandlerModifiable;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -234,8 +235,8 @@ public class AdvancedAlloyFurnaceBlockEntity extends BlockEntity implements Menu
                 boolean isMetalMold = MoldIdentifier.isMetalMold(stack);
 
                 if (slot < 6) {
-                    // 输入槽（0-5）不能接受无用锭和模具
-                    return !isUselessIngot && !isMetalMold;
+                    // 输入槽（0-5）可以接受无用锭，但不能接受模具
+                    return !isMetalMold;
                     // 输入槽可以接受其他有效输入物品
                 } else if (slot >= 6 && slot < 12) {
                     // 输出槽（6-11）不能手动放置物品
@@ -1472,12 +1473,83 @@ public class AdvancedAlloyFurnaceBlockEntity extends BlockEntity implements Menu
             return lazyEnergyHandler.cast();
         }
         if (cap == ForgeCapabilities.ITEM_HANDLER) {
-            return lazyItemHandler.cast();
+            // 根据方向返回不同的物品处理器
+            if (side == Direction.DOWN) {
+                // 后方访问：只能访问催化剂槽（12）和模具槽（13）
+                return LazyOptional.of(() -> new DirectionalItemHandler(itemHandler, side)).cast();
+            } else {
+                // 非后方访问：只能访问输入槽（0-5）和输出槽（6-11）
+                return LazyOptional.of(() -> new DirectionalItemHandler(itemHandler, side)).cast();
+            }
         }
         if (cap == ForgeCapabilities.FLUID_HANDLER) {
             return lazyFluidHandler.cast();
         }
         return super.getCapability(cap, side);
+    }
+    
+    // 方向感知的物品处理器包装类
+    private class DirectionalItemHandler implements IItemHandlerModifiable {
+        private final MultiSlotItemHandler originalHandler;
+        private final Direction accessDirection;
+        
+        public DirectionalItemHandler(MultiSlotItemHandler originalHandler, Direction accessDirection) {
+            this.originalHandler = originalHandler;
+            this.accessDirection = accessDirection;
+        }
+        
+        @Override
+        public int getSlots() {
+            return originalHandler.getSlots();
+        }
+        
+        @Nonnull
+        @Override
+        public ItemStack getStackInSlot(int slot) {
+            return originalHandler.getStackInSlot(slot);
+        }
+        
+        @Nonnull
+        @Override
+        public ItemStack insertItem(int slot, @Nonnull ItemStack stack, boolean simulate) {
+            // 基于方向和槽位类型限制插入
+            if (accessDirection == Direction.DOWN) {
+                // 后方访问：只能插入催化剂槽（12）
+                if (slot == CATALYST_SLOT) {
+                    return originalHandler.insertItem(slot, stack, simulate);
+                }
+            } else {
+                // 非后方访问：只能插入输入槽（0-5）
+                if (slot < 6) {
+                    return originalHandler.insertItem(slot, stack, simulate);
+                }
+            }
+            // 不允许插入的情况，返回原物品
+            return stack;
+        }
+        
+        @Nonnull
+        @Override
+        public ItemStack extractItem(int slot, int amount, boolean simulate) {
+            // 提取不受方向限制
+            return originalHandler.extractItem(slot, amount, simulate);
+        }
+        
+        @Override
+        public int getSlotLimit(int slot) {
+            return originalHandler.getSlotLimit(slot);
+        }
+        
+        @Override
+        public boolean isItemValid(int slot, @Nonnull ItemStack stack) {
+            return originalHandler.isItemValid(slot, stack);
+        }
+        
+        @Override
+        public void setStackInSlot(int slot, @Nonnull ItemStack stack) {
+            // 转发设置操作到原始处理器
+            originalHandler.setStackInSlot(slot, stack);
+        }
     }
 
     @Override

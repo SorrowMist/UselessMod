@@ -101,7 +101,27 @@ public class MoldIdentifier {
      * @return 如果是可接受的标志物则返回true，否则返回false
      */
     public static boolean isAcceptableMarker(ItemStack stack) {
-        return isMetalMold(stack) || isMachineMarker(stack) || isVanillaFurnace(stack);
+        return isMetalMold(stack) || isMachineMarker(stack) || isVanillaFurnace(stack) || isVanillaGlassPane(stack);
+    }
+    
+    /**
+     * 检查物品是否为玻璃板（包括所有颜色变体）
+     * @param stack 要检查的物品堆叠
+     * @return 如果是玻璃板则返回true，否则返回false
+     */
+    public static boolean isVanillaGlassPane(ItemStack stack) {
+        if (stack.isEmpty()) return false;
+        
+        // 检查物品是否为原版无色玻璃板
+        if (stack.is(net.minecraft.world.item.Items.GLASS_PANE)) {
+            return true;
+        }
+        
+        // 检查物品是否为彩色玻璃板（通过注册表名称）
+        Item item = stack.getItem();
+        ResourceLocation registryName = ForgeRegistries.ITEMS.getKey(item);
+        
+        return registryName != null && registryName.getPath().contains("glass_pane");
     }
     
     /**
@@ -128,7 +148,8 @@ public class MoldIdentifier {
                registryName.getPath().contains("drive") || registryName.getPath().contains("crafting") ||
                registryName.getPath().contains("processor") || registryName.getPath().contains("import") ||
                registryName.getPath().contains("export") || registryName.getPath().contains("p2p") ||
-               registryName.getPath().contains("inscriber");
+               registryName.getPath().contains("inscriber") || registryName.getPath().contains("knife") ||
+               registryName.getPath().contains("charger");
     }
     
     /**

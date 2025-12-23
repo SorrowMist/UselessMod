@@ -12,7 +12,10 @@
     "defaultRequire": 1
   },
   "mixins": [
+    "AEBaseMenuMixin",
     "BlockTravelAnchorMixin",
+    "PatternAccessTermMenuMixin",
+    "WrenchHookMixin",
     "PatternSlotTrackerMixin",
     "TileAssemblerMatrixPatternMixin",
     "TileComponentEjectorMixin",
@@ -21,6 +24,8 @@
     "accessor.DelayAccessor",
     "botanypots.BlockEntityBotanyPotMixin",
     "botanypots.BotanyPotsForgeClientMixin",
+    "emi.EmiAgnosMixin",
+    "jei.ForgePluginFinderMixin",
     "mek.CachedRecipeMixin",
     "mek.DigitalMinerMixin",
     "mek.ElectricPumpMixin",

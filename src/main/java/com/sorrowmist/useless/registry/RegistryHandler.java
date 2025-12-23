@@ -8,6 +8,7 @@ import com.sorrowmist.useless.blocks.advancedalloyfurnace.AdvancedAlloyFurnaceBl
 import com.sorrowmist.useless.blocks.oregenerator.OreGeneratorBlock;
 import com.sorrowmist.useless.blocks.teleport.TeleportBlock;
 import com.sorrowmist.useless.blocks.teleport.TeleportBlock2;
+import com.sorrowmist.useless.blocks.teleport.TeleportBlock3;
 import com.sorrowmist.useless.inventories.UselessTab;
 import com.sorrowmist.useless.items.EndlessBeafItem;
 import com.sorrowmist.useless.recipes.ModRecipeSerializers;
@@ -15,6 +16,7 @@ import com.sorrowmist.useless.recipes.ModRecipeTypes;
 import com.sorrowmist.useless.utils.ThermalDependencyHelper;
 import com.sorrowmist.useless.worldgen.dimension.UselessDimension;
 import com.sorrowmist.useless.worldgen.dimension.UselessDimension2;
+import com.sorrowmist.useless.worldgen.dimension.UselessDimension3;
 import net.minecraftforge.eventbus.api.IEventBus;
 import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
 import net.minecraftforge.registries.DeferredRegister;
@@ -65,6 +67,8 @@ public class RegistryHandler {
         addRegistry(TeleportBlock.ITEMS);
         addRegistry(TeleportBlock2.BLOCKS);
         addRegistry(TeleportBlock2.ITEMS);
+        addRegistry(TeleportBlock3.BLOCKS);
+        addRegistry(TeleportBlock3.ITEMS);
         addRegistry(OreGeneratorBlock.BLOCKS);
         addRegistry(OreGeneratorBlock.ITEMS);
         addRegistry(GlowPlasticBlock.BLOCKS);
@@ -79,6 +83,7 @@ public class RegistryHandler {
         // 维度注册
         addRegistry(UselessDimension.CHUNK_GENERATORS);
         addRegistry(UselessDimension2.CHUNK_GENERATORS);
+        addRegistry(UselessDimension3.CHUNK_GENERATORS);
 
         // 菜单注册
         addRegistry(ModMenuTypes.MENUS);
@@ -87,6 +92,8 @@ public class RegistryHandler {
         addRegistry(ModIngots.ITEMS);
         // 添加金属模具的注册
         addRegistry(ModMolds.ITEMS);
+        // 添加齿轮和玻璃组件的注册
+        addRegistry(ModComponents.ITEMS);
 
 
 

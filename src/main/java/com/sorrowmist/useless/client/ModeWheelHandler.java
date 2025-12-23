@@ -25,12 +25,30 @@ public class ModeWheelHandler {
             return;
         }
         
-        // 检查主手物品是否是永恒牛排工具或包含我们NBT数据的Mekanism配置器
+        // 检查主手和副手物品是否是永恒牛排工具或包含我们NBT数据的Omnitool扳手
         ItemStack mainHandItem = minecraft.player.getMainHandItem();
-        net.minecraft.resources.ResourceLocation itemId = net.minecraftforge.registries.ForgeRegistries.ITEMS.getKey(mainHandItem.getItem());
-        if (!(mainHandItem.getItem() instanceof EndlessBeafItem) && 
-            !(itemId != null && itemId.toString().equals("mekanism:configurator") && 
-              mainHandItem.hasTag() && mainHandItem.getTag().contains("ToolModes"))) {
+        ItemStack offHandItem = minecraft.player.getOffhandItem();
+        
+        ItemStack targetItem = null;
+        
+        // 检查主手
+        net.minecraft.resources.ResourceLocation mainItemId = net.minecraftforge.registries.ForgeRegistries.ITEMS.getKey(mainHandItem.getItem());
+        if (mainHandItem.getItem() instanceof EndlessBeafItem || 
+            (mainItemId != null && mainItemId.toString().equals("omnitools:omni_wrench") && 
+             mainHandItem.hasTag() && mainHandItem.getTag().contains("ToolModes"))) {
+            targetItem = mainHandItem;
+        } 
+        // 检查副手
+        else {
+            net.minecraft.resources.ResourceLocation offItemId = net.minecraftforge.registries.ForgeRegistries.ITEMS.getKey(offHandItem.getItem());
+            if (offHandItem.getItem() instanceof EndlessBeafItem || 
+                (offItemId != null && offItemId.toString().equals("omnitools:omni_wrench") && 
+                 offHandItem.hasTag() && offHandItem.getTag().contains("ToolModes"))) {
+                targetItem = offHandItem;
+            }
+        }
+        
+        if (targetItem == null) {
             return;
         }
         
@@ -38,8 +56,8 @@ public class ModeWheelHandler {
         if (KeyBindings.SWITCH_MODE_WHEEL_KEY.consumeClick()) {
             // 显示模式轮盘屏幕
             ModeManager modeManager = new ModeManager();
-            modeManager.loadFromStack(mainHandItem);
-            ModeWheelScreen.show(modeManager, mainHandItem);
+            modeManager.loadFromStack(targetItem);
+            ModeWheelScreen.show(modeManager, targetItem);
         }
     }
 }

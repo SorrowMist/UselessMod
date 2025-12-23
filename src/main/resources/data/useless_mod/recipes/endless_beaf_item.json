@@ -16,30 +16,22 @@
       "item": "useless_mod:useless_ingot_tier_3"
     },
     "D": {
-      "type": "forge:partial_nbt",
-      "item": "minecraft:enchanted_book",
-      "nbt": "{StoredEnchantments:[{id:\"minecraft:silk_touch\",lvl:1}]}"
+      "item": "minecraft:diamond_pickaxe"
     },
     "E": {
       "item": "useless_mod:useless_ingot_tier_2"
     },
     "F": {
-      "type": "forge:partial_nbt",
-      "item": "minecraft:enchanted_book",
-      "nbt": "{StoredEnchantments:[{id:\"minecraft:fortune\",lvl:3}]}"
+      "item": "minecraft:netherite_pickaxe"
     },
     "G": {
       "item": "useless_mod:useless_ingot_tier_1"
     },
     "H": {
-      "type": "forge:partial_nbt",
-      "item": "minecraft:potion",
-      "nbt": "{Potion:\"minecraft:night_vision\"}"
+      "item": "minecraft:golden_carrot"
     },
     "I": {
-      "type": "forge:partial_nbt",
-      "item": "minecraft:potion",
-      "nbt": "{Potion:\"minecraft:regeneration\"}"
+      "item": "minecraft:ghast_tear"
     }
   },
   "result": {

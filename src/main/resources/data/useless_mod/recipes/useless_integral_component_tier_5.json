@@ -1,12 +1,21 @@
 {
   "type": "minecraft:crafting_shaped",
   "pattern": [
-    " # ",
-    "# #",
-    " # "
+    "#O#",
+    "GCG",
+    "#O#"
   ],
   "key": {
     "#": {
+      "item": "useless_mod:useless_ingot_tier_5"
+    },
+    "O": {
+      "item": "useless_mod:useless_glass_tier_5"
+    },
+    "G": {
+      "item": "useless_mod:useless_gear_tier_5"
+    },
+    "C": {
       "item": "useless_mod:useless_integral_component_tier_4"
     }
   },

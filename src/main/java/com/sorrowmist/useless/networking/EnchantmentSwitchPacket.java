@@ -29,10 +29,24 @@ public class EnchantmentSwitchPacket {
         context.enqueueWork(() -> {
             ServerPlayer player = context.getSender();
             if (player != null) {
+                // 检查主手和副手物品
                 ItemStack mainHandItem = player.getMainHandItem();
-                if (mainHandItem.getItem() instanceof EndlessBeafItem endlessBeaf) {
+                ItemStack offHandItem = player.getOffhandItem();
+                
+                ItemStack targetItem = null;
+                
+                // 检查主手
+                if (mainHandItem.getItem() instanceof EndlessBeafItem) {
+                    targetItem = mainHandItem;
+                } 
+                // 检查副手
+                else if (offHandItem.getItem() instanceof EndlessBeafItem) {
+                    targetItem = offHandItem;
+                }
+                
+                if (targetItem != null && targetItem.getItem() instanceof EndlessBeafItem endlessBeaf) {
                     // 使用专门的方法切换附魔模式，确保模式管理器状态和NBT标签一致
-                    endlessBeaf.switchEnchantmentMode(mainHandItem, switchToSilkTouch);
+                    endlessBeaf.switchEnchantmentMode(targetItem, switchToSilkTouch);
                     
                     if (switchToSilkTouch) {
                         player.displayClientMessage(Component.translatable("message.useless_mod.switched_to_silk_touch"), true);

@@ -189,7 +189,15 @@ dependencies {
     implementation fg.deobf("curse.maven:mob_grinding_utils-1.20.1-1.1.0-254241:5131447") // mob_grinding_utils-1.20.1-1.1.0
     implementation fg.deobf("curse.maven:biggerstacks-1.20.1-1.0.4-all-564896:6458432") // biggerstacks-1.20.1-1.0.4-all
     implementation fg.deobf("curse.maven:SkyBreaker-1.20.1-1.0.8-1109012:6645990") // SkyBreaker-1.20.1-1.0.8
-
+    implementation fg.deobf("curse.maven:omnitools-1.0.0-1401075:7314939") // omnitools-1.0.0
+    implementation fg.deobf("curse.maven:advancedae-1084104:7159779")//advancedae
+    implementation fg.deobf("curse.maven:geckolib-388172:7025129")//geckolib
+    // implementation fg.deobf("curse.maven:emi-580555:6420945")//emi
+    compileOnly fg.deobf("curse.maven:emi-580555:6420945")//emi
+    implementation fg.deobf("curse.maven:mega-cells-622112:6175008")//mega-cells
+    implementation fg.deobf("curse.maven:omni-cells-1359517:7169531")//omni-cells
+    implementation fg.deobf("curse.maven:applied-flux-965012:7072853")//applied-flux
+    implementation fg.deobf("curse.maven:cloth-config-348521:5729105")//cloth-config-5.1.48-forge
 
 
     //exendedae前置
@@ -197,7 +205,7 @@ dependencies {
     //extendedAE
     implementation fg.deobf("curse.maven:ex-pattern-provider-892005:7144417")
     //ae2
-    implementation fg.deobf("curse.maven:applied-energistics-2-223794:6629570")
+    implementation fg.deobf("curse.maven:applied-energistics-2-223794:7148487")
     implementation fg.deobf("curse.maven:guideme-1173950:7127447")
     //config
     implementation fg.deobf("curse.maven:configured-457570:5180900")

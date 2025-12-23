@@ -1,5 +1,4 @@
 package com.sorrowmist.useless.blocks;
-
 /*
  * This file is part of Mekanism.
  * 

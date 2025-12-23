@@ -1,12 +1,21 @@
 {
   "type": "minecraft:crafting_shaped",
   "pattern": [
-    " # ",
-    "# #",
-    " # "
+    "#O#",
+    "GCG",
+    "#O#"
   ],
   "key": {
     "#": {
+      "item": "useless_mod:useless_ingot_tier_1"
+    },
+    "O": {
+      "item": "useless_mod:useless_glass_tier_1"
+    },
+    "G": {
+      "item": "useless_mod:useless_gear_tier_1"
+    },
+    "C": {
       "item": "thermal:upgrade_augment_3"
     }
   },

@@ -13,6 +13,9 @@ public class KeyBindings {
     public static final String KEY_SWITCH_ENHANCED_CHAIN_MINING = "key.useless_mod.enhanced_chain_mining";
     public static final String KEY_SWITCH_MODE_WHEEL = "key.useless_mod.switch_mode_wheel";
     public static final String KEY_SWITCH_FORCE_MINING = "key.useless_mod.force_mining";
+    public static final String KEY_TRIGGER_FORCE_MINING = "key.useless_mod.trigger_force_mining";
+    public static final String KEY_SET_MASTER_PATTERN = "key.useless_mod.set_master_pattern";
+    public static final String KEY_SET_SLAVE_PATTERN = "key.useless_mod.set_slave_pattern";
 
     public static final KeyMapping SWITCH_SILK_TOUCH_KEY = new KeyMapping(KEY_SWITCH_SILK_TOUCH,
             KeyConflictContext.IN_GAME,
@@ -48,6 +51,24 @@ public class KeyBindings {
             KeyConflictContext.IN_GAME,
             InputConstants.Type.KEYSYM,
             GLFW.GLFW_KEY_KP_9,
+            KEY_CATEGORY_USELESS);
+    
+    public static final KeyMapping TRIGGER_FORCE_MINING_KEY = new KeyMapping(KEY_TRIGGER_FORCE_MINING,
+            KeyConflictContext.IN_GAME,
+            InputConstants.Type.KEYSYM,
+            GLFW.GLFW_KEY_R,
+            KEY_CATEGORY_USELESS);
+    
+    public static final KeyMapping SET_MASTER_PATTERN_KEY = new KeyMapping(KEY_SET_MASTER_PATTERN,
+            KeyConflictContext.IN_GAME,
+            InputConstants.Type.KEYSYM,
+            GLFW.GLFW_KEY_K,
+            KEY_CATEGORY_USELESS);
+    
+    public static final KeyMapping SET_SLAVE_PATTERN_KEY = new KeyMapping(KEY_SET_SLAVE_PATTERN,
+            KeyConflictContext.IN_GAME,
+            InputConstants.Type.KEYSYM,
+            GLFW.GLFW_KEY_L,
             KEY_CATEGORY_USELESS);
     
     // 跟踪连锁挖掘按键的按下状态

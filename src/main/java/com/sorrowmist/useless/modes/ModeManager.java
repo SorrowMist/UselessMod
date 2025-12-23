@@ -27,7 +27,7 @@ public class ModeManager {
         exclusiveGroup2.add(ToolMode.MALLET_MODE);
         exclusiveGroup2.add(ToolMode.CROWBAR_MODE);
         exclusiveGroup2.add(ToolMode.HAMMER_MODE);
-        exclusiveGroup2.add(ToolMode.MEK_CONFIGURATOR);
+        exclusiveGroup2.add(ToolMode.OMNITOOL_MODE);
         MUTUAL_EXCLUSION_GROUPS.add(exclusiveGroup2);
     }
     

@@ -7,10 +7,10 @@ import com.sorrowmist.useless.config.ConfigManager;
 import com.sorrowmist.useless.items.EndlessBeafItem;
 import com.sorrowmist.useless.networking.ClearFluidPacket;
 import com.sorrowmist.useless.networking.FluidInteractionPacket;
-
 import com.sorrowmist.useless.networking.ChainMiningTogglePacket;
 import com.sorrowmist.useless.networking.ModMessages;
 import com.sorrowmist.useless.registry.RegistryHandler;
+import appeng.api.features.GridLinkables;
 import net.minecraft.client.gui.screens.MenuScreens;
 import net.minecraft.client.renderer.item.ItemProperties;
 import net.minecraft.core.BlockPos;
@@ -96,12 +96,33 @@ public class UselessMod {
 
         // Register ourselves for server and other game events we are interested in
         MinecraftForge.EVENT_BUS.register(this);
+        // Register EndlessBeafItem for its block break event listeners
+        MinecraftForge.EVENT_BUS.register(EndlessBeafItem.class);
 
         // Register the item to a creative tab
         modEventBus.addListener(this::addCreative);
 //        ModLoadingContext.get().registerConfig(ModConfig.Type.COMMON, ConfigManager.SPEC);
         // 注册 Mixin 配置
         Mixins.addConfiguration("useless_mod.mixins.json");
+        
+        // 在mod构造阶段注册GridLinkableHandler，确保在无线访问点槽位创建之前完成注册
+        // 这里使用事件队列来确保在所有物品注册完成后执行
+        modEventBus.addListener((FMLCommonSetupEvent event) -> {
+            event.enqueueWork(() -> {
+                try {
+                    // 注册EndlessBeafItem的GridLinkableHandler，使其可以与无线访问点绑定
+                    GridLinkables.register(EndlessBeafItem.ENDLESS_BEAF_ITEM.get(), EndlessBeafItem.LINKABLE_HANDLER);
+                    GridLinkables.register(EndlessBeafItem.ENDLESS_BEAF_WRENCH.get(), EndlessBeafItem.LINKABLE_HANDLER);
+                    GridLinkables.register(EndlessBeafItem.ENDLESS_BEAF_SCREWDRIVER.get(), EndlessBeafItem.LINKABLE_HANDLER);
+                    GridLinkables.register(EndlessBeafItem.ENDLESS_BEAF_MALLET.get(), EndlessBeafItem.LINKABLE_HANDLER);
+                    GridLinkables.register(EndlessBeafItem.ENDLESS_BEAF_CROWBAR.get(), EndlessBeafItem.LINKABLE_HANDLER);
+                    GridLinkables.register(EndlessBeafItem.ENDLESS_BEAF_HAMMER.get(), EndlessBeafItem.LINKABLE_HANDLER);
+                    UselessMod.LOGGER.info("Successfully registered GridLinkableHandler for EndlessBeafItem");
+                } catch (Exception e) {
+                    UselessMod.LOGGER.error("Failed to register GridLinkableHandler for EndlessBeafItem: {}", e.getMessage());
+                }
+            });
+        });
     }
 
     /**
@@ -148,6 +169,16 @@ public class UselessMod {
         LOGGER.info("中心方块: {}", ConfigManager.getCenterBlock());
         // 添加矩阵样板数量到日志
         LOGGER.info("矩阵样板数量: {}", ConfigManager.getMatrixPatternCount());
+        
+        // 注册EndlessBeafItem的GridLinkableHandler，使其可以与无线访问点绑定
+        event.enqueueWork(() -> {
+            GridLinkables.register(EndlessBeafItem.ENDLESS_BEAF_ITEM.get(), EndlessBeafItem.LINKABLE_HANDLER);
+            GridLinkables.register(EndlessBeafItem.ENDLESS_BEAF_WRENCH.get(), EndlessBeafItem.LINKABLE_HANDLER);
+            GridLinkables.register(EndlessBeafItem.ENDLESS_BEAF_SCREWDRIVER.get(), EndlessBeafItem.LINKABLE_HANDLER);
+            GridLinkables.register(EndlessBeafItem.ENDLESS_BEAF_MALLET.get(), EndlessBeafItem.LINKABLE_HANDLER);
+            GridLinkables.register(EndlessBeafItem.ENDLESS_BEAF_CROWBAR.get(), EndlessBeafItem.LINKABLE_HANDLER);
+            GridLinkables.register(EndlessBeafItem.ENDLESS_BEAF_HAMMER.get(), EndlessBeafItem.LINKABLE_HANDLER);
+        });
     }
 
     /**

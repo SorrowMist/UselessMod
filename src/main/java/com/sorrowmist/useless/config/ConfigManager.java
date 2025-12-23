@@ -112,16 +112,16 @@ public class ConfigManager {
         BUILDER.push("Mekanism升级设置");
 
         TIME_MULTIPLIER = BUILDER
-                .comment("机器运行时间的基础倍率因子")
-                .defineInRange("时间倍率", 1, 1, Integer.MAX_VALUE);
+                .comment("速度升级增强倍率")
+                .defineInRange("速度平均每8个升级最终效果乘以一次该倍率", 1, 1, Integer.MAX_VALUE);
 
         ELECTRICITY_MULTIPLIER = BUILDER
-                .comment("机器电力消耗的基础倍率因子")
-                .defineInRange("电力倍率", 1, 1, Integer.MAX_VALUE);
+                .comment("能量升级节电增强倍率")
+                .defineInRange("节电平均每8个升级最终效果乘以一次该倍率", 1, 1, Integer.MAX_VALUE);
 
         CAPACITY_MULTIPLIER = BUILDER
-                .comment("机器容量的基础倍率因子")
-                .defineInRange("容量倍率", 1, 1, Integer.MAX_VALUE);
+                .comment("能量升级储电增强倍率")
+                .defineInRange("储电平均每8个升级最终效果乘以一次该倍率", 1, 1, Integer.MAX_VALUE);
 
         MAX_UPGRADE = BUILDER
                 .comment("机器可接受的最大速度/能量升级数量，重启游戏生效")

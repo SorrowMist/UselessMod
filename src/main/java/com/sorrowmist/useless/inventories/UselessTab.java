@@ -6,7 +6,9 @@ import com.sorrowmist.useless.blocks.advancedalloyfurnace.AdvancedAlloyFurnaceBl
 import com.sorrowmist.useless.blocks.oregenerator.OreGeneratorBlock;
 import com.sorrowmist.useless.blocks.teleport.TeleportBlock;
 import com.sorrowmist.useless.blocks.teleport.TeleportBlock2;
+import com.sorrowmist.useless.blocks.teleport.TeleportBlock3;
 import com.sorrowmist.useless.items.EndlessBeafItem;
+import com.sorrowmist.useless.registry.ModComponents;
 import com.sorrowmist.useless.registry.ModIngots;
 import com.sorrowmist.useless.registry.ModMolds;
 import com.sorrowmist.useless.registry.ThermalMoreItems;
@@ -34,8 +36,10 @@ public class UselessTab {
                         pOutput.accept(TeleportBlock.TELEPORT_BLOCK_ITEM.get());
                         pOutput.accept(OreGeneratorBlock.ORE_GENERATOR_BLOCK_ITEM.get());
                         pOutput.accept(TeleportBlock2.TELEPORT_BLOCK_ITEM_2.get());
+                        pOutput.accept(TeleportBlock3.TELEPORT_BLOCK_ITEM_3.get());
 
                         pOutput.accept(AdvancedAlloyFurnaceBlock.ADVANCED_ALLOY_FURNACE_BLOCK_ITEM.get());
+
 
                         // 发光塑料块 - 始终添加
                         for (RegistryObject<Item> item : GlowPlasticBlock.GLOW_PLASTIC_BLOCK_ITEMS.values()) {
@@ -62,6 +66,28 @@ public class UselessTab {
                         pOutput.accept(ModMolds.METAL_MOLD_ROD.get());
                         pOutput.accept(ModMolds.METAL_MOLD_GEAR.get());
                         pOutput.accept(ModMolds.METAL_MOLD_WIRE.get());
+                        
+                        // 添加无用齿轮到创造标签
+                        pOutput.accept(ModComponents.USELESS_GEAR_TIER_1.get());
+                        pOutput.accept(ModComponents.USELESS_GEAR_TIER_2.get());
+                        pOutput.accept(ModComponents.USELESS_GEAR_TIER_3.get());
+                        pOutput.accept(ModComponents.USELESS_GEAR_TIER_4.get());
+                        pOutput.accept(ModComponents.USELESS_GEAR_TIER_5.get());
+                        pOutput.accept(ModComponents.USELESS_GEAR_TIER_6.get());
+                        pOutput.accept(ModComponents.USELESS_GEAR_TIER_7.get());
+                        pOutput.accept(ModComponents.USELESS_GEAR_TIER_8.get());
+                        pOutput.accept(ModComponents.USELESS_GEAR_TIER_9.get());
+                        
+                        // 添加无用玻璃到创造标签
+                        pOutput.accept(ModComponents.USELESS_GLASS_TIER_1.get());
+                        pOutput.accept(ModComponents.USELESS_GLASS_TIER_2.get());
+                        pOutput.accept(ModComponents.USELESS_GLASS_TIER_3.get());
+                        pOutput.accept(ModComponents.USELESS_GLASS_TIER_4.get());
+                        pOutput.accept(ModComponents.USELESS_GLASS_TIER_5.get());
+                        pOutput.accept(ModComponents.USELESS_GLASS_TIER_6.get());
+                        pOutput.accept(ModComponents.USELESS_GLASS_TIER_7.get());
+                        pOutput.accept(ModComponents.USELESS_GLASS_TIER_8.get());
+                        pOutput.accept(ModComponents.USELESS_GLASS_TIER_9.get());
 
                         // 只在热力系列安装时添加 ThermalMore 整合的物品
                         if (ThermalDependencyHelper.isAnyThermalModLoaded()) {

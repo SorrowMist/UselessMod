@@ -2,14 +2,18 @@
 package com.sorrowmist.useless.blocks.advancedalloyfurnace;
 
 import com.sorrowmist.useless.UselessMod;
+import com.sorrowmist.useless.blocks.advancedalloyfurnace.AdvancedAlloyFurnaceBlockItem;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.MenuProvider;
+import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.context.BlockPlaceContext;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
@@ -43,7 +47,7 @@ public class AdvancedAlloyFurnaceBlock extends Block implements EntityBlock {
             () -> new AdvancedAlloyFurnaceBlock());
 
     public static final RegistryObject<Item> ADVANCED_ALLOY_FURNACE_BLOCK_ITEM = ITEMS.register("advanced_alloy_furnace_block",
-            () -> new BlockItem(ADVANCED_ALLOY_FURNACE_BLOCK.get(), new Item.Properties()));
+            () -> new AdvancedAlloyFurnaceBlockItem(ADVANCED_ALLOY_FURNACE_BLOCK.get(), new Item.Properties()));
 
     // 方块构造函数
     public AdvancedAlloyFurnaceBlock() {
@@ -88,12 +92,17 @@ public class AdvancedAlloyFurnaceBlock extends Block implements EntityBlock {
         if (!state.is(newState.getBlock())) {
             BlockEntity blockEntity = level.getBlockEntity(pos);
             if (blockEntity instanceof AdvancedAlloyFurnaceBlockEntity furnace) {
-                // 掉落方块实体中的物品和流体
-                furnace.drops();
-                // 通知客户端更新
-                level.updateNeighbourForOutputSignal(pos, this);
+                // 确保方块实体的数据已保存，以便在精准采集模式下能正确获取NBT数据
+                furnace.setChanged();
+                
+                // 对于有方块实体的方块，需要特殊处理以确保数据正确保存
+                // 这里不直接创建物品实体，而是让掉落物处理系统来处理
+                // BlockBreakUtils.getBlockDrops方法会正确处理战利品表
+                // ForceBreakUtils.createSilkTouchDrop方法会保存方块实体的NBT数据
             }
         }
+        // 调用父类方法，让方块正常破坏并触发掉落事件
+        // 现在战利品表已修复，方块会有正常的掉落物
         super.onRemove(state, level, pos, newState, isMoving);
     }
 

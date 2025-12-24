@@ -489,26 +489,36 @@ public class EndlessBeafItem extends PickaxeItem {
     
     // 将物品栈存入AE网络
     private static boolean storeItemInAENetwork(ItemStack stack, Player player) {
+        return storeItemInAENetwork(stack, player, null);
+    }
+    
+    // 将物品栈存入AE网络（带工具参数）
+    private static boolean storeItemInAENetwork(ItemStack stack, Player player, ItemStack toolStack) {
         if (player == null || stack.isEmpty()) {
             return false;
         }
         
-        // 获取玩家手中的EndlessBeafItem
-        ItemStack mainHandItem = player.getMainHandItem();
-        ItemStack offHandItem = player.getOffhandItem();
-        ItemStack toolItem = ItemStack.EMPTY;
-        
-        if (mainHandItem.getItem() instanceof EndlessBeafItem) {
-            toolItem = mainHandItem;
-        } else if (offHandItem.getItem() instanceof EndlessBeafItem) {
-            toolItem = offHandItem;
-        } else {
-            return false;
+        // 获取工具
+        ItemStack toolItem = toolStack;
+        if (toolItem == null || toolItem.isEmpty()) {
+            // 如果没有提供工具参数，从玩家手中获取
+            ItemStack mainHandItem = player.getMainHandItem();
+            ItemStack offHandItem = player.getOffhandItem();
+            
+            if (mainHandItem.getItem() instanceof EndlessBeafItem) {
+                toolItem = mainHandItem;
+            } else if (offHandItem.getItem() instanceof EndlessBeafItem) {
+                toolItem = offHandItem;
+            } else {
+                return false;
+            }
         }
         
         // 检查是否启用了AE存储优先模式
         EndlessBeafItem tool = (EndlessBeafItem) toolItem.getItem();
-        if (!tool.isAEStoragePriorityMode(toolItem)) {
+        boolean isAEStoragePriority = tool.isAEStoragePriorityMode(toolItem);
+        if (!isAEStoragePriority) {
+            UselessMod.LOGGER.debug("AE存储优先模式未启用，工具: {}", toolItem);
             return false;
         }
         
@@ -516,27 +526,42 @@ public class EndlessBeafItem extends PickaxeItem {
         try {
             // 获取链接的网格
             IGrid grid = getLinkedGrid(toolItem, player.level(), player);
-            if (grid != null) {
-                // 获取物品存储处理程序
-                MEStorage storage = grid.getStorageService().getInventory();
-                if (storage != null) {
-                    // 转换为AE物品栈
-                    AEItemKey aeKey = AEItemKey.of(stack);
-                    if (aeKey != null) {
-                        // 存入AE网络
-                        long inserted = storage.insert(aeKey, stack.getCount(), appeng.api.config.Actionable.MODULATE, new PlayerSource(player, null));
-                        // 如果插入的数量等于物品栈数量，说明全部存入
-                        if (inserted == stack.getCount()) {
-                            return true;
-                        } else {
-                            // 更新物品栈为剩余数量
-                            stack.setCount((int) (stack.getCount() - inserted));
-                            return stack.isEmpty();
-                        }
-                    }
-                }
+            if (grid == null) {
+                UselessMod.LOGGER.debug("无法获取AE网格，工具: {}", toolItem);
+                return false;
+            }
+            
+            // 获取物品存储处理程序
+            MEStorage storage = grid.getStorageService().getInventory();
+            if (storage == null) {
+                UselessMod.LOGGER.debug("无法获取AE存储服务，工具: {}", toolItem);
+                return false;
+            }
+            
+            // 转换为AE物品栈
+            AEItemKey aeKey = AEItemKey.of(stack);
+            if (aeKey == null) {
+                UselessMod.LOGGER.debug("无法转换为AE物品键，物品: {}", stack);
+                return false;
+            }
+            
+            // 存入AE网络
+            long inserted = storage.insert(aeKey, stack.getCount(), appeng.api.config.Actionable.MODULATE, new PlayerSource(player, null));
+            // 如果插入的数量等于物品栈数量，说明全部存入
+            if (inserted == stack.getCount()) {
+                UselessMod.LOGGER.debug("成功存入AE网络，物品: {}，数量: {}", stack, inserted);
+                return true;
+            } else if (inserted > 0) {
+                // 更新物品栈为剩余数量
+                stack.setCount((int) (stack.getCount() - inserted));
+                UselessMod.LOGGER.debug("部分存入AE网络，物品: {}，存入: {}，剩余: {}", stack.getItem(), inserted, stack.getCount());
+                return stack.isEmpty();
+            } else {
+                UselessMod.LOGGER.debug("AE网络存储失败，物品: {}，插入数量: 0", stack);
+                return false;
             }
         } catch (Exception e) {
+            UselessMod.LOGGER.debug("AE存储过程中出现异常: {}", e.getMessage());
             // 忽略任何异常
         }
         
@@ -545,6 +570,11 @@ public class EndlessBeafItem extends PickaxeItem {
     
     // 将物品列表存入AE网络或玩家背包
     public static void handleDrops(List<ItemStack> drops, Player player) {
+        handleDrops(drops, player, null);
+    }
+    
+    // 将物品列表存入AE网络或玩家背包（带工具参数）
+    public static void handleDrops(List<ItemStack> drops, Player player, ItemStack toolStack) {
         if (drops == null || drops.isEmpty()) {
             return;
         }
@@ -559,7 +589,7 @@ public class EndlessBeafItem extends PickaxeItem {
             }
             
             // 尝试存入AE网络
-            if (storeItemInAENetwork(dropStack, player)) {
+            if (storeItemInAENetwork(dropStack, player, toolStack)) {
                 iterator.remove();
                 continue;
             }
@@ -866,13 +896,27 @@ public class EndlessBeafItem extends PickaxeItem {
         // 保存当前的连锁挖掘按键状态
         boolean chainMiningPressed = isChainMiningPressed(stack);
         
-        // 使用模式管理器切换模式
+        // 使用模式管理器切换模式，保持其他模式状态
         modeManager.loadFromStack(stack);
+        
+        // 保存当前所有模式状态
+        boolean aeStoragePriority = modeManager.isModeActive(com.sorrowmist.useless.modes.ToolMode.AE_STORAGE_PRIORITY);
+        boolean forceMining = modeManager.isModeActive(com.sorrowmist.useless.modes.ToolMode.FORCE_MINING);
+        boolean enhancedChainMining = modeManager.isModeActive(com.sorrowmist.useless.modes.ToolMode.ENHANCED_CHAIN_MINING);
+        
         if (silkTouchMode) {
             modeManager.setModeActive(com.sorrowmist.useless.modes.ToolMode.SILK_TOUCH, true);
+            modeManager.setModeActive(com.sorrowmist.useless.modes.ToolMode.FORTUNE, false);
         } else {
+            modeManager.setModeActive(com.sorrowmist.useless.modes.ToolMode.SILK_TOUCH, false);
             modeManager.setModeActive(com.sorrowmist.useless.modes.ToolMode.FORTUNE, true);
         }
+        
+        // 恢复其他重要模式状态
+        modeManager.setModeActive(com.sorrowmist.useless.modes.ToolMode.AE_STORAGE_PRIORITY, aeStoragePriority);
+        modeManager.setModeActive(com.sorrowmist.useless.modes.ToolMode.FORCE_MINING, forceMining);
+        modeManager.setModeActive(com.sorrowmist.useless.modes.ToolMode.ENHANCED_CHAIN_MINING, enhancedChainMining);
+        
         modeManager.saveToStack(stack);
         
         // 更新实际的附魔NBT

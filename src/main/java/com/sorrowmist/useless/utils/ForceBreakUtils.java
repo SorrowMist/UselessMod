@@ -16,6 +16,7 @@ import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraftforge.event.level.BlockEvent;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
@@ -49,16 +50,23 @@ public class ForceBreakUtils {
             return true;
         }
 
-        List<ItemStack> drops;
+        // 4. 强制破坏方块 - 最后破坏方块，这样确保获取了需要的物品
+        event.setCanceled(true);
+        
+        // 在破坏方块之前，先处理扩展样板供应器的主从关系和样板清空
+        // 这是因为createSilkTouchDrop会保存当前的NBT状态，所以需要先处理主从关系和清空样板
+        com.sorrowmist.useless.items.EndlessBeafItem.onBlockBreak(event);
+        
+        // 然后再创建包含NBT的物品
+        List<ItemStack> drops = new ArrayList<>();
         
         // 1. 检查是否为精准采集模式
         boolean isSilkTouch = isSilkTouchMode(stack);
         
         if (isSilkTouch) {
-            // 精准采集模式：优先获取物品本身（包含NBT）
+            // 精准采集模式：只获取包含NBT的物品本身
             ItemStack silkTouchDrop = createSilkTouchDrop(level, pos, state);
-            drops = Collections.singletonList(silkTouchDrop);
-            // 注意：在精准采集模式下，箱子内容物会随箱子一起销毁，不会产生额外掉落物
+            drops.add(silkTouchDrop);
         } else {
             // 非精准采集模式：使用正常逻辑获取掉落物
             // 2. 尝试获取方块的掉落物（使用正常逻辑，包括战利品表和时运）
@@ -71,34 +79,67 @@ public class ForceBreakUtils {
                 drops = Collections.singletonList(forcedDrop);
             }
         }
-
-        // 4. 强制破坏方块 - 最后破坏方块，这样确保获取了需要的物品
-        event.setCanceled(true);
         
+        // 精准采集模式下，先处理容器内容物，防止设置方块为空气时触发onRemove导致内容物掉落
         if (isSilkTouch) {
-            // 在精准采集模式下，先清除原方块实体的内容物，以防止内容物掉落
             BlockEntity blockEntity = level.getBlockEntity(pos);
             if (blockEntity != null) {
-                // 尝试获取并清空容器内容物，防止其作为掉落物生成
+                // 对于容器类BlockEntity，在破坏前确保内容物不会自动掉落
+                // 这是因为当我们设置方块为空气时，会触发BlockState.onRemove()，
+                // 该方法会自动掉落容器内容物，导致重复掉落
                 try {
-                    net.minecraftforge.items.IItemHandler itemHandler = 
-                        blockEntity.getCapability(net.minecraftforge.common.capabilities.ForgeCapabilities.ITEM_HANDLER).orElse(null);
-                    if (itemHandler != null) {
-                        // 尝试将处理程序转换为可修改的类型
-                        if (itemHandler instanceof net.minecraftforge.items.IItemHandlerModifiable modifiableHandler) {
-                            for (int i = 0; i < modifiableHandler.getSlots(); i++) {
-                                modifiableHandler.setStackInSlot(i, ItemStack.EMPTY); // 清空每个槽位
+                    // 对于箱子等容器，直接使用方块实体的方法来清空内容物，而不是通过IItemHandler
+                    // 这样可以确保只影响当前方块实体，不影响相邻方块
+                    if (blockEntity instanceof net.minecraft.world.level.block.entity.ChestBlockEntity chestEntity) {
+                        // 直接操作箱子的物品列表，只清空当前箱子的内容物
+                        // 这种方式不会影响相邻箱子，因为每个ChestBlockEntity只管理自己的27个物品槽
+                        for (int i = 0; i < chestEntity.getContainerSize(); i++) {
+                            // 直接设置为空气，不产生掉落物
+                            chestEntity.setItem(i, ItemStack.EMPTY);
+                        }
+                        // 标记箱子已更改
+                        chestEntity.setChanged();
+                    } else if (blockEntity instanceof net.minecraft.world.level.block.entity.HopperBlockEntity hopperEntity) {
+                        // 处理漏斗
+                        for (int i = 0; i < hopperEntity.getContainerSize(); i++) {
+                            hopperEntity.setItem(i, ItemStack.EMPTY);
+                        }
+                        hopperEntity.setChanged();
+                    } else if (blockEntity instanceof net.minecraft.world.level.block.entity.DispenserBlockEntity dispenserEntity) {
+                        // 处理发射器
+                        for (int i = 0; i < dispenserEntity.getContainerSize(); i++) {
+                            dispenserEntity.setItem(i, ItemStack.EMPTY);
+                        }
+                        dispenserEntity.setChanged();
+                    } else if (blockEntity instanceof net.minecraft.world.level.block.entity.DropperBlockEntity dropperEntity) {
+                        // 处理投掷器
+                        for (int i = 0; i < dropperEntity.getContainerSize(); i++) {
+                            dropperEntity.setItem(i, ItemStack.EMPTY);
+                        }
+                        dropperEntity.setChanged();
+                    } else if (blockEntity instanceof net.minecraft.world.level.block.entity.ShulkerBoxBlockEntity shulkerEntity) {
+                        // 处理潜影盒
+                        for (int i = 0; i < shulkerEntity.getContainerSize(); i++) {
+                            shulkerEntity.setItem(i, ItemStack.EMPTY);
+                        }
+                        shulkerEntity.setChanged();
+                    } else {
+                        // 对于其他容器，尝试使用IItemHandler
+                        net.minecraftforge.items.IItemHandler itemHandler = 
+                            blockEntity.getCapability(net.minecraftforge.common.capabilities.ForgeCapabilities.ITEM_HANDLER).orElse(null);
+                        if (itemHandler != null) {
+                            // 尝试将处理程序转换为可修改的类型
+                            if (itemHandler instanceof net.minecraftforge.items.IItemHandlerModifiable modifiableHandler) {
+                                // 清空容器内容物，但由于我们已经保存了NBT，所以不会丢失数据
+                                // 这样当设置方块为空气时，onRemove方法就不会再次掉落内容物
+                                for (int i = 0; i < modifiableHandler.getSlots(); i++) {
+                                    modifiableHandler.setStackInSlot(i, ItemStack.EMPTY);
+                                }
                             }
                         }
                     }
-                } catch (Exception e) {
-                    // 如果处理失败，记录错误但继续执行
-                    UselessMod.LOGGER.debug("Failed to clear container contents: {}", e.getMessage());
-                }
-                
-                // 额外添加SophisticatedStorage模组的扩展槽位清理
-                try {
-                    // 检查是否是SophisticatedStorage的存储方块实体
+                    
+                    // 只处理SophisticatedStorage模组的扩展槽位
                     if (blockEntity.getClass().getName().contains("sophisticatedstorage")) {
                         // 方法1：尝试通过反射清空升级槽位
                         try {
@@ -151,17 +192,25 @@ public class ForceBreakUtils {
                         blockEntity.setChanged();
                     }
                 } catch (Exception e) {
-                    // 如果处理SophisticatedStorage升级槽位失败，记录错误但继续执行
-                    UselessMod.LOGGER.debug("Failed to clear SophisticatedStorage upgrade slots: {}", e.getMessage());
+                    // 如果处理失败，记录错误但继续执行
+                    UselessMod.LOGGER.debug("Failed to handle container before break: {}", e.getMessage());
                 }
             }
         }
         
         // 破坏方块，但不产生额外的掉落物
+        // 1. 先移除BlockEntity，防止设置方块为空气时触发onRemove导致内容物掉落
+        if (isSilkTouch) {
+            // 对于精准采集模式，我们已经保存了NBT数据，现在可以安全移除BlockEntity
+            level.removeBlockEntity(pos);
+        }
+        
+        // 2. 设置方块为空气
         level.setBlock(pos, Blocks.AIR.defaultBlockState(), 3);
         level.sendBlockUpdated(pos, state, Blocks.AIR.defaultBlockState(), 3);
         
         // 3. 处理掉落物：优先存入AE网络，然后是玩家背包，最后是掉落
+        // 只处理我们自己创建的掉落物，不允许原版掉落物生成
         EndlessBeafItem.handleDrops(drops, player, stack);
 
         // 4. 生成剩余的掉落物（如果有）
@@ -202,15 +251,26 @@ public class ForceBreakUtils {
         BlockEntity blockEntity = level.getBlockEntity(pos);
         if (blockEntity != null) {
             // 确保所有数据都已同步到NBT
-            if (blockEntity instanceof net.minecraft.world.level.block.entity.BlockEntity) {
-                net.minecraft.world.level.block.entity.BlockEntity be = (net.minecraft.world.level.block.entity.BlockEntity) blockEntity;
-                be.setChanged(); // 标记为已更改，确保数据被保存
-            }
-            CompoundTag blockEntityTag = blockEntity.saveWithoutMetadata();
-            if (!blockEntityTag.isEmpty()) {
-                // 创建方块物品的NBT标签
-                CompoundTag itemTag = stack.getOrCreateTag();
-                itemTag.put("BlockEntityTag", blockEntityTag);
+            blockEntity.setChanged(); // 标记为已更改，确保数据被保存
+            
+            // 特殊处理：大箱子（DoubleChest）
+            if (blockEntity instanceof net.minecraft.world.level.block.entity.ChestBlockEntity chestEntity) {
+                // 获取当前箱子的完整数据，包括内容物
+                // 注意：这里保存的是单个箱子的NBT数据，不包括相邻箱子的数据
+                CompoundTag blockEntityTag = chestEntity.saveWithoutMetadata();
+                if (!blockEntityTag.isEmpty()) {
+                    // 创建方块物品的NBT标签
+                    CompoundTag itemTag = stack.getOrCreateTag();
+                    itemTag.put("BlockEntityTag", blockEntityTag);
+                }
+            } else {
+                // 普通方块实体处理
+                CompoundTag blockEntityTag = blockEntity.saveWithoutMetadata();
+                if (!blockEntityTag.isEmpty()) {
+                    // 创建方块物品的NBT标签
+                    CompoundTag itemTag = stack.getOrCreateTag();
+                    itemTag.put("BlockEntityTag", blockEntityTag);
+                }
             }
         }
         

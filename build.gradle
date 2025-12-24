@@ -198,6 +198,9 @@ dependencies {
     implementation fg.deobf("curse.maven:omni-cells-1359517:7169531")//omni-cells
     implementation fg.deobf("curse.maven:applied-flux-965012:7072853")//applied-flux
     implementation fg.deobf("curse.maven:cloth-config-348521:5729105")//cloth-config-5.1.48-forge
+    implementation fg.deobf("curse.maven:sophisticated-core-618298:7369562")//sophisticated-core-6.1.82-forge
+    implementation fg.deobf("curse.maven:sophisticated-storage-619320:7369594")//sophisticated-storage-6.1.82-forge
+    implementation fg.deobf("curse.maven:sophisticated-backpacks-422301:7369580")//sophisticated-backpacks-6.1.82-forge
 
 
     //exendedae前置

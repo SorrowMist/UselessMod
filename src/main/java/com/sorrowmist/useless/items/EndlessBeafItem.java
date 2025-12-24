@@ -979,17 +979,20 @@ public class EndlessBeafItem extends PickaxeItem {
         List<PatternProviderKey> mastersToRemove = new ArrayList<>();
         List<PatternProviderKey> slavesToRemove = new ArrayList<>();
         
-        // 检查是否有任何主端位于该方块
-        for (PatternProviderKey key : masterToSlaves.keySet()) {
-            if (key.getPos().equals(pos)) {
-                mastersToRemove.add(key);
+        // 遍历所有方向，检查是否有任何主端或从端位于该方块的任何方向
+        for (Direction direction : Direction.values()) {
+            // 检查所有主端，无论方向如何
+            for (PatternProviderKey key : masterToSlaves.keySet()) {
+                if (key.getPos().equals(pos)) {
+                    mastersToRemove.add(key);
+                }
             }
-        }
-        
-        // 检查是否有任何从端位于该方块
-        for (PatternProviderKey key : slaveToMaster.keySet()) {
-            if (key.getPos().equals(pos)) {
-                slavesToRemove.add(key);
+            
+            // 检查所有从端，无论方向如何
+            for (PatternProviderKey key : slaveToMaster.keySet()) {
+                if (key.getPos().equals(pos)) {
+                    slavesToRemove.add(key);
+                }
             }
         }
         

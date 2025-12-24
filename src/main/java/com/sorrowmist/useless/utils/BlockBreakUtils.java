@@ -115,6 +115,33 @@ public class BlockBreakUtils {
     }
 
     /**
+     * 处理普通方块的自动收集
+     */
+    public static boolean handleNormalBlockBreak(BlockEvent.BreakEvent event, Level level, BlockPos pos, BlockState state, Player player, ItemStack stack, List<ItemStack> drops) {
+        // 处理掉落物：优先存入AE网络，然后是玩家背包，最后是掉落
+        EndlessBeafItem.handleDrops(drops, player, stack);
+
+        // 生成剩余的掉落物（如果有）
+        for (ItemStack drop : drops) {
+            if (!drop.isEmpty() && drop.getItem() != Items.AIR) {
+                // 掉落在玩家脚下
+                ItemEntity itemEntity = new ItemEntity(level,
+                        player.getX(), player.getY(), player.getZ(),
+                        drop.copy());
+                level.addFreshEntity(itemEntity);
+            }
+        }
+
+        // 无论是否收集成功，都取消原版事件并手动破坏方块，避免重复掉落
+        event.setCanceled(true);
+        level.setBlock(pos, Blocks.AIR.defaultBlockState(), 3);
+
+        // 播放破坏音效
+        playBreakSoundWithCooldown(level, pos, state, player);
+        return true;
+    }
+
+    /**
      * 回退到原版破坏逻辑的处理
      */
     public static void handleFallbackBlockBreak(Level level, BlockPos pos, BlockState state, Player player, ItemStack tool) {
@@ -160,33 +187,6 @@ public class BlockBreakUtils {
 
         // 播放破坏音效
         playBreakSoundWithCooldown(level, pos, state, player);
-    }
-
-    /**
-     * 处理普通方块的自动收集
-     */
-    public static boolean handleNormalBlockBreak(BlockEvent.BreakEvent event, Level level, BlockPos pos, BlockState state, Player player, ItemStack stack, List<ItemStack> drops) {
-        // 处理掉落物：优先存入AE网络，然后是玩家背包，最后是掉落
-        EndlessBeafItem.handleDrops(drops, player);
-
-        // 生成剩余的掉落物（如果有）
-        for (ItemStack drop : drops) {
-            if (!drop.isEmpty() && drop.getItem() != Items.AIR) {
-                // 掉落在玩家脚下
-                ItemEntity itemEntity = new ItemEntity(level,
-                        player.getX(), player.getY(), player.getZ(),
-                        drop.copy());
-                level.addFreshEntity(itemEntity);
-            }
-        }
-
-        // 无论是否收集成功，都取消原版事件并手动破坏方块，避免重复掉落
-        event.setCanceled(true);
-        level.setBlock(pos, Blocks.AIR.defaultBlockState(), 3);
-
-        // 播放破坏音效
-        playBreakSoundWithCooldown(level, pos, state, player);
-        return true;
     }
 
     /**

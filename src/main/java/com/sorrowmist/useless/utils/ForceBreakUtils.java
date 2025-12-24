@@ -40,7 +40,7 @@ public class ForceBreakUtils {
         net.minecraft.world.level.material.FluidState fluidState = level.getFluidState(pos);
         // 检查流体是否是水，并且是水源方块（level == 8表示水源）
         if (fluidState.getType() == net.minecraft.world.level.material.Fluids.WATER && fluidState.isSource()) {
-            // 含水方块，直接返回false，不取消事件，让原版破坏逻辑处理
+            // 含水方块，直接返回false，让原版破坏逻辑处理
             return false;
         }
         
@@ -51,19 +51,20 @@ public class ForceBreakUtils {
 
         List<ItemStack> drops;
         
-        // 检查是否为精准采集模式
+        // 1. 检查是否为精准采集模式
         boolean isSilkTouch = isSilkTouchMode(stack);
         
         if (isSilkTouch) {
             // 精准采集模式：优先获取物品本身（包含NBT）
             ItemStack silkTouchDrop = createSilkTouchDrop(level, pos, state);
             drops = Collections.singletonList(silkTouchDrop);
+            // 注意：在精准采集模式下，箱子内容物会随箱子一起销毁，不会产生额外掉落物
         } else {
             // 非精准采集模式：使用正常逻辑获取掉落物
-            // 1. 尝试获取方块的掉落物（使用正常逻辑，包括战利品表和时运）
+            // 2. 尝试获取方块的掉落物（使用正常逻辑，包括战利品表和时运）
             drops = BlockBreakUtils.getBlockDrops(state, level, pos, player, stack);
 
-            // 2. 如果没有有效的掉落物，强制掉落一个方块
+            // 3. 如果没有有效的掉落物，强制掉落一个方块
             if (drops == null || drops.isEmpty() || BlockBreakUtils.hasInvalidDrops(drops)) {
                 // 强制掉落一个目标方块
                 ItemStack forcedDrop = new ItemStack(state.getBlock().asItem(), 1);
@@ -71,8 +72,97 @@ public class ForceBreakUtils {
             }
         }
 
+        // 4. 强制破坏方块 - 最后破坏方块，这样确保获取了需要的物品
+        event.setCanceled(true);
+        
+        if (isSilkTouch) {
+            // 在精准采集模式下，先清除原方块实体的内容物，以防止内容物掉落
+            BlockEntity blockEntity = level.getBlockEntity(pos);
+            if (blockEntity != null) {
+                // 尝试获取并清空容器内容物，防止其作为掉落物生成
+                try {
+                    net.minecraftforge.items.IItemHandler itemHandler = 
+                        blockEntity.getCapability(net.minecraftforge.common.capabilities.ForgeCapabilities.ITEM_HANDLER).orElse(null);
+                    if (itemHandler != null) {
+                        // 尝试将处理程序转换为可修改的类型
+                        if (itemHandler instanceof net.minecraftforge.items.IItemHandlerModifiable modifiableHandler) {
+                            for (int i = 0; i < modifiableHandler.getSlots(); i++) {
+                                modifiableHandler.setStackInSlot(i, ItemStack.EMPTY); // 清空每个槽位
+                            }
+                        }
+                    }
+                } catch (Exception e) {
+                    // 如果处理失败，记录错误但继续执行
+                    UselessMod.LOGGER.debug("Failed to clear container contents: {}", e.getMessage());
+                }
+                
+                // 额外添加SophisticatedStorage模组的扩展槽位清理
+                try {
+                    // 检查是否是SophisticatedStorage的存储方块实体
+                    if (blockEntity.getClass().getName().contains("sophisticatedstorage")) {
+                        // 方法1：尝试通过反射清空升级槽位
+                        try {
+                            // 尝试获取storageWrapper并清空升级槽位
+                            java.lang.reflect.Field storageWrapperField = blockEntity.getClass().getDeclaredField("storageWrapper");
+                            storageWrapperField.setAccessible(true);
+                            Object storageWrapper = storageWrapperField.get(blockEntity);
+                            
+                            // 尝试获取upgradeHandler
+                            java.lang.reflect.Method getUpgradeHandlerMethod = storageWrapper.getClass().getMethod("getUpgradeHandler");
+                            Object upgradeHandler = getUpgradeHandlerMethod.invoke(storageWrapper);
+                            
+                            // 清空升级槽位
+                            if (upgradeHandler instanceof net.minecraftforge.items.IItemHandlerModifiable modifiableUpgradeHandler) {
+                                for (int i = 0; i < modifiableUpgradeHandler.getSlots(); i++) {
+                                    modifiableUpgradeHandler.setStackInSlot(i, ItemStack.EMPTY);
+                                }
+                            }
+                        } catch (Exception e) {
+                            // 如果反射方法失败，尝试方法2：直接操作NBT数据
+                            UselessMod.LOGGER.debug("Reflection method failed, trying NBT method: {}", e.getMessage());
+                        }
+                        
+                        // 方法2：直接操作NBT数据清理升级槽位
+                        CompoundTag blockEntityTag = blockEntity.saveWithoutMetadata();
+                        if (blockEntityTag.contains("storageWrapper")) {
+                            CompoundTag storageWrapperTag = blockEntityTag.getCompound("storageWrapper");
+                            if (storageWrapperTag.contains("contents")) {
+                                CompoundTag contentsTag = storageWrapperTag.getCompound("contents");
+                                if (contentsTag.contains("upgradeInventory")) {
+                                    // 清空升级槽位数据
+                                    CompoundTag upgradeInventoryTag = new CompoundTag();
+                                    upgradeInventoryTag.putInt("Size", 0);
+                                    upgradeInventoryTag.put("Items", new net.minecraft.nbt.ListTag());
+                                    contentsTag.put("upgradeInventory", upgradeInventoryTag);
+                                    
+                                    // 更新storageWrapper标签
+                                    storageWrapperTag.put("contents", contentsTag);
+                                    
+                                    // 更新方块实体标签
+                                    blockEntityTag.put("storageWrapper", storageWrapperTag);
+                                    
+                                    // 将修改后的NBT数据加载回方块实体
+                                    blockEntity.load(blockEntityTag);
+                                }
+                            }
+                        }
+                        
+                        // 强制更新方块实体的NBT数据，确保清理后的状态被保存
+                        blockEntity.setChanged();
+                    }
+                } catch (Exception e) {
+                    // 如果处理SophisticatedStorage升级槽位失败，记录错误但继续执行
+                    UselessMod.LOGGER.debug("Failed to clear SophisticatedStorage upgrade slots: {}", e.getMessage());
+                }
+            }
+        }
+        
+        // 破坏方块，但不产生额外的掉落物
+        level.setBlock(pos, Blocks.AIR.defaultBlockState(), 3);
+        level.sendBlockUpdated(pos, state, Blocks.AIR.defaultBlockState(), 3);
+        
         // 3. 处理掉落物：优先存入AE网络，然后是玩家背包，最后是掉落
-        EndlessBeafItem.handleDrops(drops, player);
+        EndlessBeafItem.handleDrops(drops, player, stack);
 
         // 4. 生成剩余的掉落物（如果有）
         for (ItemStack drop : drops) {
@@ -84,10 +174,6 @@ public class ForceBreakUtils {
                 level.addFreshEntity(itemEntity);
             }
         }
-
-        // 5. 强制破坏方块
-        event.setCanceled(true);
-        level.setBlock(pos, Blocks.AIR.defaultBlockState(), 3);
 
         // 6. 播放破坏音效
         BlockBreakUtils.playBreakSoundWithCooldown(level, pos, state, player);
@@ -115,6 +201,11 @@ public class ForceBreakUtils {
         // 尝试获取并复制方块实体的NBT数据
         BlockEntity blockEntity = level.getBlockEntity(pos);
         if (blockEntity != null) {
+            // 确保所有数据都已同步到NBT
+            if (blockEntity instanceof net.minecraft.world.level.block.entity.BlockEntity) {
+                net.minecraft.world.level.block.entity.BlockEntity be = (net.minecraft.world.level.block.entity.BlockEntity) blockEntity;
+                be.setChanged(); // 标记为已更改，确保数据被保存
+            }
             CompoundTag blockEntityTag = blockEntity.saveWithoutMetadata();
             if (!blockEntityTag.isEmpty()) {
                 // 创建方块物品的NBT标签
@@ -170,7 +261,7 @@ public class ForceBreakUtils {
 
                     // 获取DEContent.CHAOS_SHARD
                     Class<?> deContentClass = Class.forName("com.brandon3055.draconicevolution.init.DEContent");
-                    java.lang.reflect.Field chaosShardField = deContentClass.getDeclaredField("CHAOS_SHARD");
+                    java.lang.reflect.Field chaosShardField = deConfigClass.getDeclaredField("CHAOS_SHARD");
                     chaosShardField.setAccessible(true);
                     Object chaosShardObject = chaosShardField.get(null);
 

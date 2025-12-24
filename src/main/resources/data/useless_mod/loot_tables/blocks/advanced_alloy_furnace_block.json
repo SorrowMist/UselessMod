@@ -9,6 +9,74 @@
           "name": "useless_mod:advanced_alloy_furnace_block"
         }
       ],
+      "functions": [
+        {
+          "function": "minecraft:copy_nbt",
+          "source": "block_entity",
+          "ops": [
+            {
+              "source": "Inventory",
+              "target": "BlockEntityTag.Inventory",
+              "op": "replace"
+            },
+            {
+              "source": "Energy",
+              "target": "BlockEntityTag.Energy",
+              "op": "replace"
+            },
+            {
+              "source": "InputFluid",
+              "target": "BlockEntityTag.InputFluid",
+              "op": "replace"
+            },
+            {
+              "source": "OutputFluid",
+              "target": "BlockEntityTag.OutputFluid",
+              "op": "replace"
+            },
+            {
+              "source": "Process",
+              "target": "BlockEntityTag.Process",
+              "op": "replace"
+            },
+            {
+              "source": "ProcessMax",
+              "target": "BlockEntityTag.ProcessMax",
+              "op": "replace"
+            },
+            {
+              "source": "ProcessTick",
+              "target": "BlockEntityTag.ProcessTick",
+              "op": "replace"
+            },
+            {
+              "source": "IsActive",
+              "target": "BlockEntityTag.IsActive",
+              "op": "replace"
+            },
+            {
+              "source": "WasActive",
+              "target": "BlockEntityTag.WasActive",
+              "op": "replace"
+            },
+            {
+              "source": "AutoOutputCounter",
+              "target": "BlockEntityTag.AutoOutputCounter",
+              "op": "replace"
+            },
+            {
+              "source": "CurrentParallel",
+              "target": "BlockEntityTag.CurrentParallel",
+              "op": "replace"
+            },
+            {
+              "source": "MaxParallel",
+              "target": "BlockEntityTag.MaxParallel",
+              "op": "replace"
+            }
+          ]
+        }
+      ],
       "conditions": [
         {
           "condition": "minecraft:survives_explosion"

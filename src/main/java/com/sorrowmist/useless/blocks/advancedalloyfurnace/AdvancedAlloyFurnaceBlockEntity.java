@@ -1648,15 +1648,6 @@ public class AdvancedAlloyFurnaceBlockEntity extends BlockEntity implements Menu
         }
     }
 
-    // 其他方法
-    public void drops() {
-        SimpleContainer inventory = new SimpleContainer(itemHandler.getSlots());
-        for (int i = 0; i < itemHandler.getSlots(); i++) {
-            inventory.setItem(i, itemHandler.getStackInSlot(i));
-        }
-        Containers.dropContents(this.level, this.worldPosition, inventory);
-    }
-
     @Override
     public Component getDisplayName() {
         return Component.translatable("block.useless_mod.advanced_alloy_furnace_block");

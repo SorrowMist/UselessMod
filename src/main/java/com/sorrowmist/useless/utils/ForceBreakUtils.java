@@ -45,6 +45,12 @@ public class ForceBreakUtils {
             return false;
         }
         
+        // 特殊处理Sophisticated Backpacks背包：当处于精准采集+强制破坏模式时，按运气+强制破坏逻辑运行
+        if (isSophisticatedBackpack(level, pos) && isSilkTouchAndForceMining(stack)) {
+            // 按照时运+强制破坏逻辑运行
+            return forceBreakBlockWithFortune(level, pos, state, player, stack);
+        }
+
         // 特殊处理混沌水晶：绕过击败混沌龙检查
         if (handleChaosCrystal(event, level, pos, state, player, stack)) {
             return true;
@@ -69,7 +75,7 @@ public class ForceBreakUtils {
             drops.add(silkTouchDrop);
         } else {
             // 非精准采集模式：使用正常逻辑获取掉落物
-            // 2. 尝试获取方块的掉落物（使用正常逻辑，包括战利品表和时运）
+            // 2. 尝试获取方块的掉落物（使用正常逻辑，包括战利u品表和时运）
             drops = BlockBreakUtils.getBlockDrops(state, level, pos, player, stack);
 
             // 3. 如果没有有效的掉落物，强制掉落一个方块
@@ -238,6 +244,76 @@ public class ForceBreakUtils {
             return stack.getTag().getBoolean("SilkTouchMode");
         }
         return false;
+    }
+
+    /**
+     * 检查工具是否同时处于精准采集和强制挖掘模式
+     */
+    private static boolean isSilkTouchAndForceMining(ItemStack stack) {
+        if (stack.hasTag() && stack.getTag().contains("ToolModes")) {
+            CompoundTag toolModes = stack.getTag().getCompound("ToolModes");
+            boolean silkTouchMode = toolModes.getBoolean("SILK_TOUCH");
+            boolean forceMiningMode = toolModes.getBoolean("FORCE_MINING");
+            return silkTouchMode && forceMiningMode;
+        }
+        return false;
+    }
+
+    /**
+     * 检查方块是否为Sophisticated Backpacks的背包
+     */
+    private static boolean isSophisticatedBackpack(Level level, BlockPos pos) {
+        // 获取方块的注册名称
+        String blockRegistryName = net.minecraftforge.registries.ForgeRegistries.BLOCKS.getKey(level.getBlockState(pos).getBlock()).toString();
+        
+        // 检查是否为Sophisticated Backpacks的背包方块
+        // 包括: diamond_backpack, gold_backpack, iron_backpack, copper_backpack, backpack
+        return blockRegistryName.contains("sophisticatedbackpacks:") && 
+               (blockRegistryName.contains("diamond_backpack") || 
+                blockRegistryName.contains("gold_backpack") || 
+                blockRegistryName.contains("iron_backpack") || 
+                blockRegistryName.contains("copper_backpack") || 
+                blockRegistryName.contains("backpack"));
+    }
+
+    /**
+     * 对Sophisticated Backpacks背包执行时运+强制破坏逻辑
+     */
+    private static boolean forceBreakBlockWithFortune(Level level, BlockPos pos, BlockState state, Player player, ItemStack stack) {
+        // 取消事件
+        // 注意：这里我们不能直接取消事件，因为需要使用时运逻辑，而不是精准采集逻辑
+        // 我们将使用时运逻辑获取掉落物，然后处理这些掉落物
+        List<ItemStack> drops = BlockBreakUtils.getBlockDrops(state, level, pos, player, stack);
+
+        // 如果没有有效的掉落物，强制掉落一个方块
+        if (drops == null || drops.isEmpty() || BlockBreakUtils.hasInvalidDrops(drops)) {
+            // 强制掉落一个目标方块
+            ItemStack forcedDrop = new ItemStack(state.getBlock().asItem(), 1);
+            drops = Collections.singletonList(forcedDrop);
+        }
+
+        // 破坏方块，但不产生额外的掉落物
+        level.setBlock(pos, Blocks.AIR.defaultBlockState(), 3);
+        level.sendBlockUpdated(pos, state, Blocks.AIR.defaultBlockState(), 3);
+
+        // 处理掉落物：优先存入AE网络，然后是玩家背包，最后是掉落
+        EndlessBeafItem.handleDrops(drops, player, stack);
+
+        // 生成剩余的掉落物（如果有）
+        for (ItemStack drop : drops) {
+            if (!drop.isEmpty() && drop.getItem() != Items.AIR) {
+                // 掉落在玩家脚下
+                ItemEntity itemEntity = new ItemEntity(level,
+                        player.getX(), player.getY(), player.getZ(),
+                        drop.copy());
+                level.addFreshEntity(itemEntity);
+            }
+        }
+
+        // 播放破坏音效
+        BlockBreakUtils.playBreakSoundWithCooldown(level, pos, state, player);
+
+        return true;
     }
 
     /**

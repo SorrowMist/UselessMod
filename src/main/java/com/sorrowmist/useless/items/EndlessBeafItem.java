@@ -627,11 +627,26 @@ public class EndlessBeafItem extends PickaxeItem {
         enchantments.put(Enchantments.MOB_LOOTING, ConfigManager.getLootingLevel());
 
         if (silkTouchMode) {
-            // 精准采集模式
-            enchantments.remove(Enchantments.BLOCK_FORTUNE); // 移除时运
-            // 确保有精准采集，使用最高等级
-            int silkTouchLevel = Math.max(1, enchantments.getOrDefault(Enchantments.SILK_TOUCH, 0));
-            enchantments.put(Enchantments.SILK_TOUCH, silkTouchLevel);
+            // 检查是否同时启用了强制挖掘模式
+            boolean forceMiningMode = false;
+            if (stack.getTag().contains("ToolModes")) {
+                CompoundTag toolModes = stack.getTag().getCompound("ToolModes");
+                forceMiningMode = toolModes.getBoolean("FORCE_MINING");
+            }
+            
+            if (forceMiningMode) {
+                // 精准采集+强制挖掘模式，对于某些特定方块（如Sophisticated Backpacks），使用时运逻辑
+                enchantments.remove(Enchantments.SILK_TOUCH); // 移除精准采集
+                // 确保有时运，使用配置中的等级
+                int fortuneLevel = Math.max(ConfigManager.getFortuneLevel(), enchantments.getOrDefault(Enchantments.BLOCK_FORTUNE, 0));
+                enchantments.put(Enchantments.BLOCK_FORTUNE, fortuneLevel);
+            } else {
+                // 纯精准采集模式
+                enchantments.remove(Enchantments.BLOCK_FORTUNE); // 移除时运
+                // 确保有精准采集，使用最高等级
+                int silkTouchLevel = Math.max(1, enchantments.getOrDefault(Enchantments.SILK_TOUCH, 0));
+                enchantments.put(Enchantments.SILK_TOUCH, silkTouchLevel);
+            }
         } else {
             // 时运模式
             enchantments.remove(Enchantments.SILK_TOUCH); // 移除精准采集
@@ -677,6 +692,16 @@ public class EndlessBeafItem extends PickaxeItem {
         
         // 保存工具模式状态，这些状态将在游戏逻辑中用于判断工具行为
         // 实际的标签处理将在物品交互时根据这些状态进行判断
+        
+        // 更新工具模式标签
+        toolModesTag.putBoolean("SILK_TOUCH", modeManager.isModeActive(ToolMode.SILK_TOUCH));
+        toolModesTag.putBoolean("FORTUNE", modeManager.isModeActive(ToolMode.FORTUNE));
+        toolModesTag.putBoolean("FORCE_MINING", modeManager.isModeActive(ToolMode.FORCE_MINING));
+        toolModesTag.putBoolean("ENHANCED_CHAIN_MINING", modeManager.isModeActive(ToolMode.ENHANCED_CHAIN_MINING));
+        toolModesTag.putBoolean("AE_STORAGE_PRIORITY", modeManager.isModeActive(ToolMode.AE_STORAGE_PRIORITY));
+        
+        // 将ToolModes标签添加到主标签
+        tag.put("ToolModes", toolModesTag);
         
         // 清除旧的工具模式标签（如果存在）
         tag.remove("ActiveToolTag");

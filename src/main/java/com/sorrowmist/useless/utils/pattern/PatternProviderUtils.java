@@ -25,8 +25,9 @@ public class PatternProviderUtils {
                 return "ExPatternProvider"; // ExtendedAE扩展样板供应器
             } else if (blockEntity instanceof appeng.blockentity.crafting.PatternProviderBlockEntity) {
                 return "AECraftingPatternProvider"; // AE2普通样板供应器
-            } else if (className.equals("net.pedroksl.advanced_ae.common.entities.AdvPatternProviderEntity")) {
-                return "AAEAdvPatternProvider"; // 高级AE的高级样板供应器
+            } else if (className.equals("net.pedroksl.advanced_ae.common.entities.AdvPatternProviderEntity") ||
+                       className.equals("net.pedroksl.advanced_ae.common.entities.SmallAdvPatternProviderEntity")) {
+                return "AAEAdvPatternProvider"; // 高级AE的高级样板供应器（普通和小型）
             }
         } 
         

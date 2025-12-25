@@ -35,7 +35,8 @@ public class PatternProviderOperation {
             String className = blockEntity.getClass().getName();
             if (className.equals("com.glodblock.github.extendedae.common.tileentities.TileExPatternProvider") ||
                     blockEntity instanceof appeng.blockentity.crafting.PatternProviderBlockEntity ||
-                    className.equals("net.pedroksl.advanced_ae.common.entities.AdvPatternProviderEntity")) {
+                    className.equals("net.pedroksl.advanced_ae.common.entities.AdvPatternProviderEntity") ||
+                    className.equals("net.pedroksl.advanced_ae.common.entities.SmallAdvPatternProviderEntity")) {
                 providerType = PatternProviderUtils.getPatternProviderType(blockEntity, null);
                 hasValidProvider = !providerType.equals("Unknown");
             } 
@@ -138,7 +139,8 @@ public class PatternProviderOperation {
             String className = blockEntity.getClass().getName();
             if (className.equals("com.glodblock.github.extendedae.common.tileentities.TileExPatternProvider") ||
                     blockEntity instanceof appeng.blockentity.crafting.PatternProviderBlockEntity ||
-                    className.equals("net.pedroksl.advanced_ae.common.entities.AdvPatternProviderEntity")) {
+                    className.equals("net.pedroksl.advanced_ae.common.entities.AdvPatternProviderEntity") ||
+                    className.equals("net.pedroksl.advanced_ae.common.entities.SmallAdvPatternProviderEntity")) {
                 slaveProviderType = PatternProviderUtils.getPatternProviderType(blockEntity, null);
                 hasValidProvider = !slaveProviderType.equals("Unknown");
             } 
@@ -202,7 +204,8 @@ public class PatternProviderOperation {
             String className = blockEntity.getClass().getName();
             boolean isBlockForm = className.equals("com.glodblock.github.extendedae.common.tileentities.TileExPatternProvider") ||
                                  blockEntity instanceof appeng.blockentity.crafting.PatternProviderBlockEntity ||
-                                 className.equals("net.pedroksl.advanced_ae.common.entities.AdvPatternProviderEntity");
+                                 className.equals("net.pedroksl.advanced_ae.common.entities.AdvPatternProviderEntity") ||
+                                 className.equals("net.pedroksl.advanced_ae.common.entities.SmallAdvPatternProviderEntity");
             
             // 如果该方块已经是从方块，先移除其从方块关系
             if (isBlockForm) {

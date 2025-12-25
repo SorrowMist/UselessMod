@@ -21,7 +21,6 @@ public class PatternProviderEvent {
         for (com.sorrowmist.useless.utils.pattern.PatternProviderKey slaveKey : PatternProviderManager.getSlaveToMaster().keySet()) {
             if (slaveKey.getPos().equals(pos)) {
                 // 从端被破坏，确保内部样板不会掉落
-                // 已经在handleSlaveBreak中清空了样板，这里可以添加额外的防护
                 BlockEntity blockEntity = levelAccessor.getBlockEntity(pos);
                 if (blockEntity != null) {
                     // 使用反射和条件类加载来处理不同类型的样板供应器
@@ -34,27 +33,54 @@ public class PatternProviderEvent {
                             slaveInv.clear();
                             slaveLogic.updatePatterns();
                         } 
+                        // 处理高级AE样板供应器
+                        else if (PatternProviderManager.checkIfClassImplementsInterface(blockEntity, "net.pedroksl.advanced_ae.common.logic.AdvPatternProviderLogicHost")) {
+                            // 使用反射获取高级AE样板供应器的样板库存并清空
+                            Object patternContainer = blockEntity;
+                            Class<?> patternContainerClass = Class.forName("appeng.helpers.patternprovider.PatternContainer");
+                            java.lang.reflect.Method getTerminalPatternInventoryMethod = patternContainerClass.getMethod("getTerminalPatternInventory");
+                            Object slaveInv = getTerminalPatternInventoryMethod.invoke(patternContainer);
+                            
+                            if (slaveInv instanceof appeng.api.inventories.InternalInventory inv) {
+                                inv.clear();
+                            }
+                        }
                         // 处理面板形式
                         else if (blockEntity instanceof appeng.api.parts.IPartHost slavePartHost) {
                             // 检查指定方向的部件，再次确认清空样板
                             appeng.api.parts.IPart sidePart = slavePartHost.getPart(slaveKey.getDirection());
-                            if (sidePart != null && PatternProviderManager.checkIfClassImplementsInterface(sidePart, "appeng.helpers.patternprovider.PatternProviderLogicHost")) {
-                                // 使用反射调用方法
-                                Object hostPart = sidePart;
-                                Class<?> hostClass = Class.forName("appeng.helpers.patternprovider.PatternProviderLogicHost");
-                                java.lang.reflect.Method getLogicMethod = hostClass.getMethod("getLogic");
-                                Object slaveLogic = getLogicMethod.invoke(hostPart);
-                                
-                                Class<?> logicClass = Class.forName("appeng.helpers.patternprovider.PatternProviderLogic");
-                                java.lang.reflect.Method getPatternInvMethod = logicClass.getMethod("getPatternInv");
-                                Object slaveInv = getPatternInvMethod.invoke(slaveLogic);
+                            if (sidePart != null) {
+                                // 处理AE2普通样板供应器面板
+                                if (PatternProviderManager.checkIfClassImplementsInterface(sidePart, "appeng.helpers.patternprovider.PatternProviderLogicHost")) {
+                                    // 使用反射调用方法
+                                    Object hostPart = sidePart;
+                                    Class<?> hostClass = Class.forName("appeng.helpers.patternprovider.PatternProviderLogicHost");
+                                    java.lang.reflect.Method getLogicMethod = hostClass.getMethod("getLogic");
+                                    Object slaveLogic = getLogicMethod.invoke(hostPart);
+                                    
+                                    Class<?> logicClass = Class.forName("appeng.helpers.patternprovider.PatternProviderLogic");
+                                    java.lang.reflect.Method getPatternInvMethod = logicClass.getMethod("getPatternInv");
+                                    Object slaveInv = getPatternInvMethod.invoke(slaveLogic);
+                                    
+                                    if (slaveInv instanceof appeng.api.inventories.InternalInventory inv) {
+                                        inv.clear();
+                                    }
+                                    
+                                    java.lang.reflect.Method updatePatternsMethod = logicClass.getMethod("updatePatterns");
+                                    updatePatternsMethod.invoke(slaveLogic);
+                                }
+                            }
+                            // 处理高级AE样板供应器面板
+                            else if (PatternProviderManager.checkIfClassImplementsInterface(sidePart, "net.pedroksl.advanced_ae.common.logic.AdvPatternProviderLogicHost")) {
+                                // 使用反射获取高级AE样板供应器的样板库存并清空
+                                Object patternContainer = sidePart;
+                                Class<?> patternContainerClass = Class.forName("appeng.helpers.patternprovider.PatternContainer");
+                                java.lang.reflect.Method getTerminalPatternInventoryMethod = patternContainerClass.getMethod("getTerminalPatternInventory");
+                                Object slaveInv = getTerminalPatternInventoryMethod.invoke(patternContainer);
                                 
                                 if (slaveInv instanceof appeng.api.inventories.InternalInventory inv) {
                                     inv.clear();
                                 }
-                                
-                                java.lang.reflect.Method updatePatternsMethod = logicClass.getMethod("updatePatterns");
-                                updatePatternsMethod.invoke(slaveLogic);
                             }
                         }
                     } catch (Exception e) {
@@ -83,31 +109,26 @@ public class PatternProviderEvent {
                 var slaveInv = slaveLogic.getPatternInv();
                 slaveInv.clear();
             }
+            // 处理高级AE样板供应器
+            else if (PatternProviderManager.checkIfClassImplementsInterface(slaveBlockEntity, "net.pedroksl.advanced_ae.common.logic.AdvPatternProviderLogicHost")) {
+                // 使用反射获取高级AE样板供应器的样板库存并清空
+                Object patternContainer = slaveBlockEntity;
+                Class<?> patternContainerClass = Class.forName("appeng.helpers.patternprovider.PatternContainer");
+                java.lang.reflect.Method getTerminalPatternInventoryMethod = patternContainerClass.getMethod("getTerminalPatternInventory");
+                Object slaveInv = getTerminalPatternInventoryMethod.invoke(patternContainer);
+                
+                if (slaveInv instanceof appeng.api.inventories.InternalInventory inv) {
+                    inv.clear();
+                }
+            }
             // 处理面板形式的样板供应器
             else if (slaveBlockEntity instanceof appeng.api.parts.IPartHost partHost) {
                 // 对于面板形式，需要获取对应的部件并清空样板
                 appeng.api.parts.IPart targetPart = partHost.getPart(slaveKey.getDirection());
-                if (targetPart != null && PatternProviderManager.checkIfClassImplementsInterface(targetPart, "appeng.helpers.patternprovider.PatternProviderLogicHost")) {
-                    // 使用反射调用方法
-                    Object hostPart = targetPart;
-                    Class<?> hostClass = Class.forName("appeng.helpers.patternprovider.PatternProviderLogicHost");
-                    java.lang.reflect.Method getLogicMethod = hostClass.getMethod("getLogic");
-                    Object slaveLogic = getLogicMethod.invoke(hostPart);
-                    
-                    Class<?> logicClass = Class.forName("appeng.helpers.patternprovider.PatternProviderLogic");
-                    java.lang.reflect.Method getPatternInvMethod = logicClass.getMethod("getPatternInv");
-                    Object slaveInv = getPatternInvMethod.invoke(slaveLogic);
-                    
-                    if (slaveInv instanceof appeng.api.inventories.InternalInventory inv) {
-                        inv.clear();
-                    }
-                }
-                // 尝试中心部件
-                else {
-                    appeng.api.parts.IPart centerPart = partHost.getPart(null);
-                    if (centerPart != null && PatternProviderManager.checkIfClassImplementsInterface(centerPart, "appeng.helpers.patternprovider.PatternProviderLogicHost")) {
+                if (targetPart != null) {
+                    if (PatternProviderManager.checkIfClassImplementsInterface(targetPart, "appeng.helpers.patternprovider.PatternProviderLogicHost")) {
                         // 使用反射调用方法
-                        Object hostPart = centerPart;
+                        Object hostPart = targetPart;
                         Class<?> hostClass = Class.forName("appeng.helpers.patternprovider.PatternProviderLogicHost");
                         java.lang.reflect.Method getLogicMethod = hostClass.getMethod("getLogic");
                         Object slaveLogic = getLogicMethod.invoke(hostPart);
@@ -118,6 +139,51 @@ public class PatternProviderEvent {
                         
                         if (slaveInv instanceof appeng.api.inventories.InternalInventory inv) {
                             inv.clear();
+                        }
+                    }
+                    // 处理高级AE样板供应器面板
+                    else if (PatternProviderManager.checkIfClassImplementsInterface(targetPart, "net.pedroksl.advanced_ae.common.logic.AdvPatternProviderLogicHost")) {
+                        // 使用反射获取高级AE样板供应器的样板库存并清空
+                        Object patternContainer = targetPart;
+                        Class<?> patternContainerClass = Class.forName("appeng.helpers.patternprovider.PatternContainer");
+                        java.lang.reflect.Method getTerminalPatternInventoryMethod = patternContainerClass.getMethod("getTerminalPatternInventory");
+                        Object slaveInv = getTerminalPatternInventoryMethod.invoke(patternContainer);
+                        
+                        if (slaveInv instanceof appeng.api.inventories.InternalInventory inv) {
+                            inv.clear();
+                        }
+                    }
+                }
+                // 尝试中心部件
+                else {
+                    appeng.api.parts.IPart centerPart = partHost.getPart(null);
+                    if (centerPart != null) {
+                        if (PatternProviderManager.checkIfClassImplementsInterface(centerPart, "appeng.helpers.patternprovider.PatternProviderLogicHost")) {
+                            // 使用反射调用方法
+                            Object hostPart = centerPart;
+                            Class<?> hostClass = Class.forName("appeng.helpers.patternprovider.PatternProviderLogicHost");
+                            java.lang.reflect.Method getLogicMethod = hostClass.getMethod("getLogic");
+                            Object slaveLogic = getLogicMethod.invoke(hostPart);
+                            
+                            Class<?> logicClass = Class.forName("appeng.helpers.patternprovider.PatternProviderLogic");
+                            java.lang.reflect.Method getPatternInvMethod = logicClass.getMethod("getPatternInv");
+                            Object slaveInv = getPatternInvMethod.invoke(slaveLogic);
+                            
+                            if (slaveInv instanceof appeng.api.inventories.InternalInventory inv) {
+                                inv.clear();
+                            }
+                        }
+                        // 处理高级AE样板供应器中心部件
+                        else if (PatternProviderManager.checkIfClassImplementsInterface(centerPart, "net.pedroksl.advanced_ae.common.logic.AdvPatternProviderLogicHost")) {
+                            // 使用反射获取高级AE样板供应器的样板库存并清空
+                            Object patternContainer = centerPart;
+                            Class<?> patternContainerClass = Class.forName("appeng.helpers.patternprovider.PatternContainer");
+                            java.lang.reflect.Method getTerminalPatternInventoryMethod = patternContainerClass.getMethod("getTerminalPatternInventory");
+                            Object slaveInv = getTerminalPatternInventoryMethod.invoke(patternContainer);
+                            
+                            if (slaveInv instanceof appeng.api.inventories.InternalInventory inv) {
+                                inv.clear();
+                            }
                         }
                     }
                 }

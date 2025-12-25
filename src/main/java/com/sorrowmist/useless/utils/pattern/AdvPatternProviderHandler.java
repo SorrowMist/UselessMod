@@ -17,7 +17,9 @@ public class AdvPatternProviderHandler implements PatternProviderHandler {
 
     @Override
     public boolean isCompatible(BlockEntity blockEntity) {
-        return blockEntity != null && blockEntity.getClass().getName().equals("net.pedroksl.advanced_ae.common.entities.AdvPatternProviderEntity");
+        return blockEntity != null && 
+               (blockEntity.getClass().getName().equals("net.pedroksl.advanced_ae.common.entities.AdvPatternProviderEntity") || 
+                blockEntity.getClass().getName().equals("net.pedroksl.advanced_ae.common.entities.SmallAdvPatternProviderEntity"));
     }
 
     @Override

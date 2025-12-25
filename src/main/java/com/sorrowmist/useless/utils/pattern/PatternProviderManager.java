@@ -88,7 +88,8 @@ public class PatternProviderManager {
         String className = blockEntity.getClass().getName();
         return blockEntity instanceof appeng.blockentity.crafting.PatternProviderBlockEntity ||
                 className.equals("com.glodblock.github.extendedae.common.tileentities.TileExPatternProvider") ||
-                className.equals("net.pedroksl.advanced_ae.common.entities.AdvPatternProviderEntity");
+                className.equals("net.pedroksl.advanced_ae.common.entities.AdvPatternProviderEntity") ||
+                className.equals("net.pedroksl.advanced_ae.common.entities.SmallAdvPatternProviderEntity");
     }
 
     /**
@@ -255,9 +256,29 @@ public class PatternProviderManager {
         
         // 使用反射和条件类加载来处理不同类型的样板供应器，避免直接引用可选模组的类
         try {
+            List<net.minecraft.world.item.ItemStack> masterPatterns = new ArrayList<>();
+            
+            // 检查是否是高级AE样板供应器（AdvPatternProviderLogicHost）
+            boolean isAdvPatternProviderHost = checkIfClassImplementsInterface(masterBlockEntity, "net.pedroksl.advanced_ae.common.logic.AdvPatternProviderLogicHost");
+            if (isAdvPatternProviderHost) {
+                // 使用反射获取高级AE样板供应器的样板库存
+                Object patternContainer = masterBlockEntity;
+                Class<?> patternContainerClass = Class.forName("appeng.helpers.patternprovider.PatternContainer");
+                java.lang.reflect.Method getTerminalPatternInventoryMethod = patternContainerClass.getMethod("getTerminalPatternInventory");
+                Object masterInv = getTerminalPatternInventoryMethod.invoke(patternContainer);
+                
+                // 遍历样板库存
+                if (masterInv instanceof appeng.api.inventories.InternalInventory inv) {
+                    for (int i = 0; i < inv.size(); i++) {
+                        net.minecraft.world.item.ItemStack stack = inv.getStackInSlot(i);
+                        if (!stack.isEmpty()) {
+                            masterPatterns.add(stack.copy());
+                        }
+                    }
+                }
+            }
             // 检查是否是AE2普通样板供应器或其扩展（使用接口而非具体类）
-            boolean isPatternProviderLogicHost = checkIfClassImplementsInterface(masterBlockEntity, "appeng.helpers.patternprovider.PatternProviderLogicHost");
-            if (isPatternProviderLogicHost) {
+            else if (checkIfClassImplementsInterface(masterBlockEntity, "appeng.helpers.patternprovider.PatternProviderLogicHost")) {
                 // 使用反射调用getLogic()方法
                 Object masterHost = masterBlockEntity;
                 Class<?> hostClass = Class.forName("appeng.helpers.patternprovider.PatternProviderLogicHost");
@@ -265,7 +286,6 @@ public class PatternProviderManager {
                 Object masterLogic = getLogicMethod.invoke(masterHost);
                 
                 // 获取样板
-                List<net.minecraft.world.item.ItemStack> masterPatterns = new ArrayList<>();
                 Class<?> logicClass = Class.forName("appeng.helpers.patternprovider.PatternProviderLogic");
                 java.lang.reflect.Method getPatternInvMethod = logicClass.getMethod("getPatternInv");
                 Object masterInv = getPatternInvMethod.invoke(masterLogic);
@@ -279,21 +299,17 @@ public class PatternProviderManager {
                         }
                     }
                 }
-                
-                if (!masterPatterns.isEmpty()) {
-                    // 处理从端
-                    syncToSlavePatternProvider(slaveBlockEntity, masterPatterns);
-                }
             }
             // 检查是否是AE2普通样板供应器或其扩展的面板形式
             else if (masterBlockEntity instanceof appeng.api.parts.IPartHost masterPartHost) {
                 // 尝试从面板获取样板
-                List<net.minecraft.world.item.ItemStack> masterPatterns = getPatternsFromPartHost(masterPartHost, masterKey.getDirection());
-                if (!masterPatterns.isEmpty()) {
-                    // 处理从端
-                    syncToSlavePatternProvider(slaveBlockEntity, masterPatterns);
-                }
+                masterPatterns = getPatternsFromPartHost(masterPartHost, masterKey.getDirection());
             }
+            
+            // 无论主端是否有样板，都需要同步到从端
+            // 当主端没有样板时，清空从端的样板
+            // 从slaveKey中获取从端的方向，确保同步到正确的面板
+            syncToSlavePatternProvider(slaveBlockEntity, slaveKey.getDirection(), masterPatterns);
         } catch (Exception e) {
             // 忽略所有异常，确保不会因为可选模组缺失而崩溃
             UselessMod.LOGGER.debug("Error syncing patterns from master: {}", e.getMessage());
@@ -327,18 +343,14 @@ public class PatternProviderManager {
             appeng.api.parts.IPart targetPart = partHost.getPart(direction);
             if (targetPart != null) {
                 patterns = getPatternsFromPart(targetPart);
-                if (!patterns.isEmpty()) {
-                    return patterns;
-                }
+                return patterns; // 即使patterns为空，也要返回，确保正确传递空状态
             }
             
             // 检查中心部件
             appeng.api.parts.IPart centerPart = partHost.getPart(null);
             if (centerPart != null) {
                 patterns = getPatternsFromPart(centerPart);
-                if (!patterns.isEmpty()) {
-                    return patterns;
-                }
+                return patterns; // 即使patterns为空，也要返回，确保正确传递空状态
             }
             
             // 检查所有方向的部件
@@ -346,9 +358,7 @@ public class PatternProviderManager {
                 appeng.api.parts.IPart sidePart = partHost.getPart(dir);
                 if (sidePart != null) {
                     patterns = getPatternsFromPart(sidePart);
-                    if (!patterns.isEmpty()) {
-                        return patterns;
-                    }
+                    return patterns; // 即使patterns为空，也要返回，确保正确传递空状态
                 }
             }
         } catch (Exception e) {
@@ -365,7 +375,7 @@ public class PatternProviderManager {
         List<net.minecraft.world.item.ItemStack> patterns = new ArrayList<>();
         
         try {
-            // 检查部件是否实现了PatternProviderLogicHost接口
+            // 检查部件是否实现了PatternProviderLogicHost接口（AE2普通样板供应器）
             if (checkIfClassImplementsInterface(part, "appeng.helpers.patternprovider.PatternProviderLogicHost")) {
                 // 使用反射获取样板
                 Class<?> hostClass = Class.forName("appeng.helpers.patternprovider.PatternProviderLogicHost");
@@ -385,6 +395,23 @@ public class PatternProviderManager {
                     }
                 }
             }
+            // 检查部件是否实现了AdvPatternProviderLogicHost接口（高级AE样板供应器）
+            else if (checkIfClassImplementsInterface(part, "net.pedroksl.advanced_ae.common.logic.AdvPatternProviderLogicHost")) {
+                // 使用反射获取高级AE样板供应器的样板库存
+                Object patternContainer = part;
+                Class<?> patternContainerClass = Class.forName("appeng.helpers.patternprovider.PatternContainer");
+                java.lang.reflect.Method getTerminalPatternInventoryMethod = patternContainerClass.getMethod("getTerminalPatternInventory");
+                Object masterInv = getTerminalPatternInventoryMethod.invoke(patternContainer);
+                
+                if (masterInv instanceof appeng.api.inventories.InternalInventory inv) {
+                    for (int i = 0; i < inv.size(); i++) {
+                        net.minecraft.world.item.ItemStack stack = inv.getStackInSlot(i);
+                        if (!stack.isEmpty()) {
+                            patterns.add(stack.copy());
+                        }
+                    }
+                }
+            }
         } catch (Exception e) {
             // 忽略异常
         }
@@ -395,10 +422,33 @@ public class PatternProviderManager {
     /**
      * 同步样板到从端样板供应器
      */
-    private static void syncToSlavePatternProvider(net.minecraft.world.level.block.entity.BlockEntity slaveBlockEntity, List<net.minecraft.world.item.ItemStack> masterPatterns) {
+    private static void syncToSlavePatternProvider(net.minecraft.world.level.block.entity.BlockEntity slaveBlockEntity, net.minecraft.core.Direction slaveDirection, List<net.minecraft.world.item.ItemStack> masterPatterns) {
         try {
+            // 检查是否是高级AE样板供应器（AdvPatternProviderLogicHost）
+            boolean isAdvPatternProviderHost = checkIfClassImplementsInterface(slaveBlockEntity, "net.pedroksl.advanced_ae.common.logic.AdvPatternProviderLogicHost");
+            if (isAdvPatternProviderHost) {
+                // 使用反射获取高级AE样板供应器的样板库存
+                Object patternContainer = slaveBlockEntity;
+                Class<?> patternContainerClass = Class.forName("appeng.helpers.patternprovider.PatternContainer");
+                java.lang.reflect.Method getTerminalPatternInventoryMethod = patternContainerClass.getMethod("getTerminalPatternInventory");
+                Object slaveInv = getTerminalPatternInventoryMethod.invoke(patternContainer);
+                
+                if (slaveInv instanceof appeng.api.inventories.InternalInventory internalInv) {
+                    // 清空从方块的inventory
+                    for (int i = 0; i < internalInv.size(); i++) {
+                        internalInv.setItemDirect(i, net.minecraft.world.item.ItemStack.EMPTY);
+                    }
+                    
+                    // 复制主方块的所有pattern到从方块
+                    for (int i = 0; i < masterPatterns.size() && i < internalInv.size(); i++) {
+                        internalInv.setItemDirect(i, masterPatterns.get(i));
+                    }
+                    
+                    // 高级AE样板供应器不需要updatePatterns方法，直接更新inventory即可
+                }
+            }
             // 检查是否是PatternProviderLogicHost类型
-            if (checkIfClassImplementsInterface(slaveBlockEntity, "appeng.helpers.patternprovider.PatternProviderLogicHost")) {
+            else if (checkIfClassImplementsInterface(slaveBlockEntity, "appeng.helpers.patternprovider.PatternProviderLogicHost")) {
                 // 使用反射获取逻辑并同步
                 Class<?> hostClass = Class.forName("appeng.helpers.patternprovider.PatternProviderLogicHost");
                 java.lang.reflect.Method getLogicMethod = hostClass.getMethod("getLogic");
@@ -429,8 +479,8 @@ public class PatternProviderManager {
             }
             // 检查是否是面板形式
             else if (slaveBlockEntity instanceof appeng.api.parts.IPartHost slavePartHost) {
-                // 尝试同步到面板
-                syncToSlavePartHost(slavePartHost, masterPatterns);
+                // 尝试同步到面板，传递从端的方向
+                syncToSlavePartHost(slavePartHost, slaveDirection, masterPatterns);
             }
         } catch (Exception e) {
             // 忽略所有异常
@@ -441,16 +491,17 @@ public class PatternProviderManager {
     /**
      * 同步样板到从端面板
      */
-    private static void syncToSlavePartHost(appeng.api.parts.IPartHost slavePartHost, List<net.minecraft.world.item.ItemStack> masterPatterns) {
+    private static void syncToSlavePartHost(appeng.api.parts.IPartHost slavePartHost, net.minecraft.core.Direction targetDirection, List<net.minecraft.world.item.ItemStack> masterPatterns) {
         try {
-            // 检查所有方向的部件
-            for (net.minecraft.core.Direction dir : net.minecraft.core.Direction.values()) {
-                appeng.api.parts.IPart sidePart = slavePartHost.getPart(dir);
-                if (sidePart != null && checkIfClassImplementsInterface(sidePart, "appeng.helpers.patternprovider.PatternProviderLogicHost")) {
+            // 首先检查指定方向的部件
+            appeng.api.parts.IPart targetPart = slavePartHost.getPart(targetDirection);
+            if (targetPart != null) {
+                // 处理AE2普通样板供应器面板
+                if (checkIfClassImplementsInterface(targetPart, "appeng.helpers.patternprovider.PatternProviderLogicHost")) {
                     // 使用反射同步
                     Class<?> hostClass = Class.forName("appeng.helpers.patternprovider.PatternProviderLogicHost");
                     java.lang.reflect.Method getLogicMethod = hostClass.getMethod("getLogic");
-                    Object slaveLogic = getLogicMethod.invoke(sidePart);
+                    Object slaveLogic = getLogicMethod.invoke(targetPart);
                     
                     Class<?> logicClass = Class.forName("appeng.helpers.patternprovider.PatternProviderLogic");
                     java.lang.reflect.Method getPatternInvMethod = logicClass.getMethod("getPatternInv");
@@ -474,7 +525,94 @@ public class PatternProviderManager {
                         // 为从端设置过滤器，防止取出样板
                         setPatternFilter(slaveLogic);
                     }
-                    break; // 只同步第一个匹配的面板
+                    return; // 已找到并同步指定方向的面板
+                }
+                // 处理高级AE样板供应器面板
+                else if (checkIfClassImplementsInterface(targetPart, "net.pedroksl.advanced_ae.common.logic.AdvPatternProviderLogicHost")) {
+                    // 使用反射同步高级AE样板供应器
+                    Object patternContainer = targetPart;
+                    Class<?> patternContainerClass = Class.forName("appeng.helpers.patternprovider.PatternContainer");
+                    java.lang.reflect.Method getTerminalPatternInventoryMethod = patternContainerClass.getMethod("getTerminalPatternInventory");
+                    Object slaveInv = getTerminalPatternInventoryMethod.invoke(patternContainer);
+                    
+                    if (slaveInv instanceof appeng.api.inventories.InternalInventory internalInv) {
+                        // 清空从方块的inventory
+                        for (int i = 0; i < internalInv.size(); i++) {
+                            internalInv.setItemDirect(i, net.minecraft.world.item.ItemStack.EMPTY);
+                        }
+                        
+                        // 复制主方块的所有pattern到从方块
+                        for (int i = 0; i < masterPatterns.size() && i < internalInv.size(); i++) {
+                            internalInv.setItemDirect(i, masterPatterns.get(i));
+                        }
+                        
+                        // 高级AE样板供应器不需要updatePatterns方法，直接更新inventory即可
+                    }
+                    return; // 已找到并同步指定方向的面板
+                }
+            }
+            
+            // 如果指定方向没有匹配的部件，遍历所有方向寻找第一个匹配的部件
+            for (net.minecraft.core.Direction dir : net.minecraft.core.Direction.values()) {
+                // 跳过已经检查过的指定方向
+                if (dir == targetDirection) continue;
+                
+                appeng.api.parts.IPart sidePart = slavePartHost.getPart(dir);
+                if (sidePart != null) {
+                    // 处理AE2普通样板供应器面板
+                    if (checkIfClassImplementsInterface(sidePart, "appeng.helpers.patternprovider.PatternProviderLogicHost")) {
+                        // 使用反射同步
+                        Class<?> hostClass = Class.forName("appeng.helpers.patternprovider.PatternProviderLogicHost");
+                        java.lang.reflect.Method getLogicMethod = hostClass.getMethod("getLogic");
+                        Object slaveLogic = getLogicMethod.invoke(sidePart);
+                        
+                        Class<?> logicClass = Class.forName("appeng.helpers.patternprovider.PatternProviderLogic");
+                        java.lang.reflect.Method getPatternInvMethod = logicClass.getMethod("getPatternInv");
+                        Object slaveInv = getPatternInvMethod.invoke(slaveLogic);
+                        
+                        if (slaveInv instanceof appeng.api.inventories.InternalInventory internalInv) {
+                            // 清空从方块的inventory
+                            for (int i = 0; i < internalInv.size(); i++) {
+                                internalInv.setItemDirect(i, net.minecraft.world.item.ItemStack.EMPTY);
+                            }
+                            
+                            // 复制主方块的所有pattern到从方块
+                            for (int i = 0; i < masterPatterns.size() && i < internalInv.size(); i++) {
+                                internalInv.setItemDirect(i, masterPatterns.get(i));
+                            }
+                            
+                            // 更新从方块的patterns
+                            java.lang.reflect.Method updatePatternsMethod = logicClass.getMethod("updatePatterns");
+                            updatePatternsMethod.invoke(slaveLogic);
+                            
+                            // 为从端设置过滤器，防止取出样板
+                            setPatternFilter(slaveLogic);
+                        }
+                        break; // 只同步第一个匹配的面板
+                    }
+                    // 处理高级AE样板供应器面板
+                    else if (checkIfClassImplementsInterface(sidePart, "net.pedroksl.advanced_ae.common.logic.AdvPatternProviderLogicHost")) {
+                        // 使用反射同步高级AE样板供应器
+                        Object patternContainer = sidePart;
+                        Class<?> patternContainerClass = Class.forName("appeng.helpers.patternprovider.PatternContainer");
+                        java.lang.reflect.Method getTerminalPatternInventoryMethod = patternContainerClass.getMethod("getTerminalPatternInventory");
+                        Object slaveInv = getTerminalPatternInventoryMethod.invoke(patternContainer);
+                        
+                        if (slaveInv instanceof appeng.api.inventories.InternalInventory internalInv) {
+                            // 清空从方块的inventory
+                            for (int i = 0; i < internalInv.size(); i++) {
+                                internalInv.setItemDirect(i, net.minecraft.world.item.ItemStack.EMPTY);
+                            }
+                            
+                            // 复制主方块的所有pattern到从方块
+                            for (int i = 0; i < masterPatterns.size() && i < internalInv.size(); i++) {
+                                internalInv.setItemDirect(i, masterPatterns.get(i));
+                            }
+                            
+                            // 高级AE样板供应器不需要updatePatterns方法，直接更新inventory即可
+                        }
+                        break; // 只同步第一个匹配的面板
+                    }
                 }
             }
         } catch (Exception e) {

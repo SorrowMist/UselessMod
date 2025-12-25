@@ -1105,7 +1105,8 @@ public class EndlessBeafItem extends PickaxeItem {
                 String masterClassName = masterBlockEntity.getClass().getName();
                 boolean isBlockForm = masterClassName.equals("com.glodblock.github.extendedae.common.tileentities.TileExPatternProvider") ||
                                      masterBlockEntity instanceof appeng.blockentity.crafting.PatternProviderBlockEntity ||
-                                     masterClassName.equals("net.pedroksl.advanced_ae.common.entities.AdvPatternProviderEntity");
+                                     masterClassName.equals("net.pedroksl.advanced_ae.common.entities.AdvPatternProviderEntity") ||
+                                     masterClassName.equals("net.pedroksl.advanced_ae.common.entities.SmallAdvPatternProviderEntity");
                 
                 if (isBlockForm) {
                     // 方块形式：只需要匹配位置

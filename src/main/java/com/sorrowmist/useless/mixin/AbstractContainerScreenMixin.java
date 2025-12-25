@@ -19,6 +19,7 @@ public class AbstractContainerScreenMixin {
                     value = "STORE",
                     ordinal = 0
             )
+        
     )
     private ItemStack modifyRenderedStack(ItemStack original, GuiGraphics guiGraphics, Slot slot) {
         if (slot instanceof HighStackSlot highStackSlot) {

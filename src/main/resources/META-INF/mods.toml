@@ -66,7 +66,7 @@ description='''这个mod可能很有用，但这个mod很有用不太可能。''
     ordering="NONE"
     side="BOTH"
 [[mods.mixinConfigs]]
-config = "useless_mod.mixins.json"
+config = "mixin.useless.json"
 minVersion = "0.8"
 
 # EMI 作为可选依赖

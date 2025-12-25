@@ -109,7 +109,7 @@ public class AEBaseMenuMixin {
                     
                     if (pos != null) {
                         // 面板形式：检查该位置的所有从端，找到匹配的方向
-                        for (com.sorrowmist.useless.items.EndlessBeafItem.PatternProviderKey slaveKey : 
+                        for (com.sorrowmist.useless.utils.pattern.PatternProviderKey slaveKey : 
                              com.sorrowmist.useless.items.EndlessBeafItem.slaveToMaster.keySet()) {
                             if (slaveKey.getPos().equals(pos)) {
                                 // 如果方向匹配或者方向为null（中心部件），则是从端

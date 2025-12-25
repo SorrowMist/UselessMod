@@ -25,9 +25,11 @@ public class WrenchHookMixin {
         BlockEntity blockEntity = level.getBlockEntity(pos);
         
         // 处理直接放置的样板供应器（方块形式）
-        if (blockEntity instanceof com.glodblock.github.extendedae.common.tileentities.TileExPatternProvider ||
+        String blockEntityClassName = blockEntity.getClass().getName();
+        if (blockEntityClassName.equals("com.glodblock.github.extendedae.common.tileentities.TileExPatternProvider") ||
             blockEntity instanceof appeng.blockentity.crafting.PatternProviderBlockEntity ||
-            blockEntity instanceof net.pedroksl.advanced_ae.common.entities.AdvPatternProviderEntity) {
+            blockEntityClassName.equals("net.pedroksl.advanced_ae.common.entities.AdvPatternProviderEntity") ||
+            blockEntityClassName.equals("net.pedroksl.advanced_ae.common.entities.SmallAdvPatternProviderEntity")) {
             // 方块形式，不需要匹配方向，检查所有方向的主从关系
             handleBlockFormDisassembly(level, pos);
         } else if (blockEntity instanceof appeng.api.parts.IPartHost partHost) {
@@ -98,7 +100,7 @@ public class WrenchHookMixin {
         
         // 遍历所有可能的方向，检查是否是主端
         for (net.minecraft.core.Direction dir : net.minecraft.core.Direction.values()) {
-            EndlessBeafItem.PatternProviderKey keyWithDir = new EndlessBeafItem.PatternProviderKey(pos, dir);
+            com.sorrowmist.useless.utils.pattern.PatternProviderKey keyWithDir = new com.sorrowmist.useless.utils.pattern.PatternProviderKey(pos, dir);
             if (EndlessBeafItem.masterToSlaves.containsKey(keyWithDir)) {
                 // 处理主端拆除，清空所有从端的样板并取消关系
                 EndlessBeafItem.handleMasterBreak(level, keyWithDir);
@@ -110,7 +112,7 @@ public class WrenchHookMixin {
         // 如果不是主端，检查是否是从端（方块形式可能有多个方向的从端）
         if (!handled) {
             // 遍历所有从端，检查是否有匹配的位置
-            for (EndlessBeafItem.PatternProviderKey slaveKey : EndlessBeafItem.slaveToMaster.keySet()) {
+            for (com.sorrowmist.useless.utils.pattern.PatternProviderKey slaveKey : EndlessBeafItem.slaveToMaster.keySet()) {
                 if (slaveKey.getPos().equals(pos)) {
                     // 处理从端拆除，取消关系并清空样板
                     EndlessBeafItem.handleSlaveBreak(level, slaveKey);
@@ -127,7 +129,7 @@ public class WrenchHookMixin {
         boolean handled = false;
         
         // 检查是否是主端（严格匹配方向）
-        EndlessBeafItem.PatternProviderKey masterKey = new EndlessBeafItem.PatternProviderKey(pos, direction);
+        com.sorrowmist.useless.utils.pattern.PatternProviderKey masterKey = new com.sorrowmist.useless.utils.pattern.PatternProviderKey(pos, direction);
         if (EndlessBeafItem.masterToSlaves.containsKey(masterKey)) {
             // 处理主端拆除，清空所有从端的样板并取消关系
             EndlessBeafItem.handleMasterBreak(level, masterKey);
@@ -137,7 +139,7 @@ public class WrenchHookMixin {
         // 如果不是主端，检查是否是从端（严格匹配方向）
         if (!handled) {
             // 遍历所有从端，检查是否有匹配的位置和方向
-            for (EndlessBeafItem.PatternProviderKey slaveKey : EndlessBeafItem.slaveToMaster.keySet()) {
+            for (com.sorrowmist.useless.utils.pattern.PatternProviderKey slaveKey : EndlessBeafItem.slaveToMaster.keySet()) {
                 // 严格匹配位置和方向
                 if (slaveKey.getPos().equals(pos) && slaveKey.getDirection().equals(direction)) {
                     // 处理从端拆除，取消关系并清空样板

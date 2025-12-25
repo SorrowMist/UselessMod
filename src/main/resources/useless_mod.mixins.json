@@ -12,12 +12,7 @@
     "defaultRequire": 1
   },
   "mixins": [
-    "AEBaseMenuMixin",
     "BlockTravelAnchorMixin",
-    "PatternAccessTermMenuMixin",
-    "WrenchHookMixin",
-    "PatternSlotTrackerMixin",
-    "TileAssemblerMatrixPatternMixin",
     "TileComponentEjectorMixin",
     "TileEntityDigitalMinerMixin",
     "accessor.BlockEntityBotanyPotAccessor",
@@ -38,6 +33,11 @@
     "thermal.ItemStorageCoFHMixin",
     "thermal.MachineBlockEntityMixin",
     "thermal.Reconfigurable4WayBlockEntityMixin",
-    "thermal.ThermalAugmentRulesMixin"
+    "thermal.ThermalAugmentRulesMixin",
+    "AEBaseMenuMixin",
+    "PatternAccessTermMenuMixin",
+    "WrenchHookMixin",
+    "PatternSlotTrackerMixin",
+    "TileAssemblerMatrixPatternMixin"
   ]
 }

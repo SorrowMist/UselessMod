@@ -217,8 +217,15 @@ public class ExPatternProviderRenderer implements BlockEntityRenderer<TileExPatt
     // 注册渲染器
     @SubscribeEvent
     public static void registerRenderers(EntityRenderersEvent.RegisterRenderers event) {
-        // 使用GlodUtil.getTileType获取BlockEntityType，确保与ExtendedAE兼容
-        event.registerBlockEntityRenderer(com.glodblock.github.glodium.util.GlodUtil.getTileType(TileExPatternProvider.class), ExPatternProviderRenderer::new);
+        // 只有在ExtendedAE模组安装时才注册渲染器
+        try {
+            // 检查ExtendedAE类是否存在
+            Class.forName("com.glodblock.github.extendedae.common.tileentities.TileExPatternProvider");
+            // 使用GlodUtil.getTileType获取BlockEntityType，确保与ExtendedAE兼容
+            event.registerBlockEntityRenderer(com.glodblock.github.glodium.util.GlodUtil.getTileType(TileExPatternProvider.class), ExPatternProviderRenderer::new);
+        } catch (ClassNotFoundException e) {
+            // ExtendedAE模组未安装，跳过注册
+        }
     }
     
     // 需要将EndlessBeafItem中的静态字段设为public或提供访问方法

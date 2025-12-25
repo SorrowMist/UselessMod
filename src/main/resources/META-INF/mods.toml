@@ -66,7 +66,7 @@ description='''这个mod可能很有用，但这个mod很有用不太可能。''
     ordering="NONE"
     side="BOTH"
 [[mods.mixinConfigs]]
-config = "mixin.useless.json"
+config = "useless_mod.mixins.json"
 minVersion = "0.8"
 
 # EMI 作为可选依赖
@@ -76,13 +76,23 @@ minVersion = "0.8"
     versionRange="[1.0.0,)"
     ordering="NONE"
     side="BOTH"
-# ex-pattern-provider 作为强制依赖
+
+# AdvancedAE 作为可选依赖
 [[dependencies.${mod_id}]]
-    modId="expatternprovider"
-    mandatory=true
+    modId="advancedae"
+    mandatory=false
     versionRange="[1.0.0,)"
     ordering="NONE"
     side="BOTH"
+
+# ExtendedAE 作为可选依赖
+[[dependencies.${mod_id}]]
+    modId="extendedae"
+    mandatory=false
+    versionRange="[1.0.0,)"
+    ordering="NONE"
+    side="BOTH"
+
 # Features are specific properties of the game environment, that you may want to declare you require. This example declares
 # that your mod requires GL version 3.2 or higher. Other features will be added. They are side aware so declaring this won't
 # stop your mod loading on the server for example.

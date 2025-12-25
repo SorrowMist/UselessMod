@@ -24,34 +24,40 @@ public class WrenchHookMixin {
         BlockPos pos = hitResult.getBlockPos();
         BlockEntity blockEntity = level.getBlockEntity(pos);
         
-        // 处理直接放置的扩展样板供应器（方块形式）
-        if (blockEntity instanceof TileExPatternProvider) {
+        // 处理直接放置的样板供应器（方块形式）
+        if (blockEntity instanceof com.glodblock.github.extendedae.common.tileentities.TileExPatternProvider ||
+            blockEntity instanceof appeng.blockentity.crafting.PatternProviderBlockEntity ||
+            blockEntity instanceof net.pedroksl.advanced_ae.common.entities.AdvPatternProviderEntity) {
             // 方块形式，不需要匹配方向，检查所有方向的主从关系
             handleBlockFormDisassembly(level, pos);
         } else if (blockEntity instanceof appeng.api.parts.IPartHost partHost) {
-            // 处理面板形式的扩展样板供应器
+            // 处理面板形式的样板供应器
             // 计算玩家点击的精确位置（相对于方块的局部坐标）
             net.minecraft.world.phys.Vec3 hitLocation = hitResult.getLocation().subtract(pos.getX(), pos.getY(), pos.getZ());
             
-            // 遍历所有方向，找到与点击位置最匹配的扩展样板供应器
+            // 遍历所有方向，找到与点击位置最匹配的样板供应器
             appeng.api.parts.IPart targetPart = null;
             net.minecraft.core.Direction targetDir = null;
             double bestMatchScore = Double.MAX_VALUE;
             
             for (net.minecraft.core.Direction dir : net.minecraft.core.Direction.values()) {
                 appeng.api.parts.IPart part = partHost.getPart(dir);
-                if (part != null && part.getClass().getName().contains("ExPatternProvider")) {
-                    // 计算该方向的扩展样板供应器与点击位置的匹配程度
-                    double matchScore = calculateMatchScore(dir, hitLocation);
-                    if (matchScore < bestMatchScore) {
-                        targetPart = part;
-                        targetDir = dir;
-                        bestMatchScore = matchScore;
+                if (part != null) {
+                    String partName = part.getClass().getName();
+                    // 检查是否是任何类型的样板供应器
+                    if (partName.contains("PatternProvider")) {
+                        // 计算该方向的样板供应器与点击位置的匹配程度
+                        double matchScore = calculateMatchScore(dir, hitLocation);
+                        if (matchScore < bestMatchScore) {
+                            targetPart = part;
+                            targetDir = dir;
+                            bestMatchScore = matchScore;
+                        }
                     }
                 }
             }
             
-            // 如果找到匹配的扩展样板供应器，处理它
+            // 如果找到匹配的样板供应器，处理它
             if (targetPart != null && targetDir != null) {
                 handlePanelFormDisassembly(level, pos, targetDir);
             }

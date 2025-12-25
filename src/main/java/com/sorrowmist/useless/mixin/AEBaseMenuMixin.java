@@ -4,6 +4,7 @@ import appeng.menu.AEBaseMenu;
 import appeng.menu.implementations.PatternProviderMenu;
 import com.sorrowmist.useless.items.EndlessBeafItem;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.ClickType;
 import net.minecraft.world.item.ItemStack;
@@ -22,50 +23,19 @@ public class AEBaseMenuMixin {
         AEBaseMenu menu = (AEBaseMenu)(Object)this;
         
         // 检查是否是PatternProviderMenu或扩展样板供应器菜单实例
-            boolean isPatternMenu = menu instanceof PatternProviderMenu;
-            boolean isExPatternMenu = menu.getClass().getName().equals("com.glodblock.github.extendedae.container.ContainerExPatternProvider");
+        boolean isPatternMenu = menu instanceof PatternProviderMenu;
+        boolean isExPatternMenu = menu.getClass().getName().equals("com.glodblock.github.extendedae.container.ContainerExPatternProvider");
+        boolean isAaeAdvPatternMenu = menu.getClass().getName().contains("AdvPatternProvider");
+        
+        if (isPatternMenu || isExPatternMenu || isAaeAdvPatternMenu) {
+            // 检查当前菜单是否属于从端样板供应器
+            boolean isSlave = isSlaveMenu(menu);
             
-            if (isPatternMenu || isExPatternMenu) {
-                // 获取当前菜单的区块位置，支持BlockEntity和IPart
-                BlockPos pos = null;
-                if (menu.getBlockEntity() != null) {
-                    pos = menu.getBlockEntity().getBlockPos();
-                } else {
-                // 尝试获取IPart
-                try {
-                    java.lang.reflect.Field partField = AEBaseMenu.class.getDeclaredField("part");
-                    partField.setAccessible(true);
-                    Object part = partField.get(menu);
-                    if (part != null) {
-                        try {
-                            // 首先尝试直接调用getBlockPos方法（适用于BlockEntity情况）
-                            java.lang.reflect.Method getBlockPosMethod = part.getClass().getMethod("getBlockPos");
-                            pos = (BlockPos) getBlockPosMethod.invoke(part);
-                        } catch (NoSuchMethodException e) {
-                            // 如果没有getBlockPos方法，尝试通过getBlockEntity方法获取（适用于Part情况）
-                            try {
-                                java.lang.reflect.Method getBlockEntityMethod = part.getClass().getMethod("getBlockEntity");
-                                Object blockEntity = getBlockEntityMethod.invoke(part);
-                                if (blockEntity != null) {
-                                    java.lang.reflect.Method getBlockPosMethod = blockEntity.getClass().getMethod("getBlockPos");
-                                    pos = (BlockPos) getBlockPosMethod.invoke(blockEntity);
-                                }
-                            } catch (Exception ex) {
-                                // 忽略反射异常
-                            }
-                        }
-                    }
-                } catch (Exception e) {
-                    // 忽略反射异常
-                }
+            if (isSlave) {
+                // 如果是从端，返回空栈，阻止快速转移
+                cir.setReturnValue(ItemStack.EMPTY);
             }
-                
-                // 检查该位置是否是从端样板供应器
-                if (pos != null && EndlessBeafItem.isSlavePatternProvider(pos)) {
-                    // 如果是从端，返回空栈，阻止快速转移
-                    cir.setReturnValue(ItemStack.EMPTY);
-                }
-            }
+        }
     }
     
     @Inject(method = "clicked", at = @At("HEAD"), cancellable = true)
@@ -74,49 +44,89 @@ public class AEBaseMenuMixin {
         AEBaseMenu menu = (AEBaseMenu)(Object)this;
         
         // 检查是否是PatternProviderMenu或扩展样板供应器菜单实例
-            boolean isPatternMenu = menu instanceof PatternProviderMenu;
-            boolean isExPatternMenu = menu.getClass().getName().equals("com.glodblock.github.extendedae.container.ContainerExPatternProvider");
+        boolean isPatternMenu = menu instanceof PatternProviderMenu;
+        boolean isExPatternMenu = menu.getClass().getName().equals("com.glodblock.github.extendedae.container.ContainerExPatternProvider");
+        boolean isAaeAdvPatternMenu = menu.getClass().getName().contains("AdvPatternProvider");
+        
+        if (isPatternMenu || isExPatternMenu || isAaeAdvPatternMenu) {
+            // 检查当前菜单是否属于从端样板供应器
+            boolean isSlave = isSlaveMenu(menu);
             
-            if (isPatternMenu || isExPatternMenu) {
-                // 获取当前菜单的区块位置，支持BlockEntity和IPart
-                BlockPos pos = null;
-                if (menu.getBlockEntity() != null) {
-                    pos = menu.getBlockEntity().getBlockPos();
-                } else {
-                // 尝试获取IPart
+            if (isSlave) {
+                // 阻止所有点击操作
+                ci.cancel();
+            }
+        }
+    }
+    
+    /**
+     * 检查当前菜单是否属于从端样板供应器
+     * 对于方块形式：检查位置
+     * 对于面板形式：检查位置和方向
+     */
+    private boolean isSlaveMenu(AEBaseMenu menu) {
+        try {
+            // 检查BlockEntity情况（方块形式）
+            if (menu.getBlockEntity() != null) {
+                BlockPos pos = menu.getBlockEntity().getBlockPos();
+                // 方块形式：直接检查位置
+                return com.sorrowmist.useless.items.EndlessBeafItem.isSlavePatternProvider(pos);
+            }
+            
+            // 检查Part情况（面板形式）
+            java.lang.reflect.Field partField = AEBaseMenu.class.getDeclaredField("part");
+            partField.setAccessible(true);
+            Object part = partField.get(menu);
+            
+            if (part != null) {
                 try {
-                    java.lang.reflect.Field partField = AEBaseMenu.class.getDeclaredField("part");
-                    partField.setAccessible(true);
-                    Object part = partField.get(menu);
-                    if (part != null) {
+                    // 获取位置
+                    BlockPos pos = null;
+                    Direction direction = null;
+                    
+                    // 尝试获取BlockEntity和位置
+                    java.lang.reflect.Method getBlockEntityMethod = part.getClass().getMethod("getBlockEntity");
+                    Object blockEntity = getBlockEntityMethod.invoke(part);
+                    if (blockEntity != null) {
+                        java.lang.reflect.Method getBlockPosMethod = blockEntity.getClass().getMethod("getBlockPos");
+                        pos = (BlockPos) getBlockPosMethod.invoke(blockEntity);
+                    }
+                    
+                    // 尝试获取方向
+                    try {
+                        java.lang.reflect.Method getSideMethod = part.getClass().getMethod("getSide");
+                        direction = (Direction) getSideMethod.invoke(part);
+                    } catch (NoSuchMethodException e) {
+                        // 有些面板可能没有getSide方法，尝试获取方向字段
                         try {
-                            // 首先尝试直接调用getBlockPos方法（适用于BlockEntity情况）
-                            java.lang.reflect.Method getBlockPosMethod = part.getClass().getMethod("getBlockPos");
-                            pos = (BlockPos) getBlockPosMethod.invoke(part);
-                        } catch (NoSuchMethodException e) {
-                            // 如果没有getBlockPos方法，尝试通过getBlockEntity方法获取（适用于Part情况）
-                            try {
-                                java.lang.reflect.Method getBlockEntityMethod = part.getClass().getMethod("getBlockEntity");
-                                Object blockEntity = getBlockEntityMethod.invoke(part);
-                                if (blockEntity != null) {
-                                    java.lang.reflect.Method getBlockPosMethod = blockEntity.getClass().getMethod("getBlockPos");
-                                    pos = (BlockPos) getBlockPosMethod.invoke(blockEntity);
+                            java.lang.reflect.Field sideField = part.getClass().getDeclaredField("side");
+                            sideField.setAccessible(true);
+                            direction = (Direction) sideField.get(part);
+                        } catch (Exception ex) {
+                            // 忽略方向获取异常，继续执行
+                        }
+                    }
+                    
+                    if (pos != null) {
+                        // 面板形式：检查该位置的所有从端，找到匹配的方向
+                        for (com.sorrowmist.useless.items.EndlessBeafItem.PatternProviderKey slaveKey : 
+                             com.sorrowmist.useless.items.EndlessBeafItem.slaveToMaster.keySet()) {
+                            if (slaveKey.getPos().equals(pos)) {
+                                // 如果方向匹配或者方向为null（中心部件），则是从端
+                                if (direction == null || slaveKey.getDirection().equals(direction)) {
+                                    return true;
                                 }
-                            } catch (Exception ex) {
-                                // 忽略反射异常
                             }
                         }
                     }
                 } catch (Exception e) {
-                    // 忽略反射异常
+                    // 忽略反射异常，继续执行
                 }
             }
-                
-                // 检查该位置是否是从端样板供应器
-                if (pos != null && EndlessBeafItem.isSlavePatternProvider(pos)) {
-                    // 阻止所有点击操作
-                    ci.cancel();
-                }
-            }
+        } catch (Exception e) {
+            // 忽略反射异常
+        }
+        
+        return false;
     }
 }

@@ -1027,13 +1027,23 @@ public class EndlessBeafItem extends PickaxeItem {
                 // 已经在handleSlaveBreak中清空了样板，这里可以添加额外的防护
                 BlockEntity blockEntity = levelAccessor.getBlockEntity(pos);
                 if (blockEntity != null) {
-                    if (blockEntity instanceof TileExPatternProvider slaveTile) {
+                    if (blockEntity instanceof appeng.helpers.patternprovider.PatternProviderLogicHost slaveHost) {
                         try {
                             // 再次确认清空样板，防止任何可能的掉落
-                            var slaveLogic = slaveTile.getLogic();
+                            var slaveLogic = slaveHost.getLogic();
                             var slaveInv = slaveLogic.getPatternInv();
                             slaveInv.clear();
                             slaveLogic.updatePatterns();
+                        } catch (Exception e) {
+                            // 忽略任何异常
+                        }
+                    } else if (blockEntity instanceof net.pedroksl.advanced_ae.common.logic.AdvPatternProviderLogicHost aaeSlaveHost) {
+                        try {
+                            // 再次确认清空AdvancedAE高级样板供应器的样板
+                            var aaeSlaveLogic = aaeSlaveHost.getLogic();
+                            var aaeSlaveInv = aaeSlaveLogic.getPatternInv();
+                            aaeSlaveInv.clear();
+                            aaeSlaveLogic.updatePatterns();
                         } catch (Exception e) {
                             // 忽略任何异常
                         }
@@ -1046,6 +1056,12 @@ public class EndlessBeafItem extends PickaxeItem {
                                 var slaveInv = slaveLogic.getPatternInv();
                                 slaveInv.clear();
                                 slaveLogic.updatePatterns();
+                            } else if (sidePart instanceof net.pedroksl.advanced_ae.common.logic.AdvPatternProviderLogicHost aaeSlaveHostPart) {
+                                // 处理面板形式的AdvancedAE高级样板供应器
+                                var aaeSlaveLogic = aaeSlaveHostPart.getLogic();
+                                var aaeSlaveInv = aaeSlaveLogic.getPatternInv();
+                                aaeSlaveInv.clear();
+                                aaeSlaveLogic.updatePatterns();
                             } else {
                                 // 检查中心部件
                                 appeng.api.parts.IPart centerPart = slavePartHost.getPart(null);
@@ -1054,6 +1070,12 @@ public class EndlessBeafItem extends PickaxeItem {
                                     var slaveInv = slaveLogic.getPatternInv();
                                     slaveInv.clear();
                                     slaveLogic.updatePatterns();
+                                } else if (centerPart instanceof net.pedroksl.advanced_ae.common.logic.AdvPatternProviderLogicHost aaeSlaveHostPart) {
+                                    // 处理中心部件形式的AdvancedAE高级样板供应器
+                                    var aaeSlaveLogic = aaeSlaveHostPart.getLogic();
+                                    var aaeSlaveInv = aaeSlaveLogic.getPatternInv();
+                                    aaeSlaveInv.clear();
+                                    aaeSlaveLogic.updatePatterns();
                                 }
                             }
                         } catch (Exception e) {
@@ -1117,11 +1139,11 @@ public class EndlessBeafItem extends PickaxeItem {
         BlockEntity slaveBlockEntity = levelAccessor.getBlockEntity(slaveKey.getPos());
         if (slaveBlockEntity == null) return;
         
-        // 处理直接放置的扩展样板供应器
-        if (slaveBlockEntity instanceof TileExPatternProvider slaveTile) {
+        // 处理直接放置的样板供应器
+        if (slaveBlockEntity instanceof appeng.helpers.patternprovider.PatternProviderLogicHost slaveHost) {
             try {
                 // 获取从端的pattern inventory并清空
-                var slaveLogic = slaveTile.getLogic();
+                var slaveLogic = slaveHost.getLogic();
                 var slaveInv = slaveLogic.getPatternInv();
                 slaveInv.clear();
                 // 更新从端的patterns
@@ -1129,28 +1151,47 @@ public class EndlessBeafItem extends PickaxeItem {
             } catch (Exception e) {
                 // 忽略任何异常
             }
-        } else if (slaveBlockEntity instanceof appeng.api.parts.IPartHost slavePartHost) {
-            // 处理面板形式的扩展样板供应器
+        } else if (slaveBlockEntity instanceof net.pedroksl.advanced_ae.common.logic.AdvPatternProviderLogicHost aaeSlaveHost) {
             try {
-                // 检查指定方向的部件，找到扩展样板供应器
+                // 获取AdvancedAE高级样板供应器的logic并清空
+                var aaeSlaveLogic = aaeSlaveHost.getLogic();
+                var aaeSlaveInv = aaeSlaveLogic.getPatternInv();
+                aaeSlaveInv.clear();
+                // 更新从端的patterns
+                aaeSlaveLogic.updatePatterns();
+            } catch (Exception e) {
+                // 忽略任何异常
+            }
+        } else if (slaveBlockEntity instanceof appeng.api.parts.IPartHost slavePartHost) {
+            // 处理面板形式的样板供应器
+            try {
+                // 检查指定方向的部件
                 appeng.api.parts.IPart sidePart = slavePartHost.getPart(slaveKey.getDirection());
-                if (sidePart != null && sidePart.getClass().getName().contains("ExPatternProvider")) {
-                    if (sidePart instanceof appeng.helpers.patternprovider.PatternProviderLogicHost slaveHostPart) {
+                if (sidePart instanceof appeng.helpers.patternprovider.PatternProviderLogicHost slaveHostPart) {
+                    var slaveLogic = slaveHostPart.getLogic();
+                    var slaveInv = slaveLogic.getPatternInv();
+                    slaveInv.clear();
+                    slaveLogic.updatePatterns();
+                } else if (sidePart instanceof net.pedroksl.advanced_ae.common.logic.AdvPatternProviderLogicHost aaeSlaveHostPart) {
+                    // 处理面板形式的AdvancedAE高级样板供应器
+                    var aaeSlaveLogic = aaeSlaveHostPart.getLogic();
+                    var aaeSlaveInv = aaeSlaveLogic.getPatternInv();
+                    aaeSlaveInv.clear();
+                    aaeSlaveLogic.updatePatterns();
+                } else {
+                    // 检查中心部件
+                    appeng.api.parts.IPart centerPart = slavePartHost.getPart(null);
+                    if (centerPart instanceof appeng.helpers.patternprovider.PatternProviderLogicHost slaveHostPart) {
                         var slaveLogic = slaveHostPart.getLogic();
                         var slaveInv = slaveLogic.getPatternInv();
                         slaveInv.clear();
                         slaveLogic.updatePatterns();
-                    }
-                } else {
-                    // 检查中心部件
-                    appeng.api.parts.IPart centerPart = slavePartHost.getPart(null);
-                    if (centerPart != null && centerPart.getClass().getName().contains("ExPatternProvider")) {
-                        if (centerPart instanceof appeng.helpers.patternprovider.PatternProviderLogicHost slaveHostPart) {
-                            var slaveLogic = slaveHostPart.getLogic();
-                            var slaveInv = slaveLogic.getPatternInv();
-                            slaveInv.clear();
-                            slaveLogic.updatePatterns();
-                        }
+                    } else if (centerPart instanceof net.pedroksl.advanced_ae.common.logic.AdvPatternProviderLogicHost aaeSlaveHostPart) {
+                        // 处理中心部件形式的AdvancedAE高级样板供应器
+                        var aaeSlaveLogic = aaeSlaveHostPart.getLogic();
+                        var aaeSlaveInv = aaeSlaveLogic.getPatternInv();
+                        aaeSlaveInv.clear();
+                        aaeSlaveLogic.updatePatterns();
                     }
                 }
             } catch (Exception e) {
@@ -1181,38 +1222,70 @@ public class EndlessBeafItem extends PickaxeItem {
         syncData.setDirty();
     }
     
+    // 获取样板供应器类型
+    private String getPatternProviderType(BlockEntity blockEntity, appeng.api.parts.IPart part) {
+        if (blockEntity instanceof com.glodblock.github.extendedae.common.tileentities.TileExPatternProvider) {
+            return "ExPatternProvider"; // ExtendedAE扩展样板供应器
+        } else if (blockEntity instanceof appeng.blockentity.crafting.PatternProviderBlockEntity) {
+            return "AECraftingPatternProvider"; // AE2普通样板供应器
+        } else if (blockEntity instanceof net.pedroksl.advanced_ae.common.entities.AdvPatternProviderEntity) {
+            return "AAEAdvPatternProvider"; // 高级AE的高级样板供应器
+        } else if (part != null) {
+            String partName = part.getClass().getName();
+            if (partName.contains("ExPatternProvider")) {
+                return "ExPatternProvider"; // 面板形式的ExtendedAE扩展样板供应器
+            } else if (partName.contains("PatternProvider") && !partName.contains("AdvPatternProvider")) {
+                return "AECraftingPatternProvider"; // 面板形式的AE2普通样板供应器
+            } else if (partName.contains("AdvPatternProvider")) {
+                return "AAEAdvPatternProvider"; // 面板形式的高级AE高级样板供应器
+            }
+        }
+        return "Unknown"; // 未知类型
+    }
+    
     // 设置为主方块
     public void setAsMaster(Level world, BlockPos masterPos, Direction direction, Player player) {
-        // 检查方块位置是否包含扩展样板供应器
-        boolean hasExPatternProvider = false;
+        // 检查方块位置是否包含有效的样板供应器
+        boolean hasValidProvider = false;
+        String providerType = "Unknown";
         
         // 获取方块实体
         BlockEntity blockEntity = world.getBlockEntity(masterPos);
         if (blockEntity != null) {
-            // 检查是否是直接放置的扩展样板供应器
-            hasExPatternProvider = blockEntity instanceof com.glodblock.github.extendedae.common.tileentities.TileExPatternProvider;
-            
-            // 如果不是，检查是否包含扩展样板供应器部件
-            if (!hasExPatternProvider) {
+            // 检查是否是直接放置的样板供应器
+            if (blockEntity instanceof com.glodblock.github.extendedae.common.tileentities.TileExPatternProvider ||
+                blockEntity instanceof appeng.blockentity.crafting.PatternProviderBlockEntity ||
+                blockEntity instanceof net.pedroksl.advanced_ae.common.entities.AdvPatternProviderEntity) {
+                hasValidProvider = true;
+                providerType = getPatternProviderType(blockEntity, null);
+            } 
+            // 如果不是，检查是否包含样板供应器部件
+            else {
                 try {
                     // 检查是否是IPartHost，包含部件
                     if (blockEntity instanceof appeng.api.parts.IPartHost partHost) {
-                        // 找到与点击位置最匹配的扩展样板供应器方向
+                        // 找到与点击位置最匹配的样板供应器方向
                         Direction actualDirection = findMatchingDirection(partHost, masterPos, direction, player);
                         
                         // 使用实际方向检查部件
                         appeng.api.parts.IPart targetPart = partHost.getPart(actualDirection);
-                        if (targetPart != null && targetPart.getClass().getName().contains("ExPatternProvider")) {
-                            hasExPatternProvider = true;
-                            // 使用实际方向替换传入的方向
-                            direction = actualDirection;
-                        } else {
-                            // 检查中心部件（线缆）
-                            appeng.api.parts.IPart centerPart = partHost.getPart(null);
-                            if (centerPart != null && centerPart.getClass().getName().contains("ExPatternProvider")) {
-                                hasExPatternProvider = true;
-                                // 中心部件方向为null
-                                direction = null;
+                        if (targetPart != null) {
+                            String partType = getPatternProviderType(null, targetPart);
+                            if (!partType.equals("Unknown")) {
+                                hasValidProvider = true;
+                                providerType = partType;
+                                direction = actualDirection;
+                            } else {
+                                // 检查中心部件（线缆）
+                                appeng.api.parts.IPart centerPart = partHost.getPart(null);
+                                if (centerPart != null) {
+                                    String centerType = getPatternProviderType(null, centerPart);
+                                    if (!centerType.equals("Unknown")) {
+                                        hasValidProvider = true;
+                                        providerType = centerType;
+                                        direction = null;
+                                    }
+                                }
                             }
                         }
                     }
@@ -1222,8 +1295,8 @@ public class EndlessBeafItem extends PickaxeItem {
             }
         }
         
-        // 如果包含扩展样板供应器，设置主方块
-        if (hasExPatternProvider) {
+        // 如果包含有效样板供应器，设置主方块
+        if (hasValidProvider) {
             // 创建主方块的键
             PatternProviderKey masterKey = new PatternProviderKey(masterPos, direction != null ? direction : Direction.UP);
             
@@ -1252,17 +1325,58 @@ public class EndlessBeafItem extends PickaxeItem {
             currentSelectedMaster = masterKey;
             
             if (player != null) {
-                player.sendSystemMessage(Component.literal("已将此扩展样板供应器设为主方块").withStyle(ChatFormatting.GREEN));
+                String providerTypeName = "样板供应器";
+                if (providerType.equals("ExPatternProvider")) {
+                    providerTypeName = "扩展样板供应器";
+                } else if (providerType.equals("AECraftingPatternProvider")) {
+                    providerTypeName = "AE2普通样板供应器";
+                } else if (providerType.equals("AAEAdvPatternProvider")) {
+                    providerTypeName = "高级AE高级样板供应器";
+                }
+                player.sendSystemMessage(Component.literal("已将此" + providerTypeName + "设为主方块").withStyle(ChatFormatting.GREEN));
             }
             
             // 保存同步数据
             saveSyncData(world);
         } else {
-            // 如果不包含扩展样板供应器，提示玩家
+            // 如果不包含有效样板供应器，提示玩家
             if (player != null) {
-                player.sendSystemMessage(Component.literal("此位置不包含扩展样板供应器").withStyle(ChatFormatting.RED));
+                player.sendSystemMessage(Component.literal("此位置不包含有效的样板供应器").withStyle(ChatFormatting.RED));
             }
         }
+    }
+    
+    // 获取给定主方块的样板供应器类型
+    private String getMasterProviderType(Level world, PatternProviderKey masterKey) {
+        BlockEntity blockEntity = world.getBlockEntity(masterKey.getPos());
+        if (blockEntity != null) {
+            // 检查是否是直接放置的样板供应器
+            if (blockEntity instanceof com.glodblock.github.extendedae.common.tileentities.TileExPatternProvider ||
+                blockEntity instanceof appeng.blockentity.crafting.PatternProviderBlockEntity ||
+                blockEntity instanceof net.pedroksl.advanced_ae.common.entities.AdvPatternProviderEntity) {
+                return getPatternProviderType(blockEntity, null);
+            } 
+            // 如果是IPartHost，检查部件
+            else if (blockEntity instanceof appeng.api.parts.IPartHost partHost) {
+                // 检查指定方向的部件
+                appeng.api.parts.IPart targetPart = partHost.getPart(masterKey.getDirection());
+                if (targetPart != null) {
+                    String partType = getPatternProviderType(null, targetPart);
+                    if (!partType.equals("Unknown")) {
+                        return partType;
+                    }
+                }
+                // 检查中心部件
+                appeng.api.parts.IPart centerPart = partHost.getPart(null);
+                if (centerPart != null) {
+                    String centerType = getPatternProviderType(null, centerPart);
+                    if (!centerType.equals("Unknown")) {
+                        return centerType;
+                    }
+                }
+            }
+        }
+        return "Unknown";
     }
     
     // 添加为从方块
@@ -1271,41 +1385,52 @@ public class EndlessBeafItem extends PickaxeItem {
         PatternProviderKey masterKey = currentSelectedMaster;
         if (masterKey == null) {
             if (player != null) {
-                player.sendSystemMessage(Component.literal("请先设置一个主扩展样板供应器").withStyle(ChatFormatting.RED));
+                player.sendSystemMessage(Component.literal("请先设置一个主样板供应器").withStyle(ChatFormatting.RED));
             }
             return;
         }
         
-        // 检查方块位置是否包含扩展样板供应器
-        boolean hasExPatternProvider = false;
+        // 检查方块位置是否包含有效的样板供应器
+        boolean hasValidProvider = false;
+        String slaveProviderType = "Unknown";
         
         // 获取方块实体
         BlockEntity blockEntity = world.getBlockEntity(slavePos);
         if (blockEntity != null) {
-            // 检查是否是直接放置的扩展样板供应器
-            hasExPatternProvider = blockEntity instanceof com.glodblock.github.extendedae.common.tileentities.TileExPatternProvider;
-            
-            // 如果不是，检查是否包含扩展样板供应器部件
-            if (!hasExPatternProvider) {
+            // 检查是否是直接放置的样板供应器
+            if (blockEntity instanceof com.glodblock.github.extendedae.common.tileentities.TileExPatternProvider ||
+                blockEntity instanceof appeng.blockentity.crafting.PatternProviderBlockEntity ||
+                blockEntity instanceof net.pedroksl.advanced_ae.common.entities.AdvPatternProviderEntity) {
+                hasValidProvider = true;
+                slaveProviderType = getPatternProviderType(blockEntity, null);
+            } 
+            // 如果不是，检查是否包含样板供应器部件
+            else {
                 try {
                     // 检查是否是IPartHost，包含部件
                     if (blockEntity instanceof appeng.api.parts.IPartHost partHost) {
-                        // 找到与点击位置最匹配的扩展样板供应器方向
+                        // 找到与点击位置最匹配的样板供应器方向
                         Direction actualDirection = findMatchingDirection(partHost, slavePos, direction, player);
                         
                         // 使用实际方向检查部件
                         appeng.api.parts.IPart targetPart = partHost.getPart(actualDirection);
-                        if (targetPart != null && targetPart.getClass().getName().contains("ExPatternProvider")) {
-                            hasExPatternProvider = true;
-                            // 使用实际方向替换传入的方向
-                            direction = actualDirection;
-                        } else {
-                            // 检查中心部件（线缆）
-                            appeng.api.parts.IPart centerPart = partHost.getPart(null);
-                            if (centerPart != null && centerPart.getClass().getName().contains("ExPatternProvider")) {
-                                hasExPatternProvider = true;
-                                // 中心部件方向为null
-                                direction = null;
+                        if (targetPart != null) {
+                            String partType = getPatternProviderType(null, targetPart);
+                            if (!partType.equals("Unknown")) {
+                                hasValidProvider = true;
+                                slaveProviderType = partType;
+                                direction = actualDirection;
+                            } else {
+                                // 检查中心部件（线缆）
+                                appeng.api.parts.IPart centerPart = partHost.getPart(null);
+                                if (centerPart != null) {
+                                    String centerType = getPatternProviderType(null, centerPart);
+                                    if (!centerType.equals("Unknown")) {
+                                        hasValidProvider = true;
+                                        slaveProviderType = centerType;
+                                        direction = null;
+                                    }
+                                }
                             }
                         }
                     }
@@ -1315,31 +1440,83 @@ public class EndlessBeafItem extends PickaxeItem {
             }
         }
         
-        // 如果包含扩展样板供应器，添加为从方块
-        if (hasExPatternProvider) {
+        // 如果包含有效样板供应器，添加为从方块
+        if (hasValidProvider) {
+            // 获取主方块的类型
+            String masterProviderType = getMasterProviderType(world, masterKey);
+            
+            // 确保只有同类样板供应器可以绑定
+            if (!slaveProviderType.equals(masterProviderType)) {
+                if (player != null) {
+                    player.sendSystemMessage(Component.literal("只有同类样板供应器可以绑定").withStyle(ChatFormatting.RED));
+                }
+                return;
+            }
             // 创建从方块的键
             PatternProviderKey slaveKey = new PatternProviderKey(slavePos, direction != null ? direction : Direction.UP);
             
+            // 检查是否是方块形式
+            boolean isBlockForm = blockEntity instanceof com.glodblock.github.extendedae.common.tileentities.TileExPatternProvider ||
+                                 blockEntity instanceof appeng.blockentity.crafting.PatternProviderBlockEntity ||
+                                 blockEntity instanceof net.pedroksl.advanced_ae.common.entities.AdvPatternProviderEntity;
+            
             // 如果该方块已经是从方块，先移除其从方块关系
-            if (slaveToMaster.containsKey(slaveKey)) {
-                PatternProviderKey oldMaster = slaveToMaster.remove(slaveKey);
-                if (oldMaster != null) {
-                    Set<PatternProviderKey> oldSlaves = masterToSlaves.get(oldMaster);
-                    if (oldSlaves != null) {
-                        oldSlaves.remove(slaveKey);
-                        if (oldSlaves.isEmpty()) {
-                            masterToSlaves.remove(oldMaster);
+            if (isBlockForm) {
+                // 方块形式：检查该位置是否有任何从端关系（不考虑方向）
+                for (Map.Entry<PatternProviderKey, PatternProviderKey> entry : slaveToMaster.entrySet()) {
+                    PatternProviderKey existingSlaveKey = entry.getKey();
+                    if (existingSlaveKey.getPos().equals(slavePos)) {
+                        PatternProviderKey oldMaster = slaveToMaster.remove(existingSlaveKey);
+                        if (oldMaster != null) {
+                            Set<PatternProviderKey> oldSlaves = masterToSlaves.get(oldMaster);
+                            if (oldSlaves != null) {
+                                oldSlaves.remove(existingSlaveKey);
+                                if (oldSlaves.isEmpty()) {
+                                    masterToSlaves.remove(oldMaster);
+                                }
+                            }
+                        }
+                        break; // 只需要移除一个，因为一个位置只能有一个从端
+                    }
+                }
+            } else {
+                // 面板形式：需要考虑方向
+                if (slaveToMaster.containsKey(slaveKey)) {
+                    PatternProviderKey oldMaster = slaveToMaster.remove(slaveKey);
+                    if (oldMaster != null) {
+                        Set<PatternProviderKey> oldSlaves = masterToSlaves.get(oldMaster);
+                        if (oldSlaves != null) {
+                            oldSlaves.remove(slaveKey);
+                            if (oldSlaves.isEmpty()) {
+                                masterToSlaves.remove(oldMaster);
+                            }
                         }
                     }
                 }
             }
             
             // 如果该方块是主方块，先移除其主方块关系
-            if (masterToSlaves.containsKey(slaveKey)) {
-                Set<PatternProviderKey> oldSlaves = masterToSlaves.remove(slaveKey);
-                if (oldSlaves != null) {
-                    for (PatternProviderKey oldSlave : oldSlaves) {
-                        slaveToMaster.remove(oldSlave);
+            if (isBlockForm) {
+                // 方块形式：检查该位置是否有任何主端关系（不考虑方向）
+                for (PatternProviderKey existingMasterKey : new HashSet<>(masterToSlaves.keySet())) {
+                    if (existingMasterKey.getPos().equals(slavePos)) {
+                        Set<PatternProviderKey> oldSlaves = masterToSlaves.remove(existingMasterKey);
+                        if (oldSlaves != null) {
+                            for (PatternProviderKey oldSlave : oldSlaves) {
+                                slaveToMaster.remove(oldSlave);
+                            }
+                        }
+                        break; // 只需要移除一个，因为一个位置只能有一个主端
+                    }
+                }
+            } else {
+                // 面板形式：需要考虑方向
+                if (masterToSlaves.containsKey(slaveKey)) {
+                    Set<PatternProviderKey> oldSlaves = masterToSlaves.remove(slaveKey);
+                    if (oldSlaves != null) {
+                        for (PatternProviderKey oldSlave : oldSlaves) {
+                            slaveToMaster.remove(oldSlave);
+                        }
                     }
                 }
             }
@@ -1349,7 +1526,15 @@ public class EndlessBeafItem extends PickaxeItem {
             slaveToMaster.put(slaveKey, masterKey);
             
             if (player != null) {
-                player.sendSystemMessage(Component.literal("已将此扩展样板供应器设为从方块，跟随主方块").withStyle(ChatFormatting.BLUE));
+                String providerTypeName = "样板供应器";
+                if (slaveProviderType.equals("ExPatternProvider")) {
+                    providerTypeName = "扩展样板供应器";
+                } else if (slaveProviderType.equals("AECraftingPatternProvider")) {
+                    providerTypeName = "AE2普通样板供应器";
+                } else if (slaveProviderType.equals("AAEAdvPatternProvider")) {
+                    providerTypeName = "高级AE高级样板供应器";
+                }
+                player.sendSystemMessage(Component.literal("已将此" + providerTypeName + "设为从方块，跟随主方块").withStyle(ChatFormatting.BLUE));
             }
             
             // 立即同步一次
@@ -1364,21 +1549,33 @@ public class EndlessBeafItem extends PickaxeItem {
                         // 检查指定方向的部件，设置从端样板供应器不在终端显示
                         appeng.api.parts.IPart targetPart = partHost.getPart(direction);
                         if (targetPart instanceof appeng.helpers.patternprovider.PatternProviderLogicHost slaveHostPart) {
-                            // 设置从端样板供应器不在终端显示
+                            // 设置AE2普通从端样板供应器不在终端显示
                             appeng.api.util.IConfigManager configManager = slaveHostPart.getConfigManager();
+                            configManager.putSetting(appeng.api.config.Settings.PATTERN_ACCESS_TERMINAL, appeng.api.config.YesNo.NO);
+                        } else if (targetPart instanceof net.pedroksl.advanced_ae.common.logic.AdvPatternProviderLogicHost aaeSlaveHostPart) {
+                            // 设置AdvancedAE高级从端样板供应器不在终端显示
+                            appeng.api.util.IConfigManager configManager = aaeSlaveHostPart.getConfigManager();
                             configManager.putSetting(appeng.api.config.Settings.PATTERN_ACCESS_TERMINAL, appeng.api.config.YesNo.NO);
                         } else {
                             // 检查中心部件（线缆）
                             appeng.api.parts.IPart centerPart = partHost.getPart(null);
                             if (centerPart instanceof appeng.helpers.patternprovider.PatternProviderLogicHost slaveHostPart) {
-                                // 设置从端样板供应器不在终端显示
+                                // 设置AE2普通从端样板供应器不在终端显示
                                 appeng.api.util.IConfigManager configManager = slaveHostPart.getConfigManager();
+                                configManager.putSetting(appeng.api.config.Settings.PATTERN_ACCESS_TERMINAL, appeng.api.config.YesNo.NO);
+                            } else if (centerPart instanceof net.pedroksl.advanced_ae.common.logic.AdvPatternProviderLogicHost aaeSlaveHostPart) {
+                                // 设置AdvancedAE高级从端样板供应器不在终端显示
+                                appeng.api.util.IConfigManager configManager = aaeSlaveHostPart.getConfigManager();
                                 configManager.putSetting(appeng.api.config.Settings.PATTERN_ACCESS_TERMINAL, appeng.api.config.YesNo.NO);
                             }
                         }
                     } else if (slaveBlockEntity instanceof appeng.helpers.patternprovider.PatternProviderLogicHost slaveHost) {
-                        // 直接放置的扩展样板供应器
+                        // 直接放置的AE2普通样板供应器
                         appeng.api.util.IConfigManager configManager = slaveHost.getConfigManager();
+                        configManager.putSetting(appeng.api.config.Settings.PATTERN_ACCESS_TERMINAL, appeng.api.config.YesNo.NO);
+                    } else if (slaveBlockEntity instanceof net.pedroksl.advanced_ae.common.logic.AdvPatternProviderLogicHost aaeSlaveHost) {
+                        // 直接放置的AdvancedAE高级样板供应器
+                        appeng.api.util.IConfigManager configManager = aaeSlaveHost.getConfigManager();
                         configManager.putSetting(appeng.api.config.Settings.PATTERN_ACCESS_TERMINAL, appeng.api.config.YesNo.NO);
                     }
                 }
@@ -1387,18 +1584,20 @@ public class EndlessBeafItem extends PickaxeItem {
             // 保存同步数据
             saveSyncData(world);
         } else {
-            // 如果不包含扩展样板供应器，提示玩家
+            // 如果不包含有效样板供应器，提示玩家
             if (player != null) {
-                player.sendSystemMessage(Component.literal("此位置不包含扩展样板供应器").withStyle(ChatFormatting.RED));
+                player.sendSystemMessage(Component.literal("此位置不包含有效的样板供应器").withStyle(ChatFormatting.RED));
             }
         }
     }
     
-    // 找到与点击位置最匹配的扩展样板供应器方向
+    // 找到与点击位置最匹配的样板供应器方向
     private Direction findMatchingDirection(appeng.api.parts.IPartHost partHost, BlockPos blockPos, Direction initialDirection, Player player) {
         // 如果是直接放置的方块，直接返回初始方向
         BlockEntity blockEntity = player.level().getBlockEntity(blockPos);
-        if (blockEntity instanceof com.glodblock.github.extendedae.common.tileentities.TileExPatternProvider) {
+        if (blockEntity instanceof com.glodblock.github.extendedae.common.tileentities.TileExPatternProvider ||
+            blockEntity instanceof appeng.blockentity.crafting.PatternProviderBlockEntity ||
+            blockEntity instanceof net.pedroksl.advanced_ae.common.entities.AdvPatternProviderEntity) {
             return initialDirection;
         }
         
@@ -1411,18 +1610,21 @@ public class EndlessBeafItem extends PickaxeItem {
         net.minecraft.world.phys.BlockHitResult blockHitResult = (net.minecraft.world.phys.BlockHitResult) hitResult;
         net.minecraft.world.phys.Vec3 hitLocation = blockHitResult.getLocation().subtract(blockPos.getX(), blockPos.getY(), blockPos.getZ());
         
-        // 遍历所有方向，找到与点击位置最匹配的扩展样板供应器
+        // 遍历所有方向，找到与点击位置最匹配的样板供应器
         Direction bestDirection = initialDirection;
         double bestMatchScore = Double.MAX_VALUE;
         
         for (Direction dir : Direction.values()) {
             appeng.api.parts.IPart part = partHost.getPart(dir);
-            if (part != null && part.getClass().getName().contains("ExPatternProvider")) {
-                // 计算该方向与点击位置的匹配程度
-                double matchScore = calculateMatchScore(dir, hitLocation);
-                if (matchScore < bestMatchScore) {
-                    bestMatchScore = matchScore;
-                    bestDirection = dir;
+            if (part != null) {
+                String partType = getPatternProviderType(null, part);
+                if (!partType.equals("Unknown")) {
+                    // 计算该方向与点击位置的匹配程度
+                    double matchScore = calculateMatchScore(dir, hitLocation);
+                    if (matchScore < bestMatchScore) {
+                        bestMatchScore = matchScore;
+                        bestDirection = dir;
+                    }
                 }
             }
         }
@@ -1473,28 +1675,98 @@ public class EndlessBeafItem extends PickaxeItem {
         BlockEntity masterBlockEntity = world.getBlockEntity(masterKey.getPos());
         if (masterBlockEntity == null) return;
         
-        // 获取主端的PatternProviderLogic
-        appeng.helpers.patternprovider.PatternProviderLogic masterLogic = null;
+        // 获取主端的样板
+        List<ItemStack> masterPatterns = new ArrayList<>();
+        boolean masterFound = false;
         
-        // 检查是否是直接放置的扩展样板供应器
-        if (masterBlockEntity instanceof TileExPatternProvider masterTile) {
-            masterLogic = masterTile.getLogic();
+        // 检查是否是直接放置的样板供应器
+        if (masterBlockEntity instanceof appeng.helpers.patternprovider.PatternProviderLogicHost masterHost) {
+            // AE2普通和ExtendedAE扩展样板供应器
+            var masterLogic = masterHost.getLogic();
+            var masterInv = masterLogic.getPatternInv();
+            for (ItemStack stack : masterInv) {
+                if (!stack.isEmpty()) {
+                    masterPatterns.add(stack.copy());
+                }
+            }
+            masterFound = true;
+        } else if (masterBlockEntity instanceof net.pedroksl.advanced_ae.common.logic.AdvPatternProviderLogicHost aaeMasterHost) {
+            // AdvancedAE高级样板供应器
+            var aaeMasterLogic = aaeMasterHost.getLogic();
+            var aaeMasterInv = aaeMasterLogic.getPatternInv();
+            for (ItemStack stack : aaeMasterInv) {
+                if (!stack.isEmpty()) {
+                    masterPatterns.add(stack.copy());
+                }
+            }
+            masterFound = true;
         } else if (masterBlockEntity instanceof appeng.api.parts.IPartHost masterPartHost) {
             // 检查指定方向的部件
             appeng.api.parts.IPart targetPart = masterPartHost.getPart(masterKey.getDirection());
             if (targetPart instanceof appeng.helpers.patternprovider.PatternProviderLogicHost masterHostPart) {
-                masterLogic = masterHostPart.getLogic();
+                // 面板形式的AE2普通或ExtendedAE扩展样板供应器
+                var masterLogic = masterHostPart.getLogic();
+                var masterInv = masterLogic.getPatternInv();
+                for (ItemStack stack : masterInv) {
+                    if (!stack.isEmpty()) {
+                        masterPatterns.add(stack.copy());
+                    }
+                }
+                masterFound = true;
+            } else if (targetPart instanceof net.pedroksl.advanced_ae.common.logic.AdvPatternProviderLogicHost aaeMasterHostPart) {
+                // 面板形式的AdvancedAE高级样板供应器
+                var aaeMasterLogic = aaeMasterHostPart.getLogic();
+                var aaeMasterInv = aaeMasterLogic.getPatternInv();
+                for (ItemStack stack : aaeMasterInv) {
+                    if (!stack.isEmpty()) {
+                        masterPatterns.add(stack.copy());
+                    }
+                }
+                masterFound = true;
             } else {
                 // 检查中心部件（线缆）
                 appeng.api.parts.IPart centerPart = masterPartHost.getPart(null);
                 if (centerPart instanceof appeng.helpers.patternprovider.PatternProviderLogicHost masterHostPart) {
-                    masterLogic = masterHostPart.getLogic();
+                    var masterLogic = masterHostPart.getLogic();
+                    var masterInv = masterLogic.getPatternInv();
+                    for (ItemStack stack : masterInv) {
+                        if (!stack.isEmpty()) {
+                            masterPatterns.add(stack.copy());
+                        }
+                    }
+                    masterFound = true;
+                } else if (centerPart instanceof net.pedroksl.advanced_ae.common.logic.AdvPatternProviderLogicHost aaeMasterHostPart) {
+                    var aaeMasterLogic = aaeMasterHostPart.getLogic();
+                    var aaeMasterInv = aaeMasterLogic.getPatternInv();
+                    for (ItemStack stack : aaeMasterInv) {
+                        if (!stack.isEmpty()) {
+                            masterPatterns.add(stack.copy());
+                        }
+                    }
+                    masterFound = true;
                 } else {
                     // 检查所有方向的部件，找到第一个匹配的
                     for (net.minecraft.core.Direction dir : net.minecraft.core.Direction.values()) {
                         appeng.api.parts.IPart sidePart = masterPartHost.getPart(dir);
                         if (sidePart instanceof appeng.helpers.patternprovider.PatternProviderLogicHost masterHostPart) {
-                            masterLogic = masterHostPart.getLogic();
+                            var masterLogic = masterHostPart.getLogic();
+                            var masterInv = masterLogic.getPatternInv();
+                            for (ItemStack stack : masterInv) {
+                                if (!stack.isEmpty()) {
+                                    masterPatterns.add(stack.copy());
+                                }
+                            }
+                            masterFound = true;
+                            break;
+                        } else if (sidePart instanceof net.pedroksl.advanced_ae.common.logic.AdvPatternProviderLogicHost aaeMasterHostPart) {
+                            var aaeMasterLogic = aaeMasterHostPart.getLogic();
+                            var aaeMasterInv = aaeMasterLogic.getPatternInv();
+                            for (ItemStack stack : aaeMasterInv) {
+                                if (!stack.isEmpty()) {
+                                    masterPatterns.add(stack.copy());
+                                }
+                            }
+                            masterFound = true;
                             break;
                         }
                     }
@@ -1502,31 +1774,43 @@ public class EndlessBeafItem extends PickaxeItem {
             }
         }
         
-        if (masterLogic == null) return;
+        if (!masterFound || masterPatterns.isEmpty()) {
+            return;
+        }
         
-        // 获取主端的pattern inventory
-        var masterInv = masterLogic.getPatternInv();
+
         
         // 获取从方块的BlockEntity
         BlockEntity slaveBlockEntity = world.getBlockEntity(slaveKey.getPos());
         if (slaveBlockEntity == null) return;
         
-        // 处理从端的扩展样板供应器，包括直接放置的和面板形式的
+        // 处理从端的样板供应器，包括直接放置的和面板形式的
         List<appeng.helpers.patternprovider.PatternProviderLogic> slaveLogics = new ArrayList<>();
+        List<net.pedroksl.advanced_ae.common.logic.AdvPatternProviderLogic> aaeSlaveLogics = new ArrayList<>();
         
-        // 检查是否是直接放置的扩展样板供应器
-        if (slaveBlockEntity instanceof TileExPatternProvider slaveTile) {
-            slaveLogics.add(slaveTile.getLogic());
+        // 检查是否是直接放置的样板供应器
+        if (slaveBlockEntity instanceof appeng.helpers.patternprovider.PatternProviderLogicHost slaveHost) {
+            // 适用于所有直接实现PatternProviderLogicHost的方块实体
+            slaveLogics.add(slaveHost.getLogic());
+        } else if (slaveBlockEntity instanceof net.pedroksl.advanced_ae.common.logic.AdvPatternProviderLogicHost aaeSlaveHost) {
+            // AdvancedAE高级样板供应器
+            aaeSlaveLogics.add(aaeSlaveHost.getLogic());
         } else if (slaveBlockEntity instanceof appeng.api.parts.IPartHost slavePartHost) {
             // 检查指定方向的部件
             appeng.api.parts.IPart targetPart = slavePartHost.getPart(slaveKey.getDirection());
             if (targetPart instanceof appeng.helpers.patternprovider.PatternProviderLogicHost slaveHostPart) {
                 slaveLogics.add(slaveHostPart.getLogic());
+            } else if (targetPart instanceof net.pedroksl.advanced_ae.common.logic.AdvPatternProviderLogicHost aaeSlaveHostPart) {
+                // 面板形式的AdvancedAE高级样板供应器
+                aaeSlaveLogics.add(aaeSlaveHostPart.getLogic());
             } else {
                 // 检查中心部件（线缆）
                 appeng.api.parts.IPart centerPart = slavePartHost.getPart(null);
                 if (centerPart instanceof appeng.helpers.patternprovider.PatternProviderLogicHost slaveHostPart) {
                     slaveLogics.add(slaveHostPart.getLogic());
+                } else if (centerPart instanceof net.pedroksl.advanced_ae.common.logic.AdvPatternProviderLogicHost aaeSlaveHostPart) {
+                    // 中心部件形式的AdvancedAE高级样板供应器
+                    aaeSlaveLogics.add(aaeSlaveHostPart.getLogic());
                 }
             }
         }
@@ -1539,30 +1823,9 @@ public class EndlessBeafItem extends PickaxeItem {
             slaveInv.clear();
             
             // 复制主方块的所有pattern到从方块
-            // 使用Java反射来调用getStackInSlot方法，避免编译问题
-            try {
-                java.lang.reflect.Method getStackInSlotMethod = masterInv.getClass().getMethod("getStackInSlot", int.class);
-                for (int i = 0; i < masterInv.size(); i++) {
-                    ItemStack stack = (ItemStack) getStackInSlotMethod.invoke(masterInv, i);
-                    if (!stack.isEmpty()) {
-                        slaveInv.setItemDirect(i, stack.copy());
-                    }
-                }
-            } catch (Exception e) {
-                // 如果反射失败，尝试另一种方式
-                // 清空从方块并使用insertItem方法
-                slaveInv.clear();
-                for (ItemStack stack : masterInv) {
-                    if (!stack.isEmpty()) {
-                        // 找到第一个空槽位并插入
-                        for (int i = 0; i < slaveInv.size(); i++) {
-                            if (slaveInv.getStackInSlot(i).isEmpty()) {
-                                slaveInv.setItemDirect(i, stack.copy());
-                                break;
-                            }
-                        }
-                    }
-                }
+            // 使用新的masterPatterns列表直接复制
+            for (int i = 0; i < masterPatterns.size() && i < slaveInv.size(); i++) {
+                slaveInv.setItemDirect(i, masterPatterns.get(i));
             }
             
             // 更新从方块的patterns
@@ -1574,6 +1837,43 @@ public class EndlessBeafItem extends PickaxeItem {
                 java.lang.reflect.Field logicField = slaveLogic.getClass().getDeclaredField("patternInventory");
                 logicField.setAccessible(true);
                 Object inventoryObj = logicField.get(slaveLogic);
+                
+                // 检查是否为AppEngInternalInventory类型
+                if (inventoryObj instanceof appeng.util.inv.AppEngInternalInventory appEngInv) {
+                    // 设置过滤器，阻止提取样板
+                    appEngInv.setFilter(new appeng.util.inv.filter.IAEItemFilter() {
+                        @Override
+                        public boolean allowExtract(appeng.api.inventories.InternalInventory inv, int slot, int amount) {
+                            return false;
+                        }
+                    });
+                }
+            } catch (Exception e) {
+                // 忽略反射异常
+            }
+        }
+        
+        // 同步所有AdvancedAE高级样板供应器从端的pattern
+        for (net.pedroksl.advanced_ae.common.logic.AdvPatternProviderLogic aaeSlaveLogic : aaeSlaveLogics) {
+            var aaeSlaveInv = aaeSlaveLogic.getPatternInv();
+            
+            // 清空从方块的inventory
+            aaeSlaveInv.clear();
+            
+            // 复制主方块的所有pattern到从方块
+            for (int i = 0; i < masterPatterns.size() && i < aaeSlaveInv.size(); i++) {
+                aaeSlaveInv.setItemDirect(i, masterPatterns.get(i));
+            }
+            
+            // 更新从方块的patterns
+            aaeSlaveLogic.updatePatterns();
+            
+            // 为从端设置过滤器，防止取出样板
+            try {
+                // 获取AdvPatternProviderLogic的patternInventory字段
+                java.lang.reflect.Field logicField = aaeSlaveLogic.getClass().getDeclaredField("patternInventory");
+                logicField.setAccessible(true);
+                Object inventoryObj = logicField.get(aaeSlaveLogic);
                 
                 // 检查是否为AppEngInternalInventory类型
                 if (inventoryObj instanceof appeng.util.inv.AppEngInternalInventory appEngInv) {
@@ -1633,8 +1933,10 @@ public class EndlessBeafItem extends PickaxeItem {
                 // 获取主端的方块实体
                 BlockEntity masterBlockEntity = level.getBlockEntity(selectedMasterKey.getPos());
                 
-                // 检查主端是否是方块形式（直接的TileExPatternProvider）
-                boolean isBlockForm = masterBlockEntity instanceof com.glodblock.github.extendedae.common.tileentities.TileExPatternProvider;
+                // 检查主端是否是方块形式（直接放置的方块，不是面板）
+                boolean isBlockForm = masterBlockEntity instanceof com.glodblock.github.extendedae.common.tileentities.TileExPatternProvider ||
+                                     masterBlockEntity instanceof appeng.blockentity.crafting.PatternProviderBlockEntity ||
+                                     masterBlockEntity instanceof net.pedroksl.advanced_ae.common.entities.AdvPatternProviderEntity;
                 
                 if (isBlockForm) {
                     // 方块形式：只需要匹配位置
@@ -1692,33 +1994,74 @@ public class EndlessBeafItem extends PickaxeItem {
             BlockEntity blockEntity = world.getBlockEntity(masterKey.getPos());
             if (blockEntity == null) continue;
             
-            // 获取主端的PatternProviderLogic，支持方块形式和面板形式
-            appeng.helpers.patternprovider.PatternProviderLogic masterLogic = null;
+            // 获取主端的样板
+            List<ItemStack> masterPatterns = new ArrayList<>();
+            boolean masterFound = false;
             
-            // 检查是否是直接放置的扩展样板供应器
-            if (blockEntity instanceof TileExPatternProvider masterTile) {
-                masterLogic = masterTile.getLogic();
+            // 处理主端的不同类型
+            if (blockEntity instanceof appeng.helpers.patternprovider.PatternProviderLogicHost masterHost) {
+                // AE2普通和ExtendedAE扩展样板供应器
+                var masterLogic = masterHost.getLogic();
+                var masterInv = masterLogic.getPatternInv();
+                for (int i = 0; i < masterInv.size(); i++) {
+                    ItemStack stack = masterInv.getStackInSlot(i);
+                    masterPatterns.add(stack.copy());
+                }
+                masterFound = true;
+            } else if (blockEntity instanceof net.pedroksl.advanced_ae.common.logic.AdvPatternProviderLogicHost aaeMasterHost) {
+                // AdvancedAE高级样板供应器
+                var aaeMasterLogic = aaeMasterHost.getLogic();
+                var aaeMasterInv = aaeMasterLogic.getPatternInv();
+                for (int i = 0; i < aaeMasterInv.size(); i++) {
+                    ItemStack stack = aaeMasterInv.getStackInSlot(i);
+                    masterPatterns.add(stack.copy());
+                }
+                masterFound = true;
             } else if (blockEntity instanceof appeng.api.parts.IPartHost masterPartHost) {
-                // 检查指定方向的部件
-                appeng.api.parts.IPart sidePart = masterPartHost.getPart(masterKey.getDirection());
-                if (sidePart != null && sidePart.getClass().getName().contains("ExPatternProvider")) {
-                    if (sidePart instanceof appeng.helpers.patternprovider.PatternProviderLogicHost masterHostPart) {
-                        masterLogic = masterHostPart.getLogic();
+                // 面板形式的样板供应器
+                appeng.api.parts.IPart targetPart = masterPartHost.getPart(masterKey.getDirection());
+                if (targetPart instanceof appeng.helpers.patternprovider.PatternProviderLogicHost masterHostPart) {
+                    // 面板形式的AE2普通或ExtendedAE扩展样板供应器
+                    var masterLogic = masterHostPart.getLogic();
+                    var masterInv = masterLogic.getPatternInv();
+                    for (int i = 0; i < masterInv.size(); i++) {
+                        ItemStack stack = masterInv.getStackInSlot(i);
+                        masterPatterns.add(stack.copy());
                     }
+                    masterFound = true;
+                } else if (targetPart instanceof net.pedroksl.advanced_ae.common.logic.AdvPatternProviderLogicHost aaeMasterHostPart) {
+                    // 面板形式的AdvancedAE高级样板供应器
+                    var aaeMasterLogic = aaeMasterHostPart.getLogic();
+                    var aaeMasterInv = aaeMasterLogic.getPatternInv();
+                    for (int i = 0; i < aaeMasterInv.size(); i++) {
+                        ItemStack stack = aaeMasterInv.getStackInSlot(i);
+                        masterPatterns.add(stack.copy());
+                    }
+                    masterFound = true;
                 } else {
-                    // 检查中心部件
+                    // 检查中心部件（线缆）
                     appeng.api.parts.IPart centerPart = masterPartHost.getPart(null);
-                    if (centerPart != null && centerPart.getClass().getName().contains("ExPatternProvider")) {
-                        if (centerPart instanceof appeng.helpers.patternprovider.PatternProviderLogicHost masterHostPart) {
-                            masterLogic = masterHostPart.getLogic();
+                    if (centerPart instanceof appeng.helpers.patternprovider.PatternProviderLogicHost masterHostPart) {
+                        var masterLogic = masterHostPart.getLogic();
+                        var masterInv = masterLogic.getPatternInv();
+                        for (int i = 0; i < masterInv.size(); i++) {
+                            ItemStack stack = masterInv.getStackInSlot(i);
+                            masterPatterns.add(stack.copy());
                         }
+                        masterFound = true;
+                    } else if (centerPart instanceof net.pedroksl.advanced_ae.common.logic.AdvPatternProviderLogicHost aaeMasterHostPart) {
+                        var aaeMasterLogic = aaeMasterHostPart.getLogic();
+                        var aaeMasterInv = aaeMasterLogic.getPatternInv();
+                        for (int i = 0; i < aaeMasterInv.size(); i++) {
+                            ItemStack stack = aaeMasterInv.getStackInSlot(i);
+                            masterPatterns.add(stack.copy());
+                        }
+                        masterFound = true;
                     }
                 }
             }
             
-            if (masterLogic == null) continue;
-            
-            var masterInv = masterLogic.getPatternInv();
+            if (!masterFound) continue;
             
             // 同步到所有从方块
             for (PatternProviderKey slaveKey : slaves) {
@@ -1729,25 +2072,46 @@ public class EndlessBeafItem extends PickaxeItem {
                     BlockEntity slaveBlockEntity = world.getBlockEntity(slaveKey.getPos());
                     if (slaveBlockEntity == null) continue;
                     
-                    // 获取从端的PatternProviderLogic，支持方块形式和面板形式
+                    // 获取从端的逻辑，支持不同类型的样板供应器
                     appeng.helpers.patternprovider.PatternProviderLogic slaveLogic = null;
+                    net.pedroksl.advanced_ae.common.logic.AdvPatternProviderLogic aaeSlaveLogic = null;
                     
-                    // 检查是否是直接放置的扩展样板供应器
-                    if (slaveBlockEntity instanceof TileExPatternProvider slaveTile) {
-                        slaveLogic = slaveTile.getLogic();
+                    // 检查是否是直接放置的样板供应器
+                    if (slaveBlockEntity instanceof appeng.helpers.patternprovider.PatternProviderLogicHost slaveHost) {
+                        // AE2普通和ExtendedAE扩展样板供应器
+                        slaveLogic = slaveHost.getLogic();
+                    } else if (slaveBlockEntity instanceof net.pedroksl.advanced_ae.common.logic.AdvPatternProviderLogicHost aaeSlaveHost) {
+                        // AdvancedAE高级样板供应器
+                        aaeSlaveLogic = aaeSlaveHost.getLogic();
                     } else if (slaveBlockEntity instanceof appeng.api.parts.IPartHost slavePartHost) {
                         // 检查指定方向的部件
                         appeng.api.parts.IPart sidePart = slavePartHost.getPart(slaveKey.getDirection());
-                        if (sidePart != null && sidePart.getClass().getName().contains("ExPatternProvider")) {
-                            if (sidePart instanceof appeng.helpers.patternprovider.PatternProviderLogicHost slaveHostPart) {
-                                slaveLogic = slaveHostPart.getLogic();
-                            }
+                        if (sidePart instanceof appeng.helpers.patternprovider.PatternProviderLogicHost slaveHostPart) {
+                            // 面板形式的AE2普通或ExtendedAE扩展样板供应器
+                            slaveLogic = slaveHostPart.getLogic();
+                        } else if (sidePart instanceof net.pedroksl.advanced_ae.common.logic.AdvPatternProviderLogicHost aaeSlaveHostPart) {
+                            // 面板形式的AdvancedAE高级样板供应器
+                            aaeSlaveLogic = aaeSlaveHostPart.getLogic();
                         } else {
                             // 检查中心部件
                             appeng.api.parts.IPart centerPart = slavePartHost.getPart(null);
-                            if (centerPart != null && centerPart.getClass().getName().contains("ExPatternProvider")) {
-                                if (centerPart instanceof appeng.helpers.patternprovider.PatternProviderLogicHost slaveHostPart) {
-                                    slaveLogic = slaveHostPart.getLogic();
+                            if (centerPart instanceof appeng.helpers.patternprovider.PatternProviderLogicHost slaveHostPart) {
+                                // 中心部件形式的AE2普通或ExtendedAE扩展样板供应器
+                                slaveLogic = slaveHostPart.getLogic();
+                            } else if (centerPart instanceof net.pedroksl.advanced_ae.common.logic.AdvPatternProviderLogicHost aaeSlaveHostPart) {
+                                // 中心部件形式的AdvancedAE高级样板供应器
+                                aaeSlaveLogic = aaeSlaveHostPart.getLogic();
+                            } else {
+                                // 检查所有方向的部件，找到第一个匹配的
+                                for (Direction dir : Direction.values()) {
+                                    appeng.api.parts.IPart dirPart = slavePartHost.getPart(dir);
+                                    if (slaveLogic == null && dirPart instanceof appeng.helpers.patternprovider.PatternProviderLogicHost slaveHostPart) {
+                                        slaveLogic = slaveHostPart.getLogic();
+                                        break;
+                                    } else if (aaeSlaveLogic == null && dirPart instanceof net.pedroksl.advanced_ae.common.logic.AdvPatternProviderLogicHost aaeSlaveHostPart) {
+                                        aaeSlaveLogic = aaeSlaveHostPart.getLogic();
+                                        break;
+                                    }
                                 }
                             }
                         }
@@ -1758,8 +2122,8 @@ public class EndlessBeafItem extends PickaxeItem {
                         
                         // 复制主方块的所有pattern到从方块
                         boolean needsUpdate = false;
-                        for (int i = 0; i < masterInv.size(); i++) {
-                            ItemStack masterStack = masterInv.getStackInSlot(i);
+                        for (int i = 0; i < masterPatterns.size() && i < slaveInv.size(); i++) {
+                            ItemStack masterStack = masterPatterns.get(i);
                             ItemStack slaveStack = slaveInv.getStackInSlot(i);
                             
                             if (!ItemStack.matches(masterStack, slaveStack)) {
@@ -1781,6 +2145,49 @@ public class EndlessBeafItem extends PickaxeItem {
                             java.lang.reflect.Field logicField = slaveLogic.getClass().getDeclaredField("patternInventory");
                             logicField.setAccessible(true);
                             Object inventoryObj = logicField.get(slaveLogic);
+                            
+                            // 检查是否为AppEngInternalInventory类型
+                            if (inventoryObj instanceof appeng.util.inv.AppEngInternalInventory appEngInv) {
+                                // 设置过滤器，阻止提取样板
+                                appEngInv.setFilter(new appeng.util.inv.filter.IAEItemFilter() {
+                                    @Override
+                                    public boolean allowExtract(appeng.api.inventories.InternalInventory inv, int slot, int amount) {
+                                        return false;
+                                    }
+                                });
+                            }
+                        } catch (Exception e) {
+                            // 忽略反射异常
+                        }
+                    } else if (aaeSlaveLogic != null) {
+                        // 处理AdvancedAE高级样板供应器
+                        var aaeSlaveInv = aaeSlaveLogic.getPatternInv();
+                        
+                        // 复制主方块的所有pattern到从方块
+                        boolean needsUpdate = false;
+                        for (int i = 0; i < masterPatterns.size() && i < aaeSlaveInv.size(); i++) {
+                            ItemStack masterStack = masterPatterns.get(i);
+                            ItemStack slaveStack = aaeSlaveInv.getStackInSlot(i);
+                            
+                            if (!ItemStack.matches(masterStack, slaveStack)) {
+                                aaeSlaveInv.setItemDirect(i, masterStack.copy());
+                                needsUpdate = true;
+                            }
+                        }
+                        
+                        if (needsUpdate) {
+                            // 更新从方块的patterns
+                            aaeSlaveLogic.updatePatterns();
+                            // 更新同步时间
+                            lastSyncTime.put(slaveKey, currentTime);
+                        }
+                        
+                        // 为从端设置过滤器，防止取出样板
+                        try {
+                            // 获取AdvPatternProviderLogic的patternInventory字段
+                            java.lang.reflect.Field logicField = aaeSlaveLogic.getClass().getDeclaredField("patternInventory");
+                            logicField.setAccessible(true);
+                            Object inventoryObj = logicField.get(aaeSlaveLogic);
                             
                             // 检查是否为AppEngInternalInventory类型
                             if (inventoryObj instanceof appeng.util.inv.AppEngInternalInventory appEngInv) {

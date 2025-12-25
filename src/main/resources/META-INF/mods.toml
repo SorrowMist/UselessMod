@@ -80,7 +80,7 @@ minVersion = "0.8"
 # AdvancedAE 作为可选依赖
 [[dependencies.${mod_id}]]
     modId="advancedae"
-    mandatory=false
+    mandatory=true
     versionRange="[1.0.0,)"
     ordering="NONE"
     side="BOTH"

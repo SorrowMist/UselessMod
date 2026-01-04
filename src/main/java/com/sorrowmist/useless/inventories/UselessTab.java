@@ -4,6 +4,7 @@ import com.sorrowmist.useless.UselessMod;
 import com.sorrowmist.useless.blocks.GlowPlasticBlock;
 import com.sorrowmist.useless.blocks.advancedalloyfurnace.AdvancedAlloyFurnaceBlock;
 import com.sorrowmist.useless.blocks.oregenerator.OreGeneratorBlock;
+import com.sorrowmist.useless.blocks.CreatorDollBlock;
 import com.sorrowmist.useless.blocks.teleport.TeleportBlock;
 import com.sorrowmist.useless.blocks.teleport.TeleportBlock2;
 import com.sorrowmist.useless.blocks.teleport.TeleportBlock3;
@@ -46,6 +47,8 @@ public class UselessTab {
                             pOutput.accept(item.get());
                         }
 
+                        // 添加制作者皮肤玩偶方块物品
+                        pOutput.accept(CreatorDollBlock.CREATOR_DOLL_BLOCK_ITEM.get());
 
                         pOutput.accept(ModIngots.USELESS_INGOT_TIER_1.get());
                         pOutput.accept(ModIngots.USELESS_INGOT_TIER_2.get());
@@ -66,6 +69,7 @@ public class UselessTab {
                         pOutput.accept(ModMolds.METAL_MOLD_ROD.get());
                         pOutput.accept(ModMolds.METAL_MOLD_GEAR.get());
                         pOutput.accept(ModMolds.METAL_MOLD_WIRE.get());
+                        pOutput.accept(ModMolds.METAL_MOLD_BLOCK.get());
                         
                         // 添加无用齿轮到创造标签
                         pOutput.accept(ModComponents.USELESS_GEAR_TIER_1.get());

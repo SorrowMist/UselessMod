@@ -43,7 +43,17 @@ import javax.annotation.Nullable;
 import java.util.ArrayList;
 import java.util.List;
 
-public class AdvancedAlloyFurnaceBlockEntity extends BlockEntity implements MenuProvider {
+// AE2 Integration
+import appeng.api.config.Actionable;
+import appeng.api.networking.*;
+import appeng.api.networking.energy.IEnergySource;
+import appeng.api.networking.security.IActionSource;
+import appeng.api.networking.storage.IStorageService;
+import appeng.api.stacks.*;
+import appeng.api.storage.*;
+import appeng.capabilities.Capabilities;
+
+public class AdvancedAlloyFurnaceBlockEntity extends BlockEntity implements MenuProvider, IGridNodeListener<AdvancedAlloyFurnaceBlockEntity>, appeng.api.networking.IInWorldGridNodeHost, appeng.api.networking.security.IActionHost {
 
     // 能量系统
     private final CustomEnergyStorage energyStorage = new CustomEnergyStorage(Integer.MAX_VALUE, Integer.MAX_VALUE, 0);
@@ -88,6 +98,11 @@ public class AdvancedAlloyFurnaceBlockEntity extends BlockEntity implements Menu
 
     // 总槽位数从12增加到14
     private static final int TOTAL_SLOTS = 14;
+    
+    // AE2 Integration
+    private final IManagedGridNode gridNode;
+    private final IActionSource actionSource;
+    private boolean isConnectedToAE = false;
 
     // 容器数据同步 - 修改为并行数
     private final ContainerData data = new ContainerData() {
@@ -316,10 +331,72 @@ public class AdvancedAlloyFurnaceBlockEntity extends BlockEntity implements Menu
         // 设置所有槽位支持高堆叠
         this.itemHandler.setAllSlotCapacity(Integer.MAX_VALUE);
         this.lazyItemHandler = LazyOptional.of(() -> itemHandler);
+        
+        // AE2 Integration
+        // 创建动作源
+        this.actionSource = appeng.api.networking.security.IActionSource.ofMachine(this);
+        
+        // 创建网格节点
+        this.gridNode = GridHelper.createManagedNode(this, this)
+                .setInWorldNode(true)
+                .setTagName("node"); // 设置为in-world节点并添加标签
+    }
+    
+    // IGridNodeListener implementation
+    @Override
+    public void onSaveChanges(AdvancedAlloyFurnaceBlockEntity nodeOwner, IGridNode node) {
+        // 当需要保存节点变化时的处理
+        setChanged();
+    }
+    
+    @Override
+    public void onGridChanged(AdvancedAlloyFurnaceBlockEntity nodeOwner, IGridNode node) {
+        // 当网格变化时，更新连接状态
+        isConnectedToAE = node.isActive();
+        setChanged();
+        markForClientUpdate();
+    }
+    
+    @Override
+    public void onStateChanged(AdvancedAlloyFurnaceBlockEntity nodeOwner, IGridNode node, State state) {
+        // 节点状态变化时的处理
+        isConnectedToAE = node.isActive();
+        setChanged();
+        markForClientUpdate();
     }
 
     // 数据同步管理
     private boolean needsClientUpdate = false;
+    
+    // AE2 Integration - 生命周期管理
+    @Override
+    public void clearRemoved() {
+        super.clearRemoved();
+        // 当方块实体不再被移除时，创建网格节点
+        GridHelper.onFirstTick(this, (be) -> {
+            be.gridNode.create(getLevel(), getBlockPos());
+        });
+    }
+    
+    @Override
+    public void onLoad() {
+        super.onLoad();
+        // 节点创建由clearRemoved中的GridHelper.onFirstTick处理，确保只创建一次
+    }
+    
+    @Override
+    public void onChunkUnloaded() {
+        super.onChunkUnloaded();
+        // 区块卸载时销毁节点
+        this.gridNode.destroy();
+    }
+    
+    @Override
+    public void setRemoved() {
+        super.setRemoved();
+        // 方块被移除时销毁节点
+        this.gridNode.destroy();
+    }
 
     // 在tick方法中实时更新并行数
     public void tick() {
@@ -494,16 +571,73 @@ public class AdvancedAlloyFurnaceBlockEntity extends BlockEntity implements Menu
     private void tryAutoOutput() {
         boolean outputtedAny = false;
 
-        // 输出物品到周围容器
+        // 优先输出物品到AE网络
+        outputtedAny |= tryOutputItemsToAE();
+        
+        // 然后输出流体到AE网络
+        outputtedAny |= tryOutputFluidsToAE();
+        
+        // 然后输出物品到周围容器
         outputtedAny |= tryOutputItems();
 
-        // 输出流体到周围容器
+        // 然后输出流体到周围容器
         outputtedAny |= tryOutputFluids();
 
         if (outputtedAny) {
             setChanged();
             markForClientUpdate();
         }
+    }
+    
+    // AE2 Integration - 输出物品到AE网络
+    private boolean tryOutputItemsToAE() {
+        boolean outputtedAny = false;
+        
+        if (!isConnectedToAE) {
+            return false;
+        }
+
+        // 检查所有输出槽位（6-11）
+        for (int slot = 6; slot < 12; slot++) {
+            ItemStack stackInSlot = itemHandler.getStackInSlot(slot);
+            if (stackInSlot.isEmpty()) continue;
+
+            // 尝试输出到AE网络
+            long inserted = tryOutputToAE(stackInSlot);
+            if (inserted > 0) {
+                // 更新槽位内容
+                if (inserted >= stackInSlot.getCount()) {
+                    itemHandler.setStackInSlot(slot, ItemStack.EMPTY);
+                } else {
+                    ItemStack remainingStack = stackInSlot.copy();
+                    remainingStack.setCount((int) (stackInSlot.getCount() - inserted));
+                    itemHandler.setStackInSlot(slot, remainingStack);
+                }
+                outputtedAny = true;
+            }
+        }
+
+        return outputtedAny;
+    }
+    
+    // AE2 Integration - 输出流体到AE网络
+    private boolean tryOutputFluidsToAE() {
+        if (!isConnectedToAE) {
+            return false;
+        }
+        
+        FluidStack fluidInTank = outputFluidTank.getFluid();
+        if (fluidInTank.isEmpty()) return false;
+
+        // 尝试输出到AE网络
+        long inserted = tryOutputFluidToAE(fluidInTank);
+        if (inserted > 0) {
+            // 从输出槽抽取相应数量的流体
+            outputFluidTank.drain((int) inserted, IFluidHandler.FluidAction.EXECUTE);
+            return true;
+        }
+
+        return false;
     }
 
     private boolean tryOutputItems() {
@@ -898,6 +1032,49 @@ public class AdvancedAlloyFurnaceBlockEntity extends BlockEntity implements Menu
     // 用于验证输入的复用列表，避免频繁创建ArrayList
     private final List<ItemStack> validationInputItems = new ArrayList<>(6);
     
+    // AE2 Integration - 获取存储服务
+    private MEStorage getStorageService() {
+        if (!isConnectedToAE) {
+            return null;
+        }
+        
+        IGridNode node = this.gridNode.getNode();
+        if (node == null || !node.isActive()) {
+            return null;
+        }
+        
+        IGrid grid = node.getGrid();
+        if (grid == null) {
+            return null;
+        }
+        
+        IStorageService storageService = grid.getService(IStorageService.class);
+        if (storageService == null) {
+            return null;
+        }
+        
+        return storageService.getInventory();
+    }
+    
+    // AE2 Integration - 获取能量源
+    private IEnergySource getEnergySource() {
+        if (!isConnectedToAE) {
+            return null;
+        }
+        
+        IGridNode node = this.gridNode.getNode();
+        if (node == null || !node.isActive()) {
+            return null;
+        }
+        
+        IGrid grid = node.getGrid();
+        if (grid == null) {
+            return null;
+        }
+        
+        return grid.getEnergyService();
+    }
+    
     private boolean validateInputs(AdvancedAlloyFurnaceRecipe recipe) {
         // 清空复用列表并重新填充，避免创建新的ArrayList
         validationInputItems.clear();
@@ -1071,7 +1248,7 @@ public class AdvancedAlloyFurnaceBlockEntity extends BlockEntity implements Menu
 
     // 直接输出到自身容器的配方结果处理方法
     private void outputRecipeResults(AdvancedAlloyFurnaceRecipe recipe, int parallel) {
-        // 直接输出物品到自身容器
+        // 直接输出物品到AE网络（如果连接），否则输出到自身容器
         for (ItemStack output : recipe.getOutputItems()) {
             if (!output.isEmpty()) {
                 // 使用long类型计算总输出数量，避免整数溢出
@@ -1086,15 +1263,50 @@ public class AdvancedAlloyFurnaceBlockEntity extends BlockEntity implements Menu
                     // 每次输出不超过Integer.MAX_VALUE
                     int stackCount = (int) Math.min(remainingCount, Integer.MAX_VALUE);
                     outputStack.setCount(stackCount);
-                    addOutputItem(outputStack);
-                    remainingCount -= stackCount;
+                    
+                    // 尝试优先输出到AE网络
+                    long inserted = tryOutputToAE(outputStack);
+                    long actualInserted = Math.min(inserted, remainingCount);
+                    remainingCount -= actualInserted;
+                    
+                    // 如果AE网络没存下，输出到自身容器
+                    if (remainingCount > 0) {
+                        ItemStack remainingStack = outputStack.copy();
+                        remainingStack.setCount((int) remainingCount);
+                        
+                        // 检查pendingOutputs列表中是否已经有相同的物品，如果有就不再添加，避免无限增长
+                        boolean alreadyExists = false;
+                        for (ItemStack existingItem : pendingOutputs) {
+                            if (ItemStack.isSameItemSameTags(existingItem, remainingStack)) {
+                                // 如果已经存在，就增加现有物品的数量，而不是添加新物品
+                                long newCount = (long) existingItem.getCount() + (long) remainingStack.getCount();
+                                if (newCount <= (long) Integer.MAX_VALUE) {
+                                    existingItem.setCount((int) newCount);
+                                } else {
+                                    existingItem.setCount(Integer.MAX_VALUE);
+                                }
+                                alreadyExists = true;
+                                break;
+                            }
+                        }
+                        
+                        if (!alreadyExists) {
+                            addOutputItem(remainingStack);
+                        }
+                    }
+                    
                     // 输出物品到自身后，触发自动输出
                     tryAutoOutput();
+                    
+                    // 避免无限循环，每次循环至少减少1
+                    if (inserted == 0) {
+                        break;
+                    }
                 }
             }
         }
 
-        // 直接输出流体到自身容器
+        // 直接输出流体到AE网络（如果连接），否则输出到自身容器
         FluidStack outputFluid = recipe.getOutputFluid();
         if (!outputFluid.isEmpty()) {
             // 使用long类型计算总输出数量，避免整数溢出
@@ -1109,12 +1321,78 @@ public class AdvancedAlloyFurnaceBlockEntity extends BlockEntity implements Menu
                 // 每次输出不超过Integer.MAX_VALUE
                 int stackAmount = (int) Math.min(remainingAmount, Integer.MAX_VALUE);
                 outputStack.setAmount(stackAmount);
-                outputFluidTank.fill(outputStack, IFluidHandler.FluidAction.EXECUTE);
-                remainingAmount -= stackAmount;
+                
+                // 尝试优先输出到AE网络
+                long inserted = tryOutputFluidToAE(outputStack);
+                long actualInserted = Math.min(inserted, remainingAmount);
+                remainingAmount -= actualInserted;
+                
+                // 如果AE网络没存下，输出到自身流体槽
+                if (remainingAmount > 0) {
+                    FluidStack remainingFluid = outputStack.copy();
+                    remainingFluid.setAmount((int) remainingAmount);
+                    outputFluidTank.fill(remainingFluid, IFluidHandler.FluidAction.EXECUTE);
+                }
+                
                 // 输出流体到自身后，触发自动输出
                 tryAutoOutput();
+                
+                // 避免无限循环，每次循环至少减少1
+                if (inserted == 0) {
+                    break;
+                }
             }
         }
+    }
+    
+    // AE2 Integration - 尝试输出物品到AE网络
+    private long tryOutputToAE(ItemStack stack) {
+        if (stack.isEmpty() || !isConnectedToAE || actionSource == null) {
+            return 0;
+        }
+        
+        MEStorage storage = getStorageService();
+        
+        if (storage == null) {
+            return 0;
+        }
+        
+        // 将ItemStack转换为AEKey
+        AEItemKey key = AEItemKey.of(stack);
+        if (key == null) {
+            return 0;
+        }
+        
+        // 尝试插入到AE网络
+        long amount = stack.getCount();
+        long inserted = storage.insert(key, amount, Actionable.MODULATE, actionSource);
+        
+        return inserted;
+    }
+    
+    // AE2 Integration - 尝试输出流体到AE网络
+    private long tryOutputFluidToAE(FluidStack stack) {
+        if (stack.isEmpty() || !isConnectedToAE || actionSource == null) {
+            return 0;
+        }
+        
+        MEStorage storage = getStorageService();
+        
+        if (storage == null) {
+            return 0;
+        }
+        
+        // 将FluidStack转换为AEKey
+        AEFluidKey key = AEFluidKey.of(stack);
+        if (key == null) {
+            return 0;
+        }
+        
+        // 尝试插入到AE网络
+        long amount = stack.getAmount();
+        long inserted = storage.insert(key, amount, Actionable.MODULATE, actionSource);
+        
+        return inserted;
     }
 
     // 尝试将物品输出到外部容器
@@ -1445,6 +1723,8 @@ public class AdvancedAlloyFurnaceBlockEntity extends BlockEntity implements Menu
         // 新增：加载并行数
         currentParallel = tag.getInt("CurrentParallel");
         maxParallel = tag.getInt("MaxParallel");
+        // AE2 Integration - 加载节点数据
+        this.gridNode.loadFromNBT(tag);
     }
 
     @Override
@@ -1463,12 +1743,18 @@ public class AdvancedAlloyFurnaceBlockEntity extends BlockEntity implements Menu
         // 新增：保存并行数
         tag.putInt("CurrentParallel", currentParallel);
         tag.putInt("MaxParallel", maxParallel);
+        // AE2 Integration - 保存节点数据
+        this.gridNode.saveToNBT(tag);
     }
 
     // Capabilities - 修复方向处理
     @Nonnull
     @Override
     public <T> LazyOptional<T> getCapability(@Nonnull Capability<T> cap, @Nullable Direction side) {
+        // AE2 Integration - 暴露网络节点能力
+        if (cap == Capabilities.IN_WORLD_GRID_NODE_HOST) {
+            return LazyOptional.of(() -> this).cast();
+        }
         if (cap == ForgeCapabilities.ENERGY) {
             return lazyEnergyHandler.cast();
         }
@@ -1486,6 +1772,25 @@ public class AdvancedAlloyFurnaceBlockEntity extends BlockEntity implements Menu
             return lazyFluidHandler.cast();
         }
         return super.getCapability(cap, side);
+    }
+    
+    // IInWorldGridNodeHost implementation
+    @Nullable
+    @Override
+    public IGridNode getGridNode(Direction dir) {
+        return this.gridNode.getNode();
+    }
+    
+    @Override
+    public appeng.api.util.AECableType getCableConnectionType(Direction dir) {
+        return appeng.api.util.AECableType.GLASS;
+    }
+    
+    // IActionHost implementation
+    @Nullable
+    @Override
+    public IGridNode getActionableNode() {
+        return this.gridNode.getNode();
     }
     
     // 方向感知的物品处理器包装类

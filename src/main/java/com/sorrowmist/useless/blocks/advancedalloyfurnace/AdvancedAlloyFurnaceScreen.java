@@ -77,9 +77,9 @@ public class AdvancedAlloyFurnaceScreen extends AbstractContainerScreen<Advanced
     // 流体槽位置和尺寸 - 根据新贴图调整
     private static final int FLUID_INPUT_X = 10;
     private static final int FLUID_OUTPUT_X = 154;
-    private static final int FLUID_Y = 143;
-    private static final int FLUID_WIDTH = 15;
-    private static final int FLUID_HEIGHT = 31;
+    private static final int FLUID_Y = 142;
+    private static final int FLUID_WIDTH = 16;
+    private static final int FLUID_HEIGHT = 32;
 
     // 新增：催化剂和模具槽位位置
     private static final int CATALYST_SLOT_X = 60;
@@ -110,8 +110,8 @@ public class AdvancedAlloyFurnaceScreen extends AbstractContainerScreen<Advanced
     // 标题位置 - 根据新要求添加
     private static final int TITLE_LABEL_X = 66;
     private static final int TITLE_LABEL_Y = 52;
-    private static final int INVENTORY_LABEL_X = 17;
-    private static final int INVENTORY_LABEL_Y = 179;
+    private static final int INVENTORY_LABEL_X = 10;
+    private static final int INVENTORY_LABEL_Y = 181;
 
     // 组件纹理坐标 - 根据新素材图调整
     private static final int ENERGY_MASK_U = 162;
@@ -303,7 +303,7 @@ public class AdvancedAlloyFurnaceScreen extends AbstractContainerScreen<Advanced
         FluidStack outputFluid = menu.getBlockEntity().getOutputFluidTank().getFluid();
 
         // 渲染输入流体
-        renderFluidTank(guiGraphics, x + FLUID_INPUT_X, y + FLUID_Y, inputFluid,
+        renderFluidTank(guiGraphics, x + FLUID_INPUT_X-1, y + FLUID_Y, inputFluid,
                 menu.getBlockEntity().getInputFluidTank().getCapacity());
 
         // 渲染输出流体
@@ -439,13 +439,13 @@ public class AdvancedAlloyFurnaceScreen extends AbstractContainerScreen<Advanced
         // 机器名字渲染为彩虹渐变
         renderRainbowText(guiGraphics, this.font, this.title, this.titleLabelX, this.titleLabelY);
 
-        // 物品栏文字渲染为金色并缩小为0.9倍
+        // 物品栏文字渲染为金色并缩小为0.8倍
         guiGraphics.pose().pushPose();
-        guiGraphics.pose().scale(0.8f, 0.8f, 1.0f);
+        guiGraphics.pose().scale(1f, 1f, 1f);
         guiGraphics.drawString(this.font, this.playerInventoryTitle,
-                (int)(this.inventoryLabelX / 0.8f),
-                (int)(this.inventoryLabelY / 0.8f+1),
-                0xFFD700, false);
+                (int)(this.inventoryLabelX),
+                (int)(this.inventoryLabelY),
+                0x000000, false);
         guiGraphics.pose().popPose();
     }
 

@@ -49,13 +49,16 @@ public class UselessDimGen2 extends ChunkGenerator {
     @Override
     public NoiseColumn getBaseColumn(int x, int z, LevelHeightAccessor level, RandomState randomState) {
         BlockState[] states = new BlockState[level.getHeight()];
+        int platformLayers = ConfigManager.getPlatformLayers();
+        int startY = ConfigManager.getPlatformStartY();
+        int maxY = startY + platformLayers;
 
         for (int y = level.getMinBuildHeight(); y < level.getMaxBuildHeight(); y++) {
             int index = y - level.getMinBuildHeight();
 
-            if (y == -64) {
+            if (y == startY && ConfigManager.shouldGenerateBedrock()) {
                 states[index] = Blocks.BEDROCK.defaultBlockState();
-            } else if (y >= -63 && y <= 5) {
+            } else if (y > startY && y <= maxY) {
                 // 使用 ConfigManager 获取填充方块
                 states[index] = ConfigManager.getFillBlock().defaultBlockState();
             } else {
@@ -77,14 +80,20 @@ public class UselessDimGen2 extends ChunkGenerator {
 
         Heightmap oceanFloorMap = chunk.getOrCreateHeightmapUnprimed(Heightmap.Types.OCEAN_FLOOR_WG);
         Heightmap surfaceMap = chunk.getOrCreateHeightmapUnprimed(Heightmap.Types.WORLD_SURFACE_WG);
+        int platformLayers = ConfigManager.getPlatformLayers();
+        int startY = ConfigManager.getPlatformStartY();
+        int maxY = startY + platformLayers;
+        int airStartY = maxY + 1;
 
         for (int x = 0; x < 16; x++) {
             for (int z = 0; z < 16; z++) {
-                // 设置基岩底层 (Y=-64)
-                chunk.setBlockState(pos.set(x, -64, z), Blocks.BEDROCK.defaultBlockState(), false);
+                // 设置基岩底层
+                if (ConfigManager.shouldGenerateBedrock()) {
+                    chunk.setBlockState(pos.set(x, startY, z), Blocks.BEDROCK.defaultBlockState(), false);
+                }
 
-                // 生成69层平台 (Y=-63 到 Y=5)
-                for (int y = -63; y <= 5; y++) {
+                // 生成平台 (Y=startY+1 到 Y=maxY)
+                for (int y = startY + 1; y <= maxY; y++) {
                     BlockState blockState;
 
                     // 判断是否在坐标(8,8)的中心方块
@@ -101,13 +110,12 @@ public class UselessDimGen2 extends ChunkGenerator {
                     chunk.setBlockState(pos.set(x, y, z), blockState, false);
                 }
 
-                // Y=6及以上设置为空气
-                for (int y = 6; y < 320; y++) {
+                // 空气层设置
+                for (int y = airStartY; y < 320; y++) {
                     chunk.setBlockState(pos.set(x, y, z), Blocks.AIR.defaultBlockState(), false);
                 }
 
-                surfaceMap.update(x, z, 6, Blocks.AIR.defaultBlockState());
-                oceanFloorMap.update(x, z, 6, Blocks.AIR.defaultBlockState());
+                
             }
         }
     }
@@ -119,12 +127,12 @@ public class UselessDimGen2 extends ChunkGenerator {
 
     @Override
     public int getBaseHeight(int x, int z, Heightmap.Types heightmap, LevelHeightAccessor level, RandomState randomState) {
-        return 70;
+        return ConfigManager.getPlatformLayers()+1;
     }
 
     @Override
     public int getMinY() {
-        return -64;
+        return ConfigManager.getPlatformStartY();
     }
 
     @Override

@@ -37,6 +37,18 @@ import net.minecraftforge.network.simple.SimpleChannel;
 import org.slf4j.Logger;
 import org.spongepowered.asm.mixin.Mixins;
 
+import net.minecraft.server.packs.PathPackResources;
+import net.minecraft.server.packs.PackType;
+import net.minecraft.server.packs.metadata.pack.PackMetadataSection;
+import net.minecraft.server.packs.repository.Pack;
+import net.minecraft.server.packs.repository.PackSource;
+import net.minecraft.network.chat.Component;
+import net.minecraft.world.flag.FeatureFlagSet;
+import net.minecraftforge.event.AddPackFindersEvent;
+import net.minecraftforge.fml.ModList;
+import net.minecraft.SharedConstants;
+
+import java.nio.file.Path;
 import java.util.*;
 import java.util.concurrent.PriorityBlockingQueue;
 
@@ -101,6 +113,8 @@ public class UselessMod {
 
         // Register the item to a creative tab
         modEventBus.addListener(this::addCreative);
+        // 注册内置材质包
+        modEventBus.addListener(this::setupBuiltinPack);
 //        ModLoadingContext.get().registerConfig(ModConfig.Type.COMMON, ConfigManager.SPEC);
         // 注册 Mixin 配置
         Mixins.addConfiguration("useless_mod.mixins.json");
@@ -314,7 +328,44 @@ public class UselessMod {
     // 调试模式
     public static final boolean DEBUG = true;
 
+    private void setupBuiltinPack(AddPackFindersEvent event) {
+        if (event.getPackType() == PackType.CLIENT_RESOURCES) {
+            // 注册god内置材质包
+            Path resourcePath = ModList.get().getModFileById(UselessMod.MOD_ID).getFile().findResource("god");
+            if (resourcePath != null) {
+                PathPackResources pack = new PathPackResources(
+                        ModList.get().getModFileById(UselessMod.MOD_ID).getFile().getFileName() + ":" + resourcePath,
+                        resourcePath,
+                        true
+                );
 
+                PackMetadataSection metadata = new PackMetadataSection(
+                        Component.translatable("pack.useless_mod.god.description"),
+                        SharedConstants.getCurrentVersion().getPackVersion(PackType.CLIENT_RESOURCES)
+                );
+
+                event.addRepositorySource(source ->
+                        source.accept(Pack.create(
+                                "builtin/god",
+                                Component.translatable("pack.useless_mod.god.name"),
+                                false,
+                                string -> pack,
+                                new Pack.Info(
+                                        metadata.getDescription(),
+                                        metadata.getPackFormat(PackType.SERVER_DATA),
+                                        metadata.getPackFormat(PackType.CLIENT_RESOURCES),
+                                        FeatureFlagSet.of(),
+                                        pack.isHidden()
+                                ),
+                                PackType.CLIENT_RESOURCES,
+                                Pack.Position.TOP,
+                                false,
+                                PackSource.BUILT_IN
+                        ))
+                );
+            }
+        }
+    }
 
     public static void logDebug(String message) {
         if (DEBUG) {

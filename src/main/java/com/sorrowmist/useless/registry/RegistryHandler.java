@@ -1,6 +1,7 @@
 package com.sorrowmist.useless.registry;
 
 import com.sorrowmist.useless.UselessMod;
+import com.sorrowmist.useless.blocks.CreatorDollBlock;
 import com.sorrowmist.useless.blocks.GlowPlasticBlock;
 import com.sorrowmist.useless.blocks.ModBlockEntities;
 import com.sorrowmist.useless.blocks.ModMenuTypes;
@@ -77,6 +78,8 @@ public class RegistryHandler {
 
         addRegistry(AdvancedAlloyFurnaceBlock.BLOCKS);
         addRegistry(AdvancedAlloyFurnaceBlock.ITEMS);
+        addRegistry(CreatorDollBlock.BLOCKS);
+        addRegistry(CreatorDollBlock.ITEMS);
         // 方块实体注册
         addRegistry(ModBlockEntities.BLOCK_ENTITIES);
 

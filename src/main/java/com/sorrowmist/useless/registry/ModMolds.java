@@ -21,4 +21,7 @@ public final class ModMolds {
 
     public static final RegistryObject<Item> METAL_MOLD_WIRE = ITEMS.register("metal_mold_wire",
             () -> new Item(new Item.Properties()));
+
+    public static final RegistryObject<Item> METAL_MOLD_BLOCK = ITEMS.register("metal_mold_block",
+            () -> new Item(new Item.Properties()));
 }

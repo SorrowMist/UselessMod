@@ -15,7 +15,7 @@
     }
   ],
   "mold": {
-    "tag": "forge:glass_panes"
+    "item": "useless_mod:metal_mold_block"
   },
   "catalyst": {
         "tag": "useless_mod:useless_ingots",

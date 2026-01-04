@@ -49,7 +49,8 @@ public class MoldIdentifier {
         return stack.is(ModMolds.METAL_MOLD_PLATE.get()) ||
                 stack.is(ModMolds.METAL_MOLD_ROD.get()) ||
                 stack.is(ModMolds.METAL_MOLD_GEAR.get()) ||
-                stack.is(ModMolds.METAL_MOLD_WIRE.get());
+                stack.is(ModMolds.METAL_MOLD_WIRE.get()) ||
+                stack.is(ModMolds.METAL_MOLD_BLOCK.get());
     }
     
     /**

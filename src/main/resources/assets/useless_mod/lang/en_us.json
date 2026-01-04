@@ -111,6 +111,9 @@
   "item.useless_mod.metal_mold_rod": "Metal Mold (Rod)",
   "item.useless_mod.metal_mold_gear": "Metal Mold (Gear)",
   "item.useless_mod.metal_mold_wire": "Metal Mold (Wire)",
+  "item.useless_mod.metal_mold_block": "Metal Mold (Block)",
+  "block.useless_mod.creator_doll_block": "Creator Skin Doll",
+  "item.useless_mod.creator_doll_block": "Creator Skin Doll",
   "item.useless_mod.useless_gear_tier_1": "Useless Gear Tier 1",
   "item.useless_mod.useless_gear_tier_2": "Useless Gear Tier 2",
   "item.useless_mod.useless_gear_tier_3": "Useless Gear Tier 3",
@@ -130,5 +133,7 @@
   "item.useless_mod.useless_glass_tier_8": "Useless Glass Tier 8",
   "item.useless_mod.useless_glass_tier_9": "Useless Glass Tier 9",
   "emi.category.useless_mod.advanced_alloy_furnace": "Advanced Alloy Furnace",
-  "emi.category.useless_mod.catalyst_info": "Catalyst Parallel Info"
+  "emi.category.useless_mod.catalyst_info": "Catalyst Parallel Info",
+  "pack.useless_mod.god.name": "Useless Mod God Pack",
+  "pack.useless_mod.god.description": "A built-in resource pack for Useless Mod"
 }

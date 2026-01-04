@@ -17,6 +17,12 @@ public class ConfigManager {
     public static final ForgeConfigSpec.ConfigValue<String> BORDER_BLOCK;
     public static final ForgeConfigSpec.ConfigValue<String> FILL_BLOCK;
     public static final ForgeConfigSpec.ConfigValue<String> CENTER_BLOCK;
+    // 塑料平台生成层数
+    public static final ForgeConfigSpec.IntValue PLATFORM_LAYERS;
+    // 塑料平台起始Y值
+    public static final ForgeConfigSpec.IntValue PLATFORM_START_Y;
+    // 是否生成基岩层
+    public static final ForgeConfigSpec.BooleanValue GENERATE_BEDROCK;
 
     // 植物盆生长速度配置
     public static final ForgeConfigSpec.IntValue BOTANY_POT_GROWTH_MULTIPLIER;
@@ -64,6 +70,18 @@ public class ConfigManager {
         CENTER_BLOCK = BUILDER
                 .comment("中心方块，若不存在则使用灰色羊毛")
                 .define("中心方块", "useless_mod:light_gray_glow_plastic");
+
+        PLATFORM_LAYERS = BUILDER
+                .comment("塑料平台生成层数")
+                .defineInRange("塑料平台层数", 69, 1, 256);
+
+        PLATFORM_START_Y = BUILDER
+                .comment("平台起始Y值(若无基岩实际会比该数值高1)")
+                .defineInRange("平台起始Y值", -64, -64, 256);
+
+        GENERATE_BEDROCK = BUILDER
+                .comment("是否生成基岩层，默认生成")
+                .define("生成基岩层", true);
 
         BUILDER.pop();
 
@@ -250,6 +268,20 @@ public class ConfigManager {
         return LOOTING_LEVEL.get();
     }
 
+    // 获取塑料平台层数
+    public static int getPlatformLayers() {
+        return PLATFORM_LAYERS.get();
+    }
+
+    // 获取是否生成基岩层
+    public static boolean shouldGenerateBedrock() {
+        return GENERATE_BEDROCK.get();
+    }
+    
+    // 获取塑料平台起始Y值
+    public static int getPlatformStartY() {
+        return PLATFORM_START_Y.get();
+    }
 
     private static Block getBlockFromString(String blockId, Block fallback) {
         try {

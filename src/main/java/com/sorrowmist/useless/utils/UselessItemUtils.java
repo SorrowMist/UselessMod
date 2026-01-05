@@ -3,6 +3,7 @@ package com.sorrowmist.useless.utils;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.LivingEntity;
@@ -23,13 +24,13 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 public class UselessItemUtils {
-
     // 音效冷却记录
     private static final Map<UUID, Long> lastSoundTime = new HashMap<>();
     private static final long SOUND_COOLDOWN = 50;
 
     // 获取方块掉落物
-    public static List<ItemStack> getBlockDrops(BlockState state, Level level, BlockPos pos, Player player, ItemStack tool) {
+    public static List<ItemStack> getBlockDrops(BlockState state, Level level, BlockPos pos, Player player,
+                                                ItemStack tool) {
         if (!(level instanceof ServerLevel serverLevel)) return Collections.emptyList();
 
         try {
@@ -41,9 +42,9 @@ public class UselessItemUtils {
                     .withOptionalParameter(LootContextParams.BLOCK_ENTITY, level.getBlockEntity(pos));
 
             return state.getDrops(lootParams)
-                    .stream()
-                    .filter(drop -> !drop.isEmpty())
-                    .collect(Collectors.toList());
+                        .stream()
+                        .filter(drop -> !drop.isEmpty())
+                        .collect(Collectors.toList());
 
         } catch (Exception e) {
             return Collections.emptyList();
@@ -51,7 +52,7 @@ public class UselessItemUtils {
     }
 
     // 将物品放入玩家背包
-    public static boolean addItemToPlayerInventory(Player player, ItemStack stack) {
+    private static boolean addItemToPlayerInventory(Player player, ItemStack stack) {
         return player.getInventory().add(stack);
     }
 
@@ -64,18 +65,21 @@ public class UselessItemUtils {
         Long lastTime = lastSoundTime.get(playerId);
 
         if (lastTime == null || currentTime - lastTime >= SOUND_COOLDOWN) {
-            level.playSound(null, pos, state.getSoundType().getBreakSound(), net.minecraft.sounds.SoundSource.BLOCKS, 0.7F, 1.0F);
+            level.playSound(null, pos, state.getSoundType().getBreakSound(), SoundSource.BLOCKS,
+                            0.7F, 1.0F
+            );
             lastSoundTime.put(playerId, currentTime);
         }
     }
 
     // 检查掉落物是否全部无效
-    public static boolean hasInvalidDrops(List<ItemStack> drops) {
+    private static boolean hasInvalidDrops(List<ItemStack> drops) {
         return drops.stream().allMatch(drop -> drop.isEmpty());
     }
 
     // 处理普通方块的自动收集
-    public static void handleNormalBlockBreak(BlockEvent.BreakEvent event, Level level, BlockPos pos, BlockState state, Player player, ItemStack stack, List<ItemStack> drops) {
+    private static void handleNormalBlockBreak(BlockEvent.BreakEvent event, Level level, BlockPos pos, BlockState state,
+                                               Player player, ItemStack stack, List<ItemStack> drops) {
         boolean allCollected = true;
         for (ItemStack drop : drops) {
             if (!addItemToPlayerInventory(player, drop.copy())) {
@@ -96,10 +100,12 @@ public class UselessItemUtils {
     }
 
     // 回退到原版破坏逻辑的处理
-    public static void handleFallbackBlockBreak(Level level, BlockPos pos, BlockState state, Player player, ItemStack tool) {
+    private static void handleFallbackBlockBreak(Level level, BlockPos pos, BlockState state, Player player,
+                                                 ItemStack tool) {
         // 记录破坏前已有的物品实体
         List<ItemEntity> existingItems = level.getEntitiesOfClass(ItemEntity.class,
-                new AABB(pos).inflate(3.0));
+                                                                  new AABB(pos).inflate(3.0)
+        );
         Set<UUID> existingItemIds = new HashSet<>();
         for (ItemEntity item : existingItems) {
             existingItemIds.add(item.getUUID());
@@ -118,7 +124,8 @@ public class UselessItemUtils {
 
             // 获取新生成的物品实体
             List<ItemEntity> newItems = level.getEntitiesOfClass(ItemEntity.class,
-                    new AABB(pos).inflate(3.0));
+                                                                 new AABB(pos).inflate(3.0)
+            );
 
             for (ItemEntity itemEntity : newItems) {
                 // 只处理新生成的物品
@@ -146,20 +153,38 @@ public class UselessItemUtils {
 
         // 饱和效果
         MobEffectInstance saturation = player.getEffect(MobEffects.SATURATION);
-        if (saturation == null || saturation.getDuration() < 20) {
-            player.addEffect(new MobEffectInstance(MobEffects.SATURATION, 200, 0, true, false, true));
+        if (saturation == null || saturation.getDuration() < 200) {
+            player.addEffect(new MobEffectInstance(MobEffects.SATURATION, 20000, 0, true, false, true));
         }
 
         // 生命恢复
         MobEffectInstance regen = player.getEffect(MobEffects.REGENERATION);
-        if (regen == null || regen.getDuration() < 20) {
-            player.addEffect(new MobEffectInstance(MobEffects.REGENERATION, 200, 5, true, false, true));
+        if (regen == null || regen.getDuration() < 200) {
+            player.addEffect(new MobEffectInstance(MobEffects.REGENERATION, 20000, 5, true, false, true));
         }
 
         // 夜视
         MobEffectInstance nightVision = player.getEffect(MobEffects.NIGHT_VISION);
-        if (nightVision == null || nightVision.getDuration() < 2000) {
+        if (nightVision == null || nightVision.getDuration() < 200) {
             player.addEffect(new MobEffectInstance(MobEffects.NIGHT_VISION, 20000, 0, true, false, true));
+        }
+
+        // 抗火
+        MobEffectInstance fireResistance = player.getEffect(MobEffects.FIRE_RESISTANCE);
+        if (fireResistance == null || fireResistance.getDuration() < 200) {
+            player.addEffect(new MobEffectInstance(MobEffects.FIRE_RESISTANCE, 20000, 0, true, false, true));
+        }
+
+        // 水下呼吸
+        MobEffectInstance waterBreathing = player.getEffect(MobEffects.WATER_BREATHING);
+        if (waterBreathing == null || waterBreathing.getDuration() < 200) {
+            player.addEffect(new MobEffectInstance(MobEffects.WATER_BREATHING, 20000, 0, true, false, true));
+        }
+
+        // 抗性提升
+        MobEffectInstance damageResistance = player.getEffect(MobEffects.DAMAGE_RESISTANCE);
+        if (damageResistance == null || damageResistance.getDuration() < 200) {
+            player.addEffect(new MobEffectInstance(MobEffects.DAMAGE_RESISTANCE, 20000, 5, true, false, true));
         }
     }
 
@@ -174,7 +199,7 @@ public class UselessItemUtils {
         if (!level.isClientSide) {
             // 显示提示消息
             sendFestiveMessage(player);
-            // 直接修改掉落物堆叠数量 - 更简单有效的方法
+            // 直接修改掉落物堆叠数量
             Collection<ItemEntity> drops = event.getDrops();
             List<ItemEntity> newDrops = new ArrayList<>();
 
@@ -208,25 +233,8 @@ public class UselessItemUtils {
         }
     }
 
-    public static void onBlockBreak(BlockEvent.BreakEvent event, ItemStack stack, Player player) {
-        if (player.isCreative()) return;
-
-        Level level = (Level) event.getLevel();
-        BlockPos pos = event.getPos();
-        BlockState state = event.getState();
-
-        List<ItemStack> drops = getBlockDrops(state, level, pos, player, stack);
-
-        if (drops.isEmpty() || hasInvalidDrops(drops)) {
-            handleFallbackBlockBreak(level, pos, state, player, stack);
-            return;
-        }
-
-        handleNormalBlockBreak(event, level, pos, state, player, stack, drops);
-    }
-
     // 显示触发提示
-    public static void sendFestiveMessage(Player player) {
+    private static void sendFestiveMessage(Player player) {
         if (player != null) {
             player.displayClientMessage(
                     Component.translatable("message.useless_mod.festive_triggered"),

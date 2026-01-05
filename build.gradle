@@ -168,7 +168,7 @@ dependencies {
     compileOnly "curse.maven:applied-flux-965012:5614830"
     compileOnly "curse.maven:jade-324717:5427817"
 
-    implementation "mekanism:Mekanism:1.21.1-10.7.0.55"
+    implementation "mekanism:Mekanism:1.21.1-10.7.15.81"
     implementation "curse.maven:applied-mekanistics-574300:5978711"
     implementation "curse.maven:botany-pots-353928:6910390"
     implementation files("libs/bookshelf-neoforge-1.21.1-21.1.66.jar")
@@ -185,7 +185,7 @@ dependencies {
     // runtime test
     runtimeOnly "curse.maven:applied-flux-965012:5614830"
     runtimeOnly "de.mari_023:ae2wtlib:19.2.1"
-    runtimeOnly "curse.maven:jade-324717:5427817"
+//    runtimeOnly "curse.maven:jade-324717:5427817"
 
     //geckolib
     runtimeOnly "curse.maven:geckolib-388172:7009924"

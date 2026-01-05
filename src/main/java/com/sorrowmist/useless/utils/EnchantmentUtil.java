@@ -1,5 +1,6 @@
 package com.sorrowmist.useless.utils;
 
+import net.minecraft.client.Minecraft;
 import net.minecraft.core.Holder;
 import net.minecraft.core.Registry;
 import net.minecraft.core.registries.Registries;
@@ -13,7 +14,7 @@ public class EnchantmentUtil {
      * 根据 Enchantment 的 ResourceKey 获取 Holder<Enchantment>
      * 适用于 1.21（NeoForge）
      *
-     * @param level 任意 Level（必须！不能为 null）
+     * @param level 任意 Level
      * @param key   Enchantments.SHARPNESS 等
      */
     public static Holder<Enchantment> getEnchantmentHolder(Level level,
@@ -24,5 +25,9 @@ public class EnchantmentUtil {
 
         Registry<Enchantment> registry = level.registryAccess().registryOrThrow(Registries.ENCHANTMENT);
         return registry.getHolderOrThrow(key);
+    }
+
+    public static Holder<Enchantment> getEnchantmentHolder(ResourceKey<Enchantment> key) {
+        return getEnchantmentHolder(Minecraft.getInstance().level, key);
     }
 }

@@ -5,6 +5,7 @@ import com.sorrowmist.useless.api.tool.FunctionMode;
 import com.sorrowmist.useless.blocks.GlowPlasticBlock;
 import com.sorrowmist.useless.utils.EnchantmentUtil;
 import com.sorrowmist.useless.utils.UselessItemUtils;
+import com.sorrowmist.useless.utils.mining.MiningUtils;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.BlockPos;
@@ -24,8 +25,6 @@ import net.minecraft.world.item.context.UseOnContext;
 import net.minecraft.world.item.enchantment.Enchantments;
 import net.minecraft.world.item.enchantment.ItemEnchantments;
 import net.minecraft.world.level.Level;
-import net.minecraft.world.level.block.Block;
-import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.neoforged.neoforge.common.ItemAbilities;
 import net.neoforged.neoforge.common.ItemAbility;
@@ -78,34 +77,10 @@ public class EndlessBeafItem extends AxeItem {
             return InteractionResult.PASS;
         }
 
-        // 快速破坏塑料块
-        if (player != null && player.isShiftKeyDown()) {
-            if (blockstate.getBlock() instanceof GlowPlasticBlock) {
-                if (!world.isClientSide) {
-                    // TODO 修改为挖掘同款放入
-                    // 在服务器端：把方块的掉落物放进背包（或在背包满时丢出）
-                    List<ItemStack> drops = UselessItemUtils.getBlockDrops(blockstate, world, blockpos, player,
-                                                                           ctx.getItemInHand()
-                    );
-                    for (ItemStack drop : drops) {
-                        // 复制一个堆叠放入（以免修改原 list）
-                        ItemStack toAdd = drop.copy();
-                        if (!player.getInventory().add(toAdd)) {
-                            // 背包满了：丢在玩家脚下
-                            player.drop(toAdd, false);
-                        }
-                    }
-
-                    // 移除方块并播放声音
-                    world.setBlock(blockpos, Blocks.AIR.defaultBlockState(), Block.UPDATE_ALL_IMMEDIATE);
-                    // 使用带冷却的音效播放
-                    UselessItemUtils.playBreakSoundWithCooldown(world, blockpos, blockstate, player);
-                } else {
-                    // 客户端只播放声音（不做掉落/方块移除）
-                    world.playSound(player, blockpos, SoundEvents.STONE_BREAK, SoundSource.BLOCKS, 0.7F, 1.0F);
-                }
-                return InteractionResult.sidedSuccess(world.isClientSide);
-            }
+        // === 快速破坏塑料块（Shift + 右键）===
+        if (player != null && player.isShiftKeyDown() && blockstate.getBlock() instanceof GlowPlasticBlock) {
+            MiningUtils.quickBreakBlock(world, blockpos, blockstate, player, ctx.getItemInHand());
+            return InteractionResult.sidedSuccess(world.isClientSide);
         }
 
         // 耕地

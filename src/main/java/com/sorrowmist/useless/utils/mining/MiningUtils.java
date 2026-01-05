@@ -16,14 +16,13 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.AABB;
 import net.neoforged.neoforge.event.level.BlockEvent;
 
-import java.util.*;
+import java.util.Collections;
+import java.util.List;
+import java.util.Set;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
-class MiningUtils {
-    // 音效冷却系统
-    private static final Map<UUID, Long> lastSoundTime = new HashMap<>();
-    private static final long SOUND_COOLDOWN = 50; // 50毫秒冷却时间
-
+public class MiningUtils {
     /**
      * 获取方块掉落物
      */
@@ -48,12 +47,10 @@ class MiningUtils {
     }
 
     /**
-     * 回退：使用原版掉落，然后立即收集物品实体（更稳定，避免Thread.sleep）
+     * 回退：使用原版掉落，然后立即收集物品实体
      */
     static void handleFallbackBlockBreak(Level level, BlockPos pos, BlockState state, Player player, ItemStack tool) {
         if (level.isClientSide()) return;
-
-        ServerLevel serverLevel = (ServerLevel) level;
 
         // 记录破坏前的物品实体UUID
         AABB area = new AABB(pos).inflate(3.0);
@@ -75,58 +72,75 @@ class MiningUtils {
                  }
                  // 背包满 → 留在地上
              });
-
-        playBreakSoundWithCooldown(level, pos, state, player);
     }
 
     /**
-     * 正常处理：自动收集到背包 + 经验 + 水源保留
+     * 正常处理
      */
-    static void handleNormalBlockBreak(BlockEvent.BreakEvent event, Level level, BlockPos pos,
-                                       BlockState state, Player player, ItemStack stack, List<ItemStack> drops) {
-        // 1. 仅服务端
-        if (level.isClientSide) {
-            return;
-        }
+    static void handleNormalBlockBreak(
+            BlockEvent.BreakEvent event,
+            Level level,
+            BlockPos pos,
+            BlockState state,
+            Player player,
+            ItemStack tool,
+            List<ItemStack> drops
+    ) {
+        if (level.isClientSide()) return;
 
-        ServerLevel serverLevel = (ServerLevel) level;
-        BlockEntity be = level.getBlockEntity(pos);
-
-        // 3. 直接给玩家（原版方式：自动处理满了掉落）
+        // ======== 掉落物 → 尝试进背包 ========
         for (ItemStack drop : drops) {
             if (!drop.isEmpty()) {
-                player.getInventory().placeItemBackInInventory(drop);
+                if (!player.getInventory().add(drop)) {
+                    player.drop(drop, false);
+                }
             }
         }
 
         // 4. 计算并弹出经验（原版API，无需事件方法）
-        if (stack.get(UComponents.EnchantModeComponent.get()) == EnchantMode.FORTUNE) {
-            int exp = state.getBlock().getExpDrop(state, level, pos, be, player, stack);
+        if (tool.get(UComponents.EnchantModeComponent.get()) == EnchantMode.FORTUNE) {
+            int exp = state.getBlock().getExpDrop(state, level, pos, level.getBlockEntity(pos), player, tool);
             if (exp > 0) {
-                state.getBlock().popExperience(serverLevel, pos, exp);
+                state.getBlock().popExperience((ServerLevel) level, pos, exp);
             }
         }
 
-        // 5. 破坏方块（原版：false=不掉落物品；自动处理水源、粒子、音效）
-        level.destroyBlock(pos, false, player);
+        // 静默移除方块（不触发额外动画/粒子）
+        level.removeBlock(pos, false);
 
-        // 6. 取消事件
+        // 阻止原版重复掉落
         event.setCanceled(true);
     }
 
     /**
-     * 播放破坏音效（带防刷音效）
+     * 快速破坏指定方块（Shift+右键物品使用时调用）
+     * 功能：掉落物直接进背包、背包满掉脚下、正确保留 waterlogged 水源、弹出经验、粒子音效
+     *
+     * @param world  世界
+     * @param pos    方块位置
+     * @param state  方块状态
+     * @param player 玩家（必须非空）
+     * @param tool   手中物品（用于计算掉落、附魔、耐久等）
      */
-    private static void playBreakSoundWithCooldown(Level level, BlockPos pos, BlockState state, Player player) {
-        if (level.isClientSide()) return;
-
-        UUID playerId = player.getUUID();
-        long currentTime = System.currentTimeMillis();
-        Long lastTime = lastSoundTime.get(playerId);
-
-        if (lastTime == null || currentTime - lastTime >= SOUND_COOLDOWN) {
-            level.playSound(null, pos, state.getSoundType().getBreakSound(), SoundSource.BLOCKS, 0.7F, 1.0F);
-            lastSoundTime.put(playerId, currentTime);
+    public static void quickBreakBlock(Level world, BlockPos pos, BlockState state, Player player, ItemStack tool) {
+        if (world.isClientSide()) {
+            world.playSound(player, pos, state.getSoundType().getBreakSound(), SoundSource.BLOCKS, 0.7F, 1.0F);
+            return;
         }
+
+        ServerLevel serverLevel = (ServerLevel) world;
+        BlockEntity blockEntity = world.getBlockEntity(pos);
+
+        List<ItemStack> drops = Block.getDrops(state, serverLevel, pos, blockEntity, player, tool);
+
+        for (ItemStack drop : drops) {
+            if (!drop.isEmpty()) {
+                if (!player.getInventory().add(drop)) {
+                    player.drop(drop, false); // 背包满 → 丢出
+                }
+            }
+        }
+
+        world.destroyBlock(pos, false, player);
     }
 }

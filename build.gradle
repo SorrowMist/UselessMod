@@ -185,7 +185,7 @@ dependencies {
     // runtime test
     runtimeOnly "curse.maven:applied-flux-965012:5614830"
     runtimeOnly "de.mari_023:ae2wtlib:19.2.1"
-//    runtimeOnly "curse.maven:jade-324717:5427817"
+    runtimeOnly "curse.maven:jade-324717:6853386"
 
     //geckolib
     runtimeOnly "curse.maven:geckolib-388172:7009924"

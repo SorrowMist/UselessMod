@@ -114,14 +114,20 @@
 
   "tooltip.useless_mod.disable": "关闭",
   "tooltip.useless_mod.enable": "开启",
-  "tooltip.useless_mod.force_mining_mode": "强制挖掘模式: ",
-  "tooltip.useless_mod.chain_mining_mode": "连锁挖掘模式: ",
+  "tooltip.useless_mod.force_mining_mode": "强制挖掘模式",
+  "tooltip.useless_mod.chain_mining_mode": "连锁挖掘模式",
   "tooltip.useless_mod.chain_mining_mode.default": "默认",
   "tooltip.useless_mod.chain_mining_mode.enhanced": "增强",
-
+  "tooltip.useless_mod.key.toggle_chain_mode": "§d按下 %s 切换连锁挖掘（普通 ↔ 增强）",
+  "tooltip.useless_mod.key.switch_force_mining": "§d按下 %s 切换强制挖掘模式",
+  "tooltip.useless_mod.key.trigger_force_mining": "§c按住 %s 临时激活强制挖掘",
+  "tooltip.useless_mod.key.switch_silk_touch": "§d按下 %s 切换到精准采集模式",
+  "tooltip.useless_mod.key.switch_fortune": "§d按下 %s 切换到时运模式",
+  "tooltip.useless_mod.key.open_mode_wheel": "§e按下 %s 打开模式选择轮盘",
   "tooltip.useless_mod.ae_storage_priority_mode": "AE存储优先",
-
-
+  "tooltip.useless_mod.enhanced_chain_mining_mode": "增强连锁挖掘",
+  "tooltip.useless_mod.force_mining_mode": "强制挖掘模式",
+  "tooltip.useless_mod.ae_storage_priority_mode": "AE存储优先",
   "jei.useless_mod.catalyst_info": "催化剂并行数信息",
   "item.useless_mod.possible_useful_ingot": "可能有用锭",
   "item.useless_mod.useful_ingot": "有用锭",

@@ -2,6 +2,7 @@ package com.sorrowmist.useless.init;
 
 import com.sorrowmist.useless.UselessMod;
 import com.sorrowmist.useless.blocks.GlowPlasticBlock;
+import com.sorrowmist.useless.config.ConfigManager;
 import com.sorrowmist.useless.utils.EnchantmentUtil;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.core.registries.Registries;
@@ -44,7 +45,7 @@ public class ModCreativeTabs {
         // 构建附魔内容
         ItemEnchantments.Mutable ench = new ItemEnchantments.Mutable(ItemEnchantments.EMPTY);
         ench.set(EnchantmentUtil.getEnchantmentHolder(Enchantments.SILK_TOUCH), 1);
-        ench.set(EnchantmentUtil.getEnchantmentHolder(Enchantments.LOOTING), 10);
+        ench.set(EnchantmentUtil.getEnchantmentHolder(Enchantments.LOOTING), ConfigManager.getLootingLevel());
 
         enchantedStack.set(DataComponents.ENCHANTMENTS, ench.toImmutable());
         return enchantedStack;

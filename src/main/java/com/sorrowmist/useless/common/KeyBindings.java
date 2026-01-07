@@ -33,22 +33,13 @@ public class KeyBindings {
             GLFW.GLFW_KEY_PAGE_UP,
             CATEGORY
     ));
-    // 普通连锁挖掘
-    private static final String SWITCH_CHAIN_MINING = "key.useless_mod.chain_mining";
-    public static final Lazy<KeyMapping> SWITCH_CHAIN_MINING_KEY = Lazy.of(() -> new KeyMapping(
-            SWITCH_CHAIN_MINING,
+    // 连锁模式切换（普通 ↔ 增强）
+    private static final String TOGGLE_CHAIN_MODE = "key.useless_mod.toggle_chain_mode";
+    public static final Lazy<KeyMapping> TOGGLE_CHAIN_MODE_KEY = Lazy.of(() -> new KeyMapping(
+            TOGGLE_CHAIN_MODE,
             KeyConflictContext.IN_GAME,
             InputConstants.Type.KEYSYM,
-            GLFW.GLFW_KEY_TAB,
-            CATEGORY
-    ));
-    // 增强型连锁挖掘
-    private static final String SWITCH_ENHANCED_CHAIN_MINING = "key.useless_mod.enhanced_chain_mining";
-    public static final Lazy<KeyMapping> SWITCH_ENHANCED_CHAIN_MINING_KEY = Lazy.of(() -> new KeyMapping(
-            SWITCH_ENHANCED_CHAIN_MINING,
-            KeyConflictContext.IN_GAME,
-            InputConstants.Type.KEYSYM,
-            GLFW.GLFW_KEY_KP_8,
+            GLFW.GLFW_KEY_V,
             CATEGORY
     ));
     // 模式轮盘

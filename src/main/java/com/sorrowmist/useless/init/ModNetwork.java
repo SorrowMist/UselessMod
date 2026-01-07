@@ -8,8 +8,10 @@ import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
 
 public class ModNetwork {
     public static void registerPayloadHandlers(final RegisterPayloadHandlersEvent event) {
-        var registrar = event.registrar(UselessMod.MODID);
-        registrar.playToServer(EnchantmentSwitchPacket.TYPE, EnchantmentSwitchPacket.STREAM_CODEC, EnchantmentSwitchPacket::handle);
+        var registrar = event.registrar(UselessMod.MODID).versioned("1");
+        registrar.playToServer(EnchantmentSwitchPacket.TYPE, EnchantmentSwitchPacket.STREAM_CODEC,
+                               EnchantmentSwitchPacket::handle
+        );
         registrar.playToServer(FunctionModeTogglePacket.TYPE, FunctionModeTogglePacket.STREAM_CODEC,
                                FunctionModeTogglePacket::handle
         );

@@ -4,12 +4,15 @@ package com.sorrowmist.useless.init;
 import com.sorrowmist.useless.UselessMod;
 import com.sorrowmist.useless.api.component.UComponents;
 import com.sorrowmist.useless.api.tool.EnchantMode;
+import com.sorrowmist.useless.api.tool.FunctionMode;
 import com.sorrowmist.useless.items.EndlessBeafItem;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.world.item.*;
 import net.minecraft.world.item.component.CustomModelData;
 import net.neoforged.neoforge.registries.DeferredItem;
 import net.neoforged.neoforge.registries.DeferredRegister;
+
+import java.util.EnumSet;
 
 public final class ModItems {
     public static final DeferredRegister.Items ITEMS = DeferredRegister.createItems(UselessMod.MODID);
@@ -26,19 +29,18 @@ public final class ModItems {
 
     static final DeferredItem<EndlessBeafItem> ENDLESS_BEAF_ITEM = ITEMS.register(
             "endless_beaf_item",
-            () -> {
-                // 创建物品
-                return new EndlessBeafItem(
-                        Tiers.NETHERITE,
-                        new Item.Properties()
-                                .attributes(DiggerItem.createAttributes(Tiers.NETHERITE, 50, 2.0F))
-                                .stacksTo(1)
-                                .rarity(Rarity.EPIC)
-                                .durability(0)
-                                .component(UComponents.EnchantModeComponent.get(), EnchantMode.SILK_TOUCH)
-                                .component(DataComponents.CUSTOM_MODEL_DATA, new CustomModelData(1))
-                );
-            }
+            () -> new EndlessBeafItem(
+                    Tiers.NETHERITE,
+                    new Item.Properties()
+                            .attributes(DiggerItem.createAttributes(Tiers.NETHERITE, 50, 2.0F))
+                            .stacksTo(1)
+                            .rarity(Rarity.EPIC)
+                            .durability(0)
+                            .component(UComponents.EnchantModeComponent.get(), EnchantMode.SILK_TOUCH)
+                            // 默认开启普通连锁挖掘
+                            .component(UComponents.FunctionModesComponent, EnumSet.of(FunctionMode.CHAIN_MINING))
+                            .component(DataComponents.CUSTOM_MODEL_DATA, new CustomModelData(1))
+            )
     );
     static final DeferredItem<BlockItem> ORE_GENERATOR_BLOCK = ITEMS.register(
             "ore_generator_block",

@@ -87,7 +87,7 @@ public final class UComponents {
      * 例如多功能工具在不同模式（镐、斧、铲等）之间切换时使用
      */
     public static final DeferredHolder<DataComponentType<?>, DataComponentType<ToolTypeMode>> CurrentToolTypeComponent =
-            register("current_tool_type", builder ->
+            register("tool_type", builder ->
                     builder
                             // 持久化存储：同样使用字符串保存枚举值
                             .persistent(Codec.STRING.xmap(ToolTypeMode::valueOf, Enum::name))

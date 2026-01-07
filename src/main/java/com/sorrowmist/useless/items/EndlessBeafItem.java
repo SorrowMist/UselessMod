@@ -3,10 +3,13 @@ package com.sorrowmist.useless.items;
 import com.sorrowmist.useless.api.component.UComponents;
 import com.sorrowmist.useless.api.tool.FunctionMode;
 import com.sorrowmist.useless.blocks.GlowPlasticBlock;
+import com.sorrowmist.useless.common.KeyBindings;
+import com.sorrowmist.useless.config.ConfigManager;
 import com.sorrowmist.useless.utils.EnchantmentUtil;
 import com.sorrowmist.useless.utils.UselessItemUtils;
 import com.sorrowmist.useless.utils.mining.MiningUtils;
 import net.minecraft.ChatFormatting;
+import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.component.DataComponents;
@@ -26,12 +29,16 @@ import net.minecraft.world.item.enchantment.Enchantments;
 import net.minecraft.world.item.enchantment.ItemEnchantments;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.state.BlockState;
+import net.neoforged.api.distmarker.Dist;
+import net.neoforged.api.distmarker.OnlyIn;
 import net.neoforged.neoforge.common.ItemAbilities;
 import net.neoforged.neoforge.common.ItemAbility;
+import net.neoforged.neoforge.common.util.Lazy;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.EnumSet;
 import java.util.List;
+import java.util.Locale;
 
 public class EndlessBeafItem extends AxeItem {
     public EndlessBeafItem(Tiers type, Properties pProperties) {
@@ -156,28 +163,62 @@ public class EndlessBeafItem extends AxeItem {
     @Override
     public void onCraftedBy(@NotNull ItemStack stack, @NotNull Level level, @NotNull Player player) {
         super.onCraftedBy(stack, level, player);
-        stack.enchant(EnchantmentUtil.getEnchantmentHolder(level, Enchantments.FORTUNE), 10);
-        stack.enchant(EnchantmentUtil.getEnchantmentHolder(level, Enchantments.LOOTING), 10);
+        // TODO 合成后的附魔
+        stack.enchant(EnchantmentUtil.getEnchantmentHolder(level, Enchantments.FORTUNE),
+                      ConfigManager.getFortuneLevel()
+        );
+        stack.enchant(EnchantmentUtil.getEnchantmentHolder(level, Enchantments.LOOTING),
+                      ConfigManager.getLootingLevel()
+        );
     }
 
     @Override
+    @OnlyIn(Dist.CLIENT)
     public void appendHoverText(@NotNull ItemStack stack, @NotNull TooltipContext context,
-                                @NotNull List<Component> tooltipComponents, @NotNull TooltipFlag tooltipFlag) {
+                                @NotNull List<Component> tooltipComponents,
+                                @NotNull TooltipFlag tooltipFlag) {
+
+        // 1. 显示功能模式状态（强制挖掘 + 连锁挖掘）
+        EnumSet<FunctionMode> activeModes = stack.getOrDefault(
+                UComponents.FunctionModesComponent.get(),
+                EnumSet.noneOf(FunctionMode.class)
+        );
 
         FunctionMode.getTooltipDisplayGroups().forEach(group -> {
             MutableComponent title = group.getTitleComponent();
-            Component status = FunctionMode.getStatusForGroup(
-                    group,
-                    stack.getOrDefault(UComponents.FunctionModesComponent.get(), EnumSet.noneOf(FunctionMode.class))
-            );
+            Component status = FunctionMode.getStatusForGroup(group, activeModes);
 
-            MutableComponent line = title.copy().append(status);
-            tooltipComponents.add(line);
+            if (!title.getString().isEmpty()) { // 避免空行
+                tooltipComponents.add(title.copy().append(": ").append(status));
+            }
         });
 
-        // 功能提示
-        tooltipComponents.add(Component.translatable("tooltip.useless_mod.switch_enchantment")
-                                       .withStyle(ChatFormatting.LIGHT_PURPLE));
+        // 2. 分隔线（可选，美观）
+        tooltipComponents.add(Component.empty());
+
+        // 3. 动态按键提示（仅客户端有效）
+        // 确保在客户端运行
+        this.addKeyTooltip(tooltipComponents, KeyBindings.SWITCH_FORTUNE_KEY,
+                           "tooltip.useless_mod.key.switch_fortune"
+        );
+        this.addKeyTooltip(tooltipComponents, KeyBindings.SWITCH_SILK_TOUCH_KEY,
+                           "tooltip.useless_mod.key.switch_silk_touch"
+        );
+        this.addKeyTooltip(tooltipComponents, KeyBindings.TOGGLE_CHAIN_MODE_KEY,
+                           "tooltip.useless_mod.key.toggle_chain_mode"
+        );
+        this.addKeyTooltip(tooltipComponents, KeyBindings.SWITCH_FORCE_MINING_KEY,
+                           "tooltip.useless_mod.key.switch_force_mining"
+        );
+        this.addKeyTooltip(tooltipComponents, KeyBindings.TRIGGER_FORCE_MINING_KEY,
+                           "tooltip.useless_mod.key.trigger_force_mining"
+        );
+        this.addKeyTooltip(tooltipComponents, KeyBindings.SWITCH_MODE_WHEEL_KEY,
+                           "tooltip.useless_mod.key.open_mode_wheel"
+        );
+
+        // 4. 其他静态功能提示
+        tooltipComponents.add(Component.empty());
         tooltipComponents.add(
                 Component.translatable("tooltip.useless_mod.wrench_function").withStyle(ChatFormatting.YELLOW));
         tooltipComponents.add(
@@ -185,99 +226,13 @@ public class EndlessBeafItem extends AxeItem {
         tooltipComponents.add(
                 Component.translatable("tooltip.useless_mod.festive_affix").withStyle(ChatFormatting.BLUE));
         tooltipComponents.add(
-                Component.translatable("tooltip.useless_mod.auto_collect").withStyle(ChatFormatting.GREEN)); // 新增提示
+                Component.translatable("tooltip.useless_mod.auto_collect").withStyle(ChatFormatting.GREEN));
 
-//
-//        // 显示当前模式
-//        if (isSilkTouchMode(stack)) {
-//            tooltip.add(Component.translatable("tooltip.useless_mod.silk_touch_mode").withStyle(ChatFormatting.AQUA));
-//            int silkTouchLevel = EnchantmentHelper.getTagEnchantmentLevel(Enchantments.SILK_TOUCH, stack);
-//            if (silkTouchLevel > 0) {
-//                tooltip.add(Component.translatable("tooltip.useless_mod.silk_touch_level", silkTouchLevel).withStyle(ChatFormatting.GOLD));
-//            }
-//        } else {
-//            tooltip.add(Component.translatable("tooltip.useless_mod.fortune_mode").withStyle(ChatFormatting.GOLD));
-//            int fortuneLevel = EnchantmentHelper.getTagEnchantmentLevel(Enchantments.BLOCK_FORTUNE, stack);
-//            if (fortuneLevel > 0) {
-//                tooltip.add(Component.translatable("tooltip.useless_mod.fortune_level", fortuneLevel).withStyle(ChatFormatting.GREEN));
-//                if (fortuneLevel > ConfigManager.getFortuneLevel()) {
-//                    tooltip.add(Component.translatable("tooltip.useless_mod.external_enchantment").withStyle(ChatFormatting.RED));
-//                }
-//            }
-//        }
-//
-//
-//
-//        // 增强连锁模式提示
-//        tooltip.add(Component.literal(isEnhancedChainMiningMode(stack) ? "增强连锁模式: 已开启" : "增强连锁模式: 已关闭").withStyle(isEnhancedChainMiningMode(stack) ? ChatFormatting.BLUE : ChatFormatting.GRAY));
-//
-//        // 强制挖掘模式提示
-//        tooltip.add(Component.literal(isForceMiningMode(stack) ? "强制挖掘模式: 已开启" : "强制挖掘模式: 已关闭").withStyle(isForceMiningMode(stack) ? ChatFormatting.RED : ChatFormatting.GRAY));
-//
-//        // 功能提示 - 动态显示按键绑定
-//        // 尝试获取实际按键绑定（仅在客户端）
-//        String silkTouchKey = "Page Down";
-//        String fortuneKey = "Page Up";
-//        String chainMiningKey = "Tab";
-//        String enhancedChainMiningKey = "Numpad 8";
-//        String forceMiningKey = "Numpad 9";
-//        String triggerForceMiningKey = "R";
-//        String modeWheelKey = "G";
-//
-//        // 新增：主从选择按键
-//        String setMasterKey = "M";
-//        String setSlaveKey = "S";
-//
-//        try {
-//            // 获取精准采集/时运切换按键
-//            KeyMapping silkTouchMapping = KeyBindings.SWITCH_SILK_TOUCH_KEY;
-//            silkTouchKey = silkTouchMapping.getTranslatedKeyMessage().getString();
-//
-//            KeyMapping fortuneMapping = KeyBindings.SWITCH_FORTUNE_KEY;
-//            fortuneKey = fortuneMapping.getTranslatedKeyMessage().getString();
-//
-//            // 获取连锁挖掘切换按键
-//            chainMiningKey = KeyBindings.SWITCH_CHAIN_MINING_KEY.getTranslatedKeyMessage().getString();
-//
-//            // 获取增强连锁模式切换按键
-//            enhancedChainMiningKey = KeyBindings.SWITCH_ENHANCED_CHAIN_MINING_KEY.getTranslatedKeyMessage().getString();
-//
-//            // 获取强制挖掘模式切换按键
-//            forceMiningKey = KeyBindings.SWITCH_FORCE_MINING_KEY.getTranslatedKeyMessage().getString();
-//
-//            // 获取强制挖掘触发按键
-//            triggerForceMiningKey = KeyBindings.TRIGGER_FORCE_MINING_KEY.getTranslatedKeyMessage().getString();
-//
-//            // 获取模式选择轮盘按键
-//            KeyMapping modeWheelMapping = KeyBindings.SWITCH_MODE_WHEEL_KEY;
-//            modeWheelKey = modeWheelMapping.getTranslatedKeyMessage().getString();
-//
-//            // 获取主从选择按键
-//            KeyMapping setMasterMapping = KeyBindings.SET_MASTER_PATTERN_KEY;
-//            setMasterKey = setMasterMapping.getTranslatedKeyMessage().getString();
-//
-//            KeyMapping setSlaveMapping = KeyBindings.SET_SLAVE_PATTERN_KEY;
-//            setSlaveKey = setSlaveMapping.getTranslatedKeyMessage().getString();
-//        } catch (Exception e) {
-//            // 如果获取失败，使用默认按键名称
-//        }
-//
-//        // 添加动态按键提示
-//        tooltip.add(Component.translatable("tooltip.useless_mod.switch_enchantment").withStyle(ChatFormatting.LIGHT_PURPLE));
-//        tooltip.add(Component.literal("按住 " + chainMiningKey + "开启连锁挖掘").withStyle(ChatFormatting.LIGHT_PURPLE));
-//        tooltip.add(Component.literal("按下 " + enhancedChainMiningKey + "切换增强连锁挖掘").withStyle(ChatFormatting.LIGHT_PURPLE));
-//        tooltip.add(Component.literal("按下 " + forceMiningKey + "切换强制挖掘模式").withStyle(ChatFormatting.LIGHT_PURPLE));
-//        tooltip.add(Component.literal("按下 " + triggerForceMiningKey + "触发强制破坏").withStyle(ChatFormatting.RED));
-//        tooltip.add(Component.literal("按下 " + modeWheelKey + " 打开模式选择界面").withStyle(ChatFormatting.YELLOW));
-//        tooltip.add(Component.literal("按下 " + setMasterKey + "设置主扩展样板供应器").withStyle(ChatFormatting.BLUE));
-//        tooltip.add(Component.literal("按下 " + setSlaveKey + "设置从扩展样板供应器").withStyle(ChatFormatting.BLUE));
-//        tooltip.add(Component.translatable("tooltip.useless_mod.fast_break_plastic").withStyle(ChatFormatting.GREEN));
-//        tooltip.add(Component.translatable("tooltip.useless_mod.festive_affix").withStyle(ChatFormatting.BLUE));
-//        tooltip.add(Component.translatable("tooltip.useless_mod.auto_collect").withStyle(ChatFormatting.GREEN)); // 新增提示
-//        tooltip.add(Component.translatable("tooltip.useless_mod.enhanced_chain_description").withStyle(ChatFormatting.BLUE));
+        // 可选：增强连锁说明
+        // tooltipComponents.add(Component.translatable("tooltip.useless_mod.enhanced_chain_description").withStyle(ChatFormatting.BLUE));
+
         super.appendHoverText(stack, context, tooltipComponents, tooltipFlag);
     }
-
 
     @Override
     public @NotNull Component getName(@NotNull ItemStack stack) {
@@ -312,5 +267,21 @@ public class EndlessBeafItem extends AxeItem {
         ench.set(EnchantmentUtil.getEnchantmentHolder(Enchantments.LOOTING), 10);
         stack.set(DataComponents.ENCHANTMENTS, ench.toImmutable());
         return stack;
+    }
+
+    /**
+     * 安全添加带按键名的提示行
+     */
+    private void addKeyTooltip(List<Component> tooltip, Lazy<KeyMapping> keyLazy, String translationKey) {
+        KeyMapping key = keyLazy.get();
+        String keyName = key.getTranslatedKeyMessage().getString().toUpperCase(Locale.ROOT);
+
+        // 处理冲突或未绑定情况
+        if (key.isUnbound()) {
+            keyName = "Unbound";
+        }
+
+        tooltip.add(Component.translatable(translationKey, keyName)
+                             .withStyle(ChatFormatting.LIGHT_PURPLE));
     }
 }

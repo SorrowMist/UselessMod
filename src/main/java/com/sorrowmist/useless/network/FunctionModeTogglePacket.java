@@ -26,27 +26,55 @@ public record FunctionModeTogglePacket(FunctionMode mode) implements CustomPacke
 
     public static void handle(FunctionModeTogglePacket msg, IPayloadContext ctx) {
         ctx.enqueueWork(() -> {
-            if (!(ctx.player() instanceof ServerPlayer player)) return;
+            ServerPlayer player = (ServerPlayer) ctx.player();
+            if (player == null) return;
 
             ItemStack stack = player.getMainHandItem();
             if (stack.isEmpty()) return;
 
-            EnumSet<FunctionMode> current = stack.getOrDefault(
+            EnumSet<FunctionMode> modes = stack.getOrDefault(
                     UComponents.FunctionModesComponent,
                     EnumSet.noneOf(FunctionMode.class)
-            ).clone(); // clone 以安全修改
+            );
 
-            ctx.player().sendSystemMessage(Component.literal(msg.mode.getName()));
+            FunctionMode m = msg.mode;
+            // 使用 getTitleComponent 但去掉颜色
+            String titleText = m.getTitleComponent().getString();  // 只取纯文本
+            Component message;
 
-            if (current.contains(msg.mode)) {
-                current.remove(msg.mode);
+            if (m == FunctionMode.ENHANCED_CHAIN_MINING) {
+                // 特殊处理：增强连锁挖掘
+                if (modes.contains(FunctionMode.ENHANCED_CHAIN_MINING)) {
+                    // 关闭增强 → 退回默认连锁
+                    modes.remove(FunctionMode.ENHANCED_CHAIN_MINING);
+                    modes.add(FunctionMode.CHAIN_MINING);
+
+                    message = Component.literal(titleText + "：关闭（默认连锁）");
+                } else {
+                    // 开启增强
+                    modes.remove(FunctionMode.CHAIN_MINING);
+                    modes.add(FunctionMode.ENHANCED_CHAIN_MINING);
+
+                    message = Component.literal(titleText + "：开启");
+                }
             } else {
-                current.add(msg.mode);
+                // 其他模式：普通开关
+                if (modes.contains(m)) {
+                    modes.remove(m);
+                    message = Component.literal(titleText + "：关闭");
+                } else {
+                    modes.add(m);
+                    message = Component.literal(titleText + "：开启");
+                }
             }
 
+            // 保存
             stack.set(UComponents.FunctionModesComponent,
-                      current.isEmpty() ? null : EnumSet.copyOf(current)
+                      modes.isEmpty() ? null : EnumSet.copyOf(modes)
             );
+
+            // 发送纯白文字行动栏消息
+            player.displayClientMessage(message, true);
         });
     }
 

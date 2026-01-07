@@ -23,12 +23,12 @@ public record ToolTypeModeSwitchPacket(ToolTypeMode mode) implements CustomPacke
 
     public static void handle(ToolTypeModeSwitchPacket msg, IPayloadContext ctx) {
         ctx.enqueueWork(() -> {
-            if (!(ctx.player() instanceof ServerPlayer player)) return;
+            ServerPlayer player = (ServerPlayer) ctx.player();
+            if (player == null) return;
 
             ItemStack stack = player.getMainHandItem();
             if (stack.isEmpty()) return;
 
-            // 直接设置当前工具类型（单选）
             stack.set(UComponents.CurrentToolTypeComponent, msg.mode);
         });
     }

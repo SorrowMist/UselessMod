@@ -2,8 +2,9 @@ package com.sorrowmist.useless.init;
 
 import com.sorrowmist.useless.UselessMod;
 import com.sorrowmist.useless.blocks.oregenerator.OreGeneratorBlock;
-import com.sorrowmist.useless.blocks.teleport.TeleportBlock;
-import com.sorrowmist.useless.blocks.teleport.TeleportBlock2;
+import com.sorrowmist.useless.blocks.teleport.UselessDimTeleporter;
+import com.sorrowmist.useless.blocks.teleport.UselessDimTeleporter2;
+import com.sorrowmist.useless.blocks.teleport.UselessDimTeleporter3;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.InteractionHand;
@@ -17,6 +18,7 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.BlockHitResult;
 import net.neoforged.neoforge.registries.DeferredBlock;
 import net.neoforged.neoforge.registries.DeferredRegister;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.Objects;
 
@@ -26,14 +28,20 @@ public final class ModBlocks {
     public static final DeferredBlock<Block> TELEPORT_BLOCK = BLOCKS.register(
             "teleport_block",
             () -> new Block(BlockBehaviour.Properties.of()
-                    .strength(2.0f, 65536.0f)
-                    .requiresCorrectToolForDrops()) {
+                                                     .strength(2.0f, 65536.0f)
+                                                     .requiresCorrectToolForDrops()) {
                 @Override
-                protected ItemInteractionResult useItemOn(ItemStack stack, BlockState state, Level level, BlockPos pos, Player player, InteractionHand hand, BlockHitResult hitResult) {
+                protected @NotNull ItemInteractionResult useItemOn(@NotNull ItemStack stack,
+                                                                   @NotNull BlockState state,
+                                                                   @NotNull Level level,
+                                                                   @NotNull BlockPos pos,
+                                                                   @NotNull Player player,
+                                                                   @NotNull InteractionHand hand,
+                                                                   @NotNull BlockHitResult hitResult) {
                     if (!level.isClientSide() && player instanceof ServerPlayer serverPlayer) {
                         // 异步处理传送，避免阻塞主线程
                         Objects.requireNonNull(level.getServer()).execute(() -> {
-                            TeleportBlock.handleTeleport(serverPlayer, pos);
+                            UselessDimTeleporter.teleport(serverPlayer, pos);
                         });
                     }
                     return ItemInteractionResult.sidedSuccess(level.isClientSide());
@@ -44,14 +52,20 @@ public final class ModBlocks {
     public static final DeferredBlock<Block> TELEPORT_BLOCK_2 = BLOCKS.register(
             "teleport_block_2",
             () -> new Block(BlockBehaviour.Properties.of()
-                    .strength(2.0f, 65536.0f)
-                    .requiresCorrectToolForDrops()) {
+                                                     .strength(2.0f, 65536.0f)
+                                                     .requiresCorrectToolForDrops()) {
                 @Override
-                protected ItemInteractionResult useItemOn(ItemStack stack, BlockState state, Level level, BlockPos pos, Player player, InteractionHand hand, BlockHitResult hitResult) {
+                protected @NotNull ItemInteractionResult useItemOn(@NotNull ItemStack stack,
+                                                                   @NotNull BlockState state,
+                                                                   @NotNull Level level,
+                                                                   @NotNull BlockPos pos,
+                                                                   @NotNull Player player,
+                                                                   @NotNull InteractionHand hand,
+                                                                   @NotNull BlockHitResult hitResult) {
                     if (!level.isClientSide() && player instanceof ServerPlayer serverPlayer) {
                         // 异步处理传送，避免阻塞主线程
                         Objects.requireNonNull(level.getServer()).execute(() -> {
-                            TeleportBlock2.handleTeleport(serverPlayer, pos);
+                            UselessDimTeleporter2.teleport(serverPlayer, pos);
                         });
                     }
                     return ItemInteractionResult.sidedSuccess(level.isClientSide());
@@ -59,7 +73,31 @@ public final class ModBlocks {
             }
     );
 
-    public static final DeferredBlock<Block> ORE_GENERATOR_BLOCK = BLOCKS.register(
+    public static final DeferredBlock<Block> TELEPORT_BLOCK_3 = BLOCKS.register(
+            "teleport_block_3",
+            () -> new Block(BlockBehaviour.Properties.of()
+                                                     .strength(2.0f, 65536.0f)
+                                                     .requiresCorrectToolForDrops()) {
+                @Override
+                protected @NotNull ItemInteractionResult useItemOn(@NotNull ItemStack stack,
+                                                                   @NotNull BlockState state,
+                                                                   @NotNull Level level,
+                                                                   @NotNull BlockPos pos,
+                                                                   @NotNull Player player,
+                                                                   @NotNull InteractionHand hand,
+                                                                   @NotNull BlockHitResult hitResult) {
+                    if (!level.isClientSide() && player instanceof ServerPlayer serverPlayer) {
+                        // 异步处理传送，避免阻塞主线程
+                        Objects.requireNonNull(level.getServer()).execute(() -> {
+                            UselessDimTeleporter3.teleport(serverPlayer, pos);
+                        });
+                    }
+                    return ItemInteractionResult.sidedSuccess(level.isClientSide());
+                }
+            }
+    );
+
+    static final DeferredBlock<Block> ORE_GENERATOR_BLOCK = BLOCKS.register(
             "ore_generator_block", OreGeneratorBlock::new
     );
 

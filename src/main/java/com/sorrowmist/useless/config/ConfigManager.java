@@ -282,4 +282,11 @@ public class ConfigManager {
             return fallback;
         }
     }
+
+    // 统一检查是否是平台方块
+    public static boolean isPlatformBlock(Block block) {
+        return block == getFillBlock() ||
+                block == getBorderBlock() ||
+                block == getCenterBlock();
+    }
 }

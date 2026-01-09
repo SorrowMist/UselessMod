@@ -1,0 +1,10 @@
+{
+  "type": "useless_mod:uselessdim3",
+  "generator": {
+    "type": "useless_mod:uselessdim_gen_3",
+    "biome_source": {
+      "type": "minecraft:fixed",
+      "biome": "useless_mod:useless_biome"
+    }
+  }
+}

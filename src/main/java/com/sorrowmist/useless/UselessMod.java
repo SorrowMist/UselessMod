@@ -4,8 +4,7 @@ import com.mojang.logging.LogUtils;
 import com.sorrowmist.useless.api.component.UComponents;
 import com.sorrowmist.useless.blocks.GlowPlasticBlock;
 import com.sorrowmist.useless.config.ConfigManager;
-import com.sorrowmist.useless.dimension.UselessDimension;
-import com.sorrowmist.useless.dimension.UselessDimension2;
+import com.sorrowmist.useless.dimension.UselessDimensions;
 import com.sorrowmist.useless.init.*;
 import net.minecraft.resources.ResourceLocation;
 import net.neoforged.bus.api.IEventBus;
@@ -39,8 +38,7 @@ public class UselessMod {
         GlowPlasticBlock.ITEMS.register(modEventBus);
 
         // 纬度注册
-        UselessDimension.CHUNK_GENERATORS.register(modEventBus);
-        UselessDimension2.CHUNK_GENERATORS.register(modEventBus);
+        UselessDimensions.init(modEventBus);
 
         NeoForge.EVENT_BUS.register(this);
 
@@ -55,13 +53,9 @@ public class UselessMod {
         return ResourceLocation.fromNamespaceAndPath(MODID, path);
     }
 
-    private void commonSetup(FMLCommonSetupEvent event) {
-
-    }
+    private void commonSetup(FMLCommonSetupEvent event) {}
 
     @SubscribeEvent
-    public void onServerStarting(ServerStartingEvent event) {
-
-    }
+    public void onServerStarting(ServerStartingEvent event) {}
 }
 

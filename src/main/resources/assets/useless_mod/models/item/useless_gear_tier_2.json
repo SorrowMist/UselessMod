@@ -1,0 +1,6 @@
+{
+  "parent": "item/generated",
+  "textures": {
+    "layer0": "useless_mod:item/gear/useless_gear_tier_2"
+  }
+}

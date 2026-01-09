@@ -32,7 +32,9 @@ public class ModCreativeTabs {
                                      // 其他常规物品
                                      pOutput.accept(ModItems.TELEPORT_BLOCK_ITEM.get());
                                      pOutput.accept(ModItems.TELEPORT_BLOCK_ITEM_2.get());
+                                     pOutput.accept(ModItems.TELEPORT_BLOCK_ITEM_3.get());
                                      pOutput.accept(ModItems.ORE_GENERATOR_BLOCK.get());
+
                                      for (DeferredItem<?> item : GlowPlasticBlock.GLOW_PLASTIC_BLOCK_ITEMS.values()) {
                                          pOutput.accept(item.get());
                                      }

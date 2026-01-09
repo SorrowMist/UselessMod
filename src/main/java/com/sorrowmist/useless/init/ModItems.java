@@ -27,6 +27,11 @@ public final class ModItems {
             () -> new BlockItem(ModBlocks.TELEPORT_BLOCK_2.get(), new Item.Properties())
     );
 
+    static final DeferredItem<BlockItem> TELEPORT_BLOCK_ITEM_3 = ITEMS.register(
+            "teleport_block_3",
+            () -> new BlockItem(ModBlocks.TELEPORT_BLOCK_3.get(), new Item.Properties())
+    );
+
     static final DeferredItem<EndlessBeafItem> ENDLESS_BEAF_ITEM = ITEMS.register(
             "endless_beaf_item",
             () -> new EndlessBeafItem(

@@ -9,6 +9,7 @@ import net.minecraft.server.level.TicketType;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.levelgen.Heightmap;
 
@@ -69,7 +70,6 @@ public abstract class AbstractDimensionTeleporter {
                 target,
                 sourceBlockPos
         );
-
         if (targetTeleportBlock == null) return;
 
         BlockPos standPos = targetTeleportBlock.above();
@@ -97,11 +97,9 @@ public abstract class AbstractDimensionTeleporter {
 
         // 搜索已有
         BlockPos found = searchExistingTeleport(level, sourceBlockPos);
-        if (found != null) {
-            return found;
-        }
+        if (found != null) return found;
 
-        // 2创建新的
+        // 创建新的
         return createTeleportBlock(level, sourceBlockPos);
     }
 
@@ -123,16 +121,10 @@ public abstract class AbstractDimensionTeleporter {
             for (int dz = -2; dz <= 2; dz++) {
 
                 if (isPlatformDim) {
-                    pos.set(
-                            sourceBlockPos.getX() + dx,
-                            baseY,
-                            sourceBlockPos.getZ() + dz
-                    );
-
+                    pos.set(sourceBlockPos.getX() + dx, baseY, sourceBlockPos.getZ() + dz);
                     if (isTeleportBlock(level, pos)) {
                         return adjustTeleportBlock(level, pos);
                     }
-
                 } else {
                     for (int dy = -4; dy <= 4; dy++) {
                         pos.set(
@@ -140,7 +132,6 @@ public abstract class AbstractDimensionTeleporter {
                                 baseY + dy,
                                 sourceBlockPos.getZ() + dz
                         );
-
                         if (isTeleportBlock(level, pos)) {
                             return adjustTeleportBlock(level, pos);
                         }
@@ -157,41 +148,101 @@ public abstract class AbstractDimensionTeleporter {
     private BlockPos createTeleportBlock(ServerLevel level,
                                          BlockPos sourceBlockPos) {
 
-        boolean isPlatformDim = level.dimension().equals(getDimensionKey());
-
-        int baseY = isPlatformDim
+        int baseY = level.dimension().equals(getDimensionKey())
                 ? getPlatformTopY()
                 : getSurfaceY(level, sourceBlockPos);
 
-        BlockPos base = new BlockPos(
+        BlockPos origin = new BlockPos(
                 sourceBlockPos.getX(),
                 baseY,
                 sourceBlockPos.getZ()
         );
 
-        // 确定最终站人位置
-        BlockPos standPos = findNearestStandable(level, base, 8);
+        BlockPos standPos = findBestPlatformStand(level, origin);
         if (standPos == null) return null;
 
         BlockPos blockPos = standPos.below();
 
-        // 若不是传送方块放置
-        if (!isTeleportBlock(level, blockPos)) {
-            level.setBlock(blockPos, teleportState(), 3);
+        BlockState floorState = level.getBlockState(blockPos);
+
+        // 仅允许替换平台地板方块
+        if (!ConfigManager.isPlatformBlock(floorState.getBlock())) {
+            return null;
         }
 
+        level.setBlock(blockPos, teleportState(), 3);
         return blockPos;
     }
 
+    /**
+     * 最终站点搜索策略
+     */
+    private BlockPos findBestPlatformStand(ServerLevel level, BlockPos origin) {
+
+        // 1. 原位置 + Y / Y+1 / ±3
+        BlockPos pos = searchVertical(level, origin);
+        if (pos != null) return pos;
+
+        // 2. 8×8 范围，从内向外
+        for (int r = 1; r <= 4; r++) {
+            for (int dx = -r; dx <= r; dx++) {
+                for (int dz = -r; dz <= r; dz++) {
+
+                    if (Math.abs(dx) != r && Math.abs(dz) != r) continue;
+
+                    BlockPos base = origin.offset(dx, 0, dz);
+                    pos = searchVertical(level, base);
+                    if (pos != null) return pos;
+                }
+            }
+        }
+
+        return null;
+    }
 
     /**
-     * 已存在的传送方块，修正其“站人高度”
+     * 在指定 XZ 上进行 Y / Y+1 / ±3 搜索
      */
+    private BlockPos searchVertical(ServerLevel level, BlockPos base) {
+
+        // 原 Y
+        if (isValidPlatformStand(level, base)) return base;
+
+        // Y + 1
+        if (isValidPlatformStand(level, base.above())) return base.above();
+
+        // 上下 ±3
+        for (int i = 1; i <= 3; i++) {
+            BlockPos up = base.above(i);
+            if (isValidPlatformStand(level, up)) return up;
+
+            BlockPos down = base.below(i);
+            if (down.getY() > level.getMinBuildHeight()
+                    && isValidPlatformStand(level, down)) {
+                return down;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * 平台 + 站立联合判定
+     */
+    private boolean isValidPlatformStand(ServerLevel level, BlockPos standPos) {
+        if (standPos == null) return false;
+
+        BlockPos floor = standPos.below();
+        BlockState floorState = level.getBlockState(floor);
+
+        return ConfigManager.isPlatformBlock(floorState.getBlock())
+                && level.getBlockState(standPos).isAir()
+                && level.getBlockState(standPos.above()).isAir();
+    }
     private BlockPos adjustTeleportBlock(ServerLevel level,
                                          BlockPos teleportBlockPos) {
 
         BlockPos standBase = teleportBlockPos.above();
-
         BlockPos standPos = findNearestStandable(level, standBase, 8);
         if (standPos == null) return teleportBlockPos;
 
@@ -199,10 +250,9 @@ public abstract class AbstractDimensionTeleporter {
 
         // 方块位置不对 → 移动
         if (!correctBlockPos.equals(teleportBlockPos)) {
-            level.setBlock(teleportBlockPos, net.minecraft.world.level.block.Blocks.AIR.defaultBlockState(), 3);
+            level.setBlock(teleportBlockPos, Blocks.AIR.defaultBlockState(), 3);
             level.setBlock(correctBlockPos, teleportState(), 3);
         }
-
         return correctBlockPos;
     }
 
@@ -222,16 +272,11 @@ public abstract class AbstractDimensionTeleporter {
                                           BlockPos start,
                                           int maxDistance) {
 
-        if (isStandable(level, start)) {
-            return start;
-        }
+        if (isStandable(level, start)) return start;
 
         for (int i = 1; i <= maxDistance; i++) {
-
             BlockPos up = start.above(i);
-            if (isStandable(level, up)) {
-                return up;
-            }
+            if (isStandable(level, up)) return up;
 
             BlockPos down = start.below(i);
             if (down.getY() > level.getMinBuildHeight()
@@ -239,7 +284,6 @@ public abstract class AbstractDimensionTeleporter {
                 return down;
             }
         }
-
         return null;
     }
 

@@ -257,7 +257,6 @@ public class ConfigManager {
         return LOOTING_LEVEL.get();
     }
 
-    // TODO 新的修改？
     // 获取塑料平台层数
     public static int getPlatformLayers() {
         return PLATFORM_LAYERS.get();

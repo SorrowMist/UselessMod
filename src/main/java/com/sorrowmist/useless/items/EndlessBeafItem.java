@@ -2,19 +2,19 @@ package com.sorrowmist.useless.items;
 
 /*
  * This file is based on Apotheosis.
- * 
+ *
  * Copyright (c) 2023 Brennan Ward
- * 
+ *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
  * in the Software without restriction, including without limitation the rights
  * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
  * copies of the Software, and to permit persons to whom the Software is
  * furnished to do so, subject to the following conditions:
- * 
+ *
  * The above copyright notice and this permission notice shall be included in all
  * copies or substantial portions of the Software.
- * 
+ *
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
@@ -105,171 +105,171 @@ public class EndlessBeafItem extends PickaxeItem {
 
     // 按键状态跟踪
 
-    
+
     // AE2无线访问点链接相关
     private static final String TAG_ACCESS_POINT_POS = "accessPoint";
     public static final IGridLinkableHandler LINKABLE_HANDLER = new LinkableHandler();
 
     // 飞行状态跟踪，避免重复设置导致卡顿
     private static final Map<UUID, Boolean> playerFlightStatus = new HashMap<>();
-    
+
     // 扩展样板供应器主从同步相关 - 已移至PatternProviderManager
     // 同步间隔，防止频繁同步
     private static final long SYNC_INTERVAL = 1000;
     // 同步数据标签
     private static final String SYNC_DATA_TAG = "PatternProviderSyncData";
-    
+
     // 为了兼容其他类（如mixin），提供静态访问方法
     public static Map<com.sorrowmist.useless.utils.pattern.PatternProviderKey, Set<com.sorrowmist.useless.utils.pattern.PatternProviderKey>> masterToSlaves = new HashMap<>() {
         @Override
         public Set<com.sorrowmist.useless.utils.pattern.PatternProviderKey> get(Object key) {
             return PatternProviderManager.getMasterToSlaves().get(key);
         }
-        
+
         @Override
         public Set<com.sorrowmist.useless.utils.pattern.PatternProviderKey> put(com.sorrowmist.useless.utils.pattern.PatternProviderKey key, Set<com.sorrowmist.useless.utils.pattern.PatternProviderKey> value) {
             return PatternProviderManager.getMasterToSlaves().put(key, value);
         }
-        
+
         @Override
         public Set<com.sorrowmist.useless.utils.pattern.PatternProviderKey> remove(Object key) {
             return PatternProviderManager.getMasterToSlaves().remove(key);
         }
-        
+
         @Override
         public void clear() {
             PatternProviderManager.getMasterToSlaves().clear();
         }
-        
+
         @Override
         public boolean containsKey(Object key) {
             return PatternProviderManager.getMasterToSlaves().containsKey(key);
         }
-        
+
         @Override
         public boolean isEmpty() {
             return PatternProviderManager.getMasterToSlaves().isEmpty();
         }
-        
+
         @Override
         public Set<Map.Entry<com.sorrowmist.useless.utils.pattern.PatternProviderKey, Set<com.sorrowmist.useless.utils.pattern.PatternProviderKey>>> entrySet() {
             return PatternProviderManager.getMasterToSlaves().entrySet();
         }
-        
+
         @Override
         public Set<com.sorrowmist.useless.utils.pattern.PatternProviderKey> keySet() {
             return PatternProviderManager.getMasterToSlaves().keySet();
         }
-        
+
         @Override
         public int size() {
             return PatternProviderManager.getMasterToSlaves().size();
         }
     };
-    
+
     public static Map<com.sorrowmist.useless.utils.pattern.PatternProviderKey, com.sorrowmist.useless.utils.pattern.PatternProviderKey> slaveToMaster = new HashMap<>() {
         @Override
         public com.sorrowmist.useless.utils.pattern.PatternProviderKey get(Object key) {
             return PatternProviderManager.getSlaveToMaster().get(key);
         }
-        
+
         @Override
         public com.sorrowmist.useless.utils.pattern.PatternProviderKey put(com.sorrowmist.useless.utils.pattern.PatternProviderKey key, com.sorrowmist.useless.utils.pattern.PatternProviderKey value) {
             return PatternProviderManager.getSlaveToMaster().put(key, value);
         }
-        
+
         @Override
         public com.sorrowmist.useless.utils.pattern.PatternProviderKey remove(Object key) {
             return PatternProviderManager.getSlaveToMaster().remove(key);
         }
-        
+
         @Override
         public void clear() {
             PatternProviderManager.getSlaveToMaster().clear();
         }
-        
+
         @Override
         public boolean containsKey(Object key) {
             return PatternProviderManager.getSlaveToMaster().containsKey(key);
         }
-        
+
         @Override
         public boolean isEmpty() {
             return PatternProviderManager.getSlaveToMaster().isEmpty();
         }
-        
+
         @Override
         public Set<Map.Entry<com.sorrowmist.useless.utils.pattern.PatternProviderKey, com.sorrowmist.useless.utils.pattern.PatternProviderKey>> entrySet() {
             return PatternProviderManager.getSlaveToMaster().entrySet();
         }
-        
+
         @Override
         public Set<com.sorrowmist.useless.utils.pattern.PatternProviderKey> keySet() {
             return PatternProviderManager.getSlaveToMaster().keySet();
         }
-        
+
         @Override
         public int size() {
             return PatternProviderManager.getSlaveToMaster().size();
         }
     };
-    
+
     public static Map<com.sorrowmist.useless.utils.pattern.PatternProviderKey, Long> lastSyncTime = new HashMap<>() {
         @Override
         public Long get(Object key) {
             return PatternProviderManager.getLastSyncTime().get(key);
         }
-        
+
         @Override
         public Long put(com.sorrowmist.useless.utils.pattern.PatternProviderKey key, Long value) {
             return PatternProviderManager.getLastSyncTime().put(key, value);
         }
-        
+
         @Override
         public Long remove(Object key) {
             return PatternProviderManager.getLastSyncTime().remove(key);
         }
-        
+
         @Override
         public void clear() {
             PatternProviderManager.getLastSyncTime().clear();
         }
-        
+
         @Override
         public boolean containsKey(Object key) {
             return PatternProviderManager.getLastSyncTime().containsKey(key);
         }
-        
+
         @Override
         public boolean isEmpty() {
             return PatternProviderManager.getLastSyncTime().isEmpty();
         }
-        
+
         @Override
         public Set<Map.Entry<com.sorrowmist.useless.utils.pattern.PatternProviderKey, Long>> entrySet() {
             return PatternProviderManager.getLastSyncTime().entrySet();
         }
-        
+
         @Override
         public Set<com.sorrowmist.useless.utils.pattern.PatternProviderKey> keySet() {
             return PatternProviderManager.getLastSyncTime().keySet();
         }
-        
+
         @Override
         public int size() {
             return PatternProviderManager.getLastSyncTime().size();
         }
     };
-    
+
     // 使用静态代理来处理currentSelectedMaster的访问
     public static com.sorrowmist.useless.utils.pattern.PatternProviderKey getCurrentSelectedMaster() {
         return PatternProviderManager.getCurrentSelectedMaster();
     }
-    
+
     public static void setCurrentSelectedMaster(com.sorrowmist.useless.utils.pattern.PatternProviderKey masterKey) {
         PatternProviderManager.setCurrentSelectedMaster(masterKey);
     }
-    
+
     // 用于处理物品与无线访问点的绑定
     private static class LinkableHandler implements IGridLinkableHandler {
         @Override
@@ -289,10 +289,10 @@ public class EndlessBeafItem extends PickaxeItem {
             itemStack.removeTagKey(TAG_ACCESS_POINT_POS);
         }
     }
-    
+
     // 用于表示扩展样板供应器的键，包含BlockPos和Direction
     // 注意：PatternProviderKey现在在com.sorrowmist.useless.utils.pattern包中定义
-    
+
 
 
     public EndlessBeafItem(Tier pTier, int pAttackDamageModifier, float pAttackSpeedModifier, Properties pProperties) {
@@ -334,46 +334,46 @@ public class EndlessBeafItem extends PickaxeItem {
 
     // 模式管理器实例
     private final ModeManager modeManager = new ModeManager();
-    
+
     // 检查是否处于精准采集模式
     public boolean isSilkTouchMode(ItemStack stack) {
         modeManager.loadFromStack(stack);
         return modeManager.isModeActive(com.sorrowmist.useless.modes.ToolMode.SILK_TOUCH);
     }
-    
+
     // 设置连锁挖掘按键按下状态
     public void setChainMiningPressedState(ItemStack stack, boolean isPressed) {
         CompoundTag tag = stack.getOrCreateTag();
         tag.putBoolean("ChainMiningPressed", isPressed);
         stack.setTag(tag);
     }
-    
+
     // 获取连锁挖掘按键按下状态
     public boolean isChainMiningPressed(ItemStack stack) {
         CompoundTag tag = stack.getTag();
         return tag != null && tag.getBoolean("ChainMiningPressed");
     }
-    
+
     // 检查是否应该启用连锁挖掘（根据按键状态和模式）
     public boolean shouldUseChainMining(ItemStack stack) {
         modeManager.loadFromStack(stack);
         // 简化连锁挖掘激活条件：只要按住连锁挖掘按键就启用
         return isChainMiningPressed(stack);
     }
-    
+
     // 获取强化连锁模式
     public boolean isEnhancedChainMiningMode(ItemStack stack) {
         modeManager.loadFromStack(stack);
         return modeManager.isModeActive(com.sorrowmist.useless.modes.ToolMode.ENHANCED_CHAIN_MINING);
     }
-    
+
     // 设置强化连锁模式
     public void setEnhancedChainMiningMode(ItemStack stack, boolean enabled) {
         modeManager.loadFromStack(stack);
         modeManager.setModeActive(com.sorrowmist.useless.modes.ToolMode.ENHANCED_CHAIN_MINING, enabled);
         modeManager.saveToStack(stack);
     }
-    
+
     // 切换强化连锁模式
     public boolean toggleEnhancedChainMiningMode(ItemStack stack) {
         modeManager.loadFromStack(stack);
@@ -381,13 +381,13 @@ public class EndlessBeafItem extends PickaxeItem {
         modeManager.saveToStack(stack);
         return modeManager.isModeActive(com.sorrowmist.useless.modes.ToolMode.ENHANCED_CHAIN_MINING);
     }
-    
+
     // 检查是否处于强制挖掘模式
     public boolean isForceMiningMode(ItemStack stack) {
         modeManager.loadFromStack(stack);
         return modeManager.isModeActive(com.sorrowmist.useless.modes.ToolMode.FORCE_MINING);
     }
-    
+
     // 切换强制挖掘模式
     public boolean toggleForceMiningMode(ItemStack stack) {
         modeManager.loadFromStack(stack);
@@ -395,13 +395,13 @@ public class EndlessBeafItem extends PickaxeItem {
         modeManager.saveToStack(stack);
         return modeManager.isModeActive(com.sorrowmist.useless.modes.ToolMode.FORCE_MINING);
     }
-    
+
     // 检查是否处于AE存储优先模式
     public boolean isAEStoragePriorityMode(ItemStack stack) {
         modeManager.loadFromStack(stack);
         return modeManager.isModeActive(com.sorrowmist.useless.modes.ToolMode.AE_STORAGE_PRIORITY);
     }
-    
+
     // 切换AE存储优先模式
     public boolean toggleAEStoragePriorityMode(ItemStack stack) {
         modeManager.loadFromStack(stack);
@@ -409,7 +409,7 @@ public class EndlessBeafItem extends PickaxeItem {
         modeManager.saveToStack(stack);
         return modeManager.isModeActive(com.sorrowmist.useless.modes.ToolMode.AE_STORAGE_PRIORITY);
     }
-    
+
     // 获取链接的无线访问点位置
     @Nullable
     public static GlobalPos getLinkedPosition(ItemStack stack) {
@@ -422,50 +422,50 @@ public class EndlessBeafItem extends PickaxeItem {
         }
         return null;
     }
-    
+
     // 获取链接的AE网格
     @Nullable
     public static IGrid getLinkedGrid(ItemStack stack, Level level, @Nullable Player player) {
         if (!(level instanceof net.minecraft.server.level.ServerLevel serverLevel)) {
             return null;
         }
-        
+
         GlobalPos linkedPos = getLinkedPosition(stack);
         if (linkedPos == null) {
             return null;
         }
-        
+
         net.minecraft.server.level.ServerLevel linkedLevel = serverLevel.getServer().getLevel(linkedPos.dimension());
         if (linkedLevel == null) {
             return null;
         }
-        
+
         net.minecraft.world.level.block.entity.BlockEntity be = linkedLevel.getBlockEntity(linkedPos.pos());
         if (!(be instanceof IWirelessAccessPoint accessPoint)) {
             return null;
         }
-        
+
         return accessPoint.getGrid();
     }
-    
+
     // 将物品栈存入AE网络
     private static boolean storeItemInAENetwork(ItemStack stack, Player player) {
         return storeItemInAENetwork(stack, player, null);
     }
-    
+
     // 将物品栈存入AE网络（带工具参数）
     private static boolean storeItemInAENetwork(ItemStack stack, Player player, ItemStack toolStack) {
         if (player == null || stack.isEmpty()) {
             return false;
         }
-        
+
         // 获取工具
         ItemStack toolItem = toolStack;
         if (toolItem == null || toolItem.isEmpty()) {
             // 如果没有提供工具参数，从玩家手中获取
             ItemStack mainHandItem = player.getMainHandItem();
             ItemStack offHandItem = player.getOffhandItem();
-            
+
             if (mainHandItem.getItem() instanceof EndlessBeafItem) {
                 toolItem = mainHandItem;
             } else if (offHandItem.getItem() instanceof EndlessBeafItem) {
@@ -474,7 +474,7 @@ public class EndlessBeafItem extends PickaxeItem {
                 return false;
             }
         }
-        
+
         // 检查是否启用了AE存储优先模式
         EndlessBeafItem tool = (EndlessBeafItem) toolItem.getItem();
         boolean isAEStoragePriority = tool.isAEStoragePriorityMode(toolItem);
@@ -482,7 +482,7 @@ public class EndlessBeafItem extends PickaxeItem {
             UselessMod.LOGGER.debug("AE存储优先模式未启用，工具: {}", toolItem);
             return false;
         }
-        
+
         // 尝试从链接的无线访问点获取AE网络
         try {
             // 获取链接的网格
@@ -491,21 +491,21 @@ public class EndlessBeafItem extends PickaxeItem {
                 UselessMod.LOGGER.debug("无法获取AE网格，工具: {}", toolItem);
                 return false;
             }
-            
+
             // 获取物品存储处理程序
             MEStorage storage = grid.getStorageService().getInventory();
             if (storage == null) {
                 UselessMod.LOGGER.debug("无法获取AE存储服务，工具: {}", toolItem);
                 return false;
             }
-            
+
             // 转换为AE物品栈
             AEItemKey aeKey = AEItemKey.of(stack);
             if (aeKey == null) {
                 UselessMod.LOGGER.debug("无法转换为AE物品键，物品: {}", stack);
                 return false;
             }
-            
+
             // 存入AE网络
             long inserted = storage.insert(aeKey, stack.getCount(), appeng.api.config.Actionable.MODULATE, new PlayerSource(player, null));
             // 如果插入的数量等于物品栈数量，说明全部存入
@@ -525,21 +525,21 @@ public class EndlessBeafItem extends PickaxeItem {
             UselessMod.LOGGER.debug("AE存储过程中出现异常: {}", e.getMessage());
             // 忽略任何异常
         }
-        
+
         return false;
     }
-    
+
     // 将物品列表存入AE网络或玩家背包
     public static void handleDrops(List<ItemStack> drops, Player player) {
         handleDrops(drops, player, null);
     }
-    
+
     // 将物品列表存入AE网络或玩家背包（带工具参数）
     public static void handleDrops(List<ItemStack> drops, Player player, ItemStack toolStack) {
         if (drops == null || drops.isEmpty()) {
             return;
         }
-        
+
         // 遍历所有掉落物品
         Iterator<ItemStack> iterator = drops.iterator();
         while (iterator.hasNext()) {
@@ -548,38 +548,38 @@ public class EndlessBeafItem extends PickaxeItem {
                 iterator.remove();
                 continue;
             }
-            
+
             // 尝试存入AE网络
             if (storeItemInAENetwork(dropStack, player, toolStack)) {
                 iterator.remove();
                 continue;
             }
-            
+
             // 尝试存入玩家背包
             if (!player.getInventory().add(dropStack)) {
                 // 背包已满，保留在掉落列表中，稍后生成物品实体
                 continue;
             }
-            
+
             // 背包添加成功，从掉落列表中移除
             iterator.remove();
         }
     }
-    
+
     // 处理增强连锁模式切换按键
     private void handleEnhancedChainMiningKey(ItemStack stack, Player player) {
         // 发送数据包到服务器，由服务器处理增强连锁模式切换
         // 客户端不再直接修改状态，而是等待服务器的响应
         com.sorrowmist.useless.networking.ModMessages.sendToServer(new com.sorrowmist.useless.networking.EnhancedChainMiningTogglePacket());
     }
-    
+
     // 处理强制挖掘模式切换按键
     private void handleForceMiningKey(ItemStack stack, Player player) {
         // 发送数据包到服务器，由服务器处理强制挖掘模式切换
         // 客户端不再直接修改状态，而是等待服务器的响应
         com.sorrowmist.useless.networking.ModMessages.sendToServer(new com.sorrowmist.useless.networking.ForceMiningTogglePacket());
     }
-    
+
     // 处理设置主扩展样板供应器按键（M键）
     private void handleSetMasterPatternKey(ItemStack stack, Player player) {
         // 获取玩家看向的方块
@@ -596,7 +596,7 @@ public class EndlessBeafItem extends PickaxeItem {
             com.sorrowmist.useless.networking.ModMessages.sendToServer(new com.sorrowmist.useless.networking.ResetMasterPatternPacket());
         }
     }
-    
+
     // 处理设置从扩展样板供应器按键（S键）
     private void handleSetSlavePatternKey(ItemStack stack, Player player) {
         // 获取玩家看向的方块
@@ -616,11 +616,11 @@ public class EndlessBeafItem extends PickaxeItem {
         // 保存关键状态（使用局部变量存储，确保不会丢失）
         ModeManager modeManager = new ModeManager();
         modeManager.loadFromStack(stack);
-        
+
         boolean enhancedChainMining = isEnhancedChainMiningMode(stack);
         boolean silkTouchMode = isSilkTouchMode(stack);
         boolean chainMiningPressed = isChainMiningPressed(stack);
-        
+
         // 获取现有的所有附魔
         Map<Enchantment, Integer> enchantments = new HashMap<>(EnchantmentHelper.getEnchantments(stack));
         // 使用配置中的抢夺等级
@@ -642,45 +642,45 @@ public class EndlessBeafItem extends PickaxeItem {
 
         // 应用更新后的附魔
         EnchantmentHelper.setEnchantments(enchantments, stack);
-        
+
         // 强制恢复关键状态标签（即使setEnchantments替换了整个NBT也能恢复）
         // 使用getOrCreateTag确保标签存在
         CompoundTag finalTag = stack.getOrCreateTag();
         finalTag.putBoolean("EnhancedChainMining", enhancedChainMining);
         finalTag.putBoolean("SilkTouchMode", silkTouchMode);
         finalTag.putBoolean("ChainMiningPressed", chainMiningPressed);
-        
+
         // 设置模型切换谓词值
         if (silkTouchMode) {
             finalTag.putFloat("useless_mod:silk_touch_mode", 1.0f);
         } else {
             finalTag.remove("useless_mod:silk_touch_mode");
         }
-        
+
         // 确保标签被正确应用到物品上
         stack.setTag(finalTag);
-        
+
         // 更新工具模式标签
         updateToolModeTags(stack, modeManager);
     }
-    
+
     // 检查是否安装了格雷科技mod
     private boolean isGTCEUInstalled() {
         return net.minecraftforge.fml.ModList.get().isLoaded("gtceu");
     }
-    
+
     // 更新工具模式，通过NBT标签跟踪激活的工具模式
     private void updateToolModeTags(ItemStack stack, ModeManager modeManager) {
         // 在NBT中存储激活的工具模式，以便在游戏逻辑中使用
         CompoundTag tag = stack.getOrCreateTag();
         CompoundTag toolModesTag = tag.getCompound("ToolModes");
-        
+
         // 保存工具模式状态，这些状态将在游戏逻辑中用于判断工具行为
         // 实际的标签处理将在物品交互时根据这些状态进行判断
-        
+
         // 清除旧的工具模式标签（如果存在）
         tag.remove("ActiveToolTag");
-        
+
         // 根据激活的模式设置活动工具标签
         if (modeManager.isModeActive(ToolMode.WRENCH_MODE)) {
             tag.putString("ActiveToolTag", "forge:tools/wrenches");
@@ -698,19 +698,19 @@ public class EndlessBeafItem extends PickaxeItem {
                 tag.remove("ActiveToolTag");
             }
         }
-        
+
         // 将更新后的标签放回stack
         stack.setTag(tag);
     }
-    
+
     // 根据激活的模式切换物品实例
     public ItemStack switchToolModeItem(ItemStack oldStack, ModeManager modeManager) {
         // 创建新的物品实例，根据激活的模式选择对应的子类
         ItemStack newStack = ItemStack.EMPTY;
-        
+
         // 检查是否安装了格雷科技mod
         boolean isGTCEUInstalled = isGTCEUInstalled();
-        
+
         // 检查激活的工具模式
         boolean hasWrenchMode = modeManager.isModeActive(ToolMode.WRENCH_MODE);
         boolean hasScrewdriverMode = isGTCEUInstalled && modeManager.isModeActive(ToolMode.SCREWDRIVER_MODE);
@@ -718,12 +718,12 @@ public class EndlessBeafItem extends PickaxeItem {
         boolean hasCrowbarMode = isGTCEUInstalled && modeManager.isModeActive(ToolMode.CROWBAR_MODE);
         boolean hasHammerMode = isGTCEUInstalled && modeManager.isModeActive(ToolMode.HAMMER_MODE);
         boolean hasOmnitoolMode = modeManager.isModeActive(ToolMode.OMNITOOL_MODE);
-        
+
         // 如果未安装格雷科技mod，禁用相关模式
         if (!isGTCEUInstalled) {
-            if (modeManager.isModeActive(ToolMode.SCREWDRIVER_MODE) || 
-                modeManager.isModeActive(ToolMode.MALLET_MODE) || 
-                modeManager.isModeActive(ToolMode.CROWBAR_MODE) || 
+            if (modeManager.isModeActive(ToolMode.SCREWDRIVER_MODE) ||
+                modeManager.isModeActive(ToolMode.MALLET_MODE) ||
+                modeManager.isModeActive(ToolMode.CROWBAR_MODE) ||
                 modeManager.isModeActive(ToolMode.HAMMER_MODE)) {
                 // 禁用相关模式
                 modeManager.setModeActive(ToolMode.SCREWDRIVER_MODE, false);
@@ -733,7 +733,7 @@ public class EndlessBeafItem extends PickaxeItem {
                 modeManager.saveToStack(oldStack);
             }
         }
-        
+
         if (hasWrenchMode) {
             // 创建扳手实例
             newStack = new ItemStack(ENDLESS_BEAF_WRENCH.get());
@@ -766,45 +766,47 @@ public class EndlessBeafItem extends PickaxeItem {
             // 如果没有激活的工具模式，使用基础实例（具有所有标签）
             newStack = new ItemStack(ENDLESS_BEAF_ITEM.get());
         }
-        
+
         // 复制原有物品的所有NBT数据到新实例
         if (oldStack.hasTag() && !newStack.isEmpty()) {
             newStack.setTag(oldStack.getTag().copy());
         }
-        
+
         // 更新新实例的附魔NBT，确保模型切换谓词值被正确设置
         updateEnchantments(newStack);
-        
+
         return newStack;
     }
-    
-    
+
+
     // 添加PlayerTickEvent监听器，用于持续检查玩家物品栏并管理飞行权限
     // 修复：当物品被移出物品栏时，确保飞行权限被正确关闭
     @SubscribeEvent
     public static void onPlayerTick(TickEvent.PlayerTickEvent event) {
         Player player = event.player;
         if (player == null) return;
-        
+
         // 只在服务器端执行，避免客户端同步问题
         if (player.level().isClientSide()) return;
-        
+
         // 检查玩家物品栏中是否有任何EndlessBeafItem变体
         boolean hasItemInInventory = player.getInventory().items.stream()
-                    .anyMatch(item -> item.getItem() instanceof EndlessBeafItem || 
+                    .anyMatch(item -> item.getItem() instanceof EndlessBeafItem ||
                     (item.hasTag() && item.getTag().contains("ToolModes")));
-        
+
         UUID playerId = player.getUUID();
         Boolean currentFlightStatus = playerFlightStatus.getOrDefault(playerId, false);
-        
+
         if (hasItemInInventory) {
-                // 物品在物品栏中，赋予飞行权限
-                if (!player.getAbilities().mayfly) {
-                    player.getAbilities().mayfly = true;
-                    player.onUpdateAbilities();
-                }
-                playerFlightStatus.put(playerId, true);
-                
+            // 物品在物品栏中，根据配置决定是否赋予飞行权限
+            if (ConfigManager.enableFlightEffect() && !player.getAbilities().mayfly) {
+                player.getAbilities().mayfly = true;
+                player.onUpdateAbilities();
+            }
+            playerFlightStatus.put(playerId, true);
+
+            // 根据配置决定是否给予药水效果
+            if (ConfigManager.enablePotionEffects()) {
                 // 给予饱和效果（不显示粒子，但显示图标）
                 MobEffectInstance baohe = player.getEffect(MobEffects.SATURATION);
                 if (baohe == null || baohe.getDuration() < 20) {
@@ -822,49 +824,50 @@ public class EndlessBeafItem extends PickaxeItem {
                 if (yeshi == null || (yeshi.getDuration() < 2000)) {
                     player.addEffect(new MobEffectInstance(MobEffects.NIGHT_VISION, 20000, 0, true, false, true));
                 }
-                
+
                 // 新增：给予抗火效果（不显示粒子，但显示图标）
                 MobEffectInstance kanghuo = player.getEffect(MobEffects.FIRE_RESISTANCE);
                 if (kanghuo == null || kanghuo.getDuration() < 200) {
                     player.addEffect(new MobEffectInstance(MobEffects.FIRE_RESISTANCE, 2000, 0, true, false, true));
                 }
-                
+
                 // 新增：给予水下呼吸效果（不显示粒子，但显示图标）
                 MobEffectInstance shuixiabreath = player.getEffect(MobEffects.WATER_BREATHING);
                 if (shuixiabreath == null || shuixiabreath.getDuration() < 200) {
                     player.addEffect(new MobEffectInstance(MobEffects.WATER_BREATHING, 2000, 0, true, false, true));
                 }
-                
+
                 // 新增：给予抗性提升效果（不显示粒子，但显示图标）
                 MobEffectInstance kangxing = player.getEffect(MobEffects.DAMAGE_RESISTANCE);
                 if (kangxing == null || kangxing.getDuration() < 200) {
                     player.addEffect(new MobEffectInstance(MobEffects.DAMAGE_RESISTANCE, 2000, 5, true, false, true));
                 }
-            } else {
-                // 物品不在物品栏中，对于非创造模式玩家，关闭飞行权限
-                // 只有当玩家是因为我们的工具才获得飞行权限的情况下，才会关闭飞行权限
-                if (!player.isCreative() && player.getAbilities().mayfly && playerFlightStatus.getOrDefault(playerId, false)) {
-                    player.getAbilities().mayfly = false;
-                    player.getAbilities().flying = false;
-                    player.onUpdateAbilities();
-                }
-                playerFlightStatus.put(playerId, false);
             }
+        } else {
+            // 物品不在物品栏中，对于非创造模式玩家，关闭飞行权限
+            // 只有当玩家是因为我们的工具才获得飞行权限的情况下，才会关闭飞行权限
+            if (!player.isCreative() && player.getAbilities().mayfly && playerFlightStatus.getOrDefault(playerId, false)) {
+                player.getAbilities().mayfly = false;
+                player.getAbilities().flying = false;
+                player.onUpdateAbilities();
+            }
+            playerFlightStatus.put(playerId, false);
+        }
     }
 
     // 切换模式的方法（供数据包调用）
     public void switchEnchantmentMode(ItemStack stack, boolean silkTouchMode) {
         // 保存当前的连锁挖掘按键状态
         boolean chainMiningPressed = isChainMiningPressed(stack);
-        
+
         // 使用模式管理器切换模式，保持其他模式状态
         modeManager.loadFromStack(stack);
-        
+
         // 保存当前所有模式状态
         boolean aeStoragePriority = modeManager.isModeActive(com.sorrowmist.useless.modes.ToolMode.AE_STORAGE_PRIORITY);
         boolean forceMining = modeManager.isModeActive(com.sorrowmist.useless.modes.ToolMode.FORCE_MINING);
         boolean enhancedChainMining = modeManager.isModeActive(com.sorrowmist.useless.modes.ToolMode.ENHANCED_CHAIN_MINING);
-        
+
         if (silkTouchMode) {
             modeManager.setModeActive(com.sorrowmist.useless.modes.ToolMode.SILK_TOUCH, true);
             modeManager.setModeActive(com.sorrowmist.useless.modes.ToolMode.FORTUNE, false);
@@ -872,20 +875,20 @@ public class EndlessBeafItem extends PickaxeItem {
             modeManager.setModeActive(com.sorrowmist.useless.modes.ToolMode.SILK_TOUCH, false);
             modeManager.setModeActive(com.sorrowmist.useless.modes.ToolMode.FORTUNE, true);
         }
-        
+
         // 恢复其他重要模式状态
         modeManager.setModeActive(com.sorrowmist.useless.modes.ToolMode.AE_STORAGE_PRIORITY, aeStoragePriority);
         modeManager.setModeActive(com.sorrowmist.useless.modes.ToolMode.FORCE_MINING, forceMining);
         modeManager.setModeActive(com.sorrowmist.useless.modes.ToolMode.ENHANCED_CHAIN_MINING, enhancedChainMining);
-        
+
         modeManager.saveToStack(stack);
-        
+
         // 更新实际的附魔NBT
         updateEnchantments(stack);
-        
+
         // 恢复连锁挖掘按键状态
         setChainMiningPressedState(stack, chainMiningPressed);
-        
+
         // 强制客户端更新物品渲染
         if (!stack.isEmpty()) {
             // 通过修改NBT强制更新
@@ -894,28 +897,28 @@ public class EndlessBeafItem extends PickaxeItem {
             stack.setTag(tag);
         }
     }
-    
+
     // 按键触发强制破坏的方法（供数据包调用）
     public void triggerForceMining(ItemStack stack, Player player) {
         if (player.level().isClientSide()) {
             return;
         }
-        
+
         // 检查是否处于强制挖掘模式
         if (!isForceMiningMode(stack)) {
             return;
         }
-        
+
         // 获取玩家视线内的方块
         double reachDistance = 4.5D; // 1.20.1中的默认交互范围
         net.minecraft.world.phys.HitResult hitResult = player.pick(reachDistance, 0.0F, false);
-        
+
         if (hitResult.getType() == net.minecraft.world.phys.HitResult.Type.BLOCK) {
             net.minecraft.world.phys.BlockHitResult blockHitResult = (net.minecraft.world.phys.BlockHitResult) hitResult;
             BlockPos pos = blockHitResult.getBlockPos();
             Level level = player.level();
             BlockState state = level.getBlockState(pos);
-            
+
             // 检查是否应该启用连锁挖掘
             if (shouldUseChainMining(stack)) {
                 // 连锁挖掘模式 - 执行连锁强制挖掘
@@ -929,17 +932,17 @@ public class EndlessBeafItem extends PickaxeItem {
             }
         }
     }
-    
+
     // 处理方块破坏事件，用于管理主从样板供应器关系
     @SubscribeEvent
     public static void onBlockBreak(BlockEvent.BreakEvent event) {
         LevelAccessor levelAccessor = event.getLevel();
         BlockPos pos = event.getPos();
-        
+
         // 检查所有主从关系，处理与该方块相关的所有主从关系
         List<PatternProviderKey> mastersToRemove = new ArrayList<>();
         List<PatternProviderKey> slavesToRemove = new ArrayList<>();
-        
+
         // 遍历所有方向，检查是否有任何主端或从端位于该方块的任何方向
         for (Direction direction : Direction.values()) {
             // 检查所有主端，无论方向如何
@@ -948,7 +951,7 @@ public class EndlessBeafItem extends PickaxeItem {
                     mastersToRemove.add(key);
                 }
             }
-            
+
             // 检查所有从端，无论方向如何
             for (PatternProviderKey key : slaveToMaster.keySet()) {
                 if (key.getPos().equals(pos)) {
@@ -956,30 +959,30 @@ public class EndlessBeafItem extends PickaxeItem {
                 }
             }
         }
-        
+
         // 如果没有相关的主从关系，直接返回
         if (mastersToRemove.isEmpty() && slavesToRemove.isEmpty()) {
             return;
         }
-        
+
         // 处理所有相关的主端
         for (PatternProviderKey masterKey : mastersToRemove) {
             handleMasterBreak(levelAccessor, masterKey);
         }
-        
+
         // 处理所有相关的从端
         for (PatternProviderKey slaveKey : slavesToRemove) {
             handleSlaveBreak(levelAccessor, slaveKey);
             clearSlavePatterns(levelAccessor, slaveKey);
         }
     }
-    
+
     // 监听方块掉落事件，防止从端样板供应器掉落样板
     @SubscribeEvent
     public static void onBlockDrops(BlockEvent.BreakEvent event) {
         com.sorrowmist.useless.utils.pattern.PatternProviderEvent.onBlockDrops(event);
     }
-    
+
     // 处理主端样板供应器被破坏的逻辑
     public static void handleMasterBreak(LevelAccessor levelAccessor, PatternProviderKey masterKey) {
         // 获取所有从端
@@ -994,16 +997,16 @@ public class EndlessBeafItem extends PickaxeItem {
                 PatternProviderManager.getLastSyncTime().remove(slaveKey);
             }
         }
-        
+
         // 如果当前选择的主方块是被破坏的主方块，重置选择
         if (PatternProviderManager.getCurrentSelectedMaster() != null && PatternProviderManager.getCurrentSelectedMaster().equals(masterKey)) {
             PatternProviderManager.setCurrentSelectedMaster(null);
         }
-        
+
         // 保存同步数据
         saveSyncDataStatic(levelAccessor);
     }
-    
+
     // 处理从端样板供应器被破坏的逻辑
     public static void handleSlaveBreak(LevelAccessor levelAccessor, PatternProviderKey slaveKey) {
         // 获取对应的主端
@@ -1021,68 +1024,68 @@ public class EndlessBeafItem extends PickaxeItem {
             // 移除同步时间记录
             PatternProviderManager.getLastSyncTime().remove(slaveKey);
         }
-        
+
         // 保存同步数据
         saveSyncDataStatic(levelAccessor);
     }
-    
+
     // 清空从端样板供应器的样板
     public static void clearSlavePatterns(LevelAccessor levelAccessor, PatternProviderKey slaveKey) {
         com.sorrowmist.useless.utils.pattern.PatternProviderEvent.clearSlavePatterns(levelAccessor, slaveKey);
     }
-    
+
     // 静态版本的保存同步数据方法
     private static void saveSyncDataStatic(LevelAccessor levelAccessor) {
         if (!(levelAccessor instanceof ServerLevel serverLevel)) return;
-        
+
         // 获取或创建同步数据
         com.sorrowmist.useless.utils.pattern.PatternProviderSyncData syncData = serverLevel.getDataStorage().computeIfAbsent(
                 com.sorrowmist.useless.utils.pattern.PatternProviderSyncData::load,
                 com.sorrowmist.useless.utils.pattern.PatternProviderSyncData::new,
                 SYNC_DATA_TAG
         );
-        
+
         // 清空现有数据
         syncData.clear();
-        
+
         // 保存主从关系
         syncData.getMasterToSlaves().putAll(PatternProviderManager.getMasterToSlaves());
         syncData.getSlaveToMaster().putAll(PatternProviderManager.getSlaveToMaster());
-        
+
         // 标记为已更改并保存
         syncData.setDirty();
     }
-    
+
     // 获取样板供应器类型
 
-    
+
     // 设置为主方块
     public void setAsMaster(Level world, BlockPos masterPos, Direction direction, Player player) {
         com.sorrowmist.useless.utils.pattern.PatternProviderOperation.setAsMaster(world, masterPos, direction, player);
     }
-    
 
-    
+
+
     // 添加为从方块
     public void addAsSlave(Level world, BlockPos slavePos, Direction direction, Player player) {
         com.sorrowmist.useless.utils.pattern.PatternProviderOperation.addAsSlave(world, slavePos, direction, player);
     }
-    
 
-    
 
-    
+
+
+
     // 同步从方块与指定主方块的pattern
     private void syncPatternsFromMaster(Level world, PatternProviderKey slaveKey, PatternProviderKey masterKey) {
         // 直接调用PatternProviderManager的同步方法
         com.sorrowmist.useless.utils.pattern.PatternProviderManager.syncPatternsFromMaster(world, slaveKey, masterKey);
     }
-    
+
     // 重置主方块选择（Shift+右键空气）
     public static void resetMasterPatternProvider(Level world) {
         com.sorrowmist.useless.utils.pattern.PatternProviderOperation.resetMasterPatternProvider(world);
     }
-    
+
     // 检查给定位置的从端是否属于当前选定的主端（用于渲染）
     public static boolean isSlaveOfCurrentMaster(BlockPos slavePos, Level level) {
         // 获取当前选定的主端
@@ -1090,24 +1093,24 @@ public class EndlessBeafItem extends PickaxeItem {
         if (selectedMasterKey == null) {
             return false;
         }
-        
+
         // 遍历所有从端，检查是否有匹配的位置
         for (Map.Entry<PatternProviderKey, PatternProviderKey> entry : slaveToMaster.entrySet()) {
             PatternProviderKey slaveKey = entry.getKey();
             PatternProviderKey masterKey = entry.getValue();
-            
+
             // 检查从端位置是否匹配
             if (slaveKey.getPos().equals(slavePos)) {
                 // 获取主端的方块实体
                 BlockEntity masterBlockEntity = level.getBlockEntity(selectedMasterKey.getPos());
-                
+
                 // 检查主端是否是方块形式（直接放置的方块，不是面板）
                 String masterClassName = masterBlockEntity.getClass().getName();
                 boolean isBlockForm = masterClassName.equals("com.glodblock.github.extendedae.common.tileentities.TileExPatternProvider") ||
                                      masterBlockEntity instanceof appeng.blockentity.crafting.PatternProviderBlockEntity ||
                                      masterClassName.equals("net.pedroksl.advanced_ae.common.entities.AdvPatternProviderEntity") ||
                                      masterClassName.equals("net.pedroksl.advanced_ae.common.entities.SmallAdvPatternProviderEntity");
-                
+
                 if (isBlockForm) {
                     // 方块形式：只需要匹配位置
                     if (masterKey.getPos().equals(selectedMasterKey.getPos())) {
@@ -1121,10 +1124,10 @@ public class EndlessBeafItem extends PickaxeItem {
                 }
             }
         }
-        
+
         return false;
     }
-    
+
     // 检查给定位置是否是主端样板供应器（用于渲染）
     public static boolean isMasterPatternProvider(BlockPos pos) {
         // 遍历所有主端，检查是否有匹配的位置
@@ -1133,10 +1136,10 @@ public class EndlessBeafItem extends PickaxeItem {
                 return true;
             }
         }
-        
+
         return false;
     }
-    
+
     // 检查给定位置是否是从端样板供应器（用于mixin和渲染）
     public static boolean isSlavePatternProvider(BlockPos pos) {
         // 遍历所有从端，检查是否有匹配的位置
@@ -1145,67 +1148,67 @@ public class EndlessBeafItem extends PickaxeItem {
                 return true;
             }
         }
-        
+
         return false;
     }
-    
+
     // 定期同步所有从方块
     private static void syncAllSlaves(Level world) {
         // 调用工具类中的同步方法
         com.sorrowmist.useless.utils.pattern.PatternProviderManager.syncAllSlaves(world);
     }
-            
 
-    
+
+
     // 保存同步数据到游戏数据中
     private void saveSyncData(Level world) {
         if (!(world instanceof ServerLevel serverLevel)) return;
-        
+
         // 获取或创建同步数据
         com.sorrowmist.useless.utils.pattern.PatternProviderSyncData syncData = serverLevel.getDataStorage().computeIfAbsent(
                 com.sorrowmist.useless.utils.pattern.PatternProviderSyncData::load,
                 com.sorrowmist.useless.utils.pattern.PatternProviderSyncData::new,
                 SYNC_DATA_TAG
         );
-        
+
         // 清空现有数据
         syncData.clear();
-        
+
         // 保存主从关系
         syncData.getMasterToSlaves().putAll(PatternProviderManager.getMasterToSlaves());
         syncData.getSlaveToMaster().putAll(PatternProviderManager.getSlaveToMaster());
-        
+
         // 标记为已更改并保存
         syncData.setDirty();
     }
-    
+
     // 从游戏数据中加载同步数据
     private static void loadSyncData(Level world) {
         if (!(world instanceof ServerLevel serverLevel)) return;
-        
+
         com.sorrowmist.useless.utils.pattern.PatternProviderSyncData syncData = serverLevel.getDataStorage().computeIfAbsent(
                 com.sorrowmist.useless.utils.pattern.PatternProviderSyncData::load,
                 com.sorrowmist.useless.utils.pattern.PatternProviderSyncData::new,
                 SYNC_DATA_TAG
         );
-        
+
         // 加载主从关系 - 已移至PatternProviderManager
         PatternProviderManager.loadSyncData(serverLevel);
     }
-    
+
     // 执行连锁强制挖掘
     private void performChainForceMining(Level level, BlockPos originPos, BlockState originState, Player player, ItemStack stack) {
         // 根据增强连锁设置使用不同的连锁逻辑
         boolean enhancedMode = isEnhancedChainMiningMode(stack);
         List<BlockPos> blocksToMine;
-        
+
         // 调用相应的工具类查找待挖掘的方块，强制挖掘模式下forceMining为true
         if (enhancedMode) {
             blocksToMine = EnhancedChainMiningUtils.findBlocksToMine(originPos, originState, level, stack, true);
         } else {
             blocksToMine = NormalChainMiningUtils.findBlocksToMine(originPos, originState, level, stack, true);
         }
-        
+
         // 对所有符合条件的方块执行强制挖掘
         for (BlockPos pos : blocksToMine) {
             BlockState state = level.getBlockState(pos);
@@ -1240,12 +1243,12 @@ public class EndlessBeafItem extends PickaxeItem {
                 }
             }
         }
-        
-        
-        
+
+
+
         // 增强连锁模式提示
         tooltip.add(Component.literal(isEnhancedChainMiningMode(stack) ? "增强连锁模式: 已开启" : "增强连锁模式: 已关闭").withStyle(isEnhancedChainMiningMode(stack) ? ChatFormatting.BLUE : ChatFormatting.GRAY));
-        
+
         // 强制挖掘模式提示
         tooltip.add(Component.literal(isForceMiningMode(stack) ? "强制挖掘模式: 已开启" : "强制挖掘模式: 已关闭").withStyle(isForceMiningMode(stack) ? ChatFormatting.RED : ChatFormatting.GRAY));
 
@@ -1258,11 +1261,11 @@ public class EndlessBeafItem extends PickaxeItem {
         String forceMiningKey = "Numpad 9";
         String triggerForceMiningKey = "R";
         String modeWheelKey = "G";
-        
+
         // 新增：主从选择按键
         String setMasterKey = "M";
         String setSlaveKey = "S";
-        
+
         try {
             // 获取精准采集/时运切换按键
             KeyMapping silkTouchMapping = KeyBindings.SWITCH_SILK_TOUCH_KEY;
@@ -1276,27 +1279,27 @@ public class EndlessBeafItem extends PickaxeItem {
 
             // 获取增强连锁模式切换按键
             enhancedChainMiningKey = KeyBindings.SWITCH_ENHANCED_CHAIN_MINING_KEY.getTranslatedKeyMessage().getString();
-            
+
             // 获取强制挖掘模式切换按键
             forceMiningKey = KeyBindings.SWITCH_FORCE_MINING_KEY.getTranslatedKeyMessage().getString();
-            
+
             // 获取强制挖掘触发按键
             triggerForceMiningKey = KeyBindings.TRIGGER_FORCE_MINING_KEY.getTranslatedKeyMessage().getString();
-            
+
             // 获取模式选择轮盘按键
             KeyMapping modeWheelMapping = KeyBindings.SWITCH_MODE_WHEEL_KEY;
             modeWheelKey = modeWheelMapping.getTranslatedKeyMessage().getString();
-            
+
             // 获取主从选择按键
             KeyMapping setMasterMapping = KeyBindings.SET_MASTER_PATTERN_KEY;
             setMasterKey = setMasterMapping.getTranslatedKeyMessage().getString();
-            
+
             KeyMapping setSlaveMapping = KeyBindings.SET_SLAVE_PATTERN_KEY;
             setSlaveKey = setSlaveMapping.getTranslatedKeyMessage().getString();
         } catch (Exception e) {
             // 如果获取失败，使用默认按键名称
         }
-        
+
         // 添加动态按键提示
         tooltip.add(Component.translatable("tooltip.useless_mod.switch_enchantment").withStyle(ChatFormatting.LIGHT_PURPLE));
         tooltip.add(Component.literal("按住 " + chainMiningKey + "开启连锁挖掘").withStyle(ChatFormatting.LIGHT_PURPLE));
@@ -1316,7 +1319,7 @@ public class EndlessBeafItem extends PickaxeItem {
     public boolean isFoil(ItemStack stack) {
         return true; // 始终显示附魔光效
     }
-    
+
 
 
     // 禁止效率附魔
@@ -1343,7 +1346,7 @@ public class EndlessBeafItem extends PickaxeItem {
     public int getEnchantmentLevel(ItemStack stack, Enchantment enchantment) {
         return EnchantmentHelper.getTagEnchantmentLevel(enchantment, stack);
     }
-    
+
     // 移除了getTags方法，因为Forge中物品标签是在注册时静态定义的
     // 改为在物品注册时创建多个具有不同标签的物品实例
     // 这里我们使用更灵活的方式处理工具模式：通过NBT标签来跟踪激活的工具模式
@@ -1380,7 +1383,7 @@ public class EndlessBeafItem extends PickaxeItem {
                             state.is(BlockTags.MINEABLE_WITH_HOE);
                 }
             });
-    
+
     // 扳手子类物品注册
     public static final RegistryObject<Item> ENDLESS_BEAF_WRENCH = ITEMS.register("endless_beaf_wrench",
             () -> new EndlessBeafItem(
@@ -1400,7 +1403,7 @@ public class EndlessBeafItem extends PickaxeItem {
                             state.is(BlockTags.MINEABLE_WITH_HOE);
                 }
             });
-    
+
     // 螺丝刀子类物品注册
     public static final RegistryObject<Item> ENDLESS_BEAF_SCREWDRIVER = ITEMS.register("endless_beaf_screwdriver",
             () -> new EndlessBeafItem(
@@ -1420,7 +1423,7 @@ public class EndlessBeafItem extends PickaxeItem {
                             state.is(BlockTags.MINEABLE_WITH_HOE);
                 }
             });
-    
+
     // 锤子子类物品注册
     public static final RegistryObject<Item> ENDLESS_BEAF_MALLET = ITEMS.register("endless_beaf_mallet",
             () -> new EndlessBeafItem(
@@ -1440,7 +1443,7 @@ public class EndlessBeafItem extends PickaxeItem {
                             state.is(BlockTags.MINEABLE_WITH_HOE);
                 }
             });
-    
+
     // 撬棍子类物品注册
     public static final RegistryObject<Item> ENDLESS_BEAF_CROWBAR = ITEMS.register("endless_beaf_crowbar",
             () -> new EndlessBeafItem(
@@ -1460,7 +1463,7 @@ public class EndlessBeafItem extends PickaxeItem {
                             state.is(BlockTags.MINEABLE_WITH_HOE);
                 }
             });
-    
+
     // 铁锤子类物品注册
     public static final RegistryObject<Item> ENDLESS_BEAF_HAMMER = ITEMS.register("endless_beaf_hammer",
             () -> new EndlessBeafItem(
@@ -1525,15 +1528,15 @@ public class EndlessBeafItem extends PickaxeItem {
                 endlessBeaf.onBlockBreak(event, mainHandItem, player);
             }
         }
-        
+
         @SubscribeEvent
         public static void onLeftClickBlock(PlayerInteractEvent.LeftClickBlock event) {
             // 获取触发事件的玩家
             Player player = event.getEntity();
             if (player == null) return;
-            
+
             ItemStack mainHandItem = player.getMainHandItem();
-            
+
             // 检查主手物品是否是EndlessBeafItem
             if (mainHandItem.getItem() instanceof EndlessBeafItem endlessBeaf) {
                 // 处理左键点击事件，用于跟踪强制挖掘
@@ -1558,7 +1561,7 @@ public class EndlessBeafItem extends PickaxeItem {
                     endlessBeaf.handleEnhancedChainMiningKey(mainHandItem, player);
                 }
             }
-            
+
             // 检查强制挖掘模式切换按键（数字键9）
             while (KeyBindings.SWITCH_FORCE_MINING_KEY.consumeClick()) {
                 ItemStack mainHandItem = player.getMainHandItem();
@@ -1567,7 +1570,7 @@ public class EndlessBeafItem extends PickaxeItem {
                     endlessBeaf.handleForceMiningKey(mainHandItem, player);
                 }
             }
-            
+
             // 检查设置主扩展样板供应器按键（M键）
             while (KeyBindings.SET_MASTER_PATTERN_KEY.consumeClick()) {
                 ItemStack mainHandItem = player.getMainHandItem();
@@ -1576,7 +1579,7 @@ public class EndlessBeafItem extends PickaxeItem {
                     endlessBeaf.handleSetMasterPatternKey(mainHandItem, player);
                 }
             }
-            
+
             // 检查设置从扩展样板供应器按键（S键）
             while (KeyBindings.SET_SLAVE_PATTERN_KEY.consumeClick()) {
                 ItemStack mainHandItem = player.getMainHandItem();
@@ -1586,84 +1589,87 @@ public class EndlessBeafItem extends PickaxeItem {
                 }
             }
         }
-        
+
         @OnlyIn(Dist.CLIENT)
         @SubscribeEvent
         public static void onMouseButton(InputEvent.MouseButton event) {
             // 现在强制破坏通过按键触发，不再需要处理鼠标左键事件
             // 此方法已废弃，保留用于向后兼容
         }
-        
+
         @SubscribeEvent
         public static void onPlayerTick(TickEvent.PlayerTickEvent event) {
             Player player = event.player;
             Level world = player.level();
-            
+
             // 只在服务器端执行
             if (world.isClientSide()) {
                 return;
             }
-            
+
             // 首次加载同步数据
             if (masterToSlaves.isEmpty() && slaveToMaster.isEmpty()) {
                 loadSyncData(world);
             }
-            
+
             // 定期同步扩展样板供应器主从方块
             if (event.phase == TickEvent.Phase.END) {
                 syncAllSlaves(world);
             }
-            
+
             // 处理飞行权限管理 - 每次tick都检查，不受phase限制
             // 检查玩家物品栏中是否有任何EndlessBeafItem变体
             boolean hasItemInInventory = player.getInventory().items.stream()
-                    .anyMatch(item -> item.getItem() instanceof EndlessBeafItem || 
+                    .anyMatch(item -> item.getItem() instanceof EndlessBeafItem ||
                     (item.hasTag() && item.getTag().contains("ToolModes")));
-            
+
             UUID playerId = player.getUUID();
-            
+
             if (hasItemInInventory) {
-                // 物品在物品栏中，赋予飞行权限
-                if (!player.getAbilities().mayfly) {
+                // 物品在物品栏中，根据配置决定是否赋予飞行权限
+                if (ConfigManager.enableFlightEffect() && !player.getAbilities().mayfly) {
                     player.getAbilities().mayfly = true;
                     player.onUpdateAbilities();
                 }
                 playerFlightStatus.put(playerId, true);
-                
-                // 给予饱和效果（不显示粒子，但显示图标）
-                MobEffectInstance baohe = player.getEffect(MobEffects.SATURATION);
-                if (baohe == null || baohe.getDuration() < 20) {
-                    player.addEffect(new MobEffectInstance(MobEffects.SATURATION, 200, 0, true, false, true));
-                }
 
-                // 给予生命恢复效果（不显示粒子，但显示图标）
-                MobEffectInstance zaisheng = player.getEffect(MobEffects.REGENERATION);
-                if (zaisheng == null || (zaisheng.getDuration() < 20)) {
-                    player.addEffect(new MobEffectInstance(MobEffects.REGENERATION, 200, 5, true, false, true));
-                }
+                // 根据配置决定是否给予药水效果
+                if (ConfigManager.enablePotionEffects()) {
+                    // 给予饱和效果（不显示粒子，但显示图标）
+                    MobEffectInstance baohe = player.getEffect(MobEffects.SATURATION);
+                    if (baohe == null || baohe.getDuration() < 20) {
+                        player.addEffect(new MobEffectInstance(MobEffects.SATURATION, 200, 0, true, false, true));
+                    }
 
-                // 给予夜视效果（不显示粒子，但显示图标）
-                MobEffectInstance yeshi = player.getEffect(MobEffects.NIGHT_VISION);
-                if (yeshi == null || (yeshi.getDuration() < 2000)) {
-                    player.addEffect(new MobEffectInstance(MobEffects.NIGHT_VISION, 20000, 0, true, false, true));
-                }
-                
-                // 新增：给予抗火效果（不显示粒子，但显示图标）
-                MobEffectInstance kanghuo = player.getEffect(MobEffects.FIRE_RESISTANCE);
-                if (kanghuo == null || kanghuo.getDuration() < 200) {
-                    player.addEffect(new MobEffectInstance(MobEffects.FIRE_RESISTANCE, 2000, 0, true, false, true));
-                }
-                
-                // 新增：给予水下呼吸效果（不显示粒子，但显示图标）
-                MobEffectInstance shuixiabreath = player.getEffect(MobEffects.WATER_BREATHING);
-                if (shuixiabreath == null || shuixiabreath.getDuration() < 200) {
-                    player.addEffect(new MobEffectInstance(MobEffects.WATER_BREATHING, 2000, 0, true, false, true));
-                }
-                
-                // 新增：给予抗性提升效果（不显示粒子，但显示图标）
-                MobEffectInstance kangxing = player.getEffect(MobEffects.DAMAGE_RESISTANCE);
-                if (kangxing == null || kangxing.getDuration() < 200) {
-                    player.addEffect(new MobEffectInstance(MobEffects.DAMAGE_RESISTANCE, 2000, 5, true, false, true));
+                    // 给予生命恢复效果（不显示粒子，但显示图标）
+                    MobEffectInstance zaisheng = player.getEffect(MobEffects.REGENERATION);
+                    if (zaisheng == null || (zaisheng.getDuration() < 20)) {
+                        player.addEffect(new MobEffectInstance(MobEffects.REGENERATION, 200, 5, true, false, true));
+                    }
+
+                    // 给予夜视效果（不显示粒子，但显示图标）
+                    MobEffectInstance yeshi = player.getEffect(MobEffects.NIGHT_VISION);
+                    if (yeshi == null || (yeshi.getDuration() < 2000)) {
+                        player.addEffect(new MobEffectInstance(MobEffects.NIGHT_VISION, 20000, 0, true, false, true));
+                    }
+
+                    // 新增：给予抗火效果（不显示粒子，但显示图标）
+                    MobEffectInstance kanghuo = player.getEffect(MobEffects.FIRE_RESISTANCE);
+                    if (kanghuo == null || kanghuo.getDuration() < 200) {
+                        player.addEffect(new MobEffectInstance(MobEffects.FIRE_RESISTANCE, 2000, 0, true, false, true));
+                    }
+
+                    // 新增：给予水下呼吸效果（不显示粒子，但显示图标）
+                    MobEffectInstance shuixiabreath = player.getEffect(MobEffects.WATER_BREATHING);
+                    if (shuixiabreath == null || shuixiabreath.getDuration() < 200) {
+                        player.addEffect(new MobEffectInstance(MobEffects.WATER_BREATHING, 2000, 0, true, false, true));
+                    }
+
+                    // 新增：给予抗性提升效果（不显示粒子，但显示图标）
+                    MobEffectInstance kangxing = player.getEffect(MobEffects.DAMAGE_RESISTANCE);
+                    if (kangxing == null || kangxing.getDuration() < 200) {
+                        player.addEffect(new MobEffectInstance(MobEffects.DAMAGE_RESISTANCE, 2000, 5, true, false, true));
+                    }
                 }
             } else {
                 // 物品不在物品栏中，对于非创造模式玩家，关闭飞行权限
@@ -1728,7 +1734,7 @@ public class EndlessBeafItem extends PickaxeItem {
     public void onLeftClickBlock(PlayerInteractEvent.LeftClickBlock event, ItemStack stack, Player player) {
         // 现在强制破坏通过按键触发，不再需要处理左键点击事件
     }
-    
+
     // 处理方块破坏事件的方法 - 新增功能
     public void onBlockBreak(BlockEvent.BreakEvent event, ItemStack stack, Player player) {
         // 修复：创造模式下不处理自动收集
@@ -1744,13 +1750,13 @@ public class EndlessBeafItem extends PickaxeItem {
         if (levelAccessor.isClientSide() || !(levelAccessor instanceof Level level)) {
             return;
         }
-        
+
         // 现在强制挖掘通过按键触发，不再需要旧的按住左键触发逻辑
         // 旧机制相关代码已移除
 
         // 检查是否应该执行连锁挖掘
         boolean shouldChainMine = shouldUseChainMining(stack);
-        
+
         if (shouldChainMine) {
             // 执行连锁挖掘
             performChainMining(event, level, pos, state, player, stack);
@@ -1759,41 +1765,41 @@ public class EndlessBeafItem extends PickaxeItem {
             BlockBreakUtils.normalBreakBlock(event, level, pos, state, player, stack);
         }
     }
-    
+
     // 执行强制挖掘
     private void performForceMining(BlockEvent.BreakEvent event, Level level, BlockPos pos, BlockState state, Player player, ItemStack stack) {
         // 调用强制破坏工具类
         ForceBreakUtils.forceBreakBlock(event, level, pos, state, player, stack);
     }
-    
+
     // 执行连锁挖掘
     private void performChainMining(BlockEvent.BreakEvent event, Level level, BlockPos originPos, BlockState originState, Player player, ItemStack stack) {
         // 获取连锁挖掘最大方块数量
         int maxBlocks = ConfigManager.getChainMiningMaxBlocks();
-        
+
         // 根据增强连锁设置使用不同的连锁逻辑
         boolean enhancedMode = isEnhancedChainMiningMode(stack);
         List<BlockPos> blocksToMine;
-        
+
         // 调用相应的工具类查找待挖掘的方块，普通连锁模式下forceMining为false
         if (enhancedMode) {
             blocksToMine = EnhancedChainMiningUtils.findBlocksToMine(originPos, originState, level, stack, false);
         } else {
             blocksToMine = NormalChainMiningUtils.findBlocksToMine(originPos, originState, level, stack, false);
         }
-        
+
         // 处理原点方块
         if (!blocksToMine.isEmpty()) {
             BlockPos firstPos = blocksToMine.get(0);
             if (firstPos.equals(originPos)) {
                 // 对原点方块使用普通破坏，会自动处理事件取消
                 BlockBreakUtils.normalBreakBlock(event, level, firstPos, level.getBlockState(firstPos), player, stack);
-                
+
                 // 处理剩余的方块
                 for (int i = 1; i < blocksToMine.size() && i < maxBlocks; i++) {
                     BlockPos pos = blocksToMine.get(i);
                     BlockState state = level.getBlockState(pos);
-                    
+
                     // 检查方块是否还存在
                     if (!level.isEmptyBlock(pos)) {
                         // 创建新的BreakEvent用于处理其他方块
@@ -1837,49 +1843,52 @@ public class EndlessBeafItem extends PickaxeItem {
         if(pEntity instanceof Player player){
             UUID playerId = player.getUUID();
             boolean hasItemInInventory = player.getInventory().items.stream()
-                    .anyMatch(item -> item.getItem() instanceof EndlessBeafItem || 
+                    .anyMatch(item -> item.getItem() instanceof EndlessBeafItem ||
                     (item.hasTag() && item.getTag().contains("ToolModes")));
 
             if (hasItemInInventory) {
-                // 给予饱和效果（不显示粒子，但显示图标）
-                MobEffectInstance baohe = player.getEffect(MobEffects.SATURATION);
-                if (baohe == null || baohe.getDuration() < 20) {
-                    player.addEffect(new MobEffectInstance(MobEffects.SATURATION, 200, 0, true, false, true));
+                // 根据配置决定是否给予药水效果
+                if (ConfigManager.enablePotionEffects()) {
+                    // 给予饱和效果（不显示粒子，但显示图标）
+                    MobEffectInstance baohe = player.getEffect(MobEffects.SATURATION);
+                    if (baohe == null || baohe.getDuration() < 20) {
+                        player.addEffect(new MobEffectInstance(MobEffects.SATURATION, 200, 0, true, false, true));
+                    }
+
+                    // 给予生命恢复效果（不显示粒子，但显示图标）
+                    MobEffectInstance zaisheng = player.getEffect(MobEffects.REGENERATION);
+                    if (zaisheng == null || (zaisheng.getDuration() < 20)) {
+                        player.addEffect(new MobEffectInstance(MobEffects.REGENERATION, 200, 5, true, false, true));
+                    }
+
+                    // 给予夜视效果（不显示粒子，但显示图标）
+                    MobEffectInstance yeshi = player.getEffect(MobEffects.NIGHT_VISION);
+                    if (yeshi == null || (yeshi.getDuration() < 2000)) {
+                        player.addEffect(new MobEffectInstance(MobEffects.NIGHT_VISION, 20000, 0, true, false, true));
+                    }
+
+                    // 新增：给予抗火效果（不显示粒子，但显示图标）
+                    MobEffectInstance kanghuo = player.getEffect(MobEffects.FIRE_RESISTANCE);
+                    if (kanghuo == null || kanghuo.getDuration() < 200) {
+                        player.addEffect(new MobEffectInstance(MobEffects.FIRE_RESISTANCE, 2000, 0, true, false, true));
+                    }
+
+                    // 新增：给予水下呼吸效果（不显示粒子，但显示图标）
+                    MobEffectInstance shuixiabreath = player.getEffect(MobEffects.WATER_BREATHING);
+                    if (shuixiabreath == null || shuixiabreath.getDuration() < 200) {
+                        player.addEffect(new MobEffectInstance(MobEffects.WATER_BREATHING, 2000, 0, true, false, true));
+                    }
+
+                    // 新增：给予抗性提升效果（不显示粒子，但显示图标）
+                    MobEffectInstance kangxing = player.getEffect(MobEffects.DAMAGE_RESISTANCE);
+                    if (kangxing == null || kangxing.getDuration() < 200) {
+                        player.addEffect(new MobEffectInstance(MobEffects.DAMAGE_RESISTANCE, 2000, 5, true, false, true));
+                    }
                 }
 
-                // 给予生命恢复效果（不显示粒子，但显示图标）
-                MobEffectInstance zaisheng = player.getEffect(MobEffects.REGENERATION);
-                if (zaisheng == null || (zaisheng.getDuration() < 20)) {
-                    player.addEffect(new MobEffectInstance(MobEffects.REGENERATION, 200, 5, true, false, true));
-                }
-
-                // 给予夜视效果（不显示粒子，但显示图标）
-                MobEffectInstance yeshi = player.getEffect(MobEffects.NIGHT_VISION);
-                if (yeshi == null || (yeshi.getDuration() < 2000)) {
-                    player.addEffect(new MobEffectInstance(MobEffects.NIGHT_VISION, 20000, 0, true, false, true));
-                }
-                
-                // 新增：给予抗火效果（不显示粒子，但显示图标）
-                MobEffectInstance kanghuo = player.getEffect(MobEffects.FIRE_RESISTANCE);
-                if (kanghuo == null || kanghuo.getDuration() < 200) {
-                    player.addEffect(new MobEffectInstance(MobEffects.FIRE_RESISTANCE, 2000, 0, true, false, true));
-                }
-                
-                // 新增：给予水下呼吸效果（不显示粒子，但显示图标）
-                MobEffectInstance shuixiabreath = player.getEffect(MobEffects.WATER_BREATHING);
-                if (shuixiabreath == null || shuixiabreath.getDuration() < 200) {
-                    player.addEffect(new MobEffectInstance(MobEffects.WATER_BREATHING, 2000, 0, true, false, true));
-                }
-                
-                // 新增：给予抗性提升效果（不显示粒子，但显示图标）
-                MobEffectInstance kangxing = player.getEffect(MobEffects.DAMAGE_RESISTANCE);
-                if (kangxing == null || kangxing.getDuration() < 200) {
-                    player.addEffect(new MobEffectInstance(MobEffects.DAMAGE_RESISTANCE, 2000, 5, true, false, true));
-                }
-                
                 // 新增：当物品在玩家物品栏内允许飞行（无论游戏模式）
                 // 修复：直接检查玩家当前飞行状态，兼容外部飞行管理系统
-                if (!player.getAbilities().mayfly) {
+                if (ConfigManager.enableFlightEffect() && !player.getAbilities().mayfly) {
                     player.getAbilities().mayfly = true;
                     player.onUpdateAbilities();
                 }
@@ -1912,7 +1921,7 @@ public class EndlessBeafItem extends PickaxeItem {
                 super.canPerformAction(stack, toolAction)||
                 toolAction.equals(ToolActions.HOE_TILL);
     }
-    
+
     @Override
     public boolean doesSneakBypassUse(ItemStack stack, net.minecraft.world.level.LevelReader world, BlockPos pos, Player player) {
         // 检查是否是塑料块，如果是则不跳过useOn方法，这样快速拆塑料块功能才能生效
@@ -1940,7 +1949,7 @@ public class EndlessBeafItem extends PickaxeItem {
         BlockPos blockpos = context.getClickedPos();
         Player player = context.getPlayer();
         BlockState blockstate = world.getBlockState(blockpos);
-        
+
         // 扩展样板供应器主从同步处理已改为按键绑定（M键和S键），这里不再处理
         // 允许默认的右键行为，以便打开GUI
 
@@ -1967,7 +1976,7 @@ public class EndlessBeafItem extends PickaxeItem {
                     // 移除方块并播放声音
                     world.setBlock(blockpos, Blocks.AIR.defaultBlockState(), Block.UPDATE_ALL_IMMEDIATE);
                     // 使用带冷却的音效播放
-                    BlockBreakUtils.playBreakSoundWithCooldown(world, blockpos, blockstate, player);   
+                    BlockBreakUtils.playBreakSoundWithCooldown(world, blockpos, blockstate, player);
                 } else {
                     // 客户端只播放声音（不做掉落/方块移除）
                     world.playSound(player, blockpos, SoundEvents.STONE_BREAK, SoundSource.BLOCKS, 0.7F, 1.0F);

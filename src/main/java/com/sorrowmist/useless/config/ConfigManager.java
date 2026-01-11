@@ -24,6 +24,10 @@ public class ConfigManager {
     // 是否生成基岩层
     public static final ForgeConfigSpec.BooleanValue GENERATE_BEDROCK;
 
+    // 效果配置
+    public static final ForgeConfigSpec.BooleanValue ENABLE_POTION_EFFECTS;
+    public static final ForgeConfigSpec.BooleanValue ENABLE_FLIGHT_EFFECT;
+
     // 植物盆生长速度配置
     public static final ForgeConfigSpec.IntValue BOTANY_POT_GROWTH_MULTIPLIER;
 
@@ -109,7 +113,7 @@ public class ConfigManager {
         CHAIN_MINING_RANGE_Z = BUILDER
                 .comment("连锁挖掘的Z轴范围半径")
                 .defineInRange("连锁挖掘Z轴范围", 8, 1, 255);
-        
+
         CHAIN_MINING_MAX_BLOCKS = BUILDER
                 .comment("连锁挖掘的最大方块数量")
                 .defineInRange("连锁挖掘最大方块数量", 1000, 1, 10000);
@@ -144,6 +148,18 @@ public class ConfigManager {
         MAX_UPGRADE = BUILDER
                 .comment("机器可接受的最大速度/能量升级数量，重启游戏生效")
                 .defineInRange("最大升级数量", 16, 1, 64);
+
+        BUILDER.pop();
+
+        BUILDER.push("效果设置");
+
+        ENABLE_POTION_EFFECTS = BUILDER
+                .comment("是否启用药水效果（饱和、生命恢复、夜视、抗火、水下呼吸、抗性提升）")
+                .define("启用药水效果", true);
+
+        ENABLE_FLIGHT_EFFECT = BUILDER
+                .comment("是否启用飞行效果")
+                .define("启用飞行效果", true);
 
         BUILDER.pop();
 
@@ -233,7 +249,7 @@ public class ConfigManager {
     public static int getElectricityMultiplier() {
         return ELECTRICITY_MULTIPLIER.get();
     }
-    
+
     public static int getChainMiningMaxBlocks() {
         return CHAIN_MINING_MAX_BLOCKS.get();
     }
@@ -244,6 +260,15 @@ public class ConfigManager {
 
     public static int getMaxUpgrade() {
         return MAX_UPGRADE.get();
+    }
+
+    // 获取效果配置
+    public static boolean enablePotionEffects() {
+        return ENABLE_POTION_EFFECTS.get();
+    }
+
+    public static boolean enableFlightEffect() {
+        return ENABLE_FLIGHT_EFFECT.get();
     }
 
     // 获取连锁挖掘范围配置
@@ -258,12 +283,12 @@ public class ConfigManager {
     public static int getChainMiningRangeZ() {
         return CHAIN_MINING_RANGE_Z.get();
     }
-    
+
     // 获取牛排工具附魔等级配置
     public static int getFortuneLevel() {
         return FORTUNE_LEVEL.get();
     }
-    
+
     public static int getLootingLevel() {
         return LOOTING_LEVEL.get();
     }
@@ -277,7 +302,7 @@ public class ConfigManager {
     public static boolean shouldGenerateBedrock() {
         return GENERATE_BEDROCK.get();
     }
-    
+
     // 获取塑料平台起始Y值
     public static int getPlatformStartY() {
         return PLATFORM_START_Y.get();

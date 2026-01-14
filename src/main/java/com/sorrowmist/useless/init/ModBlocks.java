@@ -25,6 +25,7 @@ import java.util.Objects;
 public final class ModBlocks {
     public static final DeferredRegister.Blocks BLOCKS = DeferredRegister.createBlocks(UselessMod.MODID);
 
+    // TODO 修改
     public static final DeferredBlock<Block> TELEPORT_BLOCK = BLOCKS.register(
             "teleport_block",
             () -> new Block(BlockBehaviour.Properties.of()
@@ -97,8 +98,15 @@ public final class ModBlocks {
             }
     );
 
-    static final DeferredBlock<Block> ORE_GENERATOR_BLOCK = BLOCKS.register(
+    public static final DeferredBlock<OreGeneratorBlock> ORE_GENERATOR_BLOCK = BLOCKS.register(
             "ore_generator_block", OreGeneratorBlock::new
+    );
+
+    public static final DeferredBlock<Block> ADVANCED_ALLOY_FURNACE_BLOCK = BLOCKS.register(
+            "advanced_alloy_furnace_block",
+            () -> new Block(BlockBehaviour.Properties.of()
+                                                     .strength(3.5f, 8.0f)
+                                                     .requiresCorrectToolForDrops())
     );
 
     private ModBlocks() {}

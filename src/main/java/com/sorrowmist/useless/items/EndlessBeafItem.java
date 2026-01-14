@@ -53,6 +53,7 @@ import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.Vec3;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.api.distmarker.OnlyIn;
+import net.neoforged.fml.ModList;
 import net.neoforged.neoforge.common.IShearable;
 import net.neoforged.neoforge.common.ItemAbilities;
 import net.neoforged.neoforge.common.ItemAbility;
@@ -67,7 +68,7 @@ public class EndlessBeafItem extends AxeItem {
     private final ToolTypeMode toolType;
 
     public EndlessBeafItem() {
-        this(null);
+        this(ToolTypeMode.NONE_MODE);
     }
 
     public EndlessBeafItem(@Nullable ToolTypeMode toolType) {
@@ -77,9 +78,9 @@ public class EndlessBeafItem extends AxeItem {
                       .stacksTo(1)
                       .rarity(Rarity.EPIC)
                       .durability(0)
-                      .component(UComponents.EnchantModeComponent.get(), EnchantMode.SILK_TOUCH)
-                      // 默认开启普通连锁挖掘
+                      .component(UComponents.EnchantModeComponent, EnchantMode.SILK_TOUCH)
                       .component(UComponents.FunctionModesComponent, EnumSet.of(FunctionMode.CHAIN_MINING))
+                      .component(UComponents.CurrentToolTypeComponent, ToolTypeMode.NONE_MODE)
                       .component(DataComponents.CUSTOM_MODEL_DATA, new CustomModelData(1))
         );
         this.toolType = toolType;
@@ -201,6 +202,7 @@ public class EndlessBeafItem extends AxeItem {
 
         // GT部分适配
         return switch (this.toolType) {
+            case NONE_MODE, OMNITOOL_MODE -> false;
             case WRENCH_MODE -> ability == ItemAbility.get("wrench_rotate") ||
                     ability == ItemAbility.get("wrench_configure") ||
                     ability == ItemAbility.get("wrench_configure_all") ||
@@ -224,7 +226,6 @@ public class EndlessBeafItem extends AxeItem {
             case HAMMER_MODE -> ability == ItemAbility.get("hammer_dig") ||
                     ability == ItemAbility.get("hammer_mute");
 
-            case OMNITOOL_MODE -> false;
         };
     }
 
@@ -392,10 +393,7 @@ public class EndlessBeafItem extends AxeItem {
     @Override
     public void onCraftedBy(@NotNull ItemStack stack, @NotNull Level level, @NotNull Player player) {
         super.onCraftedBy(stack, level, player);
-        // TODO 合成后的附魔
-        stack.enchant(EnchantmentUtil.getEnchantmentHolder(level, Enchantments.FORTUNE),
-                      ConfigManager.getFortuneLevel()
-        );
+        stack.enchant(EnchantmentUtil.getEnchantmentHolder(level, Enchantments.SILK_TOUCH), 1);
         stack.enchant(EnchantmentUtil.getEnchantmentHolder(level, Enchantments.LOOTING),
                       ConfigManager.getLootingLevel()
         );
@@ -436,8 +434,19 @@ public class EndlessBeafItem extends AxeItem {
     public void appendHoverText(@NotNull ItemStack stack, @NotNull TooltipContext context,
                                 @NotNull List<Component> tooltipComponents,
                                 @NotNull TooltipFlag tooltipFlag) {
+        if (ModList.get().isLoaded("gtceu")) {
+            ToolTypeMode currentToolType = stack.getOrDefault(
+                    UComponents.CurrentToolTypeComponent.get(),
+                    ToolTypeMode.NONE_MODE
+            );
 
-        // 1. 显示功能模式状态（强制挖掘 + 连锁挖掘）
+            tooltipComponents.add(Component.translatable("tooltip.useless_mod.current_tool_mode")
+                                           .append(": ")
+                                           .append(currentToolType.getTooltip())
+                                           .withStyle(ChatFormatting.GOLD));
+            tooltipComponents.add(Component.empty());
+        }
+
         EnumSet<FunctionMode> activeModes = stack.getOrDefault(
                 UComponents.FunctionModesComponent.get(),
                 EnumSet.noneOf(FunctionMode.class)
@@ -447,12 +456,11 @@ public class EndlessBeafItem extends AxeItem {
             MutableComponent title = group.getTitleComponent();
             Component status = FunctionMode.getStatusForGroup(group, activeModes);
 
-            if (!title.getString().isEmpty()) { // 避免空行
+            if (!title.getString().isEmpty()) {
                 tooltipComponents.add(title.copy().append(": ").append(status));
             }
         });
 
-        // 2. 分隔线（可选，美观）
         tooltipComponents.add(Component.empty());
 
         // 3. 动态按键提示（Shift 展开）
@@ -523,11 +531,10 @@ public class EndlessBeafItem extends AxeItem {
 
     @Override
     public @NotNull ItemStack getDefaultInstance() {
-        ItemStack stack = super.getDefaultInstance();
-        // 构造附魔
+        ItemStack stack = new ItemStack(this);
         ItemEnchantments.Mutable ench = new ItemEnchantments.Mutable(ItemEnchantments.EMPTY);
         ench.set(EnchantmentUtil.getEnchantmentHolder(Enchantments.SILK_TOUCH), 1);
-        ench.set(EnchantmentUtil.getEnchantmentHolder(Enchantments.LOOTING), 10);
+        ench.set(EnchantmentUtil.getEnchantmentHolder(Enchantments.LOOTING), ConfigManager.getLootingLevel());
         stack.set(DataComponents.ENCHANTMENTS, ench.toImmutable());
         return stack;
     }

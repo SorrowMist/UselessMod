@@ -27,6 +27,10 @@ public class ModeWheelHandler {
             return;
         }
 
+        if (minecraft.screen != null) {
+            return;
+        }
+
         // 检查是否是G键按下事件 (GLFW_PRESS = 1)
         if (event.getKey() == KeyBindings.SWITCH_MODE_WHEEL_KEY.get().getKey().getValue() && event.getAction() == 1) {
             // 检查主手和副手物品是否是永恒牛排工具或包含我们NBT数据的Omnitool扳手

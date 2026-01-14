@@ -17,6 +17,7 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.item.ItemStack;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
+import org.jetbrains.annotations.NotNull;
 
 public record ToolTypeModeSwitchPacket(ToolTypeMode mode) implements CustomPacketPayload {
     public static final StreamCodec<FriendlyByteBuf, ToolTypeModeSwitchPacket> STREAM_CODEC =
@@ -31,7 +32,6 @@ public record ToolTypeModeSwitchPacket(ToolTypeMode mode) implements CustomPacke
     public static void handle(ToolTypeModeSwitchPacket msg, IPayloadContext ctx) {
         ctx.enqueueWork(() -> {
             ServerPlayer player = (ServerPlayer) ctx.player();
-            if (player == null) return;
             // 检查主手和副手物品
             ItemStack mainHandItem = player.getMainHandItem();
             ItemStack offHandItem = player.getOffhandItem();
@@ -69,16 +69,14 @@ public record ToolTypeModeSwitchPacket(ToolTypeMode mode) implements CustomPacke
                             yield new ItemStack(ModItems.ENDLESS_BEAF_WRENCH.get());
                         }
                     }
+                    default -> new ItemStack(ModItems.ENDLESS_BEAF_ITEM.get());
                 };
 
                 // 复制原有物品的所有NBT数据到新实例
                 DataComponentMap components = targetItem.getComponents();
 
                 for (TypedDataComponent<?> component : components) {
-                    newStack.set(
-                            (DataComponentType) component.type(),
-                            component.value()
-                    );
+                    newStack.set((DataComponentType) component.type(), component.value());
                 }
 
                 // 切换物品实例
@@ -92,7 +90,7 @@ public record ToolTypeModeSwitchPacket(ToolTypeMode mode) implements CustomPacke
     }
 
     @Override
-    public Type<? extends CustomPacketPayload> type() {
+    public @NotNull Type<? extends CustomPacketPayload> type() {
         return TYPE;
     }
 }

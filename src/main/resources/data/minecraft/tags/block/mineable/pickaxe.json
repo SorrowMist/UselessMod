@@ -4,6 +4,7 @@
     "useless_mod:ore_generator_block",
     "useless_mod:teleport_block",
     "useless_mod:teleport_block_2",
+    "useless_mod:teleport_block_3",
     "useless_mod:black_glow_plastic",
     "useless_mod:red_glow_plastic",
     "useless_mod:green_glow_plastic",
@@ -21,6 +22,7 @@
     "useless_mod:orange_glow_plastic",
     "useless_mod:white_glow_plastic",
     "useless_mod:dark_red_glow_plastic",
-    "useless_mod:aqua_glow_plastic"
+    "useless_mod:aqua_glow_plastic",
+    "useless_mod:advanced_alloy_furnace_block"
   ]
 }

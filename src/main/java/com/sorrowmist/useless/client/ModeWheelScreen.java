@@ -17,6 +17,7 @@ import net.minecraft.client.renderer.GameRenderer;
 import net.minecraft.network.chat.Component;
 import net.minecraft.util.Mth;
 import net.minecraft.world.item.ItemStack;
+import net.neoforged.fml.ModList;
 import net.neoforged.neoforge.network.PacketDistributor;
 
 import java.util.ArrayList;
@@ -33,6 +34,7 @@ public class ModeWheelScreen extends Screen {
     private static final int COL_HOVER_R = 63, COL_HOVER_G = 161, COL_HOVER_B = 191, COL_HOVER_A = 160;
 
     private final ItemStack mainHandItem;
+    private final boolean showMiddleDisc;
 
     private final List<ModeData> leftModes = new ArrayList<>();
     private final List<ModeData> middleModes = new ArrayList<>();
@@ -44,8 +46,10 @@ public class ModeWheelScreen extends Screen {
         super(Component.literal("Mode Wheel"));
         this.mainHandItem = mainHandItem;
         this.minecraft = Minecraft.getInstance();
+        this.showMiddleDisc = ModList.get().isLoaded("gtceu");
         this.loadModesFromEnums();
     }
+
 
     private void loadModesFromEnums() {
         this.leftModes.clear();
@@ -82,10 +86,7 @@ public class ModeWheelScreen extends Screen {
     public void render(GuiGraphics g, int mouseX, int mouseY, float pt) {
         PoseStack ms = g.pose();
 
-        float curr = 0;
-        if (this.minecraft != null) {
-            curr = this.minecraft.getFrameTimeNs();
-        }
+        float curr = this.minecraft != null ? this.minecraft.getFrameTimeNs() : 0;
         this.totalTime += (curr + this.extraTick - this.prevTick) / 20f;
         this.extraTick = 0;
         this.prevTick = curr;
@@ -94,9 +95,19 @@ public class ModeWheelScreen extends Screen {
         anim = (float) (1 - Math.pow(1 - anim, 3));
 
         int cy = this.height / 2;
-        int lx = (int) (this.width / 2f - DISC_SPACING);
-        int mx = this.width / 2;
-        int rx = (int) (this.width / 2f + DISC_SPACING);
+        int centerX = this.width / 2;
+
+        int lx, mx, rx;
+
+        if (this.showMiddleDisc) {
+            lx = (int) (centerX - DISC_SPACING);
+            mx = centerX;
+            rx = (int) (centerX + DISC_SPACING);
+        } else {
+            lx = (int) (centerX - DISC_SPACING / 2);
+            mx = centerX; // 不使用
+            rx = (int) (centerX + DISC_SPACING / 2);
+        }
 
         ms.pushPose();
 
@@ -107,19 +118,21 @@ public class ModeWheelScreen extends Screen {
         RenderSystem.setShader(GameRenderer::getPositionColorShader);
 
         Tesselator t = Tesselator.getInstance();
-
-        /* ---------- 背景 + 高亮 ---------- */
         BufferBuilder buf = t.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_COLOR);
+
         this.drawDisc(buf, lx, cy, this.leftModes, mouseX, mouseY, anim);
-        this.drawDisc(buf, mx, cy, this.middleModes, mouseX, mouseY, anim);
+        if (this.showMiddleDisc)
+            this.drawDisc(buf, mx, cy, this.middleModes, mouseX, mouseY, anim);
         this.drawDisc(buf, rx, cy, this.rightModes, mouseX, mouseY, anim);
+
         BufferUploader.drawWithShader(buf.buildOrThrow());
 
-        /* ---------- 分隔线 ---------- */
         buf = t.begin(VertexFormat.Mode.DEBUG_LINES, DefaultVertexFormat.POSITION_COLOR);
         this.drawDividers(buf, lx, cy, this.leftModes.size(), anim);
-        this.drawDividers(buf, mx, cy, this.middleModes.size(), anim);
+        if (this.showMiddleDisc)
+            this.drawDividers(buf, mx, cy, this.middleModes.size(), anim);
         this.drawDividers(buf, rx, cy, this.rightModes.size(), anim);
+
         BufferUploader.drawWithShader(buf.buildOrThrow());
 
         RenderSystem.enableDepthTest();
@@ -127,15 +140,18 @@ public class ModeWheelScreen extends Screen {
         RenderSystem.disableBlend();
 
         this.drawModeNames(g, lx, cy, this.leftModes, anim);
-        this.drawModeNames(g, mx, cy, this.middleModes, anim);
+        if (this.showMiddleDisc)
+            this.drawModeNames(g, mx, cy, this.middleModes, anim);
         this.drawModeNames(g, rx, cy, this.rightModes, anim);
 
         this.drawHover(g, lx, cy, this.leftModes, mouseX, mouseY);
-        this.drawHover(g, mx, cy, this.middleModes, mouseX, mouseY);
+        if (this.showMiddleDisc)
+            this.drawHover(g, mx, cy, this.middleModes, mouseX, mouseY);
         this.drawHover(g, rx, cy, this.rightModes, mouseX, mouseY);
 
         ms.popPose();
     }
+
 
     @Override
     public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
@@ -236,14 +252,19 @@ public class ModeWheelScreen extends Screen {
 
     @Override
     public boolean mouseClicked(double mx, double my, int btn) {
-
         int cy = this.height / 2;
-        int lx = (int) ((float) this.width / 2 - DISC_SPACING);
-        int mxC = this.width / 2;
-        int rx = (int) ((float) this.width / 2 + DISC_SPACING);
+        int centerX = this.width / 2;
+
+        int lx = this.showMiddleDisc
+                ? (int) (centerX - DISC_SPACING)
+                : (int) (centerX - DISC_SPACING / 2);
+
+        int rx = this.showMiddleDisc
+                ? (int) (centerX + DISC_SPACING)
+                : (int) (centerX + DISC_SPACING / 2);
 
         return this.checkClick((int) mx, (int) my, lx, cy, this.leftModes)
-                || this.checkClick((int) mx, (int) my, mxC, cy, this.middleModes)
+                || (this.showMiddleDisc && this.checkClick((int) mx, (int) my, centerX, cy, this.middleModes))
                 || this.checkClick((int) mx, (int) my, rx, cy, this.rightModes)
                 || super.mouseClicked(mx, my, btn);
     }
@@ -260,19 +281,18 @@ public class ModeWheelScreen extends Screen {
 
         Enum<?> mode = modes.get(adj).mode();
 
-        this.onModeSelected(modes, adj, mode);
+        this.onModeSelected(mode);
 
         this.onClose();
         return true;
     }
 
-    private void onModeSelected(List<ModeData> list, int index, Enum<?> mode) {
+    private void onModeSelected(Enum<?> mode) {
         if (mode instanceof EnchantMode em) {
             PacketDistributor.sendToServer(new EnchantmentSwitchPacket(em));
         } else if (mode instanceof ToolTypeMode tm) {
             PacketDistributor.sendToServer(new ToolTypeModeSwitchPacket(tm));
         } else if (mode instanceof FunctionMode fm) {
-            boolean currentlyActive = list.get(index).active();
             PacketDistributor.sendToServer(new FunctionModeTogglePacket(fm));
         }
     }

@@ -1,9 +1,9 @@
 {
   "itemGroup.useless_mod.main": "Useless",
   "item.useless_mod.endless_beaf_item": "造化垂青之杖",
-  "block.useless_mod.teleport_block": "偶数维度传送方块",
   "block.useless_mod.ore_generator_block": "矿石生成器",
-  "block.useless_mod.teleport_block_2": "奇数维度传送方块",
+  "block.useless_mod.teleport_block": "奇数维度传送方块",
+  "block.useless_mod.teleport_block_2": "偶数维度传送方块",
   "block.useless_mod.teleport_block_3": "三维度传送方块",
   "biome.useless_mod:useless_biome": "无用之地",
   "block.useless_mod.black_glow_plastic": "黑色荧光塑料",
@@ -42,6 +42,7 @@
   "tooltip.useless_mod.external_enchantment": "(受外部附魔增强)",
   "tooltip.useless_mod.switch_enchantment": "使用 PAGE_UP/PAGE_DOWN 切换模式",
   "tooltip.useless_mod.fast_break_plastic": "Shift + 右键点击快速破坏塑料方块",
+
   "item.useless_mod.endless_beaf_item.silk_touch": "太初洞见之杖",
   "item.useless_mod.endless_beaf_item.fortune": "造化垂青之杖",
   "text.useless_mod.silk_touch": "精准采集",
@@ -128,6 +129,7 @@
   "tooltip.useless_mod.enhanced_chain_mining_mode": "增强连锁挖掘",
   "tooltip.useless_mod.force_mining_mode": "强制挖掘模式",
   "tooltip.useless_mod.ae_storage_priority_mode": "AE存储优先",
+  "tooltip.useless_mod.press_shift_for_keys": "按住 Shift 显示按键绑定",
   "jei.useless_mod.catalyst_info": "催化剂并行数信息",
   "item.useless_mod.possible_useful_ingot": "可能有用锭",
   "item.useless_mod.useful_ingot": "有用锭",
@@ -159,5 +161,6 @@
   "emi.category.useless_mod.advanced_alloy_furnace": "万象合金炉",
   "emi.category.useless_mod.catalyst_info": "催化剂并行数信息",
   "pack.useless_mod.god.name": "无用模组 - 神权杖材质包",
-  "pack.useless_mod.god.description": "麦淇淋制作的立体神权杖材质包"
+  "pack.useless_mod.god.description": "麦淇淋制作的立体神权杖材质包",
+  "tooltip.useless_mod.wrench_function": "Can be used as a wrench (compatible with other mods)"
 }

@@ -17,8 +17,6 @@ import java.util.EnumSet;
 import java.util.function.UnaryOperator;
 
 public final class UComponents {
-    // 创建一个 DeferredRegister，用于延迟注册 DataComponentType 到 Minecraft 的注册表中
-    // 注册表键为 Registries.DATA_COMPONENT_TYPE，模组 ID 为 UselessMod.MODID
     private static final DeferredRegister<DataComponentType<?>> DATA_COMPONENTS =
             DeferredRegister.create(Registries.DATA_COMPONENT_TYPE, UselessMod.MODID);
 
@@ -59,22 +57,22 @@ public final class UComponents {
                                     },
                                     set -> set.stream()
                                               .map(Enum::name)
-                                              .toList()                     // 将 EnumSet 转为字符串列表
+                                              .toList()
                             )
                     )
                     // 网络同步：手动写入集合大小 + 每个枚举值
                     .networkSynchronized(StreamCodec.of(
                             (buf, set) -> {
-                                buf.writeVarInt(set.size());                    // 先写集合大小（可变整数）
+                                buf.writeVarInt(set.size());
                                 for (FunctionMode mode : set) {
-                                    buf.writeEnum(mode);                        // 逐个写枚举
+                                    buf.writeEnum(mode);
                                 }
                             },
                             buf -> {
-                                int size = buf.readVarInt();                     // 读取集合大小
+                                int size = buf.readVarInt();
                                 EnumSet<FunctionMode> set = EnumSet.noneOf(FunctionMode.class);
                                 for (int i = 0; i < size; i++) {
-                                    set.add(buf.readEnum(FunctionMode.class));  // 逐个读取枚举并加入集合
+                                    set.add(buf.readEnum(FunctionMode.class));
                                 }
                                 return set;
                             }

@@ -64,6 +64,13 @@ repositories {
         name 'Thermal Maven'
         url 'https://maven.covers1624.net/'
     }
+    maven {
+        url "https://maven.shadowsoffire.dev/releases"
+    }
+    maven {
+        name = "TheIllusiveC4"
+        url = "https://maven.theillusivec4.top/"
+    }
     mavenCentral()
 }
 
@@ -91,14 +98,16 @@ neoForge {
     runs {
         client {
             client()
-
+            gameDirectory = project.file('run/client')
+            programArgument '-Xmx3G'
             // Comma-separated list of namespaces to load gametests from. Empty = all namespaces.
             systemProperty 'neoforge.enabledGameTestNamespaces', project.mod_id
         }
 
         server {
             server()
-            programArgument '--nogui'
+            gameDirectory = project.file('run/server')
+            programArgument '--nogui -Xmx3G'
             systemProperty 'neoforge.enabledGameTestNamespaces', project.mod_id
         }
 
@@ -155,15 +164,21 @@ configurations {
 
 dependencies {
     implementation "curse.maven:BotanyPots-353928:6895762"
+    implementation "curse.maven:BotanyPots-353928:6895762"
+    // apotheosis
+    implementation "dev.shadowsoffire:Placebo:1.21.1-9.6.3"
+    implementation "dev.shadowsoffire:ApothicAttributes:1.21.1-2.6.0"
+    implementation "dev.shadowsoffire:ApothicSpawners:1.21.1-1.2.0"
+    implementation "dev.shadowsoffire:ApothicEnchanting:1.21.1-1.3.0"
+    implementation "dev.shadowsoffire:Apotheosis:1.21.1-8.1.0"
 
-    // --- Added dependencies for target mods ---
     implementation "curse.maven:glodium-957920:5821676"
     implementation "org.appliedenergistics:appliedenergistics2:19.2.15"
     implementation "org.appliedenergistics:guideme:2.5.1"
-    // jarJar configuration not set in this build; use implementation for API for now
-    implementation "de.mari_023:ae2wtlib_api:19.2.0"
-    implementation "curse.maven:curios-309927:6529130"
 
+    implementation "de.mari_023:ae2wtlib_api:19.2.0"
+//    implementation "curse.maven:curios-309927:6073321"
+    implementation "top.theillusivec4.curios:curios-neoforge:9.5.1+1.21.1:api"
     implementation "curse.maven:ex-pattern-provider-892005:6863556"
     compileOnly "curse.maven:applied-flux-965012:5614830"
     compileOnly "curse.maven:jade-324717:5427817"

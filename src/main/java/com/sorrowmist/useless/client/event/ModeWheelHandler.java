@@ -53,7 +53,7 @@ public class ModeWheelHandler {
             if (targetItem != null && !(minecraft.screen instanceof ModeWheelScreen)) {
                 // 显示模式轮盘屏幕
                 // TODO 待完善
-                Minecraft.getInstance().setScreen(new ModeWheelScreen(mainHandItem));
+                Minecraft.getInstance().setScreen(new ModeWheelScreen(targetItem));
             }
         }
     }

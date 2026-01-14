@@ -158,16 +158,21 @@ public abstract class AbstractDimensionTeleporter {
                 sourceBlockPos.getZ()
         );
 
-        BlockPos standPos = findBestPlatformStand(level, origin);
+        boolean isPlatformDim = level.dimension().equals(getDimensionKey());
+
+        BlockPos standPos = isPlatformDim
+                ? findBestPlatformStand(level, origin)
+                : findBestPlatformStandNonPlatform(level, origin);
+
         if (standPos == null) return null;
 
         BlockPos blockPos = standPos.below();
 
-        BlockState floorState = level.getBlockState(blockPos);
-
-        // 仅允许替换平台地板方块
-        if (!ConfigManager.isPlatformBlock(floorState.getBlock())) {
-            return null;
+        if (isPlatformDim) {
+            BlockState floorState = level.getBlockState(blockPos);
+            if (!ConfigManager.isPlatformBlock(floorState.getBlock())) {
+                return null;
+            }
         }
 
         level.setBlock(blockPos, teleportState(), 3);
@@ -201,6 +206,33 @@ public abstract class AbstractDimensionTeleporter {
     }
 
     /**
+     * 非平台维度搜索策略：优先找空气，找不到则回退到原位置
+     */
+    private BlockPos findBestPlatformStandNonPlatform(ServerLevel level, BlockPos origin) {
+
+        // 1. 优先在原位置搜索空气
+        BlockPos pos = searchVerticalForAir(level, origin);
+        if (pos != null) return pos;
+
+        // 2. 8×8 范围，从内向外搜索空气
+        for (int r = 1; r <= 4; r++) {
+            for (int dx = -r; dx <= r; dx++) {
+                for (int dz = -r; dz <= r; dz++) {
+
+                    if (Math.abs(dx) != r && Math.abs(dz) != r) continue;
+
+                    BlockPos base = origin.offset(dx, 0, dz);
+                    pos = searchVerticalForAir(level, base);
+                    if (pos != null) return pos;
+                }
+            }
+        }
+
+        // 3. 找不到空气，回退到原位置强制放置
+        return origin;
+    }
+
+    /**
      * 在指定 XZ 上进行 Y / Y+1 / ±3 搜索
      */
     private BlockPos searchVertical(ServerLevel level, BlockPos base) {
@@ -227,6 +259,32 @@ public abstract class AbstractDimensionTeleporter {
     }
 
     /**
+     * 在指定 XZ 上搜索空气位置
+     */
+    private BlockPos searchVerticalForAir(ServerLevel level, BlockPos base) {
+
+        // 原 Y
+        if (isValidAirStand(level, base)) return base;
+
+        // Y + 1
+        if (isValidAirStand(level, base.above())) return base.above();
+
+        // 上下 ±3
+        for (int i = 1; i <= 3; i++) {
+            BlockPos up = base.above(i);
+            if (isValidAirStand(level, up)) return up;
+
+            BlockPos down = base.below(i);
+            if (down.getY() > level.getMinBuildHeight()
+                    && isValidAirStand(level, down)) {
+                return down;
+            }
+        }
+
+        return null;
+    }
+
+    /**
      * 平台 + 站立联合判定
      */
     private boolean isValidPlatformStand(ServerLevel level, BlockPos standPos) {
@@ -239,6 +297,17 @@ public abstract class AbstractDimensionTeleporter {
                 && level.getBlockState(standPos).isAir()
                 && level.getBlockState(standPos.above()).isAir();
     }
+
+    /**
+     * 仅检查站立位置是否为空气（用于非平台维度）
+     */
+    private boolean isValidAirStand(ServerLevel level, BlockPos standPos) {
+        if (standPos == null) return false;
+
+        return level.getBlockState(standPos).isAir()
+                && level.getBlockState(standPos.above()).isAir();
+    }
+
     private BlockPos adjustTeleportBlock(ServerLevel level,
                                          BlockPos teleportBlockPos) {
 

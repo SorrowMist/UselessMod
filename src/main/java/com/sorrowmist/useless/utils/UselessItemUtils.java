@@ -59,7 +59,7 @@ public class UselessItemUtils {
         if (player == null) return;
 
         // 5% 概率
-        if (!(Math.random() < 1)) {
+        if (!(Math.random() < 0.05)) {
             return;
         }
 

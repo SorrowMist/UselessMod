@@ -24,12 +24,12 @@ public class UselessDimGen extends AbstractPlasticPlatformGenerator {
 
     @Override
     protected BlockState getPlatformBlockState(int x, int z) {
-        if (x >= 7 && x <= 8 && z >= 7 && z <= 8) { // 中心 2x2
+        if (x == 8 && z == 8) {
             return ConfigManager.getCenterBlock().defaultBlockState();
-        } else if (x >= 1 && x <= 14 && z >= 1 && z <= 14) { // 内层填充
-            return ConfigManager.getFillBlock().defaultBlockState();
+        } else if (x == 0 || z == 0) {
+            return ConfigManager.getBorderBlock().defaultBlockState();
         } else {
-            return ConfigManager.getBorderBlock().defaultBlockState(); // 最外边框
+            return ConfigManager.getFillBlock().defaultBlockState();
         }
     }
 

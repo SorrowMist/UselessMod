@@ -1,7 +1,9 @@
 package com.sorrowmist.useless.items;
 
 import com.sorrowmist.useless.api.component.UComponents;
+import com.sorrowmist.useless.api.tool.EnchantMode;
 import com.sorrowmist.useless.api.tool.FunctionMode;
+import com.sorrowmist.useless.api.tool.ToolTypeMode;
 import com.sorrowmist.useless.blocks.GlowPlasticBlock;
 import com.sorrowmist.useless.common.KeyBindings;
 import com.sorrowmist.useless.config.ConfigManager;
@@ -11,38 +13,76 @@ import com.sorrowmist.useless.utils.mining.MiningUtils;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.core.component.DataComponents;
+import net.minecraft.core.particles.BlockParticleOption;
+import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
+import net.minecraft.sounds.SoundEvent;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
+import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.HumanoidArm;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.item.AxeItem;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.Tiers;
-import net.minecraft.world.item.TooltipFlag;
+import net.minecraft.world.entity.projectile.ProjectileUtil;
+import net.minecraft.world.item.*;
+import net.minecraft.world.item.component.CustomModelData;
+import net.minecraft.world.item.component.Tool;
 import net.minecraft.world.item.context.UseOnContext;
 import net.minecraft.world.item.enchantment.Enchantments;
 import net.minecraft.world.item.enchantment.ItemEnchantments;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.LevelReader;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.BrushableBlock;
+import net.minecraft.world.level.block.RenderShape;
+import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.world.level.block.entity.BrushableBlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.gameevent.GameEvent;
+import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.world.phys.HitResult;
+import net.minecraft.world.phys.Vec3;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.api.distmarker.OnlyIn;
+import net.neoforged.neoforge.common.IShearable;
 import net.neoforged.neoforge.common.ItemAbilities;
 import net.neoforged.neoforge.common.ItemAbility;
 import net.neoforged.neoforge.common.util.Lazy;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
-import java.util.EnumSet;
-import java.util.List;
-import java.util.Locale;
+import java.util.*;
+import java.util.stream.Collectors;
 
 public class EndlessBeafItem extends AxeItem {
-    public EndlessBeafItem(Tiers type, Properties pProperties) {
-        super(type, pProperties);
+    private final ToolTypeMode toolType;
+
+    public EndlessBeafItem() {
+        this(null);
+    }
+
+    public EndlessBeafItem(@Nullable ToolTypeMode toolType) {
+        super(Tiers.NETHERITE,
+              new Item.Properties()
+                      .attributes(DiggerItem.createAttributes(Tiers.NETHERITE, 50, 2.0F))
+                      .stacksTo(1)
+                      .rarity(Rarity.EPIC)
+                      .durability(0)
+                      .component(UComponents.EnchantModeComponent.get(), EnchantMode.SILK_TOUCH)
+                      // 默认开启普通连锁挖掘
+                      .component(UComponents.FunctionModesComponent, EnumSet.of(FunctionMode.CHAIN_MINING))
+                      .component(DataComponents.CUSTOM_MODEL_DATA, new CustomModelData(1))
+        );
+        this.toolType = toolType;
     }
 
     @Override
@@ -55,6 +95,17 @@ public class EndlessBeafItem extends AxeItem {
     public boolean hasCraftingRemainingItem(@NotNull ItemStack stack) {
         // 确保该物品有剩余物品（即本身）
         return true;
+    }
+
+    @Override
+    public boolean doesSneakBypassUse(@NotNull ItemStack stack,
+                                      LevelReader world,
+                                      @NotNull BlockPos pos,
+                                      @NotNull Player player) {
+        // 检查是否是塑料块，如果是则不跳过useOn方法
+        Block block = world.getBlockState(pos).getBlock();
+        // 对于塑料块，不绕过useOn方法，以便执行快速破坏逻辑
+        return !(block instanceof GlowPlasticBlock);
     }
 
     @Override
@@ -80,12 +131,28 @@ public class EndlessBeafItem extends AxeItem {
         Player player = ctx.getPlayer();
         BlockState blockstate = world.getBlockState(blockpos);
 
-        if (player != null && player.isCreative()) {
-            return InteractionResult.PASS;
+        // === 刷子功能（仅对可刷取的方块）===
+        if (player != null) {
+            HitResult hitresult = ProjectileUtil.getHitResultOnViewVector(
+                    player,
+                    (p) -> !p.isSpectator() && p.isPickable(),
+                    player.blockInteractionRange()
+            );
+            if (hitresult instanceof BlockHitResult blockhitresult
+                    && hitresult.getType() == HitResult.Type.BLOCK) {
+                BlockPos hitPos = blockhitresult.getBlockPos();
+                BlockState hitState = world.getBlockState(hitPos);
+                if (hitState.getBlock() instanceof BrushableBlock) {
+                    player.startUsingItem(ctx.getHand());
+                    return InteractionResult.CONSUME;
+                }
+            }
         }
 
+        if (player == null || player.isCreative()) return InteractionResult.PASS;
+
         // === 快速破坏塑料块（Shift + 右键）===
-        if (player != null && player.isShiftKeyDown() && blockstate.getBlock() instanceof GlowPlasticBlock) {
+        if (player.isShiftKeyDown() && blockstate.getBlock() instanceof GlowPlasticBlock) {
             MiningUtils.quickBreakBlock(world, blockpos, blockstate, player, ctx.getItemInHand());
             return InteractionResult.sidedSuccess(world.isClientSide);
         }
@@ -116,33 +183,195 @@ public class EndlessBeafItem extends AxeItem {
 
     @Override
     public boolean canPerformAction(@NotNull ItemStack stack, @NotNull ItemAbility ability) {
-        return ItemAbilities.DEFAULT_AXE_ACTIONS.contains(ability) ||
+        // 基础工具能力（所有工具都有）
+        if (ItemAbilities.DEFAULT_AXE_ACTIONS.contains(ability) ||
                 ItemAbilities.DEFAULT_PICKAXE_ACTIONS.contains(ability) ||
                 ItemAbilities.DEFAULT_SHOVEL_ACTIONS.contains(ability) ||
                 ItemAbilities.DEFAULT_HOE_ACTIONS.contains(ability) ||
-                ability == ItemAbilities.SWORD_SWEEP;
+                ItemAbilities.DEFAULT_BRUSH_ACTIONS.contains(ability) ||
+                ItemAbilities.DEFAULT_SHEARS_ACTIONS.contains(ability) ||
+                ability == ItemAbilities.SWORD_SWEEP) {
+            return true;
+        }
+
+        // 根据工具类型返回特定能力
+        if (this.toolType == null) {
+            return false;
+        }
+
+        // GT部分适配
+        return switch (this.toolType) {
+            case WRENCH_MODE -> ability == ItemAbility.get("wrench_rotate") ||
+                    ability == ItemAbility.get("wrench_configure") ||
+                    ability == ItemAbility.get("wrench_configure_all") ||
+                    ability == ItemAbility.get("wrench_configure_items") ||
+                    ability == ItemAbility.get("wrench_configure_fluids") ||
+                    ability == ItemAbility.get("wrench_dig") ||
+                    ability == ItemAbility.get("wrench_dismantle") ||
+                    ability == ItemAbility.get("wrench_connect");
+
+            case SCREWDRIVER_MODE -> ability == ItemAbility.get("screwdriver_configure") ||
+                    ability == ItemAbility.get("interact_with_cover");
+
+            case MALLET_MODE -> ability == ItemAbility.get("mallet_pause") ||
+                    ability == ItemAbility.get("mallet_configure") ||
+                    ability == ItemAbility.get("interact_with_cover");
+
+            case CROWBAR_MODE -> ability == ItemAbility.get("crowbar_rotate") ||
+                    ability == ItemAbility.get("crowbar_remove_cover") ||
+                    ability == ItemAbility.get("crowbar_dig");
+
+            case HAMMER_MODE -> ability == ItemAbility.get("hammer_dig") ||
+                    ability == ItemAbility.get("hammer_mute");
+
+            case OMNITOOL_MODE -> false;
+        };
     }
 
     @Override
-    public float getDestroySpeed(@NotNull ItemStack stack, BlockState state) {
-        // 获取基础破坏速度
-        float baseSpeed = 10.0f;
-        // 只对有效方块应用速度加成
-        if (state.getDestroySpeed(null, null) > 0) {
-            // 应用类似MinersFervorEnchant的机制
-            // 基础速度7.5F + 每级4.5F加成，最大29.9999F
-            float hardness = state.getDestroySpeed(null, null);
-            if (hardness > 0) {
-                return baseSpeed * hardness;
-            }
+    public void onUseTick(@NotNull Level level,
+                          @NotNull LivingEntity livingEntity,
+                          @NotNull ItemStack stack,
+                          int remainingUseDuration) {
+
+        if (!(livingEntity instanceof Player player) || remainingUseDuration < 0) {
+            livingEntity.releaseUsingItem();
+            return;
         }
 
-        return baseSpeed;
+        HitResult hitResult = ProjectileUtil.getHitResultOnViewVector(
+                player,
+                e -> !e.isSpectator() && e.isPickable(),
+                player.blockInteractionRange()
+        );
+
+        if (!(hitResult instanceof BlockHitResult blockHit)
+                || hitResult.getType() != HitResult.Type.BLOCK) {
+            livingEntity.releaseUsingItem();
+            return;
+        }
+
+        int i = this.getUseDuration(stack, livingEntity) - remainingUseDuration + 1;
+        boolean doBrushTick = i % 10 == 5;
+
+        if (!doBrushTick) {
+            return;
+        }
+
+        BlockPos blockPos = blockHit.getBlockPos();
+        BlockState blockState = level.getBlockState(blockPos);
+
+        /* ---------- 客户端：粒子 & 音效 ---------- */
+        HumanoidArm arm = livingEntity.getUsedItemHand() == InteractionHand.MAIN_HAND
+                ? player.getMainArm()
+                : player.getMainArm().getOpposite();
+
+        if (blockState.shouldSpawnTerrainParticles()
+                && blockState.getRenderShape() != RenderShape.INVISIBLE) {
+            this.spawnBrushParticles(
+                    level,
+                    blockHit,
+                    blockState,
+                    livingEntity.getViewVector(0.0F),
+                    arm
+            );
+        }
+
+        SoundEvent sound = blockState.getBlock() instanceof BrushableBlock brushable
+                ? brushable.getBrushSound()
+                : SoundEvents.BRUSH_GENERIC;
+
+        level.playSound(player, blockPos, sound, SoundSource.BLOCKS);
+
+        /* ---------- 服务端：正常刷取 + 战利品直收 ---------- */
+        if (!level.isClientSide) {
+            BlockEntity blockEntity = level.getBlockEntity(blockPos);
+            if (blockEntity instanceof BrushableBlockEntity brushable) {
+
+                // 刷取前记录已有掉落
+                AABB area = new AABB(blockPos).inflate(3.0);
+                Set<UUID> before = level.getEntitiesOfClass(ItemEntity.class, area)
+                                        .stream()
+                                        .map(Entity::getUUID)
+                                        .collect(Collectors.toSet());
+
+                boolean finished = brushable.brush(
+                        level.getGameTime(),
+                        player,
+                        blockHit.getDirection()
+                );
+
+                // 只有刷完那一刻才回收掉落
+                if (finished) {
+                    level.getEntitiesOfClass(ItemEntity.class, area).stream()
+                         .filter(e -> !before.contains(e.getUUID()))
+                         .forEach(entity -> {
+                             ItemStack drop = entity.getItem().copy();
+                             if (!drop.isEmpty()) {
+                                 if (!player.getInventory().add(drop)) {
+                                     player.drop(drop, false);
+                                 }
+                             }
+                             entity.discard();
+                         });
+                }
+            }
+        }
+    }
+
+
+    @Override
+    @SuppressWarnings("all")
+    public float getDestroySpeed(@NotNull ItemStack stack, @NotNull BlockState state) {
+        // 基础工具速度
+        Tool tool = stack.get(DataComponents.TOOL);
+        float baseSpeed = Math.max(tool != null ? tool.getMiningSpeed(state) : 10.0F, 10.0F);
+
+        float hardness = state.getDestroySpeed(null, null);
+        if (hardness < 0) {
+            return 0.0F;
+        }
+
+        float speed = baseSpeed * hardness;
+
+        // 防止 NaN / 极端情况
+        if (speed <= 0 || Float.isNaN(speed) || Float.isInfinite(speed)) {
+            return baseSpeed;
+        }
+
+        return speed;
     }
 
     @Override
     public boolean isCorrectToolForDrops(@NotNull ItemStack stack, @NotNull BlockState state) {
         return true;
+    }
+
+    @Override
+    @SuppressWarnings("all")
+    public @NotNull InteractionResult interactLivingEntity(@NotNull ItemStack stack,
+                                                           @NotNull Player player,
+                                                           @NotNull LivingEntity entity,
+                                                           @NotNull InteractionHand hand) {
+        if (entity instanceof IShearable target) {
+            BlockPos pos = entity.blockPosition();
+            boolean isClient = entity.level().isClientSide();
+            if (target.isShearable(player, stack, entity.level(), pos)) {
+                List<ItemStack> drops = target.onSheared(player, stack, entity.level(), pos);
+                if (!isClient) {
+                    for (ItemStack drop : drops) {
+                        if (!drop.isEmpty()) {
+                            if (!player.getInventory().add(drop)) {
+                                player.drop(drop, false);
+                            }
+                        }
+                    }
+                }
+                entity.gameEvent(GameEvent.SHEAR, player);
+                return InteractionResult.sidedSuccess(isClient);
+            }
+        }
+        return InteractionResult.PASS;
     }
 
     @Override
@@ -174,6 +403,36 @@ public class EndlessBeafItem extends AxeItem {
 
     @Override
     @OnlyIn(Dist.CLIENT)
+    public @NotNull UseAnim getUseAnimation(@NotNull ItemStack stack) {
+        Player player = Minecraft.getInstance().player;
+        Level level = Minecraft.getInstance().level;
+
+        if (player != null && level != null && player.isUsingItem()) {
+            HitResult hitResult = ProjectileUtil.getHitResultOnViewVector(
+                    player,
+                    e -> !e.isSpectator() && e.isPickable(),
+                    player.blockInteractionRange()
+            );
+
+            if (hitResult instanceof BlockHitResult blockHit
+                    && hitResult.getType() == HitResult.Type.BLOCK) {
+                BlockPos blockPos = blockHit.getBlockPos();
+                BlockState blockState = level.getBlockState(blockPos);
+                if (blockState.getBlock() instanceof BrushableBlock) {
+                    return UseAnim.BRUSH;
+                }
+            }
+        }
+        return super.getUseAnimation(stack);
+    }
+
+    @Override
+    public int getUseDuration(@NotNull ItemStack stack, @NotNull LivingEntity entity) {
+        return 20;
+    }
+
+    @Override
+    @OnlyIn(Dist.CLIENT)
     public void appendHoverText(@NotNull ItemStack stack, @NotNull TooltipContext context,
                                 @NotNull List<Component> tooltipComponents,
                                 @NotNull TooltipFlag tooltipFlag) {
@@ -196,31 +455,35 @@ public class EndlessBeafItem extends AxeItem {
         // 2. 分隔线（可选，美观）
         tooltipComponents.add(Component.empty());
 
-        // 3. 动态按键提示（仅客户端有效）
-        // 确保在客户端运行
-        this.addKeyTooltip(tooltipComponents, KeyBindings.SWITCH_FORTUNE_KEY,
-                           "tooltip.useless_mod.key.switch_fortune"
-        );
-        this.addKeyTooltip(tooltipComponents, KeyBindings.SWITCH_SILK_TOUCH_KEY,
-                           "tooltip.useless_mod.key.switch_silk_touch"
-        );
-        this.addKeyTooltip(tooltipComponents, KeyBindings.TOGGLE_CHAIN_MODE_KEY,
-                           "tooltip.useless_mod.key.toggle_chain_mode"
-        );
-        this.addKeyTooltip(tooltipComponents, KeyBindings.SWITCH_FORCE_MINING_KEY,
-                           "tooltip.useless_mod.key.switch_force_mining"
-        );
-        this.addKeyTooltip(tooltipComponents, KeyBindings.TRIGGER_FORCE_MINING_KEY,
-                           "tooltip.useless_mod.key.trigger_force_mining"
-        );
-        this.addKeyTooltip(tooltipComponents, KeyBindings.SWITCH_MODE_WHEEL_KEY,
-                           "tooltip.useless_mod.key.open_mode_wheel"
-        );
+        // 3. 动态按键提示（Shift 展开）
+        if (Screen.hasShiftDown()) {
+            // 显示详细按键绑定
+            this.addKeyTooltip(tooltipComponents, KeyBindings.SWITCH_FORTUNE_KEY,
+                               "tooltip.useless_mod.key.switch_fortune"
+            );
+            this.addKeyTooltip(tooltipComponents, KeyBindings.SWITCH_SILK_TOUCH_KEY,
+                               "tooltip.useless_mod.key.switch_silk_touch"
+            );
+            this.addKeyTooltip(tooltipComponents, KeyBindings.TOGGLE_CHAIN_MODE_KEY,
+                               "tooltip.useless_mod.key.toggle_chain_mode"
+            );
+            this.addKeyTooltip(tooltipComponents, KeyBindings.SWITCH_FORCE_MINING_KEY,
+                               "tooltip.useless_mod.key.switch_force_mining"
+            );
+            this.addKeyTooltip(tooltipComponents, KeyBindings.TRIGGER_FORCE_MINING_KEY,
+                               "tooltip.useless_mod.key.trigger_force_mining"
+            );
+            this.addKeyTooltip(tooltipComponents, KeyBindings.SWITCH_MODE_WHEEL_KEY,
+                               "tooltip.useless_mod.key.open_mode_wheel"
+            );
+            tooltipComponents.add(Component.empty());
+        } else {
+            // 未按 Shift 时显示提示
+            tooltipComponents.add(Component.translatable("tooltip.useless_mod.press_shift_for_keys")
+                                           .withStyle(ChatFormatting.GRAY));
+        }
 
         // 4. 其他静态功能提示
-        tooltipComponents.add(Component.empty());
-        tooltipComponents.add(
-                Component.translatable("tooltip.useless_mod.wrench_function").withStyle(ChatFormatting.YELLOW));
         tooltipComponents.add(
                 Component.translatable("tooltip.useless_mod.fast_break_plastic").withStyle(ChatFormatting.GREEN));
         tooltipComponents.add(
@@ -269,6 +532,31 @@ public class EndlessBeafItem extends AxeItem {
         return stack;
     }
 
+    private void spawnBrushParticles(Level level,
+                                     BlockHitResult hitResult,
+                                     BlockState state,
+                                     Vec3 pos,
+                                     HumanoidArm arm) {
+        int i = arm == HumanoidArm.RIGHT ? 1 : -1;
+        int j = level.getRandom().nextInt(7, 12);
+        BlockParticleOption blockparticleoption = new BlockParticleOption(ParticleTypes.BLOCK, state);
+        Direction direction = hitResult.getDirection();
+        Vec3 vec3 = hitResult.getLocation();
+
+        for (int k = 0; k < j; ++k) {
+            level.addParticle(blockparticleoption,
+                              vec3.x - (double) (direction == Direction.WEST ? 1.0E-6F : 0.0F),
+                              vec3.y,
+                              vec3.z - (double) (direction == Direction.NORTH ? 1.0E-6F : 0.0F),
+                              (direction.getAxis() == Direction.Axis.X ? 0.0 :
+                                      direction.getStepX()) * i * 3.0 * level.getRandom().nextDouble(),
+                              0.0,
+                              (direction.getAxis() == Direction.Axis.Z ? 0.0 :
+                                      direction.getStepZ()) * i * 3.0 * level.getRandom().nextDouble()
+            );
+        }
+    }
+
     /**
      * 安全添加带按键名的提示行
      */
@@ -281,7 +569,6 @@ public class EndlessBeafItem extends AxeItem {
             keyName = "Unbound";
         }
 
-        tooltip.add(Component.translatable(translationKey, keyName)
-                             .withStyle(ChatFormatting.LIGHT_PURPLE));
+        tooltip.add(Component.translatable(translationKey, keyName).withStyle(ChatFormatting.LIGHT_PURPLE));
     }
 }

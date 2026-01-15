@@ -99,7 +99,6 @@ neoForge {
         client {
             client()
             gameDirectory = project.file('run/client')
-            programArgument '-Xmx3G'
             // Comma-separated list of namespaces to load gametests from. Empty = all namespaces.
             systemProperty 'neoforge.enabledGameTestNamespaces', project.mod_id
         }
@@ -107,7 +106,7 @@ neoForge {
         server {
             server()
             gameDirectory = project.file('run/server')
-            programArgument '--nogui -Xmx3G'
+            programArgument '--nogui'
             systemProperty 'neoforge.enabledGameTestNamespaces', project.mod_id
         }
 
@@ -208,6 +207,7 @@ dependencies {
     //ftbteams
     runtimeOnly "curse.maven:ftb-teams-forge-404468:6930910"
     runtimeOnly "curse.maven:ftb-library-forge-404465:7029003"
+    runtimeOnly "curse.maven:ftb-chunks-forge-314906:7157142"
     runtimeOnly "curse.maven:architectury-api-419699:5786327"
 
 

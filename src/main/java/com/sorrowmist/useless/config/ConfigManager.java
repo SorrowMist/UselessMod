@@ -1,6 +1,5 @@
 package com.sorrowmist.useless.config;
 
-import com.sorrowmist.useless.utils.ThermalDependencyHelper;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.level.block.Block;
@@ -27,6 +26,10 @@ public class ConfigManager {
     // 矩阵样板数量配置
     private static final ModConfigSpec.IntValue MATRIX_PATTERN_COUNT;
 
+    // 药水效果配置
+    private static final ModConfigSpec.BooleanValue ENABLE_POTION_EFFECTS;
+    private static final ModConfigSpec.BooleanValue ENABLE_FLIGHT_EFFECT;
+
     // 牛排工具连锁挖掘配置
     private static final ModConfigSpec.IntValue CHAIN_MINING_RANGE_X;
     private static final ModConfigSpec.IntValue CHAIN_MINING_RANGE_Y;
@@ -41,17 +44,6 @@ public class ConfigManager {
     private static final ModConfigSpec.IntValue ELECTRICITY_MULTIPLIER;
     private static final ModConfigSpec.IntValue CAPACITY_MULTIPLIER;
     private static final ModConfigSpec.IntValue MAX_UPGRADE;
-
-    // Thermal Parallel 配置 - 只在热力系列安装时注册
-    private static final ModConfigSpec.BooleanValue PARALLEL_INCREASE_ITEM_CAPACITY;
-    private static final ModConfigSpec.BooleanValue PARALLEL_INCREASE_FLUID_CAPACITY;
-    private static final ModConfigSpec.BooleanValue PARALLEL_INCREASE_ENERGY_CAPACITY;
-    private static final ModConfigSpec.BooleanValue PARALLEL_INCREASE_ITEM_TRANSFER;
-    private static final ModConfigSpec.BooleanValue PARALLEL_INCREASE_FLUID_TRANSFER;
-    private static final ModConfigSpec.BooleanValue PARALLEL_INCREASE_ENERGY_TRANSFER;
-    private static final ModConfigSpec.BooleanValue PARALLEL_INCREASE_ENERGY_CONSUMPTION;
-    private static final ModConfigSpec.BooleanValue BASE_MOD_AFFECT_PARALLEL;
-    private static final ModConfigSpec.BooleanValue ADD_EXTRA_PARALLEL_AUGMENTS_TO_TAB;
 
     static {
         BUILDER.push("维度生成设置");
@@ -92,6 +84,14 @@ public class ConfigManager {
 
         // 牛排工具连锁挖掘配置
         BUILDER.push("牛排工具设置");
+        ENABLE_POTION_EFFECTS = BUILDER
+                .comment("是否启用药水效果")
+                .define("启用药水效果", true);
+
+        ENABLE_FLIGHT_EFFECT = BUILDER
+                .comment("是否启用飞行效果")
+                .define("启用飞行效果", true);
+
         CHAIN_MINING_RANGE_X = BUILDER
                 .comment("连锁挖掘的X轴范围半径")
                 .defineInRange("连锁挖掘X轴范围", 8, 1, 32);
@@ -135,60 +135,6 @@ public class ConfigManager {
                 .comment("机器可接受的最大速度/能量升级数量，重启游戏生效")
                 .defineInRange("最大升级数量", 16, 1, 64);
         BUILDER.pop();
-
-        // 只在热力系列安装时添加 Thermal Parallel 配置
-        if (ThermalDependencyHelper.isAnyThermalModLoaded()) {
-            BUILDER.push("Thermal Parallel 设置");
-
-            PARALLEL_INCREASE_ENERGY_CONSUMPTION = BUILDER
-                    .comment("如果设置为true，则机器的能耗会随并行增多而成倍增加")
-                    .define("并行增加能耗", false);
-
-            BASE_MOD_AFFECT_PARALLEL = BUILDER
-                    .comment("如果设置为true，则机器的并行数量会被整合组件带来的基础倍率增幅")
-                    .define("基础倍率影响并行", false);
-
-            ADD_EXTRA_PARALLEL_AUGMENTS_TO_TAB = BUILDER
-                    .comment("如果设置为true，则更高等级的并行插件会被加进创造模式物品栏")
-                    .define("添加额外并行增强到标签", false);
-
-            PARALLEL_INCREASE_ITEM_CAPACITY = BUILDER
-                    .comment("如果设置为true，则并行升级会同步提高机器的输入/输出物品存储上限")
-                    .define("并行增加物品容量", true);
-
-            PARALLEL_INCREASE_FLUID_CAPACITY = BUILDER
-                    .comment("如果设置为true，则并行升级会同步提高机器的流体存储上限")
-                    .define("并行增加流体容量", true);
-
-            PARALLEL_INCREASE_ENERGY_CAPACITY = BUILDER
-                    .comment("如果设置为true，则并行升级会同步提高机器的能量存储上限")
-                    .define("并行增加能量容量", false);
-
-            PARALLEL_INCREASE_ITEM_TRANSFER = BUILDER
-                    .comment("如果设置为true，则并行升级会同步提高机器进行自动提取/弹出物品的速率上限")
-                    .define("并行增加物品传输", true);
-
-            PARALLEL_INCREASE_FLUID_TRANSFER = BUILDER
-                    .comment("如果设置为true，则并行升级会同步提高机器进行自动提取/弹出流体的速率上限")
-                    .define("并行增加流体传输", true);
-
-            PARALLEL_INCREASE_ENERGY_TRANSFER = BUILDER
-                    .comment("如果设置为true，则并行升级会同步提高机器的能量传输上限")
-                    .define("并行增加能量传输", true);
-
-            BUILDER.pop();
-        } else {
-            // 如果热力系列未安装，设置默认值
-            PARALLEL_INCREASE_ENERGY_CONSUMPTION = null;
-            BASE_MOD_AFFECT_PARALLEL = null;
-            ADD_EXTRA_PARALLEL_AUGMENTS_TO_TAB = null;
-            PARALLEL_INCREASE_ITEM_CAPACITY = null;
-            PARALLEL_INCREASE_FLUID_CAPACITY = null;
-            PARALLEL_INCREASE_ENERGY_CAPACITY = null;
-            PARALLEL_INCREASE_ITEM_TRANSFER = null;
-            PARALLEL_INCREASE_FLUID_TRANSFER = null;
-            PARALLEL_INCREASE_ENERGY_TRANSFER = null;
-        }
 
         SPEC = BUILDER.build();
     }
@@ -270,6 +216,15 @@ public class ConfigManager {
     // 获取塑料平台起始Y值
     public static int getPlatformStartY() {
         return PLATFORM_START_Y.get();
+    }
+
+    // 获取药水效果配置
+    public static boolean shouldEnablePotionEffects() {
+        return ENABLE_POTION_EFFECTS.get();
+    }
+
+    public static boolean shouldEnableFlightEffect() {
+        return ENABLE_FLIGHT_EFFECT.get();
     }
 
     private static Block getBlockFromString(String blockId, Block fallback) {

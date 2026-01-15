@@ -1,7 +1,10 @@
 package com.sorrowmist.useless.datagen;
 
 import com.sorrowmist.useless.UselessMod;
+import com.sorrowmist.useless.datagen.providers.ULootTableProvider;
 import com.sorrowmist.useless.datagen.providers.recipes.CraftingRecipes;
+import com.sorrowmist.useless.datagen.providers.tags.UBlockTagsProvider;
+import com.sorrowmist.useless.datagen.providers.tags.UItemTagsProvider;
 import net.minecraft.data.DataGenerator;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
@@ -15,8 +18,16 @@ public class DataGenerators {
         DataGenerator generator = event.getGenerator();
         var registries = event.getLookupProvider();
         var pack = generator.getVanillaPack(true);
+        var existingFileHelper = event.getExistingFileHelper();
 
-        // 仅添加配方生成器
+        var blockTagsProvider = pack.addProvider(
+                output -> new UBlockTagsProvider(output, registries, existingFileHelper));
+        pack.addProvider(output -> new UItemTagsProvider(output,
+                                                         registries,
+                                                         blockTagsProvider.contentsGetter()
+        ));
+        pack.addProvider(output -> new ULootTableProvider(output, registries));
+//        pack.addProvider(output -> new ModBiomeProvider(output, registries));
         pack.addProvider(output -> new CraftingRecipes(output, registries));
     }
 }

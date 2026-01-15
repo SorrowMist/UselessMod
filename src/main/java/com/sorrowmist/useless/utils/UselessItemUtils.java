@@ -1,5 +1,6 @@
 package com.sorrowmist.useless.utils;
 
+import com.sorrowmist.useless.config.ConfigManager;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.effect.MobEffects;
@@ -18,40 +19,43 @@ public class UselessItemUtils {
     public static void applyEndlessBeafEffects(Player player) {
         if (player == null) return;
 
-        // 饱和效果
-        MobEffectInstance saturation = player.getEffect(MobEffects.SATURATION);
-        if (saturation == null || saturation.getDuration() < 200) {
-            player.addEffect(new MobEffectInstance(MobEffects.SATURATION, 20000, 0, true, false, true));
-        }
+        // 检查是否启用药水效果
+        if (ConfigManager.shouldEnablePotionEffects()) {
+            // 饱和效果
+            MobEffectInstance saturation = player.getEffect(MobEffects.SATURATION);
+            if (saturation == null || saturation.getDuration() < 200) {
+                player.addEffect(new MobEffectInstance(MobEffects.SATURATION, 20000, 0, true, false, true));
+            }
 
-        // 生命恢复
-        MobEffectInstance regen = player.getEffect(MobEffects.REGENERATION);
-        if (regen == null || regen.getDuration() < 200) {
-            player.addEffect(new MobEffectInstance(MobEffects.REGENERATION, 20000, 5, true, false, true));
-        }
+            // 生命恢复
+            MobEffectInstance regen = player.getEffect(MobEffects.REGENERATION);
+            if (regen == null || regen.getDuration() < 200) {
+                player.addEffect(new MobEffectInstance(MobEffects.REGENERATION, 20000, 5, true, false, true));
+            }
 
-        // 夜视
-        MobEffectInstance nightVision = player.getEffect(MobEffects.NIGHT_VISION);
-        if (nightVision == null || nightVision.getDuration() < 200) {
-            player.addEffect(new MobEffectInstance(MobEffects.NIGHT_VISION, 20000, 0, true, false, true));
-        }
+            // 夜视
+            MobEffectInstance nightVision = player.getEffect(MobEffects.NIGHT_VISION);
+            if (nightVision == null || nightVision.getDuration() < 200) {
+                player.addEffect(new MobEffectInstance(MobEffects.NIGHT_VISION, 20000, 0, true, false, true));
+            }
 
-        // 抗火
-        MobEffectInstance fireResistance = player.getEffect(MobEffects.FIRE_RESISTANCE);
-        if (fireResistance == null || fireResistance.getDuration() < 200) {
-            player.addEffect(new MobEffectInstance(MobEffects.FIRE_RESISTANCE, 20000, 0, true, false, true));
-        }
+            // 抗火
+            MobEffectInstance fireResistance = player.getEffect(MobEffects.FIRE_RESISTANCE);
+            if (fireResistance == null || fireResistance.getDuration() < 200) {
+                player.addEffect(new MobEffectInstance(MobEffects.FIRE_RESISTANCE, 20000, 0, true, false, true));
+            }
 
-        // 水下呼吸
-        MobEffectInstance waterBreathing = player.getEffect(MobEffects.WATER_BREATHING);
-        if (waterBreathing == null || waterBreathing.getDuration() < 200) {
-            player.addEffect(new MobEffectInstance(MobEffects.WATER_BREATHING, 20000, 0, true, false, true));
-        }
+            // 水下呼吸
+            MobEffectInstance waterBreathing = player.getEffect(MobEffects.WATER_BREATHING);
+            if (waterBreathing == null || waterBreathing.getDuration() < 200) {
+                player.addEffect(new MobEffectInstance(MobEffects.WATER_BREATHING, 20000, 0, true, false, true));
+            }
 
-        // 抗性提升
-        MobEffectInstance damageResistance = player.getEffect(MobEffects.DAMAGE_RESISTANCE);
-        if (damageResistance == null || damageResistance.getDuration() < 200) {
-            player.addEffect(new MobEffectInstance(MobEffects.DAMAGE_RESISTANCE, 20000, 5, true, false, true));
+            // 抗性提升
+            MobEffectInstance damageResistance = player.getEffect(MobEffects.DAMAGE_RESISTANCE);
+            if (damageResistance == null || damageResistance.getDuration() < 200) {
+                player.addEffect(new MobEffectInstance(MobEffects.DAMAGE_RESISTANCE, 20000, 5, true, false, true));
+            }
         }
     }
 

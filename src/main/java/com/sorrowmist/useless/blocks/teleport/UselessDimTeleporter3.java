@@ -1,4 +1,3 @@
-// UselessDimTeleporter3.java （对应 uselessdim3 + TELEPORT_BLOCK_3）
 package com.sorrowmist.useless.blocks.teleport;
 
 import com.sorrowmist.useless.UselessMod;

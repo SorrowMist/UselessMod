@@ -1,18 +1,18 @@
 {
-  "type": "minecraft:crafting_shaped",
-  "category": "misc",
-  "key": {
-    "X": {
-      "item": "useless_mod:useless_ingot_tier_1"
+    "type": "minecraft:crafting_shaped",
+    "category": "misc",
+    "key": {
+        "X": {
+            "item": "useless_mod:useless_ingot_tier_1"
+        }
+    },
+    "pattern": [
+        " X ",
+        "X X",
+        " X "
+    ],
+    "result": {
+        "count": 1,
+        "id": "useless_mod:metal_mold_gear"
     }
-  },
-  "pattern": [
-    " X ",
-    "X X",
-    " X "
-  ],
-  "result": {
-    "count": 1,
-    "id": "useless_mod:metal_mold_gear"
-  }
 }

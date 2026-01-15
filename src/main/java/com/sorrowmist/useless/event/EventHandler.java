@@ -2,6 +2,7 @@ package com.sorrowmist.useless.event;
 
 import com.sorrowmist.useless.UselessMod;
 import com.sorrowmist.useless.common.FlyEffectedHolder;
+import com.sorrowmist.useless.config.ConfigManager;
 import com.sorrowmist.useless.items.EndlessBeafItem;
 import com.sorrowmist.useless.utils.UselessItemUtils;
 import com.sorrowmist.useless.utils.mining.MiningDispatcher;
@@ -39,17 +40,17 @@ public class EventHandler {
     }
 
     @SubscribeEvent
-    public static void onPlayerInteract(PlayerTickEvent.Post event) {
+    public static void onPlayerTick(PlayerTickEvent.Post event) {
         Player player = event.getEntity();
-        if (player == null || player.level().isClientSide()) return; // 仅在服务器端处理
+        if (player == null || player.level().isClientSide()) return;
 
         if (!player.isCreative()) {
             boolean hasItemInInventory = player.getInventory().items.stream().anyMatch(
                     item -> item.getItem() instanceof EndlessBeafItem);
 
-            if (hasItemInInventory) {
+            if (hasItemInInventory && ConfigManager.shouldEnableFlightEffect()) {
                 FlyEffectedHolder.add(player.getUUID());
-                if (!player.getAbilities().mayfly && FlyEffectedHolder.contains(player.getUUID())) {
+                if (!player.getAbilities().mayfly) {
                     player.getAbilities().mayfly = true;
                     player.onUpdateAbilities();
                 }

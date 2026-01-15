@@ -1,0 +1,21 @@
+{
+    "type": "minecraft:block",
+    "pools": [
+        {
+            "bonus_rolls": 0.0,
+            "conditions": [
+                {
+                    "condition": "minecraft:survives_explosion"
+                }
+            ],
+            "entries": [
+                {
+                    "type": "minecraft:item",
+                    "name": "useless_mod:green_glow_plastic"
+                }
+            ],
+            "rolls": 1.0
+        }
+    ],
+    "random_sequence": "useless_mod:blocks/green_glow_plastic"
+}

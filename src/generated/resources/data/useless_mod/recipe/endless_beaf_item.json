@@ -1,42 +1,42 @@
 {
-  "type": "minecraft:crafting_shaped",
-  "category": "misc",
-  "key": {
-    "A": {
-      "item": "useless_mod:useless_ingot_tier_5"
+    "type": "minecraft:crafting_shaped",
+    "category": "misc",
+    "key": {
+        "A": {
+            "item": "useless_mod:useless_ingot_tier_5"
+        },
+        "B": {
+            "item": "useless_mod:useless_ingot_tier_4"
+        },
+        "C": {
+            "item": "useless_mod:useless_ingot_tier_3"
+        },
+        "D": {
+            "item": "minecraft:diamond_pickaxe"
+        },
+        "E": {
+            "item": "useless_mod:useless_ingot_tier_2"
+        },
+        "F": {
+            "item": "minecraft:netherite_pickaxe"
+        },
+        "G": {
+            "item": "useless_mod:useless_ingot_tier_1"
+        },
+        "H": {
+            "item": "minecraft:golden_carrot"
+        },
+        "I": {
+            "item": "minecraft:ghast_tear"
+        }
     },
-    "B": {
-      "item": "useless_mod:useless_ingot_tier_4"
-    },
-    "C": {
-      "item": "useless_mod:useless_ingot_tier_3"
-    },
-    "D": {
-      "item": "minecraft:diamond_pickaxe"
-    },
-    "E": {
-      "item": "useless_mod:useless_ingot_tier_2"
-    },
-    "F": {
-      "item": "minecraft:netherite_pickaxe"
-    },
-    "G": {
-      "item": "useless_mod:useless_ingot_tier_1"
-    },
-    "H": {
-      "item": "minecraft:golden_carrot"
-    },
-    "I": {
-      "item": "minecraft:ghast_tear"
+    "pattern": [
+        "ABC",
+        "DEF",
+        "IGH"
+    ],
+    "result": {
+        "count": 1,
+        "id": "useless_mod:endless_beaf_item"
     }
-  },
-  "pattern": [
-    "ABC",
-    "DEF",
-    "IGH"
-  ],
-  "result": {
-    "count": 1,
-    "id": "useless_mod:endless_beaf_item"
-  }
 }

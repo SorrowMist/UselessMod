@@ -4,7 +4,7 @@ import com.sorrowmist.useless.UselessMod;
 import com.sorrowmist.useless.api.component.UComponents;
 import com.sorrowmist.useless.api.tool.ToolTypeMode;
 import com.sorrowmist.useless.init.ModItems;
-import com.sorrowmist.useless.items.EndlessBeafItem;
+import com.sorrowmist.useless.utils.UselessItemUtils;
 import net.minecraft.core.component.DataComponentMap;
 import net.minecraft.core.component.DataComponentType;
 import net.minecraft.core.component.TypedDataComponent;
@@ -32,29 +32,19 @@ public record ToolTypeModeSwitchPacket(ToolTypeMode mode) implements CustomPacke
     public static void handle(ToolTypeModeSwitchPacket msg, IPayloadContext ctx) {
         ctx.enqueueWork(() -> {
             ServerPlayer player = (ServerPlayer) ctx.player();
-            // 检查主手和副手物品
-            ItemStack mainHandItem = player.getMainHandItem();
-            ItemStack offHandItem = player.getOffhandItem();
+            // 使用工具方法查找目标工具
             ItemStack targetItem = null;
-
             InteractionHand targetHand = null;
 
-            // 检查主手
-            ResourceLocation mainItemId = BuiltInRegistries.ITEM.getKey(mainHandItem.getItem());
-            // TODO omni_wrench 处理
-            if (mainHandItem.getItem() instanceof EndlessBeafItem) {
-                targetItem = mainHandItem;
-                targetHand = InteractionHand.MAIN_HAND;
-            } else if (offHandItem.getItem() instanceof EndlessBeafItem) {
-                // 检查副手
-                // TODO omni_wrench 处理
-//                ResourceLocation offItemId = BuiltInRegistries.ITEM.getKey(offHandItem.getItem());
-                targetItem = offHandItem;
-                targetHand = InteractionHand.OFF_HAND;
+            var toolEntry = UselessItemUtils.findTargetToolInHands(player);
+            if (toolEntry.isPresent()) {
+                var entry = toolEntry.get();
+                targetItem = entry.getKey();
+                targetHand = entry.getValue();
             }
 
             // 如果找到了目标物品
-            if (targetItem != null && targetHand != null) {
+            if (targetItem != null) {
                 ItemStack newStack = switch (msg.mode) {
                     case WRENCH_MODE -> new ItemStack(ModItems.ENDLESS_BEAF_WRENCH.get());
                     case SCREWDRIVER_MODE -> new ItemStack(ModItems.ENDLESS_BEAF_SCREWDRIVER.get());
@@ -64,7 +54,9 @@ public record ToolTypeModeSwitchPacket(ToolTypeMode mode) implements CustomPacke
                     case OMNITOOL_MODE -> {
                         ResourceLocation omnitoolId = ResourceLocation.fromNamespaceAndPath("omnitools", "omni_wrench");
                         if (BuiltInRegistries.ITEM.containsKey(omnitoolId)) {
-                            yield new ItemStack(BuiltInRegistries.ITEM.get(omnitoolId));
+                            ItemStack itemStack = new ItemStack(BuiltInRegistries.ITEM.get(omnitoolId));
+                            itemStack.set(UComponents.CurrentToolTypeComponent, ToolTypeMode.OMNITOOL_MODE);
+                            yield itemStack;
                         } else {
                             yield new ItemStack(ModItems.ENDLESS_BEAF_WRENCH.get());
                         }

@@ -25,7 +25,6 @@ import java.util.EnumSet;
 import java.util.List;
 
 public class ModeWheelScreen extends Screen {
-
     private static final float DISC_RADIUS = 60.0f;
     private static final float DISC_SPACING = 150.0f;
     private static final float PRECISION = 5.0f;
@@ -33,20 +32,20 @@ public class ModeWheelScreen extends Screen {
     private static final int COL_ACTIVE_R = 80, COL_ACTIVE_G = 180, COL_ACTIVE_B = 80, COL_ACTIVE_A = 140;
     private static final int COL_HOVER_R = 63, COL_HOVER_G = 161, COL_HOVER_B = 191, COL_HOVER_A = 160;
 
+    private static final boolean hasGtceuMod = ModList.get().isLoaded("gtceu");
+    private static final boolean hasOmnitoolMod = ModList.get().isLoaded("omnitools");
     private final ItemStack mainHandItem;
-    private final boolean showMiddleDisc;
-
     private final List<ModeData> leftModes = new ArrayList<>();
     private final List<ModeData> middleModes = new ArrayList<>();
     private final List<ModeData> rightModes = new ArrayList<>();
-
+    private boolean showMiddleDisc;
     private float totalTime, prevTick, extraTick;
 
     public ModeWheelScreen(ItemStack mainHandItem) {
         super(Component.literal("Mode Wheel"));
         this.mainHandItem = mainHandItem;
         this.minecraft = Minecraft.getInstance();
-        this.showMiddleDisc = ModList.get().isLoaded("gtceu");
+        this.showMiddleDisc = false;
         this.loadModesFromEnums();
     }
 
@@ -68,9 +67,23 @@ public class ModeWheelScreen extends Screen {
         for (EnchantMode m : EnchantMode.values())
             this.leftModes.add(new ModeData(m, m.getTooltip(), m == currentEnchant));
 
-        // 中：工具形态
-        for (ToolTypeMode m : ToolTypeMode.values())
-            this.middleModes.add(new ModeData(m, m.getTooltip(), m == currentTool));
+        for (ToolTypeMode m : ToolTypeMode.values()) {
+            boolean shouldAdd = switch (m) {
+                // NONE_MODE
+                case NONE_MODE -> true;
+                // gtceu
+                case WRENCH_MODE, SCREWDRIVER_MODE, MALLET_MODE, CROWBAR_MODE, HAMMER_MODE -> hasGtceuMod;
+                // omnitool
+                case OMNITOOL_MODE -> hasOmnitoolMod;
+            };
+            // 根据模式类型和模组依赖决定是否添加
+            if (shouldAdd) {
+                this.middleModes.add(new ModeData(m, m.getTooltip(), m == currentTool));
+            }
+        }
+
+        // 如果有可用的工具模式，则显示中间轮盘
+        this.showMiddleDisc = !this.middleModes.isEmpty();
 
         // 右：功能模式（分组后的 3 个）
         for (FunctionMode m : FunctionMode.getTooltipDisplayGroups()) {
@@ -169,7 +182,7 @@ public class ModeWheelScreen extends Screen {
         if (this.totalTime < 0.25f)
             this.extraTick++;
 
-        // G 松开 → 自动关闭（与 1.20 完全一致）
+        // G 松开 → 自动关闭
         if (!InputConstants.isKeyDown(
                 Minecraft.getInstance().getWindow().getWindow(),
                 InputConstants.KEY_G

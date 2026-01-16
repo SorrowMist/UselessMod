@@ -1,7 +1,13 @@
 package com.sorrowmist.useless.utils;
 
+import com.sorrowmist.useless.api.component.UComponents;
+import com.sorrowmist.useless.api.tool.ToolTypeMode;
 import com.sorrowmist.useless.config.ConfigManager;
+import com.sorrowmist.useless.items.EndlessBeafItem;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.InteractionHand;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.LivingEntity;
@@ -11,9 +17,11 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.neoforged.neoforge.event.entity.living.LivingDropsEvent;
 
+import java.util.AbstractMap.SimpleImmutableEntry;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 
 public class UselessItemUtils {
     public static void applyEndlessBeafEffects(Player player) {
@@ -106,5 +114,49 @@ public class UselessItemUtils {
                     true
             );
         }
+    }
+
+    /**
+     * 检查物品是否是目标工具（牛排或特定模式的omnitools扳手）
+     */
+    private static boolean isTargetTool(ItemStack itemStack) {
+        if (itemStack.isEmpty()) {
+            return false;
+        }
+
+        // 检查是否是永恒牛排工具
+        if (itemStack.getItem() instanceof EndlessBeafItem) {
+            return true;
+        }
+
+        // 检查是否是omnitools扳手且处于正确模式
+        ResourceLocation itemId = BuiltInRegistries.ITEM.getKey(itemStack.getItem());
+        return itemId.getNamespace().equals("omnitools")
+                && itemStack.get(UComponents.CurrentToolTypeComponent) == ToolTypeMode.OMNITOOL_MODE;
+    }
+
+    /**
+     * 从玩家的主手和副手中查找目标工具
+     * 返回包含目标物品和对应手的Optional
+     */
+    public static Optional<SimpleImmutableEntry<ItemStack, InteractionHand>> findTargetToolInHands(Player player) {
+        if (player == null) {
+            return Optional.empty();
+        }
+
+        ItemStack mainHandItem = player.getMainHandItem();
+        ItemStack offHandItem = player.getOffhandItem();
+
+        // 检查主手
+        if (isTargetTool(mainHandItem)) {
+            return Optional.of(new SimpleImmutableEntry<>(mainHandItem, InteractionHand.MAIN_HAND));
+        }
+
+        // 检查副手
+        if (isTargetTool(offHandItem)) {
+            return Optional.of(new SimpleImmutableEntry<>(offHandItem, InteractionHand.OFF_HAND));
+        }
+
+        return Optional.empty();
     }
 }

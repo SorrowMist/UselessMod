@@ -94,9 +94,7 @@ public class BlockBreakUtils {
                     .collect(Collectors.toList());
 
         } catch (Exception e) {
-            // 记录错误但不崩溃
-            UselessMod.LOGGER.debug("Failed to get drops for block {} at {}: {}",
-                    ForgeRegistries.BLOCKS.getKey(state.getBlock()), pos, e.getMessage());
+            // 忽略错误但不崩溃
             return Collections.emptyList();
         }
     }

@@ -108,8 +108,6 @@ public class UselessTab {
                             safelyAddItem(pOutput, ThermalParallelItems.AUGMENT_PARALLEL_1);
                             safelyAddItem(pOutput, ThermalParallelItems.AUGMENT_PARALLEL_2);
                             safelyAddItem(pOutput, ThermalParallelItems.AUGMENT_PARALLEL_3);
-                        } else {
-                            UselessMod.LOGGER.debug("热力系列模组未安装，跳过 Thermal 相关物品添加到创造标签");
                         }
                     }))
                     .build());
@@ -127,7 +125,7 @@ public class UselessTab {
                 }
             }
         } catch (Exception e) {
-            UselessMod.LOGGER.warn("无法添加物品到创造标签: {}", itemRegistryObject.getId(), e);
+            // 忽略无法添加的物品
         }
     }
 }

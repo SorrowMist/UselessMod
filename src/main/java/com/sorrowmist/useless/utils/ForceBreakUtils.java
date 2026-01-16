@@ -160,7 +160,6 @@ public class ForceBreakUtils {
                             }
                         } catch (Exception e) {
                             // 如果反射方法失败，尝试方法2：直接操作NBT数据
-                            UselessMod.LOGGER.debug("Reflection method failed, trying NBT method: {}", e.getMessage());
                         }
                         
                         // 方法2：直接操作NBT数据清理升级槽位
@@ -192,8 +191,7 @@ public class ForceBreakUtils {
                         blockEntity.setChanged();
                     }
                 } catch (Exception e) {
-                    // 如果处理失败，记录错误但继续执行
-                    UselessMod.LOGGER.debug("Failed to handle container before break: {}", e.getMessage());
+                    // 如果处理失败，忽略错误但继续执行
                 }
             }
         }
@@ -353,15 +351,13 @@ public class ForceBreakUtils {
                         return true;
                     }
                 } catch (Exception e) {
-                    // 如果任何步骤失败，回退到正常的强制挖掘逻辑
-                    UselessMod.LOGGER.debug("Failed to handle Chaos Crystal drops: {}", e.getMessage());
-                }
+                            // 如果任何步骤失败，回退到正常的强制挖掘逻辑
+                        }
             }
         } catch (ClassNotFoundException e) {
             // 如果Draconic Evolution模组没有安装，忽略此处理
         } catch (Exception e) {
-            // 记录其他异常但不崩溃
-            UselessMod.LOGGER.debug("Error handling Chaos Crystal: {}", e.getMessage());
+            // 忽略其他异常但不崩溃
         }
 
         return false;

@@ -85,7 +85,6 @@ public class PatternProviderEvent {
                         }
                     } catch (Exception e) {
                         // 忽略任何异常，确保不会因为可选模组缺失而崩溃
-                        UselessMod.LOGGER.debug("Error clearing patterns on block drop: {}", e.getMessage());
                     }
                 }
                 break;
@@ -189,7 +188,7 @@ public class PatternProviderEvent {
                 }
             }
         } catch (Exception e) {
-            UselessMod.LOGGER.error("清空样板供应器样板失败: {}", e.getMessage());
+            // 忽略清空样板失败的异常
         }
     }
 }

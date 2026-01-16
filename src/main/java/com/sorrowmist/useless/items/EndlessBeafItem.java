@@ -479,7 +479,6 @@ public class EndlessBeafItem extends PickaxeItem {
         EndlessBeafItem tool = (EndlessBeafItem) toolItem.getItem();
         boolean isAEStoragePriority = tool.isAEStoragePriorityMode(toolItem);
         if (!isAEStoragePriority) {
-            UselessMod.LOGGER.debug("AE存储优先模式未启用，工具: {}", toolItem);
             return false;
         }
         
@@ -488,21 +487,18 @@ public class EndlessBeafItem extends PickaxeItem {
             // 获取链接的网格
             IGrid grid = getLinkedGrid(toolItem, player.level(), player);
             if (grid == null) {
-                UselessMod.LOGGER.debug("无法获取AE网格，工具: {}", toolItem);
                 return false;
             }
             
             // 获取物品存储处理程序
             MEStorage storage = grid.getStorageService().getInventory();
             if (storage == null) {
-                UselessMod.LOGGER.debug("无法获取AE存储服务，工具: {}", toolItem);
                 return false;
             }
             
             // 转换为AE物品栈
             AEItemKey aeKey = AEItemKey.of(stack);
             if (aeKey == null) {
-                UselessMod.LOGGER.debug("无法转换为AE物品键，物品: {}", stack);
                 return false;
             }
             
@@ -510,19 +506,15 @@ public class EndlessBeafItem extends PickaxeItem {
             long inserted = storage.insert(aeKey, stack.getCount(), appeng.api.config.Actionable.MODULATE, new PlayerSource(player, null));
             // 如果插入的数量等于物品栈数量，说明全部存入
             if (inserted == stack.getCount()) {
-                UselessMod.LOGGER.debug("成功存入AE网络，物品: {}，数量: {}", stack, inserted);
                 return true;
             } else if (inserted > 0) {
                 // 更新物品栈为剩余数量
                 stack.setCount((int) (stack.getCount() - inserted));
-                UselessMod.LOGGER.debug("部分存入AE网络，物品: {}，存入: {}，剩余: {}", stack.getItem(), inserted, stack.getCount());
                 return stack.isEmpty();
             } else {
-                UselessMod.LOGGER.debug("AE网络存储失败，物品: {}，插入数量: 0", stack);
                 return false;
             }
         } catch (Exception e) {
-            UselessMod.LOGGER.debug("AE存储过程中出现异常: {}", e.getMessage());
             // 忽略任何异常
         }
         

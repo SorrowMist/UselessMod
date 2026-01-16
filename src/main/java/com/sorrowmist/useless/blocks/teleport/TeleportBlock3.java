@@ -106,8 +106,6 @@ public class TeleportBlock3 {
         int searchRadius = 16;
         BlockPos.MutableBlockPos searchPos = new BlockPos.MutableBlockPos();
 
-        UselessMod.LOGGER.info("开始在位置 {} 附近搜索传送方块", sourcePos);
-
         // 优先搜索同一Y层和相邻层
         int[] priorityYLevels = {
                 sourcePos.getY(),      // 同一层 (最高优先级)
@@ -127,37 +125,26 @@ public class TeleportBlock3 {
 
             BlockPos found = searchAtYLevel(level, sourcePos, y, searchRadius);
             if (found != null) {
-                UselessMod.LOGGER.info("在Y层 {} 找到传送方块: {}", y, found);
                 return found;
             }
         }
 
         // 如果优先级层次没找到，向下扩展搜索（地下可能有很多传送方块）
-        UselessMod.LOGGER.info("在主要层次未找到，向下扩展搜索");
         for (int y = sourcePos.getY() - 4; y >= level.getMinBuildHeight() + 1; y--) {
             BlockPos found = searchAtYLevel(level, sourcePos, y, searchRadius);
             if (found != null) {
-                UselessMod.LOGGER.info("在下方Y层 {} 找到传送方块: {}", y, found);
                 return found;
-            }
-
-            // 每搜索5层输出一次进度
-            if ((sourcePos.getY() - y) % 5 == 0) {
-                UselessMod.LOGGER.debug("已向下搜索到Y层 {}", y);
             }
         }
 
         // 最后向上搜索（作为备选）
-        UselessMod.LOGGER.info("向下搜索未找到，向上扩展搜索");
         for (int y = sourcePos.getY() + 4; y < level.getMaxBuildHeight() - 10; y++) {
             BlockPos found = searchAtYLevel(level, sourcePos, y, searchRadius);
             if (found != null) {
-                UselessMod.LOGGER.info("在上方Y层 {} 找到传送方块: {}", y, found);
                 return found;
             }
         }
 
-        UselessMod.LOGGER.info("未找到现有传送方块，创建新的");
         return createTeleportBlockFast(level, sourcePos);
     }
 
@@ -196,11 +183,7 @@ public class TeleportBlock3 {
             }
         }
 
-        boolean isValid = level.getBlockState(pos).getBlock() == TELEPORT_BLOCK_3.get();
-        if (isValid) {
-            UselessMod.LOGGER.debug("验证传送方块在位置 {}: {}", pos, isValid);
-        }
-        return isValid;
+        return level.getBlockState(pos).getBlock() == TELEPORT_BLOCK_3.get();
     }
 
     private static BlockPos createTeleportBlockFast(ServerLevel level, BlockPos sourcePos) {

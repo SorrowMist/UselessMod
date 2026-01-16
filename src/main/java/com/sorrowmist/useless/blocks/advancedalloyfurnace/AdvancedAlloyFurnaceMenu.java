@@ -20,15 +20,19 @@ public class AdvancedAlloyFurnaceMenu extends AbstractContainerMenu {
     private final ContainerData data;
 
     // 新的槽位布局常量 - 根据新贴图调整
-    // 输入槽位 (6个)
+    // 输入槽位 (9个，三行三列)
     private static final int INPUT_SLOTS_X = 8;
-    private static final int INPUT_SLOTS_FIRST_Y = 23;
-    private static final int INPUT_SLOT_SPACING = 18; // 槽位高度18像素
+    private static final int INPUT_SLOTS_FIRST_Y = 18;
+    private static final int INPUT_SLOT_WIDTH = 16;
+    private static final int INPUT_SLOT_HEIGHT = 16;
+    private static final int INPUT_SLOT_SPACING = 2; // 槽位间隔2像素
 
-    // 输出槽位 (6个)
-    private static final int OUTPUT_SLOTS_X = 153;
-    private static final int OUTPUT_SLOTS_FIRST_Y = 23;
-    private static final int OUTPUT_SLOT_SPACING = 18; // 槽位高度18像素
+    // 输出槽位 (9个，三行三列)
+    private static final int OUTPUT_SLOTS_X = 116;
+    private static final int OUTPUT_SLOTS_FIRST_Y = 113;
+    private static final int OUTPUT_SLOT_WIDTH = 16;
+    private static final int OUTPUT_SLOT_HEIGHT = 16;
+    private static final int OUTPUT_SLOT_SPACING = 2; // 槽位间隔2像素
 
     // 流体槽位 - 根据新贴图调整
     private static final int FLUID_INPUT_X = 10;
@@ -36,10 +40,10 @@ public class AdvancedAlloyFurnaceMenu extends AbstractContainerMenu {
     private static final int FLUID_Y = 143;
 
     // 新增：催化剂和模具槽位位置
-    private static final int CATALYST_SLOT_X = 60;  // 位于流体输入和输出正中间
-    private static final int CATALYST_SLOT_Y = 150;
-    private static final int MOLD_SLOT_X = 100;      // 模具槽在催化剂槽右侧
-    private static final int MOLD_SLOT_Y = 150;
+    private static final int CATALYST_SLOT_X = 61;
+    private static final int CATALYST_SLOT_Y = 87;
+    private static final int MOLD_SLOT_X = 99;
+    private static final int MOLD_SLOT_Y = 87;
 
     // 指示灯位置
     private static final int INDICATOR_Y_OFFSET = -8; // 槽位上方2像素
@@ -78,30 +82,40 @@ public class AdvancedAlloyFurnaceMenu extends AbstractContainerMenu {
             this.blockEntity = (AdvancedAlloyFurnaceBlockEntity) blockEntity;
         } else {
             this.blockEntity = null;
-            UselessMod.LOGGER.warn("AdvancedAlloyFurnaceMenu created with invalid block entity: {}", blockEntity);
+
         }
 
         // 只有在方块实体存在时才添加物品槽位
         if (this.blockEntity != null) {
             // 在添加机器槽位时使用HighStackSlot
             this.blockEntity.getCapability(ForgeCapabilities.ITEM_HANDLER).ifPresent(handler -> {
-                // 输入槽位 (0-5) - 使用HighStackSlot
-                for (int i = 0; i < 6; i++) {
-                    this.addSlot(new HighStackSlot(handler, i, INPUT_SLOTS_X+1, INPUT_SLOTS_FIRST_Y + i * INPUT_SLOT_SPACING+1));
+                // 输入槽位 (0-8) - 使用HighStackSlot，三行三列布局
+                for (int row = 0; row < 3; row++) {
+                    for (int col = 0; col < 3; col++) {
+                        int slotIndex = row * 3 + col;
+                        int x = INPUT_SLOTS_X + col * (INPUT_SLOT_WIDTH + INPUT_SLOT_SPACING);
+                        int y = INPUT_SLOTS_FIRST_Y + row * (INPUT_SLOT_HEIGHT + INPUT_SLOT_SPACING);
+                        this.addSlot(new HighStackSlot(handler, slotIndex, x, y));
+                    }
                 }
 
-                // 输出槽位 (6-11) - 使用HighStackSlot
-                for (int i = 6; i < 12; i++) {
-                    this.addSlot(new HighStackSlot(handler, i, OUTPUT_SLOTS_X+1, OUTPUT_SLOTS_FIRST_Y + (i-6) * OUTPUT_SLOT_SPACING+1) {
-                        @Override
-                        public boolean mayPlace(ItemStack stack) {
-                            return false; // 输出槽不能手动放置物品
-                        }
-                    });
+                // 输出槽位 (9-17) - 使用HighStackSlot，三行三列布局
+                for (int row = 0; row < 3; row++) {
+                    for (int col = 0; col < 3; col++) {
+                        int slotIndex = 9 + row * 3 + col;
+                        int x = OUTPUT_SLOTS_X + col * (OUTPUT_SLOT_WIDTH + OUTPUT_SLOT_SPACING);
+                        int y = OUTPUT_SLOTS_FIRST_Y + row * (OUTPUT_SLOT_HEIGHT + OUTPUT_SLOT_SPACING);
+                        this.addSlot(new HighStackSlot(handler, slotIndex, x, y) {
+                            @Override
+                            public boolean mayPlace(ItemStack stack) {
+                                return false; // 输出槽不能手动放置物品
+                            }
+                        });
+                    }
                 }
 
-                // 催化剂槽 (12) - 使用HighStackSlot
-                this.addSlot(new HighStackSlot(handler, 12, CATALYST_SLOT_X+1, CATALYST_SLOT_Y+1) {
+                // 催化剂槽 (18) - 使用HighStackSlot
+                this.addSlot(new HighStackSlot(handler, 18, CATALYST_SLOT_X, CATALYST_SLOT_Y) {
                     @Override
                     public boolean mayPlace(ItemStack stack) {
                         if (blockEntity instanceof AdvancedAlloyFurnaceBlockEntity furnace) {
@@ -111,14 +125,12 @@ public class AdvancedAlloyFurnaceMenu extends AbstractContainerMenu {
                     }
                 });
 
-                // 模具槽 (13) - 使用HighStackSlot
-                this.addSlot(new HighStackSlot(handler, 13, MOLD_SLOT_X+1, MOLD_SLOT_Y+1) {
+                // 模具槽 (19) - 使用HighStackSlot
+                this.addSlot(new HighStackSlot(handler, 19, MOLD_SLOT_X, MOLD_SLOT_Y) {
                     @Override
                     public boolean mayPlace(ItemStack stack) {
-                        if (blockEntity instanceof AdvancedAlloyFurnaceBlockEntity furnace) {
-                            return furnace.isAcceptableMarker(stack);
-                        }
-                        return false;
+                        // 模具槽可以接受任何物品
+                        return true;
                     }
                 });
             });
@@ -138,18 +150,22 @@ public class AdvancedAlloyFurnaceMenu extends AbstractContainerMenu {
     }
 
     private void addPlayerInventory(Inventory playerInventory) {
-        // 主物品栏 (27个) - 3行9列，根据新贴图调整位置
+        // 主物品栏 (27个) - 3行9列，根据新贴图调整位置：起点8，174，大小16*16，间隔2
         for (int i = 0; i < 3; ++i) {
             for (int j = 0; j < 9; ++j) {
-                this.addSlot(new Slot(playerInventory, j + i * 9 + 9, 9 + j * 18, 192 + i * 18));
+                int x = 8 + j * (16 + 2);
+                int y = 174 + i * (16 + 2);
+                this.addSlot(new Slot(playerInventory, j + i * 9 + 9, x, y));
             }
         }
     }
 
     private void addPlayerHotbar(Inventory playerInventory) {
-        // 快捷栏 (9个) - 根据新贴图调整位置
+        // 快捷栏 (9个) - 根据新贴图调整位置：起点8，232，大小16*16，间隔2
         for (int i = 0; i < 9; ++i) {
-            this.addSlot(new Slot(playerInventory, i, 9 + i * 18, 250));
+            int x = 8 + i * (16 + 2);
+            int y = 232;
+            this.addSlot(new Slot(playerInventory, i, x, y));
         }
     }
 
@@ -168,21 +184,21 @@ public class AdvancedAlloyFurnaceMenu extends AbstractContainerMenu {
 
             // 定义槽位范围
             final int MACHINE_INPUT_START = 0;
-            final int MACHINE_INPUT_END = 5;
-            final int MACHINE_OUTPUT_START = 6;
-            final int MACHINE_OUTPUT_END = 11;
-            final int CATALYST_SLOT = 12;
-            final int MOLD_SLOT = 13;
-            final int PLAYER_INVENTORY_START = 14;
-            final int PLAYER_INVENTORY_END = 40;
-            final int PLAYER_HOTBAR_START = 41;
-            final int PLAYER_HOTBAR_END = 49;
+            final int MACHINE_INPUT_END = 8;
+            final int MACHINE_OUTPUT_START = 9;
+            final int MACHINE_OUTPUT_END = 17;
+            final int CATALYST_SLOT = 18;
+            final int MOLD_SLOT = 19;
+            final int PLAYER_INVENTORY_START = 20;
+            final int PLAYER_INVENTORY_END = 46;
+            final int HOTBAR_START = 47;
+            final int HOTBAR_END = 55;
 
             // 从机器输出槽转移到玩家物品栏
             if (index >= MACHINE_OUTPUT_START && index <= MACHINE_OUTPUT_END) {
                 // 输出槽可以转移到玩家物品栏的任何位置
                 ItemStack originalStack = stackInSlot.copy();
-                if (!this.moveItemStackTo(stackInSlot, PLAYER_INVENTORY_START, PLAYER_HOTBAR_END + 1, true)) {
+                if (!this.moveItemStackTo(stackInSlot, PLAYER_INVENTORY_START, HOTBAR_END + 1, true)) {
                     return ItemStack.EMPTY;
                 }
                 // 修复：根据转移后的剩余数量更新实际槽位
@@ -192,7 +208,7 @@ public class AdvancedAlloyFurnaceMenu extends AbstractContainerMenu {
             // 从催化剂槽转移到玩家物品栏
             else if (index == CATALYST_SLOT) {
                 ItemStack originalStack = stackInSlot.copy();
-                if (!this.moveItemStackTo(stackInSlot, PLAYER_INVENTORY_START, PLAYER_HOTBAR_END + 1, true)) {
+                if (!this.moveItemStackTo(stackInSlot, PLAYER_INVENTORY_START, HOTBAR_END + 1, true)) {
                     return ItemStack.EMPTY;
                 }
                 // 修复：根据转移后的剩余数量更新实际槽位
@@ -202,7 +218,7 @@ public class AdvancedAlloyFurnaceMenu extends AbstractContainerMenu {
             // 从模具槽转移到玩家物品栏
             else if (index == MOLD_SLOT) {
                 ItemStack originalStack = stackInSlot.copy();
-                if (!this.moveItemStackTo(stackInSlot, PLAYER_INVENTORY_START, PLAYER_HOTBAR_END + 1, true)) {
+                if (!this.moveItemStackTo(stackInSlot, PLAYER_INVENTORY_START, HOTBAR_END + 1, true)) {
                     return ItemStack.EMPTY;
                 }
                 // 修复：根据转移后的剩余数量更新实际槽位
@@ -213,7 +229,7 @@ public class AdvancedAlloyFurnaceMenu extends AbstractContainerMenu {
             else if (index >= MACHINE_INPUT_START && index <= MACHINE_INPUT_END) {
                 // 输入槽转移到玩家物品栏的任何位置
                 ItemStack originalStack = stackInSlot.copy();
-                if (!this.moveItemStackTo(stackInSlot, PLAYER_INVENTORY_START, PLAYER_HOTBAR_END + 1, true)) {
+                if (!this.moveItemStackTo(stackInSlot, PLAYER_INVENTORY_START, HOTBAR_END + 1, true)) {
                     return ItemStack.EMPTY;
                 }
                 // 修复：根据转移后的剩余数量更新实际槽位
@@ -221,9 +237,8 @@ public class AdvancedAlloyFurnaceMenu extends AbstractContainerMenu {
                 slot.onQuickCraft(originalStack, itemstack);
             }
             // 从玩家物品栏转移到机器
-            else if (index >= PLAYER_INVENTORY_START && index <= PLAYER_HOTBAR_END) {
+            else if (index >= PLAYER_INVENTORY_START && index <= HOTBAR_END) {
                 boolean isUselessIngot = blockEntity.isUselessIngot(stackInSlot);
-                boolean isAcceptableMarker = blockEntity.isAcceptableMarker(stackInSlot);
 
                 // 根据物品类型决定转移目标
                 if (isUselessIngot) {
@@ -231,24 +246,22 @@ public class AdvancedAlloyFurnaceMenu extends AbstractContainerMenu {
                     if (!this.moveItemStackTo(stackInSlot, CATALYST_SLOT, CATALYST_SLOT + 1, false)) {
                         return ItemStack.EMPTY;
                     }
-                } else if (isAcceptableMarker) {
-                    // 可接受的标志物(模具或机器标志物)只能转移到模具槽
-                    if (!this.moveItemStackTo(stackInSlot, MOLD_SLOT, MOLD_SLOT + 1, false)) {
-                        return ItemStack.EMPTY;
-                    }
                 } else {
-                    // 其他物品只能转移到机器输入槽
+                    // 先尝试转移到输入槽
                     if (!this.moveItemStackTo(stackInSlot, MACHINE_INPUT_START, MACHINE_INPUT_END + 1, false)) {
-                        // 如果无法转移到输入槽，尝试转移到玩家物品栏的其他位置
-                        if (index >= PLAYER_INVENTORY_START && index <= PLAYER_INVENTORY_END) {
-                            // 从主物品栏转移到快捷栏
-                            if (!this.moveItemStackTo(stackInSlot, PLAYER_HOTBAR_START, PLAYER_HOTBAR_END + 1, false)) {
-                                return ItemStack.EMPTY;
-                            }
-                        } else if (index >= PLAYER_HOTBAR_START && index <= PLAYER_HOTBAR_END) {
-                            // 从快捷栏转移到主物品栏
-                            if (!this.moveItemStackTo(stackInSlot, PLAYER_INVENTORY_START, PLAYER_INVENTORY_END + 1, false)) {
-                                return ItemStack.EMPTY;
+                        // 如果无法转移到输入槽，尝试转移到模具槽
+                        if (!this.moveItemStackTo(stackInSlot, MOLD_SLOT, MOLD_SLOT + 1, false)) {
+                            // 如果仍无法转移，尝试转移到玩家物品栏的其他位置
+                            if (index >= PLAYER_INVENTORY_START && index <= PLAYER_INVENTORY_END) {
+                                // 从主物品栏转移到快捷栏
+                                if (!this.moveItemStackTo(stackInSlot, HOTBAR_START, HOTBAR_END + 1, false)) {
+                                    return ItemStack.EMPTY;
+                                }
+                            } else if (index >= HOTBAR_START && index <= HOTBAR_END) {
+                                // 从快捷栏转移到主物品栏
+                                if (!this.moveItemStackTo(stackInSlot, PLAYER_INVENTORY_START, PLAYER_INVENTORY_END + 1, false)) {
+                                    return ItemStack.EMPTY;
+                                }
                             }
                         }
                     }

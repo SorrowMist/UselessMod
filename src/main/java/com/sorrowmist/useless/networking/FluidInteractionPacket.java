@@ -16,12 +16,18 @@ public class FluidInteractionPacket {
     private final boolean isInputTank;
     private final boolean isFill;
     private final int button;
+    private final int tankIndex;
 
     public FluidInteractionPacket(BlockPos pos, boolean isInputTank, boolean isFill, int button) {
+        this(pos, isInputTank, isFill, button, 0);
+    }
+    
+    public FluidInteractionPacket(BlockPos pos, boolean isInputTank, boolean isFill, int button, int tankIndex) {
         this.pos = pos;
         this.isInputTank = isInputTank;
         this.isFill = isFill;
         this.button = button;
+        this.tankIndex = tankIndex;
     }
 
     public static void encode(FluidInteractionPacket packet, FriendlyByteBuf buffer) {
@@ -29,6 +35,7 @@ public class FluidInteractionPacket {
         buffer.writeBoolean(packet.isInputTank);
         buffer.writeBoolean(packet.isFill);
         buffer.writeInt(packet.button);
+        buffer.writeInt(packet.tankIndex);
     }
 
     public static FluidInteractionPacket decode(FriendlyByteBuf buffer) {
@@ -36,6 +43,7 @@ public class FluidInteractionPacket {
                 buffer.readBlockPos(),
                 buffer.readBoolean(),
                 buffer.readBoolean(),
+                buffer.readInt(),
                 buffer.readInt()
         );
     }
@@ -50,7 +58,7 @@ public class FluidInteractionPacket {
                     if (blockEntity instanceof AdvancedAlloyFurnaceBlockEntity furnace) {
                         ItemStack carried = player.containerMenu.getCarried();
                         if (!carried.isEmpty()) {
-                            furnace.interactWithFluid(player, carried, packet.isInputTank, packet.isFill);
+                            furnace.interactWithFluid(player, carried, packet.isInputTank, packet.isFill, packet.tankIndex);
                             // 更新客户端手持物品
                             player.containerMenu.setCarried(carried);
                         }

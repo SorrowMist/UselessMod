@@ -71,7 +71,7 @@ public class PatternProviderOperation {
                         }
                     }
                 } catch (Exception e) {
-                    UselessMod.LOGGER.error("检查面板形式样板供应器失败: {}", e.getMessage());
+                    // 忽略检查失败的异常
                 }
             }
         }
@@ -175,7 +175,7 @@ public class PatternProviderOperation {
                         }
                     }
                 } catch (Exception e) {
-                    UselessMod.LOGGER.error("检查从端面板形式样板供应器失败: {}", e.getMessage());
+                    // 忽略检查失败的异常
                 }
             }
         }
@@ -381,9 +381,8 @@ public class PatternProviderOperation {
                             }
                         }
                     } catch (Exception e) {
-                        // 忽略任何异常，确保不会因为可选模组缺失而崩溃
-                        UselessMod.LOGGER.debug("Error setting slave pattern provider config: {}", e.getMessage());
-                    }
+                // 忽略任何异常，确保不会因为可选模组缺失而崩溃
+            }
                 }
             }
             

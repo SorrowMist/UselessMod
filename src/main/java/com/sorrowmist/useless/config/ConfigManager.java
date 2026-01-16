@@ -100,11 +100,11 @@ public class ConfigManager {
 
         CHAIN_MINING_RANGE_X = BUILDER
                 .comment("连锁挖掘的X轴范围半径")
-                .defineInRange("连锁挖掘X轴范围", 8, 1, 32);
+                .defineInRange("连锁挖掘X轴范围", 8, 1, 255);
 
         CHAIN_MINING_RANGE_Y = BUILDER
                 .comment("连锁挖掘的Y轴范围半径")
-                .defineInRange("连锁挖掘Y轴范围", 8, 1, 32);
+                .defineInRange("连锁挖掘Y轴范围", 8, 1, 255);
 
         CHAIN_MINING_RANGE_Z = BUILDER
                 .comment("连锁挖掘的Z轴范围半径")

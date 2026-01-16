@@ -124,17 +124,16 @@ public class UselessMod {
         modEventBus.addListener((FMLCommonSetupEvent event) -> {
             event.enqueueWork(() -> {
                 try {
-                    // 注册EndlessBeafItem的GridLinkableHandler，使其可以与无线访问点绑定
-                    GridLinkables.register(EndlessBeafItem.ENDLESS_BEAF_ITEM.get(), EndlessBeafItem.LINKABLE_HANDLER);
-                    GridLinkables.register(EndlessBeafItem.ENDLESS_BEAF_WRENCH.get(), EndlessBeafItem.LINKABLE_HANDLER);
-                    GridLinkables.register(EndlessBeafItem.ENDLESS_BEAF_SCREWDRIVER.get(), EndlessBeafItem.LINKABLE_HANDLER);
-                    GridLinkables.register(EndlessBeafItem.ENDLESS_BEAF_MALLET.get(), EndlessBeafItem.LINKABLE_HANDLER);
-                    GridLinkables.register(EndlessBeafItem.ENDLESS_BEAF_CROWBAR.get(), EndlessBeafItem.LINKABLE_HANDLER);
-                    GridLinkables.register(EndlessBeafItem.ENDLESS_BEAF_HAMMER.get(), EndlessBeafItem.LINKABLE_HANDLER);
-                    UselessMod.LOGGER.info("Successfully registered GridLinkableHandler for EndlessBeafItem");
-                } catch (Exception e) {
-                    UselessMod.LOGGER.error("Failed to register GridLinkableHandler for EndlessBeafItem: {}", e.getMessage());
-                }
+                        // 注册EndlessBeafItem的GridLinkableHandler，使其可以与无线访问点绑定
+                        GridLinkables.register(EndlessBeafItem.ENDLESS_BEAF_ITEM.get(), EndlessBeafItem.LINKABLE_HANDLER);
+                        GridLinkables.register(EndlessBeafItem.ENDLESS_BEAF_WRENCH.get(), EndlessBeafItem.LINKABLE_HANDLER);
+                        GridLinkables.register(EndlessBeafItem.ENDLESS_BEAF_SCREWDRIVER.get(), EndlessBeafItem.LINKABLE_HANDLER);
+                        GridLinkables.register(EndlessBeafItem.ENDLESS_BEAF_MALLET.get(), EndlessBeafItem.LINKABLE_HANDLER);
+                        GridLinkables.register(EndlessBeafItem.ENDLESS_BEAF_CROWBAR.get(), EndlessBeafItem.LINKABLE_HANDLER);
+                        GridLinkables.register(EndlessBeafItem.ENDLESS_BEAF_HAMMER.get(), EndlessBeafItem.LINKABLE_HANDLER);
+                    } catch (Exception e) {
+                        // Ignore exception if GridLinkables registration fails
+                    }
             });
         });
     }
@@ -145,7 +144,6 @@ public class UselessMod {
     private void registerConfig() {
         // 注册通用配置
         ModLoadingContext.get().registerConfig(ModConfig.Type.COMMON, ConfigManager.SPEC, "useless_mod-common.toml");
-        LOGGER.info("已注册 TOML 配置文件");
     }
 
     // 在模组主类中添加网络注册
@@ -176,14 +174,6 @@ public class UselessMod {
      * 通用设置
      */
     private void commonSetup(final FMLCommonSetupEvent event) {
-        // 在通用设置中记录配置信息
-        LOGGER.info("植物盆生长倍率: {}", ConfigManager.getBotanyPotGrowthMultiplier());
-        LOGGER.info("边框方块: {}", ConfigManager.getBorderBlock());
-        LOGGER.info("填充方块: {}", ConfigManager.getFillBlock());
-        LOGGER.info("中心方块: {}", ConfigManager.getCenterBlock());
-        // 添加矩阵样板数量到日志
-        LOGGER.info("矩阵样板数量: {}", ConfigManager.getMatrixPatternCount());
-        
         // 注册EndlessBeafItem的GridLinkableHandler，使其可以与无线访问点绑定
         event.enqueueWork(() -> {
             GridLinkables.register(EndlessBeafItem.ENDLESS_BEAF_ITEM.get(), EndlessBeafItem.LINKABLE_HANDLER);
@@ -208,10 +198,6 @@ public class UselessMod {
     @SubscribeEvent
     public void onServerStarting(ServerStartingEvent event) {
         // 服务器启动时执行的操作
-        LOGGER.info("HELLO from server starting");
-        LOGGER.info("服务器配置 - 植物盆生长倍率: {}", ConfigManager.getBotanyPotGrowthMultiplier());
-        // 添加矩阵样板数量到日志
-        LOGGER.info("服务器配置 - 矩阵样板数量: {}", ConfigManager.getMatrixPatternCount());
     }
 
     /**
@@ -244,9 +230,6 @@ public class UselessMod {
         @SubscribeEvent
         public static void onClientSetup(FMLClientSetupEvent event) {
             // 客户端设置
-            LOGGER.info("客户端配置 - 植物盆生长倍率: {}", ConfigManager.getBotanyPotGrowthMultiplier());
-            // 添加矩阵样板数量到日志
-            LOGGER.info("客户端配置 - 矩阵样板数量: {}", ConfigManager.getMatrixPatternCount());
             // 注册物品模型属性
             event.enqueueWork(() -> {
                 registerItemModelProperties();
@@ -321,8 +304,6 @@ public class UselessMod {
                         }
                         return 0.0F;
                     });
-
-            LOGGER.info("已注册所有EndlessBeafItem模型属性");
         }
     }
     // 调试模式

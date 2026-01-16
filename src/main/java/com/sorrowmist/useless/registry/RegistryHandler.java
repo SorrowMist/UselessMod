@@ -48,8 +48,6 @@ public class RegistryHandler {
         for (Runnable registry : OTHER_REGISTRIES) {
             registry.run();
         }
-
-        UselessMod.LOGGER.info("已注册 {} 个标准注册器和 {} 个其他注册器", REGISTRIES.size(), OTHER_REGISTRIES.size());
     }
 
     /**
@@ -106,11 +104,6 @@ public class RegistryHandler {
         if (ThermalDependencyHelper.isAnyThermalModLoaded()) {
             addOtherRegistry(() -> ThermalMoreItems.ITEMS.register(FMLJavaModLoadingContext.get().getModEventBus()));
             addOtherRegistry(() -> ThermalParallelItems.ITEMS.register(FMLJavaModLoadingContext.get().getModEventBus()));
-
-
-            UselessMod.LOGGER.info("检测到热力系列模组，已注册 ThermalMore、ThermalParallel 和高级机器");
-        } else {
-            UselessMod.LOGGER.info("未检测到热力系列模组，跳过 Thermal 相关物品注册");
         }
     }
 

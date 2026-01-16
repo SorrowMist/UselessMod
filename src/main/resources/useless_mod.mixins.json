@@ -11,6 +11,7 @@
   "injectors": {
     "defaultRequire": 1
   },
+  "plugin": "com.sorrowmist.useless.mixin.MixinConfigPlugin",
   "mixins": [
     "AEBaseMenuMixin",
     "BlockTravelAnchorMixin",

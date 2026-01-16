@@ -55,7 +55,6 @@ public class PatternProviderManager {
                     slaveToMaster.remove(slaveKey);
                 }
             }
-            UselessMod.LOGGER.debug("移除无效的主方块: {}", masterKey);
         }
 
         // 移除无效的从方块
@@ -70,7 +69,6 @@ public class PatternProviderManager {
                     }
                 }
             }
-            UselessMod.LOGGER.debug("移除无效的从方块: {}", slaveKey);
         }
     }
 
@@ -312,7 +310,6 @@ public class PatternProviderManager {
             syncToSlavePatternProvider(slaveBlockEntity, slaveKey.getDirection(), masterPatterns);
         } catch (Exception e) {
             // 忽略所有异常，确保不会因为可选模组缺失而崩溃
-            UselessMod.LOGGER.debug("Error syncing patterns from master: {}", e.getMessage());
         }
         
         // 更新同步时间
@@ -484,7 +481,6 @@ public class PatternProviderManager {
             }
         } catch (Exception e) {
             // 忽略所有异常
-            UselessMod.LOGGER.debug("Error syncing to slave pattern provider: {}", e.getMessage());
         }
     }
     
@@ -617,7 +613,6 @@ public class PatternProviderManager {
             }
         } catch (Exception e) {
             // 忽略所有异常
-            UselessMod.LOGGER.debug("Error syncing to slave part host: {}", e.getMessage());
         }
     }
     

@@ -41,19 +41,41 @@ public class AdvancedAlloyFurnaceRecipe implements Recipe<Container> {
     private final Ingredient catalyst;
     private final int catalystCount;
     private final Ingredient mold;
+    
+    // 新增字段：标记是否为有机灌注机配方
+    private final boolean isInsolatorRecipe;
+    
+    // 新增字段：标记是否为冲压机配方
+    private final boolean isPressRecipe;
 
     public AdvancedAlloyFurnaceRecipe(ResourceLocation id, List<Ingredient> inputItems,
                                       List<Long> inputItemCounts, FluidStack inputFluid,
                                       List<ItemStack> outputItems, FluidStack outputFluid,
                                       int energy, int processTime) {
         this(id, inputItems, inputItemCounts, inputFluid, outputItems, outputFluid,
-                energy, processTime, Ingredient.EMPTY, 0, Ingredient.EMPTY);
+                energy, processTime, Ingredient.EMPTY, 0, Ingredient.EMPTY, false, false);
     }
 
     // 新增构造函数
     public AdvancedAlloyFurnaceRecipe(ResourceLocation id, List<Ingredient> inputItems, List<Long> inputItemCounts, 
                                       FluidStack inputFluid, List<ItemStack> outputItems, FluidStack outputFluid,
                                       int energy, int processTime, Ingredient catalyst, int catalystCount, Ingredient mold) {
+        this(id, inputItems, inputItemCounts, inputFluid, outputItems, outputFluid,
+                energy, processTime, catalyst, catalystCount, mold, false, false);
+    }
+    
+    // 新增构造函数，支持有机灌注机配方标记
+    public AdvancedAlloyFurnaceRecipe(ResourceLocation id, List<Ingredient> inputItems, List<Long> inputItemCounts, 
+                                      FluidStack inputFluid, List<ItemStack> outputItems, FluidStack outputFluid,
+                                      int energy, int processTime, Ingredient catalyst, int catalystCount, Ingredient mold, boolean isInsolatorRecipe) {
+        this(id, inputItems, inputItemCounts, inputFluid, outputItems, outputFluid,
+                energy, processTime, catalyst, catalystCount, mold, isInsolatorRecipe, false);
+    }
+    
+    // 新增构造函数，支持冲压机配方标记
+    public AdvancedAlloyFurnaceRecipe(ResourceLocation id, List<Ingredient> inputItems, List<Long> inputItemCounts, 
+                                      FluidStack inputFluid, List<ItemStack> outputItems, FluidStack outputFluid,
+                                      int energy, int processTime, Ingredient catalyst, int catalystCount, Ingredient mold, boolean isInsolatorRecipe, boolean isPressRecipe) {
         this.id = id;
         this.inputItems = inputItems;
         this.inputItemCounts = inputItemCounts;
@@ -65,6 +87,18 @@ public class AdvancedAlloyFurnaceRecipe implements Recipe<Container> {
         this.catalyst = catalyst;
         this.catalystCount = catalystCount;
         this.mold = mold;
+        this.isInsolatorRecipe = isInsolatorRecipe;
+        this.isPressRecipe = isPressRecipe;
+    }
+    
+    // 新增：检查是否为有机灌注机配方
+    public boolean isInsolatorRecipe() {
+        return isInsolatorRecipe;
+    }
+    
+    // 新增：检查是否为冲压机配方
+    public boolean isPressRecipe() {
+        return isPressRecipe;
     }
 
     @Override
@@ -86,33 +120,34 @@ public class AdvancedAlloyFurnaceRecipe implements Recipe<Container> {
 
     // 修复匹配逻辑
     public boolean matches(List<ItemStack> inputSlots, FluidStack inputTank) {
+
+        
         // 检查流体
         if (!inputFluid.isEmpty()) {
-            if (inputTank.isEmpty() || inputTank.getAmount() < inputFluid.getAmount() ||
-                    !inputTank.getFluid().isSame(inputFluid.getFluid())) {
+            if (inputTank.isEmpty()) {
+                return false;
+            }
+            if (inputTank.getAmount() < inputFluid.getAmount()) {
+                return false;
+            }
+            if (!inputTank.getFluid().isSame(inputFluid.getFluid())) {
                 return false;
             }
         }
 
         // 创建可用物品的副本用于匹配计算
         List<ItemStack> availableItems = new ArrayList<>();
-        for (ItemStack stack : inputSlots) {
+        for (int i = 0; i < inputSlots.size(); i++) {
+            ItemStack stack = inputSlots.get(i);
             if (!stack.isEmpty()) {
                 availableItems.add(stack.copy());
             }
         }
 
-
-        // 为每个配方输入创建需求映射
-        Map<Ingredient, Long> requiredItems = new HashMap<>();
+        // 直接遍历输入物品列表，不使用HashMap，避免重复Ingredient被覆盖
         for (int i = 0; i < inputItems.size(); i++) {
-            requiredItems.put(inputItems.get(i), inputItemCounts.get(i));
-        }
-
-        // 尝试匹配所有要求的物品
-        for (Map.Entry<Ingredient, Long> entry : requiredItems.entrySet()) {
-            Ingredient ingredient = entry.getKey();
-            long requiredCount = entry.getValue();
+            Ingredient ingredient = inputItems.get(i);
+            long requiredCount = inputItemCounts.get(i);
             long foundCount = 0;
 
             // 在所有可用物品中查找匹配
@@ -139,27 +174,22 @@ public class AdvancedAlloyFurnaceRecipe implements Recipe<Container> {
     // 修复匹配逻辑，使催化剂真正成为可选项
     public boolean matches(List<ItemStack> inputSlots, FluidStack inputTank,
                            ItemStack catalystSlot, ItemStack moldSlot) {
-
-
-
-
         // 检查模具匹配（如果配方需要模具）- 模具仍然是必须的
         if (requiresMold()) {
-            if (moldSlot.isEmpty() || !mold.test(moldSlot)) {
+            if (moldSlot.isEmpty()) {
+                return false;
+            }
+            if (!mold.test(moldSlot)) {
                 return false;
             }
         }
 
         // 修改：催化剂现在是可选的，不检查催化剂状态
         // 即使配方需要催化剂但没有放入，也允许匹配（并行数为1）
-        if (requiresCatalyst()) {
-            UselessMod.LOGGER.debug("    Recipe requires catalyst (optional)");
-            // 如果有催化剂且匹配，会使用催化剂的并行数
-            // 如果没有催化剂，仍然允许配方运行（并行数为1）
-        }
 
         // 然后检查输入物品和流体
-        return matches(inputSlots, inputTank);
+        boolean itemsAndFluidMatch = matches(inputSlots, inputTank);
+        return itemsAndFluidMatch;
     }
 
     @Override
@@ -226,14 +256,11 @@ public class AdvancedAlloyFurnaceRecipe implements Recipe<Container> {
 
     // 修改消耗逻辑，考虑催化剂和并行数
     public void consumeInputs(List<ItemStack> inputSlots, FluidStack inputTank, ItemStack catalystSlot, int parallel) {
-        UselessMod.LOGGER.debug("Consuming inputs for recipe {} with parallel {}", id, parallel);
-
         // 消耗流体，乘以并行数
         if (!inputFluid.isEmpty()) {
             int fluidToConsume = inputFluid.getAmount() * parallel;
             int consumed = Math.min(inputTank.getAmount(), fluidToConsume);
             inputTank.shrink(consumed);
-            UselessMod.LOGGER.debug("Consumed {} fluid ({} required)", consumed, fluidToConsume);
         }
 
         // 修改：如果催化剂槽有物品且是有效的催化剂，就消耗催化剂，无论配方是否明确要求
@@ -243,14 +270,22 @@ public class AdvancedAlloyFurnaceRecipe implements Recipe<Container> {
             !catalystId.equals("useless_mod:useful_ingot")) {
             // 消耗一个催化剂
             catalystSlot.shrink(1);
-            UselessMod.LOGGER.debug("Consumed 1 catalyst");
+        }
+        
+        // 特殊处理：有机灌注机配方不消耗输入物品
+        if (isInsolatorRecipe()) {
+            return;
         }
 
         // 为每个配方输入创建消耗计数器，乘以并行数
         long[] remainingToConsume = new long[inputItems.size()];
         for (int i = 0; i < inputItems.size(); i++) {
-            remainingToConsume[i] = inputItemCounts.get(i) * parallel;
-            UselessMod.LOGGER.debug("Need to consume {} of ingredient {}", remainingToConsume[i], inputItems.get(i));
+            // 对于冲压机配方，忽略底部输入栏对应的物品（索引为1），只消耗顶部输入栏（索引为0）
+            if (isPressRecipe() && i == 1) {
+                remainingToConsume[i] = 0; // 不消耗底部输入栏物品
+            } else {
+                remainingToConsume[i] = inputItemCounts.get(i) * parallel;
+            }
         }
 
         // 消耗物品输入 - 遍历所有输入槽位
@@ -268,23 +303,12 @@ public class AdvancedAlloyFurnaceRecipe implements Recipe<Container> {
                     slotStack.shrink(consumeAmount);
                     remainingToConsume[ingredientIndex] -= consumeAmount;
 
-                    UselessMod.LOGGER.debug("Consumed {} from slot {}, remaining: {}",
-                            consumeAmount, slotIndex, remainingToConsume[ingredientIndex]);
-
                     // 如果槽位物品被消耗完，设置为空并跳出内层循环
                     if (slotStack.isEmpty()) {
                         inputSlots.set(slotIndex, ItemStack.EMPTY);
                         break;
                     }
                 }
-            }
-        }
-
-        // 检查是否全部消耗完
-        for (int i = 0; i < remainingToConsume.length; i++) {
-            if (remainingToConsume[i] > 0) {
-                UselessMod.LOGGER.warn("Could not consume all required items for recipe {}: ingredient {} needed {} more",
-                        getId(), i, remainingToConsume[i]);
             }
         }
     }
@@ -310,8 +334,6 @@ public class AdvancedAlloyFurnaceRecipe implements Recipe<Container> {
     public static class Serializer implements RecipeSerializer<AdvancedAlloyFurnaceRecipe> {
         @Override
         public AdvancedAlloyFurnaceRecipe fromJson(ResourceLocation recipeId, JsonObject json) {
-            UselessMod.LOGGER.debug("Parsing recipe: {}", recipeId);
-
             // 解析输入物品
             List<Ingredient> inputItems = new ArrayList<>();
             List<Long> inputCounts = new ArrayList<>();
@@ -346,7 +368,6 @@ public class AdvancedAlloyFurnaceRecipe implements Recipe<Container> {
 
                     inputItems.add(ingredient);
                     inputCounts.add(count);
-                    UselessMod.LOGGER.debug("Parsed ingredient: count={}, ingredient={}", count, ingredient);
                 }
             }
 
@@ -357,7 +378,6 @@ public class AdvancedAlloyFurnaceRecipe implements Recipe<Container> {
                 ResourceLocation fluidId = ResourceLocation.parse(GsonHelper.getAsString(fluidObj, "fluid"));
                 int amount = GsonHelper.getAsInt(fluidObj, "amount", 1000);
                 inputFluid = new FluidStack(ForgeRegistries.FLUIDS.getValue(fluidId), amount);
-                UselessMod.LOGGER.debug("Parsed input fluid: {} x {}", fluidId, amount);
             }
 
             // 解析输出物品
@@ -370,7 +390,6 @@ public class AdvancedAlloyFurnaceRecipe implements Recipe<Container> {
                     int count = GsonHelper.getAsInt(resultObj, "count", 1);
                     ItemStack output = new ItemStack(ForgeRegistries.ITEMS.getValue(itemId), count);
                     outputItems.add(output);
-                    UselessMod.LOGGER.debug("Parsed output: {} x {}", itemId, count);
                 }
             }
 
@@ -392,13 +411,11 @@ public class AdvancedAlloyFurnaceRecipe implements Recipe<Container> {
                     JsonObject catalystObj = catalystElement.getAsJsonObject();
                     catalyst = Ingredient.fromJson(catalystObj);
                     catalystCount = GsonHelper.getAsInt(catalystObj, "count", 1);
-                    UselessMod.LOGGER.debug("Parsed catalyst: count={}", catalystCount);
                 } else if (catalystElement.isJsonPrimitive()) {
                     // 简写格式：直接是物品ID
                     String itemId = catalystElement.getAsString();
                     catalyst = Ingredient.of(ForgeRegistries.ITEMS.getValue(ResourceLocation.parse(itemId)));
                     catalystCount = 1;
-                    UselessMod.LOGGER.debug("Parsed catalyst (simple): {}", itemId);
                 }
             }
 
@@ -409,20 +426,14 @@ public class AdvancedAlloyFurnaceRecipe implements Recipe<Container> {
                 if (moldElement.isJsonPrimitive()) {
                     String itemId = moldElement.getAsString();
                     mold = Ingredient.of(ForgeRegistries.ITEMS.getValue(ResourceLocation.parse(itemId)));
-                    UselessMod.LOGGER.debug("Parsed mold: {}", itemId);
                 } else if (moldElement.isJsonObject()) {
                     JsonObject moldObj = moldElement.getAsJsonObject();
                     mold = Ingredient.fromJson(moldObj);
-                    UselessMod.LOGGER.debug("Parsed mold (object)");
                 }
             }
 
             int energy = GsonHelper.getAsInt(json, "energy", 2000);
             int processTime = GsonHelper.getAsInt(json, "process_time", 200);
-
-            UselessMod.LOGGER.debug("Recipe {}: inputs={}, catalyst={}, mold={}, outputs={}, energy={}, processTime={}",
-                    recipeId, inputItems.size(), catalyst.isEmpty() ? "none" : "present",
-                    mold.isEmpty() ? "none" : "present", outputItems.size(), energy, processTime);
 
             return new AdvancedAlloyFurnaceRecipe(recipeId, inputItems, inputCounts, inputFluid,
                     outputItems, outputFluid, energy, processTime, catalyst, catalystCount, mold);

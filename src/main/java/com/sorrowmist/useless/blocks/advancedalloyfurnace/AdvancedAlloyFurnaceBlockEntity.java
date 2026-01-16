@@ -16,6 +16,7 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.game.ClientGamePacketListener;
 import net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.Containers;
 import net.minecraft.world.MenuProvider;
@@ -37,6 +38,7 @@ import net.minecraftforge.fluids.capability.IFluidHandler;
 import net.minecraftforge.fluids.capability.templates.FluidTank;
 import net.minecraftforge.items.IItemHandler;
 import net.minecraftforge.items.IItemHandlerModifiable;
+import net.minecraftforge.registries.ForgeRegistries;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -59,31 +61,29 @@ public class AdvancedAlloyFurnaceBlockEntity extends BlockEntity implements Menu
     private final CustomEnergyStorage energyStorage = new CustomEnergyStorage(Integer.MAX_VALUE, Integer.MAX_VALUE, 0);
     private final LazyOptional<IEnergyStorage> lazyEnergyHandler = LazyOptional.of(() -> energyStorage);
 
-    // 状态管理
-    private boolean isActive = false;
-    private boolean wasActive = false;
-    private int syncCounter = 0;
-
-    // 处理进度
-    private int process;
-    private int processMax = 200;
-    private int processTick = 10;
-
+    // 状态管理 - 重构版本
+    private volatile boolean isActive = false; // 是否活跃
+    private volatile int process = 0; // 处理进度
+    private int processMax = 200; // 最大处理进度
+    private int processTick = 10; // 每tick消耗的能量
+    private boolean wasActive = false; // 上一次是否活跃
+    private int syncCounter = 0; // 同步计数器
+    
     // 并行数相关
-    private int currentParallel = 1;
-    private int maxParallel = 1;
-    private boolean hasCatalyst = false;
-    private boolean requiresMold = false;
-
+    private int currentParallel = 1; // 当前并行数
+    private int maxParallel = 1; // 最大并行数
+    private boolean hasCatalyst = false; // 是否有催化剂
+    private boolean requiresMold = false; // 是否需要模具
+    
     // 配方管理
-    private AdvancedAlloyFurnaceRecipe currentRecipe;
+    private AdvancedAlloyFurnaceRecipe currentRecipe; // 当前配方
     
     // 输入缓存，用于检测输入变化
     private List<ItemStack> lastInputItems = new ArrayList<>();
     private FluidStack lastInputFluid = FluidStack.EMPTY;
     private ItemStack lastCatalyst = ItemStack.EMPTY;
     private ItemStack lastMold = ItemStack.EMPTY;
-
+    
     // 自动输出相关
     private int autoOutputCounter = 0;
     private static final int AUTO_OUTPUT_INTERVAL = 20; // 每20tick尝试输出一次，主动检测输出槽
@@ -91,50 +91,47 @@ public class AdvancedAlloyFurnaceBlockEntity extends BlockEntity implements Menu
     // 输出暂存相关
     private List<ItemStack> pendingOutputs = new ArrayList<>();
     private boolean isOutputPending = false;
-
+    
     // 新增槽位索引定义
-    private static final int CATALYST_SLOT = 12;  // 无用锭催化槽
-    private static final int MOLD_SLOT = 13;      // 金属模具槽
-
-    // 总槽位数从12增加到14
-    private static final int TOTAL_SLOTS = 14;
+    private static final int INPUT_SLOTS = 9;  // 物品输入槽数量
+    private static final int OUTPUT_SLOTS = 9;  // 物品输出槽数量
+    private static final int CATALYST_SLOT = INPUT_SLOTS + OUTPUT_SLOTS;  // 无用锭催化槽
+    private static final int MOLD_SLOT = CATALYST_SLOT + 1;      // 金属模具槽
+    
+    // 总槽位数：9输入 + 9输出 + 1催化剂 + 1模具 = 20
+    private static final int TOTAL_SLOTS = INPUT_SLOTS + OUTPUT_SLOTS + 2;
     
     // AE2 Integration
     private final IManagedGridNode gridNode;
     private final IActionSource actionSource;
     private boolean isConnectedToAE = false;
-
-    // 容器数据同步 - 修改为并行数
+    
+    // 容器数据同步 - 重构版本
     private final ContainerData data = new ContainerData() {
         @Override
         public int get(int index) {
-            return switch (index) {
-                case 0 -> getEnergyStored();
-                case 1 -> getMaxEnergyStored();
-                case 2 -> getProgress();
-                case 3 -> getMaxProgress();
-                case 4 -> isActive() ? 1 : 0;
-                case 5 -> getProcessTick();
-                case 6 -> getCurrentParallel();  // 当前并行数
-                case 7 -> getMaxParallel();      // 最大并行数
-                case 8 -> requiresMold ? 1 : 0;   // 是否需要模具
-                default -> 0;
-            };
-        }
-
-        @Override
-        public void set(int index, int value) {
             switch (index) {
-                case 0 -> energyStorage.setEnergy(value);
-                case 2 -> process = value;
-                case 4 -> isActive = value == 1;
-                case 5 -> processTick = value;
-                case 6 -> currentParallel = value;
-                case 7 -> maxParallel = value;
-                case 8 -> requiresMold = value == 1;
+                case 0 -> { return energyStorage.getEnergyStored(); }
+                case 1 -> { return energyStorage.getMaxEnergyStored(); }
+                case 2 -> { return process; }
+                case 3 -> { return processMax; }
+                case 4 -> { return isActive ? 1 : 0; }
+                case 5 -> { return processTick; }
+                case 6 -> { return currentParallel; }
+                case 7 -> { return maxParallel; }
+                case 8 -> { return requiresMold ? 1 : 0; }
+                default -> { return 0; }
             }
         }
-
+        
+        @Override
+        public void set(int index, int value) {
+            // 只允许客户端修改能量，其他状态由服务端控制
+            if (index == 0) {
+                energyStorage.setEnergy(value);
+            }
+        }
+        
         @Override
         public int getCount() {
             return 9;
@@ -163,80 +160,14 @@ public class AdvancedAlloyFurnaceBlockEntity extends BlockEntity implements Menu
     private final MultiSlotItemHandler itemHandler;
     private final LazyOptional<IItemHandler> lazyItemHandler;
 
-    // 修复流体槽
-    private final FluidTank inputFluidTank = new FluidTank(Integer.MAX_VALUE) {
-        @Override
-        protected void onContentsChanged() {
-            setChanged();
-            markForClientUpdate();
-            // 输入流体变化时，触发检测
-            triggerInputChangeDetection();
-        }
-
-        @Override
-        public boolean isFluidValid(FluidStack stack) {
-            boolean valid = level != null ?
-                    AdvancedAlloyFurnaceRecipeManager.getInstance().isValidInputFluid(level, stack) : true;
-            return valid;
-        }
-    };
-
-    private final FluidTank outputFluidTank = new FluidTank(Integer.MAX_VALUE) {
-        @Override
-        protected void onContentsChanged() {
-            setChanged();
-            markForClientUpdate();
-        }
-    };
+    // 流体槽配置
+    private static final int FLUID_INPUT_COUNT = 6;
+    private static final int FLUID_OUTPUT_COUNT = 6;
+    private final List<FluidTank> inputFluidTanks = new ArrayList<>();
+    private final List<FluidTank> outputFluidTanks = new ArrayList<>();
 
     // 修复流体处理器
-    private final LazyOptional<IFluidHandler> lazyFluidHandler = LazyOptional.of(() -> new IFluidHandler() {
-        @Override
-        public int getTanks() {
-            return 2;
-        }
-
-        @Nonnull
-        @Override
-        public FluidStack getFluidInTank(int tank) {
-            return tank == 0 ? inputFluidTank.getFluid() : outputFluidTank.getFluid();
-        }
-
-        @Override
-        public int getTankCapacity(int tank) {
-            return tank == 0 ? inputFluidTank.getCapacity() : outputFluidTank.getCapacity();
-        }
-
-        @Override
-        public boolean isFluidValid(int tank, @Nonnull FluidStack stack) {
-            if (tank == 0) {
-                return inputFluidTank.isFluidValid(stack);
-            }
-            return false; // 输出槽不接受输入
-        }
-
-        @Override
-        public int fill(FluidStack resource, FluidAction action) {
-            if (resource.isEmpty() || !isFluidValid(0, resource)) {
-                return 0;
-            }
-
-            int filled = inputFluidTank.fill(resource, action);
-            return filled;
-        }
-
-        @Nonnull
-        @Override
-        public FluidStack drain(FluidStack resource, FluidAction action) {
-            return outputFluidTank.drain(resource, action);
-        }
-
-        @Nonnull
-        @Override
-        public FluidStack drain(int maxDrain, FluidAction action) {
-            return outputFluidTank.drain(maxDrain, action);
-        }
-    });
+    private final LazyOptional<IFluidHandler> lazyFluidHandler;
 
     public AdvancedAlloyFurnaceBlockEntity(BlockPos pos, BlockState state) {
         super(ModBlockEntities.ADVANCED_ALLOY_FURNACE.get(), pos, state);
@@ -249,19 +180,19 @@ public class AdvancedAlloyFurnaceBlockEntity extends BlockEntity implements Menu
                 boolean isUselessIngot = MoldIdentifier.isUselessIngot(stack);
                 boolean isMetalMold = MoldIdentifier.isMetalMold(stack);
 
-                if (slot < 6) {
-                    // 输入槽（0-5）可以接受无用锭，但不能接受模具
+                if (slot < INPUT_SLOTS) {
+                    // 输入槽（0-8）可以接受无用锭，但不能接受模具
                     return !isMetalMold;
                     // 输入槽可以接受其他有效输入物品
-                } else if (slot >= 6 && slot < 12) {
-                    // 输出槽（6-11）不能手动放置物品
+                } else if (slot >= INPUT_SLOTS && slot < INPUT_SLOTS + OUTPUT_SLOTS) {
+                    // 输出槽（9-17）不能手动放置物品
                     return false;
                 } else if (slot == CATALYST_SLOT) {
                     // 催化剂槽只能接受无用锭
                     return MoldIdentifier.isUselessIngot(stack);
                 } else if (slot == MOLD_SLOT) {
-                    // 模具槽可以接受金属模具或其他模组的机器标志物
-                    return MoldIdentifier.isAcceptableMarker(stack);
+                    // 模具槽可以接受任何物品
+                    return true;
                 }
                 return false;
             }
@@ -315,10 +246,10 @@ public class AdvancedAlloyFurnaceBlockEntity extends BlockEntity implements Menu
                 markForClientUpdate();
                 
                 // 检查是否为输入槽、催化剂槽或模具槽
-                if (slot < 6 || slot == CATALYST_SLOT || slot == MOLD_SLOT) {
+                if (slot < INPUT_SLOTS || slot == CATALYST_SLOT || slot == MOLD_SLOT) {
                     // 输入物品、催化剂或模具变化时，触发检测
                     triggerInputChangeDetection();
-                } else if (slot >= 6 && slot < 12) {
+                } else if (slot >= INPUT_SLOTS && slot < INPUT_SLOTS + OUTPUT_SLOTS) {
                     // 输出槽变化且有物品时，触发自动输出
                     ItemStack stack = getStackInSlot(slot);
                     if (!stack.isEmpty()) {
@@ -327,6 +258,122 @@ public class AdvancedAlloyFurnaceBlockEntity extends BlockEntity implements Menu
                 }
             }
         };
+
+        // 初始化流体槽
+        for (int i = 0; i < FLUID_INPUT_COUNT; i++) {
+            final int tankIndex = i;
+            inputFluidTanks.add(new FluidTank(Integer.MAX_VALUE) {
+                @Override
+                protected void onContentsChanged() {
+                    setChanged();
+                    markForClientUpdate();
+                    // 输入流体变化时，触发检测
+                    triggerInputChangeDetection();
+                }
+
+                @Override
+                public boolean isFluidValid(FluidStack stack) {
+                    // 允许任何流体被放入输入槽，不限制流体类型
+                    return true;
+                }
+            });
+        }
+
+        for (int i = 0; i < FLUID_OUTPUT_COUNT; i++) {
+            outputFluidTanks.add(new FluidTank(Integer.MAX_VALUE) {
+                @Override
+                protected void onContentsChanged() {
+                    setChanged();
+                    markForClientUpdate();
+                }
+            });
+        }
+
+        // 初始化流体处理器
+        this.lazyFluidHandler = LazyOptional.of(() -> new IFluidHandler() {
+            @Override
+            public int getTanks() {
+                return FLUID_INPUT_COUNT + FLUID_OUTPUT_COUNT;
+            }
+
+            @Nonnull
+            @Override
+            public FluidStack getFluidInTank(int tank) {
+                if (tank < FLUID_INPUT_COUNT) {
+                    return inputFluidTanks.get(tank).getFluid();
+                } else {
+                    return outputFluidTanks.get(tank - FLUID_INPUT_COUNT).getFluid();
+                }
+            }
+
+            @Override
+            public int getTankCapacity(int tank) {
+                if (tank < FLUID_INPUT_COUNT) {
+                    return inputFluidTanks.get(tank).getCapacity();
+                } else {
+                    return outputFluidTanks.get(tank - FLUID_INPUT_COUNT).getCapacity();
+                }
+            }
+
+            @Override
+            public boolean isFluidValid(int tank, @Nonnull FluidStack stack) {
+                if (tank < FLUID_INPUT_COUNT) {
+                    return inputFluidTanks.get(tank).isFluidValid(stack);
+                }
+                return false; // 输出槽不接受输入
+            }
+
+            @Override
+            public int fill(FluidStack resource, FluidAction action) {
+                if (resource.isEmpty()) {
+                    return 0;
+                }
+
+                int totalFilled = 0;
+                for (int i = 0; i < FLUID_INPUT_COUNT; i++) {
+                    FluidTank tank = inputFluidTanks.get(i);
+                    if (tank.isFluidValid(resource)) {
+                        int filled = tank.fill(resource, action);
+                        totalFilled += filled;
+                        if (filled > 0) {
+                            // 只填充到第一个可用槽
+                            break;
+                        }
+                    }
+                }
+                return totalFilled;
+            }
+
+            @Nonnull
+            @Override
+            public FluidStack drain(FluidStack resource, FluidAction action) {
+                if (resource.isEmpty()) {
+                    return FluidStack.EMPTY;
+                }
+
+                for (int i = 0; i < FLUID_OUTPUT_COUNT; i++) {
+                    FluidTank tank = outputFluidTanks.get(i);
+                    FluidStack drained = tank.drain(resource, action);
+                    if (!drained.isEmpty()) {
+                        return drained;
+                    }
+                }
+                return FluidStack.EMPTY;
+            }
+
+            @Nonnull
+            @Override
+            public FluidStack drain(int maxDrain, FluidAction action) {
+                for (int i = 0; i < FLUID_OUTPUT_COUNT; i++) {
+                    FluidTank tank = outputFluidTanks.get(i);
+                    FluidStack drained = tank.drain(maxDrain, action);
+                    if (!drained.isEmpty()) {
+                        return drained;
+                    }
+                }
+                return FluidStack.EMPTY;
+            }
+        });
 
         // 设置所有槽位支持高堆叠
         this.itemHandler.setAllSlotCapacity(Integer.MAX_VALUE);
@@ -398,19 +445,16 @@ public class AdvancedAlloyFurnaceBlockEntity extends BlockEntity implements Menu
         this.gridNode.destroy();
     }
 
-    // 在tick方法中实时更新并行数
+    // 重构的tick方法，简洁可靠的配方运行逻辑
     public void tick() {
         if (level == null) return;
-
-        boolean curActive = isActive;
 
         if (!level.isClientSide) {
             // 服务端逻辑
             
             // 减少数据同步频率
             syncCounter++;
-            boolean shouldSync = false;
-
+            
             // 处理暂存输出
             if (isOutputPending) {
                 processPendingOutputs();
@@ -421,13 +465,19 @@ public class AdvancedAlloyFurnaceBlockEntity extends BlockEntity implements Menu
             if (autoOutputCounter >= AUTO_OUTPUT_INTERVAL) {
                 // 检查输出槽是否有物品或流体，如果有则尝试自动输出
                 boolean hasOutputItems = false;
-                for (int slot = 6; slot < 12; slot++) {
+                for (int slot = INPUT_SLOTS; slot < INPUT_SLOTS + OUTPUT_SLOTS; slot++) {
                     if (!itemHandler.getStackInSlot(slot).isEmpty()) {
                         hasOutputItems = true;
                         break;
                     }
                 }
-                boolean hasOutputFluid = !outputFluidTank.isEmpty();
+                boolean hasOutputFluid = false;
+                for (FluidTank tank : outputFluidTanks) {
+                    if (!tank.isEmpty()) {
+                        hasOutputFluid = true;
+                        break;
+                    }
+                }
                 
                 if (hasOutputItems || hasOutputFluid) {
                     tryAutoOutput();
@@ -435,49 +485,160 @@ public class AdvancedAlloyFurnaceBlockEntity extends BlockEntity implements Menu
                 autoOutputCounter = 0; // 重置计数器
             }
 
-            // 只在非活跃状态下检查是否可以开始合成，活跃状态下不需要重复检查
-            if (!isActive) {
-                if (canProcessStart()) {
-                    processStart();
-                    isActive = true;
-                    shouldSync = true;
-                }
-            } else {
-                // 检查输入是否仍然满足配方要求，如果不满足则停止合成
-                if (currentRecipe == null || !validateInputs(currentRecipe)) {
-                    processOff();
-                    shouldSync = true;
-                    // 配方变为无效时，更新催化剂和模具状态
-                    triggerInputChangeDetection();
-                } else {
-                    processTick();
-                    if (process <= 0) {
-                        processFinish();
-                        if (!canProcessStart()) {
-                            processOff();
-                        } else {
-                            processStart();
-                        }
-                        shouldSync = true;
-                    } else if (energyStorage.getEnergyStored() < processTick) {
-                        processOff();
-                        shouldSync = true;
-                    }
-                }
-            }
-
-            // 只有状态变化时才更新激活状态
-            if (curActive != isActive) {
-                updateActiveState(curActive);
-            }
-
+            // 核心配方运行逻辑
+            handleRecipeLogic();
+            
             // 数据同步（减少频率）
-            if (needsClientUpdate || shouldSync || syncCounter >= 20) {
+            if (needsClientUpdate || syncCounter >= 20) {
                 syncToClient();
                 needsClientUpdate = false;
                 syncCounter = 0;
             }
         }
+    }
+    
+    // 核心配方运行逻辑 - 重构版本
+    private void handleRecipeLogic() {
+        // 如果没有活跃的配方，尝试查找并开始新配方
+        if (!isActive || currentRecipe == null) {
+            startNewRecipe();
+            return;
+        }
+        
+        // 活跃状态下的处理
+        processActiveRecipe();
+    }
+    
+    // 开始新配方
+    private void startNewRecipe() {
+        // 查找匹配的配方
+        AdvancedAlloyFurnaceRecipe foundRecipe = findMatchingRecipe();
+        if (foundRecipe == null) {
+            return;
+        }
+        
+        // 验证输入是否满足要求
+        if (!validateInputs(foundRecipe)) {
+            return;
+        }
+        
+        // 验证输出空间是否足够
+        if (!validateOutputs(foundRecipe, currentParallel)) {
+            return;
+        }
+        
+        // 更新并行数
+        updateParallelNumbersForRecipe(foundRecipe);
+        
+        // 设置当前配方并开始处理
+        currentRecipe = foundRecipe;
+        processMax = foundRecipe.getProcessTime();
+        process = processMax;
+        
+        // 计算能量消耗
+        ItemStack catalyst = itemHandler.getStackInSlot(CATALYST_SLOT);
+        String catalystId = ForgeRegistries.ITEMS.getKey(catalyst.getItem()).toString();
+        boolean isUsefulIngot = catalystId.equals("useless_mod:useful_ingot");
+        int energyToUse = isUsefulIngot ? foundRecipe.getEnergy() : foundRecipe.getEnergy() * currentParallel;
+        processTick = Math.max(1, energyToUse / foundRecipe.getProcessTime());
+        
+        // 激活机器
+        isActive = true;
+        updateActiveState(false);
+        markForClientUpdate();
+    }
+    
+    // 处理活跃的配方
+    private void processActiveRecipe() {
+        // 检查当前配方是否仍然有效
+        if (!validateInputs(currentRecipe)) {
+            stopRecipe();
+            return;
+        }
+        
+        // 检查能量是否足够
+        if (energyStorage.getEnergyStored() < processTick) {
+            return;
+        }
+        
+        // 消耗能量并更新进度
+        energyStorage.modifyEnergy(-processTick);
+        process--;
+        
+        // 检查工艺是否完成
+        if (process <= 0) {
+            completeRecipe();
+        } else {
+            markForClientUpdate();
+        }
+    }
+    
+    // 完成配方
+    private void completeRecipe() {
+        // 确保当前配方不为null
+        if (currentRecipe == null) {
+            stopRecipe();
+            return;
+        }
+        
+        // 处理配方输出
+        resolveRecipe(currentRecipe);
+        
+        // 重置当前配方
+        currentRecipe = null;
+        
+        // 尝试开始下一个配方
+        startNewRecipe();
+        
+        // 如果没有新配方，停止当前配方
+        if (!isActive || currentRecipe == null) {
+            stopRecipe();
+        }
+    }
+    
+    // 停止配方
+    private void stopRecipe() {
+        // 重置状态
+        isActive = false;
+        process = 0;
+        processMax = 200;
+        processTick = 10;
+        wasActive = true;
+        
+        // 通知客户端更新
+        updateActiveState(true);
+        markForClientUpdate();
+    }
+    
+    // 更新并行数
+    private void updateParallelNumbersForRecipe(AdvancedAlloyFurnaceRecipe recipe) {
+        // 获取当前输入和催化剂状态
+        List<ItemStack> inputItems = new ArrayList<>();
+        for (int i = 0; i < INPUT_SLOTS; i++) {
+            inputItems.add(itemHandler.getStackInSlot(i).copy());
+        }
+        
+        ItemStack catalyst = itemHandler.getStackInSlot(CATALYST_SLOT).copy();
+        ItemStack mold = itemHandler.getStackInSlot(MOLD_SLOT).copy();
+        
+        // 找到与配方匹配的流体
+        FluidStack matchingFluid = FluidStack.EMPTY;
+        FluidStack requiredFluid = recipe.getInputFluid();
+        if (!requiredFluid.isEmpty()) {
+            for (FluidTank tank : inputFluidTanks) {
+                FluidStack tankFluid = tank.getFluid();
+                if (!tankFluid.isEmpty() && tankFluid.getFluid().isSame(requiredFluid.getFluid())) {
+                    matchingFluid = tankFluid;
+                    break;
+                }
+            }
+        }
+        
+        // 更新并行数
+        updateParallelNumbers(catalyst, recipe, inputItems, matchingFluid);
+        
+        // 更新需要模具的状态
+        requiresMold = recipe.requiresMold();
     }
 
     private void markForClientUpdate() {
@@ -488,10 +649,20 @@ public class AdvancedAlloyFurnaceBlockEntity extends BlockEntity implements Menu
     private void triggerInputChangeDetection() {
         // 获取输入物品和流体
         List<ItemStack> inputItems = new ArrayList<>();
-        for (int i = 0; i < 6; i++) {
+        for (int i = 0; i < INPUT_SLOTS; i++) {
             inputItems.add(itemHandler.getStackInSlot(i));
         }
-        FluidStack inputFluid = inputFluidTank.getFluid();
+        
+        // 获取所有输入流体槽中的流体，取第一个非空流体作为当前输入流体
+        FluidStack inputFluid = FluidStack.EMPTY;
+        for (FluidTank tank : inputFluidTanks) {
+            FluidStack tankFluid = tank.getFluid();
+            if (!tankFluid.isEmpty()) {
+                inputFluid = tankFluid;
+                break;
+            }
+        }
+        
         ItemStack catalyst = itemHandler.getStackInSlot(CATALYST_SLOT);
         ItemStack mold = itemHandler.getStackInSlot(MOLD_SLOT);
         
@@ -597,8 +768,8 @@ public class AdvancedAlloyFurnaceBlockEntity extends BlockEntity implements Menu
             return false;
         }
 
-        // 检查所有输出槽位（6-11）
-        for (int slot = 6; slot < 12; slot++) {
+        // 检查所有输出槽位（9-17）
+        for (int slot = INPUT_SLOTS; slot < INPUT_SLOTS + OUTPUT_SLOTS; slot++) {
             ItemStack stackInSlot = itemHandler.getStackInSlot(slot);
             if (stackInSlot.isEmpty()) continue;
 
@@ -626,25 +797,28 @@ public class AdvancedAlloyFurnaceBlockEntity extends BlockEntity implements Menu
             return false;
         }
         
-        FluidStack fluidInTank = outputFluidTank.getFluid();
-        if (fluidInTank.isEmpty()) return false;
+        boolean outputtedAny = false;
+        for (FluidTank tank : outputFluidTanks) {
+            FluidStack fluidInTank = tank.getFluid();
+            if (fluidInTank.isEmpty()) continue;
 
-        // 尝试输出到AE网络
-        long inserted = tryOutputFluidToAE(fluidInTank);
-        if (inserted > 0) {
-            // 从输出槽抽取相应数量的流体
-            outputFluidTank.drain((int) inserted, IFluidHandler.FluidAction.EXECUTE);
-            return true;
+            // 尝试输出到AE网络
+            long inserted = tryOutputFluidToAE(fluidInTank);
+            if (inserted > 0) {
+                // 从输出槽抽取相应数量的流体
+                tank.drain((int) inserted, IFluidHandler.FluidAction.EXECUTE);
+                outputtedAny = true;
+            }
         }
 
-        return false;
+        return outputtedAny;
     }
 
     private boolean tryOutputItems() {
         boolean outputtedAny = false;
 
-        // 检查所有输出槽位（6-11）
-        for (int slot = 6; slot < 12; slot++) {
+        // 检查所有输出槽位（9-17）
+        for (int slot = INPUT_SLOTS; slot < INPUT_SLOTS + OUTPUT_SLOTS; slot++) {
             ItemStack stackInSlot = itemHandler.getStackInSlot(slot);
             if (stackInSlot.isEmpty()) continue;
 
@@ -701,43 +875,46 @@ public class AdvancedAlloyFurnaceBlockEntity extends BlockEntity implements Menu
     }
 
     private boolean tryOutputFluids() {
-        FluidStack fluidInTank = outputFluidTank.getFluid();
-        if (fluidInTank.isEmpty()) return false;
-
         boolean outputtedAny = false;
-        FluidStack remainingFluid = fluidInTank.copy();
 
         // 恢复全向输出
-        for (Direction direction : Direction.values()) {
-            if (remainingFluid.isEmpty()) break;
+        for (FluidTank fluidTank : outputFluidTanks) {
+            FluidStack fluidInTank = fluidTank.getFluid();
+            if (fluidInTank.isEmpty()) continue;
 
-            BlockPos neighborPos = worldPosition.relative(direction);
-            var neighborEntity = level.getBlockEntity(neighborPos);
+            FluidStack remainingFluid = fluidInTank.copy();
 
-            if (neighborEntity != null) {
-                // 检查目标方块是否在黑名单中（暂时只包含自身方块）
-                BlockState neighborState = level.getBlockState(neighborPos);
-                if (neighborState.getBlock() instanceof AdvancedAlloyFurnaceBlock) {
-                    continue; // 跳过自身方块
-                }
-                
-                // 只获取一次能力，避免重复调用
-                var fluidHandlerOpt = neighborEntity.getCapability(ForgeCapabilities.FLUID_HANDLER, direction.getOpposite());
-                if (fluidHandlerOpt.isPresent()) {
-                    IFluidHandler neighborHandler = fluidHandlerOpt.resolve().get();
+            for (Direction direction : Direction.values()) {
+                if (remainingFluid.isEmpty()) break;
 
-                    // 尝试填充到邻居容器
-                    int filled = neighborHandler.fill(remainingFluid.copy(), IFluidHandler.FluidAction.SIMULATE);
-                    if (filled > 0) {
-                        // 实际填充
-                        FluidStack fluidToDrain = new FluidStack(remainingFluid, filled);
-                        int actuallyFilled = neighborHandler.fill(fluidToDrain, IFluidHandler.FluidAction.EXECUTE);
+                BlockPos neighborPos = worldPosition.relative(direction);
+                var neighborEntity = level.getBlockEntity(neighborPos);
 
-                        if (actuallyFilled > 0) {
-                            // 从输出槽抽取相应数量的流体
-                            outputFluidTank.drain(actuallyFilled, IFluidHandler.FluidAction.EXECUTE);
-                            remainingFluid.shrink(actuallyFilled);
-                            outputtedAny = true;
+                if (neighborEntity != null) {
+                    // 检查目标方块是否在黑名单中（暂时只包含自身方块）
+                    BlockState neighborState = level.getBlockState(neighborPos);
+                    if (neighborState.getBlock() instanceof AdvancedAlloyFurnaceBlock) {
+                        continue; // 跳过自身方块
+                    }
+                    
+                    // 只获取一次能力，避免重复调用
+                    var fluidHandlerOpt = neighborEntity.getCapability(ForgeCapabilities.FLUID_HANDLER, direction.getOpposite());
+                    if (fluidHandlerOpt.isPresent()) {
+                        IFluidHandler neighborHandler = fluidHandlerOpt.resolve().get();
+
+                        // 尝试填充到邻居容器
+                        int filled = neighborHandler.fill(remainingFluid.copy(), IFluidHandler.FluidAction.SIMULATE);
+                        if (filled > 0) {
+                            // 实际填充
+                            FluidStack fluidToDrain = new FluidStack(remainingFluid, filled);
+                            int actuallyFilled = neighborHandler.fill(fluidToDrain, IFluidHandler.FluidAction.EXECUTE);
+
+                            if (actuallyFilled > 0) {
+                                // 从输出槽抽取相应数量的流体
+                                fluidTank.drain(actuallyFilled, IFluidHandler.FluidAction.EXECUTE);
+                                remainingFluid.shrink(actuallyFilled);
+                                outputtedAny = true;
+                            }
                         }
                     }
                 }
@@ -747,154 +924,47 @@ public class AdvancedAlloyFurnaceBlockEntity extends BlockEntity implements Menu
         return outputtedAny;
     }
 
-    // 配方处理逻辑
-    protected boolean canProcessStart() {
-        // 如果有暂存输出，不允许开始新的合成
-        if (isOutputPending) {
-            return false;
-        }
-        
-        if (energyStorage.getEnergyStored() < processTick) {
-            return false;
-        }
-
-        // 获取当前输入状态
-        List<ItemStack> inputItems = new ArrayList<>();
-        for (int i = 0; i < 6; i++) {
-            inputItems.add(itemHandler.getStackInSlot(i));
-        }
-        FluidStack inputFluid = inputFluidTank.getFluid();
-        ItemStack catalyst = itemHandler.getStackInSlot(CATALYST_SLOT);
-        ItemStack mold = itemHandler.getStackInSlot(MOLD_SLOT);
-
-        // 重新查询配方，确保使用最新的输入状态
-        currentRecipe = findMatchingRecipe();
-        if (currentRecipe == null) {
-            return false;
-        }
-
-        // 更新并行数，确保使用最新的输入和催化剂状态
-        updateParallelNumbers(catalyst, currentRecipe, inputItems, inputFluid);
-        
-        // 更新需要模具的状态
-        requiresMold = currentRecipe != null && currentRecipe.requiresMold();
-
-        // 检查输入是否满足要求
-        if (!validateInputs(currentRecipe)) {
-            return false;
-        }
-
-        // 检查输出空间
-        boolean canValidate = validateOutputs(currentRecipe, currentParallel);
-        return canValidate;
-    }
-
-    protected boolean canProcessFinish() {
-        return process <= 0;
-    }
-
-    protected void processStart() {
-        if (currentRecipe != null) {
-            processMax = currentRecipe.getProcessTime();
-            
-            // 检查催化剂是否为有用的锭（USEFUL_INGOT），如果是，能量消耗不会被倍增
-            ItemStack catalyst = itemHandler.getStackInSlot(CATALYST_SLOT);
-            String catalystId = net.minecraftforge.registries.ForgeRegistries.ITEMS.getKey(catalyst.getItem()).toString();
-            boolean isUsefulIngot = catalystId.equals("useless_mod:useful_ingot");
-            
-            // 计算能量消耗：如果是有用的锭，能量消耗不乘以并行数；否则正常计算
-            int energyToUse = isUsefulIngot ? currentRecipe.getEnergy() : currentRecipe.getEnergy() * currentParallel;
-            processTick = Math.max(1, energyToUse / currentRecipe.getProcessTime());
-            
-            process = processMax;
-
-            setChanged();
-            markForClientUpdate();
-        } else {
-            UselessMod.LOGGER.error("processStart called but currentRecipe is null!");
-        }
-    }
-
-    protected void processFinish() {
-        if (currentRecipe == null) {
-            UselessMod.LOGGER.error("processFinish called but currentRecipe is null!");
-            processOff();
-            return;
-        }
-
-        if (!validateInputs(currentRecipe)) {
-            UselessMod.LOGGER.warn("Input validation failed in processFinish for recipe: {}", currentRecipe.getId());
-            processOff();
-            return;
-        }
-
-        resolveRecipe(currentRecipe);
-
-        setChanged();
-        markForClientUpdate();
-    }
-
-    // 添加调试方法
-    private String getInputItemsDebugString() {
-        StringBuilder sb = new StringBuilder();
-        for (int i = 0; i < 6; i++) {
-            ItemStack stack = itemHandler.getStackInSlot(i);
-            if (!stack.isEmpty()) {
-                sb.append(stack.getItem()).append("x").append(stack.getCount()).append(" ");
-            }
-        }
-        return sb.toString().isEmpty() ? "empty" : sb.toString();
-    }
-
-    private String getOutputItemsDebugString() {
-        StringBuilder sb = new StringBuilder();
-        for (int i = 6; i < 12; i++) {
-            ItemStack stack = itemHandler.getStackInSlot(i);
-            if (!stack.isEmpty()) {
-                sb.append(stack.getItem()).append("x").append(stack.getCount()).append(" ");
-            }
-        }
-        return sb.toString().isEmpty() ? "empty" : sb.toString();
-    }
-
-    protected void processOff() {
-        process = 0;
-        isActive = false;
-        wasActive = true;
-        setChanged();
-        markForClientUpdate();
-    }
-
-    protected void processTick() {
-        if (process <= 0) return;
-
-        if (energyStorage.getEnergyStored() >= processTick) {
-            energyStorage.modifyEnergy(-processTick);
-            process--;
-            setChanged();
-            markForClientUpdate();
-        }
-    }
+    // 简化canProcessStart方法，适应新的runRecipeLogic逻辑
+    // 调试方法已移除，使用更详细的日志记录替代
+    
 
     // 配方查找和验证
     // 修改配方查找方法，计算并行数
     // 修改配方查找方法，确保正确更新并行数
     private AdvancedAlloyFurnaceRecipe findMatchingRecipe() {
         List<ItemStack> inputItems = new ArrayList<>();
-        for (int i = 0; i < 6; i++) {
+        for (int i = 0; i < INPUT_SLOTS; i++) {
             inputItems.add(itemHandler.getStackInSlot(i));
         }
 
-        FluidStack inputFluid = inputFluidTank.getFluid();
+        // 检查所有输入流体槽，找到匹配配方的流体
         ItemStack catalyst = itemHandler.getStackInSlot(CATALYST_SLOT);
         ItemStack mold = itemHandler.getStackInSlot(MOLD_SLOT);
-
+        
+        // 首先尝试使用空流体查找配方（适用于不需要流体的配方）
         AdvancedAlloyFurnaceRecipe recipe = AdvancedAlloyFurnaceRecipeManager.getInstance()
-                .getRecipeWithCatalystOrMold(level, inputItems, inputFluid, catalyst, mold);
+                .getRecipeWithCatalystOrMold(level, inputItems, FluidStack.EMPTY, catalyst, mold);
+        
+        if (recipe != null) {
+            // Recipe found with empty fluid
+        } else {
+            // No recipe found with empty fluid, checking fluid tanks
+            for (int tankIndex = 0; tankIndex < inputFluidTanks.size(); tankIndex++) {
+                FluidTank tank = inputFluidTanks.get(tankIndex);
+                FluidStack tankFluid = tank.getFluid();
+                if (!tankFluid.isEmpty()) {
+                    recipe = AdvancedAlloyFurnaceRecipeManager.getInstance()
+                            .getRecipeWithCatalystOrMold(level, inputItems, tankFluid, catalyst, mold);
+                    if (recipe != null) {
+                        break;
+                    }
+                }
+            }
+        }
 
         // 更新当前配方引用
         currentRecipe = recipe;
-
+        
         return recipe;
     }
     // 修复并行数更新逻辑
@@ -980,6 +1050,11 @@ public class AdvancedAlloyFurnaceBlockEntity extends BlockEntity implements Menu
         
         if (hasItems) {
             for (int i = 0; i < inputIngredients.size(); i++) {
+                // 对于冲压机配方，忽略底部输入栏对应的物品（索引为1），只考虑顶部输入栏（索引为0）
+                if (recipe.isPressRecipe() && i == 1) {
+                    continue; // 跳过底部输入栏物品
+                }
+                
                 Ingredient ingredient = inputIngredients.get(i);
                 long requiredCount = inputCounts.get(i);
 
@@ -1013,11 +1088,22 @@ public class AdvancedAlloyFurnaceBlockEntity extends BlockEntity implements Menu
         int fluidParallel = Integer.MAX_VALUE;
         FluidStack requiredFluid = recipe.getInputFluid();
         if (!requiredFluid.isEmpty() && requiredFluid.getAmount() > 0) {
-            if (!inputFluid.isEmpty() && inputFluid.getFluid().isSame(requiredFluid.getFluid())) {
+            // 检查所有输入流体槽，找到支持的最大并行数
+            long totalFluidAvailable = 0;
+            boolean hasMatchingFluid = false;
+            
+            for (FluidTank tank : inputFluidTanks) {
+                FluidStack tankFluid = tank.getFluid();
+                if (!tankFluid.isEmpty() && tankFluid.getFluid().isSame(requiredFluid.getFluid())) {
+                    totalFluidAvailable += tankFluid.getAmount();
+                    hasMatchingFluid = true;
+                }
+            }
+            
+            if (hasMatchingFluid) {
                 // 使用long类型计算流体并行数，避免整数溢出
-                long fluidAvailable = inputFluid.getAmount();
                 long fluidRequired = requiredFluid.getAmount();
-                long fluidParallelLong = fluidAvailable / fluidRequired;
+                long fluidParallelLong = totalFluidAvailable / fluidRequired;
                 fluidParallel = (int) Math.min(fluidParallelLong, Integer.MAX_VALUE);
             } else {
                 fluidParallel = 0;
@@ -1030,7 +1116,7 @@ public class AdvancedAlloyFurnaceBlockEntity extends BlockEntity implements Menu
     }
 
     // 用于验证输入的复用列表，避免频繁创建ArrayList
-    private final List<ItemStack> validationInputItems = new ArrayList<>(6);
+    private final List<ItemStack> validationInputItems = new ArrayList<>(INPUT_SLOTS);
     
     // AE2 Integration - 获取存储服务
     private MEStorage getStorageService() {
@@ -1076,18 +1162,46 @@ public class AdvancedAlloyFurnaceBlockEntity extends BlockEntity implements Menu
     }
     
     private boolean validateInputs(AdvancedAlloyFurnaceRecipe recipe) {
-        // 清空复用列表并重新填充，避免创建新的ArrayList
-        validationInputItems.clear();
-        for (int i = 0; i < 6; i++) {
-            validationInputItems.add(itemHandler.getStackInSlot(i));
+        // 每次验证都创建新的输入列表，使用ItemStack副本，避免被matches方法修改
+        List<ItemStack> inputCopies = new ArrayList<>();
+        for (int i = 0; i < INPUT_SLOTS; i++) {
+            inputCopies.add(itemHandler.getStackInSlot(i).copy());
         }
+        
+        ItemStack catalyst = itemHandler.getStackInSlot(CATALYST_SLOT).copy();
+        ItemStack mold = itemHandler.getStackInSlot(MOLD_SLOT).copy();
 
-        FluidStack inputFluid = inputFluidTank.getFluid();
-        ItemStack catalyst = itemHandler.getStackInSlot(CATALYST_SLOT);
-        ItemStack mold = itemHandler.getStackInSlot(MOLD_SLOT);
-
-        // 修改：使用新的匹配逻辑，使催化剂为可选项
-        return recipe.matches(validationInputItems, inputFluid, catalyst, mold);
+        // 检查配方是否需要流体输入
+        FluidStack requiredFluid = recipe.getInputFluid();
+        if (requiredFluid.isEmpty()) {
+            // 如果配方不需要流体，直接使用空流体进行匹配
+            return recipe.matches(inputCopies, FluidStack.EMPTY, catalyst, mold);
+        } else {
+            // 如果配方需要流体，检查所有输入流体槽是否有匹配的流体
+            for (int tankIndex = 0; tankIndex < inputFluidTanks.size(); tankIndex++) {
+                FluidTank tank = inputFluidTanks.get(tankIndex);
+                FluidStack tankFluid = tank.getFluid();
+                if (!tankFluid.isEmpty()) {
+                    // 检查流体类型是否匹配
+                    if (tankFluid.getFluid().isSame(requiredFluid.getFluid())) {
+                        // 检查流体数量是否足够
+                        if (tankFluid.getAmount() >= requiredFluid.getAmount()) {
+                            // 每次匹配都创建新的输入副本，避免被修改
+                            List<ItemStack> freshInputCopies = new ArrayList<>();
+                            for (int i = 0; i < INPUT_SLOTS; i++) {
+                                freshInputCopies.add(itemHandler.getStackInSlot(i).copy());
+                            }
+                            boolean result = recipe.matches(freshInputCopies, tankFluid, catalyst, mold);
+                            if (result) {
+                                return true;
+                            }
+                        }
+                    }
+                }
+            }
+            // 没有找到匹配的流体槽，返回false
+            return false;
+        }
     }
 
     private boolean validateOutputs(AdvancedAlloyFurnaceRecipe recipe, int parallel) {
@@ -1129,7 +1243,7 @@ public class AdvancedAlloyFurnaceBlockEntity extends BlockEntity implements Menu
                 ItemStack testOutput = output.copy();
                 testOutput.setCount(testOutput.getCount() * parallel);
                 boolean hasSpace = false;
-                for (int i = 6; i < 12; i++) {
+                for (int i = INPUT_SLOTS; i < INPUT_SLOTS + OUTPUT_SLOTS; i++) {
                     ItemStack slot = itemHandler.getStackInSlot(i);
                     // 修改：允许堆叠到已有相同物品的槽位，或者使用空槽位
                     if (slot.isEmpty() || (ItemStack.isSameItemSameTags(slot, testOutput) &&
@@ -1147,9 +1261,16 @@ public class AdvancedAlloyFurnaceBlockEntity extends BlockEntity implements Menu
         if (!outputFluid.isEmpty()) {
             FluidStack testOutput = outputFluid.copy();
             testOutput.setAmount(testOutput.getAmount() * parallel);
-            if (outputFluidTank.getSpace() < testOutput.getAmount()) {
-                return false;
+            boolean hasSpace = false;
+            for (FluidTank tank : outputFluidTanks) {
+                if (tank.getSpace() >= testOutput.getAmount() || 
+                    (tank.getFluid().isFluidEqual(testOutput) && 
+                     tank.getFluid().getAmount() + testOutput.getAmount() <= Integer.MAX_VALUE)) {
+                    hasSpace = true;
+                    break;
+                }
             }
+            if (!hasSpace) return false;
         }
 
         return true;
@@ -1202,24 +1323,38 @@ public class AdvancedAlloyFurnaceBlockEntity extends BlockEntity implements Menu
     // 修复配方处理方法
     private void resolveRecipe(AdvancedAlloyFurnaceRecipe recipe) {
         if (recipe == null) {
-            UselessMod.LOGGER.warn("resolveRecipe called with null recipe");
             return;
         }
-
-        UselessMod.LOGGER.debug("Resolving recipe: {} with parallel: {}", recipe.getId(), currentParallel);
 
         // 保存当前并行数到局部变量，避免后续更新槽位时被修改
         int parallel = currentParallel;
 
         // 创建输入物品的副本用于消耗计算
         List<ItemStack> inputItems = new ArrayList<>();
-        for (int i = 0; i < 6; i++) {
+        for (int i = 0; i < INPUT_SLOTS; i++) {
             inputItems.add(itemHandler.getStackInSlot(i).copy());
         }
-
-        FluidStack inputFluid = inputFluidTank.getFluid().copy();
+        
         ItemStack catalystSlot = itemHandler.getStackInSlot(CATALYST_SLOT).copy();
 
+        // 找到与配方匹配的流体槽
+        FluidStack inputFluid = FluidStack.EMPTY;
+        FluidTank matchingFluidTank = null;
+        
+        // 检查配方是否需要流体
+        FluidStack requiredFluid = recipe.getInputFluid();
+        if (!requiredFluid.isEmpty()) {
+            // 查找匹配的流体槽
+            for (FluidTank tank : inputFluidTanks) {
+                FluidStack tankFluid = tank.getFluid();
+                if (!tankFluid.isEmpty() && tankFluid.getFluid().isSame(requiredFluid.getFluid())) {
+                    inputFluid = tankFluid.copy();
+                    matchingFluidTank = tank;
+                    break;
+                }
+            }
+        }
+        
         // 使用并行数消耗输入
         recipe.consumeInputs(inputItems, inputFluid, catalystSlot, parallel);
 
@@ -1227,7 +1362,7 @@ public class AdvancedAlloyFurnaceBlockEntity extends BlockEntity implements Menu
         outputRecipeResults(recipe, parallel);
 
         // 然后更新实际的输入槽位
-        for (int i = 0; i < 6; i++) {
+        for (int i = 0; i < INPUT_SLOTS; i++) {
             itemHandler.setStackInSlot(i, inputItems.get(i));
         }
 
@@ -1238,8 +1373,10 @@ public class AdvancedAlloyFurnaceBlockEntity extends BlockEntity implements Menu
 
         // 注意：模具槽位的物品不会被消耗，保持不变
 
-        // 更新输入流体
-        inputFluidTank.setFluid(inputFluid);
+        // 更新匹配的输入流体槽
+        if (matchingFluidTank != null) {
+            matchingFluidTank.setFluid(inputFluid);
+        }
 
         // 强制立即同步到客户端
         setChanged();
@@ -1248,38 +1385,50 @@ public class AdvancedAlloyFurnaceBlockEntity extends BlockEntity implements Menu
 
     // 直接输出到自身容器的配方结果处理方法
     private void outputRecipeResults(AdvancedAlloyFurnaceRecipe recipe, int parallel) {
+        // 对于有机灌注机配方，使用催化剂支持的最大并行数，而不是当前并行数
+        int outputParallel = parallel;
+        if (recipe.isInsolatorRecipe()) {
+            // 获取催化剂
+            ItemStack catalyst = itemHandler.getStackInSlot(CATALYST_SLOT);
+            // 获取催化剂支持的最大并行数
+            int catalystMaxParallel = CatalystManager.getCatalystParallel(catalyst);
+            outputParallel = Math.max(1, catalystMaxParallel);
+        }
+        
         // 直接输出物品到AE网络（如果连接），否则输出到自身容器
         for (ItemStack output : recipe.getOutputItems()) {
             if (!output.isEmpty()) {
                 // 使用long类型计算总输出数量，避免整数溢出
-                long totalOutputCount = (long) output.getCount() * parallel;
+                long totalOutputCount = (long) output.getCount() * outputParallel;
                 
                 // 如果总输出数量超过Integer.MAX_VALUE，分多次创建ItemStack
                 ItemStack baseOutputStack = output.copy();
-                long remainingCount = totalOutputCount;
+                long remainingToProcess = totalOutputCount;
                 
-                while (remainingCount > 0) {
-                    ItemStack outputStack = baseOutputStack.copy();
+                while (remainingToProcess > 0) {
                     // 每次输出不超过Integer.MAX_VALUE
-                    int stackCount = (int) Math.min(remainingCount, Integer.MAX_VALUE);
-                    outputStack.setCount(stackCount);
+                    int batchSize = (int) Math.min(remainingToProcess, Integer.MAX_VALUE);
+                    ItemStack outputStack = baseOutputStack.copy();
+                    outputStack.setCount(batchSize);
                     
                     // 尝试优先输出到AE网络
                     long inserted = tryOutputToAE(outputStack);
-                    long actualInserted = Math.min(inserted, remainingCount);
-                    remainingCount -= actualInserted;
+                    long actualInserted = Math.min(inserted, remainingToProcess);
+                    remainingToProcess -= actualInserted;
                     
                     // 如果AE网络没存下，输出到自身容器
-                    if (remainingCount > 0) {
-                        ItemStack remainingStack = outputStack.copy();
-                        remainingStack.setCount((int) remainingCount);
+                    if (remainingToProcess > 0) {
+                        // 计算本次需要输出到自身容器的数量
+                        int toOutputToContainer = (int) Math.min(remainingToProcess, Integer.MAX_VALUE);
+                        ItemStack containerOutputStack = baseOutputStack.copy();
+                        containerOutputStack.setCount(toOutputToContainer);
                         
                         // 检查pendingOutputs列表中是否已经有相同的物品，如果有就不再添加，避免无限增长
                         boolean alreadyExists = false;
                         for (ItemStack existingItem : pendingOutputs) {
-                            if (ItemStack.isSameItemSameTags(existingItem, remainingStack)) {
+                            if (ItemStack.isSameItemSameTags(existingItem, containerOutputStack)) {
                                 // 如果已经存在，就增加现有物品的数量，而不是添加新物品
-                                long newCount = (long) existingItem.getCount() + (long) remainingStack.getCount();
+                                long newCount = (long) existingItem.getCount() + toOutputToContainer;
                                 if (newCount <= (long) Integer.MAX_VALUE) {
                                     existingItem.setCount((int) newCount);
                                 } else {
@@ -1291,15 +1440,24 @@ public class AdvancedAlloyFurnaceBlockEntity extends BlockEntity implements Menu
                         }
                         
                         if (!alreadyExists) {
-                            addOutputItem(remainingStack);
+                            addOutputItem(containerOutputStack);
                         }
+                        
+                        // 从剩余数量中减去本次输出到容器的数量
+                        remainingToProcess -= toOutputToContainer;
                     }
                     
                     // 输出物品到自身后，触发自动输出
                     tryAutoOutput();
                     
                     // 避免无限循环，每次循环至少减少1
-                    if (inserted == 0) {
+                    if (inserted == 0 && remainingToProcess > 0) {
+                        // 如果AE网络没存下，且已经输出到容器，继续处理剩余数量
+                        continue;
+                    }
+                    
+                    // 只有当没有剩余数量或AE网络插入失败时才退出循环
+                    if (remainingToProcess <= 0 || inserted == 0) {
                         break;
                     }
                 }
@@ -1310,7 +1468,7 @@ public class AdvancedAlloyFurnaceBlockEntity extends BlockEntity implements Menu
         FluidStack outputFluid = recipe.getOutputFluid();
         if (!outputFluid.isEmpty()) {
             // 使用long类型计算总输出数量，避免整数溢出
-            long totalFluidAmount = (long) outputFluid.getAmount() * parallel;
+            long totalFluidAmount = (long) outputFluid.getAmount() * outputParallel;
             
             // 如果总流体数量超过Integer.MAX_VALUE，分多次填充
             FluidStack baseOutputStack = outputFluid.copy();
@@ -1327,11 +1485,26 @@ public class AdvancedAlloyFurnaceBlockEntity extends BlockEntity implements Menu
                 long actualInserted = Math.min(inserted, remainingAmount);
                 remainingAmount -= actualInserted;
                 
-                // 如果AE网络没存下，输出到自身流体槽
+                // 如果AE网络没存下，输出到自身流体槽（寻找第一个适合的槽位）
                 if (remainingAmount > 0) {
                     FluidStack remainingFluid = outputStack.copy();
                     remainingFluid.setAmount((int) remainingAmount);
-                    outputFluidTank.fill(remainingFluid, IFluidHandler.FluidAction.EXECUTE);
+                    
+                    boolean fluidAdded = false;
+                    for (FluidTank tank : outputFluidTanks) {
+                        if (tank.isEmpty() || tank.getFluid().isFluidEqual(remainingFluid)) {
+                            int filled = tank.fill(remainingFluid, IFluidHandler.FluidAction.EXECUTE);
+                            if (filled > 0) {
+                                fluidAdded = true;
+                                // 如果没有完全填充，继续寻找下一个槽位
+                                if (filled < remainingFluid.getAmount()) {
+                                    remainingFluid.shrink(filled);
+                                } else {
+                                    break;
+                                }
+                            }
+                        }
+                    }
                 }
                 
                 // 输出流体到自身后，触发自动输出
@@ -1459,16 +1632,38 @@ public class AdvancedAlloyFurnaceBlockEntity extends BlockEntity implements Menu
 
     // 清空输入流体
     public void clearInputFluid() {
-        inputFluidTank.setFluid(FluidStack.EMPTY);
+        for (FluidTank tank : inputFluidTanks) {
+            tank.setFluid(FluidStack.EMPTY);
+        }
         setChanged();
         syncToClient();
+    }
+    
+    // 清空指定索引的输入流体槽
+    public void clearInputFluid(int tankIndex) {
+        if (tankIndex >= 0 && tankIndex < inputFluidTanks.size()) {
+            inputFluidTanks.get(tankIndex).setFluid(FluidStack.EMPTY);
+            setChanged();
+            syncToClient();
+        }
     }
 
     // 清空输出流体
     public void clearOutputFluid() {
-        outputFluidTank.setFluid(FluidStack.EMPTY);
+        for (FluidTank tank : outputFluidTanks) {
+            tank.setFluid(FluidStack.EMPTY);
+        }
         setChanged();
         syncToClient();
+    }
+    
+    // 清空指定索引的输出流体槽
+    public void clearOutputFluid(int tankIndex) {
+        if (tankIndex >= 0 && tankIndex < outputFluidTanks.size()) {
+            outputFluidTanks.get(tankIndex).setFluid(FluidStack.EMPTY);
+            setChanged();
+            syncToClient();
+        }
     }
 
     // 修改：改进的输出物品添加方法，将物品添加到暂存列表
@@ -1493,7 +1688,7 @@ public class AdvancedAlloyFurnaceBlockEntity extends BlockEntity implements Menu
             boolean outputProcessed = false;
             
             // 首先尝试堆叠到已有相同物品的槽位，但避免整数溢出
-            for (int i = 6; i < 12; i++) {
+            for (int i = INPUT_SLOTS; i < INPUT_SLOTS + OUTPUT_SLOTS; i++) {
                 ItemStack slotStack = itemHandler.getStackInSlot(i);
                 if (ItemStack.isSameItemSameTags(slotStack, outputStack)) {
                     // 检查当前数量加上要添加的数量是否会超过Integer.MAX_VALUE
@@ -1510,7 +1705,7 @@ public class AdvancedAlloyFurnaceBlockEntity extends BlockEntity implements Menu
             
             // 如果没有堆叠成功，尝试放入空槽位
             if (!outputProcessed) {
-                for (int i = 6; i < 12; i++) {
+                for (int i = INPUT_SLOTS; i < INPUT_SLOTS + OUTPUT_SLOTS; i++) {
                     ItemStack slotStack = itemHandler.getStackInSlot(i);
                     if (slotStack.isEmpty()) {
                         itemHandler.setStackInSlot(i, outputStack.copy());
@@ -1540,53 +1735,77 @@ public class AdvancedAlloyFurnaceBlockEntity extends BlockEntity implements Menu
 
     // 修复的流体交互方法
     public boolean interactWithFluid(Player player, ItemStack stack, boolean isInputTank, boolean isFill) {
+        return interactWithFluid(player, stack, isInputTank, isFill, 0);
+    }
+    
+    public boolean interactWithFluid(Player player, ItemStack stack, boolean isInputTank, boolean isFill, int tankIndex) {
         if (level == null || level.isClientSide) return false;
 
-        return stack.getCapability(ForgeCapabilities.FLUID_HANDLER_ITEM).map(itemHandler -> {
-            return getCapability(ForgeCapabilities.FLUID_HANDLER).map(blockHandler -> {
-                boolean success = false;
+        // 首先尝试处理普通流体容器
+        boolean success = handleFluidContainerInteraction(stack, isInputTank, isFill, tankIndex);
+        
+        
 
-                if (isFill) {
-                    // 向机器填充流体 - 只允许输入槽
-                    if (isInputTank) {
+        if (success) {
+            setChanged();
+            syncToClient();
+            // 更新玩家手持物品
+            if (player instanceof ServerPlayer serverPlayer) {
+                serverPlayer.containerMenu.setCarried(stack);
+            }
+        }
+
+        return success;
+    }
+    
+    /**
+     * 处理普通流体容器的交互
+     */
+    private boolean handleFluidContainerInteraction(ItemStack stack, boolean isInputTank, boolean isFill, int tankIndex) {
+        return stack.getCapability(ForgeCapabilities.FLUID_HANDLER_ITEM).map(itemHandler -> {
+            boolean success = false;
+
+            if (isFill) {
+                // 向机器填充流体 - 只允许输入槽
+                if (isInputTank) {
+                    // 确保tankIndex在有效范围内
+                    if (tankIndex >= 0 && tankIndex < inputFluidTanks.size()) {
+                        FluidTank targetTank = inputFluidTanks.get(tankIndex);
                         FluidStack drained = itemHandler.drain(Integer.MAX_VALUE, IFluidHandler.FluidAction.SIMULATE);
                         if (!drained.isEmpty()) {
-                            int filled = blockHandler.fill(drained, IFluidHandler.FluidAction.SIMULATE);
+                            int filled = targetTank.fill(drained, IFluidHandler.FluidAction.SIMULATE);
                             if (filled > 0) {
                                 FluidStack actualDrained = itemHandler.drain(filled, IFluidHandler.FluidAction.EXECUTE);
-                                blockHandler.fill(actualDrained, IFluidHandler.FluidAction.EXECUTE);
+                                targetTank.fill(actualDrained, IFluidHandler.FluidAction.EXECUTE);
                                 success = true;
                             }
                         }
                     }
-                } else {
-                    // 从机器抽取流体 - 只允许输出槽
-                    if (!isInputTank) {
-                        FluidStack drained = blockHandler.drain(Integer.MAX_VALUE, IFluidHandler.FluidAction.SIMULATE);
+                }
+            } else {
+                // 从机器抽取流体 - 只允许输出槽
+                if (!isInputTank) {
+                    // 确保tankIndex在有效范围内
+                    if (tankIndex >= 0 && tankIndex < outputFluidTanks.size()) {
+                        FluidTank targetTank = outputFluidTanks.get(tankIndex);
+                        FluidStack drained = targetTank.drain(Integer.MAX_VALUE, IFluidHandler.FluidAction.SIMULATE);
                         if (!drained.isEmpty()) {
                             int filled = itemHandler.fill(drained, IFluidHandler.FluidAction.SIMULATE);
                             if (filled > 0) {
-                                FluidStack actualDrained = blockHandler.drain(filled, IFluidHandler.FluidAction.EXECUTE);
+                                FluidStack actualDrained = targetTank.drain(filled, IFluidHandler.FluidAction.EXECUTE);
                                 itemHandler.fill(actualDrained, IFluidHandler.FluidAction.EXECUTE);
                                 success = true;
                             }
                         }
                     }
                 }
+            }
 
-                if (success) {
-                    setChanged();
-                    syncToClient();
-                    // 更新玩家手持物品
-                    if (player instanceof ServerPlayer serverPlayer) {
-                        serverPlayer.containerMenu.setCarried(stack);
-                    }
-                }
-
-                return success;
-            }).orElse(false);
+            return success;
         }).orElse(false);
     }
+    
+    
 
     // 添加便捷方法供UI使用
     public boolean fillInputTank(Player player, ItemStack container) {
@@ -1692,12 +1911,40 @@ public class AdvancedAlloyFurnaceBlockEntity extends BlockEntity implements Menu
         return ItemStack.EMPTY;
     }
 
+    // 兼容旧方法：返回第一个输入流体槽
     public FluidTank getInputFluidTank() {
-        return inputFluidTank;
+        return inputFluidTanks.isEmpty() ? new FluidTank(0) : inputFluidTanks.get(0);
     }
 
+    // 兼容旧方法：返回第一个输出流体槽
     public FluidTank getOutputFluidTank() {
-        return outputFluidTank;
+        return outputFluidTanks.isEmpty() ? new FluidTank(0) : outputFluidTanks.get(0);
+    }
+
+    // 获取输入流体槽列表
+    public List<FluidTank> getInputFluidTanks() {
+        return inputFluidTanks;
+    }
+
+    // 获取输出流体槽列表
+    public List<FluidTank> getOutputFluidTanks() {
+        return outputFluidTanks;
+    }
+
+    // 获取指定索引的输入流体槽
+    public FluidTank getInputFluidTank(int index) {
+        if (index >= 0 && index < inputFluidTanks.size()) {
+            return inputFluidTanks.get(index);
+        }
+        return new FluidTank(0); // 返回空的流体槽作为默认值
+    }
+
+    // 获取指定索引的输出流体槽
+    public FluidTank getOutputFluidTank(int index) {
+        if (index >= 0 && index < outputFluidTanks.size()) {
+            return outputFluidTanks.get(index);
+        }
+        return new FluidTank(0); // 返回空的流体槽作为默认值
     }
 
     public ContainerData getContainerData() {
@@ -1712,8 +1959,31 @@ public class AdvancedAlloyFurnaceBlockEntity extends BlockEntity implements Menu
             itemHandler.deserializeNBT(tag.getCompound("Inventory"));
         }
         energyStorage.deserializeNBT(tag.get("Energy"));
-        inputFluidTank.readFromNBT(tag.getCompound("InputFluid"));
-        outputFluidTank.readFromNBT(tag.getCompound("OutputFluid"));
+        
+        // 加载输入流体槽
+        for (int i = 0; i < inputFluidTanks.size(); i++) {
+            String key = "InputFluid" + i;
+            if (tag.contains(key)) {
+                inputFluidTanks.get(i).readFromNBT(tag.getCompound(key));
+            }
+        }
+        
+        // 加载输出流体槽
+        for (int i = 0; i < outputFluidTanks.size(); i++) {
+            String key = "OutputFluid" + i;
+            if (tag.contains(key)) {
+                outputFluidTanks.get(i).readFromNBT(tag.getCompound(key));
+            }
+        }
+        
+        // 兼容旧格式
+        if (tag.contains("InputFluid") && !inputFluidTanks.isEmpty()) {
+            inputFluidTanks.get(0).readFromNBT(tag.getCompound("InputFluid"));
+        }
+        if (tag.contains("OutputFluid") && !outputFluidTanks.isEmpty()) {
+            outputFluidTanks.get(0).readFromNBT(tag.getCompound("OutputFluid"));
+        }
+        
         process = tag.getInt("Process");
         processMax = tag.getInt("ProcessMax");
         processTick = tag.getInt("ProcessTick");
@@ -1732,8 +2002,19 @@ public class AdvancedAlloyFurnaceBlockEntity extends BlockEntity implements Menu
         super.saveAdditional(tag);
         tag.put("Inventory", itemHandler.serializeNBT());
         tag.put("Energy", energyStorage.serializeNBT());
-        tag.put("InputFluid", inputFluidTank.writeToNBT(new CompoundTag()));
-        tag.put("OutputFluid", outputFluidTank.writeToNBT(new CompoundTag()));
+        
+        // 保存输入流体槽
+        for (int i = 0; i < inputFluidTanks.size(); i++) {
+            String key = "InputFluid" + i;
+            tag.put(key, inputFluidTanks.get(i).writeToNBT(new CompoundTag()));
+        }
+        
+        // 保存输出流体槽
+        for (int i = 0; i < outputFluidTanks.size(); i++) {
+            String key = "OutputFluid" + i;
+            tag.put(key, outputFluidTanks.get(i).writeToNBT(new CompoundTag()));
+        }
+        
         tag.putInt("Process", process);
         tag.putInt("ProcessMax", processMax);
         tag.putInt("ProcessTick", processTick);
@@ -1760,17 +2041,14 @@ public class AdvancedAlloyFurnaceBlockEntity extends BlockEntity implements Menu
         }
         if (cap == ForgeCapabilities.ITEM_HANDLER) {
             // 根据方向返回不同的物品处理器
-            if (side == Direction.DOWN) {
-                // 后方访问：只能访问催化剂槽（12）和模具槽（13）
-                return LazyOptional.of(() -> new DirectionalItemHandler(itemHandler, side)).cast();
-            } else {
-                // 非后方访问：只能访问输入槽（0-5）和输出槽（6-11）
-                return LazyOptional.of(() -> new DirectionalItemHandler(itemHandler, side)).cast();
-            }
+            return LazyOptional.of(() -> new DirectionalItemHandler(itemHandler, side)).cast();
         }
         if (cap == ForgeCapabilities.FLUID_HANDLER) {
             return lazyFluidHandler.cast();
         }
+        
+       
+        
         return super.getCapability(cap, side);
     }
     
@@ -1824,8 +2102,8 @@ public class AdvancedAlloyFurnaceBlockEntity extends BlockEntity implements Menu
                     return originalHandler.insertItem(slot, stack, simulate);
                 }
             } else {
-                // 非后方访问：只能插入输入槽（0-5）
-                if (slot < 6) {
+                // 非后方访问：只能插入输入槽（0-8）
+                if (slot < INPUT_SLOTS) {
                     return originalHandler.insertItem(slot, stack, simulate);
                 }
             }

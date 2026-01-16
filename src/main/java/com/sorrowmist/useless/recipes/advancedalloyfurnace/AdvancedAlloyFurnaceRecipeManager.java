@@ -1,5 +1,6 @@
 package com.sorrowmist.useless.recipes.advancedalloyfurnace;
 
+import com.sorrowmist.useless.UselessMod;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.crafting.Ingredient;
 import net.minecraft.world.item.crafting.RecipeManager;
@@ -19,6 +20,13 @@ public class AdvancedAlloyFurnaceRecipeManager {
     }
 
     private AdvancedAlloyFurnaceRecipeManager() {}
+
+    // 转换后的配方缓存
+    private final List<AdvancedAlloyFurnaceRecipe> thermalConvertedRecipes = new ArrayList<>();
+    private boolean thermalRecipesConverted = false;
+    
+    private final List<AdvancedAlloyFurnaceRecipe> mekanismConvertedRecipes = new ArrayList<>();
+    private boolean mekanismRecipesConverted = false;
 
     // 优化后的配方查找方法
     @Nullable
@@ -49,9 +57,54 @@ public class AdvancedAlloyFurnaceRecipeManager {
         }
 
         RecipeManager recipeManager = level.getRecipeManager();
-        Collection<AdvancedAlloyFurnaceRecipe> allRecipes = recipeManager.getAllRecipesFor(
+        
+        // 转换热力配方并缓存（只在第一次调用时执行）
+        if (!thermalRecipesConverted) {
+            try {
+                // 导入热力配方转换器
+                // 转换有机灌注机配方
+                List<AdvancedAlloyFurnaceRecipe> insolatorRecipes = com.sorrowmist.useless.compat.thermal.ThermalRecipeConverter.convertInsolatorRecipes(recipeManager);
+                thermalConvertedRecipes.addAll(insolatorRecipes);
+
+                
+                // 转换感应炉配方
+                List<AdvancedAlloyFurnaceRecipe> smelterRecipes = com.sorrowmist.useless.compat.thermal.ThermalRecipeConverter.convertSmelterRecipes(recipeManager);
+                thermalConvertedRecipes.addAll(smelterRecipes);
+
+                
+                // 转换冲压机配方
+                List<AdvancedAlloyFurnaceRecipe> pressRecipes = com.sorrowmist.useless.compat.thermal.ThermalRecipeConverter.convertPressRecipes(recipeManager);
+                thermalConvertedRecipes.addAll(pressRecipes);
+
+                
+                thermalRecipesConverted = true;
+            } catch (Exception e) {
+                // Failed to convert Thermal recipes, continue with other recipes
+            }
+        }
+        
+        // 转换Mekanism配方并缓存（只在第一次调用时执行）
+        if (!mekanismRecipesConverted) {
+            try {
+                // 导入Mekanism配方转换器
+                List<AdvancedAlloyFurnaceRecipe> metallurgicInfuserRecipes = com.sorrowmist.useless.compat.mekanism.MekanismRecipeConverter.convertMetallurgicInfuserRecipes(recipeManager);
+                mekanismConvertedRecipes.addAll(metallurgicInfuserRecipes);
+                
+                mekanismRecipesConverted = true;
+            } catch (Exception e) {
+                // Failed to convert Mekanism recipes, continue with other recipes
+            }
+        }
+        
+        // 获取所有高级合金炉配方
+        Collection<AdvancedAlloyFurnaceRecipe> allRecipes = new ArrayList<>(recipeManager.getAllRecipesFor(
                 com.sorrowmist.useless.recipes.ModRecipeTypes.ADVANCED_ALLOY_FURNACE_TYPE.get()
-        );
+        ));
+        
+        // 添加转换后的热力配方
+        allRecipes.addAll(thermalConvertedRecipes);
+        // 添加转换后的Mekanism配方
+        allRecipes.addAll(mekanismConvertedRecipes);
 
         boolean hasCatalyst = !catalyst.isEmpty();
         boolean hasMold = !mold.isEmpty();
@@ -61,26 +114,28 @@ public class AdvancedAlloyFurnaceRecipeManager {
         AdvancedAlloyFurnaceRecipe normalRecipe = null;
         AdvancedAlloyFurnaceRecipe smeltingRecipe = null;
 
+        // 先寻找完全匹配的配方
         for (AdvancedAlloyFurnaceRecipe recipe : allRecipes) {
-            // 首先检查输入物品和流体是否匹配
-            if (!recipe.matches(inputItems, inputFluid)) {
-                continue;
+            if (recipe.matches(inputItems, inputFluid, catalyst, mold)) {
+                // 找到完全匹配的配方，直接返回
+                List<AdvancedAlloyFurnaceRecipe> resultList = Collections.singletonList(recipe);
+                recipeCache.put(cacheKey, resultList);
+                return recipe;
             }
+        }
 
-            // 检查模具匹配（如果配方需要模具）- 模具是必须的
-            if (recipe.requiresMold()) {
-                if (!hasMold || !recipe.getMold().test(mold)) {
-                    continue;
+        // 如果没有完全匹配的配方，再根据优先级寻找可能匹配的配方
+        for (AdvancedAlloyFurnaceRecipe recipe : allRecipes) {
+            // 检查是否匹配输入物品和流体（不考虑催化剂和模具）
+            if (recipe.matches(inputItems, inputFluid, ItemStack.EMPTY, ItemStack.EMPTY)) {
+                // 根据优先级找到第一个匹配的配方
+                if (recipe.requiresCatalyst() && !hasCatalyst && catalystRecipe == null) {
+                    catalystRecipe = recipe;
+                } else if (recipe.requiresMold() && !hasMold && moldRecipe == null) {
+                    moldRecipe = recipe;
+                } else if (!recipe.requiresCatalyst() && !recipe.requiresMold() && normalRecipe == null) {
+                    normalRecipe = recipe;
                 }
-            }
-
-            // 根据优先级找到第一个匹配的配方
-            if (recipe.requiresCatalyst() && catalystRecipe == null) {
-                catalystRecipe = recipe;
-            } else if (recipe.requiresMold() && moldRecipe == null) {
-                moldRecipe = recipe;
-            } else if (!recipe.requiresCatalyst() && !recipe.requiresMold() && normalRecipe == null) {
-                normalRecipe = recipe;
             }
             
             // 如果所有类型都找到了，提前退出循环
@@ -248,9 +303,49 @@ public class AdvancedAlloyFurnaceRecipeManager {
         }
 
         RecipeManager recipeManager = level.getRecipeManager();
-        Collection<AdvancedAlloyFurnaceRecipe> allRecipes = recipeManager.getAllRecipesFor(
+        
+        // 确保热力配方已转换
+        if (!thermalRecipesConverted) {
+            try {
+                // 转换有机灌注机配方
+                List<AdvancedAlloyFurnaceRecipe> insolatorRecipes = com.sorrowmist.useless.compat.thermal.ThermalRecipeConverter.convertInsolatorRecipes(recipeManager);
+                thermalConvertedRecipes.addAll(insolatorRecipes);
+                
+                // 转换感应炉配方
+                List<AdvancedAlloyFurnaceRecipe> smelterRecipes = com.sorrowmist.useless.compat.thermal.ThermalRecipeConverter.convertSmelterRecipes(recipeManager);
+                thermalConvertedRecipes.addAll(smelterRecipes);
+                
+                // 转换冲压机配方
+                List<AdvancedAlloyFurnaceRecipe> pressRecipes = com.sorrowmist.useless.compat.thermal.ThermalRecipeConverter.convertPressRecipes(recipeManager);
+                thermalConvertedRecipes.addAll(pressRecipes);
+                
+                thermalRecipesConverted = true;
+            } catch (Exception e) {
+                // Failed to convert Thermal recipes, continue with other recipes
+            }
+        }
+        
+        // 确保Mekanism配方已转换
+        if (!mekanismRecipesConverted) {
+            try {
+                // 转换Mekanism冶金灌注机配方
+                List<AdvancedAlloyFurnaceRecipe> metallurgicInfuserRecipes = com.sorrowmist.useless.compat.mekanism.MekanismRecipeConverter.convertMetallurgicInfuserRecipes(recipeManager);
+                mekanismConvertedRecipes.addAll(metallurgicInfuserRecipes);
+                
+                mekanismRecipesConverted = true;
+            } catch (Exception e) {
+                // Failed to convert Mekanism recipes, continue with other recipes
+            }
+        }
+        
+        // 获取所有高级合金炉配方
+        Collection<AdvancedAlloyFurnaceRecipe> allRecipes = new ArrayList<>(recipeManager.getAllRecipesFor(
                 com.sorrowmist.useless.recipes.ModRecipeTypes.ADVANCED_ALLOY_FURNACE_TYPE.get()
-        );
+        ));
+        
+        // 添加转换后的配方
+        allRecipes.addAll(thermalConvertedRecipes);
+        allRecipes.addAll(mekanismConvertedRecipes);
 
         for (AdvancedAlloyFurnaceRecipe recipe : allRecipes) {
             for (net.minecraft.world.item.crafting.Ingredient ingredient : recipe.getInputItems()) {
@@ -278,9 +373,38 @@ public class AdvancedAlloyFurnaceRecipeManager {
         }
 
         RecipeManager recipeManager = level.getRecipeManager();
-        Collection<AdvancedAlloyFurnaceRecipe> allRecipes = recipeManager.getAllRecipesFor(
+        
+        // 确保热力配方已转换
+        if (!thermalRecipesConverted) {
+            try {
+                List<AdvancedAlloyFurnaceRecipe> convertedRecipes = com.sorrowmist.useless.compat.thermal.ThermalRecipeConverter.convertInsolatorRecipes(recipeManager);
+                thermalConvertedRecipes.addAll(convertedRecipes);
+                thermalRecipesConverted = true;
+            } catch (Exception e) {
+                // Failed to convert Thermal Insolator recipes, continue with other recipes
+            }
+        }
+        
+        // 确保Mekanism配方已转换
+        if (!mekanismRecipesConverted) {
+            try {
+                // 转换Mekanism冶金灌注机配方
+                List<AdvancedAlloyFurnaceRecipe> metallurgicInfuserRecipes = com.sorrowmist.useless.compat.mekanism.MekanismRecipeConverter.convertMetallurgicInfuserRecipes(recipeManager);
+                mekanismConvertedRecipes.addAll(metallurgicInfuserRecipes);
+                mekanismRecipesConverted = true;
+            } catch (Exception e) {
+                // Failed to convert Mekanism recipes, continue with other recipes
+            }
+        }
+        
+        // 获取所有高级合金炉配方
+        Collection<AdvancedAlloyFurnaceRecipe> allRecipes = new ArrayList<>(recipeManager.getAllRecipesFor(
                 com.sorrowmist.useless.recipes.ModRecipeTypes.ADVANCED_ALLOY_FURNACE_TYPE.get()
-        );
+        ));
+        
+        // 添加转换后的配方
+        allRecipes.addAll(thermalConvertedRecipes);
+        allRecipes.addAll(mekanismConvertedRecipes);
 
         for (AdvancedAlloyFurnaceRecipe recipe : allRecipes) {
             FluidStack recipeFluid = recipe.getInputFluid();

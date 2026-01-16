@@ -2,6 +2,7 @@ package com.sorrowmist.useless.compat.jei;
 
 import com.sorrowmist.useless.UselessMod;
 import com.sorrowmist.useless.blocks.advancedalloyfurnace.AdvancedAlloyFurnaceBlock;
+import com.sorrowmist.useless.compat.thermal.ThermalRecipeConverter;
 import com.sorrowmist.useless.recipes.ModRecipeTypes;
 import com.sorrowmist.useless.registry.ModIngots;
 import mezz.jei.api.IModPlugin;
@@ -92,6 +93,36 @@ public class JEIPlugin implements IModPlugin {
             );
             
             recipes.add(convertedRecipe);
+        }
+
+        // 添加热力配方转换
+        try {
+            // 直接从RecipeManager获取所有InsolatorRecipe并转换
+            List<com.sorrowmist.useless.recipes.advancedalloyfurnace.AdvancedAlloyFurnaceRecipe> convertedRecipes = 
+                    ThermalRecipeConverter.convertInsolatorRecipes(recipeManager);
+            recipes.addAll(convertedRecipes);
+            
+            // 添加热力感应炉(Smelter)配方转换
+            List<com.sorrowmist.useless.recipes.advancedalloyfurnace.AdvancedAlloyFurnaceRecipe> smelterRecipes = 
+                    ThermalRecipeConverter.convertSmelterRecipes(recipeManager);
+            recipes.addAll(smelterRecipes);
+            
+            // 添加热力多驱冲压机(Press)配方转换
+            List<com.sorrowmist.useless.recipes.advancedalloyfurnace.AdvancedAlloyFurnaceRecipe> pressRecipes = 
+                    ThermalRecipeConverter.convertPressRecipes(recipeManager);
+            recipes.addAll(pressRecipes);
+        } catch (Exception e) {
+            // 如果热力模组未加载，捕获异常以避免崩溃
+        }
+        
+        // 添加Mekanism配方转换
+        try {
+            // 添加Mekanism冶金灌注机(Metallurgic Infuser)配方转换
+            List<com.sorrowmist.useless.recipes.advancedalloyfurnace.AdvancedAlloyFurnaceRecipe> mekanismRecipes = 
+                    com.sorrowmist.useless.compat.mekanism.MekanismRecipeConverter.convertMetallurgicInfuserRecipes(recipeManager);
+            recipes.addAll(mekanismRecipes);
+        } catch (Exception e) {
+            // 如果Mekanism模组未加载，捕获异常以避免崩溃
         }
 
         registration.addRecipes(AdvancedAlloyFurnaceRecipeCategory.TYPE, recipes);

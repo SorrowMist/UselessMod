@@ -20,7 +20,6 @@ public class ModMenuTypes {
                     () -> IForgeMenuType.create((windowId, inv, data) -> {
                         // 添加更健壮的数据检查
                         if (data == null) {
-                            UselessMod.LOGGER.error("Received null data when opening Advanced Alloy Furnace menu");
                             // 返回一个安全的默认菜单，而不是null
                             return new AdvancedAlloyFurnaceMenu(windowId, inv, null);
                         }
@@ -28,26 +27,22 @@ public class ModMenuTypes {
                         try {
                             BlockPos pos = data.readBlockPos();
                             if (pos == null) {
-                                UselessMod.LOGGER.error("Received null position data");
                                 return new AdvancedAlloyFurnaceMenu(windowId, inv, null);
                             }
 
                             // 检查世界和方块实体是否存在
                             if (inv.player == null || inv.player.level() == null) {
-                                UselessMod.LOGGER.error("Player or level is null");
                                 return new AdvancedAlloyFurnaceMenu(windowId, inv, null);
                             }
 
                             BlockEntity blockEntity = inv.player.level().getBlockEntity(pos);
                             if (blockEntity == null) {
-                                UselessMod.LOGGER.warn("Block entity not found at position: {}", pos);
                                 // 仍然创建菜单，但方块实体为null
                                 return new AdvancedAlloyFurnaceMenu(windowId, inv, null);
                             }
 
                             return new AdvancedAlloyFurnaceMenu(windowId, inv, blockEntity);
                         } catch (Exception e) {
-                            UselessMod.LOGGER.error("Error creating Advanced Alloy Furnace menu: {}", e.getMessage());
                             // 发生异常时返回安全的默认菜单
                             return new AdvancedAlloyFurnaceMenu(windowId, inv, null);
                         }

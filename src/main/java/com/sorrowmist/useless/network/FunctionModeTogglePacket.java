@@ -3,6 +3,7 @@ package com.sorrowmist.useless.network;
 import com.sorrowmist.useless.UselessMod;
 import com.sorrowmist.useless.api.component.UComponents;
 import com.sorrowmist.useless.api.tool.FunctionMode;
+import com.sorrowmist.useless.utils.UComponentUtils;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.codec.StreamCodec;
@@ -32,10 +33,7 @@ public record FunctionModeTogglePacket(FunctionMode mode) implements CustomPacke
             ItemStack stack = player.getMainHandItem();
             if (stack.isEmpty()) return;
 
-            EnumSet<FunctionMode> modes = stack.getOrDefault(
-                    UComponents.FunctionModesComponent,
-                    EnumSet.noneOf(FunctionMode.class)
-            );
+            var modes = UComponentUtils.getFunctionModes(stack);
 
             FunctionMode m = msg.mode;
             // 使用 getTitleComponent 但去掉颜色

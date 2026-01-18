@@ -69,4 +69,13 @@ public class KeyBindings {
             GLFW.GLFW_KEY_R,
             CATEGORY
     ));
+    // Tab键触发连锁挖掘
+    private static final String TRIGGER_CHAIN_MINING = "key.useless_mod.trigger_chain_mining";
+    public static final Lazy<KeyMapping> TRIGGER_CHAIN_MINING_KEY = Lazy.of(() -> new KeyMapping(
+            TRIGGER_CHAIN_MINING,
+            KeyConflictContext.IN_GAME,
+            InputConstants.Type.KEYSYM,
+            GLFW.GLFW_KEY_TAB,
+            CATEGORY
+    ));
 }

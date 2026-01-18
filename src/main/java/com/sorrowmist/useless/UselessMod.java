@@ -1,11 +1,13 @@
 package com.sorrowmist.useless;
 
+import appeng.api.features.GridLinkables;
 import com.mojang.logging.LogUtils;
 import com.sorrowmist.useless.api.component.UComponents;
 import com.sorrowmist.useless.blocks.GlowPlasticBlock;
 import com.sorrowmist.useless.config.ConfigManager;
 import com.sorrowmist.useless.dimension.UselessDimensions;
 import com.sorrowmist.useless.init.*;
+import com.sorrowmist.useless.items.EndlessBeafItem;
 import net.minecraft.resources.ResourceLocation;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.bus.api.SubscribeEvent;
@@ -53,7 +55,16 @@ public class UselessMod {
         return ResourceLocation.fromNamespaceAndPath(MODID, path);
     }
 
-    private void commonSetup(FMLCommonSetupEvent event) {}
+    private void commonSetup(FMLCommonSetupEvent event) {
+        event.enqueueWork(() -> {
+            GridLinkables.register(ModItems.ENDLESS_BEAF_ITEM.get(), EndlessBeafItem.LINKABLE_HANDLER);
+            GridLinkables.register(ModItems.ENDLESS_BEAF_WRENCH.get(), EndlessBeafItem.LINKABLE_HANDLER);
+            GridLinkables.register(ModItems.ENDLESS_BEAF_SCREWDRIVER.get(), EndlessBeafItem.LINKABLE_HANDLER);
+            GridLinkables.register(ModItems.ENDLESS_BEAF_MALLET.get(), EndlessBeafItem.LINKABLE_HANDLER);
+            GridLinkables.register(ModItems.ENDLESS_BEAF_CROWBAR.get(), EndlessBeafItem.LINKABLE_HANDLER);
+            GridLinkables.register(ModItems.ENDLESS_BEAF_HAMMER.get(), EndlessBeafItem.LINKABLE_HANDLER);
+        });
+    }
 
     @SubscribeEvent
     public void onServerStarting(ServerStartingEvent event) {}

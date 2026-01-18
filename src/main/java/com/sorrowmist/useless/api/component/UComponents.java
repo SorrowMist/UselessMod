@@ -5,6 +5,7 @@ import com.sorrowmist.useless.UselessMod;
 import com.sorrowmist.useless.api.tool.EnchantMode;
 import com.sorrowmist.useless.api.tool.FunctionMode;
 import com.sorrowmist.useless.api.tool.ToolTypeMode;
+import net.minecraft.core.GlobalPos;
 import net.minecraft.core.component.DataComponentType;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.network.FriendlyByteBuf;
@@ -95,6 +96,13 @@ public final class UComponents {
                                     buf -> buf.readEnum(ToolTypeMode.class)
                             ))
             );
+
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<GlobalPos>> WIRELESS_LINK_TARGET = register(
+            "wireless_link_target",
+            builder ->
+                    builder.persistent(GlobalPos.CODEC)
+                           .networkSynchronized(GlobalPos.STREAM_CODEC)
+    );
 
     // 私有构造器，防止外部实例化（该类仅用于注册静态组件）
     private UComponents() {}

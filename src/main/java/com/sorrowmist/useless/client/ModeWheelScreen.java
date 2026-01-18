@@ -10,6 +10,7 @@ import com.sorrowmist.useless.api.tool.ToolTypeMode;
 import com.sorrowmist.useless.network.EnchantmentSwitchPacket;
 import com.sorrowmist.useless.network.FunctionModeTogglePacket;
 import com.sorrowmist.useless.network.ToolTypeModeSwitchPacket;
+import com.sorrowmist.useless.utils.UComponentUtils;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
@@ -21,7 +22,6 @@ import net.neoforged.fml.ModList;
 import net.neoforged.neoforge.network.PacketDistributor;
 
 import java.util.ArrayList;
-import java.util.EnumSet;
 import java.util.List;
 
 public class ModeWheelScreen extends Screen {
@@ -57,11 +57,7 @@ public class ModeWheelScreen extends Screen {
 
         EnchantMode currentEnchant = this.mainHandItem.get(UComponents.EnchantModeComponent);
         ToolTypeMode currentTool = this.mainHandItem.get(UComponents.CurrentToolTypeComponent);
-        EnumSet<FunctionMode> currentFuncs =
-                this.mainHandItem.getOrDefault(
-                        UComponents.FunctionModesComponent,
-                        EnumSet.noneOf(FunctionMode.class)
-                );
+        var currentFuncs = UComponentUtils.getFunctionModes(this.mainHandItem);
 
         // 左：附魔模式
         for (EnchantMode m : EnchantMode.values())

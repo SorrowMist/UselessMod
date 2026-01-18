@@ -3,6 +3,7 @@ package com.sorrowmist.useless.init;
 import com.sorrowmist.useless.UselessMod;
 import com.sorrowmist.useless.network.EnchantmentSwitchPacket;
 import com.sorrowmist.useless.network.FunctionModeTogglePacket;
+import com.sorrowmist.useless.network.TabKeyPressedPacket;
 import com.sorrowmist.useless.network.ToolTypeModeSwitchPacket;
 import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
 
@@ -17,6 +18,9 @@ public class ModNetwork {
         );
         registrar.playToServer(ToolTypeModeSwitchPacket.TYPE, ToolTypeModeSwitchPacket.STREAM_CODEC,
                                ToolTypeModeSwitchPacket::handle
+        );
+        registrar.playToServer(TabKeyPressedPacket.TYPE, TabKeyPressedPacket.STREAM_CODEC,
+                               TabKeyPressedPacket::handle
         );
     }
 }

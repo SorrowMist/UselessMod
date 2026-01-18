@@ -183,7 +183,9 @@ dependencies {
     compileOnly "curse.maven:jade-324717:5427817"
 
     implementation "mekanism:Mekanism:1.21.1-10.7.15.81"
+    runtimeOnly "mekanism:Mekanism:1.21.1-10.7.15.81:generators"
     implementation "curse.maven:applied-mekanistics-574300:5978711"
+
     implementation "curse.maven:botany-pots-353928:6910390"
     implementation files("libs/bookshelf-neoforge-1.21.1-21.1.66.jar")
     implementation files("libs/prickle-neoforge-1.21.1-21.1.11.jar")
@@ -212,6 +214,7 @@ dependencies {
 
 
     runtimeOnly fileTree(dir: 'libs', includes: ['*.jar'], exclude: ['*MouseTweaks*.jar'])
+    compileOnly files("libs/gtceu-1.21.1-7.0.1.jar")
 }
 
 // This block of code expands all declared replace properties in the specified resource targets.

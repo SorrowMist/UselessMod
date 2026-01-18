@@ -1,5 +1,12 @@
 package com.sorrowmist.useless.items;
 
+import appeng.api.features.IGridLinkableHandler;
+import appeng.api.ids.AEComponents;
+import appeng.api.implementations.blockentities.IWirelessAccessPoint;
+import appeng.api.networking.IGrid;
+import appeng.core.localization.PlayerMessages;
+import appeng.items.tools.powered.WirelessTerminalItem;
+import appeng.util.Platform;
 import com.sorrowmist.useless.api.component.UComponents;
 import com.sorrowmist.useless.api.tool.EnchantMode;
 import com.sorrowmist.useless.api.tool.FunctionMode;
@@ -11,19 +18,24 @@ import com.sorrowmist.useless.utils.EnchantmentUtil;
 import com.sorrowmist.useless.utils.UselessItemUtils;
 import com.sorrowmist.useless.utils.mining.MiningUtils;
 import net.minecraft.ChatFormatting;
+import net.minecraft.advancements.CriteriaTriggers;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.core.GlobalPos;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.core.particles.BlockParticleOption;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvent;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
+import net.minecraft.tags.BlockTags;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.Entity;
@@ -62,9 +74,11 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.*;
+import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
-public class EndlessBeafItem extends AxeItem {
+public class EndlessBeafItem extends TieredItem {
+    public static final IGridLinkableHandler LINKABLE_HANDLER = new LinkableHandler();
     private final ToolTypeMode toolType;
 
     public EndlessBeafItem() {
@@ -72,12 +86,27 @@ public class EndlessBeafItem extends AxeItem {
     }
 
     public EndlessBeafItem(@Nullable ToolTypeMode toolType) {
-        super(Tiers.NETHERITE,
+        super(Tiers.STONE,
               new Item.Properties()
-                      .attributes(DiggerItem.createAttributes(Tiers.NETHERITE, 50, 2.0F))
+                      .attributes(DiggerItem.createAttributes(Tiers.STONE, 50, 2.0F))
                       .stacksTo(1)
                       .rarity(Rarity.EPIC)
                       .durability(0)
+                      .component(DataComponents.TOOL, new Tool(
+                                         List.of(
+                                                 Tool.Rule.deniesDrops(Tiers.STONE.getIncorrectBlocksForDrops()),
+                                                 Tool.Rule.minesAndDrops(BlockTags.MINEABLE_WITH_PICKAXE,
+                                                                         Tiers.NETHERITE.getSpeed()
+                                                 ),
+                                                 Tool.Rule.minesAndDrops(BlockTags.MINEABLE_WITH_AXE, Tiers.NETHERITE.getSpeed()),
+                                                 Tool.Rule.minesAndDrops(BlockTags.MINEABLE_WITH_SHOVEL,
+                                                                         Tiers.NETHERITE.getSpeed()
+                                                 ),
+                                                 Tool.Rule.minesAndDrops(BlockTags.MINEABLE_WITH_HOE, Tiers.NETHERITE.getSpeed())
+                                         ),
+                                         1.0F, 0
+                                 )
+                      )
                       .component(UComponents.EnchantModeComponent, EnchantMode.SILK_TOUCH)
                       .component(UComponents.FunctionModesComponent, EnumSet.of(FunctionMode.CHAIN_MINING))
                       .component(UComponents.CurrentToolTypeComponent, ToolTypeMode.NONE_MODE)
@@ -113,73 +142,6 @@ public class EndlessBeafItem extends AxeItem {
     public void setDamage(@NotNull ItemStack stack, int damage) {
         // 阻止任何耐久度设置
         super.setDamage(stack, 0);
-    }
-
-    @Override
-    public int getEnchantmentValue(@NotNull ItemStack stack) {
-        return -1; // 允许被附魔
-    }
-
-    @Override
-    public boolean isDamageable(@NotNull ItemStack stack) {
-        return false; // 物品不可损坏
-    }
-
-    @Override
-    public @NotNull InteractionResult useOn(UseOnContext ctx) {
-        Level world = ctx.getLevel();
-        BlockPos blockpos = ctx.getClickedPos();
-        Player player = ctx.getPlayer();
-        BlockState blockstate = world.getBlockState(blockpos);
-
-        // === 刷子功能（仅对可刷取的方块）===
-        if (player != null) {
-            HitResult hitresult = ProjectileUtil.getHitResultOnViewVector(
-                    player,
-                    (p) -> !p.isSpectator() && p.isPickable(),
-                    player.blockInteractionRange()
-            );
-            if (hitresult instanceof BlockHitResult blockhitresult
-                    && hitresult.getType() == HitResult.Type.BLOCK) {
-                BlockPos hitPos = blockhitresult.getBlockPos();
-                BlockState hitState = world.getBlockState(hitPos);
-                if (hitState.getBlock() instanceof BrushableBlock) {
-                    player.startUsingItem(ctx.getHand());
-                    return InteractionResult.CONSUME;
-                }
-            }
-        }
-
-        if (player == null || player.isCreative()) return InteractionResult.PASS;
-
-        // === 快速破坏塑料块（Shift + 右键）===
-        if (player.isShiftKeyDown() && blockstate.getBlock() instanceof GlowPlasticBlock) {
-            MiningUtils.quickBreakBlock(world, blockpos, blockstate, player, ctx.getItemInHand());
-            return InteractionResult.sidedSuccess(world.isClientSide);
-        }
-
-        // 耕地
-        BlockState modified = blockstate.getToolModifiedState(ctx, ItemAbilities.HOE_TILL, false);
-        if (modified != null) {
-            world.playSound(null, blockpos, SoundEvents.HOE_TILL, SoundSource.BLOCKS, 1F, 1F);
-            if (!world.isClientSide) {
-                world.setBlock(blockpos, modified, 11);
-            }
-            return InteractionResult.sidedSuccess(world.isClientSide);
-        }
-
-        // 铺路
-        modified = blockstate.getToolModifiedState(ctx, ItemAbilities.SHOVEL_FLATTEN, false);
-        if (modified != null) {
-            world.playSound(null, blockpos, SoundEvents.SHOVEL_FLATTEN, SoundSource.BLOCKS, 1F, 1F);
-            if (!world.isClientSide) {
-                world.setBlock(blockpos, modified, 11);
-            }
-            return InteractionResult.sidedSuccess(world.isClientSide);
-        }
-
-        // 其他全部走 AxeItem（剥皮、刮铜、刮蜡）
-        return super.useOn(ctx);
     }
 
     @Override
@@ -227,6 +189,16 @@ public class EndlessBeafItem extends AxeItem {
                     ability == ItemAbility.get("hammer_mute");
 
         };
+    }
+
+    @Override
+    public int getEnchantmentValue(@NotNull ItemStack stack) {
+        return -1; // 允许被附魔
+    }
+
+    @Override
+    public boolean isDamageable(@NotNull ItemStack stack) {
+        return false; // 物品不可损坏
     }
 
     @Override
@@ -320,6 +292,62 @@ public class EndlessBeafItem extends AxeItem {
         }
     }
 
+    @Override
+    public @NotNull InteractionResult useOn(UseOnContext ctx) {
+        Level world = ctx.getLevel();
+        BlockPos blockpos = ctx.getClickedPos();
+        Player player = ctx.getPlayer();
+        BlockState blockstate = world.getBlockState(blockpos);
+
+        // === 刷子功能（仅对可刷取的方块）===
+        if (player != null) {
+            HitResult hitresult = ProjectileUtil.getHitResultOnViewVector(
+                    player,
+                    (p) -> !p.isSpectator() && p.isPickable(),
+                    player.blockInteractionRange()
+            );
+            if (hitresult instanceof BlockHitResult blockhitresult
+                    && hitresult.getType() == HitResult.Type.BLOCK) {
+                BlockPos hitPos = blockhitresult.getBlockPos();
+                BlockState hitState = world.getBlockState(hitPos);
+                if (hitState.getBlock() instanceof BrushableBlock) {
+                    player.startUsingItem(ctx.getHand());
+                    return InteractionResult.CONSUME;
+                }
+            }
+        }
+
+        if (player == null) return InteractionResult.PASS;
+
+        // === 快速破坏塑料块（Shift + 右键）===
+        if (!player.isCreative() && player.isShiftKeyDown() && blockstate.getBlock() instanceof GlowPlasticBlock) {
+            MiningUtils.quickBreakBlock(world, blockpos, blockstate, player, ctx.getItemInHand());
+            return InteractionResult.sidedSuccess(world.isClientSide);
+        }
+
+        // 统一工具逻辑处理 (耕地、铺路、剥皮、刮蜡、刮铜)
+        // 按照 铲 -> 锄 -> 斧 的顺序尝试修改方块状态
+        // 尝试 铲子 (铺路)
+        InteractionResult shovelRes = this.tryToolAction(ctx, ItemAbilities.SHOVEL_FLATTEN, SoundEvents.SHOVEL_FLATTEN);
+        if (shovelRes != InteractionResult.PASS) return shovelRes;
+
+        // 尝试 锄头 (耕地)
+        InteractionResult hoeRes = this.tryToolAction(ctx, ItemAbilities.HOE_TILL, SoundEvents.HOE_TILL);
+        if (hoeRes != InteractionResult.PASS) return hoeRes;
+
+        // 尝试 斧头 (剥皮)
+        InteractionResult stripRes = this.tryToolAction(ctx, ItemAbilities.AXE_STRIP, SoundEvents.AXE_STRIP);
+        if (stripRes != InteractionResult.PASS) return stripRes;
+
+        // 尝试 斧头 (刮铜 Scrape)
+        InteractionResult scrapeRes = this.tryScrapeOrWaxOff(ctx, ItemAbilities.AXE_SCRAPE, SoundEvents.AXE_SCRAPE,
+                                                             3005
+        );
+        if (scrapeRes != InteractionResult.PASS) return scrapeRes;
+
+        // 尝试 斧头 (去蜡 Wax Off)
+        return this.tryScrapeOrWaxOff(ctx, ItemAbilities.AXE_WAX_OFF, SoundEvents.AXE_WAX_OFF, 3004);
+    }
 
     @Override
     @SuppressWarnings("all")
@@ -341,11 +369,6 @@ public class EndlessBeafItem extends AxeItem {
         }
 
         return speed;
-    }
-
-    @Override
-    public boolean isCorrectToolForDrops(@NotNull ItemStack stack, @NotNull BlockState state) {
-        return true;
     }
 
     @Override
@@ -539,6 +562,48 @@ public class EndlessBeafItem extends AxeItem {
         return stack;
     }
 
+    /**
+     * 通用工具动作逻辑
+     */
+    private InteractionResult tryToolAction(UseOnContext ctx, ItemAbility ability, SoundEvent sound) {
+        Level world = ctx.getLevel();
+        BlockPos pos = ctx.getClickedPos();
+        BlockState modified = world.getBlockState(pos).getToolModifiedState(ctx, ability, false);
+        if (modified != null) {
+            world.playSound(ctx.getPlayer(), pos, sound, SoundSource.BLOCKS, 1.0F, 1.0F);
+            if (!world.isClientSide) {
+                world.setBlock(pos, modified, 11);
+                if (ctx.getPlayer() instanceof ServerPlayer sp) {
+                    CriteriaTriggers.ITEM_USED_ON_BLOCK.trigger(sp, pos, ctx.getItemInHand());
+                }
+            }
+            return InteractionResult.sidedSuccess(world.isClientSide);
+        }
+        return InteractionResult.PASS;
+    }
+
+    /**
+     * 针对铜块刮擦和去蜡的特殊逻辑 (带 LevelEvent 粒子效果)
+     */
+    private InteractionResult tryScrapeOrWaxOff(UseOnContext ctx, ItemAbility ability, SoundEvent sound,
+                                                int levelEvent) {
+        Level world = ctx.getLevel();
+        BlockPos pos = ctx.getClickedPos();
+        BlockState modified = world.getBlockState(pos).getToolModifiedState(ctx, ability, false);
+        if (modified != null) {
+            world.playSound(ctx.getPlayer(), pos, sound, SoundSource.BLOCKS, 1.0F, 1.0F);
+            world.levelEvent(ctx.getPlayer(), levelEvent, pos, 0);
+            if (!world.isClientSide) {
+                world.setBlock(pos, modified, 11);
+                if (ctx.getPlayer() instanceof ServerPlayer sp) {
+                    CriteriaTriggers.ITEM_USED_ON_BLOCK.trigger(sp, pos, ctx.getItemInHand());
+                }
+            }
+            return InteractionResult.sidedSuccess(world.isClientSide);
+        }
+        return InteractionResult.PASS;
+    }
+
     private void spawnBrushParticles(Level level,
                                      BlockHitResult hitResult,
                                      BlockState state,
@@ -577,5 +642,63 @@ public class EndlessBeafItem extends AxeItem {
         }
 
         tooltip.add(Component.translatable(translationKey, keyName).withStyle(ChatFormatting.LIGHT_PURPLE));
+    }
+
+    @Nullable private GlobalPos getLinkedPosition(ItemStack item) {
+        return item.get(AEComponents.WIRELESS_LINK_TARGET);
+    }
+
+    @Nullable private IGrid getLinkedGrid(ItemStack stack, Level level, @Nullable Consumer<Component> errorConsumer) {
+        if (level instanceof ServerLevel serverLevel) {
+            GlobalPos linkedPos = this.getLinkedPosition(stack);
+            if (linkedPos == null) {
+                if (errorConsumer != null) {
+                    errorConsumer.accept(PlayerMessages.DeviceNotLinked.text());
+                }
+                return null;
+            } else {
+                ServerLevel linkedLevel = serverLevel.getServer().getLevel(linkedPos.dimension());
+                if (linkedLevel == null) {
+                    if (errorConsumer != null) {
+                        errorConsumer.accept(PlayerMessages.LinkedNetworkNotFound.text());
+                    }
+                    return null;
+                } else {
+                    BlockEntity be = Platform.getTickingBlockEntity(linkedLevel, linkedPos.pos());
+                    if (be instanceof IWirelessAccessPoint) {
+                        IWirelessAccessPoint accessPoint = (IWirelessAccessPoint) be;
+                        IGrid grid = accessPoint.getGrid();
+                        if (grid == null && errorConsumer != null) {
+                            errorConsumer.accept(PlayerMessages.LinkedNetworkNotFound.text());
+                        }
+                        return grid;
+                    } else {
+                        if (errorConsumer != null) {
+                            errorConsumer.accept(PlayerMessages.LinkedNetworkNotFound.text());
+                        }
+                        return null;
+                    }
+                }
+            }
+        } else {
+            return null;
+        }
+    }
+
+    private static class LinkableHandler implements IGridLinkableHandler {
+        @Override
+        public boolean canLink(ItemStack stack) {
+            return stack.getItem() instanceof WirelessTerminalItem;
+        }
+
+        @Override
+        public void link(ItemStack itemStack, GlobalPos pos) {
+            itemStack.set(AEComponents.WIRELESS_LINK_TARGET, pos);
+        }
+
+        @Override
+        public void unlink(ItemStack itemStack) {
+            itemStack.remove(AEComponents.WIRELESS_LINK_TARGET);
+        }
     }
 }

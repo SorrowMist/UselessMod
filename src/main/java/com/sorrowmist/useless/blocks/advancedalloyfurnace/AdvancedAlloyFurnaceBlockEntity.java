@@ -623,12 +623,17 @@ public class AdvancedAlloyFurnaceBlockEntity extends BlockEntity implements Menu
         
         // 找到与配方匹配的流体
         FluidStack matchingFluid = FluidStack.EMPTY;
-        FluidStack requiredFluid = recipe.getInputFluid();
-        if (!requiredFluid.isEmpty()) {
-            for (FluidTank tank : inputFluidTanks) {
-                FluidStack tankFluid = tank.getFluid();
-                if (!tankFluid.isEmpty() && tankFluid.getFluid().isSame(requiredFluid.getFluid())) {
-                    matchingFluid = tankFluid;
+        List<FluidStack> requiredFluids = recipe.getInputFluids();
+        if (!requiredFluids.isEmpty()) {
+            for (FluidStack requiredFluid : requiredFluids) {
+                for (FluidTank tank : inputFluidTanks) {
+                    FluidStack tankFluid = tank.getFluid();
+                    if (!tankFluid.isEmpty() && tankFluid.getFluid().isSame(requiredFluid.getFluid())) {
+                        matchingFluid = tankFluid;
+                        break;
+                    }
+                }
+                if (!matchingFluid.isEmpty()) {
                     break;
                 }
             }
@@ -937,30 +942,21 @@ public class AdvancedAlloyFurnaceBlockEntity extends BlockEntity implements Menu
             inputItems.add(itemHandler.getStackInSlot(i));
         }
 
-        // 检查所有输入流体槽，找到匹配配方的流体
+        // 获取所有非空的输入流体槽
+        List<FluidStack> inputFluidsList = new ArrayList<>();
+        for (FluidTank tank : inputFluidTanks) {
+            FluidStack tankFluid = tank.getFluid();
+            if (!tankFluid.isEmpty()) {
+                inputFluidsList.add(tankFluid);
+            }
+        }
+
         ItemStack catalyst = itemHandler.getStackInSlot(CATALYST_SLOT);
         ItemStack mold = itemHandler.getStackInSlot(MOLD_SLOT);
         
-        // 首先尝试使用空流体查找配方（适用于不需要流体的配方）
+        // 使用支持多种流体输入的配方查找方法
         AdvancedAlloyFurnaceRecipe recipe = AdvancedAlloyFurnaceRecipeManager.getInstance()
-                .getRecipeWithCatalystOrMold(level, inputItems, FluidStack.EMPTY, catalyst, mold);
-        
-        if (recipe != null) {
-            // Recipe found with empty fluid
-        } else {
-            // No recipe found with empty fluid, checking fluid tanks
-            for (int tankIndex = 0; tankIndex < inputFluidTanks.size(); tankIndex++) {
-                FluidTank tank = inputFluidTanks.get(tankIndex);
-                FluidStack tankFluid = tank.getFluid();
-                if (!tankFluid.isEmpty()) {
-                    recipe = AdvancedAlloyFurnaceRecipeManager.getInstance()
-                            .getRecipeWithCatalystOrMold(level, inputItems, tankFluid, catalyst, mold);
-                    if (recipe != null) {
-                        break;
-                    }
-                }
-            }
-        }
+                .getRecipeWithCatalystOrMold(level, inputItems, inputFluidsList, catalyst, mold);
 
         // 更新当前配方引用
         currentRecipe = recipe;
@@ -1039,70 +1035,79 @@ public class AdvancedAlloyFurnaceBlockEntity extends BlockEntity implements Menu
         List<Ingredient> inputIngredients = recipe.getInputItems();
         List<Long> inputCounts = recipe.getInputItemCounts();
         
-        // 提前检查是否有输入物品
-        boolean hasItems = false;
-        for (ItemStack stack : inputItems) {
-            if (!stack.isEmpty()) {
-                hasItems = true;
-                break;
-            }
-        }
+        // 检查配方是否有物品输入需求
+        boolean hasItemInputs = !inputIngredients.isEmpty();
         
-        if (hasItems) {
-            for (int i = 0; i < inputIngredients.size(); i++) {
-                // 对于冲压机配方，忽略底部输入栏对应的物品（索引为1），只考虑顶部输入栏（索引为0）
-                if (recipe.isPressRecipe() && i == 1) {
-                    continue; // 跳过底部输入栏物品
+        if (hasItemInputs) {
+            // 提前检查是否有输入物品
+            boolean hasItems = false;
+            for (ItemStack stack : inputItems) {
+                if (!stack.isEmpty()) {
+                    hasItems = true;
+                    break;
                 }
-                
-                Ingredient ingredient = inputIngredients.get(i);
-                long requiredCount = inputCounts.get(i);
+            }
+            
+            if (hasItems) {
+                for (int i = 0; i < inputIngredients.size(); i++) {
+                    // 对于冲压机配方，忽略底部输入栏对应的物品（索引为1），只考虑顶部输入栏（索引为0）
+                    if (recipe.isPressRecipe() && i == 1) {
+                        continue; // 跳过底部输入栏物品
+                    }
+                    
+                    Ingredient ingredient = inputIngredients.get(i);
+                    long requiredCount = inputCounts.get(i);
 
-                if (requiredCount <= 0) {
-                    continue;
-                }
+                    if (requiredCount <= 0) {
+                        continue;
+                    }
 
-                // 使用long类型存储可用数量，避免整数溢出
-                long availableCount = 0;
-                for (ItemStack stack : inputItems) {
-                    if (!stack.isEmpty() && ingredient.test(stack)) {
-                        availableCount += stack.getCount();
+                    // 使用long类型存储可用数量，避免整数溢出
+                    long availableCount = 0;
+                    for (ItemStack stack : inputItems) {
+                        if (!stack.isEmpty() && ingredient.test(stack)) {
+                            availableCount += stack.getCount();
+                        }
+                    }
+
+                    // 计算可能的并行数，确保结果不会超过Integer.MAX_VALUE
+                    long possibleParallelLong = availableCount / requiredCount;
+                    int possibleParallel = (int) Math.min(possibleParallelLong, Integer.MAX_VALUE);
+                    itemParallel = Math.min(itemParallel, possibleParallel);
+                    
+                    // 如果已经是0，提前返回
+                    if (itemParallel == 0) {
+                        return 1;
                     }
                 }
-
-                // 计算可能的并行数，确保结果不会超过Integer.MAX_VALUE
-                long possibleParallelLong = availableCount / requiredCount;
-                int possibleParallel = (int) Math.min(possibleParallelLong, Integer.MAX_VALUE);
-                itemParallel = Math.min(itemParallel, possibleParallel);
-                
-                // 如果已经是0，提前返回
-                if (itemParallel == 0) {
-                    return 1;
-                }
+            } else {
+                itemParallel = 0;
             }
-        } else {
-            itemParallel = 0;
         }
 
         // 计算输入流体支持的并行数
         int fluidParallel = Integer.MAX_VALUE;
-        FluidStack requiredFluid = recipe.getInputFluid();
-        if (!requiredFluid.isEmpty() && requiredFluid.getAmount() > 0) {
+        List<FluidStack> requiredFluids = recipe.getInputFluids();
+        boolean hasFluidInputs = !requiredFluids.isEmpty();
+        
+        if (hasFluidInputs) {
             // 检查所有输入流体槽，找到支持的最大并行数
             long totalFluidAvailable = 0;
             boolean hasMatchingFluid = false;
             
-            for (FluidTank tank : inputFluidTanks) {
-                FluidStack tankFluid = tank.getFluid();
-                if (!tankFluid.isEmpty() && tankFluid.getFluid().isSame(requiredFluid.getFluid())) {
-                    totalFluidAvailable += tankFluid.getAmount();
-                    hasMatchingFluid = true;
+            for (FluidStack requiredFluid : requiredFluids) {
+                for (FluidTank tank : inputFluidTanks) {
+                    FluidStack tankFluid = tank.getFluid();
+                    if (!tankFluid.isEmpty() && tankFluid.getFluid().isSame(requiredFluid.getFluid())) {
+                        totalFluidAvailable += tankFluid.getAmount();
+                        hasMatchingFluid = true;
+                    }
                 }
             }
             
             if (hasMatchingFluid) {
                 // 使用long类型计算流体并行数，避免整数溢出
-                long fluidRequired = requiredFluid.getAmount();
+                long fluidRequired = requiredFluids.get(0).getAmount();
                 long fluidParallelLong = totalFluidAvailable / fluidRequired;
                 fluidParallel = (int) Math.min(fluidParallelLong, Integer.MAX_VALUE);
             } else {
@@ -1111,7 +1116,23 @@ public class AdvancedAlloyFurnaceBlockEntity extends BlockEntity implements Menu
         }
 
         // 取最小并行数，但不超过最大并行数
-        int actualParallel = Math.min(Math.min(itemParallel, fluidParallel), maxParallel);
+        // 当配方没有物品输入时，只考虑fluidParallel和maxParallel
+        // 当配方没有流体输入时，只考虑itemParallel和maxParallel
+        int actualParallel;
+        if (hasItemInputs && hasFluidInputs) {
+            // 有物品和流体输入，取三者最小值
+            actualParallel = Math.min(Math.min(itemParallel, fluidParallel), maxParallel);
+        } else if (hasItemInputs) {
+            // 只有物品输入，取itemParallel和maxParallel的最小值
+            actualParallel = Math.min(itemParallel, maxParallel);
+        } else if (hasFluidInputs) {
+            // 只有流体输入，取fluidParallel和maxParallel的最小值
+            actualParallel = Math.min(fluidParallel, maxParallel);
+        } else {
+            // 没有输入，返回1
+            actualParallel = 1;
+        }
+        
         return Math.max(1, actualParallel);
     }
 
@@ -1171,36 +1192,23 @@ public class AdvancedAlloyFurnaceBlockEntity extends BlockEntity implements Menu
         ItemStack catalyst = itemHandler.getStackInSlot(CATALYST_SLOT).copy();
         ItemStack mold = itemHandler.getStackInSlot(MOLD_SLOT).copy();
 
-        // 检查配方是否需要流体输入
-        FluidStack requiredFluid = recipe.getInputFluid();
-        if (requiredFluid.isEmpty()) {
-            // 如果配方不需要流体，直接使用空流体进行匹配
-            return recipe.matches(inputCopies, FluidStack.EMPTY, catalyst, mold);
-        } else {
-            // 如果配方需要流体，检查所有输入流体槽是否有匹配的流体
-            for (int tankIndex = 0; tankIndex < inputFluidTanks.size(); tankIndex++) {
-                FluidTank tank = inputFluidTanks.get(tankIndex);
-                FluidStack tankFluid = tank.getFluid();
-                if (!tankFluid.isEmpty()) {
-                    // 检查流体类型是否匹配
-                    if (tankFluid.getFluid().isSame(requiredFluid.getFluid())) {
-                        // 检查流体数量是否足够
-                        if (tankFluid.getAmount() >= requiredFluid.getAmount()) {
-                            // 每次匹配都创建新的输入副本，避免被修改
-                            List<ItemStack> freshInputCopies = new ArrayList<>();
-                            for (int i = 0; i < INPUT_SLOTS; i++) {
-                                freshInputCopies.add(itemHandler.getStackInSlot(i).copy());
-                            }
-                            boolean result = recipe.matches(freshInputCopies, tankFluid, catalyst, mold);
-                            if (result) {
-                                return true;
-                            }
-                        }
-                    }
-                }
+        // 获取所有非空的输入流体槽
+        List<FluidStack> inputFluidsList = new ArrayList<>();
+        for (FluidTank tank : inputFluidTanks) {
+            FluidStack tankFluid = tank.getFluid();
+            if (!tankFluid.isEmpty()) {
+                inputFluidsList.add(tankFluid);
             }
-            // 没有找到匹配的流体槽，返回false
-            return false;
+        }
+
+        // 检查配方是否需要流体输入
+        List<FluidStack> requiredFluids = recipe.getInputFluids();
+        if (requiredFluids.isEmpty()) {
+            // 如果配方不需要流体，直接使用空流体列表进行匹配
+            return recipe.matches(inputCopies, inputFluidsList, catalyst, mold);
+        } else {
+            // 如果配方需要流体，检查所有配方流体是否都能在输入流体槽中找到匹配
+            return recipe.matches(inputCopies, inputFluidsList, catalyst, mold);
         }
     }
 
@@ -1223,12 +1231,14 @@ public class AdvancedAlloyFurnaceBlockEntity extends BlockEntity implements Menu
         }
 
         // 检查输出流体在外部容器的空间
-        FluidStack outputFluid = recipe.getOutputFluid();
-        if (!outputFluid.isEmpty()) {
-            FluidStack testOutput = outputFluid.copy();
-            testOutput.setAmount(testOutput.getAmount() * parallel);
-            if (!canOutputFluidToExternal(testOutput)) {
-                return false;
+        List<FluidStack> outputFluids = recipe.getOutputFluids();
+        if (!outputFluids.isEmpty()) {
+            for (FluidStack outputFluid : outputFluids) {
+                FluidStack testOutput = outputFluid.copy();
+                testOutput.setAmount(testOutput.getAmount() * parallel);
+                if (!canOutputFluidToExternal(testOutput)) {
+                    return false;
+                }
             }
         }
 
@@ -1257,20 +1267,22 @@ public class AdvancedAlloyFurnaceBlockEntity extends BlockEntity implements Menu
         }
 
         // 检查输出流体空间
-        FluidStack outputFluid = recipe.getOutputFluid();
-        if (!outputFluid.isEmpty()) {
-            FluidStack testOutput = outputFluid.copy();
-            testOutput.setAmount(testOutput.getAmount() * parallel);
-            boolean hasSpace = false;
-            for (FluidTank tank : outputFluidTanks) {
-                if (tank.getSpace() >= testOutput.getAmount() || 
-                    (tank.getFluid().isFluidEqual(testOutput) && 
-                     tank.getFluid().getAmount() + testOutput.getAmount() <= Integer.MAX_VALUE)) {
-                    hasSpace = true;
-                    break;
+        List<FluidStack> outputFluids = recipe.getOutputFluids();
+        if (!outputFluids.isEmpty()) {
+            for (FluidStack outputFluid : outputFluids) {
+                FluidStack testOutput = outputFluid.copy();
+                testOutput.setAmount(testOutput.getAmount() * parallel);
+                boolean hasSpace = false;
+                for (FluidTank tank : outputFluidTanks) {
+                    if (tank.getSpace() >= testOutput.getAmount() || 
+                        (tank.getFluid().isFluidEqual(testOutput) && 
+                         tank.getFluid().getAmount() + testOutput.getAmount() <= Integer.MAX_VALUE)) {
+                        hasSpace = true;
+                        break;
+                    }
                 }
+                if (!hasSpace) return false;
             }
-            if (!hasSpace) return false;
         }
 
         return true;
@@ -1337,26 +1349,17 @@ public class AdvancedAlloyFurnaceBlockEntity extends BlockEntity implements Menu
         
         ItemStack catalystSlot = itemHandler.getStackInSlot(CATALYST_SLOT).copy();
 
-        // 找到与配方匹配的流体槽
-        FluidStack inputFluid = FluidStack.EMPTY;
-        FluidTank matchingFluidTank = null;
-        
-        // 检查配方是否需要流体
-        FluidStack requiredFluid = recipe.getInputFluid();
-        if (!requiredFluid.isEmpty()) {
-            // 查找匹配的流体槽
-            for (FluidTank tank : inputFluidTanks) {
-                FluidStack tankFluid = tank.getFluid();
-                if (!tankFluid.isEmpty() && tankFluid.getFluid().isSame(requiredFluid.getFluid())) {
-                    inputFluid = tankFluid.copy();
-                    matchingFluidTank = tank;
-                    break;
-                }
+        // 获取所有非空的输入流体槽的副本用于消耗计算
+        List<FluidStack> inputFluidsList = new ArrayList<>();
+        for (FluidTank tank : inputFluidTanks) {
+            FluidStack tankFluid = tank.getFluid();
+            if (!tankFluid.isEmpty()) {
+                inputFluidsList.add(tankFluid.copy());
             }
         }
         
-        // 使用并行数消耗输入
-        recipe.consumeInputs(inputItems, inputFluid, catalystSlot, parallel);
+        // 使用并行数消耗输入（支持多种流体）
+        recipe.consumeInputs(inputItems, inputFluidsList, catalystSlot, parallel);
 
         // 先输出配方结果，使用保存的并行数
         outputRecipeResults(recipe, parallel);
@@ -1373,9 +1376,18 @@ public class AdvancedAlloyFurnaceBlockEntity extends BlockEntity implements Menu
 
         // 注意：模具槽位的物品不会被消耗，保持不变
 
-        // 更新匹配的输入流体槽
-        if (matchingFluidTank != null) {
-            matchingFluidTank.setFluid(inputFluid);
+        // 更新所有输入流体槽
+        int fluidIndex = 0;
+        for (FluidTank tank : inputFluidTanks) {
+            FluidStack tankFluid = tank.getFluid();
+            if (!tankFluid.isEmpty()) {
+                // 确保我们没有超出流体列表的范围
+                if (fluidIndex < inputFluidsList.size()) {
+                    // 更新流体槽的内容
+                    tank.setFluid(inputFluidsList.get(fluidIndex));
+                    fluidIndex++;
+                }
+            }
         }
 
         // 强制立即同步到客户端
@@ -1465,54 +1477,56 @@ public class AdvancedAlloyFurnaceBlockEntity extends BlockEntity implements Menu
         }
 
         // 直接输出流体到AE网络（如果连接），否则输出到自身容器
-        FluidStack outputFluid = recipe.getOutputFluid();
-        if (!outputFluid.isEmpty()) {
-            // 使用long类型计算总输出数量，避免整数溢出
-            long totalFluidAmount = (long) outputFluid.getAmount() * outputParallel;
-            
-            // 如果总流体数量超过Integer.MAX_VALUE，分多次填充
-            FluidStack baseOutputStack = outputFluid.copy();
-            long remainingAmount = totalFluidAmount;
-            
-            while (remainingAmount > 0) {
-                FluidStack outputStack = baseOutputStack.copy();
-                // 每次输出不超过Integer.MAX_VALUE
-                int stackAmount = (int) Math.min(remainingAmount, Integer.MAX_VALUE);
-                outputStack.setAmount(stackAmount);
+        List<FluidStack> outputFluids = recipe.getOutputFluids();
+        if (!outputFluids.isEmpty()) {
+            for (FluidStack outputFluid : outputFluids) {
+                // 使用long类型计算总输出数量，避免整数溢出
+                long totalFluidAmount = (long) outputFluid.getAmount() * outputParallel;
                 
-                // 尝试优先输出到AE网络
-                long inserted = tryOutputFluidToAE(outputStack);
-                long actualInserted = Math.min(inserted, remainingAmount);
-                remainingAmount -= actualInserted;
+                // 如果总流体数量超过Integer.MAX_VALUE，分多次填充
+                FluidStack baseOutputStack = outputFluid.copy();
+                long remainingAmount = totalFluidAmount;
                 
-                // 如果AE网络没存下，输出到自身流体槽（寻找第一个适合的槽位）
-                if (remainingAmount > 0) {
-                    FluidStack remainingFluid = outputStack.copy();
-                    remainingFluid.setAmount((int) remainingAmount);
+                while (remainingAmount > 0) {
+                    FluidStack outputStack = baseOutputStack.copy();
+                    // 每次输出不超过Integer.MAX_VALUE
+                    int stackAmount = (int) Math.min(remainingAmount, Integer.MAX_VALUE);
+                    outputStack.setAmount(stackAmount);
                     
-                    boolean fluidAdded = false;
-                    for (FluidTank tank : outputFluidTanks) {
-                        if (tank.isEmpty() || tank.getFluid().isFluidEqual(remainingFluid)) {
-                            int filled = tank.fill(remainingFluid, IFluidHandler.FluidAction.EXECUTE);
-                            if (filled > 0) {
-                                fluidAdded = true;
-                                // 如果没有完全填充，继续寻找下一个槽位
-                                if (filled < remainingFluid.getAmount()) {
-                                    remainingFluid.shrink(filled);
-                                } else {
-                                    break;
+                    // 尝试优先输出到AE网络
+                    long inserted = tryOutputFluidToAE(outputStack);
+                    long actualInserted = Math.min(inserted, remainingAmount);
+                    remainingAmount -= actualInserted;
+                    
+                    // 如果AE网络没存下，输出到自身流体槽（寻找第一个适合的槽位）
+                    if (remainingAmount > 0) {
+                        FluidStack remainingFluid = outputStack.copy();
+                        remainingFluid.setAmount((int) remainingAmount);
+                        
+                        boolean fluidAdded = false;
+                        for (FluidTank tank : outputFluidTanks) {
+                            if (tank.isEmpty() || tank.getFluid().isFluidEqual(remainingFluid)) {
+                                int filled = tank.fill(remainingFluid, IFluidHandler.FluidAction.EXECUTE);
+                                if (filled > 0) {
+                                    fluidAdded = true;
+                                    // 如果没有完全填充，继续寻找下一个槽位
+                                    if (filled < remainingFluid.getAmount()) {
+                                        remainingFluid.shrink(filled);
+                                    } else {
+                                        break;
+                                    }
                                 }
                             }
                         }
                     }
-                }
-                
-                // 输出流体到自身后，触发自动输出
-                tryAutoOutput();
-                
-                // 避免无限循环，每次循环至少减少1
-                if (inserted == 0) {
-                    break;
+                    
+                    // 输出流体到自身后，触发自动输出
+                    tryAutoOutput();
+                    
+                    // 避免无限循环，每次循环至少减少1
+                    if (inserted == 0) {
+                        break;
+                    }
                 }
             }
         }

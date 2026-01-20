@@ -79,7 +79,7 @@ public class ThermalRecipeConverter {
                     }
 
                     // 3. 处理输入流体：直接使用原配方的输入流体
-                    FluidStack inputFluid = FluidStack.EMPTY;
+                    List<FluidStack> inputFluids = new ArrayList<>();
                     if (!insolatorRecipe.getInputFluids().isEmpty()) {
                         // 获取第一个流体输入
                         cofh.lib.common.fluid.FluidIngredient fluidIngredient = insolatorRecipe.getInputFluids().get(0);
@@ -89,7 +89,7 @@ public class ThermalRecipeConverter {
                             if (fluidStacks.length > 0) {
                                 FluidStack fluidStack = fluidStacks[0];
                                 // 使用流体栈中的流体，保留原始数量
-                                inputFluid = fluidStack;
+                                inputFluids.add(fluidStack);
                             }
                         }
                     }
@@ -112,9 +112,9 @@ public class ThermalRecipeConverter {
                     }
 
                     // 5. 处理输出流体：直接使用原配方的输出流体
-                    FluidStack outputFluid = FluidStack.EMPTY;
+                    List<FluidStack> outputFluids = new ArrayList<>();
                     if (!insolatorRecipe.getOutputFluids().isEmpty()) {
-                        outputFluid = insolatorRecipe.getOutputFluids().get(0).copy();
+                        outputFluids.add(insolatorRecipe.getOutputFluids().get(0).copy());
                     }
 
                     // 6. 处理能量消耗：使用原配方的能量值
@@ -150,9 +150,9 @@ public class ThermalRecipeConverter {
                             newId,
                             inputIngredients,
                             inputItemCounts,
-                            inputFluid,
+                            inputFluids,
                             outputItems,
-                            outputFluid,
+                            outputFluids,
                             energy,
                             processTime,
                             catalyst,
@@ -239,13 +239,13 @@ public class ThermalRecipeConverter {
                     }
 
                     // 4. 处理输入流体
-                    FluidStack inputFluid = FluidStack.EMPTY;
+                    List<FluidStack> inputFluids = new ArrayList<>();
                     Method getInputFluidsMethod = smelterRecipeClass.getMethod("getInputFluids");
-                    List<?> inputFluids = (List<?>) getInputFluidsMethod.invoke(smelterRecipe);
+                    List<?> inputFluidsList = (List<?>) getInputFluidsMethod.invoke(smelterRecipe);
                     
-                    if (!inputFluids.isEmpty()) {
+                    if (!inputFluidsList.isEmpty()) {
                         // 获取第一个流体输入
-                        Object fluidIngredient = inputFluids.get(0);
+                        Object fluidIngredient = inputFluidsList.get(0);
                         Class<?> fluidIngredientClass = fluidIngredient.getClass();
                         
                         // 获取流体栈数组
@@ -256,7 +256,7 @@ public class ThermalRecipeConverter {
                             FluidStack fluidStack = fluidStacks[0].copy();
                             // 输入流体数量乘以64倍
                             fluidStack.setAmount(fluidStack.getAmount() * 64);
-                            inputFluid = fluidStack;
+                            inputFluids.add(fluidStack);
                         }
                     }
 
@@ -273,7 +273,7 @@ public class ThermalRecipeConverter {
                     }
 
                     // 6. 处理输出流体：数量乘以64倍
-                    FluidStack outputFluid = FluidStack.EMPTY;
+                    List<FluidStack> outputFluids = new ArrayList<>();
                     Method getOutputFluidsMethod = smelterRecipeClass.getMethod("getOutputFluids");
                     List<FluidStack> originalOutputFluids = (List<FluidStack>) getOutputFluidsMethod.invoke(smelterRecipe);
                     
@@ -281,7 +281,7 @@ public class ThermalRecipeConverter {
                         FluidStack fluidStack = originalOutputFluids.get(0).copy();
                         // 输出流体数量乘以64倍
                         fluidStack.setAmount(fluidStack.getAmount() * 64);
-                        outputFluid = fluidStack;
+                        outputFluids.add(fluidStack);
                     }
 
                     // 7. 处理能量消耗：使用原配方的能量值，乘以64倍
@@ -318,9 +318,9 @@ public class ThermalRecipeConverter {
                             newId,
                             inputIngredients,
                             inputItemCounts,
-                            inputFluid,
+                            inputFluids,
                             outputItems,
-                            outputFluid,
+                            outputFluids,
                             energy,
                             processTime,
                             catalyst,
@@ -408,13 +408,13 @@ public class ThermalRecipeConverter {
                     }
 
                     // 4. 处理输入流体
-                    FluidStack inputFluid = FluidStack.EMPTY;
+                    List<FluidStack> inputFluids = new ArrayList<>();
                     Method getInputFluidsMethod = pressRecipeClass.getMethod("getInputFluids");
-                    List<?> inputFluids = (List<?>) getInputFluidsMethod.invoke(pressRecipe);
+                    List<?> inputFluidsList = (List<?>) getInputFluidsMethod.invoke(pressRecipe);
                     
-                    if (!inputFluids.isEmpty()) {
+                    if (!inputFluidsList.isEmpty()) {
                         // 获取第一个流体输入
-                        Object fluidIngredient = inputFluids.get(0);
+                        Object fluidIngredient = inputFluidsList.get(0);
                         Class<?> fluidIngredientClass = fluidIngredient.getClass();
                         
                         // 获取流体栈数组
@@ -425,7 +425,7 @@ public class ThermalRecipeConverter {
                             FluidStack fluidStack = fluidStacks[0].copy();
                             // 输入流体数量乘以64倍
                             fluidStack.setAmount(fluidStack.getAmount() * 64);
-                            inputFluid = fluidStack;
+                            inputFluids.add(fluidStack);
                         }
                     }
 
@@ -442,7 +442,7 @@ public class ThermalRecipeConverter {
                     }
 
                     // 6. 处理输出流体：数量乘以64倍
-                    FluidStack outputFluid = FluidStack.EMPTY;
+                    List<FluidStack> outputFluids = new ArrayList<>();
                     Method getOutputFluidsMethod = pressRecipeClass.getMethod("getOutputFluids");
                     List<FluidStack> originalOutputFluids = (List<FluidStack>) getOutputFluidsMethod.invoke(pressRecipe);
                     
@@ -450,7 +450,7 @@ public class ThermalRecipeConverter {
                         FluidStack fluidStack = originalOutputFluids.get(0).copy();
                         // 输出流体数量乘以64倍
                         fluidStack.setAmount(fluidStack.getAmount() * 64);
-                        outputFluid = fluidStack;
+                        outputFluids.add(fluidStack);
                     }
 
                     // 7. 处理能量消耗：使用原配方的能量值，乘以64倍
@@ -496,9 +496,9 @@ public class ThermalRecipeConverter {
                             newId,
                             inputIngredients,
                             inputItemCounts,
-                            inputFluid,
+                            inputFluids,
                             outputItems,
-                            outputFluid,
+                            outputFluids,
                             energy,
                             processTime,
                             catalyst,

@@ -67,7 +67,7 @@ public class ModeWheelScreen extends Screen {
         rightModes.clear();
         
         for (ToolMode mode : ToolMode.values()) {
-            if (mode != ToolMode.CHAIN_MINING && mode != ToolMode.ENHANCED_CHAIN_MINING) {
+            if (mode != ToolMode.CHAIN_MINING) {
                 boolean shouldAddMode = true;
                 if (mode == ToolMode.OMNITOOL_MODE) {
                     net.minecraft.resources.ResourceLocation omnitoolId = new net.minecraft.resources.ResourceLocation("omnitools:omni_wrench");
@@ -95,6 +95,7 @@ public class ModeWheelScreen extends Screen {
                             break;
                         case FORCE_MINING:
                         case AE_STORAGE_PRIORITY:
+                        case ENHANCED_CHAIN_MINING:
                             rightModes.add(modeData);
                             break;
                         default:

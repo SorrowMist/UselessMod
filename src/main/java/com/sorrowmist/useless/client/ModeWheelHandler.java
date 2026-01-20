@@ -50,8 +50,7 @@ public class ModeWheelHandler {
                 }
             }
             
-            if (targetItem != null && !(minecraft.screen instanceof ModeWheelScreen)) {
-                // 显示模式轮盘屏幕
+            if (targetItem != null && minecraft.screen == null) {
                 ModeManager modeManager = new ModeManager();
                 modeManager.loadFromStack(targetItem);
                 ModeWheelScreen.show(modeManager, targetItem);

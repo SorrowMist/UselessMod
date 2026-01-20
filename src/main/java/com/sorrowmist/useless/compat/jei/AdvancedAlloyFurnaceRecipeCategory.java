@@ -45,46 +45,49 @@ public class AdvancedAlloyFurnaceRecipeCategory implements IRecipeCategory<Advan
     // 使用新的JEI渲染贴图
     private static final ResourceLocation GUI_TEXTURE =
             ResourceLocation.fromNamespaceAndPath("useless_mod", "textures/gui/jei_advanced_alloy_furnace_gui.png");
-    // 进度条贴图
-    private static final ResourceLocation PROGRESS_TEXTURE =
-            ResourceLocation.fromNamespaceAndPath("useless_mod", "textures/gui/jei_arrow_advanced_alloy_furnace_gui.png");
-    // JEI中显示的背景区域 (191x54)
-    private static final int DISPLAY_WIDTH = 191;
-    private static final int DISPLAY_HEIGHT = 54;
+    // JEI中显示的背景区域 (212x72)
+    private static final int DISPLAY_WIDTH = 212;
+    private static final int DISPLAY_HEIGHT = 72;
     // 槽位位置 - 根据新贴图调整
-    // 输入物品槽位 (6个) - 3行2列排列
+    // 输入物品槽位 (9个) - 3行3列排列
     private static final int INPUT_SLOTS_START_X = 1;
     private static final int INPUT_SLOTS_START_Y = 1;
     private static final int INPUT_SLOT_SPACING_X = 18;
     private static final int INPUT_SLOT_SPACING_Y = 18;
-    // 输出物品槽位 (6个) - 3行2列排列
-    private static final int OUTPUT_SLOTS_START_X = 138;
+    // 输出物品槽位 (9个) - 3行3列排列
+    private static final int OUTPUT_SLOTS_START_X = 159;
     private static final int OUTPUT_SLOTS_START_Y = 1;
     // 流体槽位
-    private static final int FLUID_INPUT_X = 37;
-    private static final int FLUID_INPUT_Y = 1;
-    private static final int FLUID_OUTPUT_X = 174;
-    private static final int FLUID_OUTPUT_Y = 1;
+    private static final int FLUID_INPUT_X = 1;
+    private static final int FLUID_INPUT_Y = 55;
+    private static final int FLUID_INPUT_WIDTH = 52;
+    private static final int FLUID_INPUT_HEIGHT = 16;
+    private static final int FLUID_OUTPUT_X = 159;
+    private static final int FLUID_OUTPUT_Y = 55;
+    private static final int FLUID_OUTPUT_WIDTH = 52;
+    private static final int FLUID_OUTPUT_HEIGHT = 16;
     // 催化剂和模具槽位
-    private static final int CATALYST_SLOT_X = 37;
-    private static final int CATALYST_SLOT_Y = 19;
-    private static final int MOLD_SLOT_X = 37;
-    private static final int MOLD_SLOT_Y = 37;
+    private static final int CATALYST_SLOT_X = 80;
+    private static final int CATALYST_SLOT_Y = 55;
+    private static final int MOLD_SLOT_X = 116;
+    private static final int MOLD_SLOT_Y = 55;
     // 进度条位置和尺寸
-    private static final int PROGRESS_BAR_X = 79;
+    private static final int PROGRESS_BAR_X = 90;
     private static final int PROGRESS_BAR_Y = 23;
-    private static final int PROGRESS_BAR_WIDTH = 33;
+    private static final int PROGRESS_BAR_WIDTH = 32;
     private static final int PROGRESS_BAR_HEIGHT = 8;
+    private static final int PROGRESS_BAR_SOURCE_X = 90;
+    private static final int PROGRESS_BAR_SOURCE_Y = 73;
     // 能量显示区域
-    private static final int ENERGY_DISPLAY_X = 68;
+    private static final int ENERGY_DISPLAY_X = 75;
     private static final int ENERGY_DISPLAY_Y = 0;
-    private static final int ENERGY_DISPLAY_WIDTH = 55;
-    private static final int ENERGY_DISPLAY_HEIGHT = 5;
+    private static final int ENERGY_DISPLAY_WIDTH = 62;
+    private static final int ENERGY_DISPLAY_HEIGHT = 7;
     // 时间显示区域
-    private static final int TIME_DISPLAY_X = 79;
-    private static final int TIME_DISPLAY_Y = 45;
-    private static final int TIME_DISPLAY_WIDTH = 33;
-    private static final int TIME_DISPLAY_HEIGHT = 6;
+    private static final int TIME_DISPLAY_X = 78;
+    private static final int TIME_DISPLAY_Y = 41;
+    private static final int TIME_DISPLAY_WIDTH = 56;
+    private static final int TIME_DISPLAY_HEIGHT = 10;
     // 文字提示位置 - 向左移动5像素
 
     private static final int CATALYST_TEXT_Y = 13;
@@ -148,7 +151,7 @@ public class AdvancedAlloyFurnaceRecipeCategory implements IRecipeCategory<Advan
 
     @Override
     public void setRecipe(IRecipeLayoutBuilder builder, AdvancedAlloyFurnaceRecipe recipe, IFocusGroup focuses) {
-        for (int i = 0; i < Math.min(recipe.getInputItems().size(), 6); i++) {
+        for (int i = 0; i < Math.min(recipe.getInputItems().size(), 9); i++) {
             Ingredient ingredient = recipe.getInputItems().get(i);
             long count = recipe.getInputItemCounts().get(i);
 
@@ -164,8 +167,8 @@ public class AdvancedAlloyFurnaceRecipeCategory implements IRecipeCategory<Advan
 
                 Ingredient displayIngredient = Ingredient.of(displayStacks);
 
-                int row = i / 2;
-                int col = i % 2;
+                int row = i / 3;
+                int col = i % 3;
                 int x = INPUT_SLOTS_START_X + col * INPUT_SLOT_SPACING_X;
                 int y = INPUT_SLOTS_START_Y + row * INPUT_SLOT_SPACING_Y;
 
@@ -175,11 +178,11 @@ public class AdvancedAlloyFurnaceRecipeCategory implements IRecipeCategory<Advan
             }
         }
 
-        // 输出物品槽位 (6个) - 3行2列排列
-        for (int i = 0; i < Math.min(recipe.getOutputItems().size(), 6); i++) {
-            // 计算槽位位置：3行2列
-            int row = i / 2;
-            int col = i % 2;
+        // 输出物品槽位 (9个) - 3行3列排列
+        for (int i = 0; i < Math.min(recipe.getOutputItems().size(), 9); i++) {
+            // 计算槽位位置：3行3列
+            int row = i / 3;
+            int col = i % 3;
             int x = OUTPUT_SLOTS_START_X + col * INPUT_SLOT_SPACING_X;
             int y = OUTPUT_SLOTS_START_Y + row * INPUT_SLOT_SPACING_Y;
 
@@ -189,21 +192,35 @@ public class AdvancedAlloyFurnaceRecipeCategory implements IRecipeCategory<Advan
         }
 
         // 输入流体槽 - 使用自定义渲染器显示数量
-        if (!recipe.getInputFluid().isEmpty()) {
-            builder.addSlot(mezz.jei.api.recipe.RecipeIngredientRole.INPUT,
-                            FLUID_INPUT_X, FLUID_INPUT_Y)
-                    .addFluidStack(recipe.getInputFluid().getFluid(), recipe.getInputFluid().getAmount())
-                    .setCustomRenderer(mezz.jei.api.forge.ForgeTypes.FLUID_STACK,
-                            new FluidStackRenderer(recipe.getInputFluid().getAmount(), true, SLOT_SIZE, SLOT_SIZE));
+        List<FluidStack> inputFluids = recipe.getInputFluids();
+        if (!inputFluids.isEmpty()) {
+            int fluidCount = inputFluids.size();
+            int fluidWidth = FLUID_INPUT_WIDTH / fluidCount;
+            
+            for (int i = 0; i < fluidCount; i++) {
+                FluidStack fluid = inputFluids.get(i);
+                int x = FLUID_INPUT_X + i * fluidWidth;
+                builder.addSlot(mezz.jei.api.recipe.RecipeIngredientRole.INPUT, x, FLUID_INPUT_Y)
+                        .addFluidStack(fluid.getFluid(), fluid.getAmount())
+                        .setCustomRenderer(mezz.jei.api.forge.ForgeTypes.FLUID_STACK,
+                                new FluidStackRenderer(fluid.getAmount(), true, fluidWidth, FLUID_INPUT_HEIGHT));
+            }
         }
 
         // 输出流体槽 - 使用自定义渲染器显示数量
-        if (!recipe.getOutputFluid().isEmpty()) {
-            builder.addSlot(mezz.jei.api.recipe.RecipeIngredientRole.OUTPUT,
-                            FLUID_OUTPUT_X, FLUID_OUTPUT_Y)
-                    .addFluidStack(recipe.getOutputFluid().getFluid(), recipe.getOutputFluid().getAmount())
-                    .setCustomRenderer(mezz.jei.api.forge.ForgeTypes.FLUID_STACK,
-                            new FluidStackRenderer(recipe.getOutputFluid().getAmount(), true, SLOT_SIZE, SLOT_SIZE));
+        List<FluidStack> outputFluids = recipe.getOutputFluids();
+        if (!outputFluids.isEmpty()) {
+            int fluidCount = outputFluids.size();
+            int fluidWidth = FLUID_OUTPUT_WIDTH / fluidCount;
+            
+            for (int i = 0; i < fluidCount; i++) {
+                FluidStack fluid = outputFluids.get(i);
+                int x = FLUID_OUTPUT_X + i * fluidWidth;
+                builder.addSlot(mezz.jei.api.recipe.RecipeIngredientRole.OUTPUT, x, FLUID_OUTPUT_Y)
+                        .addFluidStack(fluid.getFluid(), fluid.getAmount())
+                        .setCustomRenderer(mezz.jei.api.forge.ForgeTypes.FLUID_STACK,
+                                new FluidStackRenderer(fluid.getAmount(), true, fluidWidth, FLUID_OUTPUT_HEIGHT));
+            }
         }
 
         // 催化剂槽位：只在配方需要催化剂时显示
@@ -247,11 +264,13 @@ public class AdvancedAlloyFurnaceRecipeCategory implements IRecipeCategory<Advan
 
         int progressWidth = (int) (PROGRESS_BAR_WIDTH * progressRatio);
         if (progressWidth > 0) {
-            guiGraphics.blit(PROGRESS_TEXTURE,
+            // 从GUI_TEXTURE的PROGRESS_BAR_SOURCE_X, PROGRESS_BAR_SOURCE_Y处抠取进度条
+            // 注意：纹理的实际尺寸可能大于显示区域，使用纹理的实际尺寸进行blit
+            guiGraphics.blit(GUI_TEXTURE,
                     PROGRESS_BAR_X, PROGRESS_BAR_Y,
-                    0, 0,
+                    PROGRESS_BAR_SOURCE_X, PROGRESS_BAR_SOURCE_Y,
                     progressWidth, PROGRESS_BAR_HEIGHT,
-                    PROGRESS_BAR_WIDTH, PROGRESS_BAR_HEIGHT);
+                    256, 256); // 使用纹理的实际尺寸（假设为256x256）
         }
 
         // 绘制能量和时间信息
@@ -503,6 +522,16 @@ public class AdvancedAlloyFurnaceRecipeCategory implements IRecipeCategory<Advan
             if (showAmount && stack.getAmount() > 0) {
                 renderFluidAmount(guiGraphics, stack);
             }
+
+            // 从UI图抠取覆盖层，尺寸根据流体槽实际大小确定，渲染在流体槽向左向上1像素位置
+            RenderSystem.setShaderTexture(0, GUI_TEXTURE);
+            guiGraphics.blit(
+                    GUI_TEXTURE,
+                    -1, -1, // 向左向上1像素
+                    0, 54, // UI图起点
+                    width + 2, height + 2, // 覆盖层大小，使用流体槽实际宽度+2，高度+2
+                    256, 256 // 纹理实际尺寸
+            );
 
             RenderSystem.disableBlend();
         }

@@ -201,6 +201,10 @@ dependencies {
     implementation fg.deobf("curse.maven:sophisticated-core-618298:7369562")//sophisticated-core-6.1.82-forge
     implementation fg.deobf("curse.maven:sophisticated-storage-619320:7369594")//sophisticated-storage-6.1.82-forge
     implementation fg.deobf("curse.maven:sophisticated-backpacks-422301:7369580")//sophisticated-backpacks-6.1.82-forge
+    implementation fg.deobf("curse.maven:industrial-foregoing-266515:7068937")//industrial-foregoing-1.20.1-1.1.0
+    implementation fg.deobf("curse.maven:titanium-287342:5468426")//titanium-1.20.1-1.0.0
+    implementation fg.deobf("curse.maven:blood-magic-224791:7253333")//blood-magic-1.20.1-1.0.0
+    implementation fg.deobf("curse.maven:embers-rekindled-300777:7446478")//mbersrekindled-1.20.1-1.4.7
 
 
     //exendedae前置
@@ -209,7 +213,7 @@ dependencies {
     implementation fg.deobf("curse.maven:ex-pattern-provider-892005:7144417")
     //ae2
     implementation fg.deobf("curse.maven:applied-energistics-2-223794:7148487")
-    implementation fg.deobf("curse.maven:guideme-1173950:7127447")
+    implementation fg.deobf("curse.maven:guideme-1173950:6679102")
     //config
     implementation fg.deobf("curse.maven:configured-457570:5180900")
 

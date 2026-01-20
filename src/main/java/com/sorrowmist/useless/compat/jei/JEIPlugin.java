@@ -60,7 +60,7 @@ public class JEIPlugin implements IModPlugin {
             List<ItemStack> outputItems = new ArrayList<>();
             outputItems.add(recipe.getResultItem(null));
             
-            net.minecraftforge.fluids.FluidStack emptyFluid = net.minecraftforge.fluids.FluidStack.EMPTY;
+            List<net.minecraftforge.fluids.FluidStack> emptyFluids = new ArrayList<>();
             net.minecraft.world.item.crafting.Ingredient furnaceIngredient = net.minecraft.world.item.crafting.Ingredient.of(net.minecraft.world.item.Items.FURNACE);
             
             // 创建无用锭标签的催化剂，允许使用所有无用锭
@@ -82,9 +82,9 @@ public class JEIPlugin implements IModPlugin {
                     recipe.getId(),
                     inputIngredients,
                     longInputCounts,
-                    emptyFluid,
+                    emptyFluids,
                     outputItems,
-                    emptyFluid,
+                    emptyFluids,
                     1000, // 能量消耗
                     40, // 处理时间：熔炉配方为40tick
                     uselessIngotCatalyst, // 催化剂：无用锭标签
@@ -121,8 +121,73 @@ public class JEIPlugin implements IModPlugin {
             List<com.sorrowmist.useless.recipes.advancedalloyfurnace.AdvancedAlloyFurnaceRecipe> mekanismRecipes = 
                     com.sorrowmist.useless.compat.mekanism.MekanismRecipeConverter.convertMetallurgicInfuserRecipes(recipeManager);
             recipes.addAll(mekanismRecipes);
+            
+            // 添加Mekanism富集仓(Enrichment Chamber)配方转换
+            List<com.sorrowmist.useless.recipes.advancedalloyfurnace.AdvancedAlloyFurnaceRecipe> enrichmentRecipes = 
+                    com.sorrowmist.useless.compat.mekanism.MekanismRecipeConverter.convertEnrichmentChamberRecipes(recipeManager);
+            recipes.addAll(enrichmentRecipes);
         } catch (Exception e) {
             // 如果Mekanism模组未加载，捕获异常以避免崩溃
+        }
+        
+        // 添加工业先锋配方转换
+        try {
+            // 添加工业先锋化学溶解室(Dissolution Chamber)配方转换
+            List<com.sorrowmist.useless.recipes.advancedalloyfurnace.AdvancedAlloyFurnaceRecipe> dissolutionRecipes = 
+                    com.sorrowmist.useless.compat.industrialforegoing.IndustrialForegoingRecipeConverter.convertDissolutionChamberRecipes(recipeManager);
+            recipes.addAll(dissolutionRecipes);
+        } catch (Exception e) {
+            // 如果工业先锋模组未加载，捕获异常以避免崩溃
+        }
+        
+        // 添加血魔法配方转换
+        try {
+            // 添加血魔法血之祭坛(Blood Altar)配方转换
+            List<com.sorrowmist.useless.recipes.advancedalloyfurnace.AdvancedAlloyFurnaceRecipe> bloodAltarRecipes = 
+                    com.sorrowmist.useless.compat.bloodmagic.BloodMagicRecipeConverter.convertBloodAltarRecipes(recipeManager);
+            recipes.addAll(bloodAltarRecipes);
+            
+            // 添加血魔法狱火熔炉(Soul Forge)配方转换
+            List<com.sorrowmist.useless.recipes.advancedalloyfurnace.AdvancedAlloyFurnaceRecipe> soulForgeRecipes = 
+                    com.sorrowmist.useless.compat.bloodmagic.BloodMagicRecipeConverter.convertTartaricForgeRecipes(recipeManager);
+            recipes.addAll(soulForgeRecipes);
+            
+            // 添加血魔法炼金术桌(Alchemy Table)配方转换
+            List<com.sorrowmist.useless.recipes.advancedalloyfurnace.AdvancedAlloyFurnaceRecipe> alchemyTableRecipes = 
+                    com.sorrowmist.useless.compat.bloodmagic.BloodMagicRecipeConverter.convertAlchemyTableRecipes(recipeManager);
+            recipes.addAll(alchemyTableRecipes);
+        } catch (Exception e) {
+            // 如果血魔法模组未加载，捕获异常以避免崩溃
+        }
+        
+        // 添加余烬mod配方转换
+        try {
+            // 添加余烬炼金台(Alchemy Tablet)配方转换
+            List<com.sorrowmist.useless.recipes.advancedalloyfurnace.AdvancedAlloyFurnaceRecipe> embersAlchemyRecipes = 
+                    com.sorrowmist.useless.compat.embers.EmbersRecipeConverter.convertAlchemyTabletRecipes(recipeManager);
+            recipes.addAll(embersAlchemyRecipes);
+            
+            // 添加余烬地质分离器(Geologic Separator)配方转换
+            List<com.sorrowmist.useless.recipes.advancedalloyfurnace.AdvancedAlloyFurnaceRecipe> embersGeoSeparatorRecipes = 
+                    com.sorrowmist.useless.compat.embers.EmbersRecipeConverter.convertGeoSeparatorRecipes(recipeManager);
+            recipes.addAll(embersGeoSeparatorRecipes);
+            
+            // 添加余烬熔炼炉(Melter)配方转换
+            List<com.sorrowmist.useless.recipes.advancedalloyfurnace.AdvancedAlloyFurnaceRecipe> embersMelterRecipes = 
+                    com.sorrowmist.useless.compat.embers.EmbersRecipeConverter.convertMelterRecipes(recipeManager);
+            recipes.addAll(embersMelterRecipes);
+            
+            // 添加余烬压印锤(Stamper)配方转换
+            List<com.sorrowmist.useless.recipes.advancedalloyfurnace.AdvancedAlloyFurnaceRecipe> embersStampingRecipes = 
+                    com.sorrowmist.useless.compat.embers.EmbersRecipeConverter.convertStampingRecipes(recipeManager);
+            recipes.addAll(embersStampingRecipes);
+            
+            // 添加余烬混合离心器(Mixer Centrifuge)配方转换
+            List<com.sorrowmist.useless.recipes.advancedalloyfurnace.AdvancedAlloyFurnaceRecipe> embersMixingRecipes = 
+                    com.sorrowmist.useless.compat.embers.EmbersRecipeConverter.convertMixingRecipes(recipeManager);
+            recipes.addAll(embersMixingRecipes);
+        } catch (Exception e) {
+            // 如果余烬mod未加载，捕获异常以避免崩溃
         }
 
         registration.addRecipes(AdvancedAlloyFurnaceRecipeCategory.TYPE, recipes);

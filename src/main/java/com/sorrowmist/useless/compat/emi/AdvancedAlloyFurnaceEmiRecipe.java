@@ -19,6 +19,7 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.crafting.Ingredient;
+import net.minecraftforge.fluids.FluidStack;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -33,28 +34,34 @@ public class AdvancedAlloyFurnaceEmiRecipe implements EmiRecipe {
     private static final int INPUT_SLOTS_START_Y = 1;
     private static final int INPUT_SLOT_SPACING_X = 18;
     private static final int INPUT_SLOT_SPACING_Y = 18;
-    private static final int OUTPUT_SLOTS_START_X = 138;
+    private static final int OUTPUT_SLOTS_START_X = 159;
     private static final int OUTPUT_SLOTS_START_Y = 1;
-    private static final int FLUID_INPUT_X = 37;
-    private static final int FLUID_INPUT_Y = 1;
-    private static final int FLUID_OUTPUT_X = 174;
-    private static final int FLUID_OUTPUT_Y = 1;
-    private static final int CATALYST_SLOT_X = 37;
-    private static final int CATALYST_SLOT_Y = 19;
-    private static final int MOLD_SLOT_X = 37;
-    private static final int MOLD_SLOT_Y = 37;
-    private static final int PROGRESS_BAR_X = 79;
+    private static final int FLUID_INPUT_X = 1;
+    private static final int FLUID_INPUT_Y = 55;
+    private static final int FLUID_INPUT_WIDTH = 52;
+    private static final int FLUID_INPUT_HEIGHT = 16;
+    private static final int FLUID_OUTPUT_X = 159;
+    private static final int FLUID_OUTPUT_Y = 55;
+    private static final int FLUID_OUTPUT_WIDTH = 52;
+    private static final int FLUID_OUTPUT_HEIGHT = 16;
+    private static final int CATALYST_SLOT_X = 80;
+    private static final int CATALYST_SLOT_Y = 55;
+    private static final int MOLD_SLOT_X = 116;
+    private static final int MOLD_SLOT_Y = 55;
+    private static final int PROGRESS_BAR_X = 90;
     private static final int PROGRESS_BAR_Y = 23;
-    private static final int PROGRESS_BAR_WIDTH = 33;
+    private static final int PROGRESS_BAR_WIDTH = 32;
     private static final int PROGRESS_BAR_HEIGHT = 8;
-    private static final int ENERGY_DISPLAY_X = 68;
+    private static final int PROGRESS_BAR_SOURCE_X = 90;
+    private static final int PROGRESS_BAR_SOURCE_Y = 73;
+    private static final int ENERGY_DISPLAY_X = 75;
     private static final int ENERGY_DISPLAY_Y = 0;
-    private static final int ENERGY_DISPLAY_WIDTH = 55;
-    private static final int ENERGY_DISPLAY_HEIGHT = 5;
-    private static final int TIME_DISPLAY_X = 79;
-    private static final int TIME_DISPLAY_Y = 45;
-    private static final int TIME_DISPLAY_WIDTH = 33;
-    private static final int TIME_DISPLAY_HEIGHT = 6;
+    private static final int ENERGY_DISPLAY_WIDTH = 62;
+    private static final int ENERGY_DISPLAY_HEIGHT = 7;
+    private static final int TIME_DISPLAY_X = 78;
+    private static final int TIME_DISPLAY_Y = 41;
+    private static final int TIME_DISPLAY_WIDTH = 56;
+    private static final int TIME_DISPLAY_HEIGHT = 10;
     private static final int CATALYST_TEXT_Y = 13;
     private static final int MOLD_TEXT_Y = 32;
     private static final int PARALLEL_TEXT_X = 57;
@@ -69,7 +76,7 @@ public class AdvancedAlloyFurnaceEmiRecipe implements EmiRecipe {
         this.recipe = recipe;
 
         // 处理输入物品
-        for (int i = 0; i < Math.min(recipe.getInputItems().size(), 6); i++) {
+        for (int i = 0; i < Math.min(recipe.getInputItems().size(), 9); i++) {
             Ingredient ingredient = recipe.getInputItems().get(i);
 
             ItemStack[] matchingStacks = ingredient.getItems();
@@ -95,12 +102,14 @@ public class AdvancedAlloyFurnaceEmiRecipe implements EmiRecipe {
         }
 
         // 处理流体输入（如果有）
-        if (!recipe.getInputFluid().isEmpty()) {
+        List<FluidStack> inputFluids = recipe.getInputFluids();
+        if (!inputFluids.isEmpty()) {
             // EMI处理流体的方式可能不同，这里先添加一个占位符
         }
 
         // 处理流体输出（如果有）
-        if (!recipe.getOutputFluid().isEmpty()) {
+        List<FluidStack> outputFluids = recipe.getOutputFluids();
+        if (!outputFluids.isEmpty()) {
             // EMI处理流体的方式可能不同，这里先添加一个占位符
         }
 
@@ -137,24 +146,24 @@ public class AdvancedAlloyFurnaceEmiRecipe implements EmiRecipe {
 
     @Override
     public int getDisplayWidth() {
-        return 191;
+        return 212;
     }
 
     @Override
     public int getDisplayHeight() {
-        return 54;
+        return 72;
     }
 
     @Override
     public void addWidgets(WidgetHolder widgets) {
         // 绘制背景
-        widgets.addTexture(GUI_TEXTURE, 0, 0, 191, 54, 0, 0, 191, 54, 256, 256);
+        widgets.addTexture(GUI_TEXTURE, 0, 0, 212, 72, 0, 0, 212, 72, 256, 256);
 
-        // 输入物品槽位 (6个) - 3行2列排列
+        // 输入物品槽位 (9个) - 3行3列排列
         int inputIndex = 0;
-        for (int i = 0; i < Math.min(recipe.getInputItems().size(), 6); i++) {
-            int row = i / 2;
-            int col = i % 2;
+        for (int i = 0; i < Math.min(recipe.getInputItems().size(), 9); i++) {
+            int row = i / 3;
+            int col = i % 3;
             // 物品渲染需要向上向左各移动1像素
             int x = INPUT_SLOTS_START_X + col * INPUT_SLOT_SPACING_X - 1;
             int y = INPUT_SLOTS_START_Y + row * INPUT_SLOT_SPACING_Y - 1;
@@ -194,10 +203,10 @@ public class AdvancedAlloyFurnaceEmiRecipe implements EmiRecipe {
             });
         }
 
-        // 输出物品槽位 (6个) - 3行2列排列
-        for (int i = 0; i < Math.min(recipe.getOutputItems().size(), 6); i++) {
-            int row = i / 2;
-            int col = i % 2;
+        // 输出物品槽位 (9个) - 3行3列排列
+        for (int i = 0; i < Math.min(recipe.getOutputItems().size(), 9); i++) {
+            int row = i / 3;
+            int col = i % 3;
             // 物品渲染需要向上向左各移动1像素
             int x = OUTPUT_SLOTS_START_X + col * INPUT_SLOT_SPACING_X - 1;
             int y = OUTPUT_SLOTS_START_Y + row * INPUT_SLOT_SPACING_Y - 1;
@@ -238,81 +247,99 @@ public class AdvancedAlloyFurnaceEmiRecipe implements EmiRecipe {
         }
 
         // 输入流体槽 - 使用SlotWidget处理流体的渲染和tooltips
-        if (!recipe.getInputFluid().isEmpty()) {
-            final var fluidStack = recipe.getInputFluid();
-            // 流体渲染位置向左上各移动一个像素
-            final int fluidX = FLUID_INPUT_X - 1;
-            final int fluidY = FLUID_INPUT_Y - 1;
+        List<FluidStack> inputFluids = recipe.getInputFluids();
+        if (!inputFluids.isEmpty()) {
+            int fluidCount = inputFluids.size();
+            int fluidWidth = FLUID_INPUT_WIDTH / fluidCount;
             
-            // 创建流体的EmiStack，用于显示tooltips和渲染
-            EmiStack emiFluidStack = EmiStack.of(fluidStack.getFluid(), fluidStack.getAmount());
-            
-            // 添加槽位，用于处理渲染和tooltips
-            widgets.addSlot(emiFluidStack, fluidX, fluidY).drawBack(false);
-            
-            // 只渲染流体数量文本，不重复渲染流体
-            widgets.addDrawable(fluidX, fluidY, 16, 16, (draw, mouseX, mouseY, delta) -> {
-                RenderSystem.enableDepthTest();
+            for (int i = 0; i < fluidCount; i++) {
+                final var fluidStack = inputFluids.get(i);
+                // 流体渲染位置向左上各移动一个像素
+                final int fluidX = FLUID_INPUT_X - 1 + i * fluidWidth;
+                final int fluidY = FLUID_INPUT_Y - 1;
                 
-                if (!fluidStack.isEmpty()) {
-                    // 只渲染流体数量文本，流体本身由SlotWidget渲染
-                    Minecraft mc = Minecraft.getInstance();
-                    Font font = mc.font;
-                    String text = NumberFormatUtil.formatFluidAmount(fluidStack.getAmount());
-                    draw.pose().pushPose();
-                    float scale = 0.65f;
-                    // 自定义绘制器的坐标是相对于自己的绘制区域的，所以从(0,0)开始
-                    draw.pose().translate(0, 0, 200.0F);
-                    draw.pose().scale(scale, scale, 1.0F);
-                    
-                    int textX = Math.round(16.0f / scale) - font.width(text);
-                    int textY = Math.round(10.0f / scale);
-                    
-                    draw.drawString(font, text, textX, textY, 0xFFFFFF, true);
-                    draw.pose().popPose();
-                }
+                // 创建流体的EmiStack，用于显示tooltips和渲染
+                EmiStack emiFluidStack = EmiStack.of(fluidStack.getFluid(), fluidStack.getAmount());
                 
-                RenderSystem.disableBlend();
-            });
+                // 添加槽位，用于处理渲染和tooltips
+                widgets.addSlot(emiFluidStack, fluidX, fluidY).drawBack(false);
+                
+                // 渲染流体数量文本
+                widgets.addDrawable(fluidX, fluidY, fluidWidth, FLUID_INPUT_HEIGHT, (draw, mouseX, mouseY, delta) -> {
+                    RenderSystem.enableDepthTest();
+                    
+                    if (!fluidStack.isEmpty()) {
+                        // 渲染流体数量文本
+                        Minecraft mc = Minecraft.getInstance();
+                        Font font = mc.font;
+                        String text = NumberFormatUtil.formatFluidAmount(fluidStack.getAmount());
+                        draw.pose().pushPose();
+                        float scale = 0.65f;
+                        // 自定义绘制器的坐标是相对于自己的绘制区域的
+                        draw.pose().translate(0, 0, 200.0F);
+                        draw.pose().scale(scale, scale, 1.0F);
+                        
+                        int textX = Math.round(fluidWidth / scale) - font.width(text);
+                        int textY = Math.round(FLUID_INPUT_HEIGHT / scale) - font.lineHeight;
+                        
+                        draw.drawString(font, text, textX, textY, 0xFFFFFF, true);
+                        draw.pose().popPose();
+                    }
+                    
+                    // 从UI图抠取覆盖层，尺寸根据流体槽实际大小确定，渲染在流体槽上
+                    draw.blit(GUI_TEXTURE, 0, 0, 0, 54, fluidWidth + 2, FLUID_INPUT_HEIGHT + 2, 256, 256);
+                    
+                    RenderSystem.disableBlend();
+                });
+            }
         }
 
         // 输出流体槽 - 使用SlotWidget处理流体的渲染和tooltips
-        if (!recipe.getOutputFluid().isEmpty()) {
-            final var fluidStack = recipe.getOutputFluid();
-            // 流体渲染位置向左上各移动一个像素
-            final int fluidX = FLUID_OUTPUT_X - 1;
-            final int fluidY = FLUID_OUTPUT_Y - 1;
+        List<FluidStack> outputFluids = recipe.getOutputFluids();
+        if (!outputFluids.isEmpty()) {
+            int fluidCount = outputFluids.size();
+            int fluidWidth = FLUID_OUTPUT_WIDTH / fluidCount;
             
-            // 创建流体的EmiStack，用于显示tooltips和渲染
-            EmiStack emiFluidStack = EmiStack.of(fluidStack.getFluid(), fluidStack.getAmount());
-            
-            // 添加槽位，用于处理渲染和tooltips
-            widgets.addSlot(emiFluidStack, fluidX, fluidY).drawBack(false);
-            
-            // 只渲染流体数量文本，不重复渲染流体
-            widgets.addDrawable(fluidX, fluidY, 16, 16, (draw, mouseX, mouseY, delta) -> {
-                RenderSystem.enableDepthTest();
+            for (int i = 0; i < fluidCount; i++) {
+                final var fluidStack = outputFluids.get(i);
+                // 流体渲染位置向左上各移动一个像素
+                final int fluidX = FLUID_OUTPUT_X - 1 + i * fluidWidth;
+                final int fluidY = FLUID_OUTPUT_Y - 1;
                 
-                if (!fluidStack.isEmpty()) {
-                    // 只渲染流体数量文本，流体本身由SlotWidget渲染
-                    Minecraft mc = Minecraft.getInstance();
-                    Font font = mc.font;
-                    String text = NumberFormatUtil.formatFluidAmount(fluidStack.getAmount());
-                    draw.pose().pushPose();
-                    float scale = 0.65f;
-                    // 自定义绘制器的坐标是相对于自己的绘制区域的，所以从(0,0)开始
-                    draw.pose().translate(0, 0, 200.0F);
-                    draw.pose().scale(scale, scale, 1.0F);
-                    
-                    int textX = Math.round(16.0f / scale) - font.width(text);
-                    int textY = Math.round(10.0f / scale);
-                    
-                    draw.drawString(font, text, textX, textY, 0xFFFFFF, true);
-                    draw.pose().popPose();
-                }
+                // 创建流体的EmiStack，用于显示tooltips和渲染
+                EmiStack emiFluidStack = EmiStack.of(fluidStack.getFluid(), fluidStack.getAmount());
                 
-                RenderSystem.disableBlend();
-            });
+                // 添加槽位，用于处理渲染和tooltips
+                widgets.addSlot(emiFluidStack, fluidX, fluidY).drawBack(false);
+                
+                // 渲染流体数量文本
+                widgets.addDrawable(fluidX, fluidY, fluidWidth, FLUID_OUTPUT_HEIGHT, (draw, mouseX, mouseY, delta) -> {
+                    RenderSystem.enableDepthTest();
+                    
+                    if (!fluidStack.isEmpty()) {
+                        // 渲染流体数量文本
+                        Minecraft mc = Minecraft.getInstance();
+                        Font font = mc.font;
+                        String text = NumberFormatUtil.formatFluidAmount(fluidStack.getAmount());
+                        draw.pose().pushPose();
+                        float scale = 0.65f;
+                        // 自定义绘制器的坐标是相对于自己的绘制区域的
+                        draw.pose().translate(0, 0, 200.0F);
+                        draw.pose().scale(scale, scale, 1.0F);
+                        
+                        int textX = Math.round(fluidWidth / scale) - font.width(text);
+                        int textY = Math.round(FLUID_OUTPUT_HEIGHT / scale) - font.lineHeight;
+                        
+                        draw.drawString(font, text, textX, textY, 0xFFFFFF, true);
+                        draw.pose().popPose();
+                    }
+                    
+                    // 从UI图抠取覆盖层，尺寸根据流体槽实际大小确定，渲染在流体槽上
+                    draw.blit(GUI_TEXTURE, 0, 0, 159, 54, fluidWidth + 2, FLUID_OUTPUT_HEIGHT + 2, 256, 256);
+                    
+                    RenderSystem.disableBlend();
+                });
+            }
         }
 
         // 催化剂槽位：只在配方需要催化剂时显示
@@ -330,7 +357,7 @@ public class AdvancedAlloyFurnaceEmiRecipe implements EmiRecipe {
         }
 
         // 绘制进度条 - 2秒完成一次合成进度
-        widgets.addAnimatedTexture(PROGRESS_TEXTURE, PROGRESS_BAR_X, PROGRESS_BAR_Y, PROGRESS_BAR_WIDTH, PROGRESS_BAR_HEIGHT, 0, 0, PROGRESS_BAR_WIDTH, PROGRESS_BAR_HEIGHT, 128, 128, 2000, true, true, false);
+        widgets.addAnimatedTexture(GUI_TEXTURE, PROGRESS_BAR_X, PROGRESS_BAR_Y, PROGRESS_BAR_WIDTH, PROGRESS_BAR_HEIGHT, PROGRESS_BAR_SOURCE_X, PROGRESS_BAR_SOURCE_Y, PROGRESS_BAR_WIDTH, PROGRESS_BAR_HEIGHT, 256, 256, 2000, true, true, false);
 
         // 移除能量条背景和填充的自定义纹理，因为JEI中没有这些
         
@@ -360,7 +387,7 @@ public class AdvancedAlloyFurnaceEmiRecipe implements EmiRecipe {
                 
                 int textWidth = minecraft.font.width(catalystText);
                 // 在整张 JEI 背景宽度内居中
-                int centeredX = (int) ((191 / 2.0f - textWidth * scale / 2) / scale);
+                int centeredX = (int) ((212 / 2.0f - textWidth * scale / 2) / scale);
                 int y = (int) (CATALYST_TEXT_Y / scale);
                 
                 draw.drawString(minecraft.font, catalystText, centeredX, y, 0xFF0000, false);
@@ -378,7 +405,7 @@ public class AdvancedAlloyFurnaceEmiRecipe implements EmiRecipe {
                 draw.pose().scale(scale, scale, 1.0f);
                 
                 int textWidth = minecraft.font.width(moldText);
-                int centeredX = (int) ((191 / 2.0f - textWidth * scale / 2) / scale);
+                int centeredX = (int) ((212 / 2.0f - textWidth * scale / 2) / scale);
                 int y = (int) (MOLD_TEXT_Y / scale);
                 
                 draw.drawString(minecraft.font, moldText, centeredX, y, 0xFF0000, false);

@@ -162,10 +162,10 @@ public class MekanismRecipeConverter {
                             outputItems.add(output64C);
 
                             // 9. 处理输入流体：无
-                            FluidStack inputFluid = FluidStack.EMPTY;
+                            List<FluidStack> inputFluids = new ArrayList<>();
 
                             // 10. 处理输出流体：无
-                            FluidStack outputFluid = FluidStack.EMPTY;
+                            List<FluidStack> outputFluids = new ArrayList<>();
 
                             // 11. 处理能量消耗：使用默认值
                             int energy = 10000; // 默认能量消耗
@@ -199,9 +199,9 @@ public class MekanismRecipeConverter {
                                     newId,
                                     inputIngredients,
                                     inputItemCounts,
-                                    inputFluid,
+                                    inputFluids,
                                     outputItems,
-                                    outputFluid,
+                                    outputFluids,
                                     energy,
                                     processTime,
                                     catalyst,
@@ -219,6 +219,135 @@ public class MekanismRecipeConverter {
             // 捕获所有异常，避免崩溃
             e.printStackTrace();
             System.err.println("Failed to convert metallurgic infuser recipes: " + e.getMessage());
+        }
+
+        return convertedRecipes;
+    }
+
+    /**
+     * 将Mekanism富集仓(EnrichmentChamber)配方转换为高级合金炉配方
+     *
+     * @param recipeManager 游戏配方管理器
+     * @return 转换后的高级合金炉配方列表
+     */
+    public static List<AdvancedAlloyFurnaceRecipe> convertEnrichmentChamberRecipes(RecipeManager recipeManager) {
+        List<AdvancedAlloyFurnaceRecipe> convertedRecipes = new ArrayList<>();
+
+        try {
+            // 获取EnrichingIRecipe类
+            Class<?> enrichingIRecipeClass = Class.forName("mekanism.common.recipe.impl.EnrichingIRecipe");
+
+            // 获取所有配方
+            Collection<? extends net.minecraft.world.item.crafting.Recipe<?>> allRecipes = recipeManager.getRecipes();
+
+            // 筛选出EnrichingIRecipe类型的配方
+            for (net.minecraft.world.item.crafting.Recipe<?> recipe : allRecipes) {
+                // 检查配方是否为EnrichingIRecipe类型
+                if (enrichingIRecipeClass.isInstance(recipe)) {
+                    // 使用反射获取配方信息
+                    Object enrichingRecipe = recipe;
+
+                    // 1. 获取配方ID
+                    ResourceLocation originalId = recipe.getId();
+
+                    // 2. 获取输入物品
+                    Method getInputMethod = enrichingRecipe.getClass().getMethod("getInput");
+                    Object itemInput = getInputMethod.invoke(enrichingRecipe);
+                    Class<?> itemStackIngredientClass = Class.forName("mekanism.api.recipes.ingredients.ItemStackIngredient");
+                    Method getRepresentationsMethod = itemStackIngredientClass.getMethod("getRepresentations");
+                    List<ItemStack> itemRepresentations = (List<ItemStack>) getRepresentationsMethod.invoke(itemInput);
+                    Ingredient inputIngredient = Ingredient.of(itemRepresentations.toArray(new ItemStack[0]));
+
+                    // 3. 获取输出物品
+                    Method getOutputDefinitionMethod = enrichingRecipe.getClass().getMethod("getOutputDefinition");
+                    List<ItemStack> outputRepresentations = (List<ItemStack>) getOutputDefinitionMethod.invoke(enrichingRecipe);
+                    if (outputRepresentations.isEmpty()) {
+                        continue; // 跳过没有输出的配方
+                    }
+                    ItemStack outputItem = outputRepresentations.get(0);
+
+                    // 4. 创建配方ID
+                    ResourceLocation newId = new ResourceLocation(
+                            "useless_mod",
+                            "mek_enrichment_" + originalId.getNamespace() + "_" + originalId.getPath()
+                    );
+
+                    // 5. 处理输入物品和数量：获取原始数量并乘以64
+                    List<Ingredient> inputIngredients = new ArrayList<>();
+                    List<Long> inputItemCounts = new ArrayList<>();
+
+                    inputIngredients.add(inputIngredient);
+                    
+                    // 获取原始输入数量
+                    long originalInputCount = 1;
+                    if (!itemRepresentations.isEmpty()) {
+                        originalInputCount = itemRepresentations.get(0).getCount();
+                    }
+                    inputItemCounts.add(originalInputCount * 64);
+
+                    // 6. 处理输出物品：原始数量乘以64
+                    List<ItemStack> outputItems = new ArrayList<>();
+                    ItemStack output64 = outputItem.copy();
+                    output64.setCount(outputItem.getCount() * 64);
+                    outputItems.add(output64);
+
+                    // 7. 处理输入流体：无
+                    List<FluidStack> inputFluids = new ArrayList<>();
+
+                    // 8. 处理输出流体：无
+                    List<FluidStack> outputFluids = new ArrayList<>();
+
+                    // 9. 处理能量消耗：使用默认值
+                    int energy = 2000; // 默认能量消耗
+
+                    // 10. 处理处理时间：使用默认值
+                    int processTime = 40; // 默认为200tick
+
+                    // 11. 处理催化剂：使用无用锭标签作为催化剂
+                    Ingredient catalyst = Ingredient.of(ModIngots.USELESS_INGOT_TIER_1.get(),
+                            ModIngots.USELESS_INGOT_TIER_2.get(),
+                            ModIngots.USELESS_INGOT_TIER_3.get(),
+                            ModIngots.USELESS_INGOT_TIER_4.get(),
+                            ModIngots.USELESS_INGOT_TIER_5.get(),
+                            ModIngots.USELESS_INGOT_TIER_6.get(),
+                            ModIngots.USELESS_INGOT_TIER_7.get(),
+                            ModIngots.USELESS_INGOT_TIER_8.get(),
+                            ModIngots.USELESS_INGOT_TIER_9.get(),
+                            ModIngots.USEFUL_INGOT.get());
+                    int catalystCount = 1;
+
+                    // 12. 处理模具：要求放入"mekanism:enrichment_chamber"
+                    ResourceLocation enrichmentChamberId = ResourceLocation.fromNamespaceAndPath("mekanism", "enrichment_chamber");
+                    net.minecraft.world.item.Item enrichmentChamber = ForgeRegistries.ITEMS.getValue(enrichmentChamberId);
+                    if (enrichmentChamber == null) {
+                        throw new RuntimeException("Could not find item: " + enrichmentChamberId);
+                    }
+                    Ingredient mold = Ingredient.of(enrichmentChamber);
+
+                    // 创建并返回转换后的高级合金炉配方
+                    AdvancedAlloyFurnaceRecipe convertedRecipe = new AdvancedAlloyFurnaceRecipe(
+                            newId,
+                            inputIngredients,
+                            inputItemCounts,
+                            inputFluids,
+                            outputItems,
+                            outputFluids,
+                            energy,
+                            processTime,
+                            catalyst,
+                            catalystCount,
+                            mold,
+                            false,
+                            false
+                    );
+
+                    convertedRecipes.add(convertedRecipe);
+                }
+            }
+        } catch (Exception e) {
+            // 捕获所有异常，避免崩溃
+            e.printStackTrace();
+            System.err.println("Failed to convert enrichment chamber recipes: " + e.getMessage());
         }
 
         return convertedRecipes;

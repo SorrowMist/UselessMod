@@ -3,10 +3,8 @@ package com.sorrowmist.useless.utils.mining;
 import com.sorrowmist.useless.api.component.UComponents;
 import com.sorrowmist.useless.api.tool.EnchantMode;
 import com.sorrowmist.useless.config.ConfigManager;
+import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.component.DataComponentMap;
-import net.minecraft.core.component.DataComponentType;
-import net.minecraft.core.component.TypedDataComponent;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.entity.player.Player;
@@ -16,58 +14,29 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
-import net.neoforged.neoforge.event.level.BlockEvent;
 
 import java.util.*;
-import java.util.stream.Collectors;
 
 public class MiningUtils {
     /**
      * 获取方块掉落物（支持强制挖掘模式）
      */
-    static List<ItemStack> getBlockDrops(BlockState state, Level level, BlockPos pos, Player player, ItemStack tool,
-                                         boolean forceMining) {
-        if (!(level instanceof ServerLevel serverLevel)) {
-            return Collections.emptyList();
-        }
-
-        List<ItemStack> drops;
+    static List<ItemStack> getBlockDrops(BlockState state, ServerLevel level, BlockPos pos, Player player,
+                                         ItemStack tool, boolean forceMining) {
         BlockEntity be = level.getBlockEntity(pos);
+        List<ItemStack> drops = Block.getDrops(state, level, pos, be, player, tool);
 
-        // 首先尝试使用原版掉落机制
-        drops = Block.getDrops(state, serverLevel, pos, be, player, tool);
-
-        // 强制挖掘模式：如果没有有效掉落物，强制掉落一个方块
-        if (forceMining && (drops.isEmpty() || drops.stream()
-                                                    .allMatch(stack -> stack.isEmpty() || stack.is(Items.AIR)))) {
-            Block block = state.getBlock();
-
-            // 检查是否有精准采集附魔
-            boolean hasSilkTouch = tool.getOrDefault(UComponents.EnchantModeComponent,
-                                                     EnchantMode.FORTUNE
+        if (forceMining && hasNoValidDrops(drops)) {
+            ItemStack stack = new ItemStack(state.getBlock().asItem());
+            boolean isSilk = tool.getOrDefault(UComponents.EnchantModeComponent.get(), EnchantMode.FORTUNE
             ) == EnchantMode.SILK_TOUCH;
 
-            if (hasSilkTouch) {
-                // 精准采集：获取方块本身（包含NBT）
-                ItemStack stack = new ItemStack(block);
-
-                // 复制方块的NBT数据
-                if (be != null) {
-                    DataComponentMap components = be.collectComponents();
-                    for (TypedDataComponent<?> component : components) {
-                        stack.set((DataComponentType) component.type(), component.value());
-                    }
-                }
-                drops.add(stack);
-            } else {
-                // 非精准采集：获取方块的默认掉落物
-                drops.add(new ItemStack(block));
+            if (isSilk && be != null) {
+                stack.applyComponents(be.collectComponents());
             }
+            return Collections.singletonList(stack);
         }
-
-        return drops.stream()
-                    .filter(drop -> !drop.isEmpty() && drop.getItem() != Items.AIR)
-                    .collect(Collectors.toList());
+        return drops;
     }
 
     /**
@@ -75,20 +44,6 @@ public class MiningUtils {
      */
     static boolean hasNoValidDrops(List<ItemStack> drops) {
         return drops.isEmpty() || drops.stream().allMatch(stack -> stack.isEmpty() || stack.is(Items.AIR));
-    }
-
-    /**
-     * 使用原版掉落，然后立即收集物品实体（支持强制挖掘模式）
-     */
-    static void handleFallbackBlockBreak(BlockEvent.BreakEvent event, Level level, BlockPos pos, BlockState state,
-                                         Player player, ItemStack tool,
-                                         boolean forceMining) {
-        if (level.isClientSide()) return;
-
-        // 强制挖掘模式：使用统一的处理方法
-        // 正常模式：使用统一的处理方法
-        processBlockBreak(level, pos, state, player, tool, forceMining);
-        event.setCanceled(true);
     }
 
     /**
@@ -101,7 +56,7 @@ public class MiningUtils {
      * @param tool        工具
      * @param forceMining 是否为强制挖掘模式
      */
-    static void processBlockBreak(Level level, BlockPos pos, BlockState state, Player player,
+    static void processBlockBreak(ServerLevel level, BlockPos pos, BlockState state, Player player,
                                   ItemStack tool, boolean forceMining) {
         if (level.isClientSide()) {
             return;
@@ -117,7 +72,7 @@ public class MiningUtils {
         if (tool.get(UComponents.EnchantModeComponent.get()) == EnchantMode.FORTUNE) {
             int exp = state.getBlock().getExpDrop(state, level, pos, level.getBlockEntity(pos), player, tool);
             if (exp > 0) {
-                state.getBlock().popExperience((ServerLevel) level, pos, exp);
+                state.getBlock().popExperience(level, pos, exp);
             }
         }
 
@@ -162,7 +117,9 @@ public class MiningUtils {
             if (item.isEmpty()) continue;
             
             boolean mergedFlag = false;
+            // 尝试合并到已有的堆叠中
             for (ItemStack mergedItem : merged) {
+                // 检查：物品相同、组件相同、且有堆叠空间
                 if (ItemStack.isSameItemSameComponents(item, mergedItem)) {
                     int remaining = mergedItem.getMaxStackSize() - mergedItem.getCount();
                     if (remaining > 0) {
@@ -176,6 +133,8 @@ public class MiningUtils {
                     }
                 }
             }
+
+            // 如果还没合并完（或者组件不同/空间不够），作为新的一堆加入
             if (!mergedFlag && !item.isEmpty()) {
                 merged.add(item.copy());
             }
@@ -209,56 +168,57 @@ public class MiningUtils {
      * @param forceMining 是否为强制挖掘模式
      * @return 需要破坏的方块列表
      */
-    static List<BlockPos> findBlocksToMine(BlockPos originPos, BlockState originState, Level level,
-                                           ItemStack stack, boolean forceMining) {
+    static List<BlockPos> findBlocksToMine(BlockPos originPos, BlockState originState, Level level, ItemStack stack,
+                                           boolean forceMining) {
+        // 最大连锁数量
+        int maxBlocks = ConfigManager.getChainMiningMaxBlocks();
         // 获取连锁挖掘范围
         int rangeX = ConfigManager.getChainMiningRangeX();
         int rangeY = ConfigManager.getChainMiningRangeY();
         int rangeZ = ConfigManager.getChainMiningRangeZ();
 
-        // 最大连锁数量
-        int maxBlocks = ConfigManager.getChainMiningMaxBlocks();
-
         Block originBlock = originState.getBlock();
         List<BlockPos> blocksToMine = new ArrayList<>(maxBlocks);
         Queue<BlockPos> queue = new LinkedList<>();
-        Set<BlockPos> visited = new HashSet<>(maxBlocks * 2);
+        LongOpenHashSet visited = new LongOpenHashSet(maxBlocks * 2);
 
         queue.add(originPos);
-        visited.add(originPos);
-
-        BlockPos.MutableBlockPos mutablePos = new BlockPos.MutableBlockPos();
+        visited.add(originPos.asLong());
 
         while (!queue.isEmpty() && blocksToMine.size() < maxBlocks) {
             BlockPos currentPos = queue.poll();
             blocksToMine.add(currentPos);
 
-            // 扩散搜索：使用三重循环遍历所有26个方向
+            int cx = currentPos.getX();
+            int cy = currentPos.getY();
+            int cz = currentPos.getZ();
+
             for (int x = -1; x <= 1; x++) {
                 for (int y = -1; y <= 1; y++) {
                     for (int z = -1; z <= 1; z++) {
                         if (x == 0 && y == 0 && z == 0) continue;
 
-                        mutablePos.set(currentPos.getX() + x, currentPos.getY() + y, currentPos.getZ() + z);
+                        int nx = cx + x;
+                        int ny = cy + y;
+                        int nz = cz + z;
 
-                        // 边界检查
-                        if (Math.abs(mutablePos.getX() - originPos.getX()) > rangeX ||
-                                Math.abs(mutablePos.getY() - originPos.getY()) > rangeY ||
-                                Math.abs(mutablePos.getZ() - originPos.getZ()) > rangeZ) {
-                            continue;
-                        }
+                        // 1. 距离快速过滤
+                        if (Math.abs(nx - originPos.getX()) > rangeX ||
+                                Math.abs(ny - originPos.getY()) > rangeY ||
+                                Math.abs(nz - originPos.getZ()) > rangeZ) continue;
 
-                        if (visited.contains(mutablePos)) continue;
+                        // 2. 访问过滤
+                        long nLong = BlockPos.asLong(nx, ny, nz);
+                        if (visited.contains(nLong)) continue;
 
-                        BlockState nextState = level.getBlockState(mutablePos);
-                        if (nextState.getBlock() == originBlock) {
+                        // 3. 状态检查
+                        BlockPos neighborPos = new BlockPos(nx, ny, nz);
+                        BlockState nextState = level.getBlockState(neighborPos);
+
+                        if (nextState.is(originBlock)) {
                             if (forceMining || stack.isCorrectToolForDrops(nextState)) {
-                                BlockPos immutableNext = mutablePos.immutable();
-                                visited.add(immutableNext);
-                                queue.add(immutableNext);
-
-                                // 限制搜索总数
-                                if (visited.size() >= maxBlocks * 2) break;
+                                visited.add(nLong);
+                                queue.add(neighborPos);
                             }
                         }
                     }

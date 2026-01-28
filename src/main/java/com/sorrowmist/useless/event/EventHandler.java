@@ -63,5 +63,7 @@ public class EventHandler {
                 FlyEffectedHolder.remove(player.getUUID());
             }
         }
+        
+        MiningDispatcher.tickCacheUpdate(player);
     }
 }

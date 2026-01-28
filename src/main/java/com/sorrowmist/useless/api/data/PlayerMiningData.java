@@ -18,19 +18,23 @@ public class PlayerMiningData {
     }
 
     public UUID getPlayerId() {
-        return playerId;
+        return this.playerId;
     }
 
     public boolean isTabPressed() {
-        return tabPressed;
+        return this.tabPressed;
     }
 
     public void setTabPressed(boolean tabPressed) {
         this.tabPressed = tabPressed;
     }
 
+    public boolean isCacheValid(BlockPos currentPos) {
+        return this.cachedPos != null && this.cachedPos.equals(currentPos) && this.hasCachedBlocks();
+    }
+
     public BlockPos getCachedPos() {
-        return cachedPos;
+        return this.cachedPos;
     }
 
     public void setCachedPos(BlockPos cachedPos) {
@@ -38,7 +42,7 @@ public class PlayerMiningData {
     }
 
     public BlockState getCachedState() {
-        return cachedState;
+        return this.cachedState;
     }
 
     public void setCachedState(BlockState cachedState) {
@@ -46,7 +50,7 @@ public class PlayerMiningData {
     }
 
     public List<BlockPos> getCachedBlocks() {
-        return cachedBlocks;
+        return this.cachedBlocks;
     }
 
     public void setCachedBlocks(List<BlockPos> cachedBlocks) {
@@ -54,12 +58,12 @@ public class PlayerMiningData {
     }
 
     public boolean hasCachedBlocks() {
-        return cachedBlocks != null && !cachedBlocks.isEmpty();
+        return this.cachedBlocks != null && !this.cachedBlocks.isEmpty();
     }
 
     public void clearCache() {
-        cachedPos = null;
-        cachedState = null;
-        cachedBlocks = null;
+        this.cachedPos = null;
+        this.cachedState = null;
+        this.cachedBlocks = null;
     }
 }

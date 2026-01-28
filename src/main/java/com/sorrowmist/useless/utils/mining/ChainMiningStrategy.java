@@ -10,7 +10,7 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
 import net.neoforged.neoforge.event.level.BlockEvent;
 
@@ -42,11 +42,12 @@ import java.util.List;
 public class ChainMiningStrategy implements MiningStrategy {
     @Override
     public void handleBreak(BlockEvent.BreakEvent event, ItemStack hand, Player player) {
-        BlockState state = event.getState();
-        Level level = (Level) event.getLevel();
+        if (!(event.getLevel() instanceof ServerLevel level)) return;
         BlockPos pos = event.getPos();
+        BlockState originState = event.getState();
+        Block originBlock = originState.getBlock();
 
-        // 获取玩家的挖矿数据
+        // 1. 获取玩家的挖掘数据
         PlayerMiningData playerData = MiningDispatcher.getOrCreatePlayerData(player);
 
         // 检测是否为强制挖掘模式
@@ -54,17 +55,17 @@ public class ChainMiningStrategy implements MiningStrategy {
 
         // 检查缓存
         List<BlockPos> blocksToMine;
-        if (playerData.getCachedPos() != null && playerData.getCachedState() != null
-                && playerData.getCachedPos().equals(pos) && playerData.getCachedState() == state
+
+        // 2. 缓存一致性检查
+        // 检查当前破坏的方块是否是玩家按下 Tab 键时预计算的那个方块
+        if (playerData.getCachedPos() != null
+                && playerData.getCachedPos().equals(pos)
                 && playerData.hasCachedBlocks()) {
+            // 直接使用按下 Tab 时预存的列表，无需再次扫描计算
             blocksToMine = playerData.getCachedBlocks();
         } else {
-            // 计算要挖掘的方块
-            blocksToMine = MiningUtils.findBlocksToMine(pos, state, level, hand, forceMining);
-            // 更新缓存
-            playerData.setCachedPos(pos);
-            playerData.setCachedState(state);
-            playerData.setCachedBlocks(blocksToMine);
+            // 如果缓存不匹配（例如玩家没按 Tab 直接挖，或者瞬间移动了准星），则进行兜底计算
+            blocksToMine = MiningUtils.findBlocksToMine(pos, originState, level, hand, forceMining);
         }
 
         if (blocksToMine.isEmpty()) {
@@ -73,56 +74,48 @@ public class ChainMiningStrategy implements MiningStrategy {
             return;
         }
 
-        // 显示连锁挖矿信息
-        player.sendSystemMessage(Component.literal("连锁挖矿: 破坏了 " + blocksToMine.size() + " 个方块"));
+        // 3. 执行挖掘逻辑
+        List<ItemStack> allDrops = new ArrayList<>();
+        int actualMinedCount = 0;
 
-        List<ItemStack> drops = new ArrayList<>();
+        for (BlockPos targetPos : blocksToMine) {
+            BlockState currentState = level.getBlockState(targetPos);
 
-        // 收集所有方块的掉落物
-        for (BlockPos blockPos : blocksToMine) {
-            BlockState blockState = level.getBlockState(blockPos);
-            drops.addAll(MiningUtils.getBlockDrops(blockState,
-                                                   level,
-                                                   blockPos,
-                                                   player,
-                                                   hand,
-                                                   forceMining
-            ));
+            // 安全性检查：处理竞争问题
+            // 如果在缓存计算后，方块被其他玩家挖走或替换，则跳过
+            if (!currentState.is(originBlock)) {
+                continue;
+            }
+
+            // 收集掉落物
+            allDrops.addAll(MiningUtils.getBlockDrops(currentState, level, targetPos, player, hand, forceMining));
+
+            // 移除方块
+            level.removeBlock(targetPos, false);
+            actualMinedCount++;
         }
 
-        if (MiningUtils.hasNoValidDrops(drops)) {
-            // 回退处理：破坏所有方块
-            for (BlockPos blockPos : blocksToMine) {
-                BlockState blockState = level.getBlockState(blockPos);
-                MiningUtils.processBlockBreak(level, blockPos, blockState, player, hand, forceMining);
-            }
-            // 取消原始事件，避免重复处理
-            event.setCanceled(true);
-        } else {
-            // 合并相同物品的堆叠
-            List<ItemStack> mergedDrops = MiningUtils.mergeItemStacks(drops);
-
-            // 处理掉落物（只处理一次）
-            MiningUtils.handleDrops(player, mergedDrops);
-
-            // 计算并弹出经验（只处理一次）
-            if (hand.get(UComponents.EnchantModeComponent.get()) == EnchantMode.FORTUNE) {
-                int exp = state.getBlock().getExpDrop(state, level, pos, level.getBlockEntity(pos), player, hand);
-                if (exp > 0) {
-                    state.getBlock().popExperience((ServerLevel) level, pos, exp * blocksToMine.size());
-                }
-            }
-
-            // 破坏所有方块（静默移除）
-            for (BlockPos blockPos : blocksToMine) {
-                level.removeBlock(blockPos, false);
-            }
-
-            // 取消原始事件，避免重复处理
-            event.setCanceled(true);
+        // 处理统一掉落物（合并后进背包）
+        if (!MiningUtils.hasNoValidDrops(allDrops)) {
+            MiningUtils.handleDrops(player, MiningUtils.mergeItemStacks(allDrops));
         }
 
-        // 挖掘完成后清理缓存
+        // 经验处理（仅在时运/默认模式下弹出）
+        if (hand.getOrDefault(UComponents.EnchantModeComponent.get(), EnchantMode.FORTUNE) == EnchantMode.FORTUNE) {
+            int exp = originBlock.getExpDrop(originState, level, pos, level.getBlockEntity(pos), player, hand);
+            if (exp > 0) {
+                // 根据实际破坏的数量倍增经验
+                originBlock.popExperience(level, pos, exp * actualMinedCount);
+            }
+        }
+
+        // 6. 交互反馈
+        if (actualMinedCount > 0) {
+            player.displayClientMessage(Component.literal("连锁挖掘: 破坏了 " + actualMinedCount + " 个方块"), true);
+        }
+
+        // 7. 清理并取消原版事件，防止重复破坏
+        event.setCanceled(true);
         playerData.clearCache();
     }
 }

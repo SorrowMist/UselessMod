@@ -86,15 +86,15 @@ public class EndlessBeafItem extends TieredItem {
     }
 
     public EndlessBeafItem(@Nullable ToolTypeMode toolType) {
-        super(Tiers.STONE,
+        super(Tiers.NETHERITE,
               new Item.Properties()
-                      .attributes(DiggerItem.createAttributes(Tiers.STONE, 50, 2.0F))
+                      .attributes(DiggerItem.createAttributes(Tiers.NETHERITE, 50, 2.0F))
                       .stacksTo(1)
                       .rarity(Rarity.EPIC)
                       .durability(0)
                       .component(DataComponents.TOOL, new Tool(
                                          List.of(
-                                                 Tool.Rule.deniesDrops(Tiers.STONE.getIncorrectBlocksForDrops()),
+                                                 Tool.Rule.deniesDrops(Tiers.NETHERITE.getIncorrectBlocksForDrops()),
                                                  Tool.Rule.minesAndDrops(BlockTags.MINEABLE_WITH_PICKAXE,
                                                                          Tiers.NETHERITE.getSpeed()
                                                  ),

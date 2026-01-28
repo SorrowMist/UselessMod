@@ -5,9 +5,6 @@ import com.sorrowmist.useless.api.component.UComponents;
 import com.sorrowmist.useless.api.tool.ToolTypeMode;
 import com.sorrowmist.useless.init.ModItems;
 import com.sorrowmist.useless.utils.UselessItemUtils;
-import net.minecraft.core.component.DataComponentMap;
-import net.minecraft.core.component.DataComponentType;
-import net.minecraft.core.component.TypedDataComponent;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
@@ -15,7 +12,9 @@ import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.InteractionHand;
+import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
 import org.jetbrains.annotations.NotNull;
 
@@ -32,55 +31,43 @@ public record ToolTypeModeSwitchPacket(ToolTypeMode mode) implements CustomPacke
     public static void handle(ToolTypeModeSwitchPacket msg, IPayloadContext ctx) {
         ctx.enqueueWork(() -> {
             ServerPlayer player = (ServerPlayer) ctx.player();
-            // 使用工具方法查找目标工具
-            ItemStack targetItem = null;
-            InteractionHand targetHand = null;
 
             var toolEntry = UselessItemUtils.findTargetToolInHands(player);
-            if (toolEntry.isPresent()) {
-                var entry = toolEntry.get();
-                targetItem = entry.getKey();
-                targetHand = entry.getValue();
-            }
+            if (toolEntry.isEmpty()) return; // 没找到工具直接返回
 
-            // 如果找到了目标物品
-            if (targetItem != null) {
-                ItemStack newStack = switch (msg.mode) {
-                    case WRENCH_MODE -> new ItemStack(ModItems.ENDLESS_BEAF_WRENCH.get());
-                    case SCREWDRIVER_MODE -> new ItemStack(ModItems.ENDLESS_BEAF_SCREWDRIVER.get());
-                    case MALLET_MODE -> new ItemStack(ModItems.ENDLESS_BEAF_MALLET.get());
-                    case CROWBAR_MODE -> new ItemStack(ModItems.ENDLESS_BEAF_CROWBAR.get());
-                    case HAMMER_MODE -> new ItemStack(ModItems.ENDLESS_BEAF_HAMMER.get());
-                    case OMNITOOL_MODE -> {
-                        ResourceLocation omnitoolId = ResourceLocation.fromNamespaceAndPath("omnitools", "omni_wrench");
-                        if (BuiltInRegistries.ITEM.containsKey(omnitoolId)) {
-                            ItemStack itemStack = new ItemStack(BuiltInRegistries.ITEM.get(omnitoolId));
-                            itemStack.set(UComponents.CurrentToolTypeComponent, ToolTypeMode.OMNITOOL_MODE);
-                            yield itemStack;
-                        } else {
-                            yield new ItemStack(ModItems.ENDLESS_BEAF_WRENCH.get());
-                        }
+            var entry = toolEntry.get();
+            ItemStack targetItem = entry.getKey();
+            InteractionHand targetHand = entry.getValue();
+
+            // 1. 创建新物品实例
+            ItemStack newStack = switch (msg.mode) {
+                case WRENCH_MODE -> new ItemStack(ModItems.ENDLESS_BEAF_WRENCH.get());
+                case SCREWDRIVER_MODE -> new ItemStack(ModItems.ENDLESS_BEAF_SCREWDRIVER.get());
+                case MALLET_MODE -> new ItemStack(ModItems.ENDLESS_BEAF_MALLET.get());
+                case CROWBAR_MODE -> new ItemStack(ModItems.ENDLESS_BEAF_CROWBAR.get());
+                case HAMMER_MODE -> new ItemStack(ModItems.ENDLESS_BEAF_HAMMER.get());
+                case OMNITOOL_MODE -> {
+                    ResourceLocation omnitoolId = ResourceLocation.fromNamespaceAndPath("omnitools", "omni_wrench");
+                    Item toolItem = BuiltInRegistries.ITEM.get(omnitoolId);
+                    if (toolItem != Items.AIR) {
+                        yield new ItemStack(toolItem);
+                    } else {
+                        yield new ItemStack(ModItems.ENDLESS_BEAF_WRENCH.get());
                     }
-                    default -> new ItemStack(ModItems.ENDLESS_BEAF_ITEM.get());
-                };
-
-                // 复制原有物品的所有NBT数据到新实例
-                DataComponentMap components = targetItem.getComponents();
-
-                for (TypedDataComponent<?> component : components) {
-                    newStack.set((DataComponentType) component.type(), component.value());
                 }
+                default -> new ItemStack(ModItems.ENDLESS_BEAF_ITEM.get());
+            };
 
-                // 切换物品实例
-                if (!newStack.isEmpty()) {
-                    // 替换玩家手中的物品（在正确的手中）
-                    newStack.set(UComponents.CurrentToolTypeComponent, msg.mode);
-                    player.setItemInHand(targetHand, newStack);
-                }
+            // 2. 复制原有物品的所有NBT数据到新实例
+            newStack.applyComponents(targetItem.getComponents());
+
+            // 3. 覆盖状态：最后设置当前的工具模式组件
+            if (!newStack.isEmpty()) {
+                newStack.set(UComponents.CurrentToolTypeComponent.get(), msg.mode);
+                player.setItemInHand(targetHand, newStack);
             }
         });
     }
-
     @Override
     public @NotNull Type<? extends CustomPacketPayload> type() {
         return TYPE;

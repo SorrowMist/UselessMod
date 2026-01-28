@@ -3,15 +3,22 @@ package com.sorrowmist.useless.utils.mining;
 import com.sorrowmist.useless.api.data.PlayerMiningData;
 import com.sorrowmist.useless.api.tool.FunctionMode;
 import com.sorrowmist.useless.utils.UComponentUtils;
+import net.minecraft.core.BlockPos;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.world.phys.HitResult;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 import net.neoforged.neoforge.event.level.BlockEvent;
 
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -45,7 +52,13 @@ public class MiningDispatcher {
      * @param pressed 是否按下
      */
     public static void setTabPressed(Player player, boolean pressed) {
-        getOrCreatePlayerData(player).setTabPressed(pressed);
+        PlayerMiningData playerData = getOrCreatePlayerData(player);
+        playerData.setTabPressed(pressed);
+
+        // 如果松开 Tab，立即清理，确保不留残余数据
+        if (!pressed) {
+            playerData.clearCache();
+        }
     }
 
     /**
@@ -71,6 +84,47 @@ public class MiningDispatcher {
 
         // 调用策略处理
         strategy.handleBreak(event, item, player);
+    }
+
+    public static void tickCacheUpdate(Player player) {
+        PlayerMiningData data = getOrCreatePlayerData(player);
+
+        // 只有当玩家按住 Tab 且主手拿着正确工具时才检测
+        if (!data.isTabPressed()) {
+            if (data.hasCachedBlocks()) {
+                data.clearCache();
+            }
+            return;
+        }
+
+        ItemStack hand = player.getMainHandItem();
+        if (hand.isEmpty() || !UComponentUtils.hasFunctionMode(hand, FunctionMode.CHAIN_MINING)) {
+            data.clearCache();
+            return;
+        }
+
+        if (!(player.level() instanceof ServerLevel level)) return;
+
+        // 获取触及距离并进行射线检测
+        double reach = player.getAttributeValue(Attributes.BLOCK_INTERACTION_RANGE);
+        HitResult hitResult = player.pick(reach, 0.0f, false);
+
+        if (hitResult.getType() == HitResult.Type.BLOCK) {
+            BlockPos currentPos = ((BlockHitResult) hitResult).getBlockPos();
+            // 关键：只有准星移动到了新方块，才重新计算 BFS
+            if (data.getCachedPos() == null || !data.getCachedPos().equals(currentPos)) {
+                BlockState state = level.getBlockState(currentPos);
+                boolean forceMining = UComponentUtils.hasFunctionMode(hand, FunctionMode.FORCE_MINING);
+
+                // 重新扫描并存入缓存
+                List<BlockPos> blocks = MiningUtils.findBlocksToMine(currentPos, state, level, hand, forceMining);
+                data.setCachedPos(currentPos);
+                data.setCachedBlocks(blocks);
+            }
+        } else {
+            // 准星指天或指向空气，清理当前缓存
+            data.clearCache();
+        }
     }
 
     /**

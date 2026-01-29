@@ -143,5 +143,14 @@
   "emi.category.useless_mod.advanced_alloy_furnace": "Advanced Alloy Furnace",
   "emi.category.useless_mod.catalyst_info": "Catalyst Parallel Info",
   "pack.useless_mod.god.name": "Useless Mod God Pack",
-  "pack.useless_mod.god.description": "A built-in resource pack for Useless Mod"
+  "pack.useless_mod.god.description": "A built-in resource pack for Useless Mod",
+  "gui.useless_mod.ultimine_status": "Ultimine: %s",
+  "gui.useless_mod.force_mining_label": "Force Mining: ",
+  "gui.useless_mod.force_mining_status": "%s",
+  "gui.useless_mod.mining_count": "Mining Count: %s",
+  "gui.useless_mod.status.enhanced": "Enhanced Chain",
+  "gui.useless_mod.status.normal": "Normal Chain",
+  "gui.useless_mod.status.inactive": "Inactive",
+  "gui.useless_mod.force.enabled": "Enabled",
+  "gui.useless_mod.force.disabled": "Disabled"
 }

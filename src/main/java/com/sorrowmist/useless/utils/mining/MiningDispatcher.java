@@ -34,7 +34,11 @@ public class MiningDispatcher {
 
     // 存储每个玩家的挖矿数据
     private static final Map<UUID, PlayerMiningData> playerDataMap = new ConcurrentHashMap<>();
-    
+
+    public static PlayerMiningData getPlayerData(Player player) {
+        return playerDataMap.get(player.getUUID());
+    }
+
     /**
      * 获取或创建玩家的挖矿数据
      *
@@ -54,11 +58,6 @@ public class MiningDispatcher {
     public static void setTabPressed(Player player, boolean pressed) {
         PlayerMiningData playerData = getOrCreatePlayerData(player);
         playerData.setTabPressed(pressed);
-
-        // 如果松开 Tab，立即清理，确保不留残余数据
-        if (!pressed) {
-            playerData.clearCache();
-        }
     }
 
     /**
@@ -89,14 +88,6 @@ public class MiningDispatcher {
     public static void tickCacheUpdate(Player player) {
         PlayerMiningData data = getOrCreatePlayerData(player);
 
-        // 只有当玩家按住 Tab 且主手拿着正确工具时才检测
-        if (!data.isTabPressed()) {
-            if (data.hasCachedBlocks()) {
-                data.clearCache();
-            }
-            return;
-        }
-
         ItemStack hand = player.getMainHandItem();
         if (hand.isEmpty() || !UComponentUtils.hasFunctionMode(hand, FunctionMode.CHAIN_MINING)) {
             data.clearCache();
@@ -104,6 +95,11 @@ public class MiningDispatcher {
         }
 
         if (!(player.level() instanceof ServerLevel level)) return;
+
+        // 只有按下Tab时才更新缓存，松开Tab时保留缓存
+        if (!data.isTabPressed()) {
+            return;
+        }
 
         // 获取触及距离并进行射线检测
         double reach = player.getAttributeValue(Attributes.BLOCK_INTERACTION_RANGE);

@@ -163,7 +163,6 @@ configurations {
 
 dependencies {
     implementation "curse.maven:BotanyPots-353928:6895762"
-    implementation "curse.maven:BotanyPots-353928:6895762"
     // apotheosis
 //    implementation "dev.shadowsoffire:Placebo:1.21.1-9.6.3"
 //    implementation "dev.shadowsoffire:ApothicAttributes:1.21.1-2.6.0"
@@ -213,7 +212,7 @@ dependencies {
     runtimeOnly "curse.maven:architectury-api-419699:5786327"
 
 
-    runtimeOnly fileTree(dir: 'libs', includes: ['*.jar'], exclude: ['*MouseTweaks*.jar'])
+    runtimeOnly fileTree(dir: 'libs', includes: ['*.jar'])
     compileOnly files("libs/gtceu-1.21.1-7.0.1.jar")
 }
 

@@ -162,5 +162,14 @@
   "emi.category.useless_mod.catalyst_info": "催化剂并行数信息",
   "pack.useless_mod.god.name": "无用模组 - 神权杖材质包",
   "pack.useless_mod.god.description": "麦淇淋制作的立体神权杖材质包",
-  "tooltip.useless_mod.wrench_function": "Can be used as a wrench (compatible with other mods)"
+  "tooltip.useless_mod.wrench_function": "Can be used as a wrench (compatible with other mods)",
+  "gui.useless_mod.ultimine_status": "Ultimine: %s",
+  "gui.useless_mod.force_mining_label": "强制挖掘: ",
+  "gui.useless_mod.force_mining_status": "%s",
+  "gui.useless_mod.mining_count": "挖掘数量: %s",
+  "gui.useless_mod.status.enhanced": "增强连锁",
+  "gui.useless_mod.status.normal": "普通连锁",
+  "gui.useless_mod.status.inactive": "未激活",
+  "gui.useless_mod.force.enabled": "开启",
+  "gui.useless_mod.force.disabled": "关闭"
 }

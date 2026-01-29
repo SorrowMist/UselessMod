@@ -97,7 +97,7 @@ public class ChainMiningStrategy implements MiningStrategy {
 
         // 处理统一掉落物（合并后进背包）
         if (!MiningUtils.hasNoValidDrops(allDrops)) {
-            MiningUtils.handleDrops(player, MiningUtils.mergeItemStacks(allDrops));
+            MiningUtils.handleDrops(player, MiningUtils.mergeItemStacks(allDrops), hand);
         }
 
         // 经验处理（仅在时运/默认模式下弹出）
@@ -108,8 +108,7 @@ public class ChainMiningStrategy implements MiningStrategy {
                 originBlock.popExperience(level, pos, exp * actualMinedCount);
             }
         }
-
-        // 6. 交互反馈
+        
         if (actualMinedCount > 0) {
             player.displayClientMessage(Component.literal("连锁挖掘: 破坏了 " + actualMinedCount + " 个方块"), true);
         }

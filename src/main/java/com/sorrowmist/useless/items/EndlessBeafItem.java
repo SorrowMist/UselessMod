@@ -1,12 +1,6 @@
 package com.sorrowmist.useless.items;
 
-import appeng.api.features.IGridLinkableHandler;
-import appeng.api.ids.AEComponents;
-import appeng.api.implementations.blockentities.IWirelessAccessPoint;
-import appeng.api.networking.IGrid;
-import appeng.core.localization.PlayerMessages;
-import appeng.items.tools.powered.WirelessTerminalItem;
-import appeng.util.Platform;
+import appeng.block.networking.WirelessAccessPointBlock;
 import com.sorrowmist.useless.api.component.UComponents;
 import com.sorrowmist.useless.api.tool.EnchantMode;
 import com.sorrowmist.useless.api.tool.FunctionMode;
@@ -30,7 +24,6 @@ import net.minecraft.core.particles.BlockParticleOption;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
-import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvent;
 import net.minecraft.sounds.SoundEvents;
@@ -74,11 +67,9 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.*;
-import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
 public class EndlessBeafItem extends TieredItem {
-    public static final IGridLinkableHandler LINKABLE_HANDLER = new LinkableHandler();
     private final ToolTypeMode toolType;
 
     public EndlessBeafItem() {
@@ -132,10 +123,11 @@ public class EndlessBeafItem extends TieredItem {
                                       LevelReader world,
                                       @NotNull BlockPos pos,
                                       @NotNull Player player) {
-        // 检查是否是塑料块，如果是则不跳过useOn方法
         Block block = world.getBlockState(pos).getBlock();
-        // 对于塑料块，不绕过useOn方法，以便执行快速破坏逻辑
-        return !(block instanceof GlowPlasticBlock);
+        if (block instanceof GlowPlasticBlock || block instanceof WirelessAccessPointBlock) {
+            return false;
+        }
+        return super.doesSneakBypassUse(stack, world, pos, player);
     }
 
     @Override
@@ -187,7 +179,6 @@ public class EndlessBeafItem extends TieredItem {
 
             case HAMMER_MODE -> ability == ItemAbility.get("hammer_dig") ||
                     ability == ItemAbility.get("hammer_mute");
-
         };
     }
 
@@ -295,57 +286,74 @@ public class EndlessBeafItem extends TieredItem {
     @Override
     public @NotNull InteractionResult useOn(UseOnContext ctx) {
         Level world = ctx.getLevel();
-        BlockPos blockpos = ctx.getClickedPos();
+        BlockPos pos = ctx.getClickedPos();
         Player player = ctx.getPlayer();
-        BlockState blockstate = world.getBlockState(blockpos);
-
-        // === 刷子功能（仅对可刷取的方块）===
-        if (player != null) {
-            HitResult hitresult = ProjectileUtil.getHitResultOnViewVector(
-                    player,
-                    (p) -> !p.isSpectator() && p.isPickable(),
-                    player.blockInteractionRange()
-            );
-            if (hitresult instanceof BlockHitResult blockhitresult
-                    && hitresult.getType() == HitResult.Type.BLOCK) {
-                BlockPos hitPos = blockhitresult.getBlockPos();
-                BlockState hitState = world.getBlockState(hitPos);
-                if (hitState.getBlock() instanceof BrushableBlock) {
-                    player.startUsingItem(ctx.getHand());
-                    return InteractionResult.CONSUME;
-                }
-            }
-        }
+        ItemStack stack = ctx.getItemInHand();
 
         if (player == null) return InteractionResult.PASS;
 
-        // === 快速破坏塑料块（Shift + 右键）===
-        if (!player.isCreative() && player.isShiftKeyDown() && blockstate.getBlock() instanceof GlowPlasticBlock) {
-            MiningUtils.quickBreakBlock(world, blockpos, blockstate, player, ctx.getItemInHand());
+        // ============================================================
+        // 1. AE2 绑定逻辑 (Shift + 右键)
+        // ============================================================
+        if (player.isShiftKeyDown()) {
+            BlockEntity be = world.getBlockEntity(pos);
+            if (be != null && be.getClass().getSimpleName().contains("WirelessAccessPoint")) {
+                if (!world.isClientSide) {
+                    GlobalPos globalPos = GlobalPos.of(world.dimension(), pos);
+                    stack.set(UComponents.WIRELESS_LINK_TARGET.get(), globalPos);
+                    player.displayClientMessage(Component.literal("已成功绑定无线接入点: " + pos.toShortString()),
+                                                true
+                    );
+                }
+                return InteractionResult.sidedSuccess(world.isClientSide);
+            }
+        }
+
+        // ============================================================
+        // 2. 刷子功能 (对 BrushableBlock 生效)
+        // ============================================================
+        HitResult hitresult = ProjectileUtil.getHitResultOnViewVector(
+                player, (p) -> !p.isSpectator() && p.isPickable(), player.blockInteractionRange());
+
+        if (hitresult instanceof BlockHitResult blockHit && hitresult.getType() == HitResult.Type.BLOCK) {
+            if (world.getBlockState(blockHit.getBlockPos()).getBlock() instanceof BrushableBlock) {
+                player.startUsingItem(ctx.getHand());
+                return InteractionResult.CONSUME;
+            }
+        }
+
+        // ============================================================
+        // 3. 快速破坏塑料块 (Shift + 右键)
+        // ============================================================
+        BlockState state = world.getBlockState(pos);
+        if (!player.isCreative() && player.isShiftKeyDown() && state.getBlock() instanceof GlowPlasticBlock) {
+            if (!world.isClientSide) {
+                MiningUtils.quickBreakBlock(world, pos, state, player, stack);
+            }
             return InteractionResult.sidedSuccess(world.isClientSide);
         }
 
-        // 统一工具逻辑处理 (耕地、铺路、剥皮、刮蜡、刮铜)
-        // 按照 铲 -> 锄 -> 斧 的顺序尝试修改方块状态
-        // 尝试 铲子 (铺路)
-        InteractionResult shovelRes = this.tryToolAction(ctx, ItemAbilities.SHOVEL_FLATTEN, SoundEvents.SHOVEL_FLATTEN);
-        if (shovelRes != InteractionResult.PASS) return shovelRes;
+        // ============================================================
+        // 4. 统一工具行为链 (铲子 -> 锄头 -> 斧头)
+        // ============================================================
 
-        // 尝试 锄头 (耕地)
-        InteractionResult hoeRes = this.tryToolAction(ctx, ItemAbilities.HOE_TILL, SoundEvents.HOE_TILL);
-        if (hoeRes != InteractionResult.PASS) return hoeRes;
+        // 4.1 铲子 (铺路)
+        InteractionResult res = this.tryToolAction(ctx, ItemAbilities.SHOVEL_FLATTEN, SoundEvents.SHOVEL_FLATTEN);
+        if (res != InteractionResult.PASS) return res;
 
-        // 尝试 斧头 (剥皮)
-        InteractionResult stripRes = this.tryToolAction(ctx, ItemAbilities.AXE_STRIP, SoundEvents.AXE_STRIP);
-        if (stripRes != InteractionResult.PASS) return stripRes;
+        // 4.2 锄头 (耕地)
+        res = this.tryToolAction(ctx, ItemAbilities.HOE_TILL, SoundEvents.HOE_TILL);
+        if (res != InteractionResult.PASS) return res;
 
-        // 尝试 斧头 (刮铜 Scrape)
-        InteractionResult scrapeRes = this.tryScrapeOrWaxOff(ctx, ItemAbilities.AXE_SCRAPE, SoundEvents.AXE_SCRAPE,
-                                                             3005
-        );
-        if (scrapeRes != InteractionResult.PASS) return scrapeRes;
+        // 4.3 斧头 (剥皮)
+        res = this.tryToolAction(ctx, ItemAbilities.AXE_STRIP, SoundEvents.AXE_STRIP);
+        if (res != InteractionResult.PASS) return res;
 
-        // 尝试 斧头 (去蜡 Wax Off)
+        // 4.4 斧头 (刮铜)
+        res = this.tryScrapeOrWaxOff(ctx, ItemAbilities.AXE_SCRAPE, SoundEvents.AXE_SCRAPE, 3005);
+        if (res != InteractionResult.PASS) return res;
+
+        // 4.5 斧头 (去蜡)
         return this.tryScrapeOrWaxOff(ctx, ItemAbilities.AXE_WAX_OFF, SoundEvents.AXE_WAX_OFF, 3004);
     }
 
@@ -642,63 +650,5 @@ public class EndlessBeafItem extends TieredItem {
         }
 
         tooltip.add(Component.translatable(translationKey, keyName).withStyle(ChatFormatting.LIGHT_PURPLE));
-    }
-
-    @Nullable private GlobalPos getLinkedPosition(ItemStack item) {
-        return item.get(AEComponents.WIRELESS_LINK_TARGET);
-    }
-
-    @Nullable private IGrid getLinkedGrid(ItemStack stack, Level level, @Nullable Consumer<Component> errorConsumer) {
-        if (level instanceof ServerLevel serverLevel) {
-            GlobalPos linkedPos = this.getLinkedPosition(stack);
-            if (linkedPos == null) {
-                if (errorConsumer != null) {
-                    errorConsumer.accept(PlayerMessages.DeviceNotLinked.text());
-                }
-                return null;
-            } else {
-                ServerLevel linkedLevel = serverLevel.getServer().getLevel(linkedPos.dimension());
-                if (linkedLevel == null) {
-                    if (errorConsumer != null) {
-                        errorConsumer.accept(PlayerMessages.LinkedNetworkNotFound.text());
-                    }
-                    return null;
-                } else {
-                    BlockEntity be = Platform.getTickingBlockEntity(linkedLevel, linkedPos.pos());
-                    if (be instanceof IWirelessAccessPoint) {
-                        IWirelessAccessPoint accessPoint = (IWirelessAccessPoint) be;
-                        IGrid grid = accessPoint.getGrid();
-                        if (grid == null && errorConsumer != null) {
-                            errorConsumer.accept(PlayerMessages.LinkedNetworkNotFound.text());
-                        }
-                        return grid;
-                    } else {
-                        if (errorConsumer != null) {
-                            errorConsumer.accept(PlayerMessages.LinkedNetworkNotFound.text());
-                        }
-                        return null;
-                    }
-                }
-            }
-        } else {
-            return null;
-        }
-    }
-
-    private static class LinkableHandler implements IGridLinkableHandler {
-        @Override
-        public boolean canLink(ItemStack stack) {
-            return stack.getItem() instanceof WirelessTerminalItem;
-        }
-
-        @Override
-        public void link(ItemStack itemStack, GlobalPos pos) {
-            itemStack.set(AEComponents.WIRELESS_LINK_TARGET, pos);
-        }
-
-        @Override
-        public void unlink(ItemStack itemStack) {
-            itemStack.remove(AEComponents.WIRELESS_LINK_TARGET);
-        }
     }
 }

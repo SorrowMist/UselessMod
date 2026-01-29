@@ -2,7 +2,10 @@ package com.sorrowmist.useless.utils.mining;
 
 import com.sorrowmist.useless.api.component.UComponents;
 import com.sorrowmist.useless.api.tool.EnchantMode;
+import com.sorrowmist.useless.api.tool.FunctionMode;
+import com.sorrowmist.useless.compat.AE2Compat;
 import com.sorrowmist.useless.config.ConfigManager;
+import com.sorrowmist.useless.utils.UComponentUtils;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
@@ -14,10 +17,15 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
+import net.neoforged.fml.ModList;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 import java.util.*;
 
 public class MiningUtils {
+    private static final Logger log = LogManager.getLogger(MiningUtils.class);
+
     /**
      * 获取方块掉落物（支持强制挖掘模式）
      */
@@ -66,7 +74,7 @@ public class MiningUtils {
         List<ItemStack> drops = getBlockDrops(state, level, pos, player, tool, forceMining);
 
         // 处理掉落物
-        handleDrops(player, drops);
+        handleDrops(player, drops, tool);
 
         // 计算并弹出经验（时运模式）
         if (tool.get(UComponents.EnchantModeComponent.get()) == EnchantMode.FORTUNE) {
@@ -100,7 +108,7 @@ public class MiningUtils {
         BlockEntity blockEntity = world.getBlockEntity(pos);
 
         List<ItemStack> drops = Block.getDrops(state, serverLevel, pos, blockEntity, player, tool);
-        handleDrops(player, drops);
+        handleDrops(player, drops, tool);
 
         world.destroyBlock(pos, false, player);
     }
@@ -148,8 +156,26 @@ public class MiningUtils {
      * @param player 玩家
      * @param drops  掉落物列表
      */
-    static void handleDrops(Player player, List<ItemStack> drops) {
+    static void handleDrops(Player player, List<ItemStack> drops, ItemStack tool) {
+        boolean isAE2Loaded = ModList.get().isLoaded("ae2");
+
         for (ItemStack drop : drops) {
+            if (drop.isEmpty()) continue;
+
+            // 1. 尝试存入 AE2 (内部处理跨维度)
+            if (isAE2Loaded
+                    && UComponentUtils.hasFunctionMode(tool, FunctionMode.AE_STORAGE_PRIORITY)
+                    && tool.has(UComponents.WIRELESS_LINK_TARGET.get())) {
+                try {
+                    int inserted = AE2Compat.tryInsertToLinkedGrid(tool, player, drop);
+                    if (inserted > 0) {
+                        drop.shrink(inserted);
+                    }
+                } catch (Throwable ignored) {
+                }
+            }
+
+            // 2. 剩余进入背包
             if (!drop.isEmpty()) {
                 if (!player.getInventory().add(drop)) {
                     player.drop(drop, false);

@@ -212,8 +212,9 @@ dependencies {
     runtimeOnly "curse.maven:architectury-api-419699:5786327"
 
 
-    runtimeOnly fileTree(dir: 'libs', includes: ['*.jar'])
-    compileOnly files("libs/gtceu-1.21.1-7.0.1.jar")
+    runtimeOnly fileTree(dir: 'libs', includes: ['*.jar'], excludes: ['*sophisticated*.jar'])
+    compileOnly fileTree(dir: 'libs', includes: ['*sophisticated*.jar'])
+    compileOnly files("libs/gtceu-1.21.1-7.0.1.jar.1")
 }
 
 // This block of code expands all declared replace properties in the specified resource targets.

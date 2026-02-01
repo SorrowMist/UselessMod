@@ -6,13 +6,10 @@ import com.sorrowmist.useless.utils.UComponentUtils;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.phys.BlockHitResult;
-import net.minecraft.world.phys.HitResult;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
@@ -31,6 +28,12 @@ public class MiningDispatcher {
     private static final MiningStrategy CHAIN_STRATEGY = new ChainMiningStrategy(false);
     // 增强连锁挖掘
     private static final MiningStrategy ENHANCED_CHAIN_STRATEGY = new ChainMiningStrategy(true);
+    // R键单方块破坏策略
+    private static final MiningStrategy FORCE_STRATEGY = new ForceBreakStrategy();
+    // R键普通连锁破坏策略
+    private static final MiningStrategy FORCE_CHAIN_STRATEGY = new ForceChainMiningStrategy(false);
+    // R键增强连锁破坏策略
+    private static final MiningStrategy FORCE_ENHANCED_CHAIN_STRATEGY = new ForceChainMiningStrategy(true);
 
     // 存储每个玩家的挖矿数据（服务端）
     private static final Map<UUID, PlayerMiningData> playerDataMap = new ConcurrentHashMap<>();
@@ -107,10 +110,10 @@ public class MiningDispatcher {
 
         MiningStrategy strategy = DEFAULT_STRATEGY;  // 默认普通（不连锁）
 
-        // 获取玩家的挖矿数据，检查Tab键状态
+        // 获取玩家的挖矿数据
         PlayerMiningData playerData = getOrCreatePlayerData(player);
 
-        // 检查是否启用了连锁挖掘
+        // 检查是否启用了连锁挖掘（仅Tab键，R键由dispatchForceBreak处理）
         if (playerData.isTabPressed()) {
             // false -> 普通连锁挖掘
             // true -> 增强连锁挖掘
@@ -146,12 +149,10 @@ public class MiningDispatcher {
             return;
         }
 
-        // 获取触及距离并进行射线检测
-        double reach = player.getAttributeValue(Attributes.BLOCK_INTERACTION_RANGE);
-        HitResult hitResult = player.pick(reach, 0.0f, false);
+        // 获取玩家指向的方块
+        BlockPos currentPos = MiningUtils.getTargetBlockPos(player);
 
-        if (hitResult.getType() == HitResult.Type.BLOCK) {
-            BlockPos currentPos = ((BlockHitResult) hitResult).getBlockPos();
+        if (currentPos != null) {
             // 只有准星移动到了新方块，才重新计算
             if (data.getCachedPos() == null || !data.getCachedPos().equals(currentPos)) {
                 BlockState state = level.getBlockState(currentPos);
@@ -196,5 +197,44 @@ public class MiningDispatcher {
         if (event.getEntity() instanceof ServerPlayer player) {
             playerDataMap.remove(player.getUUID());
         }
+    }
+
+    /**
+     * 强制破坏分派方法（R键触发）
+     * 直接执行破坏，不通过BlockEvent
+     *
+     * @param player     玩家
+     * @param tabPressed 是否同时按下了Tab键
+     */
+    public static void dispatchForceBreak(Player player, boolean tabPressed) {
+        if (player.isCreative()) return;
+        if (player.level().isClientSide()) return;
+
+        // 获取玩家指向的方块
+        BlockPos targetPos = MiningUtils.getTargetBlockPos(player);
+        if (targetPos == null) return;
+
+        ServerLevel level = (ServerLevel) player.level();
+        BlockState state = level.getBlockState(targetPos);
+        if (state.isAir()) return;
+
+        ItemStack hand = player.getMainHandItem();
+        MiningStrategy strategy;
+
+        // 根据是否按下Tab键选择策略
+        if (tabPressed) {
+            // R + Tab：R键连锁破坏
+            if (UComponentUtils.isEnhancedChainMiningEnabled(hand)) {
+                strategy = FORCE_ENHANCED_CHAIN_STRATEGY;
+            } else {
+                strategy = FORCE_CHAIN_STRATEGY;
+            }
+        } else {
+            // 仅R：R键单方块破坏
+            strategy = FORCE_STRATEGY;
+        }
+
+        BlockEvent.BreakEvent dummyEvent = new BlockEvent.BreakEvent(level, targetPos, state, player);
+        strategy.handleBreak(dummyEvent, hand, player);
     }
 }

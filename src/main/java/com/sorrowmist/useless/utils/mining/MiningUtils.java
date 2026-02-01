@@ -3,19 +3,28 @@ package com.sorrowmist.useless.utils.mining;
 import com.sorrowmist.useless.api.component.UComponents;
 import com.sorrowmist.useless.api.tool.EnchantMode;
 import com.sorrowmist.useless.compat.AE2Compat;
+import com.sorrowmist.useless.compat.SophisticatedCompat;
 import com.sorrowmist.useless.config.ConfigManager;
 import com.sorrowmist.useless.utils.UComponentUtils;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
+import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.component.DataComponents;
+import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.sounds.SoundSource;
+import net.minecraft.world.Container;
+import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
+import net.minecraft.world.item.component.ItemLore;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.world.phys.HitResult;
 import net.neoforged.fml.ModList;
 
 import java.util.*;
@@ -318,5 +327,102 @@ public class MiningUtils {
         blocksToMine.sort(Comparator.comparingDouble(pos -> pos.distSqr(originPos)));
 
         return blocksToMine;
+    }
+
+    /**
+     * 获取精准采集模式的掉落物（带NBT）
+     *
+     * @param state 方块状态
+     * @param level 世界
+     * @param pos   方块位置
+     * @return 带NBT的物品堆列表
+     */
+    static List<ItemStack> getSilkTouchDrops(BlockState state, ServerLevel level, BlockPos pos) {
+        BlockEntity be = level.getBlockEntity(pos);
+        Block block = state.getBlock();
+
+        // 使用 getCloneItemStack 获取正确的物品（处理 asItem() 返回空气的情况）
+        ItemStack stack = block.getCloneItemStack(level, pos, state);
+
+        // 如果还是空，尝试从掉落物列表获取
+        if (stack.isEmpty()) {
+            List<ItemStack> drops = Block.getDrops(state, level, pos, be, null, ItemStack.EMPTY);
+            if (!drops.isEmpty()) {
+                stack = drops.get(0).copy();
+            }
+        }
+
+        if (be != null && !stack.isEmpty()) {
+            // 尝试处理 SophisticatedStorage 的方块
+            boolean handledByCompat = false;
+            if (ModList.get().isLoaded("sophisticatedstorage")) {
+                handledByCompat = SophisticatedCompat.handleSilkTouchDrop(block, be, stack);
+            }
+
+            // 如果不是 SophisticatedStorage 方块，使用标准方式复制NBT数据
+            if (!handledByCompat) {
+                stack.applyComponents(be.collectComponents());
+
+                // 只有包含 container 组件时才添加 "+nbt" tooltip
+                if (stack.has(DataComponents.CONTAINER)) {
+                    Component nbtTooltip = Component.literal("+nbt")
+                                                    .withStyle(ChatFormatting.LIGHT_PURPLE)
+                                                    .withStyle(ChatFormatting.ITALIC);
+
+                    // 获取已有的 lore
+                    ItemLore existingLore = stack.get(DataComponents.LORE);
+                    List<Component> newLoreLines = new ArrayList<>();
+                    if (existingLore != null) {
+                        newLoreLines.addAll(existingLore.lines());
+                    }
+
+                    // 检查是否已经存在 "+nbt" tooltip，避免重复添加
+                    boolean alreadyHasNbtTooltip = newLoreLines.stream()
+                            .anyMatch(line -> line.getString().equals("+nbt"));
+
+                    if (!alreadyHasNbtTooltip) {
+                        newLoreLines.add(nbtTooltip);
+                        stack.set(DataComponents.LORE, new ItemLore(newLoreLines));
+                    }
+                }
+            }
+        }
+
+        return Collections.singletonList(stack);
+    }
+
+    /**
+     * 安全移除方块，防止容器方块（箱子、潜影盒等）的内容物额外掉落
+     * 在移除方块前会先清空 BlockEntity 的容器内容
+     *
+     * @param level 世界
+     * @param pos   方块位置
+     */
+    static void removeBlockSafely(ServerLevel level, BlockPos pos) {
+        BlockEntity be = level.getBlockEntity(pos);
+
+        // 如果方块有 BlockEntity 且实现了 Container 接口（容器方块），先清空内容
+        if (be instanceof Container container) {
+            container.clearContent();
+        }
+
+        // 安全移除方块
+        level.removeBlock(pos, false);
+    }
+
+    /**
+     * 获取玩家指向的方块位置
+     *
+     * @param player 玩家
+     * @return 方块位置，如果没有指向方块则返回null
+     */
+    static BlockPos getTargetBlockPos(Player player) {
+        double reach = player.getAttributeValue(Attributes.BLOCK_INTERACTION_RANGE);
+        HitResult hitResult = player.pick(reach, 0.0f, false);
+
+        if (hitResult.getType() == HitResult.Type.BLOCK) {
+            return ((BlockHitResult) hitResult).getBlockPos();
+        }
+        return null;
     }
 }

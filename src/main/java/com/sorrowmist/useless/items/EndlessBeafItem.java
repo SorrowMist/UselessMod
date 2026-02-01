@@ -75,7 +75,6 @@ public class EndlessBeafItem extends TieredItem {
     }
 
     public EndlessBeafItem(@Nullable ToolTypeMode toolType) {
-
         super(Tiers.NETHERITE,
               new Item.Properties()
                       .attributes(DiggerItem.createAttributes(Tiers.NETHERITE, 50, 2.0F))
@@ -84,8 +83,7 @@ public class EndlessBeafItem extends TieredItem {
                       .durability(0)
                       .component(DataComponents.TOOL, new Tool(
                                          List.of(
-                                                 // TODO 测试强制挖掘使用
-                                                 Tool.Rule.deniesDrops(Tiers.STONE.getIncorrectBlocksForDrops()),
+                                                 Tool.Rule.deniesDrops(Tiers.NETHERITE.getIncorrectBlocksForDrops()),
                                                  Tool.Rule.minesAndDrops(BlockTags.MINEABLE_WITH_PICKAXE,
                                                                          Tiers.NETHERITE.getSpeed()
                                                  ),
@@ -499,22 +497,31 @@ public class EndlessBeafItem extends TieredItem {
 
         // 3. 动态按键提示（Shift 展开）
         if (Screen.hasShiftDown()) {
-            // 显示详细按键绑定
-            this.addKeyTooltip(tooltipComponents, KeyBindings.SWITCH_FORTUNE_KEY,
-                               "tooltip.useless_mod.key.switch_fortune"
-            );
+            // 附魔切换
             this.addKeyTooltip(tooltipComponents, KeyBindings.SWITCH_SILK_TOUCH_KEY,
                                "tooltip.useless_mod.key.switch_silk_touch"
             );
+            this.addKeyTooltip(tooltipComponents, KeyBindings.SWITCH_FORTUNE_KEY,
+                               "tooltip.useless_mod.key.switch_fortune"
+            );
+
+            // 模式开关
             this.addKeyTooltip(tooltipComponents, KeyBindings.TOGGLE_CHAIN_MODE_KEY,
                                "tooltip.useless_mod.key.toggle_chain_mode"
             );
             this.addKeyTooltip(tooltipComponents, KeyBindings.SWITCH_FORCE_MINING_KEY,
                                "tooltip.useless_mod.key.switch_force_mining"
             );
+
+            // 触发按键
+            this.addKeyTooltip(tooltipComponents, KeyBindings.TRIGGER_CHAIN_MINING_KEY,
+                               "tooltip.useless_mod.key.trigger_chain_mining"
+            );
             this.addKeyTooltip(tooltipComponents, KeyBindings.TRIGGER_FORCE_MINING_KEY,
                                "tooltip.useless_mod.key.trigger_force_mining"
             );
+
+            // UI
             this.addKeyTooltip(tooltipComponents, KeyBindings.SWITCH_MODE_WHEEL_KEY,
                                "tooltip.useless_mod.key.open_mode_wheel"
             );

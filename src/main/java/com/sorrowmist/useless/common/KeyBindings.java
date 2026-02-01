@@ -60,7 +60,7 @@ public class KeyBindings {
             GLFW.GLFW_KEY_KP_9,
             CATEGORY
     ));
-    // 触发强制挖掘(按住此键时临时激活强制挖掘功能)
+    // 触发强制挖掘
     private static final String TRIGGER_FORCE_MINING = "key.useless_mod.trigger_force_mining";
     public static final Lazy<KeyMapping> TRIGGER_FORCE_MINING_KEY = Lazy.of(() -> new KeyMapping(
             TRIGGER_FORCE_MINING,

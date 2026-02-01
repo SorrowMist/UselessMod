@@ -3,6 +3,7 @@ package com.sorrowmist.useless.api.data;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.block.state.BlockState;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 
@@ -11,7 +12,7 @@ public class PlayerMiningData {
     private boolean tabPressed = false;
     private BlockPos cachedPos = null;
     private BlockState cachedState = null;
-    private List<BlockPos> cachedBlocks = null;
+    private List<BlockPos> cachedBlocks = Collections.emptyList();
 
     public PlayerMiningData(UUID playerId) {
         this.playerId = playerId;
@@ -54,16 +55,16 @@ public class PlayerMiningData {
     }
 
     public void setCachedBlocks(List<BlockPos> cachedBlocks) {
-        this.cachedBlocks = cachedBlocks;
+        this.cachedBlocks = cachedBlocks != null ? cachedBlocks : Collections.emptyList();
     }
 
     public boolean hasCachedBlocks() {
-        return this.cachedBlocks != null && !this.cachedBlocks.isEmpty();
+        return !this.cachedBlocks.isEmpty();
     }
 
     public void clearCache() {
         this.cachedPos = null;
         this.cachedState = null;
-        this.cachedBlocks = null;
+        this.cachedBlocks = Collections.emptyList();
     }
 }

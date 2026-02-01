@@ -1,8 +1,8 @@
 package com.sorrowmist.useless.client.gui;
 
 import com.sorrowmist.useless.api.data.PlayerMiningData;
-import com.sorrowmist.useless.api.tool.FunctionMode;
 import com.sorrowmist.useless.common.KeyBindings;
+import com.sorrowmist.useless.items.EndlessBeafItem;
 import com.sorrowmist.useless.utils.UComponentUtils;
 import com.sorrowmist.useless.utils.mining.MiningDispatcher;
 import net.minecraft.client.DeltaTracker;
@@ -11,8 +11,6 @@ import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.item.ItemStack;
-
-import java.util.EnumSet;
 
 public class MiningStatusGui {
     private static final int BG_MAIN = 0xB0202020;
@@ -32,17 +30,27 @@ public class MiningStatusGui {
         if (!KeyBindings.TRIGGER_CHAIN_MINING_KEY.get().isDown()) return;
 
         ItemStack stack = player.getMainHandItem();
-        EnumSet<FunctionMode> modes = UComponentUtils.getFunctionModes(stack);
+        boolean isEndlessBeaf = stack.getItem() instanceof EndlessBeafItem;
+        boolean enhancedChainMining = UComponentUtils.isEnhancedChainMiningEnabled(stack);
+        boolean forceMiningEnabled = UComponentUtils.isForceMiningEnabled(stack);
 
-        boolean enhanced = modes.contains(FunctionMode.ENHANCED_CHAIN_MINING);
-        boolean normal = modes.contains(FunctionMode.CHAIN_MINING);
-        boolean force = modes.contains(FunctionMode.FORCE_MINING);
+        String statusKey;
+        int statusColor;
 
-        String statusKey = enhanced
-                ? "gui.useless_mod.status.enhanced"
-                : normal
-                ? "gui.useless_mod.status.normal"
-                : "gui.useless_mod.status.inactive";
+        if (isEndlessBeaf) {
+            // 主手手持 EndlessBeafItem 时，根据 ChainMiningComponent 显示状态
+            if (enhancedChainMining) {
+                statusKey = "gui.useless_mod.status.enhanced";
+                statusColor = COLOR_ENHANCED;
+            } else {
+                statusKey = "gui.useless_mod.status.normal";
+                statusColor = COLOR_NORMAL;
+            }
+        } else {
+            // 未手持 EndlessBeafItem 时，显示未激活
+            statusKey = "gui.useless_mod.status.inactive";
+            statusColor = COLOR_OFF;
+        }
 
         Component statusValue = Component.translatable(statusKey);
         Component statusLine = Component.translatable(
@@ -52,25 +60,18 @@ public class MiningStatusGui {
 
         Component forceLabel = Component.translatable("gui.useless_mod.force_mining_label");
         Component forceValue = Component.translatable(
-                force ? "gui.useless_mod.force.enabled"
-                        : "gui.useless_mod.force.disabled"
+                forceMiningEnabled ? "gui.useless_mod.force.enabled" : "gui.useless_mod.force.disabled"
         );
 
         PlayerMiningData data = MiningDispatcher.getPlayerData(player);
-        int count = data != null && data.getCachedBlocks() != null
-                ? data.getCachedBlocks().size()
-                : 0;
+        int count = data != null ? data.getCachedBlocks().size() : 0;
 
         Component countText = Component.translatable(
                 "gui.useless_mod.mining_count",
                 count
         );
 
-        int statusColor = enhanced ? COLOR_ENHANCED
-                : normal ? COLOR_NORMAL
-                : COLOR_OFF;
-
-        int forceColor = force ? COLOR_FORCE_ON : COLOR_MUTED;
+        int forceColor = forceMiningEnabled ? COLOR_FORCE_ON : COLOR_MUTED;
 
         /* ========= 尺寸计算 ========= */
         int padding = 6;

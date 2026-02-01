@@ -1,6 +1,5 @@
 package com.sorrowmist.useless.utils.mining;
 
-import com.sorrowmist.useless.api.tool.FunctionMode;
 import com.sorrowmist.useless.utils.UComponentUtils;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
@@ -18,7 +17,7 @@ public class DefaultMiningStrategy implements MiningStrategy {
         BlockPos pos = event.getPos();
 
         // 检查是否开启了强制挖掘模式
-        boolean forceMining = UComponentUtils.hasFunctionMode(hand, FunctionMode.FORCE_MINING);
+        boolean forceMining = UComponentUtils.isForceMiningEnabled(hand);
         // 检查工具是否适合挖掘此方块
         boolean isCorrectTool = hand.isCorrectToolForDrops(state);
 

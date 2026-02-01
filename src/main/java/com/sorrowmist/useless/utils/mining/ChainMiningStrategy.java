@@ -3,7 +3,6 @@ package com.sorrowmist.useless.utils.mining;
 import com.sorrowmist.useless.api.component.UComponents;
 import com.sorrowmist.useless.api.data.PlayerMiningData;
 import com.sorrowmist.useless.api.tool.EnchantMode;
-import com.sorrowmist.useless.api.tool.FunctionMode;
 import com.sorrowmist.useless.utils.UComponentUtils;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
@@ -40,6 +39,12 @@ import java.util.List;
  * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 public class ChainMiningStrategy implements MiningStrategy {
+    private final boolean enhanced;
+
+    ChainMiningStrategy(boolean enhanced) {
+        this.enhanced = enhanced;
+    }
+
     @Override
     public void handleBreak(BlockEvent.BreakEvent event, ItemStack hand, Player player) {
         if (!(event.getLevel() instanceof ServerLevel level)) return;
@@ -51,21 +56,25 @@ public class ChainMiningStrategy implements MiningStrategy {
         PlayerMiningData playerData = MiningDispatcher.getOrCreatePlayerData(player);
 
         // 检测是否为强制挖掘模式
-        boolean forceMining = UComponentUtils.hasFunctionMode(hand, FunctionMode.FORCE_MINING);
+        boolean forceMining = UComponentUtils.isForceMiningEnabled(hand);
 
         // 检查缓存
         List<BlockPos> blocksToMine;
 
         // 2. 缓存一致性检查
-        // 检查当前破坏的方块是否是玩家按下 Tab 键时预计算的那个方块
+        // 检查当前破坏的方块是否是玩家按下 Tab 键时预计算方块
         if (playerData.getCachedPos() != null
                 && playerData.getCachedPos().equals(pos)
                 && playerData.hasCachedBlocks()) {
             // 直接使用按下 Tab 时预存的列表，无需再次扫描计算
             blocksToMine = playerData.getCachedBlocks();
         } else {
-            // 如果缓存不匹配（例如玩家没按 Tab 直接挖，或者瞬间移动了准星），则进行兜底计算
-            blocksToMine = MiningUtils.findBlocksToMine(pos, originState, level, hand, forceMining);
+            // 缓存不匹配进行兜底计算
+            if (this.enhanced) {
+                blocksToMine = MiningUtils.findBlocksToMineEnhanced(pos, originState, level, hand, forceMining);
+            } else {
+                blocksToMine = MiningUtils.findBlocksToMine(pos, originState, level, hand, forceMining);
+            }
         }
 
         if (blocksToMine.isEmpty()) {
@@ -82,7 +91,7 @@ public class ChainMiningStrategy implements MiningStrategy {
             BlockState currentState = level.getBlockState(targetPos);
 
             // 安全性检查：处理竞争问题
-            // 如果在缓存计算后，方块被其他玩家挖走或替换，则跳过
+            // 缓存计算后，方块被其他玩家挖走或替换，则跳过
             if (!currentState.is(originBlock)) {
                 continue;
             }
@@ -110,7 +119,10 @@ public class ChainMiningStrategy implements MiningStrategy {
         }
         
         if (actualMinedCount > 0) {
-            player.displayClientMessage(Component.literal("连锁挖掘: 破坏了 " + actualMinedCount + " 个方块"), true);
+            String translationKey = this.enhanced
+                    ? "gui.useless_mod.enhanced_chain_mining_result"
+                    : "gui.useless_mod.chain_mining_result";
+            player.displayClientMessage(Component.translatable(translationKey, actualMinedCount), true);
         }
 
         // 7. 清理并取消原版事件，防止重复破坏

@@ -46,94 +46,94 @@ public class ConfigManager {
     private static final ModConfigSpec.IntValue MAX_UPGRADE;
 
     static {
-        BUILDER.push("维度生成设置");
+        BUILDER.push("dimension_generation");
         BORDER_BLOCK = BUILDER
                 .comment("边框方块，若不存在则使用蓝色羊毛")
-                .define("边框方块", "useless_mod:aqua_glow_plastic");
+                .define("border_block", "useless_mod:aqua_glow_plastic");
 
         FILL_BLOCK = BUILDER
                 .comment("填充方块，若不存在则使用白色羊毛")
-                .define("填充方块", "useless_mod:white_glow_plastic");
+                .define("fill_block", "useless_mod:white_glow_plastic");
 
         CENTER_BLOCK = BUILDER
                 .comment("中心方块，若不存在则使用灰色羊毛")
-                .define("中心方块", "useless_mod:light_gray_glow_plastic");
+                .define("center_block", "useless_mod:light_gray_glow_plastic");
 
         PLATFORM_LAYERS = BUILDER
                 .comment("塑料平台生成层数")
-                .defineInRange("塑料平台层数", 69, 1, 256);
+                .defineInRange("platform_layers", 69, 1, 256);
 
         PLATFORM_START_Y = BUILDER
                 .comment("平台起始Y值(若无基岩实际会比该数值高1)")
-                .defineInRange("平台起始Y值", -64, -64, 256);
+                .defineInRange("platform_start_y", -64, -64, 256);
 
         GENERATE_BEDROCK = BUILDER
                 .comment("是否生成基岩层，默认生成")
-                .define("生成基岩层", true);
+                .define("generate_bedrock", true);
         BUILDER.pop();
 
-        BUILDER.push("游戏机制设置");
+        BUILDER.push("game_mechanics");
         BOTANY_POT_GROWTH_MULTIPLIER = BUILDER
                 .comment("植物盆生长倍率 - 1.0为原版速度，2.0为2倍速度")
-                .defineInRange("植物盆生长倍率（仅限非附属的植物盆）", 1, 1, Integer.MAX_VALUE);
+                .defineInRange("botany_pot_growth_multiplier", 1, 1, Integer.MAX_VALUE);
 
         MATRIX_PATTERN_COUNT = BUILDER
                 .comment("矩阵样板槽位倍数 - 减少数量时请保持槽位空！否则可能会造成样板丢失")
-                .defineInRange("矩阵样板槽位倍数", 1, 1, 100);
+                .defineInRange("matrix_pattern_count", 1, 1, 100);
         BUILDER.pop();
 
         // 牛排工具连锁挖掘配置
-        BUILDER.push("牛排工具设置");
+        BUILDER.push("beef_tool");
         ENABLE_POTION_EFFECTS = BUILDER
                 .comment("是否启用药水效果")
-                .define("启用药水效果", true);
+                .define("enable_potion_effects", true);
 
         ENABLE_FLIGHT_EFFECT = BUILDER
                 .comment("是否启用飞行效果")
-                .define("启用飞行效果", true);
+                .define("enable_flight_effect", true);
 
         CHAIN_MINING_RANGE_X = BUILDER
                 .comment("连锁挖掘的X轴范围半径")
-                .defineInRange("连锁挖掘X轴范围", 8, 1, 32);
+                .defineInRange("chain_mining_range_x", 8, 1, 32);
 
         CHAIN_MINING_RANGE_Y = BUILDER
                 .comment("连锁挖掘的Y轴范围半径")
-                .defineInRange("连锁挖掘Y轴范围", 8, 1, 32);
+                .defineInRange("chain_mining_range_y", 8, 1, 32);
 
         CHAIN_MINING_RANGE_Z = BUILDER
                 .comment("连锁挖掘的Z轴范围半径")
-                .defineInRange("连锁挖掘Z轴范围", 8, 1, 255);
+                .defineInRange("chain_mining_range_z", 8, 1, 255);
 
         CHAIN_MINING_MAX_BLOCKS = BUILDER
                 .comment("连锁挖掘的最大方块数量")
-                .defineInRange("连锁挖掘最大方块数量", 1000, 1, 10000);
+                .defineInRange("chain_mining_max_blocks", 1000, 1, 10000);
 
         // 牛排工具附魔等级配置
         FORTUNE_LEVEL = BUILDER
                 .comment("牛排工具时运附魔等级")
-                .defineInRange("牛排工具时运等级", 10, 1, 127);
+                .defineInRange("fortune_level", 10, 1, 127);
 
         LOOTING_LEVEL = BUILDER
                 .comment("牛排工具抢夺附魔等级")
-                .defineInRange("牛排工具抢夺等级", 10, 1, 127);
+                .defineInRange("looting_level", 10, 1, 127);
         BUILDER.pop();
 
-        BUILDER.push("Mekanism升级设置");
+        BUILDER.push("mekanism_upgrade");
         TIME_MULTIPLIER = BUILDER
                 .comment("速度升级增强倍率")
-                .defineInRange("速度平均每8个升级最终效果乘以一次该倍率", 1, 1, Integer.MAX_VALUE);
+                .defineInRange("time_multiplier", 1, 1, Integer.MAX_VALUE);
 
         ELECTRICITY_MULTIPLIER = BUILDER
                 .comment("能量升级节电增强倍率")
-                .defineInRange("节电平均每8个升级最终效果乘以一次该倍率", 1, 1, Integer.MAX_VALUE);
+                .defineInRange("electricity_multiplier", 1, 1, Integer.MAX_VALUE);
 
         CAPACITY_MULTIPLIER = BUILDER
                 .comment("能量升级储电增强倍率")
-                .defineInRange("储电平均每8个升级最终效果乘以一次该倍率", 1, 1, Integer.MAX_VALUE);
+                .defineInRange("capacity_multiplier", 1, 1, Integer.MAX_VALUE);
 
         MAX_UPGRADE = BUILDER
                 .comment("机器可接受的最大速度/能量升级数量，重启游戏生效")
-                .defineInRange("最大升级数量", 16, 1, 64);
+                .defineInRange("max_upgrade", 16, 1, 64);
         BUILDER.pop();
 
         SPEC = BUILDER.build();

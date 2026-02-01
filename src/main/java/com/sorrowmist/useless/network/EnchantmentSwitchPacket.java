@@ -5,6 +5,7 @@ import com.sorrowmist.useless.api.component.UComponents;
 import com.sorrowmist.useless.api.tool.EnchantMode;
 import com.sorrowmist.useless.config.ConfigManager;
 import com.sorrowmist.useless.utils.EnchantmentUtil;
+import com.sorrowmist.useless.utils.UselessItemUtils;
 import net.minecraft.core.Holder;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.network.FriendlyByteBuf;
@@ -40,10 +41,11 @@ public class EnchantmentSwitchPacket implements CustomPacketPayload {
     public static void handle(EnchantmentSwitchPacket msg, IPayloadContext ctx) {
         ctx.enqueueWork(() -> {
             ServerPlayer player = (ServerPlayer) ctx.player();
-            if (player == null) return;
+            var toolEntry = UselessItemUtils.findTargetToolInHands(player);
+            if (toolEntry.isEmpty()) return; // 没找到工具直接返回
 
-            ItemStack stack = player.getMainHandItem();
-            if (stack.isEmpty()) return;
+            var entry = toolEntry.get();
+            ItemStack stack = entry.getKey();
 
             Level level = player.level();
 
@@ -51,7 +53,7 @@ public class EnchantmentSwitchPacket implements CustomPacketPayload {
             Holder<Enchantment> silk = EnchantmentUtil.getEnchantmentHolder(level, Enchantments.SILK_TOUCH);
 
             // 写入组件
-            stack.set(UComponents.EnchantModeComponent, msg.mode);
+            stack.set(UComponents.EnchantModeComponent.get(), msg.mode);
 
             // 切换模型数据
             stack.set(DataComponents.CUSTOM_MODEL_DATA,
@@ -71,6 +73,9 @@ public class EnchantmentSwitchPacket implements CustomPacketPayload {
                         }
                     }
             );
+
+            // 显式同步物品到客户端
+            player.containerMenu.broadcastChanges();
         });
     }
 

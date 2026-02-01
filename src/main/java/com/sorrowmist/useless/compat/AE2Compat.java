@@ -50,8 +50,7 @@ public class AE2Compat {
             return 0;
         }
 
-        // 5. 核心判断：检查无线访问点是否在线 (服务器端判断频道与电力)
-        // 在服务器端，getMainNode().isOnline() 是最可靠的判断方式
+        // 5. 检查无线访问点是否在线
         if (!wap.getMainNode().isOnline()) {
             player.displayClientMessage(Component.literal("无线访问点已掉线（无电力或无频道）"), true);
             return 0;
@@ -68,7 +67,6 @@ public class AE2Compat {
         if (key == null) return 0;
 
         // 7. 执行存入操作
-        // 注意：1.21 的 insert 接收 long 类型
         long inserted = storage.getInventory().insert(
                 key,
                 drop.getCount(),

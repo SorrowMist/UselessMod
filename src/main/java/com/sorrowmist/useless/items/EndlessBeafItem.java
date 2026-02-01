@@ -1,9 +1,7 @@
 package com.sorrowmist.useless.items;
 
-import appeng.block.networking.WirelessAccessPointBlock;
 import com.sorrowmist.useless.api.component.UComponents;
 import com.sorrowmist.useless.api.tool.EnchantMode;
-import com.sorrowmist.useless.api.tool.FunctionMode;
 import com.sorrowmist.useless.api.tool.ToolTypeMode;
 import com.sorrowmist.useless.blocks.GlowPlasticBlock;
 import com.sorrowmist.useless.common.KeyBindings;
@@ -18,12 +16,10 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
-import net.minecraft.core.GlobalPos;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.core.particles.BlockParticleOption;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.network.chat.Component;
-import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvent;
 import net.minecraft.sounds.SoundEvents;
@@ -42,7 +38,6 @@ import net.minecraft.world.item.component.CustomModelData;
 import net.minecraft.world.item.component.Tool;
 import net.minecraft.world.item.context.UseOnContext;
 import net.minecraft.world.item.enchantment.Enchantments;
-import net.minecraft.world.item.enchantment.ItemEnchantments;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.LevelReader;
 import net.minecraft.world.level.block.Block;
@@ -66,7 +61,10 @@ import net.neoforged.neoforge.common.util.Lazy;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.*;
+import java.util.List;
+import java.util.Locale;
+import java.util.Set;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 public class EndlessBeafItem extends TieredItem {
@@ -77,6 +75,7 @@ public class EndlessBeafItem extends TieredItem {
     }
 
     public EndlessBeafItem(@Nullable ToolTypeMode toolType) {
+
         super(Tiers.NETHERITE,
               new Item.Properties()
                       .attributes(DiggerItem.createAttributes(Tiers.NETHERITE, 50, 2.0F))
@@ -85,7 +84,8 @@ public class EndlessBeafItem extends TieredItem {
                       .durability(0)
                       .component(DataComponents.TOOL, new Tool(
                                          List.of(
-                                                 Tool.Rule.deniesDrops(Tiers.NETHERITE.getIncorrectBlocksForDrops()),
+                                                 // TODO 测试强制挖掘使用
+                                                 Tool.Rule.deniesDrops(Tiers.STONE.getIncorrectBlocksForDrops()),
                                                  Tool.Rule.minesAndDrops(BlockTags.MINEABLE_WITH_PICKAXE,
                                                                          Tiers.NETHERITE.getSpeed()
                                                  ),
@@ -99,7 +99,9 @@ public class EndlessBeafItem extends TieredItem {
                                  )
                       )
                       .component(UComponents.EnchantModeComponent, EnchantMode.SILK_TOUCH)
-                      .component(UComponents.FunctionModesComponent, EnumSet.of(FunctionMode.CHAIN_MINING))
+                      .component(UComponents.EnhancedChainMiningComponent, false)
+                      .component(UComponents.ForceMiningComponent, false)
+                      .component(UComponents.AEStoragePriorityComponent, false)
                       .component(UComponents.CurrentToolTypeComponent, ToolTypeMode.NONE_MODE)
                       .component(DataComponents.CUSTOM_MODEL_DATA, new CustomModelData(1))
         );
@@ -120,14 +122,14 @@ public class EndlessBeafItem extends TieredItem {
 
     @Override
     public boolean doesSneakBypassUse(@NotNull ItemStack stack,
-                                      LevelReader world,
+                                      @NotNull LevelReader level,
                                       @NotNull BlockPos pos,
                                       @NotNull Player player) {
-        Block block = world.getBlockState(pos).getBlock();
-        if (block instanceof GlowPlasticBlock || block instanceof WirelessAccessPointBlock) {
+        Block block = level.getBlockState(pos).getBlock();
+        if (block instanceof GlowPlasticBlock) {
             return false;
         }
-        return super.doesSneakBypassUse(stack, world, pos, player);
+        return super.doesSneakBypassUse(stack, level, pos, player);
     }
 
     @Override
@@ -293,24 +295,7 @@ public class EndlessBeafItem extends TieredItem {
         if (player == null) return InteractionResult.PASS;
 
         // ============================================================
-        // 1. AE2 绑定逻辑 (Shift + 右键)
-        // ============================================================
-        if (player.isShiftKeyDown()) {
-            BlockEntity be = world.getBlockEntity(pos);
-            if (be != null && be.getClass().getSimpleName().contains("WirelessAccessPoint")) {
-                if (!world.isClientSide) {
-                    GlobalPos globalPos = GlobalPos.of(world.dimension(), pos);
-                    stack.set(UComponents.WIRELESS_LINK_TARGET.get(), globalPos);
-                    player.displayClientMessage(Component.literal("已成功绑定无线接入点: " + pos.toShortString()),
-                                                true
-                    );
-                }
-                return InteractionResult.sidedSuccess(world.isClientSide);
-            }
-        }
-
-        // ============================================================
-        // 2. 刷子功能 (对 BrushableBlock 生效)
+        // 1. 刷子功能 (对 BrushableBlock 生效)
         // ============================================================
         HitResult hitresult = ProjectileUtil.getHitResultOnViewVector(
                 player, (p) -> !p.isSpectator() && p.isPickable(), player.blockInteractionRange());
@@ -323,7 +308,7 @@ public class EndlessBeafItem extends TieredItem {
         }
 
         // ============================================================
-        // 3. 快速破坏塑料块 (Shift + 右键)
+        // 2. 快速破坏塑料块 (Shift + 右键)
         // ============================================================
         BlockState state = world.getBlockState(pos);
         if (!player.isCreative() && player.isShiftKeyDown() && state.getBlock() instanceof GlowPlasticBlock) {
@@ -334,26 +319,26 @@ public class EndlessBeafItem extends TieredItem {
         }
 
         // ============================================================
-        // 4. 统一工具行为链 (铲子 -> 锄头 -> 斧头)
+        // 3. 统一工具行为链 (铲子 -> 锄头 -> 斧头)
         // ============================================================
 
-        // 4.1 铲子 (铺路)
+        // 3.1 铲子 (铺路)
         InteractionResult res = this.tryToolAction(ctx, ItemAbilities.SHOVEL_FLATTEN, SoundEvents.SHOVEL_FLATTEN);
         if (res != InteractionResult.PASS) return res;
 
-        // 4.2 锄头 (耕地)
+        // 3.2 锄头 (耕地)
         res = this.tryToolAction(ctx, ItemAbilities.HOE_TILL, SoundEvents.HOE_TILL);
         if (res != InteractionResult.PASS) return res;
 
-        // 4.3 斧头 (剥皮)
+        // 3.3 斧头 (剥皮)
         res = this.tryToolAction(ctx, ItemAbilities.AXE_STRIP, SoundEvents.AXE_STRIP);
         if (res != InteractionResult.PASS) return res;
 
-        // 4.4 斧头 (刮铜)
+        // 3.4 斧头 (刮铜)
         res = this.tryScrapeOrWaxOff(ctx, ItemAbilities.AXE_SCRAPE, SoundEvents.AXE_SCRAPE, 3005);
         if (res != InteractionResult.PASS) return res;
 
-        // 4.5 斧头 (去蜡)
+        // 3.5 斧头 (去蜡)
         return this.tryScrapeOrWaxOff(ctx, ItemAbilities.AXE_WAX_OFF, SoundEvents.AXE_WAX_OFF, 3004);
     }
 
@@ -478,19 +463,37 @@ public class EndlessBeafItem extends TieredItem {
             tooltipComponents.add(Component.empty());
         }
 
-        EnumSet<FunctionMode> activeModes = stack.getOrDefault(
-                UComponents.FunctionModesComponent.get(),
-                EnumSet.noneOf(FunctionMode.class)
-        );
+        // 增强连锁挖矿模式
+        boolean chainMiningEnabled = stack.getOrDefault(UComponents.EnhancedChainMiningComponent.get(), false);
+        tooltipComponents.add(Component.translatable("tooltip.useless_mod.enhanced_chain_mining_mode")
+                                       .append(": ")
+                                       .append(Component.translatable(
+                                               chainMiningEnabled ? "tooltip.useless_mod.enable" :
+                                                       "tooltip.useless_mod.disable"
+                                       ).withStyle(chainMiningEnabled ? ChatFormatting.GREEN : ChatFormatting.GRAY))
+                                       .withStyle(ChatFormatting.GREEN));
 
-        FunctionMode.getTooltipDisplayGroups().forEach(group -> {
-            MutableComponent title = group.getTitleComponent();
-            Component status = FunctionMode.getStatusForGroup(group, activeModes);
+        // 强制挖掘状态
+        boolean forceMiningEnabled = stack.getOrDefault(UComponents.ForceMiningComponent.get(), false);
+        tooltipComponents.add(Component.translatable("tooltip.useless_mod.force_mining_mode")
+                                       .append(": ")
+                                       .append(Component.translatable(
+                                               forceMiningEnabled ? "tooltip.useless_mod.enable" :
+                                                       "tooltip.useless_mod.disable"
+                                       ).withStyle(forceMiningEnabled ? ChatFormatting.GREEN : ChatFormatting.GRAY))
+                                       .withStyle(ChatFormatting.RED));
 
-            if (!title.getString().isEmpty()) {
-                tooltipComponents.add(title.copy().append(": ").append(status));
-            }
-        });
+        // AE存储优先状态（仅当AE2模组存在时）
+        if (ModList.get().isLoaded("ae2")) {
+            boolean aeStorageEnabled = stack.getOrDefault(UComponents.AEStoragePriorityComponent.get(), false);
+            tooltipComponents.add(Component.translatable("tooltip.useless_mod.ae_storage_priority_mode")
+                                           .append(": ")
+                                           .append(Component.translatable(
+                                                   aeStorageEnabled ? "tooltip.useless_mod.enable" :
+                                                           "tooltip.useless_mod.disable"
+                                           ).withStyle(aeStorageEnabled ? ChatFormatting.GREEN : ChatFormatting.GRAY))
+                                           .withStyle(ChatFormatting.BLUE));
+        }
 
         tooltipComponents.add(Component.empty());
 
@@ -537,6 +540,7 @@ public class EndlessBeafItem extends TieredItem {
     }
 
     @Override
+    @OnlyIn(Dist.CLIENT)
     public @NotNull Component getName(@NotNull ItemStack stack) {
         Level level = Minecraft.getInstance().level;
         // 根据模式添加后缀
@@ -558,16 +562,6 @@ public class EndlessBeafItem extends TieredItem {
     @Override
     public boolean isEnchantable(@NotNull ItemStack stack) {
         return true; // 允许被附魔
-    }
-
-    @Override
-    public @NotNull ItemStack getDefaultInstance() {
-        ItemStack stack = new ItemStack(this);
-        ItemEnchantments.Mutable ench = new ItemEnchantments.Mutable(ItemEnchantments.EMPTY);
-        ench.set(EnchantmentUtil.getEnchantmentHolder(Enchantments.SILK_TOUCH), 1);
-        ench.set(EnchantmentUtil.getEnchantmentHolder(Enchantments.LOOTING), ConfigManager.getLootingLevel());
-        stack.set(DataComponents.ENCHANTMENTS, ench.toImmutable());
-        return stack;
     }
 
     /**

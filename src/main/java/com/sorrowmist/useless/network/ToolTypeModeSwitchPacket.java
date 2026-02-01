@@ -31,7 +31,6 @@ public record ToolTypeModeSwitchPacket(ToolTypeMode mode) implements CustomPacke
     public static void handle(ToolTypeModeSwitchPacket msg, IPayloadContext ctx) {
         ctx.enqueueWork(() -> {
             ServerPlayer player = (ServerPlayer) ctx.player();
-
             var toolEntry = UselessItemUtils.findTargetToolInHands(player);
             if (toolEntry.isEmpty()) return; // 没找到工具直接返回
 
@@ -65,6 +64,9 @@ public record ToolTypeModeSwitchPacket(ToolTypeMode mode) implements CustomPacke
             if (!newStack.isEmpty()) {
                 newStack.set(UComponents.CurrentToolTypeComponent.get(), msg.mode);
                 player.setItemInHand(targetHand, newStack);
+
+                // 显式同步物品到客户端
+                player.containerMenu.broadcastChanges();
             }
         });
     }

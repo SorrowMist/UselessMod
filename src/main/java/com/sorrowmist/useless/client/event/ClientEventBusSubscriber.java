@@ -1,13 +1,13 @@
 package com.sorrowmist.useless.client.event;
 
 import com.sorrowmist.useless.UselessMod;
+import com.sorrowmist.useless.api.component.UComponents;
 import com.sorrowmist.useless.api.tool.EnchantMode;
-import com.sorrowmist.useless.api.tool.FunctionMode;
 import com.sorrowmist.useless.client.gui.MiningStatusGui;
 import com.sorrowmist.useless.common.KeyBindings;
 import com.sorrowmist.useless.items.EndlessBeafItem;
 import com.sorrowmist.useless.network.EnchantmentSwitchPacket;
-import com.sorrowmist.useless.network.FunctionModeTogglePacket;
+import com.sorrowmist.useless.network.ModeTogglePacket;
 import com.sorrowmist.useless.network.TabKeyPressedPacket;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.player.LocalPlayer;
@@ -75,16 +75,22 @@ public class ClientEventBusSubscriber {
         if (KeyBindings.TOGGLE_CHAIN_MODE_KEY.get().consumeClick()) {
             ItemStack mainHandItem = player.getMainHandItem();
             if (mainHandItem.getItem() instanceof EndlessBeafItem) {
-
+                // 切换连锁挖矿模式
+                boolean currentEnabled = mainHandItem.getOrDefault(UComponents.EnhancedChainMiningComponent.get(),
+                                                                   false
+                );
                 PacketDistributor.sendToServer(
-                        new FunctionModeTogglePacket(FunctionMode.CHAIN_MINING));
+                        new ModeTogglePacket(ModeTogglePacket.ModeType.CHAIN_MINING, !currentEnabled));
             }
         }
 
         if (KeyBindings.SWITCH_FORCE_MINING_KEY.get().consumeClick()) {
             ItemStack mainHandItem = player.getMainHandItem();
             if (mainHandItem.getItem() instanceof EndlessBeafItem) {
-                PacketDistributor.sendToServer(new FunctionModeTogglePacket(FunctionMode.FORCE_MINING));
+                // 切换强制挖掘模式
+                boolean currentEnabled = mainHandItem.getOrDefault(UComponents.ForceMiningComponent.get(), false);
+                PacketDistributor.sendToServer(
+                        new ModeTogglePacket(ModeTogglePacket.ModeType.FORCE_MINING, !currentEnabled));
             }
         }
     }

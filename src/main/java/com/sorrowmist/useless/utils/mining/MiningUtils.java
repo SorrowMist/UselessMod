@@ -2,7 +2,6 @@ package com.sorrowmist.useless.utils.mining;
 
 import com.sorrowmist.useless.api.component.UComponents;
 import com.sorrowmist.useless.api.tool.EnchantMode;
-import com.sorrowmist.useless.api.tool.FunctionMode;
 import com.sorrowmist.useless.compat.AE2Compat;
 import com.sorrowmist.useless.config.ConfigManager;
 import com.sorrowmist.useless.utils.UComponentUtils;
@@ -18,13 +17,10 @@ import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.neoforged.fml.ModList;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
 
 import java.util.*;
 
 public class MiningUtils {
-    private static final Logger log = LogManager.getLogger(MiningUtils.class);
 
     /**
      * 获取方块掉落物（支持强制挖掘模式）
@@ -164,7 +160,7 @@ public class MiningUtils {
 
             // 1. 尝试存入 AE2 (内部处理跨维度)
             if (isAE2Loaded
-                    && UComponentUtils.hasFunctionMode(tool, FunctionMode.AE_STORAGE_PRIORITY)
+                    && UComponentUtils.isAEStoragePriorityEnabled(tool)
                     && tool.has(UComponents.WIRELESS_LINK_TARGET.get())) {
                 try {
                     int inserted = AE2Compat.tryInsertToLinkedGrid(tool, player, drop);
@@ -205,6 +201,12 @@ public class MiningUtils {
 
         Block originBlock = originState.getBlock();
         List<BlockPos> blocksToMine = new ArrayList<>(maxBlocks);
+
+        // 检查原点方块是否可以被挖掘（工具等级检查）
+        if (!forceMining && !stack.isCorrectToolForDrops(originState)) {
+            return blocksToMine; // 返回空列表
+        }
+
         Queue<BlockPos> queue = new LinkedList<>();
         LongOpenHashSet visited = new LongOpenHashSet(maxBlocks * 2);
 
@@ -249,6 +251,66 @@ public class MiningUtils {
                         }
                     }
                 }
+            }
+        }
+
+        // 使用欧几里得距离平方进行排序
+        blocksToMine.sort(Comparator.comparingDouble(pos -> pos.distSqr(originPos)));
+
+        return blocksToMine;
+    }
+
+    /**
+     * 增强连锁模式下查找需要破坏的方块
+     * 增强连锁：取消相邻才能连锁的限制
+     *
+     * @param originPos   原点位置
+     * @param originState 原点方块状态
+     * @param level       世界
+     * @param stack       工具
+     * @param forceMining 是否为强制挖掘模式
+     * @return 需要破坏的方块列表
+     */
+    static List<BlockPos> findBlocksToMineEnhanced(BlockPos originPos, BlockState originState, Level level,
+                                                   ItemStack stack,
+                                                   boolean forceMining) {
+        // 最大连锁数量（包含原点方块）
+        int maxBlocks = ConfigManager.getChainMiningMaxBlocks();
+        // 获取连锁挖掘范围
+        int rangeX = ConfigManager.getChainMiningRangeX();
+        int rangeY = ConfigManager.getChainMiningRangeY();
+        int rangeZ = ConfigManager.getChainMiningRangeZ();
+
+        Block originBlock = originState.getBlock();
+        List<BlockPos> blocksToMine = new ArrayList<>(maxBlocks);
+
+        // 增强连锁：直接在范围内扫描所有相同方块，不需要相邻限制
+        for (int x = -rangeX; x <= rangeX; x++) {
+            for (int y = -rangeY; y <= rangeY; y++) {
+                for (int z = -rangeZ; z <= rangeZ; z++) {
+                    int nx = originPos.getX() + x;
+                    int ny = originPos.getY() + y;
+                    int nz = originPos.getZ() + z;
+
+                    BlockPos targetPos = new BlockPos(nx, ny, nz);
+                    BlockState nextState = level.getBlockState(targetPos);
+
+                    if (nextState.is(originBlock)) {
+                        if (forceMining || stack.isCorrectToolForDrops(nextState)) {
+                            blocksToMine.add(targetPos);
+                        }
+                    }
+
+                    if (blocksToMine.size() >= maxBlocks) {
+                        break;
+                    }
+                }
+                if (blocksToMine.size() >= maxBlocks) {
+                    break;
+                }
+            }
+            if (blocksToMine.size() >= maxBlocks) {
+                break;
             }
         }
 

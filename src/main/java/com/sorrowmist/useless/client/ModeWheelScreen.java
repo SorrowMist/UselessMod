@@ -5,12 +5,12 @@ import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.*;
 import com.sorrowmist.useless.api.component.UComponents;
 import com.sorrowmist.useless.api.tool.EnchantMode;
-import com.sorrowmist.useless.api.tool.FunctionMode;
+import com.sorrowmist.useless.api.tool.ModeTypeEnum;
 import com.sorrowmist.useless.api.tool.ToolTypeMode;
+import com.sorrowmist.useless.common.KeyBindings;
 import com.sorrowmist.useless.network.EnchantmentSwitchPacket;
-import com.sorrowmist.useless.network.FunctionModeTogglePacket;
+import com.sorrowmist.useless.network.ModeTogglePacket;
 import com.sorrowmist.useless.network.ToolTypeModeSwitchPacket;
-import com.sorrowmist.useless.utils.UComponentUtils;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
@@ -34,10 +34,11 @@ public class ModeWheelScreen extends Screen {
 
     private static final boolean hasGtceuMod = ModList.get().isLoaded("gtceu");
     private static final boolean hasOmnitoolMod = ModList.get().isLoaded("omnitools");
-    private final ItemStack mainHandItem;
+    private static final boolean hasAE2 = ModList.get().isLoaded("ae2");
     private final List<ModeData> leftModes = new ArrayList<>();
     private final List<ModeData> middleModes = new ArrayList<>();
     private final List<ModeData> rightModes = new ArrayList<>();
+    private ItemStack mainHandItem;
     private boolean showMiddleDisc;
     private float totalTime, prevTick, extraTick;
 
@@ -57,7 +58,9 @@ public class ModeWheelScreen extends Screen {
 
         EnchantMode currentEnchant = this.mainHandItem.get(UComponents.EnchantModeComponent);
         ToolTypeMode currentTool = this.mainHandItem.get(UComponents.CurrentToolTypeComponent);
-        var currentFuncs = UComponentUtils.getFunctionModes(this.mainHandItem);
+        boolean chainMiningEnabled = this.mainHandItem.getOrDefault(UComponents.EnhancedChainMiningComponent, false);
+        boolean forceMiningEnabled = this.mainHandItem.getOrDefault(UComponents.ForceMiningComponent, false);
+        boolean aeStorageEnabled = this.mainHandItem.getOrDefault(UComponents.AEStoragePriorityComponent, false);
 
         // 左：附魔模式
         for (EnchantMode m : EnchantMode.values())
@@ -65,8 +68,8 @@ public class ModeWheelScreen extends Screen {
 
         for (ToolTypeMode m : ToolTypeMode.values()) {
             boolean shouldAdd = switch (m) {
-                // NONE_MODE
-                case NONE_MODE -> true;
+                // NONE_MODE - 只有在有其他模式可用时才添加
+                case NONE_MODE -> hasGtceuMod || hasOmnitoolMod;
                 // gtceu
                 case WRENCH_MODE, SCREWDRIVER_MODE, MALLET_MODE, CROWBAR_MODE, HAMMER_MODE -> hasGtceuMod;
                 // omnitool
@@ -81,12 +84,27 @@ public class ModeWheelScreen extends Screen {
         // 如果有可用的工具模式，则显示中间轮盘
         this.showMiddleDisc = !this.middleModes.isEmpty();
 
-        // 右：功能模式（分组后的 3 个）
-        for (FunctionMode m : FunctionMode.getTooltipDisplayGroups()) {
+        // 右：功能模式
+        // 1. 增强连锁挖矿模式
+        this.rightModes.add(new ModeData(
+                ModeTypeEnum.getEnhancedChainMiningMode(chainMiningEnabled),
+                ModeTypeEnum.getEnhancedChainMiningMode(chainMiningEnabled).getTooltip(),
+                chainMiningEnabled
+        ));
+
+        // 2. 强制挖掘
+        this.rightModes.add(new ModeData(
+                ModeTypeEnum.getForceMiningMode(forceMiningEnabled),
+                ModeTypeEnum.getForceMiningMode(forceMiningEnabled).getTooltip(),
+                forceMiningEnabled
+        ));
+
+        // 3. AE存储优先（仅当AE2模组存在时）
+        if (hasAE2) {
             this.rightModes.add(new ModeData(
-                    m,
-                    m.getTooltip(),
-                    currentFuncs.contains(m)   // ✔ 集合包含 = 高亮
+                    ModeTypeEnum.getAEStoragePriorityMode(aeStorageEnabled),
+                    ModeTypeEnum.getAEStoragePriorityMode(aeStorageEnabled).getTooltip(),
+                    aeStorageEnabled
             ));
         }
     }
@@ -94,6 +112,16 @@ public class ModeWheelScreen extends Screen {
     @Override
     public void render(GuiGraphics g, int mouseX, int mouseY, float pt) {
         PoseStack ms = g.pose();
+
+        // 实时从玩家主手获取最新物品，确保获取到服务器端同步的最新状态
+        if (this.minecraft != null && this.minecraft.player != null) {
+            ItemStack currentMainHand = this.minecraft.player.getMainHandItem();
+            if (!currentMainHand.isEmpty() && currentMainHand.getItem() instanceof com.sorrowmist.useless.items.EndlessBeafItem) {
+                // 只有当主手物品是EndlessBeafItem时才更新
+                this.mainHandItem = currentMainHand;
+                this.loadModesFromEnums();
+            }
+        }
 
         float curr = this.minecraft != null ? this.minecraft.getFrameTimeNs() : 0;
         this.totalTime += (curr + this.extraTick - this.prevTick) / 20f;
@@ -178,10 +206,9 @@ public class ModeWheelScreen extends Screen {
         if (this.totalTime < 0.25f)
             this.extraTick++;
 
-        // G 松开 → 自动关闭
         if (!InputConstants.isKeyDown(
                 Minecraft.getInstance().getWindow().getWindow(),
-                InputConstants.KEY_G
+                KeyBindings.SWITCH_MODE_WHEEL_KEY.get().getKey().getValue()
         )) {
             this.onClose();
         }
@@ -288,7 +315,7 @@ public class ModeWheelScreen extends Screen {
         int adj = ((sel + (n / 2 + 1)) % n) - 1;
         if (adj == -1) adj = n - 1;
 
-        Enum<?> mode = modes.get(adj).mode();
+        Object mode = modes.get(adj).mode();
 
         this.onModeSelected(mode);
 
@@ -296,13 +323,33 @@ public class ModeWheelScreen extends Screen {
         return true;
     }
 
-    private void onModeSelected(Enum<?> mode) {
+    private void onModeSelected(Object mode) {
         if (mode instanceof EnchantMode em) {
             PacketDistributor.sendToServer(new EnchantmentSwitchPacket(em));
         } else if (mode instanceof ToolTypeMode tm) {
             PacketDistributor.sendToServer(new ToolTypeModeSwitchPacket(tm));
-        } else if (mode instanceof FunctionMode fm) {
-            PacketDistributor.sendToServer(new FunctionModeTogglePacket(fm));
+        } else if (mode instanceof ModeTypeEnum me) {
+            switch (me) {
+                case ENHANCED_CHAIN_MINING_ENABLED, ENHANCED_CHAIN_MINING_DISABLED -> {
+                    boolean currentEnabled = this.mainHandItem.getOrDefault(UComponents.EnhancedChainMiningComponent,
+                                                                            false
+                    );
+                    PacketDistributor.sendToServer(
+                            new ModeTogglePacket(ModeTogglePacket.ModeType.CHAIN_MINING, !currentEnabled));
+                }
+                case FORCE_MINING_ENABLED, FORCE_MINING_DISABLED -> {
+                    boolean currentEnabled = this.mainHandItem.getOrDefault(UComponents.ForceMiningComponent, false);
+                    PacketDistributor.sendToServer(
+                            new ModeTogglePacket(ModeTogglePacket.ModeType.FORCE_MINING, !currentEnabled));
+                }
+                case AE_STORAGE_PRIORITY_ENABLED, AE_STORAGE_PRIORITY_DISABLED -> {
+                    boolean currentEnabled = this.mainHandItem.getOrDefault(UComponents.AEStoragePriorityComponent,
+                                                                            false
+                    );
+                    PacketDistributor.sendToServer(
+                            new ModeTogglePacket(ModeTogglePacket.ModeType.AE_STORAGE_PRIORITY, !currentEnabled));
+                }
+            }
         }
     }
 
@@ -372,7 +419,6 @@ public class ModeWheelScreen extends Screen {
         }
 
         if (sel >= 0) {
-
             int adj = ((sel + (n / 2 + 1)) % n) - 1;
             if (adj == -1) adj = n - 1;
 
@@ -418,5 +464,5 @@ public class ModeWheelScreen extends Screen {
         }
     }
 
-    private record ModeData(Enum<?> mode, Component name, boolean active) {}
+    private record ModeData(Object mode, Component name, boolean active) {}
 }

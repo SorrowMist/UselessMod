@@ -3,7 +3,6 @@ package com.sorrowmist.useless.api.component;
 import com.mojang.serialization.Codec;
 import com.sorrowmist.useless.UselessMod;
 import com.sorrowmist.useless.api.tool.EnchantMode;
-import com.sorrowmist.useless.api.tool.FunctionMode;
 import com.sorrowmist.useless.api.tool.ToolTypeMode;
 import net.minecraft.core.GlobalPos;
 import net.minecraft.core.component.DataComponentType;
@@ -14,7 +13,6 @@ import net.neoforged.bus.api.IEventBus;
 import net.neoforged.neoforge.registries.DeferredHolder;
 import net.neoforged.neoforge.registries.DeferredRegister;
 
-import java.util.EnumSet;
 import java.util.function.UnaryOperator;
 
 public final class UComponents {
@@ -39,62 +37,57 @@ public final class UComponents {
             );
 
     /**
-     * 功能模式集合组件（FunctionModes）
-     * 用于在物品上存储一组激活的功能模式（EnumSet<FunctionMode>）
-     * 允许物品同时拥有多个功能模式
-     */
-    public static final DeferredHolder<DataComponentType<?>, DataComponentType<EnumSet<FunctionMode>>> FunctionModesComponent =
-            register("function_modes", builder -> builder
-                    // 持久化存储：先将 EnumSet 转为字符串列表，再保存
-                    .persistent(
-                            Codec.STRING.listOf().xmap(
-                                    list -> {
-                                        // 从字符串列表恢复 EnumSet
-                                        EnumSet<FunctionMode> set = EnumSet.noneOf(FunctionMode.class);
-                                        for (String s : list) {
-                                            set.add(FunctionMode.valueOf(s));
-                                        }
-                                        return set;
-                                    },
-                                    set -> set.stream()
-                                              .map(Enum::name)
-                                              .toList()
-                            )
-                    )
-                    // 网络同步：手动写入集合大小 + 每个枚举值
-                    .networkSynchronized(StreamCodec.of(
-                            (buf, set) -> {
-                                buf.writeVarInt(set.size());
-                                for (FunctionMode mode : set) {
-                                    buf.writeEnum(mode);
-                                }
-                            },
-                            buf -> {
-                                int size = buf.readVarInt();
-                                EnumSet<FunctionMode> set = EnumSet.noneOf(FunctionMode.class);
-                                for (int i = 0; i < size; i++) {
-                                    set.add(buf.readEnum(FunctionMode.class));
-                                }
-                                return set;
-                            }
-                    ))
-            );
-
-    /**
      * 当前工具类型组件（CurrentToolType）
      * 用于在物品上存储当前选中的工具类型（枚举类型 ToolTypeMode）
      * 例如多功能工具在不同模式（镐、斧、铲等）之间切换时使用
      */
     public static final DeferredHolder<DataComponentType<?>, DataComponentType<ToolTypeMode>> CurrentToolTypeComponent =
             register("tool_type", builder ->
-                    builder
-                            // 持久化存储：同样使用字符串保存枚举值
-                            .persistent(Codec.STRING.xmap(ToolTypeMode::valueOf, Enum::name))
-                            // 网络同步：直接使用枚举的读写方法
+                    builder.persistent(Codec.STRING.xmap(ToolTypeMode::valueOf, Enum::name))
                             .networkSynchronized(StreamCodec.of(
                                     FriendlyByteBuf::writeEnum,
                                     buf -> buf.readEnum(ToolTypeMode.class)
                             ))
+            );
+
+    /**
+     * 增强连锁挖矿模式组件（EnhancedChainMiningMode）
+     * 用于在物品上存储是否启用增强连锁挖掘（布尔类型）
+     * true = 启用增强连锁挖掘，false = 使用普通连锁挖掘
+     */
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<Boolean>> EnhancedChainMiningComponent =
+            register("chain_mining", builder ->
+                    builder.persistent(Codec.BOOL)
+                           .networkSynchronized(StreamCodec.of(
+                                   FriendlyByteBuf::writeBoolean,
+                                   FriendlyByteBuf::readBoolean
+                           ))
+            );
+
+    /**
+     * 强制挖掘组件（ForceMining）
+     * 用于在物品上存储是否启用强制挖掘功能（布尔类型）
+     */
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<Boolean>> ForceMiningComponent =
+            register("force_mining", builder ->
+                    builder.persistent(Codec.BOOL)
+                           .networkSynchronized(StreamCodec.of(
+                                   FriendlyByteBuf::writeBoolean,
+                                   FriendlyByteBuf::readBoolean
+                           ))
+            );
+
+    /**
+     * AE存储优先组件（AEStoragePriority）
+     * 用于在物品上存储是否启用AE存储优先功能（布尔类型）
+     */
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<Boolean>> AEStoragePriorityComponent =
+            register("ae_storage_priority", builder ->
+                    builder.persistent(Codec.BOOL)
+                           .networkSynchronized(StreamCodec.of(
+                                   FriendlyByteBuf::writeBoolean,
+                                   FriendlyByteBuf::readBoolean
+                           ))
             );
 
     public static final DeferredHolder<DataComponentType<?>, DataComponentType<GlobalPos>> WIRELESS_LINK_TARGET = register(

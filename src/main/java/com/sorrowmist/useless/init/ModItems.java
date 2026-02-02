@@ -150,42 +150,42 @@ public final class ModItems {
             "useless_gear_tier_9",
             () -> new Item(new Item.Properties().rarity(RarityExtension.MYTHIC.getValue()))
     );
-    // 无用锭对应的玻璃物品
-    public static final DeferredItem<Item> USELESS_GLASS_TIER_1 = registerAndAdd(
+    // 无用玻璃方块物品
+    public static final DeferredItem<BlockItem> USELESS_GLASS_TIER_1 = registerAndAdd(
             "useless_glass_tier_1",
-            () -> new Item(new Item.Properties().rarity(Rarity.COMMON))
+            () -> new BlockItem(ModBlocks.USELESS_GLASS_TIER_1.get(), new Item.Properties().rarity(Rarity.COMMON))
     );
-    public static final DeferredItem<Item> USELESS_GLASS_TIER_2 = registerAndAdd(
+    public static final DeferredItem<BlockItem> USELESS_GLASS_TIER_2 = registerAndAdd(
             "useless_glass_tier_2",
-            () -> new Item(new Item.Properties().rarity(Rarity.COMMON))
+            () -> new BlockItem(ModBlocks.USELESS_GLASS_TIER_2.get(), new Item.Properties().rarity(Rarity.COMMON))
     );
-    public static final DeferredItem<Item> USELESS_GLASS_TIER_3 = registerAndAdd(
+    public static final DeferredItem<BlockItem> USELESS_GLASS_TIER_3 = registerAndAdd(
             "useless_glass_tier_3",
-            () -> new Item(new Item.Properties().rarity(Rarity.UNCOMMON))
+            () -> new BlockItem(ModBlocks.USELESS_GLASS_TIER_3.get(), new Item.Properties().rarity(Rarity.UNCOMMON))
     );
-    public static final DeferredItem<Item> USELESS_GLASS_TIER_4 = registerAndAdd(
+    public static final DeferredItem<BlockItem> USELESS_GLASS_TIER_4 = registerAndAdd(
             "useless_glass_tier_4",
-            () -> new Item(new Item.Properties().rarity(Rarity.UNCOMMON))
+            () -> new BlockItem(ModBlocks.USELESS_GLASS_TIER_4.get(), new Item.Properties().rarity(Rarity.UNCOMMON))
     );
-    public static final DeferredItem<Item> USELESS_GLASS_TIER_5 = registerAndAdd(
+    public static final DeferredItem<BlockItem> USELESS_GLASS_TIER_5 = registerAndAdd(
             "useless_glass_tier_5",
-            () -> new Item(new Item.Properties().rarity(Rarity.RARE))
+            () -> new BlockItem(ModBlocks.USELESS_GLASS_TIER_5.get(), new Item.Properties().rarity(Rarity.RARE))
     );
-    public static final DeferredItem<Item> USELESS_GLASS_TIER_6 = registerAndAdd(
+    public static final DeferredItem<BlockItem> USELESS_GLASS_TIER_6 = registerAndAdd(
             "useless_glass_tier_6",
-            () -> new Item(new Item.Properties().rarity(Rarity.RARE))
+            () -> new BlockItem(ModBlocks.USELESS_GLASS_TIER_6.get(), new Item.Properties().rarity(Rarity.RARE))
     );
-    public static final DeferredItem<Item> USELESS_GLASS_TIER_7 = registerAndAdd(
+    public static final DeferredItem<BlockItem> USELESS_GLASS_TIER_7 = registerAndAdd(
             "useless_glass_tier_7",
-            () -> new Item(new Item.Properties().rarity(Rarity.EPIC))
+            () -> new BlockItem(ModBlocks.USELESS_GLASS_TIER_7.get(), new Item.Properties().rarity(Rarity.EPIC))
     );
-    public static final DeferredItem<Item> USELESS_GLASS_TIER_8 = registerAndAdd(
+    public static final DeferredItem<BlockItem> USELESS_GLASS_TIER_8 = registerAndAdd(
             "useless_glass_tier_8",
-            () -> new Item(new Item.Properties().rarity(RarityExtension.MYTHIC.getValue()))
+            () -> new BlockItem(ModBlocks.USELESS_GLASS_TIER_8.get(), new Item.Properties().rarity(RarityExtension.MYTHIC.getValue()))
     );
-    public static final DeferredItem<Item> USELESS_GLASS_TIER_9 = registerAndAdd(
+    public static final DeferredItem<BlockItem> USELESS_GLASS_TIER_9 = registerAndAdd(
             "useless_glass_tier_9",
-            () -> new Item(new Item.Properties().rarity(RarityExtension.LEGENDARY.getValue()))
+            () -> new BlockItem(ModBlocks.USELESS_GLASS_TIER_9.get(), new Item.Properties().rarity(RarityExtension.LEGENDARY.getValue()))
     );
     static final DeferredItem<BlockItem> TELEPORT_BLOCK_ITEM = registerAndAdd(
             "teleport_block",

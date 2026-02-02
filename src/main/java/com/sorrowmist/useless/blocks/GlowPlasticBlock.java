@@ -2,13 +2,24 @@ package com.sorrowmist.useless.blocks;
 
 import com.sorrowmist.useless.UselessMod;
 import com.sorrowmist.useless.api.EnumColor;
+import com.sorrowmist.useless.items.EndlessBeafItem;
+import com.sorrowmist.useless.utils.mining.MiningUtils;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.ItemInteractionResult;
+import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockBehaviour;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.phys.BlockHitResult;
 import net.neoforged.neoforge.registries.DeferredBlock;
 import net.neoforged.neoforge.registries.DeferredItem;
 import net.neoforged.neoforge.registries.DeferredRegister;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -47,7 +58,7 @@ public class GlowPlasticBlock extends Block implements IColoredBlock {
 
     private final EnumColor color;
 
-    public GlowPlasticBlock(EnumColor color, UnaryOperator<Properties> propertyModifier) {
+    private GlowPlasticBlock(EnumColor color, UnaryOperator<Properties> propertyModifier) {
         super(applyLightLevelAdjustments(propertyModifier.apply(Properties.of()
                 .mapColor(color.getMapColor())
                 .strength(5F, 6F)
@@ -60,8 +71,26 @@ public class GlowPlasticBlock extends Block implements IColoredBlock {
     }
 
     @Override
-    public EnumColor getColor() {
-        return color;
+    protected @NotNull ItemInteractionResult useItemOn(@NotNull ItemStack heldItem,
+                                                       @NotNull BlockState state,
+                                                       @NotNull Level level,
+                                                       @NotNull BlockPos pos,
+                                                       Player player,
+                                                       @NotNull InteractionHand hand,
+                                                       @NotNull BlockHitResult hit) {
+        if (player.isShiftKeyDown()) {
+            if (!level.isClientSide()) {
+                if (heldItem.getItem() instanceof EndlessBeafItem) {
+                    MiningUtils.quickBreakBlock(level, pos, state, player, heldItem);
+                }
+            }
+            return ItemInteractionResult.sidedSuccess(level.isClientSide());
+        }
+        return super.useItemOn(heldItem, state, level, pos, player, hand, hit);
     }
 
+    @Override
+    public EnumColor getColor() {
+        return this.color;
+    }
 }

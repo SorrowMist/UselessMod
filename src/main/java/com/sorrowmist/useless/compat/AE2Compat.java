@@ -27,7 +27,7 @@ public class AE2Compat {
         // 1. 获取绑定坐标组件
         GlobalPos linkedPos = tool.get(UComponents.WIRELESS_LINK_TARGET.get());
         if (linkedPos == null) {
-            player.displayClientMessage(Component.literal("未绑定无线访问点"), true);
+            player.displayClientMessage(Component.translatable("gui.useless_mod.ae2.not_bound"), true);
             return 0;
         }
         BlockPos pos = linkedPos.pos();
@@ -39,25 +39,25 @@ public class AE2Compat {
         // 3. 获取目标维度世界并检查区块是否加载
         ServerLevel targetLevel = server.getLevel(linkedPos.dimension());
         if (targetLevel == null || !targetLevel.isLoaded(pos)) {
-            player.displayClientMessage(Component.literal("目标区域未加载"), true);
+            player.displayClientMessage(Component.translatable("gui.useless_mod.ae2.chunk_not_loaded"), true);
             return 0;
         }
 
         // 4. 获取 BlockEntity 并验证类型
         BlockEntity be = targetLevel.getBlockEntity(pos);
         if (!(be instanceof WirelessAccessPointBlockEntity wap)) {
-            player.displayClientMessage(Component.literal("链接的目标不是有效的无线访问点"), true);
+            player.displayClientMessage(Component.translatable("gui.useless_mod.ae2.invalid_target"), true);
             return 0;
         }
 
         // 5. 检查无线访问点是否在线
         if (!wap.getMainNode().isOnline()) {
-            player.displayClientMessage(Component.literal("无线访问点已掉线（无电力或无频道）"), true);
+            player.displayClientMessage(Component.translatable("gui.useless_mod.ae2.offline"), true);
             return 0;
         }
 
         // 6. 获取网格及存储服务
-        IGrid grid = wap.getGrid(); // 或者使用 wap.getMainNode().getGrid();
+        IGrid grid = wap.getGrid();
         if (grid == null) return 0;
 
         IStorageService storage = grid.getStorageService();

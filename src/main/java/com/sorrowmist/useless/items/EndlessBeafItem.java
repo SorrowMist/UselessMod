@@ -4,11 +4,11 @@ import com.sorrowmist.useless.api.component.UComponents;
 import com.sorrowmist.useless.api.tool.EnchantMode;
 import com.sorrowmist.useless.api.tool.ToolTypeMode;
 import com.sorrowmist.useless.blocks.GlowPlasticBlock;
+import com.sorrowmist.useless.blocks.UselessGlassBlock;
 import com.sorrowmist.useless.common.KeyBindings;
 import com.sorrowmist.useless.config.ConfigManager;
 import com.sorrowmist.useless.utils.EnchantmentUtil;
 import com.sorrowmist.useless.utils.UselessItemUtils;
-import com.sorrowmist.useless.utils.mining.MiningUtils;
 import net.minecraft.ChatFormatting;
 import net.minecraft.advancements.CriteriaTriggers;
 import net.minecraft.client.KeyMapping;
@@ -124,8 +124,8 @@ public class EndlessBeafItem extends TieredItem {
                                       @NotNull BlockPos pos,
                                       @NotNull Player player) {
         Block block = level.getBlockState(pos).getBlock();
-        if (block instanceof GlowPlasticBlock) {
-            return false;
+        if (block instanceof GlowPlasticBlock || block instanceof UselessGlassBlock) {
+            return true;
         }
         return super.doesSneakBypassUse(stack, level, pos, player);
     }
@@ -286,9 +286,7 @@ public class EndlessBeafItem extends TieredItem {
     @Override
     public @NotNull InteractionResult useOn(UseOnContext ctx) {
         Level world = ctx.getLevel();
-        BlockPos pos = ctx.getClickedPos();
         Player player = ctx.getPlayer();
-        ItemStack stack = ctx.getItemInHand();
 
         if (player == null) return InteractionResult.PASS;
 
@@ -306,37 +304,26 @@ public class EndlessBeafItem extends TieredItem {
         }
 
         // ============================================================
-        // 2. 快速破坏塑料块 (Shift + 右键)
-        // ============================================================
-        BlockState state = world.getBlockState(pos);
-        if (!player.isCreative() && player.isShiftKeyDown() && state.getBlock() instanceof GlowPlasticBlock) {
-            if (!world.isClientSide) {
-                MiningUtils.quickBreakBlock(world, pos, state, player, stack);
-            }
-            return InteractionResult.sidedSuccess(world.isClientSide);
-        }
-
-        // ============================================================
-        // 3. 统一工具行为链 (铲子 -> 锄头 -> 斧头)
+        // 2. 统一工具行为链 (铲子 -> 锄头 -> 斧头)
         // ============================================================
 
-        // 3.1 铲子 (铺路)
+        // 2.1 铲子 (铺路)
         InteractionResult res = this.tryToolAction(ctx, ItemAbilities.SHOVEL_FLATTEN, SoundEvents.SHOVEL_FLATTEN);
         if (res != InteractionResult.PASS) return res;
 
-        // 3.2 锄头 (耕地)
+        // 2.2 锄头 (耕地)
         res = this.tryToolAction(ctx, ItemAbilities.HOE_TILL, SoundEvents.HOE_TILL);
         if (res != InteractionResult.PASS) return res;
 
-        // 3.3 斧头 (剥皮)
+        // 2.3 斧头 (剥皮)
         res = this.tryToolAction(ctx, ItemAbilities.AXE_STRIP, SoundEvents.AXE_STRIP);
         if (res != InteractionResult.PASS) return res;
 
-        // 3.4 斧头 (刮铜)
+        // 2.4 斧头 (刮铜)
         res = this.tryScrapeOrWaxOff(ctx, ItemAbilities.AXE_SCRAPE, SoundEvents.AXE_SCRAPE, 3005);
         if (res != InteractionResult.PASS) return res;
 
-        // 3.5 斧头 (去蜡)
+        // 2.5 斧头 (去蜡)
         return this.tryScrapeOrWaxOff(ctx, ItemAbilities.AXE_WAX_OFF, SoundEvents.AXE_WAX_OFF, 3004);
     }
 

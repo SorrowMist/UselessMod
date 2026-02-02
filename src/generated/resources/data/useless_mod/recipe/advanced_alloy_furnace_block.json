@@ -1,42 +1,42 @@
 {
-    "type": "minecraft:crafting_shaped",
-    "category": "building",
-    "key": {
-        "A": {
-            "item": "minecraft:emerald_block"
-        },
-        "B": {
-            "item": "minecraft:diamond_block"
-        },
-        "C": {
-            "item": "minecraft:lapis_block"
-        },
-        "D": {
-            "item": "minecraft:iron_block"
-        },
-        "E": {
-            "item": "minecraft:furnace"
-        },
-        "F": {
-            "item": "minecraft:gold_block"
-        },
-        "G": {
-            "item": "minecraft:water_bucket"
-        },
-        "H": {
-            "item": "minecraft:netherite_block"
-        },
-        "I": {
-            "item": "minecraft:lava_bucket"
-        }
+  "type": "minecraft:crafting_shaped",
+  "category": "building",
+  "key": {
+    "A": {
+      "item": "minecraft:emerald_block"
     },
-    "pattern": [
-        "ABC",
-        "DEF",
-        "GHI"
-    ],
-    "result": {
-        "count": 1,
-        "id": "useless_mod:advanced_alloy_furnace_block"
+    "B": {
+      "item": "minecraft:diamond_block"
+    },
+    "C": {
+      "item": "minecraft:lapis_block"
+    },
+    "D": {
+      "item": "minecraft:iron_block"
+    },
+    "E": {
+      "item": "minecraft:furnace"
+    },
+    "F": {
+      "item": "minecraft:gold_block"
+    },
+    "G": {
+      "item": "minecraft:water_bucket"
+    },
+    "H": {
+      "item": "minecraft:netherite_block"
+    },
+    "I": {
+      "item": "minecraft:lava_bucket"
     }
+  },
+  "pattern": [
+    "ABC",
+    "DEF",
+    "GHI"
+  ],
+  "result": {
+    "count": 1,
+    "id": "useless_mod:advanced_alloy_furnace_block"
+  }
 }

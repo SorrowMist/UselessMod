@@ -110,7 +110,7 @@ public class UselessItemUtils {
     private static void sendFestiveMessage(Player player) {
         if (player != null) {
             player.displayClientMessage(
-                    Component.translatable("message.useless_mod.festive_triggered"),
+                    Component.translatable("gui.useless_mod.festive_triggered"),
                     true
             );
         }

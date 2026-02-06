@@ -1,10 +1,10 @@
 package com.sorrowmist.useless.utils.mining;
 
-import com.sorrowmist.useless.api.component.UComponents;
-import com.sorrowmist.useless.api.tool.EnchantMode;
+import com.sorrowmist.useless.api.enums.tool.EnchantMode;
 import com.sorrowmist.useless.compat.AE2Compat;
 import com.sorrowmist.useless.compat.SophisticatedCompat;
-import com.sorrowmist.useless.config.ConfigManager;
+import com.sorrowmist.useless.core.component.UComponents;
+import com.sorrowmist.useless.core.config.ConfigManager;
 import com.sorrowmist.useless.utils.UComponentUtils;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import net.minecraft.ChatFormatting;

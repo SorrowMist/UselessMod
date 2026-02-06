@@ -1,7 +1,7 @@
 package com.sorrowmist.useless.mixin.eae;
 
 import appeng.util.inv.AppEngInternalInventory;
-import com.sorrowmist.useless.config.ConfigManager;
+import com.sorrowmist.useless.core.config.ConfigManager;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Redirect;

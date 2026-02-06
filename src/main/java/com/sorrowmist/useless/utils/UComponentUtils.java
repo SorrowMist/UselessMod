@@ -1,6 +1,6 @@
 package com.sorrowmist.useless.utils;
 
-import com.sorrowmist.useless.api.component.UComponents;
+import com.sorrowmist.useless.core.component.UComponents;
 import net.minecraft.world.item.ItemStack;
 
 public class UComponentUtils {

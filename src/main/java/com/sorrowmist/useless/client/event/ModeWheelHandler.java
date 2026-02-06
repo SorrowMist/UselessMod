@@ -1,7 +1,7 @@
 package com.sorrowmist.useless.client.event;
 
-import com.sorrowmist.useless.client.ModeWheelScreen;
-import com.sorrowmist.useless.common.KeyBindings;
+import com.sorrowmist.useless.client.gui.ModeWheelScreen;
+import com.sorrowmist.useless.core.common.KeyBindings;
 import com.sorrowmist.useless.utils.UselessItemUtils;
 import net.minecraft.client.Minecraft;
 import net.minecraft.world.item.ItemStack;

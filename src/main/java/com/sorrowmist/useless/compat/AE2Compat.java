@@ -6,7 +6,7 @@ import appeng.api.networking.security.IActionSource;
 import appeng.api.networking.storage.IStorageService;
 import appeng.api.stacks.AEItemKey;
 import appeng.blockentity.networking.WirelessAccessPointBlockEntity;
-import com.sorrowmist.useless.api.component.UComponents;
+import com.sorrowmist.useless.core.component.UComponents;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.GlobalPos;
 import net.minecraft.network.chat.Component;

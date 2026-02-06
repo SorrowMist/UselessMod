@@ -6,6 +6,7 @@ import com.sorrowmist.useless.network.ForceBreakKeyPacket;
 import com.sorrowmist.useless.network.MiningDataSyncPacket;
 import com.sorrowmist.useless.network.ModeTogglePacket;
 import com.sorrowmist.useless.network.TabKeyPressedPacket;
+import com.sorrowmist.useless.network.TankClearPacket;
 import com.sorrowmist.useless.network.ToolTypeModeSwitchPacket;
 import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
 
@@ -26,6 +27,9 @@ public class ModNetwork {
         );
         registrar.playToServer(ForceBreakKeyPacket.TYPE, ForceBreakKeyPacket.STREAM_CODEC,
                                ForceBreakKeyPacket::handle
+        );
+        registrar.playToServer(TankClearPacket.TYPE, TankClearPacket.STREAM_CODEC,
+                               TankClearPacket::handle
         );
         registrar.playToClient(MiningDataSyncPacket.TYPE, MiningDataSyncPacket.STREAM_CODEC,
                                MiningDataSyncPacket::handle

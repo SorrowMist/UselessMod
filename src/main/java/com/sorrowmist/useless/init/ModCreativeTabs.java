@@ -1,8 +1,8 @@
 package com.sorrowmist.useless.init;
 
 import com.sorrowmist.useless.UselessMod;
-import com.sorrowmist.useless.blocks.GlowPlasticBlock;
-import com.sorrowmist.useless.config.ConfigManager;
+import com.sorrowmist.useless.content.blocks.GlowPlasticBlock;
+import com.sorrowmist.useless.core.config.ConfigManager;
 import com.sorrowmist.useless.utils.EnchantmentUtil;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.core.registries.Registries;
@@ -15,7 +15,7 @@ import net.neoforged.neoforge.registries.DeferredItem;
 import net.neoforged.neoforge.registries.DeferredRegister;
 import org.jetbrains.annotations.NotNull;
 
-import static com.sorrowmist.useless.api.EnumColor.BLACK;
+import static com.sorrowmist.useless.api.enums.EnumColor.BLACK;
 
 public class ModCreativeTabs {
     public static final DeferredRegister<CreativeModeTab> CREATIVE_TAB =

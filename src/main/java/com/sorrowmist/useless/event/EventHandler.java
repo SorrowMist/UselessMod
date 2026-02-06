@@ -1,10 +1,10 @@
 package com.sorrowmist.useless.event;
 
 import com.sorrowmist.useless.UselessMod;
-import com.sorrowmist.useless.api.component.UComponents;
-import com.sorrowmist.useless.common.FlyEffectedHolder;
-import com.sorrowmist.useless.config.ConfigManager;
-import com.sorrowmist.useless.items.EndlessBeafItem;
+import com.sorrowmist.useless.content.items.EndlessBeafItem;
+import com.sorrowmist.useless.core.common.FlyEffectedHolder;
+import com.sorrowmist.useless.core.component.UComponents;
+import com.sorrowmist.useless.core.config.ConfigManager;
 import com.sorrowmist.useless.utils.UselessItemUtils;
 import com.sorrowmist.useless.utils.mining.MiningDispatcher;
 import net.minecraft.core.BlockPos;

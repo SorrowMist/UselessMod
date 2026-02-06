@@ -1,9 +1,9 @@
 package com.sorrowmist.useless.network;
 
 import com.sorrowmist.useless.UselessMod;
-import com.sorrowmist.useless.api.component.UComponents;
-import com.sorrowmist.useless.api.tool.EnchantMode;
-import com.sorrowmist.useless.config.ConfigManager;
+import com.sorrowmist.useless.api.enums.tool.EnchantMode;
+import com.sorrowmist.useless.core.component.UComponents;
+import com.sorrowmist.useless.core.config.ConfigManager;
 import com.sorrowmist.useless.utils.EnchantmentUtil;
 import com.sorrowmist.useless.utils.UselessItemUtils;
 import net.minecraft.core.Holder;

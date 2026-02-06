@@ -1,12 +1,14 @@
 package com.sorrowmist.useless.init;
 
 import com.sorrowmist.useless.UselessMod;
-import com.sorrowmist.useless.api.EnumColor;
-import com.sorrowmist.useless.blocks.GlowPlasticBlock;
+import com.sorrowmist.useless.api.enums.EnumColor;
+import com.sorrowmist.useless.client.gui.AdvancedAlloyFurnaceScreen;
+import com.sorrowmist.useless.content.blocks.GlowPlasticBlock;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.client.event.RegisterColorHandlersEvent;
+import net.neoforged.neoforge.client.event.RegisterMenuScreensEvent;
 
 @EventBusSubscriber(modid = UselessMod.MODID, value = Dist.CLIENT)
 public class ClientSetup {
@@ -32,5 +34,10 @@ public class ClientSetup {
                 return tintIndex == 0 ? color.getRgb() : 0xFFFFFFFF;
             }, block);
         }
+    }
+
+    @SubscribeEvent
+    public static void registerScreens(RegisterMenuScreensEvent event) {
+        event.register(ModMenuType.ADVANCED_ALLOY_FURNACE_MENU.get(), AdvancedAlloyFurnaceScreen::new);
     }
 }

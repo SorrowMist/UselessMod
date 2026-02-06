@@ -1,8 +1,8 @@
 package com.sorrowmist.useless.network;
 
 import com.sorrowmist.useless.UselessMod;
-import com.sorrowmist.useless.api.component.UComponents;
-import com.sorrowmist.useless.api.tool.ToolTypeMode;
+import com.sorrowmist.useless.api.enums.tool.ToolTypeMode;
+import com.sorrowmist.useless.core.component.UComponents;
 import com.sorrowmist.useless.init.ModItems;
 import com.sorrowmist.useless.utils.UselessItemUtils;
 import net.minecraft.core.registries.BuiltInRegistries;

@@ -2,9 +2,9 @@ package com.sorrowmist.useless.init;
 
 
 import com.sorrowmist.useless.UselessMod;
-import com.sorrowmist.useless.api.RarityExtension;
-import com.sorrowmist.useless.api.tool.ToolTypeMode;
-import com.sorrowmist.useless.items.EndlessBeafItem;
+import com.sorrowmist.useless.api.enums.RarityExtension;
+import com.sorrowmist.useless.api.enums.tool.ToolTypeMode;
+import com.sorrowmist.useless.content.items.EndlessBeafItem;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.Rarity;

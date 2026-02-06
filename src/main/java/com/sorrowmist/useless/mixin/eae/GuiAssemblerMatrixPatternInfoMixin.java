@@ -2,7 +2,7 @@ package com.sorrowmist.useless.mixin.eae;
 
 
 
-import com.sorrowmist.useless.config.ConfigManager;
+import com.sorrowmist.useless.core.config.ConfigManager;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.Constant;
 import org.spongepowered.asm.mixin.injection.ModifyConstant;

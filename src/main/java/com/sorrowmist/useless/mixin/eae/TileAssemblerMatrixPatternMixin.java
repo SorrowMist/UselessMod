@@ -2,7 +2,7 @@ package com.sorrowmist.useless.mixin.eae;
 
 import appeng.util.inv.AppEngInternalInventory;
 import com.glodblock.github.extendedae.common.tileentities.matrix.TileAssemblerMatrixPattern;
-import com.sorrowmist.useless.config.ConfigManager;
+import com.sorrowmist.useless.core.config.ConfigManager;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.block.state.BlockState;
 import org.spongepowered.asm.mixin.Final;

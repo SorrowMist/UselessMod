@@ -3,6 +3,7 @@ package com.sorrowmist.useless.datagen.providers.tags;
 
 import com.sorrowmist.useless.UselessMod;
 import com.sorrowmist.useless.init.ModItems;
+import com.sorrowmist.useless.init.ModTags;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.data.PackOutput;
 import net.minecraft.data.tags.ItemTagsProvider;
@@ -36,6 +37,19 @@ public class UItemTagsProvider extends ItemTagsProvider {
 
     private void addUselessModTags() {
         this.tag(this.createTagKey("useless_ingots"))
+            .replace(false)
+            .add(ModItems.USELESS_INGOT_TIER_1.get())
+            .add(ModItems.USELESS_INGOT_TIER_2.get())
+            .add(ModItems.USELESS_INGOT_TIER_3.get())
+            .add(ModItems.USELESS_INGOT_TIER_4.get())
+            .add(ModItems.USELESS_INGOT_TIER_5.get())
+            .add(ModItems.USELESS_INGOT_TIER_6.get())
+            .add(ModItems.USELESS_INGOT_TIER_7.get())
+            .add(ModItems.USELESS_INGOT_TIER_8.get())
+            .add(ModItems.USELESS_INGOT_TIER_9.get())
+            .add(ModItems.USEFUL_INGOT.get());
+
+        this.tag(ModTags.CATALYSTS)
             .replace(false)
             .add(ModItems.USELESS_INGOT_TIER_1.get())
             .add(ModItems.USELESS_INGOT_TIER_2.get())

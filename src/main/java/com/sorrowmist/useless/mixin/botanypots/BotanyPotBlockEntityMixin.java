@@ -1,7 +1,7 @@
 package com.sorrowmist.useless.mixin.botanypots;
 
 
-import com.sorrowmist.useless.config.ConfigManager;
+import com.sorrowmist.useless.core.config.ConfigManager;
 import net.darkhax.bookshelf.common.api.data.enchantment.EnchantmentLevel;
 import net.darkhax.bookshelf.common.api.service.Services;
 import net.darkhax.bookshelf.common.api.util.TickAccumulator;

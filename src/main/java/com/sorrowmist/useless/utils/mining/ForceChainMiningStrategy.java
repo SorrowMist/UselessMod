@@ -1,9 +1,9 @@
 package com.sorrowmist.useless.utils.mining;
 
-import com.sorrowmist.useless.api.component.UComponents;
-import com.sorrowmist.useless.api.data.PlayerMiningData;
-import com.sorrowmist.useless.api.tool.EnchantMode;
+import com.sorrowmist.useless.api.enums.tool.EnchantMode;
 import com.sorrowmist.useless.compat.SophisticatedCompat;
+import com.sorrowmist.useless.core.component.UComponents;
+import com.sorrowmist.useless.data.PlayerMiningData;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;

@@ -1,8 +1,8 @@
 package com.sorrowmist.useless.client.gui;
 
-import com.sorrowmist.useless.api.data.PlayerMiningData;
-import com.sorrowmist.useless.common.KeyBindings;
-import com.sorrowmist.useless.items.EndlessBeafItem;
+import com.sorrowmist.useless.content.items.EndlessBeafItem;
+import com.sorrowmist.useless.core.common.KeyBindings;
+import com.sorrowmist.useless.data.PlayerMiningData;
 import com.sorrowmist.useless.utils.UComponentUtils;
 import com.sorrowmist.useless.utils.mining.MiningDispatcher;
 import net.minecraft.client.DeltaTracker;

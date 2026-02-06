@@ -1,7 +1,7 @@
 package com.sorrowmist.useless.datagen.providers.tags;
 
 import com.sorrowmist.useless.UselessMod;
-import com.sorrowmist.useless.blocks.GlowPlasticBlock;
+import com.sorrowmist.useless.content.blocks.GlowPlasticBlock;
 import com.sorrowmist.useless.init.ModBlocks;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.data.PackOutput;

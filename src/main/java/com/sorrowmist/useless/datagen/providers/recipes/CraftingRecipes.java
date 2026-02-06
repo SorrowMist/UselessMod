@@ -1,6 +1,8 @@
 package com.sorrowmist.useless.datagen.providers.recipes;
 
 import com.sorrowmist.useless.UselessMod;
+import com.sorrowmist.useless.api.enums.AlloyFurnaceMode;
+import com.sorrowmist.useless.content.recipe.AdvancedAlloyFurnaceRecipeBuilder;
 import com.sorrowmist.useless.init.ModBlocks;
 import com.sorrowmist.useless.init.ModItems;
 import net.minecraft.core.HolderLookup;
@@ -11,7 +13,11 @@ import net.minecraft.data.recipes.RecipeProvider;
 import net.minecraft.data.recipes.ShapedRecipeBuilder;
 import net.minecraft.tags.ItemTags;
 import net.minecraft.world.item.Items;
+import net.minecraft.world.item.crafting.Ingredient;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.material.Fluids;
+import net.neoforged.neoforge.common.Tags;
+import net.neoforged.neoforge.fluids.FluidStack;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.concurrent.CompletableFuture;
@@ -24,10 +30,11 @@ public class CraftingRecipes extends RecipeProvider {
     @Override
     protected void buildRecipes(@NotNull RecipeOutput consumer) {
         this.addMoldRecipes(consumer);
-        this.addAdvancedAlloyFurnaceRecipe(consumer);
+        this.addAdvancedAlloyFurnaceBlockRecipe(consumer);
         this.addEndlessBeafItemRecipe(consumer);
         this.addOreGeneratorBlockRecipe(consumer);
         this.addTeleportBlockRecipes(consumer);
+        this.addAdvancedAlloyFurnaceRecipes(consumer);
     }
 
     private void addMoldRecipes(RecipeOutput consumer) {
@@ -70,7 +77,7 @@ public class CraftingRecipes extends RecipeProvider {
                            .save(consumer, UselessMod.id("mold/metal_mold_block"));
     }
 
-    private void addAdvancedAlloyFurnaceRecipe(RecipeOutput consumer) {
+    private void addAdvancedAlloyFurnaceBlockRecipe(RecipeOutput consumer) {
         ShapedRecipeBuilder.shaped(RecipeCategory.BUILDING_BLOCKS,
                                    ModBlocks.ADVANCED_ALLOY_FURNACE_BLOCK.get(),
                                    1
@@ -89,6 +96,21 @@ public class CraftingRecipes extends RecipeProvider {
                            .define('I', Items.LAVA_BUCKET)
                            .unlockedBy("has_furnace", has(Blocks.FURNACE))
                            .save(consumer);
+    }
+
+    private void addAdvancedAlloyFurnaceRecipes(RecipeOutput output) {
+        // 示例1：普通合金合成（NORMAL 模式）
+        AdvancedAlloyFurnaceRecipeBuilder.create()
+                                         .input(Ingredient.of(Items.IRON_INGOT), 3)
+                                         .input(Ingredient.of(Tags.Items.INGOTS_COPPER), 2)
+                                         .fluidInput(new FluidStack(Fluids.LAVA, 1000))
+                                         .output(ModItems.USELESS_GEAR_TIER_1.get(), 1)
+                                         .energy(4800)
+                                         .processTime(300)
+                                         .catalyst(Ingredient.of(ModItems.USELESS_GEAR_TIER_1.get()), 5)
+                                         .mold(Ingredient.of(ModItems.METAL_MOLD_BLOCK.get()))
+                                         .mode(AlloyFurnaceMode.NORMAL)
+                                         .save(output, UselessMod.id("advanced_alloy/normal_alloy"));
     }
 
     private void addEndlessBeafItemRecipe(RecipeOutput consumer) {

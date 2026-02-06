@@ -1,9 +1,9 @@
 package com.sorrowmist.useless.utils;
 
-import com.sorrowmist.useless.api.component.UComponents;
-import com.sorrowmist.useless.api.tool.ToolTypeMode;
-import com.sorrowmist.useless.config.ConfigManager;
-import com.sorrowmist.useless.items.EndlessBeafItem;
+import com.sorrowmist.useless.api.enums.tool.ToolTypeMode;
+import com.sorrowmist.useless.content.items.EndlessBeafItem;
+import com.sorrowmist.useless.core.component.UComponents;
+import com.sorrowmist.useless.core.config.ConfigManager;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;

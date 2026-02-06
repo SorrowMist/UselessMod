@@ -1,7 +1,7 @@
 package com.sorrowmist.useless.network;
 
 import com.sorrowmist.useless.UselessMod;
-import com.sorrowmist.useless.api.data.PlayerMiningData;
+import com.sorrowmist.useless.data.PlayerMiningData;
 import com.sorrowmist.useless.utils.mining.MiningDispatcher;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.FriendlyByteBuf;

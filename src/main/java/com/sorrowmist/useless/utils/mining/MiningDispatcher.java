@@ -1,6 +1,6 @@
 package com.sorrowmist.useless.utils.mining;
 
-import com.sorrowmist.useless.api.data.PlayerMiningData;
+import com.sorrowmist.useless.data.PlayerMiningData;
 import com.sorrowmist.useless.network.MiningDataSyncPacket;
 import com.sorrowmist.useless.utils.UComponentUtils;
 import net.minecraft.core.BlockPos;

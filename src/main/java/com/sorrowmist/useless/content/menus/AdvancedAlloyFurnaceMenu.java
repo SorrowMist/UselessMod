@@ -234,6 +234,16 @@ public class AdvancedAlloyFurnaceMenu extends AbstractContainerMenu {
         return this.data.get(AdvancedAlloyFurnaceData.DATA_MAX_PARALLEL);
     }
 
+    /**
+     * 获取催化剂提供的最大并行数（仅由催化剂决定）
+     */
+    public int getCatalystMaxParallel() {
+        if (this.blockEntity != null) {
+            return this.blockEntity.getCatalystMaxParallel();
+        }
+        return 1;
+    }
+
     public boolean hasMold() {
         return this.data.get(AdvancedAlloyFurnaceData.DATA_HAS_MOLD) > 0;
     }

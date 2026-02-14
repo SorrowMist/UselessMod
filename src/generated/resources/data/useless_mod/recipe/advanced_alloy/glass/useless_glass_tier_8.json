@@ -1,0 +1,27 @@
+{
+  "type": "useless_mod:advanced_alloy_furnace",
+  "energy": 8000,
+  "id": "useless_mod:advanced_alloy/glass/useless_glass_tier_8",
+  "ingredients": [
+    {
+      "count": 2,
+      "ingredient": {
+        "item": "minecraft:glass"
+      }
+    },
+    {
+      "ingredient": {
+        "item": "useless_mod:useless_ingot_tier_8"
+      }
+    }
+  ],
+  "mold": {
+    "item": "useless_mod:metal_mold_block"
+  },
+  "outputs": [
+    {
+      "id": "useless_mod:useless_glass_tier_8"
+    }
+  ],
+  "process_time": 40
+}

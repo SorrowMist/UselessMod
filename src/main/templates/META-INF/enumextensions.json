@@ -5,7 +5,7 @@
       "name": "USELESS_MOD_MYTHIC",
       "constructor": "(ILjava/lang/String;Ljava/util/function/UnaryOperator;)V",
       "parameters": {
-        "class": "com/sorrowmist/useless/api/RarityExtension",
+        "class": "com/sorrowmist/useless/api/enums/RarityExtension",
         "field": "MYTHIC"
       }
     },
@@ -14,7 +14,7 @@
       "name": "USELESS_MOD_LEGENDARY",
       "constructor": "(ILjava/lang/String;Ljava/util/function/UnaryOperator;)V",
       "parameters": {
-        "class": "com/sorrowmist/useless/api/RarityExtension",
+        "class": "com/sorrowmist/useless/api/enums/RarityExtension",
         "field": "LEGENDARY"
       }
     }

@@ -3,15 +3,17 @@ package com.sorrowmist.useless.compat.jei;
 import com.sorrowmist.useless.UselessMod;
 import com.sorrowmist.useless.content.recipe.AdvancedAlloyFurnaceRecipe;
 import com.sorrowmist.useless.init.ModBlocks;
-import com.sorrowmist.useless.init.ModItems;
 import com.sorrowmist.useless.init.ModRecipeTypes;
+import com.sorrowmist.useless.init.ModTags;
 import mezz.jei.api.IModPlugin;
 import mezz.jei.api.JeiPlugin;
 import mezz.jei.api.helpers.IGuiHelper;
 import mezz.jei.api.registration.IRecipeCatalystRegistration;
 import mezz.jei.api.registration.IRecipeCategoryRegistration;
 import mezz.jei.api.registration.IRecipeRegistration;
+import mezz.jei.api.runtime.IJeiRuntime;
 import net.minecraft.client.Minecraft;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.crafting.RecipeHolder;
@@ -24,6 +26,7 @@ import java.util.List;
 public class JEIPlugin implements IModPlugin {
 
     private static final ResourceLocation UID = ResourceLocation.fromNamespaceAndPath(UselessMod.MODID, "jei_plugin");
+    private static IJeiRuntime runtime;
 
     @Override
     public ResourceLocation getPluginUid() {
@@ -70,46 +73,39 @@ public class JEIPlugin implements IModPlugin {
                 CatalystInfoCategory.TYPE
         );
 
-        // 添加各个等级的催化剂作为配方催化剂
-        registration.addRecipeCatalyst(
-                new ItemStack(ModItems.USELESS_INGOT_TIER_1.get()),
-                CatalystInfoCategory.TYPE
-        );
-        registration.addRecipeCatalyst(
-                new ItemStack(ModItems.USELESS_INGOT_TIER_2.get()),
-                CatalystInfoCategory.TYPE
-        );
-        registration.addRecipeCatalyst(
-                new ItemStack(ModItems.USELESS_INGOT_TIER_3.get()),
-                CatalystInfoCategory.TYPE
-        );
-        registration.addRecipeCatalyst(
-                new ItemStack(ModItems.USELESS_INGOT_TIER_4.get()),
-                CatalystInfoCategory.TYPE
-        );
-        registration.addRecipeCatalyst(
-                new ItemStack(ModItems.USELESS_INGOT_TIER_5.get()),
-                CatalystInfoCategory.TYPE
-        );
-        registration.addRecipeCatalyst(
-                new ItemStack(ModItems.USELESS_INGOT_TIER_6.get()),
-                CatalystInfoCategory.TYPE
-        );
-        registration.addRecipeCatalyst(
-                new ItemStack(ModItems.USELESS_INGOT_TIER_7.get()),
-                CatalystInfoCategory.TYPE
-        );
-        registration.addRecipeCatalyst(
-                new ItemStack(ModItems.USELESS_INGOT_TIER_8.get()),
-                CatalystInfoCategory.TYPE
-        );
-        registration.addRecipeCatalyst(
-                new ItemStack(ModItems.USELESS_INGOT_TIER_9.get()),
-                CatalystInfoCategory.TYPE
-        );
-        registration.addRecipeCatalyst(
-                new ItemStack(ModItems.USEFUL_INGOT.get()),
-                CatalystInfoCategory.TYPE
-        );
+        // 使用ModTags.CATALYSTS动态注册所有催化剂
+        BuiltInRegistries.ITEM.getTag(ModTags.CATALYSTS).ifPresent(tag -> {
+            for (var holder : tag) {
+                registration.addRecipeCatalyst(new ItemStack(holder.value()), CatalystInfoCategory.TYPE);
+            }
+        });
+    }
+
+    @Override
+    public void onRuntimeAvailable(IJeiRuntime jeiRuntime) {
+        JEIPlugin.runtime = jeiRuntime;
+    }
+
+    /**
+     * 获取JEI运行时实例
+     */
+    public static IJeiRuntime getRuntime() {
+        return runtime;
+    }
+
+    /**
+     * 打开高级合金炉配方界面
+     */
+    public static void showAdvancedAlloyFurnaceRecipes() {
+        if (runtime != null) {
+            runtime.getRecipesGui().showTypes(List.of(AdvancedAlloyFurnaceRecipeCategory.TYPE));
+        }
+    }
+
+    /**
+     * 检查JEI是否可用
+     */
+    public static boolean isAvailable() {
+        return runtime != null;
     }
 }

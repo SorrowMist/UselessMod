@@ -1,0 +1,44 @@
+{
+  "type": "useless_mod:advanced_alloy_furnace",
+  "catalyst": {
+    "item": "useless_mod:useless_ingot_tier_5"
+  },
+  "catalyst_uses": 1,
+  "energy": 5000000,
+  "id": "useless_mod:advanced_alloy/ingot/useless_ingot_tier_6",
+  "ingredients": [
+    {
+      "ingredient": {
+        "item": "minecraft:dragon_head"
+      }
+    },
+    {
+      "ingredient": {
+        "item": "minecraft:elytra"
+      }
+    },
+    {
+      "ingredient": {
+        "item": "minecraft:totem_of_undying"
+      }
+    },
+    {
+      "count": 4,
+      "ingredient": {
+        "item": "minecraft:enchanted_golden_apple"
+      }
+    },
+    {
+      "count": 8,
+      "ingredient": {
+        "item": "minecraft:netherite_block"
+      }
+    }
+  ],
+  "outputs": [
+    {
+      "id": "useless_mod:useless_ingot_tier_6"
+    }
+  ],
+  "process_time": 1
+}

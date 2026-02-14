@@ -6,6 +6,8 @@ import com.sorrowmist.useless.UselessMod;
 import com.sorrowmist.useless.content.recipe.AdvancedAlloyFurnaceRecipe;
 import com.sorrowmist.useless.content.recipe.CountedIngredient;
 import com.sorrowmist.useless.init.ModBlocks;
+import com.sorrowmist.useless.init.ModTags;
+import com.sorrowmist.useless.utils.CatalystParallelManager;
 import mezz.jei.api.constants.VanillaTypes;
 import mezz.jei.api.gui.builder.IRecipeLayoutBuilder;
 import mezz.jei.api.gui.builder.ITooltipBuilder;
@@ -26,6 +28,7 @@ import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.Mth;
@@ -159,6 +162,10 @@ public class AdvancedAlloyFurnaceRecipeCategory implements IRecipeCategory<Advan
 
     @Override
     public void setRecipe(IRecipeLayoutBuilder builder, AdvancedAlloyFurnaceRecipe recipe, IFocusGroup focuses) {
+        // 计算配方相关的并行数信息
+        int targetTier = getTargetUselessIngotTier(recipe);
+        boolean isUselessRecipe = targetTier > 0;
+
         // 输入物品槽位 (最多9个) - 3行3列排列
         List<CountedIngredient> inputs = recipe.inputs();
         for (int i = 0; i < Math.min(inputs.size(), 9); i++) {
@@ -239,20 +246,36 @@ public class AdvancedAlloyFurnaceRecipeCategory implements IRecipeCategory<Advan
             }
         }
 
-        // 催化剂槽位：只在配方需要催化剂时显示
+        // 催化剂槽位：只在配方允许催化剂时显示
         if (!recipe.catalyst().isEmpty()) {
-            ItemStack[] catalystStacks = recipe.catalyst().getItems();
-            if (catalystStacks.length > 0) {
-                ItemStack[] displayCatalystStacks = new ItemStack[catalystStacks.length];
-                for (int j = 0; j < catalystStacks.length; j++) {
-                    ItemStack displayStack = catalystStacks[j].copy();
+            List<ItemStack> catalystStacks;
+
+            if (isUselessRecipe) {
+                // 无用锭配方：显示配方中定义的特定催化剂
+                ItemStack[] recipeCatalysts = recipe.catalyst().getItems();
+                catalystStacks = new ArrayList<>();
+                for (ItemStack stack : recipeCatalysts) {
+                    ItemStack displayStack = stack.copy();
                     displayStack.setCount(recipe.catalystUses() > 0 ? recipe.catalystUses() : 1);
-                    displayCatalystStacks[j] = displayStack;
+                    catalystStacks.add(displayStack);
                 }
+            } else {
+                // 普通配方：使用ModTags.CATALYSTS轮询显示所有催化剂
+                catalystStacks = new ArrayList<>();
+                BuiltInRegistries.ITEM.getTag(ModTags.CATALYSTS).ifPresent(tag -> {
+                    for (var holder : tag) {
+                        ItemStack displayStack = new ItemStack(holder.value());
+                        displayStack.setCount(recipe.catalystUses() > 0 ? recipe.catalystUses() : 1);
+                        catalystStacks.add(displayStack);
+                    }
+                });
+            }
+
+            if (!catalystStacks.isEmpty()) {
                 builder.addSlot(RecipeIngredientRole.CATALYST,
                                 CATALYST_SLOT_X, CATALYST_SLOT_Y
                        )
-                       .addIngredients(Ingredient.of(displayCatalystStacks))
+                       .addIngredients(Ingredient.of(catalystStacks.toArray(new ItemStack[0])))
                        .setCustomRenderer(VanillaTypes.ITEM_STACK, new ItemStackRenderer());
             }
         }
@@ -299,18 +322,29 @@ public class AdvancedAlloyFurnaceRecipeCategory implements IRecipeCategory<Advan
         String energyText = this.formatEnergy(recipe.energy());
         String timeText = recipe.processTime() + " ticks";
 
-        // 在能量显示区域居中显示能量（绿色）
+        // 在能量显示区域居中显示能量（绿色）- 使用缩小字体
+        guiGraphics.pose().pushPose();
+        float energyScale = 0.8f;
+        guiGraphics.pose().scale(energyScale, energyScale, 1.0f);
         int energyTextWidth = minecraft.font.width(energyText);
-        int energyX = ENERGY_DISPLAY_X + (ENERGY_DISPLAY_WIDTH - energyTextWidth) / 2;
-        guiGraphics.drawString(minecraft.font, energyText, energyX, ENERGY_DISPLAY_Y, 0x00FF00, false);
+        int energyX = (int) ((ENERGY_DISPLAY_X + (ENERGY_DISPLAY_WIDTH - energyTextWidth * energyScale) / 2) / energyScale);
+        int energyY = (int) (ENERGY_DISPLAY_Y / energyScale);
+        guiGraphics.drawString(minecraft.font, energyText, energyX, energyY, 0x00FF00, false);
+        guiGraphics.pose().popPose();
 
-        // 在时间显示区域居中显示时间（绿色）
+        // 在时间显示区域居中显示时间（绿色）- 使用缩小字体，位置往下移动
+        guiGraphics.pose().pushPose();
+        float timeScale = 0.8f;
+        guiGraphics.pose().scale(timeScale, timeScale, 1.0f);
         int timeTextWidth = minecraft.font.width(timeText);
-        int timeX = TIME_DISPLAY_X + (TIME_DISPLAY_WIDTH - timeTextWidth) / 2;
-        guiGraphics.drawString(minecraft.font, timeText, timeX, TIME_DISPLAY_Y, 0x00FF00, false);
+        int timeX = (int) ((TIME_DISPLAY_X + (TIME_DISPLAY_WIDTH - timeTextWidth * timeScale) / 2) / timeScale);
+        int timeY = (int) ((TIME_DISPLAY_Y + 1) / timeScale);
+        guiGraphics.drawString(minecraft.font, timeText, timeX, timeY, 0x00FF00, false);
+        guiGraphics.pose().popPose();
 
-        // 只有当配方允许催化剂时才显示提示
-        if (!recipe.catalyst().isEmpty()) {
+        // 只有当配方允许通用催化剂（非特定催化剂）时才显示提示
+        // 无用锭配方有特定的催化剂要求，不显示此提示
+        if (!recipe.catalyst().isEmpty() && !this.isUselessIngotRecipe(recipe)) {
             guiGraphics.pose().pushPose();
             float scale = 0.7f;
             guiGraphics.pose().scale(scale, scale, 1.0f);
@@ -358,9 +392,10 @@ public class AdvancedAlloyFurnaceRecipeCategory implements IRecipeCategory<Advan
             tooltip.add(Component.literal("处理时间不受并行数影响"));
         }
 
-        // 并行数效果说明区域
+        // 并行数效果说明区域 - 只在显示红色提示文本时（非无用锭配方且允许催化剂）才渲染
         if (mouseX >= PARALLEL_TEXT_X && mouseX <= PARALLEL_TEXT_X + 120 &&
-                mouseY >= PARALLEL_TEXT_Y && mouseY <= PARALLEL_TEXT_Y + 10) {
+                mouseY >= PARALLEL_TEXT_Y && mouseY <= PARALLEL_TEXT_Y + 10 &&
+                !recipe.catalyst().isEmpty() && !isUselessIngotRecipe(recipe)) {
             tooltip.add(Component.literal("并行数效果说明").withStyle(ChatFormatting.GOLD));
             tooltip.add(Component.literal("• 输入物品消耗 × 并行数").withStyle(ChatFormatting.GRAY));
             tooltip.add(Component.literal("• 输出物品数量 × 并行数").withStyle(ChatFormatting.GRAY));
@@ -373,9 +408,21 @@ public class AdvancedAlloyFurnaceRecipeCategory implements IRecipeCategory<Advan
         if (mouseX >= CATALYST_SLOT_X && mouseX <= CATALYST_SLOT_X + SLOT_SIZE &&
                 mouseY >= CATALYST_SLOT_Y && mouseY <= CATALYST_SLOT_Y + SLOT_SIZE) {
             tooltip.add(Component.literal("催化剂").withStyle(ChatFormatting.GOLD));
-            tooltip.add(Component.literal("• 可以使用无用锭提高并行数").withStyle(ChatFormatting.GRAY));
-            tooltip.add(Component.literal("• 催化剂会被消耗").withStyle(ChatFormatting.RED));
-            tooltip.add(Component.literal("• 不同等级的无用锭提供不同的并行数").withStyle(ChatFormatting.GRAY));
+            
+            int targetTier = getTargetUselessIngotTier(recipe);
+            if (targetTier > 0) {
+                // 无用锭配方：显示跨阶合成信息
+                tooltip.add(Component.literal("无用锭配方催化剂说明:").withStyle(ChatFormatting.YELLOW));
+                tooltip.add(Component.literal("• 可使用高阶无用锭催化低阶合成").withStyle(ChatFormatting.GRAY));
+                tooltip.add(Component.literal("• 例如：用5阶催化4阶，并行数=3").withStyle(ChatFormatting.GRAY));
+                tooltip.add(Component.literal("• 有用锭可提供无限并行").withStyle(ChatFormatting.GREEN));
+                tooltip.add(Component.literal("⚠ 催化剂会被消耗（有用锭除外）").withStyle(ChatFormatting.RED));
+            } else {
+                // 普通配方
+                tooltip.add(Component.literal("• 可以使用无用锭提高并行数").withStyle(ChatFormatting.GRAY));
+                tooltip.add(Component.literal("• 催化剂会被消耗").withStyle(ChatFormatting.RED));
+                tooltip.add(Component.literal("• 不同等级的无用锭提供不同的并行数").withStyle(ChatFormatting.GRAY));
+            }
         }
     }
 
@@ -416,6 +463,25 @@ public class AdvancedAlloyFurnaceRecipeCategory implements IRecipeCategory<Advan
         } else {
             return String.valueOf(amount);
         }
+    }
+
+    // 判断是否是无用锭配方（根据输出物品判断）
+    private boolean isUselessIngotRecipe(AdvancedAlloyFurnaceRecipe recipe) {
+        return getTargetUselessIngotTier(recipe) > 0;
+    }
+
+    // 获取目标无用锭等级
+    private int getTargetUselessIngotTier(AdvancedAlloyFurnaceRecipe recipe) {
+        List<ItemStack> outputs = recipe.outputs();
+        if (outputs.isEmpty()) return 0;
+
+        for (ItemStack output : outputs) {
+            int tier = CatalystParallelManager.getTargetUselessIngotTier(output);
+            if (tier > 0) {
+                return tier;
+            }
+        }
+        return 0;
     }
 
     private static class ItemStackRenderer implements IIngredientRenderer<ItemStack> {

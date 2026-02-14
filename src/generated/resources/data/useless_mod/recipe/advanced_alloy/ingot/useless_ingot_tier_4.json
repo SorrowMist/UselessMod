@@ -1,0 +1,46 @@
+{
+  "type": "useless_mod:advanced_alloy_furnace",
+  "catalyst": {
+    "item": "useless_mod:useless_ingot_tier_3"
+  },
+  "catalyst_uses": 1,
+  "energy": 500000,
+  "id": "useless_mod:advanced_alloy/ingot/useless_ingot_tier_4",
+  "ingredients": [
+    {
+      "count": 2,
+      "ingredient": {
+        "item": "minecraft:blaze_rod"
+      }
+    },
+    {
+      "count": 2,
+      "ingredient": {
+        "item": "minecraft:ender_pearl"
+      }
+    },
+    {
+      "count": 2,
+      "ingredient": {
+        "item": "minecraft:ghast_tear"
+      }
+    },
+    {
+      "ingredient": {
+        "item": "minecraft:netherite_ingot"
+      }
+    },
+    {
+      "count": 2,
+      "ingredient": {
+        "item": "minecraft:diamond_block"
+      }
+    }
+  ],
+  "outputs": [
+    {
+      "id": "useless_mod:useless_ingot_tier_4"
+    }
+  ],
+  "process_time": 1
+}

@@ -1,0 +1,46 @@
+{
+  "type": "useless_mod:advanced_alloy_furnace",
+  "catalyst": {
+    "item": "useless_mod:useless_ingot_tier_7"
+  },
+  "catalyst_uses": 1,
+  "energy": 50000000,
+  "id": "useless_mod:advanced_alloy/ingot/useless_ingot_tier_8",
+  "ingredients": [
+    {
+      "count": 8,
+      "ingredient": {
+        "item": "minecraft:enchanted_book"
+      }
+    },
+    {
+      "count": 4,
+      "ingredient": {
+        "item": "minecraft:heart_of_the_sea"
+      }
+    },
+    {
+      "ingredient": {
+        "item": "minecraft:trident"
+      }
+    },
+    {
+      "count": 8,
+      "ingredient": {
+        "item": "minecraft:shulker_shell"
+      }
+    },
+    {
+      "count": 32,
+      "ingredient": {
+        "item": "minecraft:netherite_block"
+      }
+    }
+  ],
+  "outputs": [
+    {
+      "id": "useless_mod:useless_ingot_tier_8"
+    }
+  ],
+  "process_time": 1
+}

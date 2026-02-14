@@ -67,7 +67,7 @@ public class OreGeneratorBlockEntity extends BlockEntity {
      * 尝试将传入物品插入方块（允许堆叠）
      * 返回未放入的剩余物品
      */
-    ItemStack insert(ItemStack stack) {
+    public ItemStack insert(ItemStack stack) {
         if (stack.isEmpty()) return ItemStack.EMPTY;
 
         ItemStack current = this.getItem();
@@ -105,13 +105,13 @@ public class OreGeneratorBlockEntity extends BlockEntity {
     /**
      * 取出全部（玩家空手右键时使用）
      */
-    ItemStack extractAll() {
+    public ItemStack extractAll() {
         ItemStack out = this.getItem().copy();
         this.setItem(ItemStack.EMPTY);
         return out;
     }
 
-    void tick() {
+    public void tick() {
         if (this.level == null || this.level.isClientSide) return;
 
         ItemStack inputStack = this.itemHandler.getStackInSlot(0);
@@ -167,7 +167,7 @@ public class OreGeneratorBlockEntity extends BlockEntity {
         }
     }
 
-    void drops() {
+    public void drops() {
         SimpleContainer inventory = new SimpleContainer(this.itemHandler.getSlots());
         for (int i = 0; i < this.itemHandler.getSlots(); i++) {
             inventory.setItem(i, this.itemHandler.getStackInSlot(i));

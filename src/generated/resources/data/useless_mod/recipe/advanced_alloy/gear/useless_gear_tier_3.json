@@ -1,0 +1,22 @@
+{
+  "type": "useless_mod:advanced_alloy_furnace",
+  "energy": 3000,
+  "id": "useless_mod:advanced_alloy/gear/useless_gear_tier_3",
+  "ingredients": [
+    {
+      "count": 4,
+      "ingredient": {
+        "item": "useless_mod:useless_ingot_tier_3"
+      }
+    }
+  ],
+  "mold": {
+    "item": "useless_mod:metal_mold_gear"
+  },
+  "outputs": [
+    {
+      "id": "useless_mod:useless_gear_tier_3"
+    }
+  ],
+  "process_time": 40
+}

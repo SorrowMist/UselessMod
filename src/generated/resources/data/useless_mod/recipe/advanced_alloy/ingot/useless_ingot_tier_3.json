@@ -1,0 +1,47 @@
+{
+  "type": "useless_mod:advanced_alloy_furnace",
+  "catalyst": {
+    "item": "useless_mod:useless_ingot_tier_2"
+  },
+  "catalyst_uses": 1,
+  "energy": 100000,
+  "id": "useless_mod:advanced_alloy/ingot/useless_ingot_tier_3",
+  "ingredients": [
+    {
+      "count": 2,
+      "ingredient": {
+        "item": "minecraft:spider_eye"
+      }
+    },
+    {
+      "count": 4,
+      "ingredient": {
+        "item": "minecraft:string"
+      }
+    },
+    {
+      "count": 4,
+      "ingredient": {
+        "item": "minecraft:feather"
+      }
+    },
+    {
+      "count": 2,
+      "ingredient": {
+        "item": "minecraft:emerald"
+      }
+    },
+    {
+      "count": 4,
+      "ingredient": {
+        "item": "minecraft:diamond"
+      }
+    }
+  ],
+  "outputs": [
+    {
+      "id": "useless_mod:useless_ingot_tier_3"
+    }
+  ],
+  "process_time": 1
+}

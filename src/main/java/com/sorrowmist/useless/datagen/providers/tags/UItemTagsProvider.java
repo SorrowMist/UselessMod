@@ -61,6 +61,14 @@ public class UItemTagsProvider extends ItemTagsProvider {
             .add(ModItems.USELESS_INGOT_TIER_8.get())
             .add(ModItems.USELESS_INGOT_TIER_9.get())
             .add(ModItems.USEFUL_INGOT.get());
+
+        this.tag(ModTags.MOLDS)
+            .replace(false)
+            .add(ModItems.METAL_MOLD_PLATE.get())
+            .add(ModItems.METAL_MOLD_ROD.get())
+            .add(ModItems.METAL_MOLD_GEAR.get())
+            .add(ModItems.METAL_MOLD_WIRE.get())
+            .add(ModItems.METAL_MOLD_BLOCK.get());
     }
 
     private void addCTags() {

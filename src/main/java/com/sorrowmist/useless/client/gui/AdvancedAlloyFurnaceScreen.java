@@ -1,11 +1,16 @@
 package com.sorrowmist.useless.client.gui;
 
 import com.mojang.blaze3d.systems.RenderSystem;
-import com.mojang.blaze3d.vertex.*;
+import com.mojang.blaze3d.vertex.BufferBuilder;
+import com.mojang.blaze3d.vertex.BufferUploader;
+import com.mojang.blaze3d.vertex.DefaultVertexFormat;
+import com.mojang.blaze3d.vertex.Tesselator;
+import com.mojang.blaze3d.vertex.VertexFormat;
 import com.sorrowmist.useless.UselessMod;
 import com.sorrowmist.useless.content.blockentities.AdvancedAlloyFurnaceBlockEntity;
 import com.sorrowmist.useless.content.menus.AdvancedAlloyFurnaceMenu;
 import com.sorrowmist.useless.network.TankClearPacket;
+import net.minecraft.ChatFormatting;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.client.renderer.GameRenderer;
@@ -14,11 +19,14 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.inventory.InventoryMenu;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.material.Fluid;
+import net.neoforged.fml.ModList;
 import net.neoforged.neoforge.client.extensions.common.IClientFluidTypeExtensions;
 import net.neoforged.neoforge.fluids.FluidStack;
 import net.neoforged.neoforge.network.PacketDistributor;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
@@ -105,6 +113,12 @@ public class AdvancedAlloyFurnaceScreen extends AbstractContainerScreen<Advanced
     private static final int INDICATOR_WIDTH = 4;
     private static final int INDICATOR_HEIGHT = 5;
 
+    // ==================== 问号区域（并行数信息） ====================
+    private static final int TIPS_AREA_X = 80;
+    private static final int TIPS_AREA_Y = 87;
+    private static final int TIPS_AREA_WIDTH = 16;
+    private static final int TIPS_AREA_HEIGHT = 16;
+
     // ==================== 标题位置 ====================
     private static final int TITLE_LABEL_X = 66;
     private static final int TITLE_LABEL_Y = 52;
@@ -190,6 +204,15 @@ public class AdvancedAlloyFurnaceScreen extends AbstractContainerScreen<Advanced
 
         this.renderFluidTankTooltip(guiGraphics, mouseX, mouseY, x, y, true);
         this.renderFluidTankTooltip(guiGraphics, mouseX, mouseY, x, y, false);
+
+        // 渲染能量条悬停提示
+        this.renderEnergyTooltip(guiGraphics, mouseX, mouseY, x, y);
+
+        // 渲染进度条悬停提示
+        this.renderProgressTooltip(guiGraphics, mouseX, mouseY, x, y);
+
+        // 渲染问号区域悬停提示（并行数信息）
+        this.renderTipsTooltip(guiGraphics, mouseX, mouseY, x, y);
     }
 
     @Override
@@ -219,6 +242,11 @@ public class AdvancedAlloyFurnaceScreen extends AbstractContainerScreen<Advanced
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
         int x = (this.width - this.imageWidth) / 2;
         int y = (this.height - this.imageHeight) / 2;
+
+        // 检查是否点击了进度条区域（JEI配方查看）
+        if (this.handleProgressClick(mouseX, mouseY, x, y)) {
+            return true;
+        }
 
         if (this.handleInputSliderClick(mouseX, mouseY, x, y)) {
             return true;
@@ -855,6 +883,133 @@ public class AdvancedAlloyFurnaceScreen extends AbstractContainerScreen<Advanced
                              SLIDER_WIDTH, SLIDER_HEIGHT
             );
         }
+    }
+
+    /**
+     * 渲染能量条悬停提示
+     */
+    private void renderEnergyTooltip(GuiGraphics guiGraphics, int mouseX, int mouseY, int x, int y) {
+        if (this.menu == null) return;
+
+        // 检查是否在能量条区域内
+        if (mouseX >= x + ENERGY_BAR_X && mouseX < x + ENERGY_BAR_X + ENERGY_BAR_WIDTH &&
+                mouseY >= y + ENERGY_BAR_Y && mouseY < y + ENERGY_BAR_Y + ENERGY_BAR_HEIGHT) {
+            List<Component> tooltip = new ArrayList<>();
+            tooltip.add(Component.literal("能量: " + this.menu.getEnergy() + " / " + this.menu.getMaxEnergy() + " FE"));
+            guiGraphics.renderTooltip(this.font, tooltip, Optional.empty(), mouseX, mouseY);
+        }
+    }
+
+    /**
+     * 渲染进度条悬停提示
+     */
+    private void renderProgressTooltip(GuiGraphics guiGraphics, int mouseX, int mouseY, int x, int y) {
+        if (this.menu == null) return;
+
+        // 检查是否在进度条区域内（左右两段进度条）
+        boolean overLeftProgress = mouseX >= x + PROGRESS_LEFT_X && mouseX < x + PROGRESS_LEFT_X + PROGRESS_LEFT_WIDTH &&
+                mouseY >= y + PROGRESS_LEFT_Y && mouseY < y + PROGRESS_LEFT_Y + PROGRESS_LEFT_HEIGHT;
+        boolean overRightProgress = mouseX >= x + PROGRESS_RIGHT_X && mouseX < x + PROGRESS_RIGHT_X + PROGRESS_RIGHT_WIDTH &&
+                mouseY >= y + PROGRESS_RIGHT_Y && mouseY < y + PROGRESS_RIGHT_Y + PROGRESS_RIGHT_HEIGHT;
+
+        if (overLeftProgress || overRightProgress) {
+            List<Component> tooltip = new ArrayList<>();
+            int progress = this.menu.getProgress();
+            int maxProgress = this.menu.getMaxProgress();
+
+            if (maxProgress > 0) {
+                float progressPercent = (float) progress / maxProgress * 100;
+                tooltip.add(Component.literal("进度: " + progress + "/" + maxProgress + " (" + String.format("%.1f",
+                                                                                                             progressPercent
+                ) + "%)"));
+
+                // 获取活跃状态（progress > 0 表示工作中）
+                boolean isActive = progress > 0 && progress < maxProgress;
+                tooltip.add(Component.literal("状态: " + (isActive ? "工作中" : "空闲"))
+                                     .withStyle(isActive ? ChatFormatting.GREEN : ChatFormatting.GRAY));
+
+                // 添加并行数信息
+                tooltip.add(Component.literal(""));
+                tooltip.add(Component.literal("本次并行数: " + this.menu.getCurrentParallel())
+                                     .withStyle(ChatFormatting.YELLOW));
+                tooltip.add(Component.literal("当前最大并行数: " + this.menu.getMaxParallel())
+                                     .withStyle(ChatFormatting.BLUE));
+
+                // 添加JEI提示
+                tooltip.add(Component.literal(""));
+                tooltip.add(Component.literal("点击查看配方").withStyle(ChatFormatting.AQUA));
+            } else {
+                tooltip.add(Component.literal("没有活动进程"));
+                tooltip.add(Component.literal(""));
+                tooltip.add(Component.literal("点击查看配方").withStyle(ChatFormatting.AQUA));
+            }
+
+            guiGraphics.renderTooltip(this.font, tooltip, Optional.empty(), mouseX, mouseY);
+        }
+    }
+
+    /**
+     * 渲染问号区域悬停提示（并行数信息）
+     */
+    private void renderTipsTooltip(GuiGraphics guiGraphics, int mouseX, int mouseY, int x, int y) {
+        if (this.menu == null) return;
+
+        // 检查是否在问号区域内
+        if (mouseX >= x + TIPS_AREA_X && mouseX < x + TIPS_AREA_X + TIPS_AREA_WIDTH &&
+                mouseY >= y + TIPS_AREA_Y && mouseY < y + TIPS_AREA_Y + TIPS_AREA_HEIGHT) {
+
+            List<Component> tooltip = new ArrayList<>();
+
+            int currentParallel = this.menu.getCurrentParallel();
+            int catalystMaxParallel = this.menu.getCatalystMaxParallel();
+
+            tooltip.add(Component.literal("并行数信息").withStyle(ChatFormatting.GOLD, ChatFormatting.BOLD));
+            tooltip.add(Component.literal(""));
+            tooltip.add(Component.literal("本次并行数: " + currentParallel).withStyle(ChatFormatting.YELLOW));
+            tooltip.add(Component.literal("当前最大并行数: " + catalystMaxParallel).withStyle(ChatFormatting.BLUE));
+
+            // 显示催化剂信息
+            if (this.menu.getBlockEntity() != null) {
+                AdvancedAlloyFurnaceBlockEntity entity = this.menu.getBlockEntity();
+                ItemStack catalyst = entity.getItemHandler().getStackInSlot(AdvancedAlloyFurnaceBlockEntity.CATALYST_SLOT);
+
+                if (!catalyst.isEmpty()) {
+                    tooltip.add(Component.literal(""));
+                    tooltip.add(Component.literal("催化剂: " + catalyst.getDisplayName().getString() + " (" + catalystMaxParallel + "倍)").withStyle(ChatFormatting.GREEN));
+                }
+            }
+
+            tooltip.add(Component.literal(""));
+            tooltip.add(Component.literal("并行数说明:").withStyle(ChatFormatting.GOLD));
+            tooltip.add(Component.literal("• 消耗和产出乘以并行数").withStyle(ChatFormatting.GRAY));
+            tooltip.add(Component.literal("• 处理时间保持不变").withStyle(ChatFormatting.GRAY));
+            tooltip.add(Component.literal("• 能量消耗乘以并行数").withStyle(ChatFormatting.GRAY));
+            tooltip.add(Component.literal("• 催化剂为可选项，可提高并行数").withStyle(ChatFormatting.GRAY));
+            tooltip.add(Component.literal("⚠ 普通催化剂会被消耗").withStyle(ChatFormatting.RED));
+
+            guiGraphics.renderTooltip(this.font, tooltip, Optional.empty(), mouseX, mouseY);
+        }
+    }
+
+    /**
+     * 处理进度条点击（打开JEI配方）
+     */
+    private boolean handleProgressClick(double mouseX, double mouseY, int x, int y) {
+        // 检查是否在进度条区域内（左右两段进度条）
+        boolean overLeftProgress = mouseX >= x + PROGRESS_LEFT_X && mouseX < x + PROGRESS_LEFT_X + PROGRESS_LEFT_WIDTH &&
+                mouseY >= y + PROGRESS_LEFT_Y && mouseY < y + PROGRESS_LEFT_Y + PROGRESS_LEFT_HEIGHT;
+        boolean overRightProgress = mouseX >= x + PROGRESS_RIGHT_X && mouseX < x + PROGRESS_RIGHT_X + PROGRESS_RIGHT_WIDTH &&
+                mouseY >= y + PROGRESS_RIGHT_Y && mouseY < y + PROGRESS_RIGHT_Y + PROGRESS_RIGHT_HEIGHT;
+
+        if (overLeftProgress || overRightProgress) {
+            // 检查JEI是否加载，然后通过compat模块打开配方界面
+            if (ModList.get().isLoaded("jei")) {
+                com.sorrowmist.useless.compat.jei.JEIPlugin.showAdvancedAlloyFurnaceRecipes();
+            }
+            return true;
+        }
+
+        return false;
     }
 
     /**

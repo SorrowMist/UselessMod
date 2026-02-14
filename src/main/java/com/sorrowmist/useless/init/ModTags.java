@@ -9,6 +9,7 @@ import net.minecraft.world.item.Item;
 public final class ModTags {
 
     public static final TagKey<Item> CATALYSTS = createItemTag("catalysts");
+    public static final TagKey<Item> MOLDS = createItemTag("molds");
 
     private static TagKey<Item> createItemTag(String path) {
         return ItemTags.create(ResourceLocation.fromNamespaceAndPath(UselessMod.MODID, path));

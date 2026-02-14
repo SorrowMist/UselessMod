@@ -18,12 +18,8 @@ import net.neoforged.neoforge.items.IItemHandler;
 import net.neoforged.neoforge.items.SlotItemHandler;
 import org.jetbrains.annotations.NotNull;
 
-/**
- * 高级合金炉菜单
- */
 public class AdvancedAlloyFurnaceMenu extends AbstractContainerMenu {
 
-    // ==================== 槽位布局常量 ====================
     private static final int INPUT_SLOTS_X = 8;
     private static final int INPUT_SLOTS_FIRST_Y = 18;
     private static final int SLOT_SIZE = 18;
@@ -40,7 +36,6 @@ public class AdvancedAlloyFurnaceMenu extends AbstractContainerMenu {
     private static final int PLAYER_INVENTORY_Y = 178;
     private static final int PLAYER_HOTBAR_Y = 236;
 
-    // ==================== 槽位范围常量 (从 BlockEntity 导入) ====================
     private static final int MACHINE_INPUT_START = AdvancedAlloyFurnaceBlockEntity.INPUT_SLOTS_START;
     private static final int MACHINE_INPUT_END = MACHINE_INPUT_START + AdvancedAlloyFurnaceBlockEntity.INPUT_SLOTS_COUNT - 1;
     private static final int MACHINE_OUTPUT_START = AdvancedAlloyFurnaceBlockEntity.OUTPUT_SLOTS_START;
@@ -76,42 +71,55 @@ public class AdvancedAlloyFurnaceMenu extends AbstractContainerMenu {
 
         if (entity != null) {
             IItemHandler itemHandler = entity.getItemHandler();
-
-            // 输入槽位 (0-8)
-            for (int row = 0; row < 3; row++) {
-                for (int col = 0; col < 3; col++) {
-                    int slotIndex = row * 3 + col;
-                    int x = INPUT_SLOTS_X + col * SLOT_SIZE;
-                    int y = INPUT_SLOTS_FIRST_Y + row * SLOT_SIZE;
-                    this.addSlot(new SlotItemHandler(itemHandler, slotIndex, x, y));
-                }
-            }
-
-            // 输出槽位 (9-17)
-            for (int row = 0; row < 3; row++) {
-                for (int col = 0; col < 3; col++) {
-                    int slotIndex = 9 + row * 3 + col;
-                    int x = OUTPUT_SLOTS_X + col * SLOT_SIZE;
-                    int y = OUTPUT_SLOTS_FIRST_Y + row * SLOT_SIZE;
-                    this.addSlot(new SlotItemHandler(itemHandler, slotIndex, x, y) {
-                        @Override
-                        public boolean mayPlace(ItemStack stack) {
-                            return false;
-                        }
-                    });
-                }
-            }
-
-            // 催化剂槽 (18)
-            this.addSlot(new SlotItemHandler(itemHandler, CATALYST_SLOT, CATALYST_SLOT_X, CATALYST_SLOT_Y));
-
-            // 模具槽 (19)
-            this.addSlot(new SlotItemHandler(itemHandler, MOLD_SLOT, MOLD_SLOT_X, MOLD_SLOT_Y));
+            this.addMachineSlots(itemHandler);
         }
 
         this.layoutPlayerInventorySlots(inv);
     }
 
+    /**
+     * 添加机器槽位（输入、输出、催化剂、模具）
+     *
+     * @param itemHandler 物品处理器
+     */
+    private void addMachineSlots(IItemHandler itemHandler) {
+        // 添加9个输入槽位（3x3）
+        for (int row = 0; row < 3; row++) {
+            for (int col = 0; col < 3; col++) {
+                int slotIndex = row * 3 + col;
+                int x = INPUT_SLOTS_X + col * SLOT_SIZE;
+                int y = INPUT_SLOTS_FIRST_Y + row * SLOT_SIZE;
+                this.addSlot(new SlotItemHandler(itemHandler, slotIndex, x, y));
+            }
+        }
+
+        // 添加9个输出槽位（3x3），不允许放入物品
+        for (int row = 0; row < 3; row++) {
+            for (int col = 0; col < 3; col++) {
+                int slotIndex = 9 + row * 3 + col;
+                int x = OUTPUT_SLOTS_X + col * SLOT_SIZE;
+                int y = OUTPUT_SLOTS_FIRST_Y + row * SLOT_SIZE;
+                this.addSlot(new SlotItemHandler(itemHandler, slotIndex, x, y) {
+                    @Override
+                    public boolean mayPlace(@NotNull ItemStack stack) {
+                        return false;
+                    }
+                });
+            }
+        }
+
+        // 添加催化剂槽位
+        this.addSlot(new SlotItemHandler(itemHandler, CATALYST_SLOT, CATALYST_SLOT_X, CATALYST_SLOT_Y));
+        // 添加模具槽位
+        this.addSlot(new SlotItemHandler(itemHandler, MOLD_SLOT, MOLD_SLOT_X, MOLD_SLOT_Y));
+    }
+
+    /**
+     * 获取容器数据
+     *
+     * @param entity 方块实体
+     * @return 容器数据
+     */
     private static ContainerData getContainerData(BlockEntity entity) {
         if (entity instanceof AdvancedAlloyFurnaceBlockEntity furnace) {
             return furnace.getData();
@@ -120,26 +128,27 @@ public class AdvancedAlloyFurnaceMenu extends AbstractContainerMenu {
     }
 
     /**
-     * 添加玩家物品栏和热键栏槽位
+     * 布局玩家背包槽位
+     *
+     * @param inventory 玩家背包
      */
     private void layoutPlayerInventorySlots(Inventory inventory) {
-        // 玩家背包 (27个)
+        // 添加27个背包槽位（3x9）
         for (int i = 0; i < 3; i++) {
             for (int j = 0; j < 9; j++) {
                 this.addSlot(new Slot(inventory, j + i * 9 + 9,
-                                      PLAYER_INVENTORY_X + j * 18, PLAYER_INVENTORY_Y + i * 18
-                ));
+                        PLAYER_INVENTORY_X + j * 18, PLAYER_INVENTORY_Y + i * 18));
             }
         }
 
-        // 热键栏 (9个)
+        // 添加9个快捷栏槽位
         for (int i = 0; i < 9; i++) {
             this.addSlot(new Slot(inventory, i, PLAYER_INVENTORY_X + i * 18, PLAYER_HOTBAR_Y));
         }
     }
 
     @Override
-    public @NotNull ItemStack quickMoveStack(Player player, int index) {
+    public @NotNull ItemStack quickMoveStack(@NotNull Player player, int index) {
         if (this.blockEntity == null) {
             return ItemStack.EMPTY;
         }
@@ -147,64 +156,80 @@ public class AdvancedAlloyFurnaceMenu extends AbstractContainerMenu {
         ItemStack itemstack = ItemStack.EMPTY;
         Slot slot = this.slots.get(index);
 
-        if (slot != null && slot.hasItem()) {
-            ItemStack stackInSlot = slot.getItem();
-            itemstack = stackInSlot.copy();
-
-            // 从机器槽位转移到玩家物品栏
-            if (index >= MACHINE_INPUT_START && index <= MOLD_SLOT) {
-                if (!this.moveItemStackTo(stackInSlot, PLAYER_INVENTORY_START, HOTBAR_END + 1, true)) {
-                    return ItemStack.EMPTY;
-                }
-                slot.onQuickCraft(stackInSlot, itemstack);
-            }
-            // 从玩家物品栏转移到机器
-            else if (index >= PLAYER_INVENTORY_START && index <= HOTBAR_END) {
-                // 先尝试输入槽
-                if (!this.moveItemStackTo(stackInSlot, MACHINE_INPUT_START, MACHINE_INPUT_END + 1, false)) {
-                    // 再尝试催化剂槽
-                    if (!this.moveItemStackTo(stackInSlot, CATALYST_SLOT, CATALYST_SLOT + 1, false)) {
-                        // 再尝试模具槽
-                        if (!this.moveItemStackTo(stackInSlot, MOLD_SLOT, MOLD_SLOT + 1, false)) {
-                            // 在玩家物品栏内部转移
-                            if (index >= PLAYER_INVENTORY_START && index <= PLAYER_INVENTORY_END) {
-                                if (!this.moveItemStackTo(stackInSlot, HOTBAR_START, HOTBAR_END + 1, false)) {
-                                    return ItemStack.EMPTY;
-                                }
-                            } else if (index >= HOTBAR_START && index <= HOTBAR_END) {
-                                if (!this.moveItemStackTo(stackInSlot, PLAYER_INVENTORY_START,
-                                                          PLAYER_INVENTORY_END + 1, false
-                                )) {
-                                    return ItemStack.EMPTY;
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            if (stackInSlot.isEmpty()) {
-                slot.set(ItemStack.EMPTY);
-            } else {
-                slot.setChanged();
-            }
-
-            if (stackInSlot.getCount() == itemstack.getCount()) {
-                return ItemStack.EMPTY;
-            }
-
-            slot.onTake(player, stackInSlot);
+        if (!slot.hasItem()) {
+            return itemstack;
         }
 
+        ItemStack stackInSlot = slot.getItem();
+        itemstack = stackInSlot.copy();
+
+        if (index >= MACHINE_INPUT_START && index <= MOLD_SLOT) {
+            if (!this.moveItemStackTo(stackInSlot, PLAYER_INVENTORY_START, HOTBAR_END + 1, true)) {
+                return ItemStack.EMPTY;
+            }
+            slot.onQuickCraft(stackInSlot, itemstack);
+        } else if (index >= PLAYER_INVENTORY_START && index <= HOTBAR_END) {
+            if (!this.tryMoveToMachine(stackInSlot)) {
+                if (!this.moveWithinPlayerInventory(stackInSlot, index)) {
+                    return ItemStack.EMPTY;
+                }
+            }
+        }
+
+        if (stackInSlot.isEmpty()) {
+            slot.set(ItemStack.EMPTY);
+        } else {
+            slot.setChanged();
+        }
+
+        if (stackInSlot.getCount() == itemstack.getCount()) {
+            return ItemStack.EMPTY;
+        }
+
+        slot.onTake(player, stackInSlot);
         return itemstack;
     }
 
-    @Override
-    public boolean stillValid(Player player) {
-        return true;
+    /**
+     * 尝试将物品移动到机器槽位
+     * <p>
+     * 优先顺序：输入槽 -> 催化剂槽 -> 模具槽
+     *
+     * @param stack 物品堆
+     * @return 是否成功移动
+     */
+    private boolean tryMoveToMachine(ItemStack stack) {
+        if (this.moveItemStackTo(stack, MACHINE_INPUT_START, MACHINE_INPUT_END + 1, false)) {
+            return true;
+        }
+        if (this.moveItemStackTo(stack, CATALYST_SLOT, CATALYST_SLOT + 1, false)) {
+            return true;
+        }
+        return this.moveItemStackTo(stack, MOLD_SLOT, MOLD_SLOT + 1, false);
     }
 
-    // ==================== 数据访问器 ====================
+    /**
+     * 在玩家背包内部移动物品
+     * <p>
+     * 在背包和快捷栏之间切换
+     *
+     * @param stack 物品堆
+     * @param index 当前槽位索引
+     * @return 是否成功移动
+     */
+    private boolean moveWithinPlayerInventory(ItemStack stack, int index) {
+        if (index >= PLAYER_INVENTORY_START && index <= PLAYER_INVENTORY_END) {
+            return this.moveItemStackTo(stack, HOTBAR_START, HOTBAR_END + 1, false);
+        } else if (index >= HOTBAR_START && index <= HOTBAR_END) {
+            return this.moveItemStackTo(stack, PLAYER_INVENTORY_START, PLAYER_INVENTORY_END + 1, false);
+        }
+        return false;
+    }
+
+    @Override
+    public boolean stillValid(@NotNull Player player) {
+        return true;
+    }
 
     public AdvancedAlloyFurnaceBlockEntity getBlockEntity() {
         return this.blockEntity;
@@ -234,14 +259,8 @@ public class AdvancedAlloyFurnaceMenu extends AbstractContainerMenu {
         return this.data.get(AdvancedAlloyFurnaceData.DATA_MAX_PARALLEL);
     }
 
-    /**
-     * 获取催化剂提供的最大并行数（仅由催化剂决定）
-     */
     public int getCatalystMaxParallel() {
-        if (this.blockEntity != null) {
-            return this.blockEntity.getCatalystMaxParallel();
-        }
-        return 1;
+        return this.blockEntity != null ? this.blockEntity.getCatalystMaxParallel() : 1;
     }
 
     public boolean hasMold() {
@@ -249,16 +268,10 @@ public class AdvancedAlloyFurnaceMenu extends AbstractContainerMenu {
     }
 
     public FluidTank getInputFluidTank(int index) {
-        if (this.blockEntity != null) {
-            return this.blockEntity.getInputFluidTank(index);
-        }
-        return new FluidTank(0);
+        return this.blockEntity != null ? this.blockEntity.getInputFluidTank(index) : new FluidTank(0);
     }
 
     public FluidTank getOutputFluidTank(int index) {
-        if (this.blockEntity != null) {
-            return this.blockEntity.getOutputFluidTank(index);
-        }
-        return new FluidTank(0);
+        return this.blockEntity != null ? this.blockEntity.getOutputFluidTank(index) : new FluidTank(0);
     }
 }

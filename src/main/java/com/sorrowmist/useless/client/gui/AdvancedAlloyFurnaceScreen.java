@@ -21,24 +21,22 @@ import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.inventory.InventoryMenu;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.material.Fluid;
+import net.minecraft.world.level.material.Fluids;
 import net.neoforged.fml.ModList;
 import net.neoforged.neoforge.client.extensions.common.IClientFluidTypeExtensions;
 import net.neoforged.neoforge.fluids.FluidStack;
 import net.neoforged.neoforge.network.PacketDistributor;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
-/**
- * 高级合金炉GUI屏幕
- */
 public class AdvancedAlloyFurnaceScreen extends AbstractContainerScreen<AdvancedAlloyFurnaceMenu> {
 
     // ==================== 纹理资源 ====================
     private static final ResourceLocation TEXTURE =
             ResourceLocation.fromNamespaceAndPath(UselessMod.MODID, "textures/gui/advanced_alloy_furnace_gui.png");
-
     private static final ResourceLocation COMPONENTS_TEXTURE =
             ResourceLocation.fromNamespaceAndPath(UselessMod.MODID, "textures/gui/advanced_alloy_furnace_zu_jian.png");
 
@@ -98,12 +96,6 @@ public class AdvancedAlloyFurnaceScreen extends AbstractContainerScreen<Advanced
     private static final int OUTPUT_SLIDER_SLOT_Y = 119;
     private static final int OUTPUT_SLIDER_SLOT_WIDTH = 3;
     private static final int OUTPUT_SLIDER_SLOT_HEIGHT = 42;
-
-    // ==================== 槽位位置 ====================
-    private static final int CATALYST_SLOT_X = 61;
-    private static final int CATALYST_SLOT_Y = 87;
-    private static final int MOLD_SLOT_X = 99;
-    private static final int MOLD_SLOT_Y = 87;
 
     // ==================== 指示灯 ====================
     private static final int CATALYST_INDICATOR_X = 67;
@@ -184,19 +176,14 @@ public class AdvancedAlloyFurnaceScreen extends AbstractContainerScreen<Advanced
     }
 
     @Override
-    protected void init() {
-        super.init();
-    }
-
-    @Override
-    public void render(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
+    public void render(@NotNull GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
         this.renderBackground(guiGraphics, mouseX, mouseY, partialTick);
         super.render(guiGraphics, mouseX, mouseY, partialTick);
         this.renderTooltip(guiGraphics, mouseX, mouseY);
     }
 
     @Override
-    protected void renderTooltip(GuiGraphics guiGraphics, int mouseX, int mouseY) {
+    protected void renderTooltip(@NotNull GuiGraphics guiGraphics, int mouseX, int mouseY) {
         super.renderTooltip(guiGraphics, mouseX, mouseY);
 
         int x = (this.width - this.imageWidth) / 2;
@@ -204,13 +191,10 @@ public class AdvancedAlloyFurnaceScreen extends AbstractContainerScreen<Advanced
 
         this.renderFluidTankTooltip(guiGraphics, mouseX, mouseY, x, y, true);
         this.renderFluidTankTooltip(guiGraphics, mouseX, mouseY, x, y, false);
-
         // 渲染能量条悬停提示
         this.renderEnergyTooltip(guiGraphics, mouseX, mouseY, x, y);
-
         // 渲染进度条悬停提示
         this.renderProgressTooltip(guiGraphics, mouseX, mouseY, x, y);
-
         // 渲染问号区域悬停提示（并行数信息）
         this.renderTipsTooltip(guiGraphics, mouseX, mouseY, x, y);
     }
@@ -218,18 +202,24 @@ public class AdvancedAlloyFurnaceScreen extends AbstractContainerScreen<Advanced
     @Override
     protected void renderLabels(GuiGraphics guiGraphics, int mouseX, int mouseY) {
         guiGraphics.drawString(this.font, this.playerInventoryTitle, this.inventoryLabelX, this.inventoryLabelY,
-                               0x404040, false
-        );
+                               0x404040, false);
     }
 
+    /**
+     * 渲染GUI背景
+     * <p>
+     * 绘制基础纹理和所有动态元素（能量条、进度条、流体、指示灯等）
+     */
     @Override
     protected void renderBg(GuiGraphics guiGraphics, float partialTick, int mouseX, int mouseY) {
         RenderSystem.setShaderColor(1.0F, 1.0F, 1.0F, 1.0F);
         int x = (this.width - this.imageWidth) / 2;
         int y = (this.height - this.imageHeight) / 2;
 
+        // 绘制基础GUI纹理
         guiGraphics.blit(TEXTURE, x, y, 0, 0, DISPLAY_WIDTH, DISPLAY_HEIGHT, TEXTURE_WIDTH, TEXTURE_HEIGHT);
 
+        // 渲染各个组件
         this.renderEnergyBar(guiGraphics, x, y);
         this.renderProgressBar(guiGraphics, x, y);
         this.renderFluidInputArea(guiGraphics, x, y);
@@ -238,31 +228,26 @@ public class AdvancedAlloyFurnaceScreen extends AbstractContainerScreen<Advanced
         this.renderSlider(guiGraphics, x, y);
     }
 
+    /**
+     * 处理鼠标点击事件
+     * <p>
+     * 检查是否点击了进度条（打开JEI）、滑块或清空按钮
+     */
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
         int x = (this.width - this.imageWidth) / 2;
         int y = (this.height - this.imageHeight) / 2;
 
         // 检查是否点击了进度条区域（JEI配方查看）
-        if (this.handleProgressClick(mouseX, mouseY, x, y)) {
-            return true;
-        }
-
-        if (this.handleInputSliderClick(mouseX, mouseY, x, y)) {
-            return true;
-        }
-
-        if (this.handleOutputSliderClick(mouseX, mouseY, x, y)) {
-            return true;
-        }
-
-        if (this.checkTankClearButtonClick(mouseX, mouseY, x, y, true)) {
-            return true;
-        }
-
-        if (this.checkTankClearButtonClick(mouseX, mouseY, x, y, false)) {
-            return true;
-        }
+        if (this.handleProgressClick(mouseX, mouseY, x, y)) return true;
+        // 检查是否点击了输入流体滑块
+        if (this.handleInputSliderClick(mouseX, mouseY, x, y)) return true;
+        // 检查是否点击了输出流体滑块
+        if (this.handleOutputSliderClick(mouseX, mouseY, x, y)) return true;
+        // 检查是否点击了输入流体槽清空按钮
+        if (this.checkTankClearButtonClick(mouseX, mouseY, x, y, true)) return true;
+        // 检查是否点击了输出流体槽清空按钮
+        if (this.checkTankClearButtonClick(mouseX, mouseY, x, y, false)) return true;
 
         return super.mouseClicked(mouseX, mouseY, button);
     }
@@ -270,36 +255,40 @@ public class AdvancedAlloyFurnaceScreen extends AbstractContainerScreen<Advanced
     @Override
     public boolean mouseDragged(double mouseX, double mouseY, int button, double dragX, double dragY) {
         if (this.isDraggingInputSlider) {
-            int x = (this.width - this.imageWidth) / 2;
-            int y = (this.height - this.imageHeight) / 2;
-            int visibleInputTanks = FLUID_INPUT_AREA_HEIGHT / (FLUID_TANK_HEIGHT + FLUID_TANK_SPACING);
-            int maxScroll = SLIDER_SLOT_HEIGHT - SLIDER_HEIGHT;
-            int relativeY = (int) mouseY - (y + SLIDER_SLOT_Y) - this.draggedInputSliderY;
-            float scrollRatio = (float) relativeY / maxScroll;
-            this.inputFluidScrollOffset = Math.max(0, Math.min(
-                                                           AdvancedAlloyFurnaceBlockEntity.FLUID_TANK_COUNT - visibleInputTanks,
-                                                           (int) (scrollRatio * (AdvancedAlloyFurnaceBlockEntity.FLUID_TANK_COUNT - visibleInputTanks))
-                                                   )
-            );
+            this.updateInputScrollOffset(mouseX, mouseY);
             return true;
         }
 
         if (this.isDraggingOutputSlider) {
-            int x = (this.width - this.imageWidth) / 2;
-            int y = (this.height - this.imageHeight) / 2;
-            int visibleOutputTanks = FLUID_OUTPUT_AREA_HEIGHT / (FLUID_TANK_HEIGHT + FLUID_TANK_SPACING);
-            int maxScroll = OUTPUT_SLIDER_SLOT_HEIGHT - SLIDER_HEIGHT;
-            int relativeY = (int) mouseY - (y + OUTPUT_SLIDER_SLOT_Y) - this.draggedOutputSliderY;
-            float scrollRatio = (float) relativeY / maxScroll;
-            this.outputFluidScrollOffset = Math.max(0, Math.min(
-                                                            AdvancedAlloyFurnaceBlockEntity.FLUID_TANK_COUNT - visibleOutputTanks,
-                                                            (int) (scrollRatio * (AdvancedAlloyFurnaceBlockEntity.FLUID_TANK_COUNT - visibleOutputTanks))
-                                                    )
-            );
+            this.updateOutputScrollOffset(mouseX, mouseY);
             return true;
         }
 
         return super.mouseDragged(mouseX, mouseY, button, dragX, dragY);
+    }
+
+    private void updateInputScrollOffset(double mouseX, double mouseY) {
+        int x = (this.width - this.imageWidth) / 2;
+        int y = (this.height - this.imageHeight) / 2;
+        int visibleInputTanks = FLUID_INPUT_AREA_HEIGHT / (FLUID_TANK_HEIGHT + FLUID_TANK_SPACING);
+        int maxScroll = SLIDER_SLOT_HEIGHT - SLIDER_HEIGHT;
+        int relativeY = (int) mouseY - (y + SLIDER_SLOT_Y) - this.draggedInputSliderY;
+        float scrollRatio = (float) relativeY / maxScroll;
+        this.inputFluidScrollOffset = Math.max(0, Math.min(
+                AdvancedAlloyFurnaceBlockEntity.FLUID_TANK_COUNT - visibleInputTanks,
+                (int) (scrollRatio * (AdvancedAlloyFurnaceBlockEntity.FLUID_TANK_COUNT - visibleInputTanks))));
+    }
+
+    private void updateOutputScrollOffset(double mouseX, double mouseY) {
+        int x = (this.width - this.imageWidth) / 2;
+        int y = (this.height - this.imageHeight) / 2;
+        int visibleOutputTanks = FLUID_OUTPUT_AREA_HEIGHT / (FLUID_TANK_HEIGHT + FLUID_TANK_SPACING);
+        int maxScroll = OUTPUT_SLIDER_SLOT_HEIGHT - SLIDER_HEIGHT;
+        int relativeY = (int) mouseY - (y + OUTPUT_SLIDER_SLOT_Y) - this.draggedOutputSliderY;
+        float scrollRatio = (float) relativeY / maxScroll;
+        this.outputFluidScrollOffset = Math.max(0, Math.min(
+                AdvancedAlloyFurnaceBlockEntity.FLUID_TANK_COUNT - visibleOutputTanks,
+                (int) (scrollRatio * (AdvancedAlloyFurnaceBlockEntity.FLUID_TANK_COUNT - visibleOutputTanks))));
     }
 
     @Override
@@ -315,234 +304,30 @@ public class AdvancedAlloyFurnaceScreen extends AbstractContainerScreen<Advanced
         return super.mouseReleased(mouseX, mouseY, button);
     }
 
-    /**
-     * 计算流体区域布局
-     */
-    private FluidAreaLayout calculateFluidAreaLayout(int areaX, int areaY, int areaWidth, int areaHeight, int x,
-                                                     int y) {
-        int visibleTanks = areaHeight / (FLUID_TANK_HEIGHT + FLUID_TANK_SPACING);
-        int totalWidth = FLUID_TANK_WIDTH + 1 + TANK_CLEAR_BUTTON_WIDTH;
-
-        if (visibleTanks <= 0) {
-            return new FluidAreaLayout(0, 0, 0, totalWidth);
-        }
-
-        int totalTankHeight = visibleTanks * FLUID_TANK_HEIGHT;
-        int totalSpacing = areaHeight - totalTankHeight;
-        int spacing = visibleTanks > 1 ? totalSpacing / (visibleTanks + 1) : totalSpacing / 2;
-        int startX = x + areaX + (areaWidth - totalWidth) / 2;
-
-        return new FluidAreaLayout(visibleTanks, spacing, startX, totalWidth);
-    }
-
-    /**
-     * 获取流体槽的Y坐标
-     */
-    private int getFluidTankY(int areaY, int spacing, int tankIndex, int scrollOffset, int y) {
-        return y + areaY + spacing + (tankIndex - scrollOffset) * (FLUID_TANK_HEIGHT + spacing);
-    }
-
-    /**
-     * 渲染流体槽悬停提示
-     */
-    private void renderFluidTankTooltip(GuiGraphics guiGraphics, int mouseX, int mouseY, int x, int y,
-                                        boolean isInput) {
-        int areaX = isInput ? FLUID_INPUT_AREA_X : FLUID_OUTPUT_AREA_X;
-        int areaY = isInput ? FLUID_INPUT_AREA_Y : FLUID_OUTPUT_AREA_Y;
-        int areaWidth = isInput ? FLUID_INPUT_AREA_WIDTH : FLUID_OUTPUT_AREA_WIDTH;
-        int areaHeight = isInput ? FLUID_INPUT_AREA_HEIGHT : FLUID_OUTPUT_AREA_HEIGHT;
-        int scrollOffset = isInput ? this.inputFluidScrollOffset : this.outputFluidScrollOffset;
-
-        FluidAreaLayout layout = this.calculateFluidAreaLayout(areaX, areaY, areaWidth, areaHeight, x, y);
-
-        if (layout.visibleTanks > 0) {
-            for (int i = scrollOffset; i < Math.min(AdvancedAlloyFurnaceBlockEntity.FLUID_TANK_COUNT,
-                                                    scrollOffset + layout.visibleTanks
-            ); i++) {
-                int tankY = this.getFluidTankY(areaY, layout.spacing, i, scrollOffset, y);
-                int tankX = layout.startX;
-
-                if (mouseX >= tankX && mouseX < tankX + FLUID_TANK_WIDTH &&
-                        mouseY >= tankY && mouseY < tankY + FLUID_TANK_HEIGHT) {
-                    FluidStack fluid = isInput ?
-                            this.menu.getInputFluidTank(i).getFluid() :
-                            this.menu.getOutputFluidTank(i).getFluid();
-                    int capacity = isInput ?
-                            this.menu.getInputFluidTank(i).getCapacity() :
-                            this.menu.getOutputFluidTank(i).getCapacity();
-
-                    if (!fluid.isEmpty()) {
-                        Component fluidName = fluid.getHoverName();
-                        Component amountText = Component.literal(
-                                String.format("%,d / %,d mB", fluid.getAmount(), capacity));
-
-                        guiGraphics.renderTooltip(this.font, List.of(fluidName, amountText),
-                                                  Optional.empty(), mouseX, mouseY
-                        );
-                    }
-                    break;
-                }
-            }
-        }
-    }
-
-    /**
-     * 处理输入区域滑块点击
-     */
-    private boolean handleInputSliderClick(double mouseX, double mouseY, int x, int y) {
-        int visibleInputTanks = FLUID_INPUT_AREA_HEIGHT / (FLUID_TANK_HEIGHT + FLUID_TANK_SPACING);
-
-        if (AdvancedAlloyFurnaceBlockEntity.FLUID_TANK_COUNT <= visibleInputTanks) {
-            return false;
-        }
-
-        float inputScrollRatio = (float) this.inputFluidScrollOffset / (AdvancedAlloyFurnaceBlockEntity.FLUID_TANK_COUNT - visibleInputTanks);
-        int inputSliderY = (int) (inputScrollRatio * (SLIDER_SLOT_HEIGHT - SLIDER_HEIGHT));
-        int sliderX = x + SLIDER_SLOT_X - (SLIDER_WIDTH - SLIDER_SLOT_WIDTH) / 2;
-        int sliderY = y + SLIDER_SLOT_Y + inputSliderY;
-
-        if (mouseX >= sliderX && mouseX < sliderX + SLIDER_WIDTH &&
-                mouseY >= sliderY && mouseY < sliderY + SLIDER_HEIGHT) {
-            this.isDraggingInputSlider = true;
-            this.draggedInputSliderY = (int) mouseY - sliderY;
-            return true;
-        }
-
-        if (mouseX >= x + SLIDER_SLOT_X && mouseX < x + SLIDER_SLOT_X + SLIDER_SLOT_WIDTH &&
-                mouseY >= y + SLIDER_SLOT_Y && mouseY < y + SLIDER_SLOT_Y + SLIDER_SLOT_HEIGHT) {
-            int clickY = (int) mouseY - (y + SLIDER_SLOT_Y) - SLIDER_HEIGHT / 2;
-            int maxScroll = SLIDER_SLOT_HEIGHT - SLIDER_HEIGHT;
-            this.inputFluidScrollOffset = Math.max(0, Math.min(
-                                                           AdvancedAlloyFurnaceBlockEntity.FLUID_TANK_COUNT - visibleInputTanks,
-                                                           (int) ((float) clickY / maxScroll * (AdvancedAlloyFurnaceBlockEntity.FLUID_TANK_COUNT - visibleInputTanks))
-                                                   )
-            );
-            return true;
-        }
-
-        return false;
-    }
-
-    /**
-     * 处理输出区域滑块点击
-     */
-    private boolean handleOutputSliderClick(double mouseX, double mouseY, int x, int y) {
-        int visibleOutputTanks = FLUID_OUTPUT_AREA_HEIGHT / (FLUID_TANK_HEIGHT + FLUID_TANK_SPACING);
-
-        if (AdvancedAlloyFurnaceBlockEntity.FLUID_TANK_COUNT <= visibleOutputTanks) {
-            return false;
-        }
-
-        float outputScrollRatio = (float) this.outputFluidScrollOffset / (AdvancedAlloyFurnaceBlockEntity.FLUID_TANK_COUNT - visibleOutputTanks);
-        int outputSliderY = (int) (outputScrollRatio * (OUTPUT_SLIDER_SLOT_HEIGHT - SLIDER_HEIGHT));
-        int sliderX = x + OUTPUT_SLIDER_SLOT_X - (SLIDER_WIDTH - OUTPUT_SLIDER_SLOT_WIDTH) / 2;
-        int sliderY = y + OUTPUT_SLIDER_SLOT_Y + outputSliderY;
-
-        if (mouseX >= sliderX && mouseX < sliderX + SLIDER_WIDTH &&
-                mouseY >= sliderY && mouseY < sliderY + SLIDER_HEIGHT) {
-            this.isDraggingOutputSlider = true;
-            this.draggedOutputSliderY = (int) mouseY - sliderY;
-            return true;
-        }
-
-        if (mouseX >= x + OUTPUT_SLIDER_SLOT_X && mouseX < x + OUTPUT_SLIDER_SLOT_X + OUTPUT_SLIDER_SLOT_WIDTH &&
-                mouseY >= y + OUTPUT_SLIDER_SLOT_Y && mouseY < y + OUTPUT_SLIDER_SLOT_Y + OUTPUT_SLIDER_SLOT_HEIGHT) {
-            int clickY = (int) mouseY - (y + OUTPUT_SLIDER_SLOT_Y) - SLIDER_HEIGHT / 2;
-            int maxScroll = OUTPUT_SLIDER_SLOT_HEIGHT - SLIDER_HEIGHT;
-            this.outputFluidScrollOffset = Math.max(0, Math.min(
-                                                            AdvancedAlloyFurnaceBlockEntity.FLUID_TANK_COUNT - visibleOutputTanks,
-                                                            (int) ((float) clickY / maxScroll * (AdvancedAlloyFurnaceBlockEntity.FLUID_TANK_COUNT - visibleOutputTanks))
-                                                    )
-            );
-            return true;
-        }
-
-        return false;
-    }
-
-    /**
-     * 检查并处理清空按钮点击
-     */
-    private boolean checkTankClearButtonClick(double mouseX, double mouseY, int x, int y, boolean isInput) {
-        int areaX = isInput ? FLUID_INPUT_AREA_X : FLUID_OUTPUT_AREA_X;
-        int areaY = isInput ? FLUID_INPUT_AREA_Y : FLUID_OUTPUT_AREA_Y;
-        int areaWidth = isInput ? FLUID_INPUT_AREA_WIDTH : FLUID_OUTPUT_AREA_WIDTH;
-        int areaHeight = isInput ? FLUID_INPUT_AREA_HEIGHT : FLUID_OUTPUT_AREA_HEIGHT;
-        int scrollOffset = isInput ? this.inputFluidScrollOffset : this.outputFluidScrollOffset;
-        boolean[] buttonsPressed = isInput ? this.inputTankClearButtonsPressed : this.outputTankClearButtonsPressed;
-
-        FluidAreaLayout layout = this.calculateFluidAreaLayout(areaX, areaY, areaWidth, areaHeight, x, y);
-
-        if (layout.visibleTanks > 0) {
-            for (int i = scrollOffset; i < Math.min(AdvancedAlloyFurnaceBlockEntity.FLUID_TANK_COUNT,
-                                                    scrollOffset + layout.visibleTanks
-            ); i++) {
-                int tankY = this.getFluidTankY(areaY, layout.spacing, i, scrollOffset, y);
-                int buttonX = layout.startX + FLUID_TANK_WIDTH + 1;
-
-                if (mouseX >= buttonX && mouseX < buttonX + TANK_CLEAR_BUTTON_WIDTH &&
-                        mouseY >= tankY && mouseY < tankY + TANK_CLEAR_BUTTON_HEIGHT) {
-                    boolean hasFluid = isInput ?
-                            !this.menu.getInputFluidTank(i).getFluid().isEmpty() :
-                            !this.menu.getOutputFluidTank(i).getFluid().isEmpty();
-
-                    if (hasFluid) {
-                        buttonsPressed[i] = true;
-
-                        if (this.menu.getBlockEntity() != null) {
-                            this.menu.getBlockEntity().clearFluidTank(i, isInput);
-
-                            PacketDistributor.sendToServer(new TankClearPacket(
-                                    this.menu.getBlockEntity().getBlockPos(),
-                                    i,
-                                    isInput
-                            ));
-                        }
-                        return true;
-                    }
-                }
-            }
-        }
-        return false;
-    }
-
     @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
         int x = (this.width - this.imageWidth) / 2;
         int y = (this.height - this.imageHeight) / 2;
 
-        if (this.handleInputAreaScroll(mouseX, mouseY, x, y, scrollY)) {
-            return true;
-        }
-
-        if (this.handleOutputAreaScroll(mouseX, mouseY, x, y, scrollY)) {
-            return true;
-        }
+        if (this.handleInputAreaScroll(mouseX, mouseY, x, y, scrollY)) return true;
+        if (this.handleOutputAreaScroll(mouseX, mouseY, x, y, scrollY)) return true;
 
         return super.mouseScrolled(mouseX, mouseY, scrollX, scrollY);
     }
 
-    /**
-     * 处理输入区域滚动
-     */
     private boolean handleInputAreaScroll(double mouseX, double mouseY, int x, int y, double scrollY) {
-        if (mouseX < x + FLUID_INPUT_AREA_X || mouseX >= x + FLUID_INPUT_AREA_X + FLUID_INPUT_AREA_WIDTH ||
-                mouseY < y + FLUID_INPUT_AREA_Y || mouseY >= y + FLUID_INPUT_AREA_Y + FLUID_INPUT_AREA_HEIGHT) {
+        if (!isInArea(mouseX, mouseY, x + FLUID_INPUT_AREA_X, y + FLUID_INPUT_AREA_Y,
+                FLUID_INPUT_AREA_WIDTH, FLUID_INPUT_AREA_HEIGHT)) {
             return false;
         }
 
         int visibleInputTanks = FLUID_INPUT_AREA_HEIGHT / (FLUID_TANK_HEIGHT + FLUID_TANK_SPACING);
 
-        if (AdvancedAlloyFurnaceBlockEntity.FLUID_TANK_COUNT <= visibleInputTanks) {
-            return false;
-        }
-
         if (scrollY > 0) {
             this.inputFluidScrollOffset = Math.max(0, this.inputFluidScrollOffset - 1);
         } else if (scrollY < 0) {
             this.inputFluidScrollOffset = Math.min(AdvancedAlloyFurnaceBlockEntity.FLUID_TANK_COUNT - visibleInputTanks,
-                                                   this.inputFluidScrollOffset + 1
-            );
+                    this.inputFluidScrollOffset + 1);
         }
         return true;
     }
@@ -551,152 +336,109 @@ public class AdvancedAlloyFurnaceScreen extends AbstractContainerScreen<Advanced
      * 处理输出区域滚动
      */
     private boolean handleOutputAreaScroll(double mouseX, double mouseY, int x, int y, double scrollY) {
-        if (mouseX < x + FLUID_OUTPUT_AREA_X || mouseX >= x + FLUID_OUTPUT_AREA_X + FLUID_OUTPUT_AREA_WIDTH ||
-                mouseY < y + FLUID_OUTPUT_AREA_Y || mouseY >= y + FLUID_OUTPUT_AREA_Y + FLUID_OUTPUT_AREA_HEIGHT) {
+        if (!isInArea(mouseX, mouseY, x + FLUID_OUTPUT_AREA_X, y + FLUID_OUTPUT_AREA_Y,
+                FLUID_OUTPUT_AREA_WIDTH, FLUID_OUTPUT_AREA_HEIGHT)) {
             return false;
         }
 
         int visibleOutputTanks = FLUID_OUTPUT_AREA_HEIGHT / (FLUID_TANK_HEIGHT + FLUID_TANK_SPACING);
-
-        if (AdvancedAlloyFurnaceBlockEntity.FLUID_TANK_COUNT <= visibleOutputTanks) {
-            return false;
-        }
 
         if (scrollY > 0) {
             this.outputFluidScrollOffset = Math.max(0, this.outputFluidScrollOffset - 1);
         } else if (scrollY < 0) {
             this.outputFluidScrollOffset = Math.min(
                     AdvancedAlloyFurnaceBlockEntity.FLUID_TANK_COUNT - visibleOutputTanks,
-                    this.outputFluidScrollOffset + 1
-            );
+                    this.outputFluidScrollOffset + 1);
         }
         return true;
     }
 
-    /**
-     * 渲染能量条
-     */
-    private void renderEnergyBar(GuiGraphics guiGraphics, int x, int y) {
-        if (this.menu == null) return;
+    private static boolean isInArea(double mouseX, double mouseY, int areaX, int areaY, int width, int height) {
+        return mouseX >= areaX && mouseX < areaX + width && mouseY >= areaY && mouseY < areaY + height;
+    }
 
+    private void renderEnergyBar(GuiGraphics guiGraphics, int x, int y) {
         int energyStored = this.menu.getEnergy();
         int maxEnergy = this.menu.getMaxEnergy();
 
-        if (maxEnergy > 0) {
-            float energyRatio = (float) energyStored / maxEnergy;
-            int energyWidth = (int) (ENERGY_BAR_WIDTH * energyRatio);
+        if (maxEnergy <= 0) return;
 
-            if (energyWidth > 0) {
-                guiGraphics.blit(COMPONENTS_TEXTURE,
-                                 x + ENERGY_BAR_X, y + ENERGY_BAR_Y,
-                                 ENERGY_BAR_U, ENERGY_BAR_V,
-                                 energyWidth, ENERGY_BAR_HEIGHT
-                );
-            }
+        float energyRatio = (float) energyStored / maxEnergy;
+        int energyWidth = (int) (ENERGY_BAR_WIDTH * energyRatio);
 
-            guiGraphics.blit(COMPONENTS_TEXTURE,
-                             x + ENERGY_MASK_X, y + ENERGY_MASK_Y,
-                             ENERGY_MASK_U, ENERGY_MASK_V,
-                             ENERGY_MASK_WIDTH, ENERGY_MASK_HEIGHT
-            );
+        if (energyWidth > 0) {
+            guiGraphics.blit(COMPONENTS_TEXTURE, x + ENERGY_BAR_X, y + ENERGY_BAR_Y,
+                    ENERGY_BAR_U, ENERGY_BAR_V, energyWidth, ENERGY_BAR_HEIGHT);
         }
+
+        guiGraphics.blit(COMPONENTS_TEXTURE, x + ENERGY_MASK_X, y + ENERGY_MASK_Y,
+                ENERGY_MASK_U, ENERGY_MASK_V, ENERGY_MASK_WIDTH, ENERGY_MASK_HEIGHT);
     }
 
-    /**
-     * 渲染进度条
-     */
     private void renderProgressBar(GuiGraphics guiGraphics, int x, int y) {
-        if (this.menu == null) return;
-
         int progress = this.menu.getProgress();
         int maxProgress = this.menu.getMaxProgress();
 
-        if (maxProgress > 0 && progress > 0) {
-            float progressRatio = (float) progress / maxProgress;
+        if (maxProgress <= 0 || progress <= 0) return;
 
-            int leftProgressHeight = (int) Math.ceil(PROGRESS_LEFT_HEIGHT * Math.min(1.0f, progressRatio * 2));
-            if (leftProgressHeight > 0) {
-                guiGraphics.blit(COMPONENTS_TEXTURE,
-                                 x + PROGRESS_LEFT_X, y + PROGRESS_LEFT_Y,
-                                 PROGRESS_LEFT_MASK_U, PROGRESS_LEFT_MASK_V,
-                                 PROGRESS_LEFT_WIDTH, leftProgressHeight
-                );
-            }
+        float progressRatio = (float) progress / maxProgress;
 
-            if (progressRatio > 0.5f) {
-                float secondSegmentRatio = (progressRatio - 0.5f) * 2;
-                int rightProgressHeight = (int) Math.ceil(PROGRESS_RIGHT_HEIGHT * secondSegmentRatio);
-                if (rightProgressHeight > 0) {
-                    guiGraphics.blit(COMPONENTS_TEXTURE,
-                                     x + PROGRESS_RIGHT_X, y + PROGRESS_RIGHT_Y,
-                                     PROGRESS_RIGHT_MASK_U, PROGRESS_RIGHT_MASK_V,
-                                     PROGRESS_RIGHT_WIDTH, rightProgressHeight
-                    );
-                }
+        int leftProgressHeight = (int) Math.ceil(PROGRESS_LEFT_HEIGHT * Math.min(1.0f, progressRatio * 2));
+        if (leftProgressHeight > 0) {
+            guiGraphics.blit(COMPONENTS_TEXTURE, x + PROGRESS_LEFT_X, y + PROGRESS_LEFT_Y,
+                    PROGRESS_LEFT_MASK_U, PROGRESS_LEFT_MASK_V, PROGRESS_LEFT_WIDTH, leftProgressHeight);
+        }
+
+        if (progressRatio > 0.5f) {
+            float secondSegmentRatio = (progressRatio - 0.5f) * 2;
+            int rightProgressHeight = (int) Math.ceil(PROGRESS_RIGHT_HEIGHT * secondSegmentRatio);
+            if (rightProgressHeight > 0) {
+                guiGraphics.blit(COMPONENTS_TEXTURE, x + PROGRESS_RIGHT_X, y + PROGRESS_RIGHT_Y,
+                        PROGRESS_RIGHT_MASK_U, PROGRESS_RIGHT_MASK_V, PROGRESS_RIGHT_WIDTH, rightProgressHeight);
             }
         }
     }
 
-    /**
-     * 渲染流体输入区域
-     */
     private void renderFluidInputArea(GuiGraphics guiGraphics, int x, int y) {
-        if (this.menu == null || this.menu.getBlockEntity() == null) return;
+        if (this.menu.getBlockEntity() == null) return;
 
         FluidAreaLayout layout = this.calculateFluidAreaLayout(FLUID_INPUT_AREA_X, FLUID_INPUT_AREA_Y,
-                                                               FLUID_INPUT_AREA_WIDTH, FLUID_INPUT_AREA_HEIGHT, x, y
-        );
+                FLUID_INPUT_AREA_WIDTH, FLUID_INPUT_AREA_HEIGHT, x, y);
 
         int maxOffset = Math.max(0, AdvancedAlloyFurnaceBlockEntity.FLUID_TANK_COUNT - layout.visibleTanks);
         this.inputFluidScrollOffset = Math.max(0, Math.min(this.inputFluidScrollOffset, maxOffset));
 
-        if (layout.visibleTanks > 0) {
-            for (int i = this.inputFluidScrollOffset;
-                 i < Math.min(AdvancedAlloyFurnaceBlockEntity.FLUID_TANK_COUNT,
-                              this.inputFluidScrollOffset + layout.visibleTanks
-                 );
-                 i++) {
-                int tankY = this.getFluidTankY(FLUID_INPUT_AREA_Y, layout.spacing, i, this.inputFluidScrollOffset, y);
-                int tankX = layout.startX;
-                int buttonX = layout.startX + FLUID_TANK_WIDTH + 1;
+        if (layout.visibleTanks <= 0) return;
 
-                guiGraphics.blit(COMPONENTS_TEXTURE,
-                                 tankX, tankY,
-                                 FLUID_TANK_U, FLUID_TANK_V,
-                                 FLUID_TANK_WIDTH, FLUID_TANK_HEIGHT
-                );
+        for (int i = this.inputFluidScrollOffset;
+             i < Math.min(AdvancedAlloyFurnaceBlockEntity.FLUID_TANK_COUNT, this.inputFluidScrollOffset + layout.visibleTanks);
+             i++) {
+            int tankY = this.getFluidTankY(FLUID_INPUT_AREA_Y, layout.spacing, i, this.inputFluidScrollOffset, y);
+            int tankX = layout.startX;
+            int buttonX = layout.startX + FLUID_TANK_WIDTH + 1;
 
-                FluidStack fluid = this.menu.getInputFluidTank(i).getFluid();
-                int capacity = this.menu.getInputFluidTank(i).getCapacity();
-                this.renderFluidTank(guiGraphics, tankX, tankY, fluid, capacity);
+            guiGraphics.blit(COMPONENTS_TEXTURE, tankX, tankY,
+                    FLUID_TANK_U, FLUID_TANK_V, FLUID_TANK_WIDTH, FLUID_TANK_HEIGHT);
 
-                guiGraphics.blit(COMPONENTS_TEXTURE,
-                                 tankX, tankY,
-                                 FLUID_TANK_MASK_U, FLUID_TANK_MASK_V,
-                                 FLUID_TANK_WIDTH, FLUID_TANK_HEIGHT
-                );
+            FluidStack fluid = this.menu.getInputFluidTank(i).getFluid();
+            int capacity = this.menu.getInputFluidTank(i).getCapacity();
+            this.renderFluidTank(guiGraphics, tankX, tankY, fluid, capacity);
 
-                this.renderTankClearButton(guiGraphics, buttonX, tankY, i, true);
-            }
+            guiGraphics.blit(COMPONENTS_TEXTURE, tankX, tankY,
+                    FLUID_TANK_MASK_U, FLUID_TANK_MASK_V, FLUID_TANK_WIDTH, FLUID_TANK_HEIGHT);
+
+            this.renderTankClearButton(guiGraphics, buttonX, tankY, i, true);
         }
     }
 
-    /**
-     * 渲染清空按钮
-     */
     private void renderTankClearButton(GuiGraphics guiGraphics, int x, int y, int tankIndex, boolean isInput) {
         boolean isPressed = isInput ?
                 this.inputTankClearButtonsPressed[tankIndex] :
                 this.outputTankClearButtonsPressed[tankIndex];
 
-        boolean hasFluid = false;
-        if (this.menu != null) {
-            if (isInput) {
-                hasFluid = !this.menu.getInputFluidTank(tankIndex).getFluid().isEmpty();
-            } else {
-                hasFluid = !this.menu.getOutputFluidTank(tankIndex).getFluid().isEmpty();
-            }
-        }
+        boolean hasFluid = isInput ?
+                !this.menu.getInputFluidTank(tankIndex).getFluid().isEmpty() :
+                !this.menu.getOutputFluidTank(tankIndex).getFluid().isEmpty();
 
         int u, v;
         if (hasFluid) {
@@ -707,66 +449,51 @@ public class AdvancedAlloyFurnaceScreen extends AbstractContainerScreen<Advanced
             v = isPressed ? TANK_CLEAR_BUTTON_PRESSED_V : TANK_CLEAR_BUTTON_V;
         }
 
-        guiGraphics.blit(COMPONENTS_TEXTURE, x, y, u, v,
-                         TANK_CLEAR_BUTTON_WIDTH, TANK_CLEAR_BUTTON_HEIGHT
-        );
+        guiGraphics.blit(COMPONENTS_TEXTURE, x, y, u, v, TANK_CLEAR_BUTTON_WIDTH, TANK_CLEAR_BUTTON_HEIGHT);
     }
 
-    /**
-     * 渲染输出流体槽
-     */
     private void renderOutputFluidTanks(GuiGraphics guiGraphics, int x, int y) {
-        if (this.menu == null || this.menu.getBlockEntity() == null) return;
+        if (this.menu.getBlockEntity() == null) return;
 
         FluidAreaLayout layout = this.calculateFluidAreaLayout(FLUID_OUTPUT_AREA_X, FLUID_OUTPUT_AREA_Y,
-                                                               FLUID_OUTPUT_AREA_WIDTH, FLUID_OUTPUT_AREA_HEIGHT, x, y
-        );
+                FLUID_OUTPUT_AREA_WIDTH, FLUID_OUTPUT_AREA_HEIGHT, x, y);
 
-        if (layout.visibleTanks > 0) {
-            for (int i = this.outputFluidScrollOffset;
-                 i < Math.min(AdvancedAlloyFurnaceBlockEntity.FLUID_TANK_COUNT,
-                              this.outputFluidScrollOffset + layout.visibleTanks
-                 );
-                 i++) {
-                int tankY = this.getFluidTankY(FLUID_OUTPUT_AREA_Y, layout.spacing, i, this.outputFluidScrollOffset, y);
-                int tankX = layout.startX;
-                int buttonX = layout.startX + FLUID_TANK_WIDTH + 1;
+        if (layout.visibleTanks <= 0) return;
 
-                guiGraphics.blit(COMPONENTS_TEXTURE,
-                                 tankX, tankY,
-                                 FLUID_TANK_U, FLUID_TANK_V,
-                                 FLUID_TANK_WIDTH, FLUID_TANK_HEIGHT
-                );
+        for (int i = this.outputFluidScrollOffset;
+             i < Math.min(AdvancedAlloyFurnaceBlockEntity.FLUID_TANK_COUNT, this.outputFluidScrollOffset + layout.visibleTanks);
+             i++) {
+            int tankY = this.getFluidTankY(FLUID_OUTPUT_AREA_Y, layout.spacing, i, this.outputFluidScrollOffset, y);
+            int tankX = layout.startX;
+            int buttonX = layout.startX + FLUID_TANK_WIDTH + 1;
 
-                FluidStack fluid = this.menu.getOutputFluidTank(i).getFluid();
-                int capacity = this.menu.getOutputFluidTank(i).getCapacity();
-                this.renderFluidTank(guiGraphics, tankX, tankY, fluid, capacity);
+            guiGraphics.blit(COMPONENTS_TEXTURE, tankX, tankY,
+                    FLUID_TANK_U, FLUID_TANK_V, FLUID_TANK_WIDTH, FLUID_TANK_HEIGHT);
 
-                guiGraphics.blit(COMPONENTS_TEXTURE,
-                                 tankX, tankY,
-                                 FLUID_TANK_MASK_U, FLUID_TANK_MASK_V,
-                                 FLUID_TANK_WIDTH, FLUID_TANK_HEIGHT
-                );
+            FluidStack fluid = this.menu.getOutputFluidTank(i).getFluid();
+            int capacity = this.menu.getOutputFluidTank(i).getCapacity();
+            this.renderFluidTank(guiGraphics, tankX, tankY, fluid, capacity);
 
-                this.renderTankClearButton(guiGraphics, buttonX, tankY, i, false);
-            }
+            guiGraphics.blit(COMPONENTS_TEXTURE, tankX, tankY,
+                    FLUID_TANK_MASK_U, FLUID_TANK_MASK_V, FLUID_TANK_WIDTH, FLUID_TANK_HEIGHT);
+
+            this.renderTankClearButton(guiGraphics, buttonX, tankY, i, false);
         }
     }
 
-    /**
-     * 渲染流体槽中的流体（从左往右填充）
-     */
     private void renderFluidTank(GuiGraphics guiGraphics, int x, int y, FluidStack fluidStack, int capacity) {
         if (fluidStack.isEmpty() || capacity <= 0) return;
 
         Fluid fluid = fluidStack.getFluid();
-        if (fluid == null || fluid == net.minecraft.world.level.material.Fluids.EMPTY) return;
+        if (fluid == Fluids.EMPTY) return;
 
         IClientFluidTypeExtensions fluidTypeExtensions = IClientFluidTypeExtensions.of(fluid);
         ResourceLocation stillTexture = fluidTypeExtensions.getStillTexture(fluidStack);
-        if (stillTexture == null) return;
 
-        TextureAtlasSprite sprite = this.minecraft.getTextureAtlas(InventoryMenu.BLOCK_ATLAS).apply(stillTexture);
+        TextureAtlasSprite sprite = null;
+        if (this.minecraft != null) {
+            sprite = this.minecraft.getTextureAtlas(InventoryMenu.BLOCK_ATLAS).apply(stillTexture);
+        }
         if (sprite == null) return;
 
         int fluidWidth = (int) ((float) fluidStack.getAmount() / capacity * FLUID_TANK_WIDTH);
@@ -806,13 +533,12 @@ public class AdvancedAlloyFurnaceScreen extends AbstractContainerScreen<Advanced
 
             float x1 = currentX;
             float x2 = currentX + drawWidth;
-            float y1 = y;
             float y2 = y + FLUID_TANK_HEIGHT;
 
             bufferBuilder.addVertex(x1, y2, 0).setUv(u0, v1);
             bufferBuilder.addVertex(x2, y2, 0).setUv(u1, v1);
-            bufferBuilder.addVertex(x2, y1, 0).setUv(u1, v0);
-            bufferBuilder.addVertex(x1, y1, 0).setUv(u0, v0);
+            bufferBuilder.addVertex(x2, (float) y, 0).setUv(u1, v0);
+            bufferBuilder.addVertex(x1, (float) y, 0).setUv(u0, v0);
 
             remainingWidth -= drawWidth;
             currentX += drawWidth;
@@ -825,195 +551,323 @@ public class AdvancedAlloyFurnaceScreen extends AbstractContainerScreen<Advanced
         guiGraphics.pose().popPose();
     }
 
-    /**
-     * 渲染指示灯
-     */
     private void renderIndicators(GuiGraphics guiGraphics, int x, int y) {
-        if (this.menu == null) return;
-
         int currentParallel = this.menu.getCurrentParallel();
 
         if (currentParallel > 1) {
-            guiGraphics.blit(COMPONENTS_TEXTURE,
-                             x + CATALYST_INDICATOR_X, y + CATALYST_INDICATOR_Y,
-                             LIT_INDICATOR_U, LIT_INDICATOR_V,
-                             INDICATOR_WIDTH, INDICATOR_HEIGHT
-            );
+            guiGraphics.blit(COMPONENTS_TEXTURE, x + CATALYST_INDICATOR_X, y + CATALYST_INDICATOR_Y,
+                    LIT_INDICATOR_U, LIT_INDICATOR_V, INDICATOR_WIDTH, INDICATOR_HEIGHT);
         }
 
         if (this.menu.hasMold()) {
-            guiGraphics.blit(COMPONENTS_TEXTURE,
-                             x + MOLD_INDICATOR_X, y + MOLD_INDICATOR_Y,
-                             LIT_INDICATOR_U, LIT_INDICATOR_V,
-                             INDICATOR_WIDTH, INDICATOR_HEIGHT
-            );
+            guiGraphics.blit(COMPONENTS_TEXTURE, x + MOLD_INDICATOR_X, y + MOLD_INDICATOR_Y,
+                    LIT_INDICATOR_U, LIT_INDICATOR_V, INDICATOR_WIDTH, INDICATOR_HEIGHT);
         }
     }
 
-    /**
-     * 渲染滑块
-     */
     private void renderSlider(GuiGraphics guiGraphics, int x, int y) {
         int visibleInputTanks = FLUID_INPUT_AREA_HEIGHT / (FLUID_TANK_HEIGHT + FLUID_TANK_SPACING);
 
-        if (AdvancedAlloyFurnaceBlockEntity.FLUID_TANK_COUNT > visibleInputTanks) {
-            float inputScrollRatio = (float) this.inputFluidScrollOffset / (AdvancedAlloyFurnaceBlockEntity.FLUID_TANK_COUNT - visibleInputTanks);
-            int inputSliderY = (int) (inputScrollRatio * (SLIDER_SLOT_HEIGHT - SLIDER_HEIGHT));
+        float inputScrollRatio = (float) this.inputFluidScrollOffset / (AdvancedAlloyFurnaceBlockEntity.FLUID_TANK_COUNT - visibleInputTanks);
+        int inputSliderY = (int) (inputScrollRatio * (SLIDER_SLOT_HEIGHT - SLIDER_HEIGHT));
 
-            guiGraphics.blit(COMPONENTS_TEXTURE,
-                             x + SLIDER_SLOT_X - (SLIDER_WIDTH - SLIDER_SLOT_WIDTH) / 2,
-                             y + SLIDER_SLOT_Y + inputSliderY,
-                             this.isDraggingInputSlider ? SLIDER_PRESSED_U : SLIDER_DEFAULT_U,
-                             this.isDraggingInputSlider ? SLIDER_PRESSED_V : SLIDER_DEFAULT_V,
-                             SLIDER_WIDTH, SLIDER_HEIGHT
-            );
-        }
+        guiGraphics.blit(COMPONENTS_TEXTURE,
+                x + SLIDER_SLOT_X - (SLIDER_WIDTH - SLIDER_SLOT_WIDTH) / 2,
+                y + SLIDER_SLOT_Y + inputSliderY,
+                this.isDraggingInputSlider ? SLIDER_PRESSED_U : SLIDER_DEFAULT_U,
+                this.isDraggingInputSlider ? SLIDER_PRESSED_V : SLIDER_DEFAULT_V,
+                SLIDER_WIDTH, SLIDER_HEIGHT);
 
         int visibleOutputTanks = FLUID_OUTPUT_AREA_HEIGHT / (FLUID_TANK_HEIGHT + FLUID_TANK_SPACING);
 
-        if (AdvancedAlloyFurnaceBlockEntity.FLUID_TANK_COUNT > visibleOutputTanks) {
-            float outputScrollRatio = (float) this.outputFluidScrollOffset / (AdvancedAlloyFurnaceBlockEntity.FLUID_TANK_COUNT - visibleOutputTanks);
-            int outputSliderY = (int) (outputScrollRatio * (OUTPUT_SLIDER_SLOT_HEIGHT - SLIDER_HEIGHT));
+        float outputScrollRatio = (float) this.outputFluidScrollOffset / (AdvancedAlloyFurnaceBlockEntity.FLUID_TANK_COUNT - visibleOutputTanks);
+        int outputSliderY = (int) (outputScrollRatio * (OUTPUT_SLIDER_SLOT_HEIGHT - SLIDER_HEIGHT));
 
-            guiGraphics.blit(COMPONENTS_TEXTURE,
-                             x + OUTPUT_SLIDER_SLOT_X - (SLIDER_WIDTH - OUTPUT_SLIDER_SLOT_WIDTH) / 2,
-                             y + OUTPUT_SLIDER_SLOT_Y + outputSliderY,
-                             this.isDraggingOutputSlider ? SLIDER_PRESSED_U : SLIDER_DEFAULT_U,
-                             this.isDraggingOutputSlider ? SLIDER_PRESSED_V : SLIDER_DEFAULT_V,
-                             SLIDER_WIDTH, SLIDER_HEIGHT
-            );
-        }
+        guiGraphics.blit(COMPONENTS_TEXTURE,
+                x + OUTPUT_SLIDER_SLOT_X - (SLIDER_WIDTH - OUTPUT_SLIDER_SLOT_WIDTH) / 2,
+                y + OUTPUT_SLIDER_SLOT_Y + outputSliderY,
+                this.isDraggingOutputSlider ? SLIDER_PRESSED_U : SLIDER_DEFAULT_U,
+                this.isDraggingOutputSlider ? SLIDER_PRESSED_V : SLIDER_DEFAULT_V,
+                SLIDER_WIDTH, SLIDER_HEIGHT);
     }
 
     /**
      * 渲染能量条悬停提示
      */
     private void renderEnergyTooltip(GuiGraphics guiGraphics, int mouseX, int mouseY, int x, int y) {
-        if (this.menu == null) return;
-
-        // 检查是否在能量条区域内
-        if (mouseX >= x + ENERGY_BAR_X && mouseX < x + ENERGY_BAR_X + ENERGY_BAR_WIDTH &&
-                mouseY >= y + ENERGY_BAR_Y && mouseY < y + ENERGY_BAR_Y + ENERGY_BAR_HEIGHT) {
-            List<Component> tooltip = new ArrayList<>();
-            tooltip.add(Component.literal("能量: " + this.menu.getEnergy() + " / " + this.menu.getMaxEnergy() + " FE"));
-            guiGraphics.renderTooltip(this.font, tooltip, Optional.empty(), mouseX, mouseY);
+        if (!isInArea(mouseX, mouseY, x + ENERGY_BAR_X, y + ENERGY_BAR_Y, ENERGY_BAR_WIDTH, ENERGY_BAR_HEIGHT)) {
+            return;
         }
+
+        List<Component> tooltip = new ArrayList<>();
+        tooltip.add(Component.translatable("gui.useless_mod.advanced_alloy_furnace.energy",
+                this.menu.getEnergy(), this.menu.getMaxEnergy()));
+        guiGraphics.renderTooltip(this.font, tooltip, Optional.empty(), mouseX, mouseY);
     }
 
     /**
      * 渲染进度条悬停提示
      */
     private void renderProgressTooltip(GuiGraphics guiGraphics, int mouseX, int mouseY, int x, int y) {
-        if (this.menu == null) return;
+        boolean overLeftProgress = isInArea(mouseX, mouseY, x + PROGRESS_LEFT_X, y + PROGRESS_LEFT_Y,
+                PROGRESS_LEFT_WIDTH, PROGRESS_LEFT_HEIGHT);
+        boolean overRightProgress = isInArea(mouseX, mouseY, x + PROGRESS_RIGHT_X, y + PROGRESS_RIGHT_Y,
+                PROGRESS_RIGHT_WIDTH, PROGRESS_RIGHT_HEIGHT);
 
-        // 检查是否在进度条区域内（左右两段进度条）
-        boolean overLeftProgress = mouseX >= x + PROGRESS_LEFT_X && mouseX < x + PROGRESS_LEFT_X + PROGRESS_LEFT_WIDTH &&
-                mouseY >= y + PROGRESS_LEFT_Y && mouseY < y + PROGRESS_LEFT_Y + PROGRESS_LEFT_HEIGHT;
-        boolean overRightProgress = mouseX >= x + PROGRESS_RIGHT_X && mouseX < x + PROGRESS_RIGHT_X + PROGRESS_RIGHT_WIDTH &&
-                mouseY >= y + PROGRESS_RIGHT_Y && mouseY < y + PROGRESS_RIGHT_Y + PROGRESS_RIGHT_HEIGHT;
+        if (!overLeftProgress && !overRightProgress) return;
 
-        if (overLeftProgress || overRightProgress) {
-            List<Component> tooltip = new ArrayList<>();
-            int progress = this.menu.getProgress();
-            int maxProgress = this.menu.getMaxProgress();
+        List<Component> tooltip = new ArrayList<>();
+        int progress = this.menu.getProgress();
+        int maxProgress = this.menu.getMaxProgress();
 
-            if (maxProgress > 0) {
-                float progressPercent = (float) progress / maxProgress * 100;
-                tooltip.add(Component.literal("进度: " + progress + "/" + maxProgress + " (" + String.format("%.1f",
-                                                                                                             progressPercent
-                ) + "%)"));
+        if (maxProgress > 0) {
+            float progressPercent = (float) progress / maxProgress * 100;
+            tooltip.add(Component.translatable("gui.useless_mod.advanced_alloy_furnace.progress",
+                    progress, maxProgress, String.format("%.1f", progressPercent)));
 
-                // 获取活跃状态（progress > 0 表示工作中）
-                boolean isActive = progress > 0 && progress < maxProgress;
-                tooltip.add(Component.literal("状态: " + (isActive ? "工作中" : "空闲"))
-                                     .withStyle(isActive ? ChatFormatting.GREEN : ChatFormatting.GRAY));
+            boolean isActive = progress > 0 && progress < maxProgress;
+            String statusKey = isActive
+                    ? "gui.useless_mod.advanced_alloy_furnace.status.active"
+                    : "gui.useless_mod.advanced_alloy_furnace.status.idle";
+            tooltip.add(Component.translatable("gui.useless_mod.advanced_alloy_furnace.status",
+                            Component.translatable(statusKey))
+                    .withStyle(isActive ? ChatFormatting.GREEN : ChatFormatting.GRAY));
 
-                // 添加并行数信息
-                tooltip.add(Component.literal(""));
-                tooltip.add(Component.literal("本次并行数: " + this.menu.getCurrentParallel())
-                                     .withStyle(ChatFormatting.YELLOW));
-                tooltip.add(Component.literal("当前最大并行数: " + this.menu.getMaxParallel())
-                                     .withStyle(ChatFormatting.BLUE));
+            tooltip.add(Component.empty());
+            tooltip.add(Component.translatable("gui.useless_mod.advanced_alloy_furnace.current_parallel",
+                            this.menu.getCurrentParallel())
+                    .withStyle(ChatFormatting.YELLOW));
+            tooltip.add(Component.translatable("gui.useless_mod.advanced_alloy_furnace.max_parallel",
+                            this.menu.getMaxParallel())
+                    .withStyle(ChatFormatting.BLUE));
 
-                // 添加JEI提示
-                tooltip.add(Component.literal(""));
-                tooltip.add(Component.literal("点击查看配方").withStyle(ChatFormatting.AQUA));
-            } else {
-                tooltip.add(Component.literal("没有活动进程"));
-                tooltip.add(Component.literal(""));
-                tooltip.add(Component.literal("点击查看配方").withStyle(ChatFormatting.AQUA));
-            }
-
-            guiGraphics.renderTooltip(this.font, tooltip, Optional.empty(), mouseX, mouseY);
+            tooltip.add(Component.empty());
+            tooltip.add(Component.translatable("gui.useless_mod.advanced_alloy_furnace.view_recipes")
+                    .withStyle(ChatFormatting.AQUA));
+        } else {
+            tooltip.add(Component.translatable("gui.useless_mod.advanced_alloy_furnace.no_process"));
+            tooltip.add(Component.empty());
+            tooltip.add(Component.translatable("gui.useless_mod.advanced_alloy_furnace.view_recipes")
+                    .withStyle(ChatFormatting.AQUA));
         }
+
+        guiGraphics.renderTooltip(this.font, tooltip, Optional.empty(), mouseX, mouseY);
     }
 
     /**
      * 渲染问号区域悬停提示（并行数信息）
      */
     private void renderTipsTooltip(GuiGraphics guiGraphics, int mouseX, int mouseY, int x, int y) {
-        if (this.menu == null) return;
-
-        // 检查是否在问号区域内
-        if (mouseX >= x + TIPS_AREA_X && mouseX < x + TIPS_AREA_X + TIPS_AREA_WIDTH &&
-                mouseY >= y + TIPS_AREA_Y && mouseY < y + TIPS_AREA_Y + TIPS_AREA_HEIGHT) {
-
-            List<Component> tooltip = new ArrayList<>();
-
-            int currentParallel = this.menu.getCurrentParallel();
-            int catalystMaxParallel = this.menu.getCatalystMaxParallel();
-
-            tooltip.add(Component.literal("并行数信息").withStyle(ChatFormatting.GOLD, ChatFormatting.BOLD));
-            tooltip.add(Component.literal(""));
-            tooltip.add(Component.literal("本次并行数: " + currentParallel).withStyle(ChatFormatting.YELLOW));
-            tooltip.add(Component.literal("当前最大并行数: " + catalystMaxParallel).withStyle(ChatFormatting.BLUE));
-
-            // 显示催化剂信息
-            if (this.menu.getBlockEntity() != null) {
-                AdvancedAlloyFurnaceBlockEntity entity = this.menu.getBlockEntity();
-                ItemStack catalyst = entity.getItemHandler().getStackInSlot(AdvancedAlloyFurnaceBlockEntity.CATALYST_SLOT);
-
-                if (!catalyst.isEmpty()) {
-                    tooltip.add(Component.literal(""));
-                    tooltip.add(Component.literal("催化剂: " + catalyst.getDisplayName().getString() + " (" + catalystMaxParallel + "倍)").withStyle(ChatFormatting.GREEN));
-                }
-            }
-
-            tooltip.add(Component.literal(""));
-            tooltip.add(Component.literal("并行数说明:").withStyle(ChatFormatting.GOLD));
-            tooltip.add(Component.literal("• 消耗和产出乘以并行数").withStyle(ChatFormatting.GRAY));
-            tooltip.add(Component.literal("• 处理时间保持不变").withStyle(ChatFormatting.GRAY));
-            tooltip.add(Component.literal("• 能量消耗乘以并行数").withStyle(ChatFormatting.GRAY));
-            tooltip.add(Component.literal("• 催化剂为可选项，可提高并行数").withStyle(ChatFormatting.GRAY));
-            tooltip.add(Component.literal("⚠ 普通催化剂会被消耗").withStyle(ChatFormatting.RED));
-
-            guiGraphics.renderTooltip(this.font, tooltip, Optional.empty(), mouseX, mouseY);
+        if (!isInArea(mouseX, mouseY, x + TIPS_AREA_X, y + TIPS_AREA_Y, TIPS_AREA_WIDTH, TIPS_AREA_HEIGHT)) {
+            return;
         }
+
+        List<Component> tooltip = new ArrayList<>();
+
+        int currentParallel = this.menu.getCurrentParallel();
+        int catalystMaxParallel = this.menu.getCatalystMaxParallel();
+
+        tooltip.add(Component.translatable("gui.useless_mod.advanced_alloy_furnace.parallel_info")
+                .withStyle(ChatFormatting.GOLD, ChatFormatting.BOLD));
+        tooltip.add(Component.empty());
+        tooltip.add(Component.translatable("gui.useless_mod.advanced_alloy_furnace.current_parallel", currentParallel)
+                .withStyle(ChatFormatting.YELLOW));
+        tooltip.add(Component.translatable("gui.useless_mod.advanced_alloy_furnace.max_parallel", catalystMaxParallel)
+                .withStyle(ChatFormatting.BLUE));
+
+        if (this.menu.getBlockEntity() != null) {
+            AdvancedAlloyFurnaceBlockEntity entity = this.menu.getBlockEntity();
+            ItemStack catalyst = entity.getItemHandler().getStackInSlot(AdvancedAlloyFurnaceBlockEntity.CATALYST_SLOT);
+
+            if (!catalyst.isEmpty()) {
+                tooltip.add(Component.empty());
+                tooltip.add(Component.translatable("gui.useless_mod.advanced_alloy_furnace.catalyst",
+                                catalyst.getDisplayName().getString(), catalystMaxParallel)
+                        .withStyle(ChatFormatting.GREEN));
+            }
+        }
+
+        tooltip.add(Component.empty());
+        tooltip.add(Component.translatable("gui.useless_mod.advanced_alloy_furnace.parallel_description.title")
+                .withStyle(ChatFormatting.GOLD));
+        tooltip.add(Component.translatable("gui.useless_mod.advanced_alloy_furnace.parallel_description.1")
+                .withStyle(ChatFormatting.GRAY));
+        tooltip.add(Component.translatable("gui.useless_mod.advanced_alloy_furnace.parallel_description.2")
+                .withStyle(ChatFormatting.GRAY));
+        tooltip.add(Component.translatable("gui.useless_mod.advanced_alloy_furnace.parallel_description.3")
+                .withStyle(ChatFormatting.GRAY));
+        tooltip.add(Component.translatable("gui.useless_mod.advanced_alloy_furnace.parallel_description.4")
+                .withStyle(ChatFormatting.GRAY));
+        tooltip.add(Component.translatable("gui.useless_mod.advanced_alloy_furnace.catalyst_warning")
+                .withStyle(ChatFormatting.RED));
+
+        guiGraphics.renderTooltip(this.font, tooltip, Optional.empty(), mouseX, mouseY);
     }
 
     /**
-     * 处理进度条点击（打开JEI配方）
+     * 渲染流体槽悬停提示
+     *
+     * @param isInput true表示输入槽，false表示输出槽
      */
-    private boolean handleProgressClick(double mouseX, double mouseY, int x, int y) {
-        // 检查是否在进度条区域内（左右两段进度条）
-        boolean overLeftProgress = mouseX >= x + PROGRESS_LEFT_X && mouseX < x + PROGRESS_LEFT_X + PROGRESS_LEFT_WIDTH &&
-                mouseY >= y + PROGRESS_LEFT_Y && mouseY < y + PROGRESS_LEFT_Y + PROGRESS_LEFT_HEIGHT;
-        boolean overRightProgress = mouseX >= x + PROGRESS_RIGHT_X && mouseX < x + PROGRESS_RIGHT_X + PROGRESS_RIGHT_WIDTH &&
-                mouseY >= y + PROGRESS_RIGHT_Y && mouseY < y + PROGRESS_RIGHT_Y + PROGRESS_RIGHT_HEIGHT;
+    private void renderFluidTankTooltip(GuiGraphics guiGraphics, int mouseX, int mouseY, int x, int y,
+                                        boolean isInput) {
+        int areaX = isInput ? FLUID_INPUT_AREA_X : FLUID_OUTPUT_AREA_X;
+        int areaY = isInput ? FLUID_INPUT_AREA_Y : FLUID_OUTPUT_AREA_Y;
+        int areaWidth = isInput ? FLUID_INPUT_AREA_WIDTH : FLUID_OUTPUT_AREA_WIDTH;
+        int areaHeight = isInput ? FLUID_INPUT_AREA_HEIGHT : FLUID_OUTPUT_AREA_HEIGHT;
+        int scrollOffset = isInput ? this.inputFluidScrollOffset : this.outputFluidScrollOffset;
 
-        if (overLeftProgress || overRightProgress) {
-            // 检查JEI是否加载，然后通过compat模块打开配方界面
-            if (ModList.get().isLoaded("jei")) {
-                com.sorrowmist.useless.compat.jei.JEIPlugin.showAdvancedAlloyFurnaceRecipes();
+        FluidAreaLayout layout = this.calculateFluidAreaLayout(areaX, areaY, areaWidth, areaHeight, x, y);
+
+        if (layout.visibleTanks <= 0) return;
+
+        for (int i = scrollOffset; i < Math.min(AdvancedAlloyFurnaceBlockEntity.FLUID_TANK_COUNT,
+                scrollOffset + layout.visibleTanks); i++) {
+            int tankY = this.getFluidTankY(areaY, layout.spacing, i, scrollOffset, y);
+            int tankX = layout.startX;
+
+            if (!isInArea(mouseX, mouseY, tankX, tankY, FLUID_TANK_WIDTH, FLUID_TANK_HEIGHT)) continue;
+
+            FluidStack fluid = isInput ?
+                    this.menu.getInputFluidTank(i).getFluid() :
+                    this.menu.getOutputFluidTank(i).getFluid();
+            int capacity = isInput ?
+                    this.menu.getInputFluidTank(i).getCapacity() :
+                    this.menu.getOutputFluidTank(i).getCapacity();
+
+            if (!fluid.isEmpty()) {
+                Component fluidName = fluid.getHoverName();
+                Component amountText = Component.translatable("gui.useless_mod.advanced_alloy_furnace.fluid_amount",
+                        String.format("%,d", fluid.getAmount()),
+                        String.format("%,d", capacity));
+
+                guiGraphics.renderTooltip(this.font, List.of(fluidName, amountText),
+                        Optional.empty(), mouseX, mouseY);
             }
+            break;
+        }
+    }
+
+    private boolean handleProgressClick(double mouseX, double mouseY, int x, int y) {
+        boolean overLeftProgress = isInArea(mouseX, mouseY, x + PROGRESS_LEFT_X, y + PROGRESS_LEFT_Y,
+                PROGRESS_LEFT_WIDTH, PROGRESS_LEFT_HEIGHT);
+        boolean overRightProgress = isInArea(mouseX, mouseY, x + PROGRESS_RIGHT_X, y + PROGRESS_RIGHT_Y,
+                PROGRESS_RIGHT_WIDTH, PROGRESS_RIGHT_HEIGHT);
+
+        if (!overLeftProgress && !overRightProgress) return false;
+
+        if (ModList.get().isLoaded("jei")) {
+            com.sorrowmist.useless.compat.jei.JEIPlugin.showAdvancedAlloyFurnaceRecipes();
+        }
+        return true;
+    }
+
+    private boolean handleInputSliderClick(double mouseX, double mouseY, int x, int y) {
+        int visibleInputTanks = FLUID_INPUT_AREA_HEIGHT / (FLUID_TANK_HEIGHT + FLUID_TANK_SPACING);
+
+        float inputScrollRatio = (float) this.inputFluidScrollOffset / (AdvancedAlloyFurnaceBlockEntity.FLUID_TANK_COUNT - visibleInputTanks);
+        int inputSliderY = (int) (inputScrollRatio * (SLIDER_SLOT_HEIGHT - SLIDER_HEIGHT));
+        int sliderX = x + SLIDER_SLOT_X - (SLIDER_WIDTH - SLIDER_SLOT_WIDTH) / 2;
+        int sliderY = y + SLIDER_SLOT_Y + inputSliderY;
+
+        if (isInArea(mouseX, mouseY, sliderX, sliderY, SLIDER_WIDTH, SLIDER_HEIGHT)) {
+            this.isDraggingInputSlider = true;
+            this.draggedInputSliderY = (int) mouseY - sliderY;
+            return true;
+        }
+
+        if (isInArea(mouseX, mouseY, x + SLIDER_SLOT_X, y + SLIDER_SLOT_Y, SLIDER_SLOT_WIDTH, SLIDER_SLOT_HEIGHT)) {
+            int clickY = (int) mouseY - (y + SLIDER_SLOT_Y) - SLIDER_HEIGHT / 2;
+            int maxScroll = SLIDER_SLOT_HEIGHT - SLIDER_HEIGHT;
+            this.inputFluidScrollOffset = Math.max(0, Math.min(
+                    AdvancedAlloyFurnaceBlockEntity.FLUID_TANK_COUNT - visibleInputTanks,
+                    (int) ((float) clickY / maxScroll * (AdvancedAlloyFurnaceBlockEntity.FLUID_TANK_COUNT - visibleInputTanks))));
             return true;
         }
 
         return false;
     }
 
-    /**
-     * 流体区域布局信息
-     */
+    private boolean handleOutputSliderClick(double mouseX, double mouseY, int x, int y) {
+        int visibleOutputTanks = FLUID_OUTPUT_AREA_HEIGHT / (FLUID_TANK_HEIGHT + FLUID_TANK_SPACING);
+
+        float outputScrollRatio = (float) this.outputFluidScrollOffset / (AdvancedAlloyFurnaceBlockEntity.FLUID_TANK_COUNT - visibleOutputTanks);
+        int outputSliderY = (int) (outputScrollRatio * (OUTPUT_SLIDER_SLOT_HEIGHT - SLIDER_HEIGHT));
+        int sliderX = x + OUTPUT_SLIDER_SLOT_X - (SLIDER_WIDTH - OUTPUT_SLIDER_SLOT_WIDTH) / 2;
+        int sliderY = y + OUTPUT_SLIDER_SLOT_Y + outputSliderY;
+
+        if (isInArea(mouseX, mouseY, sliderX, sliderY, SLIDER_WIDTH, SLIDER_HEIGHT)) {
+            this.isDraggingOutputSlider = true;
+            this.draggedOutputSliderY = (int) mouseY - sliderY;
+            return true;
+        }
+
+        if (isInArea(mouseX, mouseY, x + OUTPUT_SLIDER_SLOT_X, y + OUTPUT_SLIDER_SLOT_Y,
+                OUTPUT_SLIDER_SLOT_WIDTH, OUTPUT_SLIDER_SLOT_HEIGHT)) {
+            int clickY = (int) mouseY - (y + OUTPUT_SLIDER_SLOT_Y) - SLIDER_HEIGHT / 2;
+            int maxScroll = OUTPUT_SLIDER_SLOT_HEIGHT - SLIDER_HEIGHT;
+            this.outputFluidScrollOffset = Math.max(0, Math.min(
+                    AdvancedAlloyFurnaceBlockEntity.FLUID_TANK_COUNT - visibleOutputTanks,
+                    (int) ((float) clickY / maxScroll * (AdvancedAlloyFurnaceBlockEntity.FLUID_TANK_COUNT - visibleOutputTanks))));
+            return true;
+        }
+
+        return false;
+    }
+
+    private boolean checkTankClearButtonClick(double mouseX, double mouseY, int x, int y, boolean isInput) {
+        int areaX = isInput ? FLUID_INPUT_AREA_X : FLUID_OUTPUT_AREA_X;
+        int areaY = isInput ? FLUID_INPUT_AREA_Y : FLUID_OUTPUT_AREA_Y;
+        int areaWidth = isInput ? FLUID_INPUT_AREA_WIDTH : FLUID_OUTPUT_AREA_WIDTH;
+        int areaHeight = isInput ? FLUID_INPUT_AREA_HEIGHT : FLUID_OUTPUT_AREA_HEIGHT;
+        int scrollOffset = isInput ? this.inputFluidScrollOffset : this.outputFluidScrollOffset;
+        boolean[] buttonsPressed = isInput ? this.inputTankClearButtonsPressed : this.outputTankClearButtonsPressed;
+
+        FluidAreaLayout layout = this.calculateFluidAreaLayout(areaX, areaY, areaWidth, areaHeight, x, y);
+
+        if (layout.visibleTanks <= 0) return false;
+
+        for (int i = scrollOffset; i < Math.min(AdvancedAlloyFurnaceBlockEntity.FLUID_TANK_COUNT,
+                scrollOffset + layout.visibleTanks); i++) {
+            int tankY = this.getFluidTankY(areaY, layout.spacing, i, scrollOffset, y);
+            int buttonX = layout.startX + FLUID_TANK_WIDTH + 1;
+
+            if (isInArea(mouseX, mouseY, buttonX, tankY, TANK_CLEAR_BUTTON_WIDTH, TANK_CLEAR_BUTTON_HEIGHT)) {
+                buttonsPressed[i] = true;
+
+                FluidStack fluid = isInput ?
+                        this.menu.getInputFluidTank(i).getFluid() :
+                        this.menu.getOutputFluidTank(i).getFluid();
+
+                if (!fluid.isEmpty()) {
+                    PacketDistributor.sendToServer(new TankClearPacket(
+                            this.menu.getBlockEntity().getBlockPos(), i, isInput));
+                }
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private FluidAreaLayout calculateFluidAreaLayout(int areaX, int areaY, int areaWidth, int areaHeight, int x, int y) {
+        int visibleTanks = areaHeight / (FLUID_TANK_HEIGHT + FLUID_TANK_SPACING);
+        int totalWidth = FLUID_TANK_WIDTH + 1 + TANK_CLEAR_BUTTON_WIDTH;
+
+        if (visibleTanks <= 0) {
+            return new FluidAreaLayout(0, 0, 0, totalWidth);
+        }
+
+        int totalTankHeight = visibleTanks * FLUID_TANK_HEIGHT;
+        int totalSpacing = areaHeight - totalTankHeight;
+        int spacing = visibleTanks > 1 ? totalSpacing / (visibleTanks + 1) : totalSpacing / 2;
+        int startX = x + areaX + (areaWidth - totalWidth) / 2;
+
+        return new FluidAreaLayout(visibleTanks, spacing, startX, totalWidth);
+    }
+
+    private int getFluidTankY(int areaY, int spacing, int tankIndex, int scrollOffset, int y) {
+        return y + areaY + spacing + (tankIndex - scrollOffset) * (FLUID_TANK_HEIGHT + spacing);
+    }
+
     private record FluidAreaLayout(int visibleTanks, int spacing, int startX, int totalWidth) {}
 }

@@ -35,16 +35,25 @@ public class AdvancedAlloyFurnaceBlock extends Block implements EntityBlock {
     private static final DirectionProperty FACING = BlockStateProperties.HORIZONTAL_FACING;
     private static final BooleanProperty ACTIVE = BooleanProperty.create("active");
 
+    /**
+     * 获取活跃状态属性（用于方块实体更新光照）
+     *
+     * @return 活跃状态属性
+     */
+    public static BooleanProperty getActiveProperty() {
+        return ACTIVE;
+    }
+
     public AdvancedAlloyFurnaceBlock() {
         super(BlockBehaviour.Properties.of()
-                                       .noOcclusion()
-                                       .strength(5.0F, 32768.0F)
-                                       .requiresCorrectToolForDrops()
-                                       .lightLevel(state -> state.getValue(ACTIVE) ? 15 : 7));
+                .noOcclusion()
+                .strength(5.0F, 32768.0F)
+                .requiresCorrectToolForDrops()
+                .lightLevel(state -> state.getValue(ACTIVE) ? 15 : 7));
 
         this.registerDefaultState(this.stateDefinition.any()
-                                                      .setValue(FACING, Direction.NORTH)
-                                                      .setValue(ACTIVE, false));
+                .setValue(FACING, Direction.NORTH)
+                .setValue(ACTIVE, false));
     }
 
     @Override
@@ -149,22 +158,28 @@ public class AdvancedAlloyFurnaceBlock extends Block implements EntityBlock {
 
         // 流体交互
         IFluidHandler fluidHandler = level.getCapability(Capabilities.FluidHandler.BLOCK, pos, null);
-        if (fluidHandler != null) {
-            boolean isFluidContainer = !stack.isEmpty() &&
-                    (stack.getCapability(Capabilities.FluidHandler.ITEM) != null ||
-                            FluidUtil.getFluidContained(stack).isPresent());
-
-            if (isFluidContainer) {
-                boolean success = FluidUtil.interactWithFluidHandler(player, hand, fluidHandler);
-                if (success) {
-                    return ItemInteractionResult.SUCCESS;
-                }
+        if (fluidHandler != null && isFluidContainer(stack)) {
+            boolean success = FluidUtil.interactWithFluidHandler(player, hand, fluidHandler);
+            if (success) {
+                return ItemInteractionResult.SUCCESS;
             }
         }
 
         // 打开GUI
         player.openMenu(this.getMenuProvider(state, level, pos), pos);
         return ItemInteractionResult.CONSUME;
+    }
+
+    /**
+     * 检查物品是否是流体容器
+     *
+     * @param stack 物品堆
+     * @return 如果是流体容器返回true
+     */
+    private static boolean isFluidContainer(ItemStack stack) {
+        if (stack.isEmpty()) return false;
+        return stack.getCapability(Capabilities.FluidHandler.ITEM) != null
+                || FluidUtil.getFluidContained(stack).isPresent();
     }
 
     @Override
@@ -186,7 +201,7 @@ public class AdvancedAlloyFurnaceBlock extends Block implements EntityBlock {
                                                                   @NotNull BlockEntityType<T> type) {
         return level.isClientSide ? null : (lvl, pos, st, be) -> {
             if (be instanceof AdvancedAlloyFurnaceBlockEntity furnace) {
-                AdvancedAlloyFurnaceBlockEntity.tick(lvl, pos, st, furnace);
+                AdvancedAlloyFurnaceBlockEntity.tick(lvl, furnace);
             }
         };
     }

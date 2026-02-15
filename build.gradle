@@ -101,6 +101,7 @@ neoForge {
             gameDirectory = project.file('run/client')
             // Comma-separated list of namespaces to load gametests from. Empty = all namespaces.
             systemProperty 'neoforge.enabledGameTestNamespaces', project.mod_id
+            jvmArguments.addAll '-Xmx3G', '-Xms3G'
         }
 
         server {
@@ -108,6 +109,7 @@ neoForge {
             gameDirectory = project.file('run/server')
             programArgument '--nogui'
             systemProperty 'neoforge.enabledGameTestNamespaces', project.mod_id
+            jvmArguments.addAll '-Xmx3G', '-Xms3G'
         }
 
         // This run config launches GameTestServer and runs all registered gametests, then exits.
@@ -171,10 +173,10 @@ dependencies {
 //    implementation "dev.shadowsoffire:Apotheosis:1.21.1-8.1.0"
 
     implementation "curse.maven:glodium-957920:5821676"
-    implementation "org.appliedenergistics:appliedenergistics2:19.2.15"
+    implementation "org.appliedenergistics:appliedenergistics2:19.2.16"
     implementation "org.appliedenergistics:guideme:2.5.1"
 
-    implementation "de.mari_023:ae2wtlib_api:19.2.0"
+    implementation "de.mari_023:ae2wtlib_api:19.2.5"
 //    implementation "curse.maven:curios-309927:6073321"
     implementation "top.theillusivec4.curios:curios-neoforge:9.5.1+1.21.1:api"
     implementation "curse.maven:ex-pattern-provider-892005:6863556"
@@ -207,7 +209,7 @@ dependencies {
 
     // runtime test
     runtimeOnly "curse.maven:applied-flux-965012:5614830"
-    runtimeOnly "de.mari_023:ae2wtlib:19.2.1"
+    runtimeOnly "de.mari_023:ae2wtlib:19.2.5"
     runtimeOnly "curse.maven:jade-324717:6853386"
 
     //geckolib

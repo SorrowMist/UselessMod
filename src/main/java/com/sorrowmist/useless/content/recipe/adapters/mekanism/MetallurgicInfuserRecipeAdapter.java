@@ -37,7 +37,7 @@ public class MetallurgicInfuserRecipeAdapter implements IRecipeAdapter<ItemStack
     // Mekanism 冶金灌注机基础能量消耗
     // 处理时间：10 ticks (0.5秒)
     private static final int MEK_ENERGY_PER_TICK = 50;
-    private static final int MEK_PROCESS_TICKS = 10;
+    private static final int MEK_PROCESS_TICKS = 20;
     private static final int TOTAL_ENERGY = MEK_ENERGY_PER_TICK * MEK_PROCESS_TICKS; // 500
 
     // 化学品到物品的转换比例定义

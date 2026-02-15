@@ -1,41 +1,28 @@
 package com.sorrowmist.useless.compat.jei;
 
-import com.mojang.blaze3d.systems.RenderSystem;
-import com.mojang.blaze3d.vertex.PoseStack;
 import com.sorrowmist.useless.UselessMod;
 import com.sorrowmist.useless.content.recipe.AdvancedAlloyFurnaceRecipe;
 import com.sorrowmist.useless.content.recipe.CountedIngredient;
 import com.sorrowmist.useless.init.ModBlocks;
 import com.sorrowmist.useless.init.ModTags;
 import com.sorrowmist.useless.utils.CatalystParallelManager;
-import mezz.jei.api.constants.VanillaTypes;
 import mezz.jei.api.gui.builder.IRecipeLayoutBuilder;
 import mezz.jei.api.gui.builder.ITooltipBuilder;
 import mezz.jei.api.gui.drawable.IDrawable;
 import mezz.jei.api.gui.ingredient.IRecipeSlotsView;
-import mezz.jei.api.gui.widgets.IRecipeExtrasBuilder;
 import mezz.jei.api.helpers.IGuiHelper;
-import mezz.jei.api.ingredients.IIngredientRenderer;
-import mezz.jei.api.neoforge.NeoForgeTypes;
 import mezz.jei.api.recipe.IFocusGroup;
 import mezz.jei.api.recipe.RecipeIngredientRole;
 import mezz.jei.api.recipe.RecipeType;
 import mezz.jei.api.recipe.category.IRecipeCategory;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.player.LocalPlayer;
-import net.minecraft.client.renderer.RenderType;
-import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
-import net.minecraft.util.Mth;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.TooltipFlag;
 import net.minecraft.world.item.crafting.Ingredient;
-import net.neoforged.neoforge.client.ItemDecoratorHandler;
 import net.neoforged.neoforge.fluids.FluidStack;
 import org.jetbrains.annotations.NotNull;
 
@@ -117,12 +104,10 @@ public class AdvancedAlloyFurnaceRecipeCategory implements IRecipeCategory<Advan
     private final Component title;
     private final int width;
     private final int height;
-    private final IGuiHelper guiHelper;
 
     AdvancedAlloyFurnaceRecipeCategory(IGuiHelper guiHelper) {
         this.width = DISPLAY_WIDTH;
         this.height = DISPLAY_HEIGHT;
-        this.guiHelper = guiHelper;
 
         // 创建背景，使用JEI贴图
         this.background = guiHelper.createDrawable(
@@ -136,12 +121,12 @@ public class AdvancedAlloyFurnaceRecipeCategory implements IRecipeCategory<Advan
     }
 
     @Override
-    public RecipeType<AdvancedAlloyFurnaceRecipe> getRecipeType() {
+    public @NotNull RecipeType<AdvancedAlloyFurnaceRecipe> getRecipeType() {
         return TYPE;
     }
 
     @Override
-    public Component getTitle() {
+    public @NotNull Component getTitle() {
         return this.title;
     }
 
@@ -161,7 +146,7 @@ public class AdvancedAlloyFurnaceRecipeCategory implements IRecipeCategory<Advan
     }
 
     @Override
-    public void setRecipe(IRecipeLayoutBuilder builder, AdvancedAlloyFurnaceRecipe recipe, IFocusGroup focuses) {
+    public void setRecipe(@NotNull IRecipeLayoutBuilder builder, @NotNull AdvancedAlloyFurnaceRecipe recipe, @NotNull IFocusGroup focuses) {
         // 计算配方相关的并行数信息
         int targetTier = getTargetUselessIngotTier(recipe);
         boolean isUselessRecipe = targetTier > 0;
@@ -183,7 +168,7 @@ public class AdvancedAlloyFurnaceRecipeCategory implements IRecipeCategory<Advan
                 ItemStack[] displayStacks = new ItemStack[matchingStacks.length];
                 for (int j = 0; j < matchingStacks.length; j++) {
                     ItemStack displayStack = matchingStacks[j].copy();
-                    displayStack.setCount(Math.min(count, Integer.MAX_VALUE));
+                    displayStack.setCount(count);
                     displayStacks[j] = displayStack;
                 }
 
@@ -191,7 +176,11 @@ public class AdvancedAlloyFurnaceRecipeCategory implements IRecipeCategory<Advan
 
                 builder.addSlot(RecipeIngredientRole.INPUT, x, y)
                        .addIngredients(displayIngredient)
-                       .setCustomRenderer(VanillaTypes.ITEM_STACK, new ItemStackRenderer());
+                       .addRichTooltipCallback((slot, tooltip) -> {
+                           if (count > 1) {
+                               tooltip.add(Component.translatable("jei.useless_mod.tooltip.amount", formatCount(count)).withStyle(ChatFormatting.GRAY));
+                           }
+                       });
             }
         }
 
@@ -203,12 +192,19 @@ public class AdvancedAlloyFurnaceRecipeCategory implements IRecipeCategory<Advan
             int x = OUTPUT_SLOTS_START_X + col * INPUT_SLOT_SPACING_X;
             int y = OUTPUT_SLOTS_START_Y + row * INPUT_SLOT_SPACING_Y;
 
+            ItemStack outputStack = outputs.get(i);
+            int count = outputStack.getCount();
+
             builder.addSlot(RecipeIngredientRole.OUTPUT, x, y)
-                    .addItemStack(outputs.get(i))
-                   .setCustomRenderer(VanillaTypes.ITEM_STACK, new ItemStackRenderer());
+                    .addItemStack(outputStack)
+                    .addRichTooltipCallback((slot, tooltip) -> {
+                        if (count > 1) {
+                            tooltip.add(Component.translatable("jei.useless_mod.tooltip.amount", formatCount(count)).withStyle(ChatFormatting.GRAY));
+                        }
+                    });
         }
 
-        // 输入流体槽 - 使用自定义渲染器显示数量
+        // 输入流体槽 - 使用JEI内置流体渲染器
         List<FluidStack> inputFluids = recipe.inputFluids();
         if (!inputFluids.isEmpty()) {
             int fluidCount = inputFluids.size();
@@ -217,17 +213,18 @@ public class AdvancedAlloyFurnaceRecipeCategory implements IRecipeCategory<Advan
             for (int i = 0; i < fluidCount; i++) {
                 FluidStack fluid = inputFluids.get(i);
                 int x = FLUID_INPUT_X + i * fluidWidth;
+                int amount = fluid.getAmount();
+
                 builder.addSlot(RecipeIngredientRole.INPUT, x, FLUID_INPUT_Y)
-                       .addFluidStack(fluid.getFluid(), fluid.getAmount())
-                       .setCustomRenderer(NeoForgeTypes.FLUID_STACK,
-                                          new FluidStackRenderer(fluid.getAmount(), true, fluidWidth,
-                                                                 FLUID_INPUT_HEIGHT
-                                          )
-                       );
+                       .setFluidRenderer(amount, false, fluidWidth, FLUID_INPUT_HEIGHT)
+                       .addFluidStack(fluid.getFluid(), amount)
+                       .addRichTooltipCallback((slot, tooltip) -> {
+                           tooltip.add(Component.translatable("jei.useless_mod.tooltip.amount.mb", formatCount(amount)).withStyle(ChatFormatting.GRAY));
+                       });
             }
         }
 
-        // 输出流体槽 - 使用自定义渲染器显示数量
+        // 输出流体槽 - 使用JEI内置流体渲染器
         List<FluidStack> outputFluids = recipe.outputFluids();
         if (!outputFluids.isEmpty()) {
             int fluidCount = outputFluids.size();
@@ -236,13 +233,14 @@ public class AdvancedAlloyFurnaceRecipeCategory implements IRecipeCategory<Advan
             for (int i = 0; i < fluidCount; i++) {
                 FluidStack fluid = outputFluids.get(i);
                 int x = FLUID_OUTPUT_X + i * fluidWidth;
+                int amount = fluid.getAmount();
+
                 builder.addSlot(RecipeIngredientRole.OUTPUT, x, FLUID_OUTPUT_Y)
-                       .addFluidStack(fluid.getFluid(), fluid.getAmount())
-                       .setCustomRenderer(NeoForgeTypes.FLUID_STACK,
-                                          new FluidStackRenderer(fluid.getAmount(), true, fluidWidth,
-                                                                 FLUID_OUTPUT_HEIGHT
-                                          )
-                       );
+                       .setFluidRenderer(amount, false, fluidWidth, FLUID_OUTPUT_HEIGHT)
+                       .addFluidStack(fluid.getFluid(), amount)
+                       .addRichTooltipCallback((slot, tooltip) -> {
+                           tooltip.add(Component.translatable("jei.useless_mod.tooltip.amount.mb", formatCount(amount)).withStyle(ChatFormatting.GRAY));
+                       });
             }
         }
 
@@ -269,31 +267,35 @@ public class AdvancedAlloyFurnaceRecipeCategory implements IRecipeCategory<Advan
         }
 
         if (!catalystStacks.isEmpty()) {
-            builder.addSlot(RecipeIngredientRole.CATALYST,
-                            CATALYST_SLOT_X, CATALYST_SLOT_Y
-                   )
+            builder.addSlot(RecipeIngredientRole.CATALYST, CATALYST_SLOT_X, CATALYST_SLOT_Y)
                    .addIngredients(Ingredient.of(catalystStacks.toArray(new ItemStack[0])))
-                   .setCustomRenderer(VanillaTypes.ITEM_STACK, new ItemStackRenderer());
+                   .addRichTooltipCallback((slot, tooltip) -> {
+                       tooltip.add(Component.translatable("jei.useless_mod.tooltip.catalyst").withStyle(ChatFormatting.GOLD));
+                       int tier = getTargetUselessIngotTier(recipe);
+                       if (tier > 0) {
+                           // 无用锭配方：显示跨阶合成信息
+                           tooltip.add(Component.translatable("jei.useless_mod.tooltip.catalyst.useless_ingot.title").withStyle(ChatFormatting.YELLOW));
+                           tooltip.add(Component.translatable("jei.useless_mod.tooltip.catalyst.useless_ingot.desc1").withStyle(ChatFormatting.GRAY));
+                           tooltip.add(Component.translatable("jei.useless_mod.tooltip.catalyst.useless_ingot.desc2").withStyle(ChatFormatting.GREEN));
+                           tooltip.add(Component.translatable("jei.useless_mod.tooltip.catalyst.useless_ingot.warning").withStyle(ChatFormatting.RED));
+                       } else if (!isUselessRecipe) {
+                           // 普通配方
+                           tooltip.add(Component.translatable("jei.useless_mod.tooltip.catalyst.normal.desc1").withStyle(ChatFormatting.GRAY));
+                           tooltip.add(Component.translatable("jei.useless_mod.tooltip.catalyst.normal.warning").withStyle(ChatFormatting.RED));
+                           tooltip.add(Component.translatable("jei.useless_mod.tooltip.catalyst.normal.desc2").withStyle(ChatFormatting.GRAY));
+                       }
+                   });
         }
 
         // 模具槽位
         if (!recipe.mold().isEmpty()) {
-            builder.addSlot(RecipeIngredientRole.CATALYST,
-                            MOLD_SLOT_X, MOLD_SLOT_Y
-                   )
-                   .addIngredients(recipe.mold())
-                   .setCustomRenderer(VanillaTypes.ITEM_STACK, new ItemStackRenderer());
+            builder.addSlot(RecipeIngredientRole.CATALYST, MOLD_SLOT_X, MOLD_SLOT_Y)
+                   .addIngredients(recipe.mold());
         }
     }
 
     @Override
-    public void createRecipeExtras(IRecipeExtrasBuilder builder, AdvancedAlloyFurnaceRecipe recipe,
-                                   IFocusGroup focuses) {
-        // 不需要额外的遮罩，因为贴图已经包含了所有视觉元素
-    }
-
-    @Override
-    public void draw(AdvancedAlloyFurnaceRecipe recipe, IRecipeSlotsView recipeSlotsView, GuiGraphics guiGraphics, double mouseX, double mouseY) {
+    public void draw(@NotNull AdvancedAlloyFurnaceRecipe recipe, @NotNull IRecipeSlotsView recipeSlotsView, @NotNull GuiGraphics guiGraphics, double mouseX, double mouseY) {
         // 绘制背景
         this.background.draw(guiGraphics);
 
@@ -340,12 +342,12 @@ public class AdvancedAlloyFurnaceRecipeCategory implements IRecipeCategory<Advan
 
         // 只有当配方允许通用催化剂（非特定催化剂）时才显示提示
         // 无用锭配方有特定的催化剂要求，不显示此提示
-        if (!recipe.catalyst().isEmpty() && !this.isUselessIngotRecipe(recipe)) {
+        if (!recipe.catalyst().isEmpty() && this.isUselessIngotRecipe(recipe)) {
             guiGraphics.pose().pushPose();
             float scale = 0.7f;
             guiGraphics.pose().scale(scale, scale, 1.0f);
 
-            String catalystText = "无用锭为可选催化剂";
+            String catalystText = Component.translatable("jei.useless_mod.gui.catalyst_optional").getString();
             int textWidth = minecraft.font.width(catalystText);
             int centeredX = (int) ((DISPLAY_WIDTH / 2.0f - textWidth * scale / 2) / scale);
             int y = (int) (CATALYST_TEXT_Y / scale);
@@ -360,7 +362,7 @@ public class AdvancedAlloyFurnaceRecipeCategory implements IRecipeCategory<Advan
             float scale = 0.7f;
             guiGraphics.pose().scale(scale, scale, 1.0f);
 
-            String moldText = "需要标志物（不会被消耗）";
+            String moldText = Component.translatable("jei.useless_mod.gui.mold_required").getString();
             int textWidth = minecraft.font.width(moldText);
             int centeredX = (int) ((DISPLAY_WIDTH / 2.0f - textWidth * scale / 2) / scale);
             int y = (int) (MOLD_TEXT_Y / scale);
@@ -372,53 +374,34 @@ public class AdvancedAlloyFurnaceRecipeCategory implements IRecipeCategory<Advan
 
     // 修改工具提示方法，添加并行数信息
     @Override
-    public void getTooltip(ITooltipBuilder tooltip, AdvancedAlloyFurnaceRecipe recipe, IRecipeSlotsView recipeSlotsView,
+    public void getTooltip(@NotNull ITooltipBuilder tooltip,
+                           @NotNull AdvancedAlloyFurnaceRecipe recipe,
+                           @NotNull IRecipeSlotsView recipeSlotsView,
                            double mouseX, double mouseY) {
         // 能量和时间显示的悬停提示
         if (mouseX >= ENERGY_DISPLAY_X && mouseX <= ENERGY_DISPLAY_X + ENERGY_DISPLAY_WIDTH &&
                 mouseY >= ENERGY_DISPLAY_Y && mouseY <= ENERGY_DISPLAY_Y + ENERGY_DISPLAY_HEIGHT) {
-            tooltip.add(Component.literal("基础能量消耗: " + this.formatEnergy(recipe.energy())));
-            tooltip.add(Component.literal("实际能量 = 基础能量 × 并行数"));
+            tooltip.add(Component.translatable("jei.useless_mod.tooltip.energy.base", this.formatEnergy(recipe.energy())));
+            tooltip.add(Component.translatable("jei.useless_mod.tooltip.energy.actual"));
         }
 
         // 时间显示区域
         if (mouseX >= TIME_DISPLAY_X && mouseX <= TIME_DISPLAY_X + TIME_DISPLAY_WIDTH &&
                 mouseY >= TIME_DISPLAY_Y && mouseY <= TIME_DISPLAY_Y + TIME_DISPLAY_HEIGHT) {
-            tooltip.add(Component.literal("处理时间: " + recipe.processTime() + " ticks"));
-            tooltip.add(Component.literal("处理时间不受并行数影响"));
+            tooltip.add(Component.translatable("jei.useless_mod.tooltip.process_time", recipe.processTime()));
+            tooltip.add(Component.translatable("jei.useless_mod.tooltip.process_time.note"));
         }
 
         // 并行数效果说明区域 - 只在显示红色提示文本时（非无用锭配方且允许催化剂）才渲染
         if (mouseX >= PARALLEL_TEXT_X && mouseX <= PARALLEL_TEXT_X + 120 &&
                 mouseY >= PARALLEL_TEXT_Y && mouseY <= PARALLEL_TEXT_Y + 10 &&
-                !recipe.catalyst().isEmpty() && !isUselessIngotRecipe(recipe)) {
-            tooltip.add(Component.literal("并行数效果说明").withStyle(ChatFormatting.GOLD));
-            tooltip.add(Component.literal("• 输入物品消耗 × 并行数").withStyle(ChatFormatting.GRAY));
-            tooltip.add(Component.literal("• 输出物品数量 × 并行数").withStyle(ChatFormatting.GRAY));
-            tooltip.add(Component.literal("• 能量消耗 × 并行数").withStyle(ChatFormatting.GRAY));
-            tooltip.add(Component.literal("• 处理时间保持不变").withStyle(ChatFormatting.GRAY));
-            tooltip.add(Component.literal("⚠ 催化剂会被消耗").withStyle(ChatFormatting.RED));
-        }
-
-        // 催化剂提示
-        if (mouseX >= CATALYST_SLOT_X && mouseX <= CATALYST_SLOT_X + SLOT_SIZE &&
-                mouseY >= CATALYST_SLOT_Y && mouseY <= CATALYST_SLOT_Y + SLOT_SIZE) {
-            tooltip.add(Component.literal("催化剂").withStyle(ChatFormatting.GOLD));
-            
-            int targetTier = getTargetUselessIngotTier(recipe);
-            if (targetTier > 0) {
-                // 无用锭配方：显示跨阶合成信息
-                tooltip.add(Component.literal("无用锭配方催化剂说明:").withStyle(ChatFormatting.YELLOW));
-                tooltip.add(Component.literal("• 可使用高阶无用锭催化低阶合成").withStyle(ChatFormatting.GRAY));
-                tooltip.add(Component.literal("• 例如：用5阶催化4阶，并行数=3").withStyle(ChatFormatting.GRAY));
-                tooltip.add(Component.literal("• 有用锭可提供无限并行").withStyle(ChatFormatting.GREEN));
-                tooltip.add(Component.literal("⚠ 催化剂会被消耗（有用锭除外）").withStyle(ChatFormatting.RED));
-            } else {
-                // 普通配方
-                tooltip.add(Component.literal("• 可以使用无用锭提高并行数").withStyle(ChatFormatting.GRAY));
-                tooltip.add(Component.literal("• 催化剂会被消耗").withStyle(ChatFormatting.RED));
-                tooltip.add(Component.literal("• 不同等级的无用锭提供不同的并行数").withStyle(ChatFormatting.GRAY));
-            }
+                !recipe.catalyst().isEmpty() && isUselessIngotRecipe(recipe)) {
+            tooltip.add(Component.translatable("jei.useless_mod.tooltip.parallel.title").withStyle(ChatFormatting.GOLD));
+            tooltip.add(Component.translatable("jei.useless_mod.tooltip.parallel.desc1").withStyle(ChatFormatting.GRAY));
+            tooltip.add(Component.translatable("jei.useless_mod.tooltip.parallel.desc2").withStyle(ChatFormatting.GRAY));
+            tooltip.add(Component.translatable("jei.useless_mod.tooltip.parallel.desc3").withStyle(ChatFormatting.GRAY));
+            tooltip.add(Component.translatable("jei.useless_mod.tooltip.parallel.desc4").withStyle(ChatFormatting.GRAY));
+            tooltip.add(Component.translatable("jei.useless_mod.tooltip.parallel.warning").withStyle(ChatFormatting.RED));
         }
     }
 
@@ -436,7 +419,7 @@ public class AdvancedAlloyFurnaceRecipeCategory implements IRecipeCategory<Advan
     }
 
     // 格式化物品数量
-    private String formatItemCount(int count) {
+    private String formatCount(int count) {
         if (count >= 1000000000) {
             return String.format("%.2fG", count / 1000000000.0);
         } else if (count >= 1000000) {
@@ -448,22 +431,9 @@ public class AdvancedAlloyFurnaceRecipeCategory implements IRecipeCategory<Advan
         }
     }
 
-    // 格式化流体数量
-    private String formatFluidAmount(int amount) {
-        if (amount >= 1000000000) {
-            return String.format("%.2fG", amount / 1000000000.0);
-        } else if (amount >= 1000000) {
-            return String.format("%.2fM", amount / 1000000.0);
-        } else if (amount >= 1000) {
-            return String.format("%.2fk", amount / 1000.0);
-        } else {
-            return String.valueOf(amount);
-        }
-    }
-
     // 判断是否是无用锭配方（根据输出物品判断）
     private boolean isUselessIngotRecipe(AdvancedAlloyFurnaceRecipe recipe) {
-        return getTargetUselessIngotTier(recipe) > 0;
+        return getTargetUselessIngotTier(recipe) <= 0;
     }
 
     // 获取目标无用锭等级
@@ -478,234 +448,5 @@ public class AdvancedAlloyFurnaceRecipeCategory implements IRecipeCategory<Advan
             }
         }
         return 0;
-    }
-
-    private static class ItemStackRenderer implements IIngredientRenderer<ItemStack> {
-
-        private static String formatItemCountStatic(int count) {
-            if (count >= 1000000000) {
-                return String.format("%.2fG", count / 1000000000.0);
-            } else if (count >= 1000000) {
-                return String.format("%.2fM", count / 1000000.0);
-            } else if (count >= 1000) {
-                return String.format("%.2fk", count / 1000.0);
-            } else {
-                return String.valueOf(count);
-            }
-        }
-
-        @Override
-        public void render(GuiGraphics guiGraphics, ItemStack stack) {
-            if (stack == null || stack.isEmpty()) return;
-
-            // 启用深度测试
-            RenderSystem.enableDepthTest();
-
-            // 渲染物品图标
-            guiGraphics.renderFakeItem(stack, 0, 0);
-            Minecraft mc = Minecraft.getInstance();
-            Font font = mc.font;
-            PoseStack pose = guiGraphics.pose();
-
-            // 数量文本缩放
-            if (stack.getCount() > 1) {
-                String text = formatItemCountStatic(stack.getCount());
-                pose.pushPose();
-                float scale = 0.65f;
-                pose.translate(0, 0, 200.0F);
-                pose.scale(scale, scale, 1.0F);
-
-                int textX = Math.round(16.0f / scale) - font.width(text);
-                int textY = Math.round(10.0f / scale);
-
-                guiGraphics.drawString(font, text, textX, textY, 0xFFFFFF, true);
-                pose.popPose();
-            }
-
-            // 原版逻辑（耐久条 + 冷却 + 装饰）
-            if (stack.isBarVisible()) {
-                int l = stack.getBarWidth();
-                int i = stack.getBarColor();
-                int j = 2;
-                int k = 13;
-                guiGraphics.fill(RenderType.guiOverlay(), j, k, j + 13, k + 2, 0xFF000000);
-                guiGraphics.fill(RenderType.guiOverlay(), j, k, j + l, k + 1, i | 0xFF000000);
-            }
-
-            LocalPlayer player = mc.player;
-            float f = player == null ? 0.0F :
-                    player.getCooldowns().getCooldownPercent(stack.getItem(), mc.getFrameTimeNs());
-            if (f > 0.0F) {
-                int i1 = Mth.floor(16.0F * (1.0F - f));
-                int j1 = i1 + Mth.ceil(16.0F * f);
-                guiGraphics.fill(RenderType.guiOverlay(), 0, i1, 16, j1, Integer.MAX_VALUE);
-            }
-
-            ItemDecoratorHandler.of(stack).render(guiGraphics, font, stack, 0, 0);
-            RenderSystem.disableBlend();
-        }
-
-        // 保持已弃用方法的重写以避免编译错误
-        @Override
-        @Deprecated
-        @SuppressWarnings("removal")
-        public @NotNull List<Component> getTooltip(ItemStack stack, TooltipFlag flag) {
-            List<Component> tooltip = stack.getTooltipLines(
-                    net.minecraft.world.item.Item.TooltipContext.of(Minecraft.getInstance().level),
-                    Minecraft.getInstance().player,
-                    flag
-            );
-
-            // 为工具提示添加数量信息（使用缩写）
-            if (stack.getCount() > 1) {
-                // 找到显示名称的行（通常是第一行），在其后添加数量信息
-                if (!tooltip.isEmpty()) {
-                    Component displayName = tooltip.getFirst();
-                    String countText = formatItemCountStatic(stack.getCount());
-                    tooltip.set(0, Component.literal(displayName.getString() + " ×" + countText));
-                }
-            }
-
-            return tooltip;
-        }
-
-        @Override
-        public int getWidth() {
-            return 16;
-        }
-
-        @Override
-        public int getHeight() {
-            return 16;
-        }
-    }
-
-    private record FluidStackRenderer(int capacity, boolean showAmount, int width,
-                                      int height) implements IIngredientRenderer<FluidStack> {
-
-        private static String formatFluidAmountStatic(int amount) {
-            if (amount >= 1000000000) {
-                return String.format("%.2fG", amount / 1000000000.0);
-            } else if (amount >= 1000000) {
-                return String.format("%.2fM", amount / 1000000.0);
-            } else if (amount >= 1000) {
-                return String.format("%.2fk", amount / 1000.0);
-            } else {
-                return String.valueOf(amount);
-            }
-        }
-
-        @Override
-        public void render(GuiGraphics guiGraphics, FluidStack stack) {
-            if (stack == null || stack.isEmpty()) return;
-
-            // 启用深度测试
-            RenderSystem.enableDepthTest();
-
-            // 渲染流体填充
-            int fluidHeight = (int) (this.height * ((float) stack.getAmount() / this.capacity));
-            if (fluidHeight > 0) {
-                net.neoforged.neoforge.client.extensions.common.IClientFluidTypeExtensions fluidAttributes =
-                        net.neoforged.neoforge.client.extensions.common.IClientFluidTypeExtensions.of(stack.getFluid());
-                ResourceLocation fluidStillTexture = fluidAttributes.getStillTexture(stack);
-                int fluidColor = fluidAttributes.getTintColor(stack);
-
-                if (fluidStillTexture != null) {
-                    TextureAtlasSprite fluidSprite = Minecraft.getInstance().getTextureAtlas(
-                            net.minecraft.world.inventory.InventoryMenu.BLOCK_ATLAS).apply(fluidStillTexture);
-
-                    float r = ((fluidColor >> 16) & 0xFF) / 255.0F;
-                    float g = ((fluidColor >> 8) & 0xFF) / 255.0F;
-                    float b = (fluidColor & 0xFF) / 255.0F;
-                    float a = ((fluidColor >> 24) & 0xFF) / 255.0F;
-
-                    RenderSystem.setShaderColor(r, g, b, a);
-                    RenderSystem.setShaderTexture(0, net.minecraft.world.inventory.InventoryMenu.BLOCK_ATLAS);
-
-                    int fluidY = this.height - fluidHeight;
-
-                    // 绘制流体纹理
-                    for (int i = 0; i < Math.ceil((double) this.width / 16); i++) {
-                        for (int j = 0; j < Math.ceil((double) fluidHeight / 16); j++) {
-                            int texWidth = Math.min(16, this.width - i * 16);
-                            int texHeight = Math.min(16, fluidHeight - j * 16);
-                            if (texWidth > 0 && texHeight > 0) {
-                                guiGraphics.blit(
-                                        i * 16,
-                                        fluidY + j * 16,
-                                        0,
-                                        texWidth, texHeight,
-                                        fluidSprite
-                                );
-                            }
-                        }
-                    }
-
-                    RenderSystem.setShaderColor(1.0F, 1.0F, 1.0F, 1.0F);
-                }
-            }
-
-            // 渲染流体数量文本
-            if (this.showAmount && stack.getAmount() > 0) {
-                this.renderFluidAmount(guiGraphics, stack);
-            }
-
-            // 从UI图抠取覆盖层
-            RenderSystem.setShaderTexture(0, GUI_TEXTURE);
-            guiGraphics.blit(
-                    GUI_TEXTURE,
-                    -1, -1, // 向左向上1像素
-                    0, 54, // UI图起点
-                    this.width + 2, this.height + 2, // 覆盖层大小
-                    256, 256 // 纹理实际尺寸
-            );
-
-            RenderSystem.disableBlend();
-        }
-
-        // 保持已弃用方法的重写以避免编译错误
-        @Override
-        @Deprecated
-        @SuppressWarnings("removal")
-        public @NotNull List<Component> getTooltip(FluidStack stack, @NotNull TooltipFlag flag) {
-            List<Component> tooltip = new ArrayList<>();
-            tooltip.add(stack.getHoverName());
-            tooltip.add(Component.literal("数量: " + formatFluidAmountStatic(stack.getAmount())));
-            return tooltip;
-        }
-
-        @Override
-        public void getTooltip(ITooltipBuilder tooltip, FluidStack stack, TooltipFlag flag) {
-            tooltip.add(stack.getHoverName());
-            tooltip.add(Component.literal("数量: " + formatFluidAmountStatic(stack.getAmount())));
-        }
-
-        @Override
-        public int getWidth() {
-            return this.width;
-        }
-
-        @Override
-        public int getHeight() {
-            return this.height;
-        }
-
-        private void renderFluidAmount(GuiGraphics guiGraphics, FluidStack stack) {
-            String text = formatFluidAmountStatic(stack.getAmount());
-            Minecraft mc = Minecraft.getInstance();
-            Font font = mc.font;
-            PoseStack pose = guiGraphics.pose();
-
-            pose.pushPose();
-            float scale = 0.65f;
-            pose.translate(0, 0, 200.0F);
-            pose.scale(scale, scale, 1.0F);
-
-            int x = Math.round(this.width / scale) - font.width(text);
-            int y = Math.round(this.height / scale) - font.lineHeight;
-
-            guiGraphics.drawString(font, text, x, y, 0xFFFFFF, true);
-            pose.popPose();
-        }
     }
 }

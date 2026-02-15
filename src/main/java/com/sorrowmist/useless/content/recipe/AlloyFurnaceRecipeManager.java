@@ -2,13 +2,21 @@ package com.sorrowmist.useless.content.recipe;
 
 import com.sorrowmist.useless.content.recipe.adapters.SmeltingRecipeAdapter;
 import com.sorrowmist.useless.init.ModRecipeTypes;
+import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.crafting.Ingredient;
 import net.minecraft.world.item.crafting.Recipe;
 import net.minecraft.world.item.crafting.RecipeHolder;
 import net.minecraft.world.level.Level;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
 
 /**
  * 高级熔炉配方管理器
@@ -21,8 +29,6 @@ import java.util.*;
  * 提供高效的配方查找和缓存机制
  */
 public class AlloyFurnaceRecipeManager {
-
-    // 单例实例
     private static AlloyFurnaceRecipeManager INSTANCE;
 
     // 配方适配器列表（按优先级排序）
@@ -37,6 +43,23 @@ public class AlloyFurnaceRecipeManager {
 
     // 缓存清理阈值
     private static final int CACHE_CLEAN_THRESHOLD = 800;
+
+    // ========== 预构建索引 ==========
+
+    // 输入物品 -> 配方列表 索引（用于快速查找）
+    private final Map<Item, List<AdvancedAlloyFurnaceRecipe>> inputItemIndex = new HashMap<>();
+
+    // 模具物品 -> 配方列表 索引（用于按模具类型快速查找）
+    private final Map<Item, List<AdvancedAlloyFurnaceRecipe>> moldIndex = new HashMap<>();
+
+    // 空模具（无模具要求）的配方列表
+    private final List<AdvancedAlloyFurnaceRecipe> noMoldRecipes = new ArrayList<>();
+
+    // 所有已索引的配方（去重）
+    private final Set<AdvancedAlloyFurnaceRecipe> indexedRecipes = new HashSet<>();
+
+    // 索引是否已构建
+    private boolean indexBuilt = false;
 
     /**
      * 获取单例实例
@@ -65,6 +88,79 @@ public class AlloyFurnaceRecipeManager {
         adapters.add(adapter);
         // 按优先级排序（高优先级在前）
         adapters.sort((a, b) -> Integer.compare(b.getPriority(), a.getPriority()));
+        // 索引需要重建
+        indexBuilt = false;
+    }
+
+    /**
+     * 构建配方索引
+     * <p>
+     * 在配方数据加载完成后调用，预构建所有索引以加速查找
+     *
+     * @param level 世界
+     */
+    public void buildIndex(Level level) {
+        if (level == null) return;
+
+        // 清空旧索引
+        clearIndex();
+
+        // 索引自定义配方
+        List<RecipeHolder<AdvancedAlloyFurnaceRecipe>> recipes = level.getRecipeManager()
+                .getAllRecipesFor(ModRecipeTypes.ADVANCED_ALLOY_FURNACE_TYPE.get());
+
+        for (RecipeHolder<AdvancedAlloyFurnaceRecipe> holder : recipes) {
+            indexRecipe(holder.value());
+        }
+
+        indexBuilt = true;
+    }
+
+    /**
+     * 清空所有索引
+     */
+    private void clearIndex() {
+        inputItemIndex.clear();
+        moldIndex.clear();
+        noMoldRecipes.clear();
+        indexedRecipes.clear();
+        indexBuilt = false;
+    }
+
+    /**
+     * 索引单个配方
+     */
+    private void indexRecipe(AdvancedAlloyFurnaceRecipe recipe) {
+        if (recipe == null || indexedRecipes.contains(recipe)) {
+            return;
+        }
+        indexedRecipes.add(recipe);
+
+        // 1. 索引输入物品
+        for (CountedIngredient countedIng : recipe.inputs()) {
+            Ingredient ingredient = countedIng.ingredient();
+            for (ItemStack stack : ingredient.getItems()) {
+                if (!stack.isEmpty()) {
+                    inputItemIndex
+                            .computeIfAbsent(stack.getItem(), k -> new ArrayList<>())
+                            .add(recipe);
+                }
+            }
+        }
+
+        // 2. 索引模具
+        Ingredient mold = recipe.mold();
+        if (mold == null || mold.isEmpty()) {
+            noMoldRecipes.add(recipe);
+        } else {
+            for (ItemStack stack : mold.getItems()) {
+                if (!stack.isEmpty()) {
+                    moldIndex
+                            .computeIfAbsent(stack.getItem(), k -> new ArrayList<>())
+                            .add(recipe);
+                }
+            }
+        }
     }
 
     /**
@@ -72,21 +168,27 @@ public class AlloyFurnaceRecipeManager {
      * <p>
      * 查找顺序：
      * 1. 缓存
-     * 2. 自定义配方
-     * 3. 通过适配器转换的配方
+     * 2. 基于索引的快速查找
+     * 3. 回退到遍历查找（如果索引未构建）
      *
      * @param level  世界
      * @param inputs 输入物品列表
+     * @param mold   当前模具（可为空）
      * @return 匹配的高级熔炉配方，如果没有则返回 null
      */
     @Nullable
-    public AdvancedAlloyFurnaceRecipe findRecipe(Level level, List<ItemStack> inputs) {
+    public AdvancedAlloyFurnaceRecipe findRecipe(Level level, List<ItemStack> inputs, @Nullable ItemStack mold) {
         if (level == null || inputs.isEmpty()) {
             return null;
         }
 
+        // 确保索引已构建
+        if (!indexBuilt) {
+            buildIndex(level);
+        }
+
         // 生成缓存键
-        RecipeCacheKey cacheKey = new RecipeCacheKey(inputs);
+        RecipeCacheKey cacheKey = new RecipeCacheKey(inputs, mold);
 
         // 检查缓存
         AdvancedAlloyFurnaceRecipe cachedRecipe = recipeCache.get(cacheKey);
@@ -94,20 +196,21 @@ public class AlloyFurnaceRecipeManager {
             return cachedRecipe;
         }
 
-        // 检查负缓存（已知没有配方）
+        // 检查负缓存
         if (negativeCache.containsKey(cacheKey)) {
             return null;
         }
 
-        // 1. 首先查找自定义配方
-        AdvancedAlloyFurnaceRecipe recipe = findCustomRecipe(level, inputs);
+        // 使用索引查找
+        AdvancedAlloyFurnaceRecipe recipe = findRecipeByIndex(inputs, mold);
+
         if (recipe != null) {
             cacheRecipe(cacheKey, recipe);
             return recipe;
         }
 
-        // 2. 通过适配器查找转换配方
-        recipe = findAdaptedRecipe(level, inputs);
+        // 3. 通过适配器查找转换配方（回退方案）
+        recipe = findAdaptedRecipe(level, inputs, mold);
         if (recipe != null) {
             cacheRecipe(cacheKey, recipe);
             return recipe;
@@ -119,16 +222,16 @@ public class AlloyFurnaceRecipeManager {
     }
 
     /**
-     * 查找自定义配方
+     * 基于索引查找配方
      */
     @Nullable
-    private AdvancedAlloyFurnaceRecipe findCustomRecipe(Level level, List<ItemStack> inputs) {
-        List<RecipeHolder<AdvancedAlloyFurnaceRecipe>> recipes = level.getRecipeManager()
-                .getAllRecipesFor(ModRecipeTypes.ADVANCED_ALLOY_FURNACE_TYPE.get());
+    private AdvancedAlloyFurnaceRecipe findRecipeByIndex(List<ItemStack> inputs, @Nullable ItemStack mold) {
+        // 获取候选配方列表
+        Set<AdvancedAlloyFurnaceRecipe> candidates = getCandidateRecipes(inputs, mold);
 
-        for (RecipeHolder<AdvancedAlloyFurnaceRecipe> holder : recipes) {
-            AdvancedAlloyFurnaceRecipe recipe = holder.value();
-            if (matchesRecipe(recipe, inputs)) {
+        // 精确匹配
+        for (AdvancedAlloyFurnaceRecipe recipe : candidates) {
+            if (matchesRecipe(recipe, inputs) && matchesMold(recipe, mold)) {
                 return recipe;
             }
         }
@@ -141,7 +244,7 @@ public class AlloyFurnaceRecipeManager {
      */
     @Nullable
     @SuppressWarnings("unchecked")
-    private <T extends Recipe<?>> AdvancedAlloyFurnaceRecipe findAdaptedRecipe(Level level, List<ItemStack> inputs) {
+    private <T extends Recipe<?>> AdvancedAlloyFurnaceRecipe findAdaptedRecipe(Level level, List<ItemStack> inputs, @Nullable ItemStack mold) {
         for (IRecipeAdapter<?> adapter : adapters) {
             RecipeHolder<T> holder = ((IRecipeAdapter<T>) adapter).findMatchingRecipe(level, inputs);
             if (holder != null) {
@@ -150,13 +253,73 @@ public class AlloyFurnaceRecipeManager {
 
                 // 查找第一个匹配的配方
                 for (AdvancedAlloyFurnaceRecipe recipe : convertedRecipes) {
-                    if (matchesRecipe(recipe, inputs)) {
+                    if (matchesRecipe(recipe, inputs) && matchesMold(recipe, mold)) {
                         return recipe;
                     }
                 }
             }
         }
         return null;
+    }
+
+    /**
+     * 获取候选配方列表（基于索引快速筛选）
+     */
+    private Set<AdvancedAlloyFurnaceRecipe> getCandidateRecipes(List<ItemStack> inputs, @Nullable ItemStack mold) {
+        Set<AdvancedAlloyFurnaceRecipe> candidates = new HashSet<>();
+
+        // 1. 基于模具筛选
+        if (mold == null || mold.isEmpty()) {
+            // 无模具时，只考虑无模具要求的配方
+            candidates.addAll(noMoldRecipes);
+        } else {
+            // 有模具时，优先考虑匹配该模具的配方
+            List<AdvancedAlloyFurnaceRecipe> moldRecipes = moldIndex.get(mold.getItem());
+            if (moldRecipes != null) {
+                candidates.addAll(moldRecipes);
+            }
+            // 同时添加无模具要求的配方（它们也可能匹配）
+            candidates.addAll(noMoldRecipes);
+        }
+
+        // 2. 基于输入物品进一步筛选
+        // 使用第一个非空输入物品作为筛选条件
+        Set<AdvancedAlloyFurnaceRecipe> inputFiltered = new HashSet<>();
+        for (ItemStack input : inputs) {
+            if (!input.isEmpty()) {
+                List<AdvancedAlloyFurnaceRecipe> recipes = inputItemIndex.get(input.getItem());
+                if (recipes != null) {
+                    inputFiltered.addAll(recipes);
+                }
+            }
+        }
+
+        // 如果基于输入找到了配方，与模具筛选结果取交集
+        if (!inputFiltered.isEmpty()) {
+            candidates.retainAll(inputFiltered);
+        }
+
+        return candidates;
+    }
+
+    /**
+     * 检查模具是否匹配配方要求
+     */
+    private boolean matchesMold(AdvancedAlloyFurnaceRecipe recipe, @Nullable ItemStack mold) {
+        Ingredient requiredMold = recipe.mold();
+
+        // 配方不需要模具
+        if (requiredMold == null || requiredMold.isEmpty()) {
+            return true; // 任何模具都可以（包括无模具）
+        }
+
+        // 配方需要模具，但当前没有模具
+        if (mold == null || mold.isEmpty()) {
+            return false;
+        }
+
+        // 检查模具是否匹配
+        return requiredMold.test(mold);
     }
 
     /**
@@ -203,7 +366,6 @@ public class AlloyFurnaceRecipeManager {
      * 清理缓存
      */
     private void cleanCache() {
-        // 简单的LRU策略：保留最新的50%条目
         int keepSize = MAX_CACHE_SIZE / 2;
 
         if (recipeCache.size() > keepSize) {
@@ -218,11 +380,15 @@ public class AlloyFurnaceRecipeManager {
     }
 
     /**
-     * 清除所有缓存
+     * 清除所有缓存和索引
+     * <p>
+     * 在配方数据重载时调用，标记索引需要重建
      */
     public void clearCache() {
         recipeCache.clear();
         negativeCache.clear();
+        // 标记索引需要重建，下次查找时会自动重建
+        indexBuilt = false;
     }
 
     /**
@@ -233,10 +399,24 @@ public class AlloyFurnaceRecipeManager {
     }
 
     /**
-     * 配方缓存键
-     * 用于快速查找缓存的配方
+     * 获取索引统计信息（用于调试）
      */
-    private record RecipeCacheKey(List<ItemStack> inputs) {
+    public String getIndexStats() {
+        return String.format(
+                "Indexed Recipes: %d, Input Items: %d, Mold Types: %d, No-Mold Recipes: %d",
+                indexedRecipes.size(),
+                inputItemIndex.size(),
+                moldIndex.size(),
+                noMoldRecipes.size()
+        );
+    }
+
+    // ========== 内部类 ==========
+
+    /**
+     * 配方缓存键
+     */
+    private record RecipeCacheKey(List<ItemStack> inputs, @Nullable ItemStack mold) {
 
         @Override
         public boolean equals(Object o) {
@@ -244,9 +424,15 @@ public class AlloyFurnaceRecipeManager {
             if (o == null || getClass() != o.getClass()) return false;
             RecipeCacheKey that = (RecipeCacheKey) o;
 
+            // 比较模具
+            if (!Objects.equals(mold, that.mold)) {
+                if (mold == null || that.mold == null) return false;
+                if (!ItemStack.isSameItemSameComponents(mold, that.mold)) return false;
+            }
+
+            // 比较输入物品
             if (inputs.size() != that.inputs.size()) return false;
 
-            // 比较物品堆栈（忽略数量，只比较物品类型和NBT）
             for (int i = 0; i < inputs.size(); i++) {
                 ItemStack a = inputs.get(i);
                 ItemStack b = that.inputs.get(i);
@@ -261,10 +447,19 @@ public class AlloyFurnaceRecipeManager {
         @Override
         public int hashCode() {
             int result = 1;
+
+            // 模具哈希
+            if (mold != null && !mold.isEmpty()) {
+                result = 31 * result + mold.getItem().hashCode();
+                var components = mold.getComponentsPatch();
+                if (!components.isEmpty()) {
+                    result = 31 * result + components.hashCode();
+                }
+            }
+
+            // 输入物品哈希
             for (ItemStack stack : inputs) {
-                // 使用物品和组件计算哈希
                 result = 31 * result + (stack.isEmpty() ? 0 : stack.getItem().hashCode());
-                // 使用 getComponentsPatch 替代 hasComponents
                 var components = stack.getComponentsPatch();
                 if (!components.isEmpty()) {
                     result = 31 * result + components.hashCode();

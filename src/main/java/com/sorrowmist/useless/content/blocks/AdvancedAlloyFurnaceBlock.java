@@ -274,8 +274,31 @@ public class AdvancedAlloyFurnaceBlock extends Block implements EntityBlock {
         }
 
         BlockEntity blockEntity = level.getBlockEntity(pos);
-        if (!(blockEntity instanceof AdvancedAlloyFurnaceBlockEntity)) {
+        if (!(blockEntity instanceof AdvancedAlloyFurnaceBlockEntity furnace)) {
             return ItemInteractionResult.PASS_TO_DEFAULT_BLOCK_INTERACTION;
+        }
+
+        // 扳手交互 - 设置输出方向
+        if (AdvancedAlloyFurnaceBlockEntity.isWrench(stack)) {
+            Direction clickedFace = hitResult.getDirection();
+            Direction currentOutput = furnace.getCachedOutputDirection();
+
+            if (currentOutput == clickedFace) {
+                // 二次点击相同面，取消设置
+                furnace.setOutputDirectionWithWrench(null);
+                player.displayClientMessage(
+                        net.minecraft.network.chat.Component.translatable("gui.useless_mod.advanced_alloy_furnace.output_cleared"),
+                        true);
+            } else {
+                // 设置新的输出面
+                furnace.setOutputDirectionWithWrench(clickedFace);
+                player.displayClientMessage(
+                        net.minecraft.network.chat.Component.translatable(
+                                "gui.useless_mod.advanced_alloy_furnace.output_set",
+                                clickedFace.getName()),
+                        true);
+            }
+            return ItemInteractionResult.CONSUME;
         }
 
         // 流体交互

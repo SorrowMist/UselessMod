@@ -2,6 +2,7 @@ package com.sorrowmist.useless.event;
 
 import com.sorrowmist.useless.UselessMod;
 import com.sorrowmist.useless.content.items.EndlessBeafItem;
+import com.sorrowmist.useless.content.recipe.AlloyFurnaceRecipeManager;
 import com.sorrowmist.useless.core.common.FlyEffectedHolder;
 import com.sorrowmist.useless.core.component.UComponents;
 import com.sorrowmist.useless.core.config.ConfigManager;
@@ -17,10 +18,14 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
+import net.neoforged.neoforge.event.AddReloadListenerEvent;
 import net.neoforged.neoforge.event.entity.living.LivingDropsEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent;
 import net.neoforged.neoforge.event.level.BlockEvent;
+import net.neoforged.neoforge.event.server.ServerStartedEvent;
 import net.neoforged.neoforge.event.tick.PlayerTickEvent;
+
+import java.util.Collections;
 
 @EventBusSubscriber(modid = UselessMod.MODID)
 public class EventHandler {
@@ -96,5 +101,28 @@ public class EventHandler {
         event.setCanceled(true);
         // 设置结果，告知系统处理已成功，停止后续传播
         event.setCancellationResult(InteractionResult.sidedSuccess(world.isClientSide));
+    }
+
+    /**
+     * 服务器启动时构建配方索引
+     */
+    @SubscribeEvent
+    public static void onServerStarted(ServerStartedEvent event) {
+        AlloyFurnaceRecipeManager.getInstance().buildIndex(event.getServer().overworld());
+    }
+
+    /**
+     * 数据重载时重建配方索引
+     */
+    @SubscribeEvent
+    public static void onAddReloadListener(AddReloadListenerEvent event) {
+        // 在配方数据重载后重建索引
+        event.addListener((stage, resourceManager, preparationsProfiler, reloadProfiler, backgroundExecutor, gameExecutor) -> {
+            return stage.wait(Collections.emptyList()).thenRun(() -> {
+                // 注意：这里无法直接获取 Level，需要在配方实际使用时延迟构建
+                // 或者通过其他方式标记索引需要重建
+                AlloyFurnaceRecipeManager.getInstance().clearCache();
+            });
+        });
     }
 }

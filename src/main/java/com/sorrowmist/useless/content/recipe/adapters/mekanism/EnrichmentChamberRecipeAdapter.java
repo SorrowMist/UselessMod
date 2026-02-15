@@ -25,7 +25,7 @@ public class EnrichmentChamberRecipeAdapter implements IRecipeAdapter<ItemStackT
     // 基础能量消耗
     private static final int BASE_ENERGY = 2000;
     // 处理时间基础值（ticks）
-    private static final int BASE_PROCESS_TIME = 100;
+    private static final int BASE_PROCESS_TIME = 20;
 
     @Override
     public Class<ItemStackToItemStackRecipe> getRecipeClass() {

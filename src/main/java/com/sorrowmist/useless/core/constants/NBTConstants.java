@@ -16,6 +16,9 @@ public final class NBTConstants {
     // 熔炉升级相关
     public static final String FURNACE_TIER = "FurnaceTier";
 
+    // 自动输出方向（扳手设置）
+    public static final String OUTPUT_DIRECTION = "OutputDirection";
+
     private NBTConstants() {
     }
 

@@ -11,6 +11,7 @@ import com.sorrowmist.useless.init.ModRecipeTypes;
 import com.sorrowmist.useless.init.ModTags;
 import com.sorrowmist.useless.utils.CatalystParallelManager;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
@@ -27,6 +28,7 @@ import net.minecraft.world.item.crafting.RecipeHolder;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
+import net.neoforged.neoforge.capabilities.Capabilities;
 import net.neoforged.neoforge.energy.IEnergyStorage;
 import net.neoforged.neoforge.fluids.FluidStack;
 import net.neoforged.neoforge.fluids.capability.IFluidHandler;
@@ -98,6 +100,17 @@ public class AdvancedAlloyFurnaceBlockEntity extends BlockEntity implements Menu
 
     // 熔炉阶级 0-9，0为基础等级
     private int furnaceTier = 0;
+
+    // 自动输出计时器
+    private int autoOutputTickCounter = 0;
+    private static final int AUTO_OUTPUT_INTERVAL = 5;
+
+    // 自动输出面缓存（null表示未指定，使用默认查找）
+    @Nullable
+    private Direction cachedOutputDirection = null;
+    // 上次成功输出的方向（用于缓存机制）
+    @Nullable
+    private Direction lastSuccessfulOutputDirection = null;
 
     private final ItemStackHandler itemHandler = new ItemStackHandler(TOTAL_SLOTS) {
         @Override
@@ -232,6 +245,49 @@ public class AdvancedAlloyFurnaceBlockEntity extends BlockEntity implements Menu
     }
 
     /**
+     * 获取指定的输出方向（扳手设置）
+     * @return 指定的输出方向，null表示未指定
+     */
+    @Nullable
+    public Direction getCachedOutputDirection() {
+        return this.cachedOutputDirection;
+    }
+
+    /**
+     * 使用扳手设置或取消输出方向
+     * @param direction 要设置的方向，null表示取消设置
+     * @return 是否成功设置（如果方向相同则取消设置）
+     */
+    public boolean setOutputDirectionWithWrench(@Nullable Direction direction) {
+        // 如果点击的是已设置的方向，则取消设置
+        if (direction != null && direction == this.cachedOutputDirection) {
+            this.cachedOutputDirection = null;
+            this.setChanged();
+            // 同步到客户端
+            if (this.level != null && !this.level.isClientSide) {
+                this.level.sendBlockUpdated(this.worldPosition, this.getBlockState(), this.getBlockState(), 3);
+            }
+            return true;
+        }
+
+        this.cachedOutputDirection = direction;
+        this.setChanged();
+        // 同步到客户端
+        if (this.level != null && !this.level.isClientSide) {
+            this.level.sendBlockUpdated(this.worldPosition, this.getBlockState(), this.getBlockState(), 3);
+        }
+        return true;
+    }
+
+    /**
+     * 检查物品是否是扳手
+     */
+    public static boolean isWrench(ItemStack stack) {
+        return stack.is(net.minecraft.tags.ItemTags.create(
+                net.minecraft.resources.ResourceLocation.fromNamespaceAndPath("c", "tools/wrench")));
+    }
+
+    /**
      * 设置熔炉阶级（内部使用，不触发容量更新）
      */
     private void setFurnaceTier(int tier) {
@@ -314,6 +370,13 @@ public class AdvancedAlloyFurnaceBlockEntity extends BlockEntity implements Menu
             entity.tryStartNewRecipe();
         } else {
             entity.processCurrentRecipe();
+        }
+
+        // 每5tick尝试自动输出物品和流体
+        entity.autoOutputTickCounter++;
+        if (entity.autoOutputTickCounter >= AUTO_OUTPUT_INTERVAL) {
+            entity.autoOutputTickCounter = 0;
+            entity.autoOutputItemsAndFluids(level);
         }
 
         // 判断是否应该处于活跃状态
@@ -639,6 +702,18 @@ public class AdvancedAlloyFurnaceBlockEntity extends BlockEntity implements Menu
         this.targetUselessIngotTier = tag.getInt(NBTConstants.TARGET_USELESS_INGOT_TIER);
         this.accumulatedEnergy = tag.getInt(NBTConstants.ACCUMULATED_ENERGY);
 
+        // 加载指定的输出方向（扳手设置）
+        if (tag.contains(NBTConstants.OUTPUT_DIRECTION)) {
+            int dirIndex = tag.getInt(NBTConstants.OUTPUT_DIRECTION);
+            if (dirIndex >= 0 && dirIndex < Direction.values().length) {
+                this.cachedOutputDirection = Direction.values()[dirIndex];
+            } else {
+                this.cachedOutputDirection = null;
+            }
+        } else {
+            this.cachedOutputDirection = null;
+        }
+
         for (int i = 0; i < FLUID_TANK_COUNT; i++) {
             String inputFluidTag = NBTConstants.getInputFluidTag(i);
             if (tag.contains(inputFluidTag)) {
@@ -675,6 +750,13 @@ public class AdvancedAlloyFurnaceBlockEntity extends BlockEntity implements Menu
         tag.putBoolean(NBTConstants.IS_USELESS_INGOT_RECIPE, this.isUselessIngotRecipe);
         tag.putInt(NBTConstants.TARGET_USELESS_INGOT_TIER, this.targetUselessIngotTier);
         tag.putInt(NBTConstants.ACCUMULATED_ENERGY, this.accumulatedEnergy);
+
+        // 保存指定的输出方向（扳手设置）
+        if (this.cachedOutputDirection != null) {
+            tag.putInt(NBTConstants.OUTPUT_DIRECTION, this.cachedOutputDirection.ordinal());
+        } else {
+            tag.putInt(NBTConstants.OUTPUT_DIRECTION, -1);
+        }
 
         for (int i = 0; i < FLUID_TANK_COUNT; i++) {
             FluidStack fluid = this.inputFluidTanks[i].getFluid();
@@ -736,9 +818,13 @@ public class AdvancedAlloyFurnaceBlockEntity extends BlockEntity implements Menu
 
         if (currentInputs.isEmpty()) return Optional.empty();
 
+        // 获取当前模具
+        ItemStack moldStack = this.itemHandler.getStackInSlot(MOLD_SLOT);
+
         // 使用配方管理器查找配方（包含自定义配方和转换的原版配方）
+        // 传入模具参数以利用模具索引加速查找
         AdvancedAlloyFurnaceRecipe recipe = AlloyFurnaceRecipeManager.getInstance().findRecipe(
-                this.level, currentInputs
+                this.level, currentInputs, moldStack
         );
 
         if (recipe != null && this.canProcessRecipe(recipe)) {
@@ -1084,6 +1170,220 @@ public class AdvancedAlloyFurnaceBlockEntity extends BlockEntity implements Menu
             }
             return FluidStack.EMPTY;
         }
+    }
+
+    /**
+     * 自动输出物品和流体到周围的容器
+     * 每5tick调用一次
+     * 扳手设置的方向具有最高优先级，即使无法输出也不会切换到其他方向
+     */
+    private void autoOutputItemsAndFluids(Level level) {
+        if (level.isClientSide) return;
+
+        // 如果扳手指定了方向，只尝试该方向（最高优先级）
+        if (this.cachedOutputDirection != null) {
+            this.autoOutputItemsToFixedDirection(level, this.cachedOutputDirection);
+            this.autoOutputFluidsToFixedDirection(level, this.cachedOutputDirection);
+            return;
+        }
+
+        // 没有扳手指定方向，使用智能模式（优先上次成功的方向）
+        Direction preferredDirection = this.lastSuccessfulOutputDirection;
+
+        // 尝试输出物品
+        boolean itemOutputSuccess = this.autoOutputItems(level, preferredDirection);
+
+        // 尝试输出流体
+        boolean fluidOutputSuccess = this.autoOutputFluids(level, preferredDirection);
+
+        // 如果优先方向输出失败，则清除缓存并尝试其他方向
+        if (!itemOutputSuccess && !fluidOutputSuccess && preferredDirection != null) {
+            this.lastSuccessfulOutputDirection = null;
+        }
+    }
+
+    /**
+     * 自动输出物品到指定方向（扳手固定模式）
+     * 只尝试指定方向，不切换到其他方向
+     */
+    private void autoOutputItemsToFixedDirection(Level level, Direction direction) {
+        for (int slot = OUTPUT_SLOTS_START; slot < OUTPUT_SLOTS_START + OUTPUT_SLOTS_COUNT; slot++) {
+            ItemStack stack = this.itemHandler.getStackInSlot(slot);
+            if (stack.isEmpty()) continue;
+
+            this.tryOutputItemToDirection(level, slot, direction);
+        }
+    }
+
+    /**
+     * 自动输出物品到周围的容器
+     * @param level 世界
+     * @param preferredDirection 优先尝试的方向（可以是null）
+     * @return 是否成功输出至少一个物品
+     */
+    private boolean autoOutputItems(Level level, @Nullable Direction preferredDirection) {
+        boolean anyOutputSuccess = false;
+
+        for (int slot = OUTPUT_SLOTS_START; slot < OUTPUT_SLOTS_START + OUTPUT_SLOTS_COUNT; slot++) {
+            ItemStack stack = this.itemHandler.getStackInSlot(slot);
+            if (stack.isEmpty()) continue;
+
+            // 先尝试优先方向
+            if (preferredDirection != null) {
+                if (this.tryOutputItemToDirection(level, slot, preferredDirection)) {
+                    anyOutputSuccess = true;
+                    stack = this.itemHandler.getStackInSlot(slot);
+                    if (stack.isEmpty()) continue;
+                }
+            }
+
+            // 如果优先方向失败或还有剩余，遍历所有方向
+            for (Direction direction : Direction.values()) {
+                if (direction == preferredDirection) continue; // 跳过已尝试的方向
+
+                if (this.tryOutputItemToDirection(level, slot, direction)) {
+                    anyOutputSuccess = true;
+                    // 更新上次成功的方向缓存
+                    this.lastSuccessfulOutputDirection = direction;
+                    this.setChanged();
+                    stack = this.itemHandler.getStackInSlot(slot);
+                    if (stack.isEmpty()) break;
+                }
+            }
+        }
+
+        return anyOutputSuccess;
+    }
+
+    /**
+     * 尝试向指定方向输出物品
+     * @return 是否成功输出至少一部分物品
+     */
+    private boolean tryOutputItemToDirection(Level level, int slot, Direction direction) {
+        BlockPos targetPos = this.worldPosition.relative(direction);
+        BlockEntity targetEntity = level.getBlockEntity(targetPos);
+
+        if (targetEntity == null) return false;
+
+        // 尝试向目标容器的物品栏输出
+        IItemHandler targetHandler = level.getCapability(
+                Capabilities.ItemHandler.BLOCK,
+                targetPos,
+                targetEntity.getBlockState(),
+                targetEntity,
+                direction.getOpposite()
+        );
+
+        if (targetHandler == null) return false;
+
+        ItemStack stack = this.itemHandler.getStackInSlot(slot);
+        if (stack.isEmpty()) return false;
+
+        // 尝试将物品插入目标容器
+        for (int targetSlot = 0; targetSlot < targetHandler.getSlots(); targetSlot++) {
+            ItemStack remaining = targetHandler.insertItem(targetSlot, stack, false);
+            if (remaining.getCount() != stack.getCount()) {
+                // 成功插入了一部分或全部
+                this.itemHandler.setStackInSlot(slot, remaining);
+                this.setChanged();
+                if (remaining.isEmpty()) {
+                    return true;
+                } else {
+                    stack = remaining;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * 自动输出流体到指定方向（扳手固定模式）
+     * 只尝试指定方向，不切换到其他方向
+     */
+    private void autoOutputFluidsToFixedDirection(Level level, Direction direction) {
+        for (int tankIndex = 0; tankIndex < FLUID_TANK_COUNT; tankIndex++) {
+            FluidStack fluid = this.outputFluidTanks[tankIndex].getFluid();
+            if (fluid.isEmpty()) continue;
+
+            this.tryOutputFluidToDirection(level, tankIndex, direction);
+        }
+    }
+
+    /**
+     * 自动输出流体到周围的容器
+     * @param level 世界
+     * @param preferredDirection 优先尝试的方向（可以是null）
+     * @return 是否成功输出至少一部分流体
+     */
+    private boolean autoOutputFluids(Level level, @Nullable Direction preferredDirection) {
+        boolean anyOutputSuccess = false;
+
+        for (int tankIndex = 0; tankIndex < FLUID_TANK_COUNT; tankIndex++) {
+            FluidStack fluid = this.outputFluidTanks[tankIndex].getFluid();
+            if (fluid.isEmpty()) continue;
+
+            // 先尝试优先方向
+            if (preferredDirection != null) {
+                int filled = this.tryOutputFluidToDirection(level, tankIndex, preferredDirection);
+                if (filled > 0) {
+                    anyOutputSuccess = true;
+                    fluid = this.outputFluidTanks[tankIndex].getFluid();
+                    if (fluid.isEmpty()) continue;
+                }
+            }
+
+            // 如果优先方向失败或还有剩余，遍历所有方向
+            for (Direction direction : Direction.values()) {
+                if (direction == preferredDirection) continue;
+
+                int filled = this.tryOutputFluidToDirection(level, tankIndex, direction);
+                if (filled > 0) {
+                    anyOutputSuccess = true;
+                    // 更新上次成功的方向缓存
+                    this.lastSuccessfulOutputDirection = direction;
+                    this.setChanged();
+                    fluid = this.outputFluidTanks[tankIndex].getFluid();
+                    if (fluid.isEmpty()) break;
+                }
+            }
+        }
+
+        return anyOutputSuccess;
+    }
+
+    /**
+     * 尝试向指定方向输出流体
+     * @return 成功输出的流体量
+     */
+    private int tryOutputFluidToDirection(Level level, int tankIndex, Direction direction) {
+        BlockPos targetPos = this.worldPosition.relative(direction);
+        BlockEntity targetEntity = level.getBlockEntity(targetPos);
+
+        if (targetEntity == null) return 0;
+
+        // 尝试向目标容器的流体槽输出
+        IFluidHandler targetHandler = level.getCapability(
+                Capabilities.FluidHandler.BLOCK,
+                targetPos,
+                targetEntity.getBlockState(),
+                targetEntity,
+                direction.getOpposite()
+        );
+
+        if (targetHandler == null) return 0;
+
+        FluidStack fluid = this.outputFluidTanks[tankIndex].getFluid();
+        if (fluid.isEmpty()) return 0;
+
+        // 尝试填充流体到目标容器
+        int filled = targetHandler.fill(fluid, IFluidHandler.FluidAction.EXECUTE);
+        if (filled > 0) {
+            this.outputFluidTanks[tankIndex].drain(filled, IFluidHandler.FluidAction.EXECUTE);
+            this.setChanged();
+        }
+
+        return filled;
     }
 
     private record CombinedFluidTankHandler(FluidTank[] inputTanks, FluidTank[] outputTanks) implements IFluidHandler {

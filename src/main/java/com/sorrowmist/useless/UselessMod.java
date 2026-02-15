@@ -2,6 +2,11 @@ package com.sorrowmist.useless;
 
 import com.mojang.logging.LogUtils;
 import com.sorrowmist.useless.content.blocks.GlowPlasticBlock;
+import com.sorrowmist.useless.content.recipe.adapters.advancedae.AdvancedAECompat;
+import com.sorrowmist.useless.content.recipe.adapters.ae2.AE2Compat;
+import com.sorrowmist.useless.content.recipe.adapters.extendedae.ExtendedAECompat;
+import com.sorrowmist.useless.content.recipe.adapters.industrialforegoing.IndustrialForegoingCompat;
+import com.sorrowmist.useless.content.recipe.adapters.mekanism.MekanismCompat;
 import com.sorrowmist.useless.core.component.UComponents;
 import com.sorrowmist.useless.core.config.ConfigManager;
 import com.sorrowmist.useless.init.*;
@@ -57,6 +62,16 @@ public class UselessMod {
     }
 
     private void commonSetup(FMLCommonSetupEvent event) {
+        // 初始化 ExtendedAE 兼容性支持（如果EAE已加载）
+        ExtendedAECompat.init(event);
+        // 初始化 AdvancedAE 兼容性支持（如果AAE已加载）
+        AdvancedAECompat.init(event);
+        // 初始化 Mekanism 兼容性支持（如果Mek已加载）
+        MekanismCompat.init(event);
+        // 初始化 AE2 兼容性支持（如果AE2已加载）
+        AE2Compat.init(event);
+        // 初始化 Industrial Foregoing 兼容性支持（如果IF已加载）
+        IndustrialForegoingCompat.init(event);
     }
 
     @SubscribeEvent

@@ -7,8 +7,9 @@ import com.sorrowmist.useless.init.ModTags;
 import com.sorrowmist.useless.utils.CatalystParallelManager;
 import mezz.jei.api.constants.VanillaTypes;
 import mezz.jei.api.gui.builder.IRecipeLayoutBuilder;
+import mezz.jei.api.gui.builder.ITooltipBuilder;
 import mezz.jei.api.gui.drawable.IDrawable;
-import mezz.jei.api.gui.ingredient.IRecipeSlotTooltipCallback;
+import mezz.jei.api.gui.ingredient.IRecipeSlotRichTooltipCallback;
 import mezz.jei.api.gui.ingredient.IRecipeSlotsView;
 import mezz.jei.api.helpers.IGuiHelper;
 import mezz.jei.api.ingredients.IIngredientRenderer;
@@ -119,7 +120,7 @@ public class CatalystInfoCategory implements IRecipeCategory<CatalystInfoCategor
             builder.addSlot(RecipeIngredientRole.INPUT, x, y)
                    .addItemStack(this.catalystStacks.get(i))
                    .setCustomRenderer(VanillaTypes.ITEM_STACK, new CatalystItemStackRenderer(i))
-                   .addTooltipCallback(new CatalystTooltipCallback(i));
+                   .addRichTooltipCallback(new CatalystTooltipCallback(i));
         }
     }
 
@@ -163,7 +164,7 @@ public class CatalystInfoCategory implements IRecipeCategory<CatalystInfoCategor
     }
 
     // 自定义工具提示回调
-    private class CatalystTooltipCallback implements IRecipeSlotTooltipCallback {
+    private class CatalystTooltipCallback implements IRecipeSlotRichTooltipCallback {
         private final int catalystIndex;
 
         CatalystTooltipCallback(int index) {
@@ -171,20 +172,19 @@ public class CatalystInfoCategory implements IRecipeCategory<CatalystInfoCategor
         }
 
         @Override
-        public void onTooltip(mezz.jei.api.gui.ingredient.IRecipeSlotView recipeSlotView, List<Component> tooltip) {
+        public void onRichTooltip(mezz.jei.api.gui.ingredient.IRecipeSlotView recipeSlotView, ITooltipBuilder tooltip) {
             if (this.catalystIndex < CatalystInfoCategory.this.catalystStacks.size()) {
                 ItemStack stack = CatalystInfoCategory.this.catalystStacks.get(this.catalystIndex);
                 int tier = CatalystParallelManager.getCatalystTier(stack);
                 String catalystName = CatalystParallelManager.getCatalystDisplayName(stack);
 
-                // 清空原有工具提示，添加自定义工具提示
-                tooltip.clear();
+                // 添加自定义工具提示
                 tooltip.add(Component.literal(catalystName).withStyle(ChatFormatting.GOLD));
 
                 // 检查是否为USEFUL_INGOT
                 if (CatalystParallelManager.isUsefulIngot(stack)) {
                     tooltip.add(Component.literal("并行数: 无上限").withStyle(ChatFormatting.GREEN));
-                    tooltip.add(Component.literal(""));
+                    tooltip.add(Component.empty());
                     tooltip.add(Component.literal("效果说明:").withStyle(ChatFormatting.YELLOW));
                     tooltip.add(Component.literal("• 催化剂不会被消耗").withStyle(ChatFormatting.GREEN));
                     tooltip.add(Component.literal("• 无并行数上限").withStyle(ChatFormatting.GREEN));
@@ -196,7 +196,7 @@ public class CatalystInfoCategory implements IRecipeCategory<CatalystInfoCategor
                     int normalParallel = CatalystParallelManager.calculateParallelForNormalRecipe(stack);
                     tooltip.add(Component.literal("普通配方并行数: " + normalParallel + "倍")
                                          .withStyle(ChatFormatting.GREEN));
-                    tooltip.add(Component.literal(""));
+                    tooltip.add(Component.empty());
                     tooltip.add(Component.literal("跨阶合成效果:").withStyle(ChatFormatting.YELLOW));
 
                     // 显示跨阶合成信息
@@ -210,7 +210,7 @@ public class CatalystInfoCategory implements IRecipeCategory<CatalystInfoCategor
                         }
                     }
 
-                    tooltip.add(Component.literal(""));
+                    tooltip.add(Component.empty());
                     tooltip.add(Component.literal("效果说明:").withStyle(ChatFormatting.YELLOW));
                     tooltip.add(Component.literal("• 输入物品消耗 × 并行数").withStyle(ChatFormatting.GRAY));
                     tooltip.add(Component.literal("• 输出物品数量 × 并行数").withStyle(ChatFormatting.GRAY));
@@ -270,6 +270,7 @@ public class CatalystInfoCategory implements IRecipeCategory<CatalystInfoCategor
         // 保持已弃用方法的重写以避免编译错误
         @Override
         @Deprecated
+        @SuppressWarnings({"removal"})
         public List<Component> getTooltip(ItemStack ingredient, TooltipFlag tooltipFlag) {
             List<Component> tooltip = new ArrayList<>();
             if (this.catalystIndex < CatalystInfoCategory.this.catalystStacks.size()) {

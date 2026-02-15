@@ -178,7 +178,15 @@ dependencies {
 //    implementation "curse.maven:curios-309927:6073321"
     implementation "top.theillusivec4.curios:curios-neoforge:9.5.1+1.21.1:api"
     implementation "curse.maven:ex-pattern-provider-892005:6863556"
-    compileOnly "curse.maven:applied-flux-965012:5614830"
+    implementation "curse.maven:applied-flux-965012:5614830"
+    implementation "curse.maven:advancedae-1084104:7222372"
+    implementation "curse.maven:ae2addonlib-1366135:7222312"
+
+    //工业先锋
+    implementation "curse.maven:industrial-foregoing-266515:7073719"
+
+
+
     compileOnly "curse.maven:jade-324717:5427817"
 
     implementation "mekanism:Mekanism:1.21.1-10.7.15.81"

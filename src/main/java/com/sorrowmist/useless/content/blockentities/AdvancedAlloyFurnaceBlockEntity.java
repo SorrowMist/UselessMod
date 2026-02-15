@@ -2,6 +2,7 @@ package com.sorrowmist.useless.content.blockentities;
 
 import com.sorrowmist.useless.content.menus.AdvancedAlloyFurnaceMenu;
 import com.sorrowmist.useless.content.recipe.AdvancedAlloyFurnaceRecipe;
+import com.sorrowmist.useless.content.recipe.AlloyFurnaceRecipeManager;
 import com.sorrowmist.useless.core.constants.NBTConstants;
 import com.sorrowmist.useless.energy.EnergyManager;
 import com.sorrowmist.useless.energy.IEnergyManager;
@@ -724,17 +725,24 @@ public class AdvancedAlloyFurnaceBlockEntity extends BlockEntity implements Menu
             return Optional.of(this.lastSuccessfulRecipe);
         }
 
-        List<RecipeHolder<AdvancedAlloyFurnaceRecipe>> recipes = this.level.getRecipeManager()
-                .getAllRecipesFor(ModRecipeTypes.ADVANCED_ALLOY_FURNACE_TYPE.get());
-
-        for (RecipeHolder<AdvancedAlloyFurnaceRecipe> holder : recipes) {
-            AdvancedAlloyFurnaceRecipe recipe = holder.value();
-            // 跳过已经检查过的上一个配方
-            if (recipe == this.lastSuccessfulRecipe) continue;
-
-            if (this.canProcessRecipe(recipe)) {
-                return Optional.of(recipe);
+        // 收集当前输入物品
+        List<ItemStack> currentInputs = new ArrayList<>();
+        for (int i = INPUT_SLOTS_START; i < INPUT_SLOTS_START + INPUT_SLOTS_COUNT; i++) {
+            ItemStack stack = this.itemHandler.getStackInSlot(i);
+            if (!stack.isEmpty()) {
+                currentInputs.add(stack);
             }
+        }
+
+        if (currentInputs.isEmpty()) return Optional.empty();
+
+        // 使用配方管理器查找配方（包含自定义配方和转换的原版配方）
+        AdvancedAlloyFurnaceRecipe recipe = AlloyFurnaceRecipeManager.getInstance().findRecipe(
+                this.level, currentInputs
+        );
+
+        if (recipe != null && this.canProcessRecipe(recipe)) {
+            return Optional.of(recipe);
         }
 
         return Optional.empty();

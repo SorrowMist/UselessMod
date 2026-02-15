@@ -42,10 +42,10 @@ displayName="${mod_name}" #mandatory
 #credits="" #optional
 
 # A text field displayed in the mod UI
-authors="${mod_authors}" #optional
+authors="C-H716 (Original by 水幕忘忧)"
 
 # The description text for the mod (multi line!) (#mandatory)
-description='''${mod_description}'''
+description='''这个mod可能很有用, 但这个mod很有用不太可能。'''
 
 enumExtensions = "META-INF/enumextensions.json"
 # The [[mixins]] block allows you to declare your mixin config to FML so that it gets loaded.

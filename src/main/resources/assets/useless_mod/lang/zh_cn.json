@@ -199,5 +199,8 @@
   "tooltip.useless_mod.key.switch_force_mining": "§d按下 %s 切换强制挖掘模式",
   "tooltip.useless_mod.key.trigger_chain_mining": "§c按住 %s 临时激活连锁挖掘",
   "tooltip.useless_mod.key.trigger_force_mining": "§c按住 %s 临时激活强制挖掘",
-  "tooltip.useless_mod.key.open_mode_wheel": "§e按下 %s 打开模式选择轮盘"
+  "tooltip.useless_mod.key.open_mode_wheel": "§e按下 %s 打开模式选择轮盘",
+  "tooltip.useless_mod.furnace_tier": "阶级: %s",
+
+  "jei.useless_mod.catalyst_info": "催化剂并行数信息"
 }

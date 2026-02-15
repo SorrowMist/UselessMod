@@ -14,9 +14,8 @@ public class AdvancedAlloyFurnaceData implements ContainerData {
     public static final int DATA_PROGRESS = 2;
     public static final int DATA_MAX_PROGRESS = 3;
     public static final int DATA_CURRENT_PARALLEL = 4;
-    public static final int DATA_MAX_PARALLEL = 5;
-    public static final int DATA_HAS_MOLD = 6;
-    public static final int DATA_COUNT = 7;
+    public static final int DATA_HAS_MOLD = 5;
+    public static final int DATA_COUNT = 6;
 
     private final AdvancedAlloyFurnaceBlockEntity entity;
 
@@ -32,7 +31,6 @@ public class AdvancedAlloyFurnaceData implements ContainerData {
             case DATA_PROGRESS -> this.entity.getProgress();
             case DATA_MAX_PROGRESS -> this.entity.getMaxProgress();
             case DATA_CURRENT_PARALLEL -> this.entity.getCurrentParallel();
-            case DATA_MAX_PARALLEL -> this.entity.getMaxParallel();
             case DATA_HAS_MOLD -> this.entity.hasMold() ? 1 : 0;
             default -> 0;
         };
@@ -44,7 +42,6 @@ public class AdvancedAlloyFurnaceData implements ContainerData {
             case DATA_PROGRESS -> this.entity.setProgress(value);
             case DATA_MAX_PROGRESS -> this.entity.setMaxProgress(value);
             case DATA_CURRENT_PARALLEL -> this.entity.setCurrentParallel(value);
-            case DATA_MAX_PARALLEL -> this.entity.setMaxParallel(value);
             case DATA_HAS_MOLD -> this.entity.setHasMold(value > 0);
         }
     }

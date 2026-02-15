@@ -255,10 +255,6 @@ public class AdvancedAlloyFurnaceMenu extends AbstractContainerMenu {
         return this.data.get(AdvancedAlloyFurnaceData.DATA_CURRENT_PARALLEL);
     }
 
-    public int getMaxParallel() {
-        return this.data.get(AdvancedAlloyFurnaceData.DATA_MAX_PARALLEL);
-    }
-
     public int getCatalystMaxParallel() {
         return this.blockEntity != null ? this.blockEntity.getCatalystMaxParallel() : 1;
     }

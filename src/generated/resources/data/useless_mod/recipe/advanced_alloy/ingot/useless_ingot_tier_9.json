@@ -1,8 +1,13 @@
 {
   "type": "useless_mod:advanced_alloy_furnace",
-  "catalyst": {
-    "item": "useless_mod:useless_ingot_tier_8"
-  },
+  "catalyst": [
+    {
+      "item": "useless_mod:useless_ingot_tier_8"
+    },
+    {
+      "item": "useless_mod:useless_ingot_tier_9"
+    }
+  ],
   "catalyst_uses": 1,
   "energy": 100000000,
   "id": "useless_mod:advanced_alloy/ingot/useless_ingot_tier_9",

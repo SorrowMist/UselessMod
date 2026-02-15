@@ -246,38 +246,34 @@ public class AdvancedAlloyFurnaceRecipeCategory implements IRecipeCategory<Advan
             }
         }
 
-        // 催化剂槽位：只在配方允许催化剂时显示
-        if (!recipe.catalyst().isEmpty()) {
-            List<ItemStack> catalystStacks;
+        // 催化剂槽位
+        List<ItemStack> catalystStacks = new ArrayList<>();
 
-            if (isUselessRecipe) {
-                // 无用锭配方：显示配方中定义的特定催化剂
-                ItemStack[] recipeCatalysts = recipe.catalyst().getItems();
-                catalystStacks = new ArrayList<>();
-                for (ItemStack stack : recipeCatalysts) {
-                    ItemStack displayStack = stack.copy();
-                    displayStack.setCount(recipe.catalystUses() > 0 ? recipe.catalystUses() : 1);
+        if (isUselessRecipe && !recipe.catalyst().isEmpty()) {
+            // 无用锭配方且有特定催化剂要求：显示配方中定义的特定催化剂
+            ItemStack[] recipeCatalysts = recipe.catalyst().getItems();
+            for (ItemStack stack : recipeCatalysts) {
+                ItemStack displayStack = stack.copy();
+                displayStack.setCount(recipe.catalystUses() > 0 ? recipe.catalystUses() : 1);
+                catalystStacks.add(displayStack);
+            }
+        } else if (!isUselessRecipe) {
+            // 普通配方：使用ModTags.CATALYSTS轮询显示所有催化剂（可选）
+            BuiltInRegistries.ITEM.getTag(ModTags.CATALYSTS).ifPresent(tag -> {
+                for (var holder : tag) {
+                    ItemStack displayStack = new ItemStack(holder.value());
+                    displayStack.setCount(1);
                     catalystStacks.add(displayStack);
                 }
-            } else {
-                // 普通配方：使用ModTags.CATALYSTS轮询显示所有催化剂
-                catalystStacks = new ArrayList<>();
-                BuiltInRegistries.ITEM.getTag(ModTags.CATALYSTS).ifPresent(tag -> {
-                    for (var holder : tag) {
-                        ItemStack displayStack = new ItemStack(holder.value());
-                        displayStack.setCount(recipe.catalystUses() > 0 ? recipe.catalystUses() : 1);
-                        catalystStacks.add(displayStack);
-                    }
-                });
-            }
+            });
+        }
 
-            if (!catalystStacks.isEmpty()) {
-                builder.addSlot(RecipeIngredientRole.CATALYST,
-                                CATALYST_SLOT_X, CATALYST_SLOT_Y
-                       )
-                       .addIngredients(Ingredient.of(catalystStacks.toArray(new ItemStack[0])))
-                       .setCustomRenderer(VanillaTypes.ITEM_STACK, new ItemStackRenderer());
-            }
+        if (!catalystStacks.isEmpty()) {
+            builder.addSlot(RecipeIngredientRole.CATALYST,
+                            CATALYST_SLOT_X, CATALYST_SLOT_Y
+                   )
+                   .addIngredients(Ingredient.of(catalystStacks.toArray(new ItemStack[0])))
+                   .setCustomRenderer(VanillaTypes.ITEM_STACK, new ItemStackRenderer());
         }
 
         // 模具槽位

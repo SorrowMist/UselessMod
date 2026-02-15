@@ -2,7 +2,6 @@ package com.sorrowmist.useless.utils;
 
 import com.sorrowmist.useless.init.ModItems;
 import net.minecraft.core.registries.BuiltInRegistries;
-import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 
 import java.util.HashMap;
@@ -47,16 +46,6 @@ public class CatalystParallelManager {
         return CATALYST_TIER_MAP.getOrDefault(itemId, 0);
     }
 
-    /**
-     * 判断物品是否为无用锭（tier 1-9）
-     *
-     * @param stack 物品堆
-     * @return 是否为无用锭
-     */
-    public static boolean isUselessIngot(ItemStack stack) {
-        int tier = getCatalystTier(stack);
-        return tier >= 1 && tier <= 9;
-    }
 
     /**
      * 判断物品是否为有用锭
@@ -66,16 +55,6 @@ public class CatalystParallelManager {
      */
     public static boolean isUsefulIngot(ItemStack stack) {
         return stack.is(ModItems.USEFUL_INGOT.get());
-    }
-
-    /**
-     * 判断物品是否为可能有用锭
-     *
-     * @param stack 物品堆
-     * @return 是否为可能有用锭
-     */
-    public static boolean isPossibleUsefulIngot(ItemStack stack) {
-        return stack.is(ModItems.POSSIBLE_USEFUL_INGOT.get());
     }
 
     /**
@@ -100,10 +79,11 @@ public class CatalystParallelManager {
     }
 
     /**
-     * 计算无用锭配方的并行数（跨阶合成）
-     * 当合成N阶无用锭时，使用M阶催化剂（M > N），并行数从基础重新开始计算
-     * 例如：合成4阶，用5阶催化剂，并行数 = 3（不是81）
-     * 例如：合成4阶，用6阶催化剂，并行数 = 9（3^2）
+     * 计算无用锭配方的并行数
+     * 当合成N阶无用锭时：
+     * - 使用N阶催化剂（同阶），并行数 = 3
+     * - 使用M阶催化剂（M > N），并行数 = 3^(M-N+1)
+     * 使用低于N阶的催化剂（如合成3阶用2阶），并行数 = 1
      *
      * @param catalystStack 催化剂物品堆
      * @param targetTier    目标无用锭等级（配方输出）
@@ -119,11 +99,12 @@ public class CatalystParallelManager {
             return Integer.MAX_VALUE;
         }
 
-        // 催化剂等级必须高于目标等级才有效
-        if (catalystTier <= targetTier) return 1;
+        // 催化剂等级必须大于等于目标等级才有并行
+        if (catalystTier < targetTier) return 1;
 
-        // 计算等级差，并行数 = 3^等级差
-        int tierDifference = catalystTier - targetTier;
+        // 计算等级差+1，并行数 = 3^(等级差+1)
+        // 同阶时等级差为0，并行数 = 3^1 = 3
+        int tierDifference = catalystTier - targetTier + 1;
         return (int) Math.pow(BASE_PARALLEL, tierDifference);
     }
 
@@ -135,10 +116,7 @@ public class CatalystParallelManager {
      * @return 等级（1-9），如果不是无用锭则返回0
      */
     public static int getTargetUselessIngotTier(ItemStack outputStack) {
-        if (outputStack.isEmpty()) return 0;
-
-        String itemId = BuiltInRegistries.ITEM.getKey(outputStack.getItem()).toString();
-        return CATALYST_TIER_MAP.getOrDefault(itemId, 0);
+        return getCatalystTier(outputStack);
     }
 
     /**

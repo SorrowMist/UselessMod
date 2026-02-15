@@ -2,6 +2,7 @@ package com.sorrowmist.useless.utils.mining;
 
 import com.sorrowmist.useless.api.enums.tool.EnchantMode;
 import com.sorrowmist.useless.compat.SophisticatedCompat;
+import com.sorrowmist.useless.content.blocks.AdvancedAlloyFurnaceBlock;
 import com.sorrowmist.useless.core.component.UComponents;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
@@ -10,6 +11,8 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.storage.loot.LootParams;
+import net.minecraft.world.level.storage.loot.parameters.LootContextParams;
 import net.neoforged.fml.ModList;
 import net.neoforged.neoforge.event.level.BlockEvent;
 
@@ -21,6 +24,7 @@ import java.util.List;
  * 特殊掉落逻辑：
  * 1. 精准采集模式：强制获取带NBT的方块
  * 2. 非精准采集模式：正常获取掉落物，无掉落物时强制掉落方块本身
+ * 3. 对万象合金炉特殊处理：使用方块的getDrops方法以保存数据
  */
 public class ForceBreakStrategy implements MiningStrategy {
 
@@ -38,7 +42,18 @@ public class ForceBreakStrategy implements MiningStrategy {
 
         List<ItemStack> drops;
 
-        if (isSilkTouch) {
+        // 对万象合金炉特殊处理：使用方块的getDrops方法以保存数据
+        if (block instanceof AdvancedAlloyFurnaceBlock alloyFurnaceBlock) {
+            BlockEntity be = level.getBlockEntity(pos);
+            LootParams.Builder lootParams = new LootParams.Builder(level)
+                    .withParameter(LootContextParams.ORIGIN, pos.getCenter())
+                    .withParameter(LootContextParams.TOOL, hand)
+                    .withParameter(LootContextParams.THIS_ENTITY, player);
+            if (be != null) {
+                lootParams.withParameter(LootContextParams.BLOCK_ENTITY, be);
+            }
+            drops = alloyFurnaceBlock.getDrops(state, lootParams);
+        } else if (isSilkTouch) {
             // 精准采集模式：强制获取带NBT的方块
             drops = MiningUtils.getSilkTouchDrops(state, level, pos);
         } else {

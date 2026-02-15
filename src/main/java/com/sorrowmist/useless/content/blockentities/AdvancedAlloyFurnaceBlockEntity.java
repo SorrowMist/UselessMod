@@ -50,18 +50,24 @@ public class AdvancedAlloyFurnaceBlockEntity extends BlockEntity implements Menu
     public static final int TOTAL_SLOTS = 20;
 
     public static final int FLUID_TANK_COUNT = 6;
-    private static final int FLUID_TANK_CAPACITY = 16000;
-
-    private static final int ENERGY_CAPACITY = 100000;
-    private static final int ENERGY_MAX_RECEIVE = 10000;
+    
+    // 基础容量配置
+    private static final int BASE_FLUID_TANK_CAPACITY = 16000;
+    private static final int BASE_ENERGY_CAPACITY = 100000;
+    private static final int BASE_ENERGY_MAX_RECEIVE = 10000;
     private static final int ENERGY_MAX_EXTRACT = 0;
+
+    // 升级后的容量（根据阶级动态计算）
+    private int fluidTankCapacity = BASE_FLUID_TANK_CAPACITY;
+    private int energyCapacity = BASE_ENERGY_CAPACITY;
+    private int energyMaxReceive = BASE_ENERGY_MAX_RECEIVE;
 
     private final FluidTank[] inputFluidTanks = new FluidTank[FLUID_TANK_COUNT];
     private final FluidTank[] outputFluidTanks = new FluidTank[FLUID_TANK_COUNT];
 
     private final IEnergyManager energyManager = EnergyManager.builder()
-            .capacity(ENERGY_CAPACITY)
-            .maxReceive(ENERGY_MAX_RECEIVE)
+            .capacity(BASE_ENERGY_CAPACITY)
+            .maxReceive(BASE_ENERGY_MAX_RECEIVE)
             .maxExtract(ENERGY_MAX_EXTRACT)
             .onChange(this::setChanged)
             .build();
@@ -71,7 +77,6 @@ public class AdvancedAlloyFurnaceBlockEntity extends BlockEntity implements Menu
     private int progress = 0;
     private int maxProgress = 200;
     private int currentParallel = 1;
-    private int maxParallel = 8;
     private boolean hasMold = false;
 
     @Nullable
@@ -89,6 +94,9 @@ public class AdvancedAlloyFurnaceBlockEntity extends BlockEntity implements Menu
     // 活跃状态冷却计时器，用于避免配方切换时的闪烁
     private int activeCooldown = 0;
     private static final int ACTIVE_COOLDOWN_TICKS = 5;
+
+    // 熔炉阶级 0-9，0为基础等级
+    private int furnaceTier = 0;
 
     private final ItemStackHandler itemHandler = new ItemStackHandler(TOTAL_SLOTS) {
         @Override
@@ -123,9 +131,167 @@ public class AdvancedAlloyFurnaceBlockEntity extends BlockEntity implements Menu
 
     public AdvancedAlloyFurnaceBlockEntity(BlockPos pos, BlockState state) {
         super(ModBlockEntities.ADVANCED_ALLOY_FURNACE.get(), pos, state);
+        // 初始化时应用当前阶级的容量
+        this.updateCapacityByTier();
         for (int i = 0; i < FLUID_TANK_COUNT; i++) {
             this.inputFluidTanks[i] = this.createTank(i, true);
             this.outputFluidTanks[i] = this.createTank(i, false);
+        }
+    }
+
+    /**
+     * 根据阶级计算并更新容量
+     * 使用指数增长曲线，9阶达到int最大值
+     */
+    private void updateCapacityByTier() {
+        this.fluidTankCapacity = calculateFluidCapacity(this.furnaceTier);
+        this.energyCapacity = calculateEnergyCapacity(this.furnaceTier);
+        this.energyMaxReceive = calculateEnergyReceive(this.furnaceTier);
+        
+        // 更新能量管理器
+        this.energyManager.setMaxEnergyStored(this.energyCapacity);
+        this.energyManager.setMaxReceive(this.energyMaxReceive);
+        
+        // 更新流体槽容量
+        for (int i = 0; i < FLUID_TANK_COUNT; i++) {
+            if (this.inputFluidTanks[i] != null) {
+                this.inputFluidTanks[i].setCapacity(this.fluidTankCapacity);
+            }
+            if (this.outputFluidTanks[i] != null) {
+                this.outputFluidTanks[i].setCapacity(this.fluidTankCapacity);
+            }
+        }
+    }
+
+    /**
+     * 计算流体槽容量
+     * 基础16000，前3阶2倍增长，之后4倍增长，9阶达到int最大值
+     */
+    public static int calculateFluidCapacity(int tier) {
+        if (tier <= 0) return BASE_FLUID_TANK_CAPACITY;
+        if (tier >= 9) return Integer.MAX_VALUE;
+        
+        long capacity;
+        if (tier <= 3) {
+            // 1-3阶：2倍增长
+            capacity = (long) BASE_FLUID_TANK_CAPACITY * (1L << tier);
+        } else {
+            // 4-8阶：4倍增长（从第3阶的基础上）
+            long base = (long) BASE_FLUID_TANK_CAPACITY * 8; // 第3阶的值
+            capacity = base * (long) Math.pow(4, tier - 3);
+        }
+        return (int) Math.min(capacity, Integer.MAX_VALUE);
+    }
+
+    /**
+     * 计算能量槽容量
+     * 基础100000，前3阶2倍增长，之后4倍增长，9阶达到int最大值
+     */
+    public static int calculateEnergyCapacity(int tier) {
+        if (tier <= 0) return BASE_ENERGY_CAPACITY;
+        if (tier >= 9) return Integer.MAX_VALUE;
+        
+        long capacity;
+        if (tier <= 3) {
+            // 1-3阶：2倍增长
+            capacity = (long) BASE_ENERGY_CAPACITY * (1L << tier);
+        } else {
+            // 4-8阶：4倍增长
+            long base = (long) BASE_ENERGY_CAPACITY * 8; // 第3阶的值
+            capacity = base * (long) Math.pow(4, tier - 3);
+        }
+        return (int) Math.min(capacity, Integer.MAX_VALUE);
+    }
+
+    /**
+     * 计算能量输入速度
+     * 基础10000，前3阶2倍增长，之后4倍增长，9阶达到int最大值
+     */
+    public static int calculateEnergyReceive(int tier) {
+        if (tier <= 0) return BASE_ENERGY_MAX_RECEIVE;
+        if (tier >= 9) return Integer.MAX_VALUE;
+        
+        long receive;
+        if (tier <= 3) {
+            // 1-3阶：2倍增长
+            receive = (long) BASE_ENERGY_MAX_RECEIVE * (1L << tier);
+        } else {
+            // 4-8阶：4倍增长
+            long base = (long) BASE_ENERGY_MAX_RECEIVE * 8; // 第3阶的值
+            receive = base * (long) Math.pow(4, tier - 3);
+        }
+        return (int) Math.min(receive, Integer.MAX_VALUE);
+    }
+
+    /**
+     * 获取当前熔炉阶级
+     */
+    public int getFurnaceTier() {
+        return this.furnaceTier;
+    }
+
+    /**
+     * 设置熔炉阶级（内部使用，不触发容量更新）
+     */
+    private void setFurnaceTier(int tier) {
+        this.furnaceTier = Math.max(0, Math.min(9, tier));
+    }
+
+    /**
+     * 尝试升级熔炉
+     * @param targetTier 目标阶级（1-9）
+     * @return 是否升级成功
+     */
+    public boolean tryUpgrade(int targetTier) {
+        // 只能升级到更高阶级
+        if (targetTier <= this.furnaceTier) {
+            return false;
+        }
+        // 限制在1-9范围内
+        if (targetTier < 1 || targetTier > 9) {
+            return false;
+        }
+        this.furnaceTier = targetTier;
+        this.updateCapacityByTier();
+        this.setChanged();
+        
+        // 同步数据到客户端，确保界面立即更新
+        if (this.level != null && !this.level.isClientSide) {
+            this.level.sendBlockUpdated(this.worldPosition, this.getBlockState(), this.getBlockState(), 3);
+        }
+        
+        return true;
+    }
+
+    /**
+     * 获取流体槽容量
+     */
+    public int getFluidTankCapacity() {
+        return this.fluidTankCapacity;
+    }
+
+    /**
+     * 获取能量槽容量
+     */
+    public int getEnergyCapacity() {
+        return this.energyCapacity;
+    }
+
+    /**
+     * 获取能量输入速度
+     */
+    public int getEnergyMaxReceive() {
+        return this.energyMaxReceive;
+    }
+
+    /**
+     * 设置物品栏中的物品（用于从NBT恢复）
+     * @param slot 槽位
+     * @param stack 物品堆
+     */
+    public void setItemInSlot(int slot, ItemStack stack) {
+        if (slot >= 0 && slot < TOTAL_SLOTS) {
+            this.itemHandler.setStackInSlot(slot, stack);
         }
     }
 
@@ -343,8 +509,7 @@ public class AdvancedAlloyFurnaceBlockEntity extends BlockEntity implements Menu
     public int getCatalystMaxParallel() {
         ItemStack catalystStack = this.itemHandler.getStackInSlot(CATALYST_SLOT);
         if (catalystStack.isEmpty()) return 1;
-        int parallel = CatalystParallelManager.calculateParallelForNormalRecipe(catalystStack);
-        return Math.min(parallel, this.maxParallel);
+        return CatalystParallelManager.calculateParallelForNormalRecipe(catalystStack);
     }
 
     private int calculateDisplayParallel() {
@@ -361,41 +526,33 @@ public class AdvancedAlloyFurnaceBlockEntity extends BlockEntity implements Menu
     }
 
     void setCurrentParallel(int parallel) {
-        this.currentParallel = Math.min(parallel, this.maxParallel);
+        this.currentParallel = parallel;
         this.setChanged();
     }
 
-    int getMaxParallel() {
-        return this.maxParallel;
-    }
-
-    void setMaxParallel(int maxParallel) {
-        this.maxParallel = maxParallel;
-    }
-
-    boolean hasMold() {
+    public boolean hasMold() {
         return this.hasMold;
     }
 
-    void setHasMold(boolean hasMold) {
+    public void setHasMold(boolean hasMold) {
         this.hasMold = hasMold;
         this.setChanged();
     }
 
-    int getProgress() {
+    public int getProgress() {
         return this.progress;
     }
 
-    void setProgress(int progress) {
+    public void setProgress(int progress) {
         this.progress = progress;
         this.setChanged();
     }
 
-    int getMaxProgress() {
+    public int getMaxProgress() {
         return this.maxProgress;
     }
 
-    void setMaxProgress(int maxProgress) {
+    public void setMaxProgress(int maxProgress) {
         this.maxProgress = maxProgress;
         this.setChanged();
     }
@@ -410,7 +567,7 @@ public class AdvancedAlloyFurnaceBlockEntity extends BlockEntity implements Menu
     }
 
     private FluidTank createTank(int index, boolean isInput) {
-        return new FluidTank(FLUID_TANK_CAPACITY) {
+        return new FluidTank(this.fluidTankCapacity) {
             @Override
             protected void onContentsChanged() {
                 AdvancedAlloyFurnaceBlockEntity.this.setChanged();
@@ -457,6 +614,12 @@ public class AdvancedAlloyFurnaceBlockEntity extends BlockEntity implements Menu
     protected void loadAdditional(@NotNull CompoundTag tag, HolderLookup.@NotNull Provider registries) {
         super.loadAdditional(tag, registries);
 
+        // 加载阶级（必须在加载其他数据之前，因为会影响容量）
+        if (tag.contains(NBTConstants.FURNACE_TIER)) {
+            this.setFurnaceTier(tag.getInt(NBTConstants.FURNACE_TIER));
+            this.updateCapacityByTier();
+        }
+
         if (tag.contains(NBTConstants.INVENTORY)) {
             this.itemHandler.deserializeNBT(registries, tag.getCompound(NBTConstants.INVENTORY));
         }
@@ -468,7 +631,6 @@ public class AdvancedAlloyFurnaceBlockEntity extends BlockEntity implements Menu
         this.progress = tag.getInt(NBTConstants.PROGRESS);
         this.maxProgress = tag.getInt(NBTConstants.MAX_PROGRESS);
         this.currentParallel = tag.getInt(NBTConstants.CURRENT_PARALLEL);
-        this.maxParallel = tag.getInt(NBTConstants.MAX_PARALLEL);
         this.hasMold = tag.getBoolean(NBTConstants.HAS_MOLD);
         this.cachedParallel = tag.getInt(NBTConstants.CACHED_PARALLEL);
         if (this.cachedParallel <= 0) this.cachedParallel = 1;
@@ -498,15 +660,15 @@ public class AdvancedAlloyFurnaceBlockEntity extends BlockEntity implements Menu
     }
 
     @Override
-    protected void saveAdditional(@NotNull CompoundTag tag, HolderLookup.Provider registries) {
+    protected void saveAdditional(@NotNull CompoundTag tag, HolderLookup.@NotNull Provider registries) {
         super.saveAdditional(tag, registries);
 
+        tag.putInt(NBTConstants.FURNACE_TIER, this.furnaceTier);
         tag.put(NBTConstants.INVENTORY, this.itemHandler.serializeNBT(registries));
         tag.putInt(NBTConstants.ENERGY, this.energyManager.getEnergyStored());
         tag.putInt(NBTConstants.PROGRESS, this.progress);
         tag.putInt(NBTConstants.MAX_PROGRESS, this.maxProgress);
         tag.putInt(NBTConstants.CURRENT_PARALLEL, this.currentParallel);
-        tag.putInt(NBTConstants.MAX_PARALLEL, this.maxParallel);
         tag.putBoolean(NBTConstants.HAS_MOLD, this.hasMold);
         tag.putInt(NBTConstants.CACHED_PARALLEL, this.cachedParallel);
         tag.putBoolean(NBTConstants.IS_USELESS_INGOT_RECIPE, this.isUselessIngotRecipe);
@@ -681,7 +843,6 @@ public class AdvancedAlloyFurnaceBlockEntity extends BlockEntity implements Menu
                 ? CatalystParallelManager.calculateParallelForUselessIngotRecipe(catalystStack, targetTier)
                 : CatalystParallelManager.calculateParallelForNormalRecipe(catalystStack);
 
-        parallel = Math.min(parallel, this.maxParallel);
         return parallel <= 0 ? 1 : parallel;
     }
 

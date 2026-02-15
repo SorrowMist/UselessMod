@@ -2,6 +2,7 @@ package com.sorrowmist.useless.utils.mining;
 
 import com.sorrowmist.useless.api.enums.tool.EnchantMode;
 import com.sorrowmist.useless.compat.SophisticatedCompat;
+import com.sorrowmist.useless.content.blocks.AdvancedAlloyFurnaceBlock;
 import com.sorrowmist.useless.core.component.UComponents;
 import com.sorrowmist.useless.data.PlayerMiningData;
 import net.minecraft.core.BlockPos;
@@ -12,6 +13,8 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.storage.loot.LootParams;
+import net.minecraft.world.level.storage.loot.parameters.LootContextParams;
 import net.neoforged.fml.ModList;
 import net.neoforged.neoforge.event.level.BlockEvent;
 
@@ -77,15 +80,26 @@ public class ForceChainMiningStrategy implements MiningStrategy {
             }
 
             BlockEntity be = level.getBlockEntity(targetPos);
+            Block currentBlock = currentState.getBlock();
 
             // 根据模式获取掉落物
             List<ItemStack> drops;
-            if (isSilkTouch) {
+            // 对万象合金炉特殊处理：使用方块的getDrops方法以保存数据
+            if (currentBlock instanceof AdvancedAlloyFurnaceBlock alloyFurnaceBlock) {
+                LootParams.Builder lootParams = new LootParams.Builder(level)
+                        .withParameter(LootContextParams.ORIGIN, targetPos.getCenter())
+                        .withParameter(LootContextParams.TOOL, hand)
+                        .withParameter(LootContextParams.THIS_ENTITY, player);
+                if (be != null) {
+                    lootParams.withParameter(LootContextParams.BLOCK_ENTITY, be);
+                }
+                drops = alloyFurnaceBlock.getDrops(currentState, lootParams);
+            } else if (isSilkTouch) {
                 drops = MiningUtils.getSilkTouchDrops(currentState, level, targetPos);
             } else {
                 drops = Block.getDrops(currentState, level, targetPos, be, player, hand);
                 if (MiningUtils.hasNoValidDrops(drops)) {
-                    drops = Collections.singletonList(new ItemStack(currentState.getBlock().asItem()));
+                    drops = Collections.singletonList(new ItemStack(currentBlock.asItem()));
                 }
             }
 
@@ -106,7 +120,9 @@ public class ForceChainMiningStrategy implements MiningStrategy {
         }
 
         // 经验处理（仅在时运模式下）
-        if (!isSilkTouch && hand.getOrDefault(UComponents.EnchantModeComponent.get(), EnchantMode.FORTUNE) == EnchantMode.FORTUNE) {
+        if (!isSilkTouch && hand.getOrDefault(UComponents.EnchantModeComponent.get(),
+                                              EnchantMode.FORTUNE
+        ) == EnchantMode.FORTUNE) {
             int exp = originBlock.getExpDrop(originState, level, pos, level.getBlockEntity(pos), player, hand);
             if (exp > 0) {
                 originBlock.popExperience(level, pos, exp * actualMinedCount);

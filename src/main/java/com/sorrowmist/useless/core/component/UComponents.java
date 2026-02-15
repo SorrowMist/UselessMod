@@ -97,6 +97,16 @@ public final class UComponents {
                            .networkSynchronized(GlobalPos.STREAM_CODEC)
     );
 
+    /**
+     * 熔炉数据组件（FurnaceData）
+     * 用于存储高级合金炉的完整状态到物品中
+     * 包含阶级、物品栏、流体、能量等所有数据
+     */
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<FurnaceDataComponent>> FURNACE_DATA =
+            register("furnace_data", builder -> builder
+                    .persistent(FurnaceDataComponent.CODEC)
+                    .networkSynchronized(FurnaceDataComponent.STREAM_CODEC));
+
     // 私有构造器，防止外部实例化（该类仅用于注册静态组件）
     private UComponents() {}
 

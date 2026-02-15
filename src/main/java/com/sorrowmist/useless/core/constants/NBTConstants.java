@@ -7,12 +7,14 @@ public final class NBTConstants {
     public static final String PROGRESS = "Progress";
     public static final String MAX_PROGRESS = "MaxProgress";
     public static final String CURRENT_PARALLEL = "CurrentParallel";
-    public static final String MAX_PARALLEL = "MaxParallel";
     public static final String HAS_MOLD = "HasMold";
     public static final String CACHED_PARALLEL = "CachedParallel";
     public static final String IS_USELESS_INGOT_RECIPE = "IsUselessIngotRecipe";
     public static final String TARGET_USELESS_INGOT_TIER = "TargetUselessIngotTier";
     public static final String ACCUMULATED_ENERGY = "AccumulatedEnergy";
+
+    // 熔炉升级相关
+    public static final String FURNACE_TIER = "FurnaceTier";
 
     private NBTConstants() {
     }

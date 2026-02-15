@@ -198,5 +198,8 @@
   "tooltip.useless_mod.key.switch_force_mining": "§dPress %s to toggle Force Mining mode",
   "tooltip.useless_mod.key.trigger_chain_mining": "§cHold %s to temporarily activate Chain Mining",
   "tooltip.useless_mod.key.trigger_force_mining": "§cHold %s to temporarily activate Force Mining",
-  "tooltip.useless_mod.key.open_mode_wheel": "§ePress %s to open Mode Selection Wheel"
+  "tooltip.useless_mod.key.open_mode_wheel": "§ePress %s to open Mode Selection Wheel",
+  "tooltip.useless_mod.furnace_tier": "Tier: %s",
+
+  "jei.useless_mod.catalyst_info": "Catalyst Parallel Info"
 }

@@ -638,7 +638,7 @@ public class AdvancedAlloyFurnaceScreen extends AbstractContainerScreen<Advanced
                             this.menu.getCurrentParallel())
                     .withStyle(ChatFormatting.YELLOW));
             tooltip.add(Component.translatable("gui.useless_mod.advanced_alloy_furnace.max_parallel",
-                            this.menu.getMaxParallel())
+                            this.menu.getCatalystMaxParallel())
                     .withStyle(ChatFormatting.BLUE));
 
             tooltip.add(Component.empty());

@@ -13,10 +13,13 @@ import org.jetbrains.annotations.Nullable;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
  * 高级熔炉配方管理器
@@ -47,16 +50,16 @@ public class AlloyFurnaceRecipeManager {
     // ========== 预构建索引 ==========
 
     // 输入物品 -> 配方列表 索引（用于快速查找）
-    private final Map<Item, List<AdvancedAlloyFurnaceRecipe>> inputItemIndex = new HashMap<>();
+    private final Map<Item, List<AdvancedAlloyFurnaceRecipe>> inputItemIndex = new ConcurrentHashMap<>();
 
     // 模具物品 -> 配方列表 索引（用于按模具类型快速查找）
-    private final Map<Item, List<AdvancedAlloyFurnaceRecipe>> moldIndex = new HashMap<>();
+    private final Map<Item, List<AdvancedAlloyFurnaceRecipe>> moldIndex = new ConcurrentHashMap<>();
 
-    // 空模具（无模具要求）的配方列表
-    private final List<AdvancedAlloyFurnaceRecipe> noMoldRecipes = new ArrayList<>();
+    // 空模具（无模具要求）的配方列表（使用 CopyOnWriteArrayList 保证线程安全）
+    private final List<AdvancedAlloyFurnaceRecipe> noMoldRecipes = new CopyOnWriteArrayList<>();
 
-    // 所有已索引的配方（去重）
-    private final Set<AdvancedAlloyFurnaceRecipe> indexedRecipes = new HashSet<>();
+    // 所有已索引的配方（去重，使用 ConcurrentHashMap 的 keySet 保证线程安全）
+    private final Set<AdvancedAlloyFurnaceRecipe> indexedRecipes = ConcurrentHashMap.newKeySet();
 
     // 索引是否已构建
     private boolean indexBuilt = false;
@@ -96,11 +99,12 @@ public class AlloyFurnaceRecipeManager {
      * 构建配方索引
      * <p>
      * 在配方数据加载完成后调用，预构建所有索引以加速查找
+     * 只能在服务器端调用，避免并发修改异常
      *
      * @param level 世界
      */
     public void buildIndex(Level level) {
-        if (level == null) return;
+        if (level == null || level.isClientSide()) return;
 
         // 清空旧索引
         clearIndex();
@@ -142,7 +146,7 @@ public class AlloyFurnaceRecipeManager {
             for (ItemStack stack : ingredient.getItems()) {
                 if (!stack.isEmpty()) {
                     inputItemIndex
-                            .computeIfAbsent(stack.getItem(), k -> new ArrayList<>())
+                            .computeIfAbsent(stack.getItem(), k -> new CopyOnWriteArrayList<>())
                             .add(recipe);
                 }
             }
@@ -156,7 +160,7 @@ public class AlloyFurnaceRecipeManager {
             for (ItemStack stack : mold.getItems()) {
                 if (!stack.isEmpty()) {
                     moldIndex
-                            .computeIfAbsent(stack.getItem(), k -> new ArrayList<>())
+                            .computeIfAbsent(stack.getItem(), k -> new CopyOnWriteArrayList<>())
                             .add(recipe);
                 }
             }
@@ -182,8 +186,8 @@ public class AlloyFurnaceRecipeManager {
             return null;
         }
 
-        // 确保索引已构建
-        if (!indexBuilt) {
+        // 确保索引已构建（只在服务器端构建，客户端等待服务器同步数据）
+        if (!indexBuilt && !level.isClientSide()) {
             buildIndex(level);
         }
 
@@ -227,7 +231,36 @@ public class AlloyFurnaceRecipeManager {
     @Nullable
     private AdvancedAlloyFurnaceRecipe findRecipeByIndex(List<ItemStack> inputs, @Nullable ItemStack mold) {
         // 获取候选配方列表
-        Set<AdvancedAlloyFurnaceRecipe> candidates = getCandidateRecipes(inputs, mold);
+        List<AdvancedAlloyFurnaceRecipe> candidates = getCandidateRecipes(inputs, mold);
+
+        // 按优先级排序候选配方：
+        // 1. 原生自定义配方（非转换配方）优先于转换配方
+        // 2. 输入要求更多的配方优先（更具体的配方优先）
+        // 3. 有模具要求的配方优先
+        candidates.sort((a, b) -> {
+            // 首先，原生配方优先于转换配方
+            boolean aIsConverted = isConvertedRecipe(a);
+            boolean bIsConverted = isConvertedRecipe(b);
+            if (aIsConverted != bIsConverted) {
+                return aIsConverted ? 1 : -1; // 原生配方在前
+            }
+
+            // 其次，输入要求更多的配方优先（更具体）
+            int aInputs = a.inputs().size();
+            int bInputs = b.inputs().size();
+            if (aInputs != bInputs) {
+                return Integer.compare(bInputs, aInputs); // 输入多的在前
+            }
+
+            // 最后，有模具要求的优先
+            boolean aHasMold = !a.mold().isEmpty();
+            boolean bHasMold = !b.mold().isEmpty();
+            if (aHasMold != bHasMold) {
+                return aHasMold ? -1 : 1; // 有模具的在前
+            }
+
+            return 0;
+        });
 
         // 精确匹配
         for (AdvancedAlloyFurnaceRecipe recipe : candidates) {
@@ -237,6 +270,13 @@ public class AlloyFurnaceRecipeManager {
         }
 
         return null;
+    }
+
+    /**
+     * 检查配方是否是适配器转换的配方
+     */
+    private boolean isConvertedRecipe(AdvancedAlloyFurnaceRecipe recipe) {
+        return recipe.id().getPath().endsWith("_converted");
     }
 
     /**
@@ -264,26 +304,33 @@ public class AlloyFurnaceRecipeManager {
 
     /**
      * 获取候选配方列表（基于索引快速筛选）
+     * <p>
+     * 返回的列表按优先级排序：
+     * 1. 有模具要求的配方（如果提供了模具）
+     * 2. 无模具要求的配方（仅当没有提供模具时，或没有匹配模具的配方时）
      */
-    private Set<AdvancedAlloyFurnaceRecipe> getCandidateRecipes(List<ItemStack> inputs, @Nullable ItemStack mold) {
-        Set<AdvancedAlloyFurnaceRecipe> candidates = new HashSet<>();
+    private List<AdvancedAlloyFurnaceRecipe> getCandidateRecipes(List<ItemStack> inputs, @Nullable ItemStack mold) {
+        // 使用 LinkedHashSet 保持插入顺序，同时去重
+        Set<AdvancedAlloyFurnaceRecipe> moldRequiredRecipes = new LinkedHashSet<>();
+        Set<AdvancedAlloyFurnaceRecipe> noMoldRequiredRecipes = new LinkedHashSet<>();
 
         // 1. 基于模具筛选
         if (mold == null || mold.isEmpty()) {
             // 无模具时，只考虑无模具要求的配方
-            candidates.addAll(noMoldRecipes);
+            noMoldRequiredRecipes.addAll(noMoldRecipes);
         } else {
             // 有模具时，优先考虑匹配该模具的配方
             List<AdvancedAlloyFurnaceRecipe> moldRecipes = moldIndex.get(mold.getItem());
             if (moldRecipes != null) {
-                candidates.addAll(moldRecipes);
+                moldRequiredRecipes.addAll(moldRecipes);
             }
-            // 同时添加无模具要求的配方（它们也可能匹配）
-            candidates.addAll(noMoldRecipes);
+            // 只有当没有匹配该模具的配方时，才考虑无模具要求的配方
+            if (moldRequiredRecipes.isEmpty()) {
+                noMoldRequiredRecipes.addAll(noMoldRecipes);
+            }
         }
 
         // 2. 基于输入物品进一步筛选
-        // 使用第一个非空输入物品作为筛选条件
         Set<AdvancedAlloyFurnaceRecipe> inputFiltered = new HashSet<>();
         for (ItemStack input : inputs) {
             if (!input.isEmpty()) {
@@ -296,10 +343,19 @@ public class AlloyFurnaceRecipeManager {
 
         // 如果基于输入找到了配方，与模具筛选结果取交集
         if (!inputFiltered.isEmpty()) {
-            candidates.retainAll(inputFiltered);
+            moldRequiredRecipes.retainAll(inputFiltered);
+            noMoldRequiredRecipes.retainAll(inputFiltered);
         }
 
-        return candidates;
+        // 3. 合并结果：有模具要求的配方优先，无模具要求的配方在后
+        List<AdvancedAlloyFurnaceRecipe> result = new ArrayList<>();
+        result.addAll(moldRequiredRecipes);
+        // 只有当没有匹配模具的配方时，才添加无模具要求的配方
+        if (moldRequiredRecipes.isEmpty()) {
+            result.addAll(noMoldRequiredRecipes);
+        }
+
+        return result;
     }
 
     /**
@@ -380,14 +436,14 @@ public class AlloyFurnaceRecipeManager {
     }
 
     /**
-     * 清除所有缓存和索引
-     * <p>
+     * 清除缓存并标记索引需要重建
      * 在配方数据重载时调用，标记索引需要重建
+     * 注意：此方法应在服务器端调用
      */
     public void clearCache() {
         recipeCache.clear();
         negativeCache.clear();
-        // 标记索引需要重建，下次查找时会自动重建
+        // 标记索引需要重建，下次服务器端查找时会自动重建
         indexBuilt = false;
     }
 

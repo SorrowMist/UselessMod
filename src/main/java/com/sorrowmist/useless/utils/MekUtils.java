@@ -21,16 +21,16 @@ public class MekUtils {
         config.load();
 
         // 读取 section
-        Config mekanism = config.get("Mekanism升级设置");
+        Config mekanism = config.get("mekanism_upgrade");
         if (mekanism != null) {
-            int max = mekanism.getInt("最大升级数量");
+            int max = mekanism.getInt("max_upgrade");
             if (max < 1 || max > 64) {
                 max = 16;
             }
             MAX_UPGRADE = max;
         } else {
             // 没有 section，就写进去
-            config.set("Mekanism升级设置.最大升级数量", MAX_UPGRADE);
+            config.set("mekanism_upgrade.max_upgrade", MAX_UPGRADE);
             config.save();
         }
 

@@ -53,7 +53,7 @@ public class MekanismCompat {
     private static void registerAdapters() {
         AlloyFurnaceRecipeManager recipeManager = AlloyFurnaceRecipeManager.getInstance();
 
-        // 注册冶金灌注机配方适配器
+        // 注册冶金灌注机配方适配器（优先级更高）
         recipeManager.registerAdapter(new MetallurgicInfuserRecipeAdapter());
         LOGGER.info("Registered MetallurgicInfuserRecipeAdapter");
 

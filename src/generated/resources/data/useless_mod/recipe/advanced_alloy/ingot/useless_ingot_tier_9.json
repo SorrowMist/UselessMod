@@ -13,31 +13,31 @@
   "id": "useless_mod:advanced_alloy/ingot/useless_ingot_tier_9",
   "ingredients": [
     {
-      "count": 8,
+      "count": 2,
       "ingredient": {
-        "item": "minecraft:dragon_head"
+        "item": "minecraft:turtle_helmet"
       }
     },
     {
-      "count": 8,
+      "count": 2,
       "ingredient": {
-        "item": "minecraft:nether_star"
+        "item": "minecraft:goat_horn"
       }
     },
     {
-      "count": 16,
+      "count": 2,
       "ingredient": {
-        "item": "minecraft:enchanted_golden_apple"
+        "item": "minecraft:rabbit_foot"
       }
     },
     {
-      "count": 8,
+      "count": 2,
       "ingredient": {
-        "item": "minecraft:totem_of_undying"
+        "item": "minecraft:diamond_block"
       }
     },
     {
-      "count": 64,
+      "count": 2,
       "ingredient": {
         "item": "minecraft:netherite_block"
       }

@@ -39,7 +39,7 @@ displayName="${mod_name}" #mandatory
 #logoFile="examplemod.png" #optional
 
 # A text field displayed in the mod UI
-#credits="" #optional
+credits="Art by 麦淇淋" #optional
 
 # A text field displayed in the mod UI
 authors="C-H716 (Original by 水幕忘忧)"

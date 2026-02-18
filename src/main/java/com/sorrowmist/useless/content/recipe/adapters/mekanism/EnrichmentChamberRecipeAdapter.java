@@ -58,7 +58,8 @@ public class EnrichmentChamberRecipeAdapter implements IRecipeAdapter<ItemStackT
             var inputStacks = input.getRepresentations();
             if (!inputStacks.isEmpty()) {
                 Ingredient ingredient = Ingredient.of(inputStacks.stream());
-                countedIngredients.add(new CountedIngredient(ingredient, 1));
+                long inputCount = input.ingredient().count();
+                countedIngredients.add(new CountedIngredient(ingredient, inputCount));
             }
         }
 

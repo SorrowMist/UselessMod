@@ -7,7 +7,6 @@ import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
-import org.spongepowered.asm.mixin.injection.callback.LocalCapture;
 
 import java.util.function.IntSupplier;
 
@@ -27,10 +26,9 @@ public abstract class CachedRecipeMixin {
                     target = "Lmekanism/api/recipes/cache/CachedRecipe;finishProcessing(I)V",
                     shift = At.Shift.AFTER
             ),
-            locals = LocalCapture.CAPTURE_FAILHARD,
             remap = false
     )
-    private void injected(CallbackInfo ci, int operations) {
+    private void injected(CallbackInfo ci) {
         MekTemp.inject.accept(this.requiredTicks.getAsInt(), this::process);
     }
 }

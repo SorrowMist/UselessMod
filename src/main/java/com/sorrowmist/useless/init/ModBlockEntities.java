@@ -23,11 +23,11 @@ public final class ModBlockEntities {
     }
 
     private static void registerCapabilities(RegisterCapabilitiesEvent event) {
-        // 注册高级合金炉的物品处理能力
+        // 注册高级合金炉的物品处理能力（支持方向感知）
         event.registerBlockEntity(
                 Capabilities.ItemHandler.BLOCK,
                 ADVANCED_ALLOY_FURNACE.get(),
-                (blockEntity, side) -> blockEntity.getItemHandler()
+                (blockEntity, side) -> blockEntity.getItemHandler(side)
         );
 
         // 注册高级合金炉的能量处理能力

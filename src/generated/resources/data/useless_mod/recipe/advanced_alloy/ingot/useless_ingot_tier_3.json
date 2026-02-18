@@ -33,29 +33,29 @@
     {
       "count": 2,
       "ingredient": {
-        "item": "minecraft:spider_eye"
-      }
-    },
-    {
-      "count": 4,
-      "ingredient": {
-        "item": "minecraft:string"
-      }
-    },
-    {
-      "count": 4,
-      "ingredient": {
-        "item": "minecraft:feather"
+        "item": "minecraft:nether_wart"
       }
     },
     {
       "count": 2,
       "ingredient": {
-        "item": "minecraft:emerald"
+        "item": "minecraft:blaze_rod"
       }
     },
     {
-      "count": 4,
+      "count": 2,
+      "ingredient": {
+        "item": "minecraft:nether_brick"
+      }
+    },
+    {
+      "count": 2,
+      "ingredient": {
+        "item": "minecraft:gold_ingot"
+      }
+    },
+    {
+      "count": 2,
       "ingredient": {
         "item": "minecraft:diamond"
       }

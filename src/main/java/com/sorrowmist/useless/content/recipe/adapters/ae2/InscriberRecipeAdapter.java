@@ -1,15 +1,13 @@
 package com.sorrowmist.useless.content.recipe.adapters.ae2;
 
-import appeng.core.AppEng;
 import appeng.core.definitions.AEBlocks;
+import appeng.recipes.handlers.InscriberProcessType;
 import appeng.recipes.handlers.InscriberRecipe;
 import com.sorrowmist.useless.api.enums.AlloyFurnaceMode;
 import com.sorrowmist.useless.content.recipe.AdvancedAlloyFurnaceRecipe;
 import com.sorrowmist.useless.content.recipe.CountedIngredient;
 import com.sorrowmist.useless.content.recipe.IRecipeAdapter;
 import net.minecraft.resources.ResourceLocation;
-import net.minecraft.tags.TagKey;
-import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.crafting.Ingredient;
 import net.minecraft.world.item.crafting.RecipeHolder;
@@ -24,7 +22,14 @@ import java.util.List;
  * AE2 压印器配方适配器
  * <p>
  * 将压印器配方转换为高级合金熔炉配方
- * 使用压印模板的配方会将模板作为模具，其他配方使用压印器作为模具
+ * <p>
+ * 处理逻辑：
+ * - 压印模板（顶部/底部）→ 模具(mold)
+ *   - INSCRIBE 模式：模具不消耗（正常模具行为）
+ *   - PRESS 模式：模具被消耗（需要特殊处理）
+ * - 中间物品 → 普通输入（总是被消耗）
+ * <p>
+ * 这样可以正确处理所有AE系列mod（AE2、ExtendedAE、AdvancedAE、MEGA Cells等）的压印器配方
  */
 public class InscriberRecipeAdapter implements IRecipeAdapter<InscriberRecipe> {
 
@@ -32,12 +37,6 @@ public class InscriberRecipeAdapter implements IRecipeAdapter<InscriberRecipe> {
     private static final int AE2_ENERGY_PER_TICK = 10;
     private static final int AE2_PROCESS_TICKS = 20; // 1秒
     private static final int TOTAL_ENERGY = AE2_ENERGY_PER_TICK * AE2_PROCESS_TICKS; // 200
-
-    // 压印模板标签
-    private static final TagKey<Item> INSCRIBER_PRESSES = TagKey.create(
-            net.minecraft.core.registries.Registries.ITEM,
-            AppEng.makeId("inscriber_presses")
-    );
 
     @Override
     public Class<InscriberRecipe> getRecipeClass() {
@@ -58,39 +57,48 @@ public class InscriberRecipeAdapter implements IRecipeAdapter<InscriberRecipe> {
         Ingredient topInput = originalRecipe.getTopOptional();
         Ingredient bottomInput = originalRecipe.getBottomOptional();
         ItemStack output = originalRecipe.getResultItem();
+        InscriberProcessType processType = originalRecipe.getProcessType();
 
         // 检查中间输入是否有效
         if (middleInput == null || isIngredientEmpty(middleInput) || output.isEmpty()) {
             return result;
         }
 
-        // 判断是否是使用压印模板的配方
-        Ingredient moldIngredient;
-
-        // 检查顶部或底部是否有压印模板
-        if (isPressTemplate(topInput)) {
-            moldIngredient = topInput;
-        } else if (isPressTemplate(bottomInput)) {
-            moldIngredient = bottomInput;
-        } else {
-            // 没有使用压印模板，使用压印器作为模具
-            moldIngredient = Ingredient.of(AEBlocks.INSCRIBER.asItem());
-        }
-
         // 构建输入列表
         List<CountedIngredient> countedIngredients = new ArrayList<>();
 
-        // 中间输入（必需）
+        // 中间输入（必需，总是被消耗）
         countedIngredients.add(new CountedIngredient(middleInput, 1));
 
-        // 顶部输入（如果不是压印模板）
-        if (!isIngredientEmpty(topInput) && !isPressTemplate(topInput)) {
-            countedIngredients.add(new CountedIngredient(topInput, 1));
+        // 确定模具（压印模板）
+        Ingredient moldIngredient;
+        boolean moldConsumed = false;
+
+        // 检查顶部或底部是否有压印模板
+        if (!isIngredientEmpty(topInput)) {
+            moldIngredient = topInput;
+            // PRESS 模式下模具被消耗
+            moldConsumed = (processType == InscriberProcessType.PRESS);
+        } else if (!isIngredientEmpty(bottomInput)) {
+            moldIngredient = bottomInput;
+            // PRESS 模式下模具被消耗
+            moldConsumed = (processType == InscriberProcessType.PRESS);
+        } else {
+            // 没有压印模板，使用压印器作为模具占位符
+            moldIngredient = Ingredient.of(AEBlocks.INSCRIBER.asItem());
         }
 
-        // 底部输入（如果不是压印模板）
-        if (!isIngredientEmpty(bottomInput) && !isPressTemplate(bottomInput)) {
-            countedIngredients.add(new CountedIngredient(bottomInput, 1));
+        // 如果模具被消耗（PRESS模式），将其加入输入列表
+        if (moldConsumed) {
+            // 顶部和底部都被消耗
+            if (!isIngredientEmpty(topInput)) {
+                countedIngredients.add(new CountedIngredient(topInput, 1));
+            }
+            if (!isIngredientEmpty(bottomInput)) {
+                countedIngredients.add(new CountedIngredient(bottomInput, 1));
+            }
+            // 模具置空，因为已经被当作输入处理了
+            moldIngredient = Ingredient.EMPTY;
         }
 
         ResourceLocation convertedId = ResourceLocation.fromNamespaceAndPath(
@@ -106,9 +114,9 @@ public class InscriberRecipeAdapter implements IRecipeAdapter<InscriberRecipe> {
                 List.of(),
                 TOTAL_ENERGY,
                 AE2_PROCESS_TICKS,
-                Ingredient.EMPTY,
+                Ingredient.EMPTY,  // 催化剂（AE2压印器配方不使用催化剂）
                 0,
-                moldIngredient,
+                moldIngredient,    // 模具（压印模板，INSCRIBE模式下不消耗）
                 AlloyFurnaceMode.NORMAL
         );
 
@@ -123,23 +131,6 @@ public class InscriberRecipeAdapter implements IRecipeAdapter<InscriberRecipe> {
         if (ingredient == null) return true;
         ItemStack[] items = ingredient.getItems();
         return items == null || items.length == 0;
-    }
-
-    /**
-     * 检查是否为压印模板
-     */
-    private boolean isPressTemplate(Ingredient ingredient) {
-        if (ingredient == null || isIngredientEmpty(ingredient)) {
-            return false;
-        }
-
-        // 检查是否匹配压印模板标签
-        for (ItemStack stack : ingredient.getItems()) {
-            if (stack.is(INSCRIBER_PRESSES)) {
-                return true;
-            }
-        }
-        return false;
     }
 
     @Override
@@ -173,19 +164,16 @@ public class InscriberRecipeAdapter implements IRecipeAdapter<InscriberRecipe> {
             Ingredient middleInput = recipe.getMiddleInput();
             Ingredient topInput = recipe.getTopOptional();
             Ingredient bottomInput = recipe.getBottomOptional();
+            InscriberProcessType processType = recipe.getProcessType();
 
             if (middleInput == null || isIngredientEmpty(middleInput)) continue;
 
-            // 判断顶部和底部是否是压印模板
-            boolean topIsPressTemplate = isPressTemplate(topInput);
-            boolean bottomIsPressTemplate = isPressTemplate(bottomInput);
-
             // 检查中间输入是否匹配
             boolean matchesMiddle = false;
-            // 如果顶部是压印模板，则不需要在输入中匹配；否则需要匹配
-            boolean matchesTop = isIngredientEmpty(topInput) || topIsPressTemplate;
-            // 如果底部是压印模板，则不需要在输入中匹配；否则需要匹配
-            boolean matchesBottom = isIngredientEmpty(bottomInput) || bottomIsPressTemplate;
+            // 顶部是否需要匹配（INSCRIBE模式下不需要，PRESS模式下需要）
+            boolean matchesTop = isIngredientEmpty(topInput);
+            // 底部是否需要匹配（INSCRIBE模式下不需要，PRESS模式下需要）
+            boolean matchesBottom = isIngredientEmpty(bottomInput);
 
             for (ItemStack stack : inputs) {
                 if (stack.isEmpty()) continue;
@@ -193,12 +181,14 @@ public class InscriberRecipeAdapter implements IRecipeAdapter<InscriberRecipe> {
                 if (!matchesMiddle && middleInput.test(stack)) {
                     matchesMiddle = true;
                 }
-                // 只有顶部不是压印模板时才需要匹配
-                if (!matchesTop && !topIsPressTemplate && topInput.test(stack)) {
+
+                // PRESS 模式下需要匹配顶部输入
+                if (!matchesTop && processType == InscriberProcessType.PRESS && topInput.test(stack)) {
                     matchesTop = true;
                 }
-                // 只有底部不是压印模板时才需要匹配
-                if (!matchesBottom && !bottomIsPressTemplate && bottomInput.test(stack)) {
+
+                // PRESS 模式下需要匹配底部输入
+                if (!matchesBottom && processType == InscriberProcessType.PRESS && bottomInput.test(stack)) {
                     matchesBottom = true;
                 }
             }

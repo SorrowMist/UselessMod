@@ -7,6 +7,7 @@ import com.sorrowmist.useless.content.recipe.IRecipeAdapter;
 import net.minecraft.core.NonNullList;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
 import net.minecraft.world.item.crafting.AbstractCookingRecipe;
 import net.minecraft.world.item.crafting.Ingredient;
 import net.minecraft.world.item.crafting.RecipeHolder;
@@ -71,6 +72,9 @@ public class SmeltingRecipeAdapter implements IRecipeAdapter<AbstractCookingReci
         // 能量消耗根据处理时间比例调整
         int energy = (int) ((double) processTime / BASE_PROCESS_TIME * BASE_ENERGY);
 
+        // 熔炉配方需要熔炉作为模具/标志物
+        Ingredient furnaceMold = Ingredient.of(Items.FURNACE);
+
         return new AdvancedAlloyFurnaceRecipe(
                 convertedId,
                 countedIngredients,
@@ -81,7 +85,7 @@ public class SmeltingRecipeAdapter implements IRecipeAdapter<AbstractCookingReci
                 processTime,
                 Ingredient.EMPTY,
                 0,
-                Ingredient.EMPTY,
+                furnaceMold,
                 AlloyFurnaceMode.NORMAL
         );
     }
@@ -143,6 +147,6 @@ public class SmeltingRecipeAdapter implements IRecipeAdapter<AbstractCookingReci
 
     @Override
     public int getPriority() {
-        return 100; // 高优先级
+        return 1;
     }
 }

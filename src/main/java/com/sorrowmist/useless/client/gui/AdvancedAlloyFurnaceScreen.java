@@ -11,6 +11,8 @@ import com.sorrowmist.useless.content.blockentities.AdvancedAlloyFurnaceBlockEnt
 import com.sorrowmist.useless.content.menus.AdvancedAlloyFurnaceMenu;
 import com.sorrowmist.useless.network.TankClearPacket;
 import net.minecraft.ChatFormatting;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.client.renderer.GameRenderer;
@@ -19,6 +21,7 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.inventory.InventoryMenu;
+import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.material.Fluid;
 import net.minecraft.world.level.material.Fluids;
@@ -203,6 +206,92 @@ public class AdvancedAlloyFurnaceScreen extends AbstractContainerScreen<Advanced
     protected void renderLabels(GuiGraphics guiGraphics, int mouseX, int mouseY) {
         guiGraphics.drawString(this.font, this.playerInventoryTitle, this.inventoryLabelX, this.inventoryLabelY,
                                0x404040, false);
+    }
+
+    /**
+     * 重写槽位渲染，只对机器槽位使用自定义的物品数量显示
+     */
+    @Override
+    protected void renderSlot(GuiGraphics guiGraphics, @NotNull Slot slot) {
+        int x = slot.x;
+        int y = slot.y;
+        ItemStack stack = slot.getItem();
+
+        // 渲染物品图标
+        guiGraphics.renderItem(stack, x, y, slot.x + slot.y * this.imageWidth);
+
+        // 只对机器槽位使用自定义数量渲染（slot索引 0-19 是机器槽，20以上是玩家背包）
+        if (slot.index < AdvancedAlloyFurnaceBlockEntity.TOTAL_SLOTS && !stack.isEmpty() && stack.getCount() > 1) {
+            this.renderCustomItemCount(guiGraphics, stack, x, y);
+        } else {
+            // 玩家背包使用原版数量渲染
+            guiGraphics.renderItemDecorations(this.font, stack, x, y, null);
+        }
+    }
+
+    /**
+     * 自定义物品数量渲染，优化大数字显示
+     * 1-999: 显示完整数字
+     * 1000-999999: 显示为 x.xK (如 1.2K, 999.9K)
+     * 1000000-999999999: 显示为 x.xM (如 1.2M, 999.9M)
+     * 1000000000+: 显示为 x.xB (如 1.2B, 2.1B)
+     */
+    private void renderCustomItemCount(GuiGraphics guiGraphics, ItemStack stack, int x, int y) {
+        int count = stack.getCount();
+        if (count <= 1) return;
+
+        String text = formatAeCount(count);
+
+        final float scaleFactor = 0.666f;
+
+        guiGraphics.pose().pushPose();
+        // 文字层级在物品之上200
+        guiGraphics.pose().translate(0.0F, 0.0F, 200.0F);
+        guiGraphics.pose().scale(scaleFactor, scaleFactor, scaleFactor);
+
+        renderSizeLabel(guiGraphics.pose().last().pose(), this.font, x, y, text);
+
+        guiGraphics.pose().popPose();
+    }
+
+    /**
+     * 参考 AE2 的 StackSizeRenderer.renderSizeLabel 实现
+     */
+    private void renderSizeLabel(org.joml.Matrix4f matrix, Font font, float xPos, float yPos, String text) {
+        final float scaleFactor = 0.666f;
+        final float inverseScaleFactor = 1.0f / scaleFactor;
+        final int offset = -1;
+
+        RenderSystem.disableBlend();
+        final int X = (int) ((xPos + offset + 16.0f + 2.0f - font.width(text) * scaleFactor) * inverseScaleFactor);
+        final int Y = (int) ((yPos + offset + 16.0f - 5.0f * scaleFactor) * inverseScaleFactor);
+        var buffer = Minecraft.getInstance().renderBuffers().bufferSource();
+        // 阴影层 - AE2 使用 0x413f54
+        font.drawInBatch(text, X + 1, Y + 1, 0x413f54, false, matrix, buffer, Font.DisplayMode.NORMAL, 0, 15728880);
+        // 白色文字
+        font.drawInBatch(text, X, Y, 0xffffff, false, matrix, buffer, Font.DisplayMode.NORMAL, 0, 15728880);
+        buffer.endBatch();
+        RenderSystem.enableBlend();
+    }
+
+    /**
+     * 格式化数字显示 - AE 风格（无小数点）
+     * 1-999: 显示完整数字
+     * 1000+: 显示为 xK/M/B
+     */
+    private String formatAeCount(int count) {
+        if (count < 1000) {
+            return String.valueOf(count);
+        } else if (count < 1000000) {
+            int k = count / 1000;
+            return k + "K";
+        } else if (count < 1000000000) {
+            int m = count / 1000000;
+            return m + "M";
+        } else {
+            int b = count / 1000000000;
+            return b + "B";
+        }
     }
 
     /**

@@ -92,12 +92,12 @@ public class CatalystParallelManager {
     public static int calculateParallelForUselessIngotRecipe(ItemStack catalystStack, int targetTier) {
         if (catalystStack.isEmpty() || targetTier < 1 || targetTier > 9) return 1;
 
-        int catalystTier = getCatalystTier(catalystStack);
-
         // 有用锭提供无限并行
-        if (catalystTier == Integer.MAX_VALUE) {
+        if (isUsefulIngot(catalystStack)) {
             return Integer.MAX_VALUE;
         }
+
+        int catalystTier = getCatalystTier(catalystStack);
 
         // 催化剂等级必须大于等于目标等级才有并行
         if (catalystTier < targetTier) return 1;

@@ -42,6 +42,6 @@ public class MekanismUtilsMixin {
      */
     @Overwrite
     public static long getMaxEnergy(IUpgradeTile tile, long def) {
-        return tile.supportsUpgrades() ? MathUtils.ceilToLong(def * MekUtils.electricity(tile)) : def;
+        return tile.supportsUpgrades() ? MathUtils.ceilToLong(def * MekUtils.capacity(tile)) : def;
     }
 }

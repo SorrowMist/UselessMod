@@ -167,6 +167,7 @@
   "key.useless_mod.force_mining": "Force Mining Toggle",
   "key.useless_mod.switch_mode_wheel": "Open Mode Selection Wheel",
   "key.useless_mod.trigger_force_mining": "Trigger Force Mining",
+  "tooltip.useless_mod.fast_break_plastic": "Shift + Right Click to quickly break plastic blocks",
   "tooltip.useless_mod.enhanced_chain_mining_on": "Enhanced Chain Mining: On",
   "tooltip.useless_mod.enhanced_chain_mining_off": "Enhanced Chain Mining: Off",
   "tooltip.useless_mod.chain_mining_enhanced": "Enhanced Chain Mode",

@@ -5,22 +5,24 @@ import com.glodblock.github.extendedae.recipe.CrystalAssemblerRecipe;
 import com.sorrowmist.useless.UselessMod;
 import com.sorrowmist.useless.content.recipe.AdvancedAlloyFurnaceRecipe;
 import com.sorrowmist.useless.content.recipe.adapters.SmeltingRecipeAdapter;
+import com.sorrowmist.useless.content.recipe.adapters.actuallyadditions.ActuallyAdditionsCompat;
+import com.sorrowmist.useless.content.recipe.adapters.actuallyadditions.EmpowererRecipeAdapter;
+import com.sorrowmist.useless.content.recipe.adapters.actuallyadditions.LaserRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.advancedae.AdvancedAECompat;
 import com.sorrowmist.useless.content.recipe.adapters.advancedae.ReactionChamberRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.ae2.AE2Compat;
 import com.sorrowmist.useless.content.recipe.adapters.ae2.InscriberRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.extendedae.CircuitCutterRecipeAdapter;
-import com.sorrowmist.useless.content.recipe.adapters.industrialforegoing.DissolutionChamberRecipeAdapter;
-import com.sorrowmist.useless.content.recipe.adapters.industrialforegoing.IndustrialForegoingCompat;
 import com.sorrowmist.useless.content.recipe.adapters.extendedae.CrystalAssemblerRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.extendedae.ExtendedAECompat;
+import com.sorrowmist.useless.content.recipe.adapters.industrialforegoing.DissolutionChamberRecipeAdapter;
+import com.sorrowmist.useless.content.recipe.adapters.industrialforegoing.IndustrialForegoingCompat;
 import com.sorrowmist.useless.content.recipe.adapters.mekanism.EnrichmentChamberRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.mekanism.MekanismCompat;
 import com.sorrowmist.useless.content.recipe.adapters.mekanism.MetallurgicInfuserRecipeAdapter;
 import com.sorrowmist.useless.init.ModBlocks;
 import com.sorrowmist.useless.init.ModRecipeTypes;
 import com.sorrowmist.useless.init.ModTags;
-import net.pedroksl.advanced_ae.recipes.ReactionChamberRecipe;
 import mezz.jei.api.IModPlugin;
 import mezz.jei.api.JeiPlugin;
 import mezz.jei.api.helpers.IGuiHelper;
@@ -36,9 +38,9 @@ import net.minecraft.world.item.crafting.AbstractCookingRecipe;
 import net.minecraft.world.item.crafting.RecipeHolder;
 import net.minecraft.world.item.crafting.RecipeManager;
 import net.minecraft.world.item.crafting.RecipeType;
-import net.minecraft.world.item.crafting.Recipe;
 import net.minecraft.world.item.crafting.SmeltingRecipe;
 import net.minecraft.world.level.Level;
+import net.pedroksl.advanced_ae.recipes.ReactionChamberRecipe;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -99,6 +101,11 @@ public class JEIPlugin implements IModPlugin {
         // 添加转换后的 Industrial Foregoing 配方（如果IF已加载）
         if (IndustrialForegoingCompat.isIndustrialForegoingLoaded()) {
             recipes.addAll(convertIndustrialForegoingRecipes(recipeManager, level));
+        }
+
+        // 添加转换后的 Actually Additions 配方（如果AA已加载）
+        if (ActuallyAdditionsCompat.isActuallyAdditionsLoaded()) {
+            recipes.addAll(convertActuallyAdditionsRecipes(recipeManager, level));
         }
 
         registration.addRecipes(AdvancedAlloyFurnaceRecipeCategory.TYPE, recipes);
@@ -180,13 +187,13 @@ public class JEIPlugin implements IModPlugin {
     private List<AdvancedAlloyFurnaceRecipe> convertMekanismRecipes(RecipeManager recipeManager, Level level) {
         List<AdvancedAlloyFurnaceRecipe> convertedRecipes = new ArrayList<>();
 
-        // 转换冶金灌注机配方
+        // 转换冶金灌注机配方（支持批量版本）
         MetallurgicInfuserRecipeAdapter infuserAdapter = new MetallurgicInfuserRecipeAdapter();
         for (RecipeHolder<mekanism.api.recipes.ItemStackChemicalToItemStackRecipe> holder : recipeManager.getAllRecipesFor(
                 mekanism.api.recipes.MekanismRecipeTypes.TYPE_METALLURGIC_INFUSING.value())) {
-            // 使用 convertAll 获取所有转换后的配方（包括基础版和富集版）
-            List<AdvancedAlloyFurnaceRecipe> convertedList = infuserAdapter.convertAll(holder, level);
-            convertedRecipes.addAll(convertedList);
+            // 使用 convertAll 获取所有批量版本（普通物品和富集物品版本）
+            List<AdvancedAlloyFurnaceRecipe> converted = infuserAdapter.convertAll(holder, level);
+            convertedRecipes.addAll(converted);
         }
 
         // 转换富集仓配方
@@ -234,6 +241,35 @@ public class JEIPlugin implements IModPlugin {
                 (RecipeType<com.buuz135.industrial.recipe.DissolutionChamberRecipe>) com.buuz135.industrial.module.ModuleCore.DISSOLUTION_TYPE.get();
         for (RecipeHolder<com.buuz135.industrial.recipe.DissolutionChamberRecipe> holder : recipeManager.getAllRecipesFor(recipeType)) {
             AdvancedAlloyFurnaceRecipe converted = dissolutionAdapter.convert(holder, level);
+            if (converted != null) {
+                convertedRecipes.add(converted);
+            }
+        }
+
+        return convertedRecipes;
+    }
+
+    /**
+     * 转换 Actually Additions 配方为高级熔炉配方用于JEI显示
+     */
+    private List<AdvancedAlloyFurnaceRecipe> convertActuallyAdditionsRecipes(RecipeManager recipeManager, Level level) {
+        List<AdvancedAlloyFurnaceRecipe> convertedRecipes = new ArrayList<>();
+
+        // 转换原子再构机配方
+        LaserRecipeAdapter laserAdapter = new LaserRecipeAdapter();
+        for (RecipeHolder<de.ellpeck.actuallyadditions.mod.crafting.LaserRecipe> holder : recipeManager.getAllRecipesFor(
+                de.ellpeck.actuallyadditions.mod.crafting.ActuallyRecipes.Types.LASER.get())) {
+            AdvancedAlloyFurnaceRecipe converted = laserAdapter.convert(holder, level);
+            if (converted != null) {
+                convertedRecipes.add(converted);
+            }
+        }
+
+        // 转换充能台配方
+        EmpowererRecipeAdapter empowererAdapter = new EmpowererRecipeAdapter();
+        for (RecipeHolder<de.ellpeck.actuallyadditions.mod.crafting.EmpowererRecipe> holder : recipeManager.getAllRecipesFor(
+                de.ellpeck.actuallyadditions.mod.crafting.ActuallyRecipes.Types.EMPOWERING.get())) {
+            AdvancedAlloyFurnaceRecipe converted = empowererAdapter.convert(holder, level);
             if (converted != null) {
                 convertedRecipes.add(converted);
             }

@@ -16,32 +16,33 @@
   "id": "useless_mod:advanced_alloy/ingot/useless_ingot_tier_8",
   "ingredients": [
     {
-      "count": 8,
+      "count": 2,
       "ingredient": {
-        "item": "minecraft:enchanted_book"
+        "item": "minecraft:dragon_head"
       }
     },
     {
-      "count": 4,
+      "count": 2,
       "ingredient": {
-        "item": "minecraft:heart_of_the_sea"
+        "item": "minecraft:echo_shard"
       }
     },
     {
+      "count": 2,
       "ingredient": {
-        "item": "minecraft:trident"
+        "item": "minecraft:conduit"
       }
     },
     {
-      "count": 8,
+      "count": 2,
       "ingredient": {
-        "item": "minecraft:shulker_shell"
+        "item": "minecraft:diamond_block"
       }
     },
     {
-      "count": 32,
+      "count": 2,
       "ingredient": {
-        "item": "minecraft:netherite_block"
+        "item": "minecraft:netherite_ingot"
       }
     }
   ],

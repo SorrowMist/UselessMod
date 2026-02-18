@@ -25,32 +25,33 @@
   "id": "useless_mod:advanced_alloy/ingot/useless_ingot_tier_5",
   "ingredients": [
     {
-      "count": 3,
+      "count": 2,
       "ingredient": {
         "item": "minecraft:wither_skeleton_skull"
       }
     },
     {
+      "count": 2,
       "ingredient": {
-        "item": "minecraft:nether_star"
-      }
-    },
-    {
-      "count": 4,
-      "ingredient": {
-        "item": "minecraft:dragon_breath"
+        "item": "minecraft:phantom_membrane"
       }
     },
     {
       "count": 2,
       "ingredient": {
-        "item": "minecraft:netherite_block"
+        "item": "minecraft:sea_lantern"
       }
     },
     {
-      "count": 4,
+      "count": 2,
       "ingredient": {
-        "item": "minecraft:emerald_block"
+        "item": "minecraft:gold_block"
+      }
+    },
+    {
+      "count": 2,
+      "ingredient": {
+        "item": "minecraft:diamond_block"
       }
     }
   ],

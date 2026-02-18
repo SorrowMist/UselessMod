@@ -102,6 +102,26 @@ public class CraftingRecipes extends RecipeProvider {
         this.addUselessIngotRecipes(output);
         this.addUselessGearRecipes(output);
         this.addUselessGlassRecipes(output);
+        this.addPossibleUsefulIngotRecipe(output);
+    }
+
+    private void addPossibleUsefulIngotRecipe(RecipeOutput output) {
+        // Possible Useful Ingot - 工作台合成配方（9个不同等级的无用锭）
+        ShapedRecipeBuilder.shaped(RecipeCategory.MISC, ModItems.POSSIBLE_USEFUL_INGOT.get(), 1)
+                           .pattern("123")
+                           .pattern("456")
+                           .pattern("789")
+                           .define('1', ModItems.USELESS_INGOT_TIER_1.get())
+                           .define('2', ModItems.USELESS_INGOT_TIER_2.get())
+                           .define('3', ModItems.USELESS_INGOT_TIER_3.get())
+                           .define('4', ModItems.USELESS_INGOT_TIER_4.get())
+                           .define('5', ModItems.USELESS_INGOT_TIER_5.get())
+                           .define('6', ModItems.USELESS_INGOT_TIER_6.get())
+                           .define('7', ModItems.USELESS_INGOT_TIER_7.get())
+                           .define('8', ModItems.USELESS_INGOT_TIER_8.get())
+                           .define('9', ModItems.USELESS_INGOT_TIER_9.get())
+                           .unlockedBy("has_ingot", has(ModItems.USELESS_INGOT_TIER_1.get()))
+                           .save(output, UselessMod.id("crafting/possible_useful_ingot"));
     }
 
     private void addUselessIngotRecipes(RecipeOutput output) {
@@ -145,11 +165,11 @@ public class CraftingRecipes extends RecipeProvider {
 
         // Tier 3 - 使用2-9阶无用锭作为催化剂（2阶无并行奖励，3阶及以上有奖励）
         AdvancedAlloyFurnaceRecipeBuilder.create()
-                                         .input(Ingredient.of(Items.SPIDER_EYE), 2)
-                                         .input(Ingredient.of(Items.STRING), 4)
-                                         .input(Ingredient.of(Items.FEATHER), 4)
-                                         .input(Ingredient.of(Items.EMERALD), 2)
-                                         .input(Ingredient.of(Items.DIAMOND), 4)
+                                         .input(Ingredient.of(Items.NETHER_WART), 2)
+                                         .input(Ingredient.of(Items.BLAZE_ROD), 2)
+                                         .input(Ingredient.of(Items.NETHER_BRICK), 2)
+                                         .input(Ingredient.of(Items.GOLD_INGOT), 2)
+                                         .input(Ingredient.of(Items.DIAMOND), 2)
                                          .catalyst(Ingredient.of(
                                                  ModItems.USELESS_INGOT_TIER_2.get(),
                                                  ModItems.USELESS_INGOT_TIER_3.get(),
@@ -168,10 +188,10 @@ public class CraftingRecipes extends RecipeProvider {
 
         // Tier 4 - 使用3-9阶无用锭作为催化剂（3阶无并行奖励，4阶及以上有奖励）
         AdvancedAlloyFurnaceRecipeBuilder.create()
-                                         .input(Ingredient.of(Items.BLAZE_ROD), 2)
                                          .input(Ingredient.of(Items.ENDER_PEARL), 2)
-                                         .input(Ingredient.of(Items.GHAST_TEAR), 2)
-                                         .input(Ingredient.of(Items.NETHERITE_INGOT), 1)
+                                         .input(Ingredient.of(Items.CHORUS_FRUIT), 2)
+                                         .input(Ingredient.of(Items.SHULKER_SHELL), 2)
+                                         .input(Ingredient.of(Items.GOLD_BLOCK), 2)
                                          .input(Ingredient.of(Items.DIAMOND_BLOCK), 2)
                                          .catalyst(Ingredient.of(
                                                  ModItems.USELESS_INGOT_TIER_3.get(),
@@ -190,11 +210,11 @@ public class CraftingRecipes extends RecipeProvider {
 
         // Tier 5 - 使用4-9阶无用锭作为催化剂（4阶无并行奖励，5阶及以上有奖励）
         AdvancedAlloyFurnaceRecipeBuilder.create()
-                                         .input(Ingredient.of(Items.WITHER_SKELETON_SKULL), 3)
-                                         .input(Ingredient.of(Items.NETHER_STAR), 1)
-                                         .input(Ingredient.of(Items.DRAGON_BREATH), 4)
-                                         .input(Ingredient.of(Items.NETHERITE_BLOCK), 2)
-                                         .input(Ingredient.of(Items.EMERALD_BLOCK), 4)
+                                         .input(Ingredient.of(Items.WITHER_SKELETON_SKULL), 2)
+                                         .input(Ingredient.of(Items.PHANTOM_MEMBRANE), 2)
+                                         .input(Ingredient.of(Items.SEA_LANTERN), 2)
+                                         .input(Ingredient.of(Items.GOLD_BLOCK), 2)
+                                         .input(Ingredient.of(Items.DIAMOND_BLOCK), 2)
                                          .catalyst(Ingredient.of(
                                                  ModItems.USELESS_INGOT_TIER_4.get(),
                                                  ModItems.USELESS_INGOT_TIER_5.get(),
@@ -211,11 +231,11 @@ public class CraftingRecipes extends RecipeProvider {
 
         // Tier 6 - 使用5-9阶无用锭作为催化剂（5阶无并行奖励，6阶及以上有奖励）
         AdvancedAlloyFurnaceRecipeBuilder.create()
-                                         .input(Ingredient.of(Items.DRAGON_HEAD), 1)
-                                         .input(Ingredient.of(Items.ELYTRA), 1)
-                                         .input(Ingredient.of(Items.TOTEM_OF_UNDYING), 1)
-                                         .input(Ingredient.of(Items.ENCHANTED_GOLDEN_APPLE), 4)
-                                         .input(Ingredient.of(Items.NETHERITE_BLOCK), 8)
+                                         .input(Ingredient.of(Items.DRAGON_BREATH), 2)
+                                         .input(Ingredient.of(Items.TOTEM_OF_UNDYING), 2)
+                                         .input(Ingredient.of(Items.ENCHANTED_GOLDEN_APPLE), 2)
+                                         .input(Ingredient.of(Items.GOLD_BLOCK), 2)
+                                         .input(Ingredient.of(Items.DIAMOND_BLOCK), 2)
                                          .catalyst(Ingredient.of(
                                                  ModItems.USELESS_INGOT_TIER_5.get(),
                                                  ModItems.USELESS_INGOT_TIER_6.get(),
@@ -231,11 +251,11 @@ public class CraftingRecipes extends RecipeProvider {
 
         // Tier 7 - 使用6-9阶无用锭作为催化剂（6阶无并行奖励，7阶及以上有奖励）
         AdvancedAlloyFurnaceRecipeBuilder.create()
-                                         .input(Ingredient.of(Items.BEACON), 1)
-                                         .input(Ingredient.of(Items.CONDUIT), 1)
-                                         .input(Ingredient.of(Items.END_CRYSTAL), 4)
-                                         .input(Ingredient.of(Items.DRAGON_EGG), 1)
-                                         .input(Ingredient.of(Items.NETHERITE_BLOCK), 16)
+                                         .input(Ingredient.of(Items.NETHER_STAR), 2)
+                                         .input(Ingredient.of(Items.WITHER_ROSE), 2)
+                                         .input(Ingredient.of(Items.GHAST_TEAR), 2)
+                                         .input(Ingredient.of(Items.DIAMOND_BLOCK), 2)
+                                         .input(Ingredient.of(Items.NETHERITE_INGOT), 2)
                                          .catalyst(Ingredient.of(
                                                  ModItems.USELESS_INGOT_TIER_6.get(),
                                                  ModItems.USELESS_INGOT_TIER_7.get(),
@@ -250,11 +270,11 @@ public class CraftingRecipes extends RecipeProvider {
 
         // Tier 8 - 使用7-9阶无用锭作为催化剂（7阶无并行奖励，8阶及以上有奖励）
         AdvancedAlloyFurnaceRecipeBuilder.create()
-                                         .input(Ingredient.of(Items.ENCHANTED_BOOK), 8)
-                                         .input(Ingredient.of(Items.HEART_OF_THE_SEA), 4)
-                                         .input(Ingredient.of(Items.TRIDENT), 1)
-                                         .input(Ingredient.of(Items.SHULKER_SHELL), 8)
-                                         .input(Ingredient.of(Items.NETHERITE_BLOCK), 32)
+                                         .input(Ingredient.of(Items.DRAGON_HEAD), 2)
+                                         .input(Ingredient.of(Items.ECHO_SHARD), 2)
+                                         .input(Ingredient.of(Items.CONDUIT), 2)
+                                         .input(Ingredient.of(Items.DIAMOND_BLOCK), 2)
+                                         .input(Ingredient.of(Items.NETHERITE_INGOT), 2)
                                          .catalyst(Ingredient.of(
                                                  ModItems.USELESS_INGOT_TIER_7.get(),
                                                  ModItems.USELESS_INGOT_TIER_8.get(),
@@ -268,11 +288,11 @@ public class CraftingRecipes extends RecipeProvider {
 
         // Tier 9 - 使用8-9阶无用锭作为催化剂（8阶无并行奖励，9阶给无限并行）
         AdvancedAlloyFurnaceRecipeBuilder.create()
-                                         .input(Ingredient.of(Items.DRAGON_HEAD), 8)
-                                         .input(Ingredient.of(Items.NETHER_STAR), 8)
-                                         .input(Ingredient.of(Items.ENCHANTED_GOLDEN_APPLE), 16)
-                                         .input(Ingredient.of(Items.TOTEM_OF_UNDYING), 8)
-                                         .input(Ingredient.of(Items.NETHERITE_BLOCK), 64)
+                                         .input(Ingredient.of(Items.TURTLE_HELMET), 2)
+                                         .input(Ingredient.of(Items.GOAT_HORN), 2)
+                                         .input(Ingredient.of(Items.RABBIT_FOOT), 2)
+                                         .input(Ingredient.of(Items.DIAMOND_BLOCK), 2)
+                                         .input(Ingredient.of(Items.NETHERITE_BLOCK), 2)
                                          .catalyst(Ingredient.of(
                                                  ModItems.USELESS_INGOT_TIER_8.get(),
                                                  ModItems.USELESS_INGOT_TIER_9.get()
@@ -282,6 +302,24 @@ public class CraftingRecipes extends RecipeProvider {
                                          .processTime(1)
                                          .mode(AlloyFurnaceMode.NORMAL)
                                          .save(output, UselessMod.id("advanced_alloy/ingot/useless_ingot_tier_9"));
+
+        // Possible Useful Ingot - 合成配方（工作台）
+        // 使用9个不同等级的无用锭合成
+
+        // Useful Ingot - 高级熔炉配方
+        AdvancedAlloyFurnaceRecipeBuilder.create()
+                                         .input(Ingredient.of(ModItems.POSSIBLE_USEFUL_INGOT.get()), 64)
+                                         .input(Ingredient.of(Blocks.IRON_BLOCK), 1024)
+                                         .input(Ingredient.of(Blocks.GOLD_BLOCK), 1024)
+                                         .input(Ingredient.of(Blocks.DIAMOND_BLOCK), 1024)
+                                         .input(Ingredient.of(Blocks.EMERALD_BLOCK), 1024)
+                                         .input(Ingredient.of(Blocks.NETHERITE_BLOCK), 1024)
+                                         .fluidInput(new FluidStack(Fluids.LAVA, 10000000))
+                                         .output(ModItems.USEFUL_INGOT.get(), 1)
+                                         .energy(10000000)
+                                         .processTime(600)
+                                         .mode(AlloyFurnaceMode.NORMAL)
+                                         .save(output, UselessMod.id("advanced_alloy/ingot/useful_ingot"));
     }
 
     private void addUselessGearRecipes(RecipeOutput output) {

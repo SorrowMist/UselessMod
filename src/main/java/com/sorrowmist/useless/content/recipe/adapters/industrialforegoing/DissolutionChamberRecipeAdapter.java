@@ -30,8 +30,10 @@ import java.util.List;
  */
 public class DissolutionChamberRecipeAdapter implements IRecipeAdapter<DissolutionChamberRecipe> {
 
-    // Industrial Foregoing 溶解成型机基础能量消耗参考
-    private static final int IF_ENERGY_PER_TICK = 100;
+    // Industrial Foregoing 溶解成型机基础能量消耗参考 (90 FE/tick)
+    private static final int IF_ENERGY_PER_TICK = 90;
+    // 能量倍率 - 使转换后的配方消耗更多能量
+    private static final int ENERGY_MULTIPLIER = 4;
 
     @Override
     public Class<DissolutionChamberRecipe> getRecipeClass() {
@@ -59,14 +61,8 @@ public class DissolutionChamberRecipeAdapter implements IRecipeAdapter<Dissoluti
             return result;
         }
 
-        // 构建物品输入列表
-        List<CountedIngredient> countedIngredients = new ArrayList<>();
-        if (itemInputs != null) {
-            for (Ingredient ingredient : itemInputs) {
-                if (ingredient == null || isIngredientEmpty(ingredient)) continue;
-                countedIngredients.add(new CountedIngredient(ingredient, 1));
-            }
-        }
+        // 构建物品输入列表 - 合并同类型的输入
+        List<CountedIngredient> countedIngredients = mergeIngredients(itemInputs);
 
         // 构建流体输入列表
         List<FluidStack> inputFluids = new ArrayList<>();
@@ -93,9 +89,9 @@ public class DissolutionChamberRecipeAdapter implements IRecipeAdapter<Dissoluti
                 Ingredient.of(dissolutionChamberItem) :
                 Ingredient.EMPTY;
 
-        // 计算总能量消耗
+        // 计算总能量消耗 (Industrial Foregoing: 90 FE/tick * processingTime * 倍率)
         int processingTime = originalRecipe.processingTime;
-        int totalEnergy = 20;
+        int totalEnergy = IF_ENERGY_PER_TICK * processingTime * ENERGY_MULTIPLIER;
 
         ResourceLocation convertedId = ResourceLocation.fromNamespaceAndPath(
                 originalId.getNamespace(),
@@ -141,11 +137,79 @@ public class DissolutionChamberRecipeAdapter implements IRecipeAdapter<Dissoluti
         return items == null || items.length == 0;
     }
 
+    /**
+     * 合并同类型的 Ingredient，统计数量
+     */
+    private List<CountedIngredient> mergeIngredients(List<Ingredient> itemInputs) {
+        List<CountedIngredient> result = new ArrayList<>();
+        if (itemInputs == null) return result;
+
+        // 使用列表来存储合并后的结果，通过比较 ingredient 的内容来判断是否相同
+        List<Ingredient> uniqueIngredients = new ArrayList<>();
+        List<Integer> counts = new ArrayList<>();
+
+        for (Ingredient ingredient : itemInputs) {
+            if (ingredient == null || isIngredientEmpty(ingredient)) continue;
+
+            // 查找是否已有相同的 ingredient
+            int existingIndex = -1;
+            for (int i = 0; i < uniqueIngredients.size(); i++) {
+                if (ingredientsEqual(uniqueIngredients.get(i), ingredient)) {
+                    existingIndex = i;
+                    break;
+                }
+            }
+
+            if (existingIndex >= 0) {
+                // 已存在，增加数量
+                counts.set(existingIndex, counts.get(existingIndex) + 1);
+            } else {
+                // 新类型，添加到列表
+                uniqueIngredients.add(ingredient);
+                counts.add(1);
+            }
+        }
+
+        // 构建 CountedIngredient 列表
+        for (int i = 0; i < uniqueIngredients.size(); i++) {
+            result.add(new CountedIngredient(uniqueIngredients.get(i), counts.get(i)));
+        }
+
+        return result;
+    }
+
+    /**
+     * 比较两个 Ingredient 是否相等（通过比较它们包含的物品）
+     */
+    private boolean ingredientsEqual(Ingredient a, Ingredient b) {
+        if (a == b) return true;
+        if (a == null || b == null) return false;
+
+        ItemStack[] itemsA = a.getItems();
+        ItemStack[] itemsB = b.getItems();
+
+        if (itemsA.length != itemsB.length) return false;
+
+        // 比较每个物品堆叠
+        for (ItemStack stackA : itemsA) {
+            boolean found = false;
+            for (ItemStack stackB : itemsB) {
+                if (ItemStack.isSameItem(stackA, stackB)) {
+                    found = true;
+                    break;
+                }
+            }
+            if (!found) return false;
+        }
+
+        return true;
+    }
+
     @Override
     @Nullable
     public AdvancedAlloyFurnaceRecipe convert(RecipeHolder<DissolutionChamberRecipe> holder, Level level) {
         List<AdvancedAlloyFurnaceRecipe> recipes = convertAll(holder, level);
-        return recipes.isEmpty() ? null : recipes.get(0);
+        return recipes.isEmpty() ? null : recipes.getFirst();
     }
 
     @Override
@@ -155,7 +219,7 @@ public class DissolutionChamberRecipeAdapter implements IRecipeAdapter<Dissoluti
 
     @Override
     @Nullable
-    @SuppressWarnings({"unchecked", "rawtypes"})
+    @SuppressWarnings({"unchecked"})
     public RecipeHolder<DissolutionChamberRecipe> findMatchingRecipe(Level level, List<ItemStack> inputs) {
         if (level == null || inputs.isEmpty()) {
             return null;
@@ -170,29 +234,66 @@ public class DissolutionChamberRecipeAdapter implements IRecipeAdapter<Dissoluti
             List<Ingredient> itemInputs = recipe.input;
             if (itemInputs == null || itemInputs.isEmpty()) continue;
 
-            // 检查所有物品输入是否匹配
-            boolean[] matched = new boolean[itemInputs.size()];
+            // 合并同类型的输入物品并统计数量
+            List<CountedIngredient> countedIngredients = mergeIngredients(itemInputs);
+            if (countedIngredients.isEmpty()) continue;
+
+            // 统计每个输入槽位中各类型物品的总数量
+            List<ItemStack> consolidatedInputs = consolidateInputs(inputs);
+
+            // 检查所有物品输入是否匹配（包括数量）
+            boolean[] matched = new boolean[countedIngredients.size()];
             int matchedCount = 0;
 
-            for (ItemStack stack : inputs) {
-                if (stack.isEmpty()) continue;
+            for (ItemStack inputStack : consolidatedInputs) {
+                if (inputStack.isEmpty()) continue;
 
-                for (int i = 0; i < itemInputs.size(); i++) {
-                    if (!matched[i] && itemInputs.get(i).test(stack)) {
-                        matched[i] = true;
-                        matchedCount++;
-                        break;
+                for (int i = 0; i < countedIngredients.size(); i++) {
+                    if (!matched[i]) {
+                        CountedIngredient counted = countedIngredients.get(i);
+                        if (counted.ingredient().test(inputStack) && inputStack.getCount() >= counted.count()) {
+                            matched[i] = true;
+                            matchedCount++;
+                            break;
+                        }
                     }
                 }
             }
 
             // 所有输入都匹配
-            if (matchedCount == itemInputs.size()) {
+            if (matchedCount == countedIngredients.size()) {
                 return holder;
             }
         }
 
         return null;
+    }
+
+    /**
+     * 合并输入物品列表，将同类型物品堆叠到一起统计总数量
+     */
+    private List<ItemStack> consolidateInputs(List<ItemStack> inputs) {
+        List<ItemStack> result = new ArrayList<>();
+
+        for (ItemStack stack : inputs) {
+            if (stack.isEmpty()) continue;
+
+            // 查找是否已有相同的物品
+            boolean found = false;
+            for (ItemStack existing : result) {
+                if (ItemStack.isSameItemSameComponents(existing, stack)) {
+                    existing.grow(stack.getCount());
+                    found = true;
+                    break;
+                }
+            }
+
+            if (!found) {
+                result.add(stack.copy());
+            }
+        }
+
+        return result;
     }
 
     @Override

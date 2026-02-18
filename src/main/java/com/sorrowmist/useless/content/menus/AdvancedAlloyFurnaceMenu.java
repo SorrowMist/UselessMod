@@ -18,6 +18,27 @@ import net.neoforged.neoforge.items.IItemHandler;
 import net.neoforged.neoforge.items.SlotItemHandler;
 import org.jetbrains.annotations.NotNull;
 
+/**
+ * 支持高堆叠数量的槽位处理器
+ * 允许槽位堆叠数量达到 Integer.MAX_VALUE（约21亿）
+ */
+class HighStackSlotItemHandler extends SlotItemHandler {
+
+    public HighStackSlotItemHandler(IItemHandler itemHandler, int index, int xPosition, int yPosition) {
+        super(itemHandler, index, xPosition, yPosition);
+    }
+
+    @Override
+    public int getMaxStackSize() {
+        return Integer.MAX_VALUE;
+    }
+
+    @Override
+    public int getMaxStackSize(@NotNull ItemStack stack) {
+        return Integer.MAX_VALUE;
+    }
+}
+
 public class AdvancedAlloyFurnaceMenu extends AbstractContainerMenu {
 
     private static final int INPUT_SLOTS_X = 8;
@@ -89,7 +110,7 @@ public class AdvancedAlloyFurnaceMenu extends AbstractContainerMenu {
                 int slotIndex = row * 3 + col;
                 int x = INPUT_SLOTS_X + col * SLOT_SIZE;
                 int y = INPUT_SLOTS_FIRST_Y + row * SLOT_SIZE;
-                this.addSlot(new SlotItemHandler(itemHandler, slotIndex, x, y));
+                this.addSlot(new HighStackSlotItemHandler(itemHandler, slotIndex, x, y));
             }
         }
 
@@ -99,7 +120,7 @@ public class AdvancedAlloyFurnaceMenu extends AbstractContainerMenu {
                 int slotIndex = 9 + row * 3 + col;
                 int x = OUTPUT_SLOTS_X + col * SLOT_SIZE;
                 int y = OUTPUT_SLOTS_FIRST_Y + row * SLOT_SIZE;
-                this.addSlot(new SlotItemHandler(itemHandler, slotIndex, x, y) {
+                this.addSlot(new HighStackSlotItemHandler(itemHandler, slotIndex, x, y) {
                     @Override
                     public boolean mayPlace(@NotNull ItemStack stack) {
                         return false;
@@ -109,9 +130,14 @@ public class AdvancedAlloyFurnaceMenu extends AbstractContainerMenu {
         }
 
         // 添加催化剂槽位
-        this.addSlot(new SlotItemHandler(itemHandler, CATALYST_SLOT, CATALYST_SLOT_X, CATALYST_SLOT_Y));
+        this.addSlot(new HighStackSlotItemHandler(itemHandler, CATALYST_SLOT, CATALYST_SLOT_X, CATALYST_SLOT_Y));
         // 添加模具槽位
-        this.addSlot(new SlotItemHandler(itemHandler, MOLD_SLOT, MOLD_SLOT_X, MOLD_SLOT_Y));
+        this.addSlot(new HighStackSlotItemHandler(itemHandler, MOLD_SLOT, MOLD_SLOT_X, MOLD_SLOT_Y) {
+            @Override
+            public int getMaxStackSize() {
+                return 1;
+            }
+        });
     }
 
     /**

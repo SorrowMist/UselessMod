@@ -2,6 +2,7 @@ package com.sorrowmist.useless;
 
 import com.mojang.logging.LogUtils;
 import com.sorrowmist.useless.content.blocks.GlowPlasticBlock;
+import com.sorrowmist.useless.content.recipe.adapters.actuallyadditions.ActuallyAdditionsCompat;
 import com.sorrowmist.useless.content.recipe.adapters.advancedae.AdvancedAECompat;
 import com.sorrowmist.useless.content.recipe.adapters.ae2.AE2Compat;
 import com.sorrowmist.useless.content.recipe.adapters.extendedae.ExtendedAECompat;
@@ -72,6 +73,8 @@ public class UselessMod {
         AE2Compat.init(event);
         // 初始化 Industrial Foregoing 兼容性支持（如果IF已加载）
         IndustrialForegoingCompat.init(event);
+        // 初始化 Actually Additions 兼容性支持（如果AA已加载）
+        ActuallyAdditionsCompat.init(event);
     }
 
     @SubscribeEvent

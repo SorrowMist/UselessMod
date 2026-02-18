@@ -20,6 +20,7 @@ import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.AddReloadListenerEvent;
 import net.neoforged.neoforge.event.entity.living.LivingDropsEvent;
+import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent;
 import net.neoforged.neoforge.event.level.BlockEvent;
 import net.neoforged.neoforge.event.server.ServerStartedEvent;
@@ -49,13 +50,28 @@ public class EventHandler {
     }
 
     @SubscribeEvent
+    public static void onBreakSpeed(PlayerEvent.BreakSpeed event) {
+        Player player = event.getEntity();
+        ItemStack mainHandItem = player.getMainHandItem();
+        if (!(mainHandItem.getItem() instanceof EndlessBeafItem)) return;
+
+        float newSpeed = event.getOriginalSpeed();
+
+        if (player.getAbilities().flying || player.isInWater()) {
+            newSpeed *= 5.0F;
+        }
+        event.setNewSpeed(newSpeed);
+    }
+
+    @SubscribeEvent
     public static void onPlayerTick(PlayerTickEvent.Post event) {
         Player player = event.getEntity();
         if (player.level().isClientSide()) return;
 
         if (!player.isCreative()) {
             boolean hasItemInInventory = player.getInventory().items.stream().anyMatch(
-                    item -> item.getItem() instanceof EndlessBeafItem);
+                    item -> item.getItem() instanceof EndlessBeafItem
+                            || item.get(UComponents.CurrentToolTypeComponent.get()) != null);
 
             if (hasItemInInventory && ConfigManager.shouldEnableFlightEffect()) {
                 FlyEffectedHolder.add(player.getUUID());

@@ -1,0 +1,55 @@
+{
+  "type": "useless_mod:advanced_alloy_furnace",
+  "energy": 10000000,
+  "id": "useless_mod:advanced_alloy/ingot/useful_ingot",
+  "ingredients": [
+    {
+      "count": 64,
+      "ingredient": {
+        "item": "useless_mod:possible_useful_ingot"
+      }
+    },
+    {
+      "count": 1024,
+      "ingredient": {
+        "item": "minecraft:iron_block"
+      }
+    },
+    {
+      "count": 1024,
+      "ingredient": {
+        "item": "minecraft:gold_block"
+      }
+    },
+    {
+      "count": 1024,
+      "ingredient": {
+        "item": "minecraft:diamond_block"
+      }
+    },
+    {
+      "count": 1024,
+      "ingredient": {
+        "item": "minecraft:emerald_block"
+      }
+    },
+    {
+      "count": 1024,
+      "ingredient": {
+        "item": "minecraft:netherite_block"
+      }
+    }
+  ],
+  "input_fluids": [
+    {
+      "amount": 10000000,
+      "id": "minecraft:lava"
+    }
+  ],
+  "outputs": [
+    {
+      "id": "useless_mod:useful_ingot"
+    }
+  ],
+  "process_time": 600
+}

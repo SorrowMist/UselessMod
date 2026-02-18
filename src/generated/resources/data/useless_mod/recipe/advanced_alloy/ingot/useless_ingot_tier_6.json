@@ -22,30 +22,33 @@
   "id": "useless_mod:advanced_alloy/ingot/useless_ingot_tier_6",
   "ingredients": [
     {
+      "count": 2,
       "ingredient": {
-        "item": "minecraft:dragon_head"
+        "item": "minecraft:dragon_breath"
       }
     },
     {
-      "ingredient": {
-        "item": "minecraft:elytra"
-      }
-    },
-    {
+      "count": 2,
       "ingredient": {
         "item": "minecraft:totem_of_undying"
       }
     },
     {
-      "count": 4,
+      "count": 2,
       "ingredient": {
         "item": "minecraft:enchanted_golden_apple"
       }
     },
     {
-      "count": 8,
+      "count": 2,
       "ingredient": {
-        "item": "minecraft:netherite_block"
+        "item": "minecraft:gold_block"
+      }
+    },
+    {
+      "count": 2,
+      "ingredient": {
+        "item": "minecraft:diamond_block"
       }
     }
   ],

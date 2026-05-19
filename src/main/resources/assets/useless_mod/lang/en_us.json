@@ -203,6 +203,8 @@
   "tooltip.useless_mod.key.trigger_force_mining": "§cHold %s to temporarily activate Force Mining",
   "tooltip.useless_mod.key.open_mode_wheel": "§ePress %s to open Mode Selection Wheel",
   "tooltip.useless_mod.furnace_tier": "Tier: %s",
+  "tooltip.useless_mod.furnace_upgrade_hint": "§eSneak + Right-click§r with §6Useless Ingot Series§r to upgrade tier",
+  "tooltip.useless_mod.furnace_upgrade_effect": "§7Upgrade Effects: §aEnergy Capacity§7 and §bFluid Capacity§7 grow with tier",
 
   "jei.useless_mod.catalyst_info": "Catalyst Parallel Info",
   "jei.useless_mod.tooltip.amount": "Amount: %s",

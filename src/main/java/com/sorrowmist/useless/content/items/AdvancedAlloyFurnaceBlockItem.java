@@ -24,10 +24,13 @@ public class AdvancedAlloyFurnaceBlockItem extends BlockItem {
     @Override
     public void appendHoverText(@NotNull ItemStack stack, @NotNull TooltipContext context, @NotNull List<Component> tooltipComponents, @NotNull TooltipFlag tooltipFlag) {
         super.appendHoverText(stack, context, tooltipComponents, tooltipFlag);
-        
+
         FurnaceDataComponent component = stack.get(UComponents.FURNACE_DATA.get());
         if (component != null && component.tier() > 0) {
             tooltipComponents.add(Component.translatable("tooltip.useless_mod.furnace_tier", component.tier()));
         }
+
+        tooltipComponents.add(Component.translatable("tooltip.useless_mod.furnace_upgrade_hint"));
+        tooltipComponents.add(Component.translatable("tooltip.useless_mod.furnace_upgrade_effect"));
     }
 }

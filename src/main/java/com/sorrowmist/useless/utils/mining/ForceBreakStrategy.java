@@ -1,6 +1,7 @@
 package com.sorrowmist.useless.utils.mining;
 
 import com.sorrowmist.useless.api.enums.tool.EnchantMode;
+import com.sorrowmist.useless.compat.DraconicEvolutionCompat;
 import com.sorrowmist.useless.compat.SophisticatedCompat;
 import com.sorrowmist.useless.content.blocks.AdvancedAlloyFurnaceBlock;
 import com.sorrowmist.useless.core.component.UComponents;
@@ -35,6 +36,14 @@ public class ForceBreakStrategy implements MiningStrategy {
         BlockPos pos = event.getPos();
         BlockState state = event.getState();
         Block block = state.getBlock();
+
+        // 检查是否是混沌水晶，如果是则使用特殊处理
+        if (DraconicEvolutionCompat.isChaosCrystal(state)) {
+            if (DraconicEvolutionCompat.handleChaosCrystalBreak(level, pos, state, player)) {
+                event.setCanceled(true);
+                return;
+            }
+        }
 
         // 检查是否为精准采集模式
         boolean isSilkTouch = hand.getOrDefault(UComponents.EnchantModeComponent.get(), EnchantMode.FORTUNE)

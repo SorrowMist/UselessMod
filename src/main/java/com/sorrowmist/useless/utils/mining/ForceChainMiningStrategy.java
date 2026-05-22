@@ -1,6 +1,7 @@
 package com.sorrowmist.useless.utils.mining;
 
 import com.sorrowmist.useless.api.enums.tool.EnchantMode;
+import com.sorrowmist.useless.compat.DraconicEvolutionCompat;
 import com.sorrowmist.useless.compat.SophisticatedCompat;
 import com.sorrowmist.useless.content.blocks.AdvancedAlloyFurnaceBlock;
 import com.sorrowmist.useless.core.component.UComponents;
@@ -77,6 +78,14 @@ public class ForceChainMiningStrategy implements MiningStrategy {
             // 安全性检查
             if (!currentState.is(originBlock)) {
                 continue;
+            }
+
+            // 检查是否是混沌水晶，如果是则使用特殊处理
+            if (DraconicEvolutionCompat.isChaosCrystal(currentState)) {
+                if (DraconicEvolutionCompat.handleChainMiningChaosCrystal(level, targetPos, currentState, player)) {
+                    actualMinedCount++;
+                    continue;
+                }
             }
 
             BlockEntity be = level.getBlockEntity(targetPos);

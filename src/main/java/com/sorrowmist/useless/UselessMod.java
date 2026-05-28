@@ -38,6 +38,7 @@ public class UselessMod {
         ModMenuType.register(modEventBus);
         ModRecipeSerializers.RECIPE_SERIALIZERS.register(modEventBus);
         ModRecipeTypes.RECIPE_TYPES.register(modEventBus);
+        ModPOIs.POI_TYPES.register(modEventBus);
 
         ModCreativeTabs.CREATIVE_TAB.register(modEventBus);
 

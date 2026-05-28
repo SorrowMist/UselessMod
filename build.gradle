@@ -164,7 +164,7 @@ configurations {
 }
 
 dependencies {
-    implementation "curse.maven:BotanyPots-353928:6895762"
+
     // apotheosis
 //    implementation "dev.shadowsoffire:Placebo:1.21.1-9.6.3"
 //    implementation "dev.shadowsoffire:ApothicAttributes:1.21.1-2.6.0"
@@ -198,9 +198,9 @@ dependencies {
     runtimeOnly "mekanism:Mekanism:1.21.1-10.7.15.81:generators"
     implementation "curse.maven:applied-mekanistics-574300:5978711"
 
-    implementation "curse.maven:botany-pots-353928:6910390"
-    implementation files("libs/bookshelf-neoforge-1.21.1-21.1.66.jar")
-    implementation files("libs/prickle-neoforge-1.21.1-21.1.11.jar")
+    implementation "curse.maven:botany-pots-353928:7115287"
+    implementation "curse.maven:prickle-1023259:5836410"
+    implementation "curse.maven:bookshelf-228525:7115332"
 
     compileOnly "dev.latvian.mods:kubejs-neoforge:2101.7.1-build.188"
     compileOnly "dev.latvian.mods:rhino:2101.2.5-build.54"
@@ -217,6 +217,9 @@ dependencies {
 
     //geckolib
     runtimeOnly "curse.maven:geckolib-388172:7009924"
+
+    runtimeOnly "curse.maven:dyson-cube-project-1345066:8082907"
+    runtimeOnly "curse.maven:titanium-287342:6443608"
 
     //ftbteams
     runtimeOnly "curse.maven:ftb-teams-forge-404468:6930910"

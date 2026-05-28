@@ -4,12 +4,13 @@ import com.sorrowmist.useless.api.enums.tool.ToolTypeMode;
 import com.sorrowmist.useless.content.items.EndlessBeafItem;
 import com.sorrowmist.useless.core.component.UComponents;
 import com.sorrowmist.useless.core.config.ConfigManager;
+import net.minecraft.core.Holder;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.InteractionHand;
+import net.minecraft.world.effect.MobEffect;
 import net.minecraft.world.effect.MobEffectInstance;
-import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.player.Player;
@@ -29,49 +30,53 @@ public class UselessItemUtils {
 
         // 检查是否启用药水效果
         if (ConfigManager.shouldEnablePotionEffects()) {
-            // 饱和效果
-            MobEffectInstance saturation = player.getEffect(MobEffects.SATURATION);
-            if (saturation == null || saturation.getDuration() < 200) {
-                player.addEffect(new MobEffectInstance(MobEffects.SATURATION, 20000, 0, true, false, true));
+            List<String> customEffects = ConfigManager.getCustomPotionEffects();
+            
+            for (String effectConfig : customEffects) {
+                applyPotionEffectFromConfig(player, effectConfig);
+            }
+        }
+    }
+
+    private static final int POTION_DURATION = 20000;
+
+    /**
+     * 从配置字符串解析并应用药水效果
+     * 格式: "modid:effect_name, amplifier"
+     */
+    private static void applyPotionEffectFromConfig(Player player, String effectConfig) {
+        try {
+            String[] parts = effectConfig.split(",");
+            if (parts.length != 2) {
+                return;
             }
 
-            // 生命恢复
-            MobEffectInstance regen = player.getEffect(MobEffects.REGENERATION);
-            if (regen == null || regen.getDuration() < 200) {
-                player.addEffect(new MobEffectInstance(MobEffects.REGENERATION, 20000, 5, true, false, true));
+            String effectId = parts[0];
+            int amplifier = Integer.parseInt(parts[1]) - 1;
+
+            ResourceLocation location = ResourceLocation.parse(effectId);
+            MobEffect effect = BuiltInRegistries.MOB_EFFECT.get(location);
+
+            if (effect == null) {
+                return;
             }
 
-            // 夜视
-            MobEffectInstance nightVision = player.getEffect(MobEffects.NIGHT_VISION);
-            if (nightVision == null || nightVision.getDuration() < 200) {
-                player.addEffect(new MobEffectInstance(MobEffects.NIGHT_VISION, 20000, 0, true, false, true));
+            Holder<MobEffect> effectHolder = BuiltInRegistries.MOB_EFFECT.wrapAsHolder(effect);
+            MobEffectInstance currentEffect = player.getEffect(effectHolder);
+            if (currentEffect == null || currentEffect.getDuration() < 200) {
+                player.addEffect(new MobEffectInstance(effectHolder, POTION_DURATION, Math.max(0, amplifier), true, false, true));
             }
-
-            // 抗火
-            MobEffectInstance fireResistance = player.getEffect(MobEffects.FIRE_RESISTANCE);
-            if (fireResistance == null || fireResistance.getDuration() < 200) {
-                player.addEffect(new MobEffectInstance(MobEffects.FIRE_RESISTANCE, 20000, 0, true, false, true));
-            }
-
-            // 水下呼吸
-            MobEffectInstance waterBreathing = player.getEffect(MobEffects.WATER_BREATHING);
-            if (waterBreathing == null || waterBreathing.getDuration() < 200) {
-                player.addEffect(new MobEffectInstance(MobEffects.WATER_BREATHING, 20000, 0, true, false, true));
-            }
-
-            // 抗性提升
-            MobEffectInstance damageResistance = player.getEffect(MobEffects.DAMAGE_RESISTANCE);
-            if (damageResistance == null || damageResistance.getDuration() < 200) {
-                player.addEffect(new MobEffectInstance(MobEffects.DAMAGE_RESISTANCE, 20000, 5, true, false, true));
-            }
+        } catch (Exception e) {
+            // 静默处理配置解析错误，避免每tick输出日志
         }
     }
 
     public static void onLivingDrops(LivingDropsEvent event, ItemStack stack, Player player) {
         if (player == null) return;
 
-        // 5% 概率
-        if (!(Math.random() < 0.05)) {
+        // 根据配置的概率判断是否触发
+        int chance = ConfigManager.getFestiveDropChance();
+        if (!(Math.random() * 100 < chance)) {
             return;
         }
 

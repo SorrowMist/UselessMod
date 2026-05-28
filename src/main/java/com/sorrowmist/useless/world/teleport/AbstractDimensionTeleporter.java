@@ -1,20 +1,41 @@
 package com.sorrowmist.useless.world.teleport;
 
-import com.sorrowmist.useless.UselessMod;
-import com.sorrowmist.useless.core.config.ConfigManager;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.core.Vec3i;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.level.TicketType;
+import net.minecraft.tags.BlockTags;
+import net.minecraft.world.entity.ai.village.poi.PoiManager;
+import net.minecraft.world.entity.ai.village.poi.PoiRecord;
+import net.minecraft.world.entity.ai.village.poi.PoiType;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.border.WorldBorder;
 import net.minecraft.world.level.levelgen.Heightmap;
+import net.minecraft.world.level.material.FluidState;
 
+import java.util.Comparator;
+import java.util.Optional;
 import java.util.function.Supplier;
 
+/**
+ * Abstract Dimension Teleporter
+ * <p>
+ * Code reference from AllTheModium (ATM) mod - TeleportPad class
+ * GitHub: https://github.com/AllTheMods/AllTheModium/blob/1.21.x/src/main/java/com/thevortex/allthemodium/blocks/TeleportPad.java
+ * <p>
+ * 参考内容包括:
+ * - POI系统查找传送垫
+ * - 螺旋搜索算法 (BlockPos.spiralAround)
+ * - 安全检查 (isSafeSpot)
+ * - 天花板维度Y轴搜索 (findSafeY)
+ */
 @SuppressWarnings("all")
 public abstract class AbstractDimensionTeleporter {
 
@@ -24,9 +45,11 @@ public abstract class AbstractDimensionTeleporter {
 
     protected abstract Supplier<Block> getTeleportBlock();
 
+    protected abstract net.minecraft.core.Holder<PoiType> getPOI();
+
     /* ================= 入口 ================= */
 
-    void handleTeleport(ServerPlayer player, BlockPos sourcePos) {
+    public void handleTeleport(ServerPlayer player, BlockPos sourcePos) {
         ServerLevel from = (ServerLevel) player.level();
 
         ResourceKey<Level> targetKey =
@@ -37,7 +60,7 @@ public abstract class AbstractDimensionTeleporter {
         ServerLevel target = player.server.getLevel(targetKey);
         if (target == null) return;
 
-        BlockPos targetBlock = findOrCreateTeleportBlock(target, sourcePos);
+        BlockPos targetBlock = findSafeExit(target, sourcePos);
         if (targetBlock == null) return;
 
         // 轻量级区块票证
@@ -48,307 +71,107 @@ public abstract class AbstractDimensionTeleporter {
                 targetBlock
         );
 
+        teleport(player, target, targetBlock);
+    }
+
+    /// 查找安全的出口位置，参考ATM的findSafeExit
+    private BlockPos findSafeExit(ServerLevel level, BlockPos entryPos) {
+        // 1. 使用POI系统查找现有的传送方块
+        Optional<BlockPos> existing = findClosestTeleportBlock(
+                level, entryPos, 32, level.getWorldBorder()
+        );
+        if (existing.isPresent()) {
+            return existing.get();
+        }
+
+        // 2. 使用螺旋搜索查找安全位置
+        for (BlockPos.MutableBlockPos candidate : BlockPos.spiralAround(entryPos, 32, Direction.EAST, Direction.SOUTH)) {
+            if (!level.getWorldBorder().isWithinBounds(candidate)) continue;
+
+            int y = level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, candidate.getX(), candidate.getZ());
+            if (level.dimensionType().hasCeiling()) {
+                y = findSafeY(level, candidate.getX(), y, candidate.getZ(), candidate);
+            }
+
+            BlockPos spot = new BlockPos(candidate.getX(), y, candidate.getZ());
+            if (isSafeSpot(level, spot)) {
+                // 创建新的传送方块
+                BlockState teleportState = getTeleportBlock().get().defaultBlockState();
+                level.setBlockAndUpdate(spot, teleportState);
+                return spot;
+            }
+        }
+
+        // 3. 回退到原始位置
+        BlockState teleportState = getTeleportBlock().get().defaultBlockState();
+        level.setBlockAndUpdate(entryPos, teleportState);
+        return entryPos;
+    }
+
+    // 在天花板维度（如下界）中查找安全的Y坐标
+    private int findSafeY(ServerLevel level, int x, int y, int z, BlockPos.MutableBlockPos pos) {
+        int minY = level.getMinBuildHeight();
+        pos.set(x, y - 1, z);
+        pos.move(Direction.DOWN);
+
+        while (pos.getY() > minY) {
+            if (isSafeSpot(level, pos.immutable())) {
+                return pos.getY();
+            }
+            pos.move(Direction.DOWN);
+        }
+
+        return level.getChunkSource().getGenerator().getSpawnHeight(level.getChunk(pos).getHeightAccessorForGeneration());
+    }
+
+    // 安全检查：确保1x2空间 + 固体地面
+    private boolean isSafeSpot(ServerLevel level, BlockPos pos) {
+        BlockState here = level.getBlockState(pos);
+        FluidState hereFluid = level.getFluidState(pos);
+        BlockState below = level.getBlockState(pos.below());
+        FluidState belowFluid = level.getFluidState(pos.below());
+        BlockState above = level.getBlockState(pos.above());
+        FluidState aboveFluid = level.getFluidState(pos.above());
+
+        return ((here.isAir() || here.is(BlockTags.REPLACEABLE)) && hereFluid.isEmpty()) &&
+                ((above.isAir() || above.is(BlockTags.REPLACEABLE)) && aboveFluid.isEmpty()) &&
+                (!(below.isAir() || below.is(BlockTags.REPLACEABLE) || below.is(Blocks.BEDROCK)) && belowFluid.isEmpty());
+    }
+
+    // 使用POI系统查找最近的传送方块
+    public Optional<BlockPos> findClosestTeleportBlock(
+            ServerLevel level,
+            BlockPos origin,
+            int radius,
+            WorldBorder border
+    ) {
+        PoiManager poiManager = level.getPoiManager();
+        poiManager.ensureLoadedAndValid(level, origin, radius);
+
+        return poiManager.getInSquare(
+                        record -> record.is(getPOI()),
+                        origin,
+                        radius,
+                        PoiManager.Occupancy.ANY
+                )
+                .map(PoiRecord::getPos)
+                .filter(border::isWithinBounds)
+                .filter(pos -> level.getBlockState(pos).is(getTeleportBlock().get()))
+                .min(Comparator.<BlockPos>
+                                comparingDouble(pos -> pos.distSqr(origin))
+                        .thenComparingInt(Vec3i::getY)
+                );
+    }
+
+    /// 执行传送
+    private void teleport(ServerPlayer player, ServerLevel level, BlockPos targetPos) {
         player.teleportTo(
-                target,
-                targetBlock.getX() + 0.5,
-                targetBlock.getY() + 1.0,
-                targetBlock.getZ() + 0.5,
+                level,
+                targetPos.getX() + 0.5D,
+                targetPos.getY() + 1.25D,
+                targetPos.getZ() + 0.5D,
                 player.getYRot(),
                 player.getXRot()
         );
-    }
-
-    private BlockPos findOrCreateTeleportBlock(ServerLevel level, BlockPos sourcePos) {
-        int searchRadius = 16;
-        boolean isTeleportingToDimensionA = level.dimension().location().getNamespace().equals(UselessMod.MODID);
-
-        if (isTeleportingToDimensionA) {
-            // 传送到本mod维度：优先搜索平台层高度
-            return findOrCreateTeleportBlockToModDimension(level, sourcePos, searchRadius);
-        } else {
-            // 传送到其他维度：优先搜索地形高度区域
-            return findOrCreateTeleportBlockToOtherDimension(level, sourcePos, searchRadius);
-        }
-    }
-
-    /**
-     * 传送到本mod维度：优先搜索平台层高度的传送方块
-     */
-    private BlockPos findOrCreateTeleportBlockToModDimension(ServerLevel level, BlockPos sourcePos, int searchRadius) {
-        int platformStartY = ConfigManager.getPlatformStartY();
-        int platformLayers = ConfigManager.getPlatformLayers();
-        int platformHeight = platformStartY + platformLayers;
-
-        // 1. 优先搜索平台层高度
-        BlockPos found = searchAtYLevel(level, sourcePos, platformHeight, searchRadius);
-        if (found != null) {
-            return found;
-        }
-
-        // 2. 搜索平台层上下各2层
-        for (int offset = 1; offset <= 2; offset++) {
-            // 向上搜索
-            int yUp = platformHeight + offset;
-            if (yUp < level.getMaxBuildHeight()) {
-                found = searchAtYLevel(level, sourcePos, yUp, searchRadius);
-                if (found != null) {
-                    return found;
-                }
-            }
-
-            // 向下搜索
-            int yDown = platformHeight - offset;
-            if (yDown > level.getMinBuildHeight()) {
-                found = searchAtYLevel(level, sourcePos, yDown, searchRadius);
-                if (found != null) {
-                    return found;
-                }
-            }
-        }
-
-        // 3. 创建新的传送方块
-        return createTeleportBlockToModDimension(level, sourcePos);
-    }
-
-    /**
-     * 传送到其他维度：优先搜索地形高度区域的传送方块
-     */
-    private BlockPos findOrCreateTeleportBlockToOtherDimension(ServerLevel level, BlockPos sourcePos,
-                                                               int searchRadius) {
-        // 获取实际固体地面高度
-        BlockPos surface = level.getHeightmapPos(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, sourcePos);
-        int originY = Math.max(62, surface.getY()) + 1;
-        BlockPos origin = new BlockPos(sourcePos.getX(), originY, sourcePos.getZ());
-
-        // 从原点出发，向上向下搜索
-        BlockPos found = searchVertical(level, origin, 32, 32); // 向上搜索32层，向下搜索32层
-        if (found != null) {
-            return found;
-        }
-
-        // 进行5*5*5范围搜索
-        found = search5x5x5Area(level, origin);
-        if (found != null) {
-            return found;
-        }
-
-        // 原点创建
-        return createTeleportBlockToOtherDimension(level, sourcePos);
-    }
-
-    /**
-     * 垂直搜索：从原点向上向下搜索指定层数
-     */
-    private BlockPos searchVertical(ServerLevel level, BlockPos origin, int upRange, int downRange) {
-        // 向上搜索
-        for (int offset = 1; offset <= upRange; offset++) {
-            int y = origin.getY() + offset;
-            if (y < level.getMaxBuildHeight()) {
-                BlockPos testPos = new BlockPos(origin.getX(), y, origin.getZ());
-                if (isValidTeleportBlock(level, testPos)) {
-                    return testPos;
-                }
-            }
-        }
-
-        // 向下搜索
-        for (int offset = 1; offset <= downRange; offset++) {
-            int y = origin.getY() - offset;
-            if (y > level.getMinBuildHeight()) {
-                BlockPos testPos = new BlockPos(origin.getX(), y, origin.getZ());
-                if (isValidTeleportBlock(level, testPos)) {
-                    return testPos;
-                }
-            }
-        }
-
-        return null;
-    }
-
-    /**
-     * 5*5*5范围搜索
-     */
-    private BlockPos search5x5x5Area(ServerLevel level, BlockPos origin) {
-        int searchRadius = 2; // 5*5*5范围
-
-        for (int dx = -searchRadius; dx <= searchRadius; dx++) {
-            for (int dy = -searchRadius; dy <= searchRadius; dy++) {
-                for (int dz = -searchRadius; dz <= searchRadius; dz++) {
-                    if (dx == 0 && dy == 0 && dz == 0) continue; // 跳过原点
-
-                    BlockPos testPos = origin.offset(dx, dy, dz);
-                    if (testPos.getY() > level.getMinBuildHeight() && testPos.getY() < level.getMaxBuildHeight()) {
-                        if (isValidTeleportBlock(level, testPos)) {
-                            return testPos;
-                        }
-                    }
-                }
-            }
-        }
-
-        return null;
-    }
-
-    private BlockPos searchAtYLevel(ServerLevel level,
-                                    BlockPos center,
-                                    int y,
-                                    int radius) {
-
-        BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
-
-        for (int r = 0; r <= radius; r++) {
-            for (int dx = -r; dx <= r; dx++) {
-                for (int dz = -r; dz <= r; dz++) {
-
-                    if (Math.abs(dx) != r && Math.abs(dz) != r) continue;
-
-                    pos.set(center.getX() + dx, y, center.getZ() + dz);
-
-                    if (isValidTeleportBlock(level, pos)) {
-                        return pos.immutable();
-                    }
-                }
-            }
-        }
-        return null;
-    }
-
-    private boolean isValidTeleportBlock(ServerLevel level, BlockPos pos) {
-
-        // 不强制加载区块
-        if (!level.isLoaded(pos)) {
-            ChunkPos chunkPos = new ChunkPos(pos);
-            if (!level.getChunkSource().hasChunk(chunkPos.x, chunkPos.z)) {
-                return false;
-            }
-        }
-
-        return level.getBlockState(pos).getBlock() == getTeleportBlock().get();
-    }
-
-    /**
-     * 传送到本mod维度：基于平台层数高度创建，确保下方是平台方块
-     */
-    private BlockPos createTeleportBlockToModDimension(ServerLevel level, BlockPos sourcePos) {
-        int platformStartY = ConfigManager.getPlatformStartY();
-        int platformLayers = ConfigManager.getPlatformLayers();
-        int platformHeight = platformStartY + platformLayers;
-
-        // 在平台层数高度搜索合适的位置，最多16x16范围
-        BlockPos placePos = findPlatformPosition(level, sourcePos, platformHeight, 16);
-        if (placePos != null) {
-            // 确保区块已加载
-            if (!level.isLoaded(placePos)) {
-                level.getChunkSource().addRegionTicket(TicketType.PORTAL, new ChunkPos(placePos), 3, placePos);
-            }
-
-            // 使用正确的放置参数确保方块被保存
-            level.setBlockAndUpdate(placePos, teleportState());
-            return placePos;
-        }
-
-        // 如果找不到合适位置，检查平台层数高度中心位置是否为空气或可替换
-        BlockPos centerPos = new BlockPos(sourcePos.getX(), platformHeight, sourcePos.getZ());
-
-        // 如果中心位置是空气或可替换，直接放置
-        if (level.getBlockState(centerPos).canBeReplaced()) {
-            if (!level.isLoaded(centerPos)) {
-                level.getChunkSource().addRegionTicket(TicketType.PORTAL, new ChunkPos(centerPos), 3, centerPos);
-            }
-            level.setBlockAndUpdate(centerPos, teleportState());
-            return centerPos;
-        } else {
-            // 如果中心位置不可替换，向上寻找最近的空气位置
-            for (int y = platformHeight + 1; y < level.getMaxBuildHeight(); y++) {
-                BlockPos testPos = new BlockPos(sourcePos.getX(), y, sourcePos.getZ());
-                if (level.getBlockState(testPos).canBeReplaced()) {
-                    // 确保区块已加载
-                    if (!level.isLoaded(testPos)) {
-                        level.getChunkSource().addRegionTicket(TicketType.PORTAL, new ChunkPos(testPos), 3, testPos);
-                    }
-                    level.setBlockAndUpdate(testPos, teleportState());
-                    return testPos;
-                }
-            }
-
-            // 找不到合适位置，在中心位置强行放置
-            if (!level.isLoaded(centerPos)) {
-                level.getChunkSource().addRegionTicket(TicketType.PORTAL, new ChunkPos(centerPos), 3, centerPos);
-            }
-            level.setBlockAndUpdate(centerPos, teleportState());
-            return centerPos;
-        }
-    }
-
-    /**
-     * 传送到其他维度：基于地形高度+1创建，如果创建位置不为空气，则向上尝试
-     */
-    private BlockPos createTeleportBlockToOtherDimension(ServerLevel level, BlockPos sourcePos) {
-        BlockPos surface = level.getHeightmapPos(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, sourcePos);
-
-        // 确保至少在Y=62以上生成
-        int surfaceHeight = Math.max(62, surface.getY());
-
-        // 从固体地面高度+1开始向上尝试放置
-        for (int y = surfaceHeight + 1; y < level.getMaxBuildHeight(); y++) {
-            BlockPos testPos = new BlockPos(sourcePos.getX(), y, sourcePos.getZ());
-            if (level.getBlockState(testPos).canBeReplaced() && level.getBlockState(testPos.below()).isSolid()) {
-                // 确保区块已加载
-                if (!level.isLoaded(testPos)) {
-                    level.getChunkSource().addRegionTicket(TicketType.PORTAL, new ChunkPos(testPos), 3, testPos);
-                }
-                // 使用正确的放置参数确保方块被保存
-                level.setBlockAndUpdate(testPos, teleportState());
-                return testPos;
-            }
-        }
-
-        // 如果找不到合适位置，直接在固体地面高度+1位置创建
-        BlockPos fallbackPos = new BlockPos(sourcePos.getX(), surfaceHeight + 1, sourcePos.getZ());
-
-        // 确保区块已加载
-        if (!level.isLoaded(fallbackPos)) {
-            level.getChunkSource().addRegionTicket(TicketType.PORTAL, new ChunkPos(fallbackPos), 3, fallbackPos);
-        }
-
-        // 使用正确的放置参数确保方块被保存
-        level.setBlockAndUpdate(fallbackPos, teleportState());
-        return fallbackPos;
-    }
-
-    /**
-     * 搜索平台位置，最多16x16范围
-     */
-    private BlockPos findPlatformPosition(ServerLevel level, BlockPos center, int targetY, int maxSearchRadius) {
-        // 先检查中心位置
-        BlockPos centerPos = new BlockPos(center.getX(), targetY, center.getZ());
-        if (level.getBlockState(centerPos.below()).isSolid() && ConfigManager.isPlatformBlock(
-                level.getBlockState(centerPos.below()).getBlock()) && level.getBlockState(centerPos).canBeReplaced()) {
-            return centerPos;
-        }
-
-        // 向外搜索，最多16x16范围
-        for (int radius = 1; radius <= maxSearchRadius; radius++) {
-            for (int dx = -radius; dx <= radius; dx++) {
-                for (int dz = -radius; dz <= radius; dz++) {
-                    // 只检查环形区域，减少检查次数
-                    if (Math.abs(dx) == radius || Math.abs(dz) == radius) {
-                        BlockPos testPos = new BlockPos(center.getX() + dx, targetY, center.getZ() + dz);
-                        // 检查下方是否为平台方块且当前位置可替换
-                        if (level.getBlockState(testPos.below()).isSolid() && ConfigManager.isPlatformBlock(
-                                level.getBlockState(testPos.below()).getBlock()) && level.getBlockState(testPos)
-                                                                                         .canBeReplaced()) {
-                            return testPos;
-                        }
-                    }
-                }
-            }
-        }
-
-        return null;
-    }
-
-    private BlockState teleportState() {
-        return getTeleportBlock().get().defaultBlockState();
     }
 }

@@ -9,5 +9,4 @@ import org.spongepowered.asm.mixin.gen.Accessor;
 public interface BotanyPotBlockEntityAccessor {
     @Accessor
     TickAccumulator getGrowCooldown();
-
 }

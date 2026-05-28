@@ -15,8 +15,6 @@ import net.neoforged.neoforge.registries.DeferredItem;
 import net.neoforged.neoforge.registries.DeferredRegister;
 import org.jetbrains.annotations.NotNull;
 
-import static com.sorrowmist.useless.api.enums.EnumColor.BLACK;
-
 public class ModCreativeTabs {
     public static final DeferredRegister<CreativeModeTab> CREATIVE_TAB =
             DeferredRegister.create(Registries.CREATIVE_MODE_TAB, UselessMod.MODID);
@@ -24,7 +22,7 @@ public class ModCreativeTabs {
     public static final DeferredHolder<CreativeModeTab, CreativeModeTab> MAIN = CREATIVE_TAB.register(
             "main",
             () -> CreativeModeTab.builder()
-                                 .icon(() -> new ItemStack(GlowPlasticBlock.GLOW_PLASTIC_BLOCKS.get(BLACK)))
+                                 .icon(() -> new ItemStack(ModItems.ADVANCED_ALLOY_FURNACE_BLOCK.get()))
                                  .title(Component.translatable("itemGroup." + UselessMod.MODID + ".main"))
                                  .displayItems((pParameters, pOutput) -> {
                                      pOutput.accept(getItemStack(pParameters));

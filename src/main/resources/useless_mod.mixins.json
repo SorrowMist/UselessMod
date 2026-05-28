@@ -7,7 +7,6 @@
     "botanypots.AbstractBotanyPotBlockEntityAccessor",
     "botanypots.BotanyPotBlockEntityAccessor",
     "botanypots.BotanyPotBlockEntityMixin",
-    "botanypots.BotanyPotsContentMixin",
     "eae.PatternSlotTrackerMixin",
     "eae.TileAssemblerMatrixPatternMixin",
     "mek.CachedRecipeMixin",
@@ -22,6 +21,8 @@
     "mek.UpgradeUtilsMixin"
   ],
   "client": [
+    "botanypots.BotanyPotRendererMixin",
+    "botanypots.PhasedDisplayStateRendererMixin",
     "eae.GuiAssemblerMatrixPatternInfoMixin"
   ],
   "injectors": {

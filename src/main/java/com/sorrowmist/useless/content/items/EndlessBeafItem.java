@@ -339,7 +339,8 @@ public class EndlessBeafItem extends TieredItem {
     public float getDestroySpeed(@NotNull ItemStack stack, @NotNull BlockState state) {
         // 基础工具速度
         Tool tool = stack.get(DataComponents.TOOL);
-        float baseSpeed = Math.max(tool != null ? tool.getMiningSpeed(state) : 10.0F, 10.0F);
+        float configSpeed = (float) ConfigManager.getBeefToolMiningSpeed();
+        float baseSpeed = Math.max(tool != null ? tool.getMiningSpeed(state) : configSpeed, configSpeed);
 
         float hardness = state.getDestroySpeed(null, null);
         if (hardness < 0) {
@@ -529,6 +530,10 @@ public class EndlessBeafItem extends TieredItem {
         // 4. 其他静态功能提示
         tooltipComponents.add(
                 Component.translatable("tooltip.useless_mod.fast_break_plastic").withStyle(ChatFormatting.GREEN));
+        if (ModList.get().isLoaded("ae2")) {
+            tooltipComponents.add(
+                    Component.translatable("tooltip.useless_mod.ae_storage_priority_bind_hint").withStyle(ChatFormatting.GREEN));
+        }
         tooltipComponents.add(
                 Component.translatable("tooltip.useless_mod.festive_affix").withStyle(ChatFormatting.BLUE));
         tooltipComponents.add(

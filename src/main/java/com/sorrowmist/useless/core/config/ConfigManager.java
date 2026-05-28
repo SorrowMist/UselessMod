@@ -6,6 +6,8 @@ import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.neoforged.neoforge.common.ModConfigSpec;
 
+import java.util.List;
+
 public class ConfigManager {
     public static final ModConfigSpec SPEC;
     private static final ModConfigSpec.Builder BUILDER = new ModConfigSpec.Builder();
@@ -22,6 +24,8 @@ public class ConfigManager {
 
     // 植物盆生长速度配置
     private static final ModConfigSpec.IntValue BOTANY_POT_GROWTH_MULTIPLIER;
+    // 植物盆渲染配置
+    private static final ModConfigSpec.BooleanValue ENABLE_BOTANY_POT_RENDERING;
 
     // 矩阵样板数量配置
     private static final ModConfigSpec.IntValue MATRIX_PATTERN_COUNT;
@@ -29,6 +33,9 @@ public class ConfigManager {
     // 药水效果配置
     private static final ModConfigSpec.BooleanValue ENABLE_POTION_EFFECTS;
     private static final ModConfigSpec.BooleanValue ENABLE_FLIGHT_EFFECT;
+    
+    // 自定义药水效果配置 - 格式: "modid:effect_name,amplifier" (持续时间固定为20000 tick)
+    private static final ModConfigSpec.ConfigValue<List<? extends String>> CUSTOM_POTION_EFFECTS;
 
     // 牛排工具连锁挖掘配置
     private static final ModConfigSpec.IntValue CHAIN_MINING_RANGE_X;
@@ -38,6 +45,11 @@ public class ConfigManager {
     // 牛排工具附魔等级配置
     private static final ModConfigSpec.IntValue FORTUNE_LEVEL;
     private static final ModConfigSpec.IntValue LOOTING_LEVEL;
+    // 牛排工具挖掘速度配置
+    private static final ModConfigSpec.DoubleValue BEEF_TOOL_MINING_SPEED;
+
+    // 战利品大爆发触发概率配置 (百分比)
+    private static final ModConfigSpec.IntValue FESTIVE_DROP_CHANCE;
 
     // Mekanism 升级配置
     private static final ModConfigSpec.IntValue TIME_MULTIPLIER;
@@ -48,15 +60,15 @@ public class ConfigManager {
     static {
         BUILDER.push("dimension_generation");
         BORDER_BLOCK = BUILDER
-                .comment("边框方块，若不存在则使用蓝色羊毛")
+                .comment("边框方块, 若不存在则使用蓝色羊毛")
                 .define("border_block", "useless_mod:aqua_glow_plastic");
 
         FILL_BLOCK = BUILDER
-                .comment("填充方块，若不存在则使用白色羊毛")
+                .comment("填充方块, 若不存在则使用白色羊毛")
                 .define("fill_block", "useless_mod:white_glow_plastic");
 
         CENTER_BLOCK = BUILDER
-                .comment("中心方块，若不存在则使用灰色羊毛")
+                .comment("中心方块, 若不存在则使用灰色羊毛")
                 .define("center_block", "useless_mod:light_gray_glow_plastic");
 
         PLATFORM_LAYERS = BUILDER
@@ -68,14 +80,18 @@ public class ConfigManager {
                 .defineInRange("platform_start_y", -64, -64, 256);
 
         GENERATE_BEDROCK = BUILDER
-                .comment("是否生成基岩层，默认生成")
+                .comment("是否生成基岩层, 默认生成")
                 .define("generate_bedrock", true);
         BUILDER.pop();
 
         BUILDER.push("game_mechanics");
         BOTANY_POT_GROWTH_MULTIPLIER = BUILDER
-                .comment("植物盆生长倍率 - 1.0为原版速度，2.0为2倍速度")
+                .comment("植物盆生长倍率 - 1.0为原版速度, 2.0为2倍速度")
                 .defineInRange("botany_pot_growth_multiplier", 1, 1, Integer.MAX_VALUE);
+
+        ENABLE_BOTANY_POT_RENDERING = BUILDER
+                .comment("是否启用植物盆作物渲染")
+                .define("enable_botany_pot_rendering", true);
 
         MATRIX_PATTERN_COUNT = BUILDER
                 .comment("矩阵样板槽位倍数 - 减少数量时请保持槽位空！否则可能会造成样板丢失")
@@ -91,6 +107,22 @@ public class ConfigManager {
         ENABLE_FLIGHT_EFFECT = BUILDER
                 .comment("是否启用飞行效果")
                 .define("enable_flight_effect", true);
+
+        // 自定义药水效果列表
+        CUSTOM_POTION_EFFECTS = BUILDER
+                .comment("自定义药水效果列表, 格式: \"modid:effect_name,amplifier\"",
+                        "例如: \"minecraft:regeneration,5\" 表示生命恢复效果, 等级5",
+                        "注意: 等级从1开始计算, 1表示I级, 2表示II级, 以此类推")
+                .defineList("custom_potion_effects",
+                        () -> List.of(
+                                "minecraft:saturation,1",
+                                "minecraft:regeneration,6",
+                                "minecraft:night_vision,1",
+                                "minecraft:fire_resistance,1",
+                                "minecraft:water_breathing,1",
+                                "minecraft:damage_resistance,6"
+                        ),
+                        obj -> obj instanceof String str && str.matches("^[a-z0-9_.-]+:[a-z0-9_./-]+,\\d+$"));
 
         CHAIN_MINING_RANGE_X = BUILDER
                 .comment("连锁挖掘的X轴范围半径")
@@ -116,6 +148,16 @@ public class ConfigManager {
         LOOTING_LEVEL = BUILDER
                 .comment("牛排工具抢夺附魔等级")
                 .defineInRange("looting_level", 10, 1, 127);
+
+        // 战利品大爆发触发概率配置
+        FESTIVE_DROP_CHANCE = BUILDER
+                .comment("战利品大爆发触发概率 (百分比, 1-100%)")
+                .defineInRange("festive_drop_chance", 5, 1, 100);
+
+        // 牛排工具挖掘速度配置
+        BEEF_TOOL_MINING_SPEED = BUILDER
+                .comment("牛排工具基础挖掘速度")
+                .defineInRange("beef_tool_mining_speed", 10.0, 1.0, 1000.0);
         BUILDER.pop();
 
         BUILDER.push("mekanism_upgrade");
@@ -132,7 +174,7 @@ public class ConfigManager {
                 .defineInRange("capacity_multiplier", 1, 1, Integer.MAX_VALUE);
 
         MAX_UPGRADE = BUILDER
-                .comment("机器可接受的最大速度/能量升级数量，重启游戏生效")
+                .comment("机器可接受的最大速度/能量升级数量, 重启游戏生效")
                 .defineInRange("max_upgrade", 16, 1, 64);
         BUILDER.pop();
 
@@ -155,6 +197,10 @@ public class ConfigManager {
     // 获取配置值方法
     public static int getBotanyPotGrowthMultiplier() {
         return BOTANY_POT_GROWTH_MULTIPLIER.get();
+    }
+
+    public static boolean shouldEnableBotanyPotRendering() {
+        return ENABLE_BOTANY_POT_RENDERING.get();
     }
 
     public static int getMatrixPatternCount() {
@@ -203,6 +249,16 @@ public class ConfigManager {
         return LOOTING_LEVEL.get();
     }
 
+    // 获取节日掉落触发概率
+    public static int getFestiveDropChance() {
+        return FESTIVE_DROP_CHANCE.get();
+    }
+
+    // 获取牛排工具基础挖掘速度
+    public static double getBeefToolMiningSpeed() {
+        return BEEF_TOOL_MINING_SPEED.get();
+    }
+
     // 获取塑料平台层数
     public static int getPlatformLayers() {
         return PLATFORM_LAYERS.get();
@@ -225,6 +281,11 @@ public class ConfigManager {
 
     public static boolean shouldEnableFlightEffect() {
         return ENABLE_FLIGHT_EFFECT.get();
+    }
+
+    // 获取自定义药水效果配置列表
+    public static List<String> getCustomPotionEffects() {
+        return (List<String>) CUSTOM_POTION_EFFECTS.get();
     }
 
     private static Block getBlockFromString(String blockId, Block fallback) {

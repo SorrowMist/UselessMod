@@ -87,6 +87,14 @@ config="${mod_id}.mixins.json"
     ordering="NONE"
     side="BOTH"
 
+# Botany Pots dependency
+[[dependencies.${mod_id}]]
+    modId="botanypots"
+    type="required"
+    versionRange="[21.1.41,)"
+    ordering="AFTER"
+    side="BOTH"
+
 # Require ExtendedAE (ExtendedAE-1.21-2.2.21-neoforge) to be present
 #[[dependencies.${mod_id}]]
 #    modId="extendedae"

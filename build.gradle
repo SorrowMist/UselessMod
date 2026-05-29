@@ -177,7 +177,7 @@ dependencies {
     implementation "org.appliedenergistics:guideme:2.5.1"
 
     implementation "de.mari_023:ae2wtlib_api:19.2.5"
-//    implementation "curse.maven:curios-309927:6073321"
+    implementation "curse.maven:curios-309927:6073321"
     implementation "top.theillusivec4.curios:curios-neoforge:9.5.1+1.21.1:api"
     implementation "curse.maven:ex-pattern-provider-892005:6863556"
     implementation "curse.maven:applied-flux-965012:5614830"

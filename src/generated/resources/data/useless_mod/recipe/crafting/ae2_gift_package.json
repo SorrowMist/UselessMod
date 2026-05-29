@@ -1,0 +1,21 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "key": {
+    "P": {
+      "tag": "minecraft:planks"
+    },
+    "S": {
+      "item": "minecraft:stick"
+    }
+  },
+  "pattern": [
+    "SPS",
+    "PPP",
+    "SPS"
+  ],
+  "result": {
+    "count": 1,
+    "id": "useless_mod:ae2_gift_package"
+  }
+}

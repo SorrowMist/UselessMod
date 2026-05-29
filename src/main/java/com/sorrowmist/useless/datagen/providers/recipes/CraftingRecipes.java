@@ -34,6 +34,7 @@ public class CraftingRecipes extends RecipeProvider {
         this.addEndlessBeafItemRecipe(consumer);
         this.addOreGeneratorBlockRecipe(consumer);
         this.addTeleportBlockRecipes(consumer);
+        this.addAE2GiftPackageRecipe(consumer);
         this.addAdvancedAlloyFurnaceRecipes(consumer);
     }
 
@@ -96,6 +97,17 @@ public class CraftingRecipes extends RecipeProvider {
                            .define('I', Items.LAVA_BUCKET)
                            .unlockedBy("has_furnace", has(Blocks.FURNACE))
                            .save(consumer);
+    }
+
+    private void addAE2GiftPackageRecipe(RecipeOutput consumer) {
+        ShapedRecipeBuilder.shaped(RecipeCategory.MISC, ModItems.AE2_GIFT_PACKAGE.get(), 1)
+                           .pattern("SPS")
+                           .pattern("PPP")
+                           .pattern("SPS")
+                           .define('P', ItemTags.PLANKS)
+                           .define('S', Items.STICK)
+                           .unlockedBy("has_planks", has(ItemTags.PLANKS))
+                           .save(consumer, UselessMod.id("crafting/ae2_gift_package"));
     }
 
     private void addAdvancedAlloyFurnaceRecipes(RecipeOutput output) {

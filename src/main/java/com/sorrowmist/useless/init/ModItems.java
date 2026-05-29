@@ -4,12 +4,14 @@ package com.sorrowmist.useless.init;
 import com.sorrowmist.useless.UselessMod;
 import com.sorrowmist.useless.api.enums.RarityExtension;
 import com.sorrowmist.useless.api.enums.tool.ToolTypeMode;
+import com.sorrowmist.useless.content.items.AE2GiftPackageItem;
 import com.sorrowmist.useless.content.items.AdvancedAlloyFurnaceBlockItem;
 import com.sorrowmist.useless.content.items.EndlessBeafItem;
 import com.sorrowmist.useless.content.items.IngotItem;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.Rarity;
+import net.neoforged.fml.ModList;
 import net.neoforged.neoforge.registries.DeferredItem;
 import net.neoforged.neoforge.registries.DeferredRegister;
 
@@ -209,6 +211,20 @@ public final class ModItems {
             "advanced_alloy_furnace_block",
             () -> new AdvancedAlloyFurnaceBlockItem(ModBlocks.ADVANCED_ALLOY_FURNACE_BLOCK.get(), new Item.Properties())
     );
+
+    public static final DeferredItem<AE2GiftPackageItem> AE2_GIFT_PACKAGE;
+
+    static {
+        if (ModList.get().isLoaded("ae2")) {
+            AE2_GIFT_PACKAGE = ITEMS.register(
+                    "ae2_gift_package",
+                    () -> new AE2GiftPackageItem(new Item.Properties().rarity(Rarity.EPIC).stacksTo(64))
+            );
+            CREATIVE_MAIN_TAB_ITEMS.add(AE2_GIFT_PACKAGE);
+        } else {
+            AE2_GIFT_PACKAGE = null;
+        }
+    }
 
     private ModItems() {}
 

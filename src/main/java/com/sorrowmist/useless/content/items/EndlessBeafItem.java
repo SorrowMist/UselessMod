@@ -340,7 +340,7 @@ public class EndlessBeafItem extends TieredItem {
         // 基础工具速度
         Tool tool = stack.get(DataComponents.TOOL);
         float configSpeed = (float) ConfigManager.getBeefToolMiningSpeed();
-        float baseSpeed = Math.max(tool != null ? tool.getMiningSpeed(state) : configSpeed, configSpeed);
+        float baseSpeed = configSpeed > 0 ? configSpeed : (tool != null ? tool.getMiningSpeed(state) : 1.0F);
 
         float hardness = state.getDestroySpeed(null, null);
         if (hardness < 0) {

@@ -90,7 +90,7 @@ config="${mod_id}.mixins.json"
 # Botany Pots dependency
 [[dependencies.${mod_id}]]
     modId="botanypots"
-    type="required"
+    type="optional"
     versionRange="[21.1.41,)"
     ordering="AFTER"
     side="BOTH"

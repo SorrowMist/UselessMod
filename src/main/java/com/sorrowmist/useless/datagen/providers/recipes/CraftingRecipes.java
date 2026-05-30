@@ -151,164 +151,112 @@ public class CraftingRecipes extends RecipeProvider {
                                          .mode(AlloyFurnaceMode.NORMAL)
                                          .save(output, UselessMod.id("advanced_alloy/ingot/useless_ingot_tier_1"));
 
-        // Tier 2 - 使用1-9阶无用锭作为催化剂（1阶无并行奖励，2阶及以上有奖励）
+        // Tier 2 - 使用1阶无用锭作为输入材料
         AdvancedAlloyFurnaceRecipeBuilder.create()
                                          .input(Ingredient.of(Items.ROTTEN_FLESH), 2)
                                          .input(Ingredient.of(Items.GUNPOWDER), 2)
                                          .input(Ingredient.of(Items.BONE), 2)
                                          .input(Ingredient.of(Items.GOLD_INGOT), 2)
                                          .input(Ingredient.of(Items.DIAMOND), 2)
-                                         .catalyst(Ingredient.of(
-                                                 ModItems.USELESS_INGOT_TIER_1.get(),
-                                                 ModItems.USELESS_INGOT_TIER_2.get(),
-                                                 ModItems.USELESS_INGOT_TIER_3.get(),
-                                                 ModItems.USELESS_INGOT_TIER_4.get(),
-                                                 ModItems.USELESS_INGOT_TIER_5.get(),
-                                                 ModItems.USELESS_INGOT_TIER_6.get(),
-                                                 ModItems.USELESS_INGOT_TIER_7.get(),
-                                                 ModItems.USELESS_INGOT_TIER_8.get(),
-                                                 ModItems.USELESS_INGOT_TIER_9.get()
-                                         ), 1)
+                                         .input(Ingredient.of(ModItems.USELESS_INGOT_TIER_1.get()), 1)
                                          .output(ModItems.USELESS_INGOT_TIER_2.get(), 1)
                                          .energy(50000)
                                          .processTime(1)
                                          .mode(AlloyFurnaceMode.NORMAL)
                                          .save(output, UselessMod.id("advanced_alloy/ingot/useless_ingot_tier_2"));
 
-        // Tier 3 - 使用2-9阶无用锭作为催化剂（2阶无并行奖励，3阶及以上有奖励）
+        // Tier 3 - 使用2阶无用锭作为输入材料
         AdvancedAlloyFurnaceRecipeBuilder.create()
                                          .input(Ingredient.of(Items.NETHER_WART), 2)
                                          .input(Ingredient.of(Items.BLAZE_ROD), 2)
                                          .input(Ingredient.of(Items.NETHER_BRICK), 2)
                                          .input(Ingredient.of(Items.GOLD_INGOT), 2)
                                          .input(Ingredient.of(Items.DIAMOND), 2)
-                                         .catalyst(Ingredient.of(
-                                                 ModItems.USELESS_INGOT_TIER_2.get(),
-                                                 ModItems.USELESS_INGOT_TIER_3.get(),
-                                                 ModItems.USELESS_INGOT_TIER_4.get(),
-                                                 ModItems.USELESS_INGOT_TIER_5.get(),
-                                                 ModItems.USELESS_INGOT_TIER_6.get(),
-                                                 ModItems.USELESS_INGOT_TIER_7.get(),
-                                                 ModItems.USELESS_INGOT_TIER_8.get(),
-                                                 ModItems.USELESS_INGOT_TIER_9.get()
-                                         ), 1)
+                                         .input(Ingredient.of(ModItems.USELESS_INGOT_TIER_2.get()), 1)
                                          .output(ModItems.USELESS_INGOT_TIER_3.get(), 1)
                                          .energy(100000)
                                          .processTime(1)
                                          .mode(AlloyFurnaceMode.NORMAL)
                                          .save(output, UselessMod.id("advanced_alloy/ingot/useless_ingot_tier_3"));
 
-        // Tier 4 - 使用3-9阶无用锭作为催化剂（3阶无并行奖励，4阶及以上有奖励）
+        // Tier 4 - 使用3阶无用锭作为输入材料
         AdvancedAlloyFurnaceRecipeBuilder.create()
                                          .input(Ingredient.of(Items.ENDER_PEARL), 2)
                                          .input(Ingredient.of(Items.CHORUS_FRUIT), 2)
                                          .input(Ingredient.of(Items.SHULKER_SHELL), 2)
                                          .input(Ingredient.of(Items.GOLD_BLOCK), 2)
                                          .input(Ingredient.of(Items.DIAMOND_BLOCK), 2)
-                                         .catalyst(Ingredient.of(
-                                                 ModItems.USELESS_INGOT_TIER_3.get(),
-                                                 ModItems.USELESS_INGOT_TIER_4.get(),
-                                                 ModItems.USELESS_INGOT_TIER_5.get(),
-                                                 ModItems.USELESS_INGOT_TIER_6.get(),
-                                                 ModItems.USELESS_INGOT_TIER_7.get(),
-                                                 ModItems.USELESS_INGOT_TIER_8.get(),
-                                                 ModItems.USELESS_INGOT_TIER_9.get()
-                                         ), 1)
+                                         .input(Ingredient.of(ModItems.USELESS_INGOT_TIER_3.get()), 1)
                                          .output(ModItems.USELESS_INGOT_TIER_4.get(), 1)
                                          .energy(500000)
                                          .processTime(1)
                                          .mode(AlloyFurnaceMode.NORMAL)
                                          .save(output, UselessMod.id("advanced_alloy/ingot/useless_ingot_tier_4"));
 
-        // Tier 5 - 使用4-9阶无用锭作为催化剂（4阶无并行奖励，5阶及以上有奖励）
+        // Tier 5 - 使用4阶无用锭作为输入材料
         AdvancedAlloyFurnaceRecipeBuilder.create()
                                          .input(Ingredient.of(Items.WITHER_SKELETON_SKULL), 2)
                                          .input(Ingredient.of(Items.PHANTOM_MEMBRANE), 2)
                                          .input(Ingredient.of(Items.SEA_LANTERN), 2)
                                          .input(Ingredient.of(Items.GOLD_BLOCK), 2)
                                          .input(Ingredient.of(Items.DIAMOND_BLOCK), 2)
-                                         .catalyst(Ingredient.of(
-                                                 ModItems.USELESS_INGOT_TIER_4.get(),
-                                                 ModItems.USELESS_INGOT_TIER_5.get(),
-                                                 ModItems.USELESS_INGOT_TIER_6.get(),
-                                                 ModItems.USELESS_INGOT_TIER_7.get(),
-                                                 ModItems.USELESS_INGOT_TIER_8.get(),
-                                                 ModItems.USELESS_INGOT_TIER_9.get()
-                                         ), 1)
+                                         .input(Ingredient.of(ModItems.USELESS_INGOT_TIER_4.get()), 1)
                                          .output(ModItems.USELESS_INGOT_TIER_5.get(), 1)
                                          .energy(1000000)
                                          .processTime(1)
                                          .mode(AlloyFurnaceMode.NORMAL)
                                          .save(output, UselessMod.id("advanced_alloy/ingot/useless_ingot_tier_5"));
 
-        // Tier 6 - 使用5-9阶无用锭作为催化剂（5阶无并行奖励，6阶及以上有奖励）
+        // Tier 6 - 使用5阶无用锭作为输入材料
         AdvancedAlloyFurnaceRecipeBuilder.create()
                                          .input(Ingredient.of(Items.DRAGON_BREATH), 2)
                                          .input(Ingredient.of(Items.TOTEM_OF_UNDYING), 2)
                                          .input(Ingredient.of(Items.ENCHANTED_GOLDEN_APPLE), 2)
                                          .input(Ingredient.of(Items.GOLD_BLOCK), 2)
                                          .input(Ingredient.of(Items.DIAMOND_BLOCK), 2)
-                                         .catalyst(Ingredient.of(
-                                                 ModItems.USELESS_INGOT_TIER_5.get(),
-                                                 ModItems.USELESS_INGOT_TIER_6.get(),
-                                                 ModItems.USELESS_INGOT_TIER_7.get(),
-                                                 ModItems.USELESS_INGOT_TIER_8.get(),
-                                                 ModItems.USELESS_INGOT_TIER_9.get()
-                                         ), 1)
+                                         .input(Ingredient.of(ModItems.USELESS_INGOT_TIER_5.get()), 1)
                                          .output(ModItems.USELESS_INGOT_TIER_6.get(), 1)
                                          .energy(5000000)
                                          .processTime(1)
                                          .mode(AlloyFurnaceMode.NORMAL)
                                          .save(output, UselessMod.id("advanced_alloy/ingot/useless_ingot_tier_6"));
 
-        // Tier 7 - 使用6-9阶无用锭作为催化剂（6阶无并行奖励，7阶及以上有奖励）
+        // Tier 7 - 使用6阶无用锭作为输入材料
         AdvancedAlloyFurnaceRecipeBuilder.create()
                                          .input(Ingredient.of(Items.NETHER_STAR), 2)
                                          .input(Ingredient.of(Items.WITHER_ROSE), 2)
                                          .input(Ingredient.of(Items.GHAST_TEAR), 2)
                                          .input(Ingredient.of(Items.DIAMOND_BLOCK), 2)
                                          .input(Ingredient.of(Items.NETHERITE_INGOT), 2)
-                                         .catalyst(Ingredient.of(
-                                                 ModItems.USELESS_INGOT_TIER_6.get(),
-                                                 ModItems.USELESS_INGOT_TIER_7.get(),
-                                                 ModItems.USELESS_INGOT_TIER_8.get(),
-                                                 ModItems.USELESS_INGOT_TIER_9.get()
-                                         ), 1)
+                                         .input(Ingredient.of(ModItems.USELESS_INGOT_TIER_6.get()), 1)
                                          .output(ModItems.USELESS_INGOT_TIER_7.get(), 1)
                                          .energy(10000000)
                                          .processTime(1)
                                          .mode(AlloyFurnaceMode.NORMAL)
                                          .save(output, UselessMod.id("advanced_alloy/ingot/useless_ingot_tier_7"));
 
-        // Tier 8 - 使用7-9阶无用锭作为催化剂（7阶无并行奖励，8阶及以上有奖励）
+        // Tier 8 - 使用7阶无用锭作为输入材料
         AdvancedAlloyFurnaceRecipeBuilder.create()
                                          .input(Ingredient.of(Items.DRAGON_HEAD), 2)
                                          .input(Ingredient.of(Items.ECHO_SHARD), 2)
                                          .input(Ingredient.of(Items.CONDUIT), 2)
                                          .input(Ingredient.of(Items.DIAMOND_BLOCK), 2)
                                          .input(Ingredient.of(Items.NETHERITE_INGOT), 2)
-                                         .catalyst(Ingredient.of(
-                                                 ModItems.USELESS_INGOT_TIER_7.get(),
-                                                 ModItems.USELESS_INGOT_TIER_8.get(),
-                                                 ModItems.USELESS_INGOT_TIER_9.get()
-                                         ), 1)
+                                         .input(Ingredient.of(ModItems.USELESS_INGOT_TIER_7.get()), 1)
                                          .output(ModItems.USELESS_INGOT_TIER_8.get(), 1)
                                          .energy(50000000)
                                          .processTime(1)
                                          .mode(AlloyFurnaceMode.NORMAL)
                                          .save(output, UselessMod.id("advanced_alloy/ingot/useless_ingot_tier_8"));
 
-        // Tier 9 - 使用8-9阶无用锭作为催化剂（8阶无并行奖励，9阶给无限并行）
+        // Tier 9 - 使用8阶无用锭作为输入材料
         AdvancedAlloyFurnaceRecipeBuilder.create()
                                          .input(Ingredient.of(Items.TURTLE_HELMET), 2)
                                          .input(Ingredient.of(Items.GOAT_HORN), 2)
                                          .input(Ingredient.of(Items.RABBIT_FOOT), 2)
                                          .input(Ingredient.of(Items.DIAMOND_BLOCK), 2)
                                          .input(Ingredient.of(Items.NETHERITE_BLOCK), 2)
-                                         .catalyst(Ingredient.of(
-                                                 ModItems.USELESS_INGOT_TIER_8.get(),
-                                                 ModItems.USELESS_INGOT_TIER_9.get()
-                                         ), 1)
+                                         .input(Ingredient.of(ModItems.USELESS_INGOT_TIER_8.get()), 1)
                                          .output(ModItems.USELESS_INGOT_TIER_9.get(), 1)
                                          .energy(100000000)
                                          .processTime(1)
@@ -329,7 +277,7 @@ public class CraftingRecipes extends RecipeProvider {
                                          .fluidInput(new FluidStack(Fluids.LAVA, 10000000))
                                          .output(ModItems.USEFUL_INGOT.get(), 1)
                                          .energy(10000000)
-                                         .processTime(600)
+                                         .processTime(100)
                                          .mode(AlloyFurnaceMode.NORMAL)
                                          .save(output, UselessMod.id("advanced_alloy/ingot/useful_ingot"));
     }

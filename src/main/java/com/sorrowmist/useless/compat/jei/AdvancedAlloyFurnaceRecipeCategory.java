@@ -244,18 +244,10 @@ public class AdvancedAlloyFurnaceRecipeCategory implements IRecipeCategory<Advan
             }
         }
 
-        // 催化剂槽位
+        // 催化剂槽位（普通配方可用）
         List<ItemStack> catalystStacks = new ArrayList<>();
 
-        if (isUselessRecipe && !recipe.catalyst().isEmpty()) {
-            // 无用锭配方且有特定催化剂要求：显示配方中定义的特定催化剂
-            ItemStack[] recipeCatalysts = recipe.catalyst().getItems();
-            for (ItemStack stack : recipeCatalysts) {
-                ItemStack displayStack = stack.copy();
-                displayStack.setCount(recipe.catalystUses() > 0 ? recipe.catalystUses() : 1);
-                catalystStacks.add(displayStack);
-            }
-        } else if (!isUselessRecipe) {
+        if (!isUselessRecipe) {
             // 普通配方：使用ModTags.CATALYSTS轮询显示所有催化剂（可选）
             BuiltInRegistries.ITEM.getTag(ModTags.CATALYSTS).ifPresent(tag -> {
                 for (var holder : tag) {
@@ -273,16 +265,15 @@ public class AdvancedAlloyFurnaceRecipeCategory implements IRecipeCategory<Advan
                        tooltip.add(Component.translatable("jei.useless_mod.tooltip.catalyst").withStyle(ChatFormatting.GOLD));
                        int tier = getTargetUselessIngotTier(recipe);
                        if (tier > 0) {
-                           // 无用锭配方：显示跨阶合成信息
+                           // 无用锭配方：显示并行数信息
                            tooltip.add(Component.translatable("jei.useless_mod.tooltip.catalyst.useless_ingot.title").withStyle(ChatFormatting.YELLOW));
-                           tooltip.add(Component.translatable("jei.useless_mod.tooltip.catalyst.useless_ingot.desc1").withStyle(ChatFormatting.GRAY));
                            tooltip.add(Component.translatable("jei.useless_mod.tooltip.catalyst.useless_ingot.desc2").withStyle(ChatFormatting.GREEN));
-                           tooltip.add(Component.translatable("jei.useless_mod.tooltip.catalyst.useless_ingot.warning").withStyle(ChatFormatting.RED));
+                           tooltip.add(Component.translatable("jei.useless_mod.tooltip.catalyst.useless_ingot.desc3").withStyle(ChatFormatting.BLUE));
                        } else if (!isUselessRecipe) {
                            // 普通配方
                            tooltip.add(Component.translatable("jei.useless_mod.tooltip.catalyst.normal.desc1").withStyle(ChatFormatting.GRAY));
-                           tooltip.add(Component.translatable("jei.useless_mod.tooltip.catalyst.normal.warning").withStyle(ChatFormatting.RED));
                            tooltip.add(Component.translatable("jei.useless_mod.tooltip.catalyst.normal.desc2").withStyle(ChatFormatting.GRAY));
+                           tooltip.add(Component.translatable("jei.useless_mod.tooltip.catalyst.normal.desc3").withStyle(ChatFormatting.BLUE));
                        }
                    });
         }
@@ -340,21 +331,7 @@ public class AdvancedAlloyFurnaceRecipeCategory implements IRecipeCategory<Advan
         guiGraphics.drawString(minecraft.font, timeText, timeX, timeY, 0x00FF00, false);
         guiGraphics.pose().popPose();
 
-        // 只有当配方允许通用催化剂（非特定催化剂）时才显示提示
-        // 无用锭配方有特定的催化剂要求，不显示此提示
-        if (!recipe.catalyst().isEmpty() && this.isUselessIngotRecipe(recipe)) {
-            guiGraphics.pose().pushPose();
-            float scale = 0.7f;
-            guiGraphics.pose().scale(scale, scale, 1.0f);
-
-            String catalystText = Component.translatable("jei.useless_mod.gui.catalyst_optional").getString();
-            int textWidth = minecraft.font.width(catalystText);
-            int centeredX = (int) ((DISPLAY_WIDTH / 2.0f - textWidth * scale / 2) / scale);
-            int y = (int) (CATALYST_TEXT_Y / scale);
-
-            guiGraphics.drawString(minecraft.font, catalystText, centeredX, y, 0xFF0000, false);
-            guiGraphics.pose().popPose();
-        }
+        
 
         // 模具提示
         if (!recipe.mold().isEmpty()) {

@@ -53,6 +53,9 @@ public class AdvancedAlloyFurnaceMenu extends AbstractContainerMenu {
     private static final int MOLD_SLOT_X = 99;
     private static final int MOLD_SLOT_Y = 87;
 
+    private static final int PATTERN_SLOTS_X = -50;
+    private static final int PATTERN_SLOTS_FIRST_Y = 18;
+
     private static final int PLAYER_INVENTORY_X = 8;
     private static final int PLAYER_INVENTORY_Y = 178;
     private static final int PLAYER_HOTBAR_Y = 236;
@@ -63,6 +66,8 @@ public class AdvancedAlloyFurnaceMenu extends AbstractContainerMenu {
     private static final int MACHINE_OUTPUT_END = MACHINE_OUTPUT_START + AdvancedAlloyFurnaceBlockEntity.OUTPUT_SLOTS_COUNT - 1;
     private static final int CATALYST_SLOT = AdvancedAlloyFurnaceBlockEntity.CATALYST_SLOT;
     private static final int MOLD_SLOT = AdvancedAlloyFurnaceBlockEntity.MOLD_SLOT;
+    private static final int PATTERN_SLOTS_START = AdvancedAlloyFurnaceBlockEntity.PATTERN_SLOTS_START;
+    private static final int PATTERN_SLOTS_END = AdvancedAlloyFurnaceBlockEntity.PATTERN_SLOTS_END;
     private static final int PLAYER_INVENTORY_START = AdvancedAlloyFurnaceBlockEntity.TOTAL_SLOTS;
     private static final int PLAYER_INVENTORY_END = PLAYER_INVENTORY_START + 26;
     private static final int HOTBAR_START = PLAYER_INVENTORY_END + 1;
@@ -138,6 +143,28 @@ public class AdvancedAlloyFurnaceMenu extends AbstractContainerMenu {
                 return 1;
             }
         });
+        
+        // 添加9个样板槽位（3x3），只能放入样板
+        for (int row = 0; row < 3; row++) {
+            for (int col = 0; col < 3; col++) {
+                int slotIndex = PATTERN_SLOTS_START + row * 3 + col;
+                int x = PATTERN_SLOTS_X + col * SLOT_SIZE;
+                int y = PATTERN_SLOTS_FIRST_Y + row * SLOT_SIZE;
+                this.addSlot(new HighStackSlotItemHandler(itemHandler, slotIndex, x, y) {
+                    @Override
+                    public int getMaxStackSize() {
+                        return 1;
+                    }
+
+                    @Override
+                    public boolean mayPlace(@NotNull ItemStack stack) {
+                        // 只能放入样板，与AE样板供应器保持一致
+                        // 使用isEncodedPattern而不是decodePattern，因为decodePattern需要Level参数
+                        return appeng.api.crafting.PatternDetailsHelper.isEncodedPattern(stack);
+                    }
+                });
+            }
+        }
     }
 
     /**
@@ -189,7 +216,7 @@ public class AdvancedAlloyFurnaceMenu extends AbstractContainerMenu {
         ItemStack stackInSlot = slot.getItem();
         itemstack = stackInSlot.copy();
 
-        if (index >= MACHINE_INPUT_START && index <= MOLD_SLOT) {
+        if (index >= MACHINE_INPUT_START && index <= PATTERN_SLOTS_END) {
             if (!this.moveItemStackTo(stackInSlot, PLAYER_INVENTORY_START, HOTBAR_END + 1, true)) {
                 return ItemStack.EMPTY;
             }
@@ -219,19 +246,30 @@ public class AdvancedAlloyFurnaceMenu extends AbstractContainerMenu {
     /**
      * 尝试将物品移动到机器槽位
      * <p>
-     * 优先顺序：输入槽 -> 催化剂槽 -> 模具槽
+     * 优先顺序：样板槽 -> 输入槽 -> 催化剂槽 -> 模具槽
+     * 样板槽优先，且只能放入样板
      *
      * @param stack 物品堆
      * @return 是否成功移动
      */
     private boolean tryMoveToMachine(ItemStack stack) {
+        // 优先检查是否是样板，如果是则优先放入样板槽
+        if (appeng.api.crafting.PatternDetailsHelper.isEncodedPattern(stack)) {
+            if (this.moveItemStackTo(stack, PATTERN_SLOTS_START, PATTERN_SLOTS_END + 1, false)) {
+                return true;
+            }
+        }
         if (this.moveItemStackTo(stack, MACHINE_INPUT_START, MACHINE_INPUT_END + 1, false)) {
             return true;
         }
         if (this.moveItemStackTo(stack, CATALYST_SLOT, CATALYST_SLOT + 1, false)) {
             return true;
         }
-        return this.moveItemStackTo(stack, MOLD_SLOT, MOLD_SLOT + 1, false);
+        if (this.moveItemStackTo(stack, MOLD_SLOT, MOLD_SLOT + 1, false)) {
+            return true;
+        }
+        // 如果不是样板，也尝试放入样板槽（但样板槽的mayPlace会阻止非样板放入）
+        return this.moveItemStackTo(stack, PATTERN_SLOTS_START, PATTERN_SLOTS_END + 1, false);
     }
 
     /**
@@ -295,5 +333,26 @@ public class AdvancedAlloyFurnaceMenu extends AbstractContainerMenu {
 
     public FluidTank getOutputFluidTank(int index) {
         return this.blockEntity != null ? this.blockEntity.getOutputFluidTank(index) : new FluidTank(0);
+    }
+
+    // AE网络合成任务状态
+    public int getActiveAETaskCount() {
+        return this.data.get(AdvancedAlloyFurnaceData.DATA_AE_ACTIVE_TASKS);
+    }
+
+    public int getTotalAEProgress() {
+        return this.data.get(AdvancedAlloyFurnaceData.DATA_AE_TOTAL_PROGRESS);
+    }
+
+    public int getTotalAEMaxProgress() {
+        return this.data.get(AdvancedAlloyFurnaceData.DATA_AE_TOTAL_MAX_PROGRESS);
+    }
+
+    // 获取所有AE任务进度信息
+    public java.util.Collection<com.sorrowmist.useless.content.blockentities.AdvancedAlloyFurnaceBlockEntity.AETaskProgress> getAETaskProgressList() {
+        if (this.blockEntity != null) {
+            return this.blockEntity.getAETaskProgressList();
+        }
+        return java.util.Collections.emptyList();
     }
 }

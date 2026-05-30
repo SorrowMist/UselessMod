@@ -14,7 +14,7 @@ import java.util.Map;
 public class CatalystParallelManager {
 
     // 基础并行倍数
-    public static final int BASE_PARALLEL = 3;
+    public static final int BASE_PARALLEL = 2;
 
     // 催化剂等级映射（物品ID -> 等级）
     private static final Map<String, Integer> CATALYST_TIER_MAP = new HashMap<>();
@@ -80,32 +80,14 @@ public class CatalystParallelManager {
 
     /**
      * 计算无用锭配方的并行数
-     * 当合成N阶无用锭时：
-     * - 使用N阶催化剂（同阶），并行数 = 3
-     * - 使用M阶催化剂（M > N），并行数 = 3^(M-N+1)
-     * 使用低于N阶的催化剂（如合成3阶用2阶），并行数 = 1
+     * 无用锭配方的并行数 = 2^目标等级
      *
-     * @param catalystStack 催化剂物品堆
      * @param targetTier    目标无用锭等级（配方输出）
-     * @return 并行数，无催化剂或无效组合返回1
+     * @return 并行数，无效目标等级返回1
      */
-    public static int calculateParallelForUselessIngotRecipe(ItemStack catalystStack, int targetTier) {
-        if (catalystStack.isEmpty() || targetTier < 1 || targetTier > 9) return 1;
-
-        // 有用锭提供无限并行
-        if (isUsefulIngot(catalystStack)) {
-            return Integer.MAX_VALUE;
-        }
-
-        int catalystTier = getCatalystTier(catalystStack);
-
-        // 催化剂等级必须大于等于目标等级才有并行
-        if (catalystTier < targetTier) return 1;
-
-        // 计算等级差+1，并行数 = 3^(等级差+1)
-        // 同阶时等级差为0，并行数 = 3^1 = 3
-        int tierDifference = catalystTier - targetTier + 1;
-        return (int) Math.pow(BASE_PARALLEL, tierDifference);
+    public static int calculateParallelForUselessIngotRecipe(int targetTier) {
+        if (targetTier < 1 || targetTier > 9) return 1;
+        return (int) Math.pow(BASE_PARALLEL, targetTier);
     }
 
     /**
@@ -151,5 +133,35 @@ public class CatalystParallelManager {
      */
     public static boolean isValidCatalyst(ItemStack stack) {
         return getCatalystTier(stack) > 0;
+    }
+
+    /**
+     * 计算催化剂对处理时间的加成
+     * 一阶催化剂减少10%时间（90%），二阶减少20%（80%），以此类推
+     * 有用锭固定为1 tick
+     *
+     * @param baseTime      基础处理时间
+     * @param catalystStack 催化剂物品堆
+     * @return 加成后的处理时间（向上取整，最小为1）
+     */
+    public static int calculateProcessTimeWithCatalyst(int baseTime, ItemStack catalystStack) {
+        // 有用锭固定为1 tick
+        if (isUsefulIngot(catalystStack)) {
+            return 1;
+        }
+
+        int tier = getCatalystTier(catalystStack);
+        if (tier <= 0) {
+            return baseTime; // 无催化剂，返回基础时间
+        }
+
+        // 计算时间减少百分比：一阶90%，二阶80%，...，九阶10%
+        double multiplier = Math.max(0.1, 1.0 - tier * 0.1); // 0.9, 0.8, ..., 0.1
+        
+        // 向上取整
+        int result = (int) Math.ceil(baseTime * multiplier);
+        
+        // 最小为1 tick
+        return Math.max(1, result);
     }
 }

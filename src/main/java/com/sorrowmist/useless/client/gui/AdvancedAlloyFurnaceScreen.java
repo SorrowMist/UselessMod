@@ -729,16 +729,49 @@ public class AdvancedAlloyFurnaceScreen extends AbstractContainerScreen<Advanced
             tooltip.add(Component.translatable("gui.useless_mod.advanced_alloy_furnace.max_parallel",
                             this.menu.getCatalystMaxParallel())
                     .withStyle(ChatFormatting.BLUE));
-
-            tooltip.add(Component.empty());
-            tooltip.add(Component.translatable("gui.useless_mod.advanced_alloy_furnace.view_recipes")
-                    .withStyle(ChatFormatting.AQUA));
         } else {
             tooltip.add(Component.translatable("gui.useless_mod.advanced_alloy_furnace.no_process"));
-            tooltip.add(Component.empty());
-            tooltip.add(Component.translatable("gui.useless_mod.advanced_alloy_furnace.view_recipes")
-                    .withStyle(ChatFormatting.AQUA));
         }
+
+        // 添加AE网络合成任务进度信息
+        int aeActiveTasks = this.menu.getActiveAETaskCount();
+        int aeTotalProgress = this.menu.getTotalAEProgress();
+        int aeTotalMaxProgress = this.menu.getTotalAEMaxProgress();
+
+        tooltip.add(Component.empty());
+        tooltip.add(Component.translatable("gui.useless_mod.advanced_alloy_furnace.ae_tasks",
+                        aeActiveTasks)
+                .withStyle(ChatFormatting.DARK_PURPLE));
+        
+        // 显示每个任务单独的进度信息
+        var taskProgressList = this.menu.getAETaskProgressList();
+        if (!taskProgressList.isEmpty()) {
+            for (var taskProgress : taskProgressList) {
+                String productName = taskProgress.getProductName();
+                int taskProgressVal = taskProgress.getProgress();
+                int taskMaxProgress = taskProgress.getMaxProgress();
+                int totalOutputCount = taskProgress.getTotalOutputCount(); // 使用最终产物总数
+                
+                float taskProgressPercent = taskMaxProgress > 0 ? (float) taskProgressVal / taskMaxProgress * 100 : 0;
+                
+                // 获取物品/流体的本地化名称
+                Component nameComponent = Component.translatable(productName);
+                
+                tooltip.add(Component.translatable("gui.useless_mod.advanced_alloy_furnace.ae_task_progress",
+                                nameComponent, totalOutputCount, taskProgressVal, taskMaxProgress, String.format("%.1f", taskProgressPercent))
+                        .withStyle(ChatFormatting.LIGHT_PURPLE));
+            }
+        } else if (aeTotalMaxProgress > 0) {
+            // 如果没有单独的任务进度信息，显示总进度
+            float aeProgressPercent = (float) aeTotalProgress / aeTotalMaxProgress * 100;
+            tooltip.add(Component.translatable("gui.useless_mod.advanced_alloy_furnace.ae_progress",
+                            aeTotalProgress, aeTotalMaxProgress, String.format("%.1f", aeProgressPercent))
+                    .withStyle(ChatFormatting.LIGHT_PURPLE));
+        }
+
+        tooltip.add(Component.empty());
+        tooltip.add(Component.translatable("gui.useless_mod.advanced_alloy_furnace.view_recipes")
+                .withStyle(ChatFormatting.AQUA));
 
         guiGraphics.renderTooltip(this.font, tooltip, Optional.empty(), mouseX, mouseY);
     }

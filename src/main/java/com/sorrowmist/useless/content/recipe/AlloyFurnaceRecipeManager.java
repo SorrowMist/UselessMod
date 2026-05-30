@@ -303,6 +303,26 @@ public class AlloyFurnaceRecipeManager {
     }
 
     /**
+     * 直接通过适配器查找转换配方（不考虑模具要求）
+     * 用于 AE 任务等不需要模具的场景
+     */
+    @Nullable
+    @SuppressWarnings("unchecked")
+    public <T extends Recipe<?>> AdvancedAlloyFurnaceRecipe findAdaptedRecipeDirectly(Level level, List<ItemStack> inputs) {
+        for (IRecipeAdapter<?> adapter : adapters) {
+            RecipeHolder<T> holder = ((IRecipeAdapter<T>) adapter).findMatchingRecipe(level, inputs);
+            if (holder != null) {
+                // 使用 convert 获取转换后的配方
+                AdvancedAlloyFurnaceRecipe recipe = ((IRecipeAdapter<T>) adapter).convert(holder, level);
+                if (recipe != null && matchesRecipe(recipe, inputs)) {
+                    return recipe;
+                }
+            }
+        }
+        return null;
+    }
+
+    /**
      * 获取候选配方列表（基于索引快速筛选）
      * <p>
      * 返回的列表按优先级排序：

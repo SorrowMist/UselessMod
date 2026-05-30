@@ -1,32 +1,5 @@
 {
   "type": "useless_mod:advanced_alloy_furnace",
-  "catalyst": [
-    {
-      "item": "useless_mod:useless_ingot_tier_2"
-    },
-    {
-      "item": "useless_mod:useless_ingot_tier_3"
-    },
-    {
-      "item": "useless_mod:useless_ingot_tier_4"
-    },
-    {
-      "item": "useless_mod:useless_ingot_tier_5"
-    },
-    {
-      "item": "useless_mod:useless_ingot_tier_6"
-    },
-    {
-      "item": "useless_mod:useless_ingot_tier_7"
-    },
-    {
-      "item": "useless_mod:useless_ingot_tier_8"
-    },
-    {
-      "item": "useless_mod:useless_ingot_tier_9"
-    }
-  ],
-  "catalyst_uses": 1,
   "energy": 100000,
   "id": "useless_mod:advanced_alloy/ingot/useless_ingot_tier_3",
   "ingredients": [
@@ -58,6 +31,11 @@
       "count": 2,
       "ingredient": {
         "item": "minecraft:diamond"
+      }
+    },
+    {
+      "ingredient": {
+        "item": "useless_mod:useless_ingot_tier_2"
       }
     }
   ],

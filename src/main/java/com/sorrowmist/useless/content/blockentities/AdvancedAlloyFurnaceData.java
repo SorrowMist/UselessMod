@@ -15,7 +15,11 @@ public class AdvancedAlloyFurnaceData implements ContainerData {
     public static final int DATA_MAX_PROGRESS = 3;
     public static final int DATA_CURRENT_PARALLEL = 4;
     public static final int DATA_HAS_MOLD = 5;
-    public static final int DATA_COUNT = 6;
+    // AE网络合成任务相关
+    public static final int DATA_AE_ACTIVE_TASKS = 6;
+    public static final int DATA_AE_TOTAL_PROGRESS = 7;
+    public static final int DATA_AE_TOTAL_MAX_PROGRESS = 8;
+    public static final int DATA_COUNT = 9;
 
     private final AdvancedAlloyFurnaceBlockEntity entity;
 
@@ -32,6 +36,9 @@ public class AdvancedAlloyFurnaceData implements ContainerData {
             case DATA_MAX_PROGRESS -> this.entity.getMaxProgress();
             case DATA_CURRENT_PARALLEL -> this.entity.getCurrentParallel();
             case DATA_HAS_MOLD -> this.entity.hasMold() ? 1 : 0;
+            case DATA_AE_ACTIVE_TASKS -> this.entity.getActiveAETaskCount();
+            case DATA_AE_TOTAL_PROGRESS -> this.entity.getTotalAEProgress();
+            case DATA_AE_TOTAL_MAX_PROGRESS -> this.entity.getTotalAEMaxProgress();
             default -> 0;
         };
     }
@@ -43,6 +50,9 @@ public class AdvancedAlloyFurnaceData implements ContainerData {
             case DATA_MAX_PROGRESS -> this.entity.setMaxProgress(value);
             case DATA_CURRENT_PARALLEL -> this.entity.setCurrentParallel(value);
             case DATA_HAS_MOLD -> this.entity.setHasMold(value > 0);
+            case DATA_AE_ACTIVE_TASKS -> this.entity.setActiveAETaskCount(value);
+            case DATA_AE_TOTAL_PROGRESS -> this.entity.setTotalAEProgress(value);
+            case DATA_AE_TOTAL_MAX_PROGRESS -> this.entity.setTotalAEMaxProgress(value);
         }
     }
 

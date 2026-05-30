@@ -142,10 +142,12 @@ public class CatalystInfoCategory implements IRecipeCategory<CatalystInfoCategor
                 Component.translatable("jei.useless_mod.catalyst_info.desc1").getString(),
                 Component.translatable("jei.useless_mod.catalyst_info.desc2").getString(),
                 Component.translatable("jei.useless_mod.catalyst_info.desc3").getString(),
-                Component.translatable("jei.useless_mod.catalyst_info.desc4").getString()
+                Component.translatable("jei.useless_mod.catalyst_info.desc4").getString(),
+                Component.translatable("jei.useless_mod.catalyst_info.desc5").getString(),
+                Component.translatable("jei.useless_mod.catalyst_info.desc6").getString()
         };
 
-        int explanationY = 85;
+        int explanationY = 78;
         for (String line : explanationLines) {
             int lineWidth = minecraft.font.width(line);
             int lineX = (DISPLAY_WIDTH - lineWidth) / 2;
@@ -198,8 +200,7 @@ public class CatalystInfoCategory implements IRecipeCategory<CatalystInfoCategor
                     // 显示跨阶合成信息
                     if (tier >= 2 && tier <= 9) {
                         for (int targetTier = 1; targetTier < tier; targetTier++) {
-                            int crossTierParallel = CatalystParallelManager.calculateParallelForUselessIngotRecipe(
-                                    stack, targetTier);
+                            int crossTierParallel = CatalystParallelManager.calculateParallelForUselessIngotRecipe(targetTier);
                             tooltip.add(Component.translatable("jei.useless_mod.tooltip.catalyst.cross_tier.format", targetTier, crossTierParallel)
                                                  .withStyle(ChatFormatting.GRAY));
                         }
@@ -211,7 +212,6 @@ public class CatalystInfoCategory implements IRecipeCategory<CatalystInfoCategor
                     tooltip.add(Component.translatable("jei.useless_mod.tooltip.parallel.desc2").withStyle(ChatFormatting.GRAY));
                     tooltip.add(Component.translatable("jei.useless_mod.tooltip.parallel.desc3").withStyle(ChatFormatting.GRAY));
                     tooltip.add(Component.translatable("jei.useless_mod.tooltip.parallel.desc4").withStyle(ChatFormatting.GRAY));
-                    tooltip.add(Component.translatable("jei.useless_mod.tooltip.parallel.warning").withStyle(ChatFormatting.RED));
                 }
             }
         }

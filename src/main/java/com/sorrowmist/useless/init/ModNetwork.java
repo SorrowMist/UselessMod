@@ -1,6 +1,7 @@
 package com.sorrowmist.useless.init;
 
 import com.sorrowmist.useless.UselessMod;
+import com.sorrowmist.useless.network.AETaskProgressPacket;
 import com.sorrowmist.useless.network.EnchantmentSwitchPacket;
 import com.sorrowmist.useless.network.ForceBreakKeyPacket;
 import com.sorrowmist.useless.network.MiningDataSyncPacket;
@@ -33,6 +34,9 @@ public class ModNetwork {
         );
         registrar.playToClient(MiningDataSyncPacket.TYPE, MiningDataSyncPacket.STREAM_CODEC,
                                MiningDataSyncPacket::handle
+        );
+        registrar.playToClient(AETaskProgressPacket.TYPE, AETaskProgressPacket.STREAM_CODEC,
+                               AETaskProgressPacket::handle
         );
     }
 }

@@ -10,6 +10,23 @@ import com.sorrowmist.useless.energy.IEnergyManager;
 import com.sorrowmist.useless.init.ModBlockEntities;
 import com.sorrowmist.useless.init.ModTags;
 import com.sorrowmist.useless.utils.CatalystParallelManager;
+import appeng.api.crafting.IPatternDetails;
+import appeng.api.crafting.PatternDetailsHelper;
+import appeng.api.config.Actionable;
+import appeng.api.networking.GridFlags;
+import appeng.api.networking.IGrid;
+import appeng.api.networking.IGridNode;
+import appeng.api.networking.IGridNodeListener;
+import appeng.api.networking.IManagedGridNode;
+import appeng.api.networking.crafting.ICraftingProvider;
+import appeng.api.networking.storage.IStorageService;
+import appeng.api.stacks.AEKey;
+import appeng.api.stacks.AEItemKey;
+import appeng.api.stacks.AEFluidKey;
+import appeng.api.stacks.KeyCounter;
+import appeng.api.storage.MEStorage;
+import appeng.api.networking.GridHelper;
+import appeng.me.ManagedGridNode;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.HolderLookup;
@@ -47,10 +64,17 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.locks.ReentrantLock;
 
-public class AdvancedAlloyFurnaceBlockEntity extends BlockEntity implements MenuProvider {
+public class AdvancedAlloyFurnaceBlockEntity extends BlockEntity implements MenuProvider, ICraftingProvider, appeng.api.networking.IInWorldGridNodeHost, appeng.api.networking.IGridNodeListener<AdvancedAlloyFurnaceBlockEntity>, appeng.api.networking.security.IActionHost {
 
     public static final int INPUT_SLOTS_START = 0;
     public static final int INPUT_SLOTS_COUNT = 9;
@@ -58,7 +82,12 @@ public class AdvancedAlloyFurnaceBlockEntity extends BlockEntity implements Menu
     public static final int OUTPUT_SLOTS_COUNT = 9;
     public static final int CATALYST_SLOT = 18;
     public static final int MOLD_SLOT = 19;
-    public static final int TOTAL_SLOTS = 20;
+    
+    public static final int PATTERN_SLOTS_START = 20;
+    public static final int PATTERN_SLOTS_COUNT = 9;
+    public static final int PATTERN_SLOTS_END = PATTERN_SLOTS_START + PATTERN_SLOTS_COUNT - 1;
+    
+    public static final int TOTAL_SLOTS = 29;
 
     public static final int FLUID_TANK_COUNT = 6;
     
@@ -121,6 +150,111 @@ public class AdvancedAlloyFurnaceBlockEntity extends BlockEntity implements Menu
     private Direction lastSuccessfulOutputDirection = null;
 
     private final ItemStackHandler itemHandler = new HighStackItemStackHandler(TOTAL_SLOTS);
+    
+    // ==================== AE网络支持 ====================
+    private final IManagedGridNode mainNode;
+    private final appeng.api.networking.security.IActionSource actionSource;
+    private boolean isConnectedToAE = false;
+    
+    // 样板槽位（用于AE网络识别）
+    private final List<IPatternDetails> patterns = new ArrayList<>();
+    private int patternPriority = 0;
+    
+    // ==================== 多线程合成任务管理器 ====================
+    private static final int MAX_CONCURRENT_TASKS = 4; // 最大并发任务数
+    private final ExecutorService craftingExecutor = Executors.newFixedThreadPool(MAX_CONCURRENT_TASKS);
+    private final ConcurrentHashMap<Integer, CraftingTask> activeTasks = new ConcurrentHashMap<>();
+    private final ReentrantLock craftingLock = new ReentrantLock();
+    private int nextTaskId = 0;
+    
+    // AE合成任务进度跟踪（用于UI显示）
+    private volatile int activeAETaskCount = 0;
+    private volatile int totalAEProgress = 0;
+    private volatile int totalAEMaxProgress = 0;
+    
+    // 存储每个任务的进度信息（用于UI显示）- 服务端使用
+    private final ConcurrentHashMap<Integer, AETaskProgress> aeTaskProgressMap = new ConcurrentHashMap<>();
+    
+    // 客户端任务进度列表 - 客户端使用
+    private final List<AETaskProgress> clientTaskProgressList = new ArrayList<>();
+    
+    // AE任务进度信息类
+    public static class AETaskProgress {
+        private final String productName;
+        private volatile int progress;
+        private volatile int maxProgress;
+        private volatile int craftCount;
+        private volatile int totalOutputCount; // 最终产物总数 = 合成次数 × 单次产出数量
+        private final int outputCount; // 单次产出数量
+        
+        public AETaskProgress(String productName, int maxProgress, int craftCount, int totalOutputCount) {
+            this.productName = productName;
+            this.progress = 0;
+            this.maxProgress = maxProgress;
+            this.craftCount = craftCount;
+            this.totalOutputCount = totalOutputCount;
+            this.outputCount = craftCount > 0 ? totalOutputCount / craftCount : 1; // 计算单次产出数量
+        }
+        
+        public AETaskProgress(String productName, int progress, int maxProgress, int craftCount, int totalOutputCount) {
+            this.productName = productName;
+            this.progress = progress;
+            this.maxProgress = maxProgress;
+            this.craftCount = craftCount;
+            this.totalOutputCount = totalOutputCount;
+            this.outputCount = craftCount > 0 ? totalOutputCount / craftCount : 1; // 计算单次产出数量
+        }
+        
+        public String getProductName() { return productName; }
+        public int getProgress() { return progress; }
+        public int getMaxProgress() { return maxProgress; }
+        public int getCraftCount() { return craftCount; }
+        public int getTotalOutputCount() { return totalOutputCount; }
+        public void setProgress(int progress) { this.progress = progress; }
+        
+        // 更新合成次数和最终产物总数（用于任务合并）
+        public void updateCraftCount(int newCraftCount) {
+            this.craftCount = newCraftCount;
+            this.totalOutputCount = newCraftCount * outputCount;
+        }
+    }
+    
+    // 更新客户端任务进度（从网络包调用）
+    public void updateClientTaskProgress(List<com.sorrowmist.useless.network.AETaskProgressPacket.TaskProgressData> tasks) {
+        synchronized (clientTaskProgressList) {
+            clientTaskProgressList.clear();
+            for (var taskData : tasks) {
+                clientTaskProgressList.add(new AETaskProgress(
+                        taskData.productName,
+                        taskData.progress,
+                        taskData.maxProgress,
+                        taskData.craftCount,
+                        taskData.totalOutputCount
+                ));
+            }
+        }
+    }
+    
+    // 发送AE任务进度到所有客户端
+    private void sendAETaskProgressToClients() {
+        if (level == null || level.isClientSide) return;
+        
+        List<com.sorrowmist.useless.network.AETaskProgressPacket.TaskProgressData> taskDataList = new ArrayList<>();
+        for (var entry : aeTaskProgressMap.entrySet()) {
+            AETaskProgress progress = entry.getValue();
+            taskDataList.add(new com.sorrowmist.useless.network.AETaskProgressPacket.TaskProgressData(
+                    progress.getProductName(),
+                    progress.getProgress(),
+                    progress.getMaxProgress(),
+                    progress.getCraftCount(),
+                    progress.getTotalOutputCount()
+            ));
+        }
+        
+        var packet = new com.sorrowmist.useless.network.AETaskProgressPacket(getBlockPos(), taskDataList);
+        net.minecraft.world.level.ChunkPos chunkPos = new net.minecraft.world.level.ChunkPos(getBlockPos());
+        net.neoforged.neoforge.network.PacketDistributor.sendToPlayersTrackingChunk((net.minecraft.server.level.ServerLevel) level, chunkPos, packet);
+    }
 
     /**
      * 支持高堆叠数量的 ItemStackHandler
@@ -208,6 +342,10 @@ public class AdvancedAlloyFurnaceBlockEntity extends BlockEntity implements Menu
             // 当输入槽或模具槽变化时，清空配方缓存和上一个成功配方
             if (slot >= INPUT_SLOTS_START && slot < INPUT_SLOTS_START + INPUT_SLOTS_COUNT || slot == MOLD_SLOT || slot == CATALYST_SLOT) {
                 AdvancedAlloyFurnaceBlockEntity.this.clearRecipeCache();
+            }
+            // 当样板槽位变化时，更新样板列表
+            if (slot >= PATTERN_SLOTS_START && slot <= PATTERN_SLOTS_END) {
+                AdvancedAlloyFurnaceBlockEntity.this.updatePatterns();
             }
         }
 
@@ -302,6 +440,17 @@ public class AdvancedAlloyFurnaceBlockEntity extends BlockEntity implements Menu
 
     public AdvancedAlloyFurnaceBlockEntity(BlockPos pos, BlockState state) {
         super(ModBlockEntities.ADVANCED_ALLOY_FURNACE.get(), pos, state);
+        
+        // AE2 Integration - 创建动作源
+        this.actionSource = appeng.api.networking.security.IActionSource.ofMachine(this);
+        
+        // AE2 Integration - 创建网格节点（使用GridHelper确保正确初始化）
+        this.mainNode = GridHelper.createManagedNode(this, this)
+                .setInWorldNode(true)
+                .setTagName("node")
+                .setFlags(GridFlags.REQUIRE_CHANNEL)
+                .addService(ICraftingProvider.class, this);
+        
         // 初始化时应用当前阶级的容量
         this.updateCapacityByTier();
         for (int i = 0; i < FLUID_TANK_COUNT; i++) {
@@ -606,8 +755,13 @@ public class AdvancedAlloyFurnaceBlockEntity extends BlockEntity implements Menu
         int actualParallel = this.cachedParallel;
         
         int baseEnergyPerTick = this.currentRecipe.energy() / this.currentRecipe.processTime();
-        // 使用long计算避免溢出
-        long energyRequiredLong = (long) baseEnergyPerTick * actualParallel;
+        
+        // 检查是否使用有用锭作为催化剂（能量不加倍）
+        ItemStack catalystStack = this.itemHandler.getStackInSlot(CATALYST_SLOT);
+        boolean useUsefulIngot = !catalystStack.isEmpty() && CatalystParallelManager.isUsefulIngot(catalystStack);
+        
+        // 使用long计算避免溢出（有用锭作为催化剂时能量不加倍）
+        long energyRequiredLong = useUsefulIngot ? baseEnergyPerTick : (long) baseEnergyPerTick * actualParallel;
         int energyRequired = energyRequiredLong > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) energyRequiredLong;
 
         // 能量不足时暂停进度，但不重置
@@ -697,7 +851,7 @@ public class AdvancedAlloyFurnaceBlockEntity extends BlockEntity implements Menu
         }
         
         int parallel = isUselessRecipe
-                ? CatalystParallelManager.calculateParallelForUselessIngotRecipe(catalystStack, targetTier)
+                ? CatalystParallelManager.calculateParallelForUselessIngotRecipe(targetTier)
                 : CatalystParallelManager.calculateParallelForNormalRecipe(catalystStack);
         
         return parallel <= 0 ? 1 : parallel;
@@ -852,8 +1006,12 @@ public class AdvancedAlloyFurnaceBlockEntity extends BlockEntity implements Menu
         int targetParallel = Math.min(Math.min(materialSupportedParallel, outputSupportedParallel), catalystSupportedParallel);
         targetParallel = Math.max(initialParallel, targetParallel); // 至少为初始并行数
         
-        // 步骤2: 计算还需要补充的能量
-        long targetTotalEnergy = (long) recipeEnergy * targetParallel;
+        // 检查是否使用有用锭作为催化剂（能量不加倍）
+        ItemStack catalystStack = this.itemHandler.getStackInSlot(CATALYST_SLOT);
+        boolean useUsefulIngot = !catalystStack.isEmpty() && CatalystParallelManager.isUsefulIngot(catalystStack);
+        
+        // 步骤2: 计算还需要补充的能量（有用锭作为催化剂时能量不加倍）
+        long targetTotalEnergy = useUsefulIngot ? recipeEnergy : (long) recipeEnergy * targetParallel;
         long additionalEnergyNeeded = targetTotalEnergy - this.accumulatedEnergy;
         
         int actualParallel;
@@ -959,7 +1117,12 @@ public class AdvancedAlloyFurnaceBlockEntity extends BlockEntity implements Menu
      */
     private void startRecipeProcessing(AdvancedAlloyFurnaceRecipe recipe) {
         this.currentRecipe = recipe;
-        this.maxProgress = recipe.processTime();
+        
+        // 计算催化剂对处理时间的加成
+        ItemStack catalystStack = this.itemHandler.getStackInSlot(CATALYST_SLOT);
+        int baseTime = recipe.processTime();
+        this.maxProgress = CatalystParallelManager.calculateProcessTimeWithCatalyst(baseTime, catalystStack);
+        
         this.progress = 0;
 
         // 更新上一个成功处理的配方
@@ -1260,6 +1423,17 @@ public class AdvancedAlloyFurnaceBlockEntity extends BlockEntity implements Menu
                 this.outputFluidTanks[i].setFluid(FluidStack.EMPTY);
             }
         }
+        
+        // 加载AE网络节点数据
+        this.mainNode.loadFromNBT(tag);
+        
+        // 加载样板优先级
+        if (tag.contains("PatternPriority")) {
+            this.patternPriority = tag.getInt("PatternPriority");
+        }
+        
+        // 重新解析样板槽中的样板（必须在物品加载之后）
+        this.updatePatterns();
     }
 
     @Override
@@ -1298,6 +1472,12 @@ public class AdvancedAlloyFurnaceBlockEntity extends BlockEntity implements Menu
                 tag.put(NBTConstants.getOutputFluidTag(i), fluid.save(registries));
             }
         }
+        
+        // 保存AE网络节点数据
+        this.mainNode.saveToNBT(tag);
+        
+        // 保存样板优先级
+        tag.putInt("PatternPriority", this.patternPriority);
     }
 
     @Nullable
@@ -1401,10 +1581,7 @@ public class AdvancedAlloyFurnaceBlockEntity extends BlockEntity implements Menu
             if (!found) return false;
         }
 
-        if (!recipe.catalyst().isEmpty()) {
-            ItemStack catalystStack = this.itemHandler.getStackInSlot(CATALYST_SLOT);
-            if (!recipe.catalyst().test(catalystStack)) return false;
-        }
+        
 
         if (!recipe.mold().isEmpty()) {
             ItemStack moldStack = this.itemHandler.getStackInSlot(MOLD_SLOT);
@@ -1507,13 +1684,6 @@ public class AdvancedAlloyFurnaceBlockEntity extends BlockEntity implements Menu
     private void produceRecipeOutputs(AdvancedAlloyFurnaceRecipe recipe, int parallel) {
         // 限制并行数在合理范围内
         parallel = Math.min(parallel, 1000000);
-
-        ItemStack catalystStack = this.itemHandler.getStackInSlot(CATALYST_SLOT);
-        if (!catalystStack.isEmpty() && CatalystParallelManager.isValidCatalyst(catalystStack)) {
-            if (!CatalystParallelManager.isUsefulIngot(catalystStack)) {
-                catalystStack.shrink(1);
-            }
-        }
 
         for (ItemStack output : recipe.outputs()) {
             // 计算总产出数量
@@ -1994,6 +2164,723 @@ public class AdvancedAlloyFurnaceBlockEntity extends BlockEntity implements Menu
                 }
             }
             return FluidStack.EMPTY;
+        }
+    }
+
+    // ==================== AE网络支持方法 ====================
+
+    @Override
+    public void onSaveChanges(AdvancedAlloyFurnaceBlockEntity nodeOwner, IGridNode node) {
+        setChanged();
+    }
+    
+    @Override
+    public void onGridChanged(AdvancedAlloyFurnaceBlockEntity nodeOwner, IGridNode node) {
+        isConnectedToAE = node.isActive();
+        setChanged();
+    }
+    
+    @Override
+    public void onStateChanged(AdvancedAlloyFurnaceBlockEntity nodeOwner, IGridNode node, IGridNodeListener.State state) {
+        isConnectedToAE = node.isActive();
+        setChanged();
+    }
+
+    public IManagedGridNode getMainNode() {
+        return this.mainNode;
+    }
+
+    @Override
+    public @Nullable appeng.api.networking.IGridNode getGridNode(Direction dir) {
+        return this.mainNode.getNode();
+    }
+
+    @Override
+    public appeng.api.util.AECableType getCableConnectionType(Direction dir) {
+        return appeng.api.util.AECableType.SMART;
+    }
+
+    @Override
+    public void clearRemoved() {
+        super.clearRemoved();
+        GridHelper.onFirstTick(this, (be) -> {
+            be.mainNode.create(getLevel(), getBlockPos());
+            // 节点创建后重新解析样板并通知AE网络
+            be.updatePatterns();
+        });
+    }
+
+    @Override
+    public void onLoad() {
+        super.onLoad();
+        // 节点创建由clearRemoved中的GridHelper.onFirstTick处理，确保只创建一次
+    }
+
+    @Override
+    public void onChunkUnloaded() {
+        super.onChunkUnloaded();
+        this.mainNode.destroy();
+    }
+
+    @Override
+    public void setRemoved() {
+        super.setRemoved();
+        this.mainNode.destroy();
+        this.craftingExecutor.shutdownNow();
+    }
+
+    @Override
+    public appeng.api.networking.IGridNode getActionableNode() {
+        return this.mainNode.getNode();
+    }
+
+    public boolean isActive() {
+        return this.mainNode.isActive();
+    }
+
+    // AE2 Integration - 获取存储服务
+    private MEStorage getStorageService() {
+        if (!isConnectedToAE) {
+            return null;
+        }
+        
+        IGridNode node = this.mainNode.getNode();
+        if (node == null || !node.isActive()) {
+            return null;
+        }
+        
+        IGrid grid = node.getGrid();
+        if (grid == null) {
+            return null;
+        }
+        
+        IStorageService storageService = grid.getService(IStorageService.class);
+        if (storageService == null) {
+            return null;
+        }
+        
+        return storageService.getInventory();
+    }
+    
+    // AE2 Integration - 尝试输出物品到AE网络
+    private long tryOutputToAE(ItemStack stack) {
+        if (stack.isEmpty() || !isConnectedToAE || actionSource == null) {
+            return 0;
+        }
+        
+        MEStorage storage = getStorageService();
+        
+        if (storage == null) {
+            return 0;
+        }
+        
+        AEItemKey key = AEItemKey.of(stack);
+        if (key == null) {
+            return 0;
+        }
+        
+        long amount = stack.getCount();
+        long inserted = storage.insert(key, amount, Actionable.MODULATE, actionSource);
+        
+        return inserted;
+    }
+    
+    // AE2 Integration - 尝试输出流体到AE网络
+    private long tryOutputFluidToAE(FluidStack stack) {
+        if (stack.isEmpty() || !isConnectedToAE || actionSource == null) {
+            return 0;
+        }
+        
+        MEStorage storage = getStorageService();
+        
+        if (storage == null) {
+            return 0;
+        }
+        
+        AEFluidKey key = AEFluidKey.of(stack);
+        if (key == null) {
+            return 0;
+        }
+        
+        long amount = stack.getAmount();
+        long inserted = storage.insert(key, amount, Actionable.MODULATE, actionSource);
+        
+        return inserted;
+    }
+    
+    // AE合成任务状态获取方法（用于UI显示）
+    public int getActiveAETaskCount() {
+        return activeAETaskCount;
+    }
+    
+    public int getTotalAEProgress() {
+        return totalAEProgress;
+    }
+    
+    public int getTotalAEMaxProgress() {
+        return totalAEMaxProgress;
+    }
+    
+    // AE合成任务状态设置方法（用于客户端同步）
+    public void setActiveAETaskCount(int value) {
+        this.activeAETaskCount = value;
+    }
+    
+    public void setTotalAEProgress(int value) {
+        this.totalAEProgress = value;
+    }
+    
+    public void setTotalAEMaxProgress(int value) {
+        this.totalAEMaxProgress = value;
+    }
+    
+    // 获取所有AE任务进度信息（用于UI显示）
+    public Collection<AETaskProgress> getAETaskProgressList() {
+        // 客户端返回同步的任务列表，服务端返回实际的任务进度
+        if (level != null && level.isClientSide) {
+            synchronized (clientTaskProgressList) {
+                return new ArrayList<>(clientTaskProgressList);
+            }
+        }
+        return aeTaskProgressMap.values();
+    }
+
+    @Override
+    public List<IPatternDetails> getAvailablePatterns() {
+        return Collections.unmodifiableList(this.patterns);
+    }
+
+    @Override
+    public int getPatternPriority() {
+        return this.patternPriority;
+    }
+
+    @Override
+    public boolean pushPattern(IPatternDetails patternDetails, KeyCounter[] inputHolder) {
+        if (!this.mainNode.isActive() || !this.patterns.contains(patternDetails)) {
+            return false;
+        }
+
+        // 尝试合并到现有的相同任务
+        CraftingTask existingTask = findExistingTask(patternDetails);
+        if (existingTask != null) {
+            // 将新材料合并到现有任务
+            existingTask.addMaterials(inputHolder);
+            return true;
+        }
+
+        // 如果没有现有任务或已达到最大并发数，则创建新任务
+        if (this.activeTasks.size() >= MAX_CONCURRENT_TASKS) {
+            return false;
+        }
+
+        int taskId = this.nextTaskId++;
+        CraftingTask task = new CraftingTask(taskId, patternDetails, inputHolder);
+        this.activeTasks.put(taskId, task);
+        this.activeAETaskCount++; // 增加任务计数
+        setChanged(); // 通知客户端
+        
+        this.craftingExecutor.submit(() -> {
+            try {
+                task.run();
+            } finally {
+                this.activeTasks.remove(taskId);
+                this.activeAETaskCount--; // 减少任务计数
+                setChanged(); // 通知客户端
+            }
+        });
+        
+        return true;
+    }
+    
+    // 查找现有的相同样板任务（用于任务合并）
+    private CraftingTask findExistingTask(IPatternDetails patternDetails) {
+        for (CraftingTask task : this.activeTasks.values()) {
+            // 找到相同样板的任务，且该任务还在接受新材料（还没开始处理或正在处理中但可以追加）
+            if (task.isSamePattern(patternDetails) && !task.isProcessingComplete()) {
+                return task;
+            }
+        }
+        return null;
+    }
+
+    @Override
+    public boolean isBusy() {
+        // 只有当任务数达到最大并发数时才返回busy，允许AE发送多个并行任务
+        return this.activeTasks.size() >= MAX_CONCURRENT_TASKS;
+    }
+
+    private void updatePatterns() {
+        this.patterns.clear();
+        for (int i = PATTERN_SLOTS_START; i <= PATTERN_SLOTS_END; i++) {
+            ItemStack stack = this.itemHandler.getStackInSlot(i);
+            if (!stack.isEmpty()) {
+                IPatternDetails pattern = PatternDetailsHelper.decodePattern(stack, this.level);
+                if (pattern != null) {
+                    this.patterns.add(pattern);
+                }
+            }
+        }
+        // 只有当节点已经创建时才通知AE网络更新
+        if (this.mainNode.getNode() != null) {
+            ICraftingProvider.requestUpdate(this.mainNode);
+        }
+    }
+
+    // ==================== 多线程合成任务类 ====================
+
+    private class CraftingTask {
+        private final int taskId;
+        private final IPatternDetails pattern;
+        private final KeyCounter[] inputHolder;
+        private volatile boolean cancelled = false;
+        private volatile boolean processingComplete = false; // 标记任务是否已完成处理
+        private volatile int craftCount = 1; // 当前任务需要合成的次数
+        private final ReentrantLock taskLock = new ReentrantLock();
+        
+        // 独立的虚拟存储空间 - 每个任务有自己的材料存储
+        private final List<ItemStack> taskInputItems = new ArrayList<>();
+        private final List<FluidStack> taskInputFluids = new ArrayList<>();
+        
+        // 任务进度引用 - 用于任务合并时更新进度信息
+        private AETaskProgress taskProgressRef = null;
+
+        public CraftingTask(int taskId, IPatternDetails pattern, KeyCounter[] inputHolder) {
+            this.taskId = taskId;
+            this.pattern = pattern;
+            this.inputHolder = inputHolder;
+            
+            // 将发配来的材料存入独立的存储空间
+            this.storeInputMaterials();
+        }
+        
+        // 判断是否是相同样板的任务
+        public boolean isSamePattern(IPatternDetails otherPattern) {
+            if (this.pattern == null || otherPattern == null) {
+                return false;
+            }
+            // 比较输出物品来判断是否是相同样板
+            var thisOutputs = this.pattern.getOutputs();
+            var otherOutputs = otherPattern.getOutputs();
+            if (thisOutputs.size() != otherOutputs.size()) {
+                return false;
+            }
+            for (int i = 0; i < thisOutputs.size(); i++) {
+                if (!thisOutputs.get(i).what().equals(otherOutputs.get(i).what())) {
+                    return false;
+                }
+            }
+            return true;
+        }
+        
+        // 判断任务是否已完成处理
+        public boolean isProcessingComplete() {
+            return processingComplete;
+        }
+        
+        // 添加新材料到任务（用于任务合并）
+        public void addMaterials(KeyCounter[] additionalInput) {
+            taskLock.lock();
+            try {
+                if (processingComplete) {
+                    return; // 任务已完成，不再接受新材料
+                }
+                craftCount++; // 增加合成次数
+                // 更新任务进度信息中的合成次数和最终产物总数
+                if (taskProgressRef != null) {
+                    taskProgressRef.updateCraftCount(craftCount);
+                    AdvancedAlloyFurnaceBlockEntity.this.setChanged();
+                    AdvancedAlloyFurnaceBlockEntity.this.sendAETaskProgressToClients();
+                }
+                // 将新材料添加到独立存储空间
+                if (additionalInput == null) return;
+                for (KeyCounter counter : additionalInput) {
+                    if (counter == null) continue;
+                    for (var entry : counter) {
+                        AEKey key = entry.getKey();
+                        long amount = entry.getLongValue();
+                        if (key instanceof AEItemKey itemKey) {
+                            ItemStack stack = itemKey.toStack((int) amount);
+                            taskInputItems.add(stack);
+                        } else if (key instanceof AEFluidKey fluidKey) {
+                            FluidStack stack = new FluidStack(fluidKey.getFluid(), (int) amount);
+                            taskInputFluids.add(stack);
+                        }
+                    }
+                }
+            } finally {
+                taskLock.unlock();
+            }
+        }
+        
+        // 将AE发配来的材料存入独立存储空间
+        private void storeInputMaterials() {
+            if (inputHolder == null) return;
+            
+            for (KeyCounter counter : inputHolder) {
+                if (counter == null) continue;
+                
+                for (var entry : counter) {
+                    AEKey key = entry.getKey();
+                    long amount = entry.getLongValue();
+                    
+                    if (key instanceof AEItemKey itemKey) {
+                        ItemStack stack = itemKey.toStack((int) amount);
+                        taskInputItems.add(stack);
+                    } else if (key instanceof AEFluidKey fluidKey) {
+                        FluidStack stack = new FluidStack(fluidKey.getFluid(), (int) amount);
+                        taskInputFluids.add(stack);
+                    }
+                }
+            }
+        }
+        
+        // 获取合成产物名称
+        private String getProductName() {
+            if (pattern == null || pattern.getOutputs().isEmpty()) {
+                return "Unknown";
+            }
+            
+            var output = pattern.getOutputs().get(0);
+            if (output.what() instanceof AEItemKey itemKey) {
+                return itemKey.getItem().getDescriptionId();
+            } else if (output.what() instanceof AEFluidKey fluidKey) {
+                return fluidKey.toString();
+            }
+            
+            return "Unknown";
+        }
+        
+        // 验证配方：检查输入材料是否能通过有效的配方合成出样板定义的产物
+        private boolean validateRecipe() {
+            if (level == null || pattern == null) {
+                returnMaterialsToAE();
+                return false;
+            }
+            
+            // 获取任务输入材料
+            List<ItemStack> tempInputs = new ArrayList<>(taskInputItems);
+            
+            // 获取机器本体模具槽位中的模具
+            ItemStack moldStack = AdvancedAlloyFurnaceBlockEntity.this.itemHandler.getStackInSlot(MOLD_SLOT);
+            
+            // 查找匹配的配方
+            AdvancedAlloyFurnaceRecipe recipe = AlloyFurnaceRecipeManager.getInstance().findRecipe(
+                    level, tempInputs, moldStack
+            );
+            
+            // 如果找不到，尝试使用空模具
+            if (recipe == null) {
+                recipe = AlloyFurnaceRecipeManager.getInstance().findRecipe(
+                        level, tempInputs, ItemStack.EMPTY
+                );
+            }
+            
+            // 如果还是找不到，尝试通过适配器查找转换配方
+            if (recipe == null) {
+                recipe = AlloyFurnaceRecipeManager.getInstance().findAdaptedRecipeDirectly(level, tempInputs);
+            }
+            
+            if (recipe == null) {
+                returnMaterialsToAE();
+                return false;
+            }
+            
+            // 验证配方输出是否与样板输出匹配
+            if (pattern.getOutputs().isEmpty() || recipe.outputs().isEmpty()) {
+                returnMaterialsToAE();
+                return false;
+            }
+            
+            // 获取样板的输出
+            var patternOutput = pattern.getOutputs().get(0);
+            ItemStack patternOutputStack = null;
+            
+            if (patternOutput.what() instanceof appeng.api.stacks.AEItemKey itemKey) {
+                patternOutputStack = itemKey.toStack((int) patternOutput.amount());
+            }
+            
+            // 获取配方的输出
+            ItemStack recipeOutput = recipe.outputs().get(0);
+            
+            // 检查输出是否匹配（只检查物品类型，不检查数量）
+            if (patternOutputStack != null && !ItemStack.isSameItem(patternOutputStack, recipeOutput)) {
+                returnMaterialsToAE();
+                return false;
+            }
+            
+            return true;
+        }
+        
+        // 将任务的原材料返回给AE网络
+        private void returnMaterialsToAE() {
+            if (level == null || level.isClientSide) return;
+            
+            level.getServer().execute(() -> {
+                // 将任务输入物品返回给AE网络
+                for (ItemStack stack : taskInputItems) {
+                    if (!stack.isEmpty()) {
+                        // 尝试输出到AE网络
+                        long inserted = AdvancedAlloyFurnaceBlockEntity.this.tryOutputToAE(stack);
+                        int remainingCount = (int) (stack.getCount() - inserted);
+                        
+                        // 如果AE网络没存下，尝试放入机器的输入槽
+                        if (remainingCount > 0) {
+                            ItemStack remainingStack = stack.copy();
+                            remainingStack.setCount(remainingCount);
+                            
+                            for (int i = INPUT_SLOTS_START; i < INPUT_SLOTS_START + INPUT_SLOTS_COUNT; i++) {
+                                ItemStack slotStack = itemHandler.getStackInSlot(i);
+                                if (slotStack.isEmpty()) {
+                                    itemHandler.setStackInSlot(i, remainingStack.copy());
+                                    break;
+                                } else if (ItemStack.isSameItemSameComponents(slotStack, remainingStack) && 
+                                           slotStack.getCount() < slotStack.getMaxStackSize()) {
+                                    int addAmount = Math.min(remainingCount, slotStack.getMaxStackSize() - slotStack.getCount());
+                                    slotStack.grow(addAmount);
+                                    remainingCount -= addAmount;
+                                    if (remainingCount <= 0) break;
+                                }
+                            }
+                        }
+                    }
+                }
+                
+                // 清空任务的独立存储空间
+                taskInputItems.clear();
+                taskInputFluids.clear();
+            });
+        }
+        
+        // 获取配方的处理时间（考虑催化剂加成）
+        private int getRecipeProcessTime() {
+            if (level == null) return 200;
+            
+            // 将任务输入材料放入机器输入槽，查找匹配的配方
+            List<ItemStack> tempInputs = new ArrayList<>(taskInputItems);
+            
+            // 获取机器本体模具槽位中的模具
+            ItemStack moldStack = AdvancedAlloyFurnaceBlockEntity.this.itemHandler.getStackInSlot(MOLD_SLOT);
+            
+            // 1. 首先尝试使用机器本体的模具查找配方
+            AdvancedAlloyFurnaceRecipe recipe = AlloyFurnaceRecipeManager.getInstance().findRecipe(
+                    level, tempInputs, moldStack
+            );
+            
+            // 2. 如果找不到（可能模具不匹配），尝试使用空模具查找
+            if (recipe == null) {
+                recipe = AlloyFurnaceRecipeManager.getInstance().findRecipe(
+                        level, tempInputs, ItemStack.EMPTY
+                );
+            }
+            
+            // 3. 如果还是找不到，尝试通过适配器查找转换配方（不考虑模具要求）
+            if (recipe == null) {
+                recipe = AlloyFurnaceRecipeManager.getInstance().findAdaptedRecipeDirectly(level, tempInputs);
+            }
+            
+            if (recipe != null && recipe.processTime() > 0) {
+                // 获取机器本体催化剂槽位中的催化剂
+                ItemStack catalystStack = AdvancedAlloyFurnaceBlockEntity.this.itemHandler.getStackInSlot(CATALYST_SLOT);
+                // 计算催化剂对处理时间的加成
+                return CatalystParallelManager.calculateProcessTimeWithCatalyst(recipe.processTime(), catalystStack);
+            }
+            
+            // 默认返回200 tick
+            return 200;
+        }
+
+        public void run() {
+            if (cancelled || level == null || level.isClientSide) {
+                return;
+            }
+
+            // 验证配方：检查输入材料是否能通过有效的配方合成出样板定义的产物
+            if (!validateRecipe()) {
+                // 找不到有效的配方，取消任务
+                processingComplete = true;
+                return;
+            }
+            
+            // 保存基础处理时间用于异常处理
+            final int baseProcessTime = getRecipeProcessTime();
+            
+            try {
+                int currentCraftCount = craftCount; // 获取当前需要合成的次数
+                // 使用机器本体催化剂槽位中的催化剂来决定最大并行数
+                int maxParallel = AdvancedAlloyFurnaceBlockEntity.this.getCatalystMaxParallel();
+                if (maxParallel <= 0) {
+                    maxParallel = 1; // 至少为1
+                }
+                
+                // 总处理时间 = 基础时间 × ceil(合成次数 / 最大并行数)
+                int batches = (int) Math.ceil((double) currentCraftCount / maxParallel);
+                int processTime = baseProcessTime * batches;
+                
+                int progress = 0;
+                
+                // 获取合成产物名称和单次产出数量
+                String productName = getProductName();
+                int outputCount = 1;
+                if (pattern != null && !pattern.getOutputs().isEmpty()) {
+                    var output = pattern.getOutputs().get(0);
+                    outputCount = (int) output.amount();
+                }
+                int totalOutputCount = currentCraftCount * outputCount; // 最终产物总数 = 合成次数 × 单次产出数量
+                
+                // 创建任务进度信息并添加到地图中
+                AETaskProgress taskProgress = new AETaskProgress(productName, processTime, currentCraftCount, totalOutputCount);
+                aeTaskProgressMap.put(taskId, taskProgress);
+                // 保存任务进度引用，用于任务合并时更新
+                this.taskProgressRef = taskProgress;
+                
+                // 更新总进度
+                totalAEMaxProgress += processTime;
+                setChanged();
+                
+                // 发送初始任务进度到客户端
+                sendAETaskProgressToClients();
+
+                int progressUpdateCounter = 0;
+                while (progress < processTime && !cancelled) {
+                    taskLock.lock();
+                    try {
+                        if (cancelled) break;
+                        
+                        int energyRequired = 1000 * maxParallel; // 能量消耗 × 最大并行数
+                        if (!energyManager.canWork(energyRequired)) {
+                            Thread.sleep(50);
+                            continue;
+                        }
+                        energyManager.tryConsumeEnergy(energyRequired);
+                        progress++;
+                        totalAEProgress++;
+                        // 更新单个任务的进度
+                        taskProgress.setProgress(progress);
+                        setChanged();
+                        
+                        // 每20 ticks发送一次进度更新（大约每秒一次）
+                        progressUpdateCounter++;
+                        if (progressUpdateCounter >= 20) {
+                            sendAETaskProgressToClients();
+                            progressUpdateCounter = 0;
+                        }
+                    } finally {
+                        taskLock.unlock();
+                    }
+                    
+                    Thread.sleep(50);
+                }
+
+                if (!cancelled && progress >= processTime) {
+                    // 使用最新的 craftCount 值，确保包含所有合并的材料
+                    completeCrafting(craftCount);
+                }
+                
+                // 标记任务已完成处理（不再接受新材料合并）
+                processingComplete = true;
+                
+                // 任务完成或取消后更新总进度
+                totalAEProgress -= progress;
+                totalAEMaxProgress -= processTime;
+                // 移除任务进度信息
+                aeTaskProgressMap.remove(taskId);
+                setChanged();
+                
+                // 发送任务完成的进度更新到客户端
+                sendAETaskProgressToClients();
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                // 任务中断后更新总进度
+                processingComplete = true;
+                int maxParallel = AdvancedAlloyFurnaceBlockEntity.this.getCatalystMaxParallel();
+                if (maxParallel <= 0) {
+                    maxParallel = 1;
+                }
+                int batches = (int) Math.ceil((double) craftCount / maxParallel);
+                totalAEMaxProgress -= baseProcessTime * batches;
+                setChanged();
+            }
+        }
+
+        private void completeCrafting(int craftCount) {
+            if (level == null || level.isClientSide) return;
+
+            level.getServer().execute(() -> {
+                // 每个任务使用自己独立的锁，不同任务之间互不干扰
+                taskLock.lock();
+                try {
+                    // 清空任务的独立存储空间（表示材料已被消耗）
+                    taskInputItems.clear();
+                    taskInputFluids.clear();
+                    
+                    // 生成输出物品（批量合成）
+                    for (var output : pattern.getOutputs()) {
+                        if (output.what() instanceof appeng.api.stacks.AEItemKey itemKey) {
+                            // 批量输出：单次输出数量 × 合成次数
+                            ItemStack outputStack = itemKey.toStack((int) (output.amount() * craftCount));
+                            
+                            // 优先输出到AE网络
+                            long inserted = tryOutputToAE(outputStack);
+                            int remainingCount = (int) (outputStack.getCount() - inserted);
+                            
+                            // 如果AE网络没存下，输出到自己的输出栏
+                            if (remainingCount > 0) {
+                                ItemStack remainingStack = outputStack.copy();
+                                remainingStack.setCount(remainingCount);
+                                // 使用craftingLock来保护共享的输出槽位
+                                craftingLock.lock();
+                                try {
+                                    for (int i = OUTPUT_SLOTS_START; i < OUTPUT_SLOTS_START + OUTPUT_SLOTS_COUNT; i++) {
+                                        ItemStack slotStack = itemHandler.getStackInSlot(i);
+                                        if (slotStack.isEmpty()) {
+                                            itemHandler.setStackInSlot(i, remainingStack.copy());
+                                            break;
+                                        } else if (ItemStack.isSameItemSameComponents(slotStack, remainingStack)) {
+                                            slotStack.grow(remainingStack.getCount());
+                                            break;
+                                        }
+                                    }
+                                } finally {
+                                    craftingLock.unlock();
+                                }
+                            }
+                        } else if (output.what() instanceof appeng.api.stacks.AEFluidKey fluidKey) {
+                            // 处理流体输出（批量合成）
+                            FluidStack outputFluid = new FluidStack(fluidKey.getFluid(), (int) (output.amount() * craftCount));
+                            
+                            // 优先输出到AE网络
+                            long inserted = tryOutputFluidToAE(outputFluid);
+                            int remainingAmount = (int) (outputFluid.getAmount() - inserted);
+                            
+                            // 如果AE网络没存下，输出到自己的流体输出槽
+                            if (remainingAmount > 0) {
+                                FluidStack remainingFluid = new FluidStack(fluidKey.getFluid(), remainingAmount);
+                                // 使用craftingLock来保护共享的流体槽
+                                craftingLock.lock();
+                                try {
+                                    for (int i = 0; i < FLUID_TANK_COUNT; i++) {
+                                        FluidTank tank = outputFluidTanks[i];
+                                        if (tank.isEmpty() || tank.getFluid().getFluid().isSame(remainingFluid.getFluid())) {
+                                            tank.fill(remainingFluid, IFluidHandler.FluidAction.EXECUTE);
+                                            break;
+                                        }
+                                    }
+                                } finally {
+                                    craftingLock.unlock();
+                                }
+                            }
+                        }
+                    }
+                    setChanged();
+                } finally {
+                    taskLock.unlock();
+                }
+            });
+        }
+
+        public void cancel() {
+            this.cancelled = true;
         }
     }
 }

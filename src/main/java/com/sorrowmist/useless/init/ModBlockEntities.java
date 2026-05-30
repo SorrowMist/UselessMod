@@ -11,6 +11,8 @@ import net.neoforged.neoforge.capabilities.RegisterCapabilitiesEvent;
 import net.neoforged.neoforge.registries.DeferredHolder;
 import net.neoforged.neoforge.registries.DeferredRegister;
 
+import appeng.api.AECapabilities;
+
 public final class ModBlockEntities {
     private static final DeferredRegister<BlockEntityType<?>> BLOCK_ENTITY_TYPES =
             DeferredRegister.create(Registries.BLOCK_ENTITY_TYPE, UselessMod.MODID);
@@ -42,6 +44,13 @@ public final class ModBlockEntities {
                 Capabilities.FluidHandler.BLOCK,
                 ADVANCED_ALLOY_FURNACE.get(),
                 (blockEntity, side) -> blockEntity.getCombinedFluidHandler()
+        );
+
+        // 注册高级合金炉的AE网络节点能力（用于连接AE网络）
+        event.registerBlockEntity(
+                AECapabilities.IN_WORLD_GRID_NODE_HOST,
+                ADVANCED_ALLOY_FURNACE.get(),
+                (blockEntity, context) -> blockEntity
         );
     }
 

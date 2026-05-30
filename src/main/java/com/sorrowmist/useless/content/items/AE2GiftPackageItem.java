@@ -83,9 +83,8 @@ public class AE2GiftPackageItem extends Item {
                 contents.add(createItemStack("ae2", "quantum_ring", 1));
             }
             contents.add(createItemStack("ae2", "quantum_link", 1));
+            contents.addAll(createEntangledSingularityPair());
         }
-
-        contents.addAll(createEntangledSingularityPair());
 
         return contents;
     }

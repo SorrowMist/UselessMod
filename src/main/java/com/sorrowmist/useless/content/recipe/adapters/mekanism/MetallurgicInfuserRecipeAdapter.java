@@ -337,12 +337,38 @@ public class MetallurgicInfuserRecipeAdapter implements IRecipeAdapter<ItemStack
             var itemInput = recipe.getItemInput();
             if (itemInput == null || itemInput.hasNoMatchingInstances()) continue;
 
-            // 检查是否有输入物品匹配
+            var chemicalInput = recipe.getChemicalInput();
+            if (chemicalInput == null) continue;
+
+            // 获取化学品来源
+            List<ChemicalSource> sources = findChemicalSources(level, chemicalInput);
+            if (sources.isEmpty()) continue;
+
+            // 检查是否有输入物品匹配主物品
+            boolean hasMainItem = false;
             for (ItemStack stack : inputs) {
                 if (!stack.isEmpty() && itemInput.test(stack)) {
-                    return holder;
+                    hasMainItem = true;
+                    break;
                 }
             }
+            if (!hasMainItem) continue;
+
+            // 检查是否有输入物品匹配化学品来源
+            boolean hasChemicalItem = false;
+            for (ChemicalSource source : sources) {
+                for (ItemStack stack : inputs) {
+                    if (!stack.isEmpty() && source.ingredient().test(stack)) {
+                        hasChemicalItem = true;
+                        break;
+                    }
+                }
+                if (hasChemicalItem) break;
+            }
+            if (!hasChemicalItem) continue;
+
+            // 主物品和化学品物品都匹配
+            return holder;
         }
 
         return null;

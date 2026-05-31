@@ -6,6 +6,7 @@ import com.sorrowmist.useless.network.EnchantmentSwitchPacket;
 import com.sorrowmist.useless.network.ForceBreakKeyPacket;
 import com.sorrowmist.useless.network.MiningDataSyncPacket;
 import com.sorrowmist.useless.network.ModeTogglePacket;
+import com.sorrowmist.useless.network.PatternPageChangePacket;
 import com.sorrowmist.useless.network.TabKeyPressedPacket;
 import com.sorrowmist.useless.network.TankClearPacket;
 import com.sorrowmist.useless.network.ToolTypeModeSwitchPacket;
@@ -37,6 +38,9 @@ public class ModNetwork {
         );
         registrar.playToClient(AETaskProgressPacket.TYPE, AETaskProgressPacket.STREAM_CODEC,
                                AETaskProgressPacket::handle
+        );
+        registrar.playToServer(PatternPageChangePacket.TYPE, PatternPageChangePacket.STREAM_CODEC,
+                               PatternPageChangePacket::handle
         );
     }
 }

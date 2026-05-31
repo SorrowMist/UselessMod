@@ -9,12 +9,12 @@ import com.mojang.blaze3d.vertex.VertexFormat;
 import com.sorrowmist.useless.UselessMod;
 import com.sorrowmist.useless.content.blockentities.AdvancedAlloyFurnaceBlockEntity;
 import com.sorrowmist.useless.content.menus.AdvancedAlloyFurnaceMenu;
+import com.sorrowmist.useless.network.PatternPageChangePacket;
 import com.sorrowmist.useless.network.TankClearPacket;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.client.renderer.GameRenderer;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.network.chat.Component;
@@ -35,21 +35,20 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
-public class AdvancedAlloyFurnaceScreen extends AbstractContainerScreen<AdvancedAlloyFurnaceMenu> {
+public class AdvancedAlloyFurnaceScreen extends net.minecraft.client.gui.screens.inventory.AbstractContainerScreen<AdvancedAlloyFurnaceMenu> {
 
-    // ==================== 纹理资源 ====================
     private static final ResourceLocation TEXTURE =
             ResourceLocation.fromNamespaceAndPath(UselessMod.MODID, "textures/gui/advanced_alloy_furnace_gui.png");
     private static final ResourceLocation COMPONENTS_TEXTURE =
             ResourceLocation.fromNamespaceAndPath(UselessMod.MODID, "textures/gui/advanced_alloy_furnace_zu_jian.png");
+    private static final ResourceLocation PATTERN_SLOT_TEXTURE =
+            ResourceLocation.fromNamespaceAndPath(UselessMod.MODID, "textures/gui/advanced_alloy_furnace_pattern_solt.png");
 
-    // ==================== GUI尺寸 ====================
     private static final int DISPLAY_WIDTH = 176;
     private static final int DISPLAY_HEIGHT = 260;
     private static final int TEXTURE_WIDTH = 176;
     private static final int TEXTURE_HEIGHT = 260;
 
-    // ==================== 进度条 ====================
     private static final int PROGRESS_LEFT_X = 32;
     private static final int PROGRESS_LEFT_Y = 72;
     private static final int PROGRESS_LEFT_WIDTH = 24;
@@ -60,7 +59,6 @@ public class AdvancedAlloyFurnaceScreen extends AbstractContainerScreen<Advanced
     private static final int PROGRESS_RIGHT_WIDTH = 27;
     private static final int PROGRESS_RIGHT_HEIGHT = 21;
 
-    // ==================== 能量条 ====================
     private static final int ENERGY_BAR_X = 58;
     private static final int ENERGY_BAR_Y = 3;
     private static final int ENERGY_BAR_WIDTH = 60;
@@ -71,7 +69,6 @@ public class AdvancedAlloyFurnaceScreen extends AbstractContainerScreen<Advanced
     private static final int ENERGY_MASK_WIDTH = 62;
     private static final int ENERGY_MASK_HEIGHT = 7;
 
-    // ==================== 流体区域 ====================
     private static final int FLUID_INPUT_AREA_X = 74;
     private static final int FLUID_INPUT_AREA_Y = 20;
     private static final int FLUID_INPUT_AREA_WIDTH = 86;
@@ -82,12 +79,10 @@ public class AdvancedAlloyFurnaceScreen extends AbstractContainerScreen<Advanced
     private static final int FLUID_OUTPUT_AREA_WIDTH = 86;
     private static final int FLUID_OUTPUT_AREA_HEIGHT = 50;
 
-    // ==================== 流体槽 ====================
     private static final int FLUID_TANK_WIDTH = 55;
     private static final int FLUID_TANK_HEIGHT = 17;
     private static final int FLUID_TANK_SPACING = 2;
 
-    // ==================== 滑块 ====================
     private static final int SLIDER_SLOT_X = 161;
     private static final int SLIDER_SLOT_Y = 24;
     private static final int SLIDER_SLOT_WIDTH = 3;
@@ -100,7 +95,6 @@ public class AdvancedAlloyFurnaceScreen extends AbstractContainerScreen<Advanced
     private static final int OUTPUT_SLIDER_SLOT_WIDTH = 3;
     private static final int OUTPUT_SLIDER_SLOT_HEIGHT = 42;
 
-    // ==================== 指示灯 ====================
     private static final int CATALYST_INDICATOR_X = 67;
     private static final int CATALYST_INDICATOR_Y = 80;
     private static final int MOLD_INDICATOR_X = 105;
@@ -108,19 +102,16 @@ public class AdvancedAlloyFurnaceScreen extends AbstractContainerScreen<Advanced
     private static final int INDICATOR_WIDTH = 4;
     private static final int INDICATOR_HEIGHT = 5;
 
-    // ==================== 问号区域（并行数信息） ====================
     private static final int TIPS_AREA_X = 80;
     private static final int TIPS_AREA_Y = 87;
     private static final int TIPS_AREA_WIDTH = 16;
     private static final int TIPS_AREA_HEIGHT = 16;
 
-    // ==================== 标题位置 ====================
     private static final int TITLE_LABEL_X = 66;
     private static final int TITLE_LABEL_Y = 52;
     private static final int INVENTORY_LABEL_X = 10;
     private static final int INVENTORY_LABEL_Y = 168;
 
-    // ==================== 组件纹理坐标 ====================
     private static final int ENERGY_BAR_U = 0;
     private static final int ENERGY_BAR_V = 94;
     private static final int ENERGY_MASK_U = 0;
@@ -144,7 +135,6 @@ public class AdvancedAlloyFurnaceScreen extends AbstractContainerScreen<Advanced
     private static final int SLIDER_PRESSED_U = 18;
     private static final int SLIDER_PRESSED_V = 72;
 
-    // ==================== 清空按钮纹理 ====================
     private static final int TANK_CLEAR_BUTTON_U = 0;
     private static final int TANK_CLEAR_BUTTON_V = 36;
     private static final int TANK_CLEAR_BUTTON_PRESSED_U = 18;
@@ -156,7 +146,6 @@ public class AdvancedAlloyFurnaceScreen extends AbstractContainerScreen<Advanced
     private static final int TANK_CLEAR_BUTTON_WIDTH = 17;
     private static final int TANK_CLEAR_BUTTON_HEIGHT = 17;
 
-    // ==================== 状态变量 ====================
     private final boolean[] inputTankClearButtonsPressed = new boolean[AdvancedAlloyFurnaceBlockEntity.FLUID_TANK_COUNT];
     private final boolean[] outputTankClearButtonsPressed = new boolean[AdvancedAlloyFurnaceBlockEntity.FLUID_TANK_COUNT];
 
@@ -167,6 +156,9 @@ public class AdvancedAlloyFurnaceScreen extends AbstractContainerScreen<Advanced
     private int outputFluidScrollOffset = 0;
     private boolean isDraggingOutputSlider = false;
     private int draggedOutputSliderY = 0;
+
+    private static final int PATTERN_PAGE_BUTTON_WIDTH = 16;
+    private static final int PATTERN_PAGE_BUTTON_HEIGHT = 16;
 
     public AdvancedAlloyFurnaceScreen(AdvancedAlloyFurnaceMenu menu, Inventory playerInventory, Component title) {
         super(menu, playerInventory, title);
@@ -183,6 +175,7 @@ public class AdvancedAlloyFurnaceScreen extends AbstractContainerScreen<Advanced
         this.renderBackground(guiGraphics, mouseX, mouseY, partialTick);
         super.render(guiGraphics, mouseX, mouseY, partialTick);
         this.renderTooltip(guiGraphics, mouseX, mouseY);
+        this.renderPatternPageButtons(guiGraphics);
     }
 
     @Override
@@ -194,11 +187,8 @@ public class AdvancedAlloyFurnaceScreen extends AbstractContainerScreen<Advanced
 
         this.renderFluidTankTooltip(guiGraphics, mouseX, mouseY, x, y, true);
         this.renderFluidTankTooltip(guiGraphics, mouseX, mouseY, x, y, false);
-        // 渲染能量条悬停提示
         this.renderEnergyTooltip(guiGraphics, mouseX, mouseY, x, y);
-        // 渲染进度条悬停提示
         this.renderProgressTooltip(guiGraphics, mouseX, mouseY, x, y);
-        // 渲染问号区域悬停提示（并行数信息）
         this.renderTipsTooltip(guiGraphics, mouseX, mouseY, x, y);
     }
 
@@ -209,7 +199,7 @@ public class AdvancedAlloyFurnaceScreen extends AbstractContainerScreen<Advanced
     }
 
     /**
-     * 重写槽位渲染，只对机器槽位使用自定义的物品数量显示
+     * 重写槽位渲染，支持自定义槽位的背景图标
      */
     @Override
     protected void renderSlot(GuiGraphics guiGraphics, @NotNull Slot slot) {
@@ -217,25 +207,29 @@ public class AdvancedAlloyFurnaceScreen extends AbstractContainerScreen<Advanced
         int y = slot.y;
         ItemStack stack = slot.getItem();
 
-        // 渲染物品图标
+        // 如果是自定义的PatternSlotItemHandler槽位，检查是否激活
+        if (slot instanceof com.sorrowmist.useless.inventory.slot.PatternSlotItemHandler patternSlot) {
+            if (!patternSlot.isActive()) {
+                return;
+            }
+            var icon = patternSlot.getIcon();
+            if ((patternSlot.renderIconWithItem() || stack.isEmpty()) && patternSlot.isSlotEnabled() && icon != null) {
+                icon.getBlitter()
+                        .dest(x, y)
+                        .opacity(patternSlot.getOpacityOfIcon())
+                        .blit(guiGraphics);
+            }
+        }
+
         guiGraphics.renderItem(stack, x, y, slot.x + slot.y * this.imageWidth);
 
-        // 只对机器槽位使用自定义数量渲染（slot索引 0-19 是机器槽，20以上是玩家背包）
         if (slot.index < AdvancedAlloyFurnaceBlockEntity.TOTAL_SLOTS && !stack.isEmpty() && stack.getCount() > 1) {
             this.renderCustomItemCount(guiGraphics, stack, x, y);
         } else {
-            // 玩家背包使用原版数量渲染
             guiGraphics.renderItemDecorations(this.font, stack, x, y, null);
         }
     }
 
-    /**
-     * 自定义物品数量渲染，优化大数字显示
-     * 1-999: 显示完整数字
-     * 1000-999999: 显示为 x.xK (如 1.2K, 999.9K)
-     * 1000000-999999999: 显示为 x.xM (如 1.2M, 999.9M)
-     * 1000000000+: 显示为 x.xB (如 1.2B, 2.1B)
-     */
     private void renderCustomItemCount(GuiGraphics guiGraphics, ItemStack stack, int x, int y) {
         int count = stack.getCount();
         if (count <= 1) return;
@@ -245,7 +239,6 @@ public class AdvancedAlloyFurnaceScreen extends AbstractContainerScreen<Advanced
         final float scaleFactor = 0.666f;
 
         guiGraphics.pose().pushPose();
-        // 文字层级在物品之上200
         guiGraphics.pose().translate(0.0F, 0.0F, 200.0F);
         guiGraphics.pose().scale(scaleFactor, scaleFactor, scaleFactor);
 
@@ -254,9 +247,6 @@ public class AdvancedAlloyFurnaceScreen extends AbstractContainerScreen<Advanced
         guiGraphics.pose().popPose();
     }
 
-    /**
-     * 参考 AE2 的 StackSizeRenderer.renderSizeLabel 实现
-     */
     private void renderSizeLabel(org.joml.Matrix4f matrix, Font font, float xPos, float yPos, String text) {
         final float scaleFactor = 0.666f;
         final float inverseScaleFactor = 1.0f / scaleFactor;
@@ -266,19 +256,12 @@ public class AdvancedAlloyFurnaceScreen extends AbstractContainerScreen<Advanced
         final int X = (int) ((xPos + offset + 16.0f + 2.0f - font.width(text) * scaleFactor) * inverseScaleFactor);
         final int Y = (int) ((yPos + offset + 16.0f - 5.0f * scaleFactor) * inverseScaleFactor);
         var buffer = Minecraft.getInstance().renderBuffers().bufferSource();
-        // 阴影层 - AE2 使用 0x413f54
         font.drawInBatch(text, X + 1, Y + 1, 0x413f54, false, matrix, buffer, Font.DisplayMode.NORMAL, 0, 15728880);
-        // 白色文字
         font.drawInBatch(text, X, Y, 0xffffff, false, matrix, buffer, Font.DisplayMode.NORMAL, 0, 15728880);
         buffer.endBatch();
         RenderSystem.enableBlend();
     }
 
-    /**
-     * 格式化数字显示 - AE 风格（无小数点）
-     * 1-999: 显示完整数字
-     * 1000+: 显示为 xK/M/B
-     */
     private String formatAeCount(int count) {
         if (count < 1000) {
             return String.valueOf(count);
@@ -294,21 +277,16 @@ public class AdvancedAlloyFurnaceScreen extends AbstractContainerScreen<Advanced
         }
     }
 
-    /**
-     * 渲染GUI背景
-     * <p>
-     * 绘制基础纹理和所有动态元素（能量条、进度条、流体、指示灯等）
-     */
     @Override
     protected void renderBg(GuiGraphics guiGraphics, float partialTick, int mouseX, int mouseY) {
         RenderSystem.setShaderColor(1.0F, 1.0F, 1.0F, 1.0F);
         int x = (this.width - this.imageWidth) / 2;
         int y = (this.height - this.imageHeight) / 2;
 
-        // 绘制基础GUI纹理
+        guiGraphics.blit(PATTERN_SLOT_TEXTURE, x - 67, y, 0, 0, 67, 186, 67, 186);
+
         guiGraphics.blit(TEXTURE, x, y, 0, 0, DISPLAY_WIDTH, DISPLAY_HEIGHT, TEXTURE_WIDTH, TEXTURE_HEIGHT);
 
-        // 渲染各个组件
         this.renderEnergyBar(guiGraphics, x, y);
         this.renderProgressBar(guiGraphics, x, y);
         this.renderFluidInputArea(guiGraphics, x, y);
@@ -317,25 +295,16 @@ public class AdvancedAlloyFurnaceScreen extends AbstractContainerScreen<Advanced
         this.renderSlider(guiGraphics, x, y);
     }
 
-    /**
-     * 处理鼠标点击事件
-     * <p>
-     * 检查是否点击了进度条（打开JEI）、滑块或清空按钮
-     */
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
         int x = (this.width - this.imageWidth) / 2;
         int y = (this.height - this.imageHeight) / 2;
 
-        // 检查是否点击了进度条区域（JEI配方查看）
+        if (this.handlePatternPageClick(mouseX, mouseY, x, y)) return true;
         if (this.handleProgressClick(mouseX, mouseY, x, y)) return true;
-        // 检查是否点击了输入流体滑块
         if (this.handleInputSliderClick(mouseX, mouseY, x, y)) return true;
-        // 检查是否点击了输出流体滑块
         if (this.handleOutputSliderClick(mouseX, mouseY, x, y)) return true;
-        // 检查是否点击了输入流体槽清空按钮
         if (this.checkTankClearButtonClick(mouseX, mouseY, x, y, true)) return true;
-        // 检查是否点击了输出流体槽清空按钮
         if (this.checkTankClearButtonClick(mouseX, mouseY, x, y, false)) return true;
 
         return super.mouseClicked(mouseX, mouseY, button);
@@ -421,9 +390,6 @@ public class AdvancedAlloyFurnaceScreen extends AbstractContainerScreen<Advanced
         return true;
     }
 
-    /**
-     * 处理输出区域滚动
-     */
     private boolean handleOutputAreaScroll(double mouseX, double mouseY, int x, int y, double scrollY) {
         if (!isInArea(mouseX, mouseY, x + FLUID_OUTPUT_AREA_X, y + FLUID_OUTPUT_AREA_Y,
                 FLUID_OUTPUT_AREA_WIDTH, FLUID_OUTPUT_AREA_HEIGHT)) {
@@ -680,9 +646,6 @@ public class AdvancedAlloyFurnaceScreen extends AbstractContainerScreen<Advanced
                 SLIDER_WIDTH, SLIDER_HEIGHT);
     }
 
-    /**
-     * 渲染能量条悬停提示
-     */
     private void renderEnergyTooltip(GuiGraphics guiGraphics, int mouseX, int mouseY, int x, int y) {
         if (!isInArea(mouseX, mouseY, x + ENERGY_BAR_X, y + ENERGY_BAR_Y, ENERGY_BAR_WIDTH, ENERGY_BAR_HEIGHT)) {
             return;
@@ -694,9 +657,6 @@ public class AdvancedAlloyFurnaceScreen extends AbstractContainerScreen<Advanced
         guiGraphics.renderTooltip(this.font, tooltip, Optional.empty(), mouseX, mouseY);
     }
 
-    /**
-     * 渲染进度条悬停提示
-     */
     private void renderProgressTooltip(GuiGraphics guiGraphics, int mouseX, int mouseY, int x, int y) {
         boolean overLeftProgress = isInArea(mouseX, mouseY, x + PROGRESS_LEFT_X, y + PROGRESS_LEFT_Y,
                 PROGRESS_LEFT_WIDTH, PROGRESS_LEFT_HEIGHT);
@@ -733,7 +693,6 @@ public class AdvancedAlloyFurnaceScreen extends AbstractContainerScreen<Advanced
             tooltip.add(Component.translatable("gui.useless_mod.advanced_alloy_furnace.no_process"));
         }
 
-        // 添加AE网络合成任务进度信息
         int aeActiveTasks = this.menu.getActiveAETaskCount();
         int aeTotalProgress = this.menu.getTotalAEProgress();
         int aeTotalMaxProgress = this.menu.getTotalAEMaxProgress();
@@ -742,27 +701,24 @@ public class AdvancedAlloyFurnaceScreen extends AbstractContainerScreen<Advanced
         tooltip.add(Component.translatable("gui.useless_mod.advanced_alloy_furnace.ae_tasks",
                         aeActiveTasks)
                 .withStyle(ChatFormatting.DARK_PURPLE));
-        
-        // 显示每个任务单独的进度信息
+
         var taskProgressList = this.menu.getAETaskProgressList();
         if (!taskProgressList.isEmpty()) {
             for (var taskProgress : taskProgressList) {
                 String productName = taskProgress.getProductName();
                 int taskProgressVal = taskProgress.getProgress();
                 int taskMaxProgress = taskProgress.getMaxProgress();
-                int totalOutputCount = taskProgress.getTotalOutputCount(); // 使用最终产物总数
-                
+                int totalOutputCount = taskProgress.getTotalOutputCount();
+
                 float taskProgressPercent = taskMaxProgress > 0 ? (float) taskProgressVal / taskMaxProgress * 100 : 0;
-                
-                // 获取物品/流体的本地化名称
+
                 Component nameComponent = Component.translatable(productName);
-                
+
                 tooltip.add(Component.translatable("gui.useless_mod.advanced_alloy_furnace.ae_task_progress",
                                 nameComponent, totalOutputCount, taskProgressVal, taskMaxProgress, String.format("%.1f", taskProgressPercent))
                         .withStyle(ChatFormatting.LIGHT_PURPLE));
             }
         } else if (aeTotalMaxProgress > 0) {
-            // 如果没有单独的任务进度信息，显示总进度
             float aeProgressPercent = (float) aeTotalProgress / aeTotalMaxProgress * 100;
             tooltip.add(Component.translatable("gui.useless_mod.advanced_alloy_furnace.ae_progress",
                             aeTotalProgress, aeTotalMaxProgress, String.format("%.1f", aeProgressPercent))
@@ -776,9 +732,6 @@ public class AdvancedAlloyFurnaceScreen extends AbstractContainerScreen<Advanced
         guiGraphics.renderTooltip(this.font, tooltip, Optional.empty(), mouseX, mouseY);
     }
 
-    /**
-     * 渲染问号区域悬停提示（并行数信息）
-     */
     private void renderTipsTooltip(GuiGraphics guiGraphics, int mouseX, int mouseY, int x, int y) {
         if (!isInArea(mouseX, mouseY, x + TIPS_AREA_X, y + TIPS_AREA_Y, TIPS_AREA_WIDTH, TIPS_AREA_HEIGHT)) {
             return;
@@ -826,11 +779,6 @@ public class AdvancedAlloyFurnaceScreen extends AbstractContainerScreen<Advanced
         guiGraphics.renderTooltip(this.font, tooltip, Optional.empty(), mouseX, mouseY);
     }
 
-    /**
-     * 渲染流体槽悬停提示
-     *
-     * @param isInput true表示输入槽，false表示输出槽
-     */
     private void renderFluidTankTooltip(GuiGraphics guiGraphics, int mouseX, int mouseY, int x, int y,
                                         boolean isInput) {
         int areaX = isInput ? FLUID_INPUT_AREA_X : FLUID_OUTPUT_AREA_X;
@@ -927,7 +875,7 @@ public class AdvancedAlloyFurnaceScreen extends AbstractContainerScreen<Advanced
         if (isInArea(mouseX, mouseY, x + OUTPUT_SLIDER_SLOT_X, y + OUTPUT_SLIDER_SLOT_Y,
                 OUTPUT_SLIDER_SLOT_WIDTH, OUTPUT_SLIDER_SLOT_HEIGHT)) {
             int clickY = (int) mouseY - (y + OUTPUT_SLIDER_SLOT_Y) - SLIDER_HEIGHT / 2;
-            int maxScroll = OUTPUT_SLIDER_SLOT_HEIGHT - SLIDER_HEIGHT;
+            int maxScroll = OUTPUT_SLIDER_SLOT_WIDTH - SLIDER_HEIGHT;
             this.outputFluidScrollOffset = Math.max(0, Math.min(
                     AdvancedAlloyFurnaceBlockEntity.FLUID_TANK_COUNT - visibleOutputTanks,
                     (int) ((float) clickY / maxScroll * (AdvancedAlloyFurnaceBlockEntity.FLUID_TANK_COUNT - visibleOutputTanks))));
@@ -992,4 +940,82 @@ public class AdvancedAlloyFurnaceScreen extends AbstractContainerScreen<Advanced
     }
 
     private record FluidAreaLayout(int visibleTanks, int spacing, int startX, int totalWidth) {}
+
+    private boolean handlePatternPageClick(double mouseX, double mouseY, int x, int y) {
+        int currentPage = this.menu.getPatternPage();
+        int maxPage = this.menu.getMaxPatternPage();
+
+        int prevButtonX = x - 67 + 2;
+        int prevButtonY = y + 168;
+        int nextButtonX = x - 67 + 46;
+        int nextButtonY = y + 168;
+
+        if (currentPage > 0 && isInArea(mouseX, mouseY, prevButtonX, prevButtonY, PATTERN_PAGE_BUTTON_WIDTH, PATTERN_PAGE_BUTTON_HEIGHT)) {
+            int newPage = currentPage - 1;
+            this.menu.setPatternPage(newPage);
+            this.updatePatternSlotVisibility();
+            PacketDistributor.sendToServer(new PatternPageChangePacket(newPage));
+            return true;
+        }
+
+        if (currentPage < maxPage && isInArea(mouseX, mouseY, nextButtonX, nextButtonY, PATTERN_PAGE_BUTTON_WIDTH, PATTERN_PAGE_BUTTON_HEIGHT)) {
+            int newPage = currentPage + 1;
+            this.menu.setPatternPage(newPage);
+            this.updatePatternSlotVisibility();
+            PacketDistributor.sendToServer(new PatternPageChangePacket(newPage));
+            return true;
+        }
+
+        return false;
+    }
+
+    private void updatePatternSlotVisibility() {
+        int currentPage = this.menu.getPatternPage();
+        int slotsPerPage = this.menu.getPatternSlotsPerPage();
+        int base = currentPage * slotsPerPage;
+        int end = Math.min(base + slotsPerPage, AdvancedAlloyFurnaceBlockEntity.PATTERN_SLOTS_COUNT);
+
+        for (Slot slot : this.menu.slots) {
+            if (slot instanceof com.sorrowmist.useless.inventory.slot.PatternSlotItemHandler patternSlot) {
+                int slotIndex = slot.getSlotIndex();
+                int relativeIndex = slotIndex - AdvancedAlloyFurnaceBlockEntity.PATTERN_SLOTS_START;
+                boolean isActive = relativeIndex >= base && relativeIndex < end;
+                patternSlot.setActive(isActive);
+            }
+        }
+    }
+
+    private void renderPatternPageButtons(GuiGraphics guiGraphics) {
+        int x = (this.width - this.imageWidth) / 2;
+        int y = (this.height - this.imageHeight) / 2;
+
+        int currentPage = this.menu.getPatternPage();
+        int maxPage = this.menu.getMaxPatternPage();
+
+        if (maxPage <= 0) return;
+
+        int prevButtonX = x - 67 + 2;
+        int prevButtonY = y + 168;
+        int nextButtonX = x - 67 + 46;
+        int nextButtonY = y + 168;
+
+        RenderSystem.setShaderColor(1.0F, 1.0F, 1.0F, 1.0F);
+
+        if (currentPage > 0) {
+            appeng.client.gui.Icon.ARROW_LEFT.getBlitter()
+                    .dest(prevButtonX, prevButtonY, PATTERN_PAGE_BUTTON_WIDTH, PATTERN_PAGE_BUTTON_HEIGHT)
+                    .blit(guiGraphics);
+        }
+
+        if (currentPage < maxPage) {
+            appeng.client.gui.Icon.ARROW_RIGHT.getBlitter()
+                    .dest(nextButtonX, nextButtonY, PATTERN_PAGE_BUTTON_WIDTH, PATTERN_PAGE_BUTTON_HEIGHT)
+                    .blit(guiGraphics);
+        }
+
+        String pageText = (currentPage + 1) + "/" + (maxPage + 1);
+        int textX = x - 67 + 22;
+        int textY = y + 170;
+        guiGraphics.drawString(this.font, pageText, textX, textY, 0xFFFFFF, false);
+    }
 }

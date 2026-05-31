@@ -84,10 +84,10 @@ public class AdvancedAlloyFurnaceBlockEntity extends BlockEntity implements Menu
     public static final int MOLD_SLOT = 19;
     
     public static final int PATTERN_SLOTS_START = 20;
-    public static final int PATTERN_SLOTS_COUNT = 9;
+    public static final int PATTERN_SLOTS_COUNT = 108;
     public static final int PATTERN_SLOTS_END = PATTERN_SLOTS_START + PATTERN_SLOTS_COUNT - 1;
     
-    public static final int TOTAL_SLOTS = 29;
+    public static final int TOTAL_SLOTS = 128;
 
     public static final int FLUID_TANK_COUNT = 6;
     

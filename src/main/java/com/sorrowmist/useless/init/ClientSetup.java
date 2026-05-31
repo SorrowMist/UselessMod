@@ -4,6 +4,7 @@ import com.sorrowmist.useless.UselessMod;
 import com.sorrowmist.useless.api.enums.EnumColor;
 import com.sorrowmist.useless.client.gui.AdvancedAlloyFurnaceScreen;
 import com.sorrowmist.useless.content.blocks.GlowPlasticBlock;
+import com.sorrowmist.useless.content.menus.AdvancedAlloyFurnaceMenu;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;

@@ -12,6 +12,19 @@ import com.sorrowmist.useless.content.recipe.adapters.advancedae.AdvancedAECompa
 import com.sorrowmist.useless.content.recipe.adapters.advancedae.ReactionChamberRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.ae2.AE2Compat;
 import com.sorrowmist.useless.content.recipe.adapters.ae2.InscriberRecipeAdapter;
+import com.sorrowmist.useless.content.recipe.adapters.ae2cs.AECrystalScienceCompat;
+import com.sorrowmist.useless.content.recipe.adapters.ae2cs.CircuitEtcherRecipeAdapter;
+import com.sorrowmist.useless.content.recipe.adapters.ae2cs.CrystalAggregatorRecipeAdapter;
+import com.sorrowmist.useless.content.recipe.adapters.ae2cs.CrystalGrowthRecipeAdapter;
+import com.sorrowmist.useless.content.recipe.adapters.ae2cs.CrystalPulverizerRecipeAdapter;
+import com.sorrowmist.useless.content.recipe.adapters.ae2lt.AELightningTechCompat;
+import com.sorrowmist.useless.content.recipe.adapters.ae2lt.CrystalCatalyzerRecipeAdapter;
+import com.sorrowmist.useless.content.recipe.adapters.ae2lt.LightningAssemblyRecipeAdapter;
+import com.sorrowmist.useless.content.recipe.adapters.ae2lt.LightningSimulationRecipeAdapter;
+import com.sorrowmist.useless.content.recipe.adapters.ae2lt.OverloadProcessingRecipeAdapter;
+import com.sorrowmist.useless.content.recipe.adapters.arsnouveau.ArsNouveauCompat;
+import com.sorrowmist.useless.content.recipe.adapters.arsnouveau.EnchantingApparatusRecipeAdapter;
+import com.sorrowmist.useless.content.recipe.adapters.arsnouveau.ImbuementRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.extendedae.CircuitCutterRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.extendedae.CrystalAssemblerRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.extendedae.ExtendedAECompat;
@@ -20,6 +33,10 @@ import com.sorrowmist.useless.content.recipe.adapters.industrialforegoing.Indust
 import com.sorrowmist.useless.content.recipe.adapters.mekanism.EnrichmentChamberRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.mekanism.MekanismCompat;
 import com.sorrowmist.useless.content.recipe.adapters.mekanism.MetallurgicInfuserRecipeAdapter;
+import com.sorrowmist.useless.content.recipe.adapters.mysticalagriculture.AwakeningRecipeAdapter;
+import com.sorrowmist.useless.content.recipe.adapters.mysticalagriculture.InfusionRecipeAdapter;
+import com.sorrowmist.useless.content.recipe.adapters.mysticalagriculture.MysticalAgricultureCompat;
+import com.sorrowmist.useless.content.recipe.adapters.mysticalagriculture.SeedEssenceRecipeAdapter;
 import com.sorrowmist.useless.init.ModBlocks;
 import com.sorrowmist.useless.init.ModRecipeTypes;
 import com.sorrowmist.useless.init.ModTags;
@@ -106,6 +123,26 @@ public class JEIPlugin implements IModPlugin {
         // 添加转换后的 Actually Additions 配方（如果AA已加载）
         if (ActuallyAdditionsCompat.isActuallyAdditionsLoaded()) {
             recipes.addAll(convertActuallyAdditionsRecipes(recipeManager, level));
+        }
+
+        // 添加转换后的 Ars Nouveau 配方（如果AN已加载）
+        if (ArsNouveauCompat.isArsNouveauLoaded()) {
+            recipes.addAll(convertArsNouveauRecipes(recipeManager, level));
+        }
+
+        // 添加转换后的 Mystical Agriculture 配方（如果MA已加载）
+        if (MysticalAgricultureCompat.isMysticalAgricultureLoaded()) {
+            recipes.addAll(convertMysticalAgricultureRecipes(recipeManager, level));
+        }
+
+        // 添加转换后的 AE2 Crystal Science 配方（如果AECS已加载）
+        if (AECrystalScienceCompat.isAECSLoaded()) {
+            recipes.addAll(convertAECSRecipes(recipeManager, level));
+        }
+
+        // 添加转换后的 AE2 Lightning Tech 配方（如果AE2LT已加载）
+        if (AELightningTechCompat.isAELightningTechLoaded()) {
+            recipes.addAll(convertAELightningTechRecipes(recipeManager, level));
         }
 
         registration.addRecipes(AdvancedAlloyFurnaceRecipeCategory.TYPE, recipes);
@@ -273,6 +310,141 @@ public class JEIPlugin implements IModPlugin {
             if (converted != null) {
                 convertedRecipes.add(converted);
             }
+        }
+
+        return convertedRecipes;
+    }
+
+    /**
+     * 转换 Ars Nouveau 配方为高级熔炉配方用于JEI显示
+     */
+    private List<AdvancedAlloyFurnaceRecipe> convertArsNouveauRecipes(RecipeManager recipeManager, Level level) {
+        List<AdvancedAlloyFurnaceRecipe> convertedRecipes = new ArrayList<>();
+
+        // 转换附魔装置配方
+        EnchantingApparatusRecipeAdapter apparatusAdapter = new EnchantingApparatusRecipeAdapter();
+        for (RecipeHolder<com.hollingsworth.arsnouveau.common.crafting.recipes.EnchantingApparatusRecipe> holder :
+                recipeManager.getAllRecipesFor(com.hollingsworth.arsnouveau.setup.registry.RecipeRegistry.APPARATUS_TYPE.get())) {
+            AdvancedAlloyFurnaceRecipe converted = apparatusAdapter.convert(holder, level);
+            if (converted != null) {
+                convertedRecipes.add(converted);
+            }
+        }
+
+        // 转换灌魔室配方
+        ImbuementRecipeAdapter imbuementAdapter = new ImbuementRecipeAdapter();
+        for (RecipeHolder<com.hollingsworth.arsnouveau.common.crafting.recipes.ImbuementRecipe> holder :
+                recipeManager.getAllRecipesFor(com.hollingsworth.arsnouveau.setup.registry.RecipeRegistry.IMBUEMENT_TYPE.get())) {
+            AdvancedAlloyFurnaceRecipe converted = imbuementAdapter.convert(holder, level);
+            if (converted != null) {
+                convertedRecipes.add(converted);
+            }
+        }
+
+        return convertedRecipes;
+    }
+
+    /**
+     * 转换 Mystical Agriculture 配方为高级熔炉配方用于JEI显示
+     */
+    private List<AdvancedAlloyFurnaceRecipe> convertMysticalAgricultureRecipes(RecipeManager recipeManager, Level level) {
+        List<AdvancedAlloyFurnaceRecipe> convertedRecipes = new ArrayList<>();
+
+        // 转换注魔祭坛配方
+        InfusionRecipeAdapter infusionAdapter = new InfusionRecipeAdapter();
+        for (RecipeHolder<com.blakebr0.mysticalagriculture.api.crafting.IInfusionRecipe> holder :
+                recipeManager.getAllRecipesFor(com.blakebr0.mysticalagriculture.init.ModRecipeTypes.INFUSION.get())) {
+            AdvancedAlloyFurnaceRecipe converted = infusionAdapter.convert(holder, level);
+            if (converted != null) {
+                convertedRecipes.add(converted);
+            }
+        }
+
+        // 转换觉醒祭坛配方
+        AwakeningRecipeAdapter awakeningAdapter = new AwakeningRecipeAdapter();
+        for (RecipeHolder<com.blakebr0.mysticalagriculture.api.crafting.IAwakeningRecipe> holder :
+                recipeManager.getAllRecipesFor(com.blakebr0.mysticalagriculture.init.ModRecipeTypes.AWAKENING.get())) {
+            AdvancedAlloyFurnaceRecipe converted = awakeningAdapter.convert(holder, level);
+            if (converted != null) {
+                convertedRecipes.add(converted);
+            }
+        }
+
+        // 添加种子→精华转换配方
+        SeedEssenceRecipeAdapter seedEssenceAdapter = new SeedEssenceRecipeAdapter();
+        convertedRecipes.addAll(seedEssenceAdapter.getAllRecipes());
+
+        return convertedRecipes;
+    }
+
+    // TODO: AE2 Crystal Science adapters not yet implemented
+    // convertAECSRecipes() method removed until adapters are created
+
+    /**
+     * 转换 AE2 Crystal Science 配方为高级熔炉配方用于JEI显示
+     */
+    private List<AdvancedAlloyFurnaceRecipe> convertAECSRecipes(RecipeManager recipeManager, Level level) {
+        List<AdvancedAlloyFurnaceRecipe> convertedRecipes = new ArrayList<>();
+
+        CircuitEtcherRecipeAdapter etcherAdapter = new CircuitEtcherRecipeAdapter();
+        for (RecipeHolder<io.github.lounode.ae2cs.common.recipe.circuit_etcher.CircuitEtcherRecipe> holder :
+                recipeManager.getAllRecipesFor(io.github.lounode.ae2cs.common.init.AECSRecipeTypes.CIRCUIT_ETCHER.get())) {
+            AdvancedAlloyFurnaceRecipe converted = etcherAdapter.convert(holder, level);
+            if (converted != null) convertedRecipes.add(converted);
+        }
+
+        CrystalAggregatorRecipeAdapter aggregatorAdapter = new CrystalAggregatorRecipeAdapter();
+        for (RecipeHolder<io.github.lounode.ae2cs.common.recipe.crystal_aggregator.CrystalAggregatorRecipe> holder :
+                recipeManager.getAllRecipesFor(io.github.lounode.ae2cs.common.init.AECSRecipeTypes.CRYSTAL_AGGREGATOR.get())) {
+            AdvancedAlloyFurnaceRecipe converted = aggregatorAdapter.convert(holder, level);
+            if (converted != null) convertedRecipes.add(converted);
+        }
+
+        CrystalPulverizerRecipeAdapter pulverizerAdapter = new CrystalPulverizerRecipeAdapter();
+        for (RecipeHolder<io.github.lounode.ae2cs.common.recipe.crystal_pulverizer.CrystalPulverizerRecipe> holder :
+                recipeManager.getAllRecipesFor(io.github.lounode.ae2cs.common.init.AECSRecipeTypes.CRYSTAL_PULVERIZER.get())) {
+            AdvancedAlloyFurnaceRecipe converted = pulverizerAdapter.convert(holder, level);
+            if (converted != null) convertedRecipes.add(converted);
+        }
+
+        CrystalGrowthRecipeAdapter growthAdapter = new CrystalGrowthRecipeAdapter();
+        convertedRecipes.addAll(growthAdapter.getAllRecipes());
+
+        return convertedRecipes;
+    }
+
+    /**
+     * 转换 AE2 Lightning Tech 配方为高级熔炉配方用于JEI显示
+     */
+    private List<AdvancedAlloyFurnaceRecipe> convertAELightningTechRecipes(RecipeManager recipeManager, Level level) {
+        List<AdvancedAlloyFurnaceRecipe> convertedRecipes = new ArrayList<>();
+
+        LightningSimulationRecipeAdapter simulationAdapter = new LightningSimulationRecipeAdapter();
+        for (RecipeHolder<com.moakiee.ae2lt.machine.lightningchamber.recipe.LightningSimulationRecipe> holder :
+                recipeManager.getAllRecipesFor(com.moakiee.ae2lt.registry.ModRecipeTypes.LIGHTNING_SIMULATION_TYPE.get())) {
+            AdvancedAlloyFurnaceRecipe converted = simulationAdapter.convert(holder, level);
+            if (converted != null) convertedRecipes.add(converted);
+        }
+
+        LightningAssemblyRecipeAdapter assemblyAdapter = new LightningAssemblyRecipeAdapter();
+        for (RecipeHolder<com.moakiee.ae2lt.machine.lightningassembly.recipe.LightningAssemblyRecipe> holder :
+                recipeManager.getAllRecipesFor(com.moakiee.ae2lt.registry.ModRecipeTypes.LIGHTNING_ASSEMBLY_TYPE.get())) {
+            AdvancedAlloyFurnaceRecipe converted = assemblyAdapter.convert(holder, level);
+            if (converted != null) convertedRecipes.add(converted);
+        }
+
+        OverloadProcessingRecipeAdapter overloadAdapter = new OverloadProcessingRecipeAdapter();
+        for (RecipeHolder<com.moakiee.ae2lt.machine.overloadfactory.recipe.OverloadProcessingRecipe> holder :
+                recipeManager.getAllRecipesFor(com.moakiee.ae2lt.registry.ModRecipeTypes.OVERLOAD_PROCESSING_TYPE.get())) {
+            AdvancedAlloyFurnaceRecipe converted = overloadAdapter.convert(holder, level);
+            if (converted != null) convertedRecipes.add(converted);
+        }
+
+        CrystalCatalyzerRecipeAdapter catalyzerAdapter = new CrystalCatalyzerRecipeAdapter();
+        for (RecipeHolder<com.moakiee.ae2lt.machine.crystalcatalyzer.recipe.CrystalCatalyzerRecipe> holder :
+                recipeManager.getAllRecipesFor(com.moakiee.ae2lt.registry.ModRecipeTypes.CRYSTAL_CATALYZER_TYPE.get())) {
+            AdvancedAlloyFurnaceRecipe converted = catalyzerAdapter.convert(holder, level);
+            if (converted != null) convertedRecipes.add(converted);
         }
 
         return convertedRecipes;

@@ -182,7 +182,13 @@ public class AlloyFurnaceRecipeManager {
      */
     @Nullable
     public AdvancedAlloyFurnaceRecipe findRecipe(Level level, List<ItemStack> inputs, @Nullable ItemStack mold) {
-        if (level == null || inputs.isEmpty()) {
+        if (level == null) {
+            return null;
+        }
+
+        // 允许空物品输入（如纯流体配方），但保持无模具+空输入时快速返回
+        // 因为无模具且无物品输入几乎不可能匹配任何配方
+        if (inputs.isEmpty() && (mold == null || mold.isEmpty())) {
             return null;
         }
 

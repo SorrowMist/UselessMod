@@ -286,7 +286,7 @@ public class AlloyFurnaceRecipeManager {
     @SuppressWarnings("unchecked")
     private <T extends Recipe<?>> AdvancedAlloyFurnaceRecipe findAdaptedRecipe(Level level, List<ItemStack> inputs, @Nullable ItemStack mold) {
         for (IRecipeAdapter<?> adapter : adapters) {
-            RecipeHolder<T> holder = ((IRecipeAdapter<T>) adapter).findMatchingRecipe(level, inputs);
+            RecipeHolder<T> holder = ((IRecipeAdapter<T>) adapter).findMatchingRecipe(level, inputs, mold);
             if (holder != null) {
                 // 使用 convertAll 获取所有转换后的配方（包括基础版和批量版）
                 List<AdvancedAlloyFurnaceRecipe> convertedRecipes = ((IRecipeAdapter<T>) adapter).convertAll(holder, level);

@@ -70,6 +70,22 @@ public interface IRecipeAdapter<T extends Recipe<?>> {
     RecipeHolder<T> findMatchingRecipe(Level level, List<ItemStack> inputs);
 
     /**
+     * 查找并返回匹配的配方持有者（带模具信息）
+     * <p>
+     * 默认实现忽略模具，调用无模具版本的匹配方法。
+     * 对于需要根据模具区分配方的适配器（如 InscriberRecipeAdapter），应重写此方法。
+     *
+     * @param level   世界
+     * @param inputs  输入物品列表
+     * @param mold    当前模具（可为空）
+     * @return 匹配的配方持有者，如果没有则返回 null
+     */
+    @Nullable
+    default RecipeHolder<T> findMatchingRecipe(Level level, List<ItemStack> inputs, @Nullable ItemStack mold) {
+        return findMatchingRecipe(level, inputs);
+    }
+
+    /**
      * 获取此适配器的优先级
      * <p>
      * 数字越大优先级越高，优先尝试匹配

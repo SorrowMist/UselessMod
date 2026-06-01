@@ -46,6 +46,8 @@ public class AdvancedAlloyFurnaceData implements ContainerData {
     @Override
     public void set(int index, int value) {
         switch (index) {
+            case DATA_ENERGY_STORED -> this.entity.setEnergy(value);
+            case DATA_ENERGY_CAPACITY -> this.entity.setMaxEnergy(value);
             case DATA_PROGRESS -> this.entity.setProgress(value);
             case DATA_MAX_PROGRESS -> this.entity.setMaxProgress(value);
             case DATA_CURRENT_PARALLEL -> this.entity.setCurrentParallel(value);

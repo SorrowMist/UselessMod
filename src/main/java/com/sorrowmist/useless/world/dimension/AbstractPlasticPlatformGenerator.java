@@ -102,10 +102,11 @@ public abstract class AbstractPlasticPlatformGenerator extends ChunkGenerator {
                     chunk.setBlockState(pos.set(x, y, z), Blocks.AIR.defaultBlockState(), false);
                 }
 
-                // 正确更新高度图（非常重要！）
+                // 正确更新高度图
+                int heightmapY = Math.max(0, Math.min(255, topY));
                 BlockState surfaceState = ConfigManager.getFillBlock().defaultBlockState();
-                worldSurface.update(x, z, topY, surfaceState);
-                oceanFloor.update(x, z, topY, surfaceState);
+                worldSurface.update(x, z, heightmapY, surfaceState);
+                oceanFloor.update(x, z, heightmapY, surfaceState);
             }
         }
     }

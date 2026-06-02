@@ -61,6 +61,7 @@ public class OverloadProcessingRecipeAdapter implements IRecipeAdapter<OverloadP
         boolean hasItemOutputs = !itemResults.isEmpty();
         boolean hasFluidOutput = !fluidResult.isEmpty();
 
+        // 只要有输入并且有输出就可以转换，不管是物品还是流体
         if (!hasItemInputs && !hasFluidInput) {
             return result;
         }
@@ -138,20 +139,13 @@ public class OverloadProcessingRecipeAdapter implements IRecipeAdapter<OverloadP
     @Nullable
     @SuppressWarnings("unchecked")
     public RecipeHolder<OverloadProcessingRecipe> findMatchingRecipe(Level level, List<ItemStack> inputs, @Nullable ItemStack mold) {
-        return findMatchingRecipeWithFluidsAndMold(level, inputs, List.of(), mold);
+        return findMatchingRecipe(level, inputs, List.of(), mold);
     }
 
     @Override
     @Nullable
     @SuppressWarnings("unchecked")
-    public RecipeHolder<OverloadProcessingRecipe> findMatchingRecipeWithFluids(Level level, List<ItemStack> inputs, List<FluidStack> fluidInputs) {
-        return findMatchingRecipeWithFluidsAndMold(level, inputs, fluidInputs, null);
-    }
-
-    @Override
-    @Nullable
-    @SuppressWarnings("unchecked")
-    public RecipeHolder<OverloadProcessingRecipe> findMatchingRecipeWithFluidsAndMold(Level level, List<ItemStack> inputs, List<FluidStack> fluidInputs, @Nullable ItemStack mold) {
+    public RecipeHolder<OverloadProcessingRecipe> findMatchingRecipe(Level level, List<ItemStack> inputs, List<FluidStack> fluidInputs, @Nullable ItemStack mold) {
         if (level == null) {
             return null;
         }
@@ -171,39 +165,35 @@ public class OverloadProcessingRecipeAdapter implements IRecipeAdapter<OverloadP
         for (RecipeHolder<OverloadProcessingRecipe> holder : recipes) {
             OverloadProcessingRecipe recipe = holder.value();
 
-            List<OverloadProcessingIngredient> recipeInputs = recipe.itemInputs();
+            List<OverloadProcessingIngredient> recipeItemInputs = recipe.itemInputs();
             FluidStack recipeFluidInput = recipe.fluidInput();
 
-            // 检查流体输入匹配
-            if (!recipeFluidInput.isEmpty()) {
-                boolean foundFluid = false;
-                for (FluidStack input : fluidInputs) {
-                    if (FluidStack.isSameFluidSameComponents(input, recipeFluidInput) && input.getAmount() >= recipeFluidInput.getAmount()) {
-                        foundFluid = true;
-                        break;
-                    }
-                }
-                if (!foundFluid) {
-                    continue;
-                }
-            }
-
             // 检查物品输入匹配
-            if (!recipeInputs.isEmpty()) {
+            boolean itemsMatch = true;
+            if (!recipeItemInputs.isEmpty()) {
                 Map<Ingredient, Long> requiredCounts = new LinkedHashMap<>();
-                for (OverloadProcessingIngredient input : recipeInputs) {
+                for (OverloadProcessingIngredient input : recipeItemInputs) {
                     mergeIngredient(requiredCounts, input.ingredient(), input.count());
                 }
-
-                if (!matchesCountedIngredients(inputs, requiredCounts)) {
-                    continue;
-                }
-            } else if (inputs.isEmpty()) {
-                // 没有物品输入，且用户也没有放物品
-                return holder;
+                itemsMatch = matchesCountedIngredients(inputs, requiredCounts);
             }
 
-            return holder;
+            // 检查流体输入匹配
+            boolean fluidsMatch = true;
+            if (!recipeFluidInput.isEmpty()) {
+                long foundAmount = 0;
+                for (FluidStack input : fluidInputs) {
+                    if (FluidStack.isSameFluidSameComponents(input, recipeFluidInput)) {
+                        foundAmount += input.getAmount();
+                    }
+                }
+                fluidsMatch = foundAmount >= recipeFluidInput.getAmount();
+            }
+
+            // 只要物品或流体有一个满足，就可以匹配（因为配方可能只有其中一种输入）
+            if ((recipeItemInputs.isEmpty() || itemsMatch) && (recipeFluidInput.isEmpty() || fluidsMatch)) {
+                return holder;
+            }
         }
 
         return null;

@@ -87,24 +87,10 @@ public interface IRecipeAdapter<T extends Recipe<?>> {
     }
 
     /**
-     * 查找并返回匹配的配方持有者（带流体输入）
-     * <p>
-     * 默认实现忽略流体，调用无流体版本的匹配方法。
-     *
-     * @param level       世界
-     * @param inputs      输入物品列表
-     * @param fluidInputs 输入流体列表
-     * @return 匹配的配方持有者，如果没有则返回 null
-     */
-    @Nullable
-    default RecipeHolder<T> findMatchingRecipeWithFluids(Level level, List<ItemStack> inputs, List<FluidStack> fluidInputs) {
-        return findMatchingRecipe(level, inputs);
-    }
-
-    /**
      * 查找并返回匹配的配方持有者（带流体输入和模具信息）
      * <p>
-     * 默认实现依次调用带模具的版本。
+     * 默认实现忽略流体输入，调用带模具版本的匹配方法。
+     * 对于需要流体输入的适配器（如 OverloadProcessingRecipeAdapter），应重写此方法。
      *
      * @param level       世界
      * @param inputs      输入物品列表
@@ -113,8 +99,8 @@ public interface IRecipeAdapter<T extends Recipe<?>> {
      * @return 匹配的配方持有者，如果没有则返回 null
      */
     @Nullable
-    default RecipeHolder<T> findMatchingRecipeWithFluidsAndMold(Level level, List<ItemStack> inputs, List<FluidStack> fluidInputs, @Nullable ItemStack mold) {
-        return findMatchingRecipeWithFluids(level, inputs, fluidInputs);
+    default RecipeHolder<T> findMatchingRecipe(Level level, List<ItemStack> inputs, List<FluidStack> fluidInputs, @Nullable ItemStack mold) {
+        return findMatchingRecipe(level, inputs, mold);
     }
 
     /**

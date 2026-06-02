@@ -392,11 +392,8 @@ public class AlloyFurnaceRecipeManager {
         for (IRecipeAdapter<?> adapter : adapters) {
             RecipeHolder<T> holder;
 
-            if (mold != null && !mold.isEmpty()) {
-                holder = ((IRecipeAdapter<T>) adapter).findMatchingRecipeWithFluidsAndMold(level, inputs, fluidInputs, mold);
-            } else {
-                holder = ((IRecipeAdapter<T>) adapter).findMatchingRecipeWithFluids(level, inputs, fluidInputs);
-            }
+            // 优先使用支持流体输入的方法
+            holder = ((IRecipeAdapter<T>) adapter).findMatchingRecipe(level, inputs, fluidInputs, mold);
 
             if (holder != null) {
                 List<AdvancedAlloyFurnaceRecipe> convertedRecipes = ((IRecipeAdapter<T>) adapter).convertAll(holder, level);

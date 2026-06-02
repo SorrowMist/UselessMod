@@ -794,10 +794,9 @@ public class AdvancedAlloyFurnaceBlockEntity extends BlockEntity implements Menu
         int energyRequired = energyRequiredLong > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) energyRequiredLong;
 
         // 能量不足时暂停进度，但不重置
-        if (!this.energyManager.canWork(energyRequired)) return;
+        if (!this.energyManager.tryConsumeEnergy(energyRequired)) return;
 
-        // 扣除能量并累积
-        this.energyManager.tryConsumeEnergy(energyRequired);
+        // 累积能量
         this.accumulatedEnergy += energyRequired;
         this.progress++;
 
@@ -1058,23 +1057,20 @@ public class AdvancedAlloyFurnaceBlockEntity extends BlockEntity implements Menu
             // 已消耗能量已经足够支持目标并行数
             actualParallel = targetParallel;
         } else {
-            // 需要补充能量，检查当前能量是否足够
-            int currentEnergy = this.energyManager.getEnergyStored();
-            
-            if (currentEnergy >= additionalEnergyNeeded) {
-                // 能量足够补充，扣除补充能量
-                this.energyManager.tryConsumeEnergy((int) Math.min(additionalEnergyNeeded, Integer.MAX_VALUE));
+            int consumable = (int) Math.min(additionalEnergyNeeded, Integer.MAX_VALUE);
+            if (this.energyManager.tryConsumeEnergy(consumable)) {
+                // 能量足够补充，扣除成功
                 actualParallel = targetParallel;
             } else {
-                // 能量不足以支持目标并行数，根据实际总能量计算可行并行数
-                long totalAvailableEnergy = this.accumulatedEnergy + currentEnergy;
+                // 能量不足以支持目标并行数（可能被并发AE任务消耗），根据实际总能量计算可行并行数
+                long totalAvailableEnergy = this.accumulatedEnergy + this.energyManager.getEnergyStored();
                 long parallelLong = totalAvailableEnergy / recipeEnergy;
                 actualParallel = parallelLong > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) parallelLong;
                 actualParallel = Math.max(0, Math.min(actualParallel, targetParallel));
                 
-                // 扣除所有当前能量
-                if (currentEnergy > 0) {
-                    this.energyManager.tryConsumeEnergy(currentEnergy);
+                int remainingEnergy = this.energyManager.getEnergyStored();
+                if (remainingEnergy > 0) {
+                    this.energyManager.tryConsumeEnergy(remainingEnergy);
                 }
             }
         }
@@ -2846,6 +2842,10 @@ public class AdvancedAlloyFurnaceBlockEntity extends BlockEntity implements Menu
                 if (maxParallel <= 0) {
                     maxParallel = 1; // 至少为1
                 }
+                if (baseEnergyPerTick > 0) {
+                    int maxEnergyParallel = energyManager.getMaxEnergyStored() / baseEnergyPerTick;
+                    maxParallel = Math.min(maxParallel, Math.max(1, maxEnergyParallel));
+                }
                 
                 // 总处理时间 = 基础时间 × ceil(合成次数 / 最大并行数)
                 int batches = (int) Math.ceil((double) currentCraftCount / maxParallel);
@@ -2890,11 +2890,10 @@ public class AdvancedAlloyFurnaceBlockEntity extends BlockEntity implements Menu
                         int actualBatchParallel = (batchIndex < batches - 1) ? maxParallel : lastBatchSize;
                         long energyRequiredLong = useUsefulIngot ? (long) baseEnergyPerTick : (long) baseEnergyPerTick * actualBatchParallel;
                         int energyRequired = energyRequiredLong > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) energyRequiredLong;
-                        if (!energyManager.canWork(energyRequired)) {
+                        if (!energyManager.tryConsumeEnergy(energyRequired)) {
                             energyFailed = true;
                             break;
                         }
-                        energyManager.tryConsumeEnergy(energyRequired);
                         progress++;
                         totalAEProgress++;
                         // 更新单个任务的进度
@@ -2948,6 +2947,10 @@ public class AdvancedAlloyFurnaceBlockEntity extends BlockEntity implements Menu
                 int maxParallel = AdvancedAlloyFurnaceBlockEntity.this.getCatalystMaxParallel();
                 if (maxParallel <= 0) {
                     maxParallel = 1;
+                }
+                if (baseEnergyPerTick > 0) {
+                    int maxEnergyParallel = energyManager.getMaxEnergyStored() / baseEnergyPerTick;
+                    maxParallel = Math.min(maxParallel, Math.max(1, maxEnergyParallel));
                 }
                 int batches = (int) Math.ceil((double) craftCount / maxParallel);
                 totalAEMaxProgress -= baseProcessTime * batches;

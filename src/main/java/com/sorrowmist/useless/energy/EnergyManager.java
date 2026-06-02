@@ -121,9 +121,9 @@ public class EnergyManager implements IEnergyManager {
     }
 
     @Override
-    public boolean tryConsumeEnergy(int amount) {
+    public synchronized boolean tryConsumeEnergy(int amount) {
         if (amount <= 0) return false;
-        if (this.canWork(amount)) {
+        if (this.energy >= amount) {
             this.energy = Math.max(0, this.energy - amount);
             this.notifyChange();
             return true;

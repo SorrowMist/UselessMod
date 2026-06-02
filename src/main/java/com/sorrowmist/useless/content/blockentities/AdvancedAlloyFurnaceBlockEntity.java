@@ -818,11 +818,18 @@ public class AdvancedAlloyFurnaceBlockEntity extends BlockEntity implements Menu
      * 所有计算都遵循"先除再乘"原则，避免溢出
      */
     private int calculateActualParallel(AdvancedAlloyFurnaceRecipe recipe) {
-        // 步骤1: 计算能量允许的最大并行（先除后乘避免溢出）
-        int energyParallel = this.calculateEnergyParallel(recipe);
-        
         // 步骤2: 获取催化剂允许的并行量
         int catalystParallel = this.calculateCatalystParallel(recipe);
+        
+        // 先判断是否用有用锭作为催化剂（用有用锭时能量不限制并行）
+        ItemStack catalystStack = this.itemHandler.getStackInSlot(CATALYST_SLOT);
+        boolean useUsefulIngot = !catalystStack.isEmpty() && CatalystParallelManager.isUsefulIngot(catalystStack);
+        
+        int energyParallel = Integer.MAX_VALUE;
+        if (!useUsefulIngot) {
+            // 不用有用锭时才计算能量允许的最大并行
+            energyParallel = this.calculateEnergyParallel(recipe);
+        }
         
         // 如果催化剂提供无限并行(Integer.MAX_VALUE)，需要特殊处理
         // 限制为能量允许的并行数，避免后续计算溢出
@@ -1320,9 +1327,9 @@ public class AdvancedAlloyFurnaceBlockEntity extends BlockEntity implements Menu
             return this.calculateActualParallel(match.get());
         }
 
-        // 没有匹配配方时，只显示催化剂提供的并行数
+        // 没有匹配配方时，只显示催化剂提供的并行数（不限制上限）
         int catalystParallel = this.getCatalystMaxParallel();
-        return Math.max(1, Math.min(catalystParallel, 1000000));
+        return Math.max(1, catalystParallel);
     }
 
     void setCurrentParallel(int parallel) {
@@ -1699,8 +1706,6 @@ public class AdvancedAlloyFurnaceBlockEntity extends BlockEntity implements Menu
     }
 
     private void consumeRecipeInputs(AdvancedAlloyFurnaceRecipe recipe, int parallel) {
-        // 限制并行数在合理范围内
-        parallel = Math.min(parallel, 1000000);
         
         for (var countedIng : recipe.inputs()) {
             long toConsume = countedIng.count() * (long) parallel;
@@ -1730,7 +1735,6 @@ public class AdvancedAlloyFurnaceBlockEntity extends BlockEntity implements Menu
     }
 
     private void produceRecipeOutputs(AdvancedAlloyFurnaceRecipe recipe, int parallel) {
-        parallel = Math.min(parallel, 1000000);
 
         for (ItemStack output : recipe.outputs()) {
             long totalCountLong = (long) output.getCount() * parallel;
@@ -2842,7 +2846,20 @@ public class AdvancedAlloyFurnaceBlockEntity extends BlockEntity implements Menu
                 if (maxParallel <= 0) {
                     maxParallel = 1; // 至少为1
                 }
-                if (baseEnergyPerTick > 0) {
+                
+                // 获取合成产物名称和单次产出数量
+                String productName = getProductName();
+                int outputCount = 1;
+                if (pattern != null && !pattern.getOutputs().isEmpty()) {
+                    var output = pattern.getOutputs().get(0);
+                    outputCount = (int) output.amount();
+                }
+                
+                ItemStack catalystStack = AdvancedAlloyFurnaceBlockEntity.this.itemHandler.getStackInSlot(CATALYST_SLOT);
+                boolean useUsefulIngot = !catalystStack.isEmpty() && CatalystParallelManager.isUsefulIngot(catalystStack);
+                
+                // 只有不用有用锭时才用能量限制并行（用有用锭时能量不限制并行）
+                if (baseEnergyPerTick > 0 && !useUsefulIngot) {
                     int maxEnergyParallel = energyManager.getMaxEnergyStored() / baseEnergyPerTick;
                     maxParallel = Math.min(maxParallel, Math.max(1, maxEnergyParallel));
                 }
@@ -2854,13 +2871,6 @@ public class AdvancedAlloyFurnaceBlockEntity extends BlockEntity implements Menu
                 
                 int progress = 0;
                 
-                // 获取合成产物名称和单次产出数量
-                String productName = getProductName();
-                int outputCount = 1;
-                if (pattern != null && !pattern.getOutputs().isEmpty()) {
-                    var output = pattern.getOutputs().get(0);
-                    outputCount = (int) output.amount();
-                }
                 int totalOutputCount = currentCraftCount * outputCount; // 最终产物总数 = 合成次数 × 单次产出数量
                 
                 // 创建任务进度信息并添加到地图中
@@ -2877,8 +2887,6 @@ public class AdvancedAlloyFurnaceBlockEntity extends BlockEntity implements Menu
                 sendAETaskProgressToClients();
 
                 int progressUpdateCounter = 0;
-                ItemStack catalystStack = AdvancedAlloyFurnaceBlockEntity.this.itemHandler.getStackInSlot(CATALYST_SLOT);
-                boolean useUsefulIngot = !catalystStack.isEmpty() && CatalystParallelManager.isUsefulIngot(catalystStack);
                 boolean energyFailed = false;
                 while (progress < processTime && !cancelled) {
                     taskLock.lock();

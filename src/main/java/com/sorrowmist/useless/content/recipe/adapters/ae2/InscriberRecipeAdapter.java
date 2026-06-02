@@ -79,12 +79,13 @@ public class InscriberRecipeAdapter implements IRecipeAdapter<InscriberRecipe> {
             }
             moldIngredient = Ingredient.of(AEBlocks.INSCRIBER.asItem());
         } else {
-            // INSCRIBE 模式：以顶部物品作为模具，中间物品作为输入
+            // INSCRIBE 模式：以顶部或底部物品作为模具（不消耗），中间物品作为输入
             countedIngredients.add(new CountedIngredient(middleInput, 1));
             if (!isIngredientEmpty(topInput)) {
                 moldIngredient = topInput;
+            } else if (!isIngredientEmpty(bottomInput)) {
+                moldIngredient = bottomInput;
             } else {
-                // 如果没有顶部物品，使用压印器作为模具
                 moldIngredient = Ingredient.of(AEBlocks.INSCRIBER.asItem());
             }
         }
@@ -114,11 +115,14 @@ public class InscriberRecipeAdapter implements IRecipeAdapter<InscriberRecipe> {
 
     /**
      * 检查 Ingredient 是否为空
+     * <p>
+     * 使用 Ingredient.isEmpty() 而非 getItems().length，
+     * 因为 AE2 等模组可能使用自定义 Ingredient 类型，
+     * 其 getItems() 返回空数组但 isEmpty() 正确返回 false。
      */
     private boolean isIngredientEmpty(Ingredient ingredient) {
         if (ingredient == null) return true;
-        ItemStack[] items = ingredient.getItems();
-        return items == null || items.length == 0;
+        return ingredient.isEmpty();
     }
 
     @Override
@@ -212,6 +216,11 @@ public class InscriberRecipeAdapter implements IRecipeAdapter<InscriberRecipe> {
                 appeng.recipes.AERecipeTypes.INSCRIBER
         );
 
+        RecipeHolder<InscriberRecipe> bestHolder = null;
+        int bestScore = -1;
+
+        boolean hasMold = mold != null && !mold.isEmpty();
+
         for (RecipeHolder<InscriberRecipe> holder : recipes) {
             InscriberRecipe recipe = holder.value();
 
@@ -222,53 +231,68 @@ public class InscriberRecipeAdapter implements IRecipeAdapter<InscriberRecipe> {
 
             if (middleInput == null || isIngredientEmpty(middleInput)) continue;
 
-            // 检查中间输入是否匹配
             boolean matchesMiddle = false;
+            for (ItemStack stack : inputs) {
+                if (!stack.isEmpty() && middleInput.test(stack)) {
+                    matchesMiddle = true;
+                    break;
+                }
+            }
+            if (!matchesMiddle) continue;
+
+            boolean hasTop = !isIngredientEmpty(topInput);
+            boolean hasBottom = !isIngredientEmpty(bottomInput);
 
             if (processType == InscriberProcessType.PRESS) {
-                // PRESS 模式：需要匹配所有输入物品和 ae2:inscriber 模具
-                boolean matchesTop = isIngredientEmpty(topInput);
-                boolean matchesBottom = isIngredientEmpty(bottomInput);
+                boolean topSatisfied = !hasTop;
+                boolean bottomSatisfied = !hasBottom;
 
                 for (ItemStack stack : inputs) {
                     if (stack.isEmpty()) continue;
-
-                    if (!matchesMiddle && middleInput.test(stack)) {
-                        matchesMiddle = true;
-                    } else if (!matchesTop && !isIngredientEmpty(topInput) && topInput.test(stack)) {
-                        matchesTop = true;
-                    } else if (!matchesBottom && !isIngredientEmpty(bottomInput) && bottomInput.test(stack)) {
-                        matchesBottom = true;
-                    }
+                    if (!topSatisfied && topInput.test(stack)) topSatisfied = true;
+                    if (!bottomSatisfied && bottomInput.test(stack)) bottomSatisfied = true;
                 }
 
-                if (matchesMiddle && matchesTop && matchesBottom) {
-                    return holder;
+                if (hasMold) {
+                    if (!topSatisfied && topInput.test(mold)) topSatisfied = true;
+                    if (!bottomSatisfied && bottomInput.test(mold)) bottomSatisfied = true;
+                }
+
+                if (!topSatisfied || !bottomSatisfied) continue;
+
+                boolean moldMatchesTop = hasTop && hasMold && topInput.test(mold);
+                boolean moldMatchesBottom = hasBottom && hasMold && bottomInput.test(mold);
+                int matchScore = moldMatchesTop || moldMatchesBottom ? 2 : 1;
+
+                if (matchScore > bestScore) {
+                    bestScore = matchScore;
+                    bestHolder = holder;
                 }
             } else {
-                // INSCRIBE 模式：检查中间输入，同时检查模具是否匹配顶部
-                for (ItemStack stack : inputs) {
-                    if (stack.isEmpty()) continue;
+                boolean moldMatchesTop = hasTop && hasMold && topInput.test(mold);
+                boolean moldMatchesBottom = hasBottom && hasMold && bottomInput.test(mold);
 
-                    if (middleInput.test(stack)) {
-                        matchesMiddle = true;
-                        break;
-                    }
+                if ((hasTop || hasBottom) && hasMold && !moldMatchesTop && !moldMatchesBottom) {
+                    continue;
                 }
 
-                if (matchesMiddle) {
-                    // 验证模具匹配（仅当配方有顶部模具要求时）
-                    if (!isIngredientEmpty(topInput)) {
-                        if (mold == null || mold.isEmpty() || !topInput.test(mold)) {
-                            continue; // 模具不匹配，继续检查下一个配方
-                        }
-                    }
-                    return holder;
+                int matchScore;
+                if (moldMatchesTop || moldMatchesBottom) {
+                    matchScore = 3;
+                } else if (!hasTop && !hasBottom) {
+                    matchScore = 1;
+                } else {
+                    matchScore = 2;
+                }
+
+                if (matchScore > bestScore) {
+                    bestScore = matchScore;
+                    bestHolder = holder;
                 }
             }
         }
 
-        return null;
+        return bestHolder;
     }
 
     @Override

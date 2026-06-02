@@ -325,6 +325,9 @@ public class AlloyFurnaceRecipeManager {
 
     /**
      * 计算配方匹配得分
+     * <p>
+     * 物品、流体、模具均为硬性要求：只要用户提供了某类输入，
+     * 配方就必须完全匹配该类输入，否则直接排除。
      */
     private int calculateMatchScore(AdvancedAlloyFurnaceRecipe recipe,
                                      List<ItemStack> inputs,
@@ -336,39 +339,24 @@ public class AlloyFurnaceRecipeManager {
 
         boolean recipeHasItems = !recipe.inputs().isEmpty();
         boolean recipeHasFluids = !recipe.inputFluids().isEmpty();
-        boolean recipeHasMold = !recipe.mold().isEmpty();
+        boolean hasMold = mold != null && !mold.isEmpty();
 
-        if (recipeHasMold && !matchesMold) return 0;
-
+        // 物品：配方要求物品则必须匹配
         if (recipeHasItems && !matchesItems) return 0;
-
+        // 流体：配方要求流体则必须匹配
         if (recipeHasFluids && !matchesFluids) return 0;
+        // 模具：用户提供了模具则必须匹配
+        if (hasMold && !matchesMold) return 0;
 
-        if (recipeHasItems && recipeHasFluids && recipeHasMold
-                && matchesItems && matchesFluids && matchesMold) {
-            return SCORE_ITEM_FLUID_MOLD;
+        if (recipeHasItems && recipeHasFluids) {
+            return matchesMold ? SCORE_ITEM_FLUID_MOLD : SCORE_ITEM_FLUID;
         }
-
-        if (recipeHasItems && recipeHasMold && matchesItems && matchesMold) {
-            return SCORE_ITEM_MOLD;
+        if (recipeHasItems) {
+            return matchesMold ? SCORE_ITEM_MOLD : SCORE_ITEM;
         }
-
-        if (recipeHasFluids && recipeHasMold && matchesFluids && matchesMold) {
-            return SCORE_FLUID_MOLD;
+        if (recipeHasFluids) {
+            return matchesMold ? SCORE_FLUID_MOLD : SCORE_FLUID;
         }
-
-        if (recipeHasItems && recipeHasFluids && matchesItems && matchesFluids) {
-            return SCORE_ITEM_FLUID;
-        }
-
-        if (recipeHasItems && matchesItems) {
-            return SCORE_ITEM;
-        }
-
-        if (recipeHasFluids && matchesFluids) {
-            return SCORE_FLUID;
-        }
-
         return 0;
     }
 
@@ -415,7 +403,7 @@ public class AlloyFurnaceRecipeManager {
                 for (AdvancedAlloyFurnaceRecipe recipe : convertedRecipes) {
                     int score = calculateMatchScore(recipe, inputs, fluidInputs, mold);
                     if (score > 0) {
-                        scoredCandidates.add(new ScoredRecipe(recipe, score));
+                        scoredCandidates.add(new ScoredRecipe(recipe, score, adapter.getPriority()));
                     }
                 }
             }
@@ -426,6 +414,7 @@ public class AlloyFurnaceRecipeManager {
         }
 
         scoredCandidates.sort(Comparator.<ScoredRecipe>comparingInt(s -> s.score).reversed()
+                .thenComparingInt(s -> s.adapterPriority).reversed()
                 .thenComparing(s -> isConvertedRecipe(s.recipe))
                 .thenComparing(s -> s.recipe.inputs().size(), Comparator.reverseOrder())
                 .thenComparing(s -> s.recipe.inputFluids().size(), Comparator.reverseOrder()));
@@ -590,6 +579,9 @@ public class AlloyFurnaceRecipeManager {
         }
     }
 
-    private record ScoredRecipe(AdvancedAlloyFurnaceRecipe recipe, int score) {
+    private record ScoredRecipe(AdvancedAlloyFurnaceRecipe recipe, int score, int adapterPriority) {
+        ScoredRecipe(AdvancedAlloyFurnaceRecipe recipe, int score) {
+            this(recipe, score, 0);
+        }
     }
 }

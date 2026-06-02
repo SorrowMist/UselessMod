@@ -895,6 +895,7 @@ public class AdvancedAlloyFurnaceBlockEntity extends BlockEntity implements Menu
      */
     private int calculateMaterialParallel(AdvancedAlloyFurnaceRecipe recipe) {
         int minParallel = Integer.MAX_VALUE;
+        boolean hasCalculation = false;
         
         // 计算物品输入限制
         for (var countedIng : recipe.inputs()) {
@@ -904,6 +905,8 @@ public class AdvancedAlloyFurnaceBlockEntity extends BlockEntity implements Menu
             
             if (requiredPerParallel <= 0) continue;
             
+            hasCalculation = true;
+
             // 统计所有输入槽中符合条件的物品总数
             for (int i = INPUT_SLOTS_START; i < INPUT_SLOTS_START + INPUT_SLOTS_COUNT; i++) {
                 ItemStack stack = this.itemHandler.getStackInSlot(i);
@@ -913,7 +916,8 @@ public class AdvancedAlloyFurnaceBlockEntity extends BlockEntity implements Menu
             }
             
             // 先除: 可用数量 / 需求数量 = 该材料允许的并行数
-            int possibleParallel = (int) (totalAvailable / requiredPerParallel);
+            long parallelLong = totalAvailable / requiredPerParallel;
+            int possibleParallel = parallelLong > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) parallelLong;
             minParallel = Math.min(minParallel, possibleParallel);
             
             // 如果已经降到0，提前返回
@@ -927,6 +931,8 @@ public class AdvancedAlloyFurnaceBlockEntity extends BlockEntity implements Menu
             
             if (requiredPerParallel <= 0) continue;
             
+            hasCalculation = true;
+
             for (int i = 0; i < FLUID_TANK_COUNT; i++) {
                 FluidStack tankFluid = this.inputFluidTanks[i].getFluid();
                 if (FluidStack.isSameFluidSameComponents(tankFluid, requiredFluid)) {
@@ -935,13 +941,14 @@ public class AdvancedAlloyFurnaceBlockEntity extends BlockEntity implements Menu
             }
             
             // 先除: 可用数量 / 需求数量 = 该流体允许的并行数
-            int possibleParallel = (int) (totalAvailable / requiredPerParallel);
+            long parallelLong = totalAvailable / requiredPerParallel;
+            int possibleParallel = parallelLong > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) parallelLong;
             minParallel = Math.min(minParallel, possibleParallel);
             
             if (minParallel <= 0) return 0;
         }
         
-        return minParallel == Integer.MAX_VALUE ? 1 : minParallel;
+        return hasCalculation ? minParallel : 1;
     }
     
     /**
@@ -1061,7 +1068,8 @@ public class AdvancedAlloyFurnaceBlockEntity extends BlockEntity implements Menu
             } else {
                 // 能量不足以支持目标并行数，根据实际总能量计算可行并行数
                 long totalAvailableEnergy = this.accumulatedEnergy + currentEnergy;
-                actualParallel = (int) (totalAvailableEnergy / recipeEnergy);
+                long parallelLong = totalAvailableEnergy / recipeEnergy;
+                actualParallel = parallelLong > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) parallelLong;
                 actualParallel = Math.max(0, Math.min(actualParallel, targetParallel));
                 
                 // 扣除所有当前能量
@@ -1092,6 +1100,7 @@ public class AdvancedAlloyFurnaceBlockEntity extends BlockEntity implements Menu
      */
     private int calculateMaterialParallelOnly(AdvancedAlloyFurnaceRecipe recipe) {
         int minParallel = Integer.MAX_VALUE;
+        boolean hasCalculation = false;
 
         // 计算物品输入限制
         for (var countedIng : recipe.inputs()) {
@@ -1100,6 +1109,8 @@ public class AdvancedAlloyFurnaceBlockEntity extends BlockEntity implements Menu
             long requiredPerParallel = countedIng.count();
 
             if (requiredPerParallel <= 0) continue;
+
+            hasCalculation = true;
 
             // 统计所有输入槽中符合条件的物品总数
             for (int i = INPUT_SLOTS_START; i < INPUT_SLOTS_START + INPUT_SLOTS_COUNT; i++) {
@@ -1110,7 +1121,8 @@ public class AdvancedAlloyFurnaceBlockEntity extends BlockEntity implements Menu
             }
 
             // 计算该材料允许的并行数
-            int possibleParallel = (int) (totalAvailable / requiredPerParallel);
+            long parallelLong = totalAvailable / requiredPerParallel;
+            int possibleParallel = parallelLong > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) parallelLong;
             minParallel = Math.min(minParallel, possibleParallel);
 
             if (minParallel <= 0) return 0;
@@ -1123,6 +1135,8 @@ public class AdvancedAlloyFurnaceBlockEntity extends BlockEntity implements Menu
 
             if (requiredPerParallel <= 0) continue;
 
+            hasCalculation = true;
+
             for (int i = 0; i < FLUID_TANK_COUNT; i++) {
                 FluidStack tankFluid = this.inputFluidTanks[i].getFluid();
                 if (FluidStack.isSameFluidSameComponents(tankFluid, requiredFluid)) {
@@ -1130,13 +1144,14 @@ public class AdvancedAlloyFurnaceBlockEntity extends BlockEntity implements Menu
                 }
             }
 
-            int possibleParallel = (int) (totalAvailable / requiredPerParallel);
+            long parallelLong = totalAvailable / requiredPerParallel;
+            int possibleParallel = parallelLong > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) parallelLong;
             minParallel = Math.min(minParallel, possibleParallel);
 
             if (minParallel <= 0) return 0;
         }
 
-        return minParallel == Integer.MAX_VALUE ? 1 : minParallel;
+        return hasCalculation ? minParallel : 1;
     }
 
     /**
@@ -1719,35 +1734,48 @@ public class AdvancedAlloyFurnaceBlockEntity extends BlockEntity implements Menu
     }
 
     private void produceRecipeOutputs(AdvancedAlloyFurnaceRecipe recipe, int parallel) {
-        // 限制并行数在合理范围内
         parallel = Math.min(parallel, 1000000);
 
         for (ItemStack output : recipe.outputs()) {
-            // 计算总产出数量
             long totalCountLong = (long) output.getCount() * parallel;
             int totalCount = totalCountLong > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) totalCountLong;
 
-            // 直接插入完整的产出数量（不再拆分成多个小堆叠）
-            if (totalCount > 0 && this.hasEmptyOutputSlotOrSpace(output)) {
-                ItemStack toInsert = output.copy();
-                toInsert.setCount(totalCount);
+            if (totalCount <= 0) continue;
 
-                // 尝试插入
-                this.insertItemStack(toInsert);
+            ItemStack toOutput = output.copy();
+            toOutput.setCount(totalCount);
+
+            long inserted = tryOutputToAE(toOutput);
+            int remaining = totalCount - (int) inserted;
+
+            if (remaining > 0 && this.hasEmptyOutputSlotOrSpace(output)) {
+                ItemStack remainingStack = output.copy();
+                remainingStack.setCount(remaining);
+                this.insertItemStack(remainingStack);
             }
         }
 
         for (FluidStack outputFluid : recipe.outputFluids()) {
-            FluidStack toInsert = outputFluid.copy();
-            // 使用long计算避免溢出
             long totalAmount = (long) outputFluid.getAmount() * parallel;
-            toInsert.setAmount(totalAmount > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) totalAmount);
+            if (totalAmount > Integer.MAX_VALUE) totalAmount = Integer.MAX_VALUE;
+            if (totalAmount <= 0) continue;
 
-            for (int i = 0; i < FLUID_TANK_COUNT && !toInsert.isEmpty(); i++) {
-                FluidStack tankFluid = this.outputFluidTanks[i].getFluid();
-                if (tankFluid.isEmpty() || FluidStack.isSameFluidSameComponents(tankFluid, toInsert)) {
-                    int filled = this.outputFluidTanks[i].fill(toInsert, IFluidHandler.FluidAction.EXECUTE);
-                    toInsert.shrink(filled);
+            FluidStack toOutput = outputFluid.copy();
+            toOutput.setAmount((int) totalAmount);
+
+            long inserted = tryOutputFluidToAE(toOutput);
+            int remaining = (int) (totalAmount - inserted);
+
+            if (remaining > 0) {
+                FluidStack remainingFluid = outputFluid.copy();
+                remainingFluid.setAmount(remaining);
+
+                for (int i = 0; i < FLUID_TANK_COUNT && !remainingFluid.isEmpty(); i++) {
+                    FluidStack tankFluid = this.outputFluidTanks[i].getFluid();
+                    if (tankFluid.isEmpty() || FluidStack.isSameFluidSameComponents(tankFluid, remainingFluid)) {
+                        int filled = this.outputFluidTanks[i].fill(remainingFluid, IFluidHandler.FluidAction.EXECUTE);
+                        remainingFluid.shrink(filled);
+                    }
                 }
             }
         }
@@ -1892,6 +1920,25 @@ public class AdvancedAlloyFurnaceBlockEntity extends BlockEntity implements Menu
      */
     private void autoOutputItemsAndFluids(Level level) {
         if (level.isClientSide) return;
+
+        for (int slot = OUTPUT_SLOTS_START; slot < OUTPUT_SLOTS_START + OUTPUT_SLOTS_COUNT; slot++) {
+            ItemStack stack = this.itemHandler.getStackInSlot(slot);
+            if (stack.isEmpty()) continue;
+            long inserted = tryOutputToAE(stack);
+            if (inserted > 0) {
+                stack.shrink((int) inserted);
+                this.setChanged();
+            }
+        }
+
+        for (int i = 0; i < FLUID_TANK_COUNT; i++) {
+            FluidStack fluid = this.outputFluidTanks[i].getFluid();
+            if (fluid.isEmpty()) continue;
+            long inserted = tryOutputFluidToAE(fluid);
+            if (inserted > 0) {
+                this.outputFluidTanks[i].drain((int) inserted, IFluidHandler.FluidAction.EXECUTE);
+            }
+        }
 
         // 如果扳手指定了方向，只尝试该方向（最高优先级）
         if (this.cachedOutputDirection != null) {
@@ -2629,13 +2676,18 @@ public class AdvancedAlloyFurnaceBlockEntity extends BlockEntity implements Menu
         }
 
         /**
-         * 使用本体模具/催化剂统一查找配方
+         * 使用本体模具/催化剂统一查找配方，与机器本体匹配逻辑一致
          */
         private AdvancedAlloyFurnaceRecipe findTaskRecipe() {
             if (level == null) return null;
 
             List<ItemStack> tempInputs = new ArrayList<>(taskInputItems);
             List<FluidStack> tempFluids = new ArrayList<>(taskInputFluids);
+
+            ItemStack catalystStack = AdvancedAlloyFurnaceBlockEntity.this.itemHandler.getStackInSlot(CATALYST_SLOT);
+            if (!catalystStack.isEmpty()) {
+                tempInputs.add(catalystStack.copy());
+            }
 
             ItemStack moldStack = AdvancedAlloyFurnaceBlockEntity.this.itemHandler.getStackInSlot(MOLD_SLOT);
 
@@ -2672,23 +2724,40 @@ public class AdvancedAlloyFurnaceBlockEntity extends BlockEntity implements Menu
                 return false;
             }
 
-            if (pattern.getOutputs().isEmpty() || recipe.outputs().isEmpty()) {
+            if (pattern.getOutputs().isEmpty()) {
                 returnMaterialsToAE();
                 return false;
             }
 
-            var patternOutput = pattern.getOutputs().get(0);
-            ItemStack patternOutputStack = null;
-
-            if (patternOutput.what() instanceof appeng.api.stacks.AEItemKey itemKey) {
-                patternOutputStack = itemKey.toStack((int) patternOutput.amount());
-            }
-
-            ItemStack recipeOutput = recipe.outputs().get(0);
-
-            if (patternOutputStack != null && !ItemStack.isSameItem(patternOutputStack, recipeOutput)) {
+            if (recipe.outputs().isEmpty() && recipe.outputFluids().isEmpty()) {
                 returnMaterialsToAE();
                 return false;
+            }
+
+            for (var patternOutput : pattern.getOutputs()) {
+                boolean matched = false;
+
+                if (patternOutput.what() instanceof AEItemKey itemKey) {
+                    ItemStack patternStack = itemKey.toStack((int) patternOutput.amount());
+                    for (ItemStack recipeOutput : recipe.outputs()) {
+                        if (ItemStack.isSameItem(patternStack, recipeOutput)) {
+                            matched = true;
+                            break;
+                        }
+                    }
+                } else if (patternOutput.what() instanceof AEFluidKey fluidKey) {
+                    for (FluidStack recipeFluid : recipe.outputFluids()) {
+                        if (fluidKey.getFluid().isSame(recipeFluid.getFluid())) {
+                            matched = true;
+                            break;
+                        }
+                    }
+                }
+
+                if (!matched) {
+                    returnMaterialsToAE();
+                    return false;
+                }
             }
 
             return true;

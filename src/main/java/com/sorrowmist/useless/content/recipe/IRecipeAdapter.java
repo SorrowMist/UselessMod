@@ -5,6 +5,7 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.crafting.Recipe;
 import net.minecraft.world.item.crafting.RecipeHolder;
 import net.minecraft.world.level.Level;
+import net.neoforged.neoforge.fluids.FluidStack;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
@@ -83,6 +84,37 @@ public interface IRecipeAdapter<T extends Recipe<?>> {
     @Nullable
     default RecipeHolder<T> findMatchingRecipe(Level level, List<ItemStack> inputs, @Nullable ItemStack mold) {
         return findMatchingRecipe(level, inputs);
+    }
+
+    /**
+     * 查找并返回匹配的配方持有者（带流体输入）
+     * <p>
+     * 默认实现忽略流体，调用无流体版本的匹配方法。
+     *
+     * @param level       世界
+     * @param inputs      输入物品列表
+     * @param fluidInputs 输入流体列表
+     * @return 匹配的配方持有者，如果没有则返回 null
+     */
+    @Nullable
+    default RecipeHolder<T> findMatchingRecipeWithFluids(Level level, List<ItemStack> inputs, List<FluidStack> fluidInputs) {
+        return findMatchingRecipe(level, inputs);
+    }
+
+    /**
+     * 查找并返回匹配的配方持有者（带流体输入和模具信息）
+     * <p>
+     * 默认实现依次调用带模具的版本。
+     *
+     * @param level       世界
+     * @param inputs      输入物品列表
+     * @param fluidInputs 输入流体列表
+     * @param mold        当前模具（可为空）
+     * @return 匹配的配方持有者，如果没有则返回 null
+     */
+    @Nullable
+    default RecipeHolder<T> findMatchingRecipeWithFluidsAndMold(Level level, List<ItemStack> inputs, List<FluidStack> fluidInputs, @Nullable ItemStack mold) {
+        return findMatchingRecipeWithFluids(level, inputs, fluidInputs);
     }
 
     /**

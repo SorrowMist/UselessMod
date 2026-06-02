@@ -115,6 +115,20 @@ public class CrystalCatalyzerRecipeAdapter implements IRecipeAdapter<CrystalCata
     @Nullable
     @SuppressWarnings("unchecked")
     public RecipeHolder<CrystalCatalyzerRecipe> findMatchingRecipe(Level level, List<ItemStack> inputs, @Nullable ItemStack mold) {
+        return findMatchingRecipeWithFluidsAndMold(level, inputs, List.of(), mold);
+    }
+
+    @Override
+    @Nullable
+    @SuppressWarnings("unchecked")
+    public RecipeHolder<CrystalCatalyzerRecipe> findMatchingRecipeWithFluids(Level level, List<ItemStack> inputs, List<FluidStack> fluidInputs) {
+        return findMatchingRecipeWithFluidsAndMold(level, inputs, fluidInputs, null);
+    }
+
+    @Override
+    @Nullable
+    @SuppressWarnings("unchecked")
+    public RecipeHolder<CrystalCatalyzerRecipe> findMatchingRecipeWithFluidsAndMold(Level level, List<ItemStack> inputs, List<FluidStack> fluidInputs, @Nullable ItemStack mold) {
         if (level == null) {
             return null;
         }
@@ -136,9 +150,25 @@ public class CrystalCatalyzerRecipeAdapter implements IRecipeAdapter<CrystalCata
             Optional<Ingredient> catalyst = recipe.catalyst();
             if (catalyst.isEmpty()) continue;
 
-            if (catalyst.get().test(mold)) {
-                return holder;
+            // 检查模具（催化剂）匹配
+            if (!catalyst.get().test(mold)) {
+                continue;
             }
+
+            // 检查流体输入匹配（水晶催化器配方固定需要水）
+            boolean foundWater = false;
+            for (FluidStack input : fluidInputs) {
+                if (input.getFluid() == net.minecraft.world.level.material.Fluids.WATER && input.getAmount() >= 1000) {
+                    foundWater = true;
+                    break;
+                }
+            }
+            if (!foundWater && !fluidInputs.isEmpty()) {
+                // 如果用户提供了流体，但不是水，跳过
+                continue;
+            }
+
+            return holder;
         }
 
         return null;

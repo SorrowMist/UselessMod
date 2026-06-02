@@ -138,7 +138,21 @@ public class OverloadProcessingRecipeAdapter implements IRecipeAdapter<OverloadP
     @Nullable
     @SuppressWarnings("unchecked")
     public RecipeHolder<OverloadProcessingRecipe> findMatchingRecipe(Level level, List<ItemStack> inputs, @Nullable ItemStack mold) {
-        if (level == null || inputs.isEmpty()) {
+        return findMatchingRecipeWithFluidsAndMold(level, inputs, List.of(), mold);
+    }
+
+    @Override
+    @Nullable
+    @SuppressWarnings("unchecked")
+    public RecipeHolder<OverloadProcessingRecipe> findMatchingRecipeWithFluids(Level level, List<ItemStack> inputs, List<FluidStack> fluidInputs) {
+        return findMatchingRecipeWithFluidsAndMold(level, inputs, fluidInputs, null);
+    }
+
+    @Override
+    @Nullable
+    @SuppressWarnings("unchecked")
+    public RecipeHolder<OverloadProcessingRecipe> findMatchingRecipeWithFluidsAndMold(Level level, List<ItemStack> inputs, List<FluidStack> fluidInputs, @Nullable ItemStack mold) {
+        if (level == null) {
             return null;
         }
 
@@ -158,17 +172,38 @@ public class OverloadProcessingRecipeAdapter implements IRecipeAdapter<OverloadP
             OverloadProcessingRecipe recipe = holder.value();
 
             List<OverloadProcessingIngredient> recipeInputs = recipe.itemInputs();
+            FluidStack recipeFluidInput = recipe.fluidInput();
 
-            if (recipeInputs.isEmpty()) continue;
-
-            Map<Ingredient, Long> requiredCounts = new LinkedHashMap<>();
-            for (OverloadProcessingIngredient input : recipeInputs) {
-                mergeIngredient(requiredCounts, input.ingredient(), input.count());
+            // 检查流体输入匹配
+            if (!recipeFluidInput.isEmpty()) {
+                boolean foundFluid = false;
+                for (FluidStack input : fluidInputs) {
+                    if (FluidStack.isSameFluidSameComponents(input, recipeFluidInput) && input.getAmount() >= recipeFluidInput.getAmount()) {
+                        foundFluid = true;
+                        break;
+                    }
+                }
+                if (!foundFluid) {
+                    continue;
+                }
             }
 
-            if (matchesCountedIngredients(inputs, requiredCounts)) {
+            // 检查物品输入匹配
+            if (!recipeInputs.isEmpty()) {
+                Map<Ingredient, Long> requiredCounts = new LinkedHashMap<>();
+                for (OverloadProcessingIngredient input : recipeInputs) {
+                    mergeIngredient(requiredCounts, input.ingredient(), input.count());
+                }
+
+                if (!matchesCountedIngredients(inputs, requiredCounts)) {
+                    continue;
+                }
+            } else if (inputs.isEmpty()) {
+                // 没有物品输入，且用户也没有放物品
                 return holder;
             }
+
+            return holder;
         }
 
         return null;

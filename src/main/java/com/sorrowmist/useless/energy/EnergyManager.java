@@ -2,12 +2,15 @@ package com.sorrowmist.useless.energy;
 
 import net.minecraft.nbt.CompoundTag;
 
+import java.util.concurrent.atomic.AtomicInteger;
+
 /**
  * 能源管理器实现类 - 提供完整的能源管理功能
+ * 使用 AtomicInteger 实现无锁线程安全
  */
 public class EnergyManager implements IEnergyManager {
 
-    private int energy;
+    private final AtomicInteger energy = new AtomicInteger(0);
     private int capacity;
     private int maxReceive;
     private int maxExtract;
@@ -29,7 +32,7 @@ public class EnergyManager implements IEnergyManager {
         this.capacity = Math.max(0, capacity);
         this.maxReceive = Math.max(0, Math.min(capacity, maxReceive));
         this.maxExtract = Math.max(0, Math.min(capacity, maxExtract));
-        this.energy = Math.max(0, Math.min(initialEnergy, this.capacity));
+        this.energy.set(Math.max(0, Math.min(initialEnergy, this.capacity)));
     }
 
     /**
@@ -45,9 +48,10 @@ public class EnergyManager implements IEnergyManager {
             return 0;
         }
 
-        int energyReceived = Math.min(this.capacity - this.energy, Math.min(this.maxReceive, maxReceive));
+        int currentEnergy = this.energy.get();
+        int energyReceived = Math.min(this.capacity - currentEnergy, Math.min(this.maxReceive, maxReceive));
         if (!simulate && energyReceived > 0) {
-            this.energy += energyReceived;
+            this.energy.addAndGet(energyReceived);
             this.notifyChange();
         }
 
@@ -60,9 +64,10 @@ public class EnergyManager implements IEnergyManager {
             return 0;
         }
 
-        int energyExtracted = Math.min(this.energy, Math.min(this.maxExtract, maxExtract));
+        int currentEnergy = this.energy.get();
+        int energyExtracted = Math.min(currentEnergy, Math.min(this.maxExtract, maxExtract));
         if (!simulate && energyExtracted > 0) {
-            this.energy -= energyExtracted;
+            this.energy.addAndGet(-energyExtracted);
             this.notifyChange();
         }
 
@@ -71,7 +76,7 @@ public class EnergyManager implements IEnergyManager {
 
     @Override
     public int getEnergyStored() {
-        return this.energy;
+        return this.energy.get();
     }
 
     @Override
@@ -94,8 +99,9 @@ public class EnergyManager implements IEnergyManager {
         this.capacity = Math.max(0, capacity);
         this.maxReceive = Math.min(this.maxReceive, capacity);
         this.maxExtract = Math.min(this.maxExtract, capacity);
-        if (this.energy > capacity) {
-            this.energy = capacity;
+        int currentEnergy = this.energy.get();
+        if (currentEnergy > capacity) {
+            this.energy.set(capacity);
             this.notifyChange();
         }
     }
@@ -112,29 +118,38 @@ public class EnergyManager implements IEnergyManager {
 
     @Override
     public void modifyEnergy(int delta) {
-        this.setEnergyStored(this.energy + delta);
+        this.setEnergyStored(this.energy.get() + delta);
     }
 
     @Override
     public boolean canWork(int energyRequired) {
-        return this.energy >= energyRequired;
+        return this.energy.get() >= energyRequired;
     }
 
     @Override
-    public synchronized boolean tryConsumeEnergy(int amount) {
+    public boolean tryConsumeEnergy(int amount) {
         if (amount <= 0) return false;
-        if (this.energy >= amount) {
-            this.energy = Math.max(0, this.energy - amount);
-            this.notifyChange();
-            return true;
+
+        // 使用 CAS 操作实现无锁线程安全
+        while (true) {
+            int current = this.energy.get();
+            if (current < amount) {
+                return false;
+            }
+            int next = Math.max(0, current - amount);
+            if (this.energy.compareAndSet(current, next)) {
+                // CAS 成功，在锁外调用 notifyChange 避免死锁
+                this.notifyChange();
+                return true;
+            }
+            // CAS 失败，重试
         }
-        return false;
     }
 
     @Override
     public CompoundTag serializeNBT() {
         CompoundTag tag = new CompoundTag();
-        tag.putInt("Energy", this.energy);
+        tag.putInt("Energy", this.energy.get());
         tag.putInt("Capacity", this.capacity);
         tag.putInt("MaxReceive", this.maxReceive);
         tag.putInt("MaxExtract", this.maxExtract);
@@ -144,7 +159,7 @@ public class EnergyManager implements IEnergyManager {
     @Override
     public void deserializeNBT(CompoundTag tag) {
         if (tag.contains("Energy")) {
-            this.energy = tag.getInt("Energy");
+            this.energy.set(tag.getInt("Energy"));
         }
         if (tag.contains("Capacity")) {
             this.capacity = tag.getInt("Capacity");
@@ -170,9 +185,10 @@ public class EnergyManager implements IEnergyManager {
 
     @Override
     public void setEnergyStored(int energy) {
-        int oldEnergy = this.energy;
-        this.energy = Math.max(0, Math.min(energy, this.capacity));
-        if (oldEnergy != this.energy) {
+        int oldEnergy = this.energy.get();
+        int newEnergy = Math.max(0, Math.min(energy, this.capacity));
+        this.energy.set(newEnergy);
+        if (oldEnergy != newEnergy) {
             this.notifyChange();
         }
     }

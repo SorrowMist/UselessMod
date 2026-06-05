@@ -48,5 +48,6 @@ public interface CraftingTaskContext {
     
     // 锁和流体罐
     ReentrantLock getCraftingLock();
+    FluidTank[] getInputFluidTanks();
     FluidTank[] getOutputFluidTanks();
 }

@@ -2659,6 +2659,11 @@ public class AdvancedAlloyFurnaceBlockEntity extends BlockEntity implements Menu
     }
 
     @Override
+    public FluidTank[] getInputFluidTanks() {
+        return inputFluidTanks;
+    }
+
+    @Override
     public FluidTank[] getOutputFluidTanks() {
         return outputFluidTanks;
     }

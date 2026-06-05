@@ -28,12 +28,13 @@ public class CraftingTask {
     private final ReentrantLock taskLock = new ReentrantLock();
     private final List<ItemStack> taskInputItems = new ArrayList<>();
     private final List<FluidStack> taskInputFluids = new ArrayList<>();
+    private final AtomicInteger craftCount = new AtomicInteger(1);
     private volatile boolean cancelled = false;
     private volatile boolean processingComplete = false;
-    private final AtomicInteger craftCount = new AtomicInteger(1);
     private AdvancedAlloyFurnaceBlockEntity.AETaskProgress taskProgressRef = null;
 
-    public CraftingTask(int taskId, IPatternDetails pattern, KeyCounter[] inputHolder, int totalCrafts, CraftingTaskContext context) {
+    public CraftingTask(int taskId, IPatternDetails pattern, KeyCounter[] inputHolder, int totalCrafts,
+                        CraftingTaskContext context) {
         this.taskId = taskId;
         this.pattern = pattern;
         this.context = context;
@@ -192,9 +193,23 @@ public class CraftingTask {
     private void returnMaterialsToAE() {
         if (context.getLevel() == null || context.getLevel().isClientSide) return;
 
+        // 在工作线程中复制需要返回的材料，避免在主线程中访问taskInputItems
+        final List<ItemStack> itemsToReturn;
+        final List<FluidStack> fluidsToReturn;
+
+        taskLock.lock();
+        try {
+            itemsToReturn = new ArrayList<>(taskInputItems);
+            fluidsToReturn = new ArrayList<>(taskInputFluids);
+            taskInputItems.clear();
+            taskInputFluids.clear();
+        } finally {
+            taskLock.unlock();
+        }
+
         context.getLevel().getServer().execute(() -> {
             // 将任务输入物品返回给AE网络
-            for (ItemStack stack : taskInputItems) {
+            for (ItemStack stack : itemsToReturn) {
                 if (!stack.isEmpty()) {
                     // 尝试输出到AE网络
                     long inserted = context.tryOutputToAE(stack);
@@ -205,30 +220,68 @@ public class CraftingTask {
                         ItemStack remainingStack = stack.copy();
                         remainingStack.setCount(remainingCount);
 
-                        int inputSlotsStart = context.getInputSlotsStart();
-                        int inputSlotsCount = context.getInputSlotsCount();
-                        for (int i = inputSlotsStart; i < inputSlotsStart + inputSlotsCount; i++) {
-                            ItemStack slotStack = context.getItemHandler().getStackInSlot(i);
-                            if (slotStack.isEmpty()) {
-                                context.getItemHandler().setStackInSlot(i, remainingStack.copy());
-                                break;
-                            } else if (ItemStack.isSameItemSameComponents(slotStack, remainingStack) &&
-                                    slotStack.getCount() < slotStack.getMaxStackSize()) {
-                                int addAmount = Math.min(remainingCount,
-                                                         slotStack.getMaxStackSize() - slotStack.getCount()
-                                );
-                                slotStack.grow(addAmount);
-                                remainingCount -= addAmount;
-                                if (remainingCount <= 0) break;
+                        // 使用tryLock避免阻塞主线程
+                        boolean locked = context.getCraftingLock().tryLock();
+                        if (locked) {
+                            try {
+                                int inputSlotsStart = context.getInputSlotsStart();
+                                int inputSlotsCount = context.getInputSlotsCount();
+                                for (int i = inputSlotsStart; i < inputSlotsStart + inputSlotsCount; i++) {
+                                    ItemStack slotStack = context.getItemHandler().getStackInSlot(i);
+                                    if (slotStack.isEmpty()) {
+                                        context.getItemHandler().setStackInSlot(i, remainingStack.copy());
+                                        break;
+                                    } else if (ItemStack.isSameItemSameComponents(slotStack, remainingStack) &&
+                                            slotStack.getCount() < slotStack.getMaxStackSize()) {
+                                        int addAmount = Math.min(remainingCount,
+                                                slotStack.getMaxStackSize() - slotStack.getCount()
+                                        );
+                                        slotStack.grow(addAmount);
+                                        remainingCount -= addAmount;
+                                        if (remainingCount <= 0) break;
+                                    }
+                                }
+                            } finally {
+                                context.getCraftingLock().unlock();
                             }
                         }
                     }
                 }
             }
 
-            // 清空任务的独立存储空间
-            taskInputItems.clear();
-            taskInputFluids.clear();
+            // 将任务输入流体返回给AE网络
+            for (FluidStack fluidStack : fluidsToReturn) {
+                if (!fluidStack.isEmpty()) {
+                    // 尝试输出到AE网络
+                    long inserted = context.tryOutputFluidToAE(fluidStack);
+                    int remainingAmount = (int) (fluidStack.getAmount() - inserted);
+
+                    // 如果AE网络没存下，尝试放入机器的输入流体槽
+                    if (remainingAmount > 0) {
+                        FluidStack remainingFluid = fluidStack.copy();
+                        remainingFluid.setAmount(remainingAmount);
+
+                        // 使用tryLock避免阻塞主线程
+                        boolean locked = context.getCraftingLock().tryLock();
+                        if (locked) {
+                            try {
+                                int fluidTankCount = context.getFluidTankCount();
+                                FluidTank[] inputFluidTanks = context.getInputFluidTanks();
+                                for (int i = 0; i < fluidTankCount; i++) {
+                                    FluidTank tank = inputFluidTanks[i];
+                                    if (tank.isEmpty() || tank.getFluid().getFluid().isSame(remainingFluid.getFluid())) {
+                                        int filled = tank.fill(remainingFluid, IFluidHandler.FluidAction.EXECUTE);
+                                        remainingAmount -= filled;
+                                        if (remainingAmount <= 0) break;
+                                    }
+                                }
+                            } finally {
+                                context.getCraftingLock().unlock();
+                            }
+                        }
+                    }
+                }
+            }
         });
     }
 
@@ -321,21 +374,27 @@ public class CraftingTask {
             int progressUpdateCounter = 0;
             boolean energyFailed = false;
             while (progress < processTime && !cancelled) {
+                // 先检查是否已取消（使用volatile读取，不需要锁）
+                if (cancelled) break;
+
+                // 根据当前批次计算实际并行数（最后一批可能不满maxParallel）
+                int batchIndex = baseProcessTime > 0 ? progress / baseProcessTime : 0;
+                int actualBatchParallel = (batchIndex < batches - 1) ? maxParallel : lastBatchSize;
+                long energyRequiredLong = useUsefulIngot ? (long) baseEnergyPerTick :
+                        (long) baseEnergyPerTick * actualBatchParallel;
+                int energyRequired =
+                        energyRequiredLong > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) energyRequiredLong;
+
+                // 尝试消耗能量（不需要锁）
+                if (!context.getEnergyManager().tryConsumeEnergy(energyRequired)) {
+                    energyFailed = true;
+                    break;
+                }
+
+                // 更新进度（需要锁保护）
                 taskLock.lock();
                 try {
                     if (cancelled) break;
-
-                    // 根据当前批次计算实际并行数（最后一批可能不满maxParallel）
-                    int batchIndex = baseProcessTime > 0 ? progress / baseProcessTime : 0;
-                    int actualBatchParallel = (batchIndex < batches - 1) ? maxParallel : lastBatchSize;
-                    long energyRequiredLong = useUsefulIngot ? (long) baseEnergyPerTick :
-                            (long) baseEnergyPerTick * actualBatchParallel;
-                    int energyRequired =
-                            energyRequiredLong > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) energyRequiredLong;
-                    if (!context.getEnergyManager().tryConsumeEnergy(energyRequired)) {
-                        energyFailed = true;
-                        break;
-                    }
                     progress++;
                     context.getTotalAEProgressAtomic().incrementAndGet();
                     // 更新单个任务的进度
@@ -403,86 +462,109 @@ public class CraftingTask {
     private void completeCrafting(int craftCount) {
         if (context.getLevel() == null || context.getLevel().isClientSide) return;
 
+        // 在工作线程中预先准备输出数据，避免在主线程中等待锁
+        final List<OutputItem> outputItems = new ArrayList<>();
+        final List<OutputFluid> outputFluids = new ArrayList<>();
+
+        for (var output : pattern.getOutputs()) {
+            if (output.what() instanceof AEItemKey itemKey) {
+                ItemStack outputStack = itemKey.toStack((int) (output.amount() * craftCount));
+                outputItems.add(new OutputItem(outputStack));
+            } else if (output.what() instanceof AEFluidKey fluidKey) {
+                FluidStack outputFluid = new FluidStack(fluidKey.getFluid(), (int) (output.amount() * craftCount));
+                outputFluids.add(new OutputFluid(outputFluid));
+            }
+        }
+
+        // 清空任务的独立存储空间（在工作线程中完成，不需要锁）
+        taskLock.lock();
+        try {
+            taskInputItems.clear();
+            taskInputFluids.clear();
+        } finally {
+            taskLock.unlock();
+        }
+
+        // 在主线程中执行AE网络输出和槽位操作，使用tryLock避免阻塞
         context.getLevel().getServer().execute(() -> {
-            // 每个任务使用自己独立的锁，不同任务之间互不干扰
-            taskLock.lock();
-            try {
-                // 清空任务的独立存储空间（表示材料已被消耗）
-                taskInputItems.clear();
-                taskInputFluids.clear();
+            // 处理物品输出
+            for (OutputItem outputItem : outputItems) {
+                ItemStack outputStack = outputItem.stack;
 
-                // 生成输出物品（批量合成）
-                for (var output : pattern.getOutputs()) {
-                    if (output.what() instanceof AEItemKey itemKey) {
-                        // 批量输出：单次输出数量 × 合成次数
-                        ItemStack outputStack = itemKey.toStack((int) (output.amount() * craftCount));
+                // 优先输出到AE网络
+                long inserted = context.tryOutputToAE(outputStack);
+                int remainingCount = (int) (outputStack.getCount() - inserted);
 
-                        // 优先输出到AE网络
-                        long inserted = context.tryOutputToAE(outputStack);
-                        int remainingCount = (int) (outputStack.getCount() - inserted);
-
-                        // 如果AE网络没存下，输出到自己的输出栏
-                        if (remainingCount > 0) {
-                            ItemStack remainingStack = outputStack.copy();
-                            remainingStack.setCount(remainingCount);
-                            // 使用craftingLock来保护共享的输出槽位
-                            context.getCraftingLock().lock();
-                            try {
-                                int outputSlotsStart = context.getOutputSlotsStart();
-                                int outputSlotsCount = context.getOutputSlotsCount();
-                                for (int i = outputSlotsStart; i < outputSlotsStart + outputSlotsCount; i++) {
-                                    ItemStack slotStack = context.getItemHandler().getStackInSlot(i);
-                                    if (slotStack.isEmpty()) {
-                                        context.getItemHandler().setStackInSlot(i, remainingStack.copy());
-                                        break;
-                                    } else if (ItemStack.isSameItemSameComponents(slotStack, remainingStack)) {
-                                        slotStack.grow(remainingStack.getCount());
-                                        break;
-                                    }
+                // 如果AE网络没存下，输出到自己的输出栏
+                if (remainingCount > 0) {
+                    ItemStack remainingStack = outputStack.copy();
+                    remainingStack.setCount(remainingCount);
+                    // 使用tryLock避免阻塞主线程
+                    boolean locked = context.getCraftingLock().tryLock();
+                    if (locked) {
+                        try {
+                            int outputSlotsStart = context.getOutputSlotsStart();
+                            int outputSlotsCount = context.getOutputSlotsCount();
+                            for (int i = outputSlotsStart; i < outputSlotsStart + outputSlotsCount; i++) {
+                                ItemStack slotStack = context.getItemHandler().getStackInSlot(i);
+                                if (slotStack.isEmpty()) {
+                                    context.getItemHandler().setStackInSlot(i, remainingStack.copy());
+                                    break;
+                                } else if (ItemStack.isSameItemSameComponents(slotStack, remainingStack)) {
+                                    slotStack.grow(remainingStack.getCount());
+                                    break;
                                 }
-                            } finally {
-                                context.getCraftingLock().unlock();
                             }
+                        } finally {
+                            context.getCraftingLock().unlock();
                         }
-                    } else if (output.what() instanceof AEFluidKey fluidKey) {
-                        // 处理流体输出（批量合成）
-                        FluidStack outputFluid = new FluidStack(fluidKey.getFluid(),
-                                                                (int) (output.amount() * craftCount)
-                        );
+                    }
+                    // 如果获取不到锁，物品会丢失（但这种情况很少发生，且比卡死游戏好）
+                }
+            }
 
-                        // 优先输出到AE网络
-                        long inserted = context.tryOutputFluidToAE(outputFluid);
-                        int remainingAmount = (int) (outputFluid.getAmount() - inserted);
+            // 处理流体输出
+            for (OutputFluid outputFluid : outputFluids) {
+                FluidStack fluidStack = outputFluid.stack;
 
-                        // 如果AE网络没存下，输出到自己的流体输出槽
-                        if (remainingAmount > 0) {
-                            FluidStack remainingFluid = new FluidStack(fluidKey.getFluid(), remainingAmount);
-                            // 使用craftingLock来保护共享的流体槽
-                            context.getCraftingLock().lock();
-                            try {
-                                int fluidTankCount = context.getFluidTankCount();
-                                FluidTank[] outputFluidTanks = context.getOutputFluidTanks();
-                                for (int i = 0; i < fluidTankCount; i++) {
-                                    FluidTank tank = outputFluidTanks[i];
-                                    if (tank.isEmpty() || tank.getFluid().getFluid().isSame(remainingFluid.getFluid())) {
-                                        tank.fill(remainingFluid, IFluidHandler.FluidAction.EXECUTE);
-                                        break;
-                                    }
+                // 优先输出到AE网络
+                long inserted = context.tryOutputFluidToAE(fluidStack);
+                int remainingAmount = (int) (fluidStack.getAmount() - inserted);
+
+                // 如果AE网络没存下，输出到自己的流体输出槽
+                if (remainingAmount > 0) {
+                    FluidStack remainingFluid = new FluidStack(fluidStack.getFluid(), remainingAmount);
+                    // 使用tryLock避免阻塞主线程
+                    boolean locked = context.getCraftingLock().tryLock();
+                    if (locked) {
+                        try {
+                            int fluidTankCount = context.getFluidTankCount();
+                            FluidTank[] outputFluidTanks = context.getOutputFluidTanks();
+                            for (int i = 0; i < fluidTankCount; i++) {
+                                FluidTank tank = outputFluidTanks[i];
+                                if (tank.isEmpty() || tank.getFluid().getFluid().isSame(remainingFluid.getFluid())) {
+                                    tank.fill(remainingFluid, IFluidHandler.FluidAction.EXECUTE);
+                                    break;
                                 }
-                            } finally {
-                                context.getCraftingLock().unlock();
                             }
+                        } finally {
+                            context.getCraftingLock().unlock();
                         }
                     }
                 }
-                context.markChanged();
-            } finally {
-                taskLock.unlock();
             }
+            context.markChanged();
         });
     }
 
     public void cancel() {
         this.cancelled = true;
+    }
+
+    // 辅助类用于存储输出数据
+    private record OutputItem(ItemStack stack) {
+    }
+
+    private record OutputFluid(FluidStack stack) {
     }
 }

@@ -3,6 +3,8 @@ package com.sorrowmist.useless.content.blockentities;
 import appeng.api.config.Actionable;
 import appeng.api.crafting.IPatternDetails;
 import appeng.api.crafting.PatternDetailsHelper;
+import appeng.api.implementations.blockentities.PatternContainerGroup;
+import appeng.api.inventories.InternalInventory;
 import appeng.api.networking.GridFlags;
 import appeng.api.networking.GridHelper;
 import appeng.api.networking.IGrid;
@@ -20,6 +22,7 @@ import appeng.api.stacks.AEKey;
 import appeng.api.stacks.KeyCounter;
 import appeng.api.storage.MEStorage;
 import appeng.api.util.AECableType;
+import appeng.helpers.patternprovider.PatternContainer;
 import com.mojang.serialization.DataResult;
 import com.sorrowmist.useless.content.blocks.AdvancedAlloyFurnaceBlock;
 import com.sorrowmist.useless.content.menus.AdvancedAlloyFurnaceMenu;
@@ -84,7 +87,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.ReentrantLock;
 
-public class AdvancedAlloyFurnaceBlockEntity extends BlockEntity implements MenuProvider, ICraftingProvider, IInWorldGridNodeHost, IGridNodeListener<AdvancedAlloyFurnaceBlockEntity>, IActionHost, CraftingTaskContext {
+public class AdvancedAlloyFurnaceBlockEntity extends BlockEntity implements MenuProvider, ICraftingProvider, IInWorldGridNodeHost, IGridNodeListener<AdvancedAlloyFurnaceBlockEntity>, IActionHost, CraftingTaskContext, PatternContainer {
 
     public static final int INPUT_SLOTS_START = 0;
     public static final int INPUT_SLOTS_COUNT = 9;
@@ -2681,6 +2684,83 @@ public class AdvancedAlloyFurnaceBlockEntity extends BlockEntity implements Menu
     @Override
     public AtomicInteger getTotalAEProgressAtomic() {
         return totalAEProgress;
+    }
+
+    // ==================== PatternContainer 接口实现 ====================
+
+    /**
+     * 样板槽位的 InternalInventory 适配器
+     * 将样板槽位包装成 AE2 的 InternalInventory 接口，用于样板管理终端访问
+     */
+    private final InternalInventory patternInventory = new InternalInventory() {
+        @Override
+        public int size() {
+            return PATTERN_SLOTS_COUNT;
+        }
+
+        @Override
+        public ItemStack getStackInSlot(int slotIndex) {
+            if (slotIndex < 0 || slotIndex >= PATTERN_SLOTS_COUNT) {
+                return ItemStack.EMPTY;
+            }
+            return itemHandler.getStackInSlot(PATTERN_SLOTS_START + slotIndex);
+        }
+
+        @Override
+        public void setItemDirect(int slotIndex, ItemStack stack) {
+            if (slotIndex < 0 || slotIndex >= PATTERN_SLOTS_COUNT) {
+                return;
+            }
+            itemHandler.setStackInSlot(PATTERN_SLOTS_START + slotIndex, stack);
+        }
+
+        @Override
+        public boolean isItemValid(int slot, ItemStack stack) {
+            // 只允许编码样板
+            return !stack.isEmpty() && PatternDetailsHelper.decodePattern(stack, level) != null;
+        }
+
+        @Override
+        public int getSlotLimit(int slot) {
+            return 1; // 样板槽位只能放一个物品
+        }
+    };
+
+    @Override
+    @Nullable
+    public IGrid getGrid() {
+        return mainNode.getGrid();
+    }
+
+    @Override
+    public boolean isVisibleInTerminal() {
+        // 始终在样板管理终端中显示
+        return true;
+    }
+
+    @Override
+    public InternalInventory getTerminalPatternInventory() {
+        return patternInventory;
+    }
+
+    @Override
+    public long getTerminalSortOrder() {
+        // 按位置排序
+        return (long) worldPosition.getZ() << 24 ^ (long) worldPosition.getX() << 8 ^ worldPosition.getY();
+    }
+
+    @Override
+    public PatternContainerGroup getTerminalGroup() {
+        // 使用方块本身的图标和名称
+        var blockState = getBlockState();
+        var block = blockState.getBlock();
+        var itemStack = new ItemStack(block);
+        var icon = AEItemKey.of(itemStack);
+        
+        // 使用 MenuProvider 的 getDisplayName() 方法
+        Component name = this.getDisplayName();
+        
+        return new PatternContainerGroup(icon, name, List.of());
     }
 
 }

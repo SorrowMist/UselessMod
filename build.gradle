@@ -228,8 +228,9 @@ dependencies {
     //geckolib
     runtimeOnly "curse.maven:geckolib-388172:7009924"
 
-    runtimeOnly "curse.maven:dyson-cube-project-1345066:8082907"
-    runtimeOnly "curse.maven:titanium-287342:6443608"
+    // 戴森立方计划
+//    runtimeOnly "curse.maven:dyson-cube-project-1345066:8082907"
+//    runtimeOnly "curse.maven:titanium-287342:6443608"
 
     //ftbteams
     runtimeOnly "curse.maven:ftb-teams-forge-404468:6930910"

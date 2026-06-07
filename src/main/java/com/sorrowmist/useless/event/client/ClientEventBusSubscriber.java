@@ -1,4 +1,4 @@
-package com.sorrowmist.useless.client.event;
+package com.sorrowmist.useless.event.client;
 
 import com.sorrowmist.useless.UselessMod;
 import com.sorrowmist.useless.api.enums.tool.EnchantMode;

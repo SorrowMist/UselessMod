@@ -1,6 +1,7 @@
 package com.sorrowmist.useless.inventory.slot;
 
 import appeng.api.crafting.PatternDetailsHelper;
+import appeng.client.gui.Icon;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.neoforged.neoforge.items.IItemHandler;
@@ -9,7 +10,7 @@ import org.jetbrains.annotations.NotNull;
 
 public class PatternSlotItemHandler extends SlotItemHandler {
 
-    private appeng.client.gui.Icon icon;
+    private Icon icon;
     private boolean enabled = true;
     private float opacity = 1.0f;
     private boolean renderIconWithItem = false;
@@ -19,11 +20,11 @@ public class PatternSlotItemHandler extends SlotItemHandler {
         super(itemHandler, index, xPosition, yPosition);
     }
 
-    public void setIcon(appeng.client.gui.Icon icon) {
+    public void setIcon(Icon icon) {
         this.icon = icon;
     }
 
-    public appeng.client.gui.Icon getIcon() {
+    public Icon getIcon() {
         return this.icon;
     }
 

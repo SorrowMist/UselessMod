@@ -1,4 +1,4 @@
-package com.sorrowmist.useless.client.event;
+package com.sorrowmist.useless.event.client;
 
 import com.sorrowmist.useless.client.gui.ModeWheelScreen;
 import com.sorrowmist.useless.core.common.KeyBindings;

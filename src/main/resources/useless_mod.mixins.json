@@ -1,6 +1,7 @@
 {
   "required": false,
   "package": "com.sorrowmist.useless.mixin",
+  "plugin": "com.sorrowmist.useless.mixin.UselessMixinPlugin",
   "compatibilityLevel": "JAVA_21",
   "mixins": [
     "LevelMixin",

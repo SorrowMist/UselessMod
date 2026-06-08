@@ -2,6 +2,7 @@ package com.sorrowmist.useless.utils.mining;
 
 import com.sorrowmist.useless.api.enums.tool.EnchantMode;
 import com.sorrowmist.useless.compat.AE2Compat;
+import com.sorrowmist.useless.compat.OccultismCompat;
 import com.sorrowmist.useless.compat.SophisticatedCompat;
 import com.sorrowmist.useless.core.component.UComponents;
 import com.sorrowmist.useless.core.config.ConfigManager;
@@ -36,6 +37,12 @@ public class MiningUtils {
      */
     static List<ItemStack> getBlockDrops(BlockState state, ServerLevel level, BlockPos pos, Player player,
                                          ItemStack tool, boolean forceMining) {
+        // 优先检查 Occultism 的 IOtherworldBlock 特殊掉落
+        List<ItemStack> otherworldDrops = OccultismCompat.getOtherworldBlockDrops(state, level, pos, player, tool);
+        if (otherworldDrops != null) {
+            return otherworldDrops;
+        }
+        
         BlockEntity be = level.getBlockEntity(pos);
         List<ItemStack> drops = Block.getDrops(state, level, pos, be, player, tool);
 

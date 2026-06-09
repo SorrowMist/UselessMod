@@ -4,11 +4,21 @@ import appeng.api.crafting.IPatternDetails;
 import appeng.api.stacks.AEFluidKey;
 import appeng.api.stacks.AEItemKey;
 import appeng.api.stacks.AEKey;
+import appeng.api.stacks.GenericStack;
 import appeng.api.stacks.KeyCounter;
+import com.fish_dan_.data_energistics.recipe.DataRipperReassemblerIngredient;
+import com.fish_dan_.data_energistics.recipe.DataRipperReassemblerRecipe;
+import com.fish_dan_.data_energistics.registry.ModRecipes;
 import com.sorrowmist.useless.content.recipe.AdvancedAlloyFurnaceRecipe;
 import com.sorrowmist.useless.content.recipe.AlloyFurnaceRecipeManager;
+import com.sorrowmist.useless.content.recipe.adapters.dataenergistics.DataEnergisticsCompat;
+import com.sorrowmist.useless.content.recipe.adapters.dataenergistics.DataReassemblerRecipeAdapter;
 import com.sorrowmist.useless.utils.CatalystParallelManager;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.crafting.RecipeHolder;
 import net.neoforged.neoforge.fluids.FluidStack;
 import net.neoforged.neoforge.fluids.capability.IFluidHandler;
 import net.neoforged.neoforge.fluids.capability.templates.FluidTank;
@@ -28,6 +38,7 @@ public class CraftingTask {
     private final ReentrantLock taskLock = new ReentrantLock();
     private final List<ItemStack> taskInputItems = new ArrayList<>();
     private final List<FluidStack> taskInputFluids = new ArrayList<>();
+    private final List<OutputKey> taskInputKeys = new ArrayList<>();
     private final AtomicInteger craftCount = new AtomicInteger(1);
     private volatile boolean cancelled = false;
     private volatile boolean processingComplete = false;
@@ -92,11 +103,19 @@ public class CraftingTask {
                 long amount = entry.getLongValue();
 
                 if (key instanceof AEItemKey itemKey) {
+                    // 普通物品：直接转换为 ItemStack
                     ItemStack stack = itemKey.toStack((int) amount);
                     taskInputItems.add(stack);
                 } else if (key instanceof AEFluidKey fluidKey) {
+                    // 流体：转换为 FluidStack
                     FluidStack stack = new FluidStack(fluidKey.getFluid(), (int) amount);
                     taskInputFluids.add(stack);
+                } else {
+                    ItemStack wrappedStack = GenericStack.wrapInItemStack(key, 1);
+                    if (!wrappedStack.isEmpty()) {
+                        taskInputItems.add(wrappedStack);
+                        taskInputKeys.add(new OutputKey(key, amount));
+                    }
                 }
             }
         }
@@ -118,9 +137,133 @@ public class CraftingTask {
 
         ItemStack moldStack = context.getItemHandler().getStackInSlot(context.getMoldSlot());
 
-        return AlloyFurnaceRecipeManager.getInstance().findRecipe(
+        AdvancedAlloyFurnaceRecipe recipe = AlloyFurnaceRecipeManager.getInstance().findRecipe(
                 context.getLevel(), tempInputs, tempFluids, moldStack
         );
+        if (recipe != null) {
+            return recipe;
+        }
+
+        return findDataEnergisticsRecipe(tempInputs, tempFluids, moldStack);
+    }
+
+    private AdvancedAlloyFurnaceRecipe findDataEnergisticsRecipe(List<ItemStack> inputs, List<FluidStack> fluids, ItemStack moldStack) {
+        if (!DataEnergisticsCompat.isDataEnergisticsLoaded() || context.getLevel() == null) {
+            return null;
+        }
+        if (!isDataReassemblerMold(moldStack)) {
+            return null;
+        }
+
+        DataReassemblerRecipeAdapter adapter = new DataReassemblerRecipeAdapter();
+        for (RecipeHolder<DataRipperReassemblerRecipe> holder : context.getLevel().getRecipeManager().getAllRecipesFor(ModRecipes.DATA_RIPPER_REASSEMBLER_TYPE.get())) {
+            DataRipperReassemblerRecipe recipe = holder.value();
+            if (matchesDataReassemblerInputs(recipe, inputs, fluids) && matchesDataReassemblerOutputs(recipe)) {
+                return adapter.convert(holder, context.getLevel());
+            }
+        }
+
+        return null;
+    }
+
+    private boolean isDataReassemblerMold(ItemStack moldStack) {
+        if (moldStack == null || moldStack.isEmpty()) {
+            return false;
+        }
+        ResourceLocation moldId = BuiltInRegistries.ITEM.getKey(moldStack.getItem());
+        return "data_energistics".equals(moldId.getNamespace()) && "data_reassembler".equals(moldId.getPath());
+    }
+
+    private boolean matchesDataReassemblerInputs(DataRipperReassemblerRecipe recipe, List<ItemStack> inputs, List<FluidStack> fluids) {
+        for (DataRipperReassemblerIngredient ingredient : recipe.getItemInputs()) {
+            long found = 0;
+            for (ItemStack input : inputs) {
+                if (ingredient.ingredient().test(input)) {
+                    found += input.getCount();
+                }
+            }
+            if (found < ingredient.count()) {
+                return false;
+            }
+        }
+
+        for (GenericStack fluidInput : recipe.getFluidInputs()) {
+            if (!(fluidInput.what() instanceof AEFluidKey requiredFluid)) {
+                continue;
+            }
+            long found = 0;
+            for (FluidStack input : fluids) {
+                AEFluidKey inputKey = AEFluidKey.of(input);
+                if (inputKey != null && inputKey.equals(requiredFluid)) {
+                    found += input.getAmount();
+                }
+            }
+            if (found < fluidInput.amount()) {
+                return false;
+            }
+        }
+
+        GenericStack keyInput = recipe.getKeyInput();
+        if (keyInput == null || keyInput.amount() <= 0) {
+            return true;
+        }
+        if (keyInput.what() instanceof AEItemKey itemKey) {
+            long found = 0;
+            Item item = itemKey.getItem();
+            for (ItemStack input : inputs) {
+                if (input.is(item)) {
+                    found += input.getCount();
+                }
+            }
+            return found >= keyInput.amount();
+        }
+        if (keyInput.what() instanceof AEFluidKey fluidKey) {
+            long found = 0;
+            for (FluidStack input : fluids) {
+                AEFluidKey inputKey = AEFluidKey.of(input);
+                if (inputKey != null && inputKey.equals(fluidKey)) {
+                    found += input.getAmount();
+                }
+            }
+            return found >= keyInput.amount();
+        }
+        for (OutputKey inputKey : taskInputKeys) {
+            if (inputKey.key.equals(keyInput.what()) && inputKey.amount >= keyInput.amount()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean matchesDataReassemblerOutputs(DataRipperReassemblerRecipe recipe) {
+        for (var patternOutput : pattern.getOutputs()) {
+            boolean matched = false;
+            if (patternOutput.what() instanceof AEItemKey itemKey) {
+                ItemStack patternStack = itemKey.toStack((int) Math.min(patternOutput.amount(), Integer.MAX_VALUE));
+                for (ItemStack recipeOutput : recipe.getItemOutputs()) {
+                    if (ItemStack.isSameItem(patternStack, recipeOutput)) {
+                        matched = true;
+                        break;
+                    }
+                }
+            } else if (patternOutput.what() instanceof AEFluidKey fluidKey) {
+                for (GenericStack fluidOutput : recipe.getFluidOutputs()) {
+                    if (fluidOutput.what() instanceof AEFluidKey outputKey && outputKey.equals(fluidKey)) {
+                        matched = true;
+                        break;
+                    }
+                }
+            } else {
+                GenericStack keyOutput = recipe.getKeyOutput();
+                matched = keyOutput != null && keyOutput.what().equals(patternOutput.what()) && keyOutput.amount() >= patternOutput.amount();
+            }
+
+            if (!matched) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private String getProductName() {
@@ -179,6 +322,14 @@ public class CraftingTask {
                         break;
                     }
                 }
+            } else {
+                ItemStack patternStack = GenericStack.wrapInItemStack(patternOutput.what(), (int) Math.min(patternOutput.amount(), Integer.MAX_VALUE));
+                for (ItemStack recipeOutput : recipe.outputs()) {
+                    if (ItemStack.isSameItemSameComponents(patternStack, recipeOutput)) {
+                        matched = true;
+                        break;
+                    }
+                }
             }
 
             if (!matched) {
@@ -196,20 +347,30 @@ public class CraftingTask {
         // 在工作线程中复制需要返回的材料，避免在主线程中访问taskInputItems
         final List<ItemStack> itemsToReturn;
         final List<FluidStack> fluidsToReturn;
+        final List<OutputKey> keysToReturn;
 
         taskLock.lock();
         try {
             itemsToReturn = new ArrayList<>(taskInputItems);
             fluidsToReturn = new ArrayList<>(taskInputFluids);
+            keysToReturn = new ArrayList<>(taskInputKeys);
             taskInputItems.clear();
             taskInputFluids.clear();
+            taskInputKeys.clear();
         } finally {
             taskLock.unlock();
         }
 
         context.getLevel().getServer().execute(() -> {
+            for (OutputKey keyToReturn : keysToReturn) {
+                context.tryOutputKeyToAE(keyToReturn.key, keyToReturn.amount);
+            }
+
             // 将任务输入物品返回给AE网络
             for (ItemStack stack : itemsToReturn) {
+                if (isWrappedKeyStack(stack, keysToReturn)) {
+                    continue;
+                }
                 if (!stack.isEmpty()) {
                     // 尝试输出到AE网络
                     long inserted = context.tryOutputToAE(stack);
@@ -465,6 +626,7 @@ public class CraftingTask {
         // 在工作线程中预先准备输出数据，避免在主线程中等待锁
         final List<OutputItem> outputItems = new ArrayList<>();
         final List<OutputFluid> outputFluids = new ArrayList<>();
+        final List<OutputKey> outputKeys = new ArrayList<>();
 
         for (var output : pattern.getOutputs()) {
             if (output.what() instanceof AEItemKey itemKey) {
@@ -473,6 +635,8 @@ public class CraftingTask {
             } else if (output.what() instanceof AEFluidKey fluidKey) {
                 FluidStack outputFluid = new FluidStack(fluidKey.getFluid(), (int) (output.amount() * craftCount));
                 outputFluids.add(new OutputFluid(outputFluid));
+            } else {
+                outputKeys.add(new OutputKey(output.what(), output.amount() * craftCount));
             }
         }
 
@@ -481,6 +645,7 @@ public class CraftingTask {
         try {
             taskInputItems.clear();
             taskInputFluids.clear();
+            taskInputKeys.clear();
         } finally {
             taskLock.unlock();
         }
@@ -553,6 +718,10 @@ public class CraftingTask {
                     }
                 }
             }
+
+            for (OutputKey outputKey : outputKeys) {
+                context.tryOutputKeyToAE(outputKey.key, outputKey.amount);
+            }
             context.markChanged();
         });
     }
@@ -566,5 +735,21 @@ public class CraftingTask {
     }
 
     private record OutputFluid(FluidStack stack) {
+    }
+
+    private record OutputKey(AEKey key, long amount) {
+    }
+
+    private boolean isWrappedKeyStack(ItemStack stack, List<OutputKey> keys) {
+        if (stack.isEmpty()) {
+            return false;
+        }
+        for (OutputKey inputKey : keys) {
+            ItemStack wrappedStack = GenericStack.wrapInItemStack(inputKey.key, 1);
+            if (ItemStack.isSameItemSameComponents(stack, wrappedStack)) {
+                return true;
+            }
+        }
+        return false;
     }
 }

@@ -1,5 +1,6 @@
 package com.sorrowmist.useless.content.blockentities;
 
+import appeng.api.stacks.AEKey;
 import com.sorrowmist.useless.energy.IEnergyManager;
 import net.minecraft.world.level.Level;
 import net.neoforged.neoforge.fluids.FluidStack;
@@ -40,6 +41,7 @@ public interface CraftingTaskContext {
     // AE网络输出
     long tryOutputToAE(net.minecraft.world.item.ItemStack stack);
     long tryOutputFluidToAE(FluidStack stack);
+    long tryOutputKeyToAE(AEKey key, long amount);
     
     // 任务进度管理
     ConcurrentHashMap<Integer, AdvancedAlloyFurnaceBlockEntity.AETaskProgress> getAETaskProgressMap();

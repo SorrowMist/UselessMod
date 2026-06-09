@@ -227,6 +227,8 @@
   "jei.useless_mod.tooltip.catalyst.normal.desc1": "• 可以使用无用锭提高并行数",
   "jei.useless_mod.tooltip.catalyst.normal.desc2": "• 不同等级的无用锭提供不同的并行数",
   "jei.useless_mod.tooltip.catalyst.normal.desc3": "• 催化剂等级越高，处理时间越短",
+  "jei.useless_mod.tooltip.key_input": "数据输入（AE2特殊数据类型）",
+  "jei.useless_mod.tooltip.key_output": "数据输出（AE2特殊数据类型）",
   "jei.useless_mod.tooltip.energy.base": "基础能量消耗: %s",
   "jei.useless_mod.tooltip.energy.actual": "实际能量 = 基础能量 × 并行数",
   "jei.useless_mod.tooltip.energy.note_useful": "有用锭催化时能量不倍增",

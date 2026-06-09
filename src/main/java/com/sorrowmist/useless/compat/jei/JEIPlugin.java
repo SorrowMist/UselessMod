@@ -23,6 +23,8 @@ import com.sorrowmist.useless.content.recipe.adapters.ae2lt.LightningAssemblyRec
 import com.sorrowmist.useless.content.recipe.adapters.ae2lt.LightningSimulationRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.ae2lt.OverloadProcessingRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.arsnouveau.ArsNouveauCompat;
+import com.sorrowmist.useless.content.recipe.adapters.dataenergistics.DataEnergisticsCompat;
+import com.sorrowmist.useless.content.recipe.adapters.dataenergistics.DataReassemblerRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.arsnouveau.EnchantingApparatusRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.arsnouveau.ImbuementRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.extendedae.CircuitCutterRecipeAdapter;
@@ -143,6 +145,11 @@ public class JEIPlugin implements IModPlugin {
         // 添加转换后的 AE2 Lightning Tech 配方（如果AE2LT已加载）
         if (AELightningTechCompat.isAELightningTechLoaded()) {
             recipes.addAll(convertAELightningTechRecipes(recipeManager, level));
+        }
+
+        // 添加转换后的 DataEnergistics 配方（如果DataEnergistics已加载）
+        if (DataEnergisticsCompat.isDataEnergisticsLoaded()) {
+            recipes.addAll(convertDataEnergisticsRecipes(recipeManager, level));
         }
 
         registration.addRecipes(AdvancedAlloyFurnaceRecipeCategory.TYPE, recipes);
@@ -445,6 +452,23 @@ public class JEIPlugin implements IModPlugin {
                 recipeManager.getAllRecipesFor(com.moakiee.ae2lt.registry.ModRecipeTypes.CRYSTAL_CATALYZER_TYPE.get())) {
             AdvancedAlloyFurnaceRecipe converted = catalyzerAdapter.convert(holder, level);
             if (converted != null) convertedRecipes.add(converted);
+        }
+
+        return convertedRecipes;
+    }
+
+    /**
+     * 转换 DataEnergistics 配方为高级熔炉配方用于JEI显示
+     */
+    @SuppressWarnings("unchecked")
+    private List<AdvancedAlloyFurnaceRecipe> convertDataEnergisticsRecipes(RecipeManager recipeManager, Level level) {
+        List<AdvancedAlloyFurnaceRecipe> convertedRecipes = new ArrayList<>();
+
+        DataReassemblerRecipeAdapter reassemblerAdapter = new DataReassemblerRecipeAdapter();
+        for (RecipeHolder<com.fish_dan_.data_energistics.recipe.DataRipperReassemblerRecipe> holder :
+                recipeManager.getAllRecipesFor(com.fish_dan_.data_energistics.registry.ModRecipes.DATA_RIPPER_REASSEMBLER_TYPE.get())) {
+            List<AdvancedAlloyFurnaceRecipe> converted = reassemblerAdapter.convertAll(holder, level);
+            convertedRecipes.addAll(converted);
         }
 
         return convertedRecipes;

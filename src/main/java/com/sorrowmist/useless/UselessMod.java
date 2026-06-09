@@ -8,6 +8,7 @@ import com.sorrowmist.useless.content.recipe.adapters.ae2.AE2Compat;
 import com.sorrowmist.useless.content.recipe.adapters.ae2cs.AECrystalScienceCompat;
 import com.sorrowmist.useless.content.recipe.adapters.ae2lt.AELightningTechCompat;
 import com.sorrowmist.useless.content.recipe.adapters.arsnouveau.ArsNouveauCompat;
+import com.sorrowmist.useless.content.recipe.adapters.dataenergistics.DataEnergisticsCompat;
 import com.sorrowmist.useless.content.recipe.adapters.extendedae.ExtendedAECompat;
 import com.sorrowmist.useless.content.recipe.adapters.industrialforegoing.IndustrialForegoingCompat;
 import com.sorrowmist.useless.content.recipe.adapters.mekanism.MekanismCompat;
@@ -87,6 +88,8 @@ public class UselessMod {
         MysticalAgricultureCompat.init(event);
         // 初始化 AE2 Lightning Tech 兼容性支持（如果AE2LT已加载）
         AELightningTechCompat.init(event);
+        // 初始化 DataEnergistics 兼容性支持（如果DataEnergistics已加载）
+        DataEnergisticsCompat.init(event);
     }
 
     @SubscribeEvent

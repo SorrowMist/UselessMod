@@ -220,10 +220,16 @@ dependencies {
     implementation "mezz.jei:jei-1.21.1-neoforge:19.21.0.247"
     implementation "curse.maven:ae2-jei-integration-1074338:5748513"
 
+    // implementation "curse.maven:occultism-361026:8187667"
+    // implementation "curse.maven:modonomicon-538392:7771524"
+    // implementation "curse.maven:smartbrainlib-661293:7055149"
+
     // runtime test
     runtimeOnly "curse.maven:applied-flux-965012:5614830"
     runtimeOnly "de.mari_023:ae2wtlib:19.2.5"
     runtimeOnly "curse.maven:jade-324717:6853386"
+
+    implementation "curse.maven:data-energistics-1565514:8217182"
 
     //geckolib
     runtimeOnly "curse.maven:geckolib-388172:7009924"

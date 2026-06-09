@@ -151,13 +151,49 @@ public class AdvancedAlloyFurnaceRecipeCategory implements IRecipeCategory<Advan
         int targetTier = getTargetUselessIngotTier(recipe);
         boolean isUselessRecipe = targetTier > 0;
 
-        // 输入物品槽位 (最多9个) - 3行3列排列
+        // 输入物品槽位
         List<CountedIngredient> inputs = recipe.inputs();
-        for (int i = 0; i < Math.min(inputs.size(), 9); i++) {
-            int row = i / 3;
-            int col = i % 3;
-            int x = INPUT_SLOTS_START_X + col * INPUT_SLOT_SPACING_X;
-            int y = INPUT_SLOTS_START_Y + row * INPUT_SLOT_SPACING_Y;
+        int inputCount = inputs.size();
+
+        // 计算输入槽位的布局参数（支持超过9个时缩放）
+        int inputCols, inputRows;
+        float inputSpacingX, inputSpacingY;
+        float inputSlotScale;
+
+        if (inputCount <= 9) {
+            // 正常布局：3x3 网格
+            inputCols = 3;
+            inputRows = 3;
+            inputSpacingX = INPUT_SLOT_SPACING_X;
+            inputSpacingY = INPUT_SLOT_SPACING_Y;
+            inputSlotScale = 1.0f;
+        } else {
+            // 缩放布局：根据数量动态调整
+            // 计算需要的列数（最多显示在54像素宽度内）
+            int maxInputWidth = 54; // 输入区域最大宽度
+            inputCols = (int) Math.ceil(Math.sqrt(inputCount));
+            if (inputCols > 6) inputCols = 6; // 最多6列
+
+            inputRows = (int) Math.ceil((float) inputCount / inputCols);
+            if (inputRows > 3) inputRows = 3; // 最多3行，超过则需要缩放
+
+            // 计算缩放比例
+            float widthPerSlot = maxInputWidth / (float) inputCols;
+            inputSlotScale = Math.min(widthPerSlot / INPUT_SLOT_SPACING_X, 1.0f);
+            if (inputRows > 3) {
+                inputSlotScale = Math.min(inputSlotScale, 3.0f / inputRows);
+            }
+
+            inputSpacingX = INPUT_SLOT_SPACING_X * inputSlotScale;
+            inputSpacingY = INPUT_SLOT_SPACING_Y * inputSlotScale;
+        }
+
+        // 设置输入物品槽位
+        for (int i = 0; i < inputCount; i++) {
+            int row = i / inputCols;
+            int col = i % inputCols;
+            int x = INPUT_SLOTS_START_X + (int) (col * inputSpacingX);
+            int y = INPUT_SLOTS_START_Y + (int) (row * inputSpacingY);
 
             CountedIngredient countedIngredient = inputs.get(i);
             Ingredient ingredient = countedIngredient.ingredient();
@@ -180,17 +216,49 @@ public class AdvancedAlloyFurnaceRecipeCategory implements IRecipeCategory<Advan
                            if (count > 1) {
                                tooltip.add(Component.translatable("jei.useless_mod.tooltip.amount", formatCount(count)).withStyle(ChatFormatting.GRAY));
                            }
+                           if (inputCount > 9) {
+                               tooltip.add(Component.translatable("jei.useless_mod.tooltip.key_input").withStyle(ChatFormatting.AQUA));
+                           }
                        });
             }
         }
 
-        // 输出物品槽位 (最多9个) - 3行3列排列
+        // 输出物品槽位
         List<ItemStack> outputs = recipe.outputs();
-        for (int i = 0; i < Math.min(outputs.size(), 9); i++) {
-            int row = i / 3;
-            int col = i % 3;
-            int x = OUTPUT_SLOTS_START_X + col * INPUT_SLOT_SPACING_X;
-            int y = OUTPUT_SLOTS_START_Y + row * INPUT_SLOT_SPACING_Y;
+        int outputCount = outputs.size();
+
+        // 计算输出槽位的布局参数（支持超过9个时缩放）
+        int outputCols, outputRows;
+        float outputSpacingX, outputSpacingY;
+
+        if (outputCount <= 9) {
+            outputCols = 3;
+            outputRows = 3;
+            outputSpacingX = INPUT_SLOT_SPACING_X;
+            outputSpacingY = INPUT_SLOT_SPACING_Y;
+        } else {
+            int maxOutputWidth = 54;
+            outputCols = (int) Math.ceil(Math.sqrt(outputCount));
+            if (outputCols > 6) outputCols = 6;
+
+            outputRows = (int) Math.ceil((float) outputCount / outputCols);
+            if (outputRows > 3) outputRows = 3;
+
+            float widthPerSlot = maxOutputWidth / (float) outputCols;
+            float outputSlotScale = Math.min(widthPerSlot / INPUT_SLOT_SPACING_X, 1.0f);
+            if (outputRows > 3) {
+                outputSlotScale = Math.min(outputSlotScale, 3.0f / outputRows);
+            }
+
+            outputSpacingX = INPUT_SLOT_SPACING_X * outputSlotScale;
+            outputSpacingY = INPUT_SLOT_SPACING_Y * outputSlotScale;
+        }
+
+        for (int i = 0; i < outputCount; i++) {
+            int row = i / outputCols;
+            int col = i % outputCols;
+            int x = OUTPUT_SLOTS_START_X + (int) (col * outputSpacingX);
+            int y = OUTPUT_SLOTS_START_Y + (int) (row * outputSpacingY);
 
             ItemStack outputStack = outputs.get(i);
             int count = outputStack.getCount();
@@ -200,6 +268,9 @@ public class AdvancedAlloyFurnaceRecipeCategory implements IRecipeCategory<Advan
                     .addRichTooltipCallback((slot, tooltip) -> {
                         if (count > 1) {
                             tooltip.add(Component.translatable("jei.useless_mod.tooltip.amount", formatCount(count)).withStyle(ChatFormatting.GRAY));
+                        }
+                        if (outputCount > 9) {
+                            tooltip.add(Component.translatable("jei.useless_mod.tooltip.key_output").withStyle(ChatFormatting.AQUA));
                         }
                     });
         }

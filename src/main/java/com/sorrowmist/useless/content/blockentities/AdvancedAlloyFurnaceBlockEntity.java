@@ -1971,6 +1971,20 @@ public class AdvancedAlloyFurnaceBlockEntity extends BlockEntity implements Menu
         return storage.insert(key, amount, Actionable.MODULATE, actionSource);
     }
 
+    public long tryOutputKeyToAE(AEKey key, long amount) {
+        if (key == null || amount <= 0 || !isConnectedToAE || actionSource == null) {
+            return 0;
+        }
+
+        MEStorage storage = getStorageService();
+
+        if (storage == null) {
+            return 0;
+        }
+
+        return storage.insert(key, amount, Actionable.MODULATE, actionSource);
+    }
+
     // AE合成任务状态获取方法（用于UI显示）
     public int getActiveAETaskCount() {
         return activeAETaskCount.get();

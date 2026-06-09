@@ -15,6 +15,7 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.neoforged.neoforge.fluids.capability.templates.FluidTank;
 import net.neoforged.neoforge.items.IItemHandler;
+import net.neoforged.neoforge.items.ItemStackHandler;
 import net.neoforged.neoforge.items.SlotItemHandler;
 import org.jetbrains.annotations.NotNull;
 
@@ -95,7 +96,7 @@ public class AdvancedAlloyFurnaceMenu extends AEBaseMenu {
     private final ContainerData data;
 
     public AdvancedAlloyFurnaceMenu(int containerId, Inventory inv, FriendlyByteBuf buf) {
-        this(containerId, inv, buf.readBlockPos());
+        this(containerId, inv, buf != null ? buf.readBlockPos() : BlockPos.ZERO);
     }
 
     private AdvancedAlloyFurnaceMenu(int containerId, Inventory inv, BlockPos pos) {
@@ -106,6 +107,10 @@ public class AdvancedAlloyFurnaceMenu extends AEBaseMenu {
         this(containerId, inv, (AdvancedAlloyFurnaceBlockEntity) entity, getContainerData(entity));
     }
 
+    public AdvancedAlloyFurnaceMenu(int containerId, Inventory inv, AdvancedAlloyFurnaceBlockEntity entity) {
+        this(containerId, inv, entity, entity.getData());
+    }
+
     public AdvancedAlloyFurnaceMenu(int containerId, Inventory inv, AdvancedAlloyFurnaceBlockEntity entity,
                                     ContainerData data) {
         super(ModMenuType.ADVANCED_ALLOY_FURNACE_MENU.get(), containerId, inv, entity);
@@ -113,10 +118,8 @@ public class AdvancedAlloyFurnaceMenu extends AEBaseMenu {
         this.blockEntity = entity;
         this.addDataSlots(data);
 
-        if (entity != null) {
-            IItemHandler itemHandler = entity.getItemHandler();
-            this.addMachineSlots(itemHandler);
-        }
+        IItemHandler itemHandler = entity != null ? entity.getItemHandler() : new ItemStackHandler(AdvancedAlloyFurnaceBlockEntity.TOTAL_SLOTS);
+        this.addMachineSlots(itemHandler);
 
         this.createPlayerInventorySlots(inv, PLAYER_INVENTORY_X, PLAYER_INVENTORY_Y, PLAYER_HOTBAR_Y);
     }

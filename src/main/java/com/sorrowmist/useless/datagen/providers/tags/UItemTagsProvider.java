@@ -298,6 +298,15 @@ public class UItemTagsProvider extends ItemTagsProvider {
             .add(ModItems.ENDLESS_BEAF_MALLET.get())
             .add(ModItems.ENDLESS_BEAF_CROWBAR.get())
             .add(ModItems.ENDLESS_BEAF_HAMMER.get());
+
+        this.tag(ItemTags.SWORDS)
+            .replace(false)
+            .add(ModItems.ENDLESS_BEAF_ITEM.get())
+            .add(ModItems.ENDLESS_BEAF_WRENCH.get())
+            .add(ModItems.ENDLESS_BEAF_SCREWDRIVER.get())
+            .add(ModItems.ENDLESS_BEAF_MALLET.get())
+            .add(ModItems.ENDLESS_BEAF_CROWBAR.get())
+            .add(ModItems.ENDLESS_BEAF_HAMMER.get());
     }
 
     private TagKey<Item> createTagKey(String path) {

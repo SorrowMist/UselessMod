@@ -9,6 +9,7 @@ import com.sorrowmist.useless.content.blockentities.AdvancedAlloyFurnaceBlockEnt
 import com.sorrowmist.useless.core.component.FurnaceDataComponent;
 import com.sorrowmist.useless.core.component.UComponents;
 import com.sorrowmist.useless.core.constants.NBTConstants;
+import com.sorrowmist.useless.init.ModMenuType;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.component.DataComponents;
@@ -275,7 +276,10 @@ public class AdvancedAlloyFurnaceBlock extends Block implements EntityBlock {
         if (level.isClientSide) {
             return InteractionResult.SUCCESS;
         }
-        player.openMenu(this.getMenuProvider(state, level, pos), pos);
+        BlockEntity blockEntity = level.getBlockEntity(pos);
+        if (blockEntity instanceof AdvancedAlloyFurnaceBlockEntity furnace) {
+            player.openMenu(furnace, buffer -> buffer.writeBlockPos(pos));
+        }
         return InteractionResult.CONSUME;
     }
 
@@ -351,7 +355,7 @@ public class AdvancedAlloyFurnaceBlock extends Block implements EntityBlock {
         }
 
         // 打开GUI
-        player.openMenu(this.getMenuProvider(state, level, pos), pos);
+        player.openMenu(furnace, buffer -> buffer.writeBlockPos(pos));
         return ItemInteractionResult.CONSUME;
     }
 

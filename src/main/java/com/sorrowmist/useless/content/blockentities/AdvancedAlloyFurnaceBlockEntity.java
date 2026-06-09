@@ -22,6 +22,7 @@ import appeng.api.stacks.AEKey;
 import appeng.api.stacks.KeyCounter;
 import appeng.api.storage.MEStorage;
 import appeng.api.util.AECableType;
+import appeng.blockentity.AEBaseBlockEntity;
 import appeng.helpers.patternprovider.PatternContainer;
 import com.sorrowmist.useless.content.blocks.AdvancedAlloyFurnaceBlock;
 import com.sorrowmist.useless.content.menus.AdvancedAlloyFurnaceMenu;
@@ -77,7 +78,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.ReentrantLock;
 
-public class AdvancedAlloyFurnaceBlockEntity extends BlockEntity implements MenuProvider, ICraftingProvider, IInWorldGridNodeHost, IGridNodeListener<AdvancedAlloyFurnaceBlockEntity>, IActionHost, CraftingTaskContext, PatternContainer {
+public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implements MenuProvider, ICraftingProvider, IInWorldGridNodeHost, IGridNodeListener<AdvancedAlloyFurnaceBlockEntity>, IActionHost, CraftingTaskContext, PatternContainer {
 
     public static final int INPUT_SLOTS_START = 0;
     public static final int INPUT_SLOTS_COUNT = 9;
@@ -958,7 +959,8 @@ public class AdvancedAlloyFurnaceBlockEntity extends BlockEntity implements Menu
 
     @Override
     public @NotNull Component getDisplayName() {
-        return Component.translatable("container.useless_mod.advanced_alloy_furnace");
+        Component customName = this.getCustomName();
+        return customName != null ? customName : Component.translatable("container.useless_mod.advanced_alloy_furnace");
     }
 
     @Override
@@ -1134,8 +1136,8 @@ public class AdvancedAlloyFurnaceBlockEntity extends BlockEntity implements Menu
     }
 
     @Override
-    protected void loadAdditional(@NotNull CompoundTag tag, HolderLookup.@NotNull Provider registries) {
-        super.loadAdditional(tag, registries);
+    public void loadTag(CompoundTag tag, HolderLookup.@NotNull Provider registries) {
+        super.loadTag(tag, registries);
 
         // 加载阶级（必须在加载其他数据之前，因为会影响容量）
         if (tag.contains(NBTConstants.FURNACE_TIER)) {
@@ -1206,7 +1208,7 @@ public class AdvancedAlloyFurnaceBlockEntity extends BlockEntity implements Menu
     }
 
     @Override
-    protected void saveAdditional(@NotNull CompoundTag tag, HolderLookup.@NotNull Provider registries) {
+    public void saveAdditional(@NotNull CompoundTag tag, HolderLookup.@NotNull Provider registries) {
         super.saveAdditional(tag, registries);
 
         tag.putInt(NBTConstants.FURNACE_TIER, this.furnaceTier);
@@ -1257,7 +1259,7 @@ public class AdvancedAlloyFurnaceBlockEntity extends BlockEntity implements Menu
 
     @Override
     public @NotNull CompoundTag getUpdateTag(HolderLookup.@NotNull Provider registries) {
-        CompoundTag tag = super.getUpdateTag(registries);
+        CompoundTag tag = new CompoundTag();
         this.saveAdditional(tag, registries);
         return tag;
     }

@@ -1,15 +1,22 @@
 package com.sorrowmist.useless.content.blocks;
 
+import appeng.items.tools.quartz.QuartzCuttingKnifeItem;
+import appeng.menu.MenuOpener;
+import appeng.menu.locator.MenuLocators;
+import appeng.util.InteractionUtil;
+import com.glodblock.github.extendedae.container.ContainerRenamer;
 import com.sorrowmist.useless.content.blockentities.AdvancedAlloyFurnaceBlockEntity;
 import com.sorrowmist.useless.core.component.FurnaceDataComponent;
 import com.sorrowmist.useless.core.component.UComponents;
 import com.sorrowmist.useless.core.constants.NBTConstants;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.core.component.DataComponents;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.StringTag;
+import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
@@ -121,6 +128,11 @@ public class AdvancedAlloyFurnaceBlock extends Block implements EntityBlock {
             // 为每个掉落物添加方块实体数据
             for (ItemStack drop : drops) {
                 if (drop.is(this.asItem())) {
+                    Component customName = furnace.getCustomName();
+                    if (customName != null) {
+                        drop.set(DataComponents.CUSTOM_NAME, customName);
+                    }
+
                     // 检查是否全空
                     boolean isEmpty = isFurnaceEmpty(furnace);
                     
@@ -290,13 +302,20 @@ public class AdvancedAlloyFurnaceBlock extends Block implements EntityBlock {
                                                        @NotNull Player player,
                                                        @NotNull InteractionHand hand,
                                                        @NotNull BlockHitResult hitResult) {
-        if (level.isClientSide) {
-            return ItemInteractionResult.SUCCESS;
-        }
-
         BlockEntity blockEntity = level.getBlockEntity(pos);
         if (!(blockEntity instanceof AdvancedAlloyFurnaceBlockEntity furnace)) {
             return ItemInteractionResult.PASS_TO_DEFAULT_BLOCK_INTERACTION;
+        }
+
+        if (!InteractionUtil.isInAlternateUseMode(player) && stack.getItem() instanceof QuartzCuttingKnifeItem) {
+            if (!level.isClientSide) {
+                MenuOpener.open(ContainerRenamer.TYPE, player, MenuLocators.forBlockEntity(furnace));
+            }
+            return ItemInteractionResult.sidedSuccess(level.isClientSide);
+        }
+
+        if (level.isClientSide) {
+            return ItemInteractionResult.SUCCESS;
         }
 
         // 扳手交互 - 设置输出方向
@@ -383,6 +402,14 @@ public class AdvancedAlloyFurnaceBlock extends Block implements EntityBlock {
         super.setPlacedBy(level, pos, state, placer, stack);
         
         if (level.isClientSide) return;
+
+        BlockEntity placedBlockEntity = level.getBlockEntity(pos);
+        if (placedBlockEntity instanceof AdvancedAlloyFurnaceBlockEntity placedFurnace) {
+            Component customName = stack.get(DataComponents.CUSTOM_NAME);
+            if (customName != null) {
+                placedFurnace.setName(customName.getString());
+            }
+        }
         
         // 从Data Component中恢复数据
         FurnaceDataComponent component = stack.get(UComponents.FURNACE_DATA.get());

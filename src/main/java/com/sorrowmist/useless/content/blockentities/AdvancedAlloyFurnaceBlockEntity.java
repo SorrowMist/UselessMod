@@ -397,6 +397,10 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
         return this.furnaceTier;
     }
 
+    public void setClientFurnaceTier(int tier) {
+        this.furnaceTier = Math.max(0, Math.min(9, tier));
+    }
+
     /**
      * 设置熔炉阶级（内部使用，不触发容量更新）
      */

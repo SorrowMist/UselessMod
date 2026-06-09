@@ -94,6 +94,8 @@
 
   "gui.useless_mod.ultimine_status": "Ultimine: %s",
   "gui.useless_mod.force_mining_label": "Force Mining: ",
+  "pack.useless_mod.xia.name": "Useless Mod - Xia Texture Optimization Pack",
+  "pack.useless_mod.xia.description": "Textures from AE2 & Mekanism, partially edited by Xiabishi Lidie, Useless Mod texture optimization V2.1",
   "gui.useless_mod.force_mining_status": "%s",
   "gui.useless_mod.mining_count": "Mining Count: %s",
   "gui.useless_mod.status.enhanced": "Enhanced Chain",

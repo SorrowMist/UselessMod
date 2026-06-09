@@ -9,8 +9,21 @@ import appeng.api.stacks.KeyCounter;
 import com.fish_dan_.data_energistics.recipe.DataRipperReassemblerIngredient;
 import com.fish_dan_.data_energistics.recipe.DataRipperReassemblerRecipe;
 import com.fish_dan_.data_energistics.registry.ModRecipes;
+import com.moakiee.ae2lt.machine.crystalcatalyzer.recipe.CrystalCatalyzerRecipe;
+import com.moakiee.ae2lt.machine.crystalcatalyzer.recipe.Mode;
+import com.moakiee.ae2lt.machine.lightningassembly.recipe.LightningAssemblyRecipe;
+import com.moakiee.ae2lt.machine.lightningchamber.recipe.LightningSimulationIngredient;
+import com.moakiee.ae2lt.machine.lightningchamber.recipe.LightningSimulationRecipe;
+import com.moakiee.ae2lt.machine.overloadfactory.recipe.OverloadProcessingIngredient;
+import com.moakiee.ae2lt.machine.overloadfactory.recipe.OverloadProcessingRecipe;
+import com.moakiee.ae2lt.me.key.LightningKey;
 import com.sorrowmist.useless.content.recipe.AdvancedAlloyFurnaceRecipe;
 import com.sorrowmist.useless.content.recipe.AlloyFurnaceRecipeManager;
+import com.sorrowmist.useless.content.recipe.adapters.ae2lt.AELightningTechCompat;
+import com.sorrowmist.useless.content.recipe.adapters.ae2lt.CrystalCatalyzerRecipeAdapter;
+import com.sorrowmist.useless.content.recipe.adapters.ae2lt.LightningAssemblyRecipeAdapter;
+import com.sorrowmist.useless.content.recipe.adapters.ae2lt.LightningSimulationRecipeAdapter;
+import com.sorrowmist.useless.content.recipe.adapters.ae2lt.OverloadProcessingRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.dataenergistics.DataEnergisticsCompat;
 import com.sorrowmist.useless.content.recipe.adapters.dataenergistics.DataReassemblerRecipeAdapter;
 import com.sorrowmist.useless.utils.CatalystParallelManager;
@@ -19,6 +32,7 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.crafting.RecipeHolder;
+import net.minecraft.world.item.crafting.Ingredient;
 import net.neoforged.neoforge.fluids.FluidStack;
 import net.neoforged.neoforge.fluids.capability.IFluidHandler;
 import net.neoforged.neoforge.fluids.capability.templates.FluidTank;
@@ -144,7 +158,173 @@ public class CraftingTask {
             return recipe;
         }
 
-        return findDataEnergisticsRecipe(tempInputs, tempFluids, moldStack);
+        recipe = findDataEnergisticsRecipe(tempInputs, tempFluids, moldStack);
+        if (recipe != null) {
+            return recipe;
+        }
+
+        return findAELightningTechRecipe(tempInputs, tempFluids, moldStack);
+    }
+
+    private AdvancedAlloyFurnaceRecipe findAELightningTechRecipe(List<ItemStack> inputs, List<FluidStack> fluids, ItemStack moldStack) {
+        if (!AELightningTechCompat.isAELightningTechLoaded() || context.getLevel() == null) {
+            return null;
+        }
+        if (moldStack == null || moldStack.isEmpty()) {
+            return null;
+        }
+
+        ResourceLocation moldId = BuiltInRegistries.ITEM.getKey(moldStack.getItem());
+        if (!"ae2lt".equals(moldId.getNamespace())) {
+            return null;
+        }
+
+        return switch (moldId.getPath()) {
+            case "lightning_simulation_room" -> findLightningSimulationRecipe(inputs);
+            case "lightning_assembly_chamber" -> findLightningAssemblyRecipe(inputs);
+            case "overload_processing_factory" -> findOverloadProcessingRecipe(inputs, fluids);
+            default -> findCrystalCatalyzerRecipe(inputs, fluids, moldStack);
+        };
+    }
+
+    private AdvancedAlloyFurnaceRecipe findLightningSimulationRecipe(List<ItemStack> inputs) {
+        LightningSimulationRecipeAdapter adapter = new LightningSimulationRecipeAdapter();
+        for (RecipeHolder<LightningSimulationRecipe> holder : context.getLevel().getRecipeManager().getAllRecipesFor(com.moakiee.ae2lt.registry.ModRecipeTypes.LIGHTNING_SIMULATION_TYPE.get())) {
+            LightningSimulationRecipe recipe = holder.value();
+            if (matchesLightningSimulationInputs(recipe.inputs(), inputs)
+                    && matchesLightningRequirement(recipe.lightningTier(), recipe.lightningCost())
+                    && matchesItemOnlyOutput(recipe.getResultStack())) {
+                return adapter.convert(holder, context.getLevel());
+            }
+        }
+        return null;
+    }
+
+    private AdvancedAlloyFurnaceRecipe findLightningAssemblyRecipe(List<ItemStack> inputs) {
+        LightningAssemblyRecipeAdapter adapter = new LightningAssemblyRecipeAdapter();
+        for (RecipeHolder<LightningAssemblyRecipe> holder : context.getLevel().getRecipeManager().getAllRecipesFor(com.moakiee.ae2lt.registry.ModRecipeTypes.LIGHTNING_ASSEMBLY_TYPE.get())) {
+            LightningAssemblyRecipe recipe = holder.value();
+            if (matchesLightningSimulationInputs(recipe.inputs(), inputs)
+                    && matchesLightningRequirement(recipe.lightningTier(), recipe.lightningCost())
+                    && matchesItemOnlyOutput(recipe.getResultStack())) {
+                return adapter.convert(holder, context.getLevel());
+            }
+        }
+        return null;
+    }
+
+    private AdvancedAlloyFurnaceRecipe findOverloadProcessingRecipe(List<ItemStack> inputs, List<FluidStack> fluids) {
+        OverloadProcessingRecipeAdapter adapter = new OverloadProcessingRecipeAdapter();
+        for (RecipeHolder<OverloadProcessingRecipe> holder : context.getLevel().getRecipeManager().getAllRecipesFor(com.moakiee.ae2lt.registry.ModRecipeTypes.OVERLOAD_PROCESSING_TYPE.get())) {
+            OverloadProcessingRecipe recipe = holder.value();
+            if (matchesOverloadInputs(recipe.itemInputs(), inputs)
+                    && matchesFluidInput(recipe.fluidInput(), fluids)
+                    && matchesLightningRequirement(recipe.lightningTier(), recipe.lightningCost())
+                    && matchesOutputs(recipe.itemResults(), recipe.fluidResult().isEmpty() ? List.of() : List.of(recipe.fluidResult()))) {
+                return adapter.convert(holder, context.getLevel());
+            }
+        }
+        return null;
+    }
+
+    private AdvancedAlloyFurnaceRecipe findCrystalCatalyzerRecipe(List<ItemStack> inputs, List<FluidStack> fluids, ItemStack moldStack) {
+        CrystalCatalyzerRecipeAdapter adapter = new CrystalCatalyzerRecipeAdapter();
+        for (RecipeHolder<CrystalCatalyzerRecipe> holder : context.getLevel().getRecipeManager().getAllRecipesFor(com.moakiee.ae2lt.registry.ModRecipeTypes.CRYSTAL_CATALYZER_TYPE.get())) {
+            CrystalCatalyzerRecipe recipe = holder.value();
+            if (recipe.mode() == Mode.CRYSTAL
+                    && recipe.catalyst().map(catalyst -> catalyst.test(moldStack)).orElse(false)
+                    && matchesFluidInput(new FluidStack(net.minecraft.world.level.material.Fluids.WATER, 1000), fluids)
+                    && matchesLightningRequirement(recipe.lightningTier(), recipe.lightningCost())
+                    && matchesItemOnlyOutput(recipe.getOutputTemplate())) {
+                return adapter.convert(holder, context.getLevel());
+            }
+        }
+        return null;
+    }
+
+    private boolean matchesLightningSimulationInputs(List<LightningSimulationIngredient> recipeInputs, List<ItemStack> inputs) {
+        for (LightningSimulationIngredient ingredient : recipeInputs) {
+            if (!matchesIngredient(ingredient.ingredient(), ingredient.count(), inputs)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private boolean matchesOverloadInputs(List<OverloadProcessingIngredient> recipeInputs, List<ItemStack> inputs) {
+        for (OverloadProcessingIngredient ingredient : recipeInputs) {
+            if (!matchesIngredient(ingredient.ingredient(), ingredient.count(), inputs)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private boolean matchesIngredient(Ingredient ingredient, long amount, List<ItemStack> inputs) {
+        long found = 0;
+        for (ItemStack input : inputs) {
+            if (ingredient.test(input)) {
+                found += input.getCount();
+            }
+        }
+        return found >= amount;
+    }
+
+    private boolean matchesFluidInput(FluidStack required, List<FluidStack> fluids) {
+        if (required.isEmpty()) {
+            return true;
+        }
+        long found = 0;
+        for (FluidStack fluid : fluids) {
+            if (FluidStack.isSameFluidSameComponents(fluid, required)) {
+                found += fluid.getAmount();
+            }
+        }
+        return found >= required.getAmount();
+    }
+
+    private boolean matchesLightningRequirement(LightningKey.Tier tier, long amount) {
+        LightningKey requiredKey = LightningKey.of(tier);
+        for (OutputKey inputKey : taskInputKeys) {
+            if (inputKey.key.equals(requiredKey) && inputKey.amount >= amount) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean matchesItemOnlyOutput(ItemStack output) {
+        if (output.isEmpty()) {
+            return false;
+        }
+        return matchesOutputs(List.of(output), List.of());
+    }
+
+    private boolean matchesOutputs(List<ItemStack> itemOutputs, List<FluidStack> fluidOutputs) {
+        for (var patternOutput : pattern.getOutputs()) {
+            boolean matched = false;
+            if (patternOutput.what() instanceof AEItemKey itemKey) {
+                ItemStack patternStack = itemKey.toStack((int) Math.min(patternOutput.amount(), Integer.MAX_VALUE));
+                for (ItemStack output : itemOutputs) {
+                    if (ItemStack.isSameItem(patternStack, output)) {
+                        matched = true;
+                        break;
+                    }
+                }
+            } else if (patternOutput.what() instanceof AEFluidKey fluidKey) {
+                for (FluidStack output : fluidOutputs) {
+                    if (fluidKey.getFluid().isSame(output.getFluid())) {
+                        matched = true;
+                        break;
+                    }
+                }
+            }
+
+            if (!matched) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private AdvancedAlloyFurnaceRecipe findDataEnergisticsRecipe(List<ItemStack> inputs, List<FluidStack> fluids, ItemStack moldStack) {

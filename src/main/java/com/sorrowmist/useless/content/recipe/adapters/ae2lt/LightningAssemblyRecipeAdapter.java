@@ -64,6 +64,7 @@ public class LightningAssemblyRecipeAdapter implements IRecipeAdapter<LightningA
         for (Map.Entry<Ingredient, Long> entry : ingredientCounts.entrySet()) {
             countedIngredients.add(new CountedIngredient(entry.getKey(), entry.getValue()));
         }
+        AELightningIngredientHelper.addLightningIngredient(countedIngredients, recipe.lightningTier(), recipe.lightningCost());
 
         int processTime = BASE_PROCESS_TIME + inputs.size() * 15;
 
@@ -148,7 +149,8 @@ public class LightningAssemblyRecipeAdapter implements IRecipeAdapter<LightningA
                 mergeIngredient(requiredCounts, input.ingredient(), input.count());
             }
 
-            if (matchesCountedIngredients(inputs, requiredCounts)) {
+            if (matchesCountedIngredients(inputs, requiredCounts)
+                    && AELightningIngredientHelper.matchesLightning(inputs, recipe.lightningTier(), recipe.lightningCost())) {
                 return holder;
             }
         }

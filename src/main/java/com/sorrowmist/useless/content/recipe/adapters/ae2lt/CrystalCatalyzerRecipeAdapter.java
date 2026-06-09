@@ -5,6 +5,7 @@ import com.moakiee.ae2lt.machine.crystalcatalyzer.recipe.Mode;
 import com.moakiee.ae2lt.registry.ModRecipeTypes;
 import com.sorrowmist.useless.api.enums.AlloyFurnaceMode;
 import com.sorrowmist.useless.content.recipe.AdvancedAlloyFurnaceRecipe;
+import com.sorrowmist.useless.content.recipe.CountedIngredient;
 import com.sorrowmist.useless.content.recipe.IRecipeAdapter;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
@@ -33,7 +34,7 @@ import java.util.Optional;
  */
 public class CrystalCatalyzerRecipeAdapter implements IRecipeAdapter<CrystalCatalyzerRecipe> {
 
-    private static final int OUTPUT_COUNT = 256;
+    private static final int OUTPUT_COUNT = 1024;
     private static final int BASE_PROCESS_TIME = 200;
 
     @Override
@@ -63,7 +64,7 @@ public class CrystalCatalyzerRecipeAdapter implements IRecipeAdapter<CrystalCata
 
         ItemStack output = outputTemplate.copyWithCount(OUTPUT_COUNT);
 
-        int energy = Math.max(recipe.energyPerCycle() * OUTPUT_COUNT, 10000);
+        int energy = recipe.energyPerCycle();
 
         ResourceLocation convertedId = ResourceLocation.fromNamespaceAndPath(
                 originalId.getNamespace(),
@@ -73,10 +74,12 @@ public class CrystalCatalyzerRecipeAdapter implements IRecipeAdapter<CrystalCata
         Ingredient moldIngredient = catalyst.orElse(Ingredient.EMPTY);
 
         FluidStack waterInput = new FluidStack(Fluids.WATER, 1000);
+        List<CountedIngredient> countedIngredients = new ArrayList<>();
+        AELightningIngredientHelper.addLightningIngredient(countedIngredients, recipe.lightningTier(), (long) recipe.lightningCost());
 
         AdvancedAlloyFurnaceRecipe convertedRecipe = new AdvancedAlloyFurnaceRecipe(
                 convertedId,
-                List.of(),
+                countedIngredients,
                 List.of(waterInput),
                 List.of(output),
                 List.of(),
@@ -136,7 +139,8 @@ public class CrystalCatalyzerRecipeAdapter implements IRecipeAdapter<CrystalCata
             Optional<Ingredient> catalyst = recipe.catalyst();
             if (catalyst.isEmpty()) continue;
 
-            if (catalyst.get().test(mold)) {
+            if (catalyst.get().test(mold)
+                    && AELightningIngredientHelper.matchesLightning(inputs, recipe.lightningTier(), (long) recipe.lightningCost())) {
                 return holder;
             }
         }

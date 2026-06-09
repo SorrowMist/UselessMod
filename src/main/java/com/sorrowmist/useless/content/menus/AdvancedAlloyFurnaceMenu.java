@@ -320,6 +320,10 @@ public class AdvancedAlloyFurnaceMenu extends AEBaseMenu {
         return this.data.get(AdvancedAlloyFurnaceData.DATA_HAS_MOLD) > 0;
     }
 
+    public int getFurnaceTier() {
+        return this.data.get(AdvancedAlloyFurnaceData.DATA_FURNACE_TIER);
+    }
+
     public FluidTank getInputFluidTank(int index) {
         return this.blockEntity != null ? this.blockEntity.getInputFluidTank(index) : new FluidTank(0);
     }

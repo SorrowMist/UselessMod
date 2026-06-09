@@ -2,6 +2,7 @@ package com.sorrowmist.useless;
 
 import com.mojang.logging.LogUtils;
 import com.sorrowmist.useless.content.blocks.GlowPlasticBlock;
+import com.sorrowmist.useless.content.items.EndlessBeafItem;
 import com.sorrowmist.useless.content.recipe.adapters.actuallyadditions.ActuallyAdditionsCompat;
 import com.sorrowmist.useless.content.recipe.adapters.advancedae.AdvancedAECompat;
 import com.sorrowmist.useless.content.recipe.adapters.ae2.AE2Compat;
@@ -17,7 +18,13 @@ import com.sorrowmist.useless.core.component.UComponents;
 import com.sorrowmist.useless.core.config.ConfigManager;
 import com.sorrowmist.useless.init.*;
 import com.sorrowmist.useless.world.dimension.UselessDimensions;
+import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.server.packs.PackType;
+import net.minecraft.server.packs.repository.Pack;
+import net.minecraft.server.packs.repository.PackSource;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.item.ItemStack;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.ModContainer;
@@ -25,6 +32,8 @@ import net.neoforged.fml.common.Mod;
 import net.neoforged.fml.config.ModConfig;
 import net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent;
 import net.neoforged.neoforge.common.NeoForge;
+import net.neoforged.neoforge.event.AddPackFindersEvent;
+import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent;
 import net.neoforged.neoforge.event.server.ServerStartingEvent;
 import org.slf4j.Logger;
 
@@ -35,6 +44,7 @@ public class UselessMod {
 
     public UselessMod(IEventBus modEventBus, ModContainer modContainer) {
         modEventBus.addListener(this::commonSetup);
+        modEventBus.addListener(this::registerBuiltinResourcePacks);
         UComponents.init(modEventBus);
 
         ModBlocks.BLOCKS.register(modEventBus);
@@ -92,6 +102,30 @@ public class UselessMod {
         DataEnergisticsCompat.init(event);
     }
 
+    private void registerBuiltinResourcePacks(AddPackFindersEvent event) {
+        if (event.getPackType() != PackType.CLIENT_RESOURCES) return;
+
+        event.addPackFinders(
+                ResourceLocation.fromNamespaceAndPath(MODID, "xia"),
+                PackType.CLIENT_RESOURCES,
+                Component.translatable("pack.useless_mod.xia.name"),
+                PackSource.BUILT_IN,
+                false,
+                Pack.Position.TOP);
+    }
+
     @SubscribeEvent
     public void onServerStarting(ServerStartingEvent event) {}
+
+    @SubscribeEvent
+    public void onRightClickBlock(PlayerInteractEvent.RightClickBlock event) {
+        ItemStack stack = event.getItemStack();
+        if (!(stack.getItem() instanceof EndlessBeafItem)) return;
+
+        InteractionResult result = EndlessBeafItem.trySummonLightningForCollector(event.getLevel(), event.getPos(), event.getEntity());
+        if (result == InteractionResult.PASS) return;
+
+        event.setCanceled(true);
+        event.setCancellationResult(result);
+    }
 }

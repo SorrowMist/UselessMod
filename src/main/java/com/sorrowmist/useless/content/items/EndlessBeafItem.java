@@ -19,7 +19,10 @@ import net.minecraft.core.Direction;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.core.particles.BlockParticleOption;
 import net.minecraft.core.particles.ParticleTypes;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvent;
 import net.minecraft.sounds.SoundEvents;
@@ -27,8 +30,10 @@ import net.minecraft.sounds.SoundSource;
 import net.minecraft.tags.BlockTags;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
+import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.HumanoidArm;
+import net.minecraft.world.entity.LightningBolt;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.player.Player;
@@ -75,6 +80,8 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 
 public class EndlessBeafItem extends TieredItem {
+    private static final ResourceLocation AE2LT_LIGHTNING_COLLECTOR_ID = ResourceLocation.fromNamespaceAndPath("ae2lt", "lightning_collector");
+    private static final String AE2LT_NATURAL_LIGHTNING_TAG = "ae2lt.natural_weather_lightning";
     private final ToolTypeMode toolType;
 
     public EndlessBeafItem() {
@@ -297,6 +304,9 @@ public class EndlessBeafItem extends TieredItem {
 
         if (player == null) return InteractionResult.PASS;
 
+        InteractionResult lightningCollectorResult = trySummonLightningForCollector(ctx.getLevel(), ctx.getClickedPos(), ctx.getPlayer());
+        if (lightningCollectorResult != InteractionResult.PASS) return lightningCollectorResult;
+
         // ============================================================
         // 1. 刷子功能 (对 BrushableBlock 生效)
         // ============================================================
@@ -332,6 +342,35 @@ public class EndlessBeafItem extends TieredItem {
 
         // 2.5 斧头 (去蜡)
         return this.tryScrapeOrWaxOff(ctx, ItemAbilities.AXE_WAX_OFF, SoundEvents.AXE_WAX_OFF, 3004);
+    }
+
+    public static InteractionResult trySummonLightningForCollector(Level level, BlockPos collectorPos, @Nullable Player player) {
+        if (!ModList.get().isLoaded("ae2lt")) return InteractionResult.PASS;
+
+        BlockState state = level.getBlockState(collectorPos);
+        if (!AE2LT_LIGHTNING_COLLECTOR_ID.equals(BuiltInRegistries.BLOCK.getKey(state.getBlock()))) {
+            return InteractionResult.PASS;
+        }
+
+        BlockPos rodPos = collectorPos.above();
+        if (!level.getBlockState(rodPos).is(net.minecraft.world.level.block.Blocks.LIGHTNING_ROD)) {
+            return InteractionResult.PASS;
+        }
+
+        if (level instanceof ServerLevel serverLevel) {
+            LightningBolt bolt = EntityType.LIGHTNING_BOLT.create(serverLevel);
+            if (bolt == null) return InteractionResult.FAIL;
+
+            Vec3 target = Vec3.atBottomCenterOf(rodPos.above());
+            bolt.moveTo(target.x, target.y, target.z);
+            if (player instanceof ServerPlayer serverPlayer) {
+                bolt.setCause(serverPlayer);
+            }
+            bolt.getPersistentData().putBoolean(AE2LT_NATURAL_LIGHTNING_TAG, true);
+            serverLevel.addFreshEntity(bolt);
+        }
+
+        return InteractionResult.sidedSuccess(level.isClientSide());
     }
 
     @Override

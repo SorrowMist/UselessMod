@@ -19,7 +19,8 @@ public class AdvancedAlloyFurnaceData implements ContainerData {
     public static final int DATA_AE_ACTIVE_TASKS = 6;
     public static final int DATA_AE_TOTAL_PROGRESS = 7;
     public static final int DATA_AE_TOTAL_MAX_PROGRESS = 8;
-    public static final int DATA_COUNT = 9;
+    public static final int DATA_FURNACE_TIER = 9;
+    public static final int DATA_COUNT = 10;
 
     private final AdvancedAlloyFurnaceBlockEntity entity;
 
@@ -39,6 +40,7 @@ public class AdvancedAlloyFurnaceData implements ContainerData {
             case DATA_AE_ACTIVE_TASKS -> this.entity.getActiveAETaskCount();
             case DATA_AE_TOTAL_PROGRESS -> this.entity.getTotalAEProgress();
             case DATA_AE_TOTAL_MAX_PROGRESS -> this.entity.getTotalAEMaxProgress();
+            case DATA_FURNACE_TIER -> this.entity.getFurnaceTier();
             default -> 0;
         };
     }
@@ -55,6 +57,7 @@ public class AdvancedAlloyFurnaceData implements ContainerData {
             case DATA_AE_ACTIVE_TASKS -> this.entity.setActiveAETaskCount(value);
             case DATA_AE_TOTAL_PROGRESS -> this.entity.setTotalAEProgress(value);
             case DATA_AE_TOTAL_MAX_PROGRESS -> this.entity.setTotalAEMaxProgress(value);
+            case DATA_FURNACE_TIER -> this.entity.setClientFurnaceTier(value);
         }
     }
 

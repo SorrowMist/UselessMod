@@ -96,6 +96,8 @@
 
   "pack.useless_mod.god.name": "无用模组 - 神权杖材质包",
   "pack.useless_mod.god.description": "麦淇淋制作的立体神权杖材质包",
+  "pack.useless_mod.xia.name": "无用模组 - 虾材质优化包",
+  "pack.useless_mod.xia.description": "材质来源：ae2&mek丨部分二改 by 虾比事李跌丨$丨无用模组材质优化V2.1",
   "gui.useless_mod.ultimine_status": "Ultimine: %s",
   "gui.useless_mod.force_mining_label": "强制挖掘: ",
   "gui.useless_mod.force_mining_status": "%s",

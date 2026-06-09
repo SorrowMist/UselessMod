@@ -680,6 +680,11 @@ public class AdvancedAlloyFurnaceScreen extends net.minecraft.client.gui.screens
         List<Component> tooltip = new ArrayList<>();
         tooltip.add(Component.translatable("gui.useless_mod.advanced_alloy_furnace.energy",
                 this.menu.getEnergy(), this.menu.getMaxEnergy()));
+        tooltip.add(Component.empty());
+        tooltip.add(Component.translatable("tooltip.useless_mod.furnace_tier", this.menu.getFurnaceTier())
+                .withStyle(ChatFormatting.GOLD));
+        tooltip.add(Component.translatable("tooltip.useless_mod.furnace_upgrade_hint"));
+        tooltip.add(Component.translatable("tooltip.useless_mod.furnace_upgrade_effect"));
         guiGraphics.renderTooltip(this.font, tooltip, Optional.empty(), mouseX, mouseY);
     }
 

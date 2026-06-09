@@ -78,14 +78,15 @@ public class OverloadProcessingRecipeAdapter implements IRecipeAdapter<OverloadP
         for (Map.Entry<Ingredient, Long> entry : ingredientCounts.entrySet()) {
             countedIngredients.add(new CountedIngredient(entry.getKey(), entry.getValue()));
         }
+        AELightningIngredientHelper.addLightningIngredient(countedIngredients, recipe.lightningTier(), recipe.lightningCost());
 
         List<FluidStack> inputFluids = hasFluidInput ? List.of(fluidInput.copy()) : List.of();
         List<ItemStack> outputs = hasItemOutputs ? itemResults.stream().map(ItemStack::copy).toList() : List.of();
         List<FluidStack> outputFluids = hasFluidOutput ? List.of(fluidResult.copy()) : List.of();
 
-        int processTime = BASE_PROCESS_TIME + itemInputs.size() * 20;
+        int processTime = BASE_PROCESS_TIME;
         long energy = recipe.totalEnergy();
-        int scaledEnergy = energy > Integer.MAX_VALUE ? 10000 : (int) Math.max(energy, 1000);
+        int scaledEnergy = energy > Integer.MAX_VALUE ? 10000 : (int) energy;
 
         ResourceLocation convertedId = ResourceLocation.fromNamespaceAndPath(
                 originalId.getNamespace(),
@@ -191,7 +192,9 @@ public class OverloadProcessingRecipeAdapter implements IRecipeAdapter<OverloadP
             }
 
             // 只要物品或流体有一个满足，就可以匹配（因为配方可能只有其中一种输入）
-            if ((recipeItemInputs.isEmpty() || itemsMatch) && (recipeFluidInput.isEmpty() || fluidsMatch)) {
+            if ((recipeItemInputs.isEmpty() || itemsMatch)
+                    && (recipeFluidInput.isEmpty() || fluidsMatch)
+                    && AELightningIngredientHelper.matchesLightning(inputs, recipe.lightningTier(), recipe.lightningCost())) {
                 return holder;
             }
         }

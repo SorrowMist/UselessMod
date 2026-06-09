@@ -2,61 +2,64 @@ package com.sorrowmist.useless.utils.mining;
 
 import com.sorrowmist.useless.api.enums.tool.EnchantMode;
 import com.sorrowmist.useless.compat.AE2Compat;
-import com.sorrowmist.useless.compat.OccultismCompat;
-import com.sorrowmist.useless.compat.SophisticatedCompat;
 import com.sorrowmist.useless.core.component.UComponents;
 import com.sorrowmist.useless.core.config.ConfigManager;
 import com.sorrowmist.useless.utils.UComponentUtils;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
-import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.component.DataComponents;
-import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.sounds.SoundSource;
-import net.minecraft.world.Container;
+import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.ai.attributes.Attributes;
+import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
-import net.minecraft.world.item.component.ItemLore;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.HitResult;
 import net.neoforged.fml.ModList;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Queue;
+import java.util.Set;
+import java.util.UUID;
+import java.util.stream.Collectors;
 
 public class MiningUtils {
-
     /**
-     * 获取方块掉落物（支持强制挖掘模式）
+     * 获取强制挖掘兜底掉落物
+     * 当方块正常破坏没有有效掉落时，返回方块本身；精准采集模式下会尽量保留方块实体组件。
+     *
+     * @param state 方块状态
+     * @param level 世界
+     * @param pos   方块位置
+     * @param tool  工具
+     * @return 兜底掉落物列表
      */
-    static List<ItemStack> getBlockDrops(BlockState state, ServerLevel level, BlockPos pos, Player player,
-                                         ItemStack tool, boolean forceMining) {
-        // 优先检查 Occultism 的 IOtherworldBlock 特殊掉落
-        List<ItemStack> otherworldDrops = OccultismCompat.getOtherworldBlockDrops(state, level, pos, player, tool);
-        if (otherworldDrops != null) {
-            return otherworldDrops;
-        }
-        
+    static List<ItemStack> getForcedFallbackDrops(BlockState state, ServerLevel level, BlockPos pos,
+                                                  ItemStack tool) {
         BlockEntity be = level.getBlockEntity(pos);
-        List<ItemStack> drops = Block.getDrops(state, level, pos, be, player, tool);
-
-        if (forceMining && hasNoValidDrops(drops)) {
-            ItemStack stack = new ItemStack(state.getBlock().asItem());
-            boolean isSilk = tool.getOrDefault(UComponents.EnchantModeComponent.get(), EnchantMode.FORTUNE
-            ) == EnchantMode.SILK_TOUCH;
-
-            if (isSilk && be != null) {
-                stack.applyComponents(be.collectComponents());
-            }
-            return Collections.singletonList(stack);
+        ItemStack stack = new ItemStack(state.getBlock().asItem());
+        if (stack.isEmpty() || stack.is(Items.AIR)) {
+            return Collections.emptyList();
         }
-        return drops;
+
+        boolean isSilk = tool.getOrDefault(UComponents.EnchantModeComponent.get(), EnchantMode.FORTUNE
+        ) == EnchantMode.SILK_TOUCH;
+
+        if (isSilk && be != null) {
+            stack.applyComponents(be.collectComponents());
+        }
+        return Collections.singletonList(stack);
     }
 
     /**
@@ -82,10 +85,11 @@ public class MiningUtils {
             return;
         }
 
-        // 获取方块掉落物
-        List<ItemStack> drops = getBlockDrops(state, level, pos, player, tool, forceMining);
-
-        // 处理掉落物
+        List<ItemStack> fallbackDrops = forceMining ? getForcedFallbackDrops(state, level, pos, tool) : Collections.emptyList();
+        List<ItemStack> drops = destroyBlockAndCollectDrops(level, pos, state, player, tool);
+        if (forceMining && hasNoValidDrops(drops) && !hasNoValidDrops(fallbackDrops)) {
+            drops = fallbackDrops;
+        }
         handleDrops(player, drops, tool);
 
         // 计算并弹出经验（时运模式）
@@ -95,9 +99,6 @@ public class MiningUtils {
                 state.getBlock().popExperience(level, pos, exp);
             }
         }
-
-        // 破坏方块
-        level.removeBlock(pos, false);
     }
 
     /**
@@ -337,83 +338,54 @@ public class MiningUtils {
     }
 
     /**
-     * 获取精准采集模式的掉落物（带NBT）
+     * 通过方块自身的破坏回调破坏方块，并收集本次新生成的掉落实体
+     * 这样可以保留其他模组在 playerDestroy 中实现的特殊掉落逻辑，同时仍然让掉落物进入背包。
      *
-     * @param state 方块状态
-     * @param level 世界
-     * @param pos   方块位置
-     * @return 带NBT的物品堆列表
+     * @param level  世界
+     * @param pos    方块位置
+     * @param state  方块状态
+     * @param player 玩家
+     * @param tool   工具
+     * @return 本次破坏生成的掉落物列表
      */
-    static List<ItemStack> getSilkTouchDrops(BlockState state, ServerLevel level, BlockPos pos) {
-        BlockEntity be = level.getBlockEntity(pos);
-        Block block = state.getBlock();
+    static List<ItemStack> destroyBlockAndCollectDrops(ServerLevel level, BlockPos pos, BlockState state,
+                                                       Player player, ItemStack tool) {
+        AABB area = new AABB(pos).inflate(1.0);
+        Set<UUID> before = level.getEntitiesOfClass(ItemEntity.class, area)
+                                .stream()
+                                .map(Entity::getUUID)
+                                .collect(Collectors.toSet());
 
-        // 使用 getCloneItemStack 获取正确的物品（处理 asItem() 返回空气的情况）
-        ItemStack stack = block.getCloneItemStack(level, pos, state);
+        destroyBlockWithoutDrops(level, pos, state, player, tool);
 
-        // 如果还是空，尝试从掉落物列表获取
-        if (stack.isEmpty()) {
-            List<ItemStack> drops = Block.getDrops(state, level, pos, be, null, ItemStack.EMPTY);
-            if (!drops.isEmpty()) {
-                stack = drops.get(0).copy();
-            }
-        }
-
-        if (be != null && !stack.isEmpty()) {
-            // 尝试处理 SophisticatedStorage 的方块
-            boolean handledByCompat = false;
-            if (ModList.get().isLoaded("sophisticatedstorage")) {
-                handledByCompat = SophisticatedCompat.handleSilkTouchDrop(block, be, stack);
-            }
-
-            // 如果不是 SophisticatedStorage 方块，使用标准方式复制NBT数据
-            if (!handledByCompat) {
-                stack.applyComponents(be.collectComponents());
-
-                // 只有包含 container 组件时才添加 "+nbt" tooltip
-                if (stack.has(DataComponents.CONTAINER)) {
-                    Component nbtTooltip = Component.literal("+nbt")
-                                                    .withStyle(ChatFormatting.LIGHT_PURPLE)
-                                                    .withStyle(ChatFormatting.ITALIC);
-
-                    // 获取已有的 lore
-                    ItemLore existingLore = stack.get(DataComponents.LORE);
-                    List<Component> newLoreLines = new ArrayList<>();
-                    if (existingLore != null) {
-                        newLoreLines.addAll(existingLore.lines());
-                    }
-
-                    // 检查是否已经存在 "+nbt" tooltip，避免重复添加
-                    boolean alreadyHasNbtTooltip = newLoreLines.stream()
-                            .anyMatch(line -> line.getString().equals("+nbt"));
-
-                    if (!alreadyHasNbtTooltip) {
-                        newLoreLines.add(nbtTooltip);
-                        stack.set(DataComponents.LORE, new ItemLore(newLoreLines));
-                    }
-                }
-            }
-        }
-
-        return Collections.singletonList(stack);
+        List<ItemStack> drops = new ArrayList<>();
+        level.getEntitiesOfClass(ItemEntity.class, area).stream()
+             .filter(entity -> !before.contains(entity.getUUID()))
+             .forEach(entity -> {
+                 ItemStack drop = entity.getItem().copy();
+                 if (!drop.isEmpty()) {
+                     drops.add(drop);
+                 }
+                 entity.discard();
+             });
+        return drops;
     }
 
     /**
-     * 安全移除方块，防止容器方块（箱子、潜影盒等）的内容物额外掉落
-     * 在移除方块前会先清空 BlockEntity 的容器内容
+     * 执行方块破坏回调并移除方块
+     * 用于集中走 playerWillDestroy 和 playerDestroy，避免直接 removeBlock 跳过模组自定义破坏逻辑。
      *
-     * @param level 世界
-     * @param pos   方块位置
+     * @param level  世界
+     * @param pos    方块位置
+     * @param state  方块状态
+     * @param player 玩家
+     * @param tool   工具
      */
-    static void removeBlockSafely(ServerLevel level, BlockPos pos) {
+    static void destroyBlockWithoutDrops(ServerLevel level, BlockPos pos, BlockState state,
+                                         Player player, ItemStack tool) {
         BlockEntity be = level.getBlockEntity(pos);
-
-        // 如果方块有 BlockEntity 且实现了 Container 接口（容器方块），先清空内容
-        if (be instanceof Container container) {
-            container.clearContent();
-        }
-
-        // 安全移除方块
+        state.getBlock().playerWillDestroy(level, pos, state, player);
+        state.getBlock().playerDestroy(level, player, pos, state, be, tool);
         level.removeBlock(pos, false);
     }
 

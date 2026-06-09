@@ -245,7 +245,7 @@ dependencies {
     runtimeOnly "curse.maven:architectury-api-419699:5786327"
 
 
-    implementation fileTree(dir: 'libs', includes: ['*.jar'], excludes: ['*sophisticated*.jar', 'compile/'])
+    implementation fileTree(dir: 'libs', includes: ['*.jar'], excludes: [ 'compile/'])
     compileOnly fileTree(dir: 'libs/compile')
     compileOnly files("libs/gtceu-1.21.1-7.0.1.jar.1")
 }

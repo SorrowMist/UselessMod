@@ -96,11 +96,14 @@ public class ChainMiningStrategy implements MiningStrategy {
                 continue;
             }
 
-            // 收集掉落物
-            allDrops.addAll(MiningUtils.getBlockDrops(currentState, level, targetPos, player, hand, forceMining));
-
-            // 移除方块
-            level.removeBlock(targetPos, false);
+            List<ItemStack> fallbackDrops = forceMining
+                    ? MiningUtils.getForcedFallbackDrops(currentState, level, targetPos, hand)
+                    : List.of();
+            List<ItemStack> drops = MiningUtils.destroyBlockAndCollectDrops(level, targetPos, currentState, player, hand);
+            if (forceMining && MiningUtils.hasNoValidDrops(drops) && !MiningUtils.hasNoValidDrops(fallbackDrops)) {
+                drops = fallbackDrops;
+            }
+            allDrops.addAll(drops);
             actualMinedCount++;
         }
 

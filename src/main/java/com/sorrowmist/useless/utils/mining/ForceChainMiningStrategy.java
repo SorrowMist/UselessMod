@@ -2,8 +2,6 @@ package com.sorrowmist.useless.utils.mining;
 
 import com.sorrowmist.useless.api.enums.tool.EnchantMode;
 import com.sorrowmist.useless.compat.DraconicEvolutionCompat;
-import com.sorrowmist.useless.compat.SophisticatedCompat;
-import com.sorrowmist.useless.content.blocks.AdvancedAlloyFurnaceBlock;
 import com.sorrowmist.useless.core.component.UComponents;
 import com.sorrowmist.useless.data.PlayerMiningData;
 import net.minecraft.core.BlockPos;
@@ -12,15 +10,10 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.Block;
-import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.storage.loot.LootParams;
-import net.minecraft.world.level.storage.loot.parameters.LootContextParams;
-import net.neoforged.fml.ModList;
 import net.neoforged.neoforge.event.level.BlockEvent;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 
 /**
@@ -88,38 +81,13 @@ public class ForceChainMiningStrategy implements MiningStrategy {
                 }
             }
 
-            BlockEntity be = level.getBlockEntity(targetPos);
-            Block currentBlock = currentState.getBlock();
-
-            // 根据模式获取掉落物
-            List<ItemStack> drops;
-            // 对万象合金炉特殊处理：使用方块的getDrops方法以保存数据
-            if (currentBlock instanceof AdvancedAlloyFurnaceBlock alloyFurnaceBlock) {
-                LootParams.Builder lootParams = new LootParams.Builder(level)
-                        .withParameter(LootContextParams.ORIGIN, targetPos.getCenter())
-                        .withParameter(LootContextParams.TOOL, hand)
-                        .withParameter(LootContextParams.THIS_ENTITY, player);
-                if (be != null) {
-                    lootParams.withParameter(LootContextParams.BLOCK_ENTITY, be);
-                }
-                drops = alloyFurnaceBlock.getDrops(currentState, lootParams);
-            } else if (isSilkTouch) {
-                drops = MiningUtils.getSilkTouchDrops(currentState, level, targetPos);
-            } else {
-                drops = Block.getDrops(currentState, level, targetPos, be, player, hand);
-                if (MiningUtils.hasNoValidDrops(drops)) {
-                    drops = Collections.singletonList(new ItemStack(currentBlock.asItem()));
-                }
+            List<ItemStack> fallbackDrops = MiningUtils.getForcedFallbackDrops(currentState, level, targetPos, hand);
+            List<ItemStack> drops = MiningUtils.destroyBlockAndCollectDrops(level, targetPos, currentState, player, hand);
+            if (MiningUtils.hasNoValidDrops(drops) && !MiningUtils.hasNoValidDrops(fallbackDrops)) {
+                drops = fallbackDrops;
             }
 
             allDrops.addAll(drops);
-
-            // 对于 SophisticatedStorage 方块，需要先设置 packed 状态
-            if (ModList.get().isLoaded("sophisticatedstorage") && be != null) {
-                SophisticatedCompat.handlePreRemoval(be);
-            }
-
-            MiningUtils.removeBlockSafely(level, targetPos);
             actualMinedCount++;
         }
 

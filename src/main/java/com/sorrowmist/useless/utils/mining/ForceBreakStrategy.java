@@ -2,8 +2,6 @@ package com.sorrowmist.useless.utils.mining;
 
 import com.sorrowmist.useless.api.enums.tool.EnchantMode;
 import com.sorrowmist.useless.compat.DraconicEvolutionCompat;
-import com.sorrowmist.useless.compat.SophisticatedCompat;
-import com.sorrowmist.useless.content.blocks.AdvancedAlloyFurnaceBlock;
 import com.sorrowmist.useless.core.component.UComponents;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
@@ -12,12 +10,8 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.storage.loot.LootParams;
-import net.minecraft.world.level.storage.loot.parameters.LootContextParams;
-import net.neoforged.fml.ModList;
 import net.neoforged.neoforge.event.level.BlockEvent;
 
-import java.util.Collections;
 import java.util.List;
 
 /**
@@ -49,34 +43,11 @@ public class ForceBreakStrategy implements MiningStrategy {
         boolean isSilkTouch = hand.getOrDefault(UComponents.EnchantModeComponent.get(), EnchantMode.FORTUNE)
                 == EnchantMode.SILK_TOUCH;
 
-        List<ItemStack> drops;
-
-        // 对万象合金炉特殊处理：使用方块的getDrops方法以保存数据
-        if (block instanceof AdvancedAlloyFurnaceBlock alloyFurnaceBlock) {
-            BlockEntity be = level.getBlockEntity(pos);
-            LootParams.Builder lootParams = new LootParams.Builder(level)
-                    .withParameter(LootContextParams.ORIGIN, pos.getCenter())
-                    .withParameter(LootContextParams.TOOL, hand)
-                    .withParameter(LootContextParams.THIS_ENTITY, player);
-            if (be != null) {
-                lootParams.withParameter(LootContextParams.BLOCK_ENTITY, be);
-            }
-            drops = alloyFurnaceBlock.getDrops(state, lootParams);
-        } else if (isSilkTouch) {
-            // 精准采集模式：强制获取带NBT的方块
-            drops = MiningUtils.getSilkTouchDrops(state, level, pos);
-        } else {
-            // 非精准采集模式：正常获取掉落物
-            BlockEntity be = level.getBlockEntity(pos);
-            drops = Block.getDrops(state, level, pos, be, player, hand);
-
-            // 如果没有有效掉落物，强制掉落方块本身
-            if (MiningUtils.hasNoValidDrops(drops)) {
-                drops = Collections.singletonList(new ItemStack(block.asItem()));
-            }
+        List<ItemStack> fallbackDrops = MiningUtils.getForcedFallbackDrops(state, level, pos, hand);
+        List<ItemStack> drops = MiningUtils.destroyBlockAndCollectDrops(level, pos, state, player, hand);
+        if (MiningUtils.hasNoValidDrops(drops) && !MiningUtils.hasNoValidDrops(fallbackDrops)) {
+            drops = fallbackDrops;
         }
-
-        // 处理掉落物
         MiningUtils.handleDrops(player, drops, hand);
 
         // 计算并弹出经验（时运模式）
@@ -87,14 +58,6 @@ public class ForceBreakStrategy implements MiningStrategy {
                 block.popExperience(level, pos, exp);
             }
         }
-
-        // 对于 SophisticatedStorage 方块，需要先设置 packed 状态
-        if (ModList.get().isLoaded("sophisticatedstorage") && be != null) {
-            SophisticatedCompat.handlePreRemoval(be);
-        }
-
-        // 破坏方块（使用安全移除方法，防止容器内容物额外掉落）
-        MiningUtils.removeBlockSafely(level, pos);
 
         // 取消原版事件
         event.setCanceled(true);

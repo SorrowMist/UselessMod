@@ -15,6 +15,7 @@
     "mek.ElectricPumpMixin",
     "mek.FluidicPlenisherMixin",
     "mek.FormulaicAssemblicatorMixin",
+    "mek.FuckingPrideHolidayMixin",
     "mek.MekanismUtilsMixin",
     "mek.TileComponentEjectorMixin",
     "mek.TileEntityDigitalMinerMixin",

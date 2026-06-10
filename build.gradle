@@ -18,11 +18,6 @@ version = mod_version
 group = mod_group_id
 
 repositories {
-    // Add here additional repositories if required by some of the dependencies below.
-    maven {
-        name = "TerraformersMC"
-        url = uri("https://maven.terraformersmc.com/")
-    }
     maven {
         name = 'cursemaven'
         url = uri("https://www.cursemaven.com")
@@ -32,44 +27,41 @@ repositories {
         url = uri("https://modmaven.dev/")
     }
     maven {
-        url = uri("https://maven.shedaniel.me/")
-    }
-    maven {
         url = uri("https://maven.architectury.dev/")
     }
     maven {
         url = uri("https://maven.latvian.dev/releases/")
     }
-
-    maven { url 'https://modmaven.dev/' }
-    maven {
-        url "https://cursemaven.com"
-    }
     maven {
         name = "Modrinth"
         url = "https://api.modrinth.com/maven"
     }
-    // Forge 官方仓库
-    maven {
-        name = "Forge"
-        url = "https://maven.minecraftforge.net"
-    }
-    // Patchouli 仓库
     maven {
         name = "BlameJared"
         url = "https://maven.blamejared.com"
     }
-
     maven {
         name 'Thermal Maven'
         url 'https://maven.covers1624.net/'
     }
     maven {
-        url "https://maven.shadowsoffire.dev/releases"
-    }
-    maven {
         name = "TheIllusiveC4"
         url = "https://maven.theillusivec4.top/"
+    }
+    maven {
+        name = "GeckoLib"
+        url = "https://dl.cloudsmith.io/public/geckolib3/geckolib/maven/"
+    }
+    maven {
+        name = "FTB"
+        url = "https://maven.ftb.dev/releases"
+    }
+    maven {
+        name = "Kotlin for Forge"
+        url = "https://thedarkcolour.github.io/KotlinForForge/"
+    }
+    maven {
+        url = uri("https://jitpack.io")
     }
     mavenCentral()
 }
@@ -164,7 +156,74 @@ configurations {
 }
 
 dependencies {
+    implementation "mezz.jei:jei-1.21.1-neoforge:19.21.0.247"
+    implementation "curse.maven:ae2-jei-integration-1074338:5748513"
 
+    implementation "org.appliedenergistics:appliedenergistics2:19.2.16"
+    implementation "org.appliedenergistics:guideme:2.5.1"
+    implementation "de.mari_023:ae2wtlib_api:19.2.5"
+
+    implementation "curse.maven:glodium-957920:5821676"
+    implementation "curse.maven:ex-pattern-provider-892005:8025439"  // 2.2.32
+    implementation "curse.maven:applied-flux-965012:5614830"
+//    implementation "curse.maven:applied-flux-965012:7429565"
+
+    // 高级ae
+    implementation "software.bernie.geckolib:geckolib-neoforge-1.21.1:4.7.7"
+    implementation "curse.maven:advancedae-1084104:7222372"
+    implementation "curse.maven:ae2addonlib-1366135:7222312"
+
+    implementation "curse.maven:ae2-crystal-science-1435174:8112039"
+    implementation "curse.maven:ae2-lightning-tech-1527395:8173754"
+    implementation "curse.maven:data-energistics-1565514:8217182"
+
+    runtimeOnly "top.theillusivec4.curios:curios-neoforge:9.5.1+1.21.1"
+    implementation "top.theillusivec4.curios:curios-neoforge:9.5.1+1.21.1:api"
+
+    implementation "maven.modrinth:jade:15.1.2+neoforge"
+
+    // 工业先锋
+    runtimeOnly "maven.modrinth:titanium:1.21-4.0.40"
+    implementation "curse.maven:industrial-foregoing-266515:7073719"
+    // 实用拓展
+    implementation "maven.modrinth:actually-additions:1.3.22"
+    // 新生魔艺
+    implementation "curse.maven:ars-nouveau-401955:8152094"
+
+    implementation "mekanism:Mekanism:1.21.1-10.7.15.81"
+    runtimeOnly "mekanism:Mekanism:1.21.1-10.7.15.81:generators"
+    implementation "curse.maven:applied-mekanistics-574300:5978711"
+
+    implementation "curse.maven:botany-pots-353928:7115287"
+    implementation "curse.maven:bookshelf-228525:7115332"
+    runtimeOnly "maven.modrinth:prickle:EE1FHDyD"
+
+//    runtimeOnly "maven.modrinth:allthemodium:2.9.5"
+    runtimeOnly "maven.modrinth:extendedae-plus:1.21.1-1.5.4.1"
+//    runtimeOnly "maven.modrinth:omnitools:1.21.1-1.2.1"
+//    runtimeOnly "curse.maven:ftb-ultimine-forge-386134:7188395"
+    // 神秘农业
+    implementation "curse.maven:cucumber-272335:8035802"
+    implementation "curse.maven:mystical-agriculture-246640:8035819"
+
+    // kjs
+    runtimeOnly "dev.latvian.mods:rhino:2101.2.5-build.54"
+    runtimeOnly "dev.latvian.mods:kubejs-neoforge:2101.7.1-build.188"
+
+    runtimeOnly "curse.maven:ftb-library-forge-404465:7029003"
+    runtimeOnly "dev.architectury:architectury-neoforge:13.0.8"
+    runtimeOnly "dev.ftb.mods:ftb-teams-neoforge:2101.1.4"
+    runtimeOnly "curse.maven:ftb-chunks-forge-314906:7157142"
+
+    // 龙研
+    compileOnly "com.brandon3055.brandonscore:BrandonsCore:1.21.1-3.2.1.309"
+    compileOnly "com.brandon3055.draconicevolution:Draconic-Evolution:1.21.1-3.1.4.632"
+
+//    compileOnly "maven.modrinth:gregtechceu-modern:mc1.21.1-7.0.1"
+
+    runtimeOnly "maven.modrinth:configuration:6Mztfq1u"
+    runtimeOnly "thedarkcolour:kotlinforforge-neoforge:5.11.0"
+    runtimeOnly "curse.maven:just-enough-characters-250702:7320033"
     // apotheosis
 //    implementation "dev.shadowsoffire:Placebo:1.21.1-9.6.3"
 //    implementation "dev.shadowsoffire:ApothicAttributes:1.21.1-2.6.0"
@@ -172,82 +231,9 @@ dependencies {
 //    implementation "dev.shadowsoffire:ApothicEnchanting:1.21.1-1.3.0"
 //    implementation "dev.shadowsoffire:Apotheosis:1.21.1-8.1.0"
 
-    implementation "curse.maven:glodium-957920:5821676"
-    implementation "org.appliedenergistics:appliedenergistics2:19.2.16"
-    implementation "org.appliedenergistics:guideme:2.5.1"
 
-    implementation "de.mari_023:ae2wtlib_api:19.2.5"
-    implementation "curse.maven:curios-309927:6073321"
-    implementation "top.theillusivec4.curios:curios-neoforge:9.5.1+1.21.1:api"
-    implementation "curse.maven:ex-pattern-provider-892005:6863556"
-    implementation "curse.maven:applied-flux-965012:5614830"
-    implementation "curse.maven:advancedae-1084104:7222372"
-    implementation "curse.maven:ae2addonlib-1366135:7222312"
-
-    //工业先锋compileOnly
-    //compileOnly "curse.maven:industrial-foregoing-266515:7073719"
-    implementation "curse.maven:industrial-foregoing-266515:7073719"
-
-    // [AA]实用拓展
-    implementation files("libs/actuallyadditions-1.3.22+mc1.21.1.jar")
-    
-    implementation "curse.maven:ars-nouveau-401955:8152094"
-
-
-
-    compileOnly "curse.maven:jade-324717:5427817"
-
-    implementation "mekanism:Mekanism:1.21.1-10.7.15.81"
-    runtimeOnly "mekanism:Mekanism:1.21.1-10.7.15.81:generators"
-    implementation "curse.maven:applied-mekanistics-574300:5978711"
-
-    implementation "curse.maven:botany-pots-353928:7115287"
-    implementation "curse.maven:prickle-1023259:5836410"
-    implementation "curse.maven:bookshelf-228525:7115332"
-    implementation "curse.maven:geckolib-388172:7707149"
-
-    implementation "curse.maven:mystical-agriculture-246640:8035819"
-    implementation "curse.maven:cucumber-272335:8035802"
-    implementation "curse.maven:ae2-crystal-science-1435174:8112039"
-    implementation "curse.maven:ae2-lightning-tech-1527395:8173754"
-
-    compileOnly "dev.latvian.mods:kubejs-neoforge:2101.7.1-build.188"
-    //implementation "dev.latvian.mods:kubejs-neoforge:2101.7.1-build.188"
-    compileOnly "dev.latvian.mods:rhino:2101.2.5-build.54"
-    compileOnly "curse.maven:framedblocks-441647:6127891"
-    compileOnly "curse.maven:advancedae-1084104:6225993"
-    compileOnly "curse.maven:functional-storage-556861:6467726"
-    implementation "mezz.jei:jei-1.21.1-neoforge:19.21.0.247"
-    implementation "curse.maven:ae2-jei-integration-1074338:5748513"
-
-    // implementation "curse.maven:occultism-361026:8187667"
-    // implementation "curse.maven:modonomicon-538392:7771524"
-    // implementation "curse.maven:smartbrainlib-661293:7055149"
-
-    // runtime test
-    runtimeOnly "curse.maven:applied-flux-965012:5614830"
-    runtimeOnly "de.mari_023:ae2wtlib:19.2.5"
-    runtimeOnly "curse.maven:jade-324717:6853386"
-
-    implementation "curse.maven:data-energistics-1565514:8217182"
-
-    //geckolib
-    runtimeOnly "curse.maven:geckolib-388172:7009924"
-
-    // 戴森立方计划
-//    runtimeOnly "curse.maven:dyson-cube-project-1345066:8082907"
-//    runtimeOnly "curse.maven:titanium-287342:6443608"
-
-    //ftbteams
-    runtimeOnly "curse.maven:ftb-teams-forge-404468:6930910"
-    runtimeOnly "curse.maven:ftb-library-forge-404465:7029003"
-    runtimeOnly "curse.maven:ftb-chunks-forge-314906:7157142"
-    runtimeOnly "curse.maven:architectury-api-419699:5786327"
-
-
-    implementation fileTree(dir: 'libs', includes: ['*.jar'], excludes: [ 'compile/'])
-    compileOnly fileTree(dir: 'libs/compile')
-    compileOnly files("libs/gtceu-1.21.1-7.0.1.jar.1")
+    implementation fileTree(dir: 'libs', includes: ['*.jar'], excludes: [])
+    compileOnly fileTree(dir: 'libs/compile', includes: ['*.jar'], excludes: [])
 }
 
 // This block of code expands all declared replace properties in the specified resource targets.

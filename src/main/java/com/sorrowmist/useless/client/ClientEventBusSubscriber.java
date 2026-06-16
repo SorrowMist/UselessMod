@@ -14,6 +14,10 @@ import net.minecraftforge.client.event.RegisterKeyMappingsEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 
+/**
+ * 客户端事件订阅器
+ * 重构：ForceBreakKey发送时检查Tab键状态
+ */
 @Mod.EventBusSubscriber(modid = UselessMod.MOD_ID, bus = Mod.EventBusSubscriber.Bus.FORGE, value = Dist.CLIENT)
 public class ClientEventBusSubscriber {
 
@@ -54,12 +58,13 @@ public class ClientEventBusSubscriber {
             }
         }
         
-        // 处理强制挖掘触发按键
+        // 处理强制挖掘触发按键（R键）- 重构：传入Tab键状态以支持R+Tab连锁强制破坏
         if (KeyBindings.TRIGGER_FORCE_MINING_KEY.consumeClick()) {
             if (minecraft.player != null) {
                 ItemStack mainHandItem = minecraft.player.getMainHandItem();
                 if (mainHandItem.getItem() instanceof EndlessBeafItem) {
-                    ModMessages.sendToServer(new TriggerForceMiningPacket());
+                    boolean tabPressed = KeyBindings.SWITCH_CHAIN_MINING_KEY.isDown();
+                    ModMessages.sendToServer(new TriggerForceMiningPacket(tabPressed));
                 }
             }
         }

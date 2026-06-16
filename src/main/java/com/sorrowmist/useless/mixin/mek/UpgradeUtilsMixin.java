@@ -27,7 +27,8 @@ public class UpgradeUtilsMixin {
     public static List<Component> getExpScaledInfo(IUpgradeTile tile, Upgrade upgrade) {
         ArrayList<Component> ret = new ArrayList();
         if (tile.supportsUpgrades() && upgrade.getMax() > 1) {
-            ret.add(MekanismLang.UPGRADES_EFFECT.translate(MekUtils.time(tile)));
+            double effect = upgrade == Upgrade.SPEED ? 1.0 / MekUtils.time(tile) : MekUtils.time(tile);
+            ret.add(MekanismLang.UPGRADES_EFFECT.translate(effect));
         }
         return ret;
     }
@@ -41,7 +42,7 @@ public class UpgradeUtilsMixin {
         ArrayList<Component> ret = new ArrayList();
         if (tile.supportsUpgrades() && upgrade.getMax() > 1) {
             double effect = upgrade == Upgrade.ENERGY ? MekUtils.capacity(tile) :
-                    (upgrade == Upgrade.SPEED ? MekUtils.time(tile) :
+                    (upgrade == Upgrade.SPEED ? 1.0 / MekUtils.time(tile) :
                             Math.pow(MekanismConfig.general.maxUpgradeMultiplier.get(),
                                     (double)tile.getComponent().getUpgrades(upgrade) / (double)upgrade.getMax()));
             ret.add(MekanismLang.UPGRADES_EFFECT.translate(MekUtils.exponential(effect)));

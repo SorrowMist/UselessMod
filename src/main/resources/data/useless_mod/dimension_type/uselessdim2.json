@@ -10,7 +10,7 @@
   "has_weather": false,
   "coordinate_scale": 1.0,
   "ambient_light": 0.0,
-  "fixed_time": 6000,
+  "fixed_time": 5000,
   "logical_height": 384,
   "effects": "minecraft:overworld",
   "infiniburn": "#minecraft:infiniburn_overworld",

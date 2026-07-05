@@ -2,6 +2,8 @@ package com.sorrowmist.useless.datagen.providers.recipes;
 
 import com.sorrowmist.useless.UselessMod;
 import com.sorrowmist.useless.api.enums.AlloyFurnaceMode;
+import com.sorrowmist.useless.api.enums.EnumColor;
+import com.sorrowmist.useless.content.blocks.GlowPlasticBlock;
 import com.sorrowmist.useless.content.recipe.AdvancedAlloyFurnaceRecipeBuilder;
 import com.sorrowmist.useless.init.ModBlocks;
 import com.sorrowmist.useless.init.ModItems;
@@ -14,6 +16,7 @@ import net.minecraft.data.recipes.ShapedRecipeBuilder;
 import net.minecraft.tags.ItemTags;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.item.crafting.Ingredient;
+import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.material.Fluids;
 import net.neoforged.neoforge.fluids.FluidStack;
@@ -34,7 +37,46 @@ public class CraftingRecipes extends RecipeProvider {
         this.addOreGeneratorBlockRecipe(consumer);
         this.addTeleportBlockRecipes(consumer);
         this.addAE2GiftPackageRecipe(consumer);
+        this.addGlowPlasticRecipes(consumer);
         this.addAdvancedAlloyFurnaceRecipes(consumer);
+    }
+
+    private void addGlowPlasticRecipes(RecipeOutput consumer) {
+        for (EnumColor color : EnumColor.valuesInOrder()) {
+            Block concrete = getConcreteBlock(color);
+            ShapedRecipeBuilder.shaped(RecipeCategory.BUILDING_BLOCKS,
+                                       GlowPlasticBlock.GLOW_PLASTIC_BLOCK_ITEMS.get(color).get(),
+                                       8
+                              )
+                              .pattern("CCC")
+                              .pattern("CGC")
+                              .pattern("CCC")
+                              .define('C', concrete)
+                              .define('G', Items.GLOWSTONE_DUST)
+                              .unlockedBy("has_" + color.getRegistryPrefix() + "_concrete", has(concrete))
+                              .save(consumer, UselessMod.id("crafting/" + color.getRegistryPrefix() + "_glow_plastic"));
+        }
+    }
+
+    private static Block getConcreteBlock(EnumColor color) {
+        return switch (color) {
+            case BLACK -> Blocks.BLACK_CONCRETE;
+            case RED, DARK_RED -> Blocks.RED_CONCRETE;
+            case GREEN -> Blocks.GREEN_CONCRETE;
+            case BROWN -> Blocks.BROWN_CONCRETE;
+            case BLUE -> Blocks.BLUE_CONCRETE;
+            case PURPLE -> Blocks.PURPLE_CONCRETE;
+            case CYAN, AQUA -> Blocks.CYAN_CONCRETE;
+            case LIGHT_GRAY -> Blocks.LIGHT_GRAY_CONCRETE;
+            case GRAY -> Blocks.GRAY_CONCRETE;
+            case PINK -> Blocks.PINK_CONCRETE;
+            case LIME -> Blocks.LIME_CONCRETE;
+            case YELLOW -> Blocks.YELLOW_CONCRETE;
+            case LIGHT_BLUE -> Blocks.LIGHT_BLUE_CONCRETE;
+            case MAGENTA -> Blocks.MAGENTA_CONCRETE;
+            case ORANGE -> Blocks.ORANGE_CONCRETE;
+            case WHITE -> Blocks.WHITE_CONCRETE;
+        };
     }
 
     private void addMoldRecipes(RecipeOutput consumer) {

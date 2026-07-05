@@ -69,11 +69,10 @@ public class EventHandler {
         if (player.level().isClientSide()) return;
 
         if (!player.isCreative()) {
-            boolean hasItemInInventory = player.getInventory().items.stream().anyMatch(
-                    item -> item.getItem() instanceof EndlessBeafItem
-                            || item.get(UComponents.CurrentToolTypeComponent.get()) != null);
+            boolean hasItemInInventory = ConfigManager.shouldEnableFlightEffect()
+                    && UselessItemUtils.hasTargetToolInInventory(player);
 
-            if (hasItemInInventory && ConfigManager.shouldEnableFlightEffect()) {
+            if (hasItemInInventory) {
                 FlyEffectedHolder.add(player.getUUID());
                 if (!player.getAbilities().mayfly) {
                     player.getAbilities().mayfly = true;

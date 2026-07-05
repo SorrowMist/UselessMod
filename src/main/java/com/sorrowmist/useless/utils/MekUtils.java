@@ -20,7 +20,6 @@ public class MekUtils {
         CommentedFileConfig config = CommentedFileConfig.builder(file).autosave().sync().build();
         config.load();
 
-        // 读取 section
         Config mekanism = config.get("mekanism_upgrade");
         if (mekanism != null) {
             int max = mekanism.getInt("max_upgrade");
@@ -29,7 +28,6 @@ public class MekUtils {
             }
             MAX_UPGRADE = max;
         } else {
-            // 没有 section，就写进去
             config.set("mekanism_upgrade.max_upgrade", MAX_UPGRADE);
             config.save();
         }

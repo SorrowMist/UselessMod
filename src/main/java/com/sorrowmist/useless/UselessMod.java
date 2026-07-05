@@ -3,20 +3,18 @@ package com.sorrowmist.useless;
 import com.mojang.logging.LogUtils;
 import com.sorrowmist.useless.content.blocks.GlowPlasticBlock;
 import com.sorrowmist.useless.content.items.EndlessBeafItem;
-import com.sorrowmist.useless.content.recipe.adapters.actuallyadditions.ActuallyAdditionsCompat;
-import com.sorrowmist.useless.content.recipe.adapters.advancedae.AdvancedAECompat;
-import com.sorrowmist.useless.content.recipe.adapters.ae2.AE2Compat;
-import com.sorrowmist.useless.content.recipe.adapters.ae2cs.AECrystalScienceCompat;
-import com.sorrowmist.useless.content.recipe.adapters.ae2lt.AELightningTechCompat;
-import com.sorrowmist.useless.content.recipe.adapters.arsnouveau.ArsNouveauCompat;
-import com.sorrowmist.useless.content.recipe.adapters.dataenergistics.DataEnergisticsCompat;
-import com.sorrowmist.useless.content.recipe.adapters.extendedae.ExtendedAECompat;
-import com.sorrowmist.useless.content.recipe.adapters.industrialforegoing.IndustrialForegoingCompat;
-import com.sorrowmist.useless.content.recipe.adapters.mekanism.MekanismCompat;
-import com.sorrowmist.useless.content.recipe.adapters.mysticalagriculture.MysticalAgricultureCompat;
+import com.sorrowmist.useless.content.recipe.adapters.RecipeAdapterCompatRegistry;
 import com.sorrowmist.useless.core.component.UComponents;
 import com.sorrowmist.useless.core.config.ConfigManager;
-import com.sorrowmist.useless.init.*;
+import com.sorrowmist.useless.init.ModBlockEntities;
+import com.sorrowmist.useless.init.ModBlocks;
+import com.sorrowmist.useless.init.ModCreativeTabs;
+import com.sorrowmist.useless.init.ModItems;
+import com.sorrowmist.useless.init.ModMenuType;
+import com.sorrowmist.useless.init.ModNetwork;
+import com.sorrowmist.useless.init.ModPOIs;
+import com.sorrowmist.useless.init.ModRecipeSerializers;
+import com.sorrowmist.useless.init.ModRecipeTypes;
 import com.sorrowmist.useless.world.dimension.UselessDimensions;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
@@ -67,10 +65,9 @@ public class UselessMod {
 
         NeoForge.EVENT_BUS.register(this);
 
-        // 注册配置：接入自定义的 ModConfigs
-        modContainer.registerConfig(ModConfig.Type.COMMON, ConfigManager.SPEC, "useless_mod-common.toml");
-//        modContainer.registerConfig(ModConfig.Type.CLIENT, ConfigManager.CLIENT_SPEC, "useless_mod-client.toml");
-//        modContainer.registerConfig(ModConfig.Type.SERVER, ConfigManager.SERVER_SPEC, "useless_mod-server.toml");
+        modContainer.registerConfig(ModConfig.Type.COMMON, ConfigManager.COMMON_SPEC, "useless_mod-common.toml");
+        modContainer.registerConfig(ModConfig.Type.CLIENT, ConfigManager.CLIENT_SPEC, "useless_mod-client.toml");
+        modContainer.registerConfig(ModConfig.Type.SERVER, ConfigManager.SERVER_SPEC, "useless_mod-server.toml");
     }
 
     // 便捷 ResourceLocation 工具
@@ -79,27 +76,7 @@ public class UselessMod {
     }
 
     private void commonSetup(FMLCommonSetupEvent event) {
-        // 初始化 ExtendedAE 兼容性支持（如果EAE已加载）
-        ExtendedAECompat.init(event);
-        // 初始化 AdvancedAE 兼容性支持（如果AAE已加载）
-        AdvancedAECompat.init(event);
-        // 初始化 Mekanism 兼容性支持（如果Mek已加载）
-        MekanismCompat.init(event);
-        // 初始化 AE2 兼容性支持（如果AE2已加载）
-        AE2Compat.init(event);
-        AECrystalScienceCompat.init(event);
-        // 初始化 Industrial Foregoing 兼容性支持（如果IF已加载）
-        IndustrialForegoingCompat.init(event);
-        // 初始化 Actually Additions 兼容性支持（如果AA已加载）
-        ActuallyAdditionsCompat.init(event);
-        // 初始化 Ars Nouveau 兼容性支持（如果AN已加载）
-        ArsNouveauCompat.init(event);
-        // 初始化 Mystical Agriculture 兼容性支持（如果MA已加载）
-        MysticalAgricultureCompat.init(event);
-        // 初始化 AE2 Lightning Tech 兼容性支持（如果AE2LT已加载）
-        AELightningTechCompat.init(event);
-        // 初始化 DataEnergistics 兼容性支持（如果DataEnergistics已加载）
-        DataEnergisticsCompat.init(event);
+        RecipeAdapterCompatRegistry.init(event);
     }
 
     private void registerBuiltinResourcePacks(AddPackFindersEvent event) {

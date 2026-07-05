@@ -164,4 +164,12 @@ public class UselessItemUtils {
 
         return Optional.empty();
     }
+
+    public static boolean hasTargetToolInInventory(Player player) {
+        if (player == null) {
+            return false;
+        }
+
+        return player.getInventory().items.stream().anyMatch(UselessItemUtils::isTargetTool);
+    }
 }

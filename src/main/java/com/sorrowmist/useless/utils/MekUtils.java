@@ -13,6 +13,7 @@ import java.io.File;
 public class MekUtils {
 
     public static int MAX_UPGRADE = 32;
+    private static final double MIN_TIME_MULTIPLIER = 0.001;
 
     static {
         File file = FMLPaths.CONFIGDIR.get().resolve("useless_mod-common.toml").toFile();
@@ -36,7 +37,8 @@ public class MekUtils {
     }
 
     public static double time(IUpgradeTile tile) {
-        return Math.pow((double)(MekanismConfig.general.maxUpgradeMultiplier.get() * ConfigManager.getTimeMultiplier()), (double)tile.getComponent().getUpgrades(Upgrade.SPEED) / (double)-8.0F);
+        double multiplier = Math.pow((double)(MekanismConfig.general.maxUpgradeMultiplier.get() * ConfigManager.getTimeMultiplier()), (double)tile.getComponent().getUpgrades(Upgrade.SPEED) / (double)-8.0F);
+        return Double.isFinite(multiplier) ? Math.max(multiplier, MIN_TIME_MULTIPLIER) : MIN_TIME_MULTIPLIER;
     }
 
     public static double electricity(IUpgradeTile tile) {
@@ -49,6 +51,10 @@ public class MekUtils {
     }
 
     public static String exponential(double d) {
+        if (!Double.isFinite(d) || d <= 0) {
+            return "0";
+        }
+
         int significant = 4;
         int exp = (int)Math.floor(Math.log10(d));
         d *= Math.pow((double)10.0F, (double)(-exp));

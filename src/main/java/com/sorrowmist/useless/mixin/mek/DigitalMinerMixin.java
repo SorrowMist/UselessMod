@@ -2,6 +2,7 @@ package com.sorrowmist.useless.mixin.mek;
 
 import mekanism.api.Upgrade;
 import mekanism.common.tile.machine.TileEntityDigitalMiner;
+import com.sorrowmist.useless.utils.MekTemp;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
@@ -29,7 +30,8 @@ public abstract class DigitalMinerMixin {
     private void onEnergyExtracted(CallbackInfoReturnable<Boolean> cir) {
         if (this.delay < 0) {
             // 补足所有负 delay 的挖掘
-            for (int i = this.delay; i < 0; i++) {
+            int extraOperations = Math.min(-this.delay, MekTemp.MAX_EXTRA_OPERATIONS_PER_TICK);
+            for (int i = 0; i < extraOperations; i++) {
                 this.tryMineBlock();
             }
             // 重新计算 Speed 升级（delay 依赖它）

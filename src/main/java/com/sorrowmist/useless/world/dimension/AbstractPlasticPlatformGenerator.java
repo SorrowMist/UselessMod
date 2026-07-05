@@ -27,6 +27,8 @@ import java.util.concurrent.CompletableFuture;
  * 子类只需实现平台外观样式和调试名称
  */
 public abstract class AbstractPlasticPlatformGenerator extends ChunkGenerator {
+    private static final int MIN_BUILD_Y = -64;
+
     AbstractPlasticPlatformGenerator(BiomeSource biomeSource) {
         super(biomeSource);
     }
@@ -79,9 +81,13 @@ public abstract class AbstractPlasticPlatformGenerator extends ChunkGenerator {
         BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
         Heightmap oceanFloor = chunk.getOrCreateHeightmapUnprimed(Heightmap.Types.OCEAN_FLOOR_WG);
         Heightmap worldSurface = chunk.getOrCreateHeightmapUnprimed(Heightmap.Types.WORLD_SURFACE_WG);
+        Heightmap motionBlocking = chunk.getOrCreateHeightmapUnprimed(Heightmap.Types.MOTION_BLOCKING);
+        Heightmap motionBlockingNoLeaves = chunk.getOrCreateHeightmapUnprimed(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES);
 
-        int topY = this.getTopY();
-        int bottomY = this.getBottomY();
+        int minY = region.getMinBuildHeight();
+        int maxY = region.getMaxBuildHeight();
+        int bottomY = clampY(this.getBottomY(), minY, maxY);
+        int topY = Math.max(bottomY, clampY(this.getTopY(), minY, maxY));
 
         for (int x = 0; x < 16; x++) {
             for (int z = 0; z < 16; z++) {
@@ -97,16 +103,15 @@ public abstract class AbstractPlasticPlatformGenerator extends ChunkGenerator {
                     chunk.setBlockState(pos.set(x, y, z), state, false);
                 }
 
-                // 上方全部清为空气
-                for (int y = topY + 1; y < 320; y++) {
+                for (int y = topY + 1; y < maxY; y++) {
                     chunk.setBlockState(pos.set(x, y, z), Blocks.AIR.defaultBlockState(), false);
                 }
 
-                // 正确更新高度图
-                int heightmapY = Math.max(0, Math.min(255, topY));
                 BlockState surfaceState = ConfigManager.getFillBlock().defaultBlockState();
-                worldSurface.update(x, z, heightmapY, surfaceState);
-                oceanFloor.update(x, z, heightmapY, surfaceState);
+                worldSurface.update(x, topY, z, surfaceState);
+                oceanFloor.update(x, topY, z, surfaceState);
+                motionBlocking.update(x, topY, z, surfaceState);
+                motionBlockingNoLeaves.update(x, topY, z, surfaceState);
             }
         }
     }
@@ -128,12 +133,12 @@ public abstract class AbstractPlasticPlatformGenerator extends ChunkGenerator {
 
     @Override public int getSeaLevel() {return 0;}
 
-    @Override public int getMinY() {return this.getBottomY();}
+    @Override public int getMinY() {return MIN_BUILD_Y;}
 
     @Override
     public int getBaseHeight(int x, int z, @NotNull Heightmap.Types heightmap,
                              @NotNull LevelHeightAccessor level, @NotNull RandomState randomState) {
-        return this.getTopY();
+        return Math.min(level.getMaxBuildHeight(), clampY(this.getTopY(), level.getMinBuildHeight(), level.getMaxBuildHeight()) + 1);
     }
 
     @Override
@@ -141,8 +146,9 @@ public abstract class AbstractPlasticPlatformGenerator extends ChunkGenerator {
                                               @NotNull RandomState randomState) {
         BlockState[] column = new BlockState[level.getHeight()];
         int minBuild = level.getMinBuildHeight();
-        int bottomY = this.getBottomY();
-        int topY = this.getTopY();
+        int maxBuild = level.getMaxBuildHeight();
+        int bottomY = clampY(this.getBottomY(), minBuild, maxBuild);
+        int topY = Math.max(bottomY, clampY(this.getTopY(), minBuild, maxBuild));
 
         for (int y = minBuild; y < level.getMaxBuildHeight(); y++) {
             int idx = y - minBuild;
@@ -165,5 +171,9 @@ public abstract class AbstractPlasticPlatformGenerator extends ChunkGenerator {
         list.add("边框方块: " + ConfigManager.getBorderBlock());
         list.add("填充方块: " + ConfigManager.getFillBlock());
         list.add("中心方块: " + ConfigManager.getCenterBlock());
+    }
+
+    private static int clampY(int y, int minY, int maxY) {
+        return Math.max(minY, Math.min(maxY - 1, y));
     }
 }

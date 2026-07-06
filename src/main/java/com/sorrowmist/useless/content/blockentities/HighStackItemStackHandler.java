@@ -29,6 +29,7 @@ public class HighStackItemStackHandler extends ItemStackHandler {
     private static final String TAG_ITEMS = "Items";
     private static final String TAG_SLOT = "Slot";
     private static final String TAG_COUNT = "RealCount";
+    private static final String TAG_STACK = "Stack";
 
     // 槽位常量
     private final int moldSlot;
@@ -155,19 +156,7 @@ public class HighStackItemStackHandler extends ItemStackHandler {
             if (!stack.isEmpty()) {
                 CompoundTag itemTag = new CompoundTag();
                 itemTag.putByte(TAG_SLOT, (byte) i);
-
-                // 保存物品的基本信息（使用count=1避免原版限制）
-                ItemStack saveStack = stack.copyWithCount(1);
-                itemTag.put("id", StringTag.valueOf(BuiltInRegistries.ITEM.getKey(stack.getItem()).toString()));
-
-                // 保存组件数据
-                DataComponentPatch components = stack.getComponentsPatch();
-                if (!components.isEmpty()) {
-                    DataResult<Tag> result = DataComponentPatch.CODEC.encodeStart(NbtOps.INSTANCE, components);
-                    result.ifSuccess(tag -> itemTag.put("components", tag));
-                }
-
-                // 保存真实的堆叠数量（使用自定义字段）
+                itemTag.put(TAG_STACK, stack.copyWithCount(1).save(provider));
                 itemTag.putInt(TAG_COUNT, stack.getCount());
 
                 itemsTag.add(itemTag);
@@ -197,35 +186,37 @@ public class HighStackItemStackHandler extends ItemStackHandler {
             int slot = itemTag.getByte(TAG_SLOT) & 255;
 
             if (slot >= 0 && slot < this.stacks.size()) {
-                // 读取物品ID
-                String itemId = itemTag.getString("id");
-                Item item = BuiltInRegistries.ITEM.get(ResourceLocation.parse(itemId));
-
-                if (item != Items.AIR) {
-                    ItemStack stack = new ItemStack(item);
-
-                    // 读取组件数据
-                    if (itemTag.contains("components")) {
-                        DataResult<DataComponentPatch> result = DataComponentPatch.CODEC.parse(
-                                NbtOps.INSTANCE, itemTag.get("components"));
-                        result.ifSuccess(stack::applyComponents);
-                    }
-
-                    // 读取真实的堆叠数量
-                    if (itemTag.contains(TAG_COUNT)) {
-                        int realCount = itemTag.getInt(TAG_COUNT);
-                        stack.setCount(realCount);
-                    } else {
-                        // 兼容旧数据
-                        stack.setCount(1);
-                    }
-
+                ItemStack stack = this.deserializeStack(provider, itemTag);
+                if (!stack.isEmpty()) {
                     this.stacks.set(slot, stack);
                 }
             }
         }
 
         this.onLoad();
+    }
+
+    private ItemStack deserializeStack(HolderLookup.Provider provider, CompoundTag itemTag) {
+        ItemStack stack = ItemStack.EMPTY;
+        if (itemTag.contains(TAG_STACK)) {
+            stack = ItemStack.parseOptional(provider, itemTag.getCompound(TAG_STACK));
+        } else if (itemTag.contains("id")) {
+            String itemId = itemTag.getString("id");
+            Item item = BuiltInRegistries.ITEM.get(ResourceLocation.parse(itemId));
+            if (item != Items.AIR) {
+                stack = new ItemStack(item);
+                if (itemTag.contains("components")) {
+                    DataResult<DataComponentPatch> result = DataComponentPatch.CODEC.parse(
+                            NbtOps.INSTANCE, itemTag.get("components"));
+                    result.ifSuccess(stack::applyComponents);
+                }
+            }
+        }
+
+        if (!stack.isEmpty()) {
+            stack.setCount(itemTag.contains(TAG_COUNT) ? itemTag.getInt(TAG_COUNT) : 1);
+        }
+        return stack;
     }
 
     @Override

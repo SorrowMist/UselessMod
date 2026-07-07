@@ -4,7 +4,8 @@
 	"render_type": "translucent",
 	"texture_size": [64, 64],
 	"textures": {
-		"12": "useless_mod:block/advanced_alloy_furnace",
+		"1": "useless_mod:block/advanced_alloy_furnace_locked",
+		"12": "useless_mod:block/advanced_alloy_furnace_locked",
 		"particle": "useless_mod:block/advanced_alloy_furnace"
 	},
 	"elements": [
@@ -139,7 +140,7 @@
 			"to": [13, 5, 1],
 			"rotation": {"angle": 0, "axis": "y", "origin": [3, 1, 1]},
 			"faces": {
-				"north": {"uv": [8, 0, 10.5, 1], "texture": "#12"}
+				"north": {"uv": [8, 0, 10.5, 1], "texture": "#1"}
 			}
 		},
 		{
@@ -147,7 +148,7 @@
 			"to": [13, 14, 1],
 			"rotation": {"angle": 0, "axis": "y", "origin": [3, 8, 1]},
 			"faces": {
-				"north": {"uv": [7, 8.75, 9.5, 10.25], "texture": "#12"}
+				"north": {"uv": [7, 8.75, 9.5, 10.25], "texture": "#1"}
 			}
 		},
 		{

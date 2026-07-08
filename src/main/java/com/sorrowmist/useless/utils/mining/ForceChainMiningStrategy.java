@@ -4,6 +4,7 @@ import com.sorrowmist.useless.api.enums.tool.EnchantMode;
 import com.sorrowmist.useless.compat.DraconicEvolutionCompat;
 import com.sorrowmist.useless.core.component.UComponents;
 import com.sorrowmist.useless.data.PlayerMiningData;
+import com.sorrowmist.useless.utils.UComponentUtils;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
@@ -38,18 +39,20 @@ public class ForceChainMiningStrategy implements MiningStrategy {
         // 获取玩家的挖掘数据
         PlayerMiningData playerData = MiningDispatcher.getOrCreatePlayerData(player);
 
-        // 查找需要破坏的方块列表
+        // R键连锁始终以强制挖掘语义查找方块（包含工具挖不动的方块）
+        // 缓存是按组件 isForceMiningEnabled 计算的，只有组件已开启强制挖掘时缓存才等价于强制列表，可安全复用；
+        // 否则必须以 forceMining=true 重新计算，避免漏掉挖不动的方块。
+        boolean componentForce = UComponentUtils.isForceMiningEnabled(hand);
         List<BlockPos> blocksToMine;
-        if (playerData.getCachedPos() != null
+        if (componentForce
+                && playerData.getCachedPos() != null
                 && playerData.getCachedPos().equals(pos)
                 && playerData.hasCachedBlocks()) {
             blocksToMine = playerData.getCachedBlocks();
+        } else if (this.enhanced) {
+            blocksToMine = MiningUtils.findBlocksToMineEnhanced(pos, originState, level, hand, true);
         } else {
-            if (this.enhanced) {
-                blocksToMine = MiningUtils.findBlocksToMineEnhanced(pos, originState, level, hand, false);
-            } else {
-                blocksToMine = MiningUtils.findBlocksToMine(pos, originState, level, hand, false);
-            }
+            blocksToMine = MiningUtils.findBlocksToMine(pos, originState, level, hand, true);
         }
 
         if (blocksToMine.isEmpty()) {
@@ -60,6 +63,12 @@ public class ForceChainMiningStrategy implements MiningStrategy {
         // 检查是否为精准采集模式
         boolean isSilkTouch = hand.getOrDefault(UComponents.EnchantModeComponent.get(), EnchantMode.FORTUNE)
                 == EnchantMode.SILK_TOUCH;
+
+        // 在破坏原点方块前捕获单个方块的经验值：破坏后 getBlockEntity(pos) 恒为 null，
+        // 会导致依赖方块实体计算经验的方块算错。
+        int expPerBlock = !isSilkTouch
+                ? originBlock.getExpDrop(originState, level, pos, level.getBlockEntity(pos), player, hand)
+                : 0;
 
         // 执行连锁挖掘
         List<ItemStack> allDrops = new ArrayList<>();
@@ -81,9 +90,11 @@ public class ForceChainMiningStrategy implements MiningStrategy {
                 }
             }
 
-            List<ItemStack> fallbackDrops = MiningUtils.getForcedFallbackDrops(currentState, level, targetPos, hand);
+            // 破坏前用掉落表判断方块是否有自然掉落，避免掉落实体被其他模组吸收导致误判
+            boolean hasNaturalDrops = MiningUtils.blockHasNaturalDrops(level, targetPos, currentState, player, hand);
+            List<ItemStack> fallbackDrops = hasNaturalDrops ? List.of() : MiningUtils.getForcedFallbackDrops(currentState, level, targetPos);
             List<ItemStack> drops = MiningUtils.destroyBlockAndCollectDrops(level, targetPos, currentState, player, hand);
-            if (MiningUtils.hasNoValidDrops(drops) && !MiningUtils.hasNoValidDrops(fallbackDrops)) {
+            if (!hasNaturalDrops && MiningUtils.hasNoValidDrops(drops) && !MiningUtils.hasNoValidDrops(fallbackDrops)) {
                 drops = fallbackDrops;
             }
 
@@ -96,14 +107,9 @@ public class ForceChainMiningStrategy implements MiningStrategy {
             MiningUtils.handleDrops(player, MiningUtils.mergeItemStacks(allDrops), hand);
         }
 
-        // 经验处理（仅在时运模式下）
-        if (!isSilkTouch && hand.getOrDefault(UComponents.EnchantModeComponent.get(),
-                                              EnchantMode.FORTUNE
-        ) == EnchantMode.FORTUNE) {
-            int exp = originBlock.getExpDrop(originState, level, pos, level.getBlockEntity(pos), player, hand);
-            if (exp > 0) {
-                originBlock.popExperience(level, pos, exp * actualMinedCount);
-            }
+        // 经验处理（仅在时运模式下），使用破坏前捕获的经验值
+        if (expPerBlock > 0 && actualMinedCount > 0) {
+            originBlock.popExperience(level, pos, expPerBlock * actualMinedCount);
         }
 
         // 显示结果

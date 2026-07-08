@@ -83,6 +83,13 @@ public class ChainMiningStrategy implements MiningStrategy {
             return;
         }
 
+        // 在破坏原点方块前捕获单个方块的经验值：破坏后 getBlockEntity(pos) 恒为 null，
+        // 会导致依赖方块实体计算经验的方块算错。
+        boolean fortuneMode = hand.getOrDefault(UComponents.EnchantModeComponent.get(), EnchantMode.FORTUNE) == EnchantMode.FORTUNE;
+        int expPerBlock = fortuneMode
+                ? originBlock.getExpDrop(originState, level, pos, level.getBlockEntity(pos), player, hand)
+                : 0;
+
         // 3. 执行挖掘逻辑
         List<ItemStack> allDrops = new ArrayList<>();
         int actualMinedCount = 0;
@@ -96,11 +103,13 @@ public class ChainMiningStrategy implements MiningStrategy {
                 continue;
             }
 
-            List<ItemStack> fallbackDrops = forceMining
-                    ? MiningUtils.getForcedFallbackDrops(currentState, level, targetPos, hand)
+            // 破坏前用掉落表判断方块是否有自然掉落，避免掉落实体被其他模组吸收导致误判
+            boolean hasNaturalDrops = !forceMining || MiningUtils.blockHasNaturalDrops(level, targetPos, currentState, player, hand);
+            List<ItemStack> fallbackDrops = (forceMining && !hasNaturalDrops)
+                    ? MiningUtils.getForcedFallbackDrops(currentState, level, targetPos)
                     : List.of();
             List<ItemStack> drops = MiningUtils.destroyBlockAndCollectDrops(level, targetPos, currentState, player, hand);
-            if (forceMining && MiningUtils.hasNoValidDrops(drops) && !MiningUtils.hasNoValidDrops(fallbackDrops)) {
+            if (forceMining && !hasNaturalDrops && MiningUtils.hasNoValidDrops(drops) && !MiningUtils.hasNoValidDrops(fallbackDrops)) {
                 drops = fallbackDrops;
             }
             allDrops.addAll(drops);
@@ -112,13 +121,10 @@ public class ChainMiningStrategy implements MiningStrategy {
             MiningUtils.handleDrops(player, MiningUtils.mergeItemStacks(allDrops), hand);
         }
 
-        // 经验处理（仅在时运/默认模式下弹出）
-        if (hand.getOrDefault(UComponents.EnchantModeComponent.get(), EnchantMode.FORTUNE) == EnchantMode.FORTUNE) {
-            int exp = originBlock.getExpDrop(originState, level, pos, level.getBlockEntity(pos), player, hand);
-            if (exp > 0) {
-                // 根据实际破坏的数量倍增经验
-                originBlock.popExperience(level, pos, exp * actualMinedCount);
-            }
+        // 经验处理（仅在时运/默认模式下弹出），使用破坏前捕获的经验值
+        if (fortuneMode && expPerBlock > 0 && actualMinedCount > 0) {
+            // 根据实际破坏的数量倍增经验
+            originBlock.popExperience(level, pos, expPerBlock * actualMinedCount);
         }
         
         if (actualMinedCount > 0) {

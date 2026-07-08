@@ -37,26 +37,23 @@ import java.util.stream.Collectors;
 public class MiningUtils {
     /**
      * 获取强制挖掘兜底掉落物
-     * 当方块正常破坏没有有效掉落时，返回方块本身；精准采集模式下会尽量保留方块实体组件。
+     * 当方块正常破坏没有有效掉落时，返回一个与目标方块 NBT 完全一致的方块物品（含方块实体组件）。
      *
      * @param state 方块状态
      * @param level 世界
      * @param pos   方块位置
-     * @param tool  工具
      * @return 兜底掉落物列表
      */
-    static List<ItemStack> getForcedFallbackDrops(BlockState state, ServerLevel level, BlockPos pos,
-                                                  ItemStack tool) {
+    static List<ItemStack> getForcedFallbackDrops(BlockState state, ServerLevel level, BlockPos pos) {
         BlockEntity be = level.getBlockEntity(pos);
         ItemStack stack = new ItemStack(state.getBlock().asItem());
         if (stack.isEmpty() || stack.is(Items.AIR)) {
             return Collections.emptyList();
         }
 
-        boolean isSilk = tool.getOrDefault(UComponents.EnchantModeComponent.get(), EnchantMode.FORTUNE
-        ) == EnchantMode.SILK_TOUCH;
-
-        if (isSilk && be != null) {
+        // 兜底掉落的语义是"复制目标方块本身"，因此只要存在方块实体就附加其 NBT 组件，
+        // 保证掉落物与目标方块 NBT 完全一致（不区分精准采集/时运）。
+        if (be != null) {
             stack.applyComponents(be.collectComponents());
         }
         return Collections.singletonList(stack);
@@ -67,6 +64,26 @@ public class MiningUtils {
      */
     static boolean hasNoValidDrops(List<ItemStack> drops) {
         return drops.isEmpty() || drops.stream().allMatch(stack -> stack.isEmpty() || stack.is(Items.AIR));
+    }
+
+    /**
+     * 在破坏前判断方块用指定工具是否会产生自然掉落。
+     * <p>
+     * 直接查询方块的掉落表（Block.getDrops），不依赖破坏后世界中的 ItemEntity。
+     * 这样即使其他模组（如 FTB Ultimine 连锁挖掘）在破坏期间吸收掉落实体，也能正确判断方块本身是否有掉落，
+     * 避免把"实体被吸收"误判为"无掉落"从而错误触发强制挖掘兜底，导致重复掉落。
+     *
+     * @param level  世界
+     * @param pos    方块位置
+     * @param state  方块状态
+     * @param player 玩家
+     * @param tool   工具
+     * @return 方块是否有自然掉落
+     */
+    static boolean blockHasNaturalDrops(ServerLevel level, BlockPos pos, BlockState state, Player player, ItemStack tool) {
+        BlockEntity be = level.getBlockEntity(pos);
+        List<ItemStack> drops = Block.getDrops(state, level, pos, be, player, tool);
+        return !hasNoValidDrops(drops);
     }
 
     /**
@@ -85,9 +102,12 @@ public class MiningUtils {
             return;
         }
 
-        List<ItemStack> fallbackDrops = forceMining ? getForcedFallbackDrops(state, level, pos, tool) : Collections.emptyList();
+        // 破坏前用掉落表判断方块是否有自然掉落，避免掉落实体被其他模组吸收导致误判
+        boolean hasNaturalDrops = !forceMining || blockHasNaturalDrops(level, pos, state, player, tool);
+        List<ItemStack> fallbackDrops = (forceMining && !hasNaturalDrops) ? getForcedFallbackDrops(state, level, pos) : Collections.emptyList();
         List<ItemStack> drops = destroyBlockAndCollectDrops(level, pos, state, player, tool);
-        if (forceMining && hasNoValidDrops(drops) && !hasNoValidDrops(fallbackDrops)) {
+        // 仅当方块本身确实无自然掉落时才使用兜底，防止能正常挖出物品的方块被额外补出方块本身
+        if (forceMining && !hasNaturalDrops && hasNoValidDrops(drops) && !hasNoValidDrops(fallbackDrops)) {
             drops = fallbackDrops;
         }
         handleDrops(player, drops, tool);
@@ -302,6 +322,7 @@ public class MiningUtils {
         List<BlockPos> blocksToMine = new ArrayList<>(maxBlocks);
 
         // 增强连锁：直接在范围内扫描所有相同方块，不需要相邻限制
+        // 先收集范围内全部匹配方块，再按距离排序、截断到上限，保证保留的是"最近"的方块而非扫描顺序靠前的。
         for (int x = -rangeX; x <= rangeX; x++) {
             for (int y = -rangeY; y <= rangeY; y++) {
                 for (int z = -rangeZ; z <= rangeZ; z++) {
@@ -317,22 +338,17 @@ public class MiningUtils {
                             blocksToMine.add(targetPos);
                         }
                     }
-
-                    if (blocksToMine.size() >= maxBlocks) {
-                        break;
-                    }
                 }
-                if (blocksToMine.size() >= maxBlocks) {
-                    break;
-                }
-            }
-            if (blocksToMine.size() >= maxBlocks) {
-                break;
             }
         }
 
-        // 使用欧几里得距离平方进行排序
+        // 使用欧几里得距离平方进行排序（最近优先）
         blocksToMine.sort(Comparator.comparingDouble(pos -> pos.distSqr(originPos)));
+
+        // 排序后截断到上限，确保保留距离最近的方块
+        if (blocksToMine.size() > maxBlocks) {
+            return new ArrayList<>(blocksToMine.subList(0, maxBlocks));
+        }
 
         return blocksToMine;
     }
@@ -350,7 +366,9 @@ public class MiningUtils {
      */
     static List<ItemStack> destroyBlockAndCollectDrops(ServerLevel level, BlockPos pos, BlockState state,
                                                        Player player, ItemStack tool) {
-        AABB area = new AABB(pos).inflate(1.0);
+        // 采用破坏前后 2 格膨胀范围内 ItemEntity 的差集来收集本次掉落，
+        // 2 格可覆盖部分模组把掉落物生成在方块中心 1 格外的情况；before/after 差集保证不会误收邻近方块的已有掉落。
+        AABB area = new AABB(pos).inflate(2.0);
         Set<UUID> before = level.getEntitiesOfClass(ItemEntity.class, area)
                                 .stream()
                                 .map(Entity::getUUID)

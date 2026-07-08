@@ -43,9 +43,11 @@ public class ForceBreakStrategy implements MiningStrategy {
         boolean isSilkTouch = hand.getOrDefault(UComponents.EnchantModeComponent.get(), EnchantMode.FORTUNE)
                 == EnchantMode.SILK_TOUCH;
 
-        List<ItemStack> fallbackDrops = MiningUtils.getForcedFallbackDrops(state, level, pos, hand);
+        // 破坏前用掉落表判断方块是否有自然掉落，避免掉落实体被其他模组吸收导致误判
+        boolean hasNaturalDrops = MiningUtils.blockHasNaturalDrops(level, pos, state, player, hand);
+        List<ItemStack> fallbackDrops = hasNaturalDrops ? List.of() : MiningUtils.getForcedFallbackDrops(state, level, pos);
         List<ItemStack> drops = MiningUtils.destroyBlockAndCollectDrops(level, pos, state, player, hand);
-        if (MiningUtils.hasNoValidDrops(drops) && !MiningUtils.hasNoValidDrops(fallbackDrops)) {
+        if (!hasNaturalDrops && MiningUtils.hasNoValidDrops(drops) && !MiningUtils.hasNoValidDrops(fallbackDrops)) {
             drops = fallbackDrops;
         }
         MiningUtils.handleDrops(player, drops, hand);

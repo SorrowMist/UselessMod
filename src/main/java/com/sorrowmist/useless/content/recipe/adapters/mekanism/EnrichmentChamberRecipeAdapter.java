@@ -1,31 +1,30 @@
 package com.sorrowmist.useless.content.recipe.adapters.mekanism;
 
 import com.sorrowmist.useless.api.enums.AlloyFurnaceMode;
+import com.sorrowmist.useless.content.recipe.AdapterUtils;
 import com.sorrowmist.useless.content.recipe.AdvancedAlloyFurnaceRecipe;
 import com.sorrowmist.useless.content.recipe.CountedIngredient;
 import com.sorrowmist.useless.content.recipe.IRecipeAdapter;
 import mekanism.api.recipes.ItemStackToItemStackRecipe;
+import mekanism.api.recipes.MekanismRecipeTypes;
+import mekanism.api.recipes.ingredients.ItemStackIngredient;
 import mekanism.common.registries.MekanismBlocks;
-import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.crafting.Ingredient;
 import net.minecraft.world.item.crafting.RecipeHolder;
 import net.minecraft.world.item.crafting.RecipeManager;
 import net.minecraft.world.level.Level;
+import net.neoforged.neoforge.fluids.FluidStack;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Mekanism 富集仓配方适配器
  */
 public class EnrichmentChamberRecipeAdapter implements IRecipeAdapter<ItemStackToItemStackRecipe> {
-
-    // 基础能量消耗
-    private static final int BASE_ENERGY = 2000;
-    // 处理时间基础值（ticks）
-    private static final int BASE_PROCESS_TIME = 20;
 
     @Override
     public Class<ItemStackToItemStackRecipe> getRecipeClass() {
@@ -34,104 +33,129 @@ public class EnrichmentChamberRecipeAdapter implements IRecipeAdapter<ItemStackT
 
     @Override
     @Nullable
-    public AdvancedAlloyFurnaceRecipe convert(RecipeHolder<ItemStackToItemStackRecipe> holder, Level level) {
-        if (holder == null) return null;
-
-        ItemStackToItemStackRecipe originalRecipe = holder.value();
-        
-        // 只处理富集仓配方（ENRICHING类型）
-        if (!originalRecipe.getType().equals(
-                mekanism.api.recipes.MekanismRecipeTypes.TYPE_ENRICHING.value())) {
-            return null;
-        }
-
-        ResourceLocation originalId = holder.id();
-        ResourceLocation convertedId = ResourceLocation.fromNamespaceAndPath(
-                originalId.getNamespace(),
-                originalId.getPath() + "_converted"
-        );
-
-        // 获取输入材料
-        List<CountedIngredient> countedIngredients = new ArrayList<>();
-        var input = originalRecipe.getInput();
-        if (input != null && !input.hasNoMatchingInstances()) {
-            var inputStacks = input.getRepresentations();
-            if (!inputStacks.isEmpty()) {
-                Ingredient ingredient = Ingredient.of(inputStacks.stream());
-                long inputCount = input.ingredient().count();
-                countedIngredients.add(new CountedIngredient(ingredient, inputCount));
-            }
-        }
-
-        if (countedIngredients.isEmpty()) {
-            return null;
-        }
-
-        // 获取输出物品
-        List<ItemStack> outputs = originalRecipe.getOutputDefinition();
-        if (outputs.isEmpty()) {
-            return null;
-        }
-
-        // 创建富集仓模具要求
-        Ingredient moldIngredient = Ingredient.of(new ItemStack(MekanismBlocks.ENRICHMENT_CHAMBER.get()));
-
-        return new AdvancedAlloyFurnaceRecipe(
-                convertedId,
-                countedIngredients,
-                List.of(),           // 无流体输入
-                outputs,
-                List.of(),           // 无流体输出
-                BASE_ENERGY,
-                BASE_PROCESS_TIME,
-                Ingredient.EMPTY,    // 无催化剂
-                0,
-                moldIngredient,      // 富集仓作为模具
-                AlloyFurnaceMode.NORMAL
-        );
+    public ItemStack getMoldItem() {
+        return new ItemStack(MekanismBlocks.ENRICHMENT_CHAMBER.get());
     }
 
     @Override
-    public boolean canHandle(Level level, List<ItemStack> inputs) {
-        return findMatchingRecipe(level, inputs) != null;
+    public List<AdvancedAlloyFurnaceRecipe> convertAll(RecipeHolder<ItemStackToItemStackRecipe> holder, Level level) {
+        List<AdvancedAlloyFurnaceRecipe> result = new ArrayList<>();
+
+        if (holder == null) return result;
+
+        ItemStackToItemStackRecipe originalRecipe = holder.value();
+
+        if (!originalRecipe.getType().equals(MekanismRecipeTypes.TYPE_ENRICHING.value())) {
+            return result;
+        }
+
+        List<CountedIngredient> countedIngredients = new ArrayList<>();
+        var input = originalRecipe.getInput();
+        addCountedIngredient(countedIngredients, input, 1);
+
+        if (countedIngredients.isEmpty()) {
+            return result;
+        }
+
+        List<ItemStack> outputs = originalRecipe.getOutputDefinition();
+        if (outputs.isEmpty()) {
+            return result;
+        }
+
+        result.add(new AdvancedAlloyFurnaceRecipe(
+                AdapterUtils.convertedId(holder.id()),
+                countedIngredients,
+                List.of(),
+                outputs,
+                List.of(),
+                AdapterUtils.mekanismEnrichmentChamberEnergyCost(1),
+                AdapterUtils.mekanismEnrichmentChamberProcessTime(1),
+                Ingredient.EMPTY,
+                0,
+                AdapterUtils.toMoldIngredient(getMoldItem()),
+                AlloyFurnaceMode.NORMAL
+        ));
+        return result;
     }
 
     @Override
     @Nullable
-    public RecipeHolder<ItemStackToItemStackRecipe> findMatchingRecipe(Level level, List<ItemStack> inputs) {
-        if (level == null || inputs.isEmpty()) {
+    public RecipeHolder<ItemStackToItemStackRecipe> findMatchingRecipe(Level level, Map<Ingredient, Long> mergedInputs, Map<FluidStack, Long> mergedFluids, @Nullable ItemStack mold) {
+        if (level == null || mergedInputs.isEmpty()) {
+            return null;
+        }
+        if (mold != null && !mold.isEmpty() && !matchesMold(mold)) {
             return null;
         }
 
         RecipeManager recipeManager = level.getRecipeManager();
         List<RecipeHolder<ItemStackToItemStackRecipe>> recipes = recipeManager.getAllRecipesFor(
-                mekanism.api.recipes.MekanismRecipeTypes.TYPE_ENRICHING.value()
+                MekanismRecipeTypes.TYPE_ENRICHING.value()
         );
 
         for (RecipeHolder<ItemStackToItemStackRecipe> holder : recipes) {
             ItemStackToItemStackRecipe recipe = holder.value();
-            
-            // 确保是富集仓配方
-            if (!recipe.getType().equals(
-                    mekanism.api.recipes.MekanismRecipeTypes.TYPE_ENRICHING.value())) {
-                continue;
-            }
 
             var input = recipe.getInput();
             if (input == null || input.hasNoMatchingInstances()) continue;
 
-            for (ItemStack stack : inputs) {
-                if (!stack.isEmpty() && input.test(stack)) {
-                    return holder;
-                }
+            if (matchesIngredient(mergedInputs, input)) {
+                return holder;
             }
         }
 
         return null;
     }
 
-    @Override
-    public int getPriority() {
-        return 70; // 优先级低于冶金灌注机
+    // ========== Helper Methods ==========
+
+    @Nullable
+    private static CountedIngredient countedIngredient(ItemStackIngredient input, long multiplier) {
+        Ingredient ingredient = ingredient(input);
+        if (ingredient.isEmpty()) {
+            return null;
+        }
+        return new CountedIngredient(ingredient, input.ingredient().count() * multiplier);
+    }
+
+    private static Ingredient ingredient(ItemStackIngredient input) {
+        if (input == null || input.hasNoMatchingInstances()) {
+            return Ingredient.EMPTY;
+        }
+        List<ItemStack> representations = input.getRepresentations();
+        if (representations.isEmpty()) {
+            return Ingredient.EMPTY;
+        }
+        return Ingredient.of(representations.stream().map(stack -> stack.copyWithCount(1)));
+    }
+
+    private static boolean matchesIngredient(Map<Ingredient, Long> mergedInputs, ItemStackIngredient required) {
+        if (required == null || required.hasNoMatchingInstances()) {
+            return false;
+        }
+        long requiredCount = required.ingredient().count();
+        for (Map.Entry<Ingredient, Long> entry : mergedInputs.entrySet()) {
+            for (ItemStack stack : entry.getKey().getItems()) {
+                if (required.testType(stack) && entry.getValue() >= requiredCount) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    private static void addCountedIngredient(List<CountedIngredient> countedIngredients, ItemStackIngredient input, long multiplier) {
+        CountedIngredient counted = countedIngredient(input, multiplier);
+        if (counted == null) {
+            return;
+        }
+        for (int i = 0; i < countedIngredients.size(); i++) {
+            CountedIngredient existing = countedIngredients.get(i);
+            if (AdapterUtils.areIngredientsEqual(existing.ingredient(), counted.ingredient())) {
+                countedIngredients.set(i, new CountedIngredient(existing.ingredient(), existing.count() + counted.count()));
+                return;
+            }
+        }
+        countedIngredients.add(counted);
     }
 }

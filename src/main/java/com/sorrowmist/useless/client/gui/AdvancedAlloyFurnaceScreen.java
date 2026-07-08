@@ -8,6 +8,7 @@ import com.mojang.blaze3d.vertex.Tesselator;
 import com.mojang.blaze3d.vertex.VertexFormat;
 import com.sorrowmist.useless.UselessMod;
 import com.sorrowmist.useless.content.blockentities.AdvancedAlloyFurnaceBlockEntity;
+import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.layout.AdvancedAlloyFurnaceLayout;
 import com.sorrowmist.useless.content.menus.AdvancedAlloyFurnaceMenu;
 import com.sorrowmist.useless.network.PatternPageChangePacket;
 import com.sorrowmist.useless.network.TankClearPacket;
@@ -206,7 +207,7 @@ public class AdvancedAlloyFurnaceScreen extends AbstractContainerScreen<Advanced
 
         guiGraphics.renderItem(stack, x, y, slot.x + slot.y * this.imageWidth);
 
-        if (slot.index < AdvancedAlloyFurnaceBlockEntity.TOTAL_SLOTS && !stack.isEmpty() && stack.getCount() > 1) {
+        if (slot.index < AdvancedAlloyFurnaceLayout.TOTAL_SLOTS && !stack.isEmpty() && stack.getCount() > 1) {
             this.renderCustomItemCount(guiGraphics, stack, x, y);
         } else {
             guiGraphics.renderItemDecorations(this.font, stack, x, y, null);
@@ -349,7 +350,7 @@ public class AdvancedAlloyFurnaceScreen extends AbstractContainerScreen<Advanced
         int startX = isInput ? FLUID_INPUT_X : FLUID_OUTPUT_X;
         int startY = isInput ? FLUID_INPUT_Y : FLUID_OUTPUT_Y;
 
-        for (int i = 0; i < AdvancedAlloyFurnaceBlockEntity.FLUID_TANK_COUNT; i++) {
+        for (int i = 0; i < AdvancedAlloyFurnaceLayout.FLUID_TANK_COUNT; i++) {
             int tankX = x + startX + i * (FLUID_TANK_WIDTH + SLOT_SPACING);
             int tankY = y + startY;
 
@@ -588,7 +589,7 @@ public class AdvancedAlloyFurnaceScreen extends AbstractContainerScreen<Advanced
      */
     private boolean handleFluidTankClick(double mouseX, double mouseY, int x, int y) {
         // 检查输入流体槽
-        for (int i = 0; i < AdvancedAlloyFurnaceBlockEntity.FLUID_TANK_COUNT; i++) {
+        for (int i = 0; i < AdvancedAlloyFurnaceLayout.FLUID_TANK_COUNT; i++) {
             int tankX = x + FLUID_INPUT_X + i * (FLUID_TANK_WIDTH + SLOT_SPACING);
             int tankY = y + FLUID_INPUT_Y;
 
@@ -603,7 +604,7 @@ public class AdvancedAlloyFurnaceScreen extends AbstractContainerScreen<Advanced
         }
 
         // 检查输出流体槽
-        for (int i = 0; i < AdvancedAlloyFurnaceBlockEntity.FLUID_TANK_COUNT; i++) {
+        for (int i = 0; i < AdvancedAlloyFurnaceLayout.FLUID_TANK_COUNT; i++) {
             int tankX = x + FLUID_OUTPUT_X + i * (FLUID_TANK_WIDTH + SLOT_SPACING);
             int tankY = y + FLUID_OUTPUT_Y;
 
@@ -624,12 +625,12 @@ public class AdvancedAlloyFurnaceScreen extends AbstractContainerScreen<Advanced
         int currentPage = this.menu.getPatternPage();
         int slotsPerPage = this.menu.getPatternSlotsPerPage();
         int base = currentPage * slotsPerPage;
-        int end = Math.min(base + slotsPerPage, AdvancedAlloyFurnaceBlockEntity.PATTERN_SLOTS_COUNT);
+        int end = Math.min(base + slotsPerPage, AdvancedAlloyFurnaceLayout.PATTERN_SLOTS_COUNT);
 
         for (Slot slot : this.menu.slots) {
             if (slot instanceof com.sorrowmist.useless.inventory.slot.PatternSlotItemHandler patternSlot) {
                 int slotIndex = slot.getSlotIndex();
-                int relativeIndex = slotIndex - AdvancedAlloyFurnaceBlockEntity.PATTERN_SLOTS_START;
+                int relativeIndex = slotIndex - AdvancedAlloyFurnaceLayout.PATTERN_SLOTS_START;
                 boolean isActive = relativeIndex >= base && relativeIndex < end;
                 patternSlot.setActive(isActive);
             }
@@ -645,7 +646,7 @@ public class AdvancedAlloyFurnaceScreen extends AbstractContainerScreen<Advanced
         int startX = isInput ? FLUID_INPUT_X : FLUID_OUTPUT_X;
         int startY = isInput ? FLUID_INPUT_Y : FLUID_OUTPUT_Y;
 
-        for (int i = 0; i < AdvancedAlloyFurnaceBlockEntity.FLUID_TANK_COUNT; i++) {
+        for (int i = 0; i < AdvancedAlloyFurnaceLayout.FLUID_TANK_COUNT; i++) {
             int tankX = x + startX + i * (FLUID_TANK_WIDTH + SLOT_SPACING);
             int tankY = y + startY;
 
@@ -724,30 +725,40 @@ public class AdvancedAlloyFurnaceScreen extends AbstractContainerScreen<Advanced
             tooltip.add(Component.translatable("gui.useless_mod.advanced_alloy_furnace.no_process"));
         }
 
-        int aeActiveTasks = this.menu.getActiveAETaskCount();
         int aeTotalProgress = this.menu.getTotalAEProgress();
         int aeTotalMaxProgress = this.menu.getTotalAEMaxProgress();
+        var taskProgressList = this.menu.getAETaskProgressList();
 
         tooltip.add(Component.empty());
         tooltip.add(Component.translatable("gui.useless_mod.advanced_alloy_furnace.ae_tasks",
-                        aeActiveTasks)
+                        taskProgressList.size())
                 .withStyle(ChatFormatting.DARK_PURPLE));
 
-        var taskProgressList = this.menu.getAETaskProgressList();
         if (!taskProgressList.isEmpty()) {
             for (var taskProgress : taskProgressList) {
                 String productName = taskProgress.getProductName();
                 int taskProgressVal = taskProgress.getProgress();
                 int taskMaxProgress = taskProgress.getMaxProgress();
                 int totalOutputCount = taskProgress.getTotalOutputCount();
+                String statusKey = taskProgress.getStatusKey();
+                String statusDetail = taskProgress.getStatusDetail();
 
-                float taskProgressPercent = taskMaxProgress > 0 ? (float) taskProgressVal / taskMaxProgress * 100 : 0;
+                Component nameComponent = Component.literal(productName);
+                Component statusComponent = Component.translatable(statusKey);
 
-                Component nameComponent = Component.translatable(productName);
-
-                tooltip.add(Component.translatable("gui.useless_mod.advanced_alloy_furnace.ae_task_progress",
-                                nameComponent, totalOutputCount, taskProgressVal, taskMaxProgress, String.format("%.1f", taskProgressPercent))
-                        .withStyle(ChatFormatting.LIGHT_PURPLE));
+                if (taskMaxProgress > 1) {
+                    tooltip.add(Component.translatable("gui.useless_mod.advanced_alloy_furnace.ae_task_progress_ticks",
+                                    nameComponent, totalOutputCount, taskProgressVal, taskMaxProgress, statusComponent)
+                            .withStyle(ChatFormatting.LIGHT_PURPLE));
+                } else if (statusDetail != null && !statusDetail.isBlank()) {
+                    tooltip.add(Component.translatable("gui.useless_mod.advanced_alloy_furnace.ae_task_waiting_detail",
+                                    nameComponent, totalOutputCount, statusComponent, createTaskDetailComponent(statusDetail))
+                            .withStyle(ChatFormatting.YELLOW));
+                } else {
+                    tooltip.add(Component.translatable("gui.useless_mod.advanced_alloy_furnace.ae_task_waiting",
+                                    nameComponent, totalOutputCount, statusComponent)
+                            .withStyle(ChatFormatting.YELLOW));
+                }
             }
         } else if (aeTotalMaxProgress > 0) {
             float aeProgressPercent = (float) aeTotalProgress / aeTotalMaxProgress * 100;
@@ -761,6 +772,13 @@ public class AdvancedAlloyFurnaceScreen extends AbstractContainerScreen<Advanced
                 .withStyle(ChatFormatting.AQUA));
 
         guiGraphics.renderTooltip(this.font, tooltip, Optional.empty(), mouseX, mouseY);
+    }
+
+    private Component createTaskDetailComponent(String statusDetail) {
+        if (statusDetail.startsWith("gui.useless_mod.")) {
+            return Component.translatable(statusDetail);
+        }
+        return Component.literal(statusDetail);
     }
 
     private void renderTipsTooltip(GuiGraphics guiGraphics, int mouseX, int mouseY, int x, int y) {
@@ -785,7 +803,7 @@ public class AdvancedAlloyFurnaceScreen extends AbstractContainerScreen<Advanced
 
         if (this.menu.getBlockEntity() != null) {
             AdvancedAlloyFurnaceBlockEntity entity = this.menu.getBlockEntity();
-            ItemStack catalyst = entity.getItemHandler().getStackInSlot(AdvancedAlloyFurnaceBlockEntity.CATALYST_SLOT);
+            ItemStack catalyst = entity.getItemHandler().getStackInSlot(AdvancedAlloyFurnaceLayout.CATALYST_SLOT);
 
             if (!catalyst.isEmpty()) {
                 tooltip.add(Component.empty());

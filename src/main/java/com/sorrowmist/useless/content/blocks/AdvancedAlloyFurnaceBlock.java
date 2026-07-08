@@ -6,6 +6,7 @@ import appeng.menu.locator.MenuLocators;
 import appeng.util.InteractionUtil;
 import com.glodblock.github.extendedae.container.ContainerRenamer;
 import com.sorrowmist.useless.content.blockentities.AdvancedAlloyFurnaceBlockEntity;
+import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.layout.AdvancedAlloyFurnaceLayout;
 import com.sorrowmist.useless.core.component.FurnaceDataComponent;
 import com.sorrowmist.useless.core.component.UComponents;
 import com.sorrowmist.useless.core.constants.NBTConstants;
@@ -178,7 +179,7 @@ public class AdvancedAlloyFurnaceBlock extends Block implements EntityBlock {
                     blockEntityData.putInt(NBTConstants.ENERGY, furnace.getEnergy());
                     
                     // 保存流体
-                    for (int i = 0; i < AdvancedAlloyFurnaceBlockEntity.FLUID_TANK_COUNT; i++) {
+                    for (int i = 0; i < AdvancedAlloyFurnaceLayout.FLUID_TANK_COUNT; i++) {
                         var inputTank = furnace.getInputFluidTank(i);
                         if (!inputTank.getFluid().isEmpty()) {
                             blockEntityData.put(NBTConstants.getInputFluidTag(i), 
@@ -232,7 +233,7 @@ public class AdvancedAlloyFurnaceBlock extends Block implements EntityBlock {
         }
         
         // 检查流体
-        for (int i = 0; i < AdvancedAlloyFurnaceBlockEntity.FLUID_TANK_COUNT; i++) {
+        for (int i = 0; i < AdvancedAlloyFurnaceLayout.FLUID_TANK_COUNT; i++) {
             if (!furnace.getInputFluidTank(i).getFluid().isEmpty()) {
                 return false;
             }
@@ -436,7 +437,7 @@ public class AdvancedAlloyFurnaceBlock extends Block implements EntityBlock {
                         for (int i = 0; i < itemsTag.size(); i++) {
                             CompoundTag itemTag = itemsTag.getCompound(i);
                             int slot = itemTag.getByte("Slot") & 255;
-                            if (slot >= 0 && slot < AdvancedAlloyFurnaceBlockEntity.TOTAL_SLOTS) {
+                            if (slot >= 0 && slot < AdvancedAlloyFurnaceLayout.TOTAL_SLOTS) {
                                 // 读取物品ID
                                 String itemId = itemTag.getString("id");
                                 Item item = BuiltInRegistries.ITEM.get(ResourceLocation.parse(itemId));
@@ -466,7 +467,7 @@ public class AdvancedAlloyFurnaceBlock extends Block implements EntityBlock {
                 }
                 
                 // 恢复流体
-                for (int i = 0; i < AdvancedAlloyFurnaceBlockEntity.FLUID_TANK_COUNT; i++) {
+                for (int i = 0; i < AdvancedAlloyFurnaceLayout.FLUID_TANK_COUNT; i++) {
                     String inputTag = NBTConstants.getInputFluidTag(i);
                     if (blockEntityData.contains(inputTag)) {
                         FluidStack fluid = FluidStack.parseOptional(

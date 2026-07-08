@@ -1,11 +1,12 @@
 package com.sorrowmist.useless.compat.jei;
 
+import appeng.api.stacks.GenericStack;
 import com.sorrowmist.useless.UselessMod;
+import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.catalyst.CatalystParallelManager;
 import com.sorrowmist.useless.content.recipe.AdvancedAlloyFurnaceRecipe;
 import com.sorrowmist.useless.content.recipe.CountedIngredient;
 import com.sorrowmist.useless.init.ModBlocks;
 import com.sorrowmist.useless.init.ModTags;
-import com.sorrowmist.useless.utils.CatalystParallelManager;
 import mezz.jei.api.gui.builder.IRecipeLayoutBuilder;
 import mezz.jei.api.gui.builder.ITooltipBuilder;
 import mezz.jei.api.gui.drawable.IDrawable;
@@ -153,14 +154,16 @@ public class AdvancedAlloyFurnaceRecipeCategory implements IRecipeCategory<Advan
 
         // 输入物品槽位
         List<CountedIngredient> inputs = recipe.inputs();
+        List<GenericStack> keyInputs = recipe.keyInputs();
         int inputCount = inputs.size();
+        int totalInputCount = inputCount + keyInputs.size();
 
         // 计算输入槽位的布局参数（支持超过9个时缩放）
         int inputCols, inputRows;
         float inputSpacingX, inputSpacingY;
         float inputSlotScale;
 
-        if (inputCount <= 9) {
+        if (totalInputCount <= 9) {
             // 正常布局：3x3 网格
             inputCols = 3;
             inputRows = 3;
@@ -171,10 +174,10 @@ public class AdvancedAlloyFurnaceRecipeCategory implements IRecipeCategory<Advan
             // 缩放布局：根据数量动态调整
             // 计算需要的列数（最多显示在54像素宽度内）
             int maxInputWidth = 54; // 输入区域最大宽度
-            inputCols = (int) Math.ceil(Math.sqrt(inputCount));
+            inputCols = (int) Math.ceil(Math.sqrt(totalInputCount));
             if (inputCols > 6) inputCols = 6; // 最多6列
 
-            inputRows = (int) Math.ceil((float) inputCount / inputCols);
+            inputRows = (int) Math.ceil((float) totalInputCount / inputCols);
             if (inputRows > 3) inputRows = 3; // 最多3行，超过则需要缩放
 
             // 计算缩放比例
@@ -216,32 +219,53 @@ public class AdvancedAlloyFurnaceRecipeCategory implements IRecipeCategory<Advan
                            if (count > 1) {
                                tooltip.add(Component.translatable("jei.useless_mod.tooltip.amount", formatCount(count)).withStyle(ChatFormatting.GRAY));
                            }
-                           if (inputCount > 9) {
+                        if (totalInputCount > 9) {
                                tooltip.add(Component.translatable("jei.useless_mod.tooltip.key_input").withStyle(ChatFormatting.AQUA));
                            }
                        });
             }
         }
 
+        for (int i = 0; i < keyInputs.size(); i++) {
+            int slotIndex = inputCount + i;
+            int row = slotIndex / inputCols;
+            int col = slotIndex % inputCols;
+            int x = INPUT_SLOTS_START_X + (int) (col * inputSpacingX);
+            int y = INPUT_SLOTS_START_Y + (int) (row * inputSpacingY);
+            GenericStack keyInput = keyInputs.get(i);
+            long amount = keyInput.amount();
+            ItemStack displayStack = GenericStack.wrapInItemStack(keyInput.what(), (int) Math.min(amount, Integer.MAX_VALUE));
+            if (!displayStack.isEmpty()) {
+                builder.addSlot(RecipeIngredientRole.INPUT, x, y)
+                        .addItemStack(displayStack)
+                        .addRichTooltipCallback((slot, tooltip) -> {
+                            tooltip.add(Component.translatable("jei.useless_mod.tooltip.key_input").withStyle(ChatFormatting.AQUA));
+                            tooltip.add(Component.translatable("jei.useless_mod.tooltip.amount", formatCount(amount)).withStyle(ChatFormatting.GRAY));
+                        });
+            }
+        }
+
         // 输出物品槽位
         List<ItemStack> outputs = recipe.outputs();
+        List<GenericStack> keyOutputs = recipe.keyOutputs();
         int outputCount = outputs.size();
+        int totalOutputCount = outputCount + keyOutputs.size();
 
         // 计算输出槽位的布局参数（支持超过9个时缩放）
         int outputCols, outputRows;
         float outputSpacingX, outputSpacingY;
 
-        if (outputCount <= 9) {
+        if (totalOutputCount <= 9) {
             outputCols = 3;
             outputRows = 3;
             outputSpacingX = INPUT_SLOT_SPACING_X;
             outputSpacingY = INPUT_SLOT_SPACING_Y;
         } else {
             int maxOutputWidth = 54;
-            outputCols = (int) Math.ceil(Math.sqrt(outputCount));
+            outputCols = (int) Math.ceil(Math.sqrt(totalOutputCount));
             if (outputCols > 6) outputCols = 6;
 
-            outputRows = (int) Math.ceil((float) outputCount / outputCols);
+            outputRows = (int) Math.ceil((float) totalOutputCount / outputCols);
             if (outputRows > 3) outputRows = 3;
 
             float widthPerSlot = maxOutputWidth / (float) outputCols;
@@ -269,10 +293,29 @@ public class AdvancedAlloyFurnaceRecipeCategory implements IRecipeCategory<Advan
                         if (count > 1) {
                             tooltip.add(Component.translatable("jei.useless_mod.tooltip.amount", formatCount(count)).withStyle(ChatFormatting.GRAY));
                         }
-                        if (outputCount > 9) {
+                        if (totalOutputCount > 9) {
                             tooltip.add(Component.translatable("jei.useless_mod.tooltip.key_output").withStyle(ChatFormatting.AQUA));
                         }
                     });
+        }
+
+        for (int i = 0; i < keyOutputs.size(); i++) {
+            int slotIndex = outputCount + i;
+            int row = slotIndex / outputCols;
+            int col = slotIndex % outputCols;
+            int x = OUTPUT_SLOTS_START_X + (int) (col * outputSpacingX);
+            int y = OUTPUT_SLOTS_START_Y + (int) (row * outputSpacingY);
+            GenericStack keyOutput = keyOutputs.get(i);
+            long amount = keyOutput.amount();
+            ItemStack displayStack = GenericStack.wrapInItemStack(keyOutput.what(), (int) Math.min(amount, Integer.MAX_VALUE));
+            if (!displayStack.isEmpty()) {
+                builder.addSlot(RecipeIngredientRole.OUTPUT, x, y)
+                        .addItemStack(displayStack)
+                        .addRichTooltipCallback((slot, tooltip) -> {
+                            tooltip.add(Component.translatable("jei.useless_mod.tooltip.key_output").withStyle(ChatFormatting.AQUA));
+                            tooltip.add(Component.translatable("jei.useless_mod.tooltip.amount", formatCount(amount)).withStyle(ChatFormatting.GRAY));
+                        });
+            }
         }
 
         // 输入流体槽 - 使用JEI内置流体渲染器
@@ -468,6 +511,10 @@ public class AdvancedAlloyFurnaceRecipeCategory implements IRecipeCategory<Advan
 
     // 格式化物品数量
     private String formatCount(int count) {
+        return formatCount((long) count);
+    }
+
+    private String formatCount(long count) {
         if (count >= 1000000000) {
             return String.format("%.2fG", count / 1000000000.0);
         } else if (count >= 1000000) {

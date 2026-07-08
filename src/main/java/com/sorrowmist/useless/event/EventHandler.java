@@ -134,9 +134,10 @@ public class EventHandler {
         // 在配方数据重载后重建索引
         event.addListener((stage, resourceManager, preparationsProfiler, reloadProfiler, backgroundExecutor, gameExecutor) -> {
             return stage.wait(Collections.emptyList()).thenRun(() -> {
-                // 注意：这里无法直接获取 Level，需要在配方实际使用时延迟构建
-                // 或者通过其他方式标记索引需要重建
+                // 配方数据已变更：清空查找缓存并标记索引需要重建
+                // 索引会在下一次 findRecipe 时延迟重建（此处无法直接获取 Level）
                 AlloyFurnaceRecipeManager.getInstance().clearCache();
+                AlloyFurnaceRecipeManager.getInstance().invalidateIndex();
             });
         });
     }

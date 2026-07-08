@@ -18,7 +18,6 @@ import net.minecraft.world.level.Level;
 import net.neoforged.neoforge.fluids.FluidStack;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -29,8 +28,6 @@ import java.util.Map;
  */
 public class SmeltingRecipeAdapter implements IRecipeAdapter<AbstractCookingRecipe> {
 
-    // 能量消耗基础值
-    private static final int BASE_ENERGY = 2000;
     // 处理时间基础值（ticks）
     private static final int BASE_PROCESS_TIME = 200;
 
@@ -49,12 +46,7 @@ public class SmeltingRecipeAdapter implements IRecipeAdapter<AbstractCookingReci
 
         // 获取输入材料
         NonNullList<Ingredient> ingredients = originalRecipe.getIngredients();
-        List<CountedIngredient> countedIngredients = new ArrayList<>();
-        for (Ingredient ingredient : ingredients) {
-            if (!ingredient.isEmpty()) {
-                countedIngredients.add(new CountedIngredient(ingredient, 1));
-            }
-        }
+        List<CountedIngredient> countedIngredients = AdapterUtils.mergeIngredients(ingredients);
 
         if (countedIngredients.isEmpty()) {
             return null;
@@ -62,6 +54,9 @@ public class SmeltingRecipeAdapter implements IRecipeAdapter<AbstractCookingReci
 
         // 获取输出物品
         ItemStack result = originalRecipe.getResultItem(level.registryAccess());
+        if (result.isEmpty()) {
+            return null;
+        }
         List<ItemStack> outputs = List.of(result.copy());
 
         // 计算能量和处理时间
@@ -69,10 +64,10 @@ public class SmeltingRecipeAdapter implements IRecipeAdapter<AbstractCookingReci
         int processTime = cookingTime > 0 ? cookingTime : BASE_PROCESS_TIME;
 
         // 能量消耗根据处理时间比例调整
-        int energy = (int) ((double) processTime / BASE_PROCESS_TIME * AdapterUtils.DEFAULT_ENERGY);
+        int energy = AdapterUtils.safeInt((long) processTime * AdapterUtils.DEFAULT_ENERGY / BASE_PROCESS_TIME);
 
         // 熔炉配方需要熔炉作为模具/标志物
-        Ingredient furnaceMold = Ingredient.of(Items.FURNACE);
+        Ingredient furnaceMold = AdapterUtils.toMoldIngredient(getMoldItem());
 
         return new AdvancedAlloyFurnaceRecipe(
                 AdapterUtils.convertedId(originalId),
@@ -97,14 +92,8 @@ public class SmeltingRecipeAdapter implements IRecipeAdapter<AbstractCookingReci
 
     @Override
     @Nullable
-    public RecipeHolder<AbstractCookingRecipe> findMatchingRecipe(Level level, List<ItemStack> inputs) {
-        return findMatchingRecipe(level, AdapterUtils.mergeInputs(inputs), Map.of(), null);
-    }
-
-    @Override
-    @Nullable
     public RecipeHolder<AbstractCookingRecipe> findMatchingRecipe(Level level, Map<Ingredient, Long> mergedInputs, Map<FluidStack, Long> mergedFluids, @Nullable ItemStack mold) {
-        if (level == null || mergedInputs.isEmpty()) {
+        if (level == null || mergedInputs.isEmpty() || !matchesMold(mold)) {
             return null;
         }
 
@@ -141,12 +130,17 @@ public class SmeltingRecipeAdapter implements IRecipeAdapter<AbstractCookingReci
 
             Ingredient mainIngredient = ingredients.getFirst();
 
-            if (AdapterUtils.hasMatchingIngredient(mergedInputs, mainIngredient)) {
+            if (AdapterUtils.hasMatchingIngredient(mergedInputs, mainIngredient, 1L)) {
                 return holder;
             }
         }
 
         return null;
+    }
+
+    @Override
+    public boolean matchesMold(@Nullable ItemStack mold) {
+        return mold != null && !mold.isEmpty() && mold.is(Items.FURNACE);
     }
 
 }

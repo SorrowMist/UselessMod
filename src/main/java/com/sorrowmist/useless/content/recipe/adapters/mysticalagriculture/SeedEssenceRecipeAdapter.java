@@ -5,6 +5,7 @@ import com.blakebr0.mysticalagriculture.registry.CropRegistry;
 import com.sorrowmist.useless.api.enums.AlloyFurnaceMode;
 import com.sorrowmist.useless.content.recipe.AdvancedAlloyFurnaceRecipe;
 import com.sorrowmist.useless.content.recipe.IRecipeAdapter;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.Item;
@@ -59,7 +60,7 @@ public class SeedEssenceRecipeAdapter implements IRecipeAdapter<SeedEssenceRecip
             );
 
             FluidStack waterInput = new FluidStack(
-                    net.minecraft.core.registries.BuiltInRegistries.FLUID.get(
+                    BuiltInRegistries.FLUID.get(
                             ResourceLocation.withDefaultNamespace("water")
                     ),
                     WATER_AMOUNT
@@ -97,6 +98,17 @@ public class SeedEssenceRecipeAdapter implements IRecipeAdapter<SeedEssenceRecip
     }
 
     @Override
+    @Nullable
+    public ItemStack getMoldItem() {
+        return null; // 种子作为模具，无固定模具物品
+    }
+
+    @Override
+    public boolean matchesMold(@Nullable ItemStack mold) {
+        return mold != null && !mold.isEmpty() && mold.getItem() instanceof ICropProvider;
+    }
+
+    @Override
     public List<AdvancedAlloyFurnaceRecipe> convertAll(RecipeHolder<SeedEssenceDummyRecipe> holder, Level level) {
         return List.of(holder.value().convertedRecipe);
     }
@@ -108,19 +120,8 @@ public class SeedEssenceRecipeAdapter implements IRecipeAdapter<SeedEssenceRecip
     }
 
     @Override
-    public boolean canHandle(Level level, List<ItemStack> inputs) {
-        return findMatchingRecipe(level, inputs) != null;
-    }
-
-    @Override
     @Nullable
-    public RecipeHolder<SeedEssenceDummyRecipe> findMatchingRecipe(Level level, List<ItemStack> inputs) {
-        return findMatchingRecipe(level, inputs, null);
-    }
-
-    @Override
-    @Nullable
-    public RecipeHolder<SeedEssenceDummyRecipe> findMatchingRecipe(Level level, List<ItemStack> inputs, @Nullable ItemStack mold) {
+    public RecipeHolder<SeedEssenceDummyRecipe> findMatchingRecipe(Level level, Map<Ingredient, Long> mergedInputs, Map<FluidStack, Long> mergedFluids, @Nullable ItemStack mold) {
         if (mold == null || mold.isEmpty()) return null;
 
         Item moldItem = mold.getItem();
@@ -131,11 +132,6 @@ public class SeedEssenceRecipeAdapter implements IRecipeAdapter<SeedEssenceRecip
 
         ResourceLocation holderId = recipe.id();
         return new RecipeHolder<>(holderId, new SeedEssenceDummyRecipe(recipe));
-    }
-
-    @Override
-    public int getPriority() {
-        return 32;
     }
 
     /**

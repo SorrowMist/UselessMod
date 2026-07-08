@@ -182,17 +182,18 @@ dependencies {
 
     implementation "maven.modrinth:jade:15.1.2+neoforge"
 
+    // 实用拓展
+    implementation "maven.modrinth:actually-additions:1.3.22"
     // 工业先锋
     runtimeOnly "maven.modrinth:titanium:1.21-4.0.40"
     implementation "curse.maven:industrial-foregoing-266515:7073719"
-    // 实用拓展
-    implementation "maven.modrinth:actually-additions:1.3.22"
     // 新生魔艺
     implementation "curse.maven:ars-nouveau-401955:8152094"
 
     implementation "mekanism:Mekanism:1.21.1-10.7.15.81"
     runtimeOnly "mekanism:Mekanism:1.21.1-10.7.15.81:generators"
     implementation "curse.maven:applied-mekanistics-574300:5978711"
+    runtimeOnly "maven.modrinth:mekanism_extra:1.21.1-1.2.4"
 
     implementation "curse.maven:botany-pots-353928:7115287"
     implementation "curse.maven:bookshelf-228525:7115332"

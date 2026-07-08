@@ -1,9 +1,9 @@
 package com.sorrowmist.useless.compat.jei;
 
 import com.sorrowmist.useless.UselessMod;
+import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.catalyst.CatalystParallelManager;
 import com.sorrowmist.useless.init.ModItems;
 import com.sorrowmist.useless.init.ModTags;
-import com.sorrowmist.useless.utils.CatalystParallelManager;
 import mezz.jei.api.gui.builder.IRecipeLayoutBuilder;
 import mezz.jei.api.gui.builder.ITooltipBuilder;
 import mezz.jei.api.gui.drawable.IDrawable;

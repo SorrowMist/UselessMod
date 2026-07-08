@@ -1,5 +1,6 @@
 package com.sorrowmist.useless.content.recipe;
 
+import appeng.api.stacks.GenericStack;
 import com.sorrowmist.useless.api.enums.AlloyFurnaceMode;
 import net.minecraft.data.recipes.RecipeOutput;
 import net.minecraft.resources.ResourceLocation;
@@ -15,7 +16,9 @@ public class AdvancedAlloyFurnaceRecipeBuilder {
 
     private final List<CountedIngredient> inputs = new ArrayList<>();
     private final List<FluidStack> inputFluids = new ArrayList<>();
+    private final List<GenericStack> keyInputs = new ArrayList<>();
     private final List<ItemStack> outputs = new ArrayList<>();
+    private final List<GenericStack> keyOutputs = new ArrayList<>();
     private int energy = 2000;
     private int processTime = 200;
     private Ingredient catalyst = Ingredient.EMPTY;
@@ -37,8 +40,18 @@ public class AdvancedAlloyFurnaceRecipeBuilder {
         return this;
     }
 
+    public AdvancedAlloyFurnaceRecipeBuilder keyInput(GenericStack keyInput) {
+        this.keyInputs.add(keyInput);
+        return this;
+    }
+
     public AdvancedAlloyFurnaceRecipeBuilder output(ItemLike item, int count) {
         this.outputs.add(new ItemStack(item, count));
+        return this;
+    }
+
+    public AdvancedAlloyFurnaceRecipeBuilder keyOutput(GenericStack keyOutput) {
+        this.keyOutputs.add(keyOutput);
         return this;
     }
 
@@ -73,8 +86,10 @@ public class AdvancedAlloyFurnaceRecipeBuilder {
                 id,
                 List.copyOf(this.inputs),
                 List.copyOf(this.inputFluids),
+                List.copyOf(this.keyInputs),
                 List.copyOf(this.outputs),
                 List.of(), // outputFluids 如果不需要可以留空
+                List.copyOf(this.keyOutputs),
                 this.energy,
                 this.processTime,
                 this.catalyst,

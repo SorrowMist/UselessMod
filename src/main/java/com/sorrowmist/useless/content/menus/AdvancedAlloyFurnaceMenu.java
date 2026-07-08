@@ -1,7 +1,12 @@
 package com.sorrowmist.useless.content.menus;
 
+import appeng.client.gui.Icon;
+import appeng.menu.AEBaseMenu;
+import appeng.menu.SlotSemantics;
 import com.sorrowmist.useless.content.blockentities.AdvancedAlloyFurnaceBlockEntity;
 import com.sorrowmist.useless.content.blockentities.AdvancedAlloyFurnaceData;
+import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.AdvancedAlloyFurnaceAeManager;
+import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.layout.AdvancedAlloyFurnaceLayout;
 import com.sorrowmist.useless.init.ModMenuType;
 import com.sorrowmist.useless.inventory.slot.PatternSlotItemHandler;
 import net.minecraft.core.BlockPos;
@@ -18,10 +23,6 @@ import net.neoforged.neoforge.items.IItemHandler;
 import net.neoforged.neoforge.items.ItemStackHandler;
 import net.neoforged.neoforge.items.SlotItemHandler;
 import org.jetbrains.annotations.NotNull;
-
-import appeng.client.gui.Icon;
-import appeng.menu.AEBaseMenu;
-import appeng.menu.SlotSemantics;
 
 /**
  * 支持高堆叠数量的槽位处理器
@@ -79,15 +80,15 @@ public class AdvancedAlloyFurnaceMenu extends AEBaseMenu {
     private static final int PATTERN_SLOTS_PER_PAGE = 27;
     private int patternPage = 0;
 
-    private static final int MACHINE_INPUT_START = AdvancedAlloyFurnaceBlockEntity.INPUT_SLOTS_START;
-    private static final int MACHINE_INPUT_END = MACHINE_INPUT_START + AdvancedAlloyFurnaceBlockEntity.INPUT_SLOTS_COUNT - 1;
-    private static final int MACHINE_OUTPUT_START = AdvancedAlloyFurnaceBlockEntity.OUTPUT_SLOTS_START;
-    private static final int MACHINE_OUTPUT_END = MACHINE_OUTPUT_START + AdvancedAlloyFurnaceBlockEntity.OUTPUT_SLOTS_COUNT - 1;
-    private static final int CATALYST_SLOT = AdvancedAlloyFurnaceBlockEntity.CATALYST_SLOT;
-    private static final int MOLD_SLOT = AdvancedAlloyFurnaceBlockEntity.MOLD_SLOT;
-    private static final int PATTERN_SLOTS_START = AdvancedAlloyFurnaceBlockEntity.PATTERN_SLOTS_START;
-    private static final int PATTERN_SLOTS_END = AdvancedAlloyFurnaceBlockEntity.PATTERN_SLOTS_END;
-    private static final int PLAYER_INVENTORY_START = AdvancedAlloyFurnaceBlockEntity.TOTAL_SLOTS;
+    private static final int MACHINE_INPUT_START = AdvancedAlloyFurnaceLayout.INPUT_SLOTS_START;
+    private static final int MACHINE_INPUT_END = MACHINE_INPUT_START + AdvancedAlloyFurnaceLayout.INPUT_SLOTS_COUNT - 1;
+    private static final int MACHINE_OUTPUT_START = AdvancedAlloyFurnaceLayout.OUTPUT_SLOTS_START;
+    private static final int MACHINE_OUTPUT_END = MACHINE_OUTPUT_START + AdvancedAlloyFurnaceLayout.OUTPUT_SLOTS_COUNT - 1;
+    private static final int CATALYST_SLOT = AdvancedAlloyFurnaceLayout.CATALYST_SLOT;
+    private static final int MOLD_SLOT = AdvancedAlloyFurnaceLayout.MOLD_SLOT;
+    private static final int PATTERN_SLOTS_START = AdvancedAlloyFurnaceLayout.PATTERN_SLOTS_START;
+    private static final int PATTERN_SLOTS_END = AdvancedAlloyFurnaceLayout.PATTERN_SLOTS_END;
+    private static final int PLAYER_INVENTORY_START = AdvancedAlloyFurnaceLayout.TOTAL_SLOTS;
     private static final int PLAYER_INVENTORY_END = PLAYER_INVENTORY_START + 26;
     private static final int HOTBAR_START = PLAYER_INVENTORY_END + 1;
     private static final int HOTBAR_END = HOTBAR_START + 8;
@@ -118,7 +119,7 @@ public class AdvancedAlloyFurnaceMenu extends AEBaseMenu {
         this.blockEntity = entity;
         this.addDataSlots(data);
 
-        IItemHandler itemHandler = entity != null ? entity.getItemHandler() : new ItemStackHandler(AdvancedAlloyFurnaceBlockEntity.TOTAL_SLOTS);
+        IItemHandler itemHandler = entity != null ? entity.getItemHandler() : new ItemStackHandler(AdvancedAlloyFurnaceLayout.TOTAL_SLOTS);
         this.addMachineSlots(itemHandler);
 
         this.createPlayerInventorySlots(inv, PLAYER_INVENTORY_X, PLAYER_INVENTORY_Y, PLAYER_HOTBAR_Y);
@@ -346,7 +347,7 @@ public class AdvancedAlloyFurnaceMenu extends AEBaseMenu {
     }
 
     // 获取所有AE任务进度信息
-    public java.util.Collection<com.sorrowmist.useless.content.blockentities.AdvancedAlloyFurnaceBlockEntity.AETaskProgress> getAETaskProgressList() {
+    public java.util.Collection<AdvancedAlloyFurnaceAeManager.AETaskProgress> getAETaskProgressList() {
         if (this.blockEntity != null) {
             return this.blockEntity.getAETaskProgressList();
         }
@@ -374,7 +375,7 @@ public class AdvancedAlloyFurnaceMenu extends AEBaseMenu {
     }
 
     public int getMaxPatternPage() {
-        return (int) Math.ceil((double) AdvancedAlloyFurnaceBlockEntity.PATTERN_SLOTS_COUNT / PATTERN_SLOTS_PER_PAGE) - 1;
+        return (int) Math.ceil((double) AdvancedAlloyFurnaceLayout.PATTERN_SLOTS_COUNT / PATTERN_SLOTS_PER_PAGE) - 1;
     }
 
     public void setPatternPage(int page) {
@@ -400,12 +401,12 @@ public class AdvancedAlloyFurnaceMenu extends AEBaseMenu {
         int currentPage = this.patternPage;
         int slotsPerPage = PATTERN_SLOTS_PER_PAGE;
         int base = currentPage * slotsPerPage;
-        int end = Math.min(base + slotsPerPage, AdvancedAlloyFurnaceBlockEntity.PATTERN_SLOTS_COUNT);
+        int end = Math.min(base + slotsPerPage, AdvancedAlloyFurnaceLayout.PATTERN_SLOTS_COUNT);
 
         for (Slot slot : this.slots) {
             if (slot instanceof com.sorrowmist.useless.inventory.slot.PatternSlotItemHandler patternSlot) {
                 int slotIndex = slot.getSlotIndex();
-                int relativeIndex = slotIndex - AdvancedAlloyFurnaceBlockEntity.PATTERN_SLOTS_START;
+                int relativeIndex = slotIndex - AdvancedAlloyFurnaceLayout.PATTERN_SLOTS_START;
                 patternSlot.setActive(relativeIndex >= base && relativeIndex < end);
             }
         }

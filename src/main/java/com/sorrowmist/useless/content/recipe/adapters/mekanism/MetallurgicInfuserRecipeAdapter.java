@@ -1,6 +1,8 @@
 package com.sorrowmist.useless.content.recipe.adapters.mekanism;
 
+import appeng.api.stacks.AEKey;
 import com.sorrowmist.useless.api.enums.AlloyFurnaceMode;
+import com.sorrowmist.useless.content.recipe.AdapterUtils;
 import com.sorrowmist.useless.content.recipe.AdvancedAlloyFurnaceRecipe;
 import com.sorrowmist.useless.content.recipe.CountedIngredient;
 import com.sorrowmist.useless.content.recipe.IRecipeAdapter;
@@ -9,21 +11,23 @@ import mekanism.api.recipes.ItemStackChemicalToItemStackRecipe;
 import mekanism.api.recipes.ItemStackToChemicalRecipe;
 import mekanism.api.recipes.MekanismRecipeTypes;
 import mekanism.api.recipes.ingredients.ChemicalStackIngredient;
+import mekanism.api.recipes.ingredients.ItemStackIngredient;
 import mekanism.common.registries.MekanismBlocks;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.crafting.Ingredient;
 import net.minecraft.world.item.crafting.RecipeHolder;
 import net.minecraft.world.item.crafting.RecipeManager;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.material.Fluid;
+import net.neoforged.neoforge.fluids.FluidStack;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 /**
  * Mekanism 冶金灌注机配方适配器
@@ -38,17 +42,19 @@ import java.util.Set;
  */
 public class MetallurgicInfuserRecipeAdapter implements IRecipeAdapter<ItemStackChemicalToItemStackRecipe> {
 
-    // 基础能量消耗
-    private static final int BASE_ENERGY = 3000;
-    // 处理时间基础值（ticks）
-    private static final int BASE_PROCESS_TIME = 40;
-
-    // 缓存化学品到物品来源的映射（按化学品类型）
     private final Map<ResourceLocation, List<ChemicalSource>> chemicalSourceCache = new HashMap<>();
+    @Nullable
+    private RecipeManager cachedRecipeManager;
 
     @Override
     public Class<ItemStackChemicalToItemStackRecipe> getRecipeClass() {
         return ItemStackChemicalToItemStackRecipe.class;
+    }
+
+    @Override
+    @Nullable
+    public ItemStack getMoldItem() {
+        return new ItemStack(MekanismBlocks.METALLURGIC_INFUSER.get());
     }
 
     @Override
@@ -58,128 +64,64 @@ public class MetallurgicInfuserRecipeAdapter implements IRecipeAdapter<ItemStack
 
         ItemStackChemicalToItemStackRecipe originalRecipe = holder.value();
 
-        // 只处理冶金灌注配方
         if (!originalRecipe.getType().equals(MekanismRecipeTypes.TYPE_METALLURGIC_INFUSING.value())) {
             return recipes;
         }
 
         ResourceLocation originalId = holder.id();
 
-        // 获取物品输入
         var itemInput = originalRecipe.getItemInput();
         if (itemInput == null || itemInput.hasNoMatchingInstances()) {
             return recipes;
         }
 
-        // 获取化学品输入
         var chemicalInput = originalRecipe.getChemicalInput();
         if (chemicalInput == null) {
             return recipes;
         }
 
-        // 获取输出
         List<ItemStack> outputs = originalRecipe.getOutputDefinition();
         if (outputs.isEmpty()) {
             return recipes;
         }
 
-        // 获取化学品来源信息
-        List<ChemicalSource> sources = findChemicalSources(level, chemicalInput);
-        if (sources.isEmpty()) {
-            return recipes;
+        for (AdvancedAlloyFurnaceRecipe directRecipe : createDirectRecipes(originalId, itemInput, chemicalInput, outputs)) {
+            addIfUnique(recipes, directRecipe);
         }
 
-        // 为每个化学品来源创建配方
+        List<ChemicalSource> sources = findChemicalSources(level, chemicalInput);
+
         for (ChemicalSource source : sources) {
             AdvancedAlloyFurnaceRecipe recipe = createRecipe(
-                    originalId, itemInput, chemicalInput, source, outputs, originalRecipe.perTickUsage()
+                    originalId, itemInput, chemicalInput, source, outputs
             );
             if (recipe != null) {
-                // 检查是否已存在相同输入输出的配方，避免重复
-                AdvancedAlloyFurnaceRecipe existingRecipe = findRecipeWithSameInputsOutputs(recipes, recipe);
-                if (existingRecipe == null) {
-                    recipes.add(recipe);
-                }
-                // 如果存在相同输入输出的配方，跳过（已存在）
+                addIfUnique(recipes, recipe);
             }
         }
 
         return recipes;
     }
 
-    @Override
-    @Nullable
-    public AdvancedAlloyFurnaceRecipe convert(RecipeHolder<ItemStackChemicalToItemStackRecipe> holder, Level level) {
-        List<AdvancedAlloyFurnaceRecipe> recipes = convertAll(holder, level);
-        return recipes.isEmpty() ? null : recipes.get(0);
-    }
-
-    /**
-     * 查找化学品的物品来源（带缓存）
-     */
     private List<ChemicalSource> findChemicalSources(Level level, ChemicalStackIngredient chemicalInput) {
         List<ChemicalSource> sources = new ArrayList<>();
         if (level == null) return sources;
 
-        // 获取化学品表示以确定缓存键
         var chemicalReps = chemicalInput.getRepresentations();
         if (chemicalReps.isEmpty()) return sources;
 
-        // 使用第一个化学品的ID作为缓存键 (getChemicalHolder().getKey().location() 替代已弃用的 getTypeRegistryName())
-        ResourceLocation chemicalId = chemicalReps.get(0).getChemicalHolder().getKey().location();
-
-        // 检查缓存
-        if (chemicalSourceCache.containsKey(chemicalId)) {
-            return chemicalSourceCache.get(chemicalId);
-        }
-
-        // 缓存未命中，从配方管理器查找
         RecipeManager recipeManager = level.getRecipeManager();
+        if (cachedRecipeManager != recipeManager) {
+            chemicalSourceCache.clear();
+            cachedRecipeManager = recipeManager;
+        }
+        buildChemicalSourceCache(recipeManager);
 
-        // 获取所有物品转化学品配方（化学品转换和氧化）
-        List<RecipeHolder<ItemStackToChemicalRecipe>> conversionRecipes = new ArrayList<>();
-        conversionRecipes.addAll(recipeManager.getAllRecipesFor(MekanismRecipeTypes.TYPE_CHEMICAL_CONVERSION.value()));
-        conversionRecipes.addAll(recipeManager.getAllRecipesFor(MekanismRecipeTypes.TYPE_OXIDIZING.value()));
-
-        // 使用Set跟踪已处理的配方ID，避免重复处理同一个配方
-        Set<ResourceLocation> processedRecipeIds = new HashSet<>();
-
-        for (RecipeHolder<ItemStackToChemicalRecipe> holder : conversionRecipes) {
-            // 跳过已处理的配方
-            if (processedRecipeIds.contains(holder.id())) {
-                continue;
-            }
-
-            ItemStackToChemicalRecipe recipe = holder.value();
-            List<ChemicalStack> outputDefinitions = recipe.getOutputDefinition();
-
-            for (ChemicalStack chemicalOutput : outputDefinitions) {
-                ResourceLocation outputChemicalId = chemicalOutput.getChemicalHolder().getKey().location();
-
-                // 确保该化学品ID的缓存列表存在
-                if (!chemicalSourceCache.containsKey(outputChemicalId)) {
-                    chemicalSourceCache.put(outputChemicalId, new ArrayList<>());
-                }
-
-                var itemInput = recipe.getInput();
-                if (itemInput != null && !itemInput.hasNoMatchingInstances()) {
-                    long amount = chemicalOutput.getAmount();
-                    List<ChemicalSource> cachedSources = chemicalSourceCache.get(outputChemicalId);
-
-                    // 避免重复添加
-                    boolean existsInCache = cachedSources.stream()
-                            .anyMatch(s -> s.recipeId().equals(holder.id()));
-                    if (!existsInCache) {
-                        ChemicalSource source = new ChemicalSource(itemInput, amount, holder.id());
-                        cachedSources.add(source);
-
-                        // 如果这是当前查找的化学品，也添加到返回列表
-                        if (chemicalInput.test(chemicalOutput)) {
-                            sources.add(source);
-                            // 标记该配方已处理，避免重复添加
-                            processedRecipeIds.add(holder.id());
-                        }
-                    }
+        for (ChemicalStack chemicalRep : chemicalReps) {
+            ResourceLocation chemicalId = chemicalRep.getChemicalHolder().getKey().location();
+            for (ChemicalSource source : chemicalSourceCache.getOrDefault(chemicalId, List.of())) {
+                if (sources.stream().noneMatch(existing -> isSameSource(existing, source))) {
+                    sources.add(source);
                 }
             }
         }
@@ -187,137 +129,173 @@ public class MetallurgicInfuserRecipeAdapter implements IRecipeAdapter<ItemStack
         return sources;
     }
 
-    /**
-     * 清除缓存（当配方重新加载时调用）
-     */
-    public void clearCache() {
-        chemicalSourceCache.clear();
+    private void buildChemicalSourceCache(RecipeManager recipeManager) {
+        if (!chemicalSourceCache.isEmpty()) {
+            return;
+        }
+        List<RecipeHolder<ItemStackToChemicalRecipe>> conversionRecipes = new ArrayList<>();
+        conversionRecipes.addAll(recipeManager.getAllRecipesFor(MekanismRecipeTypes.TYPE_CHEMICAL_CONVERSION.value()));
+        conversionRecipes.addAll(recipeManager.getAllRecipesFor(MekanismRecipeTypes.TYPE_OXIDIZING.value()));
+
+        for (RecipeHolder<ItemStackToChemicalRecipe> holder : conversionRecipes) {
+            ItemStackToChemicalRecipe recipe = holder.value();
+            var itemInput = recipe.getInput();
+            if (itemInput == null || itemInput.hasNoMatchingInstances()) {
+                continue;
+            }
+
+            List<ChemicalStack> outputDefinitions = recipe.getOutputDefinition();
+
+            for (ChemicalStack chemicalOutput : outputDefinitions) {
+                ResourceLocation outputChemicalId = chemicalOutput.getChemicalHolder().getKey().location();
+                if (chemicalOutput.getAmount() <= 0) {
+                    continue;
+                }
+                ChemicalSource source = new ChemicalSource(itemInput, chemicalOutput.getAmount(), holder.id(), outputChemicalId);
+                List<ChemicalSource> cachedSources = chemicalSourceCache.computeIfAbsent(outputChemicalId, id -> new ArrayList<>());
+                if (cachedSources.stream().noneMatch(existing -> isSameSource(existing, source))) {
+                    cachedSources.add(source);
+                }
+            }
+        }
     }
 
-    /**
-     * 创建高级熔炉配方
-     */
+    public void clearCache() {
+        chemicalSourceCache.clear();
+        cachedRecipeManager = null;
+    }
+
     @Nullable
     private AdvancedAlloyFurnaceRecipe createRecipe(
             ResourceLocation originalId,
-            mekanism.api.recipes.ingredients.ItemStackIngredient itemInput,
+            ItemStackIngredient itemInput,
             ChemicalStackIngredient chemicalInput,
             ChemicalSource chemicalSource,
-            List<ItemStack> outputs,
-            boolean perTickUsage) {
+            List<ItemStack> outputs) {
 
-        // 获取化学品需求量
-        long requiredChemicalAmount = getRequiredChemicalAmount(chemicalInput);
+        long requiredChemicalAmount = getRequiredChemicalAmount(chemicalInput, chemicalSource.chemicalId());
         if (requiredChemicalAmount <= 0) {
             return null;
         }
 
-        // 计算转换比例
-        // sourceAmount: 一个物品能产生的化学品数量（如1富集红石=80mb）
-        // requiredChemicalAmount: 配方需要的化学品数量（如10mb）
-        // 比例 = sourceAmount / requiredChemicalAmount（如80/10=8，表示1个富集红石可以做8份配方）
         long sourceAmount = chemicalSource.amount();
-        long gcd = gcd(requiredChemicalAmount, sourceAmount);
-        // 主物品倍数 = sourceAmount / gcd（如80/10=8，需要8个铜锭）
+        if (sourceAmount <= 0) {
+            return null;
+        }
+        long gcd = AdapterUtils.gcd(requiredChemicalAmount, sourceAmount);
         long multiplier = sourceAmount / gcd;
-        // 化学品物品数量 = requiredChemicalAmount / gcd（如10/10=1，需要1个富集红石）
-        long itemCount = requiredChemicalAmount / gcd;
+        long conversionCount = requiredChemicalAmount / gcd;
 
-        // 构建配方ID
-        String suffix = "_converted_" + chemicalSource.recipeId().getPath().replace('/', '_');
+        String suffix = "_" + chemicalSource.recipeId().getNamespace() + "_" + chemicalSource.recipeId().getPath().replace('/', '_') + "_converted";
         ResourceLocation convertedId = ResourceLocation.fromNamespaceAndPath(
                 originalId.getNamespace(),
                 originalId.getPath() + suffix
         );
 
-        // 构建输入列表
         List<CountedIngredient> countedIngredients = new ArrayList<>();
 
-        // 添加主物品输入
-        var itemRepresentations = itemInput.getRepresentations();
-        if (!itemRepresentations.isEmpty()) {
-            Ingredient mainIngredient = Ingredient.of(itemRepresentations.stream());
-            // 获取原配方中主物品的数量（如青铜配方中的3个铜锭）
-            int baseItemCount = itemRepresentations.get(0).getCount();
-            // 计算最终需要的物品数量 = 原配方数量 × 倍数
-            long finalItemCount = baseItemCount * multiplier;
-            countedIngredients.add(new CountedIngredient(mainIngredient, finalItemCount));
-        }
-
-        // 添加化学品对应的物品输入
-        var chemItemRepresentations = chemicalSource.ingredient().getRepresentations();
-        if (!chemItemRepresentations.isEmpty()) {
-            Ingredient chemIngredient = Ingredient.of(chemItemRepresentations.stream());
-            countedIngredients.add(new CountedIngredient(chemIngredient, itemCount));
-        }
+        addCountedIngredient(countedIngredients, itemInput, multiplier);
+        addCountedIngredient(countedIngredients, chemicalSource.ingredient(), conversionCount);
 
         if (countedIngredients.isEmpty()) {
             return null;
         }
 
-        // 计算输出（按比例放大）
-        List<ItemStack> scaledOutputs = new ArrayList<>();
-        for (ItemStack output : outputs) {
-            ItemStack scaled = output.copy();
-            scaled.setCount((int) (output.getCount() * multiplier));
-            scaledOutputs.add(scaled);
-        }
-
-        // 创建冶金灌注机模具要求
-        Ingredient moldIngredient = Ingredient.of(new ItemStack(MekanismBlocks.METALLURGIC_INFUSER.get()));
-
-        // 计算能量和时间（随批量增加）
-        int energy = BASE_ENERGY * (int) multiplier;
-        int processTime = BASE_PROCESS_TIME * (int) multiplier;
-
         return new AdvancedAlloyFurnaceRecipe(
                 convertedId,
                 countedIngredients,
-                List.of(),           // 无流体输入
-                scaledOutputs,
-                List.of(),           // 无流体输出
-                energy,
-                processTime,
-                Ingredient.EMPTY,    // 无催化剂
+                List.of(),
+                scaleOutputs(outputs, multiplier),
+                List.of(),
+                AdapterUtils.mekanismMetallurgicInfuserEnergyCost(multiplier),
+                AdapterUtils.mekanismMetallurgicInfuserProcessTime(multiplier),
+                Ingredient.EMPTY,
                 0,
-                moldIngredient,      // 冶金灌注机作为模具
+                AdapterUtils.toMoldIngredient(getMoldItem()),
                 AlloyFurnaceMode.NORMAL
         );
     }
 
-    /**
-     * 获取化学品需求量
-     */
-    private long getRequiredChemicalAmount(ChemicalStackIngredient chemicalInput) {
-        // 尝试从化学品输入定义中获取数量
-        var representations = chemicalInput.getRepresentations();
-        if (!representations.isEmpty()) {
-            return representations.get(0).getAmount();
+    private List<AdvancedAlloyFurnaceRecipe> createDirectRecipes(
+            ResourceLocation originalId,
+            ItemStackIngredient itemInput,
+            ChemicalStackIngredient chemicalInput,
+            List<ItemStack> outputs) {
+
+        List<CountedIngredient> countedIngredients = new ArrayList<>();
+        addCountedIngredient(countedIngredients, itemInput, 1);
+        if (countedIngredients.isEmpty()) {
+            return List.of();
+        }
+
+        List<AdvancedAlloyFurnaceRecipe> recipes = new ArrayList<>();
+        for (ChemicalStack chemicalStack : chemicalInput.getRepresentations()) {
+            FluidStack chemicalFluid = getChemicalFluid(chemicalStack);
+            if (chemicalFluid.isEmpty()) {
+                continue;
+            }
+            ResourceLocation fluidId = BuiltInRegistries.FLUID.getKey(chemicalFluid.getFluid());
+            ResourceLocation convertedId = ResourceLocation.fromNamespaceAndPath(
+                    originalId.getNamespace(),
+                    originalId.getPath() + "_" + fluidId.getNamespace() + "_" + fluidId.getPath().replace('/', '_') + "_chemical_converted"
+            );
+
+            recipes.add(new AdvancedAlloyFurnaceRecipe(
+                    convertedId,
+                    List.copyOf(countedIngredients),
+                    List.of(chemicalFluid),
+                    scaleOutputs(outputs, 1),
+                    List.of(),
+                    AdapterUtils.mekanismMetallurgicInfuserEnergyCost(1),
+                    AdapterUtils.mekanismMetallurgicInfuserProcessTime(1),
+                    Ingredient.EMPTY,
+                    0,
+                    AdapterUtils.toMoldIngredient(getMoldItem()),
+                    AlloyFurnaceMode.NORMAL
+            ));
+        }
+        return recipes;
+    }
+
+    private List<ItemStack> scaleOutputs(List<ItemStack> outputs, long multiplier) {
+        List<ItemStack> scaledOutputs = new ArrayList<>();
+        for (ItemStack output : outputs) {
+            ItemStack scaled = output.copy();
+            scaled.setCount(AdapterUtils.safeInt(output.getCount() * multiplier));
+            scaledOutputs.add(scaled);
+        }
+        return scaledOutputs;
+    }
+
+    private FluidStack getChemicalFluid(ChemicalStack chemicalStack) {
+        ResourceLocation chemicalId = chemicalStack.getChemicalHolder().getKey().location();
+        Fluid fluid = BuiltInRegistries.FLUID.get(chemicalId);
+        if (BuiltInRegistries.FLUID.getKey(fluid).equals(chemicalId)) {
+            return new FluidStack(fluid, AdapterUtils.safeInt(chemicalStack.getAmount()));
+        }
+        Fluid fallbackFluid = BuiltInRegistries.FLUID.get(ResourceLocation.fromNamespaceAndPath(chemicalId.getNamespace(), chemicalId.getPath() + "_chemical"));
+        if (BuiltInRegistries.FLUID.getKey(fallbackFluid).equals(ResourceLocation.fromNamespaceAndPath(chemicalId.getNamespace(), chemicalId.getPath() + "_chemical"))) {
+            return new FluidStack(fallbackFluid, AdapterUtils.safeInt(chemicalStack.getAmount()));
+        }
+        return FluidStack.EMPTY;
+    }
+
+    private long getRequiredChemicalAmount(ChemicalStackIngredient chemicalInput, ResourceLocation chemicalId) {
+        for (ChemicalStack representation : chemicalInput.getRepresentations()) {
+            if (representation.getChemicalHolder().getKey().location().equals(chemicalId)) {
+                return representation.getAmount();
+            }
         }
         return 0;
     }
 
-    /**
-     * 计算最大公约数
-     */
-    private long gcd(long a, long b) {
-        while (b != 0) {
-            long temp = b;
-            b = a % b;
-            a = temp;
-        }
-        return a;
-    }
-
-    @Override
-    public boolean canHandle(Level level, List<ItemStack> inputs) {
-        return findMatchingRecipe(level, inputs) != null;
-    }
-
     @Override
     @Nullable
-    public RecipeHolder<ItemStackChemicalToItemStackRecipe> findMatchingRecipe(Level level, List<ItemStack> inputs) {
-        if (level == null || inputs.isEmpty()) {
+    public RecipeHolder<ItemStackChemicalToItemStackRecipe> findMatchingRecipe(Level level, Map<Ingredient, Long> mergedInputs, Map<FluidStack, Long> mergedFluids, Map<AEKey, Long> mergedKeys, @Nullable ItemStack mold) {
+        if (level == null || (mergedInputs.isEmpty() && mergedFluids.isEmpty())) {
+            return null;
+        }
+        if (mold != null && !mold.isEmpty() && !matchesMold(mold)) {
             return null;
         }
 
@@ -329,49 +307,61 @@ public class MetallurgicInfuserRecipeAdapter implements IRecipeAdapter<ItemStack
         for (RecipeHolder<ItemStackChemicalToItemStackRecipe> holder : recipes) {
             ItemStackChemicalToItemStackRecipe recipe = holder.value();
 
-            // 确保是冶金灌注配方
-            if (!recipe.getType().equals(MekanismRecipeTypes.TYPE_METALLURGIC_INFUSING.value())) {
-                continue;
-            }
-
             var itemInput = recipe.getItemInput();
             if (itemInput == null || itemInput.hasNoMatchingInstances()) continue;
 
             var chemicalInput = recipe.getChemicalInput();
             if (chemicalInput == null) continue;
 
-            // 获取化学品来源
-            List<ChemicalSource> sources = findChemicalSources(level, chemicalInput);
-            if (sources.isEmpty()) continue;
-
-            // 检查是否有输入物品匹配主物品
-            boolean hasMainItem = false;
-            for (ItemStack stack : inputs) {
-                if (!stack.isEmpty() && itemInput.test(stack)) {
-                    hasMainItem = true;
-                    break;
-                }
-            }
+            boolean hasMainItem = matchesIngredient(mergedInputs, itemInput);
             if (!hasMainItem) continue;
 
-            // 检查是否有输入物品匹配化学品来源
-            boolean hasChemicalItem = false;
-            for (ChemicalSource source : sources) {
-                for (ItemStack stack : inputs) {
-                    if (!stack.isEmpty() && source.ingredient().test(stack)) {
-                        hasChemicalItem = true;
-                        break;
-                    }
+            for (ChemicalStack chemicalStack : chemicalInput.getRepresentations()) {
+                FluidStack chemicalFluid = getChemicalFluid(chemicalStack);
+                if (!chemicalFluid.isEmpty() && matchesFluid(mergedFluids, chemicalFluid)) {
+                    return holder;
                 }
-                if (hasChemicalItem) break;
             }
-            if (!hasChemicalItem) continue;
 
-            // 主物品和化学品物品都匹配
-            return holder;
+            List<ChemicalSource> sources = findChemicalSources(level, chemicalInput);
+            for (ChemicalSource source : sources) {
+                AdvancedAlloyFurnaceRecipe converted = createRecipe(holder.id(), itemInput, chemicalInput, source, recipe.getOutputDefinition());
+                if (converted != null && matchesCountedInputs(mergedInputs, converted.inputs())) {
+                    return holder;
+                }
+            }
         }
 
         return null;
+    }
+
+    private boolean matchesCountedInputs(Map<Ingredient, Long> mergedInputs, List<CountedIngredient> requiredInputs) {
+        for (CountedIngredient requiredInput : requiredInputs) {
+            if (!AdapterUtils.hasMatchingIngredient(mergedInputs, requiredInput.ingredient(), requiredInput.count())) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private boolean matchesFluid(Map<FluidStack, Long> mergedFluids, FluidStack requiredFluid) {
+        long found = 0;
+        for (Map.Entry<FluidStack, Long> entry : mergedFluids.entrySet()) {
+            if (FluidStack.isSameFluidSameComponents(entry.getKey(), requiredFluid)) {
+                found += entry.getValue();
+            }
+        }
+        return found >= requiredFluid.getAmount();
+    }
+
+    private void addIfUnique(List<AdvancedAlloyFurnaceRecipe> recipes, AdvancedAlloyFurnaceRecipe recipe) {
+        if (findRecipeWithSameInputsOutputs(recipes, recipe) == null) {
+            recipes.add(recipe);
+        }
+    }
+
+    private boolean isSameSource(ChemicalSource a, ChemicalSource b) {
+        return a.recipeId().equals(b.recipeId()) && a.chemicalId().equals(b.chemicalId()) && a.amount() == b.amount();
     }
 
     /**
@@ -394,23 +384,39 @@ public class MetallurgicInfuserRecipeAdapter implements IRecipeAdapter<ItemStack
      * 比较两个配方是否有相同的输入和输出
      */
     private boolean hasSameInputsOutputs(AdvancedAlloyFurnaceRecipe a, AdvancedAlloyFurnaceRecipe b) {
-        // 比较输入
         if (a.inputs().size() != b.inputs().size()) {
             return false;
         }
-        for (int i = 0; i < a.inputs().size(); i++) {
-            CountedIngredient inputA = a.inputs().get(i);
-            CountedIngredient inputB = b.inputs().get(i);
-            if (inputA.count() != inputB.count()) {
-                return false;
+        if (a.inputFluids().size() != b.inputFluids().size()) {
+            return false;
+        }
+
+        for (CountedIngredient inputA : a.inputs()) {
+            boolean found = false;
+            for (CountedIngredient inputB : b.inputs()) {
+                if (inputA.count() == inputB.count() && AdapterUtils.areIngredientsEqual(inputA.ingredient(), inputB.ingredient())) {
+                    found = true;
+                    break;
+                }
             }
-            // 比较Ingredient的内容（使用ItemStack比较）
-            if (!ingredientsEqual(inputA.ingredient(), inputB.ingredient())) {
+            if (!found) {
                 return false;
             }
         }
 
-        // 比较输出
+        for (FluidStack fluidA : a.inputFluids()) {
+            boolean found = false;
+            for (FluidStack fluidB : b.inputFluids()) {
+                if (FluidStack.isSameFluidSameComponents(fluidA, fluidB) && fluidA.getAmount() == fluidB.getAmount()) {
+                    found = true;
+                    break;
+                }
+            }
+            if (!found) {
+                return false;
+            }
+        }
+
         if (a.outputs().size() != b.outputs().size()) {
             return false;
         }
@@ -428,34 +434,62 @@ public class MetallurgicInfuserRecipeAdapter implements IRecipeAdapter<ItemStack
         return true;
     }
 
-    /**
-     * 比较两个Ingredient是否相等（基于它们匹配的物品）
-     */
-    private boolean ingredientsEqual(Ingredient a, Ingredient b) {
-        ItemStack[] stacksA = a.getItems();
-        ItemStack[] stacksB = b.getItems();
-        if (stacksA.length != stacksB.length) {
+    // ========== Helper Methods ==========
+
+    @Nullable
+    private static CountedIngredient countedIngredient(ItemStackIngredient input, long multiplier) {
+        Ingredient ingredient = ingredient(input);
+        if (ingredient.isEmpty()) {
+            return null;
+        }
+        return new CountedIngredient(ingredient, input.ingredient().count() * multiplier);
+    }
+
+    private static Ingredient ingredient(ItemStackIngredient input) {
+        if (input == null || input.hasNoMatchingInstances()) {
+            return Ingredient.EMPTY;
+        }
+        List<ItemStack> representations = input.getRepresentations();
+        if (representations.isEmpty()) {
+            return Ingredient.EMPTY;
+        }
+        return Ingredient.of(representations.stream().map(stack -> stack.copyWithCount(1)));
+    }
+
+    private static boolean matchesIngredient(Map<Ingredient, Long> mergedInputs, ItemStackIngredient required) {
+        if (required == null || required.hasNoMatchingInstances()) {
             return false;
         }
-        for (int i = 0; i < stacksA.length; i++) {
-            if (!ItemStack.isSameItemSameComponents(stacksA[i], stacksB[i])) {
-                return false;
+        long requiredCount = required.ingredient().count();
+        for (Map.Entry<Ingredient, Long> entry : mergedInputs.entrySet()) {
+            for (ItemStack stack : entry.getKey().getItems()) {
+                if (required.testType(stack) && entry.getValue() >= requiredCount) {
+                    return true;
+                }
             }
         }
-        return true;
+        return false;
     }
 
-    @Override
-    public int getPriority() {
-        return 80; // 优先级高于富集仓
+    private static void addCountedIngredient(List<CountedIngredient> countedIngredients, ItemStackIngredient input, long multiplier) {
+        CountedIngredient counted = countedIngredient(input, multiplier);
+        if (counted == null) {
+            return;
+        }
+        for (int i = 0; i < countedIngredients.size(); i++) {
+            CountedIngredient existing = countedIngredients.get(i);
+            if (AdapterUtils.areIngredientsEqual(existing.ingredient(), counted.ingredient())) {
+                countedIngredients.set(i, new CountedIngredient(existing.ingredient(), existing.count() + counted.count()));
+                return;
+            }
+        }
+        countedIngredients.add(counted);
     }
 
-    /**
-     * 化学品来源记录
-     */
     private record ChemicalSource(
-            mekanism.api.recipes.ingredients.ItemStackIngredient ingredient,
+            ItemStackIngredient ingredient,
             long amount,
-            ResourceLocation recipeId
+            ResourceLocation recipeId,
+            ResourceLocation chemicalId
     ) {}
 }

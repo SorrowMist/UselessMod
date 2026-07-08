@@ -1,5 +1,6 @@
 package com.sorrowmist.useless.content.recipe;
 
+import appeng.api.stacks.GenericStack;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.MapCodec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
@@ -25,8 +26,10 @@ public record AdvancedAlloyFurnaceRecipe(
         ResourceLocation id,
         List<CountedIngredient> inputs,
         List<FluidStack> inputFluids,
+        List<GenericStack> keyInputs,
         List<ItemStack> outputs,
         List<FluidStack> outputFluids,
+        List<GenericStack> keyOutputs,
         int energy,
         int processTime,
         Ingredient catalyst,
@@ -41,8 +44,10 @@ public record AdvancedAlloyFurnaceRecipe(
                 ResourceLocation.STREAM_CODEC.encode(buf, r.id());
                 CountedIngredient.STREAM_CODEC.apply(ByteBufCodecs.list()).encode(buf, r.inputs());
                 FluidStack.STREAM_CODEC.apply(ByteBufCodecs.list()).encode(buf, r.inputFluids());
+                GenericStack.STREAM_CODEC.apply(ByteBufCodecs.list()).encode(buf, r.keyInputs());
                 ItemStack.STREAM_CODEC.apply(ByteBufCodecs.list()).encode(buf, r.outputs());
                 FluidStack.STREAM_CODEC.apply(ByteBufCodecs.list()).encode(buf, r.outputFluids());
+                GenericStack.STREAM_CODEC.apply(ByteBufCodecs.list()).encode(buf, r.keyOutputs());
                 ByteBufCodecs.VAR_INT.encode(buf, r.energy());
                 ByteBufCodecs.VAR_INT.encode(buf, r.processTime());
                 Ingredient.CONTENTS_STREAM_CODEC.encode(buf, r.catalyst());
@@ -54,8 +59,10 @@ public record AdvancedAlloyFurnaceRecipe(
                 ResourceLocation id = ResourceLocation.STREAM_CODEC.decode(buf);
                 List<CountedIngredient> inputs = CountedIngredient.STREAM_CODEC.apply(ByteBufCodecs.list()).decode(buf);
                 List<FluidStack> inputFluids = FluidStack.STREAM_CODEC.apply(ByteBufCodecs.list()).decode(buf);
+                List<GenericStack> keyInputs = GenericStack.STREAM_CODEC.apply(ByteBufCodecs.list()).decode(buf);
                 List<ItemStack> outputs = ItemStack.STREAM_CODEC.apply(ByteBufCodecs.list()).decode(buf);
                 List<FluidStack> outputFluids = FluidStack.STREAM_CODEC.apply(ByteBufCodecs.list()).decode(buf);
+                List<GenericStack> keyOutputs = GenericStack.STREAM_CODEC.apply(ByteBufCodecs.list()).decode(buf);
                 int energy = ByteBufCodecs.VAR_INT.decode(buf);
                 int processTime = ByteBufCodecs.VAR_INT.decode(buf);
                 Ingredient catalyst = Ingredient.CONTENTS_STREAM_CODEC.decode(buf);
@@ -65,7 +72,7 @@ public record AdvancedAlloyFurnaceRecipe(
                 AlloyFurnaceMode mode = AlloyFurnaceMode.fromString(modeStr);
 
                 return new AdvancedAlloyFurnaceRecipe(
-                        id, inputs, inputFluids, outputs, outputFluids,
+                        id, inputs, inputFluids, keyInputs, outputs, outputFluids, keyOutputs,
                         energy, processTime, catalyst, catalystUses, mold, mode
                 );
             }
@@ -84,9 +91,13 @@ public record AdvancedAlloyFurnaceRecipe(
                                            .forGetter(AdvancedAlloyFurnaceRecipe::inputs),
                     FluidStack.CODEC.listOf().optionalFieldOf("input_fluids", List.of())
                                     .forGetter(AdvancedAlloyFurnaceRecipe::inputFluids),
+                    GenericStack.CODEC.listOf().optionalFieldOf("key_inputs", List.of())
+                                    .forGetter(AdvancedAlloyFurnaceRecipe::keyInputs),
                     ITEM_STACK_CODEC.listOf().fieldOf("outputs").forGetter(AdvancedAlloyFurnaceRecipe::outputs),
                     FluidStack.CODEC.listOf().optionalFieldOf("output_fluids", List.of())
                                     .forGetter(AdvancedAlloyFurnaceRecipe::outputFluids),
+                    GenericStack.CODEC.listOf().optionalFieldOf("key_outputs", List.of())
+                                    .forGetter(AdvancedAlloyFurnaceRecipe::keyOutputs),
                     Codec.INT.optionalFieldOf("energy", 2000).forGetter(AdvancedAlloyFurnaceRecipe::energy),
                     Codec.INT.optionalFieldOf("process_time", 200).forGetter(AdvancedAlloyFurnaceRecipe::processTime),
                     Ingredient.CODEC.optionalFieldOf("catalyst", Ingredient.EMPTY)
@@ -97,6 +108,20 @@ public record AdvancedAlloyFurnaceRecipe(
                     AlloyFurnaceMode.CODEC.optionalFieldOf("mode", AlloyFurnaceMode.NORMAL)
                                           .forGetter(AdvancedAlloyFurnaceRecipe::mode)
             ).apply(instance, AdvancedAlloyFurnaceRecipe::new));
+
+    public AdvancedAlloyFurnaceRecipe(ResourceLocation id,
+                                      List<CountedIngredient> inputs,
+                                      List<FluidStack> inputFluids,
+                                      List<ItemStack> outputs,
+                                      List<FluidStack> outputFluids,
+                                      int energy,
+                                      int processTime,
+                                      Ingredient catalyst,
+                                      int catalystUses,
+                                      Ingredient mold,
+                                      AlloyFurnaceMode mode) {
+        this(id, inputs, inputFluids, List.of(), outputs, outputFluids, List.of(), energy, processTime, catalyst, catalystUses, mold, mode);
+    }
 
     // ────────────── 以下是 Recipe 接口的占位实现 ──────────────
 

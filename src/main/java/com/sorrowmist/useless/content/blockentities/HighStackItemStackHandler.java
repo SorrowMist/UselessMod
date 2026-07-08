@@ -229,9 +229,9 @@ public class HighStackItemStackHandler extends ItemStackHandler {
             onMoldSlotChanged.accept(slot);
         }
         
-        // 当输入槽或模具槽变化时，清空配方缓存和上一个成功配方
-        if ((slot >= inputSlotsStart && slot < inputSlotsStart + inputSlotsCount || slot == moldSlot || slot == catalystSlot) 
-            && onInputOrCatalystChanged != null) {
+        boolean isInputSlot = slot >= inputSlotsStart && slot < inputSlotsStart + inputSlotsCount;
+        boolean isRecipeAffectingSlot = isInputSlot || slot == moldSlot || slot == catalystSlot;
+        if (isRecipeAffectingSlot && onInputOrCatalystChanged != null) {
             onInputOrCatalystChanged.accept(slot);
         }
         

@@ -270,5 +270,8 @@
   "jei.useless_mod.catalyst_info.desc3": "• 并行数影响消耗、产出和能量",
   "jei.useless_mod.catalyst_info.desc4": "• 催化剂等级越高，处理时间越短",
   "jei.useless_mod.catalyst_info.desc5": "• 一阶90%%时间，二阶80%%时间，依此类推",
-  "jei.useless_mod.catalyst_info.desc6": "• 有用锭固定1 tick且能量不倍增"
+  "jei.useless_mod.catalyst_info.desc6": "• 有用锭固定1 tick且能量不倍增",
+
+  "config.jade.plugin_useless_mod.advanced_alloy_furnace_tasks": "万象合金炉任务",
+  "config.jade.plugin_useless_mod.advanced_alloy_furnace_tasks.comment": "显示万象合金炉的AE任务"
 }

@@ -3,7 +3,7 @@
   "category": "building",
   "key": {
     "C": {
-      "item": "minecraft:cyan_concrete"
+      "item": "minecraft:cyan_concrete_powder"
     },
     "G": {
       "item": "minecraft:glowstone_dust"

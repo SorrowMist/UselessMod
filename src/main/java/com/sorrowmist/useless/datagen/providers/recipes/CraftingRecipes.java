@@ -61,12 +61,14 @@ public class CraftingRecipes extends RecipeProvider {
     private static Block getConcreteBlock(EnumColor color) {
         return switch (color) {
             case BLACK -> Blocks.BLACK_CONCRETE;
-            case RED, DARK_RED -> Blocks.RED_CONCRETE;
+            case RED -> Blocks.RED_CONCRETE;
+            case DARK_RED -> Blocks.RED_CONCRETE_POWDER;
             case GREEN -> Blocks.GREEN_CONCRETE;
             case BROWN -> Blocks.BROWN_CONCRETE;
             case BLUE -> Blocks.BLUE_CONCRETE;
             case PURPLE -> Blocks.PURPLE_CONCRETE;
-            case CYAN, AQUA -> Blocks.CYAN_CONCRETE;
+            case CYAN -> Blocks.CYAN_CONCRETE;
+            case AQUA -> Blocks.CYAN_CONCRETE_POWDER;
             case LIGHT_GRAY -> Blocks.LIGHT_GRAY_CONCRETE;
             case GRAY -> Blocks.GRAY_CONCRETE;
             case PINK -> Blocks.PINK_CONCRETE;

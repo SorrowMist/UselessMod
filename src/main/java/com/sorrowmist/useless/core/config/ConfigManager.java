@@ -39,7 +39,8 @@ public class ConfigManager {
     private static final ModConfigSpec.BooleanValue ENABLE_FLIGHT_EFFECT;
     
     // 自定义药水效果配置 - 格式: "modid:effect_name,amplifier" (持续时间固定为20000 tick)
-    private static final ModConfigSpec.ConfigValue<List<? extends String>> CUSTOM_POTION_EFFECTS;
+    // 多个效果用分号(;)分隔, 例如: "minecraft:saturation,1;minecraft:regeneration,6"
+    private static final ModConfigSpec.ConfigValue<String> CUSTOM_POTION_EFFECTS;
 
     // 牛排工具连锁挖掘配置
     private static final ModConfigSpec.IntValue CHAIN_MINING_RANGE_X;
@@ -120,18 +121,12 @@ public class ConfigManager {
         // 自定义药水效果列表
         CUSTOM_POTION_EFFECTS = COMMON_BUILDER
                 .comment("自定义药水效果列表, 格式: \"modid:effect_name,amplifier\"",
-                        "例如: \"minecraft:regeneration,5\" 表示生命恢复效果, 等级5",
+                        "多个效果用分号(;)分隔",
+                        "例如: \"minecraft:regeneration,5;minecraft:speed,2\"",
                         "注意: 等级从1开始计算, 1表示I级, 2表示II级, 以此类推")
-                .defineList("custom_potion_effects",
-                        () -> List.of(
-                                "minecraft:saturation,1",
-                                "minecraft:regeneration,6",
-                                "minecraft:night_vision,1",
-                                "minecraft:fire_resistance,1",
-                                "minecraft:water_breathing,1",
-                                "minecraft:damage_resistance,6"
-                        ),
-                        obj -> obj instanceof String str && str.matches("^[a-z0-9_.-]+:[a-z0-9_./-]+,\\d+$"));
+                .define("custom_potion_effects",
+                        "minecraft:saturation,1;minecraft:regeneration,6;minecraft:night_vision,1;minecraft:fire_resistance,1;minecraft:water_breathing,1;minecraft:resistance,6",
+                        str -> str instanceof String s && s.matches("^([a-zA-Z0-9_.-]+:[a-zA-Z0-9_./-]+,\\d+)(;[a-zA-Z0-9_.-]+:[a-zA-Z0-9_./-]+,\\d+)*$"));
 
         CHAIN_MINING_RANGE_X = COMMON_BUILDER
                 .comment("连锁挖掘的X轴范围半径")
@@ -296,7 +291,11 @@ public class ConfigManager {
 
     // 获取自定义药水效果配置列表
     public static List<String> getCustomPotionEffects() {
-        return (List<String>) CUSTOM_POTION_EFFECTS.get();
+        String value = CUSTOM_POTION_EFFECTS.get();
+        if (value == null || value.isBlank()) {
+            return List.of();
+        }
+        return List.of(value.split(";"));
     }
 
     private static Block getBlockFromString(String blockId, Block fallback) {

@@ -10,6 +10,7 @@ import com.sorrowmist.useless.UselessMod;
 import com.sorrowmist.useless.content.blockentities.AdvancedAlloyFurnaceBlockEntity;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.layout.AdvancedAlloyFurnaceLayout;
 import com.sorrowmist.useless.content.menus.AdvancedAlloyFurnaceMenu;
+import com.sorrowmist.useless.inventory.slot.PatternSlotItemHandler;
 import com.sorrowmist.useless.network.PatternPageChangePacket;
 import com.sorrowmist.useless.network.TankClearPacket;
 import net.minecraft.ChatFormatting;
@@ -32,6 +33,10 @@ import net.neoforged.neoforge.client.extensions.common.IClientFluidTypeExtension
 import net.neoforged.neoforge.fluids.FluidStack;
 import net.neoforged.neoforge.network.PacketDistributor;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+
+import appeng.api.crafting.PatternDetailsHelper;
+import appeng.api.stacks.GenericStack;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -191,8 +196,10 @@ public class AdvancedAlloyFurnaceScreen extends AbstractContainerScreen<Advanced
         int y = slot.y;
         ItemStack stack = slot.getItem();
 
+        boolean isPatternSlot = slot instanceof PatternSlotItemHandler;
         // 如果是自定义的PatternSlotItemHandler槽位，检查是否激活
-        if (slot instanceof com.sorrowmist.useless.inventory.slot.PatternSlotItemHandler patternSlot) {
+        if (isPatternSlot) {
+            PatternSlotItemHandler patternSlot = (PatternSlotItemHandler) slot;
             if (!patternSlot.isActive()) {
                 return;
             }
@@ -205,7 +212,10 @@ public class AdvancedAlloyFurnaceScreen extends AbstractContainerScreen<Advanced
             }
         }
 
-        guiGraphics.renderItem(stack, x, y, slot.x + slot.y * this.imageWidth);
+        GenericStack patternOutput = isPatternSlot ? getPatternOutput(stack) : null;
+        ItemStack renderStack = patternOutput != null ? GenericStack.wrapInItemStack(patternOutput) : stack;
+
+        guiGraphics.renderItem(renderStack, x, y, slot.x + slot.y * this.imageWidth);
 
         if (slot.index < AdvancedAlloyFurnaceLayout.TOTAL_SLOTS && !stack.isEmpty() && stack.getCount() > 1) {
             this.renderCustomItemCount(guiGraphics, stack, x, y);
@@ -259,6 +269,25 @@ public class AdvancedAlloyFurnaceScreen extends AbstractContainerScreen<Advanced
             int b = count / 1000000000;
             return b + "B";
         }
+    }
+
+    /**
+     * 解析编码样板，返回主产物（用于在样板槽上直接显示产物图标）
+     */
+    @Nullable
+    private GenericStack getPatternOutput(ItemStack stack) {
+        if (stack.isEmpty() || !PatternDetailsHelper.isEncodedPattern(stack)) {
+            return null;
+        }
+        var details = PatternDetailsHelper.decodePattern(stack, Minecraft.getInstance().level);
+        if (details == null) {
+            return null;
+        }
+        var outputs = details.getOutputs();
+        if (outputs == null || outputs.isEmpty()) {
+            return null;
+        }
+        return outputs.get(0);
     }
 
     @Override

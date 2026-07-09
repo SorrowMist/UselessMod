@@ -141,6 +141,8 @@
   "useless_mod.configuration.platform_start_y.comment": "Platform starting Y value (actual value will be 1 higher if no bedrock)",
   "useless_mod.configuration.generate_bedrock": "Generate Bedrock",
   "useless_mod.configuration.generate_bedrock.comment": "Whether to generate bedrock layer, enabled by default",
+  "useless_mod.configuration.bedrock_at_bottom": "Bedrock At World Bottom",
+  "useless_mod.configuration.bedrock_at_bottom.comment": "Whether to fix the bedrock layer at the world bottom (Y=-64) instead of directly below the plastic layer. When enabled, bedrock always generates at the bottom regardless of the platform start Y",
   "useless_mod.configuration.game_mechanics": "Game Mechanics Settings",
   "useless_mod.configuration.botany_pot_growth_multiplier": "Botany Pot Growth Multiplier",
   "useless_mod.configuration.botany_pot_growth_multiplier.comment": "Botany pot growth multiplier - 1.0 is vanilla speed, 2.0 is 2x speed",

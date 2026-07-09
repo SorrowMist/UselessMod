@@ -142,6 +142,8 @@
   "useless_mod.configuration.platform_start_y.comment": "平台起始Y值(若无基岩实际会比该数值高1)",
   "useless_mod.configuration.generate_bedrock": "生成基岩层",
   "useless_mod.configuration.generate_bedrock.comment": "是否生成基岩层，默认生成",
+  "useless_mod.configuration.bedrock_at_bottom": "基岩固定在世界最底层",
+  "useless_mod.configuration.bedrock_at_bottom.comment": "基岩层是否固定生成在世界最底层(Y=-64)，而非紧贴塑料层下方。开启后无论塑料起始层为多少，基岩都生成在最底层",
   "useless_mod.configuration.game_mechanics": "游戏机制设置",
   "useless_mod.configuration.botany_pot_growth_multiplier": "植物盆生长倍率",
   "useless_mod.configuration.botany_pot_growth_multiplier.comment": "植物盆生长倍率 - 1.0为原版速度，2.0为2倍速度",

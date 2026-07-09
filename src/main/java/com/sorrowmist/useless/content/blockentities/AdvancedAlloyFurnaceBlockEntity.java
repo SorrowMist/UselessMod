@@ -34,9 +34,16 @@ import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.Craftin
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.catalyst.CatalystEffectResolver;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.catalyst.ResolvedCatalystEffect;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.execution.AlloyFurnaceRecipeExecutor;
+import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.io.FurnaceAutoIoController;
+import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.io.FurnaceCombinedFluidTankHandler;
+import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.io.FurnaceFaceAccessor;
+import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.io.FurnaceFluidTankHandler;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.io.FurnaceInputPort;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.io.FurnaceOutputPort;
+import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.io.FurnaceSidedFluidHandler;
+import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.io.FurnaceSidedItemHandler;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.parallel.AlloyFurnaceParallelCalculator;
+import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.recipe.AlloyFurnaceRecipeCalculator;
 import com.sorrowmist.useless.content.menus.AdvancedAlloyFurnaceMenu;
 import com.sorrowmist.useless.content.recipe.AdvancedAlloyFurnaceRecipe;
 import com.sorrowmist.useless.content.recipe.AlloyFurnaceRecipeManager;
@@ -44,7 +51,6 @@ import com.sorrowmist.useless.core.constants.NBTConstants;
 import com.sorrowmist.useless.energy.EnergyManager;
 import com.sorrowmist.useless.energy.IEnergyManager;
 import com.sorrowmist.useless.init.ModBlockEntities;
-import com.sorrowmist.useless.init.ModTags;
 import com.sorrowmist.useless.network.AETaskProgressPacket;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -73,7 +79,6 @@ import net.neoforged.neoforge.items.ItemStackHandler;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
@@ -94,7 +99,7 @@ import static com.sorrowmist.useless.content.machines.advanced_alloy_furnace.lay
 import static com.sorrowmist.useless.content.machines.advanced_alloy_furnace.layout.AdvancedAlloyFurnaceLayout.PATTERN_SLOTS_START;
 import static com.sorrowmist.useless.content.machines.advanced_alloy_furnace.layout.AdvancedAlloyFurnaceLayout.TOTAL_SLOTS;
 
-public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implements MenuProvider, ICraftingProvider, IInWorldGridNodeHost, IGridNodeListener<AdvancedAlloyFurnaceBlockEntity>, IActionHost, CraftingTaskContext, PatternContainer {
+public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implements MenuProvider, ICraftingProvider, IInWorldGridNodeHost, IGridNodeListener<AdvancedAlloyFurnaceBlockEntity>, IActionHost, CraftingTaskContext, PatternContainer, FurnaceFaceAccessor, FurnaceAutoIoController.Context {
 
     // 基础容量配置
     private static final int BASE_FLUID_TANK_CAPACITY = 16000;
@@ -104,18 +109,6 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
     private static final int ACTIVE_COOLDOWN_TICKS = 5;
     private static final int AUTO_OUTPUT_INTERVAL = 1;
     private static final int DISPLAY_PARALLEL_CACHE_DURATION = 20;
-    private static final Direction[] ALL_DIRECTIONS = Direction.values();
-    private static final int[] MATERIAL_INPUT_SLOT_CANDIDATES;
-    private static final int[] CATALYST_INPUT_SLOT_CANDIDATES = {CATALYST_SLOT};
-    private static final int[] MOLD_INPUT_SLOT_CANDIDATES = {MOLD_SLOT};
-    private static final int[] EMPTY_INPUT_SLOT_CANDIDATES = {};
-    static {
-        MATERIAL_INPUT_SLOT_CANDIDATES = new int[]{
-                INPUT_SLOTS_START, INPUT_SLOTS_START + 1, INPUT_SLOTS_START + 2,
-                INPUT_SLOTS_START + 3, INPUT_SLOTS_START + 4, INPUT_SLOTS_START + 5,
-                INPUT_SLOTS_START + 6, INPUT_SLOTS_START + 7, INPUT_SLOTS_START + 8,
-        };
-    }
     private final FluidTank[] inputFluidTanks = new FluidTank[FLUID_TANK_COUNT];
     private final FluidTank[] outputFluidTanks = new FluidTank[FLUID_TANK_COUNT];
     private final IEnergyManager energyManager = EnergyManager.builder()
@@ -127,6 +120,8 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
     private final AdvancedAlloyFurnaceData data = new AdvancedAlloyFurnaceData(this);
     private final ItemStackHandler itemHandler;
     private final AdvancedAlloyFurnaceAeManager aeManager;
+    private final FurnaceAutoIoController autoIoController;
+    private final AlloyFurnaceRecipeCalculator recipeCalculator;
     // ==================== AE网络支持 ====================
     private final IManagedGridNode mainNode;
     private final IActionSource actionSource;
@@ -159,9 +154,6 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
     private int furnaceTier = 0;
     // 自动输出计时器
     private int autoOutputTickCounter = 0;
-    // 上次成功输出的方向（用于缓存机制）
-    @Nullable
-    private Direction lastSuccessfulOutputDirection = null;
     private boolean isConnectedToAE = false;
     // 六个面的输入输出模式（按FurnaceFace索引）
     private final FurnaceFaceMode[] faceModes = new FurnaceFaceMode[FurnaceFace.COUNT];
@@ -210,6 +202,14 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
 
         // 初始化所有面模式为禁止
         Arrays.fill(this.faceModes, FurnaceFaceMode.DISABLED);
+
+        // 初始化自动输入输出控制器
+        this.autoIoController = new FurnaceAutoIoController(
+                this, this.itemHandler, this.inputFluidTanks, this.outputFluidTanks, pos);
+
+        // 初始化配方匹配与并行计算器（纯只读计算，不持有运行状态）
+        this.recipeCalculator = new AlloyFurnaceRecipeCalculator(
+                this.itemHandler, this.inputFluidTanks, this.outputFluidTanks, this.energyManager);
     }
 
 
@@ -330,7 +330,7 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
         entity.autoOutputTickCounter++;
         if (entity.autoOutputTickCounter >= AUTO_OUTPUT_INTERVAL) {
             entity.autoOutputTickCounter = 0;
-            entity.autoOutputItemsAndFluids(level);
+            entity.autoIoController.tick(level);
         }
 
         // 判断是否应该处于活跃状态
@@ -546,163 +546,31 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
     }
 
     /**
-     * 计算实际可用的并行数
-     * 按照以下顺序计算，避免数据溢出：
-     * 1. 通过配方及能量上限，计算当前配方理论允许的最大并行
-     * 2. 通过催化剂获取当前催化剂允许的并行量
-     * 3. 通过输入物品，匹配配方实际能运行的并行量
-     * 4. 通过输出空间，计算能容纳的并行量
-     * <p>
-     * 所有计算都遵循"先除再乘"原则，避免溢出
+     * 计算实际可用的并行数（委托给配方计算器）。
      */
     private int calculateActualParallel(AdvancedAlloyFurnaceRecipe recipe) {
-        ItemStack catalystStack = this.itemHandler.getStackInSlot(CATALYST_SLOT);
-        ResolvedCatalystEffect resolvedCatalystEffect = CatalystEffectResolver.resolve(recipe, catalystStack, recipe.processTime());
-        int energyParallel = AlloyFurnaceParallelCalculator.calculateEnergyParallel(this.energyManager, recipe,
-                                                                                    resolvedCatalystEffect
-        );
-        int catalystParallel = resolvedCatalystEffect.recipeParallel();
-        int materialParallel = this.calculateMaterialParallel(recipe);
-        int outputParallel = this.calculateOutputParallel(recipe);
-        return AlloyFurnaceParallelCalculator.calculateStartableParallel(energyParallel, catalystParallel, materialParallel, outputParallel);
+        return this.recipeCalculator.calculateActualParallel(recipe);
     }
 
     /**
-     * 步骤2: 计算催化剂允许的并行数
-     * 优先使用缓存的催化剂效果，避免重复解析
+     * 计算催化剂允许的并行数（委托给配方计算器，优先使用缓存的催化剂效果）。
      */
     private int calculateCatalystParallel(AdvancedAlloyFurnaceRecipe recipe) {
-        if (this.cachedCatalystEffect != null) {
-            return this.cachedCatalystEffect.recipeParallel();
-        }
-        ItemStack catalystStack = this.itemHandler.getStackInSlot(CATALYST_SLOT);
-        return CatalystEffectResolver.resolve(recipe, catalystStack, recipe.processTime()).recipeParallel();
+        return this.recipeCalculator.calculateCatalystParallel(recipe, this.cachedCatalystEffect);
     }
 
     /**
-     * 步骤3: 计算输入材料允许的并行数
-     * 对于每种材料: 可用数量 / 配方需求数量 = 该材料允许的并行数
-     * 取所有材料的最小值
+     * 计算输入材料允许的并行数（委托给配方计算器）。
      */
     private int calculateMaterialParallel(AdvancedAlloyFurnaceRecipe recipe) {
-        int minParallel = Integer.MAX_VALUE;
-        boolean hasCalculation = false;
-
-        // 计算物品输入限制
-        for (var countedIng : recipe.inputs()) {
-            long totalAvailable = 0;
-            var ingredient = countedIng.ingredient();
-            long requiredPerParallel = countedIng.count();
-
-            if (requiredPerParallel <= 0) continue;
-
-            hasCalculation = true;
-
-            // 统计所有输入槽中符合条件的物品总数
-            for (int i = INPUT_SLOTS_START; i < INPUT_SLOTS_START + INPUT_SLOTS_COUNT; i++) {
-                ItemStack stack = this.itemHandler.getStackInSlot(i);
-                if (ingredient.test(stack)) {
-                    totalAvailable += stack.getCount();
-                }
-            }
-
-            // 先除: 可用数量 / 需求数量 = 该材料允许的并行数
-            long parallelLong = totalAvailable / requiredPerParallel;
-            int possibleParallel = parallelLong > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) parallelLong;
-            minParallel = Math.min(minParallel, possibleParallel);
-
-            // 如果已经降到0，提前返回
-            if (minParallel <= 0) return 0;
-        }
-
-        // 计算流体输入限制
-        for (FluidStack requiredFluid : recipe.inputFluids()) {
-            long totalAvailable = 0;
-            long requiredPerParallel = requiredFluid.getAmount();
-
-            if (requiredPerParallel <= 0) continue;
-
-            hasCalculation = true;
-
-            for (int i = 0; i < FLUID_TANK_COUNT; i++) {
-                FluidStack tankFluid = this.inputFluidTanks[i].getFluid();
-                if (FluidStack.isSameFluidSameComponents(tankFluid, requiredFluid)) {
-                    totalAvailable += tankFluid.getAmount();
-                }
-            }
-
-            // 先除: 可用数量 / 需求数量 = 该流体允许的并行数
-            long parallelLong = totalAvailable / requiredPerParallel;
-            int possibleParallel = parallelLong > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) parallelLong;
-            minParallel = Math.min(minParallel, possibleParallel);
-
-            if (minParallel <= 0) return 0;
-        }
-
-        return hasCalculation ? minParallel : 1;
+        return this.recipeCalculator.calculateMaterialParallel(recipe);
     }
 
     /**
-     * 步骤4: 计算输出空间允许的并行数
-     * 对于每种输出: 可用空间 / 单次产出数量 = 该输出允许的并行数
-     * 取所有输出的最小值
+     * 计算输出空间允许的并行数（委托给配方计算器）。
      */
     private int calculateOutputParallel(AdvancedAlloyFurnaceRecipe recipe) {
-        int maxParallel = Integer.MAX_VALUE;
-
-        // 计算物品输出空间限制
-        for (ItemStack output : recipe.outputs()) {
-            long totalSpace = 0;
-            int outputCount = output.getCount();
-
-            if (outputCount <= 0) continue;
-
-            for (int i = OUTPUT_SLOTS_START; i < OUTPUT_SLOTS_START + OUTPUT_SLOTS_COUNT; i++) {
-                ItemStack slotStack = this.itemHandler.getStackInSlot(i);
-                int slotLimit = this.itemHandler.getSlotLimit(i);
-
-                if (slotStack.isEmpty()) {
-                    totalSpace += slotLimit;
-                } else if (ItemStack.isSameItemSameComponents(slotStack, output)) {
-                    totalSpace += (long) slotLimit - slotStack.getCount();
-                }
-            }
-
-            // 先除: 可用空间 / 单次产出数量 = 该输出允许的并行数
-            long parallelLong = totalSpace / outputCount;
-            int possibleParallel = parallelLong > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) parallelLong;
-            maxParallel = Math.min(maxParallel, possibleParallel);
-
-            if (maxParallel <= 0) return 0;
-        }
-
-        // 计算流体输出空间限制
-        for (FluidStack outputFluid : recipe.outputFluids()) {
-            long totalSpace = 0;
-            int fluidAmount = outputFluid.getAmount();
-
-            if (fluidAmount <= 0) continue;
-
-            for (int i = 0; i < FLUID_TANK_COUNT; i++) {
-                FluidStack tankFluid = this.outputFluidTanks[i].getFluid();
-                int tankCapacity = this.outputFluidTanks[i].getCapacity();
-
-                if (tankFluid.isEmpty()) {
-                    totalSpace += tankCapacity;
-                } else if (FluidStack.isSameFluidSameComponents(tankFluid, outputFluid)) {
-                    totalSpace += (long) tankCapacity - tankFluid.getAmount();
-                }
-            }
-
-            // 先除: 可用空间 / 单次产出数量 = 该流体允许的并行数
-            long parallelLong = totalSpace / fluidAmount;
-            int possibleParallel = parallelLong > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) parallelLong;
-            maxParallel = Math.min(maxParallel, possibleParallel);
-
-            if (maxParallel <= 0) return 0;
-        }
-
-        return maxParallel;
+        return this.recipeCalculator.calculateOutputParallel(recipe);
     }
 
     /**
@@ -823,16 +691,12 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
      * 获取方向感知的物品处理器。
      * <p>
      * 根据面的输入输出模式限制外部物流手段的访问。
-     * 从底部输入且底部模式为"催化剂输入"时优先进入催化剂槽位。
      *
      * @param side 输入方向
      * @return 物品处理器
      */
     public IItemHandler getItemHandler(@Nullable Direction side) {
-        if (side == null) {
-            return new SidedItemHandler(this.itemHandler, null, this);
-        }
-        return new SidedItemHandler(this.itemHandler, side, this);
+        return new FurnaceSidedItemHandler(this.itemHandler, side, this);
     }
 
     // ==================== 面模式管理方法 ====================
@@ -1077,15 +941,15 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
     }
 
     public IFluidHandler getInputFluidHandler() {
-        return new FluidTankHandler(this.inputFluidTanks, true);
+        return new FurnaceFluidTankHandler(this.inputFluidTanks, true);
     }
 
     public IFluidHandler getOutputFluidHandler() {
-        return new FluidTankHandler(this.outputFluidTanks, false);
+        return new FurnaceFluidTankHandler(this.outputFluidTanks, false);
     }
 
     public IFluidHandler getCombinedFluidHandler() {
-        return new CombinedFluidTankHandler(this.inputFluidTanks, this.outputFluidTanks);
+        return new FurnaceCombinedFluidTankHandler(this.inputFluidTanks, this.outputFluidTanks);
     }
 
     /**
@@ -1098,7 +962,7 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
      */
     public IFluidHandler getCombinedFluidHandler(@Nullable Direction side) {
         if (side == null) return getCombinedFluidHandler();
-        return new SidedFluidHandler(this.inputFluidTanks, this.outputFluidTanks, side, this);
+        return new FurnaceSidedFluidHandler(this.inputFluidTanks, this.outputFluidTanks, side, this);
     }
 
     public void clearFluidTank(int tankIndex, boolean isInput) {
@@ -1306,138 +1170,15 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
      * @return 匹配的配方，如果没有则返回空
      */
     private Optional<AdvancedAlloyFurnaceRecipe> findMatchingRecipe() {
-        if (this.level == null) return Optional.empty();
-
-        // 优先检查上次成功配方（无需构建输入列表，直接检查slot）
-        if (this.lastSuccessfulRecipe != null && this.canProcessRecipe(this.lastSuccessfulRecipe)) {
-            return Optional.of(this.lastSuccessfulRecipe);
-        }
-
-        // 构建输入列表（用于 AlloyFurnaceRecipeManager 查找）
-        List<ItemStack> currentInputs = new ArrayList<>();
-        for (int i = INPUT_SLOTS_START; i < INPUT_SLOTS_START + INPUT_SLOTS_COUNT; i++) {
-            ItemStack stack = this.itemHandler.getStackInSlot(i);
-            if (!stack.isEmpty()) {
-                currentInputs.add(stack);
-            }
-        }
-
-        List<FluidStack> currentFluids = new ArrayList<>();
-        for (int i = 0; i < FLUID_TANK_COUNT; i++) {
-            FluidStack fluid = this.inputFluidTanks[i].getFluid();
-            if (!fluid.isEmpty()) {
-                currentFluids.add(fluid.copy());
-            }
-        }
-
-        if (currentInputs.isEmpty() && currentFluids.isEmpty()) return Optional.empty();
-
-        ItemStack moldStack = this.itemHandler.getStackInSlot(MOLD_SLOT);
-
-        AdvancedAlloyFurnaceRecipe bestRecipe = AlloyFurnaceRecipeManager.getInstance().findRecipe(
-                this.level, currentInputs, currentFluids, moldStack
-        );
-
-        if (bestRecipe != null && canProcessRecipe(bestRecipe)) {
-            return Optional.of(bestRecipe);
-        }
-
-        return Optional.empty();
-    }
-
-    /**
-     * 检查配方是否可处理（直接遍历slot，不构建中间列表）
-     * <p>
-     * 模具检查提前，便于快速失败。
-     */
-    private boolean canProcessRecipe(AdvancedAlloyFurnaceRecipe recipe) {
-        // 模具检查提前（快速失败）
-        if (!recipe.mold().isEmpty()) {
-            ItemStack moldStack = this.itemHandler.getStackInSlot(MOLD_SLOT);
-            if (!recipe.mold().test(moldStack)) return false;
-        }
-
-        for (var countedIng : recipe.inputs()) {
-            long requiredCount = countedIng.count();
-            var ingredient = countedIng.ingredient();
-
-            long foundCount = 0;
-            for (int i = INPUT_SLOTS_START; i < INPUT_SLOTS_START + INPUT_SLOTS_COUNT; i++) {
-                ItemStack stack = this.itemHandler.getStackInSlot(i);
-                if (!stack.isEmpty() && ingredient.test(stack)) {
-                    foundCount += stack.getCount();
-                    if (foundCount >= requiredCount) break;
-                }
-            }
-
-            if (foundCount < requiredCount) return false;
-        }
-
-        for (FluidStack requiredFluid : recipe.inputFluids()) {
-            boolean found = false;
-            for (int i = 0; i < FLUID_TANK_COUNT; i++) {
-                FluidStack tankFluid = this.inputFluidTanks[i].getFluid();
-                if (FluidStack.isSameFluidSameComponents(tankFluid, requiredFluid)
-                        && tankFluid.getAmount() >= requiredFluid.getAmount()) {
-                    found = true;
-                    break;
-                }
-            }
-            if (!found) return false;
-        }
-
-        return true;
-    }
-
-    /**
-     * 检查是否有足够的输入材料支持指定的并行数
-     *
-     * @param recipe   配方
-     * @param parallel 并行数
-     * @return 如果有足够的材料返回true
-     */
-    private boolean canConsumeRecipeInputs(AdvancedAlloyFurnaceRecipe recipe, int parallel) {
-        for (var countedIng : recipe.inputs()) {
-            long requiredCount = countedIng.count() * (long) parallel;
-            var ingredient = countedIng.ingredient();
-
-            long foundCount = 0;
-            for (int i = INPUT_SLOTS_START; i < INPUT_SLOTS_START + INPUT_SLOTS_COUNT; i++) {
-                ItemStack stack = this.itemHandler.getStackInSlot(i);
-                if (ingredient.test(stack)) {
-                    foundCount += stack.getCount();
-                }
-            }
-
-            if (foundCount < requiredCount) return false;
-        }
-
-        for (FluidStack requiredFluid : recipe.inputFluids()) {
-            long requiredAmount = requiredFluid.getAmount() * (long) parallel;
-            long foundAmount = 0;
-            for (int i = 0; i < FLUID_TANK_COUNT; i++) {
-                FluidStack tankFluid = this.inputFluidTanks[i].getFluid();
-                if (FluidStack.isSameFluidSameComponents(tankFluid, requiredFluid)) {
-                    foundAmount += tankFluid.getAmount();
-                }
-            }
-            if (foundAmount < requiredAmount) return false;
-        }
-
-        if (!recipe.mold().isEmpty()) {
-            ItemStack moldStack = this.itemHandler.getStackInSlot(MOLD_SLOT);
-            return recipe.mold().test(moldStack);
-        }
-
-        return true;
+        return this.recipeCalculator.findMatchingRecipe(this.level, this.lastSuccessfulRecipe);
     }
 
     /**
      * 检查是否有足够的输入材料支持至少一次配方
-     * （用于开始新配方前的检查）
+     * （用于开始新配方前的检查，委托给配方计算器）。
      */
     private boolean canConsumeRecipeInputs(AdvancedAlloyFurnaceRecipe recipe) {
-        return canConsumeRecipeInputs(recipe, 1);
+        return this.recipeCalculator.canConsumeRecipeInputs(recipe);
     }
 
     private void consumeRecipeInputs(AdvancedAlloyFurnaceRecipe recipe, int parallel) {
@@ -1511,315 +1252,6 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
         this.lastSuccessfulRecipe = null;
         AlloyFurnaceRecipeManager.getInstance().clearCache();
         this.setChanged();
-    }
-
-    /**
-     * 自动输入输出物品和流体到周围的容器
-     * 每5tick调用一次
-     */
-    private void autoOutputItemsAndFluids(Level level) {
-        if (level.isClientSide) return;
-
-        // 自动输入（从周围容器拉取）
-        if (this.autoInputEnabled) {
-            this.autoInputFromSurroundings(level);
-        }
-
-        // 自动输出（推送到周围容器）
-        if (this.autoOutputEnabled) {
-            this.autoOutputToSurroundings(level);
-        }
-    }
-
-    /**
-     * 从周围容器自动输入物品和流体到机器。
-     * 仅从开启了对应面模式的面进行输入。
-     */
-    private void autoInputFromSurroundings(Level level) {
-        Direction facing = this.getFacing();
-        for (Direction dir : Direction.values()) {
-            FurnaceFace face = FurnaceFace.fromDirection(dir, facing);
-            if (face == null) continue;
-            FurnaceFaceMode mode = this.faceModes[face.ordinal()];
-            if (!mode.allowsAny()) continue;
-
-            BlockPos srcPos = this.worldPosition.relative(dir);
-            BlockEntity srcEntity = level.getBlockEntity(srcPos);
-            if (srcEntity == null) continue;
-
-            // 输入物品
-            if (mode.allowsMaterialInput() || mode.allowsCatalystInput() || mode.allowsMoldInput()) {
-                IItemHandler srcHandler = level.getCapability(
-                        Capabilities.ItemHandler.BLOCK, srcPos, srcEntity.getBlockState(), srcEntity, dir.getOpposite());
-                if (srcHandler != null) {
-                    IItemHandler selfHandler = new SidedItemHandler(this.itemHandler, dir, this);
-                    int[] targetSlots = getAutoInputSlotCandidates(mode);
-                    for (int srcSlot = 0; srcSlot < srcHandler.getSlots(); srcSlot++) {
-                        ItemStack extracted = srcHandler.extractItem(srcSlot, Integer.MAX_VALUE, true);
-                        if (extracted.isEmpty()) continue;
-
-                        ItemStack remaining = extracted;
-                        for (int machineSlot : targetSlots) {
-                            remaining = selfHandler.insertItem(machineSlot, remaining, false);
-                            if (remaining.isEmpty()) break;
-                        }
-
-                        int moved = extracted.getCount() - remaining.getCount();
-                        if (moved > 0) {
-                            srcHandler.extractItem(srcSlot, moved, false);
-                            this.setChanged();
-                        }
-                    }
-                }
-            }
-
-            // 输入流体
-            if (mode.allowsMaterialInput()) {
-                IFluidHandler srcFluidHandler = level.getCapability(
-                        Capabilities.FluidHandler.BLOCK, srcPos, srcEntity.getBlockState(), srcEntity, dir.getOpposite());
-                if (srcFluidHandler != null) {
-                    IFluidHandler selfFluidHandler = new SidedFluidHandler(this.inputFluidTanks, this.outputFluidTanks, dir, this);
-                    FluidStack drained = srcFluidHandler.drain(Integer.MAX_VALUE, IFluidHandler.FluidAction.SIMULATE);
-                    if (!drained.isEmpty()) {
-                        int filled = selfFluidHandler.fill(drained, IFluidHandler.FluidAction.EXECUTE);
-                        if (filled > 0) {
-                            srcFluidHandler.drain(filled, IFluidHandler.FluidAction.EXECUTE);
-                            this.setChanged();
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    private static int[] getAutoInputSlotCandidates(FurnaceFaceMode mode) {
-        if (mode.allowsMaterialInput()) return MATERIAL_INPUT_SLOT_CANDIDATES;
-        if (mode.allowsCatalystInput()) return CATALYST_INPUT_SLOT_CANDIDATES;
-        if (mode.allowsMoldInput()) return MOLD_INPUT_SLOT_CANDIDATES;
-        return EMPTY_INPUT_SLOT_CANDIDATES;
-    }
-
-    /**
-     * 自动输出物品和流体到周围容器和AE网络。
-     * 仅输出到开启了"原材料输出"模式的面。
-     */
-    private void autoOutputToSurroundings(Level level) {
-        // AE网络输出不受面模式控制
-        for (int slot = OUTPUT_SLOTS_START; slot < OUTPUT_SLOTS_START + OUTPUT_SLOTS_COUNT; slot++) {
-            ItemStack stack = this.itemHandler.getStackInSlot(slot);
-            if (stack.isEmpty()) continue;
-            long inserted = tryOutputToAE(stack);
-            if (inserted > 0) {
-                stack.shrink((int) inserted);
-                this.setChanged();
-            }
-        }
-
-        for (int i = 0; i < FLUID_TANK_COUNT; i++) {
-            FluidStack fluid = this.outputFluidTanks[i].getFluid();
-            if (fluid.isEmpty()) continue;
-            long inserted = tryOutputFluidToAE(fluid);
-            if (inserted > 0) {
-                this.outputFluidTanks[i].drain((int) inserted, IFluidHandler.FluidAction.EXECUTE);
-            }
-        }
-
-        Direction facing = this.getFacing();
-
-        // 输出物品到周围容器（仅允许输出模式的面）
-        for (int slot = OUTPUT_SLOTS_START; slot < OUTPUT_SLOTS_START + OUTPUT_SLOTS_COUNT; slot++) {
-            ItemStack stack = this.itemHandler.getStackInSlot(slot);
-            if (stack.isEmpty()) continue;
-            for (Direction dir : ALL_DIRECTIONS) {
-                FurnaceFace face = FurnaceFace.fromDirection(dir, facing);
-                if (face == null) continue;
-                if (!this.faceModes[face.ordinal()].allowsMaterialOutput()) continue;
-                if (this.tryOutputItemToDirection(level, slot, dir)) {
-                    this.lastSuccessfulOutputDirection = dir;
-                    this.setChanged();
-                    stack = this.itemHandler.getStackInSlot(slot);
-                    if (stack.isEmpty()) break;
-                }
-            }
-        }
-
-        // 输出流体到周围容器（仅允许输出模式的面）
-        for (int tankIndex = 0; tankIndex < FLUID_TANK_COUNT; tankIndex++) {
-            FluidStack fluid = this.outputFluidTanks[tankIndex].getFluid();
-            if (fluid.isEmpty()) continue;
-            for (Direction dir : ALL_DIRECTIONS) {
-                FurnaceFace face = FurnaceFace.fromDirection(dir, facing);
-                if (face == null) continue;
-                if (!this.faceModes[face.ordinal()].allowsMaterialOutput()) continue;
-                int filled = this.tryOutputFluidToDirection(level, tankIndex, dir);
-                if (filled > 0) {
-                    this.lastSuccessfulOutputDirection = dir;
-                    this.setChanged();
-                    fluid = this.outputFluidTanks[tankIndex].getFluid();
-                    if (fluid.isEmpty()) break;
-                }
-            }
-        }
-    }
-
-    /**
-     * 自动输出物品到周围的容器
-     *
-     * @param level              世界
-     * @param preferredDirection 优先尝试的方向（可以是null）
-     * @return 是否成功输出至少一个物品
-     */
-    private boolean autoOutputItems(Level level, @Nullable Direction preferredDirection) {
-        boolean anyOutputSuccess = false;
-
-        for (int slot = OUTPUT_SLOTS_START; slot < OUTPUT_SLOTS_START + OUTPUT_SLOTS_COUNT; slot++) {
-            ItemStack stack = this.itemHandler.getStackInSlot(slot);
-            if (stack.isEmpty()) continue;
-
-            // 先尝试优先方向
-            if (preferredDirection != null) {
-                if (this.tryOutputItemToDirection(level, slot, preferredDirection)) {
-                    anyOutputSuccess = true;
-                    stack = this.itemHandler.getStackInSlot(slot);
-                    if (stack.isEmpty()) continue;
-                }
-            }
-
-            // 如果优先方向失败或还有剩余，遍历所有方向
-            for (Direction direction : ALL_DIRECTIONS) {
-                if (direction == preferredDirection) continue;
-
-                if (this.tryOutputItemToDirection(level, slot, direction)) {
-                    anyOutputSuccess = true;
-                    this.lastSuccessfulOutputDirection = direction;
-                    this.setChanged();
-                    stack = this.itemHandler.getStackInSlot(slot);
-                    if (stack.isEmpty()) break;
-                }
-            }
-        }
-
-        return anyOutputSuccess;
-    }
-
-    /**
-     * 尝试向指定方向输出物品
-     *
-     * @return 是否成功输出至少一部分物品
-     */
-    private boolean tryOutputItemToDirection(Level level, int slot, Direction direction) {
-        BlockPos targetPos = this.worldPosition.relative(direction);
-        BlockEntity targetEntity = level.getBlockEntity(targetPos);
-
-        if (targetEntity == null) return false;
-
-        // 尝试向目标容器的物品栏输出
-        IItemHandler targetHandler = level.getCapability(
-                Capabilities.ItemHandler.BLOCK,
-                targetPos,
-                targetEntity.getBlockState(),
-                targetEntity,
-                direction.getOpposite()
-        );
-
-        if (targetHandler == null) return false;
-
-        ItemStack stack = this.itemHandler.getStackInSlot(slot);
-        if (stack.isEmpty()) return false;
-
-        // 尝试将物品插入目标容器
-        for (int targetSlot = 0; targetSlot < targetHandler.getSlots(); targetSlot++) {
-            ItemStack remaining = targetHandler.insertItem(targetSlot, stack, false);
-            if (remaining.getCount() != stack.getCount()) {
-                // 成功插入了一部分或全部
-                this.itemHandler.setStackInSlot(slot, remaining);
-                this.setChanged();
-                if (remaining.isEmpty()) {
-                    return true;
-                } else {
-                    stack = remaining;
-                }
-            }
-        }
-
-        return false;
-    }
-
-    /**
-     * 自动输出流体到周围的容器
-     *
-     * @param level              世界
-     * @param preferredDirection 优先尝试的方向（可以是null）
-     * @return 是否成功输出至少一部分流体
-     */
-    private boolean autoOutputFluids(Level level, @Nullable Direction preferredDirection) {
-        boolean anyOutputSuccess = false;
-
-        for (int tankIndex = 0; tankIndex < FLUID_TANK_COUNT; tankIndex++) {
-            FluidStack fluid = this.outputFluidTanks[tankIndex].getFluid();
-            if (fluid.isEmpty()) continue;
-
-            // 先尝试优先方向
-            if (preferredDirection != null) {
-                int filled = this.tryOutputFluidToDirection(level, tankIndex, preferredDirection);
-                if (filled > 0) {
-                    anyOutputSuccess = true;
-                    fluid = this.outputFluidTanks[tankIndex].getFluid();
-                    if (fluid.isEmpty()) continue;
-                }
-            }
-
-            // 如果优先方向失败或还有剩余，遍历所有方向
-            for (Direction direction : ALL_DIRECTIONS) {
-                if (direction == preferredDirection) continue;
-
-                int filled = this.tryOutputFluidToDirection(level, tankIndex, direction);
-                if (filled > 0) {
-                    anyOutputSuccess = true;
-                    this.lastSuccessfulOutputDirection = direction;
-                    this.setChanged();
-                    fluid = this.outputFluidTanks[tankIndex].getFluid();
-                    if (fluid.isEmpty()) break;
-                }
-            }
-        }
-
-        return anyOutputSuccess;
-    }
-
-    /**
-     * 尝试向指定方向输出流体
-     *
-     * @return 成功输出的流体量
-     */
-    private int tryOutputFluidToDirection(Level level, int tankIndex, Direction direction) {
-        BlockPos targetPos = this.worldPosition.relative(direction);
-        BlockEntity targetEntity = level.getBlockEntity(targetPos);
-
-        if (targetEntity == null) return 0;
-
-        // 尝试向目标容器的流体槽输出
-        IFluidHandler targetHandler = level.getCapability(
-                Capabilities.FluidHandler.BLOCK,
-                targetPos,
-                targetEntity.getBlockState(),
-                targetEntity,
-                direction.getOpposite()
-        );
-
-        if (targetHandler == null) return 0;
-
-        FluidStack fluid = this.outputFluidTanks[tankIndex].getFluid();
-        if (fluid.isEmpty()) return 0;
-
-        // 尝试填充流体到目标容器
-        int filled = targetHandler.fill(fluid, IFluidHandler.FluidAction.EXECUTE);
-        if (filled > 0) {
-            this.outputFluidTanks[tankIndex].drain(filled, IFluidHandler.FluidAction.EXECUTE);
-            this.setChanged();
-        }
-
-        return filled;
     }
 
     @Override
@@ -2005,375 +1437,6 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
 
     private void updatePatterns() {
         this.aeManager.updatePatterns();
-    }
-
-    /**
-     * 底部输入专用的物品处理器
-     * 优先将催化剂物品输入到催化剂槽位
-     */
-    private record BottomInputItemHandler(IItemHandler baseHandler) implements IItemHandler {
-
-        @Override
-        public int getSlots() {
-            return this.baseHandler.getSlots();
-        }
-
-        @Override
-        public @NotNull ItemStack getStackInSlot(int slot) {
-            return this.baseHandler.getStackInSlot(slot);
-        }
-
-        @Override
-        public @NotNull ItemStack insertItem(int slot, @NotNull ItemStack stack, boolean simulate) {
-            // 如果是催化剂且槽位不是催化剂槽，尝试优先插入催化剂槽
-            if (stack.is(ModTags.CATALYSTS) && slot != CATALYST_SLOT) {
-                ItemStack catalystSlotStack = this.baseHandler.getStackInSlot(CATALYST_SLOT);
-                // 检查催化剂槽是否已满
-                if (catalystSlotStack.isEmpty() ||
-                        (ItemStack.isSameItemSameComponents(catalystSlotStack, stack) &&
-                                catalystSlotStack.getCount() < this.baseHandler.getSlotLimit(CATALYST_SLOT))) {
-                    return this.baseHandler.insertItem(CATALYST_SLOT, stack, simulate);
-                }
-            }
-            return this.baseHandler.insertItem(slot, stack, simulate);
-        }
-
-        @Override
-        public @NotNull ItemStack extractItem(int slot, int amount, boolean simulate) {
-            return this.baseHandler.extractItem(slot, amount, simulate);
-        }
-
-        @Override
-        public int getSlotLimit(int slot) {
-            return this.baseHandler.getSlotLimit(slot);
-        }
-
-        @Override
-        public boolean isItemValid(int slot, @NotNull ItemStack stack) {
-            return this.baseHandler.isItemValid(slot, stack);
-        }
-    }
-
-    /**
-     * 根据面模式限制的方向感知物品处理器。
-     * <p>
-     * 仅当对应面模式激活时才允许特定类型的插入/抽取操作。
-     */
-    private record SidedItemHandler(IItemHandler baseHandler, @Nullable Direction side,
-                                    AdvancedAlloyFurnaceBlockEntity owner) implements IItemHandler {
-
-        @Nullable
-        private FurnaceFaceMode getMode() {
-            if (side == null) return null; // 无限制
-            FurnaceFace face = FurnaceFace.fromDirection(side, owner.getFacing());
-            if (face == null) return FurnaceFaceMode.DISABLED;
-            return owner.getFaceMode(face);
-        }
-
-        @Override
-        public int getSlots() {
-            return baseHandler.getSlots();
-        }
-
-        @Override
-        public @NotNull ItemStack getStackInSlot(int slot) {
-            return baseHandler.getStackInSlot(slot);
-        }
-
-        @Override
-        public @NotNull ItemStack insertItem(int slot, @NotNull ItemStack stack, boolean simulate) {
-            FurnaceFaceMode mode = getMode();
-            if (mode == null) {
-                // 无面向时普通行为
-                return baseHandler.insertItem(slot, stack, simulate);
-            }
-            if (!mode.allowsAny()) return stack; // 完全禁止
-
-            // 催化剂优先路由（与BottomInputItemHandler逻辑一致）
-            if (stack.is(ModTags.CATALYSTS) && mode.allowsCatalystInput() && slot != CATALYST_SLOT) {
-                ItemStack catalystSlotStack = baseHandler.getStackInSlot(CATALYST_SLOT);
-                if (catalystSlotStack.isEmpty() ||
-                        (ItemStack.isSameItemSameComponents(catalystSlotStack, stack) &&
-                                catalystSlotStack.getCount() < baseHandler.getSlotLimit(CATALYST_SLOT))) {
-                    return baseHandler.insertItem(CATALYST_SLOT, stack, simulate);
-                }
-            }
-
-            // 模具优先路由
-            if (stack.is(ModTags.MOLDS) && mode.allowsMoldInput() && slot != MOLD_SLOT) {
-                ItemStack moldSlotStack = baseHandler.getStackInSlot(MOLD_SLOT);
-                if (moldSlotStack.isEmpty()) {
-                    return baseHandler.insertItem(MOLD_SLOT, stack, simulate);
-                }
-            }
-
-            boolean isInputSlot = slot >= INPUT_SLOTS_START && slot < INPUT_SLOTS_START + INPUT_SLOTS_COUNT;
-            boolean isCatalystSlot = slot == CATALYST_SLOT;
-            boolean isMoldSlot = slot == MOLD_SLOT;
-
-            // 仅允许输入到对应类型的槽位
-            if (isInputSlot && mode.allowsMaterialInput()) {
-                return baseHandler.insertItem(slot, stack, simulate);
-            }
-            if (isCatalystSlot && mode.allowsCatalystInput()) {
-                return baseHandler.insertItem(slot, stack, simulate);
-            }
-            if (isMoldSlot && mode.allowsMoldInput()) {
-                return baseHandler.insertItem(slot, stack, simulate);
-            }
-
-            return stack; // 不允许插入到此槽位
-        }
-
-        @Override
-        public @NotNull ItemStack extractItem(int slot, int amount, boolean simulate) {
-            FurnaceFaceMode mode = getMode();
-            if (mode == null) {
-                return baseHandler.extractItem(slot, amount, simulate);
-            }
-            if (!mode.allowsMaterialOutput()) return ItemStack.EMPTY;
-
-            boolean isOutputSlot = slot >= OUTPUT_SLOTS_START && slot < OUTPUT_SLOTS_START + OUTPUT_SLOTS_COUNT;
-            if (isOutputSlot) {
-                return baseHandler.extractItem(slot, amount, simulate);
-            }
-            return ItemStack.EMPTY;
-        }
-
-        @Override
-        public int getSlotLimit(int slot) {
-            return baseHandler.getSlotLimit(slot);
-        }
-
-        @Override
-        public boolean isItemValid(int slot, @NotNull ItemStack stack) {
-            return baseHandler.isItemValid(slot, stack);
-        }
-    }
-
-    /**
-     * 根据面模式限制的方向感知流体处理器。
-     * <p>
-     * 仅当对应面模式激活时才允许填充/抽取操作。
-     */
-    private record SidedFluidHandler(FluidTank[] inputTanks, FluidTank[] outputTanks,
-                                     Direction side, AdvancedAlloyFurnaceBlockEntity owner) implements IFluidHandler {
-
-        @Nullable
-        private FurnaceFaceMode getMode() {
-            FurnaceFace face = FurnaceFace.fromDirection(side, owner.getFacing());
-            if (face == null) return FurnaceFaceMode.DISABLED;
-            return owner.getFaceMode(face);
-        }
-
-        @Override
-        public int getTanks() {
-            return FLUID_TANK_COUNT * 2;
-        }
-
-        @Override
-        public @NotNull FluidStack getFluidInTank(int tank) {
-            if (tank < FLUID_TANK_COUNT) {
-                return inputTanks[tank].getFluid();
-            } else if (tank < FLUID_TANK_COUNT * 2) {
-                return outputTanks[tank - FLUID_TANK_COUNT].getFluid();
-            }
-            return FluidStack.EMPTY;
-        }
-
-        @Override
-        public int getTankCapacity(int tank) {
-            if (tank < FLUID_TANK_COUNT) {
-                return inputTanks[tank].getCapacity();
-            } else if (tank < FLUID_TANK_COUNT * 2) {
-                return outputTanks[tank - FLUID_TANK_COUNT].getCapacity();
-            }
-            return 0;
-        }
-
-        @Override
-        public boolean isFluidValid(int tank, @NotNull FluidStack stack) {
-            if (tank < FLUID_TANK_COUNT) {
-                return inputTanks[tank].isFluidValid(stack);
-            } else if (tank < FLUID_TANK_COUNT * 2) {
-                return outputTanks[tank - FLUID_TANK_COUNT].isFluidValid(stack);
-            }
-            return false;
-        }
-
-        @Override
-        public int fill(@NotNull FluidStack resource, @NotNull FluidAction action) {
-            FurnaceFaceMode mode = getMode();
-            if (mode == null || !mode.allowsMaterialInput()) return 0;
-            return CombinedFluidTankHandler.fillInput(inputTanks, resource, action);
-        }
-
-        @Override
-        public @NotNull FluidStack drain(@NotNull FluidStack resource, @NotNull FluidAction action) {
-            FurnaceFaceMode mode = getMode();
-            if (mode == null || !mode.allowsMaterialOutput()) return FluidStack.EMPTY;
-            for (FluidTank tank : outputTanks) {
-                FluidStack drained = tank.drain(resource, action);
-                if (!drained.isEmpty()) return drained;
-            }
-            return FluidStack.EMPTY;
-        }
-
-        @Override
-        public @NotNull FluidStack drain(int maxDrain, @NotNull FluidAction action) {
-            FurnaceFaceMode mode = getMode();
-            if (mode == null || !mode.allowsMaterialOutput()) return FluidStack.EMPTY;
-            for (FluidTank tank : outputTanks) {
-                if (!tank.getFluid().isEmpty()) {
-                    return tank.drain(maxDrain, action);
-                }
-            }
-            return FluidStack.EMPTY;
-        }
-    }
-
-    private record FluidTankHandler(FluidTank[] tanks, boolean allowFill) implements IFluidHandler {
-
-        @Override
-        public int getTanks() {
-            return FLUID_TANK_COUNT;
-        }
-
-        @Override
-        public @NotNull FluidStack getFluidInTank(int tank) {
-            return this.tanks[tank].getFluid();
-        }
-
-        @Override
-        public int getTankCapacity(int tank) {
-            return this.tanks[tank].getCapacity();
-        }
-
-        @Override
-        public boolean isFluidValid(int tank, @NotNull FluidStack stack) {
-            return this.tanks[tank].isFluidValid(stack);
-        }
-
-        @Override
-        public int fill(@NotNull FluidStack resource, @NotNull FluidAction action) {
-            if (!this.allowFill) return 0;
-            for (int i = 0; i < FLUID_TANK_COUNT; i++) {
-                FluidTank tank = this.tanks[i];
-                if (tank.isFluidValid(resource)) {
-                    if (tank.getFluid().isEmpty()
-                            || FluidStack.isSameFluidSameComponents(tank.getFluid(), resource)) {
-                        int filled = tank.fill(resource, action);
-                        if (filled > 0) return filled;
-                    }
-                }
-            }
-            return 0;
-        }
-
-        @Override
-        public @NotNull FluidStack drain(@NotNull FluidStack resource, @NotNull FluidAction action) {
-            for (int i = 0; i < FLUID_TANK_COUNT; i++) {
-                FluidStack drained = this.tanks[i].drain(resource, action);
-                if (!drained.isEmpty()) return drained;
-            }
-            return FluidStack.EMPTY;
-        }
-
-        @Override
-        public @NotNull FluidStack drain(int maxDrain, @NotNull FluidAction action) {
-            for (int i = 0; i < FLUID_TANK_COUNT; i++) {
-                if (!this.tanks[i].getFluid().isEmpty()) {
-                    return this.tanks[i].drain(maxDrain, action);
-                }
-            }
-            return FluidStack.EMPTY;
-        }
-    }
-
-    private record CombinedFluidTankHandler(FluidTank[] inputTanks, FluidTank[] outputTanks) implements IFluidHandler {
-        @Override
-        public int getTanks() {
-            return FLUID_TANK_COUNT * 2;
-        }
-
-        @Override
-        public @NotNull FluidStack getFluidInTank(int tank) {
-            if (tank < FLUID_TANK_COUNT) {
-                return this.inputTanks[tank].getFluid();
-            } else if (tank < FLUID_TANK_COUNT * 2) {
-                return this.outputTanks[tank - FLUID_TANK_COUNT].getFluid();
-            }
-            return FluidStack.EMPTY;
-        }
-
-        @Override
-        public int getTankCapacity(int tank) {
-            if (tank < FLUID_TANK_COUNT) {
-                return this.inputTanks[tank].getCapacity();
-            } else if (tank < FLUID_TANK_COUNT * 2) {
-                return this.outputTanks[tank - FLUID_TANK_COUNT].getCapacity();
-            }
-            return 0;
-        }
-
-        @Override
-        public boolean isFluidValid(int tank, @NotNull FluidStack stack) {
-            if (tank < FLUID_TANK_COUNT) {
-                return this.inputTanks[tank].isFluidValid(stack);
-            } else if (tank < FLUID_TANK_COUNT * 2) {
-                return this.outputTanks[tank - FLUID_TANK_COUNT].isFluidValid(stack);
-            }
-            return false;
-        }
-
-        @Override
-        public int fill(@NotNull FluidStack resource, @NotNull FluidAction action) {
-            return fillInput(inputTanks, resource, action);
-        }
-
-        /**
-         * 静态辅助方法，用于SidedFluidHandler复用。
-         */
-        static int fillInput(FluidTank[] inputTanks, FluidStack resource, FluidAction action) {
-            for (FluidTank tank : inputTanks) {
-                if (tank.isFluidValid(resource)) {
-                    if (tank.getFluid().isEmpty()
-                            || FluidStack.isSameFluidSameComponents(tank.getFluid(), resource)) {
-                        int filled = tank.fill(resource, action);
-                        if (filled > 0) return filled;
-                    }
-                }
-            }
-            return 0;
-        }
-
-        @Override
-        public @NotNull FluidStack drain(@NotNull FluidStack resource, @NotNull FluidAction action) {
-            for (int i = 0; i < FLUID_TANK_COUNT; i++) {
-                FluidStack drained = this.outputTanks[i].drain(resource, action);
-                if (!drained.isEmpty()) return drained;
-            }
-            for (int i = 0; i < FLUID_TANK_COUNT; i++) {
-                FluidStack drained = this.inputTanks[i].drain(resource, action);
-                if (!drained.isEmpty()) return drained;
-            }
-            return FluidStack.EMPTY;
-        }
-
-        @Override
-        public @NotNull FluidStack drain(int maxDrain, @NotNull FluidAction action) {
-            for (int i = 0; i < FLUID_TANK_COUNT; i++) {
-                if (!this.outputTanks[i].getFluid().isEmpty()) {
-                    return this.outputTanks[i].drain(maxDrain, action);
-                }
-            }
-            for (int i = 0; i < FLUID_TANK_COUNT; i++) {
-                if (!this.inputTanks[i].getFluid().isEmpty()) {
-                    return this.inputTanks[i].drain(maxDrain, action);
-                }
-            }
-            return FluidStack.EMPTY;
-        }
     }
 
     // ==================== CraftingTaskContext 接口实现 ====================

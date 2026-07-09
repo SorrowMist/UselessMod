@@ -25,6 +25,8 @@ import appeng.api.util.AECableType;
 import appeng.blockentity.AEBaseBlockEntity;
 import appeng.helpers.patternprovider.PatternContainer;
 import com.sorrowmist.useless.api.enums.CatalystType;
+import com.sorrowmist.useless.api.enums.FurnaceFace;
+import com.sorrowmist.useless.api.enums.FurnaceFaceMode;
 import com.sorrowmist.useless.content.blocks.AdvancedAlloyFurnaceBlock;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.AdvancedAlloyFurnaceAeManager;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.CraftingTaskContext;
@@ -71,6 +73,7 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -98,9 +101,20 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
     private static final int BASE_ENERGY_MAX_RECEIVE = 10000;
     private static final int ENERGY_MAX_EXTRACT = 0;
     private static final int ACTIVE_COOLDOWN_TICKS = 5;
-    private static final int AUTO_OUTPUT_INTERVAL = 2;
+    private static final int AUTO_OUTPUT_INTERVAL = 1;
     private static final int DISPLAY_PARALLEL_CACHE_DURATION = 20;
     private static final Direction[] ALL_DIRECTIONS = Direction.values();
+    private static final int[] MATERIAL_INPUT_SLOT_CANDIDATES;
+    private static final int[] CATALYST_INPUT_SLOT_CANDIDATES = {CATALYST_SLOT};
+    private static final int[] MOLD_INPUT_SLOT_CANDIDATES = {MOLD_SLOT};
+    private static final int[] EMPTY_INPUT_SLOT_CANDIDATES = {};
+    static {
+        MATERIAL_INPUT_SLOT_CANDIDATES = new int[]{
+                INPUT_SLOTS_START, INPUT_SLOTS_START + 1, INPUT_SLOTS_START + 2,
+                INPUT_SLOTS_START + 3, INPUT_SLOTS_START + 4, INPUT_SLOTS_START + 5,
+                INPUT_SLOTS_START + 6, INPUT_SLOTS_START + 7, INPUT_SLOTS_START + 8,
+        };
+    }
     private final FluidTank[] inputFluidTanks = new FluidTank[FLUID_TANK_COUNT];
     private final FluidTank[] outputFluidTanks = new FluidTank[FLUID_TANK_COUNT];
     private final IEnergyManager energyManager = EnergyManager.builder()
@@ -144,13 +158,16 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
     private int furnaceTier = 0;
     // 自动输出计时器
     private int autoOutputTickCounter = 0;
-    // 自动输出面缓存（null表示未指定，使用默认查找）
-    @Nullable
-    private Direction cachedOutputDirection = null;
     // 上次成功输出的方向（用于缓存机制）
     @Nullable
     private Direction lastSuccessfulOutputDirection = null;
     private boolean isConnectedToAE = false;
+    // 六个面的输入输出模式（按FurnaceFace索引）
+    private final FurnaceFaceMode[] faceModes = new FurnaceFaceMode[FurnaceFace.COUNT];
+    // 自动输入开关
+    private boolean autoInputEnabled = false;
+    // 自动输出开关
+    private boolean autoOutputEnabled = false;
 
     public AdvancedAlloyFurnaceBlockEntity(BlockPos pos, BlockState state) {
         super(ModBlockEntities.ADVANCED_ALLOY_FURNACE.get(), pos, state);
@@ -187,6 +204,9 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
             this.inputFluidTanks[i] = this.createTank(i, true);
             this.outputFluidTanks[i] = this.createTank(i, false);
         }
+
+        // 初始化所有面模式为禁止
+        Arrays.fill(this.faceModes, FurnaceFaceMode.DISABLED);
     }
 
 
@@ -284,7 +304,7 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
         entity.aeManager.flushAEBatches();
         entity.aeManager.tickAETasks();
 
-        // 每5tick尝试自动输出物品和流体
+        // 每tick尝试自动输入输出物品和流体
         entity.autoOutputTickCounter++;
         if (entity.autoOutputTickCounter >= AUTO_OUTPUT_INTERVAL) {
             entity.autoOutputTickCounter = 0;
@@ -369,41 +389,6 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
      */
     private void setFurnaceTier(int tier) {
         this.furnaceTier = Math.max(0, Math.min(9, tier));
-    }
-
-    /**
-     * 获取指定的输出方向（扳手设置）
-     *
-     * @return 指定的输出方向，null表示未指定
-     */
-    @Nullable
-    public Direction getCachedOutputDirection() {
-        return this.cachedOutputDirection;
-    }
-
-    /**
-     * 使用扳手设置或取消输出方向
-     *
-     * @param direction 要设置的方向，null表示取消设置
-     */
-    public void setOutputDirectionWithWrench(@Nullable Direction direction) {
-        // 如果点击的是已设置的方向，则取消设置
-        if (direction != null && direction == this.cachedOutputDirection) {
-            this.cachedOutputDirection = null;
-            this.setChanged();
-            // 同步到客户端
-            if (this.level != null && !this.level.isClientSide) {
-                this.level.sendBlockUpdated(this.worldPosition, this.getBlockState(), this.getBlockState(), 3);
-            }
-            return;
-        }
-
-        this.cachedOutputDirection = direction;
-        this.setChanged();
-        // 同步到客户端
-        if (this.level != null && !this.level.isClientSide) {
-            this.level.sendBlockUpdated(this.worldPosition, this.getBlockState(), this.getBlockState(), 3);
-        }
     }
 
     /**
@@ -813,17 +798,111 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
     }
 
     /**
-     * 获取方向感知的物品处理器
-     * 从底部输入时，催化剂物品会优先进入催化剂槽位
+     * 获取方向感知的物品处理器。
+     * <p>
+     * 根据面的输入输出模式限制外部物流手段的访问。
+     * 从底部输入且底部模式为"催化剂输入"时优先进入催化剂槽位。
      *
      * @param side 输入方向
      * @return 物品处理器
      */
     public IItemHandler getItemHandler(@Nullable Direction side) {
-        if (side == Direction.DOWN) {
-            return new BottomInputItemHandler(this.itemHandler);
+        if (side == null) {
+            return new SidedItemHandler(this.itemHandler, null, this);
         }
-        return this.itemHandler;
+        return new SidedItemHandler(this.itemHandler, side, this);
+    }
+
+    // ==================== 面模式管理方法 ====================
+
+    /**
+     * 获取指定逻辑面的模式。
+     */
+    public FurnaceFaceMode getFaceMode(FurnaceFace face) {
+        return this.faceModes[face.ordinal()];
+    }
+
+    /**
+     * 设置指定逻辑面的模式。
+     */
+    public void setFaceMode(FurnaceFace face, FurnaceFaceMode mode) {
+        this.faceModes[face.ordinal()] = mode;
+        this.setChanged();
+    }
+
+    /**
+     * 将指定逻辑面的模式循环到下一个。
+     *
+     * @return 新的模式
+     */
+    public FurnaceFaceMode cycleFaceMode(FurnaceFace face) {
+        FurnaceFaceMode current = this.faceModes[face.ordinal()];
+        FurnaceFaceMode next = current.next();
+        this.faceModes[face.ordinal()] = next;
+        this.setChanged();
+        // 同步到客户端
+        if (this.level != null && !this.level.isClientSide) {
+            this.level.sendBlockUpdated(this.worldPosition, this.getBlockState(), this.getBlockState(), 3);
+        }
+        return next;
+    }
+
+    /**
+     * 获取所有面模式数组的副本。
+     */
+    public FurnaceFaceMode[] getFaceModes() {
+        return this.faceModes.clone();
+    }
+
+    /**
+     * 获取方块的水平朝向。
+     */
+    public Direction getFacing() {
+        return this.getBlockState().getValue(net.minecraft.world.level.block.state.properties.BlockStateProperties.HORIZONTAL_FACING);
+    }
+
+    // ==================== 自动输入输出开关 ====================
+
+    public boolean isAutoInputEnabled() {
+        return this.autoInputEnabled;
+    }
+
+    public void setAutoInputEnabled(boolean enabled) {
+        this.autoInputEnabled = enabled;
+        this.setChanged();
+    }
+
+    public boolean isAutoOutputEnabled() {
+        return this.autoOutputEnabled;
+    }
+
+    public void setAutoOutputEnabled(boolean enabled) {
+        this.autoOutputEnabled = enabled;
+        this.setChanged();
+    }
+
+    /**
+     * 切换自动输入开关。
+     */
+    public boolean toggleAutoInput() {
+        this.autoInputEnabled = !this.autoInputEnabled;
+        this.setChanged();
+        if (this.level != null && !this.level.isClientSide) {
+            this.level.sendBlockUpdated(this.worldPosition, this.getBlockState(), this.getBlockState(), 3);
+        }
+        return this.autoInputEnabled;
+    }
+
+    /**
+     * 切换自动输出开关。
+     */
+    public boolean toggleAutoOutput() {
+        this.autoOutputEnabled = !this.autoOutputEnabled;
+        this.setChanged();
+        if (this.level != null && !this.level.isClientSide) {
+            this.level.sendBlockUpdated(this.worldPosition, this.getBlockState(), this.getBlockState(), 3);
+        }
+        return this.autoOutputEnabled;
     }
 
     public IEnergyStorage getEnergyStorage() {
@@ -962,6 +1041,19 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
         return new CombinedFluidTankHandler(this.inputFluidTanks, this.outputFluidTanks);
     }
 
+    /**
+     * 获取方向感知的复合流体处理器。
+     * <p>
+     * 根据面的输入输出模式限制外部物流手段的访问。
+     *
+     * @param side 方向
+     * @return 流体处理器
+     */
+    public IFluidHandler getCombinedFluidHandler(@Nullable Direction side) {
+        if (side == null) return getCombinedFluidHandler();
+        return new SidedFluidHandler(this.inputFluidTanks, this.outputFluidTanks, side, this);
+    }
+
     public void clearFluidTank(int tankIndex, boolean isInput) {
         if (tankIndex < 0 || tankIndex >= FLUID_TANK_COUNT) return;
 
@@ -1007,18 +1099,6 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
         this.targetUselessIngotTier = tag.getInt(NBTConstants.TARGET_USELESS_INGOT_TIER);
         this.accumulatedEnergy = tag.getLong(NBTConstants.ACCUMULATED_ENERGY);
 
-        // 加载指定的输出方向（扳手设置）
-        if (tag.contains(NBTConstants.OUTPUT_DIRECTION)) {
-            int dirIndex = tag.getInt(NBTConstants.OUTPUT_DIRECTION);
-            if (dirIndex >= 0 && dirIndex < Direction.values().length) {
-                this.cachedOutputDirection = Direction.values()[dirIndex];
-            } else {
-                this.cachedOutputDirection = null;
-            }
-        } else {
-            this.cachedOutputDirection = null;
-        }
-
         for (int i = 0; i < FLUID_TANK_COUNT; i++) {
             String inputFluidTag = NBTConstants.getInputFluidTag(i);
             if (tag.contains(inputFluidTag)) {
@@ -1041,6 +1121,18 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
 
         // 加载AE网络节点数据
         this.mainNode.loadFromNBT(tag);
+
+        // 加载面模式
+        this.faceModes[FurnaceFace.TOP.ordinal()] = FurnaceFaceMode.byIndex(tag.getInt("FaceModeTop"));
+        this.faceModes[FurnaceFace.BOTTOM.ordinal()] = FurnaceFaceMode.byIndex(tag.getInt("FaceModeBottom"));
+        this.faceModes[FurnaceFace.FRONT.ordinal()] = FurnaceFaceMode.byIndex(tag.getInt("FaceModeFront"));
+        this.faceModes[FurnaceFace.BACK.ordinal()] = FurnaceFaceMode.byIndex(tag.getInt("FaceModeBack"));
+        this.faceModes[FurnaceFace.LEFT.ordinal()] = FurnaceFaceMode.byIndex(tag.getInt("FaceModeLeft"));
+        this.faceModes[FurnaceFace.RIGHT.ordinal()] = FurnaceFaceMode.byIndex(tag.getInt("FaceModeRight"));
+
+        // 加载自动输入输出开关
+        this.autoInputEnabled = tag.getBoolean("AutoInputEnabled");
+        this.autoOutputEnabled = tag.getBoolean("AutoOutputEnabled");
 
         if (tag.contains("PatternPriority")) {
             this.aeManager.setPatternPriority(tag.getInt("PatternPriority"));
@@ -1067,13 +1159,6 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
         tag.putInt(NBTConstants.TARGET_USELESS_INGOT_TIER, this.targetUselessIngotTier);
         tag.putLong(NBTConstants.ACCUMULATED_ENERGY, this.accumulatedEnergy);
 
-        // 保存指定的输出方向（扳手设置）
-        if (this.cachedOutputDirection != null) {
-            tag.putInt(NBTConstants.OUTPUT_DIRECTION, this.cachedOutputDirection.ordinal());
-        } else {
-            tag.putInt(NBTConstants.OUTPUT_DIRECTION, -1);
-        }
-
         for (int i = 0; i < FLUID_TANK_COUNT; i++) {
             FluidStack fluid = this.inputFluidTanks[i].getFluid();
             if (!fluid.isEmpty()) {
@@ -1093,6 +1178,18 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
 
         // 保存样板优先级
         tag.putInt("PatternPriority", this.aeManager.getPatternPriority());
+
+        // 保存面模式
+        tag.putInt("FaceModeTop", this.faceModes[FurnaceFace.TOP.ordinal()].ordinal());
+        tag.putInt("FaceModeBottom", this.faceModes[FurnaceFace.BOTTOM.ordinal()].ordinal());
+        tag.putInt("FaceModeFront", this.faceModes[FurnaceFace.FRONT.ordinal()].ordinal());
+        tag.putInt("FaceModeBack", this.faceModes[FurnaceFace.BACK.ordinal()].ordinal());
+        tag.putInt("FaceModeLeft", this.faceModes[FurnaceFace.LEFT.ordinal()].ordinal());
+        tag.putInt("FaceModeRight", this.faceModes[FurnaceFace.RIGHT.ordinal()].ordinal());
+
+        // 保存自动输入输出开关
+        tag.putBoolean("AutoInputEnabled", this.autoInputEnabled);
+        tag.putBoolean("AutoOutputEnabled", this.autoOutputEnabled);
 
     }
 
@@ -1364,13 +1461,97 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
     }
 
     /**
-     * 自动输出物品和流体到周围的容器
+     * 自动输入输出物品和流体到周围的容器
      * 每5tick调用一次
-     * 扳手设置的方向具有最高优先级，即使无法输出也不会切换到其他方向
      */
     private void autoOutputItemsAndFluids(Level level) {
         if (level.isClientSide) return;
 
+        // 自动输入（从周围容器拉取）
+        if (this.autoInputEnabled) {
+            this.autoInputFromSurroundings(level);
+        }
+
+        // 自动输出（推送到周围容器）
+        if (this.autoOutputEnabled) {
+            this.autoOutputToSurroundings(level);
+        }
+    }
+
+    /**
+     * 从周围容器自动输入物品和流体到机器。
+     * 仅从开启了对应面模式的面进行输入。
+     */
+    private void autoInputFromSurroundings(Level level) {
+        Direction facing = this.getFacing();
+        for (Direction dir : Direction.values()) {
+            FurnaceFace face = FurnaceFace.fromDirection(dir, facing);
+            if (face == null) continue;
+            FurnaceFaceMode mode = this.faceModes[face.ordinal()];
+            if (!mode.allowsAny()) continue;
+
+            BlockPos srcPos = this.worldPosition.relative(dir);
+            BlockEntity srcEntity = level.getBlockEntity(srcPos);
+            if (srcEntity == null) continue;
+
+            // 输入物品
+            if (mode.allowsMaterialInput() || mode.allowsCatalystInput() || mode.allowsMoldInput()) {
+                IItemHandler srcHandler = level.getCapability(
+                        Capabilities.ItemHandler.BLOCK, srcPos, srcEntity.getBlockState(), srcEntity, dir.getOpposite());
+                if (srcHandler != null) {
+                    IItemHandler selfHandler = new SidedItemHandler(this.itemHandler, dir, this);
+                    int[] targetSlots = getAutoInputSlotCandidates(mode);
+                    for (int srcSlot = 0; srcSlot < srcHandler.getSlots(); srcSlot++) {
+                        ItemStack extracted = srcHandler.extractItem(srcSlot, Integer.MAX_VALUE, true);
+                        if (extracted.isEmpty()) continue;
+
+                        ItemStack remaining = extracted;
+                        for (int machineSlot : targetSlots) {
+                            remaining = selfHandler.insertItem(machineSlot, remaining, false);
+                            if (remaining.isEmpty()) break;
+                        }
+
+                        int moved = extracted.getCount() - remaining.getCount();
+                        if (moved > 0) {
+                            srcHandler.extractItem(srcSlot, moved, false);
+                            this.setChanged();
+                        }
+                    }
+                }
+            }
+
+            // 输入流体
+            if (mode.allowsMaterialInput()) {
+                IFluidHandler srcFluidHandler = level.getCapability(
+                        Capabilities.FluidHandler.BLOCK, srcPos, srcEntity.getBlockState(), srcEntity, dir.getOpposite());
+                if (srcFluidHandler != null) {
+                    IFluidHandler selfFluidHandler = new SidedFluidHandler(this.inputFluidTanks, this.outputFluidTanks, dir, this);
+                    FluidStack drained = srcFluidHandler.drain(Integer.MAX_VALUE, IFluidHandler.FluidAction.SIMULATE);
+                    if (!drained.isEmpty()) {
+                        int filled = selfFluidHandler.fill(drained, IFluidHandler.FluidAction.EXECUTE);
+                        if (filled > 0) {
+                            srcFluidHandler.drain(filled, IFluidHandler.FluidAction.EXECUTE);
+                            this.setChanged();
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private static int[] getAutoInputSlotCandidates(FurnaceFaceMode mode) {
+        if (mode.allowsMaterialInput()) return MATERIAL_INPUT_SLOT_CANDIDATES;
+        if (mode.allowsCatalystInput()) return CATALYST_INPUT_SLOT_CANDIDATES;
+        if (mode.allowsMoldInput()) return MOLD_INPUT_SLOT_CANDIDATES;
+        return EMPTY_INPUT_SLOT_CANDIDATES;
+    }
+
+    /**
+     * 自动输出物品和流体到周围容器和AE网络。
+     * 仅输出到开启了"原材料输出"模式的面。
+     */
+    private void autoOutputToSurroundings(Level level) {
+        // AE网络输出不受面模式控制
         for (int slot = OUTPUT_SLOTS_START; slot < OUTPUT_SLOTS_START + OUTPUT_SLOTS_COUNT; slot++) {
             ItemStack stack = this.itemHandler.getStackInSlot(slot);
             if (stack.isEmpty()) continue;
@@ -1390,37 +1571,41 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
             }
         }
 
-        // 如果扳手指定了方向，只尝试该方向（最高优先级）
-        if (this.cachedOutputDirection != null) {
-            this.autoOutputItemsToFixedDirection(level, this.cachedOutputDirection);
-            this.autoOutputFluidsToFixedDirection(level, this.cachedOutputDirection);
-            return;
-        }
+        Direction facing = this.getFacing();
 
-        // 没有扳手指定方向，使用智能模式（优先上次成功的方向）
-        Direction preferredDirection = this.lastSuccessfulOutputDirection;
-
-        // 尝试输出物品
-        boolean itemOutputSuccess = this.autoOutputItems(level, preferredDirection);
-
-        // 尝试输出流体
-        boolean fluidOutputSuccess = this.autoOutputFluids(level, preferredDirection);
-
-        // 如果优先方向输出失败，则清除缓存并尝试其他方向
-        if (!itemOutputSuccess && !fluidOutputSuccess && preferredDirection != null) {
-            this.lastSuccessfulOutputDirection = null;
-        }
-    }
-
-    /**
-     * 自动输出物品到指定方向（扳手固定模式）
-     * 只尝试指定方向，不切换到其他方向
-     */
-    private void autoOutputItemsToFixedDirection(Level level, Direction direction) {
+        // 输出物品到周围容器（仅允许输出模式的面）
         for (int slot = OUTPUT_SLOTS_START; slot < OUTPUT_SLOTS_START + OUTPUT_SLOTS_COUNT; slot++) {
             ItemStack stack = this.itemHandler.getStackInSlot(slot);
             if (stack.isEmpty()) continue;
-            this.tryOutputItemToDirection(level, slot, direction);
+            for (Direction dir : ALL_DIRECTIONS) {
+                FurnaceFace face = FurnaceFace.fromDirection(dir, facing);
+                if (face == null) continue;
+                if (!this.faceModes[face.ordinal()].allowsMaterialOutput()) continue;
+                if (this.tryOutputItemToDirection(level, slot, dir)) {
+                    this.lastSuccessfulOutputDirection = dir;
+                    this.setChanged();
+                    stack = this.itemHandler.getStackInSlot(slot);
+                    if (stack.isEmpty()) break;
+                }
+            }
+        }
+
+        // 输出流体到周围容器（仅允许输出模式的面）
+        for (int tankIndex = 0; tankIndex < FLUID_TANK_COUNT; tankIndex++) {
+            FluidStack fluid = this.outputFluidTanks[tankIndex].getFluid();
+            if (fluid.isEmpty()) continue;
+            for (Direction dir : ALL_DIRECTIONS) {
+                FurnaceFace face = FurnaceFace.fromDirection(dir, facing);
+                if (face == null) continue;
+                if (!this.faceModes[face.ordinal()].allowsMaterialOutput()) continue;
+                int filled = this.tryOutputFluidToDirection(level, tankIndex, dir);
+                if (filled > 0) {
+                    this.lastSuccessfulOutputDirection = dir;
+                    this.setChanged();
+                    fluid = this.outputFluidTanks[tankIndex].getFluid();
+                    if (fluid.isEmpty()) break;
+                }
+            }
         }
     }
 
@@ -1505,18 +1690,6 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
         }
 
         return false;
-    }
-
-    /**
-     * 自动输出流体到指定方向（扳手固定模式）
-     * 只尝试指定方向，不切换到其他方向
-     */
-    private void autoOutputFluidsToFixedDirection(Level level, Direction direction) {
-        for (int tankIndex = 0; tankIndex < FLUID_TANK_COUNT; tankIndex++) {
-            FluidStack fluid = this.outputFluidTanks[tankIndex].getFluid();
-            if (fluid.isEmpty()) continue;
-            this.tryOutputFluidToDirection(level, tankIndex, direction);
-        }
     }
 
     /**
@@ -1828,6 +2001,184 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
         }
     }
 
+    /**
+     * 根据面模式限制的方向感知物品处理器。
+     * <p>
+     * 仅当对应面模式激活时才允许特定类型的插入/抽取操作。
+     */
+    private record SidedItemHandler(IItemHandler baseHandler, @Nullable Direction side,
+                                    AdvancedAlloyFurnaceBlockEntity owner) implements IItemHandler {
+
+        @Nullable
+        private FurnaceFaceMode getMode() {
+            if (side == null) return null; // 无限制
+            FurnaceFace face = FurnaceFace.fromDirection(side, owner.getFacing());
+            if (face == null) return FurnaceFaceMode.DISABLED;
+            return owner.getFaceMode(face);
+        }
+
+        @Override
+        public int getSlots() {
+            return baseHandler.getSlots();
+        }
+
+        @Override
+        public @NotNull ItemStack getStackInSlot(int slot) {
+            return baseHandler.getStackInSlot(slot);
+        }
+
+        @Override
+        public @NotNull ItemStack insertItem(int slot, @NotNull ItemStack stack, boolean simulate) {
+            FurnaceFaceMode mode = getMode();
+            if (mode == null) {
+                // 无面向时普通行为
+                return baseHandler.insertItem(slot, stack, simulate);
+            }
+            if (!mode.allowsAny()) return stack; // 完全禁止
+
+            // 催化剂优先路由（与BottomInputItemHandler逻辑一致）
+            if (stack.is(ModTags.CATALYSTS) && mode.allowsCatalystInput() && slot != CATALYST_SLOT) {
+                ItemStack catalystSlotStack = baseHandler.getStackInSlot(CATALYST_SLOT);
+                if (catalystSlotStack.isEmpty() ||
+                        (ItemStack.isSameItemSameComponents(catalystSlotStack, stack) &&
+                                catalystSlotStack.getCount() < baseHandler.getSlotLimit(CATALYST_SLOT))) {
+                    return baseHandler.insertItem(CATALYST_SLOT, stack, simulate);
+                }
+            }
+
+            // 模具优先路由
+            if (stack.is(ModTags.MOLDS) && mode.allowsMoldInput() && slot != MOLD_SLOT) {
+                ItemStack moldSlotStack = baseHandler.getStackInSlot(MOLD_SLOT);
+                if (moldSlotStack.isEmpty()) {
+                    return baseHandler.insertItem(MOLD_SLOT, stack, simulate);
+                }
+            }
+
+            boolean isInputSlot = slot >= INPUT_SLOTS_START && slot < INPUT_SLOTS_START + INPUT_SLOTS_COUNT;
+            boolean isCatalystSlot = slot == CATALYST_SLOT;
+            boolean isMoldSlot = slot == MOLD_SLOT;
+
+            // 仅允许输入到对应类型的槽位
+            if (isInputSlot && mode.allowsMaterialInput()) {
+                return baseHandler.insertItem(slot, stack, simulate);
+            }
+            if (isCatalystSlot && mode.allowsCatalystInput()) {
+                return baseHandler.insertItem(slot, stack, simulate);
+            }
+            if (isMoldSlot && mode.allowsMoldInput()) {
+                return baseHandler.insertItem(slot, stack, simulate);
+            }
+
+            return stack; // 不允许插入到此槽位
+        }
+
+        @Override
+        public @NotNull ItemStack extractItem(int slot, int amount, boolean simulate) {
+            FurnaceFaceMode mode = getMode();
+            if (mode == null) {
+                return baseHandler.extractItem(slot, amount, simulate);
+            }
+            if (!mode.allowsMaterialOutput()) return ItemStack.EMPTY;
+
+            boolean isOutputSlot = slot >= OUTPUT_SLOTS_START && slot < OUTPUT_SLOTS_START + OUTPUT_SLOTS_COUNT;
+            if (isOutputSlot) {
+                return baseHandler.extractItem(slot, amount, simulate);
+            }
+            return ItemStack.EMPTY;
+        }
+
+        @Override
+        public int getSlotLimit(int slot) {
+            return baseHandler.getSlotLimit(slot);
+        }
+
+        @Override
+        public boolean isItemValid(int slot, @NotNull ItemStack stack) {
+            return baseHandler.isItemValid(slot, stack);
+        }
+    }
+
+    /**
+     * 根据面模式限制的方向感知流体处理器。
+     * <p>
+     * 仅当对应面模式激活时才允许填充/抽取操作。
+     */
+    private record SidedFluidHandler(FluidTank[] inputTanks, FluidTank[] outputTanks,
+                                     Direction side, AdvancedAlloyFurnaceBlockEntity owner) implements IFluidHandler {
+
+        @Nullable
+        private FurnaceFaceMode getMode() {
+            FurnaceFace face = FurnaceFace.fromDirection(side, owner.getFacing());
+            if (face == null) return FurnaceFaceMode.DISABLED;
+            return owner.getFaceMode(face);
+        }
+
+        @Override
+        public int getTanks() {
+            return FLUID_TANK_COUNT * 2;
+        }
+
+        @Override
+        public @NotNull FluidStack getFluidInTank(int tank) {
+            if (tank < FLUID_TANK_COUNT) {
+                return inputTanks[tank].getFluid();
+            } else if (tank < FLUID_TANK_COUNT * 2) {
+                return outputTanks[tank - FLUID_TANK_COUNT].getFluid();
+            }
+            return FluidStack.EMPTY;
+        }
+
+        @Override
+        public int getTankCapacity(int tank) {
+            if (tank < FLUID_TANK_COUNT) {
+                return inputTanks[tank].getCapacity();
+            } else if (tank < FLUID_TANK_COUNT * 2) {
+                return outputTanks[tank - FLUID_TANK_COUNT].getCapacity();
+            }
+            return 0;
+        }
+
+        @Override
+        public boolean isFluidValid(int tank, @NotNull FluidStack stack) {
+            if (tank < FLUID_TANK_COUNT) {
+                return inputTanks[tank].isFluidValid(stack);
+            } else if (tank < FLUID_TANK_COUNT * 2) {
+                return outputTanks[tank - FLUID_TANK_COUNT].isFluidValid(stack);
+            }
+            return false;
+        }
+
+        @Override
+        public int fill(@NotNull FluidStack resource, @NotNull FluidAction action) {
+            FurnaceFaceMode mode = getMode();
+            if (mode == null || !mode.allowsMaterialInput()) return 0;
+            return CombinedFluidTankHandler.fillInput(inputTanks, resource, action);
+        }
+
+        @Override
+        public @NotNull FluidStack drain(@NotNull FluidStack resource, @NotNull FluidAction action) {
+            FurnaceFaceMode mode = getMode();
+            if (mode == null || !mode.allowsMaterialOutput()) return FluidStack.EMPTY;
+            for (FluidTank tank : outputTanks) {
+                FluidStack drained = tank.drain(resource, action);
+                if (!drained.isEmpty()) return drained;
+            }
+            return FluidStack.EMPTY;
+        }
+
+        @Override
+        public @NotNull FluidStack drain(int maxDrain, @NotNull FluidAction action) {
+            FurnaceFaceMode mode = getMode();
+            if (mode == null || !mode.allowsMaterialOutput()) return FluidStack.EMPTY;
+            for (FluidTank tank : outputTanks) {
+                if (!tank.getFluid().isEmpty()) {
+                    return tank.drain(maxDrain, action);
+                }
+            }
+            return FluidStack.EMPTY;
+        }
+    }
+
     private record FluidTankHandler(FluidTank[] tanks, boolean allowFill) implements IFluidHandler {
 
         @Override
@@ -1924,8 +2275,14 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
 
         @Override
         public int fill(@NotNull FluidStack resource, @NotNull FluidAction action) {
-            for (int i = 0; i < FLUID_TANK_COUNT; i++) {
-                FluidTank tank = this.inputTanks[i];
+            return fillInput(inputTanks, resource, action);
+        }
+
+        /**
+         * 静态辅助方法，用于SidedFluidHandler复用。
+         */
+        static int fillInput(FluidTank[] inputTanks, FluidStack resource, FluidAction action) {
+            for (FluidTank tank : inputTanks) {
                 if (tank.isFluidValid(resource)) {
                     if (tank.getFluid().isEmpty()
                             || FluidStack.isSameFluidSameComponents(tank.getFluid(), resource)) {

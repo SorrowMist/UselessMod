@@ -5,6 +5,8 @@ import appeng.menu.MenuOpener;
 import appeng.menu.locator.MenuLocators;
 import appeng.util.InteractionUtil;
 import com.glodblock.github.extendedae.container.ContainerRenamer;
+import com.sorrowmist.useless.api.enums.FurnaceFace;
+import com.sorrowmist.useless.api.enums.FurnaceFaceMode;
 import com.sorrowmist.useless.content.blockentities.AdvancedAlloyFurnaceBlockEntity;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.layout.AdvancedAlloyFurnaceLayout;
 import com.sorrowmist.useless.core.component.FurnaceDataComponent;
@@ -197,6 +199,19 @@ public class AdvancedAlloyFurnaceBlock extends Block implements EntityBlock {
                     blockEntityData.putInt(NBTConstants.MAX_PROGRESS, furnace.getMaxProgress());
                     blockEntityData.putInt(NBTConstants.CURRENT_PARALLEL, furnace.getData().get(0)); // 从data获取
                     blockEntityData.putBoolean(NBTConstants.HAS_MOLD, furnace.hasMold());
+
+                    // 保存面模式
+                    FurnaceFaceMode[] faceModes = furnace.getFaceModes();
+                    blockEntityData.putInt("FaceModeTop", faceModes[FurnaceFace.TOP.ordinal()].ordinal());
+                    blockEntityData.putInt("FaceModeBottom", faceModes[FurnaceFace.BOTTOM.ordinal()].ordinal());
+                    blockEntityData.putInt("FaceModeFront", faceModes[FurnaceFace.FRONT.ordinal()].ordinal());
+                    blockEntityData.putInt("FaceModeBack", faceModes[FurnaceFace.BACK.ordinal()].ordinal());
+                    blockEntityData.putInt("FaceModeLeft", faceModes[FurnaceFace.LEFT.ordinal()].ordinal());
+                    blockEntityData.putInt("FaceModeRight", faceModes[FurnaceFace.RIGHT.ordinal()].ordinal());
+
+                    // 保存自动输入输出开关
+                    blockEntityData.putBoolean("AutoInputEnabled", furnace.isAutoInputEnabled());
+                    blockEntityData.putBoolean("AutoOutputEnabled", furnace.isAutoOutputEnabled());
                     
                     // 使用Data Component存储数据
                     FurnaceDataComponent component = new FurnaceDataComponent(
@@ -321,29 +336,6 @@ public class AdvancedAlloyFurnaceBlock extends Block implements EntityBlock {
 
         if (level.isClientSide) {
             return ItemInteractionResult.SUCCESS;
-        }
-
-        // 扳手交互 - 设置输出方向
-        if (AdvancedAlloyFurnaceBlockEntity.isWrench(stack)) {
-            Direction clickedFace = hitResult.getDirection();
-            Direction currentOutput = furnace.getCachedOutputDirection();
-
-            if (currentOutput == clickedFace) {
-                // 二次点击相同面，取消设置
-                furnace.setOutputDirectionWithWrench(null);
-                player.displayClientMessage(
-                        net.minecraft.network.chat.Component.translatable("gui.useless_mod.advanced_alloy_furnace.output_cleared"),
-                        true);
-            } else {
-                // 设置新的输出面
-                furnace.setOutputDirectionWithWrench(clickedFace);
-                player.displayClientMessage(
-                        net.minecraft.network.chat.Component.translatable(
-                                "gui.useless_mod.advanced_alloy_furnace.output_set",
-                                clickedFace.getName()),
-                        true);
-            }
-            return ItemInteractionResult.CONSUME;
         }
 
         // 流体交互
@@ -497,7 +489,35 @@ public class AdvancedAlloyFurnaceBlock extends Block implements EntityBlock {
                 if (blockEntityData.contains(NBTConstants.HAS_MOLD)) {
                     furnace.setHasMold(blockEntityData.getBoolean(NBTConstants.HAS_MOLD));
                 }
-                
+
+                // 恢复面模式
+                if (blockEntityData.contains("FaceModeTop")) {
+                    furnace.setFaceMode(FurnaceFace.TOP, FurnaceFaceMode.byIndex(blockEntityData.getInt("FaceModeTop")));
+                }
+                if (blockEntityData.contains("FaceModeBottom")) {
+                    furnace.setFaceMode(FurnaceFace.BOTTOM, FurnaceFaceMode.byIndex(blockEntityData.getInt("FaceModeBottom")));
+                }
+                if (blockEntityData.contains("FaceModeFront")) {
+                    furnace.setFaceMode(FurnaceFace.FRONT, FurnaceFaceMode.byIndex(blockEntityData.getInt("FaceModeFront")));
+                }
+                if (blockEntityData.contains("FaceModeBack")) {
+                    furnace.setFaceMode(FurnaceFace.BACK, FurnaceFaceMode.byIndex(blockEntityData.getInt("FaceModeBack")));
+                }
+                if (blockEntityData.contains("FaceModeLeft")) {
+                    furnace.setFaceMode(FurnaceFace.LEFT, FurnaceFaceMode.byIndex(blockEntityData.getInt("FaceModeLeft")));
+                }
+                if (blockEntityData.contains("FaceModeRight")) {
+                    furnace.setFaceMode(FurnaceFace.RIGHT, FurnaceFaceMode.byIndex(blockEntityData.getInt("FaceModeRight")));
+                }
+
+                // 恢复自动输入输出开关
+                if (blockEntityData.contains("AutoInputEnabled")) {
+                    furnace.setAutoInputEnabled(blockEntityData.getBoolean("AutoInputEnabled"));
+                }
+                if (blockEntityData.contains("AutoOutputEnabled")) {
+                    furnace.setAutoOutputEnabled(blockEntityData.getBoolean("AutoOutputEnabled"));
+                }
+
                 furnace.setChanged();
             }
         }

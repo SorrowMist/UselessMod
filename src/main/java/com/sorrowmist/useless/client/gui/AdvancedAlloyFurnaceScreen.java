@@ -7,10 +7,14 @@ import com.mojang.blaze3d.vertex.DefaultVertexFormat;
 import com.mojang.blaze3d.vertex.Tesselator;
 import com.mojang.blaze3d.vertex.VertexFormat;
 import com.sorrowmist.useless.UselessMod;
+import com.sorrowmist.useless.api.enums.FurnaceFace;
+import com.sorrowmist.useless.api.enums.FurnaceFaceMode;
 import com.sorrowmist.useless.content.blockentities.AdvancedAlloyFurnaceBlockEntity;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.layout.AdvancedAlloyFurnaceLayout;
 import com.sorrowmist.useless.content.menus.AdvancedAlloyFurnaceMenu;
 import com.sorrowmist.useless.inventory.slot.PatternSlotItemHandler;
+import com.sorrowmist.useless.network.AutoIOChangePacket;
+import com.sorrowmist.useless.network.FaceModeChangePacket;
 import com.sorrowmist.useless.network.PatternPageChangePacket;
 import com.sorrowmist.useless.network.TankClearPacket;
 import net.minecraft.ChatFormatting;
@@ -146,6 +150,73 @@ public class AdvancedAlloyFurnaceScreen extends AbstractContainerScreen<Advanced
     private static final int TIPS_AREA_Y = 154;
     private static final int TIPS_AREA_SIZE = 16;
 
+    // ==================== 面模式控制区域 ====================
+    // 覆盖图尺寸
+    private static final int OVERLAY_WIDTH = 11;
+    private static final int OVERLAY_HEIGHT = 12;
+    private static final int OVERLAY_V = 265;
+
+    // 六个面的控制区域坐标（x, y, 对应的FurnaceFace）
+    // 顶部：26,197
+    private static final int FACE_TOP_X = 26;
+    private static final int FACE_TOP_Y = 197;
+
+    // 左侧：14,210
+    private static final int FACE_LEFT_X = 14;
+    private static final int FACE_LEFT_Y = 210;
+
+    // 前面：26,210
+    private static final int FACE_FRONT_X = 26;
+    private static final int FACE_FRONT_Y = 210;
+
+    // 右侧：38,210
+    private static final int FACE_RIGHT_X = 38;
+    private static final int FACE_RIGHT_Y = 210;
+
+    // 下部：26,223
+    private static final int FACE_BOTTOM_X = 26;
+    private static final int FACE_BOTTOM_Y = 223;
+
+    // 后部：38,223
+    private static final int FACE_BACK_X = 38;
+    private static final int FACE_BACK_Y = 223;
+
+    // 面模式区域定义（按FurnaceFace顺序存储x, y）
+    private static final int[] FACE_XS = {
+            FACE_TOP_X,   // TOP
+            FACE_LEFT_X,  // LEFT
+            FACE_FRONT_X, // FRONT
+            FACE_RIGHT_X, // RIGHT
+            FACE_BOTTOM_X,// BOTTOM
+            FACE_BACK_X,  // BACK
+    };
+    private static final int[] FACE_YS = {
+            FACE_TOP_Y,
+            FACE_LEFT_Y,
+            FACE_FRONT_Y,
+            FACE_RIGHT_Y,
+            FACE_BOTTOM_Y,
+            FACE_BACK_Y,
+    };
+
+    // ==================== 自动输入输出配置区域 ====================
+    // 自动输出：10,237，15*12
+    private static final int AUTO_OUTPUT_X = 10;
+    private static final int AUTO_OUTPUT_Y = 237;
+    private static final int AUTO_OUTPUT_WIDTH = 15;
+    private static final int AUTO_OUTPUT_HEIGHT = 12;
+
+    // 自动输入：43,237，15*12
+    private static final int AUTO_INPUT_X = 43;
+    private static final int AUTO_INPUT_Y = 237;
+    private static final int AUTO_INPUT_WIDTH = 15;
+    private static final int AUTO_INPUT_HEIGHT = 12;
+
+    // 自动输入输出覆盖图在纹理中的坐标（V=265）
+    private static final int AUTO_OUTPUT_OVERLAY_U = 107;
+    private static final int AUTO_INPUT_OVERLAY_U = 123;
+    private static final int AUTO_IO_OVERLAY_V = 265;
+
     // 翻页按钮状态
     private boolean prevPageButtonPressed = false;
     private boolean nextPageButtonPressed = false;
@@ -159,6 +230,31 @@ public class AdvancedAlloyFurnaceScreen extends AbstractContainerScreen<Advanced
         this.titleLabelY = 0;
         this.inventoryLabelX = 0;
         this.inventoryLabelY = 0;
+    }
+
+    /**
+     * 渲染自动输入输出配置的覆盖图。
+     */
+    private void renderAutoIOOverlays(GuiGraphics guiGraphics, int x, int y) {
+        if (this.menu.getBlockEntity() == null) return;
+
+        // 自动输出
+        if (this.menu.getBlockEntity().isAutoOutputEnabled()) {
+            guiGraphics.blit(TEXTURE,
+                    x + AUTO_OUTPUT_X, y + AUTO_OUTPUT_Y,
+                    AUTO_OUTPUT_OVERLAY_U, AUTO_IO_OVERLAY_V,
+                    AUTO_OUTPUT_WIDTH, AUTO_OUTPUT_HEIGHT,
+                    TEXTURE_WIDTH, TEXTURE_HEIGHT);
+        }
+
+        // 自动输入
+        if (this.menu.getBlockEntity().isAutoInputEnabled()) {
+            guiGraphics.blit(TEXTURE,
+                    x + AUTO_INPUT_X, y + AUTO_INPUT_Y,
+                    AUTO_INPUT_OVERLAY_U, AUTO_IO_OVERLAY_V,
+                    AUTO_INPUT_WIDTH, AUTO_INPUT_HEIGHT,
+                    TEXTURE_WIDTH, TEXTURE_HEIGHT);
+        }
     }
 
     @Override
@@ -180,6 +276,8 @@ public class AdvancedAlloyFurnaceScreen extends AbstractContainerScreen<Advanced
         this.renderEnergyTooltip(guiGraphics, mouseX, mouseY, x, y);
         this.renderProgressTooltip(guiGraphics, mouseX, mouseY, x, y);
         this.renderTipsTooltip(guiGraphics, mouseX, mouseY, x, y);
+        this.renderFaceModeTooltip(guiGraphics, mouseX, mouseY, x, y);
+        this.renderAutoIOTooltip(guiGraphics, mouseX, mouseY, x, y);
     }
 
     @Override
@@ -314,6 +412,12 @@ public class AdvancedAlloyFurnaceScreen extends AbstractContainerScreen<Advanced
 
         // 渲染翻页按钮
         this.renderPageButtons(guiGraphics, x, y);
+
+        // 渲染面模式覆盖图
+        this.renderFaceModeOverlays(guiGraphics, x, y);
+
+        // 渲染自动输入输出覆盖图
+        this.renderAutoIOOverlays(guiGraphics, x, y);
     }
 
     /**
@@ -544,6 +648,29 @@ public class AdvancedAlloyFurnaceScreen extends AbstractContainerScreen<Advanced
         guiGraphics.drawString(this.font, pageText, textX, textY, 0xFFFFFF, false);
     }
 
+    /**
+     * 渲染六个面的模式覆盖图。
+     * 仅当模式不是DISABLED时才渲染对应的覆盖纹理。
+     * <p>
+     * 纹理坐标：U从FurnaceFaceMode.getOverlayU()取，V=265，尺寸11*12。
+     */
+    private void renderFaceModeOverlays(GuiGraphics guiGraphics, int x, int y) {
+        if (this.menu.getBlockEntity() == null) return;
+        FurnaceFaceMode[] modes = this.menu.getBlockEntity().getFaceModes();
+        for (int faceIdx = 0; faceIdx < FurnaceFace.COUNT; faceIdx++) {
+            FurnaceFaceMode mode = modes[faceIdx];
+            if (!mode.hasOverlay()) continue;
+            int u = mode.getOverlayU();
+            int faceX = x + FACE_XS[faceIdx];
+            int faceY = y + FACE_YS[faceIdx];
+            guiGraphics.blit(TEXTURE,
+                    faceX, faceY,
+                    u, OVERLAY_V,
+                    OVERLAY_WIDTH, OVERLAY_HEIGHT,
+                    TEXTURE_WIDTH, TEXTURE_HEIGHT);
+        }
+    }
+
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
         int x = (this.width - this.imageWidth) / 2;
@@ -552,6 +679,8 @@ public class AdvancedAlloyFurnaceScreen extends AbstractContainerScreen<Advanced
         if (this.handlePatternPageClick(mouseX, mouseY, x, y)) return true;
         if (this.handleProgressClick(mouseX, mouseY, x, y)) return true;
         if (this.handleFluidTankClick(mouseX, mouseY, x, y)) return true;
+        if (this.handleFaceModeClick(mouseX, mouseY, x, y)) return true;
+        if (this.handleAutoIOClick(mouseX, mouseY, x, y)) return true;
 
         return super.mouseClicked(mouseX, mouseY, button);
     }
@@ -645,6 +774,59 @@ public class AdvancedAlloyFurnaceScreen extends AbstractContainerScreen<Advanced
                 }
                 return true;
             }
+        }
+
+        return false;
+    }
+
+    /**
+     * 处理面模式控制区域点击。
+     * <p>
+     * 点击时循环该面的输入输出模式：
+     * 客户端本地立即更新显示，同时发送网络包到服务器。
+     */
+    private boolean handleFaceModeClick(double mouseX, double mouseY, int x, int y) {
+        for (int faceIdx = 0; faceIdx < FurnaceFace.COUNT; faceIdx++) {
+            int faceX = x + FACE_XS[faceIdx];
+            int faceY = y + FACE_YS[faceIdx];
+            if (isInArea(mouseX, mouseY, faceX, faceY, OVERLAY_WIDTH, OVERLAY_HEIGHT)) {
+                FurnaceFace face = FurnaceFace.values()[faceIdx];
+                // 客户端本地立即更新
+                FurnaceFaceMode newMode = this.menu.getBlockEntity().getFaceMode(face).next();
+                this.menu.getBlockEntity().setFaceMode(face, newMode);
+                // 发送网络包到服务器
+                PacketDistributor.sendToServer(new FaceModeChangePacket(
+                        this.menu.getBlockEntity().getBlockPos(), faceIdx));
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * 处理自动输入输出配置区域点击。
+     */
+    private boolean handleAutoIOClick(double mouseX, double mouseY, int x, int y) {
+        if (this.menu.getBlockEntity() == null) return false;
+
+        // 自动输出区域
+        if (isInArea(mouseX, mouseY, x + AUTO_OUTPUT_X, y + AUTO_OUTPUT_Y,
+                AUTO_OUTPUT_WIDTH, AUTO_OUTPUT_HEIGHT)) {
+            boolean newState = !this.menu.getBlockEntity().isAutoOutputEnabled();
+            this.menu.getBlockEntity().setAutoOutputEnabled(newState);
+            PacketDistributor.sendToServer(new AutoIOChangePacket(
+                    this.menu.getBlockEntity().getBlockPos(), true));
+            return true;
+        }
+
+        // 自动输入区域
+        if (isInArea(mouseX, mouseY, x + AUTO_INPUT_X, y + AUTO_INPUT_Y,
+                AUTO_INPUT_WIDTH, AUTO_INPUT_HEIGHT)) {
+            boolean newState = !this.menu.getBlockEntity().isAutoInputEnabled();
+            this.menu.getBlockEntity().setAutoInputEnabled(newState);
+            PacketDistributor.sendToServer(new AutoIOChangePacket(
+                    this.menu.getBlockEntity().getBlockPos(), false));
+            return true;
         }
 
         return false;
@@ -857,5 +1039,49 @@ public class AdvancedAlloyFurnaceScreen extends AbstractContainerScreen<Advanced
                 .withStyle(ChatFormatting.RED));
 
         guiGraphics.renderTooltip(this.font, tooltip, Optional.empty(), mouseX, mouseY);
+    }
+
+    private void renderFaceModeTooltip(GuiGraphics guiGraphics, int mouseX, int mouseY, int x, int y) {
+        if (this.menu.getBlockEntity() == null) return;
+
+        for (int faceIdx = 0; faceIdx < FurnaceFace.COUNT; faceIdx++) {
+            int faceX = x + FACE_XS[faceIdx];
+            int faceY = y + FACE_YS[faceIdx];
+            if (!isInArea(mouseX, mouseY, faceX, faceY, OVERLAY_WIDTH, OVERLAY_HEIGHT)) continue;
+
+            FurnaceFace face = FurnaceFace.values()[faceIdx];
+            FurnaceFaceMode mode = this.menu.getBlockEntity().getFaceMode(face);
+
+            Component faceName = Component.translatable("gui.useless_mod.advanced_alloy_furnace.face." + face.name().toLowerCase());
+            Component modeName = Component.translatable("gui.useless_mod.advanced_alloy_furnace.face_mode." + mode.name().toLowerCase());
+
+            guiGraphics.renderTooltip(this.font, List.of(faceName, modeName), Optional.empty(), mouseX, mouseY);
+            break;
+        }
+    }
+
+    private void renderAutoIOTooltip(GuiGraphics guiGraphics, int mouseX, int mouseY, int x, int y) {
+        if (this.menu.getBlockEntity() == null) return;
+
+        // 自动输出
+        if (isInArea(mouseX, mouseY, x + AUTO_OUTPUT_X, y + AUTO_OUTPUT_Y,
+                AUTO_OUTPUT_WIDTH, AUTO_OUTPUT_HEIGHT)) {
+            Component title = Component.translatable("gui.useless_mod.advanced_alloy_furnace.auto_output");
+            Component status = this.menu.getBlockEntity().isAutoOutputEnabled()
+                    ? Component.translatable("gui.useless_mod.enabled")
+                    : Component.translatable("gui.useless_mod.disabled");
+            guiGraphics.renderTooltip(this.font, List.of(title, status), Optional.empty(), mouseX, mouseY);
+            return;
+        }
+
+        // 自动输入
+        if (isInArea(mouseX, mouseY, x + AUTO_INPUT_X, y + AUTO_INPUT_Y,
+                AUTO_INPUT_WIDTH, AUTO_INPUT_HEIGHT)) {
+            Component title = Component.translatable("gui.useless_mod.advanced_alloy_furnace.auto_input");
+            Component status = this.menu.getBlockEntity().isAutoInputEnabled()
+                    ? Component.translatable("gui.useless_mod.enabled")
+                    : Component.translatable("gui.useless_mod.disabled");
+            guiGraphics.renderTooltip(this.font, List.of(title, status), Optional.empty(), mouseX, mouseY);
+        }
     }
 }

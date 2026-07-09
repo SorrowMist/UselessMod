@@ -39,11 +39,11 @@ public final class ModBlockEntities {
                 (blockEntity, side) -> blockEntity.getEnergyStorage()
         );
 
-        // 注册高级合金炉的流体处理能力（复合处理器，同时管理输入和输出槽位）
+        // 注册高级合金炉的流体处理能力（支持方向感知）
         event.registerBlockEntity(
                 Capabilities.FluidHandler.BLOCK,
                 ADVANCED_ALLOY_FURNACE.get(),
-                (blockEntity, side) -> blockEntity.getCombinedFluidHandler()
+                (blockEntity, side) -> blockEntity.getCombinedFluidHandler(side)
         );
 
         // 注册高级合金炉的AE网络节点能力（用于连接AE网络）

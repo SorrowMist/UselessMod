@@ -2,7 +2,9 @@ package com.sorrowmist.useless.init;
 
 import com.sorrowmist.useless.UselessMod;
 import com.sorrowmist.useless.network.AETaskProgressPacket;
+import com.sorrowmist.useless.network.AutoIOChangePacket;
 import com.sorrowmist.useless.network.EnchantmentSwitchPacket;
+import com.sorrowmist.useless.network.FaceModeChangePacket;
 import com.sorrowmist.useless.network.ForceBreakKeyPacket;
 import com.sorrowmist.useless.network.MiningDataSyncPacket;
 import com.sorrowmist.useless.network.ModeTogglePacket;
@@ -41,6 +43,12 @@ public class ModNetwork {
         );
         registrar.playToServer(PatternPageChangePacket.TYPE, PatternPageChangePacket.STREAM_CODEC,
                                PatternPageChangePacket::handle
+        );
+        registrar.playToServer(FaceModeChangePacket.TYPE, FaceModeChangePacket.STREAM_CODEC,
+                               FaceModeChangePacket::handle
+        );
+        registrar.playToServer(AutoIOChangePacket.TYPE, AutoIOChangePacket.STREAM_CODEC,
+                               AutoIOChangePacket::handle
         );
     }
 }

@@ -9,6 +9,7 @@ import com.mojang.blaze3d.vertex.VertexFormat;
 import com.sorrowmist.useless.UselessMod;
 import com.sorrowmist.useless.api.enums.FurnaceFace;
 import com.sorrowmist.useless.api.enums.FurnaceFaceMode;
+import com.sorrowmist.useless.api.enums.RedstoneControlMode;
 import com.sorrowmist.useless.content.blockentities.AdvancedAlloyFurnaceBlockEntity;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.layout.AdvancedAlloyFurnaceLayout;
 import com.sorrowmist.useless.content.menus.AdvancedAlloyFurnaceMenu;
@@ -16,6 +17,7 @@ import com.sorrowmist.useless.inventory.slot.PatternSlotItemHandler;
 import com.sorrowmist.useless.network.AutoIOChangePacket;
 import com.sorrowmist.useless.network.FaceModeChangePacket;
 import com.sorrowmist.useless.network.PatternPageChangePacket;
+import com.sorrowmist.useless.network.RedstoneControlPacket;
 import com.sorrowmist.useless.network.TankClearPacket;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
@@ -217,6 +219,13 @@ public class AdvancedAlloyFurnaceScreen extends AbstractContainerScreen<Advanced
     private static final int AUTO_INPUT_OVERLAY_U = 123;
     private static final int AUTO_IO_OVERLAY_V = 265;
 
+    // ==================== 红石控制区域 ====================
+    // 红石控制：27,237，14*12
+    private static final int REDSTONE_CONTROL_X = 27;
+    private static final int REDSTONE_CONTROL_Y = 237;
+    private static final int REDSTONE_CONTROL_WIDTH = 14;
+    private static final int REDSTONE_CONTROL_HEIGHT = 12;
+
     // 翻页按钮状态
     private boolean prevPageButtonPressed = false;
     private boolean nextPageButtonPressed = false;
@@ -257,6 +266,20 @@ public class AdvancedAlloyFurnaceScreen extends AbstractContainerScreen<Advanced
         }
     }
 
+    /**
+     * 渲染红石控制模式的覆盖图。
+     */
+    private void renderRedstoneControlOverlay(GuiGraphics guiGraphics, int x, int y) {
+        if (this.menu.getBlockEntity() == null) return;
+        RedstoneControlMode mode = this.menu.getBlockEntity().getRedstoneControlMode();
+        if (!mode.hasOverlay()) return;
+        guiGraphics.blit(TEXTURE,
+                x + REDSTONE_CONTROL_X, y + REDSTONE_CONTROL_Y,
+                mode.getOverlayU(), AUTO_IO_OVERLAY_V,
+                REDSTONE_CONTROL_WIDTH, REDSTONE_CONTROL_HEIGHT,
+                TEXTURE_WIDTH, TEXTURE_HEIGHT);
+    }
+
     @Override
     public void render(@NotNull GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
         this.renderBackground(guiGraphics, mouseX, mouseY, partialTick);
@@ -278,6 +301,7 @@ public class AdvancedAlloyFurnaceScreen extends AbstractContainerScreen<Advanced
         this.renderTipsTooltip(guiGraphics, mouseX, mouseY, x, y);
         this.renderFaceModeTooltip(guiGraphics, mouseX, mouseY, x, y);
         this.renderAutoIOTooltip(guiGraphics, mouseX, mouseY, x, y);
+        this.renderRedstoneControlTooltip(guiGraphics, mouseX, mouseY, x, y);
     }
 
     @Override
@@ -418,6 +442,9 @@ public class AdvancedAlloyFurnaceScreen extends AbstractContainerScreen<Advanced
 
         // 渲染自动输入输出覆盖图
         this.renderAutoIOOverlays(guiGraphics, x, y);
+
+        // 渲染红石控制覆盖图
+        this.renderRedstoneControlOverlay(guiGraphics, x, y);
     }
 
     /**
@@ -681,6 +708,7 @@ public class AdvancedAlloyFurnaceScreen extends AbstractContainerScreen<Advanced
         if (this.handleFluidTankClick(mouseX, mouseY, x, y)) return true;
         if (this.handleFaceModeClick(mouseX, mouseY, x, y)) return true;
         if (this.handleAutoIOClick(mouseX, mouseY, x, y)) return true;
+        if (this.handleRedstoneControlClick(mouseX, mouseY, x, y)) return true;
 
         return super.mouseClicked(mouseX, mouseY, button);
     }
@@ -826,6 +854,24 @@ public class AdvancedAlloyFurnaceScreen extends AbstractContainerScreen<Advanced
             this.menu.getBlockEntity().setAutoInputEnabled(newState);
             PacketDistributor.sendToServer(new AutoIOChangePacket(
                     this.menu.getBlockEntity().getBlockPos(), false));
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * 处理红石控制区域点击。
+     */
+    private boolean handleRedstoneControlClick(double mouseX, double mouseY, int x, int y) {
+        if (this.menu.getBlockEntity() == null) return false;
+
+        if (isInArea(mouseX, mouseY, x + REDSTONE_CONTROL_X, y + REDSTONE_CONTROL_Y,
+                REDSTONE_CONTROL_WIDTH, REDSTONE_CONTROL_HEIGHT)) {
+            RedstoneControlMode newMode = this.menu.getBlockEntity().getRedstoneControlMode().next();
+            this.menu.getBlockEntity().setRedstoneControlMode(newMode);
+            PacketDistributor.sendToServer(new RedstoneControlPacket(
+                    this.menu.getBlockEntity().getBlockPos()));
             return true;
         }
 
@@ -1081,6 +1127,18 @@ public class AdvancedAlloyFurnaceScreen extends AbstractContainerScreen<Advanced
             Component status = this.menu.getBlockEntity().isAutoInputEnabled()
                     ? Component.translatable("gui.useless_mod.enabled")
                     : Component.translatable("gui.useless_mod.disabled");
+            guiGraphics.renderTooltip(this.font, List.of(title, status), Optional.empty(), mouseX, mouseY);
+        }
+    }
+
+    private void renderRedstoneControlTooltip(GuiGraphics guiGraphics, int mouseX, int mouseY, int x, int y) {
+        if (this.menu.getBlockEntity() == null) return;
+
+        if (isInArea(mouseX, mouseY, x + REDSTONE_CONTROL_X, y + REDSTONE_CONTROL_Y,
+                REDSTONE_CONTROL_WIDTH, REDSTONE_CONTROL_HEIGHT)) {
+            RedstoneControlMode mode = this.menu.getBlockEntity().getRedstoneControlMode();
+            Component title = Component.translatable("gui.useless_mod.advanced_alloy_furnace.redstone_control");
+            Component status = Component.translatable("gui.useless_mod.advanced_alloy_furnace.redstone_control." + mode.name().toLowerCase());
             guiGraphics.renderTooltip(this.font, List.of(title, status), Optional.empty(), mouseX, mouseY);
         }
     }

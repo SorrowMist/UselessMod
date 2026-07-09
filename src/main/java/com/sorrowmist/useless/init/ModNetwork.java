@@ -9,6 +9,7 @@ import com.sorrowmist.useless.network.ForceBreakKeyPacket;
 import com.sorrowmist.useless.network.MiningDataSyncPacket;
 import com.sorrowmist.useless.network.ModeTogglePacket;
 import com.sorrowmist.useless.network.PatternPageChangePacket;
+import com.sorrowmist.useless.network.RedstoneControlPacket;
 import com.sorrowmist.useless.network.TabKeyPressedPacket;
 import com.sorrowmist.useless.network.TankClearPacket;
 import com.sorrowmist.useless.network.ToolTypeModeSwitchPacket;
@@ -49,6 +50,9 @@ public class ModNetwork {
         );
         registrar.playToServer(AutoIOChangePacket.TYPE, AutoIOChangePacket.STREAM_CODEC,
                                AutoIOChangePacket::handle
+        );
+        registrar.playToServer(RedstoneControlPacket.TYPE, RedstoneControlPacket.STREAM_CODEC,
+                               RedstoneControlPacket::handle
         );
     }
 }

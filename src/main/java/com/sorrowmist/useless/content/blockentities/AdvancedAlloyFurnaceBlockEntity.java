@@ -27,6 +27,7 @@ import appeng.helpers.patternprovider.PatternContainer;
 import com.sorrowmist.useless.api.enums.CatalystType;
 import com.sorrowmist.useless.api.enums.FurnaceFace;
 import com.sorrowmist.useless.api.enums.FurnaceFaceMode;
+import com.sorrowmist.useless.api.enums.RedstoneControlMode;
 import com.sorrowmist.useless.content.blocks.AdvancedAlloyFurnaceBlock;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.AdvancedAlloyFurnaceAeManager;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.CraftingTaskContext;
@@ -168,6 +169,8 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
     private boolean autoInputEnabled = false;
     // 自动输出开关
     private boolean autoOutputEnabled = false;
+    // 红石控制模式
+    private RedstoneControlMode redstoneControlMode = RedstoneControlMode.DISABLED;
 
     public AdvancedAlloyFurnaceBlockEntity(BlockPos pos, BlockState state) {
         super(ModBlockEntities.ADVANCED_ALLOY_FURNACE.get(), pos, state);
@@ -294,6 +297,25 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
 
         boolean wasActive = entity.getBlockState().getValue(
                 com.sorrowmist.useless.content.blocks.AdvancedAlloyFurnaceBlock.getActiveProperty());
+
+        // 红石控制：被阻止时跳过所有操作
+        boolean blocked = entity.isRedstoneBlocked();
+
+        if (blocked) {
+            // 被阻止时，配方进度冻结但不清零
+            // 不执行任何配方处理、AE任务、自动IO
+            boolean shouldBeActive = entity.currentRecipe != null && entity.progress > 0;
+            if (wasActive != shouldBeActive) {
+                level.setBlock(entity.worldPosition,
+                               entity.getBlockState().setValue(
+                                       AdvancedAlloyFurnaceBlock.getActiveProperty(),
+                                       shouldBeActive
+                               ),
+                               3
+                );
+            }
+            return;
+        }
 
         if (entity.currentRecipe == null) {
             entity.tryStartNewRecipe();
@@ -905,6 +927,31 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
         return this.autoOutputEnabled;
     }
 
+    // ==================== 红石控制 ====================
+
+    public RedstoneControlMode getRedstoneControlMode() {
+        return this.redstoneControlMode;
+    }
+
+    public void setRedstoneControlMode(RedstoneControlMode mode) {
+        this.redstoneControlMode = mode;
+        this.setChanged();
+    }
+
+    public RedstoneControlMode cycleRedstoneControlMode() {
+        this.redstoneControlMode = this.redstoneControlMode.next();
+        this.setChanged();
+        if (this.level != null && !this.level.isClientSide) {
+            this.level.sendBlockUpdated(this.worldPosition, this.getBlockState(), this.getBlockState(), 3);
+        }
+        return this.redstoneControlMode;
+    }
+
+    public boolean isRedstoneBlocked() {
+        boolean hasSignal = this.level != null && this.level.hasNeighborSignal(this.worldPosition);
+        return !this.redstoneControlMode.shouldRun(hasSignal);
+    }
+
     public IEnergyStorage getEnergyStorage() {
         return this.energyManager;
     }
@@ -1134,6 +1181,9 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
         this.autoInputEnabled = tag.getBoolean("AutoInputEnabled");
         this.autoOutputEnabled = tag.getBoolean("AutoOutputEnabled");
 
+        // 加载红石控制模式
+        this.redstoneControlMode = RedstoneControlMode.byIndex(tag.getInt("RedstoneControlMode"));
+
         if (tag.contains("PatternPriority")) {
             this.aeManager.setPatternPriority(tag.getInt("PatternPriority"));
         }
@@ -1190,6 +1240,9 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
         // 保存自动输入输出开关
         tag.putBoolean("AutoInputEnabled", this.autoInputEnabled);
         tag.putBoolean("AutoOutputEnabled", this.autoOutputEnabled);
+
+        // 保存红石控制模式
+        tag.putInt("RedstoneControlMode", this.redstoneControlMode.ordinal());
 
     }
 

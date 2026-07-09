@@ -7,6 +7,7 @@ import appeng.util.InteractionUtil;
 import com.glodblock.github.extendedae.container.ContainerRenamer;
 import com.sorrowmist.useless.api.enums.FurnaceFace;
 import com.sorrowmist.useless.api.enums.FurnaceFaceMode;
+import com.sorrowmist.useless.api.enums.RedstoneControlMode;
 import com.sorrowmist.useless.content.blockentities.AdvancedAlloyFurnaceBlockEntity;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.layout.AdvancedAlloyFurnaceLayout;
 import com.sorrowmist.useless.core.component.FurnaceDataComponent;
@@ -212,6 +213,9 @@ public class AdvancedAlloyFurnaceBlock extends Block implements EntityBlock {
                     // 保存自动输入输出开关
                     blockEntityData.putBoolean("AutoInputEnabled", furnace.isAutoInputEnabled());
                     blockEntityData.putBoolean("AutoOutputEnabled", furnace.isAutoOutputEnabled());
+
+                    // 保存红石控制模式
+                    blockEntityData.putInt("RedstoneControlMode", furnace.getRedstoneControlMode().ordinal());
                     
                     // 使用Data Component存储数据
                     FurnaceDataComponent component = new FurnaceDataComponent(
@@ -516,6 +520,11 @@ public class AdvancedAlloyFurnaceBlock extends Block implements EntityBlock {
                 }
                 if (blockEntityData.contains("AutoOutputEnabled")) {
                     furnace.setAutoOutputEnabled(blockEntityData.getBoolean("AutoOutputEnabled"));
+                }
+
+                // 恢复红石控制模式
+                if (blockEntityData.contains("RedstoneControlMode")) {
+                    furnace.setRedstoneControlMode(RedstoneControlMode.byIndex(blockEntityData.getInt("RedstoneControlMode")));
                 }
 
                 furnace.setChanged();

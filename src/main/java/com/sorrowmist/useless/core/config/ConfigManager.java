@@ -25,6 +25,8 @@ public class ConfigManager {
     private static final ModConfigSpec.IntValue PLATFORM_START_Y;
     // 是否生成基岩层
     private static final ModConfigSpec.BooleanValue GENERATE_BEDROCK;
+    // 基岩层是否固定生成在世界最底层
+    private static final ModConfigSpec.BooleanValue BEDROCK_AT_BOTTOM;
 
     // 植物盆生长速度配置
     private static final ModConfigSpec.IntValue BOTANY_POT_GROWTH_MULTIPLIER;
@@ -87,6 +89,11 @@ public class ConfigManager {
         GENERATE_BEDROCK = COMMON_BUILDER
                 .comment("是否生成基岩层, 默认生成")
                 .define("generate_bedrock", true);
+
+        BEDROCK_AT_BOTTOM = COMMON_BUILDER
+                .comment("基岩层是否固定生成在世界最底层(Y=-64), 而非紧贴塑料层下方",
+                        "开启后无论塑料起始层为多少, 基岩都生成在最底层")
+                .define("bedrock_at_bottom", false);
         COMMON_BUILDER.pop();
 
         COMMON_BUILDER.push("game_mechanics");
@@ -273,6 +280,11 @@ public class ConfigManager {
     // 获取是否生成基岩层
     public static boolean shouldGenerateBedrock() {
         return GENERATE_BEDROCK.get();
+    }
+
+    // 获取基岩层是否固定生成在世界最底层
+    public static boolean shouldBedrockAtBottom() {
+        return BEDROCK_AT_BOTTOM.get();
     }
 
     // 获取塑料平台起始Y值

@@ -64,6 +64,17 @@ public abstract class AbstractPlasticPlatformGenerator extends ChunkGenerator {
         return ConfigManager.shouldGenerateBedrock();
     }
 
+    /**
+     * 基岩层所在的 Y 值
+     * 若开启"固定最底层"选项则返回世界最底层, 否则紧贴平台下方
+     */
+    private int getBedrockY(int minY, int maxY) {
+        if (ConfigManager.shouldBedrockAtBottom()) {
+            return clampY(minY, minY, maxY);
+        }
+        return clampY(this.getBottomY(), minY, maxY);
+    }
+
     @Override public void applyCarvers(@NotNull WorldGenRegion region,
                                        long seed,
                                        @NotNull RandomState randomState,
@@ -88,13 +99,14 @@ public abstract class AbstractPlasticPlatformGenerator extends ChunkGenerator {
         int maxY = region.getMaxBuildHeight();
         int bottomY = clampY(this.getBottomY(), minY, maxY);
         int topY = Math.max(bottomY, clampY(this.getTopY(), minY, maxY));
+        int bedrockY = this.getBedrockY(minY, maxY);
 
         for (int x = 0; x < 16; x++) {
             for (int z = 0; z < 16; z++) {
 
                 // 可选：基岩底层
                 if (this.shouldGenerateBedrock()) {
-                    chunk.setBlockState(pos.set(x, bottomY, z), Blocks.BEDROCK.defaultBlockState(), false);
+                    chunk.setBlockState(pos.set(x, bedrockY, z), Blocks.BEDROCK.defaultBlockState(), false);
                 }
 
                 // 平台主体层（从 bottomY + 1 到 topY）
@@ -149,10 +161,11 @@ public abstract class AbstractPlasticPlatformGenerator extends ChunkGenerator {
         int maxBuild = level.getMaxBuildHeight();
         int bottomY = clampY(this.getBottomY(), minBuild, maxBuild);
         int topY = Math.max(bottomY, clampY(this.getTopY(), minBuild, maxBuild));
+        int bedrockY = this.getBedrockY(minBuild, maxBuild);
 
         for (int y = minBuild; y < level.getMaxBuildHeight(); y++) {
             int idx = y - minBuild;
-            if (y == bottomY && this.shouldGenerateBedrock()) {
+            if (y == bedrockY && this.shouldGenerateBedrock()) {
                 column[idx] = Blocks.BEDROCK.defaultBlockState();
             } else if (y > bottomY && y <= topY) {
                 column[idx] = ConfigManager.getFillBlock().defaultBlockState();
@@ -167,7 +180,8 @@ public abstract class AbstractPlasticPlatformGenerator extends ChunkGenerator {
     public void addDebugScreenInfo(List<String> list, @NotNull RandomState randomState, @NotNull BlockPos pos) {
         list.add("Useless Dimension - " + this.getDebugName());
         list.add("高度: Y=" + this.getBottomY() + " ~ " + this.getTopY());
-        list.add("基岩: " + this.shouldGenerateBedrock());
+        list.add("基岩: " + this.shouldGenerateBedrock()
+                + (this.shouldGenerateBedrock() ? " (Y=" + this.getBedrockY(this.getMinY(), this.getGenDepth() + this.getMinY()) + ")" : ""));
         list.add("边框方块: " + ConfigManager.getBorderBlock());
         list.add("填充方块: " + ConfigManager.getFillBlock());
         list.add("中心方块: " + ConfigManager.getCenterBlock());

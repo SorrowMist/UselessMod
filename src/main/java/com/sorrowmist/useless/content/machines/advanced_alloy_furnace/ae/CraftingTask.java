@@ -471,7 +471,17 @@ public class CraftingTask {
 
         if (recipe != null) {
             for (GenericStack keyOutput : recipe.keyOutputs()) {
-                outputKeys.add(new OutputKey(keyOutput.what(), keyOutput.amount() * craftCount));
+                // 样板输出已包含该 key（走上面的 else 分支输出），跳过以避免重复产出
+                boolean alreadyInPattern = false;
+                for (var patternOutput : pattern.getOutputs()) {
+                    if (keyOutput.what().equals(patternOutput.what())) {
+                        alreadyInPattern = true;
+                        break;
+                    }
+                }
+                if (!alreadyInPattern) {
+                    outputKeys.add(new OutputKey(keyOutput.what(), keyOutput.amount() * craftCount));
+                }
             }
         }
 

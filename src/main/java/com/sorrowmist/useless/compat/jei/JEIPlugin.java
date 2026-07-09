@@ -23,6 +23,7 @@ import com.sorrowmist.useless.content.recipe.adapters.ae.ae2lt.CrystalCatalyzerR
 import com.sorrowmist.useless.content.recipe.adapters.ae.ae2lt.LightningAssemblyRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.ae.ae2lt.LightningSimulationRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.ae.ae2lt.OverloadProcessingRecipeAdapter;
+import com.sorrowmist.useless.content.recipe.adapters.ae.ae2lt.SteakLightningRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.ae.dataenergistics.DataReassemblerRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.ae.extendedae.CircuitCutterRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.ae.extendedae.CrystalAssemblerRecipeAdapter;
@@ -366,6 +367,9 @@ public class JEIPlugin implements IModPlugin {
 
         CrystalCatalyzerRecipeAdapter catalyzerAdapter = new CrystalCatalyzerRecipeAdapter();
         addConvertedRecipes(convertedRecipes, recipeManager, CRYSTAL_CATALYZER_TYPE.get(), catalyzerAdapter, level);
+
+        SteakLightningRecipeAdapter steakAdapter = new SteakLightningRecipeAdapter();
+        convertedRecipes.addAll(steakAdapter.getAllRecipes());
 
         return convertedRecipes;
     }

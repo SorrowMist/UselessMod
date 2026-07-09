@@ -14,6 +14,7 @@ import com.sorrowmist.useless.content.recipe.adapters.ae.ae2lt.CrystalCatalyzerR
 import com.sorrowmist.useless.content.recipe.adapters.ae.ae2lt.LightningAssemblyRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.ae.ae2lt.LightningSimulationRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.ae.ae2lt.OverloadProcessingRecipeAdapter;
+import com.sorrowmist.useless.content.recipe.adapters.ae.ae2lt.SteakLightningRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.ae.dataenergistics.DataReassemblerRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.ae.extendedae.CircuitCutterRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.ae.extendedae.CrystalAssemblerRecipeAdapter;
@@ -146,6 +147,7 @@ public final class RecipeAdapterCompatRegistry {
         register(new LightningAssemblyRecipeAdapter());
         register(new OverloadProcessingRecipeAdapter());
         register(new CrystalCatalyzerRecipeAdapter());
+        register(new SteakLightningRecipeAdapter());
     }
 
     private static void registerDataEnergistics() {

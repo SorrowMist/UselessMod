@@ -1,6 +1,7 @@
 package com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae;
 
 import appeng.api.crafting.IPatternDetails;
+import appeng.api.crafting.PatternDetailsHelper;
 import appeng.api.stacks.AEFluidKey;
 import appeng.api.stacks.AEItemKey;
 import appeng.api.stacks.AEKey;
@@ -13,8 +14,14 @@ import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.io.Furnace
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.parallel.AlloyFurnaceParallelCalculator;
 import com.sorrowmist.useless.content.recipe.AdvancedAlloyFurnaceRecipe;
 import com.sorrowmist.useless.content.recipe.AlloyFurnaceRecipeManager;
+import net.minecraft.core.HolderLookup;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.ListTag;
+import net.minecraft.nbt.Tag;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.Level;
 import net.neoforged.neoforge.fluids.FluidStack;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -62,6 +69,26 @@ public class CraftingTask {
         this.storeInputMaterials(inputHolder, this.taskInputItems, this.taskInputFluids, this.taskInputKeys);
     }
 
+    /** 从一个拆分出的子任务构造独立任务（用于空闲线程再分配） */
+    private CraftingTask(int taskId, IPatternDetails pattern, CraftingTaskContext context, CraftingSubTask subTask) {
+        this.taskId = taskId;
+        this.pattern = pattern;
+        this.context = context;
+        this.craftCount = Math.max(1, subTask.craftCount);
+        this.displayedCraftCount = this.craftCount;
+        this.taskInputItems.addAll(subTask.items);
+        this.taskInputFluids.addAll(subTask.fluids);
+        this.taskInputKeys.addAll(subTask.keys);
+    }
+
+    /** 用于从 NBT 恢复的空任务构造 */
+    private CraftingTask(int taskId, IPatternDetails pattern, CraftingTaskContext context) {
+        this.taskId = taskId;
+        this.pattern = pattern;
+        this.context = context;
+    }
+
+
     public boolean isProcessingComplete() {
         return processingComplete;
     }
@@ -90,6 +117,35 @@ public class CraftingTask {
         boolean valid = isRecipeValid(recipe);
         this.waitingDetail = "";
         return valid;
+    }
+
+    public int getTaskId() {
+        return this.taskId;
+    }
+
+    /** 是否还有排队中的子任务可拆分到空闲线程 */
+    public boolean hasQueuedSubTasks() {
+        return !this.processingComplete && !this.cancelled && !this.queuedSubTasks.isEmpty();
+    }
+
+    /**
+     * 拆出队尾的一个子任务，构造为独立任务在空闲线程运行。
+     * 当前任务保留正在处理的批次不受影响。
+     *
+     * @param newTaskId 新任务 ID
+     * @return 拆分出的独立任务，若无可拆分子任务则返回 null
+     */
+    @Nullable
+    public CraftingTask splitLastSubTask(int newTaskId) {
+        if (!hasQueuedSubTasks()) {
+            return null;
+        }
+        CraftingSubTask subTask = queuedSubTasks.removeLast();
+        updateDisplayedCraftCount();
+        updateTaskProgressTotals();
+        context.markChanged();
+        context.sendAETaskProgressToClients();
+        return new CraftingTask(newTaskId, pattern, context, subTask);
     }
 
     public String getWaitingDetail() {
@@ -521,6 +577,136 @@ public class CraftingTask {
         this.cancelled = true;
         returnMaterialsToAE();
         finishTask();
+    }
+
+    // ==================== 持久化 ====================
+
+    /**
+     * 将任务序列化为 NBT。
+     * 保存输入材料、子任务队列以及当前批次的运行进度，使重载后能从原进度继续。
+     */
+    public CompoundTag save(HolderLookup.Provider registries) {
+        CompoundTag tag = new CompoundTag();
+        tag.putInt("TaskId", taskId);
+        tag.put("Pattern", pattern.getDefinition().toTag(registries));
+        tag.putInt("CraftCount", craftCount);
+        tag.put("Inputs", writeStacks(registries, taskInputItems, taskInputFluids, taskInputKeys));
+
+        ListTag subTasksTag = new ListTag();
+        for (CraftingSubTask subTask : queuedSubTasks) {
+            CompoundTag subTag = new CompoundTag();
+            subTag.putInt("CraftCount", subTask.craftCount);
+            subTag.put("Inputs", writeStacks(registries, subTask.items, subTask.fluids, subTask.keys));
+            subTasksTag.add(subTag);
+        }
+        tag.put("SubTasks", subTasksTag);
+
+        // 保存已初始化后的运行进度，使重载后从原进度继续，而非归零重算
+        tag.putBoolean("Initialized", initialized);
+        if (initialized) {
+            tag.putInt("Progress", progress);
+            tag.putInt("ProcessTime", processTime);
+            tag.putInt("BaseProcessTime", baseProcessTime);
+            tag.putInt("BaseEnergyPerTick", baseEnergyPerTick);
+            tag.putInt("MaxParallel", maxParallel);
+            tag.putInt("Batches", batches);
+            tag.putInt("LastBatchSize", lastBatchSize);
+        }
+        return tag;
+    }
+
+    /**
+     * 从 NBT 恢复任务。样板解码失败时返回 null。
+     * 若任务在存档前已初始化，则恢复运行进度并重新注册进全局进度统计。
+     */
+    @Nullable
+    public static CraftingTask load(CompoundTag tag, Level level, CraftingTaskContext context, HolderLookup.Provider registries) {
+        AEItemKey definition = AEItemKey.fromTag(registries, tag.getCompound("Pattern"));
+        if (definition == null) {
+            return null;
+        }
+        IPatternDetails pattern = PatternDetailsHelper.decodePattern(definition.toStack(), level);
+        if (pattern == null) {
+            return null;
+        }
+
+        int taskId = tag.getInt("TaskId");
+        CraftingTask task = new CraftingTask(taskId, pattern, context);
+        task.craftCount = Math.max(1, tag.getInt("CraftCount"));
+        readStacks(registries, tag.getList("Inputs", Tag.TAG_COMPOUND), task.taskInputItems, task.taskInputFluids, task.taskInputKeys);
+
+        ListTag subTasksTag = tag.getList("SubTasks", Tag.TAG_COMPOUND);
+        for (int i = 0; i < subTasksTag.size(); i++) {
+            CompoundTag subTag = subTasksTag.getCompound(i);
+            List<ItemStack> items = new ArrayList<>();
+            List<FluidStack> fluids = new ArrayList<>();
+            List<OutputKey> keys = new ArrayList<>();
+            readStacks(registries, subTag.getList("Inputs", Tag.TAG_COMPOUND), items, fluids, keys);
+            task.queuedSubTasks.add(new CraftingSubTask(items, fluids, keys, Math.max(1, subTag.getInt("CraftCount"))));
+        }
+        task.updateDisplayedCraftCount();
+
+        if (tag.getBoolean("Initialized")) {
+            task.restoreProgress(tag);
+        }
+        return task;
+    }
+
+    /**
+     * 恢复已初始化任务的运行进度，并将进度重新注册进全局进度统计与进度显示对象。
+     * 全局 atomic 与 taskProgressRef 不随存档持久化，需要在加载时重建。
+     */
+    private void restoreProgress(CompoundTag tag) {
+        this.baseProcessTime = Math.max(1, tag.getInt("BaseProcessTime"));
+        this.baseEnergyPerTick = Math.max(1, tag.getInt("BaseEnergyPerTick"));
+        this.maxParallel = Math.max(1, tag.getInt("MaxParallel"));
+        this.batches = Math.max(1, tag.getInt("Batches"));
+        this.lastBatchSize = Math.max(1, tag.getInt("LastBatchSize"));
+        this.processTime = Math.max(1, tag.getInt("ProcessTime"));
+        this.progress = Math.max(0, Math.min(tag.getInt("Progress"), this.processTime));
+
+        int outputCount = 1;
+        if (pattern != null && !pattern.getOutputs().isEmpty()) {
+            outputCount = (int) pattern.getOutputs().getFirst().amount();
+        }
+        int totalOutputCount = displayedCraftCount * outputCount;
+        this.taskProgressRef = new AdvancedAlloyFurnaceAeManager.AETaskProgress(getProductName(), processTime, displayedCraftCount, totalOutputCount);
+        this.taskProgressRef.setProgress(progress);
+        context.getAETaskProgressMap().put(taskId, taskProgressRef);
+        context.getTotalAEProgressAtomic().addAndGet(progress);
+        context.getTotalAEMaxProgressAtomic().addAndGet(processTime);
+        this.progressRegistered = true;
+        this.initialized = true;
+    }
+
+    private static ListTag writeStacks(HolderLookup.Provider registries, List<ItemStack> items, List<FluidStack> fluids, List<OutputKey> keys) {
+        ListTag list = new ListTag();
+        for (ItemStack stack : items) {
+            GenericStack gs = GenericStack.fromItemStack(stack);
+            if (gs != null) list.add(GenericStack.writeTag(registries, gs));
+        }
+        for (FluidStack stack : fluids) {
+            GenericStack gs = GenericStack.fromFluidStack(stack);
+            if (gs != null) list.add(GenericStack.writeTag(registries, gs));
+        }
+        for (OutputKey key : keys) {
+            list.add(GenericStack.writeTag(registries, new GenericStack(key.key, key.amount)));
+        }
+        return list;
+    }
+
+    private static void readStacks(HolderLookup.Provider registries, ListTag list, List<ItemStack> items, List<FluidStack> fluids, List<OutputKey> keys) {
+        for (int i = 0; i < list.size(); i++) {
+            GenericStack gs = GenericStack.readTag(registries, list.getCompound(i));
+            if (gs == null) continue;
+            if (gs.what() instanceof AEItemKey itemKey) {
+                items.add(itemKey.toStack((int) gs.amount()));
+            } else if (gs.what() instanceof AEFluidKey fluidKey) {
+                fluids.add(new FluidStack(fluidKey.getFluid(), (int) gs.amount()));
+            } else {
+                keys.add(new OutputKey(gs.what(), gs.amount()));
+            }
+        }
     }
 
     // 辅助类用于存储输出数据

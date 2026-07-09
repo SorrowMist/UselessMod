@@ -9,6 +9,10 @@ import appeng.api.stacks.KeyCounter;
 import com.sorrowmist.useless.content.blockentities.AdvancedAlloyFurnaceBlockEntity;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.layout.AdvancedAlloyFurnaceLayout;
 import com.sorrowmist.useless.network.AETaskProgressPacket;
+import net.minecraft.core.HolderLookup;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.ListTag;
+import net.minecraft.nbt.Tag;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
@@ -35,7 +39,7 @@ public final class AdvancedAlloyFurnaceAeManager {
 
     private final AdvancedAlloyFurnaceBlockEntity owner;
     private final ConcurrentHashMap<Integer, CraftingTask> activeTasks = new ConcurrentHashMap<>();
-    private final Map<PatternKey, CraftingTask> activeTasksByPattern = new HashMap<>();
+    private final Map<PatternKey, List<CraftingTask>> activeTasksByPattern = new HashMap<>();
     private final ReentrantLock craftingLock = new ReentrantLock();
     private final ConcurrentHashMap<Integer, AETaskProgress> aeTaskProgressMap = new ConcurrentHashMap<>();
     private final List<AETaskProgress> clientTaskProgressList = new ArrayList<>();
@@ -46,6 +50,9 @@ public final class AdvancedAlloyFurnaceAeManager {
     private final AtomicInteger totalAEMaxProgress = new AtomicInteger(0);
     private int patternPriority = 0;
     private int nextTaskId = 0;
+    // 延迟加载的任务数据（loadTag 时 level 尚不可用，需推迟到首 tick 解码样板）
+    @org.jetbrains.annotations.Nullable
+    private CompoundTag deferredTasksTag = null;
 
     public AdvancedAlloyFurnaceAeManager(AdvancedAlloyFurnaceBlockEntity owner) {
         this.owner = owner;
@@ -59,6 +66,78 @@ public final class AdvancedAlloyFurnaceAeManager {
         this.totalAEProgress.set(0);
         this.totalAEMaxProgress.set(0);
         this.aeTaskProgressMap.clear();
+    }
+
+    // ==================== 持久化 ====================
+
+    /**
+     * 将活跃任务与待启动批次序列化到 NBT。
+     */
+    public void saveTasks(CompoundTag tag, HolderLookup.Provider registries) {
+        ListTag tasksTag = new ListTag();
+        for (CraftingTask task : this.activeTasks.values()) {
+            tasksTag.add(task.save(registries));
+        }
+        tag.put("ActiveTasks", tasksTag);
+
+        ListTag pendingTag = new ListTag();
+        synchronized (this.aePendingBatches) {
+            for (PendingAEBatch batch : this.aePendingBatches.values()) {
+                CompoundTag batchTag = batch.save(registries);
+                if (batchTag != null) {
+                    pendingTag.add(batchTag);
+                }
+            }
+        }
+        tag.put("PendingBatches", pendingTag);
+        tag.putInt("NextTaskId", this.nextTaskId);
+    }
+
+    /**
+     * 记录任务 NBT，推迟到 level 可用时（首 tick）再解码。
+     */
+    public void readTasksTag(CompoundTag tag) {
+        if (tag.contains("AeTasks")) {
+            this.deferredTasksTag = tag.getCompound("AeTasks");
+        }
+    }
+
+    /**
+     * 在 level 可用后加载延迟的任务数据（样板解码需要 level）。
+     */
+    public void loadDeferredTasks() {
+        CompoundTag tag = this.deferredTasksTag;
+        this.deferredTasksTag = null;
+        if (tag == null) {
+            return;
+        }
+        Level level = this.owner.getLevel();
+        if (level == null) {
+            return;
+        }
+        HolderLookup.Provider registries = level.registryAccess();
+
+        this.nextTaskId = tag.getInt("NextTaskId");
+
+        ListTag tasksTag = tag.getList("ActiveTasks", Tag.TAG_COMPOUND);
+        for (int i = 0; i < tasksTag.size(); i++) {
+            CraftingTask task = CraftingTask.load(tasksTag.getCompound(i), level, this.owner, registries);
+            if (task != null) {
+                this.activeTasks.put(task.getTaskId(), task);
+                this.activeTasksByPattern.computeIfAbsent(PatternKey.of(task.getPattern()), k -> new ArrayList<>()).add(task);
+                this.activeAETaskCount.incrementAndGet();
+            }
+        }
+
+        ListTag pendingTag = tag.getList("PendingBatches", Tag.TAG_COMPOUND);
+        synchronized (this.aePendingBatches) {
+            for (int i = 0; i < pendingTag.size(); i++) {
+                PendingAEBatch batch = PendingAEBatch.load(pendingTag.getCompound(i), level, registries);
+                if (batch != null && batch.pattern != null) {
+                    this.aePendingBatches.put(PatternKey.of(batch.pattern), batch);
+                }
+            }
+        }
     }
 
     public void updateClientTaskProgress(List<AETaskProgressPacket.TaskProgressData> tasks) {
@@ -175,9 +254,57 @@ public final class AdvancedAlloyFurnaceAeManager {
             task.tick();
             if (task.isProcessingComplete()) {
                 iterator.remove();
-                this.activeTasksByPattern.remove(PatternKey.of(task.getPattern()));
+                this.removeFromPatternIndex(task);
                 this.activeAETaskCount.decrementAndGet();
                 this.owner.markChanged();
+            }
+        }
+
+        this.rebalanceTasks();
+    }
+
+    /**
+     * 空闲线程再分配：当活跃任务数未达上限时，把已有任务队列尾部的子任务拆出，
+     * 放到新的空闲线程并行运行。
+     */
+    private void rebalanceTasks() {
+        int maxTasks = this.owner.getMaxAETaskCount();
+        while (this.activeAETaskCount.get() < maxTasks) {
+            CraftingTask donor = this.findSplittableTask();
+            if (donor == null) {
+                break;
+            }
+            CraftingTask split = donor.splitLastSubTask(this.nextTaskId++);
+            if (split == null) {
+                break;
+            }
+            this.registerActiveTask(split);
+        }
+    }
+
+    private CraftingTask findSplittableTask() {
+        for (CraftingTask task : this.activeTasks.values()) {
+            if (task.hasQueuedSubTasks()) {
+                return task;
+            }
+        }
+        return null;
+    }
+
+    private void registerActiveTask(CraftingTask task) {
+        this.activeTasks.put(task.getTaskId(), task);
+        this.activeTasksByPattern.computeIfAbsent(PatternKey.of(task.getPattern()), k -> new ArrayList<>()).add(task);
+        this.activeAETaskCount.incrementAndGet();
+        this.owner.markChanged();
+    }
+
+    private void removeFromPatternIndex(CraftingTask task) {
+        PatternKey key = PatternKey.of(task.getPattern());
+        List<CraftingTask> list = this.activeTasksByPattern.get(key);
+        if (list != null) {
+            list.remove(task);
+            if (list.isEmpty()) {
+                this.activeTasksByPattern.remove(key);
             }
         }
     }
@@ -329,10 +456,7 @@ public final class AdvancedAlloyFurnaceAeManager {
             return false;
         }
 
-        this.activeTasks.put(taskId, task);
-        this.activeTasksByPattern.put(PatternKey.of(batch.pattern), task);
-        this.activeAETaskCount.incrementAndGet();
-        this.owner.markChanged();
+        this.registerActiveTask(task);
         return true;
     }
 
@@ -359,8 +483,16 @@ public final class AdvancedAlloyFurnaceAeManager {
     }
 
     private CraftingTask findExistingTask(PatternKey patternKey) {
-        CraftingTask task = this.activeTasksByPattern.get(patternKey);
-        return task != null && !task.isProcessingComplete() ? task : null;
+        List<CraftingTask> list = this.activeTasksByPattern.get(patternKey);
+        if (list == null) {
+            return null;
+        }
+        for (CraftingTask task : list) {
+            if (!task.isProcessingComplete()) {
+                return task;
+            }
+        }
+        return null;
     }
 
     private AETaskProgress createPendingProgress(PendingAEBatch batch) {
@@ -464,6 +596,65 @@ public final class AdvancedAlloyFurnaceAeManager {
             this.allInputs.clear();
             return result;
         }
+
+        CompoundTag save(HolderLookup.Provider registries) {
+            if (this.pattern == null) {
+                return null;
+            }
+            CompoundTag tag = new CompoundTag();
+            tag.put("Pattern", this.pattern.getDefinition().toTag(registries));
+            ListTag craftsTag = new ListTag();
+            for (KeyCounter[] counters : this.allInputs) {
+                craftsTag.add(writeKeyCounters(registries, counters));
+            }
+            tag.put("Crafts", craftsTag);
+            return tag;
+        }
+
+        @org.jetbrains.annotations.Nullable
+        static PendingAEBatch load(CompoundTag tag, Level level, HolderLookup.Provider registries) {
+            appeng.api.stacks.AEItemKey definition = appeng.api.stacks.AEItemKey.fromTag(registries, tag.getCompound("Pattern"));
+            if (definition == null) {
+                return null;
+            }
+            IPatternDetails pattern = PatternDetailsHelper.decodePattern(definition.toStack(), level);
+            if (pattern == null) {
+                return null;
+            }
+            PendingAEBatch batch = new PendingAEBatch(pattern);
+            ListTag craftsTag = tag.getList("Crafts", Tag.TAG_COMPOUND);
+            for (int i = 0; i < craftsTag.size(); i++) {
+                batch.allInputs.add(readKeyCounters(registries, craftsTag.getCompound(i)));
+            }
+            return batch;
+        }
+    }
+
+    private static CompoundTag writeKeyCounters(HolderLookup.Provider registries, KeyCounter[] counters) {
+        ListTag list = new ListTag();
+        if (counters != null) {
+            for (KeyCounter counter : counters) {
+                if (counter == null) continue;
+                for (var entry : counter) {
+                    list.add(GenericStack.writeTag(registries, new GenericStack(entry.getKey(), entry.getLongValue())));
+                }
+            }
+        }
+        CompoundTag tag = new CompoundTag();
+        tag.put("Stacks", list);
+        return tag;
+    }
+
+    private static KeyCounter[] readKeyCounters(HolderLookup.Provider registries, CompoundTag tag) {
+        ListTag list = tag.getList("Stacks", Tag.TAG_COMPOUND);
+        KeyCounter counter = new KeyCounter();
+        for (int i = 0; i < list.size(); i++) {
+            GenericStack gs = GenericStack.readTag(registries, list.getCompound(i));
+            if (gs != null) {
+                counter.add(gs.what(), gs.amount());
+            }
+        }
+        return new KeyCounter[]{counter};
     }
 
     private record PatternKey(List<GenericStack> outputs) {

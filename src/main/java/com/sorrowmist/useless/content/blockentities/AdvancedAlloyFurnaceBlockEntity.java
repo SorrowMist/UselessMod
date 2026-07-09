@@ -1055,6 +1055,9 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
         // 重新解析样板槽中的样板（必须在物品加载之后）
         this.updatePatterns();
 
+        // 记录 AE 合成任务数据，推迟到 level 可用（首 tick）时解码
+        this.aeManager.readTasksTag(tag);
+
     }
 
     @Override
@@ -1108,6 +1111,10 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
         // 保存红石控制模式
         tag.putInt("RedstoneControlMode", this.redstoneControlMode.ordinal());
 
+        // 保存 AE 合成任务（仅落盘，网络更新包会剥离）
+        CompoundTag aeTasksTag = new CompoundTag();
+        this.aeManager.saveTasks(aeTasksTag, registries);
+        tag.put("AeTasks", aeTasksTag);
     }
 
     @Nullable
@@ -1120,6 +1127,8 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
     public @NotNull CompoundTag getUpdateTag(HolderLookup.@NotNull Provider registries) {
         CompoundTag tag = new CompoundTag();
         this.saveAdditional(tag, registries);
+        // AE 合成任务数据体积大且客户端无需，网络更新包中剥离
+        tag.remove("AeTasks");
         return tag;
     }
 
@@ -1138,6 +1147,8 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
                                    be.mainNode.create(getLevel(), getBlockPos());
                                    // 节点创建后重新解析样板并通知AE网络
                                    be.updatePatterns();
+                                   // level 已可用，加载持久化的 AE 合成任务
+                                   be.aeManager.loadDeferredTasks();
                                }
         );
     }

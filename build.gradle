@@ -200,7 +200,7 @@ dependencies {
     runtimeOnly "maven.modrinth:prickle:EE1FHDyD"
 
 //    runtimeOnly "maven.modrinth:allthemodium:2.9.5"
-    runtimeOnly "maven.modrinth:extendedae-plus:1.21.1-1.5.4.1"
+    implementation "maven.modrinth:extendedae-plus:1.21.1-1.5.4.1"
 //    runtimeOnly "maven.modrinth:omnitools:1.21.1-1.2.1"
 //    runtimeOnly "curse.maven:ftb-ultimine-forge-386134:7188395"
     // 神秘农业

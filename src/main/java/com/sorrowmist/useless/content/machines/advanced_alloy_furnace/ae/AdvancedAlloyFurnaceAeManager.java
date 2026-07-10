@@ -6,6 +6,7 @@ import appeng.api.networking.crafting.ICraftingProvider;
 import appeng.api.stacks.AEKey;
 import appeng.api.stacks.GenericStack;
 import appeng.api.stacks.KeyCounter;
+import com.sorrowmist.useless.compat.EapCompat;
 import com.sorrowmist.useless.content.blockentities.AdvancedAlloyFurnaceBlockEntity;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.layout.AdvancedAlloyFurnaceLayout;
 import com.sorrowmist.useless.network.AETaskProgressPacket;
@@ -215,7 +216,10 @@ public final class AdvancedAlloyFurnaceAeManager {
     }
 
     public boolean pushPattern(IPatternDetails patternDetails, KeyCounter[] inputHolder) {
-        if (!this.owner.getMainNode().isActive() || !this.patterns.contains(patternDetails)) {
+        // EAP 翻倍样板回退：ScaledProcessingPattern -> 原始样板
+        IPatternDetails original = EapCompat.unwrap(patternDetails);
+
+        if (!this.owner.getMainNode().isActive() || !this.patterns.contains(original)) {
             return false;
         }
 
@@ -352,6 +356,7 @@ public final class AdvancedAlloyFurnaceAeManager {
             if (!stack.isEmpty()) {
                 IPatternDetails pattern = PatternDetailsHelper.decodePattern(stack, level);
                 if (pattern != null) {
+                    EapCompat.tryMarkPatternForScaling(pattern);
                     this.patterns.add(pattern);
                 }
             }
@@ -453,9 +458,12 @@ public final class AdvancedAlloyFurnaceAeManager {
         KeyCounter[] merged = this.mergeKeyCounters(allInputs);
 
         int taskId = this.nextTaskId++;
-        int totalCrafts = allInputs.size();
+        // EAP 翻倍：用原始样板 + 缩放后的 craftCount
+        IPatternDetails taskPattern = EapCompat.unwrap(batch.pattern);
+        int multiplier = EapCompat.getMultiplier(batch.pattern);
+        int totalCrafts = allInputs.size() * multiplier;
 
-        CraftingTask task = new CraftingTask(taskId, batch.pattern, merged, totalCrafts, this.owner);
+        CraftingTask task = new CraftingTask(taskId, taskPattern, merged, totalCrafts, this.owner);
         if (!task.canStartNow()) {
             batch.allInputs.addAll(allInputs);
             batch.statusKey = "gui.useless_mod.advanced_alloy_furnace.ae_task_status.waiting_mold";

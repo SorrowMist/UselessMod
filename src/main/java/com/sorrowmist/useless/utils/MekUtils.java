@@ -13,7 +13,6 @@ import java.io.File;
 public class MekUtils {
 
     public static int MAX_UPGRADE = 32;
-    private static final double MIN_TIME_MULTIPLIER = 0.001;
 
     static {
         File file = FMLPaths.CONFIGDIR.get().resolve("useless_mod-common.toml").toFile();
@@ -38,7 +37,8 @@ public class MekUtils {
 
     public static double time(IUpgradeTile tile) {
         double multiplier = Math.pow((double)(MekanismConfig.general.maxUpgradeMultiplier.get() * ConfigManager.getTimeMultiplier()), (double)tile.getComponent().getUpgrades(Upgrade.SPEED) / (double)-8.0F);
-        return Double.isFinite(multiplier) ? Math.max(multiplier, MIN_TIME_MULTIPLIER) : MIN_TIME_MULTIPLIER;
+        // 仅防御 NaN/Infinity 异常值，不再硬截断有效倍数，避免限制高倍率增强
+        return Double.isFinite(multiplier) ? multiplier : 1.0;
     }
 
     public static double electricity(IUpgradeTile tile) {

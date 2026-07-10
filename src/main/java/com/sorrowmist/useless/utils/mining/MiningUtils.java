@@ -53,12 +53,23 @@ public class MiningUtils {
             return Collections.emptyList();
         }
 
-        // 兜底掉落的语义是"复制目标方块本身"，因此只要存在方块实体就附加其 NBT 组件，
-        // 保证掉落物与目标方块 NBT 完全一致（不区分精准采集/时运）。
+        // 兜底掉落的语义是"复制目标方块本身"，因此只要存在方块实体就写入其完整 NBT。
+        // 使用 saveToItem 而非 collectComponents：后者只保存方块实体暴露的隐式物品组件，
+        // 会丢失存放在方块实体 NBT 中的数据（如 AE2 线缆总线的部件/连接信息）。
+        // 丢失这些数据会导致放回时方块实体为空而自我失效（物品直接消失）。
+        // saveToItem 会写入 BLOCK_ENTITY_DATA（完整自定义 NBT）并附加组件，放置时可完整还原，
+        // 与 Mekanism 纸箱保存整块方块实体数据的做法一致。
         if (be != null) {
-            stack.applyComponents(be.collectComponents());
+            be.saveToItem(stack, level.registryAccess());
         }
         return Collections.singletonList(stack);
+    }
+
+    /**
+     * 判断工具是否处于精准采集（SILK_TOUCH）模式
+     */
+    static boolean isSilkTouch(ItemStack tool) {
+        return tool.getOrDefault(UComponents.EnchantModeComponent.get(), EnchantMode.FORTUNE) == EnchantMode.SILK_TOUCH;
     }
 
     /**
@@ -121,6 +132,14 @@ public class MiningUtils {
     static void processBlockBreak(ServerLevel level, BlockPos pos, BlockState state, Player player,
                                   ItemStack tool, boolean forceMining) {
         if (level.isClientSide()) {
+            return;
+        }
+
+        // 强制挖掘 + 精准采集同时激活：不再检查凋落物列表，直接兜底掉落方块本身（含完整 NBT/组件）
+        if (forceMining && isSilkTouch(tool)) {
+            List<ItemStack> fallbackDrops = getForcedFallbackDrops(state, level, pos);
+            destroyBlockAndCollectDrops(level, pos, state, player, tool);
+            handleDrops(player, fallbackDrops, tool);
             return;
         }
 

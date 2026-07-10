@@ -86,6 +86,8 @@ public class ChainMiningStrategy implements MiningStrategy {
         // 在破坏原点方块前捕获单个方块的经验值：破坏后 getBlockEntity(pos) 恒为 null，
         // 会导致依赖方块实体计算经验的方块算错。
         boolean fortuneMode = hand.getOrDefault(UComponents.EnchantModeComponent.get(), EnchantMode.FORTUNE) == EnchantMode.FORTUNE;
+        // 强制挖掘 + 精准采集同时激活：不再检查凋落物列表，直接兜底掉落方块本身（含完整 NBT/组件）
+        boolean forceSilkFallback = forceMining && MiningUtils.isSilkTouch(hand);
         int expPerBlock = fortuneMode
                 ? originBlock.getExpDrop(originState, level, pos, level.getBlockEntity(pos), player, hand)
                 : 0;
@@ -104,6 +106,13 @@ public class ChainMiningStrategy implements MiningStrategy {
             }
 
             // 破坏前用掉落表判断方块是否有自然掉落，避免掉落实体被其他模组吸收导致误判
+            if (forceSilkFallback) {
+                List<ItemStack> fallbackDrops = MiningUtils.getForcedFallbackDrops(currentState, level, targetPos);
+                MiningUtils.destroyBlockAndCollectDrops(level, targetPos, currentState, player, hand);
+                allDrops.addAll(fallbackDrops);
+                actualMinedCount++;
+                continue;
+            }
             boolean hasNaturalDrops = !forceMining || MiningUtils.blockHasNaturalDrops(level, targetPos, currentState, player, hand);
             List<ItemStack> fallbackDrops = (forceMining && !hasNaturalDrops)
                     ? MiningUtils.getForcedFallbackDrops(currentState, level, targetPos)

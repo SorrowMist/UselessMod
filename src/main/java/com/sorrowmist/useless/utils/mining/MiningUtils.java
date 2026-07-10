@@ -13,6 +13,8 @@ import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.BlockItem;
+import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.Level;
@@ -64,6 +66,26 @@ public class MiningUtils {
      */
     static boolean hasNoValidDrops(List<ItemStack> drops) {
         return drops.isEmpty() || drops.stream().allMatch(stack -> stack.isEmpty() || stack.is(Items.AIR));
+    }
+
+    /**
+     * 检测掉落物是否全为"降级方块物品"（即非方块本身的其他 BlockItem）。
+     * <p>
+     * AE2 系列母岩、数据陨石等方块在非精准采集下 loot table 返回的是降级版方块物品，
+     * 而非方块本身——这种情况应视为"无正确自身掉落"，触发强制挖掘兜底，让玩家获得方块本身。
+     *
+     * @param drops      掉落物列表
+     * @param selfBlock  被破坏的方块
+     * @return 当所有掉落物均为 BlockItem 且没有一个是方块本身的物品时返回 true
+     */
+    static boolean dropsAreDowngradedBlocks(List<ItemStack> drops, Block selfBlock) {
+        if (hasNoValidDrops(drops)) return false;
+        Item selfItem = selfBlock.asItem();
+        List<ItemStack> valid = drops.stream().filter(s -> !s.isEmpty() && !s.is(Items.AIR)).toList();
+        if (valid.isEmpty()) return false;
+        // 所有掉落物必须是 BlockItem，且没有一个是方块自身
+        return valid.stream().allMatch(s -> s.getItem() instanceof BlockItem)
+                && valid.stream().noneMatch(s -> s.is(selfItem));
     }
 
     /**

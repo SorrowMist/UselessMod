@@ -91,10 +91,15 @@ public class ForceChainMiningStrategy implements MiningStrategy {
             }
 
             // 破坏前用掉落表判断方块是否有自然掉落，避免掉落实体被其他模组吸收导致误判
-            boolean hasNaturalDrops = MiningUtils.blockHasNaturalDrops(level, targetPos, currentState, player, hand);
+            List<ItemStack> preDrops = MiningUtils.blockHasNaturalDrops(level, targetPos, currentState, player, hand)
+                    ? Block.getDrops(currentState, level, targetPos, level.getBlockEntity(targetPos), player, hand)
+                    : List.of();
+            boolean hasNaturalDrops = !MiningUtils.hasNoValidDrops(preDrops)
+                    && !MiningUtils.dropsAreDowngradedBlocks(preDrops, originBlock);
             List<ItemStack> fallbackDrops = hasNaturalDrops ? List.of() : MiningUtils.getForcedFallbackDrops(currentState, level, targetPos);
             List<ItemStack> drops = MiningUtils.destroyBlockAndCollectDrops(level, targetPos, currentState, player, hand);
-            if (!hasNaturalDrops && MiningUtils.hasNoValidDrops(drops) && !MiningUtils.hasNoValidDrops(fallbackDrops)) {
+            if (!hasNaturalDrops && (MiningUtils.hasNoValidDrops(drops) || MiningUtils.dropsAreDowngradedBlocks(drops, originBlock))
+                    && !MiningUtils.hasNoValidDrops(fallbackDrops)) {
                 drops = fallbackDrops;
             }
 

@@ -555,16 +555,19 @@ public class CraftingTask {
         return new FurnaceOutputPort.AeOutput() {
             @Override
             public long insertItem(ItemStack stack) {
+                if (!context.isReturnOutputToAe()) return 0;
                 return context.tryOutputToAE(stack);
             }
 
             @Override
             public long insertFluid(FluidStack stack) {
+                if (!context.isReturnOutputToAe()) return 0;
                 return context.tryOutputFluidToAE(stack);
             }
 
             @Override
             public long insertKey(AEKey key, long amount) {
+                if (!context.isReturnOutputToAe()) return 0;
                 return context.tryOutputKeyToAE(key, amount);
             }
         };

@@ -59,6 +59,10 @@ public final class AdvancedAlloyFurnaceAeManager {
     }
 
     public void shutdown() {
+        this.cancelAllTasks();
+    }
+
+    public void cancelAllTasks() {
         this.activeTasks.values().forEach(CraftingTask::cancel);
         this.activeTasks.clear();
         this.activeTasksByPattern.clear();
@@ -66,6 +70,10 @@ public final class AdvancedAlloyFurnaceAeManager {
         this.totalAEProgress.set(0);
         this.totalAEMaxProgress.set(0);
         this.aeTaskProgressMap.clear();
+        synchronized (this.aePendingBatches) {
+            this.aePendingBatches.clear();
+        }
+        this.owner.markChanged();
     }
 
     // ==================== 持久化 ====================

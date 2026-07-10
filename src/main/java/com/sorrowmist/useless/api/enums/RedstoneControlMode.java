@@ -7,7 +7,7 @@ package com.sorrowmist.useless.api.enums;
  */
 public enum RedstoneControlMode {
     /** 无红石控制：始终运行 */
-    DISABLED(-1),
+    DISABLED(172),
     /** 高电平激活：有红石信号时运行 */
     HIGH_ACTIVE(156),
     /** 低电平激活：无红石信号时运行 */

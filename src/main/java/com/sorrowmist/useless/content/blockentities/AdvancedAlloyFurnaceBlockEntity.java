@@ -163,6 +163,8 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
     private boolean autoOutputEnabled = false;
     // 红石控制模式
     private RedstoneControlMode redstoneControlMode = RedstoneControlMode.DISABLED;
+    // 产物是否回AE
+    private boolean returnOutputToAe = true;
 
     public AdvancedAlloyFurnaceBlockEntity(BlockPos pos, BlockState state) {
         super(ModBlockEntities.ADVANCED_ALLOY_FURNACE.get(), pos, state);
@@ -816,6 +818,19 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
         return !this.redstoneControlMode.shouldRun(hasSignal);
     }
 
+    public boolean isReturnOutputToAe() {
+        return this.returnOutputToAe;
+    }
+
+    public void setReturnOutputToAe(boolean value) {
+        this.returnOutputToAe = value;
+        this.setChanged();
+    }
+
+    public void cancelAllAETasks() {
+        this.aeManager.cancelAllTasks();
+    }
+
     public IEnergyStorage getEnergyStorage() {
         return this.energyManager;
     }
@@ -1048,6 +1063,10 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
         // 加载红石控制模式
         this.redstoneControlMode = RedstoneControlMode.byIndex(tag.getInt("RedstoneControlMode"));
 
+        if (tag.contains("ReturnOutputToAe")) {
+            this.returnOutputToAe = tag.getBoolean("ReturnOutputToAe");
+        }
+
         if (tag.contains("PatternPriority")) {
             this.aeManager.setPatternPriority(tag.getInt("PatternPriority"));
         }
@@ -1110,6 +1129,9 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
 
         // 保存红石控制模式
         tag.putInt("RedstoneControlMode", this.redstoneControlMode.ordinal());
+
+        // 保存产物是否回AE
+        tag.putBoolean("ReturnOutputToAe", this.returnOutputToAe);
 
         // 保存 AE 合成任务（仅落盘，网络更新包会剥离）
         CompoundTag aeTasksTag = new CompoundTag();
@@ -1221,16 +1243,19 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
         return new FurnaceOutputPort.AeOutput() {
             @Override
             public long insertItem(ItemStack stack) {
+                if (!AdvancedAlloyFurnaceBlockEntity.this.isReturnOutputToAe()) return 0;
                 return AdvancedAlloyFurnaceBlockEntity.this.tryOutputToAE(stack);
             }
 
             @Override
             public long insertFluid(FluidStack stack) {
+                if (!AdvancedAlloyFurnaceBlockEntity.this.isReturnOutputToAe()) return 0;
                 return AdvancedAlloyFurnaceBlockEntity.this.tryOutputFluidToAE(stack);
             }
 
             @Override
             public long insertKey(AEKey key, long amount) {
+                if (!AdvancedAlloyFurnaceBlockEntity.this.isReturnOutputToAe()) return 0;
                 return AdvancedAlloyFurnaceBlockEntity.this.tryOutputKeyToAE(key, amount);
             }
         };

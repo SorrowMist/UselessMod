@@ -15,6 +15,8 @@ import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.layout.Adv
 import com.sorrowmist.useless.content.menus.AdvancedAlloyFurnaceMenu;
 import com.sorrowmist.useless.inventory.slot.PatternSlotItemHandler;
 import com.sorrowmist.useless.network.AutoIOChangePacket;
+import com.sorrowmist.useless.network.AECancelPacket;
+import com.sorrowmist.useless.network.AEReturnOutputTogglePacket;
 import com.sorrowmist.useless.network.FaceModeChangePacket;
 import com.sorrowmist.useless.network.PatternPageChangePacket;
 import com.sorrowmist.useless.network.RedstoneControlPacket;
@@ -137,15 +139,15 @@ public class AdvancedAlloyFurnaceScreen extends AbstractContainerScreen<Advanced
     private static final int PROGRESS_BAR_U = 1;
     private static final int PROGRESS_BAR_V = 373;
 
-    // 能量槽位置：起点153,153，大小82*18
+    // 能量槽位置：起点153,169，大小84*4
     private static final int ENERGY_BAR_X = 153;
-    private static final int ENERGY_BAR_Y = 153;
-    private static final int ENERGY_BAR_WIDTH = 82;
-    private static final int ENERGY_BAR_HEIGHT = 18;
+    private static final int ENERGY_BAR_Y = 169;
+    private static final int ENERGY_BAR_WIDTH = 84;
+    private static final int ENERGY_BAR_HEIGHT = 4;
 
-    // 能量槽纹理坐标：起点13,401
-    private static final int ENERGY_BAR_U = 13;
-    private static final int ENERGY_BAR_V = 401;
+    // 能量槽纹理坐标：起点12,402
+    private static final int ENERGY_BAR_U = 12;
+    private static final int ENERGY_BAR_V = 402;
 
     // 帮助提示区域位置：起点103,154，大小16*16
     private static final int TIPS_AREA_X = 103;
@@ -220,15 +222,36 @@ public class AdvancedAlloyFurnaceScreen extends AbstractContainerScreen<Advanced
     private static final int AUTO_IO_OVERLAY_V = 265;
 
     // ==================== 红石控制区域 ====================
-    // 红石控制：27,237，14*12
-    private static final int REDSTONE_CONTROL_X = 27;
-    private static final int REDSTONE_CONTROL_Y = 237;
+    // 红石控制：152,151，14*15
+    private static final int REDSTONE_CONTROL_X = 152;
+    private static final int REDSTONE_CONTROL_Y = 151;
     private static final int REDSTONE_CONTROL_WIDTH = 14;
-    private static final int REDSTONE_CONTROL_HEIGHT = 12;
+    private static final int REDSTONE_CONTROL_HEIGHT = 15;
+
+    // ==================== AE 任务控制区域 ====================
+    // 取消 AE 合成任务按钮：169,151，14*15，常态[140,283]，按下[156,283]
+    private static final int CANCEL_AE_X = 169;
+    private static final int CANCEL_AE_Y = 151;
+    private static final int CANCEL_AE_WIDTH = 14;
+    private static final int CANCEL_AE_HEIGHT = 15;
+    private static final int CANCEL_AE_NORMAL_U = 140;
+    private static final int CANCEL_AE_PRESSED_U = 156;
+    private static final int CANCEL_AE_V = 283;
+
+    // 产物回AE切换按钮：186,151，14*15，关闭[140,301]，开启[156,301]
+    private static final int AE_RETURN_X = 186;
+    private static final int AE_RETURN_Y = 151;
+    private static final int AE_RETURN_WIDTH = 14;
+    private static final int AE_RETURN_HEIGHT = 15;
+    private static final int AE_RETURN_OFF_U = 140;
+    private static final int AE_RETURN_ON_U = 156;
+    private static final int AE_RETURN_V = 301;
 
     // 翻页按钮状态
     private boolean prevPageButtonPressed = false;
     private boolean nextPageButtonPressed = false;
+    // 取消AE任务按钮状态
+    private boolean cancelAePressed = false;
 
     public AdvancedAlloyFurnaceScreen(AdvancedAlloyFurnaceMenu menu, Inventory playerInventory, Component title) {
         super(menu, playerInventory, title);
@@ -280,6 +303,31 @@ public class AdvancedAlloyFurnaceScreen extends AbstractContainerScreen<Advanced
                 TEXTURE_WIDTH, TEXTURE_HEIGHT);
     }
 
+    /**
+     * 渲染取消AE任务按钮。
+     */
+    private void renderCancelAeButton(GuiGraphics guiGraphics, int x, int y) {
+        int u = this.cancelAePressed ? CANCEL_AE_PRESSED_U : CANCEL_AE_NORMAL_U;
+        guiGraphics.blit(TEXTURE,
+                x + CANCEL_AE_X, y + CANCEL_AE_Y,
+                u, CANCEL_AE_V,
+                CANCEL_AE_WIDTH, CANCEL_AE_HEIGHT,
+                TEXTURE_WIDTH, TEXTURE_HEIGHT);
+    }
+
+    /**
+     * 渲染产物回AE切换按钮。
+     */
+    private void renderAeReturnButton(GuiGraphics guiGraphics, int x, int y) {
+        boolean isOn = this.menu.isReturnOutputToAe();
+        int u = isOn ? AE_RETURN_ON_U : AE_RETURN_OFF_U;
+        guiGraphics.blit(TEXTURE,
+                x + AE_RETURN_X, y + AE_RETURN_Y,
+                u, AE_RETURN_V,
+                AE_RETURN_WIDTH, AE_RETURN_HEIGHT,
+                TEXTURE_WIDTH, TEXTURE_HEIGHT);
+    }
+
     @Override
     public void render(@NotNull GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
         this.renderBackground(guiGraphics, mouseX, mouseY, partialTick);
@@ -302,6 +350,8 @@ public class AdvancedAlloyFurnaceScreen extends AbstractContainerScreen<Advanced
         this.renderFaceModeTooltip(guiGraphics, mouseX, mouseY, x, y);
         this.renderAutoIOTooltip(guiGraphics, mouseX, mouseY, x, y);
         this.renderRedstoneControlTooltip(guiGraphics, mouseX, mouseY, x, y);
+        this.renderCancelAeTooltip(guiGraphics, mouseX, mouseY, x, y);
+        this.renderAeReturnTooltip(guiGraphics, mouseX, mouseY, x, y);
     }
 
     @Override
@@ -445,6 +495,12 @@ public class AdvancedAlloyFurnaceScreen extends AbstractContainerScreen<Advanced
 
         // 渲染红石控制覆盖图
         this.renderRedstoneControlOverlay(guiGraphics, x, y);
+
+        // 渲染取消AE任务按钮
+        this.renderCancelAeButton(guiGraphics, x, y);
+
+        // 渲染产物回AE切换按钮
+        this.renderAeReturnButton(guiGraphics, x, y);
     }
 
     /**
@@ -709,6 +765,8 @@ public class AdvancedAlloyFurnaceScreen extends AbstractContainerScreen<Advanced
         if (this.handleFaceModeClick(mouseX, mouseY, x, y)) return true;
         if (this.handleAutoIOClick(mouseX, mouseY, x, y)) return true;
         if (this.handleRedstoneControlClick(mouseX, mouseY, x, y)) return true;
+        if (this.handleCancelAeClick(mouseX, mouseY, x, y)) return true;
+        if (this.handleAeReturnClick(mouseX, mouseY, x, y)) return true;
 
         return super.mouseClicked(mouseX, mouseY, button);
     }
@@ -717,6 +775,7 @@ public class AdvancedAlloyFurnaceScreen extends AbstractContainerScreen<Advanced
     public boolean mouseReleased(double mouseX, double mouseY, int button) {
         this.prevPageButtonPressed = false;
         this.nextPageButtonPressed = false;
+        this.cancelAePressed = false;
         return super.mouseReleased(mouseX, mouseY, button);
     }
 
@@ -751,6 +810,29 @@ public class AdvancedAlloyFurnaceScreen extends AbstractContainerScreen<Advanced
             return true;
         }
 
+        return false;
+    }
+
+    private boolean handleCancelAeClick(double mouseX, double mouseY, int x, int y) {
+        if (isInArea(mouseX, mouseY, x + CANCEL_AE_X, y + CANCEL_AE_Y,
+                CANCEL_AE_WIDTH, CANCEL_AE_HEIGHT)) {
+            this.cancelAePressed = true;
+            PacketDistributor.sendToServer(new AECancelPacket(
+                    this.menu.getBlockEntity().getBlockPos()));
+            return true;
+        }
+        return false;
+    }
+
+    private boolean handleAeReturnClick(double mouseX, double mouseY, int x, int y) {
+        if (isInArea(mouseX, mouseY, x + AE_RETURN_X, y + AE_RETURN_Y,
+                AE_RETURN_WIDTH, AE_RETURN_HEIGHT)) {
+            if (this.menu.getBlockEntity() != null) {
+                PacketDistributor.sendToServer(new AEReturnOutputTogglePacket(
+                        this.menu.getBlockEntity().getBlockPos()));
+            }
+            return true;
+        }
         return false;
     }
 
@@ -1141,5 +1223,27 @@ public class AdvancedAlloyFurnaceScreen extends AbstractContainerScreen<Advanced
             Component status = Component.translatable("gui.useless_mod.advanced_alloy_furnace.redstone_control." + mode.name().toLowerCase());
             guiGraphics.renderTooltip(this.font, List.of(title, status), Optional.empty(), mouseX, mouseY);
         }
+    }
+
+    private void renderCancelAeTooltip(GuiGraphics guiGraphics, int mouseX, int mouseY, int x, int y) {
+        if (isInArea(mouseX, mouseY, x + CANCEL_AE_X, y + CANCEL_AE_Y,
+                CANCEL_AE_WIDTH, CANCEL_AE_HEIGHT)) {
+            Component title = Component.translatable("gui.useless_mod.advanced_alloy_furnace.cancel_ae_tasks");
+            Component desc = Component.translatable("gui.useless_mod.advanced_alloy_furnace.cancel_ae_tasks.desc");
+            guiGraphics.renderTooltip(this.font, List.of(title, desc), Optional.empty(), mouseX, mouseY);
+        }
+    }
+
+    private void renderAeReturnTooltip(GuiGraphics guiGraphics, int mouseX, int mouseY, int x, int y) {
+        if (!isInArea(mouseX, mouseY, x + AE_RETURN_X, y + AE_RETURN_Y,
+                AE_RETURN_WIDTH, AE_RETURN_HEIGHT)) {
+            return;
+        }
+        if (this.menu.getBlockEntity() == null) return;
+        Component title = Component.translatable("gui.useless_mod.advanced_alloy_furnace.ae_return_output");
+        Component status = this.menu.getBlockEntity().isReturnOutputToAe()
+                ? Component.translatable("gui.useless_mod.enabled")
+                : Component.translatable("gui.useless_mod.disabled");
+        guiGraphics.renderTooltip(this.font, List.of(title, status), Optional.empty(), mouseX, mouseY);
     }
 }

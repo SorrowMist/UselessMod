@@ -41,6 +41,9 @@ public interface CraftingTaskContext {
     long tryOutputToAE(net.minecraft.world.item.ItemStack stack);
     long tryOutputFluidToAE(FluidStack stack);
     long tryOutputKeyToAE(AEKey key, long amount);
+
+    // 产物输出模式
+    boolean isReturnOutputToAe();
     
     // 任务进度管理
     ConcurrentHashMap<Integer, AdvancedAlloyFurnaceAeManager.AETaskProgress> getAETaskProgressMap();

@@ -325,6 +325,10 @@ public class AdvancedAlloyFurnaceMenu extends AEBaseMenu {
         return this.data.get(AdvancedAlloyFurnaceData.DATA_FURNACE_TIER);
     }
 
+    public boolean isReturnOutputToAe() {
+        return this.data.get(AdvancedAlloyFurnaceData.DATA_RETURN_OUTPUT_TO_AE) > 0;
+    }
+
     public FluidTank getInputFluidTank(int index) {
         return this.blockEntity != null ? this.blockEntity.getInputFluidTank(index) : new FluidTank(0);
     }

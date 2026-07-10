@@ -1,6 +1,8 @@
 package com.sorrowmist.useless.init;
 
 import com.sorrowmist.useless.UselessMod;
+import com.sorrowmist.useless.network.AECancelPacket;
+import com.sorrowmist.useless.network.AEReturnOutputTogglePacket;
 import com.sorrowmist.useless.network.AETaskProgressPacket;
 import com.sorrowmist.useless.network.AutoIOChangePacket;
 import com.sorrowmist.useless.network.EnchantmentSwitchPacket;
@@ -53,6 +55,12 @@ public class ModNetwork {
         );
         registrar.playToServer(RedstoneControlPacket.TYPE, RedstoneControlPacket.STREAM_CODEC,
                                RedstoneControlPacket::handle
+        );
+        registrar.playToServer(AECancelPacket.TYPE, AECancelPacket.STREAM_CODEC,
+                               AECancelPacket::handle
+        );
+        registrar.playToServer(AEReturnOutputTogglePacket.TYPE, AEReturnOutputTogglePacket.STREAM_CODEC,
+                               AEReturnOutputTogglePacket::handle
         );
     }
 }

@@ -31,12 +31,12 @@ public class ForceChainMiningStrategy implements MiningStrategy {
         BlockState originState = event.getState();
         Block originBlock = originState.getBlock();
 
-        // 查找需要破坏的方块列表
+        // R键连锁始终以强制挖掘语义查找方块（包含工具挖不动的方块）
         List<BlockPos> blocksToMine;
         if (this.enhanced) {
-            blocksToMine = MiningUtils.findBlocksToMineEnhanced(pos, originState, level, hand, false);
+            blocksToMine = MiningUtils.findBlocksToMineEnhanced(pos, originState, level, hand, true);
         } else {
-            blocksToMine = MiningUtils.findBlocksToMine(pos, originState, level, hand, false);
+            blocksToMine = MiningUtils.findBlocksToMine(pos, originState, level, hand, true);
         }
 
         if (blocksToMine.isEmpty()) {
@@ -44,6 +44,9 @@ public class ForceChainMiningStrategy implements MiningStrategy {
         }
 
         boolean isSilkTouch = MiningUtils.isSilkTouchMode(hand);
+
+        // 在破坏原点方块前捕获经验值：破坏后 getBlockEntity(pos) 恒为 null
+        int expPerBlock = !isSilkTouch ? originBlock.getExpDrop(originState, level, level.random, pos, 0, 0) : 0;
 
         // 执行连锁挖掘
         List<ItemStack> allDrops = new ArrayList<>();
@@ -58,9 +61,16 @@ public class ForceChainMiningStrategy implements MiningStrategy {
                 clearContainerContents(level, targetPos);
             }
 
-            List<ItemStack> fallbackDrops = MiningUtils.getForcedFallbackDrops(currentState, level, targetPos, hand);
+            // 破坏前用掉落表判断方块是否有自然掉落，避免掉落实体被其他模组吸收导致误判
+            List<ItemStack> preDrops = MiningUtils.blockHasNaturalDrops(level, targetPos, currentState, player, hand)
+                    ? Block.getDrops(currentState, level, targetPos, level.getBlockEntity(targetPos), player, hand)
+                    : List.of();
+            boolean hasNaturalDrops = !MiningUtils.hasNoValidDrops(preDrops)
+                    && !MiningUtils.dropsAreDowngradedBlocks(preDrops, originBlock);
+            List<ItemStack> fallbackDrops = hasNaturalDrops ? List.of() : MiningUtils.getForcedFallbackDrops(currentState, level, targetPos);
             List<ItemStack> drops = MiningUtils.destroyBlockAndCollectDrops(level, targetPos, currentState, player, hand);
-            if (MiningUtils.hasNoValidDrops(drops) && !MiningUtils.hasNoValidDrops(fallbackDrops)) {
+            if (!hasNaturalDrops && (MiningUtils.hasNoValidDrops(drops) || MiningUtils.dropsAreDowngradedBlocks(drops, originBlock))
+                    && !MiningUtils.hasNoValidDrops(fallbackDrops)) {
                 drops = fallbackDrops;
             }
             allDrops.addAll(drops);
@@ -72,9 +82,9 @@ public class ForceChainMiningStrategy implements MiningStrategy {
             MiningUtils.handleDrops(player, MiningUtils.mergeItemStacks(allDrops), hand);
         }
 
-        // 经验处理（时运模式）
-        if (!isSilkTouch) {
-            originBlock.popExperience(level, pos, originBlock.getExpDrop(originState, level, level.random, pos, 0, 0) * actualMinedCount);
+        // 经验处理（时运模式），使用破坏前捕获的经验值
+        if (expPerBlock > 0 && actualMinedCount > 0) {
+            originBlock.popExperience(level, pos, expPerBlock * actualMinedCount);
         }
 
         if (actualMinedCount > 0) {

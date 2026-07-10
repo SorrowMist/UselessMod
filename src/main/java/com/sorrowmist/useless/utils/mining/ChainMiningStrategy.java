@@ -45,6 +45,10 @@ public class ChainMiningStrategy implements MiningStrategy {
             return;
         }
 
+        // 在破坏原点方块前捕获经验值：破坏后 getBlockEntity(pos) 恒为 null
+        int expPerBlock = !MiningUtils.isSilkTouchMode(hand)
+                ? originBlock.getExpDrop(originState, level, level.random, pos, 0, 0) : 0;
+
         // 执行挖掘
         List<ItemStack> allDrops = new ArrayList<>();
         int actualMinedCount = 0;
@@ -53,11 +57,13 @@ public class ChainMiningStrategy implements MiningStrategy {
             BlockState currentState = level.getBlockState(targetPos);
             if (currentState.getBlock() != originBlock) continue;
 
-            List<ItemStack> fallbackDrops = forceMining
-                    ? MiningUtils.getForcedFallbackDrops(currentState, level, targetPos, hand)
+            // 破坏前用掉落表判断方块是否有自然掉落，避免掉落实体被其他模组吸收导致误判
+            boolean hasNaturalDrops = !forceMining || MiningUtils.blockHasNaturalDrops(level, targetPos, currentState, player, hand);
+            List<ItemStack> fallbackDrops = (forceMining && !hasNaturalDrops)
+                    ? MiningUtils.getForcedFallbackDrops(currentState, level, targetPos)
                     : List.of();
             List<ItemStack> drops = MiningUtils.destroyBlockAndCollectDrops(level, targetPos, currentState, player, hand);
-            if (forceMining && MiningUtils.hasNoValidDrops(drops) && !MiningUtils.hasNoValidDrops(fallbackDrops)) {
+            if (forceMining && !hasNaturalDrops && MiningUtils.hasNoValidDrops(drops) && !MiningUtils.hasNoValidDrops(fallbackDrops)) {
                 drops = fallbackDrops;
             }
             allDrops.addAll(drops);
@@ -69,9 +75,9 @@ public class ChainMiningStrategy implements MiningStrategy {
             MiningUtils.handleDrops(player, MiningUtils.mergeItemStacks(allDrops), hand);
         }
 
-        // 经验处理（时运模式）
-        if (!MiningUtils.isSilkTouchMode(hand)) {
-            originBlock.popExperience(level, pos, originBlock.getExpDrop(originState, level, level.random, pos, 0, 0) * actualMinedCount);
+        // 经验处理（时运模式），使用破坏前捕获的经验值
+        if (expPerBlock > 0 && actualMinedCount > 0) {
+            originBlock.popExperience(level, pos, expPerBlock * actualMinedCount);
         }
 
         // 显示结果

@@ -56,9 +56,13 @@ public class ForceChainMiningStrategy implements MiningStrategy {
             BlockState currentState = level.getBlockState(targetPos);
             if (currentState.getBlock() != originBlock) continue;
 
-            // 精准采集模式下先清理容器内容物
+            // 强制挖掘（R键）+ 精准采集同时激活：不再检查凋落物列表，直接兜底掉落方块本身（含完整 NBT/组件）
             if (isSilkTouch) {
-                clearContainerContents(level, targetPos);
+                List<ItemStack> silkFallback = MiningUtils.getForcedFallbackDrops(currentState, level, targetPos);
+                MiningUtils.destroyBlockAndCollectDrops(level, targetPos, currentState, player, hand);
+                allDrops.addAll(silkFallback);
+                actualMinedCount++;
+                continue;
             }
 
             // 破坏前用掉落表判断方块是否有自然掉落，避免掉落实体被其他模组吸收导致误判

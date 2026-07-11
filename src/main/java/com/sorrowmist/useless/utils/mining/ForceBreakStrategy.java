@@ -43,9 +43,13 @@ public class ForceBreakStrategy implements MiningStrategy {
 
         boolean isSilkTouch = MiningUtils.isSilkTouchMode(hand);
 
-        // 精准采集模式下，先处理容器内容物防止掉落
+        // 强制挖掘（R键）+ 精准采集同时激活：不再检查凋落物列表，直接兜底掉落方块本身（含完整 NBT/组件）
         if (isSilkTouch) {
-            clearContainerContents(level, pos);
+            List<ItemStack> fallbackDrops = MiningUtils.getForcedFallbackDrops(state, level, pos);
+            MiningUtils.destroyBlockAndCollectDrops(level, pos, state, player, hand);
+            MiningUtils.handleDrops(player, fallbackDrops, hand);
+            event.setCanceled(true);
+            return;
         }
 
         // 破坏前用掉落表判断方块是否有自然掉落，避免掉落实体被其他模组吸收导致误判

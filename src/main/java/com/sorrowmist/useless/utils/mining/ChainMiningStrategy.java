@@ -32,6 +32,8 @@ public class ChainMiningStrategy implements MiningStrategy {
         Block originBlock = originState.getBlock();
 
         boolean forceMining = MiningUtils.isForceMiningMode(hand);
+        // 强制挖掘 + 精准采集同时激活：不再检查凋落物列表，直接兜底掉落方块本身（含完整 NBT/组件）
+        boolean forceSilkFallback = forceMining && MiningUtils.isSilkTouchMode(hand);
 
         // 查找需要破坏的方块列表
         List<BlockPos> blocksToMine;
@@ -56,6 +58,14 @@ public class ChainMiningStrategy implements MiningStrategy {
         for (BlockPos targetPos : blocksToMine) {
             BlockState currentState = level.getBlockState(targetPos);
             if (currentState.getBlock() != originBlock) continue;
+
+            if (forceSilkFallback) {
+                List<ItemStack> fallbackDrops = MiningUtils.getForcedFallbackDrops(currentState, level, targetPos);
+                MiningUtils.destroyBlockAndCollectDrops(level, targetPos, currentState, player, hand);
+                allDrops.addAll(fallbackDrops);
+                actualMinedCount++;
+                continue;
+            }
 
             // 破坏前用掉落表判断方块是否有自然掉落，避免掉落实体被其他模组吸收导致误判
             boolean hasNaturalDrops = !forceMining || MiningUtils.blockHasNaturalDrops(level, targetPos, currentState, player, hand);

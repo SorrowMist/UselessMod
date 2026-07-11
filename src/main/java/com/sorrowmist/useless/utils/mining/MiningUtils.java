@@ -174,6 +174,14 @@ public class MiningUtils {
      */
     public static void processBlockBreak(ServerLevel level, BlockPos pos, BlockState state, Player player,
                                           ItemStack tool, boolean forceMining) {
+        // 强制挖掘 + 精准采集同时激活：不再检查凋落物列表，直接兜底掉落方块本身（含完整 NBT/组件）
+        if (forceMining && isSilkTouchMode(tool)) {
+            List<ItemStack> fallbackDrops = getForcedFallbackDrops(state, level, pos);
+            destroyBlockAndCollectDrops(level, pos, state, player, tool);
+            handleDrops(player, fallbackDrops, tool);
+            return;
+        }
+
         // 破坏前用掉落表判断方块是否有自然掉落，避免掉落实体被其他模组吸收导致误判
         boolean hasNaturalDrops = !forceMining || blockHasNaturalDrops(level, pos, state, player, tool);
         List<ItemStack> fallbackDrops = (forceMining && !hasNaturalDrops) ? getForcedFallbackDrops(state, level, pos) : Collections.emptyList();

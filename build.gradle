@@ -174,7 +174,7 @@ dependencies {
     implementation "curse.maven:ae2addonlib-1366135:7222312"
 
     implementation "curse.maven:ae2-crystal-science-1435174:8112039"
-    implementation "curse.maven:ae2-lightning-tech-1527395:8173754"
+    implementation "curse.maven:ae2-lightning-tech-1527395:8410116"
     implementation "curse.maven:data-energistics-1565514:8217182"
 
     runtimeOnly "top.theillusivec4.curios:curios-neoforge:9.5.1+1.21.1"

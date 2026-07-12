@@ -11,6 +11,7 @@ import com.sorrowmist.useless.content.recipe.adapters.ae.ae2cs.CrystalAggregator
 import com.sorrowmist.useless.content.recipe.adapters.ae.ae2cs.CrystalGrowthRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.ae.ae2cs.CrystalPulverizerRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.ae.ae2lt.CrystalCatalyzerRecipeAdapter;
+import com.sorrowmist.useless.content.recipe.adapters.ae.ae2lt.FirmamentConversionRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.ae.ae2lt.LightningAssemblyRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.ae.ae2lt.LightningSimulationRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.ae.ae2lt.OverloadProcessingRecipeAdapter;
@@ -21,8 +22,11 @@ import com.sorrowmist.useless.content.recipe.adapters.ae.extendedae.CrystalAssem
 import com.sorrowmist.useless.content.recipe.adapters.arsnouveau.EnchantingApparatusRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.arsnouveau.ImbuementRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.industrialforegoing.DissolutionChamberRecipeAdapter;
+import com.sorrowmist.useless.content.recipe.adapters.mekanism.CrusherRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.mekanism.EnrichmentChamberRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.mekanism.MetallurgicInfuserRecipeAdapter;
+import com.sorrowmist.useless.content.recipe.adapters.mekanism.OsmiumCompressorRecipeAdapter;
+import com.sorrowmist.useless.content.recipe.adapters.mekanism.PrecisionSawmillRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.minecraft.SmeltingRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.mysticalagriculture.AwakeningRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.mysticalagriculture.InfusionRecipeAdapter;
@@ -109,6 +113,9 @@ public final class RecipeAdapterCompatRegistry {
     private static void registerMekanism() {
         register(new MetallurgicInfuserRecipeAdapter());
         register(new EnrichmentChamberRecipeAdapter());
+        register(new CrusherRecipeAdapter());
+        register(new PrecisionSawmillRecipeAdapter());
+        register(new OsmiumCompressorRecipeAdapter());
     }
 
     private static void registerAE2() {
@@ -147,6 +154,7 @@ public final class RecipeAdapterCompatRegistry {
         register(new LightningAssemblyRecipeAdapter());
         register(new OverloadProcessingRecipeAdapter());
         register(new CrystalCatalyzerRecipeAdapter());
+        register(new FirmamentConversionRecipeAdapter());
         register(new SteakLightningRecipeAdapter());
     }
 

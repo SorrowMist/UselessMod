@@ -20,6 +20,7 @@ import com.sorrowmist.useless.content.recipe.adapters.ae.ae2cs.CrystalAggregator
 import com.sorrowmist.useless.content.recipe.adapters.ae.ae2cs.CrystalGrowthRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.ae.ae2cs.CrystalPulverizerRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.ae.ae2lt.CrystalCatalyzerRecipeAdapter;
+import com.sorrowmist.useless.content.recipe.adapters.ae.ae2lt.FirmamentConversionRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.ae.ae2lt.LightningAssemblyRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.ae.ae2lt.LightningSimulationRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.ae.ae2lt.OverloadProcessingRecipeAdapter;
@@ -30,8 +31,11 @@ import com.sorrowmist.useless.content.recipe.adapters.ae.extendedae.CrystalAssem
 import com.sorrowmist.useless.content.recipe.adapters.arsnouveau.EnchantingApparatusRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.arsnouveau.ImbuementRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.industrialforegoing.DissolutionChamberRecipeAdapter;
+import com.sorrowmist.useless.content.recipe.adapters.mekanism.CrusherRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.mekanism.EnrichmentChamberRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.mekanism.MetallurgicInfuserRecipeAdapter;
+import com.sorrowmist.useless.content.recipe.adapters.mekanism.OsmiumCompressorRecipeAdapter;
+import com.sorrowmist.useless.content.recipe.adapters.mekanism.PrecisionSawmillRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.minecraft.SmeltingRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.mysticalagriculture.AwakeningRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.mysticalagriculture.InfusionRecipeAdapter;
@@ -70,6 +74,7 @@ import java.util.List;
 import static com.blakebr0.mysticalagriculture.init.ModRecipeTypes.AWAKENING;
 import static com.blakebr0.mysticalagriculture.init.ModRecipeTypes.INFUSION;
 import static com.moakiee.ae2lt.registry.ModRecipeTypes.CRYSTAL_CATALYZER_TYPE;
+import static com.moakiee.ae2lt.registry.ModRecipeTypes.FIRMAMENT_CONVERSION_TYPE;
 import static com.moakiee.ae2lt.registry.ModRecipeTypes.LIGHTNING_ASSEMBLY_TYPE;
 import static com.moakiee.ae2lt.registry.ModRecipeTypes.LIGHTNING_SIMULATION_TYPE;
 import static com.moakiee.ae2lt.registry.ModRecipeTypes.OVERLOAD_PROCESSING_TYPE;
@@ -238,9 +243,18 @@ public class JEIPlugin implements IModPlugin {
         MetallurgicInfuserRecipeAdapter infuserAdapter = new MetallurgicInfuserRecipeAdapter();
         addConvertedRecipes(convertedRecipes, recipeManager, MekanismRecipeTypes.TYPE_METALLURGIC_INFUSING.value(), infuserAdapter, level);
 
+        OsmiumCompressorRecipeAdapter compressorAdapter = new OsmiumCompressorRecipeAdapter();
+        addConvertedRecipes(convertedRecipes, recipeManager, MekanismRecipeTypes.TYPE_COMPRESSING.value(), compressorAdapter, level);
+
         // 转换富集仓配方
         EnrichmentChamberRecipeAdapter enrichmentAdapter = new EnrichmentChamberRecipeAdapter();
         addConvertedRecipes(convertedRecipes, recipeManager, MekanismRecipeTypes.TYPE_ENRICHING.value(), enrichmentAdapter, level);
+
+        CrusherRecipeAdapter crusherAdapter = new CrusherRecipeAdapter();
+        addConvertedRecipes(convertedRecipes, recipeManager, MekanismRecipeTypes.TYPE_CRUSHING.value(), crusherAdapter, level);
+
+        PrecisionSawmillRecipeAdapter sawmillAdapter = new PrecisionSawmillRecipeAdapter();
+        addConvertedRecipes(convertedRecipes, recipeManager, MekanismRecipeTypes.TYPE_SAWING.value(), sawmillAdapter, level);
 
         return convertedRecipes;
     }
@@ -367,6 +381,9 @@ public class JEIPlugin implements IModPlugin {
 
         CrystalCatalyzerRecipeAdapter catalyzerAdapter = new CrystalCatalyzerRecipeAdapter();
         addConvertedRecipes(convertedRecipes, recipeManager, CRYSTAL_CATALYZER_TYPE.get(), catalyzerAdapter, level);
+
+        FirmamentConversionRecipeAdapter firmamentAdapter = new FirmamentConversionRecipeAdapter();
+        addConvertedRecipes(convertedRecipes, recipeManager, FIRMAMENT_CONVERSION_TYPE.get(), firmamentAdapter, level);
 
         SteakLightningRecipeAdapter steakAdapter = new SteakLightningRecipeAdapter();
         convertedRecipes.addAll(steakAdapter.getAllRecipes());

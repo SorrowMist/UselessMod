@@ -19,6 +19,7 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.crafting.Ingredient;
 import net.minecraft.world.item.crafting.RecipeHolder;
 import net.minecraft.world.item.crafting.RecipeManager;
+import net.minecraft.world.item.crafting.RecipeType;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.material.Fluid;
 import net.neoforged.neoforge.fluids.FluidStack;
@@ -57,6 +58,10 @@ public class MetallurgicInfuserRecipeAdapter implements IRecipeAdapter<ItemStack
         return new ItemStack(MekanismBlocks.METALLURGIC_INFUSER.get());
     }
 
+    protected RecipeType<ItemStackChemicalToItemStackRecipe> getMekanismRecipeType() {
+        return MekanismRecipeTypes.TYPE_METALLURGIC_INFUSING.value();
+    }
+
     @Override
     public List<AdvancedAlloyFurnaceRecipe> convertAll(RecipeHolder<ItemStackChemicalToItemStackRecipe> holder, Level level) {
         List<AdvancedAlloyFurnaceRecipe> recipes = new ArrayList<>();
@@ -64,7 +69,7 @@ public class MetallurgicInfuserRecipeAdapter implements IRecipeAdapter<ItemStack
 
         ItemStackChemicalToItemStackRecipe originalRecipe = holder.value();
 
-        if (!originalRecipe.getType().equals(MekanismRecipeTypes.TYPE_METALLURGIC_INFUSING.value())) {
+        if (!originalRecipe.getType().equals(getMekanismRecipeType())) {
             return recipes;
         }
 
@@ -85,7 +90,7 @@ public class MetallurgicInfuserRecipeAdapter implements IRecipeAdapter<ItemStack
             return recipes;
         }
 
-        for (AdvancedAlloyFurnaceRecipe directRecipe : createDirectRecipes(originalId, itemInput, chemicalInput, outputs)) {
+        for (AdvancedAlloyFurnaceRecipe directRecipe : createDirectRecipes(originalId, itemInput, chemicalInput, originalRecipe, outputs)) {
             addIfUnique(recipes, directRecipe);
         }
 
@@ -93,7 +98,7 @@ public class MetallurgicInfuserRecipeAdapter implements IRecipeAdapter<ItemStack
 
         for (ChemicalSource source : sources) {
             AdvancedAlloyFurnaceRecipe recipe = createRecipe(
-                    originalId, itemInput, chemicalInput, source, outputs
+                    originalId, itemInput, chemicalInput, originalRecipe, source, outputs
             );
             if (recipe != null) {
                 addIfUnique(recipes, recipe);
@@ -170,10 +175,11 @@ public class MetallurgicInfuserRecipeAdapter implements IRecipeAdapter<ItemStack
             ResourceLocation originalId,
             ItemStackIngredient itemInput,
             ChemicalStackIngredient chemicalInput,
+            ItemStackChemicalToItemStackRecipe originalRecipe,
             ChemicalSource chemicalSource,
             List<ItemStack> outputs) {
 
-        long requiredChemicalAmount = getRequiredChemicalAmount(chemicalInput, chemicalSource.chemicalId());
+        long requiredChemicalAmount = getRequiredChemicalAmount(chemicalInput, originalRecipe, chemicalSource.chemicalId());
         if (requiredChemicalAmount <= 0) {
             return null;
         }
@@ -220,6 +226,7 @@ public class MetallurgicInfuserRecipeAdapter implements IRecipeAdapter<ItemStack
             ResourceLocation originalId,
             ItemStackIngredient itemInput,
             ChemicalStackIngredient chemicalInput,
+            ItemStackChemicalToItemStackRecipe originalRecipe,
             List<ItemStack> outputs) {
 
         List<CountedIngredient> countedIngredients = new ArrayList<>();
@@ -229,8 +236,9 @@ public class MetallurgicInfuserRecipeAdapter implements IRecipeAdapter<ItemStack
         }
 
         List<AdvancedAlloyFurnaceRecipe> recipes = new ArrayList<>();
+        long requiredChemicalAmount = getEffectiveChemicalAmount(chemicalInput, originalRecipe);
         for (ChemicalStack chemicalStack : chemicalInput.getRepresentations()) {
-            FluidStack chemicalFluid = getChemicalFluid(chemicalStack);
+            FluidStack chemicalFluid = getChemicalFluid(chemicalStack, requiredChemicalAmount);
             if (chemicalFluid.isEmpty()) {
                 continue;
             }
@@ -268,25 +276,37 @@ public class MetallurgicInfuserRecipeAdapter implements IRecipeAdapter<ItemStack
     }
 
     private FluidStack getChemicalFluid(ChemicalStack chemicalStack) {
+        return getChemicalFluid(chemicalStack, chemicalStack.getAmount());
+    }
+
+    private FluidStack getChemicalFluid(ChemicalStack chemicalStack, long amount) {
         ResourceLocation chemicalId = chemicalStack.getChemicalHolder().getKey().location();
         Fluid fluid = BuiltInRegistries.FLUID.get(chemicalId);
         if (BuiltInRegistries.FLUID.getKey(fluid).equals(chemicalId)) {
-            return new FluidStack(fluid, AdapterUtils.safeInt(chemicalStack.getAmount()));
+            return new FluidStack(fluid, AdapterUtils.safeInt(amount));
         }
         Fluid fallbackFluid = BuiltInRegistries.FLUID.get(ResourceLocation.fromNamespaceAndPath(chemicalId.getNamespace(), chemicalId.getPath() + "_chemical"));
         if (BuiltInRegistries.FLUID.getKey(fallbackFluid).equals(ResourceLocation.fromNamespaceAndPath(chemicalId.getNamespace(), chemicalId.getPath() + "_chemical"))) {
-            return new FluidStack(fallbackFluid, AdapterUtils.safeInt(chemicalStack.getAmount()));
+            return new FluidStack(fallbackFluid, AdapterUtils.safeInt(amount));
         }
         return FluidStack.EMPTY;
     }
 
-    private long getRequiredChemicalAmount(ChemicalStackIngredient chemicalInput, ResourceLocation chemicalId) {
+    private long getRequiredChemicalAmount(ChemicalStackIngredient chemicalInput, ItemStackChemicalToItemStackRecipe originalRecipe, ResourceLocation chemicalId) {
         for (ChemicalStack representation : chemicalInput.getRepresentations()) {
             if (representation.getChemicalHolder().getKey().location().equals(chemicalId)) {
-                return representation.getAmount();
+                return getEffectiveChemicalAmount(chemicalInput, originalRecipe);
             }
         }
         return 0;
+    }
+
+    private long getEffectiveChemicalAmount(ChemicalStackIngredient chemicalInput, ItemStackChemicalToItemStackRecipe originalRecipe) {
+        long amount = chemicalInput.amount();
+        if (originalRecipe.perTickUsage()) {
+            return amount * AdapterUtils.MEKANISM_BASE_TICKS_REQUIRED;
+        }
+        return amount;
     }
 
     @Override
@@ -301,7 +321,7 @@ public class MetallurgicInfuserRecipeAdapter implements IRecipeAdapter<ItemStack
 
         RecipeManager recipeManager = level.getRecipeManager();
         List<RecipeHolder<ItemStackChemicalToItemStackRecipe>> recipes = recipeManager.getAllRecipesFor(
-                MekanismRecipeTypes.TYPE_METALLURGIC_INFUSING.value()
+                getMekanismRecipeType()
         );
 
         for (RecipeHolder<ItemStackChemicalToItemStackRecipe> holder : recipes) {
@@ -316,8 +336,10 @@ public class MetallurgicInfuserRecipeAdapter implements IRecipeAdapter<ItemStack
             boolean hasMainItem = matchesIngredient(mergedInputs, itemInput);
             if (!hasMainItem) continue;
 
+            long requiredChemicalAmount = getEffectiveChemicalAmount(chemicalInput, recipe);
+
             for (ChemicalStack chemicalStack : chemicalInput.getRepresentations()) {
-                FluidStack chemicalFluid = getChemicalFluid(chemicalStack);
+                FluidStack chemicalFluid = getChemicalFluid(chemicalStack, requiredChemicalAmount);
                 if (!chemicalFluid.isEmpty() && matchesFluid(mergedFluids, chemicalFluid)) {
                     return holder;
                 }
@@ -325,7 +347,7 @@ public class MetallurgicInfuserRecipeAdapter implements IRecipeAdapter<ItemStack
 
             List<ChemicalSource> sources = findChemicalSources(level, chemicalInput);
             for (ChemicalSource source : sources) {
-                AdvancedAlloyFurnaceRecipe converted = createRecipe(holder.id(), itemInput, chemicalInput, source, recipe.getOutputDefinition());
+                AdvancedAlloyFurnaceRecipe converted = createRecipe(holder.id(), itemInput, chemicalInput, recipe, source, recipe.getOutputDefinition());
                 if (converted != null && matchesCountedInputs(mergedInputs, converted.inputs())) {
                     return holder;
                 }

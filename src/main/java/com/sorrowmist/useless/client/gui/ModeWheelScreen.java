@@ -4,11 +4,13 @@ import com.mojang.blaze3d.platform.InputConstants;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.*;
 import com.sorrowmist.useless.api.enums.tool.EnchantMode;
+import com.sorrowmist.useless.api.enums.tool.ForceKillMode;
 import com.sorrowmist.useless.api.enums.tool.ModeTypeEnum;
 import com.sorrowmist.useless.api.enums.tool.ToolTypeMode;
 import com.sorrowmist.useless.core.common.KeyBindings;
 import com.sorrowmist.useless.core.component.UComponents;
 import com.sorrowmist.useless.network.EnchantmentSwitchPacket;
+import com.sorrowmist.useless.network.ForceKillModeSwitchPacket;
 import com.sorrowmist.useless.network.ModeTogglePacket;
 import com.sorrowmist.useless.network.ToolTypeModeSwitchPacket;
 import net.minecraft.client.Minecraft;
@@ -38,6 +40,7 @@ public class ModeWheelScreen extends Screen {
     private final List<ModeData> leftModes = new ArrayList<>();
     private final List<ModeData> middleModes = new ArrayList<>();
     private final List<ModeData> rightModes = new ArrayList<>();
+    private final List<ModeData> forceKillModes = new ArrayList<>();
     private ItemStack mainHandItem;
     private boolean showMiddleDisc;
     private float totalTime, prevTick, extraTick;
@@ -55,16 +58,28 @@ public class ModeWheelScreen extends Screen {
         this.leftModes.clear();
         this.middleModes.clear();
         this.rightModes.clear();
+        this.forceKillModes.clear();
 
         EnchantMode currentEnchant = this.mainHandItem.get(UComponents.EnchantModeComponent);
+        ForceKillMode currentForceKillMode = this.mainHandItem.getOrDefault(UComponents.ForceKillModeComponent,
+                                                                            ForceKillMode.KILL);
         ToolTypeMode currentTool = this.mainHandItem.get(UComponents.CurrentToolTypeComponent);
         boolean chainMiningEnabled = this.mainHandItem.getOrDefault(UComponents.EnhancedChainMiningComponent, false);
         boolean forceMiningEnabled = this.mainHandItem.getOrDefault(UComponents.ForceMiningComponent, false);
         boolean aeStorageEnabled = this.mainHandItem.getOrDefault(UComponents.AEStoragePriorityComponent, false);
+        boolean forceKillEnabled = this.mainHandItem.getOrDefault(UComponents.ForceKillEnabledComponent, true);
 
         // 左：附魔模式
         for (EnchantMode m : EnchantMode.values())
             this.leftModes.add(new ModeData(m, m.getTooltip(), m == currentEnchant));
+
+        this.forceKillModes.add(new ModeData(
+                ModeTypeEnum.FORCE_KILL_DISABLED,
+                Component.translatable("tooltip.useless_mod.force_kill_mode.disabled"),
+                !forceKillEnabled
+        ));
+        for (ForceKillMode m : ForceKillMode.values())
+            this.forceKillModes.add(new ModeData(m, m.getTooltip(), forceKillEnabled && m == currentForceKillMode));
 
         for (ToolTypeMode m : ToolTypeMode.values()) {
             boolean shouldAdd = switch (m) {
@@ -134,16 +149,18 @@ public class ModeWheelScreen extends Screen {
         int cy = this.height / 2;
         int centerX = this.width / 2;
 
-        int lx, mx, rx;
+        int lx, mx, rx, fx;
 
         if (this.showMiddleDisc) {
-            lx = (int) (centerX - DISC_SPACING);
-            mx = centerX;
-            rx = (int) (centerX + DISC_SPACING);
+            lx = (int) (centerX - DISC_SPACING * 1.5F);
+            mx = (int) (centerX - DISC_SPACING * 0.5F);
+            rx = (int) (centerX + DISC_SPACING * 0.5F);
+            fx = (int) (centerX + DISC_SPACING * 1.5F);
         } else {
-            lx = (int) (centerX - DISC_SPACING / 2);
+            lx = (int) (centerX - DISC_SPACING);
             mx = centerX; // 不使用
-            rx = (int) (centerX + DISC_SPACING / 2);
+            rx = centerX;
+            fx = (int) (centerX + DISC_SPACING);
         }
 
         ms.pushPose();
@@ -161,6 +178,7 @@ public class ModeWheelScreen extends Screen {
         if (this.showMiddleDisc)
             this.drawDisc(buf, mx, cy, this.middleModes, mouseX, mouseY, anim);
         this.drawDisc(buf, rx, cy, this.rightModes, mouseX, mouseY, anim);
+        this.drawDisc(buf, fx, cy, this.forceKillModes, mouseX, mouseY, anim);
 
         BufferUploader.drawWithShader(buf.buildOrThrow());
 
@@ -169,6 +187,7 @@ public class ModeWheelScreen extends Screen {
         if (this.showMiddleDisc)
             this.drawDividers(buf, mx, cy, this.middleModes.size(), anim);
         this.drawDividers(buf, rx, cy, this.rightModes.size(), anim);
+        this.drawDividers(buf, fx, cy, this.forceKillModes.size(), anim);
 
         BufferUploader.drawWithShader(buf.buildOrThrow());
 
@@ -180,11 +199,13 @@ public class ModeWheelScreen extends Screen {
         if (this.showMiddleDisc)
             this.drawModeNames(g, mx, cy, this.middleModes, anim);
         this.drawModeNames(g, rx, cy, this.rightModes, anim);
+        this.drawModeNames(g, fx, cy, this.forceKillModes, anim);
 
         this.drawHover(g, lx, cy, this.leftModes, mouseX, mouseY);
         if (this.showMiddleDisc)
             this.drawHover(g, mx, cy, this.middleModes, mouseX, mouseY);
         this.drawHover(g, rx, cy, this.rightModes, mouseX, mouseY);
+        this.drawHover(g, fx, cy, this.forceKillModes, mouseX, mouseY);
 
         ms.popPose();
     }
@@ -292,16 +313,25 @@ public class ModeWheelScreen extends Screen {
         int centerX = this.width / 2;
 
         int lx = this.showMiddleDisc
-                ? (int) (centerX - DISC_SPACING)
-                : (int) (centerX - DISC_SPACING / 2);
+                ? (int) (centerX - DISC_SPACING * 1.5F)
+                : (int) (centerX - DISC_SPACING);
+
+        int midX = this.showMiddleDisc
+                ? (int) (centerX - DISC_SPACING * 0.5F)
+                : centerX;
 
         int rx = this.showMiddleDisc
-                ? (int) (centerX + DISC_SPACING)
-                : (int) (centerX + DISC_SPACING / 2);
+                ? (int) (centerX + DISC_SPACING * 0.5F)
+                : centerX;
+
+        int fx = this.showMiddleDisc
+                ? (int) (centerX + DISC_SPACING * 1.5F)
+                : (int) (centerX + DISC_SPACING);
 
         return this.checkClick((int) mx, (int) my, lx, cy, this.leftModes)
-                || (this.showMiddleDisc && this.checkClick((int) mx, (int) my, centerX, cy, this.middleModes))
+                || (this.showMiddleDisc && this.checkClick((int) mx, (int) my, midX, cy, this.middleModes))
                 || this.checkClick((int) mx, (int) my, rx, cy, this.rightModes)
+                || this.checkClick((int) mx, (int) my, fx, cy, this.forceKillModes)
                 || super.mouseClicked(mx, my, btn);
     }
 
@@ -326,6 +356,8 @@ public class ModeWheelScreen extends Screen {
     private void onModeSelected(Object mode) {
         if (mode instanceof EnchantMode em) {
             PacketDistributor.sendToServer(new EnchantmentSwitchPacket(em));
+        } else if (mode instanceof ForceKillMode fkm) {
+            PacketDistributor.sendToServer(new ForceKillModeSwitchPacket(fkm));
         } else if (mode instanceof ToolTypeMode tm) {
             PacketDistributor.sendToServer(new ToolTypeModeSwitchPacket(tm));
         } else if (mode instanceof ModeTypeEnum me) {
@@ -348,6 +380,10 @@ public class ModeWheelScreen extends Screen {
                     );
                     PacketDistributor.sendToServer(
                             new ModeTogglePacket(ModeTogglePacket.ModeType.AE_STORAGE_PRIORITY, !currentEnabled));
+                }
+                case FORCE_KILL_ENABLED, FORCE_KILL_DISABLED -> {
+                    PacketDistributor.sendToServer(
+                            new ModeTogglePacket(ModeTogglePacket.ModeType.FORCE_KILL, me == ModeTypeEnum.FORCE_KILL_ENABLED));
                 }
             }
         }

@@ -181,6 +181,10 @@ dependencies {
     implementation "top.theillusivec4.curios:curios-neoforge:9.5.1+1.21.1:api"
 
     implementation "maven.modrinth:jade:15.1.2+neoforge"
+    //龙之研究
+    implementation "curse.maven:codechicken-lib-1-8-242818:7281427"
+    implementation "curse.maven:brandons-core-231382:7130990"
+    implementation "curse.maven:draconic-evolution-223565:7584459"
 
     // 实用拓展
     implementation "maven.modrinth:actually-additions:1.3.22"

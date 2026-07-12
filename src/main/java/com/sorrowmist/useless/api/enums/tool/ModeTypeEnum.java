@@ -14,7 +14,10 @@ public enum ModeTypeEnum {
     
     // AE存储优先模式
     AE_STORAGE_PRIORITY_ENABLED("ae_storage_priority_enabled", "tooltip.useless_mod.ae_storage_priority_mode"),
-    AE_STORAGE_PRIORITY_DISABLED("ae_storage_priority_disabled", "tooltip.useless_mod.ae_storage_priority_mode");
+    AE_STORAGE_PRIORITY_DISABLED("ae_storage_priority_disabled", "tooltip.useless_mod.ae_storage_priority_mode"),
+
+    FORCE_KILL_ENABLED("force_kill_enabled", "tooltip.useless_mod.force_kill_enabled_mode"),
+    FORCE_KILL_DISABLED("force_kill_disabled", "tooltip.useless_mod.force_kill_enabled_mode");
 
     private final String name;
     private final String tooltipKey;
@@ -37,6 +40,10 @@ public enum ModeTypeEnum {
 
     public static ModeTypeEnum getAEStoragePriorityMode(boolean enabled) {
         return enabled ? AE_STORAGE_PRIORITY_ENABLED : AE_STORAGE_PRIORITY_DISABLED;
+    }
+
+    public static ModeTypeEnum getForceKillEnabledMode(boolean enabled) {
+        return enabled ? FORCE_KILL_ENABLED : FORCE_KILL_DISABLED;
     }
     
     public String getName() {return this.name;}

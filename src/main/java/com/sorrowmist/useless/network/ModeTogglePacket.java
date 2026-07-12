@@ -54,6 +54,9 @@ public class ModeTogglePacket implements CustomPacketPayload {
                 case AE_STORAGE_PRIORITY -> {
                     stack.set(UComponents.AEStoragePriorityComponent.get(), msg.enabled);
                 }
+                case FORCE_KILL -> {
+                    stack.set(UComponents.ForceKillEnabledComponent.get(), msg.enabled);
+                }
             }
 
             // 显式同步物品到客户端
@@ -69,6 +72,7 @@ public class ModeTogglePacket implements CustomPacketPayload {
     public enum ModeType {
         CHAIN_MINING,
         FORCE_MINING,
-        AE_STORAGE_PRIORITY
+        AE_STORAGE_PRIORITY,
+        FORCE_KILL
     }
 }

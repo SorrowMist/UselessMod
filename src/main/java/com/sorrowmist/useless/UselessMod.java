@@ -22,6 +22,9 @@ import net.minecraft.server.packs.PackType;
 import net.minecraft.server.packs.repository.Pack;
 import net.minecraft.server.packs.repository.PackSource;
 import net.minecraft.world.InteractionResult;
+import net.minecraft.world.entity.EquipmentSlotGroup;
+import net.minecraft.world.entity.ai.attributes.AttributeModifier;
+import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.item.ItemStack;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.bus.api.SubscribeEvent;
@@ -31,6 +34,7 @@ import net.neoforged.fml.config.ModConfig;
 import net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent;
 import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.event.AddPackFindersEvent;
+import net.neoforged.neoforge.event.ItemAttributeModifierEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent;
 import net.neoforged.neoforge.event.server.ServerStartingEvent;
 import org.slf4j.Logger;
@@ -104,5 +108,21 @@ public class UselessMod {
 
         event.setCanceled(true);
         event.setCancellationResult(result);
+    }
+
+    @SubscribeEvent
+    public void onItemAttributeModifiers(ItemAttributeModifierEvent event) {
+        if (!(event.getItemStack().getItem() instanceof EndlessBeafItem)) return;
+
+        event.addModifier(Attributes.ENTITY_INTERACTION_RANGE,
+                          new AttributeModifier(id("beef_tool_entity_interaction_range"),
+                                                ConfigManager.getBeefToolEntityInteractionRange(),
+                                                AttributeModifier.Operation.ADD_VALUE),
+                          EquipmentSlotGroup.MAINHAND);
+        event.addModifier(Attributes.BLOCK_INTERACTION_RANGE,
+                          new AttributeModifier(id("beef_tool_block_interaction_range"),
+                                                ConfigManager.getBeefToolBlockInteractionRange(),
+                                                AttributeModifier.Operation.ADD_VALUE),
+                          EquipmentSlotGroup.MAINHAND);
     }
 }

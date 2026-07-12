@@ -54,6 +54,10 @@ public class ConfigManager {
     private static final ModConfigSpec.IntValue LOOTING_LEVEL;
     // 牛排工具挖掘速度配置
     private static final ModConfigSpec.DoubleValue BEEF_TOOL_MINING_SPEED;
+    private static final ModConfigSpec.DoubleValue BEEF_TOOL_ENTITY_INTERACTION_RANGE;
+    private static final ModConfigSpec.DoubleValue BEEF_TOOL_BLOCK_INTERACTION_RANGE;
+    private static final ModConfigSpec.ConfigValue<String> BEEF_TOOL_FORCE_KILL_BLACKLIST;
+    private static final ModConfigSpec.ConfigValue<String> BEEF_TOOL_FORCE_KILL_NON_LIVING_WHITELIST;
 
     // 战利品大爆发触发概率配置 (百分比)
     private static final ModConfigSpec.IntValue FESTIVE_DROP_CHANCE;
@@ -116,13 +120,15 @@ public class ConfigManager {
         SERVER_BUILDER.pop();
 
         // 牛排工具连锁挖掘配置
-        COMMON_BUILDER.push("beef_tool");
+        COMMON_BUILDER.translation("useless_mod.configuration.beef_tool").push("beef_tool");
         ENABLE_POTION_EFFECTS = COMMON_BUILDER
                 .comment("是否启用药水效果")
+                .translation("useless_mod.configuration.enable_potion_effects")
                 .define("enable_potion_effects", true);
 
         ENABLE_FLIGHT_EFFECT = COMMON_BUILDER
                 .comment("是否启用飞行效果")
+                .translation("useless_mod.configuration.enable_flight_effect")
                 .define("enable_flight_effect", true);
 
         // 自定义药水效果列表
@@ -131,44 +137,73 @@ public class ConfigManager {
                         "多个效果用分号(;)分隔",
                         "例如: \"minecraft:regeneration,5;minecraft:speed,2\"",
                         "注意: 等级从1开始计算, 1表示I级, 2表示II级, 以此类推")
+                .translation("useless_mod.configuration.custom_potion_effects")
                 .define("custom_potion_effects",
                         "minecraft:saturation,1;minecraft:regeneration,6;minecraft:night_vision,1;minecraft:fire_resistance,1;minecraft:water_breathing,1;minecraft:resistance,6",
                         str -> str instanceof String s && s.matches("^([a-zA-Z0-9_.-]+:[a-zA-Z0-9_./-]+,\\d+)(;[a-zA-Z0-9_.-]+:[a-zA-Z0-9_./-]+,\\d+)*$"));
 
         CHAIN_MINING_RANGE_X = COMMON_BUILDER
                 .comment("连锁挖掘的X轴范围半径")
+                .translation("useless_mod.configuration.chain_mining_range_x")
                 .defineInRange("chain_mining_range_x", 8, 1, 32);
 
         CHAIN_MINING_RANGE_Y = COMMON_BUILDER
                 .comment("连锁挖掘的Y轴范围半径")
+                .translation("useless_mod.configuration.chain_mining_range_y")
                 .defineInRange("chain_mining_range_y", 8, 1, 32);
 
         CHAIN_MINING_RANGE_Z = COMMON_BUILDER
                 .comment("连锁挖掘的Z轴范围半径")
+                .translation("useless_mod.configuration.chain_mining_range_z")
                 .defineInRange("chain_mining_range_z", 8, 1, 255);
 
         CHAIN_MINING_MAX_BLOCKS = COMMON_BUILDER
                 .comment("连锁挖掘的最大方块数量")
+                .translation("useless_mod.configuration.chain_mining_max_blocks")
                 .defineInRange("chain_mining_max_blocks", 1000, 1, 10000);
 
         // 牛排工具附魔等级配置
         FORTUNE_LEVEL = COMMON_BUILDER
                 .comment("牛排工具时运附魔等级")
+                .translation("useless_mod.configuration.fortune_level")
                 .defineInRange("fortune_level", 10, 1, 127);
 
         LOOTING_LEVEL = COMMON_BUILDER
                 .comment("牛排工具抢夺附魔等级")
+                .translation("useless_mod.configuration.looting_level")
                 .defineInRange("looting_level", 10, 1, 127);
 
         // 战利品大爆发触发概率配置
         FESTIVE_DROP_CHANCE = COMMON_BUILDER
                 .comment("战利品大爆发触发概率 (百分比, 1-100%)")
+                .translation("useless_mod.configuration.festive_drop_chance")
                 .defineInRange("festive_drop_chance", 5, 1, 100);
 
         // 牛排工具挖掘速度配置
         BEEF_TOOL_MINING_SPEED = COMMON_BUILDER
                 .comment("牛排工具基础挖掘速度")
+                .translation("useless_mod.configuration.beef_tool_mining_speed")
                 .defineInRange("beef_tool_mining_speed", 10.0, 1.0, 1000.0);
+
+        BEEF_TOOL_ENTITY_INTERACTION_RANGE = COMMON_BUILDER
+                .comment("牛排工具实体触及范围加成, 重启游戏生效")
+                .translation("useless_mod.configuration.beef_tool_entity_interaction_range")
+                .defineInRange("beef_tool_entity_interaction_range", 8.0, 0.0, 1024.0);
+
+        BEEF_TOOL_BLOCK_INTERACTION_RANGE = COMMON_BUILDER
+                .comment("牛排工具方块触及范围加成, 重启游戏生效")
+                .translation("useless_mod.configuration.beef_tool_block_interaction_range")
+                .defineInRange("beef_tool_block_interaction_range", 8.0, 0.0, 1024.0);
+
+        BEEF_TOOL_FORCE_KILL_BLACKLIST = COMMON_BUILDER
+                .comment("牛排工具强制击杀黑名单, 多个实体ID用分号分隔, 例如 minecraft:wither;modid:boss")
+                .translation("useless_mod.configuration.beef_tool_force_kill_blacklist")
+                .define("beef_tool_force_kill_blacklist", "");
+
+        BEEF_TOOL_FORCE_KILL_NON_LIVING_WHITELIST = COMMON_BUILDER
+                .comment("牛排工具非生物实体强制击杀白名单, 多个实体ID用分号分隔")
+                .translation("useless_mod.configuration.beef_tool_force_kill_non_living_whitelist")
+                .define("beef_tool_force_kill_non_living_whitelist", "draconicevolution:guardian_crystal");
         COMMON_BUILDER.pop();
 
         COMMON_BUILDER.push("mekanism_upgrade");
@@ -272,6 +307,22 @@ public class ConfigManager {
         return BEEF_TOOL_MINING_SPEED.get();
     }
 
+    public static double getBeefToolEntityInteractionRange() {
+        return BEEF_TOOL_ENTITY_INTERACTION_RANGE.get();
+    }
+
+    public static double getBeefToolBlockInteractionRange() {
+        return BEEF_TOOL_BLOCK_INTERACTION_RANGE.get();
+    }
+
+    public static List<String> getBeefToolForceKillBlacklist() {
+        return splitEntityIdList(BEEF_TOOL_FORCE_KILL_BLACKLIST.get());
+    }
+
+    public static List<String> getBeefToolForceKillNonLivingWhitelist() {
+        return splitEntityIdList(BEEF_TOOL_FORCE_KILL_NON_LIVING_WHITELIST.get());
+    }
+
     // 获取塑料平台层数
     public static int getPlatformLayers() {
         return PLATFORM_LAYERS.get();
@@ -304,6 +355,13 @@ public class ConfigManager {
     // 获取自定义药水效果配置列表
     public static List<String> getCustomPotionEffects() {
         String value = CUSTOM_POTION_EFFECTS.get();
+        if (value == null || value.isBlank()) {
+            return List.of();
+        }
+        return List.of(value.split(";"));
+    }
+
+    private static List<String> splitEntityIdList(String value) {
         if (value == null || value.isBlank()) {
             return List.of();
         }

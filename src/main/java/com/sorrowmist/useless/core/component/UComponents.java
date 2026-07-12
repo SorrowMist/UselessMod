@@ -3,6 +3,7 @@ package com.sorrowmist.useless.core.component;
 import com.mojang.serialization.Codec;
 import com.sorrowmist.useless.UselessMod;
 import com.sorrowmist.useless.api.enums.tool.EnchantMode;
+import com.sorrowmist.useless.api.enums.tool.ForceKillMode;
 import com.sorrowmist.useless.api.enums.tool.ToolTypeMode;
 import net.minecraft.core.GlobalPos;
 import net.minecraft.core.component.DataComponentType;
@@ -87,6 +88,24 @@ public final class UComponents {
                            .networkSynchronized(StreamCodec.of(
                                    FriendlyByteBuf::writeBoolean,
                                    FriendlyByteBuf::readBoolean
+                           ))
+            );
+
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<Boolean>> ForceKillEnabledComponent =
+            register("force_kill_enabled", builder ->
+                    builder.persistent(Codec.BOOL)
+                           .networkSynchronized(StreamCodec.of(
+                                   FriendlyByteBuf::writeBoolean,
+                                   FriendlyByteBuf::readBoolean
+                           ))
+            );
+
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<ForceKillMode>> ForceKillModeComponent =
+            register("force_kill_mode", builder ->
+                    builder.persistent(Codec.STRING.xmap(ForceKillMode::valueOf, Enum::name))
+                           .networkSynchronized(StreamCodec.of(
+                                   FriendlyByteBuf::writeEnum,
+                                   buf -> buf.readEnum(ForceKillMode.class)
                            ))
             );
 

@@ -6,20 +6,26 @@ import com.sorrowmist.useless.content.recipe.AlloyFurnaceRecipeManager;
 import com.sorrowmist.useless.core.common.FlyEffectedHolder;
 import com.sorrowmist.useless.core.component.UComponents;
 import com.sorrowmist.useless.core.config.ConfigManager;
+import com.sorrowmist.useless.network.BeefInvulnerabilitySyncPacket;
+import com.sorrowmist.useless.network.BeefInvulnerabilityStatePacket;
 import com.sorrowmist.useless.utils.UselessItemUtils;
 import com.sorrowmist.useless.utils.mining.MiningDispatcher;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.GlobalPos;
 import net.minecraft.network.chat.Component;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.InteractionResult;
+import net.minecraft.world.entity.Pose;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BlockEntity;
+import net.neoforged.bus.api.EventPriority;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.AddReloadListenerEvent;
 import net.neoforged.neoforge.event.entity.living.LivingDamageEvent;
+import net.neoforged.neoforge.event.entity.living.LivingDeathEvent;
 import net.neoforged.neoforge.event.entity.living.LivingDropsEvent;
 import net.neoforged.neoforge.event.entity.living.LivingIncomingDamageEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
@@ -27,8 +33,10 @@ import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent;
 import net.neoforged.neoforge.event.level.BlockEvent;
 import net.neoforged.neoforge.event.server.ServerStartedEvent;
 import net.neoforged.neoforge.event.tick.PlayerTickEvent;
+import net.neoforged.neoforge.network.PacketDistributor;
 
 import java.util.Collections;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -36,18 +44,39 @@ import java.util.concurrent.ConcurrentHashMap;
 @EventBusSubscriber(modid = UselessMod.MODID)
 public class EventHandler {
     private static final Set<UUID> BEEF_INVULNERABLE_PLAYERS = Collections.newSetFromMap(new ConcurrentHashMap<>());
+    private static final Set<Integer> CLIENT_BEEF_INVULNERABLE_ENTITY_IDS = Collections.newSetFromMap(new ConcurrentHashMap<>());
+    private static final Set<UUID> BEEF_RESTORE_SYNCED_PLAYERS = Collections.newSetFromMap(new ConcurrentHashMap<>());
+    private static final Map<UUID, Integer> SERVER_BEEF_RESTORE_TICKS = new ConcurrentHashMap<>();
+    private static final Map<UUID, Integer> CLIENT_BEEF_RESTORE_TICKS = new ConcurrentHashMap<>();
 
-    @SubscribeEvent
+    @SubscribeEvent(priority = EventPriority.HIGHEST)
     public static void onLivingIncomingDamage(LivingIncomingDamageEvent event) {
         if (event.getEntity() instanceof Player player && shouldApplyBeefInvulnerability(player)) {
             event.setCanceled(true);
+            player.setHealth(player.getMaxHealth());
+            player.clearFire();
+            player.fallDistance = 0.0F;
         }
     }
 
-    @SubscribeEvent
+    @SubscribeEvent(priority = EventPriority.HIGHEST)
     public static void onLivingDamagePre(LivingDamageEvent.Pre event) {
         if (event.getEntity() instanceof Player player && shouldApplyBeefInvulnerability(player)) {
             event.setNewDamage(0.0F);
+            player.setHealth(player.getMaxHealth());
+            player.clearFire();
+            player.fallDistance = 0.0F;
+        }
+    }
+
+    @SubscribeEvent(priority = EventPriority.HIGHEST)
+    public static void onLivingDeath(LivingDeathEvent event) {
+        if (event.getEntity() instanceof Player player && shouldApplyBeefInvulnerability(player)) {
+            event.setCanceled(true);
+            player.setHealth(player.getMaxHealth());
+            player.setInvulnerable(true);
+            player.clearFire();
+            player.fallDistance = 0.0F;
         }
     }
 
@@ -119,6 +148,10 @@ public class EventHandler {
         UUID uuid = player.getUUID();
 
         if (hasItemInInventory) {
+            if (player instanceof ServerPlayer serverPlayer && (!BEEF_INVULNERABLE_PLAYERS.contains(uuid) || player.tickCount % 20 == 0)) {
+                PacketDistributor.sendToPlayersTrackingEntityAndSelf(serverPlayer, new BeefInvulnerabilityStatePacket(serverPlayer.getId(), true));
+            }
+            BEEF_RESTORE_SYNCED_PLAYERS.remove(uuid);
             if (!player.isInvulnerable()) {
                 BEEF_INVULNERABLE_PLAYERS.add(uuid);
                 player.setInvulnerable(true);
@@ -128,11 +161,53 @@ public class EventHandler {
 
         if (BEEF_INVULNERABLE_PLAYERS.remove(uuid)) {
             player.setInvulnerable(false);
+            BEEF_RESTORE_SYNCED_PLAYERS.remove(uuid);
+            if (player instanceof ServerPlayer serverPlayer) {
+                PacketDistributor.sendToPlayersTrackingEntityAndSelf(serverPlayer, new BeefInvulnerabilityStatePacket(serverPlayer.getId(), false));
+            }
         }
     }
 
-    private static boolean shouldApplyBeefInvulnerability(Player player) {
-        return !player.level().isClientSide() && UselessItemUtils.hasTargetToolInInventory(player);
+    public static boolean shouldApplyBeefInvulnerability(Player player) {
+        return !player.level().isClientSide() && hasBeefInvulnerabilityItem(player);
+    }
+
+    public static boolean hasBeefInvulnerabilityItem(Player player) {
+        return UselessItemUtils.hasTargetToolInInventory(player) || player.level().isClientSide() && CLIENT_BEEF_INVULNERABLE_ENTITY_IDS.contains(player.getId());
+    }
+
+    public static void setClientBeefInvulnerabilityState(int entityId, boolean protectedState) {
+        if (protectedState) {
+            CLIENT_BEEF_INVULNERABLE_ENTITY_IDS.add(entityId);
+            return;
+        }
+        CLIENT_BEEF_INVULNERABLE_ENTITY_IDS.remove(entityId);
+    }
+
+    public static void restoreBeefProtectedPlayer(Player player) {
+        Map<UUID, Integer> restoreTicks = player.level().isClientSide() ? CLIENT_BEEF_RESTORE_TICKS : SERVER_BEEF_RESTORE_TICKS;
+        UUID uuid = player.getUUID();
+        Integer lastRestoreTick = restoreTicks.put(uuid, player.tickCount);
+        if (lastRestoreTick != null && lastRestoreTick == player.tickCount) {
+            return;
+        }
+
+        float maxHealth = player.getMaxHealth();
+        player.deathTime = 0;
+        player.hurtTime = 0;
+        player.hurtDuration = 0;
+        player.setHealth(maxHealth);
+        player.setInvulnerable(true);
+        player.setPose(Pose.STANDING);
+        player.clearFire();
+        player.fallDistance = 0.0F;
+        if (player instanceof ServerPlayer serverPlayer) {
+            boolean shouldSyncRestore = BEEF_RESTORE_SYNCED_PLAYERS.add(serverPlayer.getUUID()) || serverPlayer.tickCount % 20 == 0;
+            if (shouldSyncRestore) {
+                PacketDistributor.sendToPlayersTrackingEntityAndSelf(serverPlayer, new BeefInvulnerabilityStatePacket(serverPlayer.getId(), true));
+                PacketDistributor.sendToPlayersTrackingEntityAndSelf(serverPlayer, new BeefInvulnerabilitySyncPacket(serverPlayer.getId(), maxHealth));
+            }
+        }
     }
 
     @SubscribeEvent

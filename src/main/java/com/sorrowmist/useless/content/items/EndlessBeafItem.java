@@ -246,12 +246,11 @@ public class EndlessBeafItem extends TieredItem {
         target.invulnerableTime = 0;
         target.hurtTime = 0;
         target.hurtDuration = 0;
-        target.hurt(damageSource, Float.MAX_VALUE);
+        target.hurt(damageSource, getForceKillDamage(target));
         if (!target.isAlive() || mode == ForceKillMode.DAMAGE_ONLY) {
             return true;
         }
 
-        target.setHealth(0.0F);
         target.die(damageSource);
         if (!target.isAlive() || mode == ForceKillMode.DIE) {
             return true;
@@ -264,6 +263,14 @@ public class EndlessBeafItem extends TieredItem {
 
         target.remove(Entity.RemovalReason.KILLED);
         return true;
+    }
+
+    private static float getForceKillDamage(LivingEntity target) {
+        float damage = target.getHealth() + target.getAbsorptionAmount() + target.getMaxHealth() + 1.0F;
+        if (!Float.isFinite(damage)) {
+            return 1024.0F;
+        }
+        return Math.max(damage, 1024.0F);
     }
 
     private static boolean forceKillNonLivingEntity(ItemStack stack, Entity target, Player player) {

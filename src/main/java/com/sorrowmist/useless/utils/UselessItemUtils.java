@@ -166,7 +166,7 @@ public class UselessItemUtils {
     }
 
     public static boolean hasTargetToolInInventory(Player player) {
-        if (player == null) {
+        if (player == null || player.getInventory() == null) {
             return false;
         }
 

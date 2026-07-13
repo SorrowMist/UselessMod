@@ -3,6 +3,9 @@
   "package": "com.sorrowmist.useless.mixin",
   "compatibilityLevel": "JAVA_21",
   "mixins": [
+    "EntityMixin",
+    "LivingEntityMixin",
+    "ServerLevelMixin",
     "LevelMixin",
     "botanypots.AbstractBotanyPotBlockEntityAccessor",
     "botanypots.BotanyPotBlockEntityAccessor",

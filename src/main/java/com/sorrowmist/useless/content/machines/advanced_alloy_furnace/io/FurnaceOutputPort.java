@@ -62,34 +62,58 @@ public final class FurnaceOutputPort {
      * 输出单个物品堆，AE 写入失败的剩余部分回退到本地槽位。
      */
     public static void outputItem(ItemStack stack, AeOutput aeOutput, ItemStackHandler itemHandler, int slotsStart, int slotsCount) {
+        outputItemWithRemainder(stack, aeOutput, itemHandler, slotsStart, slotsCount);
+    }
+
+    /**
+     * 输出单个物品堆，AE 写入失败的剩余部分回退到本地槽位。
+     *
+     * @return 本地槽位也放不下的剩余部分（全部放入则为 EMPTY），由调用方决定去向
+     */
+    public static ItemStack outputItemWithRemainder(ItemStack stack, AeOutput aeOutput, ItemStackHandler itemHandler, int slotsStart, int slotsCount) {
         if (stack.isEmpty()) {
-            return;
+            return ItemStack.EMPTY;
         }
         long inserted = aeOutput.insertItem(stack);
         int remainingCount = (int) Math.max(0, stack.getCount() - inserted);
         if (remainingCount <= 0) {
-            return;
+            return ItemStack.EMPTY;
         }
         ItemStack remainingStack = stack.copy();
         remainingStack.setCount(remainingCount);
-        insertItemIntoSlots(remainingStack, itemHandler, slotsStart, slotsCount);
+        int leftover = insertItemIntoSlots(remainingStack, itemHandler, slotsStart, slotsCount);
+        if (leftover <= 0) {
+            return ItemStack.EMPTY;
+        }
+        ItemStack leftoverStack = stack.copy();
+        leftoverStack.setCount(leftover);
+        return leftoverStack;
     }
 
     /**
      * 输出单个流体栈，AE 写入失败的剩余部分回退到本地流体槽。
      */
     public static void outputFluid(FluidStack stack, AeOutput aeOutput, FluidTank[] tanks, int tankCount) {
+        outputFluidWithRemainder(stack, aeOutput, tanks, tankCount);
+    }
+
+    /**
+     * 输出单个流体栈，AE 写入失败的剩余部分回退到本地流体槽。
+     *
+     * @return 流体槽也装不下的剩余部分（全部装入则为 EMPTY），由调用方决定去向
+     */
+    public static FluidStack outputFluidWithRemainder(FluidStack stack, AeOutput aeOutput, FluidTank[] tanks, int tankCount) {
         if (stack.isEmpty()) {
-            return;
+            return FluidStack.EMPTY;
         }
         long inserted = aeOutput.insertFluid(stack);
         int remainingAmount = (int) Math.max(0, stack.getAmount() - inserted);
         if (remainingAmount <= 0) {
-            return;
+            return FluidStack.EMPTY;
         }
         FluidStack remainingFluid = stack.copy();
         remainingFluid.setAmount(remainingAmount);
-        fillFluidTanks(remainingFluid, tanks, tankCount);
+        return fillFluidTanks(remainingFluid, tanks, tankCount);
     }
 
     /**
@@ -99,7 +123,8 @@ public final class FurnaceOutputPort {
         aeOutput.insertKey(key, amount);
     }
 
-    private static void insertItemIntoSlots(ItemStack stack, ItemStackHandler itemHandler, int slotsStart, int slotsCount) {
+    /** @return 槽位放不下的剩余数量 */
+    private static int insertItemIntoSlots(ItemStack stack, ItemStackHandler itemHandler, int slotsStart, int slotsCount) {
         int remainingCount = stack.getCount();
         for (int i = slotsStart; i < slotsStart + slotsCount && remainingCount > 0; i++) {
             ItemStack slotStack = itemHandler.getStackInSlot(i);
@@ -121,9 +146,11 @@ public final class FurnaceOutputPort {
                 remainingCount -= toAdd;
             }
         }
+        return remainingCount;
     }
 
-    private static void fillFluidTanks(FluidStack fluidStack, FluidTank[] tanks, int tankCount) {
+    /** @return 流体槽装不下的剩余部分（全部装入则为 EMPTY） */
+    private static FluidStack fillFluidTanks(FluidStack fluidStack, FluidTank[] tanks, int tankCount) {
         FluidStack remainingFluid = fluidStack.copy();
         for (int i = 0; i < tankCount && !remainingFluid.isEmpty(); i++) {
             FluidTank tank = tanks[i];
@@ -133,5 +160,6 @@ public final class FurnaceOutputPort {
                 remainingFluid.shrink(filled);
             }
         }
+        return remainingFluid;
     }
 }

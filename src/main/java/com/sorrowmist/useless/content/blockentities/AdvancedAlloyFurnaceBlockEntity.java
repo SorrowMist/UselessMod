@@ -327,6 +327,7 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
 
         entity.aeManager.flushAEBatches();
         entity.aeManager.tickAETasks();
+        entity.aeManager.tickUnreturnedInputs();
 
         // 每tick尝试自动输入输出物品和流体
         entity.autoOutputTickCounter++;
@@ -831,6 +832,11 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
         this.aeManager.cancelAllTasks();
     }
 
+    @Override
+    public void stashUnreturnedInput(AEKey key, long amount) {
+        this.aeManager.stashUnreturnedInput(key, amount);
+    }
+
     public IEnergyStorage getEnergyStorage() {
         return this.energyManager;
     }
@@ -1237,28 +1243,6 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
                 this.outputFluidTanks,
                 FLUID_TANK_COUNT
         );
-    }
-
-    private FurnaceOutputPort.AeOutput createAeOutputPort() {
-        return new FurnaceOutputPort.AeOutput() {
-            @Override
-            public long insertItem(ItemStack stack) {
-                if (!AdvancedAlloyFurnaceBlockEntity.this.isReturnOutputToAe()) return 0;
-                return AdvancedAlloyFurnaceBlockEntity.this.tryOutputToAE(stack);
-            }
-
-            @Override
-            public long insertFluid(FluidStack stack) {
-                if (!AdvancedAlloyFurnaceBlockEntity.this.isReturnOutputToAe()) return 0;
-                return AdvancedAlloyFurnaceBlockEntity.this.tryOutputFluidToAE(stack);
-            }
-
-            @Override
-            public long insertKey(AEKey key, long amount) {
-                if (!AdvancedAlloyFurnaceBlockEntity.this.isReturnOutputToAe()) return 0;
-                return AdvancedAlloyFurnaceBlockEntity.this.tryOutputKeyToAE(key, amount);
-            }
-        };
     }
 
     private void resetProgress() {

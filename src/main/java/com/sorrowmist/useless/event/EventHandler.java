@@ -19,7 +19,9 @@ import net.minecraft.world.level.block.entity.BlockEntity;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.AddReloadListenerEvent;
+import net.neoforged.neoforge.event.entity.living.LivingDamageEvent;
 import net.neoforged.neoforge.event.entity.living.LivingDropsEvent;
+import net.neoforged.neoforge.event.entity.living.LivingIncomingDamageEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent;
 import net.neoforged.neoforge.event.level.BlockEvent;
@@ -27,9 +29,28 @@ import net.neoforged.neoforge.event.server.ServerStartedEvent;
 import net.neoforged.neoforge.event.tick.PlayerTickEvent;
 
 import java.util.Collections;
+import java.util.Set;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 @EventBusSubscriber(modid = UselessMod.MODID)
 public class EventHandler {
+    private static final Set<UUID> BEEF_INVULNERABLE_PLAYERS = Collections.newSetFromMap(new ConcurrentHashMap<>());
+
+    @SubscribeEvent
+    public static void onLivingIncomingDamage(LivingIncomingDamageEvent event) {
+        if (event.getEntity() instanceof Player player && shouldApplyBeefInvulnerability(player)) {
+            event.setCanceled(true);
+        }
+    }
+
+    @SubscribeEvent
+    public static void onLivingDamagePre(LivingDamageEvent.Pre event) {
+        if (event.getEntity() instanceof Player player && shouldApplyBeefInvulnerability(player)) {
+            event.setNewDamage(0.0F);
+        }
+    }
+
     @SubscribeEvent
     public static void onLivingDrops(LivingDropsEvent event) {
         if (event.getSource().getEntity() instanceof Player player) {
@@ -87,8 +108,31 @@ public class EventHandler {
                 FlyEffectedHolder.remove(player.getUUID());
             }
         }
+
+        updateBeefInvulnerability(player);
         
         MiningDispatcher.tickCacheUpdate(player);
+    }
+
+    private static void updateBeefInvulnerability(Player player) {
+        boolean hasItemInInventory = UselessItemUtils.hasTargetToolInInventory(player);
+        UUID uuid = player.getUUID();
+
+        if (hasItemInInventory) {
+            if (!player.isInvulnerable()) {
+                BEEF_INVULNERABLE_PLAYERS.add(uuid);
+                player.setInvulnerable(true);
+            }
+            return;
+        }
+
+        if (BEEF_INVULNERABLE_PLAYERS.remove(uuid)) {
+            player.setInvulnerable(false);
+        }
+    }
+
+    private static boolean shouldApplyBeefInvulnerability(Player player) {
+        return !player.level().isClientSide() && UselessItemUtils.hasTargetToolInInventory(player);
     }
 
     @SubscribeEvent

@@ -29,10 +29,3 @@ Status: [OPEN]
 
 - Keep dangerous `setPos` protection active on both client and server.
 - Restrict `remove` / `setRemoved` cancellation back to server-side only, so the client can legitimately replace/remove the old local player during respawn/recovery synchronization.
-- New evidence in `references/latest.log` shows no duplicate UUID, but `Can't keep up! ... Running 37548ms or 750 ticks behind` after More Avaritia god sword testing.
-- More Avaritia `InfinitySwordGodItem.onEntitySwing` performs 256 scan passes per swing, each pass doing 3 ray traces, entity query, sorting, and repeated kill/remove calls.
-- Disable the unsafe god sword sweep entry point through a compatibility Mixin while leaving direct left-click entity handling to the existing invulnerability protections.
-- User clarified that killing players without the beef tool does not freeze, so the sweep itself is not sufficient to explain the freeze.
-- Removed the More Avaritia-specific Mixin and instead rate-limited repeated beef restore synchronization to avoid packet storms when the same protected player is hit many times in one swing.
-- Latest `references/latest.log` still shows the same single tick freeze, so packet limiting alone is insufficient.
-- Add per-side, per-player, per-tick restore de-duplication so repeated `hurt` / `setHealth(0)` / `die` calls in the same tick are canceled but only the first one performs full state restoration.

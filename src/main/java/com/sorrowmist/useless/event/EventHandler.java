@@ -28,6 +28,7 @@ import net.neoforged.neoforge.event.entity.living.LivingDamageEvent;
 import net.neoforged.neoforge.event.entity.living.LivingDeathEvent;
 import net.neoforged.neoforge.event.entity.living.LivingDropsEvent;
 import net.neoforged.neoforge.event.entity.living.LivingIncomingDamageEvent;
+import net.neoforged.neoforge.event.entity.player.AttackEntityEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent;
 import net.neoforged.neoforge.event.level.BlockEvent;
@@ -36,7 +37,6 @@ import net.neoforged.neoforge.event.tick.PlayerTickEvent;
 import net.neoforged.neoforge.network.PacketDistributor;
 
 import java.util.Collections;
-import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -45,9 +45,6 @@ import java.util.concurrent.ConcurrentHashMap;
 public class EventHandler {
     private static final Set<UUID> BEEF_INVULNERABLE_PLAYERS = Collections.newSetFromMap(new ConcurrentHashMap<>());
     private static final Set<Integer> CLIENT_BEEF_INVULNERABLE_ENTITY_IDS = Collections.newSetFromMap(new ConcurrentHashMap<>());
-    private static final Set<UUID> BEEF_RESTORE_SYNCED_PLAYERS = Collections.newSetFromMap(new ConcurrentHashMap<>());
-    private static final Map<UUID, Integer> SERVER_BEEF_RESTORE_TICKS = new ConcurrentHashMap<>();
-    private static final Map<UUID, Integer> CLIENT_BEEF_RESTORE_TICKS = new ConcurrentHashMap<>();
 
     @SubscribeEvent(priority = EventPriority.HIGHEST)
     public static void onLivingIncomingDamage(LivingIncomingDamageEvent event) {
@@ -77,6 +74,13 @@ public class EventHandler {
             player.setInvulnerable(true);
             player.clearFire();
             player.fallDistance = 0.0F;
+        }
+    }
+
+    @SubscribeEvent(priority = EventPriority.HIGHEST)
+    public static void onAttackEntity(AttackEntityEvent event) {
+        if (event.getTarget() instanceof Player player && hasBeefInvulnerabilityItem(player)) {
+            event.setCanceled(true);
         }
     }
 
@@ -151,7 +155,6 @@ public class EventHandler {
             if (player instanceof ServerPlayer serverPlayer && (!BEEF_INVULNERABLE_PLAYERS.contains(uuid) || player.tickCount % 20 == 0)) {
                 PacketDistributor.sendToPlayersTrackingEntityAndSelf(serverPlayer, new BeefInvulnerabilityStatePacket(serverPlayer.getId(), true));
             }
-            BEEF_RESTORE_SYNCED_PLAYERS.remove(uuid);
             if (!player.isInvulnerable()) {
                 BEEF_INVULNERABLE_PLAYERS.add(uuid);
                 player.setInvulnerable(true);
@@ -161,7 +164,6 @@ public class EventHandler {
 
         if (BEEF_INVULNERABLE_PLAYERS.remove(uuid)) {
             player.setInvulnerable(false);
-            BEEF_RESTORE_SYNCED_PLAYERS.remove(uuid);
             if (player instanceof ServerPlayer serverPlayer) {
                 PacketDistributor.sendToPlayersTrackingEntityAndSelf(serverPlayer, new BeefInvulnerabilityStatePacket(serverPlayer.getId(), false));
             }
@@ -185,13 +187,6 @@ public class EventHandler {
     }
 
     public static void restoreBeefProtectedPlayer(Player player) {
-        Map<UUID, Integer> restoreTicks = player.level().isClientSide() ? CLIENT_BEEF_RESTORE_TICKS : SERVER_BEEF_RESTORE_TICKS;
-        UUID uuid = player.getUUID();
-        Integer lastRestoreTick = restoreTicks.put(uuid, player.tickCount);
-        if (lastRestoreTick != null && lastRestoreTick == player.tickCount) {
-            return;
-        }
-
         float maxHealth = player.getMaxHealth();
         player.deathTime = 0;
         player.hurtTime = 0;
@@ -202,11 +197,8 @@ public class EventHandler {
         player.clearFire();
         player.fallDistance = 0.0F;
         if (player instanceof ServerPlayer serverPlayer) {
-            boolean shouldSyncRestore = BEEF_RESTORE_SYNCED_PLAYERS.add(serverPlayer.getUUID()) || serverPlayer.tickCount % 20 == 0;
-            if (shouldSyncRestore) {
-                PacketDistributor.sendToPlayersTrackingEntityAndSelf(serverPlayer, new BeefInvulnerabilityStatePacket(serverPlayer.getId(), true));
-                PacketDistributor.sendToPlayersTrackingEntityAndSelf(serverPlayer, new BeefInvulnerabilitySyncPacket(serverPlayer.getId(), maxHealth));
-            }
+            PacketDistributor.sendToPlayersTrackingEntityAndSelf(serverPlayer, new BeefInvulnerabilityStatePacket(serverPlayer.getId(), true));
+            PacketDistributor.sendToPlayersTrackingEntityAndSelf(serverPlayer, new BeefInvulnerabilitySyncPacket(serverPlayer.getId(), maxHealth));
         }
     }
 

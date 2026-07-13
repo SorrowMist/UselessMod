@@ -9,9 +9,34 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 @Mixin(Entity.class)
 public class EntityMixin {
+    @Inject(method = "isPickable", at = @At("HEAD"), cancellable = true)
+    private void useless_mod$makeBeefPlayerUnpickable(CallbackInfoReturnable<Boolean> cir) {
+        Entity entity = (Entity) (Object) this;
+        if (entity instanceof Player player && EventHandler.hasBeefInvulnerabilityItem(player)) {
+            cir.setReturnValue(false);
+        }
+    }
+
+    @Inject(method = "isAttackable", at = @At("HEAD"), cancellable = true)
+    private void useless_mod$makeBeefPlayerUnattackable(CallbackInfoReturnable<Boolean> cir) {
+        Entity entity = (Entity) (Object) this;
+        if (entity instanceof Player player && EventHandler.hasBeefInvulnerabilityItem(player)) {
+            cir.setReturnValue(false);
+        }
+    }
+
+    @Inject(method = "canBeHitByProjectile", at = @At("HEAD"), cancellable = true)
+    private void useless_mod$makeBeefPlayerProjectileUntargetable(CallbackInfoReturnable<Boolean> cir) {
+        Entity entity = (Entity) (Object) this;
+        if (entity instanceof Player player && EventHandler.hasBeefInvulnerabilityItem(player)) {
+            cir.setReturnValue(false);
+        }
+    }
+
     @Inject(method = "setPos(DDD)V", at = @At("HEAD"), cancellable = true)
     private void useless_mod$protectBeefPlayerFromUnsafeSetPos(double x, double y, double z, CallbackInfo ci) {
         Entity entity = (Entity) (Object) this;

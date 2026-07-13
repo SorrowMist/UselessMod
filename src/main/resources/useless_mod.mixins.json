@@ -5,6 +5,7 @@
   "mixins": [
     "EntityMixin",
     "LivingEntityMixin",
+    "PlayerMixin",
     "ServerLevelMixin",
     "LevelMixin",
     "botanypots.AbstractBotanyPotBlockEntityAccessor",

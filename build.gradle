@@ -185,9 +185,9 @@ dependencies {
     implementation "curse.maven:codechicken-lib-1-8-242818:7281427"
     implementation "curse.maven:brandons-core-231382:7130990"
     implementation "curse.maven:draconic-evolution-223565:7584459"
-    //无线终端
-    implementation "curse.maven:applied-energistics-2-wireless-terminals-459929:8048692"
-    implementation "curse.maven:cloth-config-348521:5729127"
+
+    
+    runtimeOnly "de.mari_023:ae2wtlib:19.2.5"
     
 
     // 实用拓展

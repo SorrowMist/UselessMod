@@ -112,6 +112,11 @@ public class AdvancedAlloyFurnaceBlock extends Block implements EntityBlock {
             if (blockEntity instanceof AdvancedAlloyFurnaceBlockEntity furnace) {
                 // 掉落物品（不包括容器内的物品，它们会保存在方块物品中）
                 // 注意：使用精准采集时，物品会通过 getDrops 保存到方块物品中
+                // AE 任务数据不随掉落物保存，必须在此返还材料：
+                // onRemove 先于 setRemoved 执行，此时 AE 节点仍然存活，材料能真正写回网络
+                if (!level.isClientSide) {
+                    furnace.cancelAllAETasks();
+                }
             }
         }
         super.onRemove(state, level, pos, newState, isMoving);

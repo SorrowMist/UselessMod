@@ -89,7 +89,7 @@ public final class EapCompat {
             long scaledAmt = outputs.getFirst().amount();
             if (origAmt > 0) {
                 long mul = scaledAmt / origAmt;
-                if (mul > 0) return (int) mul;
+                if (mul > 0) return (int) Math.min(mul, Integer.MAX_VALUE);
             }
         }
         return 1;

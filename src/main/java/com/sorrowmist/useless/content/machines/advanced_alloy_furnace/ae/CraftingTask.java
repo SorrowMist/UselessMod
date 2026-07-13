@@ -18,6 +18,7 @@ import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
+import net.minecraft.world.Containers;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.neoforged.neoforge.fluids.FluidStack;
@@ -40,6 +41,13 @@ public class CraftingTask {
     private final List<FluidStack> taskInputFluids = new ArrayList<>();
     private final List<OutputKey> taskInputKeys = new ArrayList<>();
     private final List<CraftingSubTask> queuedSubTasks = new ArrayList<>();
+    // 待输出缓冲：产物先进缓冲，由 flushPendingOutputs 逐 tick 写出，写不下时保留重试，避免静默丢失
+    private final List<ItemStack> pendingOutputItems = new ArrayList<>();
+    private final List<FluidStack> pendingOutputFluids = new ArrayList<>();
+    private final List<OutputKey> pendingOutputKeys = new ArrayList<>();
+    private boolean awaitingOutputFlush = false;
+    // 当前子任务已扣除的能量，用于完成结算（与本体 settleCompletionEnergy 语义对齐）
+    private long accumulatedEnergy = 0;
     private int craftCount = 1;
     private int displayedCraftCount = 1;
     private boolean cancelled = false;
@@ -66,7 +74,7 @@ public class CraftingTask {
         this.context = context;
         this.craftCount = Math.max(1, totalCrafts);
         this.displayedCraftCount = this.craftCount;
-        this.storeInputMaterials(inputHolder, this.taskInputItems, this.taskInputFluids, this.taskInputKeys);
+        storeInputMaterials(inputHolder, this.taskInputItems, this.taskInputFluids, this.taskInputKeys);
     }
 
     /** 从一个拆分出的子任务构造独立任务（用于空闲线程再分配） */
@@ -104,7 +112,18 @@ public class CraftingTask {
         if (processingComplete || cancelled) {
             return false;
         }
-        queuedSubTasks.add(createMergedSubTask(allInputs));
+        CraftingSubTask merged = createMergedSubTask(allInputs);
+        if (queuedSubTasks.isEmpty()) {
+            queuedSubTasks.add(merged);
+        } else {
+            // 并入队尾尚未启动的子任务，减少批次数（每个子任务独立收一份结算能量）
+            CraftingSubTask last = queuedSubTasks.getLast();
+            last.items.addAll(merged.items);
+            last.fluids.addAll(merged.fluids);
+            last.keys.addAll(merged.keys);
+            int combined = (int) Math.min((long) last.craftCount + merged.craftCount, Integer.MAX_VALUE);
+            queuedSubTasks.set(queuedSubTasks.size() - 1, new CraftingSubTask(last.items, last.fluids, last.keys, combined));
+        }
         updateDisplayedCraftCount();
         updateTaskProgressTotals();
         context.markChanged();
@@ -172,7 +191,7 @@ public class CraftingTask {
         return new CraftingSubTask(items, fluids, keys, Math.max(1, allInputs.size()));
     }
 
-    private void storeInputMaterials(KeyCounter[] counters, List<ItemStack> items, List<FluidStack> fluids, List<OutputKey> keys) {
+    private static void storeInputMaterials(KeyCounter[] counters, List<ItemStack> items, List<FluidStack> fluids, List<OutputKey> keys) {
         if (counters == null) return;
 
         for (KeyCounter counter : counters) {
@@ -182,12 +201,22 @@ public class CraftingTask {
                 AEKey key = entry.getKey();
                 long amount = entry.getLongValue();
 
+                // ItemStack/FluidStack 数量是 int：512M 级请求直接强转会溢出为负，
+                // 导致材料变空、配方匹配失败。超出部分按 int 上限分块存放。
                 if (key instanceof AEItemKey itemKey) {
-                    ItemStack stack = itemKey.toStack((int) amount);
-                    items.add(stack);
+                    long remaining = amount;
+                    while (remaining > 0) {
+                        int chunk = (int) Math.min(remaining, Integer.MAX_VALUE);
+                        items.add(itemKey.toStack(chunk));
+                        remaining -= chunk;
+                    }
                 } else if (key instanceof AEFluidKey fluidKey) {
-                    FluidStack stack = new FluidStack(fluidKey.getFluid(), (int) amount);
-                    fluids.add(stack);
+                    long remaining = amount;
+                    while (remaining > 0) {
+                        int chunk = (int) Math.min(remaining, Integer.MAX_VALUE);
+                        fluids.add(new FluidStack(fluidKey.getFluid(), chunk));
+                        remaining -= chunk;
+                    }
                 } else {
                     keys.add(new OutputKey(key, amount));
                 }
@@ -303,21 +332,76 @@ public class CraftingTask {
             fluidsToReturn.addAll(subTask.fluids);
             keysToReturn.addAll(subTask.keys);
         }
+        // 已结算但尚未写出的产物同样不能丢，随取消一并返还
+        itemsToReturn.addAll(pendingOutputItems);
+        fluidsToReturn.addAll(pendingOutputFluids);
+        keysToReturn.addAll(pendingOutputKeys);
+        pendingOutputItems.clear();
+        pendingOutputFluids.clear();
+        pendingOutputKeys.clear();
+        awaitingOutputFlush = false;
         taskInputItems.clear();
         taskInputFluids.clear();
         taskInputKeys.clear();
         queuedSubTasks.clear();
 
-        for (OutputKey keyToReturn : keysToReturn) {
-            FurnaceOutputPort.outputKey(keyToReturn.key, keyToReturn.amount, createAeOutputPort());
+        returnMaterials(context, itemsToReturn, fluidsToReturn, keysToReturn);
+    }
+
+    /** 返还尚未转为任务的 AE 原始输入（待启动批次取消时使用） */
+    public static void returnInputsToAE(List<KeyCounter[]> allInputs, CraftingTaskContext context) {
+        List<ItemStack> items = new ArrayList<>();
+        List<FluidStack> fluids = new ArrayList<>();
+        List<OutputKey> keys = new ArrayList<>();
+        for (KeyCounter[] counters : allInputs) {
+            storeInputMaterials(counters, items, fluids, keys);
+        }
+        returnMaterials(context, items, fluids, keys);
+    }
+
+    /**
+     * 返还材料，与产物一致地尊重“产物返回AE”开关：开关开启时优先写回 AE 网络，
+     * 其次本地输入槽/流体槽。任何路径都不允许静默丢失 ——
+     * 物品放不下时掉落到机器上方；流体最后尝试输出流体槽，仍有剩余则进暂存缓冲重试；
+     * key 类材料（如化学品）没有本地槽位可回退，无视开关直接尝试 AE，失败部分进暂存缓冲。
+     */
+    private static void returnMaterials(CraftingTaskContext context, List<ItemStack> items, List<FluidStack> fluids, List<OutputKey> keys) {
+        Level level = context.getLevel();
+        if (level == null || level.isClientSide) return;
+        if (items.isEmpty() && fluids.isEmpty() && keys.isEmpty()) return;
+
+        FurnaceOutputPort.AeOutput port = context.createAeOutputPort();
+
+        for (OutputKey keyToReturn : keys) {
+            long inserted = context.tryOutputKeyToAE(keyToReturn.key, keyToReturn.amount);
+            long remaining = keyToReturn.amount - inserted;
+            if (remaining > 0) {
+                context.stashUnreturnedInput(keyToReturn.key, remaining);
+            }
         }
 
-        for (ItemStack stack : itemsToReturn) {
-            FurnaceOutputPort.outputItem(stack, createAeOutputPort(), context.getItemHandler(), context.getInputSlotsStart(), context.getInputSlotsCount());
+        for (ItemStack stack : items) {
+            ItemStack leftover = FurnaceOutputPort.outputItemWithRemainder(stack, port,
+                    context.getItemHandler(), context.getInputSlotsStart(), context.getInputSlotsCount());
+            if (!leftover.isEmpty()) {
+                var pos = context.getBlockPos();
+                Containers.dropItemStack(level, pos.getX() + 0.5, pos.getY() + 1.0, pos.getZ() + 0.5, leftover);
+            }
         }
 
-        for (FluidStack fluidStack : fluidsToReturn) {
-            FurnaceOutputPort.outputFluid(fluidStack, createAeOutputPort(), context.getInputFluidTanks(), context.getFluidTankCount());
+        for (FluidStack fluidStack : fluids) {
+            FluidStack leftover = FurnaceOutputPort.outputFluidWithRemainder(fluidStack, port,
+                    context.getInputFluidTanks(), context.getFluidTankCount());
+            if (!leftover.isEmpty()) {
+                leftover = FurnaceOutputPort.outputFluidWithRemainder(leftover, port,
+                        context.getOutputFluidTanks(), context.getFluidTankCount());
+            }
+            if (!leftover.isEmpty()) {
+                AEFluidKey fluidKey = AEFluidKey.of(leftover);
+                if (fluidKey != null) {
+                    context.stashUnreturnedInput(fluidKey, leftover.getAmount());
+                }
+            }
         }
         context.markChanged();
     }
@@ -343,44 +427,106 @@ public class CraftingTask {
             return true;
         }
 
-        int batchIndex = baseProcessTime > 0 ? progress / baseProcessTime : 0;
-        int actualBatchParallel = batchIndex < batches - 1 ? maxParallel : lastBatchSize;
-        ResolvedCatalystEffect resolvedCatalystEffect = getCatalystEffect(findTaskRecipe());
-        AlloyFurnaceRecipeExecutor.TickResult tickResult = AlloyFurnaceRecipeExecutor.consumeTickEnergy(context.getEnergyManager(), baseEnergyPerTick, actualBatchParallel,
-                                                                                                        resolvedCatalystEffect
-        );
+        if (!awaitingOutputFlush) {
+            AdvancedAlloyFurnaceRecipe recipe = findTaskRecipe();
+            ResolvedCatalystEffect resolvedCatalystEffect = getCatalystEffect(recipe);
+            long energyTarget = getSubTaskEnergyTarget(recipe, resolvedCatalystEffect);
 
-        if (!tickResult.consumedEnergy()) {
-            return false;
-        }
+            if (progress < processTime) {
+                int batchIndex = baseProcessTime > 0 ? progress / baseProcessTime : 0;
+                int actualBatchParallel = batchIndex < batches - 1 ? maxParallel : lastBatchSize;
+                int tickEnergy = AlloyFurnaceRecipeExecutor.calculateTickEnergy(baseEnergyPerTick, actualBatchParallel, resolvedCatalystEffect);
+                // 每 tick 扣能以结算目标为上限，避免总额超出本体语义（有用锭=一份配方能量）
+                int required = (int) Math.min(tickEnergy, Math.max(0L, energyTarget - accumulatedEnergy));
+                if (required > 0) {
+                    if (!context.getEnergyManager().tryConsumeEnergy(required)) {
+                        return false;
+                    }
+                    accumulatedEnergy += required;
+                }
 
-        progress++;
-        context.getTotalAEProgressAtomic().incrementAndGet();
-        if (taskProgressRef != null) {
-            taskProgressRef.setProgress(progress);
-        }
-        context.markChanged();
+                progress++;
+                context.getTotalAEProgressAtomic().incrementAndGet();
+                if (taskProgressRef != null) {
+                    taskProgressRef.setProgress(progress);
+                }
+                context.markChanged();
 
-        progressUpdateCounter++;
-        if (progressUpdateCounter >= PROGRESS_SYNC_INTERVAL) {
-            context.sendAETaskProgressToClients();
-            progressUpdateCounter = 0;
-        }
+                progressUpdateCounter++;
+                if (progressUpdateCounter >= PROGRESS_SYNC_INTERVAL) {
+                    context.sendAETaskProgressToClients();
+                    progressUpdateCounter = 0;
+                }
 
-        if (progress >= processTime) {
-            completeCrafting(craftCount);
-            displayedCraftCount -= craftCount;
-            updateTaskProgressTotals();
+                if (progress < processTime) {
+                    return false;
+                }
+            }
+
+            // 完成结算：与本体 settleCompletionEnergy 语义对齐 ——
+            // 有用锭补足到一份配方能量，其余催化剂补足到 energy × craftCount
+            if (!settleSubTaskEnergy(energyTarget)) {
+                return false;
+            }
+
+            generatePendingOutputs(craftCount);
             taskInputItems.clear();
             taskInputFluids.clear();
             taskInputKeys.clear();
-            if (startNextSubTask()) {
-                context.markChanged();
-                context.sendAETaskProgressToClients();
-                return false;
-            }
-            finishTask();
+            awaitingOutputFlush = true;
+        }
+
+        // 产物写不下时保留在缓冲中逐 tick 重试，避免静默丢失
+        if (!flushPendingOutputs()) {
+            return false;
+        }
+        awaitingOutputFlush = false;
+
+        displayedCraftCount -= craftCount;
+        updateTaskProgressTotals();
+        if (startNextSubTask()) {
+            context.markChanged();
+            context.sendAETaskProgressToClients();
+            return false;
+        }
+        finishTask();
+        return true;
+    }
+
+    /**
+     * 当前子任务的能量结算目标，与本体 settleCompletionEnergy 的目标一致：
+     * 有用锭（不随并行倍增）时整个子任务只收一份配方能量；
+     * 其余催化剂按 energy × craftCount 收取完整份额。
+     */
+    private long getSubTaskEnergyTarget(@Nullable AdvancedAlloyFurnaceRecipe recipe, ResolvedCatalystEffect resolvedCatalystEffect) {
+        long recipeEnergy = recipe != null
+                ? Math.max(0, recipe.energy())
+                : (long) baseEnergyPerTick * Math.max(1, baseProcessTime);
+        return resolvedCatalystEffect.energyMultipliesWithParallel()
+                ? recipeEnergy * Math.max(1, craftCount)
+                : recipeEnergy;
+    }
+
+    /**
+     * 子任务完成时补扣能量到结算目标。能量不足时尽量扣取现有存量并保持等待，
+     * 直到补足为止（材料已消耗，无法像本体那样回退并行数）。
+     *
+     * @return 是否已补足到目标
+     */
+    private boolean settleSubTaskEnergy(long energyTarget) {
+        long deficit = energyTarget - accumulatedEnergy;
+        if (deficit <= 0) {
             return true;
+        }
+        int consumable = (int) Math.min(deficit, Integer.MAX_VALUE);
+        if (context.getEnergyManager().tryConsumeEnergy(consumable)) {
+            accumulatedEnergy += consumable;
+            return accumulatedEnergy >= energyTarget;
+        }
+        int available = context.getEnergyManager().getEnergyStored();
+        if (available > 0 && context.getEnergyManager().tryConsumeEnergy(available)) {
+            accumulatedEnergy += available;
+            context.markChanged();
         }
         return false;
     }
@@ -393,18 +539,7 @@ public class CraftingTask {
             return false;
         }
 
-        baseProcessTime = getRecipeProcessTime(recipe);
-        if (recipe != null && recipe.processTime() > 0) {
-            baseEnergyPerTick = Math.max(1, recipe.energy() / Math.max(1, recipe.processTime()));
-        } else {
-            baseEnergyPerTick = 200;
-        }
-
-        ResolvedCatalystEffect resolvedCatalystEffect = getCatalystEffect(recipe);
-        maxParallel = AlloyFurnaceParallelCalculator.calculateAeTaskParallel(context.getEnergyManager(), baseEnergyPerTick,
-                                                                             resolvedCatalystEffect
-        );
-
+        refreshCatalystLayout();
         recalculateBatchLayout();
 
         int outputCount = 1;
@@ -413,7 +548,7 @@ public class CraftingTask {
             outputCount = (int) output.amount();
         }
 
-        int totalOutputCount = displayedCraftCount * outputCount;
+        int totalOutputCount = (int) Math.min((long) displayedCraftCount * outputCount, Integer.MAX_VALUE);
         taskProgressRef = new AdvancedAlloyFurnaceAeManager.AETaskProgress(getProductName(), processTime, displayedCraftCount, totalOutputCount);
         this.waitingDetail = "";
         context.getAETaskProgressMap().put(taskId, taskProgressRef);
@@ -430,7 +565,7 @@ public class CraftingTask {
         if (pattern != null && !pattern.getOutputs().isEmpty()) {
             outputCount = (int) pattern.getOutputs().getFirst().amount();
         }
-        int totalOutputCount = displayedCraftCount * outputCount;
+        int totalOutputCount = (int) Math.min((long) displayedCraftCount * outputCount, Integer.MAX_VALUE);
         taskProgressRef = new AdvancedAlloyFurnaceAeManager.AETaskProgress(getProductName(), 0, 1, displayedCraftCount, totalOutputCount,
                 "gui.useless_mod.advanced_alloy_furnace.ae_task_status.waiting_mold", this.waitingDetail);
         context.getAETaskProgressMap().put(taskId, taskProgressRef);
@@ -439,9 +574,14 @@ public class CraftingTask {
     }
 
     private void recalculateBatchLayout() {
-        batches = (int) Math.ceil((double) craftCount / maxParallel);
-        processTime = Math.max(1, baseProcessTime * batches);
-        lastBatchSize = craftCount - maxParallel * (batches - 1);
+        // 全程 long 运算并按 int 上限饱和：512M 级 craftCount 下 int 乘法会溢出为负，
+        // 导致 processTime 被 Math.max 钳到 1、整批瞬间完成
+        long parallel = Math.max(1L, maxParallel);
+        long batchesLong = ((long) craftCount + parallel - 1) / parallel;
+        batches = (int) Math.min(batchesLong, Integer.MAX_VALUE);
+        long processTimeLong = (long) Math.max(1, baseProcessTime) * batches;
+        processTime = (int) Math.min(processTimeLong, Integer.MAX_VALUE);
+        lastBatchSize = (int) Math.max(1L, craftCount - parallel * (batches - 1L));
     }
 
     private void updateDisplayedCraftCount() {
@@ -476,6 +616,8 @@ public class CraftingTask {
         invalidateRecipeCache(); // 输入已变更，配方缓存失效
         craftCount = subTask.craftCount;
         progress = 0;
+        accumulatedEnergy = 0;
+        refreshCatalystLayout(); // 催化剂可能在执行期间被更换，按当前催化剂重算批次布局
         recalculateBatchLayout();
         if (progressRegistered) {
             context.getTotalAEMaxProgressAtomic().addAndGet(processTime);
@@ -493,6 +635,20 @@ public class CraftingTask {
         return CatalystEffectResolver.resolve(recipe, catalystStack, baseTime);
     }
 
+    /** 按当前催化剂重算时长、每 tick 能耗与并行上限（初始化及每个子任务启动时调用） */
+    private void refreshCatalystLayout() {
+        AdvancedAlloyFurnaceRecipe recipe = findTaskRecipe();
+        baseProcessTime = getRecipeProcessTime(recipe);
+        if (recipe != null && recipe.processTime() > 0) {
+            baseEnergyPerTick = Math.max(1, recipe.energy() / Math.max(1, recipe.processTime()));
+        } else {
+            baseEnergyPerTick = 200;
+        }
+        maxParallel = AlloyFurnaceParallelCalculator.calculateAeTaskParallel(context.getEnergyManager(), baseEnergyPerTick,
+                                                                             getCatalystEffect(recipe)
+        );
+    }
+
     private void finishTask() {
         processingComplete = true;
         if (progressRegistered) {
@@ -505,23 +661,32 @@ public class CraftingTask {
         context.sendAETaskProgressToClients();
     }
 
-    private void completeCrafting(int craftCount) {
+    /**
+     * 生成本批产物到待输出缓冲。数量全程 long 分块，防止 512M 级请求 int 溢出。
+     * 实际写出由 flushPendingOutputs 逐 tick 执行。
+     */
+    private void generatePendingOutputs(int craftCount) {
         if (context.getLevel() == null || context.getLevel().isClientSide) return;
 
         AdvancedAlloyFurnaceRecipe recipe = findTaskRecipe();
 
-        List<OutputFluid> outputFluids = new ArrayList<>();
-        List<OutputKey> outputKeys = new ArrayList<>();
-
         for (var output : pattern.getOutputs()) {
             if (output.what() instanceof AEItemKey itemKey) {
-                ItemStack outputStack = itemKey.toStack((int) (output.amount() * craftCount));
-                FurnaceOutputPort.outputItem(outputStack, createAeOutputPort(), context.getItemHandler(), context.getOutputSlotsStart(), context.getOutputSlotsCount());
+                long remaining = output.amount() * (long) craftCount;
+                while (remaining > 0) {
+                    int chunk = (int) Math.min(remaining, Integer.MAX_VALUE);
+                    pendingOutputItems.add(itemKey.toStack(chunk));
+                    remaining -= chunk;
+                }
             } else if (output.what() instanceof AEFluidKey fluidKey) {
-                FluidStack outputFluid = new FluidStack(fluidKey.getFluid(), (int) (output.amount() * craftCount));
-                outputFluids.add(new OutputFluid(outputFluid));
+                long remaining = output.amount() * (long) craftCount;
+                while (remaining > 0) {
+                    int chunk = (int) Math.min(remaining, Integer.MAX_VALUE);
+                    pendingOutputFluids.add(new FluidStack(fluidKey.getFluid(), chunk));
+                    remaining -= chunk;
+                }
             } else {
-                outputKeys.add(new OutputKey(output.what(), output.amount() * craftCount));
+                pendingOutputKeys.add(new OutputKey(output.what(), output.amount() * craftCount));
             }
         }
 
@@ -536,41 +701,57 @@ public class CraftingTask {
                     }
                 }
                 if (!alreadyInPattern) {
-                    outputKeys.add(new OutputKey(keyOutput.what(), keyOutput.amount() * craftCount));
+                    pendingOutputKeys.add(new OutputKey(keyOutput.what(), keyOutput.amount() * craftCount));
                 }
             }
-        }
-
-        for (OutputFluid outputFluid : outputFluids) {
-            FurnaceOutputPort.outputFluid(outputFluid.stack, createAeOutputPort(), context.getOutputFluidTanks(), context.getFluidTankCount());
-        }
-
-        for (OutputKey outputKey : outputKeys) {
-            FurnaceOutputPort.outputKey(outputKey.key, outputKey.amount, createAeOutputPort());
         }
         context.markChanged();
     }
 
-    private FurnaceOutputPort.AeOutput createAeOutputPort() {
-        return new FurnaceOutputPort.AeOutput() {
-            @Override
-            public long insertItem(ItemStack stack) {
-                if (!context.isReturnOutputToAe()) return 0;
-                return context.tryOutputToAE(stack);
-            }
+    /**
+     * 尝试把待输出缓冲写入 AE 网络/本地槽位，写不下的部分保留在缓冲中下 tick 重试。
+     *
+     * @return 是否已全部写出
+     */
+    private boolean flushPendingOutputs() {
+        FurnaceOutputPort.AeOutput port = context.createAeOutputPort();
 
-            @Override
-            public long insertFluid(FluidStack stack) {
-                if (!context.isReturnOutputToAe()) return 0;
-                return context.tryOutputFluidToAE(stack);
+        for (int i = 0; i < pendingOutputItems.size(); ) {
+            ItemStack leftover = FurnaceOutputPort.outputItemWithRemainder(pendingOutputItems.get(i), port,
+                    context.getItemHandler(), context.getOutputSlotsStart(), context.getOutputSlotsCount());
+            if (leftover.isEmpty()) {
+                pendingOutputItems.remove(i);
+            } else {
+                pendingOutputItems.set(i, leftover);
+                i++;
             }
+        }
 
-            @Override
-            public long insertKey(AEKey key, long amount) {
-                if (!context.isReturnOutputToAe()) return 0;
-                return context.tryOutputKeyToAE(key, amount);
+        for (int i = 0; i < pendingOutputFluids.size(); ) {
+            FluidStack leftover = FurnaceOutputPort.outputFluidWithRemainder(pendingOutputFluids.get(i), port,
+                    context.getOutputFluidTanks(), context.getFluidTankCount());
+            if (leftover.isEmpty()) {
+                pendingOutputFluids.remove(i);
+            } else {
+                pendingOutputFluids.set(i, leftover);
+                i++;
             }
-        };
+        }
+
+        for (int i = 0; i < pendingOutputKeys.size(); ) {
+            OutputKey pending = pendingOutputKeys.get(i);
+            long inserted = port.insertKey(pending.key, pending.amount);
+            if (inserted >= pending.amount) {
+                pendingOutputKeys.remove(i);
+            } else {
+                pendingOutputKeys.set(i, new OutputKey(pending.key, pending.amount - Math.max(0, inserted)));
+                i++;
+            }
+        }
+
+        boolean flushed = pendingOutputItems.isEmpty() && pendingOutputFluids.isEmpty() && pendingOutputKeys.isEmpty();
+        context.markChanged();
+        return flushed;
     }
 
     public void cancel() {
@@ -614,6 +795,9 @@ public class CraftingTask {
             tag.putInt("MaxParallel", maxParallel);
             tag.putInt("Batches", batches);
             tag.putInt("LastBatchSize", lastBatchSize);
+            tag.putLong("AccumulatedEnergy", accumulatedEnergy);
+            tag.putBoolean("AwaitingOutputFlush", awaitingOutputFlush);
+            tag.put("PendingOutputs", writeStacks(registries, pendingOutputItems, pendingOutputFluids, pendingOutputKeys));
         }
         return tag;
     }
@@ -650,7 +834,7 @@ public class CraftingTask {
         task.updateDisplayedCraftCount();
 
         if (tag.getBoolean("Initialized")) {
-            task.restoreProgress(tag);
+            task.restoreProgress(tag, registries);
         }
         return task;
     }
@@ -659,7 +843,7 @@ public class CraftingTask {
      * 恢复已初始化任务的运行进度，并将进度重新注册进全局进度统计与进度显示对象。
      * 全局 atomic 与 taskProgressRef 不随存档持久化，需要在加载时重建。
      */
-    private void restoreProgress(CompoundTag tag) {
+    private void restoreProgress(CompoundTag tag, HolderLookup.Provider registries) {
         this.baseProcessTime = Math.max(1, tag.getInt("BaseProcessTime"));
         this.baseEnergyPerTick = Math.max(1, tag.getInt("BaseEnergyPerTick"));
         this.maxParallel = Math.max(1, tag.getInt("MaxParallel"));
@@ -667,12 +851,16 @@ public class CraftingTask {
         this.lastBatchSize = Math.max(1, tag.getInt("LastBatchSize"));
         this.processTime = Math.max(1, tag.getInt("ProcessTime"));
         this.progress = Math.max(0, Math.min(tag.getInt("Progress"), this.processTime));
+        this.accumulatedEnergy = Math.max(0L, tag.getLong("AccumulatedEnergy"));
+        this.awaitingOutputFlush = tag.getBoolean("AwaitingOutputFlush");
+        readStacks(registries, tag.getList("PendingOutputs", Tag.TAG_COMPOUND),
+                this.pendingOutputItems, this.pendingOutputFluids, this.pendingOutputKeys);
 
         int outputCount = 1;
         if (pattern != null && !pattern.getOutputs().isEmpty()) {
             outputCount = (int) pattern.getOutputs().getFirst().amount();
         }
-        int totalOutputCount = displayedCraftCount * outputCount;
+        int totalOutputCount = (int) Math.min((long) displayedCraftCount * outputCount, Integer.MAX_VALUE);
         this.taskProgressRef = new AdvancedAlloyFurnaceAeManager.AETaskProgress(getProductName(), processTime, displayedCraftCount, totalOutputCount);
         this.taskProgressRef.setProgress(progress);
         context.getAETaskProgressMap().put(taskId, taskProgressRef);
@@ -713,9 +901,6 @@ public class CraftingTask {
     }
 
     // 辅助类用于存储输出数据
-    private record OutputFluid(FluidStack stack) {
-    }
-
     private record OutputKey(AEKey key, long amount) {
     }
 

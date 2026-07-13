@@ -37,6 +37,7 @@ import java.util.concurrent.locks.ReentrantLock;
 public final class AdvancedAlloyFurnaceAeManager {
     private static final int MAX_CONCURRENT_TASKS = 4;
     private static final int BATCH_RIPE_TICKS = 10;
+    private static final int UNRETURNED_RETRY_TICKS = 20;
 
     private final AdvancedAlloyFurnaceBlockEntity owner;
     private final ConcurrentHashMap<Integer, CraftingTask> activeTasks = new ConcurrentHashMap<>();
@@ -49,6 +50,9 @@ public final class AdvancedAlloyFurnaceAeManager {
     private final AtomicInteger activeAETaskCount = new AtomicInteger(0);
     private final AtomicInteger totalAEProgress = new AtomicInteger(0);
     private final AtomicInteger totalAEMaxProgress = new AtomicInteger(0);
+    // 返还失败的输入暂存（防丢失），逐 tick 重试写回 AE 网络；仅服务端主线程访问
+    private final List<GenericStack> unreturnedInputs = new ArrayList<>();
+    private int unreturnedRetryTimer = 0;
     private int patternPriority = 0;
     private int nextTaskId = 0;
     // 延迟加载的任务数据（loadTag 时 level 尚不可用，需推迟到首 tick 解码样板）
@@ -59,8 +63,14 @@ public final class AdvancedAlloyFurnaceAeManager {
         this.owner = owner;
     }
 
+    /**
+     * 方块实体被移除时的清理。
+     * 注意：不做取消返还 —— 任务与批次已随 NBT 持久化（区块卸载后会恢复），
+     * 在这里返还会造成卸载复制；且 setRemoved 时 AE 节点已销毁，材料无法写回网络。
+     * 主动取消只有两个入口：玩家在 GUI 点取消（AECancelPacket），以及方块被真正破坏时
+     * AdvancedAlloyFurnaceBlock.onRemove 在节点销毁前调用。
+     */
     public void shutdown() {
-        this.cancelAllTasks();
     }
 
     public void cancelAllTasks() {
@@ -71,10 +81,61 @@ public final class AdvancedAlloyFurnaceAeManager {
         this.totalAEProgress.set(0);
         this.totalAEMaxProgress.set(0);
         this.aeTaskProgressMap.clear();
+
+        // 待启动批次的输入尚未转为任务，同样需要返还，否则材料会随 clear() 丢失
+        List<KeyCounter[]> pendingInputs = new ArrayList<>();
         synchronized (this.aePendingBatches) {
+            for (PendingAEBatch batch : this.aePendingBatches.values()) {
+                pendingInputs.addAll(batch.drain());
+            }
             this.aePendingBatches.clear();
         }
+        CraftingTask.returnInputsToAE(pendingInputs, this.owner);
+
         this.owner.markChanged();
+        // 全部清空后主动同步一次，否则客户端会残留已取消的排队任务
+        this.sendAETaskProgressToClients();
+    }
+
+    // ==================== 未返还输入暂存 ====================
+
+    /** 暂存返还失败的输入（如 AE 不可达时的化学品/流体），逐 tick 重试写回网络 */
+    public void stashUnreturnedInput(AEKey key, long amount) {
+        if (key == null || amount <= 0) {
+            return;
+        }
+        this.unreturnedInputs.add(new GenericStack(key, amount));
+        this.owner.markChanged();
+    }
+
+    /** 定期把暂存的未返还输入重试写回 AE 网络 */
+    public void tickUnreturnedInputs() {
+        if (this.unreturnedInputs.isEmpty()) {
+            return;
+        }
+        if (++this.unreturnedRetryTimer < UNRETURNED_RETRY_TICKS) {
+            return;
+        }
+        this.unreturnedRetryTimer = 0;
+
+        boolean changed = false;
+        var it = this.unreturnedInputs.listIterator();
+        while (it.hasNext()) {
+            GenericStack gs = it.next();
+            long inserted = this.owner.tryOutputKeyToAE(gs.what(), gs.amount());
+            if (inserted <= 0) {
+                continue;
+            }
+            changed = true;
+            if (inserted >= gs.amount()) {
+                it.remove();
+            } else {
+                it.set(new GenericStack(gs.what(), gs.amount() - inserted));
+            }
+        }
+        if (changed) {
+            this.owner.markChanged();
+        }
     }
 
     // ==================== 持久化 ====================
@@ -99,6 +160,12 @@ public final class AdvancedAlloyFurnaceAeManager {
             }
         }
         tag.put("PendingBatches", pendingTag);
+
+        ListTag unreturnedTag = new ListTag();
+        for (GenericStack gs : this.unreturnedInputs) {
+            unreturnedTag.add(GenericStack.writeTag(registries, gs));
+        }
+        tag.put("UnreturnedInputs", unreturnedTag);
         tag.putInt("NextTaskId", this.nextTaskId);
     }
 
@@ -145,6 +212,14 @@ public final class AdvancedAlloyFurnaceAeManager {
                 if (batch != null && batch.pattern != null) {
                     this.aePendingBatches.put(PatternKey.of(batch.pattern), batch);
                 }
+            }
+        }
+
+        ListTag unreturnedTag = tag.getList("UnreturnedInputs", Tag.TAG_COMPOUND);
+        for (int i = 0; i < unreturnedTag.size(); i++) {
+            GenericStack gs = GenericStack.readTag(registries, unreturnedTag.getCompound(i));
+            if (gs != null) {
+                this.unreturnedInputs.add(gs);
             }
         }
     }
@@ -458,10 +533,10 @@ public final class AdvancedAlloyFurnaceAeManager {
         KeyCounter[] merged = this.mergeKeyCounters(allInputs);
 
         int taskId = this.nextTaskId++;
-        // EAP 翻倍：用原始样板 + 缩放后的 craftCount
+        // EAP 翻倍：用原始样板 + 缩放后的 craftCount（long 运算防溢出，按 int 上限饱和）
         IPatternDetails taskPattern = EapCompat.unwrap(batch.pattern);
         int multiplier = EapCompat.getMultiplier(batch.pattern);
-        int totalCrafts = allInputs.size() * multiplier;
+        int totalCrafts = (int) Math.min((long) allInputs.size() * multiplier, Integer.MAX_VALUE);
 
         CraftingTask task = new CraftingTask(taskId, taskPattern, merged, totalCrafts, this.owner);
         if (!task.canStartNow()) {
@@ -584,10 +659,10 @@ public final class AdvancedAlloyFurnaceAeManager {
             this.statusDetail = statusDetail;
         }
 
-        // 更新合成次数和最终产物总数（用于任务合并）
+        // 更新合成次数和最终产物总数（用于任务合并；long 运算防 512M 级溢出）
         public void updateCraftCount(int newCraftCount) {
             this.craftCount = newCraftCount;
-            this.totalOutputCount = newCraftCount * outputCount;
+            this.totalOutputCount = (int) Math.min((long) newCraftCount * outputCount, Integer.MAX_VALUE);
         }
     }
 
@@ -603,8 +678,10 @@ public final class AdvancedAlloyFurnaceAeManager {
         }
 
         void add(KeyCounter[] input) {
+            // 不重置 ripeTimer：成熟计时从批次创建（或重排）起算。
+            // 若每次推送都重置，AE CPU 对超大请求持续推送时批次永远不会成熟，
+            // 任务迟迟不启动，表现为“一直不合成”。
             this.allInputs.add(input);
-            this.ripeTimer = BATCH_RIPE_TICKS;
         }
 
         List<KeyCounter[]> drain() {

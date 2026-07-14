@@ -188,6 +188,11 @@ dependencies {
 
     
     runtimeOnly "de.mari_023:ae2wtlib:19.2.5"
+    //任意门
+    implementation "curse.maven:tempad-514923:6517779"
+    implementation "curse.maven:resourceful-lib-570073:5973188"
+    implementation "curse.maven:resourceful-config-714059:6467772"
+
     
 
     // 实用拓展

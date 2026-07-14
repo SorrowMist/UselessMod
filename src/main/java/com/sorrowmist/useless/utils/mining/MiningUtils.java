@@ -2,6 +2,7 @@ package com.sorrowmist.useless.utils.mining;
 
 import com.sorrowmist.useless.api.enums.tool.EnchantMode;
 import com.sorrowmist.useless.compat.AE2Compat;
+import com.sorrowmist.useless.compat.DraconicEvolutionCompat;
 import com.sorrowmist.useless.core.component.UComponents;
 import com.sorrowmist.useless.core.config.ConfigManager;
 import com.sorrowmist.useless.utils.UComponentUtils;
@@ -11,6 +12,7 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.ai.attributes.Attributes;
+import net.minecraft.world.entity.ExperienceOrb;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.BlockItem;
@@ -37,6 +39,10 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 
 public class MiningUtils {
+    record MiningResult(List<ItemStack> drops, int experience, boolean mined) {
+        private static final MiningResult NOT_MINED = new MiningResult(List.of(), 0, false);
+    }
+
     /**
      * 获取强制挖掘兜底掉落物
      * 当方块正常破坏没有有效掉落时，返回一个与目标方块 NBT 完全一致的方块物品（含方块实体组件）。
@@ -100,26 +106,6 @@ public class MiningUtils {
     }
 
     /**
-     * 在破坏前判断方块用指定工具是否会产生自然掉落。
-     * <p>
-     * 直接查询方块的掉落表（Block.getDrops），不依赖破坏后世界中的 ItemEntity。
-     * 这样即使其他模组（如 FTB Ultimine 连锁挖掘）在破坏期间吸收掉落实体，也能正确判断方块本身是否有掉落，
-     * 避免把"实体被吸收"误判为"无掉落"从而错误触发强制挖掘兜底，导致重复掉落。
-     *
-     * @param level  世界
-     * @param pos    方块位置
-     * @param state  方块状态
-     * @param player 玩家
-     * @param tool   工具
-     * @return 方块是否有自然掉落
-     */
-    static boolean blockHasNaturalDrops(ServerLevel level, BlockPos pos, BlockState state, Player player, ItemStack tool) {
-        BlockEntity be = level.getBlockEntity(pos);
-        List<ItemStack> drops = Block.getDrops(state, level, pos, be, player, tool);
-        return !hasNoValidDrops(drops);
-    }
-
-    /**
      * 处理方块破坏的核心逻辑：获取掉落物、处理掉落物、计算经验、破坏方块
      *
      * @param level       世界
@@ -135,31 +121,62 @@ public class MiningUtils {
             return;
         }
 
-        // 强制挖掘 + 精准采集同时激活：不再检查凋落物列表，直接兜底掉落方块本身（含完整 NBT/组件）
-        if (forceMining && isSilkTouch(tool)) {
+        MiningResult result = forceMining
+                ? forceMineBlock(level, pos, state, player, tool)
+                : mineBlock(level, pos, state, player, tool);
+        handleDrops(player, result.drops(), tool);
+        if (result.experience() > 0) {
+            player.giveExperiencePoints(result.experience());
+        }
+    }
+
+    static MiningResult mineBlock(ServerLevel level, BlockPos pos, BlockState state, Player player, ItemStack tool) {
+        if (state.isAir() || !tool.isCorrectToolForDrops(state)) {
+            return MiningResult.NOT_MINED;
+        }
+
+        int experience = getExperience(level, pos, state, player, tool);
+        List<ItemStack> drops = destroyBlockAndCollectDrops(level, pos, state, player, tool);
+        return new MiningResult(drops, experience, true);
+    }
+
+    static MiningResult forceMineBlock(ServerLevel level, BlockPos pos, BlockState state, Player player, ItemStack tool) {
+        if (state.isAir()) {
+            return MiningResult.NOT_MINED;
+        }
+        if (DraconicEvolutionCompat.isChaosCrystal(state)
+                && DraconicEvolutionCompat.handleChaosCrystalBreak(level, pos, state, player)) {
+            return new MiningResult(List.of(), 0, true);
+        }
+
+        int experience = getExperience(level, pos, state, player, tool);
+        if (isSilkTouch(tool)) {
             List<ItemStack> fallbackDrops = getForcedFallbackDrops(state, level, pos);
             destroyBlockAndCollectDrops(level, pos, state, player, tool);
-            handleDrops(player, fallbackDrops, tool);
-            return;
+            return new MiningResult(fallbackDrops, 0, true);
         }
 
-        // 破坏前用掉落表判断方块是否有自然掉落，避免掉落实体被其他模组吸收导致误判
-        boolean hasNaturalDrops = !forceMining || blockHasNaturalDrops(level, pos, state, player, tool);
-        List<ItemStack> fallbackDrops = (forceMining && !hasNaturalDrops) ? getForcedFallbackDrops(state, level, pos) : Collections.emptyList();
+        BlockEntity blockEntity = level.getBlockEntity(pos);
+        List<ItemStack> naturalDrops = Block.getDrops(state, level, pos, blockEntity, player, tool);
+        boolean useFallback = hasNoValidDrops(naturalDrops)
+                || dropsAreDowngradedBlocks(naturalDrops, state.getBlock());
+        List<ItemStack> fallbackDrops = useFallback
+                ? getForcedFallbackDrops(state, level, pos)
+                : List.of();
         List<ItemStack> drops = destroyBlockAndCollectDrops(level, pos, state, player, tool);
-        // 仅当方块本身确实无自然掉落时才使用兜底，防止能正常挖出物品的方块被额外补出方块本身
-        if (forceMining && !hasNaturalDrops && hasNoValidDrops(drops) && !hasNoValidDrops(fallbackDrops)) {
+        if (useFallback
+                && (hasNoValidDrops(drops) || dropsAreDowngradedBlocks(drops, state.getBlock()))
+                && !hasNoValidDrops(fallbackDrops)) {
             drops = fallbackDrops;
         }
-        handleDrops(player, drops, tool);
+        return new MiningResult(drops, experience, true);
+    }
 
-        // 计算并弹出经验（时运模式）
-        if (tool.get(UComponents.EnchantModeComponent.get()) == EnchantMode.FORTUNE) {
-            int exp = state.getBlock().getExpDrop(state, level, pos, level.getBlockEntity(pos), player, tool);
-            if (exp > 0) {
-                state.getBlock().popExperience(level, pos, exp);
-            }
+    private static int getExperience(ServerLevel level, BlockPos pos, BlockState state, Player player, ItemStack tool) {
+        if (tool.getOrDefault(UComponents.EnchantModeComponent.get(), EnchantMode.FORTUNE) != EnchantMode.FORTUNE) {
+            return 0;
         }
+        return state.getBlock().getExpDrop(state, level, pos, level.getBlockEntity(pos), player, tool);
     }
 
     /**
@@ -268,8 +285,11 @@ public class MiningUtils {
      * @param forceMining 是否为强制挖掘模式
      * @return 需要破坏的方块列表
      */
-    static List<BlockPos> findBlocksToMine(BlockPos originPos, BlockState originState, Level level, ItemStack stack,
-                                           boolean forceMining) {
+    static List<BlockPos> scanBlocksToMine(BlockPos originPos, BlockState originState, Level level, ItemStack stack,
+                                           boolean forceMining, boolean enhanced) {
+        if (enhanced) {
+            return scanAreaBlocks(originPos, originState, level, stack, forceMining);
+        }
         // 最大连锁数量
         int maxBlocks = ConfigManager.getChainMiningMaxBlocks();
         // 获取连锁挖掘范围
@@ -349,9 +369,8 @@ public class MiningUtils {
      * @param forceMining 是否为强制挖掘模式
      * @return 需要破坏的方块列表
      */
-    static List<BlockPos> findBlocksToMineEnhanced(BlockPos originPos, BlockState originState, Level level,
-                                                   ItemStack stack,
-                                                   boolean forceMining) {
+    private static List<BlockPos> scanAreaBlocks(BlockPos originPos, BlockState originState, Level level,
+                                                 ItemStack stack, boolean forceMining) {
         // 最大连锁数量（包含原点方块）
         int maxBlocks = ConfigManager.getChainMiningMaxBlocks();
         // 获取连锁挖掘范围
@@ -414,8 +433,18 @@ public class MiningUtils {
                                 .stream()
                                 .map(Entity::getUUID)
                                 .collect(Collectors.toSet());
+        Set<UUID> experienceBefore = level.getEntitiesOfClass(ExperienceOrb.class, area)
+                                          .stream()
+                                          .map(Entity::getUUID)
+                                          .collect(Collectors.toSet());
 
         destroyBlockWithoutDrops(level, pos, state, player, tool);
+
+        for (ExperienceOrb experienceOrb : level.getEntitiesOfClass(ExperienceOrb.class, area)) {
+            if (!experienceBefore.contains(experienceOrb.getUUID())) {
+                experienceOrb.discard();
+            }
+        }
 
         List<ItemStack> drops = new ArrayList<>();
         level.getEntitiesOfClass(ItemEntity.class, area).stream()

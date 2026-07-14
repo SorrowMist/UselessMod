@@ -100,7 +100,8 @@ public class ClientEventBusSubscriber {
         // 检测R键按下（触发强制破坏）
         if (KeyBindings.TRIGGER_FORCE_MINING_KEY.get().consumeClick()) {
             ItemStack mainHandItem = player.getMainHandItem();
-            if (mainHandItem.getItem() instanceof EndlessBeafItem) {
+            if (mainHandItem.getItem() instanceof EndlessBeafItem
+                    && mainHandItem.getOrDefault(UComponents.ForceMiningComponent.get(), false)) {
                 // R键按下，发送强制破坏请求，同时传入当前Tab键状态
                 boolean tabPressed = KeyBindings.TRIGGER_CHAIN_MINING_KEY.get().isDown();
                 PacketDistributor.sendToServer(new ForceBreakKeyPacket(tabPressed));

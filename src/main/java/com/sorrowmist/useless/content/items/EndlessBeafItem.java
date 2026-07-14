@@ -115,6 +115,7 @@ public class EndlessBeafItem extends TieredItem {
                       .component(UComponents.EnhancedChainMiningComponent, false)
                       .component(UComponents.ForceMiningComponent, false)
                       .component(UComponents.ForceKillEnabledComponent, true)
+                      .component(UComponents.BeefInvulnerabilityEnabledComponent, true)
                       .component(UComponents.ForceKillModeComponent, ForceKillMode.KILL)
                       .component(UComponents.AEStoragePriorityComponent, false)
                       .component(UComponents.CurrentToolTypeComponent, ToolTypeMode.NONE_MODE)
@@ -606,6 +607,15 @@ public class EndlessBeafItem extends TieredItem {
                                        .append((forceKillEnabled ? forceKillMode.getTooltip().copy() :
                                                Component.translatable("tooltip.useless_mod.disable")).withStyle(forceKillEnabled ? ChatFormatting.GOLD : ChatFormatting.GRAY))
                                        .withStyle(ChatFormatting.DARK_RED));
+
+        boolean beefInvulnerabilityEnabled = stack.getOrDefault(UComponents.BeefInvulnerabilityEnabledComponent.get(), false);
+        tooltipComponents.add(Component.translatable("tooltip.useless_mod.beef_invulnerability_mode")
+                                       .append(": ")
+                                       .append(Component.translatable(
+                                               beefInvulnerabilityEnabled ? "tooltip.useless_mod.enable" :
+                                                       "tooltip.useless_mod.disable"
+                                       ).withStyle(beefInvulnerabilityEnabled ? ChatFormatting.GREEN : ChatFormatting.GRAY))
+                                       .withStyle(ChatFormatting.DARK_PURPLE));
 
         // AE存储优先状态（仅当AE2模组存在时）
         if (ModList.get().isLoaded("ae2")) {

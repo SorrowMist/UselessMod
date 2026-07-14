@@ -159,13 +159,8 @@ public class MiningDispatcher {
                 boolean forceMining = UComponentUtils.isForceMiningEnabled(hand);
                 boolean enhancedChainMining = UComponentUtils.isEnhancedChainMiningEnabled(hand);
 
-                // 重新扫描并存入缓存（根据是否启用增强连锁选择不同的扫描方式）
-                List<BlockPos> blocks;
-                if (enhancedChainMining) {
-                    blocks = MiningUtils.findBlocksToMineEnhanced(currentPos, state, level, hand, forceMining);
-                } else {
-                    blocks = MiningUtils.findBlocksToMine(currentPos, state, level, hand, forceMining);
-                }
+                List<BlockPos> blocks = MiningUtils.scanBlocksToMine(
+                        currentPos, state, level, hand, forceMining, enhancedChainMining);
 
                 data.setCachedPos(currentPos);
                 data.setCachedBlocks(blocks);
@@ -219,6 +214,7 @@ public class MiningDispatcher {
         if (state.isAir()) return;
 
         ItemStack hand = player.getMainHandItem();
+        if (!UComponentUtils.isForceMiningEnabled(hand)) return;
         MiningStrategy strategy;
 
         // 根据是否按下Tab键选择策略

@@ -1,18 +1,11 @@
 package com.sorrowmist.useless.utils.mining;
 
-import com.sorrowmist.useless.api.enums.tool.EnchantMode;
-import com.sorrowmist.useless.compat.DraconicEvolutionCompat;
-import com.sorrowmist.useless.core.component.UComponents;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.level.block.Block;
-import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.neoforged.neoforge.event.level.BlockEvent;
-
-import java.util.List;
 
 /**
  * R键单方块破坏策略
@@ -29,53 +22,7 @@ public class ForceBreakStrategy implements MiningStrategy {
 
         BlockPos pos = event.getPos();
         BlockState state = event.getState();
-        Block block = state.getBlock();
-
-        // 检查是否是混沌水晶，如果是则使用特殊处理
-        if (DraconicEvolutionCompat.isChaosCrystal(state)) {
-            if (DraconicEvolutionCompat.handleChaosCrystalBreak(level, pos, state, player)) {
-                event.setCanceled(true);
-                return;
-            }
-        }
-
-        // 检查是否为精准采集模式
-        boolean isSilkTouch = hand.getOrDefault(UComponents.EnchantModeComponent.get(), EnchantMode.FORTUNE)
-                == EnchantMode.SILK_TOUCH;
-
-        // 强制挖掘（R键）+ 精准采集同时激活：不再检查凋落物列表，直接兜底掉落方块本身（含完整 NBT/组件）
-        if (isSilkTouch) {
-            List<ItemStack> fallbackDrops = MiningUtils.getForcedFallbackDrops(state, level, pos);
-            MiningUtils.destroyBlockAndCollectDrops(level, pos, state, player, hand);
-            MiningUtils.handleDrops(player, fallbackDrops, hand);
-            event.setCanceled(true);
-            return;
-        }
-
-        // 破坏前用掉落表判断方块是否有自然掉落，避免掉落实体被其他模组吸收导致误判
-        List<ItemStack> preDrops = MiningUtils.blockHasNaturalDrops(level, pos, state, player, hand)
-                ? Block.getDrops(state, level, pos, level.getBlockEntity(pos), player, hand)
-                : List.of();
-        boolean hasNaturalDrops = !MiningUtils.hasNoValidDrops(preDrops)
-                && !MiningUtils.dropsAreDowngradedBlocks(preDrops, block);
-        List<ItemStack> fallbackDrops = hasNaturalDrops ? List.of() : MiningUtils.getForcedFallbackDrops(state, level, pos);
-        List<ItemStack> drops = MiningUtils.destroyBlockAndCollectDrops(level, pos, state, player, hand);
-        if (!hasNaturalDrops && (MiningUtils.hasNoValidDrops(drops) || MiningUtils.dropsAreDowngradedBlocks(drops, block))
-                && !MiningUtils.hasNoValidDrops(fallbackDrops)) {
-            drops = fallbackDrops;
-        }
-        MiningUtils.handleDrops(player, drops, hand);
-
-        // 计算并弹出经验（时运模式）
-        BlockEntity be = level.getBlockEntity(pos);
-        if (!isSilkTouch && hand.get(UComponents.EnchantModeComponent.get()) == EnchantMode.FORTUNE) {
-            int exp = block.getExpDrop(state, level, pos, be, player, hand);
-            if (exp > 0) {
-                block.popExperience(level, pos, exp);
-            }
-        }
-
-        // 取消原版事件
+        MiningUtils.processBlockBreak(level, pos, state, player, hand, true);
         event.setCanceled(true);
     }
 }

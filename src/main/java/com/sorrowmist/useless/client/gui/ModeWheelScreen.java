@@ -68,6 +68,7 @@ public class ModeWheelScreen extends Screen {
         boolean forceMiningEnabled = this.mainHandItem.getOrDefault(UComponents.ForceMiningComponent, false);
         boolean aeStorageEnabled = this.mainHandItem.getOrDefault(UComponents.AEStoragePriorityComponent, false);
         boolean forceKillEnabled = this.mainHandItem.getOrDefault(UComponents.ForceKillEnabledComponent, true);
+        boolean beefInvulnerabilityEnabled = this.mainHandItem.getOrDefault(UComponents.BeefInvulnerabilityEnabledComponent, false);
 
         // 左：附魔模式
         for (EnchantMode m : EnchantMode.values())
@@ -80,6 +81,11 @@ public class ModeWheelScreen extends Screen {
         ));
         for (ForceKillMode m : ForceKillMode.values())
             this.forceKillModes.add(new ModeData(m, m.getTooltip(), forceKillEnabled && m == currentForceKillMode));
+        this.forceKillModes.add(new ModeData(
+                ModeTypeEnum.getBeefInvulnerabilityMode(beefInvulnerabilityEnabled),
+                ModeTypeEnum.getBeefInvulnerabilityMode(beefInvulnerabilityEnabled).getTooltip(),
+                beefInvulnerabilityEnabled
+        ));
 
         for (ToolTypeMode m : ToolTypeMode.values()) {
             boolean shouldAdd = switch (m) {
@@ -384,6 +390,15 @@ public class ModeWheelScreen extends Screen {
                 case FORCE_KILL_ENABLED, FORCE_KILL_DISABLED -> {
                     PacketDistributor.sendToServer(
                             new ModeTogglePacket(ModeTogglePacket.ModeType.FORCE_KILL, me == ModeTypeEnum.FORCE_KILL_ENABLED));
+                }
+                case BEEF_INVULNERABILITY_ENABLED, BEEF_INVULNERABILITY_DISABLED -> {
+                    boolean currentEnabled = this.mainHandItem.getOrDefault(
+                            UComponents.BeefInvulnerabilityEnabledComponent,
+                            false
+                    );
+                    PacketDistributor.sendToServer(
+                            new ModeTogglePacket(ModeTogglePacket.ModeType.BEEF_INVULNERABILITY,
+                                                  !currentEnabled));
                 }
             }
         }

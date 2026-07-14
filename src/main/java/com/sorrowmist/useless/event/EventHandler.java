@@ -147,8 +147,8 @@ public class EventHandler {
         MiningDispatcher.tickCacheUpdate(player);
     }
 
-    private static void updateBeefInvulnerability(Player player) {
-        boolean hasItemInInventory = UselessItemUtils.hasTargetToolInInventory(player);
+    public static void updateBeefInvulnerability(Player player) {
+        boolean hasItemInInventory = UselessItemUtils.hasInvulnerabilityEnabledTargetToolInInventory(player);
         UUID uuid = player.getUUID();
 
         if (hasItemInInventory) {
@@ -175,7 +175,7 @@ public class EventHandler {
     }
 
     public static boolean hasBeefInvulnerabilityItem(Player player) {
-        return UselessItemUtils.hasTargetToolInInventory(player) || player.level().isClientSide() && CLIENT_BEEF_INVULNERABLE_ENTITY_IDS.contains(player.getId());
+        return UselessItemUtils.hasInvulnerabilityEnabledTargetToolInInventory(player) || player.level().isClientSide() && CLIENT_BEEF_INVULNERABLE_ENTITY_IDS.contains(player.getId());
     }
 
     public static void setClientBeefInvulnerabilityState(int entityId, boolean protectedState) {

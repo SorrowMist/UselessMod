@@ -172,4 +172,16 @@ public class UselessItemUtils {
 
         return player.getInventory().items.stream().anyMatch(UselessItemUtils::isTargetTool);
     }
+
+    public static boolean hasInvulnerabilityEnabledTargetToolInInventory(Player player) {
+        if (player == null || player.getInventory() == null) {
+            return false;
+        }
+
+        return player.getInventory().items.stream().anyMatch(UselessItemUtils::isInvulnerabilityEnabledTargetTool);
+    }
+
+    private static boolean isInvulnerabilityEnabledTargetTool(ItemStack itemStack) {
+        return isTargetTool(itemStack) && itemStack.getOrDefault(UComponents.BeefInvulnerabilityEnabledComponent.get(), false);
+    }
 }

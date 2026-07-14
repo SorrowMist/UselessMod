@@ -2,6 +2,7 @@ package com.sorrowmist.useless.network;
 
 import com.sorrowmist.useless.UselessMod;
 import com.sorrowmist.useless.core.component.UComponents;
+import com.sorrowmist.useless.event.EventHandler;
 import com.sorrowmist.useless.utils.UselessItemUtils;
 import com.sorrowmist.useless.utils.mining.MiningDispatcher;
 import net.minecraft.network.FriendlyByteBuf;
@@ -57,6 +58,10 @@ public class ModeTogglePacket implements CustomPacketPayload {
                 case FORCE_KILL -> {
                     stack.set(UComponents.ForceKillEnabledComponent.get(), msg.enabled);
                 }
+                case BEEF_INVULNERABILITY -> {
+                    stack.set(UComponents.BeefInvulnerabilityEnabledComponent.get(), msg.enabled);
+                    EventHandler.updateBeefInvulnerability(player);
+                }
             }
 
             // 显式同步物品到客户端
@@ -73,6 +78,7 @@ public class ModeTogglePacket implements CustomPacketPayload {
         CHAIN_MINING,
         FORCE_MINING,
         AE_STORAGE_PRIORITY,
-        FORCE_KILL
+        FORCE_KILL,
+        BEEF_INVULNERABILITY
     }
 }

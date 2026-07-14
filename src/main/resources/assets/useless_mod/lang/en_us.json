@@ -261,6 +261,7 @@
   "tooltip.useless_mod.force_kill_enabled_mode": "Force Kill",
   "tooltip.useless_mod.force_kill_mode": "Force Kill Mode",
   "tooltip.useless_mod.force_kill_mode.disabled": "Disable Force Kill",
+  "tooltip.useless_mod.beef_invulnerability_mode": "Player Protection",
   "tooltip.useless_mod.force_kill_mode.damage_only": "Damage Only",
   "tooltip.useless_mod.force_kill_mode.die": "Death Flow",
   "tooltip.useless_mod.force_kill_mode.kill": "Entity Kill",

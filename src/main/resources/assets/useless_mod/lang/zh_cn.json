@@ -260,6 +260,7 @@
   "tooltip.useless_mod.force_kill_enabled_mode": "强制击杀",
   "tooltip.useless_mod.force_kill_mode": "强制击杀模式",
   "tooltip.useless_mod.force_kill_mode.disabled": "关闭强制击杀",
+  "tooltip.useless_mod.beef_invulnerability_mode": "玩家保护",
   "tooltip.useless_mod.force_kill_mode.damage_only": "仅伤害",
   "tooltip.useless_mod.force_kill_mode.die": "死亡流程",
   "tooltip.useless_mod.force_kill_mode.kill": "实体 Kill",

@@ -16,24 +16,11 @@ public class DefaultMiningStrategy implements MiningStrategy {
         ServerLevel level = (ServerLevel) event.getLevel();
         BlockPos pos = event.getPos();
 
-        // 检查是否开启了强制挖掘模式
         boolean forceMining = UComponentUtils.isForceMiningEnabled(hand);
-        // 检查工具是否适合挖掘此方块
-        boolean isCorrectTool = hand.isCorrectToolForDrops(state);
 
-        // 强制挖掘模式：忽略工具类型检查，直接强制挖掘
-        if (forceMining) {
-            MiningUtils.processBlockBreak(level, pos, state, player, hand, true);
+        if (forceMining || hand.isCorrectToolForDrops(state)) {
+            MiningUtils.processBlockBreak(level, pos, state, player, hand, forceMining);
             event.setCanceled(true);
-        } else {
-            // 非强制挖掘模式：检查工具是否正确
-            if (isCorrectTool) {
-                MiningUtils.processBlockBreak(level, pos, state, player, hand, false);
-                event.setCanceled(true);
-            }
-            // else
-            // 工具不正确且未开启强制挖掘：不处理，使用原版行为
-            // 原版会根据工具情况决定是否允许破坏及掉落
         }
     }
 }

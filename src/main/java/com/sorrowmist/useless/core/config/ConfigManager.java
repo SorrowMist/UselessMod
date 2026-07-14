@@ -49,6 +49,7 @@ public class ConfigManager {
     private static final ModConfigSpec.IntValue CHAIN_MINING_RANGE_Y;
     private static final ModConfigSpec.IntValue CHAIN_MINING_RANGE_Z;
     private static final ModConfigSpec.IntValue CHAIN_MINING_MAX_BLOCKS;
+    private static final ModConfigSpec.DoubleValue BEEF_TOOL_FLIGHT_SPEED;
     // 牛排工具附魔等级配置
     private static final ModConfigSpec.IntValue FORTUNE_LEVEL;
     private static final ModConfigSpec.IntValue LOOTING_LEVEL;
@@ -130,6 +131,11 @@ public class ConfigManager {
                 .comment("是否启用飞行效果")
                 .translation("useless_mod.configuration.enable_flight_effect")
                 .define("enable_flight_effect", true);
+
+        BEEF_TOOL_FLIGHT_SPEED = COMMON_BUILDER
+                .comment("牛排工具飞行速度")
+                .translation("useless_mod.configuration.beef_tool_flight_speed")
+                .defineInRange("beef_tool_flight_speed", 0.05, 0.01, 1.0);
 
         // 自定义药水效果列表
         CUSTOM_POTION_EFFECTS = COMMON_BUILDER
@@ -286,6 +292,10 @@ public class ConfigManager {
 
     public static int getChainMiningRangeZ() {
         return CHAIN_MINING_RANGE_Z.get();
+    }
+
+    public static double getBeefToolFlightSpeed() {
+        return BEEF_TOOL_FLIGHT_SPEED.get();
     }
 
     // 获取牛排工具附魔等级配置

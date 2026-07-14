@@ -128,14 +128,23 @@ public class EventHandler {
 
             if (hasItemInInventory) {
                 FlyEffectedHolder.add(player.getUUID());
+                float flightSpeed = (float) ConfigManager.getBeefToolFlightSpeed();
+                boolean abilitiesChanged = player.getAbilities().getFlyingSpeed() != flightSpeed;
+                if (abilitiesChanged) {
+                    player.getAbilities().setFlyingSpeed(flightSpeed);
+                }
                 if (!player.getAbilities().mayfly) {
                     player.getAbilities().mayfly = true;
+                    abilitiesChanged = true;
+                }
+                if (abilitiesChanged) {
                     player.onUpdateAbilities();
                 }
             } else {
                 if (player.getAbilities().mayfly && FlyEffectedHolder.contains(player.getUUID())) {
                     player.getAbilities().mayfly = false;
                     player.getAbilities().flying = false;
+                    player.getAbilities().setFlyingSpeed(0.05F);
                     player.onUpdateAbilities();
                 }
                 FlyEffectedHolder.remove(player.getUUID());

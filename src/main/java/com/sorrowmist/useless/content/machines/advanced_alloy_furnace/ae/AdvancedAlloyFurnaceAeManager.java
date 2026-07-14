@@ -3,6 +3,7 @@ package com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae;
 import appeng.api.crafting.IPatternDetails;
 import appeng.api.crafting.PatternDetailsHelper;
 import appeng.api.networking.crafting.ICraftingProvider;
+import appeng.api.stacks.AEItemKey;
 import appeng.api.stacks.AEKey;
 import appeng.api.stacks.GenericStack;
 import appeng.api.stacks.KeyCounter;
@@ -750,12 +751,12 @@ public final class AdvancedAlloyFurnaceAeManager {
         return new KeyCounter[]{counter};
     }
 
-    private record PatternKey(List<GenericStack> outputs) {
+    /** 完整样板定义与 EAP 倍率共同标识批次，不能只按输出合并。 */
+    private record PatternKey(@org.jetbrains.annotations.Nullable AEItemKey definition, int multiplier) {
         static PatternKey of(IPatternDetails pattern) {
-            if (pattern == null || pattern.getOutputs().isEmpty()) {
-                return new PatternKey(List.of());
-            }
-            return new PatternKey(List.copyOf(pattern.getOutputs()));
+            if (pattern == null) return new PatternKey(null, 1);
+            IPatternDetails original = EapCompat.unwrap(pattern);
+            return new PatternKey(original.getDefinition(), Math.max(1, EapCompat.getMultiplier(pattern)));
         }
     }
 }

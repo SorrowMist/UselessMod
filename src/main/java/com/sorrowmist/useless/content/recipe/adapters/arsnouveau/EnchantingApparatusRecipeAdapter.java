@@ -107,13 +107,13 @@ public class EnchantingApparatusRecipeAdapter implements IRecipeAdapter<Enchanti
     @Override
     @Nullable
     @SuppressWarnings("unchecked")
-    public RecipeHolder<EnchantingApparatusRecipe> findMatchingRecipe(Level level, Map<Ingredient, Long> mergedInputs, Map<FluidStack, Long> mergedFluids, @Nullable ItemStack mold) {
+    public List<RecipeHolder<EnchantingApparatusRecipe>> findMatchingRecipes(Level level, Map<Ingredient, Long> mergedInputs, Map<FluidStack, Long> mergedFluids, @Nullable ItemStack mold) {
         if (level == null || mergedInputs.isEmpty()) {
-            return null;
+            return List.of();
         }
 
         if (!matchesMold(mold)) {
-            return null;
+            return List.of();
         }
 
         RecipeManager recipeManager = level.getRecipeManager();
@@ -121,6 +121,7 @@ public class EnchantingApparatusRecipeAdapter implements IRecipeAdapter<Enchanti
                 RecipeRegistry.APPARATUS_TYPE.get()
         );
 
+        List<RecipeHolder<EnchantingApparatusRecipe>> matches = new java.util.ArrayList<>();
         for (RecipeHolder<EnchantingApparatusRecipe> holder : recipes) {
             EnchantingApparatusRecipe recipe = holder.value();
 
@@ -143,10 +144,9 @@ public class EnchantingApparatusRecipeAdapter implements IRecipeAdapter<Enchanti
             if (requiredCounts.isEmpty()) continue;
 
             if (AdapterUtils.matchesRequired(mergedInputs, requiredCounts)) {
-                return holder;
+                matches.add(holder);
             }
         }
-
-        return null;
+        return matches;
     }
 }

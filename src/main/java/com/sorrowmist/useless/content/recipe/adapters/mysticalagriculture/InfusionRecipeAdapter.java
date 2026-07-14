@@ -104,13 +104,13 @@ public class InfusionRecipeAdapter implements IRecipeAdapter<IInfusionRecipe> {
     @Override
     @Nullable
     @SuppressWarnings("unchecked")
-    public RecipeHolder<IInfusionRecipe> findMatchingRecipe(Level level, Map<Ingredient, Long> mergedInputs, Map<FluidStack, Long> mergedFluids, @Nullable ItemStack mold) {
+    public List<RecipeHolder<IInfusionRecipe>> findMatchingRecipes(Level level, Map<Ingredient, Long> mergedInputs, Map<FluidStack, Long> mergedFluids, @Nullable ItemStack mold) {
         if (level == null || mergedInputs.isEmpty()) {
-            return null;
+            return List.of();
         }
 
         if (!matchesMold(mold)) {
-            return null;
+            return List.of();
         }
 
         RecipeManager recipeManager = level.getRecipeManager();
@@ -118,6 +118,7 @@ public class InfusionRecipeAdapter implements IRecipeAdapter<IInfusionRecipe> {
                 ModRecipeTypes.INFUSION.get()
         );
 
+        List<RecipeHolder<IInfusionRecipe>> matches = new java.util.ArrayList<>();
         for (RecipeHolder<IInfusionRecipe> holder : recipes) {
             IInfusionRecipe recipe = holder.value();
 
@@ -141,10 +142,9 @@ public class InfusionRecipeAdapter implements IRecipeAdapter<IInfusionRecipe> {
             if (requiredCounts.isEmpty()) continue;
 
             if (AdapterUtils.matchesRequired(mergedInputs, requiredCounts)) {
-                return holder;
+                matches.add(holder);
             }
         }
-
-        return null;
+        return matches;
     }
 }

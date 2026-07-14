@@ -102,14 +102,15 @@ public class CrystalAssemblerRecipeAdapter implements IRecipeAdapter<CrystalAsse
 
     @Override
     @Nullable
-    public RecipeHolder<CrystalAssemblerRecipe> findMatchingRecipe(Level level, Map<Ingredient, Long> mergedInputs, Map<FluidStack, Long> mergedFluids, @Nullable ItemStack mold) {
+    public List<RecipeHolder<CrystalAssemblerRecipe>> findMatchingRecipes(Level level, Map<Ingredient, Long> mergedInputs, Map<FluidStack, Long> mergedFluids, @Nullable ItemStack mold) {
         if (level == null || mergedInputs.isEmpty()) {
-            return null;
+            return List.of();
         }
 
         RecipeManager recipeManager = level.getRecipeManager();
         List<RecipeHolder<CrystalAssemblerRecipe>> recipes = recipeManager.getAllRecipesFor(CrystalAssemblerRecipe.TYPE);
 
+        List<RecipeHolder<CrystalAssemblerRecipe>> matches = new java.util.ArrayList<>();
         for (RecipeHolder<CrystalAssemblerRecipe> holder : recipes) {
             CrystalAssemblerRecipe recipe = holder.value();
             // 使用全类名
@@ -127,10 +128,9 @@ public class CrystalAssemblerRecipeAdapter implements IRecipeAdapter<CrystalAsse
             }
 
             if (allMatch && !recipeInputs.isEmpty()) {
-                return holder;
+                matches.add(holder);
             }
         }
-
-        return null;
+        return matches;
     }
 }

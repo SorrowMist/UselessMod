@@ -140,9 +140,9 @@ public class InscriberRecipeAdapter implements IRecipeAdapter<InscriberRecipe> {
     @Override
     @Nullable
     @SuppressWarnings("unchecked")
-    public RecipeHolder<InscriberRecipe> findMatchingRecipe(Level level, Map<Ingredient, Long> mergedInputs, Map<FluidStack, Long> mergedFluids, @Nullable ItemStack mold) {
+    public List<RecipeHolder<InscriberRecipe>> findMatchingRecipes(Level level, Map<Ingredient, Long> mergedInputs, Map<FluidStack, Long> mergedFluids, @Nullable ItemStack mold) {
         if (level == null || mergedInputs.isEmpty()) {
-            return null;
+            return List.of();
         }
 
         RecipeManager recipeManager = level.getRecipeManager();
@@ -150,8 +150,7 @@ public class InscriberRecipeAdapter implements IRecipeAdapter<InscriberRecipe> {
                 AERecipeTypes.INSCRIBER
         );
 
-        RecipeHolder<InscriberRecipe> bestHolder = null;
-        int bestScore = -1;
+        List<RecipeHolder<InscriberRecipe>> matches = new java.util.ArrayList<>();
 
         boolean hasMold = mold != null && !mold.isEmpty();
 
@@ -181,12 +180,7 @@ public class InscriberRecipeAdapter implements IRecipeAdapter<InscriberRecipe> {
 
                 if (!topSatisfied || !bottomSatisfied) continue;
 
-                int matchScore = 1;
-
-                if (matchScore > bestScore) {
-                    bestScore = matchScore;
-                    bestHolder = holder;
-                }
+                matches.add(holder);
             } else {
                 boolean moldMatchesTop = hasTop && hasMold && topInput.test(mold);
                 boolean moldMatchesBottom = hasBottom && hasMold && bottomInput.test(mold);
@@ -195,22 +189,10 @@ public class InscriberRecipeAdapter implements IRecipeAdapter<InscriberRecipe> {
                     continue;
                 }
 
-                int matchScore;
-                if (moldMatchesTop || moldMatchesBottom) {
-                    matchScore = 3;
-                } else if (!hasTop && !hasBottom) {
-                    matchScore = 1;
-                } else {
-                    matchScore = 2;
-                }
-
-                if (matchScore > bestScore) {
-                    bestScore = matchScore;
-                    bestHolder = holder;
-                }
+                matches.add(holder);
             }
         }
 
-        return bestHolder;
+        return matches;
     }
 }

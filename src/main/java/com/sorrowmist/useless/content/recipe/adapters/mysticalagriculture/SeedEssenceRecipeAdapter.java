@@ -121,17 +121,17 @@ public class SeedEssenceRecipeAdapter implements IRecipeAdapter<SeedEssenceRecip
 
     @Override
     @Nullable
-    public RecipeHolder<SeedEssenceDummyRecipe> findMatchingRecipe(Level level, Map<Ingredient, Long> mergedInputs, Map<FluidStack, Long> mergedFluids, @Nullable ItemStack mold) {
-        if (mold == null || mold.isEmpty()) return null;
+    public List<RecipeHolder<SeedEssenceDummyRecipe>> findMatchingRecipes(Level level, Map<Ingredient, Long> mergedInputs, Map<FluidStack, Long> mergedFluids, @Nullable ItemStack mold) {
+        if (mold == null || mold.isEmpty()) return List.of();
 
         Item moldItem = mold.getItem();
-        if (!(moldItem instanceof ICropProvider)) return null;
+        if (!(moldItem instanceof ICropProvider)) return List.of();
 
         AdvancedAlloyFurnaceRecipe recipe = recipeMap.get(moldItem);
-        if (recipe == null) return null;
+        if (recipe == null) return List.of();
 
         ResourceLocation holderId = recipe.id();
-        return new RecipeHolder<>(holderId, new SeedEssenceDummyRecipe(recipe));
+        return List.of(new RecipeHolder<>(holderId, new SeedEssenceDummyRecipe(recipe)));
     }
 
     /**

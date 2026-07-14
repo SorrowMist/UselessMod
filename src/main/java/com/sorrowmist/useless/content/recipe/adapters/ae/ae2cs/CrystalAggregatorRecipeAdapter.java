@@ -81,11 +81,12 @@ public class CrystalAggregatorRecipeAdapter implements IRecipeAdapter<CrystalAgg
     @Override
     @Nullable
     @SuppressWarnings("unchecked")
-    public RecipeHolder<CrystalAggregatorRecipe> findMatchingRecipe(Level level, Map<Ingredient, Long> mergedInputs, Map<FluidStack, Long> mergedFluids, @Nullable ItemStack mold) {
-        if (level == null) return null;
-        if (!CircuitEtcherRecipeAdapter.checkMold(mold, "crystal_aggregator")) return null;
+    public List<RecipeHolder<CrystalAggregatorRecipe>> findMatchingRecipes(Level level, Map<Ingredient, Long> mergedInputs, Map<FluidStack, Long> mergedFluids, @Nullable ItemStack mold) {
+        if (level == null) return List.of();
+        if (!CircuitEtcherRecipeAdapter.checkMold(mold, "crystal_aggregator")) return List.of();
 
         RecipeManager recipeManager = level.getRecipeManager();
+        List<RecipeHolder<CrystalAggregatorRecipe>> matches = new java.util.ArrayList<>();
         for (RecipeHolder<CrystalAggregatorRecipe> holder : (List<RecipeHolder<CrystalAggregatorRecipe>>) (List<?>)
                 recipeManager.getAllRecipesFor(AECSRecipeTypes.CRYSTAL_AGGREGATOR.get())) {
             CrystalAggregatorRecipe recipe = holder.value();
@@ -97,8 +98,8 @@ public class CrystalAggregatorRecipeAdapter implements IRecipeAdapter<CrystalAgg
             CircuitEtcherRecipeAdapter.addSizedIngredient(required, recipe.inputC());
             if (required.isEmpty()) continue;
 
-            if (AdapterUtils.matchesRequired(mergedInputs, required)) return holder;
+            if (AdapterUtils.matchesRequired(mergedInputs, required)) matches.add(holder);
         }
-        return null;
+        return matches;
     }
 }

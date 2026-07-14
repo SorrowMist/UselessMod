@@ -87,19 +87,15 @@ public class LaserRecipeAdapter implements IRecipeAdapter<LaserRecipe> {
 
     @Override
     @Nullable
-    public RecipeHolder<LaserRecipe> findMatchingRecipe(Level level, Map<Ingredient, Long> mergedInputs, Map<FluidStack, Long> mergedFluids, @Nullable ItemStack mold) {
-        if (mergedInputs.isEmpty() || level == null) return null;
+    public List<RecipeHolder<LaserRecipe>> findMatchingRecipes(Level level, Map<Ingredient, Long> mergedInputs, Map<FluidStack, Long> mergedFluids, @Nullable ItemStack mold) {
+        if (mergedInputs.isEmpty() || level == null) return List.of();
 
         RecipeManager recipeManager = level.getRecipeManager();
         List<RecipeHolder<LaserRecipe>> recipes = recipeManager.getAllRecipesFor(de.ellpeck.actuallyadditions.mod.crafting.ActuallyRecipes.Types.LASER.get());
 
-        for (RecipeHolder<LaserRecipe> holder : recipes) {
-            LaserRecipe recipe = holder.value();
-            Ingredient input = recipe.getInput();
-            if (input != null && AdapterUtils.hasMatchingIngredient(mergedInputs, input)) {
-                return holder;
-            }
-        }
-        return null;
+        return recipes.stream().filter(holder -> {
+            Ingredient input = holder.value().getInput();
+            return input != null && AdapterUtils.hasMatchingIngredient(mergedInputs, input);
+        }).toList();
     }
 }

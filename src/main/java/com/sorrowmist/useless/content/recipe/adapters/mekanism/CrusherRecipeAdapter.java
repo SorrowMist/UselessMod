@@ -76,12 +76,12 @@ public class CrusherRecipeAdapter implements IRecipeAdapter<ItemStackToItemStack
 
     @Override
     @Nullable
-    public RecipeHolder<ItemStackToItemStackRecipe> findMatchingRecipe(Level level, Map<Ingredient, Long> mergedInputs, Map<FluidStack, Long> mergedFluids, @Nullable ItemStack mold) {
+    public List<RecipeHolder<ItemStackToItemStackRecipe>> findMatchingRecipes(Level level, Map<Ingredient, Long> mergedInputs, Map<FluidStack, Long> mergedFluids, @Nullable ItemStack mold) {
         if (level == null || mergedInputs.isEmpty()) {
-            return null;
+            return List.of();
         }
         if (mold != null && !mold.isEmpty() && !matchesMold(mold)) {
-            return null;
+            return List.of();
         }
 
         RecipeManager recipeManager = level.getRecipeManager();
@@ -89,17 +89,17 @@ public class CrusherRecipeAdapter implements IRecipeAdapter<ItemStackToItemStack
                 MekanismRecipeTypes.TYPE_CRUSHING.value()
         );
 
+        List<RecipeHolder<ItemStackToItemStackRecipe>> matches = new java.util.ArrayList<>();
         for (RecipeHolder<ItemStackToItemStackRecipe> holder : recipes) {
             ItemStackToItemStackRecipe recipe = holder.value();
             ItemStackIngredient input = recipe.getInput();
             if (input == null || input.hasNoMatchingInstances()) continue;
 
             if (matchesIngredient(mergedInputs, input)) {
-                return holder;
+                matches.add(holder);
             }
         }
-
-        return null;
+        return matches;
     }
 
     @Nullable

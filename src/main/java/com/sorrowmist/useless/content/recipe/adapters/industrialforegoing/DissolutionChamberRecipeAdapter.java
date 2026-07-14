@@ -147,23 +147,18 @@ public class DissolutionChamberRecipeAdapter implements IRecipeAdapter<Dissoluti
     @Override
     @Nullable
     @SuppressWarnings({"unchecked"})
-    public RecipeHolder<DissolutionChamberRecipe> findMatchingRecipe(Level level, Map<Ingredient, Long> mergedInputs, Map<FluidStack, Long> mergedFluids, @Nullable ItemStack mold) {
+    public List<RecipeHolder<DissolutionChamberRecipe>> findMatchingRecipes(Level level, Map<Ingredient, Long> mergedInputs, Map<FluidStack, Long> mergedFluids, @Nullable ItemStack mold) {
         if (level == null || (mergedInputs.isEmpty() && mergedFluids.isEmpty()) || !matchesMold(mold)) {
-            return null;
+            return List.of();
         }
 
         RecipeManager recipeManager = level.getRecipeManager();
         RecipeType<DissolutionChamberRecipe> recipeType = (RecipeType<DissolutionChamberRecipe>) ModuleCore.DISSOLUTION_TYPE.get();
 
-        for (RecipeHolder<DissolutionChamberRecipe> holder : recipeManager.getAllRecipesFor(recipeType)) {
-            DissolutionChamberRecipe recipe = holder.value();
-
-            if (matchesItemInputs(mergedInputs, recipe.input) && matchesFluidInput(mergedFluids, recipe.inputFluid)) {
-                return holder;
-            }
-        }
-
-        return null;
+        return recipeManager.getAllRecipesFor(recipeType).stream()
+                .filter(holder -> matchesItemInputs(mergedInputs, holder.value().input)
+                        && matchesFluidInput(mergedFluids, holder.value().inputFluid))
+                .toList();
     }
 
     @Override

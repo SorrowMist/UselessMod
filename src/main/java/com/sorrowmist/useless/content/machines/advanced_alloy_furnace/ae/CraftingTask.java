@@ -225,7 +225,7 @@ public class CraftingTask {
     }
 
     /**
-     * 使用本体模具/催化剂统一查找配方，与机器本体匹配逻辑一致。
+     * 使用本体模具与样板目标输出统一查找配方。
      * 结果缓存于 cachedRecipe，避免 tick() 每帧重复查找；
      * 输入变化时（新子任务/新批次）由调用方通过 invalidateRecipeCache() 使其失效。
      */
@@ -236,15 +236,11 @@ public class CraftingTask {
         List<ItemStack> tempInputs = new ArrayList<>(taskInputItems);
         List<FluidStack> tempFluids = new ArrayList<>(taskInputFluids);
 
-        ItemStack catalystStack = context.getItemHandler().getStackInSlot(context.getCatalystSlot());
-        if (!catalystStack.isEmpty()) {
-            tempInputs.add(catalystStack.copy());
-        }
-
         ItemStack moldStack = context.getItemHandler().getStackInSlot(context.getMoldSlot());
 
-        cachedRecipe = AlloyFurnaceRecipeManager.getInstance().findRecipe(
-                context.getLevel(), tempInputs, tempFluids, toGenericStacks(taskInputKeys), moldStack
+        cachedRecipe = AlloyFurnaceRecipeManager.getInstance().findRecipeForCrafting(
+                context.getLevel(), tempInputs, tempFluids, toGenericStacks(taskInputKeys), moldStack,
+                pattern == null ? List.of() : pattern.getOutputs(), craftCount
         );
         return cachedRecipe;
     }
@@ -282,43 +278,7 @@ public class CraftingTask {
             return false;
         }
 
-        if (recipe.outputs().isEmpty() && recipe.outputFluids().isEmpty() && recipe.keyOutputs().isEmpty()) {
-            return false;
-        }
-
-        for (var patternOutput : pattern.getOutputs()) {
-            boolean matched = false;
-
-            if (patternOutput.what() instanceof AEItemKey itemKey) {
-                ItemStack patternStack = itemKey.toStack((int) patternOutput.amount());
-                for (ItemStack recipeOutput : recipe.outputs()) {
-                    if (ItemStack.isSameItem(patternStack, recipeOutput)) {
-                        matched = true;
-                        break;
-                    }
-                }
-            } else if (patternOutput.what() instanceof AEFluidKey fluidKey) {
-                for (FluidStack recipeFluid : recipe.outputFluids()) {
-                    if (fluidKey.getFluid().isSame(recipeFluid.getFluid())) {
-                        matched = true;
-                        break;
-                    }
-                }
-            } else {
-                for (GenericStack keyOutput : recipe.keyOutputs()) {
-                    if (keyOutput.what().equals(patternOutput.what()) && keyOutput.amount() >= patternOutput.amount()) {
-                        matched = true;
-                        break;
-                    }
-                }
-            }
-
-            if (!matched) {
-                return false;
-            }
-        }
-
-        return true;
+        return AlloyFurnaceRecipeManager.matchesExpectedOutputs(recipe, pattern.getOutputs());
     }
 
     private void returnMaterialsToAE() {

@@ -128,15 +128,16 @@ public class OverloadProcessingRecipeAdapter implements IRecipeAdapter<OverloadP
     @Override
     @Nullable
     @SuppressWarnings("unchecked")
-    public RecipeHolder<OverloadProcessingRecipe> findMatchingRecipe(Level level, Map<Ingredient, Long> mergedInputs, Map<FluidStack, Long> mergedFluids, Map<AEKey, Long> mergedKeys, @Nullable ItemStack mold) {
-        if (level == null) return null;
+    public List<RecipeHolder<OverloadProcessingRecipe>> findMatchingRecipes(Level level, Map<Ingredient, Long> mergedInputs, Map<FluidStack, Long> mergedFluids, Map<AEKey, Long> mergedKeys, @Nullable ItemStack mold) {
+        if (level == null) return List.of();
 
         if (mold != null && !mold.isEmpty()) {
             ResourceLocation moldId = BuiltInRegistries.ITEM.getKey(mold.getItem());
-            if (!"ae2lt".equals(moldId.getNamespace()) || !"overload_processing_factory".equals(moldId.getPath())) return null;
+            if (!"ae2lt".equals(moldId.getNamespace()) || !"overload_processing_factory".equals(moldId.getPath())) return List.of();
         }
 
         RecipeManager recipeManager = level.getRecipeManager();
+        List<RecipeHolder<OverloadProcessingRecipe>> matches = new java.util.ArrayList<>();
         for (RecipeHolder<OverloadProcessingRecipe> holder : recipeManager.getAllRecipesFor(ModRecipeTypes.OVERLOAD_PROCESSING_TYPE.get())) {
             OverloadProcessingRecipe recipe = holder.value();
 
@@ -169,9 +170,9 @@ public class OverloadProcessingRecipeAdapter implements IRecipeAdapter<OverloadP
             if ((recipeItemInputs.isEmpty() || itemsMatch)
                     && (recipeFluidInput.isEmpty() || fluidsMatch)
                     && AELightningIngredientHelper.matchesOverloadLightning(mergedInputs, mergedKeys, recipe.lightningTier(), recipe.lightningCost())) {
-                return holder;
+                matches.add(holder);
             }
         }
-        return null;
+        return matches;
     }
 }

@@ -109,15 +109,16 @@ public class LightningSimulationRecipeAdapter implements IRecipeAdapter<Lightnin
     @Override
     @Nullable
     @SuppressWarnings("unchecked")
-    public RecipeHolder<LightningSimulationRecipe> findMatchingRecipe(Level level, Map<Ingredient, Long> mergedInputs, Map<FluidStack, Long> mergedFluids, Map<AEKey, Long> mergedKeys, @Nullable ItemStack mold) {
-        if (level == null || mergedInputs.isEmpty()) return null;
+    public List<RecipeHolder<LightningSimulationRecipe>> findMatchingRecipes(Level level, Map<Ingredient, Long> mergedInputs, Map<FluidStack, Long> mergedFluids, Map<AEKey, Long> mergedKeys, @Nullable ItemStack mold) {
+        if (level == null || mergedInputs.isEmpty()) return List.of();
 
         if (mold != null && !mold.isEmpty()) {
             ResourceLocation moldId = BuiltInRegistries.ITEM.getKey(mold.getItem());
-            if (!"ae2lt".equals(moldId.getNamespace()) || !"lightning_simulation_room".equals(moldId.getPath())) return null;
+            if (!"ae2lt".equals(moldId.getNamespace()) || !"lightning_simulation_room".equals(moldId.getPath())) return List.of();
         }
 
         RecipeManager recipeManager = level.getRecipeManager();
+        List<RecipeHolder<LightningSimulationRecipe>> matches = new java.util.ArrayList<>();
         for (RecipeHolder<LightningSimulationRecipe> holder : recipeManager.getAllRecipesFor(ModRecipeTypes.LIGHTNING_SIMULATION_TYPE.get())) {
             LightningSimulationRecipe recipe = holder.value();
             List<LightningSimulationIngredient> recipeInputs = recipe.inputs();
@@ -131,9 +132,9 @@ public class LightningSimulationRecipeAdapter implements IRecipeAdapter<Lightnin
 
             if (AdapterUtils.matchesRequired(mergedInputs, requiredCounts)
                     && AELightningIngredientHelper.matchesSimulationOrAssemblyLightning(mergedInputs, mergedKeys, recipe.lightningTier(), recipe.lightningCost())) {
-                return holder;
+                matches.add(holder);
             }
         }
-        return null;
+        return matches;
     }
 }

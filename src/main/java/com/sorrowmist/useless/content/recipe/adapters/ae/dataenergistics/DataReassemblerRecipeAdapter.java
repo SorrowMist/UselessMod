@@ -169,13 +169,13 @@ public class DataReassemblerRecipeAdapter implements IRecipeAdapter<DataRipperRe
     @Override
     @Nullable
     @SuppressWarnings("unchecked")
-    public RecipeHolder<DataRipperReassemblerRecipe> findMatchingRecipe(Level level, Map<Ingredient, Long> mergedInputs, Map<FluidStack, Long> mergedFluids, Map<AEKey, Long> mergedKeys, @Nullable ItemStack mold) {
-        if (level == null) return null;
+    public List<RecipeHolder<DataRipperReassemblerRecipe>> findMatchingRecipes(Level level, Map<Ingredient, Long> mergedInputs, Map<FluidStack, Long> mergedFluids, Map<AEKey, Long> mergedKeys, @Nullable ItemStack mold) {
+        if (level == null) return List.of();
 
         // 检查模具是否匹配数据重组器
         if (mold != null && !mold.isEmpty()) {
             ResourceLocation moldId = BuiltInRegistries.ITEM.getKey(mold.getItem());
-            if (!"data_energistics".equals(moldId.getNamespace()) || !"data_reassembler".equals(moldId.getPath())) return null;
+            if (!"data_energistics".equals(moldId.getNamespace()) || !"data_reassembler".equals(moldId.getPath())) return List.of();
         }
 
         RecipeManager recipeManager = level.getRecipeManager();
@@ -183,8 +183,7 @@ public class DataReassemblerRecipeAdapter implements IRecipeAdapter<DataRipperRe
                 ModRecipes.DATA_RIPPER_REASSEMBLER_TYPE.get()
         );
 
-        RecipeHolder<DataRipperReassemblerRecipe> bestHolder = null;
-        int bestScore = -1;
+        List<RecipeHolder<DataRipperReassemblerRecipe>> matches = new java.util.ArrayList<>();
 
         for (RecipeHolder<DataRipperReassemblerRecipe> holder : recipes) {
             DataRipperReassemblerRecipe recipe = holder.value();
@@ -216,28 +215,11 @@ public class DataReassemblerRecipeAdapter implements IRecipeAdapter<DataRipperRe
             boolean keysMatch = !hasKeyInput || matchesKeyInput(mergedInputs, mergedFluids, mergedKeys, keyInput);
 
             if ((requiredCounts.isEmpty() || itemsMatch) && (recipeFluidInputs.isEmpty() || fluidsMatch) && keysMatch) {
-                int score = calculateScore(recipeItemInputs, recipeFluidInputs, hasKeyInput, itemsMatch, fluidsMatch);
-                if (score > bestScore) {
-                    bestScore = score;
-                    bestHolder = holder;
-                }
+                matches.add(holder);
             }
         }
 
-        return bestHolder;
-    }
-
-    private int calculateScore(List<DataRipperReassemblerIngredient> itemInputs, List<GenericStack> fluidInputs,
-                               boolean hasKeyInput, boolean itemsMatch, boolean fluidsMatch) {
-        int score = 0;
-        if (itemsMatch && (!itemInputs.isEmpty() || hasKeyInput)) {
-            score += 2;
-            if (hasKeyInput) score += 1; // keyInput 匹配额外加分
-        }
-        if (fluidsMatch && !fluidInputs.isEmpty()) {
-            score += 1;
-        }
-        return score;
+        return matches;
     }
 
     private boolean matchesFluidInputs(Map<FluidStack, Long> mergedFluids, List<GenericStack> requiredFluids) {

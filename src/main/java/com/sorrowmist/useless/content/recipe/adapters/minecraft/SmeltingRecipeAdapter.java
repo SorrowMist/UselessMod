@@ -91,37 +91,27 @@ public class SmeltingRecipeAdapter implements IRecipeAdapter<AbstractCookingReci
     }
 
     @Override
-    @Nullable
-    public RecipeHolder<AbstractCookingRecipe> findMatchingRecipe(Level level, Map<Ingredient, Long> mergedInputs, Map<FluidStack, Long> mergedFluids, @Nullable ItemStack mold) {
+    public List<RecipeHolder<AbstractCookingRecipe>> findMatchingRecipes(Level level, Map<Ingredient, Long> mergedInputs, Map<FluidStack, Long> mergedFluids, @Nullable ItemStack mold) {
         if (level == null || mergedInputs.isEmpty() || !matchesMold(mold)) {
-            return null;
+            return List.of();
         }
 
         RecipeManager recipeManager = level.getRecipeManager();
 
         // 只查找原版熔炉配方
-        return castHolder(findSmeltingRecipe(recipeManager, RecipeType.SMELTING, mergedInputs));
-    }
-
-    /**
-     * 安全地转换配方持有者类型
-     */
-    @SuppressWarnings("unchecked")
-    private <T extends AbstractCookingRecipe> RecipeHolder<AbstractCookingRecipe> castHolder(RecipeHolder<T> holder) {
-        return (RecipeHolder<AbstractCookingRecipe>) holder;
+        return castHolders(findSmeltingRecipes(recipeManager, RecipeType.SMELTING, mergedInputs));
     }
 
     /**
      * 查找匹配的熔炉配方
      */
-    @Nullable
-    private <T extends AbstractCookingRecipe> RecipeHolder<T> findSmeltingRecipe(
+    private <T extends AbstractCookingRecipe> List<RecipeHolder<T>> findSmeltingRecipes(
             RecipeManager recipeManager,
             RecipeType<T> recipeType,
             Map<Ingredient, Long> mergedInputs
     ) {
         List<RecipeHolder<T>> recipes = recipeManager.getAllRecipesFor(recipeType);
-
+        List<RecipeHolder<T>> matches = new java.util.ArrayList<>();
         for (RecipeHolder<T> holder : recipes) {
             T recipe = holder.value();
             NonNullList<Ingredient> ingredients = recipe.getIngredients();
@@ -131,11 +121,15 @@ public class SmeltingRecipeAdapter implements IRecipeAdapter<AbstractCookingReci
             Ingredient mainIngredient = ingredients.getFirst();
 
             if (AdapterUtils.hasMatchingIngredient(mergedInputs, mainIngredient, 1L)) {
-                return holder;
+                matches.add(holder);
             }
         }
+        return matches;
+    }
 
-        return null;
+    @SuppressWarnings("unchecked")
+    private <T extends AbstractCookingRecipe> List<RecipeHolder<AbstractCookingRecipe>> castHolders(List<RecipeHolder<T>> holders) {
+        return (List<RecipeHolder<AbstractCookingRecipe>>) (List<?>) holders;
     }
 
     @Override

@@ -16,12 +16,10 @@ import org.slf4j.Logger;
 
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Comparator;
-import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -65,20 +63,12 @@ public class AlloyFurnaceRecipeManager {
 
     private static final int MAX_CACHE_SIZE = 500;
 
-    // ========== 得分常量 ==========
-    private static final int SCORE_ITEM_FLUID_MOLD = 6;
-    private static final int SCORE_ITEM_MOLD = 5;
-    private static final int SCORE_FLUID_MOLD = 4;
-    private static final int SCORE_ITEM_FLUID = 3;
-    private static final int SCORE_ITEM = 2;
-    private static final int SCORE_FLUID = 1;
-
     // ========== 预构建索引 ==========
 
     private final Map<Item, List<AdvancedAlloyFurnaceRecipe>> inputItemIndex = new ConcurrentHashMap<>();
     private final Map<Item, List<AdvancedAlloyFurnaceRecipe>> moldIndex = new ConcurrentHashMap<>();
-    private final List<AdvancedAlloyFurnaceRecipe> noMoldRecipes = new CopyOnWriteArrayList<>();
     private final List<AdvancedAlloyFurnaceRecipe> hasFluidInputRecipes = new CopyOnWriteArrayList<>();
+    private final List<AdvancedAlloyFurnaceRecipe> hasKeyInputRecipes = new CopyOnWriteArrayList<>();
     private final Set<AdvancedAlloyFurnaceRecipe> indexedRecipes = ConcurrentHashMap.newKeySet();
 
     private boolean indexBuilt = false;
@@ -109,6 +99,7 @@ public class AlloyFurnaceRecipeManager {
         if (level == null || level.isClientSide()) return;
 
         clearIndex();
+        clearCache();
 
         List<RecipeHolder<AdvancedAlloyFurnaceRecipe>> recipes = level.getRecipeManager()
                 .getAllRecipesFor(ModRecipeTypes.ADVANCED_ALLOY_FURNACE_TYPE.get());
@@ -123,8 +114,8 @@ public class AlloyFurnaceRecipeManager {
     private void clearIndex() {
         inputItemIndex.clear();
         moldIndex.clear();
-        noMoldRecipes.clear();
         hasFluidInputRecipes.clear();
+        hasKeyInputRecipes.clear();
         indexedRecipes.clear();
         indexBuilt = false;
     }
@@ -147,9 +138,7 @@ public class AlloyFurnaceRecipeManager {
         }
 
         Ingredient mold = recipe.mold();
-        if (mold == null || mold.isEmpty()) {
-            noMoldRecipes.add(recipe);
-        } else {
+        if (mold != null && !mold.isEmpty()) {
             for (ItemStack stack : mold.getItems()) {
                 if (!stack.isEmpty()) {
                     moldIndex
@@ -162,19 +151,12 @@ public class AlloyFurnaceRecipeManager {
         if (!recipe.inputFluids().isEmpty()) {
             hasFluidInputRecipes.add(recipe);
         }
+        if (!recipe.keyInputs().isEmpty()) {
+            hasKeyInputRecipes.add(recipe);
+        }
     }
 
-    /**
-     * 按优先级统一查找配方（物品+流体+模具）
-     * <p>
-     * 匹配优先级：
-     * 1. 物品+流体+模具 全部匹配
-     * 2. 物品+模具 匹配
-     * 3. 流体+模具 匹配
-     * 4. 物品+流体 匹配
-     * 5. 仅物品匹配
-     * 6. 仅流体匹配
-     */
+    /** 按当前机器输入查找最具体的可运行配方。 */
     @Nullable
     public AdvancedAlloyFurnaceRecipe findRecipe(Level level, List<ItemStack> inputs,
                                                   List<FluidStack> fluidInputs, @Nullable ItemStack mold) {
@@ -184,14 +166,33 @@ public class AlloyFurnaceRecipeManager {
     @Nullable
     public AdvancedAlloyFurnaceRecipe findRecipe(Level level, List<ItemStack> inputs,
                                                   List<FluidStack> fluidInputs, List<GenericStack> keyInputs, @Nullable ItemStack mold) {
+        return findRecipe(level, new RecipeLookupContext(inputs, fluidInputs, keyInputs, mold, List.of(), 1L));
+    }
+
+    /**
+     * 按 AE 样板目标输出查找配方。
+     *
+     * @param expectedOutputs 样板声明的输出；只作为配方身份约束，不比较输出数量
+     * @param operations      当前输入聚合了多少次样板操作
+     */
+    @Nullable
+    public AdvancedAlloyFurnaceRecipe findRecipeForCrafting(Level level, List<ItemStack> inputs,
+                                                             List<FluidStack> fluidInputs, List<GenericStack> keyInputs,
+                                                             @Nullable ItemStack mold, List<GenericStack> expectedOutputs,
+                                                             long operations) {
+        return findRecipe(level, new RecipeLookupContext(inputs, fluidInputs, keyInputs, mold, expectedOutputs, operations));
+    }
+
+    @Nullable
+    private AdvancedAlloyFurnaceRecipe findRecipe(Level level, RecipeLookupContext context) {
         if (level == null) {
             return null;
         }
 
-        boolean hasItems = !inputs.isEmpty();
-        boolean hasFluids = fluidInputs != null && !fluidInputs.isEmpty();
-        boolean hasKeys = keyInputs != null && !keyInputs.isEmpty();
-        boolean hasMold = mold != null && !mold.isEmpty();
+        boolean hasItems = !context.inputs().isEmpty();
+        boolean hasFluids = !context.fluidInputs().isEmpty();
+        boolean hasKeys = !context.keyInputs().isEmpty();
+        boolean hasMold = context.mold() != null && !context.mold().isEmpty();
 
         if (!hasItems && !hasFluids && !hasKeys && !hasMold) {
             return null;
@@ -201,7 +202,7 @@ public class AlloyFurnaceRecipeManager {
             buildIndex(level);
         }
 
-        RecipeCacheKey cacheKey = new RecipeCacheKey(inputs, fluidInputs, keyInputs, mold);
+        RecipeCacheKey cacheKey = RecipeCacheKey.from(context);
 
         AdvancedAlloyFurnaceRecipe cachedRecipe = recipeCache.get(cacheKey);
         if (cachedRecipe != null) {
@@ -212,20 +213,16 @@ public class AlloyFurnaceRecipeManager {
             return null;
         }
 
-        AdvancedAlloyFurnaceRecipe recipe = findRecipeByScore(inputs, fluidInputs, keyInputs, mold);
+        LinkedHashSet<AdvancedAlloyFurnaceRecipe> candidates = new LinkedHashSet<>(getCandidateRecipes(context));
 
+        if (hasMold) {
+            candidates.addAll(findAdaptedRecipes(level, context));
+        }
+
+        AdvancedAlloyFurnaceRecipe recipe = selectBestRecipe(candidates, context);
         if (recipe != null) {
             cacheRecipe(cacheKey, recipe);
             return recipe;
-        }
-
-        // 有模具时，通过适配器按模具预筛选查找外部配方
-        if (hasMold) {
-            recipe = findAdaptedRecipeByScore(level, inputs, fluidInputs, keyInputs, mold);
-            if (recipe != null) {
-                cacheRecipe(cacheKey, recipe);
-                return recipe;
-            }
         }
 
         cacheNegativeResult(cacheKey);
@@ -233,294 +230,217 @@ public class AlloyFurnaceRecipeManager {
     }
 
     /**
-     * 基于评分系统查找配方
+     * 索引只用于缩小候选集，所有集合都取并集；交集筛选可能在某个候选数量不足时
+     * 错误隐藏仍可运行的通用配方。
      */
-    @Nullable
-    private AdvancedAlloyFurnaceRecipe findRecipeByScore(List<ItemStack> inputs,
-                                                          List<FluidStack> fluidInputs,
-                                                          List<GenericStack> keyInputs,
-                                                          @Nullable ItemStack mold) {
-        List<AdvancedAlloyFurnaceRecipe> candidates = getCandidateRecipes(inputs, fluidInputs, mold);
+    private List<AdvancedAlloyFurnaceRecipe> getCandidateRecipes(RecipeLookupContext context) {
+        LinkedHashSet<AdvancedAlloyFurnaceRecipe> candidates = new LinkedHashSet<>();
+
+        for (ItemStack input : context.inputs()) {
+            if (input.isEmpty()) continue;
+            List<AdvancedAlloyFurnaceRecipe> recipes = inputItemIndex.get(input.getItem());
+            if (recipes != null) candidates.addAll(recipes);
+        }
+
+        if (!context.fluidInputs().isEmpty()) {
+            candidates.addAll(hasFluidInputRecipes);
+        }
+        if (!context.keyInputs().isEmpty()) {
+            candidates.addAll(hasKeyInputRecipes);
+        }
+        if (context.mold() != null && !context.mold().isEmpty()) {
+            List<AdvancedAlloyFurnaceRecipe> recipes = moldIndex.get(context.mold().getItem());
+            if (recipes != null) candidates.addAll(recipes);
+        }
 
         if (candidates.isEmpty()) {
-            return null;
+            candidates.addAll(indexedRecipes);
         }
-
-        return selectBestByScore(candidates, inputs, fluidInputs, keyInputs, mold);
+        return new ArrayList<>(candidates);
     }
 
-    /**
-     * 获取候选配方列表（基于索引快速筛选）。
-     * 模具是最具区分度的过滤条件，优先使用模具索引缩小候选集。
-     */
-    private List<AdvancedAlloyFurnaceRecipe> getCandidateRecipes(List<ItemStack> inputs,
-                                                                  List<FluidStack> fluidInputs,
-                                                                  @Nullable ItemStack mold) {
-        Set<AdvancedAlloyFurnaceRecipe> candidateSet = new HashSet<>();
-        boolean hasItems = !inputs.isEmpty();
-        boolean hasFluids = fluidInputs != null && !fluidInputs.isEmpty();
-        boolean hasMold = mold != null && !mold.isEmpty();
-
-        // 1. 模具优先：模具是最具区分度的过滤条件
-        Set<AdvancedAlloyFurnaceRecipe> moldFiltered = null;
-        if (hasMold) {
-            List<AdvancedAlloyFurnaceRecipe> moldRecipes = moldIndex.get(mold.getItem());
-            if (moldRecipes != null && !moldRecipes.isEmpty()) {
-                moldFiltered = new HashSet<>(moldRecipes);
-                candidateSet.addAll(moldFiltered);
-            }
-        }
-
-        // 2. 物品过滤：与模具结果取交集
-        if (hasItems) {
-            Set<AdvancedAlloyFurnaceRecipe> itemFiltered = new HashSet<>();
-            for (ItemStack input : inputs) {
-                if (!input.isEmpty()) {
-                    List<AdvancedAlloyFurnaceRecipe> recipes = inputItemIndex.get(input.getItem());
-                    if (recipes != null) {
-                        itemFiltered.addAll(recipes);
-                    }
-                }
-            }
-            if (!itemFiltered.isEmpty()) {
-                if (!candidateSet.isEmpty()) {
-                    candidateSet.retainAll(itemFiltered); // 模具 ∩ 物品
-                } else {
-                    candidateSet.addAll(itemFiltered);
-                }
-            }
-        }
-
-        // 如果没有找到模具候选但有物品，说明模具筛选太窄，回退到仅物品
-        if (candidateSet.isEmpty() && hasItems && moldFiltered != null) {
-            // 模具+物品交集为空，仅使用物品过滤
-            for (ItemStack input : inputs) {
-                if (!input.isEmpty()) {
-                    List<AdvancedAlloyFurnaceRecipe> recipes = inputItemIndex.get(input.getItem());
-                    if (recipes != null) candidateSet.addAll(recipes);
-                }
-            }
-        }
-
-        // 3. 流体过滤
-        if (hasFluids && !hasFluidInputRecipes.isEmpty()) {
-            if (!candidateSet.isEmpty()) {
-                candidateSet.retainAll(hasFluidInputRecipes);
-            } else {
-                candidateSet.addAll(hasFluidInputRecipes);
-            }
-        }
-
-        // 4. 兜底：无候选时加入无模具配方
-        if (candidateSet.isEmpty()) {
-            if (hasMold && moldFiltered != null && !moldFiltered.isEmpty()) {
-                candidateSet.addAll(moldFiltered);
-            }
-            candidateSet.addAll(noMoldRecipes);
-        }
-
-        return new ArrayList<>(candidateSet);
-    }
-
-    /**
-     * 按评分从候选列表中选出最佳配方。
-     * 使用线性扫描（O(n)）替代收集+排序（O(n log n)），
-     * 跟踪当前最佳，避免 ArrayList 分配和排序开销。
-     */
     @Nullable
-    private AdvancedAlloyFurnaceRecipe selectBestByScore(List<AdvancedAlloyFurnaceRecipe> candidates,
-                                                          List<ItemStack> inputs,
-                                                          List<FluidStack> fluidInputs,
-                                                          List<GenericStack> keyInputs,
-                                                          @Nullable ItemStack mold) {
-        ScoredRecipe best = null;
-
+    private AdvancedAlloyFurnaceRecipe selectBestRecipe(Iterable<AdvancedAlloyFurnaceRecipe> candidates,
+                                                         RecipeLookupContext context) {
+        AdvancedAlloyFurnaceRecipe best = null;
         for (AdvancedAlloyFurnaceRecipe recipe : candidates) {
-            int score = calculateMatchScore(recipe, inputs, fluidInputs, keyInputs, mold, false);
-            if (score <= 0) continue;
-
-            // 满分原生配方：没有其他配方能超越，立即返回
-            if (score == SCORE_ITEM_FLUID_MOLD && !isConvertedRecipe(recipe)) {
-                return recipe;
-            }
-
-            ScoredRecipe current = new ScoredRecipe(recipe, score);
-            if (best == null || isBetterThan(current, best)) {
-                best = current;
+            if (!matchesLookup(recipe, context)) continue;
+            if (best == null || isMoreSpecific(recipe, best)) {
+                best = recipe;
             }
         }
-
-        return best != null ? best.recipe : null;
+        return best;
     }
 
-    /**
-     * 比较两个评分配方，a 是否优于 b。
-     * 优先比较得分，得分相同时按：原生>转换、更多输入>更少、需要模具>不需要。
-     */
-    private boolean isBetterThan(ScoredRecipe a, ScoredRecipe b) {
-        if (a.score != b.score) return a.score > b.score;
-        // 原生配方优先于转换配方
-        if (isConvertedRecipe(a.recipe) != isConvertedRecipe(b.recipe))
-            return !isConvertedRecipe(a.recipe);
-        // 更多输入类型优先
-        if (a.recipe.inputs().size() != b.recipe.inputs().size())
-            return a.recipe.inputs().size() > b.recipe.inputs().size();
-        // 更多流体输入优先
-        if (a.recipe.inputFluids().size() != b.recipe.inputFluids().size())
-            return a.recipe.inputFluids().size() > b.recipe.inputFluids().size();
-        // 需要模具的配方优先
-        return !a.recipe.mold().isEmpty() && b.recipe.mold().isEmpty();
+    /** 包级可见的纯选择入口，供回归测试和其他无世界上下文的调用者使用。 */
+    @Nullable
+    static AdvancedAlloyFurnaceRecipe selectBestCandidate(Iterable<AdvancedAlloyFurnaceRecipe> candidates,
+                                                           List<ItemStack> inputs, List<FluidStack> fluidInputs,
+                                                           List<GenericStack> keyInputs, @Nullable ItemStack mold,
+                                                           List<GenericStack> expectedOutputs, long operations) {
+        RecipeLookupContext context = new RecipeLookupContext(
+                inputs, fluidInputs, keyInputs, mold, expectedOutputs, operations);
+        return getInstance().selectBestRecipe(candidates, context);
+    }
+
+    private boolean matchesLookup(AdvancedAlloyFurnaceRecipe recipe, RecipeLookupContext context) {
+        return matchesMold(recipe, context.mold())
+                && matchesItems(recipe, context.inputs(), context.operations())
+                && matchesFluids(recipe, context.fluidInputs(), context.operations())
+                && matchesKeys(recipe, context.keyInputs(), context.operations())
+                && matchesExpectedOutputs(recipe, context.expectedOutputs());
+    }
+
+    /** 按“模具专用、输入种类、各类数量、来源、ID”稳定比较具体度。 */
+    private boolean isMoreSpecific(AdvancedAlloyFurnaceRecipe candidate, AdvancedAlloyFurnaceRecipe current) {
+        boolean candidateHasMold = !candidate.mold().isEmpty();
+        boolean currentHasMold = !current.mold().isEmpty();
+        if (candidateHasMold != currentHasMold) return candidateHasMold;
+
+        long candidateKinds = inputKindCount(candidate);
+        long currentKinds = inputKindCount(current);
+        if (candidateKinds != currentKinds) return candidateKinds > currentKinds;
+
+        long candidateItems = requiredItemAmount(candidate);
+        long currentItems = requiredItemAmount(current);
+        if (candidateItems != currentItems) return candidateItems > currentItems;
+
+        long candidateFluids = requiredFluidAmount(candidate);
+        long currentFluids = requiredFluidAmount(current);
+        if (candidateFluids != currentFluids) return candidateFluids > currentFluids;
+
+        long candidateKeys = requiredKeyAmount(candidate);
+        long currentKeys = requiredKeyAmount(current);
+        if (candidateKeys != currentKeys) return candidateKeys > currentKeys;
+
+        boolean candidateConverted = isConvertedRecipe(candidate);
+        boolean currentConverted = isConvertedRecipe(current);
+        if (candidateConverted != currentConverted) return !candidateConverted;
+
+        return candidate.id().toString().compareTo(current.id().toString()) < 0;
+    }
+
+    private long inputKindCount(AdvancedAlloyFurnaceRecipe recipe) {
+        return (long) recipe.inputs().size() + recipe.inputFluids().size() + recipe.keyInputs().size();
+    }
+
+    private long requiredItemAmount(AdvancedAlloyFurnaceRecipe recipe) {
+        long result = 0;
+        for (CountedIngredient input : recipe.inputs()) {
+            result = saturatingAdd(result, Math.max(0L, input.count()));
+        }
+        return result;
+    }
+
+    private long requiredFluidAmount(AdvancedAlloyFurnaceRecipe recipe) {
+        long result = 0;
+        for (FluidStack input : recipe.inputFluids()) {
+            result = saturatingAdd(result, Math.max(0, input.getAmount()));
+        }
+        return result;
+    }
+
+    private long requiredKeyAmount(AdvancedAlloyFurnaceRecipe recipe) {
+        long result = 0;
+        for (GenericStack input : recipe.keyInputs()) {
+            if (input != null) result = saturatingAdd(result, Math.max(0L, input.amount()));
+        }
+        return result;
     }
 
     private boolean isConvertedRecipe(AdvancedAlloyFurnaceRecipe recipe) {
         return recipe.id().getPath().endsWith("_converted");
     }
 
-    /**
-     * 计算配方匹配得分
-     * <p>
-     * 物品、流体、模具均为硬性要求：只要用户提供了某类输入，
-     * 配方就必须完全匹配该类输入，否则直接排除。
-     */
-    private int calculateMatchScore(AdvancedAlloyFurnaceRecipe recipe,
-                                     List<ItemStack> inputs,
-                                     List<FluidStack> fluidInputs,
-                                     List<GenericStack> keyInputs,
-                                     @Nullable ItemStack mold) {
-        return calculateMatchScore(recipe, inputs, fluidInputs, keyInputs, mold, false);
-    }
-
-    private int calculateMatchScore(AdvancedAlloyFurnaceRecipe recipe,
-                                     List<ItemStack> inputs,
-                                     List<FluidStack> fluidInputs,
-                                     List<GenericStack> keyInputs,
-                                     @Nullable ItemStack mold,
-                                     boolean skipKeyCheck) {
-        boolean hasMold = mold != null && !mold.isEmpty();
-
-        // 模具检查最便宜，提前失败。同时缓存结果避免后续评分时重复调用
-        boolean moldMatches = !hasMold || matchesMold(recipe, mold);
-        if (!moldMatches) return 0;
-
-        boolean recipeHasItems = !recipe.inputs().isEmpty();
-        boolean recipeHasFluids = !recipe.inputFluids().isEmpty();
-        boolean recipeHasKeys = !recipe.keyInputs().isEmpty() && !skipKeyCheck;
-
-        // 惰性计算：仅在配方要求该类输入时才执行匹配检查
-        if (recipeHasItems && !matchesRecipe(recipe, inputs)) return 0;
-        if (recipeHasFluids && !matchesFluids(recipe, fluidInputs)) return 0;
-        if (recipeHasKeys && !matchesKeys(recipe, keyInputs)) return 0;
-
-        if (recipeHasKeys) {
-            return moldMatches ? SCORE_ITEM_FLUID_MOLD : SCORE_ITEM_FLUID;
-        }
-        if (recipeHasItems && recipeHasFluids) {
-            return moldMatches ? SCORE_ITEM_FLUID_MOLD : SCORE_ITEM_FLUID;
-        }
-        if (recipeHasItems) {
-            return moldMatches ? SCORE_ITEM_MOLD : SCORE_ITEM;
-        }
-        if (recipeHasFluids) {
-            return moldMatches ? SCORE_FLUID_MOLD : SCORE_FLUID;
-        }
-        return 0;
-    }
-
-    /**
-     * 检查流体输入是否匹配配方
-     */
-    private boolean matchesFluids(AdvancedAlloyFurnaceRecipe recipe, List<FluidStack> fluidInputs) {
-        if (fluidInputs == null || fluidInputs.isEmpty()) {
-            return recipe.inputFluids().isEmpty();
-        }
-
-        for (FluidStack requiredFluid : recipe.inputFluids()) {
-            long foundAmount = 0;
-            for (FluidStack input : fluidInputs) {
-                if (FluidStack.isSameFluidSameComponents(input, requiredFluid)) {
-                    foundAmount += input.getAmount();
+    private boolean matchesItems(AdvancedAlloyFurnaceRecipe recipe, List<ItemStack> inputs, long operations) {
+        for (CountedIngredient countedIngredient : recipe.inputs()) {
+            long required = saturatingMultiply(Math.max(0L, countedIngredient.count()), operations);
+            long found = 0;
+            for (ItemStack input : inputs) {
+                if (!input.isEmpty() && countedIngredient.ingredient().test(input)) {
+                    found = saturatingAdd(found, input.getCount());
                 }
             }
-            if (foundAmount < requiredFluid.getAmount()) return false;
+            if (found < required) return false;
         }
         return true;
     }
 
-    private boolean matchesKeys(AdvancedAlloyFurnaceRecipe recipe, List<GenericStack> keyInputs) {
-        return AdapterUtils.matchesKeyRequirements(AdapterUtils.mergeKeys(keyInputs), recipe.keyInputs());
+    private boolean matchesFluids(AdvancedAlloyFurnaceRecipe recipe, List<FluidStack> inputs, long operations) {
+        Map<AEKey, Long> available = snapshotFluids(inputs);
+        Map<AEKey, Long> required = snapshotFluids(recipe.inputFluids());
+        return containsScaled(available, required, operations);
+    }
+
+    private boolean matchesKeys(AdvancedAlloyFurnaceRecipe recipe, List<GenericStack> inputs, long operations) {
+        return containsScaled(snapshotGenericStacks(inputs), snapshotGenericStacks(recipe.keyInputs()), operations);
+    }
+
+    private static boolean containsScaled(Map<AEKey, Long> available, Map<AEKey, Long> required, long operations) {
+        for (Map.Entry<AEKey, Long> entry : required.entrySet()) {
+            long amount = saturatingMultiply(entry.getValue(), operations);
+            if (available.getOrDefault(entry.getKey(), 0L) < amount) return false;
+        }
+        return true;
     }
 
     /**
-     * 通过适配器按评分查找
-     * <p>
-     * 查找策略：
-     * 1. 优先通过 moldAdapterMap 精确查找（O(1)），适配器的 getMoldItem() 返回了具体物品
-     * 2. 然后遍历 fallbackAdapters，通过 matchesMold() 动态判断（如 SeedEssenceRecipeAdapter 检查 instanceof）
+     * AE 输出约束只比较 AEKey（包含组件），不比较数量，以兼容已有倍量样板。
      */
-    @Nullable
-    private <T extends Recipe<?>> AdvancedAlloyFurnaceRecipe findAdaptedRecipeByScore(
-            Level level, List<ItemStack> inputs, List<FluidStack> fluidInputs, List<GenericStack> keyInputs, @Nullable ItemStack mold) {
-        List<ScoredRecipe> scoredCandidates = new ArrayList<>();
+    public static boolean matchesExpectedOutputs(AdvancedAlloyFurnaceRecipe recipe, List<GenericStack> expectedOutputs) {
+        if (expectedOutputs == null || expectedOutputs.isEmpty()) return true;
 
-        // 在 Manager 层统一合并输入
-        Map<Ingredient, Long> mergedInputs = AdapterUtils.mergeInputs(inputs);
-        Map<FluidStack, Long> mergedFluids = AdapterUtils.mergeFluids(fluidInputs);
-        Map<AEKey, Long> mergedKeys = AdapterUtils.mergeKeys(keyInputs);
+        Set<AEKey> available = new LinkedHashSet<>();
+        for (ItemStack output : recipe.outputs()) {
+            GenericStack stack = GenericStack.fromItemStack(output);
+            if (stack != null) available.add(stack.what());
+        }
+        for (FluidStack output : recipe.outputFluids()) {
+            GenericStack stack = GenericStack.fromFluidStack(output);
+            if (stack != null) available.add(stack.what());
+        }
+        for (GenericStack output : recipe.keyOutputs()) {
+            if (output != null && output.what() != null) available.add(output.what());
+        }
 
-//        if (LOGGER.isDebugEnabled()) {
-//            LOGGER.debug("mergeInputs: {} item types from {} stacks: {}", mergedInputs.size(), inputs.size(), mergedInputs);
-//            LOGGER.debug("mergeFluids: {} fluid types from {} stacks: {}", mergedFluids.size(), fluidInputs != null ? fluidInputs.size() : 0, mergedFluids);
-//        }
+        for (GenericStack expected : expectedOutputs) {
+            if (expected == null || expected.what() == null || !available.contains(expected.what())) return false;
+        }
+        return true;
+    }
 
-        // 1. 按模具物品精确查找 adapter
+    /** 收集所有可能匹配的外部配方，最终由统一匹配器过滤和排序。 */
+    private List<AdvancedAlloyFurnaceRecipe> findAdaptedRecipes(Level level, RecipeLookupContext context) {
+        List<AdvancedAlloyFurnaceRecipe> candidates = new ArrayList<>();
+        Map<Ingredient, Long> mergedInputs = AdapterUtils.mergeInputs(context.inputs());
+        Map<FluidStack, Long> mergedFluids = AdapterUtils.mergeFluids(context.fluidInputs());
+        Map<AEKey, Long> mergedKeys = AdapterUtils.mergeKeys(context.keyInputs());
+
+        ItemStack mold = context.mold();
         if (mold != null && !mold.isEmpty()) {
             IRecipeAdapter<?> exactAdapter = moldAdapterMap.get(mold.getItem());
             if (exactAdapter != null) {
-                tryAdapter(exactAdapter, level, mergedInputs, mergedFluids, mergedKeys, mold, scoredCandidates, inputs, fluidInputs, keyInputs);
+                collectAdapterRecipes(exactAdapter, level, mergedInputs, mergedFluids, mergedKeys, mold, candidates);
             }
         }
 
-        // 2. 遍历无固定模具的 adapter，通过 matchesMold() 动态判断
         for (IRecipeAdapter<?> adapter : fallbackAdapters) {
-            if (!adapter.matchesMold(mold)) {
-                continue;
+            if (adapter.matchesMold(mold)) {
+                collectAdapterRecipes(adapter, level, mergedInputs, mergedFluids, mergedKeys, mold, candidates);
             }
-            tryAdapter(adapter, level, mergedInputs, mergedFluids, mergedKeys, mold, scoredCandidates, inputs, fluidInputs, keyInputs);
         }
-
-        if (scoredCandidates.isEmpty()) {
-            return null;
-        }
-
-        scoredCandidates.sort(Comparator.<ScoredRecipe>comparingInt(s -> s.score).reversed()
-                .thenComparing(s -> isConvertedRecipe(s.recipe))
-                .thenComparing(s -> s.recipe.inputs().size(), Comparator.reverseOrder())
-                .thenComparing(s -> s.recipe.inputFluids().size(), Comparator.reverseOrder()));
-
-        return scoredCandidates.getFirst().recipe;
+        return candidates;
     }
 
-    /**
-     * 尝试用给定的 adapter 查找配方并评分
-     */
     @SuppressWarnings("unchecked")
-    private <T extends Recipe<?>> void tryAdapter(
+    private <T extends Recipe<?>> void collectAdapterRecipes(
             IRecipeAdapter<?> adapter, Level level,
             Map<Ingredient, Long> mergedInputs, Map<FluidStack, Long> mergedFluids,
-            Map<AEKey, Long> mergedKeys,
-            @Nullable ItemStack mold, List<ScoredRecipe> scoredCandidates,
-            List<ItemStack> inputs, List<FluidStack> fluidInputs, List<GenericStack> keyInputs) {
-        RecipeHolder<T> holder;
-        holder = ((IRecipeAdapter<T>) adapter).findMatchingRecipe(level, mergedInputs, mergedFluids, mergedKeys, mold);
-
-        if (holder != null) {
-            List<AdvancedAlloyFurnaceRecipe> convertedRecipes = ((IRecipeAdapter<T>) adapter).convertAll(holder, level);
-            for (AdvancedAlloyFurnaceRecipe recipe : convertedRecipes) {
-                int score = calculateMatchScore(recipe, inputs, fluidInputs, keyInputs, mold, true);
-                if (score > 0) {
-                    scoredCandidates.add(new ScoredRecipe(recipe, score));
-                }
-            }
+            Map<AEKey, Long> mergedKeys, @Nullable ItemStack mold,
+            List<AdvancedAlloyFurnaceRecipe> candidates) {
+        IRecipeAdapter<T> typedAdapter = (IRecipeAdapter<T>) adapter;
+        for (RecipeHolder<T> holder : typedAdapter.findMatchingRecipes(level, mergedInputs, mergedFluids, mergedKeys, mold)) {
+            candidates.addAll(typedAdapter.convertAll(holder, level));
         }
     }
 
@@ -536,23 +456,6 @@ public class AlloyFurnaceRecipeManager {
         }
 
         return requiredMold.test(mold);
-    }
-
-    private boolean matchesRecipe(AdvancedAlloyFurnaceRecipe recipe, List<ItemStack> inputs) {
-        for (var countedIng : recipe.inputs()) {
-            long requiredCount = countedIng.count();
-            var ingredient = countedIng.ingredient();
-
-            long foundCount = 0;
-            for (ItemStack stack : inputs) {
-                if (ingredient.test(stack)) {
-                    foundCount += stack.getCount();
-                }
-            }
-
-            if (foundCount < requiredCount) return false;
-        }
-        return true;
     }
 
     private void cacheRecipe(RecipeCacheKey key, AdvancedAlloyFurnaceRecipe recipe) {
@@ -575,109 +478,98 @@ public class AlloyFurnaceRecipeManager {
         indexBuilt = false;
     }
 
-    private static final class RecipeCacheKey {
-        private final List<ItemStack> inputs;
-        @Nullable private final List<FluidStack> fluidInputs;
-        @Nullable private final List<GenericStack> keyInputs;
-        @Nullable private final ItemStack mold;
-        private final int hash;
-
-        RecipeCacheKey(List<ItemStack> inputs, @Nullable List<FluidStack> fluidInputs,
-                       @Nullable List<GenericStack> keyInputs, @Nullable ItemStack mold) {
-            this.inputs = inputs;
-            this.fluidInputs = fluidInputs;
-            this.keyInputs = keyInputs;
-            this.mold = mold;
-            this.hash = computeHash();
-        }
-
-        List<ItemStack> inputs() { return inputs; }
-        @Nullable List<FluidStack> fluidInputs() { return fluidInputs; }
-        @Nullable List<GenericStack> keyInputs() { return keyInputs; }
-        @Nullable ItemStack mold() { return mold; }
-
-        @Override
-        public boolean equals(Object o) {
-            if (this == o) return true;
-            if (o == null || getClass() != o.getClass()) return false;
-            RecipeCacheKey that = (RecipeCacheKey) o;
-
-            if (!Objects.equals(mold, that.mold)) {
-                if (mold == null || that.mold == null) return false;
-                if (!ItemStack.isSameItemSameComponents(mold, that.mold)) return false;
-            }
-
-            if (inputs.size() != that.inputs.size()) return false;
-            for (int i = 0; i < inputs.size(); i++) {
-                ItemStack a = inputs.get(i);
-                ItemStack b = that.inputs.get(i);
-                if (!ItemStack.isSameItemSameComponents(a, b)) {
-                    return false;
-                }
-            }
-
-            List<FluidStack> f1 = fluidInputs != null ? fluidInputs : List.of();
-            List<FluidStack> f2 = that.fluidInputs != null ? that.fluidInputs : List.of();
-            if (f1.size() != f2.size()) return false;
-            for (int i = 0; i < f1.size(); i++) {
-                if (!FluidStack.isSameFluidSameComponents(f1.get(i), f2.get(i))) {
-                    return false;
-                }
-            }
-
-            List<GenericStack> k1 = keyInputs != null ? keyInputs : List.of();
-            List<GenericStack> k2 = that.keyInputs != null ? that.keyInputs : List.of();
-            if (k1.size() != k2.size()) return false;
-            for (int i = 0; i < k1.size(); i++) {
-                GenericStack a = k1.get(i);
-                GenericStack b = k2.get(i);
-                if (!Objects.equals(a.what(), b.what()) || a.amount() != b.amount()) {
-                    return false;
-                }
-            }
-
-            return true;
-        }
-
-        @Override
-        public int hashCode() {
-            return hash;
-        }
-
-        private int computeHash() {
-            int result = 1;
-
-            if (mold != null && !mold.isEmpty()) {
-                result = 31 * result + mold.getItem().hashCode();
-                var components = mold.getComponentsPatch();
-                if (!components.isEmpty()) {
-                    result = 31 * result + components.hashCode();
-                }
-            }
-
-            for (ItemStack stack : inputs) {
-                result = 31 * result + (stack.isEmpty() ? 0 : stack.getItem().hashCode());
-                var components = stack.getComponentsPatch();
-                if (!components.isEmpty()) {
-                    result = 31 * result + components.hashCode();
-                }
-            }
-
-            List<FluidStack> f = fluidInputs != null ? fluidInputs : List.of();
-            for (FluidStack fs : f) {
-                result = 31 * result + fs.getFluid().hashCode();
-                result = 31 * result + fs.getComponentsPatch().hashCode();
-            }
-
-            List<GenericStack> k = keyInputs != null ? keyInputs : List.of();
-            for (GenericStack keyInput : k) {
-                result = 31 * result + keyInput.what().hashCode();
-                result = 31 * result + Long.hashCode(keyInput.amount());
-            }
-
-            return result;
+    private record RecipeLookupContext(
+            List<ItemStack> inputs,
+            List<FluidStack> fluidInputs,
+            List<GenericStack> keyInputs,
+            @Nullable ItemStack mold,
+            List<GenericStack> expectedOutputs,
+            long operations
+    ) {
+        private RecipeLookupContext {
+            inputs = inputs == null ? List.of() : inputs;
+            fluidInputs = fluidInputs == null ? List.of() : fluidInputs;
+            keyInputs = keyInputs == null ? List.of() : keyInputs;
+            expectedOutputs = expectedOutputs == null ? List.of() : expectedOutputs;
+            operations = Math.max(1L, operations);
         }
     }
 
-    private record ScoredRecipe(AdvancedAlloyFurnaceRecipe recipe, int score) {}
+    /** 只保存不可变的 AEKey/数量快照，不持有调用方可变的 ItemStack。 */
+    static record RecipeCacheKey(
+            Map<AEKey, Long> items,
+            Map<AEKey, Long> fluids,
+            Map<AEKey, Long> keys,
+            @Nullable AEKey mold,
+            Map<AEKey, Long> expectedOutputs,
+            long operations
+    ) {
+        private static RecipeCacheKey from(RecipeLookupContext context) {
+            GenericStack moldStack = context.mold() == null || context.mold().isEmpty()
+                    ? null
+                    : GenericStack.fromItemStack(context.mold());
+            return new RecipeCacheKey(
+                    snapshotItems(context.inputs()),
+                    snapshotFluids(context.fluidInputs()),
+                    snapshotGenericStacks(context.keyInputs()),
+                    moldStack == null ? null : moldStack.what(),
+                    snapshotGenericStacks(context.expectedOutputs()),
+                    context.operations()
+            );
+        }
+
+        static RecipeCacheKey create(List<ItemStack> inputs, List<FluidStack> fluidInputs,
+                                     List<GenericStack> keyInputs, @Nullable ItemStack mold,
+                                     List<GenericStack> expectedOutputs, long operations) {
+            return from(new RecipeLookupContext(
+                    inputs, fluidInputs, keyInputs, mold, expectedOutputs, operations));
+        }
+    }
+
+    private static Map<AEKey, Long> snapshotItems(List<ItemStack> stacks) {
+        Map<AEKey, Long> result = new LinkedHashMap<>();
+        if (stacks == null) return Map.of();
+        for (ItemStack stack : stacks) {
+            if (stack == null || stack.isEmpty()) continue;
+            GenericStack genericStack = GenericStack.fromItemStack(stack);
+            if (genericStack != null) {
+                result.merge(genericStack.what(), (long) stack.getCount(), AlloyFurnaceRecipeManager::saturatingAdd);
+            }
+        }
+        return Map.copyOf(result);
+    }
+
+    private static Map<AEKey, Long> snapshotFluids(List<FluidStack> stacks) {
+        Map<AEKey, Long> result = new LinkedHashMap<>();
+        if (stacks == null) return Map.of();
+        for (FluidStack stack : stacks) {
+            if (stack == null || stack.isEmpty()) continue;
+            GenericStack genericStack = GenericStack.fromFluidStack(stack);
+            if (genericStack != null) {
+                result.merge(genericStack.what(), (long) stack.getAmount(), AlloyFurnaceRecipeManager::saturatingAdd);
+            }
+        }
+        return Map.copyOf(result);
+    }
+
+    private static Map<AEKey, Long> snapshotGenericStacks(List<GenericStack> stacks) {
+        Map<AEKey, Long> result = new LinkedHashMap<>();
+        if (stacks == null) return Map.of();
+        for (GenericStack stack : stacks) {
+            if (stack == null || stack.what() == null || stack.amount() <= 0) continue;
+            result.merge(stack.what(), stack.amount(), AlloyFurnaceRecipeManager::saturatingAdd);
+        }
+        return Map.copyOf(result);
+    }
+
+    private static long saturatingAdd(long a, long b) {
+        if (a >= Long.MAX_VALUE - b) return Long.MAX_VALUE;
+        return a + b;
+    }
+
+    private static long saturatingMultiply(long amount, long multiplier) {
+        if (amount <= 0 || multiplier <= 0) return 0;
+        if (amount > Long.MAX_VALUE / multiplier) return Long.MAX_VALUE;
+        return amount * multiplier;
+    }
 }

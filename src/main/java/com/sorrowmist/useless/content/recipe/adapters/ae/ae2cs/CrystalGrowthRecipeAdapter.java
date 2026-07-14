@@ -111,10 +111,11 @@ public class CrystalGrowthRecipeAdapter implements IRecipeAdapter<CrystalGrowthR
 
     @Override
     @Nullable
-    public RecipeHolder<GrowthDummyRecipe> findMatchingRecipe(Level level, Map<Ingredient, Long> mergedInputs, Map<FluidStack, Long> mergedFluids, @Nullable ItemStack mold) {
-        if (level == null || mergedInputs.isEmpty()) return null;
-        if (!CircuitEtcherRecipeAdapter.checkMold(mold, "crystal_growth_chamber")) return null;
+    public List<RecipeHolder<GrowthDummyRecipe>> findMatchingRecipes(Level level, Map<Ingredient, Long> mergedInputs, Map<FluidStack, Long> mergedFluids, @Nullable ItemStack mold) {
+        if (level == null || mergedInputs.isEmpty()) return List.of();
+        if (!CircuitEtcherRecipeAdapter.checkMold(mold, "crystal_growth_chamber")) return List.of();
 
+        List<RecipeHolder<GrowthDummyRecipe>> matches = new java.util.ArrayList<>();
         for (Ingredient input : mergedInputs.keySet()) {
             for (ItemStack stack : input.getItems()) {
                 Item item = stack.getItem();
@@ -122,11 +123,11 @@ public class CrystalGrowthRecipeAdapter implements IRecipeAdapter<CrystalGrowthR
 
                 AdvancedAlloyFurnaceRecipe recipe = recipeMap.get(item);
                 if (recipe != null) {
-                    return new RecipeHolder<>(recipe.id(), new GrowthDummyRecipe(recipe));
+                    matches.add(new RecipeHolder<>(recipe.id(), new GrowthDummyRecipe(recipe)));
                 }
             }
         }
-        return null;
+        return matches;
     }
 
     public static class GrowthDummyRecipe implements Recipe<RecipeInput> {

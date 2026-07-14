@@ -96,12 +96,12 @@ public class PrecisionSawmillRecipeAdapter implements IRecipeAdapter<SawmillReci
 
     @Override
     @Nullable
-    public RecipeHolder<SawmillRecipe> findMatchingRecipe(Level level, Map<Ingredient, Long> mergedInputs, Map<FluidStack, Long> mergedFluids, @Nullable ItemStack mold) {
+    public List<RecipeHolder<SawmillRecipe>> findMatchingRecipes(Level level, Map<Ingredient, Long> mergedInputs, Map<FluidStack, Long> mergedFluids, @Nullable ItemStack mold) {
         if (level == null || mergedInputs.isEmpty()) {
-            return null;
+            return List.of();
         }
         if (mold != null && !mold.isEmpty() && !matchesMold(mold)) {
-            return null;
+            return List.of();
         }
 
         RecipeManager recipeManager = level.getRecipeManager();
@@ -109,17 +109,17 @@ public class PrecisionSawmillRecipeAdapter implements IRecipeAdapter<SawmillReci
                 MekanismRecipeTypes.TYPE_SAWING.value()
         );
 
+        List<RecipeHolder<SawmillRecipe>> matches = new java.util.ArrayList<>();
         for (RecipeHolder<SawmillRecipe> holder : recipes) {
             SawmillRecipe recipe = holder.value();
             ItemStackIngredient input = recipe.getInput();
             if (input == null || input.hasNoMatchingInstances()) continue;
 
             if (matchesIngredient(mergedInputs, input)) {
-                return holder;
+                matches.add(holder);
             }
         }
-
-        return null;
+        return matches;
     }
 
     private static ChanceScale scaleChance(double chance) {

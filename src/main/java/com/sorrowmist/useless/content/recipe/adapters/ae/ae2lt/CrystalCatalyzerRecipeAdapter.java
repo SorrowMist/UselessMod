@@ -104,15 +104,16 @@ public class CrystalCatalyzerRecipeAdapter implements IRecipeAdapter<CrystalCata
     @Override
     @Nullable
     @SuppressWarnings("unchecked")
-    public RecipeHolder<CrystalCatalyzerRecipe> findMatchingRecipe(Level level, Map<Ingredient, Long> mergedInputs, Map<FluidStack, Long> mergedFluids, Map<AEKey, Long> mergedKeys, @Nullable ItemStack mold) {
-        if (level == null) return null;
-        if (mold == null || mold.isEmpty()) return null;
+    public List<RecipeHolder<CrystalCatalyzerRecipe>> findMatchingRecipes(Level level, Map<Ingredient, Long> mergedInputs, Map<FluidStack, Long> mergedFluids, Map<AEKey, Long> mergedKeys, @Nullable ItemStack mold) {
+        if (level == null) return List.of();
+        if (mold == null || mold.isEmpty()) return List.of();
 
         RecipeManager recipeManager = level.getRecipeManager();
         List<RecipeHolder<CrystalCatalyzerRecipe>> recipes = (List<RecipeHolder<CrystalCatalyzerRecipe>>) (List<?>) recipeManager.getAllRecipesFor(
                 ModRecipeTypes.CRYSTAL_CATALYZER_TYPE.get()
         );
 
+        List<RecipeHolder<CrystalCatalyzerRecipe>> matches = new java.util.ArrayList<>();
         for (RecipeHolder<CrystalCatalyzerRecipe> holder : recipes) {
             CrystalCatalyzerRecipe recipe = holder.value();
 
@@ -123,11 +124,10 @@ public class CrystalCatalyzerRecipeAdapter implements IRecipeAdapter<CrystalCata
 
             if (catalyst.get().test(mold)
                     && AELightningIngredientHelper.matchesLightning(mergedKeys, recipe.lightningTier(), (long) recipe.lightningCost())) {
-                return holder;
+                matches.add(holder);
             }
         }
-
-        return null;
+        return matches;
     }
 
 }

@@ -117,14 +117,15 @@ public class ReactionChamberRecipeAdapter implements IRecipeAdapter<ReactionCham
 
     @Override
     @Nullable
-    public RecipeHolder<ReactionChamberRecipe> findMatchingRecipe(Level level, Map<Ingredient, Long> mergedInputs, Map<FluidStack, Long> mergedFluids, @Nullable ItemStack mold) {
+    public List<RecipeHolder<ReactionChamberRecipe>> findMatchingRecipes(Level level, Map<Ingredient, Long> mergedInputs, Map<FluidStack, Long> mergedFluids, @Nullable ItemStack mold) {
         if (level == null || mergedInputs.isEmpty()) {
-            return null;
+            return List.of();
         }
 
         RecipeManager recipeManager = level.getRecipeManager();
         List<RecipeHolder<ReactionChamberRecipe>> recipes = recipeManager.getAllRecipesFor(ReactionChamberRecipe.TYPE);
 
+        List<RecipeHolder<ReactionChamberRecipe>> matches = new java.util.ArrayList<>();
         for (RecipeHolder<ReactionChamberRecipe> holder : recipes) {
             ReactionChamberRecipe recipe = holder.value();
             List<IngredientStack.Item> recipeInputs = recipe.getInputs();
@@ -141,11 +142,10 @@ public class ReactionChamberRecipeAdapter implements IRecipeAdapter<ReactionCham
             }
 
             if (allMatch && !recipeInputs.isEmpty() && matchesFluidInput(mergedFluids, recipe.getFluid())) {
-                return holder;
+                matches.add(holder);
             }
         }
-
-        return null;
+        return matches;
     }
 
     private boolean matchesFluidInput(Map<FluidStack, Long> mergedFluids, IngredientStack.Fluid fluidInput) {

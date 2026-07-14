@@ -114,6 +114,18 @@ public interface IRecipeAdapter<T extends Recipe<?>> {
     }
 
     /**
+     * 查找全部匹配的原始配方持有者（不含 AEKey 输入）。
+     * <p>
+     * 默认实现包装旧的单结果接口，保证第三方适配器无需立即迁移；内置适配器应覆写此方法，
+     * 避免重叠配方在适配器内部被“第一个匹配项”截断。
+     */
+    default List<RecipeHolder<T>> findMatchingRecipes(Level level, Map<Ingredient, Long> mergedInputs,
+                                                       Map<FluidStack, Long> mergedFluids, @Nullable ItemStack mold) {
+        RecipeHolder<T> holder = findMatchingRecipe(level, mergedInputs, mergedFluids, mold);
+        return holder == null ? List.of() : List.of(holder);
+    }
+
+    /**
      * 查找并返回匹配的原始配方持有者
      * <p>
      * 这是当前适配器的主匹配入口。Manager 层会先统一合并物品、流体和 AEKey，再调用此方法。
@@ -131,5 +143,21 @@ public interface IRecipeAdapter<T extends Recipe<?>> {
     @Nullable
     default RecipeHolder<T> findMatchingRecipe(Level level, Map<Ingredient, Long> mergedInputs, Map<FluidStack, Long> mergedFluids, Map<AEKey, Long> mergedKeys, @Nullable ItemStack mold) {
         return findMatchingRecipe(level, mergedInputs, mergedFluids, mold);
+    }
+
+    /**
+     * 查找全部匹配的原始配方持有者。
+     * <p>
+     * 无 AEKey 的适配器自动回退到四参候选接口；需要 AEKey 的适配器可覆写本方法。
+     */
+    default List<RecipeHolder<T>> findMatchingRecipes(Level level, Map<Ingredient, Long> mergedInputs,
+                                                       Map<FluidStack, Long> mergedFluids, Map<AEKey, Long> mergedKeys,
+                                                       @Nullable ItemStack mold) {
+        List<RecipeHolder<T>> matches = findMatchingRecipes(level, mergedInputs, mergedFluids, mold);
+        if (!matches.isEmpty()) return matches;
+
+        // 兼容只覆写旧五参单结果接口的第三方 AEKey 适配器。
+        RecipeHolder<T> holder = findMatchingRecipe(level, mergedInputs, mergedFluids, mergedKeys, mold);
+        return holder == null ? List.of() : List.of(holder);
     }
 }

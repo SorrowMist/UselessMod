@@ -50,7 +50,6 @@ import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.parallel.A
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.recipe.AlloyFurnaceRecipeCalculator;
 import com.sorrowmist.useless.content.menus.AdvancedAlloyFurnaceMenu;
 import com.sorrowmist.useless.content.recipe.AdvancedAlloyFurnaceRecipe;
-import com.sorrowmist.useless.content.recipe.AlloyFurnaceRecipeManager;
 import com.sorrowmist.useless.core.config.ConfigManager;
 import com.sorrowmist.useless.core.constants.NBTConstants;
 import com.sorrowmist.useless.energy.EnergyManager;
@@ -140,9 +139,6 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
     private boolean hasMold = false;
     @Nullable
     private AdvancedAlloyFurnaceRecipe currentRecipe;
-    // 上一个成功处理的配方，用于优先匹配以减少配方查找时间
-    @Nullable
-    private AdvancedAlloyFurnaceRecipe lastSuccessfulRecipe;
     // 缓存催化剂解析结果，避免每tick重复解析
     @Nullable
     private ResolvedCatalystEffect cachedCatalystEffect;
@@ -185,7 +181,7 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
                 PATTERN_SLOTS_END,
                 this::setChanged,
                 slot -> this.updateMoldState(),
-                slot -> this.clearRecipeCache(),
+                null,
                 slot -> this.updatePatterns()
         );
 
@@ -691,9 +687,6 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
         this.consumeRecipeInputs(this.currentRecipe, actualParallel);
         this.produceRecipeOutputs(this.currentRecipe, actualParallel);
 
-        // 记录上一个成功处理的配方，用于下次优先匹配
-        this.lastSuccessfulRecipe = this.currentRecipe;
-
         this.resetProgress();
     }
 
@@ -714,9 +707,6 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
         this.maxProgress = resolvedCatalystEffect.processTime();
 
         this.progress = 0;
-
-        // 更新上一个成功处理的配方
-        this.lastSuccessfulRecipe = recipe;
 
         // 使用统一的并行计算方法
         this.cachedParallel = this.calculateActualParallel(recipe);
@@ -1260,13 +1250,12 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
     /**
      * 查找匹配的配方（统一匹配，支持物品+流体+模具优先级）
      * <p>
-     * 优先检查上一个成功处理的配方（直接遍历slot，无需构建输入列表），
-     * 仅在 lastSuccessfulRecipe 失效时才进行完整的配方查找链。
+     * 每次按当前输入查询最具体配方；查询管理器会用包含数量的不可变键缓存结果。
      *
      * @return 匹配的配方，如果没有则返回空
      */
     private Optional<AdvancedAlloyFurnaceRecipe> findMatchingRecipe() {
-        return this.recipeCalculator.findMatchingRecipe(this.level, this.lastSuccessfulRecipe);
+        return this.recipeCalculator.findMatchingRecipe(this.level);
     }
 
     /**
@@ -1318,16 +1307,6 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
     private void updateMoldState() {
         ItemStack moldStack = this.itemHandler.getStackInSlot(MOLD_SLOT);
         this.hasMold = !moldStack.isEmpty();
-        this.setChanged();
-    }
-
-    /**
-     * 清空配方缓存和上一个成功配方
-     * 当输入槽、模具槽或催化剂槽变化时调用
-     */
-    private void clearRecipeCache() {
-        this.lastSuccessfulRecipe = null;
-        AlloyFurnaceRecipeManager.getInstance().clearCache();
         this.setChanged();
     }
 

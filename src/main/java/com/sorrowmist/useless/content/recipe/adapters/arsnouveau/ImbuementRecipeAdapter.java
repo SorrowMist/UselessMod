@@ -92,9 +92,9 @@ public class ImbuementRecipeAdapter implements IRecipeAdapter<ImbuementRecipe> {
     @Override
     @Nullable
     @SuppressWarnings("unchecked")
-    public RecipeHolder<ImbuementRecipe> findMatchingRecipe(Level level, Map<Ingredient, Long> mergedInputs, Map<FluidStack, Long> mergedFluids, @Nullable ItemStack mold) {
+    public List<RecipeHolder<ImbuementRecipe>> findMatchingRecipes(Level level, Map<Ingredient, Long> mergedInputs, Map<FluidStack, Long> mergedFluids, @Nullable ItemStack mold) {
         if (level == null || mergedInputs.isEmpty()) {
-            return null;
+            return List.of();
         }
 
         RecipeManager recipeManager = level.getRecipeManager();
@@ -102,6 +102,7 @@ public class ImbuementRecipeAdapter implements IRecipeAdapter<ImbuementRecipe> {
                 RecipeRegistry.IMBUEMENT_TYPE.get()
         );
 
+        List<RecipeHolder<ImbuementRecipe>> matches = new java.util.ArrayList<>();
         for (RecipeHolder<ImbuementRecipe> holder : recipes) {
             ImbuementRecipe recipe = holder.value();
 
@@ -118,9 +119,8 @@ public class ImbuementRecipeAdapter implements IRecipeAdapter<ImbuementRecipe> {
                 }
             }
 
-            return holder;
+            matches.add(holder);
         }
-
-        return null;
+        return matches;
     }
 }

@@ -113,19 +113,15 @@ public class EmpowererRecipeAdapter implements IRecipeAdapter<EmpowererRecipe> {
 
     @Override
     @Nullable
-    public RecipeHolder<EmpowererRecipe> findMatchingRecipe(Level level, Map<Ingredient, Long> mergedInputs, Map<FluidStack, Long> mergedFluids, @Nullable ItemStack mold) {
-        if (mergedInputs.isEmpty() || level == null) return null;
+    public List<RecipeHolder<EmpowererRecipe>> findMatchingRecipes(Level level, Map<Ingredient, Long> mergedInputs, Map<FluidStack, Long> mergedFluids, @Nullable ItemStack mold) {
+        if (mergedInputs.isEmpty() || level == null) return List.of();
 
         RecipeManager recipeManager = level.getRecipeManager();
         List<RecipeHolder<EmpowererRecipe>> recipes = recipeManager.getAllRecipesFor(ActuallyRecipes.Types.EMPOWERING.get());
 
-        for (RecipeHolder<EmpowererRecipe> holder : recipes) {
-            EmpowererRecipe recipe = holder.value();
-            if (matchesRecipeInputs(recipe, mergedInputs)) {
-                return holder;
-            }
-        }
-        return null;
+        return recipes.stream()
+                .filter(holder -> matchesRecipeInputs(holder.value(), mergedInputs))
+                .toList();
     }
 
     private boolean matchesRecipeInputs(EmpowererRecipe recipe, Map<Ingredient, Long> mergedInputs) {

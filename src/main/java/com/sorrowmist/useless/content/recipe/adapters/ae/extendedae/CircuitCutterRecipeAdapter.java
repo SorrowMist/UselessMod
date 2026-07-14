@@ -85,14 +85,15 @@ public class CircuitCutterRecipeAdapter implements IRecipeAdapter<CircuitCutterR
 
     @Override
     @Nullable
-    public RecipeHolder<CircuitCutterRecipe> findMatchingRecipe(Level level, Map<Ingredient, Long> mergedInputs, Map<FluidStack, Long> mergedFluids, @Nullable ItemStack mold) {
+    public List<RecipeHolder<CircuitCutterRecipe>> findMatchingRecipes(Level level, Map<Ingredient, Long> mergedInputs, Map<FluidStack, Long> mergedFluids, @Nullable ItemStack mold) {
         if (level == null || mergedInputs.isEmpty()) {
-            return null;
+            return List.of();
         }
 
         RecipeManager recipeManager = level.getRecipeManager();
         List<RecipeHolder<CircuitCutterRecipe>> recipes = recipeManager.getAllRecipesFor(CircuitCutterRecipe.TYPE);
 
+        List<RecipeHolder<CircuitCutterRecipe>> matches = new java.util.ArrayList<>();
         for (RecipeHolder<CircuitCutterRecipe> holder : recipes) {
             CircuitCutterRecipe recipe = holder.value();
             IngredientStack.Item inputStack = recipe.getInput();
@@ -101,11 +102,10 @@ public class CircuitCutterRecipeAdapter implements IRecipeAdapter<CircuitCutterR
 
             Ingredient ingredient = inputStack.getIngredient();
             if (AdapterUtils.hasMatchingIngredient(mergedInputs, ingredient, inputStack.getAmount())) {
-                return holder;
+                matches.add(holder);
             }
         }
-
-        return null;
+        return matches;
     }
 
 }

@@ -311,12 +311,12 @@ public class MetallurgicInfuserRecipeAdapter implements IRecipeAdapter<ItemStack
 
     @Override
     @Nullable
-    public RecipeHolder<ItemStackChemicalToItemStackRecipe> findMatchingRecipe(Level level, Map<Ingredient, Long> mergedInputs, Map<FluidStack, Long> mergedFluids, Map<AEKey, Long> mergedKeys, @Nullable ItemStack mold) {
+    public List<RecipeHolder<ItemStackChemicalToItemStackRecipe>> findMatchingRecipes(Level level, Map<Ingredient, Long> mergedInputs, Map<FluidStack, Long> mergedFluids, Map<AEKey, Long> mergedKeys, @Nullable ItemStack mold) {
         if (level == null || (mergedInputs.isEmpty() && mergedFluids.isEmpty())) {
-            return null;
+            return List.of();
         }
         if (mold != null && !mold.isEmpty() && !matchesMold(mold)) {
-            return null;
+            return List.of();
         }
 
         RecipeManager recipeManager = level.getRecipeManager();
@@ -324,6 +324,7 @@ public class MetallurgicInfuserRecipeAdapter implements IRecipeAdapter<ItemStack
                 getMekanismRecipeType()
         );
 
+        List<RecipeHolder<ItemStackChemicalToItemStackRecipe>> matches = new ArrayList<>();
         for (RecipeHolder<ItemStackChemicalToItemStackRecipe> holder : recipes) {
             ItemStackChemicalToItemStackRecipe recipe = holder.value();
 
@@ -338,23 +339,29 @@ public class MetallurgicInfuserRecipeAdapter implements IRecipeAdapter<ItemStack
 
             long requiredChemicalAmount = getEffectiveChemicalAmount(chemicalInput, recipe);
 
+            boolean holderMatches = false;
             for (ChemicalStack chemicalStack : chemicalInput.getRepresentations()) {
                 FluidStack chemicalFluid = getChemicalFluid(chemicalStack, requiredChemicalAmount);
                 if (!chemicalFluid.isEmpty() && matchesFluid(mergedFluids, chemicalFluid)) {
-                    return holder;
+                    holderMatches = true;
+                    break;
                 }
             }
 
-            List<ChemicalSource> sources = findChemicalSources(level, chemicalInput);
-            for (ChemicalSource source : sources) {
-                AdvancedAlloyFurnaceRecipe converted = createRecipe(holder.id(), itemInput, chemicalInput, recipe, source, recipe.getOutputDefinition());
-                if (converted != null && matchesCountedInputs(mergedInputs, converted.inputs())) {
-                    return holder;
+            if (!holderMatches) {
+                List<ChemicalSource> sources = findChemicalSources(level, chemicalInput);
+                for (ChemicalSource source : sources) {
+                    AdvancedAlloyFurnaceRecipe converted = createRecipe(holder.id(), itemInput, chemicalInput, recipe, source, recipe.getOutputDefinition());
+                    if (converted != null && matchesCountedInputs(mergedInputs, converted.inputs())) {
+                        holderMatches = true;
+                        break;
+                    }
                 }
             }
+            if (holderMatches) matches.add(holder);
         }
 
-        return null;
+        return matches;
     }
 
     private boolean matchesCountedInputs(Map<Ingredient, Long> mergedInputs, List<CountedIngredient> requiredInputs) {

@@ -96,12 +96,12 @@ public class FirmamentConversionRecipeAdapter implements IRecipeAdapter<Firmamen
     @Override
     @Nullable
     @SuppressWarnings("unchecked")
-    public RecipeHolder<FirmamentConversionRecipe> findMatchingRecipe(Level level, Map<Ingredient, Long> mergedInputs, Map<FluidStack, Long> mergedFluids, Map<AEKey, Long> mergedKeys, @Nullable ItemStack mold) {
-        if (level == null || mergedInputs.isEmpty()) return null;
+    public List<RecipeHolder<FirmamentConversionRecipe>> findMatchingRecipes(Level level, Map<Ingredient, Long> mergedInputs, Map<FluidStack, Long> mergedFluids, Map<AEKey, Long> mergedKeys, @Nullable ItemStack mold) {
+        if (level == null || mergedInputs.isEmpty()) return List.of();
 
         if (mold != null && !mold.isEmpty()) {
             ResourceLocation moldId = BuiltInRegistries.ITEM.getKey(mold.getItem());
-            if (!"ae2lt".equals(moldId.getNamespace()) || !"firmament_conversion_core".equals(moldId.getPath())) return null;
+            if (!"ae2lt".equals(moldId.getNamespace()) || !"firmament_conversion_core".equals(moldId.getPath())) return List.of();
         }
 
         RecipeManager recipeManager = level.getRecipeManager();
@@ -112,6 +112,7 @@ public class FirmamentConversionRecipeAdapter implements IRecipeAdapter<Firmamen
                 .thenComparing(holder -> holder.value().totalInputCount(), Comparator.reverseOrder())
                 .thenComparing(holder -> holder.id().toString()));
 
+        List<RecipeHolder<FirmamentConversionRecipe>> matches = new ArrayList<>();
         for (RecipeHolder<FirmamentConversionRecipe> holder : recipes) {
             FirmamentConversionRecipe recipe = holder.value();
             List<FirmamentConversionIngredient> recipeInputs = recipe.inputs();
@@ -124,9 +125,9 @@ public class FirmamentConversionRecipeAdapter implements IRecipeAdapter<Firmamen
             }
 
             if (AdapterUtils.matchesRequired(mergedInputs, requiredCounts)) {
-                return holder;
+                matches.add(holder);
             }
         }
-        return null;
+        return matches;
     }
 }

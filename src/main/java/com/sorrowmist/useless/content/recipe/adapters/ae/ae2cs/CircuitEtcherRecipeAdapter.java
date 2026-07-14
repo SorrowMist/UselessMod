@@ -89,11 +89,12 @@ public class CircuitEtcherRecipeAdapter implements IRecipeAdapter<CircuitEtcherR
     @Override
     @Nullable
     @SuppressWarnings("unchecked")
-    public RecipeHolder<CircuitEtcherRecipe> findMatchingRecipe(Level level, Map<Ingredient, Long> mergedInputs, Map<FluidStack, Long> mergedFluids, @Nullable ItemStack mold) {
-        if (level == null) return null;
-        if (!checkMold(mold, "circuit_etcher")) return null;
+    public List<RecipeHolder<CircuitEtcherRecipe>> findMatchingRecipes(Level level, Map<Ingredient, Long> mergedInputs, Map<FluidStack, Long> mergedFluids, @Nullable ItemStack mold) {
+        if (level == null) return List.of();
+        if (!checkMold(mold, "circuit_etcher")) return List.of();
 
         RecipeManager recipeManager = level.getRecipeManager();
+        List<RecipeHolder<CircuitEtcherRecipe>> matches = new java.util.ArrayList<>();
         for (RecipeHolder<CircuitEtcherRecipe> holder : (List<RecipeHolder<CircuitEtcherRecipe>>) (List<?>)
                 recipeManager.getAllRecipesFor(AECSRecipeTypes.CIRCUIT_ETCHER.get())) {
             CircuitEtcherRecipe recipe = holder.value();
@@ -105,9 +106,9 @@ public class CircuitEtcherRecipeAdapter implements IRecipeAdapter<CircuitEtcherR
             addSizedIngredient(required, recipe.inputC());
             if (required.isEmpty()) continue;
 
-            if (AdapterUtils.matchesRequired(mergedInputs, required)) return holder;
+            if (AdapterUtils.matchesRequired(mergedInputs, required)) matches.add(holder);
         }
-        return null;
+        return matches;
     }
 
     static void addSizedIngredient(Map<Ingredient, Long> map, SizedIngredient si) {

@@ -86,11 +86,12 @@ public class CrystalPulverizerRecipeAdapter implements IRecipeAdapter<CrystalPul
     @Override
     @Nullable
     @SuppressWarnings("unchecked")
-    public RecipeHolder<CrystalPulverizerRecipe> findMatchingRecipe(Level level, Map<Ingredient, Long> mergedInputs, Map<FluidStack, Long> mergedFluids, @Nullable ItemStack mold) {
-        if (level == null) return null;
-        if (!CircuitEtcherRecipeAdapter.checkMold(mold, "crystal_pulverizer")) return null;
+    public List<RecipeHolder<CrystalPulverizerRecipe>> findMatchingRecipes(Level level, Map<Ingredient, Long> mergedInputs, Map<FluidStack, Long> mergedFluids, @Nullable ItemStack mold) {
+        if (level == null) return List.of();
+        if (!CircuitEtcherRecipeAdapter.checkMold(mold, "crystal_pulverizer")) return List.of();
 
         RecipeManager recipeManager = level.getRecipeManager();
+        List<RecipeHolder<CrystalPulverizerRecipe>> matches = new java.util.ArrayList<>();
         for (RecipeHolder<CrystalPulverizerRecipe> holder : (List<RecipeHolder<CrystalPulverizerRecipe>>) (List<?>)
                 recipeManager.getAllRecipesFor(AECSRecipeTypes.CRYSTAL_PULVERIZER.get())) {
             CrystalPulverizerRecipe recipe = holder.value();
@@ -100,8 +101,8 @@ public class CrystalPulverizerRecipeAdapter implements IRecipeAdapter<CrystalPul
             CircuitEtcherRecipeAdapter.addSizedIngredient(required, recipe.input());
             if (required.isEmpty()) continue;
 
-            if (AdapterUtils.matchesRequired(mergedInputs, required)) return holder;
+            if (AdapterUtils.matchesRequired(mergedInputs, required)) matches.add(holder);
         }
-        return null;
+        return matches;
     }
 }

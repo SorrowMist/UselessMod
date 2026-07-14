@@ -123,18 +123,19 @@ public class SteakLightningRecipeAdapter implements IRecipeAdapter<SteakLightnin
 
     @Override
     @Nullable
-    public RecipeHolder<SteakLightningDummyRecipe> findMatchingRecipe(Level level, Map<Ingredient, Long> mergedInputs, Map<FluidStack, Long> mergedFluids, @Nullable ItemStack mold) {
-        if (level == null) return null;
-        if (!matchesMold(mold)) return null;
-        if (mergedFluids == null || mergedFluids.isEmpty()) return null;
+    public List<RecipeHolder<SteakLightningDummyRecipe>> findMatchingRecipes(Level level, Map<Ingredient, Long> mergedInputs, Map<FluidStack, Long> mergedFluids, @Nullable ItemStack mold) {
+        if (level == null) return List.of();
+        if (!matchesMold(mold)) return List.of();
+        if (mergedFluids == null || mergedFluids.isEmpty()) return List.of();
 
+        List<RecipeHolder<SteakLightningDummyRecipe>> matches = new java.util.ArrayList<>();
         if (hasFluid(mergedFluids, Fluids.WATER)) {
-            return new RecipeHolder<>(waterRecipe.id(), new SteakLightningDummyRecipe(waterRecipe));
+            matches.add(new RecipeHolder<>(waterRecipe.id(), new SteakLightningDummyRecipe(waterRecipe)));
         }
         if (hasFluid(mergedFluids, Fluids.LAVA)) {
-            return new RecipeHolder<>(lavaRecipe.id(), new SteakLightningDummyRecipe(lavaRecipe));
+            matches.add(new RecipeHolder<>(lavaRecipe.id(), new SteakLightningDummyRecipe(lavaRecipe)));
         }
-        return null;
+        return matches;
     }
 
     private static boolean hasFluid(Map<FluidStack, Long> mergedFluids, Fluid fluid) {

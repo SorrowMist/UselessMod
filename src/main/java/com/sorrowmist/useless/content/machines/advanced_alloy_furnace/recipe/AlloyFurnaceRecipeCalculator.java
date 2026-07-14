@@ -49,21 +49,14 @@ public final class AlloyFurnaceRecipeCalculator {
     /**
      * 查找匹配的配方（统一匹配，支持物品+流体+模具优先级）。
      * <p>
-     * 优先检查传入的上一个成功配方（直接遍历 slot，无需构建输入列表），
-     * 仅在其失效时才进行完整的配方查找链。
+     * 每次都通过统一管理器取得当前最具体配方；管理器的不可变输入键负责缓存，
+     * 避免复用旧配方导致后来变得可用的更具体配方长期饥饿。
      *
-     * @param level                世界
-     * @param lastSuccessfulRecipe 上一个成功处理的配方（可为 null）
+     * @param level 世界
      * @return 匹配的配方，如果没有则返回空
      */
-    public Optional<AdvancedAlloyFurnaceRecipe> findMatchingRecipe(
-            @Nullable Level level, @Nullable AdvancedAlloyFurnaceRecipe lastSuccessfulRecipe) {
+    public Optional<AdvancedAlloyFurnaceRecipe> findMatchingRecipe(@Nullable Level level) {
         if (level == null) return Optional.empty();
-
-        // 优先检查上次成功配方（无需构建输入列表，直接检查slot）
-        if (lastSuccessfulRecipe != null && this.canProcessRecipe(lastSuccessfulRecipe)) {
-            return Optional.of(lastSuccessfulRecipe);
-        }
 
         // 构建输入列表（用于 AlloyFurnaceRecipeManager 查找）
         List<ItemStack> currentInputs = new ArrayList<>();

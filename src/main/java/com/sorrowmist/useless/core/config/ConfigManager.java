@@ -69,6 +69,10 @@ public class ConfigManager {
     private static final ModConfigSpec.IntValue CAPACITY_MULTIPLIER;
     private static final ModConfigSpec.IntValue MAX_UPGRADE;
 
+    // 万象炉从AE网络抽取能量配置
+    private static final ModConfigSpec.BooleanValue FURNACE_DRAW_APPFLUX_ENERGY;
+    private static final ModConfigSpec.BooleanValue FURNACE_DRAW_AE_ENERGY;
+
     static {
         COMMON_BUILDER.push("dimension_generation");
         BORDER_BLOCK = COMMON_BUILDER
@@ -230,6 +234,19 @@ public class ConfigManager {
                 .defineInRange("max_upgrade", 16, 1, 64);
         COMMON_BUILDER.pop();
 
+        COMMON_BUILDER.push("advanced_alloy_furnace");
+        FURNACE_DRAW_APPFLUX_ENERGY = COMMON_BUILDER
+                .comment("万象炉是否自动从所在AE网络抽取AppliedFlux(应用通量)存储的FE能量",
+                        "需要安装AppliedFlux且网络中有通量元件, 每tick抽取量受熔炉最大输入速率限制")
+                .define("draw_appflux_energy", true);
+
+        FURNACE_DRAW_AE_ENERGY = COMMON_BUILDER
+                .comment("万象炉是否直接抽取AE网络自身的能量(按 1 AE = 2 FE 折算)",
+                        "警告: 会与网络中其他设备争抢供电, 网络储能不足时可能导致设备频繁掉线",
+                        "在AppliedFlux抽取之后作为补充, 每tick总抽取量受熔炉最大输入速率限制")
+                .define("draw_ae_energy", false);
+        COMMON_BUILDER.pop();
+
         COMMON_SPEC = COMMON_BUILDER.build();
         CLIENT_SPEC = CLIENT_BUILDER.build();
         SERVER_SPEC = SERVER_BUILDER.build();
@@ -279,6 +296,15 @@ public class ConfigManager {
 
     public static int getMaxUpgrade() {
         return MAX_UPGRADE.get();
+    }
+
+    // 万象炉AE网络抽电配置
+    public static boolean isFurnaceDrawAppfluxEnergyEnabled() {
+        return FURNACE_DRAW_APPFLUX_ENERGY.get();
+    }
+
+    public static boolean isFurnaceDrawAeEnergyEnabled() {
+        return FURNACE_DRAW_AE_ENERGY.get();
     }
 
     // 获取连锁挖掘范围配置

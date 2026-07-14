@@ -1,6 +1,8 @@
 package com.sorrowmist.useless.content.blockentities;
 
 import appeng.api.config.Actionable;
+import appeng.api.config.PowerMultiplier;
+import appeng.api.config.PowerUnit;
 import appeng.api.crafting.IPatternDetails;
 import appeng.api.crafting.PatternDetailsHelper;
 import appeng.api.implementations.blockentities.PatternContainerGroup;
@@ -13,6 +15,7 @@ import appeng.api.networking.IGridNodeListener;
 import appeng.api.networking.IInWorldGridNodeHost;
 import appeng.api.networking.IManagedGridNode;
 import appeng.api.networking.crafting.ICraftingProvider;
+import appeng.api.networking.energy.IEnergyService;
 import appeng.api.networking.security.IActionHost;
 import appeng.api.networking.security.IActionSource;
 import appeng.api.networking.storage.IStorageService;
@@ -25,6 +28,7 @@ import appeng.api.util.AECableType;
 import appeng.blockentity.AEBaseBlockEntity;
 import appeng.helpers.patternprovider.PatternContainer;
 import com.sorrowmist.useless.api.enums.CatalystType;
+import com.sorrowmist.useless.compat.AppFluxCompat;
 import com.sorrowmist.useless.api.enums.FurnaceFace;
 import com.sorrowmist.useless.api.enums.FurnaceFaceMode;
 import com.sorrowmist.useless.api.enums.RedstoneControlMode;
@@ -47,6 +51,7 @@ import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.recipe.All
 import com.sorrowmist.useless.content.menus.AdvancedAlloyFurnaceMenu;
 import com.sorrowmist.useless.content.recipe.AdvancedAlloyFurnaceRecipe;
 import com.sorrowmist.useless.content.recipe.AlloyFurnaceRecipeManager;
+import com.sorrowmist.useless.core.config.ConfigManager;
 import com.sorrowmist.useless.core.constants.NBTConstants;
 import com.sorrowmist.useless.energy.EnergyManager;
 import com.sorrowmist.useless.energy.IEnergyManager;
@@ -319,6 +324,9 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
             return;
         }
 
+        // 先补电再处理配方，本tick抽到的能量当tick即可使用
+        entity.drawEnergyFromAeNetwork();
+
         if (entity.currentRecipe == null) {
             entity.tryStartNewRecipe();
         } else {
@@ -359,6 +367,55 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
                            ),
                            3
             );
+        }
+    }
+
+    /**
+     * 从所在AE网络为熔炉补充能量：
+     * <ol>
+     *   <li>AppliedFlux 已安装且配置开启时，抽取网络存储中的FE能量（通量元件）</li>
+     *   <li>配置开启时（默认关闭），抽取AE网络自身能量作为补充（按 PowerUnit 折算，1 AE = 2 FE）</li>
+     * </ol>
+     * 每tick总抽取量受熔炉容量与最大输入速率限制。
+     */
+    private void drawEnergyFromAeNetwork() {
+        boolean drawAppflux = AppFluxCompat.isLoaded() && ConfigManager.isFurnaceDrawAppfluxEnergyEnabled();
+        boolean drawAe = ConfigManager.isFurnaceDrawAeEnergyEnabled();
+        if (!drawAppflux && !drawAe) {
+            return;
+        }
+        if (!this.isConnectedToAE) {
+            return;
+        }
+
+        // 模拟接收得到本tick可接受的能量（受容量与最大输入速率约束）
+        int wanted = this.energyManager.receiveEnergy(Integer.MAX_VALUE, true);
+        if (wanted <= 0) {
+            return;
+        }
+
+        IGrid grid = this.mainNode.getGrid();
+        if (grid == null) {
+            return;
+        }
+
+        if (drawAppflux) {
+            long got = AppFluxCompat.extractFe(grid, wanted, this.actionSource);
+            if (got > 0) {
+                this.energyManager.modifyEnergy((int) got);
+                wanted -= (int) got;
+            }
+        }
+
+        if (drawAe && wanted > 0) {
+            IEnergyService energyService = grid.getEnergyService();
+            double aeWanted = PowerUnit.FE.convertTo(PowerUnit.AE, wanted);
+            double aeGot = energyService.extractAEPower(aeWanted, Actionable.MODULATE, PowerMultiplier.ONE);
+            // 以实际抽取量入账并向下取整，宁可丢弃不足1FE的零头也不凭空多记能量
+            int feGot = (int) Math.min(wanted, (long) Math.floor(PowerUnit.AE.convertTo(PowerUnit.FE, aeGot)));
+            if (feGot > 0) {
+                this.energyManager.modifyEnergy(feGot);
+            }
         }
     }
 

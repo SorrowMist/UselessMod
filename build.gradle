@@ -200,6 +200,7 @@ dependencies {
     // 工业先锋
     runtimeOnly "maven.modrinth:titanium:1.21-4.0.40"
     implementation "curse.maven:industrial-foregoing-266515:7073719"
+    implementation "curse.maven:mifa-1086142:6288756"
     // 新生魔艺
     implementation "curse.maven:ars-nouveau-401955:8152094"
 

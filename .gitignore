@@ -35,9 +35,8 @@ othermods
 crashreport
 .cursor
 .cache
-
+.codex
 # external reference code
 references/
 
-# local tests
-/src/test/
+

@@ -40,6 +40,8 @@ import com.sorrowmist.useless.content.recipe.adapters.minecraft.SmeltingRecipeAd
 import com.sorrowmist.useless.content.recipe.adapters.mysticalagriculture.AwakeningRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.mysticalagriculture.InfusionRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.mysticalagriculture.SeedEssenceRecipeAdapter;
+import com.sorrowmist.useless.content.recipe.adapters.productivebees.BeeProduceRecipeAdapter;
+import com.sorrowmist.useless.content.recipe.adapters.productivebees.CentrifugeRecipeAdapter;
 import com.sorrowmist.useless.init.ModBlocks;
 import com.sorrowmist.useless.init.ModRecipeTypes;
 import com.sorrowmist.useless.init.ModTags;
@@ -170,6 +172,10 @@ public class JEIPlugin implements IModPlugin {
         // 添加转换后的 DataEnergistics 配方（如果DataEnergistics已加载）
         if (RecipeAdapterCompatRegistry.isLoaded(RecipeAdapterCompatRegistry.DATA_ENERGISTICS)) {
             recipes.addAll(convertDataEnergisticsRecipes(recipeManager, level));
+        }
+
+        if (RecipeAdapterCompatRegistry.isLoaded(RecipeAdapterCompatRegistry.PRODUCTIVE_BEES)) {
+            recipes.addAll(convertProductiveBeesRecipes(recipeManager, level));
         }
 
         registration.addRecipes(AdvancedAlloyFurnaceRecipeCategory.TYPE, recipes);
@@ -400,6 +406,26 @@ public class JEIPlugin implements IModPlugin {
         DataReassemblerRecipeAdapter reassemblerAdapter = new DataReassemblerRecipeAdapter();
         addConvertedRecipes(convertedRecipes, recipeManager, ModRecipes.DATA_RIPPER_REASSEMBLER_TYPE.get(), reassemblerAdapter, level);
 
+        return convertedRecipes;
+    }
+
+    private List<AdvancedAlloyFurnaceRecipe> convertProductiveBeesRecipes(RecipeManager recipeManager, Level level) {
+        List<AdvancedAlloyFurnaceRecipe> convertedRecipes = new ArrayList<>();
+
+        addConvertedRecipes(
+                convertedRecipes,
+                recipeManager,
+                cy.jdkdigital.productivebees.init.ModRecipeTypes.ADVANCED_BEEHIVE_TYPE.get(),
+                new BeeProduceRecipeAdapter(),
+                level
+        );
+        addConvertedRecipes(
+                convertedRecipes,
+                recipeManager,
+                cy.jdkdigital.productivebees.init.ModRecipeTypes.CENTRIFUGE_TYPE.get(),
+                new CentrifugeRecipeAdapter(),
+                level
+        );
         return convertedRecipes;
     }
 

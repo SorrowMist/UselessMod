@@ -31,6 +31,8 @@ import com.sorrowmist.useless.content.recipe.adapters.minecraft.SmeltingRecipeAd
 import com.sorrowmist.useless.content.recipe.adapters.mysticalagriculture.AwakeningRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.mysticalagriculture.InfusionRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.mysticalagriculture.SeedEssenceRecipeAdapter;
+import com.sorrowmist.useless.content.recipe.adapters.productivebees.BeeProduceRecipeAdapter;
+import com.sorrowmist.useless.content.recipe.adapters.productivebees.CentrifugeRecipeAdapter;
 import net.neoforged.fml.ModList;
 import net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent;
 import org.apache.logging.log4j.LogManager;
@@ -53,6 +55,7 @@ public final class RecipeAdapterCompatRegistry {
     public static final String MYSTICAL_AGRICULTURE = "mysticalagriculture";
     public static final String AE2LT = "ae2lt";
     public static final String DATA_ENERGISTICS = "data_energistics";
+    public static final String PRODUCTIVE_BEES = "productivebees";
 
     private static final List<CompatEntry> ENTRIES = List.of(
             new CompatEntry(null, RecipeAdapterCompatRegistry::registerMinecraft),
@@ -66,7 +69,8 @@ public final class RecipeAdapterCompatRegistry {
             new CompatEntry(ARS_NOUVEAU, RecipeAdapterCompatRegistry::registerArsNouveau),
             new CompatEntry(MYSTICAL_AGRICULTURE, RecipeAdapterCompatRegistry::registerMysticalAgriculture),
             new CompatEntry(AE2LT, RecipeAdapterCompatRegistry::registerAELightningTech),
-            new CompatEntry(DATA_ENERGISTICS, RecipeAdapterCompatRegistry::registerDataEnergistics)
+            new CompatEntry(DATA_ENERGISTICS, RecipeAdapterCompatRegistry::registerDataEnergistics),
+            new CompatEntry(PRODUCTIVE_BEES, RecipeAdapterCompatRegistry::registerProductiveBees)
     );
 
     private RecipeAdapterCompatRegistry() {}
@@ -160,6 +164,11 @@ public final class RecipeAdapterCompatRegistry {
 
     private static void registerDataEnergistics() {
         register(new DataReassemblerRecipeAdapter());
+    }
+
+    private static void registerProductiveBees() {
+        register(new BeeProduceRecipeAdapter());
+        register(new CentrifugeRecipeAdapter());
     }
 
     private record CompatEntry(@Nullable String modId, Runnable registerAction) {}

@@ -69,6 +69,7 @@ public class AlloyFurnaceRecipeManager {
     private final Map<Item, List<AdvancedAlloyFurnaceRecipe>> moldIndex = new ConcurrentHashMap<>();
     private final List<AdvancedAlloyFurnaceRecipe> hasFluidInputRecipes = new CopyOnWriteArrayList<>();
     private final List<AdvancedAlloyFurnaceRecipe> hasKeyInputRecipes = new CopyOnWriteArrayList<>();
+    private final Set<AdvancedAlloyFurnaceRecipe> hasNonSimpleIngredientRecipes = ConcurrentHashMap.newKeySet();
     private final Set<AdvancedAlloyFurnaceRecipe> indexedRecipes = ConcurrentHashMap.newKeySet();
 
     private boolean indexBuilt = false;
@@ -116,6 +117,7 @@ public class AlloyFurnaceRecipeManager {
         moldIndex.clear();
         hasFluidInputRecipes.clear();
         hasKeyInputRecipes.clear();
+        hasNonSimpleIngredientRecipes.clear();
         indexedRecipes.clear();
         indexBuilt = false;
     }
@@ -128,6 +130,10 @@ public class AlloyFurnaceRecipeManager {
 
         for (CountedIngredient countedIng : recipe.inputs()) {
             Ingredient ingredient = countedIng.ingredient();
+            if (!ingredient.isSimple()) {
+                // Non-simple/custom ingredient item lists are display hints and may be empty or incomplete.
+                hasNonSimpleIngredientRecipes.add(recipe);
+            }
             for (ItemStack stack : ingredient.getItems()) {
                 if (!stack.isEmpty()) {
                     inputItemIndex
@@ -139,6 +145,9 @@ public class AlloyFurnaceRecipeManager {
 
         Ingredient mold = recipe.mold();
         if (mold != null && !mold.isEmpty()) {
+            if (!mold.isSimple()) {
+                hasNonSimpleIngredientRecipes.add(recipe);
+            }
             for (ItemStack stack : mold.getItems()) {
                 if (!stack.isEmpty()) {
                     moldIndex
@@ -235,6 +244,8 @@ public class AlloyFurnaceRecipeManager {
      */
     private List<AdvancedAlloyFurnaceRecipe> getCandidateRecipes(RecipeLookupContext context) {
         LinkedHashSet<AdvancedAlloyFurnaceRecipe> candidates = new LinkedHashSet<>();
+
+        candidates.addAll(hasNonSimpleIngredientRecipes);
 
         for (ItemStack input : context.inputs()) {
             if (input.isEmpty()) continue;
@@ -353,17 +364,7 @@ public class AlloyFurnaceRecipeManager {
     }
 
     private boolean matchesItems(AdvancedAlloyFurnaceRecipe recipe, List<ItemStack> inputs, long operations) {
-        for (CountedIngredient countedIngredient : recipe.inputs()) {
-            long required = saturatingMultiply(Math.max(0L, countedIngredient.count()), operations);
-            long found = 0;
-            for (ItemStack input : inputs) {
-                if (!input.isEmpty() && countedIngredient.ingredient().test(input)) {
-                    found = saturatingAdd(found, input.getCount());
-                }
-            }
-            if (found < required) return false;
-        }
-        return true;
+        return ItemIngredientAllocator.matches(recipe.inputs(), inputs, operations);
     }
 
     private boolean matchesFluids(AdvancedAlloyFurnaceRecipe recipe, List<FluidStack> inputs, long operations) {

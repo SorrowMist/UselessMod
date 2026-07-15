@@ -684,7 +684,10 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
         }
 
         // 消耗材料并产出物品
-        this.consumeRecipeInputs(this.currentRecipe, actualParallel);
+        if (!this.consumeRecipeInputs(this.currentRecipe, actualParallel)) {
+            this.resetProgress();
+            return;
+        }
         this.produceRecipeOutputs(this.currentRecipe, actualParallel);
 
         this.resetProgress();
@@ -1266,8 +1269,9 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
         return this.recipeCalculator.canConsumeRecipeInputs(recipe);
     }
 
-    private void consumeRecipeInputs(AdvancedAlloyFurnaceRecipe recipe, int parallel) {
-        FurnaceInputPort.consumeRecipeInputs(
+    private boolean consumeRecipeInputs(AdvancedAlloyFurnaceRecipe recipe, int parallel) {
+        if (!this.recipeCalculator.canConsumeRecipeInputs(recipe, parallel)) return false;
+        return FurnaceInputPort.consumeRecipeInputs(
                 recipe,
                 parallel,
                 this.itemHandler,

@@ -38,3 +38,6 @@ crashreport
 
 # external reference code
 references/
+
+# local tests
+/src/test/

@@ -5,6 +5,7 @@ import appeng.api.stacks.GenericStack;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.crafting.Ingredient;
+import net.neoforged.neoforge.common.crafting.DataComponentIngredient;
 import net.neoforged.neoforge.fluids.FluidStack;
 import org.jetbrains.annotations.Nullable;
 
@@ -133,18 +134,23 @@ public class AdapterUtils {
      */
     public static Map<Ingredient, Long> mergeInputs(List<ItemStack> inputs) {
         Map<Ingredient, Long> merged = new LinkedHashMap<>();
+        if (inputs == null) return merged;
         for (ItemStack stack : inputs) {
-            if (stack.isEmpty()) continue;
+            if (stack == null || stack.isEmpty()) continue;
             boolean found = false;
             for (Map.Entry<Ingredient, Long> entry : merged.entrySet()) {
-                if (entry.getKey().test(stack)) {
+                ItemStack[] representatives = entry.getKey().getItems();
+                if (representatives.length == 1
+                        && ItemStack.isSameItemSameComponents(representatives[0], stack)) {
                     merged.put(entry.getKey(), entry.getValue() + stack.getCount());
                     found = true;
                     break;
                 }
             }
             if (!found) {
-                merged.put(Ingredient.of(stack), (long) stack.getCount());
+                // Vanilla Ingredient.of(ItemStack) ignores components in equals(), so it cannot
+                // safely be used as a map key for two component-distinct stacks of the same item.
+                merged.put(DataComponentIngredient.of(true, stack.copyWithCount(1)), (long) stack.getCount());
             }
         }
         return merged;
@@ -222,16 +228,7 @@ public class AdapterUtils {
      * @return 实际输入是否满足全部需求
      */
     public static boolean matchesRequired(Map<Ingredient, Long> mergedInputs, Map<Ingredient, Long> requiredCounts) {
-        for (Map.Entry<Ingredient, Long> req : requiredCounts.entrySet()) {
-            long found = 0;
-            for (Map.Entry<Ingredient, Long> input : mergedInputs.entrySet()) {
-                if (areIngredientsEqual(req.getKey(), input.getKey()) || ingredientMatches(req.getKey(), input.getKey())) {
-                    found += input.getValue();
-                }
-            }
-            if (found < req.getValue()) return false;
-        }
-        return true;
+        return ItemIngredientAllocator.matches(mergedInputs, requiredCounts);
     }
 
     /**
@@ -339,26 +336,10 @@ public class AdapterUtils {
      * @return 输入是否满足全部需求
      */
     public static boolean matchesCountedIngredients(List<ItemStack> inputs, Map<Ingredient, Long> requiredCounts) {
-        Map<Ingredient, Long> inputMatchCounts = new LinkedHashMap<>();
-
-        for (ItemStack stack : inputs) {
-            if (stack.isEmpty()) continue;
-            int stackCount = stack.getCount();
-
-            for (Map.Entry<Ingredient, Long> entry : requiredCounts.entrySet()) {
-                if (entry.getKey().test(stack)) {
-                    inputMatchCounts.merge(entry.getKey(), (long) stackCount, Long::sum);
-                    break;
-                }
-            }
-        }
-
-        for (Map.Entry<Ingredient, Long> entry : requiredCounts.entrySet()) {
-            long required = entry.getValue();
-            long actual = inputMatchCounts.getOrDefault(entry.getKey(), 0L);
-            if (actual < required) return false;
-        }
-        return true;
+        List<CountedIngredient> requirements = requiredCounts.entrySet().stream()
+                .map(entry -> new CountedIngredient(entry.getKey(), entry.getValue()))
+                .toList();
+        return ItemIngredientAllocator.matches(requirements, inputs, 1L);
     }
 
     /**
@@ -373,11 +354,15 @@ public class AdapterUtils {
     public static boolean areIngredientsEqual(Ingredient a, Ingredient b) {
         if (a == b) return true;
         if (a == null || b == null) return false;
+        if (a.equals(b)) return true;
+
+        // Custom ingredient item lists are display hints, not semantic identities.
+        if (a.isCustom() || b.isCustom()) return false;
 
         ItemStack[] stacksA = a.getItems();
         ItemStack[] stacksB = b.getItems();
 
-        if (stacksA.length != stacksB.length) return false;
+        if (stacksA.length == 0 || stacksA.length != stacksB.length) return false;
 
         for (ItemStack stackA : stacksA) {
             boolean found = false;

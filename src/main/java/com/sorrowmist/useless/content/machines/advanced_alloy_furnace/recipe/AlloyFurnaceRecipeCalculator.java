@@ -2,6 +2,7 @@ package com.sorrowmist.useless.content.machines.advanced_alloy_furnace.recipe;
 
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.catalyst.CatalystEffectResolver;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.catalyst.ResolvedCatalystEffect;
+import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.io.FurnaceInputPort;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.parallel.AlloyFurnaceParallelCalculator;
 import com.sorrowmist.useless.content.recipe.AdvancedAlloyFurnaceRecipe;
 import com.sorrowmist.useless.content.recipe.AlloyFurnaceRecipeManager;
@@ -96,42 +97,7 @@ public final class AlloyFurnaceRecipeCalculator {
      * 模具检查提前，便于快速失败。
      */
     public boolean canProcessRecipe(AdvancedAlloyFurnaceRecipe recipe) {
-        // 模具检查提前（快速失败）
-        if (!recipe.mold().isEmpty()) {
-            ItemStack moldStack = this.itemHandler.getStackInSlot(MOLD_SLOT);
-            if (!recipe.mold().test(moldStack)) return false;
-        }
-
-        for (var countedIng : recipe.inputs()) {
-            long requiredCount = countedIng.count();
-            var ingredient = countedIng.ingredient();
-
-            long foundCount = 0;
-            for (int i = INPUT_SLOTS_START; i < INPUT_SLOTS_START + INPUT_SLOTS_COUNT; i++) {
-                ItemStack stack = this.itemHandler.getStackInSlot(i);
-                if (!stack.isEmpty() && ingredient.test(stack)) {
-                    foundCount += stack.getCount();
-                    if (foundCount >= requiredCount) break;
-                }
-            }
-
-            if (foundCount < requiredCount) return false;
-        }
-
-        for (FluidStack requiredFluid : recipe.inputFluids()) {
-            boolean found = false;
-            for (int i = 0; i < FLUID_TANK_COUNT; i++) {
-                FluidStack tankFluid = this.inputFluidTanks[i].getFluid();
-                if (FluidStack.isSameFluidSameComponents(tankFluid, requiredFluid)
-                        && tankFluid.getAmount() >= requiredFluid.getAmount()) {
-                    found = true;
-                    break;
-                }
-            }
-            if (!found) return false;
-        }
-
-        return true;
+        return this.canConsumeRecipeInputs(recipe, 1);
     }
 
     /**
@@ -142,39 +108,14 @@ public final class AlloyFurnaceRecipeCalculator {
      * @return 如果有足够的材料返回true
      */
     public boolean canConsumeRecipeInputs(AdvancedAlloyFurnaceRecipe recipe, int parallel) {
-        for (var countedIng : recipe.inputs()) {
-            long requiredCount = countedIng.count() * (long) parallel;
-            var ingredient = countedIng.ingredient();
-
-            long foundCount = 0;
-            for (int i = INPUT_SLOTS_START; i < INPUT_SLOTS_START + INPUT_SLOTS_COUNT; i++) {
-                ItemStack stack = this.itemHandler.getStackInSlot(i);
-                if (ingredient.test(stack)) {
-                    foundCount += stack.getCount();
-                }
-            }
-
-            if (foundCount < requiredCount) return false;
-        }
-
-        for (FluidStack requiredFluid : recipe.inputFluids()) {
-            long requiredAmount = requiredFluid.getAmount() * (long) parallel;
-            long foundAmount = 0;
-            for (int i = 0; i < FLUID_TANK_COUNT; i++) {
-                FluidStack tankFluid = this.inputFluidTanks[i].getFluid();
-                if (FluidStack.isSameFluidSameComponents(tankFluid, requiredFluid)) {
-                    foundAmount += tankFluid.getAmount();
-                }
-            }
-            if (foundAmount < requiredAmount) return false;
-        }
-
+        if (recipe == null || parallel <= 0) return false;
         if (!recipe.mold().isEmpty()) {
             ItemStack moldStack = this.itemHandler.getStackInSlot(MOLD_SLOT);
-            return recipe.mold().test(moldStack);
+            if (!recipe.mold().test(moldStack)) return false;
         }
-
-        return true;
+        return FurnaceInputPort.canConsumeRecipeInputs(
+                recipe, parallel, this.itemHandler, INPUT_SLOTS_START, INPUT_SLOTS_COUNT,
+                this.inputFluidTanks, FLUID_TANK_COUNT);
     }
 
     /**
@@ -228,61 +169,9 @@ public final class AlloyFurnaceRecipeCalculator {
      * 对于每种材料: 可用数量 / 配方需求数量 = 该材料允许的并行数，取所有材料的最小值。
      */
     public int calculateMaterialParallel(AdvancedAlloyFurnaceRecipe recipe) {
-        int minParallel = Integer.MAX_VALUE;
-        boolean hasCalculation = false;
-
-        // 计算物品输入限制
-        for (var countedIng : recipe.inputs()) {
-            long totalAvailable = 0;
-            var ingredient = countedIng.ingredient();
-            long requiredPerParallel = countedIng.count();
-
-            if (requiredPerParallel <= 0) continue;
-
-            hasCalculation = true;
-
-            // 统计所有输入槽中符合条件的物品总数
-            for (int i = INPUT_SLOTS_START; i < INPUT_SLOTS_START + INPUT_SLOTS_COUNT; i++) {
-                ItemStack stack = this.itemHandler.getStackInSlot(i);
-                if (ingredient.test(stack)) {
-                    totalAvailable += stack.getCount();
-                }
-            }
-
-            // 先除: 可用数量 / 需求数量 = 该材料允许的并行数
-            long parallelLong = totalAvailable / requiredPerParallel;
-            int possibleParallel = parallelLong > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) parallelLong;
-            minParallel = Math.min(minParallel, possibleParallel);
-
-            // 如果已经降到0，提前返回
-            if (minParallel <= 0) return 0;
-        }
-
-        // 计算流体输入限制
-        for (FluidStack requiredFluid : recipe.inputFluids()) {
-            long totalAvailable = 0;
-            long requiredPerParallel = requiredFluid.getAmount();
-
-            if (requiredPerParallel <= 0) continue;
-
-            hasCalculation = true;
-
-            for (int i = 0; i < FLUID_TANK_COUNT; i++) {
-                FluidStack tankFluid = this.inputFluidTanks[i].getFluid();
-                if (FluidStack.isSameFluidSameComponents(tankFluid, requiredFluid)) {
-                    totalAvailable += tankFluid.getAmount();
-                }
-            }
-
-            // 先除: 可用数量 / 需求数量 = 该流体允许的并行数
-            long parallelLong = totalAvailable / requiredPerParallel;
-            int possibleParallel = parallelLong > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) parallelLong;
-            minParallel = Math.min(minParallel, possibleParallel);
-
-            if (minParallel <= 0) return 0;
-        }
-
-        return hasCalculation ? minParallel : 1;
+        return FurnaceInputPort.calculateMaterialParallel(
+                recipe, this.itemHandler, INPUT_SLOTS_START, INPUT_SLOTS_COUNT,
+                this.inputFluidTanks, FLUID_TANK_COUNT);
     }
 
     /**

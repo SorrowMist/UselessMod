@@ -19,7 +19,7 @@ public class AdvancedAlloyFurnaceRecipeBuilder {
     private final List<GenericStack> keyInputs = new ArrayList<>();
     private final List<ItemStack> outputs = new ArrayList<>();
     private final List<GenericStack> keyOutputs = new ArrayList<>();
-    private int energy = 2000;
+    private long energy = 2000L;
     private int processTime = 200;
     private Ingredient catalyst = Ingredient.EMPTY;
     private int catalystUses = 0;
@@ -55,7 +55,7 @@ public class AdvancedAlloyFurnaceRecipeBuilder {
         return this;
     }
 
-    public AdvancedAlloyFurnaceRecipeBuilder energy(int energy) {
+    public AdvancedAlloyFurnaceRecipeBuilder energy(long energy) {
         this.energy = energy;
         return this;
     }

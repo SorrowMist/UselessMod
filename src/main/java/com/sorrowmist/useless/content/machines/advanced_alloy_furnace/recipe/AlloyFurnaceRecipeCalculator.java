@@ -6,7 +6,6 @@ import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.io.Furnace
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.parallel.AlloyFurnaceParallelCalculator;
 import com.sorrowmist.useless.content.recipe.AdvancedAlloyFurnaceRecipe;
 import com.sorrowmist.useless.content.recipe.AlloyFurnaceRecipeManager;
-import com.sorrowmist.useless.energy.IEnergyManager;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.neoforged.neoforge.fluids.FluidStack;
@@ -37,14 +36,11 @@ public final class AlloyFurnaceRecipeCalculator {
     private final ItemStackHandler itemHandler;
     private final FluidTank[] inputFluidTanks;
     private final FluidTank[] outputFluidTanks;
-    private final IEnergyManager energyManager;
-
     public AlloyFurnaceRecipeCalculator(ItemStackHandler itemHandler, FluidTank[] inputFluidTanks,
-                                        FluidTank[] outputFluidTanks, IEnergyManager energyManager) {
+                                        FluidTank[] outputFluidTanks) {
         this.itemHandler = itemHandler;
         this.inputFluidTanks = inputFluidTanks;
         this.outputFluidTanks = outputFluidTanks;
-        this.energyManager = energyManager;
     }
 
     /**
@@ -139,9 +135,7 @@ public final class AlloyFurnaceRecipeCalculator {
     public int calculateActualParallel(AdvancedAlloyFurnaceRecipe recipe) {
         ItemStack catalystStack = this.itemHandler.getStackInSlot(CATALYST_SLOT);
         ResolvedCatalystEffect resolvedCatalystEffect = CatalystEffectResolver.resolve(recipe, catalystStack, recipe.processTime());
-        int energyParallel = AlloyFurnaceParallelCalculator.calculateEnergyParallel(this.energyManager, recipe,
-                                                                                    resolvedCatalystEffect
-        );
+        int energyParallel = AlloyFurnaceParallelCalculator.calculateEnergyParallel(recipe, resolvedCatalystEffect);
         int catalystParallel = resolvedCatalystEffect.recipeParallel();
         int materialParallel = this.calculateMaterialParallel(recipe);
         int outputParallel = this.calculateOutputParallel(recipe);

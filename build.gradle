@@ -240,6 +240,7 @@ dependencies {
     runtimeOnly "mekanism:Mekanism:1.21.1-10.7.15.81:generators"
     implementation "curse.maven:applied-mekanistics-574300:5978711"
     runtimeOnly "maven.modrinth:mekanism_extra:1.21.1-1.2.4"
+    implementation "curse.maven:flux-networks-248020:6089446"
 
     implementation "curse.maven:botany-pots-353928:7115287"
     implementation "curse.maven:bookshelf-228525:7115332"

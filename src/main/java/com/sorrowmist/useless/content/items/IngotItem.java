@@ -13,9 +13,14 @@ import net.minecraft.world.level.block.state.BlockState;
 import org.jetbrains.annotations.NotNull;
 
 public class IngotItem extends Item {
+    private final int furnaceTier;
 
-    public IngotItem(Properties properties) {
+    public IngotItem(Properties properties, int furnaceTier) {
         super(properties);
+        if (furnaceTier < 1 || furnaceTier > AdvancedAlloyFurnaceBlockEntity.MAX_FURNACE_TIER) {
+            throw new IllegalArgumentException("Invalid furnace tier: " + furnaceTier);
+        }
+        this.furnaceTier = furnaceTier;
     }
 
     /**
@@ -38,45 +43,22 @@ public class IngotItem extends Item {
             
             // 获取方块实体
             if (level.getBlockEntity(pos) instanceof AdvancedAlloyFurnaceBlockEntity furnace) {
-                // 获取目标阶级
-                int targetTier = getIngotTier(stack);
-                if (targetTier > 0) {
-                    int currentTier = furnace.getFurnaceTier();
-                    if (targetTier > currentTier) {
-                        // 尝试升级
-                        if (furnace.tryUpgrade(targetTier)) {
-                            // 消耗一个锭
-                            stack.shrink(1);
-                            return InteractionResult.SUCCESS;
-                        }
+                int currentTier = furnace.getFurnaceTier();
+                if (this.furnaceTier > currentTier) {
+                    if (furnace.tryUpgrade(this.furnaceTier)) {
+                        stack.shrink(1);
+                        return InteractionResult.SUCCESS;
                     }
-                    // 升级失败（阶级相同或更低），返回CONSUME阻止其他交互
-                    return InteractionResult.CONSUME;
                 }
+                // 升级失败（阶级相同或更低），阻止继续打开界面。
+                return InteractionResult.CONSUME;
             }
         }
         
         return super.useOn(context);
     }
 
-    /**
-     * 获取锭的阶级
-     * @param stack 物品堆
-     * @return 锭的阶级（1-9），如果不是无用锭则返回0
-     */
-    private static int getIngotTier(ItemStack stack) {
-        // 这里需要通过物品注册名来判断阶级
-        // 由于无法直接访问ModItems，我们使用物品的描述ID
-        String itemId = stack.getItem().toString();
-        if (itemId.contains("useless_ingot_tier_1")) return 1;
-        if (itemId.contains("useless_ingot_tier_2")) return 2;
-        if (itemId.contains("useless_ingot_tier_3")) return 3;
-        if (itemId.contains("useless_ingot_tier_4")) return 4;
-        if (itemId.contains("useless_ingot_tier_5")) return 5;
-        if (itemId.contains("useless_ingot_tier_6")) return 6;
-        if (itemId.contains("useless_ingot_tier_7")) return 7;
-        if (itemId.contains("useless_ingot_tier_8")) return 8;
-        if (itemId.contains("useless_ingot_tier_9")) return 9;
-        return 0;
+    public int getFurnaceTier() {
+        return this.furnaceTier;
     }
 }

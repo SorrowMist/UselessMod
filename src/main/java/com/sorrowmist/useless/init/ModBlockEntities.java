@@ -3,6 +3,10 @@ package com.sorrowmist.useless.init;
 import com.sorrowmist.useless.UselessMod;
 import com.sorrowmist.useless.content.blockentities.AdvancedAlloyFurnaceBlockEntity;
 import com.sorrowmist.useless.content.blockentities.OreGeneratorBlockEntity;
+import com.sorrowmist.useless.compat.draconicevolution.DraconicOpStorageCompat;
+import com.sorrowmist.useless.compat.fluxnetworks.FluxNetworksEnergyCompat;
+import com.sorrowmist.useless.compat.mekanism.MekanismEnergyCompat;
+import com.sorrowmist.useless.content.recipe.adapters.RecipeAdapterCompatRegistry;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.neoforged.bus.api.IEventBus;
@@ -10,6 +14,7 @@ import net.neoforged.neoforge.capabilities.Capabilities;
 import net.neoforged.neoforge.capabilities.RegisterCapabilitiesEvent;
 import net.neoforged.neoforge.registries.DeferredHolder;
 import net.neoforged.neoforge.registries.DeferredRegister;
+import net.neoforged.fml.ModList;
 
 import appeng.api.AECapabilities;
 
@@ -52,6 +57,16 @@ public final class ModBlockEntities {
                 ADVANCED_ALLOY_FURNACE.get(),
                 (blockEntity, context) -> blockEntity
         );
+
+        if (ModList.get().isLoaded(RecipeAdapterCompatRegistry.DRACONIC_EVOLUTION)) {
+            DraconicOpStorageCompat.registerCapabilities(event);
+        }
+        if (ModList.get().isLoaded(MekanismEnergyCompat.MOD_ID)) {
+            MekanismEnergyCompat.registerCapabilities(event);
+        }
+        if (ModList.get().isLoaded(FluxNetworksEnergyCompat.MOD_ID)) {
+            FluxNetworksEnergyCompat.registerCapabilities(event);
+        }
     }
 
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<OreGeneratorBlockEntity>> ORE_GENERATOR =

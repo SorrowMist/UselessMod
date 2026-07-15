@@ -497,13 +497,19 @@ public class AdvancedAlloyFurnaceRecipeCategory implements IRecipeCategory<Advan
     }
 
     // 格式化能量显示
-    private String formatEnergy(int energy) {
-        if (energy >= 1000000000) {
-            return String.format("%.2fG FE", energy / 1000000000.0);
-        } else if (energy >= 1000000) {
-            return String.format("%.2fM FE", energy / 1000000.0);
-        } else if (energy >= 1000) {
-            return String.format("%.2fk FE", energy / 1000.0);
+    private String formatEnergy(long energy) {
+        if (energy >= 1_000_000_000_000_000_000L) {
+            return String.format("%.2fE FE", energy / 1_000_000_000_000_000_000.0);
+        } else if (energy >= 1_000_000_000_000_000L) {
+            return String.format("%.2fP FE", energy / 1_000_000_000_000_000.0);
+        } else if (energy >= 1_000_000_000_000L) {
+            return String.format("%.2fT FE", energy / 1_000_000_000_000.0);
+        } else if (energy >= 1_000_000_000L) {
+            return String.format("%.2fG FE", energy / 1_000_000_000.0);
+        } else if (energy >= 1_000_000L) {
+            return String.format("%.2fM FE", energy / 1_000_000.0);
+        } else if (energy >= 1_000L) {
+            return String.format("%.2fk FE", energy / 1_000.0);
         } else {
             return energy + " FE";
         }

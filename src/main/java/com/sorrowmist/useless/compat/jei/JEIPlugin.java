@@ -42,6 +42,7 @@ import com.sorrowmist.useless.content.recipe.adapters.mysticalagriculture.Infusi
 import com.sorrowmist.useless.content.recipe.adapters.mysticalagriculture.SeedEssenceRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.productivebees.BeeProduceRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.productivebees.CentrifugeRecipeAdapter;
+import com.sorrowmist.useless.content.recipe.adapters.draconicevolution.DraconicFusionRecipeAdapter;
 import com.sorrowmist.useless.init.ModBlocks;
 import com.sorrowmist.useless.init.ModRecipeTypes;
 import com.sorrowmist.useless.init.ModTags;
@@ -176,6 +177,10 @@ public class JEIPlugin implements IModPlugin {
 
         if (RecipeAdapterCompatRegistry.isLoaded(RecipeAdapterCompatRegistry.PRODUCTIVE_BEES)) {
             recipes.addAll(convertProductiveBeesRecipes(recipeManager, level));
+        }
+
+        if (RecipeAdapterCompatRegistry.isLoaded(RecipeAdapterCompatRegistry.DRACONIC_EVOLUTION)) {
+            recipes.addAll(convertDraconicEvolutionRecipes(recipeManager, level));
         }
 
         registration.addRecipes(AdvancedAlloyFurnaceRecipeCategory.TYPE, recipes);
@@ -424,6 +429,19 @@ public class JEIPlugin implements IModPlugin {
                 recipeManager,
                 cy.jdkdigital.productivebees.init.ModRecipeTypes.CENTRIFUGE_TYPE.get(),
                 new CentrifugeRecipeAdapter(),
+                level
+        );
+        return convertedRecipes;
+    }
+
+    private List<AdvancedAlloyFurnaceRecipe> convertDraconicEvolutionRecipes(
+            RecipeManager recipeManager, Level level) {
+        List<AdvancedAlloyFurnaceRecipe> convertedRecipes = new ArrayList<>();
+        addConvertedRecipes(
+                convertedRecipes,
+                recipeManager,
+                com.brandon3055.draconicevolution.api.DraconicAPI.FUSION_RECIPE_TYPE.get(),
+                new DraconicFusionRecipeAdapter(),
                 level
         );
         return convertedRecipes;

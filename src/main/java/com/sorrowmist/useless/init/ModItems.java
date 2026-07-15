@@ -4,6 +4,7 @@ package com.sorrowmist.useless.init;
 import com.sorrowmist.useless.UselessMod;
 import com.sorrowmist.useless.api.enums.RarityExtension;
 import com.sorrowmist.useless.api.enums.tool.ToolTypeMode;
+import com.sorrowmist.useless.content.blockentities.AdvancedAlloyFurnaceBlockEntity;
 import com.sorrowmist.useless.content.items.AE2GiftPackageItem;
 import com.sorrowmist.useless.content.items.AdvancedAlloyFurnaceBlockItem;
 import com.sorrowmist.useless.content.items.EndlessBeafItem;
@@ -54,39 +55,39 @@ public final class ModItems {
     static final List<DeferredItem<? extends Item>> CREATIVE_MAIN_TAB_ITEMS = new ArrayList<>();
     public static final DeferredItem<Item> USELESS_INGOT_TIER_1 = registerAndAdd(
             "useless_ingot_tier_1",
-            () -> new IngotItem(new Item.Properties().rarity(Rarity.COMMON))
+            () -> new IngotItem(new Item.Properties().rarity(Rarity.COMMON), 1)
     );
     public static final DeferredItem<Item> USELESS_INGOT_TIER_2 = registerAndAdd(
             "useless_ingot_tier_2",
-            () -> new IngotItem(new Item.Properties().rarity(Rarity.COMMON))
+            () -> new IngotItem(new Item.Properties().rarity(Rarity.COMMON), 2)
     );
     public static final DeferredItem<Item> USELESS_INGOT_TIER_3 = registerAndAdd(
             "useless_ingot_tier_3",
-            () -> new IngotItem(new Item.Properties().rarity(Rarity.UNCOMMON))
+            () -> new IngotItem(new Item.Properties().rarity(Rarity.UNCOMMON), 3)
     );
     public static final DeferredItem<Item> USELESS_INGOT_TIER_4 = registerAndAdd(
             "useless_ingot_tier_4",
-            () -> new IngotItem(new Item.Properties().rarity(Rarity.UNCOMMON))
+            () -> new IngotItem(new Item.Properties().rarity(Rarity.UNCOMMON), 4)
     );
     public static final DeferredItem<Item> USELESS_INGOT_TIER_5 = registerAndAdd(
             "useless_ingot_tier_5",
-            () -> new IngotItem(new Item.Properties().rarity(Rarity.RARE))
+            () -> new IngotItem(new Item.Properties().rarity(Rarity.RARE), 5)
     );
     public static final DeferredItem<Item> USELESS_INGOT_TIER_6 = registerAndAdd(
             "useless_ingot_tier_6",
-            () -> new IngotItem(new Item.Properties().rarity(Rarity.RARE))
+            () -> new IngotItem(new Item.Properties().rarity(Rarity.RARE), 6)
     );
     public static final DeferredItem<Item> USELESS_INGOT_TIER_7 = registerAndAdd(
             "useless_ingot_tier_7",
-            () -> new IngotItem(new Item.Properties().rarity(Rarity.EPIC))
+            () -> new IngotItem(new Item.Properties().rarity(Rarity.EPIC), 7)
     );
     public static final DeferredItem<Item> USELESS_INGOT_TIER_8 = registerAndAdd(
             "useless_ingot_tier_8",
-            () -> new IngotItem(new Item.Properties().rarity(RarityExtension.MYTHIC.getValue()))
+            () -> new IngotItem(new Item.Properties().rarity(RarityExtension.MYTHIC.getValue()), 8)
     );
     public static final DeferredItem<Item> USELESS_INGOT_TIER_9 = registerAndAdd(
             "useless_ingot_tier_9",
-            () -> new IngotItem(new Item.Properties().rarity(RarityExtension.LEGENDARY.getValue()))
+            () -> new IngotItem(new Item.Properties().rarity(RarityExtension.LEGENDARY.getValue()), 9)
     );
     public static final DeferredItem<Item> POSSIBLE_USEFUL_INGOT = registerAndAdd(
             "possible_useful_ingot",
@@ -94,7 +95,9 @@ public final class ModItems {
     );
     public static final DeferredItem<Item> USEFUL_INGOT = registerAndAdd(
             "useful_ingot",
-            () -> new Item(new Item.Properties().rarity(RarityExtension.LEGENDARY.getValue()))
+            () -> new IngotItem(
+                    new Item.Properties().rarity(RarityExtension.LEGENDARY.getValue()),
+                    AdvancedAlloyFurnaceBlockEntity.USEFUL_INGOT_FURNACE_TIER)
     );
     // 金属模具
     public static final DeferredItem<Item> METAL_MOLD_PLATE = registerAndAdd(

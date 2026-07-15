@@ -33,6 +33,7 @@ import com.sorrowmist.useless.content.recipe.adapters.mysticalagriculture.Infusi
 import com.sorrowmist.useless.content.recipe.adapters.mysticalagriculture.SeedEssenceRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.productivebees.BeeProduceRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.productivebees.CentrifugeRecipeAdapter;
+import com.sorrowmist.useless.content.recipe.adapters.draconicevolution.DraconicFusionRecipeAdapter;
 import net.neoforged.fml.ModList;
 import net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent;
 import org.apache.logging.log4j.LogManager;
@@ -56,6 +57,7 @@ public final class RecipeAdapterCompatRegistry {
     public static final String AE2LT = "ae2lt";
     public static final String DATA_ENERGISTICS = "data_energistics";
     public static final String PRODUCTIVE_BEES = "productivebees";
+    public static final String DRACONIC_EVOLUTION = "draconicevolution";
 
     private static final List<CompatEntry> ENTRIES = List.of(
             new CompatEntry(null, RecipeAdapterCompatRegistry::registerMinecraft),
@@ -70,7 +72,8 @@ public final class RecipeAdapterCompatRegistry {
             new CompatEntry(MYSTICAL_AGRICULTURE, RecipeAdapterCompatRegistry::registerMysticalAgriculture),
             new CompatEntry(AE2LT, RecipeAdapterCompatRegistry::registerAELightningTech),
             new CompatEntry(DATA_ENERGISTICS, RecipeAdapterCompatRegistry::registerDataEnergistics),
-            new CompatEntry(PRODUCTIVE_BEES, RecipeAdapterCompatRegistry::registerProductiveBees)
+            new CompatEntry(PRODUCTIVE_BEES, RecipeAdapterCompatRegistry::registerProductiveBees),
+            new CompatEntry(DRACONIC_EVOLUTION, RecipeAdapterCompatRegistry::registerDraconicEvolution)
     );
 
     private RecipeAdapterCompatRegistry() {}
@@ -169,6 +172,10 @@ public final class RecipeAdapterCompatRegistry {
     private static void registerProductiveBees() {
         register(new BeeProduceRecipeAdapter());
         register(new CentrifugeRecipeAdapter());
+    }
+
+    private static void registerDraconicEvolution() {
+        register(new DraconicFusionRecipeAdapter());
     }
 
     private record CompatEntry(@Nullable String modId, Runnable registerAction) {}

@@ -105,11 +105,14 @@ import static com.sorrowmist.useless.content.machines.advanced_alloy_furnace.lay
 
 public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implements MenuProvider, ICraftingProvider, IInWorldGridNodeHost, IGridNodeListener<AdvancedAlloyFurnaceBlockEntity>, IActionHost, CraftingTaskContext, PatternContainer, FurnaceFaceAccessor, FurnaceAutoIoController.Context {
 
+    public static final int MAX_FURNACE_TIER = 10;
+    public static final int USEFUL_INGOT_FURNACE_TIER = 10;
+
     // 基础容量配置
     private static final int BASE_FLUID_TANK_CAPACITY = 16000;
-    private static final int BASE_ENERGY_CAPACITY = 100000;
-    private static final int BASE_ENERGY_MAX_RECEIVE = 10000;
-    private static final int ENERGY_MAX_EXTRACT = 0;
+    private static final long BASE_ENERGY_CAPACITY = 100_000L;
+    private static final long BASE_ENERGY_MAX_RECEIVE = 10_000L;
+    private static final long ENERGY_MAX_EXTRACT = 0L;
     private static final int ACTIVE_COOLDOWN_TICKS = 5;
     private static final int AUTO_OUTPUT_INTERVAL = 1;
     private static final int DISPLAY_PARALLEL_CACHE_DURATION = 20;
@@ -131,8 +134,8 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
     private final IActionSource actionSource;
     // 升级后的容量（根据阶级动态计算）
     private int fluidTankCapacity = BASE_FLUID_TANK_CAPACITY;
-    private int energyCapacity = BASE_ENERGY_CAPACITY;
-    private int energyMaxReceive = BASE_ENERGY_MAX_RECEIVE;
+    private long energyCapacity = BASE_ENERGY_CAPACITY;
+    private long energyMaxReceive = BASE_ENERGY_MAX_RECEIVE;
     private int progress = 0;
     private int maxProgress = 200;
     private int currentParallel = 1;
@@ -151,7 +154,7 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
     private long accumulatedEnergy = 0;
     // 活跃状态冷却计时器，用于避免配方切换时的闪烁
     private int activeCooldown = 0;
-    // 熔炉阶级 0-9，0为基础等级
+    // 熔炉阶级 0-10，0为基础等级，10为有用锭 long 能量等级
     private int furnaceTier = 0;
     // 自动输出计时器
     private int autoOutputTickCounter = 0;
@@ -212,7 +215,7 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
 
         // 初始化配方匹配与并行计算器（纯只读计算，不持有运行状态）
         this.recipeCalculator = new AlloyFurnaceRecipeCalculator(
-                this.itemHandler, this.inputFluidTanks, this.outputFluidTanks, this.energyManager);
+                this.itemHandler, this.inputFluidTanks, this.outputFluidTanks);
     }
 
 
@@ -239,11 +242,11 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
 
     /**
      * 计算能量槽容量
-     * 基础100000，前3阶2倍增长，之后4倍增长，9阶达到int最大值
+     * 基础100000，前3阶2倍增长，之后4倍增长；使用 long 保留完整等级曲线。
      */
-    public static int calculateEnergyCapacity(int tier) {
+    public static long calculateEnergyCapacity(int tier) {
         if (tier <= 0) return BASE_ENERGY_CAPACITY;
-        if (tier >= 9) return Integer.MAX_VALUE;
+        if (tier >= USEFUL_INGOT_FURNACE_TIER) return Long.MAX_VALUE;
 
         long capacity;
         if (tier <= 3) {
@@ -255,16 +258,16 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
             // 使用位移代替Math.pow避免浮点数精度问题
             capacity = base * (1L << (2 * (tier - 3)));
         }
-        return capacity > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) capacity;
+        return capacity;
     }
 
     /**
      * 计算能量输入速度
-     * 基础10000，前3阶2倍增长，之后4倍增长，9阶达到int最大值
+     * 基础10000，前3阶2倍增长，之后4倍增长；使用 long 保留完整等级曲线。
      */
-    public static int calculateEnergyReceive(int tier) {
+    public static long calculateEnergyReceive(int tier) {
         if (tier <= 0) return BASE_ENERGY_MAX_RECEIVE;
-        if (tier >= 9) return Integer.MAX_VALUE;
+        if (tier >= USEFUL_INGOT_FURNACE_TIER) return Long.MAX_VALUE;
 
         long receive;
         if (tier <= 3) {
@@ -276,7 +279,7 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
             // 使用位移代替Math.pow避免浮点数精度问题
             receive = base * (1L << (2 * (tier - 3)));
         }
-        return receive > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) receive;
+        return receive;
     }
 
     /**
@@ -307,7 +310,8 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
         if (blocked) {
             // 被阻止时，配方进度冻结但不清零
             // 不执行任何配方处理、AE任务、自动IO
-            boolean shouldBeActive = entity.currentRecipe != null && entity.progress > 0;
+            boolean shouldBeActive = entity.currentRecipe != null
+                    && (entity.progress > 0 || entity.accumulatedEnergy > 0L);
             if (wasActive != shouldBeActive) {
                 level.setBlock(entity.worldPosition,
                                entity.getBlockState().setValue(
@@ -341,7 +345,8 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
         }
 
         // 判断是否应该处于活跃状态
-        boolean isProcessing = entity.currentRecipe != null && entity.progress > 0;
+        boolean isProcessing = entity.currentRecipe != null
+                && (entity.progress > 0 || entity.accumulatedEnergy > 0L);
 
         // 如果正在处理，重置冷却计时器
         if (isProcessing) {
@@ -385,8 +390,8 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
         }
 
         // 模拟接收得到本tick可接受的能量（受容量与最大输入速率约束）
-        int wanted = this.energyManager.receiveEnergy(Integer.MAX_VALUE, true);
-        if (wanted <= 0) {
+        long wanted = this.energyManager.receiveEnergy(Long.MAX_VALUE, true);
+        if (wanted <= 0L) {
             return;
         }
 
@@ -398,18 +403,18 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
         if (drawAppflux) {
             long got = AppFluxCompat.extractFe(grid, wanted, this.actionSource);
             if (got > 0) {
-                this.energyManager.modifyEnergy((int) got);
-                wanted -= (int) got;
+                this.energyManager.modifyEnergy(got);
+                wanted -= got;
             }
         }
 
-        if (drawAe && wanted > 0) {
+        if (drawAe && wanted > 0L) {
             IEnergyService energyService = grid.getEnergyService();
             double aeWanted = PowerUnit.FE.convertTo(PowerUnit.AE, wanted);
             double aeGot = energyService.extractAEPower(aeWanted, Actionable.MODULATE, PowerMultiplier.ONE);
             // 以实际抽取量入账并向下取整，宁可丢弃不足1FE的零头也不凭空多记能量
-            int feGot = (int) Math.min(wanted, (long) Math.floor(PowerUnit.AE.convertTo(PowerUnit.FE, aeGot)));
-            if (feGot > 0) {
+            long feGot = Math.min(wanted, (long) Math.floor(PowerUnit.AE.convertTo(PowerUnit.FE, aeGot)));
+            if (feGot > 0L) {
                 this.energyManager.modifyEnergy(feGot);
             }
         }
@@ -429,7 +434,7 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
 
     /**
      * 根据阶级计算并更新容量
-     * 使用指数增长曲线，9阶达到int最大值
+     * 使用指数增长曲线，并同步 long 容量与输入速率。
      */
     private void updateCapacityByTier() {
         this.fluidTankCapacity = calculateFluidCapacity(this.furnaceTier);
@@ -459,20 +464,20 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
     }
 
     public void setClientFurnaceTier(int tier) {
-        this.furnaceTier = Math.max(0, Math.min(9, tier));
+        this.furnaceTier = Math.max(0, Math.min(MAX_FURNACE_TIER, tier));
     }
 
     /**
      * 设置熔炉阶级（内部使用，不触发容量更新）
      */
     private void setFurnaceTier(int tier) {
-        this.furnaceTier = Math.max(0, Math.min(9, tier));
+        this.furnaceTier = Math.max(0, Math.min(MAX_FURNACE_TIER, tier));
     }
 
     /**
      * 尝试升级熔炉
      *
-     * @param targetTier 目标阶级（1-9）
+     * @param targetTier 目标阶级（1-10）
      * @return 是否升级成功
      */
     public boolean tryUpgrade(int targetTier) {
@@ -480,8 +485,8 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
         if (targetTier <= this.furnaceTier) {
             return false;
         }
-        // 限制在1-9范围内
-        if (targetTier < 1 || targetTier > 9) {
+        // 1-9阶由无用锭升级，第10阶由有用锭升级。
+        if (targetTier < 1 || targetTier > MAX_FURNACE_TIER) {
             return false;
         }
         this.furnaceTier = targetTier;
@@ -506,14 +511,14 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
     /**
      * 获取能量槽容量
      */
-    public int getEnergyCapacity() {
+    public long getEnergyCapacity() {
         return this.energyCapacity;
     }
 
     /**
      * 获取能量输入速度
      */
-    public int getEnergyMaxReceive() {
+    public long getEnergyMaxReceive() {
         return this.energyMaxReceive;
     }
 
@@ -582,16 +587,21 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
             resolvedCatalystEffect = CatalystEffectResolver.resolve(this.currentRecipe, catalystStack, this.currentRecipe.processTime());
             this.cachedCatalystEffect = resolvedCatalystEffect;
         }
-        int baseEnergyPerTick = AlloyFurnaceRecipeExecutor.calculateBaseEnergyPerTick(this.currentRecipe);
-        AlloyFurnaceRecipeExecutor.TickResult tickResult = AlloyFurnaceRecipeExecutor.consumeTickEnergy(this.energyManager, baseEnergyPerTick, actualParallel,
-                                                                                                        resolvedCatalystEffect
-        );
+        long targetEnergy = AlloyFurnaceRecipeExecutor.calculateTargetTotalEnergy(
+                this.currentRecipe.energy(), actualParallel, resolvedCatalystEffect);
+        AlloyFurnaceRecipeExecutor.TickResult tickResult = AlloyFurnaceRecipeExecutor.consumeProgressEnergy(
+                this.energyManager, targetEnergy, this.progress, this.maxProgress, this.accumulatedEnergy);
 
         // 能量不足时暂停进度，但不重置
-        if (!tickResult.consumedEnergy()) return;
+        this.accumulatedEnergy += tickResult.energyConsumed();
+        if (!tickResult.progressAdvanced()) {
+            if (tickResult.energyConsumed() > 0L) {
+                this.setChanged();
+            }
+            return;
+        }
 
         // 累积能量
-        this.accumulatedEnergy += tickResult.energyConsumed();
         this.progress++;
 
         if (this.progress >= this.maxProgress) {
@@ -647,7 +657,7 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
      * - 如果能量足够，产出64份；不够则按实际能量计算
      */
     private void completeRecipe() {
-        int recipeEnergy = this.currentRecipe.energy();
+        long recipeEnergy = this.currentRecipe.energy();
         int initialParallel = this.cachedParallel;
 
         // 步骤1: 计算材料、输出空间、催化剂支持的最大并行数
@@ -667,6 +677,9 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
             ItemStack catalystStack = this.itemHandler.getStackInSlot(CATALYST_SLOT);
             resolvedCatalystEffect = CatalystEffectResolver.resolve(this.currentRecipe, catalystStack, this.currentRecipe.processTime());
         }
+
+        targetParallel = Math.min(targetParallel, AlloyFurnaceParallelCalculator.calculateEnergyParallel(
+                this.currentRecipe, resolvedCatalystEffect));
 
         AlloyFurnaceRecipeExecutor.CompletionEnergyResult completionEnergy = AlloyFurnaceRecipeExecutor.settleCompletionEnergy(
                 this.energyManager,
@@ -903,20 +916,20 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
         return (index >= 0 && index < FLUID_TANK_COUNT) ? this.outputFluidTanks[index] : new FluidTank(0);
     }
 
-    public int getEnergy() {
-        return this.energyManager.getEnergyStored();
+    public long getEnergy() {
+        return this.energyManager.getEnergyStoredLong();
     }
 
-    public void setEnergy(int energy) {
+    public void setEnergy(long energy) {
         this.energyManager.setEnergyStored(energy);
         this.setChanged();
     }
 
-    public int getMaxEnergy() {
-        return this.energyManager.getMaxEnergyStored();
+    public long getMaxEnergy() {
+        return this.energyManager.getMaxEnergyStoredLong();
     }
 
-    public void setMaxEnergy(int energy) {
+    public void setMaxEnergy(long energy) {
         this.energyManager.setMaxEnergyStored(energy);
     }
 
@@ -1068,7 +1081,7 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
         }
 
         if (tag.contains(NBTConstants.ENERGY)) {
-            this.energyManager.setEnergyStored(tag.getInt(NBTConstants.ENERGY));
+            this.energyManager.setEnergyStored(tag.getLong(NBTConstants.ENERGY));
         }
 
         this.progress = tag.getInt(NBTConstants.PROGRESS);
@@ -1141,7 +1154,7 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
 
         tag.putInt(NBTConstants.FURNACE_TIER, this.furnaceTier);
         tag.put(NBTConstants.INVENTORY, this.itemHandler.serializeNBT(registries));
-        tag.putInt(NBTConstants.ENERGY, this.energyManager.getEnergyStored());
+        tag.putLong(NBTConstants.ENERGY, this.energyManager.getEnergyStoredLong());
         tag.putInt(NBTConstants.PROGRESS, this.progress);
         tag.putInt(NBTConstants.MAX_PROGRESS, this.maxProgress);
         tag.putInt(NBTConstants.CURRENT_PARALLEL, this.currentParallel);

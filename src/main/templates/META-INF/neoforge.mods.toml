@@ -103,6 +103,29 @@ config="${mod_id}.mixins.json"
     ordering="AFTER"
     side="BOTH"
 
+# Draconic Evolution fusion recipe and long OP compatibility
+[[dependencies.${mod_id}]]
+    modId="draconicevolution"
+    type="optional"
+    versionRange="[3.1.4.632,)"
+    ordering="AFTER"
+    side="BOTH"
+
+# Optional long-energy capability integrations
+[[dependencies.${mod_id}]]
+    modId="mekanism"
+    type="optional"
+    versionRange="[10.7.15,)"
+    ordering="AFTER"
+    side="BOTH"
+
+[[dependencies.${mod_id}]]
+    modId="fluxnetworks"
+    type="optional"
+    versionRange="[8.0.0,)"
+    ordering="AFTER"
+    side="BOTH"
+
 # Require ExtendedAE (ExtendedAE-1.21-2.2.21-neoforge) to be present
 #[[dependencies.${mod_id}]]
 #    modId="extendedae"

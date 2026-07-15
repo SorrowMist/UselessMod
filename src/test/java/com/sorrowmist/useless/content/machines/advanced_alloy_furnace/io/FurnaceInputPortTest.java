@@ -55,7 +55,7 @@ class FurnaceInputPortTest {
                 List.of(water(600))
         );
         AlloyFurnaceRecipeCalculator calculator = new AlloyFurnaceRecipeCalculator(
-                items, inputTanks, outputTanks, null);
+                items, inputTanks, outputTanks);
 
         assertTrue(calculator.canProcessRecipe(recipe));
         assertTrue(calculator.canConsumeRecipeInputs(recipe, 2));

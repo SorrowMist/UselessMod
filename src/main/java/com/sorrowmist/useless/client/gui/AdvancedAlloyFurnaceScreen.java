@@ -535,12 +535,12 @@ public class AdvancedAlloyFurnaceScreen extends AbstractContainerScreen<Advanced
      * 根据电量百分比从左到右渲染
      */
     private void renderEnergyBar(GuiGraphics guiGraphics, int x, int y) {
-        int energyStored = this.menu.getEnergy();
-        int maxEnergy = this.menu.getMaxEnergy();
+        long energyStored = this.menu.getEnergy();
+        long maxEnergy = this.menu.getMaxEnergy();
 
         if (maxEnergy <= 0) return;
 
-        float energyRatio = (float) energyStored / maxEnergy;
+        double energyRatio = (double) energyStored / maxEnergy;
         int energyWidth = (int) (ENERGY_BAR_WIDTH * energyRatio);
 
         if (energyWidth > 0) {

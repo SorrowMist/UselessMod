@@ -184,7 +184,7 @@ public class AdvancedAlloyFurnaceBlock extends Block implements EntityBlock {
                     }
                     
                     // 保存能量
-                    blockEntityData.putInt(NBTConstants.ENERGY, furnace.getEnergy());
+                    blockEntityData.putLong(NBTConstants.ENERGY, furnace.getEnergy());
                     
                     // 保存流体
                     for (int i = 0; i < AdvancedAlloyFurnaceLayout.FLUID_TANK_COUNT; i++) {
@@ -464,7 +464,7 @@ public class AdvancedAlloyFurnaceBlock extends Block implements EntityBlock {
                 
                 // 恢复能量
                 if (blockEntityData.contains(NBTConstants.ENERGY)) {
-                    furnace.setEnergy(blockEntityData.getInt(NBTConstants.ENERGY));
+                    furnace.setEnergy(blockEntityData.getLong(NBTConstants.ENERGY));
                 }
                 
                 // 恢复流体

@@ -2,174 +2,216 @@ package com.sorrowmist.useless.energy;
 
 import net.minecraft.nbt.CompoundTag;
 
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 
-/**
- * 能源管理器实现类 - 提供完整的能源管理功能
- * 使用 AtomicInteger 实现无锁线程安全
- */
+/** Thread-safe long-backed energy storage. */
 public class EnergyManager implements IEnergyManager {
 
-    private final AtomicInteger energy = new AtomicInteger(0);
-    private int capacity;
-    private int maxReceive;
-    private int maxExtract;
+    private final AtomicLong energy = new AtomicLong(0L);
+    private volatile long capacity;
+    private volatile long maxReceive;
+    private volatile long maxExtract;
     private Runnable changeListener;
 
-    public EnergyManager(int capacity) {
+    public EnergyManager(long capacity) {
         this(capacity, capacity, capacity);
     }
 
-    public EnergyManager(int capacity, int maxTransfer) {
+    public EnergyManager(long capacity, long maxTransfer) {
         this(capacity, maxTransfer, maxTransfer);
     }
 
-    private EnergyManager(int capacity, int maxReceive, int maxExtract) {
-        this(capacity, maxReceive, maxExtract, 0);
+    private EnergyManager(long capacity, long maxReceive, long maxExtract) {
+        this(capacity, maxReceive, maxExtract, 0L);
     }
 
-    private EnergyManager(int capacity, int maxReceive, int maxExtract, int initialEnergy) {
-        this.capacity = Math.max(0, capacity);
-        this.maxReceive = Math.max(0, Math.min(capacity, maxReceive));
-        this.maxExtract = Math.max(0, Math.min(capacity, maxExtract));
-        this.energy.set(Math.max(0, Math.min(initialEnergy, this.capacity)));
+    private EnergyManager(long capacity, long maxReceive, long maxExtract, long initialEnergy) {
+        this.capacity = Math.max(0L, capacity);
+        this.maxReceive = clamp(maxReceive, 0L, this.capacity);
+        this.maxExtract = clamp(maxExtract, 0L, this.capacity);
+        this.energy.set(clamp(initialEnergy, 0L, this.capacity));
     }
 
-    /**
-     * 创建能源管理器的构建器
-     */
     public static Builder builder() {
         return new Builder();
     }
 
     @Override
+    public long receiveEnergy(long requested, boolean simulate) {
+        if (!this.canReceive() || requested <= 0L) {
+            return 0L;
+        }
+
+        while (true) {
+            long current = this.energy.get();
+            long accepted = Math.min(this.capacity - current, Math.min(this.maxReceive, requested));
+            if (accepted <= 0L || simulate) {
+                return Math.max(0L, accepted);
+            }
+            if (this.energy.compareAndSet(current, current + accepted)) {
+                this.notifyChange();
+                return accepted;
+            }
+        }
+    }
+
+    @Override
     public int receiveEnergy(int maxReceive, boolean simulate) {
-        if (!this.canReceive()) {
-            return 0;
+        return (int) Math.min(Integer.MAX_VALUE, this.receiveEnergy((long) maxReceive, simulate));
+    }
+
+    @Override
+    public long extractEnergy(long requested, boolean simulate) {
+        if (!this.canExtract() || requested <= 0L) {
+            return 0L;
         }
 
-        int currentEnergy = this.energy.get();
-        int energyReceived = Math.min(this.capacity - currentEnergy, Math.min(this.maxReceive, maxReceive));
-        if (!simulate && energyReceived > 0) {
-            this.energy.addAndGet(energyReceived);
-            this.notifyChange();
+        while (true) {
+            long current = this.energy.get();
+            long extracted = Math.min(current, Math.min(this.maxExtract, requested));
+            if (extracted <= 0L || simulate) {
+                return Math.max(0L, extracted);
+            }
+            if (this.energy.compareAndSet(current, current - extracted)) {
+                this.notifyChange();
+                return extracted;
+            }
         }
-
-        return energyReceived;
     }
 
     @Override
     public int extractEnergy(int maxExtract, boolean simulate) {
-        if (!this.canExtract()) {
-            return 0;
-        }
-
-        int currentEnergy = this.energy.get();
-        int energyExtracted = Math.min(currentEnergy, Math.min(this.maxExtract, maxExtract));
-        if (!simulate && energyExtracted > 0) {
-            this.energy.addAndGet(-energyExtracted);
-            this.notifyChange();
-        }
-
-        return energyExtracted;
+        return (int) Math.min(Integer.MAX_VALUE, this.extractEnergy((long) maxExtract, simulate));
     }
 
     @Override
     public int getEnergyStored() {
+        return (int) Math.min(Integer.MAX_VALUE, this.getEnergyStoredLong());
+    }
+
+    @Override
+    public long getEnergyStoredLong() {
         return this.energy.get();
     }
 
     @Override
     public int getMaxEnergyStored() {
+        return (int) Math.min(Integer.MAX_VALUE, this.getMaxEnergyStoredLong());
+    }
+
+    @Override
+    public long getMaxEnergyStoredLong() {
         return this.capacity;
     }
 
     @Override
+    public long getMaxReceiveLong() {
+        return this.maxReceive;
+    }
+
+    @Override
+    public long getMaxExtractLong() {
+        return this.maxExtract;
+    }
+
+    @Override
     public boolean canExtract() {
-        return this.maxExtract > 0;
+        return this.maxExtract > 0L;
     }
 
     @Override
     public boolean canReceive() {
-        return this.maxReceive > 0;
+        return this.maxReceive > 0L;
     }
 
     @Override
-    public void setMaxEnergyStored(int capacity) {
-        this.capacity = Math.max(0, capacity);
-        this.maxReceive = Math.min(this.maxReceive, capacity);
-        this.maxExtract = Math.min(this.maxExtract, capacity);
-        int currentEnergy = this.energy.get();
-        if (currentEnergy > capacity) {
-            this.energy.set(capacity);
+    public void setMaxEnergyStored(long capacity) {
+        long previousCapacity = this.capacity;
+        this.capacity = Math.max(0L, capacity);
+        this.maxReceive = Math.min(this.maxReceive, this.capacity);
+        this.maxExtract = Math.min(this.maxExtract, this.capacity);
+        this.setEnergyStored(this.energy.get());
+        if (previousCapacity != this.capacity) {
             this.notifyChange();
         }
     }
 
     @Override
-    public void setMaxReceive(int maxReceive) {
-        this.maxReceive = Math.max(0, Math.min(this.capacity, maxReceive));
+    public void setMaxReceive(long maxReceive) {
+        this.maxReceive = clamp(maxReceive, 0L, this.capacity);
     }
 
     @Override
-    public void setMaxExtract(int maxExtract) {
-        this.maxExtract = Math.max(0, Math.min(this.capacity, maxExtract));
+    public void setMaxExtract(long maxExtract) {
+        this.maxExtract = clamp(maxExtract, 0L, this.capacity);
     }
 
     @Override
-    public void modifyEnergy(int delta) {
-        this.setEnergyStored(this.energy.get() + delta);
+    public void modifyEnergy(long delta) {
+        this.modifyEnergyStored(delta);
     }
 
     @Override
-    public boolean canWork(int energyRequired) {
-        return this.energy.get() >= energyRequired;
-    }
-
-    @Override
-    public boolean tryConsumeEnergy(int amount) {
-        if (amount <= 0) return false;
-
-        // 使用 CAS 操作实现无锁线程安全
+    public long modifyEnergyStored(long delta) {
+        if (delta == 0L) {
+            return 0L;
+        }
         while (true) {
-            int current = this.energy.get();
+            long current = this.energy.get();
+            long next = clamp(saturatingAdd(current, delta), 0L, this.capacity);
+            if (next == current) {
+                return 0L;
+            }
+            if (this.energy.compareAndSet(current, next)) {
+                this.notifyChange();
+                return next > current ? next - current : current - next;
+            }
+        }
+    }
+
+    @Override
+    public boolean canWork(long energyRequired) {
+        return energyRequired >= 0L && this.energy.get() >= energyRequired;
+    }
+
+    @Override
+    public boolean tryConsumeEnergy(long amount) {
+        if (amount <= 0L) {
+            return false;
+        }
+
+        while (true) {
+            long current = this.energy.get();
             if (current < amount) {
                 return false;
             }
-            int next = Math.max(0, current - amount);
-            if (this.energy.compareAndSet(current, next)) {
-                // CAS 成功，在锁外调用 notifyChange 避免死锁
+            if (this.energy.compareAndSet(current, current - amount)) {
                 this.notifyChange();
                 return true;
             }
-            // CAS 失败，重试
         }
     }
 
     @Override
     public CompoundTag serializeNBT() {
         CompoundTag tag = new CompoundTag();
-        tag.putInt("Energy", this.energy.get());
-        tag.putInt("Capacity", this.capacity);
-        tag.putInt("MaxReceive", this.maxReceive);
-        tag.putInt("MaxExtract", this.maxExtract);
+        tag.putLong("Energy", this.energy.get());
+        tag.putLong("Capacity", this.capacity);
+        tag.putLong("MaxReceive", this.maxReceive);
+        tag.putLong("MaxExtract", this.maxExtract);
         return tag;
     }
 
     @Override
     public void deserializeNBT(CompoundTag tag) {
-        if (tag.contains("Energy")) {
-            this.energy.set(tag.getInt("Energy"));
-        }
-        if (tag.contains("Capacity")) {
-            this.capacity = tag.getInt("Capacity");
-        }
-        if (tag.contains("MaxReceive")) {
-            this.maxReceive = tag.getInt("MaxReceive");
-        }
-        if (tag.contains("MaxExtract")) {
-            this.maxExtract = tag.getInt("MaxExtract");
-        }
+        long loadedCapacity = tag.contains("Capacity") ? tag.getLong("Capacity") : this.capacity;
+        this.capacity = Math.max(0L, loadedCapacity);
+        this.maxReceive = clamp(tag.contains("MaxReceive") ? tag.getLong("MaxReceive") : this.maxReceive,
+                0L, this.capacity);
+        this.maxExtract = clamp(tag.contains("MaxExtract") ? tag.getLong("MaxExtract") : this.maxExtract,
+                0L, this.capacity);
+        this.energy.set(clamp(tag.contains("Energy") ? tag.getLong("Energy") : this.energy.get(),
+                0L, this.capacity));
         this.notifyChange();
     }
 
@@ -184,11 +226,10 @@ public class EnergyManager implements IEnergyManager {
     }
 
     @Override
-    public void setEnergyStored(int energy) {
-        int oldEnergy = this.energy.get();
-        int newEnergy = Math.max(0, Math.min(energy, this.capacity));
-        this.energy.set(newEnergy);
-        if (oldEnergy != newEnergy) {
+    public void setEnergyStored(long energy) {
+        long next = clamp(energy, 0L, this.capacity);
+        long previous = this.energy.getAndSet(next);
+        if (previous != next) {
             this.notifyChange();
         }
     }
@@ -199,35 +240,49 @@ public class EnergyManager implements IEnergyManager {
         }
     }
 
+    private static long clamp(long value, long minimum, long maximum) {
+        return Math.max(minimum, Math.min(value, maximum));
+    }
+
+    private static long saturatingAdd(long left, long right) {
+        if (right > 0L && left > Long.MAX_VALUE - right) {
+            return Long.MAX_VALUE;
+        }
+        if (right < 0L && left < Long.MIN_VALUE - right) {
+            return Long.MIN_VALUE;
+        }
+        return left + right;
+    }
+
     public static class Builder {
-        private int capacity = 10000;
-        private int maxReceive = 1000;
-        private int maxExtract = 1000;
-        private int initialEnergy = 0;
+        private long capacity = 10_000L;
+        private long maxReceive = 1_000L;
+        private long maxExtract = 1_000L;
+        private long initialEnergy = 0L;
         private Runnable changeListener;
 
-        public Builder capacity(int capacity) {
+        public Builder capacity(long capacity) {
             this.capacity = capacity;
             return this;
         }
 
-        public Builder maxReceive(int maxReceive) {
+        public Builder maxReceive(long maxReceive) {
             this.maxReceive = maxReceive;
             return this;
         }
 
-        public Builder maxExtract(int maxExtract) {
+        public Builder maxExtract(long maxExtract) {
             this.maxExtract = maxExtract;
             return this;
         }
 
-        public Builder maxTransfer(int maxTransfer) {
+        public Builder maxTransfer(long maxTransfer) {
             this.maxReceive = maxTransfer;
             this.maxExtract = maxTransfer;
             return this;
         }
 
-        public Builder initialEnergy(int initialEnergy) {
+        public Builder initialEnergy(long initialEnergy) {
             this.initialEnergy = initialEnergy;
             return this;
         }
@@ -238,9 +293,8 @@ public class EnergyManager implements IEnergyManager {
         }
 
         public EnergyManager build() {
-            EnergyManager manager = new EnergyManager(this.capacity, this.maxReceive, this.maxExtract,
-                                                      this.initialEnergy
-            );
+            EnergyManager manager = new EnergyManager(
+                    this.capacity, this.maxReceive, this.maxExtract, this.initialEnergy);
             if (this.changeListener != null) {
                 manager.setChangeListener(this.changeListener);
             }

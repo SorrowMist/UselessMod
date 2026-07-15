@@ -54,7 +54,7 @@ public class CraftingTask {
     private boolean processingComplete = false;
     private boolean initialized = false;
     private int baseProcessTime = 200;
-    private int baseEnergyPerTick = 200;
+    private long baseEnergyPerTick = 200L;
     private int maxParallel = 1;
     private int batches = 1;
     private int lastBatchSize = 1;
@@ -390,22 +390,26 @@ public class CraftingTask {
         if (!awaitingOutputFlush) {
             AdvancedAlloyFurnaceRecipe recipe = findTaskRecipe();
             ResolvedCatalystEffect resolvedCatalystEffect = getCatalystEffect(recipe);
-            long energyTarget = getSubTaskEnergyTarget(recipe, resolvedCatalystEffect);
 
             if (progress < processTime) {
-                int batchIndex = baseProcessTime > 0 ? progress / baseProcessTime : 0;
-                int actualBatchParallel = batchIndex < batches - 1 ? maxParallel : lastBatchSize;
-                int tickEnergy = AlloyFurnaceRecipeExecutor.calculateTickEnergy(baseEnergyPerTick, actualBatchParallel, resolvedCatalystEffect);
-                // 每 tick 扣能以结算目标为上限，避免总额超出本体语义（有用锭=一份配方能量）
-                int required = (int) Math.min(tickEnergy, Math.max(0L, energyTarget - accumulatedEnergy));
-                if (required > 0) {
-                    if (!context.getEnergyManager().tryConsumeEnergy(required)) {
-                        return false;
+                ProgressEnergyStep energyStep = getProgressEnergyStep(recipe, resolvedCatalystEffect);
+                AlloyFurnaceRecipeExecutor.TickResult tickResult =
+                        AlloyFurnaceRecipeExecutor.consumeProgressEnergy(
+                                context.getEnergyManager(), energyStep.targetEnergy(),
+                                energyStep.progress(), energyStep.duration(), accumulatedEnergy);
+                accumulatedEnergy += tickResult.energyConsumed();
+                if (!tickResult.progressAdvanced()) {
+                    if (tickResult.energyConsumed() > 0L) {
+                        context.markChanged();
                     }
-                    accumulatedEnergy += required;
+                    return false;
                 }
 
                 progress++;
+                if (energyStep.resetAfterAdvance()
+                        && energyStep.progress() + 1 >= energyStep.duration()) {
+                    accumulatedEnergy = 0L;
+                }
                 context.getTotalAEProgressAtomic().incrementAndGet();
                 if (taskProgressRef != null) {
                     taskProgressRef.setProgress(progress);
@@ -421,12 +425,6 @@ public class CraftingTask {
                 if (progress < processTime) {
                     return false;
                 }
-            }
-
-            // 完成结算：与本体 settleCompletionEnergy 语义对齐 ——
-            // 有用锭补足到一份配方能量，其余催化剂补足到 energy × craftCount
-            if (!settleSubTaskEnergy(energyTarget)) {
-                return false;
             }
 
             generatePendingOutputs(craftCount);
@@ -453,42 +451,24 @@ public class CraftingTask {
         return true;
     }
 
-    /**
-     * 当前子任务的能量结算目标，与本体 settleCompletionEnergy 的目标一致：
-     * 有用锭（不随并行倍增）时整个子任务只收一份配方能量；
-     * 其余催化剂按 energy × craftCount 收取完整份额。
-     */
-    private long getSubTaskEnergyTarget(@Nullable AdvancedAlloyFurnaceRecipe recipe, ResolvedCatalystEffect resolvedCatalystEffect) {
+    private ProgressEnergyStep getProgressEnergyStep(
+            @Nullable AdvancedAlloyFurnaceRecipe recipe,
+            ResolvedCatalystEffect resolvedCatalystEffect) {
         long recipeEnergy = recipe != null
-                ? Math.max(0, recipe.energy())
-                : (long) baseEnergyPerTick * Math.max(1, baseProcessTime);
-        return resolvedCatalystEffect.energyMultipliesWithParallel()
-                ? recipeEnergy * Math.max(1, craftCount)
-                : recipeEnergy;
-    }
+                ? Math.max(0L, recipe.energy())
+                : saturatingMultiply(baseEnergyPerTick, Math.max(1, baseProcessTime));
 
-    /**
-     * 子任务完成时补扣能量到结算目标。能量不足时尽量扣取现有存量并保持等待，
-     * 直到补足为止（材料已消耗，无法像本体那样回退并行数）。
-     *
-     * @return 是否已补足到目标
-     */
-    private boolean settleSubTaskEnergy(long energyTarget) {
-        long deficit = energyTarget - accumulatedEnergy;
-        if (deficit <= 0) {
-            return true;
+        if (!resolvedCatalystEffect.energyMultipliesWithParallel()) {
+            return new ProgressEnergyStep(recipeEnergy, progress, processTime, false);
         }
-        int consumable = (int) Math.min(deficit, Integer.MAX_VALUE);
-        if (context.getEnergyManager().tryConsumeEnergy(consumable)) {
-            accumulatedEnergy += consumable;
-            return accumulatedEnergy >= energyTarget;
-        }
-        int available = context.getEnergyManager().getEnergyStored();
-        if (available > 0 && context.getEnergyManager().tryConsumeEnergy(available)) {
-            accumulatedEnergy += available;
-            context.markChanged();
-        }
-        return false;
+
+        int batchDuration = Math.max(1, baseProcessTime);
+        int batchIndex = Math.min(progress / batchDuration, Math.max(0, batches - 1));
+        int batchParallel = batchIndex < batches - 1 ? maxParallel : lastBatchSize;
+        long batchEnergy = AlloyFurnaceRecipeExecutor.calculateTargetTotalEnergy(
+                recipeEnergy, batchParallel, resolvedCatalystEffect);
+        return new ProgressEnergyStep(
+                batchEnergy, progress % batchDuration, batchDuration, true);
     }
 
     private boolean initialize() {
@@ -600,13 +580,12 @@ public class CraftingTask {
         AdvancedAlloyFurnaceRecipe recipe = findTaskRecipe();
         baseProcessTime = getRecipeProcessTime(recipe);
         if (recipe != null && recipe.processTime() > 0) {
-            baseEnergyPerTick = Math.max(1, recipe.energy() / Math.max(1, recipe.processTime()));
+            baseEnergyPerTick = Math.max(1L, recipe.energy() / Math.max(1, recipe.processTime()));
         } else {
-            baseEnergyPerTick = 200;
+            baseEnergyPerTick = 200L;
         }
-        maxParallel = AlloyFurnaceParallelCalculator.calculateAeTaskParallel(context.getEnergyManager(), baseEnergyPerTick,
-                                                                             getCatalystEffect(recipe)
-        );
+        maxParallel = AlloyFurnaceParallelCalculator.calculateAeTaskParallel(
+                recipe, getCatalystEffect(recipe));
     }
 
     private void finishTask() {
@@ -751,7 +730,7 @@ public class CraftingTask {
             tag.putInt("Progress", progress);
             tag.putInt("ProcessTime", processTime);
             tag.putInt("BaseProcessTime", baseProcessTime);
-            tag.putInt("BaseEnergyPerTick", baseEnergyPerTick);
+            tag.putLong("BaseEnergyPerTick", baseEnergyPerTick);
             tag.putInt("MaxParallel", maxParallel);
             tag.putInt("Batches", batches);
             tag.putInt("LastBatchSize", lastBatchSize);
@@ -805,7 +784,7 @@ public class CraftingTask {
      */
     private void restoreProgress(CompoundTag tag, HolderLookup.Provider registries) {
         this.baseProcessTime = Math.max(1, tag.getInt("BaseProcessTime"));
-        this.baseEnergyPerTick = Math.max(1, tag.getInt("BaseEnergyPerTick"));
+        this.baseEnergyPerTick = Math.max(1L, tag.getLong("BaseEnergyPerTick"));
         this.maxParallel = Math.max(1, tag.getInt("MaxParallel"));
         this.batches = Math.max(1, tag.getInt("Batches"));
         this.lastBatchSize = Math.max(1, tag.getInt("LastBatchSize"));
@@ -861,6 +840,17 @@ public class CraftingTask {
     }
 
     // 辅助类用于存储输出数据
+    private static long saturatingMultiply(long amount, long multiplier) {
+        if (amount <= 0L || multiplier <= 0L) {
+            return 0L;
+        }
+        return amount > Long.MAX_VALUE / multiplier ? Long.MAX_VALUE : amount * multiplier;
+    }
+
+    private record ProgressEnergyStep(
+            long targetEnergy, int progress, int duration, boolean resetAfterAdvance) {
+    }
+
     private record OutputKey(AEKey key, long amount) {
     }
 

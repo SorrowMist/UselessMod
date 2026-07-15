@@ -30,7 +30,7 @@ public record AdvancedAlloyFurnaceRecipe(
         List<ItemStack> outputs,
         List<FluidStack> outputFluids,
         List<GenericStack> keyOutputs,
-        int energy,
+        long energy,
         int processTime,
         Ingredient catalyst,
         int catalystUses,
@@ -48,7 +48,7 @@ public record AdvancedAlloyFurnaceRecipe(
                 ItemStack.STREAM_CODEC.apply(ByteBufCodecs.list()).encode(buf, r.outputs());
                 FluidStack.STREAM_CODEC.apply(ByteBufCodecs.list()).encode(buf, r.outputFluids());
                 GenericStack.STREAM_CODEC.apply(ByteBufCodecs.list()).encode(buf, r.keyOutputs());
-                ByteBufCodecs.VAR_INT.encode(buf, r.energy());
+                ByteBufCodecs.VAR_LONG.encode(buf, r.energy());
                 ByteBufCodecs.VAR_INT.encode(buf, r.processTime());
                 Ingredient.CONTENTS_STREAM_CODEC.encode(buf, r.catalyst());
                 ByteBufCodecs.VAR_INT.encode(buf, r.catalystUses());
@@ -63,7 +63,7 @@ public record AdvancedAlloyFurnaceRecipe(
                 List<ItemStack> outputs = ItemStack.STREAM_CODEC.apply(ByteBufCodecs.list()).decode(buf);
                 List<FluidStack> outputFluids = FluidStack.STREAM_CODEC.apply(ByteBufCodecs.list()).decode(buf);
                 List<GenericStack> keyOutputs = GenericStack.STREAM_CODEC.apply(ByteBufCodecs.list()).decode(buf);
-                int energy = ByteBufCodecs.VAR_INT.decode(buf);
+                long energy = ByteBufCodecs.VAR_LONG.decode(buf);
                 int processTime = ByteBufCodecs.VAR_INT.decode(buf);
                 Ingredient catalyst = Ingredient.CONTENTS_STREAM_CODEC.decode(buf);
                 int catalystUses = ByteBufCodecs.VAR_INT.decode(buf);
@@ -98,7 +98,7 @@ public record AdvancedAlloyFurnaceRecipe(
                                     .forGetter(AdvancedAlloyFurnaceRecipe::outputFluids),
                     GenericStack.CODEC.listOf().optionalFieldOf("key_outputs", List.of())
                                     .forGetter(AdvancedAlloyFurnaceRecipe::keyOutputs),
-                    Codec.INT.optionalFieldOf("energy", 2000).forGetter(AdvancedAlloyFurnaceRecipe::energy),
+                    Codec.LONG.optionalFieldOf("energy", 2000L).forGetter(AdvancedAlloyFurnaceRecipe::energy),
                     Codec.INT.optionalFieldOf("process_time", 200).forGetter(AdvancedAlloyFurnaceRecipe::processTime),
                     Ingredient.CODEC.optionalFieldOf("catalyst", Ingredient.EMPTY)
                                     .forGetter(AdvancedAlloyFurnaceRecipe::catalyst),
@@ -114,7 +114,7 @@ public record AdvancedAlloyFurnaceRecipe(
                                       List<FluidStack> inputFluids,
                                       List<ItemStack> outputs,
                                       List<FluidStack> outputFluids,
-                                      int energy,
+                                      long energy,
                                       int processTime,
                                       Ingredient catalyst,
                                       int catalystUses,

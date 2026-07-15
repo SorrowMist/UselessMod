@@ -3,71 +3,52 @@ package com.sorrowmist.useless.energy;
 import net.minecraft.nbt.CompoundTag;
 import net.neoforged.neoforge.energy.IEnergyStorage;
 
-/**
- * 能源管理器接口 - 提供统一的能源管理功能
- */
+/** Long-backed energy storage with an int Forge Energy compatibility surface. */
 public interface IEnergyManager extends IEnergyStorage {
 
-    /**
-     * 设置当前能量值
-     */
-    void setEnergyStored(int energy);
+    long receiveEnergy(long maxReceive, boolean simulate);
+
+    long extractEnergy(long maxExtract, boolean simulate);
+
+    long getEnergyStoredLong();
+
+    long getMaxEnergyStoredLong();
+
+    long getMaxReceiveLong();
+
+    long getMaxExtractLong();
+
+    void setEnergyStored(long energy);
+
+    void setMaxEnergyStored(long capacity);
+
+    void setMaxReceive(long maxReceive);
+
+    void setMaxExtract(long maxExtract);
+
+    void modifyEnergy(long delta);
 
     /**
-     * 设置最大能量容量
+     * Changes stored energy without applying transfer-rate limits.
+     *
+     * @return the absolute amount that was actually added or removed
      */
-    void setMaxEnergyStored(int capacity);
+    long modifyEnergyStored(long delta);
 
-    /**
-     * 设置最大接收速率
-     */
-    void setMaxReceive(int maxReceive);
+    boolean canWork(long energyRequired);
 
-    /**
-     * 设置最大输出速率
-     */
-    void setMaxExtract(int maxExtract);
+    boolean tryConsumeEnergy(long amount);
 
-    /**
-     * 修改能量值（正数增加，负数减少）
-     */
-    void modifyEnergy(int delta);
-
-    /**
-     * 是否可以工作（能量是否足够）
-     */
-    boolean canWork(int energyRequired);
-
-    /**
-     * 尝试消耗能量进行工作
-     * @return 是否成功消耗
-     */
-    boolean tryConsumeEnergy(int amount);
-
-    /**
-     * 获取能量百分比 (0.0 - 1.0)
-     */
-    default float getEnergyPercentage() {
-        return (float) this.getEnergyStored() / this.getMaxEnergyStored();
+    default double getEnergyPercentage() {
+        long capacity = this.getMaxEnergyStoredLong();
+        return capacity <= 0L ? 0.0D : (double) this.getEnergyStoredLong() / capacity;
     }
 
-    /**
-     * 序列化到NBT
-     */
     CompoundTag serializeNBT();
 
-    /**
-     * 从NBT反序列化
-     */
     void deserializeNBT(CompoundTag tag);
 
-    /**
-     * 设置能量变化监听器
-     */
     void setChangeListener(Runnable listener);
 
-    /**
-     * 移除能量变化监听器
-     */
     void removeChangeListener();
 }

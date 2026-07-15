@@ -4,87 +4,143 @@ import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.catalyst.R
 import com.sorrowmist.useless.content.recipe.AdvancedAlloyFurnaceRecipe;
 import com.sorrowmist.useless.energy.IEnergyManager;
 
-/**
- * 高级合金炉执行阶段的公共能量结算工具。
- * 负责统一普通炉子与 AE 任务在每 tick 扣能和完成时补能结算上的规则。
- */
+/** Shared long-energy accounting for local and AE alloy-furnace execution. */
 public final class AlloyFurnaceRecipeExecutor {
     private AlloyFurnaceRecipeExecutor() {
     }
 
-    /**
-     * 单个 tick 扣能结果。
-     */
-    public record TickResult(boolean consumedEnergy, int energyConsumed) {
+    public record TickResult(boolean progressAdvanced, long energyConsumed) {
     }
 
-    /**
-     * 配方完成时的能量结算结果。
-     */
     public record CompletionEnergyResult(int actualParallel, long additionalEnergyConsumed) {
     }
 
-    /**
-     * 计算配方的基础每 tick 能耗。
-     */
-    public static int calculateBaseEnergyPerTick(AdvancedAlloyFurnaceRecipe recipe) {
-        return Math.max(1, recipe.energy() / Math.max(1, recipe.processTime()));
+    public static long calculateBaseEnergyPerTick(AdvancedAlloyFurnaceRecipe recipe) {
+        long energy = Math.max(0L, recipe.energy());
+        return energy == 0L ? 0L : Math.max(1L, energy / Math.max(1, recipe.processTime()));
     }
 
-    /**
-     * 计算当前 tick 在给定并行数下实际需要扣除的能量。
-     */
-    public static int calculateTickEnergy(int baseEnergyPerTick, int parallel, ResolvedCatalystEffect resolvedCatalystEffect) {
-        long energyRequired = resolvedCatalystEffect.energyMultipliesWithParallel() ? (long) baseEnergyPerTick * parallel : baseEnergyPerTick;
-        return energyRequired > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) energyRequired;
+    public static long calculateTickEnergy(long baseEnergyPerTick, int parallel,
+                                           ResolvedCatalystEffect resolvedCatalystEffect) {
+        if (!resolvedCatalystEffect.energyMultipliesWithParallel()) {
+            return Math.max(0L, baseEnergyPerTick);
+        }
+        return saturatingMultiply(Math.max(0L, baseEnergyPerTick), Math.max(0, parallel));
     }
 
-    /**
-     * 执行单个 tick 的能量扣除。
-     */
-    public static TickResult consumeTickEnergy(IEnergyManager energyManager, int baseEnergyPerTick, int parallel, ResolvedCatalystEffect resolvedCatalystEffect) {
-        int energyRequired = calculateTickEnergy(baseEnergyPerTick, parallel, resolvedCatalystEffect);
+    public static TickResult consumeTickEnergy(IEnergyManager energyManager, long baseEnergyPerTick, int parallel,
+                                               ResolvedCatalystEffect resolvedCatalystEffect) {
+        long energyRequired = calculateTickEnergy(baseEnergyPerTick, parallel, resolvedCatalystEffect);
+        if (energyRequired == 0L) {
+            return new TickResult(true, 0L);
+        }
         if (!energyManager.tryConsumeEnergy(energyRequired)) {
-            return new TickResult(false, 0);
+            return new TickResult(false, 0L);
         }
         return new TickResult(true, energyRequired);
     }
 
     /**
-     * 计算目标并行数需要满足的总能量。
+     * Charges the next progress step. Partial payments are retained so a step can cost more than the buffer capacity.
      */
-    public static long calculateTargetTotalEnergy(int recipeEnergy, int targetParallel, ResolvedCatalystEffect resolvedCatalystEffect) {
-        return resolvedCatalystEffect.energyMultipliesWithParallel() ? (long) recipeEnergy * targetParallel : recipeEnergy;
+    public static TickResult consumeProgressEnergy(IEnergyManager energyManager, long targetTotalEnergy,
+                                                   int currentProgress, int maxProgress,
+                                                   long accumulatedEnergy) {
+        long normalizedTarget = Math.max(0L, targetTotalEnergy);
+        if (normalizedTarget == 0L) {
+            return new TickResult(true, 0L);
+        }
+
+        long threshold = energyAtProgress(
+                normalizedTarget, Math.min(Math.max(0, currentProgress) + 1, Math.max(1, maxProgress)), maxProgress);
+        long required = threshold - Math.max(0L, accumulatedEnergy);
+        if (required <= 0L) {
+            return new TickResult(true, 0L);
+        }
+
+        long consumable = Math.min(required, energyManager.getEnergyStoredLong());
+        if (consumable <= 0L || !energyManager.tryConsumeEnergy(consumable)) {
+            return new TickResult(false, 0L);
+        }
+        return new TickResult(accumulatedEnergy + consumable >= threshold, consumable);
     }
 
-    /**
-     * 在配方完成时补扣能量，并根据剩余总能量回退最终可执行并行数。
-     */
-    public static CompletionEnergyResult settleCompletionEnergy(IEnergyManager energyManager, int recipeEnergy, int targetParallel, long accumulatedEnergy, ResolvedCatalystEffect resolvedCatalystEffect) {
+    /** Returns the cumulative energy that must be paid at a given progress position. */
+    static long energyAtProgress(long totalEnergy, int progress, int maxProgress) {
+        if (totalEnergy <= 0L || progress <= 0) {
+            return 0L;
+        }
+        int steps = Math.max(1, maxProgress);
+        if (progress >= steps) {
+            return totalEnergy;
+        }
+
+        long quotient = totalEnergy / steps;
+        long remainder = totalEnergy % steps;
+        long whole = quotient * progress;
+        long fractional = (remainder * progress + steps - 1L) / steps;
+        return whole + fractional;
+    }
+
+    public static long calculateTargetTotalEnergy(long recipeEnergy, int targetParallel,
+                                                  ResolvedCatalystEffect resolvedCatalystEffect) {
+        long normalizedEnergy = Math.max(0L, recipeEnergy);
+        return resolvedCatalystEffect.energyMultipliesWithParallel()
+                ? saturatingMultiply(normalizedEnergy, Math.max(0, targetParallel))
+                : normalizedEnergy;
+    }
+
+    public static CompletionEnergyResult settleCompletionEnergy(
+            IEnergyManager energyManager, long recipeEnergy, int targetParallel, long accumulatedEnergy,
+            ResolvedCatalystEffect resolvedCatalystEffect) {
         long targetTotalEnergy = calculateTargetTotalEnergy(recipeEnergy, targetParallel, resolvedCatalystEffect);
-        long additionalEnergyNeeded = targetTotalEnergy - accumulatedEnergy;
-        if (additionalEnergyNeeded <= 0) {
-            return new CompletionEnergyResult(targetParallel, 0);
+        long additionalEnergyNeeded = targetTotalEnergy - Math.max(0L, accumulatedEnergy);
+        if (additionalEnergyNeeded <= 0L) {
+            return new CompletionEnergyResult(targetParallel, 0L);
         }
 
-        int consumable = (int) Math.min(additionalEnergyNeeded, Integer.MAX_VALUE);
-        if (energyManager.tryConsumeEnergy(consumable)) {
-            return new CompletionEnergyResult(targetParallel, consumable);
+        if (energyManager.tryConsumeEnergy(additionalEnergyNeeded)) {
+            return new CompletionEnergyResult(targetParallel, additionalEnergyNeeded);
         }
 
-        if (recipeEnergy <= 0) {
-            return new CompletionEnergyResult(targetParallel, 0);
+        if (recipeEnergy <= 0L) {
+            return new CompletionEnergyResult(targetParallel, 0L);
         }
 
-        long totalAvailableEnergy = accumulatedEnergy + energyManager.getEnergyStored();
-        long parallelLong = totalAvailableEnergy / recipeEnergy;
-        int actualParallel = parallelLong > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) parallelLong;
-        actualParallel = Math.max(0, Math.min(actualParallel, targetParallel));
-
-        int remainingEnergy = energyManager.getEnergyStored();
-        if (remainingEnergy > 0) {
-            energyManager.tryConsumeEnergy(remainingEnergy);
+        long normalizedAccumulated = Math.max(0L, accumulatedEnergy);
+        long totalAvailableEnergy = saturatingAdd(
+                normalizedAccumulated, energyManager.getEnergyStoredLong());
+        int actualParallel;
+        if (resolvedCatalystEffect.energyMultipliesWithParallel()) {
+            long parallelLong = totalAvailableEnergy / recipeEnergy;
+            actualParallel = parallelLong > Integer.MAX_VALUE
+                    ? Integer.MAX_VALUE
+                    : (int) parallelLong;
+            actualParallel = Math.max(0, Math.min(actualParallel, targetParallel));
+        } else {
+            actualParallel = totalAvailableEnergy >= recipeEnergy ? targetParallel : 0;
         }
-        return new CompletionEnergyResult(actualParallel, remainingEnergy);
+
+        long actualTargetEnergy = calculateTargetTotalEnergy(
+                recipeEnergy, actualParallel, resolvedCatalystEffect);
+        long energyToConsume = Math.max(0L, actualTargetEnergy - normalizedAccumulated);
+        if (energyToConsume > 0L && !energyManager.tryConsumeEnergy(energyToConsume)) {
+            return new CompletionEnergyResult(0, 0L);
+        }
+        return new CompletionEnergyResult(actualParallel, energyToConsume);
+    }
+
+    private static long saturatingMultiply(long amount, long multiplier) {
+        if (amount <= 0L || multiplier <= 0L) {
+            return 0L;
+        }
+        return amount > Long.MAX_VALUE / multiplier ? Long.MAX_VALUE : amount * multiplier;
+    }
+
+    private static long saturatingAdd(long left, long right) {
+        if (right > 0L && left > Long.MAX_VALUE - right) {
+            return Long.MAX_VALUE;
+        }
+        return left + right;
     }
 }

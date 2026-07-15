@@ -293,12 +293,16 @@ public class AdvancedAlloyFurnaceMenu extends AEBaseMenu {
         return this.blockEntity;
     }
 
-    public int getEnergy() {
-        return this.data.get(AdvancedAlloyFurnaceData.DATA_ENERGY_STORED);
+    public long getEnergy() {
+        return AdvancedAlloyFurnaceData.joinBits(
+                this.data.get(AdvancedAlloyFurnaceData.DATA_ENERGY_STORED_LOW),
+                this.data.get(AdvancedAlloyFurnaceData.DATA_ENERGY_STORED_HIGH));
     }
 
-    public int getMaxEnergy() {
-        return this.data.get(AdvancedAlloyFurnaceData.DATA_ENERGY_CAPACITY);
+    public long getMaxEnergy() {
+        return AdvancedAlloyFurnaceData.joinBits(
+                this.data.get(AdvancedAlloyFurnaceData.DATA_ENERGY_CAPACITY_LOW),
+                this.data.get(AdvancedAlloyFurnaceData.DATA_ENERGY_CAPACITY_HIGH));
     }
 
     public int getProgress() {

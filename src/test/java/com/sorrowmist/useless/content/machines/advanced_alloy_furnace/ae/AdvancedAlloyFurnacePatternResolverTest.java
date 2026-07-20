@@ -201,6 +201,23 @@ class AdvancedAlloyFurnacePatternResolverTest {
     }
 
     @Test
+    void idOnlyInputKeepsCanonicalChildOutputAsPrimaryPlanningKey() {
+        ItemStack jeiInput = new ItemStack(Items.DIAMOND_SWORD);
+        jeiInput.set(DataComponents.CUSTOM_NAME, Component.literal("jei-components"));
+        ItemStack canonicalOutput = new ItemStack(Items.DIAMOND_SWORD);
+        canonicalOutput.set(DataComponents.CUSTOM_NAME, Component.literal("canonical-child-output"));
+        DynamicComponentPatternDetails parent = dynamicPattern(
+                jeiInput, new ItemStack(Items.NETHER_STAR), canonicalOutput);
+
+        GenericStack[] candidates = parent.getInputs()[0].getPossibleInputs();
+
+        assertEquals(2, candidates.length);
+        assertEquals(AEItemKey.of(canonicalOutput), candidates[0].what());
+        assertEquals(AEItemKey.of(jeiInput), candidates[1].what());
+        assertTrue(parent.getInputs()[0].isValid(AEItemKey.of(Items.DIAMOND_SWORD), null));
+    }
+
+    @Test
     void sparseProcessingInputsPushSelectedComponentsInPhysicalSlotOrder() {
         ItemStack jeiSword = new ItemStack(Items.DIAMOND_SWORD);
         jeiSword.set(DataComponents.CUSTOM_NAME, Component.literal("jei-components"));

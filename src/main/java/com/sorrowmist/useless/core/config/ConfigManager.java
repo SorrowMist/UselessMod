@@ -160,17 +160,17 @@ public class ConfigManager {
         CHAIN_MINING_RANGE_Y = COMMON_BUILDER
                 .comment("连锁挖掘的Y轴范围半径")
                 .translation("useless_mod.configuration.chain_mining_range_y")
-                .defineInRange("chain_mining_range_y", 8, 1, 32);
+                .defineInRange("chain_mining_range_y", 8, 1, 255);
 
         CHAIN_MINING_RANGE_Z = COMMON_BUILDER
                 .comment("连锁挖掘的Z轴范围半径")
                 .translation("useless_mod.configuration.chain_mining_range_z")
-                .defineInRange("chain_mining_range_z", 8, 1, 255);
+                .defineInRange("chain_mining_range_z", 8, 1, 32);
 
         CHAIN_MINING_MAX_BLOCKS = COMMON_BUILDER
                 .comment("连锁挖掘的最大方块数量")
                 .translation("useless_mod.configuration.chain_mining_max_blocks")
-                .defineInRange("chain_mining_max_blocks", 1000, 1, 10000);
+                .defineInRange("chain_mining_max_blocks", 1000, 1, 1000000);
 
         // 牛排工具附魔等级配置
         FORTUNE_LEVEL = COMMON_BUILDER

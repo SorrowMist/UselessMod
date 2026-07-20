@@ -9,6 +9,7 @@
     "ServerLevelMixin",
     "LevelMixin",
     "ae2.CraftingCpuLogicAccessor",
+    "ae2.CraftingTreeProcessMixin",
     "ae2.ExecutingCraftingJobAccessor",
     "ae2.ElapsedTimeTrackerAccessor",
     "ae2.CraftingCpuLogicMixin",

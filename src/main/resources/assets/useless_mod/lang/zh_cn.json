@@ -198,7 +198,7 @@
   "useless_mod.configuration.chain_mining_range_z.tooltip": "连锁挖掘的Z轴范围半径",
   "useless_mod.configuration.chain_mining_max_blocks": "连锁挖掘最大方块数量",
   "useless_mod.configuration.chain_mining_max_blocks.comment": "连锁挖掘的最大方块数量",
-  "useless_mod.configuration.chain_mining_max_blocks.tooltip": "连锁挖掘的最大方块数量",
+  "useless_mod.configuration.chain_mining_max_blocks.tooltip": "连锁挖掘的最大方块数量（数值过大可能导致卡死）",
   "useless_mod.configuration.fortune_level": "牛排工具时运等级",
   "useless_mod.configuration.fortune_level.comment": "牛排工具时运附魔等级",
   "useless_mod.configuration.fortune_level.tooltip": "牛排工具时运附魔等级",

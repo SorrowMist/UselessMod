@@ -197,7 +197,7 @@
   "useless_mod.configuration.chain_mining_range_z.tooltip": "Chain mining Z-axis range radius",
   "useless_mod.configuration.chain_mining_max_blocks": "Chain Mining Max Blocks",
   "useless_mod.configuration.chain_mining_max_blocks.comment": "Maximum number of blocks for chain mining",
-  "useless_mod.configuration.chain_mining_max_blocks.tooltip": "Maximum number of blocks for chain mining",
+  "useless_mod.configuration.chain_mining_max_blocks.tooltip": "Maximum number of blocks for chain mining (high values may cause lag)",
   "useless_mod.configuration.fortune_level": "Beef Tool Fortune Level",
   "useless_mod.configuration.fortune_level.comment": "Fortune enchantment level for beef tool",
   "useless_mod.configuration.fortune_level.tooltip": "Fortune enchantment level for beef tool",

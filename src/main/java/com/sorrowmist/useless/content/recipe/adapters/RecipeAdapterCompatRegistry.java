@@ -10,12 +10,7 @@ import com.sorrowmist.useless.content.recipe.adapters.ae.ae2cs.CircuitEtcherReci
 import com.sorrowmist.useless.content.recipe.adapters.ae.ae2cs.CrystalAggregatorRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.ae.ae2cs.CrystalGrowthRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.ae.ae2cs.CrystalPulverizerRecipeAdapter;
-import com.sorrowmist.useless.content.recipe.adapters.ae.ae2lt.CrystalCatalyzerRecipeAdapter;
-import com.sorrowmist.useless.content.recipe.adapters.ae.ae2lt.FirmamentConversionRecipeAdapter;
-import com.sorrowmist.useless.content.recipe.adapters.ae.ae2lt.LightningAssemblyRecipeAdapter;
-import com.sorrowmist.useless.content.recipe.adapters.ae.ae2lt.LightningSimulationRecipeAdapter;
-import com.sorrowmist.useless.content.recipe.adapters.ae.ae2lt.OverloadProcessingRecipeAdapter;
-import com.sorrowmist.useless.content.recipe.adapters.ae.ae2lt.SteakLightningRecipeAdapter;
+import com.sorrowmist.useless.content.recipe.adapters.ae.ae2lt.AELightningTechCompatLoader;
 import com.sorrowmist.useless.content.recipe.adapters.ae.dataenergistics.DataReassemblerRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.ae.extendedae.CircuitCutterRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.ae.extendedae.CrystalAssemblerRecipeAdapter;
@@ -167,12 +162,7 @@ public final class RecipeAdapterCompatRegistry {
     }
 
     private static void registerAELightningTech() {
-        register(new LightningSimulationRecipeAdapter());
-        register(new LightningAssemblyRecipeAdapter());
-        register(new OverloadProcessingRecipeAdapter());
-        register(new CrystalCatalyzerRecipeAdapter());
-        register(new FirmamentConversionRecipeAdapter());
-        register(new SteakLightningRecipeAdapter());
+        AELightningTechCompatLoader.createAdapters().forEach(RecipeAdapterCompatRegistry::register);
     }
 
     private static void registerDataEnergistics() {

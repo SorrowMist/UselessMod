@@ -5,9 +5,6 @@ import appeng.api.stacks.AEItemKey;
 import appeng.api.stacks.AEKey;
 import appeng.api.stacks.GenericStack;
 import appeng.api.stacks.KeyCounter;
-import com.moakiee.ae2lt.overload.model.MatchMode;
-import com.moakiee.ae2lt.overload.pattern.OverloadedProviderOnlyPatternDetails;
-import com.moakiee.ae2lt.overload.pattern.OverloadPatternDetails;
 import com.sorrowmist.useless.compat.EapCompat;
 import com.sorrowmist.useless.content.recipe.RecipeOutputConstraint;
 import net.minecraft.world.item.Item;
@@ -19,7 +16,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 
-/** Reads AE2LT's slot-local matching modes without changing global AE key semantics. */
+/** Reads the local slot-level component matching policy. */
 final class AdvancedAlloyFurnacePatternPolicy {
     private AdvancedAlloyFurnacePatternPolicy() {
     }
@@ -30,7 +27,7 @@ final class AdvancedAlloyFurnacePatternPolicy {
         }
 
         IPatternDetails original = EapCompat.unwrap(pattern);
-        OverloadPatternDetails overload = overloadDetails(original);
+        DynamicComponentPattern dynamic = dynamicDetails(original);
         List<GenericStack> outputs = original.getOutputs();
         List<RecipeOutputConstraint> result = new ArrayList<>(outputs.size());
         for (int slot = 0; slot < outputs.size(); slot++) {
@@ -38,8 +35,8 @@ final class AdvancedAlloyFurnacePatternPolicy {
             if (output == null || output.what() == null) {
                 continue;
             }
-            boolean idOnly = overload != null
-                    && overload.outputMode(slot) == MatchMode.ID_ONLY
+            boolean idOnly = dynamic != null
+                    && dynamic.isItemIdOutput(slot)
                     && output.what() instanceof AEItemKey;
             result.add(idOnly
                     ? RecipeOutputConstraint.itemId(output.what())
@@ -49,18 +46,18 @@ final class AdvancedAlloyFurnacePatternPolicy {
     }
 
     static boolean usesRecipeOutputs(@Nullable IPatternDetails pattern) {
-        OverloadPatternDetails overload = overloadDetails(EapCompat.unwrap(pattern));
-        if (overload == null) {
+        DynamicComponentPattern dynamic = dynamicDetails(EapCompat.unwrap(pattern));
+        if (dynamic == null) {
             return false;
         }
-        return overload.outputs().stream().anyMatch(output -> output.matchMode() == MatchMode.ID_ONLY);
+        return dynamic.usesDynamicOutputs();
     }
 
     static Set<AEKey> componentInputKeys(
             @Nullable IPatternDetails pattern, @Nullable KeyCounter[] inputHolder) {
         IPatternDetails original = EapCompat.unwrap(pattern);
-        OverloadPatternDetails overload = overloadDetails(original);
-        if (overload == null || inputHolder == null) {
+        DynamicComponentPattern dynamic = dynamicDetails(original);
+        if (dynamic == null || inputHolder == null) {
             return Set.of();
         }
 
@@ -68,7 +65,7 @@ final class AdvancedAlloyFurnacePatternPolicy {
         IPatternDetails.IInput[] inputs = original.getInputs();
         if (inputHolder.length == inputs.length) {
             for (int slot = 0; slot < inputs.length; slot++) {
-                if (overload.inputMode(slot) != MatchMode.ID_ONLY || inputHolder[slot] == null) {
+                if (!dynamic.isItemIdInput(slot) || inputHolder[slot] == null) {
                     continue;
                 }
                 for (var entry : inputHolder[slot]) {
@@ -80,7 +77,7 @@ final class AdvancedAlloyFurnacePatternPolicy {
             return Set.copyOf(result);
         }
 
-        Set<Item> relaxedItems = relaxedItems(original, overload);
+        Set<Item> relaxedItems = relaxedItems(original, dynamic);
         for (KeyCounter counter : inputHolder) {
             if (counter == null) continue;
             for (var entry : counter) {
@@ -97,12 +94,12 @@ final class AdvancedAlloyFurnacePatternPolicy {
     static Set<AEKey> componentInputKeys(
             @Nullable IPatternDetails pattern, List<ItemStack> actualInputs) {
         IPatternDetails original = EapCompat.unwrap(pattern);
-        OverloadPatternDetails overload = overloadDetails(original);
-        if (overload == null || actualInputs == null || actualInputs.isEmpty()) {
+        DynamicComponentPattern dynamic = dynamicDetails(original);
+        if (dynamic == null || actualInputs == null || actualInputs.isEmpty()) {
             return Set.of();
         }
 
-        Set<Item> relaxedItems = relaxedItems(original, overload);
+        Set<Item> relaxedItems = relaxedItems(original, dynamic);
 
         Set<AEKey> result = new LinkedHashSet<>();
         for (ItemStack stack : actualInputs) {
@@ -118,11 +115,11 @@ final class AdvancedAlloyFurnacePatternPolicy {
     }
 
     private static Set<Item> relaxedItems(
-            IPatternDetails pattern, OverloadPatternDetails overload) {
+            IPatternDetails pattern, DynamicComponentPattern dynamic) {
         Set<Item> result = new LinkedHashSet<>();
         IPatternDetails.IInput[] inputs = pattern.getInputs();
         for (int slot = 0; slot < inputs.length; slot++) {
-            if (overload.inputMode(slot) != MatchMode.ID_ONLY) {
+            if (!dynamic.isItemIdInput(slot)) {
                 continue;
             }
             for (GenericStack possible : inputs[slot].getPossibleInputs()) {
@@ -135,10 +132,7 @@ final class AdvancedAlloyFurnacePatternPolicy {
     }
 
     @Nullable
-    private static OverloadPatternDetails overloadDetails(@Nullable IPatternDetails pattern) {
-        if (pattern instanceof OverloadedProviderOnlyPatternDetails overloaded) {
-            return overloaded.overloadPatternDetailsView();
-        }
-        return null;
+    private static DynamicComponentPattern dynamicDetails(@Nullable IPatternDetails pattern) {
+        return pattern instanceof DynamicComponentPattern dynamic ? dynamic : null;
     }
 }

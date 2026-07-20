@@ -19,12 +19,7 @@ import com.sorrowmist.useless.content.recipe.adapters.ae.ae2cs.CircuitEtcherReci
 import com.sorrowmist.useless.content.recipe.adapters.ae.ae2cs.CrystalAggregatorRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.ae.ae2cs.CrystalGrowthRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.ae.ae2cs.CrystalPulverizerRecipeAdapter;
-import com.sorrowmist.useless.content.recipe.adapters.ae.ae2lt.CrystalCatalyzerRecipeAdapter;
-import com.sorrowmist.useless.content.recipe.adapters.ae.ae2lt.FirmamentConversionRecipeAdapter;
-import com.sorrowmist.useless.content.recipe.adapters.ae.ae2lt.LightningAssemblyRecipeAdapter;
-import com.sorrowmist.useless.content.recipe.adapters.ae.ae2lt.LightningSimulationRecipeAdapter;
-import com.sorrowmist.useless.content.recipe.adapters.ae.ae2lt.OverloadProcessingRecipeAdapter;
-import com.sorrowmist.useless.content.recipe.adapters.ae.ae2lt.SteakLightningRecipeAdapter;
+import com.sorrowmist.useless.content.recipe.adapters.ae.ae2lt.AELightningTechCompatLoader;
 import com.sorrowmist.useless.content.recipe.adapters.ae.dataenergistics.DataReassemblerRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.ae.extendedae.CircuitCutterRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.ae.extendedae.CrystalAssemblerRecipeAdapter;
@@ -82,11 +77,6 @@ import java.util.List;
 
 import static com.blakebr0.mysticalagriculture.init.ModRecipeTypes.AWAKENING;
 import static com.blakebr0.mysticalagriculture.init.ModRecipeTypes.INFUSION;
-import static com.moakiee.ae2lt.registry.ModRecipeTypes.CRYSTAL_CATALYZER_TYPE;
-import static com.moakiee.ae2lt.registry.ModRecipeTypes.FIRMAMENT_CONVERSION_TYPE;
-import static com.moakiee.ae2lt.registry.ModRecipeTypes.LIGHTNING_ASSEMBLY_TYPE;
-import static com.moakiee.ae2lt.registry.ModRecipeTypes.LIGHTNING_SIMULATION_TYPE;
-import static com.moakiee.ae2lt.registry.ModRecipeTypes.OVERLOAD_PROCESSING_TYPE;
 
 @JeiPlugin
 public class JEIPlugin implements IModPlugin {
@@ -173,7 +163,7 @@ public class JEIPlugin implements IModPlugin {
 
         // 添加转换后的 AE2 Lightning Tech 配方（如果AE2LT已加载）
         if (RecipeAdapterCompatRegistry.isLoaded(RecipeAdapterCompatRegistry.AE2LT)) {
-            recipes.addAll(convertAELightningTechRecipes(recipeManager, level));
+            recipes.addAll(AELightningTechCompatLoader.getJeiRecipes(recipeManager, level));
         }
 
         // 添加转换后的 DataEnergistics 配方（如果DataEnergistics已加载）
@@ -385,33 +375,6 @@ public class JEIPlugin implements IModPlugin {
 
         CrystalGrowthRecipeAdapter growthAdapter = new CrystalGrowthRecipeAdapter();
         convertedRecipes.addAll(growthAdapter.getAllRecipes());
-
-        return convertedRecipes;
-    }
-
-    /**
-     * 转换 AE2 Lightning Tech 配方为高级熔炉配方用于JEI显示
-     */
-    private List<AdvancedAlloyFurnaceRecipe> convertAELightningTechRecipes(RecipeManager recipeManager, Level level) {
-        List<AdvancedAlloyFurnaceRecipe> convertedRecipes = new ArrayList<>();
-
-        LightningSimulationRecipeAdapter simulationAdapter = new LightningSimulationRecipeAdapter();
-        addConvertedRecipes(convertedRecipes, recipeManager, LIGHTNING_SIMULATION_TYPE.get(), simulationAdapter, level);
-
-        LightningAssemblyRecipeAdapter assemblyAdapter = new LightningAssemblyRecipeAdapter();
-        addConvertedRecipes(convertedRecipes, recipeManager, LIGHTNING_ASSEMBLY_TYPE.get(), assemblyAdapter, level);
-
-        OverloadProcessingRecipeAdapter overloadAdapter = new OverloadProcessingRecipeAdapter();
-        addConvertedRecipes(convertedRecipes, recipeManager, OVERLOAD_PROCESSING_TYPE.get(), overloadAdapter, level);
-
-        CrystalCatalyzerRecipeAdapter catalyzerAdapter = new CrystalCatalyzerRecipeAdapter();
-        addConvertedRecipes(convertedRecipes, recipeManager, CRYSTAL_CATALYZER_TYPE.get(), catalyzerAdapter, level);
-
-        FirmamentConversionRecipeAdapter firmamentAdapter = new FirmamentConversionRecipeAdapter();
-        addConvertedRecipes(convertedRecipes, recipeManager, FIRMAMENT_CONVERSION_TYPE.get(), firmamentAdapter, level);
-
-        SteakLightningRecipeAdapter steakAdapter = new SteakLightningRecipeAdapter();
-        convertedRecipes.addAll(steakAdapter.getAllRecipes());
 
         return convertedRecipes;
     }

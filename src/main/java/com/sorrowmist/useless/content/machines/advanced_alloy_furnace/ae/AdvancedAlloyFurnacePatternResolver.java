@@ -6,12 +6,6 @@ import appeng.api.stacks.AEItemKey;
 import appeng.api.stacks.AEKey;
 import appeng.api.stacks.GenericStack;
 import appeng.crafting.pattern.AEProcessingPattern;
-import com.moakiee.ae2lt.overload.model.EncodedOverloadPattern;
-import com.moakiee.ae2lt.overload.model.MatchMode;
-import com.moakiee.ae2lt.overload.pattern.Ae2OverloadPatternDetails;
-import com.moakiee.ae2lt.overload.pattern.OverloadedProviderOnlyPatternDetails;
-import com.moakiee.ae2lt.overload.pattern.OverloadPatternDetails;
-import com.moakiee.ae2lt.overload.pattern.OverloadPatternSupport;
 import com.mojang.logging.LogUtils;
 import com.sorrowmist.useless.content.recipe.adapters.draconicevolution.DraconicFusionRecipeAdapter;
 import net.minecraft.world.item.ItemStack;
@@ -27,7 +21,6 @@ import java.util.Map;
 /** Builds provider-local component-aware views of otherwise unchanged AE patterns. */
 public final class AdvancedAlloyFurnacePatternResolver {
     private static final Logger LOGGER = LogUtils.getLogger();
-    private static final String AE2LT_MOD_ID = "ae2lt";
     private static final String DRACONIC_EVOLUTION_MOD_ID = "draconicevolution";
 
     private AdvancedAlloyFurnacePatternResolver() {
@@ -40,9 +33,8 @@ public final class AdvancedAlloyFurnacePatternResolver {
     }
 
     public static IPatternDetails resolve(IPatternDetails pattern, Level level) {
-        if (!ModList.get().isLoaded(AE2LT_MOD_ID)
-                || !ModList.get().isLoaded(DRACONIC_EVOLUTION_MOD_ID)
-                || pattern instanceof OverloadedProviderOnlyPatternDetails
+        if (!ModList.get().isLoaded(DRACONIC_EVOLUTION_MOD_ID)
+                || pattern instanceof DynamicComponentPattern
                 || !(pattern instanceof AEProcessingPattern processingPattern)) {
             return pattern;
         }
@@ -69,28 +61,15 @@ public final class AdvancedAlloyFurnacePatternResolver {
             return pattern;
         }
 
-        var parsed = OverloadPatternSupport.toParsedDefinition(
-                pattern.getDefinition().toStack(), pattern, level.registryAccess());
         var profile = dynamicProfile.get();
-        var encoding = EncodedOverloadPattern.builder();
-        for (var input : parsed.inputs()) {
-            encoding.input(input.slotIndex(), profile.idOnlyInputSlots().contains(input.slotIndex())
-                    ? MatchMode.ID_ONLY
-                    : MatchMode.STRICT);
-        }
-        for (var output : parsed.outputs()) {
-            encoding.output(output.slotIndex(), profile.idOnlyOutputSlots().contains(output.slotIndex())
-                    ? MatchMode.ID_ONLY
-                    : MatchMode.STRICT);
-        }
-
-        var overloadDetails = new OverloadPatternDetails(parsed, encoding.build());
         AEProcessingPattern executionPattern = profile.canonicalInputs().isEmpty()
                 ? pattern
                 : withCanonicalInputs(pattern, profile.canonicalInputs());
-        var overloadPattern = new Ae2OverloadPatternDetails(
-                pattern.getDefinition(), overloadDetails, executionPattern);
-        return new IdentifiedOverloadPatternDetails(overloadPattern, level.registryAccess());
+        return new DynamicComponentPatternDetails(
+                executionPattern,
+                profile.idOnlyInputSlots(),
+                profile.idOnlyOutputSlots(),
+                level.registryAccess());
     }
 
     private static List<ItemStack> itemInputs(IPatternDetails pattern) {

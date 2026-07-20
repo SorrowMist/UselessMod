@@ -10,15 +10,6 @@ import appeng.api.stacks.KeyCounter;
 import appeng.crafting.execution.CraftingCpuHelper;
 import appeng.crafting.inv.ListCraftingInventory;
 import appeng.crafting.pattern.AEProcessingPattern;
-import com.moakiee.ae2lt.overload.cpu.OverloadCpuOwner;
-import com.moakiee.ae2lt.overload.cpu.OverloadCpuState;
-import com.moakiee.ae2lt.overload.cpu.OverloadCpuStateManager;
-import com.moakiee.ae2lt.overload.cpu.OverloadPatternReference;
-import com.moakiee.ae2lt.overload.model.EncodedOverloadPattern;
-import com.moakiee.ae2lt.overload.model.MatchMode;
-import com.moakiee.ae2lt.overload.pattern.Ae2OverloadPatternDetails;
-import com.moakiee.ae2lt.overload.pattern.OverloadPatternDetails;
-import com.moakiee.ae2lt.overload.pattern.OverloadPatternSupport;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.core.RegistryAccess;
 import net.minecraft.core.component.DataComponents;
@@ -30,6 +21,7 @@ import net.minecraft.world.level.Level;
 import org.jetbrains.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -93,51 +85,56 @@ class AdvancedAlloyFurnacePatternResolverTest {
     }
 
     @Test
-    void completePatternDefinitionSeparatesOtherwiseIdenticalOverloadLayouts() {
-        IdentifiedOverloadPatternDetails sword = overloadPattern(
+    void completePatternDefinitionSeparatesOtherwiseIdenticalDynamicLayouts() {
+        DynamicComponentPatternDetails sword = dynamicPattern(
                 new ItemStack(Items.IRON_INGOT), new ItemStack(Items.DIAMOND_SWORD), null);
-        IdentifiedOverloadPatternDetails pickaxe = overloadPattern(
+        DynamicComponentPatternDetails pickaxe = dynamicPattern(
                 new ItemStack(Items.IRON_INGOT), new ItemStack(Items.DIAMOND_PICKAXE), null);
-        IdentifiedOverloadPatternDetails shovel = overloadPattern(
+        DynamicComponentPatternDetails shovel = dynamicPattern(
                 new ItemStack(Items.IRON_INGOT), new ItemStack(Items.DIAMOND_SHOVEL), null);
-        IdentifiedOverloadPatternDetails swordReloaded = overloadPattern(
+        DynamicComponentPatternDetails swordReloaded = dynamicPattern(
                 new ItemStack(Items.IRON_INGOT), new ItemStack(Items.DIAMOND_SWORD), null);
 
-        assertNotEquals(sword.overloadPatternIdentity(), pickaxe.overloadPatternIdentity());
-        assertNotEquals(sword.overloadPatternIdentity(), shovel.overloadPatternIdentity());
-        assertNotEquals(pickaxe.overloadPatternIdentity(), shovel.overloadPatternIdentity());
-        assertEquals(sword.overloadPatternIdentity(), swordReloaded.overloadPatternIdentity());
+        assertNotEquals(sword.dynamicPatternIdentity(), pickaxe.dynamicPatternIdentity());
+        assertNotEquals(sword.dynamicPatternIdentity(), shovel.dynamicPatternIdentity());
+        assertNotEquals(pickaxe.dynamicPatternIdentity(), shovel.dynamicPatternIdentity());
+        assertEquals(sword.dynamicPatternIdentity(), swordReloaded.dynamicPatternIdentity());
     }
 
     @Test
     void cpuTracksSameLayoutOutputsIndependentlyAndRestoresThem() {
-        IdentifiedOverloadPatternDetails sword = overloadPattern(
+        DynamicComponentPatternDetails sword = dynamicPattern(
                 new ItemStack(Items.IRON_INGOT), new ItemStack(Items.DIAMOND_SWORD), null);
-        IdentifiedOverloadPatternDetails pickaxe = overloadPattern(
+        DynamicComponentPatternDetails pickaxe = dynamicPattern(
                 new ItemStack(Items.IRON_INGOT), new ItemStack(Items.DIAMOND_PICKAXE), null);
-        IdentifiedOverloadPatternDetails shovel = overloadPattern(
+        DynamicComponentPatternDetails shovel = dynamicPattern(
                 new ItemStack(Items.IRON_INGOT), new ItemStack(Items.DIAMOND_SHOVEL), null);
         Object logic = new Object();
         UUID craftingId = UUID.randomUUID();
-        OverloadCpuOwner owner = OverloadCpuOwner.from(craftingId, logic);
-        OverloadCpuState state = new OverloadCpuState(owner);
+        DynamicPatternCpuStateManager manager = DynamicPatternCpuStateManager.INSTANCE;
+        manager.registerExpectedOutputs(logic, craftingId, sword, null, 1);
+        manager.registerExpectedOutputs(logic, craftingId, pickaxe, null, 1);
+        manager.registerExpectedOutputs(logic, craftingId, shovel, null, 1);
 
-        registerOutput(state, sword);
-        registerOutput(state, pickaxe);
-        registerOutput(state, shovel);
+        assertEquals(3, manager.snapshotPending(logic).size());
+        assertEquals(1, manager.getRemainingForItem(logic, BuiltInRegistries.ITEM.getKey(Items.DIAMOND_SWORD)));
+        assertEquals(1, manager.getRemainingForItem(logic, BuiltInRegistries.ITEM.getKey(Items.DIAMOND_PICKAXE)));
+        assertEquals(1, manager.getRemainingForItem(logic, BuiltInRegistries.ITEM.getKey(Items.DIAMOND_SHOVEL)));
 
-        assertEquals(3, state.allPending().size());
-        assertEquals(1, state.getRemainingForItem(BuiltInRegistries.ITEM.getKey(Items.DIAMOND_SWORD)));
-        assertEquals(1, state.getRemainingForItem(BuiltInRegistries.ITEM.getKey(Items.DIAMOND_PICKAXE)));
-        assertEquals(1, state.getRemainingForItem(BuiltInRegistries.ITEM.getKey(Items.DIAMOND_SHOVEL)));
-
-        OverloadCpuState restored = OverloadCpuState.fromTag(owner, state.toTag(REGISTRIES), REGISTRIES);
-        assertEquals(3, restored.allPending().size());
-        assertEquals(1, restored.claimByItemId(
-                BuiltInRegistries.ITEM.getKey(Items.DIAMOND_PICKAXE), 1, true).claimedAmount());
-        assertEquals(0, restored.getRemainingForItem(BuiltInRegistries.ITEM.getKey(Items.DIAMOND_PICKAXE)));
-        assertEquals(1, restored.getRemainingForItem(BuiltInRegistries.ITEM.getKey(Items.DIAMOND_SWORD)));
-        assertEquals(1, restored.getRemainingForItem(BuiltInRegistries.ITEM.getKey(Items.DIAMOND_SHOVEL)));
+        var saved = manager.writeToTag(logic, REGISTRIES);
+        Object restoredLogic = new Object();
+        manager.readFromTag(restoredLogic, craftingId, saved, REGISTRIES);
+        assertEquals(3, manager.snapshotPending(restoredLogic).size());
+        assertEquals(1, manager.claim(
+                restoredLogic, AEItemKey.of(Items.DIAMOND_PICKAXE), 1, Actionable.MODULATE).claimedAmount());
+        assertEquals(0, manager.getRemainingForItem(
+                restoredLogic, BuiltInRegistries.ITEM.getKey(Items.DIAMOND_PICKAXE)));
+        assertEquals(1, manager.getRemainingForItem(
+                restoredLogic, BuiltInRegistries.ITEM.getKey(Items.DIAMOND_SWORD)));
+        assertEquals(1, manager.getRemainingForItem(
+                restoredLogic, BuiltInRegistries.ITEM.getKey(Items.DIAMOND_SHOVEL)));
+        manager.clear(logic);
+        manager.clear(restoredLogic);
     }
 
     @Test
@@ -146,33 +143,29 @@ class AdvancedAlloyFurnacePatternResolverTest {
         firstInput.set(DataComponents.CUSTOM_NAME, Component.literal("first-definition"));
         ItemStack secondInput = new ItemStack(Items.IRON_INGOT);
         secondInput.set(DataComponents.CUSTOM_NAME, Component.literal("second-definition"));
-        IdentifiedOverloadPatternDetails first = overloadPattern(
+        DynamicComponentPatternDetails first = dynamicPattern(
                 firstInput, new ItemStack(Items.DIAMOND_SWORD), null);
-        IdentifiedOverloadPatternDetails second = overloadPattern(
+        DynamicComponentPatternDetails second = dynamicPattern(
                 secondInput, new ItemStack(Items.DIAMOND_SWORD), null);
 
         Object directLogic = new Object();
-        OverloadCpuState directState = new OverloadCpuState(
-                OverloadCpuOwner.from(UUID.randomUUID(), directLogic));
-        registerOutput(directState, first);
-        registerOutput(directState, first);
-        assertEquals(1, directState.allPending().size());
-        assertEquals(2, directState.getRemainingForItem(
-                BuiltInRegistries.ITEM.getKey(Items.DIAMOND_SWORD)));
+        DynamicPatternCpuStateManager manager = DynamicPatternCpuStateManager.INSTANCE;
+        UUID directCraftingId = UUID.randomUUID();
+        manager.registerExpectedOutputs(directLogic, directCraftingId, first, null, 1);
+        manager.registerExpectedOutputs(directLogic, directCraftingId, first, null, 1);
+        assertEquals(1, manager.snapshotPending(directLogic).size());
+        assertEquals(2, manager.getRemainingForItem(
+                directLogic, BuiltInRegistries.ITEM.getKey(Items.DIAMOND_SWORD)));
 
         Object managedLogic = new Object();
         UUID craftingId = UUID.randomUUID();
-        OverloadCpuStateManager manager = OverloadCpuStateManager.INSTANCE;
         try {
-            OverloadPatternReference firstReference = reference(first);
-            manager.registerExpectedOutputs(
-                    managedLogic, craftingId, firstReference, first.overloadPatternDetailsView(),
-                    first.getOutputs(), null, 1);
-            assertFalse(manager.hasAmbiguousOutputRegistration(
-                    managedLogic, firstReference, first.overloadPatternDetailsView()));
+            manager.registerExpectedOutputs(managedLogic, craftingId, first, null, 1);
+            assertFalse(manager.hasAmbiguousOutputRegistration(managedLogic, first));
             assertTrue(manager.hasAmbiguousOutputRegistration(
-                    managedLogic, reference(second), second.overloadPatternDetailsView()));
+                    managedLogic, second));
         } finally {
+            manager.clear(directLogic);
             manager.clear(managedLogic);
         }
     }
@@ -183,7 +176,7 @@ class AdvancedAlloyFurnacePatternResolverTest {
         jeiInput.set(DataComponents.CUSTOM_NAME, Component.literal("jei-components"));
         ItemStack actualInput = new ItemStack(Items.DIAMOND_SWORD);
         actualInput.set(DataComponents.CUSTOM_NAME, Component.literal("newly-crafted-components"));
-        IdentifiedOverloadPatternDetails parent = overloadPattern(
+        DynamicComponentPatternDetails parent = dynamicPattern(
                 jeiInput, new ItemStack(Items.NETHER_STAR), new ItemStack(Items.DIAMOND_SWORD));
 
         ListCraftingInventory inventory = inventoryWith(actualInput);
@@ -195,8 +188,8 @@ class AdvancedAlloyFurnacePatternResolverTest {
         assertEquals(1, extracted[0].get(actualKey));
         assertEquals(0, inventory.list.get(actualKey));
 
-        IdentifiedOverloadPatternDetails strictParent = overloadPattern(
-                jeiInput, new ItemStack(Items.NETHER_STAR), null, MatchMode.STRICT, MatchMode.ID_ONLY);
+        DynamicComponentPatternDetails strictParent = dynamicPattern(
+                jeiInput, new ItemStack(Items.NETHER_STAR), null, false, true);
         ListCraftingInventory strictInventory = inventoryWith(actualInput);
         assertNull(CraftingCpuHelper.extractPatternInputs(
                 strictParent, strictInventory, null, new KeyCounter(), new KeyCounter()));
@@ -208,10 +201,50 @@ class AdvancedAlloyFurnacePatternResolverTest {
     }
 
     @Test
+    void sparseProcessingInputsPushSelectedComponentsInPhysicalSlotOrder() {
+        ItemStack jeiSword = new ItemStack(Items.DIAMOND_SWORD);
+        jeiSword.set(DataComponents.CUSTOM_NAME, Component.literal("jei-components"));
+        ItemStack craftedSword = new ItemStack(Items.DIAMOND_SWORD);
+        craftedSword.set(DataComponents.CUSTOM_NAME, Component.literal("newly-crafted-components"));
+
+        GenericStack encodedSword = Objects.requireNonNull(GenericStack.fromItemStack(jeiSword));
+        GenericStack encodedIron = Objects.requireNonNull(
+                GenericStack.fromItemStack(new ItemStack(Items.IRON_INGOT)));
+        GenericStack encodedOutput = Objects.requireNonNull(
+                GenericStack.fromItemStack(new ItemStack(Items.NETHER_STAR)));
+        ItemStack encodedPattern = PatternDetailsHelper.encodeProcessingPattern(
+                List.of(encodedSword, encodedIron, encodedSword), List.of(encodedOutput));
+        AEProcessingPattern source = new AEProcessingPattern(
+                Objects.requireNonNull(AEItemKey.of(encodedPattern)));
+        DynamicComponentPatternDetails dynamic = new DynamicComponentPatternDetails(
+                source, List.of(0), List.of(0), REGISTRIES);
+
+        AEItemKey craftedKey = Objects.requireNonNull(AEItemKey.of(craftedSword));
+        AEItemKey ironKey = Objects.requireNonNull(AEItemKey.of(Items.IRON_INGOT));
+        KeyCounter swords = new KeyCounter();
+        swords.add(craftedKey, 2);
+        KeyCounter iron = new KeyCounter();
+        iron.add(ironKey, 1);
+        List<GenericStack> pushed = new ArrayList<>();
+
+        dynamic.pushInputsToExternalInventory(
+                new KeyCounter[]{swords, iron},
+                (key, amount) -> pushed.add(new GenericStack(key, amount)));
+
+        assertEquals(List.of(
+                new GenericStack(craftedKey, 1),
+                new GenericStack(ironKey, 1),
+                new GenericStack(craftedKey, 1)), pushed);
+    }
+
+    @Test
     void restoredJobMixinTargetsLoadWithoutInjectionFailure() {
         assertDoesNotThrow(() -> Class.forName("appeng.crafting.execution.ExecutingCraftingJob"));
+        assertDoesNotThrow(() -> Class.forName("appeng.crafting.execution.CraftingCpuLogic"));
         assertDoesNotThrow(() -> Class.forName(
                 "net.pedroksl.advanced_ae.common.logic.ExecutingCraftingJob"));
+        assertDoesNotThrow(() -> Class.forName(
+                "net.pedroksl.advanced_ae.common.logic.AdvCraftingCPULogic"));
     }
 
     private static ListCraftingInventory inventoryWith(ItemStack stack) {
@@ -222,25 +255,14 @@ class AdvancedAlloyFurnacePatternResolverTest {
         return inventory;
     }
 
-    private static void registerOutput(
-            OverloadCpuState state, IdentifiedOverloadPatternDetails pattern) {
-        state.registerExpectedOutputs(
-                reference(pattern), pattern.overloadPatternDetailsView(), pattern.getOutputs(), null, 1);
-    }
-
-    private static OverloadPatternReference reference(IdentifiedOverloadPatternDetails pattern) {
-        return new OverloadPatternReference(
-                pattern.overloadPatternIdentity(), pattern.overloadPatternDetailsView().sourcePattern());
-    }
-
-    private static IdentifiedOverloadPatternDetails overloadPattern(
+    private static DynamicComponentPatternDetails dynamicPattern(
             ItemStack input, ItemStack output, @Nullable ItemStack canonicalInput) {
-        return overloadPattern(input, output, canonicalInput, MatchMode.ID_ONLY, MatchMode.ID_ONLY);
+        return dynamicPattern(input, output, canonicalInput, true, true);
     }
 
-    private static IdentifiedOverloadPatternDetails overloadPattern(
+    private static DynamicComponentPatternDetails dynamicPattern(
             ItemStack input, ItemStack output, @Nullable ItemStack canonicalInput,
-            MatchMode inputMode, MatchMode outputMode) {
+            boolean inputIdOnly, boolean outputIdOnly) {
         GenericStack encodedInput = Objects.requireNonNull(GenericStack.fromItemStack(input));
         GenericStack encodedOutput = Objects.requireNonNull(GenericStack.fromItemStack(output));
         ItemStack encodedPattern = PatternDetailsHelper.encodeProcessingPattern(
@@ -251,14 +273,11 @@ class AdvancedAlloyFurnacePatternResolverTest {
                 ? source
                 : AdvancedAlloyFurnacePatternResolver.withCanonicalInputs(
                 source, Map.of(0, canonicalInput));
-        var parsed = OverloadPatternSupport.toParsedDefinition(encodedPattern, source, REGISTRIES);
-        var encoding = EncodedOverloadPattern.builder()
-                .input(0, inputMode)
-                .output(0, outputMode)
-                .build();
-        var details = new OverloadPatternDetails(parsed, encoding);
-        var delegate = new Ae2OverloadPatternDetails(source.getDefinition(), details, execution);
-        return new IdentifiedOverloadPatternDetails(delegate, REGISTRIES);
+        return new DynamicComponentPatternDetails(
+                execution,
+                inputIdOnly ? List.of(0) : List.of(),
+                outputIdOnly ? List.of(0) : List.of(),
+                REGISTRIES);
     }
 
     private static IPatternDetails.IInput input(GenericStack possibleInput, long multiplier) {

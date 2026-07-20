@@ -43,6 +43,12 @@ import com.sorrowmist.useless.content.recipe.adapters.mysticalagriculture.SeedEs
 import com.sorrowmist.useless.content.recipe.adapters.productivebees.BeeProduceRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.productivebees.CentrifugeRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.draconicevolution.DraconicFusionRecipeAdapter;
+import com.sorrowmist.useless.content.recipe.adapters.powah.EnergizingRecipeAdapter;
+import com.sorrowmist.useless.content.recipe.adapters.extendedcrafting.ExtendedCraftingCombinationRecipeAdapter;
+import com.sorrowmist.useless.content.recipe.adapters.extendedcrafting.ExtendedCraftingCompressorRecipeAdapter;
+import com.sorrowmist.useless.content.recipe.adapters.extendedcrafting.ExtendedCraftingEnderCrafterRecipeAdapter;
+import com.sorrowmist.useless.content.recipe.adapters.extendedcrafting.ExtendedCraftingFluxCrafterRecipeAdapter;
+import com.sorrowmist.useless.content.recipe.adapters.extendedcrafting.ExtendedCraftingTableRecipeAdapter;
 import com.sorrowmist.useless.init.ModBlocks;
 import com.sorrowmist.useless.init.ModRecipeTypes;
 import com.sorrowmist.useless.init.ModTags;
@@ -181,6 +187,14 @@ public class JEIPlugin implements IModPlugin {
 
         if (RecipeAdapterCompatRegistry.isLoaded(RecipeAdapterCompatRegistry.DRACONIC_EVOLUTION)) {
             recipes.addAll(convertDraconicEvolutionRecipes(recipeManager, level));
+        }
+
+        if (RecipeAdapterCompatRegistry.isLoaded(RecipeAdapterCompatRegistry.POWAH)) {
+            recipes.addAll(convertPowahRecipes(recipeManager, level));
+        }
+
+        if (RecipeAdapterCompatRegistry.isLoaded(RecipeAdapterCompatRegistry.EXTENDED_CRAFTING)) {
+            recipes.addAll(convertExtendedCraftingRecipes(recipeManager, level));
         }
 
         registration.addRecipes(AdvancedAlloyFurnaceRecipeCategory.TYPE, recipes);
@@ -442,6 +456,61 @@ public class JEIPlugin implements IModPlugin {
                 recipeManager,
                 com.brandon3055.draconicevolution.api.DraconicAPI.FUSION_RECIPE_TYPE.get(),
                 new DraconicFusionRecipeAdapter(),
+                level
+        );
+        return convertedRecipes;
+    }
+
+    private List<AdvancedAlloyFurnaceRecipe> convertPowahRecipes(
+            RecipeManager recipeManager, Level level) {
+        List<AdvancedAlloyFurnaceRecipe> convertedRecipes = new ArrayList<>();
+        addConvertedRecipes(
+                convertedRecipes,
+                recipeManager,
+                owmii.powah.recipe.Recipes.ENERGIZING.get(),
+                new EnergizingRecipeAdapter(),
+                level
+        );
+        return convertedRecipes;
+    }
+
+    private List<AdvancedAlloyFurnaceRecipe> convertExtendedCraftingRecipes(
+            RecipeManager recipeManager, Level level) {
+        List<AdvancedAlloyFurnaceRecipe> convertedRecipes = new ArrayList<>();
+
+        addConvertedRecipes(
+                convertedRecipes,
+                recipeManager,
+                com.blakebr0.extendedcrafting.init.ModRecipeTypes.TABLE.get(),
+                new ExtendedCraftingTableRecipeAdapter(),
+                level
+        );
+        addConvertedRecipes(
+                convertedRecipes,
+                recipeManager,
+                com.blakebr0.extendedcrafting.init.ModRecipeTypes.COMPRESSOR.get(),
+                new ExtendedCraftingCompressorRecipeAdapter(),
+                level
+        );
+        addConvertedRecipes(
+                convertedRecipes,
+                recipeManager,
+                com.blakebr0.extendedcrafting.init.ModRecipeTypes.COMBINATION.get(),
+                new ExtendedCraftingCombinationRecipeAdapter(),
+                level
+        );
+        addConvertedRecipes(
+                convertedRecipes,
+                recipeManager,
+                com.blakebr0.extendedcrafting.init.ModRecipeTypes.ENDER_CRAFTER.get(),
+                new ExtendedCraftingEnderCrafterRecipeAdapter(),
+                level
+        );
+        addConvertedRecipes(
+                convertedRecipes,
+                recipeManager,
+                com.blakebr0.extendedcrafting.init.ModRecipeTypes.FLUX_CRAFTER.get(),
+                new ExtendedCraftingFluxCrafterRecipeAdapter(),
                 level
         );
         return convertedRecipes;

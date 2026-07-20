@@ -4,6 +4,42 @@
     "useless_mod:metal_mold_rod",
     "useless_mod:metal_mold_gear",
     "useless_mod:metal_mold_wire",
-    "useless_mod:metal_mold_block"
+    "useless_mod:metal_mold_block",
+    {
+      "id": "powah:energizing_orb",
+      "required": false
+    },
+    {
+      "id": "extendedcrafting:basic_table",
+      "required": false
+    },
+    {
+      "id": "extendedcrafting:advanced_table",
+      "required": false
+    },
+    {
+      "id": "extendedcrafting:elite_table",
+      "required": false
+    },
+    {
+      "id": "extendedcrafting:ultimate_table",
+      "required": false
+    },
+    {
+      "id": "extendedcrafting:compressor",
+      "required": false
+    },
+    {
+      "id": "extendedcrafting:crafting_core",
+      "required": false
+    },
+    {
+      "id": "extendedcrafting:ender_crafter",
+      "required": false
+    },
+    {
+      "id": "extendedcrafting:flux_crafter",
+      "required": false
+    }
   ]
 }

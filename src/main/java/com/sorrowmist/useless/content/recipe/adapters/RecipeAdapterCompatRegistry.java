@@ -34,6 +34,12 @@ import com.sorrowmist.useless.content.recipe.adapters.mysticalagriculture.SeedEs
 import com.sorrowmist.useless.content.recipe.adapters.productivebees.BeeProduceRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.productivebees.CentrifugeRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.draconicevolution.DraconicFusionRecipeAdapter;
+import com.sorrowmist.useless.content.recipe.adapters.powah.EnergizingRecipeAdapter;
+import com.sorrowmist.useless.content.recipe.adapters.extendedcrafting.ExtendedCraftingCombinationRecipeAdapter;
+import com.sorrowmist.useless.content.recipe.adapters.extendedcrafting.ExtendedCraftingCompressorRecipeAdapter;
+import com.sorrowmist.useless.content.recipe.adapters.extendedcrafting.ExtendedCraftingEnderCrafterRecipeAdapter;
+import com.sorrowmist.useless.content.recipe.adapters.extendedcrafting.ExtendedCraftingFluxCrafterRecipeAdapter;
+import com.sorrowmist.useless.content.recipe.adapters.extendedcrafting.ExtendedCraftingTableRecipeAdapter;
 import net.neoforged.fml.ModList;
 import net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent;
 import org.apache.logging.log4j.LogManager;
@@ -58,6 +64,8 @@ public final class RecipeAdapterCompatRegistry {
     public static final String DATA_ENERGISTICS = "data_energistics";
     public static final String PRODUCTIVE_BEES = "productivebees";
     public static final String DRACONIC_EVOLUTION = "draconicevolution";
+    public static final String POWAH = "powah";
+    public static final String EXTENDED_CRAFTING = "extendedcrafting";
 
     private static final List<CompatEntry> ENTRIES = List.of(
             new CompatEntry(null, RecipeAdapterCompatRegistry::registerMinecraft),
@@ -73,7 +81,9 @@ public final class RecipeAdapterCompatRegistry {
             new CompatEntry(AE2LT, RecipeAdapterCompatRegistry::registerAELightningTech),
             new CompatEntry(DATA_ENERGISTICS, RecipeAdapterCompatRegistry::registerDataEnergistics),
             new CompatEntry(PRODUCTIVE_BEES, RecipeAdapterCompatRegistry::registerProductiveBees),
-            new CompatEntry(DRACONIC_EVOLUTION, RecipeAdapterCompatRegistry::registerDraconicEvolution)
+            new CompatEntry(DRACONIC_EVOLUTION, RecipeAdapterCompatRegistry::registerDraconicEvolution),
+            new CompatEntry(POWAH, RecipeAdapterCompatRegistry::registerPowah),
+            new CompatEntry(EXTENDED_CRAFTING, RecipeAdapterCompatRegistry::registerExtendedCrafting)
     );
 
     private RecipeAdapterCompatRegistry() {}
@@ -176,6 +186,18 @@ public final class RecipeAdapterCompatRegistry {
 
     private static void registerDraconicEvolution() {
         register(new DraconicFusionRecipeAdapter());
+    }
+
+    private static void registerPowah() {
+        register(new EnergizingRecipeAdapter());
+    }
+
+    private static void registerExtendedCrafting() {
+        register(new ExtendedCraftingTableRecipeAdapter());
+        register(new ExtendedCraftingCompressorRecipeAdapter());
+        register(new ExtendedCraftingCombinationRecipeAdapter());
+        register(new ExtendedCraftingEnderCrafterRecipeAdapter());
+        register(new ExtendedCraftingFluxCrafterRecipeAdapter());
     }
 
     private record CompatEntry(@Nullable String modId, Runnable registerAction) {}

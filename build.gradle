@@ -187,8 +187,8 @@ dependencies {
     implementation "mezz.jei:jei-1.21.1-neoforge:19.21.0.247"
     implementation "curse.maven:ae2-jei-integration-1074338:5748513"
 
-    implementation "org.appliedenergistics:appliedenergistics2:19.2.16"
-    implementation "org.appliedenergistics:guideme:2.5.1"
+    implementation "org.appliedenergistics:appliedenergistics2:19.2.17"
+    implementation "org.appliedenergistics:guideme:21.1.17"
     implementation "de.mari_023:ae2wtlib_api:19.2.5"
 
     implementation "curse.maven:glodium-957920:5821676"
@@ -205,8 +205,17 @@ dependencies {
     implementation "curse.maven:ae2-lightning-tech-1527395:8410116"
     implementation "curse.maven:data-energistics-1565514:8217182"
 
+    //powah
+    implementation "curse.maven:powah-rearchitected-633483:8011715"
+    implementation "maven.modrinth:9s6osm5g:izKINKFg"
+
     runtimeOnly "top.theillusivec4.curios:curios-neoforge:9.5.1+1.21.1"
     implementation "top.theillusivec4.curios:curios-neoforge:9.5.1+1.21.1:api"
+
+    //合成拓展
+    implementation "maven.modrinth:5JMG1gql:Pb2OHQ8E"
+    implementation "maven.modrinth:Rw1NrDzF:8421rqFF"
+
 
     implementation "maven.modrinth:jade:15.1.2+neoforge"
     //龙之研究

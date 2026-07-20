@@ -68,7 +68,16 @@ public class UItemTagsProvider extends ItemTagsProvider {
             .add(ModItems.METAL_MOLD_ROD.get())
             .add(ModItems.METAL_MOLD_GEAR.get())
             .add(ModItems.METAL_MOLD_WIRE.get())
-            .add(ModItems.METAL_MOLD_BLOCK.get());
+            .add(ModItems.METAL_MOLD_BLOCK.get())
+            .addOptional(ResourceLocation.fromNamespaceAndPath("powah", "energizing_orb"))
+            .addOptional(ResourceLocation.fromNamespaceAndPath("extendedcrafting", "basic_table"))
+            .addOptional(ResourceLocation.fromNamespaceAndPath("extendedcrafting", "advanced_table"))
+            .addOptional(ResourceLocation.fromNamespaceAndPath("extendedcrafting", "elite_table"))
+            .addOptional(ResourceLocation.fromNamespaceAndPath("extendedcrafting", "ultimate_table"))
+            .addOptional(ResourceLocation.fromNamespaceAndPath("extendedcrafting", "compressor"))
+            .addOptional(ResourceLocation.fromNamespaceAndPath("extendedcrafting", "crafting_core"))
+            .addOptional(ResourceLocation.fromNamespaceAndPath("extendedcrafting", "ender_crafter"))
+            .addOptional(ResourceLocation.fromNamespaceAndPath("extendedcrafting", "flux_crafter"));
     }
 
     private void addCTags() {

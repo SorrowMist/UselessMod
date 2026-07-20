@@ -111,6 +111,22 @@ config="${mod_id}.mixins.json"
     ordering="AFTER"
     side="BOTH"
 
+# Optional Powah energizing recipe compatibility
+[[dependencies.${mod_id}]]
+    modId="powah"
+    type="optional"
+    versionRange="*"
+    ordering="AFTER"
+    side="BOTH"
+
+# Optional Extended Crafting recipe compatibility
+[[dependencies.${mod_id}]]
+    modId="extendedcrafting"
+    type="optional"
+    versionRange="*"
+    ordering="AFTER"
+    side="BOTH"
+
 # Optional long-energy capability integrations
 [[dependencies.${mod_id}]]
     modId="mekanism"

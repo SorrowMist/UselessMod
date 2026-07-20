@@ -571,7 +571,7 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
         // 每20tick检查一次配方是否切换，避免评分系统不稳定导致连续重启
         if (this.progress % 20 == 0) {
             Optional<AdvancedAlloyFurnaceRecipe> bestMatch = this.findMatchingRecipe();
-            if (bestMatch.isPresent() && !bestMatch.get().id().equals(this.currentRecipe.id())) {
+            if (bestMatch.isPresent() && !hasSameProcessingOutput(bestMatch.get(), this.currentRecipe)) {
                 this.startRecipeProcessing(bestMatch.get());
                 return;
             }
@@ -609,6 +609,22 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
         }
 
         this.setChanged();
+    }
+
+    private static boolean hasSameProcessingOutput(
+            AdvancedAlloyFurnaceRecipe candidate, AdvancedAlloyFurnaceRecipe current) {
+        if (!candidate.id().equals(current.id()) || candidate.outputs().size() != current.outputs().size()) {
+            return false;
+        }
+        for (int i = 0; i < candidate.outputs().size(); i++) {
+            ItemStack candidateOutput = candidate.outputs().get(i);
+            ItemStack currentOutput = current.outputs().get(i);
+            if (candidateOutput.getCount() != currentOutput.getCount()
+                    || !ItemStack.isSameItemSameComponents(candidateOutput, currentOutput)) {
+                return false;
+            }
+        }
+        return true;
     }
 
     /**

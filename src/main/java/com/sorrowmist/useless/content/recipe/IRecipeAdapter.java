@@ -64,6 +64,17 @@ public interface IRecipeAdapter<T extends Recipe<?>> {
     }
 
     /**
+     * 按本次查询的真实物品输入转换配方。
+     * <p>
+     * 需要根据数据组件动态生成输出的适配器可以覆写此方法；默认仍使用静态转换，
+     * 从而保持现有适配器的行为不变。调用方和实现均不得修改 {@code actualInputs}。
+     */
+    default List<AdvancedAlloyFurnaceRecipe> convertAll(RecipeHolder<T> holder, Level level,
+                                                         List<ItemStack> actualInputs) {
+        return convertAll(holder, level);
+    }
+
+    /**
      * 获取此适配器对应的模具物品。
      * <p>
      * 用于 AlloyFurnaceRecipeManager 按模具预筛选适配器，快速定位配方类型。

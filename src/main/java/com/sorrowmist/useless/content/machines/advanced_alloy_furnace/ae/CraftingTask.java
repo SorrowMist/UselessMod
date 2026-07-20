@@ -1,7 +1,6 @@
 package com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae;
 
 import appeng.api.crafting.IPatternDetails;
-import appeng.api.crafting.PatternDetailsHelper;
 import appeng.api.stacks.AEFluidKey;
 import appeng.api.stacks.AEItemKey;
 import appeng.api.stacks.AEKey;
@@ -26,6 +25,7 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 
 /**
  * 高级合金炉中的单个 AE 合成任务。
@@ -40,6 +40,7 @@ public class CraftingTask {
     private final List<ItemStack> taskInputItems = new ArrayList<>();
     private final List<FluidStack> taskInputFluids = new ArrayList<>();
     private final List<OutputKey> taskInputKeys = new ArrayList<>();
+    private Set<AEKey> componentInputKeys = Set.of();
     private final List<CraftingSubTask> queuedSubTasks = new ArrayList<>();
     // 待输出缓冲：产物先进缓冲，由 flushPendingOutputs 逐 tick 写出，写不下时保留重试，避免静默丢失
     private final List<ItemStack> pendingOutputItems = new ArrayList<>();
@@ -75,6 +76,7 @@ public class CraftingTask {
         this.craftCount = Math.max(1, totalCrafts);
         this.displayedCraftCount = this.craftCount;
         storeInputMaterials(inputHolder, this.taskInputItems, this.taskInputFluids, this.taskInputKeys);
+        this.componentInputKeys = AdvancedAlloyFurnacePatternPolicy.componentInputKeys(pattern, inputHolder);
     }
 
     /** 从一个拆分出的子任务构造独立任务（用于空闲线程再分配） */
@@ -87,6 +89,7 @@ public class CraftingTask {
         this.taskInputItems.addAll(subTask.items);
         this.taskInputFluids.addAll(subTask.fluids);
         this.taskInputKeys.addAll(subTask.keys);
+        this.componentInputKeys = AdvancedAlloyFurnacePatternPolicy.componentInputKeys(pattern, this.taskInputItems);
     }
 
     /** 用于从 NBT 恢复的空任务构造 */
@@ -103,6 +106,10 @@ public class CraftingTask {
 
     public IPatternDetails getPattern() {
         return pattern;
+    }
+
+    Set<AEKey> getComponentInputKeys() {
+        return componentInputKeys;
     }
 
     /**
@@ -238,9 +245,9 @@ public class CraftingTask {
 
         ItemStack moldStack = context.getItemHandler().getStackInSlot(context.getMoldSlot());
 
-        cachedRecipe = AlloyFurnaceRecipeManager.getInstance().findRecipeForCrafting(
+        cachedRecipe = AlloyFurnaceRecipeManager.getInstance().findRecipeForCraftingWithConstraints(
                 context.getLevel(), tempInputs, tempFluids, toGenericStacks(taskInputKeys), moldStack,
-                pattern == null ? List.of() : pattern.getOutputs(), craftCount
+                AdvancedAlloyFurnacePatternPolicy.outputConstraints(pattern), craftCount
         );
         return cachedRecipe;
     }
@@ -278,7 +285,8 @@ public class CraftingTask {
             return false;
         }
 
-        return AlloyFurnaceRecipeManager.matchesExpectedOutputs(recipe, pattern.getOutputs());
+        return AlloyFurnaceRecipeManager.matchesOutputConstraints(
+                recipe, AdvancedAlloyFurnacePatternPolicy.outputConstraints(pattern));
     }
 
     private void returnMaterialsToAE() {
@@ -553,6 +561,7 @@ public class CraftingTask {
         taskInputFluids.addAll(subTask.fluids);
         taskInputKeys.clear();
         taskInputKeys.addAll(subTask.keys);
+        componentInputKeys = AdvancedAlloyFurnacePatternPolicy.componentInputKeys(pattern, taskInputItems);
         invalidateRecipeCache(); // 输入已变更，配方缓存失效
         craftCount = subTask.craftCount;
         progress = 0;
@@ -609,14 +618,26 @@ public class CraftingTask {
 
         AdvancedAlloyFurnaceRecipe recipe = findTaskRecipe();
 
+        if (recipe != null && AdvancedAlloyFurnacePatternPolicy.usesRecipeOutputs(pattern)) {
+            for (ItemStack output : recipe.outputs()) {
+                addPendingItem(output, (long) output.getCount() * craftCount);
+            }
+            for (FluidStack output : recipe.outputFluids()) {
+                addPendingFluid(output, (long) output.getAmount() * craftCount);
+            }
+            for (GenericStack output : recipe.keyOutputs()) {
+                if (output != null && output.what() != null && output.amount() > 0) {
+                    pendingOutputKeys.add(new OutputKey(
+                            output.what(), saturatingMultiply(output.amount(), craftCount)));
+                }
+            }
+            context.markChanged();
+            return;
+        }
+
         for (var output : pattern.getOutputs()) {
             if (output.what() instanceof AEItemKey itemKey) {
-                long remaining = output.amount() * (long) craftCount;
-                while (remaining > 0) {
-                    int chunk = (int) Math.min(remaining, Integer.MAX_VALUE);
-                    pendingOutputItems.add(itemKey.toStack(chunk));
-                    remaining -= chunk;
-                }
+                addPendingItem(itemKey.toStack(), saturatingMultiply(output.amount(), craftCount));
             } else if (output.what() instanceof AEFluidKey fluidKey) {
                 long remaining = output.amount() * (long) craftCount;
                 while (remaining > 0) {
@@ -645,6 +666,24 @@ public class CraftingTask {
             }
         }
         context.markChanged();
+    }
+
+    private void addPendingItem(ItemStack template, long amount) {
+        long remaining = amount;
+        while (!template.isEmpty() && remaining > 0) {
+            int chunk = (int) Math.min(remaining, Integer.MAX_VALUE);
+            pendingOutputItems.add(template.copyWithCount(chunk));
+            remaining -= chunk;
+        }
+    }
+
+    private void addPendingFluid(FluidStack template, long amount) {
+        long remaining = amount;
+        while (!template.isEmpty() && remaining > 0) {
+            int chunk = (int) Math.min(remaining, Integer.MAX_VALUE);
+            pendingOutputFluids.add(template.copyWithAmount(chunk));
+            remaining -= chunk;
+        }
     }
 
     /**
@@ -751,7 +790,7 @@ public class CraftingTask {
         if (definition == null) {
             return null;
         }
-        IPatternDetails pattern = PatternDetailsHelper.decodePattern(definition.toStack(), level);
+        IPatternDetails pattern = AdvancedAlloyFurnacePatternResolver.decode(definition.toStack(), level);
         if (pattern == null) {
             return null;
         }
@@ -760,6 +799,7 @@ public class CraftingTask {
         CraftingTask task = new CraftingTask(taskId, pattern, context);
         task.craftCount = Math.max(1, tag.getInt("CraftCount"));
         readStacks(registries, tag.getList("Inputs", Tag.TAG_COMPOUND), task.taskInputItems, task.taskInputFluids, task.taskInputKeys);
+        task.componentInputKeys = AdvancedAlloyFurnacePatternPolicy.componentInputKeys(pattern, task.taskInputItems);
 
         ListTag subTasksTag = tag.getList("SubTasks", Tag.TAG_COMPOUND);
         for (int i = 0; i < subTasksTag.size(); i++) {

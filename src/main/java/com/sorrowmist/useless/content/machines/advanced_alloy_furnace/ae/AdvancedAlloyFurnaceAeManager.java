@@ -1,7 +1,6 @@
 package com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae;
 
 import appeng.api.crafting.IPatternDetails;
-import appeng.api.crafting.PatternDetailsHelper;
 import appeng.api.networking.crafting.ICraftingProvider;
 import appeng.api.stacks.AEItemKey;
 import appeng.api.stacks.AEKey;
@@ -27,6 +26,7 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.ReentrantLock;
@@ -42,11 +42,11 @@ public final class AdvancedAlloyFurnaceAeManager {
 
     private final AdvancedAlloyFurnaceBlockEntity owner;
     private final ConcurrentHashMap<Integer, CraftingTask> activeTasks = new ConcurrentHashMap<>();
-    private final Map<PatternKey, List<CraftingTask>> activeTasksByPattern = new HashMap<>();
+    private final Map<PatternExecutionKey, List<CraftingTask>> activeTasksByPattern = new HashMap<>();
     private final ReentrantLock craftingLock = new ReentrantLock();
     private final ConcurrentHashMap<Integer, AETaskProgress> aeTaskProgressMap = new ConcurrentHashMap<>();
     private final List<AETaskProgress> clientTaskProgressList = new ArrayList<>();
-    private final Map<PatternKey, PendingAEBatch> aePendingBatches = new HashMap<>();
+    private final Map<PatternExecutionKey, PendingAEBatch> aePendingBatches = new HashMap<>();
     private final List<IPatternDetails> patterns = new ArrayList<>();
     private final AtomicInteger activeAETaskCount = new AtomicInteger(0);
     private final AtomicInteger totalAEProgress = new AtomicInteger(0);
@@ -201,7 +201,9 @@ public final class AdvancedAlloyFurnaceAeManager {
             CraftingTask task = CraftingTask.load(tasksTag.getCompound(i), level, this.owner, registries);
             if (task != null) {
                 this.activeTasks.put(task.getTaskId(), task);
-                this.activeTasksByPattern.computeIfAbsent(PatternKey.of(task.getPattern()), k -> new ArrayList<>()).add(task);
+                this.activeTasksByPattern.computeIfAbsent(
+                        PatternExecutionKey.of(task.getPattern(), task.getComponentInputKeys()),
+                        k -> new ArrayList<>()).add(task);
                 this.activeAETaskCount.incrementAndGet();
             }
         }
@@ -211,7 +213,8 @@ public final class AdvancedAlloyFurnaceAeManager {
             for (int i = 0; i < pendingTag.size(); i++) {
                 PendingAEBatch batch = PendingAEBatch.load(pendingTag.getCompound(i), level, registries);
                 if (batch != null && batch.pattern != null) {
-                    this.aePendingBatches.put(PatternKey.of(batch.pattern), batch);
+                    this.aePendingBatches.put(PatternExecutionKey.of(
+                            batch.pattern, batch.getComponentInputKeys()), batch);
                 }
             }
         }
@@ -300,7 +303,7 @@ public final class AdvancedAlloyFurnaceAeManager {
         }
 
         synchronized (this.aePendingBatches) {
-            PendingAEBatch batch = this.findOrCreateBatch(patternDetails);
+            PendingAEBatch batch = this.findOrCreateBatch(patternDetails, inputHolder);
             batch.add(inputHolder);
         }
         this.sendAETaskProgressToClients();
@@ -381,13 +384,16 @@ public final class AdvancedAlloyFurnaceAeManager {
 
     private void registerActiveTask(CraftingTask task) {
         this.activeTasks.put(task.getTaskId(), task);
-        this.activeTasksByPattern.computeIfAbsent(PatternKey.of(task.getPattern()), k -> new ArrayList<>()).add(task);
+        this.activeTasksByPattern.computeIfAbsent(
+                PatternExecutionKey.of(task.getPattern(), task.getComponentInputKeys()),
+                k -> new ArrayList<>()).add(task);
         this.activeAETaskCount.incrementAndGet();
         this.owner.markChanged();
     }
 
     private void removeFromPatternIndex(CraftingTask task) {
-        PatternKey key = PatternKey.of(task.getPattern());
+        PatternExecutionKey key = PatternExecutionKey.of(
+                task.getPattern(), task.getComponentInputKeys());
         List<CraftingTask> list = this.activeTasksByPattern.get(key);
         if (list != null) {
             list.remove(task);
@@ -430,7 +436,7 @@ public final class AdvancedAlloyFurnaceAeManager {
         for (int i = AdvancedAlloyFurnaceLayout.PATTERN_SLOTS_START; i <= AdvancedAlloyFurnaceLayout.PATTERN_SLOTS_END; i++) {
             ItemStack stack = this.owner.getItemHandler().getStackInSlot(i);
             if (!stack.isEmpty()) {
-                IPatternDetails pattern = PatternDetailsHelper.decodePattern(stack, level);
+                IPatternDetails pattern = AdvancedAlloyFurnacePatternResolver.decode(stack, level);
                 if (pattern != null) {
                     EapCompat.tryMarkPatternForScaling(pattern);
                     this.patterns.add(pattern);
@@ -499,8 +505,11 @@ public final class AdvancedAlloyFurnaceAeManager {
         return this.craftingLock;
     }
 
-    private PendingAEBatch findOrCreateBatch(IPatternDetails patternDetails) {
-        PatternKey key = PatternKey.of(patternDetails);
+    private PendingAEBatch findOrCreateBatch(
+            IPatternDetails patternDetails, @org.jetbrains.annotations.Nullable KeyCounter[] inputHolder) {
+        PatternExecutionKey key = PatternExecutionKey.of(
+                patternDetails,
+                AdvancedAlloyFurnacePatternPolicy.componentInputKeys(patternDetails, inputHolder));
         PendingAEBatch existing = this.aePendingBatches.get(key);
         if (existing != null) {
             return existing;
@@ -512,7 +521,8 @@ public final class AdvancedAlloyFurnaceAeManager {
 
     private void requeueBatch(PendingAEBatch batch) {
         synchronized (this.aePendingBatches) {
-            PendingAEBatch target = this.findOrCreateBatch(batch.pattern);
+            KeyCounter[] firstInput = batch.allInputs.isEmpty() ? null : batch.allInputs.getFirst();
+            PendingAEBatch target = this.findOrCreateBatch(batch.pattern, firstInput);
             target.allInputs.addAll(batch.allInputs);
             target.statusKey = batch.statusKey;
             target.statusDetail = batch.statusDetail;
@@ -574,7 +584,7 @@ public final class AdvancedAlloyFurnaceAeManager {
         return new KeyCounter[]{result};
     }
 
-    private CraftingTask findExistingTask(PatternKey patternKey) {
+    private CraftingTask findExistingTask(PatternExecutionKey patternKey) {
         List<CraftingTask> list = this.activeTasksByPattern.get(patternKey);
         if (list == null) {
             return null;
@@ -711,7 +721,7 @@ public final class AdvancedAlloyFurnaceAeManager {
             if (definition == null) {
                 return null;
             }
-            IPatternDetails pattern = PatternDetailsHelper.decodePattern(definition.toStack(), level);
+            IPatternDetails pattern = AdvancedAlloyFurnacePatternResolver.decode(definition.toStack(), level);
             if (pattern == null) {
                 return null;
             }
@@ -721,6 +731,13 @@ public final class AdvancedAlloyFurnaceAeManager {
                 batch.allInputs.add(readKeyCounters(registries, craftsTag.getCompound(i)));
             }
             return batch;
+        }
+
+        Set<AEKey> getComponentInputKeys() {
+            if (allInputs.isEmpty()) {
+                return Set.of();
+            }
+            return AdvancedAlloyFurnacePatternPolicy.componentInputKeys(pattern, allInputs.getFirst());
         }
     }
 
@@ -757,6 +774,16 @@ public final class AdvancedAlloyFurnaceAeManager {
             if (pattern == null) return new PatternKey(null, 1);
             IPatternDetails original = EapCompat.unwrap(pattern);
             return new PatternKey(original.getDefinition(), Math.max(1, EapCompat.getMultiplier(pattern)));
+        }
+    }
+
+    private record PatternExecutionKey(PatternKey pattern, Set<AEKey> componentInputKeys) {
+        private PatternExecutionKey {
+            componentInputKeys = componentInputKeys == null ? Set.of() : Set.copyOf(componentInputKeys);
+        }
+
+        static PatternExecutionKey of(IPatternDetails pattern, Set<AEKey> componentInputKeys) {
+            return new PatternExecutionKey(PatternKey.of(pattern), componentInputKeys);
         }
     }
 }

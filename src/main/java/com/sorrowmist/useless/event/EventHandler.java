@@ -211,7 +211,7 @@ public class EventHandler {
         }
     }
 
-    @SubscribeEvent
+    @SubscribeEvent(priority = EventPriority.HIGHEST)
     public static void onBlockInteract(PlayerInteractEvent.RightClickBlock event) {
         ItemStack stack = event.getItemStack();
         if (!(stack.getItem() instanceof EndlessBeafItem)) return;

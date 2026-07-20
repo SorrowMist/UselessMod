@@ -83,6 +83,10 @@ public class MiningUtils {
         return drops.isEmpty() || drops.stream().allMatch(stack -> stack.isEmpty() || stack.is(Items.AIR));
     }
 
+    static boolean canMineBlock(BlockState state, ItemStack tool, boolean forceMining) {
+        return forceMining || !state.requiresCorrectToolForDrops() || tool.isCorrectToolForDrops(state);
+    }
+
     /**
      * 选择强制挖掘最终应交付的掉落物。
      * 仅当掉落表和实际破坏均没有产生有效掉落时才使用方块本体兜底；
@@ -124,7 +128,7 @@ public class MiningUtils {
     }
 
     static MiningResult mineBlock(ServerLevel level, BlockPos pos, BlockState state, Player player, ItemStack tool) {
-        if (state.isAir() || !tool.isCorrectToolForDrops(state)) {
+        if (state.isAir() || !canMineBlock(state, tool, false)) {
             return MiningResult.NOT_MINED;
         }
 
@@ -289,7 +293,7 @@ public class MiningUtils {
         List<BlockPos> blocksToMine = new ArrayList<>(maxBlocks);
 
         // 检查原点方块是否可以被挖掘（工具等级检查）
-        if (!forceMining && !stack.isCorrectToolForDrops(originState)) {
+        if (!canMineBlock(originState, stack, forceMining)) {
             return blocksToMine; // 返回空列表
         }
 
@@ -330,7 +334,7 @@ public class MiningUtils {
                         BlockState nextState = level.getBlockState(neighborPos);
 
                         if (nextState.is(originBlock)) {
-                            if (forceMining || stack.isCorrectToolForDrops(nextState)) {
+                            if (canMineBlock(nextState, stack, forceMining)) {
                                 visited.add(nLong);
                                 queue.add(neighborPos);
                             }
@@ -382,7 +386,7 @@ public class MiningUtils {
                     BlockState nextState = level.getBlockState(targetPos);
 
                     if (nextState.is(originBlock)) {
-                        if (forceMining || stack.isCorrectToolForDrops(nextState)) {
+                        if (canMineBlock(nextState, stack, forceMining)) {
                             blocksToMine.add(targetPos);
                         }
                     }

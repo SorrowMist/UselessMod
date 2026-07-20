@@ -18,7 +18,7 @@ public class DefaultMiningStrategy implements MiningStrategy {
 
         boolean forceMining = UComponentUtils.isForceMiningEnabled(hand);
 
-        if (forceMining || hand.isCorrectToolForDrops(state)) {
+        if (MiningUtils.canMineBlock(state, hand, forceMining)) {
             MiningUtils.processBlockBreak(level, pos, state, player, hand, forceMining);
             event.setCanceled(true);
         }

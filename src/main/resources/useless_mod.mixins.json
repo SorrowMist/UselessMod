@@ -8,6 +8,8 @@
     "PlayerMixin",
     "ServerLevelMixin",
     "LevelMixin",
+    "ae2.ExecutingCraftingJobMixin",
+    "advancedae.ExecutingCraftingJobMixin",
     "botanypots.AbstractBotanyPotBlockEntityAccessor",
     "botanypots.BotanyPotBlockEntityAccessor",
     "botanypots.BotanyPotBlockEntityMixin",

@@ -189,7 +189,18 @@ public class AlloyFurnaceRecipeManager {
                                                              List<FluidStack> fluidInputs, List<GenericStack> keyInputs,
                                                              @Nullable ItemStack mold, List<GenericStack> expectedOutputs,
                                                              long operations) {
-        return findRecipe(level, new RecipeLookupContext(inputs, fluidInputs, keyInputs, mold, expectedOutputs, operations));
+        return findRecipeForCraftingWithConstraints(level, inputs, fluidInputs, keyInputs, mold,
+                RecipeOutputConstraint.exact(expectedOutputs), operations);
+    }
+
+    @Nullable
+    public AdvancedAlloyFurnaceRecipe findRecipeForCraftingWithConstraints(
+            Level level, List<ItemStack> inputs,
+            List<FluidStack> fluidInputs, List<GenericStack> keyInputs,
+            @Nullable ItemStack mold, List<RecipeOutputConstraint> expectedOutputs,
+            long operations) {
+        return findRecipe(level, new RecipeLookupContext(
+                inputs, fluidInputs, keyInputs, mold, expectedOutputs, operations));
     }
 
     @Nullable
@@ -290,6 +301,18 @@ public class AlloyFurnaceRecipeManager {
                                                            List<GenericStack> keyInputs, @Nullable ItemStack mold,
                                                            List<GenericStack> expectedOutputs, long operations) {
         RecipeLookupContext context = new RecipeLookupContext(
+                inputs, fluidInputs, keyInputs, mold,
+                RecipeOutputConstraint.exact(expectedOutputs), operations);
+        return getInstance().selectBestRecipe(candidates, context);
+    }
+
+    @Nullable
+    static AdvancedAlloyFurnaceRecipe selectBestCandidateWithConstraints(
+            Iterable<AdvancedAlloyFurnaceRecipe> candidates,
+            List<ItemStack> inputs, List<FluidStack> fluidInputs,
+            List<GenericStack> keyInputs, @Nullable ItemStack mold,
+            List<RecipeOutputConstraint> expectedOutputs, long operations) {
+        RecipeLookupContext context = new RecipeLookupContext(
                 inputs, fluidInputs, keyInputs, mold, expectedOutputs, operations);
         return getInstance().selectBestRecipe(candidates, context);
     }
@@ -299,7 +322,7 @@ public class AlloyFurnaceRecipeManager {
                 && matchesItems(recipe, context.inputs(), context.operations())
                 && matchesFluids(recipe, context.fluidInputs(), context.operations())
                 && matchesKeys(recipe, context.keyInputs(), context.operations())
-                && matchesExpectedOutputs(recipe, context.expectedOutputs());
+                && matchesOutputConstraints(recipe, context.expectedOutputs());
     }
 
     /** 按“模具专用、输入种类、各类数量、来源、ID”稳定比较具体度。 */
@@ -389,6 +412,11 @@ public class AlloyFurnaceRecipeManager {
      * AE 输出约束只比较 AEKey（包含组件），不比较数量，以兼容已有倍量样板。
      */
     public static boolean matchesExpectedOutputs(AdvancedAlloyFurnaceRecipe recipe, List<GenericStack> expectedOutputs) {
+        return matchesOutputConstraints(recipe, RecipeOutputConstraint.exact(expectedOutputs));
+    }
+
+    public static boolean matchesOutputConstraints(
+            AdvancedAlloyFurnaceRecipe recipe, List<RecipeOutputConstraint> expectedOutputs) {
         if (expectedOutputs == null || expectedOutputs.isEmpty()) return true;
 
         Set<AEKey> available = new LinkedHashSet<>();
@@ -404,8 +432,8 @@ public class AlloyFurnaceRecipeManager {
             if (output != null && output.what() != null) available.add(output.what());
         }
 
-        for (GenericStack expected : expectedOutputs) {
-            if (expected == null || expected.what() == null || !available.contains(expected.what())) return false;
+        for (RecipeOutputConstraint expected : expectedOutputs) {
+            if (expected == null || available.stream().noneMatch(expected::matches)) return false;
         }
         return true;
     }
@@ -421,13 +449,15 @@ public class AlloyFurnaceRecipeManager {
         if (mold != null && !mold.isEmpty()) {
             IRecipeAdapter<?> exactAdapter = moldAdapterMap.get(mold.getItem());
             if (exactAdapter != null) {
-                collectAdapterRecipes(exactAdapter, level, mergedInputs, mergedFluids, mergedKeys, mold, candidates);
+                collectAdapterRecipes(exactAdapter, level, context.inputs(), mergedInputs, mergedFluids,
+                        mergedKeys, mold, candidates);
             }
         }
 
         for (IRecipeAdapter<?> adapter : fallbackAdapters) {
             if (adapter.matchesMold(mold)) {
-                collectAdapterRecipes(adapter, level, mergedInputs, mergedFluids, mergedKeys, mold, candidates);
+                collectAdapterRecipes(adapter, level, context.inputs(), mergedInputs, mergedFluids,
+                        mergedKeys, mold, candidates);
             }
         }
         return candidates;
@@ -436,12 +466,13 @@ public class AlloyFurnaceRecipeManager {
     @SuppressWarnings("unchecked")
     private <T extends Recipe<?>> void collectAdapterRecipes(
             IRecipeAdapter<?> adapter, Level level,
+            List<ItemStack> actualInputs,
             Map<Ingredient, Long> mergedInputs, Map<FluidStack, Long> mergedFluids,
             Map<AEKey, Long> mergedKeys, @Nullable ItemStack mold,
             List<AdvancedAlloyFurnaceRecipe> candidates) {
         IRecipeAdapter<T> typedAdapter = (IRecipeAdapter<T>) adapter;
         for (RecipeHolder<T> holder : typedAdapter.findMatchingRecipes(level, mergedInputs, mergedFluids, mergedKeys, mold)) {
-            candidates.addAll(typedAdapter.convertAll(holder, level));
+            candidates.addAll(typedAdapter.convertAll(holder, level, actualInputs));
         }
     }
 
@@ -484,7 +515,7 @@ public class AlloyFurnaceRecipeManager {
             List<FluidStack> fluidInputs,
             List<GenericStack> keyInputs,
             @Nullable ItemStack mold,
-            List<GenericStack> expectedOutputs,
+            List<RecipeOutputConstraint> expectedOutputs,
             long operations
     ) {
         private RecipeLookupContext {
@@ -502,7 +533,7 @@ public class AlloyFurnaceRecipeManager {
             Map<AEKey, Long> fluids,
             Map<AEKey, Long> keys,
             @Nullable AEKey mold,
-            Map<AEKey, Long> expectedOutputs,
+            List<RecipeOutputConstraint> expectedOutputs,
             long operations
     ) {
         private static RecipeCacheKey from(RecipeLookupContext context) {
@@ -514,7 +545,7 @@ public class AlloyFurnaceRecipeManager {
                     snapshotFluids(context.fluidInputs()),
                     snapshotGenericStacks(context.keyInputs()),
                     moldStack == null ? null : moldStack.what(),
-                    snapshotGenericStacks(context.expectedOutputs()),
+                    List.copyOf(context.expectedOutputs()),
                     context.operations()
             );
         }
@@ -522,6 +553,15 @@ public class AlloyFurnaceRecipeManager {
         static RecipeCacheKey create(List<ItemStack> inputs, List<FluidStack> fluidInputs,
                                      List<GenericStack> keyInputs, @Nullable ItemStack mold,
                                      List<GenericStack> expectedOutputs, long operations) {
+            return from(new RecipeLookupContext(
+                    inputs, fluidInputs, keyInputs, mold,
+                    RecipeOutputConstraint.exact(expectedOutputs), operations));
+        }
+
+        static RecipeCacheKey createWithConstraints(
+                List<ItemStack> inputs, List<FluidStack> fluidInputs,
+                List<GenericStack> keyInputs, @Nullable ItemStack mold,
+                List<RecipeOutputConstraint> expectedOutputs, long operations) {
             return from(new RecipeLookupContext(
                     inputs, fluidInputs, keyInputs, mold, expectedOutputs, operations));
         }

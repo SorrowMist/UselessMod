@@ -5,6 +5,11 @@ import com.sorrowmist.useless.content.blocks.AdvancedAlloyFurnaceBlock;
 import com.sorrowmist.useless.content.blocks.OreGeneratorBlock;
 import com.sorrowmist.useless.content.blocks.TeleportPadBlock;
 import com.sorrowmist.useless.content.blocks.UselessGlassBlock;
+import com.sorrowmist.useless.content.blocks.multiblock.MePatternAssemblyBlock;
+import com.sorrowmist.useless.content.blocks.multiblock.MultiblockAlloyFurnaceCoreBlock;
+import com.sorrowmist.useless.content.blocks.multiblock.MultiblockPartBlock;
+import com.sorrowmist.useless.content.blocks.multiblock.OmniversalMoldHubBlock;
+import com.sorrowmist.useless.content.blocks.multiblock.UselessCoilBlock;
 import com.sorrowmist.useless.world.teleport.UselessDimTeleporter;
 import com.sorrowmist.useless.world.teleport.UselessDimTeleporter2;
 import com.sorrowmist.useless.world.teleport.UselessDimTeleporter3;
@@ -57,6 +62,35 @@ public final class ModBlocks {
             "advanced_alloy_furnace_block",
             AdvancedAlloyFurnaceBlock::new
     );
+
+    public static final DeferredBlock<MultiblockAlloyFurnaceCoreBlock> MULTIBLOCK_ALLOY_FURNACE_CORE = BLOCKS.register(
+            "multiblock_alloy_furnace_core",
+            () -> new MultiblockAlloyFurnaceCoreBlock(BlockBehaviour.Properties.of()
+                    .strength(5.0F, 32768.0F).requiresCorrectToolForDrops()));
+    public static final DeferredBlock<MePatternAssemblyBlock> ME_PATTERN_ASSEMBLY = BLOCKS.register(
+            "me_pattern_assembly",
+            () -> new MePatternAssemblyBlock(BlockBehaviour.Properties.of()
+                    .strength(4.0F, 1200.0F).requiresCorrectToolForDrops()));
+    public static final DeferredBlock<OmniversalMoldHubBlock> OMNIVERSAL_MOLD_HUB = BLOCKS.register(
+            "omniversal_mold_hub",
+            () -> new OmniversalMoldHubBlock(BlockBehaviour.Properties.of()
+                    .strength(4.0F, 1200.0F).requiresCorrectToolForDrops()));
+    public static final DeferredBlock<MultiblockPartBlock> OMNIVERSAL_FURNACE_CASING = BLOCKS.register(
+            "omniversal_furnace_casing",
+            () -> new MultiblockPartBlock(BlockBehaviour.Properties.of()
+                    .strength(4.0F, 1200.0F).requiresCorrectToolForDrops()));
+
+    public static final Map<Integer, DeferredBlock<UselessCoilBlock>> USELESS_COILS = new LinkedHashMap<>();
+
+    static {
+        for (int tier = UselessCoilBlock.MIN_TIER; tier <= UselessCoilBlock.MAX_TIER; tier++) {
+            int capturedTier = tier;
+            USELESS_COILS.put(tier, BLOCKS.register(UselessCoilBlock.registryName(tier),
+                    () -> new UselessCoilBlock(capturedTier, BlockBehaviour.Properties.of()
+                            .strength(3.0F + capturedTier * 0.25F, 1200.0F + capturedTier * 600.0F)
+                            .requiresCorrectToolForDrops())));
+        }
+    }
 
     // 无用玻璃方块 - 防爆，Shift+右键快速破坏
     public static final Map<String, DeferredBlock<UselessGlassBlock>> USELESS_GLASS_BLOCKS = new LinkedHashMap<>();

@@ -9,13 +9,11 @@ import net.minecraft.data.loot.LootTableProvider;
 import net.minecraft.world.flag.FeatureFlags;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.storage.loot.parameters.LootContextParamSets;
-import net.neoforged.neoforge.registries.DeferredHolder;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 public class ULootTableProvider extends LootTableProvider {
@@ -41,6 +39,14 @@ public class ULootTableProvider extends LootTableProvider {
             this.dropSelf(ModBlocks.TELEPORT_BLOCK_2.get());
             this.dropSelf(ModBlocks.TELEPORT_BLOCK_3.get());
             this.dropSelf(ModBlocks.ADVANCED_ALLOY_FURNACE_BLOCK.get());
+            this.dropSelf(ModBlocks.MULTIBLOCK_ALLOY_FURNACE_CORE.get());
+            this.dropSelf(ModBlocks.ME_PATTERN_ASSEMBLY.get());
+            this.dropSelf(ModBlocks.OMNIVERSAL_MOLD_HUB.get());
+            this.dropSelf(ModBlocks.OMNIVERSAL_FURNACE_CASING.get());
+
+            for (var coil : ModBlocks.USELESS_COILS.values()) {
+                this.dropSelf(coil.get());
+            }
 
             for (var entry : GlowPlasticBlock.GLOW_PLASTIC_BLOCKS.entrySet()) {
                 this.dropSelf(entry.getValue().get());
@@ -53,19 +59,20 @@ public class ULootTableProvider extends LootTableProvider {
 
         @Override
         protected @NotNull Iterable<Block> getKnownBlocks() {
-            return Stream.concat(
-                    Stream.concat(
-                            GlowPlasticBlock.GLOW_PLASTIC_BLOCKS.values().stream().map(DeferredHolder::get),
-                            ModBlocks.USELESS_GLASS_BLOCKS.values().stream().map(DeferredHolder::get)
-                    ),
-                    Stream.of(
-                            ModBlocks.ORE_GENERATOR_BLOCK.get(),
-                            ModBlocks.TELEPORT_BLOCK.get(),
-                            ModBlocks.TELEPORT_BLOCK_2.get(),
-                            ModBlocks.TELEPORT_BLOCK_3.get(),
-                            ModBlocks.ADVANCED_ALLOY_FURNACE_BLOCK.get()
-                    )
-            ).collect(Collectors.toList());
+            Stream.Builder<Block> blocks = Stream.builder();
+            GlowPlasticBlock.GLOW_PLASTIC_BLOCKS.values().forEach(block -> blocks.add(block.get()));
+            ModBlocks.USELESS_GLASS_BLOCKS.values().forEach(block -> blocks.add(block.get()));
+            ModBlocks.USELESS_COILS.values().forEach(block -> blocks.add(block.get()));
+            blocks.add(ModBlocks.ORE_GENERATOR_BLOCK.get());
+            blocks.add(ModBlocks.TELEPORT_BLOCK.get());
+            blocks.add(ModBlocks.TELEPORT_BLOCK_2.get());
+            blocks.add(ModBlocks.TELEPORT_BLOCK_3.get());
+            blocks.add(ModBlocks.ADVANCED_ALLOY_FURNACE_BLOCK.get());
+            blocks.add(ModBlocks.MULTIBLOCK_ALLOY_FURNACE_CORE.get());
+            blocks.add(ModBlocks.ME_PATTERN_ASSEMBLY.get());
+            blocks.add(ModBlocks.OMNIVERSAL_MOLD_HUB.get());
+            blocks.add(ModBlocks.OMNIVERSAL_FURNACE_CASING.get());
+            return blocks.build().toList();
         }
     }
 }

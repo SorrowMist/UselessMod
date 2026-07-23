@@ -2,6 +2,7 @@ package com.sorrowmist.useless.network;
 
 import com.sorrowmist.useless.UselessMod;
 import com.sorrowmist.useless.content.blockentities.AdvancedAlloyFurnaceBlockEntity;
+import com.sorrowmist.useless.content.blockentities.multiblock.MultiblockAlloyFurnaceCoreBlockEntity;
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.FriendlyByteBuf;
@@ -85,6 +86,8 @@ public record AETaskProgressPacket(BlockPos pos, List<AETaskProgressPacket.TaskP
             if (mc.level != null) {
                 var blockEntity = mc.level.getBlockEntity(msg.pos);
                 if (blockEntity instanceof AdvancedAlloyFurnaceBlockEntity furnace) {
+                    furnace.updateClientTaskProgress(msg.tasks);
+                } else if (blockEntity instanceof MultiblockAlloyFurnaceCoreBlockEntity furnace) {
                     furnace.updateClientTaskProgress(msg.tasks);
                 }
             }

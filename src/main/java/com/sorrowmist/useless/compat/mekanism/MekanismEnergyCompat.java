@@ -21,6 +21,11 @@ public final class MekanismEnergyCompat {
                 ModBlockEntities.ADVANCED_ALLOY_FURNACE.get(),
                 (blockEntity, side) -> new FurnaceStrictEnergyHandler(blockEntity.getEnergyManager())
         );
+        event.registerBlockEntity(
+                Capabilities.STRICT_ENERGY.block(),
+                ModBlockEntities.MULTIBLOCK_ALLOY_FURNACE_CORE.get(),
+                (blockEntity, side) -> new FurnaceStrictEnergyHandler(blockEntity.getEnergyManager())
+        );
     }
 
     static final class FurnaceStrictEnergyHandler implements IStrictEnergyHandler {

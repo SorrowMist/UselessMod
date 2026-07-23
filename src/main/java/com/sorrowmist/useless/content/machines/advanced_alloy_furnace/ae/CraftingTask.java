@@ -6,11 +6,9 @@ import appeng.api.stacks.AEItemKey;
 import appeng.api.stacks.AEKey;
 import appeng.api.stacks.GenericStack;
 import appeng.api.stacks.KeyCounter;
-import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.catalyst.CatalystEffectResolver;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.catalyst.ResolvedCatalystEffect;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.execution.AlloyFurnaceRecipeExecutor;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.io.FurnaceOutputPort;
-import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.parallel.AlloyFurnaceParallelCalculator;
 import com.sorrowmist.useless.content.recipe.AdvancedAlloyFurnaceRecipe;
 import com.sorrowmist.useless.content.recipe.AlloyFurnaceRecipeManager;
 import net.minecraft.core.HolderLookup;
@@ -243,12 +241,8 @@ public class CraftingTask {
         List<ItemStack> tempInputs = new ArrayList<>(taskInputItems);
         List<FluidStack> tempFluids = new ArrayList<>(taskInputFluids);
 
-        ItemStack moldStack = context.getItemHandler().getStackInSlot(context.getMoldSlot());
-
-        cachedRecipe = AlloyFurnaceRecipeManager.getInstance().findRecipeForCraftingWithConstraints(
-                context.getLevel(), tempInputs, tempFluids, toGenericStacks(taskInputKeys), moldStack,
-                AdvancedAlloyFurnacePatternPolicy.outputConstraints(pattern), craftCount
-        );
+        cachedRecipe = context.resolveTaskRecipe(
+                pattern, tempInputs, tempFluids, toGenericStacks(taskInputKeys), craftCount);
         return cachedRecipe;
     }
 
@@ -285,8 +279,9 @@ public class CraftingTask {
             return false;
         }
 
-        return AlloyFurnaceRecipeManager.matchesOutputConstraints(
-                recipe, AdvancedAlloyFurnacePatternPolicy.outputConstraints(pattern));
+        return context.isTaskRecipeAvailable(recipe)
+                && AlloyFurnaceRecipeManager.matchesOutputConstraints(
+                        recipe, AdvancedAlloyFurnacePatternPolicy.outputConstraints(pattern));
     }
 
     private void returnMaterialsToAE() {
@@ -352,8 +347,7 @@ public class CraftingTask {
             ItemStack leftover = FurnaceOutputPort.outputItemWithRemainder(stack, port,
                     context.getItemHandler(), context.getInputSlotsStart(), context.getInputSlotsCount());
             if (!leftover.isEmpty()) {
-                var pos = context.getBlockPos();
-                Containers.dropItemStack(level, pos.getX() + 0.5, pos.getY() + 1.0, pos.getZ() + 0.5, leftover);
+                context.handleUnreturnedItem(leftover);
             }
         }
 
@@ -365,22 +359,14 @@ public class CraftingTask {
                         context.getOutputFluidTanks(), context.getFluidTankCount());
             }
             if (!leftover.isEmpty()) {
-                AEFluidKey fluidKey = AEFluidKey.of(leftover);
-                if (fluidKey != null) {
-                    context.stashUnreturnedInput(fluidKey, leftover.getAmount());
-                }
+                context.handleUnreturnedFluid(leftover);
             }
         }
         context.markChanged();
     }
 
     private int getRecipeProcessTime(AdvancedAlloyFurnaceRecipe recipe) {
-        if (recipe != null && recipe.processTime() > 0) {
-            ItemStack catalystStack = context.getItemHandler().getStackInSlot(context.getCatalystSlot());
-            return CatalystEffectResolver.resolve(recipe, catalystStack, recipe.processTime()).processTime();
-        }
-
-        return 200;
+        return context.getTaskProcessTime(recipe, context.resolveTaskEffect(recipe));
     }
 
     public boolean tick() {
@@ -391,6 +377,7 @@ public class CraftingTask {
             processingComplete = true;
             return true;
         }
+        if (!context.isTaskExecutionEnabled()) return false;
         if (!initialized && !initialize()) {
             return true;
         }
@@ -398,6 +385,13 @@ public class CraftingTask {
         if (!awaitingOutputFlush) {
             AdvancedAlloyFurnaceRecipe recipe = findTaskRecipe();
             ResolvedCatalystEffect resolvedCatalystEffect = getCatalystEffect(recipe);
+
+            if (progress == 0 && accumulatedEnergy == 0L && !context.isTaskRecipeAvailable(recipe)) {
+                updateWaitingProgress();
+                return false;
+            } else if (taskProgressRef != null) {
+                taskProgressRef.setStatus("gui.useless_mod.advanced_alloy_furnace.ae_task_status.processing", "");
+            }
 
             if (progress < processTime) {
                 ProgressEnergyStep energyStep = getProgressEnergyStep(recipe, resolvedCatalystEffect);
@@ -579,9 +573,7 @@ public class CraftingTask {
     }
 
     private ResolvedCatalystEffect getCatalystEffect(AdvancedAlloyFurnaceRecipe recipe) {
-        ItemStack catalystStack = context.getItemHandler().getStackInSlot(context.getCatalystSlot());
-        int baseTime = recipe != null ? recipe.processTime() : 200;
-        return CatalystEffectResolver.resolve(recipe, catalystStack, baseTime);
+        return context.resolveTaskEffect(recipe);
     }
 
     /** 按当前催化剂重算时长、每 tick 能耗与并行上限（初始化及每个子任务启动时调用） */
@@ -593,8 +585,7 @@ public class CraftingTask {
         } else {
             baseEnergyPerTick = 200L;
         }
-        maxParallel = AlloyFurnaceParallelCalculator.calculateAeTaskParallel(
-                recipe, getCatalystEffect(recipe));
+        maxParallel = context.getTaskParallel(recipe, getCatalystEffect(recipe));
     }
 
     private void finishTask() {
@@ -749,6 +740,7 @@ public class CraftingTask {
      */
     public CompoundTag save(HolderLookup.Provider registries) {
         CompoundTag tag = new CompoundTag();
+        tag.putInt("DataVersion", 1);
         tag.putInt("TaskId", taskId);
         tag.put("Pattern", pattern.getDefinition().toTag(registries));
         tag.putInt("CraftCount", craftCount);

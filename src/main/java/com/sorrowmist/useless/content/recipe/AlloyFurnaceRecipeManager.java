@@ -43,6 +43,7 @@ public class AlloyFurnaceRecipeManager {
     private final Map<Item, IRecipeAdapter<?>> moldAdapterMap = new ConcurrentHashMap<>();
     /** 无固定模具的 adapter，需通过 matchesMold() 动态判断（如 SeedEssenceRecipeAdapter） */
     private final List<IRecipeAdapter<?>> fallbackAdapters = new CopyOnWriteArrayList<>();
+    private final List<IRecipeAdapter<?>> allAdapters = new CopyOnWriteArrayList<>();
 
     // access-order LinkedHashMap（LRU）。get() 会改动内部链表，非线程安全，
     // 而 findRecipe 可能被 AE 合成任务和主线程同时调用，故用 synchronizedMap 保护。
@@ -85,6 +86,7 @@ public class AlloyFurnaceRecipeManager {
     }
 
     public void registerAdapter(IRecipeAdapter<?> adapter) {
+        allAdapters.add(adapter);
         ItemStack moldItem = adapter.getMoldItem();
         if (moldItem != null && !moldItem.isEmpty()) {
             IRecipeAdapter<?> existing = moldAdapterMap.put(moldItem.getItem(), adapter);
@@ -94,6 +96,10 @@ public class AlloyFurnaceRecipeManager {
         } else {
             fallbackAdapters.add(adapter);
         }
+    }
+
+    public List<IRecipeAdapter<?>> getRegisteredAdapters() {
+        return List.copyOf(allAdapters);
     }
 
     public void buildIndex(Level level) {
@@ -508,6 +514,7 @@ public class AlloyFurnaceRecipeManager {
      */
     public void invalidateIndex() {
         indexBuilt = false;
+        AlloyFurnaceRecipeCatalog.invalidate();
     }
 
     private record RecipeLookupContext(

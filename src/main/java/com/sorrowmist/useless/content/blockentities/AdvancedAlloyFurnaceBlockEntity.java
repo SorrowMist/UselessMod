@@ -35,6 +35,7 @@ import com.sorrowmist.useless.api.enums.RedstoneControlMode;
 import com.sorrowmist.useless.content.blocks.AdvancedAlloyFurnaceBlock;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.AdvancedAlloyFurnaceAeManager;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.CraftingTaskContext;
+import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.AlloyFurnaceAeHost;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.catalyst.CatalystEffectResolver;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.catalyst.ResolvedCatalystEffect;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.execution.AlloyFurnaceRecipeExecutor;
@@ -103,7 +104,7 @@ import static com.sorrowmist.useless.content.machines.advanced_alloy_furnace.lay
 import static com.sorrowmist.useless.content.machines.advanced_alloy_furnace.layout.AdvancedAlloyFurnaceLayout.PATTERN_SLOTS_START;
 import static com.sorrowmist.useless.content.machines.advanced_alloy_furnace.layout.AdvancedAlloyFurnaceLayout.TOTAL_SLOTS;
 
-public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implements MenuProvider, ICraftingProvider, IInWorldGridNodeHost, IGridNodeListener<AdvancedAlloyFurnaceBlockEntity>, IActionHost, CraftingTaskContext, PatternContainer, FurnaceFaceAccessor, FurnaceAutoIoController.Context {
+public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implements MenuProvider, ICraftingProvider, IInWorldGridNodeHost, IGridNodeListener<AdvancedAlloyFurnaceBlockEntity>, IActionHost, AlloyFurnaceAeHost, PatternContainer, FurnaceFaceAccessor, FurnaceAutoIoController.Context {
 
     public static final int MAX_FURNACE_TIER = 10;
     public static final int USEFUL_INGOT_FURNACE_TIER = 10;
@@ -1475,6 +1476,15 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
     // 获取最大AE任务数量（基于熔炉等级）
     public int getMaxAETaskCount() {
         return this.furnaceTier + 1;
+    }
+
+    @Override
+    public Iterable<ItemStack> getPatternStacks() {
+        List<ItemStack> result = new java.util.ArrayList<>(PATTERN_SLOTS_COUNT);
+        for (int slot = PATTERN_SLOTS_START; slot <= PATTERN_SLOTS_END; slot++) {
+            result.add(itemHandler.getStackInSlot(slot));
+        }
+        return result;
     }
 
     // AE合成任务状态设置方法（用于客户端同步）

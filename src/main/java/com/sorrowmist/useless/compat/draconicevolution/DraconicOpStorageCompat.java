@@ -16,6 +16,11 @@ public final class DraconicOpStorageCompat {
                 ModBlockEntities.ADVANCED_ALLOY_FURNACE.get(),
                 (blockEntity, side) -> new FurnaceOpStorage(blockEntity.getEnergyManager())
         );
+        event.registerBlockEntity(
+                CapabilityOP.BLOCK,
+                ModBlockEntities.MULTIBLOCK_ALLOY_FURNACE_CORE.get(),
+                (blockEntity, side) -> new FurnaceOpStorage(blockEntity.getEnergyManager())
+        );
     }
 
     private record FurnaceOpStorage(IEnergyManager energy) implements IOPStorage {

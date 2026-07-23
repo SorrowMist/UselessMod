@@ -3,6 +3,7 @@ package com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae;
 import appeng.api.config.Actionable;
 import appeng.api.crafting.IPatternDetails;
 import appeng.api.crafting.PatternDetailsHelper;
+import appeng.api.ids.AEComponents;
 import appeng.api.stacks.AEItemKey;
 import appeng.api.stacks.AEKey;
 import appeng.api.stacks.GenericStack;
@@ -10,10 +11,15 @@ import appeng.api.stacks.KeyCounter;
 import appeng.crafting.execution.CraftingCpuHelper;
 import appeng.crafting.inv.ListCraftingInventory;
 import appeng.crafting.pattern.AEProcessingPattern;
+import com.extendedae_plus.api.crafting.ScaledProcessingPattern;
+import com.sorrowmist.useless.core.component.OmniversalPatternData;
+import com.sorrowmist.useless.core.component.UComponents;
+import com.sorrowmist.useless.init.ModItems;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.core.RegistryAccess;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
@@ -25,7 +31,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.UUID;
+import net.minecraft.resources.ResourceLocation;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -37,6 +45,25 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class AdvancedAlloyFurnacePatternResolverTest {
     private static final HolderLookup.Provider REGISTRIES = RegistryAccess.EMPTY;
+
+    @Test
+    void omniversalDefinitionKeepsItsDataComponentInAeItemKey() {
+        ItemStack processing = PatternDetailsHelper.encodeProcessingPattern(
+                List.of(new GenericStack(Objects.requireNonNull(AEItemKey.of(Items.IRON_INGOT)), 1)),
+                List.of(new GenericStack(Objects.requireNonNull(AEItemKey.of(Items.GOLD_INGOT)), 1)));
+        ItemStack omniversal = new ItemStack(ModItems.OMNIVERSAL_PATTERN.get());
+        omniversal.set(AEComponents.ENCODED_PROCESSING_PATTERN,
+                processing.get(AEComponents.ENCODED_PROCESSING_PATTERN));
+        omniversal.set(UComponents.OMNIVERSAL_PATTERN_DATA.get(), new OmniversalPatternData(
+                OmniversalPatternData.CURRENT_VERSION,
+                ResourceLocation.fromNamespaceAndPath("useless_mod_test", "recipe"),
+                "fingerprint", false, Optional.empty(), List.of(), List.of()));
+
+        AEItemKey key = Objects.requireNonNull(AEItemKey.of(omniversal));
+        assertNotNull(key.get(UComponents.OMNIVERSAL_PATTERN_DATA.get()));
+        assertTrue(PatternDetailsHelper.isEncodedPattern(omniversal));
+        assertDoesNotThrow(() -> DynamicComponentPatternDetails.definitionFingerprint(key, REGISTRIES));
+    }
 
     @Test
     void canonicalChildOutputIsThePrimaryAutocraftingCandidate() {
@@ -133,6 +160,52 @@ class AdvancedAlloyFurnacePatternResolverTest {
                 restoredLogic, BuiltInRegistries.ITEM.getKey(Items.DIAMOND_SWORD)));
         assertEquals(1, manager.getRemainingForItem(
                 restoredLogic, BuiltInRegistries.ITEM.getKey(Items.DIAMOND_SHOVEL)));
+        manager.clear(logic);
+        manager.clear(restoredLogic);
+    }
+
+    @Test
+    void scaledDynamicExecutionTracksNewComponentVariantsAcrossReload() {
+        ItemStack encodedOutput = new ItemStack(Items.DIAMOND_SWORD);
+        encodedOutput.set(DataComponents.CUSTOM_NAME, Component.literal("encoded-components"));
+        ItemStack producedOutput = new ItemStack(Items.DIAMOND_SWORD, 10);
+        producedOutput.set(DataComponents.CUSTOM_NAME, Component.literal("produced-components"));
+        DynamicComponentPatternDetails dynamic = dynamicPattern(
+                new ItemStack(Items.IRON_INGOT), encodedOutput, null);
+        ScaledProcessingPattern scaled = new ScaledProcessingPattern(dynamic, 10L);
+
+        DynamicPatternExecution.Resolved resolved = DynamicPatternExecution.resolve(scaled);
+        assertNotNull(resolved);
+        assertEquals(dynamic, resolved.pattern());
+        assertEquals(10L, resolved.copies());
+        DynamicPatternExecution.Resolved nested = DynamicPatternExecution.resolve(
+                new ScaledProcessingPattern(scaled, 3L));
+        assertNotNull(nested);
+        assertEquals(dynamic, nested.pattern());
+        assertEquals(30L, nested.copies());
+
+        DynamicPatternCpuStateManager manager = DynamicPatternCpuStateManager.INSTANCE;
+        Object logic = new Object();
+        UUID craftingId = UUID.randomUUID();
+        manager.registerExpectedOutputs(
+                logic, craftingId, resolved.pattern(), null, resolved.copies());
+        assertEquals(10L, manager.getRemainingForItem(
+                logic, BuiltInRegistries.ITEM.getKey(Items.DIAMOND_SWORD)));
+
+        AEItemKey producedKey = Objects.requireNonNull(AEItemKey.of(producedOutput));
+        var firstClaim = manager.claim(logic, producedKey, 4L, Actionable.MODULATE);
+        assertEquals(4L, firstClaim.claimedAmount());
+        assertEquals(AEItemKey.of(encodedOutput), firstClaim.claims().getFirst().exactExpectedKey());
+
+        CompoundTag saved = Objects.requireNonNull(manager.writeToTag(logic, REGISTRIES));
+        Object restoredLogic = new Object();
+        manager.readFromTag(restoredLogic, craftingId, saved, REGISTRIES);
+        assertEquals(6L, manager.getRemainingForItem(
+                restoredLogic, BuiltInRegistries.ITEM.getKey(Items.DIAMOND_SWORD)));
+        assertEquals(6L, manager.claim(
+                restoredLogic, producedKey, 6L, Actionable.MODULATE).claimedAmount());
+        assertFalse(manager.hasAnyPending(restoredLogic));
+
         manager.clear(logic);
         manager.clear(restoredLogic);
     }

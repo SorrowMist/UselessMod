@@ -73,6 +73,9 @@ public class ConfigManager {
     private static final ModConfigSpec.BooleanValue FURNACE_DRAW_APPFLUX_ENERGY;
     private static final ModConfigSpec.BooleanValue FURNACE_DRAW_AE_ENERGY;
 
+    private static final ModConfigSpec.IntValue OMNIVERSAL_PATTERN_SLOTS;
+    private static final ModConfigSpec.IntValue OMNIVERSAL_MOLD_SLOTS;
+
     static {
         COMMON_BUILDER.push("dimension_generation");
         BORDER_BLOCK = COMMON_BUILDER
@@ -121,7 +124,14 @@ public class ConfigManager {
                 .define("enable_botany_pot_rendering", true);
         CLIENT_BUILDER.pop();
 
-        SERVER_BUILDER.push("server");
+        SERVER_BUILDER.push("omniversal_multiblock_alloy_furnace");
+        OMNIVERSAL_PATTERN_SLOTS = SERVER_BUILDER
+                .comment("ME pattern assembly slots. Values are normalized to pages of 27.")
+                .defineInRange("pattern_slots", 108, 27, 540);
+        OMNIVERSAL_MOLD_SLOTS = SERVER_BUILDER
+                .comment("Omniversal mold hub slots. Values are normalized to pages of 27.")
+                .defineInRange("mold_slots", 108, 27, 540);
+
         SERVER_BUILDER.pop();
 
         // 牛排工具连锁挖掘配置
@@ -305,6 +315,19 @@ public class ConfigManager {
 
     public static boolean isFurnaceDrawAeEnergyEnabled() {
         return FURNACE_DRAW_AE_ENERGY.get();
+    }
+
+    public static int getOmniversalPatternSlots() {
+        return normalizeInventorySlots(OMNIVERSAL_PATTERN_SLOTS.get());
+    }
+
+    public static int getOmniversalMoldSlots() {
+        return normalizeInventorySlots(OMNIVERSAL_MOLD_SLOTS.get());
+    }
+
+    private static int normalizeInventorySlots(int value) {
+        int clamped = Math.max(27, Math.min(540, value));
+        return Math.max(27, clamped / 27 * 27);
     }
 
     // 获取连锁挖掘范围配置

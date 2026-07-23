@@ -31,7 +31,7 @@ import java.util.TreeMap;
  * Only the explicitly marked slots use item-id matching; all other slots retain
  * the source AE2 semantics.
  */
-public final class DynamicComponentPatternDetails implements DynamicComponentPattern {
+public class DynamicComponentPatternDetails extends AEProcessingPattern implements DynamicComponentPattern {
     private final AEItemKey definition;
     private final AEProcessingPattern source;
     private final IInput[] inputs;
@@ -45,6 +45,7 @@ public final class DynamicComponentPatternDetails implements DynamicComponentPat
             Iterable<Integer> itemIdInputSlots,
             Iterable<Integer> itemIdOutputSlots,
             HolderLookup.Provider registries) {
+        super(source.getDefinition());
         this.source = Objects.requireNonNull(source, "source");
         this.definition = source.getDefinition();
         this.outputs = List.copyOf(source.getOutputs());
@@ -94,7 +95,12 @@ public final class DynamicComponentPatternDetails implements DynamicComponentPat
     public void pushInputsToExternalInventory(KeyCounter[] inputHolder, PatternInputSink inputSink) {
         List<GenericStack> sparseInputs = source.getSparseInputs();
         if (sparseInputs.size() == inputs.length) {
-            DynamicComponentPattern.super.pushInputsToExternalInventory(inputHolder, inputSink);
+            for (KeyCounter counter : inputHolder) {
+                if (counter == null) continue;
+                for (var entry : counter) {
+                    inputSink.pushInput(entry.getKey(), entry.getLongValue());
+                }
+            }
             return;
         }
 

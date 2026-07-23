@@ -1,8 +1,11 @@
 package com.sorrowmist.useless.datagen.providers.recipes;
 
+import appeng.core.definitions.AEBlocks;
+import appeng.core.definitions.AEItems;
 import com.sorrowmist.useless.UselessMod;
 import com.sorrowmist.useless.api.enums.AlloyFurnaceMode;
 import com.sorrowmist.useless.api.enums.EnumColor;
+import com.sorrowmist.useless.content.blocks.multiblock.UselessCoilBlock;
 import com.sorrowmist.useless.content.blocks.GlowPlasticBlock;
 import com.sorrowmist.useless.content.recipe.AdvancedAlloyFurnaceRecipeBuilder;
 import com.sorrowmist.useless.init.ModBlocks;
@@ -33,6 +36,7 @@ public class CraftingRecipes extends RecipeProvider {
     protected void buildRecipes(@NotNull RecipeOutput consumer) {
         this.addMoldRecipes(consumer);
         this.addAdvancedAlloyFurnaceBlockRecipe(consumer);
+        this.addOmniversalFurnaceRecipes(consumer);
         this.addEndlessBeafItemRecipe(consumer);
         this.addOreGeneratorBlockRecipe(consumer);
         this.addTeleportBlockRecipes(consumer);
@@ -140,6 +144,86 @@ public class CraftingRecipes extends RecipeProvider {
                            .define('I', Items.LAVA_BUCKET)
                            .unlockedBy("has_furnace", has(Blocks.FURNACE))
                            .save(consumer);
+    }
+
+    private void addOmniversalFurnaceRecipes(RecipeOutput consumer) {
+        ShapedRecipeBuilder.shaped(RecipeCategory.BUILDING_BLOCKS,
+                                   ModBlocks.MULTIBLOCK_ALLOY_FURNACE_CORE.get())
+                           .pattern("IRI")
+                           .pattern("RFR")
+                           .pattern("IRI")
+                           .define('I', Items.IRON_INGOT)
+                           .define('R', Items.REDSTONE)
+                           .define('F', ModBlocks.ADVANCED_ALLOY_FURNACE_BLOCK.get())
+                           .unlockedBy("has_alloy_furnace", has(ModBlocks.ADVANCED_ALLOY_FURNACE_BLOCK.get()))
+                           .save(consumer, UselessMod.id("crafting/multiblock_alloy_furnace_core"));
+
+        ShapedRecipeBuilder.shaped(RecipeCategory.BUILDING_BLOCKS, ModBlocks.ME_PATTERN_ASSEMBLY.get())
+                           .pattern(" R ")
+                           .pattern("CPC")
+                           .pattern(" R ")
+                           .define('R', Items.REDSTONE)
+                           .define('C', Blocks.CHEST)
+                           .define('P', AEBlocks.PATTERN_PROVIDER)
+                           .unlockedBy("has_pattern_provider", has(AEBlocks.PATTERN_PROVIDER))
+                           .save(consumer, UselessMod.id("crafting/me_pattern_assembly"));
+
+        ShapedRecipeBuilder.shaped(RecipeCategory.BUILDING_BLOCKS, ModBlocks.OMNIVERSAL_MOLD_HUB.get())
+                           .pattern(" R ")
+                           .pattern("CHR")
+                           .pattern(" R ")
+                           .define('R', Items.REDSTONE)
+                           .define('C', Blocks.CHEST)
+                           .define('H', Blocks.HOPPER)
+                           .unlockedBy("has_hopper", has(Blocks.HOPPER))
+                           .save(consumer, UselessMod.id("crafting/omniversal_mold_hub"));
+
+        ShapedRecipeBuilder.shaped(RecipeCategory.BUILDING_BLOCKS,
+                                   ModBlocks.OMNIVERSAL_FURNACE_CASING.get(), 8)
+                           .pattern("NNN")
+                           .pattern("NSN")
+                           .pattern("NNN")
+                           .define('N', Items.IRON_NUGGET)
+                           .define('S', Blocks.SMOOTH_STONE)
+                           .unlockedBy("has_smooth_stone", has(Blocks.SMOOTH_STONE))
+                           .save(consumer, UselessMod.id("crafting/omniversal_furnace_casing"));
+
+        for (int tier = UselessCoilBlock.MIN_TIER; tier <= UselessCoilBlock.MAX_TIER; tier++) {
+            var ingot = switch (tier) {
+                case 1 -> ModItems.USELESS_INGOT_TIER_1.get();
+                case 2 -> ModItems.USELESS_INGOT_TIER_2.get();
+                case 3 -> ModItems.USELESS_INGOT_TIER_3.get();
+                case 4 -> ModItems.USELESS_INGOT_TIER_4.get();
+                case 5 -> ModItems.USELESS_INGOT_TIER_5.get();
+                case 6 -> ModItems.USELESS_INGOT_TIER_6.get();
+                case 7 -> ModItems.USELESS_INGOT_TIER_7.get();
+                case 8 -> ModItems.USELESS_INGOT_TIER_8.get();
+                case 9 -> ModItems.USELESS_INGOT_TIER_9.get();
+                case UselessCoilBlock.USEFUL_TIER -> ModItems.USEFUL_INGOT.get();
+                default -> throw new IllegalStateException("Unexpected coil tier: " + tier);
+            };
+            ShapedRecipeBuilder.shaped(RecipeCategory.BUILDING_BLOCKS,
+                                       ModBlocks.USELESS_COILS.get(tier).get(), 16)
+                               .pattern("CRC")
+                               .pattern("RIR")
+                               .pattern("CRC")
+                               .define('C', Items.COPPER_INGOT)
+                               .define('R', Items.REDSTONE)
+                               .define('I', ingot)
+                               .unlockedBy("has_tier_ingot", has(ingot))
+                               .save(consumer, UselessMod.id(
+                                       "crafting/" + UselessCoilBlock.registryName(tier)));
+        }
+
+        ShapedRecipeBuilder.shaped(RecipeCategory.TOOLS, ModItems.OMNIVERSAL_PATTERN_ENCODER.get())
+                           .pattern("IRI")
+                           .pattern("RPR")
+                           .pattern("IRI")
+                           .define('I', Items.IRON_INGOT)
+                           .define('R', Items.REDSTONE)
+                           .define('P', AEItems.BLANK_PATTERN)
+                           .unlockedBy("has_blank_pattern", has(AEItems.BLANK_PATTERN))
+                           .save(consumer, UselessMod.id("crafting/omniversal_pattern_encoder"));
     }
 
     private void addAE2GiftPackageRecipe(RecipeOutput consumer) {

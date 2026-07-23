@@ -135,6 +135,15 @@ public final class UComponents {
                     .persistent(FurnaceDataComponent.CODEC)
                     .networkSynchronized(FurnaceDataComponent.STREAM_CODEC));
 
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<OmniversalPatternData>> OMNIVERSAL_PATTERN_DATA =
+            register("omniversal_pattern_data", builder -> builder
+                    .persistent(OmniversalPatternData.CODEC)
+                    .networkSynchronized(OmniversalPatternData.STREAM_CODEC));
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<MultiblockRecoveryData>> MULTIBLOCK_RECOVERY_DATA =
+            register("multiblock_recovery_data", builder -> builder
+                    .persistent(MultiblockRecoveryData.CODEC)
+                    .networkSynchronized(MultiblockRecoveryData.STREAM_CODEC));
+
     // 私有构造器，防止外部实例化（该类仅用于注册静态组件）
     private UComponents() {}
 

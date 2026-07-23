@@ -1,0 +1,73 @@
+package com.sorrowmist.useless.content.multiblock;
+
+import com.sorrowmist.useless.api.enums.AlloyFurnaceMode;
+import com.sorrowmist.useless.api.enums.CatalystType;
+import com.sorrowmist.useless.content.blocks.multiblock.UselessCoilBlock;
+import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.execution.AlloyFurnaceRecipeExecutor;
+import com.sorrowmist.useless.content.recipe.AdvancedAlloyFurnaceRecipe;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.item.crafting.Ingredient;
+import org.junit.jupiter.api.Test;
+
+import java.util.List;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+class OmniversalCoilStatsTest {
+    private static final AdvancedAlloyFurnaceRecipe NORMAL_RECIPE = new AdvancedAlloyFurnaceRecipe(
+            ResourceLocation.fromNamespaceAndPath("test", "coil_stats"),
+            List.of(), List.of(), List.of(), List.of(),
+            1_000L, 1_000,
+            Ingredient.EMPTY, 0, Ingredient.EMPTY, AlloyFurnaceMode.NORMAL);
+
+    @Test
+    void uselessCoilsReuseTheirMatchingCatalystRulesWithExtraThreads() {
+        for (int tier = UselessCoilBlock.MIN_TIER; tier < UselessCoilBlock.USEFUL_TIER; tier++) {
+            OmniversalCoilStats stats = OmniversalCoilStats.forTier(tier);
+            CatalystType expectedType = CatalystType.uselessIngotTier(tier);
+            var effect = stats.resolveEffect(NORMAL_RECIPE);
+
+            assertEquals(expectedType, stats.catalystType());
+            assertEquals(expectedType.getNormalRecipeParallel(), stats.singleTaskParallel());
+            assertEquals(expectedType.getNormalRecipeParallel(), effect.recipeParallel());
+            assertEquals(expectedType.calculateProcessTime(NORMAL_RECIPE.processTime()), effect.processTime());
+            assertTrue(effect.energyMultipliesWithParallel());
+            assertEquals(tier + 1, stats.threads());
+            assertTrue((long) stats.threads() * stats.singleTaskParallel()
+                    > stats.singleTaskParallel());
+        }
+    }
+
+    @Test
+    void usefulCoilKeepsUsefulIngotSpecialRules() {
+        OmniversalCoilStats stats = OmniversalCoilStats.forTier(UselessCoilBlock.USEFUL_TIER);
+        var effect = stats.resolveEffect(NORMAL_RECIPE);
+
+        assertEquals(CatalystType.USEFUL_INGOT, stats.catalystType());
+        assertEquals(Integer.MAX_VALUE, stats.singleTaskParallel());
+        assertEquals(Integer.MAX_VALUE, effect.recipeParallel());
+        assertEquals(11, stats.threads());
+        assertEquals(1, effect.processTime());
+        assertFalse(effect.energyMultipliesWithParallel());
+        assertEquals(1_000L, AlloyFurnaceRecipeExecutor.calculateTargetTotalEnergy(
+                NORMAL_RECIPE.energy(), 1_000_000, effect));
+        assertEquals(Long.MAX_VALUE, stats.energyCapacity());
+        assertEquals(Long.MAX_VALUE, stats.maxReceive());
+    }
+
+    @Test
+    void fixedEnergyCurveRetainsLongTierNineValues() {
+        OmniversalCoilStats stats = OmniversalCoilStats.forTier(9);
+        assertEquals(3_276_800_000L, stats.energyCapacity());
+        assertEquals(327_680_000L, stats.maxReceive());
+    }
+
+    @Test
+    void rejectsUnsupportedTiers() {
+        assertThrows(IllegalArgumentException.class, () -> OmniversalCoilStats.forTier(0));
+        assertThrows(IllegalArgumentException.class, () -> OmniversalCoilStats.forTier(11));
+    }
+}

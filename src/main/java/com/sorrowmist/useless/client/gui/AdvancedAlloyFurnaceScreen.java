@@ -14,6 +14,7 @@ import com.sorrowmist.useless.content.blockentities.AdvancedAlloyFurnaceBlockEnt
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.layout.AdvancedAlloyFurnaceLayout;
 import com.sorrowmist.useless.content.menus.AdvancedAlloyFurnaceMenu;
 import com.sorrowmist.useless.inventory.slot.PatternSlotItemHandler;
+import com.sorrowmist.useless.client.render.PatternSlotRenderer;
 import com.sorrowmist.useless.network.AutoIOChangePacket;
 import com.sorrowmist.useless.network.AECancelPacket;
 import com.sorrowmist.useless.network.AEReturnOutputTogglePacket;
@@ -385,9 +386,13 @@ public class AdvancedAlloyFurnaceScreen extends AbstractContainerScreen<Advanced
         }
 
         GenericStack patternOutput = isPatternSlot ? getPatternOutput(stack) : null;
-        ItemStack renderStack = patternOutput != null ? GenericStack.wrapInItemStack(patternOutput) : stack;
+        if (patternOutput != null && PatternSlotRenderer.renderPattern(
+                guiGraphics, this.font, stack, x, y, slot.x + slot.y * this.imageWidth,
+                Minecraft.getInstance().level)) {
+            return;
+        }
 
-        guiGraphics.renderItem(renderStack, x, y, slot.x + slot.y * this.imageWidth);
+        guiGraphics.renderItem(stack, x, y, slot.x + slot.y * this.imageWidth);
 
         if (slot.index < AdvancedAlloyFurnaceLayout.TOTAL_SLOTS && !stack.isEmpty() && stack.getCount() > 1) {
             this.renderCustomItemCount(guiGraphics, stack, x, y);

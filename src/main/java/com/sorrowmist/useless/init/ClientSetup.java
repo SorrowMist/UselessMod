@@ -3,13 +3,25 @@ package com.sorrowmist.useless.init;
 import com.sorrowmist.useless.UselessMod;
 import com.sorrowmist.useless.api.enums.EnumColor;
 import com.sorrowmist.useless.client.gui.AdvancedAlloyFurnaceScreen;
+import com.sorrowmist.useless.client.gui.OmniversalPatternEncoderScreen;
+import com.sorrowmist.useless.client.gui.PagedRecoverableScreen;
+import com.sorrowmist.useless.client.gui.PatternAssemblyScreen;
+import com.sorrowmist.useless.client.gui.MoldHubScreen;
+import com.sorrowmist.useless.client.gui.MultiblockAlloyFurnaceScreen;
 import com.sorrowmist.useless.content.blocks.GlowPlasticBlock;
 import com.sorrowmist.useless.content.menus.AdvancedAlloyFurnaceMenu;
+import com.sorrowmist.useless.content.recipe.AlloyFurnaceRecipeCatalog;
+import com.sorrowmist.useless.core.component.UComponents;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.client.event.RegisterColorHandlersEvent;
 import net.neoforged.neoforge.client.event.RegisterMenuScreensEvent;
+import net.neoforged.neoforge.client.event.RecipesUpdatedEvent;
+import net.neoforged.neoforge.event.entity.player.ItemTooltipEvent;
+import net.minecraft.ChatFormatting;
+import net.minecraft.network.chat.Component;
+import net.minecraft.resources.ResourceLocation;
 
 @EventBusSubscriber(modid = UselessMod.MODID, value = Dist.CLIENT)
 public class ClientSetup {
@@ -40,5 +52,34 @@ public class ClientSetup {
     @SubscribeEvent
     public static void registerScreens(RegisterMenuScreensEvent event) {
         event.register(ModMenuType.ADVANCED_ALLOY_FURNACE_MENU.get(), AdvancedAlloyFurnaceScreen::new);
+        event.register(ModMenuType.OMNIVERSAL_PATTERN_ENCODER_MENU.get(), OmniversalPatternEncoderScreen::new);
+        event.register(ModMenuType.ME_PATTERN_ASSEMBLY_MENU.get(), PatternAssemblyScreen::new);
+        event.register(ModMenuType.OMNIVERSAL_MOLD_HUB_MENU.get(), MoldHubScreen::new);
+        event.register(ModMenuType.MULTIBLOCK_ALLOY_FURNACE_MENU.get(), MultiblockAlloyFurnaceScreen::new);
+    }
+
+    @SubscribeEvent
+    public static void onRecipesUpdated(RecipesUpdatedEvent event) {
+        AlloyFurnaceRecipeCatalog.invalidate();
+    }
+
+    @SubscribeEvent
+    public static void onItemTooltip(ItemTooltipEvent event) {
+        if (!event.getItemStack().is(ModItems.OMNIVERSAL_PATTERN.get())) return;
+        var data = event.getItemStack().get(UComponents.OMNIVERSAL_PATTERN_DATA.get());
+        if (data == null) return;
+        event.getToolTip().add(createRecipeTooltip(data.recipeId()));
+        Component mold = !data.requiresMold()
+                ? Component.translatable("tooltip.useless_mod.omniversal_pattern.no_mold")
+                : data.displayMold().<Component>map(key -> key.getDisplayName())
+                        .orElseGet(() -> Component.translatable("tooltip.useless_mod.omniversal_pattern.unknown_mold"));
+        event.getToolTip().add(Component.translatable(
+                "tooltip.useless_mod.omniversal_pattern.mold", mold).withStyle(ChatFormatting.GOLD));
+    }
+
+    static Component createRecipeTooltip(ResourceLocation recipeId) {
+        return Component.translatable(
+                "tooltip.useless_mod.omniversal_pattern.recipe", recipeId.toString())
+                .withStyle(ChatFormatting.DARK_GRAY);
     }
 }

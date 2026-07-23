@@ -84,7 +84,7 @@ public record AdvancedAlloyFurnaceRecipe(
     ).apply(instance, (item, count) -> new ItemStack(item, count)));
 
     // 主 Codec（JSON / datapack）
-    static final MapCodec<AdvancedAlloyFurnaceRecipe> CODEC = RecordCodecBuilder.mapCodec(
+    public static final MapCodec<AdvancedAlloyFurnaceRecipe> CODEC = RecordCodecBuilder.mapCodec(
             instance -> instance.group(
                     ResourceLocation.CODEC.fieldOf("id").forGetter(AdvancedAlloyFurnaceRecipe::id),
                     CountedIngredient.CODEC.codec().listOf().fieldOf("ingredients")

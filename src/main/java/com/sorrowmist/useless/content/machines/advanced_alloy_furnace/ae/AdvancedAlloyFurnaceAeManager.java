@@ -2,13 +2,13 @@ package com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae;
 
 import appeng.api.crafting.IPatternDetails;
 import appeng.api.networking.crafting.ICraftingProvider;
+import appeng.api.networking.IManagedGridNode;
 import appeng.api.stacks.AEItemKey;
 import appeng.api.stacks.AEKey;
 import appeng.api.stacks.GenericStack;
 import appeng.api.stacks.KeyCounter;
+import com.mojang.logging.LogUtils;
 import com.sorrowmist.useless.compat.EapCompat;
-import com.sorrowmist.useless.content.blockentities.AdvancedAlloyFurnaceBlockEntity;
-import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.layout.AdvancedAlloyFurnaceLayout;
 import com.sorrowmist.useless.network.AETaskProgressPacket;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
@@ -30,17 +30,18 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.ReentrantLock;
+import org.slf4j.Logger;
 
 /**
  * 高级合金炉的 AE 任务调度器。
  * 负责管理样板、任务队列、批量合并、活跃任务和客户端进度同步。
  */
 public final class AdvancedAlloyFurnaceAeManager {
-    private static final int MAX_CONCURRENT_TASKS = 4;
+    private static final Logger LOGGER = LogUtils.getLogger();
     private static final int BATCH_RIPE_TICKS = 10;
     private static final int UNRETURNED_RETRY_TICKS = 20;
 
-    private final AdvancedAlloyFurnaceBlockEntity owner;
+    private final AlloyFurnaceAeHost owner;
     private final ConcurrentHashMap<Integer, CraftingTask> activeTasks = new ConcurrentHashMap<>();
     private final Map<PatternExecutionKey, List<CraftingTask>> activeTasksByPattern = new HashMap<>();
     private final ReentrantLock craftingLock = new ReentrantLock();
@@ -60,7 +61,7 @@ public final class AdvancedAlloyFurnaceAeManager {
     @org.jetbrains.annotations.Nullable
     private CompoundTag deferredTasksTag = null;
 
-    public AdvancedAlloyFurnaceAeManager(AdvancedAlloyFurnaceBlockEntity owner) {
+    public AdvancedAlloyFurnaceAeManager(AlloyFurnaceAeHost owner) {
         this.owner = owner;
     }
 
@@ -298,7 +299,8 @@ public final class AdvancedAlloyFurnaceAeManager {
         // EAP 翻倍样板回退：ScaledProcessingPattern -> 原始样板
         IPatternDetails original = EapCompat.unwrap(patternDetails);
 
-        if (!this.owner.getMainNode().isActive() || !this.patterns.contains(original)) {
+        if (this.owner.getMainNode() == null || !this.owner.getMainNode().isActive()
+                || !this.patterns.contains(original)) {
             return false;
         }
 
@@ -311,7 +313,7 @@ public final class AdvancedAlloyFurnaceAeManager {
     }
 
     public boolean isBusy() {
-        return this.activeTasks.size() >= MAX_CONCURRENT_TASKS;
+        return this.activeTasks.size() >= this.owner.getMaxAETaskCount();
     }
 
     public void tickAETasks() {
@@ -427,25 +429,65 @@ public final class AdvancedAlloyFurnaceAeManager {
     }
 
     public void updatePatterns() {
+        rebuildPatterns();
+        requestPatternUpdate();
+    }
+
+    /** Rebuilds the provider snapshot without touching AE's live grid index. */
+    public void rebuildPatterns() {
         this.patterns.clear();
         Level level = this.owner.getLevel();
-        if (level == null) {
+        if (level == null || !this.owner.canPublishPatterns()) {
             return;
         }
 
-        for (int i = AdvancedAlloyFurnaceLayout.PATTERN_SLOTS_START; i <= AdvancedAlloyFurnaceLayout.PATTERN_SLOTS_END; i++) {
-            ItemStack stack = this.owner.getItemHandler().getStackInSlot(i);
+        int seen = 0;
+        int decoded = 0;
+        for (ItemStack stack : this.owner.getPatternStacks()) {
             if (!stack.isEmpty()) {
-                IPatternDetails pattern = AdvancedAlloyFurnacePatternResolver.decode(stack, level);
-                if (pattern != null) {
-                    EapCompat.tryMarkPatternForScaling(pattern);
-                    this.patterns.add(pattern);
+                seen++;
+                try {
+                    IPatternDetails pattern = AdvancedAlloyFurnacePatternResolver.decode(stack, level);
+                    if (pattern != null && this.owner.acceptsPattern(pattern)) {
+                        EapCompat.tryMarkPatternForScaling(pattern);
+                        this.patterns.add(pattern);
+                        decoded++;
+                    } else {
+                        LOGGER.debug("Ignoring non-publishable alloy furnace pattern at {} (item={}, decoded={})",
+                                this.owner.getBlockPos(), stack.getItem(), pattern != null);
+                    }
+                } catch (RuntimeException exception) {
+                    // A malformed pattern must not prevent the remaining
+                    // slots from being published to AE2.
+                    LOGGER.warn("Failed to decode alloy furnace pattern at {} (item={})",
+                            this.owner.getBlockPos(), stack.getItem(), exception);
                 }
             }
         }
 
-        if (this.owner.getMainNode().getNode() != null) {
-            ICraftingProvider.requestUpdate(this.owner.getMainNode());
+        LOGGER.debug("Updated alloy furnace patterns at {}: seen={}, published={}",
+                this.owner.getBlockPos(), seen, decoded);
+    }
+
+    public List<GenericStack> getUnreturnedInputsSnapshot() {
+        return List.copyOf(this.unreturnedInputs);
+    }
+
+    public void addUnreturnedInputs(List<GenericStack> stacks) {
+        if (stacks == null) return;
+        for (GenericStack stack : stacks) {
+            if (stack != null && stack.what() != null && stack.amount() > 0) {
+                this.unreturnedInputs.add(stack);
+            }
+        }
+        if (!stacks.isEmpty()) this.owner.markChanged();
+    }
+
+    private void requestPatternUpdate() {
+        IManagedGridNode node = this.owner.getMainNode();
+        if (node != null && node.isActive() && node.getNode() != null
+                && node.getNode().getGrid() != null) {
+            ICraftingProvider.requestUpdate(node);
         }
     }
 

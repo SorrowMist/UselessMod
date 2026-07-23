@@ -1,0 +1,32 @@
+{
+  "parent": "minecraft:recipes/root",
+  "criteria": {
+    "has_blank_pattern": {
+      "conditions": {
+        "items": [
+          {
+            "items": "ae2:blank_pattern"
+          }
+        ]
+      },
+      "trigger": "minecraft:inventory_changed"
+    },
+    "has_the_recipe": {
+      "conditions": {
+        "recipe": "useless_mod:crafting/omniversal_pattern_encoder"
+      },
+      "trigger": "minecraft:recipe_unlocked"
+    }
+  },
+  "requirements": [
+    [
+      "has_the_recipe",
+      "has_blank_pattern"
+    ]
+  ],
+  "rewards": {
+    "recipes": [
+      "useless_mod:crafting/omniversal_pattern_encoder"
+    ]
+  }
+}

@@ -5,10 +5,15 @@ import com.sorrowmist.useless.UselessMod;
 import com.sorrowmist.useless.api.enums.RarityExtension;
 import com.sorrowmist.useless.api.enums.tool.ToolTypeMode;
 import com.sorrowmist.useless.content.blockentities.AdvancedAlloyFurnaceBlockEntity;
+import com.sorrowmist.useless.content.blocks.multiblock.UselessCoilBlock;
 import com.sorrowmist.useless.content.items.AE2GiftPackageItem;
 import com.sorrowmist.useless.content.items.AdvancedAlloyFurnaceBlockItem;
 import com.sorrowmist.useless.content.items.EndlessBeafItem;
 import com.sorrowmist.useless.content.items.IngotItem;
+import com.sorrowmist.useless.content.items.OmniversalPatternEncoderItem;
+import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.OmniversalPatternDetails;
+import appeng.api.crafting.PatternDetailsHelper;
+import appeng.crafting.pattern.AEProcessingPattern;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.Rarity;
@@ -214,6 +219,37 @@ public final class ModItems {
             "advanced_alloy_furnace_block",
             () -> new AdvancedAlloyFurnaceBlockItem(ModBlocks.ADVANCED_ALLOY_FURNACE_BLOCK.get(), new Item.Properties())
     );
+    public static final DeferredItem<BlockItem> MULTIBLOCK_ALLOY_FURNACE_CORE = registerAndAdd(
+            "multiblock_alloy_furnace_core",
+            () -> new BlockItem(ModBlocks.MULTIBLOCK_ALLOY_FURNACE_CORE.get(), new Item.Properties()));
+    public static final DeferredItem<BlockItem> ME_PATTERN_ASSEMBLY = registerAndAdd(
+            "me_pattern_assembly",
+            () -> new BlockItem(ModBlocks.ME_PATTERN_ASSEMBLY.get(), new Item.Properties()));
+    public static final DeferredItem<BlockItem> OMNIVERSAL_MOLD_HUB = registerAndAdd(
+            "omniversal_mold_hub",
+            () -> new BlockItem(ModBlocks.OMNIVERSAL_MOLD_HUB.get(), new Item.Properties()));
+    public static final DeferredItem<BlockItem> OMNIVERSAL_FURNACE_CASING = registerAndAdd(
+            "omniversal_furnace_casing",
+            () -> new BlockItem(ModBlocks.OMNIVERSAL_FURNACE_CASING.get(), new Item.Properties()));
+    public static final List<DeferredItem<BlockItem>> USELESS_COILS = new ArrayList<>();
+    public static final DeferredItem<Item> OMNIVERSAL_PATTERN = registerAndAdd(
+            "omniversal_pattern",
+            () -> PatternDetailsHelper.<OmniversalPatternDetails>encodedPatternItemBuilder(
+                            OmniversalPatternDetails::decode)
+                    .invalidPatternTooltip(AEProcessingPattern::getInvalidPatternTooltip)
+                    .itemProperties(new Item.Properties().stacksTo(1))
+                    .build());
+    public static final DeferredItem<Item> OMNIVERSAL_PATTERN_ENCODER = registerAndAdd(
+            "omniversal_pattern_encoder",
+            () -> new OmniversalPatternEncoderItem(new Item.Properties().stacksTo(1)));
+
+    static {
+        for (int tier = UselessCoilBlock.MIN_TIER; tier <= UselessCoilBlock.MAX_TIER; tier++) {
+            int capturedTier = tier;
+            USELESS_COILS.add(registerAndAdd(UselessCoilBlock.registryName(tier),
+                    () -> new BlockItem(ModBlocks.USELESS_COILS.get(capturedTier).get(), new Item.Properties())));
+        }
+    }
 
     public static final DeferredItem<AE2GiftPackageItem> AE2_GIFT_PACKAGE;
 

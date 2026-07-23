@@ -3,6 +3,7 @@ package com.sorrowmist.useless.datagen.providers.tags;
 import com.sorrowmist.useless.UselessMod;
 import com.sorrowmist.useless.content.blocks.GlowPlasticBlock;
 import com.sorrowmist.useless.init.ModBlocks;
+import com.sorrowmist.useless.init.ModTags;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.data.PackOutput;
 import net.minecraft.tags.BlockTags;
@@ -27,6 +28,9 @@ public class UBlockTagsProvider extends BlockTagsProvider {
     @Override
     protected void addTags(HolderLookup.@NotNull Provider provider) {
         this.addMinecraftTags();
+        this.tag(ModTags.OMNIVERSAL_FURNACE_CASINGS)
+            .replace(false)
+            .add(ModBlocks.OMNIVERSAL_FURNACE_CASING.get());
     }
 
     private void addMinecraftTags() {
@@ -36,7 +40,15 @@ public class UBlockTagsProvider extends BlockTagsProvider {
             .add(ModBlocks.TELEPORT_BLOCK.get())
             .add(ModBlocks.TELEPORT_BLOCK_2.get())
             .add(ModBlocks.TELEPORT_BLOCK_3.get())
-            .add(ModBlocks.ADVANCED_ALLOY_FURNACE_BLOCK.get());
+            .add(ModBlocks.ADVANCED_ALLOY_FURNACE_BLOCK.get())
+            .add(ModBlocks.MULTIBLOCK_ALLOY_FURNACE_CORE.get())
+            .add(ModBlocks.ME_PATTERN_ASSEMBLY.get())
+            .add(ModBlocks.OMNIVERSAL_MOLD_HUB.get())
+            .add(ModBlocks.OMNIVERSAL_FURNACE_CASING.get());
+
+        for (var coil : ModBlocks.USELESS_COILS.values()) {
+            this.tag(BlockTags.MINEABLE_WITH_PICKAXE).add(coil.get());
+        }
 
         for (var entry : GlowPlasticBlock.GLOW_PLASTIC_BLOCKS.entrySet()) {
             this.tag(BlockTags.MINEABLE_WITH_PICKAXE)

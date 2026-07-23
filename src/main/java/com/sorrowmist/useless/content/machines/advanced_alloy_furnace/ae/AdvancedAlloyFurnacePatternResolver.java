@@ -8,6 +8,9 @@ import appeng.api.stacks.GenericStack;
 import appeng.crafting.pattern.AEProcessingPattern;
 import com.mojang.logging.LogUtils;
 import com.sorrowmist.useless.content.recipe.adapters.draconicevolution.DraconicFusionRecipeAdapter;
+import com.sorrowmist.useless.core.component.OmniversalPatternData;
+import com.sorrowmist.useless.core.component.UComponents;
+import com.sorrowmist.useless.init.ModItems;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.neoforged.fml.ModList;
@@ -28,6 +31,34 @@ public final class AdvancedAlloyFurnacePatternResolver {
 
     @Nullable
     public static IPatternDetails decode(ItemStack stack, Level level) {
+        if (stack == null || stack.isEmpty() || level == null) {
+            return null;
+        }
+
+        /*
+         * AE2's generic decoder deliberately catches every exception thrown by
+         * an EncodedPatternItem and returns null.  That is useful for ordinary
+         * invalid patterns, but it makes a recipe-bound omniversal pattern look
+         * exactly like an empty slot.  Decode our item explicitly so the
+         * binding can be validated and failures can be diagnosed, while still
+         * leaving all other AE2 pattern types on the normal path.
+         */
+        if (stack.is(ModItems.OMNIVERSAL_PATTERN.get())) {
+            AEItemKey definition = AEItemKey.of(stack);
+            OmniversalPatternData data = definition == null
+                    ? null
+                    : definition.get(UComponents.OMNIVERSAL_PATTERN_DATA.get());
+            try {
+                return OmniversalPatternDetails.decode(definition, level);
+            } catch (RuntimeException exception) {
+                LOGGER.warn("Ignoring invalid omniversal pattern (recipe={}, fingerprint={})",
+                        data == null ? "<missing>" : data.recipeId(),
+                        data == null ? "<missing>" : data.recipeFingerprint(),
+                        exception);
+                return null;
+            }
+        }
+
         IPatternDetails decoded = PatternDetailsHelper.decodePattern(stack, level);
         return decoded == null ? null : resolve(decoded, level);
     }

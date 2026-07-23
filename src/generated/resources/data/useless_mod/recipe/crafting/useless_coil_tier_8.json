@@ -1,0 +1,24 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "building",
+  "key": {
+    "C": {
+      "item": "minecraft:copper_ingot"
+    },
+    "I": {
+      "item": "useless_mod:useless_ingot_tier_8"
+    },
+    "R": {
+      "item": "minecraft:redstone"
+    }
+  },
+  "pattern": [
+    "CRC",
+    "RIR",
+    "CRC"
+  ],
+  "result": {
+    "count": 16,
+    "id": "useless_mod:useless_coil_tier_8"
+  }
+}

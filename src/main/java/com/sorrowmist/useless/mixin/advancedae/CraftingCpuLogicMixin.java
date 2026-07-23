@@ -13,7 +13,7 @@ import appeng.crafting.inv.ListCraftingInventory;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import com.sorrowmist.useless.compat.ae.DynamicReflectionSupport;
-import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.DynamicComponentPattern;
+import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.DynamicPatternExecution;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.DynamicPatternCpuStateManager;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.DynamicPatternInsertContext;
 import net.minecraft.core.HolderLookup;
@@ -144,9 +144,13 @@ public abstract class CraftingCpuLogicMixin {
     private boolean uselessMod$registerDynamicOutputs(
             ICraftingProvider provider, IPatternDetails details, KeyCounter[] inputHolder,
             Operation<Boolean> original) {
-        if (!AVAILABLE || !(details instanceof DynamicComponentPattern dynamic)) {
+        DynamicPatternExecution.Resolved resolved = AVAILABLE
+                ? DynamicPatternExecution.resolve(details)
+                : null;
+        if (resolved == null) {
             return original.call(provider, details, inputHolder);
         }
+        var dynamic = resolved.pattern();
         if (DynamicPatternCpuStateManager.INSTANCE.hasAmbiguousOutputRegistration(this, dynamic)) {
             return false;
         }
@@ -158,7 +162,7 @@ public abstract class CraftingCpuLogicMixin {
             if (link != null) {
                 DynamicPatternCpuStateManager.INSTANCE.registerExpectedOutputs(
                         this, link.getCraftingID(), dynamic,
-                        finalOutput == null ? null : finalOutput.what(), 1L);
+                        finalOutput == null ? null : finalOutput.what(), resolved.copies());
             }
         }
         return pushed;

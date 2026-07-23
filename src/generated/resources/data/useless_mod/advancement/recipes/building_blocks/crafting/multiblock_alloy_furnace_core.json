@@ -1,0 +1,32 @@
+{
+  "parent": "minecraft:recipes/root",
+  "criteria": {
+    "has_alloy_furnace": {
+      "conditions": {
+        "items": [
+          {
+            "items": "useless_mod:advanced_alloy_furnace_block"
+          }
+        ]
+      },
+      "trigger": "minecraft:inventory_changed"
+    },
+    "has_the_recipe": {
+      "conditions": {
+        "recipe": "useless_mod:crafting/multiblock_alloy_furnace_core"
+      },
+      "trigger": "minecraft:recipe_unlocked"
+    }
+  },
+  "requirements": [
+    [
+      "has_the_recipe",
+      "has_alloy_furnace"
+    ]
+  ],
+  "rewards": {
+    "recipes": [
+      "useless_mod:crafting/multiblock_alloy_furnace_core"
+    ]
+  }
+}

@@ -18,6 +18,11 @@ public final class FluxNetworksEnergyCompat {
                 ModBlockEntities.ADVANCED_ALLOY_FURNACE.get(),
                 (blockEntity, side) -> new FurnaceFluxEnergyStorage(blockEntity.getEnergyManager())
         );
+        event.registerBlockEntity(
+                FluxCapabilities.BLOCK,
+                ModBlockEntities.MULTIBLOCK_ALLOY_FURNACE_CORE.get(),
+                (blockEntity, side) -> new FurnaceFluxEnergyStorage(blockEntity.getEnergyManager())
+        );
     }
 
     static record FurnaceFluxEnergyStorage(IEnergyManager energy) implements IFNEnergyStorage {

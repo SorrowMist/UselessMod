@@ -2,6 +2,7 @@ package com.sorrowmist.useless.network;
 
 import com.sorrowmist.useless.UselessMod;
 import com.sorrowmist.useless.content.blockentities.AdvancedAlloyFurnaceBlockEntity;
+import com.sorrowmist.useless.content.blockentities.multiblock.MultiblockAlloyFurnaceCoreBlockEntity;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
@@ -36,6 +37,8 @@ public class RedstoneControlPacket implements CustomPacketPayload {
 
             BlockEntity be = player.level().getBlockEntity(msg.pos);
             if (be instanceof AdvancedAlloyFurnaceBlockEntity furnace) {
+                furnace.cycleRedstoneControlMode();
+            } else if (be instanceof MultiblockAlloyFurnaceCoreBlockEntity furnace) {
                 furnace.cycleRedstoneControlMode();
             }
         });

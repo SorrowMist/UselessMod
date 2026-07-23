@@ -3,6 +3,8 @@ package com.sorrowmist.useless.event;
 import com.sorrowmist.useless.UselessMod;
 import com.sorrowmist.useless.content.items.EndlessBeafItem;
 import com.sorrowmist.useless.content.recipe.AlloyFurnaceRecipeManager;
+import com.sorrowmist.useless.content.multiblock.OmniversalFurnaceAutoBuilder;
+import com.sorrowmist.useless.content.blockentities.multiblock.MultiblockAlloyFurnaceCoreBlockEntity;
 import com.sorrowmist.useless.core.common.FlyEffectedHolder;
 import com.sorrowmist.useless.core.component.UComponents;
 import com.sorrowmist.useless.core.config.ConfigManager;
@@ -223,6 +225,17 @@ public class EventHandler {
         BlockPos pos = event.getPos();
         BlockEntity be = world.getBlockEntity(pos);
         if (be == null) return;
+
+        if (be instanceof MultiblockAlloyFurnaceCoreBlockEntity) {
+            if (!world.isClientSide && player instanceof ServerPlayer serverPlayer) {
+                OmniversalFurnaceAutoBuilder.Result result =
+                        OmniversalFurnaceAutoBuilder.build(serverPlayer, stack, pos);
+                player.displayClientMessage(result.message(), true);
+            }
+            event.setCanceled(true);
+            event.setCancellationResult(InteractionResult.sidedSuccess(world.isClientSide));
+            return;
+        }
 
         String className = be.getClass().getName();
         if (!className.contains("WirelessAccessPoint")) return;

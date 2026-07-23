@@ -16,17 +16,26 @@ public final class CatalystEffectResolver {
      * 根据配方、催化剂物品和基础处理时间解析最终催化剂效果。
      */
     public static ResolvedCatalystEffect resolve(AdvancedAlloyFurnaceRecipe recipe, ItemStack catalystStack, int baseProcessTime) {
-        CatalystType catalystType = CatalystType.fromStack(catalystStack);
+        return resolveForType(recipe, CatalystType.fromStack(catalystStack), baseProcessTime);
+    }
+
+    /** Resolves the shared catalyst rules for non-item providers such as multiblock coils. */
+    public static ResolvedCatalystEffect resolveForType(
+            AdvancedAlloyFurnaceRecipe recipe, CatalystType catalystType, int baseProcessTime) {
+        CatalystType resolvedType = catalystType == null ? CatalystType.NONE : catalystType;
         int targetTier = findTargetUselessIngotTier(recipe);
         boolean uselessIngotRecipe = targetTier > 0;
-        int catalystParallel = catalystType.getNormalRecipeParallel();
-        int recipeParallel = uselessIngotRecipe ? Math.max(CatalystParallelManager.calculateParallelForUselessIngotRecipe(targetTier), catalystParallel) : catalystParallel;
+        int catalystParallel = resolvedType.getNormalRecipeParallel();
+        int recipeParallel = uselessIngotRecipe
+                ? Math.max(CatalystParallelManager.calculateParallelForUselessIngotRecipe(targetTier),
+                        catalystParallel)
+                : catalystParallel;
         return new ResolvedCatalystEffect(
-                catalystType,
+                resolvedType,
                 Math.max(1, catalystParallel),
                 Math.max(1, recipeParallel),
-                catalystType.calculateProcessTime(baseProcessTime),
-                !catalystType.isUsefulIngot(),
+                resolvedType.calculateProcessTime(baseProcessTime),
+                !resolvedType.isUsefulIngot(),
                 uselessIngotRecipe,
                 targetTier
         );

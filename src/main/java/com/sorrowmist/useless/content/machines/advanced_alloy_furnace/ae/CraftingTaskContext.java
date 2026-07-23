@@ -1,6 +1,13 @@
 package com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae;
 
 import appeng.api.stacks.AEKey;
+import appeng.api.crafting.IPatternDetails;
+import appeng.api.stacks.GenericStack;
+import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.catalyst.CatalystEffectResolver;
+import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.catalyst.ResolvedCatalystEffect;
+import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.parallel.AlloyFurnaceParallelCalculator;
+import com.sorrowmist.useless.content.recipe.AdvancedAlloyFurnaceRecipe;
+import com.sorrowmist.useless.content.recipe.AlloyFurnaceRecipeManager;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.io.FurnaceOutputPort;
 import com.sorrowmist.useless.energy.IEnergyManager;
 import net.minecraft.world.item.ItemStack;
@@ -10,6 +17,7 @@ import net.neoforged.neoforge.fluids.capability.templates.FluidTank;
 import net.neoforged.neoforge.items.ItemStackHandler;
 
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.ReentrantLock;
 
@@ -86,4 +94,52 @@ public interface CraftingTaskContext {
     ReentrantLock getCraftingLock();
     FluidTank[] getInputFluidTanks();
     FluidTank[] getOutputFluidTanks();
+
+    default AdvancedAlloyFurnaceRecipe resolveTaskRecipe(
+            IPatternDetails pattern, List<ItemStack> items, List<FluidStack> fluids,
+            List<GenericStack> keys, long operations) {
+        ItemStack mold = getItemHandler().getStackInSlot(getMoldSlot());
+        return AlloyFurnaceRecipeManager.getInstance().findRecipeForCraftingWithConstraints(
+                getLevel(), items, fluids, keys, mold,
+                AdvancedAlloyFurnacePatternPolicy.outputConstraints(pattern), operations);
+    }
+
+    default boolean isTaskRecipeAvailable(AdvancedAlloyFurnaceRecipe recipe) {
+        if (recipe == null) return false;
+        if (recipe.mold() == null || recipe.mold().isEmpty()) return true;
+        ItemStack mold = getItemHandler().getStackInSlot(getMoldSlot());
+        return !mold.isEmpty() && recipe.mold().test(mold);
+    }
+
+    default ResolvedCatalystEffect resolveTaskEffect(AdvancedAlloyFurnaceRecipe recipe) {
+        int baseTime = recipe == null ? 200 : Math.max(1, recipe.processTime());
+        return CatalystEffectResolver.resolve(recipe, getItemHandler().getStackInSlot(getCatalystSlot()), baseTime);
+    }
+
+    default int getTaskProcessTime(AdvancedAlloyFurnaceRecipe recipe, ResolvedCatalystEffect effect) {
+        return effect == null ? Math.max(1, recipe == null ? 200 : recipe.processTime())
+                : Math.max(1, effect.processTime());
+    }
+
+    default int getTaskParallel(AdvancedAlloyFurnaceRecipe recipe, ResolvedCatalystEffect effect) {
+        return recipe == null || effect == null ? 1
+                : AlloyFurnaceParallelCalculator.calculateAeTaskParallel(recipe, effect);
+    }
+
+    default boolean isTaskExecutionEnabled() {
+        return true;
+    }
+
+    default void handleUnreturnedItem(ItemStack stack) {
+        if (stack == null || stack.isEmpty() || getLevel() == null) return;
+        var pos = getBlockPos();
+        net.minecraft.world.Containers.dropItemStack(
+                getLevel(), pos.getX() + 0.5D, pos.getY() + 1.0D, pos.getZ() + 0.5D, stack);
+    }
+
+    default void handleUnreturnedFluid(FluidStack stack) {
+        if (stack == null || stack.isEmpty()) return;
+        var key = appeng.api.stacks.AEFluidKey.of(stack);
+        if (key != null) stashUnreturnedInput(key, stack.getAmount());
+    }
 }

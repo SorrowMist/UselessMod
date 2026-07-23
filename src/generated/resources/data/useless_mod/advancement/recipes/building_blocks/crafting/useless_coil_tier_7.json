@@ -1,0 +1,32 @@
+{
+  "parent": "minecraft:recipes/root",
+  "criteria": {
+    "has_the_recipe": {
+      "conditions": {
+        "recipe": "useless_mod:crafting/useless_coil_tier_7"
+      },
+      "trigger": "minecraft:recipe_unlocked"
+    },
+    "has_tier_ingot": {
+      "conditions": {
+        "items": [
+          {
+            "items": "useless_mod:useless_ingot_tier_7"
+          }
+        ]
+      },
+      "trigger": "minecraft:inventory_changed"
+    }
+  },
+  "requirements": [
+    [
+      "has_the_recipe",
+      "has_tier_ingot"
+    ]
+  ],
+  "rewards": {
+    "recipes": [
+      "useless_mod:crafting/useless_coil_tier_7"
+    ]
+  }
+}

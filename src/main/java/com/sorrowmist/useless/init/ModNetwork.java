@@ -8,6 +8,7 @@ import com.sorrowmist.useless.network.AutoIOChangePacket;
 import com.sorrowmist.useless.network.BeefInvulnerabilitySyncPacket;
 import com.sorrowmist.useless.network.BeefInvulnerabilityStatePacket;
 import com.sorrowmist.useless.network.EnchantmentSwitchPacket;
+import com.sorrowmist.useless.network.EncodeJeiOmniversalPatternPacket;
 import com.sorrowmist.useless.network.FaceModeChangePacket;
 import com.sorrowmist.useless.network.ForceKillModeSwitchPacket;
 import com.sorrowmist.useless.network.ForceBreakKeyPacket;
@@ -74,5 +75,7 @@ public class ModNetwork {
         registrar.playToServer(AEReturnOutputTogglePacket.TYPE, AEReturnOutputTogglePacket.STREAM_CODEC,
                                AEReturnOutputTogglePacket::handle
         );
+        registrar.playToServer(EncodeJeiOmniversalPatternPacket.TYPE, EncodeJeiOmniversalPatternPacket.STREAM_CODEC,
+                               EncodeJeiOmniversalPatternPacket::handle);
     }
 }

@@ -1,0 +1,24 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "building",
+  "key": {
+    "C": {
+      "item": "minecraft:chest"
+    },
+    "P": {
+      "item": "ae2:pattern_provider"
+    },
+    "R": {
+      "item": "minecraft:redstone"
+    }
+  },
+  "pattern": [
+    " R ",
+    "CPC",
+    " R "
+  ],
+  "result": {
+    "count": 1,
+    "id": "useless_mod:me_pattern_assembly"
+  }
+}

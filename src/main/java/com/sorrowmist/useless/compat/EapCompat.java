@@ -78,6 +78,11 @@ public final class EapCompat {
      * 如果是 ScaledProcessingPattern，返回翻倍倍数；否则返回 1。
      */
     public static int getMultiplier(IPatternDetails pattern) {
+        return (int) Math.min(getMultiplierLong(pattern), Integer.MAX_VALUE);
+    }
+
+    /** Returns the exact scaling factor without truncating it to an int. */
+    public static long getMultiplierLong(IPatternDetails pattern) {
         if (!isLoaded() || !(pattern instanceof ScaledProcessingPattern scaled)) return 1;
 
         // multiplier 字段为 protected，通过输出量推算
@@ -89,7 +94,7 @@ public final class EapCompat {
             long scaledAmt = outputs.getFirst().amount();
             if (origAmt > 0) {
                 long mul = scaledAmt / origAmt;
-                if (mul > 0) return (int) Math.min(mul, Integer.MAX_VALUE);
+                if (mul > 0) return mul;
             }
         }
         return 1;

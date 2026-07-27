@@ -42,6 +42,7 @@ public class ULootTableProvider extends LootTableProvider {
             this.dropSelf(ModBlocks.MULTIBLOCK_ALLOY_FURNACE_CORE.get());
             this.dropSelf(ModBlocks.ME_PATTERN_ASSEMBLY.get());
             this.dropSelf(ModBlocks.OMNIVERSAL_MOLD_HUB.get());
+            this.dropSelf(ModBlocks.PASSIVE_CRAFTING_HATCH.get());
             this.dropSelf(ModBlocks.OMNIVERSAL_FURNACE_CASING.get());
 
             for (var coil : ModBlocks.USELESS_COILS.values()) {
@@ -71,6 +72,7 @@ public class ULootTableProvider extends LootTableProvider {
             blocks.add(ModBlocks.MULTIBLOCK_ALLOY_FURNACE_CORE.get());
             blocks.add(ModBlocks.ME_PATTERN_ASSEMBLY.get());
             blocks.add(ModBlocks.OMNIVERSAL_MOLD_HUB.get());
+            blocks.add(ModBlocks.PASSIVE_CRAFTING_HATCH.get());
             blocks.add(ModBlocks.OMNIVERSAL_FURNACE_CASING.get());
             return blocks.build().toList();
         }

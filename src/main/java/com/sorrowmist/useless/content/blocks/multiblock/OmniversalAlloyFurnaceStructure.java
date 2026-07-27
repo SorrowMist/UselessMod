@@ -9,6 +9,7 @@ import net.minecraft.core.SectionPos;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.LevelReader;
 import net.minecraft.world.level.block.state.BlockState;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -41,8 +42,11 @@ public final class OmniversalAlloyFurnaceStructure {
     public record Mismatch(BlockPos worldPos, Part expected, BlockState actual) {
     }
 
-    public record ValidationResult(boolean valid, int coilTier, List<Mismatch> mismatches) {
+    public record ValidationResult(boolean valid, int coilTier,
+                                   @Nullable BlockPos passiveHatchPos,
+                                   List<Mismatch> mismatches) {
         public ValidationResult {
+            passiveHatchPos = passiveHatchPos == null ? null : passiveHatchPos.immutable();
             mismatches = List.copyOf(mismatches);
         }
     }
@@ -63,10 +67,12 @@ public final class OmniversalAlloyFurnaceStructure {
     public static ValidationResult validate(LevelReader level, BlockPos corePos, Direction facing) {
         List<Mismatch> mismatches = new ArrayList<>();
         int coilTier = 0;
+        BlockPos passiveHatchPos = null;
+        int passiveHatchCount = 0;
         for (Entry entry : ENTRIES) {
             BlockPos worldPos = entry.worldPos(corePos, facing);
             if (!isChunkLoaded(level, worldPos)) {
-                return new ValidationResult(false, 0, List.of());
+                return new ValidationResult(false, 0, null, List.of());
             }
             BlockState state = level.getBlockState(worldPos);
             if (entry.part == Part.COIL) {
@@ -81,11 +87,25 @@ public final class OmniversalAlloyFurnaceStructure {
                 }
                 continue;
             }
+            if (entry.part == Part.CASING && state.is(ModBlocks.PASSIVE_CRAFTING_HATCH.get())) {
+                passiveHatchCount++;
+                if (isPassiveHatchCountValid(passiveHatchCount)) {
+                    passiveHatchPos = worldPos.immutable();
+                } else {
+                    mismatches.add(new Mismatch(worldPos, Part.CASING, state));
+                }
+                continue;
+            }
             if (!matches(entry.part, state)) {
                 mismatches.add(new Mismatch(worldPos, entry.part, state));
             }
         }
-        return new ValidationResult(mismatches.isEmpty() && coilTier > 0, coilTier, mismatches);
+        return new ValidationResult(mismatches.isEmpty() && coilTier > 0,
+                coilTier, passiveHatchPos, mismatches);
+    }
+
+    static boolean isPassiveHatchCountValid(int count) {
+        return count >= 0 && count <= 1;
     }
 
     public static void notifyNearbyCores(Level level, BlockPos changedPos) {

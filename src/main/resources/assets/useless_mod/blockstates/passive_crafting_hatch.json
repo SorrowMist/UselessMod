@@ -1,0 +1,5 @@
+{
+  "variants": {
+    "": { "model": "useless_mod:block/passive_crafting_hatch" }
+  }
+}

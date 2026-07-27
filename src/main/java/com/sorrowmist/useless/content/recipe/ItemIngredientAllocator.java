@@ -107,7 +107,7 @@ public final class ItemIngredientAllocator {
         int low = 0;
         int high = upperLong > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) upperLong;
         while (low < high) {
-            int middle = low + (high - low + 1) / 2;
+            int middle = low + (int) (((long) high - low + 1L) / 2L);
             if (matches(requirements, inputs, middle)) {
                 low = middle;
             } else {

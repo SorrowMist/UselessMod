@@ -47,4 +47,21 @@ class RecoverableItemStackHandlerTest {
         activeSlots.set(10_000);
         assertEquals(RecoverableItemStackHandler.MAX_SLOTS, handler.getActiveSlots());
     }
+
+    @Test
+    void customCapacitySupportsZeroActiveRecoveryStorage() {
+        AtomicInteger activeSlots = new AtomicInteger(0);
+        RecoverableItemStackHandler handler = new RecoverableItemStackHandler(
+                30, 0, activeSlots::get, stack -> stack.is(Items.IRON_INGOT), () -> {});
+        handler.setStackInSlot(29, new ItemStack(Items.IRON_INGOT, 7));
+
+        assertEquals(30, handler.getSlots());
+        assertEquals(0, handler.getActiveSlots());
+        assertTrue(handler.isRecoverySlot(29));
+        assertFalse(handler.isItemValid(0, new ItemStack(Items.IRON_INGOT)));
+        assertEquals(7, handler.extractItem(29, 64, false).getCount());
+
+        activeSlots.set(33);
+        assertEquals(30, handler.getActiveSlots());
+    }
 }

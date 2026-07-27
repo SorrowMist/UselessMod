@@ -72,6 +72,8 @@ public final class MultiblockAlloyFurnaceCoreBlockEntity extends BlockEntity imp
     private boolean structureDirty = true;
     private boolean formed;
     private int coilTier;
+    @Nullable
+    private BlockPos passiveHatchPos;
     private int validationTimer;
     private long structureGeneration;
     private boolean deferredTasksLoaded;
@@ -125,11 +127,16 @@ public final class MultiblockAlloyFurnaceCoreBlockEntity extends BlockEntity imp
         // after every validation/load transition without rebuilding patterns.
         MePatternAssemblyBlockEntity assembly = getAssembly();
         if (assembly != null) assembly.refreshProviderIfReady();
-        if (!isTaskExecutionEnabled()) return;
-        drawEnergyFromAeNetwork();
-        aeManager.flushAEBatches();
-        aeManager.tickAETasks();
-        aeManager.tickUnreturnedInputs();
+        if (isTaskExecutionEnabled()) {
+            drawEnergyFromAeNetwork();
+            aeManager.flushAEBatches();
+            aeManager.tickAETasks();
+            aeManager.tickUnreturnedInputs();
+        }
+        PassiveCraftingHatchBlockEntity passiveHatch = getPassiveHatch();
+        if (passiveHatch != null) {
+            passiveHatch.serverTickFromController(this);
+        }
     }
 
     public void requestStructureValidation() {
@@ -143,9 +150,14 @@ public final class MultiblockAlloyFurnaceCoreBlockEntity extends BlockEntity imp
         Direction facing = getBlockState().getValue(MultiblockAlloyFurnaceCoreBlock.FACING);
         OmniversalAlloyFurnaceStructure.ValidationResult result =
                 OmniversalAlloyFurnaceStructure.validate(level, worldPosition, facing);
-        boolean stateChanged = formed != result.valid() || coilTier != result.coilTier();
+        int validatedCoilTier = result.valid() ? result.coilTier() : 0;
+        BlockPos validatedHatchPos = result.valid() ? result.passiveHatchPos() : null;
+        boolean stateChanged = formed != result.valid()
+                || coilTier != validatedCoilTier
+                || !java.util.Objects.equals(passiveHatchPos, validatedHatchPos);
         formed = result.valid();
-        coilTier = formed ? result.coilTier() : 0;
+        coilTier = validatedCoilTier;
+        passiveHatchPos = validatedHatchPos == null ? null : validatedHatchPos.immutable();
         if (stateChanged) {
             structureGeneration++;
             if (formed) {
@@ -169,6 +181,25 @@ public final class MultiblockAlloyFurnaceCoreBlockEntity extends BlockEntity imp
         if (assembly != null) assembly.linkController(formed ? worldPosition : null, structureGeneration);
         OmniversalMoldHubBlockEntity hub = getMoldHub(facing);
         if (hub != null) hub.linkController(formed ? worldPosition : null, structureGeneration);
+        for (OmniversalAlloyFurnaceStructure.Entry entry : OmniversalAlloyFurnaceStructure.entries()) {
+            if (entry.part() != OmniversalAlloyFurnaceStructure.Part.CASING) continue;
+            BlockPos pos = entry.worldPos(worldPosition, facing);
+            if (!level.isLoaded(pos)) continue;
+            if (level.getBlockEntity(pos) instanceof PassiveCraftingHatchBlockEntity hatch) {
+                // Keep the raw controller association while invalid so removal can still
+                // recover buffered materials. getController() performs the strict link check.
+                hatch.linkController(worldPosition, structureGeneration);
+            }
+        }
+    }
+
+    @Nullable
+    private PassiveCraftingHatchBlockEntity getPassiveHatch() {
+        if (!formed || passiveHatchPos == null || level == null || !level.isLoaded(passiveHatchPos)) {
+            return null;
+        }
+        return level.getBlockEntity(passiveHatchPos) instanceof PassiveCraftingHatchBlockEntity hatch
+                ? hatch : null;
     }
 
     @Nullable
@@ -229,6 +260,21 @@ public final class MultiblockAlloyFurnaceCoreBlockEntity extends BlockEntity imp
         aeManager.cancelAllTasks();
     }
 
+    /** Cancels every task owned by this structure before recovery data is captured. */
+    public void cancelAllTasksForRemoval() {
+        aeManager.cancelAllTasks();
+        if (level == null) return;
+        Direction facing = getBlockState().getValue(MultiblockAlloyFurnaceCoreBlock.FACING);
+        for (OmniversalAlloyFurnaceStructure.Entry entry : OmniversalAlloyFurnaceStructure.entries()) {
+            if (entry.part() != OmniversalAlloyFurnaceStructure.Part.CASING) continue;
+            BlockPos pos = entry.worldPos(worldPosition, facing);
+            if (!level.isLoaded(pos)) continue;
+            if (level.getBlockEntity(pos) instanceof PassiveCraftingHatchBlockEntity hatch) {
+                hatch.prepareForControllerRemoval(this);
+            }
+        }
+    }
+
     public MultiblockRecoveryData createRecoveryData() {
         return new MultiblockRecoveryData(
                 MultiblockRecoveryData.CURRENT_VERSION,
@@ -262,6 +308,15 @@ public final class MultiblockAlloyFurnaceCoreBlockEntity extends BlockEntity imp
 
     public long getStructureGeneration() {
         return structureGeneration;
+    }
+
+    public int getPassiveCraftingMaxParallel() {
+        return formed ? OmniversalCoilStats.forTier(coilTier).singleTaskParallel() : 1;
+    }
+
+    public boolean isPassiveHatchLinked(BlockPos pos, long generation) {
+        return formed && passiveHatchPos != null && passiveHatchPos.equals(pos)
+                && structureGeneration == generation;
     }
 
     public RedstoneControlMode getRedstoneControlMode() {
@@ -425,12 +480,23 @@ public final class MultiblockAlloyFurnaceCoreBlockEntity extends BlockEntity imp
     @Override
     public long tryOutputKeyToAE(AEKey key, long amount) {
         if (key == null || amount <= 0) return 0L;
+        AeNetworkAccess access = getAeNetworkAccess();
+        return access == null ? 0L
+                : access.storage().insert(key, amount, Actionable.MODULATE, access.source());
+    }
+
+    @Nullable
+    AeNetworkAccess getAeNetworkAccess() {
+        if (!formed) return null;
         MePatternAssemblyBlockEntity assembly = getAssembly();
-        if (assembly == null || !assembly.getMainNode().isActive()) return 0L;
+        if (assembly == null || !assembly.getMainNode().isActive()) return null;
         IGrid grid = assembly.getMainNode().getGrid();
-        if (grid == null) return 0L;
-        MEStorage storage = grid.getStorageService().getInventory();
-        return storage.insert(key, amount, Actionable.MODULATE, IActionSource.ofMachine(assembly));
+        if (grid == null) return null;
+        return new AeNetworkAccess(
+                grid.getStorageService().getInventory(), IActionSource.ofMachine(assembly));
+    }
+
+    record AeNetworkAccess(MEStorage storage, IActionSource source) {
     }
 
     private void drawEnergyFromAeNetwork() {
@@ -467,6 +533,8 @@ public final class MultiblockAlloyFurnaceCoreBlockEntity extends BlockEntity imp
         formed = tag.getBoolean("Formed");
         coilTier = tag.getInt("CoilTier");
         structureGeneration = tag.getLong("StructureGeneration");
+        passiveHatchPos = tag.contains("PassiveHatch")
+                ? BlockPos.of(tag.getLong("PassiveHatch")) : null;
         redstoneControlMode = RedstoneControlMode.byIndex(tag.getInt("RedstoneControlMode"));
         aeManager.setPatternPriority(tag.getInt("PatternPriority"));
         aeManager.readTasksTag(tag);
@@ -494,6 +562,7 @@ public final class MultiblockAlloyFurnaceCoreBlockEntity extends BlockEntity imp
         tag.putBoolean("Formed", formed);
         tag.putInt("CoilTier", coilTier);
         tag.putLong("StructureGeneration", structureGeneration);
+        if (passiveHatchPos != null) tag.putLong("PassiveHatch", passiveHatchPos.asLong());
         tag.putInt("RedstoneControlMode", redstoneControlMode.ordinal());
         tag.putInt("PatternPriority", aeManager.getPatternPriority());
         CompoundTag tasks = new CompoundTag();

@@ -5,6 +5,8 @@ import com.sorrowmist.useless.content.recipe.AdvancedAlloyFurnaceRecipe;
 import com.sorrowmist.useless.content.recipe.AlloyFurnaceRecipeCatalog;
 import com.sorrowmist.useless.init.ModBlocks;
 import com.sorrowmist.useless.init.ModTags;
+
+import appeng.menu.me.items.PatternEncodingTermMenu;
 import mezz.jei.api.IModPlugin;
 import mezz.jei.api.JeiPlugin;
 import mezz.jei.api.helpers.IGuiHelper;
@@ -16,8 +18,10 @@ import mezz.jei.api.runtime.IJeiRuntime;
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.inventory.MenuType;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
+import net.neoforged.fml.ModList;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.List;
@@ -50,11 +54,46 @@ public final class JEIPlugin implements IModPlugin {
                 List.of(new CatalystInfoCategory.CatalystInfo()));
     }
 
+
     @Override
     public void registerRecipeTransferHandlers(IRecipeTransferRegistration registration) {
+        // Only this category encodes omniversal patterns. Every other page in a pattern encoding
+        // terminal keeps falling through to ae2jeiintegration's universal handler, which JEI consults
+        // only when no category-specific handler is registered for the open menu.
         registration.addRecipeTransferHandler(
-                new OmniversalPatternJeiTransferHandler(registration.getTransferHelper()),
+                new OmniversalPatternJeiTransferHandler<>(
+                        PatternEncodingTermMenu.class,
+                        PatternEncodingTermMenu.TYPE,
+                        registration.getTransferHelper()),
                 AdvancedAlloyFurnaceRecipeCategory.TYPE);
+        registerWirelessTransferHandler(registration);
+    }
+
+    /**
+     * The wireless pattern encoding terminal is a {@link PatternEncodingTermMenu} subclass, and JEI
+     * matches handlers on the menu's exact class, so it needs its own registration. ae2wtlib is only
+     * a runtime dependency here, hence the reflective lookup; without it the wireless terminal would
+     * silently fall back to ae2jeiintegration's universal handler and encode a plain pattern.
+     */
+    @SuppressWarnings("unchecked")
+    private static void registerWirelessTransferHandler(IRecipeTransferRegistration registration) {
+        if (!ModList.get().isLoaded("ae2wtlib")) return;
+        try {
+            Class<?> menuClass = Class.forName("de.mari_023.ae2wtlib.wet.WETMenu");
+            if (!PatternEncodingTermMenu.class.isAssignableFrom(menuClass)) return;
+            var menuType = (MenuType<PatternEncodingTermMenu>) menuClass.getField("TYPE").get(null);
+            registration.addRecipeTransferHandler(
+                    new OmniversalPatternJeiTransferHandler<>(
+                            (Class<PatternEncodingTermMenu>) menuClass,
+                            menuType,
+                            registration.getTransferHelper()),
+                    AdvancedAlloyFurnaceRecipeCategory.TYPE);
+        } catch (ReflectiveOperationException | ClassCastException exception) {
+            UselessMod.LOGGER.warn(
+                    "Could not register the omniversal pattern transfer handler for ae2wtlib's wireless "
+                            + "pattern encoding terminal; it will encode plain patterns instead.",
+                    exception);
+        }
     }
 
     @Override

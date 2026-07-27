@@ -6,6 +6,7 @@ import com.sorrowmist.useless.content.menus.OmniversalPatternEncoderMenu;
 import com.sorrowmist.useless.content.menus.MePatternAssemblyMenu;
 import com.sorrowmist.useless.content.menus.OmniversalMoldHubMenu;
 import com.sorrowmist.useless.content.menus.MultiblockAlloyFurnaceMenu;
+import com.sorrowmist.useless.content.menus.PassiveCraftingHatchMenu;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.world.inventory.MenuType;
 import net.neoforged.bus.api.IEventBus;
@@ -34,6 +35,9 @@ public final class ModMenuType {
     public static final Supplier<MenuType<MultiblockAlloyFurnaceMenu>> MULTIBLOCK_ALLOY_FURNACE_MENU =
             MENU_TYPES.register("multiblock_alloy_furnace_menu",
                     () -> IMenuTypeExtension.create(MultiblockAlloyFurnaceMenu::new));
+    public static final Supplier<MenuType<PassiveCraftingHatchMenu>> PASSIVE_CRAFTING_HATCH_MENU =
+            MENU_TYPES.register("passive_crafting_hatch_menu",
+                    () -> IMenuTypeExtension.create(PassiveCraftingHatchMenu::new));
 
     private ModMenuType() {}
 

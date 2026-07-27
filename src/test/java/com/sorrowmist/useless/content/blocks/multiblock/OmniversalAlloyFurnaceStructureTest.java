@@ -91,4 +91,21 @@ class OmniversalAlloyFurnaceStructureTest {
         assertEquals(0, result.coilTier());
         assertEquals(0, blockStateReads[0]);
     }
+
+    @Test
+    void casingLayoutAllowsAtMostOnePassiveHatch() {
+        assertTrue(OmniversalAlloyFurnaceStructure.isPassiveHatchCountValid(0));
+        assertTrue(OmniversalAlloyFurnaceStructure.isPassiveHatchCountValid(1));
+        assertFalse(OmniversalAlloyFurnaceStructure.isPassiveHatchCountValid(2));
+
+        BlockPos core = new BlockPos(3, 70, -4);
+        for (Direction facing : Direction.Plane.HORIZONTAL) {
+            long casingPositions = OmniversalAlloyFurnaceStructure.entries().stream()
+                    .filter(entry -> entry.part() == OmniversalAlloyFurnaceStructure.Part.CASING)
+                    .map(entry -> entry.worldPos(core, facing))
+                    .distinct()
+                    .count();
+            assertEquals(OmniversalAlloyFurnaceStructure.CASING_COUNT, casingPositions);
+        }
+    }
 }

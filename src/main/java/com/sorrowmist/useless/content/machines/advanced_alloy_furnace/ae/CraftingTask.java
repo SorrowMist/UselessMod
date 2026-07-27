@@ -102,6 +102,10 @@ public class CraftingTask {
         return processingComplete;
     }
 
+    public boolean isAwaitingOutputFlush() {
+        return awaitingOutputFlush;
+    }
+
     public IPatternDetails getPattern() {
         return pattern;
     }
@@ -808,6 +812,23 @@ public class CraftingTask {
             task.restoreProgress(tag, registries);
         }
         return task;
+    }
+
+    /** Returns all resources owned by a task tag when its pattern can no longer be decoded. */
+    public static void returnSavedMaterials(CompoundTag tag, CraftingTaskContext context,
+                                            HolderLookup.Provider registries) {
+        List<ItemStack> items = new ArrayList<>();
+        List<FluidStack> fluids = new ArrayList<>();
+        List<OutputKey> keys = new ArrayList<>();
+        readStacks(registries, tag.getList("Inputs", Tag.TAG_COMPOUND), items, fluids, keys);
+
+        ListTag subTasksTag = tag.getList("SubTasks", Tag.TAG_COMPOUND);
+        for (int index = 0; index < subTasksTag.size(); index++) {
+            CompoundTag subTask = subTasksTag.getCompound(index);
+            readStacks(registries, subTask.getList("Inputs", Tag.TAG_COMPOUND), items, fluids, keys);
+        }
+        readStacks(registries, tag.getList("PendingOutputs", Tag.TAG_COMPOUND), items, fluids, keys);
+        returnMaterials(context, items, fluids, keys);
     }
 
     /**

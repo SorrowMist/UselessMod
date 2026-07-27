@@ -30,7 +30,8 @@ public class UBlockTagsProvider extends BlockTagsProvider {
         this.addMinecraftTags();
         this.tag(ModTags.OMNIVERSAL_FURNACE_CASINGS)
             .replace(false)
-            .add(ModBlocks.OMNIVERSAL_FURNACE_CASING.get());
+            .add(ModBlocks.OMNIVERSAL_FURNACE_CASING.get())
+            .add(ModBlocks.PASSIVE_CRAFTING_HATCH.get());
     }
 
     private void addMinecraftTags() {
@@ -44,6 +45,7 @@ public class UBlockTagsProvider extends BlockTagsProvider {
             .add(ModBlocks.MULTIBLOCK_ALLOY_FURNACE_CORE.get())
             .add(ModBlocks.ME_PATTERN_ASSEMBLY.get())
             .add(ModBlocks.OMNIVERSAL_MOLD_HUB.get())
+            .add(ModBlocks.PASSIVE_CRAFTING_HATCH.get())
             .add(ModBlocks.OMNIVERSAL_FURNACE_CASING.get());
 
         for (var coil : ModBlocks.USELESS_COILS.values()) {

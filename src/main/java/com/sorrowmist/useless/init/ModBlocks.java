@@ -9,6 +9,7 @@ import com.sorrowmist.useless.content.blocks.multiblock.MePatternAssemblyBlock;
 import com.sorrowmist.useless.content.blocks.multiblock.MultiblockAlloyFurnaceCoreBlock;
 import com.sorrowmist.useless.content.blocks.multiblock.MultiblockPartBlock;
 import com.sorrowmist.useless.content.blocks.multiblock.OmniversalMoldHubBlock;
+import com.sorrowmist.useless.content.blocks.multiblock.PassiveCraftingHatchBlock;
 import com.sorrowmist.useless.content.blocks.multiblock.UselessCoilBlock;
 import com.sorrowmist.useless.world.teleport.UselessDimTeleporter;
 import com.sorrowmist.useless.world.teleport.UselessDimTeleporter2;
@@ -74,6 +75,10 @@ public final class ModBlocks {
     public static final DeferredBlock<OmniversalMoldHubBlock> OMNIVERSAL_MOLD_HUB = BLOCKS.register(
             "omniversal_mold_hub",
             () -> new OmniversalMoldHubBlock(BlockBehaviour.Properties.of()
+                    .strength(4.0F, 1200.0F).requiresCorrectToolForDrops()));
+    public static final DeferredBlock<PassiveCraftingHatchBlock> PASSIVE_CRAFTING_HATCH = BLOCKS.register(
+            "passive_crafting_hatch",
+            () -> new PassiveCraftingHatchBlock(BlockBehaviour.Properties.of()
                     .strength(4.0F, 1200.0F).requiresCorrectToolForDrops()));
     public static final DeferredBlock<MultiblockPartBlock> OMNIVERSAL_FURNACE_CASING = BLOCKS.register(
             "omniversal_furnace_casing",

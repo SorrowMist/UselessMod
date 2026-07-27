@@ -443,8 +443,8 @@ public class AdvancedAlloyFurnaceScreen extends AbstractContainerScreen<Advanced
             int m = count / 1000000;
             return m + "M";
         } else {
-            int b = count / 1000000000;
-            return b + "B";
+            int g = count / 1000000000;
+            return g + "G";
         }
     }
 

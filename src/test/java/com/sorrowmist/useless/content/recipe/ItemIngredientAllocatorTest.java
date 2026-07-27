@@ -87,6 +87,19 @@ class ItemIngredientAllocatorTest {
     }
 
     @Test
+    void maxOperationsTerminatesWhenTotalInputExceedsIntegerRange() {
+        List<CountedIngredient> requirements = List.of(
+                new CountedIngredient(Ingredient.of(Items.IRON_INGOT), 1)
+        );
+        List<ItemStack> inputs = List.of(
+                stack(Items.IRON_INGOT, Integer.MAX_VALUE),
+                stack(Items.IRON_INGOT, Integer.MAX_VALUE)
+        );
+
+        assertEquals(Integer.MAX_VALUE, ItemIngredientAllocator.maxOperations(requirements, inputs));
+    }
+
+    @Test
     void mergeInputsPreservesDifferentComponentsOfTheSameItem() {
         ItemStack alpha = namedPaper("alpha", 2);
         ItemStack beta = namedPaper("beta", 3);

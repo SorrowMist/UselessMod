@@ -228,6 +228,9 @@ public final class ModItems {
     public static final DeferredItem<BlockItem> OMNIVERSAL_MOLD_HUB = registerAndAdd(
             "omniversal_mold_hub",
             () -> new BlockItem(ModBlocks.OMNIVERSAL_MOLD_HUB.get(), new Item.Properties()));
+    public static final DeferredItem<BlockItem> PASSIVE_CRAFTING_HATCH = registerAndAdd(
+            "passive_crafting_hatch",
+            () -> new BlockItem(ModBlocks.PASSIVE_CRAFTING_HATCH.get(), new Item.Properties()));
     public static final DeferredItem<BlockItem> OMNIVERSAL_FURNACE_CASING = registerAndAdd(
             "omniversal_furnace_casing",
             () -> new BlockItem(ModBlocks.OMNIVERSAL_FURNACE_CASING.get(), new Item.Properties()));

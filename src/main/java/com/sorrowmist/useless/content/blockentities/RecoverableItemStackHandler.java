@@ -12,18 +12,25 @@ public class RecoverableItemStackHandler extends ItemStackHandler {
     public static final int MAX_SLOTS = 540;
 
     private final IntSupplier activeSlots;
+    private final int minimumActiveSlots;
     private final Predicate<ItemStack> validator;
     private final Runnable changeListener;
 
     public RecoverableItemStackHandler(IntSupplier activeSlots, Predicate<ItemStack> validator, Runnable changeListener) {
-        super(MAX_SLOTS);
+        this(MAX_SLOTS, 27, activeSlots, validator, changeListener);
+    }
+
+    public RecoverableItemStackHandler(int capacity, int minimumActiveSlots, IntSupplier activeSlots,
+                                       Predicate<ItemStack> validator, Runnable changeListener) {
+        super(validateCapacity(capacity));
         this.activeSlots = Objects.requireNonNull(activeSlots, "activeSlots");
+        this.minimumActiveSlots = Math.max(0, Math.min(capacity, minimumActiveSlots));
         this.validator = Objects.requireNonNull(validator, "validator");
         this.changeListener = Objects.requireNonNull(changeListener, "changeListener");
     }
 
     public int getActiveSlots() {
-        return Math.max(27, Math.min(MAX_SLOTS, activeSlots.getAsInt()));
+        return Math.max(minimumActiveSlots, Math.min(getSlots(), activeSlots.getAsInt()));
     }
 
     public boolean isRecoverySlot(int slot) {
@@ -46,5 +53,12 @@ public class RecoverableItemStackHandler extends ItemStackHandler {
     @Override
     protected void onContentsChanged(int slot) {
         changeListener.run();
+    }
+
+    private static int validateCapacity(int capacity) {
+        if (capacity <= 0 || capacity > MAX_SLOTS) {
+            throw new IllegalArgumentException("Capacity must be between 1 and " + MAX_SLOTS);
+        }
+        return capacity;
     }
 }

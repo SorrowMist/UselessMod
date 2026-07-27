@@ -535,6 +535,12 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
         }
     }
 
+    public void restoreInventory(CompoundTag inventoryTag, HolderLookup.Provider registries) {
+        this.itemHandler.deserializeNBT(registries, inventoryTag);
+        this.updateMoldState();
+        this.updatePatterns();
+    }
+
     /**
      * 尝试开始新配方处理
      * <p>

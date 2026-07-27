@@ -2,6 +2,7 @@ package com.sorrowmist.useless.datagen.providers.recipes;
 
 import appeng.core.definitions.AEBlocks;
 import appeng.core.definitions.AEItems;
+import appeng.core.definitions.AEParts;
 import com.sorrowmist.useless.UselessMod;
 import com.sorrowmist.useless.api.enums.AlloyFurnaceMode;
 import com.sorrowmist.useless.api.enums.EnumColor;
@@ -177,6 +178,18 @@ public class CraftingRecipes extends RecipeProvider {
                            .define('H', Blocks.HOPPER)
                            .unlockedBy("has_hopper", has(Blocks.HOPPER))
                            .save(consumer, UselessMod.id("crafting/omniversal_mold_hub"));
+
+        ShapedRecipeBuilder.shaped(RecipeCategory.BUILDING_BLOCKS,
+                                   ModBlocks.PASSIVE_CRAFTING_HATCH.get())
+                           .pattern(" C ")
+                           .pattern("EPE")
+                           .pattern(" R ")
+                           .define('C', Items.CLOCK)
+                           .define('E', AEParts.EXPORT_BUS)
+                           .define('P', ModBlocks.ME_PATTERN_ASSEMBLY.get())
+                           .define('R', Items.REDSTONE)
+                           .unlockedBy("has_pattern_assembly", has(ModBlocks.ME_PATTERN_ASSEMBLY.get()))
+                           .save(consumer, UselessMod.id("crafting/passive_crafting_hatch"));
 
         ShapedRecipeBuilder.shaped(RecipeCategory.BUILDING_BLOCKS,
                                    ModBlocks.OMNIVERSAL_FURNACE_CASING.get(), 8)

@@ -228,7 +228,7 @@ dependencies {
     implementation "curse.maven:draconic-evolution-223565:7584459"
 
     
-    runtimeOnly "de.mari_023:ae2wtlib:19.2.5"
+    runtimeOnly "de.mari_023:ae2wtlib:19.5.1"
     //任意门
     implementation "curse.maven:tempad-514923:6517779"
     implementation "curse.maven:resourceful-lib-570073:5973188"

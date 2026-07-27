@@ -8,14 +8,16 @@ import com.sorrowmist.useless.network.AutoIOChangePacket;
 import com.sorrowmist.useless.network.BeefInvulnerabilitySyncPacket;
 import com.sorrowmist.useless.network.BeefInvulnerabilityStatePacket;
 import com.sorrowmist.useless.network.EnchantmentSwitchPacket;
-import com.sorrowmist.useless.network.EncodeJeiOmniversalPatternPacket;
 import com.sorrowmist.useless.network.FaceModeChangePacket;
 import com.sorrowmist.useless.network.ForceKillModeSwitchPacket;
 import com.sorrowmist.useless.network.ForceBreakKeyPacket;
 import com.sorrowmist.useless.network.MiningDataSyncPacket;
 import com.sorrowmist.useless.network.ModeTogglePacket;
 import com.sorrowmist.useless.network.PatternPageChangePacket;
+import com.sorrowmist.useless.network.PassiveCraftingSettingsPacket;
+import com.sorrowmist.useless.network.PassiveCraftingStatusPacket;
 import com.sorrowmist.useless.network.RedstoneControlPacket;
+import com.sorrowmist.useless.network.SelectOmniversalPatternRecipePacket;
 import com.sorrowmist.useless.network.TabKeyPressedPacket;
 import com.sorrowmist.useless.network.TankClearPacket;
 import com.sorrowmist.useless.network.ToolTypeModeSwitchPacket;
@@ -73,9 +75,15 @@ public class ModNetwork {
                                AECancelPacket::handle
         );
         registrar.playToServer(AEReturnOutputTogglePacket.TYPE, AEReturnOutputTogglePacket.STREAM_CODEC,
-                               AEReturnOutputTogglePacket::handle
-        );
-        registrar.playToServer(EncodeJeiOmniversalPatternPacket.TYPE, EncodeJeiOmniversalPatternPacket.STREAM_CODEC,
-                               EncodeJeiOmniversalPatternPacket::handle);
+                               AEReturnOutputTogglePacket::handle);
+        registrar.playToServer(SelectOmniversalPatternRecipePacket.TYPE,
+                               SelectOmniversalPatternRecipePacket.STREAM_CODEC,
+                               SelectOmniversalPatternRecipePacket::handle);
+        registrar.playToServer(PassiveCraftingSettingsPacket.TYPE,
+                               PassiveCraftingSettingsPacket.STREAM_CODEC,
+                               PassiveCraftingSettingsPacket::handle);
+        registrar.playToClient(PassiveCraftingStatusPacket.TYPE,
+                               PassiveCraftingStatusPacket.STREAM_CODEC,
+                               PassiveCraftingStatusPacket::handle);
     }
 }

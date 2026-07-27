@@ -17,20 +17,14 @@ import com.sorrowmist.useless.init.ModMenuType;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.component.DataComponents;
-import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.ListTag;
-import net.minecraft.nbt.StringTag;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.ItemInteractionResult;
 import net.minecraft.world.MenuProvider;
 import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.Items;
 import net.minecraft.world.item.context.BlockPlaceContext;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
@@ -156,32 +150,8 @@ public class AdvancedAlloyFurnaceBlock extends Block implements EntityBlock {
                     blockEntityData.putInt(NBTConstants.FURNACE_TIER, furnace.getFurnaceTier());
                     
                     // 保存物品栏（使用自定义序列化支持大堆叠）
-                    IItemHandler itemHandler = furnace.getItemHandler();
-                    if (itemHandler != null) {
-                        CompoundTag inventoryTag = new CompoundTag();
-                        ListTag itemsTag = new ListTag();
-                        for (int i = 0; i < itemHandler.getSlots(); i++) {
-                            ItemStack stack = itemHandler.getStackInSlot(i);
-                            if (!stack.isEmpty()) {
-                                CompoundTag itemTag = new CompoundTag();
-                                itemTag.putByte("Slot", (byte) i);
-                                // 保存物品ID
-                                itemTag.put("id", StringTag.valueOf(BuiltInRegistries.ITEM.getKey(stack.getItem()).toString()));
-                                // 保存真实数量（支持超过99）
-                                itemTag.putInt("RealCount", stack.getCount());
-                                // 保存组件数据（如果有）
-                                if (!stack.getComponentsPatch().isEmpty()) {
-                                    CompoundTag saved = (CompoundTag) stack.save(params.getLevel().registryAccess());
-                                    if (saved.contains("components")) {
-                                        itemTag.put("components", saved.getCompound("components"));
-                                    }
-                                }
-                                itemsTag.add(itemTag);
-                            }
-                        }
-                        inventoryTag.put("Items", itemsTag);
-                        blockEntityData.put(NBTConstants.INVENTORY, inventoryTag);
-                    }
+                    blockEntityData.put(NBTConstants.INVENTORY,
+                            furnace.getItemHandler().serializeNBT(params.getLevel().registryAccess()));
                     
                     // 保存能量
                     blockEntityData.putLong(NBTConstants.ENERGY, furnace.getEnergy());
@@ -433,33 +403,7 @@ public class AdvancedAlloyFurnaceBlock extends Block implements EntityBlock {
                 // 恢复物品栏（使用自定义格式支持大堆叠）
                 if (blockEntityData.contains(NBTConstants.INVENTORY)) {
                     CompoundTag inventoryTag = blockEntityData.getCompound(NBTConstants.INVENTORY);
-                    if (inventoryTag.contains("Items")) {
-                        ListTag itemsTag = inventoryTag.getList("Items", net.minecraft.nbt.Tag.TAG_COMPOUND);
-                        for (int i = 0; i < itemsTag.size(); i++) {
-                            CompoundTag itemTag = itemsTag.getCompound(i);
-                            int slot = itemTag.getByte("Slot") & 255;
-                            if (slot >= 0 && slot < AdvancedAlloyFurnaceLayout.TOTAL_SLOTS) {
-                                // 读取物品ID
-                                String itemId = itemTag.getString("id");
-                                Item item = BuiltInRegistries.ITEM.get(ResourceLocation.parse(itemId));
-                                if (item != Items.AIR) {
-                                    ItemStack itemStack = new ItemStack(item);
-                                    // 读取真实数量
-                                    if (itemTag.contains("RealCount")) {
-                                        itemStack.setCount(itemTag.getInt("RealCount"));
-                                    }
-                                    // 读取组件数据
-                                    if (itemTag.contains("components")) {
-                                        ItemStack parsed = ItemStack.parseOptional(level.registryAccess(), itemTag);
-                                        if (!parsed.isEmpty()) {
-                                            itemStack.applyComponents(parsed.getComponentsPatch());
-                                        }
-                                    }
-                                    furnace.setItemInSlot(slot, itemStack);
-                                }
-                            }
-                        }
-                    }
+                    furnace.restoreInventory(inventoryTag, level.registryAccess());
                 }
                 
                 // 恢复能量

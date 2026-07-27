@@ -6,6 +6,7 @@ import com.sorrowmist.useless.content.blockentities.OreGeneratorBlockEntity;
 import com.sorrowmist.useless.content.blockentities.multiblock.MePatternAssemblyBlockEntity;
 import com.sorrowmist.useless.content.blockentities.multiblock.MultiblockAlloyFurnaceCoreBlockEntity;
 import com.sorrowmist.useless.content.blockentities.multiblock.OmniversalMoldHubBlockEntity;
+import com.sorrowmist.useless.content.blockentities.multiblock.PassiveCraftingHatchBlockEntity;
 import com.sorrowmist.useless.compat.draconicevolution.DraconicOpStorageCompat;
 import com.sorrowmist.useless.compat.fluxnetworks.FluxNetworksEnergyCompat;
 import com.sorrowmist.useless.compat.mekanism.MekanismEnergyCompat;
@@ -56,6 +57,10 @@ public final class ModBlockEntities {
                 Capabilities.ItemHandler.BLOCK,
                 OMNIVERSAL_MOLD_HUB.get(),
                 (blockEntity, side) -> blockEntity.getMolds());
+        event.registerBlockEntity(
+                Capabilities.ItemHandler.BLOCK,
+                PASSIVE_CRAFTING_HATCH.get(),
+                (blockEntity, side) -> blockEntity.getPatterns());
 
         // 注册高级合金炉的能量处理能力
         event.registerBlockEntity(
@@ -116,6 +121,10 @@ public final class ModBlockEntities {
             BLOCK_ENTITY_TYPES.register("omniversal_mold_hub",
                     () -> BlockEntityType.Builder.of(OmniversalMoldHubBlockEntity::new,
                             ModBlocks.OMNIVERSAL_MOLD_HUB.get()).build(null));
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<PassiveCraftingHatchBlockEntity>> PASSIVE_CRAFTING_HATCH =
+            BLOCK_ENTITY_TYPES.register("passive_crafting_hatch",
+                    () -> BlockEntityType.Builder.of(PassiveCraftingHatchBlockEntity::new,
+                            ModBlocks.PASSIVE_CRAFTING_HATCH.get()).build(null));
 
 
 }

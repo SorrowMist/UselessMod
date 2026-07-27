@@ -1,7 +1,6 @@
 package com.sorrowmist.useless.content.menus;
 
 import appeng.api.crafting.PatternDetailsHelper;
-import appeng.core.definitions.AEItems;
 import appeng.crafting.pattern.AEProcessingPattern;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.OmniversalPatternDetails;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.OmniversalPatternEncoding;
@@ -35,7 +34,6 @@ public final class OmniversalPatternEncoderMenu extends AbstractContainerMenu {
     private final ResultContainer result = new ResultContainer();
     private List<AlloyFurnaceRecipeCatalog.Entry> candidates = List.of();
     private int selectedCandidate = -1;
-    private boolean paidJeiResult;
     private final ContainerData data = new ContainerData() {
         @Override
         public int get(int index) {
@@ -76,13 +74,8 @@ public final class OmniversalPatternEncoderMenu extends AbstractContainerMenu {
 
             @Override
             public void onTake(Player player, ItemStack stack) {
-                if (paidJeiResult) {
-                    paidJeiResult = false;
-                    result.setItem(0, ItemStack.EMPTY);
-                } else {
-                    source.removeItem(0, 1);
-                    recomputeCandidates();
-                }
+                source.removeItem(0, 1);
+                recomputeCandidates();
                 super.onTake(player, stack);
             }
         });
@@ -101,7 +94,7 @@ public final class OmniversalPatternEncoderMenu extends AbstractContainerMenu {
     @Override
     public void slotsChanged(Container container) {
         super.slotsChanged(container);
-        if (container == source && !paidJeiResult) recomputeCandidates();
+        if (container == source) recomputeCandidates();
     }
 
     private void recomputeCandidates() {
@@ -134,7 +127,7 @@ public final class OmniversalPatternEncoderMenu extends AbstractContainerMenu {
 
     @Override
     public boolean clickMenuButton(Player player, int id) {
-        if (paidJeiResult || candidates.isEmpty()) return false;
+        if (candidates.isEmpty()) return false;
         if (id == PREVIOUS_CANDIDATE) {
             selectedCandidate = selectedCandidate < 0 ? candidates.size() - 1 : selectedCandidate - 1;
         } else if (id == NEXT_CANDIDATE) {
@@ -148,44 +141,6 @@ public final class OmniversalPatternEncoderMenu extends AbstractContainerMenu {
                 source.getItem(0), candidates.get(selectedCandidate), player.level()));
         broadcastChanges();
         return true;
-    }
-
-    public boolean canAcceptJeiRecipe() {
-        return source.getItem(0).isEmpty() && result.getItem(0).isEmpty();
-    }
-
-    public boolean hasBlankPattern(Player player) {
-        if (player.getAbilities().instabuild) return true;
-        for (int slot = 0; slot < player.getInventory().getContainerSize(); slot++) {
-            if (AEItems.BLANK_PATTERN.is(player.getInventory().getItem(slot))) return true;
-        }
-        return false;
-    }
-
-    public boolean encodeJeiRecipe(AlloyFurnaceRecipeCatalog.Entry entry, Player player) {
-        if (!canAcceptJeiRecipe() || entry == null) return false;
-        ItemStack processingPattern = OmniversalPatternEncoding.createProcessingPattern(entry.recipe());
-        ItemStack encoded = OmniversalPatternEncoding.encode(processingPattern, entry, player.level());
-        if (encoded.isEmpty() || !consumeBlankPattern(player)) return false;
-        candidates = List.of(entry);
-        selectedCandidate = 0;
-        paidJeiResult = true;
-        result.setItem(0, encoded);
-        broadcastChanges();
-        return true;
-    }
-
-    private boolean consumeBlankPattern(Player player) {
-        if (player.getAbilities().instabuild) return true;
-        for (int slot = 0; slot < player.getInventory().getContainerSize(); slot++) {
-            ItemStack stack = player.getInventory().getItem(slot);
-            if (AEItems.BLANK_PATTERN.is(stack)) {
-                stack.shrink(1);
-                player.getInventory().setChanged();
-                return true;
-            }
-        }
-        return false;
     }
 
     @Override
@@ -219,9 +174,5 @@ public final class OmniversalPatternEncoderMenu extends AbstractContainerMenu {
     public void removed(Player player) {
         super.removed(player);
         clearContainer(player, source);
-        if (paidJeiResult && !result.getItem(0).isEmpty()) {
-            player.getInventory().placeItemBackInInventory(result.removeItemNoUpdate(0));
-            paidJeiResult = false;
-        }
     }
 }

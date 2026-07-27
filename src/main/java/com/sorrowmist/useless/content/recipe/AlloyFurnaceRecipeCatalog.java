@@ -5,6 +5,8 @@ import appeng.api.stacks.AEFluidKey;
 import appeng.api.stacks.AEItemKey;
 import appeng.api.stacks.AEKey;
 import appeng.api.stacks.GenericStack;
+import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.AdvancedAlloyFurnacePatternResolver;
+import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.DynamicComponentPattern;
 import com.sorrowmist.useless.content.recipe.adapters.RecipeAdapterCompatRegistry;
 import com.sorrowmist.useless.content.recipe.adapters.ae.ae2cs.CrystalGrowthRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.ae.ae2lt.AELightningTechCompatLoader;
@@ -22,6 +24,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -142,10 +145,48 @@ public final class AlloyFurnaceRecipeCatalog {
 
     public static List<Entry> findPatternCandidates(Level level, IPatternDetails pattern) {
         if (level == null || pattern == null) return List.of();
+        // Resolved once per lookup: identifying dynamic slots scans every fusion recipe, and the
+        // answer depends only on the pattern, not on the candidate being tested.
+        Set<Integer> componentAgnosticOutputs = componentAgnosticOutputSlots(pattern, level);
         return entries(level).stream()
-                .filter(entry -> matchesPattern(entry.recipe, pattern))
+                .filter(entry -> matchesPattern(entry.recipe, pattern, componentAgnosticOutputs))
                 .sorted(Comparator.comparing(entry -> entry.identity.recipeId().toString()))
                 .toList();
+    }
+
+    /**
+     * Whether the encoded contents of {@code pattern} describe {@code recipe}.
+     *
+     * <p>Used when the recipe is already known — the player picked it in JEI — so the only remaining
+     * question is whether the slots AE2 filled actually correspond to it. Unlike
+     * {@link #findPatternCandidates}, this never searches, so a recipe that shares its inputs and
+     * outputs with another one is still accepted: ambiguity was resolved by the player's click.
+     */
+    public static boolean matchesRecipe(Level level, AdvancedAlloyFurnaceRecipe recipe, IPatternDetails pattern) {
+        if (level == null || recipe == null || pattern == null) return false;
+        return matchesPattern(recipe, pattern, componentAgnosticOutputSlots(pattern, level));
+    }
+
+    /**
+     * Output slots whose components must be ignored when matching a pattern against a recipe.
+     *
+     * <p>Draconic Evolution fusion recipes copy components from the catalyst onto the result
+     * ({@code IFusionDataTransfer}), so the encoded pattern carries components that the catalogued
+     * recipe — built from the recipe's static result — cannot have. Those slots are exactly the ones
+     * the resolver already marks as item-id-only, so reuse that decision instead of relaxing every
+     * output (which would collapse recipes differing only by an output component, e.g. Productive
+     * Bees honeycomb {@code bee_type}).
+     */
+    private static Set<Integer> componentAgnosticOutputSlots(IPatternDetails pattern, Level level) {
+        IPatternDetails resolved = AdvancedAlloyFurnacePatternResolver.resolve(pattern, level);
+        if (!(resolved instanceof DynamicComponentPattern dynamic)) return Set.of();
+
+        Set<Integer> slots = new LinkedHashSet<>();
+        List<GenericStack> outputs = resolved.getOutputs();
+        for (int slot = 0; slot < outputs.size(); slot++) {
+            if (dynamic.isItemIdOutput(slot)) slots.add(slot);
+        }
+        return slots;
     }
 
     public static void invalidate() {
@@ -238,7 +279,13 @@ public final class AlloyFurnaceRecipeCatalog {
         }
     }
 
-    private static boolean matchesPattern(AdvancedAlloyFurnaceRecipe recipe, IPatternDetails pattern) {
+    // Package-private for regression testing of component-exact output matching.
+    static boolean matchesPattern(AdvancedAlloyFurnaceRecipe recipe, IPatternDetails pattern) {
+        return matchesPattern(recipe, pattern, Set.of());
+    }
+
+    private static boolean matchesPattern(AdvancedAlloyFurnaceRecipe recipe, IPatternDetails pattern,
+                                          Set<Integer> componentAgnosticOutputs) {
         PatternContents contents = PatternContents.read(pattern);
         if (contents == null) return false;
 
@@ -248,13 +295,45 @@ public final class AlloyFurnaceRecipeCatalog {
                 || !ItemIngredientAllocator.matches(recipe.inputs(), contents.items, 1L)) return false;
 
         if (!sameAmounts(contents.fluids, recipe.inputFluids())) return false;
-        if (!sameGeneric(contents.keys, recipe.keyInputs(), false)) return false;
+        if (!sameGeneric(contents.keys, recipe.keyInputs())) return false;
 
         List<GenericStack> expectedOutputs = new ArrayList<>();
         recipe.outputs().stream().map(GenericStack::fromItemStack).forEach(expectedOutputs::add);
         recipe.outputFluids().stream().map(GenericStack::fromFluidStack).forEach(expectedOutputs::add);
         expectedOutputs.addAll(recipe.keyOutputs());
-        return sameGeneric(pattern.getOutputs(), expectedOutputs, true);
+        // Outputs match component-exactly by default, mirroring the server-side identity built by
+        // AlloyFurnaceRecipeFingerprint.encodeExactOutput. Relaxing item components everywhere would
+        // collapse recipes that differ only by an output component (e.g. Productive Bees honeycomb
+        // carrying distinct bee_type values), so a single honeycomb pattern would match every bee
+        // recipe and candidate selection would pick the alphabetically-first one (black_quartz),
+        // encoding the wrong mold. Only the slots the resolver marked as item-id-only ignore
+        // components, which keeps Draconic Evolution's component-transferring fusion results working.
+        return componentAgnosticOutputs.isEmpty()
+                ? sameGeneric(pattern.getOutputs(), expectedOutputs)
+                : sameGenericIgnoringSlotComponents(
+                pattern.getOutputs(), expectedOutputs, componentAgnosticOutputs);
+    }
+
+    /**
+     * Compares outputs slot-by-slot, ignoring item components in the given slots. Slot indices are
+     * positional, so this cannot use the order-insensitive multiset comparison.
+     */
+    private static boolean sameGenericIgnoringSlotComponents(
+            List<GenericStack> patternOutputs, List<GenericStack> recipeOutputs, Set<Integer> ignoredSlots) {
+        if (patternOutputs.size() != recipeOutputs.size()) return false;
+        for (int slot = 0; slot < patternOutputs.size(); slot++) {
+            GenericStack left = patternOutputs.get(slot);
+            GenericStack right = recipeOutputs.get(slot);
+            if (left == null || right == null || left.amount() != right.amount()) return false;
+            if (!ignoredSlots.contains(slot)) {
+                if (!left.what().equals(right.what())) return false;
+            } else if (!(left.what() instanceof AEItemKey leftItem)
+                    || !(right.what() instanceof AEItemKey rightItem)
+                    || leftItem.getItem() != rightItem.getItem()) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private static boolean sameAmounts(List<FluidStack> left, List<FluidStack> right) {
@@ -265,20 +344,17 @@ public final class AlloyFurnaceRecipeCatalog {
         return leftMap.equals(rightMap);
     }
 
-    private static boolean sameGeneric(List<GenericStack> left, List<GenericStack> right, boolean relaxItemComponents) {
-        Map<Object, Long> leftMap = genericMap(left, relaxItemComponents);
-        Map<Object, Long> rightMap = genericMap(right, relaxItemComponents);
+    private static boolean sameGeneric(List<GenericStack> left, List<GenericStack> right) {
+        Map<AEKey, Long> leftMap = genericMap(left);
+        Map<AEKey, Long> rightMap = genericMap(right);
         return leftMap.equals(rightMap);
     }
 
-    private static Map<Object, Long> genericMap(List<GenericStack> stacks, boolean relaxItemComponents) {
-        Map<Object, Long> result = new LinkedHashMap<>();
+    private static Map<AEKey, Long> genericMap(List<GenericStack> stacks) {
+        Map<AEKey, Long> result = new LinkedHashMap<>();
         for (GenericStack stack : stacks) {
             if (stack == null || stack.what() == null || stack.amount() <= 0) continue;
-            Object key = relaxItemComponents && stack.what() instanceof AEItemKey itemKey
-                    ? itemKey.getItem()
-                    : stack.what();
-            result.merge(key, stack.amount(), Long::sum);
+            result.merge(stack.what(), stack.amount(), Long::sum);
         }
         return result;
     }

@@ -41,7 +41,7 @@ public final class MultiblockAlloyFurnaceCoreBlock extends Block implements Enti
     protected void onRemove(BlockState state, Level level, BlockPos pos, BlockState newState, boolean movedByPiston) {
         if (!state.is(newState.getBlock()) && !level.isClientSide
                 && level.getBlockEntity(pos) instanceof MultiblockAlloyFurnaceCoreBlockEntity core) {
-            core.cancelAllAETasks();
+            core.cancelAllTasksForRemoval();
         }
         super.onRemove(state, level, pos, newState, movedByPiston);
     }
@@ -51,7 +51,7 @@ public final class MultiblockAlloyFurnaceCoreBlock extends Block implements Enti
         List<ItemStack> drops = super.getDrops(state, params);
         if (params.getOptionalParameter(LootContextParams.BLOCK_ENTITY)
                 instanceof MultiblockAlloyFurnaceCoreBlockEntity core) {
-            core.cancelAllAETasks();
+            core.cancelAllTasksForRemoval();
             MultiblockRecoveryData recovery = core.createRecoveryData();
             if (!recovery.isEmpty()) {
                 for (ItemStack drop : drops) {

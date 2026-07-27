@@ -226,18 +226,15 @@ public class AdvancedAlloyFurnaceScreen extends AbstractContainerScreen<Advanced
     // 红石控制：152,151，14*15
     private static final int REDSTONE_CONTROL_X = 152;
     private static final int REDSTONE_CONTROL_Y = 151;
-    private static final int REDSTONE_CONTROL_WIDTH = 14;
-    private static final int REDSTONE_CONTROL_HEIGHT = 15;
+    private static final int REDSTONE_CONTROL_WIDTH = AlloyFurnaceControlIcons.WIDTH;
+    private static final int REDSTONE_CONTROL_HEIGHT = AlloyFurnaceControlIcons.HEIGHT;
 
     // ==================== AE 任务控制区域 ====================
     // 取消 AE 合成任务按钮：169,151，14*15，常态[140,283]，按下[156,283]
     private static final int CANCEL_AE_X = 169;
     private static final int CANCEL_AE_Y = 151;
-    private static final int CANCEL_AE_WIDTH = 14;
-    private static final int CANCEL_AE_HEIGHT = 15;
-    private static final int CANCEL_AE_NORMAL_U = 140;
-    private static final int CANCEL_AE_PRESSED_U = 156;
-    private static final int CANCEL_AE_V = 283;
+    private static final int CANCEL_AE_WIDTH = AlloyFurnaceControlIcons.WIDTH;
+    private static final int CANCEL_AE_HEIGHT = AlloyFurnaceControlIcons.HEIGHT;
 
     // 产物回AE切换按钮：186,151，14*15，关闭[140,301]，开启[156,301]
     private static final int AE_RETURN_X = 186;
@@ -297,23 +294,16 @@ public class AdvancedAlloyFurnaceScreen extends AbstractContainerScreen<Advanced
         if (this.menu.getBlockEntity() == null) return;
         RedstoneControlMode mode = this.menu.getBlockEntity().getRedstoneControlMode();
         if (!mode.hasOverlay()) return;
-        guiGraphics.blit(TEXTURE,
-                x + REDSTONE_CONTROL_X, y + REDSTONE_CONTROL_Y,
-                mode.getOverlayU(), AUTO_IO_OVERLAY_V,
-                REDSTONE_CONTROL_WIDTH, REDSTONE_CONTROL_HEIGHT,
-                TEXTURE_WIDTH, TEXTURE_HEIGHT);
+        AlloyFurnaceControlIcons.drawRedstone(
+                guiGraphics, x + REDSTONE_CONTROL_X, y + REDSTONE_CONTROL_Y, mode);
     }
 
     /**
      * 渲染取消AE任务按钮。
      */
     private void renderCancelAeButton(GuiGraphics guiGraphics, int x, int y) {
-        int u = this.cancelAePressed ? CANCEL_AE_PRESSED_U : CANCEL_AE_NORMAL_U;
-        guiGraphics.blit(TEXTURE,
-                x + CANCEL_AE_X, y + CANCEL_AE_Y,
-                u, CANCEL_AE_V,
-                CANCEL_AE_WIDTH, CANCEL_AE_HEIGHT,
-                TEXTURE_WIDTH, TEXTURE_HEIGHT);
+        AlloyFurnaceControlIcons.drawCancel(
+                guiGraphics, x + CANCEL_AE_X, y + CANCEL_AE_Y, cancelAePressed);
     }
 
     /**

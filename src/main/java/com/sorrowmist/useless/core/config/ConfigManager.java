@@ -124,12 +124,15 @@ public class ConfigManager {
                 .define("enable_botany_pot_rendering", true);
         CLIENT_BUILDER.pop();
 
-        SERVER_BUILDER.push("omniversal_multiblock_alloy_furnace");
+        SERVER_BUILDER.translation("useless_mod.configuration.omniversal_multiblock_alloy_furnace")
+                .push("omniversal_multiblock_alloy_furnace");
         OMNIVERSAL_PATTERN_SLOTS = SERVER_BUILDER
                 .comment("ME pattern assembly slots. Values are normalized to pages of 27.")
+                .translation("useless_mod.configuration.pattern_slots")
                 .defineInRange("pattern_slots", 108, 27, 540);
         OMNIVERSAL_MOLD_SLOTS = SERVER_BUILDER
                 .comment("Omniversal mold hub slots. Values are normalized to pages of 27.")
+                .translation("useless_mod.configuration.mold_slots")
                 .defineInRange("mold_slots", 108, 27, 540);
 
         SERVER_BUILDER.pop();

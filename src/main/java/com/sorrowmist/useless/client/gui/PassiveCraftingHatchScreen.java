@@ -5,7 +5,6 @@ import com.sorrowmist.useless.content.blockentities.multiblock.PassiveCraftingHa
 import com.sorrowmist.useless.content.menus.PassiveCraftingHatchMenu;
 import com.sorrowmist.useless.network.PassiveCraftingSettingsPacket;
 import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.network.chat.Component;
@@ -21,18 +20,13 @@ import java.util.Optional;
 
 public final class PassiveCraftingHatchScreen
         extends AbstractContainerScreen<PassiveCraftingHatchMenu> {
-    private static final int PANEL_COLOR = 0xFF20252B;
-    private static final int PANEL_EDGE = 0xFF59636E;
-    private static final int SLOT_COLOR = 0xFF101418;
-    private static final int SLOT_EDGE = 0xFF737D87;
-
     private EditBox intervalField;
     private EditBox multiplierField;
-    private Button intervalDown;
-    private Button intervalUp;
-    private Button multiplierDown;
-    private Button multiplierUp;
-    private Button applyButton;
+    private PressableAE2Button intervalDown;
+    private PressableAE2Button intervalUp;
+    private PressableAE2Button multiplierDown;
+    private PressableAE2Button multiplierUp;
+    private PressableAE2Button applyButton;
     private int lastSyncedInterval = Integer.MIN_VALUE;
     private int lastSyncedMultiplier = Integer.MIN_VALUE;
 
@@ -57,22 +51,22 @@ public final class PassiveCraftingHatchScreen
         addRenderableWidget(intervalField);
         addRenderableWidget(multiplierField);
 
-        intervalDown = addRenderableWidget(Button.builder(
-                        Component.literal("-"), button -> adjustInterval(-20))
-                .bounds(leftPos + 128, topPos + 34, 18, 14).build());
-        intervalUp = addRenderableWidget(Button.builder(
-                        Component.literal("+"), button -> adjustInterval(20))
-                .bounds(leftPos + 220, topPos + 34, 18, 14).build());
-        multiplierDown = addRenderableWidget(Button.builder(
-                        Component.literal("-"), button -> adjustMultiplier(-1))
-                .bounds(leftPos + 128, topPos + 70, 18, 14).build());
-        multiplierUp = addRenderableWidget(Button.builder(
-                        Component.literal("+"), button -> adjustMultiplier(1))
-                .bounds(leftPos + 220, topPos + 70, 18, 14).build());
-        applyButton = addRenderableWidget(Button.builder(
-                        Component.translatable("gui.useless_mod.passive_crafting.apply"),
-                        button -> sendSettings())
-                .bounds(leftPos + 128, topPos + 92, 110, 18).build());
+        intervalDown = addRenderableWidget(new PressableAE2Button(
+                leftPos + 128, topPos + 34, 18, 14,
+                Component.literal("-"), button -> adjustInterval(-20)));
+        intervalUp = addRenderableWidget(new PressableAE2Button(
+                leftPos + 220, topPos + 34, 18, 14,
+                Component.literal("+"), button -> adjustInterval(20)));
+        multiplierDown = addRenderableWidget(new PressableAE2Button(
+                leftPos + 128, topPos + 70, 18, 14,
+                Component.literal("-"), button -> adjustMultiplier(-1)));
+        multiplierUp = addRenderableWidget(new PressableAE2Button(
+                leftPos + 220, topPos + 70, 18, 14,
+                Component.literal("+"), button -> adjustMultiplier(1)));
+        applyButton = addRenderableWidget(new PressableAE2Button(
+                leftPos + 128, topPos + 92, 110, 18,
+                Component.translatable("gui.useless_mod.passive_crafting.apply"),
+                button -> sendSettings()));
         syncFields(true);
     }
 
@@ -153,7 +147,7 @@ public final class PassiveCraftingHatchScreen
 
     @Override
     public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
-        if (keyCode == GLFW.GLFW_KEY_ENTER
+        if ((keyCode == GLFW.GLFW_KEY_ENTER || keyCode == GLFW.GLFW_KEY_KP_ENTER)
                 && (intervalField.isFocused() || multiplierField.isFocused())) {
             sendSettings();
             setFocused(null);
@@ -163,23 +157,28 @@ public final class PassiveCraftingHatchScreen
     }
 
     @Override
-    protected void renderBg(GuiGraphics graphics, float partialTick, int mouseX, int mouseY) {
-        graphics.fill(leftPos, topPos, leftPos + imageWidth, topPos + imageHeight, PANEL_EDGE);
-        graphics.fill(leftPos + 1, topPos + 1,
-                leftPos + imageWidth - 1, topPos + imageHeight - 1, PANEL_COLOR);
-        graphics.fill(leftPos + 120, topPos + 18, leftPos + 246, topPos + 142, 0xFF171B20);
-
-        for (int slot = 0; slot < menu.slots.size(); slot++) {
-            Slot menuSlot = menu.slots.get(slot);
-            drawSlotBackground(graphics, menuSlot.x, menuSlot.y);
-        }
+    public boolean mouseReleased(double mouseX, double mouseY, int button) {
+        intervalDown.releaseVisualState();
+        intervalUp.releaseVisualState();
+        multiplierDown.releaseVisualState();
+        multiplierUp.releaseVisualState();
+        applyButton.releaseVisualState();
+        return super.mouseReleased(mouseX, mouseY, button);
     }
 
-    private void drawSlotBackground(GuiGraphics graphics, int x, int y) {
-        int left = leftPos + x - 1;
-        int top = topPos + y - 1;
-        graphics.fill(left, top, left + 18, top + 18, SLOT_EDGE);
-        graphics.fill(left + 1, top + 1, left + 17, top + 17, SLOT_COLOR);
+    @Override
+    protected void renderBg(GuiGraphics graphics, float partialTick, int mouseX, int mouseY) {
+        MachineScreenStyle.drawPanel(graphics, leftPos, topPos, imageWidth, imageHeight);
+        MachineScreenStyle.drawInset(graphics,
+                leftPos + 120, topPos + 18, leftPos + 246, topPos + 142);
+        MachineScreenStyle.drawSlotGroup(graphics, leftPos, topPos, 8, 22, 6, 5);
+        MachineScreenStyle.drawSlotGroup(graphics, leftPos, topPos, 44, 158, 9, 3);
+        MachineScreenStyle.drawSlotGroup(graphics, leftPos, topPos, 44, 218, 9, 1);
+
+        for (int slot = 0; slot < menu.slots.size(); slot++) {
+            MachineScreenStyle.drawSlotBackground(
+                    graphics, leftPos, topPos, menu.slots.get(slot));
+        }
     }
 
     @Override
@@ -203,30 +202,31 @@ public final class PassiveCraftingHatchScreen
         if (index >= menu.getActivePatternSlots()) {
             graphics.fill(slot.x, slot.y, slot.x + 16, slot.y + 16, 0x66000000);
             // Compact padlock glyph for withdraw-only recovery slots.
-            graphics.fill(slot.x + 11, slot.y + 2, slot.x + 15, slot.y + 7, 0xFF8E969E);
-            graphics.fill(slot.x + 12, slot.y + 1, slot.x + 14, slot.y + 3, 0xFF8E969E);
+            graphics.fill(slot.x + 11, slot.y + 2, slot.x + 15, slot.y + 7, 0xFFF2F2F2);
+            graphics.fill(slot.x + 12, slot.y + 1, slot.x + 14, slot.y + 3, 0xFFF2F2F2);
         }
     }
 
     @Override
     protected void renderLabels(GuiGraphics graphics, int mouseX, int mouseY) {
-        graphics.drawString(font, title, titleLabelX, titleLabelY, 0xFFE6EBEF, false);
+        graphics.drawString(font, title, titleLabelX, titleLabelY,
+                MachineScreenStyle.TEXT_COLOR, false);
         graphics.drawString(font, playerInventoryTitle,
-                inventoryLabelX, inventoryLabelY, 0xFFBEC6CE, false);
+                inventoryLabelX, inventoryLabelY, MachineScreenStyle.TEXT_COLOR, false);
         graphics.drawString(font,
                 Component.translatable("gui.useless_mod.passive_crafting.interval"),
-                128, 22, 0xFFBEC6CE, false);
+                128, 22, MachineScreenStyle.TEXT_COLOR, false);
         graphics.drawString(font,
                 Component.translatable("gui.useless_mod.passive_crafting.multiplier"),
-                128, 58, 0xFFBEC6CE, false);
+                128, 58, MachineScreenStyle.TEXT_COLOR, false);
         graphics.drawString(font,
                 Component.translatable("gui.useless_mod.passive_crafting.max_multiplier",
                         menu.getMaxMultiplier()),
-                128, 114, 0xFFAEB8C1, false);
+                128, 114, MachineScreenStyle.MUTED_TEXT_COLOR, false);
         graphics.drawString(font,
                 Component.translatable("gui.useless_mod.passive_crafting.countdown",
                         menu.getCountdownTicks()),
-                128, 125, 0xFFAEB8C1, false);
+                128, 125, MachineScreenStyle.MUTED_TEXT_COLOR, false);
 
         Slot hovered = hoveredSlot;
         if (hovered != null && hovered.index < PassiveCraftingHatchMenu.PATTERN_SLOTS) {
@@ -238,18 +238,18 @@ public final class PassiveCraftingHatchScreen
                 graphics.drawString(font,
                         Component.translatable("gui.useless_mod.passive_crafting.progress",
                                 status.progress(), status.maxProgress()),
-                        8, 128, 0xFFAEB8C1, false);
+                        8, 128, MachineScreenStyle.MUTED_TEXT_COLOR, false);
             }
         } else {
             Component state = Component.translatable(menu.isFormed()
                     ? "gui.useless_mod.passive_crafting.connected"
                     : "gui.useless_mod.passive_crafting.unformed");
             graphics.drawString(font, state, 8, 116,
-                    menu.isFormed() ? 0xFF72C28B : 0xFFE2A45E, false);
+                    menu.isFormed() ? 0xFF2E7D32 : 0xFFA66A00, false);
             graphics.drawString(font,
                     Component.translatable("gui.useless_mod.passive_crafting.active_slots",
                             menu.getActivePatternSlots(), PassiveCraftingHatchMenu.PATTERN_SLOTS),
-                    8, 128, 0xFFAEB8C1, false);
+                    8, 128, MachineScreenStyle.MUTED_TEXT_COLOR, false);
         }
     }
 
@@ -262,12 +262,13 @@ public final class PassiveCraftingHatchScreen
 
     private static int statusColor(PassiveCraftingHatchBlockEntity.SlotState state) {
         return switch (state) {
-            case EMPTY -> 0xFF6F7780;
-            case READY -> 0xFF65AEDD;
-            case RUNNING -> 0xFF67C587;
-            case PAUSED -> 0xFFE1AA52;
-            case WAITING_OUTPUT -> 0xFFC08AE1;
-            case MISSING_INPUT, MISSING_MOLD, AE_OFFLINE, INVALID_PATTERN -> 0xFFE16F69;
+            case EMPTY -> MachineScreenStyle.MUTED_TEXT_COLOR;
+            case READY -> 0xFF517497;
+            case RUNNING -> 0xFF2E7D32;
+            case PAUSED -> 0xFFA66A00;
+            case WAITING_OUTPUT -> 0xFF7B4EA3;
+            case MISSING_INPUT, MISSING_MOLD, AE_OFFLINE, INVALID_PATTERN ->
+                    MachineScreenStyle.ERROR_TEXT_COLOR;
         };
     }
 

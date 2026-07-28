@@ -13,6 +13,7 @@ import com.sorrowmist.useless.network.ForceKillModeSwitchPacket;
 import com.sorrowmist.useless.network.ForceBreakKeyPacket;
 import com.sorrowmist.useless.network.MiningDataSyncPacket;
 import com.sorrowmist.useless.network.ModeTogglePacket;
+import com.sorrowmist.useless.network.MultiblockAlloyFurnaceEnergyLimitPacket;
 import com.sorrowmist.useless.network.PatternPageChangePacket;
 import com.sorrowmist.useless.network.PassiveCraftingSettingsPacket;
 import com.sorrowmist.useless.network.PassiveCraftingStatusPacket;
@@ -82,6 +83,9 @@ public class ModNetwork {
         registrar.playToServer(PassiveCraftingSettingsPacket.TYPE,
                                PassiveCraftingSettingsPacket.STREAM_CODEC,
                                PassiveCraftingSettingsPacket::handle);
+        registrar.playToServer(MultiblockAlloyFurnaceEnergyLimitPacket.TYPE,
+                               MultiblockAlloyFurnaceEnergyLimitPacket.STREAM_CODEC,
+                               MultiblockAlloyFurnaceEnergyLimitPacket::handle);
         registrar.playToClient(PassiveCraftingStatusPacket.TYPE,
                                PassiveCraftingStatusPacket.STREAM_CODEC,
                                PassiveCraftingStatusPacket::handle);

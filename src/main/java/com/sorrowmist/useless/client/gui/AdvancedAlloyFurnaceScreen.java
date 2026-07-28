@@ -1073,7 +1073,7 @@ public class AdvancedAlloyFurnaceScreen extends AbstractContainerScreen<Advanced
                 String productName = taskProgress.getProductName();
                 int taskProgressVal = taskProgress.getProgress();
                 int taskMaxProgress = taskProgress.getMaxProgress();
-                int totalOutputCount = taskProgress.getTotalOutputCount();
+                long totalOutputCount = taskProgress.getTotalOutputCount();
                 String statusKey = taskProgress.getStatusKey();
                 String statusDetail = taskProgress.getStatusDetail();
 

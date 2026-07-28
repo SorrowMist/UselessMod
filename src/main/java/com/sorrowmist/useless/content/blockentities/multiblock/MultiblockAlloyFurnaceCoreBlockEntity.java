@@ -16,12 +16,12 @@ import appeng.api.stacks.KeyCounter;
 import appeng.api.storage.MEStorage;
 import com.sorrowmist.useless.api.enums.RedstoneControlMode;
 import com.sorrowmist.useless.compat.AppFluxCompat;
-import com.sorrowmist.useless.compat.EapCompat;
 import com.sorrowmist.useless.content.blocks.multiblock.MultiblockAlloyFurnaceCoreBlock;
 import com.sorrowmist.useless.content.blocks.multiblock.OmniversalAlloyFurnaceStructure;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.AdvancedAlloyFurnaceAeManager;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.AlloyFurnaceAeHost;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.OmniversalPatternDetails;
+import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.SmartDoublingPatterns;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.catalyst.ResolvedCatalystEffect;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.parallel.AlloyFurnaceParallelCalculator;
 import com.sorrowmist.useless.content.multiblock.OmniversalCoilStats;
@@ -36,6 +36,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.Tag;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BlockEntity;
@@ -62,7 +63,7 @@ import java.util.concurrent.locks.ReentrantLock;
 /** Controller, energy store and persistent task owner for the multiblock furnace. */
 public final class MultiblockAlloyFurnaceCoreBlockEntity extends BlockEntity implements AlloyFurnaceAeHost, MenuProvider {
     private static final int SAFETY_REVALIDATION_TICKS = 40;
-    public static final int MENU_DATA_COUNT = 9;
+    public static final int MENU_DATA_COUNT = 11;
     private static final ItemStackHandler EMPTY_ITEMS = new ItemStackHandler(0);
     private static final FluidTank[] EMPTY_TANKS = new FluidTank[0];
 
@@ -80,11 +81,13 @@ public final class MultiblockAlloyFurnaceCoreBlockEntity extends BlockEntity imp
     private long recipeCatalogGeneration = -1L;
     private boolean unloading;
     private RedstoneControlMode redstoneControlMode = RedstoneControlMode.DISABLED;
+    private long automaticEnergyLimit = Long.MAX_VALUE;
     private final ContainerData menuData = new ContainerData() {
         @Override
         public int get(int index) {
             long stored = energy.getEnergyStoredLong();
             long capacity = energy.getMaxEnergyStoredLong();
+            long energyLimit = getAutomaticEnergyLimit();
             return switch (index) {
                 case 0 -> formed ? 1 : 0;
                 case 1 -> coilTier;
@@ -95,6 +98,8 @@ public final class MultiblockAlloyFurnaceCoreBlockEntity extends BlockEntity imp
                 case 6 -> aeManager.getActiveAETaskCount();
                 case 7 -> redstoneControlMode.ordinal();
                 case 8 -> getMaxAETaskCount();
+                case 9 -> (int) energyLimit;
+                case 10 -> (int) (energyLimit >>> 32);
                 default -> 0;
             };
         }
@@ -374,14 +379,14 @@ public final class MultiblockAlloyFurnaceCoreBlockEntity extends BlockEntity imp
 
     @Override
     public boolean acceptsPattern(IPatternDetails pattern) {
-        return EapCompat.unwrap(pattern) instanceof OmniversalPatternDetails;
+        return SmartDoublingPatterns.unwrap(pattern) instanceof OmniversalPatternDetails;
     }
 
     @Override
     public AdvancedAlloyFurnaceRecipe resolveTaskRecipe(
             IPatternDetails pattern, List<ItemStack> items, List<FluidStack> fluids,
             List<GenericStack> keys, long operations) {
-        IPatternDetails original = EapCompat.unwrap(pattern);
+        IPatternDetails original = SmartDoublingPatterns.unwrap(pattern);
         return original instanceof OmniversalPatternDetails omniversal ? omniversal.recipe() : null;
     }
 
@@ -428,6 +433,17 @@ public final class MultiblockAlloyFurnaceCoreBlockEntity extends BlockEntity imp
     @Override
     public IEnergyManager getEnergyManager() { return energy; }
     public IEnergyManager getEnergyStorage() { return energy; }
+    public long getAutomaticEnergyLimit() {
+        return clampAutomaticEnergyLimit(automaticEnergyLimit, energy.getMaxEnergyStoredLong());
+    }
+
+    public void setAutomaticEnergyLimit(long limit) {
+        if (limit < 0L) return;
+        long clampedLimit = clampAutomaticEnergyLimit(limit, energy.getMaxEnergyStoredLong());
+        if (automaticEnergyLimit == clampedLimit) return;
+        automaticEnergyLimit = clampedLimit;
+        setChanged();
+    }
     @Override
     public void markChanged() { setChanged(); }
     @Override
@@ -505,7 +521,9 @@ public final class MultiblockAlloyFurnaceCoreBlockEntity extends BlockEntity imp
         if (!drawAppflux && !drawAe) return;
         MePatternAssemblyBlockEntity assembly = getAssembly();
         if (assembly == null || !assembly.getMainNode().isActive()) return;
-        long wanted = energy.receiveEnergy(Long.MAX_VALUE, true);
+        long wanted = calculateAutomaticEnergyRequest(
+                energy.getEnergyStoredLong(), energy.getMaxEnergyStoredLong(),
+                energy.getMaxReceiveLong(), automaticEnergyLimit);
         IGrid grid = assembly.getMainNode().getGrid();
         if (wanted <= 0 || grid == null) return;
         IActionSource source = IActionSource.ofMachine(assembly);
@@ -526,6 +544,17 @@ public final class MultiblockAlloyFurnaceCoreBlockEntity extends BlockEntity imp
         }
     }
 
+    static long calculateAutomaticEnergyRequest(
+            long stored, long capacity, long maxReceive, long configuredLimit) {
+        long effectiveLimit = clampAutomaticEnergyLimit(configuredLimit, capacity);
+        if (stored >= effectiveLimit) return 0L;
+        return Math.min(Math.max(0L, maxReceive), effectiveLimit - Math.max(0L, stored));
+    }
+
+    static long clampAutomaticEnergyLimit(long requested, long capacity) {
+        return Math.min(Math.max(0L, requested), Math.max(0L, capacity));
+    }
+
     @Override
     protected void loadAdditional(CompoundTag tag, HolderLookup.Provider registries) {
         super.loadAdditional(tag, registries);
@@ -536,6 +565,9 @@ public final class MultiblockAlloyFurnaceCoreBlockEntity extends BlockEntity imp
         passiveHatchPos = tag.contains("PassiveHatch")
                 ? BlockPos.of(tag.getLong("PassiveHatch")) : null;
         redstoneControlMode = RedstoneControlMode.byIndex(tag.getInt("RedstoneControlMode"));
+        automaticEnergyLimit = tag.contains("AutomaticEnergyLimit", Tag.TAG_ANY_NUMERIC)
+                ? Math.max(0L, tag.getLong("AutomaticEnergyLimit"))
+                : Long.MAX_VALUE;
         aeManager.setPatternPriority(tag.getInt("PatternPriority"));
         aeManager.readTasksTag(tag);
         structureDirty = true;
@@ -564,6 +596,7 @@ public final class MultiblockAlloyFurnaceCoreBlockEntity extends BlockEntity imp
         tag.putLong("StructureGeneration", structureGeneration);
         if (passiveHatchPos != null) tag.putLong("PassiveHatch", passiveHatchPos.asLong());
         tag.putInt("RedstoneControlMode", redstoneControlMode.ordinal());
+        tag.putLong("AutomaticEnergyLimit", automaticEnergyLimit);
         tag.putInt("PatternPriority", aeManager.getPatternPriority());
         CompoundTag tasks = new CompoundTag();
         aeManager.saveTasks(tasks, registries);

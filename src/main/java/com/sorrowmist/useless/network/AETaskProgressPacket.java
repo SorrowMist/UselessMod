@@ -20,17 +20,17 @@ public record AETaskProgressPacket(BlockPos pos, List<AETaskProgressPacket.TaskP
         public final String productName;
         public final int progress;
         public final int maxProgress;
-        public final int craftCount;
-        public final int totalOutputCount;
+        public final long craftCount;
+        public final long totalOutputCount;
         public final String statusKey;
         public final String statusDetail;
 
-        public TaskProgressData(String productName, int progress, int maxProgress, int craftCount, int totalOutputCount) {
+        public TaskProgressData(String productName, int progress, int maxProgress, long craftCount, long totalOutputCount) {
             this(productName, progress, maxProgress, craftCount, totalOutputCount,
                     "gui.useless_mod.advanced_alloy_furnace.ae_task_status.processing", "");
         }
 
-        public TaskProgressData(String productName, int progress, int maxProgress, int craftCount, int totalOutputCount, String statusKey, String statusDetail) {
+        public TaskProgressData(String productName, int progress, int maxProgress, long craftCount, long totalOutputCount, String statusKey, String statusDetail) {
             this.productName = productName;
             this.progress = progress;
             this.maxProgress = maxProgress;
@@ -56,8 +56,8 @@ public record AETaskProgressPacket(BlockPos pos, List<AETaskProgressPacket.TaskP
             buf.writeUtf(task.productName);
             buf.writeInt(task.progress);
             buf.writeInt(task.maxProgress);
-            buf.writeInt(task.craftCount);
-            buf.writeInt(task.totalOutputCount);
+            buf.writeLong(task.craftCount);
+            buf.writeLong(task.totalOutputCount);
             buf.writeUtf(task.statusKey);
             buf.writeUtf(task.statusDetail);
         }
@@ -71,8 +71,8 @@ public record AETaskProgressPacket(BlockPos pos, List<AETaskProgressPacket.TaskP
             String productName = buf.readUtf();
             int progress = buf.readInt();
             int maxProgress = buf.readInt();
-            int craftCount = buf.readInt();
-            int totalOutputCount = buf.readInt();
+            long craftCount = buf.readLong();
+            long totalOutputCount = buf.readLong();
             String statusKey = buf.readUtf();
             String statusDetail = buf.readUtf();
             tasks.add(new TaskProgressData(productName, progress, maxProgress, craftCount, totalOutputCount, statusKey, statusDetail));

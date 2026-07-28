@@ -10,7 +10,7 @@ import java.util.Objects;
 
 /**
  * Describes how an AE pattern output identifies a converted furnace recipe.
- * Amounts are intentionally excluded because EAP scaling is represented by the
+ * Amounts are intentionally excluded because smart-doubling scaling is represented by the
  * operation count rather than by a different recipe identity.
  */
 public record RecipeOutputConstraint(AEKey key, MatchMode matchMode) {

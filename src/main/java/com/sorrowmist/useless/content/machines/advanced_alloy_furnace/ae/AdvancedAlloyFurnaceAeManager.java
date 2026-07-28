@@ -8,7 +8,6 @@ import appeng.api.stacks.AEKey;
 import appeng.api.stacks.GenericStack;
 import appeng.api.stacks.KeyCounter;
 import com.mojang.logging.LogUtils;
-import com.sorrowmist.useless.compat.EapCompat;
 import com.sorrowmist.useless.network.AETaskProgressPacket;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
@@ -47,7 +46,7 @@ public final class AdvancedAlloyFurnaceAeManager {
     private final ReentrantLock craftingLock = new ReentrantLock();
     private final ConcurrentHashMap<Integer, AETaskProgress> aeTaskProgressMap = new ConcurrentHashMap<>();
     private final List<AETaskProgress> clientTaskProgressList = new ArrayList<>();
-    private final Map<PatternExecutionKey, PendingAEBatch> aePendingBatches = new HashMap<>();
+    private final Map<PendingPatternExecutionKey, PendingAEBatch> aePendingBatches = new HashMap<>();
     private final List<IPatternDetails> patterns = new ArrayList<>();
     private final AtomicInteger activeAETaskCount = new AtomicInteger(0);
     private final AtomicInteger totalAEProgress = new AtomicInteger(0);
@@ -214,8 +213,8 @@ public final class AdvancedAlloyFurnaceAeManager {
             for (int i = 0; i < pendingTag.size(); i++) {
                 PendingAEBatch batch = PendingAEBatch.load(pendingTag.getCompound(i), level, registries);
                 if (batch != null && batch.pattern != null) {
-                    this.aePendingBatches.put(PatternExecutionKey.of(
-                            batch.pattern, batch.getComponentInputKeys()), batch);
+                    this.aePendingBatches.put(PendingPatternExecutionKey.of(
+                            batch.pattern, batch.operationsPerPush, batch.getComponentInputKeys()), batch);
                 }
             }
         }
@@ -296,8 +295,8 @@ public final class AdvancedAlloyFurnaceAeManager {
     }
 
     public boolean pushPattern(IPatternDetails patternDetails, KeyCounter[] inputHolder) {
-        // EAP 翻倍样板回退：ScaledProcessingPattern -> 原始样板
-        IPatternDetails original = EapCompat.unwrap(patternDetails);
+        SmartDoublingPatterns.Resolved execution = SmartDoublingPatterns.resolve(patternDetails);
+        IPatternDetails original = execution.pattern();
 
         if (this.owner.getMainNode() == null || !this.owner.getMainNode().isActive()
                 || !this.patterns.contains(original)) {
@@ -305,7 +304,8 @@ public final class AdvancedAlloyFurnaceAeManager {
         }
 
         synchronized (this.aePendingBatches) {
-            PendingAEBatch batch = this.findOrCreateBatch(patternDetails, inputHolder);
+            PendingAEBatch batch = this.findOrCreateBatch(
+                    original, execution.operationsPerPush(), inputHolder);
             batch.add(inputHolder);
         }
         this.sendAETaskProgressToClients();
@@ -322,19 +322,21 @@ public final class AdvancedAlloyFurnaceAeManager {
             var it = this.aePendingBatches.entrySet().iterator();
             while (it.hasNext()) {
                 var entry = it.next();
-                mergeTarget = this.findExistingTask(entry.getKey());
+                PendingAEBatch pending = entry.getValue();
+                mergeTarget = this.findExistingTask(PatternExecutionKey.of(
+                        pending.pattern, pending.getComponentInputKeys()));
                 if (mergeTarget != null) {
-                    List<KeyCounter[]> inputs = entry.getValue().drain();
+                    List<KeyCounter[]> inputs = pending.drain();
                     if (inputs.isEmpty()) {
                         it.remove();
                         continue;
                     }
-                    if (mergeTarget.addMergedBatch(inputs)) {
+                    if (mergeTarget.addMergedBatch(inputs, pending.operationsPerPush)) {
                         it.remove();
                     } else {
-                        entry.getValue().statusKey = "gui.useless_mod.advanced_alloy_furnace.ae_task_status.queued";
-                        entry.getValue().statusDetail = "";
-                        entry.getValue().allInputs.addAll(inputs);
+                        pending.statusKey = "gui.useless_mod.advanced_alloy_furnace.ae_task_status.queued";
+                        pending.statusDetail = "";
+                        pending.allInputs.addAll(inputs);
                     }
                 }
             }
@@ -449,7 +451,6 @@ public final class AdvancedAlloyFurnaceAeManager {
                 try {
                     IPatternDetails pattern = AdvancedAlloyFurnacePatternResolver.decode(stack, level);
                     if (pattern != null && this.owner.acceptsPattern(pattern)) {
-                        EapCompat.tryMarkPatternForScaling(pattern);
                         this.patterns.add(pattern);
                         decoded++;
                     } else {
@@ -548,15 +549,16 @@ public final class AdvancedAlloyFurnaceAeManager {
     }
 
     private PendingAEBatch findOrCreateBatch(
-            IPatternDetails patternDetails, @org.jetbrains.annotations.Nullable KeyCounter[] inputHolder) {
-        PatternExecutionKey key = PatternExecutionKey.of(
-                patternDetails,
+            IPatternDetails patternDetails, long operationsPerPush,
+            @org.jetbrains.annotations.Nullable KeyCounter[] inputHolder) {
+        PendingPatternExecutionKey key = PendingPatternExecutionKey.of(
+                patternDetails, operationsPerPush,
                 AdvancedAlloyFurnacePatternPolicy.componentInputKeys(patternDetails, inputHolder));
         PendingAEBatch existing = this.aePendingBatches.get(key);
         if (existing != null) {
             return existing;
         }
-        PendingAEBatch batch = new PendingAEBatch(patternDetails);
+        PendingAEBatch batch = new PendingAEBatch(patternDetails, operationsPerPush);
         this.aePendingBatches.put(key, batch);
         return batch;
     }
@@ -564,7 +566,8 @@ public final class AdvancedAlloyFurnaceAeManager {
     private void requeueBatch(PendingAEBatch batch) {
         synchronized (this.aePendingBatches) {
             KeyCounter[] firstInput = batch.allInputs.isEmpty() ? null : batch.allInputs.getFirst();
-            PendingAEBatch target = this.findOrCreateBatch(batch.pattern, firstInput);
+            PendingAEBatch target = this.findOrCreateBatch(
+                    batch.pattern, batch.operationsPerPush, firstInput);
             target.allInputs.addAll(batch.allInputs);
             target.statusKey = batch.statusKey;
             target.statusDetail = batch.statusDetail;
@@ -586,10 +589,8 @@ public final class AdvancedAlloyFurnaceAeManager {
         KeyCounter[] merged = this.mergeKeyCounters(allInputs);
 
         int taskId = this.nextTaskId++;
-        // EAP 翻倍：用原始样板 + 缩放后的 craftCount（long 运算防溢出，按 int 上限饱和）
-        IPatternDetails taskPattern = EapCompat.unwrap(batch.pattern);
-        int multiplier = EapCompat.getMultiplier(batch.pattern);
-        int totalCrafts = (int) Math.min((long) allInputs.size() * multiplier, Integer.MAX_VALUE);
+        IPatternDetails taskPattern = batch.pattern;
+        long totalCrafts = calculateTotalCrafts(allInputs.size(), batch.operationsPerPush);
 
         CraftingTask task = new CraftingTask(taskId, taskPattern, merged, totalCrafts, this.owner);
         if (!task.canStartNow()) {
@@ -614,7 +615,8 @@ public final class AdvancedAlloyFurnaceAeManager {
             for (KeyCounter counter : counters) {
                 if (counter == null) continue;
                 for (var entry : counter) {
-                    merged.merge(entry.getKey(), entry.getLongValue(), Long::sum);
+                    merged.merge(entry.getKey(), entry.getLongValue(),
+                            AdvancedAlloyFurnaceAeManager::saturatingAdd);
                 }
             }
         }
@@ -640,12 +642,12 @@ public final class AdvancedAlloyFurnaceAeManager {
     }
 
     private AETaskProgress createPendingProgress(PendingAEBatch batch) {
-        int craftCount = Math.max(1, batch.allInputs.size());
+        long craftCount = calculateTotalCrafts(batch.allInputs.size(), batch.operationsPerPush);
         long outputAmount = 1L;
         if (batch.pattern != null && !batch.pattern.getOutputs().isEmpty()) {
             outputAmount = batch.pattern.getOutputs().getFirst().amount();
         }
-        int totalOutputCount = outputAmount * craftCount > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) (outputAmount * craftCount);
+        long totalOutputCount = saturatingMultiply(outputAmount, craftCount);
         return new AETaskProgress(this.getPatternProductName(batch.pattern), 0, 1, craftCount, totalOutputCount,
                 batch.statusKey, batch.statusDetail);
     }
@@ -660,25 +662,25 @@ public final class AdvancedAlloyFurnaceAeManager {
     // AE任务进度信息类
     public static class AETaskProgress {
         private final String productName;
-        private final int outputCount; // 单次产出数量
+        private final long outputCount; // 单次产出数量
         private volatile int progress;
         private volatile int maxProgress;
-        private volatile int craftCount;
-        private volatile int totalOutputCount; // 最终产物总数 = 合成次数 × 单次产出数量
+        private volatile long craftCount;
+        private volatile long totalOutputCount; // 最终产物总数 = 合成次数 × 单次产出数量
         private volatile String statusKey;
         private volatile String statusDetail;
 
-        public AETaskProgress(String productName, int maxProgress, int craftCount, int totalOutputCount) {
+        public AETaskProgress(String productName, int maxProgress, long craftCount, long totalOutputCount) {
             this(productName, 0, maxProgress, craftCount, totalOutputCount,
                     "gui.useless_mod.advanced_alloy_furnace.ae_task_status.processing", "");
         }
 
-        public AETaskProgress(String productName, int progress, int maxProgress, int craftCount, int totalOutputCount) {
+        public AETaskProgress(String productName, int progress, int maxProgress, long craftCount, long totalOutputCount) {
             this(productName, progress, maxProgress, craftCount, totalOutputCount,
                     "gui.useless_mod.advanced_alloy_furnace.ae_task_status.processing", "");
         }
 
-        public AETaskProgress(String productName, int progress, int maxProgress, int craftCount, int totalOutputCount, String statusKey, String statusDetail) {
+        public AETaskProgress(String productName, int progress, int maxProgress, long craftCount, long totalOutputCount, String statusKey, String statusDetail) {
             this.productName = productName;
             this.progress = progress;
             this.maxProgress = maxProgress;
@@ -699,9 +701,9 @@ public final class AdvancedAlloyFurnaceAeManager {
 
         public void setMaxProgress(int maxProgress) {this.maxProgress = maxProgress;}
 
-        public int getCraftCount() {return craftCount;}
+        public long getCraftCount() {return craftCount;}
 
-        public int getTotalOutputCount() {return totalOutputCount;}
+        public long getTotalOutputCount() {return totalOutputCount;}
 
         public String getStatusKey() {return statusKey;}
 
@@ -712,22 +714,24 @@ public final class AdvancedAlloyFurnaceAeManager {
             this.statusDetail = statusDetail;
         }
 
-        // 更新合成次数和最终产物总数（用于任务合并；long 运算防 512M 级溢出）
-        public void updateCraftCount(int newCraftCount) {
+        // 更新合成次数和最终产物总数（用于任务合并）。
+        public void updateCraftCount(long newCraftCount) {
             this.craftCount = newCraftCount;
-            this.totalOutputCount = (int) Math.min((long) newCraftCount * outputCount, Integer.MAX_VALUE);
+            this.totalOutputCount = saturatingMultiply(newCraftCount, outputCount);
         }
     }
 
-    private static final class PendingAEBatch {
+    static final class PendingAEBatch {
         final IPatternDetails pattern;
+        final long operationsPerPush;
         final List<KeyCounter[]> allInputs = new ArrayList<>();
         int ripeTimer = BATCH_RIPE_TICKS;
         String statusKey = "gui.useless_mod.advanced_alloy_furnace.ae_task_status.queued";
         String statusDetail = "";
 
-        PendingAEBatch(IPatternDetails pattern) {
+        PendingAEBatch(IPatternDetails pattern, long operationsPerPush) {
             this.pattern = pattern;
+            this.operationsPerPush = Math.max(1L, operationsPerPush);
         }
 
         void add(KeyCounter[] input) {
@@ -749,6 +753,7 @@ public final class AdvancedAlloyFurnaceAeManager {
             }
             CompoundTag tag = new CompoundTag();
             tag.put("Pattern", this.pattern.getDefinition().toTag(registries));
+            tag.putLong("OperationsPerPush", this.operationsPerPush);
             ListTag craftsTag = new ListTag();
             for (KeyCounter[] counters : this.allInputs) {
                 craftsTag.add(writeKeyCounters(registries, counters));
@@ -767,7 +772,10 @@ public final class AdvancedAlloyFurnaceAeManager {
             if (pattern == null) {
                 return null;
             }
-            PendingAEBatch batch = new PendingAEBatch(pattern);
+            long operationsPerPush = tag.contains("OperationsPerPush", Tag.TAG_ANY_NUMERIC)
+                    ? Math.max(1L, tag.getLong("OperationsPerPush"))
+                    : 1L;
+            PendingAEBatch batch = new PendingAEBatch(pattern, operationsPerPush);
             ListTag craftsTag = tag.getList("Crafts", Tag.TAG_COMPOUND);
             for (int i = 0; i < craftsTag.size(); i++) {
                 batch.allInputs.add(readKeyCounters(registries, craftsTag.getCompound(i)));
@@ -810,13 +818,29 @@ public final class AdvancedAlloyFurnaceAeManager {
         return new KeyCounter[]{counter};
     }
 
-    /** 完整样板定义与 EAP 倍率共同标识批次，不能只按输出合并。 */
-    private record PatternKey(@org.jetbrains.annotations.Nullable AEItemKey definition, int multiplier) {
+    private record PatternKey(@org.jetbrains.annotations.Nullable AEItemKey definition) {
         static PatternKey of(IPatternDetails pattern) {
-            if (pattern == null) return new PatternKey(null, 1);
-            IPatternDetails original = EapCompat.unwrap(pattern);
-            return new PatternKey(original.getDefinition(), Math.max(1, EapCompat.getMultiplier(pattern)));
+            if (pattern == null) return new PatternKey(null);
+            return new PatternKey(SmartDoublingPatterns.unwrap(pattern).getDefinition());
         }
+    }
+
+    static long calculateTotalCrafts(long batchSize, long multiplier) {
+        return saturatingMultiply(Math.max(0L, batchSize), Math.max(1L, multiplier));
+    }
+
+    private static long saturatingMultiply(long amount, long multiplier) {
+        if (amount <= 0L || multiplier <= 0L) {
+            return 0L;
+        }
+        return amount > Long.MAX_VALUE / multiplier ? Long.MAX_VALUE : amount * multiplier;
+    }
+
+    private static long saturatingAdd(long left, long right) {
+        if (right > 0L && left > Long.MAX_VALUE - right) {
+            return Long.MAX_VALUE;
+        }
+        return left + right;
     }
 
     private record PatternExecutionKey(PatternKey pattern, Set<AEKey> componentInputKeys) {
@@ -826,6 +850,21 @@ public final class AdvancedAlloyFurnaceAeManager {
 
         static PatternExecutionKey of(IPatternDetails pattern, Set<AEKey> componentInputKeys) {
             return new PatternExecutionKey(PatternKey.of(pattern), componentInputKeys);
+        }
+    }
+
+    /** Pending batches keep their per-push multiplier separate from active-task identity. */
+    private record PendingPatternExecutionKey(
+            PatternKey pattern, long operationsPerPush, Set<AEKey> componentInputKeys) {
+        private PendingPatternExecutionKey {
+            operationsPerPush = Math.max(1L, operationsPerPush);
+            componentInputKeys = componentInputKeys == null ? Set.of() : Set.copyOf(componentInputKeys);
+        }
+
+        static PendingPatternExecutionKey of(
+                IPatternDetails pattern, long operationsPerPush, Set<AEKey> componentInputKeys) {
+            return new PendingPatternExecutionKey(
+                    PatternKey.of(pattern), operationsPerPush, componentInputKeys);
         }
     }
 }

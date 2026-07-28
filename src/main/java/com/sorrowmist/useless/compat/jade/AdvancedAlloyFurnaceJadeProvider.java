@@ -41,7 +41,7 @@ public enum AdvancedAlloyFurnaceJadeProvider implements IBlockComponentProvider,
             String productName = task.getString(TAG_PRODUCT);
             int progress = task.getInt(TAG_PROGRESS);
             int maxProgress = task.getInt(TAG_MAX_PROGRESS);
-            int totalOutput = task.getInt(TAG_TOTAL_OUTPUT);
+            long totalOutput = task.getLong(TAG_TOTAL_OUTPUT);
             String statusKey = task.getString(TAG_STATUS_KEY);
             String statusDetail = task.getString(TAG_STATUS_DETAIL);
             Component product = Component.literal(productName);
@@ -79,7 +79,7 @@ public enum AdvancedAlloyFurnaceJadeProvider implements IBlockComponentProvider,
             task.putString(TAG_PRODUCT, progress.getProductName());
             task.putInt(TAG_PROGRESS, progress.getProgress());
             task.putInt(TAG_MAX_PROGRESS, progress.getMaxProgress());
-            task.putInt(TAG_TOTAL_OUTPUT, progress.getTotalOutputCount());
+            task.putLong(TAG_TOTAL_OUTPUT, progress.getTotalOutputCount());
             task.putString(TAG_STATUS_KEY, progress.getStatusKey());
             task.putString(TAG_STATUS_DETAIL, progress.getStatusDetail());
             tasks.add(task);

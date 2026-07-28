@@ -5,7 +5,6 @@ import appeng.api.stacks.AEItemKey;
 import appeng.api.stacks.AEKey;
 import appeng.api.stacks.GenericStack;
 import appeng.api.stacks.KeyCounter;
-import com.sorrowmist.useless.compat.EapCompat;
 import com.sorrowmist.useless.content.recipe.RecipeOutputConstraint;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
@@ -26,7 +25,7 @@ final class AdvancedAlloyFurnacePatternPolicy {
             return List.of();
         }
 
-        IPatternDetails original = EapCompat.unwrap(pattern);
+        IPatternDetails original = SmartDoublingPatterns.unwrap(pattern);
         DynamicComponentPattern dynamic = dynamicDetails(original);
         List<GenericStack> outputs = original.getOutputs();
         List<RecipeOutputConstraint> result = new ArrayList<>(outputs.size());
@@ -46,7 +45,7 @@ final class AdvancedAlloyFurnacePatternPolicy {
     }
 
     static boolean usesRecipeOutputs(@Nullable IPatternDetails pattern) {
-        DynamicComponentPattern dynamic = dynamicDetails(EapCompat.unwrap(pattern));
+        DynamicComponentPattern dynamic = dynamicDetails(SmartDoublingPatterns.unwrap(pattern));
         if (dynamic == null) {
             return false;
         }
@@ -55,7 +54,7 @@ final class AdvancedAlloyFurnacePatternPolicy {
 
     static Set<AEKey> componentInputKeys(
             @Nullable IPatternDetails pattern, @Nullable KeyCounter[] inputHolder) {
-        IPatternDetails original = EapCompat.unwrap(pattern);
+        IPatternDetails original = SmartDoublingPatterns.unwrap(pattern);
         DynamicComponentPattern dynamic = dynamicDetails(original);
         if (dynamic == null || inputHolder == null) {
             return Set.of();
@@ -93,7 +92,7 @@ final class AdvancedAlloyFurnacePatternPolicy {
 
     static Set<AEKey> componentInputKeys(
             @Nullable IPatternDetails pattern, List<ItemStack> actualInputs) {
-        IPatternDetails original = EapCompat.unwrap(pattern);
+        IPatternDetails original = SmartDoublingPatterns.unwrap(pattern);
         DynamicComponentPattern dynamic = dynamicDetails(original);
         if (dynamic == null || actualInputs == null || actualInputs.isEmpty()) {
             return Set.of();

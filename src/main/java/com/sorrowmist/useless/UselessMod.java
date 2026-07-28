@@ -1,7 +1,6 @@
 package com.sorrowmist.useless;
 
 import com.mojang.logging.LogUtils;
-import com.sorrowmist.useless.compat.EapMenuLocatorCompat;
 import com.sorrowmist.useless.content.blocks.GlowPlasticBlock;
 import com.sorrowmist.useless.content.items.EndlessBeafItem;
 import com.sorrowmist.useless.content.recipe.adapters.RecipeAdapterCompatRegistry;
@@ -33,7 +32,6 @@ import net.neoforged.fml.ModContainer;
 import net.neoforged.fml.common.Mod;
 import net.neoforged.fml.config.ModConfig;
 import net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent;
-import net.neoforged.fml.event.lifecycle.InterModEnqueueEvent;
 import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.event.AddPackFindersEvent;
 import net.neoforged.neoforge.event.ItemAttributeModifierEvent;
@@ -48,7 +46,6 @@ public class UselessMod {
 
     public UselessMod(IEventBus modEventBus, ModContainer modContainer) {
         modEventBus.addListener(this::commonSetup);
-        modEventBus.addListener(this::enqueueInterMod);
         modEventBus.addListener(this::registerBuiltinResourcePacks);
         UComponents.init(modEventBus);
 
@@ -84,10 +81,6 @@ public class UselessMod {
 
     private void commonSetup(FMLCommonSetupEvent event) {
         RecipeAdapterCompatRegistry.init(event);
-    }
-
-    private void enqueueInterMod(InterModEnqueueEvent event) {
-        event.enqueueWork(EapMenuLocatorCompat::registerIfNeeded);
     }
 
     private void registerBuiltinResourcePacks(AddPackFindersEvent event) {

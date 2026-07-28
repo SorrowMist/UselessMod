@@ -3,19 +3,25 @@ package com.sorrowmist.useless.client.gui;
 import com.sorrowmist.useless.api.enums.RedstoneControlMode;
 import com.sorrowmist.useless.content.blocks.multiblock.MultiblockAlloyFurnaceCoreBlock;
 import com.sorrowmist.useless.content.blocks.multiblock.OmniversalAlloyFurnaceStructure;
+import com.sorrowmist.useless.content.blocks.multiblock.UselessCoilBlock;
 import com.sorrowmist.useless.content.menus.MultiblockAlloyFurnaceMenu;
+import com.sorrowmist.useless.init.ModBlocks;
 import com.sorrowmist.useless.network.AECancelPacket;
+import com.sorrowmist.useless.network.MultiblockAlloyFurnaceEnergyLimitPacket;
 import com.sorrowmist.useless.network.RedstoneControlPacket;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.player.Inventory;
+import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.neoforged.neoforge.network.PacketDistributor;
 import org.jetbrains.annotations.Nullable;
+import org.lwjgl.glfw.GLFW;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -38,11 +44,21 @@ public final class MultiblockAlloyFurnaceScreen extends AbstractContainerScreen<
     private static final int ENERGY_BAR_WIDTH = 154;
     private static final int ENERGY_BAR_HEIGHT = 6;
     private static final int TASK_LIST_Y = 84;
+    private static final int ENERGY_LIMIT_FIELD_X = 88;
+    private static final int ENERGY_LIMIT_FIELD_Y = 60;
+    private static final int ENERGY_LIMIT_FIELD_WIDTH = 80;
 
     @Nullable
     private OmniversalAlloyFurnaceStructure.ValidationResult liveValidation;
     @Nullable
     private AlloyFurnaceControlButton cancelButton;
+    @Nullable
+    private EditBox energyLimitField;
+    private long lastSyncedEnergyLimit = Long.MIN_VALUE;
+    private String syncedEnergyLimitText = "";
+    private boolean updatingEnergyLimitField;
+    private boolean energyLimitDirty;
+    private boolean energyLimitFieldWasFocused;
     private Map<Long, OmniversalAlloyFurnaceStructure.Mismatch> liveMismatches = Map.of();
     private Direction liveFacing = Direction.NORTH;
 
@@ -65,7 +81,31 @@ public final class MultiblockAlloyFurnaceScreen extends AbstractContainerScreen<
                 leftPos + CANCEL_BUTTON_X, topPos + CONTROL_BUTTON_Y,
                 button -> PacketDistributor.sendToServer(
                         new AECancelPacket(menu.getBlockPos()))));
+        energyLimitField = new EditBox(font,
+                leftPos + ENERGY_LIMIT_FIELD_X, topPos + ENERGY_LIMIT_FIELD_Y,
+                ENERGY_LIMIT_FIELD_WIDTH, 14,
+                Component.translatable("gui.useless_mod.multiblock_alloy_furnace.energy_limit"));
+        energyLimitField.setMaxLength(24);
+        energyLimitField.setFilter(ScaledEnergyAmount::isValidInput);
+        energyLimitField.setResponder(value -> {
+            if (!updatingEnergyLimitField) {
+                energyLimitDirty = !value.equals(syncedEnergyLimitText);
+            }
+        });
+        addRenderableWidget(energyLimitField);
+        syncEnergyLimitField(true);
         refreshStructurePreview();
+    }
+
+    @Override
+    public boolean mouseClicked(double mouseX, double mouseY, int button) {
+        if (energyLimitField != null && energyLimitField.isFocused()
+                && !energyLimitField.isMouseOver(mouseX, mouseY)) {
+            commitEnergyLimit();
+            setFocused(null);
+            energyLimitFieldWasFocused = false;
+        }
+        return super.mouseClicked(mouseX, mouseY, button);
     }
 
     @Override
@@ -79,7 +119,58 @@ public final class MultiblockAlloyFurnaceScreen extends AbstractContainerScreen<
     @Override
     protected void containerTick() {
         super.containerTick();
+        boolean focused = energyLimitField != null && energyLimitField.isFocused();
+        if (energyLimitFieldWasFocused && !focused) commitEnergyLimit();
+        energyLimitFieldWasFocused = focused;
+        syncEnergyLimitField(false);
         refreshStructurePreview();
+    }
+
+    private void syncEnergyLimitField(boolean force) {
+        if (energyLimitField == null) return;
+        long limit = menu.getAutomaticEnergyLimit();
+        if ((force || (!energyLimitField.isFocused() && !energyLimitDirty))
+                && limit != lastSyncedEnergyLimit) {
+            setEnergyLimitFieldValue(limit);
+            lastSyncedEnergyLimit = limit;
+        }
+    }
+
+    private void commitEnergyLimit() {
+        if (energyLimitField == null || !energyLimitDirty) return;
+        long limit = ScaledEnergyAmount.parse(
+                energyLimitField.getValue(), menu.getCapacity())
+                .orElse(menu.getAutomaticEnergyLimit());
+        setEnergyLimitFieldValue(limit);
+        PacketDistributor.sendToServer(new MultiblockAlloyFurnaceEnergyLimitPacket(
+                menu.containerId, menu.getBlockPos(), limit));
+    }
+
+    private void setEnergyLimitFieldValue(long limit) {
+        if (energyLimitField == null) return;
+        syncedEnergyLimitText = ScaledEnergyAmount.format(limit);
+        updatingEnergyLimitField = true;
+        energyLimitField.setValue(syncedEnergyLimitText);
+        updatingEnergyLimitField = false;
+        energyLimitDirty = false;
+    }
+
+    @Override
+    public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+        if (energyLimitField != null && energyLimitField.isFocused()
+                && (keyCode == GLFW.GLFW_KEY_ENTER || keyCode == GLFW.GLFW_KEY_KP_ENTER)) {
+            commitEnergyLimit();
+            setFocused(null);
+            energyLimitFieldWasFocused = false;
+            return true;
+        }
+        return super.keyPressed(keyCode, scanCode, modifiers);
+    }
+
+    @Override
+    public void onClose() {
+        commitEnergyLimit();
+        super.onClose();
     }
 
     private void refreshStructurePreview() {
@@ -155,19 +246,32 @@ public final class MultiblockAlloyFurnaceScreen extends AbstractContainerScreen<
                 "gui.useless_mod.multiblock_alloy_furnace.coil", detectedCoilTier),
                 8, 34, MachineScreenStyle.MUTED_TEXT_COLOR, false);
         RedstoneControlMode redstoneMode = RedstoneControlMode.byIndex(menu.getRedstoneMode());
-        graphics.drawString(font, Component.translatable(
+        Component redstoneText = Component.translatable(
                 "gui.useless_mod.multiblock_alloy_furnace.redstone",
                 Component.translatable("gui.useless_mod.advanced_alloy_furnace.redstone_control."
-                        + redstoneMode.name().toLowerCase(Locale.ROOT))),
+                        + redstoneMode.name().toLowerCase(Locale.ROOT)));
+        graphics.drawString(font, truncate(redstoneText, 76),
                 8, 52, MachineScreenStyle.TEXT_COLOR, false);
-        graphics.drawString(font, Component.translatable(
+        graphics.drawString(font, truncate(Component.translatable(
+                        "gui.useless_mod.multiblock_alloy_furnace.energy_limit"), 80),
+                ENERGY_LIMIT_FIELD_X, 50, MachineScreenStyle.MUTED_TEXT_COLOR, false);
+        Component tasksText = Component.translatable(
                 "gui.useless_mod.multiblock_alloy_furnace.tasks",
-                menu.getActiveTasks(), menu.getMaxTasks()),
+                menu.getActiveTasks(), menu.getMaxTasks());
+        graphics.drawString(font, truncate(tasksText, 76),
                 8, 63, MachineScreenStyle.MUTED_TEXT_COLOR, false);
         renderStructurePreview(graphics);
         renderTaskList(graphics);
         graphics.drawString(font, playerInventoryTitle, 8, inventoryLabelY,
                 MachineScreenStyle.MUTED_TEXT_COLOR, false);
+    }
+
+    private Component truncate(Component text, int maxWidth) {
+        String value = text.getString();
+        return font.width(value) <= maxWidth
+                ? text
+                : Component.literal(font.plainSubstrByWidth(
+                        value, maxWidth - font.width("...")) + "...");
     }
 
     private void renderStructurePreview(GuiGraphics graphics) {
@@ -238,7 +342,18 @@ public final class MultiblockAlloyFurnaceScreen extends AbstractContainerScreen<
                 ENERGY_BAR_WIDTH, ENERGY_BAR_HEIGHT, mouseX, mouseY)) {
             graphics.renderTooltip(font, Component.translatable(
                     "gui.useless_mod.advanced_alloy_furnace.energy",
-                    menu.getEnergy(), menu.getCapacity()), mouseX, mouseY);
+                    ScaledEnergyAmount.format(menu.getEnergy()),
+                    ScaledEnergyAmount.format(menu.getCapacity())), mouseX, mouseY);
+        }
+        if (energyLimitField != null && energyLimitField.isMouseOver(mouseX, mouseY)) {
+            graphics.renderTooltip(font, List.of(
+                    Component.translatable(
+                            "gui.useless_mod.multiblock_alloy_furnace.energy_limit"),
+                    Component.translatable(
+                            "gui.useless_mod.multiblock_alloy_furnace.energy_limit.desc"),
+                    Component.translatable(
+                            "gui.useless_mod.multiblock_alloy_furnace.energy_limit.units")),
+                    Optional.empty(), mouseX, mouseY);
         }
         renderControlTooltips(graphics, mouseX, mouseY);
         renderStructureTooltip(graphics, mouseX, mouseY);
@@ -284,9 +399,7 @@ public final class MultiblockAlloyFurnaceScreen extends AbstractContainerScreen<
                         : "gui.useless_mod.multiblock_alloy_furnace.preview.unavailable")
                 .withStyle(!known ? ChatFormatting.GRAY
                         : mismatch ? ChatFormatting.RED : ChatFormatting.GREEN));
-        Component expected = Component.translatable(
-                "gui.useless_mod.multiblock_alloy_furnace.preview.part."
-                        + entry.part().name().toLowerCase(Locale.ROOT));
+        Component expected = expectedPartName(entry, worldPos);
         lines.add(Component.translatable(
                 "gui.useless_mod.multiblock_alloy_furnace.preview.expected", expected));
         lines.add(Component.translatable(
@@ -296,6 +409,39 @@ public final class MultiblockAlloyFurnaceScreen extends AbstractContainerScreen<
                 "gui.useless_mod.multiblock_alloy_furnace.preview.position",
                 worldPos.getX(), worldPos.getY(), worldPos.getZ()));
         graphics.renderTooltip(font, lines, Optional.empty(), mouseX, mouseY);
+    }
+
+    private Component expectedPartName(
+            OmniversalAlloyFurnaceStructure.Entry entry, BlockPos worldPos) {
+        return switch (entry.part()) {
+            case CORE -> ModBlocks.MULTIBLOCK_ALLOY_FURNACE_CORE.get().getName();
+            case PATTERN_ASSEMBLY -> ModBlocks.ME_PATTERN_ASSEMBLY.get().getName();
+            case MOLD_HUB -> ModBlocks.OMNIVERSAL_MOLD_HUB.get().getName();
+            case CASING -> expectedCasingName(worldPos);
+            case COIL -> expectedCoilName();
+            case AIR -> Blocks.AIR.getName();
+        };
+    }
+
+    private Component expectedCasingName(BlockPos worldPos) {
+        Component casingName = ModBlocks.OMNIVERSAL_FURNACE_CASING.get().getName();
+        if (liveValidation != null && liveValidation.passiveHatchPos() != null
+                && !liveValidation.passiveHatchPos().equals(worldPos)) {
+            return casingName;
+        }
+        return Component.translatable(
+                "gui.useless_mod.multiblock_alloy_furnace.preview.casing_with_hatch",
+                casingName, ModBlocks.PASSIVE_CRAFTING_HATCH.get().getName());
+    }
+
+    private Component expectedCoilName() {
+        int tier = liveValidation == null ? menu.getCoilTier() : liveValidation.coilTier();
+        var coil = ModBlocks.USELESS_COILS.get(tier);
+        if (coil != null) return coil.get().getName();
+        return Component.translatable(
+                "gui.useless_mod.multiblock_alloy_furnace.preview.coil_any",
+                ModBlocks.USELESS_COILS.get(UselessCoilBlock.MIN_TIER).get().getName(),
+                ModBlocks.USELESS_COILS.get(UselessCoilBlock.MAX_TIER).get().getName());
     }
 
     @Nullable

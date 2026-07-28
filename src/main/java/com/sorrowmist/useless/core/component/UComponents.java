@@ -143,6 +143,12 @@ public final class UComponents {
             register("multiblock_recovery_data", builder -> builder
                     .persistent(MultiblockRecoveryData.CODEC)
                     .networkSynchronized(MultiblockRecoveryData.STREAM_CODEC));
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<Long>> SMART_DOUBLING_OPERATIONS =
+            register("smart_doubling_operations", builder -> builder
+                    .persistent(Codec.LONG)
+                    .networkSynchronized(StreamCodec.of(
+                            FriendlyByteBuf::writeLong,
+                            FriendlyByteBuf::readLong)));
 
     // 私有构造器，防止外部实例化（该类仅用于注册静态组件）
     private UComponents() {}

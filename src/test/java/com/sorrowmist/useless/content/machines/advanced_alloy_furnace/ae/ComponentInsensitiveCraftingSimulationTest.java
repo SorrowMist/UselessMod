@@ -27,17 +27,13 @@ import appeng.crafting.pattern.AEProcessingPattern;
 import appeng.me.helpers.BaseActionSource;
 import appeng.me.service.helpers.NetworkCraftingProviders;
 import com.google.common.collect.ImmutableSet;
-import com.electronwill.nightconfig.core.CommentedConfig;
 import net.minecraft.core.RegistryAccess;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.Level;
-import net.neoforged.fml.config.IConfigSpec;
-import net.neoforged.neoforge.common.ModConfigSpec;
 import org.jetbrains.annotations.Nullable;
-import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import sun.misc.Unsafe;
 
@@ -56,11 +52,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ComponentInsensitiveCraftingSimulationTest {
     private static final Level LEVEL = allocateLevel();
-
-    @BeforeAll
-    static void loadCraftingCalculationMixinConfig() {
-        loadDefaults(com.extendedae_plus.config.ModConfigs.SERVER_SPEC);
-    }
 
     @Test
     void dynamicParentRecursivelyPlansThreeComponentBearingChildOutputs() {
@@ -230,22 +221,6 @@ class ComponentInsensitiveCraftingSimulationTest {
             var field = Unsafe.class.getDeclaredField("theUnsafe");
             field.setAccessible(true);
             return (Level) ((Unsafe) field.get(null)).allocateInstance(ServerLevel.class);
-        } catch (ReflectiveOperationException exception) {
-            throw new ExceptionInInitializerError(exception);
-        }
-    }
-
-    private static void loadDefaults(ModConfigSpec spec) {
-        if (spec.isLoaded()) {
-            return;
-        }
-        CommentedConfig config = CommentedConfig.inMemory();
-        spec.correct(config);
-        try {
-            Class<?> loadedConfigType = Class.forName("net.neoforged.fml.config.LoadedConfig");
-            var constructor = loadedConfigType.getDeclaredConstructors()[0];
-            constructor.setAccessible(true);
-            spec.acceptConfig((IConfigSpec.ILoadedConfig) constructor.newInstance(config, null, null));
         } catch (ReflectiveOperationException exception) {
             throw new ExceptionInInitializerError(exception);
         }

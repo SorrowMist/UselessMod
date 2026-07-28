@@ -28,6 +28,7 @@ import appeng.api.util.AECableType;
 import appeng.blockentity.AEBaseBlockEntity;
 import appeng.helpers.patternprovider.PatternContainer;
 import com.sorrowmist.useless.api.enums.CatalystType;
+import com.sorrowmist.useless.api.crafting.SmartDoublingCraftingProvider;
 import com.sorrowmist.useless.compat.AppFluxCompat;
 import com.sorrowmist.useless.api.enums.FurnaceFace;
 import com.sorrowmist.useless.api.enums.FurnaceFaceMode;
@@ -104,7 +105,10 @@ import static com.sorrowmist.useless.content.machines.advanced_alloy_furnace.lay
 import static com.sorrowmist.useless.content.machines.advanced_alloy_furnace.layout.AdvancedAlloyFurnaceLayout.PATTERN_SLOTS_START;
 import static com.sorrowmist.useless.content.machines.advanced_alloy_furnace.layout.AdvancedAlloyFurnaceLayout.TOTAL_SLOTS;
 
-public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implements MenuProvider, ICraftingProvider, IInWorldGridNodeHost, IGridNodeListener<AdvancedAlloyFurnaceBlockEntity>, IActionHost, AlloyFurnaceAeHost, PatternContainer, FurnaceFaceAccessor, FurnaceAutoIoController.Context {
+public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implements MenuProvider, ICraftingProvider,
+        SmartDoublingCraftingProvider, IInWorldGridNodeHost,
+        IGridNodeListener<AdvancedAlloyFurnaceBlockEntity>, IActionHost, AlloyFurnaceAeHost,
+        PatternContainer, FurnaceFaceAccessor, FurnaceAutoIoController.Context {
 
     public static final int MAX_FURNACE_TIER = 10;
     public static final int USEFUL_INGOT_FURNACE_TIER = 10;

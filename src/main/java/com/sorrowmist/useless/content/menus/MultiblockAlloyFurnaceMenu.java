@@ -54,6 +54,7 @@ public final class MultiblockAlloyFurnaceMenu extends AbstractContainerMenu {
     public int getActiveTasks() { return data.get(6); }
     public int getRedstoneMode() { return data.get(7); }
     public int getMaxTasks() { return data.get(8); }
+    public long getAutomaticEnergyLimit() { return join(data.get(9), data.get(10)); }
     @Nullable public MultiblockAlloyFurnaceCoreBlockEntity getCore() { return core; }
 
     static ContainerData createMenuData(boolean clientSide, @Nullable ContainerData serverData) {

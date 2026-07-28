@@ -18,6 +18,7 @@ import appeng.api.util.AECableType;
 import appeng.blockentity.AEBaseBlockEntity;
 import appeng.helpers.patternprovider.PatternContainer;
 import com.mojang.logging.LogUtils;
+import com.sorrowmist.useless.api.crafting.SmartDoublingCraftingProvider;
 import com.sorrowmist.useless.content.blockentities.RecoverableItemStackHandler;
 import com.sorrowmist.useless.core.config.ConfigManager;
 import com.sorrowmist.useless.init.ModBlockEntities;
@@ -42,7 +43,7 @@ import java.util.Objects;
 
 /** AE node and pattern inventory for the multiblock furnace. */
 public final class MePatternAssemblyBlockEntity extends AEBaseBlockEntity
-        implements ICraftingProvider, IInWorldGridNodeHost,
+        implements ICraftingProvider, SmartDoublingCraftingProvider, IInWorldGridNodeHost,
         IGridNodeListener<MePatternAssemblyBlockEntity>, IActionHost, PatternContainer, MenuProvider {
     private static final Logger LOGGER = LogUtils.getLogger();
     private final RecoverableItemStackHandler patterns = new RecoverableItemStackHandler(

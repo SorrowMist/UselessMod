@@ -10,7 +10,7 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 class MultiblockAlloyFurnaceMenuTest {
     @Test
     void clientAlwaysUsesAWritableSynchronizationBuffer() {
-        int[] liveValues = {1, 9, 0, 0, 0, 0, 3, 2, 10};
+        int[] liveValues = {1, 9, 0, 0, 0, 0, 3, 2, 10, -1, Integer.MAX_VALUE};
         ContainerData readOnlyLiveData = readOnly(liveValues);
 
         ContainerData clientData = MultiblockAlloyFurnaceMenu.createMenuData(true, readOnlyLiveData);
@@ -23,7 +23,7 @@ class MultiblockAlloyFurnaceMenuTest {
 
     @Test
     void serverKeepsTheCoreLiveDataAndLongValuesRoundTrip() {
-        ContainerData liveData = readOnly(new int[9]);
+        ContainerData liveData = readOnly(new int[11]);
         assertSame(liveData, MultiblockAlloyFurnaceMenu.createMenuData(false, liveData));
 
         long tierNineCapacity = 3_276_800_000L;

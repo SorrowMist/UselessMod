@@ -4,6 +4,7 @@ import com.mojang.logging.LogUtils;
 import com.sorrowmist.useless.content.blocks.GlowPlasticBlock;
 import com.sorrowmist.useless.content.items.EndlessBeafItem;
 import com.sorrowmist.useless.content.recipe.adapters.RecipeAdapterCompatRegistry;
+import com.sorrowmist.useless.content.recipe.adapters.occultism.OccultismSpiritEggHandler;
 import com.sorrowmist.useless.core.component.UComponents;
 import com.sorrowmist.useless.core.config.ConfigManager;
 import com.sorrowmist.useless.init.ModBlockEntities;
@@ -30,6 +31,7 @@ import net.neoforged.bus.api.EventPriority;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.ModContainer;
+import net.neoforged.fml.ModList;
 import net.neoforged.fml.common.Mod;
 import net.neoforged.fml.config.ModConfig;
 import net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent;
@@ -102,6 +104,12 @@ public class UselessMod {
     @SubscribeEvent(priority = EventPriority.HIGHEST, receiveCanceled = true)
     public void onRightClickBlock(PlayerInteractEvent.RightClickBlock event) {
         ItemStack stack = event.getItemStack();
+        InteractionResult occultismResult = trySpawnMarkedOccultismSpirit(event);
+        if (occultismResult != InteractionResult.PASS) {
+            event.setCanceled(true);
+            event.setCancellationResult(occultismResult);
+            return;
+        }
         if (!(stack.getItem() instanceof EndlessBeafItem)) return;
 
         InteractionResult result = EndlessBeafItem.trySummonLightningForCollector(event.getLevel(), event.getPos(), event.getEntity());
@@ -109,6 +117,13 @@ public class UselessMod {
 
         event.setCanceled(true);
         event.setCancellationResult(result);
+    }
+
+    private static InteractionResult trySpawnMarkedOccultismSpirit(PlayerInteractEvent.RightClickBlock event) {
+        if (!ModList.get().isLoaded("occultism")) {
+            return InteractionResult.PASS;
+        }
+        return OccultismSpiritEggHandler.trySpawn(event);
     }
 
     @SubscribeEvent

@@ -20,6 +20,7 @@ import com.sorrowmist.useless.content.blocks.multiblock.MultiblockAlloyFurnaceCo
 import com.sorrowmist.useless.content.blocks.multiblock.OmniversalAlloyFurnaceStructure;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.AdvancedAlloyFurnaceAeManager;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.AlloyFurnaceAeHost;
+import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.CraftingTaskContext;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.OmniversalPatternDetails;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.SmartDoublingPatterns;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.catalyst.ResolvedCatalystEffect;
@@ -47,6 +48,7 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.inventory.ContainerData;
 import net.minecraft.network.chat.Component;
+import net.minecraft.server.level.ServerPlayer;
 import com.sorrowmist.useless.content.menus.MultiblockAlloyFurnaceMenu;
 import net.neoforged.neoforge.fluids.FluidStack;
 import net.neoforged.neoforge.fluids.capability.templates.FluidTank;
@@ -339,10 +341,11 @@ public final class MultiblockAlloyFurnaceCoreBlockEntity extends BlockEntity imp
 
     @Override
     public AbstractContainerMenu createMenu(int containerId, Inventory inventory, Player player) {
-        if (level != null && !level.isClientSide) {
-            aeManager.sendAETaskProgressToClients();
-        }
         return new MultiblockAlloyFurnaceMenu(containerId, inventory, worldPosition);
+    }
+
+    public void sendAETaskProgressToPlayer(ServerPlayer player) {
+        aeManager.sendAETaskProgressToPlayer(player);
     }
 
     public void cycleRedstoneControlMode() {
@@ -392,8 +395,32 @@ public final class MultiblockAlloyFurnaceCoreBlockEntity extends BlockEntity imp
 
     @Override
     public boolean isTaskRecipeAvailable(AdvancedAlloyFurnaceRecipe recipe) {
+        return getTaskAvailability(recipe).available();
+    }
+
+    @Override
+    public CraftingTaskContext.TaskAvailability getTaskAvailability(AdvancedAlloyFurnaceRecipe recipe) {
+        if (!formed) {
+            return CraftingTaskContext.TaskAvailability.unavailable(
+                    "gui.useless_mod.advanced_alloy_furnace.ae_task_status.waiting_structure", "");
+        }
+        if (recipe == null) {
+            return CraftingTaskContext.TaskAvailability.unavailable(
+                    "gui.useless_mod.advanced_alloy_furnace.ae_task_status.waiting_recipe", "");
+        }
+        if (recipe.mold() == null || recipe.mold().isEmpty()) {
+            return CraftingTaskContext.TaskAvailability.ready();
+        }
         OmniversalMoldHubBlockEntity hub = getMoldHub();
-        return formed && hub != null && hub.containsMold(recipe.mold());
+        if (hub == null) {
+            return CraftingTaskContext.TaskAvailability.unavailable(
+                    "gui.useless_mod.advanced_alloy_furnace.ae_task_status.waiting_mold_hub", "");
+        }
+        return hub.containsMold(recipe.mold())
+                ? CraftingTaskContext.TaskAvailability.ready()
+                : CraftingTaskContext.TaskAvailability.unavailable(
+                        "gui.useless_mod.advanced_alloy_furnace.ae_task_status.waiting_missing_mold",
+                        CraftingTaskContext.describeRequiredMold(recipe.mold()));
     }
 
     @Override

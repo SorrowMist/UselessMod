@@ -10,7 +10,7 @@ import com.sorrowmist.useless.content.items.AE2GiftPackageItem;
 import com.sorrowmist.useless.content.items.AdvancedAlloyFurnaceBlockItem;
 import com.sorrowmist.useless.content.items.EndlessBeafItem;
 import com.sorrowmist.useless.content.items.IngotItem;
-import com.sorrowmist.useless.content.items.OmniversalPatternEncoderItem;
+import com.sorrowmist.useless.content.items.RitualBlueprintItem;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.OmniversalPatternDetails;
 import appeng.api.crafting.PatternDetailsHelper;
 import appeng.crafting.pattern.AEProcessingPattern;
@@ -242,10 +242,6 @@ public final class ModItems {
                     .invalidPatternTooltip(AEProcessingPattern::getInvalidPatternTooltip)
                     .itemProperties(new Item.Properties().stacksTo(1))
                     .build());
-    public static final DeferredItem<Item> OMNIVERSAL_PATTERN_ENCODER = registerAndAdd(
-            "omniversal_pattern_encoder",
-            () -> new OmniversalPatternEncoderItem(new Item.Properties().stacksTo(1)));
-
     static {
         for (int tier = UselessCoilBlock.MIN_TIER; tier <= UselessCoilBlock.MAX_TIER; tier++) {
             int capturedTier = tier;
@@ -255,6 +251,7 @@ public final class ModItems {
     }
 
     public static final DeferredItem<AE2GiftPackageItem> AE2_GIFT_PACKAGE;
+    public static final DeferredItem<RitualBlueprintItem> RITUAL_BLUEPRINT;
 
     static {
         if (ModList.get().isLoaded("ae2")) {
@@ -265,6 +262,16 @@ public final class ModItems {
             CREATIVE_MAIN_TAB_ITEMS.add(AE2_GIFT_PACKAGE);
         } else {
             AE2_GIFT_PACKAGE = null;
+        }
+
+        if (ModList.get().isLoaded("occultism")) {
+            RITUAL_BLUEPRINT = ITEMS.register(
+                    "ritual_blueprint",
+                    () -> new RitualBlueprintItem(new Item.Properties().stacksTo(1))
+            );
+            CREATIVE_MAIN_TAB_ITEMS.add(RITUAL_BLUEPRINT);
+        } else {
+            RITUAL_BLUEPRINT = null;
         }
     }
 

@@ -6,6 +6,8 @@ import appeng.api.stacks.AEItemKey;
 import appeng.api.stacks.GenericStack;
 import appeng.crafting.pattern.AEProcessingPattern;
 import com.sorrowmist.useless.api.enums.AlloyFurnaceMode;
+import com.sorrowmist.useless.core.component.RitualBlueprintPentacles;
+import com.sorrowmist.useless.core.component.UComponents;
 import net.minecraft.SharedConstants;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.network.chat.Component;
@@ -54,6 +56,24 @@ class AlloyFurnaceRecipeCatalogMoldTest {
                 namedPaper("different"), List.of(recipe)));
         assertFalse(AlloyFurnaceRecipeCatalog.isKnownMold(
                 new ItemStack(Items.PAPER), List.of(recipe)));
+    }
+
+    @Test
+    void acceptsBlueprintsContainingTheRequiredPentacle() {
+        ResourceLocation requiredId = ResourceLocation.fromNamespaceAndPath("occultism", "craft_afrit");
+        ResourceLocation additionalId = ResourceLocation.fromNamespaceAndPath("occultism", "possess_djinni");
+        ItemStack required = new ItemStack(Items.PAPER);
+        required.set(UComponents.RITUAL_BLUEPRINT_PENTACLE.get(), RitualBlueprintPentacles.of(requiredId));
+        AdvancedAlloyFurnaceRecipe recipe = recipe(DataComponentIngredient.of(true, required));
+
+        ItemStack multiple = new ItemStack(Items.PAPER);
+        multiple.set(UComponents.RITUAL_BLUEPRINT_PENTACLE.get(),
+                RitualBlueprintPentacles.of(List.of(requiredId, additionalId)));
+        ItemStack wrong = new ItemStack(Items.PAPER);
+        wrong.set(UComponents.RITUAL_BLUEPRINT_PENTACLE.get(), RitualBlueprintPentacles.of(additionalId));
+
+        assertTrue(AlloyFurnaceRecipeCatalog.isKnownMold(multiple, List.of(recipe)));
+        assertFalse(AlloyFurnaceRecipeCatalog.isKnownMold(wrong, List.of(recipe)));
     }
 
     @Test

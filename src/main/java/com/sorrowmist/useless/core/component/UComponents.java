@@ -149,6 +149,11 @@ public final class UComponents {
                     .networkSynchronized(StreamCodec.of(
                             FriendlyByteBuf::writeLong,
                             FriendlyByteBuf::readLong)));
+    /** The Occultism pentacles recorded on an imprinted ritual blueprint. */
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<RitualBlueprintPentacles>> RITUAL_BLUEPRINT_PENTACLE =
+            register("ritual_blueprint_pentacle", builder -> builder
+                    .persistent(RitualBlueprintPentacles.CODEC)
+                    .networkSynchronized(RitualBlueprintPentacles.STREAM_CODEC));
 
     // 私有构造器，防止外部实例化（该类仅用于注册静态组件）
     private UComponents() {}

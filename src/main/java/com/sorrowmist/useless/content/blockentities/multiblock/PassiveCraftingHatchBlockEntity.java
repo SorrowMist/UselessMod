@@ -518,9 +518,7 @@ public final class PassiveCraftingHatchBlockEntity extends BlockEntity
                 state = SlotState.WAITING_OUTPUT;
             } else if (!enabled) {
                 state = SlotState.PAUSED;
-            } else if (progress != null &&
-                    "gui.useless_mod.advanced_alloy_furnace.ae_task_status.waiting_mold"
-                            .equals(progress.getStatusKey())) {
+            } else if (progress != null && isWaitingForMold(progress.getStatusKey())) {
                 state = SlotState.MISSING_MOLD;
             } else {
                 state = SlotState.RUNNING;
@@ -531,6 +529,12 @@ public final class PassiveCraftingHatchBlockEntity extends BlockEntity
                     progress == null ? "" : progress.getStatusDetail()));
         }
         return List.copyOf(result);
+    }
+
+    private static boolean isWaitingForMold(String statusKey) {
+        return "gui.useless_mod.advanced_alloy_furnace.ae_task_status.waiting_mold".equals(statusKey)
+                || "gui.useless_mod.advanced_alloy_furnace.ae_task_status.waiting_missing_mold".equals(statusKey)
+                || "gui.useless_mod.advanced_alloy_furnace.ae_task_status.waiting_mold_hub".equals(statusKey);
     }
 
     private int getBusyMask() {

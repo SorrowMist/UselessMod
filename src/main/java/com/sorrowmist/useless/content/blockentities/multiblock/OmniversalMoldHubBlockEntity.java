@@ -1,6 +1,7 @@
 package com.sorrowmist.useless.content.blockentities.multiblock;
 
 import com.sorrowmist.useless.content.blockentities.RecoverableItemStackHandler;
+import com.sorrowmist.useless.content.recipe.AdapterUtils;
 import com.sorrowmist.useless.content.recipe.AlloyFurnaceRecipeCatalog;
 import com.sorrowmist.useless.core.config.ConfigManager;
 import com.sorrowmist.useless.init.ModBlockEntities;
@@ -48,7 +49,7 @@ public final class OmniversalMoldHubBlockEntity extends BlockEntity implements M
         int activeSlots = molds.getActiveSlots();
         for (int slot = 0; slot < activeSlots; slot++) {
             ItemStack stack = molds.getStackInSlot(slot);
-            if (!stack.isEmpty() && ingredient.test(stack)) return true;
+            if (AdapterUtils.matchesMold(ingredient, stack)) return true;
         }
         return false;
     }

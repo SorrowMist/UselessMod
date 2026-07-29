@@ -493,7 +493,7 @@ public class AlloyFurnaceRecipeManager {
             return false;
         }
 
-        return requiredMold.test(mold);
+        return AdapterUtils.matchesMold(requiredMold, mold);
     }
 
     private void cacheRecipe(RecipeCacheKey key, AdvancedAlloyFurnaceRecipe recipe) {

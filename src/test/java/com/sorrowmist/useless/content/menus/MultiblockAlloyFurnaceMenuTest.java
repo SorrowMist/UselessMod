@@ -1,7 +1,11 @@
 package com.sorrowmist.useless.content.menus;
 
 import net.minecraft.world.inventory.ContainerData;
+import com.sorrowmist.useless.network.AETaskProgressPacket;
 import org.junit.jupiter.api.Test;
+
+import java.util.ArrayList;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
@@ -33,6 +37,21 @@ class MultiblockAlloyFurnaceMenuTest {
 
         assertEquals(Long.MAX_VALUE, MultiblockAlloyFurnaceMenu.join(
                 (int) Long.MAX_VALUE, (int) (Long.MAX_VALUE >>> 32)));
+    }
+
+    @Test
+    void taskProgressSnapshotSurvivesSourceChangesAndCanBeCleared() {
+        var task = new AETaskProgressPacket.TaskProgressData(
+                "bound book", 1, 20, 1L, 1L);
+        var source = new ArrayList<>(List.of(task));
+        var snapshot = new MultiblockAlloyFurnaceMenu.TaskProgressSnapshot();
+
+        snapshot.update(source);
+        source.clear();
+        assertEquals(List.of(task), snapshot.get());
+
+        snapshot.update(List.of());
+        assertEquals(List.of(), snapshot.get());
     }
 
     private static ContainerData readOnly(int[] values) {

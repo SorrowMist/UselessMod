@@ -31,6 +31,20 @@ import java.util.Set;
  */
 public class CraftingTask {
     private static final int PROGRESS_SYNC_INTERVAL = 5;
+    private static final String STATUS_PROCESSING =
+            "gui.useless_mod.advanced_alloy_furnace.ae_task_status.processing";
+    private static final String STATUS_WAITING_RECIPE =
+            "gui.useless_mod.advanced_alloy_furnace.ae_task_status.waiting_recipe";
+    private static final String STATUS_WAITING_INVALID_PATTERN =
+            "gui.useless_mod.advanced_alloy_furnace.ae_task_status.waiting_invalid_pattern";
+    private static final String STATUS_WAITING_OUTPUT_MISMATCH =
+            "gui.useless_mod.advanced_alloy_furnace.ae_task_status.waiting_output_mismatch";
+    private static final String STATUS_WAITING_CONDITIONS =
+            "gui.useless_mod.advanced_alloy_furnace.ae_task_status.waiting_conditions";
+    private static final String STATUS_WAITING_ENERGY =
+            "gui.useless_mod.advanced_alloy_furnace.ae_task_status.waiting_energy";
+    private static final String WAITING_ENERGY_DETAIL =
+            "gui.useless_mod.advanced_alloy_furnace.ae_task_waiting_energy_detail";
 
     private final int taskId;
     private final IPatternDetails pattern;
@@ -62,6 +76,7 @@ public class CraftingTask {
     private int progressUpdateCounter = 0;
     private boolean progressRegistered = false;
     private AdvancedAlloyFurnaceAeManager.AETaskProgress taskProgressRef = null;
+    private String waitingStatusKey = STATUS_WAITING_CONDITIONS;
     private String waitingDetail = "";
     // 缓存已解析的配方，避免 tick() 每帧重复查找（AE 任务的输入在批次内固定）
     private AdvancedAlloyFurnaceRecipe cachedRecipe = null;
@@ -143,9 +158,7 @@ public class CraftingTask {
 
     public boolean canStartNow() {
         AdvancedAlloyFurnaceRecipe recipe = findTaskRecipe();
-        boolean valid = isRecipeValid(recipe);
-        this.waitingDetail = "";
-        return valid;
+        return isRecipeValid(recipe);
     }
 
     public int getTaskId() {
@@ -179,6 +192,10 @@ public class CraftingTask {
 
     public String getWaitingDetail() {
         return this.waitingDetail;
+    }
+
+    public String getWaitingStatusKey() {
+        return this.waitingStatusKey;
     }
 
     /** 从 KeyCounter[] 创建单次子任务（仅构造时使用） */
@@ -282,20 +299,45 @@ public class CraftingTask {
 
     private boolean isRecipeValid(AdvancedAlloyFurnaceRecipe recipe) {
         if (context.getLevel() == null || pattern == null) {
+            setWaiting(pattern == null ? STATUS_WAITING_INVALID_PATTERN : STATUS_WAITING_CONDITIONS, "");
             return false;
         }
 
         if (recipe == null) {
+            setWaiting(STATUS_WAITING_RECIPE, "");
             return false;
         }
 
         if (pattern.getOutputs().isEmpty()) {
+            setWaiting(STATUS_WAITING_INVALID_PATTERN, "");
             return false;
         }
 
-        return context.isTaskRecipeAvailable(recipe)
-                && AlloyFurnaceRecipeManager.matchesOutputConstraints(
-                        recipe, AdvancedAlloyFurnacePatternPolicy.outputConstraints(pattern));
+        CraftingTaskContext.TaskAvailability availability = context.getTaskAvailability(recipe);
+        if (!availability.available()) {
+            setWaiting(availability.statusKey(), availability.statusDetail());
+            return false;
+        }
+
+        if (!AlloyFurnaceRecipeManager.matchesOutputConstraints(
+                recipe, AdvancedAlloyFurnacePatternPolicy.outputConstraints(pattern))) {
+            setWaiting(STATUS_WAITING_OUTPUT_MISMATCH, "");
+            return false;
+        }
+
+        clearWaiting();
+        return true;
+    }
+
+    private void setWaiting(String statusKey, String detail) {
+        this.waitingStatusKey = statusKey == null || statusKey.isBlank()
+                ? STATUS_WAITING_CONDITIONS : statusKey;
+        this.waitingDetail = detail == null ? "" : detail;
+    }
+
+    private void clearWaiting() {
+        this.waitingStatusKey = STATUS_PROCESSING;
+        this.waitingDetail = "";
     }
 
     private void returnMaterialsToAE() {
@@ -400,11 +442,11 @@ public class CraftingTask {
             AdvancedAlloyFurnaceRecipe recipe = findTaskRecipe();
             ResolvedCatalystEffect resolvedCatalystEffect = getCatalystEffect(recipe);
 
-            if (progress == 0 && accumulatedEnergy == 0L && !context.isTaskRecipeAvailable(recipe)) {
+            if (progress == 0 && accumulatedEnergy == 0L && !isRecipeValid(recipe)) {
                 updateWaitingProgress();
                 return false;
-            } else if (taskProgressRef != null) {
-                taskProgressRef.setStatus("gui.useless_mod.advanced_alloy_furnace.ae_task_status.processing", "");
+            } else if (taskProgressRef != null && !STATUS_WAITING_ENERGY.equals(waitingStatusKey)) {
+                taskProgressRef.setStatus(STATUS_PROCESSING, "");
             }
 
             if (progress < processTime) {
@@ -418,9 +460,15 @@ public class CraftingTask {
                     if (tickResult.energyConsumed() > 0L) {
                         context.markChanged();
                     }
+                    setWaiting(STATUS_WAITING_ENERGY, WAITING_ENERGY_DETAIL);
+                    if (taskProgressRef != null) {
+                        taskProgressRef.setStatus(waitingStatusKey, waitingDetail);
+                        context.sendAETaskProgressToClients();
+                    }
                     return false;
                 }
 
+                clearWaiting();
                 progress++;
                 if (energyStep.resetAfterAdvance()
                         && energyStep.progress() + 1 >= energyStep.duration()) {
@@ -481,7 +529,6 @@ public class CraftingTask {
     private boolean initialize() {
         AdvancedAlloyFurnaceRecipe recipe = findTaskRecipe();
         if (!isRecipeValid(recipe)) {
-            this.waitingDetail = "";
             this.updateWaitingProgress();
             return false;
         }
@@ -497,7 +544,7 @@ public class CraftingTask {
 
         long totalOutputCount = saturatingMultiply(displayedCraftCount, outputCount);
         taskProgressRef = new AdvancedAlloyFurnaceAeManager.AETaskProgress(getProductName(), processTime, displayedCraftCount, totalOutputCount);
-        this.waitingDetail = "";
+        clearWaiting();
         context.getAETaskProgressMap().put(taskId, taskProgressRef);
         context.getTotalAEMaxProgressAtomic().addAndGet(processTime);
         progressRegistered = true;
@@ -514,7 +561,7 @@ public class CraftingTask {
         }
         long totalOutputCount = saturatingMultiply(displayedCraftCount, outputCount);
         taskProgressRef = new AdvancedAlloyFurnaceAeManager.AETaskProgress(getProductName(), 0, 1, displayedCraftCount, totalOutputCount,
-                "gui.useless_mod.advanced_alloy_furnace.ae_task_status.waiting_mold", this.waitingDetail);
+                waitingStatusKey, waitingDetail);
         context.getAETaskProgressMap().put(taskId, taskProgressRef);
         context.markChanged();
         context.sendAETaskProgressToClients();

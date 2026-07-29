@@ -31,4 +31,16 @@ class AETaskProgressPacketTest {
             buffer.release();
         }
     }
+
+    @Test
+    void requestRoundTripsMenuIdentityAndPosition() {
+        var expected = new AETaskProgressRequestPacket(37, new BlockPos(8, 64, -12));
+        FriendlyByteBuf buffer = new FriendlyByteBuf(Unpooled.buffer());
+        try {
+            AETaskProgressRequestPacket.STREAM_CODEC.encode(buffer, expected);
+            assertEquals(expected, AETaskProgressRequestPacket.STREAM_CODEC.decode(buffer));
+        } finally {
+            buffer.release();
+        }
+    }
 }

@@ -2,6 +2,8 @@ package com.sorrowmist.useless.content.recipe;
 
 import appeng.api.stacks.AEKey;
 import appeng.api.stacks.GenericStack;
+import com.sorrowmist.useless.core.component.RitualBlueprintPentacles;
+import com.sorrowmist.useless.core.component.UComponents;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.crafting.Ingredient;
@@ -66,6 +68,26 @@ public class AdapterUtils {
     public static Ingredient toMoldIngredient(@Nullable ItemStack moldItem) {
         if (moldItem == null || moldItem.isEmpty()) return Ingredient.EMPTY;
         return Ingredient.of(moldItem);
+    }
+
+    /** Matches normal molds exactly and ritual blueprints by required pentacle inclusion. */
+    public static boolean matchesMold(@Nullable Ingredient requiredMold, @Nullable ItemStack actualMold) {
+        if (requiredMold == null || requiredMold.isEmpty()) return true;
+        if (actualMold == null || actualMold.isEmpty()) return false;
+        if (requiredMold.test(actualMold)) return true;
+
+        RitualBlueprintPentacles actualPentacles = actualMold.get(UComponents.RITUAL_BLUEPRINT_PENTACLE.get());
+        if (actualPentacles == null || actualPentacles.isEmpty()) return false;
+        for (ItemStack representative : requiredMold.getItems()) {
+            RitualBlueprintPentacles requiredPentacles = representative.get(
+                    UComponents.RITUAL_BLUEPRINT_PENTACLE.get());
+            if (requiredPentacles != null && !requiredPentacles.isEmpty()
+                    && ItemStack.isSameItem(representative, actualMold)
+                    && actualPentacles.containsAll(requiredPentacles)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**

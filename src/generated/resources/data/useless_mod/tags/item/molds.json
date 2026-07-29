@@ -68,6 +68,10 @@
     {
       "id": "naturesaura:crushing_catalyst",
       "required": false
+    },
+    {
+      "id": "useless_mod:ritual_blueprint",
+      "required": false
     }
   ]
 }

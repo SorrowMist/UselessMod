@@ -5,6 +5,7 @@ import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.catalyst.R
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.io.FurnaceInputPort;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.parallel.AlloyFurnaceParallelCalculator;
 import com.sorrowmist.useless.content.recipe.AdvancedAlloyFurnaceRecipe;
+import com.sorrowmist.useless.content.recipe.AdapterUtils;
 import com.sorrowmist.useless.content.recipe.AlloyFurnaceRecipeManager;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
@@ -107,7 +108,7 @@ public final class AlloyFurnaceRecipeCalculator {
         if (recipe == null || parallel <= 0) return false;
         if (!recipe.mold().isEmpty()) {
             ItemStack moldStack = this.itemHandler.getStackInSlot(MOLD_SLOT);
-            if (!recipe.mold().test(moldStack)) return false;
+            if (!AdapterUtils.matchesMold(recipe.mold(), moldStack)) return false;
         }
         return FurnaceInputPort.canConsumeRecipeInputs(
                 recipe, parallel, this.itemHandler, INPUT_SLOTS_START, INPUT_SLOTS_COUNT,

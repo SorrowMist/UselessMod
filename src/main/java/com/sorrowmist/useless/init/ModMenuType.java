@@ -2,7 +2,6 @@ package com.sorrowmist.useless.init;
 
 import com.sorrowmist.useless.UselessMod;
 import com.sorrowmist.useless.content.menus.AdvancedAlloyFurnaceMenu;
-import com.sorrowmist.useless.content.menus.OmniversalPatternEncoderMenu;
 import com.sorrowmist.useless.content.menus.MePatternAssemblyMenu;
 import com.sorrowmist.useless.content.menus.OmniversalMoldHubMenu;
 import com.sorrowmist.useless.content.menus.MultiblockAlloyFurnaceMenu;
@@ -22,10 +21,6 @@ public final class ModMenuType {
             MENU_TYPES.register("advanced_alloy_furnace_menu",
                                 () -> IMenuTypeExtension.create(AdvancedAlloyFurnaceMenu::new)
             );
-    public static final Supplier<MenuType<OmniversalPatternEncoderMenu>> OMNIVERSAL_PATTERN_ENCODER_MENU =
-            MENU_TYPES.register("omniversal_pattern_encoder_menu",
-                    () -> IMenuTypeExtension.create((id, inventory, buffer) ->
-                            new OmniversalPatternEncoderMenu(id, inventory)));
     public static final Supplier<MenuType<MePatternAssemblyMenu>> ME_PATTERN_ASSEMBLY_MENU =
             MENU_TYPES.register("me_pattern_assembly_menu",
                     () -> IMenuTypeExtension.create(MePatternAssemblyMenu::new));

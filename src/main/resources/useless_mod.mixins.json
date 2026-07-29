@@ -19,6 +19,7 @@
     "ae2.CraftingCpuLogicMixin",
     "ae2.ExecutingCraftingJobMixin",
     "ae2.PatternEncodingLogicMixin",
+    "ae2.PatternDetailsHelperOccultismMixin",
     "ae2.PatternDetailsHelperSmartDoublingMixin",
     "advancedae.AdvancedCraftingCpuAccessor",
     "advancedae.CraftingCpuLogicMixin",

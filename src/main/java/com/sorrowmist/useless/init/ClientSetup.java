@@ -3,7 +3,6 @@ package com.sorrowmist.useless.init;
 import com.sorrowmist.useless.UselessMod;
 import com.sorrowmist.useless.api.enums.EnumColor;
 import com.sorrowmist.useless.client.gui.AdvancedAlloyFurnaceScreen;
-import com.sorrowmist.useless.client.gui.OmniversalPatternEncoderScreen;
 import com.sorrowmist.useless.client.gui.PagedRecoverableScreen;
 import com.sorrowmist.useless.client.gui.PatternAssemblyScreen;
 import com.sorrowmist.useless.client.gui.MoldHubScreen;
@@ -53,7 +52,6 @@ public class ClientSetup {
     @SubscribeEvent
     public static void registerScreens(RegisterMenuScreensEvent event) {
         event.register(ModMenuType.ADVANCED_ALLOY_FURNACE_MENU.get(), AdvancedAlloyFurnaceScreen::new);
-        event.register(ModMenuType.OMNIVERSAL_PATTERN_ENCODER_MENU.get(), OmniversalPatternEncoderScreen::new);
         event.register(ModMenuType.ME_PATTERN_ASSEMBLY_MENU.get(), PatternAssemblyScreen::new);
         event.register(ModMenuType.OMNIVERSAL_MOLD_HUB_MENU.get(), MoldHubScreen::new);
         event.register(ModMenuType.MULTIBLOCK_ALLOY_FURNACE_MENU.get(), MultiblockAlloyFurnaceScreen::new);

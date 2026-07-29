@@ -84,7 +84,8 @@ public class UItemTagsProvider extends ItemTagsProvider {
             .addOptional(ResourceLocation.fromNamespaceAndPath("naturesaura", "animal_spawner"))
             .addOptional(ResourceLocation.fromNamespaceAndPath("naturesaura", "offering_table"))
             .addOptional(ResourceLocation.fromNamespaceAndPath("naturesaura", "conversion_catalyst"))
-            .addOptional(ResourceLocation.fromNamespaceAndPath("naturesaura", "crushing_catalyst"));
+            .addOptional(ResourceLocation.fromNamespaceAndPath("naturesaura", "crushing_catalyst"))
+            .addOptional(ResourceLocation.fromNamespaceAndPath("useless_mod", "ritual_blueprint"));
     }
 
     private void addCTags() {

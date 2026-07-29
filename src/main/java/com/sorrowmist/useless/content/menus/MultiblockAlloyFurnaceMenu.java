@@ -2,6 +2,7 @@ package com.sorrowmist.useless.content.menus;
 
 import com.sorrowmist.useless.content.blockentities.multiblock.MultiblockAlloyFurnaceCoreBlockEntity;
 import com.sorrowmist.useless.init.ModMenuType;
+import com.sorrowmist.useless.network.AETaskProgressPacket;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.world.entity.player.Inventory;
@@ -13,11 +14,14 @@ import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemStack;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.List;
+
 public final class MultiblockAlloyFurnaceMenu extends AbstractContainerMenu {
     private final BlockPos blockPos;
     private final ContainerData data;
     @Nullable
     private final MultiblockAlloyFurnaceCoreBlockEntity core;
+    private final TaskProgressSnapshot taskProgress = new TaskProgressSnapshot();
 
     public MultiblockAlloyFurnaceMenu(int containerId, Inventory inventory, FriendlyByteBuf buffer) {
         this(containerId, inventory, buffer.readBlockPos());
@@ -57,6 +61,14 @@ public final class MultiblockAlloyFurnaceMenu extends AbstractContainerMenu {
     public long getAutomaticEnergyLimit() { return join(data.get(9), data.get(10)); }
     @Nullable public MultiblockAlloyFurnaceCoreBlockEntity getCore() { return core; }
 
+    public List<AETaskProgressPacket.TaskProgressData> getTaskProgress() {
+        return taskProgress.get();
+    }
+
+    public void updateTaskProgress(List<AETaskProgressPacket.TaskProgressData> tasks) {
+        taskProgress.update(tasks);
+    }
+
     static ContainerData createMenuData(boolean clientSide, @Nullable ContainerData serverData) {
         return !clientSide && serverData != null
                 ? serverData
@@ -65,6 +77,18 @@ public final class MultiblockAlloyFurnaceMenu extends AbstractContainerMenu {
 
     static long join(int low, int high) {
         return Integer.toUnsignedLong(low) | (long) high << 32;
+    }
+
+    static final class TaskProgressSnapshot {
+        private volatile List<AETaskProgressPacket.TaskProgressData> tasks = List.of();
+
+        List<AETaskProgressPacket.TaskProgressData> get() {
+            return tasks;
+        }
+
+        void update(List<AETaskProgressPacket.TaskProgressData> updatedTasks) {
+            tasks = List.copyOf(updatedTasks);
+        }
     }
 
     @Override

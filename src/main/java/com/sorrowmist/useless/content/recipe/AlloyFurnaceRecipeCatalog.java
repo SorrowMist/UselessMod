@@ -13,6 +13,7 @@ import com.sorrowmist.useless.content.recipe.adapters.ae.ae2lt.AELightningTechCo
 import com.sorrowmist.useless.content.recipe.adapters.minecraft.SmeltingRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.mysticalagriculture.SeedEssenceRecipeAdapter;
 import com.sorrowmist.useless.init.ModRecipeTypes;
+import com.mojang.logging.LogUtils;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.crafting.RecipeHolder;
@@ -33,9 +34,11 @@ import java.util.WeakHashMap;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
+import org.slf4j.Logger;
 
 /** Server/client recipe directory used by JEI, the encoder and pattern validation. */
 public final class AlloyFurnaceRecipeCatalog {
+    private static final Logger LOGGER = LogUtils.getLogger();
     private static final Map<Object, Snapshot> CACHE = java.util.Collections.synchronizedMap(new WeakHashMap<>());
     private static final AtomicLong GENERATION = new AtomicLong();
 
@@ -66,7 +69,7 @@ public final class AlloyFurnaceRecipeCatalog {
         if (stack == null || stack.isEmpty() || recipes == null) return false;
         for (AdvancedAlloyFurnaceRecipe recipe : recipes) {
             if (recipe == null || recipe.mold() == null || recipe.mold().isEmpty()) continue;
-            if (recipe.mold().test(stack)) return true;
+            if (AdapterUtils.matchesMold(recipe.mold(), stack)) return true;
         }
         return false;
     }
@@ -250,9 +253,13 @@ public final class AlloyFurnaceRecipeCatalog {
         Map<AlloyFurnaceRecipeIdentity, Entry> unique = new LinkedHashMap<>();
         for (AdvancedAlloyFurnaceRecipe recipe : recipes) {
             if (recipe == null) continue;
-            AlloyFurnaceRecipeIdentity identity = new AlloyFurnaceRecipeIdentity(
-                    recipe.id(), AlloyFurnaceRecipeFingerprint.create(recipe, level.registryAccess()));
-            unique.putIfAbsent(identity, new Entry(identity, recipe));
+            try {
+                AlloyFurnaceRecipeIdentity identity = new AlloyFurnaceRecipeIdentity(
+                        recipe.id(), AlloyFurnaceRecipeFingerprint.create(recipe, level.registryAccess()));
+                unique.putIfAbsent(identity, new Entry(identity, recipe));
+            } catch (RuntimeException exception) {
+                LOGGER.warn("Skipping alloy-furnace recipe with an unencodable identity: {}", recipe.id(), exception);
+            }
         }
         List<Entry> ordered = unique.values().stream()
                 .sorted(Comparator.comparing((Entry entry) -> entry.identity.recipeId().toString())

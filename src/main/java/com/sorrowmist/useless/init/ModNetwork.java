@@ -4,6 +4,7 @@ import com.sorrowmist.useless.UselessMod;
 import com.sorrowmist.useless.network.AECancelPacket;
 import com.sorrowmist.useless.network.AEReturnOutputTogglePacket;
 import com.sorrowmist.useless.network.AETaskProgressPacket;
+import com.sorrowmist.useless.network.AETaskProgressRequestPacket;
 import com.sorrowmist.useless.network.AutoIOChangePacket;
 import com.sorrowmist.useless.network.BeefInvulnerabilitySyncPacket;
 import com.sorrowmist.useless.network.BeefInvulnerabilityStatePacket;
@@ -53,6 +54,9 @@ public class ModNetwork {
         );
         registrar.playToClient(AETaskProgressPacket.TYPE, AETaskProgressPacket.STREAM_CODEC,
                                AETaskProgressPacket::handle
+        );
+        registrar.playToServer(AETaskProgressRequestPacket.TYPE, AETaskProgressRequestPacket.STREAM_CODEC,
+                               AETaskProgressRequestPacket::handle
         );
         registrar.playToClient(BeefInvulnerabilitySyncPacket.TYPE, BeefInvulnerabilitySyncPacket.STREAM_CODEC,
                                BeefInvulnerabilitySyncPacket::handle

@@ -7,6 +7,7 @@ import com.sorrowmist.useless.content.blocks.multiblock.UselessCoilBlock;
 import com.sorrowmist.useless.content.menus.MultiblockAlloyFurnaceMenu;
 import com.sorrowmist.useless.init.ModBlocks;
 import com.sorrowmist.useless.network.AECancelPacket;
+import com.sorrowmist.useless.network.AETaskProgressRequestPacket;
 import com.sorrowmist.useless.network.MultiblockAlloyFurnaceEnergyLimitPacket;
 import com.sorrowmist.useless.network.RedstoneControlPacket;
 import net.minecraft.ChatFormatting;
@@ -43,7 +44,17 @@ public final class MultiblockAlloyFurnaceScreen extends AbstractContainerScreen<
     private static final int ENERGY_BAR_Y = 74;
     private static final int ENERGY_BAR_WIDTH = 154;
     private static final int ENERGY_BAR_HEIGHT = 6;
+    private static final int TASK_LIST_X = 11;
     private static final int TASK_LIST_Y = 84;
+    private static final int TASK_LIST_WIDTH = 154;
+    private static final int TASK_LIST_MAX_LINES = 5;
+    private static final int TASK_LIST_LINE_HEIGHT = 9;
+    private static final float TASK_LIST_TEXT_SCALE = 0.75F;
+    private static final int TASK_PAGE_PREVIOUS_X = 124;
+    private static final int TASK_PAGE_NEXT_X = 154;
+    private static final int TASK_PAGE_BUTTON_Y = 118;
+    private static final int TASK_PAGE_BUTTON_WIDTH = 12;
+    private static final int TASK_PAGE_BUTTON_HEIGHT = 10;
     private static final int ENERGY_LIMIT_FIELD_X = 88;
     private static final int ENERGY_LIMIT_FIELD_Y = 60;
     private static final int ENERGY_LIMIT_FIELD_WIDTH = 80;
@@ -53,12 +64,17 @@ public final class MultiblockAlloyFurnaceScreen extends AbstractContainerScreen<
     @Nullable
     private AlloyFurnaceControlButton cancelButton;
     @Nullable
+    private PressableAE2Button previousTaskPageButton;
+    @Nullable
+    private PressableAE2Button nextTaskPageButton;
+    @Nullable
     private EditBox energyLimitField;
     private long lastSyncedEnergyLimit = Long.MIN_VALUE;
     private String syncedEnergyLimitText = "";
     private boolean updatingEnergyLimitField;
     private boolean energyLimitDirty;
     private boolean energyLimitFieldWasFocused;
+    private int taskPage;
     private Map<Long, OmniversalAlloyFurnaceStructure.Mismatch> liveMismatches = Map.of();
     private Direction liveFacing = Direction.NORTH;
 
@@ -93,8 +109,18 @@ public final class MultiblockAlloyFurnaceScreen extends AbstractContainerScreen<
             }
         });
         addRenderableWidget(energyLimitField);
+        previousTaskPageButton = addRenderableWidget(new PressableAE2Button(
+                leftPos + TASK_PAGE_PREVIOUS_X, topPos + TASK_PAGE_BUTTON_Y,
+                TASK_PAGE_BUTTON_WIDTH, TASK_PAGE_BUTTON_HEIGHT,
+                Component.literal("<"), button -> changeTaskPage(-1)));
+        nextTaskPageButton = addRenderableWidget(new PressableAE2Button(
+                leftPos + TASK_PAGE_NEXT_X, topPos + TASK_PAGE_BUTTON_Y,
+                TASK_PAGE_BUTTON_WIDTH, TASK_PAGE_BUTTON_HEIGHT,
+                Component.literal(">"), button -> changeTaskPage(1)));
         syncEnergyLimitField(true);
         refreshStructurePreview();
+        PacketDistributor.sendToServer(new AETaskProgressRequestPacket(
+                menu.containerId, menu.getBlockPos()));
     }
 
     @Override
@@ -113,6 +139,12 @@ public final class MultiblockAlloyFurnaceScreen extends AbstractContainerScreen<
         if (cancelButton != null) {
             cancelButton.releaseVisualState();
         }
+        if (previousTaskPageButton != null) {
+            previousTaskPageButton.releaseVisualState();
+        }
+        if (nextTaskPageButton != null) {
+            nextTaskPageButton.releaseVisualState();
+        }
         return super.mouseReleased(mouseX, mouseY, button);
     }
 
@@ -124,6 +156,7 @@ public final class MultiblockAlloyFurnaceScreen extends AbstractContainerScreen<
         energyLimitFieldWasFocused = focused;
         syncEnergyLimitField(false);
         refreshStructurePreview();
+        updateTaskPageControls();
     }
 
     private void syncEnergyLimitField(boolean force) {
@@ -204,6 +237,7 @@ public final class MultiblockAlloyFurnaceScreen extends AbstractContainerScreen<
 
     @Override
     protected void renderBg(GuiGraphics graphics, float partialTick, int mouseX, int mouseY) {
+        updateTaskPageControls();
         MachineScreenStyle.drawPanel(graphics, leftPos, topPos, imageWidth, imageHeight);
         MachineScreenStyle.drawInset(graphics,
                 leftPos + 4, topPos + 20, leftPos + imageWidth - 4, topPos + 128);
@@ -311,27 +345,98 @@ public final class MultiblockAlloyFurnaceScreen extends AbstractContainerScreen<
     }
 
     private void renderTaskList(GuiGraphics graphics) {
-        if (menu.getCore() == null) return;
-        var visibleTasks = new ArrayList<>(menu.getCore().getAETaskProgressList());
-        visibleTasks.sort(Comparator
-                .comparing(com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae
-                        .AdvancedAlloyFurnaceAeManager.AETaskProgress::getProductName)
-                .thenComparingInt(task -> task.getProgress()));
-        int rows = Math.min(3, visibleTasks.size());
-        for (int index = 0; index < rows; index++) {
-            var task = visibleTasks.get(index);
-            String state = task.getProgress() > 0 && task.getMaxProgress() > 0
-                    ? task.getProgress() + "/" + task.getMaxProgress()
-                    : Component.translatable(task.getStatusKey()).getString();
-            String line = task.getProductName() + " x" + task.getTotalOutputCount() + "  " + state;
-            if (font.width(line) > 154) line = font.plainSubstrByWidth(line, 151) + "...";
-            graphics.drawString(font, line, 11, TASK_LIST_Y + index * 12,
+        List<List<com.sorrowmist.useless.network.AETaskProgressPacket.TaskProgressData>> pages = taskPages();
+        taskPage = Math.clamp(taskPage, 0, pages.size() - 1);
+        List<String> lines = new ArrayList<>();
+        for (var task : pages.get(taskPage)) {
+            lines.addAll(taskLines(task));
+        }
+        graphics.pose().pushPose();
+        graphics.pose().translate(TASK_LIST_X, TASK_LIST_Y, 0);
+        graphics.pose().scale(TASK_LIST_TEXT_SCALE, TASK_LIST_TEXT_SCALE, 1.0F);
+        for (int line = 0; line < lines.size(); line++) {
+            graphics.drawString(font, lines.get(line), 0, line * TASK_LIST_LINE_HEIGHT,
                     MachineScreenStyle.MUTED_TEXT_COLOR, false);
         }
-        if (visibleTasks.size() > rows) {
-            graphics.drawString(font, "+" + (visibleTasks.size() - rows), 11, 119,
+        graphics.pose().popPose();
+
+        if (pages.size() > 1) {
+            String pageText = (taskPage + 1) + "/" + pages.size();
+            graphics.drawString(font, pageText,
+                    TASK_PAGE_NEXT_X - 2 - font.width(pageText), TASK_PAGE_BUTTON_Y + 1,
                     MachineScreenStyle.SUBTLE_TEXT_COLOR, false);
         }
+    }
+
+    private String fitTaskLine(String text) {
+        int scaledWidth = (int) (TASK_LIST_WIDTH / TASK_LIST_TEXT_SCALE);
+        if (font.width(text) <= scaledWidth) return text;
+        return font.plainSubstrByWidth(text, scaledWidth - font.width("...")) + "...";
+    }
+
+    private List<String> taskLines(
+            com.sorrowmist.useless.network.AETaskProgressPacket.TaskProgressData task) {
+        String status = task.progress > 0 && task.maxProgress > 0
+                ? task.progress + "/" + task.maxProgress
+                : Component.translatable(task.statusKey).getString();
+        String detail = task.statusDetail == null || task.statusDetail.isBlank() ? ""
+                : task.statusDetail.startsWith("gui.useless_mod.")
+                ? Component.translatable(task.statusDetail).getString()
+                : task.statusDetail;
+        String state = detail.isEmpty() ? status : status + ": " + detail;
+        String product = task.productName + " x" + task.totalOutputCount;
+        String combined = product + "  " + state;
+        if (font.width(combined) <= (int) (TASK_LIST_WIDTH / TASK_LIST_TEXT_SCALE)) {
+            return List.of(combined);
+        }
+        if (detail.isEmpty() || font.width(state) <= (int) (TASK_LIST_WIDTH / TASK_LIST_TEXT_SCALE)) {
+            return List.of(fitTaskLine(product), fitTaskLine(state));
+        }
+        return List.of(fitTaskLine(product), fitTaskLine(status), fitTaskLine(detail));
+    }
+
+    private List<List<com.sorrowmist.useless.network.AETaskProgressPacket.TaskProgressData>> taskPages() {
+        var tasks = new ArrayList<>(menu.getTaskProgress());
+        tasks.sort(Comparator
+                .comparing((com.sorrowmist.useless.network.AETaskProgressPacket.TaskProgressData task)
+                        -> task.productName)
+                .thenComparingInt(task -> task.progress));
+        List<List<com.sorrowmist.useless.network.AETaskProgressPacket.TaskProgressData>> pages = new ArrayList<>();
+        List<com.sorrowmist.useless.network.AETaskProgressPacket.TaskProgressData> page = new ArrayList<>();
+        int usedLines = 0;
+        for (var task : tasks) {
+            int requiredLines = taskLines(task).size();
+            if (!page.isEmpty() && usedLines + requiredLines > TASK_LIST_MAX_LINES) {
+                pages.add(List.copyOf(page));
+                page.clear();
+                usedLines = 0;
+            }
+            page.add(task);
+            usedLines += requiredLines;
+        }
+        if (!page.isEmpty() || pages.isEmpty()) {
+            pages.add(List.copyOf(page));
+        }
+        return pages;
+    }
+
+    private void updateTaskPageControls() {
+        int pageCount = taskPages().size();
+        taskPage = Math.clamp(taskPage, 0, pageCount - 1);
+        if (previousTaskPageButton != null) {
+            previousTaskPageButton.visible = pageCount > 1;
+            previousTaskPageButton.active = taskPage > 0;
+        }
+        if (nextTaskPageButton != null) {
+            nextTaskPageButton.visible = pageCount > 1;
+            nextTaskPageButton.active = taskPage < pageCount - 1;
+        }
+    }
+
+    private void changeTaskPage(int delta) {
+        int lastPage = taskPages().size() - 1;
+        taskPage = Math.clamp(taskPage + delta, 0, lastPage);
+        updateTaskPageControls();
     }
 
     @Override

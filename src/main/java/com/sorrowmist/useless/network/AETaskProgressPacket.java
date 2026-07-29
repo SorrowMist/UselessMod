@@ -3,6 +3,7 @@ package com.sorrowmist.useless.network;
 import com.sorrowmist.useless.UselessMod;
 import com.sorrowmist.useless.content.blockentities.AdvancedAlloyFurnaceBlockEntity;
 import com.sorrowmist.useless.content.blockentities.multiblock.MultiblockAlloyFurnaceCoreBlockEntity;
+import com.sorrowmist.useless.content.menus.MultiblockAlloyFurnaceMenu;
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.FriendlyByteBuf;
@@ -16,6 +17,11 @@ import java.util.ArrayList;
 import java.util.List;
 
 public record AETaskProgressPacket(BlockPos pos, List<AETaskProgressPacket.TaskProgressData> tasks) implements CustomPacketPayload {
+    public AETaskProgressPacket {
+        pos = pos.immutable();
+        tasks = List.copyOf(tasks);
+    }
+
     public static class TaskProgressData {
         public final String productName;
         public final int progress;
@@ -83,6 +89,11 @@ public record AETaskProgressPacket(BlockPos pos, List<AETaskProgressPacket.TaskP
     public static void handle(AETaskProgressPacket msg, IPayloadContext ctx) {
         ctx.enqueueWork(() -> {
             Minecraft mc = Minecraft.getInstance();
+            if (mc.player != null
+                    && mc.player.containerMenu instanceof MultiblockAlloyFurnaceMenu menu
+                    && menu.getBlockPos().equals(msg.pos)) {
+                menu.updateTaskProgress(msg.tasks);
+            }
             if (mc.level != null) {
                 var blockEntity = mc.level.getBlockEntity(msg.pos);
                 if (blockEntity instanceof AdvancedAlloyFurnaceBlockEntity furnace) {

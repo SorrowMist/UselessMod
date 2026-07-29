@@ -91,7 +91,7 @@ public final class OmniversalPatternJeiTransferHandler<T extends PatternEncoding
         if (inputs.size() > menu.getProcessingInputSlots().length
                 || outputs.size() > menu.getProcessingOutputSlots().length) {
             return helper.createUserErrorWithTooltip(
-                    Component.translatable("gui.useless_mod.omniversal_encoder.too_many_slots"));
+                    Component.translatable("gui.useless_mod.omniversal_pattern.too_many_slots"));
         }
         if (!doTransfer) {
             return null;

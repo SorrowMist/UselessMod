@@ -14,6 +14,7 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.neoforged.neoforge.network.PacketDistributor;
@@ -249,6 +250,17 @@ public final class AdvancedAlloyFurnaceAeManager {
         Level level = this.owner.getLevel();
         if (!(level instanceof ServerLevel serverLevel)) return;
 
+        var packet = createTaskProgressPacket();
+        PacketDistributor.sendToPlayersTrackingChunk(serverLevel,
+                new net.minecraft.world.level.ChunkPos(this.owner.getBlockPos()), packet);
+    }
+
+    public void sendAETaskProgressToPlayer(ServerPlayer player) {
+        if (player == null || !(this.owner.getLevel() instanceof ServerLevel)) return;
+        PacketDistributor.sendToPlayer(player, createTaskProgressPacket());
+    }
+
+    private AETaskProgressPacket createTaskProgressPacket() {
         List<AETaskProgressPacket.TaskProgressData> taskDataList = new ArrayList<>();
         for (var entry : this.aeTaskProgressMap.entrySet()) {
             AETaskProgress progress = entry.getValue();
@@ -278,8 +290,7 @@ public final class AdvancedAlloyFurnaceAeManager {
             }
         }
 
-        var packet = new AETaskProgressPacket(this.owner.getBlockPos(), taskDataList);
-        PacketDistributor.sendToPlayersTrackingChunk(serverLevel, new net.minecraft.world.level.ChunkPos(this.owner.getBlockPos()), packet);
+        return new AETaskProgressPacket(this.owner.getBlockPos(), taskDataList);
     }
 
     public List<IPatternDetails> getAvailablePatterns() {
@@ -408,6 +419,10 @@ public final class AdvancedAlloyFurnaceAeManager {
     }
 
     public void flushAEBatches() {
+        flushAEBatches(this::sendAETaskProgressToClients);
+    }
+
+    void flushAEBatches(Runnable syncProgress) {
         List<PendingAEBatch> ripe;
         synchronized (this.aePendingBatches) {
             var it = this.aePendingBatches.entrySet().iterator();
@@ -423,10 +438,17 @@ public final class AdvancedAlloyFurnaceAeManager {
             }
         }
 
+        boolean requeued = false;
         for (PendingAEBatch batch : ripe) {
             if (!this.flushBatch(batch)) {
                 this.requeueBatch(batch);
+                requeued = true;
             }
+        }
+        // A retry is removed from aePendingBatches while it is evaluated. Sync only
+        // after it has been reinserted, otherwise clients briefly receive an empty list.
+        if (requeued) {
+            syncProgress.run();
         }
     }
 
@@ -595,9 +617,8 @@ public final class AdvancedAlloyFurnaceAeManager {
         CraftingTask task = new CraftingTask(taskId, taskPattern, merged, totalCrafts, this.owner);
         if (!task.canStartNow()) {
             batch.allInputs.addAll(allInputs);
-            batch.statusKey = "gui.useless_mod.advanced_alloy_furnace.ae_task_status.waiting_mold";
+            batch.statusKey = task.getWaitingStatusKey();
             batch.statusDetail = task.getWaitingDetail();
-            this.sendAETaskProgressToClients();
             return false;
         }
 

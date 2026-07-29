@@ -8,6 +8,7 @@ import appeng.api.stacks.GenericStack;
 import appeng.crafting.pattern.AEProcessingPattern;
 import com.mojang.logging.LogUtils;
 import com.sorrowmist.useless.content.recipe.adapters.draconicevolution.DraconicFusionRecipeAdapter;
+import com.sorrowmist.useless.content.recipe.adapters.occultism.OccultismRitualRecipeAdapter;
 import com.sorrowmist.useless.core.component.OmniversalPatternData;
 import com.sorrowmist.useless.core.component.UComponents;
 import com.sorrowmist.useless.init.ModItems;
@@ -25,6 +26,7 @@ import java.util.Map;
 public final class AdvancedAlloyFurnacePatternResolver {
     private static final Logger LOGGER = LogUtils.getLogger();
     private static final String DRACONIC_EVOLUTION_MOD_ID = "draconicevolution";
+    private static final String OCCULTISM_MOD_ID = "occultism";
 
     private AdvancedAlloyFurnacePatternResolver() {
     }
@@ -64,14 +66,22 @@ public final class AdvancedAlloyFurnacePatternResolver {
     }
 
     public static IPatternDetails resolve(IPatternDetails pattern, Level level) {
-        if (!ModList.get().isLoaded(DRACONIC_EVOLUTION_MOD_ID)
-                || pattern instanceof DynamicComponentPattern
+        if (pattern instanceof DynamicComponentPattern
                 || !(pattern instanceof AEProcessingPattern processingPattern)) {
             return pattern;
         }
 
         try {
-            return resolveDynamicDraconicPattern(processingPattern, level);
+            if (ModList.get().isLoaded(DRACONIC_EVOLUTION_MOD_ID)) {
+                IPatternDetails resolved = resolveDynamicDraconicPattern(processingPattern, level);
+                if (resolved != processingPattern) {
+                    return resolved;
+                }
+            }
+            if (ModList.get().isLoaded(OCCULTISM_MOD_ID)) {
+                return resolveDynamicOccultismPattern(processingPattern, level);
+            }
+            return processingPattern;
         } catch (RuntimeException exception) {
             LOGGER.warn("Failed to create a component-aware AE view for pattern {}",
                     pattern.getDefinition(), exception);
@@ -100,6 +110,21 @@ public final class AdvancedAlloyFurnacePatternResolver {
                 executionPattern,
                 profile.idOnlyInputSlots(),
                 profile.idOnlyOutputSlots(),
+                level.registryAccess());
+    }
+
+    private static IPatternDetails resolveDynamicOccultismPattern(
+            AEProcessingPattern pattern, Level level) {
+        List<ItemStack> inputs = itemInputs(pattern);
+        List<ItemStack> outputs = itemOutputs(pattern);
+        var profile = OccultismRitualRecipeAdapter.findDynamicPatternProfile(level, inputs, outputs);
+        if (profile.isEmpty()) {
+            return pattern;
+        }
+        return new DynamicComponentPatternDetails(
+                pattern,
+                profile.get().idOnlyInputSlots(),
+                profile.get().idOnlyOutputSlots(),
                 level.registryAccess());
     }
 

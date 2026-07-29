@@ -7,10 +7,12 @@ import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.catalyst.C
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.catalyst.ResolvedCatalystEffect;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.parallel.AlloyFurnaceParallelCalculator;
 import com.sorrowmist.useless.content.recipe.AdvancedAlloyFurnaceRecipe;
+import com.sorrowmist.useless.content.recipe.AdapterUtils;
 import com.sorrowmist.useless.content.recipe.AlloyFurnaceRecipeManager;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.io.FurnaceOutputPort;
 import com.sorrowmist.useless.energy.IEnergyManager;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.crafting.Ingredient;
 import net.minecraft.world.level.Level;
 import net.neoforged.neoforge.fluids.FluidStack;
 import net.neoforged.neoforge.fluids.capability.templates.FluidTank;
@@ -105,10 +107,44 @@ public interface CraftingTaskContext {
     }
 
     default boolean isTaskRecipeAvailable(AdvancedAlloyFurnaceRecipe recipe) {
-        if (recipe == null) return false;
-        if (recipe.mold() == null || recipe.mold().isEmpty()) return true;
+        return getTaskAvailability(recipe).available();
+    }
+
+    default TaskAvailability getTaskAvailability(AdvancedAlloyFurnaceRecipe recipe) {
+        if (recipe == null) {
+            return TaskAvailability.unavailable(
+                    "gui.useless_mod.advanced_alloy_furnace.ae_task_status.waiting_recipe", "");
+        }
+        if (recipe.mold() == null || recipe.mold().isEmpty()) return TaskAvailability.ready();
         ItemStack mold = getItemHandler().getStackInSlot(getMoldSlot());
-        return !mold.isEmpty() && recipe.mold().test(mold);
+        return AdapterUtils.matchesMold(recipe.mold(), mold)
+                ? TaskAvailability.ready()
+                : TaskAvailability.unavailable(
+                        "gui.useless_mod.advanced_alloy_furnace.ae_task_status.waiting_missing_mold",
+                        describeRequiredMold(recipe.mold()));
+    }
+
+    static String describeRequiredMold(Ingredient ingredient) {
+        if (ingredient == null || ingredient.isEmpty()) return "";
+        for (ItemStack candidate : ingredient.getItems()) {
+            if (!candidate.isEmpty()) return candidate.getHoverName().getString();
+        }
+        return "";
+    }
+
+    record TaskAvailability(boolean available, String statusKey, String statusDetail) {
+        public TaskAvailability {
+            statusKey = statusKey == null ? "" : statusKey;
+            statusDetail = statusDetail == null ? "" : statusDetail;
+        }
+
+        public static TaskAvailability ready() {
+            return new TaskAvailability(true, "", "");
+        }
+
+        public static TaskAvailability unavailable(String statusKey, String statusDetail) {
+            return new TaskAvailability(false, statusKey, statusDetail);
+        }
     }
 
     default ResolvedCatalystEffect resolveTaskEffect(AdvancedAlloyFurnaceRecipe recipe) {

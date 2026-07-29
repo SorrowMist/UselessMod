@@ -16,7 +16,7 @@ class PassiveCraftingPacketsTest {
     @Test
     void settingsPayloadRoundTripsAllValidationFields() {
         var expected = new PassiveCraftingSettingsPacket(
-                42, new BlockPos(4, 70, -8), 72_000, Integer.MAX_VALUE);
+                42, new BlockPos(4, 70, -8), 72_000, Long.MAX_VALUE);
         FriendlyByteBuf buffer = new FriendlyByteBuf(Unpooled.buffer());
 
         PassiveCraftingSettingsPacket.STREAM_CODEC.encode(buffer, expected);

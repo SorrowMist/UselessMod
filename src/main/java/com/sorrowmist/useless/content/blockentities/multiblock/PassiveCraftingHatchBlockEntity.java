@@ -58,7 +58,7 @@ import java.util.concurrent.locks.ReentrantLock;
 public final class PassiveCraftingHatchBlockEntity extends BlockEntity
         implements MenuProvider, CraftingTaskContext {
     public static final int PATTERN_SLOTS = 30;
-    public static final int MENU_DATA_COUNT = 8;
+    public static final int MENU_DATA_COUNT = 10;
     public static final int MIN_INTERVAL_TICKS = 1;
     public static final int MAX_INTERVAL_TICKS = 72_000;
     public static final int DEFAULT_INTERVAL_TICKS = 1_200;
@@ -86,7 +86,7 @@ public final class PassiveCraftingHatchBlockEntity extends BlockEntity
     private long structureGeneration;
     private int intervalTicks = DEFAULT_INTERVAL_TICKS;
     private int countdownTicks = DEFAULT_INTERVAL_TICKS;
-    private int multiplier = 1;
+    private long multiplier = 1L;
     private long recipeCatalogGeneration = -1L;
     @Nullable
     private CompoundTag deferredTasksTag;
@@ -105,9 +105,11 @@ public final class PassiveCraftingHatchBlockEntity extends BlockEntity
                 case 2 -> getActivePatternSlots();
                 case 3 -> intervalTicks;
                 case 4 -> countdownTicks;
-                case 5 -> multiplier;
-                case 6 -> getCurrentMaxParallel();
-                case 7 -> getBusyMask();
+                case 5 -> (int) multiplier;
+                case 6 -> (int) (multiplier >>> 32);
+                case 7 -> (int) getCurrentMaxParallel();
+                case 8 -> (int) (getCurrentMaxParallel() >>> 32);
+                case 9 -> getBusyMask();
                 default -> 0;
             };
         }
@@ -146,7 +148,7 @@ public final class PassiveCraftingHatchBlockEntity extends BlockEntity
         return countdownTicks;
     }
 
-    public int getMultiplier() {
+    public long getMultiplier() {
         return multiplier;
     }
 
@@ -159,18 +161,18 @@ public final class PassiveCraftingHatchBlockEntity extends BlockEntity
         return Math.max(0, Math.min(PATTERN_SLOTS, coilTier * 3));
     }
 
-    public int getCurrentMaxParallel() {
+    public long getCurrentMaxParallel() {
         MultiblockAlloyFurnaceCoreBlockEntity controller = getController();
-        return controller == null ? 1 : Math.max(1, controller.getPassiveCraftingMaxParallel());
+        return controller == null ? 1L : Math.max(1L, controller.getPassiveCraftingMaxParallel());
     }
 
-    public void applySettings(int requestedInterval, int requestedMultiplier) {
+    public void applySettings(int requestedInterval, long requestedMultiplier) {
         if (getController() == null) {
             return;
         }
         int newInterval = Math.max(MIN_INTERVAL_TICKS,
                 Math.min(MAX_INTERVAL_TICKS, requestedInterval));
-        int newMultiplier = Math.max(1, Math.min(getCurrentMaxParallel(), requestedMultiplier));
+        long newMultiplier = Math.max(1L, Math.min(getCurrentMaxParallel(), requestedMultiplier));
         if (newInterval == intervalTicks && newMultiplier == multiplier) {
             return;
         }
@@ -354,18 +356,44 @@ public final class PassiveCraftingHatchBlockEntity extends BlockEntity
         }
     }
 
-    private static boolean amountsFit(OmniversalPatternDetails pattern, int operations) {
+    private static boolean amountsFit(OmniversalPatternDetails pattern, long operations) {
         try {
-            for (GenericStack output : pattern.getOutputs()) {
-                Math.multiplyExact(output.amount(), (long) operations);
-            }
-            for (GenericStack output : pattern.recipe().keyOutputs()) {
-                Math.multiplyExact(output.amount(), (long) operations);
+            Map<AEKey, Long> totals = new HashMap<>();
+            if (pattern.usesDynamicOutputs()) {
+                for (ItemStack output : pattern.recipe().outputs()) {
+                    addScaledAmount(totals, AEItemKey.of(output), output.getCount(), operations);
+                }
+                for (FluidStack output : pattern.recipe().outputFluids()) {
+                    addScaledAmount(totals, AEFluidKey.of(output), output.getAmount(), operations);
+                }
+                for (GenericStack output : pattern.recipe().keyOutputs()) {
+                    addScaledAmount(totals, output.what(), output.amount(), operations);
+                }
+            } else {
+                for (GenericStack output : pattern.getOutputs()) {
+                    addScaledAmount(totals, output.what(), output.amount(), operations);
+                }
+                for (GenericStack output : pattern.recipe().keyOutputs()) {
+                    boolean alreadyInPattern = pattern.getOutputs().stream()
+                            .anyMatch(patternOutput -> output.what().equals(patternOutput.what()));
+                    if (!alreadyInPattern) {
+                        addScaledAmount(totals, output.what(), output.amount(), operations);
+                    }
+                }
             }
             return true;
         } catch (ArithmeticException exception) {
             return false;
         }
+    }
+
+    private static void addScaledAmount(
+            Map<AEKey, Long> totals, @Nullable AEKey key, long amount, long operations) {
+        if (key == null || amount <= 0L) {
+            return;
+        }
+        long scaled = Math.multiplyExact(amount, operations);
+        totals.merge(key, scaled, Math::addExact);
     }
 
     public void prepareForRemoval() {
@@ -539,7 +567,7 @@ public final class PassiveCraftingHatchBlockEntity extends BlockEntity
         if (controller == null) {
             return;
         }
-        int clamped = Math.max(1,
+        long clamped = Math.max(1L,
                 Math.min(multiplier, controller.getPassiveCraftingMaxParallel()));
         if (clamped != multiplier) {
             multiplier = clamped;
@@ -582,7 +610,7 @@ public final class PassiveCraftingHatchBlockEntity extends BlockEntity
         if (!tag.contains("IntervalTicks")) {
             intervalTicks = DEFAULT_INTERVAL_TICKS;
         }
-        multiplier = Math.max(1, tag.getInt("Multiplier"));
+        multiplier = Math.max(1L, tag.getLong("Multiplier"));
         countdownTicks = intervalTicks;
         deferredTasksTag = tag.contains("PassiveTasks") ? tag.getCompound("PassiveTasks") : null;
         localUnreturnedInputs.clear();
@@ -606,7 +634,7 @@ public final class PassiveCraftingHatchBlockEntity extends BlockEntity
         }
         tag.putLong("StructureGeneration", structureGeneration);
         tag.putInt("IntervalTicks", intervalTicks);
-        tag.putInt("Multiplier", multiplier);
+        tag.putLong("Multiplier", multiplier);
         tag.put("PassiveTasks", saveTasks(registries));
         ListTag unreturned = new ListTag();
         for (GenericStack stack : localUnreturnedInputs) {
@@ -698,7 +726,7 @@ public final class PassiveCraftingHatchBlockEntity extends BlockEntity
 
     @Override
     public int getCatalystMaxParallel() {
-        return getCurrentMaxParallel();
+        return (int) Math.min(Integer.MAX_VALUE, getCurrentMaxParallel());
     }
 
     @Override
@@ -790,9 +818,14 @@ public final class PassiveCraftingHatchBlockEntity extends BlockEntity
     }
 
     @Override
-    public int getTaskParallel(AdvancedAlloyFurnaceRecipe recipe, ResolvedCatalystEffect effect) {
+    public long getTaskParallel(AdvancedAlloyFurnaceRecipe recipe, ResolvedCatalystEffect effect) {
         MultiblockAlloyFurnaceCoreBlockEntity controller = getRawController();
         return controller == null ? 1 : controller.getTaskParallel(recipe, effect);
+    }
+
+    @Override
+    public boolean supportsLongAeAmounts() {
+        return true;
     }
 
     @Override

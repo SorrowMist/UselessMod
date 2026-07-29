@@ -705,8 +705,9 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
             resolvedCatalystEffect = CatalystEffectResolver.resolve(this.currentRecipe, catalystStack, this.currentRecipe.processTime());
         }
 
-        targetParallel = Math.min(targetParallel, AlloyFurnaceParallelCalculator.calculateEnergyParallel(
-                this.currentRecipe, resolvedCatalystEffect));
+        targetParallel = (int) Math.min(targetParallel,
+                AlloyFurnaceParallelCalculator.calculateEnergyParallel(
+                        this.currentRecipe, resolvedCatalystEffect));
 
         AlloyFurnaceRecipeExecutor.CompletionEnergyResult completionEnergy = AlloyFurnaceRecipeExecutor.settleCompletionEnergy(
                 this.energyManager,

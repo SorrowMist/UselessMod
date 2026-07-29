@@ -113,6 +113,26 @@ final class AdvancedAlloyFurnacePatternPolicy {
         return Set.copyOf(result);
     }
 
+    static Set<AEKey> componentInputKeysFromGenericStacks(
+            @Nullable IPatternDetails pattern, List<GenericStack> actualInputs) {
+        IPatternDetails original = SmartDoublingPatterns.unwrap(pattern);
+        DynamicComponentPattern dynamic = dynamicDetails(original);
+        if (dynamic == null || actualInputs == null || actualInputs.isEmpty()) {
+            return Set.of();
+        }
+
+        Set<Item> relaxedItems = relaxedItems(original, dynamic);
+        Set<AEKey> result = new LinkedHashSet<>();
+        for (GenericStack stack : actualInputs) {
+            if (stack != null && stack.amount() > 0
+                    && stack.what() instanceof AEItemKey itemKey
+                    && relaxedItems.contains(itemKey.getItem())) {
+                result.add(itemKey);
+            }
+        }
+        return Set.copyOf(result);
+    }
+
     private static Set<Item> relaxedItems(
             IPatternDetails pattern, DynamicComponentPattern dynamic) {
         Set<Item> result = new LinkedHashSet<>();

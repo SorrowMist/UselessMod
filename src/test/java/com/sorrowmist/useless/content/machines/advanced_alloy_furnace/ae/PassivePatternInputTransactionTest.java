@@ -153,6 +153,19 @@ class PassivePatternInputTransactionTest {
                 planned.failure());
     }
 
+    @Test
+    void acceptsLongMaxOperationsWhenTheScaledAmountStillFits() {
+        AEItemKey iron = AEItemKey.of(new ItemStack(Items.IRON_INGOT));
+        IPatternDetails pattern = pattern(input(1L, iron::equals, iron));
+
+        var planned = PassivePatternInputTransaction.plan(
+                pattern, Long.MAX_VALUE, null, counter(iron, Long.MAX_VALUE));
+
+        assertEquals(PassivePatternInputTransaction.Failure.NONE, planned.failure());
+        assertEquals(Long.MAX_VALUE, planned.inputs()[0].get(iron));
+        assertEquals(Long.MAX_VALUE, planned.consumed().get(iron));
+    }
+
     private static KeyCounter counter(AEKey key, long amount) {
         KeyCounter result = new KeyCounter();
         result.add(key, amount);

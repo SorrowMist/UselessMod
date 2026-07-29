@@ -40,6 +40,10 @@
     {
       "id": "extendedcrafting:flux_crafter",
       "required": false
+    },
+    {
+      "id": "neoecoae:integrated_working_station",
+      "required": false
     }
   ]
 }

@@ -11,7 +11,6 @@ import appeng.api.stacks.KeyCounter;
 import appeng.crafting.execution.CraftingCpuHelper;
 import appeng.crafting.inv.ListCraftingInventory;
 import appeng.crafting.pattern.AEProcessingPattern;
-import com.sorrowmist.useless.compat.ae.DynamicReflectionSupport;
 import com.sorrowmist.useless.core.component.OmniversalPatternData;
 import com.sorrowmist.useless.core.component.UComponents;
 import com.sorrowmist.useless.init.ModItems;
@@ -325,16 +324,6 @@ class AdvancedAlloyFurnacePatternResolverTest {
                 new GenericStack(craftedKey, 1),
                 new GenericStack(ironKey, 1),
                 new GenericStack(craftedKey, 1)), pushed);
-    }
-
-    @Test
-    void optionalCpuTargetsMayBeAbsent() {
-        assertDoesNotThrow(() -> Class.forName("appeng.crafting.execution.ExecutingCraftingJob"));
-        assertDoesNotThrow(() -> Class.forName("appeng.crafting.execution.CraftingCpuLogic"));
-        assertNull(DynamicReflectionSupport.findClassSafe(
-                "net.pedroksl.advanced_ae.common.logic.AdvCraftingCPULogic"));
-        assertNull(DynamicReflectionSupport.findClassSafe(
-                "cn.dancingsnow.neoecoae.api.me.ECOCraftingCPULogic"));
     }
 
     private static ListCraftingInventory inventoryWith(ItemStack stack) {

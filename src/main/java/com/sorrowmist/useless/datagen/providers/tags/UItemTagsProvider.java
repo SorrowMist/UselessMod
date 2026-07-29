@@ -77,7 +77,8 @@ public class UItemTagsProvider extends ItemTagsProvider {
             .addOptional(ResourceLocation.fromNamespaceAndPath("extendedcrafting", "compressor"))
             .addOptional(ResourceLocation.fromNamespaceAndPath("extendedcrafting", "crafting_core"))
             .addOptional(ResourceLocation.fromNamespaceAndPath("extendedcrafting", "ender_crafter"))
-            .addOptional(ResourceLocation.fromNamespaceAndPath("extendedcrafting", "flux_crafter"));
+            .addOptional(ResourceLocation.fromNamespaceAndPath("extendedcrafting", "flux_crafter"))
+            .addOptional(ResourceLocation.fromNamespaceAndPath("neoecoae", "integrated_working_station"));
     }
 
     private void addCTags() {

@@ -22,6 +22,14 @@ class PassiveCraftingHatchMenuTest {
         assertSame(readOnly, PassiveCraftingHatchMenu.createMenuData(false, readOnly));
     }
 
+    @Test
+    void joinsLongMultiplierDataWithoutLosingHighBits() {
+        assertEquals(Long.MAX_VALUE,
+                PassiveCraftingHatchMenu.join(-1, Integer.MAX_VALUE));
+        assertEquals((long) Integer.MAX_VALUE + 1L,
+                PassiveCraftingHatchMenu.join(Integer.MIN_VALUE, 0));
+    }
+
     private static ContainerData readOnlyData() {
         return new ContainerData() {
             @Override

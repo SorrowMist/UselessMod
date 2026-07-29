@@ -18,7 +18,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class AlloyFurnaceLongEnergyTest {
     private static final ResolvedCatalystEffect NORMAL = new ResolvedCatalystEffect(
-            CatalystType.NONE, 1, 1, 4, true, false, 0);
+            CatalystType.NONE, 1, 1, 4, true, 1, false, 0);
+    private static final ResolvedCatalystEffect HALF_ENERGY = new ResolvedCatalystEffect(
+            CatalystType.NONE, 4, 4, 4, true, 2, false, 0);
 
     @Test
     void paysOneProgressStepAcrossMultipleBufferFills() {
@@ -75,6 +77,23 @@ class AlloyFurnaceLongEnergyTest {
         assertEquals(2, result.actualParallel());
         assertEquals(100L, result.additionalEnergyConsumed());
         assertEquals(50L, energy.getEnergyStoredLong());
+    }
+
+    @Test
+    void discountedCompletionUsesTheCombinedBatchPriceBeforeRounding() {
+        EnergyManager energy = EnergyManager.builder()
+                .capacity(5L)
+                .maxExtract(0L)
+                .initialEnergy(5L)
+                .build();
+
+        AlloyFurnaceRecipeExecutor.CompletionEnergyResult result =
+                AlloyFurnaceRecipeExecutor.settleCompletionEnergy(
+                        energy, 3L, 4, 0L, HALF_ENERGY);
+
+        assertEquals(3, result.actualParallel());
+        assertEquals(5L, result.additionalEnergyConsumed());
+        assertEquals(0L, energy.getEnergyStoredLong());
     }
 
     @Test

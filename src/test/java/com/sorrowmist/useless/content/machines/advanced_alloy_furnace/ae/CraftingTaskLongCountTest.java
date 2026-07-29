@@ -63,6 +63,27 @@ class CraftingTaskLongCountTest {
     }
 
     @Test
+    void longAeContextsKeepLongMaxInputsAsOneGenericStack() {
+        AEItemKey paper = AEItemKey.of(new ItemStack(Items.PAPER));
+        KeyCounter input = new KeyCounter();
+        input.add(paper, Long.MAX_VALUE);
+        CraftingTaskContext context = (CraftingTaskContext) Proxy.newProxyInstance(
+                getClass().getClassLoader(), new Class<?>[]{CraftingTaskContext.class},
+                (proxy, method, arguments) -> method.getName().equals("supportsLongAeAmounts"));
+        CraftingTask task = new CraftingTask(
+                9, pattern(), new KeyCounter[]{input}, Long.MAX_VALUE, context);
+
+        CompoundTag saved = task.save(registries);
+        var inputs = saved.getList("Inputs", Tag.TAG_COMPOUND);
+        GenericStack stored = GenericStack.readTag(registries, inputs.getCompound(0));
+
+        assertEquals(1, inputs.size());
+        assertNotNull(stored);
+        assertEquals(paper, stored.what());
+        assertEquals(Long.MAX_VALUE, stored.amount());
+    }
+
+    @Test
     void progressTotalsRemainExactAboveTheIntegerRange() {
         long craftCount = (long) Integer.MAX_VALUE + 9L;
         long totalOutput = craftCount * 7L;
@@ -80,7 +101,7 @@ class CraftingTaskLongCountTest {
     void mergedBatchesAddTheirRealOperationCounts() {
         CraftingTaskContext context = (CraftingTaskContext) Proxy.newProxyInstance(
                 getClass().getClassLoader(), new Class<?>[]{CraftingTaskContext.class},
-                (proxy, method, arguments) -> null);
+                (proxy, method, arguments) -> method.getReturnType() == boolean.class ? false : null);
         CraftingTask task = new CraftingTask(
                 8, pattern(), new KeyCounter[0], 2L, context);
 

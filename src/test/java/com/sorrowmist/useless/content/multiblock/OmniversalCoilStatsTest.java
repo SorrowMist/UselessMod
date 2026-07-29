@@ -4,6 +4,7 @@ import com.sorrowmist.useless.api.enums.AlloyFurnaceMode;
 import com.sorrowmist.useless.api.enums.CatalystType;
 import com.sorrowmist.useless.content.blocks.multiblock.UselessCoilBlock;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.execution.AlloyFurnaceRecipeExecutor;
+import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.parallel.AlloyFurnaceParallelCalculator;
 import com.sorrowmist.useless.content.recipe.AdvancedAlloyFurnaceRecipe;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.crafting.Ingredient;
@@ -24,17 +25,26 @@ class OmniversalCoilStatsTest {
             Ingredient.EMPTY, 0, Ingredient.EMPTY, AlloyFurnaceMode.NORMAL);
 
     @Test
-    void uselessCoilsReuseTheirMatchingCatalystRulesWithExtraThreads() {
+    void uselessCoilsProvideQuarticParallelAndHalveEnergyAtEachTier() {
         for (int tier = UselessCoilBlock.MIN_TIER; tier < UselessCoilBlock.USEFUL_TIER; tier++) {
             OmniversalCoilStats stats = OmniversalCoilStats.forTier(tier);
             CatalystType expectedType = CatalystType.uselessIngotTier(tier);
             var effect = stats.resolveEffect(NORMAL_RECIPE);
+            long expectedParallel = 1L << (tier * 2);
+            int expectedEnergyDivisor = 1 << tier;
 
             assertEquals(expectedType, stats.catalystType());
-            assertEquals(expectedType.getNormalRecipeParallel(), stats.singleTaskParallel());
-            assertEquals(expectedType.getNormalRecipeParallel(), effect.recipeParallel());
+            assertEquals(expectedParallel, stats.singleTaskParallel());
+            assertEquals(expectedParallel, effect.catalystParallel());
+            assertEquals(expectedParallel, effect.recipeParallel());
+            assertEquals(expectedEnergyDivisor, stats.energyDivisor());
+            assertEquals(expectedEnergyDivisor, effect.energyDivisor());
             assertEquals(expectedType.calculateProcessTime(NORMAL_RECIPE.processTime()), effect.processTime());
             assertTrue(effect.energyMultipliesWithParallel());
+            assertEquals((1_000L * expectedParallel + expectedEnergyDivisor - 1L)
+                            / expectedEnergyDivisor,
+                    AlloyFurnaceRecipeExecutor.calculateTargetTotalEnergy(
+                            NORMAL_RECIPE.energy(), expectedParallel, effect));
             assertEquals(tier + 1, stats.threads());
             assertTrue((long) stats.threads() * stats.singleTaskParallel()
                     > stats.singleTaskParallel());
@@ -42,17 +52,22 @@ class OmniversalCoilStatsTest {
     }
 
     @Test
-    void usefulCoilKeepsUsefulIngotSpecialRules() {
+    void usefulCoilKeepsItsOneTickAndLongMaxParallelSpecialRules() {
         OmniversalCoilStats stats = OmniversalCoilStats.forTier(UselessCoilBlock.USEFUL_TIER);
         var effect = stats.resolveEffect(NORMAL_RECIPE);
 
         assertEquals(CatalystType.USEFUL_INGOT, stats.catalystType());
-        assertEquals(Integer.MAX_VALUE, stats.singleTaskParallel());
-        assertEquals(Integer.MAX_VALUE, effect.recipeParallel());
+        assertEquals(Long.MAX_VALUE, stats.singleTaskParallel());
+        assertEquals(Long.MAX_VALUE, effect.catalystParallel());
+        assertEquals(Long.MAX_VALUE, effect.recipeParallel());
+        assertEquals(1_024, stats.energyDivisor());
+        assertEquals(1_024, effect.energyDivisor());
         assertEquals(11, stats.threads());
         assertEquals(1, effect.processTime());
         assertFalse(effect.energyMultipliesWithParallel());
-        assertEquals(1_000L, AlloyFurnaceRecipeExecutor.calculateTargetTotalEnergy(
+        assertEquals(Long.MAX_VALUE,
+                AlloyFurnaceParallelCalculator.calculateAeTaskParallel(NORMAL_RECIPE, effect));
+        assertEquals(1L, AlloyFurnaceRecipeExecutor.calculateTargetTotalEnergy(
                 NORMAL_RECIPE.energy(), 1_000_000, effect));
         assertEquals(Long.MAX_VALUE, stats.energyCapacity());
         assertEquals(Long.MAX_VALUE, stats.maxReceive());

@@ -11,6 +11,8 @@ import com.sorrowmist.useless.content.recipe.AdvancedAlloyFurnaceRecipe;
 public record OmniversalCoilStats(
         int tier,
         CatalystType catalystType,
+        long singleTaskParallel,
+        int energyDivisor,
         int threads,
         long energyCapacity,
         long maxReceive
@@ -24,13 +26,19 @@ public record OmniversalCoilStats(
         return BY_TIER[tier - UselessCoilBlock.MIN_TIER];
     }
 
-    public int singleTaskParallel() {
-        return catalystType.getNormalRecipeParallel();
-    }
-
     public ResolvedCatalystEffect resolveEffect(AdvancedAlloyFurnaceRecipe recipe) {
         int baseTime = recipe == null ? 200 : Math.max(1, recipe.processTime());
-        return CatalystEffectResolver.resolveForType(recipe, catalystType, baseTime);
+        ResolvedCatalystEffect catalystEffect =
+                CatalystEffectResolver.resolveForType(recipe, catalystType, baseTime);
+        return new ResolvedCatalystEffect(
+                catalystEffect.catalystType(),
+                singleTaskParallel,
+                singleTaskParallel,
+                catalystEffect.processTime(),
+                catalystEffect.energyMultipliesWithParallel(),
+                energyDivisor,
+                catalystEffect.uselessIngotRecipe(),
+                catalystEffect.targetUselessIngotTier());
     }
 
     private static OmniversalCoilStats[] createStats() {
@@ -39,9 +47,14 @@ public record OmniversalCoilStats(
             CatalystType catalystType = tier == UselessCoilBlock.USEFUL_TIER
                     ? CatalystType.USEFUL_INGOT
                     : CatalystType.uselessIngotTier(tier);
+            long singleTaskParallel = tier == UselessCoilBlock.USEFUL_TIER
+                    ? Long.MAX_VALUE
+                    : 1L << (tier * 2);
             stats[tier - UselessCoilBlock.MIN_TIER] = new OmniversalCoilStats(
                     tier,
                     catalystType,
+                    singleTaskParallel,
+                    1 << tier,
                     tier + 1,
                     AdvancedAlloyFurnaceBlockEntity.calculateEnergyCapacity(tier),
                     AdvancedAlloyFurnaceBlockEntity.calculateEnergyReceive(tier));

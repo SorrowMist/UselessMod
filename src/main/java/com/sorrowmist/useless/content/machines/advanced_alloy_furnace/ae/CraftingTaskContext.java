@@ -121,9 +121,14 @@ public interface CraftingTaskContext {
                 : Math.max(1, effect.processTime());
     }
 
-    default int getTaskParallel(AdvancedAlloyFurnaceRecipe recipe, ResolvedCatalystEffect effect) {
+    default long getTaskParallel(AdvancedAlloyFurnaceRecipe recipe, ResolvedCatalystEffect effect) {
         return recipe == null || effect == null ? 1
                 : AlloyFurnaceParallelCalculator.calculateAeTaskParallel(recipe, effect);
+    }
+
+    /** Long-count AE contexts keep item and fluid amounts as AE keys instead of int-sized stacks. */
+    default boolean supportsLongAeAmounts() {
+        return false;
     }
 
     default boolean isTaskExecutionEnabled() {

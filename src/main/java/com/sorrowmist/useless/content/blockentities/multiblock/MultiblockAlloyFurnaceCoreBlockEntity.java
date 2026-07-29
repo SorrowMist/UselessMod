@@ -315,7 +315,7 @@ public final class MultiblockAlloyFurnaceCoreBlockEntity extends BlockEntity imp
         return structureGeneration;
     }
 
-    public int getPassiveCraftingMaxParallel() {
+    public long getPassiveCraftingMaxParallel() {
         return formed ? OmniversalCoilStats.forTier(coilTier).singleTaskParallel() : 1;
     }
 
@@ -402,8 +402,13 @@ public final class MultiblockAlloyFurnaceCoreBlockEntity extends BlockEntity imp
     }
 
     @Override
-    public int getTaskParallel(AdvancedAlloyFurnaceRecipe recipe, ResolvedCatalystEffect effect) {
+    public long getTaskParallel(AdvancedAlloyFurnaceRecipe recipe, ResolvedCatalystEffect effect) {
         return AlloyFurnaceParallelCalculator.calculateAeTaskParallel(recipe, effect);
+    }
+
+    @Override
+    public boolean supportsLongAeAmounts() {
+        return true;
     }
 
     @Override

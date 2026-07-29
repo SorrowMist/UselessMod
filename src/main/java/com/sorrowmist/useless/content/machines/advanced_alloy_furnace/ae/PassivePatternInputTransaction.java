@@ -42,7 +42,7 @@ public final class PassivePatternInputTransaction {
         void accept(AEKey key, long amount);
     }
 
-    public static Result extract(IPatternDetails pattern, int operations, @Nullable Level level,
+    public static Result extract(IPatternDetails pattern, long operations, @Nullable Level level,
                                  MEStorage storage, IActionSource source, KeyCounter available,
                                  UnreturnedInputSink unreturnedInputSink) {
         return extractAll(List.of(pattern), operations, level, storage, source, available,
@@ -50,7 +50,7 @@ public final class PassivePatternInputTransaction {
     }
 
     /** Plans every pattern against one shared snapshot, then commits the whole round atomically. */
-    public static List<Result> extractAll(List<? extends IPatternDetails> patterns, int operations,
+    public static List<Result> extractAll(List<? extends IPatternDetails> patterns, long operations,
                                           @Nullable Level level, MEStorage storage, IActionSource source,
                                           KeyCounter available,
                                           UnreturnedInputSink unreturnedInputSink) {
@@ -119,7 +119,7 @@ public final class PassivePatternInputTransaction {
         return List.copyOf(results);
     }
 
-    static PlannedExtraction plan(IPatternDetails pattern, int operations,
+    static PlannedExtraction plan(IPatternDetails pattern, long operations,
                                   @Nullable Level level, KeyCounter available) {
         if (operations <= 0) {
             return PlannedExtraction.failure(Failure.AMOUNT_OVERFLOW, null);
@@ -140,7 +140,7 @@ public final class PassivePatternInputTransaction {
 
             long required;
             try {
-                required = Math.multiplyExact(input.getMultiplier(), (long) operations);
+                required = Math.multiplyExact(input.getMultiplier(), operations);
             } catch (ArithmeticException exception) {
                 return PlannedExtraction.failure(Failure.AMOUNT_OVERFLOW, firstPossibleKey(input));
             }

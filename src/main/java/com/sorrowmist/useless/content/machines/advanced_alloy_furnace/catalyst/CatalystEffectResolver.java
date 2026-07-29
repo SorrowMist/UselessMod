@@ -36,6 +36,7 @@ public final class CatalystEffectResolver {
                 Math.max(1, recipeParallel),
                 resolvedType.calculateProcessTime(baseProcessTime),
                 !resolvedType.isUsefulIngot(),
+                1,
                 uselessIngotRecipe,
                 targetTier
         );

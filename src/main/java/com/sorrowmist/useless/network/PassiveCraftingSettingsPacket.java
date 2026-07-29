@@ -13,7 +13,7 @@ import net.neoforged.neoforge.network.handling.IPayloadContext;
 import org.jetbrains.annotations.NotNull;
 
 public record PassiveCraftingSettingsPacket(
-        int containerId, BlockPos pos, int intervalTicks, int multiplier)
+        int containerId, BlockPos pos, int intervalTicks, long multiplier)
         implements CustomPacketPayload {
     public static final Type<PassiveCraftingSettingsPacket> TYPE = new Type<>(
             ResourceLocation.fromNamespaceAndPath(UselessMod.MODID, "passive_crafting_settings"));
@@ -22,9 +22,9 @@ public record PassiveCraftingSettingsPacket(
                 buf.writeVarInt(packet.containerId);
                 buf.writeBlockPos(packet.pos);
                 buf.writeVarInt(packet.intervalTicks);
-                buf.writeVarInt(packet.multiplier);
+                buf.writeVarLong(packet.multiplier);
             }, buf -> new PassiveCraftingSettingsPacket(
-                    buf.readVarInt(), buf.readBlockPos(), buf.readVarInt(), buf.readVarInt()));
+                    buf.readVarInt(), buf.readBlockPos(), buf.readVarInt(), buf.readVarLong()));
 
     public static void handle(PassiveCraftingSettingsPacket packet, IPayloadContext context) {
         context.enqueueWork(() -> {

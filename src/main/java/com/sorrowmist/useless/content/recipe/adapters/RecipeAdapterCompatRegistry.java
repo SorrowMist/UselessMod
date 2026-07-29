@@ -29,6 +29,7 @@ import com.sorrowmist.useless.content.recipe.adapters.mysticalagriculture.SeedEs
 import com.sorrowmist.useless.content.recipe.adapters.productivebees.BeeProduceRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.productivebees.CentrifugeRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.draconicevolution.DraconicFusionRecipeAdapter;
+import com.sorrowmist.useless.content.recipe.adapters.eco.IntegratedWorkingStationRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.powah.EnergizingRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.extendedcrafting.ExtendedCraftingCombinationRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.extendedcrafting.ExtendedCraftingCompressorRecipeAdapter;
@@ -61,6 +62,7 @@ public final class RecipeAdapterCompatRegistry {
     public static final String DRACONIC_EVOLUTION = "draconicevolution";
     public static final String POWAH = "powah";
     public static final String EXTENDED_CRAFTING = "extendedcrafting";
+    public static final String NEO_ECO_AE = "neoecoae";
 
     private static final List<CompatEntry> ENTRIES = List.of(
             new CompatEntry(null, RecipeAdapterCompatRegistry::registerMinecraft),
@@ -78,7 +80,8 @@ public final class RecipeAdapterCompatRegistry {
             new CompatEntry(PRODUCTIVE_BEES, RecipeAdapterCompatRegistry::registerProductiveBees),
             new CompatEntry(DRACONIC_EVOLUTION, RecipeAdapterCompatRegistry::registerDraconicEvolution),
             new CompatEntry(POWAH, RecipeAdapterCompatRegistry::registerPowah),
-            new CompatEntry(EXTENDED_CRAFTING, RecipeAdapterCompatRegistry::registerExtendedCrafting)
+            new CompatEntry(EXTENDED_CRAFTING, RecipeAdapterCompatRegistry::registerExtendedCrafting),
+            new CompatEntry(NEO_ECO_AE, RecipeAdapterCompatRegistry::registerNeoECOAE)
     );
 
     private RecipeAdapterCompatRegistry() {}
@@ -188,6 +191,10 @@ public final class RecipeAdapterCompatRegistry {
         register(new ExtendedCraftingCombinationRecipeAdapter());
         register(new ExtendedCraftingEnderCrafterRecipeAdapter());
         register(new ExtendedCraftingFluxCrafterRecipeAdapter());
+    }
+
+    private static void registerNeoECOAE() {
+        register(new IntegratedWorkingStationRecipeAdapter());
     }
 
     private record CompatEntry(@Nullable String modId, Runnable registerAction) {}

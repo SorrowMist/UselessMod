@@ -135,6 +135,14 @@ config="${mod_id}.mixins.json"
     ordering="AFTER"
     side="BOTH"
 
+# Optional ECO Integrated Working Station recipe compatibility
+[[dependencies.${mod_id}]]
+    modId="neoecoae"
+    type="optional"
+    versionRange="[21.1.1,)"
+    ordering="AFTER"
+    side="BOTH"
+
 # Optional long-energy capability integrations
 [[dependencies.${mod_id}]]
     modId="mekanism"

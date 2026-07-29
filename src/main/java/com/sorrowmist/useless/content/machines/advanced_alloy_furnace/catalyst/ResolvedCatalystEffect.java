@@ -8,10 +8,11 @@ import com.sorrowmist.useless.api.enums.CatalystType;
  */
 public record ResolvedCatalystEffect(
         CatalystType catalystType,
-        int catalystParallel,
-        int recipeParallel,
+        long catalystParallel,
+        long recipeParallel,
         int processTime,
         boolean energyMultipliesWithParallel,
+        int energyDivisor,
         boolean uselessIngotRecipe,
         int targetUselessIngotTier
 ) {

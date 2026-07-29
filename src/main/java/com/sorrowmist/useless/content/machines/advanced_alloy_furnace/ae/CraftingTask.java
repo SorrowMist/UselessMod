@@ -54,9 +54,9 @@ public class CraftingTask {
     private boolean initialized = false;
     private int baseProcessTime = 200;
     private long baseEnergyPerTick = 200L;
-    private int maxParallel = 1;
+    private long maxParallel = 1L;
     private int batches = 1;
-    private int lastBatchSize = 1;
+    private long lastBatchSize = 1L;
     private int processTime = 200;
     private int progress = 0;
     private int progressUpdateCounter = 0;
@@ -73,7 +73,8 @@ public class CraftingTask {
         this.context = context;
         this.craftCount = Math.max(1L, totalCrafts);
         this.displayedCraftCount = this.craftCount;
-        storeInputMaterials(inputHolder, this.taskInputItems, this.taskInputFluids, this.taskInputKeys);
+        storeInputMaterials(inputHolder, this.taskInputItems, this.taskInputFluids,
+                this.taskInputKeys, context != null && context.supportsLongAeAmounts());
         this.componentInputKeys = AdvancedAlloyFurnacePatternPolicy.componentInputKeys(pattern, inputHolder);
     }
 
@@ -87,7 +88,7 @@ public class CraftingTask {
         this.taskInputItems.addAll(subTask.items);
         this.taskInputFluids.addAll(subTask.fluids);
         this.taskInputKeys.addAll(subTask.keys);
-        this.componentInputKeys = AdvancedAlloyFurnacePatternPolicy.componentInputKeys(pattern, this.taskInputItems);
+        this.componentInputKeys = resolveComponentInputKeys();
     }
 
     /** 用于从 NBT 恢复的空任务构造 */
@@ -185,7 +186,7 @@ public class CraftingTask {
         List<ItemStack> items = new ArrayList<>();
         List<FluidStack> fluids = new ArrayList<>();
         List<OutputKey> keys = new ArrayList<>();
-        storeInputMaterials(counters, items, fluids, keys);
+        storeInputMaterials(counters, items, fluids, keys, context.supportsLongAeAmounts());
         return new CraftingSubTask(items, fluids, keys, crafts);
     }
 
@@ -196,14 +197,16 @@ public class CraftingTask {
         List<FluidStack> fluids = new ArrayList<>();
         List<OutputKey> keys = new ArrayList<>();
         for (KeyCounter[] counters : allInputs) {
-            storeInputMaterials(counters, items, fluids, keys);
+            storeInputMaterials(counters, items, fluids, keys, context.supportsLongAeAmounts());
         }
         long operations = saturatingMultiply(
                 Math.max(1L, allInputs.size()), Math.max(1L, operationsPerPush));
         return new CraftingSubTask(items, fluids, keys, operations);
     }
 
-    private static void storeInputMaterials(KeyCounter[] counters, List<ItemStack> items, List<FluidStack> fluids, List<OutputKey> keys) {
+    private static void storeInputMaterials(
+            KeyCounter[] counters, List<ItemStack> items, List<FluidStack> fluids,
+            List<OutputKey> keys, boolean keepLongAmounts) {
         if (counters == null) return;
 
         for (KeyCounter counter : counters) {
@@ -212,6 +215,10 @@ public class CraftingTask {
             for (var entry : counter) {
                 AEKey key = entry.getKey();
                 long amount = entry.getLongValue();
+                if (keepLongAmounts) {
+                    keys.add(new OutputKey(key, amount));
+                    continue;
+                }
 
                 // ItemStack/FluidStack 数量是 int：512M 级请求直接强转会溢出为负，
                 // 导致材料变空、配方匹配失败。超出部分按 int 上限分块存放。
@@ -324,7 +331,7 @@ public class CraftingTask {
         List<FluidStack> fluids = new ArrayList<>();
         List<OutputKey> keys = new ArrayList<>();
         for (KeyCounter[] counters : allInputs) {
-            storeInputMaterials(counters, items, fluids, keys);
+            storeInputMaterials(counters, items, fluids, keys, context.supportsLongAeAmounts());
         }
         returnMaterials(context, items, fluids, keys);
     }
@@ -466,9 +473,8 @@ public class CraftingTask {
         long recipeEnergy = recipe != null
                 ? Math.max(0L, recipe.energy())
                 : saturatingMultiply(baseEnergyPerTick, Math.max(1, baseProcessTime));
-        long targetEnergy = resolvedCatalystEffect.energyMultipliesWithParallel()
-                ? saturatingMultiply(recipeEnergy, craftCount)
-                : recipeEnergy;
+        long targetEnergy = AlloyFurnaceRecipeExecutor.calculateTargetTotalEnergy(
+                recipeEnergy, craftCount, resolvedCatalystEffect);
         return new ProgressEnergyStep(targetEnergy, progress, processTime, false);
     }
 
@@ -520,7 +526,7 @@ public class CraftingTask {
         batches = (int) Math.min(batchesLong, Integer.MAX_VALUE);
         long processTimeLong = saturatingMultiply(Math.max(1, baseProcessTime), batchesLong);
         processTime = (int) Math.min(processTimeLong, Integer.MAX_VALUE);
-        lastBatchSize = (int) (1L + (Math.max(1L, craftCount) - 1L) % parallel);
+        lastBatchSize = 1L + (Math.max(1L, craftCount) - 1L) % parallel;
     }
 
     private void updateDisplayedCraftCount() {
@@ -552,7 +558,7 @@ public class CraftingTask {
         taskInputFluids.addAll(subTask.fluids);
         taskInputKeys.clear();
         taskInputKeys.addAll(subTask.keys);
-        componentInputKeys = AdvancedAlloyFurnacePatternPolicy.componentInputKeys(pattern, taskInputItems);
+        componentInputKeys = resolveComponentInputKeys();
         invalidateRecipeCache(); // 输入已变更，配方缓存失效
         craftCount = subTask.craftCount;
         progress = 0;
@@ -608,10 +614,10 @@ public class CraftingTask {
 
         if (recipe != null && AdvancedAlloyFurnacePatternPolicy.usesRecipeOutputs(pattern)) {
             for (ItemStack output : recipe.outputs()) {
-                addPendingItem(output, saturatingMultiply(output.getCount(), craftCount));
+                addPendingItemOrKey(output, saturatingMultiply(output.getCount(), craftCount));
             }
             for (FluidStack output : recipe.outputFluids()) {
-                addPendingFluid(output, saturatingMultiply(output.getAmount(), craftCount));
+                addPendingFluidOrKey(output, saturatingMultiply(output.getAmount(), craftCount));
             }
             for (GenericStack output : recipe.keyOutputs()) {
                 if (output != null && output.what() != null && output.amount() > 0) {
@@ -624,7 +630,10 @@ public class CraftingTask {
         }
 
         for (var output : pattern.getOutputs()) {
-            if (output.what() instanceof AEItemKey itemKey) {
+            if (context.supportsLongAeAmounts()) {
+                pendingOutputKeys.add(new OutputKey(
+                        output.what(), saturatingMultiply(output.amount(), craftCount)));
+            } else if (output.what() instanceof AEItemKey itemKey) {
                 addPendingItem(itemKey.toStack(), saturatingMultiply(output.amount(), craftCount));
             } else if (output.what() instanceof AEFluidKey fluidKey) {
                 long remaining = saturatingMultiply(output.amount(), craftCount);
@@ -666,12 +675,30 @@ public class CraftingTask {
         }
     }
 
+    private void addPendingItemOrKey(ItemStack template, long amount) {
+        AEItemKey key = AEItemKey.of(template);
+        if (context.supportsLongAeAmounts() && key != null) {
+            pendingOutputKeys.add(new OutputKey(key, amount));
+        } else {
+            addPendingItem(template, amount);
+        }
+    }
+
     private void addPendingFluid(FluidStack template, long amount) {
         long remaining = amount;
         while (!template.isEmpty() && remaining > 0) {
             int chunk = (int) Math.min(remaining, Integer.MAX_VALUE);
             pendingOutputFluids.add(template.copyWithAmount(chunk));
             remaining -= chunk;
+        }
+    }
+
+    private void addPendingFluidOrKey(FluidStack template, long amount) {
+        AEFluidKey key = AEFluidKey.of(template);
+        if (context.supportsLongAeAmounts() && key != null) {
+            pendingOutputKeys.add(new OutputKey(key, amount));
+        } else {
+            addPendingFluid(template, amount);
         }
     }
 
@@ -760,9 +787,9 @@ public class CraftingTask {
             tag.putInt("ProcessTime", processTime);
             tag.putInt("BaseProcessTime", baseProcessTime);
             tag.putLong("BaseEnergyPerTick", baseEnergyPerTick);
-            tag.putInt("MaxParallel", maxParallel);
+            tag.putLong("MaxParallel", maxParallel);
             tag.putInt("Batches", batches);
-            tag.putInt("LastBatchSize", lastBatchSize);
+            tag.putLong("LastBatchSize", lastBatchSize);
             tag.putLong("AccumulatedEnergy", accumulatedEnergy);
             tag.putBoolean("AwaitingOutputFlush", awaitingOutputFlush);
             tag.put("PendingOutputs", writeStacks(registries, pendingOutputItems, pendingOutputFluids, pendingOutputKeys));
@@ -788,8 +815,10 @@ public class CraftingTask {
         int taskId = tag.getInt("TaskId");
         CraftingTask task = new CraftingTask(taskId, pattern, context);
         task.craftCount = Math.max(1L, tag.getLong("CraftCount"));
-        readStacks(registries, tag.getList("Inputs", Tag.TAG_COMPOUND), task.taskInputItems, task.taskInputFluids, task.taskInputKeys);
-        task.componentInputKeys = AdvancedAlloyFurnacePatternPolicy.componentInputKeys(pattern, task.taskInputItems);
+        readStacks(registries, tag.getList("Inputs", Tag.TAG_COMPOUND),
+                task.taskInputItems, task.taskInputFluids, task.taskInputKeys,
+                context.supportsLongAeAmounts());
+        task.componentInputKeys = task.resolveComponentInputKeys();
 
         ListTag subTasksTag = tag.getList("SubTasks", Tag.TAG_COMPOUND);
         for (int i = 0; i < subTasksTag.size(); i++) {
@@ -797,7 +826,8 @@ public class CraftingTask {
             List<ItemStack> items = new ArrayList<>();
             List<FluidStack> fluids = new ArrayList<>();
             List<OutputKey> keys = new ArrayList<>();
-            readStacks(registries, subTag.getList("Inputs", Tag.TAG_COMPOUND), items, fluids, keys);
+            readStacks(registries, subTag.getList("Inputs", Tag.TAG_COMPOUND),
+                    items, fluids, keys, context.supportsLongAeAmounts());
             task.queuedSubTasks.add(new CraftingSubTask(
                     items, fluids, keys, Math.max(1L, subTag.getLong("CraftCount"))));
         }
@@ -815,14 +845,17 @@ public class CraftingTask {
         List<ItemStack> items = new ArrayList<>();
         List<FluidStack> fluids = new ArrayList<>();
         List<OutputKey> keys = new ArrayList<>();
-        readStacks(registries, tag.getList("Inputs", Tag.TAG_COMPOUND), items, fluids, keys);
+        readStacks(registries, tag.getList("Inputs", Tag.TAG_COMPOUND),
+                items, fluids, keys, context.supportsLongAeAmounts());
 
         ListTag subTasksTag = tag.getList("SubTasks", Tag.TAG_COMPOUND);
         for (int index = 0; index < subTasksTag.size(); index++) {
             CompoundTag subTask = subTasksTag.getCompound(index);
-            readStacks(registries, subTask.getList("Inputs", Tag.TAG_COMPOUND), items, fluids, keys);
+            readStacks(registries, subTask.getList("Inputs", Tag.TAG_COMPOUND),
+                    items, fluids, keys, context.supportsLongAeAmounts());
         }
-        readStacks(registries, tag.getList("PendingOutputs", Tag.TAG_COMPOUND), items, fluids, keys);
+        readStacks(registries, tag.getList("PendingOutputs", Tag.TAG_COMPOUND),
+                items, fluids, keys, context.supportsLongAeAmounts());
         returnMaterials(context, items, fluids, keys);
     }
 
@@ -833,15 +866,16 @@ public class CraftingTask {
     private void restoreProgress(CompoundTag tag, HolderLookup.Provider registries) {
         this.baseProcessTime = Math.max(1, tag.getInt("BaseProcessTime"));
         this.baseEnergyPerTick = Math.max(1L, tag.getLong("BaseEnergyPerTick"));
-        this.maxParallel = Math.max(1, tag.getInt("MaxParallel"));
+        this.maxParallel = Math.max(1L, tag.getLong("MaxParallel"));
         this.batches = Math.max(1, tag.getInt("Batches"));
-        this.lastBatchSize = Math.max(1, tag.getInt("LastBatchSize"));
+        this.lastBatchSize = Math.max(1L, tag.getLong("LastBatchSize"));
         this.processTime = Math.max(1, tag.getInt("ProcessTime"));
         this.progress = Math.max(0, Math.min(tag.getInt("Progress"), this.processTime));
         this.accumulatedEnergy = Math.max(0L, tag.getLong("AccumulatedEnergy"));
         this.awaitingOutputFlush = tag.getBoolean("AwaitingOutputFlush");
         readStacks(registries, tag.getList("PendingOutputs", Tag.TAG_COMPOUND),
-                this.pendingOutputItems, this.pendingOutputFluids, this.pendingOutputKeys);
+                this.pendingOutputItems, this.pendingOutputFluids, this.pendingOutputKeys,
+                context.supportsLongAeAmounts());
 
         long outputCount = 1L;
         if (pattern != null && !pattern.getOutputs().isEmpty()) {
@@ -873,11 +907,15 @@ public class CraftingTask {
         return list;
     }
 
-    private static void readStacks(HolderLookup.Provider registries, ListTag list, List<ItemStack> items, List<FluidStack> fluids, List<OutputKey> keys) {
+    private static void readStacks(
+            HolderLookup.Provider registries, ListTag list, List<ItemStack> items,
+            List<FluidStack> fluids, List<OutputKey> keys, boolean keepLongAmounts) {
         for (int i = 0; i < list.size(); i++) {
             GenericStack gs = GenericStack.readTag(registries, list.getCompound(i));
             if (gs == null) continue;
-            if (gs.what() instanceof AEItemKey itemKey) {
+            if (keepLongAmounts) {
+                keys.add(new OutputKey(gs.what(), gs.amount()));
+            } else if (gs.what() instanceof AEItemKey itemKey) {
                 items.add(itemKey.toStack((int) gs.amount()));
             } else if (gs.what() instanceof AEFluidKey fluidKey) {
                 fluids.add(new FluidStack(fluidKey.getFluid(), (int) gs.amount()));
@@ -918,6 +956,14 @@ public class CraftingTask {
             stacks.add(new GenericStack(key.key, key.amount));
         }
         return stacks;
+    }
+
+    private Set<AEKey> resolveComponentInputKeys() {
+        if (context != null && context.supportsLongAeAmounts()) {
+            return AdvancedAlloyFurnacePatternPolicy.componentInputKeysFromGenericStacks(
+                    pattern, toGenericStacks(taskInputKeys));
+        }
+        return AdvancedAlloyFurnacePatternPolicy.componentInputKeys(pattern, taskInputItems);
     }
 
 }

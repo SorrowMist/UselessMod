@@ -28,7 +28,7 @@ public final class PassiveCraftingHatchScreen
     private PressableAE2Button multiplierUp;
     private PressableAE2Button applyButton;
     private int lastSyncedInterval = Integer.MIN_VALUE;
-    private int lastSyncedMultiplier = Integer.MIN_VALUE;
+    private long lastSyncedMultiplier = Long.MIN_VALUE;
 
     public PassiveCraftingHatchScreen(
             PassiveCraftingHatchMenu menu, Inventory inventory, Component title) {
@@ -72,7 +72,7 @@ public final class PassiveCraftingHatchScreen
 
     private EditBox numericField(int x, int y, int width, Component narration) {
         EditBox field = new EditBox(font, leftPos + x, topPos + y, width, 14, narration);
-        field.setMaxLength(10);
+        field.setMaxLength(19);
         field.setFilter(value -> value.isEmpty() || value.chars().allMatch(Character::isDigit));
         return field;
     }
@@ -94,13 +94,13 @@ public final class PassiveCraftingHatchScreen
     private void syncFields(boolean force) {
         int interval = Math.max(PassiveCraftingHatchBlockEntity.MIN_INTERVAL_TICKS,
                 menu.getIntervalTicks());
-        int multiplier = Math.max(1, menu.getMultiplier());
+        long multiplier = Math.max(1L, menu.getMultiplier());
         if ((force || !intervalField.isFocused()) && interval != lastSyncedInterval) {
             intervalField.setValue(Integer.toString(interval));
             lastSyncedInterval = interval;
         }
         if ((force || !multiplierField.isFocused()) && multiplier != lastSyncedMultiplier) {
-            multiplierField.setValue(Integer.toString(multiplier));
+            multiplierField.setValue(Long.toString(multiplier));
             lastSyncedMultiplier = multiplier;
         }
     }
@@ -116,8 +116,11 @@ public final class PassiveCraftingHatchScreen
 
     private void adjustMultiplier(int delta) {
         long current = readNumber(multiplierField, menu.getMultiplier());
-        int value = (int) Mth.clamp(current + delta, 1L, (long) menu.getMaxMultiplier());
-        multiplierField.setValue(Integer.toString(value));
+        long adjusted = delta > 0
+                ? current == Long.MAX_VALUE ? Long.MAX_VALUE : current + 1L
+                : current <= 1L ? 1L : current - 1L;
+        long value = Math.max(1L, Math.min(menu.getMaxMultiplier(), adjusted));
+        multiplierField.setValue(Long.toString(value));
         sendSettings();
     }
 
@@ -129,15 +132,15 @@ public final class PassiveCraftingHatchScreen
         int interval = (int) Mth.clamp(readNumber(intervalField, menu.getIntervalTicks()),
                 (long) PassiveCraftingHatchBlockEntity.MIN_INTERVAL_TICKS,
                 (long) PassiveCraftingHatchBlockEntity.MAX_INTERVAL_TICKS);
-        int multiplier = (int) Mth.clamp(readNumber(multiplierField, menu.getMultiplier()),
-                1L, (long) menu.getMaxMultiplier());
+        long multiplier = Math.max(1L, Math.min(menu.getMaxMultiplier(),
+                readNumber(multiplierField, menu.getMultiplier())));
         intervalField.setValue(Integer.toString(interval));
-        multiplierField.setValue(Integer.toString(multiplier));
+        multiplierField.setValue(Long.toString(multiplier));
         PacketDistributor.sendToServer(new PassiveCraftingSettingsPacket(
                 menu.containerId, menu.getBlockPos(), interval, multiplier));
     }
 
-    private static long readNumber(EditBox field, int fallback) {
+    private static long readNumber(EditBox field, long fallback) {
         try {
             return Long.parseLong(field.getValue());
         } catch (NumberFormatException exception) {

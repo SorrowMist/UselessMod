@@ -4,6 +4,8 @@ import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.catalyst.R
 import com.sorrowmist.useless.content.recipe.AdvancedAlloyFurnaceRecipe;
 import com.sorrowmist.useless.energy.IEnergyManager;
 
+import java.math.BigInteger;
+
 /** Shared long-energy accounting for local and AE alloy-furnace execution. */
 public final class AlloyFurnaceRecipeExecutor {
     private AlloyFurnaceRecipeExecutor() {
@@ -23,9 +25,12 @@ public final class AlloyFurnaceRecipeExecutor {
     public static long calculateTickEnergy(long baseEnergyPerTick, int parallel,
                                            ResolvedCatalystEffect resolvedCatalystEffect) {
         if (!resolvedCatalystEffect.energyMultipliesWithParallel()) {
-            return Math.max(0L, baseEnergyPerTick);
+            return divideRoundUp(Math.max(0L, baseEnergyPerTick),
+                    resolvedCatalystEffect.energyDivisor());
         }
-        return saturatingMultiply(Math.max(0L, baseEnergyPerTick), Math.max(0, parallel));
+        return multiplyThenDivideRoundUp(
+                Math.max(0L, baseEnergyPerTick), Math.max(0, parallel),
+                resolvedCatalystEffect.energyDivisor());
     }
 
     public static TickResult consumeTickEnergy(IEnergyManager energyManager, long baseEnergyPerTick, int parallel,
@@ -82,12 +87,14 @@ public final class AlloyFurnaceRecipeExecutor {
         return whole + fractional;
     }
 
-    public static long calculateTargetTotalEnergy(long recipeEnergy, int targetParallel,
+    public static long calculateTargetTotalEnergy(long recipeEnergy, long targetParallel,
                                                   ResolvedCatalystEffect resolvedCatalystEffect) {
         long normalizedEnergy = Math.max(0L, recipeEnergy);
         return resolvedCatalystEffect.energyMultipliesWithParallel()
-                ? saturatingMultiply(normalizedEnergy, Math.max(0, targetParallel))
-                : normalizedEnergy;
+                ? multiplyThenDivideRoundUp(
+                        normalizedEnergy, Math.max(0, targetParallel),
+                        resolvedCatalystEffect.energyDivisor())
+                : divideRoundUp(normalizedEnergy, resolvedCatalystEffect.energyDivisor());
     }
 
     public static CompletionEnergyResult settleCompletionEnergy(
@@ -112,13 +119,12 @@ public final class AlloyFurnaceRecipeExecutor {
                 normalizedAccumulated, energyManager.getEnergyStoredLong());
         int actualParallel;
         if (resolvedCatalystEffect.energyMultipliesWithParallel()) {
-            long parallelLong = totalAvailableEnergy / recipeEnergy;
-            actualParallel = parallelLong > Integer.MAX_VALUE
-                    ? Integer.MAX_VALUE
-                    : (int) parallelLong;
+            long parallelLong = maximumAffordableParallel(
+                    totalAvailableEnergy, recipeEnergy, resolvedCatalystEffect.energyDivisor());
+            actualParallel = (int) Math.min(Integer.MAX_VALUE, parallelLong);
             actualParallel = Math.max(0, Math.min(actualParallel, targetParallel));
         } else {
-            actualParallel = totalAvailableEnergy >= recipeEnergy ? targetParallel : 0;
+            actualParallel = totalAvailableEnergy >= targetTotalEnergy ? targetParallel : 0;
         }
 
         long actualTargetEnergy = calculateTargetTotalEnergy(
@@ -135,6 +141,54 @@ public final class AlloyFurnaceRecipeExecutor {
             return 0L;
         }
         return amount > Long.MAX_VALUE / multiplier ? Long.MAX_VALUE : amount * multiplier;
+    }
+
+    private static long multiplyThenDivideRoundUp(long amount, long multiplier, int divisor) {
+        if (amount <= 0L || multiplier <= 0L) {
+            return 0L;
+        }
+        long normalizedDivisor = Math.max(1, divisor);
+        long quotient = amount / normalizedDivisor;
+        long remainder = amount % normalizedDivisor;
+        long whole = saturatingMultiply(quotient, multiplier);
+        if (whole == Long.MAX_VALUE || remainder == 0L) {
+            return whole;
+        }
+        long fractional = multiplyThenDivideRoundUpExact(
+                remainder, multiplier, normalizedDivisor);
+        return saturatingAdd(whole, fractional);
+    }
+
+    private static long multiplyThenDivideRoundUpExact(long amount, long multiplier, long divisor) {
+        if (amount <= Long.MAX_VALUE / multiplier) {
+            return divideRoundUp(amount * multiplier, divisor);
+        }
+        BigInteger result = BigInteger.valueOf(amount)
+                .multiply(BigInteger.valueOf(multiplier))
+                .add(BigInteger.valueOf(divisor - 1L))
+                .divide(BigInteger.valueOf(divisor));
+        return result.compareTo(BigInteger.valueOf(Long.MAX_VALUE)) > 0
+                ? Long.MAX_VALUE
+                : result.longValue();
+    }
+
+    private static long divideRoundUp(long amount, long divisor) {
+        if (amount <= 0L) {
+            return 0L;
+        }
+        return 1L + (amount - 1L) / Math.max(1L, divisor);
+    }
+
+    private static long maximumAffordableParallel(long availableEnergy, long recipeEnergy, int divisor) {
+        if (availableEnergy <= 0L || recipeEnergy <= 0L) {
+            return 0L;
+        }
+        BigInteger affordable = BigInteger.valueOf(availableEnergy)
+                .multiply(BigInteger.valueOf(Math.max(1, divisor)))
+                .divide(BigInteger.valueOf(recipeEnergy));
+        return affordable.compareTo(BigInteger.valueOf(Long.MAX_VALUE)) > 0
+                ? Long.MAX_VALUE
+                : affordable.longValue();
     }
 
     private static long saturatingAdd(long left, long right) {

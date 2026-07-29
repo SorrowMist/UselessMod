@@ -115,16 +115,20 @@ public final class PassiveCraftingHatchMenu extends AbstractContainerMenu {
         return data.get(4);
     }
 
-    public int getMultiplier() {
-        return data.get(5);
+    public long getMultiplier() {
+        return join(data.get(5), data.get(6));
     }
 
-    public int getMaxMultiplier() {
-        return Math.max(1, data.get(6));
+    public long getMaxMultiplier() {
+        return Math.max(1L, join(data.get(7), data.get(8)));
     }
 
     public boolean isSlotBusy(int slot) {
-        return slot >= 0 && slot < PATTERN_SLOTS && (data.get(7) & (1 << slot)) != 0;
+        return slot >= 0 && slot < PATTERN_SLOTS && (data.get(9) & (1 << slot)) != 0;
+    }
+
+    static long join(int low, int high) {
+        return Integer.toUnsignedLong(low) | (long) high << 32;
     }
 
     public PassiveCraftingHatchBlockEntity.SlotStatus getSlotStatus(int slot) {

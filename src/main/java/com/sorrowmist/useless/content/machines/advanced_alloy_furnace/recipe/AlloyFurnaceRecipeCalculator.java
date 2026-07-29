@@ -135,8 +135,8 @@ public final class AlloyFurnaceRecipeCalculator {
     public int calculateActualParallel(AdvancedAlloyFurnaceRecipe recipe) {
         ItemStack catalystStack = this.itemHandler.getStackInSlot(CATALYST_SLOT);
         ResolvedCatalystEffect resolvedCatalystEffect = CatalystEffectResolver.resolve(recipe, catalystStack, recipe.processTime());
-        int energyParallel = AlloyFurnaceParallelCalculator.calculateEnergyParallel(recipe, resolvedCatalystEffect);
-        int catalystParallel = resolvedCatalystEffect.recipeParallel();
+        long energyParallel = AlloyFurnaceParallelCalculator.calculateEnergyParallel(recipe, resolvedCatalystEffect);
+        long catalystParallel = resolvedCatalystEffect.recipeParallel();
         int materialParallel = this.calculateMaterialParallel(recipe);
         int outputParallel = this.calculateOutputParallel(recipe);
         return AlloyFurnaceParallelCalculator.calculateStartableParallel(energyParallel, catalystParallel, materialParallel, outputParallel);
@@ -152,10 +152,15 @@ public final class AlloyFurnaceRecipeCalculator {
     public int calculateCatalystParallel(AdvancedAlloyFurnaceRecipe recipe,
                                          @Nullable ResolvedCatalystEffect cachedCatalystEffect) {
         if (cachedCatalystEffect != null) {
-            return cachedCatalystEffect.recipeParallel();
+            return clampParallelToInt(cachedCatalystEffect.recipeParallel());
         }
         ItemStack catalystStack = this.itemHandler.getStackInSlot(CATALYST_SLOT);
-        return CatalystEffectResolver.resolve(recipe, catalystStack, recipe.processTime()).recipeParallel();
+        return clampParallelToInt(
+                CatalystEffectResolver.resolve(recipe, catalystStack, recipe.processTime()).recipeParallel());
+    }
+
+    private static int clampParallelToInt(long parallel) {
+        return (int) Math.max(0L, Math.min(Integer.MAX_VALUE, parallel));
     }
 
     /**

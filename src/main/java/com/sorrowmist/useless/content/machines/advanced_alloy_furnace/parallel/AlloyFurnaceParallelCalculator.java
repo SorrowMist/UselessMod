@@ -3,43 +3,49 @@ package com.sorrowmist.useless.content.machines.advanced_alloy_furnace.parallel;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.catalyst.ResolvedCatalystEffect;
 import com.sorrowmist.useless.content.recipe.AdvancedAlloyFurnaceRecipe;
 
+import java.math.BigInteger;
+
 /** Calculates parallel limits without requiring a full recipe energy payment in the buffer. */
 public final class AlloyFurnaceParallelCalculator {
     private AlloyFurnaceParallelCalculator() {
     }
 
     /** Limits parallelism only when its exact long energy target would overflow. */
-    public static int calculateEnergyParallel(
+    public static long calculateEnergyParallel(
             AdvancedAlloyFurnaceRecipe recipe, ResolvedCatalystEffect resolvedCatalystEffect) {
         if (!resolvedCatalystEffect.energyMultipliesWithParallel()) {
-            return Integer.MAX_VALUE;
+            return Long.MAX_VALUE;
         }
         long recipeEnergy = recipe.energy();
         if (recipeEnergy <= 0L) {
-            return Integer.MAX_VALUE;
+            return Long.MAX_VALUE;
         }
-        long maximum = Long.MAX_VALUE / recipeEnergy;
-        return maximum > Integer.MAX_VALUE ? Integer.MAX_VALUE : Math.max(1, (int) maximum);
+        BigInteger maximum = BigInteger.valueOf(Long.MAX_VALUE)
+                .multiply(BigInteger.valueOf(Math.max(1, resolvedCatalystEffect.energyDivisor())))
+                .divide(BigInteger.valueOf(recipeEnergy));
+        return maximum.compareTo(BigInteger.valueOf(Long.MAX_VALUE)) > 0
+                ? Long.MAX_VALUE
+                : Math.max(1L, maximum.longValue());
     }
 
     public static int calculateStartableParallel(
-            int energyParallel, int catalystParallel, int materialParallel, int outputParallel) {
-        int limitedCatalystParallel = catalystParallel == Integer.MAX_VALUE ? energyParallel : catalystParallel;
-        int parallel = Math.min(
+            long energyParallel, long catalystParallel, int materialParallel, int outputParallel) {
+        long limitedCatalystParallel = catalystParallel == Long.MAX_VALUE ? energyParallel : catalystParallel;
+        long parallel = Math.min(
                 Math.min(energyParallel, limitedCatalystParallel),
-                Math.min(materialParallel, outputParallel));
-        return Math.max(0, parallel);
+                (long) Math.min(materialParallel, outputParallel));
+        return (int) Math.max(0L, Math.min(Integer.MAX_VALUE, parallel));
     }
 
     public static int calculateCompletionTargetParallel(
-            int initialParallel, int catalystParallel, int materialParallel, int outputParallel) {
-        int parallel = Math.min(Math.min(materialParallel, outputParallel), catalystParallel);
-        return Math.max(initialParallel, parallel);
+            int initialParallel, long catalystParallel, int materialParallel, int outputParallel) {
+        long parallel = Math.min((long) Math.min(materialParallel, outputParallel), catalystParallel);
+        return (int) Math.max(initialParallel, Math.min(Integer.MAX_VALUE, parallel));
     }
 
-    public static int calculateAeTaskParallel(
+    public static long calculateAeTaskParallel(
             AdvancedAlloyFurnaceRecipe recipe, ResolvedCatalystEffect resolvedCatalystEffect) {
-        int catalystParallel = Math.max(1, resolvedCatalystEffect.recipeParallel());
+        long catalystParallel = Math.max(1L, resolvedCatalystEffect.recipeParallel());
         return Math.min(catalystParallel, calculateEnergyParallel(recipe, resolvedCatalystEffect));
     }
 }

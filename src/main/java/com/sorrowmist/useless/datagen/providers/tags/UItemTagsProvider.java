@@ -78,7 +78,13 @@ public class UItemTagsProvider extends ItemTagsProvider {
             .addOptional(ResourceLocation.fromNamespaceAndPath("extendedcrafting", "crafting_core"))
             .addOptional(ResourceLocation.fromNamespaceAndPath("extendedcrafting", "ender_crafter"))
             .addOptional(ResourceLocation.fromNamespaceAndPath("extendedcrafting", "flux_crafter"))
-            .addOptional(ResourceLocation.fromNamespaceAndPath("neoecoae", "integrated_working_station"));
+            .addOptional(ResourceLocation.fromNamespaceAndPath("neoecoae", "integrated_working_station"))
+            .addOptional(ResourceLocation.fromNamespaceAndPath("naturesaura", "wood_stand"))
+            .addOptional(ResourceLocation.fromNamespaceAndPath("naturesaura", "nature_altar"))
+            .addOptional(ResourceLocation.fromNamespaceAndPath("naturesaura", "animal_spawner"))
+            .addOptional(ResourceLocation.fromNamespaceAndPath("naturesaura", "offering_table"))
+            .addOptional(ResourceLocation.fromNamespaceAndPath("naturesaura", "conversion_catalyst"))
+            .addOptional(ResourceLocation.fromNamespaceAndPath("naturesaura", "crushing_catalyst"));
     }
 
     private void addCTags() {

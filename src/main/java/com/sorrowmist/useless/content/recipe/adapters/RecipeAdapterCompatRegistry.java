@@ -31,6 +31,10 @@ import com.sorrowmist.useless.content.recipe.adapters.productivebees.CentrifugeR
 import com.sorrowmist.useless.content.recipe.adapters.draconicevolution.DraconicFusionRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.eco.IntegratedWorkingStationRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.powah.EnergizingRecipeAdapter;
+import com.sorrowmist.useless.content.recipe.adapters.naturesaura.AnimalSpawnerRecipeAdapter;
+import com.sorrowmist.useless.content.recipe.adapters.naturesaura.NatureAltarRecipeAdapter;
+import com.sorrowmist.useless.content.recipe.adapters.naturesaura.OfferingRecipeAdapter;
+import com.sorrowmist.useless.content.recipe.adapters.naturesaura.TreeRitualRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.extendedcrafting.ExtendedCraftingCombinationRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.extendedcrafting.ExtendedCraftingCompressorRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.extendedcrafting.ExtendedCraftingEnderCrafterRecipeAdapter;
@@ -63,6 +67,7 @@ public final class RecipeAdapterCompatRegistry {
     public static final String POWAH = "powah";
     public static final String EXTENDED_CRAFTING = "extendedcrafting";
     public static final String NEO_ECO_AE = "neoecoae";
+    public static final String NATURES_AURA = "naturesaura";
 
     private static final List<CompatEntry> ENTRIES = List.of(
             new CompatEntry(null, RecipeAdapterCompatRegistry::registerMinecraft),
@@ -81,7 +86,8 @@ public final class RecipeAdapterCompatRegistry {
             new CompatEntry(DRACONIC_EVOLUTION, RecipeAdapterCompatRegistry::registerDraconicEvolution),
             new CompatEntry(POWAH, RecipeAdapterCompatRegistry::registerPowah),
             new CompatEntry(EXTENDED_CRAFTING, RecipeAdapterCompatRegistry::registerExtendedCrafting),
-            new CompatEntry(NEO_ECO_AE, RecipeAdapterCompatRegistry::registerNeoECOAE)
+            new CompatEntry(NEO_ECO_AE, RecipeAdapterCompatRegistry::registerNeoECOAE),
+            new CompatEntry(NATURES_AURA, RecipeAdapterCompatRegistry::registerNaturesAura)
     );
 
     private RecipeAdapterCompatRegistry() {}
@@ -195,6 +201,13 @@ public final class RecipeAdapterCompatRegistry {
 
     private static void registerNeoECOAE() {
         register(new IntegratedWorkingStationRecipeAdapter());
+    }
+
+    private static void registerNaturesAura() {
+        register(new TreeRitualRecipeAdapter());
+        register(new NatureAltarRecipeAdapter());
+        register(new AnimalSpawnerRecipeAdapter());
+        register(new OfferingRecipeAdapter());
     }
 
     private record CompatEntry(@Nullable String modId, Runnable registerAction) {}

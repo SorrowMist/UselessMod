@@ -143,6 +143,14 @@ config="${mod_id}.mixins.json"
     ordering="AFTER"
     side="BOTH"
 
+# Optional Nature's Aura ritual recipe compatibility
+[[dependencies.${mod_id}]]
+    modId="naturesaura"
+    type="optional"
+    versionRange="[41.9,)"
+    ordering="AFTER"
+    side="BOTH"
+
 # Optional long-energy capability integrations
 [[dependencies.${mod_id}]]
     modId="mekanism"

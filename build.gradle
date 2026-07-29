@@ -271,6 +271,15 @@ dependencies {
     implementation "curse.maven:cucumber-272335:8035802"
     implementation "curse.maven:mystical-agriculture-246640:8035819"
 
+    //自然灵气
+    implementation "maven.modrinth:natures-aura:41.9"
+    implementation "maven.modrinth:patchouli:1.21.1-93-neoforge"
+
+    //神秘学
+    implementation "maven.modrinth:occultism:1.21.1-neoforge-1.224.0"
+    implementation "maven.modrinth:modonomicon:1.21.1-1.120.3"
+    implementation "maven.modrinth:smartbrainlib:O5EpeqI3" // 1.16.11 for Minecraft 1.21.1
+
     // kjs
     // runtimeOnly "dev.latvian.mods:rhino:2101.2.5-build.54"
     // runtimeOnly "dev.latvian.mods:kubejs-neoforge:2101.7.1-build.188"
@@ -288,7 +297,7 @@ dependencies {
 
     runtimeOnly "maven.modrinth:configuration:6Mztfq1u"
     runtimeOnly "thedarkcolour:kotlinforforge-neoforge:5.11.0"
-    runtimeOnly "curse.maven:just-enough-characters-250702:7320033"
+    runtimeOnly "curse.maven:just-enough-characters-250702:8413478"
     // apotheosis
 //    implementation "dev.shadowsoffire:Placebo:1.21.1-9.6.3"
 //    implementation "dev.shadowsoffire:ApothicAttributes:1.21.1-2.6.0"

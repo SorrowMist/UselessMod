@@ -44,6 +44,30 @@
     {
       "id": "neoecoae:integrated_working_station",
       "required": false
+    },
+    {
+      "id": "naturesaura:wood_stand",
+      "required": false
+    },
+    {
+      "id": "naturesaura:nature_altar",
+      "required": false
+    },
+    {
+      "id": "naturesaura:animal_spawner",
+      "required": false
+    },
+    {
+      "id": "naturesaura:offering_table",
+      "required": false
+    },
+    {
+      "id": "naturesaura:conversion_catalyst",
+      "required": false
+    },
+    {
+      "id": "naturesaura:crushing_catalyst",
+      "required": false
     }
   ]
 }

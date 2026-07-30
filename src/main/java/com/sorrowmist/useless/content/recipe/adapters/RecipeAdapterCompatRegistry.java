@@ -36,6 +36,8 @@ import com.sorrowmist.useless.content.recipe.adapters.naturesaura.NatureAltarRec
 import com.sorrowmist.useless.content.recipe.adapters.naturesaura.OfferingRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.naturesaura.TreeRitualRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.occultism.OccultismRitualRecipeAdapter;
+import com.sorrowmist.useless.content.recipe.adapters.malum.SpiritFocusingRecipeAdapter;
+import com.sorrowmist.useless.content.recipe.adapters.malum.SpiritInfusionRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.extendedcrafting.ExtendedCraftingCombinationRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.extendedcrafting.ExtendedCraftingCompressorRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.extendedcrafting.ExtendedCraftingEnderCrafterRecipeAdapter;
@@ -70,6 +72,7 @@ public final class RecipeAdapterCompatRegistry {
     public static final String NEO_ECO_AE = "neoecoae";
     public static final String NATURES_AURA = "naturesaura";
     public static final String OCCULTISM = "occultism";
+    public static final String MALUM = "malum";
 
     private static final List<CompatEntry> ENTRIES = List.of(
             new CompatEntry(null, RecipeAdapterCompatRegistry::registerMinecraft),
@@ -90,7 +93,8 @@ public final class RecipeAdapterCompatRegistry {
             new CompatEntry(EXTENDED_CRAFTING, RecipeAdapterCompatRegistry::registerExtendedCrafting),
             new CompatEntry(NEO_ECO_AE, RecipeAdapterCompatRegistry::registerNeoECOAE),
             new CompatEntry(NATURES_AURA, RecipeAdapterCompatRegistry::registerNaturesAura),
-            new CompatEntry(OCCULTISM, RecipeAdapterCompatRegistry::registerOccultism)
+            new CompatEntry(OCCULTISM, RecipeAdapterCompatRegistry::registerOccultism),
+            new CompatEntry(MALUM, RecipeAdapterCompatRegistry::registerMalum)
     );
 
     private RecipeAdapterCompatRegistry() {}
@@ -215,6 +219,11 @@ public final class RecipeAdapterCompatRegistry {
 
     private static void registerOccultism() {
         register(new OccultismRitualRecipeAdapter());
+    }
+
+    private static void registerMalum() {
+        register(new SpiritFocusingRecipeAdapter());
+        register(new SpiritInfusionRecipeAdapter());
     }
 
     private record CompatEntry(@Nullable String modId, Runnable registerAction) {}

@@ -68,7 +68,7 @@ public final class OmniversalMoldHubBlockEntity extends BlockEntity implements M
         if (unloading || isRemoved() || level == null || controllerPos == null
                 || !level.isLoaded(controllerPos)) return null;
         if (level.getBlockEntity(controllerPos) instanceof MultiblockAlloyFurnaceCoreBlockEntity core
-                && core.isFormed() && core.getStructureGeneration() == structureGeneration) {
+                && core.isMoldHubLinked(worldPosition, structureGeneration)) {
             return core;
         }
         return null;

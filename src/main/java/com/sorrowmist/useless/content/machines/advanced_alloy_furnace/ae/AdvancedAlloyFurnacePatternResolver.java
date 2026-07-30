@@ -8,6 +8,7 @@ import appeng.api.stacks.GenericStack;
 import appeng.crafting.pattern.AEProcessingPattern;
 import com.mojang.logging.LogUtils;
 import com.sorrowmist.useless.content.recipe.adapters.draconicevolution.DraconicFusionRecipeAdapter;
+import com.sorrowmist.useless.content.recipe.adapters.malum.SpiritInfusionRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.occultism.OccultismRitualRecipeAdapter;
 import com.sorrowmist.useless.core.component.OmniversalPatternData;
 import com.sorrowmist.useless.core.component.UComponents;
@@ -27,6 +28,7 @@ public final class AdvancedAlloyFurnacePatternResolver {
     private static final Logger LOGGER = LogUtils.getLogger();
     private static final String DRACONIC_EVOLUTION_MOD_ID = "draconicevolution";
     private static final String OCCULTISM_MOD_ID = "occultism";
+    private static final String MALUM_MOD_ID = "malum";
 
     private AdvancedAlloyFurnacePatternResolver() {
     }
@@ -79,7 +81,13 @@ public final class AdvancedAlloyFurnacePatternResolver {
                 }
             }
             if (ModList.get().isLoaded(OCCULTISM_MOD_ID)) {
-                return resolveDynamicOccultismPattern(processingPattern, level);
+                IPatternDetails resolved = resolveDynamicOccultismPattern(processingPattern, level);
+                if (resolved != processingPattern) {
+                    return resolved;
+                }
+            }
+            if (ModList.get().isLoaded(MALUM_MOD_ID)) {
+                return resolveDynamicMalumPattern(processingPattern, level);
             }
             return processingPattern;
         } catch (RuntimeException exception) {
@@ -118,6 +126,21 @@ public final class AdvancedAlloyFurnacePatternResolver {
         List<ItemStack> inputs = itemInputs(pattern);
         List<ItemStack> outputs = itemOutputs(pattern);
         var profile = OccultismRitualRecipeAdapter.findDynamicPatternProfile(level, inputs, outputs);
+        if (profile.isEmpty()) {
+            return pattern;
+        }
+        return new DynamicComponentPatternDetails(
+                pattern,
+                profile.get().idOnlyInputSlots(),
+                profile.get().idOnlyOutputSlots(),
+                level.registryAccess());
+    }
+
+    private static IPatternDetails resolveDynamicMalumPattern(
+            AEProcessingPattern pattern, Level level) {
+        List<ItemStack> inputs = itemInputs(pattern);
+        List<ItemStack> outputs = itemOutputs(pattern);
+        var profile = SpiritInfusionRecipeAdapter.findDynamicPatternProfile(level, inputs, outputs);
         if (profile.isEmpty()) {
             return pattern;
         }

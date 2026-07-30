@@ -7,87 +7,49 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.inventory.ContainerData;
 import net.minecraft.world.inventory.SimpleContainerData;
 import net.minecraft.world.inventory.Slot;
-import net.minecraft.world.item.ItemStack;
-import net.neoforged.neoforge.items.ItemStackHandler;
-import net.neoforged.neoforge.items.SlotItemHandler;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.ArrayList;
-import java.util.List;
-
-public final class PassiveCraftingHatchMenu extends AbstractContainerMenu {
-    public static final int PATTERN_COLUMNS = 6;
-    public static final int PATTERN_ROWS = 5;
-    public static final int PATTERN_SLOTS = PATTERN_COLUMNS * PATTERN_ROWS;
-
-    private final BlockPos blockPos;
-    @Nullable
-    private final PassiveCraftingHatchBlockEntity hatch;
+/** Paginated passive-pattern inventory with the hatch's interval controls. */
+public final class PassiveCraftingHatchMenu extends PagedRecoverableMenu {
+    private final @Nullable PassiveCraftingHatchBlockEntity hatch;
     private final ContainerData data;
-    private List<PassiveCraftingHatchBlockEntity.SlotStatus> slotStatuses;
+    private final PassiveCraftingHatchBlockEntity.SlotStatus[] slotStatuses =
+            new PassiveCraftingHatchBlockEntity.SlotStatus[PassiveCraftingHatchBlockEntity.MAX_PATTERN_SLOTS];
 
     public PassiveCraftingHatchMenu(int containerId, Inventory inventory, FriendlyByteBuf buffer) {
         this(containerId, inventory, buffer.readBlockPos());
     }
 
     public PassiveCraftingHatchMenu(int containerId, Inventory inventory, BlockPos pos) {
-        super(ModMenuType.PASSIVE_CRAFTING_HATCH_MENU.get(), containerId);
-        this.blockPos = pos.immutable();
-        this.hatch = inventory.player.level().getBlockEntity(pos)
+        super(ModMenuType.PASSIVE_CRAFTING_HATCH_MENU.get(), containerId, inventory,
+                handler(inventory, pos), pos, 8, 22, 44, 158, 44, 218);
+        hatch = inventory.player.level().getBlockEntity(pos)
                 instanceof PassiveCraftingHatchBlockEntity found ? found : null;
-        boolean clientSide = inventory.player.level().isClientSide;
         ContainerData liveData = hatch == null
                 ? new SimpleContainerData(PassiveCraftingHatchBlockEntity.MENU_DATA_COUNT)
                 : hatch.getMenuData();
-        this.data = createMenuData(clientSide, liveData);
-
-        var patternInventory = clientSide
-                ? new ItemStackHandler(PATTERN_SLOTS)
-                : hatch == null ? unavailableHandler() : hatch.getPatterns();
-        for (int row = 0; row < PATTERN_ROWS; row++) {
-            for (int column = 0; column < PATTERN_COLUMNS; column++) {
-                int slot = column + row * PATTERN_COLUMNS;
-                addSlot(new SlotItemHandler(patternInventory, slot,
-                        8 + column * 18, 22 + row * 18));
-            }
-        }
-
-        for (int row = 0; row < 3; row++) {
-            for (int column = 0; column < 9; column++) {
-                addSlot(new Slot(inventory, column + row * 9 + 9,
-                        44 + column * 18, 158 + row * 18));
-            }
-        }
-        for (int column = 0; column < 9; column++) {
-            addSlot(new Slot(inventory, column, 44 + column * 18, 218));
-        }
-
+        data = createMenuData(inventory.player.level().isClientSide, liveData);
         addDataSlots(data);
-        List<PassiveCraftingHatchBlockEntity.SlotStatus> initial = new ArrayList<>(PATTERN_SLOTS);
-        for (int slot = 0; slot < PATTERN_SLOTS; slot++) {
-            initial.add(new PassiveCraftingHatchBlockEntity.SlotStatus(
-                    slot, PassiveCraftingHatchBlockEntity.SlotState.EMPTY, 0, 0, ""));
+        for (int slot = 0; slot < slotStatuses.length; slot++) {
+            slotStatuses[slot] = emptyStatus(slot);
         }
-        slotStatuses = List.copyOf(initial);
     }
 
-    private static RecoverableItemStackHandler unavailableHandler() {
-        return new RecoverableItemStackHandler(PATTERN_SLOTS, 0, () -> 0,
-                stack -> false, () -> { });
+    private static RecoverableItemStackHandler handler(Inventory inventory, BlockPos pos) {
+        if (inventory.player.level().getBlockEntity(pos) instanceof PassiveCraftingHatchBlockEntity hatch) {
+            return hatch.getPatterns();
+        }
+        return new RecoverableItemStackHandler(PassiveCraftingHatchBlockEntity.MAX_PATTERN_SLOTS, 0,
+                () -> 0, stack -> false, () -> { });
     }
 
     static ContainerData createMenuData(boolean clientSide, ContainerData liveData) {
         return clientSide
                 ? new SimpleContainerData(PassiveCraftingHatchBlockEntity.MENU_DATA_COUNT)
                 : liveData;
-    }
-
-    public BlockPos getBlockPos() {
-        return blockPos;
     }
 
     @Nullable
@@ -104,7 +66,11 @@ public final class PassiveCraftingHatchMenu extends AbstractContainerMenu {
     }
 
     public int getActivePatternSlots() {
-        return Math.max(0, Math.min(PATTERN_SLOTS, data.get(2)));
+        return Math.max(0, Math.min(PassiveCraftingHatchBlockEntity.MAX_PATTERN_SLOTS, data.get(2)));
+    }
+
+    public int getConfiguredPatternSlots() {
+        return Math.max(1, Math.min(PassiveCraftingHatchBlockEntity.MAX_PATTERN_SLOTS, data.get(9)));
     }
 
     public int getIntervalTicks() {
@@ -123,55 +89,46 @@ public final class PassiveCraftingHatchMenu extends AbstractContainerMenu {
         return Math.max(1L, join(data.get(7), data.get(8)));
     }
 
-    public boolean isSlotBusy(int slot) {
-        return slot >= 0 && slot < PATTERN_SLOTS && (data.get(9) & (1 << slot)) != 0;
-    }
-
     static long join(int low, int high) {
         return Integer.toUnsignedLong(low) | (long) high << 32;
     }
 
-    public PassiveCraftingHatchBlockEntity.SlotStatus getSlotStatus(int slot) {
-        if (slot < 0 || slot >= slotStatuses.size()) {
-            return new PassiveCraftingHatchBlockEntity.SlotStatus(
-                    slot, PassiveCraftingHatchBlockEntity.SlotState.EMPTY, 0, 0, "");
-        }
-        return slotStatuses.get(slot);
+    public int getPatternSlotIndex(Slot slot) {
+        int menuSlot = slots.indexOf(slot);
+        return menuSlot >= 0 && menuSlot < SLOTS_PER_PAGE
+                ? getPage() * SLOTS_PER_PAGE + menuSlot : -1;
     }
 
-    public void updateSlotStatuses(List<PassiveCraftingHatchBlockEntity.SlotStatus> statuses) {
-        PassiveCraftingHatchBlockEntity.SlotStatus[] updated =
-                slotStatuses.toArray(PassiveCraftingHatchBlockEntity.SlotStatus[]::new);
+    public PassiveCraftingHatchBlockEntity.SlotStatus getSlotStatus(int slot) {
+        return slot >= 0 && slot < slotStatuses.length ? slotStatuses[slot] : emptyStatus(slot);
+    }
+
+    public void updateSlotStatuses(Iterable<PassiveCraftingHatchBlockEntity.SlotStatus> statuses) {
         for (PassiveCraftingHatchBlockEntity.SlotStatus status : statuses) {
-            if (status.slot() >= 0 && status.slot() < PATTERN_SLOTS) {
-                updated[status.slot()] = status;
+            if (status.slot() >= 0 && status.slot() < slotStatuses.length) {
+                slotStatuses[status.slot()] = status;
             }
         }
-        slotStatuses = List.of(updated);
     }
 
     @Override
-    public ItemStack quickMoveStack(Player player, int index) {
-        if (index < 0 || index >= slots.size()) return ItemStack.EMPTY;
-        Slot slot = slots.get(index);
-        if (!slot.hasItem()) return ItemStack.EMPTY;
-        ItemStack source = slot.getItem();
-        ItemStack copy = source.copy();
-        if (index < PATTERN_SLOTS) {
-            if (!moveItemStackTo(source, PATTERN_SLOTS, slots.size(), true)) return ItemStack.EMPTY;
-        } else if (!moveItemStackTo(source, 0, PATTERN_SLOTS, false)) {
-            return ItemStack.EMPTY;
+    public boolean clickMenuButton(Player player, int id) {
+        boolean changed = super.clickMenuButton(player, id);
+        if (changed && hatch != null) {
+            hatch.requestStatusSync();
         }
-        if (source.isEmpty()) slot.set(ItemStack.EMPTY); else slot.setChanged();
-        if (source.getCount() == copy.getCount()) return ItemStack.EMPTY;
-        slot.onTake(player, source);
-        return copy;
+        return changed;
     }
 
     @Override
     public boolean stillValid(Player player) {
-        return hatch != null && player.level().getBlockEntity(blockPos) == hatch
-                && player.distanceToSqr(blockPos.getX() + 0.5D, blockPos.getY() + 0.5D,
-                blockPos.getZ() + 0.5D) <= 64.0D;
+        return hatch != null && player.level().getBlockEntity(getBlockPos()) == hatch
+                && player.distanceToSqr(getBlockPos().getX() + 0.5D, getBlockPos().getY() + 0.5D,
+                getBlockPos().getZ() + 0.5D) <= 64.0D;
+    }
+
+    private static PassiveCraftingHatchBlockEntity.SlotStatus emptyStatus(int slot) {
+        return new PassiveCraftingHatchBlockEntity.SlotStatus(
+                slot, PassiveCraftingHatchBlockEntity.SlotState.EMPTY, 0, 0, "");
     }
 }

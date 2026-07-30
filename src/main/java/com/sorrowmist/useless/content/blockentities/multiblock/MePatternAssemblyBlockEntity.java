@@ -108,6 +108,21 @@ public final class MePatternAssemblyBlockEntity extends AEBaseBlockEntity
         }
     }
 
+    /** True when this assembly's persisted link belongs to the given core. */
+    public boolean isLinkedToController(BlockPos controllerPos) {
+        return Objects.equals(this.controllerPos, controllerPos);
+    }
+
+    /**
+     * Pattern assemblies are exclusive multiblock parts. A stale or unformed
+     * controller is deliberately not considered an owner, allowing a newly
+     * valid structure to claim the part after the old structure breaks.
+     */
+    public boolean isClaimedByOtherController(BlockPos controllerPos) {
+        MultiblockAlloyFurnaceCoreBlockEntity controller = getController();
+        return controller != null && !controller.getBlockPos().equals(controllerPos);
+    }
+
     /** Marks the AE provider cache stale for the controller's next server tick. */
     public void requestProviderRefresh() {
         if (unloading || isRemoved()) return;
@@ -154,7 +169,7 @@ public final class MePatternAssemblyBlockEntity extends AEBaseBlockEntity
         if (unloading || isRemoved() || level == null || controllerPos == null
                 || !level.isLoaded(controllerPos)) return null;
         if (level.getBlockEntity(controllerPos) instanceof MultiblockAlloyFurnaceCoreBlockEntity core
-                && core.isFormed() && core.getStructureGeneration() == structureGeneration) {
+                && core.isPatternAssemblyLinked(worldPosition, structureGeneration)) {
             return core;
         }
         return null;
@@ -239,12 +254,26 @@ public final class MePatternAssemblyBlockEntity extends AEBaseBlockEntity
     @Override
     public PatternContainerGroup getTerminalGroup() {
         return new PatternContainerGroup(AEItemKey.of(new ItemStack(getBlockState().getBlock())),
-                Component.translatable("block.useless_mod.me_pattern_assembly"), List.of());
+                getDisplayName(), List.of());
     }
 
     @Override
     public Component getDisplayName() {
-        return Component.translatable("block.useless_mod.me_pattern_assembly");
+        Component customName = getCustomName();
+        return customName != null ? customName : Component.translatable("block.useless_mod.me_pattern_assembly");
+    }
+
+    @Override
+    public void setName(String name) {
+        super.setName(name);
+        setChanged();
+        if (level == null || level.isClientSide) return;
+        MultiblockAlloyFurnaceCoreBlockEntity controller = getController();
+        if (controller != null) {
+            controller.updatePatterns();
+        } else {
+            requestProviderRefresh();
+        }
     }
 
     @Override

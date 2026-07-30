@@ -816,8 +816,12 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
      * @return 新的模式
      */
     public FurnaceFaceMode cycleFaceMode(FurnaceFace face) {
+        return this.cycleFaceMode(face, false);
+    }
+
+    public FurnaceFaceMode cycleFaceMode(FurnaceFace face, boolean reverse) {
         FurnaceFaceMode current = this.faceModes[face.ordinal()];
-        FurnaceFaceMode next = current.next();
+        FurnaceFaceMode next = reverse ? current.previous() : current.next();
         this.faceModes[face.ordinal()] = next;
         this.setChanged();
         // 同步到客户端

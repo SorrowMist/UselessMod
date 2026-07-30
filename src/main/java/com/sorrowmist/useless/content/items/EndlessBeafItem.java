@@ -116,6 +116,7 @@ public class EndlessBeafItem extends TieredItem {
                       .component(UComponents.ForceMiningComponent, false)
                       .component(UComponents.ForceKillEnabledComponent, true)
                       .component(UComponents.BeefInvulnerabilityEnabledComponent, true)
+                      .component(UComponents.BeefCaptureEnabledComponent, false)
                       .component(UComponents.ForceKillModeComponent, ForceKillMode.KILL)
                       .component(UComponents.AEStoragePriorityComponent, false)
                       .component(UComponents.CurrentToolTypeComponent, ToolTypeMode.NONE_MODE)
@@ -616,6 +617,15 @@ public class EndlessBeafItem extends TieredItem {
                                                        "tooltip.useless_mod.disable"
                                        ).withStyle(beefInvulnerabilityEnabled ? ChatFormatting.GREEN : ChatFormatting.GRAY))
                                        .withStyle(ChatFormatting.DARK_PURPLE));
+
+        boolean beefCaptureEnabled = stack.getOrDefault(UComponents.BeefCaptureEnabledComponent.get(), false);
+        tooltipComponents.add(Component.translatable("tooltip.useless_mod.beef_capture_mode")
+                                       .append(": ")
+                                       .append(Component.translatable(
+                                               beefCaptureEnabled ? "tooltip.useless_mod.enable" :
+                                                       "tooltip.useless_mod.disable"
+                                       ).withStyle(beefCaptureEnabled ? ChatFormatting.GREEN : ChatFormatting.GRAY))
+                                       .withStyle(ChatFormatting.DARK_GREEN));
 
         // AE存储优先状态（仅当AE2模组存在时）
         if (ModList.get().isLoaded("ae2")) {

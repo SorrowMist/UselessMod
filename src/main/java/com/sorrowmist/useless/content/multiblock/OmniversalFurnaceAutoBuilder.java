@@ -2,7 +2,9 @@ package com.sorrowmist.useless.content.multiblock;
 
 import appeng.api.config.Actionable;
 import com.sorrowmist.useless.compat.AE2Compat;
+import com.sorrowmist.useless.content.blockentities.multiblock.MePatternAssemblyBlockEntity;
 import com.sorrowmist.useless.content.blockentities.multiblock.MultiblockAlloyFurnaceCoreBlockEntity;
+import com.sorrowmist.useless.content.blockentities.multiblock.PassiveCraftingHatchBlockEntity;
 import com.sorrowmist.useless.content.blocks.multiblock.MultiblockAlloyFurnaceCoreBlock;
 import com.sorrowmist.useless.content.blocks.multiblock.OmniversalAlloyFurnaceStructure;
 import com.sorrowmist.useless.content.blocks.multiblock.UselessCoilBlock;
@@ -70,6 +72,11 @@ public final class OmniversalFurnaceAutoBuilder {
         }
         if (coilTier == 0) return failure("gui.useless_mod.multiblock_builder.missing_coils");
 
+        FunctionalLayout functionalLayout = resolveFunctionalLayout(level, corePos, facing);
+        if (functionalLayout == null) {
+            return failure("gui.useless_mod.multiblock_builder.invalid_functional_parts");
+        }
+
         List<Placement> placements = new ArrayList<>();
         Map<Item, Integer> requirements = new LinkedHashMap<>();
         for (OmniversalAlloyFurnaceStructure.Entry entry : OmniversalAlloyFurnaceStructure.entries()) {
@@ -80,9 +87,11 @@ public final class OmniversalFurnaceAutoBuilder {
                 return failure("gui.useless_mod.multiblock_builder.no_permission");
             }
             BlockState current = level.getBlockState(pos);
-            BlockState expected = expectedState(entry.part(), coilTier);
-            if (matches(entry.part(), current, coilTier)) continue;
-            if (level.getBlockEntity(pos) != null || (!current.canBeReplaced() && !current.isAir())) {
+            OmniversalAlloyFurnaceStructure.FunctionalPart functionalPart =
+                    functionalLayout.parts().get(pos);
+            BlockState expected = expectedState(entry.part(), coilTier, functionalPart);
+            if (matches(entry.part(), current, coilTier, functionalPart)) continue;
+            if (level.getBlockEntity(pos) != null || !canReplaceForBuild(current, functionalPart)) {
                 return failure("gui.useless_mod.multiblock_builder.blocked", pos.toShortString());
             }
             placements.add(new Placement(pos.immutable(), current, expected));
@@ -120,6 +129,77 @@ public final class OmniversalFurnaceAutoBuilder {
                 "gui.useless_mod.multiblock_builder.success", coilTier));
     }
 
+    private static FunctionalLayout resolveFunctionalLayout(
+            ServerLevel level, BlockPos corePos, Direction facing) {
+        Map<BlockPos, OmniversalAlloyFurnaceStructure.FunctionalPart> parts = new LinkedHashMap<>();
+        for (OmniversalAlloyFurnaceStructure.Entry entry : OmniversalAlloyFurnaceStructure.entries()) {
+            if (entry.part() != OmniversalAlloyFurnaceStructure.Part.CASING) continue;
+            BlockPos pos = entry.worldPos(corePos, facing);
+            OmniversalAlloyFurnaceStructure.FunctionalPart functionalPart =
+                    OmniversalAlloyFurnaceStructure.functionalPart(level.getBlockState(pos));
+            if (functionalPart == null) continue;
+            if (parts.containsValue(functionalPart)) return null;
+            if (isExclusivePartClaimedByAnotherCore(level, corePos, pos, functionalPart)) return null;
+            parts.put(pos.immutable(), functionalPart);
+        }
+
+        if (!parts.containsValue(OmniversalAlloyFurnaceStructure.FunctionalPart.PATTERN_ASSEMBLY)) {
+            BlockPos pos = chooseFunctionalPosition(level, corePos, facing, parts,
+                    OmniversalAlloyFurnaceStructure.PREFERRED_PATTERN_ASSEMBLY_POS);
+            if (pos == null) return null;
+            parts.put(pos, OmniversalAlloyFurnaceStructure.FunctionalPart.PATTERN_ASSEMBLY);
+        }
+        if (!parts.containsValue(OmniversalAlloyFurnaceStructure.FunctionalPart.MOLD_HUB)) {
+            BlockPos pos = chooseFunctionalPosition(level, corePos, facing, parts,
+                    OmniversalAlloyFurnaceStructure.PREFERRED_MOLD_HUB_POS);
+            if (pos == null) return null;
+            parts.put(pos, OmniversalAlloyFurnaceStructure.FunctionalPart.MOLD_HUB);
+        }
+        return new FunctionalLayout(Map.copyOf(parts));
+    }
+
+    private static boolean isExclusivePartClaimedByAnotherCore(
+            ServerLevel level, BlockPos corePos, BlockPos partPos,
+            OmniversalAlloyFurnaceStructure.FunctionalPart functionalPart) {
+        return switch (functionalPart) {
+            case PATTERN_ASSEMBLY -> level.getBlockEntity(partPos)
+                    instanceof MePatternAssemblyBlockEntity assembly
+                    && assembly.isClaimedByOtherController(corePos);
+            case PASSIVE_HATCH -> level.getBlockEntity(partPos)
+                    instanceof PassiveCraftingHatchBlockEntity hatch
+                    && hatch.isClaimedByOtherController(corePos);
+            case MOLD_HUB -> false;
+        };
+    }
+
+    private static BlockPos chooseFunctionalPosition(
+            ServerLevel level, BlockPos corePos, Direction facing,
+            Map<BlockPos, OmniversalAlloyFurnaceStructure.FunctionalPart> assigned,
+            BlockPos preferredLocalPos) {
+        for (OmniversalAlloyFurnaceStructure.Entry entry : OmniversalAlloyFurnaceStructure.entries()) {
+            if (entry.part() != OmniversalAlloyFurnaceStructure.Part.CASING
+                    || !entry.localPos().equals(preferredLocalPos)) continue;
+            BlockPos pos = entry.worldPos(corePos, facing);
+            if (!assigned.containsKey(pos) && isAvailableFunctionalPosition(level, pos)) {
+                return pos.immutable();
+            }
+        }
+        for (OmniversalAlloyFurnaceStructure.Entry entry : OmniversalAlloyFurnaceStructure.entries()) {
+            if (entry.part() != OmniversalAlloyFurnaceStructure.Part.CASING) continue;
+            BlockPos pos = entry.worldPos(corePos, facing);
+            if (!assigned.containsKey(pos) && isAvailableFunctionalPosition(level, pos)) {
+                return pos.immutable();
+            }
+        }
+        return null;
+    }
+
+    private static boolean isAvailableFunctionalPosition(ServerLevel level, BlockPos pos) {
+        if (level.getBlockEntity(pos) != null) return false;
+        BlockState state = level.getBlockState(pos);
+        return state.canBeReplaced() || state.isAir() || state.is(ModTags.OMNIVERSAL_FURNACE_CASINGS);
+    }
+
     private static boolean hasMaterials(ServerPlayer player, ItemStack tool, Map<Item, Integer> requirements) {
         for (Map.Entry<Item, Integer> entry : requirements.entrySet()) {
             ItemStack requested = new ItemStack(entry.getKey(), entry.getValue());
@@ -133,7 +213,7 @@ public final class OmniversalFurnaceAutoBuilder {
         int missing = 0;
         for (var entry : OmniversalAlloyFurnaceStructure.entries()) {
             if (entry.part() == OmniversalAlloyFurnaceStructure.Part.COIL
-                    && !matches(entry.part(), level.getBlockState(entry.worldPos(corePos, facing)), tier)) {
+                    && !matches(entry.part(), level.getBlockState(entry.worldPos(corePos, facing)), tier, null)) {
                 missing++;
             }
         }
@@ -145,21 +225,36 @@ public final class OmniversalFurnaceAutoBuilder {
                 && blockItem.getBlock() instanceof UselessCoilBlock coil ? coil.tier() : 0;
     }
 
-    private static boolean matches(OmniversalAlloyFurnaceStructure.Part part, BlockState state, int coilTier) {
+    private static boolean matches(OmniversalAlloyFurnaceStructure.Part part, BlockState state, int coilTier,
+                                   OmniversalAlloyFurnaceStructure.FunctionalPart functionalPart) {
+        if (functionalPart != null) {
+            return OmniversalAlloyFurnaceStructure.functionalPart(state) == functionalPart;
+        }
         return switch (part) {
             case CORE -> state.is(ModBlocks.MULTIBLOCK_ALLOY_FURNACE_CORE.get());
-            case PATTERN_ASSEMBLY -> state.is(ModBlocks.ME_PATTERN_ASSEMBLY.get());
-            case MOLD_HUB -> state.is(ModBlocks.OMNIVERSAL_MOLD_HUB.get());
-            case CASING -> state.is(ModTags.OMNIVERSAL_FURNACE_CASINGS);
+            case CASING -> state.is(ModTags.OMNIVERSAL_FURNACE_CASINGS)
+                    && OmniversalAlloyFurnaceStructure.functionalPart(state) == null;
             case COIL -> state.getBlock() instanceof UselessCoilBlock coil && coil.tier() == coilTier;
             case AIR -> state.isAir();
         };
     }
 
-    private static BlockState expectedState(OmniversalAlloyFurnaceStructure.Part part, int coilTier) {
+    private static boolean canReplaceForBuild(BlockState current,
+                                              OmniversalAlloyFurnaceStructure.FunctionalPart functionalPart) {
+        return current.canBeReplaced() || current.isAir()
+                || functionalPart != null && current.is(ModTags.OMNIVERSAL_FURNACE_CASINGS);
+    }
+
+    private static BlockState expectedState(OmniversalAlloyFurnaceStructure.Part part, int coilTier,
+                                            OmniversalAlloyFurnaceStructure.FunctionalPart functionalPart) {
+        if (functionalPart != null) {
+            return switch (functionalPart) {
+                case PATTERN_ASSEMBLY -> ModBlocks.ME_PATTERN_ASSEMBLY.get().defaultBlockState();
+                case MOLD_HUB -> ModBlocks.OMNIVERSAL_MOLD_HUB.get().defaultBlockState();
+                case PASSIVE_HATCH -> ModBlocks.PASSIVE_CRAFTING_HATCH.get().defaultBlockState();
+            };
+        }
         return switch (part) {
-            case PATTERN_ASSEMBLY -> ModBlocks.ME_PATTERN_ASSEMBLY.get().defaultBlockState();
-            case MOLD_HUB -> ModBlocks.OMNIVERSAL_MOLD_HUB.get().defaultBlockState();
             case CASING -> ModBlocks.OMNIVERSAL_FURNACE_CASING.get().defaultBlockState();
             case COIL -> ModBlocks.USELESS_COILS.get(coilTier).get().defaultBlockState();
             case AIR -> Blocks.AIR.defaultBlockState();
@@ -181,6 +276,10 @@ public final class OmniversalFurnaceAutoBuilder {
     }
 
     private record Placement(BlockPos pos, BlockState original, BlockState expected) {
+    }
+
+    private record FunctionalLayout(
+            Map<BlockPos, OmniversalAlloyFurnaceStructure.FunctionalPart> parts) {
     }
 
     private static final class MaterialTransaction {

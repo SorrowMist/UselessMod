@@ -759,7 +759,7 @@ public class AdvancedAlloyFurnaceScreen extends AbstractContainerScreen<Advanced
         if (this.handlePatternPageClick(mouseX, mouseY, x, y)) return true;
         if (this.handleProgressClick(mouseX, mouseY, x, y)) return true;
         if (this.handleFluidTankClick(mouseX, mouseY, x, y)) return true;
-        if (this.handleFaceModeClick(mouseX, mouseY, x, y)) return true;
+        if (this.handleFaceModeClick(mouseX, mouseY, button, x, y)) return true;
         if (this.handleAutoIOClick(mouseX, mouseY, x, y)) return true;
         if (this.handleRedstoneControlClick(mouseX, mouseY, x, y)) return true;
         if (this.handleCancelAeClick(mouseX, mouseY, x, y)) return true;
@@ -892,18 +892,20 @@ public class AdvancedAlloyFurnaceScreen extends AbstractContainerScreen<Advanced
      * 点击时循环该面的输入输出模式：
      * 客户端本地立即更新显示，同时发送网络包到服务器。
      */
-    private boolean handleFaceModeClick(double mouseX, double mouseY, int x, int y) {
+    private boolean handleFaceModeClick(double mouseX, double mouseY, int button, int x, int y) {
         for (int faceIdx = 0; faceIdx < FurnaceFace.COUNT; faceIdx++) {
             int faceX = x + FACE_XS[faceIdx];
             int faceY = y + FACE_YS[faceIdx];
             if (isInArea(mouseX, mouseY, faceX, faceY, OVERLAY_WIDTH, OVERLAY_HEIGHT)) {
                 FurnaceFace face = FurnaceFace.values()[faceIdx];
                 // 客户端本地立即更新
-                FurnaceFaceMode newMode = this.menu.getBlockEntity().getFaceMode(face).next();
+                boolean reverse = button == 1;
+                FurnaceFaceMode currentMode = this.menu.getBlockEntity().getFaceMode(face);
+                FurnaceFaceMode newMode = reverse ? currentMode.previous() : currentMode.next();
                 this.menu.getBlockEntity().setFaceMode(face, newMode);
                 // 发送网络包到服务器
                 PacketDistributor.sendToServer(new FaceModeChangePacket(
-                        this.menu.getBlockEntity().getBlockPos(), faceIdx));
+                        this.menu.getBlockEntity().getBlockPos(), faceIdx, reverse));
                 return true;
             }
         }

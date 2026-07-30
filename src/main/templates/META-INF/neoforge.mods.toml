@@ -159,6 +159,14 @@ config="${mod_id}.mixins.json"
     ordering="AFTER"
     side="BOTH"
 
+# Optional Malum spirit-crucible and spirit-altar recipe compatibility
+[[dependencies.${mod_id}]]
+    modId="malum"
+    type="optional"
+    versionRange="[1.8.2,)"
+    ordering="AFTER"
+    side="BOTH"
+
 # Optional long-energy capability integrations
 [[dependencies.${mod_id}]]
     modId="mekanism"

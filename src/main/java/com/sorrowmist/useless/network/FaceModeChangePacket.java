@@ -25,19 +25,26 @@ public class FaceModeChangePacket implements CustomPacketPayload {
             (buf, pkt) -> {
                 buf.writeBlockPos(pkt.pos);
                 buf.writeByte(pkt.faceIndex);
+                buf.writeBoolean(pkt.reverse);
             },
-            buf -> new FaceModeChangePacket(buf.readBlockPos(), buf.readByte())
+            buf -> new FaceModeChangePacket(buf.readBlockPos(), buf.readByte(), buf.readBoolean())
     );
     private final BlockPos pos;
     private final byte faceIndex;
+    private final boolean reverse;
 
     /**
      * @param pos       方块位置
      * @param faceIndex FurnaceFace的ordinal值
      */
     public FaceModeChangePacket(BlockPos pos, int faceIndex) {
+        this(pos, faceIndex, false);
+    }
+
+    public FaceModeChangePacket(BlockPos pos, int faceIndex, boolean reverse) {
         this.pos = pos;
         this.faceIndex = (byte) faceIndex;
+        this.reverse = reverse;
     }
 
     public static void handle(FaceModeChangePacket msg, IPayloadContext ctx) {
@@ -48,7 +55,7 @@ public class FaceModeChangePacket implements CustomPacketPayload {
             BlockEntity be = player.level().getBlockEntity(msg.pos);
             if (be instanceof AdvancedAlloyFurnaceBlockEntity furnace) {
                 FurnaceFace face = FurnaceFace.values()[msg.faceIndex % FurnaceFace.COUNT];
-                FurnaceFaceMode newMode = furnace.cycleFaceMode(face);
+                FurnaceFaceMode newMode = furnace.cycleFaceMode(face, msg.reverse);
             }
         });
     }

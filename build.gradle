@@ -301,6 +301,13 @@ dependencies {
     runtimeOnly "dev.ftb.mods:ftb-teams-neoforge:2101.1.4"
     runtimeOnly "curse.maven:ftb-chunks-forge-314906:7157142"
 
+    //性能
+    implementation "maven.modrinth:observable:5.4.4+neoforge"
+
+    //灵灾
+    implementation "maven.modrinth:malum:1.8.2"
+    implementation "maven.modrinth:bN3xUWdo:CohX6yP1"
+
     // 龙研
     compileOnly "com.brandon3055.brandonscore:BrandonsCore:1.21.1-3.2.1.309"
     compileOnly "com.brandon3055.draconicevolution:Draconic-Evolution:1.21.1-3.1.4.632"

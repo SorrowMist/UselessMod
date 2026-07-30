@@ -3,6 +3,7 @@ package com.sorrowmist.useless.network;
 import com.sorrowmist.useless.UselessMod;
 import com.sorrowmist.useless.content.blockentities.multiblock.PassiveCraftingHatchBlockEntity;
 import com.sorrowmist.useless.content.menus.PassiveCraftingHatchMenu;
+import com.sorrowmist.useless.content.menus.PagedRecoverableMenu;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
@@ -12,7 +13,9 @@ import net.neoforged.neoforge.network.handling.IPayloadContext;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 public record PassiveCraftingStatusPacket(
         int containerId, BlockPos pos,
@@ -26,6 +29,10 @@ public record PassiveCraftingStatusPacket(
     public PassiveCraftingStatusPacket {
         pos = pos.immutable();
         statuses = List.copyOf(statuses);
+        if (statuses.size() > PagedRecoverableMenu.SLOTS_PER_PAGE) {
+            throw new IllegalArgumentException("Passive crafting status packets may contain one page only");
+        }
+        validateStatuses(statuses);
     }
 
     private static void encode(FriendlyByteBuf buf, PassiveCraftingStatusPacket packet) {
@@ -33,7 +40,7 @@ public record PassiveCraftingStatusPacket(
         buf.writeBlockPos(packet.pos);
         buf.writeVarInt(packet.statuses.size());
         for (PassiveCraftingHatchBlockEntity.SlotStatus status : packet.statuses) {
-            buf.writeByte(status.slot());
+            buf.writeVarInt(status.slot());
             buf.writeByte(status.state().ordinal());
             buf.writeVarInt(status.progress());
             buf.writeVarInt(status.maxProgress());
@@ -45,15 +52,15 @@ public record PassiveCraftingStatusPacket(
         int containerId = buf.readVarInt();
         BlockPos pos = buf.readBlockPos();
         int size = buf.readVarInt();
-        if (size < 0 || size > PassiveCraftingHatchBlockEntity.PATTERN_SLOTS) {
+        if (size < 0 || size > PagedRecoverableMenu.SLOTS_PER_PAGE) {
             throw new IllegalArgumentException("Invalid passive crafting status count: " + size);
         }
         var states = PassiveCraftingHatchBlockEntity.SlotState.values();
         List<PassiveCraftingHatchBlockEntity.SlotStatus> statuses = new ArrayList<>(size);
         for (int index = 0; index < size; index++) {
-            int slot = buf.readUnsignedByte();
+            int slot = buf.readVarInt();
             int stateIndex = buf.readUnsignedByte();
-            if (slot >= PassiveCraftingHatchBlockEntity.PATTERN_SLOTS) {
+            if (slot < 0 || slot >= PassiveCraftingHatchBlockEntity.MAX_PATTERN_SLOTS) {
                 throw new IllegalArgumentException("Invalid passive crafting slot: " + slot);
             }
             if (stateIndex >= states.length) {
@@ -63,6 +70,25 @@ public record PassiveCraftingStatusPacket(
                     slot, states[stateIndex], buf.readVarInt(), buf.readVarInt(), buf.readUtf(256)));
         }
         return new PassiveCraftingStatusPacket(containerId, pos, statuses);
+    }
+
+    private static void validateStatuses(List<PassiveCraftingHatchBlockEntity.SlotStatus> statuses) {
+        int page = -1;
+        Set<Integer> seenSlots = new HashSet<>();
+        for (PassiveCraftingHatchBlockEntity.SlotStatus status : statuses) {
+            int slot = status.slot();
+            if (slot < 0 || slot >= PassiveCraftingHatchBlockEntity.MAX_PATTERN_SLOTS) {
+                throw new IllegalArgumentException("Invalid passive crafting slot: " + slot);
+            }
+            if (!seenSlots.add(slot)) {
+                throw new IllegalArgumentException("Duplicate passive crafting slot: " + slot);
+            }
+            int statusPage = slot / PagedRecoverableMenu.SLOTS_PER_PAGE;
+            if (page >= 0 && page != statusPage) {
+                throw new IllegalArgumentException("Passive crafting status packets may contain one page only");
+            }
+            page = statusPage;
+        }
     }
 
     public static void handle(PassiveCraftingStatusPacket packet, IPayloadContext context) {

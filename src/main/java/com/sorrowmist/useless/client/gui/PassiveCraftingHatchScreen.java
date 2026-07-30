@@ -3,6 +3,7 @@ package com.sorrowmist.useless.client.gui;
 import com.sorrowmist.useless.client.render.PatternSlotRenderer;
 import com.sorrowmist.useless.content.blockentities.multiblock.PassiveCraftingHatchBlockEntity;
 import com.sorrowmist.useless.content.menus.PassiveCraftingHatchMenu;
+import com.sorrowmist.useless.content.menus.PagedRecoverableMenu;
 import com.sorrowmist.useless.network.PassiveCraftingSettingsPacket;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.EditBox;
@@ -27,6 +28,8 @@ public final class PassiveCraftingHatchScreen
     private PressableAE2Button multiplierDown;
     private PressableAE2Button multiplierUp;
     private PressableAE2Button applyButton;
+    private PressableAE2Button previousPageButton;
+    private PressableAE2Button nextPageButton;
     private int lastSyncedInterval = Integer.MIN_VALUE;
     private long lastSyncedMultiplier = Long.MIN_VALUE;
 
@@ -44,30 +47,38 @@ public final class PassiveCraftingHatchScreen
     @Override
     protected void init() {
         super.init();
-        intervalField = numericField(148, 34, 70,
+        previousPageButton = addRenderableWidget(new PressableAE2Button(
+                leftPos + 128, topPos + 4, 18, 12,
+                Component.literal("<"), button -> page(PagedRecoverableMenu.PREVIOUS_PAGE)));
+        nextPageButton = addRenderableWidget(new PressableAE2Button(
+                leftPos + 148, topPos + 4, 18, 12,
+                Component.literal(">"), button -> page(PagedRecoverableMenu.NEXT_PAGE)));
+
+        intervalField = numericField(177, 34, 62,
                 Component.translatable("gui.useless_mod.passive_crafting.interval"));
-        multiplierField = numericField(148, 70, 70,
+        multiplierField = numericField(177, 78, 62,
                 Component.translatable("gui.useless_mod.passive_crafting.multiplier"));
         addRenderableWidget(intervalField);
         addRenderableWidget(multiplierField);
 
         intervalDown = addRenderableWidget(new PressableAE2Button(
-                leftPos + 128, topPos + 34, 18, 14,
+                leftPos + 177, topPos + 51, 28, 14,
                 Component.literal("-"), button -> adjustInterval(-20)));
         intervalUp = addRenderableWidget(new PressableAE2Button(
-                leftPos + 220, topPos + 34, 18, 14,
+                leftPos + 211, topPos + 51, 28, 14,
                 Component.literal("+"), button -> adjustInterval(20)));
         multiplierDown = addRenderableWidget(new PressableAE2Button(
-                leftPos + 128, topPos + 70, 18, 14,
+                leftPos + 177, topPos + 95, 28, 14,
                 Component.literal("-"), button -> adjustMultiplier(-1)));
         multiplierUp = addRenderableWidget(new PressableAE2Button(
-                leftPos + 220, topPos + 70, 18, 14,
+                leftPos + 211, topPos + 95, 28, 14,
                 Component.literal("+"), button -> adjustMultiplier(1)));
         applyButton = addRenderableWidget(new PressableAE2Button(
-                leftPos + 128, topPos + 92, 110, 18,
+                leftPos + 177, topPos + 116, 62, 18,
                 Component.translatable("gui.useless_mod.passive_crafting.apply"),
                 button -> sendSettings()));
         syncFields(true);
+        updatePageControls();
     }
 
     private EditBox numericField(int x, int y, int width, Component narration) {
@@ -89,6 +100,21 @@ public final class PassiveCraftingHatchScreen
         multiplierDown.active = editable;
         multiplierUp.active = editable;
         applyButton.active = editable;
+        updatePageControls();
+    }
+
+    private void updatePageControls() {
+        int pageCount = menu.getPageCount();
+        previousPageButton.visible = pageCount > 1;
+        previousPageButton.active = menu.getPage() > 0;
+        nextPageButton.visible = pageCount > 1;
+        nextPageButton.active = menu.getPage() < pageCount - 1;
+    }
+
+    private void page(int id) {
+        if (minecraft != null && minecraft.gameMode != null) {
+            minecraft.gameMode.handleInventoryButtonClick(menu.containerId, id);
+        }
     }
 
     private void syncFields(boolean force) {
@@ -161,6 +187,8 @@ public final class PassiveCraftingHatchScreen
 
     @Override
     public boolean mouseReleased(double mouseX, double mouseY, int button) {
+        previousPageButton.releaseVisualState();
+        nextPageButton.releaseVisualState();
         intervalDown.releaseVisualState();
         intervalUp.releaseVisualState();
         multiplierDown.releaseVisualState();
@@ -173,38 +201,35 @@ public final class PassiveCraftingHatchScreen
     protected void renderBg(GuiGraphics graphics, float partialTick, int mouseX, int mouseY) {
         MachineScreenStyle.drawPanel(graphics, leftPos, topPos, imageWidth, imageHeight);
         MachineScreenStyle.drawInset(graphics,
-                leftPos + 120, topPos + 18, leftPos + 246, topPos + 142);
-        MachineScreenStyle.drawSlotGroup(graphics, leftPos, topPos, 8, 22, 6, 5);
+                leftPos + 172, topPos + 18, leftPos + 246, topPos + 142);
+        MachineScreenStyle.drawSlotGroup(graphics, leftPos, topPos, 8, 22, 9, 3);
         MachineScreenStyle.drawSlotGroup(graphics, leftPos, topPos, 44, 158, 9, 3);
         MachineScreenStyle.drawSlotGroup(graphics, leftPos, topPos, 44, 218, 9, 1);
 
-        for (int slot = 0; slot < menu.slots.size(); slot++) {
-            MachineScreenStyle.drawSlotBackground(
-                    graphics, leftPos, topPos, menu.slots.get(slot));
+        for (Slot slot : menu.slots) {
+            MachineScreenStyle.drawSlotBackground(graphics, leftPos, topPos, slot);
         }
     }
 
     @Override
     protected void renderSlot(GuiGraphics graphics, Slot slot) {
-        boolean pattern = slot.index < PassiveCraftingHatchMenu.PATTERN_SLOTS;
-        if (!pattern || !PatternSlotRenderer.renderPattern(
+        int patternSlot = menu.getPatternSlotIndex(slot);
+        if (patternSlot < 0 || !PatternSlotRenderer.renderPattern(
                 graphics, font, slot.getItem(), slot.x, slot.y,
                 slot.x + slot.y * imageWidth, minecraft == null ? null : minecraft.level)) {
             super.renderSlot(graphics, slot);
         }
-        if (!pattern) return;
+        if (patternSlot < 0) return;
 
-        int index = slot.index;
-        var status = menu.getSlotStatus(index);
+        var status = menu.getSlotStatus(patternSlot);
         int color = statusColor(status.state());
         int width = status.maxProgress() <= 0 ? 16
                 : Mth.clamp((int) ((long) status.progress() * 16L / status.maxProgress()), 0, 16);
         if (width > 0 && status.state() != PassiveCraftingHatchBlockEntity.SlotState.EMPTY) {
             graphics.fill(slot.x, slot.y + 14, slot.x + width, slot.y + 16, color);
         }
-        if (index >= menu.getActivePatternSlots()) {
+        if (patternSlot >= menu.getActivePatternSlots()) {
             graphics.fill(slot.x, slot.y, slot.x + 16, slot.y + 16, 0x66000000);
-            // Compact padlock glyph for withdraw-only recovery slots.
             graphics.fill(slot.x + 11, slot.y + 2, slot.x + 15, slot.y + 7, 0xFFF2F2F2);
             graphics.fill(slot.x + 12, slot.y + 1, slot.x + 14, slot.y + 3, 0xFFF2F2F2);
         }
@@ -214,28 +239,32 @@ public final class PassiveCraftingHatchScreen
     protected void renderLabels(GuiGraphics graphics, int mouseX, int mouseY) {
         graphics.drawString(font, title, titleLabelX, titleLabelY,
                 MachineScreenStyle.TEXT_COLOR, false);
+        String page = (menu.getPage() + 1) + "/" + menu.getPageCount();
+        graphics.drawString(font, page, 126 - font.width(page), 6,
+                menu.isRecoveryPage() ? MachineScreenStyle.ERROR_TEXT_COLOR : MachineScreenStyle.MUTED_TEXT_COLOR,
+                false);
         graphics.drawString(font, playerInventoryTitle,
                 inventoryLabelX, inventoryLabelY, MachineScreenStyle.TEXT_COLOR, false);
         graphics.drawString(font,
                 Component.translatable("gui.useless_mod.passive_crafting.interval"),
-                128, 22, MachineScreenStyle.TEXT_COLOR, false);
+                177, 22, MachineScreenStyle.TEXT_COLOR, false);
         graphics.drawString(font,
                 Component.translatable("gui.useless_mod.passive_crafting.multiplier"),
-                128, 58, MachineScreenStyle.TEXT_COLOR, false);
+                177, 66, MachineScreenStyle.TEXT_COLOR, false);
         graphics.drawString(font,
                 Component.translatable("gui.useless_mod.passive_crafting.max_multiplier",
                         menu.getMaxMultiplier()),
-                128, 114, MachineScreenStyle.MUTED_TEXT_COLOR, false);
+                8, 91, MachineScreenStyle.MUTED_TEXT_COLOR, false);
         graphics.drawString(font,
                 Component.translatable("gui.useless_mod.passive_crafting.countdown",
                         menu.getCountdownTicks()),
-                128, 125, MachineScreenStyle.MUTED_TEXT_COLOR, false);
+                8, 102, MachineScreenStyle.MUTED_TEXT_COLOR, false);
 
-        Slot hovered = hoveredSlot;
-        if (hovered != null && hovered.index < PassiveCraftingHatchMenu.PATTERN_SLOTS) {
-            var status = menu.getSlotStatus(hovered.index);
+        int patternSlot = menu.getPatternSlotIndex(hoveredSlot);
+        if (patternSlot >= 0) {
+            var status = menu.getSlotStatus(patternSlot);
             Component statusText = statusComponent(status);
-            graphics.drawString(font, font.split(statusText, 108).getFirst(),
+            graphics.drawString(font, font.split(statusText, 156).getFirst(),
                     8, 116, statusColor(status.state()), false);
             if (status.maxProgress() > 0) {
                 graphics.drawString(font,
@@ -251,7 +280,7 @@ public final class PassiveCraftingHatchScreen
                     menu.isFormed() ? 0xFF2E7D32 : 0xFFA66A00, false);
             graphics.drawString(font,
                     Component.translatable("gui.useless_mod.passive_crafting.active_slots",
-                            menu.getActivePatternSlots(), PassiveCraftingHatchMenu.PATTERN_SLOTS),
+                            menu.getActivePatternSlots(), menu.getConfiguredPatternSlots()),
                     8, 128, MachineScreenStyle.MUTED_TEXT_COLOR, false);
         }
     }
@@ -279,11 +308,10 @@ public final class PassiveCraftingHatchScreen
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
         super.render(graphics, mouseX, mouseY, partialTick);
         renderTooltip(graphics, mouseX, mouseY);
-        if (hoveredSlot != null
-                && hoveredSlot.index < PassiveCraftingHatchMenu.PATTERN_SLOTS
-                && hoveredSlot.getItem().isEmpty()) {
-            var status = menu.getSlotStatus(hoveredSlot.index);
-            Component first = hoveredSlot.index >= menu.getActivePatternSlots()
+        int patternSlot = menu.getPatternSlotIndex(hoveredSlot);
+        if (hoveredSlot != null && patternSlot >= 0 && hoveredSlot.getItem().isEmpty()) {
+            var status = menu.getSlotStatus(patternSlot);
+            Component first = patternSlot >= menu.getActivePatternSlots()
                     ? Component.translatable("gui.useless_mod.passive_crafting.locked_slot")
                     : statusComponent(status);
             graphics.renderTooltip(font, List.of(first), Optional.empty(), mouseX, mouseY);

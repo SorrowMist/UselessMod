@@ -30,6 +30,7 @@ class PagedRecoverableMenuTest {
         RecoverableItemStackHandler backing = handler();
         backing.setStackInSlot(0, new ItemStack(Items.IRON_INGOT, 2));
         backing.setStackInSlot(27, new ItemStack(Items.GOLD_INGOT, 3));
+        backing.setStackInSlot(539, new ItemStack(Items.EMERALD, 4));
         PagedRecoverableMenu.PageView view =
                 new PagedRecoverableMenu.PageView(backing, page::get, false);
         SlotItemHandler slot = new SlotItemHandler(view, 0, 0, 0);
@@ -42,6 +43,11 @@ class PagedRecoverableMenuTest {
         slot.set(new ItemStack(Items.DIAMOND, 4));
         assertTrue(backing.getStackInSlot(27).is(Items.DIAMOND));
         assertEquals(4, backing.getStackInSlot(27).getCount());
+
+        page.set(19);
+        SlotItemHandler finalSlot = new SlotItemHandler(view, 26, 0, 0);
+        assertTrue(finalSlot.getItem().is(Items.EMERALD));
+        assertEquals(4, finalSlot.getItem().getCount());
     }
 
     @Test

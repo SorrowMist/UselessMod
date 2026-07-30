@@ -73,6 +73,11 @@ public enum FurnaceFaceMode {
         return values[(this.ordinal() + 1) % values.length];
     }
 
+    public FurnaceFaceMode previous() {
+        FurnaceFaceMode[] values = values();
+        return values[(this.ordinal() - 1 + values.length) % values.length];
+    }
+
     public static FurnaceFaceMode byIndex(int index) {
         FurnaceFaceMode[] values = values();
         if (index < 0 || index >= values.length) return DISABLED;

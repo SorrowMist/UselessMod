@@ -4,6 +4,8 @@ import com.sorrowmist.useless.api.enums.tool.ToolTypeMode;
 import com.sorrowmist.useless.content.items.EndlessBeafItem;
 import com.sorrowmist.useless.core.component.UComponents;
 import com.sorrowmist.useless.core.config.ConfigManager;
+import cy.jdkdigital.productivebees.common.entity.bee.ProductiveBee;
+import cy.jdkdigital.productivebees.util.BeeCreator;
 import net.minecraft.core.Holder;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
@@ -11,10 +13,15 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.effect.MobEffect;
 import net.minecraft.world.effect.MobEffectInstance;
+import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
+import net.minecraft.world.item.SpawnEggItem;
+import net.minecraft.world.level.GameRules;
 import net.minecraft.world.level.Level;
 import net.neoforged.neoforge.event.entity.living.LivingDropsEvent;
 
@@ -25,6 +32,9 @@ import java.util.List;
 import java.util.Optional;
 
 public class UselessItemUtils {
+    private static final ResourceLocation COGNIZANT_DUST_ID = ResourceLocation.fromNamespaceAndPath(
+            "mysticalagriculture", "cognizant_dust");
+
     public static void applyEndlessBeafEffects(Player player) {
         if (player == null) return;
 
@@ -109,6 +119,66 @@ public class UselessItemUtils {
         // 清空原掉落物，重新添加只需掉在地上的部分（主要是可损坏物品）
         drops.clear();
         drops.addAll(remainingDrops);
+    }
+
+    public static void tryAddCognizantDustDrop(LivingDropsEvent event, ItemStack stack) {
+        if (!(stack.getItem() instanceof EndlessBeafItem)) {
+            return;
+        }
+
+        LivingEntity killedEntity = event.getEntity();
+        Level level = killedEntity.level();
+        if (level.isClientSide() || !level.getGameRules().getBoolean(GameRules.RULE_DOMOBLOOT)) {
+            return;
+        }
+
+        int count = killedEntity.getType() == EntityType.WITHER ? 4
+                : killedEntity.getType() == EntityType.ENDER_DRAGON ? 6 : 0;
+        if (count == 0) {
+            return;
+        }
+
+        Item cognizantDust = BuiltInRegistries.ITEM.get(COGNIZANT_DUST_ID);
+        if (cognizantDust != Items.AIR) {
+            event.getDrops().add(new ItemEntity(
+                    level,
+                    killedEntity.getX(),
+                    killedEntity.getY(),
+                    killedEntity.getZ(),
+                    new ItemStack(cognizantDust, count)
+            ));
+        }
+    }
+
+    public static void tryCaptureSpawnEgg(LivingEntity killedEntity, ItemStack stack, Player player) {
+        if (killedEntity.level().isClientSide()
+                || !(stack.getItem() instanceof EndlessBeafItem)
+                || !stack.getOrDefault(UComponents.BeefCaptureEnabledComponent.get(), false)) {
+            return;
+        }
+
+        ItemStack spawnEggStack;
+        if (killedEntity instanceof ProductiveBee productiveBee) {
+            ResourceLocation beeType = productiveBee.getBeeType();
+            if (beeType == null) {
+                return;
+            }
+            spawnEggStack = BeeCreator.getSpawnEgg(beeType);
+        } else {
+            SpawnEggItem spawnEgg = SpawnEggItem.byId(killedEntity.getType());
+            if (spawnEgg == null) {
+                return;
+            }
+            spawnEggStack = new ItemStack(spawnEgg);
+        }
+
+        if (spawnEggStack.isEmpty()) {
+            return;
+        }
+
+        if (!player.getInventory().add(spawnEggStack)) {
+            player.drop(spawnEggStack, false);
+        }
     }
 
     // 显示触发提示

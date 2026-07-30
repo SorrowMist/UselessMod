@@ -1,6 +1,8 @@
 package com.sorrowmist.useless.content.blocks.multiblock;
 
 import com.sorrowmist.useless.content.blockentities.multiblock.MultiblockAlloyFurnaceCoreBlockEntity;
+import com.sorrowmist.useless.content.blockentities.multiblock.MePatternAssemblyBlockEntity;
+import com.sorrowmist.useless.content.blockentities.multiblock.PassiveCraftingHatchBlockEntity;
 import com.sorrowmist.useless.init.ModBlocks;
 import com.sorrowmist.useless.init.ModTags;
 import net.minecraft.core.BlockPos;
@@ -17,7 +19,11 @@ import java.util.List;
 /** Canonical 3x4x3 template shared by validation, preview and automatic construction. */
 public final class OmniversalAlloyFurnaceStructure {
     public static final int COIL_COUNT = 16;
+    /** Normal casing blocks required after the assembly and hub occupy two shell positions. */
     public static final int CASING_COUNT = 15;
+    public static final int FUNCTIONAL_CASING_COUNT = 17;
+    public static final BlockPos PREFERRED_PATTERN_ASSEMBLY_POS = new BlockPos(-1, 0, 0);
+    public static final BlockPos PREFERRED_MOLD_HUB_POS = new BlockPos(1, 0, 0);
 
     private static final List<Entry> ENTRIES = createEntries();
 
@@ -26,11 +32,15 @@ public final class OmniversalAlloyFurnaceStructure {
 
     public enum Part {
         CORE,
-        PATTERN_ASSEMBLY,
-        MOLD_HUB,
         CASING,
         COIL,
         AIR
+    }
+
+    public enum FunctionalPart {
+        PATTERN_ASSEMBLY,
+        MOLD_HUB,
+        PASSIVE_HATCH
     }
 
     public record Entry(BlockPos localPos, Part part) {
@@ -43,9 +53,13 @@ public final class OmniversalAlloyFurnaceStructure {
     }
 
     public record ValidationResult(boolean valid, int coilTier,
+                                   @Nullable BlockPos patternAssemblyPos,
+                                   @Nullable BlockPos moldHubPos,
                                    @Nullable BlockPos passiveHatchPos,
                                    List<Mismatch> mismatches) {
         public ValidationResult {
+            patternAssemblyPos = patternAssemblyPos == null ? null : patternAssemblyPos.immutable();
+            moldHubPos = moldHubPos == null ? null : moldHubPos.immutable();
             passiveHatchPos = passiveHatchPos == null ? null : passiveHatchPos.immutable();
             mismatches = List.copyOf(mismatches);
         }
@@ -67,12 +81,17 @@ public final class OmniversalAlloyFurnaceStructure {
     public static ValidationResult validate(LevelReader level, BlockPos corePos, Direction facing) {
         List<Mismatch> mismatches = new ArrayList<>();
         int coilTier = 0;
-        BlockPos passiveHatchPos = null;
+        int assemblyCount = 0;
+        int moldHubCount = 0;
         int passiveHatchCount = 0;
+        BlockPos assemblyPos = null;
+        BlockPos moldHubPos = null;
+        BlockPos passiveHatchPos = null;
+
         for (Entry entry : ENTRIES) {
             BlockPos worldPos = entry.worldPos(corePos, facing);
             if (!isChunkLoaded(level, worldPos)) {
-                return new ValidationResult(false, 0, null, List.of());
+                return new ValidationResult(false, 0, null, null, null, List.of());
             }
             BlockState state = level.getBlockState(worldPos);
             if (entry.part == Part.COIL) {
@@ -87,12 +106,30 @@ public final class OmniversalAlloyFurnaceStructure {
                 }
                 continue;
             }
-            if (entry.part == Part.CASING && state.is(ModBlocks.PASSIVE_CRAFTING_HATCH.get())) {
-                passiveHatchCount++;
-                if (isPassiveHatchCountValid(passiveHatchCount)) {
-                    passiveHatchPos = worldPos.immutable();
-                } else {
-                    mismatches.add(new Mismatch(worldPos, Part.CASING, state));
+            if (entry.part == Part.CASING) {
+                FunctionalPart functionalPart = functionalPart(state);
+                if (functionalPart == null) {
+                    if (!state.is(ModTags.OMNIVERSAL_FURNACE_CASINGS)) {
+                        mismatches.add(new Mismatch(worldPos, Part.CASING, state));
+                    }
+                    continue;
+                }
+                switch (functionalPart) {
+                    case PATTERN_ASSEMBLY -> {
+                        assemblyCount++;
+                        if (assemblyCount == 1) assemblyPos = worldPos.immutable();
+                        else mismatches.add(new Mismatch(worldPos, Part.CASING, state));
+                    }
+                    case MOLD_HUB -> {
+                        moldHubCount++;
+                        if (moldHubCount == 1) moldHubPos = worldPos.immutable();
+                        else mismatches.add(new Mismatch(worldPos, Part.CASING, state));
+                    }
+                    case PASSIVE_HATCH -> {
+                        passiveHatchCount++;
+                        if (passiveHatchCount == 1) passiveHatchPos = worldPos.immutable();
+                        else mismatches.add(new Mismatch(worldPos, Part.CASING, state));
+                    }
                 }
                 continue;
             }
@@ -100,12 +137,51 @@ public final class OmniversalAlloyFurnaceStructure {
                 mismatches.add(new Mismatch(worldPos, entry.part, state));
             }
         }
-        return new ValidationResult(mismatches.isEmpty() && coilTier > 0,
-                coilTier, passiveHatchPos, mismatches);
+        boolean functionalCountsValid = isFunctionalPartCountsValid(
+                assemblyCount, moldHubCount, passiveHatchCount);
+        if (assemblyPos != null && isClaimedByAnotherCore(level, corePos, assemblyPos,
+                FunctionalPart.PATTERN_ASSEMBLY)) {
+            mismatches.add(new Mismatch(assemblyPos, Part.CASING, level.getBlockState(assemblyPos)));
+        }
+        if (passiveHatchPos != null && isClaimedByAnotherCore(level, corePos, passiveHatchPos,
+                FunctionalPart.PASSIVE_HATCH)) {
+            mismatches.add(new Mismatch(passiveHatchPos, Part.CASING, level.getBlockState(passiveHatchPos)));
+        }
+        return new ValidationResult(mismatches.isEmpty() && functionalCountsValid && coilTier > 0,
+                coilTier, assemblyPos, moldHubPos, passiveHatchPos, mismatches);
+    }
+
+    public static boolean isFunctionalPartCountsValid(
+            int patternAssemblyCount, int moldHubCount, int passiveHatchCount) {
+        return patternAssemblyCount == 1 && moldHubCount == 1 && isPassiveHatchCountValid(passiveHatchCount);
     }
 
     static boolean isPassiveHatchCountValid(int count) {
         return count >= 0 && count <= 1;
+    }
+
+    @Nullable
+    public static FunctionalPart functionalPart(BlockState state) {
+        if (state.is(ModBlocks.ME_PATTERN_ASSEMBLY.get())) return FunctionalPart.PATTERN_ASSEMBLY;
+        if (state.is(ModBlocks.OMNIVERSAL_MOLD_HUB.get())) return FunctionalPart.MOLD_HUB;
+        if (state.is(ModBlocks.PASSIVE_CRAFTING_HATCH.get())) return FunctionalPart.PASSIVE_HATCH;
+        return null;
+    }
+
+    private static boolean isClaimedByAnotherCore(
+            LevelReader level, BlockPos corePos, BlockPos partPos, FunctionalPart part) {
+        if (!(level instanceof Level actualLevel)) {
+            return false;
+        }
+        return switch (part) {
+            case PATTERN_ASSEMBLY -> actualLevel.getBlockEntity(partPos)
+                    instanceof MePatternAssemblyBlockEntity assembly
+                    && assembly.isClaimedByOtherController(corePos);
+            case PASSIVE_HATCH -> actualLevel.getBlockEntity(partPos)
+                    instanceof PassiveCraftingHatchBlockEntity hatch
+                    && hatch.isClaimedByOtherController(corePos);
+            case MOLD_HUB -> false;
+        };
     }
 
     public static void notifyNearbyCores(Level level, BlockPos changedPos) {
@@ -135,8 +211,6 @@ public final class OmniversalAlloyFurnaceStructure {
     private static boolean matches(Part part, BlockState state) {
         return switch (part) {
             case CORE -> state.is(ModBlocks.MULTIBLOCK_ALLOY_FURNACE_CORE.get());
-            case PATTERN_ASSEMBLY -> state.is(ModBlocks.ME_PATTERN_ASSEMBLY.get());
-            case MOLD_HUB -> state.is(ModBlocks.OMNIVERSAL_MOLD_HUB.get());
             case CASING -> state.is(ModTags.OMNIVERSAL_FURNACE_CASINGS);
             case AIR -> state.isAir();
             case COIL -> state.getBlock() instanceof UselessCoilBlock;
@@ -146,8 +220,8 @@ public final class OmniversalAlloyFurnaceStructure {
     private static List<Entry> createEntries() {
         List<Entry> entries = new ArrayList<>(36);
         entries.add(new Entry(new BlockPos(0, 0, 0), Part.CORE));
-        entries.add(new Entry(new BlockPos(-1, 0, 0), Part.PATTERN_ASSEMBLY));
-        entries.add(new Entry(new BlockPos(1, 0, 0), Part.MOLD_HUB));
+        entries.add(new Entry(PREFERRED_PATTERN_ASSEMBLY_POS, Part.CASING));
+        entries.add(new Entry(PREFERRED_MOLD_HUB_POS, Part.CASING));
 
         for (int z = 1; z <= 2; z++) {
             for (int x = -1; x <= 1; x++) {

@@ -324,20 +324,30 @@ public final class MultiblockAlloyFurnaceScreen extends AbstractContainerScreen<
                     graphics.fill(x, y, x + PREVIEW_CELL_SIZE - 1,
                             y + PREVIEW_CELL_SIZE - 1, MachineScreenStyle.ERROR_TEXT_COLOR);
                     graphics.fill(x + 1, y + 1, x + PREVIEW_CELL_SIZE - 2,
-                            y + PREVIEW_CELL_SIZE - 2, partColor(entry.part()));
+                            y + PREVIEW_CELL_SIZE - 2, partColor(entry, worldPos));
                 } else {
                     graphics.fill(x, y, x + PREVIEW_CELL_SIZE - 1,
-                            y + PREVIEW_CELL_SIZE - 1, partColor(entry.part()));
+                            y + PREVIEW_CELL_SIZE - 1, partColor(entry, worldPos));
                 }
             }
         }
     }
 
-    private static int partColor(OmniversalAlloyFurnaceStructure.Part part) {
-        return switch (part) {
+    private int partColor(OmniversalAlloyFurnaceStructure.Entry entry, BlockPos worldPos) {
+        if (entry.part() == OmniversalAlloyFurnaceStructure.Part.CASING
+                && minecraft != null && minecraft.level != null) {
+            OmniversalAlloyFurnaceStructure.FunctionalPart functionalPart =
+                    OmniversalAlloyFurnaceStructure.functionalPart(minecraft.level.getBlockState(worldPos));
+            if (functionalPart != null) {
+                return switch (functionalPart) {
+                    case PATTERN_ASSEMBLY -> 0xFF00838F;
+                    case MOLD_HUB -> 0xFFF9A825;
+                    case PASSIVE_HATCH -> 0xFF517497;
+                };
+            }
+        }
+        return switch (entry.part()) {
             case CORE -> 0xFFD84315;
-            case PATTERN_ASSEMBLY -> 0xFF00838F;
-            case MOLD_HUB -> 0xFFF9A825;
             case CASING -> 0xFF757575;
             case COIL -> 0xFF6A1B9A;
             case AIR -> 0xFF212121;
@@ -520,8 +530,6 @@ public final class MultiblockAlloyFurnaceScreen extends AbstractContainerScreen<
             OmniversalAlloyFurnaceStructure.Entry entry, BlockPos worldPos) {
         return switch (entry.part()) {
             case CORE -> ModBlocks.MULTIBLOCK_ALLOY_FURNACE_CORE.get().getName();
-            case PATTERN_ASSEMBLY -> ModBlocks.ME_PATTERN_ASSEMBLY.get().getName();
-            case MOLD_HUB -> ModBlocks.OMNIVERSAL_MOLD_HUB.get().getName();
             case CASING -> expectedCasingName(worldPos);
             case COIL -> expectedCoilName();
             case AIR -> Blocks.AIR.getName();
@@ -530,13 +538,11 @@ public final class MultiblockAlloyFurnaceScreen extends AbstractContainerScreen<
 
     private Component expectedCasingName(BlockPos worldPos) {
         Component casingName = ModBlocks.OMNIVERSAL_FURNACE_CASING.get().getName();
-        if (liveValidation != null && liveValidation.passiveHatchPos() != null
-                && !liveValidation.passiveHatchPos().equals(worldPos)) {
-            return casingName;
-        }
         return Component.translatable(
-                "gui.useless_mod.multiblock_alloy_furnace.preview.casing_with_hatch",
-                casingName, ModBlocks.PASSIVE_CRAFTING_HATCH.get().getName());
+                "gui.useless_mod.multiblock_alloy_furnace.preview.casing_with_functional_parts",
+                casingName, ModBlocks.ME_PATTERN_ASSEMBLY.get().getName(),
+                ModBlocks.OMNIVERSAL_MOLD_HUB.get().getName(),
+                ModBlocks.PASSIVE_CRAFTING_HATCH.get().getName());
     }
 
     private Component expectedCoilName() {

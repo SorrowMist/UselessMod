@@ -1,6 +1,7 @@
 package com.sorrowmist.useless.network;
 
 import com.sorrowmist.useless.UselessMod;
+import com.sorrowmist.useless.content.items.EndlessBeafItem;
 import com.sorrowmist.useless.core.component.UComponents;
 import com.sorrowmist.useless.event.EventHandler;
 import com.sorrowmist.useless.utils.UselessItemUtils;
@@ -62,6 +63,11 @@ public class ModeTogglePacket implements CustomPacketPayload {
                     stack.set(UComponents.BeefInvulnerabilityEnabledComponent.get(), msg.enabled);
                     EventHandler.updateBeefInvulnerability(player);
                 }
+                case BEEF_CAPTURE -> {
+                    if (stack.getItem() instanceof EndlessBeafItem) {
+                        stack.set(UComponents.BeefCaptureEnabledComponent.get(), msg.enabled);
+                    }
+                }
             }
 
             // 显式同步物品到客户端
@@ -79,6 +85,7 @@ public class ModeTogglePacket implements CustomPacketPayload {
         FORCE_MINING,
         AE_STORAGE_PRIORITY,
         FORCE_KILL,
-        BEEF_INVULNERABILITY
+        BEEF_INVULNERABILITY,
+        BEEF_CAPTURE
     }
 }

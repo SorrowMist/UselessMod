@@ -79,6 +79,15 @@ public class EventHandler {
         }
     }
 
+    @SubscribeEvent(priority = EventPriority.LOWEST)
+    public static void onBeefToolLivingDeath(LivingDeathEvent event) {
+        if (!(event.getSource().getEntity() instanceof Player player)) {
+            return;
+        }
+
+        UselessItemUtils.tryCaptureSpawnEgg(event.getEntity(), player.getMainHandItem(), player);
+    }
+
     @SubscribeEvent(priority = EventPriority.HIGHEST)
     public static void onAttackEntity(AttackEntityEvent event) {
         if (event.getTarget() instanceof Player player && hasBeefInvulnerabilityItem(player)) {
@@ -91,6 +100,7 @@ public class EventHandler {
         if (event.getSource().getEntity() instanceof Player player) {
             ItemStack mainHandItem = player.getMainHandItem();
             if (mainHandItem.getItem() instanceof EndlessBeafItem) {
+                UselessItemUtils.tryAddCognizantDustDrop(event, mainHandItem);
                 UselessItemUtils.onLivingDrops(event, mainHandItem, player);
             }
         }

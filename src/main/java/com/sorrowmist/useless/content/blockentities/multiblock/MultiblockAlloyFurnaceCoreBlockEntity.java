@@ -76,6 +76,10 @@ public final class MultiblockAlloyFurnaceCoreBlockEntity extends BlockEntity imp
     private boolean formed;
     private int coilTier;
     @Nullable
+    private BlockPos patternAssemblyPos;
+    @Nullable
+    private BlockPos moldHubPos;
+    @Nullable
     private BlockPos passiveHatchPos;
     private int validationTimer;
     private long structureGeneration;
@@ -158,12 +162,18 @@ public final class MultiblockAlloyFurnaceCoreBlockEntity extends BlockEntity imp
         OmniversalAlloyFurnaceStructure.ValidationResult result =
                 OmniversalAlloyFurnaceStructure.validate(level, worldPosition, facing);
         int validatedCoilTier = result.valid() ? result.coilTier() : 0;
+        BlockPos validatedAssemblyPos = result.valid() ? result.patternAssemblyPos() : null;
+        BlockPos validatedMoldHubPos = result.valid() ? result.moldHubPos() : null;
         BlockPos validatedHatchPos = result.valid() ? result.passiveHatchPos() : null;
         boolean stateChanged = formed != result.valid()
                 || coilTier != validatedCoilTier
+                || !java.util.Objects.equals(patternAssemblyPos, validatedAssemblyPos)
+                || !java.util.Objects.equals(moldHubPos, validatedMoldHubPos)
                 || !java.util.Objects.equals(passiveHatchPos, validatedHatchPos);
         formed = result.valid();
         coilTier = validatedCoilTier;
+        patternAssemblyPos = validatedAssemblyPos == null ? null : validatedAssemblyPos.immutable();
+        moldHubPos = validatedMoldHubPos == null ? null : validatedMoldHubPos.immutable();
         passiveHatchPos = validatedHatchPos == null ? null : validatedHatchPos.immutable();
         if (stateChanged) {
             structureGeneration++;
@@ -178,24 +188,35 @@ public final class MultiblockAlloyFurnaceCoreBlockEntity extends BlockEntity imp
             }
             setChanged();
         }
-        linkFunctionalParts(facing);
+        linkFunctionalParts();
         if (stateChanged) updatePatterns();
     }
 
-    private void linkFunctionalParts(Direction facing) {
+    private void linkFunctionalParts() {
         if (unloading || isRemoved() || level == null) return;
-        MePatternAssemblyBlockEntity assembly = getAssembly(facing);
-        if (assembly != null) assembly.linkController(formed ? worldPosition : null, structureGeneration);
-        OmniversalMoldHubBlockEntity hub = getMoldHub(facing);
-        if (hub != null) hub.linkController(formed ? worldPosition : null, structureGeneration);
+        Direction facing = getBlockState().getValue(MultiblockAlloyFurnaceCoreBlock.FACING);
         for (OmniversalAlloyFurnaceStructure.Entry entry : OmniversalAlloyFurnaceStructure.entries()) {
             if (entry.part() != OmniversalAlloyFurnaceStructure.Part.CASING) continue;
             BlockPos pos = entry.worldPos(worldPosition, facing);
             if (!level.isLoaded(pos)) continue;
-            if (level.getBlockEntity(pos) instanceof PassiveCraftingHatchBlockEntity hatch) {
-                // Keep the raw controller association while invalid so removal can still
-                // recover buffered materials. getController() performs the strict link check.
-                hatch.linkController(worldPosition, structureGeneration);
+            BlockEntity part = level.getBlockEntity(pos);
+            if (part instanceof MePatternAssemblyBlockEntity assembly) {
+                if (formed && pos.equals(patternAssemblyPos)) {
+                    assembly.linkController(worldPosition, structureGeneration);
+                } else if (assembly.isLinkedToController(worldPosition)) {
+                    assembly.linkController(null, structureGeneration);
+                }
+            } else if (part instanceof OmniversalMoldHubBlockEntity hub) {
+                hub.linkController(formed && pos.equals(moldHubPos)
+                        ? worldPosition : null, structureGeneration);
+            } else if (part instanceof PassiveCraftingHatchBlockEntity hatch) {
+                if (formed && pos.equals(passiveHatchPos)) {
+                    hatch.linkController(worldPosition, structureGeneration);
+                } else if (hatch.isLinkedToController(worldPosition)) {
+                    // Keep our own raw association while invalid so removal can still
+                    // recover buffered materials, without stealing another core's hatch.
+                    hatch.linkController(worldPosition, structureGeneration);
+                }
             }
         }
     }
@@ -211,28 +232,18 @@ public final class MultiblockAlloyFurnaceCoreBlockEntity extends BlockEntity imp
 
     @Nullable
     private MePatternAssemblyBlockEntity getAssembly() {
-        return getAssembly(getBlockState().getValue(MultiblockAlloyFurnaceCoreBlock.FACING));
-    }
-
-    @Nullable
-    private MePatternAssemblyBlockEntity getAssembly(Direction facing) {
-        if (unloading || isRemoved() || level == null) return null;
-        BlockPos pos = OmniversalAlloyFurnaceStructure.toWorld(worldPosition, facing, new BlockPos(-1, 0, 0));
-        if (!level.isLoaded(pos)) return null;
-        return level.getBlockEntity(pos) instanceof MePatternAssemblyBlockEntity assembly ? assembly : null;
+        if (unloading || isRemoved() || level == null || patternAssemblyPos == null
+                || !level.isLoaded(patternAssemblyPos)) return null;
+        return level.getBlockEntity(patternAssemblyPos) instanceof MePatternAssemblyBlockEntity assembly
+                ? assembly : null;
     }
 
     @Nullable
     private OmniversalMoldHubBlockEntity getMoldHub() {
-        return getMoldHub(getBlockState().getValue(MultiblockAlloyFurnaceCoreBlock.FACING));
-    }
-
-    @Nullable
-    private OmniversalMoldHubBlockEntity getMoldHub(Direction facing) {
-        if (unloading || isRemoved() || level == null) return null;
-        BlockPos pos = OmniversalAlloyFurnaceStructure.toWorld(worldPosition, facing, new BlockPos(1, 0, 0));
-        if (!level.isLoaded(pos)) return null;
-        return level.getBlockEntity(pos) instanceof OmniversalMoldHubBlockEntity hub ? hub : null;
+        if (unloading || isRemoved() || level == null || moldHubPos == null || !level.isLoaded(moldHubPos)) {
+            return null;
+        }
+        return level.getBlockEntity(moldHubPos) instanceof OmniversalMoldHubBlockEntity hub ? hub : null;
     }
 
     public void onAeGridChanged() {
@@ -319,6 +330,16 @@ public final class MultiblockAlloyFurnaceCoreBlockEntity extends BlockEntity imp
 
     public long getPassiveCraftingMaxParallel() {
         return formed ? OmniversalCoilStats.forTier(coilTier).singleTaskParallel() : 1;
+    }
+
+    public boolean isPatternAssemblyLinked(BlockPos pos, long generation) {
+        return formed && patternAssemblyPos != null && patternAssemblyPos.equals(pos)
+                && structureGeneration == generation;
+    }
+
+    public boolean isMoldHubLinked(BlockPos pos, long generation) {
+        return formed && moldHubPos != null && moldHubPos.equals(pos)
+                && structureGeneration == generation;
     }
 
     public boolean isPassiveHatchLinked(BlockPos pos, long generation) {
@@ -594,6 +615,9 @@ public final class MultiblockAlloyFurnaceCoreBlockEntity extends BlockEntity imp
         formed = tag.getBoolean("Formed");
         coilTier = tag.getInt("CoilTier");
         structureGeneration = tag.getLong("StructureGeneration");
+        patternAssemblyPos = tag.contains("PatternAssembly")
+                ? BlockPos.of(tag.getLong("PatternAssembly")) : null;
+        moldHubPos = tag.contains("MoldHub") ? BlockPos.of(tag.getLong("MoldHub")) : null;
         passiveHatchPos = tag.contains("PassiveHatch")
                 ? BlockPos.of(tag.getLong("PassiveHatch")) : null;
         redstoneControlMode = RedstoneControlMode.byIndex(tag.getInt("RedstoneControlMode"));
@@ -626,6 +650,8 @@ public final class MultiblockAlloyFurnaceCoreBlockEntity extends BlockEntity imp
         tag.putBoolean("Formed", formed);
         tag.putInt("CoilTier", coilTier);
         tag.putLong("StructureGeneration", structureGeneration);
+        if (patternAssemblyPos != null) tag.putLong("PatternAssembly", patternAssemblyPos.asLong());
+        if (moldHubPos != null) tag.putLong("MoldHub", moldHubPos.asLong());
         if (passiveHatchPos != null) tag.putLong("PassiveHatch", passiveHatchPos.asLong());
         tag.putInt("RedstoneControlMode", redstoneControlMode.ordinal());
         tag.putLong("AutomaticEnergyLimit", automaticEnergyLimit);

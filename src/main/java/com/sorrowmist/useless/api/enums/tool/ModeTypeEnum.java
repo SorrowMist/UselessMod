@@ -20,7 +20,10 @@ public enum ModeTypeEnum {
     FORCE_KILL_DISABLED("force_kill_disabled", "tooltip.useless_mod.force_kill_enabled_mode"),
 
     BEEF_INVULNERABILITY_ENABLED("beef_invulnerability_enabled", "tooltip.useless_mod.beef_invulnerability_mode"),
-    BEEF_INVULNERABILITY_DISABLED("beef_invulnerability_disabled", "tooltip.useless_mod.beef_invulnerability_mode");
+    BEEF_INVULNERABILITY_DISABLED("beef_invulnerability_disabled", "tooltip.useless_mod.beef_invulnerability_mode"),
+
+    BEEF_CAPTURE_ENABLED("beef_capture_enabled", "tooltip.useless_mod.beef_capture_mode"),
+    BEEF_CAPTURE_DISABLED("beef_capture_disabled", "tooltip.useless_mod.beef_capture_mode");
 
     private final String name;
     private final String tooltipKey;
@@ -51,6 +54,10 @@ public enum ModeTypeEnum {
 
     public static ModeTypeEnum getBeefInvulnerabilityMode(boolean enabled) {
         return enabled ? BEEF_INVULNERABILITY_ENABLED : BEEF_INVULNERABILITY_DISABLED;
+    }
+
+    public static ModeTypeEnum getBeefCaptureMode(boolean enabled) {
+        return enabled ? BEEF_CAPTURE_ENABLED : BEEF_CAPTURE_DISABLED;
     }
     
     public String getName() {return this.name;}

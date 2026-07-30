@@ -32,11 +32,11 @@ class OmniversalAlloyFurnaceStructureTest {
 
         assertEquals(36, entries.size());
         assertEquals(1, counts.get(OmniversalAlloyFurnaceStructure.Part.CORE));
-        assertEquals(1, counts.get(OmniversalAlloyFurnaceStructure.Part.PATTERN_ASSEMBLY));
-        assertEquals(1, counts.get(OmniversalAlloyFurnaceStructure.Part.MOLD_HUB));
         assertEquals(OmniversalAlloyFurnaceStructure.COIL_COUNT,
                 counts.get(OmniversalAlloyFurnaceStructure.Part.COIL));
-        assertEquals(OmniversalAlloyFurnaceStructure.CASING_COUNT,
+        assertEquals(OmniversalAlloyFurnaceStructure.FUNCTIONAL_CASING_COUNT,
+                counts.get(OmniversalAlloyFurnaceStructure.Part.CASING));
+        assertEquals(OmniversalAlloyFurnaceStructure.CASING_COUNT + 2,
                 counts.get(OmniversalAlloyFurnaceStructure.Part.CASING));
         assertEquals(2, counts.get(OmniversalAlloyFurnaceStructure.Part.AIR));
     }
@@ -93,10 +93,16 @@ class OmniversalAlloyFurnaceStructureTest {
     }
 
     @Test
-    void casingLayoutAllowsAtMostOnePassiveHatch() {
+    void casingLayoutAllowsAllFunctionalPartsAtAnyOuterPosition() {
         assertTrue(OmniversalAlloyFurnaceStructure.isPassiveHatchCountValid(0));
         assertTrue(OmniversalAlloyFurnaceStructure.isPassiveHatchCountValid(1));
         assertFalse(OmniversalAlloyFurnaceStructure.isPassiveHatchCountValid(2));
+        assertTrue(OmniversalAlloyFurnaceStructure.isFunctionalPartCountsValid(1, 1, 0));
+        assertTrue(OmniversalAlloyFurnaceStructure.isFunctionalPartCountsValid(1, 1, 1));
+        assertFalse(OmniversalAlloyFurnaceStructure.isFunctionalPartCountsValid(0, 1, 0));
+        assertFalse(OmniversalAlloyFurnaceStructure.isFunctionalPartCountsValid(1, 0, 0));
+        assertFalse(OmniversalAlloyFurnaceStructure.isFunctionalPartCountsValid(2, 1, 0));
+        assertFalse(OmniversalAlloyFurnaceStructure.isFunctionalPartCountsValid(1, 2, 0));
 
         BlockPos core = new BlockPos(3, 70, -4);
         for (Direction facing : Direction.Plane.HORIZONTAL) {
@@ -105,7 +111,7 @@ class OmniversalAlloyFurnaceStructureTest {
                     .map(entry -> entry.worldPos(core, facing))
                     .distinct()
                     .count();
-            assertEquals(OmniversalAlloyFurnaceStructure.CASING_COUNT, casingPositions);
+            assertEquals(OmniversalAlloyFurnaceStructure.FUNCTIONAL_CASING_COUNT, casingPositions);
         }
     }
 }

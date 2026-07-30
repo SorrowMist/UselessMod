@@ -70,6 +70,14 @@
       "required": false
     },
     {
+      "id": "malum:spirit_crucible",
+      "required": false
+    },
+    {
+      "id": "malum:spirit_altar",
+      "required": false
+    },
+    {
       "id": "useless_mod:ritual_blueprint",
       "required": false
     }

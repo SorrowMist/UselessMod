@@ -109,6 +109,15 @@ public final class UComponents {
                            ))
             );
 
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<Boolean>> BeefCaptureEnabledComponent =
+            register("beef_capture_enabled", builder ->
+                    builder.persistent(Codec.BOOL)
+                           .networkSynchronized(StreamCodec.of(
+                                   FriendlyByteBuf::writeBoolean,
+                                   FriendlyByteBuf::readBoolean
+                           ))
+            );
+
     public static final DeferredHolder<DataComponentType<?>, DataComponentType<ForceKillMode>> ForceKillModeComponent =
             register("force_kill_mode", builder ->
                     builder.persistent(Codec.STRING.xmap(ForceKillMode::valueOf, Enum::name))

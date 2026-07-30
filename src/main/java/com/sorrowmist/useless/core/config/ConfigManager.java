@@ -75,6 +75,7 @@ public class ConfigManager {
 
     private static final ModConfigSpec.IntValue OMNIVERSAL_PATTERN_SLOTS;
     private static final ModConfigSpec.IntValue OMNIVERSAL_MOLD_SLOTS;
+    private static final ModConfigSpec.IntValue OMNIVERSAL_PASSIVE_PATTERN_SLOTS;
 
     static {
         COMMON_BUILDER.push("dimension_generation");
@@ -134,6 +135,10 @@ public class ConfigManager {
                 .comment("Omniversal mold hub slots. Values are normalized to pages of 27.")
                 .translation("useless_mod.configuration.mold_slots")
                 .defineInRange("mold_slots", 108, 27, 540);
+        OMNIVERSAL_PASSIVE_PATTERN_SLOTS = SERVER_BUILDER
+                .comment("Passive crafting hatch slots. Higher coil tiers unlock this capacity gradually.")
+                .translation("useless_mod.configuration.passive_pattern_slots")
+                .defineInRange("passive_pattern_slots", 30, 1, 540);
 
         SERVER_BUILDER.pop();
 
@@ -326,6 +331,10 @@ public class ConfigManager {
 
     public static int getOmniversalMoldSlots() {
         return normalizeInventorySlots(OMNIVERSAL_MOLD_SLOTS.get());
+    }
+
+    public static int getOmniversalPassivePatternSlots() {
+        return Math.max(1, Math.min(540, OMNIVERSAL_PASSIVE_PATTERN_SLOTS.get()));
     }
 
     private static int normalizeInventorySlots(int value) {

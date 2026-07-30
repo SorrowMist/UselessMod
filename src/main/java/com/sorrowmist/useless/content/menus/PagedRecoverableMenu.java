@@ -34,7 +34,7 @@ public class PagedRecoverableMenu extends AbstractContainerMenu {
         @Override
         public int get(int index) {
             return switch (index) {
-                case 0 -> page;
+                case 0 -> getPage();
                 case 1 -> clientSide ? syncedPageCount : calculatePageCount();
                 case 2 -> clientSide ? syncedActivePageCount : calculateActivePageCount();
                 default -> 0;
@@ -56,6 +56,15 @@ public class PagedRecoverableMenu extends AbstractContainerMenu {
 
     protected PagedRecoverableMenu(MenuType<?> type, int containerId, Inventory playerInventory,
                                    RecoverableItemStackHandler inventory, BlockPos blockPos) {
+        this(type, containerId, playerInventory, inventory, blockPos,
+                8, 18, 8, 85, 8, 143);
+    }
+
+    protected PagedRecoverableMenu(MenuType<?> type, int containerId, Inventory playerInventory,
+                                   RecoverableItemStackHandler inventory, BlockPos blockPos,
+                                   int storageX, int storageY,
+                                   int playerInventoryX, int playerInventoryY,
+                                   int hotbarX, int hotbarY) {
         super(type, containerId);
         this.inventory = inventory;
         this.blockPos = blockPos.immutable();
@@ -63,22 +72,28 @@ public class PagedRecoverableMenu extends AbstractContainerMenu {
         IItemHandler pageView = new PageView(inventory, () -> page, clientSide);
         for (int row = 0; row < 3; row++) {
             for (int column = 0; column < 9; column++) {
-                addSlot(new SlotItemHandler(pageView, column + row * 9, 8 + column * 18, 18 + row * 18));
+                addSlot(new SlotItemHandler(pageView, column + row * 9,
+                        storageX + column * 18, storageY + row * 18));
             }
         }
         for (int row = 0; row < 3; row++) {
             for (int column = 0; column < 9; column++) {
-                addSlot(new Slot(playerInventory, column + row * 9 + 9, 8 + column * 18, 85 + row * 18));
+                addSlot(new Slot(playerInventory, column + row * 9 + 9,
+                        playerInventoryX + column * 18, playerInventoryY + row * 18));
             }
         }
         for (int column = 0; column < 9; column++) {
-            addSlot(new Slot(playerInventory, column, 8 + column * 18, 143));
+            addSlot(new Slot(playerInventory, column, hotbarX + column * 18, hotbarY));
         }
         addDataSlots(pageData);
     }
 
+    public BlockPos getBlockPos() {
+        return blockPos;
+    }
+
     public int getPage() {
-        return page;
+        return Math.min(page, Math.max(0, getPageCount() - 1));
     }
 
     public int getPageCount() {
@@ -101,24 +116,36 @@ public class PagedRecoverableMenu extends AbstractContainerMenu {
     }
 
     private int calculateActivePageCount() {
-        return Math.max(1, inventory.getActiveSlots() / SLOTS_PER_PAGE);
+        return Math.max(1, (inventory.getActiveSlots() + SLOTS_PER_PAGE - 1) / SLOTS_PER_PAGE);
     }
 
     public boolean isRecoveryPage() {
-        return page >= getActivePageCount();
+        return getPage() >= getActivePageCount();
     }
 
     @Override
     public boolean clickMenuButton(Player player, int id) {
         if (id != PREVIOUS_PAGE && id != NEXT_PAGE) return false;
         int count = getPageCount();
-        page = Math.floorMod(page + (id == NEXT_PAGE ? 1 : -1), count);
+        page = Math.floorMod(getPage() + (id == NEXT_PAGE ? 1 : -1), count);
         broadcastChanges();
         return true;
     }
 
     @Override
+    public void broadcastChanges() {
+        // A configuration or coil-tier reduction can remove pages while a
+        // viewer has one selected. Keep the server-side page in range before
+        // slot synchronization maps the page view onto backing storage.
+        if (!clientSide) {
+            page = getPage();
+        }
+        super.broadcastChanges();
+    }
+
+    @Override
     public ItemStack quickMoveStack(Player player, int index) {
+        if (index < 0 || index >= slots.size()) return ItemStack.EMPTY;
         Slot slot = slots.get(index);
         if (!slot.hasItem()) return ItemStack.EMPTY;
         ItemStack source = slot.getItem();

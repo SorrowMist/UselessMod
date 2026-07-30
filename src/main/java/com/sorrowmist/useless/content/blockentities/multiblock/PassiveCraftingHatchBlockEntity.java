@@ -7,6 +7,7 @@ import appeng.api.stacks.AEKey;
 import appeng.api.stacks.GenericStack;
 import appeng.api.stacks.KeyCounter;
 import com.sorrowmist.useless.content.blockentities.RecoverableItemStackHandler;
+import com.sorrowmist.useless.content.blocks.multiblock.UselessCoilBlock;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.AdvancedAlloyFurnaceAeManager;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.AdvancedAlloyFurnacePatternResolver;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.CraftingTask;
@@ -15,8 +16,10 @@ import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.Omniver
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.PassivePatternInputTransaction;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.catalyst.ResolvedCatalystEffect;
 import com.sorrowmist.useless.content.menus.PassiveCraftingHatchMenu;
+import com.sorrowmist.useless.content.menus.PagedRecoverableMenu;
 import com.sorrowmist.useless.content.recipe.AdvancedAlloyFurnaceRecipe;
 import com.sorrowmist.useless.content.recipe.AlloyFurnaceRecipeCatalog;
+import com.sorrowmist.useless.core.config.ConfigManager;
 import com.sorrowmist.useless.energy.EnergyManager;
 import com.sorrowmist.useless.energy.IEnergyManager;
 import com.sorrowmist.useless.init.ModBlockEntities;
@@ -57,7 +60,8 @@ import java.util.concurrent.locks.ReentrantLock;
 /** Pattern inventory and independent passive task owner for an optional multiblock casing hatch. */
 public final class PassiveCraftingHatchBlockEntity extends BlockEntity
         implements MenuProvider, CraftingTaskContext {
-    public static final int PATTERN_SLOTS = 30;
+    public static final int MAX_PATTERN_SLOTS = RecoverableItemStackHandler.MAX_SLOTS;
+    public static final int PATTERN_SLOTS = MAX_PATTERN_SLOTS;
     public static final int MENU_DATA_COUNT = 10;
     public static final int MIN_INTERVAL_TICKS = 1;
     public static final int MAX_INTERVAL_TICKS = 72_000;
@@ -67,7 +71,7 @@ public final class PassiveCraftingHatchBlockEntity extends BlockEntity
     private static final FluidTank[] EMPTY_TANKS = new FluidTank[0];
 
     private final RecoverableItemStackHandler patterns = new RecoverableItemStackHandler(
-            PATTERN_SLOTS, 0, this::getActivePatternSlots,
+            MAX_PATTERN_SLOTS, 0, this::getActivePatternSlots,
             stack -> stack.is(ModItems.OMNIVERSAL_PATTERN.get()), this::inventoryChanged);
     private final Map<Integer, CraftingTask> activeTasks = new HashMap<>();
     private final SlotState[] idleStates = new SlotState[PATTERN_SLOTS];
@@ -94,6 +98,7 @@ public final class PassiveCraftingHatchBlockEntity extends BlockEntity
     private boolean unloading;
     private boolean statusDirty = true;
     private int statusSyncTimer;
+    private int observedActivePatternSlots = -1;
 
     private final ContainerData menuData = new ContainerData() {
         @Override
@@ -109,7 +114,7 @@ public final class PassiveCraftingHatchBlockEntity extends BlockEntity
                 case 6 -> (int) (multiplier >>> 32);
                 case 7 -> (int) getCurrentMaxParallel();
                 case 8 -> (int) (getCurrentMaxParallel() >>> 32);
-                case 9 -> getBusyMask();
+                case 9 -> getConfiguredPatternSlots();
                 default -> 0;
             };
         }
@@ -158,7 +163,17 @@ public final class PassiveCraftingHatchBlockEntity extends BlockEntity
     }
 
     public static int activeSlotsForCoilTier(int coilTier) {
-        return Math.max(0, Math.min(PATTERN_SLOTS, coilTier * 3));
+        return activeSlotsForCoilTier(coilTier, ConfigManager.getOmniversalPassivePatternSlots());
+    }
+
+    static int activeSlotsForCoilTier(int coilTier, int configuredSlots) {
+        int tier = Math.max(0, Math.min(UselessCoilBlock.MAX_TIER, coilTier));
+        int capacity = Math.max(1, Math.min(MAX_PATTERN_SLOTS, configuredSlots));
+        return (capacity * tier + UselessCoilBlock.MAX_TIER - 1) / UselessCoilBlock.MAX_TIER;
+    }
+
+    public int getConfiguredPatternSlots() {
+        return ConfigManager.getOmniversalPassivePatternSlots();
     }
 
     public long getCurrentMaxParallel() {
@@ -194,13 +209,28 @@ public final class PassiveCraftingHatchBlockEntity extends BlockEntity
         }
 
         if (controllerPos != null && immutable != null && !controllerPos.equals(immutable)) {
+            MultiblockAlloyFurnaceCoreBlockEntity previousController = getRawController();
             cancelAllTasks();
+            if (previousController != null) {
+                flushLocalUnreturnedInputs(previousController);
+            }
         }
         controllerPos = immutable;
         structureGeneration = generation;
         clampMultiplier();
         statusDirty = true;
         setChanged();
+    }
+
+    /** True when this hatch's raw association belongs to the given core. */
+    public boolean isLinkedToController(BlockPos controllerPos) {
+        return Objects.equals(this.controllerPos, controllerPos);
+    }
+
+    /** Passive hatches can only execute work for one formed controller. */
+    public boolean isClaimedByOtherController(BlockPos controllerPos) {
+        MultiblockAlloyFurnaceCoreBlockEntity controller = getController();
+        return controller != null && !controller.getBlockPos().equals(controllerPos);
     }
 
     @Nullable
@@ -231,6 +261,7 @@ public final class PassiveCraftingHatchBlockEntity extends BlockEntity
             return;
         }
         loadDeferredTasks();
+        reconcileActivePatternSlots();
         flushLocalUnreturnedInputs(controller);
 
         long currentCatalogGeneration = AlloyFurnaceRecipeCatalog.generation();
@@ -406,7 +437,8 @@ public final class PassiveCraftingHatchBlockEntity extends BlockEntity
     }
 
     public void prepareForControllerRemoval(MultiblockAlloyFurnaceCoreBlockEntity controller) {
-        if (controller == null || level == null || controller.getLevel() != level) {
+        if (controller == null || level == null || controller.getLevel() != level
+                || getRawController() != controller) {
             return;
         }
         loadDeferredTasks();
@@ -452,6 +484,36 @@ public final class PassiveCraftingHatchBlockEntity extends BlockEntity
             }
         }
         statusDirty = true;
+    }
+
+    /**
+     * A server-config reduction turns excess pattern slots into recovery-only
+     * storage. Any task already using such a slot must return its materials
+     * before the slot becomes inactive.
+     */
+    private void reconcileActivePatternSlots() {
+        int activeSlots = getActivePatternSlots();
+        if (observedActivePatternSlots == activeSlots) {
+            return;
+        }
+        observedActivePatternSlots = activeSlots;
+        boolean changed = false;
+        for (int slot : new ArrayList<>(activeTasks.keySet())) {
+            if (slot < activeSlots) {
+                continue;
+            }
+            CraftingTask task = activeTasks.remove(slot);
+            if (task != null) {
+                task.cancel();
+                taskProgress.remove(slot);
+                changed = true;
+            }
+        }
+        resetIdleStates();
+        statusDirty = true;
+        if (changed) {
+            setChanged();
+        }
     }
 
     private CompoundTag saveTasks(HolderLookup.Provider registries) {
@@ -503,10 +565,12 @@ public final class PassiveCraftingHatchBlockEntity extends BlockEntity
         }
     }
 
-    public List<SlotStatus> getSlotStatusSnapshot() {
-        List<SlotStatus> result = new ArrayList<>(PATTERN_SLOTS);
+    private List<SlotStatus> getSlotStatusSnapshot(int firstSlot, int count) {
+        int start = Math.max(0, Math.min(PATTERN_SLOTS, firstSlot));
+        int end = Math.max(start, Math.min(PATTERN_SLOTS, start + Math.max(0, count)));
+        List<SlotStatus> result = new ArrayList<>(end - start);
         boolean enabled = isTaskExecutionEnabled();
-        for (int slot = 0; slot < PATTERN_SLOTS; slot++) {
+        for (int slot = start; slot < end; slot++) {
             CraftingTask task = activeTasks.get(slot);
             if (task == null) {
                 result.add(new SlotStatus(slot, idleStates[slot], 0, 0, idleDetails[slot]));
@@ -537,14 +601,9 @@ public final class PassiveCraftingHatchBlockEntity extends BlockEntity
                 || "gui.useless_mod.advanced_alloy_furnace.ae_task_status.waiting_mold_hub".equals(statusKey);
     }
 
-    private int getBusyMask() {
-        int mask = 0;
-        for (int slot : activeTasks.keySet()) {
-            if (slot >= 0 && slot < PATTERN_SLOTS) {
-                mask |= 1 << slot;
-            }
-        }
-        return mask;
+    public void requestStatusSync() {
+        statusDirty = true;
+        statusSyncTimer = 20;
     }
 
     private void flushStatusUpdates() {
@@ -556,12 +615,13 @@ public final class PassiveCraftingHatchBlockEntity extends BlockEntity
         if (!(level instanceof ServerLevel serverLevel)) {
             return;
         }
-        List<SlotStatus> statuses = getSlotStatusSnapshot();
         for (var player : serverLevel.players()) {
             if (player.containerMenu instanceof PassiveCraftingHatchMenu menu
                     && menu.getBlockPos().equals(worldPosition)) {
                 PacketDistributor.sendToPlayer(player,
-                        new PassiveCraftingStatusPacket(menu.containerId, worldPosition, statuses));
+                        new PassiveCraftingStatusPacket(menu.containerId, worldPosition,
+                                getSlotStatusSnapshot(menu.getPage() * PagedRecoverableMenu.SLOTS_PER_PAGE,
+                                        PagedRecoverableMenu.SLOTS_PER_PAGE)));
             }
         }
     }
@@ -625,6 +685,7 @@ public final class PassiveCraftingHatchBlockEntity extends BlockEntity
                 localUnreturnedInputs.add(stack);
             }
         }
+        observedActivePatternSlots = -1;
         resetIdleStates();
     }
 
@@ -653,6 +714,7 @@ public final class PassiveCraftingHatchBlockEntity extends BlockEntity
         unloading = false;
         countdownTicks = intervalTicks;
         statusDirty = true;
+        observedActivePatternSlots = -1;
     }
 
     @Override

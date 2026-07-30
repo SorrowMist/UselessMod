@@ -69,6 +69,7 @@ public class ModeWheelScreen extends Screen {
         boolean aeStorageEnabled = this.mainHandItem.getOrDefault(UComponents.AEStoragePriorityComponent, false);
         boolean forceKillEnabled = this.mainHandItem.getOrDefault(UComponents.ForceKillEnabledComponent, true);
         boolean beefInvulnerabilityEnabled = this.mainHandItem.getOrDefault(UComponents.BeefInvulnerabilityEnabledComponent, false);
+        boolean beefCaptureEnabled = this.mainHandItem.getOrDefault(UComponents.BeefCaptureEnabledComponent, false);
 
         // 左：附魔模式
         for (EnchantMode m : EnchantMode.values())
@@ -86,6 +87,13 @@ public class ModeWheelScreen extends Screen {
                 ModeTypeEnum.getBeefInvulnerabilityMode(beefInvulnerabilityEnabled).getTooltip(),
                 beefInvulnerabilityEnabled
         ));
+        if (this.mainHandItem.getItem() instanceof com.sorrowmist.useless.content.items.EndlessBeafItem) {
+            this.forceKillModes.add(new ModeData(
+                    ModeTypeEnum.getBeefCaptureMode(beefCaptureEnabled),
+                    ModeTypeEnum.getBeefCaptureMode(beefCaptureEnabled).getTooltip(),
+                    beefCaptureEnabled
+            ));
+        }
 
         for (ToolTypeMode m : ToolTypeMode.values()) {
             boolean shouldAdd = switch (m) {
@@ -399,6 +407,14 @@ public class ModeWheelScreen extends Screen {
                     PacketDistributor.sendToServer(
                             new ModeTogglePacket(ModeTogglePacket.ModeType.BEEF_INVULNERABILITY,
                                                   !currentEnabled));
+                }
+                case BEEF_CAPTURE_ENABLED, BEEF_CAPTURE_DISABLED -> {
+                    boolean currentEnabled = this.mainHandItem.getOrDefault(
+                            UComponents.BeefCaptureEnabledComponent,
+                            false
+                    );
+                    PacketDistributor.sendToServer(
+                            new ModeTogglePacket(ModeTogglePacket.ModeType.BEEF_CAPTURE, !currentEnabled));
                 }
             }
         }

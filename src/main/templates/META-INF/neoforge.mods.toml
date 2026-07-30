@@ -155,7 +155,7 @@ config="${mod_id}.mixins.json"
 [[dependencies.${mod_id}]]
     modId="occultism"
     type="optional"
-    versionRange="[1.224.0,)"
+    versionRange="[1.205.0,)"
     ordering="AFTER"
     side="BOTH"
 

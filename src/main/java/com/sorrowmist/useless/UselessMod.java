@@ -4,7 +4,6 @@ import com.mojang.logging.LogUtils;
 import com.sorrowmist.useless.content.blocks.GlowPlasticBlock;
 import com.sorrowmist.useless.content.items.EndlessBeafItem;
 import com.sorrowmist.useless.content.recipe.adapters.RecipeAdapterCompatRegistry;
-import com.sorrowmist.useless.content.recipe.adapters.occultism.OccultismSpiritEggHandler;
 import com.sorrowmist.useless.core.component.UComponents;
 import com.sorrowmist.useless.core.config.ConfigManager;
 import com.sorrowmist.useless.init.ModBlockEntities;
@@ -123,7 +122,15 @@ public class UselessMod {
         if (!ModList.get().isLoaded("occultism")) {
             return InteractionResult.PASS;
         }
-        return OccultismSpiritEggHandler.trySpawn(event);
+        return OccultismCompat.trySpawnMarkedSpirit(event);
+    }
+
+    /** Isolates the optional Occultism class reference from the main mod entrypoint. */
+    private static final class OccultismCompat {
+        private static InteractionResult trySpawnMarkedSpirit(PlayerInteractEvent.RightClickBlock event) {
+            return com.sorrowmist.useless.content.recipe.adapters.occultism.OccultismSpiritEggHandler
+                    .trySpawn(event);
+        }
     }
 
     @SubscribeEvent

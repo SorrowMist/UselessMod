@@ -453,15 +453,24 @@ public final class AdvancedAlloyFurnaceAeManager {
     }
 
     public void updatePatterns() {
+        Level level = this.owner.getLevel();
+        if (level == null || level.isClientSide) {
+            return;
+        }
         rebuildPatterns();
         requestPatternUpdate();
     }
 
     /** Rebuilds the provider snapshot without touching AE's live grid index. */
     public void rebuildPatterns() {
-        this.patterns.clear();
         Level level = this.owner.getLevel();
-        if (level == null || !this.owner.canPublishPatterns()) {
+        // AE providers and the dynamic recipe catalog are server-authoritative. Client block
+        // entity synchronization may invoke inventory callbacks repeatedly while a GUI is open.
+        if (level == null || level.isClientSide) {
+            return;
+        }
+        this.patterns.clear();
+        if (!this.owner.canPublishPatterns()) {
             return;
         }
 
@@ -507,6 +516,10 @@ public final class AdvancedAlloyFurnaceAeManager {
     }
 
     private void requestPatternUpdate() {
+        Level level = this.owner.getLevel();
+        if (level == null || level.isClientSide) {
+            return;
+        }
         IManagedGridNode node = this.owner.getMainNode();
         if (node != null && node.isActive() && node.getNode() != null
                 && node.getNode().getGrid() != null) {

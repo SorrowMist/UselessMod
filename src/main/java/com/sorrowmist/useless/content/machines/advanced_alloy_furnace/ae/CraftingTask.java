@@ -63,6 +63,9 @@ public class CraftingTask {
     private long accumulatedEnergy = 0;
     private long craftCount = 1L;
     private long displayedCraftCount = 1L;
+    // A manually scaled AE pattern may represent multiple base recipe operations per push.
+    private long patternOperationsPerPush = 1L;
+    private boolean patternOperationsResolved = false;
     private boolean cancelled = false;
     private boolean processingComplete = false;
     private boolean initialized = false;
@@ -94,12 +97,15 @@ public class CraftingTask {
     }
 
     /** 从一个拆分出的子任务构造独立任务（用于空闲线程再分配） */
-    private CraftingTask(int taskId, IPatternDetails pattern, CraftingTaskContext context, CraftingSubTask subTask) {
+    private CraftingTask(int taskId, IPatternDetails pattern, CraftingTaskContext context,
+                         CraftingSubTask subTask, long patternOperationsPerPush) {
         this.taskId = taskId;
         this.pattern = pattern;
         this.context = context;
         this.craftCount = Math.max(1L, subTask.craftCount);
         this.displayedCraftCount = this.craftCount;
+        this.patternOperationsPerPush = Math.max(1L, patternOperationsPerPush);
+        this.patternOperationsResolved = true;
         this.taskInputItems.addAll(subTask.items);
         this.taskInputFluids.addAll(subTask.fluids);
         this.taskInputKeys.addAll(subTask.keys);
@@ -157,8 +163,7 @@ public class CraftingTask {
     }
 
     public boolean canStartNow() {
-        AdvancedAlloyFurnaceRecipe recipe = findTaskRecipe();
-        return isRecipeValid(recipe);
+        return prepareTaskRecipe() != null;
     }
 
     public int getTaskId() {
@@ -187,7 +192,7 @@ public class CraftingTask {
         updateTaskProgressTotals();
         context.markChanged();
         context.sendAETaskProgressToClients();
-        return new CraftingTask(newTaskId, pattern, context, subTask);
+        return new CraftingTask(newTaskId, pattern, context, subTask, patternOperationsPerPush);
     }
 
     public String getWaitingDetail() {
@@ -217,7 +222,8 @@ public class CraftingTask {
             storeInputMaterials(counters, items, fluids, keys, context.supportsLongAeAmounts());
         }
         long operations = saturatingMultiply(
-                Math.max(1L, allInputs.size()), Math.max(1L, operationsPerPush));
+                saturatingMultiply(Math.max(1L, allInputs.size()), Math.max(1L, operationsPerPush)),
+                patternOperationsPerPush);
         return new CraftingSubTask(items, fluids, keys, operations);
     }
 
@@ -275,6 +281,72 @@ public class CraftingTask {
         cachedRecipe = context.resolveTaskRecipe(
                 pattern, tempInputs, tempFluids, toGenericStacks(taskInputKeys), craftCount);
         return cachedRecipe;
+    }
+
+    @Nullable
+    private AdvancedAlloyFurnaceRecipe prepareTaskRecipe() {
+        AdvancedAlloyFurnaceRecipe recipe = findTaskRecipe();
+        if (!isRecipeValid(recipe) || !resolvePatternOperations(recipe)) {
+            return null;
+        }
+        return recipe;
+    }
+
+    /**
+     * A normal AE processing pattern has no operation-count metadata. When a player manually
+     * scales its inputs and outputs, derive the scale from the declared outputs and charge the
+     * corresponding number of base recipe operations instead of treating the whole pattern as one.
+     */
+    private boolean resolvePatternOperations(AdvancedAlloyFurnaceRecipe recipe) {
+        if (patternOperationsResolved) {
+            return true;
+        }
+
+        ManualPatternOperationResolver.Resolution resolution =
+                ManualPatternOperationResolver.resolve(recipe, pattern);
+        if (!resolution.valid()) {
+            setWaiting(STATUS_WAITING_INVALID_PATTERN, "");
+            return false;
+        }
+
+        long resolvedCraftCount = saturatingMultiply(craftCount, resolution.operationsPerPattern());
+        RecipeInputs inputs = materializeRecipeInputs();
+        if (!AlloyFurnaceRecipeManager.matchesInputsForOperations(
+                recipe, inputs.items(), inputs.fluids(), inputs.keys(), resolvedCraftCount)) {
+            setWaiting(STATUS_WAITING_INVALID_PATTERN, "");
+            return false;
+        }
+
+        patternOperationsPerPush = resolution.operationsPerPattern();
+        patternOperationsResolved = true;
+        craftCount = resolvedCraftCount;
+        updateDisplayedCraftCount();
+        return true;
+    }
+
+    private RecipeInputs materializeRecipeInputs() {
+        List<ItemStack> items = new ArrayList<>(taskInputItems);
+        List<FluidStack> fluids = new ArrayList<>(taskInputFluids);
+        List<GenericStack> keys = new ArrayList<>();
+        for (OutputKey input : taskInputKeys) {
+            long remaining = input.amount;
+            if (input.key instanceof AEItemKey itemKey) {
+                while (remaining > 0L) {
+                    int chunk = (int) Math.min(remaining, Integer.MAX_VALUE);
+                    items.add(itemKey.toStack(chunk));
+                    remaining -= chunk;
+                }
+            } else if (input.key instanceof AEFluidKey fluidKey) {
+                while (remaining > 0L) {
+                    int chunk = (int) Math.min(remaining, Integer.MAX_VALUE);
+                    fluids.add(new FluidStack(fluidKey.getFluid(), chunk));
+                    remaining -= chunk;
+                }
+            } else if (remaining > 0L) {
+                keys.add(new GenericStack(input.key, remaining));
+            }
+        }
+        return new RecipeInputs(items, fluids, keys);
     }
 
     /** 使配方缓存失效（输入/模具/催化剂变化时调用） */
@@ -527,8 +599,8 @@ public class CraftingTask {
     }
 
     private boolean initialize() {
-        AdvancedAlloyFurnaceRecipe recipe = findTaskRecipe();
-        if (!isRecipeValid(recipe)) {
+        AdvancedAlloyFurnaceRecipe recipe = prepareTaskRecipe();
+        if (recipe == null) {
             this.updateWaitingProgress();
             return false;
         }
@@ -536,13 +608,7 @@ public class CraftingTask {
         refreshCatalystLayout();
         recalculateBatchLayout();
 
-        long outputCount = 1L;
-        if (pattern != null && !pattern.getOutputs().isEmpty()) {
-            var output = pattern.getOutputs().getFirst();
-            outputCount = Math.max(1L, output.amount());
-        }
-
-        long totalOutputCount = saturatingMultiply(displayedCraftCount, outputCount);
+        long totalOutputCount = calculateDisplayedOutputCount();
         taskProgressRef = new AdvancedAlloyFurnaceAeManager.AETaskProgress(getProductName(), processTime, displayedCraftCount, totalOutputCount);
         clearWaiting();
         context.getAETaskProgressMap().put(taskId, taskProgressRef);
@@ -555,16 +621,27 @@ public class CraftingTask {
     }
 
     private void updateWaitingProgress() {
-        long outputCount = 1L;
-        if (pattern != null && !pattern.getOutputs().isEmpty()) {
-            outputCount = Math.max(1L, pattern.getOutputs().getFirst().amount());
-        }
-        long totalOutputCount = saturatingMultiply(displayedCraftCount, outputCount);
+        long totalOutputCount = calculateDisplayedOutputCount();
         taskProgressRef = new AdvancedAlloyFurnaceAeManager.AETaskProgress(getProductName(), 0, 1, displayedCraftCount, totalOutputCount,
                 waitingStatusKey, waitingDetail);
         context.getAETaskProgressMap().put(taskId, taskProgressRef);
         context.markChanged();
         context.sendAETaskProgressToClients();
+    }
+
+    private long calculateDisplayedOutputCount() {
+        long outputCount = 1L;
+        if (pattern != null && !pattern.getOutputs().isEmpty()) {
+            outputCount = Math.max(1L, pattern.getOutputs().getFirst().amount());
+        }
+        return saturatingMultiply(outputCount,
+                calculatePatternOutputRuns(displayedCraftCount, patternOperationsPerPush));
+    }
+
+    static long calculatePatternOutputRuns(long operations, long operationsPerPattern) {
+        long safeOperations = Math.max(1L, operations);
+        long safePatternOperations = Math.max(1L, operationsPerPattern);
+        return Math.max(1L, safeOperations / safePatternOperations);
     }
 
     private void recalculateBatchLayout() {
@@ -676,21 +753,23 @@ public class CraftingTask {
             return;
         }
 
+        long patternOutputRuns = calculatePatternOutputRuns(craftCount, patternOperationsPerPush);
         for (var output : pattern.getOutputs()) {
             if (context.supportsLongAeAmounts()) {
                 pendingOutputKeys.add(new OutputKey(
-                        output.what(), saturatingMultiply(output.amount(), craftCount)));
+                        output.what(), saturatingMultiply(output.amount(), patternOutputRuns)));
             } else if (output.what() instanceof AEItemKey itemKey) {
-                addPendingItem(itemKey.toStack(), saturatingMultiply(output.amount(), craftCount));
+                addPendingItem(itemKey.toStack(), saturatingMultiply(output.amount(), patternOutputRuns));
             } else if (output.what() instanceof AEFluidKey fluidKey) {
-                long remaining = saturatingMultiply(output.amount(), craftCount);
+                long remaining = saturatingMultiply(output.amount(), patternOutputRuns);
                 while (remaining > 0) {
                     int chunk = (int) Math.min(remaining, Integer.MAX_VALUE);
                     pendingOutputFluids.add(new FluidStack(fluidKey.getFluid(), chunk));
                     remaining -= chunk;
                 }
             } else {
-                pendingOutputKeys.add(new OutputKey(output.what(), saturatingMultiply(output.amount(), craftCount)));
+                pendingOutputKeys.add(new OutputKey(
+                        output.what(), saturatingMultiply(output.amount(), patternOutputRuns)));
             }
         }
 
@@ -816,6 +895,8 @@ public class CraftingTask {
         tag.putInt("TaskId", taskId);
         tag.put("Pattern", pattern.getDefinition().toTag(registries));
         tag.putLong("CraftCount", craftCount);
+        tag.putLong("PatternOperationsPerPush", patternOperationsPerPush);
+        tag.putBoolean("PatternOperationsResolved", patternOperationsResolved);
         tag.put("Inputs", writeStacks(registries, taskInputItems, taskInputFluids, taskInputKeys));
 
         ListTag subTasksTag = new ListTag();
@@ -862,6 +943,8 @@ public class CraftingTask {
         int taskId = tag.getInt("TaskId");
         CraftingTask task = new CraftingTask(taskId, pattern, context);
         task.craftCount = Math.max(1L, tag.getLong("CraftCount"));
+        task.patternOperationsPerPush = Math.max(1L, tag.getLong("PatternOperationsPerPush"));
+        task.patternOperationsResolved = tag.getBoolean("PatternOperationsResolved");
         readStacks(registries, tag.getList("Inputs", Tag.TAG_COMPOUND),
                 task.taskInputItems, task.taskInputFluids, task.taskInputKeys,
                 context.supportsLongAeAmounts());
@@ -924,11 +1007,7 @@ public class CraftingTask {
                 this.pendingOutputItems, this.pendingOutputFluids, this.pendingOutputKeys,
                 context.supportsLongAeAmounts());
 
-        long outputCount = 1L;
-        if (pattern != null && !pattern.getOutputs().isEmpty()) {
-            outputCount = Math.max(1L, pattern.getOutputs().getFirst().amount());
-        }
-        long totalOutputCount = saturatingMultiply(displayedCraftCount, outputCount);
+        long totalOutputCount = calculateDisplayedOutputCount();
         this.taskProgressRef = new AdvancedAlloyFurnaceAeManager.AETaskProgress(getProductName(), processTime, displayedCraftCount, totalOutputCount);
         this.taskProgressRef.setProgress(progress);
         context.getAETaskProgressMap().put(taskId, taskProgressRef);
@@ -992,6 +1071,9 @@ public class CraftingTask {
     }
 
     private record OutputKey(AEKey key, long amount) {
+    }
+
+    private record RecipeInputs(List<ItemStack> items, List<FluidStack> fluids, List<GenericStack> keys) {
     }
 
     private record CraftingSubTask(List<ItemStack> items, List<FluidStack> fluids, List<OutputKey> keys, long craftCount) {

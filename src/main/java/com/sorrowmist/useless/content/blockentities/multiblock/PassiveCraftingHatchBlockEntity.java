@@ -814,6 +814,15 @@ public final class PassiveCraftingHatchBlockEntity extends BlockEntity
     }
 
     @Override
+    public CraftingTaskContext.TaskAvailability getTaskAvailability(AdvancedAlloyFurnaceRecipe recipe) {
+        MultiblockAlloyFurnaceCoreBlockEntity controller = getController();
+        return controller == null
+                ? CraftingTaskContext.TaskAvailability.unavailable(
+                        "gui.useless_mod.advanced_alloy_furnace.ae_task_status.waiting_structure", "")
+                : controller.getTaskAvailability(recipe);
+    }
+
+    @Override
     public ResolvedCatalystEffect resolveTaskEffect(AdvancedAlloyFurnaceRecipe recipe) {
         MultiblockAlloyFurnaceCoreBlockEntity controller = getRawController();
         return controller == null

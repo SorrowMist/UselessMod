@@ -116,7 +116,14 @@ public interface CraftingTaskContext {
                     "gui.useless_mod.advanced_alloy_furnace.ae_task_status.waiting_recipe", "");
         }
         if (recipe.mold() == null || recipe.mold().isEmpty()) return TaskAvailability.ready();
-        ItemStack mold = getItemHandler().getStackInSlot(getMoldSlot());
+        ItemStackHandler itemHandler = getItemHandler();
+        int moldSlot = getMoldSlot();
+        if (itemHandler == null || moldSlot < 0 || moldSlot >= itemHandler.getSlots()) {
+            return TaskAvailability.unavailable(
+                    "gui.useless_mod.advanced_alloy_furnace.ae_task_status.waiting_missing_mold",
+                    describeRequiredMold(recipe.mold()));
+        }
+        ItemStack mold = itemHandler.getStackInSlot(moldSlot);
         return AdapterUtils.matchesMold(recipe.mold(), mold)
                 ? TaskAvailability.ready()
                 : TaskAvailability.unavailable(

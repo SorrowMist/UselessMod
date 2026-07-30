@@ -251,7 +251,7 @@ public final class ModItems {
     }
 
     public static final DeferredItem<AE2GiftPackageItem> AE2_GIFT_PACKAGE;
-    public static final DeferredItem<RitualBlueprintItem> RITUAL_BLUEPRINT;
+    public static final DeferredItem<Item> RITUAL_BLUEPRINT;
 
     static {
         if (ModList.get().isLoaded("ae2")) {
@@ -267,7 +267,7 @@ public final class ModItems {
         if (ModList.get().isLoaded("occultism")) {
             RITUAL_BLUEPRINT = ITEMS.register(
                     "ritual_blueprint",
-                    () -> new RitualBlueprintItem(new Item.Properties().stacksTo(1))
+                    OccultismItems::createRitualBlueprint
             );
             CREATIVE_MAIN_TAB_ITEMS.add(RITUAL_BLUEPRINT);
         } else {
@@ -276,6 +276,13 @@ public final class ModItems {
     }
 
     private ModItems() {}
+
+    /** Keeps the optional Occultism-backed item class out of ModItems' eager linkage. */
+    private static final class OccultismItems {
+        private static Item createRitualBlueprint() {
+            return new RitualBlueprintItem(new Item.Properties().stacksTo(1));
+        }
+    }
 
     private static <T extends Item> DeferredItem<T> registerAndAdd(String name, Supplier<T> supplier) {
         DeferredItem<T> deferred = ITEMS.register(name, supplier);

@@ -1,7 +1,10 @@
 package com.sorrowmist.useless.client.render;
 
 import appeng.api.crafting.PatternDetailsHelper;
+import appeng.api.ids.AEComponents;
+import appeng.api.stacks.AEItemKey;
 import appeng.api.stacks.GenericStack;
+import appeng.crafting.pattern.AEProcessingPattern;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.world.item.ItemStack;
@@ -20,7 +23,12 @@ public final class PatternSlotRenderer {
 
     public static boolean renderPattern(GuiGraphics graphics, Font font, ItemStack pattern,
                                         int x, int y, int seed, @Nullable Level level) {
-        GenericStack output = getPrimaryOutput(pattern, level);
+        return renderPattern(graphics, font, getPrimaryOutput(pattern, level), x, y, seed);
+    }
+
+    /** Renders a display output which was already decoded by the caller. */
+    public static boolean renderPattern(GuiGraphics graphics, Font font, @Nullable GenericStack output,
+                                        int x, int y, int seed) {
         if (output == null) return false;
         ItemStack display = output.what().wrapForDisplayOrFilter();
         graphics.renderItem(display, x, y, seed);
@@ -30,9 +38,27 @@ public final class PatternSlotRenderer {
 
     @Nullable
     public static GenericStack getPrimaryOutput(ItemStack pattern, @Nullable Level level) {
+        // Processing patterns already carry their display inputs and outputs. Decoding them via
+        // PatternDetailsHelper can invoke dynamic recipe compatibility solely to render an icon.
+        if (pattern.get(AEComponents.ENCODED_PROCESSING_PATTERN) != null) {
+            return getEncodedProcessingPrimaryOutput(pattern);
+        }
         if (pattern.isEmpty() || level == null || !PatternDetailsHelper.isEncodedPattern(pattern)) return null;
         var details = PatternDetailsHelper.decodePattern(pattern, level);
         return details == null || details.getOutputs().isEmpty() ? null : details.getOutputs().getFirst();
+    }
+
+    @Nullable
+    private static GenericStack getEncodedProcessingPrimaryOutput(ItemStack pattern) {
+        AEItemKey definition = AEItemKey.of(pattern);
+        if (definition == null) return null;
+        try {
+            var source = new AEProcessingPattern(definition);
+            return source.getOutputs().isEmpty() ? null : source.getOutputs().getFirst();
+        } catch (RuntimeException ignored) {
+            // Invalid patterns are rendered normally and retain AE2's usual invalid tooltip.
+            return null;
+        }
     }
 
     private static void renderAmount(GuiGraphics graphics, Font font, int x, int y, GenericStack output) {

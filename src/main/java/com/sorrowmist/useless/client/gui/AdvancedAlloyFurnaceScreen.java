@@ -45,10 +45,13 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import appeng.api.crafting.PatternDetailsHelper;
+import appeng.api.stacks.AEItemKey;
 import appeng.api.stacks.GenericStack;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 public class AdvancedAlloyFurnaceScreen extends AbstractContainerScreen<AdvancedAlloyFurnaceMenu> {
@@ -251,6 +254,9 @@ public class AdvancedAlloyFurnaceScreen extends AbstractContainerScreen<Advanced
     // 取消AE任务按钮状态
     private boolean cancelAePressed = false;
 
+    // Cache both successful and failed pattern display lookups for this screen instance.
+    private final Map<AEItemKey, Optional<GenericStack>> patternOutputCache = new HashMap<>();
+
     public AdvancedAlloyFurnaceScreen(AdvancedAlloyFurnaceMenu menu, Inventory playerInventory, Component title) {
         super(menu, playerInventory, title);
         this.imageWidth = DISPLAY_WIDTH;
@@ -376,9 +382,8 @@ public class AdvancedAlloyFurnaceScreen extends AbstractContainerScreen<Advanced
         }
 
         GenericStack patternOutput = isPatternSlot ? getPatternOutput(stack) : null;
-        if (patternOutput != null && PatternSlotRenderer.renderPattern(
-                guiGraphics, this.font, stack, x, y, slot.x + slot.y * this.imageWidth,
-                Minecraft.getInstance().level)) {
+        if (PatternSlotRenderer.renderPattern(
+                guiGraphics, this.font, patternOutput, x, y, slot.x + slot.y * this.imageWidth)) {
             return;
         }
 
@@ -446,15 +451,12 @@ public class AdvancedAlloyFurnaceScreen extends AbstractContainerScreen<Advanced
         if (stack.isEmpty() || !PatternDetailsHelper.isEncodedPattern(stack)) {
             return null;
         }
-        var details = PatternDetailsHelper.decodePattern(stack, Minecraft.getInstance().level);
-        if (details == null) {
-            return null;
+        AEItemKey key = AEItemKey.of(stack);
+        if (key == null) {
+            return PatternSlotRenderer.getPrimaryOutput(stack, Minecraft.getInstance().level);
         }
-        var outputs = details.getOutputs();
-        if (outputs == null || outputs.isEmpty()) {
-            return null;
-        }
-        return outputs.get(0);
+        return patternOutputCache.computeIfAbsent(key, ignored -> Optional.ofNullable(
+                PatternSlotRenderer.getPrimaryOutput(stack, Minecraft.getInstance().level))).orElse(null);
     }
 
     @Override

@@ -275,10 +275,22 @@ dependencies {
     implementation "maven.modrinth:natures-aura:41.9"
     implementation "maven.modrinth:patchouli:1.21.1-93-neoforge"
 
-    //神秘学
-    implementation "maven.modrinth:occultism:1.21.1-neoforge-1.224.0"
-    implementation "maven.modrinth:modonomicon:1.21.1-1.120.3"
-    implementation "maven.modrinth:smartbrainlib:O5EpeqI3" // 1.16.11 for Minecraft 1.21.1
+    // Occultism is an optional runtime integration. Keep it off the production
+    // dependency graph; it is present only for development and its focused tests.
+    def occultism = "maven.modrinth:occultism:1.21.1-neoforge-1.205.0"
+    def modonomicon = "maven.modrinth:modonomicon:1.21.1-1.117.2"
+    def smartBrainLib = "maven.modrinth:smartbrainlib:O5EpeqI3"
+    compileOnly occultism
+    compileOnly modonomicon
+    compileOnly smartBrainLib
+    testImplementation occultism
+    testRuntimeOnly modonomicon
+    testRuntimeOnly smartBrainLib
+    if (!project.hasProperty('withoutOccultism')) {
+        localRuntime occultism
+        localRuntime modonomicon
+        localRuntime smartBrainLib
+    }
 
     // kjs
     // runtimeOnly "dev.latvian.mods:rhino:2101.2.5-build.54"

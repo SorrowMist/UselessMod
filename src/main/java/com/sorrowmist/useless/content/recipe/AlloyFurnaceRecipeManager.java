@@ -421,6 +421,22 @@ public class AlloyFurnaceRecipeManager {
         return matchesOutputConstraints(recipe, RecipeOutputConstraint.exact(expectedOutputs));
     }
 
+    /**
+     * Checks whether the supplied AE materials can cover an exact number of executions of a
+     * recipe. Pattern output counts are deliberately not considered here: callers use this when
+     * validating a manually scaled processing pattern after its output multiplier was resolved.
+     */
+    public static boolean matchesInputsForOperations(
+            AdvancedAlloyFurnaceRecipe recipe, List<ItemStack> inputs,
+            List<FluidStack> fluidInputs, List<GenericStack> keyInputs, long operations) {
+        if (recipe == null || operations <= 0L) {
+            return false;
+        }
+        return ItemIngredientAllocator.matches(recipe.inputs(), inputs, operations)
+                && containsScaled(snapshotFluids(fluidInputs), snapshotFluids(recipe.inputFluids()), operations)
+                && containsScaled(snapshotGenericStacks(keyInputs), snapshotGenericStacks(recipe.keyInputs()), operations);
+    }
+
     public static boolean matchesOutputConstraints(
             AdvancedAlloyFurnaceRecipe recipe, List<RecipeOutputConstraint> expectedOutputs) {
         if (expectedOutputs == null || expectedOutputs.isEmpty()) return true;

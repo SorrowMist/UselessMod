@@ -241,7 +241,7 @@ public final class MultiblockAlloyFurnaceCoreBlockEntity extends BlockEntity imp
     }
 
     public void updatePatterns() {
-        if (unloading || isRemoved()) return;
+        if (unloading || isRemoved() || level == null || level.isClientSide) return;
         aeManager.rebuildPatterns();
         MePatternAssemblyBlockEntity assembly = getAssembly();
         if (assembly != null) assembly.requestProviderRefresh();

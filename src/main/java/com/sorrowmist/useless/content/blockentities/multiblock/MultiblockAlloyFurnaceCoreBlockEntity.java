@@ -8,6 +8,7 @@ import appeng.api.networking.IGrid;
 import appeng.api.networking.IManagedGridNode;
 import appeng.api.networking.energy.IEnergyService;
 import appeng.api.networking.security.IActionSource;
+import appeng.api.networking.storage.IStorageService;
 import appeng.api.stacks.AEFluidKey;
 import appeng.api.stacks.AEItemKey;
 import appeng.api.stacks.AEKey;
@@ -561,11 +562,18 @@ public final class MultiblockAlloyFurnaceCoreBlockEntity extends BlockEntity imp
         if (assembly == null || !assembly.getMainNode().isActive()) return null;
         IGrid grid = assembly.getMainNode().getGrid();
         if (grid == null) return null;
-        return new AeNetworkAccess(
-                grid.getStorageService().getInventory(), IActionSource.ofMachine(assembly));
+        var storageService = grid.getStorageService();
+        return new AeNetworkAccess(storageService, IActionSource.ofMachine(assembly));
     }
 
-    record AeNetworkAccess(MEStorage storage, IActionSource source) {
+    record AeNetworkAccess(IStorageService storageService, IActionSource source) {
+        MEStorage storage() {
+            return storageService.getInventory();
+        }
+
+        KeyCounter cachedInventory() {
+            return storageService.getCachedInventory();
+        }
     }
 
     private void drawEnergyFromAeNetwork() {

@@ -15,7 +15,9 @@ public final class OmniversalPatternDetails extends DynamicComponentPatternDetai
     private final AdvancedAlloyFurnaceRecipe recipe;
 
     private OmniversalPatternDetails(Decoded decoded) {
-        super(decoded.source, decoded.data.itemIdInputSlots(), decoded.data.itemIdOutputSlots(),
+        super(decoded.source, OmniversalPatternEncoding.resolveItemIdInputSlots(
+                        decoded.entry.recipe(), decoded.source, decoded.data.itemIdInputSlots()),
+                decoded.data.itemIdOutputSlots(),
                 decoded.level.registryAccess());
         this.data = decoded.data;
         this.recipe = decoded.entry.recipe();

@@ -21,11 +21,17 @@ import net.minecraft.network.chat.Component;
 import com.sorrowmist.useless.content.menus.OmniversalMoldHubMenu;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.IdentityHashMap;
+import java.util.Map;
+
 public final class OmniversalMoldHubBlockEntity extends BlockEntity implements MenuProvider {
     private final RecoverableItemStackHandler molds = new RecoverableItemStackHandler(
             ConfigManager::getOmniversalMoldSlots,
             this::isValidMold,
-            this::setChanged);
+            this::moldInventoryChanged);
+    private final Map<Ingredient, Boolean> moldMatchCache = new IdentityHashMap<>();
+    private int cachedActiveSlots = -1;
+    private long cachedRecipeCatalogGeneration = -1L;
     @Nullable
     private BlockPos controllerPos;
     private long structureGeneration;
@@ -46,12 +52,34 @@ public final class OmniversalMoldHubBlockEntity extends BlockEntity implements M
 
     public boolean containsMold(Ingredient ingredient) {
         if (ingredient == null || ingredient.isEmpty()) return true;
+        refreshMoldMatchCache();
+        Boolean cached = moldMatchCache.get(ingredient);
+        if (cached != null) return cached;
         int activeSlots = molds.getActiveSlots();
         for (int slot = 0; slot < activeSlots; slot++) {
             ItemStack stack = molds.getStackInSlot(slot);
-            if (AdapterUtils.matchesMold(ingredient, stack)) return true;
+            if (AdapterUtils.matchesMold(ingredient, stack)) {
+                moldMatchCache.put(ingredient, true);
+                return true;
+            }
         }
+        moldMatchCache.put(ingredient, false);
         return false;
+    }
+
+    private void refreshMoldMatchCache() {
+        int activeSlots = molds.getActiveSlots();
+        long catalogGeneration = AlloyFurnaceRecipeCatalog.generation();
+        if (cachedActiveSlots != activeSlots || cachedRecipeCatalogGeneration != catalogGeneration) {
+            moldMatchCache.clear();
+            cachedActiveSlots = activeSlots;
+            cachedRecipeCatalogGeneration = catalogGeneration;
+        }
+    }
+
+    private void moldInventoryChanged() {
+        moldMatchCache.clear();
+        setChanged();
     }
 
     public void linkController(@Nullable BlockPos controllerPos, long generation) {
@@ -88,6 +116,9 @@ public final class OmniversalMoldHubBlockEntity extends BlockEntity implements M
     protected void loadAdditional(CompoundTag tag, HolderLookup.Provider registries) {
         super.loadAdditional(tag, registries);
         molds.deserializeNBT(registries, tag.getCompound("Molds"));
+        moldMatchCache.clear();
+        cachedActiveSlots = -1;
+        cachedRecipeCatalogGeneration = -1L;
         controllerPos = tag.contains("Controller") ? BlockPos.of(tag.getLong("Controller")) : null;
         structureGeneration = tag.getLong("StructureGeneration");
     }

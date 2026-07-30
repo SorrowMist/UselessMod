@@ -1,18 +1,25 @@
 package com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae;
 
 import appeng.api.config.Actionable;
+import appeng.api.config.FuzzyMode;
 import appeng.api.crafting.IPatternDetails;
 import appeng.api.networking.security.IActionSource;
 import appeng.api.stacks.AEKey;
+import appeng.api.stacks.AEItemKey;
 import appeng.api.stacks.GenericStack;
 import appeng.api.stacks.KeyCounter;
 import appeng.api.storage.MEStorage;
+import net.minecraft.world.item.Item;
 import net.minecraft.world.level.Level;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.IdentityHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
+import java.util.function.Supplier;
 
 /** Plans and commits one passive pattern extraction without partially consuming network inputs. */
 public final class PassivePatternInputTransaction {
@@ -43,50 +50,44 @@ public final class PassivePatternInputTransaction {
     }
 
     public static Result extract(IPatternDetails pattern, long operations, @Nullable Level level,
-                                 MEStorage storage, IActionSource source, KeyCounter available,
+                                 MEStorage storage, Supplier<KeyCounter> cachedInventory,
+                                 IActionSource source,
                                  UnreturnedInputSink unreturnedInputSink) {
-        return extractAll(List.of(pattern), operations, level, storage, source, available,
+        return extractAll(List.of(pattern), operations, level, storage, cachedInventory, source,
                 unreturnedInputSink).getFirst();
     }
 
-    /** Plans every pattern against one shared snapshot, then commits the whole round atomically. */
+    /** Simulates and commits each pattern in order without enumerating the network for exact inputs. */
     public static List<Result> extractAll(List<? extends IPatternDetails> patterns, long operations,
-                                          @Nullable Level level, MEStorage storage, IActionSource source,
-                                          KeyCounter available,
+                                          @Nullable Level level, MEStorage storage,
+                                          Supplier<KeyCounter> cachedInventory, IActionSource source,
                                           UnreturnedInputSink unreturnedInputSink) {
         Objects.requireNonNull(patterns, "patterns");
         Objects.requireNonNull(storage, "storage");
+        Objects.requireNonNull(cachedInventory, "cachedInventory");
         Objects.requireNonNull(source, "source");
-        Objects.requireNonNull(available, "available");
         Objects.requireNonNull(unreturnedInputSink, "unreturnedInputSink");
 
-        KeyCounter remaining = new KeyCounter();
-        remaining.addAll(available);
-        KeyCounter total = new KeyCounter();
-        List<PlannedExtraction> planned = new ArrayList<>(patterns.size());
+        AvailableInputIndex inputIndex = new AvailableInputIndex(cachedInventory);
+        List<Result> results = new ArrayList<>(patterns.size());
         for (IPatternDetails pattern : patterns) {
             Objects.requireNonNull(pattern, "pattern");
-            PlannedExtraction entry = plan(pattern, operations, level, remaining);
-            planned.add(entry);
+            PlannedExtraction entry = plan(
+                    pattern, operations, level, storage, source, inputIndex);
             if (entry.failure != Failure.NONE) {
+                results.add(new Result(entry.failure, entry.inputs, entry.missingKey));
                 continue;
             }
-            for (var consumed : entry.consumed) {
-                remaining.remove(consumed.getKey(), consumed.getLongValue());
-                total.add(consumed.getKey(), consumed.getLongValue());
-            }
+            results.add(commit(storage, source, entry, unreturnedInputSink));
         }
+        return List.copyOf(results);
+    }
 
-        for (var entry : total) {
-            long simulated = storage.extract(
-                    entry.getKey(), entry.getLongValue(), Actionable.SIMULATE, source);
-            if (simulated < entry.getLongValue()) {
-                return storageChangedResults(planned, entry.getKey());
-            }
-        }
-
+    private static Result commit(MEStorage storage, IActionSource source,
+                                 PlannedExtraction planned,
+                                 UnreturnedInputSink unreturnedInputSink) {
         KeyCounter extracted = new KeyCounter();
-        for (var entry : total) {
+        for (var entry : planned.consumed) {
             long amount = storage.extract(
                     entry.getKey(), entry.getLongValue(), Actionable.MODULATE, source);
             if (amount > 0) {
@@ -94,42 +95,24 @@ public final class PassivePatternInputTransaction {
             }
             if (amount < entry.getLongValue()) {
                 rollback(storage, source, extracted, unreturnedInputSink);
-                return storageChangedResults(planned, entry.getKey());
+                return new Result(Failure.STORAGE_CHANGED, new KeyCounter[0], entry.getKey());
             }
         }
-
-        for (var entry : total) {
-            available.remove(entry.getKey(), entry.getLongValue());
-        }
-        List<Result> results = new ArrayList<>(planned.size());
-        for (PlannedExtraction entry : planned) {
-            results.add(new Result(entry.failure, entry.inputs, entry.missingKey));
-        }
-        return List.copyOf(results);
+        return new Result(Failure.NONE, planned.inputs, null);
     }
 
-    private static List<Result> storageChangedResults(
-            List<PlannedExtraction> planned, @Nullable AEKey changedKey) {
-        List<Result> results = new ArrayList<>(planned.size());
-        for (PlannedExtraction entry : planned) {
-            results.add(entry.failure == Failure.NONE
-                    ? new Result(Failure.STORAGE_CHANGED, new KeyCounter[0], changedKey)
-                    : new Result(entry.failure, entry.inputs, entry.missingKey));
-        }
-        return List.copyOf(results);
-    }
-
-    static PlannedExtraction plan(IPatternDetails pattern, long operations,
-                                  @Nullable Level level, KeyCounter available) {
+    private static PlannedExtraction plan(
+            IPatternDetails pattern, long operations, @Nullable Level level,
+            MEStorage storage, IActionSource source, AvailableInputIndex inputIndex) {
         if (operations <= 0) {
             return PlannedExtraction.failure(Failure.AMOUNT_OVERFLOW, null);
         }
 
-        KeyCounter remaining = new KeyCounter();
-        remaining.addAll(available);
         KeyCounter consumed = new KeyCounter();
+        Map<AEKey, Long> simulatedAmounts = new HashMap<>();
         IPatternDetails.IInput[] patternInputs = pattern.getInputs();
         KeyCounter[] selectedInputs = new KeyCounter[patternInputs.length];
+        DynamicComponentPattern dynamic = pattern instanceof DynamicComponentPattern value ? value : null;
 
         for (int slot = 0; slot < patternInputs.length; slot++) {
             IPatternDetails.IInput input = patternInputs[slot];
@@ -157,22 +140,16 @@ public final class PassivePatternInputTransaction {
                 if (!input.isValid(key, level)) {
                     continue;
                 }
-                missing -= take(key, missing, remaining, selectedInputs[slot], consumed);
+                missing -= takeSimulated(
+                        key, missing, storage, source, simulatedAmounts,
+                        selectedInputs[slot], consumed);
             }
 
             if (missing > 0) {
-                List<AEKey> candidates = new ArrayList<>();
-                for (var entry : remaining) {
-                    if (entry.getLongValue() > 0 && input.isValid(entry.getKey(), level)) {
-                        candidates.add(entry.getKey());
-                    }
-                }
-                for (AEKey candidate : candidates) {
-                    if (missing <= 0) {
-                        break;
-                    }
-                    missing -= take(candidate, missing, remaining, selectedInputs[slot], consumed);
-                }
+                missing = takeAdditionalCandidates(
+                        dynamic, slot, input, missing, level,
+                        storage, source, simulatedAmounts,
+                        selectedInputs[slot], consumed, inputIndex);
             }
 
             if (missing > 0) {
@@ -183,13 +160,48 @@ public final class PassivePatternInputTransaction {
         return new PlannedExtraction(Failure.NONE, selectedInputs, consumed, null);
     }
 
-    private static long take(AEKey key, long wanted, KeyCounter remaining,
-                             KeyCounter selected, KeyCounter consumed) {
-        long amount = Math.min(wanted, remaining.get(key));
+    private static long takeAdditionalCandidates(
+            @Nullable DynamicComponentPattern dynamic,
+            int slot,
+            IPatternDetails.IInput input,
+            long missing,
+            @Nullable Level level,
+            MEStorage storage,
+            IActionSource source,
+            Map<AEKey, Long> simulatedAmounts,
+            KeyCounter selected,
+            KeyCounter consumed,
+            AvailableInputIndex inputIndex) {
+        if (dynamic == null || !dynamic.isItemIdInput(slot)) {
+            return missing;
+        }
+        for (GenericStack possible : input.getPossibleInputs()) {
+            if (possible == null || !(possible.what() instanceof AEItemKey possibleItem)) {
+                continue;
+            }
+            for (AEKey candidate : inputIndex.itemVariants(possibleItem)) {
+                if (missing <= 0) {
+                    return 0L;
+                }
+                if (input.isValid(candidate, level)) {
+                    missing -= takeSimulated(
+                            candidate, missing, storage, source, simulatedAmounts,
+                            selected, consumed);
+                }
+            }
+        }
+        return missing;
+    }
+
+    private static long takeSimulated(
+            AEKey key, long wanted, MEStorage storage, IActionSource source,
+            Map<AEKey, Long> simulatedAmounts, KeyCounter selected, KeyCounter consumed) {
+        long available = simulatedAmounts.computeIfAbsent(key, candidate -> Math.max(0L,
+                storage.extract(candidate, Long.MAX_VALUE, Actionable.SIMULATE, source)));
+        long amount = Math.min(wanted, Math.max(0L, available - consumed.get(key)));
         if (amount <= 0) {
             return 0;
         }
-        remaining.remove(key, amount);
         selected.add(key, amount);
         consumed.add(key, amount);
         return amount;
@@ -221,6 +233,37 @@ public final class PassivePatternInputTransaction {
                              KeyCounter consumed, @Nullable AEKey missingKey) {
         static PlannedExtraction failure(Failure failure, @Nullable AEKey missingKey) {
             return new PlannedExtraction(failure, new KeyCounter[0], new KeyCounter(), missingKey);
+        }
+    }
+
+    /** Lazily enumerates network keys only when a component-relaxed input needs variants. */
+    private static final class AvailableInputIndex {
+        private final Supplier<KeyCounter> cachedInventorySupplier;
+        private final Map<Item, List<AEKey>> itemVariants = new IdentityHashMap<>();
+        private KeyCounter cachedInventory;
+
+        private AvailableInputIndex(Supplier<KeyCounter> cachedInventorySupplier) {
+            this.cachedInventorySupplier = cachedInventorySupplier;
+        }
+
+        private KeyCounter cachedInventory() {
+            if (cachedInventory == null) {
+                cachedInventory = Objects.requireNonNull(
+                        cachedInventorySupplier.get(), "cached inventory supplier returned null");
+            }
+            return cachedInventory;
+        }
+
+        private List<AEKey> itemVariants(AEItemKey template) {
+            return itemVariants.computeIfAbsent(template.getItem(), ignored -> {
+                List<AEKey> variants = new ArrayList<>();
+                for (var entry : cachedInventory().findFuzzy(template, FuzzyMode.IGNORE_ALL)) {
+                    if (entry.getLongValue() > 0L) {
+                        variants.add(entry.getKey());
+                    }
+                }
+                return List.copyOf(variants);
+            });
         }
     }
 }

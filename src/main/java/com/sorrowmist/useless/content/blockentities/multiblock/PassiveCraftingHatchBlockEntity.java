@@ -5,7 +5,6 @@ import appeng.api.stacks.AEFluidKey;
 import appeng.api.stacks.AEItemKey;
 import appeng.api.stacks.AEKey;
 import appeng.api.stacks.GenericStack;
-import appeng.api.stacks.KeyCounter;
 import com.sorrowmist.useless.content.blockentities.RecoverableItemStackHandler;
 import com.sorrowmist.useless.content.blocks.multiblock.UselessCoilBlock;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.AdvancedAlloyFurnaceAeManager;
@@ -76,6 +75,8 @@ public final class PassiveCraftingHatchBlockEntity extends BlockEntity
     private final Map<Integer, CraftingTask> activeTasks = new HashMap<>();
     private final SlotState[] idleStates = new SlotState[PATTERN_SLOTS];
     private final String[] idleDetails = new String[PATTERN_SLOTS];
+    private final OmniversalPatternDetails[] decodedPatterns = new OmniversalPatternDetails[PATTERN_SLOTS];
+    private final boolean[] patternDecodeCached = new boolean[PATTERN_SLOTS];
     private final ConcurrentHashMap<Integer, AdvancedAlloyFurnaceAeManager.AETaskProgress> taskProgress =
             new ConcurrentHashMap<>();
     private final AtomicInteger totalProgress = new AtomicInteger();
@@ -267,6 +268,7 @@ public final class PassiveCraftingHatchBlockEntity extends BlockEntity
         long currentCatalogGeneration = AlloyFurnaceRecipeCatalog.generation();
         if (recipeCatalogGeneration != currentCatalogGeneration) {
             recipeCatalogGeneration = currentCatalogGeneration;
+            clearPatternDecodeCache();
             resetIdleStates();
         }
 
@@ -328,8 +330,8 @@ public final class PassiveCraftingHatchBlockEntity extends BlockEntity
                 continue;
             }
 
-            IPatternDetails decoded = AdvancedAlloyFurnacePatternResolver.decode(stack, level);
-            if (!(decoded instanceof OmniversalPatternDetails omniversal)) {
+            OmniversalPatternDetails omniversal = decodePattern(slot, stack);
+            if (omniversal == null) {
                 setIdleState(slot, SlotState.INVALID_PATTERN, "");
                 continue;
             }
@@ -355,11 +357,11 @@ public final class PassiveCraftingHatchBlockEntity extends BlockEntity
             return;
         }
 
-        KeyCounter available = access.storage().getAvailableStacks();
         List<PassivePatternInputTransaction.Result> extractions =
                 PassivePatternInputTransaction.extractAll(
                         candidates.stream().map(Candidate::pattern).toList(), multiplier, level,
-                        access.storage(), access.source(), available, this::stashUnreturnedInput);
+                        access.storage(), access::cachedInventory, access.source(),
+                        this::stashUnreturnedInput);
         for (int index = 0; index < candidates.size(); index++) {
             Candidate candidate = candidates.get(index);
             PassivePatternInputTransaction.Result extraction = extractions.get(index);
@@ -538,10 +540,27 @@ public final class PassiveCraftingHatchBlockEntity extends BlockEntity
         if (loading || unloading || isRemoved()) {
             return;
         }
+        clearPatternDecodeCache();
         countdownTicks = intervalTicks;
         resetIdleStates();
         statusDirty = true;
         setChanged();
+    }
+
+    @Nullable
+    private OmniversalPatternDetails decodePattern(int slot, ItemStack stack) {
+        if (!patternDecodeCached[slot]) {
+            IPatternDetails decoded = AdvancedAlloyFurnacePatternResolver.decode(stack, level);
+            decodedPatterns[slot] = decoded instanceof OmniversalPatternDetails omniversal
+                    ? omniversal : null;
+            patternDecodeCached[slot] = true;
+        }
+        return decodedPatterns[slot];
+    }
+
+    private void clearPatternDecodeCache() {
+        java.util.Arrays.fill(decodedPatterns, null);
+        java.util.Arrays.fill(patternDecodeCached, false);
     }
 
     private void resetIdleStates() {
@@ -686,6 +705,7 @@ public final class PassiveCraftingHatchBlockEntity extends BlockEntity
             }
         }
         observedActivePatternSlots = -1;
+        clearPatternDecodeCache();
         resetIdleStates();
     }
 
@@ -715,6 +735,7 @@ public final class PassiveCraftingHatchBlockEntity extends BlockEntity
         countdownTicks = intervalTicks;
         statusDirty = true;
         observedActivePatternSlots = -1;
+        clearPatternDecodeCache();
     }
 
     @Override

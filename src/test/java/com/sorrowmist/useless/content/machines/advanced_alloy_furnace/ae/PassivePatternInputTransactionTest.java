@@ -43,13 +43,14 @@ class PassivePatternInputTransactionTest {
         AEItemKey gold = AEItemKey.of(new ItemStack(Items.GOLD_INGOT));
         IPatternDetails pattern = pattern(input(3, key -> key.equals(iron) || key.equals(gold),
                 iron, gold));
-        KeyCounter available = counter(gold, 12);
+        TestStorage storage = new TestStorage(counter(gold, 12));
 
-        var planned = PassivePatternInputTransaction.plan(pattern, 4, null, available);
+        var result = extract(pattern, 4, storage);
 
-        assertEquals(PassivePatternInputTransaction.Failure.NONE, planned.failure());
-        assertEquals(12, planned.inputs()[0].get(gold));
-        assertEquals(12, planned.consumed().get(gold));
+        assertEquals(PassivePatternInputTransaction.Failure.NONE, result.failure());
+        assertEquals(12, result.inputs()[0].get(gold));
+        assertEquals(0, storage.amount(gold));
+        assertNoInventoryEnumeration(storage);
     }
 
     @Test
@@ -58,16 +59,43 @@ class PassivePatternInputTransactionTest {
         namedIron.set(DataComponents.CUSTOM_NAME, Component.literal("Stored variant"));
         AEItemKey canonical = AEItemKey.of(new ItemStack(Items.IRON_INGOT));
         AEItemKey stored = AEItemKey.of(namedIron);
-        IPatternDetails pattern = pattern(input(1,
-                key -> key instanceof AEItemKey itemKey && itemKey.getItem() == Items.IRON_INGOT,
+        IPatternDetails pattern = dynamicPattern(true, input(1,
+                key -> {
+                    if (key instanceof AEItemKey itemKey && itemKey.getItem() != Items.IRON_INGOT) {
+                        throw new AssertionError("Item-id lookup returned an unrelated item");
+                    }
+                    return key instanceof AEItemKey itemKey && itemKey.getItem() == Items.IRON_INGOT;
+                },
                 canonical));
 
-        var planned = PassivePatternInputTransaction.plan(
-                pattern, 1, null, counter(stored, 1));
+        KeyCounter contents = counter(stored, 1);
+        contents.add(AEItemKey.of(new ItemStack(Items.GOLD_INGOT)), 64);
+        TestStorage storage = new TestStorage(contents);
+        var result = extract(pattern, 1, storage);
 
-        assertEquals(PassivePatternInputTransaction.Failure.NONE, planned.failure());
-        assertEquals(1, planned.inputs()[0].get(stored));
-        assertEquals(0, planned.inputs()[0].get(canonical));
+        assertEquals(PassivePatternInputTransaction.Failure.NONE, result.failure());
+        assertEquals(1, result.inputs()[0].get(stored));
+        assertEquals(0, result.inputs()[0].get(canonical));
+        assertEquals(0, storage.availableStackRequests);
+        assertEquals(1, storage.cachedInventoryRequests);
+    }
+
+    @Test
+    void exactDynamicInputDoesNotScanUnrelatedNetworkKeys() {
+        AEItemKey iron = AEItemKey.of(new ItemStack(Items.IRON_INGOT));
+        AEItemKey gold = AEItemKey.of(new ItemStack(Items.GOLD_INGOT));
+        IPatternDetails pattern = dynamicPattern(false, input(1, key -> {
+            if (key.equals(gold)) {
+                throw new AssertionError("Exact component slot scanned an unrelated network key");
+            }
+            return key.equals(iron);
+        }, iron));
+
+        TestStorage storage = new TestStorage(counter(gold, 1));
+        var result = extract(pattern, 1, storage);
+
+        assertEquals(PassivePatternInputTransaction.Failure.MISSING_INPUT, result.failure());
+        assertNoInventoryEnumeration(storage);
     }
 
     @Test
@@ -75,11 +103,12 @@ class PassivePatternInputTransactionTest {
         AEFluidKey water = AEFluidKey.of(Fluids.WATER);
         IPatternDetails pattern = pattern(input(1_000, water::equals, water));
 
-        var planned = PassivePatternInputTransaction.plan(
-                pattern, 2, null, counter(water, 2_000));
+        TestStorage storage = new TestStorage(counter(water, 2_000));
+        var result = extract(pattern, 2, storage);
 
-        assertEquals(PassivePatternInputTransaction.Failure.NONE, planned.failure());
-        assertEquals(2_000, planned.inputs()[0].get(water));
+        assertEquals(PassivePatternInputTransaction.Failure.NONE, result.failure());
+        assertEquals(2_000, result.inputs()[0].get(water));
+        assertNoInventoryEnumeration(storage);
     }
 
     @Test
@@ -87,17 +116,17 @@ class PassivePatternInputTransactionTest {
         AEItemKey iron = AEItemKey.of(new ItemStack(Items.IRON_INGOT));
         IPatternDetails pattern = pattern(input(2, iron::equals, iron));
         TestStorage storage = new TestStorage(counter(iron, 3));
-        KeyCounter snapshot = storage.getAvailableStacks();
 
         List<PassivePatternInputTransaction.Result> results =
                 PassivePatternInputTransaction.extractAll(
-                        List.of(pattern, pattern), 1, null, storage, SOURCE, snapshot,
+                        List.of(pattern, pattern), 1, null, storage, storage::cachedInventory, SOURCE,
                         (key, amount) -> { });
 
         assertEquals(PassivePatternInputTransaction.Failure.NONE, results.get(0).failure());
         assertEquals(PassivePatternInputTransaction.Failure.MISSING_INPUT,
                 results.get(1).failure());
         assertEquals(1, storage.amount(iron));
+        assertNoInventoryEnumeration(storage);
     }
 
     @Test
@@ -110,13 +139,14 @@ class PassivePatternInputTransactionTest {
 
         List<PassivePatternInputTransaction.Result> results =
                 PassivePatternInputTransaction.extractAll(
-                        List.of(missing, available), 1, null, storage, SOURCE,
-                        storage.getAvailableStacks(), (key, amount) -> { });
+                        List.of(missing, available), 1, null, storage, storage::cachedInventory, SOURCE,
+                        (key, amount) -> { });
 
         assertEquals(PassivePatternInputTransaction.Failure.MISSING_INPUT,
                 results.get(0).failure());
         assertEquals(PassivePatternInputTransaction.Failure.NONE, results.get(1).failure());
         assertEquals(0, storage.amount(iron));
+        assertNoInventoryEnumeration(storage);
     }
 
     @Test
@@ -132,7 +162,7 @@ class PassivePatternInputTransactionTest {
         KeyCounter unreturned = new KeyCounter();
 
         var result = PassivePatternInputTransaction.extractAll(
-                List.of(pattern), 1, null, storage, SOURCE, storage.getAvailableStacks(),
+                List.of(pattern), 1, null, storage, storage::cachedInventory, SOURCE,
                 unreturned::add).getFirst();
 
         assertEquals(PassivePatternInputTransaction.Failure.STORAGE_CHANGED, result.failure());
@@ -146,11 +176,12 @@ class PassivePatternInputTransactionTest {
         AEItemKey iron = AEItemKey.of(new ItemStack(Items.IRON_INGOT));
         IPatternDetails pattern = pattern(input(Long.MAX_VALUE, iron::equals, iron));
 
-        var planned = PassivePatternInputTransaction.plan(
-                pattern, 2, null, counter(iron, Long.MAX_VALUE));
+        TestStorage storage = new TestStorage(counter(iron, Long.MAX_VALUE));
+        var result = extract(pattern, 2, storage);
 
         assertEquals(PassivePatternInputTransaction.Failure.AMOUNT_OVERFLOW,
-                planned.failure());
+                result.failure());
+        assertEquals(Long.MAX_VALUE, storage.amount(iron));
     }
 
     @Test
@@ -158,12 +189,24 @@ class PassivePatternInputTransactionTest {
         AEItemKey iron = AEItemKey.of(new ItemStack(Items.IRON_INGOT));
         IPatternDetails pattern = pattern(input(1L, iron::equals, iron));
 
-        var planned = PassivePatternInputTransaction.plan(
-                pattern, Long.MAX_VALUE, null, counter(iron, Long.MAX_VALUE));
+        TestStorage storage = new TestStorage(counter(iron, Long.MAX_VALUE));
+        var result = extract(pattern, Long.MAX_VALUE, storage);
 
-        assertEquals(PassivePatternInputTransaction.Failure.NONE, planned.failure());
-        assertEquals(Long.MAX_VALUE, planned.inputs()[0].get(iron));
-        assertEquals(Long.MAX_VALUE, planned.consumed().get(iron));
+        assertEquals(PassivePatternInputTransaction.Failure.NONE, result.failure());
+        assertEquals(Long.MAX_VALUE, result.inputs()[0].get(iron));
+        assertEquals(0, storage.amount(iron));
+    }
+
+    private static PassivePatternInputTransaction.Result extract(
+            IPatternDetails pattern, long operations, TestStorage storage) {
+        return PassivePatternInputTransaction.extract(
+                pattern, operations, null, storage, storage::cachedInventory, SOURCE,
+                (key, amount) -> { });
+    }
+
+    private static void assertNoInventoryEnumeration(TestStorage storage) {
+        assertEquals(0, storage.availableStackRequests);
+        assertEquals(0, storage.cachedInventoryRequests);
     }
 
     private static KeyCounter counter(AEKey key, long amount) {
@@ -174,6 +217,47 @@ class PassivePatternInputTransactionTest {
 
     private static IPatternDetails pattern(IPatternDetails.IInput... inputs) {
         return new IPatternDetails() {
+            @Override
+            public AEItemKey getDefinition() {
+                return AEItemKey.of(new ItemStack(Items.PAPER));
+            }
+
+            @Override
+            public IInput[] getInputs() {
+                return inputs;
+            }
+
+            @Override
+            public List<GenericStack> getOutputs() {
+                return List.of(new GenericStack(
+                        AEItemKey.of(new ItemStack(Items.PAPER)), 1));
+            }
+        };
+    }
+
+    private static DynamicComponentPattern dynamicPattern(
+            boolean itemIdInput, IPatternDetails.IInput... inputs) {
+        return new DynamicComponentPattern() {
+            @Override
+            public String dynamicPatternIdentity() {
+                return "test:passive_input";
+            }
+
+            @Override
+            public boolean isItemIdInput(int slot) {
+                return itemIdInput;
+            }
+
+            @Override
+            public boolean isItemIdOutput(int slot) {
+                return false;
+            }
+
+            @Override
+            public boolean usesDynamicOutputs() {
+                return false;
+            }
+
             @Override
             public AEItemKey getDefinition() {
                 return AEItemKey.of(new ItemStack(Items.PAPER));
@@ -225,6 +309,8 @@ class PassivePatternInputTransactionTest {
         private final Map<AEKey, Long> contents = new LinkedHashMap<>();
         private int modulationCalls;
         private int failModulationCall;
+        private int availableStackRequests;
+        private int cachedInventoryRequests;
 
         private TestStorage(KeyCounter initial) {
             for (var entry : initial) {
@@ -255,6 +341,7 @@ class PassivePatternInputTransactionTest {
 
         @Override
         public void getAvailableStacks(KeyCounter out) {
+            availableStackRequests++;
             contents.forEach(out::add);
         }
 
@@ -265,6 +352,13 @@ class PassivePatternInputTransactionTest {
 
         private long amount(AEKey key) {
             return contents.getOrDefault(key, 0L);
+        }
+
+        private KeyCounter cachedInventory() {
+            cachedInventoryRequests++;
+            KeyCounter result = new KeyCounter();
+            contents.forEach(result::add);
+            return result;
         }
     }
 }

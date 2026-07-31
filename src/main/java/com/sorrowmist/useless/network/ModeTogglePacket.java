@@ -61,7 +61,7 @@ public class ModeTogglePacket implements CustomPacketPayload {
                 }
                 case BEEF_INVULNERABILITY -> {
                     stack.set(UComponents.BeefInvulnerabilityEnabledComponent.get(), msg.enabled);
-                    EventHandler.updateBeefInvulnerability(player);
+                    EventHandler.updateBeefInvulnerability(player, true);
                 }
                 case BEEF_CAPTURE -> {
                     if (stack.getItem() instanceof EndlessBeafItem) {

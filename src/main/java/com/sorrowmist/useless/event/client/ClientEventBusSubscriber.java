@@ -6,6 +6,7 @@ import com.sorrowmist.useless.client.gui.MiningStatusGui;
 import com.sorrowmist.useless.content.items.EndlessBeafItem;
 import com.sorrowmist.useless.core.common.KeyBindings;
 import com.sorrowmist.useless.core.component.UComponents;
+import com.sorrowmist.useless.event.EventHandler;
 import com.sorrowmist.useless.network.EnchantmentSwitchPacket;
 import com.sorrowmist.useless.network.ForceBreakKeyPacket;
 import com.sorrowmist.useless.network.ModeTogglePacket;
@@ -18,9 +19,11 @@ import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.client.event.ClientTickEvent;
+import net.neoforged.neoforge.client.event.ClientPlayerNetworkEvent;
 import net.neoforged.neoforge.client.event.RegisterGuiLayersEvent;
 import net.neoforged.neoforge.client.event.RegisterKeyMappingsEvent;
 import net.neoforged.neoforge.client.gui.VanillaGuiLayers;
+import net.neoforged.neoforge.event.entity.EntityLeaveLevelEvent;
 import net.neoforged.neoforge.network.PacketDistributor;
 
 @EventBusSubscriber(modid = UselessMod.MODID, value = Dist.CLIENT)
@@ -116,5 +119,32 @@ public class ClientEventBusSubscriber {
                 ResourceLocation.fromNamespaceAndPath(UselessMod.MODID, "ultimine_status"),
                 MiningStatusGui::render
         );
+    }
+
+    @SubscribeEvent
+    public static void onClientLoggingIn(ClientPlayerNetworkEvent.LoggingIn event) {
+        clearClientBeefProtectionState();
+    }
+
+    @SubscribeEvent
+    public static void onClientLoggingOut(ClientPlayerNetworkEvent.LoggingOut event) {
+        clearClientBeefProtectionState();
+    }
+
+    @SubscribeEvent
+    public static void onClientPlayerClone(ClientPlayerNetworkEvent.Clone event) {
+        clearClientBeefProtectionState();
+    }
+
+    @SubscribeEvent
+    public static void onEntityLeaveLevel(EntityLeaveLevelEvent event) {
+        if (event.getLevel().isClientSide() && event.getEntity() instanceof net.minecraft.world.entity.player.Player player) {
+            EventHandler.setClientBeefInvulnerabilityState(player.getId(), false);
+        }
+    }
+
+    private static void clearClientBeefProtectionState() {
+        EventHandler.clearClientBeefInvulnerabilityStates();
+        lastTabPressed = false;
     }
 }

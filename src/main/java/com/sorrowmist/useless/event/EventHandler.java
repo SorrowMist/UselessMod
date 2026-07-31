@@ -14,6 +14,7 @@ import com.sorrowmist.useless.utils.UselessItemUtils;
 import com.sorrowmist.useless.utils.mining.MiningDispatcher;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.GlobalPos;
+import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.InteractionResult;
@@ -45,7 +46,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 @EventBusSubscriber(modid = UselessMod.MODID)
 public class EventHandler {
-    private static final Set<UUID> BEEF_INVULNERABLE_PLAYERS = Collections.newSetFromMap(new ConcurrentHashMap<>());
+    private static final Set<UUID> BEEF_PROTECTED_PLAYERS = Collections.newSetFromMap(new ConcurrentHashMap<>());
     private static final Set<Integer> CLIENT_BEEF_INVULNERABLE_ENTITY_IDS = Collections.newSetFromMap(new ConcurrentHashMap<>());
 
     @SubscribeEvent(priority = EventPriority.HIGHEST)
@@ -72,10 +73,7 @@ public class EventHandler {
     public static void onLivingDeath(LivingDeathEvent event) {
         if (event.getEntity() instanceof Player player && shouldApplyBeefInvulnerability(player)) {
             event.setCanceled(true);
-            player.setHealth(player.getMaxHealth());
-            player.setInvulnerable(true);
-            player.clearFire();
-            player.fallDistance = 0.0F;
+            restoreBeefProtectedPlayer(player);
         }
     }
 
@@ -169,26 +167,79 @@ public class EventHandler {
     }
 
     public static void updateBeefInvulnerability(Player player) {
+        updateBeefInvulnerability(player, false);
+    }
+
+    public static void updateBeefInvulnerability(Player player, boolean forceSync) {
+        if (player.level().isClientSide()) {
+            return;
+        }
+
+        migrateLegacyBeefInvulnerability(player);
+
         boolean hasItemInInventory = UselessItemUtils.hasInvulnerabilityEnabledTargetToolInInventory(player);
         UUID uuid = player.getUUID();
 
         if (hasItemInInventory) {
-            if (player instanceof ServerPlayer serverPlayer && (!BEEF_INVULNERABLE_PLAYERS.contains(uuid) || player.tickCount % 20 == 0)) {
+            boolean newlyTracked = BEEF_PROTECTED_PLAYERS.add(uuid);
+            claimBeefInvulnerability(player);
+            if (player instanceof ServerPlayer serverPlayer && (forceSync || newlyTracked || player.tickCount % 20 == 0)) {
                 PacketDistributor.sendToPlayersTrackingEntityAndSelf(serverPlayer, new BeefInvulnerabilityStatePacket(serverPlayer.getId(), true));
-            }
-            if (!player.isInvulnerable()) {
-                BEEF_INVULNERABLE_PLAYERS.add(uuid);
-                player.setInvulnerable(true);
             }
             return;
         }
 
-        if (BEEF_INVULNERABLE_PLAYERS.remove(uuid)) {
-            player.setInvulnerable(false);
-            if (player instanceof ServerPlayer serverPlayer) {
-                PacketDistributor.sendToPlayersTrackingEntityAndSelf(serverPlayer, new BeefInvulnerabilityStatePacket(serverPlayer.getId(), false));
-            }
+        boolean wasTracked = BEEF_PROTECTED_PLAYERS.remove(uuid);
+        boolean released = releaseBeefInvulnerability(player);
+        if (player instanceof ServerPlayer serverPlayer && (forceSync || wasTracked || released)) {
+            PacketDistributor.sendToPlayersTrackingEntityAndSelf(serverPlayer, new BeefInvulnerabilityStatePacket(serverPlayer.getId(), false));
         }
+    }
+
+    private static void migrateLegacyBeefInvulnerability(Player player) {
+        CompoundTag ownershipData = BeefInvulnerabilityOwnership.get(player);
+        if (BeefInvulnerabilityOwnership.isMigrationComplete(ownershipData)) {
+            return;
+        }
+
+        // Preserve an active ownership cycle while upgrading its metadata.
+        if (BeefInvulnerabilityOwnership.isOwned(ownershipData)) {
+            BeefInvulnerabilityOwnership.markMigrationComplete(ownershipData);
+            return;
+        }
+
+        // Defer migration until an affected survival/adventure player carries the tool.
+        if (player.isCreative()
+                || player.isSpectator()
+                || !UselessItemUtils.hasTargetToolInInventory(player)) {
+            return;
+        }
+
+        // Old builds, including v1 ownership tracking, could leave this flag behind
+        // after protection had already been released.
+        if (player.isInvulnerable()) {
+            player.setInvulnerable(false);
+        }
+        BeefInvulnerabilityOwnership.markMigrationComplete(BeefInvulnerabilityOwnership.getOrCreate(player));
+    }
+
+    private static void claimBeefInvulnerability(Player player) {
+        CompoundTag ownershipData = BeefInvulnerabilityOwnership.getOrCreate(player);
+        BeefInvulnerabilityOwnership.claim(ownershipData, player.isInvulnerable());
+        if (!player.isInvulnerable()) {
+            player.setInvulnerable(true);
+        }
+    }
+
+    private static boolean releaseBeefInvulnerability(Player player) {
+        BeefInvulnerabilityOwnership.ReleaseResult result =
+                BeefInvulnerabilityOwnership.release(BeefInvulnerabilityOwnership.get(player));
+        if (!result.owned()) {
+            return false;
+        }
+
+        player.setInvulnerable(result.previousInvulnerable());
+        return true;
     }
 
     public static boolean shouldApplyBeefInvulnerability(Player player) {
@@ -207,13 +258,22 @@ public class EventHandler {
         CLIENT_BEEF_INVULNERABLE_ENTITY_IDS.remove(entityId);
     }
 
+    public static void clearClientBeefInvulnerabilityStates() {
+        CLIENT_BEEF_INVULNERABLE_ENTITY_IDS.clear();
+    }
+
     public static void restoreBeefProtectedPlayer(Player player) {
+        if (!player.level().isClientSide()) {
+            BEEF_PROTECTED_PLAYERS.add(player.getUUID());
+            migrateLegacyBeefInvulnerability(player);
+            claimBeefInvulnerability(player);
+        }
+
         float maxHealth = player.getMaxHealth();
         player.deathTime = 0;
         player.hurtTime = 0;
         player.hurtDuration = 0;
         player.setHealth(maxHealth);
-        player.setInvulnerable(true);
         player.setPose(Pose.STANDING);
         player.clearFire();
         player.fallDistance = 0.0F;
@@ -221,6 +281,26 @@ public class EventHandler {
             PacketDistributor.sendToPlayersTrackingEntityAndSelf(serverPlayer, new BeefInvulnerabilityStatePacket(serverPlayer.getId(), true));
             PacketDistributor.sendToPlayersTrackingEntityAndSelf(serverPlayer, new BeefInvulnerabilitySyncPacket(serverPlayer.getId(), maxHealth));
         }
+    }
+
+    @SubscribeEvent
+    public static void onPlayerLoggedIn(PlayerEvent.PlayerLoggedInEvent event) {
+        updateBeefInvulnerability(event.getEntity(), true);
+    }
+
+    @SubscribeEvent
+    public static void onPlayerRespawn(PlayerEvent.PlayerRespawnEvent event) {
+        updateBeefInvulnerability(event.getEntity(), true);
+    }
+
+    @SubscribeEvent
+    public static void onPlayerChangedDimension(PlayerEvent.PlayerChangedDimensionEvent event) {
+        updateBeefInvulnerability(event.getEntity(), true);
+    }
+
+    @SubscribeEvent
+    public static void onPlayerLoggedOut(PlayerEvent.PlayerLoggedOutEvent event) {
+        BEEF_PROTECTED_PLAYERS.remove(event.getEntity().getUUID());
     }
 
     @SubscribeEvent(priority = EventPriority.HIGHEST)

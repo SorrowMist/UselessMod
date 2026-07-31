@@ -1,11 +1,10 @@
 package com.sorrowmist.useless.utils;
 
 import com.sorrowmist.useless.api.enums.tool.ToolTypeMode;
+import com.sorrowmist.useless.compat.productivebees.ProductiveBeesCaptureCompat;
 import com.sorrowmist.useless.content.items.EndlessBeafItem;
 import com.sorrowmist.useless.core.component.UComponents;
 import com.sorrowmist.useless.core.config.ConfigManager;
-import cy.jdkdigital.productivebees.common.entity.bee.ProductiveBee;
-import cy.jdkdigital.productivebees.util.BeeCreator;
 import net.minecraft.core.Holder;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
@@ -23,6 +22,7 @@ import net.minecraft.world.item.Items;
 import net.minecraft.world.item.SpawnEggItem;
 import net.minecraft.world.level.GameRules;
 import net.minecraft.world.level.Level;
+import net.neoforged.fml.ModList;
 import net.neoforged.neoforge.event.entity.living.LivingDropsEvent;
 
 import java.util.AbstractMap.SimpleImmutableEntry;
@@ -32,6 +32,7 @@ import java.util.List;
 import java.util.Optional;
 
 public class UselessItemUtils {
+    private static final String PRODUCTIVE_BEES_MOD_ID = "productivebees";
     private static final ResourceLocation COGNIZANT_DUST_ID = ResourceLocation.fromNamespaceAndPath(
             "mysticalagriculture", "cognizant_dust");
 
@@ -157,14 +158,12 @@ public class UselessItemUtils {
             return;
         }
 
-        ItemStack spawnEggStack;
-        if (killedEntity instanceof ProductiveBee productiveBee) {
-            ResourceLocation beeType = productiveBee.getBeeType();
-            if (beeType == null) {
-                return;
-            }
-            spawnEggStack = BeeCreator.getSpawnEgg(beeType);
-        } else {
+        ItemStack spawnEggStack = null;
+        if (ModList.get().isLoaded(PRODUCTIVE_BEES_MOD_ID)) {
+            spawnEggStack = ProductiveBeesCaptureCompat.tryCreateSpawnEgg(killedEntity);
+        }
+
+        if (spawnEggStack == null) {
             SpawnEggItem spawnEgg = SpawnEggItem.byId(killedEntity.getType());
             if (spawnEgg == null) {
                 return;

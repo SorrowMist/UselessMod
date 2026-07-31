@@ -74,6 +74,20 @@ class PagedRecoverableMenuTest {
         assertTrue(slot.getItem().isEmpty());
     }
 
+    @Test
+    void insertionContinuesIntoTheNextPageWhenTheCurrentPageIsFull() {
+        RecoverableItemStackHandler backing = handler();
+        for (int slot = 0; slot < PagedRecoverableMenu.SLOTS_PER_PAGE; slot++) {
+            backing.setStackInSlot(slot, new ItemStack(Items.IRON_INGOT, 64));
+        }
+        ItemStack source = new ItemStack(Items.GOLD_INGOT, 3);
+
+        assertTrue(PagedRecoverableMenu.insertIntoActiveSlots(backing, source, 0));
+        assertTrue(source.isEmpty());
+        assertTrue(backing.getStackInSlot(PagedRecoverableMenu.SLOTS_PER_PAGE).is(Items.GOLD_INGOT));
+        assertEquals(3, backing.getStackInSlot(PagedRecoverableMenu.SLOTS_PER_PAGE).getCount());
+    }
+
     private static RecoverableItemStackHandler handler() {
         return new RecoverableItemStackHandler(() -> 54, stack -> true, () -> {
         });

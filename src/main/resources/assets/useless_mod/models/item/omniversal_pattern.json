@@ -1,3 +1,6 @@
 {
-  "parent": "ae2:item/processing_pattern"
+  "parent": "ae2:item/processing_pattern",
+  "textures": {
+    "layer0": "useless_mod:item/omniversal_pattern"
+  }
 }

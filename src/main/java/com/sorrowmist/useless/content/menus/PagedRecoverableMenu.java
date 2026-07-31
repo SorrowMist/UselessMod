@@ -153,12 +153,39 @@ public class PagedRecoverableMenu extends AbstractContainerMenu {
         if (index < SLOTS_PER_PAGE) {
             if (!moveItemStackTo(source, SLOTS_PER_PAGE, slots.size(), true)) return ItemStack.EMPTY;
         } else {
-            if (!moveItemStackTo(source, 0, SLOTS_PER_PAGE, false)) return ItemStack.EMPTY;
+            boolean moved = clientSide
+                    ? moveItemStackTo(source, 0, SLOTS_PER_PAGE, false)
+                    : insertIntoActiveSlots(inventory, source, getPage() * SLOTS_PER_PAGE);
+            if (!moved) return ItemStack.EMPTY;
         }
         if (source.isEmpty()) slot.set(ItemStack.EMPTY); else slot.setChanged();
         if (source.getCount() == copy.getCount()) return ItemStack.EMPTY;
         slot.onTake(player, source);
         return copy;
+    }
+
+    static boolean insertIntoActiveSlots(
+            RecoverableItemStackHandler inventory, ItemStack stack, int firstSlot) {
+        if (stack.isEmpty()) return false;
+        int activeSlots = inventory.getActiveSlots();
+        if (activeSlots <= 0) return false;
+
+        ItemStack remaining = stack.copy();
+        int first = Math.floorMod(firstSlot, activeSlots);
+        // Match existing stacks before claiming empty slots, like vanilla quick-move.
+        for (int pass = 0; pass < 2 && !remaining.isEmpty(); pass++) {
+            boolean emptySlots = pass == 1;
+            for (int offset = 0; offset < activeSlots && !remaining.isEmpty(); offset++) {
+                int slot = (first + offset) % activeSlots;
+                if (inventory.getStackInSlot(slot).isEmpty() != emptySlots) continue;
+                remaining = inventory.insertItem(slot, remaining, false);
+            }
+        }
+
+        int inserted = stack.getCount() - remaining.getCount();
+        if (inserted <= 0) return false;
+        stack.shrink(inserted);
+        return true;
     }
 
     @Override

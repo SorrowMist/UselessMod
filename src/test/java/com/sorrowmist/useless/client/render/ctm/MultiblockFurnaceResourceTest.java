@@ -100,6 +100,20 @@ class MultiblockFurnaceResourceTest {
     }
 
     @Test
+    void omniversalPatternUsesItsOwnTexture() throws IOException {
+        String modelResource = ASSETS + "models/item/omniversal_pattern.json";
+        JsonObject model = readJson(modelResource);
+        assertEquals("ae2:item/processing_pattern", model.get("parent").getAsString());
+        assertEquals("useless_mod:item/omniversal_pattern",
+                model.getAsJsonObject("textures").get("layer0").getAsString());
+
+        String textureResource = ASSETS + "textures/item/omniversal_pattern.png";
+        BufferedImage texture = readImage(textureResource);
+        assertEquals(16, texture.getWidth(), textureResource);
+        assertEquals(16, texture.getHeight(), textureResource);
+    }
+
+    @Test
     void functionalPartsProvideModelsForAllSixFacings() throws IOException {
         for (String name : DIRECTIONAL_PARTS) {
             String resource = ASSETS + "blockstates/" + name + ".json";
@@ -185,6 +199,7 @@ class MultiblockFurnaceResourceTest {
         resources.add(ASSETS + "models/block/multiblock_alloy_furnace_core_run.json");
         resources.add(ASSETS + "models/block/multiblock_alloy_furnace_core_wait.json");
         resources.add(ASSETS + "models/block/multiblock_coil_active.json");
+        resources.add(ASSETS + "models/item/omniversal_pattern.json");
         for (int tier = UselessCoilBlock.MIN_TIER;
              tier <= UselessCoilBlock.MAX_TIER; tier++) {
             resources.add(ASSETS + "models/block/"

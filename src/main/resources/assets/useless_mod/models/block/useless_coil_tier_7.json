@@ -1,0 +1,4 @@
+{
+  "parent": "minecraft:block/cube_all",
+  "textures": { "all": "useless_mod:block/multiblock_alloy_furnace/coils/useless_coil_tier_7" }
+}

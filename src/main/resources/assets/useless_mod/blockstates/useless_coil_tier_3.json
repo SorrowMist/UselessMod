@@ -1,3 +1,6 @@
 {
-  "variants": { "": { "model": "useless_mod:block/useless_glass_tier_3" } }
+  "variants": {
+    "active=false": { "model": "useless_mod:block/useless_coil_tier_3" },
+    "active=true": { "model": "useless_mod:block/useless_coil_tier_3_active" }
+  }
 }

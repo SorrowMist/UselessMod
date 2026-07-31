@@ -327,7 +327,8 @@ public final class AdvancedAlloyFurnaceAeManager {
         return this.activeTasks.size() >= this.owner.getMaxAETaskCount();
     }
 
-    public void tickAETasks() {
+    public boolean tickAETasks() {
+        boolean progressed = false;
         CraftingTask mergeTarget;
         synchronized (this.aePendingBatches) {
             var it = this.aePendingBatches.entrySet().iterator();
@@ -358,6 +359,7 @@ public final class AdvancedAlloyFurnaceAeManager {
             Map.Entry<Integer, CraftingTask> entry = iterator.next();
             CraftingTask task = entry.getValue();
             task.tick();
+            progressed |= task.progressedLastTick();
             if (task.isProcessingComplete()) {
                 iterator.remove();
                 this.removeFromPatternIndex(task);
@@ -367,6 +369,16 @@ public final class AdvancedAlloyFurnaceAeManager {
         }
 
         this.rebalanceTasks();
+        return progressed;
+    }
+
+    public boolean hasWork() {
+        if (!this.activeTasks.isEmpty() || this.deferredTasksTag != null) {
+            return true;
+        }
+        synchronized (this.aePendingBatches) {
+            return !this.aePendingBatches.isEmpty();
+        }
     }
 
     /**

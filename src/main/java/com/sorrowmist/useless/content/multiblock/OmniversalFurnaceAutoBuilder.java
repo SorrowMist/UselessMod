@@ -6,6 +6,7 @@ import com.sorrowmist.useless.content.blockentities.multiblock.MePatternAssembly
 import com.sorrowmist.useless.content.blockentities.multiblock.MultiblockAlloyFurnaceCoreBlockEntity;
 import com.sorrowmist.useless.content.blockentities.multiblock.PassiveCraftingHatchBlockEntity;
 import com.sorrowmist.useless.content.blocks.multiblock.MultiblockAlloyFurnaceCoreBlock;
+import com.sorrowmist.useless.content.blocks.multiblock.DirectionalMultiblockPartBlock;
 import com.sorrowmist.useless.content.blocks.multiblock.OmniversalAlloyFurnaceStructure;
 import com.sorrowmist.useless.content.blocks.multiblock.UselessCoilBlock;
 import com.sorrowmist.useless.init.ModBlocks;
@@ -89,13 +90,15 @@ public final class OmniversalFurnaceAutoBuilder {
             BlockState current = level.getBlockState(pos);
             OmniversalAlloyFurnaceStructure.FunctionalPart functionalPart =
                     functionalLayout.parts().get(pos);
-            BlockState expected = expectedState(entry.part(), coilTier, functionalPart);
+            BlockState expected = expectedState(entry.part(), coilTier, functionalPart, facing);
             if (matches(entry.part(), current, coilTier, functionalPart)) continue;
             if (level.getBlockEntity(pos) != null || !canReplaceForBuild(current, functionalPart)) {
                 return failure("gui.useless_mod.multiblock_builder.blocked", pos.toShortString());
             }
             placements.add(new Placement(pos.immutable(), current, expected));
-            if (!expected.isAir()) requirements.merge(expected.getBlock().asItem(), 1, Integer::sum);
+            if (!expected.isAir()) {
+                requirements.merge(expected.getBlock().asItem(), 1, Integer::sum);
+            }
         }
 
         if (!player.getAbilities().instabuild && !hasMaterials(player, tool, requirements)) {
@@ -245,14 +248,15 @@ public final class OmniversalFurnaceAutoBuilder {
                 || functionalPart != null && current.is(ModTags.OMNIVERSAL_FURNACE_CASINGS);
     }
 
-    private static BlockState expectedState(OmniversalAlloyFurnaceStructure.Part part, int coilTier,
-                                            OmniversalAlloyFurnaceStructure.FunctionalPart functionalPart) {
+    static BlockState expectedState(OmniversalAlloyFurnaceStructure.Part part, int coilTier,
+                                    OmniversalAlloyFurnaceStructure.FunctionalPart functionalPart,
+                                    Direction facing) {
         if (functionalPart != null) {
-            return switch (functionalPart) {
+            return (switch (functionalPart) {
                 case PATTERN_ASSEMBLY -> ModBlocks.ME_PATTERN_ASSEMBLY.get().defaultBlockState();
                 case MOLD_HUB -> ModBlocks.OMNIVERSAL_MOLD_HUB.get().defaultBlockState();
                 case PASSIVE_HATCH -> ModBlocks.PASSIVE_CRAFTING_HATCH.get().defaultBlockState();
-            };
+            }).setValue(DirectionalMultiblockPartBlock.FACING, facing);
         }
         return switch (part) {
             case CASING -> ModBlocks.OMNIVERSAL_FURNACE_CASING.get().defaultBlockState();

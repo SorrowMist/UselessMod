@@ -14,7 +14,7 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.BlockHitResult;
 import org.jetbrains.annotations.Nullable;
 
-public final class PassiveCraftingHatchBlock extends MultiblockPartBlock implements EntityBlock {
+public final class PassiveCraftingHatchBlock extends DirectionalMultiblockPartBlock implements EntityBlock {
     public PassiveCraftingHatchBlock(Properties properties) {
         super(properties);
     }

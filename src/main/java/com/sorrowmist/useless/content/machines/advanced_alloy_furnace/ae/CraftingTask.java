@@ -68,6 +68,7 @@ public class CraftingTask {
     private boolean patternOperationsResolved = false;
     private boolean cancelled = false;
     private boolean processingComplete = false;
+    private boolean progressedLastTick = false;
     private boolean initialized = false;
     private int baseProcessTime = 200;
     private long baseEnergyPerTick = 200L;
@@ -122,6 +123,10 @@ public class CraftingTask {
 
     public boolean isProcessingComplete() {
         return processingComplete;
+    }
+
+    public boolean progressedLastTick() {
+        return progressedLastTick;
     }
 
     public boolean isAwaitingOutputFlush() {
@@ -498,6 +503,7 @@ public class CraftingTask {
     }
 
     public boolean tick() {
+        progressedLastTick = false;
         if (processingComplete) {
             return true;
         }
@@ -542,6 +548,7 @@ public class CraftingTask {
 
                 clearWaiting();
                 progress++;
+                progressedLastTick = true;
                 if (energyStep.resetAfterAdvance()
                         && energyStep.progress() + 1 >= energyStep.duration()) {
                     accumulatedEnergy = 0L;

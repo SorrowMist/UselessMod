@@ -1,12 +1,20 @@
 {
   "variants": {
-    "facing=north,formed=false": { "model": "useless_mod:block/advanced_alloy_furnace" },
-    "facing=east,formed=false": { "model": "useless_mod:block/advanced_alloy_furnace", "y": 90 },
-    "facing=south,formed=false": { "model": "useless_mod:block/advanced_alloy_furnace", "y": 180 },
-    "facing=west,formed=false": { "model": "useless_mod:block/advanced_alloy_furnace", "y": 270 },
-    "facing=north,formed=true": { "model": "useless_mod:block/advanced_alloy_furnace_active" },
-    "facing=east,formed=true": { "model": "useless_mod:block/advanced_alloy_furnace_active", "y": 90 },
-    "facing=south,formed=true": { "model": "useless_mod:block/advanced_alloy_furnace_active", "y": 180 },
-    "facing=west,formed=true": { "model": "useless_mod:block/advanced_alloy_furnace_active", "y": 270 }
+    "facing=north,formed=false": { "model": "useless_mod:block/multiblock_alloy_furnace_core_base", "uvlock": true },
+    "facing=east,formed=false": { "model": "useless_mod:block/multiblock_alloy_furnace_core_base", "y": 90, "uvlock": true },
+    "facing=south,formed=false": { "model": "useless_mod:block/multiblock_alloy_furnace_core_base", "y": 180, "uvlock": true },
+    "facing=west,formed=false": { "model": "useless_mod:block/multiblock_alloy_furnace_core_base", "y": 270, "uvlock": true },
+    "activity=idle,facing=north,formed=true": { "model": "useless_mod:block/multiblock_alloy_furnace_core_idle", "uvlock": true },
+    "activity=idle,facing=east,formed=true": { "model": "useless_mod:block/multiblock_alloy_furnace_core_idle", "y": 90, "uvlock": true },
+    "activity=idle,facing=south,formed=true": { "model": "useless_mod:block/multiblock_alloy_furnace_core_idle", "y": 180, "uvlock": true },
+    "activity=idle,facing=west,formed=true": { "model": "useless_mod:block/multiblock_alloy_furnace_core_idle", "y": 270, "uvlock": true },
+    "activity=run,facing=north,formed=true": { "model": "useless_mod:block/multiblock_alloy_furnace_core_run", "uvlock": true },
+    "activity=run,facing=east,formed=true": { "model": "useless_mod:block/multiblock_alloy_furnace_core_run", "y": 90, "uvlock": true },
+    "activity=run,facing=south,formed=true": { "model": "useless_mod:block/multiblock_alloy_furnace_core_run", "y": 180, "uvlock": true },
+    "activity=run,facing=west,formed=true": { "model": "useless_mod:block/multiblock_alloy_furnace_core_run", "y": 270, "uvlock": true },
+    "activity=wait,facing=north,formed=true": { "model": "useless_mod:block/multiblock_alloy_furnace_core_wait", "uvlock": true },
+    "activity=wait,facing=east,formed=true": { "model": "useless_mod:block/multiblock_alloy_furnace_core_wait", "y": 90, "uvlock": true },
+    "activity=wait,facing=south,formed=true": { "model": "useless_mod:block/multiblock_alloy_furnace_core_wait", "y": 180, "uvlock": true },
+    "activity=wait,facing=west,formed=true": { "model": "useless_mod:block/multiblock_alloy_furnace_core_wait", "y": 270, "uvlock": true }
   }
 }

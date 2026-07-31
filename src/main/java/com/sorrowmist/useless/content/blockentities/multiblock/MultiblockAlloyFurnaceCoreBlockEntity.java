@@ -18,7 +18,9 @@ import appeng.api.storage.MEStorage;
 import com.sorrowmist.useless.api.enums.RedstoneControlMode;
 import com.sorrowmist.useless.compat.AppFluxCompat;
 import com.sorrowmist.useless.content.blocks.multiblock.MultiblockAlloyFurnaceCoreBlock;
+import com.sorrowmist.useless.content.blocks.multiblock.MultiblockFurnaceActivity;
 import com.sorrowmist.useless.content.blocks.multiblock.OmniversalAlloyFurnaceStructure;
+import com.sorrowmist.useless.content.blocks.multiblock.UselessCoilBlock;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.AdvancedAlloyFurnaceAeManager;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.AlloyFurnaceAeHost;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.CraftingTaskContext;
@@ -41,6 +43,7 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.Tag;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.MenuProvider;
@@ -87,6 +90,7 @@ public final class MultiblockAlloyFurnaceCoreBlockEntity extends BlockEntity imp
     private boolean deferredTasksLoaded;
     private long recipeCatalogGeneration = -1L;
     private boolean unloading;
+    private boolean coilActivitySynchronized;
     private RedstoneControlMode redstoneControlMode = RedstoneControlMode.DISABLED;
     private long automaticEnergyLimit = Long.MAX_VALUE;
     private final ContainerData menuData = new ContainerData() {
@@ -139,15 +143,36 @@ public final class MultiblockAlloyFurnaceCoreBlockEntity extends BlockEntity imp
         // after every validation/load transition without rebuilding patterns.
         MePatternAssemblyBlockEntity assembly = getAssembly();
         if (assembly != null) assembly.refreshProviderIfReady();
+        boolean progressed = false;
         if (isTaskExecutionEnabled()) {
             drawEnergyFromAeNetwork();
             aeManager.flushAEBatches();
-            aeManager.tickAETasks();
+            progressed = aeManager.tickAETasks();
             aeManager.tickUnreturnedInputs();
         }
         PassiveCraftingHatchBlockEntity passiveHatch = getPassiveHatch();
         if (passiveHatch != null) {
-            passiveHatch.serverTickFromController(this);
+            progressed |= passiveHatch.serverTickFromController(this);
+        }
+        boolean hasWork = aeManager.hasWork()
+                || passiveHatch != null && passiveHatch.hasWork();
+        updateDisplayedActivity(progressed, hasWork);
+    }
+
+    private void updateDisplayedActivity(boolean progressed, boolean hasWork) {
+        MultiblockFurnaceActivity activity =
+                MultiblockFurnaceActivity.resolve(formed, progressed, hasWork);
+        BlockState state = getBlockState();
+        boolean activityChanged =
+                state.getValue(MultiblockAlloyFurnaceCoreBlock.ACTIVITY) != activity;
+        if (activityChanged) {
+            level.setBlock(worldPosition,
+                    state.setValue(MultiblockAlloyFurnaceCoreBlock.ACTIVITY, activity),
+                    Block.UPDATE_CLIENTS);
+        }
+        if (activityChanged || !coilActivitySynchronized) {
+            setCoilsActive(activity == MultiblockFurnaceActivity.RUN);
+            coilActivitySynchronized = true;
         }
     }
 
@@ -159,6 +184,7 @@ public final class MultiblockAlloyFurnaceCoreBlockEntity extends BlockEntity imp
     public void validateStructure() {
         if (unloading || isRemoved() || level == null) return;
         structureDirty = false;
+        coilActivitySynchronized = false;
         Direction facing = getBlockState().getValue(MultiblockAlloyFurnaceCoreBlock.FACING);
         OmniversalAlloyFurnaceStructure.ValidationResult result =
                 OmniversalAlloyFurnaceStructure.validate(level, worldPosition, facing);
@@ -283,6 +309,8 @@ public final class MultiblockAlloyFurnaceCoreBlockEntity extends BlockEntity imp
     public void cancelAllTasksForRemoval() {
         aeManager.cancelAllTasks();
         if (level == null) return;
+        setCoilsActive(false);
+        coilActivitySynchronized = true;
         Direction facing = getBlockState().getValue(MultiblockAlloyFurnaceCoreBlock.FACING);
         for (OmniversalAlloyFurnaceStructure.Entry entry : OmniversalAlloyFurnaceStructure.entries()) {
             if (entry.part() != OmniversalAlloyFurnaceStructure.Part.CASING) continue;
@@ -291,6 +319,24 @@ public final class MultiblockAlloyFurnaceCoreBlockEntity extends BlockEntity imp
             if (level.getBlockEntity(pos) instanceof PassiveCraftingHatchBlockEntity hatch) {
                 hatch.prepareForControllerRemoval(this);
             }
+        }
+    }
+
+    private void setCoilsActive(boolean active) {
+        if (level == null || level.isClientSide) return;
+        Direction facing = getBlockState().getValue(MultiblockAlloyFurnaceCoreBlock.FACING);
+        for (OmniversalAlloyFurnaceStructure.Entry entry
+                : OmniversalAlloyFurnaceStructure.entries()) {
+            if (entry.part() != OmniversalAlloyFurnaceStructure.Part.COIL) continue;
+            BlockPos pos = entry.worldPos(worldPosition, facing);
+            if (!level.isLoaded(pos)) continue;
+            BlockState coilState = level.getBlockState(pos);
+            if (!(coilState.getBlock() instanceof UselessCoilBlock)
+                    || coilState.getValue(UselessCoilBlock.ACTIVE) == active) {
+                continue;
+            }
+            level.setBlock(pos, coilState.setValue(UselessCoilBlock.ACTIVE, active),
+                    Block.UPDATE_CLIENTS);
         }
     }
 

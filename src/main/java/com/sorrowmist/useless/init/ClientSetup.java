@@ -8,6 +8,7 @@ import com.sorrowmist.useless.client.gui.PatternAssemblyScreen;
 import com.sorrowmist.useless.client.gui.MoldHubScreen;
 import com.sorrowmist.useless.client.gui.MultiblockAlloyFurnaceScreen;
 import com.sorrowmist.useless.client.gui.PassiveCraftingHatchScreen;
+import com.sorrowmist.useless.client.render.ctm.CtmModelRegistrar;
 import com.sorrowmist.useless.content.blocks.GlowPlasticBlock;
 import com.sorrowmist.useless.content.menus.AdvancedAlloyFurnaceMenu;
 import com.sorrowmist.useless.content.recipe.AlloyFurnaceRecipeCatalog;
@@ -17,6 +18,7 @@ import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.client.event.RegisterColorHandlersEvent;
 import net.neoforged.neoforge.client.event.RegisterMenuScreensEvent;
+import net.neoforged.neoforge.client.event.ModelEvent;
 import net.neoforged.neoforge.client.event.RecipesUpdatedEvent;
 import net.neoforged.neoforge.event.entity.player.ItemTooltipEvent;
 import net.minecraft.ChatFormatting;
@@ -25,6 +27,11 @@ import net.minecraft.resources.ResourceLocation;
 
 @EventBusSubscriber(modid = UselessMod.MODID, value = Dist.CLIENT)
 public class ClientSetup {
+    @SubscribeEvent
+    public static void modifyBakedModels(ModelEvent.ModifyBakingResult event) {
+        CtmModelRegistrar.modifyBakingResult(event);
+    }
+
     @SubscribeEvent
     public static void onItemColor(RegisterColorHandlersEvent.Item event) {
         // 注册所有颜色的物品染色器

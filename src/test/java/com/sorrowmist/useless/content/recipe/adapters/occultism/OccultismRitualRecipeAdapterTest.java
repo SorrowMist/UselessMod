@@ -16,9 +16,11 @@ import net.minecraft.core.component.DataComponents;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
+import net.minecraft.world.item.SpawnEggItem;
 import net.minecraft.world.item.component.CustomData;
 import net.minecraft.world.item.crafting.Ingredient;
 import net.minecraft.world.item.crafting.RecipeHolder;
@@ -219,6 +221,24 @@ class OccultismRitualRecipeAdapterTest {
         assertEquals("occultism:crush_tier4", entityData.getCompound("spiritJob").getString("factoryId"));
     }
 
+    @Test
+    void createsAUsableSpawnEggForEveryRandomEntity() {
+        CompoundTag sourceEntityData = new CompoundTag();
+        sourceEntityData.putString("CustomName", "ritual animal");
+
+        List<ItemStack> outputs = OccultismRitualRecipeAdapter.spawnEggOutputs(
+                List.of(EntityType.COW, EntityType.IRON_GOLEM), sourceEntityData);
+
+        assertEquals(2, outputs.size());
+        assertSpawnEgg(outputs.get(0), EntityType.COW);
+        assertSpawnEgg(outputs.get(1), EntityType.IRON_GOLEM);
+        for (ItemStack output : outputs) {
+            assertEquals(1, output.getCount());
+            assertEquals("ritual animal",
+                    output.get(DataComponents.ENTITY_DATA).copyTag().getString("CustomName"));
+        }
+    }
+
     private static RitualRecipe recipe(
             String type, Ingredient activation, NonNullList<Ingredient> ingredients, ItemStack result) {
         return new RitualRecipe(
@@ -242,6 +262,11 @@ class OccultismRitualRecipeAdapterTest {
 
     private static RecipeHolder<RitualRecipe> holder(String id, RitualRecipe recipe) {
         return new RecipeHolder<>(ResourceLocation.fromNamespaceAndPath("occultism", id), recipe);
+    }
+
+    private static void assertSpawnEgg(ItemStack stack, EntityType<?> expectedType) {
+        assertTrue(stack.getItem() instanceof SpawnEggItem);
+        assertEquals(expectedType, ((SpawnEggItem) stack.getItem()).getType(stack));
     }
 
     private static ItemStack named(ItemStack stack, String name) {

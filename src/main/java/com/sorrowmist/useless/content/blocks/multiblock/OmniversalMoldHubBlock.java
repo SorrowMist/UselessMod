@@ -11,7 +11,7 @@ import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.MenuProvider;
 import org.jetbrains.annotations.Nullable;
 
-public final class OmniversalMoldHubBlock extends MultiblockPartBlock implements EntityBlock {
+public final class OmniversalMoldHubBlock extends DirectionalMultiblockPartBlock implements EntityBlock {
     public OmniversalMoldHubBlock(Properties properties) {
         super(properties);
     }

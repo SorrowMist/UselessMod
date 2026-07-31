@@ -1,5 +1,10 @@
 {
   "variants": {
-    "": { "model": "ae2:block/pattern_provider" }
+    "facing=down": { "model": "useless_mod:block/me_pattern_assembly", "x": 90, "uvlock": true },
+    "facing=up": { "model": "useless_mod:block/me_pattern_assembly", "x": 270, "uvlock": true },
+    "facing=north": { "model": "useless_mod:block/me_pattern_assembly", "uvlock": true },
+    "facing=east": { "model": "useless_mod:block/me_pattern_assembly", "y": 90, "uvlock": true },
+    "facing=south": { "model": "useless_mod:block/me_pattern_assembly", "y": 180, "uvlock": true },
+    "facing=west": { "model": "useless_mod:block/me_pattern_assembly", "y": 270, "uvlock": true }
   }
 }

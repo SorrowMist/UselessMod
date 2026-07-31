@@ -22,6 +22,7 @@ import net.minecraft.core.component.DataComponents;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Rarity;
 import net.minecraft.world.item.SpawnEggItem;
@@ -39,6 +40,7 @@ import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -184,8 +186,8 @@ public final class OccultismRitualRecipeAdapter implements IRecipeAdapter<Ritual
             List<ItemStack> patternInputs,
             List<ItemStack> patternOutputs) {
         if (recipes == null || patternInputs == null || patternInputs.isEmpty()
-                || patternOutputs == null || patternOutputs.size() != 1
-                || patternOutputs.getFirst() == null || patternOutputs.getFirst().isEmpty()) {
+                || patternOutputs == null || patternOutputs.isEmpty()
+                || patternOutputs.stream().anyMatch(output -> output == null || output.isEmpty())) {
             return Optional.empty();
         }
         List<DynamicPatternProfile> matches = new ArrayList<>();
@@ -196,13 +198,17 @@ public final class OccultismRitualRecipeAdapter implements IRecipeAdapter<Ritual
             RitualRecipe source = holder.value();
             Set<Integer> boundBookSlots = boundBookActivationSlots(source, patternInputs);
             if (isRepairLike(source)) {
-                addRepairPatternMatch(source, patternInputs, patternOutputs.getFirst(), matches);
+                if (patternOutputs.size() == 1) {
+                    addRepairPatternMatch(source, patternInputs, patternOutputs.getFirst(), matches);
+                }
             } else if (isUpgrade(source)) {
-                addUpgradePatternMatch(
-                        source, patternInputs, patternOutputs.getFirst(), boundBookSlots, matches);
+                if (patternOutputs.size() == 1) {
+                    addUpgradePatternMatch(
+                            source, patternInputs, patternOutputs.getFirst(), boundBookSlots, matches);
+                }
             } else if (!boundBookSlots.isEmpty()) {
                 addBoundBookPatternMatch(
-                        source, patternInputs, patternOutputs.getFirst(), boundBookSlots, matches);
+                        source, patternInputs, patternOutputs, boundBookSlots, matches);
             }
             if (matches.size() > 1) {
                 return Optional.empty();
@@ -223,7 +229,8 @@ public final class OccultismRitualRecipeAdapter implements IRecipeAdapter<Ritual
             }
             Converted data = convert(source, activation, null, null);
             if (data != null && matchesPatternInputs(data.inputs(), patternInputs)
-                    && matchesOutputItem(data.output(), patternOutput)) {
+                    && data.outputs().size() == 1
+                    && matchesOutputItem(data.outputs().getFirst(), patternOutput)) {
                 matches.add(new DynamicPatternProfile(Set.of(slot), Set.of(0)));
             }
         }
@@ -240,7 +247,8 @@ public final class OccultismRitualRecipeAdapter implements IRecipeAdapter<Ritual
                 continue;
             }
             Converted data = convert(source, null, base, null);
-            if (data != null && matchesOutputItem(data.output(), patternOutput)
+            if (data != null && data.outputs().size() == 1
+                    && matchesOutputItem(data.outputs().getFirst(), patternOutput)
                     && matchesPatternInputs(data.inputs(), patternInputs)) {
                 Set<Integer> idOnlyInputs = new LinkedHashSet<>(boundBookSlots);
                 idOnlyInputs.add(slot);
@@ -250,10 +258,10 @@ public final class OccultismRitualRecipeAdapter implements IRecipeAdapter<Ritual
     }
 
     private static void addBoundBookPatternMatch(
-            RitualRecipe source, List<ItemStack> patternInputs, ItemStack patternOutput,
+            RitualRecipe source, List<ItemStack> patternInputs, List<ItemStack> patternOutputs,
             Set<Integer> boundBookSlots, List<DynamicPatternProfile> matches) {
         Converted data = convert(source, null, null, null);
-        if (data == null || !matchesStaticOutput(data.output(), patternOutput)
+        if (data == null || !matchesStaticOutputs(data.outputs(), patternOutputs)
                 || !matchesPatternInputs(data.inputs(), patternInputs)) {
             return;
         }
@@ -296,6 +304,28 @@ public final class OccultismRitualRecipeAdapter implements IRecipeAdapter<Ritual
                 && ItemStack.isSameItemSameComponents(expected, patternOutput);
     }
 
+    private static boolean matchesStaticOutputs(
+            List<ItemStack> expected, List<ItemStack> patternOutputs) {
+        if (expected.size() != patternOutputs.size()) {
+            return false;
+        }
+        boolean[] matched = new boolean[patternOutputs.size()];
+        for (ItemStack expectedOutput : expected) {
+            boolean found = false;
+            for (int slot = 0; slot < patternOutputs.size(); slot++) {
+                if (!matched[slot] && matchesStaticOutput(expectedOutput, patternOutputs.get(slot))) {
+                    matched[slot] = true;
+                    found = true;
+                    break;
+                }
+            }
+            if (!found) {
+                return false;
+            }
+        }
+        return true;
+    }
+
     private static long totalRequiredItems(List<CountedIngredient> requirements) {
         long total = 0L;
         for (CountedIngredient requirement : requirements) {
@@ -334,26 +364,32 @@ public final class OccultismRitualRecipeAdapter implements IRecipeAdapter<Ritual
             return null;
         }
 
-        ItemStack output;
+        List<ItemStack> outputs;
         if (REPAIR.equals(source.getRitualType())) {
-            output = repairActivation == null ? ItemStack.EMPTY : repair(repairActivation);
+            ItemStack output = repairActivation == null ? ItemStack.EMPTY : repair(repairActivation);
+            outputs = output.isEmpty() ? List.of() : List.of(output);
         } else if (UNBREAKABLE.equals(source.getRitualType())) {
-            output = repairActivation == null ? ItemStack.EMPTY : makeUnbreakable(repairActivation);
+            ItemStack output = repairActivation == null ? ItemStack.EMPTY : makeUnbreakable(repairActivation);
+            outputs = output.isEmpty() ? List.of() : List.of(output);
         } else if (UPGRADE.equals(source.getRitualType())) {
-            output = upgradeBase == null ? ItemStack.EMPTY : upgrade(source, upgradeBase, upgradeActivation);
+            ItemStack output = upgradeBase == null ? ItemStack.EMPTY : upgrade(source, upgradeBase, upgradeActivation);
+            outputs = output.isEmpty() ? List.of() : List.of(output);
+        } else if (source.getEntityTagToSummon() != null) {
+            outputs = randomSummonEggs(source);
         } else {
-            output = source.getResultItem(null).copy();
+            ItemStack output = source.getResultItem(null).copy();
             if (source.getSpiritJobType() != null) {
                 output = jobEgg(source, output);
             }
+            outputs = output.isEmpty() ? List.of() : List.of(output);
         }
-        if (output.isEmpty()) {
+        if (outputs.isEmpty()) {
             return null;
         }
         List<CountedIngredient> inputs = requirements.entrySet().stream()
                 .map(entry -> new CountedIngredient(entry.getKey(), entry.getValue()))
                 .toList();
-        return new Converted(inputs, requirements, output);
+        return new Converted(inputs, requirements, outputs);
     }
 
     @Nullable
@@ -417,7 +453,7 @@ public final class OccultismRitualRecipeAdapter implements IRecipeAdapter<Ritual
                 id,
                 data.inputs(),
                 List.of(),
-                List.of(data.output().copy()),
+                data.outputs().stream().map(ItemStack::copy).toList(),
                 List.of(),
                 AdapterUtils.DEFAULT_ENERGY,
                 Math.max(1, source.getDuration()),
@@ -426,6 +462,42 @@ public final class OccultismRitualRecipeAdapter implements IRecipeAdapter<Ritual
                 blueprintMold(source.getPentacleId()),
                 AlloyFurnaceMode.NORMAL
         );
+    }
+
+    private static List<ItemStack> randomSummonEggs(RitualRecipe source) {
+        List<EntityType<?>> entityTypes = new ArrayList<>();
+        for (var holder : BuiltInRegistries.ENTITY_TYPE.getTagOrEmpty(source.getEntityTagToSummon())) {
+            entityTypes.add(holder.value());
+        }
+        entityTypes.sort(Comparator.comparing(
+                type -> BuiltInRegistries.ENTITY_TYPE.getKey(type).toString()));
+        return spawnEggOutputs(entityTypes, source.getEntityNbt());
+    }
+
+    static List<ItemStack> spawnEggOutputs(
+            Iterable<EntityType<?>> entityTypes, @Nullable CompoundTag sourceEntityData) {
+        List<ItemStack> outputs = new ArrayList<>();
+        for (EntityType<?> entityType : entityTypes) {
+            if (entityType == null) {
+                continue;
+            }
+            SpawnEggItem spawnEgg = SpawnEggItem.byId(entityType);
+            if (spawnEgg == null) {
+                spawnEgg = SpawnEggItem.byId(EntityType.PIG);
+            }
+            if (spawnEgg == null) {
+                continue;
+            }
+            ItemStack output = new ItemStack(spawnEgg);
+            if (spawnEgg.getType(output) != entityType || sourceEntityData != null) {
+                CompoundTag entityData = sourceEntityData == null
+                        ? new CompoundTag() : sourceEntityData.copy();
+                entityData.putString("id", BuiltInRegistries.ENTITY_TYPE.getKey(entityType).toString());
+                output.set(DataComponents.ENTITY_DATA, CustomData.of(entityData));
+            }
+            outputs.add(output);
+        }
+        return List.copyOf(outputs);
     }
 
     private static ItemStack jobEgg(RitualRecipe source, ItemStack result) {
@@ -603,7 +675,10 @@ public final class OccultismRitualRecipeAdapter implements IRecipeAdapter<Ritual
     private record Converted(
             List<CountedIngredient> inputs,
             Map<Ingredient, Long> requirements,
-            ItemStack output) {
+            List<ItemStack> outputs) {
+        private Converted {
+            outputs = outputs.stream().map(ItemStack::copy).toList();
+        }
     }
 
     public record DynamicPatternProfile(Set<Integer> idOnlyInputSlots, Set<Integer> idOnlyOutputSlots) {

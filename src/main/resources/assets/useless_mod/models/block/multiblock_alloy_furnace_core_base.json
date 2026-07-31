@@ -1,0 +1,7 @@
+{
+  "parent": "useless_mod:block/multiblock_furnace_overlay",
+  "textures": {
+    "base": "useless_mod:block/multiblock_alloy_furnace/furnace_casing",
+    "overlay": "useless_mod:block/multiblock_alloy_furnace/core_base_overlay"
+  }
+}

@@ -1,7 +1,6 @@
 {
   "variants": {
-    "": {
-      "model": "useless_mod:block/useful_coil"
-    }
+    "active=false": { "model": "useless_mod:block/useful_coil" },
+    "active=true": { "model": "useless_mod:block/useful_coil_active" }
   }
 }

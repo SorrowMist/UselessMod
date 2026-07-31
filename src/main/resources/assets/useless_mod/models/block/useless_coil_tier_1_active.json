@@ -1,0 +1,7 @@
+{
+  "parent": "useless_mod:block/multiblock_coil_active",
+  "textures": {
+    "base": "useless_mod:block/multiblock_alloy_furnace/coils/useless_coil_tier_1",
+    "active": "useless_mod:block/multiblock_alloy_furnace/coils/useless_coil_active"
+  }
+}

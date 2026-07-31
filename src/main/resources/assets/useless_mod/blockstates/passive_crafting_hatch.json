@@ -1,5 +1,10 @@
 {
   "variants": {
-    "": { "model": "useless_mod:block/passive_crafting_hatch" }
+    "facing=down": { "model": "useless_mod:block/passive_crafting_hatch", "x": 90, "uvlock": true },
+    "facing=up": { "model": "useless_mod:block/passive_crafting_hatch", "x": 270, "uvlock": true },
+    "facing=north": { "model": "useless_mod:block/passive_crafting_hatch", "uvlock": true },
+    "facing=east": { "model": "useless_mod:block/passive_crafting_hatch", "y": 90, "uvlock": true },
+    "facing=south": { "model": "useless_mod:block/passive_crafting_hatch", "y": 180, "uvlock": true },
+    "facing=west": { "model": "useless_mod:block/passive_crafting_hatch", "y": 270, "uvlock": true }
   }
 }

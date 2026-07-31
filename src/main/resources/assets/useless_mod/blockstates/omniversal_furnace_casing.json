@@ -1,5 +1,5 @@
 {
   "variants": {
-    "": { "model": "minecraft:block/smooth_stone" }
+    "": { "model": "useless_mod:block/omniversal_furnace_casing" }
   }
 }

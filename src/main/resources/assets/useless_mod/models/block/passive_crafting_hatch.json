@@ -1,6 +1,7 @@
 {
-  "parent": "minecraft:block/cube_all",
+  "parent": "useless_mod:block/multiblock_furnace_overlay",
   "textures": {
-    "all": "ae2:block/pattern_provider_alternate"
+    "base": "useless_mod:block/multiblock_alloy_furnace/furnace_casing",
+    "overlay": "useless_mod:block/multiblock_alloy_furnace/passive_crafting_hatch_overlay"
   }
 }

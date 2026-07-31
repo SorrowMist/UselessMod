@@ -28,7 +28,7 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
 
-public final class MePatternAssemblyBlock extends MultiblockPartBlock implements EntityBlock {
+public final class MePatternAssemblyBlock extends DirectionalMultiblockPartBlock implements EntityBlock {
     public MePatternAssemblyBlock(Properties properties) {
         super(properties);
     }

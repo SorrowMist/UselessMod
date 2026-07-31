@@ -257,9 +257,9 @@ public final class PassiveCraftingHatchBlockEntity extends BlockEntity
     }
 
     /** Called by the linked controller after normal AE tasks have consumed their tick. */
-    public void serverTickFromController(MultiblockAlloyFurnaceCoreBlockEntity controller) {
+    public boolean serverTickFromController(MultiblockAlloyFurnaceCoreBlockEntity controller) {
         if (unloading || isRemoved() || level == null || level.isClientSide || controller != getController()) {
-            return;
+            return false;
         }
         loadDeferredTasks();
         reconcileActivePatternSlots();
@@ -274,16 +274,17 @@ public final class PassiveCraftingHatchBlockEntity extends BlockEntity
 
         if (!controller.isTaskExecutionEnabled()) {
             flushStatusUpdates();
-            return;
+            return false;
         }
 
-        tickActiveTasks();
+        boolean progressed = tickActiveTasks();
         if (--countdownTicks <= 0) {
             countdownTicks = intervalTicks;
             runPassiveCycle(controller);
             setChanged();
         }
         flushStatusUpdates();
+        return progressed;
     }
 
     /** Keeps viewer status current while the structure is unavailable without advancing work. */
@@ -299,7 +300,8 @@ public final class PassiveCraftingHatchBlockEntity extends BlockEntity
         flushStatusUpdates();
     }
 
-    private void tickActiveTasks() {
+    private boolean tickActiveTasks() {
+        boolean progressed = false;
         List<Integer> slots = new ArrayList<>(activeTasks.keySet());
         slots.sort(Integer::compareTo);
         for (int slot : slots) {
@@ -308,6 +310,7 @@ public final class PassiveCraftingHatchBlockEntity extends BlockEntity
                 continue;
             }
             task.tick();
+            progressed |= task.progressedLastTick();
             if (task.isProcessingComplete()) {
                 activeTasks.remove(slot);
                 setIdleState(slot, patterns.getStackInSlot(slot).isEmpty()
@@ -315,6 +318,20 @@ public final class PassiveCraftingHatchBlockEntity extends BlockEntity
                 setChanged();
             }
         }
+        return progressed;
+    }
+
+    public boolean hasWork() {
+        if (!activeTasks.isEmpty() || deferredTasksTag != null) {
+            return true;
+        }
+        int activeSlots = getActivePatternSlots();
+        for (int slot = 0; slot < activeSlots; slot++) {
+            if (!patterns.getStackInSlot(slot).isEmpty()) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private void runPassiveCycle(MultiblockAlloyFurnaceCoreBlockEntity controller) {

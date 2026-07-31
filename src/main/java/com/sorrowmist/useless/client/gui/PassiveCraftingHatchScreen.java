@@ -215,7 +215,16 @@ public final class PassiveCraftingHatchScreen
             setFocused(null);
             return true;
         }
+        if (keyCode != GLFW.GLFW_KEY_ESCAPE
+                && (consumesTextInputKey(intervalField, keyCode, scanCode, modifiers)
+                || consumesTextInputKey(multiplierField, keyCode, scanCode, modifiers))) {
+            return true;
+        }
         return super.keyPressed(keyCode, scanCode, modifiers);
+    }
+
+    private static boolean consumesTextInputKey(EditBox field, int keyCode, int scanCode, int modifiers) {
+        return field.keyPressed(keyCode, scanCode, modifiers) || field.canConsumeInput();
     }
 
     @Override

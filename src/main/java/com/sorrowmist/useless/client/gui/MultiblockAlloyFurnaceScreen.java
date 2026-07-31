@@ -197,7 +197,15 @@ public final class MultiblockAlloyFurnaceScreen extends AbstractContainerScreen<
             energyLimitFieldWasFocused = false;
             return true;
         }
+        if (keyCode != GLFW.GLFW_KEY_ESCAPE && energyLimitField != null
+                && consumesTextInputKey(energyLimitField, keyCode, scanCode, modifiers)) {
+            return true;
+        }
         return super.keyPressed(keyCode, scanCode, modifiers);
+    }
+
+    private static boolean consumesTextInputKey(EditBox field, int keyCode, int scanCode, int modifiers) {
+        return field.keyPressed(keyCode, scanCode, modifiers) || field.canConsumeInput();
     }
 
     @Override

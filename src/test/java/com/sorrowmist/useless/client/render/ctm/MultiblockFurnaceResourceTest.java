@@ -21,7 +21,6 @@ import java.util.Set;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class MultiblockFurnaceResourceTest {
@@ -46,8 +45,10 @@ class MultiblockFurnaceResourceTest {
         for (String resource : textureResources()) {
             BufferedImage image = readImage(resource);
             int expectedWidth = resource.endsWith("_ctm.png") ? 32 : 16;
+            int expectedHeight = resource.endsWith("useful_coil_ctm.png") ? 64
+                    : resource.endsWith("useful_coil.png") ? 32 : expectedWidth;
             assertEquals(expectedWidth, image.getWidth(), resource);
-            assertEquals(expectedWidth, image.getHeight(), resource);
+            assertEquals(expectedHeight, image.getHeight(), resource);
         }
     }
 
@@ -72,11 +73,11 @@ class MultiblockFurnaceResourceTest {
     }
 
     @Test
-    void usefulCoilIsStaticWithoutAnimationMetadata() {
-        assertNull(MultiblockFurnaceResourceTest.class.getClassLoader()
-                .getResource(TEXTURES + "coils/useful_coil.png.mcmeta"));
-        assertNull(MultiblockFurnaceResourceTest.class.getClassLoader()
-                .getResource(TEXTURES + "coils/useful_coil_ctm.png.mcmeta"));
+    void usefulCoilUsesSlowInterpolatedTwoFrameAnimation() throws IOException {
+        assertFramesDiffer("useful_coil.png");
+        assertFramesDiffer("useful_coil_ctm.png");
+        assertAnimationMetadata("useful_coil.png.mcmeta");
+        assertAnimationMetadata("useful_coil_ctm.png.mcmeta");
     }
 
     @Test
@@ -122,6 +123,30 @@ class MultiblockFurnaceResourceTest {
                 validateObject(JsonParser.parseReader(reader).getAsJsonObject(), resource);
             }
         }
+    }
+
+    private static void assertFramesDiffer(String name) throws IOException {
+        BufferedImage image = readImage(TEXTURES + "coils/" + name);
+        int frameSize = image.getWidth();
+        assertEquals(frameSize * 2, image.getHeight(), name);
+        for (int y = 0; y < frameSize; y++) {
+            for (int x = 0; x < frameSize; x++) {
+                if (image.getRGB(x, y) != image.getRGB(x, y + frameSize)) {
+                    return;
+                }
+            }
+        }
+        throw new AssertionError(name + " must contain two distinct animation frames");
+    }
+
+    private static void assertAnimationMetadata(String name) throws IOException {
+        String resource = TEXTURES + "coils/" + name;
+        JsonObject animation = readJson(resource).getAsJsonObject("animation");
+        assertNotNull(animation, resource);
+        assertEquals(40, animation.get("frametime").getAsInt(), resource);
+        assertTrue(animation.get("interpolate").getAsBoolean(), resource);
+        assertEquals(List.of(0, 1), animation.getAsJsonArray("frames").asList().stream()
+                .map(JsonElement::getAsInt).toList(), resource);
     }
 
     private static List<String> textureResources() {

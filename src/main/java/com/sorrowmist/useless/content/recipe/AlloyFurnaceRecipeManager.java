@@ -1,5 +1,7 @@
 package com.sorrowmist.useless.content.recipe;
 
+import appeng.api.stacks.AEFluidKey;
+import appeng.api.stacks.AEItemKey;
 import appeng.api.stacks.AEKey;
 import appeng.api.stacks.GenericStack;
 import com.mojang.logging.LogUtils;
@@ -432,9 +434,11 @@ public class AlloyFurnaceRecipeManager {
         if (recipe == null || operations <= 0L) {
             return false;
         }
-        return ItemIngredientAllocator.matches(recipe.inputs(), inputs, operations)
-                && containsScaled(snapshotFluids(fluidInputs), snapshotFluids(recipe.inputFluids()), operations)
-                && containsScaled(snapshotGenericStacks(keyInputs), snapshotGenericStacks(recipe.keyInputs()), operations);
+        return ItemIngredientAllocator.matches(recipe.inputs(), inputs, keyInputs, operations)
+                && containsScaled(snapshotFluidInputs(fluidInputs, keyInputs),
+                snapshotFluids(recipe.inputFluids()), operations)
+                && containsScaled(snapshotNonStackKeyInputs(keyInputs),
+                snapshotGenericStacks(recipe.keyInputs()), operations);
     }
 
     public static boolean matchesOutputConstraints(
@@ -612,6 +616,31 @@ public class AlloyFurnaceRecipeManager {
             if (genericStack != null) {
                 result.merge(genericStack.what(), (long) stack.getAmount(), AlloyFurnaceRecipeManager::saturatingAdd);
             }
+        }
+        return Map.copyOf(result);
+    }
+
+    private static Map<AEKey, Long> snapshotFluidInputs(
+            List<FluidStack> stacks, List<GenericStack> keyInputs) {
+        Map<AEKey, Long> result = new LinkedHashMap<>(snapshotFluids(stacks));
+        if (keyInputs != null) {
+            for (GenericStack input : keyInputs) {
+                if (input == null || input.amount() <= 0L || !(input.what() instanceof AEFluidKey)) continue;
+                result.merge(input.what(), input.amount(), AlloyFurnaceRecipeManager::saturatingAdd);
+            }
+        }
+        return Map.copyOf(result);
+    }
+
+    private static Map<AEKey, Long> snapshotNonStackKeyInputs(List<GenericStack> stacks) {
+        Map<AEKey, Long> result = new LinkedHashMap<>();
+        if (stacks == null) return Map.of();
+        for (GenericStack stack : stacks) {
+            if (stack == null || stack.what() == null || stack.amount() <= 0L
+                    || stack.what() instanceof AEItemKey || stack.what() instanceof AEFluidKey) {
+                continue;
+            }
+            result.merge(stack.what(), stack.amount(), AlloyFurnaceRecipeManager::saturatingAdd);
         }
         return Map.copyOf(result);
     }

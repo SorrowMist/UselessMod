@@ -4,10 +4,10 @@ import appeng.api.config.Actionable;
 import appeng.api.crafting.IPatternDetails;
 import appeng.api.networking.crafting.ICraftingProvider;
 import appeng.api.stacks.AEKey;
+import appeng.api.stacks.AEKeyType;
 import appeng.api.stacks.GenericStack;
 import appeng.api.stacks.KeyCounter;
 import appeng.crafting.CraftingLink;
-import appeng.crafting.execution.ExecutingCraftingJob;
 import appeng.crafting.inv.ListCraftingInventory;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
@@ -15,8 +15,6 @@ import com.sorrowmist.useless.compat.ae.DynamicReflectionSupport;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.DynamicPatternExecution;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.DynamicPatternCpuStateManager;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.DynamicPatternInsertContext;
-import com.sorrowmist.useless.mixin.ae2.ElapsedTimeTrackerAccessor;
-import com.sorrowmist.useless.mixin.ae2.ExecutingCraftingJobAccessor;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
 import org.jetbrains.annotations.Nullable;
@@ -38,6 +36,12 @@ public abstract class CraftingCpuLogicMixin {
     private static final @Nullable Class<?> LOGIC_CLASS =
             DynamicReflectionSupport.findClassSafe("cn.dancingsnow.neoecoae.api.me.ECOCraftingCPULogic");
     @Unique
+    private static final @Nullable Class<?> JOB_CLASS =
+            DynamicReflectionSupport.findClassSafe("cn.dancingsnow.neoecoae.api.me.ExecutingCraftingJob");
+    @Unique
+    private static final @Nullable Class<?> TRACKER_CLASS =
+            DynamicReflectionSupport.findClassSafe("appeng.crafting.execution.ElapsedTimeTracker");
+    @Unique
     private static final @Nullable Field JOB_FIELD = DynamicReflectionSupport.findFieldSafe(LOGIC_CLASS, "job");
     @Unique
     private static final @Nullable Field INVENTORY_FIELD = DynamicReflectionSupport.findFieldSafe(LOGIC_CLASS, "inventory");
@@ -50,8 +54,29 @@ public abstract class CraftingCpuLogicMixin {
     private static final @Nullable Method POST_CHANGE_METHOD =
             DynamicReflectionSupport.findMethodSafe(LOGIC_CLASS, "postChange", AEKey.class);
     @Unique
-    private static final boolean AVAILABLE = LOGIC_CLASS != null && JOB_FIELD != null
-            && INVENTORY_FIELD != null && CPU_FIELD != null && FINISH_METHOD != null && POST_CHANGE_METHOD != null;
+    private static final @Nullable Field JOB_WAITING_FIELD =
+            DynamicReflectionSupport.findFieldSafe(JOB_CLASS, "waitingFor");
+    @Unique
+    private static final @Nullable Field JOB_TRACKER_FIELD =
+            DynamicReflectionSupport.findFieldSafe(JOB_CLASS, "timeTracker");
+    @Unique
+    private static final @Nullable Field JOB_FINAL_OUTPUT_FIELD =
+            DynamicReflectionSupport.findFieldSafe(JOB_CLASS, "finalOutput");
+    @Unique
+    private static final @Nullable Field JOB_REMAINING_FIELD =
+            DynamicReflectionSupport.findFieldSafe(JOB_CLASS, "remainingAmount");
+    @Unique
+    private static final @Nullable Field JOB_LINK_FIELD =
+            DynamicReflectionSupport.findFieldSafe(JOB_CLASS, "link");
+    @Unique
+    private static final @Nullable Method DECREMENT_METHOD =
+            DynamicReflectionSupport.findMethodSafe(TRACKER_CLASS, "decrementItems", long.class, AEKeyType.class);
+    @Unique
+    private static final boolean AVAILABLE = LOGIC_CLASS != null && JOB_CLASS != null && TRACKER_CLASS != null
+            && JOB_FIELD != null && INVENTORY_FIELD != null && CPU_FIELD != null
+            && FINISH_METHOD != null && POST_CHANGE_METHOD != null && JOB_WAITING_FIELD != null
+            && JOB_TRACKER_FIELD != null && JOB_FINAL_OUTPUT_FIELD != null && JOB_REMAINING_FIELD != null
+            && JOB_LINK_FIELD != null && DECREMENT_METHOD != null;
 
     @Unique
     @Nullable
@@ -134,11 +159,10 @@ public abstract class CraftingCpuLogicMixin {
             return false;
         }
         boolean pushed = original.call(provider, details, inputHolder);
-        ExecutingCraftingJob job = uselessMod$getJob();
+        Object job = uselessMod$getJob();
         if (pushed && job != null) {
-            ExecutingCraftingJobAccessor access = (ExecutingCraftingJobAccessor) job;
-            CraftingLink link = access.uselessMod$getLink();
-            GenericStack finalOutput = access.uselessMod$getFinalOutput();
+            CraftingLink link = uselessMod$getJobLink(job);
+            GenericStack finalOutput = uselessMod$getJobFinalOutput(job);
             if (link != null) {
                 DynamicPatternCpuStateManager.INSTANCE.registerExpectedOutputs(
                         this, link.getCraftingID(), dynamic,
@@ -169,13 +193,11 @@ public abstract class CraftingCpuLogicMixin {
             return;
         }
         DynamicPatternCpuStateManager.INSTANCE.clear(this);
-        ExecutingCraftingJob job = uselessMod$getJob();
-        if (job != null && data.contains(DynamicPatternCpuStateManager.NBT_KEY, CompoundTag.TAG_COMPOUND)) {
-            CraftingLink link = ((ExecutingCraftingJobAccessor) job).uselessMod$getLink();
-            if (link != null) {
-                DynamicPatternCpuStateManager.INSTANCE.readFromTag(
-                        this, link.getCraftingID(), data.getCompound(DynamicPatternCpuStateManager.NBT_KEY), registries);
-            }
+        Object job = uselessMod$getJob();
+        CraftingLink link = job == null ? null : uselessMod$getJobLink(job);
+        if (link != null && data.contains(DynamicPatternCpuStateManager.NBT_KEY, CompoundTag.TAG_COMPOUND)) {
+            DynamicPatternCpuStateManager.INSTANCE.readFromTag(
+                    this, link.getCraftingID(), data.getCompound(DynamicPatternCpuStateManager.NBT_KEY), registries);
         }
     }
 
@@ -188,9 +210,8 @@ public abstract class CraftingCpuLogicMixin {
 
     @Unique
     @Nullable
-    private ExecutingCraftingJob uselessMod$getJob() {
-        Object value = DynamicReflectionSupport.get(JOB_FIELD, this);
-        return value instanceof ExecutingCraftingJob job ? job : null;
+    private Object uselessMod$getJob() {
+        return DynamicReflectionSupport.get(JOB_FIELD, this);
     }
 
     @Unique
@@ -207,34 +228,64 @@ public abstract class CraftingCpuLogicMixin {
     }
 
     @Unique
+    @Nullable
+    private ListCraftingInventory uselessMod$getJobWaitingFor(Object job) {
+        Object value = DynamicReflectionSupport.get(JOB_WAITING_FIELD, job);
+        return value instanceof ListCraftingInventory inventory ? inventory : null;
+    }
+
+    @Unique
+    @Nullable
+    private GenericStack uselessMod$getJobFinalOutput(Object job) {
+        Object value = DynamicReflectionSupport.get(JOB_FINAL_OUTPUT_FIELD, job);
+        return value instanceof GenericStack stack ? stack : null;
+    }
+
+    @Unique
+    private long uselessMod$getJobRemaining(Object job) {
+        return DynamicReflectionSupport.getLong(JOB_REMAINING_FIELD, job, 0L);
+    }
+
+    @Unique
+    private void uselessMod$setJobRemaining(Object job, long amount) {
+        DynamicReflectionSupport.setLong(JOB_REMAINING_FIELD, job, amount, "set ECO remaining amount");
+    }
+
+    @Unique
+    @Nullable
+    private CraftingLink uselessMod$getJobLink(Object job) {
+        Object value = DynamicReflectionSupport.get(JOB_LINK_FIELD, job);
+        return value instanceof CraftingLink link ? link : null;
+    }
+
+    @Unique
     private void uselessMod$deductWaitingFor(DynamicPatternCpuStateManager.ClaimResult claims) {
-        ExecutingCraftingJob job = uselessMod$getJob();
-        if (job == null) {
+        Object job = uselessMod$getJob();
+        ListCraftingInventory waitingFor = job == null ? null : uselessMod$getJobWaitingFor(job);
+        if (waitingFor == null) {
             return;
         }
-        ListCraftingInventory waitingFor = ((ExecutingCraftingJobAccessor) job).uselessMod$getWaitingFor();
         for (DynamicPatternCpuStateManager.Claim claim : claims.claims()) {
             waitingFor.extract(claim.exactExpectedKey(), claim.claimedAmount(), Actionable.MODULATE);
         }
     }
 
     @Unique
-    private void uselessMod$decrementItems(ExecutingCraftingJob job, long amount, AEKey key) {
-        ((ElapsedTimeTrackerAccessor) (Object)
-                ((ExecutingCraftingJobAccessor) job).uselessMod$getTimeTracker())
-                .uselessMod$decrementItems(amount, key.getType());
+    private void uselessMod$decrementItems(Object job, long amount, AEKeyType type) {
+        Object tracker = DynamicReflectionSupport.get(JOB_TRACKER_FIELD, job);
+        DynamicReflectionSupport.invoke(DECREMENT_METHOD, tracker, "decrement ECO items", amount, type);
     }
 
     @Unique
     private long uselessMod$applyInventoryClaims(
             AEKey incoming, DynamicPatternCpuStateManager.ClaimResult claims) {
         long claimed = claims.claimedForInventory();
-        ExecutingCraftingJob job = uselessMod$getJob();
+        Object job = uselessMod$getJob();
         ListCraftingInventory inventory = uselessMod$getInventory();
         if (claimed <= 0 || job == null || inventory == null) {
             return 0;
         }
-        uselessMod$decrementItems(job, claimed, incoming);
+        uselessMod$decrementItems(job, claimed, incoming.getType());
         inventory.insert(incoming, claimed, Actionable.MODULATE);
         return claimed;
     }
@@ -243,17 +294,16 @@ public abstract class CraftingCpuLogicMixin {
     private long uselessMod$applyRequesterClaims(
             AEKey incoming, DynamicPatternCpuStateManager.ClaimResult claims) {
         long claimed = claims.claimedForRequester();
-        ExecutingCraftingJob job = uselessMod$getJob();
+        Object job = uselessMod$getJob();
         if (claimed <= 0 || job == null) {
             return 0;
         }
-        ExecutingCraftingJobAccessor access = (ExecutingCraftingJobAccessor) job;
-        uselessMod$decrementItems(job, claimed, incoming);
-        CraftingLink link = access.uselessMod$getLink();
+        uselessMod$decrementItems(job, claimed, incoming.getType());
+        CraftingLink link = uselessMod$getJobLink(job);
         long inserted = link == null ? 0 : link.insert(incoming, claimed, Actionable.MODULATE);
         DynamicReflectionSupport.invoke(POST_CHANGE_METHOD, this, "post ECO dynamic output", incoming);
-        long remaining = Math.max(0L, access.uselessMod$getRemainingAmount() - claimed);
-        access.uselessMod$setRemainingAmount(remaining);
+        long remaining = Math.max(0L, uselessMod$getJobRemaining(job) - claimed);
+        uselessMod$setJobRemaining(job, remaining);
         if (remaining <= 0) {
             DynamicReflectionSupport.invoke(FINISH_METHOD, this, "finish ECO dynamic job", true);
         }

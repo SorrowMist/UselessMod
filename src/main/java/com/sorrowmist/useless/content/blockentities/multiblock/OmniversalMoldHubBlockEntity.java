@@ -19,6 +19,7 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.network.chat.Component;
 import com.sorrowmist.useless.content.menus.OmniversalMoldHubMenu;
+import com.sorrowmist.useless.core.component.MultiblockPartData;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.IdentityHashMap;
@@ -43,6 +44,16 @@ public final class OmniversalMoldHubBlockEntity extends BlockEntity implements M
 
     public RecoverableItemStackHandler getMolds() {
         return molds;
+    }
+
+    public MultiblockPartData createItemData(HolderLookup.Provider registries) {
+        return MultiblockPartData.inventory(molds, registries);
+    }
+
+    public void restoreItemData(MultiblockPartData data, HolderLookup.Provider registries) {
+        if (data == null) return;
+        data.restoreInventory(molds, registries);
+        moldInventoryChanged();
     }
 
     private boolean isValidMold(ItemStack stack) {

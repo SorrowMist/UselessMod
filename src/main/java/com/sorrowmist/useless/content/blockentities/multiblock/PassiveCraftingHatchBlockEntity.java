@@ -19,6 +19,7 @@ import com.sorrowmist.useless.content.menus.PagedRecoverableMenu;
 import com.sorrowmist.useless.content.recipe.AdvancedAlloyFurnaceRecipe;
 import com.sorrowmist.useless.content.recipe.AlloyFurnaceRecipeCatalog;
 import com.sorrowmist.useless.core.config.ConfigManager;
+import com.sorrowmist.useless.core.component.MultiblockPartData;
 import com.sorrowmist.useless.energy.EnergyManager;
 import com.sorrowmist.useless.energy.IEnergyManager;
 import com.sorrowmist.useless.init.ModBlockEntities;
@@ -140,6 +141,33 @@ public final class PassiveCraftingHatchBlockEntity extends BlockEntity
 
     public RecoverableItemStackHandler getPatterns() {
         return patterns;
+    }
+
+    public MultiblockPartData createItemData(HolderLookup.Provider registries) {
+        return MultiblockPartData.passiveHatch(
+                patterns, registries, intervalTicks, multiplier);
+    }
+
+    public void restoreItemData(MultiblockPartData data, HolderLookup.Provider registries) {
+        if (data == null) return;
+        loading = true;
+        try {
+            data.restoreInventory(patterns, registries);
+        } finally {
+            loading = false;
+        }
+        intervalTicks = data.intervalTicks() > 0
+                ? Math.max(MIN_INTERVAL_TICKS, Math.min(MAX_INTERVAL_TICKS, data.intervalTicks()))
+                : DEFAULT_INTERVAL_TICKS;
+        multiplier = Math.max(1L, data.multiplier());
+        countdownTicks = intervalTicks;
+        deferredTasksTag = null;
+        localUnreturnedInputs.clear();
+        observedActivePatternSlots = -1;
+        clearPatternDecodeCache();
+        resetIdleStates();
+        statusDirty = true;
+        setChanged();
     }
 
     public ContainerData getMenuData() {

@@ -1,5 +1,7 @@
 package com.sorrowmist.useless.content.recipe;
 
+import appeng.api.stacks.AEItemKey;
+import appeng.api.stacks.GenericStack;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.crafting.Ingredient;
 import org.jetbrains.annotations.Nullable;
@@ -26,6 +28,30 @@ public final class ItemIngredientAllocator {
         return allocate(requirements, inputs, operations) != null;
     }
 
+    /** Matches item supplies stored as AE keys without narrowing their long amounts to stack counts. */
+    public static boolean matches(List<CountedIngredient> requirements, List<ItemStack> inputs,
+                                  List<GenericStack> keyInputs, long operations) {
+        List<ItemStack> safeInputs = inputs == null ? List.of() : inputs;
+        List<GenericStack> safeKeyInputs = keyInputs == null ? List.of() : keyInputs;
+        List<Supply> supplies = new ArrayList<>();
+        for (int i = 0; i < safeInputs.size(); i++) {
+            ItemStack stack = safeInputs.get(i);
+            if (stack == null || stack.isEmpty() || stack.getCount() <= 0) continue;
+            supplies.add(new Supply(i, stack.getCount(),
+                    ingredient -> ingredient != null && ingredient.test(stack)));
+        }
+        for (int i = 0; i < safeKeyInputs.size(); i++) {
+            GenericStack input = safeKeyInputs.get(i);
+            if (input == null || input.amount() <= 0L || !(input.what() instanceof AEItemKey itemKey)) continue;
+            ItemStack representative = itemKey.toStack(1);
+            supplies.add(new Supply(safeInputs.size() + i, input.amount(),
+                    ingredient -> ingredient != null && ingredient.test(representative)));
+        }
+
+        return solve(supplies, createDemands(requirements, operations),
+                safeInputs.size() + safeKeyInputs.size()) != null;
+    }
+
     /**
      * Allocates concrete input stacks to all requirements.
      *
@@ -41,18 +67,7 @@ public final class ItemIngredientAllocator {
             supplies.add(new Supply(i, stack.getCount(), ingredient -> ingredient != null && ingredient.test(stack)));
         }
 
-        List<Demand> demands = new ArrayList<>();
-        long multiplier = Math.max(0L, operations);
-        if (requirements != null) {
-            for (CountedIngredient requirement : requirements) {
-                if (requirement == null || requirement.count() <= 0) continue;
-                long amount = saturatingMultiply(requirement.count(), multiplier);
-                if (amount > 0) {
-                    demands.add(new Demand(requirement.ingredient(), amount));
-                }
-            }
-        }
-        return solve(supplies, demands, safeInputs.size());
+        return solve(supplies, createDemands(requirements, operations), safeInputs.size());
     }
 
     /** Matches adapter input maps without flattening overlapping ingredient requirements. */
@@ -126,6 +141,21 @@ public final class ItemIngredientAllocator {
             }
         }
         return false;
+    }
+
+    private static List<Demand> createDemands(List<CountedIngredient> requirements, long operations) {
+        List<Demand> demands = new ArrayList<>();
+        long multiplier = Math.max(0L, operations);
+        if (requirements == null) return demands;
+
+        for (CountedIngredient requirement : requirements) {
+            if (requirement == null || requirement.count() <= 0) continue;
+            long amount = saturatingMultiply(requirement.count(), multiplier);
+            if (amount > 0) {
+                demands.add(new Demand(requirement.ingredient(), amount));
+            }
+        }
+        return demands;
     }
 
     @Nullable

@@ -21,6 +21,7 @@ import com.mojang.logging.LogUtils;
 import com.sorrowmist.useless.api.crafting.SmartDoublingCraftingProvider;
 import com.sorrowmist.useless.content.blockentities.RecoverableItemStackHandler;
 import com.sorrowmist.useless.core.config.ConfigManager;
+import com.sorrowmist.useless.core.component.MultiblockPartData;
 import com.sorrowmist.useless.init.ModBlockEntities;
 import com.sorrowmist.useless.init.ModItems;
 import net.minecraft.core.BlockPos;
@@ -86,6 +87,16 @@ public final class MePatternAssemblyBlockEntity extends AEBaseBlockEntity
 
     public RecoverableItemStackHandler getPatterns() {
         return patterns;
+    }
+
+    public MultiblockPartData createItemData(HolderLookup.Provider registries) {
+        return MultiblockPartData.inventory(patterns, registries);
+    }
+
+    public void restoreItemData(MultiblockPartData data, HolderLookup.Provider registries) {
+        if (data == null) return;
+        data.restoreInventory(patterns, registries);
+        inventoryChanged();
     }
 
     public IManagedGridNode getMainNode() {

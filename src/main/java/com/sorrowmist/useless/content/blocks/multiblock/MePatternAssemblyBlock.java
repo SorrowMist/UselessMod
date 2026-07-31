@@ -6,6 +6,8 @@ import appeng.menu.locator.MenuLocators;
 import appeng.util.InteractionUtil;
 import com.glodblock.github.extendedae.container.ContainerRenamer;
 import com.sorrowmist.useless.content.blockentities.multiblock.MePatternAssemblyBlockEntity;
+import com.sorrowmist.useless.core.component.MultiblockPartData;
+import com.sorrowmist.useless.core.component.UComponents;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.network.chat.Component;
@@ -39,24 +41,18 @@ public final class MePatternAssemblyBlock extends DirectionalMultiblockPartBlock
     }
 
     @Override
-    protected void onRemove(BlockState state, net.minecraft.world.level.Level level, BlockPos pos,
-                            BlockState newState, boolean movedByPiston) {
-        if (!state.is(newState.getBlock())
-                && level.getBlockEntity(pos) instanceof MePatternAssemblyBlockEntity assembly) {
-            dropInventory(level, pos, assembly.getPatterns());
-        }
-        super.onRemove(state, level, pos, newState, movedByPiston);
-    }
-
-    @Override
     public List<ItemStack> getDrops(BlockState state, LootParams.Builder params) {
         List<ItemStack> drops = super.getDrops(state, params);
         if (params.getOptionalParameter(LootContextParams.BLOCK_ENTITY)
                 instanceof MePatternAssemblyBlockEntity assembly) {
+            MultiblockPartData itemData = assembly.createItemData(params.getLevel().registryAccess());
             Component customName = assembly.getCustomName();
-            if (customName != null) {
-                for (ItemStack drop : drops) {
-                    if (drop.is(asItem())) {
+            for (ItemStack drop : drops) {
+                if (drop.is(asItem())) {
+                    if (!itemData.isEmpty()) {
+                        drop.set(UComponents.MULTIBLOCK_PART_DATA.get(), itemData);
+                    }
+                    if (customName != null) {
                         drop.set(DataComponents.CUSTOM_NAME, customName);
                     }
                 }
@@ -70,6 +66,10 @@ public final class MePatternAssemblyBlock extends DirectionalMultiblockPartBlock
                             @Nullable LivingEntity placer, ItemStack stack) {
         super.setPlacedBy(level, pos, state, placer, stack);
         if (!level.isClientSide && level.getBlockEntity(pos) instanceof MePatternAssemblyBlockEntity assembly) {
+            MultiblockPartData itemData = stack.get(UComponents.MULTIBLOCK_PART_DATA.get());
+            if (itemData != null) {
+                assembly.restoreItemData(itemData, level.registryAccess());
+            }
             Component customName = stack.get(DataComponents.CUSTOM_NAME);
             if (customName != null) {
                 assembly.setName(customName.getString());

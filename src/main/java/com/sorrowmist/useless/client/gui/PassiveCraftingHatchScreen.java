@@ -32,6 +32,10 @@ public final class PassiveCraftingHatchScreen
     private PressableAE2Button nextPageButton;
     private int lastSyncedInterval = Integer.MIN_VALUE;
     private long lastSyncedMultiplier = Long.MIN_VALUE;
+    private String syncedMultiplierText = "";
+    private boolean updatingMultiplierField;
+    private boolean multiplierDirty;
+    private boolean multiplierFieldWasFocused;
 
     public PassiveCraftingHatchScreen(
             PassiveCraftingHatchMenu menu, Inventory inventory, Component title) {
@@ -56,7 +60,7 @@ public final class PassiveCraftingHatchScreen
 
         intervalField = numericField(177, 34, 62,
                 Component.translatable("gui.useless_mod.passive_crafting.interval"));
-        multiplierField = numericField(177, 78, 62,
+        multiplierField = scaledAmountField(177, 78, 62,
                 Component.translatable("gui.useless_mod.passive_crafting.multiplier"));
         addRenderableWidget(intervalField);
         addRenderableWidget(multiplierField);
@@ -88,9 +92,26 @@ public final class PassiveCraftingHatchScreen
         return field;
     }
 
+    private EditBox scaledAmountField(int x, int y, int width, Component narration) {
+        EditBox field = new EditBox(font, leftPos + x, topPos + y, width, 14, narration);
+        field.setMaxLength(24);
+        field.setFilter(ScaledEnergyAmount::isValidInput);
+        field.setResponder(value -> {
+            if (!updatingMultiplierField) {
+                multiplierDirty = !value.equals(syncedMultiplierText);
+            }
+        });
+        return field;
+    }
+
     @Override
     protected void containerTick() {
         super.containerTick();
+        boolean multiplierFocused = multiplierField.isFocused();
+        if (multiplierFieldWasFocused && !multiplierFocused && multiplierDirty) {
+            sendSettings();
+        }
+        multiplierFieldWasFocused = multiplierFocused;
         syncFields(false);
         boolean editable = menu.isFormed();
         intervalField.setEditable(editable);
@@ -126,7 +147,7 @@ public final class PassiveCraftingHatchScreen
             lastSyncedInterval = interval;
         }
         if ((force || !multiplierField.isFocused()) && multiplier != lastSyncedMultiplier) {
-            multiplierField.setValue(Long.toString(multiplier));
+            setMultiplierFieldValue(multiplier);
             lastSyncedMultiplier = multiplier;
         }
     }
@@ -141,12 +162,13 @@ public final class PassiveCraftingHatchScreen
     }
 
     private void adjustMultiplier(int delta) {
-        long current = readNumber(multiplierField, menu.getMultiplier());
+        long current = ScaledEnergyAmount.parse(multiplierField.getValue(), menu.getMaxMultiplier())
+                .orElse(menu.getMultiplier());
         long adjusted = delta > 0
                 ? current == Long.MAX_VALUE ? Long.MAX_VALUE : current + 1L
                 : current <= 1L ? 1L : current - 1L;
         long value = Math.max(1L, Math.min(menu.getMaxMultiplier(), adjusted));
-        multiplierField.setValue(Long.toString(value));
+        setMultiplierFieldValue(value);
         sendSettings();
     }
 
@@ -158,12 +180,23 @@ public final class PassiveCraftingHatchScreen
         int interval = (int) Mth.clamp(readNumber(intervalField, menu.getIntervalTicks()),
                 (long) PassiveCraftingHatchBlockEntity.MIN_INTERVAL_TICKS,
                 (long) PassiveCraftingHatchBlockEntity.MAX_INTERVAL_TICKS);
-        long multiplier = Math.max(1L, Math.min(menu.getMaxMultiplier(),
-                readNumber(multiplierField, menu.getMultiplier())));
+        long multiplier = ScaledEnergyAmount.parse(multiplierField.getValue(), menu.getMaxMultiplier())
+                .orElse(menu.getMultiplier());
+        multiplier = Math.max(1L, Math.min(menu.getMaxMultiplier(), multiplier));
         intervalField.setValue(Integer.toString(interval));
-        multiplierField.setValue(Long.toString(multiplier));
+        setMultiplierFieldValue(multiplier);
+        lastSyncedInterval = interval;
+        lastSyncedMultiplier = multiplier;
         PacketDistributor.sendToServer(new PassiveCraftingSettingsPacket(
                 menu.containerId, menu.getBlockPos(), interval, multiplier));
+    }
+
+    private void setMultiplierFieldValue(long multiplier) {
+        syncedMultiplierText = ScaledEnergyAmount.format(multiplier);
+        updatingMultiplierField = true;
+        multiplierField.setValue(syncedMultiplierText);
+        updatingMultiplierField = false;
+        multiplierDirty = false;
     }
 
     private static long readNumber(EditBox field, long fallback) {
@@ -183,6 +216,14 @@ public final class PassiveCraftingHatchScreen
             return true;
         }
         return super.keyPressed(keyCode, scanCode, modifiers);
+    }
+
+    @Override
+    public void onClose() {
+        if (multiplierDirty) {
+            sendSettings();
+        }
+        super.onClose();
     }
 
     @Override
@@ -253,7 +294,7 @@ public final class PassiveCraftingHatchScreen
                 177, 66, MachineScreenStyle.TEXT_COLOR, false);
         graphics.drawString(font,
                 Component.translatable("gui.useless_mod.passive_crafting.max_multiplier",
-                        menu.getMaxMultiplier()),
+                        ScaledEnergyAmount.format(menu.getMaxMultiplier())),
                 8, 91, MachineScreenStyle.MUTED_TEXT_COLOR, false);
         graphics.drawString(font,
                 Component.translatable("gui.useless_mod.passive_crafting.countdown",

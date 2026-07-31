@@ -148,17 +148,23 @@ public class CraftingTask {
         if (processingComplete || cancelled) {
             return false;
         }
-        CraftingSubTask merged = createMergedSubTask(allInputs, operationsPerPush);
-        if (queuedSubTasks.isEmpty()) {
-            queuedSubTasks.add(merged);
-        } else {
-            // 并入队尾尚未启动的子任务，减少批次数（每个子任务独立收一份结算能量）
-            CraftingSubTask last = queuedSubTasks.getLast();
-            last.items.addAll(merged.items);
-            last.fluids.addAll(merged.fluids);
-            last.keys.addAll(merged.keys);
-            long combined = saturatingAdd(last.craftCount, merged.craftCount);
-            queuedSubTasks.set(queuedSubTasks.size() - 1, new CraftingSubTask(last.items, last.fluids, last.keys, combined));
+        if (allInputs == null || allInputs.isEmpty()) {
+            return true;
+        }
+
+        long craftsPerInput = multiplyWithinLong(
+                Math.max(1L, operationsPerPush), Math.max(1L, patternOperationsPerPush));
+        long maximumCraftsPerSubTask = maximumCraftsPerSubTask();
+        if (craftsPerInput <= 0L || craftsPerInput > maximumCraftsPerSubTask) {
+            return false;
+        }
+
+        List<CraftingSubTask> additions = new ArrayList<>(allInputs.size());
+        for (KeyCounter[] counters : allInputs) {
+            additions.add(createSubTask(counters, craftsPerInput));
+        }
+        for (CraftingSubTask addition : additions) {
+            appendQueuedSubTask(addition, maximumCraftsPerSubTask);
         }
         updateDisplayedCraftCount();
         updateTaskProgressTotals();
@@ -217,19 +223,20 @@ public class CraftingTask {
         return new CraftingSubTask(items, fluids, keys, crafts);
     }
 
-    /** 批量合并 KeyCounter 为单子任务，跳过中间 KeyCounter 分配 */
-    private CraftingSubTask createMergedSubTask(
-            List<KeyCounter[]> allInputs, long operationsPerPush) {
-        List<ItemStack> items = new ArrayList<>();
-        List<FluidStack> fluids = new ArrayList<>();
-        List<OutputKey> keys = new ArrayList<>();
-        for (KeyCounter[] counters : allInputs) {
-            storeInputMaterials(counters, items, fluids, keys, context.supportsLongAeAmounts());
+    private void appendQueuedSubTask(CraftingSubTask addition, long maximumCraftsPerSubTask) {
+        if (!queuedSubTasks.isEmpty()) {
+            CraftingSubTask last = queuedSubTasks.getLast();
+            if (last.craftCount <= maximumCraftsPerSubTask - addition.craftCount) {
+                last.items.addAll(addition.items);
+                last.fluids.addAll(addition.fluids);
+                last.keys.addAll(addition.keys);
+                queuedSubTasks.set(queuedSubTasks.size() - 1,
+                        new CraftingSubTask(last.items, last.fluids, last.keys,
+                                last.craftCount + addition.craftCount));
+                return;
+            }
         }
-        long operations = saturatingMultiply(
-                saturatingMultiply(Math.max(1L, allInputs.size()), Math.max(1L, operationsPerPush)),
-                patternOperationsPerPush);
-        return new CraftingSubTask(items, fluids, keys, operations);
+        queuedSubTasks.add(addition);
     }
 
     private static void storeInputMaterials(
@@ -314,10 +321,14 @@ public class CraftingTask {
             return false;
         }
 
-        long resolvedCraftCount = saturatingMultiply(craftCount, resolution.operationsPerPattern());
-        RecipeInputs inputs = materializeRecipeInputs();
+        long resolvedCraftCount = multiplyWithinLong(craftCount, resolution.operationsPerPattern());
+        if (resolvedCraftCount <= 0L) {
+            setWaiting(STATUS_WAITING_INVALID_PATTERN, "");
+            return false;
+        }
         if (!AlloyFurnaceRecipeManager.matchesInputsForOperations(
-                recipe, inputs.items(), inputs.fluids(), inputs.keys(), resolvedCraftCount)) {
+                recipe, taskInputItems, taskInputFluids,
+                toGenericStacks(taskInputKeys), resolvedCraftCount)) {
             setWaiting(STATUS_WAITING_INVALID_PATTERN, "");
             return false;
         }
@@ -327,31 +338,6 @@ public class CraftingTask {
         craftCount = resolvedCraftCount;
         updateDisplayedCraftCount();
         return true;
-    }
-
-    private RecipeInputs materializeRecipeInputs() {
-        List<ItemStack> items = new ArrayList<>(taskInputItems);
-        List<FluidStack> fluids = new ArrayList<>(taskInputFluids);
-        List<GenericStack> keys = new ArrayList<>();
-        for (OutputKey input : taskInputKeys) {
-            long remaining = input.amount;
-            if (input.key instanceof AEItemKey itemKey) {
-                while (remaining > 0L) {
-                    int chunk = (int) Math.min(remaining, Integer.MAX_VALUE);
-                    items.add(itemKey.toStack(chunk));
-                    remaining -= chunk;
-                }
-            } else if (input.key instanceof AEFluidKey fluidKey) {
-                while (remaining > 0L) {
-                    int chunk = (int) Math.min(remaining, Integer.MAX_VALUE);
-                    fluids.add(new FluidStack(fluidKey.getFluid(), chunk));
-                    remaining -= chunk;
-                }
-            } else if (remaining > 0L) {
-                keys.add(new GenericStack(input.key, remaining));
-            }
-        }
-        return new RecipeInputs(items, fluids, keys);
     }
 
     /** 使配方缓存失效（输入/模具/催化剂变化时调用） */
@@ -808,6 +794,15 @@ public class CraftingTask {
         }
     }
 
+    private long maximumCraftsPerSubTask() {
+        if (pattern == null) {
+            return Long.MAX_VALUE;
+        }
+        long safePatternPushes = SmartDoublingPatterns.maximumSafeMultiplier(pattern);
+        long resolved = multiplyWithinLong(safePatternPushes, Math.max(1L, patternOperationsPerPush));
+        return resolved <= 0L ? Long.MAX_VALUE : resolved;
+    }
+
     private void addPendingItemOrKey(ItemStack template, long amount) {
         AEItemKey key = AEItemKey.of(template);
         if (context.supportsLongAeAmounts() && key != null) {
@@ -1066,6 +1061,13 @@ public class CraftingTask {
         return amount > Long.MAX_VALUE / multiplier ? Long.MAX_VALUE : amount * multiplier;
     }
 
+    private static long multiplyWithinLong(long amount, long multiplier) {
+        if (amount <= 0L || multiplier <= 0L || amount > Long.MAX_VALUE / multiplier) {
+            return 0L;
+        }
+        return amount * multiplier;
+    }
+
     static long saturatingAdd(long left, long right) {
         if (right > 0L && left > Long.MAX_VALUE - right) {
             return Long.MAX_VALUE;
@@ -1078,9 +1080,6 @@ public class CraftingTask {
     }
 
     private record OutputKey(AEKey key, long amount) {
-    }
-
-    private record RecipeInputs(List<ItemStack> items, List<FluidStack> fluids, List<GenericStack> keys) {
     }
 
     private record CraftingSubTask(List<ItemStack> items, List<FluidStack> fluids, List<OutputKey> keys, long craftCount) {

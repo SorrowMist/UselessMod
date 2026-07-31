@@ -156,11 +156,10 @@ public class MiningDispatcher {
             // 只有准星移动到了新方块，才重新计算
             if (data.getCachedPos() == null || !data.getCachedPos().equals(currentPos)) {
                 BlockState state = level.getBlockState(currentPos);
-                boolean forceMining = UComponentUtils.isForceMiningEnabled(hand);
                 boolean enhancedChainMining = UComponentUtils.isEnhancedChainMiningEnabled(hand);
 
                 List<BlockPos> blocks = MiningUtils.scanBlocksToMine(
-                        currentPos, state, level, hand, forceMining, enhancedChainMining);
+                        currentPos, state, level, hand, false, enhancedChainMining);
 
                 data.setCachedPos(currentPos);
                 data.setCachedBlocks(blocks);

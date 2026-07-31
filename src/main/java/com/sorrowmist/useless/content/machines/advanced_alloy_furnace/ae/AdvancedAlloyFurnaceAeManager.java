@@ -310,7 +310,8 @@ public final class AdvancedAlloyFurnaceAeManager {
         IPatternDetails original = execution.pattern();
 
         if (this.owner.getMainNode() == null || !this.owner.getMainNode().isActive()
-                || !this.patterns.contains(original)) {
+                || !this.patterns.contains(original)
+                || execution.operationsPerPush() > SmartDoublingPatterns.maximumSafeMultiplier(original)) {
             return false;
         }
 
@@ -633,11 +634,15 @@ public final class AdvancedAlloyFurnaceAeManager {
             return false;
         }
 
-        KeyCounter[] merged = this.mergeKeyCounters(allInputs);
+        long maximumTaskCrafts = SmartDoublingPatterns.maximumSafeMultiplier(batch.pattern);
+        List<List<KeyCounter[]>> taskBatches = splitInputBatches(
+                allInputs, batch.operationsPerPush, maximumTaskCrafts);
+        List<KeyCounter[]> firstBatch = taskBatches.getFirst();
+        KeyCounter[] merged = this.mergeKeyCounters(firstBatch);
 
         int taskId = this.nextTaskId++;
         IPatternDetails taskPattern = batch.pattern;
-        long totalCrafts = calculateTotalCrafts(allInputs.size(), batch.operationsPerPush);
+        long totalCrafts = multiplyExactPositive(firstBatch.size(), batch.operationsPerPush);
 
         CraftingTask task = new CraftingTask(taskId, taskPattern, merged, totalCrafts, this.owner);
         if (!task.canStartNow()) {
@@ -647,8 +652,70 @@ public final class AdvancedAlloyFurnaceAeManager {
             return false;
         }
 
+        List<KeyCounter[]> queuedInputs = new ArrayList<>();
+        for (int index = 1; index < taskBatches.size(); index++) {
+            queuedInputs.addAll(taskBatches.get(index));
+        }
+        if (!queuedInputs.isEmpty()
+                && !task.addMergedBatch(queuedInputs, batch.operationsPerPush)) {
+            batch.allInputs.addAll(allInputs);
+            batch.statusKey = task.getWaitingStatusKey();
+            batch.statusDetail = task.getWaitingDetail();
+            return false;
+        }
+
         this.registerActiveTask(task);
         return true;
+    }
+
+    /**
+     * Splits pushed AE inputs before either total operations or any individual key amount would
+     * exceed the long range. Individual pushes are left intact when they already use a full long.
+     */
+    static List<List<KeyCounter[]>> splitInputBatches(
+            List<KeyCounter[]> allInputs, long operationsPerPush, long maximumTaskCrafts) {
+        if (allInputs == null || allInputs.isEmpty()) {
+            return List.of();
+        }
+
+        long safeOperationsPerPush = Math.max(1L, operationsPerPush);
+        long safeMaximumTaskCrafts = Math.max(1L, maximumTaskCrafts);
+        List<List<KeyCounter[]>> result = new ArrayList<>();
+        List<KeyCounter[]> current = new ArrayList<>();
+        Map<AEKey, Long> currentAmounts = new HashMap<>();
+        long currentCrafts = 0L;
+        boolean currentRequiresIsolation = false;
+
+        for (KeyCounter[] input : allInputs) {
+            Map<AEKey, Long> inputAmounts = collectExactKeyAmounts(input);
+            boolean fitsCurrentBatch = !current.isEmpty()
+                    && !currentRequiresIsolation
+                    && safeOperationsPerPush <= safeMaximumTaskCrafts - currentCrafts
+                    && inputAmounts != null
+                    && canAddExact(currentAmounts, inputAmounts);
+            if (!current.isEmpty() && !fitsCurrentBatch) {
+                result.add(current);
+                current = new ArrayList<>();
+                currentAmounts = new HashMap<>();
+                currentCrafts = 0L;
+                currentRequiresIsolation = false;
+            }
+
+            current.add(input);
+            if (inputAmounts == null) {
+                // A single push can contain repeated full-range keys in distinct holders. Keep
+                // it as-is, but never combine it with another push and lose the extra amount.
+                currentRequiresIsolation = true;
+            } else {
+                addExact(currentAmounts, inputAmounts);
+            }
+            currentCrafts += safeOperationsPerPush;
+        }
+
+        if (!current.isEmpty()) {
+            result.add(current);
+        }
+        return result;
     }
 
     private KeyCounter[] mergeKeyCounters(List<KeyCounter[]> allInputs) {
@@ -661,8 +728,13 @@ public final class AdvancedAlloyFurnaceAeManager {
             for (KeyCounter counter : counters) {
                 if (counter == null) continue;
                 for (var entry : counter) {
-                    merged.merge(entry.getKey(), entry.getLongValue(),
-                            AdvancedAlloyFurnaceAeManager::saturatingAdd);
+                    long amount = entry.getLongValue();
+                    if (amount <= 0L) continue;
+                    long current = merged.getOrDefault(entry.getKey(), 0L);
+                    if (current > Long.MAX_VALUE - amount) {
+                        throw new IllegalStateException("Attempted to merge AE inputs beyond long range");
+                    }
+                    merged.put(entry.getKey(), current + amount);
                 }
             }
         }
@@ -672,6 +744,40 @@ public final class AdvancedAlloyFurnaceAeManager {
             result.add(entry.getKey(), entry.getValue());
         }
         return new KeyCounter[]{result};
+    }
+
+    @org.jetbrains.annotations.Nullable
+    private static Map<AEKey, Long> collectExactKeyAmounts(KeyCounter[] counters) {
+        Map<AEKey, Long> result = new HashMap<>();
+        if (counters == null) return result;
+        for (KeyCounter counter : counters) {
+            if (counter == null) continue;
+            for (var entry : counter) {
+                long amount = entry.getLongValue();
+                if (amount <= 0L) continue;
+                long current = result.getOrDefault(entry.getKey(), 0L);
+                if (current > Long.MAX_VALUE - amount) {
+                    return null;
+                }
+                result.put(entry.getKey(), current + amount);
+            }
+        }
+        return result;
+    }
+
+    private static boolean canAddExact(Map<AEKey, Long> target, Map<AEKey, Long> additions) {
+        for (var entry : additions.entrySet()) {
+            if (target.getOrDefault(entry.getKey(), 0L) > Long.MAX_VALUE - entry.getValue()) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static void addExact(Map<AEKey, Long> target, Map<AEKey, Long> additions) {
+        for (var entry : additions.entrySet()) {
+            target.merge(entry.getKey(), entry.getValue(), Long::sum);
+        }
     }
 
     private CraftingTask findExistingTask(PatternExecutionKey patternKey) {
@@ -873,6 +979,15 @@ public final class AdvancedAlloyFurnaceAeManager {
 
     static long calculateTotalCrafts(long batchSize, long multiplier) {
         return saturatingMultiply(Math.max(0L, batchSize), Math.max(1L, multiplier));
+    }
+
+    private static long multiplyExactPositive(long amount, long multiplier) {
+        long safeAmount = Math.max(1L, amount);
+        long safeMultiplier = Math.max(1L, multiplier);
+        if (safeAmount > Long.MAX_VALUE / safeMultiplier) {
+            throw new IllegalStateException("Batch partition failed to keep operations within long range");
+        }
+        return safeAmount * safeMultiplier;
     }
 
     private static long saturatingMultiply(long amount, long multiplier) {

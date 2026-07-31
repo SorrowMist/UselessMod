@@ -152,6 +152,10 @@ public final class UComponents {
             register("multiblock_recovery_data", builder -> builder
                     .persistent(MultiblockRecoveryData.CODEC)
                     .networkSynchronized(MultiblockRecoveryData.STREAM_CODEC));
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<MultiblockPartData>> MULTIBLOCK_PART_DATA =
+            register("multiblock_part_data", builder -> builder
+                    .persistent(MultiblockPartData.CODEC)
+                    .networkSynchronized(MultiblockPartData.STREAM_CODEC));
     public static final DeferredHolder<DataComponentType<?>, DataComponentType<Long>> SMART_DOUBLING_OPERATIONS =
             register("smart_doubling_operations", builder -> builder
                     .persistent(Codec.LONG)

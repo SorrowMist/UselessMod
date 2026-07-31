@@ -1,6 +1,5 @@
 package com.sorrowmist.useless.utils.mining;
 
-import com.sorrowmist.useless.utils.UComponentUtils;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.player.Player;
@@ -16,10 +15,8 @@ public class DefaultMiningStrategy implements MiningStrategy {
         ServerLevel level = (ServerLevel) event.getLevel();
         BlockPos pos = event.getPos();
 
-        boolean forceMining = UComponentUtils.isForceMiningEnabled(hand);
-
-        if (MiningUtils.canMineBlock(state, hand, forceMining)) {
-            MiningUtils.processBlockBreak(level, pos, state, player, hand, forceMining);
+        if (MiningUtils.canMineBlock(state, hand, false)) {
+            MiningUtils.processBlockBreak(level, pos, state, player, hand, false);
             event.setCanceled(true);
         }
     }

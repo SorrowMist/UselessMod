@@ -1,18 +1,26 @@
 package com.sorrowmist.useless.content.blocks.multiblock;
 
 import com.sorrowmist.useless.content.blockentities.multiblock.PassiveCraftingHatchBlockEntity;
+import com.sorrowmist.useless.core.component.MultiblockPartData;
+import com.sorrowmist.useless.core.component.UComponents;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.MenuProvider;
+import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.EntityBlock;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.entity.BlockEntityTicker;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.storage.loot.LootParams;
+import net.minecraft.world.level.storage.loot.parameters.LootContextParams;
 import net.minecraft.world.phys.BlockHitResult;
 import org.jetbrains.annotations.Nullable;
+
+import java.util.List;
 
 public final class PassiveCraftingHatchBlock extends DirectionalMultiblockPartBlock implements EntityBlock {
     public PassiveCraftingHatchBlock(Properties properties) {
@@ -43,9 +51,42 @@ public final class PassiveCraftingHatchBlock extends DirectionalMultiblockPartBl
             if (!level.isClientSide) {
                 hatch.prepareForRemoval();
             }
-            dropInventory(level, pos, hatch.getPatterns());
         }
         super.onRemove(state, level, pos, newState, movedByPiston);
+    }
+
+    @Override
+    public List<ItemStack> getDrops(BlockState state, LootParams.Builder params) {
+        List<ItemStack> drops = super.getDrops(state, params);
+        if (params.getOptionalParameter(LootContextParams.BLOCK_ENTITY)
+                instanceof PassiveCraftingHatchBlockEntity hatch) {
+            hatch.prepareForRemoval();
+            MultiblockPartData itemData = hatch.createItemData(params.getLevel().registryAccess());
+            boolean hasCustomData = itemData.hasInventoryContents()
+                    || itemData.intervalTicks() != PassiveCraftingHatchBlockEntity.DEFAULT_INTERVAL_TICKS
+                    || itemData.multiplier() != 1L;
+            if (hasCustomData) {
+                for (ItemStack drop : drops) {
+                    if (drop.is(asItem())) {
+                        drop.set(UComponents.MULTIBLOCK_PART_DATA.get(), itemData);
+                    }
+                }
+            }
+        }
+        return drops;
+    }
+
+    @Override
+    public void setPlacedBy(Level level, BlockPos pos, BlockState state,
+                            @Nullable LivingEntity placer, ItemStack stack) {
+        super.setPlacedBy(level, pos, state, placer, stack);
+        if (!level.isClientSide
+                && level.getBlockEntity(pos) instanceof PassiveCraftingHatchBlockEntity hatch) {
+            MultiblockPartData itemData = stack.get(UComponents.MULTIBLOCK_PART_DATA.get());
+            if (itemData != null) {
+                hatch.restoreItemData(itemData, level.registryAccess());
+            }
+        }
     }
 
     @Override

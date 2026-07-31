@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ScaledEnergyAmountTest {
+
     @Test
     void formatsLongValuesWithScaledSuffixesWithoutRoundingAboveTheValue() {
         assertEquals("0", ScaledEnergyAmount.format(0L));
@@ -24,6 +25,8 @@ class ScaledEnergyAmountTest {
                 ScaledEnergyAmount.parse("99E", 3_276_800_000L).orElseThrow());
         assertEquals(1_250_000L,
                 ScaledEnergyAmount.parse("1.25m", Long.MAX_VALUE).orElseThrow());
+        assertEquals(1_500L,
+                ScaledEnergyAmount.parse("1.5K", Long.MAX_VALUE).orElseThrow());
     }
 
     @Test

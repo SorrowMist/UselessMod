@@ -344,7 +344,8 @@ public final class MultiblockAlloyFurnaceCoreBlockEntity extends BlockEntity imp
         return new MultiblockRecoveryData(
                 MultiblockRecoveryData.CURRENT_VERSION,
                 energy.getEnergyStoredLong(),
-                aeManager.getUnreturnedInputsSnapshot());
+                aeManager.getUnreturnedInputsSnapshot(),
+                automaticEnergyLimit);
     }
 
     public void restoreRecoveryData(MultiblockRecoveryData data) {
@@ -352,6 +353,7 @@ public final class MultiblockAlloyFurnaceCoreBlockEntity extends BlockEntity imp
         energy.setMaxEnergyStored(Math.max(energy.getMaxEnergyStoredLong(), data.energy()));
         energy.setEnergyStored(data.energy());
         aeManager.addUnreturnedInputs(data.contents());
+        automaticEnergyLimit = data.automaticEnergyLimit();
         setChanged();
     }
 

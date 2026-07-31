@@ -1,22 +1,34 @@
 package com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae;
 
 import appeng.api.crafting.IPatternDetails;
+import appeng.api.stacks.AEFluidKey;
 import appeng.api.stacks.AEItemKey;
+import appeng.api.stacks.AEKey;
 import appeng.api.stacks.GenericStack;
 import appeng.api.stacks.KeyCounter;
+import com.sorrowmist.useless.api.enums.AlloyFurnaceMode;
+import com.sorrowmist.useless.content.recipe.AdvancedAlloyFurnaceRecipe;
+import com.sorrowmist.useless.content.recipe.CountedIngredient;
 import net.minecraft.SharedConstants;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.core.RegistryAccess;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.Tag;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.Bootstrap;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
+import net.minecraft.world.item.crafting.Ingredient;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.material.Fluids;
+import net.neoforged.neoforge.fluids.FluidStack;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.ArrayList;
+import java.util.Objects;
 import java.lang.reflect.Proxy;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -84,6 +96,79 @@ class CraftingTaskLongCountTest {
     }
 
     @Test
+    void resolvesLongMaxInputsWithoutMaterializingIntegerChunks() throws ReflectiveOperationException {
+        AEItemKey iron = Objects.requireNonNull(AEItemKey.of(new ItemStack(Items.IRON_INGOT)));
+        AEFluidKey water = Objects.requireNonNull(AEFluidKey.of(new FluidStack(Fluids.WATER, 1)));
+        KeyCounter input = new KeyCounter();
+        input.add(iron, Long.MAX_VALUE);
+        input.add(water, Long.MAX_VALUE);
+        CraftingTaskContext context = (CraftingTaskContext) Proxy.newProxyInstance(
+                getClass().getClassLoader(), new Class<?>[]{CraftingTaskContext.class},
+                (proxy, method, arguments) -> method.getName().equals("supportsLongAeAmounts"));
+        CraftingTask task = new CraftingTask(
+                10, pattern(), new KeyCounter[]{input}, Long.MAX_VALUE, context);
+        AdvancedAlloyFurnaceRecipe recipe = new AdvancedAlloyFurnaceRecipe(
+                ResourceLocation.fromNamespaceAndPath("useless_mod_test", "long_ae_inputs"),
+                List.of(new CountedIngredient(Ingredient.of(Items.IRON_INGOT), 1L)),
+                List.of(new FluidStack(Fluids.WATER, 1)),
+                List.of(),
+                List.of(new ItemStack(Items.PAPER)),
+                List.of(),
+                List.of(),
+                2_000L,
+                200,
+                Ingredient.EMPTY,
+                0,
+                Ingredient.EMPTY,
+                AlloyFurnaceMode.NORMAL);
+
+        var resolver = CraftingTask.class.getDeclaredMethod(
+                "resolvePatternOperations", AdvancedAlloyFurnaceRecipe.class);
+        resolver.setAccessible(true);
+
+        assertTrue((boolean) resolver.invoke(task, recipe));
+    }
+
+    @Test
+    void splitsTenToOneLongPushesBeforeTheySaturate() {
+        long operationsPerPush = Long.MAX_VALUE / 10L;
+        AEItemKey iron = Objects.requireNonNull(AEItemKey.of(new ItemStack(Items.IRON_INGOT)));
+        KeyCounter[] push = new KeyCounter[]{counter(iron, operationsPerPush * 10L)};
+
+        List<List<KeyCounter[]>> batches = AdvancedAlloyFurnaceAeManager.splitInputBatches(
+                List.of(push, push), operationsPerPush, operationsPerPush);
+
+        assertEquals(2, batches.size());
+        assertEquals(1, batches.getFirst().size());
+        assertEquals(1, batches.getLast().size());
+    }
+
+    @Test
+    void keepsExtremeMergedPushesAsSeparateSubTasks() {
+        long operationsPerPush = Long.MAX_VALUE / 10L;
+        AEItemKey iron = Objects.requireNonNull(AEItemKey.of(new ItemStack(Items.IRON_INGOT)));
+        KeyCounter[] push = new KeyCounter[]{counter(iron, operationsPerPush * 10L)};
+        CraftingTaskContext context = (CraftingTaskContext) Proxy.newProxyInstance(
+                getClass().getClassLoader(), new Class<?>[]{CraftingTaskContext.class},
+                (proxy, method, arguments) -> method.getName().equals("supportsLongAeAmounts"));
+        CraftingTask task = new CraftingTask(
+                11, tenToOnePattern(), new KeyCounter[0], 1L, context);
+        List<KeyCounter[]> pushes = new ArrayList<>();
+        for (int index = 0; index < 11; index++) {
+            pushes.add(push);
+        }
+
+        assertTrue(task.addMergedBatch(pushes, operationsPerPush));
+
+        CompoundTag saved = task.save(registries);
+        var subTasks = saved.getList("SubTasks", Tag.TAG_COMPOUND);
+        assertEquals(11, subTasks.size());
+        for (int index = 0; index < subTasks.size(); index++) {
+            assertEquals(operationsPerPush, subTasks.getCompound(index).getLong("CraftCount"));
+        }
+    }
+
+    @Test
     void progressTotalsRemainExactAboveTheIntegerRange() {
         long craftCount = (long) Integer.MAX_VALUE + 9L;
         long totalOutput = craftCount * 7L;
@@ -125,6 +210,53 @@ class CraftingTaskLongCountTest {
             @Override
             public IInput[] getInputs() {
                 return new IInput[0];
+            }
+
+            @Override
+            public List<GenericStack> getOutputs() {
+                return List.of(new GenericStack(paper, 1L));
+            }
+        };
+    }
+
+    private static KeyCounter counter(AEKey key, long amount) {
+        KeyCounter counter = new KeyCounter();
+        counter.add(key, amount);
+        return counter;
+    }
+
+    private static IPatternDetails tenToOnePattern() {
+        AEItemKey iron = Objects.requireNonNull(AEItemKey.of(new ItemStack(Items.IRON_INGOT)));
+        AEItemKey paper = Objects.requireNonNull(AEItemKey.of(new ItemStack(Items.PAPER)));
+        return new IPatternDetails() {
+            @Override
+            public AEItemKey getDefinition() {
+                return paper;
+            }
+
+            @Override
+            public IInput[] getInputs() {
+                return new IInput[]{new IInput() {
+                    @Override
+                    public GenericStack[] getPossibleInputs() {
+                        return new GenericStack[]{new GenericStack(iron, 1L)};
+                    }
+
+                    @Override
+                    public long getMultiplier() {
+                        return 10L;
+                    }
+
+                    @Override
+                    public boolean isValid(AEKey input, Level level) {
+                        return iron.equals(input);
+                    }
+
+                    @Override
+                    public AEKey getRemainingKey(AEKey template) {
+                        return null;
+                    }
+                }};
             }
 
             @Override

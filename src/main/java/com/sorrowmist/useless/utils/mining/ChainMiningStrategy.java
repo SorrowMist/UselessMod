@@ -43,7 +43,7 @@ public class ChainMiningStrategy implements MiningStrategy {
     }
 
     protected boolean isForceMining(ItemStack hand) {
-        return UComponentUtils.isForceMiningEnabled(hand);
+        return false;
     }
 
     protected boolean canUseCache(ItemStack hand, boolean forceMining) {

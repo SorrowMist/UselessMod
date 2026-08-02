@@ -22,6 +22,7 @@ import com.sorrowmist.useless.content.recipe.adapters.mekanism.EnrichmentChamber
 import com.sorrowmist.useless.content.recipe.adapters.mekanism.MetallurgicInfuserRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.mekanism.OsmiumCompressorRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.mekanism.PrecisionSawmillRecipeAdapter;
+import com.sorrowmist.useless.content.recipe.adapters.minecraft.CraftingRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.minecraft.SmeltingRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.mysticalagriculture.AwakeningRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.mysticalagriculture.InfusionRecipeAdapter;
@@ -126,6 +127,7 @@ public final class RecipeAdapterCompatRegistry {
     }
 
     private static void registerMinecraft() {
+        register(new CraftingRecipeAdapter());
         register(new SmeltingRecipeAdapter());
     }
 

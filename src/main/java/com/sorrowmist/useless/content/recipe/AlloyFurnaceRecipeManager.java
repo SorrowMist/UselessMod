@@ -8,6 +8,7 @@ import com.mojang.logging.LogUtils;
 import com.sorrowmist.useless.init.ModRecipeTypes;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
 import net.minecraft.world.item.crafting.Ingredient;
 import net.minecraft.world.item.crafting.Recipe;
 import net.minecraft.world.item.crafting.RecipeHolder;
@@ -293,11 +294,30 @@ public class AlloyFurnaceRecipeManager {
     private AdvancedAlloyFurnaceRecipe selectBestRecipe(Iterable<AdvancedAlloyFurnaceRecipe> candidates,
                                                          RecipeLookupContext context) {
         AdvancedAlloyFurnaceRecipe best = null;
+        List<AdvancedAlloyFurnaceRecipe> equallySpecific = new ArrayList<>();
         for (AdvancedAlloyFurnaceRecipe recipe : candidates) {
             if (!matchesLookup(recipe, context)) continue;
-            if (best == null || isMoreSpecific(recipe, best)) {
+            if (best == null) {
                 best = recipe;
+                equallySpecific.add(recipe);
+                continue;
             }
+
+            int specificity = compareSpecificity(recipe, best);
+            if (specificity > 0) {
+                best = recipe;
+                equallySpecific.clear();
+                equallySpecific.add(recipe);
+            } else if (specificity == 0) {
+                equallySpecific.add(recipe);
+                if (compareRecipeId(recipe, best) < 0) {
+                    best = recipe;
+                }
+            }
+        }
+
+        if (best != null && isAmbiguousManualCraftingLookup(context, equallySpecific)) {
+            return null;
         }
         return best;
     }
@@ -333,33 +353,76 @@ public class AlloyFurnaceRecipeManager {
                 && matchesOutputConstraints(recipe, context.expectedOutputs());
     }
 
-    /** 按“模具专用、输入种类、各类数量、来源、ID”稳定比较具体度。 */
-    private boolean isMoreSpecific(AdvancedAlloyFurnaceRecipe candidate, AdvancedAlloyFurnaceRecipe current) {
+    /** 按“模具专用、输入种类、各类数量、来源”比较具体度；并列项另按 ID 稳定选择。 */
+    private int compareSpecificity(AdvancedAlloyFurnaceRecipe candidate, AdvancedAlloyFurnaceRecipe current) {
         boolean candidateHasMold = !candidate.mold().isEmpty();
         boolean currentHasMold = !current.mold().isEmpty();
-        if (candidateHasMold != currentHasMold) return candidateHasMold;
+        if (candidateHasMold != currentHasMold) return candidateHasMold ? 1 : -1;
 
         long candidateKinds = inputKindCount(candidate);
         long currentKinds = inputKindCount(current);
-        if (candidateKinds != currentKinds) return candidateKinds > currentKinds;
+        if (candidateKinds != currentKinds) return Long.compare(candidateKinds, currentKinds);
 
         long candidateItems = requiredItemAmount(candidate);
         long currentItems = requiredItemAmount(current);
-        if (candidateItems != currentItems) return candidateItems > currentItems;
+        if (candidateItems != currentItems) return Long.compare(candidateItems, currentItems);
 
         long candidateFluids = requiredFluidAmount(candidate);
         long currentFluids = requiredFluidAmount(current);
-        if (candidateFluids != currentFluids) return candidateFluids > currentFluids;
+        if (candidateFluids != currentFluids) return Long.compare(candidateFluids, currentFluids);
 
         long candidateKeys = requiredKeyAmount(candidate);
         long currentKeys = requiredKeyAmount(current);
-        if (candidateKeys != currentKeys) return candidateKeys > currentKeys;
+        if (candidateKeys != currentKeys) return Long.compare(candidateKeys, currentKeys);
 
         boolean candidateConverted = isConvertedRecipe(candidate);
         boolean currentConverted = isConvertedRecipe(current);
-        if (candidateConverted != currentConverted) return !candidateConverted;
+        if (candidateConverted != currentConverted) return candidateConverted ? -1 : 1;
 
-        return candidate.id().toString().compareTo(current.id().toString()) < 0;
+        return 0;
+    }
+
+    private int compareRecipeId(AdvancedAlloyFurnaceRecipe left, AdvancedAlloyFurnaceRecipe right) {
+        return left.id().toString().compareTo(right.id().toString());
+    }
+
+    private boolean isAmbiguousManualCraftingLookup(
+            RecipeLookupContext context, List<AdvancedAlloyFurnaceRecipe> candidates) {
+        if (!context.expectedOutputs().isEmpty()
+                || context.mold() == null
+                || !context.mold().is(Items.CRAFTING_TABLE)
+                || candidates.size() < 2) {
+            return false;
+        }
+
+        Map<AEKey, Long> expected = outputSignature(candidates.getFirst());
+        for (int index = 1; index < candidates.size(); index++) {
+            if (!expected.equals(outputSignature(candidates.get(index)))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private Map<AEKey, Long> outputSignature(AdvancedAlloyFurnaceRecipe recipe) {
+        Map<AEKey, Long> result = new LinkedHashMap<>();
+        for (ItemStack output : recipe.outputs()) {
+            mergeOutput(result, GenericStack.fromItemStack(output));
+        }
+        for (FluidStack output : recipe.outputFluids()) {
+            mergeOutput(result, GenericStack.fromFluidStack(output));
+        }
+        for (GenericStack output : recipe.keyOutputs()) {
+            mergeOutput(result, output);
+        }
+        return result;
+    }
+
+    private void mergeOutput(Map<AEKey, Long> outputs, @Nullable GenericStack output) {
+        if (output == null || output.what() == null || output.amount() <= 0L) {
+            return;
+        }
+        outputs.merge(output.what(), output.amount(), AlloyFurnaceRecipeManager::saturatingAdd);
     }
 
     private long inputKindCount(AdvancedAlloyFurnaceRecipe recipe) {

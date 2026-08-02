@@ -21,6 +21,7 @@ import java.util.Objects;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 
 class AlloyFurnaceRecipeManagerTest {
@@ -144,6 +145,64 @@ class AlloyFurnaceRecipeManagerTest {
     }
 
     @Test
+    void manualCraftingTableLookupRejectsDifferentOutputsAtEqualPriority() {
+        AdvancedAlloyFurnaceRecipe diamond = recipe(
+                "diamond_converted", List.of(counted(Items.OAK_LOG, 1)), List.of(),
+                Items.DIAMOND, Ingredient.of(Items.CRAFTING_TABLE));
+        AdvancedAlloyFurnaceRecipe gold = recipe(
+                "gold_converted", List.of(counted(Items.OAK_LOG, 1)), List.of(),
+                Items.GOLD_INGOT, Ingredient.of(Items.CRAFTING_TABLE));
+
+        assertNull(selectWithMold(List.of(gold, diamond), List.of(stack(Items.OAK_LOG, 1)),
+                new ItemStack(Items.CRAFTING_TABLE), List.of()));
+    }
+
+    @Test
+    void craftingTableExpectedOutputSelectsIntendedRecipe() {
+        AdvancedAlloyFurnaceRecipe diamond = recipe(
+                "diamond_converted", List.of(counted(Items.OAK_LOG, 1)), List.of(),
+                Items.DIAMOND, Ingredient.of(Items.CRAFTING_TABLE));
+        AdvancedAlloyFurnaceRecipe gold = recipe(
+                "gold_converted", List.of(counted(Items.OAK_LOG, 1)), List.of(),
+                Items.GOLD_INGOT, Ingredient.of(Items.CRAFTING_TABLE));
+        List<ItemStack> inputs = List.of(stack(Items.OAK_LOG, 1));
+
+        assertSame(diamond, selectWithMold(List.of(gold, diamond), inputs,
+                new ItemStack(Items.CRAFTING_TABLE), List.of(genericItem(Items.DIAMOND, 1))));
+        assertSame(gold, selectWithMold(List.of(diamond, gold), inputs,
+                new ItemStack(Items.CRAFTING_TABLE), List.of(genericItem(Items.GOLD_INGOT, 1))));
+    }
+
+    @Test
+    void duplicateCraftingTableOutputsUseStableRecipeId() {
+        AdvancedAlloyFurnaceRecipe idA = recipeWithOutputs(
+                "a_converted", List.of(counted(Items.OAK_LOG, 1)), List.of(),
+                List.of(new ItemStack(Items.DIAMOND), new ItemStack(Items.GOLD_INGOT, 2)),
+                Ingredient.of(Items.CRAFTING_TABLE));
+        AdvancedAlloyFurnaceRecipe idZ = recipeWithOutputs(
+                "z_converted", List.of(counted(Items.OAK_LOG, 1)), List.of(),
+                List.of(new ItemStack(Items.GOLD_INGOT), new ItemStack(Items.DIAMOND),
+                        new ItemStack(Items.GOLD_INGOT)),
+                Ingredient.of(Items.CRAFTING_TABLE));
+
+        assertSame(idA, selectWithMold(List.of(idZ, idA), List.of(stack(Items.OAK_LOG, 1)),
+                new ItemStack(Items.CRAFTING_TABLE), List.of()));
+    }
+
+    @Test
+    void differentOutputsRemainStableForOtherMolds() {
+        AdvancedAlloyFurnaceRecipe idA = recipe(
+                "a_converted", List.of(counted(Items.OAK_LOG, 1)), List.of(),
+                Items.DIAMOND, Ingredient.of(Items.FURNACE));
+        AdvancedAlloyFurnaceRecipe idZ = recipe(
+                "z_converted", List.of(counted(Items.OAK_LOG, 1)), List.of(),
+                Items.GOLD_INGOT, Ingredient.of(Items.FURNACE));
+
+        assertSame(idA, selectWithMold(List.of(idZ, idA), List.of(stack(Items.OAK_LOG, 1)),
+                new ItemStack(Items.FURNACE), List.of()));
+    }
+
+    @Test
     void cacheFingerprintIncludesAmountsComponentsAndIsOrderIndependent() {
         List<ItemStack> ordered = List.of(stack(Items.OAK_LOG, 2), stack(Items.COBBLESTONE, 5));
         List<ItemStack> reversed = List.of(stack(Items.COBBLESTONE, 5), stack(Items.OAK_LOG, 2));
@@ -177,14 +236,27 @@ class AlloyFurnaceRecipeManagerTest {
                 inputs, fluids, List.of(), ItemStack.EMPTY, List.of(), 1);
     }
 
+    private static AdvancedAlloyFurnaceRecipe selectWithMold(
+            List<AdvancedAlloyFurnaceRecipe> candidates, List<ItemStack> inputs,
+            ItemStack mold, List<GenericStack> expectedOutputs) {
+        return AlloyFurnaceRecipeManager.selectBestCandidate(
+                candidates, inputs, List.of(), List.of(), mold, expectedOutputs, 1);
+    }
+
     private static AdvancedAlloyFurnaceRecipe recipe(String path, List<CountedIngredient> inputs,
                                                        List<FluidStack> fluids, Item output, Ingredient mold) {
+        return recipeWithOutputs(path, inputs, fluids, List.of(new ItemStack(output)), mold);
+    }
+
+    private static AdvancedAlloyFurnaceRecipe recipeWithOutputs(
+            String path, List<CountedIngredient> inputs, List<FluidStack> fluids,
+            List<ItemStack> outputs, Ingredient mold) {
         return new AdvancedAlloyFurnaceRecipe(
                 ResourceLocation.fromNamespaceAndPath("useless_mod_test", path),
                 inputs,
                 fluids,
                 List.of(),
-                List.of(new ItemStack(output)),
+                outputs,
                 List.of(),
                 List.of(),
                 2000,

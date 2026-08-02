@@ -304,6 +304,9 @@ dependencies {
     //性能
     implementation "maven.modrinth:observable:5.4.4+neoforge"
 
+    //eio
+    implementation "curse.maven:ender-io-64578:8192838"
+
     //灵灾
     implementation "maven.modrinth:malum:1.8.2"
     implementation "maven.modrinth:bN3xUWdo:CohX6yP1"

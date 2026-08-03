@@ -201,13 +201,10 @@ dependencies {
     implementation "curse.maven:advancedae-1084104:7222372"
     implementation "curse.maven:ae2addonlib-1366135:7222312"
 
-    implementation "curse.maven:ae2-crystal-science-1435174:8112039"
-    def ae2LightningTech = "curse.maven:ae2-lightning-tech-1527395:8410116"
-    compileOnly ae2LightningTech
-    if (!project.hasProperty('withoutAe2lt')) {
-        localRuntime ae2LightningTech
-    }
-    implementation "curse.maven:data-energistics-1565514:8217182"
+    implementation "curse.maven:ae2-crystal-science-1435174:8498888" // 1.21.1-1.2.1
+    implementation "curse.maven:ae2-lightning-tech-1527395:8567287"
+    implementation "curse.maven:thunderbolt-core-1631756:8566512"
+    implementation "curse.maven:data-energistics-1565514:8458485" // 1.21.1-2.3.2
 
     //powah
     implementation "curse.maven:powah-rearchitected-633483:8011715"
@@ -318,6 +315,7 @@ dependencies {
 //    compileOnly "maven.modrinth:gregtechceu-modern:mc1.21.1-7.0.1"
 
     runtimeOnly "maven.modrinth:configuration:6Mztfq1u"
+    implementation "curse.maven:configured-457570:7276577"
     runtimeOnly "thedarkcolour:kotlinforforge-neoforge:5.11.0"
     runtimeOnly "curse.maven:just-enough-characters-250702:8413478"
     // apotheosis

@@ -95,101 +95,10 @@ config="${mod_id}.mixins.json"
     ordering="AFTER"
     side="BOTH"
 
-# Botany Pots dependency
-[[dependencies.${mod_id}]]
-    modId="botanypots"
-    type="optional"
-    versionRange="[21.1.41,)"
-    ordering="AFTER"
-    side="BOTH"
-
-# Productive Bees recipe compatibility
-[[dependencies.${mod_id}]]
-    modId="productivebees"
-    type="optional"
-    versionRange="[1.21.1-13.13.5,)"
-    ordering="AFTER"
-    side="BOTH"
-
-# Draconic Evolution fusion recipe and long OP compatibility
-[[dependencies.${mod_id}]]
-    modId="draconicevolution"
-    type="optional"
-    versionRange="[3.1.4.632,)"
-    ordering="AFTER"
-    side="BOTH"
-
-# Optional Powah energizing recipe compatibility
-[[dependencies.${mod_id}]]
-    modId="powah"
-    type="optional"
-    versionRange="*"
-    ordering="AFTER"
-    side="BOTH"
-
-# Optional Extended Crafting recipe compatibility
-[[dependencies.${mod_id}]]
-    modId="extendedcrafting"
-    type="optional"
-    versionRange="*"
-    ordering="AFTER"
-    side="BOTH"
-
-# Optional ECO Integrated Working Station recipe compatibility
-[[dependencies.${mod_id}]]
-    modId="neoecoae"
-    type="optional"
-    versionRange="[21.1.1,)"
-    ordering="AFTER"
-    side="BOTH"
-
-# Optional Nature's Aura ritual recipe compatibility
-[[dependencies.${mod_id}]]
-    modId="naturesaura"
-    type="optional"
-    versionRange="[41.9,)"
-    ordering="AFTER"
-    side="BOTH"
-
-# Optional Occultism ritual recipe compatibility
-[[dependencies.${mod_id}]]
-    modId="occultism"
-    type="optional"
-    versionRange="[1.205.0,)"
-    ordering="AFTER"
-    side="BOTH"
-
-# Optional Malum spirit-crucible and spirit-altar recipe compatibility
-[[dependencies.${mod_id}]]
-    modId="malum"
-    type="optional"
-    versionRange="[1.8.2,)"
-    ordering="AFTER"
-    side="BOTH"
-
-# Optional long-energy capability integrations
-[[dependencies.${mod_id}]]
-    modId="mekanism"
-    type="optional"
-    versionRange="[10.7.15,)"
-    ordering="AFTER"
-    side="BOTH"
-
-[[dependencies.${mod_id}]]
-    modId="fluxnetworks"
-    type="optional"
-    versionRange="[8.0.0,)"
-    ordering="AFTER"
-    side="BOTH"
-
-# Require ExtendedAE (ExtendedAE-1.21-2.2.21-neoforge) to be present
-#[[dependencies.${mod_id}]]
-#    modId="extendedae"
-#    type="required"
-#    # Use a permissive range to tolerate upstream version string variations (e.g. 1.21-2.2.21-neoforge)
-#    versionRange="*"
-#    ordering="AFTER"
-#    side="BOTH"
+# Recipe and energy integrations are discovered at runtime with ModList and
+# registered only when the corresponding mod is present.  They intentionally
+# do not appear as NeoForge dependencies: an integration must not reject an
+# otherwise valid modpack just because it ships an older compatible version.
 
 # Features are specific properties of the game environment, that you may want to declare you require. This example declares
 # that your mod requires GL version 3.2 or higher. Other features will be added. They are side aware so declaring this won't

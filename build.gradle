@@ -183,6 +183,28 @@ def extractProductiveLib = tasks.register('extractProductiveLib', Copy) {
 }
 def productiveLibCompileFiles = files(productiveLibJar).builtBy(extractProductiveLib)
 
+// Ender IO ships EnderCore, GraphLib and the optional conduit module as Jar-in-Jar
+// libraries.  NeoForge loads those libraries at runtime, but the nested jars are
+// not exposed on the Java compile classpath by the Curse Maven artifact.
+def enderIoApi = configurations.create('enderIoApi') {
+    canBeConsumed = false
+    canBeResolved = true
+    transitive = false
+}
+
+def enderIoApiDirectory = layout.buildDirectory.dir('generated/enderio-api')
+def extractEnderIoApi = tasks.register('extractEnderIoApi', Copy) {
+    from { enderIoApi.collect { zipTree(it).matching { include 'META-INF/jarjar/*.jar' } } }
+    eachFile { details -> details.path = details.name }
+    includeEmptyDirs = false
+    into enderIoApiDirectory
+}
+def enderIoCompileFiles = files(
+        layout.buildDirectory.file('generated/enderio-api/com.enderio.endercore-8.2.11-beta.jar'),
+        layout.buildDirectory.file('generated/enderio-api/GraphLib3-3.0.5.jar'),
+        layout.buildDirectory.file('generated/enderio-api/com.enderio.enderio-modded-conduits-8.2.11-beta.jar')
+).builtBy(extractEnderIoApi)
+
 dependencies {
     implementation "mezz.jei:jei-1.21.1-neoforge:19.39.0.372"
     implementation "curse.maven:ae2-jei-integration-1074338:5748513"
@@ -236,6 +258,9 @@ dependencies {
     add(productiveBeesApi.name, "curse.maven:productivebees-377897:8022994")
     implementation "curse.maven:productivebees-377897:8022994"
     compileOnly productiveLibCompileFiles
+
+    add(enderIoApi.name, "curse.maven:ender-io-64578:8192838")
+    compileOnly enderIoCompileFiles
 
     //eco
     implementation "maven.modrinth:neoecoae:21.1.1"
@@ -332,6 +357,7 @@ dependencies {
     testImplementation platform('org.junit:junit-bom:5.11.4')
     testImplementation 'org.junit.jupiter:junit-jupiter'
     testImplementation productiveLibCompileFiles
+    testImplementation enderIoCompileFiles
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
 
@@ -361,6 +387,7 @@ sourceSets.main.resources.srcDir generateModMetadata
 // To avoid having to run "generateModMetadata" manually, make it run on every project reload
 neoForge.ideSyncTask generateModMetadata
 neoForge.ideSyncTask extractProductiveLib
+neoForge.ideSyncTask extractEnderIoApi
 
 // Example configuration to allow publishing using the maven-publish plugin
 publishing {

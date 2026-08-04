@@ -5,6 +5,7 @@ import appeng.api.stacks.AEItemKey;
 import appeng.api.stacks.GenericStack;
 import appeng.crafting.pattern.AEProcessingPattern;
 import com.klikli_dev.occultism.crafting.recipe.RitualRecipe;
+import com.klikli_dev.occultism.registry.OccultismBlocks;
 import com.klikli_dev.occultism.registry.OccultismDataComponents;
 import com.klikli_dev.occultism.registry.OccultismItems;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.DynamicComponentPatternDetails;
@@ -239,6 +240,183 @@ class OccultismRitualRecipeAdapterTest {
         }
     }
 
+    @Test
+    void convertsAllMinerSpiritRitualsWithConfiguredStaticOutputs() {
+        List<MinerSpec> specs = List.of(
+                new MinerSpec(
+                        "craft_miner_foliot_unspecialized",
+                        OccultismItems.BOOK_OF_BINDING_BOUND_FOLIOT.get(),
+                        OccultismItems.MINER_FOLIOT_UNSPECIALIZED.get(),
+                        List.of(OccultismItems.MAGIC_LAMP_EMPTY.get(), Items.IRON_INGOT, Items.GRAVEL)),
+                new MinerSpec(
+                        "craft_miner_djinni_ores",
+                        OccultismItems.BOOK_OF_BINDING_BOUND_DJINNI.get(),
+                        OccultismItems.MINER_DJINNI_ORES.get(),
+                        List.of(OccultismItems.MINER_FOLIOT_UNSPECIALIZED.get(), Items.IRON_PICKAXE,
+                                Items.GOLD_INGOT, Items.LAPIS_LAZULI,
+                                OccultismBlocks.SPIRIT_ATTUNED_CRYSTAL.get().asItem())),
+                new MinerSpec(
+                        "craft_miner_afrit_deeps",
+                        OccultismItems.BOOK_OF_BINDING_BOUND_AFRIT.get(),
+                        OccultismItems.MINER_AFRIT_DEEPS.get(),
+                        List.of(OccultismItems.MINER_DJINNI_ORES.get(), Items.IRON_PICKAXE,
+                                OccultismBlocks.SPIRIT_ATTUNED_CRYSTAL.get().asItem(),
+                                OccultismItems.AFRIT_ESSENCE.get(),
+                                Items.ECHO_SHARD, Items.CRYING_OBSIDIAN)),
+                new MinerSpec(
+                        "craft_miner_marid_master",
+                        OccultismItems.BOOK_OF_BINDING_BOUND_MARID.get(),
+                        OccultismItems.MINER_MARID_MASTER.get(),
+                        List.of(OccultismItems.MINER_AFRIT_DEEPS.get(), Items.IRON_PICKAXE,
+                                OccultismBlocks.SPIRIT_ATTUNED_CRYSTAL.get().asItem(), Items.NETHERITE_PICKAXE,
+                                Items.DRAGON_BREATH, Items.TOTEM_OF_UNDYING, Items.NETHER_STAR,
+                                OccultismItems.MARID_ESSENCE.get())),
+                new MinerSpec(
+                        "misc_miner_ancient_eldritch",
+                        OccultismItems.MINING_DIMENSION_CORE_PIECE.get(),
+                        OccultismItems.MINER_ANCIENT_ELDRITCH.get(),
+                        List.of(OccultismItems.MINER_MARID_MASTER.get(), OccultismItems.MINER_MARID_MASTER.get(),
+                                OccultismItems.MINER_MARID_MASTER.get(), OccultismItems.MINER_MARID_MASTER.get(),
+                                OccultismItems.MINER_MARID_MASTER.get(), OccultismItems.MINER_MARID_MASTER.get(),
+                                OccultismItems.MINER_MARID_MASTER.get(), OccultismItems.MINER_MARID_MASTER.get())));
+
+        OccultismRitualRecipeAdapter adapter = new OccultismRitualRecipeAdapter();
+        for (MinerSpec spec : specs) {
+            ItemStack activation = new ItemStack(spec.activation());
+            RitualRecipe source = minerRecipe(spec.activation(), spec.result(), spec.ingredients());
+            AdvancedAlloyFurnaceRecipe converted = adapter.convertAll(
+                            holder(spec.id(), source), null)
+                    .getFirst();
+
+            ItemStack output = converted.outputs().getFirst();
+            assertTrue(output.is(spec.result()));
+            assertTrue(output.has(OccultismDataComponents.MAX_MINING_TIME));
+            assertTrue(output.has(OccultismDataComponents.ROLLS_PER_OPERATION));
+            assertFalse(output.has(OccultismDataComponents.SPIRIT_NAME), spec.id());
+            assertEquals(spec.ingredients().size() + 1,
+                    converted.inputs().stream().mapToLong(input -> input.count()).sum());
+            assertTrue(ItemIngredientAllocator.matches(
+                    converted.inputs(), withInputs(activation, spec.ingredients()), 1), spec.id());
+            assertFalse(converted.mold().isEmpty(), spec.id());
+            assertEquals(PENTACLE, converted.mold().getItems()[0]
+                    .get(com.sorrowmist.useless.core.component.UComponents.RITUAL_BLUEPRINT_PENTACLE.get())
+                    .pentacles().getFirst());
+        }
+    }
+
+    @Test
+    void copiesMinerSpiritNameAtRuntimeWithoutMutatingActivation() {
+        ItemStack activation = new ItemStack(OccultismItems.BOOK_OF_BINDING_BOUND_AFRIT.get());
+        activation.set(OccultismDataComponents.SPIRIT_NAME, "bound-afrit");
+        ItemStack activationBefore = activation.copy();
+        List<ItemStack> ingredients = List.of(
+                new ItemStack(OccultismItems.MINER_DJINNI_ORES.get()),
+                new ItemStack(Items.IRON_PICKAXE),
+                new ItemStack(OccultismBlocks.SPIRIT_ATTUNED_CRYSTAL.get().asItem()),
+                new ItemStack(OccultismItems.AFRIT_ESSENCE.get()),
+                new ItemStack(Items.ECHO_SHARD),
+                new ItemStack(Items.CRYING_OBSIDIAN));
+        RitualRecipe source = minerRecipe(
+                OccultismItems.BOOK_OF_BINDING_BOUND_AFRIT.get(),
+                OccultismItems.MINER_AFRIT_DEEPS.get(),
+                ingredients.stream().map(ItemStack::getItem).toList());
+
+        AdvancedAlloyFurnaceRecipe converted = new OccultismRitualRecipeAdapter().convertAll(
+                        holder("craft_miner_afrit_deeps", source), null,
+                        withInputs(activation, ingredients))
+                .getFirst();
+
+        ItemStack output = converted.outputs().getFirst();
+        assertEquals("bound-afrit", output.get(OccultismDataComponents.SPIRIT_NAME));
+        assertTrue(output.has(OccultismDataComponents.MAX_MINING_TIME));
+        assertTrue(output.has(OccultismDataComponents.ROLLS_PER_OPERATION));
+        assertTrue(ItemStack.isSameItemSameComponents(activationBefore, activation));
+        assertTrue(converted.inputs().getFirst().ingredient().test(activation));
+        assertFalse(converted.inputs().getFirst().ingredient().test(
+                new ItemStack(OccultismItems.BOOK_OF_BINDING_BOUND_DJINNI.get())));
+    }
+
+    @Test
+    void recognizesMinerPatternsWithDynamicActivationAndOutputSlots() {
+        ItemStack displayedActivation = boundBook(
+                OccultismItems.BOOK_OF_BINDING_BOUND_FOLIOT.get(), "displayed-spirit");
+        RitualRecipe source = minerRecipe(
+                OccultismItems.BOOK_OF_BINDING_BOUND_FOLIOT.get(),
+                OccultismItems.MINER_FOLIOT_UNSPECIALIZED.get(),
+                List.of(OccultismItems.MAGIC_LAMP_EMPTY.get(), Items.IRON_INGOT, Items.GRAVEL));
+        AdvancedAlloyFurnaceRecipe staticRecipe = new OccultismRitualRecipeAdapter().convertAll(
+                        holder("craft_miner_foliot_unspecialized", source), null)
+                .getFirst();
+
+        var profile = OccultismRitualRecipeAdapter.findDynamicPatternProfile(
+                List.of(holder("craft_miner_foliot_unspecialized", source)),
+                withInputs(displayedActivation, List.of(
+                        new ItemStack(OccultismItems.MAGIC_LAMP_EMPTY.get()), new ItemStack(Items.IRON_INGOT),
+                        new ItemStack(Items.GRAVEL))),
+                List.of(staticRecipe.outputs().getFirst()))
+                .orElseThrow();
+
+        assertEquals(Set.of(0), profile.idOnlyInputSlots());
+        assertEquals(Set.of(0), profile.idOnlyOutputSlots());
+
+        ItemStack differentSpirit = boundBook(
+                OccultismItems.BOOK_OF_BINDING_BOUND_FOLIOT.get(), "different-spirit");
+        DynamicComponentPatternDetails dynamic = dynamicPattern(
+                withInputs(displayedActivation, List.of(
+                        new ItemStack(OccultismItems.MAGIC_LAMP_EMPTY.get()), new ItemStack(Items.IRON_INGOT),
+                        new ItemStack(Items.GRAVEL))),
+                List.of(staticRecipe.outputs().getFirst()), profile);
+        assertTrue(dynamic.getInputs()[0].isValid(AEItemKey.of(differentSpirit), null));
+        assertTrue(dynamic.getOutputs().getFirst().what() instanceof AEItemKey key
+                && key.getItem() == OccultismItems.MINER_FOLIOT_UNSPECIALIZED.get());
+        assertTrue(OccultismRitualRecipeAdapter.findDynamicPatternProfile(
+                List.of(holder("craft_miner_foliot_unspecialized", source)),
+                withInputs(new ItemStack(OccultismItems.BOOK_OF_BINDING_BOUND_DJINNI.get()), List.of(
+                        new ItemStack(OccultismItems.MAGIC_LAMP_EMPTY.get()), new ItemStack(Items.IRON_INGOT),
+                        new ItemStack(Items.GRAVEL))),
+                List.of(staticRecipe.outputs().getFirst())).isEmpty());
+        assertTrue(OccultismRitualRecipeAdapter.findDynamicPatternProfile(
+                List.of(holder("craft_miner_foliot_unspecialized", source)),
+                withInputs(displayedActivation, List.of(
+                        new ItemStack(OccultismItems.MAGIC_LAMP_EMPTY.get()), new ItemStack(Items.IRON_INGOT),
+                        new ItemStack(Items.GRAVEL))),
+                List.of(new ItemStack(OccultismItems.MINER_DJINNI_ORES.get()))).isEmpty());
+    }
+
+    @Test
+    void recognizesAncientMinerWithComponentBearingMiningCore() {
+        ItemStack displayedCore = new ItemStack(OccultismItems.MINING_DIMENSION_CORE_PIECE.get());
+        displayedCore.set(OccultismDataComponents.SPIRIT_NAME, "displayed-ancient");
+        List<Item> ingredients = List.of(
+                OccultismItems.MINER_MARID_MASTER.get(), OccultismItems.MINER_MARID_MASTER.get(),
+                OccultismItems.MINER_MARID_MASTER.get(), OccultismItems.MINER_MARID_MASTER.get(),
+                OccultismItems.MINER_MARID_MASTER.get(), OccultismItems.MINER_MARID_MASTER.get(),
+                OccultismItems.MINER_MARID_MASTER.get(), OccultismItems.MINER_MARID_MASTER.get());
+        RitualRecipe source = minerRecipe(
+                OccultismItems.MINING_DIMENSION_CORE_PIECE.get(),
+                OccultismItems.MINER_ANCIENT_ELDRITCH.get(), ingredients);
+        AdvancedAlloyFurnaceRecipe staticRecipe = new OccultismRitualRecipeAdapter().convertAll(
+                        holder("misc_miner_ancient_eldritch", source), null)
+                .getFirst();
+        var profile = OccultismRitualRecipeAdapter.findDynamicPatternProfile(
+                List.of(holder("misc_miner_ancient_eldritch", source)),
+                List.of(displayedCore, new ItemStack(OccultismItems.MINER_MARID_MASTER.get(), 8)),
+                List.of(staticRecipe.outputs().getFirst()))
+                .orElseThrow();
+
+        assertEquals(Set.of(0), profile.idOnlyInputSlots());
+        assertEquals(Set.of(0), profile.idOnlyOutputSlots());
+
+        ItemStack actualCore = new ItemStack(OccultismItems.MINING_DIMENSION_CORE_PIECE.get());
+        actualCore.set(OccultismDataComponents.SPIRIT_NAME, "actual-ancient");
+        AdvancedAlloyFurnaceRecipe runtime = new OccultismRitualRecipeAdapter().convertAll(
+                        holder("misc_miner_ancient_eldritch", source), null,
+                        List.of(actualCore, new ItemStack(OccultismItems.MINER_MARID_MASTER.get(), 8)))
+                .getFirst();
+        assertEquals("actual-ancient", runtime.outputs().getFirst()
+                .get(OccultismDataComponents.SPIRIT_NAME));
+    }
+
     private static RitualRecipe recipe(
             String type, Ingredient activation, NonNullList<Ingredient> ingredients, ItemStack result) {
         return new RitualRecipe(
@@ -258,6 +436,41 @@ class OccultismRitualRecipeAdapterTest {
                 null,
                 null,
                 null);
+    }
+
+    private static RitualRecipe minerRecipe(Item activation, Item result, List<Item> ingredients) {
+        NonNullList<Ingredient> requirements = NonNullList.create();
+        ingredients.forEach(item -> requirements.add(Ingredient.of(item)));
+        return new RitualRecipe(
+                PENTACLE,
+                ResourceLocation.fromNamespaceAndPath("occultism", "craft_miner_spirit"),
+                new ItemStack(Items.PAPER),
+                new ItemStack(result),
+                null,
+                null,
+                null,
+                Ingredient.of(activation),
+                requirements,
+                80,
+                -1,
+                1,
+                null,
+                null,
+                null,
+                null);
+    }
+
+    private static List<ItemStack> withInputs(ItemStack activation, List<?> ingredients) {
+        List<ItemStack> result = new java.util.ArrayList<>();
+        result.add(activation);
+        for (Object ingredient : ingredients) {
+            if (ingredient instanceof Item item) {
+                result.add(new ItemStack(item));
+            } else if (ingredient instanceof ItemStack stack) {
+                result.add(stack);
+            }
+        }
+        return result;
     }
 
     private static RecipeHolder<RitualRecipe> holder(String id, RitualRecipe recipe) {
@@ -280,12 +493,26 @@ class OccultismRitualRecipeAdapterTest {
         return stack;
     }
 
+    private record MinerSpec(String id, Item activation, Item result, List<Item> ingredients) {
+    }
+
     private static DynamicComponentPatternDetails dynamicPattern(
-            ItemStack input, ItemStack output, OccultismRitualRecipeAdapter.DynamicPatternProfile profile) {
-        GenericStack encodedInput = Objects.requireNonNull(GenericStack.fromItemStack(input));
-        GenericStack encodedOutput = Objects.requireNonNull(GenericStack.fromItemStack(output));
+            ItemStack input, ItemStack output,
+            OccultismRitualRecipeAdapter.DynamicPatternProfile profile) {
+        return dynamicPattern(List.of(input), List.of(output), profile);
+    }
+
+    private static DynamicComponentPatternDetails dynamicPattern(
+            List<ItemStack> inputs, List<ItemStack> outputs,
+            OccultismRitualRecipeAdapter.DynamicPatternProfile profile) {
+        List<GenericStack> encodedInputs = inputs.stream()
+                .map(stack -> Objects.requireNonNull(GenericStack.fromItemStack(stack)))
+                .toList();
+        List<GenericStack> encodedOutputs = outputs.stream()
+                .map(stack -> Objects.requireNonNull(GenericStack.fromItemStack(stack)))
+                .toList();
         ItemStack encodedPattern = PatternDetailsHelper.encodeProcessingPattern(
-                List.of(encodedInput), List.of(encodedOutput));
+                encodedInputs, encodedOutputs);
         AEProcessingPattern source = new AEProcessingPattern(
                 Objects.requireNonNull(AEItemKey.of(encodedPattern)));
         return new DynamicComponentPatternDetails(

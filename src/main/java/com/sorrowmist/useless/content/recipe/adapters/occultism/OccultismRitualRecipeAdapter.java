@@ -56,8 +56,15 @@ public final class OccultismRitualRecipeAdapter implements IRecipeAdapter<Ritual
     private static final ResourceLocation REPAIR = id("repair");
     private static final ResourceLocation UPGRADE = id("upgrade");
     private static final ResourceLocation UNBREAKABLE = id("unbreakable");
+    private static final ResourceLocation CRAFT_MINER_SPIRIT = id("craft_miner_spirit");
     private static final ResourceLocation RESURRECT_FAMILIAR = id("resurrect_familiar");
     private static final ResourceLocation COMMAND = id("execute_command");
+    private static final Set<ResourceLocation> MINER_SPIRIT_RECIPE_IDS = Set.of(
+            id("craft_miner_foliot_unspecialized"),
+            id("craft_miner_djinni_ores"),
+            id("craft_miner_afrit_deeps"),
+            id("craft_miner_marid_master"),
+            id("misc_miner_ancient_eldritch"));
     public static final String AUTO_TAME_MARKER = "useless_mod_occultism_auto_tame";
     private static final Set<ResourceLocation> WARNED_SKIPPED_RECIPES = ConcurrentHashMap.newKeySet();
 
@@ -94,7 +101,7 @@ public final class OccultismRitualRecipeAdapter implements IRecipeAdapter<Ritual
         if (isUpgrade(source)) {
             return staticUpgradeRecipes(holder, source);
         }
-        Converted data = convert(source, null, null, null);
+        Converted data = convert(source, null, null, null, level);
         return data == null ? List.of() : List.of(createRecipe(holder.id(), source, data));
     }
 
@@ -134,6 +141,16 @@ public final class OccultismRitualRecipeAdapter implements IRecipeAdapter<Ritual
             }
             return recipes;
         }
+        if (isCraftMinerSpirit(source)) {
+            List<AdvancedAlloyFurnaceRecipe> recipes = new ArrayList<>();
+            for (ItemStack activation : distinctMatches(actualInputs, source.getActivationItem())) {
+                Converted data = convert(source, activation, null, null, level);
+                if (data != null) {
+                    recipes.add(createRecipe(variantId(holder.id(), activation), source, data));
+                }
+            }
+            return recipes;
+        }
         return convertAll(holder, level);
     }
 
@@ -167,7 +184,8 @@ public final class OccultismRitualRecipeAdapter implements IRecipeAdapter<Ritual
     /** Used by the AE pattern resolver to identify outputs generated from actual component-bearing inputs. */
     public static boolean isDynamicComponentRitual(RitualRecipe recipe) {
         return recipe != null && (REPAIR.equals(recipe.getRitualType())
-                || UPGRADE.equals(recipe.getRitualType()) || UNBREAKABLE.equals(recipe.getRitualType()));
+                || UPGRADE.equals(recipe.getRitualType()) || UNBREAKABLE.equals(recipe.getRitualType())
+                || isCraftMinerSpirit(recipe));
     }
 
     public static Optional<DynamicPatternProfile> findDynamicPatternProfile(
@@ -196,25 +214,70 @@ public final class OccultismRitualRecipeAdapter implements IRecipeAdapter<Ritual
                 continue;
             }
             RitualRecipe source = holder.value();
-            Set<Integer> boundBookSlots = boundBookActivationSlots(source, patternInputs);
-            if (isRepairLike(source)) {
+            if (isMinerSpiritRecipe(holder)) {
+                if (patternOutputs.size() == 1) {
+                    addMinerSpiritPatternMatch(source, patternInputs, patternOutputs.getFirst(), matches);
+                }
+            } else if (isRepairLike(source)) {
                 if (patternOutputs.size() == 1) {
                     addRepairPatternMatch(source, patternInputs, patternOutputs.getFirst(), matches);
                 }
             } else if (isUpgrade(source)) {
+                Set<Integer> boundBookSlots = boundBookActivationSlots(source, patternInputs);
                 if (patternOutputs.size() == 1) {
                     addUpgradePatternMatch(
                             source, patternInputs, patternOutputs.getFirst(), boundBookSlots, matches);
                 }
-            } else if (!boundBookSlots.isEmpty()) {
-                addBoundBookPatternMatch(
-                        source, patternInputs, patternOutputs, boundBookSlots, matches);
+            } else {
+                Set<Integer> boundBookSlots = boundBookActivationSlots(source, patternInputs);
+                if (!boundBookSlots.isEmpty()) {
+                    addBoundBookPatternMatch(
+                            source, patternInputs, patternOutputs, boundBookSlots, matches);
+                }
             }
             if (matches.size() > 1) {
                 return Optional.empty();
             }
         }
         return matches.isEmpty() ? Optional.empty() : Optional.of(matches.getFirst());
+    }
+
+    private static void addMinerSpiritPatternMatch(
+            RitualRecipe source, List<ItemStack> patternInputs, ItemStack patternOutput,
+            List<DynamicPatternProfile> matches) {
+        Converted data = convert(source, null, null, null);
+        if (data == null || data.outputs().size() != 1
+                || !matchesOutputItem(data.outputs().getFirst(), patternOutput)
+                || !matchesPatternInputs(data.inputs(), patternInputs)) {
+            return;
+        }
+
+        Set<Integer> activationSlots = new LinkedHashSet<>();
+        Ingredient activation = source.getActivationItem();
+        for (int slot = 0; slot < patternInputs.size(); slot++) {
+            ItemStack input = patternInputs.get(slot);
+            if (matchesItemId(activation, input)) {
+                activationSlots.add(slot);
+            }
+        }
+        if (activationSlots.size() == 1) {
+            matches.add(new DynamicPatternProfile(activationSlots, Set.of(0)));
+        }
+    }
+
+    private static boolean matchesItemId(@Nullable Ingredient ingredient, @Nullable ItemStack stack) {
+        if (ingredient == null || ingredient.isEmpty() || stack == null || stack.isEmpty()) {
+            return false;
+        }
+        for (ItemStack option : ingredient.getItems()) {
+            if (option != null && !option.isEmpty() && option.is(stack.getItem())) {
+                return true;
+            }
+        }
+        // Custom ingredients do not necessarily expose enumerable item stacks. Their own test
+        // remains the only safe fallback, while all five built-in miner rituals use simple item
+        // ingredients and therefore take the component-agnostic branch above.
+        return ingredient.getCustomIngredient() != null && ingredient.test(stack);
     }
 
     private static void addRepairPatternMatch(
@@ -355,6 +418,13 @@ public final class OccultismRitualRecipeAdapter implements IRecipeAdapter<Ritual
     private static Converted convert(
             RitualRecipe source, @Nullable ItemStack repairActivation, @Nullable ItemStack upgradeBase,
             @Nullable ItemStack upgradeActivation) {
+        return convert(source, repairActivation, upgradeBase, upgradeActivation, null);
+    }
+
+    @Nullable
+    private static Converted convert(
+            RitualRecipe source, @Nullable ItemStack repairActivation, @Nullable ItemStack upgradeBase,
+            @Nullable ItemStack upgradeActivation, @Nullable Level level) {
         if (source == null || source.getDuration() < 0 || source.getPentacleId() == null) {
             return null;
         }
@@ -373,6 +443,9 @@ public final class OccultismRitualRecipeAdapter implements IRecipeAdapter<Ritual
             outputs = output.isEmpty() ? List.of() : List.of(output);
         } else if (UPGRADE.equals(source.getRitualType())) {
             ItemStack output = upgradeBase == null ? ItemStack.EMPTY : upgrade(source, upgradeBase, upgradeActivation);
+            outputs = output.isEmpty() ? List.of() : List.of(output);
+        } else if (isCraftMinerSpirit(source)) {
+            ItemStack output = craftMinerSpirit(source, repairActivation, level);
             outputs = output.isEmpty() ? List.of() : List.of(output);
         } else if (source.getEntityTagToSummon() != null) {
             outputs = randomSummonEggs(source);
@@ -563,6 +636,24 @@ public final class OccultismRitualRecipeAdapter implements IRecipeAdapter<Ritual
         return output;
     }
 
+    private static ItemStack craftMinerSpirit(
+            RitualRecipe source, @Nullable ItemStack activation, @Nullable Level level) {
+        ItemStack output = source.getResultItem(null).copy();
+        output.getItem().onCraftedBy(output, level, null);
+        if (activation == null) {
+            // The static JEI representative must not contain a generated spirit name. The
+            // runtime ritual adds the name after configuring the miner from the activation item.
+            output.remove(OccultismDataComponents.SPIRIT_NAME);
+        } else {
+            // CraftMinerSpiritRitual works on a copy of the activation item. Keep the real input
+            // stack untouched, including the case where Occultism generates a name for an input
+            // which did not already carry SPIRIT_NAME.
+            ItemStack activationCopy = activation.copy();
+            ItemNBTUtil.setBoundSpiritName(output, ItemNBTUtil.getBoundSpiritName(activationCopy));
+        }
+        return output;
+    }
+
     private static boolean isSupported(@Nullable RecipeHolder<RitualRecipe> holder) {
         if (holder == null || holder.value() == null) {
             return false;
@@ -601,6 +692,15 @@ public final class OccultismRitualRecipeAdapter implements IRecipeAdapter<Ritual
 
     private static boolean isUpgrade(RitualRecipe source) {
         return UPGRADE.equals(source.getRitualType());
+    }
+
+    private static boolean isCraftMinerSpirit(RitualRecipe source) {
+        return source != null && CRAFT_MINER_SPIRIT.equals(source.getRitualType());
+    }
+
+    private static boolean isMinerSpiritRecipe(RecipeHolder<RitualRecipe> holder) {
+        return holder != null && MINER_SPIRIT_RECIPE_IDS.contains(holder.id())
+                && isCraftMinerSpirit(holder.value());
     }
 
     private static Ingredient upgradeBaseIngredient(RitualRecipe source) {

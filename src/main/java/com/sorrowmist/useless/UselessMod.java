@@ -10,6 +10,7 @@ import com.sorrowmist.useless.init.ModBlockEntities;
 import com.sorrowmist.useless.init.ModBlocks;
 import com.sorrowmist.useless.init.ModCreativeTabs;
 import com.sorrowmist.useless.init.ModItems;
+import com.sorrowmist.useless.init.ModIngredientTypes;
 import com.sorrowmist.useless.init.ModMenuType;
 import com.sorrowmist.useless.init.ModNetwork;
 import com.sorrowmist.useless.init.ModPOIs;
@@ -50,6 +51,7 @@ public class UselessMod {
         modEventBus.addListener(this::commonSetup);
         modEventBus.addListener(this::registerBuiltinResourcePacks);
         UComponents.init(modEventBus);
+        ModIngredientTypes.INGREDIENT_TYPES.register(modEventBus);
 
         ModBlocks.BLOCKS.register(modEventBus);
         ModItems.ITEMS.register(modEventBus);

@@ -44,6 +44,12 @@ import com.sorrowmist.useless.content.recipe.adapters.extendedcrafting.ExtendedC
 import com.sorrowmist.useless.content.recipe.adapters.extendedcrafting.ExtendedCraftingEnderCrafterRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.extendedcrafting.ExtendedCraftingFluxCrafterRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.extendedcrafting.ExtendedCraftingTableRecipeAdapter;
+import com.sorrowmist.useless.content.recipe.adapters.enderio.AlloySmeltingRecipeAdapter;
+import com.sorrowmist.useless.content.recipe.adapters.enderio.EnchanterRecipeAdapter;
+import com.sorrowmist.useless.content.recipe.adapters.enderio.SlicingRecipeAdapter;
+import com.sorrowmist.useless.content.recipe.adapters.enderio.SagMillingRecipeAdapter;
+import com.sorrowmist.useless.content.recipe.adapters.enderio.SoulBindingRecipeAdapter;
+import com.sorrowmist.useless.content.recipe.adapters.enderio.VatFermentingRecipeAdapter;
 import net.neoforged.fml.ModList;
 import net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent;
 import org.apache.logging.log4j.LogManager;
@@ -74,6 +80,7 @@ public final class RecipeAdapterCompatRegistry {
     public static final String NATURES_AURA = "naturesaura";
     public static final String OCCULTISM = "occultism";
     public static final String MALUM = "malum";
+    public static final String ENDER_IO = "enderio";
 
     private static final List<CompatEntry> ENTRIES = List.of(
             new CompatEntry(null, RecipeAdapterCompatRegistry::registerMinecraft),
@@ -95,7 +102,8 @@ public final class RecipeAdapterCompatRegistry {
             new CompatEntry(NEO_ECO_AE, RecipeAdapterCompatRegistry::registerNeoECOAE),
             new CompatEntry(NATURES_AURA, RecipeAdapterCompatRegistry::registerNaturesAura),
             new CompatEntry(OCCULTISM, RecipeAdapterCompatRegistry::registerOccultism),
-            new CompatEntry(MALUM, RecipeAdapterCompatRegistry::registerMalum)
+            new CompatEntry(MALUM, RecipeAdapterCompatRegistry::registerMalum),
+            new CompatEntry(ENDER_IO, RecipeAdapterCompatRegistry::registerEnderIO)
     );
 
     private RecipeAdapterCompatRegistry() {}
@@ -226,6 +234,15 @@ public final class RecipeAdapterCompatRegistry {
     private static void registerMalum() {
         register(new SpiritFocusingRecipeAdapter());
         register(new SpiritInfusionRecipeAdapter());
+    }
+
+    private static void registerEnderIO() {
+        register(new EnchanterRecipeAdapter());
+        register(new AlloySmeltingRecipeAdapter());
+        register(new SlicingRecipeAdapter());
+        register(new SagMillingRecipeAdapter());
+        register(new SoulBindingRecipeAdapter());
+        register(new VatFermentingRecipeAdapter());
     }
 
     private record CompatEntry(@Nullable String modId, Runnable registerAction) {}

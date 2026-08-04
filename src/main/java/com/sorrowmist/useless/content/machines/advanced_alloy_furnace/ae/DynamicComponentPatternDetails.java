@@ -23,8 +23,10 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HexFormat;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.TreeMap;
+import java.util.function.Predicate;
 
 /**
  * Local AE pattern view for recipes whose output may carry runtime components.
@@ -38,12 +40,27 @@ public class DynamicComponentPatternDetails extends AEProcessingPattern implemen
     private final List<GenericStack> outputs;
     private final boolean[] itemIdInputs;
     private final boolean[] itemIdOutputs;
+    private final boolean hasInputMatchers;
     private final String identity;
+
+    @FunctionalInterface
+    public interface InputMatcher {
+        boolean test(AEKey input);
+    }
 
     public DynamicComponentPatternDetails(
             AEProcessingPattern source,
             Iterable<Integer> itemIdInputSlots,
             Iterable<Integer> itemIdOutputSlots,
+            HolderLookup.Provider registries) {
+        this(source, itemIdInputSlots, itemIdOutputSlots, Map.of(), registries);
+    }
+
+    public DynamicComponentPatternDetails(
+            AEProcessingPattern source,
+            Iterable<Integer> itemIdInputSlots,
+            Iterable<Integer> itemIdOutputSlots,
+            Map<Integer, ? extends InputMatcher> inputMatchers,
             HolderLookup.Provider registries) {
         super(source.getDefinition());
         this.source = Objects.requireNonNull(source, "source");
@@ -54,15 +71,27 @@ public class DynamicComponentPatternDetails extends AEProcessingPattern implemen
         this.inputs = new IInput[sourceInputs.length];
         this.itemIdInputs = new boolean[sourceInputs.length];
         this.itemIdOutputs = new boolean[this.outputs.size()];
+        InputMatcher[] matchers = new InputMatcher[sourceInputs.length];
+        if (inputMatchers != null) {
+            for (Map.Entry<Integer, ? extends InputMatcher> entry : inputMatchers.entrySet()) {
+                Integer slot = entry.getKey();
+                if (slot == null || slot < 0 || slot >= matchers.length) {
+                    throw new IllegalArgumentException(
+                            "Input matcher slot is outside the processing pattern: " + slot);
+                }
+                matchers[slot] = Objects.requireNonNull(entry.getValue(), "input matcher");
+            }
+        }
         for (int slot = 0; slot < sourceInputs.length; slot++) {
             this.inputs[slot] = sourceInputs[slot];
         }
 
         markSlots(this.itemIdInputs, itemIdInputSlots, "input");
         markSlots(this.itemIdOutputs, itemIdOutputSlots, "output");
+        this.hasInputMatchers = Arrays.stream(matchers).anyMatch(Objects::nonNull);
         for (int slot = 0; slot < this.inputs.length; slot++) {
             if (this.itemIdInputs[slot]) {
-                this.inputs[slot] = new ItemIdInput(this.inputs[slot]);
+                this.inputs[slot] = new ItemIdInput(this.inputs[slot], matchers[slot]);
             }
         }
 
@@ -94,7 +123,7 @@ public class DynamicComponentPatternDetails extends AEProcessingPattern implemen
     @Override
     public void pushInputsToExternalInventory(KeyCounter[] inputHolder, PatternInputSink inputSink) {
         List<GenericStack> sparseInputs = source.getSparseInputs();
-        if (sparseInputs.size() == inputs.length) {
+        if (sparseInputs.size() == inputs.length && !hasInputMatchers) {
             for (KeyCounter counter : inputHolder) {
                 if (counter == null) continue;
                 for (var entry : counter) {
@@ -115,27 +144,33 @@ public class DynamicComponentPatternDetails extends AEProcessingPattern implemen
             if (sparseInput == null) {
                 continue;
             }
-            if (isItemIdSparseInput(sparseInput.what())
-                    && sparseInput.what() instanceof AEItemKey expectedItem) {
-                pushItemIdInput(expectedItem, sparseInput.amount(), availableInputs, inputSink);
+            ItemIdInput itemIdInput = itemIdInputFor(sparseInput.what());
+            if (itemIdInput != null && sparseInput.what() instanceof AEItemKey expectedItem) {
+                pushItemIdInput(expectedItem, itemIdInput, sparseInput.amount(),
+                        availableInputs, inputSink);
             } else {
                 pushStrictInput(sparseInput.what(), sparseInput.amount(), availableInputs, inputSink);
             }
         }
     }
 
-    private boolean isItemIdSparseInput(AEKey expectedKey) {
+    @Nullable
+    private ItemIdInput itemIdInputFor(AEKey expectedKey) {
         for (int slot = 0; slot < inputs.length; slot++) {
             if (!itemIdInputs[slot]) {
                 continue;
             }
-            for (GenericStack possible : inputs[slot].getPossibleInputs()) {
+            IInput input = inputs[slot];
+            if (!(input instanceof ItemIdInput itemIdInput)) {
+                continue;
+            }
+            for (GenericStack possible : input.getPossibleInputs()) {
                 if (possible != null && possible.what().equals(expectedKey)) {
-                    return true;
+                    return itemIdInput;
                 }
             }
         }
-        return false;
+        return null;
     }
 
     private static void pushStrictInput(
@@ -153,12 +188,13 @@ public class DynamicComponentPatternDetails extends AEProcessingPattern implemen
     }
 
     private static void pushItemIdInput(
-            AEItemKey expectedItem,
+            AEItemKey expectedItem, ItemIdInput input,
             long requiredAmount,
             KeyCounter availableInputs,
             PatternInputSink inputSink) {
         long remaining = requiredAmount;
-        remaining -= pushSelectedInput(expectedItem, remaining, availableInputs, inputSink);
+        remaining -= pushSelectedInput(expectedItem, remaining, availableInputs, inputSink,
+                input::isValidWithoutLevel);
         if (remaining > 0) {
             List<AEKey> selectedKeys = new ArrayList<>();
             for (var entry : availableInputs) {
@@ -172,10 +208,12 @@ public class DynamicComponentPatternDetails extends AEProcessingPattern implemen
                 }
                 if (selectedKey.equals(expectedItem)
                         || !(selectedKey instanceof AEItemKey selectedItem)
-                        || selectedItem.getItem() != expectedItem.getItem()) {
+                        || selectedItem.getItem() != expectedItem.getItem()
+                        || !input.isValidWithoutLevel(selectedKey)) {
                     continue;
                 }
-                remaining -= pushSelectedInput(selectedKey, remaining, availableInputs, inputSink);
+                remaining -= pushSelectedInput(selectedKey, remaining, availableInputs, inputSink,
+                        input::isValidWithoutLevel);
             }
         }
         if (remaining > 0) {
@@ -188,7 +226,11 @@ public class DynamicComponentPatternDetails extends AEProcessingPattern implemen
             AEKey key,
             long requiredAmount,
             KeyCounter availableInputs,
-            PatternInputSink inputSink) {
+            PatternInputSink inputSink,
+            Predicate<AEKey> allowed) {
+        if (!allowed.test(key)) {
+            return 0;
+        }
         long selected = Math.min(requiredAmount, availableInputs.get(key));
         if (selected <= 0) {
             return 0;
@@ -294,10 +336,13 @@ public class DynamicComponentPatternDetails extends AEProcessingPattern implemen
     private static final class ItemIdInput implements IInput {
         private final IInput source;
         private final GenericStack[] possibleInputs;
+        @Nullable
+        private final InputMatcher matcher;
 
-        private ItemIdInput(IInput source) {
+        private ItemIdInput(IInput source, @Nullable InputMatcher matcher) {
             this.source = Objects.requireNonNull(source, "source");
             this.possibleInputs = source.getPossibleInputs().clone();
+            this.matcher = matcher;
         }
 
         @Override
@@ -318,15 +363,22 @@ public class DynamicComponentPatternDetails extends AEProcessingPattern implemen
             for (GenericStack possible : possibleInputs) {
                 if (possible != null && possible.what() instanceof AEItemKey possibleItem
                         && possibleItem.getItem() == itemKey.getItem()) {
-                    return true;
+                    return matcher == null || matcher.test(input);
                 }
             }
             return false;
         }
 
+        private boolean isValidWithoutLevel(AEKey input) {
+            return isValid(input, null);
+        }
+
         @Override
         @Nullable
         public AEKey getRemainingKey(AEKey template) {
+            if (!isValidWithoutLevel(template)) {
+                return null;
+            }
             AEKey direct = source.getRemainingKey(template);
             if (direct != null) {
                 return direct;

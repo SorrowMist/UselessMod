@@ -8,6 +8,7 @@ import appeng.api.stacks.GenericStack;
 import appeng.crafting.pattern.AEProcessingPattern;
 import com.mojang.logging.LogUtils;
 import com.sorrowmist.useless.content.recipe.adapters.draconicevolution.DraconicFusionRecipeAdapter;
+import com.sorrowmist.useless.content.recipe.adapters.enderio.SoulBindingRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.malum.SpiritInfusionRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.occultism.OccultismRitualRecipeAdapter;
 import com.sorrowmist.useless.core.component.OmniversalPatternData;
@@ -27,6 +28,7 @@ import java.util.Map;
 public final class AdvancedAlloyFurnacePatternResolver {
     private static final Logger LOGGER = LogUtils.getLogger();
     private static final String DRACONIC_EVOLUTION_MOD_ID = "draconicevolution";
+    private static final String ENDER_IO_MOD_ID = "enderio";
     private static final String OCCULTISM_MOD_ID = "occultism";
     private static final String MALUM_MOD_ID = "malum";
 
@@ -87,7 +89,16 @@ public final class AdvancedAlloyFurnacePatternResolver {
                 }
             }
             if (ModList.get().isLoaded(MALUM_MOD_ID)) {
-                return resolveDynamicMalumPattern(processingPattern, level);
+                IPatternDetails resolved = resolveDynamicMalumPattern(processingPattern, level);
+                if (resolved != processingPattern) {
+                    return resolved;
+                }
+            }
+            if (ModList.get().isLoaded(ENDER_IO_MOD_ID)) {
+                IPatternDetails resolved = resolveDynamicSoulBindingPattern(processingPattern, level);
+                if (resolved != processingPattern) {
+                    return resolved;
+                }
             }
             return processingPattern;
         } catch (RuntimeException exception) {
@@ -151,7 +162,23 @@ public final class AdvancedAlloyFurnacePatternResolver {
                 level.registryAccess());
     }
 
-    private static List<ItemStack> itemInputs(IPatternDetails pattern) {
+    private static IPatternDetails resolveDynamicSoulBindingPattern(
+            AEProcessingPattern pattern, Level level) {
+        List<ItemStack> inputs = itemInputs(pattern);
+        List<ItemStack> outputs = itemOutputs(pattern);
+        var profile = SoulBindingRecipeAdapter.findDynamicPatternProfile(level, inputs, outputs);
+        if (profile.isEmpty()) {
+            return pattern;
+        }
+        return new DynamicComponentPatternDetails(
+                pattern,
+                profile.get().idOnlyInputSlots(),
+                profile.get().idOnlyOutputSlots(),
+                profile.get().inputMatchers(),
+                level.registryAccess());
+    }
+
+    static List<ItemStack> itemInputs(IPatternDetails pattern) {
         List<ItemStack> result = new ArrayList<>();
         for (IPatternDetails.IInput input : pattern.getInputs()) {
             AEItemKey itemKey = firstItemKey(input.getPossibleInputs());
@@ -164,7 +191,7 @@ public final class AdvancedAlloyFurnacePatternResolver {
         return result;
     }
 
-    private static List<ItemStack> itemOutputs(IPatternDetails pattern) {
+    static List<ItemStack> itemOutputs(IPatternDetails pattern) {
         List<ItemStack> result = new ArrayList<>();
         for (GenericStack output : pattern.getOutputs()) {
             if (!(output.what() instanceof AEItemKey itemKey)

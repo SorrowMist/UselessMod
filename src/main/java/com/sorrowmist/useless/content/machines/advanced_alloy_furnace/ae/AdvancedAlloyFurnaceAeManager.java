@@ -1,8 +1,6 @@
 package com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae;
 
 import appeng.api.crafting.IPatternDetails;
-import appeng.api.networking.crafting.ICraftingProvider;
-import appeng.api.networking.IManagedGridNode;
 import appeng.api.stacks.AEItemKey;
 import appeng.api.stacks.AEKey;
 import appeng.api.stacks.GenericStack;
@@ -51,6 +49,7 @@ public final class AdvancedAlloyFurnaceAeManager {
     private final List<AETaskProgress> clientTaskProgressList = new ArrayList<>();
     private final Map<PendingPatternExecutionKey, PendingAEBatch> aePendingBatches = new HashMap<>();
     private final List<IPatternDetails> patterns = new ArrayList<>();
+    private boolean patternRefreshPending;
     private final AtomicInteger activeAETaskCount = new AtomicInteger(0);
     private final AtomicInteger totalAEProgress = new AtomicInteger(0);
     private final AtomicInteger totalAEMaxProgress = new AtomicInteger(0);
@@ -603,12 +602,21 @@ public final class AdvancedAlloyFurnaceAeManager {
     }
 
     public void updatePatterns() {
+        this.patternRefreshPending = true;
+    }
+
+    /** Rebuilds and publishes the provider at most once during a server tick. */
+    public void tickPatternRefresh() {
+        if (!this.patternRefreshPending) {
+            return;
+        }
         Level level = this.owner.getLevel();
         if (level == null || level.isClientSide) {
             return;
         }
+        this.patternRefreshPending = false;
         rebuildPatterns();
-        requestPatternUpdate();
+        this.owner.onPatternsRebuilt();
     }
 
     /** Rebuilds the provider snapshot without touching AE's live grid index. */
@@ -677,18 +685,6 @@ public final class AdvancedAlloyFurnaceAeManager {
             }
         }
         if (!stacks.isEmpty()) this.owner.markChanged();
-    }
-
-    private void requestPatternUpdate() {
-        Level level = this.owner.getLevel();
-        if (level == null || level.isClientSide) {
-            return;
-        }
-        IManagedGridNode node = this.owner.getMainNode();
-        if (node != null && node.isActive() && node.getNode() != null
-                && node.getNode().getGrid() != null) {
-            ICraftingProvider.requestUpdate(node);
-        }
     }
 
     public int getActiveAETaskCount() {

@@ -176,6 +176,7 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
     // 自动输出计时器
     private int autoOutputTickCounter = 0;
     private boolean isConnectedToAE = false;
+    private long itemStorageRevision;
     // 六个面的输入输出模式（按FurnaceFace索引）
     private final FurnaceFaceMode[] faceModes = new FurnaceFaceMode[FurnaceFace.COUNT];
     private long recipeCatalogGeneration = -1L;
@@ -201,7 +202,7 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
                 INPUT_SLOTS_COUNT,
                 PATTERN_SLOTS_START,
                 PATTERN_SLOTS_END,
-                this::setChanged,
+                this::onItemStorageChanged,
                 slot -> this.updateMoldState(),
                 null,
                 slot -> this.updatePatterns()
@@ -350,6 +351,7 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
             entity.recipeCatalogGeneration = currentCatalogGeneration;
             entity.updatePatterns();
         }
+        entity.aeManager.tickPatternRefresh();
 
         boolean wasActive = entity.getBlockState().getValue(
                 com.sorrowmist.useless.content.blocks.AdvancedAlloyFurnaceBlock.getActiveProperty());
@@ -597,6 +599,7 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
 
     public void restoreInventory(CompoundTag inventoryTag, HolderLookup.Provider registries) {
         this.itemHandler.deserializeNBT(registries, inventoryTag);
+        this.itemStorageRevision++;
         this.updateMoldState();
         this.updatePatterns();
     }
@@ -835,6 +838,10 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
 
     public ItemStackHandler getItemHandler() {
         return this.itemHandler;
+    }
+
+    public long getItemStorageRevision() {
+        return this.itemStorageRevision;
     }
 
     /**
@@ -1224,6 +1231,7 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
 
         if (tag.contains(NBTConstants.INVENTORY)) {
             this.itemHandler.deserializeNBT(registries, tag.getCompound(NBTConstants.INVENTORY));
+            this.itemStorageRevision++;
         }
 
         if (tag.contains(NBTConstants.ENERGY)) {
@@ -1684,6 +1692,18 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
     }
 
     @Override
+    public void onPatternsRebuilt() {
+        if (this.level == null || this.level.isClientSide) {
+            return;
+        }
+        IManagedGridNode node = this.getMainNode();
+        if (node != null && node.isActive() && node.getNode() != null
+                && node.getNode().getGrid() != null) {
+            ICraftingProvider.requestUpdate(node);
+        }
+    }
+
+    @Override
     public int getPatternPriority() {
         return this.aeManager.getPatternPriority();
     }
@@ -1700,6 +1720,11 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
 
     private void updatePatterns() {
         this.aeManager.updatePatterns();
+    }
+
+    private void onItemStorageChanged() {
+        this.itemStorageRevision++;
+        this.setChanged();
     }
 
     // ==================== CraftingTaskContext 接口实现 ====================

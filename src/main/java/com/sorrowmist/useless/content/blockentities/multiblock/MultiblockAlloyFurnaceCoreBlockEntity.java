@@ -141,6 +141,7 @@ public final class MultiblockAlloyFurnaceCoreBlockEntity extends BlockEntity imp
         // The assembly node may have mounted before the controller was linked
         // or while the AE grid was still booting.  Retry the provider refresh
         // after every validation/load transition without rebuilding patterns.
+        aeManager.tickPatternRefresh();
         MePatternAssemblyBlockEntity assembly = getAssembly();
         if (assembly != null) assembly.refreshProviderIfReady();
         boolean progressed = false;
@@ -280,13 +281,21 @@ public final class MultiblockAlloyFurnaceCoreBlockEntity extends BlockEntity imp
 
     public void updatePatterns() {
         if (unloading || isRemoved() || level == null || level.isClientSide) return;
-        aeManager.rebuildPatterns();
+        aeManager.updatePatterns();
         MePatternAssemblyBlockEntity assembly = getAssembly();
         if (assembly != null) assembly.requestProviderRefresh();
     }
 
     public List<IPatternDetails> getAvailablePatterns() {
         return aeManager.getAvailablePatterns();
+    }
+
+    @Override
+    public void onPatternsRebuilt() {
+        MePatternAssemblyBlockEntity assembly = getAssembly();
+        if (assembly != null) {
+            assembly.requestProviderRefresh();
+        }
     }
 
     public int getPatternPriority() {

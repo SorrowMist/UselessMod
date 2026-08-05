@@ -1,0 +1,24 @@
+{
+  "required": false,
+  "package": "com.sorrowmist.useless.mixin.mek",
+  "compatibilityLevel": "JAVA_21",
+  "mixins": [
+    "CachedRecipeMixin",
+    "DigitalMinerMixin",
+    "ElectricPumpMixin",
+    "FluidicPlenisherMixin",
+    "FormulaicAssemblicatorMixin",
+    "FuckingPrideHolidayMixin",
+    "MekanismUtilsMixin",
+    "TileComponentEjectorMixin",
+    "TileEntityDigitalMinerMixin",
+    "UpgradeMixin",
+    "UpgradeUtilsMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  },
+  "overwrites": {
+    "requireAnnotations": true
+  }
+}

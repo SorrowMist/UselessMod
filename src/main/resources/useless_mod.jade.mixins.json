@@ -1,0 +1,12 @@
+{
+  "required": false,
+  "package": "com.sorrowmist.useless.mixin.jade",
+  "compatibilityLevel": "JAVA_21",
+  "mixins": [
+    "JadeItemStorageProviderMixin",
+    "JadeItemStorageExtensionMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

@@ -45,12 +45,9 @@ import net.neoforged.neoforge.network.PacketDistributor;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import appeng.api.crafting.PatternDetailsHelper;
-import appeng.api.stacks.AEItemKey;
 import appeng.api.stacks.GenericStack;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -262,7 +259,6 @@ public class AdvancedAlloyFurnaceScreen extends AbstractContainerScreen<Advanced
     private boolean cancelAePressed = false;
 
     // Cache both successful and failed pattern display lookups for this screen instance.
-    private final Map<AEItemKey, Optional<GenericStack>> patternOutputCache = new HashMap<>();
 
     public AdvancedAlloyFurnaceScreen(AdvancedAlloyFurnaceMenu menu, Inventory playerInventory, Component title) {
         super(menu, playerInventory, title);
@@ -457,15 +453,9 @@ public class AdvancedAlloyFurnaceScreen extends AbstractContainerScreen<Advanced
      */
     @Nullable
     private GenericStack getPatternOutput(ItemStack stack) {
-        if (stack.isEmpty() || !PatternDetailsHelper.isEncodedPattern(stack)) {
-            return null;
-        }
-        AEItemKey key = AEItemKey.of(stack);
-        if (key == null) {
-            return PatternSlotRenderer.getPrimaryOutput(stack, Minecraft.getInstance().level);
-        }
-        return patternOutputCache.computeIfAbsent(key, ignored -> Optional.ofNullable(
-                PatternSlotRenderer.getPrimaryOutput(stack, Minecraft.getInstance().level))).orElse(null);
+        return stack.isEmpty()
+                ? null
+                : PatternSlotRenderer.getPrimaryOutput(stack, Minecraft.getInstance().level);
     }
 
     @Override

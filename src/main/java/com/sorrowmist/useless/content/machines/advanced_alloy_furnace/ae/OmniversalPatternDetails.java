@@ -10,9 +10,17 @@ import com.sorrowmist.useless.core.component.UComponents;
 import net.minecraft.world.level.Level;
 import net.neoforged.fml.ModList;
 
+import java.lang.ref.WeakReference;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.Optional;
+import java.util.WeakHashMap;
 
 public final class OmniversalPatternDetails extends DynamicComponentPatternDetails {
+    private static final int MAX_DECODE_CACHE_ENTRIES = 512;
+    private static final Object DECODE_CACHE_LOCK = new Object();
+    private static final Map<Level, LevelDecodeCache> DECODE_CACHES = new WeakHashMap<>();
+
     private final OmniversalPatternData data;
     private final AdvancedAlloyFurnaceRecipe recipe;
 
@@ -28,6 +36,34 @@ public final class OmniversalPatternDetails extends DynamicComponentPatternDetai
 
     public static OmniversalPatternDetails decode(AEItemKey definition, Level level) {
         if (definition == null || level == null) return null;
+
+        synchronized (DECODE_CACHE_LOCK) {
+            LevelDecodeCache cache = DECODE_CACHES.computeIfAbsent(level, ignored -> new LevelDecodeCache());
+            cache.prepare(AlloyFurnaceRecipeCatalog.generation());
+            CachedDecode cached = cache.entries.get(definition);
+            if (cached != null) {
+                if (cached.failure != null) {
+                    throw cached.failure;
+                }
+                OmniversalPatternDetails details = cached.details.get();
+                if (details != null) {
+                    return details;
+                }
+                cache.entries.remove(definition);
+            }
+
+            try {
+                OmniversalPatternDetails details = decodeUncached(definition, level);
+                cache.entries.put(definition, CachedDecode.success(details));
+                return details;
+            } catch (RuntimeException exception) {
+                cache.entries.put(definition, CachedDecode.failure(exception));
+                throw exception;
+            }
+        }
+    }
+
+    private static OmniversalPatternDetails decodeUncached(AEItemKey definition, Level level) {
         OmniversalPatternData data = definition.get(UComponents.OMNIVERSAL_PATTERN_DATA.get());
         if (data == null || data.version() > OmniversalPatternData.CURRENT_VERSION) {
             throw new IllegalArgumentException("Missing or unsupported omniversal pattern data");
@@ -42,6 +78,43 @@ public final class OmniversalPatternDetails extends DynamicComponentPatternDetai
                         "The bound alloy-furnace recipe is missing or has changed: " + data.recipeId()));
         return new OmniversalPatternDetails(new Decoded(
                 source, data, entry, level));
+    }
+
+    private static final class LevelDecodeCache {
+        private long generation = Long.MIN_VALUE;
+        private final LinkedHashMap<AEItemKey, CachedDecode> entries =
+                new LinkedHashMap<>(64, 0.75F, true) {
+                    @Override
+                    protected boolean removeEldestEntry(Map.Entry<AEItemKey, CachedDecode> eldest) {
+                        return size() > MAX_DECODE_CACHE_ENTRIES;
+                    }
+                };
+
+        private void prepare(long currentGeneration) {
+            if (generation != currentGeneration) {
+                generation = currentGeneration;
+                entries.clear();
+            }
+        }
+    }
+
+    private static final class CachedDecode {
+        private final WeakReference<OmniversalPatternDetails> details;
+        private final RuntimeException failure;
+
+        private CachedDecode(WeakReference<OmniversalPatternDetails> details,
+                             RuntimeException failure) {
+            this.details = details;
+            this.failure = failure;
+        }
+
+        private static CachedDecode success(OmniversalPatternDetails details) {
+            return new CachedDecode(new WeakReference<>(details), null);
+        }
+
+        private static CachedDecode failure(RuntimeException failure) {
+            return new CachedDecode(new WeakReference<>(null), failure);
+        }
     }
 
     public OmniversalPatternData data() {

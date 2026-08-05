@@ -64,4 +64,18 @@ class RecoverableItemStackHandlerTest {
         activeSlots.set(33);
         assertEquals(30, handler.getActiveSlots());
     }
+
+    @Test
+    void changeBatchNotifiesOnceForSeveralSlotWrites() {
+        AtomicInteger changes = new AtomicInteger();
+        RecoverableItemStackHandler handler = new RecoverableItemStackHandler(
+                () -> 27, stack -> true, changes::incrementAndGet);
+
+        handler.withChangeBatch(() -> {
+            handler.setStackInSlot(0, new ItemStack(Items.IRON_INGOT));
+            handler.setStackInSlot(1, new ItemStack(Items.GOLD_INGOT));
+        });
+
+        assertEquals(1, changes.get());
+    }
 }

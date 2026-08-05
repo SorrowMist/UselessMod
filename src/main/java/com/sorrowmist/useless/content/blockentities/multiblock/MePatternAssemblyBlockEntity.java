@@ -55,6 +55,7 @@ public final class MePatternAssemblyBlockEntity extends AEBaseBlockEntity
     @Nullable
     private BlockPos controllerPos;
     private long structureGeneration;
+    private long patternStorageRevision;
     /**
      * AE2 snapshots a provider's patterns when its node is mounted.  The node
      * can become ready before the multiblock controller is linked (or before
@@ -75,6 +76,7 @@ public final class MePatternAssemblyBlockEntity extends AEBaseBlockEntity
 
     private void inventoryChanged() {
         if (unloading || isRemoved()) return;
+        patternStorageRevision++;
         setChanged();
         if (level == null || level.isClientSide) return;
         MultiblockAlloyFurnaceCoreBlockEntity controller = getController();
@@ -87,6 +89,10 @@ public final class MePatternAssemblyBlockEntity extends AEBaseBlockEntity
 
     public RecoverableItemStackHandler getPatterns() {
         return patterns;
+    }
+
+    public long getPatternStorageRevision() {
+        return patternStorageRevision;
     }
 
     public MultiblockPartData createItemData(HolderLookup.Provider registries) {
@@ -331,6 +337,7 @@ public final class MePatternAssemblyBlockEntity extends AEBaseBlockEntity
     public void loadTag(CompoundTag tag, HolderLookup.Provider registries) {
         super.loadTag(tag, registries);
         patterns.deserializeNBT(registries, tag.getCompound("Patterns"));
+        patternStorageRevision++;
         controllerPos = tag.contains("Controller") ? BlockPos.of(tag.getLong("Controller")) : null;
         structureGeneration = tag.getLong("StructureGeneration");
         mainNode.loadFromNBT(tag);

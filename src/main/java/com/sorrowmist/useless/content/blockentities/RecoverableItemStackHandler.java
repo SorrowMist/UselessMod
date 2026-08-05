@@ -15,6 +15,8 @@ public class RecoverableItemStackHandler extends ItemStackHandler {
     private final int minimumActiveSlots;
     private final Predicate<ItemStack> validator;
     private final Runnable changeListener;
+    private int changeBatchDepth;
+    private boolean changePending;
 
     public RecoverableItemStackHandler(IntSupplier activeSlots, Predicate<ItemStack> validator, Runnable changeListener) {
         this(MAX_SLOTS, 27, activeSlots, validator, changeListener);
@@ -50,9 +52,27 @@ public class RecoverableItemStackHandler extends ItemStackHandler {
         return super.insertItem(slot, stack, simulate);
     }
 
+    /** Groups several backing-slot writes into one inventory change callback. */
+    public void withChangeBatch(Runnable action) {
+        changeBatchDepth++;
+        try {
+            action.run();
+        } finally {
+            changeBatchDepth--;
+            if (changeBatchDepth == 0 && changePending) {
+                changePending = false;
+                changeListener.run();
+            }
+        }
+    }
+
     @Override
     protected void onContentsChanged(int slot) {
-        changeListener.run();
+        if (changeBatchDepth > 0) {
+            changePending = true;
+        } else {
+            changeListener.run();
+        }
     }
 
     private static int validateCapacity(int capacity) {

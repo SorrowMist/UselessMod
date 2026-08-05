@@ -5,6 +5,7 @@ import appeng.api.ids.AEComponents;
 import appeng.api.stacks.AEItemKey;
 import appeng.api.stacks.GenericStack;
 import appeng.crafting.pattern.AEProcessingPattern;
+import com.sorrowmist.useless.content.recipe.AlloyFurnaceRecipeCatalog;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.world.item.ItemStack;
@@ -38,14 +39,22 @@ public final class PatternSlotRenderer {
 
     @Nullable
     public static GenericStack getPrimaryOutput(ItemStack pattern, @Nullable Level level) {
-        // Processing patterns already carry their display inputs and outputs. Decoding them via
-        // PatternDetailsHelper can invoke dynamic recipe compatibility solely to render an icon.
-        if (pattern.get(AEComponents.ENCODED_PROCESSING_PATTERN) != null) {
-            return getEncodedProcessingPrimaryOutput(pattern);
-        }
-        if (pattern.isEmpty() || level == null || !PatternDetailsHelper.isEncodedPattern(pattern)) return null;
-        var details = PatternDetailsHelper.decodePattern(pattern, level);
-        return details == null || details.getOutputs().isEmpty() ? null : details.getOutputs().getFirst();
+        if (pattern.isEmpty()) return null;
+        AEItemKey key = AEItemKey.of(pattern);
+        if (key == null) return null;
+
+        return PatternOutputCache.get(key, level, AlloyFurnaceRecipeCatalog.generation(), () -> {
+            // Processing patterns already carry their display inputs and outputs. Decoding them
+            // via PatternDetailsHelper can invoke dynamic recipe compatibility solely to render
+            // an icon.
+            if (pattern.get(AEComponents.ENCODED_PROCESSING_PATTERN) != null) {
+                return getEncodedProcessingPrimaryOutput(pattern);
+            }
+            if (level == null || !PatternDetailsHelper.isEncodedPattern(pattern)) return null;
+            var details = PatternDetailsHelper.decodePattern(pattern, level);
+            return details == null || details.getOutputs().isEmpty()
+                    ? null : details.getOutputs().getFirst();
+        }).orElse(null);
     }
 
     @Nullable

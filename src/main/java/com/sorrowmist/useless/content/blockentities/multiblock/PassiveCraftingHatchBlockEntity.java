@@ -101,6 +101,7 @@ public final class PassiveCraftingHatchBlockEntity extends BlockEntity
     private boolean statusDirty = true;
     private int statusSyncTimer;
     private int observedActivePatternSlots = -1;
+    private long patternStorageRevision;
 
     private final ContainerData menuData = new ContainerData() {
         @Override
@@ -143,6 +144,10 @@ public final class PassiveCraftingHatchBlockEntity extends BlockEntity
         return patterns;
     }
 
+    public long getPatternStorageRevision() {
+        return patternStorageRevision;
+    }
+
     public MultiblockPartData createItemData(HolderLookup.Provider registries) {
         return MultiblockPartData.passiveHatch(
                 patterns, registries, intervalTicks, multiplier);
@@ -156,6 +161,7 @@ public final class PassiveCraftingHatchBlockEntity extends BlockEntity
         } finally {
             loading = false;
         }
+        patternStorageRevision++;
         intervalTicks = data.intervalTicks() > 0
                 ? Math.max(MIN_INTERVAL_TICKS, Math.min(MAX_INTERVAL_TICKS, data.intervalTicks()))
                 : DEFAULT_INTERVAL_TICKS;
@@ -585,6 +591,7 @@ public final class PassiveCraftingHatchBlockEntity extends BlockEntity
         if (loading || unloading || isRemoved()) {
             return;
         }
+        patternStorageRevision++;
         clearPatternDecodeCache();
         countdownTicks = intervalTicks;
         resetIdleStates();
@@ -731,6 +738,7 @@ public final class PassiveCraftingHatchBlockEntity extends BlockEntity
         loading = true;
         patterns.deserializeNBT(registries, tag.getCompound("Patterns"));
         loading = false;
+        patternStorageRevision++;
         controllerPos = tag.contains("Controller") ? BlockPos.of(tag.getLong("Controller")) : null;
         structureGeneration = tag.getLong("StructureGeneration");
         intervalTicks = Math.max(MIN_INTERVAL_TICKS,

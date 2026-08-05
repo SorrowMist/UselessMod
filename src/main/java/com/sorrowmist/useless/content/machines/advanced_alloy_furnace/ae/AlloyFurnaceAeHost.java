@@ -13,6 +13,10 @@ public interface AlloyFurnaceAeHost extends CraftingTaskContext {
 
     Iterable<ItemStack> getPatternStacks();
 
+    /** Called after a pending pattern snapshot has been rebuilt on the server thread. */
+    default void onPatternsRebuilt() {
+    }
+
     default boolean canPublishPatterns() {
         return true;
     }

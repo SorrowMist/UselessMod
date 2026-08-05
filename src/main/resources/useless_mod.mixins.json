@@ -1,7 +1,6 @@
 {
   "required": false,
   "package": "com.sorrowmist.useless.mixin",
-  "plugin": "com.sorrowmist.useless.mixin.UselessMixinConfigPlugin",
   "compatibilityLevel": "JAVA_21",
   "mixins": [
     "EntityMixin",
@@ -31,18 +30,7 @@
     "botanypots.BotanyPotBlockEntityAccessor",
     "botanypots.BotanyPotBlockEntityMixin",
     "eae.PatternSlotTrackerMixin",
-    "eae.TileAssemblerMatrixPatternMixin",
-    "mek.CachedRecipeMixin",
-    "mek.DigitalMinerMixin",
-    "mek.ElectricPumpMixin",
-    "mek.FluidicPlenisherMixin",
-    "mek.FormulaicAssemblicatorMixin",
-    "mek.FuckingPrideHolidayMixin",
-    "mek.MekanismUtilsMixin",
-    "mek.TileComponentEjectorMixin",
-    "mek.TileEntityDigitalMinerMixin",
-    "mek.UpgradeMixin",
-    "mek.UpgradeUtilsMixin"
+    "eae.TileAssemblerMatrixPatternMixin"
   ],
   "client": [
     "botanypots.BotanyPotRendererMixin",

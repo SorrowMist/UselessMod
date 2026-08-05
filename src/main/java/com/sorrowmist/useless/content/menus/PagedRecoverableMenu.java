@@ -173,14 +173,19 @@ public class PagedRecoverableMenu extends AbstractContainerMenu {
         ItemStack remaining = stack.copy();
         int first = Math.floorMod(firstSlot, activeSlots);
         // Match existing stacks before claiming empty slots, like vanilla quick-move.
-        for (int pass = 0; pass < 2 && !remaining.isEmpty(); pass++) {
-            boolean emptySlots = pass == 1;
-            for (int offset = 0; offset < activeSlots && !remaining.isEmpty(); offset++) {
-                int slot = (first + offset) % activeSlots;
-                if (inventory.getStackInSlot(slot).isEmpty() != emptySlots) continue;
-                remaining = inventory.insertItem(slot, remaining, false);
+        final ItemStack[] remainingHolder = {remaining};
+        inventory.withChangeBatch(() -> {
+            int firstPass = stack.getMaxStackSize() <= 1 ? 1 : 0;
+            for (int pass = firstPass; pass < 2 && !remainingHolder[0].isEmpty(); pass++) {
+                boolean emptySlots = pass == 1;
+                for (int offset = 0; offset < activeSlots && !remainingHolder[0].isEmpty(); offset++) {
+                    int slot = (first + offset) % activeSlots;
+                    if (inventory.getStackInSlot(slot).isEmpty() != emptySlots) continue;
+                    remainingHolder[0] = inventory.insertItem(slot, remainingHolder[0], false);
+                }
             }
-        }
+        });
+        remaining = remainingHolder[0];
 
         int inserted = stack.getCount() - remaining.getCount();
         if (inserted <= 0) return false;

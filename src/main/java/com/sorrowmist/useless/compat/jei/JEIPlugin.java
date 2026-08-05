@@ -38,6 +38,7 @@ public final class JEIPlugin implements IModPlugin {
 
     @Override
     public void registerCategories(IRecipeCategoryRegistration registration) {
+        GenericStackJeiIngredientProviders.initialize();
         IGuiHelper guiHelper = registration.getJeiHelpers().getGuiHelper();
         registration.addRecipeCategories(new AdvancedAlloyFurnaceRecipeCategory(guiHelper));
         registration.addRecipeCategories(new CatalystInfoCategory(guiHelper));

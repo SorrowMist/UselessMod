@@ -17,11 +17,6 @@ import com.sorrowmist.useless.content.recipe.adapters.ae.extendedae.CrystalAssem
 import com.sorrowmist.useless.content.recipe.adapters.arsnouveau.EnchantingApparatusRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.arsnouveau.ImbuementRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.industrialforegoing.DissolutionChamberRecipeAdapter;
-import com.sorrowmist.useless.content.recipe.adapters.mekanism.CrusherRecipeAdapter;
-import com.sorrowmist.useless.content.recipe.adapters.mekanism.EnrichmentChamberRecipeAdapter;
-import com.sorrowmist.useless.content.recipe.adapters.mekanism.MetallurgicInfuserRecipeAdapter;
-import com.sorrowmist.useless.content.recipe.adapters.mekanism.OsmiumCompressorRecipeAdapter;
-import com.sorrowmist.useless.content.recipe.adapters.mekanism.PrecisionSawmillRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.minecraft.CraftingRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.minecraft.SmeltingRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.mysticalagriculture.AwakeningRecipeAdapter;
@@ -64,6 +59,8 @@ public final class RecipeAdapterCompatRegistry {
     public static final String EXTENDED_AE = "extendedae";
     public static final String ADVANCED_AE = "advanced_ae";
     public static final String MEKANISM = "mekanism";
+    public static final String MEKANISM_GENERATORS = "mekanismgenerators";
+    public static final String APP_MEK = "appmek";
     public static final String AE2 = "ae2";
     public static final String AE2CS = "ae2cs";
     public static final String INDUSTRIAL_FOREGOING = "industrialforegoing";
@@ -78,6 +75,7 @@ public final class RecipeAdapterCompatRegistry {
     public static final String EXTENDED_CRAFTING = "extendedcrafting";
     public static final String NEO_ECO_AE = "neoecoae";
     public static final String NATURES_AURA = "naturesaura";
+    public static final String FORBIDDEN_ARCANUS = "forbidden_arcanus";
     public static final String OCCULTISM = "occultism";
     public static final String MALUM = "malum";
     public static final String ENDER_IO = "enderio";
@@ -87,6 +85,7 @@ public final class RecipeAdapterCompatRegistry {
             new CompatEntry(EXTENDED_AE, RecipeAdapterCompatRegistry::registerExtendedAE),
             new CompatEntry(ADVANCED_AE, RecipeAdapterCompatRegistry::registerAdvancedAE),
             new CompatEntry(MEKANISM, RecipeAdapterCompatRegistry::registerMekanism),
+            new CompatEntry(MEKANISM_GENERATORS, RecipeAdapterCompatRegistry::registerMekanismGenerators),
             new CompatEntry(AE2, RecipeAdapterCompatRegistry::registerAE2),
             new CompatEntry(AE2CS, RecipeAdapterCompatRegistry::registerAECrystalScience),
             new CompatEntry(INDUSTRIAL_FOREGOING, RecipeAdapterCompatRegistry::registerIndustrialForegoing),
@@ -101,6 +100,7 @@ public final class RecipeAdapterCompatRegistry {
             new CompatEntry(EXTENDED_CRAFTING, RecipeAdapterCompatRegistry::registerExtendedCrafting),
             new CompatEntry(NEO_ECO_AE, RecipeAdapterCompatRegistry::registerNeoECOAE),
             new CompatEntry(NATURES_AURA, RecipeAdapterCompatRegistry::registerNaturesAura),
+            new CompatEntry(FORBIDDEN_ARCANUS, RecipeAdapterCompatRegistry::registerForbiddenArcanus),
             new CompatEntry(OCCULTISM, RecipeAdapterCompatRegistry::registerOccultism),
             new CompatEntry(MALUM, RecipeAdapterCompatRegistry::registerMalum),
             new CompatEntry(ENDER_IO, RecipeAdapterCompatRegistry::registerEnderIO)
@@ -149,11 +149,22 @@ public final class RecipeAdapterCompatRegistry {
     }
 
     private static void registerMekanism() {
-        register(new MetallurgicInfuserRecipeAdapter());
-        register(new EnrichmentChamberRecipeAdapter());
-        register(new CrusherRecipeAdapter());
-        register(new PrecisionSawmillRecipeAdapter());
-        register(new OsmiumCompressorRecipeAdapter());
+        invokeOptionalLoader("com.sorrowmist.useless.compat.mekanism.MekanismRecipeCompatLoader");
+    }
+
+    private static void registerMekanismGenerators() {
+        if (isLoaded(MEKANISM) && isLoaded(APP_MEK)) {
+            invokeOptionalLoader("com.sorrowmist.useless.compat.mekanismgenerators.MekanismGeneratorsCompatLoader");
+        }
+    }
+
+    private static void invokeOptionalLoader(String className) {
+        try {
+            Class<?> loader = Class.forName(className, true, RecipeAdapterCompatRegistry.class.getClassLoader());
+            loader.getMethod("register").invoke(null);
+        } catch (ReflectiveOperationException | LinkageError exception) {
+            LOGGER.error("Failed to register optional recipe adapters from {}", className, exception);
+        }
     }
 
     private static void registerAE2() {
@@ -225,6 +236,10 @@ public final class RecipeAdapterCompatRegistry {
         register(new NatureAltarRecipeAdapter());
         register(new AnimalSpawnerRecipeAdapter());
         register(new OfferingRecipeAdapter());
+    }
+
+    private static void registerForbiddenArcanus() {
+        invokeOptionalLoader("com.sorrowmist.useless.compat.forbiddenarcanus.ForbiddenArcanusRecipeCompatLoader");
     }
 
     private static void registerOccultism() {

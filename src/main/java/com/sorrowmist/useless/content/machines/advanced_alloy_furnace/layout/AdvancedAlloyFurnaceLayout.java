@@ -16,6 +16,8 @@ public final class AdvancedAlloyFurnaceLayout {
     public static final int PATTERN_SLOTS_END = PATTERN_SLOTS_START + PATTERN_SLOTS_COUNT - 1;
     public static final int TOTAL_SLOTS = 128;
     public static final int FLUID_TANK_COUNT = 6;
+    public static final int CHEMICAL_TANK_COUNT = 3;
+    public static final int CHEMICAL_TANK_START = FLUID_TANK_COUNT;
 
     private AdvancedAlloyFurnaceLayout() {
     }

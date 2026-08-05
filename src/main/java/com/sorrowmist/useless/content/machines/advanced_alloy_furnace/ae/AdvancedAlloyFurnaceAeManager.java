@@ -9,6 +9,8 @@ import appeng.api.stacks.GenericStack;
 import appeng.api.stacks.KeyCounter;
 import com.mojang.logging.LogUtils;
 import com.sorrowmist.useless.network.AETaskProgressPacket;
+import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.chemical.ChemicalStackView;
+import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.chemical.FurnaceChemicalStorage;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
@@ -54,7 +56,9 @@ public final class AdvancedAlloyFurnaceAeManager {
     private final AtomicInteger totalAEMaxProgress = new AtomicInteger(0);
     // 返还失败的输入暂存（防丢失），逐 tick 重试写回 AE 网络；仅服务端主线程访问
     private final List<GenericStack> unreturnedInputs = new ArrayList<>();
-    private int unreturnedRetryTimer = 0;
+    private final List<GenericStack> unreturnedOutputs = new ArrayList<>();
+    private int unreturnedInputRetryTimer = 0;
+    private int unreturnedOutputRetryTimer = 0;
     private int patternPriority = 0;
     private int nextTaskId = 0;
     // 延迟加载的任务数据（loadTag 时 level 尚不可用，需推迟到首 tick 解码样板）
@@ -110,34 +114,119 @@ public final class AdvancedAlloyFurnaceAeManager {
         this.owner.markChanged();
     }
 
+    /** Stores normal recipe output that fits neither AE nor an output chemical slot yet. */
+    public void stashUnreturnedOutput(AEKey key, long amount) {
+        if (key == null || amount <= 0) {
+            return;
+        }
+        this.unreturnedOutputs.add(new GenericStack(key, amount));
+        this.owner.markChanged();
+    }
+
     /** 定期把暂存的未返还输入重试写回 AE 网络 */
     public void tickUnreturnedInputs() {
         if (this.unreturnedInputs.isEmpty()) {
             return;
         }
-        if (++this.unreturnedRetryTimer < UNRETURNED_RETRY_TICKS) {
+        if (++this.unreturnedInputRetryTimer < UNRETURNED_RETRY_TICKS) {
             return;
         }
-        this.unreturnedRetryTimer = 0;
+        this.unreturnedInputRetryTimer = 0;
 
         boolean changed = false;
         var it = this.unreturnedInputs.listIterator();
         while (it.hasNext()) {
             GenericStack gs = it.next();
-            long inserted = this.owner.tryOutputKeyToAE(gs.what(), gs.amount());
+            long requested = gs.amount();
+            long inserted = clampInserted(this.owner.tryOutputKeyToAE(gs.what(), requested), requested);
+            long remaining = requested - inserted;
+            if (remaining > 0L && this.owner.getChemicalKeyProvider().isChemicalKey(gs.what())) {
+                inserted += insertChemicalFallback(gs.what(), remaining);
+                remaining = requested - inserted;
+            }
             if (inserted <= 0) {
                 continue;
             }
             changed = true;
-            if (inserted >= gs.amount()) {
+            if (remaining <= 0L) {
                 it.remove();
             } else {
-                it.set(new GenericStack(gs.what(), gs.amount() - inserted));
+                it.set(new GenericStack(gs.what(), remaining));
             }
         }
         if (changed) {
             this.owner.markChanged();
         }
+    }
+
+    /** Retries normal chemical outputs without ever placing them into input slots. */
+    public void tickUnreturnedOutputs() {
+        if (this.unreturnedOutputs.isEmpty()) {
+            return;
+        }
+        if (++this.unreturnedOutputRetryTimer < UNRETURNED_RETRY_TICKS) {
+            return;
+        }
+        this.unreturnedOutputRetryTimer = 0;
+
+        boolean changed = false;
+        var it = this.unreturnedOutputs.listIterator();
+        while (it.hasNext()) {
+            GenericStack gs = it.next();
+            long requested = gs.amount();
+            long inserted = this.owner.isReturnOutputToAe()
+                    ? clampInserted(this.owner.tryOutputKeyToAE(gs.what(), requested), requested)
+                    : 0L;
+            long remaining = requested - inserted;
+            if (remaining > 0L && this.owner.getChemicalKeyProvider().isChemicalKey(gs.what())) {
+                inserted += insertChemicalOutputFallback(gs.what(), remaining);
+                remaining = requested - inserted;
+            }
+            if (inserted <= 0L) {
+                continue;
+            }
+            changed = true;
+            if (remaining <= 0L) {
+                it.remove();
+            } else {
+                it.set(new GenericStack(gs.what(), remaining));
+            }
+        }
+        if (changed) {
+            this.owner.markChanged();
+        }
+    }
+
+    private long insertChemicalFallback(AEKey key, long amount) {
+        if (amount <= 0L) return 0L;
+        ChemicalStackView view = this.owner.getChemicalKeyProvider()
+                .fromGenericStack(new GenericStack(key, amount));
+        if (view == null || view.isEmpty()) return 0L;
+
+        long inserted = insertChemical(this.owner.getInputChemicalStorage(), view);
+        if (inserted < amount) {
+            inserted += insertChemical(this.owner.getOutputChemicalStorage(),
+                    view.copyWithAmount(amount - inserted));
+        }
+        return Math.min(amount, Math.max(0L, inserted));
+    }
+
+    private long insertChemicalOutputFallback(AEKey key, long amount) {
+        if (amount <= 0L) return 0L;
+        ChemicalStackView view = this.owner.getChemicalKeyProvider()
+                .fromGenericStack(new GenericStack(key, amount));
+        if (view == null || view.isEmpty()) return 0L;
+        return insertChemical(this.owner.getOutputChemicalStorage(), view);
+    }
+
+    private static long insertChemical(FurnaceChemicalStorage storage, ChemicalStackView view) {
+        if (storage == null || !storage.isAvailable() || view == null || view.isEmpty()) return 0L;
+        ChemicalStackView remainder = storage.insertChemical(view, false);
+        return Math.max(0L, view.amount() - remainder.amount());
+    }
+
+    private static long clampInserted(long inserted, long requested) {
+        return Math.max(0L, Math.min(requested, inserted));
     }
 
     // ==================== 持久化 ====================
@@ -168,7 +257,21 @@ public final class AdvancedAlloyFurnaceAeManager {
             unreturnedTag.add(GenericStack.writeTag(registries, gs));
         }
         tag.put("UnreturnedInputs", unreturnedTag);
+
+        ListTag unreturnedOutputsTag = new ListTag();
+        for (GenericStack gs : this.unreturnedOutputs) {
+            unreturnedOutputsTag.add(GenericStack.writeTag(registries, gs));
+        }
+        tag.put("UnreturnedOutputs", unreturnedOutputsTag);
         tag.putInt("NextTaskId", this.nextTaskId);
+    }
+
+    public boolean hasPersistedData() {
+        return !this.activeTasks.isEmpty()
+                || !this.aePendingBatches.isEmpty()
+                || !this.unreturnedInputs.isEmpty()
+                || !this.unreturnedOutputs.isEmpty()
+                || this.deferredTasksTag != null;
     }
 
     /**
@@ -185,7 +288,6 @@ public final class AdvancedAlloyFurnaceAeManager {
      */
     public void loadDeferredTasks() {
         CompoundTag tag = this.deferredTasksTag;
-        this.deferredTasksTag = null;
         if (tag == null) {
             return;
         }
@@ -193,29 +295,46 @@ public final class AdvancedAlloyFurnaceAeManager {
         if (level == null) {
             return;
         }
+        this.deferredTasksTag = null;
         HolderLookup.Provider registries = level.registryAccess();
 
         this.nextTaskId = tag.getInt("NextTaskId");
 
         ListTag tasksTag = tag.getList("ActiveTasks", Tag.TAG_COMPOUND);
         for (int i = 0; i < tasksTag.size(); i++) {
-            CraftingTask task = CraftingTask.load(tasksTag.getCompound(i), level, this.owner, registries);
-            if (task != null) {
-                this.activeTasks.put(task.getTaskId(), task);
-                this.activeTasksByPattern.computeIfAbsent(
-                        PatternExecutionKey.of(task.getPattern(), task.getComponentInputKeys()),
-                        k -> new ArrayList<>()).add(task);
-                this.activeAETaskCount.incrementAndGet();
+            CompoundTag taskTag = tasksTag.getCompound(i);
+            try {
+                CraftingTask task = CraftingTask.load(taskTag, level, this.owner, registries);
+                if (task != null) {
+                    this.activeTasks.put(task.getTaskId(), task);
+                    this.activeTasksByPattern.computeIfAbsent(
+                            PatternExecutionKey.of(task.getPattern(), task.getComponentInputKeys()),
+                            k -> new ArrayList<>()).add(task);
+                    this.activeAETaskCount.incrementAndGet();
+                } else {
+                    CraftingTask.returnSavedMaterials(taskTag, this.owner, registries);
+                }
+            } catch (RuntimeException exception) {
+                LOGGER.error("Failed to restore an Advanced Alloy Furnace AE task; returning its saved materials", exception);
+                CraftingTask.returnSavedMaterials(taskTag, this.owner, registries);
             }
         }
 
         ListTag pendingTag = tag.getList("PendingBatches", Tag.TAG_COMPOUND);
         synchronized (this.aePendingBatches) {
             for (int i = 0; i < pendingTag.size(); i++) {
-                PendingAEBatch batch = PendingAEBatch.load(pendingTag.getCompound(i), level, registries);
-                if (batch != null && batch.pattern != null) {
-                    this.aePendingBatches.put(PendingPatternExecutionKey.of(
-                            batch.pattern, batch.operationsPerPush, batch.getComponentInputKeys()), batch);
+                CompoundTag batchTag = pendingTag.getCompound(i);
+                try {
+                    PendingAEBatch batch = PendingAEBatch.load(batchTag, level, registries);
+                    if (batch != null && batch.pattern != null) {
+                        this.aePendingBatches.put(PendingPatternExecutionKey.of(
+                                batch.pattern, batch.operationsPerPush, batch.getComponentInputKeys()), batch);
+                    } else {
+                        returnSavedBatchMaterials(batchTag, registries);
+                    }
+                } catch (RuntimeException exception) {
+                    LOGGER.error("Failed to restore an Advanced Alloy Furnace AE batch; returning its saved materials", exception);
+                    returnSavedBatchMaterials(batchTag, registries);
                 }
             }
         }
@@ -227,6 +346,23 @@ public final class AdvancedAlloyFurnaceAeManager {
                 this.unreturnedInputs.add(gs);
             }
         }
+
+        ListTag unreturnedOutputsTag = tag.getList("UnreturnedOutputs", Tag.TAG_COMPOUND);
+        for (int i = 0; i < unreturnedOutputsTag.size(); i++) {
+            GenericStack gs = GenericStack.readTag(registries, unreturnedOutputsTag.getCompound(i));
+            if (gs != null) {
+                this.unreturnedOutputs.add(gs);
+            }
+        }
+    }
+
+    private void returnSavedBatchMaterials(CompoundTag tag, HolderLookup.Provider registries) {
+        List<KeyCounter[]> inputs = new ArrayList<>();
+        ListTag craftsTag = tag.getList("Crafts", Tag.TAG_COMPOUND);
+        for (int i = 0; i < craftsTag.size(); i++) {
+            inputs.add(readKeyCounters(registries, craftsTag.getCompound(i)));
+        }
+        CraftingTask.returnInputsToAE(inputs, this.owner);
     }
 
     public void updateClientTaskProgress(List<AETaskProgressPacket.TaskProgressData> tasks) {
@@ -374,7 +510,8 @@ public final class AdvancedAlloyFurnaceAeManager {
     }
 
     public boolean hasWork() {
-        if (!this.activeTasks.isEmpty() || this.deferredTasksTag != null) {
+        if (!this.activeTasks.isEmpty() || this.deferredTasksTag != null
+                || !this.unreturnedInputs.isEmpty() || !this.unreturnedOutputs.isEmpty()) {
             return true;
         }
         synchronized (this.aePendingBatches) {
@@ -518,11 +655,25 @@ public final class AdvancedAlloyFurnaceAeManager {
         return List.copyOf(this.unreturnedInputs);
     }
 
+    public List<GenericStack> getUnreturnedOutputsSnapshot() {
+        return List.copyOf(this.unreturnedOutputs);
+    }
+
     public void addUnreturnedInputs(List<GenericStack> stacks) {
         if (stacks == null) return;
         for (GenericStack stack : stacks) {
             if (stack != null && stack.what() != null && stack.amount() > 0) {
                 this.unreturnedInputs.add(stack);
+            }
+        }
+        if (!stacks.isEmpty()) this.owner.markChanged();
+    }
+
+    public void addUnreturnedOutputs(List<GenericStack> stacks) {
+        if (stacks == null) return;
+        for (GenericStack stack : stacks) {
+            if (stack != null && stack.what() != null && stack.amount() > 0) {
+                this.unreturnedOutputs.add(stack);
             }
         }
         if (!stacks.isEmpty()) this.owner.markChanged();

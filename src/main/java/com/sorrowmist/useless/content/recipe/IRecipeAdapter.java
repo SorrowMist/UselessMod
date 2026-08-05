@@ -33,6 +33,16 @@ public interface IRecipeAdapter<T extends Recipe<?>> {
     Class<T> getRecipeClass();
 
     /**
+     * Returns recipe holders generated from runtime data rather than the world's RecipeManager.
+     *
+     * <p>This is used by integrations such as Mekanism's recipe-viewer-only machines. The default
+     * is empty so ordinary adapters keep using RecipeManager entries.</p>
+     */
+    default List<RecipeHolder<T>> getGeneratedRecipes(Level level) {
+        return List.of();
+    }
+
+    /**
      * 将一个原始配方转换为单个高级合金炉配方
      * <p>
      * 这是单结果转换的便捷入口。默认实现会调用 {@link #convertAll(RecipeHolder, Level)}，并返回列表中的第一个结果。

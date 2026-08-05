@@ -9,6 +9,7 @@ import appeng.api.stacks.KeyCounter;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.catalyst.ResolvedCatalystEffect;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.execution.AlloyFurnaceRecipeExecutor;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.io.FurnaceOutputPort;
+import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.chemical.ChemicalStackView;
 import com.sorrowmist.useless.content.recipe.AdvancedAlloyFurnaceRecipe;
 import com.sorrowmist.useless.content.recipe.AlloyFurnaceRecipeManager;
 import net.minecraft.core.HolderLookup;
@@ -409,15 +410,15 @@ public class CraftingTask {
         List<ItemStack> itemsToReturn = new ArrayList<>(taskInputItems);
         List<FluidStack> fluidsToReturn = new ArrayList<>(taskInputFluids);
         List<OutputKey> keysToReturn = new ArrayList<>(taskInputKeys);
+        List<ItemStack> outputItemsToReturn = new ArrayList<>(pendingOutputItems);
+        List<FluidStack> outputFluidsToReturn = new ArrayList<>(pendingOutputFluids);
+        List<OutputKey> outputKeysToReturn = new ArrayList<>(pendingOutputKeys);
         for (CraftingSubTask subTask : queuedSubTasks) {
             itemsToReturn.addAll(subTask.items);
             fluidsToReturn.addAll(subTask.fluids);
             keysToReturn.addAll(subTask.keys);
         }
         // 已结算但尚未写出的产物同样不能丢，随取消一并返还
-        itemsToReturn.addAll(pendingOutputItems);
-        fluidsToReturn.addAll(pendingOutputFluids);
-        keysToReturn.addAll(pendingOutputKeys);
         pendingOutputItems.clear();
         pendingOutputFluids.clear();
         pendingOutputKeys.clear();
@@ -428,6 +429,7 @@ public class CraftingTask {
         queuedSubTasks.clear();
 
         returnMaterials(context, itemsToReturn, fluidsToReturn, keysToReturn);
+        returnOutputMaterials(context, outputItemsToReturn, outputFluidsToReturn, outputKeysToReturn);
     }
 
     /** 返还尚未转为任务的 AE 原始输入（待启动批次取消时使用） */
@@ -455,8 +457,11 @@ public class CraftingTask {
         FurnaceOutputPort.AeOutput port = context.createAeOutputPort();
 
         for (OutputKey keyToReturn : keys) {
-            long inserted = context.tryOutputKeyToAE(keyToReturn.key, keyToReturn.amount);
+            long inserted = clampInserted(context.tryOutputKeyToAE(keyToReturn.key, keyToReturn.amount), keyToReturn.amount);
             long remaining = keyToReturn.amount - inserted;
+            if (remaining > 0L && context.getChemicalKeyProvider().isChemicalKey(keyToReturn.key)) {
+                remaining -= insertChemicalFallback(context, keyToReturn.key, remaining, true);
+            }
             if (remaining > 0) {
                 context.stashUnreturnedInput(keyToReturn.key, remaining);
             }
@@ -479,6 +484,49 @@ public class CraftingTask {
             }
             if (!leftover.isEmpty()) {
                 context.handleUnreturnedFluid(leftover);
+            }
+        }
+        context.markChanged();
+    }
+
+    /** Returns already-produced outputs without putting chemical products into input slots. */
+    private static void returnOutputMaterials(CraftingTaskContext context, List<ItemStack> items,
+                                               List<FluidStack> fluids, List<OutputKey> keys) {
+        Level level = context.getLevel();
+        if (level == null || level.isClientSide) return;
+        if (items.isEmpty() && fluids.isEmpty() && keys.isEmpty()) return;
+
+        FurnaceOutputPort.AeOutput port = context.createAeOutputPort();
+        for (ItemStack stack : items) {
+            ItemStack leftover = FurnaceOutputPort.outputItemWithRemainder(stack, port,
+                    context.getItemHandler(), context.getOutputSlotsStart(), context.getOutputSlotsCount());
+            if (!leftover.isEmpty()) {
+                context.handleUnreturnedItem(leftover);
+            }
+        }
+
+        for (FluidStack fluidStack : fluids) {
+            FluidStack leftover = FurnaceOutputPort.outputFluidWithRemainder(fluidStack, port,
+                    context.getOutputFluidTanks(), context.getFluidTankCount());
+            if (leftover.isEmpty()) continue;
+
+            AEFluidKey key = AEFluidKey.of(leftover);
+            if (key != null) {
+                context.stashUnreturnedOutput(key, leftover.getAmount());
+            } else {
+                context.handleUnreturnedFluid(leftover);
+            }
+        }
+
+        for (OutputKey keyToReturn : keys) {
+            long inserted = clampInserted(port.insertKey(keyToReturn.key, keyToReturn.amount),
+                    keyToReturn.amount);
+            long remaining = keyToReturn.amount - inserted;
+            if (remaining > 0L && context.getChemicalKeyProvider().isChemicalKey(keyToReturn.key)) {
+                remaining -= insertChemicalFallback(context, keyToReturn.key, remaining, false);
+            }
+            if (remaining > 0L) {
+                context.stashUnreturnedOutput(keyToReturn.key, remaining);
             }
         }
         context.markChanged();
@@ -862,11 +910,13 @@ public class CraftingTask {
 
         for (int i = 0; i < pendingOutputKeys.size(); ) {
             OutputKey pending = pendingOutputKeys.get(i);
-            long inserted = port.insertKey(pending.key, pending.amount);
-            if (inserted >= pending.amount) {
+            GenericStack remainder = FurnaceOutputPort.outputKeyWithRemainder(
+                    new GenericStack(pending.key, pending.amount), port,
+                    context.getOutputChemicalStorage(), context.getChemicalKeyProvider());
+            if (remainder == null || remainder.amount() <= 0L) {
                 pendingOutputKeys.remove(i);
             } else {
-                pendingOutputKeys.set(i, new OutputKey(pending.key, pending.amount - Math.max(0, inserted)));
+                pendingOutputKeys.set(i, new OutputKey(pending.key, remainder.amount()));
                 i++;
             }
         }
@@ -874,6 +924,33 @@ public class CraftingTask {
         boolean flushed = pendingOutputItems.isEmpty() && pendingOutputFluids.isEmpty() && pendingOutputKeys.isEmpty();
         context.markChanged();
         return flushed;
+    }
+
+    private static long insertChemicalFallback(CraftingTaskContext context, AEKey key, long amount,
+                                                boolean inputFirst) {
+        if (amount <= 0L || !context.getChemicalKeyProvider().isChemicalKey(key)) return 0L;
+        ChemicalStackView view = context.getChemicalKeyProvider().fromGenericStack(new GenericStack(key, amount));
+        if (view == null || view.isEmpty()) return 0L;
+
+        long inserted = 0L;
+        if (inputFirst) {
+            inserted += insertChemical(context.getInputChemicalStorage(), view.copyWithAmount(amount - inserted));
+        }
+        if (inserted < amount) {
+            inserted += insertChemical(context.getOutputChemicalStorage(), view.copyWithAmount(amount - inserted));
+        }
+        return inserted;
+    }
+
+    private static long insertChemical(com.sorrowmist.useless.content.machines.advanced_alloy_furnace.chemical.FurnaceChemicalStorage storage,
+                                        ChemicalStackView view) {
+        if (storage == null || !storage.isAvailable() || view == null || view.isEmpty()) return 0L;
+        ChemicalStackView remainder = storage.insertChemical(view, false);
+        return Math.max(0L, view.amount() - remainder.amount());
+    }
+
+    private static long clampInserted(long inserted, long requested) {
+        return Math.max(0L, Math.min(requested, inserted));
     }
 
     public void cancel() {
@@ -977,6 +1054,9 @@ public class CraftingTask {
         List<ItemStack> items = new ArrayList<>();
         List<FluidStack> fluids = new ArrayList<>();
         List<OutputKey> keys = new ArrayList<>();
+        List<ItemStack> pendingOutputItems = new ArrayList<>();
+        List<FluidStack> pendingOutputFluids = new ArrayList<>();
+        List<OutputKey> pendingOutputKeys = new ArrayList<>();
         readStacks(registries, tag.getList("Inputs", Tag.TAG_COMPOUND),
                 items, fluids, keys, context.supportsLongAeAmounts());
 
@@ -987,8 +1067,9 @@ public class CraftingTask {
                     items, fluids, keys, context.supportsLongAeAmounts());
         }
         readStacks(registries, tag.getList("PendingOutputs", Tag.TAG_COMPOUND),
-                items, fluids, keys, context.supportsLongAeAmounts());
+                pendingOutputItems, pendingOutputFluids, pendingOutputKeys, context.supportsLongAeAmounts());
         returnMaterials(context, items, fluids, keys);
+        returnOutputMaterials(context, pendingOutputItems, pendingOutputFluids, pendingOutputKeys);
     }
 
     /**

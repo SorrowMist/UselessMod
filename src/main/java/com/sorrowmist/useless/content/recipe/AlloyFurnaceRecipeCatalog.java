@@ -244,6 +244,7 @@ public final class AlloyFurnaceRecipeCatalog {
                 recipes.addAll(synthetic.getAllRecipes());
                 continue;
             }
+            collectGenerated(adapter, level, recipes);
             collectConverted(adapter, sourceRecipes, level, recipes);
         }
         if (RecipeAdapterCompatRegistry.isLoaded(RecipeAdapterCompatRegistry.AE2LT)) {
@@ -283,6 +284,15 @@ public final class AlloyFurnaceRecipeCatalog {
             if (!recipeClass.isInstance(holder.value())) continue;
             if (adapter instanceof SmeltingRecipeAdapter && holder.value().getType() != RecipeType.SMELTING) continue;
             output.addAll(adapter.convertAll((RecipeHolder) holder, level));
+        }
+    }
+
+    @SuppressWarnings({"rawtypes", "unchecked"})
+    private static void collectGenerated(IRecipeAdapter adapter, Level level,
+                                         List<AdvancedAlloyFurnaceRecipe> output) {
+        List<RecipeHolder<?>> generated = (List<RecipeHolder<?>>) (List<?>) adapter.getGeneratedRecipes(level);
+        for (RecipeHolder<?> holder : generated) {
+            output.addAll(adapter.convertAll(holder, level));
         }
     }
 

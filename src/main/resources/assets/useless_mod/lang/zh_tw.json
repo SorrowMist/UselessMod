@@ -147,6 +147,7 @@
   "gui.useless_mod.advanced_alloy_furnace.face.right": "右面",
   "gui.useless_mod.advanced_alloy_furnace.face.top": "頂面",
   "gui.useless_mod.advanced_alloy_furnace.fluid_amount": "%s / %s mB",
+  "gui.useless_mod.advanced_alloy_furnace.chemical_amount": "%s / %s",
   "gui.useless_mod.advanced_alloy_furnace.max_parallel": "當前最大並行數: %s",
   "gui.useless_mod.advanced_alloy_furnace.no_process": "沒有運作中的進程",
   "gui.useless_mod.advanced_alloy_furnace.parallel_description.1": "• 消耗與產出皆會乘以並行數",

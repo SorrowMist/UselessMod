@@ -10,6 +10,11 @@ import org.jetbrains.annotations.Nullable;
 public class OsmiumCompressorRecipeAdapter extends MetallurgicInfuserRecipeAdapter {
 
     @Override
+    protected long getEnergyPerTick() {
+        return 100L;
+    }
+
+    @Override
     @Nullable
     public ItemStack getMoldItem() {
         return new ItemStack(MekanismBlocks.OSMIUM_COMPRESSOR.get());

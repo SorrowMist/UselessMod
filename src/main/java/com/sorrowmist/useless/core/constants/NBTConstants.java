@@ -26,4 +26,12 @@ public final class NBTConstants {
     public static String getOutputFluidTag(int index) {
         return "OutputFluid" + index;
     }
+
+    public static String getInputChemicalTag(int index) {
+        return "InputChemical" + index;
+    }
+
+    public static String getOutputChemicalTag(int index) {
+        return "OutputChemical" + index;
+    }
 }

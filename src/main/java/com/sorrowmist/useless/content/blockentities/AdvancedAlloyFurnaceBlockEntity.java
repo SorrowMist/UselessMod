@@ -37,6 +37,12 @@ import com.sorrowmist.useless.content.blocks.AdvancedAlloyFurnaceBlock;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.AdvancedAlloyFurnaceAeManager;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.CraftingTaskContext;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.AlloyFurnaceAeHost;
+import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.chemical.ChemicalHandlerView;
+import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.chemical.ChemicalCompatProviders;
+import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.chemical.ChemicalKeyProvider;
+import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.chemical.ChemicalKeyProviders;
+import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.chemical.ChemicalStackView;
+import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.chemical.FurnaceChemicalStorage;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.catalyst.CatalystEffectResolver;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.catalyst.ResolvedCatalystEffect;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.execution.AlloyFurnaceRecipeExecutor;
@@ -52,6 +58,7 @@ import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.parallel.A
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.recipe.AlloyFurnaceRecipeCalculator;
 import com.sorrowmist.useless.content.menus.AdvancedAlloyFurnaceMenu;
 import com.sorrowmist.useless.content.recipe.AdvancedAlloyFurnaceRecipe;
+import com.sorrowmist.useless.content.recipe.AlloyFurnaceRecipeCatalog;
 import com.sorrowmist.useless.core.config.ConfigManager;
 import com.sorrowmist.useless.core.constants.NBTConstants;
 import com.sorrowmist.useless.energy.EnergyManager;
@@ -94,6 +101,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.ReentrantLock;
 
 import static com.sorrowmist.useless.content.machines.advanced_alloy_furnace.layout.AdvancedAlloyFurnaceLayout.CATALYST_SLOT;
+import static com.sorrowmist.useless.content.machines.advanced_alloy_furnace.layout.AdvancedAlloyFurnaceLayout.CHEMICAL_TANK_COUNT;
 import static com.sorrowmist.useless.content.machines.advanced_alloy_furnace.layout.AdvancedAlloyFurnaceLayout.FLUID_TANK_COUNT;
 import static com.sorrowmist.useless.content.machines.advanced_alloy_furnace.layout.AdvancedAlloyFurnaceLayout.INPUT_SLOTS_COUNT;
 import static com.sorrowmist.useless.content.machines.advanced_alloy_furnace.layout.AdvancedAlloyFurnaceLayout.INPUT_SLOTS_START;
@@ -115,6 +123,7 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
 
     // 基础容量配置
     private static final int BASE_FLUID_TANK_CAPACITY = 16000;
+    private static final long BASE_CHEMICAL_TANK_CAPACITY = BASE_FLUID_TANK_CAPACITY;
     private static final long BASE_ENERGY_CAPACITY = 100_000L;
     private static final long BASE_ENERGY_MAX_RECEIVE = 10_000L;
     private static final long ENERGY_MAX_EXTRACT = 0L;
@@ -123,6 +132,8 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
     private static final int DISPLAY_PARALLEL_CACHE_DURATION = 20;
     private final FluidTank[] inputFluidTanks = new FluidTank[FLUID_TANK_COUNT];
     private final FluidTank[] outputFluidTanks = new FluidTank[FLUID_TANK_COUNT];
+    private final FurnaceChemicalStorage inputChemicalStorage;
+    private final FurnaceChemicalStorage outputChemicalStorage;
     private final IEnergyManager energyManager = EnergyManager.builder()
                                                               .capacity(BASE_ENERGY_CAPACITY)
                                                               .maxReceive(BASE_ENERGY_MAX_RECEIVE)
@@ -139,6 +150,7 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
     private final IActionSource actionSource;
     // 升级后的容量（根据阶级动态计算）
     private int fluidTankCapacity = BASE_FLUID_TANK_CAPACITY;
+    private long chemicalTankCapacity = BASE_CHEMICAL_TANK_CAPACITY;
     private long energyCapacity = BASE_ENERGY_CAPACITY;
     private long energyMaxReceive = BASE_ENERGY_MAX_RECEIVE;
     private int progress = 0;
@@ -166,6 +178,7 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
     private boolean isConnectedToAE = false;
     // 六个面的输入输出模式（按FurnaceFace索引）
     private final FurnaceFaceMode[] faceModes = new FurnaceFaceMode[FurnaceFace.COUNT];
+    private long recipeCatalogGeneration = -1L;
     // 自动输入开关
     private boolean autoInputEnabled = false;
     // 自动输出开关
@@ -174,6 +187,7 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
     private RedstoneControlMode redstoneControlMode = RedstoneControlMode.DISABLED;
     // 产物是否回AE
     private boolean returnOutputToAe = true;
+    private boolean dropDataCaptured;
 
     public AdvancedAlloyFurnaceBlockEntity(BlockPos pos, BlockState state) {
         super(ModBlockEntities.ADVANCED_ALLOY_FURNACE.get(), pos, state);
@@ -204,6 +218,11 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
                                   .addService(ICraftingProvider.class, this);
         this.aeManager = new AdvancedAlloyFurnaceAeManager(this);
 
+        this.inputChemicalStorage = ChemicalCompatProviders.get().createStorage(
+                BASE_CHEMICAL_TANK_CAPACITY, this::onChemicalStorageChanged);
+        this.outputChemicalStorage = ChemicalCompatProviders.get().createStorage(
+                BASE_CHEMICAL_TANK_CAPACITY, this::onChemicalStorageChanged);
+
         // 初始化时应用当前阶级的容量
         this.updateCapacityByTier();
         for (int i = 0; i < FLUID_TANK_COUNT; i++) {
@@ -216,11 +235,14 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
 
         // 初始化自动输入输出控制器
         this.autoIoController = new FurnaceAutoIoController(
-                this, this.itemHandler, this.inputFluidTanks, this.outputFluidTanks, pos);
+                this, this.itemHandler, this.inputFluidTanks, this.outputFluidTanks,
+                this.inputChemicalStorage, this.outputChemicalStorage, pos);
 
         // 初始化配方匹配与并行计算器（纯只读计算，不持有运行状态）
         this.recipeCalculator = new AlloyFurnaceRecipeCalculator(
-                this.itemHandler, this.inputFluidTanks, this.outputFluidTanks);
+                this.itemHandler, this.inputFluidTanks, this.outputFluidTanks,
+                this.inputChemicalStorage, this.outputChemicalStorage,
+                ChemicalKeyProviders.get());
     }
 
 
@@ -243,6 +265,23 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
             capacity = base * (1L << (2 * (tier - 3)));
         }
         return capacity > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) capacity;
+    }
+
+    /** Chemical tanks use the same progression, without the int-sized fluid cap. */
+    public static long calculateChemicalCapacity(int tier) {
+        if (tier <= 0) return BASE_CHEMICAL_TANK_CAPACITY;
+        if (tier >= USEFUL_INGOT_FURNACE_TIER) return Long.MAX_VALUE;
+
+        long capacity;
+        if (tier <= 3) {
+            capacity = BASE_CHEMICAL_TANK_CAPACITY * (1L << tier);
+        } else {
+            long base = BASE_CHEMICAL_TANK_CAPACITY * 8L;
+            int shift = 2 * (tier - 3);
+            capacity = shift >= Long.SIZE - 1 || base > Long.MAX_VALUE / (1L << shift)
+                    ? Long.MAX_VALUE : base * (1L << shift);
+        }
+        return Math.max(0L, capacity);
     }
 
     /**
@@ -306,6 +345,12 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
     public static void tick(Level level, AdvancedAlloyFurnaceBlockEntity entity) {
         if (level.isClientSide) return;
 
+        long currentCatalogGeneration = AlloyFurnaceRecipeCatalog.generation();
+        if (entity.recipeCatalogGeneration != currentCatalogGeneration) {
+            entity.recipeCatalogGeneration = currentCatalogGeneration;
+            entity.updatePatterns();
+        }
+
         boolean wasActive = entity.getBlockState().getValue(
                 com.sorrowmist.useless.content.blocks.AdvancedAlloyFurnaceBlock.getActiveProperty());
 
@@ -341,6 +386,7 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
         entity.aeManager.flushAEBatches();
         entity.aeManager.tickAETasks();
         entity.aeManager.tickUnreturnedInputs();
+        entity.aeManager.tickUnreturnedOutputs();
 
         // 每tick尝试自动输入输出物品和流体
         entity.autoOutputTickCounter++;
@@ -443,6 +489,7 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
      */
     private void updateCapacityByTier() {
         this.fluidTankCapacity = calculateFluidCapacity(this.furnaceTier);
+        this.chemicalTankCapacity = calculateChemicalCapacity(this.furnaceTier);
         this.energyCapacity = calculateEnergyCapacity(this.furnaceTier);
         this.energyMaxReceive = calculateEnergyReceive(this.furnaceTier);
 
@@ -458,6 +505,15 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
             if (this.outputFluidTanks[i] != null) {
                 this.outputFluidTanks[i].setCapacity(this.fluidTankCapacity);
             }
+        }
+        this.inputChemicalStorage.setCapacity(this.chemicalTankCapacity);
+        this.outputChemicalStorage.setCapacity(this.chemicalTankCapacity);
+    }
+
+    private void onChemicalStorageChanged() {
+        this.setChanged();
+        if (this.level != null && !this.level.isClientSide) {
+            this.level.sendBlockUpdated(this.worldPosition, this.getBlockState(), this.getBlockState(), 3);
         }
     }
 
@@ -927,9 +983,33 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
         this.aeManager.cancelAllTasks();
     }
 
+    public boolean hasPersistedAETaskData() {
+        return this.aeManager.hasPersistedData();
+    }
+
+    public void saveAETasks(CompoundTag tag, HolderLookup.Provider registries) {
+        this.aeManager.saveTasks(tag, registries);
+    }
+
+    public void readAETasks(CompoundTag tag) {
+        this.aeManager.readTasksTag(tag);
+    }
+
+    public void markDropDataCaptured() {
+        this.dropDataCaptured = true;
+    }
+
+    public boolean isDropDataCaptured() {
+        return this.dropDataCaptured;
+    }
+
     @Override
     public void stashUnreturnedInput(AEKey key, long amount) {
         this.aeManager.stashUnreturnedInput(key, amount);
+    }
+
+    public void stashUnreturnedOutput(AEKey key, long amount) {
+        this.aeManager.stashUnreturnedOutput(key, amount);
     }
 
     public IEnergyStorage getEnergyStorage() {
@@ -946,6 +1026,30 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
 
     public FluidTank getOutputFluidTank(int index) {
         return (index >= 0 && index < FLUID_TANK_COUNT) ? this.outputFluidTanks[index] : new FluidTank(0);
+    }
+
+    public FurnaceChemicalStorage getInputChemicalStorage() {
+        return this.inputChemicalStorage;
+    }
+
+    public FurnaceChemicalStorage getOutputChemicalStorage() {
+        return this.outputChemicalStorage;
+    }
+
+    public ChemicalStackView getInputChemical(int index) {
+        return this.inputChemicalStorage.getStackInSlot(index);
+    }
+
+    public ChemicalStackView getOutputChemical(int index) {
+        return this.outputChemicalStorage.getStackInSlot(index);
+    }
+
+    public long getChemicalTankCapacity() {
+        return this.chemicalTankCapacity;
+    }
+
+    public boolean hasChemicalSupport() {
+        return this.inputChemicalStorage.isAvailable() && this.outputChemicalStorage.isAvailable();
     }
 
     public long getEnergy() {
@@ -1098,6 +1202,16 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
         }
     }
 
+    public void clearChemicalTank(int tankIndex, boolean isInput) {
+        if (!this.hasChemicalSupport() || tankIndex < 0 || tankIndex >= CHEMICAL_TANK_COUNT) return;
+        if (isInput) {
+            this.inputChemicalStorage.setStackInSlot(tankIndex, ChemicalStackView.EMPTY);
+        } else {
+            this.outputChemicalStorage.setStackInSlot(tankIndex, ChemicalStackView.EMPTY);
+        }
+        this.onChemicalStorageChanged();
+    }
+
     @Override
     public void loadTag(CompoundTag tag, HolderLookup.@NotNull Provider registries) {
         super.loadTag(tag, registries);
@@ -1145,6 +1259,9 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
                 this.outputFluidTanks[i].setFluid(FluidStack.EMPTY);
             }
         }
+
+        this.inputChemicalStorage.load(tag, "InputChemical", registries);
+        this.outputChemicalStorage.load(tag, "OutputChemical", registries);
 
         // 加载AE网络节点数据
         this.mainNode.loadFromNBT(tag);
@@ -1209,6 +1326,9 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
                 tag.put(NBTConstants.getOutputFluidTag(i), fluid.save(registries));
             }
         }
+
+        this.inputChemicalStorage.save(tag, "InputChemical", registries);
+        this.outputChemicalStorage.save(tag, "OutputChemical", registries);
 
         // 保存AE网络节点数据
         this.mainNode.saveToNBT(tag);
@@ -1323,7 +1443,9 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
                 INPUT_SLOTS_START,
                 INPUT_SLOTS_COUNT,
                 this.inputFluidTanks,
-                FLUID_TANK_COUNT
+                FLUID_TANK_COUNT,
+                this.inputChemicalStorage,
+                ChemicalKeyProviders.get()
         );
     }
 
@@ -1336,7 +1458,10 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
                 OUTPUT_SLOTS_START,
                 OUTPUT_SLOTS_COUNT,
                 this.outputFluidTanks,
-                FLUID_TANK_COUNT
+                FLUID_TANK_COUNT,
+                this.outputChemicalStorage,
+                ChemicalKeyProviders.get(),
+                this::stashUnreturnedOutput
         );
     }
 
@@ -1482,6 +1607,30 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
         }
 
         return storage.insert(key, amount, Actionable.MODULATE, actionSource);
+    }
+
+    @Override
+    public long tryOutputChemicalToAE(ChemicalStackView stack) {
+        if (stack == null || stack.isEmpty()) return 0L;
+        ChemicalKeyProvider provider = ChemicalKeyProviders.get();
+        appeng.api.stacks.GenericStack generic = provider.toGenericStack(stack);
+        return generic == null ? 0L : this.tryOutputKeyToAE(generic.what(), generic.amount());
+    }
+
+    @Override
+    public void handleUnreturnedChemical(ChemicalStackView stack) {
+        if (stack == null || stack.isEmpty()) return;
+        appeng.api.stacks.GenericStack generic = ChemicalKeyProviders.get().toGenericStack(stack);
+        if (generic != null) {
+            this.aeManager.stashUnreturnedInput(generic.what(), generic.amount());
+        }
+    }
+
+    @Override
+    public ChemicalHandlerView getAdjacentChemicalHandler(Level level, BlockPos pos, BlockState state,
+                                                           BlockEntity entity, @Nullable Direction side) {
+        if (!this.hasChemicalSupport()) return null;
+        return ChemicalCompatProviders.get().getAdjacentHandler(level, pos, state, entity, side);
     }
 
     public int getActiveAETaskCount() {

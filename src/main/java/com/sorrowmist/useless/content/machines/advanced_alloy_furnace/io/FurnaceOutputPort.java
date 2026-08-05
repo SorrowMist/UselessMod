@@ -1,12 +1,17 @@
 package com.sorrowmist.useless.content.machines.advanced_alloy_furnace.io;
 
 import appeng.api.stacks.AEKey;
+import appeng.api.stacks.GenericStack;
+import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.chemical.ChemicalKeyProvider;
+import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.chemical.FurnaceChemicalStorage;
 import com.sorrowmist.useless.content.recipe.AdvancedAlloyFurnaceRecipe;
 import net.minecraft.world.item.ItemStack;
 import net.neoforged.neoforge.fluids.FluidStack;
 import net.neoforged.neoforge.fluids.capability.IFluidHandler;
 import net.neoforged.neoforge.fluids.capability.templates.FluidTank;
 import net.neoforged.neoforge.items.ItemStackHandler;
+
+import java.util.function.BiConsumer;
 
 /**
  * 高级合金炉统一输出端口。
@@ -31,6 +36,27 @@ public final class FurnaceOutputPort {
      * 按配方批量输出物品、流体和 AEKey 产物。
      */
     public static void outputRecipe(AdvancedAlloyFurnaceRecipe recipe, int parallel, AeOutput aeOutput, ItemStackHandler itemHandler, int outputSlotsStart, int outputSlotsCount, FluidTank[] outputFluidTanks, int fluidTankCount) {
+        outputRecipe(recipe, parallel, aeOutput, itemHandler, outputSlotsStart, outputSlotsCount,
+                outputFluidTanks, fluidTankCount, FurnaceChemicalStorage.DISABLED,
+                ChemicalKeyProvider.NONE, null);
+    }
+
+    public static void outputRecipe(AdvancedAlloyFurnaceRecipe recipe, int parallel, AeOutput aeOutput,
+                                    ItemStackHandler itemHandler, int outputSlotsStart, int outputSlotsCount,
+                                    FluidTank[] outputFluidTanks, int fluidTankCount,
+                                    FurnaceChemicalStorage outputChemicalStorage,
+                                    ChemicalKeyProvider chemicalKeyProvider) {
+        outputRecipe(recipe, parallel, aeOutput, itemHandler, outputSlotsStart, outputSlotsCount,
+                outputFluidTanks, fluidTankCount, outputChemicalStorage, chemicalKeyProvider, null);
+    }
+
+    /** Same as the normal recipe output path, retaining key material that fits nowhere locally. */
+    public static void outputRecipe(AdvancedAlloyFurnaceRecipe recipe, int parallel, AeOutput aeOutput,
+                                    ItemStackHandler itemHandler, int outputSlotsStart, int outputSlotsCount,
+                                    FluidTank[] outputFluidTanks, int fluidTankCount,
+                                    FurnaceChemicalStorage outputChemicalStorage,
+                                    ChemicalKeyProvider chemicalKeyProvider,
+                                    BiConsumer<AEKey, Long> onKeyRemainder) {
         for (ItemStack output : recipe.outputs()) {
             long totalCountLong = (long) output.getCount() * parallel;
             int totalCount = totalCountLong > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) totalCountLong;
@@ -54,7 +80,13 @@ public final class FurnaceOutputPort {
         }
 
         for (var keyOutput : recipe.keyOutputs()) {
-            outputKey(keyOutput.what(), keyOutput.amount() * parallel, aeOutput);
+            if (keyOutput == null || keyOutput.what() == null || keyOutput.amount() <= 0L) continue;
+            GenericStack remainder = outputKeyWithRemainder(
+                    new GenericStack(keyOutput.what(), saturatingMultiply(keyOutput.amount(), parallel)),
+                    aeOutput, outputChemicalStorage, chemicalKeyProvider);
+            if (remainder != null && onKeyRemainder != null) {
+                onKeyRemainder.accept(remainder.what(), remainder.amount());
+            }
         }
     }
 
@@ -121,6 +153,42 @@ public final class FurnaceOutputPort {
      */
     public static void outputKey(AEKey key, long amount, AeOutput aeOutput) {
         aeOutput.insertKey(key, amount);
+    }
+
+    /**
+     * Outputs an AE key, then falls back to the local chemical slots when the
+     * registered provider recognizes it as a chemical key.
+     *
+     * @return the portion that could not be written to either destination
+     */
+    public static GenericStack outputKeyWithRemainder(GenericStack stack, AeOutput aeOutput,
+                                                       FurnaceChemicalStorage outputChemicalStorage,
+                                                       ChemicalKeyProvider chemicalKeyProvider) {
+        if (stack == null || stack.what() == null || stack.amount() <= 0L) return null;
+
+        long requested = stack.amount();
+        long inserted = clampInserted(aeOutput.insertKey(stack.what(), requested), requested);
+        long remaining = requested - inserted;
+        if (remaining <= 0L) return null;
+
+        if (chemicalKeyProvider != null && chemicalKeyProvider.isChemicalKey(stack.what())) {
+            var view = chemicalKeyProvider.fromGenericStack(new GenericStack(stack.what(), remaining));
+            if (view != null && outputChemicalStorage != null) {
+                var remainder = outputChemicalStorage.insertChemical(view, false);
+                long local = Math.max(0L, remaining - remainder.amount());
+                remaining -= local;
+            }
+        }
+        return remaining <= 0L ? null : new GenericStack(stack.what(), remaining);
+    }
+
+    private static long clampInserted(long inserted, long requested) {
+        return Math.max(0L, Math.min(requested, inserted));
+    }
+
+    private static long saturatingMultiply(long amount, long multiplier) {
+        if (amount <= 0L || multiplier <= 0L) return 0L;
+        return amount > Long.MAX_VALUE / multiplier ? Long.MAX_VALUE : amount * multiplier;
     }
 
     /** @return 槽位放不下的剩余数量 */

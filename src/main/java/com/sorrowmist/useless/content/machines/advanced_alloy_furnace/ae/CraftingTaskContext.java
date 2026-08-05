@@ -10,6 +10,10 @@ import com.sorrowmist.useless.content.recipe.AdvancedAlloyFurnaceRecipe;
 import com.sorrowmist.useless.content.recipe.AdapterUtils;
 import com.sorrowmist.useless.content.recipe.AlloyFurnaceRecipeManager;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.io.FurnaceOutputPort;
+import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.chemical.ChemicalKeyProvider;
+import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.chemical.ChemicalKeyProviders;
+import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.chemical.ChemicalStackView;
+import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.chemical.FurnaceChemicalStorage;
 import com.sorrowmist.useless.energy.IEnergyManager;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.crafting.Ingredient;
@@ -55,11 +59,34 @@ public interface CraftingTaskContext {
     long tryOutputFluidToAE(FluidStack stack);
     long tryOutputKeyToAE(AEKey key, long amount);
 
+    default long tryOutputChemicalToAE(ChemicalStackView stack) {
+        if (stack == null || stack.isEmpty()) return 0L;
+        GenericStack generic = getChemicalKeyProvider().toGenericStack(stack);
+        return generic == null ? 0L : tryOutputKeyToAE(generic.what(), generic.amount());
+    }
+
+    default FurnaceChemicalStorage getInputChemicalStorage() {
+        return FurnaceChemicalStorage.DISABLED;
+    }
+
+    default FurnaceChemicalStorage getOutputChemicalStorage() {
+        return FurnaceChemicalStorage.DISABLED;
+    }
+
+    default ChemicalKeyProvider getChemicalKeyProvider() {
+        return ChemicalKeyProviders.get();
+    }
+
     // 产物输出模式
     boolean isReturnOutputToAe();
 
     /** 暂存未能返还的输入（AE 写入失败时防丢失，由管理器逐 tick 重试写回） */
     void stashUnreturnedInput(AEKey key, long amount);
+
+    /** Stores a produced key that could not be returned to AE or an output slot. */
+    default void stashUnreturnedOutput(AEKey key, long amount) {
+        stashUnreturnedInput(key, amount);
+    }
 
     /**
      * 统一 AE 输出端口：受“产物返回AE”开关约束，开关关闭时不写入 AE 网络，

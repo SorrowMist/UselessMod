@@ -181,6 +181,7 @@
   "gui.useless_mod.advanced_alloy_furnace.parallel_description.4": "• 催化剂为可选项，可提高并行数",
   "gui.useless_mod.advanced_alloy_furnace.catalyst_warning": "催化剂不会被消耗",
   "gui.useless_mod.advanced_alloy_furnace.fluid_amount": "%s / %s mB",
+  "gui.useless_mod.advanced_alloy_furnace.chemical_amount": "%s / %s",
   "gui.useless_mod.advanced_alloy_furnace.face_mode.disabled": "禁止输入输出",
   "gui.useless_mod.advanced_alloy_furnace.face_mode.material_input": "输入",
   "gui.useless_mod.advanced_alloy_furnace.face_mode.material_output": "输出",

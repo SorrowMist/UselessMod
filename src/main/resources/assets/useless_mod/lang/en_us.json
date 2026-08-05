@@ -179,6 +179,7 @@
   "gui.useless_mod.advanced_alloy_furnace.parallel_description.4": "• Catalyst is optional, can increase parallel",
   "gui.useless_mod.advanced_alloy_furnace.catalyst_warning": "⚠ Normal catalyst will be consumed",
   "gui.useless_mod.advanced_alloy_furnace.fluid_amount": "%s / %s mB",
+  "gui.useless_mod.advanced_alloy_furnace.chemical_amount": "%s / %s",
   "gui.useless_mod.advanced_alloy_furnace.face_mode.disabled": "Disabled",
   "gui.useless_mod.advanced_alloy_furnace.face_mode.material_input": "Material Input",
   "gui.useless_mod.advanced_alloy_furnace.face_mode.material_output": "Material Output",

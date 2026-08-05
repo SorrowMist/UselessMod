@@ -3,6 +3,9 @@ package com.sorrowmist.useless.content.machines.advanced_alloy_furnace.recipe;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.catalyst.CatalystEffectResolver;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.catalyst.ResolvedCatalystEffect;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.io.FurnaceInputPort;
+import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.chemical.ChemicalKeyProvider;
+import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.chemical.ChemicalKeyProviders;
+import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.chemical.FurnaceChemicalStorage;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.parallel.AlloyFurnaceParallelCalculator;
 import com.sorrowmist.useless.content.recipe.AdvancedAlloyFurnaceRecipe;
 import com.sorrowmist.useless.content.recipe.AdapterUtils;
@@ -37,11 +40,27 @@ public final class AlloyFurnaceRecipeCalculator {
     private final ItemStackHandler itemHandler;
     private final FluidTank[] inputFluidTanks;
     private final FluidTank[] outputFluidTanks;
+    private final FurnaceChemicalStorage inputChemicalStorage;
+    private final FurnaceChemicalStorage outputChemicalStorage;
+    private final ChemicalKeyProvider chemicalKeyProvider;
     public AlloyFurnaceRecipeCalculator(ItemStackHandler itemHandler, FluidTank[] inputFluidTanks,
                                         FluidTank[] outputFluidTanks) {
+        this(itemHandler, inputFluidTanks, outputFluidTanks,
+                FurnaceChemicalStorage.DISABLED, FurnaceChemicalStorage.DISABLED,
+                ChemicalKeyProvider.NONE);
+    }
+
+    public AlloyFurnaceRecipeCalculator(ItemStackHandler itemHandler, FluidTank[] inputFluidTanks,
+                                        FluidTank[] outputFluidTanks,
+                                        FurnaceChemicalStorage inputChemicalStorage,
+                                        FurnaceChemicalStorage outputChemicalStorage,
+                                        ChemicalKeyProvider chemicalKeyProvider) {
         this.itemHandler = itemHandler;
         this.inputFluidTanks = inputFluidTanks;
         this.outputFluidTanks = outputFluidTanks;
+        this.inputChemicalStorage = inputChemicalStorage == null ? FurnaceChemicalStorage.DISABLED : inputChemicalStorage;
+        this.outputChemicalStorage = outputChemicalStorage == null ? FurnaceChemicalStorage.DISABLED : outputChemicalStorage;
+        this.chemicalKeyProvider = chemicalKeyProvider == null ? ChemicalKeyProvider.NONE : chemicalKeyProvider;
     }
 
     /**
@@ -73,12 +92,19 @@ public final class AlloyFurnaceRecipeCalculator {
             }
         }
 
-        if (currentInputs.isEmpty() && currentFluids.isEmpty()) return Optional.empty();
+        List<appeng.api.stacks.GenericStack> currentChemicals = new ArrayList<>();
+        ChemicalKeyProvider provider = currentChemicalKeyProvider();
+        for (int i = 0; i < this.inputChemicalStorage.size(); i++) {
+            var generic = provider.toGenericStack(this.inputChemicalStorage.getStackInSlot(i));
+            if (generic != null && generic.amount() > 0L) currentChemicals.add(generic);
+        }
+
+        if (currentInputs.isEmpty() && currentFluids.isEmpty() && currentChemicals.isEmpty()) return Optional.empty();
 
         ItemStack moldStack = this.itemHandler.getStackInSlot(MOLD_SLOT);
 
         AdvancedAlloyFurnaceRecipe bestRecipe = AlloyFurnaceRecipeManager.getInstance().findRecipe(
-                level, currentInputs, currentFluids, moldStack
+                level, currentInputs, currentFluids, currentChemicals, moldStack
         );
 
         if (bestRecipe != null && canProcessRecipe(bestRecipe)) {
@@ -112,7 +138,8 @@ public final class AlloyFurnaceRecipeCalculator {
         }
         return FurnaceInputPort.canConsumeRecipeInputs(
                 recipe, parallel, this.itemHandler, INPUT_SLOTS_START, INPUT_SLOTS_COUNT,
-                this.inputFluidTanks, FLUID_TANK_COUNT);
+                this.inputFluidTanks, FLUID_TANK_COUNT,
+                this.inputChemicalStorage, currentChemicalKeyProvider());
     }
 
     /**
@@ -171,7 +198,8 @@ public final class AlloyFurnaceRecipeCalculator {
     public int calculateMaterialParallel(AdvancedAlloyFurnaceRecipe recipe) {
         return FurnaceInputPort.calculateMaterialParallel(
                 recipe, this.itemHandler, INPUT_SLOTS_START, INPUT_SLOTS_COUNT,
-                this.inputFluidTanks, FLUID_TANK_COUNT);
+                this.inputFluidTanks, FLUID_TANK_COUNT,
+                this.inputChemicalStorage, currentChemicalKeyProvider());
     }
 
     /**
@@ -233,6 +261,39 @@ public final class AlloyFurnaceRecipeCalculator {
             if (maxParallel <= 0) return 0;
         }
 
+        ChemicalKeyProvider provider = currentChemicalKeyProvider();
+        for (var outputChemical : recipe.keyOutputs()) {
+            if (outputChemical == null || outputChemical.what() == null || outputChemical.amount() <= 0L
+                    || !provider.isChemicalKey(outputChemical.what())) {
+                continue;
+            }
+            var view = provider.fromGenericStack(outputChemical);
+            if (view == null) return 0;
+            long totalSpace = 0L;
+            for (int i = 0; i < this.outputChemicalStorage.size(); i++) {
+                var stored = this.outputChemicalStorage.getStackInSlot(i);
+                if (stored.isEmpty()) {
+                    totalSpace = saturatingAdd(totalSpace, this.outputChemicalStorage.capacity(i));
+                } else if (stored.isSameType(view)) {
+                    long free = this.outputChemicalStorage.capacity(i) - stored.amount();
+                    if (free > 0L) totalSpace = saturatingAdd(totalSpace, free);
+                }
+            }
+            long possible = totalSpace / outputChemical.amount();
+            maxParallel = Math.min(maxParallel,
+                    possible > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) possible);
+            if (maxParallel <= 0) return 0;
+        }
+
         return maxParallel;
+    }
+
+    private ChemicalKeyProvider currentChemicalKeyProvider() {
+        ChemicalKeyProvider registered = ChemicalKeyProviders.get();
+        return registered == ChemicalKeyProvider.NONE ? this.chemicalKeyProvider : registered;
+    }
+
+    private static long saturatingAdd(long left, long right) {
+        return right > 0L && left > Long.MAX_VALUE - right ? Long.MAX_VALUE : left + right;
     }
 }

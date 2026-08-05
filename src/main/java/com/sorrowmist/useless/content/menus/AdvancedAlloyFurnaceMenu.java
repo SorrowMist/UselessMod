@@ -6,6 +6,7 @@ import appeng.menu.SlotSemantics;
 import com.sorrowmist.useless.content.blockentities.AdvancedAlloyFurnaceBlockEntity;
 import com.sorrowmist.useless.content.blockentities.AdvancedAlloyFurnaceData;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.AdvancedAlloyFurnaceAeManager;
+import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.chemical.ChemicalStackView;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.layout.AdvancedAlloyFurnaceLayout;
 import com.sorrowmist.useless.init.ModMenuType;
 import com.sorrowmist.useless.inventory.slot.PatternSlotItemHandler;
@@ -339,6 +340,22 @@ public class AdvancedAlloyFurnaceMenu extends AEBaseMenu {
 
     public FluidTank getOutputFluidTank(int index) {
         return this.blockEntity != null ? this.blockEntity.getOutputFluidTank(index) : new FluidTank(0);
+    }
+
+    public ChemicalStackView getInputChemical(int index) {
+        return this.blockEntity != null ? this.blockEntity.getInputChemical(index) : ChemicalStackView.EMPTY;
+    }
+
+    public ChemicalStackView getOutputChemical(int index) {
+        return this.blockEntity != null ? this.blockEntity.getOutputChemical(index) : ChemicalStackView.EMPTY;
+    }
+
+    public long getChemicalTankCapacity() {
+        return this.blockEntity != null ? this.blockEntity.getChemicalTankCapacity() : 0L;
+    }
+
+    public boolean hasChemicalSupport() {
+        return this.blockEntity != null && this.blockEntity.hasChemicalSupport();
     }
 
     // AE网络合成任务状态

@@ -4,7 +4,6 @@ import appeng.api.stacks.AEFluidKey;
 import appeng.api.stacks.AEItemKey;
 import appeng.api.stacks.AEKey;
 import appeng.api.stacks.GenericStack;
-import com.mojang.logging.LogUtils;
 import com.sorrowmist.useless.init.ModRecipeTypes;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
@@ -15,7 +14,6 @@ import net.minecraft.world.item.crafting.RecipeHolder;
 import net.minecraft.world.level.Level;
 import net.neoforged.neoforge.fluids.FluidStack;
 import org.jetbrains.annotations.Nullable;
-import org.slf4j.Logger;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -39,11 +37,10 @@ import java.util.concurrent.CopyOnWriteArrayList;
  * 物品+流体+模具 > 物品+模具 > 流体+模具 > 物品+流体 > 物品 > 流体
  */
 public class AlloyFurnaceRecipeManager {
-    private static final Logger LOGGER = LogUtils.getLogger();
     private static AlloyFurnaceRecipeManager INSTANCE;
 
     /** 按模具物品直接查找 adapter（getMoldItem() != null 的注册到这里） */
-    private final Map<Item, IRecipeAdapter<?>> moldAdapterMap = new ConcurrentHashMap<>();
+    private final Map<Item, List<IRecipeAdapter<?>>> moldAdapterMap = new ConcurrentHashMap<>();
     /** 无固定模具的 adapter，需通过 matchesMold() 动态判断（如 SeedEssenceRecipeAdapter） */
     private final List<IRecipeAdapter<?>> fallbackAdapters = new CopyOnWriteArrayList<>();
     private final List<IRecipeAdapter<?>> allAdapters = new CopyOnWriteArrayList<>();
@@ -92,10 +89,8 @@ public class AlloyFurnaceRecipeManager {
         allAdapters.add(adapter);
         ItemStack moldItem = adapter.getMoldItem();
         if (moldItem != null && !moldItem.isEmpty()) {
-            IRecipeAdapter<?> existing = moldAdapterMap.put(moldItem.getItem(), adapter);
-            if (existing != null) {
-                LOGGER.warn("模具物品 {} 已注册到 adapter: {}, 被覆盖为: {}", moldItem.getItem(), existing.getClass().getSimpleName(), adapter.getClass().getSimpleName());
-            }
+            moldAdapterMap.computeIfAbsent(moldItem.getItem(), ignored -> new CopyOnWriteArrayList<>())
+                    .add(adapter);
         } else {
             fallbackAdapters.add(adapter);
         }
@@ -536,10 +531,12 @@ public class AlloyFurnaceRecipeManager {
 
         ItemStack mold = context.mold();
         if (mold != null && !mold.isEmpty()) {
-            IRecipeAdapter<?> exactAdapter = moldAdapterMap.get(mold.getItem());
-            if (exactAdapter != null) {
-                collectAdapterRecipes(exactAdapter, level, context.inputs(), mergedInputs, mergedFluids,
-                        mergedKeys, mold, candidates);
+            List<IRecipeAdapter<?>> exactAdapters = moldAdapterMap.get(mold.getItem());
+            if (exactAdapters != null) {
+                for (IRecipeAdapter<?> exactAdapter : exactAdapters) {
+                    collectAdapterRecipes(exactAdapter, level, context.inputs(), mergedInputs, mergedFluids,
+                            mergedKeys, mold, candidates);
+                }
             }
         }
 

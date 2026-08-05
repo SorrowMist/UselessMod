@@ -2,6 +2,9 @@ package com.sorrowmist.useless.content.machines.advanced_alloy_furnace.io;
 
 import com.sorrowmist.useless.api.enums.FurnaceFace;
 import com.sorrowmist.useless.api.enums.FurnaceFaceMode;
+import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.chemical.ChemicalHandlerView;
+import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.chemical.ChemicalStackView;
+import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.chemical.FurnaceChemicalStorage;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.world.item.ItemStack;
@@ -55,6 +58,19 @@ public final class FurnaceAutoIoController {
 
         long tryOutputFluidToAE(FluidStack stack);
 
+        default long tryOutputChemicalToAE(ChemicalStackView stack) {
+            return 0L;
+        }
+
+        default void handleUnreturnedChemical(ChemicalStackView stack) {
+        }
+
+        default ChemicalHandlerView getAdjacentChemicalHandler(Level level, BlockPos pos,
+                                                                net.minecraft.world.level.block.state.BlockState state,
+                                                                BlockEntity entity, Direction side) {
+            return null;
+        }
+
         void markChanged();
     }
 
@@ -62,15 +78,28 @@ public final class FurnaceAutoIoController {
     private final ItemStackHandler itemHandler;
     private final FluidTank[] inputFluidTanks;
     private final FluidTank[] outputFluidTanks;
+    private final FurnaceChemicalStorage inputChemicalStorage;
+    private final FurnaceChemicalStorage outputChemicalStorage;
     private final BlockPos worldPosition;
 
     public FurnaceAutoIoController(Context context, ItemStackHandler itemHandler,
                                    FluidTank[] inputFluidTanks, FluidTank[] outputFluidTanks,
                                    BlockPos worldPosition) {
+        this(context, itemHandler, inputFluidTanks, outputFluidTanks,
+                FurnaceChemicalStorage.DISABLED, FurnaceChemicalStorage.DISABLED, worldPosition);
+    }
+
+    public FurnaceAutoIoController(Context context, ItemStackHandler itemHandler,
+                                   FluidTank[] inputFluidTanks, FluidTank[] outputFluidTanks,
+                                   FurnaceChemicalStorage inputChemicalStorage,
+                                   FurnaceChemicalStorage outputChemicalStorage,
+                                   BlockPos worldPosition) {
         this.context = context;
         this.itemHandler = itemHandler;
         this.inputFluidTanks = inputFluidTanks;
         this.outputFluidTanks = outputFluidTanks;
+        this.inputChemicalStorage = inputChemicalStorage;
+        this.outputChemicalStorage = outputChemicalStorage;
         this.worldPosition = worldPosition;
     }
 
@@ -147,6 +176,29 @@ public final class FurnaceAutoIoController {
                     }
                 }
             }
+
+            // 输入化学品。提取和容量计算都使用 long，且只写入本机输入化学品槽。
+            if (mode.allowsMaterialInput() && this.inputChemicalStorage.isAvailable()) {
+                ChemicalHandlerView sourceChemicalHandler = this.context.getAdjacentChemicalHandler(
+                        level, srcPos, srcEntity.getBlockState(), srcEntity, dir.getOpposite());
+                if (sourceChemicalHandler != null) {
+                    ChemicalStackView extracted = sourceChemicalHandler.extractChemical(Long.MAX_VALUE, true);
+                    if (extracted != null && !extracted.isEmpty()) {
+                        ChemicalStackView remainder = this.inputChemicalStorage.insertChemical(extracted, true);
+                        long moved = acceptedAmount(extracted, remainder);
+                        if (moved > 0L) {
+                            ChemicalStackView actual = sourceChemicalHandler.extractChemical(extracted, moved, false);
+                            if (actual != null && !actual.isEmpty()) {
+                                ChemicalStackView localRemainder = this.inputChemicalStorage.insertChemical(actual, false);
+                                if (acceptedAmount(actual, localRemainder) > 0L) {
+                                    this.context.markChanged();
+                                }
+                                restoreChemicalRemainder(sourceChemicalHandler, actual, localRemainder);
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 
@@ -182,6 +234,15 @@ public final class FurnaceAutoIoController {
             }
         }
 
+        for (int i = 0; i < this.outputChemicalStorage.size(); i++) {
+            ChemicalStackView chemical = this.outputChemicalStorage.getStackInSlot(i);
+            if (chemical.isEmpty()) continue;
+            long inserted = clampAmount(this.context.tryOutputChemicalToAE(chemical), chemical.amount());
+            if (inserted > 0L) {
+                this.outputChemicalStorage.extractChemical(i, inserted, false);
+            }
+        }
+
         Direction facing = this.context.getFacing();
 
         // 输出物品到周围容器（仅允许输出模式的面）
@@ -213,6 +274,22 @@ public final class FurnaceAutoIoController {
                     this.context.markChanged();
                     fluid = this.outputFluidTanks[tankIndex].getFluid();
                     if (fluid.isEmpty()) break;
+                }
+            }
+        }
+
+        // 输出化学品到周围容器（仅允许输出模式的面）。
+        for (int tankIndex = 0; tankIndex < this.outputChemicalStorage.size(); tankIndex++) {
+            ChemicalStackView chemical = this.outputChemicalStorage.getStackInSlot(tankIndex);
+            if (chemical.isEmpty()) continue;
+            for (Direction dir : ALL_DIRECTIONS) {
+                FurnaceFace face = FurnaceFace.fromDirection(dir, facing);
+                if (face == null || !this.context.getFaceMode(face).allowsMaterialOutput()) continue;
+                long moved = this.tryOutputChemicalToDirection(level, tankIndex, dir);
+                if (moved > 0L) {
+                    this.context.markChanged();
+                    chemical = this.outputChemicalStorage.getStackInSlot(tankIndex);
+                    if (chemical.isEmpty()) break;
                 }
             }
         }
@@ -289,5 +366,60 @@ public final class FurnaceAutoIoController {
         }
 
         return filled;
+    }
+
+    private long tryOutputChemicalToDirection(Level level, int tankIndex, Direction direction) {
+        BlockPos targetPos = this.worldPosition.relative(direction);
+        BlockEntity targetEntity = level.getBlockEntity(targetPos);
+        if (targetEntity == null) return 0L;
+
+        ChemicalHandlerView targetHandler = this.context.getAdjacentChemicalHandler(
+                level, targetPos, targetEntity.getBlockState(), targetEntity, direction.getOpposite());
+        if (targetHandler == null) return 0L;
+
+        ChemicalStackView chemical = this.outputChemicalStorage.getStackInSlot(tankIndex);
+        if (chemical.isEmpty()) return 0L;
+        ChemicalStackView remainder = targetHandler.insertChemical(chemical, true);
+        long moved = acceptedAmount(chemical, remainder);
+        if (moved <= 0L) return 0L;
+
+        ChemicalStackView accepted = targetHandler.insertChemical(chemical.copyWithAmount(moved), false);
+        long actualMoved = acceptedAmount(chemical.copyWithAmount(moved), accepted);
+        if (actualMoved > 0L) {
+            this.outputChemicalStorage.extractChemical(tankIndex, actualMoved, false);
+        }
+        return actualMoved;
+    }
+
+    private void restoreChemicalRemainder(ChemicalHandlerView source, ChemicalStackView extracted,
+                                          ChemicalStackView remainder) {
+        ChemicalStackView remaining = normalizeRemainder(extracted, remainder);
+        if (remaining.isEmpty()) return;
+
+        remaining = source.insertChemical(remaining, false);
+        if (remaining == null || remaining.isEmpty()) return;
+        remaining = this.inputChemicalStorage.insertChemical(remaining, false);
+        if (remaining == null || remaining.isEmpty()) return;
+        remaining = this.outputChemicalStorage.insertChemical(remaining, false);
+        if (remaining != null && !remaining.isEmpty()) {
+            this.context.handleUnreturnedChemical(remaining);
+        }
+    }
+
+    private static long acceptedAmount(ChemicalStackView requested, ChemicalStackView remainder) {
+        if (requested == null || requested.isEmpty() || remainder == null) return 0L;
+        long remaining = clampAmount(remainder.amount(), requested.amount());
+        return requested.amount() - remaining;
+    }
+
+    private static ChemicalStackView normalizeRemainder(ChemicalStackView requested, ChemicalStackView remainder) {
+        if (requested == null || requested.isEmpty()) return ChemicalStackView.EMPTY;
+        if (remainder == null) return requested;
+        long amount = clampAmount(remainder.amount(), requested.amount());
+        return amount <= 0L ? ChemicalStackView.EMPTY : requested.copyWithAmount(amount);
+    }
+
+    private static long clampAmount(long amount, long maximum) {
+        return Math.max(0L, Math.min(Math.max(0L, maximum), amount));
     }
 }

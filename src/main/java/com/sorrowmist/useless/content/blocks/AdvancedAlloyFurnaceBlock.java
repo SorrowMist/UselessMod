@@ -108,7 +108,7 @@ public class AdvancedAlloyFurnaceBlock extends Block implements EntityBlock {
                 // 注意：使用精准采集时，物品会通过 getDrops 保存到方块物品中
                 // AE 任务数据不随掉落物保存，必须在此返还材料：
                 // onRemove 先于 setRemoved 执行，此时 AE 节点仍然存活，材料能真正写回网络
-                if (!level.isClientSide) {
+                if (!level.isClientSide && !furnace.isDropDataCaptured()) {
                     furnace.cancelAllAETasks();
                 }
             }
@@ -141,7 +141,7 @@ public class AdvancedAlloyFurnaceBlock extends Block implements EntityBlock {
                     boolean isEmpty = isFurnaceEmpty(furnace);
                     
                     // 如果全空且不高于0阶，不保存任何数据
-                    if (isEmpty && furnace.getFurnaceTier() <= 0) {
+                    if (isEmpty && furnace.getFurnaceTier() <= 0 && !furnace.hasPersistedAETaskData()) {
                         continue;
                     }
                     
@@ -169,6 +169,14 @@ public class AdvancedAlloyFurnaceBlock extends Block implements EntityBlock {
                                 outputTank.getFluid().save(params.getLevel().registryAccess()));
                         }
                     }
+                    furnace.getInputChemicalStorage().save(
+                            blockEntityData, "InputChemical", params.getLevel().registryAccess());
+                    furnace.getOutputChemicalStorage().save(
+                            blockEntityData, "OutputChemical", params.getLevel().registryAccess());
+
+                    CompoundTag aeTasksTag = new CompoundTag();
+                    furnace.saveAETasks(aeTasksTag, params.getLevel().registryAccess());
+                    blockEntityData.put("AeTasks", aeTasksTag);
                     
                     // 保存其他状态
                     blockEntityData.putInt(NBTConstants.PROGRESS, furnace.getProgress());
@@ -198,6 +206,7 @@ public class AdvancedAlloyFurnaceBlock extends Block implements EntityBlock {
                         blockEntityData
                     );
                     drop.set(UComponents.FURNACE_DATA.get(), component);
+                    furnace.markDropDataCaptured();
                 }
             }
         }
@@ -237,6 +246,14 @@ public class AdvancedAlloyFurnaceBlock extends Block implements EntityBlock {
         }
         
         // 检查模具
+        if (furnace.hasChemicalSupport()) {
+            for (int i = 0; i < AdvancedAlloyFurnaceLayout.CHEMICAL_TANK_COUNT; i++) {
+                if (!furnace.getInputChemical(i).isEmpty() || !furnace.getOutputChemical(i).isEmpty()) {
+                    return false;
+                }
+            }
+        }
+
         if (furnace.hasMold()) {
             return false;
         }
@@ -433,6 +450,12 @@ public class AdvancedAlloyFurnaceBlock extends Block implements EntityBlock {
                 }
                 
                 // 恢复其他状态
+                furnace.getInputChemicalStorage().load(
+                        blockEntityData, "InputChemical", level.registryAccess());
+                furnace.getOutputChemicalStorage().load(
+                        blockEntityData, "OutputChemical", level.registryAccess());
+                furnace.readAETasks(blockEntityData);
+
                 if (blockEntityData.contains(NBTConstants.PROGRESS)) {
                     furnace.setProgress(blockEntityData.getInt(NBTConstants.PROGRESS));
                 }

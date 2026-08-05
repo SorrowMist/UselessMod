@@ -9,8 +9,6 @@ import com.sorrowmist.useless.content.blockentities.multiblock.OmniversalMoldHub
 import com.sorrowmist.useless.content.blockentities.multiblock.PassiveCraftingHatchBlockEntity;
 import com.sorrowmist.useless.compat.draconicevolution.DraconicOpStorageCompat;
 import com.sorrowmist.useless.compat.fluxnetworks.FluxNetworksEnergyCompat;
-import com.sorrowmist.useless.compat.mekanism.MekanismEnergyCompat;
-import com.sorrowmist.useless.content.recipe.adapters.RecipeAdapterCompatRegistry;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.neoforged.bus.api.IEventBus;
@@ -83,14 +81,28 @@ public final class ModBlockEntities {
                 (blockEntity, context) -> blockEntity
         );
 
-        if (ModList.get().isLoaded(RecipeAdapterCompatRegistry.DRACONIC_EVOLUTION)) {
+        if (ModList.get().isLoaded("draconicevolution")) {
             DraconicOpStorageCompat.registerCapabilities(event);
         }
-        if (ModList.get().isLoaded(MekanismEnergyCompat.MOD_ID)) {
-            MekanismEnergyCompat.registerCapabilities(event);
+        if (ModList.get().isLoaded("mekanism")) {
+            invokeOptionalCapabilityLoader(
+                    "com.sorrowmist.useless.compat.mekanism.MekanismCompatLoader", event);
         }
         if (ModList.get().isLoaded(FluxNetworksEnergyCompat.MOD_ID)) {
             FluxNetworksEnergyCompat.registerCapabilities(event);
+        }
+    }
+
+    /**
+     * Keep optional Mekanism classes out of this always-loaded registry class.  In particular, the
+     * JVM must not resolve AppMek's capability types on a server that does not install AppMek.
+     */
+    private static void invokeOptionalCapabilityLoader(String className, RegisterCapabilitiesEvent event) {
+        try {
+            Class<?> loader = Class.forName(className, true, ModBlockEntities.class.getClassLoader());
+            loader.getMethod("registerCapabilities", RegisterCapabilitiesEvent.class).invoke(null, event);
+        } catch (ReflectiveOperationException | LinkageError exception) {
+            UselessMod.LOGGER.error("Failed to register optional capabilities from {}", className, exception);
         }
     }
 

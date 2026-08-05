@@ -1,5 +1,9 @@
 package com.sorrowmist.useless.content.machines.advanced_alloy_furnace.io;
 
+import appeng.api.stacks.AEKey;
+import appeng.api.stacks.GenericStack;
+import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.chemical.ChemicalKeyProvider;
+import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.chemical.FurnaceChemicalStorage;
 import com.sorrowmist.useless.content.recipe.AdvancedAlloyFurnaceRecipe;
 import com.sorrowmist.useless.content.recipe.ItemIngredientAllocator;
 import net.minecraft.world.item.ItemStack;
@@ -23,8 +27,19 @@ public final class FurnaceInputPort {
      * 按指定并行数消耗配方所需的物品和流体输入。
      */
     public static boolean consumeRecipeInputs(AdvancedAlloyFurnaceRecipe recipe, int parallel, ItemStackHandler itemHandler, int inputSlotsStart, int inputSlotsCount, FluidTank[] inputFluidTanks, int fluidTankCount) {
+        return consumeRecipeInputs(recipe, parallel, itemHandler, inputSlotsStart, inputSlotsCount,
+                inputFluidTanks, fluidTankCount, FurnaceChemicalStorage.DISABLED,
+                ChemicalKeyProvider.NONE);
+    }
+
+    public static boolean consumeRecipeInputs(AdvancedAlloyFurnaceRecipe recipe, int parallel,
+                                              ItemStackHandler itemHandler, int inputSlotsStart,
+                                              int inputSlotsCount, FluidTank[] inputFluidTanks,
+                                              int fluidTankCount, FurnaceChemicalStorage inputChemicalStorage,
+                                              ChemicalKeyProvider chemicalKeyProvider) {
         PreparedInputs prepared = prepareInputs(
-                recipe, parallel, itemHandler, inputSlotsStart, inputSlotsCount, inputFluidTanks, fluidTankCount);
+                recipe, parallel, itemHandler, inputSlotsStart, inputSlotsCount, inputFluidTanks,
+                fluidTankCount, inputChemicalStorage, chemicalKeyProvider);
         if (prepared == null) return false;
 
         for (int i = 0; i < prepared.itemAllocation().inputCount(); i++) {
@@ -48,27 +63,69 @@ public final class FurnaceInputPort {
                 remaining -= chunk;
             }
         }
+
+        for (int i = 0; i < prepared.chemicalConsumedByTank().length; i++) {
+            long amount = prepared.chemicalConsumedByTank()[i];
+            if (amount <= 0L) continue;
+            var extracted = inputChemicalStorage.extractChemical(i, amount, false);
+            if (extracted.isEmpty() || extracted.amount() != amount) {
+                throw new IllegalStateException("Validated alloy furnace chemical input changed during consumption");
+            }
+        }
         return true;
     }
 
     public static boolean canConsumeRecipeInputs(AdvancedAlloyFurnaceRecipe recipe, int parallel, ItemStackHandler itemHandler, int inputSlotsStart, int inputSlotsCount, FluidTank[] inputFluidTanks, int fluidTankCount) {
+        return canConsumeRecipeInputs(recipe, parallel, itemHandler, inputSlotsStart, inputSlotsCount,
+                inputFluidTanks, fluidTankCount, FurnaceChemicalStorage.DISABLED,
+                ChemicalKeyProvider.NONE);
+    }
+
+    public static boolean canConsumeRecipeInputs(AdvancedAlloyFurnaceRecipe recipe, int parallel,
+                                                 ItemStackHandler itemHandler, int inputSlotsStart,
+                                                 int inputSlotsCount, FluidTank[] inputFluidTanks,
+                                                 int fluidTankCount, FurnaceChemicalStorage inputChemicalStorage,
+                                                 ChemicalKeyProvider chemicalKeyProvider) {
         return prepareInputs(
-                recipe, parallel, itemHandler, inputSlotsStart, inputSlotsCount, inputFluidTanks, fluidTankCount) != null;
+                recipe, parallel, itemHandler, inputSlotsStart, inputSlotsCount, inputFluidTanks,
+                fluidTankCount, inputChemicalStorage, chemicalKeyProvider) != null;
     }
 
     public static int calculateMaterialParallel(AdvancedAlloyFurnaceRecipe recipe, ItemStackHandler itemHandler, int inputSlotsStart, int inputSlotsCount, FluidTank[] inputFluidTanks, int fluidTankCount) {
+        return calculateMaterialParallel(recipe, itemHandler, inputSlotsStart, inputSlotsCount,
+                inputFluidTanks, fluidTankCount, FurnaceChemicalStorage.DISABLED,
+                ChemicalKeyProvider.NONE);
+    }
+
+    public static int calculateMaterialParallel(AdvancedAlloyFurnaceRecipe recipe,
+                                                ItemStackHandler itemHandler, int inputSlotsStart,
+                                                int inputSlotsCount, FluidTank[] inputFluidTanks,
+                                                int fluidTankCount, FurnaceChemicalStorage inputChemicalStorage,
+                                                ChemicalKeyProvider chemicalKeyProvider) {
         if (recipe == null) return 0;
 
         List<ItemStack> itemInputs = snapshotItems(itemHandler, inputSlotsStart, inputSlotsCount);
         int itemParallel = ItemIngredientAllocator.maxOperations(recipe.inputs(), itemInputs);
         int fluidParallel = maxFluidOperations(recipe.inputFluids(), inputFluidTanks, fluidTankCount);
+        int chemicalParallel = maxChemicalOperations(recipe.keyInputs(), inputChemicalStorage, chemicalKeyProvider);
         boolean hasItemDemand = recipe.inputs().stream().anyMatch(input -> input != null && input.count() > 0);
         boolean hasFluidDemand = recipe.inputFluids().stream().anyMatch(input -> input != null && !input.isEmpty() && input.getAmount() > 0);
-        if (!hasItemDemand && !hasFluidDemand) return 1;
-        return Math.min(itemParallel, fluidParallel);
+        boolean hasChemicalDemand = hasChemicalDemand(recipe.keyInputs(), chemicalKeyProvider);
+        if (!hasItemDemand && !hasFluidDemand && !hasChemicalDemand) return 1;
+        return Math.min(itemParallel, Math.min(fluidParallel, chemicalParallel));
     }
 
     private static PreparedInputs prepareInputs(AdvancedAlloyFurnaceRecipe recipe, long operations, ItemStackHandler itemHandler, int inputSlotsStart, int inputSlotsCount, FluidTank[] inputFluidTanks, int fluidTankCount) {
+        return prepareInputs(recipe, operations, itemHandler, inputSlotsStart, inputSlotsCount,
+                inputFluidTanks, fluidTankCount, FurnaceChemicalStorage.DISABLED,
+                ChemicalKeyProvider.NONE);
+    }
+
+    private static PreparedInputs prepareInputs(AdvancedAlloyFurnaceRecipe recipe, long operations,
+                                                ItemStackHandler itemHandler, int inputSlotsStart,
+                                                int inputSlotsCount, FluidTank[] inputFluidTanks,
+                                                int fluidTankCount, FurnaceChemicalStorage inputChemicalStorage,
+                                                ChemicalKeyProvider chemicalKeyProvider) {
         if (recipe == null || operations <= 0 || itemHandler == null || inputFluidTanks == null) return null;
 
         List<ItemStack> itemInputs = snapshotItems(itemHandler, inputSlotsStart, inputSlotsCount);
@@ -78,7 +135,10 @@ public final class FurnaceInputPort {
 
         long[] fluidAllocation = allocateFluids(recipe.inputFluids(), operations, inputFluidTanks, fluidTankCount);
         if (fluidAllocation == null) return null;
-        return new PreparedInputs(itemAllocation, fluidAllocation);
+        long[] chemicalAllocation = allocateChemicals(recipe.keyInputs(), operations,
+                inputChemicalStorage, chemicalKeyProvider);
+        if (chemicalAllocation == null) return null;
+        return new PreparedInputs(itemAllocation, fluidAllocation, chemicalAllocation);
     }
 
     private static List<ItemStack> snapshotItems(ItemStackHandler itemHandler, int inputSlotsStart, int inputSlotsCount) {
@@ -128,6 +188,80 @@ public final class FurnaceInputPort {
         return maximum;
     }
 
+    private static long[] allocateChemicals(List<GenericStack> requirements, long operations,
+                                             FurnaceChemicalStorage storage,
+                                             ChemicalKeyProvider provider) {
+        int count = storage == null ? 0 : storage.size();
+        long[] consumedByTank = new long[count];
+        for (ChemicalDemand demand : mergeChemicalDemands(requirements)) {
+            // keyInputs also carries non-chemical AE materials used by other integrations.
+            // Those are supplied by the AE task path and do not belong in local chemical tanks.
+            if (provider == null || !provider.isChemicalKey(demand.key())) continue;
+            long remaining = saturatingMultiply(demand.amount(), operations);
+            for (int i = 0; i < count && remaining > 0L; i++) {
+                GenericStack available = provider.toGenericStack(storage.getStackInSlot(i));
+                if (available == null || !demand.key().equals(available.what())) continue;
+                long free = available.amount() - consumedByTank[i];
+                if (free <= 0L) continue;
+                long consumed = Math.min(remaining, free);
+                consumedByTank[i] += consumed;
+                remaining -= consumed;
+            }
+            if (remaining > 0L) return null;
+        }
+        return consumedByTank;
+    }
+
+    private static int maxChemicalOperations(List<GenericStack> requirements,
+                                             FurnaceChemicalStorage storage,
+                                             ChemicalKeyProvider provider) {
+        List<ChemicalDemand> demands = mergeChemicalDemands(requirements).stream()
+                .filter(demand -> provider != null && provider.isChemicalKey(demand.key()))
+                .toList();
+        if (demands.isEmpty()) return Integer.MAX_VALUE;
+        if (storage == null || provider == null) return 0;
+
+        int maximum = Integer.MAX_VALUE;
+        for (ChemicalDemand demand : demands) {
+            long availableAmount = 0L;
+            for (int i = 0; i < storage.size(); i++) {
+                GenericStack available = provider.toGenericStack(storage.getStackInSlot(i));
+                if (available != null && demand.key().equals(available.what())) {
+                    availableAmount = saturatingAdd(availableAmount, available.amount());
+                }
+            }
+            long operations = availableAmount / demand.amount();
+            maximum = Math.min(maximum, operations > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) operations);
+        }
+        return maximum;
+    }
+
+    private static boolean hasChemicalDemand(List<GenericStack> requirements,
+                                             ChemicalKeyProvider provider) {
+        if (requirements == null || provider == null) return false;
+        return requirements.stream().anyMatch(input -> input != null && input.what() != null
+                && input.amount() > 0L && provider.isChemicalKey(input.what()));
+    }
+
+    private static List<ChemicalDemand> mergeChemicalDemands(List<GenericStack> requirements) {
+        List<ChemicalDemand> demands = new ArrayList<>();
+        if (requirements == null) return demands;
+        for (GenericStack requirement : requirements) {
+            if (requirement == null || requirement.what() == null || requirement.amount() <= 0L) continue;
+            boolean merged = false;
+            for (int i = 0; i < demands.size(); i++) {
+                ChemicalDemand existing = demands.get(i);
+                if (existing.key().equals(requirement.what())) {
+                    demands.set(i, new ChemicalDemand(existing.key(), saturatingAdd(existing.amount(), requirement.amount())));
+                    merged = true;
+                    break;
+                }
+            }
+            if (!merged) demands.add(new ChemicalDemand(requirement.what(), requirement.amount()));
+        }
+        return demands;
+    }
+
     private static List<FluidDemand> mergeFluidDemands(List<FluidStack> requirements) {
         List<FluidDemand> demands = new ArrayList<>();
         if (requirements == null) return demands;
@@ -163,6 +297,10 @@ public final class FurnaceInputPort {
     private record FluidDemand(FluidStack fluid, long amount) {
     }
 
-    private record PreparedInputs(ItemIngredientAllocator.Allocation itemAllocation, long[] fluidConsumedByTank) {
+    private record ChemicalDemand(AEKey key, long amount) {
+    }
+
+    private record PreparedInputs(ItemIngredientAllocator.Allocation itemAllocation,
+                                  long[] fluidConsumedByTank, long[] chemicalConsumedByTank) {
     }
 }

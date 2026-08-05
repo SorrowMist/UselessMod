@@ -25,6 +25,7 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.crafting.Ingredient;
 import net.neoforged.neoforge.fluids.FluidStack;
+import mezz.jei.api.gui.builder.IRecipeSlotBuilder;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.ArrayList;
@@ -234,14 +235,12 @@ public class AdvancedAlloyFurnaceRecipeCategory implements IRecipeCategory<Advan
             int y = INPUT_SLOTS_START_Y + (int) (row * inputSpacingY);
             GenericStack keyInput = keyInputs.get(i);
             long amount = keyInput.amount();
-            ItemStack displayStack = GenericStack.wrapInItemStack(keyInput.what(), (int) Math.min(amount, Integer.MAX_VALUE));
-            if (!displayStack.isEmpty()) {
-                builder.addSlot(RecipeIngredientRole.INPUT, x, y)
-                        .addItemStack(displayStack)
-                        .addRichTooltipCallback((slot, tooltip) -> {
-                            tooltip.add(Component.translatable("jei.useless_mod.tooltip.key_input").withStyle(ChatFormatting.AQUA));
-                            tooltip.add(Component.translatable("jei.useless_mod.tooltip.amount", formatCount(amount)).withStyle(ChatFormatting.GRAY));
-                        });
+            IRecipeSlotBuilder slot = addKeyStack(builder, RecipeIngredientRole.INPUT, x, y, keyInput);
+            if (slot != null) {
+                slot.addRichTooltipCallback((slotView, tooltip) -> {
+                    tooltip.add(Component.translatable("jei.useless_mod.tooltip.key_input").withStyle(ChatFormatting.AQUA));
+                    tooltip.add(Component.translatable("jei.useless_mod.tooltip.amount", formatCount(amount)).withStyle(ChatFormatting.GRAY));
+                });
             }
         }
 
@@ -307,14 +306,12 @@ public class AdvancedAlloyFurnaceRecipeCategory implements IRecipeCategory<Advan
             int y = OUTPUT_SLOTS_START_Y + (int) (row * outputSpacingY);
             GenericStack keyOutput = keyOutputs.get(i);
             long amount = keyOutput.amount();
-            ItemStack displayStack = GenericStack.wrapInItemStack(keyOutput.what(), (int) Math.min(amount, Integer.MAX_VALUE));
-            if (!displayStack.isEmpty()) {
-                builder.addSlot(RecipeIngredientRole.OUTPUT, x, y)
-                        .addItemStack(displayStack)
-                        .addRichTooltipCallback((slot, tooltip) -> {
-                            tooltip.add(Component.translatable("jei.useless_mod.tooltip.key_output").withStyle(ChatFormatting.AQUA));
-                            tooltip.add(Component.translatable("jei.useless_mod.tooltip.amount", formatCount(amount)).withStyle(ChatFormatting.GRAY));
-                        });
+            IRecipeSlotBuilder slot = addKeyStack(builder, RecipeIngredientRole.OUTPUT, x, y, keyOutput);
+            if (slot != null) {
+                slot.addRichTooltipCallback((slotView, tooltip) -> {
+                    tooltip.add(Component.translatable("jei.useless_mod.tooltip.key_output").withStyle(ChatFormatting.AQUA));
+                    tooltip.add(Component.translatable("jei.useless_mod.tooltip.amount", formatCount(amount)).withStyle(ChatFormatting.GRAY));
+                });
             }
         }
 
@@ -530,6 +527,25 @@ public class AdvancedAlloyFurnaceRecipeCategory implements IRecipeCategory<Advan
         } else {
             return String.valueOf(count);
         }
+    }
+
+    private static IRecipeSlotBuilder addKeyStack(IRecipeLayoutBuilder builder,
+                                                    RecipeIngredientRole role,
+                                                    int x,
+                                                    int y,
+                                                    GenericStack stack) {
+        GenericStackJeiIngredientProvider.Ingredient nativeIngredient =
+                GenericStackJeiIngredientProviders.resolve(stack);
+        if (nativeIngredient != null) {
+            IRecipeSlotBuilder slot = builder.addSlot(role, x, y);
+            nativeIngredient.addTo(slot);
+            return slot;
+        }
+
+        ItemStack displayStack = GenericStack.wrapInItemStack(
+                stack.what(), (int) Math.min(stack.amount(), Integer.MAX_VALUE));
+        if (displayStack.isEmpty()) return null;
+        return builder.addSlot(role, x, y).addItemStack(displayStack);
     }
 
     // 判断是否是无用锭配方（根据输出物品判断）

@@ -12,6 +12,7 @@ import com.sorrowmist.useless.api.enums.FurnaceFaceMode;
 import com.sorrowmist.useless.api.enums.RedstoneControlMode;
 import com.sorrowmist.useless.content.blockentities.AdvancedAlloyFurnaceBlockEntity;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.layout.AdvancedAlloyFurnaceLayout;
+import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.chemical.ChemicalStackView;
 import com.sorrowmist.useless.content.menus.AdvancedAlloyFurnaceMenu;
 import com.sorrowmist.useless.inventory.slot.PatternSlotItemHandler;
 import com.sorrowmist.useless.client.render.PatternSlotRenderer;
@@ -88,6 +89,12 @@ public class AdvancedAlloyFurnaceScreen extends AbstractContainerScreen<Advanced
     // 流体输出槽位置：起点75,113，大小16*31，横向9个
     private static final int FLUID_OUTPUT_X = 75;
     private static final int FLUID_OUTPUT_Y = 113;
+
+    // The three reserved positions after the six fluid tanks are chemical tanks.
+    private static final int CHEMICAL_INPUT_X = FLUID_INPUT_X
+            + AdvancedAlloyFurnaceLayout.FLUID_TANK_COUNT * (FLUID_TANK_WIDTH + SLOT_SPACING);
+    private static final int CHEMICAL_OUTPUT_X = FLUID_OUTPUT_X
+            + AdvancedAlloyFurnaceLayout.FLUID_TANK_COUNT * (FLUID_TANK_WIDTH + SLOT_SPACING);
 
     // 样板槽位置：起点8,5，横向3个纵向9个
     private static final int PATTERN_SLOTS_X = 8;
@@ -341,6 +348,8 @@ public class AdvancedAlloyFurnaceScreen extends AbstractContainerScreen<Advanced
 
         this.renderFluidTankTooltip(guiGraphics, mouseX, mouseY, x, y, true);
         this.renderFluidTankTooltip(guiGraphics, mouseX, mouseY, x, y, false);
+        this.renderChemicalTankTooltip(guiGraphics, mouseX, mouseY, x, y, true);
+        this.renderChemicalTankTooltip(guiGraphics, mouseX, mouseY, x, y, false);
         this.renderEnergyTooltip(guiGraphics, mouseX, mouseY, x, y);
         this.renderProgressTooltip(guiGraphics, mouseX, mouseY, x, y);
         this.renderTipsTooltip(guiGraphics, mouseX, mouseY, x, y);
@@ -477,6 +486,8 @@ public class AdvancedAlloyFurnaceScreen extends AbstractContainerScreen<Advanced
         // 渲染流体槽
         this.renderFluidTanks(guiGraphics, x, y, true);
         this.renderFluidTanks(guiGraphics, x, y, false);
+        this.renderChemicalTanks(guiGraphics, x, y, true);
+        this.renderChemicalTanks(guiGraphics, x, y, false);
 
         // 渲染指示灯
         this.renderIndicators(guiGraphics, x, y);
@@ -652,6 +663,67 @@ public class AdvancedAlloyFurnaceScreen extends AbstractContainerScreen<Advanced
         guiGraphics.pose().popPose();
     }
 
+    private void renderChemicalTanks(GuiGraphics guiGraphics, int x, int y, boolean isInput) {
+        if (!this.menu.hasChemicalSupport()) return;
+
+        int startX = isInput ? CHEMICAL_INPUT_X : CHEMICAL_OUTPUT_X;
+        int startY = isInput ? FLUID_INPUT_Y : FLUID_OUTPUT_Y;
+        for (int i = 0; i < AdvancedAlloyFurnaceLayout.CHEMICAL_TANK_COUNT; i++) {
+            int tankX = x + startX + i * (FLUID_TANK_WIDTH + SLOT_SPACING);
+            ChemicalStackView chemical = isInput
+                    ? this.menu.getInputChemical(i) : this.menu.getOutputChemical(i);
+            this.renderChemicalTank(guiGraphics, tankX, y + startY, chemical,
+                    this.menu.getChemicalTankCapacity());
+        }
+    }
+
+    private void renderChemicalTank(GuiGraphics guiGraphics, int x, int y,
+                                    ChemicalStackView chemical, long capacity) {
+        if (chemical == null || chemical.isEmpty() || capacity <= 0L) return;
+
+        int fillHeight = (int) Math.min(FLUID_TANK_HEIGHT,
+                Math.max(1L, Math.min((long) FLUID_TANK_HEIGHT,
+                        (long) ((double) chemical.amount() / (double) capacity * FLUID_TANK_HEIGHT))));
+        ResourceLocation icon = chemical.icon();
+        TextureAtlasSprite sprite = icon == null || this.minecraft == null ? null
+                : this.minecraft.getTextureAtlas(InventoryMenu.BLOCK_ATLAS).apply(icon);
+        if (sprite == null) return;
+
+        int color = chemical.tintColor();
+        float r = ((color >> 16) & 0xFF) / 255.0F;
+        float g = ((color >> 8) & 0xFF) / 255.0F;
+        float b = (color & 0xFF) / 255.0F;
+
+        guiGraphics.pose().pushPose();
+        RenderSystem.enableBlend();
+        RenderSystem.defaultBlendFunc();
+        RenderSystem.setShaderColor(r, g, b, 1.0F);
+        RenderSystem.setShaderTexture(0, sprite.atlasLocation());
+        RenderSystem.setShader(GameRenderer::getPositionTexShader);
+
+        int remainingHeight = fillHeight;
+        int currentY = y + FLUID_TANK_HEIGHT - fillHeight;
+        Tesselator tesselator = Tesselator.getInstance();
+        BufferBuilder bufferBuilder = tesselator.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_TEX);
+        while (remainingHeight > 0) {
+            int drawHeight = Math.min(16, remainingHeight);
+            float u0 = sprite.getU0();
+            float v0 = sprite.getV0();
+            float u1 = sprite.getU1();
+            float v1 = sprite.getV((float) drawHeight / 16.0F);
+            bufferBuilder.addVertex(x, currentY + drawHeight, 0).setUv(u0, v1);
+            bufferBuilder.addVertex(x + FLUID_TANK_WIDTH, currentY + drawHeight, 0).setUv(u1, v1);
+            bufferBuilder.addVertex(x + FLUID_TANK_WIDTH, currentY, 0).setUv(u1, v0);
+            bufferBuilder.addVertex(x, currentY, 0).setUv(u0, v0);
+            remainingHeight -= drawHeight;
+            currentY += drawHeight;
+        }
+        BufferUploader.drawWithShader(bufferBuilder.buildOrThrow());
+        RenderSystem.setShaderColor(1.0F, 1.0F, 1.0F, 1.0F);
+        RenderSystem.disableBlend();
+        guiGraphics.pose().popPose();
+    }
+
     /**
      * 渲染指示灯
      */
@@ -759,6 +831,7 @@ public class AdvancedAlloyFurnaceScreen extends AbstractContainerScreen<Advanced
         if (this.handlePatternPageClick(mouseX, mouseY, x, y)) return true;
         if (this.handleProgressClick(mouseX, mouseY, x, y)) return true;
         if (this.handleFluidTankClick(mouseX, mouseY, x, y)) return true;
+        if (this.handleChemicalTankClick(mouseX, mouseY, x, y)) return true;
         if (this.handleFaceModeClick(mouseX, mouseY, button, x, y)) return true;
         if (this.handleAutoIOClick(mouseX, mouseY, x, y)) return true;
         if (this.handleRedstoneControlClick(mouseX, mouseY, x, y)) return true;
@@ -886,6 +959,35 @@ public class AdvancedAlloyFurnaceScreen extends AbstractContainerScreen<Advanced
         return false;
     }
 
+    private boolean handleChemicalTankClick(double mouseX, double mouseY, int x, int y) {
+        if (!this.menu.hasChemicalSupport()) return false;
+
+        for (int i = 0; i < AdvancedAlloyFurnaceLayout.CHEMICAL_TANK_COUNT; i++) {
+            int tankX = x + CHEMICAL_INPUT_X + i * (FLUID_TANK_WIDTH + SLOT_SPACING);
+            if (isInArea(mouseX, mouseY, tankX, y + FLUID_INPUT_Y,
+                    FLUID_TANK_WIDTH, FLUID_TANK_HEIGHT)) {
+                if (!this.menu.getInputChemical(i).isEmpty()) {
+                    PacketDistributor.sendToServer(new TankClearPacket(
+                            this.menu.getBlockEntity().getBlockPos(), i, true, true));
+                }
+                return true;
+            }
+        }
+
+        for (int i = 0; i < AdvancedAlloyFurnaceLayout.CHEMICAL_TANK_COUNT; i++) {
+            int tankX = x + CHEMICAL_OUTPUT_X + i * (FLUID_TANK_WIDTH + SLOT_SPACING);
+            if (isInArea(mouseX, mouseY, tankX, y + FLUID_OUTPUT_Y,
+                    FLUID_TANK_WIDTH, FLUID_TANK_HEIGHT)) {
+                if (!this.menu.getOutputChemical(i).isEmpty()) {
+                    PacketDistributor.sendToServer(new TankClearPacket(
+                            this.menu.getBlockEntity().getBlockPos(), i, false, true));
+                }
+                return true;
+            }
+        }
+        return false;
+    }
+
     /**
      * 处理面模式控制区域点击。
      * <p>
@@ -1008,6 +1110,33 @@ public class AdvancedAlloyFurnaceScreen extends AbstractContainerScreen<Advanced
             }
             break;
         }
+    }
+
+    private void renderChemicalTankTooltip(GuiGraphics guiGraphics, int mouseX, int mouseY,
+                                           int x, int y, boolean isInput) {
+        if (!this.menu.hasChemicalSupport()) return;
+        int startX = isInput ? CHEMICAL_INPUT_X : CHEMICAL_OUTPUT_X;
+        int startY = isInput ? FLUID_INPUT_Y : FLUID_OUTPUT_Y;
+        for (int i = 0; i < AdvancedAlloyFurnaceLayout.CHEMICAL_TANK_COUNT; i++) {
+            int tankX = x + startX + i * (FLUID_TANK_WIDTH + SLOT_SPACING);
+            int tankY = y + startY;
+            if (!isInArea(mouseX, mouseY, tankX, tankY, FLUID_TANK_WIDTH, FLUID_TANK_HEIGHT)) continue;
+
+            ChemicalStackView chemical = isInput
+                    ? this.menu.getInputChemical(i) : this.menu.getOutputChemical(i);
+            if (!chemical.isEmpty()) {
+                Component amountText = Component.translatable(
+                        "gui.useless_mod.advanced_alloy_furnace.chemical_amount",
+                        formatLong(chemical.amount()), formatLong(this.menu.getChemicalTankCapacity()));
+                guiGraphics.renderTooltip(this.font,
+                        List.of(chemical.displayName(), amountText), Optional.empty(), mouseX, mouseY);
+            }
+            break;
+        }
+    }
+
+    private static String formatLong(long amount) {
+        return String.format("%,d", amount);
     }
 
     private void renderEnergyTooltip(GuiGraphics guiGraphics, int mouseX, int mouseY, int x, int y) {

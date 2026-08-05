@@ -41,6 +41,11 @@ public final class AdvancedAlloyFurnacePatternResolver {
             return null;
         }
 
+        AEItemKey definition = AEItemKey.of(stack);
+        if (definition != null && SmartDoublingPatterns.definitionOperations(definition) != null) {
+            return SmartDoublingPatterns.restore(definition, level);
+        }
+
         /*
          * AE2's generic decoder deliberately catches every exception thrown by
          * an EncodedPatternItem and returns null.  That is useful for ordinary
@@ -48,9 +53,8 @@ public final class AdvancedAlloyFurnacePatternResolver {
          * exactly like an empty slot.  Decode our item explicitly so the
          * binding can be validated and failures can be diagnosed, while still
          * leaving all other AE2 pattern types on the normal path.
-         */
+        */
         if (stack.is(ModItems.OMNIVERSAL_PATTERN.get())) {
-            AEItemKey definition = AEItemKey.of(stack);
             OmniversalPatternData data = definition == null
                     ? null
                     : definition.get(UComponents.OMNIVERSAL_PATTERN_DATA.get());

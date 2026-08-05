@@ -12,6 +12,7 @@ import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.Advance
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.CraftingTask;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.CraftingTaskContext;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.OmniversalPatternDetails;
+import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.SmartDoublingPatterns;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.PassivePatternInputTransaction;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.catalyst.ResolvedCatalystEffect;
 import com.sorrowmist.useless.content.menus.PassiveCraftingHatchMenu;
@@ -443,27 +444,14 @@ public final class PassiveCraftingHatchBlockEntity extends BlockEntity
     private static boolean amountsFit(OmniversalPatternDetails pattern, long operations) {
         try {
             Map<AEKey, Long> totals = new HashMap<>();
-            if (pattern.usesDynamicOutputs()) {
-                for (ItemStack output : pattern.recipe().outputs()) {
-                    addScaledAmount(totals, AEItemKey.of(output), output.getCount(), operations);
-                }
-                for (FluidStack output : pattern.recipe().outputFluids()) {
-                    addScaledAmount(totals, AEFluidKey.of(output), output.getAmount(), operations);
-                }
-                for (GenericStack output : pattern.recipe().keyOutputs()) {
-                    addScaledAmount(totals, output.what(), output.amount(), operations);
-                }
-            } else {
-                for (GenericStack output : pattern.getOutputs()) {
-                    addScaledAmount(totals, output.what(), output.amount(), operations);
-                }
-                for (GenericStack output : pattern.recipe().keyOutputs()) {
-                    boolean alreadyInPattern = pattern.getOutputs().stream()
-                            .anyMatch(patternOutput -> output.what().equals(patternOutput.what()));
-                    if (!alreadyInPattern) {
-                        addScaledAmount(totals, output.what(), output.amount(), operations);
-                    }
-                }
+            for (ItemStack output : pattern.recipe().outputs()) {
+                addScaledAmount(totals, AEItemKey.of(output), output.getCount(), operations);
+            }
+            for (FluidStack output : pattern.recipe().outputFluids()) {
+                addScaledAmount(totals, AEFluidKey.of(output), output.getAmount(), operations);
+            }
+            for (GenericStack output : pattern.recipe().keyOutputs()) {
+                addScaledAmount(totals, output.what(), output.amount(), operations);
             }
             return true;
         } catch (ArithmeticException exception) {
@@ -940,7 +928,8 @@ public final class PassiveCraftingHatchBlockEntity extends BlockEntity
     public AdvancedAlloyFurnaceRecipe resolveTaskRecipe(
             IPatternDetails pattern, List<ItemStack> items, List<FluidStack> fluids,
             List<GenericStack> keys, long operations) {
-        return pattern instanceof OmniversalPatternDetails omniversal ? omniversal.recipe() : null;
+        IPatternDetails original = SmartDoublingPatterns.unwrap(pattern);
+        return original instanceof OmniversalPatternDetails omniversal ? omniversal.recipe() : null;
     }
 
     @Override

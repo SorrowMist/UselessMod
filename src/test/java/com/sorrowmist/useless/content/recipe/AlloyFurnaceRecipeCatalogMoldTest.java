@@ -13,13 +13,17 @@ import net.minecraft.core.component.DataComponents;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.Bootstrap;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.item.crafting.Ingredient;
+import net.minecraft.world.level.Level;
 import net.neoforged.neoforge.common.crafting.DataComponentIngredient;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import sun.misc.Unsafe;
 
+import java.lang.reflect.Field;
 import java.util.List;
 import java.util.Objects;
 
@@ -27,10 +31,15 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class AlloyFurnaceRecipeCatalogMoldTest {
+    private static Level level;
+
     @BeforeAll
-    static void bootstrapMinecraft() {
+    static void bootstrapMinecraft() throws ReflectiveOperationException {
         SharedConstants.tryDetectVersion();
         Bootstrap.bootStrap();
+        Field field = Unsafe.class.getDeclaredField("theUnsafe");
+        field.setAccessible(true);
+        level = (Level) ((Unsafe) field.get(null)).allocateInstance(ServerLevel.class);
     }
 
     @Test
@@ -115,11 +124,50 @@ class AlloyFurnaceRecipeCatalogMoldTest {
         assertTrue(AlloyFurnaceRecipeCatalog.matchesPattern(recipe, pattern));
     }
 
+    @Test
+    void knownRecipeMayOmitSecondaryOutputs() {
+        AdvancedAlloyFurnaceRecipe recipe = recipeWithOutputs(
+                new ItemStack(Items.GOLD_INGOT, 3), new ItemStack(Items.DIAMOND));
+        IPatternDetails pattern = processingPattern(
+                new ItemStack(Items.IRON_INGOT), List.of(new ItemStack(Items.GOLD_INGOT, 3)));
+
+        assertTrue(AlloyFurnaceRecipeCatalog.matchesRecipe(level, recipe, pattern));
+    }
+
+    @Test
+    void omittedOutputsDoNotRelaxRetainedOutputMatching() {
+        AdvancedAlloyFurnaceRecipe recipe = recipeWithOutputs(
+                new ItemStack(Items.GOLD_INGOT, 3), new ItemStack(Items.DIAMOND));
+
+        assertFalse(AlloyFurnaceRecipeCatalog.matchesRecipe(level, recipe,
+                processingPattern(new ItemStack(Items.IRON_INGOT),
+                        List.of(new ItemStack(Items.GOLD_INGOT, 2)))));
+        assertFalse(AlloyFurnaceRecipeCatalog.matchesRecipe(level, recipe,
+                processingPattern(new ItemStack(Items.IRON_INGOT),
+                        List.of(new ItemStack(Items.GOLD_INGOT, 3), new ItemStack(Items.EMERALD)))));
+    }
+
+    @Test
+    void retainedSecondaryOutputMayBecomeThePrimaryOutput() {
+        AdvancedAlloyFurnaceRecipe recipe = recipeWithOutputs(
+                new ItemStack(Items.GOLD_INGOT, 3), new ItemStack(Items.DIAMOND));
+
+        assertTrue(AlloyFurnaceRecipeCatalog.matchesRecipe(level, recipe,
+                processingPattern(new ItemStack(Items.IRON_INGOT),
+                        List.of(new ItemStack(Items.DIAMOND)))));
+    }
+
     private static IPatternDetails processingPattern(ItemStack input, ItemStack output) {
+        return processingPattern(input, List.of(output));
+    }
+
+    private static IPatternDetails processingPattern(ItemStack input, List<ItemStack> outputs) {
         GenericStack encodedInput = Objects.requireNonNull(GenericStack.fromItemStack(input));
-        GenericStack encodedOutput = Objects.requireNonNull(GenericStack.fromItemStack(output));
+        List<GenericStack> encodedOutputs = outputs.stream()
+                .map(stack -> Objects.requireNonNull(GenericStack.fromItemStack(stack)))
+                .toList();
         ItemStack encoded = PatternDetailsHelper.encodeProcessingPattern(
-                List.of(encodedInput), List.of(encodedOutput));
+                List.of(encodedInput), encodedOutputs);
         return new AEProcessingPattern(Objects.requireNonNull(AEItemKey.of(encoded)));
     }
 
@@ -147,12 +195,16 @@ class AlloyFurnaceRecipeCatalogMoldTest {
     }
 
     private static AdvancedAlloyFurnaceRecipe recipeWithOutput(ItemStack output) {
+        return recipeWithOutputs(output);
+    }
+
+    private static AdvancedAlloyFurnaceRecipe recipeWithOutputs(ItemStack... outputs) {
         return new AdvancedAlloyFurnaceRecipe(
                 ResourceLocation.fromNamespaceAndPath("useless_mod_test", "output"),
                 List.of(new CountedIngredient(Ingredient.of(Items.IRON_INGOT), 1)),
                 List.of(),
                 List.of(),
-                List.of(output),
+                List.of(outputs),
                 List.of(),
                 List.of(),
                 100L,

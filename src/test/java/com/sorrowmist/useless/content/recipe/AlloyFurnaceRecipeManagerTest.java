@@ -203,6 +203,18 @@ class AlloyFurnaceRecipeManagerTest {
     }
 
     @Test
+    void distinctFluidInputsRemainAndRequirements() {
+        AdvancedAlloyFurnaceRecipe recipe = recipeWithOutputs(
+                "two_fluids", List.of(), List.of(water(1_000), lava(500)),
+                List.of(new ItemStack(Items.GOLD_INGOT)), Ingredient.EMPTY);
+
+        assertSame(recipe, select(List.of(recipe), List.of(),
+                List.of(water(1_000), lava(500)), List.of(), 1));
+        assertNull(select(List.of(recipe), List.of(), List.of(water(1_000)), List.of(), 1));
+        assertNull(select(List.of(recipe), List.of(), List.of(lava(500)), List.of(), 1));
+    }
+
+    @Test
     void cacheFingerprintIncludesAmountsComponentsAndIsOrderIndependent() {
         List<ItemStack> ordered = List.of(stack(Items.OAK_LOG, 2), stack(Items.COBBLESTONE, 5));
         List<ItemStack> reversed = List.of(stack(Items.COBBLESTONE, 5), stack(Items.OAK_LOG, 2));
@@ -278,6 +290,10 @@ class AlloyFurnaceRecipeManagerTest {
 
     private static FluidStack water(int amount) {
         return new FluidStack(Fluids.WATER, amount);
+    }
+
+    private static FluidStack lava(int amount) {
+        return new FluidStack(Fluids.LAVA, amount);
     }
 
     private static GenericStack genericItem(Item item, int count) {

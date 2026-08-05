@@ -77,11 +77,28 @@ public final class MekanismChemicalRecipeSupport {
 
     static boolean matchesFluid(Map<FluidStack, Long> inputs, FluidStackIngredient required) {
         if (required == null || required.hasNoMatchingInstances()) return false;
-        long amount = 0L;
+        List<FluidStack> matchingFluids = new ArrayList<>();
+        List<Long> matchingAmounts = new ArrayList<>();
         for (Map.Entry<FluidStack, Long> entry : inputs.entrySet()) {
-            if (required.testType(entry.getKey())) amount = saturatingAdd(amount, entry.getValue());
+            FluidStack input = entry.getKey();
+            Long amount = entry.getValue();
+            if (input == null || input.isEmpty() || amount == null || amount <= 0L
+                    || !required.testType(input)) continue;
+
+            boolean merged = false;
+            for (int index = 0; index < matchingFluids.size(); index++) {
+                if (!FluidStack.isSameFluidSameComponents(matchingFluids.get(index), input)) continue;
+                matchingAmounts.set(index, saturatingAdd(matchingAmounts.get(index), amount));
+                merged = true;
+                break;
+            }
+            if (!merged) {
+                matchingFluids.add(input.copy());
+                matchingAmounts.add(amount);
+            }
         }
-        return amount >= required.ingredient().amount();
+        long requiredAmount = required.ingredient().amount();
+        return matchingAmounts.stream().anyMatch(amount -> amount >= requiredAmount);
     }
 
     public static List<FluidStack> fluidRepresentations(FluidStackIngredient ingredient) {

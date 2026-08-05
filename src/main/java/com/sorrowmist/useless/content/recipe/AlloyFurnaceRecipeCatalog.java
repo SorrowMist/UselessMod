@@ -152,7 +152,7 @@ public final class AlloyFurnaceRecipeCatalog {
         // answer depends only on the pattern, not on the candidate being tested.
         Set<Integer> componentAgnosticOutputs = componentAgnosticOutputSlots(pattern, level);
         return entries(level).stream()
-                .filter(entry -> matchesPattern(entry.recipe, pattern, componentAgnosticOutputs))
+                .filter(entry -> matchesPattern(entry.recipe, pattern, componentAgnosticOutputs, false))
                 .sorted(Comparator.comparing(entry -> entry.identity.recipeId().toString()))
                 .toList();
     }
@@ -167,7 +167,7 @@ public final class AlloyFurnaceRecipeCatalog {
      */
     public static boolean matchesRecipe(Level level, AdvancedAlloyFurnaceRecipe recipe, IPatternDetails pattern) {
         if (level == null || recipe == null || pattern == null) return false;
-        return matchesPattern(recipe, pattern, componentAgnosticOutputSlots(pattern, level));
+        return matchesPattern(recipe, pattern, componentAgnosticOutputSlots(pattern, level), true);
     }
 
     /**
@@ -298,11 +298,12 @@ public final class AlloyFurnaceRecipeCatalog {
 
     // Package-private for regression testing of component-exact output matching.
     static boolean matchesPattern(AdvancedAlloyFurnaceRecipe recipe, IPatternDetails pattern) {
-        return matchesPattern(recipe, pattern, Set.of());
+        return matchesPattern(recipe, pattern, Set.of(), false);
     }
 
     private static boolean matchesPattern(AdvancedAlloyFurnaceRecipe recipe, IPatternDetails pattern,
-                                          Set<Integer> componentAgnosticOutputs) {
+                                          Set<Integer> componentAgnosticOutputs,
+                                          boolean allowMissingOutputs) {
         PatternContents contents = PatternContents.read(pattern);
         if (contents == null) return false;
 
@@ -325,10 +326,65 @@ public final class AlloyFurnaceRecipeCatalog {
         // recipe and candidate selection would pick the alphabetically-first one (black_quartz),
         // encoding the wrong mold. Only the slots the resolver marked as item-id-only ignore
         // components, which keeps Draconic Evolution's component-transferring fusion results working.
+        if (allowMissingOutputs) {
+            return matchesGenericSubset(
+                    pattern.getOutputs(), expectedOutputs, componentAgnosticOutputs);
+        }
         return componentAgnosticOutputs.isEmpty()
                 ? sameGeneric(pattern.getOutputs(), expectedOutputs)
                 : sameGenericIgnoringSlotComponents(
-                pattern.getOutputs(), expectedOutputs, componentAgnosticOutputs);
+                        pattern.getOutputs(), expectedOutputs, componentAgnosticOutputs);
+    }
+
+    /**
+     * Matches the outputs retained by a known recipe-bound pattern. The encoder may omit
+     * secondary outputs, but every retained stack must still match one complete recipe output.
+     */
+    private static boolean matchesGenericSubset(
+            List<GenericStack> actual, List<GenericStack> expected,
+            Set<Integer> componentAgnosticSlots) {
+        if (actual == null || actual.isEmpty() || expected == null || actual.size() > expected.size()) {
+            return false;
+        }
+
+        boolean[] matched = new boolean[expected.size()];
+        for (int actualSlot = 0; actualSlot < actual.size(); actualSlot++) {
+            GenericStack actualOutput = actual.get(actualSlot);
+            if (actualOutput == null || actualOutput.what() == null || actualOutput.amount() <= 0L) {
+                return false;
+            }
+
+            int matchedSlot = -1;
+            for (int expectedSlot = 0; expectedSlot < expected.size(); expectedSlot++) {
+                if (matched[expectedSlot]) {
+                    continue;
+                }
+                GenericStack expectedOutput = expected.get(expectedSlot);
+                if (expectedOutput == null || expectedOutput.what() == null
+                        || expectedOutput.amount() != actualOutput.amount()) {
+                    continue;
+                }
+
+                boolean matches = componentAgnosticSlots.contains(actualSlot)
+                        ? matchesItemId(actualOutput.what(), expectedOutput.what())
+                        : actualOutput.what().equals(expectedOutput.what());
+                if (matches) {
+                    matchedSlot = expectedSlot;
+                    break;
+                }
+            }
+            if (matchedSlot < 0) {
+                return false;
+            }
+            matched[matchedSlot] = true;
+        }
+        return true;
+    }
+
+    private static boolean matchesItemId(AEKey actual, AEKey expected) {
+        return actual instanceof AEItemKey actualItem
+                && expected instanceof AEItemKey expectedItem
+                && actualItem.getItem() == expectedItem.getItem();
     }
 
     /**

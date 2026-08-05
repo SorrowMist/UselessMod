@@ -2,8 +2,11 @@ package com.sorrowmist.useless.content.recipe.adapters.mekanism;
 
 import appeng.api.stacks.AEItemKey;
 import appeng.api.stacks.GenericStack;
+import com.sorrowmist.useless.content.recipe.AdapterUtils;
 import com.sorrowmist.useless.content.recipe.AdvancedAlloyFurnaceRecipe;
 import com.sorrowmist.useless.content.recipe.CountedIngredient;
+import mekanism.api.recipes.ingredients.FluidStackIngredient;
+import mekanism.api.recipes.ingredients.creator.IngredientCreatorAccess;
 import net.minecraft.SharedConstants;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.Bootstrap;
@@ -12,6 +15,7 @@ import net.minecraft.world.item.Items;
 import net.minecraft.world.item.crafting.Ingredient;
 import net.minecraft.world.level.material.Fluids;
 import net.neoforged.neoforge.fluids.FluidStack;
+import net.neoforged.neoforge.fluids.crafting.FluidIngredient;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
@@ -19,6 +23,8 @@ import java.util.List;
 import java.util.Objects;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class MekanismChemicalRecipeSupportTest {
     @BeforeAll
@@ -77,6 +83,37 @@ class MekanismChemicalRecipeSupportTest {
         assertEquals(Integer.MAX_VALUE, recipe.outputFluids().getFirst().getAmount());
     }
 
+    @Test
+    void treatsFluidIngredientRepresentationsAsAlternatives() {
+        FluidStackIngredient required = IngredientCreatorAccess.fluid().from(
+                FluidIngredient.of(Fluids.WATER, Fluids.LAVA), 1_000);
+
+        assertTrue(MekanismChemicalRecipeSupport.matchesFluid(
+                java.util.Map.of(water(1_000), 1_000L), required));
+        assertTrue(MekanismChemicalRecipeSupport.matchesFluid(
+                java.util.Map.of(lava(1_000), 1_000L), required));
+        assertFalse(MekanismChemicalRecipeSupport.matchesFluid(
+                java.util.Map.of(water(500), 500L, lava(500), 500L), required));
+    }
+
+    @Test
+    void combinesSplitAmountsOfTheSameFluidOnly() {
+        FluidStackIngredient required = IngredientCreatorAccess.fluid().from(
+                FluidIngredient.of(Fluids.WATER, Fluids.LAVA), 1_000);
+        var splitWater = AdapterUtils.mergeFluids(java.util.List.of(water(400), water(600)));
+
+        assertTrue(MekanismChemicalRecipeSupport.matchesFluid(splitWater, required));
+    }
+
+    @Test
+    void handlesLargeAvailableFluidAmountsWithoutOverflow() {
+        FluidStackIngredient required = IngredientCreatorAccess.fluid().from(
+                FluidIngredient.of(Fluids.WATER), Integer.MAX_VALUE);
+
+        assertTrue(MekanismChemicalRecipeSupport.matchesFluid(
+                java.util.Map.of(water(Integer.MAX_VALUE), Long.MAX_VALUE), required));
+    }
+
     private static ResourceLocation id(String path) {
         return ResourceLocation.fromNamespaceAndPath("useless_mod_test", path);
     }
@@ -88,5 +125,9 @@ class MekanismChemicalRecipeSupportTest {
 
     private static FluidStack water(int amount) {
         return new FluidStack(Fluids.WATER, amount);
+    }
+
+    private static FluidStack lava(int amount) {
+        return new FluidStack(Fluids.LAVA, amount);
     }
 }

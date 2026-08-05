@@ -45,7 +45,12 @@ final class AdvancedAlloyFurnacePatternPolicy {
     }
 
     static boolean usesRecipeOutputs(@Nullable IPatternDetails pattern) {
-        DynamicComponentPattern dynamic = dynamicDetails(SmartDoublingPatterns.unwrap(pattern));
+        IPatternDetails original = SmartDoublingPatterns.unwrap(pattern);
+        if (original instanceof OmniversalPatternDetails) {
+            return true;
+        }
+
+        DynamicComponentPattern dynamic = dynamicDetails(original);
         if (dynamic == null) {
             return false;
         }

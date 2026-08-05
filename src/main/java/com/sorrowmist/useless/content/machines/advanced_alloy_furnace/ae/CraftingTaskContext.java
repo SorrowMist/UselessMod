@@ -127,6 +127,13 @@ public interface CraftingTaskContext {
     default AdvancedAlloyFurnaceRecipe resolveTaskRecipe(
             IPatternDetails pattern, List<ItemStack> items, List<FluidStack> fluids,
             List<GenericStack> keys, long operations) {
+        if (pattern != null) {
+            IPatternDetails original = SmartDoublingPatterns.unwrap(pattern);
+            if (original instanceof OmniversalPatternDetails omniversal) {
+                return omniversal.recipe();
+            }
+        }
+
         ItemStack mold = getItemHandler().getStackInSlot(getMoldSlot());
         return AlloyFurnaceRecipeManager.getInstance().findRecipeForCraftingWithConstraints(
                 getLevel(), items, fluids, keys, mold,

@@ -1,7 +1,6 @@
 package com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae;
 
 import appeng.api.crafting.IPatternDetails;
-import appeng.api.crafting.PatternDetailsHelper;
 import appeng.api.stacks.AEItemKey;
 import appeng.api.stacks.GenericStack;
 import com.sorrowmist.useless.core.component.UComponents;
@@ -87,15 +86,15 @@ public final class SmartDoublingPatterns {
             return null;
         }
 
-        IPatternDetails decoded = PatternDetailsHelper.decodePattern(baseDefinition, level);
+        IPatternDetails decoded = AdvancedAlloyFurnacePatternResolver.decode(
+                baseDefinition.toStack(), level);
         if (decoded == null) {
             return null;
         }
-        IPatternDetails resolved = AdvancedAlloyFurnacePatternResolver.resolve(decoded, level);
-        if (operations > maximumSafeMultiplier(resolved)) {
+        if (operations > maximumSafeMultiplier(decoded)) {
             return null;
         }
-        return scale(resolved, operations);
+        return scale(decoded, operations);
     }
 
     static AEItemKey executionDefinition(IPatternDetails original, long operationsPerPush) {

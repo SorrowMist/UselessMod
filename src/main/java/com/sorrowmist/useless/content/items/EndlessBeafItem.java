@@ -1,13 +1,13 @@
 package com.sorrowmist.useless.content.items;
 
 import com.sorrowmist.useless.api.enums.tool.EnchantMode;
-import com.sorrowmist.useless.api.enums.tool.ForceKillMode;
 import com.sorrowmist.useless.api.enums.tool.ToolTypeMode;
 import com.sorrowmist.useless.content.blocks.GlowPlasticBlock;
 import com.sorrowmist.useless.content.blocks.UselessGlassBlock;
 import com.sorrowmist.useless.core.common.KeyBindings;
 import com.sorrowmist.useless.core.component.UComponents;
 import com.sorrowmist.useless.core.config.ConfigManager;
+import com.sorrowmist.useless.init.ModDamageTypes;
 import com.sorrowmist.useless.utils.EnchantmentUtil;
 import com.sorrowmist.useless.utils.UselessItemUtils;
 import net.minecraft.ChatFormatting;
@@ -36,6 +36,9 @@ import net.minecraft.world.entity.HumanoidArm;
 import net.minecraft.world.entity.LightningBolt;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.Mob;
+import net.minecraft.world.entity.Pose;
+import net.minecraft.world.entity.boss.enderdragon.EnderDragon;
+import net.minecraft.world.entity.boss.wither.WitherBoss;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.entity.projectile.ProjectileUtil;
@@ -79,10 +82,12 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 public class EndlessBeafItem extends TieredItem {
     private static final String AE2LT_NATURAL_LIGHTNING_TAG = "ae2lt.natural_weather_lightning";
+    private static final Set<UUID> FORCE_KILL_DEATH_CONTEXT = ConcurrentHashMap.newKeySet();
     private final ToolTypeMode toolType;
 
     public EndlessBeafItem() {
@@ -114,10 +119,9 @@ public class EndlessBeafItem extends TieredItem {
                       .component(UComponents.EnchantModeComponent, EnchantMode.SILK_TOUCH)
                       .component(UComponents.EnhancedChainMiningComponent, false)
                       .component(UComponents.ForceMiningComponent, false)
-                      .component(UComponents.ForceKillEnabledComponent, true)
+                      .component(UComponents.ForceKillEnabledComponent, false)
                       .component(UComponents.BeefInvulnerabilityEnabledComponent, true)
                       .component(UComponents.BeefCaptureEnabledComponent, false)
-                      .component(UComponents.ForceKillModeComponent, ForceKillMode.KILL)
                       .component(UComponents.AEStoragePriorityComponent, false)
                       .component(UComponents.CurrentToolTypeComponent, ToolTypeMode.NONE_MODE)
                       .component(DataComponents.CUSTOM_MODEL_DATA, new CustomModelData(1))
@@ -238,33 +242,123 @@ public class EndlessBeafItem extends TieredItem {
         return entity;
     }
 
+    public static boolean isForceKillDeathInProgress(LivingEntity target) {
+        return FORCE_KILL_DEATH_CONTEXT.contains(target.getUUID());
+    }
+
     private static boolean forceKillLivingEntity(ItemStack stack, LivingEntity target, Player player) {
-        if (target.level().isClientSide || target instanceof Player || !target.isAlive() || isForceKillBlacklisted(target) || !stack.getOrDefault(UComponents.ForceKillEnabledComponent, true)) {
+        if (target.level().isClientSide || target instanceof Player || !target.isAlive()
+                || isForceKillBlacklisted(target)
+                || !stack.getOrDefault(UComponents.ForceKillEnabledComponent, false)) {
             return false;
         }
 
-        DamageSource damageSource = target.damageSources().playerAttack(player);
-        ForceKillMode mode = stack.getOrDefault(UComponents.ForceKillModeComponent, ForceKillMode.KILL);
-        target.invulnerableTime = 0;
-        target.hurtTime = 0;
-        target.hurtDuration = 0;
-        target.hurt(damageSource, getForceKillDamage(target));
-        if (!target.isAlive() || mode == ForceKillMode.DAMAGE_ONLY) {
-            return true;
+        FORCE_KILL_DEATH_CONTEXT.add(target.getUUID());
+        try {
+            ServerLevel level = (ServerLevel) target.level();
+            DamageSource damageSource = ModDamageTypes.beefTool(level, player);
+            executeForceKill(level, target, damageSource);
+
+            if (target.isRemoved() || target.dead || !target.isAlive()) {
+                UselessItemUtils.tryCaptureSpawnEgg(target, stack, player);
+            }
+        } finally {
+            FORCE_KILL_DEATH_CONTEXT.remove(target.getUUID());
+        }
+        return true;
+    }
+
+    private static void executeForceKill(ServerLevel level, LivingEntity target, DamageSource damageSource) {
+        float damage = getForceKillDamage(target);
+
+        if (target instanceof EnderDragon dragon) {
+            dragon.hurt(dragon.head, damageSource, damage);
+            if (!target.isAlive()) {
+                return;
+            }
+        } else if (target instanceof WitherBoss wither) {
+            wither.setInvulnerableTicks(0);
         }
 
-        target.die(damageSource);
-        if (!target.isAlive() || mode == ForceKillMode.DIE) {
-            return true;
+        target.invulnerableTime = 0;
+        target.hurt(damageSource, damage);
+        if (!target.isAlive()) {
+            return;
+        }
+
+        directHurt(target, damageSource, damage);
+        if (!target.isAlive()) {
+            return;
         }
 
         target.kill();
-        if (target.isRemoved() || !target.isAlive() || mode == ForceKillMode.KILL) {
-            return true;
+        if (!target.isAlive()) {
+            return;
         }
 
-        target.remove(Entity.RemovalReason.KILLED);
+        target.setHealth(0.0F);
+        if (!target.isAlive()) {
+            return;
+        }
+
+        forceDie(level, target, damageSource);
+    }
+
+    private static boolean directHurt(LivingEntity victim, DamageSource source, float amount) {
+        if (victim.level().isClientSide || victim.isDeadOrDying()) {
+            return false;
+        }
+
+        if (victim.isMultipartEntity()) {
+            for (Entity part : victim.getParts()) {
+                if (part instanceof PartEntity<?> partEntity && partEntity.getParent() == victim) {
+                    part.hurt(source, amount);
+                }
+            }
+        }
+        if (victim.isSleeping()) {
+            victim.stopSleeping();
+        }
+
+        victim.setNoActionTime(0);
+        victim.walkAnimation.setSpeed(1.5F);
+        victim.lastHurt = amount;
+        victim.invulnerableTime = 0;
+        victim.getCombatTracker().recordDamage(source, amount);
+        victim.setHealth(victim.getHealth() - amount);
+        victim.gameEvent(GameEvent.ENTITY_DAMAGE);
+        victim.hurtDuration = 10;
+        victim.hurtTime = victim.hurtDuration;
+
+        if (victim.isDeadOrDying()) {
+            forceDie((ServerLevel) victim.level(), victim, source);
+        }
         return true;
+    }
+
+    private static void forceDie(ServerLevel level, LivingEntity victim, DamageSource source) {
+        if (victim.isRemoved() || victim.dead) {
+            return;
+        }
+
+        LivingEntity killer = victim.getKillCredit();
+        if (victim.deathScore >= 0 && killer != null) {
+            killer.awardKillScore(victim, victim.deathScore, source);
+        }
+        if (victim.isSleeping()) {
+            victim.stopSleeping();
+        }
+
+        victim.dead = true;
+        victim.getCombatTracker().recheckStatus();
+
+        Entity sourceEntity = source.getEntity();
+        if (sourceEntity == null || sourceEntity.killedEntity(level, victim)) {
+            victim.gameEvent(GameEvent.ENTITY_DIE);
+            victim.dropAllDeathLoot(level, source);
+        }
+        level.broadcastEntityEvent(victim, (byte) 3);
+        victim.setPose(Pose.DYING);
     }
 
     private static float getForceKillDamage(LivingEntity target) {
@@ -276,12 +370,14 @@ public class EndlessBeafItem extends TieredItem {
     }
 
     private static boolean forceKillNonLivingEntity(ItemStack stack, Entity target, Player player) {
-        if (target.level().isClientSide || target.isRemoved() || isForceKillBlacklisted(target) || !isForceKillNonLivingWhitelisted(target) || !stack.getOrDefault(UComponents.ForceKillEnabledComponent, true)) {
+        if (target.level().isClientSide || target.isRemoved() || isForceKillBlacklisted(target)
+                || !isForceKillNonLivingWhitelisted(target)
+                || !stack.getOrDefault(UComponents.ForceKillEnabledComponent, false)) {
             return false;
         }
 
         target.kill();
-        if (!target.isRemoved() && stack.getOrDefault(UComponents.ForceKillModeComponent, ForceKillMode.KILL) == ForceKillMode.REMOVE) {
+        if (!target.isRemoved()) {
             target.remove(Entity.RemovalReason.KILLED);
         }
         return true;
@@ -601,12 +697,13 @@ public class EndlessBeafItem extends TieredItem {
                                        ).withStyle(forceMiningEnabled ? ChatFormatting.GREEN : ChatFormatting.GRAY))
                                        .withStyle(ChatFormatting.RED));
 
-        boolean forceKillEnabled = stack.getOrDefault(UComponents.ForceKillEnabledComponent.get(), true);
-        ForceKillMode forceKillMode = stack.getOrDefault(UComponents.ForceKillModeComponent.get(), ForceKillMode.KILL);
-        tooltipComponents.add(Component.translatable("tooltip.useless_mod.force_kill_mode")
+        boolean forceKillEnabled = stack.getOrDefault(UComponents.ForceKillEnabledComponent.get(), false);
+        tooltipComponents.add(Component.translatable("tooltip.useless_mod.force_kill_enabled_mode")
                                        .append(": ")
-                                       .append((forceKillEnabled ? forceKillMode.getTooltip().copy() :
-                                               Component.translatable("tooltip.useless_mod.disable")).withStyle(forceKillEnabled ? ChatFormatting.GOLD : ChatFormatting.GRAY))
+                                       .append(Component.translatable(
+                                               forceKillEnabled ? "tooltip.useless_mod.enable" :
+                                                       "tooltip.useless_mod.disable"
+                                       ).withStyle(forceKillEnabled ? ChatFormatting.GOLD : ChatFormatting.GRAY))
                                        .withStyle(ChatFormatting.DARK_RED));
 
         boolean beefInvulnerabilityEnabled = stack.getOrDefault(UComponents.BeefInvulnerabilityEnabledComponent.get(), false);

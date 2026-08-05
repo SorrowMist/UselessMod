@@ -79,6 +79,9 @@ public class EventHandler {
 
     @SubscribeEvent(priority = EventPriority.LOWEST)
     public static void onBeefToolLivingDeath(LivingDeathEvent event) {
+        if (EndlessBeafItem.isForceKillDeathInProgress(event.getEntity())) {
+            return;
+        }
         if (!(event.getSource().getEntity() instanceof Player player)) {
             return;
         }

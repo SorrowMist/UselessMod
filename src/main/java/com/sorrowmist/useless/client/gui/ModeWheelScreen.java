@@ -4,13 +4,11 @@ import com.mojang.blaze3d.platform.InputConstants;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.*;
 import com.sorrowmist.useless.api.enums.tool.EnchantMode;
-import com.sorrowmist.useless.api.enums.tool.ForceKillMode;
 import com.sorrowmist.useless.api.enums.tool.ModeTypeEnum;
 import com.sorrowmist.useless.api.enums.tool.ToolTypeMode;
 import com.sorrowmist.useless.core.common.KeyBindings;
 import com.sorrowmist.useless.core.component.UComponents;
 import com.sorrowmist.useless.network.EnchantmentSwitchPacket;
-import com.sorrowmist.useless.network.ForceKillModeSwitchPacket;
 import com.sorrowmist.useless.network.ModeTogglePacket;
 import com.sorrowmist.useless.network.ToolTypeModeSwitchPacket;
 import net.minecraft.client.Minecraft;
@@ -61,13 +59,11 @@ public class ModeWheelScreen extends Screen {
         this.forceKillModes.clear();
 
         EnchantMode currentEnchant = this.mainHandItem.get(UComponents.EnchantModeComponent);
-        ForceKillMode currentForceKillMode = this.mainHandItem.getOrDefault(UComponents.ForceKillModeComponent,
-                                                                            ForceKillMode.KILL);
         ToolTypeMode currentTool = this.mainHandItem.get(UComponents.CurrentToolTypeComponent);
         boolean chainMiningEnabled = this.mainHandItem.getOrDefault(UComponents.EnhancedChainMiningComponent, false);
         boolean forceMiningEnabled = this.mainHandItem.getOrDefault(UComponents.ForceMiningComponent, false);
         boolean aeStorageEnabled = this.mainHandItem.getOrDefault(UComponents.AEStoragePriorityComponent, false);
-        boolean forceKillEnabled = this.mainHandItem.getOrDefault(UComponents.ForceKillEnabledComponent, true);
+        boolean forceKillEnabled = this.mainHandItem.getOrDefault(UComponents.ForceKillEnabledComponent, false);
         boolean beefInvulnerabilityEnabled = this.mainHandItem.getOrDefault(UComponents.BeefInvulnerabilityEnabledComponent, false);
         boolean beefCaptureEnabled = this.mainHandItem.getOrDefault(UComponents.BeefCaptureEnabledComponent, false);
 
@@ -76,12 +72,10 @@ public class ModeWheelScreen extends Screen {
             this.leftModes.add(new ModeData(m, m.getTooltip(), m == currentEnchant));
 
         this.forceKillModes.add(new ModeData(
-                ModeTypeEnum.FORCE_KILL_DISABLED,
-                Component.translatable("tooltip.useless_mod.force_kill_mode.disabled"),
-                !forceKillEnabled
+                ModeTypeEnum.FORCE_KILL,
+                ModeTypeEnum.FORCE_KILL.getTooltip(),
+                forceKillEnabled
         ));
-        for (ForceKillMode m : ForceKillMode.values())
-            this.forceKillModes.add(new ModeData(m, m.getTooltip(), forceKillEnabled && m == currentForceKillMode));
         this.forceKillModes.add(new ModeData(
                 ModeTypeEnum.getBeefInvulnerabilityMode(beefInvulnerabilityEnabled),
                 ModeTypeEnum.getBeefInvulnerabilityMode(beefInvulnerabilityEnabled).getTooltip(),
@@ -370,8 +364,6 @@ public class ModeWheelScreen extends Screen {
     private void onModeSelected(Object mode) {
         if (mode instanceof EnchantMode em) {
             PacketDistributor.sendToServer(new EnchantmentSwitchPacket(em));
-        } else if (mode instanceof ForceKillMode fkm) {
-            PacketDistributor.sendToServer(new ForceKillModeSwitchPacket(fkm));
         } else if (mode instanceof ToolTypeMode tm) {
             PacketDistributor.sendToServer(new ToolTypeModeSwitchPacket(tm));
         } else if (mode instanceof ModeTypeEnum me) {
@@ -395,9 +387,11 @@ public class ModeWheelScreen extends Screen {
                     PacketDistributor.sendToServer(
                             new ModeTogglePacket(ModeTogglePacket.ModeType.AE_STORAGE_PRIORITY, !currentEnabled));
                 }
-                case FORCE_KILL_ENABLED, FORCE_KILL_DISABLED -> {
+                case FORCE_KILL -> {
+                    boolean currentEnabled = this.mainHandItem.getOrDefault(UComponents.ForceKillEnabledComponent,
+                                                                            false);
                     PacketDistributor.sendToServer(
-                            new ModeTogglePacket(ModeTogglePacket.ModeType.FORCE_KILL, me == ModeTypeEnum.FORCE_KILL_ENABLED));
+                            new ModeTogglePacket(ModeTogglePacket.ModeType.FORCE_KILL, !currentEnabled));
                 }
                 case BEEF_INVULNERABILITY_ENABLED, BEEF_INVULNERABILITY_DISABLED -> {
                     boolean currentEnabled = this.mainHandItem.getOrDefault(

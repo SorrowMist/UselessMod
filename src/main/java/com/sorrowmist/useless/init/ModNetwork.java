@@ -10,7 +10,6 @@ import com.sorrowmist.useless.network.BeefInvulnerabilitySyncPacket;
 import com.sorrowmist.useless.network.BeefInvulnerabilityStatePacket;
 import com.sorrowmist.useless.network.EnchantmentSwitchPacket;
 import com.sorrowmist.useless.network.FaceModeChangePacket;
-import com.sorrowmist.useless.network.ForceKillModeSwitchPacket;
 import com.sorrowmist.useless.network.ForceBreakKeyPacket;
 import com.sorrowmist.useless.network.MiningDataSyncPacket;
 import com.sorrowmist.useless.network.ModeTogglePacket;
@@ -39,9 +38,6 @@ public class ModNetwork {
         );
         registrar.playToServer(ModeTogglePacket.TYPE, ModeTogglePacket.STREAM_CODEC,
                                ModeTogglePacket::handle
-        );
-        registrar.playToServer(ForceKillModeSwitchPacket.TYPE, ForceKillModeSwitchPacket.STREAM_CODEC,
-                               ForceKillModeSwitchPacket::handle
         );
         registrar.playToServer(ForceBreakKeyPacket.TYPE, ForceBreakKeyPacket.STREAM_CODEC,
                                ForceBreakKeyPacket::handle

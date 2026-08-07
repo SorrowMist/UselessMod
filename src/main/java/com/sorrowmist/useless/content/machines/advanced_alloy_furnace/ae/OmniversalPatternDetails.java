@@ -10,14 +10,16 @@ import com.sorrowmist.useless.core.component.UComponents;
 import net.minecraft.world.level.Level;
 import net.neoforged.fml.ModList;
 
-import java.lang.ref.WeakReference;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
 import java.util.WeakHashMap;
+import org.jetbrains.annotations.Nullable;
 
 public final class OmniversalPatternDetails extends DynamicComponentPatternDetails {
-    private static final int MAX_DECODE_CACHE_ENTRIES = 512;
+    // Keep every distinct pattern in a maximum-size 540-slot container hot, with room for
+    // patterns from another container in the same client world.
+    private static final int MAX_DECODE_CACHE_ENTRIES = 1024;
     private static final Object DECODE_CACHE_LOCK = new Object();
     private static final Map<Level, LevelDecodeCache> DECODE_CACHES = new WeakHashMap<>();
 
@@ -45,7 +47,7 @@ public final class OmniversalPatternDetails extends DynamicComponentPatternDetai
                 if (cached.failure != null) {
                     throw cached.failure;
                 }
-                OmniversalPatternDetails details = cached.details.get();
+                OmniversalPatternDetails details = cached.details;
                 if (details != null) {
                     return details;
                 }
@@ -99,21 +101,22 @@ public final class OmniversalPatternDetails extends DynamicComponentPatternDetai
     }
 
     private static final class CachedDecode {
-        private final WeakReference<OmniversalPatternDetails> details;
+        @Nullable
+        private final OmniversalPatternDetails details;
         private final RuntimeException failure;
 
-        private CachedDecode(WeakReference<OmniversalPatternDetails> details,
+        private CachedDecode(@Nullable OmniversalPatternDetails details,
                              RuntimeException failure) {
             this.details = details;
             this.failure = failure;
         }
 
         private static CachedDecode success(OmniversalPatternDetails details) {
-            return new CachedDecode(new WeakReference<>(details), null);
+            return new CachedDecode(details, null);
         }
 
         private static CachedDecode failure(RuntimeException failure) {
-            return new CachedDecode(new WeakReference<>(null), failure);
+            return new CachedDecode(null, failure);
         }
     }
 

@@ -10,11 +10,14 @@ import com.fish_dan_.data_energistics.api.registry.provider.definition.PatternPr
 import com.fish_dan_.data_energistics.api.registry.provider.definition.PatternProviderRegistration;
 import com.fish_dan_.data_energistics.api.registry.provider.definition.ProviderIdentityDescriptor;
 import com.fish_dan_.data_energistics.api.registry.provider.runtime.PatternProviderFactoryContext;
+import com.fish_dan_.data_energistics.api.registry.search.TrinityPatternSearchRegistry;
+import com.fish_dan_.data_energistics.api.registry.search.TrinityPatternSearchTermRegistration;
 import com.sorrowmist.useless.UselessMod;
 import com.sorrowmist.useless.content.blockentities.AdvancedAlloyFurnaceBlockEntity;
 import com.sorrowmist.useless.content.blockentities.multiblock.MePatternAssemblyBlockEntity;
 import com.sorrowmist.useless.init.ModBlockEntities;
 import com.sorrowmist.useless.init.ModBlocks;
+import com.sorrowmist.useless.integration.dataenergistics.search.OmniversalPatternMoldSearchTerms;
 import net.minecraft.resources.ResourceLocation;
 import org.jetbrains.annotations.NotNull;
 
@@ -28,6 +31,8 @@ public final class UselessDataEnergisticsPatternProviderPlugin implements DataEn
             UselessMod.id("advanced_alloy_furnace");
     private static final ResourceLocation ME_PATTERN_ASSEMBLY_REGISTRATION_ID =
             UselessMod.id("me_pattern_assembly");
+    private static final ResourceLocation OMNIVERSAL_PATTERN_MOLD_SEARCH_REGISTRATION_ID =
+            UselessMod.id("omniversal_pattern_mold_search");
 
     /** Public constructor required by the Data Energistics entrypoint scanner. */
     public UselessDataEnergisticsPatternProviderPlugin() {}
@@ -43,6 +48,7 @@ public final class UselessDataEnergisticsPatternProviderPlugin implements DataEn
                 advancedAlloyFurnaceItemId,
                 mePatternAssemblyTypeId,
                 mePatternAssemblyItemId));
+        registerSearchTerms(registry.trinityPatternSearch());
     }
 
     /** Creates the two immutable provider declarations used by this integration. */
@@ -77,6 +83,13 @@ public final class UselessDataEnergisticsPatternProviderPlugin implements DataEn
         for (PatternProviderRegistration registration : registrations) {
             registry.register(registration);
         }
+    }
+
+    /** Registers the hidden mold stored in an Omniversal Pattern as an independent Trinity search candidate. */
+    static void registerSearchTerms(@NotNull TrinityPatternSearchRegistry registry) {
+        registry.register(new TrinityPatternSearchTermRegistration(
+                OMNIVERSAL_PATTERN_MOLD_SEARCH_REGISTRATION_ID,
+                OmniversalPatternMoldSearchTerms::searchTerms));
     }
 
     private static @NotNull PatternProviderMetadata metadata(

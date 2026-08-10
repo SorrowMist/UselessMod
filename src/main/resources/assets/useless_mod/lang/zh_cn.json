@@ -311,6 +311,7 @@
   "useless_mod.configuration.max_upgrade": "最大升级数量",
   "useless_mod.configuration.max_upgrade.comment": "机器可接受的最大速度/能量升级数量，重启游戏生效",
   "useless_mod.configuration.omniversal_multiblock_alloy_furnace": "多方块万象合金炉",
+  "useless_mod.configuration.ore_generator": "矿石生成器",
   "useless_mod.configuration.pattern_slots": "ME样板总成槽位",
   "useless_mod.configuration.pattern_slots.comment": "ME样板总成的可用槽位数量。数值会向下取整为27的整页；降低配置后，超出范围的已有内容仍可在只取恢复页中取出。",
   "useless_mod.configuration.pattern_slots.tooltip": "ME样板总成的可用槽位数量。数值会向下取整为27的整页；降低配置后，超出范围的已有内容仍可在只取恢复页中取出。",
@@ -429,4 +430,19 @@
   "item.useless_mod.ritual_blueprint.imprinted_multiple": "已将%s个五芒星阵刻印到仪式蓝图",
   "item.useless_mod.ritual_blueprint.no_pentacle": "未找到已完成的仪式五芒星阵",
   "item.useless_mod.ritual_blueprint.ambiguous": "找到多个五芒星阵；请在副手持有启动物品"
+  ,"container.useless_mod.ore_generator": "矿石生成器"
+  ,"gui.useless_mod.ore_generator.rate": "输出速率"
+  ,"gui.useless_mod.ore_generator.rate_unit": "每槽 / 20 tick"
+  ,"gui.useless_mod.ore_generator.apply": "应用"
+  ,"gui.useless_mod.ore_generator.ae_toggle": "AE 输出"
+  ,"gui.useless_mod.ore_generator.ae_online": "AE 在线"
+  ,"gui.useless_mod.ore_generator.ae_offline": "AE 离线"
+  ,"gui.useless_mod.ore_generator.ae_enabled": "AE 输出：启用"
+  ,"gui.useless_mod.ore_generator.ae_disabled": "AE 输出：关闭"
+  ,"gui.useless_mod.ore_generator.countdown": "下次输出：%s tick"
+  ,"gui.useless_mod.ore_generator.active_slots": "活动槽位：%s / %s"
+  ,"gui.useless_mod.ore_generator.locked_slot": "锁定的样板槽位"
+  ,"useless_mod.configuration.ore_generator_slots": "矿石生成器样板槽位"
+  ,"useless_mod.configuration.ore_generator_slots.comment": "矿石生成器的活动样板槽位数量。降低配置后，超出范围的内容仍可在恢复页取出。"
+  ,"useless_mod.configuration.ore_generator_slots.tooltip": "矿石生成器的活动样板槽位数量。降低配置后，超出范围的内容仍可在恢复页取出。"
 }

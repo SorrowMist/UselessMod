@@ -2,6 +2,7 @@ package com.sorrowmist.useless.content.recipe.adapters.ae.ae2lt;
 
 import com.sorrowmist.useless.content.recipe.AdvancedAlloyFurnaceRecipe;
 import com.sorrowmist.useless.content.recipe.IRecipeAdapter;
+import com.sorrowmist.useless.content.recipe.RecipeConversionUtils;
 import net.minecraft.world.item.crafting.Recipe;
 import net.minecraft.world.item.crafting.RecipeHolder;
 import net.minecraft.world.item.crafting.RecipeInput;
@@ -62,7 +63,7 @@ public final class AELightningTechCompatProvider {
             IRecipeAdapter<T> adapter,
             Level level) {
         for (RecipeHolder<T> holder : recipeManager.getAllRecipesFor(recipeType)) {
-            convertedRecipes.addAll(adapter.convertAll(holder, level));
+            convertedRecipes.addAll(RecipeConversionUtils.convertAll(adapter, holder, level));
         }
     }
 }

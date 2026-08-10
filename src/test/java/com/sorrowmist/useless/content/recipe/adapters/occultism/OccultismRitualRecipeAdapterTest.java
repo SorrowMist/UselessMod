@@ -7,6 +7,7 @@ import appeng.crafting.pattern.AEProcessingPattern;
 import com.klikli_dev.occultism.crafting.recipe.RitualRecipe;
 import com.klikli_dev.occultism.registry.OccultismBlocks;
 import com.klikli_dev.occultism.registry.OccultismDataComponents;
+import com.klikli_dev.occultism.registry.OccultismEntities;
 import com.klikli_dev.occultism.registry.OccultismItems;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.DynamicComponentPatternDetails;
 import com.sorrowmist.useless.content.recipe.AdvancedAlloyFurnaceRecipe;
@@ -23,6 +24,7 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.item.SpawnEggItem;
 import net.minecraft.world.item.component.CustomData;
+import net.minecraft.world.item.component.ItemLore;
 import net.minecraft.world.item.crafting.Ingredient;
 import net.minecraft.world.item.crafting.RecipeHolder;
 import net.neoforged.neoforge.common.crafting.DataComponentIngredient;
@@ -34,6 +36,7 @@ import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class OccultismRitualRecipeAdapterTest {
@@ -223,6 +226,96 @@ class OccultismRitualRecipeAdapterTest {
     }
 
     @Test
+    void fixedEntityWithOrdinaryResultAlwaysProducesTheDeclaredEntityEgg() {
+        ItemStack result = named(new ItemStack(Items.BOOK), "ordinary ritual result");
+        result.set(DataComponents.LORE, new ItemLore(List.of(Component.literal("book lore"))));
+        CompoundTag entityNbt = new CompoundTag();
+        entityNbt.putString("CustomName", "summoned cow");
+        RitualRecipe source = entityRecipe(
+                "fixed_ordinary_result", result, EntityType.COW, entityNbt, null, -1);
+
+        List<ItemStack> outputs = new OccultismRitualRecipeAdapter()
+                .convertAll(holder("fixed_ordinary_result", source), null)
+                .getFirst().outputs();
+        assertEquals(2, outputs.size());
+        ItemStack output = outputs.getFirst();
+
+        assertSpawnEgg(output, EntityType.COW);
+        assertTrue(output.is(Items.COW_SPAWN_EGG));
+        assertFalse(output.has(DataComponents.CUSTOM_NAME));
+        assertNotEquals(result.get(DataComponents.LORE), output.get(DataComponents.LORE));
+        assertEquals("minecraft:cow", output.get(DataComponents.ENTITY_DATA)
+                .copyTag().getString("id"));
+        assertEquals("summoned cow", output.get(DataComponents.ENTITY_DATA)
+                .copyTag().getString("CustomName"));
+        assertTrue(ItemStack.isSameItemSameComponents(result, outputs.get(1)));
+    }
+
+    @Test
+    void callingBookJobRitualsProduceTamedWorkEggs() {
+        List<JobSpec> jobs = List.of(
+                new JobSpec("lumberjack", OccultismEntities.FOLIOT.get(),
+                        OccultismItems.BOOK_OF_CALLING_FOLIOT_LUMBERJACK.get()),
+                new JobSpec("farmer", OccultismEntities.FOLIOT.get(),
+                        OccultismItems.BOOK_OF_CALLING_FOLIOT_FARMER.get()),
+                new JobSpec("cleaner", OccultismEntities.FOLIOT.get(),
+                        OccultismItems.BOOK_OF_CALLING_FOLIOT_CLEANER.get()),
+                new JobSpec("transport_items", OccultismEntities.FOLIOT.get(),
+                        OccultismItems.BOOK_OF_CALLING_FOLIOT_TRANSPORT_ITEMS.get()),
+                new JobSpec("manage_machine", OccultismEntities.DJINNI.get(),
+                        OccultismItems.BOOK_OF_CALLING_DJINNI_MANAGE_MACHINE.get()));
+
+        for (JobSpec spec : jobs) {
+            RitualRecipe source = entityRecipe(
+                    "job_" + spec.jobId(), new ItemStack(spec.result()), spec.entityType(), null,
+                    ResourceLocation.fromNamespaceAndPath("occultism", spec.jobId()), 600);
+            List<ItemStack> outputs = new OccultismRitualRecipeAdapter()
+                    .convertAll(holder("job_" + spec.jobId(), source), null)
+                    .getFirst().outputs();
+            assertEquals(2, outputs.size(), spec.jobId());
+            ItemStack output = outputs.getFirst();
+
+            assertSpawnEgg(output, spec.entityType());
+            assertTrue(output.has(DataComponents.ENTITY_DATA), spec.jobId());
+            CompoundTag entityData = output.get(DataComponents.ENTITY_DATA).copyTag();
+            assertEquals(600, entityData.getInt("spiritMaxAge"), spec.jobId());
+            assertEquals("occultism:" + spec.jobId(),
+                    entityData.getCompound("spiritJob").getString("factoryId"), spec.jobId());
+            assertTrue(output.get(DataComponents.CUSTOM_DATA).copyTag()
+                    .getBoolean(OccultismRitualRecipeAdapter.AUTO_TAME_MARKER), spec.jobId());
+            assertFalse(output.has(OccultismDataComponents.SPIRIT_NAME), spec.jobId());
+            assertTrue(ItemStack.isSameItemSameComponents(
+                    new ItemStack(spec.result()), outputs.get(1)), spec.jobId());
+        }
+    }
+
+    @Test
+    void copiesOnlyNameAndLoreFromAnExistingSpawnEggResult() {
+        ItemStack result = new ItemStack(Items.COW_SPAWN_EGG);
+        result.set(DataComponents.CUSTOM_NAME, Component.literal("named cow"));
+        result.set(DataComponents.ITEM_NAME, Component.literal("ritual cow"));
+        result.set(DataComponents.LORE, new ItemLore(List.of(Component.literal("special lore"))));
+        CompoundTag resultCustomData = new CompoundTag();
+        resultCustomData.putString("should_not_copy", "yes");
+        result.set(DataComponents.CUSTOM_DATA, CustomData.of(resultCustomData));
+
+        RitualRecipe source = entityRecipe(
+                "named_egg_result", result, EntityType.COW, null, null, -1);
+        List<ItemStack> outputs = new OccultismRitualRecipeAdapter()
+                .convertAll(holder("named_egg_result", source), null)
+                .getFirst().outputs();
+        assertEquals(2, outputs.size());
+        ItemStack output = outputs.getFirst();
+
+        assertTrue(output.is(Items.COW_SPAWN_EGG));
+        assertEquals(result.get(DataComponents.CUSTOM_NAME), output.get(DataComponents.CUSTOM_NAME));
+        assertEquals(result.get(DataComponents.ITEM_NAME), output.get(DataComponents.ITEM_NAME));
+        assertEquals(result.get(DataComponents.LORE), output.get(DataComponents.LORE));
+        assertFalse(output.has(DataComponents.CUSTOM_DATA));
+        assertTrue(ItemStack.isSameItemSameComponents(result, outputs.get(1)));
+    }
+
+    @Test
     void createsAUsableSpawnEggForEveryRandomEntity() {
         CompoundTag sourceEntityData = new CompoundTag();
         sourceEntityData.putString("CustomName", "ritual animal");
@@ -238,6 +331,18 @@ class OccultismRitualRecipeAdapterTest {
             assertEquals("ritual animal",
                     output.get(DataComponents.ENTITY_DATA).copyTag().getString("CustomName"));
         }
+    }
+
+    @Test
+    void emptyEntityTagsStayEmptyAndMissingEggsUsePigWithTheTargetId() {
+        assertTrue(OccultismRitualRecipeAdapter.spawnEggOutputs(List.of(), null).isEmpty());
+
+        ItemStack output = OccultismRitualRecipeAdapter.spawnEggOutputs(
+                List.of(EntityType.PLAYER), null).getFirst();
+        assertTrue(output.is(Items.PIG_SPAWN_EGG));
+        assertSpawnEgg(output, EntityType.PLAYER);
+        assertEquals("minecraft:player", output.get(DataComponents.ENTITY_DATA)
+                .copyTag().getString("id"));
     }
 
     @Test
@@ -438,6 +543,28 @@ class OccultismRitualRecipeAdapterTest {
                 null);
     }
 
+    private static RitualRecipe entityRecipe(
+            String type, ItemStack result, EntityType<?> entityType, CompoundTag entityNbt,
+            ResourceLocation spiritJobType, int spiritMaxAge) {
+        return new RitualRecipe(
+                PENTACLE,
+                ResourceLocation.fromNamespaceAndPath("occultism", type),
+                new ItemStack(Items.PAPER),
+                result,
+                entityType,
+                null,
+                entityNbt,
+                Ingredient.of(Items.BOOK),
+                NonNullList.create(),
+                80,
+                spiritMaxAge,
+                1,
+                spiritJobType,
+                null,
+                null,
+                null);
+    }
+
     private static RitualRecipe minerRecipe(Item activation, Item result, List<Item> ingredients) {
         NonNullList<Ingredient> requirements = NonNullList.create();
         ingredients.forEach(item -> requirements.add(Ingredient.of(item)));
@@ -494,6 +621,9 @@ class OccultismRitualRecipeAdapterTest {
     }
 
     private record MinerSpec(String id, Item activation, Item result, List<Item> ingredients) {
+    }
+
+    private record JobSpec(String jobId, EntityType<?> entityType, Item result) {
     }
 
     private static DynamicComponentPatternDetails dynamicPattern(

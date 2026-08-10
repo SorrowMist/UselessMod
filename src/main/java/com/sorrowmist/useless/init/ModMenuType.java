@@ -5,6 +5,7 @@ import com.sorrowmist.useless.content.menus.AdvancedAlloyFurnaceMenu;
 import com.sorrowmist.useless.content.menus.MePatternAssemblyMenu;
 import com.sorrowmist.useless.content.menus.OmniversalMoldHubMenu;
 import com.sorrowmist.useless.content.menus.MultiblockAlloyFurnaceMenu;
+import com.sorrowmist.useless.content.menus.OreGeneratorMenu;
 import com.sorrowmist.useless.content.menus.PassiveCraftingHatchMenu;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.world.inventory.MenuType;
@@ -33,6 +34,9 @@ public final class ModMenuType {
     public static final Supplier<MenuType<PassiveCraftingHatchMenu>> PASSIVE_CRAFTING_HATCH_MENU =
             MENU_TYPES.register("passive_crafting_hatch_menu",
                     () -> IMenuTypeExtension.create(PassiveCraftingHatchMenu::new));
+    public static final Supplier<MenuType<OreGeneratorMenu>> ORE_GENERATOR_MENU =
+            MENU_TYPES.register("ore_generator_menu",
+                    () -> IMenuTypeExtension.create(OreGeneratorMenu::new));
 
     private ModMenuType() {}
 

@@ -44,6 +44,10 @@ public class RecoverableItemStackHandler extends ItemStackHandler {
         return slot >= 0 && slot < getActiveSlots() && validator.test(stack);
     }
 
+    protected final boolean isValidItem(ItemStack stack) {
+        return validator.test(stack);
+    }
+
     @Override
     public ItemStack insertItem(int slot, ItemStack stack, boolean simulate) {
         if (!isItemValid(slot, stack)) {

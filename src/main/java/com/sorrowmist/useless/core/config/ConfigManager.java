@@ -76,6 +76,7 @@ public class ConfigManager {
     private static final ModConfigSpec.IntValue OMNIVERSAL_PATTERN_SLOTS;
     private static final ModConfigSpec.IntValue OMNIVERSAL_MOLD_SLOTS;
     private static final ModConfigSpec.IntValue OMNIVERSAL_PASSIVE_PATTERN_SLOTS;
+    private static final ModConfigSpec.IntValue ORE_GENERATOR_SLOTS;
 
     static {
         COMMON_BUILDER.push("dimension_generation");
@@ -139,7 +140,14 @@ public class ConfigManager {
                 .comment("Passive crafting hatch slots. Higher coil tiers unlock this capacity gradually.")
                 .translation("useless_mod.configuration.passive_pattern_slots")
                 .defineInRange("passive_pattern_slots", 30, 1, 540);
+        SERVER_BUILDER.pop();
 
+        SERVER_BUILDER.translation("useless_mod.configuration.ore_generator")
+                .push("ore_generator");
+        ORE_GENERATOR_SLOTS = SERVER_BUILDER
+                .comment("Ore generator sample slots. Slots above this value remain recovery-only.")
+                .translation("useless_mod.configuration.ore_generator_slots")
+                .defineInRange("ore_generator_slots", 9, 1, 540);
         SERVER_BUILDER.pop();
 
         // 牛排工具连锁挖掘配置
@@ -335,6 +343,10 @@ public class ConfigManager {
 
     public static int getOmniversalPassivePatternSlots() {
         return Math.max(1, Math.min(540, OMNIVERSAL_PASSIVE_PATTERN_SLOTS.get()));
+    }
+
+    public static int getOreGeneratorSlots() {
+        return Math.max(1, Math.min(540, ORE_GENERATOR_SLOTS.get()));
     }
 
     private static int normalizeInventorySlots(int value) {

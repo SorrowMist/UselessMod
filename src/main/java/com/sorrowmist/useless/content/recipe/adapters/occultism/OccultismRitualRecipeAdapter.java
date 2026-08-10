@@ -1,8 +1,10 @@
 package com.sorrowmist.useless.content.recipe.adapters.occultism;
 
+import com.klikli_dev.occultism.common.entity.spirit.SpiritEntity;
 import com.klikli_dev.occultism.common.item.spirit.BookOfBindingBoundItem;
 import com.klikli_dev.occultism.crafting.recipe.RitualRecipe;
 import com.klikli_dev.occultism.registry.OccultismDataComponents;
+import com.klikli_dev.occultism.registry.OccultismEntities;
 import com.klikli_dev.occultism.registry.OccultismRecipes;
 import com.klikli_dev.occultism.registry.OccultismSpiritJobs;
 import com.klikli_dev.occultism.util.ItemNBTUtil;
@@ -449,11 +451,10 @@ public final class OccultismRitualRecipeAdapter implements IRecipeAdapter<Ritual
             outputs = output.isEmpty() ? List.of() : List.of(output);
         } else if (source.getEntityTagToSummon() != null) {
             outputs = randomSummonEggs(source);
+        } else if (source.getEntityToSummon() != null) {
+            outputs = fixedSummonEggs(source);
         } else {
             ItemStack output = source.getResultItem(null).copy();
-            if (source.getSpiritJobType() != null) {
-                output = jobEgg(source, output);
-            }
             outputs = output.isEmpty() ? List.of() : List.of(output);
         }
         if (outputs.isEmpty()) {
@@ -544,55 +545,124 @@ public final class OccultismRitualRecipeAdapter implements IRecipeAdapter<Ritual
         }
         entityTypes.sort(Comparator.comparing(
                 type -> BuiltInRegistries.ENTITY_TYPE.getKey(type).toString()));
-        return spawnEggOutputs(entityTypes, source.getEntityNbt());
+        return entitySummonOutputs(entityTypes, source);
+    }
+
+    private static List<ItemStack> fixedSummonEggs(RitualRecipe source) {
+        return entitySummonOutputs(List.of(source.getEntityToSummon()), source);
+    }
+
+    private static List<ItemStack> entitySummonOutputs(
+            Iterable<EntityType<?>> entityTypes, RitualRecipe source) {
+        List<ItemStack> outputs = new ArrayList<>(spawnEggOutputs(
+                entityTypes, source.getEntityNbt(), source.getResultItem(null),
+                source.getSpiritJobType(), source.getSpiritMaxAge()));
+        ItemStack originalResult = source.getResultItem(null).copy();
+        if (!outputs.isEmpty() && !originalResult.isEmpty()) {
+            outputs.add(originalResult);
+        }
+        return List.copyOf(outputs);
     }
 
     static List<ItemStack> spawnEggOutputs(
             Iterable<EntityType<?>> entityTypes, @Nullable CompoundTag sourceEntityData) {
+        return spawnEggOutputs(entityTypes, sourceEntityData, null, null, -1);
+    }
+
+    private static List<ItemStack> spawnEggOutputs(
+            Iterable<EntityType<?>> entityTypes, @Nullable CompoundTag sourceEntityData,
+            @Nullable ItemStack sourceResult, @Nullable ResourceLocation spiritJobType,
+            int spiritMaxAge) {
         List<ItemStack> outputs = new ArrayList<>();
         for (EntityType<?> entityType : entityTypes) {
             if (entityType == null) {
                 continue;
             }
-            SpawnEggItem spawnEgg = SpawnEggItem.byId(entityType);
-            if (spawnEgg == null) {
-                spawnEgg = SpawnEggItem.byId(EntityType.PIG);
-            }
-            if (spawnEgg == null) {
+            ItemStack output = spawnEgg(entityType, sourceEntityData, sourceResult, spiritJobType, spiritMaxAge);
+            if (output.isEmpty()) {
                 continue;
-            }
-            ItemStack output = new ItemStack(spawnEgg);
-            if (spawnEgg.getType(output) != entityType || sourceEntityData != null) {
-                CompoundTag entityData = sourceEntityData == null
-                        ? new CompoundTag() : sourceEntityData.copy();
-                entityData.putString("id", BuiltInRegistries.ENTITY_TYPE.getKey(entityType).toString());
-                output.set(DataComponents.ENTITY_DATA, CustomData.of(entityData));
             }
             outputs.add(output);
         }
         return List.copyOf(outputs);
     }
 
-    private static ItemStack jobEgg(RitualRecipe source, ItemStack result) {
-        if (!(result.getItem() instanceof SpawnEggItem egg) || source.getEntityToSummon() == null
-                || egg.getType(result) != source.getEntityToSummon()
-                || OccultismSpiritJobs.REGISTRY.get(source.getSpiritJobType()) == null) {
+    private static ItemStack spawnEgg(
+            EntityType<?> entityType, @Nullable CompoundTag sourceEntityData,
+            @Nullable ItemStack sourceResult, @Nullable ResourceLocation spiritJobType,
+            int spiritMaxAge) {
+        SpawnEggItem spawnEgg = SpawnEggItem.byId(entityType);
+        boolean fallback = false;
+        if (spawnEgg == null) {
+            spawnEgg = SpawnEggItem.byId(EntityType.PIG);
+            fallback = true;
+        }
+        if (spawnEgg == null) {
             return ItemStack.EMPTY;
         }
-        applyJobEntityData(source, result);
 
-        CompoundTag marker = result.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).copyTag();
-        marker.putBoolean(AUTO_TAME_MARKER, true);
-        result.set(DataComponents.CUSTOM_DATA, CustomData.of(marker));
-        return result;
+        ItemStack output = new ItemStack(spawnEgg);
+        copySpawnEggPresentation(sourceResult, output);
+
+        boolean validSpiritJob = isValidSpiritJob(spiritJobType);
+        if (fallback || sourceEntityData != null || validSpiritJob) {
+            CompoundTag entityData = sourceEntityData == null ? new CompoundTag() : sourceEntityData.copy();
+            ResourceLocation entityId = BuiltInRegistries.ENTITY_TYPE.getKey(entityType);
+            if (entityId != null) {
+                entityData.putString("id", entityId.toString());
+            }
+            if (validSpiritJob) {
+                entityData.putInt("spiritMaxAge", spiritMaxAge);
+                CompoundTag job = entityData.getCompound("spiritJob").copy();
+                job.putString("factoryId", spiritJobType.toString());
+                entityData.put("spiritJob", job);
+            }
+            output.set(DataComponents.ENTITY_DATA, CustomData.of(entityData));
+        }
+
+        if (isOccultismSpiritType(entityType)) {
+            CompoundTag marker = new CompoundTag();
+            marker.putBoolean(AUTO_TAME_MARKER, true);
+            output.set(DataComponents.CUSTOM_DATA, CustomData.of(marker));
+        }
+        return output;
+    }
+
+    private static void copySpawnEggPresentation(@Nullable ItemStack source, ItemStack target) {
+        if (source == null || !(source.getItem() instanceof SpawnEggItem)) {
+            return;
+        }
+        if (source.has(DataComponents.CUSTOM_NAME)) {
+            target.set(DataComponents.CUSTOM_NAME, source.get(DataComponents.CUSTOM_NAME));
+        }
+        if (source.has(DataComponents.ITEM_NAME)) {
+            target.set(DataComponents.ITEM_NAME, source.get(DataComponents.ITEM_NAME));
+        }
+        if (source.has(DataComponents.LORE)) {
+            target.set(DataComponents.LORE, source.get(DataComponents.LORE));
+        }
+    }
+
+    private static boolean isValidSpiritJob(@Nullable ResourceLocation spiritJobType) {
+        return spiritJobType != null && OccultismSpiritJobs.REGISTRY.get(spiritJobType) != null;
+    }
+
+    private static boolean isOccultismSpiritType(EntityType<?> entityType) {
+        return entityType == OccultismEntities.FOLIOT.get()
+                || entityType == OccultismEntities.DJINNI.get()
+                || entityType == OccultismEntities.AFRIT.get()
+                || entityType == OccultismEntities.MARID.get()
+                || SpiritEntity.class.isAssignableFrom(entityType.getBaseClass());
     }
 
     static void applyJobEntityData(RitualRecipe source, ItemStack result) {
         CompoundTag entityData = source.getEntityNbt() == null ? new CompoundTag() : source.getEntityNbt().copy();
         ResourceLocation entityId = BuiltInRegistries.ENTITY_TYPE.getKey(source.getEntityToSummon());
-        entityData.putString("id", entityId.toString());
+        if (entityId != null) {
+            entityData.putString("id", entityId.toString());
+        }
         entityData.putInt("spiritMaxAge", source.getSpiritMaxAge());
-        CompoundTag job = new CompoundTag();
+        CompoundTag job = entityData.getCompound("spiritJob").copy();
         job.putString("factoryId", source.getSpiritJobType().toString());
         entityData.put("spiritJob", job);
         result.set(DataComponents.ENTITY_DATA, CustomData.of(entityData));

@@ -558,7 +558,7 @@ public class AlloyFurnaceRecipeManager {
             List<AdvancedAlloyFurnaceRecipe> candidates) {
         IRecipeAdapter<T> typedAdapter = (IRecipeAdapter<T>) adapter;
         for (RecipeHolder<T> holder : typedAdapter.findMatchingRecipes(level, mergedInputs, mergedFluids, mergedKeys, mold)) {
-            candidates.addAll(typedAdapter.convertAll(holder, level, actualInputs));
+            candidates.addAll(RecipeConversionUtils.convertAll(typedAdapter, holder, level, actualInputs));
         }
     }
 

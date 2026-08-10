@@ -154,8 +154,9 @@ public class PagedRecoverableMenu extends AbstractContainerMenu {
             if (!moveItemStackTo(source, SLOTS_PER_PAGE, slots.size(), true)) return ItemStack.EMPTY;
         } else {
             boolean moved = clientSide
-                    ? moveItemStackTo(source, 0, SLOTS_PER_PAGE, false)
-                    : insertIntoActiveSlots(inventory, source, getPage() * SLOTS_PER_PAGE);
+                    ? !isRecoveryPage() && moveItemStackTo(source, 0, SLOTS_PER_PAGE, false)
+                    : !isRecoveryPage()
+                    && insertIntoActiveSlots(inventory, source, getPage() * SLOTS_PER_PAGE);
             if (!moved) return ItemStack.EMPTY;
         }
         if (source.isEmpty()) slot.set(ItemStack.EMPTY); else slot.setChanged();

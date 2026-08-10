@@ -206,7 +206,7 @@ def enderIoCompileFiles = files(
 
 dependencies {
     implementation "mezz.jei:jei-1.21.1-neoforge:19.39.0.372"
-    implementation "curse.maven:ae2-jei-integration-1074338:5748513"
+    implementation "curse.maven:ae2-jei-integration-1074338:7727898"
 
     implementation "org.appliedenergistics:appliedenergistics2:19.2.17"
     implementation "org.appliedenergistics:guideme:21.1.17"

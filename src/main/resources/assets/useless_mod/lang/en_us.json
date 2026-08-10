@@ -310,6 +310,7 @@
   "useless_mod.configuration.max_upgrade": "Max Upgrade Count",
   "useless_mod.configuration.max_upgrade.comment": "Maximum number of speed/energy upgrades a machine can accept, requires game restart",
   "useless_mod.configuration.omniversal_multiblock_alloy_furnace": "Omniversal Multiblock Alloy Furnace",
+  "useless_mod.configuration.ore_generator": "Ore Generator",
   "useless_mod.configuration.pattern_slots": "ME Pattern Assembly Slots",
   "useless_mod.configuration.pattern_slots.comment": "Number of active slots in the ME pattern assembly. Values are rounded down to complete pages of 27; contents above a reduced limit remain available on withdraw-only recovery pages.",
   "useless_mod.configuration.pattern_slots.tooltip": "Number of active slots in the ME pattern assembly. Values are rounded down to complete pages of 27; contents above a reduced limit remain available on withdraw-only recovery pages.",
@@ -429,4 +430,19 @@
   "item.useless_mod.ritual_blueprint.imprinted_multiple": "Ritual blueprint imprinted with %s pentacles",
   "item.useless_mod.ritual_blueprint.no_pentacle": "No completed ritual pentacle found",
   "item.useless_mod.ritual_blueprint.ambiguous": "Multiple pentacles found; hold the activation item in the offhand"
+  ,"container.useless_mod.ore_generator": "Ore Generator"
+  ,"gui.useless_mod.ore_generator.rate": "Output rate"
+  ,"gui.useless_mod.ore_generator.rate_unit": "items / slot / 20 ticks"
+  ,"gui.useless_mod.ore_generator.apply": "Apply"
+  ,"gui.useless_mod.ore_generator.ae_toggle": "AE output"
+  ,"gui.useless_mod.ore_generator.ae_online": "AE online"
+  ,"gui.useless_mod.ore_generator.ae_offline": "AE offline"
+  ,"gui.useless_mod.ore_generator.ae_enabled": "AE output: enabled"
+  ,"gui.useless_mod.ore_generator.ae_disabled": "AE output: disabled"
+  ,"gui.useless_mod.ore_generator.countdown": "Next output: %s ticks"
+  ,"gui.useless_mod.ore_generator.active_slots": "Active slots: %s / %s"
+  ,"gui.useless_mod.ore_generator.locked_slot": "Locked sample slot"
+  ,"useless_mod.configuration.ore_generator_slots": "Ore Generator Sample Slots"
+  ,"useless_mod.configuration.ore_generator_slots.comment": "Number of active ore generator sample slots. Contents above a reduced limit remain available on recovery pages."
+  ,"useless_mod.configuration.ore_generator_slots.tooltip": "Number of active ore generator sample slots. Contents above a reduced limit remain available on recovery pages."
 }

@@ -318,6 +318,7 @@
   "tooltip.useless_mod.silk_touch_mode": "絲綢之觸",
   "tooltip.useless_mod.wrench_mode": "扳手模式",
   "useless_mod.configuration.omniversal_multiblock_alloy_furnace": "多方塊萬象合金爐",
+  "useless_mod.configuration.ore_generator": "礦物生成器",
   "useless_mod.configuration.pattern_slots": "ME樣板總成槽位",
   "useless_mod.configuration.pattern_slots.comment": "ME樣板總成的可用槽位數量。數值會向下取整為27的整頁；降低設定後，超出範圍的既有內容仍可在僅取出恢復頁中取出。",
   "useless_mod.configuration.pattern_slots.tooltip": "ME樣板總成的可用槽位數量。數值會向下取整為27的整頁；降低設定後，超出範圍的既有內容仍可在僅取出恢復頁中取出。",
@@ -421,4 +422,19 @@
   "item.useless_mod.ritual_blueprint.imprinted_multiple": "已將%s個五芒星陣刻印到儀式藍圖",
   "item.useless_mod.ritual_blueprint.no_pentacle": "未找到已完成的儀式五芒星陣",
   "item.useless_mod.ritual_blueprint.ambiguous": "找到多個五芒星陣；請在副手持有啟動物品"
+  ,"container.useless_mod.ore_generator": "礦物生成器"
+  ,"gui.useless_mod.ore_generator.rate": "輸出速率"
+  ,"gui.useless_mod.ore_generator.rate_unit": "每槽 / 20 tick"
+  ,"gui.useless_mod.ore_generator.apply": "套用"
+  ,"gui.useless_mod.ore_generator.ae_toggle": "AE 輸出"
+  ,"gui.useless_mod.ore_generator.ae_online": "AE 在線"
+  ,"gui.useless_mod.ore_generator.ae_offline": "AE 離線"
+  ,"gui.useless_mod.ore_generator.ae_enabled": "AE 輸出：啟用"
+  ,"gui.useless_mod.ore_generator.ae_disabled": "AE 輸出：關閉"
+  ,"gui.useless_mod.ore_generator.countdown": "下次輸出：%s tick"
+  ,"gui.useless_mod.ore_generator.active_slots": "啟用欄位：%s / %s"
+  ,"gui.useless_mod.ore_generator.locked_slot": "鎖定的樣板欄位"
+  ,"useless_mod.configuration.ore_generator_slots": "礦物生成器樣板欄位"
+  ,"useless_mod.configuration.ore_generator_slots.comment": "礦物生成器的啟用樣板欄位數量。降低設定後，超出範圍的內容仍可在恢復頁取出。"
+  ,"useless_mod.configuration.ore_generator_slots.tooltip": "礦物生成器的啟用樣板欄位數量。降低設定後，超出範圍的內容仍可在恢復頁取出。"
 }

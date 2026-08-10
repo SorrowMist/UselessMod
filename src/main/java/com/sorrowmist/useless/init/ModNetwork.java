@@ -17,6 +17,8 @@ import com.sorrowmist.useless.network.MultiblockAlloyFurnaceEnergyLimitPacket;
 import com.sorrowmist.useless.network.PatternPageChangePacket;
 import com.sorrowmist.useless.network.PassiveCraftingSettingsPacket;
 import com.sorrowmist.useless.network.PassiveCraftingStatusPacket;
+import com.sorrowmist.useless.network.OreGeneratorOutputTogglePacket;
+import com.sorrowmist.useless.network.OreGeneratorSettingsPacket;
 import com.sorrowmist.useless.network.RedstoneControlPacket;
 import com.sorrowmist.useless.network.SelectOmniversalPatternRecipePacket;
 import com.sorrowmist.useless.network.TabKeyPressedPacket;
@@ -89,5 +91,11 @@ public class ModNetwork {
         registrar.playToClient(PassiveCraftingStatusPacket.TYPE,
                                PassiveCraftingStatusPacket.STREAM_CODEC,
                                PassiveCraftingStatusPacket::handle);
+        registrar.playToServer(OreGeneratorSettingsPacket.TYPE,
+                               OreGeneratorSettingsPacket.STREAM_CODEC,
+                               OreGeneratorSettingsPacket::handle);
+        registrar.playToServer(OreGeneratorOutputTogglePacket.TYPE,
+                               OreGeneratorOutputTogglePacket.STREAM_CODEC,
+                               OreGeneratorOutputTogglePacket::handle);
     }
 }

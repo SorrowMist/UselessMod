@@ -276,23 +276,28 @@ public final class AlloyFurnaceRecipeCatalog {
                 ConcurrentHashMap.newKeySet());
     }
 
-    @SuppressWarnings({"rawtypes", "unchecked"})
-    private static void collectConverted(IRecipeAdapter adapter, Collection<RecipeHolder<?>> holders,
+    private static void collectConverted(IRecipeAdapter<?> adapter, Collection<RecipeHolder<?>> holders,
                                          Level level, List<AdvancedAlloyFurnaceRecipe> output) {
         Class<?> recipeClass = adapter.getRecipeClass();
         for (RecipeHolder<?> holder : holders) {
             if (!recipeClass.isInstance(holder.value())) continue;
             if (adapter instanceof SmeltingRecipeAdapter && holder.value().getType() != RecipeType.SMELTING) continue;
-            output.addAll(adapter.convertAll((RecipeHolder) holder, level));
+            output.addAll(RecipeConversionUtils.convertAll(adapter, holder, level));
         }
     }
 
-    @SuppressWarnings({"rawtypes", "unchecked"})
-    private static void collectGenerated(IRecipeAdapter adapter, Level level,
+    private static void collectGenerated(IRecipeAdapter<?> adapter, Level level,
                                          List<AdvancedAlloyFurnaceRecipe> output) {
-        List<RecipeHolder<?>> generated = (List<RecipeHolder<?>>) (List<?>) adapter.getGeneratedRecipes(level);
+        List<? extends RecipeHolder<?>> generated;
+        try {
+            generated = adapter.getGeneratedRecipes(level);
+        } catch (RuntimeException exception) {
+            LOGGER.warn("Skipping generated recipes: adapter={}", adapter.getClass().getName(), exception);
+            return;
+        }
+        if (generated == null) return;
         for (RecipeHolder<?> holder : generated) {
-            output.addAll(adapter.convertAll(holder, level));
+            output.addAll(RecipeConversionUtils.convertAll(adapter, holder, level));
         }
     }
 

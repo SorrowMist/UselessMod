@@ -8,6 +8,7 @@ import com.sorrowmist.useless.client.gui.PatternAssemblyScreen;
 import com.sorrowmist.useless.client.gui.MoldHubScreen;
 import com.sorrowmist.useless.client.gui.MultiblockAlloyFurnaceScreen;
 import com.sorrowmist.useless.client.gui.PassiveCraftingHatchScreen;
+import com.sorrowmist.useless.client.gui.OreGeneratorScreen;
 import com.sorrowmist.useless.client.render.ctm.CtmModelRegistrar;
 import com.sorrowmist.useless.content.blocks.GlowPlasticBlock;
 import com.sorrowmist.useless.content.menus.AdvancedAlloyFurnaceMenu;
@@ -63,6 +64,7 @@ public class ClientSetup {
         event.register(ModMenuType.OMNIVERSAL_MOLD_HUB_MENU.get(), MoldHubScreen::new);
         event.register(ModMenuType.MULTIBLOCK_ALLOY_FURNACE_MENU.get(), MultiblockAlloyFurnaceScreen::new);
         event.register(ModMenuType.PASSIVE_CRAFTING_HATCH_MENU.get(), PassiveCraftingHatchScreen::new);
+        event.register(ModMenuType.ORE_GENERATOR_MENU.get(), OreGeneratorScreen::new);
     }
 
     @SubscribeEvent

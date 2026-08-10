@@ -9,6 +9,7 @@ import com.sorrowmist.useless.init.ModRecipeSerializers;
 import com.sorrowmist.useless.init.ModRecipeTypes;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.core.NonNullList;
+import net.minecraft.core.component.DataComponentPatch;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.ByteBufCodecs;
@@ -77,11 +78,13 @@ public record AdvancedAlloyFurnaceRecipe(
                 );
             }
     );
-    // 自定义ItemStack Codec，匹配JSON格式 {"id": "xxx", "count": 1}
+    // Keep the legacy id/count shape while retaining persistent item components in JSON.
     private static final Codec<ItemStack> ITEM_STACK_CODEC = RecordCodecBuilder.create(instance -> instance.group(
-            BuiltInRegistries.ITEM.byNameCodec().fieldOf("id").forGetter(ItemStack::getItem),
-            Codec.INT.optionalFieldOf("count", 1).forGetter(ItemStack::getCount)
-    ).apply(instance, (item, count) -> new ItemStack(item, count)));
+            ItemStack.ITEM_NON_AIR_CODEC.fieldOf("id").forGetter(ItemStack::getItemHolder),
+            Codec.INT.optionalFieldOf("count", 1).forGetter(ItemStack::getCount),
+            DataComponentPatch.CODEC.optionalFieldOf("components", DataComponentPatch.EMPTY)
+                    .forGetter(ItemStack::getComponentsPatch)
+    ).apply(instance, ItemStack::new));
 
     // 主 Codec（JSON / datapack）
     public static final MapCodec<AdvancedAlloyFurnaceRecipe> CODEC = RecordCodecBuilder.mapCodec(

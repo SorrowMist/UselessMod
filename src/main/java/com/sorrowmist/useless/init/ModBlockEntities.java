@@ -59,6 +59,10 @@ public final class ModBlockEntities {
                 Capabilities.ItemHandler.BLOCK,
                 PASSIVE_CRAFTING_HATCH.get(),
                 (blockEntity, side) -> blockEntity.getPatterns());
+        event.registerBlockEntity(
+                AECapabilities.IN_WORLD_GRID_NODE_HOST,
+                ORE_GENERATOR.get(),
+                (blockEntity, context) -> blockEntity);
 
         // 注册高级合金炉的能量处理能力
         event.registerBlockEntity(

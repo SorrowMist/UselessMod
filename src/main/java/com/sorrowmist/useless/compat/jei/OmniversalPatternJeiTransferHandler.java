@@ -80,6 +80,30 @@ public final class OmniversalPatternJeiTransferHandler<T extends PatternEncoding
             Player player,
             boolean maxTransfer,
             boolean doTransfer) {
+        return transferOmniversalRecipe(menu, recipe, recipeSlots, player, maxTransfer, doTransfer, this.helper);
+    }
+
+    /**
+     * Transfers a selected alloy-furnace recipe through any AE2 pattern-encoding menu, including optional terminals
+     * that subclass the base menu and register their own exact JEI container type.
+     *
+     * @param menu active AE2-compatible pattern encoding menu
+     * @param recipe exact JEI recipe selection whose identity includes the mold
+     * @param recipeSlots displayed JEI slots for the selected recipe
+     * @param player player requesting the transfer
+     * @param maxTransfer whether JEI requested a maximum transfer
+     * @param doTransfer whether JEI is performing rather than simulating the transfer
+     * @param helper JEI error factory for the active registration
+     * @return a user-facing transfer error, or {@code null} when the transfer succeeds
+     */
+    public static @Nullable IRecipeTransferError transferOmniversalRecipe(
+            PatternEncodingTermMenu menu,
+            AdvancedAlloyFurnaceRecipe recipe,
+            IRecipeSlotsView recipeSlots,
+            Player player,
+            boolean maxTransfer,
+            boolean doTransfer,
+            IRecipeTransferHandlerHelper helper) {
         List<List<GenericStack>> inputs = inputOptions(recipe);
         List<GenericStack> outputs = outputs(recipe);
         if (inputs.isEmpty() || outputs.isEmpty()) {

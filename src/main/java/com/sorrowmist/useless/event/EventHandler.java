@@ -273,6 +273,7 @@ public class EventHandler {
         }
 
         float maxHealth = player.getMaxHealth();
+        player.dead = false;
         player.deathTime = 0;
         player.hurtTime = 0;
         player.hurtDuration = 0;

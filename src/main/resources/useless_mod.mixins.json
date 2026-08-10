@@ -32,6 +32,10 @@
     "eae.PatternSlotTrackerMixin",
     "eae.TileAssemblerMatrixPatternMixin"
   ],
+  "server": [
+    "PlayerListMixin",
+    "ServerGamePacketListenerImplMixin"
+  ],
   "client": [
     "botanypots.BotanyPotRendererMixin",
     "botanypots.PhasedDisplayStateRendererMixin",

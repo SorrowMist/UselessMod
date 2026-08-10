@@ -1512,7 +1512,7 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
         setChanged();
     }
 
-    public IManagedGridNode getMainNode() {
+    public @NotNull IManagedGridNode getMainNode() {
         return this.mainNode;
     }
 
@@ -1697,7 +1697,7 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
             return;
         }
         IManagedGridNode node = this.getMainNode();
-        if (node != null && node.isActive() && node.getNode() != null
+        if (node.isActive() && node.getNode() != null
                 && node.getNode().getGrid() != null) {
             ICraftingProvider.requestUpdate(node);
         }

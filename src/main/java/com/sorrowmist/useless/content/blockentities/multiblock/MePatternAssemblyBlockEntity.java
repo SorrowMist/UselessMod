@@ -36,6 +36,7 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.AbstractContainerMenu;
 import com.sorrowmist.useless.content.menus.MePatternAssemblyMenu;
 import net.minecraft.world.level.block.state.BlockState;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 
@@ -105,7 +106,7 @@ public final class MePatternAssemblyBlockEntity extends AEBaseBlockEntity
         inventoryChanged();
     }
 
-    public IManagedGridNode getMainNode() {
+    public @NotNull IManagedGridNode getMainNode() {
         return mainNode;
     }
 

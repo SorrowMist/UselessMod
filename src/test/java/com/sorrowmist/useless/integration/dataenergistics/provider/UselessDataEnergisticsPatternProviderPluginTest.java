@@ -3,6 +3,8 @@ package com.sorrowmist.useless.integration.dataenergistics.provider;
 import com.fish_dan_.data_energistics.api.registry.provider.PatternProviderRegistry;
 import com.fish_dan_.data_energistics.api.registry.provider.definition.PatternProviderRegistration;
 import com.fish_dan_.data_energistics.api.registry.provider.definition.ProviderIdentityDescriptor;
+import com.fish_dan_.data_energistics.api.registry.search.TrinityPatternSearchRegistry;
+import com.fish_dan_.data_energistics.api.registry.search.TrinityPatternSearchTermRegistration;
 import com.sorrowmist.useless.UselessMod;
 import net.minecraft.resources.ResourceLocation;
 import org.jetbrains.annotations.NotNull;
@@ -53,11 +55,32 @@ class UselessDataEnergisticsPatternProviderPluginTest {
         assertNotNull(assembly.postCommitHook());
     }
 
+    @Test
+    void registersTheOmniversalMoldAsASeparateTrinitySearchContributor() {
+        RecordingTrinityPatternSearchRegistry registry = new RecordingTrinityPatternSearchRegistry();
+
+        UselessDataEnergisticsPatternProviderPlugin.registerSearchTerms(registry);
+
+        assertEquals(1, registry.registrations.size());
+        TrinityPatternSearchTermRegistration registration = registry.registrations.getFirst();
+        assertEquals(UselessMod.id("omniversal_pattern_mold_search"), registration.registrationId());
+        assertNotNull(registration.contributor());
+    }
+
     private static final class RecordingPatternProviderRegistry implements PatternProviderRegistry {
         private final List<PatternProviderRegistration> registrations = new ArrayList<>();
 
         @Override
         public void register(@NotNull PatternProviderRegistration registration) {
+            registrations.add(registration);
+        }
+    }
+
+    private static final class RecordingTrinityPatternSearchRegistry implements TrinityPatternSearchRegistry {
+        private final List<TrinityPatternSearchTermRegistration> registrations = new ArrayList<>();
+
+        @Override
+        public void register(@NotNull TrinityPatternSearchTermRegistration registration) {
             registrations.add(registration);
         }
     }

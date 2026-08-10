@@ -4,9 +4,9 @@ import appeng.api.stacks.AEFluidKey;
 import appeng.api.stacks.AEItemKey;
 import appeng.api.stacks.AEKey;
 import appeng.api.stacks.GenericStack;
-import com.fish_dan_.data_energistics.recipe.DataRipperReassemblerIngredient;
-import com.fish_dan_.data_energistics.recipe.DataRipperReassemblerRecipe;
-import com.fish_dan_.data_energistics.registry.ModRecipes;
+import com.fish_dan_.data_energistics.recipe.reassembler.DataRipperReassemblerIngredient;
+import com.fish_dan_.data_energistics.recipe.reassembler.DataRipperReassemblerRecipe;
+import com.fish_dan_.data_energistics.registry.DERecipes;
 import com.sorrowmist.useless.api.enums.AlloyFurnaceMode;
 import com.sorrowmist.useless.content.recipe.AdapterUtils;
 import com.sorrowmist.useless.content.recipe.AdvancedAlloyFurnaceRecipe;
@@ -180,10 +180,10 @@ public class DataReassemblerRecipeAdapter implements IRecipeAdapter<DataRipperRe
 
         RecipeManager recipeManager = level.getRecipeManager();
         List<RecipeHolder<DataRipperReassemblerRecipe>> recipes = (List<RecipeHolder<DataRipperReassemblerRecipe>>) (List<?>) recipeManager.getAllRecipesFor(
-                ModRecipes.DATA_RIPPER_REASSEMBLER_TYPE.get()
+                DERecipes.DATA_RIPPER_REASSEMBLER_TYPE.get()
         );
 
-        List<RecipeHolder<DataRipperReassemblerRecipe>> matches = new java.util.ArrayList<>();
+        List<RecipeHolder<DataRipperReassemblerRecipe>> matches = new ArrayList<>();
 
         for (RecipeHolder<DataRipperReassemblerRecipe> holder : recipes) {
             DataRipperReassemblerRecipe recipe = holder.value();

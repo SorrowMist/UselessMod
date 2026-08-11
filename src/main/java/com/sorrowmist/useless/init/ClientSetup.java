@@ -78,12 +78,23 @@ public class ClientSetup {
         var data = event.getItemStack().get(UComponents.OMNIVERSAL_PATTERN_DATA.get());
         if (data == null) return;
         event.getToolTip().add(createRecipeTooltip(data.recipeId()));
-        Component mold = !data.requiresMold()
-                ? Component.translatable("tooltip.useless_mod.omniversal_pattern.no_mold")
-                : data.displayMold().<Component>map(key -> key.getDisplayName())
-                        .orElseGet(() -> Component.translatable("tooltip.useless_mod.omniversal_pattern.unknown_mold"));
-        event.getToolTip().add(Component.translatable(
-                "tooltip.useless_mod.omniversal_pattern.mold", mold).withStyle(ChatFormatting.GOLD));
+        if (!data.requiresMold()) {
+            event.getToolTip().add(Component.translatable(
+                    "tooltip.useless_mod.omniversal_pattern.mold",
+                    Component.translatable("tooltip.useless_mod.omniversal_pattern.no_mold"))
+                    .withStyle(ChatFormatting.GOLD));
+        } else if (!data.displayMolds().isEmpty()) {
+            for (var mold : data.displayMolds()) {
+                event.getToolTip().add(Component.translatable(
+                        "tooltip.useless_mod.omniversal_pattern.mold",
+                        mold.getDisplayName()).withStyle(ChatFormatting.GOLD));
+            }
+        } else {
+            Component mold = data.displayMold().<Component>map(key -> key.getDisplayName())
+                    .orElseGet(() -> Component.translatable("tooltip.useless_mod.omniversal_pattern.unknown_mold"));
+            event.getToolTip().add(Component.translatable(
+                    "tooltip.useless_mod.omniversal_pattern.mold", mold).withStyle(ChatFormatting.GOLD));
+        }
     }
 
     static Component createRecipeTooltip(ResourceLocation recipeId) {

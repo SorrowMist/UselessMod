@@ -23,7 +23,7 @@ public class AdvancedAlloyFurnaceRecipeBuilder {
     private int processTime = 200;
     private Ingredient catalyst = Ingredient.EMPTY;
     private int catalystUses = 0;
-    private Ingredient mold = Ingredient.EMPTY;
+    private final List<Ingredient> molds = new ArrayList<>();
     private AlloyFurnaceMode mode = AlloyFurnaceMode.NORMAL;
 
     public static AdvancedAlloyFurnaceRecipeBuilder create() {
@@ -72,7 +72,36 @@ public class AdvancedAlloyFurnaceRecipeBuilder {
     }
 
     public AdvancedAlloyFurnaceRecipeBuilder mold(Ingredient mold) {
-        this.mold = mold;
+        this.molds.clear();
+        if (mold != null) {
+            this.molds.add(mold);
+        }
+        return this;
+    }
+
+    /** Replaces the complete set of independent mold requirements. */
+    public AdvancedAlloyFurnaceRecipeBuilder molds(List<Ingredient> molds) {
+        this.molds.clear();
+        if (molds != null) {
+            this.molds.addAll(molds);
+        }
+        return this;
+    }
+
+    /** Replaces the complete set of independent mold requirements. */
+    public AdvancedAlloyFurnaceRecipeBuilder molds(Ingredient... molds) {
+        this.molds.clear();
+        if (molds != null) {
+            for (Ingredient mold : molds) {
+                this.molds.add(mold);
+            }
+        }
+        return this;
+    }
+
+    /** Adds one independent mold requirement. */
+    public AdvancedAlloyFurnaceRecipeBuilder addMold(Ingredient mold) {
+        this.molds.add(mold);
         return this;
     }
 
@@ -94,7 +123,7 @@ public class AdvancedAlloyFurnaceRecipeBuilder {
                 this.processTime,
                 this.catalyst,
                 this.catalystUses,
-                this.mold,
+                List.copyOf(this.molds),
                 this.mode
         );
         output.accept(id, recipe, null); // null = 无 advancement

@@ -6,8 +6,12 @@ import com.mojang.serialization.codecs.RecordCodecBuilder;
 import com.sorrowmist.useless.content.recipe.AlloyFurnaceRecipeIdentity;
 import io.netty.handler.codec.DecoderException;
 import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.tags.TagKey;
+import net.minecraft.world.item.Item;
 
 import java.util.List;
 import java.util.Optional;
@@ -18,11 +22,37 @@ public record OmniversalPatternData(
         String recipeFingerprint,
         boolean requiresMold,
         Optional<AEItemKey> displayMold,
+        List<AEItemKey> displayMolds,
+        List<TagInputSlot> tagInputSlots,
         List<Integer> itemIdInputSlots,
         List<Integer> itemIdOutputSlots) {
     private static final int LEGACY_DEFAULT_VERSION = 1;
     public static final int SEMANTIC_FINGERPRINT_VERSION = 2;
-    public static final int CURRENT_VERSION = SEMANTIC_FINGERPRINT_VERSION;
+    public static final int MULTI_MOLD_VERSION = 3;
+    public static final int TAG_INPUT_VERSION = 4;
+    public static final int CURRENT_VERSION = TAG_INPUT_VERSION;
+
+    public record TagInputSlot(int slot, TagKey<Item> tag) {
+        public static final Codec<TagInputSlot> CODEC = RecordCodecBuilder.create(instance -> instance.group(
+                Codec.INT.fieldOf("slot").forGetter(TagInputSlot::slot),
+                TagKey.codec(Registries.ITEM).fieldOf("tag").forGetter(TagInputSlot::tag)
+        ).apply(instance, TagInputSlot::new));
+
+        public static final StreamCodec<RegistryFriendlyByteBuf, TagInputSlot> STREAM_CODEC =
+                StreamCodec.composite(
+                        ByteBufCodecs.VAR_INT, TagInputSlot::slot,
+                        ByteBufCodecs.fromCodecWithRegistries(TagKey.codec(Registries.ITEM)), TagInputSlot::tag,
+                        TagInputSlot::new);
+
+        public TagInputSlot {
+            if (slot < 0) {
+                throw new IllegalArgumentException("Tag input slot cannot be negative: " + slot);
+            }
+            if (tag == null) {
+                throw new NullPointerException("tag");
+            }
+        }
+    }
 
     public static final Codec<OmniversalPatternData> CODEC = RecordCodecBuilder.create(instance -> instance.group(
             // Version one was omitted by its original codec, so its decode
@@ -32,6 +62,8 @@ public record OmniversalPatternData(
             Codec.STRING.fieldOf("recipe_fingerprint").forGetter(OmniversalPatternData::recipeFingerprint),
             Codec.BOOL.optionalFieldOf("requires_mold", false).forGetter(OmniversalPatternData::requiresMold),
             AEItemKey.CODEC.optionalFieldOf("display_mold").forGetter(OmniversalPatternData::displayMold),
+            AEItemKey.CODEC.listOf().optionalFieldOf("display_molds", List.of()).forGetter(OmniversalPatternData::displayMolds),
+            TagInputSlot.CODEC.listOf().optionalFieldOf("tag_inputs", List.of()).forGetter(OmniversalPatternData::tagInputSlots),
             Codec.INT.listOf().optionalFieldOf("item_id_inputs", List.of()).forGetter(OmniversalPatternData::itemIdInputSlots),
             Codec.INT.listOf().optionalFieldOf("item_id_outputs", List.of()).forGetter(OmniversalPatternData::itemIdOutputSlots)
     ).apply(instance, OmniversalPatternData::new));
@@ -42,8 +74,38 @@ public record OmniversalPatternData(
 
     public OmniversalPatternData {
         displayMold = displayMold == null ? Optional.empty() : displayMold;
+        displayMolds = List.copyOf(displayMolds == null ? List.of() : displayMolds);
+        tagInputSlots = List.copyOf(tagInputSlots == null ? List.of() : tagInputSlots);
         itemIdInputSlots = List.copyOf(itemIdInputSlots == null ? List.of() : itemIdInputSlots);
         itemIdOutputSlots = List.copyOf(itemIdOutputSlots == null ? List.of() : itemIdOutputSlots);
+    }
+
+    /** Compatibility constructor for metadata written before tag input slots were introduced. */
+    public OmniversalPatternData(
+            int version,
+            ResourceLocation recipeId,
+            String recipeFingerprint,
+            boolean requiresMold,
+            Optional<AEItemKey> displayMold,
+            List<AEItemKey> displayMolds,
+            List<Integer> itemIdInputSlots,
+            List<Integer> itemIdOutputSlots) {
+        this(version, recipeId, recipeFingerprint, requiresMold, displayMold, displayMolds,
+                List.of(), itemIdInputSlots, itemIdOutputSlots);
+    }
+
+    /** Compatibility constructor for metadata written before display_molds was introduced. */
+    public OmniversalPatternData(
+            int version,
+            ResourceLocation recipeId,
+            String recipeFingerprint,
+            boolean requiresMold,
+            Optional<AEItemKey> displayMold,
+            List<Integer> itemIdInputSlots,
+            List<Integer> itemIdOutputSlots) {
+        this(version, recipeId, recipeFingerprint, requiresMold, displayMold,
+                List.of(), List.of(),
+                itemIdInputSlots, itemIdOutputSlots);
     }
 
     public AlloyFurnaceRecipeIdentity identity() {
@@ -57,6 +119,12 @@ public record OmniversalPatternData(
         buffer.writeBoolean(data.requiresMold);
         buffer.writeBoolean(data.displayMold.isPresent());
         data.displayMold.ifPresent(mold -> mold.writeToPacket(buffer));
+        if (data.version >= MULTI_MOLD_VERSION) {
+            writeMolds(buffer, data.displayMolds);
+        }
+        if (data.version >= TAG_INPUT_VERSION) {
+            writeTagInputs(buffer, data.tagInputSlots);
+        }
         writeInts(buffer, data.itemIdInputSlots);
         writeInts(buffer, data.itemIdOutputSlots);
     }
@@ -69,8 +137,43 @@ public record OmniversalPatternData(
         Optional<AEItemKey> displayMold = buffer.readBoolean()
                 ? Optional.of(AEItemKey.fromPacket(buffer))
                 : Optional.empty();
+        List<AEItemKey> displayMolds = version >= MULTI_MOLD_VERSION
+                ? readMolds(buffer) : List.of();
+        List<TagInputSlot> tagInputSlots = version >= TAG_INPUT_VERSION
+                ? readTagInputs(buffer) : List.of();
         return new OmniversalPatternData(
-                version, recipeId, fingerprint, requiresMold, displayMold, readInts(buffer), readInts(buffer));
+                version, recipeId, fingerprint, requiresMold, displayMold, displayMolds,
+                tagInputSlots, readInts(buffer), readInts(buffer));
+    }
+
+    private static void writeMolds(RegistryFriendlyByteBuf buffer, List<AEItemKey> molds) {
+        buffer.writeVarInt(molds.size());
+        for (AEItemKey mold : molds) mold.writeToPacket(buffer);
+    }
+
+    private static List<AEItemKey> readMolds(RegistryFriendlyByteBuf buffer) {
+        int size = buffer.readVarInt();
+        if (size < 0 || size > 256) {
+            throw new DecoderException("Omniversal pattern mold list exceeds 256 entries");
+        }
+        java.util.ArrayList<AEItemKey> result = new java.util.ArrayList<>(size);
+        for (int i = 0; i < size; i++) result.add(AEItemKey.fromPacket(buffer));
+        return List.copyOf(result);
+    }
+
+    private static void writeTagInputs(RegistryFriendlyByteBuf buffer, List<TagInputSlot> slots) {
+        buffer.writeVarInt(slots.size());
+        for (TagInputSlot slot : slots) TagInputSlot.STREAM_CODEC.encode(buffer, slot);
+    }
+
+    private static List<TagInputSlot> readTagInputs(RegistryFriendlyByteBuf buffer) {
+        int size = buffer.readVarInt();
+        if (size < 0 || size > 256) {
+            throw new DecoderException("Omniversal pattern tag input list exceeds 256 entries");
+        }
+        java.util.ArrayList<TagInputSlot> result = new java.util.ArrayList<>(size);
+        for (int i = 0; i < size; i++) result.add(TagInputSlot.STREAM_CODEC.decode(buffer));
+        return List.copyOf(result);
     }
 
     private static void writeInts(RegistryFriendlyByteBuf buffer, List<Integer> values) {

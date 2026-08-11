@@ -24,6 +24,7 @@ import net.minecraft.world.item.crafting.RecipeType;
 import net.minecraft.world.item.crafting.ShapedRecipe;
 import net.minecraft.world.item.crafting.ShapelessRecipe;
 import net.minecraft.world.level.Level;
+import net.neoforged.neoforge.common.crafting.DataComponentIngredient;
 import net.neoforged.neoforge.fluids.FluidStack;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
@@ -74,13 +75,15 @@ public final class CraftingRecipeAdapter implements IRecipeAdapter<CraftingRecip
                 AdapterUtils.convertedId(holder.id()),
                 converted.itemInputs(),
                 converted.fluidInputs(),
+                List.of(),
                 converted.outputs(),
+                List.of(),
                 List.of(),
                 AdapterUtils.DEFAULT_ENERGY,
                 AdapterUtils.DEFAULT_PROCESS_TIME,
                 Ingredient.EMPTY,
                 0,
-                AdapterUtils.toMoldIngredient(getMoldItem()),
+                converted.molds(),
                 AlloyFurnaceMode.NORMAL
         ));
     }
@@ -93,7 +96,8 @@ public final class CraftingRecipeAdapter implements IRecipeAdapter<CraftingRecip
             @Nullable ItemStack mold) {
         if (level == null || !matchesMold(mold)
                 || ((mergedInputs == null || mergedInputs.isEmpty())
-                && (mergedFluids == null || mergedFluids.isEmpty()))) {
+                && (mergedFluids == null || mergedFluids.isEmpty())
+                && (mold == null || mold.isEmpty()))) {
             return List.of();
         }
 
@@ -135,21 +139,20 @@ public final class CraftingRecipeAdapter implements IRecipeAdapter<CraftingRecip
             return null;
         }
 
-        List<ItemStack> canonicalRemainders;
-        try {
-            canonicalRemainders = source.getRemainingItems(craftingInput(source, canonicalStacks));
-        } catch (RuntimeException exception) {
-            return null;
-        }
-        if (canonicalRemainders == null || canonicalRemainders.size() != ingredientSlots.size()) {
+        Set<Integer> fluidSlots = new LinkedHashSet<>();
+        Map<AEFluidKey, Long> fluidAmounts = new LinkedHashMap<>();
+        Optional<List<ItemStack>> remainders = ExtendedCraftingAdapterUtils.deterministicRemaindersBySlot(
+                ingredientSlots,
+                Set.of(),
+                stacks -> craftingInput(source, stacks),
+                source::getRemainingItems);
+        if (remainders.isEmpty() || remainders.get().size() != ingredientSlots.size()) {
             return null;
         }
 
-        Set<Integer> fluidSlots = new LinkedHashSet<>();
-        Map<AEFluidKey, Long> fluidAmounts = new LinkedHashMap<>();
         for (int slot = 0; slot < ingredientSlots.size(); slot++) {
             Optional<GenericStack> fluid = fluidSubstitute(
-                    ingredientSlots.get(slot), canonicalRemainders.get(slot));
+                    ingredientSlots.get(slot), remainders.get().get(slot));
             if (fluid.isEmpty()) {
                 continue;
             }
@@ -159,33 +162,45 @@ public final class CraftingRecipeAdapter implements IRecipeAdapter<CraftingRecip
         }
 
         Map<Ingredient, Long> itemAmounts = new LinkedHashMap<>();
+        List<Ingredient> remainderMolds = new ArrayList<>();
+        Set<Integer> durabilitySlots = new LinkedHashSet<>();
         for (int slot = 0; slot < ingredientSlots.size(); slot++) {
             Ingredient ingredient = ingredientSlots.get(slot);
-            if (!fluidSlots.contains(slot) && ingredient != null && !ingredient.isEmpty()) {
+            ItemStack remainder = remainders.get().get(slot);
+            if (fluidSlots.contains(slot)) {
+                continue;
+            }
+
+            if (remainder.isEmpty()) {
+                if (ingredient != null && !ingredient.isEmpty()) {
+                    AdapterUtils.mergeIngredient(itemAmounts, ingredient, 1L);
+                }
+                continue;
+            }
+
+            ItemStack canonical = canonicalStacks.get(slot);
+            if (isDurabilityRemainder(canonical, remainder)) {
+                durabilitySlots.add(slot);
+                remainderMolds.add(ingredient);
+            } else {
+                remainderMolds.add(stackIngredient(remainder));
+            }
+
+            if (!durabilitySlots.contains(slot) && ingredient != null && !ingredient.isEmpty()) {
                 AdapterUtils.mergeIngredient(itemAmounts, ingredient, 1L);
             }
         }
-        if (itemAmounts.isEmpty() && fluidAmounts.isEmpty()) {
-            return null;
-        }
 
-        Optional<List<ItemStack>> remainders = ExtendedCraftingAdapterUtils.deterministicRemainders(
-                ingredientSlots,
-                fluidSlots,
-                stacks -> craftingInput(source, stacks),
-                source::getRemainingItems);
-        if (remainders.isEmpty()) {
+        List<Ingredient> molds = new ArrayList<>();
+        molds.add(AdapterUtils.toMoldIngredient(new ItemStack(Items.CRAFTING_TABLE)));
+        molds.addAll(remainderMolds);
+        if (itemAmounts.isEmpty() && fluidAmounts.isEmpty() && remainderMolds.isEmpty()) {
             return null;
         }
 
         List<ItemStack> outputs = new ArrayList<>();
         if (!ExtendedCraftingAdapterUtils.mergeOutput(outputs, result)) {
             return null;
-        }
-        for (ItemStack remainder : remainders.get()) {
-            if (!ExtendedCraftingAdapterUtils.mergeOutput(outputs, remainder)) {
-                return null;
-            }
         }
 
         List<CountedIngredient> itemInputs = itemAmounts.entrySet().stream()
@@ -199,7 +214,7 @@ public final class CraftingRecipeAdapter implements IRecipeAdapter<CraftingRecip
             }
             fluidInputs.add(entry.getKey().toStack((int) amount));
         }
-        return new Converted(itemInputs, List.copyOf(fluidInputs), List.copyOf(outputs));
+        return new Converted(itemInputs, List.copyOf(fluidInputs), List.copyOf(outputs), List.copyOf(molds));
     }
 
     @Nullable
@@ -239,8 +254,15 @@ public final class CraftingRecipeAdapter implements IRecipeAdapter<CraftingRecip
             } catch (RuntimeException exception) {
                 return null;
             }
-            if (candidates == null || candidates.length == 0
-                    || candidates[0] == null || candidates[0].isEmpty()) {
+            if (candidates == null || candidates.length == 0) {
+                // A tag can be temporarily unresolved while the recipe index is built. The
+                // original ingredient remains the actual requirement; an empty probe is enough
+                // for ordinary recipes which do not inspect the concrete input item.
+                stacks.add(ItemStack.EMPTY);
+                foundInput = true;
+                continue;
+            }
+            if (candidates[0] == null || candidates[0].isEmpty()) {
                 return null;
             }
             stacks.add(candidates[0].copyWithCount(1));
@@ -286,6 +308,25 @@ public final class CraftingRecipeAdapter implements IRecipeAdapter<CraftingRecip
         return contained != null && contained.what() instanceof AEFluidKey && contained.amount() > 0L
                 ? Optional.of(contained)
                 : Optional.empty();
+    }
+
+    private static boolean isDurabilityRemainder(
+            @Nullable ItemStack original, @Nullable ItemStack remainder) {
+        if (original == null || original.isEmpty() || remainder == null || remainder.isEmpty()
+                || !original.isDamageableItem() || !remainder.isDamageableItem()
+                || remainder.getDamageValue() <= original.getDamageValue()) {
+            return false;
+        }
+
+        ItemStack originalWithoutDamage = original.copy();
+        ItemStack remainderWithoutDamage = remainder.copy();
+        originalWithoutDamage.setDamageValue(0);
+        remainderWithoutDamage.setDamageValue(0);
+        return ItemStack.isSameItemSameComponents(originalWithoutDamage, remainderWithoutDamage);
+    }
+
+    private static Ingredient stackIngredient(ItemStack stack) {
+        return DataComponentIngredient.of(true, stack.copyWithCount(1));
     }
 
     private static boolean matchesItems(
@@ -335,6 +376,7 @@ public final class CraftingRecipeAdapter implements IRecipeAdapter<CraftingRecip
     private record Converted(
             List<CountedIngredient> itemInputs,
             List<FluidStack> fluidInputs,
-            List<ItemStack> outputs) {
+            List<ItemStack> outputs,
+            List<Ingredient> molds) {
     }
 }

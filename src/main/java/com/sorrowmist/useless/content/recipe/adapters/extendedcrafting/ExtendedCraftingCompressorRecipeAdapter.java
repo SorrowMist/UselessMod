@@ -31,7 +31,7 @@ import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.Set;
 
-/** Converts Extended Crafting compressor recipes, including their catalyst return. */
+/** Converts Extended Crafting compressor recipes, retaining the catalyst as a mold requirement. */
 public class ExtendedCraftingCompressorRecipeAdapter implements IRecipeAdapter<ICompressorRecipe> {
     private static final Logger LOGGER = LogUtils.getLogger();
 
@@ -60,13 +60,15 @@ public class ExtendedCraftingCompressorRecipeAdapter implements IRecipeAdapter<I
                 AdapterUtils.convertedId(holder.id()),
                 converted.inputs(),
                 List.of(),
+                List.of(),
                 converted.outputs(),
+                List.of(),
                 List.of(),
                 converted.energy(),
                 converted.processTime(),
                 Ingredient.EMPTY,
                 0,
-                AdapterUtils.toMoldIngredient(getMoldItem()),
+                converted.molds(),
                 AlloyFurnaceMode.NORMAL
         ));
     }
@@ -127,12 +129,6 @@ public class ExtendedCraftingCompressorRecipeAdapter implements IRecipeAdapter<I
         if (catalyst == null || catalyst.isEmpty()) {
             return null;
         }
-        Optional<ItemStack> catalystStack = ExtendedCraftingAdapterUtils.deterministicStack(catalyst);
-        if (catalystStack.isEmpty()) {
-            LOGGER.warn("Skipping compressor recipe with non-deterministic catalyst");
-            return null;
-        }
-
         long powerCost = source.getPowerCost();
         long powerRate = source.getPowerRate();
         OptionalInt processTime = ExtendedCraftingAdapterUtils.powerProcessTime(powerCost, powerRate);
@@ -147,7 +143,6 @@ public class ExtendedCraftingCompressorRecipeAdapter implements IRecipeAdapter<I
 
         Map<Ingredient, Long> requirements = new LinkedHashMap<>();
         AdapterUtils.mergeIngredient(requirements, input, inputCount);
-        AdapterUtils.mergeIngredient(requirements, catalyst, 1L);
 
         Optional<List<ItemStack>> remainders = ExtendedCraftingAdapterUtils.deterministicRemainders(
                 List.of(input, catalyst),
@@ -160,8 +155,7 @@ public class ExtendedCraftingCompressorRecipeAdapter implements IRecipeAdapter<I
         }
 
         List<ItemStack> outputs = new ArrayList<>();
-        if (!ExtendedCraftingAdapterUtils.mergeOutput(outputs, result)
-                || !ExtendedCraftingAdapterUtils.mergeOutput(outputs, catalystStack.get())) {
+        if (!ExtendedCraftingAdapterUtils.mergeOutput(outputs, result)) {
             return null;
         }
         for (ItemStack remainder : remainders.get()) {
@@ -171,7 +165,10 @@ public class ExtendedCraftingCompressorRecipeAdapter implements IRecipeAdapter<I
         }
 
         List<CountedIngredient> counted = ExtendedCraftingAdapterUtils.countedIngredients(requirements);
-        return new Converted(counted, outputs, requirements, powerCost, processTime.getAsInt());
+        List<Ingredient> molds = List.of(
+                AdapterUtils.toMoldIngredient(new ItemStack(ModBlocks.COMPRESSOR.get())),
+                catalyst);
+        return new Converted(counted, outputs, requirements, molds, powerCost, processTime.getAsInt());
     }
 
     @Nullable
@@ -204,6 +201,7 @@ public class ExtendedCraftingCompressorRecipeAdapter implements IRecipeAdapter<I
             List<CountedIngredient> inputs,
             List<ItemStack> outputs,
             Map<Ingredient, Long> requirements,
+            List<Ingredient> molds,
             long energy,
             int processTime) {
     }

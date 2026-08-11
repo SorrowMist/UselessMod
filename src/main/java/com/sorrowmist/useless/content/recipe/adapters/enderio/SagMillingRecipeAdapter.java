@@ -12,6 +12,7 @@ import com.sorrowmist.useless.content.recipe.CountedIngredient;
 import com.sorrowmist.useless.content.recipe.ExpectedOutputScaler;
 import com.sorrowmist.useless.content.recipe.IRecipeAdapter;
 import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.crafting.Ingredient;
@@ -23,6 +24,7 @@ import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -46,7 +48,42 @@ public final class SagMillingRecipeAdapter implements IRecipeAdapter<SagMillingR
     @Override
     public List<AdvancedAlloyFurnaceRecipe> convertAll(
             RecipeHolder<SagMillingRecipe> holder, Level level) {
-        return convertAll(holder, level, maximumGrindingBallMultipliers());
+        if (holder == null || holder.value() == null) {
+            return List.of();
+        }
+
+        SagMillingRecipe source = holder.value();
+        List<AdvancedAlloyFurnaceRecipe> result = new ArrayList<>();
+        AdvancedAlloyFurnaceRecipe base = convertRecipe(
+                AdapterUtils.convertedId(holder.id()),
+                source,
+                GrindingBallMultipliers.IDENTITY,
+                1.0,
+                List.of(AdapterUtils.toMoldIngredient(getMoldItem())));
+        if (base != null) {
+            result.add(base);
+        }
+
+        for (Map.Entry<Item, GrindingBallData> entry : grindingBallData().entrySet()) {
+            Item ball = entry.getKey();
+            GrindingBallData data = entry.getValue();
+            ResourceLocation ballId = BuiltInRegistries.ITEM.getKey(ball);
+            if (ballId == null || data == null) {
+                continue;
+            }
+            AdvancedAlloyFurnaceRecipe variant = convertRecipe(
+                    grindingBallVariantId(holder.id(), ballId),
+                    source,
+                    new GrindingBallMultipliers(data.outputMultiplier(), data.bonusMultiplier()),
+                    data.powerUse(),
+                    List.of(
+                            AdapterUtils.toMoldIngredient(getMoldItem()),
+                            AdapterUtils.toMoldIngredient(new ItemStack(ball))));
+            if (variant != null) {
+                result.add(variant);
+            }
+        }
+        return List.copyOf(result);
     }
 
     /** Package-private seam used by tests to provide deterministic data-map values. */
@@ -58,7 +95,8 @@ public final class SagMillingRecipeAdapter implements IRecipeAdapter<SagMillingR
         }
 
         AdvancedAlloyFurnaceRecipe converted = convertRecipe(
-                holder.id(), holder.value(), grindingBallMultipliers);
+                AdapterUtils.convertedId(holder.id()), holder.value(), grindingBallMultipliers,
+                1.0, List.of(AdapterUtils.toMoldIngredient(new ItemStack(EIOBlocks.SAG_MILL.get()))));
         return converted == null ? List.of() : List.of(converted);
     }
 
@@ -71,13 +109,15 @@ public final class SagMillingRecipeAdapter implements IRecipeAdapter<SagMillingR
             return List.of();
         }
 
-        GrindingBallMultipliers multipliers = maximumGrindingBallMultipliers();
         RecipeManager recipeManager = level.getRecipeManager();
         List<RecipeHolder<SagMillingRecipe>> matches = new ArrayList<>();
         for (RecipeHolder<SagMillingRecipe> holder : recipeManager.getAllRecipesFor(
                 EIORecipes.SAG_MILLING.type().get())) {
             SagMillingRecipe source = holder.value();
-            AdvancedAlloyFurnaceRecipe converted = convertRecipe(holder.id(), source, multipliers);
+            AdvancedAlloyFurnaceRecipe converted = convertRecipe(
+                    AdapterUtils.convertedId(holder.id()), source,
+                    GrindingBallMultipliers.IDENTITY, 1.0,
+                    List.of(AdapterUtils.toMoldIngredient(new ItemStack(EIOBlocks.SAG_MILL.get()))));
             if (converted == null || converted.inputs().isEmpty()) {
                 continue;
             }
@@ -92,11 +132,14 @@ public final class SagMillingRecipeAdapter implements IRecipeAdapter<SagMillingR
 
     @Nullable
     private static AdvancedAlloyFurnaceRecipe convertRecipe(
-            net.minecraft.resources.ResourceLocation sourceId,
+            ResourceLocation convertedId,
             SagMillingRecipe source,
-            @Nullable GrindingBallMultipliers grindingBallMultipliers) {
+            @Nullable GrindingBallMultipliers grindingBallMultipliers,
+            double powerUse,
+            List<Ingredient> molds) {
         if (source == null || source.input() == null || source.input().isEmpty()
-                || source.energy() < 0) {
+                || source.energy() < 0 || !isFiniteNonNegative(powerUse)
+                || molds == null || molds.isEmpty()) {
             return null;
         }
 
@@ -105,30 +148,32 @@ public final class SagMillingRecipeAdapter implements IRecipeAdapter<SagMillingR
                 : grindingBallMultipliers;
         Optional<ExpectedOutputScaler.ScaledOutputs> scaled = scaleOutputs(source, multipliers);
         if (scaled.isEmpty() || scaled.get().outputs().isEmpty()) {
-            LOGGER.warn("Skipping unsupported Ender IO SAG Mill recipe: {}", sourceId);
+            LOGGER.warn("Skipping unsupported Ender IO SAG Mill recipe: {}", convertedId);
             return null;
         }
 
         int operations = scaled.get().operations();
-        OptionalInt energy = ExpectedOutputScaler.multiplyToInt(source.energy(), operations);
+        OptionalInt energy = scaledEnergy(source.energy(), powerUse, operations);
         OptionalInt processTime = ExpectedOutputScaler.multiplyToInt(
                 AdapterUtils.DEFAULT_PROCESS_TIME, operations);
         if (energy.isEmpty() || processTime.isEmpty()) {
-            LOGGER.warn("Skipping overflowing Ender IO SAG Mill recipe: {}", sourceId);
+            LOGGER.warn("Skipping overflowing Ender IO SAG Mill recipe: {}", convertedId);
             return null;
         }
 
         return new AdvancedAlloyFurnaceRecipe(
-                AdapterUtils.convertedId(sourceId),
+                convertedId,
                 List.of(new CountedIngredient(source.input(), operations)),
                 List.of(),
+                List.of(),
                 scaled.get().outputs(),
+                List.of(),
                 List.of(),
                 energy.getAsInt(),
                 processTime.getAsInt(),
                 Ingredient.EMPTY,
                 0,
-                AdapterUtils.toMoldIngredient(new ItemStack(EIOBlocks.SAG_MILL.get())),
+                molds,
                 AlloyFurnaceMode.NORMAL
         );
     }
@@ -195,27 +240,39 @@ public final class SagMillingRecipeAdapter implements IRecipeAdapter<SagMillingR
         return ExpectedOutputScaler.scale(weightedOutputs);
     }
 
-    private static GrindingBallMultipliers maximumGrindingBallMultipliers() {
-        double outputMultiplier = GrindingBallMultipliers.IDENTITY.outputMultiplier();
-        double bonusMultiplier = GrindingBallMultipliers.IDENTITY.bonusMultiplier();
-
+    private static Map<Item, GrindingBallData> grindingBallData() {
+        Map<Item, GrindingBallData> result = new LinkedHashMap<>();
         for (Item item : BuiltInRegistries.ITEM.getDataMap(GrindingBallData.DATA_MAP_TYPE)
                 .keySet().stream().map(BuiltInRegistries.ITEM::get).toList()) {
             if (item == null) {
                 continue;
             }
             GrindingBallData data = item.builtInRegistryHolder().getData(GrindingBallData.DATA_MAP_TYPE);
-            if (data == null) {
-                continue;
-            }
-            if (isFiniteNonNegative(data.outputMultiplier())) {
-                outputMultiplier = Math.max(outputMultiplier, data.outputMultiplier());
-            }
-            if (isFiniteNonNegative(data.bonusMultiplier())) {
-                bonusMultiplier = Math.max(bonusMultiplier, data.bonusMultiplier());
+            if (data != null) {
+                result.put(item, data);
             }
         }
-        return new GrindingBallMultipliers(outputMultiplier, bonusMultiplier);
+        return result;
+    }
+
+    private static OptionalInt scaledEnergy(int baseEnergy, double powerUse, int operations) {
+        if (baseEnergy < 0 || !isFiniteNonNegative(powerUse) || operations < 0) {
+            return OptionalInt.empty();
+        }
+        double scaled = (double) baseEnergy * powerUse;
+        if (!Double.isFinite(scaled) || scaled > Integer.MAX_VALUE) {
+            return OptionalInt.empty();
+        }
+        long perOperation = (long) scaled;
+        return ExpectedOutputScaler.multiplyToInt(perOperation, operations);
+    }
+
+    private static ResourceLocation grindingBallVariantId(
+            ResourceLocation sourceId, ResourceLocation ballId) {
+        String suffix = ballId.getNamespace() + "_" + ballId.getPath().replace('/', '_');
+        return ResourceLocation.fromNamespaceAndPath(
+                sourceId.getNamespace(),
+                AdapterUtils.convertedId(sourceId).getPath() + "_with_grinding_ball_" + suffix);
     }
 
     private static double clampChance(double chance) {

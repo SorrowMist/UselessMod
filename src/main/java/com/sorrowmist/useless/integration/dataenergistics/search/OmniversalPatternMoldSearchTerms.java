@@ -8,17 +8,17 @@ import net.minecraft.world.item.ItemStack;
 import java.util.List;
 
 /**
- * Extracts the encoded internal mold as a separate Trinity pattern-search candidate.
+ * Extracts encoded internal molds as separate Trinity pattern-search candidates.
  */
 public final class OmniversalPatternMoldSearchTerms {
 
     private OmniversalPatternMoldSearchTerms() {}
 
     /**
-     * Returns the mold display name stored in one Omniversal Pattern, when that pattern needs a mold.
+     * Returns mold display names stored in one Omniversal Pattern, when that pattern needs molds.
      *
      * @param encodedPattern candidate encoded pattern stack
-     * @return one independent mold-name candidate, or no candidates for every other pattern
+     * @return independent mold-name candidates, or no candidates for every other pattern
      */
     public static List<String> searchTerms(ItemStack encodedPattern) {
         OmniversalPatternData data = encodedPattern.get(UComponents.OMNIVERSAL_PATTERN_DATA.get());
@@ -26,18 +26,22 @@ public final class OmniversalPatternMoldSearchTerms {
     }
 
     /**
-     * Returns one display candidate for metadata that has already been decoded from an Omniversal Pattern.
+     * Returns display candidates for metadata that has already been decoded from an Omniversal Pattern.
      *
      * @param data persisted Omniversal Pattern metadata
-     * @return one independent mold-name candidate, or no candidate when no mold is required
+     * @return independent mold-name candidates, or no candidates when no mold is required
      */
     static List<String> searchTerms(OmniversalPatternData data) {
         if (!data.requiresMold()) {
             return List.of();
         }
+        if (!data.displayMolds().isEmpty()) {
+            return data.displayMolds().stream()
+                    .map(key -> key.getDisplayName().getString())
+                    .toList();
+        }
         return data.displayMold()
-                .map(key -> key.getDisplayName().getString())
-                .stream()
-                .toList();
+                .map(key -> List.of(key.getDisplayName().getString()))
+                .orElseGet(List::of);
     }
 }

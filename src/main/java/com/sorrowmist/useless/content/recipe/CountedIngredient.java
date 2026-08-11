@@ -12,9 +12,12 @@ public record CountedIngredient(
         Ingredient ingredient,
         long count
 ) {
+    static final StreamCodec<RegistryFriendlyByteBuf, Ingredient> INGREDIENT_STREAM_CODEC =
+            ByteBufCodecs.fromCodecWithRegistries(Ingredient.CODEC);
+
     public static final StreamCodec<RegistryFriendlyByteBuf, CountedIngredient> STREAM_CODEC =
             StreamCodec.composite(
-                    Ingredient.CONTENTS_STREAM_CODEC, CountedIngredient::ingredient,
+                    INGREDIENT_STREAM_CODEC, CountedIngredient::ingredient,
                     ByteBufCodecs.VAR_LONG, CountedIngredient::count,
                     CountedIngredient::new
             );

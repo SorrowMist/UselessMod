@@ -96,17 +96,19 @@ class AlloyFurnaceRecipeFingerprintTest {
                 ConnectionType.OTHER);
         Ingredient networkExpansion;
         try {
-            Ingredient.CONTENTS_STREAM_CODEC.encode(networkBuffer, serverTag);
-            networkExpansion = Ingredient.CONTENTS_STREAM_CODEC.decode(networkBuffer);
+            CountedIngredient.INGREDIENT_STREAM_CODEC.encode(networkBuffer, serverTag);
+            networkExpansion = CountedIngredient.INGREDIENT_STREAM_CODEC.decode(networkBuffer);
         } finally {
             networkBuffer.release();
         }
 
-        assertEquals(fingerprint(recipeWithInput(serverTag)), fingerprint(recipeWithInput(clientExpansion)));
+        assertNotEquals(fingerprint(recipeWithInput(serverTag)), fingerprint(recipeWithInput(clientExpansion)));
         assertEquals(fingerprint(recipeWithInput(serverTag)), fingerprint(recipeWithInput(networkExpansion)));
-        assertTrue(networkExpansion.getValues()[0] instanceof Ingredient.ItemValue);
+        assertTrue(networkExpansion.getValues()[0] instanceof Ingredient.TagValue);
         assertNotEquals(fingerprint(recipeWithInput(serverTag)),
-                AlloyFurnaceRecipeFingerprint.createLegacy(recipeWithInput(serverTag), RegistryAccess.EMPTY));
+                AlloyFurnaceRecipeFingerprint.createLegacySemantic(recipeWithInput(serverTag), RegistryAccess.EMPTY));
+        assertEquals(fingerprint(recipeWithInput(clientExpansion)),
+                AlloyFurnaceRecipeFingerprint.createLegacySemantic(recipeWithInput(serverTag), RegistryAccess.EMPTY));
         assertEquals(
                 fingerprint(recipeWithInput(Ingredient.of(Items.IRON_INGOT, Items.GOLD_INGOT))),
                 fingerprint(recipeWithInput(Ingredient.of(Items.GOLD_INGOT, Items.IRON_INGOT))));

@@ -11,6 +11,7 @@ import net.minecraft.world.level.Level;
 import net.neoforged.fml.ModList;
 
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.WeakHashMap;
@@ -30,6 +31,7 @@ public final class OmniversalPatternDetails extends DynamicComponentPatternDetai
         super(decoded.source, OmniversalPatternEncoding.resolveItemIdInputSlots(
                         decoded.entry.recipe(), decoded.source, decoded.data.itemIdInputSlots()),
                 decoded.data.itemIdOutputSlots(),
+                tagInputTags(decoded.data),
                 soulBindingInputMatchers(decoded),
                 decoded.level.registryAccess());
         this.data = decoded.data;
@@ -72,8 +74,8 @@ public final class OmniversalPatternDetails extends DynamicComponentPatternDetai
         }
         AEProcessingPattern source = new AEProcessingPattern(definition);
         Optional<AlloyFurnaceRecipeCatalog.Entry> resolved =
-                data.version() < OmniversalPatternData.SEMANTIC_FINGERPRINT_VERSION
-                        ? AlloyFurnaceRecipeCatalog.resolveLegacyPattern(level, data.identity(), source)
+                data.version() < OmniversalPatternData.TAG_INPUT_VERSION
+                        ? AlloyFurnaceRecipeCatalog.resolveLegacyPattern(level, data.identity(), source, data.version())
                         : AlloyFurnaceRecipeCatalog.resolve(level, data.identity());
         AlloyFurnaceRecipeCatalog.Entry entry = resolved
                 .orElseThrow(() -> new IllegalArgumentException(
@@ -139,6 +141,16 @@ public final class OmniversalPatternDetails extends DynamicComponentPatternDetai
                         AdvancedAlloyFurnacePatternResolver.itemOutputs(decoded.source))
                 .map(SoulBindingRecipeAdapter.DynamicPatternProfile::inputMatchers)
                 .orElseGet(java.util.Map::of);
+    }
+
+    private static Map<Integer, List<net.minecraft.tags.TagKey<net.minecraft.world.item.Item>>>
+            tagInputTags(OmniversalPatternData data) {
+        if (data.version() < OmniversalPatternData.TAG_INPUT_VERSION) return Map.of();
+        Map<Integer, List<net.minecraft.tags.TagKey<net.minecraft.world.item.Item>>> result = new LinkedHashMap<>();
+        for (OmniversalPatternData.TagInputSlot slot : data.tagInputSlots()) {
+            result.computeIfAbsent(slot.slot(), ignored -> new java.util.ArrayList<>()).add(slot.tag());
+        }
+        return result;
     }
 
     @Override

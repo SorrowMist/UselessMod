@@ -123,7 +123,7 @@ class ExternalRecipeAdaptersTest {
     }
 
     @Test
-    void expandsCompressorCountAndReturnsCatalyst() {
+    void expandsCompressorCountAndUsesCatalystAsMold() {
         ItemStack namedIron = named(new ItemStack(Items.IRON_INGOT), "compressor-input");
         IngredientWithCount counted = new IngredientWithCount(
                 Ingredient.of(namedIron).getValues()[0], 64);
@@ -145,15 +145,17 @@ class ExternalRecipeAdaptersTest {
                 .findFirst().orElseThrow().count());
         assertFalse(converted.inputs().stream()
                 .anyMatch(input -> input.ingredient().test(new ItemStack(Items.IRON_INGOT, 64))));
-        assertEquals(1L, converted.inputs().stream()
-                .filter(input -> input.ingredient().test(new ItemStack(Items.BUCKET)))
-                .findFirst().orElseThrow().count());
-        assertTrue(converted.outputs().stream().anyMatch(stack -> stack.is(Items.BUCKET)));
+        assertFalse(converted.inputs().stream()
+                .anyMatch(input -> input.ingredient().test(new ItemStack(Items.BUCKET))));
+        assertFalse(converted.outputs().stream().anyMatch(stack -> stack.is(Items.BUCKET)));
+        assertEquals(2, converted.molds().size());
+        assertTrue(converted.molds().get(0).test(new ItemStack(ModBlocks.COMPRESSOR.get())));
+        assertTrue(converted.molds().get(1).test(new ItemStack(Items.BUCKET)));
         assertEquals(4, converted.processTime());
         Map<Ingredient, Long> requirements = new java.util.LinkedHashMap<>();
         converted.inputs().forEach(input -> requirements.put(input.ingredient(), input.count()));
         assertTrue(AdapterUtils.matchesRequired(
-                AdapterUtils.mergeInputs(List.of(namedIron.copyWithCount(64), new ItemStack(Items.BUCKET))),
+                AdapterUtils.mergeInputs(List.of(namedIron.copyWithCount(64))),
                 requirements));
     }
 

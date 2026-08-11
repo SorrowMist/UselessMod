@@ -179,14 +179,17 @@ public final class PassivePatternInputTransaction {
             if (possible == null || !(possible.what() instanceof AEItemKey possibleItem)) {
                 continue;
             }
-            for (AEKey candidate : inputIndex.itemVariants(possibleItem)) {
+            Iterable<AEKey> candidates = dynamic.isTagInput(slot)
+                    ? inputIndex.allItemVariants()
+                    : inputIndex.itemVariants(possibleItem);
+            for (AEKey candidate : candidates) {
                 if (missing <= 0) {
                     return 0L;
                 }
                 if (input.isValid(candidate, level)) {
                     missing -= takeSimulated(
                             candidate, missing, storage, source, simulatedAmounts,
-                            selected, consumed);
+                        selected, consumed);
                 }
             }
         }
@@ -240,6 +243,7 @@ public final class PassivePatternInputTransaction {
     private static final class AvailableInputIndex {
         private final Supplier<KeyCounter> cachedInventorySupplier;
         private final Map<Item, List<AEKey>> itemVariants = new IdentityHashMap<>();
+        private List<AEKey> allItemVariants;
         private KeyCounter cachedInventory;
 
         private AvailableInputIndex(Supplier<KeyCounter> cachedInventorySupplier) {
@@ -264,6 +268,19 @@ public final class PassivePatternInputTransaction {
                 }
                 return List.copyOf(variants);
             });
+        }
+
+        private List<AEKey> allItemVariants() {
+            if (allItemVariants == null) {
+                List<AEKey> variants = new ArrayList<>();
+                for (var entry : cachedInventory()) {
+                    if (entry.getLongValue() > 0L && entry.getKey() instanceof AEItemKey) {
+                        variants.add(entry.getKey());
+                    }
+                }
+                allItemVariants = List.copyOf(variants);
+            }
+            return allItemVariants;
         }
     }
 }

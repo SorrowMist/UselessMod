@@ -23,6 +23,7 @@ import net.neoforged.neoforge.fluids.capability.templates.FluidTank;
 import net.neoforged.neoforge.items.ItemStackHandler;
 
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.ReentrantLock;
@@ -149,20 +150,25 @@ public interface CraftingTaskContext {
             return TaskAvailability.unavailable(
                     "gui.useless_mod.advanced_alloy_furnace.ae_task_status.waiting_recipe", "");
         }
-        if (recipe.mold() == null || recipe.mold().isEmpty()) return TaskAvailability.ready();
+        if (recipe.molds().isEmpty()) return TaskAvailability.ready();
+        if (recipe.molds().size() > 1) {
+            return TaskAvailability.unavailable(
+                    "gui.useless_mod.advanced_alloy_furnace.ae_task_status.waiting_missing_mold",
+                    describeRequiredMolds(recipe.molds()));
+        }
         ItemStackHandler itemHandler = getItemHandler();
         int moldSlot = getMoldSlot();
         if (itemHandler == null || moldSlot < 0 || moldSlot >= itemHandler.getSlots()) {
             return TaskAvailability.unavailable(
                     "gui.useless_mod.advanced_alloy_furnace.ae_task_status.waiting_missing_mold",
-                    describeRequiredMold(recipe.mold()));
+                    describeRequiredMolds(recipe.molds()));
         }
         ItemStack mold = itemHandler.getStackInSlot(moldSlot);
-        return AdapterUtils.matchesMold(recipe.mold(), mold)
+        return AdapterUtils.matchesMold(recipe.molds().getFirst(), mold)
                 ? TaskAvailability.ready()
                 : TaskAvailability.unavailable(
                         "gui.useless_mod.advanced_alloy_furnace.ae_task_status.waiting_missing_mold",
-                        describeRequiredMold(recipe.mold()));
+                        describeRequiredMolds(recipe.molds()));
     }
 
     static String describeRequiredMold(Ingredient ingredient) {
@@ -171,6 +177,16 @@ public interface CraftingTaskContext {
             if (!candidate.isEmpty()) return candidate.getHoverName().getString();
         }
         return "";
+    }
+
+    static String describeRequiredMolds(List<Ingredient> ingredients) {
+        if (ingredients == null || ingredients.isEmpty()) return "";
+        List<String> descriptions = new ArrayList<>();
+        for (Ingredient ingredient : ingredients) {
+            String description = describeRequiredMold(ingredient);
+            if (!description.isEmpty()) descriptions.add(description);
+        }
+        return String.join(", ", descriptions);
     }
 
     record TaskAvailability(boolean available, String statusKey, String statusDetail) {

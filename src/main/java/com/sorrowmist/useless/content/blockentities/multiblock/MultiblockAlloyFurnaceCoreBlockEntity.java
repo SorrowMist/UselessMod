@@ -487,7 +487,7 @@ public final class MultiblockAlloyFurnaceCoreBlockEntity extends BlockEntity imp
             return CraftingTaskContext.TaskAvailability.unavailable(
                     "gui.useless_mod.advanced_alloy_furnace.ae_task_status.waiting_recipe", "");
         }
-        if (recipe.mold() == null || recipe.mold().isEmpty()) {
+        if (recipe.molds().isEmpty()) {
             return CraftingTaskContext.TaskAvailability.ready();
         }
         OmniversalMoldHubBlockEntity hub = getMoldHub();
@@ -495,11 +495,11 @@ public final class MultiblockAlloyFurnaceCoreBlockEntity extends BlockEntity imp
             return CraftingTaskContext.TaskAvailability.unavailable(
                     "gui.useless_mod.advanced_alloy_furnace.ae_task_status.waiting_mold_hub", "");
         }
-        return hub.containsMold(recipe.mold())
+        return hub.containsMolds(recipe.molds())
                 ? CraftingTaskContext.TaskAvailability.ready()
                 : CraftingTaskContext.TaskAvailability.unavailable(
                         "gui.useless_mod.advanced_alloy_furnace.ae_task_status.waiting_missing_mold",
-                        CraftingTaskContext.describeRequiredMold(recipe.mold()));
+                        CraftingTaskContext.describeRequiredMolds(recipe.molds()));
     }
 
     @Override

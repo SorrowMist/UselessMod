@@ -116,6 +116,32 @@ public final class ExtendedCraftingAdapterUtils {
             Set<Integer> ignoredSlots,
             Function<List<ItemStack>, I> inputFactory,
             Function<I, List<ItemStack>> resolver) {
+        return deterministicRemaindersInternal(
+                ingredientSlots, ignoredSlots, inputFactory, resolver, false);
+    }
+
+    /**
+     * Finds remainders which are invariant for all displayed ingredient candidates and keeps
+     * one result for each source slot. Empty slots and ignored slots are represented by an empty
+     * stack. Unlike {@link #deterministicRemainders(List, Set, Function, Function)}, this method
+     * does not merge equal remainders because callers may need to retain their source-slot
+     * identity (for example, each crafting remainder is an independent mold requirement).
+     */
+    public static <I extends RecipeInput> Optional<List<ItemStack>> deterministicRemaindersBySlot(
+            List<Ingredient> ingredientSlots,
+            Set<Integer> ignoredSlots,
+            Function<List<ItemStack>, I> inputFactory,
+            Function<I, List<ItemStack>> resolver) {
+        return deterministicRemaindersInternal(
+                ingredientSlots, ignoredSlots, inputFactory, resolver, true);
+    }
+
+    private static <I extends RecipeInput> Optional<List<ItemStack>> deterministicRemaindersInternal(
+            List<Ingredient> ingredientSlots,
+            Set<Integer> ignoredSlots,
+            Function<List<ItemStack>, I> inputFactory,
+            Function<I, List<ItemStack>> resolver,
+            boolean preserveSlots) {
         if (ingredientSlots == null || inputFactory == null || resolver == null) {
             return Optional.empty();
         }
@@ -189,14 +215,18 @@ public final class ExtendedCraftingAdapterUtils {
             } catch (RuntimeException exception) {
                 return Optional.empty();
             }
-            Optional<List<ItemStack>> normalizedResult = normalizeRemainder(remainder, ignored);
+            Optional<List<ItemStack>> normalizedResult = preserveSlots
+                    ? normalizeRemainderBySlot(remainder, ingredientSlots.size(), ignored)
+                    : normalizeRemainder(remainder, ignored);
             if (normalizedResult.isEmpty()) {
                 return Optional.empty();
             }
             List<ItemStack> normalized = normalizedResult.get();
             if (expected == null) {
                 expected = normalized;
-            } else if (!sameStacks(expected, normalized)) {
+            } else if (preserveSlots
+                    ? !sameStacksBySlot(expected, normalized)
+                    : !sameStacks(expected, normalized)) {
                 return Optional.empty();
             }
         }
@@ -260,6 +290,41 @@ public final class ExtendedCraftingAdapterUtils {
         return Optional.of(result);
     }
 
+    private static Optional<List<ItemStack>> normalizeRemainderBySlot(
+            @Nullable List<ItemStack> remainder, int slotCount, Set<Integer> ignoredSlots) {
+        if (remainder == null) {
+            return Optional.empty();
+        }
+
+        List<ItemStack> result = new ArrayList<>(slotCount);
+        for (int slot = 0; slot < slotCount; slot++) {
+            if (ignoredSlots.contains(slot) || slot >= remainder.size()) {
+                result.add(ItemStack.EMPTY);
+                continue;
+            }
+            ItemStack stack = remainder.get(slot);
+            if (stack == null || stack.isEmpty()) {
+                result.add(ItemStack.EMPTY);
+                continue;
+            }
+            if (stack.getCount() <= 0) {
+                return Optional.empty();
+            }
+            result.add(stack.copy());
+        }
+
+        // A resolver should return one remainder entry per source slot. Preserve the old
+        // aggregate helper's permissive handling of trailing empty entries, but reject a
+        // non-empty remainder that cannot be assigned to a source slot.
+        for (int slot = slotCount; slot < remainder.size(); slot++) {
+            ItemStack stack = remainder.get(slot);
+            if (stack != null && !stack.isEmpty() && stack.getCount() > 0) {
+                return Optional.empty();
+            }
+        }
+        return Optional.of(List.copyOf(result));
+    }
+
     private static boolean sameStacks(List<ItemStack> left, List<ItemStack> right) {
         if (left.size() != right.size()) {
             return false;
@@ -278,6 +343,21 @@ public final class ExtendedCraftingAdapterUtils {
                 }
             }
             if (!found) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static boolean sameStacksBySlot(List<ItemStack> left, List<ItemStack> right) {
+        if (left.size() != right.size()) {
+            return false;
+        }
+        for (int slot = 0; slot < left.size(); slot++) {
+            ItemStack expected = left.get(slot);
+            ItemStack actual = right.get(slot);
+            if (expected.getCount() != actual.getCount()
+                    || !ItemStack.isSameItemSameComponents(expected, actual)) {
                 return false;
             }
         }

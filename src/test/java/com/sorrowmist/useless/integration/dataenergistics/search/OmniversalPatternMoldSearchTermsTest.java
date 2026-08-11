@@ -46,6 +46,24 @@ class OmniversalPatternMoldSearchTermsTest {
                 OmniversalPatternMoldSearchTerms.searchTerms(data(itemKey(Items.IRON_INGOT), false)));
     }
 
+    @Test
+    void exposesEveryDisplayedMoldForMultiMoldMetadata() {
+        OmniversalPatternData multi = new OmniversalPatternData(
+                OmniversalPatternData.CURRENT_VERSION,
+                ResourceLocation.fromNamespaceAndPath("useless_mod_test", "multi_mold"),
+                "fingerprint",
+                true,
+                Optional.empty(),
+                List.of(itemKey(Items.IRON_INGOT), itemKey(Items.GOLD_INGOT)),
+                List.of(),
+                List.of());
+
+        assertEquals(List.of(
+                itemKey(Items.IRON_INGOT).getDisplayName().getString(),
+                itemKey(Items.GOLD_INGOT).getDisplayName().getString()),
+                OmniversalPatternMoldSearchTerms.searchTerms(multi));
+    }
+
     private static OmniversalPatternData data(AEItemKey mold, boolean requiresMold) {
         return new OmniversalPatternData(
                 OmniversalPatternData.CURRENT_VERSION,

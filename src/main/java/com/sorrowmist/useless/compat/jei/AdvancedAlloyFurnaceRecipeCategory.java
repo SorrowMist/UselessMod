@@ -69,6 +69,7 @@ public class AdvancedAlloyFurnaceRecipeCategory implements IRecipeCategory<Advan
     private static final int CATALYST_SLOT_Y = 55;
     private static final int MOLD_SLOT_X = 116;
     private static final int MOLD_SLOT_Y = 55;
+    private static final int MOLD_SLOT_SPACING = 18;
 
     // 进度条位置和尺寸
     private static final int PROGRESS_BAR_X = 90;
@@ -389,10 +390,11 @@ public class AdvancedAlloyFurnaceRecipeCategory implements IRecipeCategory<Advan
                    });
         }
 
-        // 模具槽位
-        if (!recipe.mold().isEmpty()) {
-            builder.addSlot(RecipeIngredientRole.CATALYST, MOLD_SLOT_X, MOLD_SLOT_Y)
-                   .addIngredients(recipe.mold());
+        // Each independent mold requirement gets its own mandatory JEI slot.
+        List<Ingredient> molds = recipe.molds();
+        for (int index = 0; index < molds.size(); index++) {
+            builder.addSlot(RecipeIngredientRole.CATALYST, moldSlotX(molds.size(), index), MOLD_SLOT_Y)
+                   .addIngredients(molds.get(index));
         }
     }
 
@@ -445,7 +447,7 @@ public class AdvancedAlloyFurnaceRecipeCategory implements IRecipeCategory<Advan
         
 
         // 模具提示
-        if (!recipe.mold().isEmpty()) {
+        if (!recipe.molds().isEmpty()) {
             guiGraphics.pose().pushPose();
             float scale = 0.7f;
             guiGraphics.pose().scale(scale, scale, 1.0f);
@@ -527,6 +529,10 @@ public class AdvancedAlloyFurnaceRecipeCategory implements IRecipeCategory<Advan
         } else {
             return String.valueOf(count);
         }
+    }
+
+    private static int moldSlotX(int count, int index) {
+        return MOLD_SLOT_X + index * MOLD_SLOT_SPACING - (count - 1) * MOLD_SLOT_SPACING / 2;
     }
 
     private static IRecipeSlotBuilder addKeyStack(IRecipeLayoutBuilder builder,

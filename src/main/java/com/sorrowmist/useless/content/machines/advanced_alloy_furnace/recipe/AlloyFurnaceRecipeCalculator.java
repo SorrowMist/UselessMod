@@ -132,6 +132,7 @@ public final class AlloyFurnaceRecipeCalculator {
      */
     public boolean canConsumeRecipeInputs(AdvancedAlloyFurnaceRecipe recipe, int parallel) {
         if (recipe == null || parallel <= 0) return false;
+        if (recipe.molds().size() > 1) return false;
         if (!recipe.mold().isEmpty()) {
             ItemStack moldStack = this.itemHandler.getStackInSlot(MOLD_SLOT);
             if (!AdapterUtils.matchesMold(recipe.mold(), moldStack)) return false;

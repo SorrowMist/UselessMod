@@ -7,6 +7,7 @@ import appeng.api.stacks.AEKey;
 import appeng.api.stacks.GenericStack;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.AdvancedAlloyFurnacePatternResolver;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.DynamicComponentPattern;
+import com.sorrowmist.useless.core.component.OmniversalPatternData;
 import com.sorrowmist.useless.content.recipe.adapters.RecipeAdapterCompatRegistry;
 import com.sorrowmist.useless.content.recipe.adapters.ae.ae2cs.CrystalGrowthRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.ae.ae2lt.AELightningTechCompatLoader;
@@ -68,8 +69,12 @@ public final class AlloyFurnaceRecipeCatalog {
     static boolean isKnownMold(ItemStack stack, Iterable<AdvancedAlloyFurnaceRecipe> recipes) {
         if (stack == null || stack.isEmpty() || recipes == null) return false;
         for (AdvancedAlloyFurnaceRecipe recipe : recipes) {
-            if (recipe == null || recipe.mold() == null || recipe.mold().isEmpty()) continue;
-            if (AdapterUtils.matchesMold(recipe.mold(), stack)) return true;
+            if (recipe == null) continue;
+            for (var mold : recipe.molds()) {
+                if (mold != null && !mold.isEmpty() && AdapterUtils.matchesMold(mold, stack)) {
+                    return true;
+                }
+            }
         }
         return false;
     }
@@ -117,6 +122,11 @@ public final class AlloyFurnaceRecipeCatalog {
      */
     public static Optional<Entry> resolveLegacyPattern(
             Level level, AlloyFurnaceRecipeIdentity legacyIdentity, IPatternDetails pattern) {
+        return resolveLegacyPattern(level, legacyIdentity, pattern, 1);
+    }
+
+    public static Optional<Entry> resolveLegacyPattern(
+            Level level, AlloyFurnaceRecipeIdentity legacyIdentity, IPatternDetails pattern, int version) {
         if (level == null || legacyIdentity == null || pattern == null) return Optional.empty();
         Snapshot snapshot = snapshot(level);
         Entry cached = snapshot.byIdentity.get(legacyIdentity);
@@ -129,7 +139,7 @@ public final class AlloyFurnaceRecipeCatalog {
         for (Entry entry : snapshot.byRecipeId.getOrDefault(legacyIdentity.recipeId(), List.of())) {
             boolean validLegacyIdentity = level.isClientSide
                     ? matchesPattern(entry.recipe, pattern)
-                    : AlloyFurnaceRecipeFingerprint.createLegacy(entry.recipe, level.registryAccess())
+                    : legacyFingerprint(entry.recipe, level, version)
                             .equals(legacyIdentity.fingerprint());
             if (!validLegacyIdentity) continue;
             if (match != null) {
@@ -144,6 +154,13 @@ public final class AlloyFurnaceRecipeCatalog {
         }
         Entry existing = snapshot.compatibilityAliases.putIfAbsent(legacyIdentity, match);
         return Optional.of(existing == null ? match : existing);
+    }
+
+    private static String legacyFingerprint(
+            AdvancedAlloyFurnaceRecipe recipe, Level level, int version) {
+        return version >= OmniversalPatternData.SEMANTIC_FINGERPRINT_VERSION
+                ? AlloyFurnaceRecipeFingerprint.createLegacySemantic(recipe, level.registryAccess())
+                : AlloyFurnaceRecipeFingerprint.createLegacy(recipe, level.registryAccess());
     }
 
     public static List<Entry> findPatternCandidates(Level level, IPatternDetails pattern) {

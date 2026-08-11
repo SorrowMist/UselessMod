@@ -7,6 +7,8 @@ import com.google.gson.JsonObject;
 import com.mojang.serialization.JsonOps;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.tags.TagKey;
+import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.crafting.Ingredient;
 
@@ -14,7 +16,9 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.Arrays;
+import java.util.ArrayList;
 import java.util.HexFormat;
+import java.util.List;
 import java.util.Objects;
 import java.util.TreeMap;
 
@@ -30,10 +34,22 @@ public final class AlloyFurnaceRecipeFingerprint {
         return create(recipe, registries, false);
     }
 
+    static String createLegacySemantic(AdvancedAlloyFurnaceRecipe recipe, HolderLookup.Provider registries) {
+        return create(recipe, registries, true, false);
+    }
+
     private static String create(
             AdvancedAlloyFurnaceRecipe recipe,
             HolderLookup.Provider registries,
             boolean normalizeIngredientSemantics) {
+        return create(recipe, registries, normalizeIngredientSemantics, true);
+    }
+
+    private static String create(
+            AdvancedAlloyFurnaceRecipe recipe,
+            HolderLookup.Provider registries,
+            boolean normalizeIngredientSemantics,
+            boolean preserveTags) {
         Objects.requireNonNull(recipe, "recipe");
         Objects.requireNonNull(registries, "registries");
         var context = registries.createSerializationContext(JsonOps.INSTANCE);
@@ -42,7 +58,7 @@ public final class AlloyFurnaceRecipeFingerprint {
                 .getOrThrow();
         JsonObject recipeJson = encoded.getAsJsonObject();
         if (normalizeIngredientSemantics) {
-            normalizeIngredients(recipe, recipeJson, context);
+            normalizeIngredients(recipe, recipeJson, context, preserveTags);
         }
         JsonArray exactItemOutputs = new JsonArray();
         for (var output : recipe.outputs()) {
@@ -58,21 +74,20 @@ public final class AlloyFurnaceRecipeFingerprint {
     }
 
     /**
-     * Simple ingredients are sent to clients as their expanded item contents,
-     * which discards whether the server originally used a tag. Fingerprints
-     * therefore use the actual item-matching semantics on both sides.
-     * Non-simple custom ingredients retain their codec form because their
-     * behavior can depend on components or predicates that cannot be
-     * represented by item ids alone.
+     * Ordinary simple ingredients are normalized to their item ids. Direct tag values retain
+     * their tag location so a tag's membership can change without changing the recipe identity.
+     * Non-simple custom ingredients retain their codec form because their behavior can depend on
+     * components or predicates that cannot be represented by item ids alone.
      */
     private static void normalizeIngredients(
             AdvancedAlloyFurnaceRecipe recipe,
             JsonObject encoded,
-            com.mojang.serialization.DynamicOps<JsonElement> context) {
+            com.mojang.serialization.DynamicOps<JsonElement> context,
+            boolean preserveTags) {
         JsonArray inputs = new JsonArray();
         for (CountedIngredient input : recipe.inputs()) {
             JsonObject counted = new JsonObject();
-            counted.add("ingredient", encodeSemanticIngredient(input.ingredient(), context));
+            counted.add("ingredient", encodeSemanticIngredient(input.ingredient(), context, preserveTags));
             if (input.count() != 1L) {
                 counted.addProperty("count", input.count());
             }
@@ -81,16 +96,32 @@ public final class AlloyFurnaceRecipeFingerprint {
         encoded.add("ingredients", inputs);
 
         if (!recipe.catalyst().isEmpty()) {
-            encoded.add("catalyst", encodeSemanticIngredient(recipe.catalyst(), context));
+            encoded.add("catalyst", encodeSemanticIngredient(recipe.catalyst(), context, preserveTags));
         }
-        if (!recipe.mold().isEmpty()) {
-            encoded.add("mold", encodeSemanticIngredient(recipe.mold(), context));
+        if (recipe.molds().size() == 1) {
+            // Preserve the historical single-mold fingerprint shape.
+            encoded.add("mold", encodeSemanticIngredient(recipe.molds().getFirst(), context, preserveTags));
+        } else if (recipe.molds().size() > 1) {
+            List<JsonElement> moldElements = new ArrayList<>();
+            for (Ingredient mold : recipe.molds()) {
+                moldElements.add(encodeSemanticIngredient(mold, context, preserveTags));
+            }
+            // Mold requirements are a set-like collection for identity purposes, but repeated
+            // entries remain significant. Sorting the encoded elements makes list order irrelevant.
+            moldElements.sort(java.util.Comparator.comparing(element -> canonicalize(element).toString()));
+            JsonArray molds = new JsonArray();
+            moldElements.forEach(molds::add);
+            encoded.add("molds", molds);
         }
     }
 
     private static JsonElement encodeSemanticIngredient(
             Ingredient ingredient,
-            com.mojang.serialization.DynamicOps<JsonElement> context) {
+            com.mojang.serialization.DynamicOps<JsonElement> context,
+            boolean preserveTags) {
+        if (preserveTags && hasDirectTag(ingredient)) {
+            return Ingredient.CODEC.encodeStart(context, ingredient).getOrThrow();
+        }
         if (!ingredient.isSimple()) {
             return Ingredient.CODEC.encodeStart(context, ingredient).getOrThrow();
         }
@@ -111,6 +142,14 @@ public final class AlloyFurnaceRecipeFingerprint {
             values.add(value);
         }
         return values.size() == 1 ? values.get(0) : values;
+    }
+
+    private static boolean hasDirectTag(Ingredient ingredient) {
+        if (ingredient == null || ingredient.isCustom()) return false;
+        for (Ingredient.Value value : ingredient.getValues()) {
+            if (value instanceof Ingredient.TagValue) return true;
+        }
+        return false;
     }
 
     /**

@@ -22,7 +22,10 @@ import com.sorrowmist.useless.content.menus.OmniversalMoldHubMenu;
 import com.sorrowmist.useless.core.component.MultiblockPartData;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.IdentityHashMap;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 public final class OmniversalMoldHubBlockEntity extends BlockEntity implements MenuProvider {
@@ -30,7 +33,7 @@ public final class OmniversalMoldHubBlockEntity extends BlockEntity implements M
             ConfigManager::getOmniversalMoldSlots,
             this::isValidMold,
             this::moldInventoryChanged);
-    private final Map<Ingredient, Boolean> moldMatchCache = new IdentityHashMap<>();
+    private final Map<List<Ingredient>, Boolean> moldMatchCache = new HashMap<>();
     private int cachedActiveSlots = -1;
     private long cachedRecipeCatalogGeneration = -1L;
     @Nullable
@@ -62,20 +65,68 @@ public final class OmniversalMoldHubBlockEntity extends BlockEntity implements M
     }
 
     public boolean containsMold(Ingredient ingredient) {
-        if (ingredient == null || ingredient.isEmpty()) return true;
+        return containsMolds(ingredient == null ? List.of() : List.of(ingredient));
+    }
+
+    /** Returns whether the active mold slots can satisfy every independent requirement. */
+    public boolean containsMolds(List<Ingredient> requirements) {
+        List<Ingredient> normalized = normalizeRequirements(requirements);
+        if (normalized.isEmpty()) return true;
         refreshMoldMatchCache();
-        Boolean cached = moldMatchCache.get(ingredient);
+        Boolean cached = moldMatchCache.get(normalized);
         if (cached != null) return cached;
+
         int activeSlots = molds.getActiveSlots();
+        List<ItemStack> available = new ArrayList<>(activeSlots);
         for (int slot = 0; slot < activeSlots; slot++) {
-            ItemStack stack = molds.getStackInSlot(slot);
-            if (AdapterUtils.matchesMold(ingredient, stack)) {
-                moldMatchCache.put(ingredient, true);
+            available.add(molds.getStackInSlot(slot));
+        }
+        boolean matched = matchesMolds(normalized, available);
+        moldMatchCache.put(normalized, matched);
+        return matched;
+    }
+
+    /**
+     * Tests the one-to-one assignment independently of inventory storage. Each available stack is
+     * one device slot, regardless of its item count; augmenting paths handle overlapping ingredients.
+     */
+    public static boolean matchesMolds(List<Ingredient> requirements, List<ItemStack> available) {
+        List<Ingredient> normalized = normalizeRequirements(requirements);
+        if (normalized.isEmpty()) return true;
+        if (available == null || available.isEmpty() || normalized.size() > available.size()) return false;
+
+        int[] requirementBySlot = new int[available.size()];
+        Arrays.fill(requirementBySlot, -1);
+        for (int requirement = 0; requirement < normalized.size(); requirement++) {
+            if (!augment(normalized, available, requirement, requirementBySlot, new boolean[available.size()])) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static boolean augment(List<Ingredient> requirements, List<ItemStack> available,
+                                   int requirement, int[] requirementBySlot, boolean[] visited) {
+        Ingredient needed = requirements.get(requirement);
+        for (int slot = 0; slot < available.size(); slot++) {
+            if (visited[slot] || !AdapterUtils.matchesMold(needed, available.get(slot))) continue;
+            visited[slot] = true;
+            int previous = requirementBySlot[slot];
+            if (previous < 0 || augment(requirements, available, previous, requirementBySlot, visited)) {
+                requirementBySlot[slot] = requirement;
                 return true;
             }
         }
-        moldMatchCache.put(ingredient, false);
         return false;
+    }
+
+    private static List<Ingredient> normalizeRequirements(List<Ingredient> requirements) {
+        if (requirements == null || requirements.isEmpty()) return List.of();
+        List<Ingredient> normalized = new ArrayList<>(requirements.size());
+        for (Ingredient requirement : requirements) {
+            if (requirement != null && !requirement.isEmpty()) normalized.add(requirement);
+        }
+        return List.copyOf(normalized);
     }
 
     private void refreshMoldMatchCache() {

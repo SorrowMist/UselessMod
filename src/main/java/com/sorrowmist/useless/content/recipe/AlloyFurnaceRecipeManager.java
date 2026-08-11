@@ -147,8 +147,8 @@ public class AlloyFurnaceRecipeManager {
             }
         }
 
-        Ingredient mold = recipe.mold();
-        if (mold != null && !mold.isEmpty()) {
+        for (Ingredient mold : recipe.molds()) {
+            if (mold == null || mold.isEmpty()) continue;
             if (!mold.isSimple()) {
                 hasNonSimpleIngredientRecipes.add(recipe);
             }
@@ -291,6 +291,9 @@ public class AlloyFurnaceRecipeManager {
         AdvancedAlloyFurnaceRecipe best = null;
         List<AdvancedAlloyFurnaceRecipe> equallySpecific = new ArrayList<>();
         for (AdvancedAlloyFurnaceRecipe recipe : candidates) {
+            // The ordinary furnace exposes one mold slot. Multiblock recipes are resolved from
+            // their bound Omniversal Pattern and are checked against the mold hub separately.
+            if (recipe.molds().size() > 1) continue;
             if (!matchesLookup(recipe, context)) continue;
             if (best == null) {
                 best = recipe;
@@ -350,8 +353,8 @@ public class AlloyFurnaceRecipeManager {
 
     /** 按“模具专用、输入种类、各类数量、来源”比较具体度；并列项另按 ID 稳定选择。 */
     private int compareSpecificity(AdvancedAlloyFurnaceRecipe candidate, AdvancedAlloyFurnaceRecipe current) {
-        boolean candidateHasMold = !candidate.mold().isEmpty();
-        boolean currentHasMold = !current.mold().isEmpty();
+        boolean candidateHasMold = !candidate.molds().isEmpty();
+        boolean currentHasMold = !current.molds().isEmpty();
         if (candidateHasMold != currentHasMold) return candidateHasMold ? 1 : -1;
 
         long candidateKinds = inputKindCount(candidate);
@@ -563,6 +566,7 @@ public class AlloyFurnaceRecipeManager {
     }
 
     private boolean matchesMold(AdvancedAlloyFurnaceRecipe recipe, @Nullable ItemStack mold) {
+        if (recipe.molds().size() > 1) return false;
         Ingredient requiredMold = recipe.mold();
 
         if (requiredMold == null || requiredMold.isEmpty()) {

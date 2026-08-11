@@ -12,12 +12,15 @@ import com.sorrowmist.useless.content.recipe.CountedIngredient;
 import com.sorrowmist.useless.core.component.OmniversalPatternData;
 import com.sorrowmist.useless.core.component.UComponents;
 import com.sorrowmist.useless.init.ModItems;
+import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.tags.TagKey;
 import net.minecraft.world.item.crafting.Ingredient;
 import net.minecraft.world.level.Level;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.TreeSet;
 
@@ -51,16 +54,34 @@ public final class OmniversalPatternEncoding {
 
         AdvancedAlloyFurnaceRecipe recipe = entry.recipe();
         dynamicInputs = resolveItemIdInputSlots(recipe, processing, dynamicInputs);
-        ItemStack[] moldOptions = recipe.mold() == null ? new ItemStack[0] : recipe.mold().getItems();
-        Optional<AEItemKey> displayMold = moldOptions.length == 0
-                ? Optional.empty()
-                : Optional.ofNullable(AEItemKey.of(moldOptions[0]));
+        Map<Integer, List<TagKey<Item>>> tagInputs =
+                resolveTagInputSlots(recipe, processing);
+        List<OmniversalPatternData.TagInputSlot> encodedTagInputs = new ArrayList<>();
+        for (Map.Entry<Integer, List<TagKey<Item>>> tagInput : tagInputs.entrySet()) {
+            for (TagKey<Item> tag : tagInput.getValue()) {
+                encodedTagInputs.add(new OmniversalPatternData.TagInputSlot(tagInput.getKey(), tag));
+            }
+        }
+        List<AEItemKey> displayMolds = new ArrayList<>();
+        if (recipe.molds().size() > 1) {
+            for (Ingredient mold : recipe.molds()) {
+                ItemStack[] options = mold.getItems();
+                if (options.length > 0) {
+                    AEItemKey key = AEItemKey.of(options[0]);
+                    if (key != null) displayMolds.add(key);
+                }
+            }
+        }
+        Optional<AEItemKey> displayMold = recipe.molds().size() == 1
+                ? firstDisplayMold(recipe.molds().getFirst()) : Optional.empty();
         OmniversalPatternData data = new OmniversalPatternData(
                 OmniversalPatternData.CURRENT_VERSION,
                 entry.identity().recipeId(),
                 entry.identity().fingerprint(),
-                recipe.mold() != null && !recipe.mold().isEmpty(),
+                !recipe.molds().isEmpty(),
                 displayMold,
+                displayMolds,
+                encodedTagInputs,
                 dynamicInputs,
                 dynamicOutputs);
 
@@ -68,6 +89,11 @@ public final class OmniversalPatternEncoding {
         result.set(AEComponents.ENCODED_PROCESSING_PATTERN, encoded);
         result.set(UComponents.OMNIVERSAL_PATTERN_DATA.get(), data);
         return result;
+    }
+
+    private static Optional<AEItemKey> firstDisplayMold(Ingredient mold) {
+        ItemStack[] options = mold.getItems();
+        return options.length == 0 ? Optional.empty() : Optional.ofNullable(AEItemKey.of(options[0]));
     }
 
     /**
@@ -98,6 +124,62 @@ public final class OmniversalPatternEncoding {
         }
         slots.addAll(componentAgnosticInputSlots(recipe, source));
         return List.copyOf(slots);
+    }
+
+    static Map<Integer, List<TagKey<Item>>> resolveTagInputSlots(
+            AdvancedAlloyFurnaceRecipe recipe, AEProcessingPattern source) {
+        if (recipe == null || source == null || recipe.inputs().isEmpty()) {
+            return Map.of();
+        }
+
+        Map<Integer, List<TagKey<Item>>> result = new java.util.TreeMap<>();
+        IPatternDetails.IInput[] inputs = source.getInputs();
+        for (int slot = 0; slot < inputs.length; slot++) {
+            IPatternDetails.IInput input = inputs[slot];
+            if (input == null) continue;
+            java.util.LinkedHashSet<TagKey<Item>> tags = new java.util.LinkedHashSet<>();
+            boolean matchedRequirement = false;
+            boolean hasNonTagRequirement = false;
+            for (GenericStack possible : input.getPossibleInputs()) {
+                if (possible == null || !(possible.what() instanceof AEItemKey itemKey)) {
+                    hasNonTagRequirement = true;
+                    continue;
+                }
+                boolean matchedPossible = false;
+                for (CountedIngredient requirement : recipe.inputs()) {
+                    if (requirement == null || requirement.count() <= 0L) continue;
+                    Ingredient ingredient = requirement.ingredient();
+                    if (ingredient == null || !ingredient.test(itemKey.toStack(1))) continue;
+                    matchedPossible = true;
+                    matchedRequirement = true;
+                    Optional<TagKey<Item>> tag = directItemTag(ingredient);
+                    if (tag.isPresent()) {
+                        tags.add(tag.get());
+                    } else {
+                        // A concrete or component-sensitive requirement sharing this encoded
+                        // item must keep the slot strict; otherwise the tag branch would widen
+                        // the recipe beyond the original allocator semantics.
+                        hasNonTagRequirement = true;
+                    }
+                }
+                if (!matchedPossible) {
+                    hasNonTagRequirement = true;
+                }
+            }
+            if (matchedRequirement && !hasNonTagRequirement && !tags.isEmpty()) {
+                result.put(slot, List.copyOf(tags));
+            }
+        }
+        return Map.copyOf(result);
+    }
+
+    private static Optional<TagKey<Item>> directItemTag(Ingredient ingredient) {
+        if (ingredient == null || ingredient.isCustom()) return Optional.empty();
+        Ingredient.Value[] values = ingredient.getValues();
+        if (values.length != 1 || !(values[0] instanceof Ingredient.TagValue tagValue)) {
+            return Optional.empty();
+        }
+        return Optional.of(tagValue.tag());
     }
 
     /**

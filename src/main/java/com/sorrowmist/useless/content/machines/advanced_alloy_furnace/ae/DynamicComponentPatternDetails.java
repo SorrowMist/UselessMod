@@ -12,7 +12,10 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.mojang.serialization.JsonOps;
 import net.minecraft.core.HolderLookup;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.tags.TagKey;
 import net.minecraft.world.item.TooltipFlag;
+import net.minecraft.world.item.Item;
 import net.minecraft.world.level.Level;
 import org.jetbrains.annotations.Nullable;
 
@@ -39,6 +42,7 @@ public class DynamicComponentPatternDetails extends AEProcessingPattern implemen
     private final IInput[] inputs;
     private final List<GenericStack> outputs;
     private final boolean[] itemIdInputs;
+    private final Map<Integer, List<TagKey<Item>>> tagInputTags;
     private final boolean[] itemIdOutputs;
     private final boolean hasInputMatchers;
     private final String identity;
@@ -53,13 +57,23 @@ public class DynamicComponentPatternDetails extends AEProcessingPattern implemen
             Iterable<Integer> itemIdInputSlots,
             Iterable<Integer> itemIdOutputSlots,
             HolderLookup.Provider registries) {
-        this(source, itemIdInputSlots, itemIdOutputSlots, Map.of(), registries);
+        this(source, itemIdInputSlots, itemIdOutputSlots, Map.of(), Map.of(), registries);
     }
 
     public DynamicComponentPatternDetails(
             AEProcessingPattern source,
             Iterable<Integer> itemIdInputSlots,
             Iterable<Integer> itemIdOutputSlots,
+            Map<Integer, ? extends InputMatcher> inputMatchers,
+            HolderLookup.Provider registries) {
+        this(source, itemIdInputSlots, itemIdOutputSlots, Map.of(), inputMatchers, registries);
+    }
+
+    public DynamicComponentPatternDetails(
+            AEProcessingPattern source,
+            Iterable<Integer> itemIdInputSlots,
+            Iterable<Integer> itemIdOutputSlots,
+            Map<Integer, ? extends Iterable<TagKey<Item>>> tagInputTags,
             Map<Integer, ? extends InputMatcher> inputMatchers,
             HolderLookup.Provider registries) {
         super(source.getDefinition());
@@ -71,6 +85,7 @@ public class DynamicComponentPatternDetails extends AEProcessingPattern implemen
         this.inputs = new IInput[sourceInputs.length];
         this.itemIdInputs = new boolean[sourceInputs.length];
         this.itemIdOutputs = new boolean[this.outputs.size()];
+        this.tagInputTags = normalizeTagInputTags(tagInputTags, sourceInputs.length);
         InputMatcher[] matchers = new InputMatcher[sourceInputs.length];
         if (inputMatchers != null) {
             for (Map.Entry<Integer, ? extends InputMatcher> entry : inputMatchers.entrySet()) {
@@ -88,14 +103,19 @@ public class DynamicComponentPatternDetails extends AEProcessingPattern implemen
 
         markSlots(this.itemIdInputs, itemIdInputSlots, "input");
         markSlots(this.itemIdOutputs, itemIdOutputSlots, "output");
-        this.hasInputMatchers = Arrays.stream(matchers).anyMatch(Objects::nonNull);
+        for (int slot : this.tagInputTags.keySet()) {
+            this.itemIdInputs[slot] = true;
+        }
+        this.hasInputMatchers = Arrays.stream(matchers).anyMatch(Objects::nonNull)
+                || !this.tagInputTags.isEmpty();
         for (int slot = 0; slot < this.inputs.length; slot++) {
             if (this.itemIdInputs[slot]) {
-                this.inputs[slot] = new ItemIdInput(this.inputs[slot], matchers[slot]);
+                this.inputs[slot] = new ItemIdInput(this.inputs[slot], this.tagInputTags.get(slot), matchers[slot]);
             }
         }
 
-        String mode = Arrays.toString(this.itemIdInputs) + "/" + Arrays.toString(this.itemIdOutputs);
+        String mode = Arrays.toString(this.itemIdInputs) + "/" + this.tagInputTags
+                + "/" + Arrays.toString(this.itemIdOutputs);
         this.identity = "useless_mod:dynamic_component|modes=" + mode
                 + "|definition_sha256=" + definitionFingerprint(definition, registries);
     }
@@ -146,8 +166,12 @@ public class DynamicComponentPatternDetails extends AEProcessingPattern implemen
             }
             ItemIdInput itemIdInput = itemIdInputFor(sparseInput.what());
             if (itemIdInput != null && sparseInput.what() instanceof AEItemKey expectedItem) {
-                pushItemIdInput(expectedItem, itemIdInput, sparseInput.amount(),
-                        availableInputs, inputSink);
+                if (itemIdInput.isTagInput()) {
+                    pushTagInput(expectedItem, itemIdInput, sparseInput.amount(), availableInputs, inputSink);
+                } else {
+                    pushItemIdInput(expectedItem, itemIdInput, sparseInput.amount(),
+                            availableInputs, inputSink);
+                }
             } else {
                 pushStrictInput(sparseInput.what(), sparseInput.amount(), availableInputs, inputSink);
             }
@@ -222,6 +246,32 @@ public class DynamicComponentPatternDetails extends AEProcessingPattern implemen
         }
     }
 
+    private static void pushTagInput(
+            AEItemKey expectedItem, ItemIdInput input,
+            long requiredAmount,
+            KeyCounter availableInputs,
+            PatternInputSink inputSink) {
+        long remaining = requiredAmount;
+        remaining -= pushSelectedInput(expectedItem, remaining, availableInputs, inputSink,
+                input::isValidWithoutLevel);
+        if (remaining > 0) {
+            List<AEKey> selectedKeys = new ArrayList<>();
+            for (var entry : availableInputs) {
+                if (entry.getLongValue() > 0) selectedKeys.add(entry.getKey());
+            }
+            for (AEKey selectedKey : selectedKeys) {
+                if (remaining <= 0) break;
+                if (selectedKey.equals(expectedItem)) continue;
+                remaining -= pushSelectedInput(selectedKey, remaining, availableInputs, inputSink,
+                        input::isValidWithoutLevel);
+            }
+        }
+        if (remaining > 0) {
+            throw new IllegalStateException("Expected at least %d of %s by tag, but only %d was selected"
+                    .formatted(requiredAmount, expectedItem, requiredAmount - remaining));
+        }
+    }
+
     private static long pushSelectedInput(
             AEKey key,
             long requiredAmount,
@@ -256,6 +306,11 @@ public class DynamicComponentPatternDetails extends AEProcessingPattern implemen
     }
 
     @Override
+    public boolean isTagInput(int slot) {
+        return tagInputTags.containsKey(slot);
+    }
+
+    @Override
     public boolean isItemIdOutput(int slot) {
         return slot >= 0 && slot < itemIdOutputs.length && itemIdOutputs[slot];
     }
@@ -276,6 +331,7 @@ public class DynamicComponentPatternDetails extends AEProcessingPattern implemen
                 || obj instanceof DynamicComponentPatternDetails other
                 && definition.equals(other.definition)
                 && Arrays.equals(itemIdInputs, other.itemIdInputs)
+                && tagInputTags.equals(other.tagInputTags)
                 && Arrays.equals(itemIdOutputs, other.itemIdOutputs);
     }
 
@@ -283,6 +339,7 @@ public class DynamicComponentPatternDetails extends AEProcessingPattern implemen
     public int hashCode() {
         int result = definition.hashCode();
         result = 31 * result + Arrays.hashCode(itemIdInputs);
+        result = 31 * result + tagInputTags.hashCode();
         return 31 * result + Arrays.hashCode(itemIdOutputs);
     }
 
@@ -311,6 +368,27 @@ public class DynamicComponentPatternDetails extends AEProcessingPattern implemen
         }
     }
 
+    private static Map<Integer, List<TagKey<Item>>> normalizeTagInputTags(
+            Map<Integer, ? extends Iterable<TagKey<Item>>> source, int inputCount) {
+        if (source == null || source.isEmpty()) return Map.of();
+        Map<Integer, List<TagKey<Item>>> result = new java.util.TreeMap<>();
+        for (Map.Entry<Integer, ? extends Iterable<TagKey<Item>>> entry : source.entrySet()) {
+            Integer slot = entry.getKey();
+            if (slot == null || slot < 0 || slot >= inputCount) {
+                throw new IllegalArgumentException("Tag input slot is outside the processing pattern: " + slot);
+            }
+            java.util.LinkedHashSet<TagKey<Item>> tags = new java.util.LinkedHashSet<>();
+            Iterable<TagKey<Item>> values = entry.getValue();
+            if (values != null) {
+                for (TagKey<Item> tag : values) {
+                    if (tag != null) tags.add(tag);
+                }
+            }
+            if (!tags.isEmpty()) result.put(slot, List.copyOf(tags));
+        }
+        return Map.copyOf(result);
+    }
+
     private static JsonElement canonicalize(JsonElement element) {
         if (element.isJsonObject()) {
             TreeMap<String, JsonElement> sorted = new TreeMap<>();
@@ -336,13 +414,19 @@ public class DynamicComponentPatternDetails extends AEProcessingPattern implemen
     private static final class ItemIdInput implements IInput {
         private final IInput source;
         private final GenericStack[] possibleInputs;
+        private final List<TagKey<Item>> tags;
         @Nullable
         private final InputMatcher matcher;
 
-        private ItemIdInput(IInput source, @Nullable InputMatcher matcher) {
+        private ItemIdInput(IInput source, List<TagKey<Item>> tags, @Nullable InputMatcher matcher) {
             this.source = Objects.requireNonNull(source, "source");
             this.possibleInputs = source.getPossibleInputs().clone();
+            this.tags = tags == null ? List.of() : tags;
             this.matcher = matcher;
+        }
+
+        private boolean isTagInput() {
+            return !tags.isEmpty();
         }
 
         @Override
@@ -359,6 +443,12 @@ public class DynamicComponentPatternDetails extends AEProcessingPattern implemen
         public boolean isValid(AEKey input, Level level) {
             if (!(input instanceof AEItemKey itemKey)) {
                 return false;
+            }
+            if (!tags.isEmpty() && tags.stream().noneMatch(tag -> isTagMember(tag, itemKey.getItem()))) {
+                return false;
+            }
+            if (!tags.isEmpty()) {
+                return matcher == null || matcher.test(input);
             }
             for (GenericStack possible : possibleInputs) {
                 if (possible != null && possible.what() instanceof AEItemKey possibleItem
@@ -395,6 +485,13 @@ public class DynamicComponentPatternDetails extends AEProcessingPattern implemen
                 }
             }
             return null;
+        }
+
+        private static boolean isTagMember(TagKey<Item> tag, Item item) {
+            for (var holder : BuiltInRegistries.ITEM.getTagOrEmpty(tag)) {
+                if (holder.value() == item) return true;
+            }
+            return false;
         }
     }
 }

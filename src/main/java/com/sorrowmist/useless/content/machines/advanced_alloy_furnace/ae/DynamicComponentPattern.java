@@ -8,6 +8,10 @@ public interface DynamicComponentPattern extends IPatternDetails {
 
     boolean isItemIdInput(int slot);
 
+    default boolean isTagInput(int slot) {
+        return false;
+    }
+
     boolean isItemIdOutput(int slot);
 
     boolean usesDynamicOutputs();

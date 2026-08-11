@@ -21,7 +21,9 @@ import net.minecraft.world.level.Level;
 import net.neoforged.neoforge.fluids.FluidStack;
 import org.jetbrains.annotations.NotNull;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 public record AdvancedAlloyFurnaceRecipe(
         ResourceLocation id,
@@ -35,9 +37,21 @@ public record AdvancedAlloyFurnaceRecipe(
         int processTime,
         Ingredient catalyst,
         int catalystUses,
-        Ingredient mold,
+        List<Ingredient> molds,
         AlloyFurnaceMode mode
 ) implements Recipe<RecipeInput> {
+
+    public AdvancedAlloyFurnaceRecipe {
+        List<Ingredient> normalizedMolds = new ArrayList<>();
+        if (molds != null) {
+            for (Ingredient mold : molds) {
+                if (mold != null && !mold.isEmpty()) {
+                    normalizedMolds.add(mold);
+                }
+            }
+        }
+        molds = List.copyOf(normalizedMolds);
+    }
 
     // 网络同步 StreamCodec
     public static final StreamCodec<RegistryFriendlyByteBuf, AdvancedAlloyFurnaceRecipe> STREAM_CODEC = StreamCodec.of(
@@ -51,9 +65,9 @@ public record AdvancedAlloyFurnaceRecipe(
                 GenericStack.STREAM_CODEC.apply(ByteBufCodecs.list()).encode(buf, r.keyOutputs());
                 ByteBufCodecs.VAR_LONG.encode(buf, r.energy());
                 ByteBufCodecs.VAR_INT.encode(buf, r.processTime());
-                Ingredient.CONTENTS_STREAM_CODEC.encode(buf, r.catalyst());
+                CountedIngredient.INGREDIENT_STREAM_CODEC.encode(buf, r.catalyst());
                 ByteBufCodecs.VAR_INT.encode(buf, r.catalystUses());
-                Ingredient.CONTENTS_STREAM_CODEC.encode(buf, r.mold());
+                CountedIngredient.INGREDIENT_STREAM_CODEC.apply(ByteBufCodecs.list()).encode(buf, r.molds());
                 ByteBufCodecs.STRING_UTF8.encode(buf, r.mode().getSerializedName());
             },
             buf -> {
@@ -66,15 +80,15 @@ public record AdvancedAlloyFurnaceRecipe(
                 List<GenericStack> keyOutputs = GenericStack.STREAM_CODEC.apply(ByteBufCodecs.list()).decode(buf);
                 long energy = ByteBufCodecs.VAR_LONG.decode(buf);
                 int processTime = ByteBufCodecs.VAR_INT.decode(buf);
-                Ingredient catalyst = Ingredient.CONTENTS_STREAM_CODEC.decode(buf);
+                Ingredient catalyst = CountedIngredient.INGREDIENT_STREAM_CODEC.decode(buf);
                 int catalystUses = ByteBufCodecs.VAR_INT.decode(buf);
-                Ingredient mold = Ingredient.CONTENTS_STREAM_CODEC.decode(buf);
+                List<Ingredient> molds = CountedIngredient.INGREDIENT_STREAM_CODEC.apply(ByteBufCodecs.list()).decode(buf);
                 String modeStr = ByteBufCodecs.STRING_UTF8.decode(buf);
                 AlloyFurnaceMode mode = AlloyFurnaceMode.fromString(modeStr);
 
                 return new AdvancedAlloyFurnaceRecipe(
                         id, inputs, inputFluids, keyInputs, outputs, outputFluids, keyOutputs,
-                        energy, processTime, catalyst, catalystUses, mold, mode
+                        energy, processTime, catalyst, catalystUses, molds, mode
                 );
             }
     );
@@ -106,11 +120,46 @@ public record AdvancedAlloyFurnaceRecipe(
                     Ingredient.CODEC.optionalFieldOf("catalyst", Ingredient.EMPTY)
                                     .forGetter(AdvancedAlloyFurnaceRecipe::catalyst),
                     Codec.INT.optionalFieldOf("catalyst_uses", 0).forGetter(AdvancedAlloyFurnaceRecipe::catalystUses),
-                    Ingredient.CODEC.optionalFieldOf("mold", Ingredient.EMPTY)
-                                    .forGetter(AdvancedAlloyFurnaceRecipe::mold),
+                    Ingredient.CODEC.optionalFieldOf("mold")
+                                    .forGetter(AdvancedAlloyFurnaceRecipe::legacyMold),
+                    Ingredient.CODEC.listOf().optionalFieldOf("molds")
+                                    .forGetter(AdvancedAlloyFurnaceRecipe::multipleMolds),
                     AlloyFurnaceMode.CODEC.optionalFieldOf("mode", AlloyFurnaceMode.NORMAL)
                                           .forGetter(AdvancedAlloyFurnaceRecipe::mode)
-            ).apply(instance, AdvancedAlloyFurnaceRecipe::new));
+            ).apply(instance, AdvancedAlloyFurnaceRecipe::fromCodec));
+
+    private static Optional<Ingredient> legacyMold(AdvancedAlloyFurnaceRecipe recipe) {
+        return recipe.molds.size() == 1 ? Optional.of(recipe.molds.getFirst()) : Optional.empty();
+    }
+
+    private static Optional<List<Ingredient>> multipleMolds(AdvancedAlloyFurnaceRecipe recipe) {
+        return recipe.molds.size() > 1 ? Optional.of(recipe.molds) : Optional.empty();
+    }
+
+    private static AdvancedAlloyFurnaceRecipe fromCodec(
+            ResourceLocation id,
+            List<CountedIngredient> inputs,
+            List<FluidStack> inputFluids,
+            List<GenericStack> keyInputs,
+            List<ItemStack> outputs,
+            List<FluidStack> outputFluids,
+            List<GenericStack> keyOutputs,
+            long energy,
+            int processTime,
+            Ingredient catalyst,
+            int catalystUses,
+            Optional<Ingredient> legacyMold,
+            Optional<List<Ingredient>> multipleMolds,
+            AlloyFurnaceMode mode) {
+        if (legacyMold.isPresent() && multipleMolds.isPresent()) {
+            throw new IllegalArgumentException("Advanced alloy-furnace recipe cannot define both mold and molds");
+        }
+        List<Ingredient> molds = multipleMolds.orElseGet(() ->
+                legacyMold.map(List::of).orElseGet(List::of));
+        return new AdvancedAlloyFurnaceRecipe(
+                id, inputs, inputFluids, keyInputs, outputs, outputFluids, keyOutputs,
+                energy, processTime, catalyst, catalystUses, molds, mode);
+    }
 
     public AdvancedAlloyFurnaceRecipe(ResourceLocation id,
                                       List<CountedIngredient> inputs,
@@ -123,7 +172,31 @@ public record AdvancedAlloyFurnaceRecipe(
                                       int catalystUses,
                                       Ingredient mold,
                                       AlloyFurnaceMode mode) {
-        this(id, inputs, inputFluids, List.of(), outputs, outputFluids, List.of(), energy, processTime, catalyst, catalystUses, mold, mode);
+        this(id, inputs, inputFluids, List.of(), outputs, outputFluids, List.of(), energy, processTime, catalyst, catalystUses,
+                mold == null ? List.of() : List.of(mold), mode);
+    }
+
+    public AdvancedAlloyFurnaceRecipe(ResourceLocation id,
+                                      List<CountedIngredient> inputs,
+                                      List<FluidStack> inputFluids,
+                                      List<GenericStack> keyInputs,
+                                      List<ItemStack> outputs,
+                                      List<FluidStack> outputFluids,
+                                      List<GenericStack> keyOutputs,
+                                      long energy,
+                                      int processTime,
+                                      Ingredient catalyst,
+                                      int catalystUses,
+                                      Ingredient mold,
+                                      AlloyFurnaceMode mode) {
+        this(id, inputs, inputFluids, keyInputs, outputs, outputFluids, keyOutputs,
+                energy, processTime, catalyst, catalystUses,
+                mold == null ? List.of() : List.of(mold), mode);
+    }
+
+    /** Compatibility accessor for the historical single-mold API. */
+    public Ingredient mold() {
+        return this.molds.isEmpty() ? Ingredient.EMPTY : this.molds.getFirst();
     }
 
     // ────────────── 以下是 Recipe 接口的占位实现 ──────────────

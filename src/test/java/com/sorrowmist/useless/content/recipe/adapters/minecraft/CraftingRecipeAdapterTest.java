@@ -4,11 +4,17 @@ import com.sorrowmist.useless.api.enums.AlloyFurnaceMode;
 import com.sorrowmist.useless.content.recipe.AdapterUtils;
 import com.sorrowmist.useless.content.recipe.AdvancedAlloyFurnaceRecipe;
 import net.minecraft.SharedConstants;
+import net.minecraft.core.Holder;
 import net.minecraft.core.NonNullList;
 import net.minecraft.core.component.DataComponents;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.core.registries.Registries;
 import net.minecraft.network.chat.Component;
+import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.Bootstrap;
+import net.minecraft.tags.TagKey;
+import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.item.crafting.CraftingBookCategory;
@@ -21,22 +27,41 @@ import net.minecraft.world.item.crafting.ShapelessRecipe;
 import net.minecraft.world.level.material.Fluids;
 import net.neoforged.neoforge.common.crafting.DataComponentIngredient;
 import net.neoforged.neoforge.fluids.FluidStack;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
+import java.util.stream.StreamSupport;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class CraftingRecipeAdapterTest {
+    private static final TagKey<Item> BOUND_TAG = TagKey.create(
+            Registries.ITEM,
+            ResourceLocation.fromNamespaceAndPath("useless_mod_test", "bound_crafting_input"));
+    private static Map<TagKey<Item>, List<Holder<Item>>> originalTags;
 
     @BeforeAll
     static void bootstrapMinecraft() {
         SharedConstants.tryDetectVersion();
         Bootstrap.bootStrap();
+        originalTags = BuiltInRegistries.ITEM.getTags().collect(Collectors.toUnmodifiableMap(
+                com.mojang.datafixers.util.Pair::getFirst,
+                pair -> StreamSupport.stream(pair.getSecond().spliterator(), false).toList()));
+        BuiltInRegistries.ITEM.bindTags(Map.of(
+                BOUND_TAG, List.of(holder(Items.IRON_INGOT), holder(Items.GOLD_INGOT))));
+    }
+
+    @AfterAll
+    static void restoreItemTags() {
+        if (originalTags != null) {
+            BuiltInRegistries.ITEM.bindTags(originalTags);
+        }
     }
 
     @Test
@@ -62,6 +87,44 @@ class CraftingRecipeAdapterTest {
         assertTrue(converted.mold().test(new ItemStack(Items.CRAFTING_TABLE)));
         assertEquals(AlloyFurnaceMode.NORMAL, converted.mode());
         assertEquals("shaped_converted", converted.id().getPath());
+    }
+
+    @Test
+    void convertsCraftingRecipeWithUnresolvedTagInput() {
+        TagKey<Item> tag = TagKey.create(
+                Registries.ITEM,
+                ResourceLocation.fromNamespaceAndPath("useless_mod_test", "unresolved_crafting_input"));
+        ShapedRecipe source = new ShapedRecipe(
+                "",
+                CraftingBookCategory.MISC,
+                ShapedRecipePattern.of(Map.of('#', Ingredient.of(tag)), "#"),
+                new ItemStack(Items.DIAMOND)
+        );
+
+        AdvancedAlloyFurnaceRecipe converted = convert("unresolved_tag", source);
+
+        assertEquals(1, converted.inputs().size());
+        assertEquals(1L, converted.inputs().getFirst().count());
+        assertEquals(1, converted.inputs().getFirst().ingredient().getValues().length);
+        assertTrue(converted.inputs().getFirst().ingredient().getValues()[0] instanceof Ingredient.TagValue);
+    }
+
+    @Test
+    void convertsCraftingRecipeWithBoundTagInput() {
+        ShapedRecipe source = new ShapedRecipe(
+                "",
+                CraftingBookCategory.MISC,
+                ShapedRecipePattern.of(Map.of('#', Ingredient.of(BOUND_TAG)), "#"),
+                new ItemStack(Items.DIAMOND)
+        );
+
+        AdvancedAlloyFurnaceRecipe converted = convert("bound_tag", source);
+
+        Ingredient input = converted.inputs().getFirst().ingredient();
+        assertEquals(1, input.getValues().length);
+        assertTrue(input.getValues()[0] instanceof Ingredient.TagValue);
+        assertTrue(input.test(new ItemStack(Items.IRON_INGOT)));
+        assertTrue(input.test(new ItemStack(Items.GOLD_INGOT)));
     }
 
     @Test
@@ -108,7 +171,23 @@ class CraftingRecipeAdapterTest {
 
         assertEquals(1L, converted.inputs().getFirst().count());
         assertTrue(converted.inputs().getFirst().ingredient().test(new ItemStack(Items.HONEY_BOTTLE)));
-        assertEquals(1, itemCount(converted.outputs(), Items.GLASS_BOTTLE));
+        assertEquals(0, itemCount(converted.outputs(), Items.GLASS_BOTTLE));
+        assertEquals(2, converted.molds().size());
+        assertTrue(converted.molds().get(1).test(new ItemStack(Items.GLASS_BOTTLE)));
+    }
+
+    @Test
+    void keepsRepeatedRemaindersAsIndependentMolds() {
+        ShapelessRecipe source = shapeless(
+                new ItemStack(Items.SUGAR),
+                Ingredient.of(Items.HONEY_BOTTLE), Ingredient.of(Items.HONEY_BOTTLE));
+
+        AdvancedAlloyFurnaceRecipe converted = convert("repeated_remainders", source);
+
+        assertEquals(2L, converted.inputs().getFirst().count());
+        assertEquals(3, converted.molds().size());
+        assertTrue(converted.molds().get(1).test(new ItemStack(Items.GLASS_BOTTLE)));
+        assertTrue(converted.molds().get(2).test(new ItemStack(Items.GLASS_BOTTLE)));
     }
 
     @Test
@@ -149,6 +228,11 @@ class CraftingRecipeAdapterTest {
     private static RecipeHolder<CraftingRecipe> holder(String path, CraftingRecipe source) {
         return new RecipeHolder<>(
                 ResourceLocation.fromNamespaceAndPath("useless_mod_test", path), source);
+    }
+
+    private static Holder<Item> holder(Item item) {
+        ResourceLocation id = java.util.Objects.requireNonNull(BuiltInRegistries.ITEM.getKey(item));
+        return BuiltInRegistries.ITEM.getHolderOrThrow(ResourceKey.create(Registries.ITEM, id));
     }
 
     private static int itemCount(List<ItemStack> stacks, net.minecraft.world.item.Item item) {

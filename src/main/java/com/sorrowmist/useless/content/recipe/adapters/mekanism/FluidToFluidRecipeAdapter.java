@@ -43,16 +43,15 @@ public final class FluidToFluidRecipeAdapter implements IRecipeAdapter<FluidToFl
         if (input == null || input.hasNoMatchingInstances()) return List.of();
 
         List<AdvancedAlloyFurnaceRecipe> result = new ArrayList<>();
-        for (FluidStack fluid : MekanismChemicalRecipeSupport.fluidRepresentations(input)) {
-            for (FluidStack output : holder.value().getOutputDefinition()) {
-                if (output.isEmpty()) continue;
-                result.add(MekanismChemicalRecipeSupport.recipe(
-                        MekanismChemicalRecipeSupport.variantId(holder.id(), "evaporating_"
-                                + fluidId(fluid) + "_out_" + fluidId(output)),
-                        List.of(), List.of(fluid), List.of(), List.of(), List.of(output.copy()), List.of(),
-                        AdapterUtils.mekanismEnergyCost(ENERGY_PER_TICK, PROCESS_TICKS, 1L),
-                        AdapterUtils.safeInt(PROCESS_TICKS), getMoldItem()));
-            }
+        List<net.neoforged.neoforge.fluids.crafting.SizedFluidIngredient> fluidInputs =
+                MekanismChemicalRecipeSupport.fluidIngredients(input);
+        for (FluidStack output : holder.value().getOutputDefinition()) {
+            if (output.isEmpty()) continue;
+            result.add(MekanismChemicalRecipeSupport.recipe(
+                    MekanismChemicalRecipeSupport.variantId(holder.id(), "evaporating_out_" + fluidId(output)),
+                    List.of(), fluidInputs, List.of(), List.of(), List.of(output.copy()), List.of(),
+                    AdapterUtils.mekanismEnergyCost(ENERGY_PER_TICK, PROCESS_TICKS, 1L),
+                    AdapterUtils.safeInt(PROCESS_TICKS), getMoldItem()));
         }
         return result;
     }

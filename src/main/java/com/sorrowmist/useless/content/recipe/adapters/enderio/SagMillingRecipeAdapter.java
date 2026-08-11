@@ -20,6 +20,7 @@ import net.minecraft.world.item.crafting.RecipeHolder;
 import net.minecraft.world.item.crafting.RecipeManager;
 import net.minecraft.world.level.Level;
 import net.neoforged.neoforge.fluids.FluidStack;
+import net.neoforged.neoforge.fluids.crafting.SizedFluidIngredient;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 
@@ -164,7 +165,7 @@ public final class SagMillingRecipeAdapter implements IRecipeAdapter<SagMillingR
         return new AdvancedAlloyFurnaceRecipe(
                 convertedId,
                 List.of(new CountedIngredient(source.input(), operations)),
-                List.of(),
+                List.<SizedFluidIngredient>of(),
                 List.of(),
                 scaled.get().outputs(),
                 List.of(),

@@ -8,6 +8,7 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.crafting.Ingredient;
 import net.minecraft.world.level.ItemLike;
 import net.neoforged.neoforge.fluids.FluidStack;
+import net.neoforged.neoforge.fluids.crafting.SizedFluidIngredient;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -15,7 +16,7 @@ import java.util.List;
 public class AdvancedAlloyFurnaceRecipeBuilder {
 
     private final List<CountedIngredient> inputs = new ArrayList<>();
-    private final List<FluidStack> inputFluids = new ArrayList<>();
+    private final List<SizedFluidIngredient> inputFluids = new ArrayList<>();
     private final List<GenericStack> keyInputs = new ArrayList<>();
     private final List<ItemStack> outputs = new ArrayList<>();
     private final List<GenericStack> keyOutputs = new ArrayList<>();
@@ -36,7 +37,15 @@ public class AdvancedAlloyFurnaceRecipeBuilder {
     }
 
     public AdvancedAlloyFurnaceRecipeBuilder fluidInput(FluidStack fluid) {
-        this.inputFluids.add(fluid.copy());
+        SizedFluidIngredient converted = AdapterUtils.toSizedFluidIngredient(fluid);
+        if (converted != null) this.inputFluids.add(converted);
+        return this;
+    }
+
+    public AdvancedAlloyFurnaceRecipeBuilder fluidInput(SizedFluidIngredient fluid) {
+        if (fluid != null) {
+            this.inputFluids.add(fluid);
+        }
         return this;
     }
 

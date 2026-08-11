@@ -116,6 +116,49 @@ public final class AlloyFurnaceRecipeCatalog {
     }
 
     /**
+     * Resolves a pattern binding, accepting a cross-side catalog rebuild when the stored fingerprint
+     * no longer exists locally but the recipe id and encoded processing contents identify exactly
+     * one current recipe. The exact identity remains the first choice; the fallback is deliberately
+     * unique-only so two recipes sharing a pattern cannot silently acquire the wrong mold.
+     */
+    public static Optional<Entry> resolvePattern(
+            Level level, AlloyFurnaceRecipeIdentity identity, IPatternDetails pattern) {
+        if (level == null || identity == null || pattern == null) return Optional.empty();
+
+        Optional<Entry> exact = resolve(level, identity);
+        if (exact.isPresent()) return exact;
+
+        Snapshot snapshot = snapshot(level);
+        Set<Integer> componentAgnosticOutputs = componentAgnosticOutputSlots(pattern, level);
+        List<Entry> candidates = snapshot.byRecipeId
+                .getOrDefault(identity.recipeId(), List.of())
+                .stream()
+                .filter(entry -> matchesPattern(
+                        entry.recipe(), pattern, componentAgnosticOutputs, true))
+                .toList();
+        if (candidates.size() != 1) {
+            // A pattern encoded on the other side of a client/server boundary can carry the same
+            // item output with a different component patch (or a legacy encoder can omit a
+            // secondary output). The recipe id is already bound by the JEI selection, so use a
+            // component-insensitive shape check only when the normal exact candidate search found
+            // none. This still refuses ambiguous ids and never turns an unrelated pattern into a
+            // recipe binding.
+            if (!candidates.isEmpty()) return Optional.empty();
+            candidates = snapshot.byRecipeId
+                    .getOrDefault(identity.recipeId(), List.of())
+                    .stream()
+                    .filter(entry -> !hasComponentSensitiveItemOutputs(entry.recipe())
+                            && matchesPatternShape(entry.recipe(), pattern))
+                    .toList();
+        }
+        if (candidates.size() != 1) return Optional.empty();
+
+        Entry compatible = candidates.getFirst();
+        snapshot.compatibilityAliases.putIfAbsent(identity, compatible);
+        return Optional.of(compatible);
+    }
+
+    /**
      * Version-one patterns used representation-sensitive fingerprints. Accept
      * them only when their recipe id and encoded processing contents identify
      * exactly one current recipe, then cache that old identity as an alias.
@@ -172,6 +215,19 @@ public final class AlloyFurnaceRecipeCatalog {
                 .filter(entry -> matchesPattern(entry.recipe, pattern, componentAgnosticOutputs, false))
                 .sorted(Comparator.comparing(entry -> entry.identity.recipeId().toString()))
                 .toList();
+    }
+
+    /**
+     * Resolves an encoded processing pattern to a single recipe that has a reusable mold. This is
+     * used only as a conservative fallback when the JEI selection packet and AE2's encoding update
+     * arrive in the opposite order. Recipes without molds are intentionally excluded because a
+     * plain processing pattern is already the correct representation for them.
+     */
+    public static Optional<Entry> findUniqueMoldPatternCandidate(Level level, IPatternDetails pattern) {
+        List<Entry> candidates = findPatternCandidates(level, pattern).stream()
+                .filter(entry -> entry.recipe() != null && !entry.recipe().molds().isEmpty())
+                .toList();
+        return candidates.size() == 1 ? Optional.of(candidates.getFirst()) : Optional.empty();
     }
 
     /**
@@ -334,7 +390,7 @@ public final class AlloyFurnaceRecipeCatalog {
         if (requiredItemCount != actualItemCount
                 || !ItemIngredientAllocator.matches(recipe.inputs(), contents.items, 1L)) return false;
 
-        if (!sameAmounts(contents.fluids, recipe.inputFluids())) return false;
+        if (!matchesFluidIngredients(contents.fluids, recipe.inputFluids())) return false;
         if (!sameGeneric(contents.keys, recipe.keyInputs())) return false;
 
         List<GenericStack> expectedOutputs = new ArrayList<>();
@@ -356,6 +412,80 @@ public final class AlloyFurnaceRecipeCatalog {
                 ? sameGeneric(pattern.getOutputs(), expectedOutputs)
                 : sameGenericIgnoringSlotComponents(
                         pattern.getOutputs(), expectedOutputs, componentAgnosticOutputs);
+    }
+
+    /**
+     * Compatibility matcher for a pattern made by a different recipe-directory representation.
+     * Inputs, fluids, keys, counts, and item identities remain strict; only item output components
+     * are ignored. The exact matcher above remains the first choice so recipes distinguished by
+     * output components cannot become ambiguous during normal resolution.
+     */
+    private static boolean matchesPatternShape(
+            AdvancedAlloyFurnaceRecipe recipe, IPatternDetails pattern) {
+        PatternContents contents = PatternContents.read(pattern);
+        if (contents == null) return false;
+
+        long requiredItemCount = recipe.inputs().stream().mapToLong(CountedIngredient::count).sum();
+        long actualItemCount = contents.items.stream().mapToLong(ItemStack::getCount).sum();
+        if (requiredItemCount != actualItemCount
+                || !ItemIngredientAllocator.matches(recipe.inputs(), contents.items, 1L)) {
+            return false;
+        }
+        if (!matchesFluidIngredients(contents.fluids, recipe.inputFluids())
+                || !sameGeneric(contents.keys, recipe.keyInputs())) {
+            return false;
+        }
+
+        List<GenericStack> expectedOutputs = new ArrayList<>();
+        recipe.outputs().stream().map(GenericStack::fromItemStack).forEach(expectedOutputs::add);
+        recipe.outputFluids().stream().map(GenericStack::fromFluidStack).forEach(expectedOutputs::add);
+        expectedOutputs.addAll(recipe.keyOutputs());
+        return matchesGenericSubsetIgnoringItemComponents(pattern.getOutputs(), expectedOutputs);
+    }
+
+    private static boolean hasComponentSensitiveItemOutputs(AdvancedAlloyFurnaceRecipe recipe) {
+        for (ItemStack output : recipe.outputs()) {
+            if (output != null && !output.isEmpty() && !output.getComponentsPatch().isEmpty()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean matchesGenericSubsetIgnoringItemComponents(
+            List<GenericStack> actual, List<GenericStack> expected) {
+        if (actual == null || actual.isEmpty() || expected == null || actual.size() > expected.size()) {
+            return false;
+        }
+
+        boolean[] matched = new boolean[expected.size()];
+        for (GenericStack actualStack : actual) {
+            if (actualStack == null || actualStack.what() == null || actualStack.amount() <= 0L) {
+                return false;
+            }
+            int matchedSlot = -1;
+            for (int expectedSlot = 0; expectedSlot < expected.size(); expectedSlot++) {
+                if (matched[expectedSlot]) continue;
+                GenericStack expectedStack = expected.get(expectedSlot);
+                if (expectedStack == null || expectedStack.what() == null
+                        || expectedStack.amount() != actualStack.amount()
+                        || !sameKeyIgnoringItemComponents(actualStack.what(), expectedStack.what())) {
+                    continue;
+                }
+                matchedSlot = expectedSlot;
+                break;
+            }
+            if (matchedSlot < 0) return false;
+            matched[matchedSlot] = true;
+        }
+        return true;
+    }
+
+    private static boolean sameKeyIgnoringItemComponents(AEKey left, AEKey right) {
+        if (left instanceof AEItemKey leftItem && right instanceof AEItemKey rightItem) {
+            return leftItem.getItem() == rightItem.getItem();
+        }
+        return left.equals(right);
     }
 
     /**
@@ -439,6 +569,49 @@ public final class AlloyFurnaceRecipeCatalog {
         return leftMap.equals(rightMap);
     }
 
+    private static boolean matchesFluidIngredients(
+            List<PatternFluidInput> actual,
+            List<net.neoforged.neoforge.fluids.crafting.SizedFluidIngredient> required) {
+        long actualAmount = 0L;
+        if (actual != null) {
+            for (PatternFluidInput input : actual) {
+                if (input != null && input.amount() > 0) {
+                    actualAmount = addAmount(actualAmount, input.amount());
+                }
+            }
+        }
+        long requiredAmount = 0L;
+        if (required != null) {
+            for (var ingredient : required) {
+                if (ingredient != null) requiredAmount = addAmount(requiredAmount, ingredient.amount());
+            }
+        }
+        if (actualAmount != requiredAmount) return false;
+        return matchesFluidCandidates(actual, required, 0, new ArrayList<>());
+    }
+
+    private static boolean matchesFluidCandidates(
+            List<PatternFluidInput> actual,
+            List<net.neoforged.neoforge.fluids.crafting.SizedFluidIngredient> required,
+            int index, List<FluidStack> selected) {
+        if (index >= actual.size()) {
+            return FluidIngredientAllocator.matches(required, selected, 1L);
+        }
+        PatternFluidInput input = actual.get(index);
+        if (input == null || input.candidates().isEmpty()) return false;
+        for (FluidStack candidate : input.candidates()) {
+            if (candidate == null || candidate.isEmpty()) continue;
+            selected.add(candidate);
+            if (matchesFluidCandidates(actual, required, index + 1, selected)) return true;
+            selected.removeLast();
+        }
+        return false;
+    }
+
+    private static long addAmount(long left, long right) {
+        return right > 0 && left > Long.MAX_VALUE - right ? Long.MAX_VALUE : left + right;
+    }
+
     private static boolean sameGeneric(List<GenericStack> left, List<GenericStack> right) {
         Map<AEKey, Long> leftMap = genericMap(left);
         Map<AEKey, Long> rightMap = genericMap(right);
@@ -482,22 +655,54 @@ public final class AlloyFurnaceRecipeCatalog {
         }
     }
 
-    private record PatternContents(List<ItemStack> items, List<FluidStack> fluids, List<GenericStack> keys) {
+    private record PatternContents(List<ItemStack> items, List<PatternFluidInput> fluids,
+                                   List<GenericStack> keys) {
         private static PatternContents read(IPatternDetails pattern) {
             List<ItemStack> items = new ArrayList<>();
-            List<FluidStack> fluids = new ArrayList<>();
+            List<PatternFluidInput> fluids = new ArrayList<>();
             List<GenericStack> keys = new ArrayList<>();
             for (IPatternDetails.IInput input : pattern.getInputs()) {
+                if (input == null) return null;
                 GenericStack[] possible = input.getPossibleInputs();
-                if (possible.length == 0 || possible[0] == null || input.getMultiplier() <= 0) return null;
-                AEKey key = possible[0].what();
                 long amount = input.getMultiplier();
                 if (amount > Integer.MAX_VALUE) return null;
+                if (possible.length == 0 || amount <= 0) return null;
+
+                List<FluidStack> fluidCandidates = new ArrayList<>();
+                boolean hasNonFluidCandidate = false;
+                for (GenericStack candidate : possible) {
+                    if (candidate == null || candidate.what() == null) continue;
+                    if (candidate.what() instanceof AEFluidKey fluidKey) {
+                        FluidStack fluid = fluidKey.toStack((int) amount);
+                        if (fluidCandidates.stream().noneMatch(existing ->
+                                FluidStack.isSameFluidSameComponents(existing, fluid))) {
+                            fluidCandidates.add(fluid);
+                        }
+                    } else {
+                        hasNonFluidCandidate = true;
+                    }
+                }
+                // A processing slot cannot be represented faithfully when its encoded candidates
+                // cross the item/fluid boundary. Keep the pattern invalid rather than silently
+                // discarding one side of the slot.
+                if (!fluidCandidates.isEmpty() && hasNonFluidCandidate) return null;
+                if (!fluidCandidates.isEmpty()) {
+                    fluids.add(new PatternFluidInput(List.copyOf(fluidCandidates), (int) amount));
+                    continue;
+                }
+
+                GenericStack first = java.util.Arrays.stream(possible)
+                        .filter(candidate -> candidate != null && candidate.what() != null)
+                        .findFirst().orElse(null);
+                if (first == null) return null;
+                AEKey key = first.what();
                 if (key instanceof AEItemKey itemKey) items.add(itemKey.toStack((int) amount));
-                else if (key instanceof AEFluidKey fluidKey) fluids.add(new FluidStack(fluidKey.getFluid(), (int) amount));
                 else keys.add(new GenericStack(key, amount));
             }
             return new PatternContents(items, fluids, keys);
         }
+    }
+
+    private record PatternFluidInput(List<FluidStack> candidates, int amount) {
     }
 }

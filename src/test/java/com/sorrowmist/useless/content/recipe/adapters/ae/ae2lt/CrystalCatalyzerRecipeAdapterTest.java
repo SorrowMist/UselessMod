@@ -37,7 +37,7 @@ class CrystalCatalyzerRecipeAdapterTest {
 
         assertEquals(3 * 256, converted.outputs().getFirst().getCount());
         assertEquals(3 * 1024, matrix.outputs().getFirst().getCount());
-        assertEquals(1_000, converted.inputFluids().getFirst().getAmount());
+        assertEquals(1_000, converted.inputFluids().getFirst().amount());
         assertEquals(123_456L, converted.energy());
         assertEquals("test/crystal_catalyzer_converted", converted.id().getPath());
         assertEquals("test/crystal_catalyzer_converted_with_collapse_matrix", matrix.id().getPath());

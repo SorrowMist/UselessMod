@@ -45,8 +45,8 @@ class IntegratedWorkingStationRecipeAdapterTest {
         assertEquals(5L, converted.inputs().getFirst().count());
         assertTrue(converted.inputs().getFirst().ingredient().test(namedInput));
         assertFalse(converted.inputs().getFirst().ingredient().test(new ItemStack(Items.IRON_INGOT)));
-        assertEquals(Fluids.WATER, converted.inputFluids().getFirst().getFluid());
-        assertEquals(250, converted.inputFluids().getFirst().getAmount());
+        assertTrue(converted.inputFluids().getFirst().ingredient().test(new FluidStack(Fluids.WATER, 1)));
+        assertEquals(250, converted.inputFluids().getFirst().amount());
         assertEquals(2, converted.outputs().getFirst().getCount());
         assertEquals("eco-output", converted.outputs().getFirst()
                 .get(DataComponents.CUSTOM_NAME).getString());
@@ -61,7 +61,7 @@ class IntegratedWorkingStationRecipeAdapterTest {
     }
 
     @Test
-    void expandsFluidAlternativesAndSupportsFluidOnlyInputs() {
+    void preservesFluidAlternativesAndSupportsFluidOnlyInputs() {
         IntegratedWorkingStationRecipe source = new IntegratedWorkingStationRecipe(
                 List.of(),
                 new SizedFluidIngredient(FluidIngredient.of(Fluids.WATER, Fluids.LAVA), 125),
@@ -73,11 +73,11 @@ class IntegratedWorkingStationRecipeAdapterTest {
         List<AdvancedAlloyFurnaceRecipe> converted = new IntegratedWorkingStationRecipeAdapter()
                 .convertAll(holder("fluid_alternatives", source), null);
 
-        assertEquals(2, converted.size());
+        assertEquals(1, converted.size());
         assertTrue(converted.stream().allMatch(recipe -> recipe.inputFluids().size() == 1));
-        assertTrue(converted.stream().allMatch(recipe -> recipe.inputFluids().getFirst().getAmount() == 125));
-        assertTrue(converted.stream().anyMatch(recipe -> recipe.inputFluids().getFirst().is(Fluids.WATER)));
-        assertTrue(converted.stream().anyMatch(recipe -> recipe.inputFluids().getFirst().is(Fluids.LAVA)));
+        assertTrue(converted.stream().allMatch(recipe -> recipe.inputFluids().getFirst().amount() == 125));
+        assertTrue(converted.getFirst().inputFluids().getFirst().ingredient().test(new FluidStack(Fluids.WATER, 1)));
+        assertTrue(converted.getFirst().inputFluids().getFirst().ingredient().test(new FluidStack(Fluids.LAVA, 1)));
     }
 
     @Test
@@ -94,8 +94,8 @@ class IntegratedWorkingStationRecipeAdapterTest {
                 .convertAll(holder("water_tag", source), null);
 
         assertEquals(1, converted.size());
-        assertTrue(converted.getFirst().inputFluids().getFirst().is(Fluids.WATER));
-        assertEquals(125, converted.getFirst().inputFluids().getFirst().getAmount());
+        assertTrue(converted.getFirst().inputFluids().getFirst().ingredient().test(new FluidStack(Fluids.WATER, 1)));
+        assertEquals(125, converted.getFirst().inputFluids().getFirst().amount());
     }
 
     @Test

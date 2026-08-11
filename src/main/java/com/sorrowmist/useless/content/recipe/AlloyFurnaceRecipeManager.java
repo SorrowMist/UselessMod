@@ -13,6 +13,7 @@ import net.minecraft.world.item.crafting.Recipe;
 import net.minecraft.world.item.crafting.RecipeHolder;
 import net.minecraft.world.level.Level;
 import net.neoforged.neoforge.fluids.FluidStack;
+import net.neoforged.neoforge.fluids.crafting.SizedFluidIngredient;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
@@ -346,7 +347,7 @@ public class AlloyFurnaceRecipeManager {
     private boolean matchesLookup(AdvancedAlloyFurnaceRecipe recipe, RecipeLookupContext context) {
         return matchesMold(recipe, context.mold())
                 && matchesItems(recipe, context.inputs(), context.operations())
-                && matchesFluids(recipe, context.fluidInputs(), context.operations())
+                && matchesFluids(recipe, context.fluidInputs(), context.keyInputs(), context.operations())
                 && matchesKeys(recipe, context.keyInputs(), context.operations())
                 && matchesOutputConstraints(recipe, context.expectedOutputs());
     }
@@ -437,8 +438,8 @@ public class AlloyFurnaceRecipeManager {
 
     private long requiredFluidAmount(AdvancedAlloyFurnaceRecipe recipe) {
         long result = 0;
-        for (FluidStack input : recipe.inputFluids()) {
-            result = saturatingAdd(result, Math.max(0, input.getAmount()));
+        for (SizedFluidIngredient input : recipe.inputFluids()) {
+            if (input != null) result = saturatingAdd(result, Math.max(0, input.amount()));
         }
         return result;
     }
@@ -460,9 +461,13 @@ public class AlloyFurnaceRecipeManager {
     }
 
     private boolean matchesFluids(AdvancedAlloyFurnaceRecipe recipe, List<FluidStack> inputs, long operations) {
-        Map<AEKey, Long> available = snapshotFluids(inputs);
-        Map<AEKey, Long> required = snapshotFluids(recipe.inputFluids());
-        return containsScaled(available, required, operations);
+        return FluidIngredientAllocator.matches(recipe.inputFluids(), inputs, operations);
+    }
+
+    private boolean matchesFluids(AdvancedAlloyFurnaceRecipe recipe,
+                                  List<FluidStack> inputs, List<GenericStack> keyInputs,
+                                  long operations) {
+        return FluidIngredientAllocator.matches(recipe.inputFluids(), inputs, keyInputs, operations);
     }
 
     private boolean matchesKeys(AdvancedAlloyFurnaceRecipe recipe, List<GenericStack> inputs, long operations) {
@@ -496,8 +501,7 @@ public class AlloyFurnaceRecipeManager {
             return false;
         }
         return ItemIngredientAllocator.matches(recipe.inputs(), inputs, keyInputs, operations)
-                && containsScaled(snapshotFluidInputs(fluidInputs, keyInputs),
-                snapshotFluids(recipe.inputFluids()), operations)
+                && FluidIngredientAllocator.matches(recipe.inputFluids(), fluidInputs, keyInputs, operations)
                 && containsScaled(snapshotNonStackKeyInputs(keyInputs),
                 snapshotGenericStacks(recipe.keyInputs()), operations);
     }
@@ -529,7 +533,8 @@ public class AlloyFurnaceRecipeManager {
     private List<AdvancedAlloyFurnaceRecipe> findAdaptedRecipes(Level level, RecipeLookupContext context) {
         List<AdvancedAlloyFurnaceRecipe> candidates = new ArrayList<>();
         Map<Ingredient, Long> mergedInputs = AdapterUtils.mergeInputs(context.inputs());
-        Map<FluidStack, Long> mergedFluids = AdapterUtils.mergeFluids(context.fluidInputs());
+        Map<FluidStack, Long> mergedFluids = mergeFluidInputs(
+                context.fluidInputs(), context.keyInputs());
         Map<AEKey, Long> mergedKeys = AdapterUtils.mergeKeys(context.keyInputs());
 
         ItemStack mold = context.mold();
@@ -560,7 +565,8 @@ public class AlloyFurnaceRecipeManager {
             Map<AEKey, Long> mergedKeys, @Nullable ItemStack mold,
             List<AdvancedAlloyFurnaceRecipe> candidates) {
         IRecipeAdapter<T> typedAdapter = (IRecipeAdapter<T>) adapter;
-        for (RecipeHolder<T> holder : typedAdapter.findMatchingRecipes(level, mergedInputs, mergedFluids, mergedKeys, mold)) {
+        for (RecipeHolder<T> holder : typedAdapter.findMatchingRecipes(
+                level, mergedInputs, mergedFluids, mergedKeys, mold, actualInputs)) {
             candidates.addAll(RecipeConversionUtils.convertAll(typedAdapter, holder, level, actualInputs));
         }
     }
@@ -633,7 +639,7 @@ public class AlloyFurnaceRecipeManager {
                     : GenericStack.fromItemStack(context.mold());
             return new RecipeCacheKey(
                     snapshotItems(context.inputs()),
-                    snapshotFluids(context.fluidInputs()),
+                    snapshotFluidInputs(context.fluidInputs(), context.keyInputs()),
                     snapshotGenericStacks(context.keyInputs()),
                     moldStack == null ? null : moldStack.what(),
                     List.copyOf(context.expectedOutputs()),
@@ -694,6 +700,38 @@ public class AlloyFurnaceRecipeManager {
             }
         }
         return Map.copyOf(result);
+    }
+
+    private static Map<FluidStack, Long> mergeFluidInputs(
+            List<FluidStack> stacks, List<GenericStack> keyInputs) {
+        Map<FluidStack, Long> result = new LinkedHashMap<>();
+        if (stacks != null) {
+            for (FluidStack stack : stacks) {
+                if (stack != null && !stack.isEmpty() && stack.getAmount() > 0) {
+                    mergeFluidAmount(result, stack, stack.getAmount());
+                }
+            }
+        }
+        if (keyInputs != null) {
+            for (GenericStack input : keyInputs) {
+                if (input == null || input.amount() <= 0L || !(input.what() instanceof AEFluidKey fluidKey)) {
+                    continue;
+                }
+                mergeFluidAmount(result, fluidKey.toStack(1), input.amount());
+            }
+        }
+        return result;
+    }
+
+    private static void mergeFluidAmount(Map<FluidStack, Long> target,
+                                          FluidStack stack, long amount) {
+        for (Map.Entry<FluidStack, Long> entry : target.entrySet()) {
+            if (FluidStack.isSameFluidSameComponents(entry.getKey(), stack)) {
+                entry.setValue(saturatingAdd(entry.getValue(), amount));
+                return;
+            }
+        }
+        target.put(stack.copyWithAmount(1), amount);
     }
 
     private static Map<AEKey, Long> snapshotNonStackKeyInputs(List<GenericStack> stacks) {

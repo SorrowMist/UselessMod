@@ -56,6 +56,9 @@ public record SelectOmniversalPatternRecipePacket(
                 return;
             }
             holder.uselessMod$setPendingOmniversalRecipe(identity);
+            // The encoded pattern can arrive before this custom selection packet. Re-run the same
+            // conversion check now so the terminal does not remain with a plain pattern forever.
+            holder.uselessMod$tryConvertPendingOmniversalPattern();
         });
     }
 

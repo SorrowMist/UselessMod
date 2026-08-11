@@ -9,6 +9,8 @@ import com.sorrowmist.useless.content.recipe.AdapterUtils;
 import com.sorrowmist.useless.content.recipe.AdvancedAlloyFurnaceRecipe;
 import com.sorrowmist.useless.content.recipe.CountedIngredient;
 import com.sorrowmist.useless.content.recipe.IRecipeAdapter;
+import net.neoforged.neoforge.fluids.crafting.SizedFluidIngredient;
+import net.neoforged.neoforge.common.crafting.DataComponentIngredient;
 import net.minecraft.tags.TagKey;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
@@ -50,33 +52,33 @@ public final class VatFermentingRecipeAdapter implements IRecipeAdapter<Fermenti
         }
 
         FermentingRecipe source = holder.value();
-        List<FluidStack> fluids = EnderIOAdapterUtils.fluidChoices(source.input());
-        if (fluids == null || fluids.isEmpty() || !valid(source)) {
+        if (!valid(source)) {
             LOGGER.warn("Skipping invalid Ender IO Vat recipe: {}", holder.id());
             return List.of();
         }
 
-        List<MultiplierGroup> groups = multiplierGroups(source);
+        List<PairResult> pairs = candidatePairs(source);
+        if (pairs.isEmpty()) {
+            LOGGER.debug("Skipping Ender IO Vat recipe without a complete reagent candidate set: {}", holder.id());
+            return List.of();
+        }
+        if (allPairsHaveSameResult(pairs)) {
+            long outputAmount = pairs.getFirst().outputAmount();
+            return List.of(createRecipe(holder.id(), source,
+                    new CountedIngredient(Ingredient.of(source.firstReagent()), 1),
+                    new CountedIngredient(Ingredient.of(source.secondReagent()), 1),
+                    source.input(), source.output().copyWithAmount((int) outputAmount),
+                    AdapterUtils.convertedId(holder.id())));
+        }
+
         List<AdvancedAlloyFurnaceRecipe> result = new ArrayList<>();
         int variantIndex = 0;
-        for (int fluidIndex = 0; fluidIndex < fluids.size(); fluidIndex++) {
-            if (groups.isEmpty()) {
-                result.add(createRecipe(holder.id(), source,
-                        new CountedIngredient(Ingredient.of(source.firstReagent()), 1),
-                        new CountedIngredient(Ingredient.of(source.secondReagent()), 1),
-                        fluids.get(fluidIndex), source.output().copy(),
-                        variantId(holder.id(), fluidIndex, variantIndex++)));
-                continue;
-            }
-
-            for (int groupIndex = 0; groupIndex < groups.size(); groupIndex++) {
-                MultiplierGroup group = groups.get(groupIndex);
-                result.add(createRecipe(holder.id(), source,
-                        new CountedIngredient(group.firstIngredient(source.firstReagent()), 1),
-                        new CountedIngredient(group.secondIngredient(source.secondReagent()), 1),
-                        fluids.get(fluidIndex), source.output().copyWithAmount((int) group.outputAmount()),
-                        variantId(holder.id(), fluidIndex, variantIndex++)));
-            }
+        for (PairResult pair : pairs) {
+            result.add(createRecipe(holder.id(), source,
+                    new CountedIngredient(exact(pair.first()), 1),
+                    new CountedIngredient(exact(pair.second()), 1),
+                    source.input(), source.output().copyWithAmount((int) pair.outputAmount()),
+                    variantId(holder.id(), 0, variantIndex++)));
         }
         return result;
     }
@@ -106,57 +108,6 @@ public final class VatFermentingRecipeAdapter implements IRecipeAdapter<Fermenti
         return result;
     }
 
-    /**
-     * Expands the two reagent tags into static recipes. Items with the same product of data-map
-     * modifiers share one recipe, while different products get different outputs/pages. The
-     * alloy furnace then selects the matching static recipe from the concrete reagent stacks.
-     */
-    private static List<MultiplierGroup> multiplierGroups(FermentingRecipe source) {
-        List<ItemStack> firstItems = tagItems(source.firstReagent());
-        List<ItemStack> secondItems = tagItems(source.secondReagent());
-        if (firstItems.isEmpty() || secondItems.isEmpty()) {
-            return List.of();
-        }
-
-        Map<Double, MultiplierGroup> groups = new LinkedHashMap<>();
-        Set<String> seenPairs = new LinkedHashSet<>();
-        for (ItemStack first : firstItems) {
-            for (ItemStack second : secondItems) {
-                addPair(source, first, second, groups, seenPairs);
-
-                // FermentingRecipe accepts either reagent order. Include the reverse assignment
-                // when the two tags overlap, because the two data-map lookups may differ.
-                if (first.is(source.secondReagent()) && second.is(source.firstReagent())) {
-                    addPair(source, second, first, groups, seenPairs);
-                }
-            }
-        }
-        return List.copyOf(groups.values());
-    }
-
-    private static void addPair(
-            FermentingRecipe source, ItemStack first, ItemStack second,
-            Map<Double, MultiplierGroup> groups, Set<String> seenPairs) {
-        if (first == null || first.isEmpty() || second == null || second.isEmpty()) {
-            return;
-        }
-        String pair = stackFingerprint(first) + "|" + stackFingerprint(second);
-        if (!seenPairs.add(pair)) {
-            return;
-        }
-
-        double multiplier = FermentingRecipe.getModifier(first, source.firstReagent())
-                * FermentingRecipe.getModifier(second, source.secondReagent());
-        long outputAmount = scaledAmount(source.output().getAmount(), multiplier);
-        if (!Double.isFinite(multiplier) || outputAmount <= 0 || outputAmount > Integer.MAX_VALUE) {
-            return;
-        }
-
-        MultiplierGroup group = groups.computeIfAbsent(multiplier,
-                ignored -> new MultiplierGroup(outputAmount));
-        group.add(first, second);
-    }
-
     private static long scaledAmount(int baseAmount, double multiplier) {
         if (baseAmount <= 0 || !Double.isFinite(multiplier) || multiplier <= 0) {
             return 0;
@@ -180,18 +131,73 @@ public final class VatFermentingRecipeAdapter implements IRecipeAdapter<Fermenti
             net.minecraft.resources.ResourceLocation id, FermentingRecipe source,
             CountedIngredient first, CountedIngredient second, FluidStack inputFluid,
             FluidStack output, net.minecraft.resources.ResourceLocation recipeId) {
+        return createRecipe(id, source, first, second,
+                SizedFluidIngredient.of(inputFluid.copy()), output, recipeId);
+    }
+
+    private static AdvancedAlloyFurnaceRecipe createRecipe(
+            net.minecraft.resources.ResourceLocation id, FermentingRecipe source,
+            CountedIngredient first, CountedIngredient second, SizedFluidIngredient inputFluid,
+            FluidStack output, net.minecraft.resources.ResourceLocation recipeId) {
         return new AdvancedAlloyFurnaceRecipe(
-                recipeId, List.of(first, second), List.of(inputFluid.copy()), List.of(),
+                recipeId, List.of(first, second), List.of(inputFluid), List.of(),
                 List.of(), List.of(output.copy()), List.of(), 0L,
                 Math.max(1, source.ticks()), Ingredient.EMPTY, 0,
-                AdapterUtils.toMoldIngredient(new ItemStack(EIOBlocks.VAT.get())), AlloyFurnaceMode.NORMAL);
+                List.of(AdapterUtils.toMoldIngredient(new ItemStack(EIOBlocks.VAT.get()))), AlloyFurnaceMode.NORMAL);
     }
 
     private static boolean valid(FermentingRecipe source) {
         return source != null && source.input() != null && source.input().amount() > 0
                 && source.firstReagent() != null && source.secondReagent() != null
                 && source.output() != null && !source.output().isEmpty()
-                && source.output().getAmount() > 0 && source.ticks() > 0;
+                && source.output().getAmount() > 0 && source.ticks() > 0
+                && source.input().ingredient() != null && !source.input().ingredient().isEmpty();
+    }
+
+    /**
+     * Enumerates the complete reagent product. An empty result means that the tags are
+     * unresolved or that at least one possible pair cannot be represented safely.
+     */
+    private static List<PairResult> candidatePairs(FermentingRecipe source) {
+        List<ItemStack> firstItems = tagItems(source.firstReagent());
+        List<ItemStack> secondItems = tagItems(source.secondReagent());
+        if (firstItems.isEmpty() || secondItems.isEmpty()) return List.of();
+
+        List<PairResult> pairs = new ArrayList<>();
+        Set<String> seen = new LinkedHashSet<>();
+        for (ItemStack first : firstItems) {
+            for (ItemStack second : secondItems) {
+                if (!addPairResult(source, first, second, pairs, seen)) return List.of();
+                if (first.is(source.secondReagent()) && second.is(source.firstReagent())) {
+                    if (!addPairResult(source, second, first, pairs, seen)) return List.of();
+                }
+            }
+        }
+        return List.copyOf(pairs);
+    }
+
+    private static boolean addPairResult(FermentingRecipe source, ItemStack first, ItemStack second,
+                                         List<PairResult> pairs, Set<String> seen) {
+        if (first == null || first.isEmpty() || second == null || second.isEmpty()) return false;
+        String key = stackFingerprint(first) + "|" + stackFingerprint(second);
+        if (!seen.add(key)) return true;
+        double multiplier = FermentingRecipe.getModifier(first, source.firstReagent())
+                * FermentingRecipe.getModifier(second, source.secondReagent());
+        long amount = scaledAmount(source.output().getAmount(), multiplier);
+        if (!Double.isFinite(multiplier) || amount <= 0 || amount > Integer.MAX_VALUE) return false;
+        pairs.add(new PairResult(first.copyWithCount(1), second.copyWithCount(1), multiplier, amount));
+        return true;
+    }
+
+    private static boolean allPairsHaveSameResult(List<PairResult> pairs) {
+        if (pairs.isEmpty()) return false;
+        PairResult first = pairs.getFirst();
+        return pairs.stream().allMatch(pair -> Double.compare(pair.multiplier(), first.multiplier()) == 0
+                && pair.outputAmount() == first.outputAmount());
+    }
+
+    private static Ingredient exact(ItemStack stack) {
+        return DataComponentIngredient.of(true, stack.copyWithCount(1));
     }
 
     private static net.minecraft.resources.ResourceLocation variantId(
@@ -209,43 +215,6 @@ public final class VatFermentingRecipeAdapter implements IRecipeAdapter<Fermenti
                 + "|" + stack.getComponents();
     }
 
-    private static final class MultiplierGroup {
-        private final long outputAmount;
-        private final List<ItemStack> firstItems = new ArrayList<>();
-        private final List<ItemStack> secondItems = new ArrayList<>();
-
-        private MultiplierGroup(long outputAmount) {
-            this.outputAmount = outputAmount;
-        }
-
-        private void add(ItemStack first, ItemStack second) {
-            addDistinct(firstItems, first);
-            addDistinct(secondItems, second);
-        }
-
-        private long outputAmount() {
-            return outputAmount;
-        }
-
-        private Ingredient firstIngredient(TagKey<Item> fallback) {
-            return ingredient(firstItems, fallback);
-        }
-
-        private Ingredient secondIngredient(TagKey<Item> fallback) {
-            return ingredient(secondItems, fallback);
-        }
-
-        private static Ingredient ingredient(List<ItemStack> stacks, TagKey<Item> fallback) {
-            if (stacks.isEmpty()) {
-                return Ingredient.of(fallback);
-            }
-            return Ingredient.of(stacks.stream().map(stack -> stack.copyWithCount(1)));
-        }
-
-        private static void addDistinct(List<ItemStack> target, ItemStack candidate) {
-            if (target.stream().noneMatch(existing -> EnderIOAdapterUtils.sameItemStack(existing, candidate))) {
-                target.add(candidate.copyWithCount(1));
-            }
-        }
+    private record PairResult(ItemStack first, ItemStack second, double multiplier, long outputAmount) {
     }
 }

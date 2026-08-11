@@ -8,6 +8,7 @@ import appeng.crafting.pattern.AEProcessingPattern;
 import com.mojang.datafixers.util.Pair;
 import com.mojang.serialization.JsonOps;
 import com.sorrowmist.useless.api.enums.AlloyFurnaceMode;
+import com.sorrowmist.useless.content.blockentities.multiblock.OmniversalMoldHubBlockEntity;
 import com.sorrowmist.useless.content.recipe.AdvancedAlloyFurnaceRecipe;
 import com.sorrowmist.useless.content.recipe.CountedIngredient;
 import com.sorrowmist.useless.core.component.OmniversalPatternData;
@@ -26,6 +27,8 @@ import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.item.crafting.Ingredient;
+import net.neoforged.neoforge.common.crafting.ICustomIngredient;
+import net.neoforged.neoforge.common.crafting.IngredientType;
 import net.minecraft.world.level.Level;
 import net.neoforged.neoforge.network.connection.ConnectionType;
 import org.junit.jupiter.api.AfterAll;
@@ -106,10 +109,12 @@ class OmniversalPatternTagInputTest {
                 OmniversalPatternData.CURRENT_VERSION,
                 ResourceLocation.fromNamespaceAndPath("useless_mod_test", "tag_data"),
                 "fingerprint",
-                false,
+                true,
                 Optional.empty(),
                 List.of(),
                 List.of(new OmniversalPatternData.TagInputSlot(0, TEST_TAG)),
+                List.of(),
+                List.of(new OmniversalPatternData.MoldTagInputSlot(1, TEST_TAG)),
                 List.of(0),
                 List.of());
 
@@ -143,12 +148,61 @@ class OmniversalPatternTagInputTest {
     }
 
     @Test
+    void onlyPureTagMoldsBecomeMoldTagSlots() {
+        Ingredient mixed = Ingredient.fromValues(Stream.of(
+                new Ingredient.TagValue(TEST_TAG),
+                new Ingredient.ItemValue(new ItemStack(Items.IRON_INGOT))));
+        AdvancedAlloyFurnaceRecipe recipe = recipe(
+                Ingredient.of(Items.IRON_INGOT), List.of(Ingredient.of(TEST_TAG), mixed));
+
+        assertEquals(List.of(new OmniversalPatternData.MoldTagInputSlot(0, TEST_TAG)),
+                OmniversalPatternEncoding.resolveMoldTagInputSlots(recipe));
+    }
+
+    @Test
+    void customIngredientWithAnExactRegisteredTagUsesThatTagForMoldDisplay() {
+        Ingredient custom = new ExactItemSetIngredient(
+                List.of(Items.IRON_INGOT, Items.GOLD_INGOT)).toVanilla();
+        AdvancedAlloyFurnaceRecipe recipe = recipe(
+                Ingredient.of(Items.DIAMOND), List.of(custom));
+
+        assertEquals(List.of(new OmniversalPatternData.MoldTagInputSlot(0, TEST_TAG)),
+                OmniversalPatternEncoding.resolveMoldTagInputSlots(recipe));
+    }
+
+    @Test
+    void broadCustomIngredientUsesTheLargestRegisteredCategoryTagForDisplay() {
+        Ingredient custom = new ExactItemSetIngredient(
+                List.of(Items.IRON_INGOT, Items.GOLD_INGOT, Items.DIAMOND)).toVanilla();
+
+        assertEquals(List.of(new OmniversalPatternData.MoldTagInputSlot(0, TEST_TAG)),
+                OmniversalPatternEncoding.resolveMoldTagInputSlots(recipe(
+                        Ingredient.of(Items.NETHERITE_INGOT), List.of(custom))));
+    }
+
+    @Test
+    void representativeOnlyCustomIngredientStillUsesContainingTagForDisplay() {
+        Ingredient custom = new RepresentativeIngredient(
+                List.of(Items.IRON_INGOT, Items.GOLD_INGOT), Items.IRON_INGOT).toVanilla();
+
+        assertEquals(List.of(new OmniversalPatternData.MoldTagInputSlot(0, TEST_TAG)),
+                OmniversalPatternEncoding.resolveMoldTagInputSlots(recipe(
+                        Ingredient.of(Items.NETHERITE_INGOT), List.of(custom))));
+    }
+
+    @Test
     void tagInputAcceptsAnotherMemberButRejectsNonMembers() {
         DynamicComponentPatternDetails pattern = tagPattern();
         IPatternDetails.IInput input = pattern.getInputs()[0];
 
         assertTrue(input.isValid(key(Items.GOLD_INGOT), null));
         assertFalse(input.isValid(key(Items.DIAMOND), null));
+    }
+
+    @Test
+    void moldHubMatchesTagMoldWithoutExpandingThePattern() {
+        assertTrue(OmniversalMoldHubBlockEntity.matchesMolds(
+                List.of(Ingredient.of(TEST_TAG)), List.of(new ItemStack(Items.GOLD_INGOT))));
     }
 
     @Test
@@ -190,6 +244,10 @@ class OmniversalPatternTagInputTest {
     }
 
     private static AdvancedAlloyFurnaceRecipe recipe(Ingredient input) {
+        return recipe(input, List.of());
+    }
+
+    private static AdvancedAlloyFurnaceRecipe recipe(Ingredient input, List<Ingredient> molds) {
         return new AdvancedAlloyFurnaceRecipe(
                 ResourceLocation.fromNamespaceAndPath("useless_mod_test", "tag_slot"),
                 List.of(new CountedIngredient(input, 1L)),
@@ -202,7 +260,7 @@ class OmniversalPatternTagInputTest {
                 20,
                 Ingredient.EMPTY,
                 0,
-                List.of(),
+                molds,
                 AlloyFurnaceMode.NORMAL);
     }
 
@@ -269,6 +327,52 @@ class OmniversalPatternTagInputTest {
             appeng.api.stacks.KeyCounter result = new appeng.api.stacks.KeyCounter();
             contents.forEach(result::add);
             return result;
+        }
+    }
+
+    private record ExactItemSetIngredient(List<Item> items) implements ICustomIngredient {
+        @Override
+        public boolean test(ItemStack stack) {
+            return stack != null && items.contains(stack.getItem());
+        }
+
+        @Override
+        public Stream<ItemStack> getItems() {
+            return items.stream().map(ItemStack::new);
+        }
+
+        @Override
+        public boolean isSimple() {
+            return false;
+        }
+
+        @Override
+        public IngredientType<?> getType() {
+            // This synthetic ingredient is only used for in-memory matching in this test.
+            return null;
+        }
+    }
+
+    private record RepresentativeIngredient(List<Item> items, Item representative)
+            implements ICustomIngredient {
+        @Override
+        public boolean test(ItemStack stack) {
+            return stack != null && items.contains(stack.getItem());
+        }
+
+        @Override
+        public Stream<ItemStack> getItems() {
+            return Stream.of(new ItemStack(representative));
+        }
+
+        @Override
+        public boolean isSimple() {
+            return false;
+        }
+
+        @Override
+        public IngredientType<?> getType() {
+            return null;
         }
     }
 }

@@ -17,6 +17,7 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.MenuType;
 import net.minecraft.world.item.ItemStack;
+import net.neoforged.neoforge.fluids.FluidStack;
 import net.neoforged.neoforge.network.PacketDistributor;
 import org.jetbrains.annotations.Nullable;
 
@@ -148,10 +149,14 @@ public final class OmniversalPatternJeiTransferHandler<T extends PatternEncoding
             }
             if (!options.isEmpty()) inputs.add(options);
         }
-        recipe.inputFluids().stream()
-                .map(GenericStack::fromFluidStack)
-                .filter(Objects::nonNull)
-                .forEach(stack -> inputs.add(List.of(stack)));
+        recipe.inputFluids().forEach(input -> {
+            List<GenericStack> options = new ArrayList<>();
+            for (FluidStack option : input.getFluids()) {
+                GenericStack stack = GenericStack.fromFluidStack(option);
+                if (stack != null) options.add(stack);
+            }
+            if (!options.isEmpty()) inputs.add(options);
+        });
         recipe.keyInputs().stream()
                 .filter(Objects::nonNull)
                 .forEach(stack -> inputs.add(List.of(stack)));

@@ -317,15 +317,15 @@ public class AdvancedAlloyFurnaceRecipeCategory implements IRecipeCategory<Advan
         }
 
         // 输入流体槽 - 使用JEI内置流体渲染器
-        List<FluidStack> inputFluids = recipe.inputFluids();
+        List<net.neoforged.neoforge.fluids.crafting.SizedFluidIngredient> inputFluids = recipe.inputFluids();
         if (!inputFluids.isEmpty()) {
             int fluidCount = inputFluids.size();
             int fluidWidth = FLUID_INPUT_WIDTH / fluidCount;
 
             for (int i = 0; i < fluidCount; i++) {
-                FluidStack fluid = inputFluids.get(i);
+                FluidStack fluid = inputFluids.get(i).getFluids()[0];
                 int x = FLUID_INPUT_X + i * fluidWidth;
-                int amount = fluid.getAmount();
+                int amount = inputFluids.get(i).amount();
 
                 builder.addSlot(RecipeIngredientRole.INPUT, x, FLUID_INPUT_Y)
                        .setFluidRenderer(amount, false, fluidWidth, FLUID_INPUT_HEIGHT)

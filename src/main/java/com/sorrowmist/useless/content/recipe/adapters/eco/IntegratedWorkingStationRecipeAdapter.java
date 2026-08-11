@@ -15,8 +15,6 @@ import net.minecraft.world.item.crafting.Ingredient;
 import net.minecraft.world.item.crafting.RecipeHolder;
 import net.minecraft.world.item.crafting.RecipeManager;
 import net.minecraft.world.level.Level;
-import net.minecraft.world.level.material.FlowingFluid;
-import net.minecraft.world.level.material.Fluid;
 import net.neoforged.neoforge.common.crafting.SizedIngredient;
 import net.neoforged.neoforge.fluids.FluidStack;
 import net.neoforged.neoforge.fluids.crafting.SizedFluidIngredient;
@@ -58,19 +56,7 @@ public final class IntegratedWorkingStationRecipeAdapter
             return List.of();
         }
 
-        List<FluidStack> inputFluidChoices = converted.inputFluidChoices();
-        if (inputFluidChoices.isEmpty()) {
-            return List.of(createRecipe(AdapterUtils.convertedId(holder.id()), converted, List.of()));
-        }
-
-        List<AdvancedAlloyFurnaceRecipe> recipes = new ArrayList<>(inputFluidChoices.size());
-        for (int index = 0; index < inputFluidChoices.size(); index++) {
-            ResourceLocation id = index == 0
-                    ? AdapterUtils.convertedId(holder.id())
-                    : convertedFluidId(holder.id(), index);
-            recipes.add(createRecipe(id, converted, List.of(inputFluidChoices.get(index).copy())));
-        }
-        return recipes;
+        return List.of(createRecipe(AdapterUtils.convertedId(holder.id()), converted));
     }
 
     @Override
@@ -98,18 +84,21 @@ public final class IntegratedWorkingStationRecipeAdapter
     }
 
     private AdvancedAlloyFurnaceRecipe createRecipe(
-            ResourceLocation id, Converted converted, List<FluidStack> inputFluids) {
+            ResourceLocation id, Converted converted) {
+        List<SizedFluidIngredient> inputFluids = List.of(converted.inputFluid());
         return new AdvancedAlloyFurnaceRecipe(
                 id,
                 converted.itemInputs(),
                 inputFluids,
+                List.of(),
                 copyItems(converted.itemOutputs()),
                 copyFluids(converted.fluidOutputs()),
+                List.of(),
                 converted.energy(),
                 AdapterUtils.DEFAULT_PROCESS_TIME,
                 Ingredient.EMPTY,
                 0,
-                AdapterUtils.toMoldIngredient(getMoldItem()),
+                List.of(AdapterUtils.toMoldIngredient(getMoldItem())),
                 AlloyFurnaceMode.NORMAL
         );
     }
@@ -140,11 +129,8 @@ public final class IntegratedWorkingStationRecipeAdapter
         }
 
         SizedFluidIngredient inputFluid = source.inputFluid();
-        if (inputFluid == null || inputFluid.amount() <= 0 || inputFluid.ingredient() == null) {
-            return null;
-        }
-        List<FluidStack> fluidChoices = fluidChoices(inputFluid);
-        if (fluidChoices == null) {
+        if (inputFluid == null || inputFluid.amount() <= 0 || inputFluid.ingredient() == null
+                || inputFluid.ingredient().isEmpty()) {
             return null;
         }
 
@@ -159,44 +145,15 @@ public final class IntegratedWorkingStationRecipeAdapter
             fluidOutputs.add(fluidOutput.copy());
         }
 
-        if ((requirements.isEmpty() && fluidChoices.isEmpty())
-                || (itemOutputs.isEmpty() && fluidOutputs.isEmpty())) {
+        if (itemOutputs.isEmpty() && fluidOutputs.isEmpty()) {
             return null;
         }
 
         List<CountedIngredient> itemInputs = requirements.entrySet().stream()
                 .map(entry -> new CountedIngredient(entry.getKey(), entry.getValue()))
                 .toList();
-        return new Converted(itemInputs, requirements, inputFluid, fluidChoices, itemOutputs, fluidOutputs,
+        return new Converted(itemInputs, requirements, inputFluid, itemOutputs, fluidOutputs,
                 source.energy());
-    }
-
-    @Nullable
-    private static List<FluidStack> fluidChoices(SizedFluidIngredient input) {
-        if (input.ingredient().isEmpty()) {
-            return List.of();
-        }
-
-        Map<FluidStack, FluidStack> uniqueChoices = new LinkedHashMap<>();
-        for (FluidStack stack : input.getFluids()) {
-            if (stack == null || stack.isEmpty()) {
-                continue;
-            }
-            // Fluid tags such as c:water include both the source and flowing variants. Tanks
-            // store the source fluid, so normalize first to avoid emitting duplicate recipes.
-            Fluid fluid = stack.getFluid();
-            if (fluid instanceof FlowingFluid flowingFluid) {
-                fluid = flowingFluid.getSource();
-            }
-            FluidStack choice = new FluidStack(fluid, input.amount());
-            choice.applyComponents(stack.getComponentsPatch());
-            boolean duplicate = uniqueChoices.keySet().stream()
-                    .anyMatch(existing -> FluidStack.isSameFluidSameComponents(existing, choice));
-            if (!duplicate) {
-                uniqueChoices.put(choice, choice);
-            }
-        }
-        return uniqueChoices.isEmpty() ? null : List.copyOf(uniqueChoices.values());
     }
 
     private static boolean matchesFluidRequirement(
@@ -204,17 +161,8 @@ public final class IntegratedWorkingStationRecipeAdapter
         if (required.ingredient().isEmpty()) {
             return true;
         }
-        for (Map.Entry<FluidStack, Long> entry : mergedFluids.entrySet()) {
-            if (entry.getValue() >= required.amount() && required.test(entry.getKey())) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    private static ResourceLocation convertedFluidId(ResourceLocation originalId, int fluidIndex) {
-        return ResourceLocation.fromNamespaceAndPath(
-                originalId.getNamespace(), originalId.getPath() + "_fluid_" + fluidIndex + "_converted");
+        return com.sorrowmist.useless.content.recipe.FluidIngredientAllocator.matches(
+                List.of(required), mergedFluids, 1L);
     }
 
     private static List<ItemStack> copyItems(List<ItemStack> stacks) {
@@ -229,7 +177,6 @@ public final class IntegratedWorkingStationRecipeAdapter
             List<CountedIngredient> itemInputs,
             Map<Ingredient, Long> itemRequirements,
             SizedFluidIngredient inputFluid,
-            List<FluidStack> inputFluidChoices,
             List<ItemStack> itemOutputs,
             List<FluidStack> fluidOutputs,
             long energy) {

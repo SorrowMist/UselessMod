@@ -4,6 +4,7 @@ import com.enderio.enderio.foundation.util.ExperienceUtil;
 import com.enderio.enderio.init.EIOFluids;
 import com.sorrowmist.useless.content.recipe.AdapterUtils;
 import com.sorrowmist.useless.content.recipe.CountedIngredient;
+import com.sorrowmist.useless.content.recipe.FluidIngredientAllocator;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.crafting.Ingredient;
 import net.neoforged.neoforge.common.crafting.SizedIngredient;
@@ -84,15 +85,8 @@ final class EnderIOAdapterUtils {
 
     static boolean matchesFluid(
             Map<FluidStack, Long> available, SizedFluidIngredient required) {
-        if (available == null || required == null || required.amount() <= 0) {
-            return false;
-        }
-        for (Map.Entry<FluidStack, Long> entry : available.entrySet()) {
-            if (entry.getValue() >= required.amount() && required.test(entry.getKey())) {
-                return true;
-            }
-        }
-        return false;
+        return required != null && required.amount() > 0
+                && FluidIngredientAllocator.matches(List.of(required), available, 1L);
     }
 
     @Nullable

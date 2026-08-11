@@ -12,6 +12,10 @@ public interface DynamicComponentPattern extends IPatternDetails {
         return false;
     }
 
+    default boolean isFluidTagInput(int slot) {
+        return false;
+    }
+
     boolean isItemIdOutput(int slot);
 
     boolean usesDynamicOutputs();

@@ -54,8 +54,9 @@ class ProductiveBeesRecipeAdapterTest {
                 .getFirst();
 
         assertTrue(converted.inputs().isEmpty());
-        assertEquals(20, converted.inputFluids().getFirst().getAmount());
-        assertTrue(FluidStack.isSameFluid(converted.inputFluids().getFirst(), new FluidStack(Fluids.WATER, 1)));
+        assertEquals(20, converted.inputFluids().getFirst().amount());
+        assertTrue(converted.inputFluids().getFirst().ingredient()
+                .test(new FluidStack(Fluids.WATER, 1)));
         assertEquals(20, findCount(converted.outputs(), new ItemStack(Items.HONEYCOMB)));
         assertEquals(1, findCount(converted.outputs(), new ItemStack(Items.WHEAT_SEEDS)));
         assertTrue(converted.mold().test(BeeCreator.getSpawnEgg(

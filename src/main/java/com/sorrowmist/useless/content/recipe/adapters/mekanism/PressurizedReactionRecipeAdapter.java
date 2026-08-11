@@ -52,26 +52,26 @@ public final class PressurizedReactionRecipeAdapter implements IRecipeAdapter<Pr
                 || chemicalInput.hasNoMatchingInstances()) return List.of();
 
         List<AdvancedAlloyFurnaceRecipe> result = new ArrayList<>();
-        for (FluidStack fluid : MekanismChemicalRecipeSupport.fluidRepresentations(fluidInput)) {
-            for (ChemicalStack chemical : chemicalInput.getRepresentations()) {
-                GenericStack chemicalKey = MekanismChemicalRecipeSupport.key(chemical);
-                if (chemicalKey == null) continue;
-                for (PressurizedReactionRecipe.PressurizedReactionRecipeOutput output
-                        : original.getOutputDefinition()) {
-                    List<GenericStack> chemicalOutputs = new ArrayList<>();
-                    if (!output.chemical().isEmpty()) {
-                        GenericStack outputKey = MekanismChemicalRecipeSupport.key(output.chemical());
-                        if (outputKey != null) chemicalOutputs.add(outputKey);
-                    }
-                    if (output.item().isEmpty() && chemicalOutputs.isEmpty()) continue;
-
-                    String suffix = "reaction_" + fluidId(fluid) + "_" + id(chemical) + "_out";
-                    result.add(MekanismChemicalRecipeSupport.recipe(
-                            MekanismChemicalRecipeSupport.variantId(holder.id(), suffix),
-                            MekanismChemicalRecipeSupport.items(itemInput), List.of(fluid), List.of(chemicalKey),
-                            output.item().isEmpty() ? List.of() : List.of(output.item().copy()), List.of(),
-                            chemicalOutputs, reactionEnergy(original), original.getDuration(), getMoldItem()));
+        List<net.neoforged.neoforge.fluids.crafting.SizedFluidIngredient> fluidInputs =
+                MekanismChemicalRecipeSupport.fluidIngredients(fluidInput);
+        for (ChemicalStack chemical : chemicalInput.getRepresentations()) {
+            GenericStack chemicalKey = MekanismChemicalRecipeSupport.key(chemical);
+            if (chemicalKey == null) continue;
+            for (PressurizedReactionRecipe.PressurizedReactionRecipeOutput output
+                    : original.getOutputDefinition()) {
+                List<GenericStack> chemicalOutputs = new ArrayList<>();
+                if (!output.chemical().isEmpty()) {
+                    GenericStack outputKey = MekanismChemicalRecipeSupport.key(output.chemical());
+                    if (outputKey != null) chemicalOutputs.add(outputKey);
                 }
+                if (output.item().isEmpty() && chemicalOutputs.isEmpty()) continue;
+
+                String suffix = "reaction_" + id(chemical) + "_out";
+                result.add(MekanismChemicalRecipeSupport.recipe(
+                        MekanismChemicalRecipeSupport.variantId(holder.id(), suffix),
+                        MekanismChemicalRecipeSupport.items(itemInput), fluidInputs, List.of(chemicalKey),
+                        output.item().isEmpty() ? List.of() : List.of(output.item().copy()), List.of(),
+                        chemicalOutputs, reactionEnergy(original), original.getDuration(), getMoldItem()));
             }
         }
         return result;

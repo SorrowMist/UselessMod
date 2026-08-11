@@ -6,6 +6,8 @@ import com.sorrowmist.useless.core.component.OmniversalPatternData;
 import com.sorrowmist.useless.integration.dataenergistics.DataEnergisticsIntegrationTestBootstrap;
 
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.core.registries.Registries;
+import net.minecraft.tags.TagKey;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.Items;
 
@@ -62,6 +64,52 @@ class OmniversalPatternMoldSearchTermsTest {
                 itemKey(Items.IRON_INGOT).getDisplayName().getString(),
                 itemKey(Items.GOLD_INGOT).getDisplayName().getString()),
                 OmniversalPatternMoldSearchTerms.searchTerms(multi));
+    }
+
+    @Test
+    void replacesRepresentativeForTagBackedMultiMold() {
+        TagKey<Item> hoes = TagKey.create(
+                Registries.ITEM,
+                ResourceLocation.fromNamespaceAndPath("useless_mod_test", "all_hoes"));
+        OmniversalPatternData multi = new OmniversalPatternData(
+                OmniversalPatternData.CURRENT_VERSION,
+                ResourceLocation.fromNamespaceAndPath("useless_mod_test", "tag_mold"),
+                "fingerprint",
+                true,
+                Optional.empty(),
+                List.of(itemKey(Items.CRAFTING_TABLE), itemKey(Items.NETHERITE_HOE)),
+                List.of(),
+                List.of(),
+                List.of(new OmniversalPatternData.MoldTagInputSlot(1, hoes)),
+                List.of(),
+                List.of());
+
+        assertEquals(List.of(
+                itemKey(Items.CRAFTING_TABLE).getDisplayName().getString(),
+                "#useless_mod_test:all_hoes"),
+                OmniversalPatternMoldSearchTerms.searchTerms(multi));
+    }
+
+    @Test
+    void hidesRepresentativeForTagBackedSingleMold() {
+        TagKey<Item> hoes = TagKey.create(
+                Registries.ITEM,
+                ResourceLocation.fromNamespaceAndPath("useless_mod_test", "all_hoes_single"));
+        OmniversalPatternData single = new OmniversalPatternData(
+                OmniversalPatternData.CURRENT_VERSION,
+                ResourceLocation.fromNamespaceAndPath("useless_mod_test", "single_tag_mold"),
+                "fingerprint",
+                true,
+                Optional.of(itemKey(Items.NETHERITE_HOE)),
+                List.of(),
+                List.of(),
+                List.of(),
+                List.of(new OmniversalPatternData.MoldTagInputSlot(0, hoes)),
+                List.of(),
+                List.of());
+
+        assertEquals(List.of("#useless_mod_test:all_hoes_single"),
+                OmniversalPatternMoldSearchTerms.searchTerms(single));
     }
 
     private static OmniversalPatternData data(AEItemKey mold, boolean requiresMold) {

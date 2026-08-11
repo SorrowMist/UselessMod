@@ -10,7 +10,6 @@ import com.sorrowmist.useless.init.ModRecipeTypes;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.core.NonNullList;
 import net.minecraft.core.component.DataComponentPatch;
-import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
@@ -19,6 +18,7 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.crafting.*;
 import net.minecraft.world.level.Level;
 import net.neoforged.neoforge.fluids.FluidStack;
+import net.neoforged.neoforge.fluids.crafting.SizedFluidIngredient;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.ArrayList;
@@ -28,7 +28,7 @@ import java.util.Optional;
 public record AdvancedAlloyFurnaceRecipe(
         ResourceLocation id,
         List<CountedIngredient> inputs,
-        List<FluidStack> inputFluids,
+        List<SizedFluidIngredient> inputFluids,
         List<GenericStack> keyInputs,
         List<ItemStack> outputs,
         List<FluidStack> outputFluids,
@@ -41,6 +41,14 @@ public record AdvancedAlloyFurnaceRecipe(
         AlloyFurnaceMode mode
 ) implements Recipe<RecipeInput> {
 
+    private static final int SIZED_FLUID_NETWORK_VERSION = -1;
+    private static final Codec<List<SizedFluidIngredient>> INPUT_FLUIDS_CODEC = Codec.either(
+            SizedFluidIngredient.NESTED_CODEC.listOf(), FluidStack.CODEC.listOf())
+            .xmap(either -> either.map(
+                            list -> list,
+                            list -> list.stream().map(AdvancedAlloyFurnaceRecipe::sizedFluid).toList()),
+                    list -> com.mojang.datafixers.util.Either.left(list));
+
     public AdvancedAlloyFurnaceRecipe {
         List<Ingredient> normalizedMolds = new ArrayList<>();
         if (molds != null) {
@@ -51,6 +59,7 @@ public record AdvancedAlloyFurnaceRecipe(
             }
         }
         molds = List.copyOf(normalizedMolds);
+        inputFluids = normalizeFluidIngredients(inputFluids);
     }
 
     // 网络同步 StreamCodec
@@ -58,7 +67,11 @@ public record AdvancedAlloyFurnaceRecipe(
             (buf, r) -> {
                 ResourceLocation.STREAM_CODEC.encode(buf, r.id());
                 CountedIngredient.STREAM_CODEC.apply(ByteBufCodecs.list()).encode(buf, r.inputs());
-                FluidStack.STREAM_CODEC.apply(ByteBufCodecs.list()).encode(buf, r.inputFluids());
+                buf.writeVarInt(SIZED_FLUID_NETWORK_VERSION);
+                ByteBufCodecs.VAR_INT.encode(buf, r.inputFluids().size());
+                for (SizedFluidIngredient inputFluid : r.inputFluids()) {
+                    SizedFluidIngredient.STREAM_CODEC.encode(buf, inputFluid);
+                }
                 GenericStack.STREAM_CODEC.apply(ByteBufCodecs.list()).encode(buf, r.keyInputs());
                 ItemStack.STREAM_CODEC.apply(ByteBufCodecs.list()).encode(buf, r.outputs());
                 FluidStack.STREAM_CODEC.apply(ByteBufCodecs.list()).encode(buf, r.outputFluids());
@@ -73,7 +86,24 @@ public record AdvancedAlloyFurnaceRecipe(
             buf -> {
                 ResourceLocation id = ResourceLocation.STREAM_CODEC.decode(buf);
                 List<CountedIngredient> inputs = CountedIngredient.STREAM_CODEC.apply(ByteBufCodecs.list()).decode(buf);
-                List<FluidStack> inputFluids = FluidStack.STREAM_CODEC.apply(ByteBufCodecs.list()).decode(buf);
+                int fluidFormat = buf.readVarInt();
+                List<SizedFluidIngredient> inputFluids = new ArrayList<>();
+                if (fluidFormat == SIZED_FLUID_NETWORK_VERSION) {
+                    int size = ByteBufCodecs.VAR_INT.decode(buf);
+                    if (size < 0) {
+                        throw new IllegalArgumentException("Negative sized fluid ingredient list length: " + size);
+                    }
+                    for (int i = 0; i < size; i++) {
+                        inputFluids.add(SizedFluidIngredient.STREAM_CODEC.decode(buf));
+                    }
+                } else {
+                    if (fluidFormat < 0) {
+                        throw new IllegalArgumentException("Unknown alloy-furnace fluid input format: " + fluidFormat);
+                    }
+                    for (int i = 0; i < fluidFormat; i++) {
+                        inputFluids.add(sizedFluid(FluidStack.STREAM_CODEC.decode(buf)));
+                    }
+                }
                 List<GenericStack> keyInputs = GenericStack.STREAM_CODEC.apply(ByteBufCodecs.list()).decode(buf);
                 List<ItemStack> outputs = ItemStack.STREAM_CODEC.apply(ByteBufCodecs.list()).decode(buf);
                 List<FluidStack> outputFluids = FluidStack.STREAM_CODEC.apply(ByteBufCodecs.list()).decode(buf);
@@ -106,7 +136,7 @@ public record AdvancedAlloyFurnaceRecipe(
                     ResourceLocation.CODEC.fieldOf("id").forGetter(AdvancedAlloyFurnaceRecipe::id),
                     CountedIngredient.CODEC.codec().listOf().fieldOf("ingredients")
                                            .forGetter(AdvancedAlloyFurnaceRecipe::inputs),
-                    FluidStack.CODEC.listOf().optionalFieldOf("input_fluids", List.of())
+                    INPUT_FLUIDS_CODEC.optionalFieldOf("input_fluids", List.of())
                                     .forGetter(AdvancedAlloyFurnaceRecipe::inputFluids),
                     GenericStack.CODEC.listOf().optionalFieldOf("key_inputs", List.of())
                                     .forGetter(AdvancedAlloyFurnaceRecipe::keyInputs),
@@ -139,7 +169,7 @@ public record AdvancedAlloyFurnaceRecipe(
     private static AdvancedAlloyFurnaceRecipe fromCodec(
             ResourceLocation id,
             List<CountedIngredient> inputs,
-            List<FluidStack> inputFluids,
+            List<SizedFluidIngredient> inputFluids,
             List<GenericStack> keyInputs,
             List<ItemStack> outputs,
             List<FluidStack> outputFluids,
@@ -163,7 +193,24 @@ public record AdvancedAlloyFurnaceRecipe(
 
     public AdvancedAlloyFurnaceRecipe(ResourceLocation id,
                                       List<CountedIngredient> inputs,
-                                      List<FluidStack> inputFluids,
+                                      Iterable<?> inputFluids,
+                                      List<GenericStack> keyInputs,
+                                      List<ItemStack> outputs,
+                                      List<FluidStack> outputFluids,
+                                      List<GenericStack> keyOutputs,
+                                      long energy,
+                                      int processTime,
+                                      Ingredient catalyst,
+                                      int catalystUses,
+                                      List<Ingredient> molds,
+                                      AlloyFurnaceMode mode) {
+        this(id, inputs, convertLegacyFluids(inputFluids), keyInputs, outputs, outputFluids, keyOutputs,
+                energy, processTime, catalyst, catalystUses, molds, mode);
+    }
+
+    public AdvancedAlloyFurnaceRecipe(ResourceLocation id,
+                                      List<CountedIngredient> inputs,
+                                      Iterable<?> inputFluids,
                                       List<ItemStack> outputs,
                                       List<FluidStack> outputFluids,
                                       long energy,
@@ -172,13 +219,13 @@ public record AdvancedAlloyFurnaceRecipe(
                                       int catalystUses,
                                       Ingredient mold,
                                       AlloyFurnaceMode mode) {
-        this(id, inputs, inputFluids, List.of(), outputs, outputFluids, List.of(), energy, processTime, catalyst, catalystUses,
+        this(id, inputs, convertLegacyFluids(inputFluids), List.of(), outputs, outputFluids, List.of(), energy, processTime, catalyst, catalystUses,
                 mold == null ? List.of() : List.of(mold), mode);
     }
 
     public AdvancedAlloyFurnaceRecipe(ResourceLocation id,
                                       List<CountedIngredient> inputs,
-                                      List<FluidStack> inputFluids,
+                                      Iterable<?> inputFluids,
                                       List<GenericStack> keyInputs,
                                       List<ItemStack> outputs,
                                       List<FluidStack> outputFluids,
@@ -189,9 +236,56 @@ public record AdvancedAlloyFurnaceRecipe(
                                       int catalystUses,
                                       Ingredient mold,
                                       AlloyFurnaceMode mode) {
-        this(id, inputs, inputFluids, keyInputs, outputs, outputFluids, keyOutputs,
+        this(id, inputs, convertLegacyFluids(inputFluids), keyInputs, outputs, outputFluids, keyOutputs,
                 energy, processTime, catalyst, catalystUses,
                 mold == null ? List.of() : List.of(mold), mode);
+    }
+
+    private static List<SizedFluidIngredient> convertLegacyFluids(Iterable<?> fluids) {
+        if (fluids == null) return List.of();
+        List<SizedFluidIngredient> result = new ArrayList<>();
+        for (Object value : fluids) {
+            if (value instanceof SizedFluidIngredient ingredient
+                    && ingredient.ingredient() != null
+                    && !ingredient.ingredient().isEmpty()
+                    && ingredient.amount() > 0) {
+                result.add(ingredient);
+            } else if (value instanceof FluidStack fluid
+                    && !fluid.isEmpty() && fluid.getAmount() > 0) {
+                result.add(sizedFluid(fluid));
+            }
+        }
+        return result;
+    }
+
+    private static SizedFluidIngredient sizedFluid(FluidStack stack) {
+        SizedFluidIngredient result = AdapterUtils.toSizedFluidIngredient(stack);
+        if (result == null) throw new IllegalArgumentException("Legacy fluid input cannot be empty");
+        return result;
+    }
+
+    private static List<SizedFluidIngredient> normalizeFluidIngredients(List<SizedFluidIngredient> fluids) {
+        if (fluids == null || fluids.isEmpty()) return List.of();
+        List<SizedFluidIngredient> normalized = new ArrayList<>();
+        for (SizedFluidIngredient fluid : fluids) {
+            if (fluid == null || fluid.ingredient() == null || fluid.ingredient().isEmpty()
+                    || fluid.amount() <= 0) continue;
+            int existing = -1;
+            for (int i = 0; i < normalized.size(); i++) {
+                if (normalized.get(i).ingredient().equals(fluid.ingredient())) {
+                    existing = i;
+                    break;
+                }
+            }
+            if (existing < 0) {
+                normalized.add(fluid);
+            } else {
+                long amount = (long) normalized.get(existing).amount() + fluid.amount();
+                normalized.set(existing, new SizedFluidIngredient(fluid.ingredient(),
+                        amount > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) amount));
+            }
+        }
+        return List.copyOf(normalized);
     }
 
     /** Compatibility accessor for the historical single-mold API. */

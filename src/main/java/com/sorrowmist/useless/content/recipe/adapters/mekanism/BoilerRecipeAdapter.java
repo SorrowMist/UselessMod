@@ -22,7 +22,7 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.crafting.RecipeHolder;
 import net.minecraft.world.level.Level;
-import net.neoforged.neoforge.fluids.FluidStack;
+import net.neoforged.neoforge.fluids.crafting.SizedFluidIngredient;
 import net.minecraft.tags.FluidTags;
 import org.jetbrains.annotations.Nullable;
 
@@ -42,7 +42,7 @@ public final class BoilerRecipeAdapter extends MekanismSyntheticRecipeAdapter {
     @Override
     protected List<RecipeHolder<MekanismSyntheticRecipe>> createGeneratedRecipes(Level level) {
         List<RecipeHolder<MekanismSyntheticRecipe>> result = new ArrayList<>();
-        List<FluidStack> water = MekanismChemicalRecipeSupport.fluidRepresentations(
+        List<SizedFluidIngredient> water = MekanismChemicalRecipeSupport.fluidIngredients(
                 IngredientCreatorAccess.fluid().from(FluidTags.WATER, WATER_AMOUNT));
         if (water.isEmpty()) return result;
 
@@ -51,9 +51,7 @@ public final class BoilerRecipeAdapter extends MekanismSyntheticRecipeAdapter {
                 / HeatUtils.getSteamEnergyEfficiency();
         ChemicalStack steam = MekanismChemicals.STEAM.asStack(WATER_AMOUNT);
         ResourceLocation waterId = Mekanism.rl("water");
-        for (FluidStack waterStack : water) {
-            addRecipe(result, waterId, waterStack, null, steam, ChemicalStack.EMPTY);
-        }
+        addRecipe(result, waterId, water.getFirst(), null, steam, ChemicalStack.EMPTY);
 
         for (Map.Entry<ResourceKey<Chemical>, HeatedCoolant> entry : MekanismAPI.CHEMICAL_REGISTRY
                 .getDataMap(IMekanismDataMapTypes.INSTANCE.heatedChemicalCoolant()).entrySet()) {
@@ -62,11 +60,9 @@ public final class BoilerRecipeAdapter extends MekanismSyntheticRecipeAdapter {
             long amount = Math.round(waterToSteamHeatNecessary / coolant.thermalEnthalpy());
             ChemicalStackIngredient input = IngredientCreatorAccess.chemicalStack().fromHolder(
                     MekanismAPI.CHEMICAL_REGISTRY.getHolderOrThrow(key), amount);
-            for (FluidStack waterStack : water) {
-                for (ChemicalStack concrete : input.getRepresentations()) {
-                    addRecipe(result, Mekanism.rl("boiler_" + id(concrete)), waterStack,
-                            concrete, steam, coolant.cool(amount));
-                }
+            for (ChemicalStack concrete : input.getRepresentations()) {
+                addRecipe(result, Mekanism.rl("boiler_" + id(concrete)), water.getFirst(),
+                        concrete, steam, coolant.cool(amount));
             }
         }
 
@@ -78,10 +74,8 @@ public final class BoilerRecipeAdapter extends MekanismSyntheticRecipeAdapter {
             if (legacy == null) continue;
             long amount = Math.round(waterToSteamHeatNecessary / legacy.getThermalEnthalpy());
             ChemicalStack coolant = chemical.getStack(amount);
-            for (FluidStack waterStack : water) {
-                addRecipe(result, Mekanism.rl("boiler_" + id(coolant)), waterStack,
-                        coolant, steam, legacy.getCooledChemical().getStack(amount));
-            }
+            addRecipe(result, Mekanism.rl("boiler_" + id(coolant)), water.getFirst(),
+                    coolant, steam, legacy.getCooledChemical().getStack(amount));
         }
         return result;
     }
@@ -89,7 +83,7 @@ public final class BoilerRecipeAdapter extends MekanismSyntheticRecipeAdapter {
     private static final int WATER_AMOUNT = 1;
 
     private void addRecipe(List<RecipeHolder<MekanismSyntheticRecipe>> result, ResourceLocation sourceId,
-                           FluidStack water, @Nullable ChemicalStack coolant,
+                           SizedFluidIngredient water, @Nullable ChemicalStack coolant,
                            ChemicalStack steam, ChemicalStack cooledCoolant) {
         GenericStack steamKey = MekanismChemicalRecipeSupport.key(steam);
         GenericStack coolantKey = coolant == null ? null : MekanismChemicalRecipeSupport.key(coolant);
@@ -101,11 +95,10 @@ public final class BoilerRecipeAdapter extends MekanismSyntheticRecipeAdapter {
         List<GenericStack> chemicalOutputs = new ArrayList<>();
         chemicalOutputs.add(steamKey);
         if (cooledKey != null) chemicalOutputs.add(cooledKey);
-        String suffix = "boiler_" + fluidId(water)
-                + (coolant == null ? "_water" : "_" + id(coolant));
+        String suffix = "boiler_" + (coolant == null ? "water" : id(coolant));
         ResourceLocation id = MekanismChemicalRecipeSupport.variantId(sourceId, suffix);
         AdvancedAlloyFurnaceRecipe converted = MekanismChemicalRecipeSupport.recipe(
-                id, List.of(), List.of(water.copy()), chemicalInputs, List.of(), List.of(), chemicalOutputs,
+                id, List.of(), List.of(water), chemicalInputs, List.of(), List.of(), chemicalOutputs,
                 0L,
                 AdapterUtils.safeInt(PROCESS_TICKS), getMoldItem());
         result.add(MekanismChemicalRecipeSupport.syntheticHolder(id, converted));
@@ -116,8 +109,4 @@ public final class BoilerRecipeAdapter extends MekanismSyntheticRecipeAdapter {
         return id.getNamespace() + "_" + id.getPath().replace('/', '_');
     }
 
-    private static String fluidId(FluidStack stack) {
-        var id = net.minecraft.core.registries.BuiltInRegistries.FLUID.getKey(stack.getFluid());
-        return id.getNamespace() + "_" + id.getPath().replace('/', '_');
-    }
 }

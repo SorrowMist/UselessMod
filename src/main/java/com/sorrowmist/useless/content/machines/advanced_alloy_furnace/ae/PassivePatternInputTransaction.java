@@ -13,12 +13,16 @@ import net.minecraft.world.item.Item;
 import net.minecraft.world.level.Level;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.ArrayDeque;
 import java.util.ArrayList;
-import java.util.HashMap;
+import java.util.Arrays;
 import java.util.IdentityHashMap;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.function.Supplier;
 
 /** Plans and commits one passive pattern extraction without partially consuming network inputs. */
@@ -108,11 +112,11 @@ public final class PassivePatternInputTransaction {
             return PlannedExtraction.failure(Failure.AMOUNT_OVERFLOW, null);
         }
 
-        KeyCounter consumed = new KeyCounter();
-        Map<AEKey, Long> simulatedAmounts = new HashMap<>();
         IPatternDetails.IInput[] patternInputs = pattern.getInputs();
-        KeyCounter[] selectedInputs = new KeyCounter[patternInputs.length];
         DynamicComponentPattern dynamic = pattern instanceof DynamicComponentPattern value ? value : null;
+        List<SlotDemand> demands = new ArrayList<>();
+        Map<AEKey, Long> availableByKey = new LinkedHashMap<>();
+        KeyCounter[] selectedInputs = new KeyCounter[patternInputs.length];
 
         for (int slot = 0; slot < patternInputs.length; slot++) {
             IPatternDetails.IInput input = patternInputs[slot];
@@ -131,83 +135,167 @@ public final class PassivePatternInputTransaction {
                 return PlannedExtraction.failure(Failure.AMOUNT_OVERFLOW, firstPossibleKey(input));
             }
 
-            long missing = required;
-            for (GenericStack possible : input.getPossibleInputs()) {
-                if (possible == null || possible.what() == null || missing <= 0) {
-                    continue;
-                }
-                AEKey key = possible.what();
-                if (!input.isValid(key, level)) {
-                    continue;
-                }
-                missing -= takeSimulated(
-                        key, missing, storage, source, simulatedAmounts,
-                        selectedInputs[slot], consumed);
-            }
-
-            if (missing > 0) {
-                missing = takeAdditionalCandidates(
-                        dynamic, slot, input, missing, level,
-                        storage, source, simulatedAmounts,
-                        selectedInputs[slot], consumed, inputIndex);
-            }
-
-            if (missing > 0) {
-                return PlannedExtraction.failure(Failure.MISSING_INPUT, firstPossibleKey(input));
-            }
-        }
-
-        return new PlannedExtraction(Failure.NONE, selectedInputs, consumed, null);
-    }
-
-    private static long takeAdditionalCandidates(
-            @Nullable DynamicComponentPattern dynamic,
-            int slot,
-            IPatternDetails.IInput input,
-            long missing,
-            @Nullable Level level,
-            MEStorage storage,
-            IActionSource source,
-            Map<AEKey, Long> simulatedAmounts,
-            KeyCounter selected,
-            KeyCounter consumed,
-            AvailableInputIndex inputIndex) {
-        if (dynamic == null || !dynamic.isItemIdInput(slot)) {
-            return missing;
-        }
-        for (GenericStack possible : input.getPossibleInputs()) {
-            if (possible == null || !(possible.what() instanceof AEItemKey possibleItem)) {
+            if (required <= 0) {
                 continue;
             }
-            Iterable<AEKey> candidates = dynamic.isTagInput(slot)
-                    ? inputIndex.allItemVariants()
-                    : inputIndex.itemVariants(possibleItem);
-            for (AEKey candidate : candidates) {
-                if (missing <= 0) {
-                    return 0L;
+
+            Set<AEKey> candidates = new LinkedHashSet<>();
+            GenericStack[] possibleInputs = input.getPossibleInputs();
+            if (possibleInputs != null) {
+                for (GenericStack possible : possibleInputs) {
+                    if (possible == null || possible.what() == null) {
+                        continue;
+                    }
+                    addCandidate(candidates, possible.what(), input, level);
                 }
-                if (input.isValid(candidate, level)) {
-                    missing -= takeSimulated(
-                            candidate, missing, storage, source, simulatedAmounts,
-                        selected, consumed);
+            }
+
+            if (dynamic != null) {
+                if (dynamic.isFluidTagInput(slot)) {
+                    for (AEKey candidate : inputIndex.allFluidVariants()) {
+                        addCandidate(candidates, candidate, input, level);
+                    }
+                } else if (dynamic.isItemIdInput(slot)) {
+                    if (dynamic.isTagInput(slot)) {
+                        for (AEKey candidate : inputIndex.allItemVariants()) {
+                            addCandidate(candidates, candidate, input, level);
+                        }
+                    } else if (possibleInputs != null) {
+                        for (GenericStack possible : possibleInputs) {
+                            if (possible != null && possible.what() instanceof AEItemKey item) {
+                                for (AEKey candidate : inputIndex.itemVariants(item)) {
+                                    addCandidate(candidates, candidate, input, level);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            for (AEKey candidate : candidates) {
+                availableByKey.computeIfAbsent(candidate, key -> Math.max(0L,
+                        storage.extract(key, Long.MAX_VALUE, Actionable.SIMULATE, source)));
+            }
+            demands.add(new SlotDemand(slot, required, List.copyOf(candidates)));
+        }
+
+        KeyAllocation allocation = allocate(demands, availableByKey, patternInputs.length);
+        if (allocation == null) {
+            for (SlotDemand demand : demands) {
+                if (demand.candidates().isEmpty()
+                        || !hasAvailableCandidate(demand, availableByKey)) {
+                    return PlannedExtraction.failure(Failure.MISSING_INPUT,
+                            firstPossibleKey(patternInputs[demand.slot()]));
+                }
+            }
+            return PlannedExtraction.failure(Failure.MISSING_INPUT,
+                    firstPossibleKey(patternInputs[demands.getFirst().slot()]));
+        }
+        return new PlannedExtraction(Failure.NONE, allocation.selectedInputs(), allocation.consumed(), null);
+    }
+
+    private static void addCandidate(Set<AEKey> candidates, @Nullable AEKey candidate,
+                                     IPatternDetails.IInput input, @Nullable Level level) {
+        if (candidate != null && input.isValid(candidate, level)) {
+            candidates.add(candidate);
+        }
+    }
+
+    private static boolean hasAvailableCandidate(SlotDemand demand, Map<AEKey, Long> availableByKey) {
+        for (AEKey candidate : demand.candidates()) {
+            if (availableByKey.getOrDefault(candidate, 0L) > 0L) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    @Nullable
+    private static KeyAllocation allocate(List<SlotDemand> demands,
+                                          Map<AEKey, Long> availableByKey,
+                                          int slotCount) {
+        if (demands.isEmpty()) {
+            return new KeyAllocation(emptyCounters(slotCount), new KeyCounter());
+        }
+
+        List<KeySupply> supplies = new ArrayList<>();
+        long totalDemand = 0L;
+        for (SlotDemand demand : demands) {
+            totalDemand = saturatingAdd(totalDemand, demand.amount());
+        }
+        for (Map.Entry<AEKey, Long> entry : availableByKey.entrySet()) {
+            long amount = entry.getValue() == null ? 0L : entry.getValue();
+            if (amount > 0L) {
+                supplies.add(new KeySupply(entry.getKey(), amount));
+            }
+        }
+        long totalSupply = 0L;
+        for (KeySupply supply : supplies) {
+            totalSupply = saturatingAdd(totalSupply, supply.amount());
+        }
+        if (totalSupply < totalDemand) {
+            return null;
+        }
+
+        Map<AEKey, Integer> supplyIndexes = new LinkedHashMap<>();
+        for (int index = 0; index < supplies.size(); index++) {
+            supplyIndexes.put(supplies.get(index).key(), index);
+        }
+
+        int source = 0;
+        int supplyStart = 1;
+        int demandStart = supplyStart + supplies.size();
+        int sink = demandStart + demands.size();
+        FlowNetwork network = new FlowNetwork(sink + 1);
+        for (int index = 0; index < supplies.size(); index++) {
+            network.addEdge(source, supplyStart + index, supplies.get(index).amount());
+        }
+
+        List<List<AllocationEdge>> demandEdges = new ArrayList<>(demands.size());
+        for (int demandIndex = 0; demandIndex < demands.size(); demandIndex++) {
+            SlotDemand demand = demands.get(demandIndex);
+            List<AllocationEdge> edges = new ArrayList<>();
+            for (AEKey candidate : demand.candidates()) {
+                Integer supplyIndex = supplyIndexes.get(candidate);
+                if (supplyIndex == null) continue;
+                FlowEdge edge = network.addEdge(
+                        supplyStart + supplyIndex, demandStart + demandIndex, totalDemand);
+                edges.add(new AllocationEdge(candidate, edge, totalDemand));
+            }
+            demandEdges.add(edges);
+            network.addEdge(demandStart + demandIndex, sink, demand.amount());
+        }
+
+        if (network.maxFlow(source, sink, totalDemand) != totalDemand) {
+            return null;
+        }
+
+        KeyCounter[] selectedInputs = emptyCounters(slotCount);
+        KeyCounter consumed = new KeyCounter();
+        for (int demandIndex = 0; demandIndex < demands.size(); demandIndex++) {
+            KeyCounter selected = selectedInputs[demands.get(demandIndex).slot()];
+            for (AllocationEdge allocationEdge : demandEdges.get(demandIndex)) {
+                long amount = allocationEdge.initialCapacity() - allocationEdge.edge().capacity;
+                if (amount > 0L) {
+                    selected.add(allocationEdge.key(), amount);
+                    consumed.add(allocationEdge.key(), amount);
                 }
             }
         }
-        return missing;
+        return new KeyAllocation(selectedInputs, consumed);
     }
 
-    private static long takeSimulated(
-            AEKey key, long wanted, MEStorage storage, IActionSource source,
-            Map<AEKey, Long> simulatedAmounts, KeyCounter selected, KeyCounter consumed) {
-        long available = simulatedAmounts.computeIfAbsent(key, candidate -> Math.max(0L,
-                storage.extract(candidate, Long.MAX_VALUE, Actionable.SIMULATE, source)));
-        long amount = Math.min(wanted, Math.max(0L, available - consumed.get(key)));
-        if (amount <= 0) {
-            return 0;
+    private static KeyCounter[] emptyCounters(int size) {
+        KeyCounter[] counters = new KeyCounter[size];
+        for (int index = 0; index < size; index++) {
+            counters[index] = new KeyCounter();
         }
-        selected.add(key, amount);
-        consumed.add(key, amount);
-        return amount;
+        return counters;
+    }
+
+    private static long saturatingAdd(long left, long right) {
+        if (right > 0L && left > Long.MAX_VALUE - right) return Long.MAX_VALUE;
+        return left + right;
     }
 
     private static void rollback(MEStorage storage, IActionSource source, KeyCounter extracted,
@@ -239,11 +327,106 @@ public final class PassivePatternInputTransaction {
         }
     }
 
+    private record SlotDemand(int slot, long amount, List<AEKey> candidates) {
+    }
+
+    private record KeySupply(AEKey key, long amount) {
+    }
+
+    private record AllocationEdge(AEKey key, FlowEdge edge, long initialCapacity) {
+    }
+
+    private record KeyAllocation(KeyCounter[] selectedInputs, KeyCounter consumed) {
+    }
+
+    private static final class FlowNetwork {
+        private final List<List<FlowEdge>> graph;
+        private final int[] levels;
+        private final int[] nextEdges;
+
+        private FlowNetwork(int nodeCount) {
+            this.graph = new ArrayList<>(nodeCount);
+            for (int index = 0; index < nodeCount; index++) {
+                this.graph.add(new ArrayList<>());
+            }
+            this.levels = new int[nodeCount];
+            this.nextEdges = new int[nodeCount];
+        }
+
+        private FlowEdge addEdge(int from, int to, long capacity) {
+            FlowEdge forward = new FlowEdge(to, this.graph.get(to).size(), capacity);
+            FlowEdge reverse = new FlowEdge(from, this.graph.get(from).size(), 0L);
+            this.graph.get(from).add(forward);
+            this.graph.get(to).add(reverse);
+            return forward;
+        }
+
+        private long maxFlow(int source, int sink, long limit) {
+            long flow = 0L;
+            while (flow < limit && buildLevels(source, sink)) {
+                Arrays.fill(this.nextEdges, 0);
+                long pushed;
+                while (flow < limit
+                        && (pushed = push(source, sink, limit - flow)) > 0L) {
+                    flow += pushed;
+                }
+            }
+            return flow;
+        }
+
+        private boolean buildLevels(int source, int sink) {
+            Arrays.fill(this.levels, -1);
+            this.levels[source] = 0;
+            ArrayDeque<Integer> queue = new ArrayDeque<>();
+            queue.add(source);
+            while (!queue.isEmpty()) {
+                int node = queue.removeFirst();
+                for (FlowEdge edge : this.graph.get(node)) {
+                    if (edge.capacity > 0L && this.levels[edge.to] < 0) {
+                        this.levels[edge.to] = this.levels[node] + 1;
+                        queue.addLast(edge.to);
+                    }
+                }
+            }
+            return this.levels[sink] >= 0;
+        }
+
+        private long push(int node, int sink, long amount) {
+            if (node == sink) return amount;
+            List<FlowEdge> edges = this.graph.get(node);
+            for (; this.nextEdges[node] < edges.size(); this.nextEdges[node]++) {
+                FlowEdge edge = edges.get(this.nextEdges[node]);
+                if (edge.capacity <= 0L || this.levels[edge.to] != this.levels[node] + 1) {
+                    continue;
+                }
+                long pushed = push(edge.to, sink, Math.min(amount, edge.capacity));
+                if (pushed <= 0L) continue;
+                edge.capacity -= pushed;
+                this.graph.get(edge.to).get(edge.reverseIndex).capacity += pushed;
+                return pushed;
+            }
+            return 0L;
+        }
+    }
+
+    private static final class FlowEdge {
+        private final int to;
+        private final int reverseIndex;
+        private long capacity;
+
+        private FlowEdge(int to, int reverseIndex, long capacity) {
+            this.to = to;
+            this.reverseIndex = reverseIndex;
+            this.capacity = capacity;
+        }
+    }
+
     /** Lazily enumerates network keys only when a component-relaxed input needs variants. */
     private static final class AvailableInputIndex {
         private final Supplier<KeyCounter> cachedInventorySupplier;
         private final Map<Item, List<AEKey>> itemVariants = new IdentityHashMap<>();
         private List<AEKey> allItemVariants;
+        private List<AEKey> allFluidVariants;
         private KeyCounter cachedInventory;
 
         private AvailableInputIndex(Supplier<KeyCounter> cachedInventorySupplier) {
@@ -281,6 +464,19 @@ public final class PassivePatternInputTransaction {
                 allItemVariants = List.copyOf(variants);
             }
             return allItemVariants;
+        }
+
+        private List<AEKey> allFluidVariants() {
+            if (allFluidVariants == null) {
+                List<AEKey> variants = new ArrayList<>();
+                for (var entry : cachedInventory()) {
+                    if (entry.getLongValue() > 0L && entry.getKey() instanceof appeng.api.stacks.AEFluidKey) {
+                        variants.add(entry.getKey());
+                    }
+                }
+                allFluidVariants = List.copyOf(variants);
+            }
+            return allFluidVariants;
         }
     }
 }

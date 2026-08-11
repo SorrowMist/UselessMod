@@ -181,4 +181,18 @@ public interface IRecipeAdapter<T extends Recipe<?>> {
         RecipeHolder<T> holder = findMatchingRecipe(level, mergedInputs, mergedFluids, mergedKeys, mold);
         return holder == null ? List.of() : List.of(holder);
     }
+
+    /**
+     * Finds all matching source recipes using the concrete item stacks currently in the machine.
+     *
+     * <p>The default keeps the historical static lookup behavior. Adapters whose output or
+     * remainder depends on the concrete input can override this method and use {@code actualInputs}
+     * to admit the source recipe before {@link #convertAll(RecipeHolder, Level, List)} assembles its
+     * runtime result.</p>
+     */
+    default List<RecipeHolder<T>> findMatchingRecipes(Level level, Map<Ingredient, Long> mergedInputs,
+                                                       Map<FluidStack, Long> mergedFluids, Map<AEKey, Long> mergedKeys,
+                                                       @Nullable ItemStack mold, List<ItemStack> actualInputs) {
+        return findMatchingRecipes(level, mergedInputs, mergedFluids, mergedKeys, mold);
+    }
 }

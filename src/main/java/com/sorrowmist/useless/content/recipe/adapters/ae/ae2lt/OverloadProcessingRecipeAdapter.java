@@ -91,7 +91,8 @@ public class OverloadProcessingRecipeAdapter implements IRecipeAdapter<OverloadP
         }
         var keyInputs = List.of(AELightningIngredientHelper.createLightningKeyInput(recipe.lightningTier(), recipe.lightningCost()));
 
-        List<FluidStack> inputFluids = hasFluidInput ? List.of(fluidInput.copy()) : List.of();
+        var sizedFluid = hasFluidInput ? AdapterUtils.toSizedFluidIngredient(fluidInput) : null;
+        List<?> inputFluids = sizedFluid == null ? List.of() : List.of(sizedFluid);
         List<ItemStack> outputs = hasItemOutputs ? itemResults.stream().map(ItemStack::copy).toList() : List.of();
         List<FluidStack> outputFluids = hasFluidOutput ? List.of(fluidResult.copy()) : List.of();
 
@@ -155,17 +156,11 @@ public class OverloadProcessingRecipeAdapter implements IRecipeAdapter<OverloadP
             }
 
             // 检查流体输入匹配（使用已合并的流体数据）
-            boolean fluidsMatch = true;
-            if (!recipeFluidInput.isEmpty()) {
-                long foundAmount = 0;
-                for (Map.Entry<FluidStack, Long> entry : mergedFluids.entrySet()) {
-                    if (FluidStack.isSameFluidSameComponents(entry.getKey(), recipeFluidInput)) {
-                        foundAmount += entry.getValue();
-                        break;
-                    }
-                }
-                fluidsMatch = foundAmount >= recipeFluidInput.getAmount();
-            }
+            boolean fluidsMatch = recipeFluidInput.isEmpty()
+                    || (AdapterUtils.toSizedFluidIngredient(recipeFluidInput) != null
+                    && com.sorrowmist.useless.content.recipe.FluidIngredientAllocator.matches(
+                    List.of(AdapterUtils.toSizedFluidIngredient(recipeFluidInput)),
+                    mergedFluids, 1L));
 
             if ((recipeItemInputs.isEmpty() || itemsMatch)
                     && (recipeFluidInput.isEmpty() || fluidsMatch)

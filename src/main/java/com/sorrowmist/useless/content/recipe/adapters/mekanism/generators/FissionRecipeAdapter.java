@@ -27,7 +27,7 @@ import net.minecraft.tags.FluidTags;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.crafting.RecipeHolder;
 import net.minecraft.world.level.Level;
-import net.neoforged.neoforge.fluids.FluidStack;
+import net.neoforged.neoforge.fluids.crafting.SizedFluidIngredient;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
@@ -88,15 +88,17 @@ public final class FissionRecipeAdapter extends MekanismSyntheticRecipeAdapter {
     List<RecipeHolder<MekanismSyntheticRecipe>> createWaterRecipes(
             FluidStackIngredient water, ChemicalStack fuel, ChemicalStack steam, ChemicalStack waste) {
         List<RecipeHolder<MekanismSyntheticRecipe>> result = new ArrayList<>();
-        for (FluidStack waterStack : MekanismChemicalRecipeSupport.fluidRepresentations(water)) {
-            addRecipe(result, MekanismGenerators.rl("fission_water"), fuel, null, waterStack, steam, waste);
+        List<SizedFluidIngredient> waterInputs = MekanismChemicalRecipeSupport.fluidIngredients(water);
+        if (!waterInputs.isEmpty()) {
+            addRecipe(result, MekanismGenerators.rl("fission_water"), fuel, null,
+                    waterInputs.getFirst(), steam, waste);
         }
         return result;
     }
 
     private void addRecipe(List<RecipeHolder<MekanismSyntheticRecipe>> result, ResourceLocation sourceId,
                            ChemicalStack fuel, @Nullable ChemicalStack coolant,
-                           @Nullable FluidStack water,
+                           @Nullable SizedFluidIngredient water,
                            ChemicalStack outputCoolant, ChemicalStack waste) {
         GenericStack fuelKey = MekanismChemicalRecipeSupport.key(fuel);
         GenericStack coolantKey = coolant == null ? null : MekanismChemicalRecipeSupport.key(coolant);
@@ -105,12 +107,12 @@ public final class FissionRecipeAdapter extends MekanismSyntheticRecipeAdapter {
         if ((coolant != null && coolantKey == null) || outputCoolantKey == null || wasteKey == null) return;
 
         List<GenericStack> inputs = coolantKey == null ? List.of(fuelKey) : List.of(fuelKey, coolantKey);
-        if (water != null && water.isEmpty()) return;
-        List<FluidStack> fluids = water == null ? List.of() : List.of(water.copy());
+        if (water != null && (water.ingredient() == null || water.ingredient().isEmpty()
+                || water.amount() <= 0)) return;
 
         String suffix = "fission_" + id(fuel);
         if (water != null) {
-            suffix += "_water_" + fluidId(water);
+            suffix += "_water";
         } else if (coolant != null) {
             suffix += "_" + id(coolant);
         } else {
@@ -118,7 +120,7 @@ public final class FissionRecipeAdapter extends MekanismSyntheticRecipeAdapter {
         }
         ResourceLocation id = MekanismChemicalRecipeSupport.variantId(sourceId, suffix);
         AdvancedAlloyFurnaceRecipe converted = MekanismChemicalRecipeSupport.recipe(
-                id, List.of(), fluids, inputs, List.of(), List.of(),
+                id, List.of(), water == null ? List.of() : List.of(water), inputs, List.of(), List.of(),
                 List.of(outputCoolantKey, wasteKey),
                 0L,
                 AdapterUtils.safeInt(PROCESS_TICKS), getMoldItem());
@@ -130,8 +132,4 @@ public final class FissionRecipeAdapter extends MekanismSyntheticRecipeAdapter {
         return id.getNamespace() + "_" + id.getPath().replace('/', '_');
     }
 
-    private static String fluidId(FluidStack stack) {
-        ResourceLocation id = net.minecraft.core.registries.BuiltInRegistries.FLUID.getKey(stack.getFluid());
-        return id.getNamespace() + "_" + id.getPath().replace('/', '_');
-    }
 }

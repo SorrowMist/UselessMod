@@ -69,12 +69,21 @@ public class PatternEncodingLogicMixin implements PendingOmniversalPatternHolder
         this.uselessMod$pendingOmniversalRecipe = identity;
     }
 
+    @Override
+    public void uselessMod$tryConvertPendingOmniversalPattern() {
+        uselessMod$tryConvertToOmniversal();
+    }
+
     @Inject(method = "onChangeInventory(Lappeng/util/inv/AppEngInternalInventory;I)V", at = @At("HEAD"), remap = false)
     private void uselessMod$tryConvertToOmniversal(AppEngInternalInventory inv, int slot, CallbackInfo ci) {
         if (inv != encodedPatternInv || slot != 0) return;
 
+        uselessMod$tryConvertToOmniversal();
+    }
+
+    @Unique
+    private void uselessMod$tryConvertToOmniversal() {
         AlloyFurnaceRecipeIdentity pending = uselessMod$pendingOmniversalRecipe;
-        if (pending == null) return;
 
         ItemStack pattern = encodedPatternInv.getStackInSlot(0);
         if (pattern.isEmpty()) return;
@@ -85,13 +94,16 @@ public class PatternEncodingLogicMixin implements PendingOmniversalPatternHolder
         IPatternDetails details = PatternDetailsHelper.decodePattern(pattern, level);
         if (!(details instanceof AEProcessingPattern) || details instanceof OmniversalPatternDetails) return;
 
-        Optional<AlloyFurnaceRecipeCatalog.Entry> entry = AlloyFurnaceRecipeCatalog.resolve(level, pending);
+        Optional<AlloyFurnaceRecipeCatalog.Entry> entry = Optional.empty();
+        if (pending != null) {
+            entry = AlloyFurnaceRecipeCatalog.resolve(level, pending)
+                    .filter(candidate -> AlloyFurnaceRecipeCatalog.matchesRecipe(
+                            level, candidate.recipe(), details));
+        }
+        if (entry.isEmpty()) {
+            entry = AlloyFurnaceRecipeCatalog.findUniqueMoldPatternCandidate(level, details);
+        }
         if (entry.isEmpty()) return;
-
-        // The terminal slots are the player's to edit after the transfer, so confirm they still spell
-        // out the picked recipe. On a mismatch the plain AE2 pattern is left alone rather than being
-        // tagged with a recipe it does not describe.
-        if (!AlloyFurnaceRecipeCatalog.matchesRecipe(level, entry.get().recipe(), details)) return;
 
         ItemStack omniversal = OmniversalPatternEncoding.encode(pattern, entry.get(), level);
         if (!omniversal.isEmpty()) {

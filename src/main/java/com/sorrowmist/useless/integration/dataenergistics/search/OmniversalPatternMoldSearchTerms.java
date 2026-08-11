@@ -5,7 +5,10 @@ import com.sorrowmist.useless.core.component.UComponents;
 
 import net.minecraft.world.item.ItemStack;
 
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 /**
  * Extracts encoded internal molds as separate Trinity pattern-search candidates.
@@ -35,13 +38,20 @@ public final class OmniversalPatternMoldSearchTerms {
         if (!data.requiresMold()) {
             return List.of();
         }
+        List<String> terms = new ArrayList<>();
+        Set<Integer> tagMoldSlots = new HashSet<>();
+        data.moldTagInputSlots().forEach(slot -> tagMoldSlots.add(slot.moldSlot()));
         if (!data.displayMolds().isEmpty()) {
-            return data.displayMolds().stream()
-                    .map(key -> key.getDisplayName().getString())
-                    .toList();
+            for (int moldSlot = 0; moldSlot < data.displayMolds().size(); moldSlot++) {
+                if (tagMoldSlots.contains(moldSlot)) continue;
+                terms.add(data.displayMolds().get(moldSlot).getDisplayName().getString());
+            }
+        } else if (!tagMoldSlots.contains(0)) {
+            data.displayMold().map(key -> key.getDisplayName().getString()).ifPresent(terms::add);
         }
-        return data.displayMold()
-                .map(key -> List.of(key.getDisplayName().getString()))
-                .orElseGet(List::of);
+        data.moldTagInputSlots().stream()
+                .map(slot -> "#" + slot.tag().location())
+                .forEach(terms::add);
+        return terms.stream().distinct().toList();
     }
 }

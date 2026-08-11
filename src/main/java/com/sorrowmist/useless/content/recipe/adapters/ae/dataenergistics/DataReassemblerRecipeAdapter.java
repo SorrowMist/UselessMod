@@ -11,6 +11,7 @@ import com.sorrowmist.useless.api.enums.AlloyFurnaceMode;
 import com.sorrowmist.useless.content.recipe.AdapterUtils;
 import com.sorrowmist.useless.content.recipe.AdvancedAlloyFurnaceRecipe;
 import com.sorrowmist.useless.content.recipe.CountedIngredient;
+import com.sorrowmist.useless.content.recipe.FluidIngredientAllocator;
 import com.sorrowmist.useless.content.recipe.IRecipeAdapter;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceLocation;
@@ -20,6 +21,7 @@ import net.minecraft.world.item.crafting.RecipeHolder;
 import net.minecraft.world.item.crafting.RecipeManager;
 import net.minecraft.world.level.Level;
 import net.neoforged.neoforge.fluids.FluidStack;
+import net.neoforged.neoforge.fluids.crafting.SizedFluidIngredient;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
@@ -107,11 +109,12 @@ public class DataReassemblerRecipeAdapter implements IRecipeAdapter<DataRipperRe
         List<GenericStack> keyInputs = hasKeyInput ? List.of(keyInput) : List.of();
 
         // 转换流体输入
-        List<FluidStack> inputFluids = new ArrayList<>();
+        List<SizedFluidIngredient> inputFluids = new ArrayList<>();
         for (GenericStack fluidInput : fluidInputs) {
             if (fluidInput.what() instanceof AEFluidKey fluidKey && fluidInput.amount() > 0) {
                 int amount = fluidInput.amount() > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) fluidInput.amount();
-                inputFluids.add(fluidKey.toStack(amount));
+                SizedFluidIngredient ingredient = AdapterUtils.toSizedFluidIngredient(fluidKey.toStack(amount));
+                if (ingredient != null) inputFluids.add(ingredient);
             }
         }
 
@@ -227,26 +230,14 @@ public class DataReassemblerRecipeAdapter implements IRecipeAdapter<DataRipperRe
             return false;
         }
 
+        List<SizedFluidIngredient> requirements = new ArrayList<>();
         for (GenericStack required : requiredFluids) {
-            if (!(required.what() instanceof AEFluidKey requiredKey)) {
-                continue;
-            }
-
-            long foundAmount = 0;
-            for (Map.Entry<FluidStack, Long> entry : mergedFluids.entrySet()) {
-                AEFluidKey inputKey = AEFluidKey.of(entry.getKey());
-                if (inputKey != null && inputKey.equals(requiredKey)) {
-                    foundAmount += entry.getValue();
-                    break;
-                }
-            }
-
-            if (foundAmount < required.amount()) {
-                return false;
-            }
+            if (!(required.what() instanceof AEFluidKey requiredKey) || required.amount() <= 0) continue;
+            int amount = required.amount() > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) required.amount();
+            SizedFluidIngredient ingredient = AdapterUtils.toSizedFluidIngredient(requiredKey.toStack(amount));
+            if (ingredient != null) requirements.add(ingredient);
         }
-
-        return true;
+        return FluidIngredientAllocator.matches(requirements, mergedFluids, 1L);
     }
 
     private boolean matchesKeyInput(Map<Ingredient, Long> mergedInputs, Map<FluidStack, Long> mergedFluids, Map<AEKey, Long> mergedKeys, GenericStack keyInput) {
@@ -254,14 +245,11 @@ public class DataReassemblerRecipeAdapter implements IRecipeAdapter<DataRipperRe
             return AdapterUtils.hasMatchingIngredient(mergedInputs, Ingredient.of(itemKey.toStack()), keyInput.amount());
         }
         if (keyInput.what() instanceof AEFluidKey fluidKey) {
-            long found = 0;
-            for (Map.Entry<FluidStack, Long> entry : mergedFluids.entrySet()) {
-                AEFluidKey inputKey = AEFluidKey.of(entry.getKey());
-                if (inputKey != null && inputKey.equals(fluidKey)) {
-                    found += entry.getValue();
-                }
-            }
-            return found >= keyInput.amount();
+            if (keyInput.amount() <= 0 || keyInput.amount() > Integer.MAX_VALUE) return false;
+            SizedFluidIngredient requirement = AdapterUtils.toSizedFluidIngredient(
+                    fluidKey.toStack((int) keyInput.amount()));
+            return requirement != null && FluidIngredientAllocator.matches(
+                    List.of(requirement), mergedFluids, 1L);
         }
         return mergedKeys.getOrDefault(keyInput.what(), 0L) >= keyInput.amount();
     }

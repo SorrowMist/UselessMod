@@ -11,6 +11,8 @@ import net.minecraft.tags.TagKey;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.crafting.Ingredient;
+import net.neoforged.neoforge.fluids.FluidStack;
+import net.neoforged.neoforge.fluids.crafting.SizedFluidIngredient;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -59,6 +61,9 @@ public final class AlloyFurnaceRecipeFingerprint {
         JsonObject recipeJson = encoded.getAsJsonObject();
         if (normalizeIngredientSemantics) {
             normalizeIngredients(recipe, recipeJson, context, preserveTags);
+        }
+        if ((!normalizeIngredientSemantics || !preserveTags) && !recipe.inputFluids().isEmpty()) {
+            encodeLegacyFluidInputs(recipe, recipeJson, context);
         }
         JsonArray exactItemOutputs = new JsonArray();
         for (var output : recipe.outputs()) {
@@ -113,6 +118,22 @@ public final class AlloyFurnaceRecipeFingerprint {
             moldElements.forEach(molds::add);
             encoded.add("molds", molds);
         }
+    }
+
+    /** Restores the pre-Ingredient representation used by version 1-4 pattern fingerprints. */
+    private static void encodeLegacyFluidInputs(
+            AdvancedAlloyFurnaceRecipe recipe,
+            JsonObject encoded,
+            com.mojang.serialization.DynamicOps<JsonElement> context) {
+        JsonArray fluids = new JsonArray();
+        for (SizedFluidIngredient ingredient : recipe.inputFluids()) {
+            if (ingredient == null || ingredient.ingredient() == null || ingredient.amount() <= 0) continue;
+            for (FluidStack stack : ingredient.getFluids()) {
+                if (stack == null || stack.isEmpty()) continue;
+                fluids.add(FluidStack.CODEC.encodeStart(context, stack).getOrThrow());
+            }
+        }
+        encoded.add("input_fluids", fluids);
     }
 
     private static JsonElement encodeSemanticIngredient(

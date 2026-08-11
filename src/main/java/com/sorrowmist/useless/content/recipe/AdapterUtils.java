@@ -9,6 +9,9 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.crafting.Ingredient;
 import net.neoforged.neoforge.common.crafting.DataComponentIngredient;
 import net.neoforged.neoforge.fluids.FluidStack;
+import net.neoforged.neoforge.fluids.crafting.DataComponentFluidIngredient;
+import net.neoforged.neoforge.fluids.crafting.FluidIngredient;
+import net.neoforged.neoforge.fluids.crafting.SizedFluidIngredient;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.LinkedHashMap;
@@ -204,6 +207,37 @@ public class AdapterUtils {
             }
         }
         return merged;
+    }
+
+    /** Converts a concrete fluid stack without dropping its component predicate. */
+    public static SizedFluidIngredient toSizedFluidIngredient(@Nullable FluidStack stack) {
+        if (stack == null || stack.isEmpty() || stack.getAmount() <= 0) return null;
+        FluidIngredient ingredient = stack.getComponents().isEmpty()
+                ? FluidIngredient.single(stack)
+                : DataComponentFluidIngredient.of(true, stack);
+        return new SizedFluidIngredient(ingredient, stack.getAmount());
+    }
+
+    /** Expands an aggregated fluid map into non-mutating supplies for the common allocator. */
+    public static List<FluidStack> fluidSupplies(@Nullable Map<FluidStack, Long> mergedFluids) {
+        if (mergedFluids == null || mergedFluids.isEmpty()) return List.of();
+        List<FluidStack> supplies = new java.util.ArrayList<>(mergedFluids.size());
+        for (Map.Entry<FluidStack, Long> entry : mergedFluids.entrySet()) {
+            FluidStack stack = entry.getKey();
+            long amount = entry.getValue() == null ? 0L : entry.getValue();
+            if (stack == null || stack.isEmpty() || amount <= 0L) continue;
+            FluidStack copy = stack.copy();
+            copy.setAmount(amount > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) amount);
+            supplies.add(copy);
+        }
+        return supplies;
+    }
+
+    public static boolean matchesFluidIngredients(
+            @Nullable Map<FluidStack, Long> mergedFluids,
+            List<SizedFluidIngredient> requirements) {
+        if (requirements == null || requirements.isEmpty()) return true;
+        return FluidIngredientAllocator.matches(requirements, mergedFluids, 1L);
     }
 
     /**

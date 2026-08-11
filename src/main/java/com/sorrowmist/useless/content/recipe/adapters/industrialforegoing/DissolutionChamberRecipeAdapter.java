@@ -7,21 +7,19 @@ import com.sorrowmist.useless.content.recipe.AdapterUtils;
 import com.sorrowmist.useless.content.recipe.AdvancedAlloyFurnaceRecipe;
 import com.sorrowmist.useless.content.recipe.CountedIngredient;
 import com.sorrowmist.useless.content.recipe.IRecipeAdapter;
-import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.crafting.Ingredient;
 import net.minecraft.world.item.crafting.RecipeHolder;
 import net.minecraft.world.item.crafting.RecipeManager;
 import net.minecraft.world.item.crafting.RecipeType;
 import net.minecraft.world.level.Level;
-import net.minecraft.world.level.material.Fluid;
 import net.neoforged.neoforge.fluids.FluidStack;
 import net.neoforged.neoforge.fluids.crafting.SizedFluidIngredient;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -75,8 +73,7 @@ public class DissolutionChamberRecipeAdapter implements IRecipeAdapter<Dissoluti
             return result;
         }
 
-        FluidStack[] fluids = inputFluidIngredient.getFluids();
-        if (fluids == null || fluids.length == 0) {
+        if (inputFluidIngredient.ingredient().isEmpty()) {
             return result;
         }
 
@@ -99,49 +96,34 @@ public class DissolutionChamberRecipeAdapter implements IRecipeAdapter<Dissoluti
             outputFluids.add(fluidOutput.copy());
         }
 
-        Map<ResourceLocation, FluidStack> uniqueFluids = new LinkedHashMap<>();
-        for (FluidStack fluid : fluids) {
-            if (fluid == null || fluid.isEmpty()) continue;
-            FluidStack inputFluid = fluid.copy();
-            inputFluid.setAmount(inputFluidIngredient.amount());
-            uniqueFluids.putIfAbsent(BuiltInRegistries.FLUID.getKey(inputFluid.getFluid()), inputFluid);
-        }
-
-        for (FluidStack inputFluid : uniqueFluids.values()) {
-            result.add(createRecipe(originalId, countedIngredients, inputFluid, outputs, outputFluids, totalEnergy, processingTime, moldIngredient, result.isEmpty()));
-        }
+        result.add(createRecipe(originalId, countedIngredients, inputFluidIngredient, outputs,
+                outputFluids, totalEnergy, processingTime, moldIngredient));
         return result;
     }
 
     private AdvancedAlloyFurnaceRecipe createRecipe(ResourceLocation originalId,
                                                     List<CountedIngredient> countedIngredients,
-                                                    FluidStack inputFluid,
+                                                    SizedFluidIngredient inputFluid,
                                                     List<ItemStack> outputs,
                                                     List<FluidStack> outputFluids,
                                                     int totalEnergy,
                                                     int processingTime,
-                                                    Ingredient moldIngredient,
-                                                    boolean primaryId) {
-        ResourceLocation id = primaryId ? AdapterUtils.convertedId(originalId) : convertedFluidId(originalId, inputFluid.getFluid());
+                                                    Ingredient moldIngredient) {
         return new AdvancedAlloyFurnaceRecipe(
-                id,
+                AdapterUtils.convertedId(originalId),
                 countedIngredients,
                 List.of(inputFluid),
+                List.of(),
                 outputs,
                 outputFluids,
+                List.of(),
                 totalEnergy,
                 processingTime,
                 Ingredient.EMPTY,
                 0,
-                moldIngredient,
+                List.of(moldIngredient),
                 AlloyFurnaceMode.NORMAL
         );
-    }
-
-    private ResourceLocation convertedFluidId(ResourceLocation originalId, Fluid fluid) {
-        ResourceLocation fluidId = BuiltInRegistries.FLUID.getKey(fluid);
-        String suffix = fluidId.getNamespace() + "_" + fluidId.getPath().replace('/', '_');
-        return ResourceLocation.fromNamespaceAndPath(originalId.getNamespace(), originalId.getPath() + "_" + suffix + "_converted");
     }
 
     @Override
@@ -168,25 +150,20 @@ public class DissolutionChamberRecipeAdapter implements IRecipeAdapter<Dissoluti
     }
 
     private boolean matchesItemInputs(Map<Ingredient, Long> mergedInputs, List<Ingredient> itemInputs) {
-        List<CountedIngredient> countedIngredients = AdapterUtils.mergeIngredients(itemInputs);
-        for (CountedIngredient counted : countedIngredients) {
-            if (!AdapterUtils.hasMatchingIngredient(mergedInputs, counted.ingredient(), counted.count())) {
-                return false;
+        Map<Ingredient, Long> requirements = new java.util.LinkedHashMap<>();
+        for (Ingredient input : itemInputs) {
+            if (input != null && !input.isEmpty()) {
+                AdapterUtils.mergeIngredient(requirements, input, 1L);
             }
         }
-        return true;
+        return AdapterUtils.matchesRequired(mergedInputs, requirements);
     }
 
     private boolean matchesFluidInput(Map<FluidStack, Long> mergedFluids, SizedFluidIngredient inputFluid) {
         if (inputFluid == null) return true;
-        if (mergedFluids.isEmpty()) return false;
-        long amount = 0L;
-        for (Map.Entry<FluidStack, Long> entry : mergedFluids.entrySet()) {
-            if (inputFluid.test(entry.getKey())) {
-                amount += entry.getValue();
-            }
-        }
-        return amount >= inputFluid.amount();
+        if (mergedFluids == null || mergedFluids.isEmpty()) return false;
+        return com.sorrowmist.useless.content.recipe.FluidIngredientAllocator.matches(
+                List.of(inputFluid), mergedFluids, 1L);
     }
 
 }

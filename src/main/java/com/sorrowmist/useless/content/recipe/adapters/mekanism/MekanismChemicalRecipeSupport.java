@@ -7,6 +7,7 @@ import com.sorrowmist.useless.compat.mekanism.MekanismChemicalCompat;
 import com.sorrowmist.useless.content.recipe.AdapterUtils;
 import com.sorrowmist.useless.content.recipe.AdvancedAlloyFurnaceRecipe;
 import com.sorrowmist.useless.content.recipe.CountedIngredient;
+import com.sorrowmist.useless.content.recipe.FluidIngredientAllocator;
 import mekanism.api.chemical.ChemicalStack;
 import mekanism.api.recipes.ingredients.ChemicalStackIngredient;
 import mekanism.api.recipes.ingredients.FluidStackIngredient;
@@ -16,6 +17,8 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.crafting.Ingredient;
 import net.minecraft.world.item.crafting.RecipeHolder;
 import net.neoforged.neoforge.fluids.FluidStack;
+import net.neoforged.neoforge.fluids.crafting.FluidIngredient;
+import net.neoforged.neoforge.fluids.crafting.SizedFluidIngredient;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
@@ -49,7 +52,7 @@ public final class MekanismChemicalRecipeSupport {
 
     static Ingredient itemIngredient(ItemStackIngredient ingredient) {
         if (ingredient == null || ingredient.hasNoMatchingInstances()) return Ingredient.EMPTY;
-        return Ingredient.of(ingredient.getRepresentations().stream().map(stack -> stack.copyWithCount(1)));
+        return ingredient.ingredient().ingredient();
     }
 
     @Nullable
@@ -65,7 +68,9 @@ public final class MekanismChemicalRecipeSupport {
 
     static boolean matchesItem(Map<Ingredient, Long> inputs, ItemStackIngredient required) {
         if (required == null || required.hasNoMatchingInstances()) return false;
-        return AdapterUtils.hasMatchingIngredient(inputs, itemIngredient(required), required.ingredient().count());
+        Map<Ingredient, Long> requirements = new LinkedHashMap<>();
+        requirements.put(itemIngredient(required), (long) required.ingredient().count());
+        return AdapterUtils.matchesRequired(inputs, requirements);
     }
 
     static boolean matchesChemical(Map<AEKey, Long> inputs, ChemicalStackIngredient required) {
@@ -77,28 +82,31 @@ public final class MekanismChemicalRecipeSupport {
 
     static boolean matchesFluid(Map<FluidStack, Long> inputs, FluidStackIngredient required) {
         if (required == null || required.hasNoMatchingInstances()) return false;
-        List<FluidStack> matchingFluids = new ArrayList<>();
-        List<Long> matchingAmounts = new ArrayList<>();
-        for (Map.Entry<FluidStack, Long> entry : inputs.entrySet()) {
-            FluidStack input = entry.getKey();
-            Long amount = entry.getValue();
-            if (input == null || input.isEmpty() || amount == null || amount <= 0L
-                    || !required.testType(input)) continue;
+        return FluidIngredientAllocator.matches(List.of(required.ingredient()), inputs, 1L);
+    }
 
-            boolean merged = false;
-            for (int index = 0; index < matchingFluids.size(); index++) {
-                if (!FluidStack.isSameFluidSameComponents(matchingFluids.get(index), input)) continue;
-                matchingAmounts.set(index, saturatingAdd(matchingAmounts.get(index), amount));
-                merged = true;
-                break;
-            }
-            if (!merged) {
-                matchingFluids.add(input.copy());
-                matchingAmounts.add(amount);
-            }
+    /** Keeps Mekanism's fluid tag/compound/component ingredient intact. */
+    public static List<SizedFluidIngredient> fluidIngredients(FluidStackIngredient ingredient) {
+        if (ingredient == null || ingredient.hasNoMatchingInstances()
+                || ingredient.ingredient() == null || ingredient.ingredient().amount() <= 0) {
+            return List.of();
         }
-        long requiredAmount = required.ingredient().amount();
-        return matchingAmounts.stream().anyMatch(amount -> amount >= requiredAmount);
+        return List.of(ingredient.ingredient());
+    }
+
+    private static List<SizedFluidIngredient> scaleFluidIngredients(
+            List<SizedFluidIngredient> ingredients) {
+        if (ingredients.isEmpty()) return ingredients;
+        List<SizedFluidIngredient> scaled = new ArrayList<>(ingredients.size());
+        for (SizedFluidIngredient ingredient : ingredients) {
+            if (ingredient == null || ingredient.ingredient() == null || ingredient.amount() <= 0) {
+                scaled.add(ingredient);
+                continue;
+            }
+            scaled.add(new SizedFluidIngredient(ingredient.ingredient(),
+                    saturatingFluidAmount(ingredient.amount())));
+        }
+        return scaled;
     }
 
     public static List<FluidStack> fluidRepresentations(FluidStackIngredient ingredient) {
@@ -119,12 +127,12 @@ public final class MekanismChemicalRecipeSupport {
     }
 
     public static AdvancedAlloyFurnaceRecipe recipe(ResourceLocation id, List<CountedIngredient> items,
-                                             List<FluidStack> fluids, List<GenericStack> chemicalInputs,
+                                             List<?> fluids, List<GenericStack> chemicalInputs,
                                              List<ItemStack> outputs, List<FluidStack> outputFluids,
                                              List<GenericStack> chemicalOutputs, long energy, int processTime,
                                              @Nullable ItemStack mold) {
         List<CountedIngredient> safeItems = items == null ? List.of() : items;
-        List<FluidStack> safeFluids = fluids == null ? List.of() : fluids;
+        List<SizedFluidIngredient> safeFluids = toSizedFluidIngredients(fluids);
         List<GenericStack> safeChemicalInputs = chemicalInputs == null ? List.of() : chemicalInputs;
         List<ItemStack> safeOutputs = outputs == null ? List.of() : outputs;
         List<FluidStack> safeOutputFluids = outputFluids == null ? List.of() : outputFluids;
@@ -135,9 +143,9 @@ public final class MekanismChemicalRecipeSupport {
         // quantities are part of the original recipe's material balance.
         boolean itemFree = safeItems.isEmpty() && safeOutputs.isEmpty();
         if (itemFree) {
-            safeFluids = scaleFluidStacks(safeFluids);
+            safeFluids = scaleFluidIngredients(safeFluids);
             safeChemicalInputs = scaleGenericStacks(safeChemicalInputs);
-            safeOutputFluids = scaleFluidStacks(safeOutputFluids);
+            safeOutputFluids = scaleOutputFluidStacks(safeOutputFluids);
             safeChemicalOutputs = scaleGenericStacks(safeChemicalOutputs);
         }
 
@@ -161,7 +169,24 @@ public final class MekanismChemicalRecipeSupport {
         return scaled;
     }
 
-    private static List<FluidStack> scaleFluidStacks(List<FluidStack> stacks) {
+    private static List<SizedFluidIngredient> toSizedFluidIngredients(List<?> fluids) {
+        if (fluids == null || fluids.isEmpty()) return List.of();
+        List<SizedFluidIngredient> result = new ArrayList<>(fluids.size());
+        for (Object value : fluids) {
+            if (value instanceof SizedFluidIngredient ingredient) {
+                if (ingredient.ingredient() != null && !ingredient.ingredient().isEmpty()
+                        && ingredient.amount() > 0) {
+                    result.add(ingredient);
+                }
+            } else if (value instanceof FluidStack stack) {
+                SizedFluidIngredient converted = AdapterUtils.toSizedFluidIngredient(stack);
+                if (converted != null) result.add(converted);
+            }
+        }
+        return List.copyOf(result);
+    }
+
+    private static List<FluidStack> scaleOutputFluidStacks(List<FluidStack> stacks) {
         if (stacks.isEmpty()) return stacks;
         List<FluidStack> scaled = new ArrayList<>(stacks.size());
         for (FluidStack stack : stacks) {
@@ -210,15 +235,7 @@ public final class MekanismChemicalRecipeSupport {
         }
         if (!AdapterUtils.matchesRequired(mergedInputs, requiredItems)) return false;
 
-        for (RequiredFluid required : mergeFluidRequirements(recipe.inputFluids())) {
-            long available = 0L;
-            for (Map.Entry<FluidStack, Long> entry : mergedFluids.entrySet()) {
-                if (FluidStack.isSameFluidSameComponents(required.stack(), entry.getKey())) {
-                    available = saturatingAdd(available, entry.getValue());
-                }
-            }
-            if (available < required.amount()) return false;
-        }
+        if (!FluidIngredientAllocator.matches(recipe.inputFluids(), mergedFluids, 1L)) return false;
 
         Map<AEKey, Long> requiredKeys = new LinkedHashMap<>();
         for (GenericStack required : recipe.keyInputs()) {
@@ -231,24 +248,4 @@ public final class MekanismChemicalRecipeSupport {
         return true;
     }
 
-    private static List<RequiredFluid> mergeFluidRequirements(List<FluidStack> fluids) {
-        List<RequiredFluid> result = new ArrayList<>();
-        if (fluids == null) return result;
-        for (FluidStack fluid : fluids) {
-            if (fluid == null || fluid.isEmpty()) continue;
-            boolean merged = false;
-            for (int i = 0; i < result.size(); i++) {
-                RequiredFluid existing = result.get(i);
-                if (!FluidStack.isSameFluidSameComponents(existing.stack(), fluid)) continue;
-                result.set(i, new RequiredFluid(existing.stack(), saturatingAdd(existing.amount(), fluid.getAmount())));
-                merged = true;
-                break;
-            }
-            if (!merged) result.add(new RequiredFluid(fluid.copy(), fluid.getAmount()));
-        }
-        return result;
-    }
-
-    private record RequiredFluid(FluidStack stack, long amount) {
-    }
 }

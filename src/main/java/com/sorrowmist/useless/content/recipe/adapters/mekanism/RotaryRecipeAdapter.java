@@ -50,18 +50,16 @@ public final class RotaryRecipeAdapter implements IRecipeAdapter<RotaryRecipe> {
         if (original.hasFluidToChemical()) {
             FluidStackIngredient fluidInput = original.getFluidInput();
             if (fluidInput != null && !fluidInput.hasNoMatchingInstances()) {
-                for (FluidStack fluid : MekanismChemicalRecipeSupport.fluidRepresentations(fluidInput)) {
-                    for (ChemicalStack chemical : original.getChemicalOutputDefinition()) {
-                        GenericStack output = MekanismChemicalRecipeSupport.key(chemical);
-                        if (output == null) continue;
-                        ResourceLocation fluidId = net.minecraft.core.registries.BuiltInRegistries.FLUID.getKey(fluid.getFluid());
-                        result.add(MekanismChemicalRecipeSupport.recipe(
-                                MekanismChemicalRecipeSupport.variantId(holder.id(), "fluid_to_chemical_"
-                                        + fluidId.getNamespace() + "_" + fluidId.getPath() + "_" + id(chemical)),
-                                List.of(), List.of(fluid), List.of(), List.of(), List.of(), List.of(output),
-                                AdapterUtils.mekanismEnergyCost(ENERGY_PER_TICK, PROCESS_TICKS, 1L),
-                                AdapterUtils.safeInt(PROCESS_TICKS), getMoldItem()));
-                    }
+                List<net.neoforged.neoforge.fluids.crafting.SizedFluidIngredient> fluidInputs =
+                        MekanismChemicalRecipeSupport.fluidIngredients(fluidInput);
+                for (ChemicalStack chemical : original.getChemicalOutputDefinition()) {
+                    GenericStack output = MekanismChemicalRecipeSupport.key(chemical);
+                    if (output == null) continue;
+                    result.add(MekanismChemicalRecipeSupport.recipe(
+                            MekanismChemicalRecipeSupport.variantId(holder.id(), "fluid_to_chemical_" + id(chemical)),
+                            List.of(), fluidInputs, List.of(), List.of(), List.of(), List.of(output),
+                            AdapterUtils.mekanismEnergyCost(ENERGY_PER_TICK, PROCESS_TICKS, 1L),
+                            AdapterUtils.safeInt(PROCESS_TICKS), getMoldItem()));
                 }
             }
         }

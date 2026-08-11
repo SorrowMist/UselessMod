@@ -1,5 +1,7 @@
 package com.sorrowmist.useless.init;
 
+import appeng.api.stacks.AEItemKey;
+import appeng.crafting.pattern.AEProcessingPattern;
 import com.sorrowmist.useless.UselessMod;
 import com.sorrowmist.useless.api.enums.EnumColor;
 import com.sorrowmist.useless.client.gui.AdvancedAlloyFurnaceScreen;
@@ -12,7 +14,9 @@ import com.sorrowmist.useless.client.gui.OreGeneratorScreen;
 import com.sorrowmist.useless.client.render.ctm.CtmModelRegistrar;
 import com.sorrowmist.useless.content.blocks.GlowPlasticBlock;
 import com.sorrowmist.useless.content.menus.AdvancedAlloyFurnaceMenu;
+import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.OmniversalPatternEncoding;
 import com.sorrowmist.useless.content.recipe.AlloyFurnaceRecipeCatalog;
+import com.sorrowmist.useless.core.component.OmniversalPatternData;
 import com.sorrowmist.useless.core.component.UComponents;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
@@ -23,8 +27,14 @@ import net.neoforged.neoforge.client.event.ModelEvent;
 import net.neoforged.neoforge.client.event.RecipesUpdatedEvent;
 import net.neoforged.neoforge.event.entity.player.ItemTooltipEvent;
 import net.minecraft.ChatFormatting;
+import net.minecraft.client.Minecraft;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.item.ItemStack;
+
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 
 @EventBusSubscriber(modid = UselessMod.MODID, value = Dist.CLIENT)
 public class ClientSetup {
@@ -77,6 +87,8 @@ public class ClientSetup {
         if (!event.getItemStack().is(ModItems.OMNIVERSAL_PATTERN.get())) return;
         var data = event.getItemStack().get(UComponents.OMNIVERSAL_PATTERN_DATA.get());
         if (data == null) return;
+        List<OmniversalPatternData.MoldTagInputSlot> moldTags =
+                resolveMoldTagInputs(event.getItemStack(), data);
         event.getToolTip().add(createRecipeTooltip(data.recipeId()));
         if (!data.requiresMold()) {
             event.getToolTip().add(Component.translatable(
@@ -84,16 +96,77 @@ public class ClientSetup {
                     Component.translatable("tooltip.useless_mod.omniversal_pattern.no_mold"))
                     .withStyle(ChatFormatting.GOLD));
         } else if (!data.displayMolds().isEmpty()) {
-            for (var mold : data.displayMolds()) {
+            Set<Integer> tagMoldSlots = new HashSet<>();
+            for (var moldTag : moldTags) {
+                tagMoldSlots.add(moldTag.moldSlot());
+            }
+            for (int moldSlot = 0; moldSlot < data.displayMolds().size(); moldSlot++) {
+                // Older metadata stored one representative item for every mold slot. A tag-backed
+                // mold must be shown by its tag instead of that arbitrary representative.
+                if (tagMoldSlots.contains(moldSlot)) continue;
+                var mold = data.displayMolds().get(moldSlot);
                 event.getToolTip().add(Component.translatable(
                         "tooltip.useless_mod.omniversal_pattern.mold",
                         mold.getDisplayName()).withStyle(ChatFormatting.GOLD));
             }
+            appendMoldTagTooltips(event, moldTags);
+        } else if (!moldTags.isEmpty()) {
+            appendMoldTagTooltips(event, moldTags);
         } else {
             Component mold = data.displayMold().<Component>map(key -> key.getDisplayName())
                     .orElseGet(() -> Component.translatable("tooltip.useless_mod.omniversal_pattern.unknown_mold"));
             event.getToolTip().add(Component.translatable(
                     "tooltip.useless_mod.omniversal_pattern.mold", mold).withStyle(ChatFormatting.GOLD));
+        }
+    }
+
+    private static void appendMoldTagTooltips(
+            ItemTooltipEvent event, List<OmniversalPatternData.MoldTagInputSlot> moldTags) {
+        for (var moldTag : moldTags) {
+            event.getToolTip().add(Component.translatable(
+                    "tooltip.useless_mod.omniversal_pattern.mold",
+                    Component.literal("#" + moldTag.tag().location()))
+                    .withStyle(ChatFormatting.GOLD));
+        }
+    }
+
+    /**
+     * Reconstructs mold tags for old metadata that predates the mold-tag field. This also makes
+     * an already encoded pattern update its tooltip without requiring the player to encode it
+     * again, while the bound recipe remains the source of truth for execution.
+     */
+    private static List<OmniversalPatternData.MoldTagInputSlot> resolveMoldTagInputs(
+            ItemStack pattern, OmniversalPatternData data) {
+        if (!data.requiresMold()) return List.of();
+        if (!data.moldTagInputSlots().isEmpty()) {
+            return data.moldTagInputSlots();
+        }
+        var level = Minecraft.getInstance().level;
+        if (level == null) return List.of();
+        try {
+            var entry = AlloyFurnaceRecipeCatalog.resolve(level, data.identity());
+            if (entry.isEmpty() && pattern != null && !pattern.isEmpty()) {
+                AEItemKey definition = AEItemKey.of(pattern);
+                if (definition != null) {
+                    entry = AlloyFurnaceRecipeCatalog.resolvePattern(
+                            level, data.identity(), new AEProcessingPattern(definition));
+                }
+            }
+            if (entry.isEmpty()) {
+                List<AlloyFurnaceRecipeCatalog.Entry> byId =
+                        AlloyFurnaceRecipeCatalog.entries(level).stream()
+                                .filter(candidate -> candidate.identity().recipeId().equals(data.recipeId()))
+                                .toList();
+                if (byId.size() == 1) {
+                    entry = java.util.Optional.of(byId.getFirst());
+                }
+            }
+            return entry.map(candidate ->
+                            OmniversalPatternEncoding.resolveMoldTagInputSlots(candidate.recipe()))
+                    .orElse(List.of());
+        } catch (RuntimeException ignored) {
+            // Tooltips must remain safe while the client recipe catalog is still loading.
+            return List.of();
         }
     }
 

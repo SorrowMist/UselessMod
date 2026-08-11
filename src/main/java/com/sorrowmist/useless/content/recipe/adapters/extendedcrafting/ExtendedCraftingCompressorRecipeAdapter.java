@@ -20,6 +20,7 @@ import net.neoforged.neoforge.common.crafting.ICustomIngredient;
 import net.neoforged.neoforge.common.crafting.CompoundIngredient;
 import net.neoforged.neoforge.common.crafting.DataComponentIngredient;
 import net.neoforged.neoforge.fluids.FluidStack;
+import net.neoforged.neoforge.fluids.crafting.SizedFluidIngredient;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 
@@ -59,7 +60,7 @@ public class ExtendedCraftingCompressorRecipeAdapter implements IRecipeAdapter<I
         return List.of(new AdvancedAlloyFurnaceRecipe(
                 AdapterUtils.convertedId(holder.id()),
                 converted.inputs(),
-                List.of(),
+                List.<SizedFluidIngredient>of(),
                 List.of(),
                 converted.outputs(),
                 List.of(),

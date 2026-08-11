@@ -41,7 +41,7 @@ class MekanismChemicalRecipeSupportTest {
                 id("item_free"), List.of(), List.of(water(4)), List.of(chemicalInput),
                 List.of(), List.of(water(5)), List.of(chemicalOutput), 12_345L, 200, null);
 
-        assertEquals(4_000, recipe.inputFluids().getFirst().getAmount());
+        assertEquals(4_000, recipe.inputFluids().getFirst().amount());
         assertEquals(2_000, recipe.keyInputs().getFirst().amount());
         assertEquals(5_000, recipe.outputFluids().getFirst().getAmount());
         assertEquals(3_000, recipe.keyOutputs().getFirst().amount());
@@ -60,7 +60,7 @@ class MekanismChemicalRecipeSupportTest {
                 List.of(new ItemStack(Items.EMERALD, 6)), List.of(water(5)),
                 List.of(chemicalOutput), 12_345L, 37, null);
 
-        assertEquals(4, recipe.inputFluids().getFirst().getAmount());
+        assertEquals(4, recipe.inputFluids().getFirst().amount());
         assertEquals(2L, recipe.keyInputs().getFirst().amount());
         assertEquals(5, recipe.outputFluids().getFirst().getAmount());
         assertEquals(3L, recipe.keyOutputs().getFirst().amount());
@@ -79,12 +79,12 @@ class MekanismChemicalRecipeSupportTest {
 
         assertEquals(Long.MAX_VALUE, recipe.keyInputs().getFirst().amount());
         assertEquals(Long.MAX_VALUE, recipe.keyOutputs().getFirst().amount());
-        assertEquals(Integer.MAX_VALUE, recipe.inputFluids().getFirst().getAmount());
+        assertEquals(Integer.MAX_VALUE, recipe.inputFluids().getFirst().amount());
         assertEquals(Integer.MAX_VALUE, recipe.outputFluids().getFirst().getAmount());
     }
 
     @Test
-    void treatsFluidIngredientRepresentationsAsAlternatives() {
+    void treatsFluidIngredientRepresentationsAsAlternativesAndAllowsTankSplitting() {
         FluidStackIngredient required = IngredientCreatorAccess.fluid().from(
                 FluidIngredient.of(Fluids.WATER, Fluids.LAVA), 1_000);
 
@@ -92,7 +92,7 @@ class MekanismChemicalRecipeSupportTest {
                 java.util.Map.of(water(1_000), 1_000L), required));
         assertTrue(MekanismChemicalRecipeSupport.matchesFluid(
                 java.util.Map.of(lava(1_000), 1_000L), required));
-        assertFalse(MekanismChemicalRecipeSupport.matchesFluid(
+        assertTrue(MekanismChemicalRecipeSupport.matchesFluid(
                 java.util.Map.of(water(500), 500L, lava(500), 500L), required));
     }
 

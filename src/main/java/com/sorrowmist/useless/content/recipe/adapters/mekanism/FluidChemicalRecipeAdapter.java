@@ -52,22 +52,20 @@ public final class FluidChemicalRecipeAdapter implements IRecipeAdapter<FluidChe
                 || chemicalInput.hasNoMatchingInstances()) return List.of();
 
         List<AdvancedAlloyFurnaceRecipe> result = new ArrayList<>();
-        for (FluidStack fluid : MekanismChemicalRecipeSupport.fluidRepresentations(fluidInput)) {
-            for (ChemicalStack chemical : chemicalInput.getRepresentations()) {
-                GenericStack chemicalKey = MekanismChemicalRecipeSupport.key(chemical);
-                if (chemicalKey == null) continue;
-                for (ChemicalStack output : original.getOutputDefinition()) {
-                    GenericStack outputKey = MekanismChemicalRecipeSupport.key(output);
-                    if (outputKey == null) continue;
-                    ResourceLocation fluidId = net.minecraft.core.registries.BuiltInRegistries.FLUID.getKey(fluid.getFluid());
-                    result.add(MekanismChemicalRecipeSupport.recipe(
-                            MekanismChemicalRecipeSupport.variantId(holder.id(), "washer_"
-                                    + fluidId.getNamespace() + "_" + fluidId.getPath() + "_" + id(chemical)
-                                    + "_out_" + id(output)), List.of(), List.of(fluid), List.of(chemicalKey),
-                            List.of(), List.of(), List.of(outputKey),
-                            AdapterUtils.mekanismEnergyCost(ENERGY_PER_TICK, PROCESS_TICKS, 1L),
-                            AdapterUtils.safeInt(PROCESS_TICKS), getMoldItem()));
-                }
+        List<net.neoforged.neoforge.fluids.crafting.SizedFluidIngredient> fluidInputs =
+                MekanismChemicalRecipeSupport.fluidIngredients(fluidInput);
+        for (ChemicalStack chemical : chemicalInput.getRepresentations()) {
+            GenericStack chemicalKey = MekanismChemicalRecipeSupport.key(chemical);
+            if (chemicalKey == null) continue;
+            for (ChemicalStack output : original.getOutputDefinition()) {
+                GenericStack outputKey = MekanismChemicalRecipeSupport.key(output);
+                if (outputKey == null) continue;
+                result.add(MekanismChemicalRecipeSupport.recipe(
+                        MekanismChemicalRecipeSupport.variantId(holder.id(), "washer_" + id(chemical)
+                                + "_out_" + id(output)), List.of(), fluidInputs, List.of(chemicalKey),
+                        List.of(), List.of(), List.of(outputKey),
+                        AdapterUtils.mekanismEnergyCost(ENERGY_PER_TICK, PROCESS_TICKS, 1L),
+                        AdapterUtils.safeInt(PROCESS_TICKS), getMoldItem()));
             }
         }
         return result;

@@ -32,7 +32,9 @@ public final class OmniversalPatternDetails extends DynamicComponentPatternDetai
                         decoded.entry.recipe(), decoded.source, decoded.data.itemIdInputSlots()),
                 decoded.data.itemIdOutputSlots(),
                 tagInputTags(decoded.data),
+                fluidTagInputTags(decoded.data),
                 soulBindingInputMatchers(decoded),
+                Map.of(),
                 decoded.level.registryAccess());
         this.data = decoded.data;
         this.recipe = decoded.entry.recipe();
@@ -76,7 +78,7 @@ public final class OmniversalPatternDetails extends DynamicComponentPatternDetai
         Optional<AlloyFurnaceRecipeCatalog.Entry> resolved =
                 data.version() < OmniversalPatternData.TAG_INPUT_VERSION
                         ? AlloyFurnaceRecipeCatalog.resolveLegacyPattern(level, data.identity(), source, data.version())
-                        : AlloyFurnaceRecipeCatalog.resolve(level, data.identity());
+                        : AlloyFurnaceRecipeCatalog.resolvePattern(level, data.identity(), source);
         AlloyFurnaceRecipeCatalog.Entry entry = resolved
                 .orElseThrow(() -> new IllegalArgumentException(
                         "The bound alloy-furnace recipe is missing or has changed: " + data.recipeId()));
@@ -148,6 +150,17 @@ public final class OmniversalPatternDetails extends DynamicComponentPatternDetai
         if (data.version() < OmniversalPatternData.TAG_INPUT_VERSION) return Map.of();
         Map<Integer, List<net.minecraft.tags.TagKey<net.minecraft.world.item.Item>>> result = new LinkedHashMap<>();
         for (OmniversalPatternData.TagInputSlot slot : data.tagInputSlots()) {
+            result.computeIfAbsent(slot.slot(), ignored -> new java.util.ArrayList<>()).add(slot.tag());
+        }
+        return result;
+    }
+
+    private static Map<Integer, List<net.minecraft.tags.TagKey<net.minecraft.world.level.material.Fluid>>>
+            fluidTagInputTags(OmniversalPatternData data) {
+        if (data.version() < OmniversalPatternData.FLUID_TAG_INPUT_VERSION) return Map.of();
+        Map<Integer, List<net.minecraft.tags.TagKey<net.minecraft.world.level.material.Fluid>>> result =
+                new LinkedHashMap<>();
+        for (OmniversalPatternData.FluidTagInputSlot slot : data.fluidTagInputSlots()) {
             result.computeIfAbsent(slot.slot(), ignored -> new java.util.ArrayList<>()).add(slot.tag());
         }
         return result;

@@ -136,12 +136,17 @@ public final class ExtendedCraftingAdapterUtils {
                 ingredientSlots, ignoredSlots, inputFactory, resolver, true);
     }
 
-    private static <I extends RecipeInput> Optional<List<ItemStack>> deterministicRemaindersInternal(
+    /**
+     * Resolves every bounded ingredient candidate combination and keeps the source input beside
+     * its normalized slot remainders. Callers which have semantic equivalence rules (for example,
+     * reusable tools whose damage changes) can classify the variants without treating the exact
+     * remainder stack as the identity of the recipe.
+     */
+    public static <I extends RecipeInput> Optional<List<RemainderVariant>> remainderVariantsBySlot(
             List<Ingredient> ingredientSlots,
             Set<Integer> ignoredSlots,
             Function<List<ItemStack>, I> inputFactory,
-            Function<I, List<ItemStack>> resolver,
-            boolean preserveSlots) {
+            Function<I, List<ItemStack>> resolver) {
         if (ingredientSlots == null || inputFactory == null || resolver == null) {
             return Optional.empty();
         }
@@ -161,9 +166,7 @@ public final class ExtendedCraftingAdapterUtils {
                 return Optional.empty();
             }
             if (values == null || values.length == 0) {
-                // Some custom KJS ingredients intentionally expose no display
-                // candidates. They can still be converted when the source
-                // recipe reports no reusable remainder for the empty probe.
+                // Preserve the unresolved-tag behavior used by the existing conversion path.
                 candidates.add(List.of(ItemStack.EMPTY));
                 continue;
             }
@@ -182,31 +185,13 @@ public final class ExtendedCraftingAdapterUtils {
             }
         }
 
-        List<List<ItemStack>> variants = new ArrayList<>();
-        if (combinations <= MAX_REMAINDER_VARIANTS) {
-            buildVariants(candidates, 0, new ArrayList<>(), variants);
-        } else {
-            // Large tags are common. Check the canonical input and each one-slot
-            // substitution without allocating a cartesian product.
-            List<ItemStack> canonical = canonicalVariant(candidates);
-            variants.add(canonical);
-            for (int slot = 0; slot < candidates.size(); slot++) {
-                List<ItemStack> values = candidates.get(slot);
-                for (ItemStack value : values) {
-                    List<ItemStack> variant = copyStacks(canonical);
-                    variant.set(slot, value.copy());
-                    variants.add(variant);
-                    if (variants.size() >= MAX_REMAINDER_VARIANTS) {
-                        break;
-                    }
-                }
-                if (variants.size() >= MAX_REMAINDER_VARIANTS) {
-                    break;
-                }
-            }
+        if (combinations > MAX_REMAINDER_VARIANTS) {
+            return Optional.empty();
         }
 
-        List<ItemStack> expected = null;
+        List<List<ItemStack>> variants = new ArrayList<>();
+        buildVariants(candidates, 0, new ArrayList<>(), variants);
+        List<RemainderVariant> result = new ArrayList<>(variants.size());
         for (List<ItemStack> variant : variants) {
             List<ItemStack> remainder;
             try {
@@ -215,13 +200,37 @@ public final class ExtendedCraftingAdapterUtils {
             } catch (RuntimeException exception) {
                 return Optional.empty();
             }
-            Optional<List<ItemStack>> normalizedResult = preserveSlots
-                    ? normalizeRemainderBySlot(remainder, ingredientSlots.size(), ignored)
-                    : normalizeRemainder(remainder, ignored);
-            if (normalizedResult.isEmpty()) {
+            Optional<List<ItemStack>> normalized = normalizeRemainderBySlot(
+                    remainder, ingredientSlots.size(), ignored);
+            if (normalized.isEmpty()) {
                 return Optional.empty();
             }
-            List<ItemStack> normalized = normalizedResult.get();
+            result.add(new RemainderVariant(copyStacks(variant), normalized.get()));
+        }
+        return Optional.of(List.copyOf(result));
+    }
+
+    private static <I extends RecipeInput> Optional<List<ItemStack>> deterministicRemaindersInternal(
+            List<Ingredient> ingredientSlots,
+            Set<Integer> ignoredSlots,
+            Function<List<ItemStack>, I> inputFactory,
+            Function<I, List<ItemStack>> resolver,
+            boolean preserveSlots) {
+        Optional<List<RemainderVariant>> variants = remainderVariantsBySlot(
+                ingredientSlots, ignoredSlots, inputFactory, resolver);
+        if (variants.isEmpty()) {
+            return Optional.empty();
+        }
+
+        Set<Integer> ignored = ignoredSlots == null ? Set.of() : new HashSet<>(ignoredSlots);
+        List<ItemStack> expected = null;
+        for (RemainderVariant variant : variants.get()) {
+            List<ItemStack> normalized = preserveSlots
+                    ? variant.remainders()
+                    : normalizeRemainder(variant.remainders(), ignored).orElse(null);
+            if (normalized == null) {
+                return Optional.empty();
+            }
             if (expected == null) {
                 expected = normalized;
             } else if (preserveSlots
@@ -231,6 +240,13 @@ public final class ExtendedCraftingAdapterUtils {
             }
         }
         return Optional.of(expected == null ? List.of() : expected);
+    }
+
+    public record RemainderVariant(List<ItemStack> inputs, List<ItemStack> remainders) {
+        public RemainderVariant {
+            inputs = inputs == null ? List.of() : List.copyOf(inputs);
+            remainders = remainders == null ? List.of() : List.copyOf(remainders);
+        }
     }
 
     private static void buildVariants(
@@ -251,14 +267,6 @@ public final class ExtendedCraftingAdapterUtils {
                 return;
             }
         }
-    }
-
-    private static List<ItemStack> canonicalVariant(List<List<ItemStack>> candidates) {
-        List<ItemStack> result = new ArrayList<>(candidates.size());
-        for (List<ItemStack> values : candidates) {
-            result.add(values.isEmpty() ? ItemStack.EMPTY : values.getFirst().copy());
-        }
-        return result;
     }
 
     private static List<ItemStack> copyStacks(List<ItemStack> stacks) {

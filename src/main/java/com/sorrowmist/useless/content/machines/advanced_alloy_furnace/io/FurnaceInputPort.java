@@ -5,9 +5,11 @@ import appeng.api.stacks.GenericStack;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.chemical.ChemicalKeyProvider;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.chemical.FurnaceChemicalStorage;
 import com.sorrowmist.useless.content.recipe.AdvancedAlloyFurnaceRecipe;
+import com.sorrowmist.useless.content.recipe.FluidIngredientAllocator;
 import com.sorrowmist.useless.content.recipe.ItemIngredientAllocator;
 import net.minecraft.world.item.ItemStack;
 import net.neoforged.neoforge.fluids.FluidStack;
+import net.neoforged.neoforge.fluids.crafting.SizedFluidIngredient;
 import net.neoforged.neoforge.fluids.capability.IFluidHandler;
 import net.neoforged.neoforge.fluids.capability.templates.FluidTank;
 import net.neoforged.neoforge.items.ItemStackHandler;
@@ -109,7 +111,7 @@ public final class FurnaceInputPort {
         int fluidParallel = maxFluidOperations(recipe.inputFluids(), inputFluidTanks, fluidTankCount);
         int chemicalParallel = maxChemicalOperations(recipe.keyInputs(), inputChemicalStorage, chemicalKeyProvider);
         boolean hasItemDemand = recipe.inputs().stream().anyMatch(input -> input != null && input.count() > 0);
-        boolean hasFluidDemand = recipe.inputFluids().stream().anyMatch(input -> input != null && !input.isEmpty() && input.getAmount() > 0);
+        boolean hasFluidDemand = recipe.inputFluids().stream().anyMatch(input -> input != null && input.amount() > 0);
         boolean hasChemicalDemand = hasChemicalDemand(recipe.keyInputs(), chemicalKeyProvider);
         if (!hasItemDemand && !hasFluidDemand && !hasChemicalDemand) return 1;
         return Math.min(itemParallel, Math.min(fluidParallel, chemicalParallel));
@@ -150,42 +152,19 @@ public final class FurnaceInputPort {
         return inputs;
     }
 
-    private static long[] allocateFluids(List<FluidStack> requirements, long operations, FluidTank[] tanks, int fluidTankCount) {
-        int count = Math.max(0, Math.min(fluidTankCount, tanks.length));
-        long[] consumedByTank = new long[count];
-        for (FluidDemand demand : mergeFluidDemands(requirements)) {
-            long remaining = saturatingMultiply(demand.amount(), operations);
-            for (int i = 0; i < count && remaining > 0; i++) {
-                FluidStack available = tanks[i].getFluid();
-                if (!FluidStack.isSameFluidSameComponents(available, demand.fluid())) continue;
-                long consumed = Math.min(remaining, (long) available.getAmount() - consumedByTank[i]);
-                if (consumed <= 0) continue;
-                consumedByTank[i] += consumed;
-                remaining -= consumed;
-            }
-            if (remaining > 0) return null;
+    private static long[] allocateFluids(List<SizedFluidIngredient> requirements, long operations, FluidTank[] tanks, int fluidTankCount) {
+        FluidIngredientAllocator.Allocation allocation = FluidIngredientAllocator.allocateTanks(
+                requirements, tanks, fluidTankCount, operations);
+        if (allocation == null) return null;
+        long[] consumed = new long[allocation.supplyCount()];
+        for (int i = 0; i < consumed.length; i++) {
+            consumed[i] = allocation.consumedFromSupply(i);
         }
-        return consumedByTank;
+        return consumed;
     }
 
-    private static int maxFluidOperations(List<FluidStack> requirements, FluidTank[] tanks, int fluidTankCount) {
-        List<FluidDemand> demands = mergeFluidDemands(requirements);
-        if (demands.isEmpty()) return Integer.MAX_VALUE;
-
-        int count = Math.max(0, Math.min(fluidTankCount, tanks.length));
-        int maximum = Integer.MAX_VALUE;
-        for (FluidDemand demand : demands) {
-            long availableAmount = 0;
-            for (int i = 0; i < count; i++) {
-                FluidStack available = tanks[i].getFluid();
-                if (FluidStack.isSameFluidSameComponents(available, demand.fluid())) {
-                    availableAmount = saturatingAdd(availableAmount, available.getAmount());
-                }
-            }
-            long operations = availableAmount / demand.amount();
-            maximum = Math.min(maximum, operations > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) operations);
-        }
-        return maximum;
+    private static int maxFluidOperations(List<SizedFluidIngredient> requirements, FluidTank[] tanks, int fluidTankCount) {
+        return FluidIngredientAllocator.maxTankOperations(requirements, tanks, fluidTankCount);
     }
 
     private static long[] allocateChemicals(List<GenericStack> requirements, long operations,
@@ -262,27 +241,6 @@ public final class FurnaceInputPort {
         return demands;
     }
 
-    private static List<FluidDemand> mergeFluidDemands(List<FluidStack> requirements) {
-        List<FluidDemand> demands = new ArrayList<>();
-        if (requirements == null) return demands;
-        for (FluidStack requirement : requirements) {
-            if (requirement == null || requirement.isEmpty() || requirement.getAmount() <= 0) continue;
-            boolean merged = false;
-            for (int i = 0; i < demands.size(); i++) {
-                FluidDemand existing = demands.get(i);
-                if (FluidStack.isSameFluidSameComponents(existing.fluid(), requirement)) {
-                    demands.set(i, new FluidDemand(existing.fluid(), saturatingAdd(existing.amount(), requirement.getAmount())));
-                    merged = true;
-                    break;
-                }
-            }
-            if (!merged) {
-                demands.add(new FluidDemand(requirement.copyWithAmount(1), requirement.getAmount()));
-            }
-        }
-        return demands;
-    }
-
     private static long saturatingAdd(long left, long right) {
         if (right > 0 && left > Long.MAX_VALUE - right) return Long.MAX_VALUE;
         return left + right;
@@ -292,9 +250,6 @@ public final class FurnaceInputPort {
         if (amount <= 0 || multiplier <= 0) return 0;
         if (amount > Long.MAX_VALUE / multiplier) return Long.MAX_VALUE;
         return amount * multiplier;
-    }
-
-    private record FluidDemand(FluidStack fluid, long amount) {
     }
 
     private record ChemicalDemand(AEKey key, long amount) {

@@ -16,6 +16,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class FissionRecipeAdapterTest {
     @BeforeAll
@@ -25,7 +26,7 @@ class FissionRecipeAdapterTest {
     }
 
     @Test
-    void expandsWaterRepresentationsIntoIndependentRecipes() {
+    void preservesWaterIngredientAsOneRecipe() {
         FluidStackIngredient water = IngredientCreatorAccess.fluid().from(
                 FluidIngredient.of(Fluids.WATER, Fluids.LAVA), 1);
         FissionRecipeAdapter adapter = new FissionRecipeAdapter();
@@ -33,7 +34,7 @@ class FissionRecipeAdapterTest {
                 adapter.createWaterRecipes(water, MekanismChemicals.FISSILE_FUEL.asStack(1),
                         MekanismChemicals.STEAM.asStack(1), MekanismChemicals.NUCLEAR_WASTE.asStack(1));
 
-        assertEquals(2, waterRecipes.size());
+        assertEquals(1, waterRecipes.size());
         assertEquals(waterRecipes.size(), waterRecipes.stream()
                 .map(net.minecraft.world.item.crafting.RecipeHolder::id)
                 .collect(Collectors.toSet()).size());
@@ -46,8 +47,9 @@ class FissionRecipeAdapterTest {
                 .distinct()
                 .findFirst()
                 .orElse(0));
-        assertEquals(Set.of(Fluids.WATER, Fluids.LAVA), waterRecipes.stream()
-                .map(holder -> holder.value().convertedRecipe().inputFluids().getFirst().getFluid())
-                .collect(Collectors.toSet()));
+        assertTrue(waterRecipes.getFirst().value().convertedRecipe().inputFluids().getFirst()
+                .ingredient().test(new net.neoforged.neoforge.fluids.FluidStack(Fluids.WATER, 1)));
+        assertTrue(waterRecipes.getFirst().value().convertedRecipe().inputFluids().getFirst()
+                .ingredient().test(new net.neoforged.neoforge.fluids.FluidStack(Fluids.LAVA, 1)));
     }
 }

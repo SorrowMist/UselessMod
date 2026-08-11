@@ -46,8 +46,9 @@ class HeavyWaterRecipeAdapterTest {
                 "useless_mod", "mekanism/heavy_water_filter_upgrade"), generated.getFirst().id());
 
         var recipe = generated.getFirst().value().convertedRecipe();
-        assertEquals(Fluids.WATER, recipe.inputFluids().getFirst().getFluid());
-        assertEquals(1_000, recipe.inputFluids().getFirst().getAmount());
+        assertTrue(recipe.inputFluids().getFirst().ingredient()
+                .test(new FluidStack(Fluids.WATER, 1)));
+        assertEquals(1_000, recipe.inputFluids().getFirst().amount());
         assertEquals(MekanismFluids.HEAVY_WATER.get(), recipe.outputFluids().getFirst().getFluid());
         assertEquals(1_000, recipe.outputFluids().getFirst().getAmount());
         assertEquals(200, recipe.processTime());

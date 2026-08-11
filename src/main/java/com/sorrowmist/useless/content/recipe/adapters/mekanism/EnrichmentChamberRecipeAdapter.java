@@ -122,26 +122,16 @@ public class EnrichmentChamberRecipeAdapter implements IRecipeAdapter<ItemStackT
         if (input == null || input.hasNoMatchingInstances()) {
             return Ingredient.EMPTY;
         }
-        List<ItemStack> representations = input.getRepresentations();
-        if (representations.isEmpty()) {
-            return Ingredient.EMPTY;
-        }
-        return Ingredient.of(representations.stream().map(stack -> stack.copyWithCount(1)));
+        return input.ingredient() == null ? Ingredient.EMPTY : input.ingredient().ingredient();
     }
 
     private static boolean matchesIngredient(Map<Ingredient, Long> mergedInputs, ItemStackIngredient required) {
         if (required == null || required.hasNoMatchingInstances()) {
             return false;
         }
-        long requiredCount = required.ingredient().count();
-        for (Map.Entry<Ingredient, Long> entry : mergedInputs.entrySet()) {
-            for (ItemStack stack : entry.getKey().getItems()) {
-                if (required.testType(stack) && entry.getValue() >= requiredCount) {
-                    return true;
-                }
-            }
-        }
-        return false;
+        Map<Ingredient, Long> requiredCounts = new java.util.LinkedHashMap<>();
+        AdapterUtils.mergeIngredient(requiredCounts, ingredient(required), required.ingredient().count());
+        return AdapterUtils.matchesRequired(mergedInputs, requiredCounts);
     }
 
     private static void addCountedIngredient(List<CountedIngredient> countedIngredients, ItemStackIngredient input, long multiplier) {

@@ -15,6 +15,7 @@ import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -62,6 +63,16 @@ class RecipeConversionUtilsTest {
 
         assertTrue(RecipeConversionUtils.convertAll(
                 adapter, holder("null_result", new FakeRecipe()), null).isEmpty());
+    }
+
+    @Test
+    void runtimeLookupFallsBackToTheLegacyStaticLookup() {
+        RecipeHolder<FakeRecipe> expected = holder("static_lookup", new FakeRecipe());
+        IRecipeAdapter<FakeRecipe> adapter = new StaticLookupAdapter(expected);
+
+        assertEquals(List.of(expected), adapter.findMatchingRecipes(
+                null, Map.of(), Map.of(), Map.of(), ItemStack.EMPTY,
+                List.of(new ItemStack(net.minecraft.world.item.Items.IRON_INGOT))));
     }
 
     @Test
@@ -127,6 +138,32 @@ class RecipeConversionUtilsTest {
                 RecipeHolder<FakeRecipe> holder, Level level, List<ItemStack> actualInputs) {
             actualInputsOverloadUsed = true;
             return convertAll(holder, level);
+        }
+    }
+
+    private static final class StaticLookupAdapter implements IRecipeAdapter<FakeRecipe> {
+        private final RecipeHolder<FakeRecipe> expected;
+
+        private StaticLookupAdapter(RecipeHolder<FakeRecipe> expected) {
+            this.expected = expected;
+        }
+
+        @Override
+        public Class<FakeRecipe> getRecipeClass() {
+            return FakeRecipe.class;
+        }
+
+        @Override
+        public @Nullable ItemStack getMoldItem() {
+            return null;
+        }
+
+        @Override
+        public List<RecipeHolder<FakeRecipe>> findMatchingRecipes(
+                Level level, Map<net.minecraft.world.item.crafting.Ingredient, Long> mergedInputs,
+                Map<net.neoforged.neoforge.fluids.FluidStack, Long> mergedFluids,
+                @Nullable ItemStack mold) {
+            return List.of(expected);
         }
     }
 

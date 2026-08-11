@@ -47,20 +47,18 @@ public final class ElectrolysisRecipeAdapter implements IRecipeAdapter<Electroly
         if (input == null || input.hasNoMatchingInstances()) return List.of();
 
         List<AdvancedAlloyFurnaceRecipe> result = new ArrayList<>();
-        for (FluidStack fluid : MekanismChemicalRecipeSupport.fluidRepresentations(input)) {
-            ResourceLocation fluidId = net.minecraft.core.registries.BuiltInRegistries.FLUID.getKey(fluid.getFluid());
-            for (ElectrolysisRecipe.ElectrolysisRecipeOutput output : original.getOutputDefinition()) {
-                GenericStack left = MekanismChemicalRecipeSupport.key(output.left());
-                GenericStack right = MekanismChemicalRecipeSupport.key(output.right());
-                if (left == null || right == null) continue;
-                result.add(MekanismChemicalRecipeSupport.recipe(
-                        MekanismChemicalRecipeSupport.variantId(holder.id(), "separating_"
-                                + fluidId.getNamespace() + "_" + fluidId.getPath()),
-                        List.of(), List.of(fluid), List.of(), List.of(), List.of(), List.of(left, right),
-                        AdapterUtils.mekanismEnergyCost(ENERGY_PER_TICK,
-                                PROCESS_TICKS, Math.max(1L, original.getEnergyMultiplier())),
-                        AdapterUtils.safeInt(PROCESS_TICKS), getMoldItem()));
-            }
+        List<net.neoforged.neoforge.fluids.crafting.SizedFluidIngredient> fluidInputs =
+                MekanismChemicalRecipeSupport.fluidIngredients(input);
+        for (ElectrolysisRecipe.ElectrolysisRecipeOutput output : original.getOutputDefinition()) {
+            GenericStack left = MekanismChemicalRecipeSupport.key(output.left());
+            GenericStack right = MekanismChemicalRecipeSupport.key(output.right());
+            if (left == null || right == null) continue;
+            result.add(MekanismChemicalRecipeSupport.recipe(
+                    MekanismChemicalRecipeSupport.variantId(holder.id(), "separating"),
+                    List.of(), fluidInputs, List.of(), List.of(), List.of(), List.of(left, right),
+                    AdapterUtils.mekanismEnergyCost(ENERGY_PER_TICK,
+                            PROCESS_TICKS, Math.max(1L, original.getEnergyMultiplier())),
+                    AdapterUtils.safeInt(PROCESS_TICKS), getMoldItem()));
         }
         return result;
     }

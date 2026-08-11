@@ -19,6 +19,7 @@ import net.neoforged.neoforge.fluids.FluidStack;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -164,21 +165,17 @@ public class InscriberRecipeAdapter implements IRecipeAdapter<InscriberRecipe> {
 
             if (middleInput == null || isIngredientEmpty(middleInput)) continue;
 
-            if (!AdapterUtils.hasMatchingIngredient(mergedInputs, middleInput)) continue;
-
             boolean hasTop = !isIngredientEmpty(topInput);
             boolean hasBottom = !isIngredientEmpty(bottomInput);
 
             if (processType == InscriberProcessType.PRESS) {
                 if (!hasMold || !ItemStack.isSameItem(mold, new ItemStack(AEBlocks.INSCRIBER.asItem()))) continue;
 
-                boolean topSatisfied = !hasTop;
-                boolean bottomSatisfied = !hasBottom;
-
-                if (!topSatisfied) topSatisfied = AdapterUtils.hasMatchingIngredient(mergedInputs, topInput);
-                if (!bottomSatisfied) bottomSatisfied = AdapterUtils.hasMatchingIngredient(mergedInputs, bottomInput);
-
-                if (!topSatisfied || !bottomSatisfied) continue;
+                Map<Ingredient, Long> requiredInputs = new LinkedHashMap<>();
+                AdapterUtils.mergeIngredient(requiredInputs, middleInput, 1L);
+                if (hasTop) AdapterUtils.mergeIngredient(requiredInputs, topInput, 1L);
+                if (hasBottom) AdapterUtils.mergeIngredient(requiredInputs, bottomInput, 1L);
+                if (!AdapterUtils.matchesRequired(mergedInputs, requiredInputs)) continue;
 
                 matches.add(holder);
             } else {
@@ -188,6 +185,10 @@ public class InscriberRecipeAdapter implements IRecipeAdapter<InscriberRecipe> {
                 if ((hasTop || hasBottom) && (!hasMold || !moldMatchesTop && !moldMatchesBottom)) {
                     continue;
                 }
+
+                Map<Ingredient, Long> requiredInputs = new LinkedHashMap<>();
+                AdapterUtils.mergeIngredient(requiredInputs, middleInput, 1L);
+                if (!AdapterUtils.matchesRequired(mergedInputs, requiredInputs)) continue;
 
                 matches.add(holder);
             }

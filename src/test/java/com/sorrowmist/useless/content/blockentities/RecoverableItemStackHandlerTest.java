@@ -78,4 +78,18 @@ class RecoverableItemStackHandlerTest {
 
         assertEquals(1, changes.get());
     }
+
+    @Test
+    void insertRunsTheItemValidatorOnce() {
+        AtomicInteger validations = new AtomicInteger();
+        RecoverableItemStackHandler handler = new RecoverableItemStackHandler(
+                () -> 27, stack -> {
+                    validations.incrementAndGet();
+                    return true;
+                }, () -> { });
+
+        handler.insertItem(0, new ItemStack(Items.IRON_INGOT), false);
+
+        assertEquals(1, validations.get());
+    }
 }

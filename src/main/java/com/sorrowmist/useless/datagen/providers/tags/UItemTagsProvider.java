@@ -87,6 +87,17 @@ public class UItemTagsProvider extends ItemTagsProvider {
             .addOptional(ResourceLocation.fromNamespaceAndPath("naturesaura", "crushing_catalyst"))
             .addOptional(ResourceLocation.fromNamespaceAndPath("malum", "spirit_crucible"))
             .addOptional(ResourceLocation.fromNamespaceAndPath("malum", "spirit_altar"))
+            .addOptional(ResourceLocation.fromNamespaceAndPath("create", "spout"))
+            .addOptional(ResourceLocation.fromNamespaceAndPath("create", "mechanical_press"))
+            .addOptional(ResourceLocation.fromNamespaceAndPath("create", "mechanical_mixer"))
+            .addOptional(ResourceLocation.fromNamespaceAndPath("create", "basin"))
+            .addOptional(ResourceLocation.fromNamespaceAndPath("create", "millstone"))
+            .addOptional(ResourceLocation.fromNamespaceAndPath("create", "crushing_wheel"))
+            .addOptional(ResourceLocation.fromNamespaceAndPath("create", "encased_fan"))
+            .addOptional(ResourceLocation.fromNamespaceAndPath("create", "mechanical_crafter"))
+            .addOptional(ResourceLocation.fromNamespaceAndPath("create", "deployer"))
+            .addOptional(ResourceLocation.fromNamespaceAndPath("create", "mechanical_saw"))
+            .addOptional(ResourceLocation.fromNamespaceAndPath("create", "blaze_burner"))
             .addOptional(ResourceLocation.fromNamespaceAndPath("useless_mod", "ritual_blueprint"));
     }
 

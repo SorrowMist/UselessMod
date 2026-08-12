@@ -558,7 +558,9 @@ public final class OccultismRitualRecipeAdapter implements IRecipeAdapter<Ritual
                 entityTypes, source.getEntityNbt(), source.getResultItem(null),
                 source.getSpiritJobType(), source.getSpiritMaxAge()));
         ItemStack originalResult = source.getResultItem(null).copy();
-        if (!outputs.isEmpty() && !originalResult.isEmpty()) {
+        if (!outputs.isEmpty() && !originalResult.isEmpty()
+                && outputs.stream().noneMatch(output ->
+                ItemStack.isSameItemSameComponents(output, originalResult))) {
             outputs.add(originalResult);
         }
         return List.copyOf(outputs);

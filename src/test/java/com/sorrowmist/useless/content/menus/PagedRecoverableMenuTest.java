@@ -88,6 +88,25 @@ class PagedRecoverableMenuTest {
         assertEquals(3, backing.getStackInSlot(PagedRecoverableMenu.SLOTS_PER_PAGE).getCount());
     }
 
+    @Test
+    void insertionSkipsValidationForOccupiedSlotsWithDifferentItems() {
+        AtomicInteger validations = new AtomicInteger();
+        RecoverableItemStackHandler backing = new RecoverableItemStackHandler(
+                () -> 54, stack -> {
+                    validations.incrementAndGet();
+                    return true;
+                }, () -> { });
+        for (int slot = 0; slot < 53; slot++) {
+            backing.setStackInSlot(slot, new ItemStack(Items.IRON_INGOT));
+        }
+
+        ItemStack source = new ItemStack(Items.GOLD_INGOT, 3);
+        assertTrue(PagedRecoverableMenu.insertIntoActiveSlots(backing, source, 0));
+
+        assertTrue(source.isEmpty());
+        assertEquals(1, validations.get());
+    }
+
     private static RecoverableItemStackHandler handler() {
         return new RecoverableItemStackHandler(() -> 54, stack -> true, () -> {
         });

@@ -34,6 +34,8 @@ public final class OmniversalMoldHubBlockEntity extends BlockEntity implements M
             this::isValidMold,
             this::moldInventoryChanged);
     private final Map<List<Ingredient>, Boolean> moldMatchCache = new HashMap<>();
+    @Nullable
+    private List<ItemStack> cachedAvailableMolds;
     private int cachedActiveSlots = -1;
     private long cachedRecipeCatalogGeneration = -1L;
     @Nullable
@@ -76,14 +78,21 @@ public final class OmniversalMoldHubBlockEntity extends BlockEntity implements M
         Boolean cached = moldMatchCache.get(normalized);
         if (cached != null) return cached;
 
-        int activeSlots = molds.getActiveSlots();
-        List<ItemStack> available = new ArrayList<>(activeSlots);
-        for (int slot = 0; slot < activeSlots; slot++) {
-            available.add(molds.getStackInSlot(slot));
-        }
-        boolean matched = matchesMolds(normalized, available);
+        boolean matched = matchesMolds(normalized, getAvailableMolds());
         moldMatchCache.put(normalized, matched);
         return matched;
+    }
+
+    private List<ItemStack> getAvailableMolds() {
+        if (cachedAvailableMolds == null) {
+            int activeSlots = molds.getActiveSlots();
+            List<ItemStack> available = new ArrayList<>(activeSlots);
+            for (int slot = 0; slot < activeSlots; slot++) {
+                available.add(molds.getStackInSlot(slot).copy());
+            }
+            cachedAvailableMolds = List.copyOf(available);
+        }
+        return cachedAvailableMolds;
     }
 
     /**
@@ -134,6 +143,7 @@ public final class OmniversalMoldHubBlockEntity extends BlockEntity implements M
         long catalogGeneration = AlloyFurnaceRecipeCatalog.generation();
         if (cachedActiveSlots != activeSlots || cachedRecipeCatalogGeneration != catalogGeneration) {
             moldMatchCache.clear();
+            cachedAvailableMolds = null;
             cachedActiveSlots = activeSlots;
             cachedRecipeCatalogGeneration = catalogGeneration;
         }
@@ -141,6 +151,7 @@ public final class OmniversalMoldHubBlockEntity extends BlockEntity implements M
 
     private void moldInventoryChanged() {
         moldMatchCache.clear();
+        cachedAvailableMolds = null;
         setChanged();
     }
 
@@ -179,6 +190,7 @@ public final class OmniversalMoldHubBlockEntity extends BlockEntity implements M
         super.loadAdditional(tag, registries);
         molds.deserializeNBT(registries, tag.getCompound("Molds"));
         moldMatchCache.clear();
+        cachedAvailableMolds = null;
         cachedActiveSlots = -1;
         cachedRecipeCatalogGeneration = -1L;
         controllerPos = tag.contains("Controller") ? BlockPos.of(tag.getLong("Controller")) : null;

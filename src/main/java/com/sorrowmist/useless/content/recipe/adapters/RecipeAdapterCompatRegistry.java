@@ -80,6 +80,7 @@ public final class RecipeAdapterCompatRegistry {
     public static final String OCCULTISM = RecipeSourceIds.OCCULTISM;
     public static final String MALUM = RecipeSourceIds.MALUM;
     public static final String ENDER_IO = RecipeSourceIds.ENDER_IO;
+    public static final String CREATE = RecipeSourceIds.CREATE;
 
     private static final List<CompatEntry> ENTRIES = List.of(
             new CompatEntry(null, RecipeAdapterCompatRegistry::registerMinecraft),
@@ -104,7 +105,8 @@ public final class RecipeAdapterCompatRegistry {
             new CompatEntry(FORBIDDEN_ARCANUS, RecipeAdapterCompatRegistry::registerForbiddenArcanus),
             new CompatEntry(OCCULTISM, RecipeAdapterCompatRegistry::registerOccultism),
             new CompatEntry(MALUM, RecipeAdapterCompatRegistry::registerMalum),
-            new CompatEntry(ENDER_IO, RecipeAdapterCompatRegistry::registerEnderIO)
+            new CompatEntry(ENDER_IO, RecipeAdapterCompatRegistry::registerEnderIO),
+            new CompatEntry(CREATE, RecipeAdapterCompatRegistry::registerCreate)
     );
 
     private RecipeAdapterCompatRegistry() {}
@@ -259,6 +261,10 @@ public final class RecipeAdapterCompatRegistry {
         register(new SagMillingRecipeAdapter());
         register(new SoulBindingRecipeAdapter());
         register(new VatFermentingRecipeAdapter());
+    }
+
+    private static void registerCreate() {
+        invokeOptionalLoader("com.sorrowmist.useless.compat.create.CreateRecipeCompatLoader");
     }
 
     private record CompatEntry(@Nullable String modId, Runnable registerAction) {}

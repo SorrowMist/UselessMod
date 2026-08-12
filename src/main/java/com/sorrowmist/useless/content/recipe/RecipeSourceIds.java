@@ -28,6 +28,7 @@ public final class RecipeSourceIds {
     public static final String OCCULTISM = "occultism";
     public static final String MALUM = "malum";
     public static final String ENDER_IO = "enderio";
+    public static final String CREATE = "create";
 
     private RecipeSourceIds() {
     }
@@ -62,6 +63,7 @@ public final class RecipeSourceIds {
         if (name.endsWith(".occultism")) return OCCULTISM;
         if (name.endsWith(".malum")) return MALUM;
         if (name.endsWith(".enderio")) return ENDER_IO;
+        if (name.endsWith(".create")) return CREATE;
         if (name.endsWith(".mekanism") || name.endsWith(".generators")) return MEKANISM;
         return UNKNOWN;
     }

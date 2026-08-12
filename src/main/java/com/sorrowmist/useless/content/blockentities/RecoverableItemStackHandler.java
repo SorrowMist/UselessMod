@@ -48,14 +48,6 @@ public class RecoverableItemStackHandler extends ItemStackHandler {
         return validator.test(stack);
     }
 
-    @Override
-    public ItemStack insertItem(int slot, ItemStack stack, boolean simulate) {
-        if (!isItemValid(slot, stack)) {
-            return stack;
-        }
-        return super.insertItem(slot, stack, simulate);
-    }
-
     /** Groups several backing-slot writes into one inventory change callback. */
     public void withChangeBatch(Runnable action) {
         changeBatchDepth++;

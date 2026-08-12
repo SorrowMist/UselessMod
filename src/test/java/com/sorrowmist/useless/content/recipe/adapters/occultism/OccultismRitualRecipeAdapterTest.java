@@ -316,6 +316,21 @@ class OccultismRitualRecipeAdapterTest {
     }
 
     @Test
+    void doesNotDuplicateAnExistingSpawnEggResult() {
+        RitualRecipe source = entityRecipe(
+                "duplicate_egg_result", new ItemStack(Items.COW_SPAWN_EGG), EntityType.COW, null, null, -1);
+
+        List<ItemStack> outputs = new OccultismRitualRecipeAdapter()
+                .convertAll(holder("duplicate_egg_result", source), null)
+                .getFirst().outputs();
+
+        assertEquals(1, outputs.size());
+        assertEquals(1, outputs.getFirst().getCount());
+        assertTrue(ItemStack.isSameItemSameComponents(
+                new ItemStack(Items.COW_SPAWN_EGG), outputs.getFirst()));
+    }
+
+    @Test
     void createsAUsableSpawnEggForEveryRandomEntity() {
         CompoundTag sourceEntityData = new CompoundTag();
         sourceEntityData.putString("CustomName", "ritual animal");

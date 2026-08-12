@@ -82,7 +82,30 @@ public final class AlloyFurnaceRecipeCatalog {
      * exposed through the shared alloy-furnace recipe directory.
      */
     public static boolean isKnownMold(Level level, ItemStack stack) {
-        return level != null && isKnownMold(stack, recipes(level));
+        if (level == null || stack == null || stack.isEmpty()) return false;
+
+        Snapshot snapshot = snapshot(level);
+        AEItemKey key = AEItemKey.of(stack);
+        if (key == null) return false;
+        Boolean cached = snapshot.knownMoldCache.get(key);
+        if (cached != null) return cached;
+
+        boolean result = isKnownMoldInEntries(stack, snapshot.entries);
+        snapshot.knownMoldCache.put(key, result);
+        return result;
+    }
+
+    private static boolean isKnownMoldInEntries(ItemStack stack, List<Entry> entries) {
+        for (Entry entry : entries) {
+            AdvancedAlloyFurnaceRecipe recipe = entry.recipe();
+            if (recipe == null) continue;
+            for (var mold : recipe.molds()) {
+                if (mold != null && !mold.isEmpty() && AdapterUtils.matchesMold(mold, stack)) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     static boolean isKnownMold(ItemStack stack, Iterable<AdvancedAlloyFurnaceRecipe> recipes) {
@@ -498,6 +521,7 @@ public final class AlloyFurnaceRecipeCatalog {
         bySourceAndRecipeId.replaceAll((ignored, entries) -> List.copyOf(entries));
         Snapshot snapshot = new Snapshot(ordered, Map.copyOf(unique), Map.copyOf(byRecipeId),
                 Map.copyOf(bySource), Map.copyOf(bySourceAndRecipeId), generation,
+                new ConcurrentHashMap<>(),
                 new ResolutionMisses(compensationRebuildUsed), new ConcurrentHashMap<>(),
                 ConcurrentHashMap.newKeySet());
         LOGGER.info("Built alloy-furnace recipe catalog: generation={}, recipes={}, sources={}, elapsed={} ms",
@@ -793,6 +817,7 @@ public final class AlloyFurnaceRecipeCatalog {
             Map<String, List<Entry>> bySource,
             Map<SourceRecipeKey, List<Entry>> bySourceAndRecipeId,
             long generation,
+            Map<AEItemKey, Boolean> knownMoldCache,
             ResolutionMisses misses,
             Map<AlloyFurnaceRecipeIdentity, Entry> compatibilityAliases,
             Set<AlloyFurnaceRecipeIdentity> legacyMisses) {

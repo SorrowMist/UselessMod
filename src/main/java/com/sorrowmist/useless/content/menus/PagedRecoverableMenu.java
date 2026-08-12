@@ -181,7 +181,14 @@ public class PagedRecoverableMenu extends AbstractContainerMenu {
                 boolean emptySlots = pass == 1;
                 for (int offset = 0; offset < activeSlots && !remainingHolder[0].isEmpty(); offset++) {
                     int slot = (first + offset) % activeSlots;
-                    if (inventory.getStackInSlot(slot).isEmpty() != emptySlots) continue;
+                    ItemStack existing = inventory.getStackInSlot(slot);
+                    if (existing.isEmpty() != emptySlots) continue;
+                    // An occupied slot containing another stack cannot accept this item. Avoid
+                    // invoking the handler validator for every unrelated occupied slot.
+                    if (!existing.isEmpty()
+                            && !ItemStack.isSameItemSameComponents(existing, remainingHolder[0])) {
+                        continue;
+                    }
                     remainingHolder[0] = inventory.insertItem(slot, remainingHolder[0], false);
                 }
             }

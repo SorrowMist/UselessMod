@@ -77,7 +77,7 @@ public final class ItemToChemicalRecipeAdapter implements IRecipeAdapter<ItemSta
         if (holder == null || level == null || holder.value().getType() != recipeType) return List.of();
         ItemStackToChemicalRecipe original = holder.value();
         ItemStackIngredient itemInput = original.getInput();
-        if (itemInput == null || itemInput.hasNoMatchingInstances()) return List.of();
+        if (MekanismChemicalRecipeSupport.item(itemInput) == null) return List.of();
 
         List<AdvancedAlloyFurnaceRecipe> result = new ArrayList<>();
         for (ChemicalStack output : original.getOutputDefinition()) {

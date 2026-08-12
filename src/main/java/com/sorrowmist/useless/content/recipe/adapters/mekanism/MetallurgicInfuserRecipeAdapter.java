@@ -56,7 +56,7 @@ public class MetallurgicInfuserRecipeAdapter implements IRecipeAdapter<ItemStack
 
         var itemInput = original.getItemInput();
         ChemicalStackIngredient chemicalInput = original.getChemicalInput();
-        if (itemInput == null || itemInput.hasNoMatchingInstances()
+        if (MekanismChemicalRecipeSupport.item(itemInput) == null
                 || chemicalInput == null || chemicalInput.hasNoMatchingInstances()
                 || original.getOutputDefinition().isEmpty()) {
             return List.of();

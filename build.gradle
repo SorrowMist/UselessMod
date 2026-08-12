@@ -278,13 +278,13 @@ dependencies {
     implementation "curse.maven:forbidden-arcanus-309858:6875895"
     implementation "curse.maven:valhelsia-core-416935:6296775"
 
-    compileOnly "mekanism:Mekanism:1.21.1-10.7.15.81"
-    runtimeOnly "mekanism:Mekanism:1.21.1-10.7.15.81"
-    compileOnly "mekanism:Mekanism:1.21.1-10.7.15.81:generators"
-    runtimeOnly "mekanism:Mekanism:1.21.1-10.7.15.81:generators"
-    compileOnly "curse.maven:applied-mekanistics-574300:5978711"
-    runtimeOnly "curse.maven:applied-mekanistics-574300:5978711"
-    runtimeOnly "maven.modrinth:mekanism_extra:1.21.1-1.2.4"
+    compileOnly "mekanism:Mekanism:1.21.1-10.7.19.85"
+    runtimeOnly "mekanism:Mekanism:1.21.1-10.7.19.85"
+    compileOnly "mekanism:Mekanism:1.21.1-10.7.19.85:generators"
+    runtimeOnly "mekanism:Mekanism:1.21.1-10.7.19.85:generators"
+    compileOnly "curse.maven:applied-mekanistics-574300:7096962"
+    runtimeOnly "curse.maven:applied-mekanistics-574300:7096962"
+    runtimeOnly "maven.modrinth:mekanism_extra:1.21.1-1.4.0"
     implementation "curse.maven:flux-networks-248020:6089446"
 
     implementation "curse.maven:botany-pots-353928:7115287"
@@ -365,9 +365,9 @@ dependencies {
     testImplementation 'org.junit.jupiter:junit-jupiter'
     testImplementation productiveLibCompileFiles
     testImplementation enderIoCompileFiles
-    testCompileOnly "mekanism:Mekanism:1.21.1-10.7.15.81"
-    testCompileOnly "mekanism:Mekanism:1.21.1-10.7.15.81:generators"
-    testCompileOnly "curse.maven:applied-mekanistics-574300:5978711"
+    testCompileOnly "mekanism:Mekanism:1.21.1-10.7.19.85"
+    testCompileOnly "mekanism:Mekanism:1.21.1-10.7.19.85:generators"
+    testCompileOnly "curse.maven:applied-mekanistics-574300:7096962"
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
 

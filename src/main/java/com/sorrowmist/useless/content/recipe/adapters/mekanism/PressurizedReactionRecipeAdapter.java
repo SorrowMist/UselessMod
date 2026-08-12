@@ -47,8 +47,8 @@ public final class PressurizedReactionRecipeAdapter implements IRecipeAdapter<Pr
         ItemStackIngredient itemInput = original.getInputSolid();
         FluidStackIngredient fluidInput = original.getInputFluid();
         ChemicalStackIngredient chemicalInput = original.getInputChemical();
-        if (itemInput == null || fluidInput == null || chemicalInput == null
-                || itemInput.hasNoMatchingInstances() || fluidInput.hasNoMatchingInstances()
+        if (MekanismChemicalRecipeSupport.item(itemInput) == null || fluidInput == null || chemicalInput == null
+                || fluidInput.hasNoMatchingInstances()
                 || chemicalInput.hasNoMatchingInstances()) return List.of();
 
         List<AdvancedAlloyFurnaceRecipe> result = new ArrayList<>();

@@ -67,6 +67,41 @@ public final class JEIPlugin implements IModPlugin {
                         registration.getTransferHelper()),
                 AdvancedAlloyFurnaceRecipeCategory.TYPE);
         registerWirelessTransferHandler(registration);
+        registerTianshuTransferHandlers(registration);
+    }
+
+    /**
+     * AE2 Lightning Tech provides separate menu classes for its Tianshu terminals. JEI resolves a
+     * recipe transfer handler by the exact menu class, so its universal handler would otherwise win
+     * and encode a normal AE2 processing pattern for this category.
+     */
+    private static void registerTianshuTransferHandlers(IRecipeTransferRegistration registration) {
+        if (!ModList.get().isLoaded("ae2lt")) return;
+        registerReflectiveTransferHandler(registration,
+                "com.moakiee.ae2lt.menu.TianshuPatternEncodingTermMenu");
+        registerReflectiveTransferHandler(registration,
+                "com.moakiee.ae2lt.menu.TianshuWirelessPatternEncodingTermMenu");
+    }
+
+    @SuppressWarnings("unchecked")
+    private static void registerReflectiveTransferHandler(
+            IRecipeTransferRegistration registration, String menuClassName) {
+        try {
+            Class<?> menuClass = Class.forName(menuClassName);
+            if (!PatternEncodingTermMenu.class.isAssignableFrom(menuClass)) return;
+            var menuType = (MenuType<PatternEncodingTermMenu>) menuClass.getField("TYPE").get(null);
+            registration.addRecipeTransferHandler(
+                    new OmniversalPatternJeiTransferHandler<>(
+                            (Class<PatternEncodingTermMenu>) menuClass,
+                            menuType,
+                            registration.getTransferHelper()),
+                    AdvancedAlloyFurnaceRecipeCategory.TYPE);
+        } catch (ReflectiveOperationException | ClassCastException exception) {
+            UselessMod.LOGGER.warn(
+                    "Could not register the omniversal pattern transfer handler for {}.",
+                    menuClassName,
+                    exception);
+        }
     }
 
     /**

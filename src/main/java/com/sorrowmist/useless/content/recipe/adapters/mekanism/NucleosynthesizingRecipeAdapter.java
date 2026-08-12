@@ -45,7 +45,7 @@ public final class NucleosynthesizingRecipeAdapter implements IRecipeAdapter<Nuc
         NucleosynthesizingRecipe original = holder.value();
         ItemStackIngredient itemInput = original.getItemInput();
         ChemicalStackIngredient chemicalInput = original.getChemicalInput();
-        if (itemInput == null || chemicalInput == null || itemInput.hasNoMatchingInstances()
+        if (MekanismChemicalRecipeSupport.item(itemInput) == null || chemicalInput == null
                 || chemicalInput.hasNoMatchingInstances() || original.getOutputDefinition().isEmpty()) return List.of();
 
         long duration = Math.max(1L, original.getDuration());

@@ -7,6 +7,7 @@ import appeng.menu.me.items.PatternEncodingTermMenu;
 import com.sorrowmist.useless.content.recipe.AdvancedAlloyFurnaceRecipe;
 import com.sorrowmist.useless.content.recipe.AlloyFurnaceRecipeCatalog;
 import com.sorrowmist.useless.content.recipe.AlloyFurnaceRecipeFingerprint;
+import com.sorrowmist.useless.content.recipe.AdapterUtils;
 import com.sorrowmist.useless.content.recipe.CountedIngredient;
 import com.sorrowmist.useless.network.SelectOmniversalPatternRecipePacket;
 import mezz.jei.api.gui.ingredient.IRecipeSlotsView;
@@ -23,7 +24,6 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Objects;
 import java.util.Optional;
 
 /**
@@ -108,7 +108,7 @@ public final class OmniversalPatternJeiTransferHandler<T extends PatternEncoding
         AdvancedAlloyFurnaceRecipe recipe = entry.recipe();
         List<List<GenericStack>> inputs = inputOptions(recipe);
         List<GenericStack> outputs = outputs(recipe);
-        if (inputs.isEmpty() || outputs.isEmpty()) {
+        if (inputs == null || outputs == null || inputs.isEmpty() || outputs.isEmpty()) {
             return helper.createInternalError();
         }
         // AE2 merges repeated inputs before filling the slots, so this can reject a recipe that would
@@ -140,37 +140,67 @@ public final class OmniversalPatternJeiTransferHandler<T extends PatternEncoding
      * {@link com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.OmniversalPatternEncoding#createProcessingPattern}
      * so the encoded slots line up with the recipe the server validates them against.
      */
-    private static List<List<GenericStack>> inputOptions(AdvancedAlloyFurnaceRecipe recipe) {
+    @Nullable
+    public static List<List<GenericStack>> inputOptions(AdvancedAlloyFurnaceRecipe recipe) {
+        if (recipe == null) return null;
         List<List<GenericStack>> inputs = new ArrayList<>();
         for (CountedIngredient input : recipe.inputs()) {
-            if (input == null || input.count() <= 0) continue;
+            if (input == null || input.count() <= 0 || input.ingredient() == null
+                    || input.ingredient().isEmpty()) return null;
             List<GenericStack> options = new ArrayList<>();
             for (ItemStack option : input.ingredient().getItems()) {
+                if (option == null || option.isEmpty()) continue;
                 AEItemKey key = AEItemKey.of(option);
                 if (key != null) options.add(new GenericStack(key, input.count()));
             }
-            if (!options.isEmpty()) inputs.add(options);
+            if (options.isEmpty()) {
+                ItemStack representative = AdapterUtils.itemRepresentative(input.ingredient());
+                AEItemKey key = representative == null ? null : AEItemKey.of(representative);
+                if (key != null) options.add(new GenericStack(key, input.count()));
+            }
+            if (options.isEmpty()) return null;
+            inputs.add(List.copyOf(options));
         }
-        recipe.inputFluids().forEach(input -> {
+        for (var input : recipe.inputFluids()) {
+            if (input == null || input.ingredient() == null || input.ingredient().isEmpty()
+                    || input.amount() <= 0) return null;
             List<GenericStack> options = new ArrayList<>();
             for (FluidStack option : input.getFluids()) {
-                GenericStack stack = GenericStack.fromFluidStack(option);
+                if (option == null || option.isEmpty()) continue;
+                GenericStack stack = GenericStack.fromFluidStack(
+                        option.copyWithAmount(input.amount()));
                 if (stack != null) options.add(stack);
             }
-            if (!options.isEmpty()) inputs.add(options);
-        });
-        recipe.keyInputs().stream()
-                .filter(Objects::nonNull)
-                .forEach(stack -> inputs.add(List.of(stack)));
+            if (options.isEmpty()) return null;
+            inputs.add(List.copyOf(options));
+        }
+        for (GenericStack stack : recipe.keyInputs()) {
+            if (stack == null || stack.what() == null || stack.amount() <= 0L) return null;
+            inputs.add(List.of(stack));
+        }
         return inputs;
     }
 
+    @Nullable
     private static List<GenericStack> outputs(AdvancedAlloyFurnaceRecipe recipe) {
+        if (recipe == null) return null;
         List<GenericStack> outputs = new ArrayList<>();
-        recipe.outputs().stream().map(GenericStack::fromItemStack).forEach(outputs::add);
-        recipe.outputFluids().stream().map(GenericStack::fromFluidStack).forEach(outputs::add);
-        outputs.addAll(recipe.keyOutputs());
-        outputs.removeIf(Objects::isNull);
+        for (ItemStack stack : recipe.outputs()) {
+            if (stack == null || stack.isEmpty() || stack.getCount() <= 0) return null;
+            GenericStack output = GenericStack.fromItemStack(stack);
+            if (output == null || output.what() == null || output.amount() <= 0L) return null;
+            outputs.add(output);
+        }
+        for (FluidStack stack : recipe.outputFluids()) {
+            if (stack == null || stack.isEmpty() || stack.getAmount() <= 0) return null;
+            GenericStack output = GenericStack.fromFluidStack(stack);
+            if (output == null || output.what() == null || output.amount() <= 0L) return null;
+            outputs.add(output);
+        }
+        for (GenericStack stack : recipe.keyOutputs()) {
+            if (stack == null || stack.what() == null || stack.amount() <= 0L) return null;
+            outputs.add(stack);
+        }
         return outputs;
     }
 }

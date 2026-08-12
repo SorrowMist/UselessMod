@@ -7,6 +7,7 @@ import appeng.api.stacks.AEItemKey;
 import appeng.api.stacks.GenericStack;
 import appeng.crafting.pattern.AEProcessingPattern;
 import com.mojang.datafixers.util.Pair;
+import com.sorrowmist.useless.content.recipe.AdapterUtils;
 import com.sorrowmist.useless.content.recipe.AdvancedAlloyFurnaceRecipe;
 import com.sorrowmist.useless.content.recipe.AlloyFurnaceRecipeCatalog;
 import com.sorrowmist.useless.content.recipe.CountedIngredient;
@@ -446,39 +447,56 @@ public final class OmniversalPatternEncoding {
     }
 
     public static ItemStack createProcessingPattern(AdvancedAlloyFurnaceRecipe recipe) {
+        if (recipe == null) return ItemStack.EMPTY;
         List<GenericStack> inputs = new ArrayList<>();
-        recipe.inputs().forEach(input -> {
-            ItemStack[] options = input.ingredient().getItems();
-            if (options.length > 0 && input.count() > 0) {
-                AEItemKey key = AEItemKey.of(options[0]);
-                if (key != null) inputs.add(new GenericStack(key, input.count()));
-            }
-        });
+        for (CountedIngredient input : recipe.inputs()) {
+            if (input == null || input.count() <= 0 || input.ingredient() == null
+                    || input.ingredient().isEmpty()) return ItemStack.EMPTY;
+            ItemStack representative = AdapterUtils.itemRepresentative(input.ingredient());
+            AEItemKey key = representative == null ? null : AEItemKey.of(representative);
+            if (key == null) return ItemStack.EMPTY;
+            inputs.add(new GenericStack(key, input.count()));
+        }
         for (SizedFluidIngredient input : recipe.inputFluids()) {
             if (input == null || input.ingredient() == null || input.ingredient().isEmpty()
-                    || input.amount() <= 0) {
-                continue;
-            }
+                    || input.amount() <= 0) return ItemStack.EMPTY;
             FluidStack[] candidates = input.getFluids();
             if (candidates.length == 0 || candidates[0] == null || candidates[0].isEmpty()) {
-                continue;
+                return ItemStack.EMPTY;
             }
             GenericStack fluid = GenericStack.fromFluidStack(
                     candidates[0].copyWithAmount(input.amount()));
-            if (fluid != null) {
-                // AE processing patterns have one concrete key per slot. Keep one representative
-                // here; omniversal metadata restores the Tag/Compound semantics on decode.
-                inputs.add(fluid);
-            }
+            if (fluid == null || fluid.what() == null || fluid.amount() <= 0L) return ItemStack.EMPTY;
+            // AE processing patterns have one concrete key per slot. Keep one representative
+            // here; omniversal metadata restores the Tag/Compound semantics on decode.
+            inputs.add(fluid);
         }
-        inputs.addAll(recipe.keyInputs());
+        for (GenericStack input : recipe.keyInputs()) {
+            if (input == null || input.what() == null || input.amount() <= 0L) return ItemStack.EMPTY;
+            inputs.add(input);
+        }
 
         List<GenericStack> outputs = new ArrayList<>();
-        recipe.outputs().stream().map(GenericStack::fromItemStack).forEach(outputs::add);
-        recipe.outputFluids().stream().map(GenericStack::fromFluidStack).forEach(outputs::add);
-        outputs.addAll(recipe.keyOutputs());
-        inputs.removeIf(java.util.Objects::isNull);
-        outputs.removeIf(java.util.Objects::isNull);
+        for (ItemStack output : recipe.outputs()) {
+            if (output == null || output.isEmpty() || output.getCount() <= 0) return ItemStack.EMPTY;
+            GenericStack converted = GenericStack.fromItemStack(output);
+            if (converted == null || converted.what() == null || converted.amount() <= 0L) {
+                return ItemStack.EMPTY;
+            }
+            outputs.add(converted);
+        }
+        for (FluidStack output : recipe.outputFluids()) {
+            if (output == null || output.isEmpty() || output.getAmount() <= 0) return ItemStack.EMPTY;
+            GenericStack converted = GenericStack.fromFluidStack(output);
+            if (converted == null || converted.what() == null || converted.amount() <= 0L) {
+                return ItemStack.EMPTY;
+            }
+            outputs.add(converted);
+        }
+        for (GenericStack output : recipe.keyOutputs()) {
+            if (output == null || output.what() == null || output.amount() <= 0L) return ItemStack.EMPTY;
+            outputs.add(output);
+        }
         if (inputs.isEmpty() || outputs.isEmpty()) return ItemStack.EMPTY;
         return PatternDetailsHelper.encodeProcessingPattern(inputs, outputs);
     }

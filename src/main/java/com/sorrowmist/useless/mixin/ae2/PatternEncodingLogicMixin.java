@@ -114,7 +114,11 @@ public class PatternEncodingLogicMixin implements PendingOmniversalPatternHolder
         Optional<AlloyFurnaceRecipeCatalog.Entry> entry = Optional.empty();
         if (pending != null) {
             String sourceId = uselessMod$pendingOmniversalSourceId;
-            entry = AlloyFurnaceRecipeCatalog.resolve(level, sourceId, pending)
+            // The client and server can materialize a tag-backed Ingredient with different
+            // representative items. Resolve the selected recipe by id and the encoded pattern
+            // contents when the fingerprint differs, otherwise a shared chemical-conversion /
+            // oxidizing recipe is indistinguishable from the plain AE2 pattern at this point.
+            entry = AlloyFurnaceRecipeCatalog.resolvePattern(level, sourceId, pending, details)
                     .filter(candidate -> AlloyFurnaceRecipeCatalog.matchesRecipe(
                             level, sourceId, candidate.recipe(), details));
         }

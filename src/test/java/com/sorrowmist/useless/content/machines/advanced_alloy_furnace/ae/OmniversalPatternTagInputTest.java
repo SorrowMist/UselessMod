@@ -8,6 +8,7 @@ import appeng.crafting.pattern.AEProcessingPattern;
 import com.mojang.datafixers.util.Pair;
 import com.mojang.serialization.JsonOps;
 import com.sorrowmist.useless.api.enums.AlloyFurnaceMode;
+import com.sorrowmist.useless.compat.jei.OmniversalPatternJeiTransferHandler;
 import com.sorrowmist.useless.content.blockentities.multiblock.OmniversalMoldHubBlockEntity;
 import com.sorrowmist.useless.content.recipe.AdvancedAlloyFurnaceRecipe;
 import com.sorrowmist.useless.content.recipe.CountedIngredient;
@@ -202,6 +203,45 @@ class OmniversalPatternTagInputTest {
     }
 
     @Test
+    void processingPatternUsesOneTemporaryRepresentativeForTagInput() {
+        AdvancedAlloyFurnaceRecipe recipe = recipe(Ingredient.of(TEST_TAG), 3L, List.of());
+
+        ItemStack encoded = OmniversalPatternEncoding.createProcessingPattern(recipe);
+        AEProcessingPattern pattern = new AEProcessingPattern(Objects.requireNonNull(AEItemKey.of(encoded)));
+
+        assertEquals(1, pattern.getInputs().length);
+        assertEquals(1, pattern.getInputs()[0].getPossibleInputs().length);
+        assertEquals(3L, pattern.getInputs()[0].getMultiplier());
+        assertEquals(key(Items.IRON_INGOT), pattern.getInputs()[0].getPossibleInputs()[0].what());
+        assertEquals(Map.of(0, List.of(TEST_TAG)),
+                OmniversalPatternEncoding.resolveTagInputSlots(recipe, pattern));
+    }
+
+    @Test
+    void jeiTransferUsesOneCompleteSlotPerItemInputInRecipeOrder() {
+        AdvancedAlloyFurnaceRecipe recipe = new AdvancedAlloyFurnaceRecipe(
+                ResourceLocation.fromNamespaceAndPath("useless_mod_test", "jei_tag_order"),
+                List.of(
+                        new CountedIngredient(Ingredient.of(TEST_TAG), 3L),
+                        new CountedIngredient(Ingredient.of(Items.DIAMOND), 2L)),
+                List.of(), List.of(), List.of(new ItemStack(Items.NETHER_STAR)),
+                List.of(), List.of(), 1L, 20, Ingredient.EMPTY, 0, List.of(),
+                AlloyFurnaceMode.NORMAL);
+
+        List<List<GenericStack>> inputs = OmniversalPatternJeiTransferHandler.inputOptions(recipe);
+
+        assertEquals(2, inputs.size());
+        assertEquals(2, inputs.get(0).size());
+        assertEquals(3L, inputs.get(0).getFirst().amount());
+        assertEquals(key(Items.IRON_INGOT), inputs.get(0).getFirst().what());
+        assertEquals(3L, inputs.get(0).get(1).amount());
+        assertEquals(key(Items.GOLD_INGOT), inputs.get(0).get(1).what());
+        assertEquals(1, inputs.get(1).size());
+        assertEquals(2L, inputs.get(1).getFirst().amount());
+        assertEquals(key(Items.DIAMOND), inputs.get(1).getFirst().what());
+    }
+
+    @Test
     void moldHubMatchesTagMoldWithoutExpandingThePattern() {
         assertTrue(OmniversalMoldHubBlockEntity.matchesMolds(
                 List.of(Ingredient.of(TEST_TAG)), List.of(new ItemStack(Items.GOLD_INGOT))));
@@ -246,13 +286,18 @@ class OmniversalPatternTagInputTest {
     }
 
     private static AdvancedAlloyFurnaceRecipe recipe(Ingredient input) {
-        return recipe(input, List.of());
+        return recipe(input, 1L, List.of());
     }
 
     private static AdvancedAlloyFurnaceRecipe recipe(Ingredient input, List<Ingredient> molds) {
+        return recipe(input, 1L, molds);
+    }
+
+    private static AdvancedAlloyFurnaceRecipe recipe(
+            Ingredient input, long count, List<Ingredient> molds) {
         return new AdvancedAlloyFurnaceRecipe(
                 ResourceLocation.fromNamespaceAndPath("useless_mod_test", "tag_slot"),
-                List.of(new CountedIngredient(input, 1L)),
+                List.of(new CountedIngredient(input, count)),
                 List.of(),
                 List.of(),
                 List.of(new ItemStack(Items.NETHER_STAR)),

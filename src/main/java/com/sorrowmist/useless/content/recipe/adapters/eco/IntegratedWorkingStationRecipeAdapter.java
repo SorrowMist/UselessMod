@@ -76,7 +76,7 @@ public final class IntegratedWorkingStationRecipeAdapter
             Converted converted = convertData(holder.value());
             if (converted != null
                     && AdapterUtils.matchesRequired(mergedInputs, converted.itemRequirements())
-                    && matchesFluidRequirement(mergedFluids, converted.inputFluid())) {
+                    && matchesFluidRequirement(mergedFluids, converted.inputFluids())) {
                 matches.add(holder);
             }
         }
@@ -85,11 +85,10 @@ public final class IntegratedWorkingStationRecipeAdapter
 
     private AdvancedAlloyFurnaceRecipe createRecipe(
             ResourceLocation id, Converted converted) {
-        List<SizedFluidIngredient> inputFluids = List.of(converted.inputFluid());
         return new AdvancedAlloyFurnaceRecipe(
                 id,
                 converted.itemInputs(),
-                inputFluids,
+                converted.inputFluids(),
                 List.of(),
                 copyItems(converted.itemOutputs()),
                 copyFluids(converted.fluidOutputs()),
@@ -129,9 +128,15 @@ public final class IntegratedWorkingStationRecipeAdapter
         }
 
         SizedFluidIngredient inputFluid = source.inputFluid();
-        if (inputFluid == null || inputFluid.amount() <= 0 || inputFluid.ingredient() == null
-                || inputFluid.ingredient().isEmpty()) {
+        if (inputFluid == null || inputFluid.ingredient() == null) {
             return null;
+        }
+        List<SizedFluidIngredient> inputFluids = List.of();
+        if (!inputFluid.ingredient().isEmpty()) {
+            if (inputFluid.amount() <= 0) {
+                return null;
+            }
+            inputFluids = List.of(inputFluid);
         }
 
         ItemStack itemOutput = source.itemOutput();
@@ -145,24 +150,25 @@ public final class IntegratedWorkingStationRecipeAdapter
             fluidOutputs.add(fluidOutput.copy());
         }
 
-        if (itemOutputs.isEmpty() && fluidOutputs.isEmpty()) {
+        if ((requirements.isEmpty() && inputFluids.isEmpty())
+                || (itemOutputs.isEmpty() && fluidOutputs.isEmpty())) {
             return null;
         }
 
         List<CountedIngredient> itemInputs = requirements.entrySet().stream()
                 .map(entry -> new CountedIngredient(entry.getKey(), entry.getValue()))
                 .toList();
-        return new Converted(itemInputs, requirements, inputFluid, itemOutputs, fluidOutputs,
+        return new Converted(itemInputs, requirements, inputFluids, itemOutputs, fluidOutputs,
                 source.energy());
     }
 
     private static boolean matchesFluidRequirement(
-            Map<FluidStack, Long> mergedFluids, SizedFluidIngredient required) {
-        if (required.ingredient().isEmpty()) {
+            Map<FluidStack, Long> mergedFluids, List<SizedFluidIngredient> required) {
+        if (required.isEmpty()) {
             return true;
         }
         return com.sorrowmist.useless.content.recipe.FluidIngredientAllocator.matches(
-                List.of(required), mergedFluids, 1L);
+                required, mergedFluids, 1L);
     }
 
     private static List<ItemStack> copyItems(List<ItemStack> stacks) {
@@ -176,7 +182,7 @@ public final class IntegratedWorkingStationRecipeAdapter
     private record Converted(
             List<CountedIngredient> itemInputs,
             Map<Ingredient, Long> itemRequirements,
-            SizedFluidIngredient inputFluid,
+            List<SizedFluidIngredient> inputFluids,
             List<ItemStack> itemOutputs,
             List<FluidStack> fluidOutputs,
             long energy) {

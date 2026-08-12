@@ -6,9 +6,13 @@ import com.sorrowmist.useless.content.recipe.AdapterUtils;
 import com.sorrowmist.useless.content.recipe.AdvancedAlloyFurnaceRecipe;
 import com.sorrowmist.useless.content.recipe.CountedIngredient;
 import mekanism.api.recipes.ingredients.FluidStackIngredient;
+import mekanism.api.recipes.ingredients.ItemStackIngredient;
 import mekanism.api.recipes.ingredients.creator.IngredientCreatorAccess;
 import net.minecraft.SharedConstants;
+import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.tags.TagKey;
+import net.minecraft.world.item.Item;
 import net.minecraft.server.Bootstrap;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
@@ -24,6 +28,7 @@ import java.util.Objects;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class MekanismChemicalRecipeSupportTest {
@@ -67,6 +72,21 @@ class MekanismChemicalRecipeSupportTest {
         assertEquals(6, recipe.outputs().getFirst().getCount());
         assertEquals(12_345L, recipe.energy());
         assertEquals(37, recipe.processTime());
+    }
+
+    @Test
+    void keepsMekanismTagIngredientAndCountWithoutExpandingMembers() {
+        TagKey<Item> tag = TagKey.create(
+                Registries.ITEM, ResourceLocation.fromNamespaceAndPath("mekanism_extras", "enriched/radiance"));
+        ItemStackIngredient source = IngredientCreatorAccess.item().from(Ingredient.of(tag), 3);
+
+        CountedIngredient converted = MekanismChemicalRecipeSupport.item(source);
+
+        assertNotNull(converted);
+        assertEquals(3L, converted.count());
+        assertEquals(1, converted.ingredient().getValues().length);
+        assertTrue(converted.ingredient().getValues()[0] instanceof Ingredient.TagValue);
+        assertEquals(tag, ((Ingredient.TagValue) converted.ingredient().getValues()[0]).tag());
     }
 
     @Test

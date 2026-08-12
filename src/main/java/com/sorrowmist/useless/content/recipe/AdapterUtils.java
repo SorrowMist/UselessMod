@@ -4,7 +4,11 @@ import appeng.api.stacks.AEKey;
 import appeng.api.stacks.GenericStack;
 import com.sorrowmist.useless.core.component.RitualBlueprintPentacles;
 import com.sorrowmist.useless.core.component.UComponents;
+import net.minecraft.core.Holder;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.tags.TagKey;
+import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.crafting.Ingredient;
 import net.neoforged.neoforge.common.crafting.DataComponentIngredient;
@@ -17,6 +21,7 @@ import org.jetbrains.annotations.Nullable;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * 配方适配器工具类
@@ -71,6 +76,44 @@ public class AdapterUtils {
     public static Ingredient toMoldIngredient(@Nullable ItemStack moldItem) {
         if (moldItem == null || moldItem.isEmpty()) return Ingredient.EMPTY;
         return Ingredient.of(moldItem);
+    }
+
+    /**
+     * Returns one concrete item only for APIs that require an {@link ItemStack} key.
+     *
+     * <p>The returned stack is a temporary encoding representative. The original ingredient must
+     * remain the recipe value so direct item tags keep their matching semantics.</p>
+     */
+    @Nullable
+    public static ItemStack itemRepresentative(@Nullable Ingredient ingredient) {
+        if (ingredient == null) return null;
+
+        for (ItemStack stack : ingredient.getItems()) {
+            if (stack != null && !stack.isEmpty()) {
+                return stack.copyWithCount(1);
+            }
+        }
+
+        Optional<TagKey<Item>> directTag = directItemTag(ingredient);
+        if (directTag.isEmpty()) return null;
+
+        // Ingredient may have cached an empty representation before datapack tags were bound.
+        // Read the current registry tag as a last-resort representative without changing the
+        // ingredient or serializing any of its members into recipe data.
+        for (Holder<Item> holder : BuiltInRegistries.ITEM.getTagOrEmpty(directTag.get())) {
+            ItemStack stack = holder.value().getDefaultInstance();
+            if (!stack.isEmpty()) return stack.copyWithCount(1);
+        }
+        return null;
+    }
+
+    private static Optional<TagKey<Item>> directItemTag(Ingredient ingredient) {
+        if (ingredient.isCustom()) return Optional.empty();
+        Ingredient.Value[] values = ingredient.getValues();
+        if (values.length != 1 || !(values[0] instanceof Ingredient.TagValue tagValue)) {
+            return Optional.empty();
+        }
+        return Optional.of(tagValue.tag());
     }
 
     /** Matches normal molds exactly and ritual blueprints by required pentacle inclusion. */

@@ -113,7 +113,7 @@ public class PrecisionSawmillRecipeAdapter implements IRecipeAdapter<SawmillReci
         for (RecipeHolder<SawmillRecipe> holder : recipes) {
             SawmillRecipe recipe = holder.value();
             ItemStackIngredient input = recipe.getInput();
-            if (input == null || input.hasNoMatchingInstances()) continue;
+            if (input == null) continue;
 
             if (matchesIngredient(mergedInputs, input)) {
                 matches.add(holder);
@@ -150,26 +150,17 @@ public class PrecisionSawmillRecipeAdapter implements IRecipeAdapter<SawmillReci
 
     @Nullable
     private static CountedIngredient countedIngredient(ItemStackIngredient input, long multiplier) {
-        Ingredient ingredient = ingredient(input);
-        if (ingredient.isEmpty()) {
-            return null;
-        }
-        return new CountedIngredient(ingredient, input.ingredient().count() * multiplier);
-    }
-
-    private static Ingredient ingredient(ItemStackIngredient input) {
-        if (input == null || input.hasNoMatchingInstances()) {
-            return Ingredient.EMPTY;
-        }
-        return input.ingredient() == null ? Ingredient.EMPTY : input.ingredient().ingredient();
+        return MekanismChemicalRecipeSupport.countedItem(input, multiplier);
     }
 
     private static boolean matchesIngredient(Map<Ingredient, Long> mergedInputs, ItemStackIngredient required) {
-        if (required == null || required.hasNoMatchingInstances()) {
+        if (required == null) {
             return false;
         }
+        CountedIngredient counted = MekanismChemicalRecipeSupport.item(required);
+        if (counted == null) return false;
         Map<Ingredient, Long> requiredCounts = new java.util.LinkedHashMap<>();
-        AdapterUtils.mergeIngredient(requiredCounts, ingredient(required), required.ingredient().count());
+        AdapterUtils.mergeIngredient(requiredCounts, counted.ingredient(), counted.count());
         return AdapterUtils.matchesRequired(mergedInputs, requiredCounts);
     }
 

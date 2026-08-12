@@ -47,7 +47,7 @@ public final class ChemicalDissolutionRecipeAdapter implements IRecipeAdapter<Ch
         ChemicalDissolutionRecipe original = holder.value();
         ItemStackIngredient itemInput = original.getItemInput();
         ChemicalStackIngredient chemicalInput = original.getChemicalInput();
-        if (itemInput == null || chemicalInput == null || itemInput.hasNoMatchingInstances()
+        if (MekanismChemicalRecipeSupport.item(itemInput) == null || chemicalInput == null
                 || chemicalInput.hasNoMatchingInstances()) return List.of();
 
         long multiplier = original.perTickUsage() ? PROCESS_TICKS : 1L;

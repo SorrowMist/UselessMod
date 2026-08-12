@@ -51,14 +51,25 @@ public final class MekanismChemicalRecipeSupport {
     }
 
     static Ingredient itemIngredient(ItemStackIngredient ingredient) {
-        if (ingredient == null || ingredient.hasNoMatchingInstances()) return Ingredient.EMPTY;
+        if (ingredient == null || ingredient.ingredient() == null || ingredient.ingredient().ingredient() == null) {
+            return Ingredient.EMPTY;
+        }
         return ingredient.ingredient().ingredient();
     }
 
     @Nullable
-    static CountedIngredient item( ItemStackIngredient ingredient) {
+    static CountedIngredient item(ItemStackIngredient ingredient) {
+        return countedItem(ingredient, 1L);
+    }
+
+    @Nullable
+    static CountedIngredient countedItem(ItemStackIngredient ingredient, long multiplier) {
         Ingredient converted = itemIngredient(ingredient);
-        return converted.isEmpty() ? null : new CountedIngredient(converted, ingredient.ingredient().count());
+        if (converted.isEmpty() || ingredient == null || ingredient.ingredient() == null || multiplier <= 0L) {
+            return null;
+        }
+        long count = saturatingMultiply(ingredient.ingredient().count(), multiplier);
+        return count <= 0L ? null : new CountedIngredient(converted, count);
     }
 
     static List<CountedIngredient> items(ItemStackIngredient ingredient) {
@@ -67,9 +78,10 @@ public final class MekanismChemicalRecipeSupport {
     }
 
     static boolean matchesItem(Map<Ingredient, Long> inputs, ItemStackIngredient required) {
-        if (required == null || required.hasNoMatchingInstances()) return false;
+        CountedIngredient counted = item(required);
+        if (counted == null) return false;
         Map<Ingredient, Long> requirements = new LinkedHashMap<>();
-        requirements.put(itemIngredient(required), (long) required.ingredient().count());
+        requirements.put(counted.ingredient(), counted.count());
         return AdapterUtils.matchesRequired(inputs, requirements);
     }
 

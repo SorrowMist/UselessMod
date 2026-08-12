@@ -7,6 +7,7 @@ import com.sorrowmist.useless.content.recipe.AlloyFurnaceRecipeCatalog;
 import com.sorrowmist.useless.content.recipe.adapters.enderio.SoulBindingRecipeAdapter;
 import com.sorrowmist.useless.core.component.OmniversalPatternData;
 import com.sorrowmist.useless.core.component.UComponents;
+import com.sorrowmist.useless.core.config.ConfigManager;
 import net.minecraft.world.level.Level;
 import net.neoforged.fml.ModList;
 
@@ -15,12 +16,14 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.WeakHashMap;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicLong;
 import org.jetbrains.annotations.Nullable;
 
 public final class OmniversalPatternDetails extends DynamicComponentPatternDetails {
-    // Keep every distinct pattern in a maximum-size 540-slot container hot, with room for
-    // patterns from another container in the same client world.
-    private static final int MAX_DECODE_CACHE_ENTRIES = 1024;
+    private static final int DEFAULT_DECODE_CACHE_CAPACITY = 2048;
     private static final Object DECODE_CACHE_LOCK = new Object();
     private static final Map<Level, LevelDecodeCache> DECODE_CACHES = new WeakHashMap<>();
 
@@ -43,30 +46,72 @@ public final class OmniversalPatternDetails extends DynamicComponentPatternDetai
     public static OmniversalPatternDetails decode(AEItemKey definition, Level level) {
         if (definition == null || level == null) return null;
 
+        LevelDecodeCache cache;
         synchronized (DECODE_CACHE_LOCK) {
-            LevelDecodeCache cache = DECODE_CACHES.computeIfAbsent(level, ignored -> new LevelDecodeCache());
-            cache.prepare(AlloyFurnaceRecipeCatalog.generation());
-            CachedDecode cached = cache.entries.get(definition);
+            cache = DECODE_CACHES.computeIfAbsent(level, ignored -> new LevelDecodeCache());
+        }
+        while (true) {
+            long generation = AlloyFurnaceRecipeCatalog.generation();
+            cache.prepare(generation);
+            if (generation != AlloyFurnaceRecipeCatalog.generation()) continue;
+
+            CachedDecode cached = cache.get(definition);
             if (cached != null) {
-                if (cached.failure != null) {
-                    throw cached.failure;
+                cache.hits.incrementAndGet();
+                if (generation != AlloyFurnaceRecipeCatalog.generation()) continue;
+                return cached.valueOrThrow();
+            }
+            cache.misses.incrementAndGet();
+
+            CompletableFuture<CachedDecode> ownerFuture = new CompletableFuture<>();
+            InFlightDecode owner = new InFlightDecode(generation, ownerFuture);
+            InFlightDecode existing = cache.inFlight.putIfAbsent(definition, owner);
+            if (existing != null) {
+                if (existing.generation != generation) {
+                    cache.inFlight.remove(definition, existing);
+                    continue;
                 }
-                OmniversalPatternDetails details = cached.details;
-                if (details != null) {
-                    return details;
+                try {
+                    CachedDecode result = existing.future.join();
+                    if (generation != AlloyFurnaceRecipeCatalog.generation()) continue;
+                    return result.valueOrThrow();
+                } catch (CompletionException exception) {
+                    if (generation != AlloyFurnaceRecipeCatalog.generation()) continue;
+                    throw unwrap(exception);
                 }
-                cache.entries.remove(definition);
             }
 
+            CachedDecode result;
             try {
-                OmniversalPatternDetails details = decodeUncached(definition, level);
-                cache.entries.put(definition, CachedDecode.success(details));
-                return details;
-            } catch (RuntimeException exception) {
-                cache.entries.put(definition, CachedDecode.failure(exception));
-                throw exception;
+                cache.actualDecodes.incrementAndGet();
+                try {
+                    result = CachedDecode.success(decodeUncached(definition, level));
+                } catch (RuntimeException exception) {
+                    result = CachedDecode.failure(exception);
+                }
+                if (generation == AlloyFurnaceRecipeCatalog.generation()) {
+                    cache.putIfCurrent(definition, result, generation);
+                }
+                ownerFuture.complete(result);
+            } catch (Throwable throwable) {
+                ownerFuture.completeExceptionally(throwable);
+                if (throwable instanceof RuntimeException runtimeException) throw runtimeException;
+                if (throwable instanceof Error error) throw error;
+                throw new RuntimeException(throwable);
+            } finally {
+                cache.inFlight.remove(definition, owner);
             }
+
+            if (generation != AlloyFurnaceRecipeCatalog.generation()) continue;
+            return result.valueOrThrow();
         }
+    }
+
+    private static RuntimeException unwrap(CompletionException exception) {
+        Throwable cause = exception.getCause();
+        if (cause instanceof RuntimeException runtimeException) return runtimeException;
+        if (cause instanceof Error error) throw error;
+        return new RuntimeException(cause == null ? exception : cause);
     }
 
     private static OmniversalPatternDetails decodeUncached(AEItemKey definition, Level level) {
@@ -77,8 +122,10 @@ public final class OmniversalPatternDetails extends DynamicComponentPatternDetai
         AEProcessingPattern source = new AEProcessingPattern(definition);
         Optional<AlloyFurnaceRecipeCatalog.Entry> resolved =
                 data.version() < OmniversalPatternData.TAG_INPUT_VERSION
-                        ? AlloyFurnaceRecipeCatalog.resolveLegacyPattern(level, data.identity(), source, data.version())
-                        : AlloyFurnaceRecipeCatalog.resolvePattern(level, data.identity(), source);
+                        ? AlloyFurnaceRecipeCatalog.resolveLegacyPattern(
+                                level, data.sourceId(), data.identity(), source, data.version())
+                        : AlloyFurnaceRecipeCatalog.resolvePattern(
+                                level, data.sourceId(), data.identity(), source);
         AlloyFurnaceRecipeCatalog.Entry entry = resolved
                 .orElseThrow(() -> new IllegalArgumentException(
                         "The bound alloy-furnace recipe is missing or has changed: " + data.recipeId()));
@@ -88,20 +135,56 @@ public final class OmniversalPatternDetails extends DynamicComponentPatternDetai
 
     private static final class LevelDecodeCache {
         private long generation = Long.MIN_VALUE;
+        private final Object lock = new Object();
+        private final ConcurrentHashMap<AEItemKey, InFlightDecode> inFlight =
+                new ConcurrentHashMap<>();
+        private final AtomicLong hits = new AtomicLong();
+        private final AtomicLong misses = new AtomicLong();
+        private final AtomicLong evictions = new AtomicLong();
+        private final AtomicLong actualDecodes = new AtomicLong();
         private final LinkedHashMap<AEItemKey, CachedDecode> entries =
                 new LinkedHashMap<>(64, 0.75F, true) {
                     @Override
                     protected boolean removeEldestEntry(Map.Entry<AEItemKey, CachedDecode> eldest) {
-                        return size() > MAX_DECODE_CACHE_ENTRIES;
+                        boolean remove = size() > capacity();
+                        if (remove) evictions.incrementAndGet();
+                        return remove;
                     }
                 };
 
         private void prepare(long currentGeneration) {
-            if (generation != currentGeneration) {
-                generation = currentGeneration;
-                entries.clear();
+            synchronized (lock) {
+                if (currentGeneration > generation) {
+                    generation = currentGeneration;
+                    entries.clear();
+                    inFlight.clear();
+                }
             }
         }
+
+        @Nullable
+        private CachedDecode get(AEItemKey definition) {
+            synchronized (lock) {
+                return entries.get(definition);
+            }
+        }
+
+        private void putIfCurrent(AEItemKey definition, CachedDecode result, long expectedGeneration) {
+            synchronized (lock) {
+                if (generation == expectedGeneration) entries.put(definition, result);
+            }
+        }
+
+        private int capacity() {
+            try {
+                return ConfigManager.getOmniversalDecodeCacheCapacity();
+            } catch (RuntimeException ignored) {
+                return DEFAULT_DECODE_CACHE_CAPACITY;
+            }
+        }
+    }
+
+    private record InFlightDecode(long generation, CompletableFuture<CachedDecode> future) {
     }
 
     private static final class CachedDecode {
@@ -122,6 +205,25 @@ public final class OmniversalPatternDetails extends DynamicComponentPatternDetai
         private static CachedDecode failure(RuntimeException failure) {
             return new CachedDecode(null, failure);
         }
+
+        private OmniversalPatternDetails valueOrThrow() {
+            if (failure != null) throw failure;
+            if (details == null) throw new IllegalStateException("Cached omniversal pattern has no result");
+            return details;
+        }
+    }
+
+    public record DecodeCacheStats(long hits, long misses, long evictions, long actualDecodes) {
+    }
+
+    public static DecodeCacheStats stats(Level level) {
+        if (level == null) return new DecodeCacheStats(0L, 0L, 0L, 0L);
+        synchronized (DECODE_CACHE_LOCK) {
+            LevelDecodeCache cache = DECODE_CACHES.get(level);
+            return cache == null ? new DecodeCacheStats(0L, 0L, 0L, 0L)
+                    : new DecodeCacheStats(cache.hits.get(), cache.misses.get(),
+                    cache.evictions.get(), cache.actualDecodes.get());
+        }
     }
 
     public OmniversalPatternData data() {
@@ -138,6 +240,7 @@ public final class OmniversalPatternDetails extends DynamicComponentPatternDetai
             return java.util.Map.of();
         }
         return SoulBindingRecipeAdapter.findDynamicPatternProfile(
+                        decoded.data.sourceId().isBlank() ? "enderio" : decoded.data.sourceId(),
                         decoded.level,
                         AdvancedAlloyFurnacePatternResolver.itemInputs(decoded.source),
                         AdvancedAlloyFurnacePatternResolver.itemOutputs(decoded.source))

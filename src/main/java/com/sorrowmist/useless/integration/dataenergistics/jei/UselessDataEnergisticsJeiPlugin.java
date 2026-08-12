@@ -30,9 +30,7 @@ public final class UselessDataEnergisticsJeiPlugin implements DataEnergisticsJei
 
     @Override
     public void register(@NotNull DataEnergisticsJeiRegistry registry) {
-        registerTransfer(
-                registry,
-                UniversalPatternEncodingTermMenu.class,
+        registerTransfer(registry, UniversalPatternEncodingTermMenu.class,
                 DEMenus.UNIVERSAL_PATTERN_ENCODING_TERM.get());
     }
 

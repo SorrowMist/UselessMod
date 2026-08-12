@@ -288,6 +288,7 @@ dependencies {
     implementation "curse.maven:flux-networks-248020:6089446"
 
     implementation "curse.maven:botany-pots-353928:7115287"
+    implementation "curse.maven:create-328085:7963363"
     implementation "curse.maven:bookshelf-228525:7115332"
     runtimeOnly "maven.modrinth:prickle:EE1FHDyD"
 

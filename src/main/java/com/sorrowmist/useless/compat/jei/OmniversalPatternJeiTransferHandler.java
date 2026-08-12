@@ -5,11 +5,11 @@ import appeng.api.stacks.GenericStack;
 import appeng.integration.modules.itemlists.EncodingHelper;
 import appeng.menu.me.items.PatternEncodingTermMenu;
 import com.sorrowmist.useless.content.recipe.AdvancedAlloyFurnaceRecipe;
+import com.sorrowmist.useless.content.recipe.AlloyFurnaceRecipeCatalog;
 import com.sorrowmist.useless.content.recipe.AlloyFurnaceRecipeFingerprint;
 import com.sorrowmist.useless.content.recipe.CountedIngredient;
 import com.sorrowmist.useless.network.SelectOmniversalPatternRecipePacket;
 import mezz.jei.api.gui.ingredient.IRecipeSlotsView;
-import mezz.jei.api.recipe.RecipeType;
 import mezz.jei.api.recipe.transfer.IRecipeTransferError;
 import mezz.jei.api.recipe.transfer.IRecipeTransferHandler;
 import mezz.jei.api.recipe.transfer.IRecipeTransferHandlerHelper;
@@ -46,7 +46,7 @@ import java.util.Optional;
  * constants, matching how ae2jeiintegration registers its encode handler twice.
  */
 public final class OmniversalPatternJeiTransferHandler<T extends PatternEncodingTermMenu>
-        implements IRecipeTransferHandler<T, AdvancedAlloyFurnaceRecipe> {
+        implements IRecipeTransferHandler<T, AlloyFurnaceRecipeCatalog.Entry> {
     private final Class<T> menuClass;
     private final MenuType<T> menuType;
     private final IRecipeTransferHandlerHelper helper;
@@ -69,19 +69,19 @@ public final class OmniversalPatternJeiTransferHandler<T extends PatternEncoding
     }
 
     @Override
-    public RecipeType<AdvancedAlloyFurnaceRecipe> getRecipeType() {
+    public mezz.jei.api.recipe.RecipeType<AlloyFurnaceRecipeCatalog.Entry> getRecipeType() {
         return AdvancedAlloyFurnaceRecipeCategory.TYPE;
     }
 
     @Override
     public @Nullable IRecipeTransferError transferRecipe(
             T menu,
-            AdvancedAlloyFurnaceRecipe recipe,
+            AlloyFurnaceRecipeCatalog.Entry entry,
             IRecipeSlotsView recipeSlots,
             Player player,
             boolean maxTransfer,
             boolean doTransfer) {
-        return transferOmniversalRecipe(menu, recipe, recipeSlots, player, maxTransfer, doTransfer, this.helper);
+        return transferOmniversalRecipe(menu, entry, recipeSlots, player, maxTransfer, doTransfer, this.helper);
     }
 
     /**
@@ -99,12 +99,13 @@ public final class OmniversalPatternJeiTransferHandler<T extends PatternEncoding
      */
     public static @Nullable IRecipeTransferError transferOmniversalRecipe(
             PatternEncodingTermMenu menu,
-            AdvancedAlloyFurnaceRecipe recipe,
+            AlloyFurnaceRecipeCatalog.Entry entry,
             IRecipeSlotsView recipeSlots,
             Player player,
             boolean maxTransfer,
             boolean doTransfer,
             IRecipeTransferHandlerHelper helper) {
+        AdvancedAlloyFurnaceRecipe recipe = entry.recipe();
         List<List<GenericStack>> inputs = inputOptions(recipe);
         List<GenericStack> outputs = outputs(recipe);
         if (inputs.isEmpty() || outputs.isEmpty()) {
@@ -127,7 +128,8 @@ public final class OmniversalPatternJeiTransferHandler<T extends PatternEncoding
         PacketDistributor.sendToServer(new SelectOmniversalPatternRecipePacket(
                 menu.containerId,
                 recipe.id(),
-                AlloyFurnaceRecipeFingerprint.create(recipe, player.level().registryAccess())));
+                AlloyFurnaceRecipeFingerprint.create(recipe, player.level().registryAccess()),
+                entry.sourceId()));
         EncodingHelper.encodeProcessingRecipe(menu, inputs, outputs);
         return null;
     }

@@ -21,6 +21,7 @@ public record OmniversalPatternData(
         int version,
         ResourceLocation recipeId,
         String recipeFingerprint,
+        String sourceId,
         boolean requiresMold,
         Optional<AEItemKey> displayMold,
         List<AEItemKey> displayMolds,
@@ -35,7 +36,8 @@ public record OmniversalPatternData(
     public static final int TAG_INPUT_VERSION = 4;
     public static final int FLUID_TAG_INPUT_VERSION = 5;
     public static final int MOLD_TAG_INPUT_VERSION = 6;
-    public static final int CURRENT_VERSION = MOLD_TAG_INPUT_VERSION;
+    public static final int SOURCE_ID_VERSION = 7;
+    public static final int CURRENT_VERSION = SOURCE_ID_VERSION;
 
     public record TagInputSlot(int slot, TagKey<Item> tag) {
         public static final Codec<TagInputSlot> CODEC = RecordCodecBuilder.create(instance -> instance.group(
@@ -110,6 +112,7 @@ public record OmniversalPatternData(
             Codec.INT.optionalFieldOf("version", LEGACY_DEFAULT_VERSION).forGetter(OmniversalPatternData::version),
             ResourceLocation.CODEC.fieldOf("recipe_id").forGetter(OmniversalPatternData::recipeId),
             Codec.STRING.fieldOf("recipe_fingerprint").forGetter(OmniversalPatternData::recipeFingerprint),
+            Codec.STRING.optionalFieldOf("source_id", "").forGetter(OmniversalPatternData::sourceId),
             Codec.BOOL.optionalFieldOf("requires_mold", false).forGetter(OmniversalPatternData::requiresMold),
             AEItemKey.CODEC.optionalFieldOf("display_mold").forGetter(OmniversalPatternData::displayMold),
             AEItemKey.CODEC.listOf().optionalFieldOf("display_molds", List.of()).forGetter(OmniversalPatternData::displayMolds),
@@ -125,6 +128,7 @@ public record OmniversalPatternData(
             OmniversalPatternData::read);
 
     public OmniversalPatternData {
+        sourceId = sourceId == null ? "" : sourceId;
         displayMold = displayMold == null ? Optional.empty() : displayMold;
         displayMolds = List.copyOf(displayMolds == null ? List.of() : displayMolds);
         tagInputSlots = List.copyOf(tagInputSlots == null ? List.of() : tagInputSlots);
@@ -144,7 +148,7 @@ public record OmniversalPatternData(
             List<AEItemKey> displayMolds,
             List<Integer> itemIdInputSlots,
             List<Integer> itemIdOutputSlots) {
-        this(version, recipeId, recipeFingerprint, requiresMold, displayMold, displayMolds,
+        this(version, recipeId, recipeFingerprint, "", requiresMold, displayMold, displayMolds,
                 List.of(), List.of(), List.of(), itemIdInputSlots, itemIdOutputSlots);
     }
 
@@ -159,7 +163,7 @@ public record OmniversalPatternData(
             List<TagInputSlot> tagInputSlots,
             List<Integer> itemIdInputSlots,
             List<Integer> itemIdOutputSlots) {
-        this(version, recipeId, recipeFingerprint, requiresMold, displayMold, displayMolds,
+        this(version, recipeId, recipeFingerprint, "", requiresMold, displayMold, displayMolds,
                 tagInputSlots, List.of(), List.of(), itemIdInputSlots, itemIdOutputSlots);
     }
 
@@ -175,8 +179,26 @@ public record OmniversalPatternData(
             List<FluidTagInputSlot> fluidTagInputSlots,
             List<Integer> itemIdInputSlots,
             List<Integer> itemIdOutputSlots) {
-        this(version, recipeId, recipeFingerprint, requiresMold, displayMold, displayMolds,
+        this(version, recipeId, recipeFingerprint, "", requiresMold, displayMold, displayMolds,
                 tagInputSlots, fluidTagInputSlots, List.of(), itemIdInputSlots, itemIdOutputSlots);
+    }
+
+    /** Compatibility constructor for the complete v6 shape. */
+    public OmniversalPatternData(
+            int version,
+            ResourceLocation recipeId,
+            String recipeFingerprint,
+            boolean requiresMold,
+            Optional<AEItemKey> displayMold,
+            List<AEItemKey> displayMolds,
+            List<TagInputSlot> tagInputSlots,
+            List<FluidTagInputSlot> fluidTagInputSlots,
+            List<MoldTagInputSlot> moldTagInputSlots,
+            List<Integer> itemIdInputSlots,
+            List<Integer> itemIdOutputSlots) {
+        this(version, recipeId, recipeFingerprint, "", requiresMold, displayMold, displayMolds,
+                tagInputSlots, fluidTagInputSlots, moldTagInputSlots,
+                itemIdInputSlots, itemIdOutputSlots);
     }
 
     /** Compatibility constructor for metadata written before display_molds was introduced. */
@@ -188,8 +210,8 @@ public record OmniversalPatternData(
             Optional<AEItemKey> displayMold,
             List<Integer> itemIdInputSlots,
             List<Integer> itemIdOutputSlots) {
-        this(version, recipeId, recipeFingerprint, requiresMold, displayMold,
-                List.of(), List.of(), List.of(),
+        this(version, recipeId, recipeFingerprint, "", requiresMold, displayMold,
+                List.of(), List.of(), List.of(), List.of(),
                 itemIdInputSlots, itemIdOutputSlots);
     }
 
@@ -201,6 +223,7 @@ public record OmniversalPatternData(
         buffer.writeVarInt(data.version);
         ResourceLocation.STREAM_CODEC.encode(buffer, data.recipeId);
         buffer.writeUtf(data.recipeFingerprint);
+        if (data.version >= SOURCE_ID_VERSION) buffer.writeUtf(data.sourceId);
         buffer.writeBoolean(data.requiresMold);
         buffer.writeBoolean(data.displayMold.isPresent());
         data.displayMold.ifPresent(mold -> mold.writeToPacket(buffer));
@@ -224,6 +247,7 @@ public record OmniversalPatternData(
         int version = buffer.readVarInt();
         ResourceLocation recipeId = ResourceLocation.STREAM_CODEC.decode(buffer);
         String fingerprint = buffer.readUtf();
+        String sourceId = version >= SOURCE_ID_VERSION ? buffer.readUtf() : "";
         boolean requiresMold = buffer.readBoolean();
         Optional<AEItemKey> displayMold = buffer.readBoolean()
                 ? Optional.of(AEItemKey.fromPacket(buffer))
@@ -237,7 +261,7 @@ public record OmniversalPatternData(
         List<MoldTagInputSlot> moldTagInputSlots = version >= MOLD_TAG_INPUT_VERSION
                 ? readMoldTagInputs(buffer) : List.of();
         return new OmniversalPatternData(
-                version, recipeId, fingerprint, requiresMold, displayMold, displayMolds,
+                version, recipeId, fingerprint, sourceId, requiresMold, displayMold, displayMolds,
                 tagInputSlots, fluidTagInputSlots, moldTagInputSlots, readInts(buffer), readInts(buffer));
     }
 

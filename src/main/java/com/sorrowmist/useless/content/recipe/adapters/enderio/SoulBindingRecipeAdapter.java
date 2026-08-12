@@ -370,6 +370,13 @@ public final class SoulBindingRecipeAdapter implements IRecipeAdapter<SoulBindin
     /** Used by the pattern resolver to mark the soul vial/output component slots as dynamic. */
     public static Optional<DynamicPatternProfile> findDynamicPatternProfile(
             @Nullable Level level, List<ItemStack> patternInputs, List<ItemStack> patternOutputs) {
+        return findDynamicPatternProfile("enderio", level, patternInputs, patternOutputs);
+    }
+
+    public static Optional<DynamicPatternProfile> findDynamicPatternProfile(
+            String sourceId, @Nullable Level level,
+            List<ItemStack> patternInputs, List<ItemStack> patternOutputs) {
+        if (sourceId == null || !sourceId.equals("enderio")) return Optional.empty();
         if (level == null) {
             return Optional.empty();
         }

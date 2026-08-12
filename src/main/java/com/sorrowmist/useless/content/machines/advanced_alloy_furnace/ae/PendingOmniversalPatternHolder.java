@@ -20,6 +20,11 @@ public interface PendingOmniversalPatternHolder {
 
     void uselessMod$setPendingOmniversalRecipe(@Nullable AlloyFurnaceRecipeIdentity identity);
 
+    @Nullable
+    String uselessMod$getPendingOmniversalSourceId();
+
+    void uselessMod$setPendingOmniversalSourceId(@Nullable String sourceId);
+
     /** Re-checks a pattern that may have been encoded before the JEI selection packet arrived. */
     default void uselessMod$tryConvertPendingOmniversalPattern() {
     }

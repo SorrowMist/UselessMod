@@ -10,6 +10,7 @@ import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.Omniver
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.PendingOmniversalPatternHolder;
 import com.sorrowmist.useless.content.recipe.AlloyFurnaceRecipeCatalog;
 import com.sorrowmist.useless.content.recipe.AlloyFurnaceRecipeIdentity;
+import com.sorrowmist.useless.content.recipe.RecipeSourceIds;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import org.jetbrains.annotations.Nullable;
@@ -58,6 +59,10 @@ public class PatternEncodingLogicMixin implements PendingOmniversalPatternHolder
     @Nullable
     private AlloyFurnaceRecipeIdentity uselessMod$pendingOmniversalRecipe;
 
+    @Unique
+    @Nullable
+    private String uselessMod$pendingOmniversalSourceId;
+
     @Override
     @Nullable
     public AlloyFurnaceRecipeIdentity uselessMod$getPendingOmniversalRecipe() {
@@ -67,6 +72,18 @@ public class PatternEncodingLogicMixin implements PendingOmniversalPatternHolder
     @Override
     public void uselessMod$setPendingOmniversalRecipe(@Nullable AlloyFurnaceRecipeIdentity identity) {
         this.uselessMod$pendingOmniversalRecipe = identity;
+    }
+
+    @Override
+    @Nullable
+    public String uselessMod$getPendingOmniversalSourceId() {
+        return uselessMod$pendingOmniversalSourceId;
+    }
+
+    @Override
+    public void uselessMod$setPendingOmniversalSourceId(@Nullable String sourceId) {
+        this.uselessMod$pendingOmniversalSourceId = sourceId == null
+                ? RecipeSourceIds.UNKNOWN : RecipeSourceIds.normalize(sourceId);
     }
 
     @Override
@@ -96,16 +113,17 @@ public class PatternEncodingLogicMixin implements PendingOmniversalPatternHolder
 
         Optional<AlloyFurnaceRecipeCatalog.Entry> entry = Optional.empty();
         if (pending != null) {
-            entry = AlloyFurnaceRecipeCatalog.resolve(level, pending)
+            String sourceId = uselessMod$pendingOmniversalSourceId;
+            entry = AlloyFurnaceRecipeCatalog.resolve(level, sourceId, pending)
                     .filter(candidate -> AlloyFurnaceRecipeCatalog.matchesRecipe(
-                            level, candidate.recipe(), details));
+                            level, sourceId, candidate.recipe(), details));
         }
         if (entry.isEmpty()) {
             entry = AlloyFurnaceRecipeCatalog.findUniqueMoldPatternCandidate(level, details);
         }
         if (entry.isEmpty()) return;
 
-        ItemStack omniversal = OmniversalPatternEncoding.encode(pattern, entry.get(), level);
+        ItemStack omniversal = OmniversalPatternEncoding.encode(pattern, details, entry.get(), level);
         if (!omniversal.isEmpty()) {
             encodedPatternInv.setItemDirect(0, omniversal);
         }

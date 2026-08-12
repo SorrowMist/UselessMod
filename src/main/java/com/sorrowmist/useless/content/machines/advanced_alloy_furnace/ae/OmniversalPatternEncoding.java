@@ -46,6 +46,17 @@ public final class OmniversalPatternEncoding {
             return ItemStack.EMPTY;
         }
         IPatternDetails decoded = PatternDetailsHelper.decodePattern(sourcePattern, level);
+        return encode(sourcePattern, decoded, entry, level);
+    }
+
+    /** Encodes from the caller's already decoded pattern to avoid a second AE2 decode pass. */
+    public static ItemStack encode(
+            ItemStack sourcePattern, IPatternDetails decoded,
+            AlloyFurnaceRecipeCatalog.Entry entry, Level level) {
+        if (sourcePattern == null || sourcePattern.isEmpty() || decoded == null
+                || entry == null || level == null) {
+            return ItemStack.EMPTY;
+        }
         if (!(decoded instanceof AEProcessingPattern processing)
                 || decoded instanceof OmniversalPatternDetails) {
             return ItemStack.EMPTY;
@@ -55,7 +66,8 @@ public final class OmniversalPatternEncoding {
 
         List<Integer> dynamicInputs = new ArrayList<>();
         List<Integer> dynamicOutputs = new ArrayList<>();
-        IPatternDetails resolved = AdvancedAlloyFurnacePatternResolver.resolve(processing, level);
+        IPatternDetails resolved = AdvancedAlloyFurnacePatternResolver.resolve(
+                processing, level, entry.sourceId());
         if (resolved instanceof DynamicComponentPattern dynamic) {
             for (int slot = 0; slot < resolved.getInputs().length; slot++) {
                 if (dynamic.isItemIdInput(slot)) dynamicInputs.add(slot);
@@ -101,6 +113,7 @@ public final class OmniversalPatternEncoding {
                 OmniversalPatternData.CURRENT_VERSION,
                 entry.identity().recipeId(),
                 entry.identity().fingerprint(),
+                entry.sourceId(),
                 !recipe.molds().isEmpty(),
                 displayMold,
                 displayMolds,

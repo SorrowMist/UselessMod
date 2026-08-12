@@ -45,6 +45,7 @@ public class AlloyFurnaceRecipeManager {
     /** 无固定模具的 adapter，需通过 matchesMold() 动态判断（如 SeedEssenceRecipeAdapter） */
     private final List<IRecipeAdapter<?>> fallbackAdapters = new CopyOnWriteArrayList<>();
     private final List<IRecipeAdapter<?>> allAdapters = new CopyOnWriteArrayList<>();
+    private final Map<IRecipeAdapter<?>, String> adapterSourceIds = new ConcurrentHashMap<>();
 
     // access-order LinkedHashMap（LRU）。get() 会改动内部链表，非线程安全，
     // 而 findRecipe 可能被 AE 合成任务和主线程同时调用，故用 synchronizedMap 保护。
@@ -87,7 +88,13 @@ public class AlloyFurnaceRecipeManager {
     }
 
     public void registerAdapter(IRecipeAdapter<?> adapter) {
+        registerAdapter(adapter, adapter == null ? RecipeSourceIds.UNKNOWN : adapter.sourceId());
+    }
+
+    public void registerAdapter(IRecipeAdapter<?> adapter, String sourceId) {
+        if (adapter == null) return;
         allAdapters.add(adapter);
+        adapterSourceIds.put(adapter, RecipeSourceIds.normalize(sourceId));
         ItemStack moldItem = adapter.getMoldItem();
         if (moldItem != null && !moldItem.isEmpty()) {
             moldAdapterMap.computeIfAbsent(moldItem.getItem(), ignored -> new CopyOnWriteArrayList<>())
@@ -99,6 +106,11 @@ public class AlloyFurnaceRecipeManager {
 
     public List<IRecipeAdapter<?>> getRegisteredAdapters() {
         return List.copyOf(allAdapters);
+    }
+
+    public String getAdapterSourceId(IRecipeAdapter<?> adapter) {
+        if (adapter == null) return RecipeSourceIds.UNKNOWN;
+        return adapterSourceIds.getOrDefault(adapter, RecipeSourceIds.normalize(adapter.sourceId()));
     }
 
     public void buildIndex(Level level) {

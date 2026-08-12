@@ -2,6 +2,7 @@ package com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae;
 
 import appeng.api.stacks.AEItemKey;
 import com.sorrowmist.useless.content.recipe.AlloyFurnaceRecipeCatalog;
+import com.sorrowmist.useless.core.config.ConfigManager;
 import net.minecraft.SharedConstants;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.network.chat.Component;
@@ -19,8 +20,14 @@ import sun.misc.Unsafe;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -30,7 +37,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class OmniversalPatternDetailsTest {
-    private static final int MAX_CACHE_ENTRIES = 1024;
+    private static final int MAX_CACHE_ENTRIES = 2048;
 
     private static Unsafe unsafe;
     private Level level;
@@ -105,6 +112,31 @@ class OmniversalPatternDetailsTest {
 
         assertSame(first, second);
         assertEquals(1, entries.size());
+        OmniversalPatternDetails.DecodeCacheStats stats = OmniversalPatternDetails.stats(level);
+        assertEquals(1L, stats.misses());
+        assertEquals(1L, stats.hits());
+        assertEquals(1L, stats.actualDecodes());
+    }
+
+    @Test
+    void concurrentDecodeOfTheSameDefinitionRunsOnlyOnce() throws Exception {
+        AEItemKey invalidDefinition = key("concurrent-invalid");
+        ExecutorService executor = Executors.newFixedThreadPool(8);
+        try {
+            List<Callable<RuntimeException>> tasks = new ArrayList<>();
+            for (int index = 0; index < 8; index++) {
+                tasks.add(() -> assertThrows(RuntimeException.class,
+                        () -> OmniversalPatternDetails.decode(invalidDefinition, level)));
+            }
+            List<Future<RuntimeException>> futures = executor.invokeAll(tasks);
+            for (Future<RuntimeException> future : futures) {
+                assertNotNull(future.get());
+            }
+        } finally {
+            executor.shutdownNow();
+        }
+
+        assertEquals(1L, OmniversalPatternDetails.stats(level).actualDecodes());
     }
 
     @Test

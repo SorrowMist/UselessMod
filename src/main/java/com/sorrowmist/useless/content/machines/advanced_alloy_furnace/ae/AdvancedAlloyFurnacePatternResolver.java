@@ -11,6 +11,7 @@ import com.sorrowmist.useless.content.recipe.adapters.draconicevolution.Draconic
 import com.sorrowmist.useless.content.recipe.adapters.enderio.SoulBindingRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.malum.SpiritInfusionRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.occultism.OccultismRitualRecipeAdapter;
+import com.sorrowmist.useless.content.recipe.RecipeSourceIds;
 import com.sorrowmist.useless.core.component.OmniversalPatternData;
 import com.sorrowmist.useless.core.component.UComponents;
 import com.sorrowmist.useless.init.ModItems;
@@ -74,32 +75,44 @@ public final class AdvancedAlloyFurnacePatternResolver {
     }
 
     public static IPatternDetails resolve(IPatternDetails pattern, Level level) {
+        return resolve(pattern, level, null);
+    }
+
+    public static IPatternDetails resolve(
+            IPatternDetails pattern, Level level, @Nullable String sourceId) {
         if (pattern instanceof DynamicComponentPattern
                 || !(pattern instanceof AEProcessingPattern processingPattern)) {
             return pattern;
         }
 
         try {
-            if (ModList.get().isLoaded(DRACONIC_EVOLUTION_MOD_ID)) {
+            String normalizedSource = sourceId == null || sourceId.isBlank()
+                    ? null : RecipeSourceIds.normalize(sourceId);
+            if (RecipeSourceIds.UNKNOWN.equals(normalizedSource)) normalizedSource = null;
+            if ((normalizedSource == null || normalizedSource.equals(RecipeSourceIds.DRACONIC_EVOLUTION))
+                    && ModList.get().isLoaded(DRACONIC_EVOLUTION_MOD_ID)) {
                 IPatternDetails resolved = resolveDynamicDraconicPattern(processingPattern, level);
                 if (resolved != processingPattern) {
                     return resolved;
                 }
             }
-            if (ModList.get().isLoaded(OCCULTISM_MOD_ID)) {
+            if ((normalizedSource == null || normalizedSource.equals(RecipeSourceIds.OCCULTISM))
+                    && ModList.get().isLoaded(OCCULTISM_MOD_ID)) {
                 IPatternDetails resolved = resolveDynamicOccultismPattern(processingPattern, level);
                 if (resolved != processingPattern) {
                     return resolved;
                 }
             }
-            if (ModList.get().isLoaded(MALUM_MOD_ID)) {
+            if ((normalizedSource == null || normalizedSource.equals(RecipeSourceIds.MALUM))
+                    && ModList.get().isLoaded(MALUM_MOD_ID)) {
                 IPatternDetails resolved = resolveDynamicMalumPattern(processingPattern, level);
                 if (resolved != processingPattern) {
                     return resolved;
                 }
             }
-            if (ModList.get().isLoaded(ENDER_IO_MOD_ID)) {
-                IPatternDetails resolved = resolveDynamicSoulBindingPattern(processingPattern, level);
+            if ((normalizedSource == null || normalizedSource.equals(RecipeSourceIds.ENDER_IO))
+                    && ModList.get().isLoaded(ENDER_IO_MOD_ID)) {
+                IPatternDetails resolved = resolveDynamicSoulBindingPattern(processingPattern, level, normalizedSource);
                 if (resolved != processingPattern) {
                     return resolved;
                 }
@@ -167,10 +180,11 @@ public final class AdvancedAlloyFurnacePatternResolver {
     }
 
     private static IPatternDetails resolveDynamicSoulBindingPattern(
-            AEProcessingPattern pattern, Level level) {
+            AEProcessingPattern pattern, Level level, @Nullable String sourceId) {
         List<ItemStack> inputs = itemInputs(pattern);
         List<ItemStack> outputs = itemOutputs(pattern);
-        var profile = SoulBindingRecipeAdapter.findDynamicPatternProfile(level, inputs, outputs);
+        var profile = SoulBindingRecipeAdapter.findDynamicPatternProfile(
+                sourceId == null ? RecipeSourceIds.ENDER_IO : sourceId, level, inputs, outputs);
         if (profile.isEmpty()) {
             return pattern;
         }

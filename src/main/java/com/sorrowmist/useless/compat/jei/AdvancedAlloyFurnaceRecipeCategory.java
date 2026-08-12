@@ -4,6 +4,7 @@ import appeng.api.stacks.GenericStack;
 import com.sorrowmist.useless.UselessMod;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.catalyst.CatalystParallelManager;
 import com.sorrowmist.useless.content.recipe.AdvancedAlloyFurnaceRecipe;
+import com.sorrowmist.useless.content.recipe.AlloyFurnaceRecipeCatalog;
 import com.sorrowmist.useless.content.recipe.CountedIngredient;
 import com.sorrowmist.useless.init.ModBlocks;
 import com.sorrowmist.useless.init.ModTags;
@@ -31,9 +32,9 @@ import org.jetbrains.annotations.NotNull;
 import java.util.ArrayList;
 import java.util.List;
 
-public class AdvancedAlloyFurnaceRecipeCategory implements IRecipeCategory<AdvancedAlloyFurnaceRecipe> {
-    public static final RecipeType<AdvancedAlloyFurnaceRecipe> TYPE =
-            RecipeType.create(UselessMod.MODID, "advanced_alloy_furnace", AdvancedAlloyFurnaceRecipe.class);
+public class AdvancedAlloyFurnaceRecipeCategory implements IRecipeCategory<AlloyFurnaceRecipeCatalog.Entry> {
+    public static final RecipeType<AlloyFurnaceRecipeCatalog.Entry> TYPE =
+            RecipeType.create(UselessMod.MODID, "advanced_alloy_furnace", AlloyFurnaceRecipeCatalog.Entry.class);
 
     // 使用JEI渲染贴图
     private static final ResourceLocation GUI_TEXTURE =
@@ -124,7 +125,7 @@ public class AdvancedAlloyFurnaceRecipeCategory implements IRecipeCategory<Advan
     }
 
     @Override
-    public @NotNull RecipeType<AdvancedAlloyFurnaceRecipe> getRecipeType() {
+    public @NotNull RecipeType<AlloyFurnaceRecipeCatalog.Entry> getRecipeType() {
         return TYPE;
     }
 
@@ -149,7 +150,10 @@ public class AdvancedAlloyFurnaceRecipeCategory implements IRecipeCategory<Advan
     }
 
     @Override
-    public void setRecipe(@NotNull IRecipeLayoutBuilder builder, @NotNull AdvancedAlloyFurnaceRecipe recipe, @NotNull IFocusGroup focuses) {
+    public void setRecipe(@NotNull IRecipeLayoutBuilder builder,
+                          @NotNull AlloyFurnaceRecipeCatalog.Entry entry,
+                          @NotNull IFocusGroup focuses) {
+        AdvancedAlloyFurnaceRecipe recipe = entry.recipe();
         // 计算配方相关的并行数信息
         int targetTier = getTargetUselessIngotTier(recipe);
         boolean isUselessRecipe = targetTier > 0;
@@ -399,7 +403,10 @@ public class AdvancedAlloyFurnaceRecipeCategory implements IRecipeCategory<Advan
     }
 
     @Override
-    public void draw(@NotNull AdvancedAlloyFurnaceRecipe recipe, @NotNull IRecipeSlotsView recipeSlotsView, @NotNull GuiGraphics guiGraphics, double mouseX, double mouseY) {
+    public void draw(@NotNull AlloyFurnaceRecipeCatalog.Entry entry,
+                     @NotNull IRecipeSlotsView recipeSlotsView,
+                     @NotNull GuiGraphics guiGraphics, double mouseX, double mouseY) {
+        AdvancedAlloyFurnaceRecipe recipe = entry.recipe();
         // 绘制背景
         this.background.draw(guiGraphics);
 
@@ -465,9 +472,10 @@ public class AdvancedAlloyFurnaceRecipeCategory implements IRecipeCategory<Advan
     // 修改工具提示方法，添加并行数信息
     @Override
     public void getTooltip(@NotNull ITooltipBuilder tooltip,
-                           @NotNull AdvancedAlloyFurnaceRecipe recipe,
+                           @NotNull AlloyFurnaceRecipeCatalog.Entry entry,
                            @NotNull IRecipeSlotsView recipeSlotsView,
                            double mouseX, double mouseY) {
+        AdvancedAlloyFurnaceRecipe recipe = entry.recipe();
         // 能量和时间显示的悬停提示
         if (mouseX >= ENERGY_DISPLAY_X && mouseX <= ENERGY_DISPLAY_X + ENERGY_DISPLAY_WIDTH &&
                 mouseY >= ENERGY_DISPLAY_Y && mouseY <= ENERGY_DISPLAY_Y + ENERGY_DISPLAY_HEIGHT) {

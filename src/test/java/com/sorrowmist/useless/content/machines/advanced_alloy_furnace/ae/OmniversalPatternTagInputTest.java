@@ -11,6 +11,7 @@ import com.sorrowmist.useless.api.enums.AlloyFurnaceMode;
 import com.sorrowmist.useless.content.blockentities.multiblock.OmniversalMoldHubBlockEntity;
 import com.sorrowmist.useless.content.recipe.AdvancedAlloyFurnaceRecipe;
 import com.sorrowmist.useless.content.recipe.CountedIngredient;
+import com.sorrowmist.useless.content.recipe.RecipeSourceIds;
 import com.sorrowmist.useless.core.component.OmniversalPatternData;
 import io.netty.buffer.Unpooled;
 import net.minecraft.SharedConstants;
@@ -109,6 +110,7 @@ class OmniversalPatternTagInputTest {
                 OmniversalPatternData.CURRENT_VERSION,
                 ResourceLocation.fromNamespaceAndPath("useless_mod_test", "tag_data"),
                 "fingerprint",
+                RecipeSourceIds.ENDER_IO,
                 true,
                 Optional.empty(),
                 List.of(),
@@ -118,8 +120,8 @@ class OmniversalPatternTagInputTest {
                 List.of(0),
                 List.of());
 
-        var encoded = OmniversalPatternData.CODEC.encodeStart(JsonOps.INSTANCE, expected).getOrThrow();
-        assertEquals(expected, OmniversalPatternData.CODEC.parse(JsonOps.INSTANCE, encoded).getOrThrow());
+            var encoded = OmniversalPatternData.CODEC.encodeStart(JsonOps.INSTANCE, expected).getOrThrow();
+            assertEquals(expected, OmniversalPatternData.CODEC.parse(JsonOps.INSTANCE, encoded).getOrThrow());
 
         RegistryFriendlyByteBuf buffer = new RegistryFriendlyByteBuf(
                 Unpooled.buffer(), RegistryAccess.fromRegistryOfRegistries(BuiltInRegistries.REGISTRY),

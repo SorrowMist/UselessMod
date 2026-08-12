@@ -80,6 +80,9 @@ public class ClientSetup {
     @SubscribeEvent
     public static void onRecipesUpdated(RecipesUpdatedEvent event) {
         AlloyFurnaceRecipeCatalog.invalidate();
+        if (Minecraft.getInstance().level != null) {
+            AlloyFurnaceRecipeCatalog.prewarm(Minecraft.getInstance().level);
+        }
     }
 
     @SubscribeEvent

@@ -1,6 +1,7 @@
 package com.sorrowmist.useless.compat.appmek;
 
 import com.sorrowmist.useless.content.recipe.AlloyFurnaceRecipeManager;
+import com.sorrowmist.useless.content.recipe.RecipeSourceIds;
 import com.sorrowmist.useless.content.recipe.adapters.mekanism.BoilerRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.mekanism.ChemicalChemicalRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.mekanism.ChemicalCrystallizerRecipeAdapter;
@@ -28,26 +29,26 @@ public final class AppMekRecipeCompatLoader {
         AppMekChemicalCompat.registerKeyProvider();
         AlloyFurnaceRecipeManager manager = AlloyFurnaceRecipeManager.getInstance();
 
-        manager.registerAdapter(new MetallurgicInfuserRecipeAdapter());
-        manager.registerAdapter(new OsmiumCompressorRecipeAdapter());
-        manager.registerAdapter(new PurificationChamberRecipeAdapter());
-        manager.registerAdapter(new ChemicalInjectionChamberRecipeAdapter());
-        manager.registerAdapter(new PaintingRecipeAdapter());
-        manager.registerAdapter(ChemicalChemicalRecipeAdapter.chemicalInfuser());
-        manager.registerAdapter(ChemicalChemicalRecipeAdapter.pigmentMixer());
-        manager.registerAdapter(ChemicalToChemicalRecipeAdapter.isotopicCentrifuge());
-        manager.registerAdapter(ChemicalToChemicalRecipeAdapter.solarNeutronActivator());
-        manager.registerAdapter(new ElectrolysisRecipeAdapter());
-        manager.registerAdapter(new ChemicalDissolutionRecipeAdapter());
-        manager.registerAdapter(new ChemicalCrystallizerRecipeAdapter());
-        manager.registerAdapter(new FluidChemicalRecipeAdapter());
-        manager.registerAdapter(new PressurizedReactionRecipeAdapter());
-        manager.registerAdapter(new RotaryRecipeAdapter());
-        manager.registerAdapter(ItemToChemicalRecipeAdapter.chemicalConversion());
-        manager.registerAdapter(ItemToChemicalRecipeAdapter.oxidizing());
-        manager.registerAdapter(ItemToChemicalRecipeAdapter.pigmentExtracting());
-        manager.registerAdapter(new NucleosynthesizingRecipeAdapter());
-        manager.registerAdapter(new SpsRecipeAdapter());
-        manager.registerAdapter(new BoilerRecipeAdapter());
+        manager.registerAdapter(new MetallurgicInfuserRecipeAdapter(), RecipeSourceIds.APP_MEK);
+        manager.registerAdapter(new OsmiumCompressorRecipeAdapter(), RecipeSourceIds.APP_MEK);
+        manager.registerAdapter(new PurificationChamberRecipeAdapter(), RecipeSourceIds.APP_MEK);
+        manager.registerAdapter(new ChemicalInjectionChamberRecipeAdapter(), RecipeSourceIds.APP_MEK);
+        manager.registerAdapter(new PaintingRecipeAdapter(), RecipeSourceIds.APP_MEK);
+        manager.registerAdapter(ChemicalChemicalRecipeAdapter.chemicalInfuser(), RecipeSourceIds.APP_MEK);
+        manager.registerAdapter(ChemicalChemicalRecipeAdapter.pigmentMixer(), RecipeSourceIds.APP_MEK);
+        manager.registerAdapter(ChemicalToChemicalRecipeAdapter.isotopicCentrifuge(), RecipeSourceIds.APP_MEK);
+        manager.registerAdapter(ChemicalToChemicalRecipeAdapter.solarNeutronActivator(), RecipeSourceIds.APP_MEK);
+        manager.registerAdapter(new ElectrolysisRecipeAdapter(), RecipeSourceIds.APP_MEK);
+        manager.registerAdapter(new ChemicalDissolutionRecipeAdapter(), RecipeSourceIds.APP_MEK);
+        manager.registerAdapter(new ChemicalCrystallizerRecipeAdapter(), RecipeSourceIds.APP_MEK);
+        manager.registerAdapter(new FluidChemicalRecipeAdapter(), RecipeSourceIds.APP_MEK);
+        manager.registerAdapter(new PressurizedReactionRecipeAdapter(), RecipeSourceIds.APP_MEK);
+        manager.registerAdapter(new RotaryRecipeAdapter(), RecipeSourceIds.APP_MEK);
+        manager.registerAdapter(ItemToChemicalRecipeAdapter.chemicalConversion(), RecipeSourceIds.APP_MEK);
+        manager.registerAdapter(ItemToChemicalRecipeAdapter.oxidizing(), RecipeSourceIds.APP_MEK);
+        manager.registerAdapter(ItemToChemicalRecipeAdapter.pigmentExtracting(), RecipeSourceIds.APP_MEK);
+        manager.registerAdapter(new NucleosynthesizingRecipeAdapter(), RecipeSourceIds.APP_MEK);
+        manager.registerAdapter(new SpsRecipeAdapter(), RecipeSourceIds.APP_MEK);
+        manager.registerAdapter(new BoilerRecipeAdapter(), RecipeSourceIds.APP_MEK);
     }
 }

@@ -1,7 +1,6 @@
 package com.sorrowmist.useless.compat.jei;
 
 import com.sorrowmist.useless.UselessMod;
-import com.sorrowmist.useless.content.recipe.AdvancedAlloyFurnaceRecipe;
 import com.sorrowmist.useless.content.recipe.AlloyFurnaceRecipeCatalog;
 import com.sorrowmist.useless.init.ModBlocks;
 import com.sorrowmist.useless.init.ModTags;
@@ -47,9 +46,9 @@ public final class JEIPlugin implements IModPlugin {
     @Override
     public void registerRecipes(@NotNull IRecipeRegistration registration) {
         Level level = Minecraft.getInstance().level;
-        List<AdvancedAlloyFurnaceRecipe> recipes = level == null
+        List<AlloyFurnaceRecipeCatalog.Entry> recipes = level == null
                 ? List.of()
-                : AlloyFurnaceRecipeCatalog.recipes(level);
+                : AlloyFurnaceRecipeCatalog.entries(level);
         registration.addRecipes(AdvancedAlloyFurnaceRecipeCategory.TYPE, recipes);
         registration.addRecipes(CatalystInfoCategory.TYPE,
                 List.of(new CatalystInfoCategory.CatalystInfo()));
@@ -131,4 +130,5 @@ public final class JEIPlugin implements IModPlugin {
     public static boolean isAvailable() {
         return runtime != null;
     }
+
 }

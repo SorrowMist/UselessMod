@@ -2,6 +2,7 @@ package com.sorrowmist.useless.content.recipe.adapters;
 
 import com.sorrowmist.useless.content.recipe.AlloyFurnaceRecipeManager;
 import com.sorrowmist.useless.content.recipe.IRecipeAdapter;
+import com.sorrowmist.useless.content.recipe.RecipeSourceIds;
 import com.sorrowmist.useless.content.recipe.adapters.actuallyadditions.EmpowererRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.actuallyadditions.LaserRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.ae.advancedae.ReactionChamberRecipeAdapter;
@@ -56,29 +57,29 @@ import java.util.List;
 public final class RecipeAdapterCompatRegistry {
     private static final Logger LOGGER = LogManager.getLogger(RecipeAdapterCompatRegistry.class);
 
-    public static final String EXTENDED_AE = "extendedae";
-    public static final String ADVANCED_AE = "advanced_ae";
-    public static final String MEKANISM = "mekanism";
-    public static final String MEKANISM_GENERATORS = "mekanismgenerators";
-    public static final String APP_MEK = "appmek";
-    public static final String AE2 = "ae2";
-    public static final String AE2CS = "ae2cs";
-    public static final String INDUSTRIAL_FOREGOING = "industrialforegoing";
-    public static final String ACTUALLY_ADDITIONS = "actuallyadditions";
-    public static final String ARS_NOUVEAU = "ars_nouveau";
-    public static final String MYSTICAL_AGRICULTURE = "mysticalagriculture";
-    public static final String AE2LT = "ae2lt";
-    public static final String DATA_ENERGISTICS = "data_energistics";
-    public static final String PRODUCTIVE_BEES = "productivebees";
-    public static final String DRACONIC_EVOLUTION = "draconicevolution";
-    public static final String POWAH = "powah";
-    public static final String EXTENDED_CRAFTING = "extendedcrafting";
-    public static final String NEO_ECO_AE = "neoecoae";
-    public static final String NATURES_AURA = "naturesaura";
-    public static final String FORBIDDEN_ARCANUS = "forbidden_arcanus";
-    public static final String OCCULTISM = "occultism";
-    public static final String MALUM = "malum";
-    public static final String ENDER_IO = "enderio";
+    public static final String EXTENDED_AE = RecipeSourceIds.EXTENDED_AE;
+    public static final String ADVANCED_AE = RecipeSourceIds.ADVANCED_AE;
+    public static final String MEKANISM = RecipeSourceIds.MEKANISM;
+    public static final String MEKANISM_GENERATORS = RecipeSourceIds.MEKANISM_GENERATORS;
+    public static final String APP_MEK = RecipeSourceIds.APP_MEK;
+    public static final String AE2 = RecipeSourceIds.AE2;
+    public static final String AE2CS = RecipeSourceIds.AE2CS;
+    public static final String INDUSTRIAL_FOREGOING = RecipeSourceIds.INDUSTRIAL_FOREGOING;
+    public static final String ACTUALLY_ADDITIONS = RecipeSourceIds.ACTUALLY_ADDITIONS;
+    public static final String ARS_NOUVEAU = RecipeSourceIds.ARS_NOUVEAU;
+    public static final String MYSTICAL_AGRICULTURE = RecipeSourceIds.MYSTICAL_AGRICULTURE;
+    public static final String AE2LT = RecipeSourceIds.AE2LT;
+    public static final String DATA_ENERGISTICS = RecipeSourceIds.DATA_ENERGISTICS;
+    public static final String PRODUCTIVE_BEES = RecipeSourceIds.PRODUCTIVE_BEES;
+    public static final String DRACONIC_EVOLUTION = RecipeSourceIds.DRACONIC_EVOLUTION;
+    public static final String POWAH = RecipeSourceIds.POWAH;
+    public static final String EXTENDED_CRAFTING = RecipeSourceIds.EXTENDED_CRAFTING;
+    public static final String NEO_ECO_AE = RecipeSourceIds.NEO_ECO_AE;
+    public static final String NATURES_AURA = RecipeSourceIds.NATURES_AURA;
+    public static final String FORBIDDEN_ARCANUS = RecipeSourceIds.FORBIDDEN_ARCANUS;
+    public static final String OCCULTISM = RecipeSourceIds.OCCULTISM;
+    public static final String MALUM = RecipeSourceIds.MALUM;
+    public static final String ENDER_IO = RecipeSourceIds.ENDER_IO;
 
     private static final List<CompatEntry> ENTRIES = List.of(
             new CompatEntry(null, RecipeAdapterCompatRegistry::registerMinecraft),

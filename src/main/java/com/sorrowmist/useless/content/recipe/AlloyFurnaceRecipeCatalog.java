@@ -41,17 +41,36 @@ import org.slf4j.Logger;
 public final class AlloyFurnaceRecipeCatalog {
     private static final Logger LOGGER = LogUtils.getLogger();
     private static final Map<Object, Snapshot> CACHE = java.util.Collections.synchronizedMap(new WeakHashMap<>());
+    private static final Map<Object, Object> BUILD_LOCKS = java.util.Collections.synchronizedMap(new WeakHashMap<>());
     private static final AtomicLong GENERATION = new AtomicLong();
 
     private AlloyFurnaceRecipeCatalog() {
     }
 
-    public record Entry(AlloyFurnaceRecipeIdentity identity, AdvancedAlloyFurnaceRecipe recipe) {
+    public record Entry(AlloyFurnaceRecipeIdentity identity, AdvancedAlloyFurnaceRecipe recipe, String sourceId) {
+        public Entry {
+            sourceId = RecipeSourceIds.normalize(sourceId);
+        }
+
+        public Entry(AlloyFurnaceRecipeIdentity identity, AdvancedAlloyFurnaceRecipe recipe) {
+            this(identity, recipe, RecipeSourceIds.UNKNOWN);
+        }
     }
 
     public static List<Entry> entries(Level level) {
         if (level == null) return List.of();
         return snapshot(level).entries;
+    }
+
+    public static List<Entry> entries(Level level, String sourceId) {
+        if (level == null) return List.of();
+        String normalizedSource = RecipeSourceIds.normalize(sourceId);
+        return snapshot(level).bySource.getOrDefault(normalizedSource, List.of());
+    }
+
+    /** Builds and publishes the immutable current-generation snapshot synchronously. */
+    public static void prewarm(Level level) {
+        if (level != null) snapshot(level);
     }
 
     public static List<AdvancedAlloyFurnaceRecipe> recipes(Level level) {
@@ -93,9 +112,10 @@ public final class AlloyFurnaceRecipeCatalog {
 
         // A pattern can be decoded while a datapack/compat adapter is still
         // finishing its recipe registration. Rebuild once on an identity miss
-        // for the whole snapshot generation. Build outside the global cache
-        // monitor so client rendering cannot block the integrated server.
-        Snapshot rebuilt = build(level, snapshot.generation, true);
+        // for the whole snapshot generation. Use the same per-recipe-manager
+        // lock as the normal prewarm path so concurrent misses cannot build
+        // duplicate snapshots.
+        Snapshot rebuilt = rebuildAfterMiss(level, cacheKey, snapshot);
         if (GENERATION.get() != snapshot.generation) {
             return resolve(level, identity);
         }
@@ -115,6 +135,22 @@ public final class AlloyFurnaceRecipeCatalog {
         return Optional.ofNullable(resolved);
     }
 
+    /** Resolves by source first, retaining the all-source path for old metadata and unknown sources. */
+    public static Optional<Entry> resolve(
+            Level level, String sourceId, AlloyFurnaceRecipeIdentity identity) {
+        if (level == null || identity == null) return Optional.empty();
+        String normalizedSource = RecipeSourceIds.normalize(sourceId);
+        if (RecipeSourceIds.UNKNOWN.equals(normalizedSource)) return resolve(level, identity);
+        Snapshot snapshot = snapshot(level);
+        Entry resolved = snapshot.bySourceAndRecipeId
+                .getOrDefault(new SourceRecipeKey(normalizedSource, identity.recipeId()), List.of())
+                .stream()
+                .filter(entry -> entry.identity().equals(identity))
+                .findFirst()
+                .orElse(null);
+        return resolved == null ? resolve(level, identity) : Optional.of(resolved);
+    }
+
     /**
      * Resolves a pattern binding, accepting a cross-side catalog rebuild when the stored fingerprint
      * no longer exists locally but the recipe id and encoded processing contents identify exactly
@@ -129,7 +165,7 @@ public final class AlloyFurnaceRecipeCatalog {
         if (exact.isPresent()) return exact;
 
         Snapshot snapshot = snapshot(level);
-        Set<Integer> componentAgnosticOutputs = componentAgnosticOutputSlots(pattern, level);
+        Set<Integer> componentAgnosticOutputs = componentAgnosticOutputSlots(pattern, level, null);
         List<Entry> candidates = snapshot.byRecipeId
                 .getOrDefault(identity.recipeId(), List.of())
                 .stream()
@@ -156,6 +192,27 @@ public final class AlloyFurnaceRecipeCatalog {
         Entry compatible = candidates.getFirst();
         snapshot.compatibilityAliases.putIfAbsent(identity, compatible);
         return Optional.of(compatible);
+    }
+
+    public static Optional<Entry> resolvePattern(
+            Level level, String sourceId, AlloyFurnaceRecipeIdentity identity, IPatternDetails pattern) {
+        if (level == null || identity == null || pattern == null) return Optional.empty();
+        String normalizedSource = RecipeSourceIds.normalize(sourceId);
+        if (RecipeSourceIds.UNKNOWN.equals(normalizedSource)) {
+            return resolvePattern(level, identity, pattern);
+        }
+        Optional<Entry> exact = resolve(level, normalizedSource, identity);
+        if (exact.isPresent()) return exact;
+        Snapshot snapshot = snapshot(level);
+        Set<Integer> componentAgnosticOutputs = componentAgnosticOutputSlots(pattern, level, normalizedSource);
+        List<Entry> candidates = snapshot.bySourceAndRecipeId
+                .getOrDefault(new SourceRecipeKey(normalizedSource, identity.recipeId()), List.of())
+                .stream()
+                .filter(entry -> matchesPattern(
+                        entry.recipe(), pattern, componentAgnosticOutputs, true))
+                .toList();
+        if (candidates.size() == 1) return Optional.of(candidates.getFirst());
+        return resolvePattern(level, identity, pattern);
     }
 
     /**
@@ -199,6 +256,30 @@ public final class AlloyFurnaceRecipeCatalog {
         return Optional.of(existing == null ? match : existing);
     }
 
+    public static Optional<Entry> resolveLegacyPattern(
+            Level level, String sourceId, AlloyFurnaceRecipeIdentity legacyIdentity,
+            IPatternDetails pattern, int version) {
+        if (level == null || legacyIdentity == null || pattern == null) return Optional.empty();
+        String normalizedSource = RecipeSourceIds.normalize(sourceId);
+        if (RecipeSourceIds.UNKNOWN.equals(normalizedSource)) {
+            return resolveLegacyPattern(level, legacyIdentity, pattern, version);
+        }
+        Snapshot snapshot = snapshot(level);
+        Entry match = null;
+        for (Entry entry : snapshot.bySourceAndRecipeId
+                .getOrDefault(new SourceRecipeKey(normalizedSource, legacyIdentity.recipeId()), List.of())) {
+            boolean valid = level.isClientSide
+                    ? matchesPattern(entry.recipe(), pattern)
+                    : legacyFingerprint(entry.recipe(), level, version).equals(legacyIdentity.fingerprint());
+            if (!valid) continue;
+            if (match != null) return resolveLegacyPattern(level, legacyIdentity, pattern, version);
+            match = entry;
+        }
+        return match == null
+                ? resolveLegacyPattern(level, legacyIdentity, pattern, version)
+                : Optional.of(match);
+    }
+
     private static String legacyFingerprint(
             AdvancedAlloyFurnaceRecipe recipe, Level level, int version) {
         return version >= OmniversalPatternData.SEMANTIC_FINGERPRINT_VERSION
@@ -239,8 +320,14 @@ public final class AlloyFurnaceRecipeCatalog {
      * outputs with another one is still accepted: ambiguity was resolved by the player's click.
      */
     public static boolean matchesRecipe(Level level, AdvancedAlloyFurnaceRecipe recipe, IPatternDetails pattern) {
+        return matchesRecipe(level, null, recipe, pattern);
+    }
+
+    public static boolean matchesRecipe(
+            Level level, String sourceId, AdvancedAlloyFurnaceRecipe recipe, IPatternDetails pattern) {
         if (level == null || recipe == null || pattern == null) return false;
-        return matchesPattern(recipe, pattern, componentAgnosticOutputSlots(pattern, level), true);
+        return matchesPattern(recipe, pattern,
+                componentAgnosticOutputSlots(pattern, level, sourceId), true);
     }
 
     /**
@@ -254,7 +341,12 @@ public final class AlloyFurnaceRecipeCatalog {
      * Bees honeycomb {@code bee_type}).
      */
     private static Set<Integer> componentAgnosticOutputSlots(IPatternDetails pattern, Level level) {
-        IPatternDetails resolved = AdvancedAlloyFurnacePatternResolver.resolve(pattern, level);
+        return componentAgnosticOutputSlots(pattern, level, null);
+    }
+
+    private static Set<Integer> componentAgnosticOutputSlots(
+            IPatternDetails pattern, Level level, String sourceId) {
+        IPatternDetails resolved = AdvancedAlloyFurnacePatternResolver.resolve(pattern, level, sourceId);
         if (!(resolved instanceof DynamicComponentPattern dynamic)) return Set.of();
 
         Set<Integer> slots = new LinkedHashSet<>();
@@ -286,51 +378,101 @@ public final class AlloyFurnaceRecipeCatalog {
                 return cached;
             }
 
-            Snapshot built = build(level, generation, false);
-            if (GENERATION.get() != generation) continue;
-            synchronized (CACHE) {
-                cached = CACHE.get(cacheKey);
-                if (cached != null && cached.generation == generation) {
-                    return cached;
+            Object buildLock = buildLock(cacheKey);
+            synchronized (buildLock) {
+                generation = GENERATION.get();
+                synchronized (CACHE) {
+                    cached = CACHE.get(cacheKey);
+                    if (cached != null && cached.generation == generation) {
+                        return cached;
+                    }
                 }
-                CACHE.put(cacheKey, built);
-                return built;
+                Snapshot built = build(level, generation, false);
+                if (GENERATION.get() != generation) continue;
+                synchronized (CACHE) {
+                    cached = CACHE.get(cacheKey);
+                    if (cached != null && cached.generation == generation) {
+                        return cached;
+                    }
+                    CACHE.put(cacheKey, built);
+                    return built;
+                }
             }
         }
     }
 
+    private static Snapshot rebuildAfterMiss(Level level, Object cacheKey, Snapshot expected) {
+        Object buildLock = buildLock(cacheKey);
+        synchronized (buildLock) {
+            long generation = GENERATION.get();
+            if (generation != expected.generation) {
+                return snapshot(level);
+            }
+
+            synchronized (CACHE) {
+                Snapshot current = CACHE.get(cacheKey);
+                if (current != null && current != expected && current.generation == generation) {
+                    return current;
+                }
+            }
+
+            Snapshot rebuilt = build(level, generation, true);
+            if (GENERATION.get() != generation) {
+                return snapshot(level);
+            }
+            synchronized (CACHE) {
+                Snapshot current = CACHE.get(cacheKey);
+                if (current != null && current != expected && current.generation == generation) {
+                    return current;
+                }
+                CACHE.put(cacheKey, rebuilt);
+                return rebuilt;
+            }
+        }
+    }
+
+    private static Object buildLock(Object cacheKey) {
+        synchronized (BUILD_LOCKS) {
+            return BUILD_LOCKS.computeIfAbsent(cacheKey, ignored -> new Object());
+        }
+    }
+
     private static Snapshot build(Level level, long generation, boolean compensationRebuildUsed) {
-        List<AdvancedAlloyFurnaceRecipe> recipes = new ArrayList<>();
+        long startedAt = System.nanoTime();
+        List<CollectedRecipe> recipes = new ArrayList<>();
         for (RecipeHolder<AdvancedAlloyFurnaceRecipe> holder : level.getRecipeManager()
                 .getAllRecipesFor(ModRecipeTypes.ADVANCED_ALLOY_FURNACE_TYPE.get())) {
-            recipes.add(holder.value());
+            recipes.add(new CollectedRecipe(holder.value(), RecipeSourceIds.CORE));
         }
 
         Collection<RecipeHolder<?>> sourceRecipes = level.getRecipeManager().getRecipes();
         for (IRecipeAdapter<?> adapter : AlloyFurnaceRecipeManager.getInstance().getRegisteredAdapters()) {
             if (adapter.getClass().getPackageName().contains(".ae.ae2lt")) continue;
+            String sourceId = AlloyFurnaceRecipeManager.getInstance().getAdapterSourceId(adapter);
             if (adapter instanceof SeedEssenceRecipeAdapter synthetic) {
-                recipes.addAll(synthetic.getAllRecipes());
+                synthetic.getAllRecipes().forEach(recipe -> recipes.add(new CollectedRecipe(recipe, sourceId)));
                 continue;
             }
             if (adapter instanceof CrystalGrowthRecipeAdapter synthetic) {
-                recipes.addAll(synthetic.getAllRecipes());
+                synthetic.getAllRecipes().forEach(recipe -> recipes.add(new CollectedRecipe(recipe, sourceId)));
                 continue;
             }
-            collectGenerated(adapter, level, recipes);
-            collectConverted(adapter, sourceRecipes, level, recipes);
+            collectGenerated(adapter, sourceId, level, recipes);
+            collectConverted(adapter, sourceId, sourceRecipes, level, recipes);
         }
         if (RecipeAdapterCompatRegistry.isLoaded(RecipeAdapterCompatRegistry.AE2LT)) {
-            recipes.addAll(AELightningTechCompatLoader.getJeiRecipes(level.getRecipeManager(), level));
+            AELightningTechCompatLoader.getJeiRecipes(level.getRecipeManager(), level)
+                    .forEach(recipe -> recipes.add(new CollectedRecipe(recipe, RecipeSourceIds.AE2LT)));
         }
 
         Map<AlloyFurnaceRecipeIdentity, Entry> unique = new LinkedHashMap<>();
-        for (AdvancedAlloyFurnaceRecipe recipe : recipes) {
+        for (CollectedRecipe collected : recipes) {
+            AdvancedAlloyFurnaceRecipe recipe = collected.recipe();
             if (recipe == null) continue;
             try {
                 AlloyFurnaceRecipeIdentity identity = new AlloyFurnaceRecipeIdentity(
                         recipe.id(), AlloyFurnaceRecipeFingerprint.create(recipe, level.registryAccess()));
-                unique.putIfAbsent(identity, new Entry(identity, recipe));
+                unique.putIfAbsent(identity, new Entry(identity, recipe, collected.sourceId()));
             } catch (RuntimeException exception) {
                 LOGGER.warn("Skipping alloy-furnace recipe with an unencodable identity: {}", recipe.id(), exception);
             }
@@ -344,23 +486,39 @@ public final class AlloyFurnaceRecipeCatalog {
             byRecipeId.computeIfAbsent(entry.identity.recipeId(), ignored -> new ArrayList<>()).add(entry);
         }
         byRecipeId.replaceAll((ignored, entries) -> List.copyOf(entries));
-        return new Snapshot(ordered, Map.copyOf(unique), Map.copyOf(byRecipeId), generation,
+        Map<String, List<Entry>> bySource = new LinkedHashMap<>();
+        Map<SourceRecipeKey, List<Entry>> bySourceAndRecipeId = new LinkedHashMap<>();
+        for (Entry entry : ordered) {
+            bySource.computeIfAbsent(entry.sourceId(), ignored -> new ArrayList<>()).add(entry);
+            bySourceAndRecipeId.computeIfAbsent(
+                    new SourceRecipeKey(entry.sourceId(), entry.identity().recipeId()),
+                    ignored -> new ArrayList<>()).add(entry);
+        }
+        bySource.replaceAll((ignored, entries) -> List.copyOf(entries));
+        bySourceAndRecipeId.replaceAll((ignored, entries) -> List.copyOf(entries));
+        Snapshot snapshot = new Snapshot(ordered, Map.copyOf(unique), Map.copyOf(byRecipeId),
+                Map.copyOf(bySource), Map.copyOf(bySourceAndRecipeId), generation,
                 new ResolutionMisses(compensationRebuildUsed), new ConcurrentHashMap<>(),
                 ConcurrentHashMap.newKeySet());
+        LOGGER.info("Built alloy-furnace recipe catalog: generation={}, recipes={}, sources={}, elapsed={} ms",
+                generation, ordered.size(), bySource.size(), (System.nanoTime() - startedAt) / 1_000_000L);
+        return snapshot;
     }
 
-    private static void collectConverted(IRecipeAdapter<?> adapter, Collection<RecipeHolder<?>> holders,
-                                         Level level, List<AdvancedAlloyFurnaceRecipe> output) {
+    private static void collectConverted(IRecipeAdapter<?> adapter, String sourceId,
+                                         Collection<RecipeHolder<?>> holders, Level level,
+                                         List<CollectedRecipe> output) {
         Class<?> recipeClass = adapter.getRecipeClass();
         for (RecipeHolder<?> holder : holders) {
             if (!recipeClass.isInstance(holder.value())) continue;
             if (adapter instanceof SmeltingRecipeAdapter && holder.value().getType() != RecipeType.SMELTING) continue;
-            output.addAll(RecipeConversionUtils.convertAll(adapter, holder, level));
+            RecipeConversionUtils.convertAll(adapter, holder, level)
+                    .forEach(recipe -> output.add(new CollectedRecipe(recipe, sourceId)));
         }
     }
 
-    private static void collectGenerated(IRecipeAdapter<?> adapter, Level level,
-                                         List<AdvancedAlloyFurnaceRecipe> output) {
+    private static void collectGenerated(IRecipeAdapter<?> adapter, String sourceId, Level level,
+                                         List<CollectedRecipe> output) {
         List<? extends RecipeHolder<?>> generated;
         try {
             generated = adapter.getGeneratedRecipes(level);
@@ -370,7 +528,8 @@ public final class AlloyFurnaceRecipeCatalog {
         }
         if (generated == null) return;
         for (RecipeHolder<?> holder : generated) {
-            output.addAll(RecipeConversionUtils.convertAll(adapter, holder, level));
+            RecipeConversionUtils.convertAll(adapter, holder, level)
+                    .forEach(recipe -> output.add(new CollectedRecipe(recipe, sourceId)));
         }
     }
 
@@ -631,10 +790,24 @@ public final class AlloyFurnaceRecipeCatalog {
             List<Entry> entries,
             Map<AlloyFurnaceRecipeIdentity, Entry> byIdentity,
             Map<ResourceLocation, List<Entry>> byRecipeId,
+            Map<String, List<Entry>> bySource,
+            Map<SourceRecipeKey, List<Entry>> bySourceAndRecipeId,
             long generation,
             ResolutionMisses misses,
             Map<AlloyFurnaceRecipeIdentity, Entry> compatibilityAliases,
             Set<AlloyFurnaceRecipeIdentity> legacyMisses) {
+    }
+
+    private record CollectedRecipe(AdvancedAlloyFurnaceRecipe recipe, String sourceId) {
+        private CollectedRecipe {
+            sourceId = RecipeSourceIds.normalize(sourceId);
+        }
+    }
+
+    private record SourceRecipeKey(String sourceId, ResourceLocation recipeId) {
+        private SourceRecipeKey {
+            sourceId = RecipeSourceIds.normalize(sourceId);
+        }
     }
 
     static final class ResolutionMisses {

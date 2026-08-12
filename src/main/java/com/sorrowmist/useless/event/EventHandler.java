@@ -3,6 +3,7 @@ package com.sorrowmist.useless.event;
 import com.sorrowmist.useless.UselessMod;
 import com.sorrowmist.useless.content.items.EndlessBeafItem;
 import com.sorrowmist.useless.content.recipe.AlloyFurnaceRecipeManager;
+import com.sorrowmist.useless.content.recipe.AlloyFurnaceRecipeCatalog;
 import com.sorrowmist.useless.content.multiblock.OmniversalFurnaceAutoBuilder;
 import com.sorrowmist.useless.content.blockentities.multiblock.MultiblockAlloyFurnaceCoreBlockEntity;
 import com.sorrowmist.useless.core.common.FlyEffectedHolder;
@@ -38,6 +39,7 @@ import net.neoforged.neoforge.event.level.BlockEvent;
 import net.neoforged.neoforge.event.server.ServerStartedEvent;
 import net.neoforged.neoforge.event.tick.PlayerTickEvent;
 import net.neoforged.neoforge.network.PacketDistributor;
+import net.neoforged.neoforge.server.ServerLifecycleHooks;
 
 import java.util.Collections;
 import java.util.Set;
@@ -351,6 +353,7 @@ public class EventHandler {
     @SubscribeEvent
     public static void onServerStarted(ServerStartedEvent event) {
         AlloyFurnaceRecipeManager.getInstance().buildIndex(event.getServer().overworld());
+        AlloyFurnaceRecipeCatalog.prewarm(event.getServer().overworld());
     }
 
     /**
@@ -360,12 +363,15 @@ public class EventHandler {
     public static void onAddReloadListener(AddReloadListenerEvent event) {
         // 在配方数据重载后重建索引
         event.addListener((stage, resourceManager, preparationsProfiler, reloadProfiler, backgroundExecutor, gameExecutor) -> {
-            return stage.wait(Collections.emptyList()).thenRun(() -> {
+            return stage.wait(Collections.emptyList()).thenRunAsync(() -> {
                 // 配方数据已变更：清空查找缓存并标记索引需要重建
                 // 索引会在下一次 findRecipe 时延迟重建（此处无法直接获取 Level）
                 AlloyFurnaceRecipeManager.getInstance().clearCache();
                 AlloyFurnaceRecipeManager.getInstance().invalidateIndex();
-            });
+                AlloyFurnaceRecipeCatalog.invalidate();
+                var server = ServerLifecycleHooks.getCurrentServer();
+                if (server != null) AlloyFurnaceRecipeCatalog.prewarm(server.overworld());
+            }, gameExecutor);
         });
     }
 }

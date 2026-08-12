@@ -151,6 +151,7 @@ class AlloyFurnaceRecipeFingerprintTest {
         OmniversalPatternData legacy = patternData(1);
         var encodedLegacy = OmniversalPatternData.CODEC.encodeStart(JsonOps.INSTANCE, legacy).getOrThrow();
         assertFalse(encodedLegacy.getAsJsonObject().has("version"));
+        assertFalse(encodedLegacy.getAsJsonObject().has("source_id"));
         assertEquals(1, OmniversalPatternData.CODEC.parse(JsonOps.INSTANCE, encodedLegacy)
                 .getOrThrow().version());
 
@@ -159,6 +160,18 @@ class AlloyFurnaceRecipeFingerprintTest {
                 .getOrThrow();
         assertEquals(OmniversalPatternData.CURRENT_VERSION,
                 encodedCurrent.getAsJsonObject().get("version").getAsInt());
+    }
+
+    @Test
+    void legacyJsonWithoutSourceIdUsesTheCompatibilitySource() {
+        var encoded = OmniversalPatternData.CODEC.encodeStart(
+                JsonOps.INSTANCE, patternData(OmniversalPatternData.CURRENT_VERSION)).getOrThrow();
+        encoded.getAsJsonObject().remove("source_id");
+
+        OmniversalPatternData decoded = OmniversalPatternData.CODEC
+                .parse(JsonOps.INSTANCE, encoded).getOrThrow();
+
+        assertEquals("", decoded.sourceId());
     }
 
     @Test

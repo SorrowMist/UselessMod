@@ -76,6 +76,7 @@ public class ConfigManager {
     private static final ModConfigSpec.IntValue OMNIVERSAL_PATTERN_SLOTS;
     private static final ModConfigSpec.IntValue OMNIVERSAL_MOLD_SLOTS;
     private static final ModConfigSpec.IntValue OMNIVERSAL_PASSIVE_PATTERN_SLOTS;
+    private static final ModConfigSpec.IntValue OMNIVERSAL_DECODE_CACHE_CAPACITY;
     private static final ModConfigSpec.IntValue ORE_GENERATOR_SLOTS;
 
     static {
@@ -140,6 +141,10 @@ public class ConfigManager {
                 .comment("Passive crafting hatch slots. Higher coil tiers unlock this capacity gradually.")
                 .translation("useless_mod.configuration.passive_pattern_slots")
                 .defineInRange("passive_pattern_slots", 30, 1, 540);
+        OMNIVERSAL_DECODE_CACHE_CAPACITY = SERVER_BUILDER
+                .comment("Maximum decoded omniversal pattern entries kept per level. Takes effect after restart.")
+                .translation("useless_mod.configuration.decode_cache_capacity")
+                .defineInRange("decode_cache_capacity", 2048, 64, 16384);
         SERVER_BUILDER.pop();
 
         SERVER_BUILDER.translation("useless_mod.configuration.ore_generator")
@@ -343,6 +348,10 @@ public class ConfigManager {
 
     public static int getOmniversalPassivePatternSlots() {
         return Math.max(1, Math.min(540, OMNIVERSAL_PASSIVE_PATTERN_SLOTS.get()));
+    }
+
+    public static int getOmniversalDecodeCacheCapacity() {
+        return Math.max(64, Math.min(16384, OMNIVERSAL_DECODE_CACHE_CAPACITY.get()));
     }
 
     public static int getOreGeneratorSlots() {

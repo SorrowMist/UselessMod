@@ -24,6 +24,15 @@ import java.util.Map;
 public interface IRecipeAdapter<T extends Recipe<?>> {
 
     /**
+     * Stable source identifier used by the recipe directory and pattern metadata.
+     * Adapters supplied by older integrations get a package-based fallback; factories that are
+     * registered for more than one compatibility source should use the explicit registration API.
+     */
+    default String sourceId() {
+        return RecipeSourceIds.fromAdapterClass(getClass());
+    }
+
+    /**
      * 获取适配器支持的配方类型
      * <p>
      * 该类型用于从 {@link net.minecraft.world.item.crafting.RecipeManager} 中筛选原始配方，也用于注册表判断适配器负责的配方来源。

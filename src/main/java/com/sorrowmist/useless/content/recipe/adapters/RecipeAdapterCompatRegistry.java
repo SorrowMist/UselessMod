@@ -32,7 +32,14 @@ import com.sorrowmist.useless.content.recipe.adapters.naturesaura.AnimalSpawnerR
 import com.sorrowmist.useless.content.recipe.adapters.naturesaura.NatureAltarRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.naturesaura.OfferingRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.naturesaura.TreeRitualRecipeAdapter;
+import com.sorrowmist.useless.content.recipe.adapters.neovitae.AraVitaeRecipeAdapter;
+import com.sorrowmist.useless.content.recipe.adapters.neovitae.AthanorRecipeAdapter;
+import com.sorrowmist.useless.content.recipe.adapters.neovitae.ForgeRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.occultism.OccultismRitualRecipeAdapter;
+import com.sorrowmist.useless.content.recipe.adapters.oritech.OritechRecipeCompatLoader;
+import com.sorrowmist.useless.content.recipe.adapters.mi.EiRecipeCompatLoader;
+import com.sorrowmist.useless.content.recipe.adapters.mi.MiRecipeCompatLoader;
+import com.sorrowmist.useless.content.recipe.adapters.ufo.UfoRecipeCompatLoader;
 import com.sorrowmist.useless.content.recipe.adapters.malum.SpiritFocusingRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.malum.SpiritInfusionRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.extendedcrafting.ExtendedCraftingCombinationRecipeAdapter;
@@ -81,6 +88,11 @@ public final class RecipeAdapterCompatRegistry {
     public static final String MALUM = RecipeSourceIds.MALUM;
     public static final String ENDER_IO = RecipeSourceIds.ENDER_IO;
     public static final String CREATE = RecipeSourceIds.CREATE;
+    public static final String NEOVITAE = RecipeSourceIds.NEOVITAE;
+    public static final String ORITECH = RecipeSourceIds.ORITECH;
+    public static final String MODERN_INDUSTRIALIZATION = RecipeSourceIds.MODERN_INDUSTRIALIZATION;
+    public static final String UFO = RecipeSourceIds.UFO;
+    public static final String EXTENDED_INDUSTRIALIZATION = RecipeSourceIds.EXTENDED_INDUSTRIALIZATION;
 
     private static final List<CompatEntry> ENTRIES = List.of(
             new CompatEntry(null, RecipeAdapterCompatRegistry::registerMinecraft),
@@ -106,7 +118,12 @@ public final class RecipeAdapterCompatRegistry {
             new CompatEntry(OCCULTISM, RecipeAdapterCompatRegistry::registerOccultism),
             new CompatEntry(MALUM, RecipeAdapterCompatRegistry::registerMalum),
             new CompatEntry(ENDER_IO, RecipeAdapterCompatRegistry::registerEnderIO),
-            new CompatEntry(CREATE, RecipeAdapterCompatRegistry::registerCreate)
+            new CompatEntry(CREATE, RecipeAdapterCompatRegistry::registerCreate),
+            new CompatEntry(NEOVITAE, RecipeAdapterCompatRegistry::registerNeoVitae),
+            new CompatEntry(ORITECH, RecipeAdapterCompatRegistry::registerOritech),
+            new CompatEntry(MODERN_INDUSTRIALIZATION, RecipeAdapterCompatRegistry::registerModernIndustrialization),
+            new CompatEntry(UFO, RecipeAdapterCompatRegistry::registerUfo),
+            new CompatEntry(EXTENDED_INDUSTRIALIZATION, RecipeAdapterCompatRegistry::registerExtendedIndustrialization)
     );
 
     private RecipeAdapterCompatRegistry() {}
@@ -265,6 +282,28 @@ public final class RecipeAdapterCompatRegistry {
 
     private static void registerCreate() {
         invokeOptionalLoader("com.sorrowmist.useless.compat.create.CreateRecipeCompatLoader");
+    }
+
+    private static void registerNeoVitae() {
+        register(new AraVitaeRecipeAdapter());
+        register(new ForgeRecipeAdapter());
+        register(new AthanorRecipeAdapter());
+    }
+
+    private static void registerOritech() {
+        OritechRecipeCompatLoader.createAdapters().forEach(RecipeAdapterCompatRegistry::register);
+    }
+
+    private static void registerModernIndustrialization() {
+        MiRecipeCompatLoader.createAdapters().forEach(RecipeAdapterCompatRegistry::register);
+    }
+
+    private static void registerUfo() {
+        UfoRecipeCompatLoader.createAdapters().forEach(RecipeAdapterCompatRegistry::register);
+    }
+
+    private static void registerExtendedIndustrialization() {
+        EiRecipeCompatLoader.createAdapters().forEach(RecipeAdapterCompatRegistry::register);
     }
 
     private record CompatEntry(@Nullable String modId, Runnable registerAction) {}

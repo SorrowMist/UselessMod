@@ -79,6 +79,9 @@ public class ConfigManager {
     private static final ModConfigSpec.IntValue OMNIVERSAL_DECODE_CACHE_CAPACITY;
     private static final ModConfigSpec.IntValue ORE_GENERATOR_SLOTS;
 
+    // 跨模组流体输入别名（例如把各家的原油都当成 c:oil）
+    private static final ModConfigSpec.ConfigValue<String> FLUID_INPUT_ALIASES;
+
     static {
         COMMON_BUILDER.push("dimension_generation");
         BORDER_BLOCK = COMMON_BUILDER
@@ -278,6 +281,18 @@ public class ConfigManager {
                 .define("draw_ae_energy", false);
         COMMON_BUILDER.pop();
 
+        COMMON_BUILDER.push("recipe_compat");
+        FLUID_INPUT_ALIASES = COMMON_BUILDER
+                .comment("跨模组流体输入别名。当适配器读到的配方流体输入匹配到 source 时，",
+                        "额外接受 aliases 中列出的流体。",
+                        "格式: source=alias1,alias2;source2=alias3，多条用分号(;)分隔，别名用逗号(,)分隔。",
+                        "source/alias 可以是流体标签(以 # 开头，如 #c:oil)或具体流体ID(如 minecraft:water)。",
+                        "示例: #c:oil=modern_industrialization:crude_oil,pneumaticcraft:oil",
+                        "不存在的流体ID会被自动忽略。修改后重进世界生效。")
+                .define("fluid_input_aliases",
+                        "#c:oil=modern_industrialization:crude_oil,pneumaticcraft:oil");
+        COMMON_BUILDER.pop();
+
         COMMON_SPEC = COMMON_BUILDER.build();
         CLIENT_SPEC = CLIENT_BUILDER.build();
         SERVER_SPEC = SERVER_BUILDER.build();
@@ -356,6 +371,11 @@ public class ConfigManager {
 
     public static int getOreGeneratorSlots() {
         return Math.max(1, Math.min(540, ORE_GENERATOR_SLOTS.get()));
+    }
+
+    /** 跨模组流体输入别名配置，格式见配置注释。 */
+    public static String getFluidInputAliases() {
+        return FLUID_INPUT_ALIASES.get();
     }
 
     private static int normalizeInventorySlots(int value) {

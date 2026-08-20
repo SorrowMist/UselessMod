@@ -450,8 +450,7 @@ public final class OmniversalPatternEncoding {
         if (recipe == null) return ItemStack.EMPTY;
         List<GenericStack> inputs = new ArrayList<>();
         for (CountedIngredient input : recipe.inputs()) {
-            if (input == null || input.count() <= 0 || input.ingredient() == null
-                    || input.ingredient().isEmpty()) return ItemStack.EMPTY;
+            if (input == null || input.count() <= 0 || input.ingredient() == null) return ItemStack.EMPTY;
             ItemStack representative = AdapterUtils.itemRepresentative(input.ingredient());
             AEItemKey key = representative == null ? null : AEItemKey.of(representative);
             if (key == null) return ItemStack.EMPTY;
@@ -461,11 +460,11 @@ public final class OmniversalPatternEncoding {
             if (input == null || input.ingredient() == null || input.ingredient().isEmpty()
                     || input.amount() <= 0) return ItemStack.EMPTY;
             FluidStack[] candidates = input.getFluids();
-            if (candidates.length == 0 || candidates[0] == null || candidates[0].isEmpty()) {
-                return ItemStack.EMPTY;
-            }
-            GenericStack fluid = GenericStack.fromFluidStack(
-                    candidates[0].copyWithAmount(input.amount()));
+            FluidStack representative = candidates.length == 0
+                    ? AdapterUtils.fluidRepresentative(input.ingredient(), input.amount())
+                    : candidates[0];
+            if (representative == null || representative.isEmpty()) return ItemStack.EMPTY;
+            GenericStack fluid = GenericStack.fromFluidStack(representative.copyWithAmount(input.amount()));
             if (fluid == null || fluid.what() == null || fluid.amount() <= 0L) return ItemStack.EMPTY;
             // AE processing patterns have one concrete key per slot. Keep one representative
             // here; omniversal metadata restores the Tag/Compound semantics on decode.

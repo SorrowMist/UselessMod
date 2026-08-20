@@ -13,11 +13,14 @@ import com.sorrowmist.useless.network.BeefInvulnerabilitySyncPacket;
 import com.sorrowmist.useless.network.BeefInvulnerabilityStatePacket;
 import com.sorrowmist.useless.utils.UselessItemUtils;
 import com.sorrowmist.useless.utils.mining.MiningDispatcher;
+import com.sorrowmist.useless.world.dimension.UselessDimensionConfigManager;
+import com.sorrowmist.useless.world.dimension.UselessDimensions;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.GlobalPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.Pose;
 import net.minecraft.world.entity.player.Player;
@@ -36,6 +39,7 @@ import net.neoforged.neoforge.event.entity.player.AttackEntityEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent;
 import net.neoforged.neoforge.event.level.BlockEvent;
+import net.neoforged.neoforge.event.level.LevelEvent;
 import net.neoforged.neoforge.event.server.ServerStartedEvent;
 import net.neoforged.neoforge.event.tick.PlayerTickEvent;
 import net.neoforged.neoforge.network.PacketDistributor;
@@ -305,6 +309,14 @@ public class EventHandler {
     }
 
     @SubscribeEvent
+    public static void onLevelLoad(LevelEvent.Load event) {
+        if (event.getLevel() instanceof ServerLevel level
+                && UselessDimensions.isUselessDimension(level.dimension())) {
+            UselessDimensionConfigManager.apply(level);
+        }
+    }
+
+    @SubscribeEvent
     public static void onPlayerLoggedOut(PlayerEvent.PlayerLoggedOutEvent event) {
         BEEF_PROTECTED_PLAYERS.remove(event.getEntity().getUUID());
     }
@@ -352,8 +364,10 @@ public class EventHandler {
      */
     @SubscribeEvent
     public static void onServerStarted(ServerStartedEvent event) {
+        UselessDimensionConfigManager.applyAll(event.getServer());
         AlloyFurnaceRecipeManager.getInstance().buildIndex(event.getServer().overworld());
         AlloyFurnaceRecipeCatalog.prewarm(event.getServer().overworld());
+        event.getServer().getPlayerList().getPlayers().forEach(EndlessBeafItem::refreshAttackDamage);
     }
 
     /**
@@ -370,7 +384,10 @@ public class EventHandler {
                 AlloyFurnaceRecipeManager.getInstance().invalidateIndex();
                 AlloyFurnaceRecipeCatalog.invalidate();
                 var server = ServerLifecycleHooks.getCurrentServer();
-                if (server != null) AlloyFurnaceRecipeCatalog.prewarm(server.overworld());
+                if (server != null) {
+                    AlloyFurnaceRecipeCatalog.prewarm(server.overworld());
+                    server.getPlayerList().getPlayers().forEach(EndlessBeafItem::refreshAttackDamage);
+                }
             }, gameExecutor);
         });
     }

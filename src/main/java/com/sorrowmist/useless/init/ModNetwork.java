@@ -24,6 +24,8 @@ import com.sorrowmist.useless.network.SelectOmniversalPatternRecipePacket;
 import com.sorrowmist.useless.network.TabKeyPressedPacket;
 import com.sorrowmist.useless.network.TankClearPacket;
 import com.sorrowmist.useless.network.ToolTypeModeSwitchPacket;
+import com.sorrowmist.useless.network.DimensionConfigGhostSlotPacket;
+import com.sorrowmist.useless.network.DimensionConfigSubmitPacket;
 import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
 
 public class ModNetwork {
@@ -97,5 +99,11 @@ public class ModNetwork {
         registrar.playToServer(OreGeneratorOutputTogglePacket.TYPE,
                                OreGeneratorOutputTogglePacket.STREAM_CODEC,
                                OreGeneratorOutputTogglePacket::handle);
+        registrar.playToServer(DimensionConfigGhostSlotPacket.TYPE,
+                               DimensionConfigGhostSlotPacket.STREAM_CODEC,
+                               DimensionConfigGhostSlotPacket::handle);
+        registrar.playToServer(DimensionConfigSubmitPacket.TYPE,
+                               DimensionConfigSubmitPacket.STREAM_CODEC,
+                               DimensionConfigSubmitPacket::handle);
     }
 }

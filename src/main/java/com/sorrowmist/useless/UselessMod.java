@@ -139,6 +139,9 @@ public class UselessMod {
     public void onItemAttributeModifiers(ItemAttributeModifierEvent event) {
         if (!(event.getItemStack().getItem() instanceof EndlessBeafItem)) return;
 
+        event.replaceModifier(Attributes.ATTACK_DAMAGE,
+                              EndlessBeafItem.createAttackDamageModifier(),
+                              EquipmentSlotGroup.MAINHAND);
         event.addModifier(Attributes.ENTITY_INTERACTION_RANGE,
                           new AttributeModifier(id("beef_tool_entity_interaction_range"),
                                                 ConfigManager.getBeefToolEntityInteractionRange(),

@@ -11,6 +11,7 @@ import net.minecraft.tags.TagKey;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.crafting.Ingredient;
+import net.minecraft.world.level.material.Fluid;
 import net.neoforged.neoforge.common.crafting.DataComponentIngredient;
 import net.neoforged.neoforge.fluids.FluidStack;
 import net.neoforged.neoforge.fluids.crafting.DataComponentFluidIngredient;
@@ -88,21 +89,69 @@ public class AdapterUtils {
     public static ItemStack itemRepresentative(@Nullable Ingredient ingredient) {
         if (ingredient == null) return null;
 
-        for (ItemStack stack : ingredient.getItems()) {
+        ItemStack[] displayed;
+        try {
+            displayed = ingredient.getItems();
+        } catch (RuntimeException exception) {
+            displayed = new ItemStack[0];
+        }
+        for (ItemStack stack : displayed) {
             if (stack != null && !stack.isEmpty()) {
                 return stack.copyWithCount(1);
             }
         }
 
         Optional<TagKey<Item>> directTag = directItemTag(ingredient);
-        if (directTag.isEmpty()) return null;
+        if (directTag.isPresent()) {
+            // Ingredient may have cached an empty representation before datapack tags were bound.
+            // Read the current registry tag as a last-resort representative without changing the
+            // ingredient or serializing any of its members into recipe data.
+            for (Holder<Item> holder : BuiltInRegistries.ITEM.getTagOrEmpty(directTag.get())) {
+                ItemStack stack = holder.value().getDefaultInstance();
+                if (!stack.isEmpty()) return stack.copyWithCount(1);
+            }
+        }
 
-        // Ingredient may have cached an empty representation before datapack tags were bound.
-        // Read the current registry tag as a last-resort representative without changing the
-        // ingredient or serializing any of its members into recipe data.
-        for (Holder<Item> holder : BuiltInRegistries.ITEM.getTagOrEmpty(directTag.get())) {
-            ItemStack stack = holder.value().getDefaultInstance();
-            if (!stack.isEmpty()) return stack.copyWithCount(1);
+        // Some custom ingredients intentionally expose no display stacks. Probe registered
+        // defaults as a last-resort encoding representative while retaining the original
+        // ingredient for the omniversal matcher.
+        for (Item item : BuiltInRegistries.ITEM) {
+            ItemStack stack = item.getDefaultInstance();
+            if (stack.isEmpty()) continue;
+            try {
+                if (ingredient.test(stack)) return stack.copyWithCount(1);
+            } catch (RuntimeException ignored) {
+                // A custom ingredient may not support probing arbitrary items.
+            }
+        }
+        return null;
+    }
+
+    /** Returns one concrete fluid only for APIs that require a {@link FluidStack}. */
+    @Nullable
+    public static FluidStack fluidRepresentative(
+            @Nullable FluidIngredient ingredient, int amount) {
+        if (ingredient == null || ingredient.isEmpty() || amount <= 0) return null;
+
+        FluidStack[] displayed;
+        try {
+            displayed = ingredient.getStacks();
+        } catch (RuntimeException exception) {
+            displayed = new FluidStack[0];
+        }
+        for (FluidStack stack : displayed) {
+            if (stack != null && !stack.isEmpty()) {
+                return stack.copyWithAmount(amount);
+            }
+        }
+
+        for (Fluid fluid : BuiltInRegistries.FLUID) {
+            FluidStack stack = new FluidStack(fluid, amount);
+            try {
+                if (ingredient.test(stack)) return stack;
+            } catch (RuntimeException ignored) {
+                // A custom ingredient may not support probing arbitrary fluids.
+            }
         }
         return null;
     }

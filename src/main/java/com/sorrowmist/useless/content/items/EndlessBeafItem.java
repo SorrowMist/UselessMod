@@ -4,6 +4,7 @@ import com.sorrowmist.useless.api.enums.tool.EnchantMode;
 import com.sorrowmist.useless.api.enums.tool.ToolTypeMode;
 import com.sorrowmist.useless.content.blocks.GlowPlasticBlock;
 import com.sorrowmist.useless.content.blocks.UselessGlassBlock;
+import com.sorrowmist.useless.content.recipe.AlloyFurnaceRecipeCatalog;
 import com.sorrowmist.useless.core.common.KeyBindings;
 import com.sorrowmist.useless.core.component.UComponents;
 import com.sorrowmist.useless.core.config.ConfigManager;
@@ -37,6 +38,9 @@ import net.minecraft.world.entity.LightningBolt;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.Pose;
+import net.minecraft.world.entity.ai.attributes.AttributeInstance;
+import net.minecraft.world.entity.ai.attributes.AttributeModifier;
+import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.boss.enderdragon.EnderDragon;
 import net.minecraft.world.entity.boss.wither.WitherBoss;
 import net.minecraft.world.entity.item.ItemEntity;
@@ -97,7 +101,7 @@ public class EndlessBeafItem extends TieredItem {
     public EndlessBeafItem(@Nullable ToolTypeMode toolType) {
         super(Tiers.NETHERITE,
               new Item.Properties()
-                      .attributes(DiggerItem.createAttributes(Tiers.NETHERITE, 50, 2.0F))
+                      .attributes(DiggerItem.createAttributes(Tiers.NETHERITE, 0, 2.0F))
                       .stacksTo(1)
                       .rarity(Rarity.EPIC)
                       .durability(0)
@@ -127,6 +131,26 @@ public class EndlessBeafItem extends TieredItem {
                       .component(DataComponents.CUSTOM_MODEL_DATA, new CustomModelData(1))
         );
         this.toolType = toolType;
+    }
+
+    public static AttributeModifier createAttackDamageModifier() {
+        return createAttackDamageModifier(AlloyFurnaceRecipeCatalog.currentRecipeCount());
+    }
+
+    static AttributeModifier createAttackDamageModifier(int recipeCount) {
+        return new AttributeModifier(
+                Item.BASE_ATTACK_DAMAGE_ID,
+                recipeCount + Tiers.NETHERITE.getAttackDamageBonus(),
+                AttributeModifier.Operation.ADD_VALUE);
+    }
+
+    public static void refreshAttackDamage(LivingEntity entity) {
+        if (!(entity.getMainHandItem().getItem() instanceof EndlessBeafItem)) return;
+
+        AttributeInstance attackDamage = entity.getAttribute(Attributes.ATTACK_DAMAGE);
+        if (attackDamage != null) {
+            attackDamage.addOrUpdateTransientModifier(createAttackDamageModifier());
+        }
     }
 
     @Override

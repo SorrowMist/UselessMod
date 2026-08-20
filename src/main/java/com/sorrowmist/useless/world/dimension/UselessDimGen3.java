@@ -3,7 +3,6 @@ package com.sorrowmist.useless.world.dimension;
 
 import com.mojang.serialization.MapCodec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
-import com.sorrowmist.useless.core.config.ConfigManager;
 import net.minecraft.world.level.biome.BiomeSource;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.ChunkGenerator;
@@ -23,13 +22,13 @@ public class UselessDimGen3 extends AbstractPlasticPlatformGenerator {
     @Override protected @NotNull MapCodec<? extends ChunkGenerator> codec() {return CODEC;}
 
     @Override
-    protected BlockState getPlatformBlockState(int x, int z) {
+    protected BlockState getPlatformBlockState(DimensionGenerationConfig configuration, int x, int z) {
         if (x == 8 && z == 8) {
-            return ConfigManager.getCenterBlock().defaultBlockState();
+            return getCenterBlockState(configuration);
         } else if (x <= 1 || x == 15 || z <= 1 || z == 15) {
-            return ConfigManager.getBorderBlock().defaultBlockState();
+            return getBorderBlockState(configuration);
         } else {
-            return ConfigManager.getFillBlock().defaultBlockState();
+            return getFillBlockState(configuration);
         }
     }
 

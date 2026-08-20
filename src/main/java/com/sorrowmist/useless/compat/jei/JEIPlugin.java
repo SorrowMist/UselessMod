@@ -1,6 +1,8 @@
 package com.sorrowmist.useless.compat.jei;
 
 import com.sorrowmist.useless.UselessMod;
+import com.sorrowmist.useless.client.gui.DimensionConfigScreen;
+import com.sorrowmist.useless.content.menus.DimensionConfigMenu;
 import com.sorrowmist.useless.content.recipe.AlloyFurnaceRecipeCatalog;
 import com.sorrowmist.useless.init.ModBlocks;
 import com.sorrowmist.useless.init.ModTags;
@@ -8,22 +10,28 @@ import com.sorrowmist.useless.init.ModTags;
 import appeng.menu.me.items.PatternEncodingTermMenu;
 import mezz.jei.api.IModPlugin;
 import mezz.jei.api.JeiPlugin;
+import mezz.jei.api.gui.handlers.IGhostIngredientHandler;
 import mezz.jei.api.helpers.IGuiHelper;
+import mezz.jei.api.ingredients.ITypedIngredient;
 import mezz.jei.api.registration.IRecipeCatalystRegistration;
 import mezz.jei.api.registration.IRecipeCategoryRegistration;
 import mezz.jei.api.registration.IRecipeRegistration;
 import mezz.jei.api.registration.IRecipeTransferRegistration;
+import mezz.jei.api.registration.IGuiHandlerRegistration;
 import mezz.jei.api.runtime.IJeiRuntime;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.renderer.Rect2i;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.inventory.MenuType;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.level.Level;
 import net.neoforged.fml.ModList;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.List;
+import java.util.ArrayList;
 
 @JeiPlugin
 public final class JEIPlugin implements IModPlugin {
@@ -68,6 +76,48 @@ public final class JEIPlugin implements IModPlugin {
                 AdvancedAlloyFurnaceRecipeCategory.TYPE);
         registerWirelessTransferHandler(registration);
         registerTianshuTransferHandlers(registration);
+    }
+
+    @Override
+    public void registerGuiHandlers(IGuiHandlerRegistration registration) {
+        registration.addGhostIngredientHandler(DimensionConfigScreen.class,
+                new DimensionConfigGhostHandler());
+    }
+
+    private static final class DimensionConfigGhostHandler
+            implements IGhostIngredientHandler<DimensionConfigScreen> {
+        @Override
+        public <I> List<Target<I>> getTargetsTyped(DimensionConfigScreen screen,
+                                                   ITypedIngredient<I> ingredient,
+                                                   boolean doStart) {
+            ItemStack stack = ingredient.getItemStack().orElse(ItemStack.EMPTY);
+            if (!(stack.getItem() instanceof BlockItem)) return List.of();
+
+            List<Target<I>> targets = new ArrayList<>(3);
+            for (int index = 0; index < 3; index++) {
+                int slotIndex = index;
+                DimensionConfigMenu.GhostSlot slot = screen.getMenu().getGhostSlot(slotIndex);
+                targets.add(new Target<>() {
+                    @Override
+                    public Rect2i getArea() {
+                        return new Rect2i(screen.getGuiLeft() + slot.x,
+                                screen.getGuiTop() + slot.y, 16, 16);
+                    }
+
+                    @Override
+                    public void accept(I value) {
+                        if (value instanceof ItemStack itemStack) {
+                            screen.getMenu().setGhostSlotFromClient(slotIndex, itemStack);
+                        }
+                    }
+                });
+            }
+            return targets;
+        }
+
+        @Override
+        public void onComplete() {
+        }
     }
 
     /**

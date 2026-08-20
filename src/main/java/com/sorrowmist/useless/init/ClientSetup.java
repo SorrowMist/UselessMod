@@ -11,8 +11,10 @@ import com.sorrowmist.useless.client.gui.MoldHubScreen;
 import com.sorrowmist.useless.client.gui.MultiblockAlloyFurnaceScreen;
 import com.sorrowmist.useless.client.gui.PassiveCraftingHatchScreen;
 import com.sorrowmist.useless.client.gui.OreGeneratorScreen;
+import com.sorrowmist.useless.client.gui.DimensionConfigScreen;
 import com.sorrowmist.useless.client.render.ctm.CtmModelRegistrar;
 import com.sorrowmist.useless.content.blocks.GlowPlasticBlock;
+import com.sorrowmist.useless.content.items.EndlessBeafItem;
 import com.sorrowmist.useless.content.menus.AdvancedAlloyFurnaceMenu;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.OmniversalPatternEncoding;
 import com.sorrowmist.useless.content.recipe.AlloyFurnaceRecipeCatalog;
@@ -75,6 +77,7 @@ public class ClientSetup {
         event.register(ModMenuType.MULTIBLOCK_ALLOY_FURNACE_MENU.get(), MultiblockAlloyFurnaceScreen::new);
         event.register(ModMenuType.PASSIVE_CRAFTING_HATCH_MENU.get(), PassiveCraftingHatchScreen::new);
         event.register(ModMenuType.ORE_GENERATOR_MENU.get(), OreGeneratorScreen::new);
+        event.register(ModMenuType.DIMENSION_CONFIG_MENU.get(), DimensionConfigScreen::new);
     }
 
     @SubscribeEvent
@@ -82,6 +85,9 @@ public class ClientSetup {
         AlloyFurnaceRecipeCatalog.invalidate();
         if (Minecraft.getInstance().level != null) {
             AlloyFurnaceRecipeCatalog.prewarm(Minecraft.getInstance().level);
+            if (Minecraft.getInstance().player != null) {
+                EndlessBeafItem.refreshAttackDamage(Minecraft.getInstance().player);
+            }
         }
     }
 

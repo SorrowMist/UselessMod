@@ -231,21 +231,6 @@
   "gui.useless_mod.ae2.invalid_target": "Linked target is not a valid wireless access point",
   "gui.useless_mod.ae2.offline": "Wireless access point is offline",
   "screen.useless_mod.title": "Useless Mod Configuration",
-  "useless_mod.configuration.dimension_generation": "Dimension Generation Settings",
-  "useless_mod.configuration.border_block": "Border Block",
-  "useless_mod.configuration.border_block.comment": "Border block, uses blue wool if not found",
-  "useless_mod.configuration.fill_block": "Fill Block",
-  "useless_mod.configuration.fill_block.comment": "Fill block, uses white wool if not found",
-  "useless_mod.configuration.center_block": "Center Block",
-  "useless_mod.configuration.center_block.comment": "Center block, uses gray wool if not found",
-  "useless_mod.configuration.platform_layers": "Platform Layers",
-  "useless_mod.configuration.platform_layers.comment": "Number of plastic platform layers to generate",
-  "useless_mod.configuration.platform_start_y": "Platform Start Y",
-  "useless_mod.configuration.platform_start_y.comment": "Platform starting Y value (actual value will be 1 higher if no bedrock)",
-  "useless_mod.configuration.generate_bedrock": "Generate Bedrock",
-  "useless_mod.configuration.generate_bedrock.comment": "Whether to generate bedrock layer, enabled by default",
-  "useless_mod.configuration.bedrock_at_bottom": "Bedrock At World Bottom",
-  "useless_mod.configuration.bedrock_at_bottom.comment": "Whether to fix the bedrock layer at the world bottom (Y=-64) instead of directly below the plastic layer. When enabled, bedrock always generates at the bottom regardless of the platform start Y",
   "useless_mod.configuration.game_mechanics": "Game Mechanics Settings",
   "useless_mod.configuration.botany_pot_growth_multiplier": "Botany Pot Growth Multiplier",
   "useless_mod.configuration.botany_pot_growth_multiplier.comment": "Botany pot growth multiplier - 1.0 is vanilla speed, 2.0 is 2x speed",
@@ -448,4 +433,18 @@
   ,"useless_mod.configuration.ore_generator_slots": "Ore Generator Sample Slots"
   ,"useless_mod.configuration.ore_generator_slots.comment": "Number of active ore generator sample slots. Contents above a reduced limit remain available on recovery pages."
   ,"useless_mod.configuration.ore_generator_slots.tooltip": "Number of active ore generator sample slots. Contents above a reduced limit remain available on recovery pages."
+  ,"menu.useless_mod.dimension_config": "Useless Dimension Configuration"
+  ,"gui.useless_mod.dimension_config.border_block": "Border"
+  ,"gui.useless_mod.dimension_config.fill_block": "Fill"
+  ,"gui.useless_mod.dimension_config.center_block": "Center"
+  ,"gui.useless_mod.dimension_config.layers": "Layers"
+  ,"gui.useless_mod.dimension_config.start_y": "Start Y"
+  ,"gui.useless_mod.dimension_config.bedrock_on": "Generate bedrock: on"
+  ,"gui.useless_mod.dimension_config.bedrock_off": "Generate bedrock: off"
+  ,"gui.useless_mod.dimension_config.bottom_on": "Bedrock at bottom: on"
+  ,"gui.useless_mod.dimension_config.bottom_off": "Bedrock at bottom: off"
+  ,"gui.useless_mod.dimension_config.apply": "Apply"
+  ,"gui.useless_mod.dimension_config.apply_and_teleport": "Apply + teleport"
+  ,"gui.useless_mod.dimension_config.cancel": "Cancel"
+  ,"gui.useless_mod.dimension_config.invalid": "Invalid dimension configuration"
 }

@@ -5,6 +5,7 @@ import com.sorrowmist.useless.UselessMod;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.catalyst.CatalystParallelManager;
 import com.sorrowmist.useless.content.recipe.AdvancedAlloyFurnaceRecipe;
 import com.sorrowmist.useless.content.recipe.AlloyFurnaceRecipeCatalog;
+import com.sorrowmist.useless.content.recipe.AdapterUtils;
 import com.sorrowmist.useless.content.recipe.CountedIngredient;
 import com.sorrowmist.useless.init.ModBlocks;
 import com.sorrowmist.useless.init.ModTags;
@@ -209,6 +210,11 @@ public class AdvancedAlloyFurnaceRecipeCategory implements IRecipeCategory<Alloy
             int count = (int) countedIngredient.count();
 
             ItemStack[] matchingStacks = ingredient.getItems();
+            if (matchingStacks.length == 0) {
+                ItemStack representative = AdapterUtils.itemRepresentative(ingredient);
+                matchingStacks = representative == null ? new ItemStack[0]
+                        : new ItemStack[] {representative};
+            }
             if (matchingStacks.length > 0) {
                 ItemStack[] displayStacks = new ItemStack[matchingStacks.length];
                 for (int j = 0; j < matchingStacks.length; j++) {
@@ -327,9 +333,14 @@ public class AdvancedAlloyFurnaceRecipeCategory implements IRecipeCategory<Alloy
             int fluidWidth = FLUID_INPUT_WIDTH / fluidCount;
 
             for (int i = 0; i < fluidCount; i++) {
-                FluidStack fluid = inputFluids.get(i).getFluids()[0];
+                var input = inputFluids.get(i);
+                FluidStack[] candidates = input.getFluids();
+                FluidStack fluid = candidates.length == 0
+                        ? AdapterUtils.fluidRepresentative(input.ingredient(), input.amount())
+                        : candidates[0];
+                if (fluid == null || fluid.isEmpty()) continue;
                 int x = FLUID_INPUT_X + i * fluidWidth;
-                int amount = inputFluids.get(i).amount();
+                int amount = input.amount();
 
                 builder.addSlot(RecipeIngredientRole.INPUT, x, FLUID_INPUT_Y)
                        .setFluidRenderer(amount, false, fluidWidth, FLUID_INPUT_HEIGHT)

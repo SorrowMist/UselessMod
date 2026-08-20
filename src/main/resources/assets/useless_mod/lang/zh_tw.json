@@ -332,8 +332,6 @@
   "useless_mod.configuration.decode_cache_capacity.comment": "每個世界保留的已解碼萬象樣板最大數量，重新啟動後生效，範圍為64至16384。",
   "useless_mod.configuration.decode_cache_capacity.tooltip": "每個世界保留的已解碼萬象樣板最大數量，重新啟動後生效，範圍為64至16384。",
   "useless_mod.configuration.advanced_alloy_furnace": "萬象爐設置",
-  "useless_mod.configuration.bedrock_at_bottom.comment": "基岩層是否固定生成在世界最底層(Y=-64)，而非緊貼塑料層下方。開啟後無論塑料起始層為多少，基岩都生成在最底層",
-  "useless_mod.configuration.bedrock_at_bottom": "基岩固定在世界最底層",
   "useless_mod.configuration.beef_tool_block_interaction_range.comment": "牛排工具方塊互動距離加成，重啟遊戲生效",
   "useless_mod.configuration.beef_tool_block_interaction_range.tooltip": "牛排工具方塊互動距離加成，重啟遊戲生效",
   "useless_mod.configuration.beef_tool_block_interaction_range": "牛排工具方塊互動距離",
@@ -353,14 +351,10 @@
   "useless_mod.configuration.beef_tool_mining_speed.tooltip": "牛排工具基礎挖掘速度",
   "useless_mod.configuration.beef_tool_mining_speed": "牛排工具挖掘速度",
   "useless_mod.configuration.beef_tool": "牛排工具設置",
-  "useless_mod.configuration.border_block.comment": "邊框方塊，若不存在則使用藍色羊毛",
-  "useless_mod.configuration.border_block": "邊框方塊",
   "useless_mod.configuration.botany_pot_growth_multiplier.comment": "植物盆栽生長倍率 - 1.0 為原版速度，2.0 為 2 倍速度",
   "useless_mod.configuration.botany_pot_growth_multiplier": "植物盆栽生長倍率",
   "useless_mod.configuration.capacity_multiplier.comment": "儲存電量平均每 8 個升級最終效果乘以一次該倍率",
   "useless_mod.configuration.capacity_multiplier": "能量升級儲存電量增強倍率",
-  "useless_mod.configuration.center_block.comment": "中心方塊，若不存在則使用灰色羊毛",
-  "useless_mod.configuration.center_block": "中心方塊",
   "useless_mod.configuration.chain_mining_max_blocks.comment": "連鎖挖掘的最大方塊數量",
   "useless_mod.configuration.chain_mining_max_blocks.tooltip": "連鎖挖掘的最大方塊數量",
   "useless_mod.configuration.chain_mining_max_blocks": "連鎖挖掘最大方塊數量",
@@ -375,7 +369,6 @@
   "useless_mod.configuration.chain_mining_range_z": "連鎖挖掘 Z 軸範圍",
   "useless_mod.configuration.custom_potion_effects.tooltip": "自定義藥水效果列表，格式：modid:effect_name,amplifier；多個效果用分號分隔",
   "useless_mod.configuration.custom_potion_effects": "自定義藥水效果",
-  "useless_mod.configuration.dimension_generation": "維度生成設置",
   "useless_mod.configuration.draw_ae_energy.comment": "萬象爐是否直接抽取 AE 網路自身的能量(按 1 AE = 2 FE 折算)。警告：會與網路中其他設備爭搶供電，網路儲能不足時可能導致設備頻繁掉線。在抽取 AppliedFlux 之後作為補充",
   "useless_mod.configuration.draw_ae_energy.tooltip": "萬象爐是否直接抽取 AE 網路自身的能量(按 1 AE = 2 FE 折算)。警告：會與網路中其他設備爭搶供電，網路儲能不足時可能導致設備頻繁掉線。在抽取 AppliedFlux 之後作為補充",
   "useless_mod.configuration.draw_ae_energy": "抽取 AE 網路自身能量",
@@ -394,14 +387,10 @@
   "useless_mod.configuration.enable_potion_effects": "啟用藥水效果",
   "useless_mod.configuration.festive_drop_chance.tooltip": "戰利品大爆發觸發機率（百分比，1-100%）",
   "useless_mod.configuration.festive_drop_chance": "戰利品大爆發機率",
-  "useless_mod.configuration.fill_block.comment": "填充方塊，若不存在則使用白色羊毛",
-  "useless_mod.configuration.fill_block": "填充方塊",
   "useless_mod.configuration.fortune_level.comment": "牛排工具時運附魔等級",
   "useless_mod.configuration.fortune_level.tooltip": "牛排工具時運附魔等級",
   "useless_mod.configuration.fortune_level": "牛排工具時運等級",
   "useless_mod.configuration.game_mechanics": "遊戲機制設置",
-  "useless_mod.configuration.generate_bedrock.comment": "是否生成基岩層，預設生成",
-  "useless_mod.configuration.generate_bedrock": "生成基岩層",
   "useless_mod.configuration.looting_level.comment": "牛排工具搶奪附魔等級",
   "useless_mod.configuration.looting_level.tooltip": "牛排工具搶奪附魔等級",
   "useless_mod.configuration.looting_level": "牛排工具搶奪等級",
@@ -410,10 +399,6 @@
   "useless_mod.configuration.max_upgrade.comment": "機器可接受的最大速度/能量升級數量，重啟遊戲生效",
   "useless_mod.configuration.max_upgrade": "最大升級數量",
   "useless_mod.configuration.mekanism_upgrade": "Mekanism 升級設置",
-  "useless_mod.configuration.platform_layers.comment": "塑料平台生成層數",
-  "useless_mod.configuration.platform_layers": "塑料平台層數",
-  "useless_mod.configuration.platform_start_y.comment": "平台起始 Y 值 (若無基岩實際會比該數值高 1)",
-  "useless_mod.configuration.platform_start_y": "平台起始 Y 值",
   "useless_mod.configuration.time_multiplier.comment": "速度平均每 8 個升級最終效果乘以一次該倍率",
   "useless_mod.configuration.time_multiplier": "速度升級增強倍率",
   "item.useless_mod.ritual_blueprint": "儀式藍圖",
@@ -440,4 +425,18 @@
   ,"useless_mod.configuration.ore_generator_slots": "礦物生成器樣板欄位"
   ,"useless_mod.configuration.ore_generator_slots.comment": "礦物生成器的啟用樣板欄位數量。降低設定後，超出範圍的內容仍可在恢復頁取出。"
   ,"useless_mod.configuration.ore_generator_slots.tooltip": "礦物生成器的啟用樣板欄位數量。降低設定後，超出範圍的內容仍可在恢復頁取出。"
+  ,"menu.useless_mod.dimension_config": "無用維度設定"
+  ,"gui.useless_mod.dimension_config.border_block": "邊框方塊"
+  ,"gui.useless_mod.dimension_config.fill_block": "填充方塊"
+  ,"gui.useless_mod.dimension_config.center_block": "中心方塊"
+  ,"gui.useless_mod.dimension_config.layers": "層數"
+  ,"gui.useless_mod.dimension_config.start_y": "起始 Y"
+  ,"gui.useless_mod.dimension_config.bedrock_on": "生成基岩層：開"
+  ,"gui.useless_mod.dimension_config.bedrock_off": "生成基岩層：關"
+  ,"gui.useless_mod.dimension_config.bottom_on": "基岩層置底：開"
+  ,"gui.useless_mod.dimension_config.bottom_off": "基岩層置底：關"
+  ,"gui.useless_mod.dimension_config.apply": "套用"
+  ,"gui.useless_mod.dimension_config.apply_and_teleport": "套用並傳送"
+  ,"gui.useless_mod.dimension_config.cancel": "取消"
+  ,"gui.useless_mod.dimension_config.invalid": "無效的維度設定"
 }

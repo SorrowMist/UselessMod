@@ -232,21 +232,6 @@
   "gui.useless_mod.ae2.invalid_target": "链接的目标不是有效的无线访问点",
   "gui.useless_mod.ae2.offline": "无线访问点已掉线",
   "screen.useless_mod.title": "Useless Mod 配置",
-  "useless_mod.configuration.dimension_generation": "维度生成设置",
-  "useless_mod.configuration.border_block": "边框方块",
-  "useless_mod.configuration.border_block.comment": "边框方块，若不存在则使用蓝色羊毛",
-  "useless_mod.configuration.fill_block": "填充方块",
-  "useless_mod.configuration.fill_block.comment": "填充方块，若不存在则使用白色羊毛",
-  "useless_mod.configuration.center_block": "中心方块",
-  "useless_mod.configuration.center_block.comment": "中心方块，若不存在则使用灰色羊毛",
-  "useless_mod.configuration.platform_layers": "塑料平台层数",
-  "useless_mod.configuration.platform_layers.comment": "塑料平台生成层数",
-  "useless_mod.configuration.platform_start_y": "平台起始Y值",
-  "useless_mod.configuration.platform_start_y.comment": "平台起始Y值(若无基岩实际会比该数值高1)",
-  "useless_mod.configuration.generate_bedrock": "生成基岩层",
-  "useless_mod.configuration.generate_bedrock.comment": "是否生成基岩层，默认生成",
-  "useless_mod.configuration.bedrock_at_bottom": "基岩固定在世界最底层",
-  "useless_mod.configuration.bedrock_at_bottom.comment": "基岩层是否固定生成在世界最底层(Y=-64)，而非紧贴塑料层下方。开启后无论塑料起始层为多少，基岩都生成在最底层",
   "useless_mod.configuration.game_mechanics": "游戏机制设置",
   "useless_mod.configuration.botany_pot_growth_multiplier": "植物盆生长倍率",
   "useless_mod.configuration.botany_pot_growth_multiplier.comment": "植物盆生长倍率 - 1.0为原版速度，2.0为2倍速度",
@@ -448,4 +433,18 @@
   ,"useless_mod.configuration.ore_generator_slots": "矿石生成器样板槽位"
   ,"useless_mod.configuration.ore_generator_slots.comment": "矿石生成器的活动样板槽位数量。降低配置后，超出范围的内容仍可在恢复页取出。"
   ,"useless_mod.configuration.ore_generator_slots.tooltip": "矿石生成器的活动样板槽位数量。降低配置后，超出范围的内容仍可在恢复页取出。"
+  ,"menu.useless_mod.dimension_config": "无用维度配置"
+  ,"gui.useless_mod.dimension_config.border_block": "边框方块"
+  ,"gui.useless_mod.dimension_config.fill_block": "填充方块"
+  ,"gui.useless_mod.dimension_config.center_block": "中心方块"
+  ,"gui.useless_mod.dimension_config.layers": "层数"
+  ,"gui.useless_mod.dimension_config.start_y": "起始 Y"
+  ,"gui.useless_mod.dimension_config.bedrock_on": "生成基岩层：开"
+  ,"gui.useless_mod.dimension_config.bedrock_off": "生成基岩层：关"
+  ,"gui.useless_mod.dimension_config.bottom_on": "基岩层置底：开"
+  ,"gui.useless_mod.dimension_config.bottom_off": "基岩层置底：关"
+  ,"gui.useless_mod.dimension_config.apply": "应用"
+  ,"gui.useless_mod.dimension_config.apply_and_teleport": "应用并传送"
+  ,"gui.useless_mod.dimension_config.cancel": "取消"
+  ,"gui.useless_mod.dimension_config.invalid": "无效的维度配置"
 }

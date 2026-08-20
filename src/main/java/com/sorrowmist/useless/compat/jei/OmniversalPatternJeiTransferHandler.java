@@ -145,8 +145,7 @@ public final class OmniversalPatternJeiTransferHandler<T extends PatternEncoding
         if (recipe == null) return null;
         List<List<GenericStack>> inputs = new ArrayList<>();
         for (CountedIngredient input : recipe.inputs()) {
-            if (input == null || input.count() <= 0 || input.ingredient() == null
-                    || input.ingredient().isEmpty()) return null;
+            if (input == null || input.count() <= 0 || input.ingredient() == null) return null;
             List<GenericStack> options = new ArrayList<>();
             for (ItemStack option : input.ingredient().getItems()) {
                 if (option == null || option.isEmpty()) continue;
@@ -169,6 +168,13 @@ public final class OmniversalPatternJeiTransferHandler<T extends PatternEncoding
                 if (option == null || option.isEmpty()) continue;
                 GenericStack stack = GenericStack.fromFluidStack(
                         option.copyWithAmount(input.amount()));
+                if (stack != null) options.add(stack);
+            }
+            if (options.isEmpty()) {
+                FluidStack representative = AdapterUtils.fluidRepresentative(
+                        input.ingredient(), input.amount());
+                GenericStack stack = representative == null
+                        ? null : GenericStack.fromFluidStack(representative);
                 if (stack != null) options.add(stack);
             }
             if (options.isEmpty()) return null;

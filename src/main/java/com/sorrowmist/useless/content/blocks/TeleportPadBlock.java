@@ -4,6 +4,7 @@ import com.sorrowmist.useless.world.teleport.AbstractDimensionTeleporter;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.InteractionHand;
+import net.minecraft.world.InteractionResult;
 import net.minecraft.world.ItemInteractionResult;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
@@ -33,11 +34,32 @@ public class TeleportPadBlock extends Block {
                                                          @NotNull Player player,
                                                          @NotNull InteractionHand hand,
                                                          @NotNull BlockHitResult hitResult) {
+        handleUse(level, pos, player);
+        return ItemInteractionResult.sidedSuccess(level.isClientSide());
+    }
+
+    @Override
+    protected @NotNull InteractionResult useWithoutItem(@NotNull BlockState state,
+                                                        @NotNull Level level,
+                                                        @NotNull BlockPos pos,
+                                                        @NotNull Player player,
+                                                        @NotNull BlockHitResult hitResult) {
+        handleUse(level, pos, player);
+        return InteractionResult.sidedSuccess(level.isClientSide());
+    }
+
+    private void handleUse(Level level, BlockPos pos, Player player) {
         if (!level.isClientSide() && player instanceof ServerPlayer serverPlayer) {
+            boolean editConfiguration = serverPlayer.isShiftKeyDown();
             Objects.requireNonNull(level.getServer()).execute(() -> {
-                teleporterSupplier.get().handleTeleport(serverPlayer, pos);
+                AbstractDimensionTeleporter teleporter = teleporterSupplier.get();
+                if (editConfiguration) {
+                    com.sorrowmist.useless.content.menus.DimensionConfigMenu.openForEdit(
+                            serverPlayer, teleporter, pos);
+                } else {
+                    teleporter.handleTeleport(serverPlayer, pos);
+                }
             });
         }
-        return ItemInteractionResult.sidedSuccess(level.isClientSide());
     }
 }

@@ -7,6 +7,7 @@ import com.sorrowmist.useless.content.menus.OmniversalMoldHubMenu;
 import com.sorrowmist.useless.content.menus.MultiblockAlloyFurnaceMenu;
 import com.sorrowmist.useless.content.menus.OreGeneratorMenu;
 import com.sorrowmist.useless.content.menus.PassiveCraftingHatchMenu;
+import com.sorrowmist.useless.content.menus.DimensionConfigMenu;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.world.inventory.MenuType;
 import net.neoforged.bus.api.IEventBus;
@@ -37,6 +38,9 @@ public final class ModMenuType {
     public static final Supplier<MenuType<OreGeneratorMenu>> ORE_GENERATOR_MENU =
             MENU_TYPES.register("ore_generator_menu",
                     () -> IMenuTypeExtension.create(OreGeneratorMenu::new));
+    public static final Supplier<MenuType<DimensionConfigMenu>> DIMENSION_CONFIG_MENU =
+            MENU_TYPES.register("dimension_config_menu",
+                    () -> IMenuTypeExtension.create(DimensionConfigMenu::new));
 
     private ModMenuType() {}
 

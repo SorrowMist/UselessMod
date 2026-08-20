@@ -1,9 +1,5 @@
 package com.sorrowmist.useless.core.config;
 
-import net.minecraft.core.registries.BuiltInRegistries;
-import net.minecraft.resources.ResourceLocation;
-import net.minecraft.world.level.block.Block;
-import net.minecraft.world.level.block.Blocks;
 import net.neoforged.neoforge.common.ModConfigSpec;
 
 import java.util.List;
@@ -15,19 +11,6 @@ public class ConfigManager {
     private static final ModConfigSpec.Builder COMMON_BUILDER = new ModConfigSpec.Builder();
     private static final ModConfigSpec.Builder CLIENT_BUILDER = new ModConfigSpec.Builder();
     private static final ModConfigSpec.Builder SERVER_BUILDER = new ModConfigSpec.Builder();
-    // 维度生成配置
-    private static final ModConfigSpec.ConfigValue<String> BORDER_BLOCK;
-    private static final ModConfigSpec.ConfigValue<String> FILL_BLOCK;
-    private static final ModConfigSpec.ConfigValue<String> CENTER_BLOCK;
-    // 塑料平台生成层数
-    private static final ModConfigSpec.IntValue PLATFORM_LAYERS;
-    // 塑料平台起始Y值
-    private static final ModConfigSpec.IntValue PLATFORM_START_Y;
-    // 是否生成基岩层
-    private static final ModConfigSpec.BooleanValue GENERATE_BEDROCK;
-    // 基岩层是否固定生成在世界最底层
-    private static final ModConfigSpec.BooleanValue BEDROCK_AT_BOTTOM;
-
     // 植物盆生长速度配置
     private static final ModConfigSpec.IntValue BOTANY_POT_GROWTH_MULTIPLIER;
     // 植物盆渲染配置
@@ -80,37 +63,6 @@ public class ConfigManager {
     private static final ModConfigSpec.IntValue ORE_GENERATOR_SLOTS;
 
     static {
-        COMMON_BUILDER.push("dimension_generation");
-        BORDER_BLOCK = COMMON_BUILDER
-                .comment("边框方块, 若不存在则使用蓝色羊毛")
-                .define("border_block", "useless_mod:aqua_glow_plastic");
-
-        FILL_BLOCK = COMMON_BUILDER
-                .comment("填充方块, 若不存在则使用白色羊毛")
-                .define("fill_block", "useless_mod:white_glow_plastic");
-
-        CENTER_BLOCK = COMMON_BUILDER
-                .comment("中心方块, 若不存在则使用灰色羊毛")
-                .define("center_block", "useless_mod:light_gray_glow_plastic");
-
-        PLATFORM_LAYERS = COMMON_BUILDER
-                .comment("塑料平台生成层数")
-                .defineInRange("platform_layers", 69, 1, 256);
-
-        PLATFORM_START_Y = COMMON_BUILDER
-                .comment("平台起始Y值(若无基岩实际会比该数值高1)")
-                .defineInRange("platform_start_y", -64, -64, 256);
-
-        GENERATE_BEDROCK = COMMON_BUILDER
-                .comment("是否生成基岩层, 默认生成")
-                .define("generate_bedrock", true);
-
-        BEDROCK_AT_BOTTOM = COMMON_BUILDER
-                .comment("基岩层是否固定生成在世界最底层(Y=-64), 而非紧贴塑料层下方",
-                        "开启后无论塑料起始层为多少, 基岩都生成在最底层")
-                .define("bedrock_at_bottom", false);
-        COMMON_BUILDER.pop();
-
         COMMON_BUILDER.push("game_mechanics");
         BOTANY_POT_GROWTH_MULTIPLIER = COMMON_BUILDER
                 .comment("植物盆生长倍率 - 1.0为原版速度, 2.0为2倍速度")
@@ -283,19 +235,6 @@ public class ConfigManager {
         SERVER_SPEC = SERVER_BUILDER.build();
     }
 
-    // 获取方块方法
-    public static Block getBorderBlock() {
-        return getBlockFromString(BORDER_BLOCK.get(), Blocks.BLUE_WOOL);
-    }
-
-    public static Block getFillBlock() {
-        return getBlockFromString(FILL_BLOCK.get(), Blocks.WHITE_WOOL);
-    }
-
-    public static Block getCenterBlock() {
-        return getBlockFromString(CENTER_BLOCK.get(), Blocks.GRAY_WOOL);
-    }
-
     // 获取配置值方法
     public static int getBotanyPotGrowthMultiplier() {
         return BOTANY_POT_GROWTH_MULTIPLIER.get();
@@ -415,26 +354,6 @@ public class ConfigManager {
         return splitEntityIdList(BEEF_TOOL_FORCE_KILL_NON_LIVING_WHITELIST.get());
     }
 
-    // 获取塑料平台层数
-    public static int getPlatformLayers() {
-        return PLATFORM_LAYERS.get();
-    }
-
-    // 获取是否生成基岩层
-    public static boolean shouldGenerateBedrock() {
-        return GENERATE_BEDROCK.get();
-    }
-
-    // 获取基岩层是否固定生成在世界最底层
-    public static boolean shouldBedrockAtBottom() {
-        return BEDROCK_AT_BOTTOM.get();
-    }
-
-    // 获取塑料平台起始Y值
-    public static int getPlatformStartY() {
-        return PLATFORM_START_Y.get();
-    }
-
     // 获取药水效果配置
     public static boolean shouldEnablePotionEffects() {
         return ENABLE_POTION_EFFECTS.get();
@@ -460,20 +379,4 @@ public class ConfigManager {
         return List.of(value.split(";"));
     }
 
-    private static Block getBlockFromString(String blockId, Block fallback) {
-        try {
-            ResourceLocation location = ResourceLocation.parse(blockId);
-            Block block = BuiltInRegistries.BLOCK.get(location);
-            return block != Blocks.AIR ? block : fallback;
-        } catch (Exception e) {
-            return fallback;
-        }
-    }
-
-    // 统一检查是否是平台方块
-    public static boolean isPlatformBlock(Block block) {
-        return block == getFillBlock() ||
-                block == getBorderBlock() ||
-                block == getCenterBlock();
-    }
 }

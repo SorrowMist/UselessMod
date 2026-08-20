@@ -1,5 +1,8 @@
 package com.sorrowmist.useless.world.teleport;
 
+import com.sorrowmist.useless.content.menus.DimensionConfigMenu;
+import com.sorrowmist.useless.world.dimension.UselessDimensionConfigManager;
+import com.sorrowmist.useless.world.dimension.UselessDimensions;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.Vec3i;
@@ -47,15 +50,40 @@ public abstract class AbstractDimensionTeleporter {
 
     protected abstract net.minecraft.core.Holder<PoiType> getPOI();
 
+    public final ResourceKey<Level> dimensionKey() {
+        return getDimensionKey();
+    }
+
+    public final ResourceKey<Level> targetDimensionFor(ResourceKey<Level> sourceDimension) {
+        return sourceDimension.equals(getDimensionKey()) ? Level.OVERWORLD : getDimensionKey();
+    }
+
+    public final Block getTeleportBlockForValidation() {
+        return getTeleportBlock().get();
+    }
+
     /* ================= 入口 ================= */
 
     public void handleTeleport(ServerPlayer player, BlockPos sourcePos) {
         ServerLevel from = (ServerLevel) player.level();
 
-        ResourceKey<Level> targetKey =
-                from.dimension().equals(getDimensionKey())
-                        ? Level.OVERWORLD
-                        : getDimensionKey();
+        ResourceKey<Level> targetKey = targetDimensionFor(from.dimension());
+
+        if (UselessDimensions.isUselessDimension(targetKey)
+                && !UselessDimensionConfigManager.isConfigured(player.server, targetKey)) {
+            DimensionConfigMenu.openForTeleport(player, this, sourcePos);
+            return;
+        }
+
+        teleportAfterConfiguration(player, from.dimension(), sourcePos);
+    }
+
+    public void teleportAfterConfiguration(ServerPlayer player,
+                                           ResourceKey<Level> sourceDimension,
+                                           BlockPos sourcePos) {
+        if (!player.level().dimension().equals(sourceDimension)) return;
+        if (!player.level().getBlockState(sourcePos).is(getTeleportBlock().get())) return;
+        ResourceKey<Level> targetKey = targetDimensionFor(sourceDimension);
 
         ServerLevel target = player.server.getLevel(targetKey);
         if (target == null) return;

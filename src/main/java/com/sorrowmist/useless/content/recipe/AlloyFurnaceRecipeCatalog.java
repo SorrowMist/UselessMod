@@ -34,6 +34,7 @@ import java.util.Set;
 import java.util.WeakHashMap;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import org.slf4j.Logger;
 
@@ -42,6 +43,7 @@ public final class AlloyFurnaceRecipeCatalog {
     private static final Logger LOGGER = LogUtils.getLogger();
     private static final Map<Object, Snapshot> CACHE = java.util.Collections.synchronizedMap(new WeakHashMap<>());
     private static final Map<Object, Object> BUILD_LOCKS = java.util.Collections.synchronizedMap(new WeakHashMap<>());
+    private static final AtomicInteger CURRENT_RECIPE_COUNT = new AtomicInteger();
     private static final AtomicLong GENERATION = new AtomicLong();
 
     private AlloyFurnaceRecipeCatalog() {
@@ -75,6 +77,11 @@ public final class AlloyFurnaceRecipeCatalog {
 
     public static List<AdvancedAlloyFurnaceRecipe> recipes(Level level) {
         return entries(level).stream().map(Entry::recipe).toList();
+    }
+
+    /** Returns the number of unique recipes in the most recently built catalog snapshot. */
+    public static int currentRecipeCount() {
+        return CURRENT_RECIPE_COUNT.get();
     }
 
     /**
@@ -382,6 +389,7 @@ public final class AlloyFurnaceRecipeCatalog {
 
     public static void invalidate() {
         CACHE.clear();
+        CURRENT_RECIPE_COUNT.set(0);
         GENERATION.incrementAndGet();
     }
 
@@ -504,6 +512,7 @@ public final class AlloyFurnaceRecipeCatalog {
                 .sorted(Comparator.comparing((Entry entry) -> entry.identity.recipeId().toString())
                         .thenComparing(entry -> entry.identity.fingerprint()))
                 .toList();
+        CURRENT_RECIPE_COUNT.set(ordered.size());
         Map<ResourceLocation, List<Entry>> byRecipeId = new LinkedHashMap<>();
         for (Entry entry : ordered) {
             byRecipeId.computeIfAbsent(entry.identity.recipeId(), ignored -> new ArrayList<>()).add(entry);

@@ -11,6 +11,7 @@ import com.sorrowmist.useless.api.enums.AlloyFurnaceMode;
 import com.sorrowmist.useless.compat.jei.OmniversalPatternJeiTransferHandler;
 import com.sorrowmist.useless.content.blockentities.multiblock.OmniversalMoldHubBlockEntity;
 import com.sorrowmist.useless.content.recipe.AdvancedAlloyFurnaceRecipe;
+import com.sorrowmist.useless.content.recipe.AdapterUtils;
 import com.sorrowmist.useless.content.recipe.CountedIngredient;
 import com.sorrowmist.useless.content.recipe.RecipeSourceIds;
 import com.sorrowmist.useless.core.component.OmniversalPatternData;
@@ -47,6 +48,7 @@ import java.util.stream.StreamSupport;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class OmniversalPatternTagInputTest {
@@ -242,6 +244,28 @@ class OmniversalPatternTagInputTest {
     }
 
     @Test
+    void jeiTransferUsesARegisteredRepresentativeForEmptyDisplayIngredients() {
+        Ingredient custom = new EmptyDisplayIngredient(Items.IRON_INGOT).toVanilla();
+        AdvancedAlloyFurnaceRecipe recipe = new AdvancedAlloyFurnaceRecipe(
+                ResourceLocation.fromNamespaceAndPath("useless_mod_test", "empty_display_input"),
+                List.of(new CountedIngredient(custom, 2L)),
+                List.of(), List.of(), List.of(new ItemStack(Items.NETHER_STAR)),
+                List.of(), List.of(), 1L, 20, Ingredient.EMPTY, 0, List.of(),
+                AlloyFurnaceMode.NORMAL);
+
+        assertTrue(custom.test(new ItemStack(Items.IRON_INGOT)));
+        assertTrue(custom.getCustomIngredient().test(new ItemStack(Items.IRON_INGOT)));
+        ItemStack representative = AdapterUtils.itemRepresentative(custom);
+        assertNotNull(representative, "item registry size=" + BuiltInRegistries.ITEM.size());
+        assertEquals(Items.IRON_INGOT, representative.getItem());
+        List<List<GenericStack>> inputs = OmniversalPatternJeiTransferHandler.inputOptions(recipe);
+
+        assertEquals(1, inputs.size());
+        assertEquals(2L, inputs.getFirst().getFirst().amount());
+        assertEquals(key(Items.IRON_INGOT), inputs.getFirst().getFirst().what());
+    }
+
+    @Test
     void moldHubMatchesTagMoldWithoutExpandingThePattern() {
         assertTrue(OmniversalMoldHubBlockEntity.matchesMolds(
                 List.of(Ingredient.of(TEST_TAG)), List.of(new ItemStack(Items.GOLD_INGOT))));
@@ -410,6 +434,28 @@ class OmniversalPatternTagInputTest {
         @Override
         public Stream<ItemStack> getItems() {
             return Stream.of(new ItemStack(representative));
+        }
+
+        @Override
+        public boolean isSimple() {
+            return false;
+        }
+
+        @Override
+        public IngredientType<?> getType() {
+            return null;
+        }
+    }
+
+    private record EmptyDisplayIngredient(Item item) implements ICustomIngredient {
+        @Override
+        public boolean test(ItemStack stack) {
+            return stack != null && stack.getItem() == item;
+        }
+
+        @Override
+        public Stream<ItemStack> getItems() {
+            return Stream.empty();
         }
 
         @Override

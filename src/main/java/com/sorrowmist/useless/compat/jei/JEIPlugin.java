@@ -189,6 +189,9 @@ public final class JEIPlugin implements IModPlugin {
                 new ItemStack(ModBlocks.MULTIBLOCK_ALLOY_FURNACE_CORE.get()),
                 AdvancedAlloyFurnaceRecipeCategory.TYPE);
         registration.addRecipeCatalyst(singleBlockFurnace, CatalystInfoCategory.TYPE);
+        registration.addRecipeCatalyst(
+                new ItemStack(ModBlocks.MULTIBLOCK_ALLOY_FURNACE_CORE.get()),
+                CatalystInfoCategory.TYPE);
 
         BuiltInRegistries.ITEM.getTag(ModTags.CATALYSTS).ifPresent(tag -> {
             for (var holder : tag) {

@@ -499,6 +499,10 @@ public class AdvancedAlloyFurnaceRecipeCategory implements IRecipeCategory<Alloy
                 mouseY >= TIME_DISPLAY_Y && mouseY <= TIME_DISPLAY_Y + TIME_DISPLAY_HEIGHT) {
             tooltip.add(Component.translatable("jei.useless_mod.tooltip.process_time", recipe.processTime()));
             tooltip.add(Component.translatable("jei.useless_mod.tooltip.process_time.note"));
+            tooltip.add(Component.translatable("jei.useless_mod.tooltip.process_time.coil_bonus")
+                    .withStyle(ChatFormatting.BLUE));
+            tooltip.add(Component.translatable("jei.useless_mod.tooltip.process_time.coil_useful")
+                    .withStyle(ChatFormatting.BLUE));
         }
 
         // 并行数效果说明区域 - 只在显示红色提示文本时（非无用锭配方且允许催化剂）才渲染

@@ -7,7 +7,7 @@ import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.catalyst.C
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.catalyst.ResolvedCatalystEffect;
 import com.sorrowmist.useless.content.recipe.AdvancedAlloyFurnaceRecipe;
 
-/** Fixed coil properties: catalyst behavior per task plus additional independent threads. */
+/** Fixed coil properties: catalyst behavior apart from processing time plus independent threads. */
 public record OmniversalCoilStats(
         int tier,
         CatalystType catalystType,
@@ -26,6 +26,15 @@ public record OmniversalCoilStats(
         return BY_TIER[tier - UselessCoilBlock.MIN_TIER];
     }
 
+    public int processTime(int baseTime) {
+        if (tier == UselessCoilBlock.USEFUL_TIER) {
+            return 1;
+        }
+        long normalizedBaseTime = Math.max(1, baseTime);
+        long divisor = 1L << tier;
+        return (int) Math.max(1L, (normalizedBaseTime + divisor - 1L) / divisor);
+    }
+
     public ResolvedCatalystEffect resolveEffect(AdvancedAlloyFurnaceRecipe recipe) {
         int baseTime = recipe == null ? 200 : Math.max(1, recipe.processTime());
         ResolvedCatalystEffect catalystEffect =
@@ -34,7 +43,7 @@ public record OmniversalCoilStats(
                 catalystEffect.catalystType(),
                 singleTaskParallel,
                 singleTaskParallel,
-                catalystEffect.processTime(),
+                processTime(baseTime),
                 catalystEffect.energyMultipliesWithParallel(),
                 energyDivisor,
                 catalystEffect.uselessIngotRecipe(),

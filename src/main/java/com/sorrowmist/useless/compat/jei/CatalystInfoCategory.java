@@ -37,7 +37,8 @@ public class CatalystInfoCategory implements IRecipeCategory<CatalystInfoCategor
 
     // 显示尺寸
     private static final int DISPLAY_WIDTH = 150;
-    private static final int DISPLAY_HEIGHT = 130;
+    private static final int DISPLAY_HEIGHT = 150;
+    private static final int TEXTURE_HEIGHT = 130;
 
     // 催化剂物品堆栈列表
     private final List<ItemStack> catalystStacks;
@@ -96,8 +97,8 @@ public class CatalystInfoCategory implements IRecipeCategory<CatalystInfoCategor
     @Override
     public void setRecipe(@NotNull IRecipeLayoutBuilder builder, @NotNull CatalystInfo recipe, @NotNull IFocusGroup focuses) {
         // 2行5列网格布局
-        int startX = 29; // 第一个格子左上角起点X坐标
-        int startY = 24; // 第一个格子左上角起点Y坐标
+        int startX = 30; // 第一个格子左上角起点X坐标
+        int startY = 25; // 第一个格子左上角起点Y坐标
         int spacing = 18; // 每个格子18*18像素
 
         // 动态计算列数（最多5列）
@@ -128,8 +129,8 @@ public class CatalystInfoCategory implements IRecipeCategory<CatalystInfoCategor
         guiGraphics.blit(GUI_TEXTURE,
                 0, 0, // 绘制位置 (0,0)
                 0, 0, // 纹理起始位置 (0,0)
-                DISPLAY_WIDTH, DISPLAY_HEIGHT, // 绘制尺寸
-                DISPLAY_WIDTH, DISPLAY_HEIGHT); // 纹理尺寸（与绘制尺寸相同）
+                DISPLAY_WIDTH, TEXTURE_HEIGHT, // 绘制尺寸
+                DISPLAY_WIDTH, TEXTURE_HEIGHT); // 纹理尺寸
 
         // 绘制标题 - 居中显示
         String titleText = Component.translatable("jei.useless_mod.catalyst_info.title").getString();
@@ -144,15 +145,17 @@ public class CatalystInfoCategory implements IRecipeCategory<CatalystInfoCategor
                 Component.translatable("jei.useless_mod.catalyst_info.desc3").getString(),
                 Component.translatable("jei.useless_mod.catalyst_info.desc4").getString(),
                 Component.translatable("jei.useless_mod.catalyst_info.desc5").getString(),
-                Component.translatable("jei.useless_mod.catalyst_info.desc6").getString()
+                Component.translatable("jei.useless_mod.catalyst_info.desc6").getString(),
+                Component.translatable("jei.useless_mod.catalyst_info.desc7").getString(),
+                Component.translatable("jei.useless_mod.catalyst_info.desc8").getString()
         };
 
-        int explanationY = 78;
+        int explanationY = 72;
         for (String line : explanationLines) {
             int lineWidth = minecraft.font.width(line);
             int lineX = (DISPLAY_WIDTH - lineWidth) / 2;
             guiGraphics.drawString(minecraft.font, line, lineX, explanationY, 0x404040, false);
-            explanationY += 10;
+            explanationY += 9;
         }
     }
 

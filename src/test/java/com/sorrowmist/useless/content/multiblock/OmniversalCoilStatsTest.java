@@ -32,6 +32,9 @@ class OmniversalCoilStatsTest {
             var effect = stats.resolveEffect(NORMAL_RECIPE);
             long expectedParallel = 1L << (tier * 2);
             int expectedEnergyDivisor = 1 << tier;
+            long timeDivisor = 1L << tier;
+            int expectedProcessTime = (int) ((NORMAL_RECIPE.processTime() + timeDivisor - 1L)
+                    / timeDivisor);
 
             assertEquals(expectedType, stats.catalystType());
             assertEquals(expectedParallel, stats.singleTaskParallel());
@@ -39,7 +42,7 @@ class OmniversalCoilStatsTest {
             assertEquals(expectedParallel, effect.recipeParallel());
             assertEquals(expectedEnergyDivisor, stats.energyDivisor());
             assertEquals(expectedEnergyDivisor, effect.energyDivisor());
-            assertEquals(expectedType.calculateProcessTime(NORMAL_RECIPE.processTime()), effect.processTime());
+            assertEquals(expectedProcessTime, effect.processTime());
             assertTrue(effect.energyMultipliesWithParallel());
             assertEquals((1_000L * expectedParallel + expectedEnergyDivisor - 1L)
                             / expectedEnergyDivisor,
@@ -49,6 +52,18 @@ class OmniversalCoilStatsTest {
             assertTrue((long) stats.threads() * stats.singleTaskParallel()
                     > stats.singleTaskParallel());
         }
+    }
+
+    @Test
+    void coilProcessTimeUsesPowerOfTwoReductionWithCeiling() {
+        int baseTime = 1_001;
+        for (int tier = UselessCoilBlock.MIN_TIER; tier < UselessCoilBlock.USEFUL_TIER; tier++) {
+            long divisor = 1L << tier;
+            int expected = (int) ((baseTime + divisor - 1L) / divisor);
+            assertEquals(expected, OmniversalCoilStats.forTier(tier).processTime(baseTime));
+        }
+        assertEquals(1, OmniversalCoilStats.forTier(UselessCoilBlock.USEFUL_TIER)
+                .processTime(baseTime));
     }
 
     @Test

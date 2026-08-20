@@ -3,6 +3,7 @@ package com.sorrowmist.useless.core.config;
 import net.neoforged.neoforge.common.ModConfigSpec;
 
 import java.util.List;
+import java.util.Map;
 
 public class ConfigManager {
     public static final ModConfigSpec COMMON_SPEC;
@@ -55,6 +56,36 @@ public class ConfigManager {
     // 万象炉从AE网络抽取能量配置
     private static final ModConfigSpec.BooleanValue FURNACE_DRAW_APPFLUX_ENERGY;
     private static final ModConfigSpec.BooleanValue FURNACE_DRAW_AE_ENERGY;
+
+    // 万象炉配方转换配置
+    private static final ModConfigSpec.BooleanValue ENABLE_CRAFTING_RECIPE_CONVERSION;
+    private static final ModConfigSpec.BooleanValue ENABLE_SMELTING_RECIPE_CONVERSION;
+    private static final ModConfigSpec.BooleanValue ENABLE_EXTENDED_AE_RECIPE_CONVERSION;
+    private static final ModConfigSpec.BooleanValue ENABLE_ADVANCED_AE_RECIPE_CONVERSION;
+    private static final ModConfigSpec.BooleanValue ENABLE_MEKANISM_RECIPE_CONVERSION;
+    private static final ModConfigSpec.BooleanValue ENABLE_MEKANISM_GENERATORS_RECIPE_CONVERSION;
+    private static final ModConfigSpec.BooleanValue ENABLE_APP_MEK_RECIPE_CONVERSION;
+    private static final ModConfigSpec.BooleanValue ENABLE_AE2_RECIPE_CONVERSION;
+    private static final ModConfigSpec.BooleanValue ENABLE_AE2CS_RECIPE_CONVERSION;
+    private static final ModConfigSpec.BooleanValue ENABLE_INDUSTRIAL_FOREGOING_RECIPE_CONVERSION;
+    private static final ModConfigSpec.BooleanValue ENABLE_ACTUALLY_ADDITIONS_RECIPE_CONVERSION;
+    private static final ModConfigSpec.BooleanValue ENABLE_ARS_NOUVEAU_RECIPE_CONVERSION;
+    private static final ModConfigSpec.BooleanValue ENABLE_MYSTICAL_AGRICULTURE_RECIPE_CONVERSION;
+    private static final ModConfigSpec.BooleanValue ENABLE_AE2LT_RECIPE_CONVERSION;
+    private static final ModConfigSpec.BooleanValue ENABLE_DATA_ENERGISTICS_RECIPE_CONVERSION;
+    private static final ModConfigSpec.BooleanValue ENABLE_PRODUCTIVE_BEES_RECIPE_CONVERSION;
+    private static final ModConfigSpec.BooleanValue ENABLE_DRACONIC_EVOLUTION_RECIPE_CONVERSION;
+    private static final ModConfigSpec.BooleanValue ENABLE_POWAH_RECIPE_CONVERSION;
+    private static final ModConfigSpec.BooleanValue ENABLE_EXTENDED_CRAFTING_RECIPE_CONVERSION;
+    private static final ModConfigSpec.BooleanValue ENABLE_NEO_ECO_AE_RECIPE_CONVERSION;
+    private static final ModConfigSpec.BooleanValue ENABLE_NATURES_AURA_RECIPE_CONVERSION;
+    private static final ModConfigSpec.BooleanValue ENABLE_FORBIDDEN_ARCANUS_RECIPE_CONVERSION;
+    private static final ModConfigSpec.BooleanValue ENABLE_OCCULTISM_RECIPE_CONVERSION;
+    private static final ModConfigSpec.BooleanValue ENABLE_MALUM_RECIPE_CONVERSION;
+    private static final ModConfigSpec.BooleanValue ENABLE_ENDER_IO_RECIPE_CONVERSION;
+    private static final ModConfigSpec.BooleanValue ENABLE_CREATE_RECIPE_CONVERSION;
+    private static final ModConfigSpec.BooleanValue ENABLE_ORITECH_RECIPE_CONVERSION;
+    private static final Map<String, ModConfigSpec.BooleanValue> RECIPE_CONVERSION_OPTIONS;
 
     private static final ModConfigSpec.IntValue OMNIVERSAL_PATTERN_SLOTS;
     private static final ModConfigSpec.IntValue OMNIVERSAL_MOLD_SLOTS;
@@ -228,11 +259,101 @@ public class ConfigManager {
                         "警告: 会与网络中其他设备争抢供电, 网络储能不足时可能导致设备频繁掉线",
                         "在AppliedFlux抽取之后作为补充, 每tick总抽取量受熔炉最大输入速率限制")
                 .define("draw_ae_energy", false);
+
+        ENABLE_CRAFTING_RECIPE_CONVERSION = defineRecipeConversionOption(
+                "enable_crafting_recipe_conversion", false);
+        ENABLE_SMELTING_RECIPE_CONVERSION = defineRecipeConversionOption(
+                "enable_smelting_recipe_conversion", true);
+        ENABLE_EXTENDED_AE_RECIPE_CONVERSION = defineRecipeConversionOption(
+                "enable_extendedae_recipe_conversion", true);
+        ENABLE_ADVANCED_AE_RECIPE_CONVERSION = defineRecipeConversionOption(
+                "enable_advanced_ae_recipe_conversion", true);
+        ENABLE_MEKANISM_RECIPE_CONVERSION = defineRecipeConversionOption(
+                "enable_mekanism_recipe_conversion", true);
+        ENABLE_MEKANISM_GENERATORS_RECIPE_CONVERSION = defineRecipeConversionOption(
+                "enable_mekanism_generators_recipe_conversion", true);
+        ENABLE_APP_MEK_RECIPE_CONVERSION = defineRecipeConversionOption(
+                "enable_appmek_recipe_conversion", true);
+        ENABLE_AE2_RECIPE_CONVERSION = defineRecipeConversionOption(
+                "enable_ae2_recipe_conversion", true);
+        ENABLE_AE2CS_RECIPE_CONVERSION = defineRecipeConversionOption(
+                "enable_ae2cs_recipe_conversion", true);
+        ENABLE_INDUSTRIAL_FOREGOING_RECIPE_CONVERSION = defineRecipeConversionOption(
+                "enable_industrial_foregoing_recipe_conversion", true);
+        ENABLE_ACTUALLY_ADDITIONS_RECIPE_CONVERSION = defineRecipeConversionOption(
+                "enable_actually_additions_recipe_conversion", true);
+        ENABLE_ARS_NOUVEAU_RECIPE_CONVERSION = defineRecipeConversionOption(
+                "enable_ars_nouveau_recipe_conversion", true);
+        ENABLE_MYSTICAL_AGRICULTURE_RECIPE_CONVERSION = defineRecipeConversionOption(
+                "enable_mystical_agriculture_recipe_conversion", true);
+        ENABLE_AE2LT_RECIPE_CONVERSION = defineRecipeConversionOption(
+                "enable_ae2lt_recipe_conversion", true);
+        ENABLE_DATA_ENERGISTICS_RECIPE_CONVERSION = defineRecipeConversionOption(
+                "enable_data_energistics_recipe_conversion", true);
+        ENABLE_PRODUCTIVE_BEES_RECIPE_CONVERSION = defineRecipeConversionOption(
+                "enable_productive_bees_recipe_conversion", true);
+        ENABLE_DRACONIC_EVOLUTION_RECIPE_CONVERSION = defineRecipeConversionOption(
+                "enable_draconic_evolution_recipe_conversion", true);
+        ENABLE_POWAH_RECIPE_CONVERSION = defineRecipeConversionOption(
+                "enable_powah_recipe_conversion", true);
+        ENABLE_EXTENDED_CRAFTING_RECIPE_CONVERSION = defineRecipeConversionOption(
+                "enable_extended_crafting_recipe_conversion", true);
+        ENABLE_NEO_ECO_AE_RECIPE_CONVERSION = defineRecipeConversionOption(
+                "enable_neo_eco_ae_recipe_conversion", true);
+        ENABLE_NATURES_AURA_RECIPE_CONVERSION = defineRecipeConversionOption(
+                "enable_natures_aura_recipe_conversion", true);
+        ENABLE_FORBIDDEN_ARCANUS_RECIPE_CONVERSION = defineRecipeConversionOption(
+                "enable_forbidden_arcanus_recipe_conversion", true);
+        ENABLE_OCCULTISM_RECIPE_CONVERSION = defineRecipeConversionOption(
+                "enable_occultism_recipe_conversion", true);
+        ENABLE_MALUM_RECIPE_CONVERSION = defineRecipeConversionOption(
+                "enable_malum_recipe_conversion", true);
+        ENABLE_ENDER_IO_RECIPE_CONVERSION = defineRecipeConversionOption(
+                "enable_ender_io_recipe_conversion", true);
+        ENABLE_CREATE_RECIPE_CONVERSION = defineRecipeConversionOption(
+                "enable_create_recipe_conversion", true);
+        ENABLE_ORITECH_RECIPE_CONVERSION = defineRecipeConversionOption(
+                "enable_oritech_recipe_conversion", true);
+
+        RECIPE_CONVERSION_OPTIONS = Map.ofEntries(
+                Map.entry("extendedae", ENABLE_EXTENDED_AE_RECIPE_CONVERSION),
+                Map.entry("advanced_ae", ENABLE_ADVANCED_AE_RECIPE_CONVERSION),
+                Map.entry("mekanism", ENABLE_MEKANISM_RECIPE_CONVERSION),
+                Map.entry("mekanismgenerators", ENABLE_MEKANISM_GENERATORS_RECIPE_CONVERSION),
+                Map.entry("appmek", ENABLE_APP_MEK_RECIPE_CONVERSION),
+                Map.entry("ae2", ENABLE_AE2_RECIPE_CONVERSION),
+                Map.entry("ae2cs", ENABLE_AE2CS_RECIPE_CONVERSION),
+                Map.entry("industrialforegoing", ENABLE_INDUSTRIAL_FOREGOING_RECIPE_CONVERSION),
+                Map.entry("actuallyadditions", ENABLE_ACTUALLY_ADDITIONS_RECIPE_CONVERSION),
+                Map.entry("ars_nouveau", ENABLE_ARS_NOUVEAU_RECIPE_CONVERSION),
+                Map.entry("mysticalagriculture", ENABLE_MYSTICAL_AGRICULTURE_RECIPE_CONVERSION),
+                Map.entry("ae2lt", ENABLE_AE2LT_RECIPE_CONVERSION),
+                Map.entry("data_energistics", ENABLE_DATA_ENERGISTICS_RECIPE_CONVERSION),
+                Map.entry("productivebees", ENABLE_PRODUCTIVE_BEES_RECIPE_CONVERSION),
+                Map.entry("draconicevolution", ENABLE_DRACONIC_EVOLUTION_RECIPE_CONVERSION),
+                Map.entry("powah", ENABLE_POWAH_RECIPE_CONVERSION),
+                Map.entry("extendedcrafting", ENABLE_EXTENDED_CRAFTING_RECIPE_CONVERSION),
+                Map.entry("neoecoae", ENABLE_NEO_ECO_AE_RECIPE_CONVERSION),
+                Map.entry("naturesaura", ENABLE_NATURES_AURA_RECIPE_CONVERSION),
+                Map.entry("forbidden_arcanus", ENABLE_FORBIDDEN_ARCANUS_RECIPE_CONVERSION),
+                Map.entry("occultism", ENABLE_OCCULTISM_RECIPE_CONVERSION),
+                Map.entry("malum", ENABLE_MALUM_RECIPE_CONVERSION),
+                Map.entry("enderio", ENABLE_ENDER_IO_RECIPE_CONVERSION),
+                Map.entry("create", ENABLE_CREATE_RECIPE_CONVERSION),
+                Map.entry("oritech", ENABLE_ORITECH_RECIPE_CONVERSION));
         COMMON_BUILDER.pop();
 
         COMMON_SPEC = COMMON_BUILDER.build();
         CLIENT_SPEC = CLIENT_BUILDER.build();
         SERVER_SPEC = SERVER_BUILDER.build();
+    }
+
+    private static ModConfigSpec.BooleanValue defineRecipeConversionOption(
+            String key, boolean defaultValue) {
+        return COMMON_BUILDER
+                .comment("是否启用该配方来源的配方转换", "修改后重启游戏生效")
+                .translation("useless_mod.configuration." + key)
+                .define(key, defaultValue);
     }
 
     // 获取配置值方法
@@ -275,6 +396,19 @@ public class ConfigManager {
 
     public static boolean isFurnaceDrawAeEnergyEnabled() {
         return FURNACE_DRAW_AE_ENERGY.get();
+    }
+
+    public static boolean isCraftingRecipeConversionEnabled() {
+        return ENABLE_CRAFTING_RECIPE_CONVERSION.get();
+    }
+
+    public static boolean isSmeltingRecipeConversionEnabled() {
+        return ENABLE_SMELTING_RECIPE_CONVERSION.get();
+    }
+
+    public static boolean isRecipeConversionEnabled(String sourceId) {
+        ModConfigSpec.BooleanValue option = RECIPE_CONVERSION_OPTIONS.get(sourceId);
+        return option == null || option.get();
     }
 
     public static int getOmniversalPatternSlots() {

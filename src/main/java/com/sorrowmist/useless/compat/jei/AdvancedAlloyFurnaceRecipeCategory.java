@@ -342,12 +342,20 @@ public class AdvancedAlloyFurnaceRecipeCategory implements IRecipeCategory<Alloy
                 int x = FLUID_INPUT_X + i * fluidWidth;
                 int amount = input.amount();
 
-                builder.addSlot(RecipeIngredientRole.INPUT, x, FLUID_INPUT_Y)
-                       .setFluidRenderer(amount, false, fluidWidth, FLUID_INPUT_HEIGHT)
-                       .addFluidStack(fluid.getFluid(), amount)
-                       .addRichTooltipCallback((slot, tooltip) -> {
-                           tooltip.add(Component.translatable("jei.useless_mod.tooltip.amount.mb", formatCount(amount)).withStyle(ChatFormatting.GRAY));
-                       });
+                IRecipeSlotBuilder slot = builder.addSlot(RecipeIngredientRole.INPUT, x, FLUID_INPUT_Y)
+                        .setFluidRenderer(amount, false, fluidWidth, FLUID_INPUT_HEIGHT);
+                if (candidates.length == 0) {
+                    slot.addFluidStack(fluid.getFluid(), amount);
+                } else {
+                    for (FluidStack candidate : candidates) {
+                        if (candidate != null && !candidate.isEmpty()) {
+                            slot.addFluidStack(candidate.getFluid(), amount);
+                        }
+                    }
+                }
+                slot.addRichTooltipCallback((slotView, tooltip) -> {
+                    tooltip.add(Component.translatable("jei.useless_mod.tooltip.amount.mb", formatCount(amount)).withStyle(ChatFormatting.GRAY));
+                });
             }
         }
 

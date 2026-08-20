@@ -211,6 +211,14 @@ dependencies {
     implementation "org.appliedenergistics:appliedenergistics2:19.2.17"
     implementation "org.appliedenergistics:guideme:21.1.17"
     implementation "de.mari_023:ae2wtlib_api:19.2.5"
+    implementation "curse.maven:oritech-1030830:8556549"
+    implementation "curse.maven:athena-841890:8061947"
+    implementation "curse.maven:neovitae-1404763:8690909"
+    implementation "curse.maven:modern-industrialization-405388:8597392"
+    implementation "curse.maven:ufo-future-1372445:8372110"
+    implementation "curse.maven:immersive-engineering-231951:6733669"
+    //implementation "curse.maven:extended-industrialization-1068418:8666147"
+    //implementation "curse.maven:tesseract-api-neoforge-1067672:8639010"
 
     implementation "curse.maven:glodium-957920:5821676"
     implementation "curse.maven:ex-pattern-provider-892005:8025439"  // 2.2.32
@@ -223,8 +231,8 @@ dependencies {
     implementation "curse.maven:ae2addonlib-1366135:7222312"
 
     implementation "curse.maven:ae2-crystal-science-1435174:8498888" // 1.21.1-1.2.1
-    implementation "curse.maven:ae2-lightning-tech-1527395:8567287"
-    implementation "curse.maven:thunderbolt-core-1631756:8566512"
+    implementation "curse.maven:ae2-lightning-tech-1527395:8638573"
+    implementation "curse.maven:thunderbolt-core-1631756:8638565"
     implementation "curse.maven:data-energistics-1565514:8613673" // 1.21.1-3.0.3
 
     //powah
@@ -326,6 +334,7 @@ dependencies {
     // runtimeOnly "dev.latvian.mods:kubejs-neoforge:2101.7.1-build.188"
 
     runtimeOnly "curse.maven:ftb-library-forge-404465:7029003"
+    compileOnly "dev.architectury:architectury-neoforge:13.0.8"
     runtimeOnly "dev.architectury:architectury-neoforge:13.0.8"
     runtimeOnly "dev.ftb.mods:ftb-teams-neoforge:2101.1.4"
     runtimeOnly "curse.maven:ftb-chunks-forge-314906:7157142"

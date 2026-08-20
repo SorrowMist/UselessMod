@@ -9,6 +9,7 @@ import com.sorrowmist.useless.content.recipe.adapters.mekanism.FluidToFluidRecip
 import com.sorrowmist.useless.content.recipe.adapters.mekanism.HeavyWaterRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.mekanism.NutritionalLiquifierRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.mekanism.PrecisionSawmillRecipeAdapter;
+import com.sorrowmist.useless.core.config.ConfigManager;
 import net.neoforged.fml.ModList;
 
 /** Registers Mekanism adapters that do not require an AppMek chemical key. */
@@ -25,7 +26,8 @@ public final class MekanismRecipeCompatLoader {
         manager.registerAdapter(new FluidToFluidRecipeAdapter(), RecipeSourceIds.MEKANISM);
         manager.registerAdapter(new HeavyWaterRecipeAdapter(), RecipeSourceIds.MEKANISM);
 
-        if (ModList.get().isLoaded("appmek")) {
+        if (ModList.get().isLoaded("appmek")
+                && ConfigManager.isRecipeConversionEnabled(RecipeSourceIds.APP_MEK)) {
             invokeAppMekRecipes();
         }
     }

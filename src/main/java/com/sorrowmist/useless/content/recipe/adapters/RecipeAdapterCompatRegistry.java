@@ -46,6 +46,7 @@ import com.sorrowmist.useless.content.recipe.adapters.enderio.SlicingRecipeAdapt
 import com.sorrowmist.useless.content.recipe.adapters.enderio.SagMillingRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.enderio.SoulBindingRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.enderio.VatFermentingRecipeAdapter;
+import com.sorrowmist.useless.core.config.ConfigManager;
 import net.neoforged.fml.ModList;
 import net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent;
 import org.apache.logging.log4j.LogManager;
@@ -81,6 +82,7 @@ public final class RecipeAdapterCompatRegistry {
     public static final String MALUM = RecipeSourceIds.MALUM;
     public static final String ENDER_IO = RecipeSourceIds.ENDER_IO;
     public static final String CREATE = RecipeSourceIds.CREATE;
+    public static final String ORITECH = RecipeSourceIds.ORITECH;
 
     private static final List<CompatEntry> ENTRIES = List.of(
             new CompatEntry(null, RecipeAdapterCompatRegistry::registerMinecraft),
@@ -106,7 +108,8 @@ public final class RecipeAdapterCompatRegistry {
             new CompatEntry(OCCULTISM, RecipeAdapterCompatRegistry::registerOccultism),
             new CompatEntry(MALUM, RecipeAdapterCompatRegistry::registerMalum),
             new CompatEntry(ENDER_IO, RecipeAdapterCompatRegistry::registerEnderIO),
-            new CompatEntry(CREATE, RecipeAdapterCompatRegistry::registerCreate)
+            new CompatEntry(CREATE, RecipeAdapterCompatRegistry::registerCreate),
+            new CompatEntry(ORITECH, RecipeAdapterCompatRegistry::registerOritech)
     );
 
     private RecipeAdapterCompatRegistry() {}
@@ -122,7 +125,7 @@ public final class RecipeAdapterCompatRegistry {
     }
 
     private static void initCompat(FMLCommonSetupEvent event, @Nullable String modId, Runnable registerAction) {
-        if (modId != null && !isLoaded(modId)) return;
+        if (modId != null && (!isLoaded(modId) || !ConfigManager.isRecipeConversionEnabled(modId))) return;
 
         event.enqueueWork(() -> {
             try {
@@ -138,8 +141,12 @@ public final class RecipeAdapterCompatRegistry {
     }
 
     private static void registerMinecraft() {
-        register(new CraftingRecipeAdapter());
-        register(new SmeltingRecipeAdapter());
+        if (ConfigManager.isCraftingRecipeConversionEnabled()) {
+            register(new CraftingRecipeAdapter());
+        }
+        if (ConfigManager.isSmeltingRecipeConversionEnabled()) {
+            register(new SmeltingRecipeAdapter());
+        }
     }
 
     private static void registerExtendedAE() {
@@ -265,6 +272,10 @@ public final class RecipeAdapterCompatRegistry {
 
     private static void registerCreate() {
         invokeOptionalLoader("com.sorrowmist.useless.compat.create.CreateRecipeCompatLoader");
+    }
+
+    private static void registerOritech() {
+        invokeOptionalLoader("com.sorrowmist.useless.compat.oritech.OritechRecipeCompatLoader");
     }
 
     private record CompatEntry(@Nullable String modId, Runnable registerAction) {}

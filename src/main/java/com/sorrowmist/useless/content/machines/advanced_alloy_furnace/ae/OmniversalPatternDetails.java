@@ -4,6 +4,7 @@ import appeng.api.stacks.AEItemKey;
 import appeng.crafting.pattern.AEProcessingPattern;
 import com.sorrowmist.useless.content.recipe.AdvancedAlloyFurnaceRecipe;
 import com.sorrowmist.useless.content.recipe.AlloyFurnaceRecipeCatalog;
+import com.sorrowmist.useless.content.recipe.RecipeSourceIds;
 import com.sorrowmist.useless.content.recipe.adapters.enderio.SoulBindingRecipeAdapter;
 import com.sorrowmist.useless.core.component.OmniversalPatternData;
 import com.sorrowmist.useless.core.component.UComponents;
@@ -36,7 +37,7 @@ public final class OmniversalPatternDetails extends DynamicComponentPatternDetai
                 decoded.data.itemIdOutputSlots(),
                 tagInputTags(decoded.data),
                 fluidTagInputTags(decoded.data),
-                soulBindingInputMatchers(decoded),
+                dynamicInputMatchers(decoded),
                 Map.of(),
                 decoded.level.registryAccess());
         this.data = decoded.data;
@@ -235,7 +236,17 @@ public final class OmniversalPatternDetails extends DynamicComponentPatternDetai
     }
 
     private static java.util.Map<Integer, DynamicComponentPatternDetails.InputMatcher>
-            soulBindingInputMatchers(Decoded decoded) {
+            dynamicInputMatchers(Decoded decoded) {
+        String sourceId = RecipeSourceIds.normalize(decoded.data.sourceId());
+        if (RecipeSourceIds.NEOVITAE.equals(sourceId)) {
+            if (!ModList.get().isLoaded("neovitae")) return java.util.Map.of();
+            return AdvancedAlloyFurnacePatternResolver.findNeoVitaeDynamicPatternProfile(
+                            decoded.level,
+                            AdvancedAlloyFurnacePatternResolver.itemInputs(decoded.source),
+                            AdvancedAlloyFurnacePatternResolver.itemOutputs(decoded.source))
+                    .map(DynamicPatternProfile::inputMatchers)
+                    .orElseGet(java.util.Map::of);
+        }
         if (!ModList.get().isLoaded("enderio")) {
             return java.util.Map.of();
         }

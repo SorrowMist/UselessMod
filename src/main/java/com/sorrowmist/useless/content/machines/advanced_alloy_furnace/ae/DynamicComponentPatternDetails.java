@@ -600,10 +600,13 @@ public class DynamicComponentPatternDetails extends AEProcessingPattern implemen
             if (!tags.isEmpty()) {
                 return matcher == null || matcher.test(input);
             }
+            if (matcher != null) {
+                return matcher.test(input);
+            }
             for (GenericStack possible : possibleInputs) {
                 if (possible != null && possible.what() instanceof AEItemKey possibleItem
                         && possibleItem.getItem() == itemKey.getItem()) {
-                    return matcher == null || matcher.test(input);
+                    return true;
                 }
             }
             return false;

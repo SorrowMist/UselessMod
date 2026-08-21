@@ -40,7 +40,8 @@ class ConfigManagerTest {
                 "malum",
                 "enderio",
                 "create",
-                "oritech");
+                "oritech",
+                "neovitae");
 
         for (String source : externalSources) {
             assertTrue(ConfigManager.isRecipeConversionEnabled(source), source);

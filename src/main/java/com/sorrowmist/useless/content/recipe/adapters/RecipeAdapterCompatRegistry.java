@@ -84,6 +84,7 @@ public final class RecipeAdapterCompatRegistry {
     public static final String ENDER_IO = RecipeSourceIds.ENDER_IO;
     public static final String CREATE = RecipeSourceIds.CREATE;
     public static final String ORITECH = RecipeSourceIds.ORITECH;
+    public static final String NEOVITAE = RecipeSourceIds.NEOVITAE;
 
     private static final List<CompatEntry> ENTRIES = List.of(
             new CompatEntry(null, RecipeAdapterCompatRegistry::registerMinecraft),
@@ -110,7 +111,8 @@ public final class RecipeAdapterCompatRegistry {
             new CompatEntry(MALUM, RecipeAdapterCompatRegistry::registerMalum),
             new CompatEntry(ENDER_IO, RecipeAdapterCompatRegistry::registerEnderIO),
             new CompatEntry(CREATE, RecipeAdapterCompatRegistry::registerCreate),
-            new CompatEntry(ORITECH, RecipeAdapterCompatRegistry::registerOritech)
+            new CompatEntry(ORITECH, RecipeAdapterCompatRegistry::registerOritech),
+            new CompatEntry(NEOVITAE, RecipeAdapterCompatRegistry::registerNeoVitae)
     );
 
     private RecipeAdapterCompatRegistry() {}
@@ -280,6 +282,10 @@ public final class RecipeAdapterCompatRegistry {
 
     private static void registerOritech() {
         invokeOptionalLoader("com.sorrowmist.useless.compat.oritech.OritechRecipeCompatLoader");
+    }
+
+    private static void registerNeoVitae() {
+        invokeOptionalLoader("com.sorrowmist.useless.compat.neovitae.NeoVitaeRecipeCompatLoader");
     }
 
     private record CompatEntry(@Nullable String modId, Runnable registerAction) {}

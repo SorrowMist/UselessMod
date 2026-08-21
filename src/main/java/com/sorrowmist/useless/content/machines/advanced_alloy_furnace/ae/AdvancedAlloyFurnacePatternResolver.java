@@ -24,6 +24,8 @@ import org.slf4j.Logger;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import java.lang.reflect.Method;
 
 /** Builds provider-local component-aware views of otherwise unchanged AE patterns. */
 public final class AdvancedAlloyFurnacePatternResolver {
@@ -32,6 +34,9 @@ public final class AdvancedAlloyFurnacePatternResolver {
     private static final String ENDER_IO_MOD_ID = "enderio";
     private static final String OCCULTISM_MOD_ID = "occultism";
     private static final String MALUM_MOD_ID = "malum";
+    private static final String NEOVITAE_MOD_ID = "neovitae";
+    private static final String NEOVITAE_DYNAMIC_SUPPORT =
+            "com.sorrowmist.useless.compat.neovitae.NeoVitaeDynamicPatternSupport";
 
     private AdvancedAlloyFurnacePatternResolver() {
     }
@@ -117,6 +122,13 @@ public final class AdvancedAlloyFurnacePatternResolver {
                     return resolved;
                 }
             }
+            if ((normalizedSource == null || normalizedSource.equals(RecipeSourceIds.NEOVITAE))
+                    && ModList.get().isLoaded(NEOVITAE_MOD_ID)) {
+                IPatternDetails resolved = resolveDynamicNeoVitaePattern(processingPattern, level);
+                if (resolved != processingPattern) {
+                    return resolved;
+                }
+            }
             return processingPattern;
         } catch (RuntimeException exception) {
             LOGGER.warn("Failed to create a component-aware AE view for pattern {}",
@@ -194,6 +206,42 @@ public final class AdvancedAlloyFurnacePatternResolver {
                 profile.get().idOnlyOutputSlots(),
                 profile.get().inputMatchers(),
                 level.registryAccess());
+    }
+
+    private static IPatternDetails resolveDynamicNeoVitaePattern(
+            AEProcessingPattern pattern, Level level) {
+        List<ItemStack> inputs = itemInputs(pattern);
+        List<ItemStack> outputs = itemOutputs(pattern);
+        Optional<DynamicPatternProfile> profile = findNeoVitaeDynamicPatternProfile(
+                level, inputs, outputs);
+        if (profile.isEmpty()) return pattern;
+
+        DynamicPatternProfile dynamic = profile.get();
+        return new DynamicComponentPatternDetails(
+                pattern,
+                dynamic.idOnlyInputSlots(),
+                dynamic.idOnlyOutputSlots(),
+                dynamic.inputMatchers(),
+                level.registryAccess());
+    }
+
+    static Optional<DynamicPatternProfile> findNeoVitaeDynamicPatternProfile(
+            Level level, List<ItemStack> inputs, List<ItemStack> outputs) {
+        try {
+            Class<?> support = Class.forName(NEOVITAE_DYNAMIC_SUPPORT);
+            Method method = support.getMethod(
+                    "findDynamicPatternProfile", Level.class, List.class, List.class);
+            Object value = method.invoke(null, level, inputs, outputs);
+            if (value instanceof Optional<?> optional && optional.isPresent()
+                    && optional.get() instanceof DynamicPatternProfile profile) {
+                return Optional.of(profile);
+            }
+        } catch (ClassNotFoundException | LinkageError ignored) {
+            // Neo Vitae is optional and has no support class when it is absent.
+        } catch (ReflectiveOperationException | RuntimeException exception) {
+            LOGGER.debug("Neo Vitae dynamic pattern support is unavailable", exception);
+        }
+        return Optional.empty();
     }
 
     static List<ItemStack> itemInputs(IPatternDetails pattern) {

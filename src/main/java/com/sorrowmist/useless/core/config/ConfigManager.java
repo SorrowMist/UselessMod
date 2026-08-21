@@ -60,6 +60,7 @@ public class ConfigManager {
     // 万象炉配方转换配置
     private static final ModConfigSpec.BooleanValue ENABLE_CRAFTING_RECIPE_CONVERSION;
     private static final ModConfigSpec.BooleanValue ENABLE_SMELTING_RECIPE_CONVERSION;
+    private static final ModConfigSpec.BooleanValue ENABLE_BREWING_RECIPE_CONVERSION;
     private static final ModConfigSpec.BooleanValue ENABLE_EXTENDED_AE_RECIPE_CONVERSION;
     private static final ModConfigSpec.BooleanValue ENABLE_ADVANCED_AE_RECIPE_CONVERSION;
     private static final ModConfigSpec.BooleanValue ENABLE_MEKANISM_RECIPE_CONVERSION;
@@ -264,6 +265,8 @@ public class ConfigManager {
                 "enable_crafting_recipe_conversion", false);
         ENABLE_SMELTING_RECIPE_CONVERSION = defineRecipeConversionOption(
                 "enable_smelting_recipe_conversion", true);
+        ENABLE_BREWING_RECIPE_CONVERSION = defineRecipeConversionOption(
+                "enable_brewing_recipe_conversion", true);
         ENABLE_EXTENDED_AE_RECIPE_CONVERSION = defineRecipeConversionOption(
                 "enable_extendedae_recipe_conversion", true);
         ENABLE_ADVANCED_AE_RECIPE_CONVERSION = defineRecipeConversionOption(
@@ -404,6 +407,10 @@ public class ConfigManager {
 
     public static boolean isSmeltingRecipeConversionEnabled() {
         return ENABLE_SMELTING_RECIPE_CONVERSION.get();
+    }
+
+    public static boolean isBrewingRecipeConversionEnabled() {
+        return ENABLE_BREWING_RECIPE_CONVERSION.get();
     }
 
     public static boolean isRecipeConversionEnabled(String sourceId) {

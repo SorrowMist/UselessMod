@@ -19,6 +19,7 @@ import com.sorrowmist.useless.content.recipe.adapters.arsnouveau.EnchantingAppar
 import com.sorrowmist.useless.content.recipe.adapters.arsnouveau.ImbuementRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.industrialforegoing.DissolutionChamberRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.minecraft.CraftingRecipeAdapter;
+import com.sorrowmist.useless.content.recipe.adapters.minecraft.BrewingRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.minecraft.SmeltingRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.mysticalagriculture.AwakeningRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.mysticalagriculture.InfusionRecipeAdapter;
@@ -146,6 +147,9 @@ public final class RecipeAdapterCompatRegistry {
         }
         if (ConfigManager.isSmeltingRecipeConversionEnabled()) {
             register(new SmeltingRecipeAdapter());
+        }
+        if (ConfigManager.isBrewingRecipeConversionEnabled()) {
+            register(new BrewingRecipeAdapter());
         }
     }
 

@@ -13,6 +13,7 @@ class ConfigManagerTest {
     void recipeConversionDefaultsMatchTheOptInVanillaCraftingPolicy() {
         assertFalse(ConfigManager.isCraftingRecipeConversionEnabled());
         assertTrue(ConfigManager.isSmeltingRecipeConversionEnabled());
+        assertTrue(ConfigManager.isBrewingRecipeConversionEnabled());
 
         List<String> externalSources = List.of(
                 "extendedae",

@@ -31,6 +31,7 @@ public final class RecipeSourceIds {
     public static final String CREATE = "create";
     public static final String ORITECH = "oritech";
     public static final String NEOVITAE = "neovitae";
+    public static final String UFO = "ufo";
 
     private RecipeSourceIds() {
     }
@@ -68,6 +69,7 @@ public final class RecipeSourceIds {
         if (name.endsWith(".create")) return CREATE;
         if (name.endsWith(".oritech")) return ORITECH;
         if (name.endsWith(".neovitae")) return NEOVITAE;
+        if (name.endsWith(".ufo")) return UFO;
         if (name.endsWith(".mekanism") || name.endsWith(".generators")) return MEKANISM;
         return UNKNOWN;
     }

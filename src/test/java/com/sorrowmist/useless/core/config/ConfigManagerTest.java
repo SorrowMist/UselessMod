@@ -1,10 +1,14 @@
 package com.sorrowmist.useless.core.config;
 
+import com.sorrowmist.useless.content.recipe.RecipeSourceIds;
+import net.neoforged.neoforge.common.ModConfigSpec;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ConfigManagerTest {
@@ -41,10 +45,17 @@ class ConfigManagerTest {
                 "enderio",
                 "create",
                 "oritech",
-                "neovitae");
+                "neovitae",
+                "ufo");
 
         for (String source : externalSources) {
             assertTrue(ConfigManager.isRecipeConversionEnabled(source), source);
         }
+
+        Object valueSpec = ConfigManager.COMMON_SPEC.getSpec()
+                .get(List.of("advanced_alloy_furnace", "enable_ufo_recipe_conversion"));
+        assertInstanceOf(ModConfigSpec.ValueSpec.class, valueSpec);
+        assertEquals(Boolean.TRUE, ((ModConfigSpec.ValueSpec) valueSpec).getDefault());
+        assertTrue(ConfigManager.isRecipeConversionEnabled(RecipeSourceIds.UFO));
     }
 }

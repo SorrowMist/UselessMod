@@ -1,7 +1,6 @@
 package com.sorrowmist.useless.content.recipe.adapters.modernindustrialization;
 
 import aztech.modern_industrialization.machines.init.MIMachineRecipeTypes;
-import aztech.modern_industrialization.machines.init.MachineTier;
 import aztech.modern_industrialization.machines.recipe.MachineRecipe;
 import aztech.modern_industrialization.machines.recipe.MachineRecipeType;
 import com.mojang.logging.LogUtils;
@@ -43,8 +42,7 @@ import java.util.OptionalInt;
 public final class ModernIndustrializationRecipeAdapter implements IRecipeAdapter<MachineRecipe> {
     private static final Logger LOGGER = LogUtils.getLogger();
     private static final String MOD_ID = "modern_industrialization";
-    private static final int UNLIMITED_EU = Integer.MAX_VALUE;
-    private static final Map<MachineRecipeType, List<MachineMold>> MACHINE_MOLDS = createMachineMolds();
+    private static final Map<MachineRecipeType, List<String>> MACHINE_MOLDS = createMachineMolds();
     private static final Map<Item, MachineRecipeType> TYPE_BY_MACHINE_ITEM = indexMachineItems();
 
     @Override
@@ -76,7 +74,7 @@ public final class ModernIndustrializationRecipeAdapter implements IRecipeAdapte
         MachineRecipe source = holder.value();
         MachineRecipeType type = machineRecipeType(source);
         if (type == null) return List.of();
-        List<MachineMold> machineMolds = MACHINE_MOLDS.get(type);
+        List<String> machineMolds = MACHINE_MOLDS.get(type);
         if (machineMolds == null || source.duration <= 0 || source.eu < 0) {
             return List.of();
         }
@@ -87,9 +85,9 @@ public final class ModernIndustrializationRecipeAdapter implements IRecipeAdapte
             return List.of();
         }
 
-        Optional<Ingredient> machineMold = machineMold(machineMolds, source.eu);
+        Optional<Ingredient> machineMold = machineMold(machineMolds);
         if (machineMold.isEmpty()) {
-            warnSkipped(holder, "no listed machine tier can process the recipe EU/t");
+            warnSkipped(holder, "no listed machine variant is registered");
             return List.of();
         }
 
@@ -188,8 +186,7 @@ public final class ModernIndustrializationRecipeAdapter implements IRecipeAdapte
             if (probability == null) return null;
             if (probability.isZero()) {
                 Optional<Ingredient> bucketMold = bucketMold(input.fluid());
-                if (bucketMold.isEmpty()) return null;
-                molds.add(bucketMold.get());
+                bucketMold.ifPresent(molds::add);
                 continue;
             }
             long amount = scaleAmount(input.amount(), probability, operations);
@@ -260,11 +257,19 @@ public final class ModernIndustrializationRecipeAdapter implements IRecipeAdapte
     }
 
     @Nullable
-    private static Rational probability(float rawProbability) {
-        if (!Float.isFinite(rawProbability) || rawProbability < 0.0f || rawProbability > 1.0f) {
+    static Rational probability(float rawProbability) {
+        return probability(Float.toString(rawProbability), rawProbability);
+    }
+
+    static Rational probability(double rawProbability) {
+        return probability(Double.toString(rawProbability), rawProbability);
+    }
+
+    private static Rational probability(String rawText, double rawProbability) {
+        if (!Double.isFinite(rawProbability) || rawProbability < 0.0d || rawProbability > 1.0d) {
             return null;
         }
-        BigDecimal decimal = new BigDecimal(Float.toString(rawProbability)).stripTrailingZeros();
+        BigDecimal decimal = new BigDecimal(rawText).stripTrailingZeros();
         int scale = Math.max(0, decimal.scale());
         BigInteger denominator = BigInteger.TEN.pow(scale);
         BigInteger numerator = decimal.movePointRight(scale).toBigInteger();
@@ -278,7 +283,19 @@ public final class ModernIndustrializationRecipeAdapter implements IRecipeAdapte
         return new Rational(numerator.longValueExact(), denominator.longValueExact());
     }
 
-    private static long scaleAmount(long amount, Rational probability, long operations) {
+    static Rational divide(Rational value, long divisor) {
+        if (value == null || value.numerator() < 0L || value.denominator() <= 0L || divisor <= 0L) {
+            return null;
+        }
+        BigInteger numerator = BigInteger.valueOf(value.numerator());
+        BigInteger denominator = BigInteger.valueOf(value.denominator()).multiply(BigInteger.valueOf(divisor));
+        BigInteger common = numerator.gcd(denominator);
+        return new Rational(
+                numerator.divide(common).longValueExact(),
+                denominator.divide(common).longValueExact());
+    }
+
+    static long scaleAmount(long amount, Rational probability, long operations) {
         if (amount <= 0 || probability.isZero()) return 0L;
         long factor = operations / probability.denominator();
         try {
@@ -370,11 +387,10 @@ public final class ModernIndustrializationRecipeAdapter implements IRecipeAdapte
         return recipe.getType() instanceof MachineRecipeType type ? type : null;
     }
 
-    private static Optional<Ingredient> machineMold(List<MachineMold> machineMolds, int eu) {
+    private static Optional<Ingredient> machineMold(List<String> machineMolds) {
         Map<Item, ItemStack> stacks = new LinkedHashMap<>();
-        for (MachineMold machineMold : machineMolds) {
-            if (eu > machineMold.maxEu()) continue;
-            Item item = BuiltInRegistries.ITEM.getOptional(id(machineMold.itemId())).orElse(null);
+        for (String machineMold : machineMolds) {
+            Item item = BuiltInRegistries.ITEM.getOptional(id(machineMold)).orElse(null);
             if (item == null || item == Items.AIR) continue;
             stacks.putIfAbsent(item, item.getDefaultInstance());
         }
@@ -382,22 +398,27 @@ public final class ModernIndustrializationRecipeAdapter implements IRecipeAdapte
         return Optional.of(Ingredient.of(stacks.values().toArray(ItemStack[]::new)));
     }
 
-    private static Map<MachineRecipeType, List<MachineMold>> createMachineMolds() {
+    private static Map<MachineRecipeType, List<String>> createMachineMolds() {
         return Map.ofEntries(
-                Map.entry(MIMachineRecipeTypes.ASSEMBLER, lv("assembler")),
-                Map.entry(MIMachineRecipeTypes.CENTRIFUGE, lv("centrifuge")),
-                Map.entry(MIMachineRecipeTypes.CHEMICAL_REACTOR, lv("chemical_reactor")),
-                Map.entry(MIMachineRecipeTypes.COMPRESSOR, tiered("compressor")),
-                Map.entry(MIMachineRecipeTypes.CUTTING_MACHINE, tiered("cutting_machine")),
-                Map.entry(MIMachineRecipeTypes.DISTILLERY, lv("distillery")),
-                Map.entry(MIMachineRecipeTypes.ELECTROLYZER, lv("electrolyzer")),
-                Map.entry(MIMachineRecipeTypes.MACERATOR, tiered("macerator")),
-                Map.entry(MIMachineRecipeTypes.MIXER, tiered("mixer")),
-                Map.entry(MIMachineRecipeTypes.PACKER, steelAndElectric("packer")),
-                Map.entry(MIMachineRecipeTypes.POLARIZER, lv("polarizer")),
-                Map.entry(MIMachineRecipeTypes.UNPACKER, steel("steel_unpacker")),
-                Map.entry(MIMachineRecipeTypes.WIREMILL, steel("steel_wiremill")),
-                Map.entry(MIMachineRecipeTypes.BLAST_FURNACE, fixed("steam_blast_furnace", "electric_blast_furnace")),
+                Map.entry(MIMachineRecipeTypes.ASSEMBLER, fixed("assembler")),
+                Map.entry(MIMachineRecipeTypes.CENTRIFUGE, fixed("centrifuge")),
+                Map.entry(MIMachineRecipeTypes.CHEMICAL_REACTOR, fixed("chemical_reactor")),
+                Map.entry(MIMachineRecipeTypes.COMPRESSOR, fixed(
+                        "bronze_compressor", "steel_compressor", "electric_compressor")),
+                Map.entry(MIMachineRecipeTypes.CUTTING_MACHINE, fixed(
+                        "bronze_cutting_machine", "steel_cutting_machine", "electric_cutting_machine")),
+                Map.entry(MIMachineRecipeTypes.DISTILLERY, fixed("distillery")),
+                Map.entry(MIMachineRecipeTypes.ELECTROLYZER, fixed("electrolyzer")),
+                Map.entry(MIMachineRecipeTypes.MACERATOR, fixed(
+                        "bronze_macerator", "steel_macerator", "electric_macerator")),
+                Map.entry(MIMachineRecipeTypes.MIXER, fixed(
+                        "bronze_mixer", "steel_mixer", "electric_mixer")),
+                Map.entry(MIMachineRecipeTypes.PACKER, fixed("steel_packer", "electric_packer")),
+                Map.entry(MIMachineRecipeTypes.POLARIZER, fixed("polarizer")),
+                Map.entry(MIMachineRecipeTypes.UNPACKER, fixed("steel_unpacker", "electric_unpacker")),
+                Map.entry(MIMachineRecipeTypes.WIREMILL, fixed("steel_wiremill", "electric_wiremill")),
+                Map.entry(MIMachineRecipeTypes.BLAST_FURNACE, fixed(
+                        "steam_blast_furnace", "electric_blast_furnace")),
                 Map.entry(MIMachineRecipeTypes.COKE_OVEN, fixed("coke_oven")),
                 Map.entry(MIMachineRecipeTypes.DISTILLATION_TOWER, fixed("distillation_tower")),
                 Map.entry(MIMachineRecipeTypes.FUSION_REACTOR, fixed("fusion_reactor")),
@@ -409,42 +430,15 @@ public final class ModernIndustrializationRecipeAdapter implements IRecipeAdapte
                 Map.entry(MIMachineRecipeTypes.VACUUM_FREEZER, fixed("vacuum_freezer")));
     }
 
-    private static List<MachineMold> fixed(String... ids) {
-        List<MachineMold> result = new ArrayList<>(ids.length);
-        for (String id : ids) result.add(new MachineMold(id, UNLIMITED_EU));
-        return List.copyOf(result);
-    }
-
-    private static List<MachineMold> lv(String... ids) {
-        List<MachineMold> result = new ArrayList<>(ids.length);
-        for (String id : ids) result.add(new MachineMold(id, MachineTier.LV.getMaxEu()));
-        return List.copyOf(result);
-    }
-
-    private static List<MachineMold> steel(String... ids) {
-        List<MachineMold> result = new ArrayList<>(ids.length);
-        for (String id : ids) result.add(new MachineMold(id, MachineTier.STEEL.getMaxEu()));
-        return List.copyOf(result);
-    }
-
-    private static List<MachineMold> tiered(String baseName) {
-        return List.of(
-                new MachineMold("bronze_" + baseName, MachineTier.BRONZE.getMaxEu()),
-                new MachineMold("steel_" + baseName, MachineTier.STEEL.getMaxEu()),
-                new MachineMold("electric_" + baseName, MachineTier.LV.getMaxEu()));
-    }
-
-    private static List<MachineMold> steelAndElectric(String baseName) {
-        return List.of(
-                new MachineMold("steel_" + baseName, MachineTier.STEEL.getMaxEu()),
-                new MachineMold("electric_" + baseName, MachineTier.LV.getMaxEu()));
+    private static List<String> fixed(String... ids) {
+        return List.of(ids);
     }
 
     private static Map<Item, MachineRecipeType> indexMachineItems() {
         Map<Item, MachineRecipeType> result = new LinkedHashMap<>();
-        for (Map.Entry<MachineRecipeType, List<MachineMold>> entry : MACHINE_MOLDS.entrySet()) {
-            for (MachineMold machineMold : entry.getValue()) {
-                Item item = BuiltInRegistries.ITEM.getOptional(id(machineMold.itemId())).orElse(null);
+        for (Map.Entry<MachineRecipeType, List<String>> entry : MACHINE_MOLDS.entrySet()) {
+            for (String machineMold : entry.getValue()) {
+                Item item = BuiltInRegistries.ITEM.getOptional(id(machineMold)).orElse(null);
                 if (item != null && item != Items.AIR) result.put(item, entry.getKey());
             }
         }
@@ -459,15 +453,12 @@ public final class ModernIndustrializationRecipeAdapter implements IRecipeAdapte
         LOGGER.warn("Skipping Modern Industrialization recipe {}: {}", holder.id(), reason);
     }
 
-    private record MachineMold(String itemId, int maxEu) {
-    }
-
-    private record Rational(long numerator, long denominator) {
-        private boolean isZero() {
+    record Rational(long numerator, long denominator) {
+        boolean isZero() {
             return numerator == 0L;
         }
 
-        private boolean isOne() {
+        boolean isOne() {
             return numerator == denominator;
         }
     }

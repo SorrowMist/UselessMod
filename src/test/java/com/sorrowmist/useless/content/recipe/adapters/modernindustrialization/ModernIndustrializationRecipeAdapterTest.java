@@ -16,6 +16,7 @@ import net.minecraft.world.item.Items;
 import net.minecraft.world.item.crafting.Ingredient;
 import net.minecraft.world.item.crafting.RecipeHolder;
 import net.minecraft.world.level.material.Fluids;
+import net.neoforged.neoforge.fluids.crafting.FluidIngredient;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
@@ -72,10 +73,10 @@ class ModernIndustrializationRecipeAdapterTest {
     }
 
     @Test
-    void filtersTieredMachineMoldsByEuPerTick() {
+    void allowsHighEuRecipesForAllMappedMachineVariants() {
         MachineRecipe source = recipe(
                 MIMachineRecipeTypes.COMPRESSOR,
-                8,
+                1_000_000,
                 20,
                 List.of(new MachineRecipe.ItemInput(Ingredient.of(Items.IRON_INGOT), 1, 1.0f)),
                 List.of(),
@@ -86,8 +87,8 @@ class ModernIndustrializationRecipeAdapterTest {
                 .convertAll(holder("modern_industrialization", "tiered", source), null)
                 .getFirst();
 
-        assertFalse(converted.mold().test(new ItemStack(item("bronze_compressor"))));
-        assertFalse(converted.mold().test(new ItemStack(item("steel_compressor"))));
+        assertTrue(converted.mold().test(new ItemStack(item("bronze_compressor"))));
+        assertTrue(converted.mold().test(new ItemStack(item("steel_compressor"))));
         assertTrue(converted.mold().test(new ItemStack(item("electric_compressor"))));
     }
 
@@ -96,8 +97,51 @@ class ModernIndustrializationRecipeAdapterTest {
         ModernIndustrializationRecipeAdapter adapter = new ModernIndustrializationRecipeAdapter();
         assertTrue(adapter.matchesMold(new ItemStack(item("assembler"))));
         assertTrue(adapter.matchesMold(new ItemStack(item("electric_quarry"))));
+        assertTrue(adapter.matchesMold(new ItemStack(item("electric_unpacker"))));
+        assertTrue(adapter.matchesMold(new ItemStack(item("electric_wiremill"))));
         assertFalse(adapter.matchesMold(new ItemStack(Items.FURNACE)));
         assertFalse(adapter.matchesMold(ItemStack.EMPTY));
+    }
+
+    @Test
+    void convertsQuantumCircuitBoardStyleAssemblerRecipe() {
+        Item board = item("quantum_circuit_board");
+        MachineRecipe source = recipe(
+                MIMachineRecipeTypes.ASSEMBLER,
+                64,
+                2_000,
+                List.of(new MachineRecipe.ItemInput(Ingredient.of(Items.IRON_INGOT), 1, 1.0f)),
+                List.of(),
+                List.of(new MachineRecipe.ItemOutput(ItemVariant.of(board), 1, 1.0f)),
+                List.of());
+
+        AdvancedAlloyFurnaceRecipe converted = new ModernIndustrializationRecipeAdapter()
+                .convertAll(holder("modern_industrialization", "quantum_circuit_board", source), null)
+                .getFirst();
+
+        assertEquals(128_000L, converted.energy());
+        assertEquals(2_000, converted.processTime());
+        assertTrue(converted.outputs().getFirst().is(board));
+    }
+
+    @Test
+    void omitsNonConsumableFluidWithoutAFilledBucket() {
+        MachineRecipe source = recipe(
+                MIMachineRecipeTypes.MIXER,
+                2,
+                20,
+                List.of(new MachineRecipe.ItemInput(Ingredient.of(Items.IRON_INGOT), 1, 1.0f)),
+                List.of(new MachineRecipe.FluidInput(FluidIngredient.empty(), 1, 0.0f)),
+                List.of(new MachineRecipe.ItemOutput(ItemVariant.of(Items.GOLD_INGOT), 1, 1.0f)),
+                List.of());
+
+        AdvancedAlloyFurnaceRecipe converted = new ModernIndustrializationRecipeAdapter()
+                .convertAll(holder("modern_industrialization", "no_bucket_catalyst", source), null)
+                .getFirst();
+
+        assertTrue(converted.inputFluids().isEmpty());
+        assertEquals(1, converted.molds().size());
+        assertTrue(converted.outputs().getFirst().is(Items.GOLD_INGOT));
     }
 
     @Test

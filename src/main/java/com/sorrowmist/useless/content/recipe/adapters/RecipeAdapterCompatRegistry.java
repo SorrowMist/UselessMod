@@ -87,6 +87,7 @@ public final class RecipeAdapterCompatRegistry {
     public static final String NEOVITAE = RecipeSourceIds.NEOVITAE;
     public static final String UFO = RecipeSourceIds.UFO;
     public static final String MODERN_INDUSTRIALIZATION = RecipeSourceIds.MODERN_INDUSTRIALIZATION;
+    public static final String IMMERSIVE_ENGINEERING = RecipeSourceIds.IMMERSIVE_ENGINEERING;
 
     private static final List<CompatEntry> ENTRIES = List.of(
             new CompatEntry(null, RecipeAdapterCompatRegistry::registerMinecraft),
@@ -116,7 +117,8 @@ public final class RecipeAdapterCompatRegistry {
             new CompatEntry(ORITECH, RecipeAdapterCompatRegistry::registerOritech),
             new CompatEntry(NEOVITAE, RecipeAdapterCompatRegistry::registerNeoVitae),
             new CompatEntry(UFO, RecipeAdapterCompatRegistry::registerUfo),
-            new CompatEntry(MODERN_INDUSTRIALIZATION, RecipeAdapterCompatRegistry::registerModernIndustrialization)
+            new CompatEntry(MODERN_INDUSTRIALIZATION, RecipeAdapterCompatRegistry::registerModernIndustrialization),
+            new CompatEntry(IMMERSIVE_ENGINEERING, RecipeAdapterCompatRegistry::registerImmersiveEngineering)
     );
 
     private RecipeAdapterCompatRegistry() {}
@@ -299,6 +301,11 @@ public final class RecipeAdapterCompatRegistry {
     private static void registerModernIndustrialization() {
         invokeOptionalLoader(
                 "com.sorrowmist.useless.compat.modernindustrialization.ModernIndustrializationRecipeCompatLoader");
+    }
+
+    private static void registerImmersiveEngineering() {
+        invokeOptionalLoader(
+                "com.sorrowmist.useless.compat.immersiveengineering.ImmersiveEngineeringRecipeCompatLoader");
     }
 
     private record CompatEntry(@Nullable String modId, Runnable registerAction) {}

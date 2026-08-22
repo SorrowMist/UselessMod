@@ -47,7 +47,8 @@ class ConfigManagerTest {
                 "oritech",
                 "neovitae",
                 "ufo",
-                "modern_industrialization");
+                "modern_industrialization",
+                "immersiveengineering");
 
         for (String source : externalSources) {
             assertTrue(ConfigManager.isRecipeConversionEnabled(source), source);

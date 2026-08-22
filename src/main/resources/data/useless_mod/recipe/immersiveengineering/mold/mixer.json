@@ -1,0 +1,30 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "building_blocks",
+  "neoforge:conditions": [
+    {
+      "type": "neoforge:mod_loaded",
+      "modid": "immersiveengineering"
+    }
+  ],
+  "pattern": [
+    "IGI",
+    "GCG",
+    "IGI"
+  ],
+  "key": {
+    "I": {
+      "item": "useless_mod:useless_ingot_tier_1"
+    },
+    "G": {
+      "item": "useless_mod:useless_glass_tier_1"
+    },
+    "C": {
+      "item": "immersiveengineering:component_iron"
+    }
+  },
+  "result": {
+    "id": "immersiveengineering:mixer",
+    "count": 1
+  }
+}

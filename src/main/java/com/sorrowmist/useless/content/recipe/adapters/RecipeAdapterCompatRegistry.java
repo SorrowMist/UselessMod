@@ -48,6 +48,8 @@ import com.sorrowmist.useless.content.recipe.adapters.enderio.SagMillingRecipeAd
 import com.sorrowmist.useless.content.recipe.adapters.enderio.SoulBindingRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.enderio.VatFermentingRecipeAdapter;
 import com.sorrowmist.useless.core.config.ConfigManager;
+import net.minecraft.world.item.Items;
+import net.minecraft.world.item.crafting.RecipeType;
 import net.neoforged.fml.ModList;
 import net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent;
 import org.apache.logging.log4j.LogManager;
@@ -158,7 +160,9 @@ public final class RecipeAdapterCompatRegistry {
             register(new CraftingRecipeAdapter());
         }
         if (ConfigManager.isSmeltingRecipeConversionEnabled()) {
-            register(new SmeltingRecipeAdapter());
+            register(new SmeltingRecipeAdapter(RecipeType.SMELTING, Items.FURNACE));
+            register(new SmeltingRecipeAdapter(RecipeType.BLASTING, Items.BLAST_FURNACE));
+            register(new SmeltingRecipeAdapter(RecipeType.SMOKING, Items.SMOKER));
         }
         if (ConfigManager.isBrewingRecipeConversionEnabled()) {
             register(new BrewingRecipeAdapter());

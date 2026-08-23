@@ -22,6 +22,7 @@ import net.minecraft.world.item.crafting.RecipeHolder;
 import net.minecraft.world.item.crafting.RecipeManager;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.material.Fluid;
+import net.minecraft.world.level.material.Fluids;
 import net.neoforged.neoforge.fluids.FluidStack;
 import net.neoforged.neoforge.fluids.FluidUtil;
 import net.neoforged.neoforge.fluids.crafting.FluidIngredient;
@@ -192,6 +193,11 @@ public final class ModernIndustrializationRecipeAdapter implements IRecipeAdapte
             long amount = scaleAmount(input.amount(), probability, operations);
             if (amount <= 0 || amount > Integer.MAX_VALUE) return null;
             if (!mergeFluidInput(inputFluids, input.fluid(), (int) amount)) return null;
+        }
+
+        if (inputCounts.isEmpty() && inputFluids.isEmpty()) {
+            inputFluids.add(new SizedFluidIngredient(
+                    FluidIngredient.single(Fluids.WATER), operations));
         }
 
         for (MachineRecipe.ItemOutput output : source.itemOutputs) {

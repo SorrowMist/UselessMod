@@ -11,14 +11,12 @@ import com.sorrowmist.useless.core.component.OmniversalPatternData;
 import com.sorrowmist.useless.content.recipe.adapters.RecipeAdapterCompatRegistry;
 import com.sorrowmist.useless.content.recipe.adapters.ae.ae2cs.CrystalGrowthRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.ae.ae2lt.AELightningTechCompatLoader;
-import com.sorrowmist.useless.content.recipe.adapters.minecraft.SmeltingRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.mysticalagriculture.SeedEssenceRecipeAdapter;
 import com.sorrowmist.useless.init.ModRecipeTypes;
 import com.mojang.logging.LogUtils;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.crafting.RecipeHolder;
-import net.minecraft.world.item.crafting.RecipeType;
 import net.minecraft.world.level.Level;
 import net.neoforged.neoforge.fluids.FluidStack;
 
@@ -544,7 +542,6 @@ public final class AlloyFurnaceRecipeCatalog {
         Class<?> recipeClass = adapter.getRecipeClass();
         for (RecipeHolder<?> holder : holders) {
             if (!recipeClass.isInstance(holder.value())) continue;
-            if (adapter instanceof SmeltingRecipeAdapter && holder.value().getType() != RecipeType.SMELTING) continue;
             RecipeConversionUtils.convertAll(adapter, holder, level)
                     .forEach(recipe -> output.add(new CollectedRecipe(recipe, sourceId)));
         }

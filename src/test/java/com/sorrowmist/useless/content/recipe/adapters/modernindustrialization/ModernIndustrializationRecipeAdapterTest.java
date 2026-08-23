@@ -4,8 +4,11 @@ import aztech.modern_industrialization.machines.init.MIMachineRecipeTypes;
 import aztech.modern_industrialization.machines.recipe.MachineRecipe;
 import aztech.modern_industrialization.machines.recipe.MachineRecipeType;
 import aztech.modern_industrialization.thirdparty.fabrictransfer.api.item.ItemVariant;
+import com.sorrowmist.useless.compat.jei.OmniversalPatternJeiTransferHandler;
+import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.OmniversalPatternEncoding;
 import com.sorrowmist.useless.content.blockentities.multiblock.OmniversalMoldHubBlockEntity;
 import com.sorrowmist.useless.content.recipe.AdvancedAlloyFurnaceRecipe;
+import com.sorrowmist.useless.content.recipe.FluidIngredientAllocator;
 import net.minecraft.SharedConstants;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceLocation;
@@ -16,16 +19,19 @@ import net.minecraft.world.item.Items;
 import net.minecraft.world.item.crafting.Ingredient;
 import net.minecraft.world.item.crafting.RecipeHolder;
 import net.minecraft.world.level.material.Fluids;
+import net.neoforged.neoforge.fluids.FluidStack;
 import net.neoforged.neoforge.fluids.crafting.FluidIngredient;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.Constructor;
 import java.util.List;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ModernIndustrializationRecipeAdapterTest {
@@ -145,6 +151,73 @@ class ModernIndustrializationRecipeAdapterTest {
     }
 
     @Test
+    void addsWaterToMachineRecipesWhoseOnlyInputsAreNonConsumableMolds() {
+        List<MachineCase> cases = List.of(
+                new MachineCase(MIMachineRecipeTypes.ELECTROLYZER, "electrolyzer", "singularity"),
+                new MachineCase(MIMachineRecipeTypes.PRESSURIZER, "pressurizer", "air_intake"),
+                new MachineCase(MIMachineRecipeTypes.VACUUM_FREEZER, "vacuum_freezer", "air_intake"));
+
+        for (MachineCase machine : cases) {
+            Item nonConsumable = item(machine.inputItem());
+            MachineRecipe source = recipe(
+                    machine.type(),
+                    2,
+                    20,
+                    List.of(new MachineRecipe.ItemInput(
+                            Ingredient.of(nonConsumable), 1, 0.0f)),
+                    List.of(),
+                    List.of(new MachineRecipe.ItemOutput(
+                            ItemVariant.of(Items.GOLD_INGOT), 1, 1.0f)),
+                    List.of());
+
+            AdvancedAlloyFurnaceRecipe converted = new ModernIndustrializationRecipeAdapter()
+                    .convertAll(holder("modern_industrialization", machine.type().getPath(), source), null)
+                    .getFirst();
+
+            assertEquals(1, converted.inputFluids().size(), machine.type().getPath());
+            assertEquals(1, converted.inputFluids().getFirst().amount(), machine.type().getPath());
+            assertTrue(converted.inputFluids().getFirst().ingredient()
+                    .test(new FluidStack(Fluids.WATER, 1)), machine.type().getPath());
+            assertEquals(2, converted.molds().size(), machine.type().getPath());
+            assertTrue(converted.molds().getFirst().test(new ItemStack(item(machine.machineItem()))));
+            assertTrue(converted.molds().get(1).test(new ItemStack(nonConsumable)));
+
+            List<List<appeng.api.stacks.GenericStack>> inputOptions =
+                    OmniversalPatternJeiTransferHandler.inputOptions(converted);
+            assertNotNull(inputOptions, machine.type().getPath());
+            assertEquals(1, inputOptions.size(), machine.type().getPath());
+            assertTrue(inputOptions.getFirst().getFirst().what()
+                    instanceof appeng.api.stacks.AEFluidKey, machine.type().getPath());
+            assertTrue(!OmniversalPatternEncoding.createProcessingPattern(converted).isEmpty(),
+                    machine.type().getPath());
+            assertFalse(FluidIngredientAllocator.matches(
+                    converted.inputFluids(), Map.of(), 1L), machine.type().getPath());
+            assertTrue(FluidIngredientAllocator.matches(
+                    converted.inputFluids(),
+                    Map.of(new FluidStack(Fluids.WATER, 1), 1L), 1L), machine.type().getPath());
+        }
+    }
+
+    @Test
+    void scalesFallbackWaterWithAProbabilityBatch() {
+        MachineRecipe source = recipe(
+                MIMachineRecipeTypes.VACUUM_FREEZER,
+                2,
+                20,
+                List.of(new MachineRecipe.ItemInput(Ingredient.of(item("air_intake")), 1, 0.0f)),
+                List.of(),
+                List.of(new MachineRecipe.ItemOutput(ItemVariant.of(Items.GOLD_INGOT), 1, 0.5f)),
+                List.of());
+
+        AdvancedAlloyFurnaceRecipe converted = new ModernIndustrializationRecipeAdapter()
+                .convertAll(holder("modern_industrialization", "water_batch", source), null)
+                .getFirst();
+
+        assertEquals(2, converted.inputFluids().getFirst().amount());
+        assertEquals(1, converted.outputs().getFirst().getCount());
+    }
+
+    @Test
     void convertsEveryListedMachineRecipeTypeButNotTheGenericFurnaceType() {
         ModernIndustrializationRecipeAdapter adapter = new ModernIndustrializationRecipeAdapter();
         List<MachineRecipeType> listedTypes = List.of(
@@ -228,5 +301,8 @@ class ModernIndustrializationRecipeAdapterTest {
 
     private static RecipeHolder<MachineRecipe> holder(String namespace, String path, MachineRecipe recipe) {
         return new RecipeHolder<>(ResourceLocation.fromNamespaceAndPath(namespace, path), recipe);
+    }
+
+    private record MachineCase(MachineRecipeType type, String machineItem, String inputItem) {
     }
 }

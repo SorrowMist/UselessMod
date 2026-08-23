@@ -7,6 +7,7 @@ import com.sorrowmist.useless.content.recipe.CountedIngredient;
 import com.sorrowmist.useless.content.recipe.IRecipeAdapter;
 import net.minecraft.core.NonNullList;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.item.crafting.AbstractCookingRecipe;
@@ -22,14 +23,25 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 熔炉配方适配器
- * <p>
- * 支持原版熔炉配方
+ * 原版烹饪配方适配器。
  */
 public class SmeltingRecipeAdapter implements IRecipeAdapter<AbstractCookingRecipe> {
 
     // 处理时间基础值（ticks）
     private static final int BASE_PROCESS_TIME = 200;
+    private final RecipeType<? extends AbstractCookingRecipe> recipeType;
+    private final Item moldItem;
+
+    public SmeltingRecipeAdapter() {
+        this(RecipeType.SMELTING, Items.FURNACE);
+    }
+
+    public SmeltingRecipeAdapter(
+            RecipeType<? extends AbstractCookingRecipe> recipeType,
+            Item moldItem) {
+        this.recipeType = recipeType;
+        this.moldItem = moldItem;
+    }
 
     @Override
     public Class<AbstractCookingRecipe> getRecipeClass() {
@@ -42,6 +54,7 @@ public class SmeltingRecipeAdapter implements IRecipeAdapter<AbstractCookingReci
         if (holder == null) return null;
 
         AbstractCookingRecipe originalRecipe = holder.value();
+        if (originalRecipe.getType() != recipeType) return null;
         ResourceLocation originalId = holder.id();
 
         // 获取输入材料
@@ -66,8 +79,7 @@ public class SmeltingRecipeAdapter implements IRecipeAdapter<AbstractCookingReci
         // 能量消耗根据处理时间比例调整
         int energy = AdapterUtils.safeInt((long) processTime * AdapterUtils.DEFAULT_ENERGY / BASE_PROCESS_TIME);
 
-        // 熔炉配方需要熔炉作为模具/标志物
-        Ingredient furnaceMold = AdapterUtils.toMoldIngredient(getMoldItem());
+        Ingredient cookingMold = AdapterUtils.toMoldIngredient(getMoldItem());
 
         return new AdvancedAlloyFurnaceRecipe(
                 AdapterUtils.convertedId(originalId),
@@ -79,7 +91,7 @@ public class SmeltingRecipeAdapter implements IRecipeAdapter<AbstractCookingReci
                 processTime,
                 Ingredient.EMPTY,
                 0,
-                furnaceMold,
+                cookingMold,
                 AlloyFurnaceMode.NORMAL
         );
     }
@@ -87,7 +99,7 @@ public class SmeltingRecipeAdapter implements IRecipeAdapter<AbstractCookingReci
     @Override
     @Nullable
     public ItemStack getMoldItem() {
-        return new ItemStack(Items.FURNACE);
+        return new ItemStack(moldItem);
     }
 
     @Override
@@ -98,14 +110,13 @@ public class SmeltingRecipeAdapter implements IRecipeAdapter<AbstractCookingReci
 
         RecipeManager recipeManager = level.getRecipeManager();
 
-        // 只查找原版熔炉配方
-        return castHolders(findSmeltingRecipes(recipeManager, RecipeType.SMELTING, mergedInputs));
+        return castHolders(findCookingRecipes(recipeManager, recipeType, mergedInputs));
     }
 
     /**
-     * 查找匹配的熔炉配方
+     * 查找匹配的原版烹饪配方
      */
-    private <T extends AbstractCookingRecipe> List<RecipeHolder<T>> findSmeltingRecipes(
+    private <T extends AbstractCookingRecipe> List<RecipeHolder<T>> findCookingRecipes(
             RecipeManager recipeManager,
             RecipeType<T> recipeType,
             Map<Ingredient, Long> mergedInputs
@@ -134,7 +145,7 @@ public class SmeltingRecipeAdapter implements IRecipeAdapter<AbstractCookingReci
 
     @Override
     public boolean matchesMold(@Nullable ItemStack mold) {
-        return mold != null && !mold.isEmpty() && mold.is(Items.FURNACE);
+        return mold != null && !mold.isEmpty() && mold.is(moldItem);
     }
 
 }

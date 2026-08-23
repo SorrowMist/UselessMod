@@ -90,6 +90,7 @@ public class ConfigManager {
     private static final ModConfigSpec.BooleanValue ENABLE_UFO_RECIPE_CONVERSION;
     private static final ModConfigSpec.BooleanValue ENABLE_MODERN_INDUSTRIALIZATION_RECIPE_CONVERSION;
     private static final ModConfigSpec.BooleanValue ENABLE_IMMERSIVE_ENGINEERING_RECIPE_CONVERSION;
+    private static final ModConfigSpec.BooleanValue ENABLE_PNEUMATICCRAFT_RECIPE_CONVERSION;
     private static final Map<String, ModConfigSpec.BooleanValue> RECIPE_CONVERSION_OPTIONS;
 
     private static final ModConfigSpec.IntValue OMNIVERSAL_PATTERN_SLOTS;
@@ -329,6 +330,8 @@ public class ConfigManager {
                 "enable_modern_industrialization_recipe_conversion", true);
         ENABLE_IMMERSIVE_ENGINEERING_RECIPE_CONVERSION = defineRecipeConversionOption(
                 "enable_immersiveengineering_recipe_conversion", true);
+        ENABLE_PNEUMATICCRAFT_RECIPE_CONVERSION = defineRecipeConversionOption(
+                "enable_pneumaticcraft_recipe_conversion", true);
 
         RECIPE_CONVERSION_OPTIONS = Map.ofEntries(
                 Map.entry("extendedae", ENABLE_EXTENDED_AE_RECIPE_CONVERSION),
@@ -359,7 +362,8 @@ public class ConfigManager {
                 Map.entry("neovitae", ENABLE_NEOVITAE_RECIPE_CONVERSION),
                 Map.entry("ufo", ENABLE_UFO_RECIPE_CONVERSION),
                 Map.entry("modern_industrialization", ENABLE_MODERN_INDUSTRIALIZATION_RECIPE_CONVERSION),
-                Map.entry("immersiveengineering", ENABLE_IMMERSIVE_ENGINEERING_RECIPE_CONVERSION));
+                Map.entry("immersiveengineering", ENABLE_IMMERSIVE_ENGINEERING_RECIPE_CONVERSION),
+                Map.entry("pneumaticcraft", ENABLE_PNEUMATICCRAFT_RECIPE_CONVERSION));
         COMMON_BUILDER.pop();
 
         COMMON_SPEC = COMMON_BUILDER.build();

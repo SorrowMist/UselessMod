@@ -217,8 +217,8 @@ dependencies {
     implementation "curse.maven:modern-industrialization-405388:8597392"
     implementation "curse.maven:ufo-future-1372445:8372110"
     implementation "curse.maven:immersive-engineering-231951:6733669"
-    //implementation "curse.maven:extended-industrialization-1068418:8666147"
-    //implementation "curse.maven:tesseract-api-neoforge-1067672:8639010"
+    implementation "curse.maven:pneumaticcraft-repressurized-281849:8519226"
+    implementation "curse.maven:applied-pneumatics-1355087:7723695"
 
     implementation "curse.maven:glodium-957920:5821676"
     implementation "curse.maven:ex-pattern-provider-892005:8025439"  // 2.2.32

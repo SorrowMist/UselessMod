@@ -34,6 +34,7 @@ public final class RecipeSourceIds {
     public static final String UFO = "ufo";
     public static final String MODERN_INDUSTRIALIZATION = "modern_industrialization";
     public static final String IMMERSIVE_ENGINEERING = "immersiveengineering";
+    public static final String PNEUMATICCRAFT = "pneumaticcraft";
 
     private RecipeSourceIds() {
     }
@@ -74,6 +75,7 @@ public final class RecipeSourceIds {
         if (name.endsWith(".ufo")) return UFO;
         if (name.endsWith(".modernindustrialization")) return MODERN_INDUSTRIALIZATION;
         if (name.endsWith(".immersiveengineering")) return IMMERSIVE_ENGINEERING;
+        if (name.endsWith(".pneumaticcraft")) return PNEUMATICCRAFT;
         if (name.endsWith(".mekanism") || name.endsWith(".generators")) return MEKANISM;
         return UNKNOWN;
     }

@@ -16,26 +16,42 @@ public final class RecipeConversionUtils {
     }
 
     public static List<AdvancedAlloyFurnaceRecipe> convertAll(
-            IRecipeAdapter<?> adapter, RecipeHolder<?> holder, Level level) {
+            com.sorrowmist.useless.api.recipe.IRecipeAdapter<?> adapter, RecipeHolder<?> holder, Level level) {
         return convert(adapter, holder, level, null, false);
     }
 
+    /** @deprecated Use the public API adapter type. */
+    @Deprecated(forRemoval = false)
     public static List<AdvancedAlloyFurnaceRecipe> convertAll(
-            IRecipeAdapter<?> adapter, RecipeHolder<?> holder, Level level,
+            IRecipeAdapter<?> adapter, RecipeHolder<?> holder, Level level) {
+        return convertAll((com.sorrowmist.useless.api.recipe.IRecipeAdapter<?>) adapter, holder, level);
+    }
+
+    public static List<AdvancedAlloyFurnaceRecipe> convertAll(
+            com.sorrowmist.useless.api.recipe.IRecipeAdapter<?> adapter, RecipeHolder<?> holder, Level level,
             List<ItemStack> actualInputs) {
         return convert(adapter, holder, level, actualInputs, true);
     }
 
+    /** @deprecated Use the public API adapter type. */
+    @Deprecated(forRemoval = false)
+    public static List<AdvancedAlloyFurnaceRecipe> convertAll(
+            IRecipeAdapter<?> adapter, RecipeHolder<?> holder, Level level,
+            List<ItemStack> actualInputs) {
+        return convertAll((com.sorrowmist.useless.api.recipe.IRecipeAdapter<?>) adapter,
+                holder, level, actualInputs);
+    }
+
     @SuppressWarnings({"rawtypes", "unchecked"})
     private static List<AdvancedAlloyFurnaceRecipe> convert(
-            IRecipeAdapter<?> adapter, RecipeHolder<?> holder, Level level,
+            com.sorrowmist.useless.api.recipe.IRecipeAdapter<?> adapter, RecipeHolder<?> holder, Level level,
             List<ItemStack> actualInputs, boolean useActualInputs) {
         if (adapter == null || holder == null) {
             return List.of();
         }
 
         try {
-            IRecipeAdapter rawAdapter = adapter;
+            com.sorrowmist.useless.api.recipe.IRecipeAdapter rawAdapter = adapter;
             List<AdvancedAlloyFurnaceRecipe> converted = useActualInputs
                     ? rawAdapter.convertAll((RecipeHolder) holder, level, actualInputs)
                     : rawAdapter.convertAll((RecipeHolder) holder, level);

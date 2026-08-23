@@ -12,6 +12,7 @@ import net.neoforged.neoforge.fluids.crafting.SizedFluidIngredient;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 
 public class AdvancedAlloyFurnaceRecipeBuilder {
 
@@ -19,6 +20,7 @@ public class AdvancedAlloyFurnaceRecipeBuilder {
     private final List<SizedFluidIngredient> inputFluids = new ArrayList<>();
     private final List<GenericStack> keyInputs = new ArrayList<>();
     private final List<ItemStack> outputs = new ArrayList<>();
+    private final List<FluidStack> outputFluids = new ArrayList<>();
     private final List<GenericStack> keyOutputs = new ArrayList<>();
     private long energy = 2000L;
     private int processTime = 200;
@@ -32,8 +34,12 @@ public class AdvancedAlloyFurnaceRecipeBuilder {
     }
 
     public AdvancedAlloyFurnaceRecipeBuilder input(Ingredient ingredient, long count) {
-        this.inputs.add(new CountedIngredient(ingredient, count));
+        this.inputs.add(new CountedIngredient(Objects.requireNonNull(ingredient, "ingredient"), count));
         return this;
+    }
+
+    public AdvancedAlloyFurnaceRecipeBuilder input(ItemLike item, long count) {
+        return input(Ingredient.of(Objects.requireNonNull(item, "item")), count);
     }
 
     public AdvancedAlloyFurnaceRecipeBuilder fluidInput(FluidStack fluid) {
@@ -50,17 +56,35 @@ public class AdvancedAlloyFurnaceRecipeBuilder {
     }
 
     public AdvancedAlloyFurnaceRecipeBuilder keyInput(GenericStack keyInput) {
-        this.keyInputs.add(keyInput);
+        if (keyInput != null) {
+            this.keyInputs.add(keyInput);
+        }
         return this;
     }
 
     public AdvancedAlloyFurnaceRecipeBuilder output(ItemLike item, int count) {
-        this.outputs.add(new ItemStack(item, count));
+        this.outputs.add(new ItemStack(Objects.requireNonNull(item, "item"), count));
+        return this;
+    }
+
+    public AdvancedAlloyFurnaceRecipeBuilder output(ItemStack output) {
+        if (output != null && !output.isEmpty()) {
+            this.outputs.add(output.copy());
+        }
+        return this;
+    }
+
+    public AdvancedAlloyFurnaceRecipeBuilder fluidOutput(FluidStack output) {
+        if (output != null && !output.isEmpty()) {
+            this.outputFluids.add(output.copy());
+        }
         return this;
     }
 
     public AdvancedAlloyFurnaceRecipeBuilder keyOutput(GenericStack keyOutput) {
-        this.keyOutputs.add(keyOutput);
+        if (keyOutput != null) {
+            this.keyOutputs.add(keyOutput);
+        }
         return this;
     }
 
@@ -75,7 +99,7 @@ public class AdvancedAlloyFurnaceRecipeBuilder {
     }
 
     public AdvancedAlloyFurnaceRecipeBuilder catalyst(Ingredient catalyst, int uses) {
-        this.catalyst = catalyst;
+        this.catalyst = Objects.requireNonNull(catalyst, "catalyst");
         this.catalystUses = uses;
         return this;
     }
@@ -110,23 +134,27 @@ public class AdvancedAlloyFurnaceRecipeBuilder {
 
     /** Adds one independent mold requirement. */
     public AdvancedAlloyFurnaceRecipeBuilder addMold(Ingredient mold) {
-        this.molds.add(mold);
+        if (mold != null) {
+            this.molds.add(mold);
+        }
         return this;
     }
 
     public AdvancedAlloyFurnaceRecipeBuilder mode(AlloyFurnaceMode mode) {
-        this.mode = mode;
+        this.mode = Objects.requireNonNull(mode, "mode");
         return this;
     }
 
-    public void save(RecipeOutput output, ResourceLocation id) {
-        var recipe = new AdvancedAlloyFurnaceRecipe(
+    /** Builds an in-memory recipe for use by an adapter conversion method. */
+    public AdvancedAlloyFurnaceRecipe build(ResourceLocation id) {
+        Objects.requireNonNull(id, "id");
+        return new AdvancedAlloyFurnaceRecipe(
                 id,
                 List.copyOf(this.inputs),
                 List.copyOf(this.inputFluids),
                 List.copyOf(this.keyInputs),
-                List.copyOf(this.outputs),
-                List.of(), // outputFluids 如果不需要可以留空
+                this.outputs.stream().map(ItemStack::copy).toList(),
+                this.outputFluids.stream().map(FluidStack::copy).toList(),
                 List.copyOf(this.keyOutputs),
                 this.energy,
                 this.processTime,
@@ -135,6 +163,9 @@ public class AdvancedAlloyFurnaceRecipeBuilder {
                 List.copyOf(this.molds),
                 this.mode
         );
-        output.accept(id, recipe, null); // null = 无 advancement
+    }
+
+    public void save(RecipeOutput output, ResourceLocation id) {
+        output.accept(id, build(id), null); // null = no advancement
     }
 }

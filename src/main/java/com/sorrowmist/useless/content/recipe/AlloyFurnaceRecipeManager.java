@@ -41,11 +41,11 @@ public class AlloyFurnaceRecipeManager {
     private static AlloyFurnaceRecipeManager INSTANCE;
 
     /** 按模具物品直接查找 adapter（getMoldItem() != null 的注册到这里） */
-    private final Map<Item, List<IRecipeAdapter<?>>> moldAdapterMap = new ConcurrentHashMap<>();
+    private final Map<Item, List<com.sorrowmist.useless.api.recipe.IRecipeAdapter<?>>> moldAdapterMap = new ConcurrentHashMap<>();
     /** 无固定模具的 adapter，需通过 matchesMold() 动态判断（如 SeedEssenceRecipeAdapter） */
-    private final List<IRecipeAdapter<?>> fallbackAdapters = new CopyOnWriteArrayList<>();
-    private final List<IRecipeAdapter<?>> allAdapters = new CopyOnWriteArrayList<>();
-    private final Map<IRecipeAdapter<?>, String> adapterSourceIds = new ConcurrentHashMap<>();
+    private final List<com.sorrowmist.useless.api.recipe.IRecipeAdapter<?>> fallbackAdapters = new CopyOnWriteArrayList<>();
+    private final List<com.sorrowmist.useless.api.recipe.IRecipeAdapter<?>> allAdapters = new CopyOnWriteArrayList<>();
+    private final Map<com.sorrowmist.useless.api.recipe.IRecipeAdapter<?>, String> adapterSourceIds = new ConcurrentHashMap<>();
 
     // access-order LinkedHashMap（LRU）。get() 会改动内部链表，非线程安全，
     // 而 findRecipe 可能被 AE 合成任务和主线程同时调用，故用 synchronizedMap 保护。
@@ -87,30 +87,52 @@ public class AlloyFurnaceRecipeManager {
     private AlloyFurnaceRecipeManager() {
     }
 
-    public void registerAdapter(IRecipeAdapter<?> adapter) {
+    public void registerAdapter(com.sorrowmist.useless.api.recipe.IRecipeAdapter<?> adapter) {
         registerAdapter(adapter, adapter == null ? RecipeSourceIds.UNKNOWN : adapter.sourceId());
     }
 
-    public void registerAdapter(IRecipeAdapter<?> adapter, String sourceId) {
+    /** @deprecated Use the public API adapter type. */
+    @Deprecated(forRemoval = false)
+    public void registerAdapter(IRecipeAdapter<?> adapter) {
+        registerAdapter((com.sorrowmist.useless.api.recipe.IRecipeAdapter<?>) adapter);
+    }
+
+    public void registerAdapter(com.sorrowmist.useless.api.recipe.IRecipeAdapter<?> adapter, String sourceId) {
         if (adapter == null) return;
-        allAdapters.add(adapter);
-        adapterSourceIds.put(adapter, RecipeSourceIds.normalize(sourceId));
         ItemStack moldItem = adapter.getMoldItem();
+
+        String normalizedSource = RecipeSourceIds.normalize(sourceId);
+        allAdapters.add(adapter);
+        adapterSourceIds.put(adapter, normalizedSource);
         if (moldItem != null && !moldItem.isEmpty()) {
             moldAdapterMap.computeIfAbsent(moldItem.getItem(), ignored -> new CopyOnWriteArrayList<>())
                     .add(adapter);
         } else {
             fallbackAdapters.add(adapter);
         }
+        clearCache();
+        invalidateIndex();
     }
 
-    public List<IRecipeAdapter<?>> getRegisteredAdapters() {
+    /** @deprecated Use the public API adapter type. */
+    @Deprecated(forRemoval = false)
+    public void registerAdapter(IRecipeAdapter<?> adapter, String sourceId) {
+        registerAdapter((com.sorrowmist.useless.api.recipe.IRecipeAdapter<?>) adapter, sourceId);
+    }
+
+    public List<com.sorrowmist.useless.api.recipe.IRecipeAdapter<?>> getRegisteredAdapters() {
         return List.copyOf(allAdapters);
     }
 
-    public String getAdapterSourceId(IRecipeAdapter<?> adapter) {
+    public String getAdapterSourceId(com.sorrowmist.useless.api.recipe.IRecipeAdapter<?> adapter) {
         if (adapter == null) return RecipeSourceIds.UNKNOWN;
         return adapterSourceIds.getOrDefault(adapter, RecipeSourceIds.normalize(adapter.sourceId()));
+    }
+
+    /** @deprecated Use the public API adapter type. */
+    @Deprecated(forRemoval = false)
+    public String getAdapterSourceId(IRecipeAdapter<?> adapter) {
+        return getAdapterSourceId((com.sorrowmist.useless.api.recipe.IRecipeAdapter<?>) adapter);
     }
 
     public void buildIndex(Level level) {
@@ -551,16 +573,16 @@ public class AlloyFurnaceRecipeManager {
 
         ItemStack mold = context.mold();
         if (mold != null && !mold.isEmpty()) {
-            List<IRecipeAdapter<?>> exactAdapters = moldAdapterMap.get(mold.getItem());
+            List<com.sorrowmist.useless.api.recipe.IRecipeAdapter<?>> exactAdapters = moldAdapterMap.get(mold.getItem());
             if (exactAdapters != null) {
-                for (IRecipeAdapter<?> exactAdapter : exactAdapters) {
+                for (com.sorrowmist.useless.api.recipe.IRecipeAdapter<?> exactAdapter : exactAdapters) {
                     collectAdapterRecipes(exactAdapter, level, context.inputs(), mergedInputs, mergedFluids,
                             mergedKeys, mold, candidates);
                 }
             }
         }
 
-        for (IRecipeAdapter<?> adapter : fallbackAdapters) {
+        for (com.sorrowmist.useless.api.recipe.IRecipeAdapter<?> adapter : fallbackAdapters) {
             if (adapter.matchesMold(mold)) {
                 collectAdapterRecipes(adapter, level, context.inputs(), mergedInputs, mergedFluids,
                         mergedKeys, mold, candidates);
@@ -571,12 +593,13 @@ public class AlloyFurnaceRecipeManager {
 
     @SuppressWarnings("unchecked")
     private <T extends Recipe<?>> void collectAdapterRecipes(
-            IRecipeAdapter<?> adapter, Level level,
+            com.sorrowmist.useless.api.recipe.IRecipeAdapter<?> adapter, Level level,
             List<ItemStack> actualInputs,
             Map<Ingredient, Long> mergedInputs, Map<FluidStack, Long> mergedFluids,
             Map<AEKey, Long> mergedKeys, @Nullable ItemStack mold,
             List<AdvancedAlloyFurnaceRecipe> candidates) {
-        IRecipeAdapter<T> typedAdapter = (IRecipeAdapter<T>) adapter;
+        com.sorrowmist.useless.api.recipe.IRecipeAdapter<T> typedAdapter =
+                (com.sorrowmist.useless.api.recipe.IRecipeAdapter<T>) adapter;
         for (RecipeHolder<T> holder : typedAdapter.findMatchingRecipes(
                 level, mergedInputs, mergedFluids, mergedKeys, mold, actualInputs)) {
             candidates.addAll(RecipeConversionUtils.convertAll(typedAdapter, holder, level, actualInputs));

@@ -477,7 +477,7 @@ public final class AlloyFurnaceRecipeCatalog {
         }
 
         Collection<RecipeHolder<?>> sourceRecipes = level.getRecipeManager().getRecipes();
-        for (IRecipeAdapter<?> adapter : AlloyFurnaceRecipeManager.getInstance().getRegisteredAdapters()) {
+        for (com.sorrowmist.useless.api.recipe.IRecipeAdapter<?> adapter : AlloyFurnaceRecipeManager.getInstance().getRegisteredAdapters()) {
             if (adapter.getClass().getPackageName().contains(".ae.ae2lt")) continue;
             String sourceId = AlloyFurnaceRecipeManager.getInstance().getAdapterSourceId(adapter);
             if (adapter instanceof SeedEssenceRecipeAdapter synthetic) {
@@ -538,7 +538,7 @@ public final class AlloyFurnaceRecipeCatalog {
         return snapshot;
     }
 
-    private static void collectConverted(IRecipeAdapter<?> adapter, String sourceId,
+    private static void collectConverted(com.sorrowmist.useless.api.recipe.IRecipeAdapter<?> adapter, String sourceId,
                                          Collection<RecipeHolder<?>> holders, Level level,
                                          List<CollectedRecipe> output) {
         Class<?> recipeClass = adapter.getRecipeClass();
@@ -550,7 +550,7 @@ public final class AlloyFurnaceRecipeCatalog {
         }
     }
 
-    private static void collectGenerated(IRecipeAdapter<?> adapter, String sourceId, Level level,
+    private static void collectGenerated(com.sorrowmist.useless.api.recipe.IRecipeAdapter<?> adapter, String sourceId, Level level,
                                          List<CollectedRecipe> output) {
         List<? extends RecipeHolder<?>> generated;
         try {

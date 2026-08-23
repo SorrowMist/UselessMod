@@ -4,6 +4,7 @@ import appeng.api.stacks.AEItemKey;
 import appeng.api.stacks.GenericStack;
 import appeng.integration.modules.itemlists.EncodingHelper;
 import appeng.menu.me.items.PatternEncodingTermMenu;
+import com.sorrowmist.useless.compat.extendedae.ExtendedAEPlusJeiCompat;
 import com.sorrowmist.useless.content.recipe.AdvancedAlloyFurnaceRecipe;
 import com.sorrowmist.useless.content.recipe.AlloyFurnaceRecipeCatalog;
 import com.sorrowmist.useless.content.recipe.AlloyFurnaceRecipeFingerprint;
@@ -19,6 +20,7 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.MenuType;
 import net.minecraft.world.item.ItemStack;
 import net.neoforged.neoforge.fluids.FluidStack;
+import net.neoforged.fml.ModList;
 import net.neoforged.neoforge.network.PacketDistributor;
 import org.jetbrains.annotations.Nullable;
 
@@ -81,6 +83,12 @@ public final class OmniversalPatternJeiTransferHandler<T extends PatternEncoding
             Player player,
             boolean maxTransfer,
             boolean doTransfer) {
+        // 骚货iava出来受精
+        if (doTransfer) {
+            if (ModList.get().isLoaded("extendedae_plus")) {
+                ExtendedAEPlusJeiCompat.presetAlloyFurnaceSearchKey();
+            }
+        }
         return transferOmniversalRecipe(menu, entry, recipeSlots, player, maxTransfer, doTransfer, this.helper);
     }
 

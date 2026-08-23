@@ -89,6 +89,7 @@ public final class RecipeAdapterCompatRegistry {
     public static final String MODERN_INDUSTRIALIZATION = RecipeSourceIds.MODERN_INDUSTRIALIZATION;
     public static final String IMMERSIVE_ENGINEERING = RecipeSourceIds.IMMERSIVE_ENGINEERING;
     public static final String PNEUMATICCRAFT = RecipeSourceIds.PNEUMATICCRAFT;
+    public static final String BIG_REACTORS = RecipeSourceIds.BIG_REACTORS;
 
     private static final List<CompatEntry> ENTRIES = List.of(
             new CompatEntry(null, RecipeAdapterCompatRegistry::registerMinecraft),
@@ -120,7 +121,8 @@ public final class RecipeAdapterCompatRegistry {
             new CompatEntry(UFO, RecipeAdapterCompatRegistry::registerUfo),
             new CompatEntry(MODERN_INDUSTRIALIZATION, RecipeAdapterCompatRegistry::registerModernIndustrialization),
             new CompatEntry(IMMERSIVE_ENGINEERING, RecipeAdapterCompatRegistry::registerImmersiveEngineering),
-            new CompatEntry(PNEUMATICCRAFT, RecipeAdapterCompatRegistry::registerPneumaticCraft)
+            new CompatEntry(PNEUMATICCRAFT, RecipeAdapterCompatRegistry::registerPneumaticCraft),
+            new CompatEntry(BIG_REACTORS, RecipeAdapterCompatRegistry::registerBigReactors)
     );
 
     private RecipeAdapterCompatRegistry() {}
@@ -313,6 +315,11 @@ public final class RecipeAdapterCompatRegistry {
     private static void registerPneumaticCraft() {
         invokeOptionalLoader(
                 "com.sorrowmist.useless.compat.pneumaticcraft.PneumaticCraftRecipeCompatLoader");
+    }
+
+    private static void registerBigReactors() {
+        invokeOptionalLoader(
+                "com.sorrowmist.useless.compat.extremereactors.ExtremeReactorsRecipeCompatLoader");
     }
 
     private record CompatEntry(@Nullable String modId, Runnable registerAction) {}

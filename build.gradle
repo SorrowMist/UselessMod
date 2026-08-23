@@ -219,6 +219,8 @@ dependencies {
     implementation "curse.maven:immersive-engineering-231951:6733669"
     implementation "curse.maven:pneumaticcraft-repressurized-281849:8519226"
     implementation "curse.maven:applied-pneumatics-1355087:7723695"
+    implementation "curse.maven:extreme-reactors-250277:7344744"
+    implementation "curse.maven:zerocore-247921:7344742"
 
     implementation "curse.maven:glodium-957920:5821676"
     implementation "curse.maven:ex-pattern-provider-892005:8025439"  // 2.2.32

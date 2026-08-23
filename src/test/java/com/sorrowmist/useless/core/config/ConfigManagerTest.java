@@ -49,7 +49,8 @@ class ConfigManagerTest {
                 "ufo",
                 "modern_industrialization",
                 "immersiveengineering",
-                "pneumaticcraft");
+                "pneumaticcraft",
+                "bigreactors");
 
         for (String source : externalSources) {
             assertTrue(ConfigManager.isRecipeConversionEnabled(source), source);
@@ -66,5 +67,11 @@ class ConfigManagerTest {
         assertInstanceOf(ModConfigSpec.ValueSpec.class, pneumaticSpec);
         assertEquals(Boolean.TRUE, ((ModConfigSpec.ValueSpec) pneumaticSpec).getDefault());
         assertTrue(ConfigManager.isRecipeConversionEnabled(RecipeSourceIds.PNEUMATICCRAFT));
+
+        Object extremeReactorsSpec = ConfigManager.COMMON_SPEC.getSpec()
+                .get(List.of("advanced_alloy_furnace", "enable_bigreactors_recipe_conversion"));
+        assertInstanceOf(ModConfigSpec.ValueSpec.class, extremeReactorsSpec);
+        assertEquals(Boolean.TRUE, ((ModConfigSpec.ValueSpec) extremeReactorsSpec).getDefault());
+        assertTrue(ConfigManager.isRecipeConversionEnabled(RecipeSourceIds.BIG_REACTORS));
     }
 }

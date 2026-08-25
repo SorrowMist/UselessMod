@@ -7,9 +7,9 @@ import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.chemical.F
 import com.sorrowmist.useless.content.recipe.AdvancedAlloyFurnaceRecipe;
 import com.sorrowmist.useless.content.recipe.FluidIngredientAllocator;
 import com.sorrowmist.useless.content.recipe.ItemIngredientAllocator;
+import com.sorrowmist.useless.content.recipe.LongSizedFluidIngredient;
 import net.minecraft.world.item.ItemStack;
 import net.neoforged.neoforge.fluids.FluidStack;
-import net.neoforged.neoforge.fluids.crafting.SizedFluidIngredient;
 import net.neoforged.neoforge.fluids.capability.IFluidHandler;
 import net.neoforged.neoforge.fluids.capability.templates.FluidTank;
 import net.neoforged.neoforge.items.ItemStackHandler;
@@ -152,8 +152,8 @@ public final class FurnaceInputPort {
         return inputs;
     }
 
-    private static long[] allocateFluids(List<SizedFluidIngredient> requirements, long operations, FluidTank[] tanks, int fluidTankCount) {
-        FluidIngredientAllocator.Allocation allocation = FluidIngredientAllocator.allocateTanks(
+    private static long[] allocateFluids(List<LongSizedFluidIngredient> requirements, long operations, FluidTank[] tanks, int fluidTankCount) {
+        FluidIngredientAllocator.Allocation allocation = FluidIngredientAllocator.allocateTanksLong(
                 requirements, tanks, fluidTankCount, operations);
         if (allocation == null) return null;
         long[] consumed = new long[allocation.supplyCount()];
@@ -163,8 +163,8 @@ public final class FurnaceInputPort {
         return consumed;
     }
 
-    private static int maxFluidOperations(List<SizedFluidIngredient> requirements, FluidTank[] tanks, int fluidTankCount) {
-        return FluidIngredientAllocator.maxTankOperations(requirements, tanks, fluidTankCount);
+    private static int maxFluidOperations(List<LongSizedFluidIngredient> requirements, FluidTank[] tanks, int fluidTankCount) {
+        return FluidIngredientAllocator.maxTankOperationsLong(requirements, tanks, fluidTankCount);
     }
 
     private static long[] allocateChemicals(List<GenericStack> requirements, long operations,

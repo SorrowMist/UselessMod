@@ -135,6 +135,18 @@ class FluidIngredientAllocatorTest {
         assertTrue(FluidIngredientAllocator.matches(List.of(empty), List.of(), 0L));
     }
 
+    @Test
+    void longRequirementsUseLongAeSuppliesWithoutCreatingLargeFluidStacks() {
+        long requiredAmount = (long) Integer.MAX_VALUE + 1L;
+        List<LongSizedFluidIngredient> requirements = List.of(
+                new LongSizedFluidIngredient(FluidIngredient.of(Fluids.WATER), requiredAmount));
+
+        assertTrue(FluidIngredientAllocator.matchesLong(
+                requirements, Map.of(water(1), requiredAmount), 1L));
+        assertFalse(FluidIngredientAllocator.matchesLong(
+                requirements, Map.of(water(1), requiredAmount - 1L), 1L));
+    }
+
     private static Holder<Fluid> holder(Fluid fluid) {
         ResourceLocation id = BuiltInRegistries.FLUID.getKey(fluid);
         return BuiltInRegistries.FLUID.getHolderOrThrow(ResourceKey.create(Registries.FLUID, id));

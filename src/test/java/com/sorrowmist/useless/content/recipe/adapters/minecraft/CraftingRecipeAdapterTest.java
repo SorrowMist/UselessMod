@@ -3,6 +3,7 @@ package com.sorrowmist.useless.content.recipe.adapters.minecraft;
 import com.sorrowmist.useless.api.enums.AlloyFurnaceMode;
 import com.sorrowmist.useless.content.recipe.AdapterUtils;
 import com.sorrowmist.useless.content.recipe.AdvancedAlloyFurnaceRecipe;
+import com.sorrowmist.useless.content.recipe.LongSizedFluidIngredient;
 import net.minecraft.SharedConstants;
 import net.minecraft.core.Holder;
 import net.minecraft.core.NonNullList;
@@ -27,7 +28,6 @@ import net.minecraft.world.item.crafting.ShapelessRecipe;
 import net.minecraft.world.level.material.Fluids;
 import net.neoforged.neoforge.common.crafting.DataComponentIngredient;
 import net.neoforged.neoforge.fluids.FluidStack;
-import net.neoforged.neoforge.fluids.crafting.SizedFluidIngredient;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -419,11 +419,11 @@ class CraftingRecipeAdapterTest {
                 .sum();
     }
 
-    private static int fluidAmount(
-            List<SizedFluidIngredient> stacks, net.minecraft.world.level.material.Fluid fluid) {
+    private static long fluidAmount(
+            List<LongSizedFluidIngredient> stacks, net.minecraft.world.level.material.Fluid fluid) {
         return stacks.stream()
                 .filter(stack -> stack.ingredient().test(new FluidStack(fluid, 1)))
-                .mapToInt(SizedFluidIngredient::amount)
+                .mapToLong(LongSizedFluidIngredient::amount)
                 .sum();
     }
 }

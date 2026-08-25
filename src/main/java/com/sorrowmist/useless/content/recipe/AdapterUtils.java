@@ -332,6 +332,13 @@ public class AdapterUtils {
         return FluidIngredientAllocator.matches(requirements, mergedFluids, 1L);
     }
 
+    public static boolean matchesLongFluidIngredients(
+            @Nullable Map<FluidStack, Long> mergedFluids,
+            List<LongSizedFluidIngredient> requirements) {
+        if (requirements == null || requirements.isEmpty()) return true;
+        return FluidIngredientAllocator.matchesLong(requirements, mergedFluids, 1L);
+    }
+
     /**
      * 将 GenericStack 列表按 AEKey 合并，返回合并后的数量 Map。
      *

@@ -4,6 +4,7 @@ import appeng.api.stacks.GenericStack;
 import com.sorrowmist.useless.api.enums.AlloyFurnaceMode;
 import com.sorrowmist.useless.content.recipe.AdvancedAlloyFurnaceRecipe;
 import com.sorrowmist.useless.content.recipe.AdvancedAlloyFurnaceRecipeBuilder;
+import com.sorrowmist.useless.content.recipe.LongSizedFluidIngredient;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.crafting.Ingredient;
@@ -42,6 +43,12 @@ public final class AlloyFurnaceRecipeBuilder extends AdvancedAlloyFurnaceRecipeB
 
     @Override
     public AlloyFurnaceRecipeBuilder fluidInput(SizedFluidIngredient fluid) {
+        super.fluidInput(fluid);
+        return this;
+    }
+
+    @Override
+    public AlloyFurnaceRecipeBuilder fluidInput(LongSizedFluidIngredient fluid) {
         super.fluidInput(fluid);
         return this;
     }

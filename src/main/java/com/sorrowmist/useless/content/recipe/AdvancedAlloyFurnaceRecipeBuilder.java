@@ -17,7 +17,7 @@ import java.util.Objects;
 public class AdvancedAlloyFurnaceRecipeBuilder {
 
     private final List<CountedIngredient> inputs = new ArrayList<>();
-    private final List<SizedFluidIngredient> inputFluids = new ArrayList<>();
+    private final List<LongSizedFluidIngredient> inputFluids = new ArrayList<>();
     private final List<GenericStack> keyInputs = new ArrayList<>();
     private final List<ItemStack> outputs = new ArrayList<>();
     private final List<FluidStack> outputFluids = new ArrayList<>();
@@ -44,11 +44,18 @@ public class AdvancedAlloyFurnaceRecipeBuilder {
 
     public AdvancedAlloyFurnaceRecipeBuilder fluidInput(FluidStack fluid) {
         SizedFluidIngredient converted = AdapterUtils.toSizedFluidIngredient(fluid);
-        if (converted != null) this.inputFluids.add(converted);
+        if (converted != null) this.inputFluids.add(LongSizedFluidIngredient.from(converted));
         return this;
     }
 
     public AdvancedAlloyFurnaceRecipeBuilder fluidInput(SizedFluidIngredient fluid) {
+        if (fluid != null) {
+            this.inputFluids.add(LongSizedFluidIngredient.from(fluid));
+        }
+        return this;
+    }
+
+    public AdvancedAlloyFurnaceRecipeBuilder fluidInput(LongSizedFluidIngredient fluid) {
         if (fluid != null) {
             this.inputFluids.add(fluid);
         }

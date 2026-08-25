@@ -320,7 +320,7 @@ final class CreateRecipeAdapterUtils {
             }
         }
         return AdapterUtils.matchesRequired(mergedInputs == null ? Map.of() : mergedInputs, requiredItems)
-                && AdapterUtils.matchesFluidIngredients(
+                && AdapterUtils.matchesLongFluidIngredients(
                 mergedFluids == null ? Map.of() : mergedFluids, recipe.inputFluids());
     }
 }

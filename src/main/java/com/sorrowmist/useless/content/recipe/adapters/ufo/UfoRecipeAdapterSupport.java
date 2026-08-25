@@ -227,7 +227,7 @@ final class UfoRecipeAdapterSupport {
         if (!AdapterUtils.matchesRequired(mergedInputs == null ? Map.of() : mergedInputs, requiredItems)) {
             return false;
         }
-        if (!FluidIngredientAllocator.matches(recipe.inputFluids(),
+        if (!FluidIngredientAllocator.matchesLong(recipe.inputFluids(),
                 mergedFluids == null ? Map.of() : mergedFluids, 1L)) {
             return false;
         }

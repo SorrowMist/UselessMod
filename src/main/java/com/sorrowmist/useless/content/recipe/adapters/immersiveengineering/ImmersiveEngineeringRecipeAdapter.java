@@ -459,7 +459,7 @@ public final class ImmersiveEngineeringRecipeAdapter
             AdapterUtils.mergeIngredient(required, input.ingredient(), input.count());
         }
         return AdapterUtils.matchesRequired(mergedInputs, required)
-                && FluidIngredientAllocator.matches(recipe.inputFluids(), mergedFluids, 1L);
+                && FluidIngredientAllocator.matchesLong(recipe.inputFluids(), mergedFluids, 1L);
     }
 
     private static long processEnergy(MultiblockRecipe recipe) {

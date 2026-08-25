@@ -247,7 +247,7 @@ public final class MekanismChemicalRecipeSupport {
         }
         if (!AdapterUtils.matchesRequired(mergedInputs, requiredItems)) return false;
 
-        if (!FluidIngredientAllocator.matches(recipe.inputFluids(), mergedFluids, 1L)) return false;
+        if (!FluidIngredientAllocator.matchesLong(recipe.inputFluids(), mergedFluids, 1L)) return false;
 
         Map<AEKey, Long> requiredKeys = new LinkedHashMap<>();
         for (GenericStack required : recipe.keyInputs()) {

@@ -11,6 +11,7 @@ import com.sorrowmist.useless.content.recipe.AdapterUtils;
 import com.sorrowmist.useless.content.recipe.AdvancedAlloyFurnaceRecipe;
 import com.sorrowmist.useless.content.recipe.AlloyFurnaceRecipeCatalog;
 import com.sorrowmist.useless.content.recipe.CountedIngredient;
+import com.sorrowmist.useless.content.recipe.LongSizedFluidIngredient;
 import com.sorrowmist.useless.core.component.OmniversalPatternData;
 import com.sorrowmist.useless.core.component.UComponents;
 import com.sorrowmist.useless.init.ModItems;
@@ -25,7 +26,6 @@ import net.minecraft.world.level.material.Fluid;
 import net.neoforged.neoforge.fluids.FluidStack;
 import net.neoforged.neoforge.fluids.crafting.CompoundFluidIngredient;
 import net.neoforged.neoforge.fluids.crafting.FluidIngredient;
-import net.neoforged.neoforge.fluids.crafting.SizedFluidIngredient;
 import net.neoforged.neoforge.fluids.crafting.TagFluidIngredient;
 
 import java.util.ArrayList;
@@ -231,7 +231,7 @@ public final class OmniversalPatternEncoding {
                 }
                 boolean matchedPossible = false;
                 FluidStack representative = fluidKey.toStack(1);
-                for (SizedFluidIngredient requirement : recipe.inputFluids()) {
+                for (LongSizedFluidIngredient requirement : recipe.inputFluids()) {
                     if (requirement == null || requirement.ingredient() == null
                             || requirement.amount() <= 0 || !requirement.ingredient().test(representative)) continue;
                     matchedPossible = true;
@@ -456,16 +456,17 @@ public final class OmniversalPatternEncoding {
             if (key == null) return ItemStack.EMPTY;
             inputs.add(new GenericStack(key, input.count()));
         }
-        for (SizedFluidIngredient input : recipe.inputFluids()) {
+        for (LongSizedFluidIngredient input : recipe.inputFluids()) {
             if (input == null || input.ingredient() == null || input.ingredient().isEmpty()
                     || input.amount() <= 0) return ItemStack.EMPTY;
-            FluidStack[] candidates = input.getFluids();
+            FluidStack[] candidates = input.getRepresentatives();
             FluidStack representative = candidates.length == 0
-                    ? AdapterUtils.fluidRepresentative(input.ingredient(), input.amount())
+                    ? AdapterUtils.fluidRepresentative(input.ingredient(), 1)
                     : candidates[0];
             if (representative == null || representative.isEmpty()) return ItemStack.EMPTY;
-            GenericStack fluid = GenericStack.fromFluidStack(representative.copyWithAmount(input.amount()));
-            if (fluid == null || fluid.what() == null || fluid.amount() <= 0L) return ItemStack.EMPTY;
+            appeng.api.stacks.AEFluidKey key = appeng.api.stacks.AEFluidKey.of(representative);
+            if (key == null) return ItemStack.EMPTY;
+            GenericStack fluid = new GenericStack(key, input.amount());
             // AE processing patterns have one concrete key per slot. Keep one representative
             // here; omniversal metadata restores the Tag/Compound semantics on decode.
             inputs.add(fluid);

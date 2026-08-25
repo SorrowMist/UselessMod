@@ -26,11 +26,22 @@ public final class FluidIngredientAllocator {
         return allocate(requirements, supplies, operations) != null;
     }
 
+    public static boolean matchesLong(List<LongSizedFluidIngredient> requirements,
+                                     List<FluidStack> supplies, long operations) {
+        return allocateLong(requirements, supplies, operations) != null;
+    }
+
     /** Matches ordinary fluid stacks plus AE fluid supplies whose amount may exceed an int. */
     public static boolean matches(List<SizedFluidIngredient> requirements,
                                   List<FluidStack> supplies, List<GenericStack> keySupplies,
                                   long operations) {
         return allocate(requirements, supplies, keySupplies, operations) != null;
+    }
+
+    public static boolean matchesLong(List<LongSizedFluidIngredient> requirements,
+                                     List<FluidStack> supplies, List<GenericStack> keySupplies,
+                                     long operations) {
+        return allocateLong(requirements, supplies, keySupplies, operations) != null;
     }
 
     /** Matches already-aggregated fluid supplies without narrowing their long amounts to int. */
@@ -39,14 +50,30 @@ public final class FluidIngredientAllocator {
         return allocate(requirements, supplies, operations) != null;
     }
 
+    public static boolean matchesLong(List<LongSizedFluidIngredient> requirements,
+                                     Map<FluidStack, Long> supplies, long operations) {
+        return allocateLong(requirements, supplies, operations) != null;
+    }
+
     public static boolean matchesTanks(List<SizedFluidIngredient> requirements,
                                        FluidTank[] tanks, int tankCount, long operations) {
         return allocateTanks(requirements, tanks, tankCount, operations) != null;
     }
 
+    public static boolean matchesTanksLong(List<LongSizedFluidIngredient> requirements,
+                                          FluidTank[] tanks, int tankCount, long operations) {
+        return allocateTanksLong(requirements, tanks, tankCount, operations) != null;
+    }
+
     @Nullable
     public static Allocation allocate(List<SizedFluidIngredient> requirements,
                                       List<FluidStack> supplies, long operations) {
+        return allocateLong(toLongRequirements(requirements), supplies, operations);
+    }
+
+    @Nullable
+    public static Allocation allocateLong(List<LongSizedFluidIngredient> requirements,
+                                          List<FluidStack> supplies, long operations) {
         List<Supply> normalizedSupplies = new ArrayList<>();
         if (supplies != null) {
             for (int i = 0; i < supplies.size(); i++) {
@@ -63,6 +90,13 @@ public final class FluidIngredientAllocator {
     public static Allocation allocate(List<SizedFluidIngredient> requirements,
                                       List<FluidStack> supplies, List<GenericStack> keySupplies,
                                       long operations) {
+        return allocateLong(toLongRequirements(requirements), supplies, keySupplies, operations);
+    }
+
+    @Nullable
+    public static Allocation allocateLong(List<LongSizedFluidIngredient> requirements,
+                                          List<FluidStack> supplies, List<GenericStack> keySupplies,
+                                          long operations) {
         List<Supply> normalizedSupplies = new ArrayList<>();
         int resultSize = supplies == null ? 0 : supplies.size();
         if (supplies != null) {
@@ -89,6 +123,12 @@ public final class FluidIngredientAllocator {
     @Nullable
     public static Allocation allocate(List<SizedFluidIngredient> requirements,
                                       Map<FluidStack, Long> supplies, long operations) {
+        return allocateLong(toLongRequirements(requirements), supplies, operations);
+    }
+
+    @Nullable
+    public static Allocation allocateLong(List<LongSizedFluidIngredient> requirements,
+                                          Map<FluidStack, Long> supplies, long operations) {
         List<Supply> normalizedSupplies = new ArrayList<>();
         int resultSize = supplies == null ? 0 : supplies.size();
         if (supplies != null) {
@@ -111,6 +151,12 @@ public final class FluidIngredientAllocator {
     @Nullable
     public static Allocation allocateTanks(List<SizedFluidIngredient> requirements,
                                            FluidTank[] tanks, int tankCount, long operations) {
+        return allocateTanksLong(toLongRequirements(requirements), tanks, tankCount, operations);
+    }
+
+    @Nullable
+    public static Allocation allocateTanksLong(List<LongSizedFluidIngredient> requirements,
+                                               FluidTank[] tanks, int tankCount, long operations) {
         int count = tanks == null ? 0 : Math.max(0, Math.min(tankCount, tanks.length));
         List<Supply> supplies = new ArrayList<>();
         for (int i = 0; i < count; i++) {
@@ -125,6 +171,11 @@ public final class FluidIngredientAllocator {
     /** Returns the largest whole operation count that all requirements can support. */
     public static int maxOperations(List<SizedFluidIngredient> requirements,
                                     List<FluidStack> supplies) {
+        return maxOperationsLong(toLongRequirements(requirements), supplies);
+    }
+
+    public static int maxOperationsLong(List<LongSizedFluidIngredient> requirements,
+                                        List<FluidStack> supplies) {
         if (requirements == null || requirements.isEmpty()) return Integer.MAX_VALUE;
         long totalAvailable = 0L;
         if (supplies != null) {
@@ -133,7 +184,7 @@ public final class FluidIngredientAllocator {
             }
         }
         long perOperation = 0L;
-        for (SizedFluidIngredient requirement : requirements) {
+        for (LongSizedFluidIngredient requirement : requirements) {
             if (requirement != null && requirement.amount() > 0) {
                 perOperation = saturatingAdd(perOperation, requirement.amount());
             }
@@ -143,7 +194,7 @@ public final class FluidIngredientAllocator {
         int high = totalAvailable > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) (totalAvailable / perOperation);
         while (low < high) {
             int middle = low + (int) (((long) high - low + 1L) / 2L);
-            if (matches(requirements, supplies, middle)) low = middle;
+            if (matchesLong(requirements, supplies, middle)) low = middle;
             else high = middle - 1;
         }
         return low;
@@ -151,6 +202,11 @@ public final class FluidIngredientAllocator {
 
     public static int maxTankOperations(List<SizedFluidIngredient> requirements,
                                         FluidTank[] tanks, int tankCount) {
+        return maxTankOperationsLong(toLongRequirements(requirements), tanks, tankCount);
+    }
+
+    public static int maxTankOperationsLong(List<LongSizedFluidIngredient> requirements,
+                                            FluidTank[] tanks, int tankCount) {
         if (requirements == null || requirements.isEmpty()) return Integer.MAX_VALUE;
         int count = tanks == null ? 0 : Math.max(0, Math.min(tankCount, tanks.length));
         long totalAvailable = 0L;
@@ -158,7 +214,7 @@ public final class FluidIngredientAllocator {
             if (tanks[i] != null) totalAvailable = saturatingAdd(totalAvailable, tanks[i].getFluidAmount());
         }
         long perOperation = 0L;
-        for (SizedFluidIngredient requirement : requirements) {
+        for (LongSizedFluidIngredient requirement : requirements) {
             if (requirement != null && requirement.amount() > 0) {
                 perOperation = saturatingAdd(perOperation, requirement.amount());
             }
@@ -168,16 +224,16 @@ public final class FluidIngredientAllocator {
         int high = totalAvailable > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) (totalAvailable / perOperation);
         while (low < high) {
             int middle = low + (int) (((long) high - low + 1L) / 2L);
-            if (matchesTanks(requirements, tanks, tankCount, middle)) low = middle;
+            if (matchesTanksLong(requirements, tanks, tankCount, middle)) low = middle;
             else high = middle - 1;
         }
         return low;
     }
 
-    private static List<Demand> demands(List<SizedFluidIngredient> requirements, long operations) {
+    private static List<Demand> demands(List<LongSizedFluidIngredient> requirements, long operations) {
         List<Demand> result = new ArrayList<>();
         if (requirements == null || operations <= 0L) return result;
-        for (SizedFluidIngredient requirement : requirements) {
+        for (LongSizedFluidIngredient requirement : requirements) {
             if (requirement == null || requirement.amount() <= 0) continue;
             if (requirement.ingredient() == null || requirement.ingredient().isEmpty()) {
                 return null;
@@ -232,6 +288,18 @@ public final class FluidIngredientAllocator {
     private static long saturatingAdd(long left, long right) {
         if (right > 0 && left > Long.MAX_VALUE - right) return Long.MAX_VALUE;
         return left + right;
+    }
+
+    private static List<LongSizedFluidIngredient> toLongRequirements(
+            List<SizedFluidIngredient> requirements) {
+        if (requirements == null || requirements.isEmpty()) return List.of();
+        List<LongSizedFluidIngredient> result = new ArrayList<>(requirements.size());
+        for (SizedFluidIngredient requirement : requirements) {
+            if (requirement != null && requirement.amount() > 0) {
+                result.add(LongSizedFluidIngredient.from(requirement));
+            }
+        }
+        return result;
     }
 
     private static long saturatingMultiply(long left, long right) {

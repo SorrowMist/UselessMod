@@ -12,7 +12,6 @@ import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.crafting.Ingredient;
 import net.neoforged.neoforge.fluids.FluidStack;
-import net.neoforged.neoforge.fluids.crafting.SizedFluidIngredient;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -62,7 +61,9 @@ public final class AlloyFurnaceRecipeFingerprint {
         if (normalizeIngredientSemantics) {
             normalizeIngredients(recipe, recipeJson, context, preserveTags);
         }
-        if ((!normalizeIngredientSemantics || !preserveTags) && !recipe.inputFluids().isEmpty()) {
+        if ((!normalizeIngredientSemantics || !preserveTags)
+                && !recipe.inputFluids().isEmpty()
+                && recipe.inputFluids().stream().allMatch(LongSizedFluidIngredient::fitsInt)) {
             encodeLegacyFluidInputs(recipe, recipeJson, context);
         }
         JsonArray exactItemOutputs = new JsonArray();
@@ -126,9 +127,9 @@ public final class AlloyFurnaceRecipeFingerprint {
             JsonObject encoded,
             com.mojang.serialization.DynamicOps<JsonElement> context) {
         JsonArray fluids = new JsonArray();
-        for (SizedFluidIngredient ingredient : recipe.inputFluids()) {
+        for (LongSizedFluidIngredient ingredient : recipe.inputFluids()) {
             if (ingredient == null || ingredient.ingredient() == null || ingredient.amount() <= 0) continue;
-            for (FluidStack stack : ingredient.getFluids()) {
+            for (FluidStack stack : ingredient.toSizedFluidIngredient().getFluids()) {
                 if (stack == null || stack.isEmpty()) continue;
                 fluids.add(FluidStack.CODEC.encodeStart(context, stack).getOrThrow());
             }

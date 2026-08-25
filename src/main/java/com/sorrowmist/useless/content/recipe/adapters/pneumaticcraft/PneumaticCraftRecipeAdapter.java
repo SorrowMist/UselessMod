@@ -219,7 +219,7 @@ public final class PneumaticCraftRecipeAdapter<T extends PneumaticCraftRecipe>
             AdapterUtils.mergeIngredient(requiredInputs, input.ingredient(), input.count());
         }
         return AdapterUtils.matchesRequired(mergedInputs, requiredInputs)
-                && FluidIngredientAllocator.matches(recipe.inputFluids(), mergedFluids, 1L);
+                && FluidIngredientAllocator.matchesLong(recipe.inputFluids(), mergedFluids, 1L);
     }
 
     private boolean matchesHeatFrameInput(

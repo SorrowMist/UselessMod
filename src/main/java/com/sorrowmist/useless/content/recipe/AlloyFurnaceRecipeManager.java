@@ -13,7 +13,6 @@ import net.minecraft.world.item.crafting.Recipe;
 import net.minecraft.world.item.crafting.RecipeHolder;
 import net.minecraft.world.level.Level;
 import net.neoforged.neoforge.fluids.FluidStack;
-import net.neoforged.neoforge.fluids.crafting.SizedFluidIngredient;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
@@ -472,7 +471,7 @@ public class AlloyFurnaceRecipeManager {
 
     private long requiredFluidAmount(AdvancedAlloyFurnaceRecipe recipe) {
         long result = 0;
-        for (SizedFluidIngredient input : recipe.inputFluids()) {
+        for (LongSizedFluidIngredient input : recipe.inputFluids()) {
             if (input != null) result = saturatingAdd(result, Math.max(0, input.amount()));
         }
         return result;
@@ -495,13 +494,13 @@ public class AlloyFurnaceRecipeManager {
     }
 
     private boolean matchesFluids(AdvancedAlloyFurnaceRecipe recipe, List<FluidStack> inputs, long operations) {
-        return FluidIngredientAllocator.matches(recipe.inputFluids(), inputs, operations);
+        return FluidIngredientAllocator.matchesLong(recipe.inputFluids(), inputs, operations);
     }
 
     private boolean matchesFluids(AdvancedAlloyFurnaceRecipe recipe,
                                   List<FluidStack> inputs, List<GenericStack> keyInputs,
                                   long operations) {
-        return FluidIngredientAllocator.matches(recipe.inputFluids(), inputs, keyInputs, operations);
+        return FluidIngredientAllocator.matchesLong(recipe.inputFluids(), inputs, keyInputs, operations);
     }
 
     private boolean matchesKeys(AdvancedAlloyFurnaceRecipe recipe, List<GenericStack> inputs, long operations) {
@@ -535,7 +534,7 @@ public class AlloyFurnaceRecipeManager {
             return false;
         }
         return ItemIngredientAllocator.matches(recipe.inputs(), inputs, keyInputs, operations)
-                && FluidIngredientAllocator.matches(recipe.inputFluids(), fluidInputs, keyInputs, operations)
+                && FluidIngredientAllocator.matchesLong(recipe.inputFluids(), fluidInputs, keyInputs, operations)
                 && containsScaled(snapshotNonStackKeyInputs(keyInputs),
                 snapshotGenericStacks(recipe.keyInputs()), operations);
     }

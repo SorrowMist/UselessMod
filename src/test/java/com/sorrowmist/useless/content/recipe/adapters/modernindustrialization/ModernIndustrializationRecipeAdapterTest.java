@@ -190,9 +190,9 @@ class ModernIndustrializationRecipeAdapterTest {
                     instanceof appeng.api.stacks.AEFluidKey, machine.type().getPath());
             assertTrue(!OmniversalPatternEncoding.createProcessingPattern(converted).isEmpty(),
                     machine.type().getPath());
-            assertFalse(FluidIngredientAllocator.matches(
+            assertFalse(FluidIngredientAllocator.matchesLong(
                     converted.inputFluids(), Map.of(), 1L), machine.type().getPath());
-            assertTrue(FluidIngredientAllocator.matches(
+            assertTrue(FluidIngredientAllocator.matchesLong(
                     converted.inputFluids(),
                     Map.of(new FluidStack(Fluids.WATER, 1), 1L), 1L), machine.type().getPath());
         }

@@ -1,6 +1,7 @@
 package com.sorrowmist.useless.compat.jei;
 
 import appeng.api.stacks.AEItemKey;
+import appeng.api.stacks.AEFluidKey;
 import appeng.api.stacks.GenericStack;
 import appeng.integration.modules.itemlists.EncodingHelper;
 import appeng.menu.me.items.PatternEncodingTermMenu;
@@ -10,6 +11,7 @@ import com.sorrowmist.useless.content.recipe.AlloyFurnaceRecipeCatalog;
 import com.sorrowmist.useless.content.recipe.AlloyFurnaceRecipeFingerprint;
 import com.sorrowmist.useless.content.recipe.AdapterUtils;
 import com.sorrowmist.useless.content.recipe.CountedIngredient;
+import com.sorrowmist.useless.content.recipe.LongSizedFluidIngredient;
 import com.sorrowmist.useless.network.SelectOmniversalPatternRecipePacket;
 import mezz.jei.api.gui.ingredient.IRecipeSlotsView;
 import mezz.jei.api.recipe.transfer.IRecipeTransferError;
@@ -168,22 +170,20 @@ public final class OmniversalPatternJeiTransferHandler<T extends PatternEncoding
             if (options.isEmpty()) return null;
             inputs.add(List.copyOf(options));
         }
-        for (var input : recipe.inputFluids()) {
+        for (LongSizedFluidIngredient input : recipe.inputFluids()) {
             if (input == null || input.ingredient() == null || input.ingredient().isEmpty()
                     || input.amount() <= 0) return null;
             List<GenericStack> options = new ArrayList<>();
-            for (FluidStack option : input.getFluids()) {
+            for (FluidStack option : input.getRepresentatives()) {
                 if (option == null || option.isEmpty()) continue;
-                GenericStack stack = GenericStack.fromFluidStack(
-                        option.copyWithAmount(input.amount()));
-                if (stack != null) options.add(stack);
+                AEFluidKey key = AEFluidKey.of(option);
+                if (key != null) options.add(new GenericStack(key, input.amount()));
             }
             if (options.isEmpty()) {
                 FluidStack representative = AdapterUtils.fluidRepresentative(
-                        input.ingredient(), input.amount());
-                GenericStack stack = representative == null
-                        ? null : GenericStack.fromFluidStack(representative);
-                if (stack != null) options.add(stack);
+                        input.ingredient(), 1);
+                AEFluidKey key = representative == null ? null : AEFluidKey.of(representative);
+                if (key != null) options.add(new GenericStack(key, input.amount()));
             }
             if (options.isEmpty()) return null;
             inputs.add(List.copyOf(options));

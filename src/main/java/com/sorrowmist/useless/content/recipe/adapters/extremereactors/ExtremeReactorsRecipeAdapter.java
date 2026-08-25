@@ -177,7 +177,7 @@ public final class ExtremeReactorsRecipeAdapter implements IRecipeAdapter<ModRec
                     ? ItemIngredientAllocator.matches(recipe.inputs(), actualInputs, 1L)
                     : matchesMergedItems(recipe.inputs(), mergedInputs);
             if (itemMatch
-                    && FluidIngredientAllocator.matches(recipe.inputFluids(), mergedFluids, 1L)
+                    && FluidIngredientAllocator.matchesLong(recipe.inputFluids(), mergedFluids, 1L)
                     && recipe.molds().size() == 1
                     && AdapterUtils.matchesMold(recipe.mold(), mold)) {
                 return true;

@@ -228,8 +228,8 @@ dependencies {
 //    implementation "curse.maven:applied-flux-965012:7429565"
 
     // 高级ae
-    implementation "software.bernie.geckolib:geckolib-neoforge-1.21.1:4.7.7"
-    implementation "curse.maven:advancedae-1084104:7222372"
+    implementation "curse.maven:geckolib-388172:8350073"
+    implementation "curse.maven:advancedae-1084104:8564177"
     implementation "curse.maven:ae2addonlib-1366135:7222312"
 
     implementation "curse.maven:ae2-crystal-science-1435174:8498888" // 1.21.1-1.2.1
@@ -361,12 +361,16 @@ dependencies {
     implementation "curse.maven:configured-457570:7276577"
     runtimeOnly "thedarkcolour:kotlinforforge-neoforge:5.11.0"
     runtimeOnly "curse.maven:just-enough-characters-250702:8413478"
-    // apotheosis
-//    implementation "dev.shadowsoffire:Placebo:1.21.1-9.6.3"
-//    implementation "dev.shadowsoffire:ApothicAttributes:1.21.1-2.6.0"
-//    implementation "dev.shadowsoffire:ApothicSpawners:1.21.1-1.2.0"
-//    implementation "dev.shadowsoffire:ApothicEnchanting:1.21.1-1.3.0"
-//    implementation "dev.shadowsoffire:Apotheosis:1.21.1-8.1.0"
+
+    implementation "curse.maven:apotheosis-313970:8564919"
+    implementation "curse.maven:apothic-spawners-986583:8469405"
+    implementation "curse.maven:placebo-283644:8463693"
+    implementation "curse.maven:apothic-enchanting-1063926:8682996"
+    implementation "curse.maven:apothic-attributes-898963:8502288"
+    implementation "curse.maven:gateways-to-eternity-417802:6926284"
+
+
+    implementation "curse.maven:omnisequence-transfinite-1624558:8622739"
 
 
     implementation fileTree(dir: 'libs', includes: ['*.jar'], excludes: [])

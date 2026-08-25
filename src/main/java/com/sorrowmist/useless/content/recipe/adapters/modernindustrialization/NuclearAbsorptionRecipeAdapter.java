@@ -149,7 +149,7 @@ public final class NuclearAbsorptionRecipeAdapter
         boolean items = actualInputs != null && !actualInputs.isEmpty()
                 ? ItemIngredientAllocator.matches(recipe.inputs(), actualInputs, 1L)
                 : matchesItems(recipe.inputs(), mergedInputs);
-        return items && FluidIngredientAllocator.matches(recipe.inputFluids(), mergedFluids, 1L);
+        return items && FluidIngredientAllocator.matchesLong(recipe.inputFluids(), mergedFluids, 1L);
     }
 
     private static boolean matchesItems(List<CountedIngredient> requirements,

@@ -60,6 +60,17 @@ class AdvancedAlloyFurnaceRecipeMultiMoldTest {
     }
 
     @Test
+    void legacyFluidStackInputsDecodeAsLongRequirements() {
+        JsonObject legacy = baseJson();
+        legacy.add("input_fluids", com.google.gson.JsonParser.parseString(
+                "[{\"amount\":10000000,\"id\":\"minecraft:lava\"}]").getAsJsonArray());
+
+        AdvancedAlloyFurnaceRecipe recipe = parse(legacy);
+
+        assertEquals(10_000_000L, recipe.inputFluids().getFirst().amount());
+    }
+
+    @Test
     void singleMoldEncodingUsesLegacyFieldAndMultiMoldUsesListField() {
         JsonObject single = AdvancedAlloyFurnaceRecipe.CODEC.codec()
                 .encodeStart(JsonOps.INSTANCE, recipe(List.of(Ingredient.of(Items.IRON_INGOT))))

@@ -125,6 +125,24 @@ class AlloyFurnaceRecipeCatalogMoldTest {
     }
 
     @Test
+    void matchesItemPatternInputAboveIntegerRange() {
+        long amount = (long) Integer.MAX_VALUE + 1L;
+        AdvancedAlloyFurnaceRecipe recipe = new AdvancedAlloyFurnaceRecipe(
+                ResourceLocation.fromNamespaceAndPath("useless_mod_test", "long_item_input"),
+                List.of(new CountedIngredient(Ingredient.of(Items.IRON_INGOT), amount)),
+                List.of(), List.of(), List.of(new ItemStack(Items.GOLD_INGOT)), List.of(), List.of(),
+                100L, 20, Ingredient.EMPTY, 0, Ingredient.EMPTY, AlloyFurnaceMode.NORMAL);
+
+        GenericStack input = new GenericStack(
+                Objects.requireNonNull(AEItemKey.of(new ItemStack(Items.IRON_INGOT))), amount);
+        IPatternDetails pattern = processingPattern(
+                List.of(input), List.of(Objects.requireNonNull(
+                        GenericStack.fromItemStack(new ItemStack(Items.GOLD_INGOT)))));
+
+        assertTrue(AlloyFurnaceRecipeCatalog.matchesPattern(recipe, pattern));
+    }
+
+    @Test
     void knownRecipeMayOmitSecondaryOutputs() {
         AdvancedAlloyFurnaceRecipe recipe = recipeWithOutputs(
                 new ItemStack(Items.GOLD_INGOT, 3), new ItemStack(Items.DIAMOND));
@@ -163,11 +181,14 @@ class AlloyFurnaceRecipeCatalogMoldTest {
 
     private static IPatternDetails processingPattern(ItemStack input, List<ItemStack> outputs) {
         GenericStack encodedInput = Objects.requireNonNull(GenericStack.fromItemStack(input));
-        List<GenericStack> encodedOutputs = outputs.stream()
+        return processingPattern(List.of(encodedInput), outputs.stream()
                 .map(stack -> Objects.requireNonNull(GenericStack.fromItemStack(stack)))
-                .toList();
+                .toList());
+    }
+
+    private static IPatternDetails processingPattern(List<GenericStack> inputs, List<GenericStack> outputs) {
         ItemStack encoded = PatternDetailsHelper.encodeProcessingPattern(
-                List.of(encodedInput), encodedOutputs);
+                inputs, outputs);
         return new AEProcessingPattern(Objects.requireNonNull(AEItemKey.of(encoded)));
     }
 

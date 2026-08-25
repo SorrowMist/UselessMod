@@ -575,9 +575,9 @@ public final class AlloyFurnaceRecipeCatalog {
         if (contents == null) return false;
 
         long requiredItemCount = recipe.inputs().stream().mapToLong(CountedIngredient::count).sum();
-        long actualItemCount = contents.items.stream().mapToLong(ItemStack::getCount).sum();
+        long actualItemCount = contents.items.stream().mapToLong(GenericStack::amount).sum();
         if (requiredItemCount != actualItemCount
-                || !ItemIngredientAllocator.matches(recipe.inputs(), contents.items, 1L)) return false;
+                || !ItemIngredientAllocator.matches(recipe.inputs(), List.of(), contents.items, 1L)) return false;
 
         if (!matchesFluidIngredients(contents.fluids, recipe.inputFluids())) return false;
         if (!sameGeneric(contents.keys, recipe.keyInputs())) return false;
@@ -615,9 +615,9 @@ public final class AlloyFurnaceRecipeCatalog {
         if (contents == null) return false;
 
         long requiredItemCount = recipe.inputs().stream().mapToLong(CountedIngredient::count).sum();
-        long actualItemCount = contents.items.stream().mapToLong(ItemStack::getCount).sum();
+        long actualItemCount = contents.items.stream().mapToLong(GenericStack::amount).sum();
         if (requiredItemCount != actualItemCount
-                || !ItemIngredientAllocator.matches(recipe.inputs(), contents.items, 1L)) {
+                || !ItemIngredientAllocator.matches(recipe.inputs(), List.of(), contents.items, 1L)) {
             return false;
         }
         if (!matchesFluidIngredients(contents.fluids, recipe.inputFluids())
@@ -760,7 +760,7 @@ public final class AlloyFurnaceRecipeCatalog {
 
     private static boolean matchesFluidIngredients(
             List<PatternFluidInput> actual,
-            List<net.neoforged.neoforge.fluids.crafting.SizedFluidIngredient> required) {
+            List<LongSizedFluidIngredient> required) {
         long actualAmount = 0L;
         if (actual != null) {
             for (PatternFluidInput input : actual) {
@@ -781,15 +781,15 @@ public final class AlloyFurnaceRecipeCatalog {
 
     private static boolean matchesFluidCandidates(
             List<PatternFluidInput> actual,
-            List<net.neoforged.neoforge.fluids.crafting.SizedFluidIngredient> required,
-            int index, List<FluidStack> selected) {
+            List<LongSizedFluidIngredient> required,
+            int index, List<GenericStack> selected) {
         if (index >= actual.size()) {
-            return FluidIngredientAllocator.matches(required, selected, 1L);
+            return FluidIngredientAllocator.matchesLong(required, List.of(), selected, 1L);
         }
         PatternFluidInput input = actual.get(index);
         if (input == null || input.candidates().isEmpty()) return false;
-        for (FluidStack candidate : input.candidates()) {
-            if (candidate == null || candidate.isEmpty()) continue;
+        for (GenericStack candidate : input.candidates()) {
+            if (candidate == null || candidate.what() == null || candidate.amount() <= 0L) continue;
             selected.add(candidate);
             if (matchesFluidCandidates(actual, required, index + 1, selected)) return true;
             selected.removeLast();
@@ -859,27 +859,26 @@ public final class AlloyFurnaceRecipeCatalog {
         }
     }
 
-    private record PatternContents(List<ItemStack> items, List<PatternFluidInput> fluids,
+    private record PatternContents(List<GenericStack> items, List<PatternFluidInput> fluids,
                                    List<GenericStack> keys) {
         private static PatternContents read(IPatternDetails pattern) {
-            List<ItemStack> items = new ArrayList<>();
+            List<GenericStack> items = new ArrayList<>();
             List<PatternFluidInput> fluids = new ArrayList<>();
             List<GenericStack> keys = new ArrayList<>();
             for (IPatternDetails.IInput input : pattern.getInputs()) {
                 if (input == null) return null;
                 GenericStack[] possible = input.getPossibleInputs();
                 long amount = input.getMultiplier();
-                if (amount > Integer.MAX_VALUE) return null;
                 if (possible.length == 0 || amount <= 0) return null;
 
-                List<FluidStack> fluidCandidates = new ArrayList<>();
+                List<GenericStack> fluidCandidates = new ArrayList<>();
                 boolean hasNonFluidCandidate = false;
                 for (GenericStack candidate : possible) {
                     if (candidate == null || candidate.what() == null) continue;
                     if (candidate.what() instanceof AEFluidKey fluidKey) {
-                        FluidStack fluid = fluidKey.toStack((int) amount);
+                        GenericStack fluid = new GenericStack(fluidKey, amount);
                         if (fluidCandidates.stream().noneMatch(existing ->
-                                FluidStack.isSameFluidSameComponents(existing, fluid))) {
+                                existing.what().equals(fluid.what()))) {
                             fluidCandidates.add(fluid);
                         }
                     } else {
@@ -891,7 +890,7 @@ public final class AlloyFurnaceRecipeCatalog {
                 // discarding one side of the slot.
                 if (!fluidCandidates.isEmpty() && hasNonFluidCandidate) return null;
                 if (!fluidCandidates.isEmpty()) {
-                    fluids.add(new PatternFluidInput(List.copyOf(fluidCandidates), (int) amount));
+                    fluids.add(new PatternFluidInput(List.copyOf(fluidCandidates), amount));
                     continue;
                 }
 
@@ -900,13 +899,13 @@ public final class AlloyFurnaceRecipeCatalog {
                         .findFirst().orElse(null);
                 if (first == null) return null;
                 AEKey key = first.what();
-                if (key instanceof AEItemKey itemKey) items.add(itemKey.toStack((int) amount));
+                if (key instanceof AEItemKey itemKey) items.add(new GenericStack(itemKey, amount));
                 else keys.add(new GenericStack(key, amount));
             }
             return new PatternContents(items, fluids, keys);
         }
     }
 
-    private record PatternFluidInput(List<FluidStack> candidates, int amount) {
+    private record PatternFluidInput(List<GenericStack> candidates, long amount) {
     }
 }

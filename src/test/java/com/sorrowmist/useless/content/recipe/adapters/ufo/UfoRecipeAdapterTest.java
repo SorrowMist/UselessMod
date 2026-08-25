@@ -33,7 +33,6 @@ import net.minecraft.world.level.material.Fluid;
 import net.minecraft.world.level.material.Fluids;
 import net.neoforged.neoforge.fluids.FluidStack;
 import net.neoforged.neoforge.fluids.crafting.FluidIngredient;
-import net.neoforged.neoforge.fluids.crafting.SizedFluidIngredient;
 import net.pedroksl.ae2addonlib.recipes.IngredientStack;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.AfterAll;
@@ -140,8 +139,8 @@ class UfoRecipeAdapterTest {
         assertEquals(2, converted.inputFluids().size());
         assertEquals(200, converted.inputFluids().getFirst().amount());
         assertEquals(40, converted.inputFluids().get(1).amount());
-        assertEquals(new SizedFluidIngredient(FluidIngredient.tag(COOLANTS), 40),
-                converted.inputFluids().get(1));
+        assertEquals(FluidIngredient.tag(COOLANTS), converted.inputFluids().get(1).ingredient());
+        assertEquals(40L, converted.inputFluids().get(1).amount());
         assertEquals(1_800L, converted.energy());
         assertSame(itemOutput, converted.keyOutputs().getFirst());
         assertSame(fluidOutput, converted.keyOutputs().get(1));

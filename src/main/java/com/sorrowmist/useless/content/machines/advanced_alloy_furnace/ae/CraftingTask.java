@@ -1125,12 +1125,30 @@ public class CraftingTask {
             if (keepLongAmounts) {
                 keys.add(new OutputKey(gs.what(), gs.amount()));
             } else if (gs.what() instanceof AEItemKey itemKey) {
-                items.add(itemKey.toStack((int) gs.amount()));
+                appendItemChunks(itemKey, gs.amount(), items);
             } else if (gs.what() instanceof AEFluidKey fluidKey) {
-                fluids.add(new FluidStack(fluidKey.getFluid(), (int) gs.amount()));
+                appendFluidChunks(fluidKey, gs.amount(), fluids);
             } else {
                 keys.add(new OutputKey(gs.what(), gs.amount()));
             }
+        }
+    }
+
+    private static void appendItemChunks(AEItemKey key, long amount, List<ItemStack> target) {
+        long remaining = amount;
+        while (remaining > 0L) {
+            int chunk = (int) Math.min(remaining, Integer.MAX_VALUE);
+            target.add(key.toStack(chunk));
+            remaining -= chunk;
+        }
+    }
+
+    private static void appendFluidChunks(AEFluidKey key, long amount, List<FluidStack> target) {
+        long remaining = amount;
+        while (remaining > 0L) {
+            int chunk = (int) Math.min(remaining, Integer.MAX_VALUE);
+            target.add(new FluidStack(key.getFluid(), chunk));
+            remaining -= chunk;
         }
     }
 

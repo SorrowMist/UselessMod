@@ -7,6 +7,7 @@ import com.sorrowmist.useless.content.recipe.AdvancedAlloyFurnaceRecipe;
 import com.sorrowmist.useless.content.recipe.AlloyFurnaceRecipeCatalog;
 import com.sorrowmist.useless.content.recipe.AdapterUtils;
 import com.sorrowmist.useless.content.recipe.CountedIngredient;
+import com.sorrowmist.useless.content.recipe.LongSizedFluidIngredient;
 import com.sorrowmist.useless.init.ModBlocks;
 import com.sorrowmist.useless.init.ModTags;
 import mezz.jei.api.gui.builder.IRecipeLayoutBuilder;
@@ -207,7 +208,8 @@ public class AdvancedAlloyFurnaceRecipeCategory implements IRecipeCategory<Alloy
 
             CountedIngredient countedIngredient = inputs.get(i);
             Ingredient ingredient = countedIngredient.ingredient();
-            int count = (int) countedIngredient.count();
+            long count = countedIngredient.count();
+            int displayCount = (int) Math.min(count, Integer.MAX_VALUE);
 
             ItemStack[] matchingStacks = ingredient.getItems();
             if (matchingStacks.length == 0) {
@@ -219,7 +221,7 @@ public class AdvancedAlloyFurnaceRecipeCategory implements IRecipeCategory<Alloy
                 ItemStack[] displayStacks = new ItemStack[matchingStacks.length];
                 for (int j = 0; j < matchingStacks.length; j++) {
                     ItemStack displayStack = matchingStacks[j].copy();
-                    displayStack.setCount(count);
+                    displayStack.setCount(displayCount);
                     displayStacks[j] = displayStack;
                 }
 
@@ -327,29 +329,30 @@ public class AdvancedAlloyFurnaceRecipeCategory implements IRecipeCategory<Alloy
         }
 
         // 输入流体槽 - 使用JEI内置流体渲染器
-        List<net.neoforged.neoforge.fluids.crafting.SizedFluidIngredient> inputFluids = recipe.inputFluids();
+        List<LongSizedFluidIngredient> inputFluids = recipe.inputFluids();
         if (!inputFluids.isEmpty()) {
             int fluidCount = inputFluids.size();
             int fluidWidth = FLUID_INPUT_WIDTH / fluidCount;
 
             for (int i = 0; i < fluidCount; i++) {
                 var input = inputFluids.get(i);
-                FluidStack[] candidates = input.getFluids();
+                FluidStack[] candidates = input.getRepresentatives();
                 FluidStack fluid = candidates.length == 0
-                        ? AdapterUtils.fluidRepresentative(input.ingredient(), input.amount())
+                        ? AdapterUtils.fluidRepresentative(input.ingredient(), 1)
                         : candidates[0];
                 if (fluid == null || fluid.isEmpty()) continue;
                 int x = FLUID_INPUT_X + i * fluidWidth;
-                int amount = input.amount();
+                long amount = input.amount();
+                int displayAmount = (int) Math.min(amount, Integer.MAX_VALUE);
 
                 IRecipeSlotBuilder slot = builder.addSlot(RecipeIngredientRole.INPUT, x, FLUID_INPUT_Y)
-                        .setFluidRenderer(amount, false, fluidWidth, FLUID_INPUT_HEIGHT);
+                        .setFluidRenderer(displayAmount, false, fluidWidth, FLUID_INPUT_HEIGHT);
                 if (candidates.length == 0) {
-                    slot.addFluidStack(fluid.getFluid(), amount);
+                    slot.addFluidStack(fluid.getFluid(), displayAmount);
                 } else {
                     for (FluidStack candidate : candidates) {
                         if (candidate != null && !candidate.isEmpty()) {
-                            slot.addFluidStack(candidate.getFluid(), amount);
+                            slot.addFluidStack(candidate.getFluid(), displayAmount);
                         }
                     }
                 }
@@ -546,10 +549,6 @@ public class AdvancedAlloyFurnaceRecipeCategory implements IRecipeCategory<Alloy
     }
 
     // 格式化物品数量
-    private String formatCount(int count) {
-        return formatCount((long) count);
-    }
-
     private String formatCount(long count) {
         if (count >= 1000000000) {
             return String.format("%.2fG", count / 1000000000.0);

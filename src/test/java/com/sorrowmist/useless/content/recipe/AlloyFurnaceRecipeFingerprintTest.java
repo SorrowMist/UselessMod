@@ -19,7 +19,9 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.item.crafting.Ingredient;
 import net.neoforged.neoforge.common.crafting.DataComponentIngredient;
+import net.neoforged.neoforge.fluids.crafting.FluidIngredient;
 import net.neoforged.neoforge.network.connection.ConnectionType;
+import net.minecraft.world.level.material.Fluids;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
@@ -201,6 +203,35 @@ class AlloyFurnaceRecipeFingerprintTest {
         assertTrue(AlloyFurnaceRecipeCatalog.generation() > before);
     }
 
+    @Test
+    void longFluidAmountsRoundTripThroughJsonAndNetwork() {
+        long amount = (long) Integer.MAX_VALUE + 1L;
+        AdvancedAlloyFurnaceRecipe recipe = longFluidRecipe(amount);
+        RegistryAccess registries = RegistryAccess.fromRegistryOfRegistries(BuiltInRegistries.REGISTRY);
+        var serialization = registries.createSerializationContext(JsonOps.INSTANCE);
+
+        var encoded = AdvancedAlloyFurnaceRecipe.CODEC.codec()
+                .encodeStart(serialization, recipe).getOrThrow();
+        AdvancedAlloyFurnaceRecipe decoded = AdvancedAlloyFurnaceRecipe.CODEC.codec()
+                .parse(serialization, encoded).getOrThrow();
+        assertEquals(amount, decoded.inputFluids().getFirst().amount());
+
+        RegistryFriendlyByteBuf buffer = new RegistryFriendlyByteBuf(
+                Unpooled.buffer(), registries, ConnectionType.OTHER);
+        try {
+            AdvancedAlloyFurnaceRecipe.STREAM_CODEC.encode(buffer, recipe);
+            AdvancedAlloyFurnaceRecipe networkDecoded = AdvancedAlloyFurnaceRecipe.STREAM_CODEC.decode(buffer);
+            assertEquals(amount, networkDecoded.inputFluids().getFirst().amount());
+        } finally {
+            buffer.release();
+        }
+
+        AdvancedAlloyFurnaceRecipe changed = longFluidRecipe(amount + 1L);
+        assertNotEquals(
+                AlloyFurnaceRecipeFingerprint.create(recipe, registries),
+                AlloyFurnaceRecipeFingerprint.create(changed, registries));
+    }
+
     private static AdvancedAlloyFurnaceRecipe recipe(long energy, Ingredient mold) {
         return recipe(energy, mold, new ItemStack(Items.GOLD_INGOT, 3));
     }
@@ -233,6 +264,23 @@ class AlloyFurnaceRecipeFingerprintTest {
                 Ingredient.EMPTY,
                 0,
                 mold,
+                AlloyFurnaceMode.NORMAL);
+    }
+
+    private static AdvancedAlloyFurnaceRecipe longFluidRecipe(long amount) {
+        return new AdvancedAlloyFurnaceRecipe(
+                ResourceLocation.fromNamespaceAndPath("useless_mod_test", "long_fluid"),
+                List.of(),
+                List.of(new LongSizedFluidIngredient(FluidIngredient.of(Fluids.WATER), amount)),
+                List.of(),
+                List.of(new ItemStack(Items.GOLD_INGOT)),
+                List.of(),
+                List.of(),
+                4_000L,
+                40,
+                Ingredient.EMPTY,
+                0,
+                Ingredient.EMPTY,
                 AlloyFurnaceMode.NORMAL);
     }
 

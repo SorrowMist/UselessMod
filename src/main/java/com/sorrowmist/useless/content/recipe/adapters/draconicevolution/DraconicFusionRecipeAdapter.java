@@ -1,5 +1,6 @@
 package com.sorrowmist.useless.content.recipe.adapters.draconicevolution;
 
+import appeng.api.stacks.GenericStack;
 import com.brandon3055.brandonscore.api.TechLevel;
 import com.brandon3055.draconicevolution.DEConfig;
 import com.brandon3055.draconicevolution.api.DraconicAPI;
@@ -11,6 +12,7 @@ import com.brandon3055.draconicevolution.api.crafting.StackIngredient;
 import com.brandon3055.draconicevolution.init.DEContent;
 import com.mojang.logging.LogUtils;
 import com.sorrowmist.useless.api.enums.AlloyFurnaceMode;
+import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.PatternStackView;
 import com.sorrowmist.useless.content.recipe.AdapterUtils;
 import com.sorrowmist.useless.content.recipe.AdvancedAlloyFurnaceRecipe;
 import com.sorrowmist.useless.content.recipe.CountedIngredient;
@@ -129,26 +131,43 @@ public final class DraconicFusionRecipeAdapter implements IRecipeAdapter<IFusion
      */
     public static Optional<DynamicPatternProfile> findDynamicPatternProfile(
             Level level, List<ItemStack> patternInputs, List<ItemStack> patternOutputs) {
-        if (level == null) {
-            return Optional.empty();
-        }
-        return findDynamicPatternProfile(
-                level.getRecipeManager().getAllRecipesFor(DraconicAPI.FUSION_RECIPE_TYPE.get()),
-                level, patternInputs, patternOutputs);
+        return findDynamicPatternProfileLong(level, PatternStackView.fromLegacy(patternInputs, patternOutputs));
     }
 
     static Optional<DynamicPatternProfile> findDynamicPatternProfile(
             Iterable<RecipeHolder<IFusionRecipe>> recipes, @Nullable Level level,
             List<ItemStack> patternInputs, List<ItemStack> patternOutputs) {
-        if (recipes == null || patternInputs == null || patternInputs.isEmpty()
-                || patternOutputs == null || patternOutputs.isEmpty()) {
+        return findDynamicPatternProfileLong(
+                recipes, level, PatternStackView.fromLegacy(patternInputs, patternOutputs));
+    }
+
+    public static Optional<DynamicPatternProfile> findDynamicPatternProfileLong(
+            Level level, PatternStackView pattern) {
+        if (level == null) {
+            return Optional.empty();
+        }
+        return findDynamicPatternProfileLong(
+                level.getRecipeManager().getAllRecipesFor(DraconicAPI.FUSION_RECIPE_TYPE.get()),
+                level, pattern);
+    }
+
+    static Optional<DynamicPatternProfile> findDynamicPatternProfileLong(
+            Iterable<RecipeHolder<IFusionRecipe>> recipes, @Nullable Level level,
+            PatternStackView pattern) {
+        if (recipes == null || pattern == null || pattern.inputs().isEmpty()
+                || pattern.outputs().isEmpty()) {
             return Optional.empty();
         }
 
-        ItemStack primaryPatternOutput = patternOutputs.getFirst();
-        if (primaryPatternOutput == null || primaryPatternOutput.isEmpty()) {
+        List<ItemStack> inputRepresentatives = pattern.inputRepresentatives();
+        List<ItemStack> outputRepresentatives = pattern.outputRepresentatives();
+        if (inputRepresentatives.size() != pattern.inputs().size()
+                || outputRepresentatives.size() != pattern.outputs().size()) {
             return Optional.empty();
         }
+
+        GenericStack primaryPatternOutput = pattern.outputs().getFirst();
+        ItemStack primaryOutputRepresentative = outputRepresentatives.getFirst();
 
         List<RecipeHolder<IFusionRecipe>> recipeList = new ArrayList<>();
         for (RecipeHolder<IFusionRecipe> holder : recipes) {
@@ -164,30 +183,27 @@ public final class DraconicFusionRecipeAdapter implements IRecipeAdapter<IFusion
 
             IFusionRecipe source = holder.value();
             ItemStack staticResult = resultItem(source, level);
-            if (!matchesPrimaryPatternOutput(staticResult, primaryPatternOutput)) {
+            if (!matchesPrimaryPatternOutput(staticResult, primaryPatternOutput, primaryOutputRepresentative)) {
                 continue;
             }
 
             ConvertedFusionData data = convertData(source, level);
-            if (data == null || totalRequiredItems(data.inputs()) != totalPatternItems(patternInputs)
-                    || !ItemIngredientAllocator.matches(data.inputs(), patternInputs, 1)) {
+            if (data == null || totalRequiredItems(data.inputs()) != totalPatternItems(pattern.inputs())
+                    || !ItemIngredientAllocator.matches(data.inputs(), List.of(), pattern.inputs(), 1L)) {
                 continue;
             }
 
             Map<Integer, ItemStack> canonicalInputs = new LinkedHashMap<>();
             Set<Integer> idOnlyInputs = new LinkedHashSet<>();
             boolean ambiguousDynamicInput = false;
-            for (int slot = 0; slot < patternInputs.size(); slot++) {
-                ItemStack input = patternInputs.get(slot);
-                if (input == null || input.isEmpty()) {
-                    continue;
-                }
+            for (int slot = 0; slot < pattern.inputs().size(); slot++) {
+                ItemStack input = inputRepresentatives.get(slot);
 
                 ItemStack canonical = canonicalDynamicOutputs.get(input.getItem());
                 if (canonical == null) {
                     continue;
                 }
-                if (hasDuplicateInputItem(patternInputs, slot)
+                if (hasDuplicateInputItem(inputRepresentatives, slot)
                         || !hasComponentAgnosticRequirement(data.inputs(), input)) {
                     ambiguousDynamicInput = true;
                     break;
@@ -203,7 +219,7 @@ public final class DraconicFusionRecipeAdapter implements IRecipeAdapter<IFusion
             Set<Integer> idOnlyOutputs = new LinkedHashSet<>();
             if (staticResult.getItem() instanceof IFusionDataTransfer) {
                 CatalystRequirement catalyst = catalystRequirement(source.getCatalyst());
-                int catalystSlot = findUniqueCatalystSlot(patternInputs, catalyst);
+                int catalystSlot = findUniqueCatalystSlot(pattern.inputs(), inputRepresentatives, catalyst);
                 if (catalystSlot < 0 || catalyst.ingredient().getCustomIngredient() != null) {
                     continue;
                 }
@@ -248,30 +264,34 @@ public final class DraconicFusionRecipeAdapter implements IRecipeAdapter<IFusion
         return results;
     }
 
-    private static boolean matchesPrimaryPatternOutput(ItemStack recipeOutput, ItemStack patternOutput) {
-        if (recipeOutput.isEmpty() || patternOutput.isEmpty()
-                || recipeOutput.getCount() != patternOutput.getCount()
-                || !recipeOutput.is(patternOutput.getItem())) {
+    private static boolean matchesPrimaryPatternOutput(
+            ItemStack recipeOutput, GenericStack patternOutput, ItemStack patternOutputRepresentative) {
+        if (recipeOutput.isEmpty() || patternOutput == null || patternOutput.amount() <= 0L
+                || patternOutputRepresentative == null || patternOutputRepresentative.isEmpty()
+                || recipeOutput.getCount() != patternOutput.amount()
+                || !recipeOutput.is(patternOutputRepresentative.getItem())) {
             return false;
         }
         return recipeOutput.getItem() instanceof IFusionDataTransfer
                 || ItemStack.isSameItemSameComponents(
-                recipeOutput.copyWithCount(1), patternOutput.copyWithCount(1));
+                recipeOutput.copyWithCount(1), patternOutputRepresentative.copyWithCount(1));
     }
 
     private static int findUniqueCatalystSlot(
-            List<ItemStack> patternInputs, CatalystRequirement catalyst) {
+            List<GenericStack> patternInputs, List<ItemStack> inputRepresentatives,
+            CatalystRequirement catalyst) {
         if (catalyst.ingredient().isEmpty() || catalyst.count() <= 0
-                || catalyst.count() > Integer.MAX_VALUE) {
+                || inputRepresentatives.size() != patternInputs.size()) {
             return -1;
         }
 
         int catalystSlot = -1;
         for (int slot = 0; slot < patternInputs.size(); slot++) {
-            ItemStack input = patternInputs.get(slot);
-            if (input == null || input.isEmpty()
-                    || input.getCount() != (int) catalyst.count()
-                    || !catalyst.ingredient().test(input)) {
+            GenericStack input = patternInputs.get(slot);
+            ItemStack representative = inputRepresentatives.get(slot);
+            if (input == null || input.amount() != catalyst.count()
+                    || representative == null || representative.isEmpty()
+                    || !catalyst.ingredient().test(representative)) {
                 continue;
             }
             if (catalystSlot >= 0) {
@@ -279,7 +299,7 @@ public final class DraconicFusionRecipeAdapter implements IRecipeAdapter<IFusion
             }
             catalystSlot = slot;
         }
-        return catalystSlot >= 0 && !hasDuplicateInputItem(patternInputs, catalystSlot)
+        return catalystSlot >= 0 && !hasDuplicateInputItem(inputRepresentatives, catalystSlot)
                 ? catalystSlot
                 : -1;
     }
@@ -312,11 +332,13 @@ public final class DraconicFusionRecipeAdapter implements IRecipeAdapter<IFusion
         return total;
     }
 
-    private static long totalPatternItems(List<ItemStack> inputs) {
+    private static long totalPatternItems(List<GenericStack> inputs) {
         long total = 0L;
-        for (ItemStack input : inputs) {
-            if (input != null && !input.isEmpty() && input.getCount() > 0) {
-                total += input.getCount();
+        for (GenericStack input : inputs) {
+            if (input != null && input.amount() > 0L) {
+                total = total > Long.MAX_VALUE - input.amount()
+                        ? Long.MAX_VALUE
+                        : total + input.amount();
             }
         }
         return total;

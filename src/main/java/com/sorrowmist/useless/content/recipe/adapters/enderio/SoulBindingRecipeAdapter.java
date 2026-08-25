@@ -1,6 +1,7 @@
 package com.sorrowmist.useless.content.recipe.adapters.enderio;
 
 import appeng.api.stacks.AEItemKey;
+import appeng.api.stacks.GenericStack;
 import com.enderio.core.common.recipes.OutputStack;
 import com.enderio.enderio.api.EnderIOCapabilities;
 import com.enderio.enderio.api.soul.Soul;
@@ -16,6 +17,7 @@ import com.enderio.enderio.init.EIORecipes;
 import com.mojang.logging.LogUtils;
 import com.sorrowmist.useless.api.enums.AlloyFurnaceMode;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.DynamicComponentPatternDetails;
+import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.PatternStackView;
 import com.sorrowmist.useless.content.recipe.AdapterUtils;
 import com.sorrowmist.useless.content.recipe.AdvancedAlloyFurnaceRecipe;
 import com.sorrowmist.useless.content.recipe.CountedIngredient;
@@ -370,26 +372,44 @@ public final class SoulBindingRecipeAdapter implements IRecipeAdapter<SoulBindin
     /** Used by the pattern resolver to mark the soul vial/output component slots as dynamic. */
     public static Optional<DynamicPatternProfile> findDynamicPatternProfile(
             @Nullable Level level, List<ItemStack> patternInputs, List<ItemStack> patternOutputs) {
-        return findDynamicPatternProfile("enderio", level, patternInputs, patternOutputs);
+        return findDynamicPatternProfileLong(level, PatternStackView.fromLegacy(patternInputs, patternOutputs));
+    }
+
+    public static Optional<DynamicPatternProfile> findDynamicPatternProfileLong(
+            @Nullable Level level, @Nullable PatternStackView pattern) {
+        return findDynamicPatternProfileLong("enderio", level, pattern);
     }
 
     public static Optional<DynamicPatternProfile> findDynamicPatternProfile(
             String sourceId, @Nullable Level level,
             List<ItemStack> patternInputs, List<ItemStack> patternOutputs) {
+        return findDynamicPatternProfileLong(sourceId, level,
+                PatternStackView.fromLegacy(patternInputs, patternOutputs));
+    }
+
+    public static Optional<DynamicPatternProfile> findDynamicPatternProfileLong(
+            String sourceId, @Nullable Level level, @Nullable PatternStackView pattern) {
         if (sourceId == null || !sourceId.equals("enderio")) return Optional.empty();
         if (level == null) {
             return Optional.empty();
         }
-        return findDynamicPatternProfile(
+        return findDynamicPatternProfileLong(
                 level.getRecipeManager().getAllRecipesFor(EIORecipes.SOUL_BINDING.type().get()),
-                level, patternInputs, patternOutputs);
+                level, pattern);
     }
 
     static Optional<DynamicPatternProfile> findDynamicPatternProfile(
             Iterable<RecipeHolder<SoulBindingRecipe>> recipes, @Nullable Level level,
             List<ItemStack> patternInputs, List<ItemStack> patternOutputs) {
-        if (recipes == null || patternInputs == null || patternInputs.isEmpty()
-                || patternOutputs == null || patternOutputs.isEmpty()) {
+        return findDynamicPatternProfileLong(recipes, level,
+                PatternStackView.fromLegacy(patternInputs, patternOutputs));
+    }
+
+    static Optional<DynamicPatternProfile> findDynamicPatternProfileLong(
+            Iterable<RecipeHolder<SoulBindingRecipe>> recipes, @Nullable Level level,
+            @Nullable PatternStackView pattern) {
+        if (recipes == null || pattern == null || pattern.inputs().isEmpty()
+                || pattern.outputs().isEmpty() || !validItemStacks(pattern)) {
             return Optional.empty();
         }
 
@@ -402,11 +422,12 @@ public final class SoulBindingRecipeAdapter implements IRecipeAdapter<SoulBindin
 
             List<CountedIngredient> requirements = baseInputs(soulVialIngredient(), source.input());
             boolean dynamicOutput = hasDynamicOutput(source, displayVials(source));
-            if (requirements == null || !matchesPatternInputs(requirements, patternInputs)
-                    || !matchesStaticOutputs(source, patternOutputs, dynamicOutput)) {
+            if (requirements == null || !matchesPatternInputs(requirements, pattern)
+                    || !matchesStaticOutputs(source, pattern.outputs(), dynamicOutput)) {
                 continue;
             }
 
+            List<ItemStack> patternInputs = pattern.inputRepresentatives();
             int vialSlot = uniqueFilledVialSlot(patternInputs);
             int targetSlot = uniqueTargetSlot(patternInputs, source.input(), vialSlot);
             if (vialSlot < 0 || targetSlot < 0) {
@@ -582,26 +603,55 @@ public final class SoulBindingRecipeAdapter implements IRecipeAdapter<SoulBindin
     }
 
     private static boolean matchesPatternInputs(
-            List<CountedIngredient> requirements, List<ItemStack> patternInputs) {
-        long required = requirements.stream().mapToLong(CountedIngredient::count).sum();
-        long actual = patternInputs.stream().filter(stack -> stack != null && !stack.isEmpty())
-                .mapToLong(ItemStack::getCount).sum();
-        return required == actual && ItemIngredientAllocator.matches(requirements, patternInputs, 1L);
+            List<CountedIngredient> requirements, PatternStackView pattern) {
+        long required = totalRequiredItems(requirements);
+        long actual = totalPatternItems(pattern.inputs());
+        return required == actual
+                && ItemIngredientAllocator.matches(requirements, List.of(), pattern.inputs(), 1L);
+    }
+
+    private static long totalRequiredItems(List<CountedIngredient> requirements) {
+        long result = 0L;
+        for (CountedIngredient requirement : requirements) {
+            if (requirement == null || requirement.count() <= 0L) {
+                continue;
+            }
+            if (result > Long.MAX_VALUE - requirement.count()) {
+                return Long.MAX_VALUE;
+            }
+            result += requirement.count();
+        }
+        return result;
+    }
+
+    private static long totalPatternItems(List<GenericStack> inputs) {
+        long result = 0L;
+        for (GenericStack input : inputs) {
+            if (input == null || input.amount() <= 0L || !(input.what() instanceof AEItemKey)) {
+                continue;
+            }
+            if (result > Long.MAX_VALUE - input.amount()) {
+                return Long.MAX_VALUE;
+            }
+            result += input.amount();
+        }
+        return result;
     }
 
     private static boolean matchesStaticOutputs(
-            SoulBindingRecipe source, List<ItemStack> patternOutputs, boolean dynamicOutput) {
+            SoulBindingRecipe source, List<GenericStack> patternOutputs, boolean dynamicOutput) {
         List<ItemStack> expected = staticOutputs(source);
         if (patternOutputs.size() != expected.size()) {
             return false;
         }
         for (int index = 0; index < expected.size(); index++) {
             ItemStack expectedStack = expected.get(index);
-            ItemStack actualStack = patternOutputs.get(index);
-            if (actualStack == null || actualStack.isEmpty()
-                    || actualStack.getCount() != expectedStack.getCount()) {
+            GenericStack actual = patternOutputs.get(index);
+            if (actual == null || actual.amount() <= 0L || actual.amount() != expectedStack.getCount()
+                    || !(actual.what() instanceof AEItemKey itemKey)) {
                 return false;
             }
+            ItemStack actualStack = itemKey.toStack(1);
             if (index == 0) {
                 // A soul-bound result is intentionally matched by item id only. Static outputs
                 // must remain component-exact so unrelated component variants cannot share a
@@ -616,6 +666,13 @@ public final class SoulBindingRecipeAdapter implements IRecipeAdapter<SoulBindin
             }
         }
         return true;
+    }
+
+    private static boolean validItemStacks(PatternStackView pattern) {
+        return pattern.inputs().stream().allMatch(stack -> stack != null && stack.amount() > 0L
+                        && stack.what() instanceof AEItemKey)
+                && pattern.outputs().stream().allMatch(stack -> stack != null && stack.amount() > 0L
+                        && stack.what() instanceof AEItemKey);
     }
 
     private static List<ItemStack> staticOutputs(SoulBindingRecipe source) {

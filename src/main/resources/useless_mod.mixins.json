@@ -4,6 +4,7 @@
   "compatibilityLevel": "JAVA_21",
   "mixins": [
     "EntityMixin",
+    "EntityGetterMixin",
     "LivingEntityMixin",
     "PlayerMixin",
     "ServerLevelMixin",

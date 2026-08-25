@@ -6,9 +6,11 @@ import com.enderio.enderio.content.machines.soul_binder.SoulBindingRecipe;
 import com.enderio.enderio.init.EIODataComponents;
 import com.enderio.enderio.init.EIOBlocks;
 import com.enderio.enderio.init.EIOItems;
+import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.PatternStackView;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.DynamicComponentPatternDetails;
 import com.sorrowmist.useless.content.recipe.AdvancedAlloyFurnaceRecipe;
 import appeng.api.stacks.AEItemKey;
+import appeng.api.stacks.GenericStack;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.RegistryAccess;
 import net.minecraft.core.component.DataComponents;
@@ -119,6 +121,17 @@ class SoulBindingRecipeAdapterTest {
         assertFalse(matcher.test(Objects.requireNonNull(AEItemKey.of(vial(EntityType.ZOMBIE)))));
         assertFalse(matcher.test(Objects.requireNonNull(
                 AEItemKey.of(new ItemStack(EIOItems.SOUL_VIAL.asItem())))));
+
+        PatternStackView pattern = new PatternStackView(
+                List.of(new GenericStack(Objects.requireNonNull(AEItemKey.of(cowVial)), 1L),
+                        new GenericStack(Objects.requireNonNull(AEItemKey.of(Items.IRON_INGOT)), 1L)),
+                List.of(new GenericStack(Objects.requireNonNull(AEItemKey.of(displayOutput)), 1L),
+                        new GenericStack(Objects.requireNonNull(
+                                AEItemKey.of(new ItemStack(EIOItems.SOUL_VIAL.asItem()))), 1L)));
+        var longProfile = SoulBindingRecipeAdapter.findDynamicPatternProfileLong(
+                List.of(holder), null, pattern).orElseThrow();
+        assertEquals(profile.idOnlyInputSlots(), longProfile.idOnlyInputSlots());
+        assertEquals(profile.idOnlyOutputSlots(), longProfile.idOnlyOutputSlots());
     }
 
     @Test

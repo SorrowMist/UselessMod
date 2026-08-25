@@ -1,6 +1,7 @@
 package com.sorrowmist.useless.compat.neovitae;
 
 import appeng.api.stacks.AEItemKey;
+import appeng.api.stacks.GenericStack;
 import com.breakinblocks.neovitae.api.recipe.AraVitaeInput;
 import com.breakinblocks.neovitae.api.recipe.AraVitaeRecipe;
 import com.breakinblocks.neovitae.common.datacomponent.NVDataComponents;
@@ -16,6 +17,7 @@ import com.breakinblocks.neovitae.common.recipe.forge.ForgeUpgradeRecipe;
 import com.mojang.datafixers.util.Pair;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.DynamicComponentPatternDetails;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.DynamicPatternProfile;
+import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.PatternStackView;
 import com.sorrowmist.useless.content.recipe.AdapterUtils;
 import com.sorrowmist.useless.content.recipe.CountedIngredient;
 import com.sorrowmist.useless.content.recipe.ItemIngredientAllocator;
@@ -45,25 +47,30 @@ public final class NeoVitaeDynamicPatternSupport {
 
     public static Optional<DynamicPatternProfile> findDynamicPatternProfile(
             Level level, List<ItemStack> patternInputs, List<ItemStack> patternOutputs) {
-        if (level == null || patternInputs == null || patternInputs.isEmpty()
-                || patternOutputs == null || patternOutputs.isEmpty()) {
+        return findDynamicPatternProfileLong(level, PatternStackView.fromLegacy(patternInputs, patternOutputs));
+    }
+
+    public static Optional<DynamicPatternProfile> findDynamicPatternProfileLong(
+            Level level, @Nullable PatternStackView pattern) {
+        if (level == null || pattern == null || pattern.inputs().isEmpty()
+                || pattern.outputs().isEmpty() || !validItemStacks(pattern)) {
             return Optional.empty();
         }
 
         List<DynamicPatternProfile> matches = new ArrayList<>();
         for (RecipeHolder<ForgeRecipe> holder : level.getRecipeManager()
                 .getAllRecipesFor(NVRecipes.HELLFIRE_FORGE_TYPE.get())) {
-            DynamicPatternProfile profile = forgeProfile(holder, level, patternInputs, patternOutputs);
+            DynamicPatternProfile profile = forgeProfileLong(holder, level, pattern);
             if (profile != null && addUnique(matches, profile)) return Optional.empty();
         }
         for (RecipeHolder<AthanorRecipe> holder : level.getRecipeManager()
                 .getAllRecipesFor(NVRecipes.ATHANOR_TYPE.get())) {
-            DynamicPatternProfile profile = athanorProfile(holder, level, patternInputs, patternOutputs);
+            DynamicPatternProfile profile = athanorProfileLong(holder, level, pattern);
             if (profile != null && addUnique(matches, profile)) return Optional.empty();
         }
         for (RecipeHolder<AraVitaeRecipe> holder : level.getRecipeManager()
                 .getAllRecipesFor(NVRecipes.ARA_VITAE_TYPE.get())) {
-            DynamicPatternProfile profile = araProfile(holder, level, patternInputs, patternOutputs);
+            DynamicPatternProfile profile = araProfileLong(holder, level, pattern);
             if (profile != null && addUnique(matches, profile)) return Optional.empty();
         }
         return matches.isEmpty() ? Optional.empty() : Optional.of(matches.getFirst());
@@ -90,6 +97,117 @@ public final class NeoVitaeDynamicPatternSupport {
             return transformProfile(transform, level, patternInputs, patternOutputs);
         }
         return null;
+    }
+
+    @Nullable
+    private static DynamicPatternProfile forgeProfileLong(
+            RecipeHolder<ForgeRecipe> holder, Level level, PatternStackView pattern) {
+        ForgeRecipe source = holder == null ? null : holder.value();
+        if (source instanceof ForgeUpgradeRecipe upgrade) {
+            return upgradeProfileLong(upgrade, level, pattern);
+        }
+        if (source instanceof ForgeSpiritusInfusionRecipe infusion) {
+            return infusionProfileLong(infusion, level, pattern);
+        }
+        if (source instanceof ForgeTransformRecipe transform) {
+            return transformProfileLong(transform, level, pattern);
+        }
+        return null;
+    }
+
+    @Nullable
+    private static DynamicPatternProfile transformProfileLong(
+            ForgeTransformRecipe source, Level level, PatternStackView pattern) {
+        List<CountedIngredient> catalysts = counted(source.getCatalysts());
+        int targetSlot = uniqueDynamicSlotLong(pattern, source.getTransformInput(), catalysts);
+        if (targetSlot < 0) return null;
+
+        ItemStack output = assemble(source, pattern.inputRepresentatives(), forgeGem(), 4, level);
+        if (!matchesSingleOutputLong(output, pattern.outputs())) return null;
+        return profile(Set.of(targetSlot), Set.of(0),
+                Map.of(targetSlot, ingredientMatcher(source.getTransformInput())));
+    }
+
+    @Nullable
+    private static DynamicPatternProfile upgradeProfileLong(
+            ForgeUpgradeRecipe source, Level level, PatternStackView pattern) {
+        List<CountedIngredient> catalysts = counted(source.getCraftingIngredients());
+        int targetSlot = uniqueDynamicSlotLong(
+                pattern, HellfireForgeRecipeAdapter::isUpgradeTarget, catalysts);
+        if (targetSlot < 0) return null;
+
+        ItemStack output = assemble(source, pattern.inputRepresentatives(), forgeGem(), 4, level);
+        if (!matchesSingleOutputLong(output, pattern.outputs())) return null;
+        return profile(Set.of(targetSlot), Set.of(0),
+                Map.of(targetSlot, itemMatcher(HellfireForgeRecipeAdapter::isUpgradeTarget)));
+    }
+
+    @Nullable
+    private static DynamicPatternProfile infusionProfileLong(
+            ForgeSpiritusInfusionRecipe source, Level level, PatternStackView pattern) {
+        if (pattern.inputs().size() != 2) return null;
+        List<ItemStack> representatives = pattern.inputRepresentatives();
+        int gemSlot = uniqueItemSlotLong(pattern,
+                stack -> source.getGemInput().test(stack) && isSpiritusGem(stack));
+        int targetSlot = uniqueItemSlotLong(pattern, HellfireForgeRecipeAdapter::isInfusionTarget);
+        if (gemSlot < 0 || targetSlot < 0 || gemSlot == targetSlot) return null;
+
+        ForgeInput input = new ForgeInput(representatives, representatives.get(gemSlot), gemSlot);
+        if (!source.matches(input, level)) return null;
+        ItemStack output = assemble(source, representatives,
+                representatives.get(gemSlot), gemSlot, level);
+        if (!matchesSingleOutputLong(output, pattern.outputs())) return null;
+
+        return profile(Set.of(gemSlot, targetSlot), Set.of(0), Map.of(
+                gemSlot, itemMatcher(stack -> source.getGemInput().test(stack)
+                        && isSpiritusGem(stack)),
+                targetSlot, itemMatcher(HellfireForgeRecipeAdapter::isInfusionTarget)));
+    }
+
+    @Nullable
+    private static DynamicPatternProfile athanorProfileLong(
+            RecipeHolder<AthanorRecipe> holder, Level level, PatternStackView pattern) {
+        AthanorRecipe source = holder == null ? null : holder.value();
+        if (!(source instanceof AthanorPotionRecipe potion) || source.getInputs().isEmpty()) return null;
+
+        List<CountedIngredient> requirements = counted(source.getInputs());
+        if (!matchesPatternInputsLong(requirements, pattern)) return null;
+        int potionSlot = uniqueItemSlotLong(pattern, source.getInputs().getFirst()::test);
+        if (potionSlot < 0) return null;
+
+        PotionContents contents = pattern.inputRepresentatives().get(potionSlot)
+                .get(DataComponents.POTION_CONTENTS);
+        List<ItemStack> expected = potionOutputs(source, contents);
+        if (!matchesDynamicOutputsLong(expected, pattern.outputs())) return null;
+
+        Set<Integer> outputSlots = new LinkedHashSet<>();
+        for (int slot = 0; slot < expected.size(); slot++) outputSlots.add(slot);
+        return profile(Set.of(potionSlot), outputSlots,
+                Map.of(potionSlot, itemMatcher(source.getInputs().getFirst()::test)));
+    }
+
+    @Nullable
+    private static DynamicPatternProfile araProfileLong(
+            RecipeHolder<AraVitaeRecipe> holder, Level level, PatternStackView pattern) {
+        AraVitaeRecipe source = holder == null ? null : holder.value();
+        if (source == null || !source.shouldCopyInputComponents()
+                || !matchesPatternInputsLong(counted(List.of(source.getInput())), pattern)) {
+            return null;
+        }
+
+        int inputSlot = uniqueItemSlotLong(pattern, source.getInput()::test);
+        if (inputSlot < 0 || !matchesSingleOutputLong(source.getResult(), pattern.outputs())) return null;
+
+        ItemStack output;
+        try {
+            output = source.assemble(new AraVitaeInput(
+                    pattern.inputRepresentatives().get(inputSlot), 0), level.registryAccess());
+        } catch (RuntimeException exception) {
+            return null;
+        }
+        if (!matchesSingleOutputLong(output, pattern.outputs())) return null;
+        return profile(Set.of(inputSlot), Set.of(0),
+                Map.of(inputSlot, itemMatcher(source.getInput()::test)));
     }
 
     @Nullable
@@ -221,6 +339,52 @@ public final class NeoVitaeDynamicPatternSupport {
                 && ItemIngredientAllocator.matches(requirements, inputs, 1L);
     }
 
+    private static boolean matchesPatternInputsLong(
+            List<CountedIngredient> requirements, PatternStackView pattern) {
+        return totalRequired(requirements) == totalItemsLong(pattern.inputs())
+                && ItemIngredientAllocator.matches(requirements, List.of(), pattern.inputs(), 1L);
+    }
+
+    private static int uniqueDynamicSlotLong(
+            PatternStackView pattern, Ingredient dynamic,
+            List<CountedIngredient> staticRequirements) {
+        if (dynamic == null || dynamic.isEmpty()) return -1;
+        return uniqueDynamicSlotLong(pattern, dynamic::test, staticRequirements);
+    }
+
+    private static int uniqueDynamicSlotLong(
+            PatternStackView pattern, Predicate<ItemStack> dynamic,
+            List<CountedIngredient> staticRequirements) {
+        List<ItemStack> representatives = pattern.inputRepresentatives();
+        int result = -1;
+        for (int slot = 0; slot < representatives.size(); slot++) {
+            ItemStack input = representatives.get(slot);
+            if (input == null || input.isEmpty() || !dynamic.test(input)) continue;
+            List<GenericStack> remaining = new ArrayList<>(pattern.inputs());
+            remaining.remove(slot);
+            if (totalRequired(staticRequirements) != totalItemsLong(remaining)
+                    || !ItemIngredientAllocator.matches(staticRequirements, List.of(), remaining, 1L)) {
+                continue;
+            }
+            if (result >= 0) return -1;
+            result = slot;
+        }
+        return result;
+    }
+
+    private static int uniqueItemSlotLong(
+            PatternStackView pattern, Predicate<ItemStack> predicate) {
+        List<ItemStack> representatives = pattern.inputRepresentatives();
+        int result = -1;
+        for (int slot = 0; slot < representatives.size(); slot++) {
+            ItemStack input = representatives.get(slot);
+            if (input == null || input.isEmpty() || !predicate.test(input)) continue;
+            if (result >= 0) return -1;
+            result = slot;
+        }
+        return result;
+    }
+
     private static int uniqueDynamicSlot(
             List<ItemStack> inputs, Ingredient dynamic, List<CountedIngredient> staticRequirements) {
         if (dynamic == null || dynamic.isEmpty()) return -1;
@@ -280,6 +444,45 @@ public final class NeoVitaeDynamicPatternSupport {
             result += input.getCount();
         }
         return result;
+    }
+
+    private static long totalItemsLong(List<GenericStack> inputs) {
+        long result = 0L;
+        for (GenericStack input : inputs) {
+            if (input == null || input.amount() <= 0L) continue;
+            if (result > Long.MAX_VALUE - input.amount()) return Long.MAX_VALUE;
+            result += input.amount();
+        }
+        return result;
+    }
+
+    private static boolean validItemStacks(PatternStackView pattern) {
+        return pattern.inputs().stream().allMatch(stack -> stack != null && stack.amount() > 0L
+                        && stack.what() instanceof AEItemKey)
+                && pattern.outputs().stream().allMatch(stack -> stack != null && stack.amount() > 0L
+                        && stack.what() instanceof AEItemKey);
+    }
+
+    private static boolean matchesSingleOutputLong(ItemStack expected, List<GenericStack> actual) {
+        return actual != null && actual.size() == 1
+                && matchesDynamicOutputLong(expected, actual.getFirst());
+    }
+
+    private static boolean matchesDynamicOutputsLong(List<ItemStack> expected, List<GenericStack> actual) {
+        if (expected == null || actual == null || expected.size() != actual.size()) return false;
+        for (int slot = 0; slot < expected.size(); slot++) {
+            if (!matchesDynamicOutputLong(expected.get(slot), actual.get(slot))) return false;
+        }
+        return true;
+    }
+
+    private static boolean matchesDynamicOutputLong(ItemStack expected, GenericStack actual) {
+        if (expected == null || expected.isEmpty() || actual == null || actual.amount() <= 0L
+                || actual.amount() != expected.getCount()
+                || !(actual.what() instanceof AEItemKey itemKey)) {
+            return false;
+        }
+        return expected.getItem() == itemKey.getItem();
     }
 
     private static DynamicComponentPatternDetails.InputMatcher itemMatcher(

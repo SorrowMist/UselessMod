@@ -5,9 +5,16 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.effect.MobEffects;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.ai.targeting.TargetingConditions;
+import net.minecraft.world.entity.player.Abilities;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.EntityGetter;
+import net.minecraft.world.level.entity.EntityTypeTest;
+import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.Vec3;
 import net.neoforged.bus.api.EventPriority;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.neoforge.event.entity.living.LivingChangeTargetEvent;
@@ -19,11 +26,15 @@ import org.junit.jupiter.api.Test;
 import sun.misc.Unsafe;
 
 import java.lang.reflect.Field;
+import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Predicate;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class EventHandlerTest {
@@ -106,12 +117,59 @@ class EventHandlerTest {
         assertFalse(EventHandler.isNonBeneficialEffect(regeneration.getEffectInstance()));
     }
 
+    @Test
+    void protectedPlayersAreHiddenFromVisibilityChecks() throws ReflectiveOperationException {
+        TestPlayer player = createTestPlayer(true);
+
+        assertFalse(player.canBeSeenAsEnemy());
+        assertFalse(player.canBeSeenByAnyone());
+    }
+
+    @Test
+    void unprotectedPlayersKeepNormalVisibility() throws ReflectiveOperationException {
+        TestPlayer player = createTestPlayer(false);
+
+        assertTrue(player.canBeSeenAsEnemy());
+        assertTrue(player.canBeSeenByAnyone());
+    }
+
+    @Test
+    void standardPlayerQueriesSkipProtectedPlayersBeforeSelectingTargets() throws ReflectiveOperationException {
+        TestPlayer protectedPlayer = createTestPlayer(true);
+        TestPlayer normalPlayer = createTestPlayer(false);
+        TestPlayer requester = createTestPlayer(false);
+        TestEntityGetter getter = new TestEntityGetter(List.of(protectedPlayer, normalPlayer));
+
+        Player nearest = getter.getNearestPlayer(0.0, 0.0, 0.0, -1.0, entity -> true);
+        Player nearestWithConditions = getter.getNearestPlayer(
+                TargetingConditions.forNonCombat(), requester);
+        List<Player> nearby = getter.getNearbyPlayers(
+                TargetingConditions.forNonCombat(),
+                requester,
+                new AABB(-1.0, -1.0, -1.0, 1.0, 1.0, 1.0));
+
+        assertSame(normalPlayer, nearest);
+        assertSame(normalPlayer, nearestWithConditions);
+        assertEquals(List.of(normalPlayer), nearby);
+        assertFalse(new TestEntityGetter(List.of(protectedPlayer))
+                .hasNearbyAlivePlayer(0.0, 0.0, 0.0, 1.0));
+    }
+
     private static TestPlayer createTestPlayer(boolean protectedState) throws ReflectiveOperationException {
         Unsafe unsafe = getUnsafe();
         TestPlayer player = (TestPlayer) unsafe.allocateInstance(TestPlayer.class);
         player.testLevel = (Level) unsafe.allocateInstance(ServerLevel.class);
         unsafe.putBoolean(player.testLevel,
                 unsafe.objectFieldOffset(Level.class.getDeclaredField("isClientSide")), true);
+        unsafe.putObject(player,
+                unsafe.objectFieldOffset(Player.class.getDeclaredField("abilities")),
+                new Abilities());
+        unsafe.putInt(player,
+                unsafe.objectFieldOffset(Entity.class.getDeclaredField("id")),
+                NEXT_ENTITY_ID.getAndIncrement());
+        unsafe.putObject(player,
+                unsafe.objectFieldOffset(Entity.class.getDeclaredField("position")),
+                Vec3.ZERO);
         if (protectedState) {
             EventHandler.setClientBeefInvulnerabilityState(player.getId(), true);
         }
@@ -122,6 +180,34 @@ class EventHandlerTest {
         Field field = Unsafe.class.getDeclaredField("theUnsafe");
         field.setAccessible(true);
         return (Unsafe) field.get(null);
+    }
+
+    private static final AtomicInteger NEXT_ENTITY_ID = new AtomicInteger(1);
+
+    private static final class TestEntityGetter implements EntityGetter {
+        private final List<? extends Player> players;
+
+        private TestEntityGetter(List<? extends Player> players) {
+            this.players = players;
+        }
+
+        @Override
+        public List<Entity> getEntities(Entity entity, AABB area, Predicate<? super Entity> predicate) {
+            return List.of();
+        }
+
+        @Override
+        public <T extends Entity> List<T> getEntities(
+                EntityTypeTest<Entity, T> entityTypeTest,
+                AABB bounds,
+                Predicate<? super T> predicate) {
+            return List.of();
+        }
+
+        @Override
+        public List<? extends Player> players() {
+            return players;
+        }
     }
 
     private static final class TestPlayer extends Player {
@@ -149,6 +235,16 @@ class EventHandlerTest {
         @Override
         public boolean isCreative() {
             return false;
+        }
+
+        @Override
+        public boolean isAlive() {
+            return true;
+        }
+
+        @Override
+        public double distanceToSqr(double x, double y, double z) {
+            return 0.0;
         }
     }
 }

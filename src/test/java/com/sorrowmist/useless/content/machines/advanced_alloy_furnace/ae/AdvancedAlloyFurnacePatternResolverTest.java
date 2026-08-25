@@ -82,6 +82,23 @@ class AdvancedAlloyFurnacePatternResolverTest {
     }
 
     @Test
+    void patternStackViewPreservesLongInputMultipliersAndUnitRepresentatives() {
+        long amount = Long.MAX_VALUE;
+        AEItemKey input = Objects.requireNonNull(AEItemKey.of(Items.IRON_INGOT));
+        AEItemKey output = Objects.requireNonNull(AEItemKey.of(Items.GOLD_INGOT));
+        ItemStack encoded = PatternDetailsHelper.encodeProcessingPattern(
+                List.of(new GenericStack(input, amount)), List.of(new GenericStack(output, 1L)));
+        AEProcessingPattern pattern = new AEProcessingPattern(Objects.requireNonNull(AEItemKey.of(encoded)));
+
+        PatternStackView view = PatternStackView.fromPattern(pattern);
+
+        assertNotNull(view);
+        assertEquals(amount, view.inputs().getFirst().amount());
+        assertEquals(1, view.inputRepresentatives().getFirst().getCount());
+        assertEquals(input, Objects.requireNonNull(AEItemKey.of(view.inputRepresentatives().getFirst())));
+    }
+
+    @Test
     void canonicalizesConcreteAeProcessingInputArrayWithoutArrayStoreFailure() {
         ItemStack jeiInput = new ItemStack(Items.DIAMOND_SWORD, 3);
         jeiInput.set(DataComponents.CUSTOM_NAME, Component.literal("jei-components"));

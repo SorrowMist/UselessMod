@@ -10,6 +10,7 @@ import com.klikli_dev.occultism.registry.OccultismDataComponents;
 import com.klikli_dev.occultism.registry.OccultismEntities;
 import com.klikli_dev.occultism.registry.OccultismItems;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.DynamicComponentPatternDetails;
+import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.PatternStackView;
 import com.sorrowmist.useless.content.recipe.AdvancedAlloyFurnaceRecipe;
 import com.sorrowmist.useless.content.recipe.ItemIngredientAllocator;
 import net.minecraft.core.NonNullList;
@@ -69,6 +70,27 @@ class OccultismRitualRecipeAdapterTest {
             DynamicComponentPatternDetails dynamic = dynamicPattern(jeiBook, new ItemStack(Items.PAPER), profile);
             assertTrue(dynamic.getInputs()[0].isValid(AEItemKey.of(craftedBook), null));
         }
+    }
+
+    @Test
+    void keepsLongPatternAmountsWhenMatchingRitualRequirements() {
+        ItemStack displayed = boundBook(OccultismItems.BOOK_OF_BINDING_BOUND_FOLIOT.get(), "jei-long");
+        RitualRecipe source = recipe("long_amount", Ingredient.of(
+                        OccultismItems.BOOK_OF_BINDING_BOUND_FOLIOT.get()),
+                NonNullList.of(Ingredient.EMPTY, Ingredient.of(Items.DIAMOND)),
+                new ItemStack(Items.PAPER));
+        GenericStack book = Objects.requireNonNull(GenericStack.fromItemStack(displayed));
+        GenericStack diamond = Objects.requireNonNull(
+                GenericStack.fromItemStack(new ItemStack(Items.DIAMOND)));
+        GenericStack paper = Objects.requireNonNull(
+                GenericStack.fromItemStack(new ItemStack(Items.PAPER)));
+
+        assertTrue(OccultismRitualRecipeAdapter.findDynamicPatternProfileLong(
+                List.of(holder("long_amount", source)),
+                new PatternStackView(
+                        List.of(new GenericStack(book.what(), Integer.MAX_VALUE + 1L),
+                                new GenericStack(diamond.what(), 1L)),
+                        List.of(new GenericStack(paper.what(), 1L)))).isEmpty());
     }
 
     @Test

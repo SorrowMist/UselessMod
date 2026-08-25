@@ -11,6 +11,7 @@ import com.sorrowmist.useless.content.recipe.AdapterUtils;
 import com.sorrowmist.useless.content.recipe.AdvancedAlloyFurnaceRecipe;
 import com.sorrowmist.useless.content.recipe.AlloyFurnaceRecipeManager;
 import com.sorrowmist.useless.content.recipe.ItemIngredientAllocator;
+import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.PatternStackView;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.network.chat.Component;
@@ -222,6 +223,35 @@ class DraconicFusionRecipeAdapterTest {
                 new ItemStack(DEContent.SHOVEL_DRACONIC.get()), profile.canonicalInputs().get(3)));
         assertFalse(ItemStack.isSameItemSameComponents(namedPickaxe, profile.canonicalInputs().get(1)));
         assertFalse(profile.idOnlyInputSlots().contains(4));
+    }
+
+    @Test
+    void keepsLongPatternAmountsWhenMatchingFusionRequirements() {
+        FusionRecipe staffRecipe = new FusionRecipe(
+                new ItemStack(DEContent.STAFF_DRACONIC.get()),
+                Ingredient.of(Items.NETHER_STAR),
+                256_000_000L,
+                TechLevel.DRACONIC,
+                List.of(consumed(DEContent.PICKAXE_DRACONIC.get()))
+        );
+        List<RecipeHolder<IFusionRecipe>> recipes = List.of(
+                fusionHolder("staff_long", staffRecipe),
+                dynamicToolRecipe("pickaxe_long", new ItemStack(DEContent.PICKAXE_DRACONIC.get()))
+        );
+        GenericStack star = Objects.requireNonNull(
+                GenericStack.fromItemStack(new ItemStack(Items.NETHER_STAR)));
+        GenericStack pickaxe = Objects.requireNonNull(
+                GenericStack.fromItemStack(new ItemStack(DEContent.PICKAXE_DRACONIC.get())));
+        GenericStack staff = Objects.requireNonNull(
+                GenericStack.fromItemStack(new ItemStack(DEContent.STAFF_DRACONIC.get())));
+
+        assertTrue(DraconicFusionRecipeAdapter.findDynamicPatternProfileLong(
+                recipes,
+                null,
+                new PatternStackView(
+                        List.of(new GenericStack(star.what(), 1L),
+                                new GenericStack(pickaxe.what(), Integer.MAX_VALUE + 1L)),
+                        List.of(new GenericStack(staff.what(), 1L)))).isEmpty());
     }
 
     @Test

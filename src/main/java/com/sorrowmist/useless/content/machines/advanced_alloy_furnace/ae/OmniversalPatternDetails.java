@@ -237,24 +237,23 @@ public final class OmniversalPatternDetails extends DynamicComponentPatternDetai
 
     private static java.util.Map<Integer, DynamicComponentPatternDetails.InputMatcher>
             dynamicInputMatchers(Decoded decoded) {
+        PatternStackView view = PatternStackView.fromPattern(decoded.source);
+        if (view == null) return java.util.Map.of();
         String sourceId = RecipeSourceIds.normalize(decoded.data.sourceId());
         if (RecipeSourceIds.NEOVITAE.equals(sourceId)) {
             if (!ModList.get().isLoaded("neovitae")) return java.util.Map.of();
             return AdvancedAlloyFurnacePatternResolver.findNeoVitaeDynamicPatternProfile(
-                            decoded.level,
-                            AdvancedAlloyFurnacePatternResolver.itemInputs(decoded.source),
-                            AdvancedAlloyFurnacePatternResolver.itemOutputs(decoded.source))
+                            decoded.level, view)
                     .map(DynamicPatternProfile::inputMatchers)
                     .orElseGet(java.util.Map::of);
         }
         if (!ModList.get().isLoaded("enderio")) {
             return java.util.Map.of();
         }
-        return SoulBindingRecipeAdapter.findDynamicPatternProfile(
+        return SoulBindingRecipeAdapter.findDynamicPatternProfileLong(
                         decoded.data.sourceId().isBlank() ? "enderio" : decoded.data.sourceId(),
                         decoded.level,
-                        AdvancedAlloyFurnacePatternResolver.itemInputs(decoded.source),
-                        AdvancedAlloyFurnacePatternResolver.itemOutputs(decoded.source))
+                        view)
                 .map(SoulBindingRecipeAdapter.DynamicPatternProfile::inputMatchers)
                 .orElseGet(java.util.Map::of);
     }

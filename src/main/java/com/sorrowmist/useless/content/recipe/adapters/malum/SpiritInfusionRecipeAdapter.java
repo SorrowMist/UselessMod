@@ -1,9 +1,12 @@
 package com.sorrowmist.useless.content.recipe.adapters.malum;
 
+import appeng.api.stacks.AEItemKey;
+import appeng.api.stacks.GenericStack;
 import com.mojang.logging.LogUtils;
 import com.sammy.malum.common.recipe.SpiritInfusionRecipe;
 import com.sammy.malum.registry.common.recipe.MalumRecipeTypes;
 import com.sorrowmist.useless.api.enums.AlloyFurnaceMode;
+import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.PatternStackView;
 import com.sorrowmist.useless.content.recipe.AdapterUtils;
 import com.sorrowmist.useless.content.recipe.AdvancedAlloyFurnaceRecipe;
 import com.sorrowmist.useless.content.recipe.CountedIngredient;
@@ -103,20 +106,30 @@ public final class SpiritInfusionRecipeAdapter implements IRecipeAdapter<SpiritI
     /** Identifies carry-over altar patterns whose primary input and output are component-dynamic. */
     public static Optional<DynamicPatternProfile> findDynamicPatternProfile(
             @Nullable Level level, List<ItemStack> patternInputs, List<ItemStack> patternOutputs) {
+        return findDynamicPatternProfileLong(level, PatternStackView.fromLegacy(patternInputs, patternOutputs));
+    }
+
+    public static Optional<DynamicPatternProfile> findDynamicPatternProfileLong(
+            @Nullable Level level, @Nullable PatternStackView pattern) {
         if (level == null) {
             return Optional.empty();
         }
-        return findDynamicPatternProfile(
+        return findDynamicPatternProfileLong(
                 level.getRecipeManager().getAllRecipesFor(MalumRecipeTypes.SPIRIT_INFUSION.get()),
-                patternInputs, patternOutputs);
+                pattern);
     }
 
     static Optional<DynamicPatternProfile> findDynamicPatternProfile(
             Iterable<RecipeHolder<SpiritInfusionRecipe>> recipes,
             List<ItemStack> patternInputs, List<ItemStack> patternOutputs) {
-        if (recipes == null || patternInputs == null || patternInputs.isEmpty()
-                || patternOutputs == null || patternOutputs.size() != 1
-                || patternOutputs.getFirst() == null || patternOutputs.getFirst().isEmpty()) {
+        return findDynamicPatternProfileLong(recipes,
+                PatternStackView.fromLegacy(patternInputs, patternOutputs));
+    }
+
+    static Optional<DynamicPatternProfile> findDynamicPatternProfileLong(
+            Iterable<RecipeHolder<SpiritInfusionRecipe>> recipes, @Nullable PatternStackView pattern) {
+        if (recipes == null || pattern == null || pattern.inputs().isEmpty()
+                || pattern.outputs().size() != 1 || !validItemStacks(pattern)) {
             return Optional.empty();
         }
 
@@ -129,12 +142,12 @@ public final class SpiritInfusionRecipeAdapter implements IRecipeAdapter<SpiritI
             }
 
             Converted converted = convertData(source, null, null);
-            if (converted == null || !matchesStaticOutput(converted.output(), patternOutputs.getFirst())
-                    || !matchesPatternInputs(converted.inputs(), patternInputs)) {
+            if (converted == null || !matchesStaticOutput(converted.output(), pattern.outputs().getFirst())
+                    || !matchesPatternInputs(converted.inputs(), pattern)) {
                 continue;
             }
 
-            int primarySlot = uniquePrimarySlot(source.input.ingredient(), patternInputs);
+            int primarySlot = uniquePrimarySlot(source.input.ingredient(), pattern.inputRepresentatives());
             if (primarySlot < 0) {
                 continue;
             }
@@ -214,15 +227,17 @@ public final class SpiritInfusionRecipeAdapter implements IRecipeAdapter<SpiritI
     }
 
     private static boolean matchesPatternInputs(
-            List<CountedIngredient> requirements, List<ItemStack> patternInputs) {
-        return totalRequiredItems(requirements) == totalPatternItems(patternInputs)
-                && ItemIngredientAllocator.matches(requirements, patternInputs, 1L);
+            List<CountedIngredient> requirements, PatternStackView pattern) {
+        return totalRequiredItems(requirements) == totalPatternItems(pattern.inputs())
+                && ItemIngredientAllocator.matches(requirements, List.of(), pattern.inputs(), 1L);
     }
 
-    private static boolean matchesStaticOutput(ItemStack expected, ItemStack actual) {
-        return expected != null && !expected.isEmpty() && actual != null && !actual.isEmpty()
-                && expected.getCount() == actual.getCount()
-                && ItemStack.isSameItemSameComponents(expected, actual);
+    private static boolean matchesStaticOutput(ItemStack expected, GenericStack actual) {
+        if (expected == null || expected.isEmpty() || actual == null || actual.amount() <= 0L
+                || actual.amount() != expected.getCount() || !(actual.what() instanceof AEItemKey itemKey)) {
+            return false;
+        }
+        return ItemStack.isSameItemSameComponents(expected, itemKey.toStack(1));
     }
 
     private static int uniquePrimarySlot(Ingredient primary, List<ItemStack> patternInputs) {
@@ -254,18 +269,25 @@ public final class SpiritInfusionRecipeAdapter implements IRecipeAdapter<SpiritI
         return result;
     }
 
-    private static long totalPatternItems(List<ItemStack> inputs) {
+    private static long totalPatternItems(List<GenericStack> inputs) {
         long result = 0L;
-        for (ItemStack input : inputs) {
-            if (input == null || input.isEmpty() || input.getCount() <= 0) {
+        for (GenericStack input : inputs) {
+            if (input == null || input.amount() <= 0L || !(input.what() instanceof AEItemKey)) {
                 continue;
             }
-            if (result > Long.MAX_VALUE - input.getCount()) {
+            if (result > Long.MAX_VALUE - input.amount()) {
                 return Long.MAX_VALUE;
             }
-            result += input.getCount();
+            result += input.amount();
         }
         return result;
+    }
+
+    private static boolean validItemStacks(PatternStackView pattern) {
+        return pattern.inputs().stream().allMatch(stack -> stack != null && stack.amount() > 0L
+                        && stack.what() instanceof AEItemKey)
+                && pattern.outputs().stream().allMatch(stack -> stack != null && stack.amount() > 0L
+                        && stack.what() instanceof AEItemKey);
     }
 
     private static ResourceLocation variantId(ResourceLocation source, ItemStack primary) {

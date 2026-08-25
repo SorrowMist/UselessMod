@@ -12,6 +12,14 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 @Mixin(LivingEntity.class)
 public class LivingEntityMixin {
+    @Inject(method = "canBeSeenByAnyone", at = @At("HEAD"), cancellable = true)
+    private void useless_mod$hideProtectedPlayerFromVisibilityChecks(CallbackInfoReturnable<Boolean> cir) {
+        LivingEntity entity = (LivingEntity) (Object) this;
+        if (entity instanceof Player player && EventHandler.hasBeefInvulnerabilityItem(player)) {
+            cir.setReturnValue(false);
+        }
+    }
+
     @Inject(method = "handleEntityEvent", at = @At("HEAD"), cancellable = true)
     private void useless_mod$protectBeefPlayerFromDeathEvent(byte id, CallbackInfo ci) {
         LivingEntity entity = (LivingEntity) (Object) this;

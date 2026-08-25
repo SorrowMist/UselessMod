@@ -1,9 +1,12 @@
 package com.sorrowmist.useless.content.recipe.adapters.malum;
 
+import appeng.api.stacks.AEItemKey;
+import appeng.api.stacks.GenericStack;
 import com.sammy.malum.common.recipe.SpiritFocusingRecipe;
 import com.sammy.malum.common.recipe.SpiritInfusionRecipe;
 import com.sammy.malum.core.systems.recipe.SpiritIngredient;
 import com.sammy.malum.registry.common.magic.MalumSpiritTypes;
+import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.PatternStackView;
 import com.sorrowmist.useless.content.recipe.AdapterUtils;
 import com.sorrowmist.useless.content.recipe.AdvancedAlloyFurnaceRecipe;
 import com.sorrowmist.useless.content.recipe.ItemIngredientAllocator;
@@ -18,6 +21,7 @@ import net.neoforged.neoforge.common.crafting.SizedIngredient;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -96,6 +100,15 @@ class MalumRecipeAdapterTest {
                 List.of(sourceResult)).orElseThrow();
         assertEquals(Set.of(0), profile.idOnlyInputSlots());
         assertEquals(Set.of(0), profile.idOnlyOutputSlots());
+
+        PatternStackView pattern = new PatternStackView(
+                List.of(new GenericStack(Objects.requireNonNull(AEItemKey.of(primary)), 1L),
+                        new GenericStack(Objects.requireNonNull(AEItemKey.of(Items.NETHER_STAR)), 1L)),
+                List.of(new GenericStack(Objects.requireNonNull(AEItemKey.of(sourceResult)), 1L)));
+        var longProfile = SpiritInfusionRecipeAdapter.findDynamicPatternProfileLong(
+                List.of(holder("carry_over", source)), pattern).orElseThrow();
+        assertEquals(profile.idOnlyInputSlots(), longProfile.idOnlyInputSlots());
+        assertEquals(profile.idOnlyOutputSlots(), longProfile.idOnlyOutputSlots());
     }
 
     private static long required(AdvancedAlloyFurnaceRecipe recipe, ItemStack stack) {

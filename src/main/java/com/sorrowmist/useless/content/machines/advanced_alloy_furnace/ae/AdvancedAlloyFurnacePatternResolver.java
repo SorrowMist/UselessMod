@@ -139,13 +139,12 @@ public final class AdvancedAlloyFurnacePatternResolver {
 
     private static IPatternDetails resolveDynamicDraconicPattern(
             AEProcessingPattern pattern, Level level) {
-        List<ItemStack> inputs = itemInputs(pattern);
-        List<ItemStack> outputs = itemOutputs(pattern);
-        if (inputs.isEmpty() || outputs.isEmpty()) {
+        PatternStackView view = PatternStackView.fromPattern(pattern);
+        if (view == null || view.inputs().isEmpty() || view.outputs().isEmpty()) {
             return pattern;
         }
 
-        var dynamicProfile = DraconicFusionRecipeAdapter.findDynamicPatternProfile(level, inputs, outputs);
+        var dynamicProfile = DraconicFusionRecipeAdapter.findDynamicPatternProfileLong(level, view);
         if (dynamicProfile.isEmpty()) {
             return pattern;
         }
@@ -163,9 +162,11 @@ public final class AdvancedAlloyFurnacePatternResolver {
 
     private static IPatternDetails resolveDynamicOccultismPattern(
             AEProcessingPattern pattern, Level level) {
-        List<ItemStack> inputs = itemInputs(pattern);
-        List<ItemStack> outputs = itemOutputs(pattern);
-        var profile = OccultismRitualRecipeAdapter.findDynamicPatternProfile(level, inputs, outputs);
+        PatternStackView view = PatternStackView.fromPattern(pattern);
+        if (view == null || view.inputs().isEmpty() || view.outputs().isEmpty()) {
+            return pattern;
+        }
+        var profile = OccultismRitualRecipeAdapter.findDynamicPatternProfileLong(level, view);
         if (profile.isEmpty()) {
             return pattern;
         }
@@ -178,9 +179,11 @@ public final class AdvancedAlloyFurnacePatternResolver {
 
     private static IPatternDetails resolveDynamicMalumPattern(
             AEProcessingPattern pattern, Level level) {
-        List<ItemStack> inputs = itemInputs(pattern);
-        List<ItemStack> outputs = itemOutputs(pattern);
-        var profile = SpiritInfusionRecipeAdapter.findDynamicPatternProfile(level, inputs, outputs);
+        PatternStackView view = PatternStackView.fromPattern(pattern);
+        if (view == null || view.inputs().isEmpty() || view.outputs().isEmpty()) {
+            return pattern;
+        }
+        var profile = SpiritInfusionRecipeAdapter.findDynamicPatternProfileLong(level, view);
         if (profile.isEmpty()) {
             return pattern;
         }
@@ -193,10 +196,12 @@ public final class AdvancedAlloyFurnacePatternResolver {
 
     private static IPatternDetails resolveDynamicSoulBindingPattern(
             AEProcessingPattern pattern, Level level, @Nullable String sourceId) {
-        List<ItemStack> inputs = itemInputs(pattern);
-        List<ItemStack> outputs = itemOutputs(pattern);
-        var profile = SoulBindingRecipeAdapter.findDynamicPatternProfile(
-                sourceId == null ? RecipeSourceIds.ENDER_IO : sourceId, level, inputs, outputs);
+        PatternStackView view = PatternStackView.fromPattern(pattern);
+        if (view == null || view.inputs().isEmpty() || view.outputs().isEmpty()) {
+            return pattern;
+        }
+        var profile = SoulBindingRecipeAdapter.findDynamicPatternProfileLong(
+                sourceId == null ? RecipeSourceIds.ENDER_IO : sourceId, level, view);
         if (profile.isEmpty()) {
             return pattern;
         }
@@ -210,10 +215,12 @@ public final class AdvancedAlloyFurnacePatternResolver {
 
     private static IPatternDetails resolveDynamicNeoVitaePattern(
             AEProcessingPattern pattern, Level level) {
-        List<ItemStack> inputs = itemInputs(pattern);
-        List<ItemStack> outputs = itemOutputs(pattern);
+        PatternStackView view = PatternStackView.fromPattern(pattern);
+        if (view == null || view.inputs().isEmpty() || view.outputs().isEmpty()) {
+            return pattern;
+        }
         Optional<DynamicPatternProfile> profile = findNeoVitaeDynamicPatternProfile(
-                level, inputs, outputs);
+                level, view);
         if (profile.isEmpty()) return pattern;
 
         DynamicPatternProfile dynamic = profile.get();
@@ -226,15 +233,32 @@ public final class AdvancedAlloyFurnacePatternResolver {
     }
 
     static Optional<DynamicPatternProfile> findNeoVitaeDynamicPatternProfile(
-            Level level, List<ItemStack> inputs, List<ItemStack> outputs) {
+            Level level, PatternStackView view) {
         try {
             Class<?> support = Class.forName(NEOVITAE_DYNAMIC_SUPPORT);
             Method method = support.getMethod(
-                    "findDynamicPatternProfile", Level.class, List.class, List.class);
-            Object value = method.invoke(null, level, inputs, outputs);
+                    "findDynamicPatternProfileLong", Level.class, PatternStackView.class);
+            Object value = method.invoke(null, level, view);
             if (value instanceof Optional<?> optional && optional.isPresent()
                     && optional.get() instanceof DynamicPatternProfile profile) {
                 return Optional.of(profile);
+            }
+        } catch (NoSuchMethodException exception) {
+            if (view.inputs().stream().allMatch(stack -> stack.amount() <= Integer.MAX_VALUE)
+                    && view.outputs().stream().allMatch(stack -> stack.amount() <= Integer.MAX_VALUE)) {
+                try {
+                    Class<?> support = Class.forName(NEOVITAE_DYNAMIC_SUPPORT);
+                    Method method = support.getMethod(
+                            "findDynamicPatternProfile", Level.class, List.class, List.class);
+                    Object value = method.invoke(null, level,
+                            view.inputRepresentatives(), view.outputRepresentatives());
+                    if (value instanceof Optional<?> optional && optional.isPresent()
+                            && optional.get() instanceof DynamicPatternProfile profile) {
+                        return Optional.of(profile);
+                    }
+                } catch (ReflectiveOperationException | RuntimeException fallbackException) {
+                    LOGGER.debug("Neo Vitae legacy dynamic pattern support is unavailable", fallbackException);
+                }
             }
         } catch (ClassNotFoundException | LinkageError ignored) {
             // Neo Vitae is optional and has no support class when it is absent.

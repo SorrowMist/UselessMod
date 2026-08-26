@@ -106,6 +106,47 @@ class ImmersiveEngineeringRecipeAdapterTest {
     }
 
     @Test
+    void convertsReturnedBottlingInputIntoAMoldAndKeepsOtherInputsConsumable() {
+        Item mold = ieItem("mold_plate");
+        BottlingMachineRecipe source = new BottlingMachineRecipe(
+                new TagOutputList(List.of(
+                        new TagOutput(new ItemStack(Items.GLASS_BOTTLE)),
+                        new TagOutput(new ItemStack(mold)))),
+                List.of(
+                        new IngredientWithSize(Ingredient.of(mold)),
+                        new IngredientWithSize(Ingredient.of(Items.COPPER_INGOT), 3)),
+                new SizedFluidIngredient(FluidIngredient.single(Fluids.WATER), 100));
+
+        AdvancedAlloyFurnaceRecipe converted = new ImmersiveEngineeringRecipeAdapter()
+                .convertAll(holder("bottling_reusable_mold", source), level).getFirst();
+
+        assertEquals(1, converted.inputs().size());
+        assertEquals(3L, converted.inputs().getFirst().count());
+        assertTrue(converted.inputs().getFirst().ingredient().test(new ItemStack(Items.COPPER_INGOT)));
+        assertTrue(converted.outputs().stream().anyMatch(output -> output.is(Items.GLASS_BOTTLE)));
+        assertFalse(converted.outputs().stream().anyMatch(output -> output.is(mold)));
+        assertEquals(2, converted.molds().size());
+        assertTrue(converted.molds().get(1).test(new ItemStack(mold)));
+    }
+
+    @Test
+    void keepsBottlingInputConsumableWhenNoMatchingItemIsReturned() {
+        BottlingMachineRecipe source = new BottlingMachineRecipe(
+                new TagOutputList(new TagOutput(new ItemStack(Items.MUD))),
+                new IngredientWithSize(Ingredient.of(Items.DIRT)),
+                new SizedFluidIngredient(FluidIngredient.single(Fluids.WATER), 250));
+
+        AdvancedAlloyFurnaceRecipe converted = new ImmersiveEngineeringRecipeAdapter()
+                .convertAll(holder("bottling_consumable_input", source), level).getFirst();
+
+        assertEquals(1, converted.inputs().size());
+        assertEquals(1L, converted.inputs().getFirst().count());
+        assertTrue(converted.inputs().getFirst().ingredient().test(new ItemStack(Items.DIRT)));
+        assertTrue(converted.outputs().stream().anyMatch(output -> output.is(Items.MUD)));
+        assertEquals(1, converted.molds().size());
+    }
+
+    @Test
     void preservesTagInputsAndConvertsArcSecondaryOutputToAStableBatch() {
         IngredientWithSize taggedInput = new IngredientWithSize(ItemTags.LOGS, 2);
         ArcFurnaceRecipe source = new ArcFurnaceRecipe(

@@ -238,15 +238,47 @@ public final class ImmersiveEngineeringRecipeAdapter
 
     private static AdvancedAlloyFurnaceRecipe convertBottling(
             ResourceLocation id, BottlingMachineRecipe source) {
+        List<IngredientWithSize> remainingInputs = new ArrayList<>();
+        List<Ingredient> reusableMolds = new ArrayList<>();
+        List<ItemStack> outputs = new ArrayList<>(tagOutputs(source.output));
+        if (source.inputs != null) {
+            for (IngredientWithSize input : source.inputs) {
+                Ingredient ingredient = input == null ? null : input.getBaseIngredient();
+                int remaining = input == null ? 0 : input.getCount();
+                if (ingredient == null || ingredient.isEmpty() || remaining <= 0) continue;
+
+                while (remaining > 0) {
+                    int outputIndex = -1;
+                    for (int index = 0; index < outputs.size(); index++) {
+                        if (ingredient.test(outputs.get(index))) {
+                            outputIndex = index;
+                            break;
+                        }
+                    }
+                    if (outputIndex < 0) break;
+
+                    ItemStack output = outputs.get(outputIndex);
+                    if (output.getCount() == 1) {
+                        outputs.remove(outputIndex);
+                    } else {
+                        output.shrink(1);
+                    }
+                    reusableMolds.add(ingredient);
+                    remaining--;
+                }
+                if (remaining > 0) remainingInputs.add(input.withSize(remaining));
+            }
+        }
+
         return build(id,
-                countedInputs(source.inputs),
+                countedInputs(remainingInputs),
                 fluidInputs(source.fluidInput),
-                tagOutputs(source.output),
+                outputs,
                 List.of(),
                 List.of(),
                 processEnergy(source),
                 processTime(source),
-                molds("bottling_machine"));
+                molds("bottling_machine", reusableMolds.toArray(Ingredient[]::new)));
     }
 
     private static AdvancedAlloyFurnaceRecipe convertCloche(

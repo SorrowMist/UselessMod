@@ -1,6 +1,7 @@
 package com.sorrowmist.useless.event;
 
 import com.sorrowmist.useless.UselessMod;
+import com.sorrowmist.useless.content.items.BeefTimeAcceleration;
 import com.sorrowmist.useless.content.items.EndlessBeafItem;
 import com.sorrowmist.useless.content.recipe.AlloyFurnaceRecipeManager;
 import com.sorrowmist.useless.content.recipe.AlloyFurnaceRecipeCatalog;
@@ -376,6 +377,7 @@ public class EventHandler {
         if (!(stack.getItem() instanceof EndlessBeafItem)) return;
 
         Player player = event.getEntity();
+        if (BeefTimeAcceleration.shouldBlockOtherRightClick(stack, player)) return;
         if (!player.isShiftKeyDown()) return;
 
         Level world = event.getLevel();

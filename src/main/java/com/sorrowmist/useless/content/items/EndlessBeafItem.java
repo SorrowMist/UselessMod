@@ -124,6 +124,7 @@ public class EndlessBeafItem extends TieredItem {
                       .component(UComponents.EnhancedChainMiningComponent, false)
                       .component(UComponents.ForceMiningComponent, false)
                       .component(UComponents.ForceKillEnabledComponent, false)
+                      .component(UComponents.BeefTimeAccelerationEnabledComponent, false)
                       .component(UComponents.BeefInvulnerabilityEnabledComponent, true)
                       .component(UComponents.BeefCaptureEnabledComponent, false)
                       .component(UComponents.AEStoragePriorityComponent, false)
@@ -520,6 +521,9 @@ public class EndlessBeafItem extends TieredItem {
         InteractionResult lightningCollectorResult = trySummonLightningForCollector(ctx.getLevel(), ctx.getClickedPos(), ctx.getPlayer());
         if (lightningCollectorResult != InteractionResult.PASS) return lightningCollectorResult;
 
+        InteractionResult timeAccelerationResult = BeefTimeAcceleration.tryUse(ctx);
+        if (timeAccelerationResult != InteractionResult.PASS) return timeAccelerationResult;
+
         // ============================================================
         // 1. 刷子功能 (对 BrushableBlock 生效)
         // ============================================================
@@ -580,6 +584,11 @@ public class EndlessBeafItem extends TieredItem {
     }
 
     @Override
+    public @NotNull InteractionResult onItemUseFirst(@NotNull ItemStack stack, @NotNull UseOnContext ctx) {
+        return BeefTimeAcceleration.tryUse(ctx);
+    }
+
+    @Override
     @SuppressWarnings("all")
     public float getDestroySpeed(@NotNull ItemStack stack, @NotNull BlockState state) {
         // 基础工具速度
@@ -608,6 +617,10 @@ public class EndlessBeafItem extends TieredItem {
                                                            @NotNull Player player,
                                                            @NotNull LivingEntity entity,
                                                            @NotNull InteractionHand hand) {
+        if (BeefTimeAcceleration.shouldBlockOtherRightClick(stack, player)) {
+            return InteractionResult.FAIL;
+        }
+
         if (entity instanceof IShearable target) {
             BlockPos pos = entity.blockPosition();
             boolean isClient = entity.level().isClientSide();
@@ -730,6 +743,15 @@ public class EndlessBeafItem extends TieredItem {
                                        ).withStyle(forceKillEnabled ? ChatFormatting.GOLD : ChatFormatting.GRAY))
                                        .withStyle(ChatFormatting.DARK_RED));
 
+        boolean beefTimeAccelerationEnabled = stack.getOrDefault(UComponents.BeefTimeAccelerationEnabledComponent.get(), false);
+        tooltipComponents.add(Component.translatable("tooltip.useless_mod.time_acceleration_mode")
+                                       .append(": ")
+                                       .append(Component.translatable(
+                                               beefTimeAccelerationEnabled ? "tooltip.useless_mod.enable" :
+                                                       "tooltip.useless_mod.disable"
+                                       ).withStyle(beefTimeAccelerationEnabled ? ChatFormatting.GREEN : ChatFormatting.GRAY))
+                                       .withStyle(ChatFormatting.AQUA));
+
         boolean beefInvulnerabilityEnabled = stack.getOrDefault(UComponents.BeefInvulnerabilityEnabledComponent.get(), false);
         tooltipComponents.add(Component.translatable("tooltip.useless_mod.beef_invulnerability_mode")
                                        .append(": ")
@@ -810,6 +832,8 @@ public class EndlessBeafItem extends TieredItem {
                 Component.translatable("tooltip.useless_mod.festive_affix").withStyle(ChatFormatting.BLUE));
         tooltipComponents.add(
                 Component.translatable("tooltip.useless_mod.auto_collect").withStyle(ChatFormatting.GREEN));
+        tooltipComponents.add(
+                Component.translatable("tooltip.useless_mod.time_acceleration_hint").withStyle(ChatFormatting.LIGHT_PURPLE));
 
         // 可选：增强连锁说明
         // tooltipComponents.add(Component.translatable("tooltip.useless_mod.enhanced_chain_description").withStyle(ChatFormatting.BLUE));

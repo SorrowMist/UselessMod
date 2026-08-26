@@ -59,8 +59,8 @@ class CtmQuadrantSelectorTest {
                 Direction.WEST, new CtmFaceAxes(Direction.SOUTH, Direction.DOWN),
                 Direction.NORTH, new CtmFaceAxes(Direction.WEST, Direction.DOWN),
                 Direction.SOUTH, new CtmFaceAxes(Direction.EAST, Direction.DOWN),
-                Direction.DOWN, new CtmFaceAxes(Direction.EAST, Direction.SOUTH),
-                Direction.UP, new CtmFaceAxes(Direction.EAST, Direction.NORTH));
+                Direction.DOWN, new CtmFaceAxes(Direction.EAST, Direction.NORTH),
+                Direction.UP, new CtmFaceAxes(Direction.EAST, Direction.SOUTH));
         expected.forEach((face, axes) -> {
             assertEquals(axes, CtmFaceAxes.forFace(face));
             assertEquals(axes.right().getOpposite(), CtmFaceAxes.forFace(face).left());

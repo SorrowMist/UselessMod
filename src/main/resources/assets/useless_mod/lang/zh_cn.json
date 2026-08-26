@@ -428,6 +428,8 @@
   "key.useless_mod.trigger_force_mining": "触发强制挖掘",
   "tooltip.useless_mod.festive_affix": "5% 概率在击杀时触发战利品大爆发",
   "tooltip.useless_mod.auto_collect": "自带磁力功能",
+  "tooltip.useless_mod.time_acceleration_mode": "时间加速模式",
+  "tooltip.useless_mod.time_acceleration_hint": "开启后按住 Shift 右键加速方块和机器",
   "tooltip.useless_mod.current_tool_mode": "当前工具模式",
   "tooltip.useless_mod.none_mode": "未选择",
   "tooltip.useless_mod.wrench_mode": "扳手",

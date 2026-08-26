@@ -18,6 +18,9 @@ public enum ModeTypeEnum {
 
     FORCE_KILL("force_kill", "tooltip.useless_mod.force_kill_enabled_mode"),
 
+    BEEF_TIME_ACCELERATION_ENABLED("beef_time_acceleration_enabled", "tooltip.useless_mod.time_acceleration_mode"),
+    BEEF_TIME_ACCELERATION_DISABLED("beef_time_acceleration_disabled", "tooltip.useless_mod.time_acceleration_mode"),
+
     BEEF_INVULNERABILITY_ENABLED("beef_invulnerability_enabled", "tooltip.useless_mod.beef_invulnerability_mode"),
     BEEF_INVULNERABILITY_DISABLED("beef_invulnerability_disabled", "tooltip.useless_mod.beef_invulnerability_mode"),
 
@@ -49,6 +52,10 @@ public enum ModeTypeEnum {
 
     public static ModeTypeEnum getBeefInvulnerabilityMode(boolean enabled) {
         return enabled ? BEEF_INVULNERABILITY_ENABLED : BEEF_INVULNERABILITY_DISABLED;
+    }
+
+    public static ModeTypeEnum getBeefTimeAccelerationMode(boolean enabled) {
+        return enabled ? BEEF_TIME_ACCELERATION_ENABLED : BEEF_TIME_ACCELERATION_DISABLED;
     }
 
     public static ModeTypeEnum getBeefCaptureMode(boolean enabled) {

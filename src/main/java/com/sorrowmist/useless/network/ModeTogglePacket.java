@@ -59,6 +59,11 @@ public class ModeTogglePacket implements CustomPacketPayload {
                 case FORCE_KILL -> {
                     stack.set(UComponents.ForceKillEnabledComponent.get(), msg.enabled);
                 }
+                case BEEF_TIME_ACCELERATION -> {
+                    if (stack.getItem() instanceof EndlessBeafItem) {
+                        stack.set(UComponents.BeefTimeAccelerationEnabledComponent.get(), msg.enabled);
+                    }
+                }
                 case BEEF_INVULNERABILITY -> {
                     stack.set(UComponents.BeefInvulnerabilityEnabledComponent.get(), msg.enabled);
                     EventHandler.updateBeefInvulnerability(player, true);
@@ -86,6 +91,7 @@ public class ModeTogglePacket implements CustomPacketPayload {
         AE_STORAGE_PRIORITY,
         FORCE_KILL,
         BEEF_INVULNERABILITY,
-        BEEF_CAPTURE
+        BEEF_CAPTURE,
+        BEEF_TIME_ACCELERATION
     }
 }

@@ -3,12 +3,14 @@ package com.sorrowmist.useless;
 import com.mojang.logging.LogUtils;
 import com.sorrowmist.useless.content.blocks.GlowPlasticBlock;
 import com.sorrowmist.useless.content.items.EndlessBeafItem;
+import com.sorrowmist.useless.content.items.BeefTimeAcceleration;
 import com.sorrowmist.useless.content.recipe.adapters.RecipeAdapterCompatRegistry;
 import com.sorrowmist.useless.core.component.UComponents;
 import com.sorrowmist.useless.core.config.ConfigManager;
 import com.sorrowmist.useless.init.ModBlockEntities;
 import com.sorrowmist.useless.init.ModBlocks;
 import com.sorrowmist.useless.init.ModCreativeTabs;
+import com.sorrowmist.useless.init.ModEntities;
 import com.sorrowmist.useless.init.ModItems;
 import com.sorrowmist.useless.init.ModIngredientTypes;
 import com.sorrowmist.useless.init.ModMenuType;
@@ -27,6 +29,7 @@ import net.minecraft.world.entity.EquipmentSlotGroup;
 import net.minecraft.world.entity.ai.attributes.AttributeModifier;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.context.UseOnContext;
 import net.neoforged.bus.api.EventPriority;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.bus.api.SubscribeEvent;
@@ -55,6 +58,7 @@ public class UselessMod {
 
         ModBlocks.BLOCKS.register(modEventBus);
         ModItems.ITEMS.register(modEventBus);
+        ModEntities.ENTITY_TYPES.register(modEventBus);
         ModBlockEntities.register(modEventBus);
         ModMenuType.register(modEventBus);
         ModRecipeSerializers.RECIPE_SERIALIZERS.register(modEventBus);
@@ -105,6 +109,16 @@ public class UselessMod {
     @SubscribeEvent(priority = EventPriority.HIGHEST, receiveCanceled = true)
     public void onRightClickBlock(PlayerInteractEvent.RightClickBlock event) {
         ItemStack stack = event.getItemStack();
+        if (stack.getItem() instanceof EndlessBeafItem) {
+            InteractionResult timeAccelerationResult = BeefTimeAcceleration.tryUse(
+                    new UseOnContext(event.getEntity(), event.getHand(), event.getHitVec()));
+            if (timeAccelerationResult != InteractionResult.PASS) {
+                event.setCanceled(true);
+                event.setCancellationResult(timeAccelerationResult);
+                return;
+            }
+        }
+
         InteractionResult occultismResult = trySpawnMarkedOccultismSpirit(event);
         if (occultismResult != InteractionResult.PASS) {
             event.setCanceled(true);

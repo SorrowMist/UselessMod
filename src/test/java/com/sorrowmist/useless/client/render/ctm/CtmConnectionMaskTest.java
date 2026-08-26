@@ -33,6 +33,33 @@ class CtmConnectionMaskTest {
     }
 
     @Test
+    void horizontalFacesUseTheirVanillaVerticalDirections() {
+        BlockState casing = ModBlocks.OMNIVERSAL_FURNACE_CASING.get().defaultBlockState();
+        Map<Direction, Direction> expectedUp = Map.of(
+                Direction.UP, Direction.NORTH,
+                Direction.DOWN, Direction.SOUTH);
+        Map<Direction, Direction> expectedDown = Map.of(
+                Direction.UP, Direction.SOUTH,
+                Direction.DOWN, Direction.NORTH);
+
+        for (Direction face : expectedUp.keySet()) {
+            Map<Integer, Direction> edges = Map.of(
+                    CtmQuadrantSelector.UP, expectedUp.get(face),
+                    CtmQuadrantSelector.DOWN, expectedDown.get(face));
+            for (Map.Entry<Integer, Direction> edge : edges.entrySet()) {
+                Map<BlockPos, BlockState> states = new HashMap<>();
+                states.put(ORIGIN, casing);
+                states.put(ORIGIN.relative(edge.getValue()), casing);
+
+                int mask = CtmConnectionMask.forFace(
+                        CtmConnectionMask.collect(level(states), ORIGIN, casing), face);
+                assertEquals(edge.getKey(), mask & (CtmQuadrantSelector.UP | CtmQuadrantSelector.DOWN),
+                        face + " " + edge.getKey());
+            }
+        }
+    }
+
+    @Test
     void outwardSameFamilyBlockOccludesAnOtherwiseConnectedEdge() {
         BlockState casing = ModBlocks.OMNIVERSAL_FURNACE_CASING.get().defaultBlockState();
         Direction face = Direction.NORTH;

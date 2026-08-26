@@ -64,6 +64,7 @@ public class ModeWheelScreen extends Screen {
         boolean forceMiningEnabled = this.mainHandItem.getOrDefault(UComponents.ForceMiningComponent, false);
         boolean aeStorageEnabled = this.mainHandItem.getOrDefault(UComponents.AEStoragePriorityComponent, false);
         boolean forceKillEnabled = this.mainHandItem.getOrDefault(UComponents.ForceKillEnabledComponent, false);
+        boolean beefTimeAccelerationEnabled = this.mainHandItem.getOrDefault(UComponents.BeefTimeAccelerationEnabledComponent, false);
         boolean beefInvulnerabilityEnabled = this.mainHandItem.getOrDefault(UComponents.BeefInvulnerabilityEnabledComponent, false);
         boolean beefCaptureEnabled = this.mainHandItem.getOrDefault(UComponents.BeefCaptureEnabledComponent, false);
 
@@ -76,6 +77,13 @@ public class ModeWheelScreen extends Screen {
                 ModeTypeEnum.FORCE_KILL.getTooltip(),
                 forceKillEnabled
         ));
+        if (this.mainHandItem.getItem() instanceof com.sorrowmist.useless.content.items.EndlessBeafItem) {
+            this.forceKillModes.add(new ModeData(
+                    ModeTypeEnum.getBeefTimeAccelerationMode(beefTimeAccelerationEnabled),
+                    ModeTypeEnum.getBeefTimeAccelerationMode(beefTimeAccelerationEnabled).getTooltip(),
+                    beefTimeAccelerationEnabled
+            ));
+        }
         this.forceKillModes.add(new ModeData(
                 ModeTypeEnum.getBeefInvulnerabilityMode(beefInvulnerabilityEnabled),
                 ModeTypeEnum.getBeefInvulnerabilityMode(beefInvulnerabilityEnabled).getTooltip(),
@@ -392,6 +400,15 @@ public class ModeWheelScreen extends Screen {
                                                                             false);
                     PacketDistributor.sendToServer(
                             new ModeTogglePacket(ModeTogglePacket.ModeType.FORCE_KILL, !currentEnabled));
+                }
+                case BEEF_TIME_ACCELERATION_ENABLED, BEEF_TIME_ACCELERATION_DISABLED -> {
+                    boolean currentEnabled = this.mainHandItem.getOrDefault(
+                            UComponents.BeefTimeAccelerationEnabledComponent,
+                            false
+                    );
+                    PacketDistributor.sendToServer(
+                            new ModeTogglePacket(ModeTogglePacket.ModeType.BEEF_TIME_ACCELERATION,
+                                                  !currentEnabled));
                 }
                 case BEEF_INVULNERABILITY_ENABLED, BEEF_INVULNERABILITY_DISABLED -> {
                     boolean currentEnabled = this.mainHandItem.getOrDefault(

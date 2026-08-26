@@ -99,6 +99,15 @@ public final class UComponents {
                            ))
             );
 
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<Boolean>> BeefTimeAccelerationEnabledComponent =
+            register("beef_time_acceleration_enabled", builder ->
+                    builder.persistent(Codec.BOOL)
+                           .networkSynchronized(StreamCodec.of(
+                                   FriendlyByteBuf::writeBoolean,
+                                   FriendlyByteBuf::readBoolean
+                           ))
+            );
+
     public static final DeferredHolder<DataComponentType<?>, DataComponentType<Boolean>> BeefInvulnerabilityEnabledComponent =
             register("beef_invulnerability_enabled", builder ->
                     builder.persistent(Codec.BOOL)

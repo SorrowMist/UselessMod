@@ -429,6 +429,8 @@
   "tooltip.useless_mod.ae_storage_priority_bind_hint": "§aShift+Right-click§rME Wireless Access Point to bind",
   "tooltip.useless_mod.festive_affix": "5% chance to trigger loot explosion on kill",
   "tooltip.useless_mod.auto_collect": "Built-in magnet function",
+  "tooltip.useless_mod.time_acceleration_mode": "Time Acceleration",
+  "tooltip.useless_mod.time_acceleration_hint": "Hold Shift and right-click to accelerate ticking blocks and machines when enabled",
   "tooltip.useless_mod.current_tool_mode": "Current Tool Mode",
   "tooltip.useless_mod.none_mode": "None",
   "tooltip.useless_mod.wrench_mode": "Wrench",

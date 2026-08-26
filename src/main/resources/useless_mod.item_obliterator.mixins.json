@@ -1,0 +1,15 @@
+{
+  "required": false,
+  "package": "com.sorrowmist.useless.mixin.itemobliterator",
+  "compatibilityLevel": "JAVA_21",
+  "mixins": [
+    "ItemObliteratorUtilsMixin",
+    "ItemObliteratorContainerMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  },
+  "overwrites": {
+    "requireAnnotations": true
+  }
+}

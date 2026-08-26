@@ -9,12 +9,15 @@ import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.world.entity.player.Inventory;
 
 public final class MePatternAssemblyMenu extends PagedRecoverableMenu {
+    private static final String PAGE_MEMORY_ID = "me_pattern_assembly";
+
     public MePatternAssemblyMenu(int containerId, Inventory inventory, FriendlyByteBuf buffer) {
         this(containerId, inventory, buffer.readBlockPos());
     }
 
     public MePatternAssemblyMenu(int containerId, Inventory inventory, BlockPos pos) {
-        super(ModMenuType.ME_PATTERN_ASSEMBLY_MENU.get(), containerId, inventory, handler(inventory, pos), pos);
+        super(ModMenuType.ME_PATTERN_ASSEMBLY_MENU.get(), containerId, inventory,
+                handler(inventory, pos), pos, PAGE_MEMORY_ID);
     }
 
     private static RecoverableItemStackHandler handler(Inventory inventory, BlockPos pos) {

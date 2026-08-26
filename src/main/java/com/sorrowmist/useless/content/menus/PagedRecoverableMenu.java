@@ -2,6 +2,8 @@ package com.sorrowmist.useless.content.menus;
 
 import com.sorrowmist.useless.content.blockentities.RecoverableItemStackHandler;
 import net.minecraft.core.BlockPos;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.Tag;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.AbstractContainerMenu;
@@ -23,10 +25,14 @@ public class PagedRecoverableMenu extends AbstractContainerMenu {
     public static final int SLOTS_PER_PAGE = 27;
     public static final int PREVIOUS_PAGE = 0;
     public static final int NEXT_PAGE = 1;
+    private static final String PAGE_MEMORY_TAG = "useless_mod:paged_menu_pages";
 
     private final RecoverableItemStackHandler inventory;
     private final BlockPos blockPos;
+    private final Player player;
     private final boolean clientSide;
+    @Nullable
+    private final String pageMemoryId;
     private int page;
     private int syncedPageCount = 1;
     private int syncedActivePageCount = 1;
@@ -57,7 +63,14 @@ public class PagedRecoverableMenu extends AbstractContainerMenu {
     protected PagedRecoverableMenu(MenuType<?> type, int containerId, Inventory playerInventory,
                                    RecoverableItemStackHandler inventory, BlockPos blockPos) {
         this(type, containerId, playerInventory, inventory, blockPos,
-                8, 18, 8, 85, 8, 143);
+                8, 18, 8, 85, 8, 143, null);
+    }
+
+    protected PagedRecoverableMenu(MenuType<?> type, int containerId, Inventory playerInventory,
+                                   RecoverableItemStackHandler inventory, BlockPos blockPos,
+                                   @Nullable String pageMemoryId) {
+        this(type, containerId, playerInventory, inventory, blockPos,
+                8, 18, 8, 85, 8, 143, pageMemoryId);
     }
 
     protected PagedRecoverableMenu(MenuType<?> type, int containerId, Inventory playerInventory,
@@ -65,10 +78,32 @@ public class PagedRecoverableMenu extends AbstractContainerMenu {
                                    int storageX, int storageY,
                                    int playerInventoryX, int playerInventoryY,
                                    int hotbarX, int hotbarY) {
+        this(type, containerId, playerInventory, inventory, blockPos,
+                storageX, storageY, playerInventoryX, playerInventoryY, hotbarX, hotbarY, null);
+    }
+
+    protected PagedRecoverableMenu(MenuType<?> type, int containerId, Inventory playerInventory,
+                                   RecoverableItemStackHandler inventory, BlockPos blockPos,
+                                   int storageX, int storageY,
+                                   int playerInventoryX, int playerInventoryY,
+                                   int hotbarX, int hotbarY,
+                                   @Nullable String pageMemoryId) {
         super(type, containerId);
         this.inventory = inventory;
         this.blockPos = blockPos.immutable();
-        this.clientSide = playerInventory.player.level().isClientSide;
+        this.player = playerInventory.player;
+        this.clientSide = player.level().isClientSide;
+        this.pageMemoryId = pageMemoryId;
+        int rememberedPage = pageMemoryId == null || clientSide
+                ? 0
+                : readRememberedPage(player.getPersistentData(), pageMemoryKey());
+        this.page = rememberedPage;
+        if (!clientSide) {
+            this.page = getPage();
+            if (this.page != rememberedPage) {
+                rememberPage();
+            }
+        }
         IItemHandler pageView = new PageView(inventory, () -> page, clientSide);
         for (int row = 0; row < 3; row++) {
             for (int column = 0; column < 9; column++) {
@@ -90,6 +125,33 @@ public class PagedRecoverableMenu extends AbstractContainerMenu {
 
     public BlockPos getBlockPos() {
         return blockPos;
+    }
+
+    static String pageMemoryKey(String pageMemoryId, String dimension, BlockPos blockPos) {
+        return pageMemoryId + "|" + dimension + "|" + blockPos.asLong();
+    }
+
+    static int readRememberedPage(CompoundTag persistentData, String key) {
+        if (!persistentData.contains(Player.PERSISTED_NBT_TAG, Tag.TAG_COMPOUND)) return 0;
+        CompoundTag playerData = persistentData.getCompound(Player.PERSISTED_NBT_TAG);
+        if (!playerData.contains(PAGE_MEMORY_TAG, Tag.TAG_COMPOUND)) return 0;
+        CompoundTag pages = playerData.getCompound(PAGE_MEMORY_TAG);
+        return pages.contains(key, Tag.TAG_INT) ? Math.max(0, pages.getInt(key)) : 0;
+    }
+
+    static void writeRememberedPage(CompoundTag persistentData, String key, int page) {
+        CompoundTag playerData;
+        if (persistentData.contains(Player.PERSISTED_NBT_TAG, Tag.TAG_COMPOUND)) {
+            playerData = persistentData.getCompound(Player.PERSISTED_NBT_TAG);
+        } else {
+            playerData = new CompoundTag();
+        }
+
+        CompoundTag pages = playerData.contains(PAGE_MEMORY_TAG, Tag.TAG_COMPOUND)
+                ? playerData.getCompound(PAGE_MEMORY_TAG) : new CompoundTag();
+        pages.putInt(key, Math.max(0, page));
+        playerData.put(PAGE_MEMORY_TAG, pages);
+        persistentData.put(Player.PERSISTED_NBT_TAG, playerData);
     }
 
     public int getPage() {
@@ -128,6 +190,7 @@ public class PagedRecoverableMenu extends AbstractContainerMenu {
         if (id != PREVIOUS_PAGE && id != NEXT_PAGE) return false;
         int count = getPageCount();
         page = Math.floorMod(getPage() + (id == NEXT_PAGE ? 1 : -1), count);
+        rememberPage();
         broadcastChanges();
         return true;
     }
@@ -138,9 +201,23 @@ public class PagedRecoverableMenu extends AbstractContainerMenu {
         // viewer has one selected. Keep the server-side page in range before
         // slot synchronization maps the page view onto backing storage.
         if (!clientSide) {
-            page = getPage();
+            int clampedPage = getPage();
+            if (page != clampedPage) {
+                page = clampedPage;
+                rememberPage();
+            }
         }
         super.broadcastChanges();
+    }
+
+    private String pageMemoryKey() {
+        return pageMemoryKey(pageMemoryId, player.level().dimension().location().toString(), blockPos);
+    }
+
+    private void rememberPage() {
+        if (!clientSide && pageMemoryId != null) {
+            writeRememberedPage(player.getPersistentData(), pageMemoryKey(), getPage());
+        }
     }
 
     @Override

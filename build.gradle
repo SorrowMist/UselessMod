@@ -232,6 +232,8 @@ dependencies {
     implementation "curse.maven:advancedae-1084104:8564177"
     implementation "curse.maven:ae2addonlib-1366135:7222312"
 
+    implementation "curse.maven:just-dire-things-1002348:7463040"
+
     implementation "curse.maven:ae2-crystal-science-1435174:8498888" // 1.21.1-1.2.1
     implementation "curse.maven:ae2-lightning-tech-1527395:8638573"
     implementation "curse.maven:thunderbolt-core-1631756:8638565"

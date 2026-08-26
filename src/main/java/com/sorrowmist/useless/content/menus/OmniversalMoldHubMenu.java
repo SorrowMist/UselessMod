@@ -9,12 +9,15 @@ import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.world.entity.player.Inventory;
 
 public final class OmniversalMoldHubMenu extends PagedRecoverableMenu {
+    private static final String PAGE_MEMORY_ID = "mold_hub";
+
     public OmniversalMoldHubMenu(int containerId, Inventory inventory, FriendlyByteBuf buffer) {
         this(containerId, inventory, buffer.readBlockPos());
     }
 
     public OmniversalMoldHubMenu(int containerId, Inventory inventory, BlockPos pos) {
-        super(ModMenuType.OMNIVERSAL_MOLD_HUB_MENU.get(), containerId, inventory, handler(inventory, pos), pos);
+        super(ModMenuType.OMNIVERSAL_MOLD_HUB_MENU.get(), containerId, inventory,
+                handler(inventory, pos), pos, PAGE_MEMORY_ID);
     }
 
     private static RecoverableItemStackHandler handler(Inventory inventory, BlockPos pos) {

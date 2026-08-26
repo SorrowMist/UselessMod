@@ -2,6 +2,8 @@ package com.sorrowmist.useless.content.menus;
 
 import com.sorrowmist.useless.content.blockentities.RecoverableItemStackHandler;
 import net.minecraft.SharedConstants;
+import net.minecraft.core.BlockPos;
+import net.minecraft.nbt.CompoundTag;
 import net.minecraft.server.Bootstrap;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
@@ -105,6 +107,49 @@ class PagedRecoverableMenuTest {
 
         assertTrue(source.isEmpty());
         assertEquals(1, validations.get());
+    }
+
+    @Test
+    void rememberedPageRoundTripsThroughPlayerPersistentData() {
+        CompoundTag persistentData = new CompoundTag();
+        String key = PagedRecoverableMenu.pageMemoryKey(
+                "mold_hub", "minecraft:overworld", new BlockPos(4, 70, -9));
+
+        PagedRecoverableMenu.writeRememberedPage(persistentData, key, 7);
+
+        assertEquals(7, PagedRecoverableMenu.readRememberedPage(persistentData.copy(), key));
+    }
+
+    @Test
+    void rememberedPagesAreIsolatedByMenuTypeDimensionAndPosition() {
+        CompoundTag persistentData = new CompoundTag();
+        BlockPos first = new BlockPos(4, 70, -9);
+        String moldPage = PagedRecoverableMenu.pageMemoryKey(
+                "mold_hub", "minecraft:overworld", first);
+        String patternPage = PagedRecoverableMenu.pageMemoryKey(
+                "me_pattern_assembly", "minecraft:overworld", first);
+        String otherDimension = PagedRecoverableMenu.pageMemoryKey(
+                "mold_hub", "minecraft:the_nether", first);
+        String otherPosition = PagedRecoverableMenu.pageMemoryKey(
+                "mold_hub", "minecraft:overworld", new BlockPos(5, 70, -9));
+
+        PagedRecoverableMenu.writeRememberedPage(persistentData, moldPage, 3);
+
+        assertEquals(3, PagedRecoverableMenu.readRememberedPage(persistentData, moldPage));
+        assertEquals(0, PagedRecoverableMenu.readRememberedPage(persistentData, patternPage));
+        assertEquals(0, PagedRecoverableMenu.readRememberedPage(persistentData, otherDimension));
+        assertEquals(0, PagedRecoverableMenu.readRememberedPage(persistentData, otherPosition));
+    }
+
+    @Test
+    void rememberedPageDoesNotKeepNegativeValues() {
+        CompoundTag persistentData = new CompoundTag();
+        String key = PagedRecoverableMenu.pageMemoryKey(
+                "mold_hub", "minecraft:overworld", BlockPos.ZERO);
+
+        PagedRecoverableMenu.writeRememberedPage(persistentData, key, -1);
+
+        assertEquals(0, PagedRecoverableMenu.readRememberedPage(persistentData, key));
     }
 
     private static RecoverableItemStackHandler handler() {

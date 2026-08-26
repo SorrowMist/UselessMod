@@ -14,6 +14,7 @@ import org.jetbrains.annotations.Nullable;
 
 /** Paginated passive-pattern inventory with the hatch's interval controls. */
 public final class PassiveCraftingHatchMenu extends PagedRecoverableMenu {
+    private static final String PAGE_MEMORY_ID = "passive_crafting_hatch";
     private final @Nullable PassiveCraftingHatchBlockEntity hatch;
     private final ContainerData data;
     private final PassiveCraftingHatchBlockEntity.SlotStatus[] slotStatuses =
@@ -25,7 +26,7 @@ public final class PassiveCraftingHatchMenu extends PagedRecoverableMenu {
 
     public PassiveCraftingHatchMenu(int containerId, Inventory inventory, BlockPos pos) {
         super(ModMenuType.PASSIVE_CRAFTING_HATCH_MENU.get(), containerId, inventory,
-                handler(inventory, pos), pos, 8, 22, 44, 158, 44, 218);
+                handler(inventory, pos), pos, 8, 22, 44, 158, 44, 218, PAGE_MEMORY_ID);
         hatch = inventory.player.level().getBlockEntity(pos)
                 instanceof PassiveCraftingHatchBlockEntity found ? found : null;
         ContainerData liveData = hatch == null

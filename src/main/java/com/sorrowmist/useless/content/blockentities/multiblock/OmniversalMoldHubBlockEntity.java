@@ -1,5 +1,6 @@
 package com.sorrowmist.useless.content.blockentities.multiblock;
 
+import com.sorrowmist.useless.content.blockentities.PagedMenuPageMemory;
 import com.sorrowmist.useless.content.blockentities.RecoverableItemStackHandler;
 import com.sorrowmist.useless.content.recipe.AdapterUtils;
 import com.sorrowmist.useless.content.recipe.AlloyFurnaceRecipeCatalog;
@@ -33,6 +34,7 @@ public final class OmniversalMoldHubBlockEntity extends BlockEntity implements M
             ConfigManager::getOmniversalMoldSlots,
             this::isValidMold,
             this::moldInventoryChanged);
+    private final PagedMenuPageMemory pageMemory = new PagedMenuPageMemory(this::setChanged);
     private final Map<List<Ingredient>, Boolean> moldMatchCache = new HashMap<>();
     @Nullable
     private List<ItemStack> cachedAvailableMolds;
@@ -49,6 +51,10 @@ public final class OmniversalMoldHubBlockEntity extends BlockEntity implements M
 
     public RecoverableItemStackHandler getMolds() {
         return molds;
+    }
+
+    public PagedMenuPageMemory getPageMemory() {
+        return pageMemory;
     }
 
     public MultiblockPartData createItemData(HolderLookup.Provider registries) {
@@ -195,6 +201,7 @@ public final class OmniversalMoldHubBlockEntity extends BlockEntity implements M
         cachedRecipeCatalogGeneration = -1L;
         controllerPos = tag.contains("Controller") ? BlockPos.of(tag.getLong("Controller")) : null;
         structureGeneration = tag.getLong("StructureGeneration");
+        pageMemory.load(tag);
     }
 
     @Override
@@ -203,6 +210,7 @@ public final class OmniversalMoldHubBlockEntity extends BlockEntity implements M
         tag.put("Molds", molds.serializeNBT(registries));
         if (controllerPos != null) tag.putLong("Controller", controllerPos.asLong());
         tag.putLong("StructureGeneration", structureGeneration);
+        pageMemory.save(tag);
     }
 
     @Override

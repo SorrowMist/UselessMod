@@ -49,8 +49,10 @@ public class ULootTableProvider extends LootTableProvider {
                 this.dropSelf(coil.get());
             }
 
-            for (var entry : GlowPlasticBlock.GLOW_PLASTIC_BLOCKS.entrySet()) {
-                this.dropSelf(entry.getValue().get());
+            for (var blockMap : GlowPlasticBlock.ALL_BLOCK_MAPS) {
+                for (var block : blockMap.values()) {
+                    this.dropSelf(block.get());
+                }
             }
 
             for (var entry : ModBlocks.USELESS_GLASS_BLOCKS.entrySet()) {
@@ -61,7 +63,9 @@ public class ULootTableProvider extends LootTableProvider {
         @Override
         protected @NotNull Iterable<Block> getKnownBlocks() {
             Stream.Builder<Block> blocks = Stream.builder();
-            GlowPlasticBlock.GLOW_PLASTIC_BLOCKS.values().forEach(block -> blocks.add(block.get()));
+            for (var blockMap : GlowPlasticBlock.ALL_BLOCK_MAPS) {
+                blockMap.values().forEach(block -> blocks.add(block.get()));
+            }
             ModBlocks.USELESS_GLASS_BLOCKS.values().forEach(block -> blocks.add(block.get()));
             ModBlocks.USELESS_COILS.values().forEach(block -> blocks.add(block.get()));
             blocks.add(ModBlocks.ORE_GENERATOR_BLOCK.get());

@@ -4,6 +4,7 @@ import com.sorrowmist.useless.content.blocks.multiblock.DirectionalMultiblockPar
 import com.sorrowmist.useless.content.blocks.multiblock.MultiblockAlloyFurnaceCoreBlock;
 import com.sorrowmist.useless.content.blocks.multiblock.MultiblockPartBlock;
 import com.sorrowmist.useless.content.blocks.multiblock.UselessCoilBlock;
+import com.sorrowmist.useless.content.blocks.GlowPlasticBlock;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
 
@@ -11,6 +12,7 @@ public final class CtmConnectionRules {
     public static final int NONE = 0;
     public static final int FURNACE = 1;
     private static final int COIL_OFFSET = 100;
+    private static final int PLASTIC_OFFSET = 1000;
 
     private CtmConnectionRules() {
     }
@@ -20,6 +22,10 @@ public final class CtmConnectionRules {
     }
 
     public static int family(Block block) {
+        if (block instanceof GlowPlasticBlock plastic && plastic.hasConnectedTexture()) {
+            return PLASTIC_OFFSET + plastic.getColor().ordinal() * 2
+                    + (plastic.isGlowing() ? 1 : 0);
+        }
         if (block instanceof UselessCoilBlock coil) {
             return COIL_OFFSET + coil.tier();
         }

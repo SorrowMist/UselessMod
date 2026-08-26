@@ -1,0 +1,32 @@
+{
+    "parent": "minecraft:recipes/root",
+    "criteria": {
+        "has_aqua_glow_plastic": {
+            "conditions": {
+                "items": [
+                    {
+                        "items": "useless_mod:aqua_glow_plastic"
+                    }
+                ]
+            },
+            "trigger": "minecraft:inventory_changed"
+        },
+        "has_the_recipe": {
+            "conditions": {
+                "recipe": "useless_mod:crafting/aqua_glow_plastic_ctm"
+            },
+            "trigger": "minecraft:recipe_unlocked"
+        }
+    },
+    "requirements": [
+        [
+            "has_the_recipe",
+            "has_aqua_glow_plastic"
+        ]
+    ],
+    "rewards": {
+        "recipes": [
+            "useless_mod:crafting/aqua_glow_plastic_ctm"
+        ]
+    }
+}

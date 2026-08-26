@@ -1,6 +1,7 @@
 package com.sorrowmist.useless.client.render.ctm;
 
 import com.sorrowmist.useless.UselessMod;
+import com.sorrowmist.useless.content.blocks.GlowPlasticBlock;
 import com.sorrowmist.useless.content.blocks.multiblock.UselessCoilBlock;
 import com.sorrowmist.useless.init.ModBlocks;
 import net.minecraft.client.renderer.block.BlockModelShaper;
@@ -20,6 +21,8 @@ public final class CtmModelRegistrar {
     private static final String FURNACE_TEXTURE_ROOT =
             "block/multiblock_alloy_furnace/";
     private static final String COIL_TEXTURE_ROOT = FURNACE_TEXTURE_ROOT + "coils/";
+    private static final String PLASTIC_TEXTURE = "block/plastic_glow_block";
+    private static final String PLASTIC_CTM_TEXTURE = "block/plastic_glow_block_ctm";
 
     private CtmModelRegistrar() {
     }
@@ -59,6 +62,13 @@ public final class CtmModelRegistrar {
                     useful ? usefulCoilActive : uselessCoilActive,
                     useful ? usefulCoilActiveCtm : uselessCoilActiveCtm);
         });
+
+        TextureAtlasSprite plasticBase = sprite(textureGetter, PLASTIC_TEXTURE);
+        TextureAtlasSprite plasticCtm = sprite(textureGetter, PLASTIC_CTM_TEXTURE);
+        GlowPlasticBlock.PLASTIC_CTM_BLOCKS.values().forEach(block ->
+                wrapBlock(event.getModels(), block.get(), plasticBase, plasticCtm));
+        GlowPlasticBlock.GLOW_PLASTIC_CTM_BLOCKS.values().forEach(block ->
+                wrapBlock(event.getModels(), block.get(), plasticBase, plasticCtm));
     }
 
     private static TextureAtlasSprite sprite(

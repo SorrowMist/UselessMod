@@ -52,9 +52,10 @@ public class UBlockTagsProvider extends BlockTagsProvider {
             this.tag(BlockTags.MINEABLE_WITH_PICKAXE).add(coil.get());
         }
 
-        for (var entry : GlowPlasticBlock.GLOW_PLASTIC_BLOCKS.entrySet()) {
-            this.tag(BlockTags.MINEABLE_WITH_PICKAXE)
-                .add(entry.getValue().get());
+        for (var blockMap : GlowPlasticBlock.ALL_BLOCK_MAPS) {
+            for (var block : blockMap.values()) {
+                this.tag(BlockTags.MINEABLE_WITH_PICKAXE).add(block.get());
+            }
         }
     }
 }

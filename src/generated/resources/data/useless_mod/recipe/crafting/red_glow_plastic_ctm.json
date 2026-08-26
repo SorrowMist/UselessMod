@@ -1,0 +1,18 @@
+{
+    "type": "minecraft:crafting_shaped",
+    "category": "building",
+    "key": {
+        "P": {
+            "item": "useless_mod:red_glow_plastic"
+        }
+    },
+    "pattern": [
+        "PPP",
+        "P P",
+        "PPP"
+    ],
+    "result": {
+        "count": 8,
+        "id": "useless_mod:red_glow_plastic_ctm"
+    }
+}

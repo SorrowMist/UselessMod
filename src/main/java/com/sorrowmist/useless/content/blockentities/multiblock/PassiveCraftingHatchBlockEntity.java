@@ -6,6 +6,7 @@ import appeng.api.stacks.AEItemKey;
 import appeng.api.stacks.AEKey;
 import appeng.api.stacks.GenericStack;
 import com.sorrowmist.useless.content.blockentities.RecoverableItemStackHandler;
+import com.sorrowmist.useless.content.blockentities.PagedMenuPageMemory;
 import com.sorrowmist.useless.content.blocks.multiblock.UselessCoilBlock;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.AdvancedAlloyFurnaceAeManager;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.AdvancedAlloyFurnacePatternResolver;
@@ -74,6 +75,7 @@ public final class PassiveCraftingHatchBlockEntity extends BlockEntity
     private final RecoverableItemStackHandler patterns = new RecoverableItemStackHandler(
             MAX_PATTERN_SLOTS, 0, this::getActivePatternSlots,
             stack -> stack.is(ModItems.OMNIVERSAL_PATTERN.get()), this::inventoryChanged);
+    private final PagedMenuPageMemory pageMemory = new PagedMenuPageMemory(this::setChanged);
     private final Map<Integer, CraftingTask> activeTasks = new HashMap<>();
     private final SlotState[] idleStates = new SlotState[PATTERN_SLOTS];
     private final String[] idleDetails = new String[PATTERN_SLOTS];
@@ -143,6 +145,10 @@ public final class PassiveCraftingHatchBlockEntity extends BlockEntity
 
     public RecoverableItemStackHandler getPatterns() {
         return patterns;
+    }
+
+    public PagedMenuPageMemory getPageMemory() {
+        return pageMemory;
     }
 
     public long getPatternStorageRevision() {
@@ -748,6 +754,7 @@ public final class PassiveCraftingHatchBlockEntity extends BlockEntity
         observedActivePatternSlots = -1;
         clearPatternDecodeCache();
         resetIdleStates();
+        pageMemory.load(tag);
     }
 
     @Override
@@ -767,6 +774,7 @@ public final class PassiveCraftingHatchBlockEntity extends BlockEntity
             unreturned.add(GenericStack.writeTag(registries, stack));
         }
         tag.put("UnreturnedInputs", unreturned);
+        pageMemory.save(tag);
     }
 
     @Override

@@ -1,5 +1,6 @@
 package com.sorrowmist.useless.content.menus;
 
+import com.sorrowmist.useless.content.blockentities.PagedMenuPageMemory;
 import com.sorrowmist.useless.content.blockentities.RecoverableItemStackHandler;
 import com.sorrowmist.useless.content.blockentities.multiblock.PassiveCraftingHatchBlockEntity;
 import com.sorrowmist.useless.init.ModMenuType;
@@ -14,7 +15,6 @@ import org.jetbrains.annotations.Nullable;
 
 /** Paginated passive-pattern inventory with the hatch's interval controls. */
 public final class PassiveCraftingHatchMenu extends PagedRecoverableMenu {
-    private static final String PAGE_MEMORY_ID = "passive_crafting_hatch";
     private final @Nullable PassiveCraftingHatchBlockEntity hatch;
     private final ContainerData data;
     private final PassiveCraftingHatchBlockEntity.SlotStatus[] slotStatuses =
@@ -26,7 +26,8 @@ public final class PassiveCraftingHatchMenu extends PagedRecoverableMenu {
 
     public PassiveCraftingHatchMenu(int containerId, Inventory inventory, BlockPos pos) {
         super(ModMenuType.PASSIVE_CRAFTING_HATCH_MENU.get(), containerId, inventory,
-                handler(inventory, pos), pos, 8, 22, 44, 158, 44, 218, PAGE_MEMORY_ID);
+                handler(inventory, pos), pos, 8, 22, 44, 158, 44, 218,
+                pageMemory(inventory, pos));
         hatch = inventory.player.level().getBlockEntity(pos)
                 instanceof PassiveCraftingHatchBlockEntity found ? found : null;
         ContainerData liveData = hatch == null
@@ -45,6 +46,12 @@ public final class PassiveCraftingHatchMenu extends PagedRecoverableMenu {
         }
         return new RecoverableItemStackHandler(PassiveCraftingHatchBlockEntity.MAX_PATTERN_SLOTS, 0,
                 () -> 0, stack -> false, () -> { });
+    }
+
+    @Nullable
+    private static PagedMenuPageMemory pageMemory(Inventory inventory, BlockPos pos) {
+        return inventory.player.level().getBlockEntity(pos) instanceof PassiveCraftingHatchBlockEntity hatch
+                ? hatch.getPageMemory() : null;
     }
 
     static ContainerData createMenuData(boolean clientSide, ContainerData liveData) {

@@ -1,0 +1,18 @@
+{
+    "type": "minecraft:crafting_shaped",
+    "category": "building",
+    "key": {
+        "C": {
+            "item": "minecraft:light_gray_concrete"
+        }
+    },
+    "pattern": [
+        "CCC",
+        "C C",
+        "CCC"
+    ],
+    "result": {
+        "count": 8,
+        "id": "useless_mod:light_gray_plastic"
+    }
+}

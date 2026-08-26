@@ -1,0 +1,32 @@
+{
+    "parent": "minecraft:recipes/root",
+    "criteria": {
+        "has_gray_plastic": {
+            "conditions": {
+                "items": [
+                    {
+                        "items": "useless_mod:gray_plastic"
+                    }
+                ]
+            },
+            "trigger": "minecraft:inventory_changed"
+        },
+        "has_the_recipe": {
+            "conditions": {
+                "recipe": "useless_mod:crafting/gray_plastic_ctm"
+            },
+            "trigger": "minecraft:recipe_unlocked"
+        }
+    },
+    "requirements": [
+        [
+            "has_the_recipe",
+            "has_gray_plastic"
+        ]
+    ],
+    "rewards": {
+        "recipes": [
+            "useless_mod:crafting/gray_plastic_ctm"
+        ]
+    }
+}

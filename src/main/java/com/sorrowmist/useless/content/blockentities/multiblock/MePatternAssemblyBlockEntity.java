@@ -19,6 +19,7 @@ import appeng.blockentity.AEBaseBlockEntity;
 import appeng.helpers.patternprovider.PatternContainer;
 import com.mojang.logging.LogUtils;
 import com.sorrowmist.useless.api.crafting.SmartDoublingCraftingProvider;
+import com.sorrowmist.useless.content.blockentities.PagedMenuPageMemory;
 import com.sorrowmist.useless.content.blockentities.RecoverableItemStackHandler;
 import com.sorrowmist.useless.core.config.ConfigManager;
 import com.sorrowmist.useless.core.component.MultiblockPartData;
@@ -52,6 +53,7 @@ public final class MePatternAssemblyBlockEntity extends AEBaseBlockEntity
             ConfigManager::getOmniversalPatternSlots,
             stack -> stack.is(ModItems.OMNIVERSAL_PATTERN.get()),
             this::inventoryChanged);
+    private final PagedMenuPageMemory pageMemory = new PagedMenuPageMemory(this::setChanged);
     private final IManagedGridNode mainNode;
     @Nullable
     private BlockPos controllerPos;
@@ -90,6 +92,10 @@ public final class MePatternAssemblyBlockEntity extends AEBaseBlockEntity
 
     public RecoverableItemStackHandler getPatterns() {
         return patterns;
+    }
+
+    public PagedMenuPageMemory getPageMemory() {
+        return pageMemory;
     }
 
     public long getPatternStorageRevision() {
@@ -341,6 +347,7 @@ public final class MePatternAssemblyBlockEntity extends AEBaseBlockEntity
         patternStorageRevision++;
         controllerPos = tag.contains("Controller") ? BlockPos.of(tag.getLong("Controller")) : null;
         structureGeneration = tag.getLong("StructureGeneration");
+        pageMemory.load(tag);
         mainNode.loadFromNBT(tag);
     }
 
@@ -350,6 +357,7 @@ public final class MePatternAssemblyBlockEntity extends AEBaseBlockEntity
         tag.put("Patterns", patterns.serializeNBT(registries));
         if (controllerPos != null) tag.putLong("Controller", controllerPos.asLong());
         tag.putLong("StructureGeneration", structureGeneration);
+        pageMemory.save(tag);
         mainNode.saveToNBT(tag);
     }
 

@@ -47,25 +47,23 @@ public class ClientSetup {
 
     @SubscribeEvent
     public static void onItemColor(RegisterColorHandlersEvent.Item event) {
-        // 注册所有颜色的物品染色器
-        for (EnumColor color : EnumColor.valuesInOrder()) {
-            var block = GlowPlasticBlock.GLOW_PLASTIC_BLOCKS.get(color).get();
-            event.register((stack, tintIndex) -> {
-                // 只对 tintIndex 0 应用颜色染色
-                return tintIndex == 0 ? color.getRgb() : 0xFFFFFFFF;
-            }, block.asItem());
+        for (var itemMap : GlowPlasticBlock.ALL_BLOCK_ITEM_MAPS) {
+            for (EnumColor color : EnumColor.valuesInOrder()) {
+                var item = itemMap.get(color).get();
+                event.register((stack, tintIndex) -> tintIndex == 0 ? color.getRgb() : 0xFFFFFFFF,
+                        item);
+            }
         }
     }
 
     @SubscribeEvent
     public static void onBlockColor(RegisterColorHandlersEvent.Block event) {
-        // 注册所有颜色的方块染色器
-        for (EnumColor color : EnumColor.valuesInOrder()) {
-            var block = GlowPlasticBlock.GLOW_PLASTIC_BLOCKS.get(color).get();
-            event.register((state, world, pos, tintIndex) -> {
-                // 只对 tintIndex 0 应用颜色染色
-                return tintIndex == 0 ? color.getRgb() : 0xFFFFFFFF;
-            }, block);
+        for (var blockMap : GlowPlasticBlock.ALL_BLOCK_MAPS) {
+            for (EnumColor color : EnumColor.valuesInOrder()) {
+                var block = blockMap.get(color).get();
+                event.register((state, world, pos, tintIndex) -> tintIndex == 0 ? color.getRgb() : 0xFFFFFFFF,
+                        block);
+            }
         }
     }
 

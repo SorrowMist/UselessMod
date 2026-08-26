@@ -17,6 +17,7 @@ import net.minecraft.data.recipes.RecipeOutput;
 import net.minecraft.data.recipes.RecipeProvider;
 import net.minecraft.data.recipes.ShapedRecipeBuilder;
 import net.minecraft.tags.ItemTags;
+import net.minecraft.world.item.Item;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.item.crafting.Ingredient;
 import net.minecraft.world.level.block.Block;
@@ -41,25 +42,54 @@ public class CraftingRecipes extends RecipeProvider {
         this.addOreGeneratorBlockRecipe(consumer);
         this.addTeleportBlockRecipes(consumer);
         this.addAE2GiftPackageRecipe(consumer);
-        this.addGlowPlasticRecipes(consumer);
+        this.addPlasticRecipes(consumer);
         this.addAdvancedAlloyFurnaceRecipes(consumer);
     }
 
-    private void addGlowPlasticRecipes(RecipeOutput consumer) {
+    private void addPlasticRecipes(RecipeOutput consumer) {
         for (EnumColor color : EnumColor.valuesInOrder()) {
             Block concrete = getConcreteBlock(color);
+            String prefix = color.getRegistryPrefix();
+
             ShapedRecipeBuilder.shaped(RecipeCategory.BUILDING_BLOCKS,
-                                       GlowPlasticBlock.GLOW_PLASTIC_BLOCK_ITEMS.get(color).get(),
-                                       8
-                              )
+                                       GlowPlasticBlock.PLASTIC_BLOCK_ITEMS.get(color).get(), 8)
+                              .pattern("CCC")
+                              .pattern("C C")
+                              .pattern("CCC")
+                              .define('C', concrete)
+                              .unlockedBy("has_" + prefix + "_concrete", has(concrete))
+                              .save(consumer, UselessMod.id("crafting/" + prefix + "_plastic"));
+
+            ShapedRecipeBuilder.shaped(RecipeCategory.BUILDING_BLOCKS,
+                                       GlowPlasticBlock.GLOW_PLASTIC_BLOCK_ITEMS.get(color).get(), 8)
                               .pattern("CCC")
                               .pattern("CGC")
                               .pattern("CCC")
                               .define('C', concrete)
                               .define('G', Items.GLOWSTONE_DUST)
-                              .unlockedBy("has_" + color.getRegistryPrefix() + "_concrete", has(concrete))
-                              .save(consumer, UselessMod.id("crafting/" + color.getRegistryPrefix() + "_glow_plastic"));
+                              .unlockedBy("has_" + prefix + "_concrete", has(concrete))
+                              .save(consumer, UselessMod.id("crafting/" + prefix + "_glow_plastic"));
+
+            addPlasticConversionRecipe(consumer,
+                    GlowPlasticBlock.PLASTIC_CTM_BLOCK_ITEMS.get(color).get(),
+                    GlowPlasticBlock.PLASTIC_BLOCK_ITEMS.get(color).get(),
+                    prefix + "_plastic_ctm");
+            addPlasticConversionRecipe(consumer,
+                    GlowPlasticBlock.GLOW_PLASTIC_CTM_BLOCK_ITEMS.get(color).get(),
+                    GlowPlasticBlock.GLOW_PLASTIC_BLOCK_ITEMS.get(color).get(),
+                    prefix + "_glow_plastic_ctm");
         }
+    }
+
+    private static void addPlasticConversionRecipe(
+            RecipeOutput consumer, Item output, Item ingredient, String recipeName) {
+        ShapedRecipeBuilder.shaped(RecipeCategory.BUILDING_BLOCKS, output, 8)
+                           .pattern("PPP")
+                           .pattern("P P")
+                           .pattern("PPP")
+                           .define('P', ingredient)
+                           .unlockedBy("has_" + recipeName.replace("_ctm", ""), has(ingredient))
+                           .save(consumer, UselessMod.id("crafting/" + recipeName));
     }
 
     private static Block getConcreteBlock(EnumColor color) {

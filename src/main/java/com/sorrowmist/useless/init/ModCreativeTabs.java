@@ -27,8 +27,10 @@ public class ModCreativeTabs {
                                  .displayItems((pParameters, pOutput) -> {
                                      pOutput.accept(getItemStack(pParameters));
                                      
-                                     for (DeferredItem<?> item : GlowPlasticBlock.GLOW_PLASTIC_BLOCK_ITEMS.values()) {
-                                         pOutput.accept(item.get());
+                                     for (var itemMap : GlowPlasticBlock.ALL_BLOCK_ITEM_MAPS) {
+                                         for (DeferredItem<?> item : itemMap.values()) {
+                                             pOutput.accept(item.get());
+                                         }
                                      }
 
                                      ModItems.CREATIVE_MAIN_TAB_ITEMS.forEach(pOutput::accept);

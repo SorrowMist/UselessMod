@@ -22,8 +22,8 @@ import net.neoforged.neoforge.registries.DeferredRegister;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
-import java.util.function.UnaryOperator;
 
 public class GlowPlasticBlock extends Block implements IColoredBlock {
 
@@ -32,42 +32,49 @@ public class GlowPlasticBlock extends Block implements IColoredBlock {
 
     public static final Map<EnumColor, DeferredBlock<GlowPlasticBlock>> GLOW_PLASTIC_BLOCKS = new LinkedHashMap<>();
     public static final Map<EnumColor, DeferredItem<Item>> GLOW_PLASTIC_BLOCK_ITEMS = new LinkedHashMap<>();
+    public static final Map<EnumColor, DeferredBlock<GlowPlasticBlock>> PLASTIC_BLOCKS = new LinkedHashMap<>();
+    public static final Map<EnumColor, DeferredItem<Item>> PLASTIC_BLOCK_ITEMS = new LinkedHashMap<>();
+    public static final Map<EnumColor, DeferredBlock<GlowPlasticBlock>> PLASTIC_CTM_BLOCKS = new LinkedHashMap<>();
+    public static final Map<EnumColor, DeferredItem<Item>> PLASTIC_CTM_BLOCK_ITEMS = new LinkedHashMap<>();
+    public static final Map<EnumColor, DeferredBlock<GlowPlasticBlock>> GLOW_PLASTIC_CTM_BLOCKS = new LinkedHashMap<>();
+    public static final Map<EnumColor, DeferredItem<Item>> GLOW_PLASTIC_CTM_BLOCK_ITEMS = new LinkedHashMap<>();
+
+    public static final List<Map<EnumColor, DeferredBlock<GlowPlasticBlock>>> ALL_BLOCK_MAPS = List.of(
+            PLASTIC_BLOCKS, GLOW_PLASTIC_BLOCKS, PLASTIC_CTM_BLOCKS, GLOW_PLASTIC_CTM_BLOCKS);
+    public static final List<Map<EnumColor, DeferredItem<Item>>> ALL_BLOCK_ITEM_MAPS = List.of(
+            PLASTIC_BLOCK_ITEMS, GLOW_PLASTIC_BLOCK_ITEMS,
+            PLASTIC_CTM_BLOCK_ITEMS, GLOW_PLASTIC_CTM_BLOCK_ITEMS);
 
     static {
-        UnaryOperator<BlockBehaviour.Properties> glowPlasticProperties = properties -> properties;
-
-        // 为每种颜色注册方块和物品
         for (EnumColor color : EnumColor.valuesInOrder()) {
-            String registryName = color.getRegistryPrefix() + "_glow_plastic";
-
-            // 注册方块
-            DeferredBlock<GlowPlasticBlock> block = BLOCKS.register(
-                    registryName,
-                    () -> new GlowPlasticBlock(color, glowPlasticProperties)
-            );
-            GLOW_PLASTIC_BLOCKS.put(color, block);
-
-            // 注册对应的物品
-            DeferredItem<Item> item = ITEMS.register(
-                    registryName,
-                    () -> new BlockItem(block.get(), new Item.Properties())
-            );
-            GLOW_PLASTIC_BLOCK_ITEMS.put(color, item);
+            registerVariant(color, color.getRegistryPrefix() + "_glow_plastic",
+                    true, false, GLOW_PLASTIC_BLOCKS, GLOW_PLASTIC_BLOCK_ITEMS);
+            registerVariant(color, color.getRegistryPrefix() + "_plastic",
+                    false, false, PLASTIC_BLOCKS, PLASTIC_BLOCK_ITEMS);
+            registerVariant(color, color.getRegistryPrefix() + "_plastic_ctm",
+                    false, true, PLASTIC_CTM_BLOCKS, PLASTIC_CTM_BLOCK_ITEMS);
+            registerVariant(color, color.getRegistryPrefix() + "_glow_plastic_ctm",
+                    true, true, GLOW_PLASTIC_CTM_BLOCKS, GLOW_PLASTIC_CTM_BLOCK_ITEMS);
         }
     }
 
     private final EnumColor color;
+    private final boolean glowing;
+    private final boolean connectedTexture;
 
-    private GlowPlasticBlock(EnumColor color, UnaryOperator<Properties> propertyModifier) {
-        super(applyLightLevelAdjustments(propertyModifier.apply(Properties.of()
-                .mapColor(color.getMapColor())
-                .strength(5F, 6F)
-                .requiresCorrectToolForDrops())));
+    private GlowPlasticBlock(EnumColor color, boolean glowing, boolean connectedTexture) {
+        super(createProperties(color, glowing));
         this.color = color;
+        this.glowing = glowing;
+        this.connectedTexture = connectedTexture;
     }
 
-    private static Properties applyLightLevelAdjustments(Properties properties) {
-        return properties.lightLevel(state -> 15);
+    private static BlockBehaviour.Properties createProperties(EnumColor color, boolean glowing) {
+        BlockBehaviour.Properties properties = BlockBehaviour.Properties.of()
+                .mapColor(color.getMapColor())
+                .strength(5F, 6F)
+                .requiresCorrectToolForDrops();
+        return glowing ? properties.lightLevel(state -> 15) : properties;
     }
 
     @Override
@@ -92,5 +99,28 @@ public class GlowPlasticBlock extends Block implements IColoredBlock {
     @Override
     public EnumColor getColor() {
         return this.color;
+    }
+
+    public boolean isGlowing() {
+        return this.glowing;
+    }
+
+    public boolean hasConnectedTexture() {
+        return this.connectedTexture;
+    }
+
+    private static void registerVariant(
+            EnumColor color, String registryName, boolean glowing, boolean connectedTexture,
+            Map<EnumColor, DeferredBlock<GlowPlasticBlock>> blocks,
+            Map<EnumColor, DeferredItem<Item>> items) {
+        DeferredBlock<GlowPlasticBlock> block = BLOCKS.register(
+                registryName,
+                () -> new GlowPlasticBlock(color, glowing, connectedTexture));
+        blocks.put(color, block);
+
+        DeferredItem<Item> item = ITEMS.register(
+                registryName,
+                () -> new BlockItem(block.get(), new Item.Properties()));
+        items.put(color, item);
     }
 }

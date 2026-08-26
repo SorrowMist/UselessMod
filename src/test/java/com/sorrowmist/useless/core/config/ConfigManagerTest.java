@@ -85,5 +85,13 @@ class ConfigManagerTest {
         assertEquals(List.of(), listSpec.getDefault());
         assertEquals("", listSpec.getNewElementSupplier().get());
         assertEquals(List.of(), ConfigManager.getUselessDimensionFloorBlockBlacklist());
+
+        Object whitelistValueSpec = ConfigManager.SERVER_SPEC.getSpec()
+                .get(List.of("useless_dimension", "floor_block_whitelist"));
+        ModConfigSpec.ListValueSpec whitelistSpec =
+                assertInstanceOf(ModConfigSpec.ListValueSpec.class, whitelistValueSpec);
+        assertEquals(List.of(), whitelistSpec.getDefault());
+        assertEquals("", whitelistSpec.getNewElementSupplier().get());
+        assertEquals(List.of(), ConfigManager.getUselessDimensionFloorBlockWhitelist());
     }
 }

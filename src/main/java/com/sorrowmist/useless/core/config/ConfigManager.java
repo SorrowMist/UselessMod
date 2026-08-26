@@ -102,9 +102,14 @@ public class ConfigManager {
     private static final ModConfigSpec.IntValue ORE_GENERATOR_SLOTS;
     private static final ModConfigSpec.ConfigValue<List<? extends String>>
             USELESS_DIMENSION_FLOOR_BLOCK_BLACKLIST;
+    private static final ModConfigSpec.ConfigValue<List<? extends String>>
+            USELESS_DIMENSION_FLOOR_BLOCK_WHITELIST;
     private static volatile List<String> cachedUselessDimensionFloorBlockBlacklist = List.of();
     private static volatile BlockBlacklistMatcher uselessDimensionFloorBlockBlacklistMatcher =
-            BlockBlacklistMatcher.empty();
+            BlockBlacklistMatcher.empty("blacklist");
+    private static volatile List<String> cachedUselessDimensionFloorBlockWhitelist = List.of();
+    private static volatile BlockBlacklistMatcher uselessDimensionFloorBlockWhitelistMatcher =
+            BlockBlacklistMatcher.empty("whitelist");
 
     static {
         COMMON_BUILDER.push("game_mechanics");
@@ -155,9 +160,17 @@ public class ConfigManager {
                 .push("useless_dimension");
         USELESS_DIMENSION_FLOOR_BLOCK_BLACKLIST = SERVER_BUILDER
                 .comment("Blocks that cannot be used for Useless Dimension borders, fills, or centers",
+                        "A block matching this list remains blocked even if it matches the whitelist",
                         "Use exact block IDs, #block tags, or * wildcard patterns")
                 .translation("useless_mod.configuration.useless_dimension_floor_block_blacklist")
                 .defineListAllowEmpty("floor_block_blacklist", List.<String>of(), () -> "",
+                        entry -> entry instanceof String);
+        USELESS_DIMENSION_FLOOR_BLOCK_WHITELIST = SERVER_BUILDER
+                .comment("When non-empty, only matching blocks can be used for Useless Dimension borders, fills, or centers",
+                        "Leave empty to allow every block that is not on the blacklist",
+                        "Use exact block IDs, #block tags, or * wildcard patterns")
+                .translation("useless_mod.configuration.useless_dimension_floor_block_whitelist")
+                .defineListAllowEmpty("floor_block_whitelist", List.<String>of(), () -> "",
                         entry -> entry instanceof String);
         SERVER_BUILDER.pop();
 
@@ -528,17 +541,29 @@ public class ConfigManager {
     }
 
     public static List<String> getUselessDimensionFloorBlockBlacklist() {
-        List<? extends String> configured;
-        try {
-            configured = USELESS_DIMENSION_FLOOR_BLOCK_BLACKLIST.get();
-        } catch (IllegalStateException ignored) {
-            return List.of();
-        }
-        return configured == null ? List.of() : List.copyOf(configured);
+        return readConfigList(USELESS_DIMENSION_FLOOR_BLOCK_BLACKLIST);
+    }
+
+    public static List<String> getUselessDimensionFloorBlockWhitelist() {
+        return readConfigList(USELESS_DIMENSION_FLOOR_BLOCK_WHITELIST);
     }
 
     public static boolean isUselessDimensionFloorBlockBlacklisted(ResourceLocation blockId) {
         return uselessDimensionFloorBlockBlacklistMatcher().matches(blockId);
+    }
+
+    public static boolean isUselessDimensionFloorBlockAllowed(ResourceLocation blockId) {
+        return isUselessDimensionFloorBlockAllowed(blockId,
+                uselessDimensionFloorBlockBlacklistMatcher(),
+                uselessDimensionFloorBlockWhitelistMatcher());
+    }
+
+    static boolean isUselessDimensionFloorBlockAllowed(
+            ResourceLocation blockId,
+            BlockBlacklistMatcher blacklist,
+            BlockBlacklistMatcher whitelist) {
+        if (blockId == null || blacklist.matches(blockId)) return false;
+        return whitelist.isEmpty() || whitelist.matches(blockId);
     }
 
     public static List<String> getBeefToolForceKillBlacklist() {
@@ -574,6 +599,16 @@ public class ConfigManager {
         return List.of(value.split(";"));
     }
 
+    private static List<String> readConfigList(
+            ModConfigSpec.ConfigValue<List<? extends String>> value) {
+        try {
+            List<? extends String> configured = value.get();
+            return configured == null ? List.of() : List.copyOf(configured);
+        } catch (IllegalStateException ignored) {
+            return List.of();
+        }
+    }
+
     private static BlockBlacklistMatcher uselessDimensionFloorBlockBlacklistMatcher() {
         List<String> configured = getUselessDimensionFloorBlockBlacklist();
         if (!configured.equals(cachedUselessDimensionFloorBlockBlacklist)) {
@@ -585,6 +620,20 @@ public class ConfigManager {
             }
         }
         return uselessDimensionFloorBlockBlacklistMatcher;
+    }
+
+    private static BlockBlacklistMatcher uselessDimensionFloorBlockWhitelistMatcher() {
+        List<String> configured = getUselessDimensionFloorBlockWhitelist();
+        if (!configured.equals(cachedUselessDimensionFloorBlockWhitelist)) {
+            synchronized (ConfigManager.class) {
+                if (!configured.equals(cachedUselessDimensionFloorBlockWhitelist)) {
+                    uselessDimensionFloorBlockWhitelistMatcher =
+                            new BlockBlacklistMatcher(configured, "whitelist");
+                    cachedUselessDimensionFloorBlockWhitelist = configured;
+                }
+            }
+        }
+        return uselessDimensionFloorBlockWhitelistMatcher;
     }
 
 }

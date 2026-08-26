@@ -46,4 +46,19 @@ class BlockBlacklistMatcherTest {
         assertFalse(matcher.matches(ResourceLocation.withDefaultNamespace("stone")));
         assertFalse(matcher.matches(ResourceLocation.withDefaultNamespace("iron_ore")));
     }
+
+    @Test
+    void whitelistRestrictsMatchesButBlacklistStillWins() {
+        BlockBlacklistMatcher blacklist = new BlockBlacklistMatcher(
+                List.of("minecraft:bedrock"), "blacklist");
+        BlockBlacklistMatcher whitelist = new BlockBlacklistMatcher(
+                List.of("minecraft:stone"), "whitelist");
+
+        assertTrue(ConfigManager.isUselessDimensionFloorBlockAllowed(
+                ResourceLocation.withDefaultNamespace("stone"), blacklist, whitelist));
+        assertFalse(ConfigManager.isUselessDimensionFloorBlockAllowed(
+                ResourceLocation.withDefaultNamespace("dirt"), blacklist, whitelist));
+        assertFalse(ConfigManager.isUselessDimensionFloorBlockAllowed(
+                ResourceLocation.withDefaultNamespace("bedrock"), blacklist, whitelist));
+    }
 }

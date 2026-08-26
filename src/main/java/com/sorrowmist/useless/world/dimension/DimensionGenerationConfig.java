@@ -90,7 +90,7 @@ public record DimensionGenerationConfig(
 
     public static boolean isAllowedBlockId(ResourceLocation id) {
         return isValidBlockId(id)
-                && !ConfigManager.isUselessDimensionFloorBlockBlacklisted(id);
+                && ConfigManager.isUselessDimensionFloorBlockAllowed(id);
     }
 
     public DimensionGenerationConfig normalized() {

@@ -21,20 +21,36 @@ final class BlockBlacklistMatcher {
     private final List<Pattern> wildcardPatterns;
     private final List<TagKey<Block>> tags;
     private final BiPredicate<Block, TagKey<Block>> tagMatcher;
+    private final String listName;
 
     static BlockBlacklistMatcher empty() {
-        return new BlockBlacklistMatcher(List.of());
+        return empty("blacklist");
+    }
+
+    static BlockBlacklistMatcher empty(String listName) {
+        return new BlockBlacklistMatcher(List.of(), listName);
     }
 
     BlockBlacklistMatcher(List<? extends String> entries) {
         this(entries, (block, tag) -> block.defaultBlockState().is(tag));
     }
 
+    BlockBlacklistMatcher(List<? extends String> entries, String listName) {
+        this(entries, listName, (block, tag) -> block.defaultBlockState().is(tag));
+    }
+
     BlockBlacklistMatcher(List<? extends String> entries,
+                          BiPredicate<Block, TagKey<Block>> tagMatcher) {
+        this(entries, "blacklist", tagMatcher);
+    }
+
+    BlockBlacklistMatcher(List<? extends String> entries,
+                          String listName,
                           BiPredicate<Block, TagKey<Block>> tagMatcher) {
         Set<ResourceLocation> exact = new HashSet<>();
         List<Pattern> wildcards = new ArrayList<>();
         List<TagKey<Block>> parsedTags = new ArrayList<>();
+        this.listName = listName;
         this.tagMatcher = tagMatcher;
 
         if (entries != null) {
@@ -83,6 +99,10 @@ final class BlockBlacklistMatcher {
         this.tags = List.copyOf(parsedTags);
     }
 
+    boolean isEmpty() {
+        return exactIds.isEmpty() && wildcardPatterns.isEmpty() && tags.isEmpty();
+    }
+
     boolean matches(ResourceLocation blockId) {
         if (blockId == null) return false;
         if (exactIds.contains(blockId)) return true;
@@ -107,8 +127,8 @@ final class BlockBlacklistMatcher {
         return Pattern.compile(regex);
     }
 
-    private static void warn(String entry, String reason) {
+    private void warn(String entry, String reason) {
         UselessMod.LOGGER.warn(
-                "Ignoring Useless Dimension floor block blacklist entry '{}': {}", entry, reason);
+                "Ignoring Useless Dimension floor block {} entry '{}': {}", listName, entry, reason);
     }
 }

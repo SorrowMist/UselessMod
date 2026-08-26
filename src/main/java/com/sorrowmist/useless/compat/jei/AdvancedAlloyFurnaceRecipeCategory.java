@@ -47,14 +47,17 @@ public class AdvancedAlloyFurnaceRecipeCategory implements IRecipeCategory<Alloy
     private static final int DISPLAY_HEIGHT = 72;
 
     // 槽位位置 - 根据贴图调整
-    // 输入物品槽位 (9个) - 3行3列排列
+    // 输入物品槽位 (最多12个) - 3行4列排列
     private static final int INPUT_SLOTS_START_X = 1;
     private static final int INPUT_SLOTS_START_Y = 1;
     private static final int INPUT_SLOT_SPACING_X = 18;
     private static final int INPUT_SLOT_SPACING_Y = 18;
+    private static final int ITEM_GRID_COLUMNS = 4;
+    private static final int ITEM_GRID_ROWS = 3;
+    private static final int ITEM_GRID_MAX_SLOTS = ITEM_GRID_COLUMNS * ITEM_GRID_ROWS;
 
-    // 输出物品槽位 (9个) - 3行3列排列
-    private static final int OUTPUT_SLOTS_START_X = 159;
+    // 输出物品槽位 (最多12个) - 3行4列排列
+    private static final int OUTPUT_SLOTS_START_X = 141;
     private static final int OUTPUT_SLOTS_START_Y = 1;
 
     // 流体槽位
@@ -70,7 +73,8 @@ public class AdvancedAlloyFurnaceRecipeCategory implements IRecipeCategory<Alloy
     // 催化剂和模具槽位
     private static final int CATALYST_SLOT_X = 80;
     private static final int CATALYST_SLOT_Y = 55;
-    private static final int MOLD_SLOT_X = 116;
+    private static final int MOLD_SLOT_START_X = 98;
+    private static final int MOLD_SLOT_END_X = 134;
     private static final int MOLD_SLOT_Y = 55;
     private static final int MOLD_SLOT_SPACING = 18;
 
@@ -166,37 +170,29 @@ public class AdvancedAlloyFurnaceRecipeCategory implements IRecipeCategory<Alloy
         int inputCount = inputs.size();
         int totalInputCount = inputCount + keyInputs.size();
 
-        // 计算输入槽位的布局参数（支持超过9个时缩放）
+        // 计算输入槽位的布局参数（支持超过12个时缩短间距）
         int inputCols, inputRows;
         float inputSpacingX, inputSpacingY;
-        float inputSlotScale;
 
-        if (totalInputCount <= 9) {
-            // 正常布局：3x3 网格
-            inputCols = 3;
-            inputRows = 3;
+        if (totalInputCount <= ITEM_GRID_MAX_SLOTS) {
+            // 正常布局：4x3 网格
+            inputCols = ITEM_GRID_COLUMNS;
+            inputRows = ITEM_GRID_ROWS;
             inputSpacingX = INPUT_SLOT_SPACING_X;
             inputSpacingY = INPUT_SLOT_SPACING_Y;
-            inputSlotScale = 1.0f;
         } else {
             // 缩放布局：根据数量动态调整
-            // 计算需要的列数（最多显示在54像素宽度内）
-            int maxInputWidth = 54; // 输入区域最大宽度
             inputCols = (int) Math.ceil(Math.sqrt(totalInputCount));
             if (inputCols > 6) inputCols = 6; // 最多6列
 
             inputRows = (int) Math.ceil((float) totalInputCount / inputCols);
-            if (inputRows > 3) inputRows = 3; // 最多3行，超过则需要缩放
 
-            // 计算缩放比例
-            float widthPerSlot = maxInputWidth / (float) inputCols;
-            inputSlotScale = Math.min(widthPerSlot / INPUT_SLOT_SPACING_X, 1.0f);
-            if (inputRows > 3) {
-                inputSlotScale = Math.min(inputSlotScale, 3.0f / inputRows);
-            }
-
-            inputSpacingX = INPUT_SLOT_SPACING_X * inputSlotScale;
-            inputSpacingY = INPUT_SLOT_SPACING_Y * inputSlotScale;
+            float horizontalScale = Math.min(1.0f,
+                    (float) (ITEM_GRID_COLUMNS - 1) / Math.max(1, inputCols - 1));
+            float verticalScale = Math.min(1.0f,
+                    (float) (ITEM_GRID_ROWS - 1) / Math.max(1, inputRows - 1));
+            inputSpacingX = INPUT_SLOT_SPACING_X * horizontalScale;
+            inputSpacingY = INPUT_SLOT_SPACING_Y * verticalScale;
         }
 
         // 设置输入物品槽位
@@ -233,7 +229,7 @@ public class AdvancedAlloyFurnaceRecipeCategory implements IRecipeCategory<Alloy
                            if (count > 1) {
                                tooltip.add(Component.translatable("jei.useless_mod.tooltip.amount", formatCount(count)).withStyle(ChatFormatting.GRAY));
                            }
-                        if (totalInputCount > 9) {
+                        if (totalInputCount > ITEM_GRID_MAX_SLOTS) {
                                tooltip.add(Component.translatable("jei.useless_mod.tooltip.key_input").withStyle(ChatFormatting.AQUA));
                            }
                        });
@@ -263,31 +259,27 @@ public class AdvancedAlloyFurnaceRecipeCategory implements IRecipeCategory<Alloy
         int outputCount = outputs.size();
         int totalOutputCount = outputCount + keyOutputs.size();
 
-        // 计算输出槽位的布局参数（支持超过9个时缩放）
+        // 计算输出槽位的布局参数（支持超过12个时缩短间距）
         int outputCols, outputRows;
         float outputSpacingX, outputSpacingY;
 
-        if (totalOutputCount <= 9) {
-            outputCols = 3;
-            outputRows = 3;
+        if (totalOutputCount <= ITEM_GRID_MAX_SLOTS) {
+            outputCols = ITEM_GRID_COLUMNS;
+            outputRows = ITEM_GRID_ROWS;
             outputSpacingX = INPUT_SLOT_SPACING_X;
             outputSpacingY = INPUT_SLOT_SPACING_Y;
         } else {
-            int maxOutputWidth = 54;
             outputCols = (int) Math.ceil(Math.sqrt(totalOutputCount));
             if (outputCols > 6) outputCols = 6;
 
             outputRows = (int) Math.ceil((float) totalOutputCount / outputCols);
-            if (outputRows > 3) outputRows = 3;
 
-            float widthPerSlot = maxOutputWidth / (float) outputCols;
-            float outputSlotScale = Math.min(widthPerSlot / INPUT_SLOT_SPACING_X, 1.0f);
-            if (outputRows > 3) {
-                outputSlotScale = Math.min(outputSlotScale, 3.0f / outputRows);
-            }
-
-            outputSpacingX = INPUT_SLOT_SPACING_X * outputSlotScale;
-            outputSpacingY = INPUT_SLOT_SPACING_Y * outputSlotScale;
+            float horizontalScale = Math.min(1.0f,
+                    (float) (ITEM_GRID_COLUMNS - 1) / Math.max(1, outputCols - 1));
+            float verticalScale = Math.min(1.0f,
+                    (float) (ITEM_GRID_ROWS - 1) / Math.max(1, outputRows - 1));
+            outputSpacingX = INPUT_SLOT_SPACING_X * horizontalScale;
+            outputSpacingY = INPUT_SLOT_SPACING_Y * verticalScale;
         }
 
         for (int i = 0; i < outputCount; i++) {
@@ -305,7 +297,7 @@ public class AdvancedAlloyFurnaceRecipeCategory implements IRecipeCategory<Alloy
                         if (count > 1) {
                             tooltip.add(Component.translatable("jei.useless_mod.tooltip.amount", formatCount(count)).withStyle(ChatFormatting.GRAY));
                         }
-                        if (totalOutputCount > 9) {
+                        if (totalOutputCount > ITEM_GRID_MAX_SLOTS) {
                             tooltip.add(Component.translatable("jei.useless_mod.tooltip.key_output").withStyle(ChatFormatting.AQUA));
                         }
                     });
@@ -562,7 +554,11 @@ public class AdvancedAlloyFurnaceRecipeCategory implements IRecipeCategory<Alloy
     }
 
     private static int moldSlotX(int count, int index) {
-        return MOLD_SLOT_X + index * MOLD_SLOT_SPACING - (count - 1) * MOLD_SLOT_SPACING / 2;
+        if (count <= 1) return MOLD_SLOT_START_X;
+
+        float spacing = Math.min(MOLD_SLOT_SPACING,
+                (MOLD_SLOT_END_X - MOLD_SLOT_START_X) / (float) (count - 1));
+        return Math.round(MOLD_SLOT_START_X + index * spacing);
     }
 
     private static IRecipeSlotBuilder addKeyStack(IRecipeLayoutBuilder builder,

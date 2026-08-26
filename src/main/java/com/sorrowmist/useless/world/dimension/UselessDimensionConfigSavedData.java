@@ -40,7 +40,7 @@ public final class UselessDimensionConfigSavedData extends SavedData {
             ResourceKey<Level> dimension, DimensionGenerationConfig config) {
         DimensionGenerationConfig existing = configurations.get(dimension.location());
         if (existing != null) return existing;
-        DimensionGenerationConfig normalized = config.normalized();
+        DimensionGenerationConfig normalized = normalizeAndValidate(config);
         configurations.put(dimension.location(), normalized);
         setDirty();
         return normalized;
@@ -48,9 +48,17 @@ public final class UselessDimensionConfigSavedData extends SavedData {
 
     public DimensionGenerationConfig put(
             ResourceKey<Level> dimension, DimensionGenerationConfig config) {
-        DimensionGenerationConfig normalized = config.normalized();
+        DimensionGenerationConfig normalized = normalizeAndValidate(config);
         configurations.put(dimension.location(), normalized);
         setDirty();
+        return normalized;
+    }
+
+    private static DimensionGenerationConfig normalizeAndValidate(DimensionGenerationConfig config) {
+        DimensionGenerationConfig normalized = config.normalized();
+        if (!normalized.hasAllowedBlockIds()) {
+            throw new IllegalArgumentException("Useless Dimension configuration contains a blocked block");
+        }
         return normalized;
     }
 

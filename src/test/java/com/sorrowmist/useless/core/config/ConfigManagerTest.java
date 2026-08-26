@@ -74,4 +74,16 @@ class ConfigManagerTest {
         assertEquals(Boolean.TRUE, ((ModConfigSpec.ValueSpec) extremeReactorsSpec).getDefault());
         assertTrue(ConfigManager.isRecipeConversionEnabled(RecipeSourceIds.BIG_REACTORS));
     }
+
+    @Test
+    void uselessDimensionBlacklistUsesAnEmptyServerListByDefault() {
+        Object valueSpec = ConfigManager.SERVER_SPEC.getSpec()
+                .get(List.of("useless_dimension", "floor_block_blacklist"));
+
+        ModConfigSpec.ListValueSpec listSpec =
+                assertInstanceOf(ModConfigSpec.ListValueSpec.class, valueSpec);
+        assertEquals(List.of(), listSpec.getDefault());
+        assertEquals("", listSpec.getNewElementSupplier().get());
+        assertEquals(List.of(), ConfigManager.getUselessDimensionFloorBlockBlacklist());
+    }
 }

@@ -1,6 +1,7 @@
 package com.sorrowmist.useless.core.config;
 
 import net.neoforged.neoforge.common.ModConfigSpec;
+import net.minecraft.resources.ResourceLocation;
 
 import java.util.List;
 import java.util.Map;
@@ -99,6 +100,11 @@ public class ConfigManager {
     private static final ModConfigSpec.IntValue OMNIVERSAL_PASSIVE_PATTERN_SLOTS;
     private static final ModConfigSpec.IntValue OMNIVERSAL_DECODE_CACHE_CAPACITY;
     private static final ModConfigSpec.IntValue ORE_GENERATOR_SLOTS;
+    private static final ModConfigSpec.ConfigValue<List<? extends String>>
+            USELESS_DIMENSION_FLOOR_BLOCK_BLACKLIST;
+    private static volatile List<String> cachedUselessDimensionFloorBlockBlacklist = List.of();
+    private static volatile BlockBlacklistMatcher uselessDimensionFloorBlockBlacklistMatcher =
+            BlockBlacklistMatcher.empty();
 
     static {
         COMMON_BUILDER.push("game_mechanics");
@@ -143,6 +149,16 @@ public class ConfigManager {
                 .comment("Ore generator sample slots. Slots above this value remain recovery-only.")
                 .translation("useless_mod.configuration.ore_generator_slots")
                 .defineInRange("ore_generator_slots", 9, 1, 540);
+        SERVER_BUILDER.pop();
+
+        SERVER_BUILDER.translation("useless_mod.configuration.useless_dimension")
+                .push("useless_dimension");
+        USELESS_DIMENSION_FLOOR_BLOCK_BLACKLIST = SERVER_BUILDER
+                .comment("Blocks that cannot be used for Useless Dimension borders, fills, or centers",
+                        "Use exact block IDs, #block tags, or * wildcard patterns")
+                .translation("useless_mod.configuration.useless_dimension_floor_block_blacklist")
+                .defineListAllowEmpty("floor_block_blacklist", List.<String>of(), () -> "",
+                        entry -> entry instanceof String);
         SERVER_BUILDER.pop();
 
         // 牛排工具连锁挖掘配置
@@ -511,6 +527,20 @@ public class ConfigManager {
         return BEEF_TOOL_BLOCK_INTERACTION_RANGE.get();
     }
 
+    public static List<String> getUselessDimensionFloorBlockBlacklist() {
+        List<? extends String> configured;
+        try {
+            configured = USELESS_DIMENSION_FLOOR_BLOCK_BLACKLIST.get();
+        } catch (IllegalStateException ignored) {
+            return List.of();
+        }
+        return configured == null ? List.of() : List.copyOf(configured);
+    }
+
+    public static boolean isUselessDimensionFloorBlockBlacklisted(ResourceLocation blockId) {
+        return uselessDimensionFloorBlockBlacklistMatcher().matches(blockId);
+    }
+
     public static List<String> getBeefToolForceKillBlacklist() {
         return splitEntityIdList(BEEF_TOOL_FORCE_KILL_BLACKLIST.get());
     }
@@ -542,6 +572,19 @@ public class ConfigManager {
             return List.of();
         }
         return List.of(value.split(";"));
+    }
+
+    private static BlockBlacklistMatcher uselessDimensionFloorBlockBlacklistMatcher() {
+        List<String> configured = getUselessDimensionFloorBlockBlacklist();
+        if (!configured.equals(cachedUselessDimensionFloorBlockBlacklist)) {
+            synchronized (ConfigManager.class) {
+                if (!configured.equals(cachedUselessDimensionFloorBlockBlacklist)) {
+                    uselessDimensionFloorBlockBlacklistMatcher = new BlockBlacklistMatcher(configured);
+                    cachedUselessDimensionFloorBlockBlacklist = configured;
+                }
+            }
+        }
+        return uselessDimensionFloorBlockBlacklistMatcher;
     }
 
 }

@@ -30,9 +30,8 @@ public record DimensionConfigGhostSlotPacket(int containerId, int slot, Resource
                     || !menu.stillValid(player)) {
                 return;
             }
-            if (menu.setGhostBlockId(packet.slot, packet.blockId)) {
-                menu.broadcastChanges();
-            }
+            menu.setGhostBlockId(packet.slot, packet.blockId);
+            menu.broadcastChanges();
         });
     }
 

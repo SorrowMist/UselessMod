@@ -178,7 +178,7 @@ public final class DimensionConfigMenu extends AbstractContainerMenu {
     }
 
     public boolean isCompleteConfiguration() {
-        return createConfiguration().map(config -> config.isValid() && config.hasValidBlockIds()).orElse(false);
+        return createConfiguration().map(config -> config.isValid() && config.hasAllowedBlockIds()).orElse(false);
     }
 
     public Optional<DimensionGenerationConfig> createConfiguration() {
@@ -202,13 +202,13 @@ public final class DimensionConfigMenu extends AbstractContainerMenu {
     public boolean setGhostBlockId(int index, @Nullable ResourceLocation id) {
         GhostSlot slot = getGhostSlot(index);
         if (slot == null) return false;
-        if (id != null && !DimensionGenerationConfig.isValidBlockId(id)) return false;
+        if (id != null && !DimensionGenerationConfig.isAllowedBlockId(id)) return false;
         slot.setBlockId(id);
         return true;
     }
 
     public void submit(ServerPlayer player, DimensionGenerationConfig requested, boolean teleportAfterSave) {
-        if (!requested.isValid() || !requested.hasValidBlockIds()
+        if (!requested.isValid() || !requested.hasAllowedBlockIds()
                 || !UselessDimensions.isUselessDimension(targetDimension)
                 || !player.getUUID().equals(playerId)
                 || !stillValid(player)) {

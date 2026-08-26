@@ -41,6 +41,11 @@ class DimensionGenerationConfigTest {
     }
 
     @Test
+    void validFloorBlocksAreAllowedWhenTheBlacklistIsEmpty() {
+        assertTrue(config(1, -64).hasAllowedBlockIds());
+    }
+
+    @Test
     void networkAndNbtRoundTripsPreserveEveryField() {
         DimensionGenerationConfig expected = new DimensionGenerationConfig(
                 STONE, DIRT, GLASS, 17, 42, false, true);

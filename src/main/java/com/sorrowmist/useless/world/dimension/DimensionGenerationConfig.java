@@ -2,6 +2,7 @@ package com.sorrowmist.useless.world.dimension;
 
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
+import com.sorrowmist.useless.core.config.ConfigManager;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.BlockItem;
@@ -75,10 +76,21 @@ public record DimensionGenerationConfig(
                 && isValidBlockId(centerBlockId);
     }
 
+    public boolean hasAllowedBlockIds() {
+        return isAllowedBlockId(borderBlockId)
+                && isAllowedBlockId(fillBlockId)
+                && isAllowedBlockId(centerBlockId);
+    }
+
     public static boolean isValidBlockId(ResourceLocation id) {
         if (id == null) return false;
         Block block = BuiltInRegistries.BLOCK.get(id);
         return block != Blocks.AIR && block.asItem() != Items.AIR;
+    }
+
+    public static boolean isAllowedBlockId(ResourceLocation id) {
+        return isValidBlockId(id)
+                && !ConfigManager.isUselessDimensionFloorBlockBlacklisted(id);
     }
 
     public DimensionGenerationConfig normalized() {

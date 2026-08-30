@@ -14,6 +14,7 @@ import com.sorrowmist.useless.client.gui.OreGeneratorScreen;
 import com.sorrowmist.useless.client.gui.DimensionConfigScreen;
 import com.sorrowmist.useless.client.render.ctm.CtmModelRegistrar;
 import com.sorrowmist.useless.client.render.supervisor.SupervisorModelLoader;
+import com.sorrowmist.useless.compat.jei.JEIPlugin;
 import com.sorrowmist.useless.content.blocks.GlowPlasticBlock;
 import com.sorrowmist.useless.content.items.EndlessBeafItem;
 import com.sorrowmist.useless.content.menus.AdvancedAlloyFurnaceMenu;
@@ -27,13 +28,16 @@ import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.client.event.RegisterColorHandlersEvent;
 import net.neoforged.neoforge.client.event.RegisterMenuScreensEvent;
 import net.neoforged.neoforge.client.event.ModelEvent;
+import net.neoforged.neoforge.client.event.ClientTickEvent;
 import net.neoforged.neoforge.client.event.RecipesUpdatedEvent;
+import net.neoforged.neoforge.event.TagsUpdatedEvent;
 import net.neoforged.neoforge.event.entity.player.ItemTooltipEvent;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.Level;
 
 import java.util.HashSet;
 import java.util.List;
@@ -41,6 +45,8 @@ import java.util.Set;
 
 @EventBusSubscriber(modid = UselessMod.MODID, value = Dist.CLIENT)
 public class ClientSetup {
+    private static Level observedClientLevel;
+
     @SubscribeEvent
     public static void modifyBakedModels(ModelEvent.ModifyBakingResult event) {
         CtmModelRegistrar.modifyBakingResult(event);
@@ -89,9 +95,40 @@ public class ClientSetup {
         AlloyFurnaceRecipeCatalog.invalidate();
         if (Minecraft.getInstance().level != null) {
             AlloyFurnaceRecipeCatalog.prewarm(Minecraft.getInstance().level);
+            JEIPlugin.refreshAlloyFurnaceRecipes();
             if (Minecraft.getInstance().player != null) {
                 EndlessBeafItem.refreshAttackDamage(Minecraft.getInstance().player);
             }
+        }
+    }
+
+    @SubscribeEvent
+    public static void onClientTick(ClientTickEvent.Post event) {
+        Minecraft minecraft = Minecraft.getInstance();
+        Level level = minecraft.level;
+        if (level == observedClientLevel) return;
+
+        observedClientLevel = level;
+        AlloyFurnaceRecipeCatalog.invalidate();
+        if (level != null) {
+            // The initial JEI registration can happen on the title screen, before a client level
+            // exists. Rebuild once after joining a world so generated compat recipes are visible.
+            AlloyFurnaceRecipeCatalog.prewarm(level);
+            JEIPlugin.refreshAlloyFurnaceRecipes();
+        }
+    }
+
+    @SubscribeEvent
+    public static void onTagsUpdated(TagsUpdatedEvent event) {
+        // Optional recipe adapters may read synced item tags. Recipes are updated before the
+        // clientbound tag packet in some login paths, so refresh the catalog after those tags bind.
+        if (Minecraft.getInstance().level == null) return;
+
+        AlloyFurnaceRecipeCatalog.invalidate();
+        AlloyFurnaceRecipeCatalog.prewarm(Minecraft.getInstance().level);
+        JEIPlugin.refreshAlloyFurnaceRecipes();
+        if (Minecraft.getInstance().player != null) {
+            EndlessBeafItem.refreshAttackDamage(Minecraft.getInstance().player);
         }
     }
 

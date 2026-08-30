@@ -62,6 +62,16 @@ public class ConfigManager {
     private static final ModConfigSpec.BooleanValue ENABLE_CRAFTING_RECIPE_CONVERSION;
     private static final ModConfigSpec.BooleanValue ENABLE_SMELTING_RECIPE_CONVERSION;
     private static final ModConfigSpec.BooleanValue ENABLE_BREWING_RECIPE_CONVERSION;
+    private static final ModConfigSpec.BooleanValue ENABLE_FARMERS_DELIGHT_RECIPE_CONVERSION;
+    private static final ModConfigSpec.BooleanValue ENABLE_EXTRA_DELIGHT_RECIPE_CONVERSION;
+    private static final ModConfigSpec.BooleanValue ENABLE_CRABBERS_DELIGHT_RECIPE_CONVERSION;
+    private static final ModConfigSpec.BooleanValue ENABLE_CASUALNESS_DELIGHT_RECIPE_CONVERSION;
+    private static final ModConfigSpec.BooleanValue ENABLE_EXPANDED_DELIGHT_RECIPE_CONVERSION;
+    private static final ModConfigSpec.BooleanValue ENABLE_BREWIN_AND_CHEWIN_RECIPE_CONVERSION;
+    private static final ModConfigSpec.BooleanValue ENABLE_NOMADS_DELIGHT_RECIPE_CONVERSION;
+    private static final ModConfigSpec.BooleanValue ENABLE_UBES_DELIGHT_RECIPE_CONVERSION;
+    private static final ModConfigSpec.BooleanValue ENABLE_BARBEQUES_DELIGHT_RECIPE_CONVERSION;
+    private static final ModConfigSpec.BooleanValue ENABLE_YOUKAI_HOMECOMING_RECIPE_CONVERSION;
     private static final ModConfigSpec.BooleanValue ENABLE_EXTENDED_AE_RECIPE_CONVERSION;
     private static final ModConfigSpec.BooleanValue ENABLE_ADVANCED_AE_RECIPE_CONVERSION;
     private static final ModConfigSpec.BooleanValue ENABLE_MEKANISM_RECIPE_CONVERSION;
@@ -296,26 +306,73 @@ public class ConfigManager {
                         "在AppliedFlux抽取之后作为补充, 每tick总抽取量受熔炉最大输入速率限制")
                 .define("draw_ae_energy", false);
 
+        COMMON_BUILDER.translation("useless_mod.configuration.advanced_alloy_furnace.recipe_conversion")
+                .push("recipe_conversion");
+        COMMON_BUILDER.translation("useless_mod.configuration.advanced_alloy_furnace.recipe_conversion.minecraft")
+                .push("minecraft");
         ENABLE_CRAFTING_RECIPE_CONVERSION = defineRecipeConversionOption(
                 "enable_crafting_recipe_conversion", false);
         ENABLE_SMELTING_RECIPE_CONVERSION = defineRecipeConversionOption(
                 "enable_smelting_recipe_conversion", true);
         ENABLE_BREWING_RECIPE_CONVERSION = defineRecipeConversionOption(
                 "enable_brewing_recipe_conversion", true);
+        COMMON_BUILDER.pop();
+
+        COMMON_BUILDER.translation("useless_mod.configuration.advanced_alloy_furnace.recipe_conversion.farmers_delight")
+                .push("farmers_delight");
+        ENABLE_FARMERS_DELIGHT_RECIPE_CONVERSION = defineRecipeConversionOption(
+                "enable_farmersdelight_recipe_conversion", true);
+        ENABLE_EXTRA_DELIGHT_RECIPE_CONVERSION = defineRecipeConversionOption(
+                "enable_extradelight_recipe_conversion", true);
+        ENABLE_CRABBERS_DELIGHT_RECIPE_CONVERSION = defineRecipeConversionOption(
+                "enable_crabbersdelight_recipe_conversion", true);
+        ENABLE_CASUALNESS_DELIGHT_RECIPE_CONVERSION = defineRecipeConversionOption(
+                "enable_casualnessdelight_recipe_conversion", true);
+        ENABLE_EXPANDED_DELIGHT_RECIPE_CONVERSION = defineRecipeConversionOption(
+                "enable_expandeddelight_recipe_conversion", true);
+        ENABLE_BREWIN_AND_CHEWIN_RECIPE_CONVERSION = defineRecipeConversionOption(
+                "enable_brewinandchewin_recipe_conversion", true);
+        ENABLE_NOMADS_DELIGHT_RECIPE_CONVERSION = defineRecipeConversionOption(
+                "enable_nomadsdelight_recipe_conversion", true);
+        ENABLE_UBES_DELIGHT_RECIPE_CONVERSION = defineRecipeConversionOption(
+                "enable_ubesdelight_recipe_conversion", true);
+        ENABLE_BARBEQUES_DELIGHT_RECIPE_CONVERSION = defineRecipeConversionOption(
+                "enable_barbequesdelight_recipe_conversion", true);
+        ENABLE_YOUKAI_HOMECOMING_RECIPE_CONVERSION = defineRecipeConversionOption(
+                "enable_youkaishomecoming_recipe_conversion", true);
+        COMMON_BUILDER.pop();
+
+        COMMON_BUILDER.translation("useless_mod.configuration.advanced_alloy_furnace.recipe_conversion.ae")
+                .push("ae");
         ENABLE_EXTENDED_AE_RECIPE_CONVERSION = defineRecipeConversionOption(
                 "enable_extendedae_recipe_conversion", true);
         ENABLE_ADVANCED_AE_RECIPE_CONVERSION = defineRecipeConversionOption(
                 "enable_advanced_ae_recipe_conversion", true);
-        ENABLE_MEKANISM_RECIPE_CONVERSION = defineRecipeConversionOption(
-                "enable_mekanism_recipe_conversion", true);
-        ENABLE_MEKANISM_GENERATORS_RECIPE_CONVERSION = defineRecipeConversionOption(
-                "enable_mekanism_generators_recipe_conversion", true);
         ENABLE_APP_MEK_RECIPE_CONVERSION = defineRecipeConversionOption(
                 "enable_appmek_recipe_conversion", true);
         ENABLE_AE2_RECIPE_CONVERSION = defineRecipeConversionOption(
                 "enable_ae2_recipe_conversion", true);
         ENABLE_AE2CS_RECIPE_CONVERSION = defineRecipeConversionOption(
                 "enable_ae2cs_recipe_conversion", true);
+
+        ENABLE_AE2LT_RECIPE_CONVERSION = defineRecipeConversionOption(
+                "enable_ae2lt_recipe_conversion", true);
+        ENABLE_DATA_ENERGISTICS_RECIPE_CONVERSION = defineRecipeConversionOption(
+                "enable_data_energistics_recipe_conversion", true);
+        ENABLE_NEO_ECO_AE_RECIPE_CONVERSION = defineRecipeConversionOption(
+                "enable_neo_eco_ae_recipe_conversion", true);
+        COMMON_BUILDER.pop();
+
+        COMMON_BUILDER.translation("useless_mod.configuration.advanced_alloy_furnace.recipe_conversion.mekanism")
+                .push("mekanism");
+        ENABLE_MEKANISM_RECIPE_CONVERSION = defineRecipeConversionOption(
+                "enable_mekanism_recipe_conversion", true);
+        ENABLE_MEKANISM_GENERATORS_RECIPE_CONVERSION = defineRecipeConversionOption(
+                "enable_mekanism_generators_recipe_conversion", true);
+        COMMON_BUILDER.pop();
+
+        COMMON_BUILDER.translation("useless_mod.configuration.advanced_alloy_furnace.recipe_conversion.other")
+                .push("other");
         ENABLE_INDUSTRIAL_FOREGOING_RECIPE_CONVERSION = defineRecipeConversionOption(
                 "enable_industrial_foregoing_recipe_conversion", true);
         ENABLE_ACTUALLY_ADDITIONS_RECIPE_CONVERSION = defineRecipeConversionOption(
@@ -324,10 +381,6 @@ public class ConfigManager {
                 "enable_ars_nouveau_recipe_conversion", true);
         ENABLE_MYSTICAL_AGRICULTURE_RECIPE_CONVERSION = defineRecipeConversionOption(
                 "enable_mystical_agriculture_recipe_conversion", true);
-        ENABLE_AE2LT_RECIPE_CONVERSION = defineRecipeConversionOption(
-                "enable_ae2lt_recipe_conversion", true);
-        ENABLE_DATA_ENERGISTICS_RECIPE_CONVERSION = defineRecipeConversionOption(
-                "enable_data_energistics_recipe_conversion", true);
         ENABLE_PRODUCTIVE_BEES_RECIPE_CONVERSION = defineRecipeConversionOption(
                 "enable_productive_bees_recipe_conversion", true);
         ENABLE_DRACONIC_EVOLUTION_RECIPE_CONVERSION = defineRecipeConversionOption(
@@ -336,8 +389,6 @@ public class ConfigManager {
                 "enable_powah_recipe_conversion", true);
         ENABLE_EXTENDED_CRAFTING_RECIPE_CONVERSION = defineRecipeConversionOption(
                 "enable_extended_crafting_recipe_conversion", true);
-        ENABLE_NEO_ECO_AE_RECIPE_CONVERSION = defineRecipeConversionOption(
-                "enable_neo_eco_ae_recipe_conversion", true);
         ENABLE_NATURES_AURA_RECIPE_CONVERSION = defineRecipeConversionOption(
                 "enable_natures_aura_recipe_conversion", true);
         ENABLE_FORBIDDEN_ARCANUS_RECIPE_CONVERSION = defineRecipeConversionOption(
@@ -364,8 +415,21 @@ public class ConfigManager {
                 "enable_pneumaticcraft_recipe_conversion", true);
         ENABLE_BIG_REACTORS_RECIPE_CONVERSION = defineRecipeConversionOption(
                 "enable_bigreactors_recipe_conversion", true);
+        COMMON_BUILDER.pop();
 
         RECIPE_CONVERSION_OPTIONS = Map.ofEntries(
+                Map.entry("farmersdelight", ENABLE_FARMERS_DELIGHT_RECIPE_CONVERSION),
+                Map.entry("extradelight", ENABLE_EXTRA_DELIGHT_RECIPE_CONVERSION),
+                Map.entry("crabbersdelight", ENABLE_CRABBERS_DELIGHT_RECIPE_CONVERSION),
+                Map.entry("casualnessdelight", ENABLE_CASUALNESS_DELIGHT_RECIPE_CONVERSION),
+                Map.entry("expandeddelight", ENABLE_EXPANDED_DELIGHT_RECIPE_CONVERSION),
+                Map.entry("brewinandchewin", ENABLE_BREWIN_AND_CHEWIN_RECIPE_CONVERSION),
+                Map.entry("nomads_delight", ENABLE_NOMADS_DELIGHT_RECIPE_CONVERSION),
+                Map.entry("nomadsdelight", ENABLE_NOMADS_DELIGHT_RECIPE_CONVERSION),
+                Map.entry("ubesdelight", ENABLE_UBES_DELIGHT_RECIPE_CONVERSION),
+                Map.entry("barbequesdelight", ENABLE_BARBEQUES_DELIGHT_RECIPE_CONVERSION),
+                Map.entry("youkaisfeasts", ENABLE_YOUKAI_HOMECOMING_RECIPE_CONVERSION),
+                Map.entry("youkaishomecoming", ENABLE_YOUKAI_HOMECOMING_RECIPE_CONVERSION),
                 Map.entry("extendedae", ENABLE_EXTENDED_AE_RECIPE_CONVERSION),
                 Map.entry("advanced_ae", ENABLE_ADVANCED_AE_RECIPE_CONVERSION),
                 Map.entry("mekanism", ENABLE_MEKANISM_RECIPE_CONVERSION),

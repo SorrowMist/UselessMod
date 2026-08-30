@@ -4,6 +4,7 @@ import com.sorrowmist.useless.UselessMod;
 import com.sorrowmist.useless.client.gui.DimensionConfigScreen;
 import com.sorrowmist.useless.content.menus.DimensionConfigMenu;
 import com.sorrowmist.useless.content.recipe.AlloyFurnaceRecipeCatalog;
+import com.sorrowmist.useless.content.recipe.AlloyFurnaceRecipeIdentity;
 import com.sorrowmist.useless.init.ModBlocks;
 import com.sorrowmist.useless.init.ModTags;
 
@@ -32,11 +33,15 @@ import org.jetbrains.annotations.NotNull;
 
 import java.util.List;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 @JeiPlugin
 public final class JEIPlugin implements IModPlugin {
     private static final ResourceLocation UID = UselessMod.id("jei_plugin");
     private static IJeiRuntime runtime;
+    private static final Map<AlloyFurnaceRecipeIdentity, AlloyFurnaceRecipeCatalog.Entry>
+            registeredAlloyFurnaceRecipes = new LinkedHashMap<>();
 
     @Override
     public @NotNull ResourceLocation getPluginUid() {
@@ -57,6 +62,10 @@ public final class JEIPlugin implements IModPlugin {
         List<AlloyFurnaceRecipeCatalog.Entry> recipes = level == null
                 ? List.of()
                 : AlloyFurnaceRecipeCatalog.entries(level);
+        registeredAlloyFurnaceRecipes.clear();
+        for (AlloyFurnaceRecipeCatalog.Entry recipe : recipes) {
+            registeredAlloyFurnaceRecipes.put(recipe.identity(), recipe);
+        }
         registration.addRecipes(AdvancedAlloyFurnaceRecipeCategory.TYPE, recipes);
         registration.addRecipes(CatalystInfoCategory.TYPE,
                 List.of(new CatalystInfoCategory.CatalystInfo()));
@@ -203,6 +212,33 @@ public final class JEIPlugin implements IModPlugin {
     @Override
     public void onRuntimeAvailable(@NotNull IJeiRuntime jeiRuntime) {
         runtime = jeiRuntime;
+        refreshAlloyFurnaceRecipes();
+    }
+
+    @Override
+    public void onRuntimeUnavailable() {
+        runtime = null;
+        registeredAlloyFurnaceRecipes.clear();
+    }
+
+    /** Adds recipes generated after JEI's initial registration, such as data-driven compat data. */
+    public static void refreshAlloyFurnaceRecipes() {
+        if (runtime == null) return;
+
+        Level level = Minecraft.getInstance().level;
+        if (level == null) return;
+
+        List<AlloyFurnaceRecipeCatalog.Entry> additions = new ArrayList<>();
+        for (AlloyFurnaceRecipeCatalog.Entry recipe : AlloyFurnaceRecipeCatalog.entries(level)) {
+            if (!registeredAlloyFurnaceRecipes.containsKey(recipe.identity())) {
+                registeredAlloyFurnaceRecipes.put(recipe.identity(), recipe);
+                additions.add(recipe);
+            }
+        }
+        if (!additions.isEmpty()) {
+            runtime.getRecipeManager().addRecipes(
+                    AdvancedAlloyFurnaceRecipeCategory.TYPE, additions);
+        }
     }
 
     public static IJeiRuntime getRuntime() {

@@ -68,6 +68,17 @@ public final class RecipeAdapterCompatRegistry {
     public static final String APP_MEK = RecipeSourceIds.APP_MEK;
     public static final String AE2 = RecipeSourceIds.AE2;
     public static final String AE2CS = RecipeSourceIds.AE2CS;
+    public static final String FARMERS_DELIGHT = RecipeSourceIds.FARMERS_DELIGHT;
+    public static final String EXTRA_DELIGHT = RecipeSourceIds.EXTRA_DELIGHT;
+    public static final String CRABBERS_DELIGHT = RecipeSourceIds.CRABBERS_DELIGHT;
+    public static final String CASUALNESS_DELIGHT = RecipeSourceIds.CASUALNESS_DELIGHT;
+    public static final String EXPANDED_DELIGHT = RecipeSourceIds.EXPANDED_DELIGHT;
+    public static final String BREWIN_AND_CHEWIN = RecipeSourceIds.BREWIN_AND_CHEWIN;
+    public static final String NOMADS_DELIGHT = RecipeSourceIds.NOMADS_DELIGHT;
+    public static final String UBES_DELIGHT = RecipeSourceIds.UBES_DELIGHT;
+    public static final String BARBEQUES_DELIGHT = RecipeSourceIds.BARBEQUES_DELIGHT;
+    public static final String YOUKAIS_FEASTS = RecipeSourceIds.YOUKAIS_FEASTS;
+    public static final String YOUKAI_HOMECOMING = RecipeSourceIds.YOUKAI_HOMECOMING;
     public static final String INDUSTRIAL_FOREGOING = RecipeSourceIds.INDUSTRIAL_FOREGOING;
     public static final String ACTUALLY_ADDITIONS = RecipeSourceIds.ACTUALLY_ADDITIONS;
     public static final String ARS_NOUVEAU = RecipeSourceIds.ARS_NOUVEAU;
@@ -95,6 +106,16 @@ public final class RecipeAdapterCompatRegistry {
 
     private static final List<CompatEntry> ENTRIES = List.of(
             new CompatEntry(null, RecipeAdapterCompatRegistry::registerMinecraft),
+            new CompatEntry(FARMERS_DELIGHT, RecipeAdapterCompatRegistry::registerFarmersDelight),
+            new CompatEntry(EXTRA_DELIGHT, RecipeAdapterCompatRegistry::registerExtraDelight),
+            new CompatEntry(CRABBERS_DELIGHT, RecipeAdapterCompatRegistry::registerCrabbersDelight),
+            new CompatEntry(CASUALNESS_DELIGHT, RecipeAdapterCompatRegistry::registerCasualnessDelight),
+            new CompatEntry(EXPANDED_DELIGHT, RecipeAdapterCompatRegistry::registerExpandedDelight),
+            new CompatEntry(BREWIN_AND_CHEWIN, RecipeAdapterCompatRegistry::registerBrewinAndChewin),
+            new CompatEntry(NOMADS_DELIGHT, RecipeAdapterCompatRegistry::registerNomadsDelight),
+            new CompatEntry(UBES_DELIGHT, RecipeAdapterCompatRegistry::registerUbesDelight),
+            new CompatEntry(BARBEQUES_DELIGHT, RecipeAdapterCompatRegistry::registerBarbequesDelight),
+            new CompatEntry(YOUKAIS_FEASTS, RecipeAdapterCompatRegistry::registerYoukaisHomecoming),
             new CompatEntry(EXTENDED_AE, RecipeAdapterCompatRegistry::registerExtendedAE),
             new CompatEntry(ADVANCED_AE, RecipeAdapterCompatRegistry::registerAdvancedAE),
             new CompatEntry(MEKANISM, RecipeAdapterCompatRegistry::registerMekanism),
@@ -167,6 +188,56 @@ public final class RecipeAdapterCompatRegistry {
         if (ConfigManager.isBrewingRecipeConversionEnabled()) {
             register(new BrewingRecipeAdapter());
         }
+    }
+
+    private static void registerFarmersDelight() {
+        invokeOptionalLoader(
+                "com.sorrowmist.useless.compat.farmersdelight.FarmersDelightRecipeCompatLoader");
+    }
+
+    private static void registerExtraDelight() {
+        invokeOptionalLoader(
+                "com.sorrowmist.useless.compat.extradelight.ExtraDelightRecipeCompatLoader");
+    }
+
+    private static void registerCrabbersDelight() {
+        invokeOptionalLoader(
+                "com.sorrowmist.useless.compat.crabbersdelight.CrabbersDelightRecipeCompatLoader");
+    }
+
+    private static void registerCasualnessDelight() {
+        invokeOptionalLoader(
+                "com.sorrowmist.useless.compat.casualnessdelight.CasualnessDelightRecipeCompatLoader");
+    }
+
+    private static void registerExpandedDelight() {
+        invokeOptionalLoader(
+                "com.sorrowmist.useless.compat.expandeddelight.ExpandedDelightRecipeCompatLoader");
+    }
+
+    private static void registerBrewinAndChewin() {
+        invokeOptionalLoader(
+                "com.sorrowmist.useless.compat.brewinandchewin.BrewinAndChewinRecipeCompatLoader");
+    }
+
+    private static void registerNomadsDelight() {
+        invokeOptionalLoader(
+                "com.sorrowmist.useless.compat.nomadsdelight.NomadsDelightRecipeCompatLoader");
+    }
+
+    private static void registerUbesDelight() {
+        invokeOptionalLoader(
+                "com.sorrowmist.useless.compat.ubesdelight.UbesDelightRecipeCompatLoader");
+    }
+
+    private static void registerBarbequesDelight() {
+        invokeOptionalLoader(
+                "com.sorrowmist.useless.compat.barbequesdelight.BarbequesDelightRecipeCompatLoader");
+    }
+
+    private static void registerYoukaisHomecoming() {
+        invokeOptionalLoader(
+                "com.sorrowmist.useless.compat.youkaishomecoming.YoukaisHomecomingRecipeCompatLoader");
     }
 
     private static void registerExtendedAE() {

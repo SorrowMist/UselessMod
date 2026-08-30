@@ -63,18 +63,18 @@ public class AdvancedAlloyFurnaceRecipeCategory implements IRecipeCategory<Alloy
     // 流体槽位
     private static final int FLUID_INPUT_X = 1;
     private static final int FLUID_INPUT_Y = 55;
-    private static final int FLUID_INPUT_WIDTH = 52;
+    private static final int FLUID_INPUT_WIDTH = 69;
     private static final int FLUID_INPUT_HEIGHT = 16;
-    private static final int FLUID_OUTPUT_X = 159;
+    private static final int FLUID_OUTPUT_X = 142;
     private static final int FLUID_OUTPUT_Y = 55;
-    private static final int FLUID_OUTPUT_WIDTH = 52;
+    private static final int FLUID_OUTPUT_WIDTH = 69;
     private static final int FLUID_OUTPUT_HEIGHT = 16;
 
     // 催化剂和模具槽位
-    private static final int CATALYST_SLOT_X = 80;
+    private static final int CATALYST_SLOT_X = 72;
     private static final int CATALYST_SLOT_Y = 55;
-    private static final int MOLD_SLOT_START_X = 98;
-    private static final int MOLD_SLOT_END_X = 134;
+    private static final int MOLD_SLOT_START_X = 89;
+    private static final int MOLD_SLOT_END_X = 125;
     private static final int MOLD_SLOT_Y = 55;
     private static final int MOLD_SLOT_SPACING = 18;
 
@@ -88,7 +88,7 @@ public class AdvancedAlloyFurnaceRecipeCategory implements IRecipeCategory<Alloy
 
     // 能量显示区域
     private static final int ENERGY_DISPLAY_X = 75;
-    private static final int ENERGY_DISPLAY_Y = 0;
+    private static final int ENERGY_DISPLAY_Y = 2;
     private static final int ENERGY_DISPLAY_WIDTH = 62;
     private static final int ENERGY_DISPLAY_HEIGHT = 7;
 

@@ -75,6 +75,6 @@ public class EntityMixin {
 
         Level level = player.level();
         BlockPos pos = BlockPos.containing(x, y, z);
-        return y < level.getMinBuildHeight() || y > level.getMaxBuildHeight() || !level.getWorldBorder().isWithinBounds(pos);
+        return y < level.getMinBuildHeight() || !level.getWorldBorder().isWithinBounds(pos);
     }
 }

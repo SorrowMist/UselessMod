@@ -7,6 +7,7 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Redirect;
 
+import java.util.ArrayList;
 import java.util.List;
 
 @Mixin(EntityGetter.class)
@@ -26,8 +27,26 @@ public interface EntityGetterMixin {
             )
     )
     private static List<? extends Player> useless_mod$filterProtectedPlayers(EntityGetter getter) {
-        return getter.players().stream()
-                .filter(player -> !EventHandler.hasBeefInvulnerabilityItem(player))
-                .toList();
+        List<? extends Player> players = getter.players();
+        if (!EventHandler.hasAnyBeefInvulnerabilityPlayers()) {
+            return players;
+        }
+
+        List<Player> filtered = null;
+        for (int i = 0; i < players.size(); i++) {
+            Player player = players.get(i);
+            if (EventHandler.hasBeefInvulnerabilityItem(player)) {
+                if (filtered == null) {
+                    filtered = new ArrayList<>(players.size() - 1);
+                    filtered.addAll(players.subList(0, i));
+                }
+                continue;
+            }
+
+            if (filtered != null) {
+                filtered.add(player);
+            }
+        }
+        return filtered == null ? players : filtered;
     }
 }

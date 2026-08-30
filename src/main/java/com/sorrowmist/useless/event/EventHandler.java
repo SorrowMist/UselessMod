@@ -306,7 +306,14 @@ public class EventHandler {
     }
 
     public static boolean hasBeefInvulnerabilityItem(Player player) {
-        return UselessItemUtils.hasInvulnerabilityEnabledTargetToolInInventory(player) || player.level().isClientSide() && CLIENT_BEEF_INVULNERABLE_ENTITY_IDS.contains(player.getId());
+        if (player.level().isClientSide()) {
+            return CLIENT_BEEF_INVULNERABLE_ENTITY_IDS.contains(player.getId());
+        }
+        return BEEF_PROTECTED_PLAYERS.contains(player.getUUID());
+    }
+
+    public static boolean hasAnyBeefInvulnerabilityPlayers() {
+        return !BEEF_PROTECTED_PLAYERS.isEmpty() || !CLIENT_BEEF_INVULNERABLE_ENTITY_IDS.isEmpty();
     }
 
     public static void setClientBeefInvulnerabilityState(int entityId, boolean protectedState) {

@@ -219,6 +219,10 @@ public final class ModItems {
             "advanced_alloy_furnace_block",
             () -> new AdvancedAlloyFurnaceBlockItem(ModBlocks.ADVANCED_ALLOY_FURNACE_BLOCK.get(), new Item.Properties())
     );
+    public static final DeferredItem<BlockItem> SUPERVISOR = registerAndAdd(
+            "supervisor",
+            () -> new BlockItem(ModBlocks.SUPERVISOR.get(), new Item.Properties())
+    );
     public static final DeferredItem<BlockItem> MULTIBLOCK_ALLOY_FURNACE_CORE = registerAndAdd(
             "multiblock_alloy_furnace_core",
             () -> new BlockItem(ModBlocks.MULTIBLOCK_ALLOY_FURNACE_CORE.get(), new Item.Properties()));

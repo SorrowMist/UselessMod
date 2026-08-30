@@ -3,6 +3,7 @@ package com.sorrowmist.useless.init;
 import com.sorrowmist.useless.UselessMod;
 import com.sorrowmist.useless.content.blocks.AdvancedAlloyFurnaceBlock;
 import com.sorrowmist.useless.content.blocks.OreGeneratorBlock;
+import com.sorrowmist.useless.content.blocks.SupervisorBlock;
 import com.sorrowmist.useless.content.blocks.TeleportPadBlock;
 import com.sorrowmist.useless.content.blocks.UselessGlassBlock;
 import com.sorrowmist.useless.content.blocks.multiblock.MePatternAssemblyBlock;
@@ -62,6 +63,13 @@ public final class ModBlocks {
     public static final DeferredBlock<AdvancedAlloyFurnaceBlock> ADVANCED_ALLOY_FURNACE_BLOCK = BLOCKS.register(
             "advanced_alloy_furnace_block",
             AdvancedAlloyFurnaceBlock::new
+    );
+
+    public static final DeferredBlock<SupervisorBlock> SUPERVISOR = BLOCKS.register(
+            "supervisor",
+            () -> new SupervisorBlock(BlockBehaviour.Properties.of()
+                    .noOcclusion()
+                    .strength(2.0F))
     );
 
     public static final DeferredBlock<MultiblockAlloyFurnaceCoreBlock> MULTIBLOCK_ALLOY_FURNACE_CORE = BLOCKS.register(

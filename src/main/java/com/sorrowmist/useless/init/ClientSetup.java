@@ -13,6 +13,7 @@ import com.sorrowmist.useless.client.gui.PassiveCraftingHatchScreen;
 import com.sorrowmist.useless.client.gui.OreGeneratorScreen;
 import com.sorrowmist.useless.client.gui.DimensionConfigScreen;
 import com.sorrowmist.useless.client.render.ctm.CtmModelRegistrar;
+import com.sorrowmist.useless.client.render.supervisor.SupervisorModelLoader;
 import com.sorrowmist.useless.content.blocks.GlowPlasticBlock;
 import com.sorrowmist.useless.content.items.EndlessBeafItem;
 import com.sorrowmist.useless.content.menus.AdvancedAlloyFurnaceMenu;
@@ -43,6 +44,11 @@ public class ClientSetup {
     @SubscribeEvent
     public static void modifyBakedModels(ModelEvent.ModifyBakingResult event) {
         CtmModelRegistrar.modifyBakingResult(event);
+    }
+
+    @SubscribeEvent
+    public static void registerGeometryLoaders(ModelEvent.RegisterGeometryLoaders event) {
+        event.register(UselessMod.id("supervisor"), SupervisorModelLoader.INSTANCE);
     }
 
     @SubscribeEvent

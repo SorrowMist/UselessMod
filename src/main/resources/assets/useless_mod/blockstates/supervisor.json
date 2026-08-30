@@ -1,0 +1,19 @@
+{
+  "variants": {
+    "facing=north": {
+      "model": "useless_mod:block/supervisor"
+    },
+    "facing=east": {
+      "model": "useless_mod:block/supervisor",
+      "y": 90
+    },
+    "facing=south": {
+      "model": "useless_mod:block/supervisor",
+      "y": 180
+    },
+    "facing=west": {
+      "model": "useless_mod:block/supervisor",
+      "y": 270
+    }
+  }
+}

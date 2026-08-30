@@ -16,6 +16,7 @@ import net.minecraft.data.recipes.RecipeCategory;
 import net.minecraft.data.recipes.RecipeOutput;
 import net.minecraft.data.recipes.RecipeProvider;
 import net.minecraft.data.recipes.ShapedRecipeBuilder;
+import net.minecraft.data.recipes.ShapelessRecipeBuilder;
 import net.minecraft.tags.ItemTags;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.Items;
@@ -41,6 +42,7 @@ public class CraftingRecipes extends RecipeProvider {
         this.addEndlessBeafItemRecipe(consumer);
         this.addOreGeneratorBlockRecipe(consumer);
         this.addTeleportBlockRecipes(consumer);
+        this.addSupervisorRecipe(consumer);
         this.addAE2GiftPackageRecipe(consumer);
         this.addPlasticRecipes(consumer);
         this.addAdvancedAlloyFurnaceRecipes(consumer);
@@ -268,6 +270,21 @@ public class CraftingRecipes extends RecipeProvider {
                            .define('S', Items.STICK)
                            .unlockedBy("has_planks", has(ItemTags.PLANKS))
                            .save(consumer, UselessMod.id("crafting/ae2_gift_package"));
+    }
+
+    private void addSupervisorRecipe(RecipeOutput consumer) {
+        ShapelessRecipeBuilder.shapeless(RecipeCategory.BUILDING_BLOCKS, ModItems.SUPERVISOR.get())
+                               .requires(ModItems.USEFUL_INGOT.get())
+                               .requires(Items.PINK_WOOL)
+                               .requires(Items.BLACK_WOOL)
+                               .requires(Items.GRAY_WOOL)
+                               .requires(Items.WHITE_WOOL)
+                               .requires(Items.GREEN_WOOL)
+                               .requires(Items.BLUE_WOOL)
+                               .requires(Items.YELLOW_WOOL)
+                               .requires(Items.ORANGE_WOOL)
+                               .unlockedBy("has_useful_ingot", has(ModItems.USEFUL_INGOT.get()))
+                               .save(consumer, UselessMod.id("crafting/supervisor"));
     }
 
     private void addAdvancedAlloyFurnaceRecipes(RecipeOutput output) {

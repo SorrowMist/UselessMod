@@ -18,6 +18,7 @@ import com.sorrowmist.useless.init.ModNetwork;
 import com.sorrowmist.useless.init.ModPOIs;
 import com.sorrowmist.useless.init.ModRecipeSerializers;
 import com.sorrowmist.useless.init.ModRecipeTypes;
+import com.sorrowmist.useless.init.ModSounds;
 import com.sorrowmist.useless.world.dimension.UselessDimensions;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
@@ -63,6 +64,7 @@ public class UselessMod {
         ModMenuType.register(modEventBus);
         ModRecipeSerializers.RECIPE_SERIALIZERS.register(modEventBus);
         ModRecipeTypes.RECIPE_TYPES.register(modEventBus);
+        ModSounds.SOUNDS.register(modEventBus);
         ModPOIs.POI_TYPES.register(modEventBus);
 
         ModCreativeTabs.CREATIVE_TAB.register(modEventBus);

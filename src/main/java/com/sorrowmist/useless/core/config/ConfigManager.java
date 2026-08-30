@@ -42,6 +42,7 @@ public class ConfigManager {
     private static final ModConfigSpec.DoubleValue BEEF_TOOL_MINING_SPEED;
     private static final ModConfigSpec.DoubleValue BEEF_TOOL_ENTITY_INTERACTION_RANGE;
     private static final ModConfigSpec.DoubleValue BEEF_TOOL_BLOCK_INTERACTION_RANGE;
+    private static final ModConfigSpec.ConfigValue<List<? extends String>> BEEF_TOOL_FORCE_MINING_BLACKLIST;
     private static final ModConfigSpec.ConfigValue<String> BEEF_TOOL_FORCE_KILL_BLACKLIST;
     private static final ModConfigSpec.ConfigValue<String> BEEF_TOOL_FORCE_KILL_NON_LIVING_WHITELIST;
 
@@ -120,6 +121,9 @@ public class ConfigManager {
     private static volatile List<String> cachedUselessDimensionFloorBlockWhitelist = List.of();
     private static volatile BlockBlacklistMatcher uselessDimensionFloorBlockWhitelistMatcher =
             BlockBlacklistMatcher.empty("whitelist");
+    private static volatile List<String> cachedBeefToolForceMiningBlacklist = List.of();
+    private static volatile BlockBlacklistMatcher beefToolForceMiningBlacklistMatcher =
+            BlockBlacklistMatcher.empty("beef tool force mining blacklist");
 
     static {
         COMMON_BUILDER.push("game_mechanics");
@@ -264,6 +268,13 @@ public class ConfigManager {
                 .comment("牛排工具方块触及范围加成, 重启游戏生效")
                 .translation("useless_mod.configuration.beef_tool_block_interaction_range")
                 .defineInRange("beef_tool_block_interaction_range", 8.0, 0.0, 1024.0);
+
+        BEEF_TOOL_FORCE_MINING_BLACKLIST = COMMON_BUILDER
+                .comment("牛排工具强制挖掘黑名单，不会被强制挖掘的方块",
+                        "支持精确方块ID、#方块标签和*通配符")
+                .translation("useless_mod.configuration.beef_tool_force_mining_blacklist")
+                .defineListAllowEmpty("beef_tool_force_mining_blacklist", List.<String>of(), () -> "",
+                        entry -> entry instanceof String);
 
         BEEF_TOOL_FORCE_KILL_BLACKLIST = COMMON_BUILDER
                 .comment("牛排工具强制击杀黑名单, 多个实体ID用分号分隔, 例如 minecraft:wither;modid:boss")
@@ -604,6 +615,14 @@ public class ConfigManager {
         return BEEF_TOOL_BLOCK_INTERACTION_RANGE.get();
     }
 
+    public static List<String> getBeefToolForceMiningBlacklist() {
+        return readConfigList(BEEF_TOOL_FORCE_MINING_BLACKLIST);
+    }
+
+    public static boolean isBeefToolForceMiningBlockBlacklisted(ResourceLocation blockId) {
+        return beefToolForceMiningBlacklistMatcher().matches(blockId);
+    }
+
     public static List<String> getUselessDimensionFloorBlockBlacklist() {
         return readConfigList(USELESS_DIMENSION_FLOOR_BLOCK_BLACKLIST);
     }
@@ -698,6 +717,20 @@ public class ConfigManager {
             }
         }
         return uselessDimensionFloorBlockWhitelistMatcher;
+    }
+
+    private static BlockBlacklistMatcher beefToolForceMiningBlacklistMatcher() {
+        List<String> configured = getBeefToolForceMiningBlacklist();
+        if (!configured.equals(cachedBeefToolForceMiningBlacklist)) {
+            synchronized (ConfigManager.class) {
+                if (!configured.equals(cachedBeefToolForceMiningBlacklist)) {
+                    beefToolForceMiningBlacklistMatcher =
+                            new BlockBlacklistMatcher(configured, "beef tool force mining blacklist");
+                    cachedBeefToolForceMiningBlacklist = configured;
+                }
+            }
+        }
+        return beefToolForceMiningBlacklistMatcher;
     }
 
 }

@@ -8,6 +8,7 @@ import com.sorrowmist.useless.core.config.ConfigManager;
 import com.sorrowmist.useless.utils.UComponentUtils;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.entity.Entity;
@@ -138,7 +139,7 @@ public class MiningUtils {
     }
 
     static MiningResult forceMineBlock(ServerLevel level, BlockPos pos, BlockState state, Player player, ItemStack tool) {
-        if (state.isAir()) {
+        if (state.isAir() || isForceMiningBlacklisted(state)) {
             return MiningResult.NOT_MINED;
         }
         if (DraconicEvolutionCompat.isChaosCrystal(state)
@@ -279,6 +280,9 @@ public class MiningUtils {
      */
     static List<BlockPos> scanBlocksToMine(BlockPos originPos, BlockState originState, Level level, ItemStack stack,
                                            boolean forceMining, boolean enhanced) {
+        if (forceMining && isForceMiningBlacklisted(originState)) {
+            return List.of();
+        }
         if (enhanced) {
             return scanAreaBlocks(originPos, originState, level, stack, forceMining);
         }
@@ -348,6 +352,11 @@ public class MiningUtils {
         blocksToMine.sort(Comparator.comparingDouble(pos -> pos.distSqr(originPos)));
 
         return blocksToMine;
+    }
+
+    private static boolean isForceMiningBlacklisted(BlockState state) {
+        return ConfigManager.isBeefToolForceMiningBlockBlacklisted(
+                BuiltInRegistries.BLOCK.getKey(state.getBlock()));
     }
 
     /**

@@ -5,9 +5,9 @@
   "render_type": "cutout",
   "gui_light": "front",
   "textures": {
-    "2": "useless_mod:block/iava_user",
+    "2": "useless_mod:block/xbai2024",
     "3": "useless_mod:block/pluto",
-    "particle": "useless_mod:block/iava_user"
+    "particle": "useless_mod:block/xbai2024"
   },
   "display": {
     "thirdperson_righthand": {
@@ -132,9 +132,9 @@
       64
     ],
     "textures": {
-      "2": "iava_user",
+      "2": "xbai2024",
       "3": "pluto",
-      "particle": "iava_user"
+      "particle": "xbai2024"
     },
     "elements": [
       {

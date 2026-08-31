@@ -459,6 +459,31 @@ tasks.withType(JavaCompile).configureEach {
 tasks.named('test', Test).configure {
     useJUnitPlatform()
     maxHeapSize = '1G'
+
+    // Forward benchmark tuning properties from the Gradle JVM to the forked test JVM.
+    ['warmup', 'iterations', 'samples'].each { name ->
+        def propertyName = "recipePerf.${name}"
+        def propertyValue = providers.systemProperty(propertyName)
+        inputs.property(propertyName, propertyValue.orElse(''))
+        if (propertyValue.isPresent()) {
+            systemProperty(propertyName, propertyValue.get())
+        }
+    }
+
+    // The performance fixture does not use optional recipe integrations. Exclude the Delight
+    // jars that bundle L2Core from this focused test launch because that library currently fails
+    // during NeoForge's registry bootstrap before JUnit can execute any test method.
+    def performanceTestRequested = providers.systemProperty('recipePerf.warmup').isPresent()
+            || filter.includePatterns.any { it.contains('RecipeLookupPerformanceTest') }
+    if (performanceTestRequested) {
+        testLogging.showStandardStreams = true
+        outputs.upToDateWhen { false }
+        classpath = classpath.filter { file ->
+            !file.name.startsWith('gensokyo-delight-youkais-feasts-')
+                    && !file.name.startsWith('barbeques-delight-')
+                    && !file.name.startsWith('l2core-')
+        }
+    }
 }
 
 // IDEA no longer automatically downloads sources/javadoc jars for dependencies, so we need to explicitly enable the behavior.

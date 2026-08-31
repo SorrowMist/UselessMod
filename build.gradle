@@ -391,6 +391,12 @@ dependencies {
     implementation "maven.modrinth:brewin-and-chewin:4.5.0+1.21.1-neoforge"
     implementation "maven.modrinth:nomads-delight:1.0.2"
 
+    // 森罗物语
+    implementation "maven.modrinth:kaleidoscope-cookery:1.4.1-neoforge+mc1.21.1"
+    implementation "maven.modrinth:kaleidoscope-grilling:ao5iN7Jb"
+    implementation "maven.modrinth:kaleidoscopetavern:1.2.0-neoforge+mc1.21.1"
+
+
     implementation fileTree(dir: 'libs', includes: ['*.jar'], excludes: [])
     compileOnly fileTree(dir: 'libs/compile', includes: ['*.jar'], excludes: [])
 

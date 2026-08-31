@@ -16,6 +16,9 @@ public final class RecipeSourceIds {
     public static final String BARBEQUES_DELIGHT = "barbequesdelight";
     public static final String YOUKAIS_FEASTS = "youkaisfeasts";
     public static final String YOUKAI_HOMECOMING = "youkaishomecoming";
+    public static final String KALEIDOSCOPE_COOKERY = "kaleidoscope_cookery";
+    public static final String KALEIDOSCOPE_GRILLING = "kaleidoscope_grilling";
+    public static final String KALEIDOSCOPE_TAVERN = "kaleidoscope_tavern";
     public static final String EXTENDED_AE = "extendedae";
     public static final String ADVANCED_AE = "advanced_ae";
     public static final String MEKANISM = "mekanism";

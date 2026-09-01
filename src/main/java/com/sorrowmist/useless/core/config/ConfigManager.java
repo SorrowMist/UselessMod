@@ -1,8 +1,10 @@
 package com.sorrowmist.useless.core.config;
 
-import net.neoforged.neoforge.common.ModConfigSpec;
 import net.minecraft.resources.ResourceLocation;
+import net.neoforged.fml.ModList;
+import net.neoforged.neoforge.common.ModConfigSpec;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -25,9 +27,9 @@ public class ConfigManager {
     private static final ModConfigSpec.BooleanValue ENABLE_POTION_EFFECTS;
     private static final ModConfigSpec.BooleanValue ENABLE_FLIGHT_EFFECT;
     
-    // 自定义药水效果配置 - 格式: "modid:effect_name,amplifier" (持续时间固定为20000 tick)
-    // 多个效果用分号(;)分隔, 例如: "minecraft:saturation,1;minecraft:regeneration,6"
-    private static final ModConfigSpec.ConfigValue<String> CUSTOM_POTION_EFFECTS;
+    // 自定义药水效果配置 - 每个列表条目格式: "modid:effect_name,amplifier"
+    // 持续时间固定为20000 tick, 等级从1开始计算
+    private static final ModConfigSpec.ConfigValue<List<? extends String>> CUSTOM_POTION_EFFECTS;
 
     // 牛排工具连锁挖掘配置
     private static final ModConfigSpec.IntValue CHAIN_MINING_RANGE_X;
@@ -118,6 +120,8 @@ public class ConfigManager {
             USELESS_DIMENSION_FLOOR_BLOCK_BLACKLIST;
     private static final ModConfigSpec.ConfigValue<List<? extends String>>
             USELESS_DIMENSION_FLOOR_BLOCK_WHITELIST;
+    private static final ModConfigSpec.ConfigValue<List<? extends String>>
+            AE2_GIFT_PACKAGE_ITEMS;
     private static volatile List<String> cachedUselessDimensionFloorBlockBlacklist = List.of();
     private static volatile BlockBlacklistMatcher uselessDimensionFloorBlockBlacklistMatcher =
             BlockBlacklistMatcher.empty("blacklist");
@@ -173,6 +177,26 @@ public class ConfigManager {
                 .defineInRange("ore_generator_slots", 9, 1, 540);
         SERVER_BUILDER.pop();
 
+        SERVER_BUILDER.translation("useless_mod.configuration.ae2_gift_package")
+                .push("ae2_gift_package");
+        AE2_GIFT_PACKAGE_ITEMS = SERVER_BUILDER
+                .comment("Items granted by the AE2 gift package. Format: modid:item_id,count.",
+                        "Missing items and entries with invalid quantities are skipped.")
+                .translation("useless_mod.configuration.ae2_gift_package.items")
+                .defineListAllowEmpty("items", defaultAE2GiftPackageItems(), () -> "",
+                        ConfigManager::isValidAE2GiftPackageEntry);
+        SERVER_BUILDER.pop();
+
+        SERVER_BUILDER.translation("useless_mod.configuration.beef_tool")
+                .push("beef_tool");
+        CUSTOM_POTION_EFFECTS = SERVER_BUILDER
+                .comment("Custom potion effects. Format: modid:effect_id,amplifier.",
+                        "Use one effect per list entry. Missing effects and invalid levels are skipped.")
+                .translation("useless_mod.configuration.custom_potion_effects")
+                .defineListAllowEmpty("custom_potion_effects", defaultCustomPotionEffects(), () -> "",
+                        ConfigManager::isValidCustomPotionEffectEntry);
+        SERVER_BUILDER.pop();
+
         SERVER_BUILDER.translation("useless_mod.configuration.useless_dimension")
                 .push("useless_dimension");
         USELESS_DIMENSION_FLOOR_BLOCK_BLACKLIST = SERVER_BUILDER
@@ -207,17 +231,6 @@ public class ConfigManager {
                 .comment("牛排工具飞行速度")
                 .translation("useless_mod.configuration.beef_tool_flight_speed")
                 .defineInRange("beef_tool_flight_speed", 0.05, 0.01, 1.0);
-
-        // 自定义药水效果列表
-        CUSTOM_POTION_EFFECTS = COMMON_BUILDER
-                .comment("自定义药水效果列表, 格式: \"modid:effect_name,amplifier\"",
-                        "多个效果用分号(;)分隔",
-                        "例如: \"minecraft:regeneration,5;minecraft:speed,2\"",
-                        "注意: 等级从1开始计算, 1表示I级, 2表示II级, 以此类推")
-                .translation("useless_mod.configuration.custom_potion_effects")
-                .define("custom_potion_effects",
-                        "minecraft:saturation,1;minecraft:regeneration,6;minecraft:night_vision,1;minecraft:fire_resistance,1;minecraft:water_breathing,1;minecraft:resistance,6",
-                        str -> str instanceof String s && s.matches("^([a-zA-Z0-9_.-]+:[a-zA-Z0-9_./-]+,\\d+)(;[a-zA-Z0-9_.-]+:[a-zA-Z0-9_./-]+,\\d+)*$"));
 
         CHAIN_MINING_RANGE_X = COMMON_BUILDER
                 .comment("连锁挖掘的X轴范围半径")
@@ -504,6 +517,82 @@ public class ConfigManager {
     }
 
     // 获取配置值方法
+    private static List<String> defaultCustomPotionEffects() {
+        return List.of(
+                "minecraft:saturation,1",
+                "minecraft:regeneration,6",
+                "minecraft:night_vision,1",
+                "minecraft:fire_resistance,1",
+                "minecraft:water_breathing,1",
+                "minecraft:resistance,6"
+        );
+    }
+
+    private static boolean isValidCustomPotionEffectEntry(Object entry) {
+        if (!(entry instanceof String value)) {
+            return false;
+        }
+
+        String[] parts = value.split(",", -1);
+        if (parts.length != 2 || ResourceLocation.tryParse(parts[0].trim()) == null) {
+            return false;
+        }
+
+        try {
+            return Integer.parseInt(parts[1].trim()) > 0;
+        } catch (NumberFormatException ignored) {
+            return false;
+        }
+    }
+
+    private static List<String> defaultAE2GiftPackageItems() {
+        List<String> items = new ArrayList<>();
+        items.add("ae2:creative_energy_cell,1");
+        items.add("ae2:fluix_covered_cable,64");
+        items.add("ae2:wireless_access_point,1");
+        items.add("ae2:wireless_booster,64");
+        items.add("ae2:wireless_crafting_terminal,1");
+        items.add("ae2:crafting_terminal,1");
+
+        if (ModList.get().isLoaded("extendedae_plus")) {
+            items.add("extendedae_plus:infinity_biginteger_cell,1");
+        } else {
+            items.add("ae2:item_storage_cell_256k,8");
+        }
+
+        if (ModList.get().isLoaded("extendedae")) {
+            items.add("extendedae:ex_drive,1");
+        } else {
+            items.add("ae2:drive,1");
+        }
+
+        if (ModList.get().isLoaded("ae2wtlib")) {
+            items.add("ae2wtlib:quantum_bridge_card,1");
+            items.add("ae2:quantum_ring,8");
+            items.add("ae2:quantum_link,1");
+            items.add("ae2:quantum_entangled_singularity,2");
+        }
+
+        return List.copyOf(items);
+    }
+
+    private static boolean isValidAE2GiftPackageEntry(Object entry) {
+        if (!(entry instanceof String value)) {
+            return false;
+        }
+
+        String[] parts = value.split(",", -1);
+        if (parts.length != 2 || ResourceLocation.tryParse(parts[0].trim()) == null) {
+            return false;
+        }
+
+        try {
+            return Integer.parseInt(parts[1].trim()) > 0;
+        } catch (NumberFormatException ignored) {
+            return false;
+        }
+    }
+
     public static int getBotanyPotGrowthMultiplier() {
         return BOTANY_POT_GROWTH_MULTIPLIER.get();
     }
@@ -635,6 +724,10 @@ public class ConfigManager {
         return readConfigList(BEEF_TOOL_FORCE_MINING_BLACKLIST);
     }
 
+    public static List<String> getAE2GiftPackageItems() {
+        return readConfigList(AE2_GIFT_PACKAGE_ITEMS);
+    }
+
     public static boolean isBeefToolForceMiningBlockBlacklisted(ResourceLocation blockId) {
         return beefToolForceMiningBlacklistMatcher().matches(blockId);
     }
@@ -684,11 +777,7 @@ public class ConfigManager {
 
     // 获取自定义药水效果配置列表
     public static List<String> getCustomPotionEffects() {
-        String value = CUSTOM_POTION_EFFECTS.get();
-        if (value == null || value.isBlank()) {
-            return List.of();
-        }
-        return List.of(value.split(";"));
+        return readConfigList(CUSTOM_POTION_EFFECTS);
     }
 
     private static List<String> splitEntityIdList(String value) {

@@ -1,6 +1,7 @@
 package com.sorrowmist.useless.content.items;
 
 import appeng.api.ids.AEComponents;
+import com.sorrowmist.useless.core.config.ConfigManager;
 import net.minecraft.core.NonNullList;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
@@ -44,7 +45,9 @@ public class AE2GiftPackageItem extends Item {
             
             stack.shrink(1);
             
-            if (player instanceof net.minecraft.server.level.ServerPlayer serverPlayer) {
+            if (ModList.get().isLoaded("ae2")
+                    && player instanceof net.minecraft.server.level.ServerPlayer serverPlayer
+                    && serverPlayer.getServer() != null) {
                 net.minecraft.commands.CommandSourceStack source = serverPlayer.createCommandSourceStack();
                 serverPlayer.getServer().getCommands().performPrefixedCommand(source, "ae2 channelmode infinite");
             }
@@ -55,66 +58,79 @@ public class AE2GiftPackageItem extends Item {
 
     private NonNullList<ItemStack> createPackageContents() {
         NonNullList<ItemStack> contents = NonNullList.create();
-
-        contents.add(createItemStack("ae2", "creative_energy_cell", 1));
-        contents.add(createItemStack("ae2", "fluix_covered_cable", 64));
-        contents.add(createItemStack("ae2", "wireless_access_point", 1));
-        contents.add(createItemStack("ae2", "wireless_booster", 64));
-        contents.add(createItemStack("ae2", "wireless_crafting_terminal", 1));
-        contents.add(createItemStack("ae2", "crafting_terminal", 1));
-
-        if (ModList.get().isLoaded("extendedae_plus")) {
-            contents.add(createItemStack("extendedae_plus", "infinity_biginteger_cell", 1));
-        } else {
-            for (int i = 0; i < 8; i++) {
-                contents.add(createItemStack("ae2", "item_storage_cell_256k", 1));
-            }
+        if (!ModList.get().isLoaded("ae2")) {
+            return contents;
         }
 
-        if (ModList.get().isLoaded("extendedae")) {
-            contents.add(createItemStack("extendedae", "ex_drive", 1));
-        } else {
-            contents.add(createItemStack("ae2", "drive", 1));
-        }
-
-        if (ModList.get().isLoaded("ae2wtlib")) {
-            contents.add(createItemStack("ae2wtlib", "quantum_bridge_card", 1));
-            for (int i = 0; i < 8; i++) {
-                contents.add(createItemStack("ae2", "quantum_ring", 1));
-            }
-            contents.add(createItemStack("ae2", "quantum_link", 1));
-            contents.addAll(createEntangledSingularityPair());
+        for (String entry : ConfigManager.getAE2GiftPackageItems()) {
+            addConfiguredEntry(contents, entry);
         }
 
         return contents;
     }
 
-    private NonNullList<ItemStack> createEntangledSingularityPair() {
-        NonNullList<ItemStack> pair = NonNullList.create();
-        Item singularityItem = BuiltInRegistries.ITEM.get(ResourceLocation.fromNamespaceAndPath("ae2", "quantum_entangled_singularity"));
-        
-        if (singularityItem != Items.AIR) {
-            long frequency = new Date().getTime() * 100 + (System.nanoTime() % 100);
-            
-            ItemStack singularity1 = new ItemStack(singularityItem, 1);
-            singularity1.set(AEComponents.ENTANGLED_SINGULARITY_ID, frequency);
-            
-            ItemStack singularity2 = new ItemStack(singularityItem, 1);
-            singularity2.set(AEComponents.ENTANGLED_SINGULARITY_ID, frequency);
-            
-            pair.add(singularity1);
-            pair.add(singularity2);
+    private void addConfiguredEntry(NonNullList<ItemStack> contents, String entry) {
+        if (entry == null) {
+            return;
         }
-        
-        return pair;
+
+        String[] parts = entry.split(",", -1);
+        if (parts.length != 2) {
+            return;
+        }
+
+        ResourceLocation itemId = ResourceLocation.tryParse(parts[0].trim());
+        if (itemId == null) {
+            return;
+        }
+
+        int count;
+        try {
+            count = Integer.parseInt(parts[1].trim());
+        } catch (NumberFormatException ignored) {
+            return;
+        }
+        if (count <= 0) {
+            return;
+        }
+
+        Item item = BuiltInRegistries.ITEM.get(itemId);
+        if (item == Items.AIR) {
+            return;
+        }
+
+        if (itemId.equals(ResourceLocation.fromNamespaceAndPath("ae2", "quantum_entangled_singularity"))) {
+            while (count >= 2) {
+                contents.addAll(createEntangledSingularityPair(item));
+                count -= 2;
+            }
+        }
+
+        addItemStacks(contents, item, count);
     }
 
-    private ItemStack createItemStack(String modId, String itemId, int count) {
-        Item item = BuiltInRegistries.ITEM.get(ResourceLocation.fromNamespaceAndPath(modId, itemId));
-        if (item == Items.AIR) {
-            return ItemStack.EMPTY;
+    private void addItemStacks(NonNullList<ItemStack> contents, Item item, int count) {
+        int maxStackSize = Math.max(1, item.getDefaultMaxStackSize());
+        while (count > 0) {
+            int stackSize = Math.min(count, maxStackSize);
+            contents.add(new ItemStack(item, stackSize));
+            count -= stackSize;
         }
-        return new ItemStack(item, count);
+    }
+
+    private NonNullList<ItemStack> createEntangledSingularityPair(Item singularityItem) {
+        NonNullList<ItemStack> pair = NonNullList.create();
+        long frequency = new Date().getTime() * 100 + (System.nanoTime() % 100);
+
+        ItemStack singularity1 = new ItemStack(singularityItem, 1);
+        singularity1.set(AEComponents.ENTANGLED_SINGULARITY_ID, frequency);
+
+        ItemStack singularity2 = new ItemStack(singularityItem, 1);
+        singularity2.set(AEComponents.ENTANGLED_SINGULARITY_ID, frequency);
+
+        pair.add(singularity1);
+        pair.add(singularity2);
+        return pair;
     }
 
     @Override

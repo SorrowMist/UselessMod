@@ -52,20 +52,30 @@ public class UselessItemUtils {
     private static final int POTION_DURATION = 20000;
 
     /**
-     * 从配置字符串解析并应用药水效果
-     * 格式: "modid:effect_name, amplifier"
+     * 从配置条目解析并应用药水效果
+     * 格式: "modid:effect_name,amplifier"
      */
     private static void applyPotionEffectFromConfig(Player player, String effectConfig) {
         try {
-            String[] parts = effectConfig.split(",");
+            if (effectConfig == null) {
+                return;
+            }
+
+            String[] parts = effectConfig.split(",", -1);
             if (parts.length != 2) {
                 return;
             }
 
-            String effectId = parts[0];
-            int amplifier = Integer.parseInt(parts[1]) - 1;
+            String effectId = parts[0].trim();
+            int amplifier = Integer.parseInt(parts[1].trim()) - 1;
+            if (amplifier < 0) {
+                return;
+            }
 
-            ResourceLocation location = ResourceLocation.parse(effectId);
+            ResourceLocation location = ResourceLocation.tryParse(effectId);
+            if (location == null) {
+                return;
+            }
             MobEffect effect = BuiltInRegistries.MOB_EFFECT.get(location);
 
             if (effect == null) {

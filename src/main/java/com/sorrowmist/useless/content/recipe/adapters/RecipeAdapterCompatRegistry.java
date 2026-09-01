@@ -79,6 +79,9 @@ public final class RecipeAdapterCompatRegistry {
     public static final String BARBEQUES_DELIGHT = RecipeSourceIds.BARBEQUES_DELIGHT;
     public static final String YOUKAIS_FEASTS = RecipeSourceIds.YOUKAIS_FEASTS;
     public static final String YOUKAI_HOMECOMING = RecipeSourceIds.YOUKAI_HOMECOMING;
+    public static final String KALEIDOSCOPE_COOKERY = RecipeSourceIds.KALEIDOSCOPE_COOKERY;
+    public static final String KALEIDOSCOPE_GRILLING = RecipeSourceIds.KALEIDOSCOPE_GRILLING;
+    public static final String KALEIDOSCOPE_TAVERN = RecipeSourceIds.KALEIDOSCOPE_TAVERN;
     public static final String INDUSTRIAL_FOREGOING = RecipeSourceIds.INDUSTRIAL_FOREGOING;
     public static final String ACTUALLY_ADDITIONS = RecipeSourceIds.ACTUALLY_ADDITIONS;
     public static final String ARS_NOUVEAU = RecipeSourceIds.ARS_NOUVEAU;
@@ -116,6 +119,9 @@ public final class RecipeAdapterCompatRegistry {
             new CompatEntry(UBES_DELIGHT, RecipeAdapterCompatRegistry::registerUbesDelight),
             new CompatEntry(BARBEQUES_DELIGHT, RecipeAdapterCompatRegistry::registerBarbequesDelight),
             new CompatEntry(YOUKAIS_FEASTS, RecipeAdapterCompatRegistry::registerYoukaisHomecoming),
+            new CompatEntry(KALEIDOSCOPE_COOKERY, RecipeAdapterCompatRegistry::registerKaleidoscopeCookery),
+            new CompatEntry(KALEIDOSCOPE_GRILLING, RecipeAdapterCompatRegistry::registerKaleidoscopeGrilling),
+            new CompatEntry(KALEIDOSCOPE_TAVERN, RecipeAdapterCompatRegistry::registerKaleidoscopeTavern),
             new CompatEntry(EXTENDED_AE, RecipeAdapterCompatRegistry::registerExtendedAE),
             new CompatEntry(ADVANCED_AE, RecipeAdapterCompatRegistry::registerAdvancedAE),
             new CompatEntry(MEKANISM, RecipeAdapterCompatRegistry::registerMekanism),
@@ -238,6 +244,21 @@ public final class RecipeAdapterCompatRegistry {
     private static void registerYoukaisHomecoming() {
         invokeOptionalLoader(
                 "com.sorrowmist.useless.compat.youkaishomecoming.YoukaisHomecomingRecipeCompatLoader");
+    }
+
+    private static void registerKaleidoscopeCookery() {
+        invokeOptionalLoader(
+                "com.sorrowmist.useless.compat.kaleidoscope.cookery.KaleidoscopeCookeryRecipeCompatLoader");
+    }
+
+    private static void registerKaleidoscopeGrilling() {
+        invokeOptionalLoader(
+                "com.sorrowmist.useless.compat.kaleidoscope.grilling.KaleidoscopeGrillingRecipeCompatLoader");
+    }
+
+    private static void registerKaleidoscopeTavern() {
+        invokeOptionalLoader(
+                "com.sorrowmist.useless.compat.kaleidoscope.tavern.KaleidoscopeTavernRecipeCompatLoader");
     }
 
     private static void registerExtendedAE() {

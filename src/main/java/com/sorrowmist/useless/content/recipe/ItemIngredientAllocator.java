@@ -33,22 +33,25 @@ public final class ItemIngredientAllocator {
                                   List<GenericStack> keyInputs, long operations) {
         List<ItemStack> safeInputs = inputs == null ? List.of() : inputs;
         List<GenericStack> safeKeyInputs = keyInputs == null ? List.of() : keyInputs;
+        List<Demand> demands = createDemands(requirements, operations);
+        if (demands.isEmpty()) return true;
+
         List<Supply> supplies = new ArrayList<>();
         for (int i = 0; i < safeInputs.size(); i++) {
             ItemStack stack = safeInputs.get(i);
             if (stack == null || stack.isEmpty() || stack.getCount() <= 0) continue;
             supplies.add(new Supply(i, stack.getCount(),
-                    ingredient -> ingredient != null && ingredient.test(stack)));
+                    ingredient -> ingredient != null && ingredient.test(stack), true));
         }
         for (int i = 0; i < safeKeyInputs.size(); i++) {
             GenericStack input = safeKeyInputs.get(i);
             if (input == null || input.amount() <= 0L || !(input.what() instanceof AEItemKey itemKey)) continue;
             ItemStack representative = itemKey.toStack(1);
             supplies.add(new Supply(safeInputs.size() + i, input.amount(),
-                    ingredient -> ingredient != null && ingredient.test(representative)));
+                    ingredient -> ingredient != null && ingredient.test(representative), true));
         }
 
-        return solve(supplies, createDemands(requirements, operations),
+        return solve(supplies, demands,
                 safeInputs.size() + safeKeyInputs.size()) != null;
     }
 
@@ -60,31 +63,22 @@ public final class ItemIngredientAllocator {
     @Nullable
     public static Allocation allocate(List<CountedIngredient> requirements, List<ItemStack> inputs, long operations) {
         List<ItemStack> safeInputs = inputs == null ? List.of() : inputs;
+        List<Demand> demands = createDemands(requirements, operations);
+        if (demands.isEmpty()) return new Allocation(new long[safeInputs.size()]);
+
         List<Supply> supplies = new ArrayList<>();
         for (int i = 0; i < safeInputs.size(); i++) {
             ItemStack stack = safeInputs.get(i);
             if (stack == null || stack.isEmpty() || stack.getCount() <= 0) continue;
-            supplies.add(new Supply(i, stack.getCount(), ingredient -> ingredient != null && ingredient.test(stack)));
+            supplies.add(new Supply(i, stack.getCount(),
+                    ingredient -> ingredient != null && ingredient.test(stack), true));
         }
 
-        return solve(supplies, createDemands(requirements, operations), safeInputs.size());
+        return solve(supplies, demands, safeInputs.size());
     }
 
     /** Matches adapter input maps without flattening overlapping ingredient requirements. */
     public static boolean matches(Map<Ingredient, Long> available, Map<Ingredient, Long> required) {
-        List<Supply> supplies = new ArrayList<>();
-        if (available != null) {
-            int index = 0;
-            for (Map.Entry<Ingredient, Long> entry : available.entrySet()) {
-                Ingredient input = entry.getKey();
-                long amount = entry.getValue() == null ? 0L : entry.getValue();
-                if (input != null && amount > 0) {
-                    supplies.add(new Supply(index, amount, requirement -> ingredientCanSupply(input, requirement)));
-                }
-                index++;
-            }
-        }
-
         List<Demand> demands = new ArrayList<>();
         if (required != null) {
             for (Map.Entry<Ingredient, Long> entry : required.entrySet()) {
@@ -94,11 +88,44 @@ public final class ItemIngredientAllocator {
                 }
             }
         }
+        if (demands.isEmpty()) return true;
+
+        List<Supply> supplies = new ArrayList<>();
+        if (available != null) {
+            int index = 0;
+            for (Map.Entry<Ingredient, Long> entry : available.entrySet()) {
+                Ingredient input = entry.getKey();
+                long amount = entry.getValue() == null ? 0L : entry.getValue();
+                if (input != null && amount > 0) {
+                    supplies.add(new Supply(index, amount,
+                            requirement -> ingredientCanSupply(input, requirement),
+                            isExactIngredient(input)));
+                }
+                index++;
+            }
+        }
+
         return solve(supplies, demands, available == null ? 0 : available.size()) != null;
     }
 
     /** Returns the largest whole-operation count supported by the supplied item stacks. */
     public static int maxOperations(List<CountedIngredient> requirements, List<ItemStack> inputs) {
+        if (requirements != null && requirements.size() == 1) {
+            CountedIngredient requirement = requirements.getFirst();
+            if (requirement == null || requirement.count() <= 0) return Integer.MAX_VALUE;
+            if (requirement.ingredient() == null || requirement.ingredient().isEmpty()) return 0;
+            long available = 0L;
+            if (inputs != null) {
+                for (ItemStack stack : inputs) {
+                    if (stack != null && !stack.isEmpty() && stack.getCount() > 0
+                            && requirement.ingredient().test(stack)) {
+                        available = saturatingAdd(available, stack.getCount());
+                    }
+                }
+            }
+            long operations = available / requirement.count();
+            return operations >= Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) operations;
+        }
         long demandPerOperation = 0L;
         if (requirements != null) {
             for (CountedIngredient requirement : requirements) {
@@ -173,6 +200,19 @@ public final class ItemIngredientAllocator {
         }
         if (totalSupply < totalDemand) return null;
 
+        // With one requirement there are no competing allocation edges, regardless of whether
+        // the ingredient is a tag or a custom predicate.
+        if (demands.size() == 1) {
+            return solveSingleDemand(supplies, demands.getFirst(), resultSize);
+        }
+
+        // Most machine recipes use concrete item ingredients. Their matching relation is
+        // disjoint, so building a flow network would only add allocation overhead. Tags,
+        // overlapping ingredients and custom predicates continue through the general path.
+        if (isExactProblem(supplies, demands)) {
+            return solveExact(supplies, demands, resultSize);
+        }
+
         int source = 0;
         int supplyStart = 1;
         int demandStart = supplyStart + supplies.size();
@@ -205,6 +245,67 @@ public final class ItemIngredientAllocator {
         return new Allocation(consumed);
     }
 
+    @Nullable
+    private static Allocation solveSingleDemand(List<Supply> supplies, Demand demand, int resultSize) {
+        long remaining = demand.amount();
+        long[] consumed = new long[resultSize];
+        for (Supply supply : supplies) {
+            if (remaining <= 0L || !supply.matches().test(demand.ingredient())) continue;
+            long amount = Math.min(remaining, supply.amount());
+            int originalIndex = supply.originalIndex();
+            consumed[originalIndex] = saturatingAdd(consumed[originalIndex], amount);
+            remaining -= amount;
+        }
+        return remaining > 0L ? null : new Allocation(consumed);
+    }
+
+    private static boolean isExactProblem(List<Supply> supplies, List<Demand> demands) {
+        for (Supply supply : supplies) {
+            if (!supply.exact()) return false;
+        }
+        for (Demand demand : demands) {
+            if (!isExactIngredient(demand.ingredient())) return false;
+        }
+        return true;
+    }
+
+    /** Greedy allocation is valid when every requirement and supply denotes one exact stack. */
+    @Nullable
+    private static Allocation solveExact(List<Supply> supplies, List<Demand> demands, int resultSize) {
+        long[] remaining = new long[supplies.size()];
+        for (int i = 0; i < supplies.size(); i++) {
+            remaining[i] = supplies.get(i).amount();
+        }
+
+        long[] consumed = new long[resultSize];
+        for (Demand demand : demands) {
+            long needed = demand.amount();
+            for (int i = 0; i < supplies.size() && needed > 0L; i++) {
+                Supply supply = supplies.get(i);
+                if (remaining[i] <= 0L || !supply.matches().test(demand.ingredient())) {
+                    continue;
+                }
+                long amount = Math.min(needed, remaining[i]);
+                remaining[i] -= amount;
+                needed -= amount;
+                int originalIndex = supply.originalIndex();
+                consumed[originalIndex] = saturatingAdd(consumed[originalIndex], amount);
+            }
+            if (needed > 0L) return null;
+        }
+        return new Allocation(consumed);
+    }
+
+    private static boolean isExactIngredient(@Nullable Ingredient ingredient) {
+        if (ingredient == null || ingredient.isEmpty() || ingredient.isCustom()) return false;
+        try {
+            Ingredient.Value[] values = ingredient.getValues();
+            return values.length == 1 && values[0] instanceof Ingredient.ItemValue;
+        } catch (RuntimeException exception) {
+            return false;
+        }
+    }
+
     private static long saturatingAdd(long a, long b) {
         if (b > 0 && a > Long.MAX_VALUE - b) return Long.MAX_VALUE;
         return a + b;
@@ -232,7 +333,7 @@ public final class ItemIngredientAllocator {
         }
     }
 
-    private record Supply(int originalIndex, long amount, Predicate<Ingredient> matches) {
+    private record Supply(int originalIndex, long amount, Predicate<Ingredient> matches, boolean exact) {
     }
 
     private record Demand(Ingredient ingredient, long amount) {

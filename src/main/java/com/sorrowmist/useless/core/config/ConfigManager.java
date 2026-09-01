@@ -73,6 +73,9 @@ public class ConfigManager {
     private static final ModConfigSpec.BooleanValue ENABLE_UBES_DELIGHT_RECIPE_CONVERSION;
     private static final ModConfigSpec.BooleanValue ENABLE_BARBEQUES_DELIGHT_RECIPE_CONVERSION;
     private static final ModConfigSpec.BooleanValue ENABLE_YOUKAI_HOMECOMING_RECIPE_CONVERSION;
+    private static final ModConfigSpec.BooleanValue ENABLE_KALEIDOSCOPE_COOKERY_RECIPE_CONVERSION;
+    private static final ModConfigSpec.BooleanValue ENABLE_KALEIDOSCOPE_GRILLING_RECIPE_CONVERSION;
+    private static final ModConfigSpec.BooleanValue ENABLE_KALEIDOSCOPE_TAVERN_RECIPE_CONVERSION;
     private static final ModConfigSpec.BooleanValue ENABLE_EXTENDED_AE_RECIPE_CONVERSION;
     private static final ModConfigSpec.BooleanValue ENABLE_ADVANCED_AE_RECIPE_CONVERSION;
     private static final ModConfigSpec.BooleanValue ENABLE_MEKANISM_RECIPE_CONVERSION;
@@ -353,6 +356,16 @@ public class ConfigManager {
                 "enable_youkaishomecoming_recipe_conversion", true);
         COMMON_BUILDER.pop();
 
+        COMMON_BUILDER.translation("useless_mod.configuration.advanced_alloy_furnace.recipe_conversion.kaleidoscope")
+                .push("kaleidoscope");
+        ENABLE_KALEIDOSCOPE_COOKERY_RECIPE_CONVERSION = defineRecipeConversionOption(
+                "enable_kaleidoscope_cookery_recipe_conversion", true);
+        ENABLE_KALEIDOSCOPE_GRILLING_RECIPE_CONVERSION = defineRecipeConversionOption(
+                "enable_kaleidoscope_grilling_recipe_conversion", true);
+        ENABLE_KALEIDOSCOPE_TAVERN_RECIPE_CONVERSION = defineRecipeConversionOption(
+                "enable_kaleidoscope_tavern_recipe_conversion", true);
+        COMMON_BUILDER.pop();
+
         COMMON_BUILDER.translation("useless_mod.configuration.advanced_alloy_furnace.recipe_conversion.ae")
                 .push("ae");
         ENABLE_EXTENDED_AE_RECIPE_CONVERSION = defineRecipeConversionOption(
@@ -441,6 +454,9 @@ public class ConfigManager {
                 Map.entry("barbequesdelight", ENABLE_BARBEQUES_DELIGHT_RECIPE_CONVERSION),
                 Map.entry("youkaisfeasts", ENABLE_YOUKAI_HOMECOMING_RECIPE_CONVERSION),
                 Map.entry("youkaishomecoming", ENABLE_YOUKAI_HOMECOMING_RECIPE_CONVERSION),
+                Map.entry("kaleidoscope_cookery", ENABLE_KALEIDOSCOPE_COOKERY_RECIPE_CONVERSION),
+                Map.entry("kaleidoscope_grilling", ENABLE_KALEIDOSCOPE_GRILLING_RECIPE_CONVERSION),
+                Map.entry("kaleidoscope_tavern", ENABLE_KALEIDOSCOPE_TAVERN_RECIPE_CONVERSION),
                 Map.entry("extendedae", ENABLE_EXTENDED_AE_RECIPE_CONVERSION),
                 Map.entry("advanced_ae", ENABLE_ADVANCED_AE_RECIPE_CONVERSION),
                 Map.entry("mekanism", ENABLE_MEKANISM_RECIPE_CONVERSION),

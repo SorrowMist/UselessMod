@@ -18,6 +18,12 @@ import com.sorrowmist.useless.content.recipe.adapters.ae.extendedae.CrystalAssem
 import com.sorrowmist.useless.content.recipe.adapters.arsnouveau.EnchantingApparatusRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.arsnouveau.ImbuementRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.industrialforegoing.DissolutionChamberRecipeAdapter;
+import com.sorrowmist.useless.content.recipe.adapters.industrialforegoing.BioReactorRecipeAdapter;
+import com.sorrowmist.useless.content.recipe.adapters.industrialforegoing.FermentationStationRecipeAdapter;
+import com.sorrowmist.useless.content.recipe.adapters.industrialforegoing.FluidSievingMachineRecipeAdapter;
+import com.sorrowmist.useless.content.recipe.adapters.industrialforegoing.WashingFactoryRecipeAdapter;
+import com.sorrowmist.useless.content.recipe.adapters.industrialforegoing.LatexProcessingUnitRecipeAdapter;
+import com.sorrowmist.useless.content.recipe.adapters.industrialforegoing.FluidExtractorRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.minecraft.CraftingRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.minecraft.BrewingRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.minecraft.SmeltingRecipeAdapter;
@@ -301,7 +307,13 @@ public final class RecipeAdapterCompatRegistry {
     }
 
     private static void registerIndustrialForegoing() {
+        register(new BioReactorRecipeAdapter());
         register(new DissolutionChamberRecipeAdapter());
+        register(new FermentationStationRecipeAdapter());
+        register(new FluidSievingMachineRecipeAdapter());
+        register(new WashingFactoryRecipeAdapter());
+        register(new LatexProcessingUnitRecipeAdapter());
+        register(new FluidExtractorRecipeAdapter());
     }
 
     private static void registerActuallyAdditions() {

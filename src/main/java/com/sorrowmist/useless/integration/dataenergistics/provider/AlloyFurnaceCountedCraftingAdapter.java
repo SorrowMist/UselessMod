@@ -2,6 +2,8 @@ package com.sorrowmist.useless.integration.dataenergistics.provider;
 
 import appeng.api.crafting.IPatternDetails;
 import appeng.api.networking.crafting.ICraftingProvider;
+import appeng.api.stacks.AEKey;
+import appeng.api.stacks.GenericStack;
 import appeng.api.stacks.KeyCounter;
 import com.fish_dan_.data_energistics.api.crafting.dispatch.CountedCraftingAdmission;
 import com.fish_dan_.data_energistics.api.crafting.dispatch.CountedCraftingCapacity;
@@ -11,15 +13,23 @@ import com.fish_dan_.data_energistics.api.crafting.dispatch.CountedCraftingTarge
 import com.fish_dan_.data_energistics.api.registry.provider.runtime.PatternProviderIdentity;
 import com.sorrowmist.useless.content.blockentities.AdvancedAlloyFurnaceBlockEntity;
 import com.sorrowmist.useless.content.blockentities.multiblock.MePatternAssemblyBlockEntity;
+import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.CraftingTaskContext;
+import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.DynamicComponentPattern;
+import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.OmniversalPatternDetails;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.ScaledProcessingPattern;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.SmartDoublingPatterns;
+import com.sorrowmist.useless.content.recipe.AdvancedAlloyFurnaceRecipe;
+import it.unimi.dsi.fastutil.objects.Object2ObjectLinkedOpenHashMap;
 import net.minecraft.world.level.Level;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.math.BigInteger;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.OptionalLong;
 import java.util.function.BooleanSupplier;
+import java.util.function.Supplier;
 
 /**
  * Bridges one alloy-furnace AE provider to Data Energistics counted Trinity dispatch.
@@ -31,14 +41,24 @@ final class AlloyFurnaceCountedCraftingAdapter implements CountedCraftingProvide
     private final ICraftingProvider provider;
     private final BooleanSupplier online;
     private final CountedCraftingTarget target;
+    private final Supplier<@Nullable CraftingTaskContext> taskContext;
 
     AlloyFurnaceCountedCraftingAdapter(
             @NotNull ICraftingProvider provider,
             @NotNull BooleanSupplier online,
             @NotNull CountedCraftingTarget target) {
+        this(provider, online, target, () -> null);
+    }
+
+    AlloyFurnaceCountedCraftingAdapter(
+            @NotNull ICraftingProvider provider,
+            @NotNull BooleanSupplier online,
+            @NotNull CountedCraftingTarget target,
+            @NotNull Supplier<@Nullable CraftingTaskContext> taskContext) {
         this.provider = provider;
         this.online = online;
         this.target = target;
+        this.taskContext = taskContext;
     }
 
     /** Creates the live adapter used by one standalone advanced alloy furnace. */
@@ -48,7 +68,8 @@ final class AlloyFurnaceCountedCraftingAdapter implements CountedCraftingProvide
         return new AlloyFurnaceCountedCraftingAdapter(
                 provider,
                 () -> isAdvancedAlloyFurnaceOnline(provider),
-                targetFor(identity));
+                targetFor(identity),
+                () -> provider);
     }
 
     /** Creates the live adapter used by one ME pattern assembly and its linked multiblock controller. */
@@ -58,7 +79,8 @@ final class AlloyFurnaceCountedCraftingAdapter implements CountedCraftingProvide
         return new AlloyFurnaceCountedCraftingAdapter(
                 provider,
                 () -> isMePatternAssemblyOnline(provider),
-                targetFor(identity));
+                targetFor(identity),
+                provider::getController);
     }
 
     @Override
@@ -158,7 +180,115 @@ final class AlloyFurnaceCountedCraftingAdapter implements CountedCraftingProvide
         if (!provider.getAvailablePatterns().contains(original)) {
             return 0L;
         }
-        return maximumBatchCount(patternDetails, prototype, requestedCount);
+        return maximumRecipeBatchCount(
+                patternDetails,
+                prototype,
+                maximumBatchCount(patternDetails, prototype, requestedCount));
+    }
+
+    private long maximumRecipeBatchCount(
+            IPatternDetails patternDetails,
+            KeyCounter[] prototype,
+            long arithmeticMaximum) {
+        CraftingTaskContext context = this.taskContext.get();
+        if (context == null || arithmeticMaximum == 0L) {
+            return arithmeticMaximum;
+        }
+        SmartDoublingPatterns.Resolved execution = SmartDoublingPatterns.resolve(patternDetails);
+        AdvancedAlloyFurnaceRecipe recipe = context.resolveTaskRecipe(
+                patternDetails,
+                List.of(),
+                List.of(),
+                compactInputs(prototype),
+                execution.operationsPerPush());
+        if (recipe == null) {
+            return 0L;
+        }
+
+        long manualOperations = SmartDoublingPatterns.manualOperationsPerPattern(
+                recipe, execution.pattern());
+        if (manualOperations == 0L) {
+            return 0L;
+        }
+        BigInteger wrapperOperations = BigInteger.valueOf(execution.operationsPerPush());
+        BigInteger operations = wrapperOperations
+                .multiply(BigInteger.valueOf(manualOperations));
+        if (usesRecipeOutputs(execution.pattern())) {
+            Object2ObjectLinkedOpenHashMap<AEKey, BigInteger> outputs = new Object2ObjectLinkedOpenHashMap<>();
+            recipe.outputs().forEach(output -> mergeOutput(outputs, GenericStack.fromItemStack(output)));
+            recipe.outputFluids().forEach(output -> mergeOutput(outputs, GenericStack.fromFluidStack(output)));
+            recipe.keyOutputs().forEach(output -> mergeOutput(outputs, output));
+            return limitByOutputs(arithmeticMaximum, outputs, operations);
+        }
+
+        Object2ObjectLinkedOpenHashMap<AEKey, BigInteger> declaredOutputs = new Object2ObjectLinkedOpenHashMap<>();
+        execution.pattern().getOutputs().forEach(output -> mergeOutput(declaredOutputs, output));
+        long maximum = limitByOutputs(arithmeticMaximum, declaredOutputs, wrapperOperations);
+        if (maximum == 0L) {
+            return 0L;
+        }
+
+        Object2ObjectLinkedOpenHashMap<AEKey, BigInteger> hiddenOutputs = new Object2ObjectLinkedOpenHashMap<>();
+        for (GenericStack output : recipe.keyOutputs()) {
+            boolean declared = execution.pattern().getOutputs().stream()
+                    .anyMatch(patternOutput -> output.what().equals(patternOutput.what()));
+            if (!declared) {
+                mergeOutput(hiddenOutputs, output);
+            }
+        }
+        return limitByOutputs(maximum, hiddenOutputs, operations);
+    }
+
+    private static long limitByOutputs(
+            long currentMaximum,
+            Object2ObjectLinkedOpenHashMap<AEKey, BigInteger> outputs,
+            BigInteger operationMultiplier) {
+        BigInteger maximumLong = BigInteger.valueOf(Long.MAX_VALUE);
+        long maximum = currentMaximum;
+        for (BigInteger amount : outputs.values()) {
+            BigInteger perLogicalCraft = amount.multiply(operationMultiplier);
+            if (perLogicalCraft.compareTo(maximumLong) > 0) {
+                return 0L;
+            }
+            maximum = Math.min(maximum, maximumLong.divide(perLogicalCraft).longValueExact());
+        }
+        return maximum;
+    }
+
+    private static boolean usesRecipeOutputs(IPatternDetails pattern) {
+        return pattern instanceof OmniversalPatternDetails
+                || pattern instanceof DynamicComponentPattern dynamic && dynamic.usesDynamicOutputs();
+    }
+
+    private static List<GenericStack> compactInputs(KeyCounter[] prototype) {
+        Object2ObjectLinkedOpenHashMap<AEKey, BigInteger> inputs = new Object2ObjectLinkedOpenHashMap<>();
+        for (KeyCounter counter : prototype) {
+            for (var entry : counter) {
+                inputs.merge(entry.getKey(), BigInteger.valueOf(entry.getLongValue()), BigInteger::add);
+            }
+        }
+        BigInteger maximumLong = BigInteger.valueOf(Long.MAX_VALUE);
+        ArrayList<GenericStack> result = new ArrayList<>(inputs.size());
+        for (var entry : inputs.object2ObjectEntrySet()) {
+            BigInteger remaining = entry.getValue();
+            while (remaining.compareTo(maximumLong) > 0) {
+                result.add(new GenericStack(entry.getKey(), Long.MAX_VALUE));
+                remaining = remaining.subtract(maximumLong);
+            }
+            if (remaining.signum() > 0) {
+                result.add(new GenericStack(entry.getKey(), remaining.longValueExact()));
+            }
+        }
+        return result;
+    }
+
+    private static void mergeOutput(
+            Object2ObjectLinkedOpenHashMap<AEKey, BigInteger> outputs,
+            @Nullable GenericStack output) {
+        if (output == null || output.amount() <= 0L) {
+            return;
+        }
+        outputs.merge(output.what(), BigInteger.valueOf(output.amount()), BigInteger::add);
     }
 
     private boolean dispatch(

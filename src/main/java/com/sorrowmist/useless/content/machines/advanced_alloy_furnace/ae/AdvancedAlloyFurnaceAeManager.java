@@ -11,6 +11,8 @@ import com.sorrowmist.useless.network.AETaskProgressPacket;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.chemical.ChemicalStackView;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.chemical.FurnaceChemicalStorage;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.io.FurnaceOutputPort;
+import it.unimi.dsi.fastutil.objects.Object2LongMap;
+import it.unimi.dsi.fastutil.objects.Object2LongOpenHashMap;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
@@ -20,6 +22,7 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.neoforged.neoforge.network.PacketDistributor;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -63,7 +66,7 @@ public final class AdvancedAlloyFurnaceAeManager {
     private int patternPriority = 0;
     private int nextTaskId = 0;
     // 延迟加载的任务数据（loadTag 时 level 尚不可用，需推迟到首 tick 解码样板）
-    @org.jetbrains.annotations.Nullable
+    @Nullable
     private CompoundTag deferredTasksTag = null;
 
     public AdvancedAlloyFurnaceAeManager(AlloyFurnaceAeHost owner) {
@@ -111,7 +114,7 @@ public final class AdvancedAlloyFurnaceAeManager {
         if (key == null || amount <= 0) {
             return;
         }
-        this.unreturnedInputs.add(new GenericStack(key, amount));
+        addUnreturnedAmount(this.unreturnedInputs, key, amount);
         this.owner.markChanged();
     }
 
@@ -120,7 +123,7 @@ public final class AdvancedAlloyFurnaceAeManager {
         if (key == null || amount <= 0) {
             return;
         }
-        this.unreturnedOutputs.add(new GenericStack(key, amount));
+        addUnreturnedAmount(this.unreturnedOutputs, key, amount);
         this.owner.markChanged();
     }
 
@@ -349,20 +352,24 @@ public final class AdvancedAlloyFurnaceAeManager {
         }
 
         ListTag unreturnedTag = tag.getList("UnreturnedInputs", Tag.TAG_COMPOUND);
+        CraftingAeAmountAccumulator unreturnedInputAmounts = new CraftingAeAmountAccumulator();
         for (int i = 0; i < unreturnedTag.size(); i++) {
             GenericStack gs = GenericStack.readTag(registries, unreturnedTag.getCompound(i));
-            if (gs != null) {
-                this.unreturnedInputs.add(gs);
+            if (gs != null && gs.amount() > 0L) {
+                unreturnedInputAmounts.add(gs);
             }
         }
+        this.unreturnedInputs.addAll(unreturnedInputAmounts.segments());
 
         ListTag unreturnedOutputsTag = tag.getList("UnreturnedOutputs", Tag.TAG_COMPOUND);
+        CraftingAeAmountAccumulator unreturnedOutputAmounts = new CraftingAeAmountAccumulator();
         for (int i = 0; i < unreturnedOutputsTag.size(); i++) {
             GenericStack gs = GenericStack.readTag(registries, unreturnedOutputsTag.getCompound(i));
-            if (gs != null) {
-                this.unreturnedOutputs.add(gs);
+            if (gs != null && gs.amount() > 0L) {
+                unreturnedOutputAmounts.add(gs);
             }
         }
+        this.unreturnedOutputs.addAll(unreturnedOutputAmounts.segments());
     }
 
     private void returnSavedBatchMaterials(CompoundTag tag, HolderLookup.Provider registries) {
@@ -679,22 +686,36 @@ public final class AdvancedAlloyFurnaceAeManager {
 
     public void addUnreturnedInputs(List<GenericStack> stacks) {
         if (stacks == null) return;
-        for (GenericStack stack : stacks) {
-            if (stack != null && stack.what() != null && stack.amount() > 0) {
-                this.unreturnedInputs.add(stack);
-            }
-        }
-        if (!stacks.isEmpty()) this.owner.markChanged();
+        if (stacks.isEmpty()) return;
+        mergeUnreturnedAmounts(this.unreturnedInputs, stacks);
+        this.owner.markChanged();
     }
 
     public void addUnreturnedOutputs(List<GenericStack> stacks) {
         if (stacks == null) return;
-        for (GenericStack stack : stacks) {
-            if (stack != null && stack.what() != null && stack.amount() > 0) {
-                this.unreturnedOutputs.add(stack);
+        if (stacks.isEmpty()) return;
+        mergeUnreturnedAmounts(this.unreturnedOutputs, stacks);
+        this.owner.markChanged();
+    }
+
+    private static void addUnreturnedAmount(List<GenericStack> target, AEKey key, long amount) {
+        CraftingAeAmountAccumulator accumulator = CraftingAeAmountAccumulator.fromGenericStacks(target);
+        accumulator.add(key, amount);
+        target.clear();
+        target.addAll(accumulator.segments());
+    }
+
+    private static void mergeUnreturnedAmounts(
+            List<GenericStack> target,
+            List<GenericStack> additions) {
+        CraftingAeAmountAccumulator accumulator = CraftingAeAmountAccumulator.fromGenericStacks(target);
+        for (GenericStack addition : additions) {
+            if (addition != null && addition.what() != null && addition.amount() > 0L) {
+                accumulator.add(addition);
             }
         }
-        if (!stacks.isEmpty()) this.owner.markChanged();
+        target.clear();
+        target.addAll(accumulator.segments());
     }
 
     public int getActiveAETaskCount() {
@@ -755,7 +776,7 @@ public final class AdvancedAlloyFurnaceAeManager {
 
     private PendingAEBatch findOrCreateBatch(
             IPatternDetails patternDetails, long operationsPerPush,
-            @org.jetbrains.annotations.Nullable KeyCounter[] inputHolder) {
+            @Nullable KeyCounter[] inputHolder) {
         PendingPatternExecutionKey key = PendingPatternExecutionKey.of(
                 patternDetails, operationsPerPush,
                 AdvancedAlloyFurnacePatternPolicy.componentInputKeys(patternDetails, inputHolder));
@@ -839,12 +860,12 @@ public final class AdvancedAlloyFurnaceAeManager {
         long safeMaximumTaskCrafts = Math.max(1L, maximumTaskCrafts);
         List<List<KeyCounter[]>> result = new ArrayList<>();
         List<KeyCounter[]> current = new ArrayList<>();
-        Map<AEKey, Long> currentAmounts = new HashMap<>();
+        Object2LongOpenHashMap<AEKey> currentAmounts = new Object2LongOpenHashMap<>();
         long currentCrafts = 0L;
         boolean currentRequiresIsolation = false;
 
         for (KeyCounter[] input : allInputs) {
-            Map<AEKey, Long> inputAmounts = collectExactKeyAmounts(input);
+            Object2LongOpenHashMap<AEKey> inputAmounts = collectExactKeyAmounts(input);
             boolean fitsCurrentBatch = !current.isEmpty()
                     && !currentRequiresIsolation
                     && safeOperationsPerPush <= safeMaximumTaskCrafts - currentCrafts
@@ -853,7 +874,7 @@ public final class AdvancedAlloyFurnaceAeManager {
             if (!current.isEmpty() && !fitsCurrentBatch) {
                 result.add(current);
                 current = new ArrayList<>();
-                currentAmounts = new HashMap<>();
+                currentAmounts = new Object2LongOpenHashMap<>();
                 currentCrafts = 0L;
                 currentRequiresIsolation = false;
             }
@@ -879,7 +900,7 @@ public final class AdvancedAlloyFurnaceAeManager {
         if (allInputs.isEmpty()) return new KeyCounter[0];
         if (allInputs.size() == 1) return allInputs.getFirst();
 
-        Map<AEKey, Long> merged = new HashMap<>();
+        Object2LongOpenHashMap<AEKey> merged = new Object2LongOpenHashMap<>();
         for (KeyCounter[] counters : allInputs) {
             if (counters == null) continue;
             for (KeyCounter counter : counters) {
@@ -887,7 +908,7 @@ public final class AdvancedAlloyFurnaceAeManager {
                 for (var entry : counter) {
                     long amount = entry.getLongValue();
                     if (amount <= 0L) continue;
-                    long current = merged.getOrDefault(entry.getKey(), 0L);
+                    long current = merged.getLong(entry.getKey());
                     if (current > Long.MAX_VALUE - amount) {
                         throw new IllegalStateException("Attempted to merge AE inputs beyond long range");
                     }
@@ -897,22 +918,22 @@ public final class AdvancedAlloyFurnaceAeManager {
         }
 
         KeyCounter result = new KeyCounter();
-        for (var entry : merged.entrySet()) {
-            result.add(entry.getKey(), entry.getValue());
+        for (var entry : merged.object2LongEntrySet()) {
+            result.add(entry.getKey(), entry.getLongValue());
         }
         return new KeyCounter[]{result};
     }
 
-    @org.jetbrains.annotations.Nullable
-    private static Map<AEKey, Long> collectExactKeyAmounts(KeyCounter[] counters) {
-        Map<AEKey, Long> result = new HashMap<>();
+    @Nullable
+    private static Object2LongOpenHashMap<AEKey> collectExactKeyAmounts(KeyCounter[] counters) {
+        Object2LongOpenHashMap<AEKey> result = new Object2LongOpenHashMap<>();
         if (counters == null) return result;
         for (KeyCounter counter : counters) {
             if (counter == null) continue;
             for (var entry : counter) {
                 long amount = entry.getLongValue();
                 if (amount <= 0L) continue;
-                long current = result.getOrDefault(entry.getKey(), 0L);
+                long current = result.getLong(entry.getKey());
                 if (current > Long.MAX_VALUE - amount) {
                     return null;
                 }
@@ -922,18 +943,18 @@ public final class AdvancedAlloyFurnaceAeManager {
         return result;
     }
 
-    private static boolean canAddExact(Map<AEKey, Long> target, Map<AEKey, Long> additions) {
-        for (var entry : additions.entrySet()) {
-            if (target.getOrDefault(entry.getKey(), 0L) > Long.MAX_VALUE - entry.getValue()) {
+    private static boolean canAddExact(Object2LongMap<AEKey> target, Object2LongMap<AEKey> additions) {
+        for (var entry : additions.object2LongEntrySet()) {
+            if (target.getLong(entry.getKey()) > Long.MAX_VALUE - entry.getLongValue()) {
                 return false;
             }
         }
         return true;
     }
 
-    private static void addExact(Map<AEKey, Long> target, Map<AEKey, Long> additions) {
-        for (var entry : additions.entrySet()) {
-            target.merge(entry.getKey(), entry.getValue(), Long::sum);
+    private static void addExact(Object2LongMap<AEKey> target, Object2LongMap<AEKey> additions) {
+        for (var entry : additions.object2LongEntrySet()) {
+            target.put(entry.getKey(), target.getLong(entry.getKey()) + entry.getLongValue());
         }
     }
 
@@ -1071,7 +1092,7 @@ public final class AdvancedAlloyFurnaceAeManager {
             return tag;
         }
 
-        @org.jetbrains.annotations.Nullable
+        @Nullable
         static PendingAEBatch load(CompoundTag tag, Level level, HolderLookup.Provider registries) {
             appeng.api.stacks.AEItemKey definition = appeng.api.stacks.AEItemKey.fromTag(registries, tag.getCompound("Pattern"));
             if (definition == null) {
@@ -1102,13 +1123,8 @@ public final class AdvancedAlloyFurnaceAeManager {
 
     private static CompoundTag writeKeyCounters(HolderLookup.Provider registries, KeyCounter[] counters) {
         ListTag list = new ListTag();
-        if (counters != null) {
-            for (KeyCounter counter : counters) {
-                if (counter == null) continue;
-                for (var entry : counter) {
-                    list.add(GenericStack.writeTag(registries, new GenericStack(entry.getKey(), entry.getLongValue())));
-                }
-            }
+        for (GenericStack amount : CraftingAeAmountAccumulator.fromCounters(counters).segments()) {
+            list.add(GenericStack.writeTag(registries, amount));
         }
         CompoundTag tag = new CompoundTag();
         tag.put("Stacks", list);
@@ -1117,17 +1133,28 @@ public final class AdvancedAlloyFurnaceAeManager {
 
     private static KeyCounter[] readKeyCounters(HolderLookup.Provider registries, CompoundTag tag) {
         ListTag list = tag.getList("Stacks", Tag.TAG_COMPOUND);
-        KeyCounter counter = new KeyCounter();
+        CraftingAeAmountAccumulator accumulator = new CraftingAeAmountAccumulator();
         for (int i = 0; i < list.size(); i++) {
             GenericStack gs = GenericStack.readTag(registries, list.getCompound(i));
-            if (gs != null) {
-                counter.add(gs.what(), gs.amount());
+            if (gs != null && gs.amount() > 0L) {
+                accumulator.add(gs);
             }
         }
-        return new KeyCounter[]{counter};
+        List<GenericStack> amounts = accumulator.segments();
+        if (amounts.isEmpty()) {
+            return new KeyCounter[]{new KeyCounter()};
+        }
+        KeyCounter[] counters = new KeyCounter[amounts.size()];
+        for (int index = 0; index < amounts.size(); index++) {
+            GenericStack amount = amounts.get(index);
+            KeyCounter counter = new KeyCounter();
+            counter.add(amount.what(), amount.amount());
+            counters[index] = counter;
+        }
+        return counters;
     }
 
-    private record PatternKey(@org.jetbrains.annotations.Nullable AEItemKey definition) {
+    private record PatternKey(@Nullable AEItemKey definition) {
         static PatternKey of(IPatternDetails pattern) {
             if (pattern == null) return new PatternKey(null);
             return new PatternKey(SmartDoublingPatterns.unwrap(pattern).getDefinition());

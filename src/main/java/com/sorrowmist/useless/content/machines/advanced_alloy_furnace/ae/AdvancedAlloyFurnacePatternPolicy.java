@@ -97,9 +97,16 @@ final class AdvancedAlloyFurnacePatternPolicy {
 
     static Set<AEKey> componentInputKeys(
             @Nullable IPatternDetails pattern, List<ItemStack> actualInputs) {
+        return componentInputKeys(pattern, actualInputs, List.of());
+    }
+
+    static Set<AEKey> componentInputKeys(
+            @Nullable IPatternDetails pattern,
+            List<ItemStack> actualInputs,
+            List<GenericStack> actualKeyInputs) {
         IPatternDetails original = SmartDoublingPatterns.unwrap(pattern);
         DynamicComponentPattern dynamic = dynamicDetails(original);
-        if (dynamic == null || actualInputs == null || actualInputs.isEmpty()) {
+        if (dynamic == null || (actualInputs.isEmpty() && actualKeyInputs.isEmpty())) {
             return Set.of();
         }
 
@@ -107,7 +114,7 @@ final class AdvancedAlloyFurnacePatternPolicy {
 
         Set<AEKey> result = new LinkedHashSet<>();
         for (ItemStack stack : actualInputs) {
-            if (stack == null || stack.isEmpty() || !relaxedItems.contains(stack.getItem())) {
+            if (stack.isEmpty() || !relaxedItems.contains(stack.getItem())) {
                 continue;
             }
             AEItemKey key = AEItemKey.of(stack);
@@ -115,27 +122,18 @@ final class AdvancedAlloyFurnacePatternPolicy {
                 result.add(key);
             }
         }
-        return Set.copyOf(result);
-    }
-
-    static Set<AEKey> componentInputKeysFromGenericStacks(
-            @Nullable IPatternDetails pattern, List<GenericStack> actualInputs) {
-        IPatternDetails original = SmartDoublingPatterns.unwrap(pattern);
-        DynamicComponentPattern dynamic = dynamicDetails(original);
-        if (dynamic == null || actualInputs == null || actualInputs.isEmpty()) {
-            return Set.of();
-        }
-
-        Set<Item> relaxedItems = relaxedItems(original, dynamic);
-        Set<AEKey> result = new LinkedHashSet<>();
-        for (GenericStack stack : actualInputs) {
-            if (stack != null && stack.amount() > 0
-                    && stack.what() instanceof AEItemKey itemKey
+        for (GenericStack stack : actualKeyInputs) {
+            if (stack.what() instanceof AEItemKey itemKey
                     && relaxedItems.contains(itemKey.getItem())) {
                 result.add(itemKey);
             }
         }
         return Set.copyOf(result);
+    }
+
+    static Set<AEKey> componentInputKeysFromGenericStacks(
+            @Nullable IPatternDetails pattern, List<GenericStack> actualInputs) {
+        return componentInputKeys(pattern, List.of(), actualInputs);
     }
 
     private static Set<Item> relaxedItems(

@@ -3,6 +3,7 @@ package com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae;
 import appeng.api.crafting.IPatternDetails;
 import appeng.api.stacks.AEItemKey;
 import appeng.api.stacks.GenericStack;
+import com.sorrowmist.useless.content.recipe.AdvancedAlloyFurnaceRecipe;
 import com.sorrowmist.useless.core.component.UComponents;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
@@ -25,6 +26,18 @@ public final class SmartDoublingPatterns {
 
     public static long operationsPerPush(IPatternDetails pattern) {
         return resolve(pattern).operationsPerPush();
+    }
+
+    /**
+     * Resolves the output-derived manual multiplier carried by the unwrapped processing pattern.
+     * Zero means the pattern cannot be proven to represent an exact number of recipe operations.
+     */
+    public static long manualOperationsPerPattern(
+            AdvancedAlloyFurnaceRecipe recipe,
+            IPatternDetails pattern) {
+        ManualPatternOperationResolver.Resolution resolution =
+                ManualPatternOperationResolver.resolve(recipe, unwrap(pattern));
+        return resolution.valid() ? resolution.operationsPerPattern() : 0L;
     }
 
     public static Resolved resolve(IPatternDetails pattern) {

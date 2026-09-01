@@ -6,11 +6,12 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.crafting.Ingredient;
+import net.minecraft.world.item.crafting.Recipe;
 
 import java.util.ArrayList;
 import java.util.List;
 
-abstract class AbstractStockpotRecipeAdapter<T extends net.minecraft.world.item.crafting.Recipe<?>>
+abstract class AbstractStockpotRecipeAdapter<T extends Recipe<?>>
         extends AbstractCookeryRecipeAdapter<T> {
     private static final ResourceLocation STOCKPOT_ID =
             ResourceLocation.fromNamespaceAndPath("kaleidoscope_cookery", "stockpot");

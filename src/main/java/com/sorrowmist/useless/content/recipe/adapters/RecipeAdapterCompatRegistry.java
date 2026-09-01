@@ -24,6 +24,11 @@ import com.sorrowmist.useless.content.recipe.adapters.industrialforegoing.FluidS
 import com.sorrowmist.useless.content.recipe.adapters.industrialforegoing.WashingFactoryRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.industrialforegoing.LatexProcessingUnitRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.industrialforegoing.FluidExtractorRecipeAdapter;
+import com.sorrowmist.useless.content.recipe.adapters.industrialforegoing.InfuserRecipeAdapter;
+import com.sorrowmist.useless.content.recipe.adapters.industrialforegoing.PrecisionShapedRecipeAdapter;
+import com.sorrowmist.useless.content.recipe.adapters.industrialforegoing.PrecisionShapelessRecipeAdapter;
+import com.sorrowmist.useless.content.recipe.adapters.industrialforegoing.FluidShapedRecipeAdapter;
+import com.sorrowmist.useless.content.recipe.adapters.industrialforegoing.FluidShapelessRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.minecraft.CraftingRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.minecraft.BrewingRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.minecraft.SmeltingRecipeAdapter;
@@ -314,6 +319,13 @@ public final class RecipeAdapterCompatRegistry {
         register(new WashingFactoryRecipeAdapter());
         register(new LatexProcessingUnitRecipeAdapter());
         register(new FluidExtractorRecipeAdapter());
+        if (isLoaded("ifeu")) {
+            register(new InfuserRecipeAdapter());
+            register(new PrecisionShapedRecipeAdapter());
+            register(new PrecisionShapelessRecipeAdapter());
+            register(new FluidShapedRecipeAdapter());
+            register(new FluidShapelessRecipeAdapter());
+        }
     }
 
     private static void registerActuallyAdditions() {

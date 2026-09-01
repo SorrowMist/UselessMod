@@ -1,6 +1,7 @@
 package com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae;
 
 import appeng.api.crafting.IPatternDetails;
+import appeng.api.stacks.AEFluidKey;
 import appeng.api.stacks.AEItemKey;
 import appeng.api.stacks.AEKey;
 import appeng.api.stacks.GenericStack;
@@ -9,6 +10,7 @@ import com.mojang.logging.LogUtils;
 import com.sorrowmist.useless.network.AETaskProgressPacket;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.chemical.ChemicalStackView;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.chemical.FurnaceChemicalStorage;
+import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.io.FurnaceOutputPort;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
@@ -137,20 +139,34 @@ public final class AdvancedAlloyFurnaceAeManager {
         while (it.hasNext()) {
             GenericStack gs = it.next();
             long requested = gs.amount();
-            long inserted = clampInserted(this.owner.tryOutputKeyToAE(gs.what(), requested), requested);
-            long remaining = requested - inserted;
-            if (remaining > 0L && this.owner.getChemicalKeyProvider().isChemicalKey(gs.what())) {
-                inserted += insertChemicalFallback(gs.what(), remaining);
-                remaining = requested - inserted;
+            GenericStack remainder;
+            if (gs.what() instanceof AEItemKey || gs.what() instanceof AEFluidKey) {
+                remainder = FurnaceOutputPort.outputKeyWithRemainder(
+                        gs,
+                        this.owner.createAeOutputPort(),
+                        this.owner.getItemHandler(),
+                        this.owner.getInputSlotsStart(),
+                        this.owner.getInputSlotsCount(),
+                        this.owner.getInputFluidTanks(),
+                        this.owner.getFluidTankCount(),
+                        this.owner.getInputChemicalStorage(),
+                        this.owner.getChemicalKeyProvider());
+            } else {
+                long inserted = clampInserted(this.owner.tryOutputKeyToAE(gs.what(), requested), requested);
+                long remaining = requested - inserted;
+                if (remaining > 0L && this.owner.getChemicalKeyProvider().isChemicalKey(gs.what())) {
+                    remaining -= insertChemicalFallback(gs.what(), remaining);
+                }
+                remainder = remaining > 0L ? new GenericStack(gs.what(), remaining) : null;
             }
-            if (inserted <= 0) {
+            if (remainder != null && remainder.amount() == requested) {
                 continue;
             }
             changed = true;
-            if (remaining <= 0L) {
+            if (remainder == null) {
                 it.remove();
             } else {
-                it.set(new GenericStack(gs.what(), remaining));
+                it.set(remainder);
             }
         }
         if (changed) {
@@ -173,22 +189,24 @@ public final class AdvancedAlloyFurnaceAeManager {
         while (it.hasNext()) {
             GenericStack gs = it.next();
             long requested = gs.amount();
-            long inserted = this.owner.isReturnOutputToAe()
-                    ? clampInserted(this.owner.tryOutputKeyToAE(gs.what(), requested), requested)
-                    : 0L;
-            long remaining = requested - inserted;
-            if (remaining > 0L && this.owner.getChemicalKeyProvider().isChemicalKey(gs.what())) {
-                inserted += insertChemicalOutputFallback(gs.what(), remaining);
-                remaining = requested - inserted;
-            }
-            if (inserted <= 0L) {
+            GenericStack remainder = FurnaceOutputPort.outputKeyWithRemainder(
+                    gs,
+                    this.owner.createAeOutputPort(),
+                    this.owner.getItemHandler(),
+                    this.owner.getOutputSlotsStart(),
+                    this.owner.getOutputSlotsCount(),
+                    this.owner.getOutputFluidTanks(),
+                    this.owner.getFluidTankCount(),
+                    this.owner.getOutputChemicalStorage(),
+                    this.owner.getChemicalKeyProvider());
+            if (remainder != null && remainder.amount() == requested) {
                 continue;
             }
             changed = true;
-            if (remaining <= 0L) {
+            if (remainder == null) {
                 it.remove();
             } else {
-                it.set(new GenericStack(gs.what(), remaining));
+                it.set(remainder);
             }
         }
         if (changed) {
@@ -208,14 +226,6 @@ public final class AdvancedAlloyFurnaceAeManager {
                     view.copyWithAmount(amount - inserted));
         }
         return Math.min(amount, Math.max(0L, inserted));
-    }
-
-    private long insertChemicalOutputFallback(AEKey key, long amount) {
-        if (amount <= 0L) return 0L;
-        ChemicalStackView view = this.owner.getChemicalKeyProvider()
-                .fromGenericStack(new GenericStack(key, amount));
-        if (view == null || view.isEmpty()) return 0L;
-        return insertChemical(this.owner.getOutputChemicalStorage(), view);
     }
 
     private static long insertChemical(FurnaceChemicalStorage storage, ChemicalStackView view) {

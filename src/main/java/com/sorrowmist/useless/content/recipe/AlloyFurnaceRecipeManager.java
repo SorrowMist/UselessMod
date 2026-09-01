@@ -21,6 +21,7 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -302,10 +303,22 @@ public class AlloyFurnaceRecipeManager {
             if (recipes != null) candidates.addAll(recipes);
         }
 
-        if (!context.fluidInputs().isEmpty()) {
+        boolean hasFluidInput = !context.fluidInputs().isEmpty();
+        boolean hasNonStackKeyInput = false;
+        for (GenericStack input : context.keyInputs()) {
+            if (input.what() instanceof AEItemKey itemKey) {
+                List<AdvancedAlloyFurnaceRecipe> recipes = inputItemIndex.get(itemKey.getItem());
+                if (recipes != null) candidates.addAll(recipes);
+            } else if (input.what() instanceof AEFluidKey) {
+                hasFluidInput = true;
+            } else {
+                hasNonStackKeyInput = true;
+            }
+        }
+        if (hasFluidInput) {
             candidates.addAll(hasFluidInputRecipes);
         }
-        if (!context.keyInputs().isEmpty()) {
+        if (hasNonStackKeyInput) {
             candidates.addAll(hasKeyInputRecipes);
         }
         if (context.mold() != null && !context.mold().isEmpty()) {
@@ -379,7 +392,7 @@ public class AlloyFurnaceRecipeManager {
 
     private boolean matchesLookup(AdvancedAlloyFurnaceRecipe recipe, RecipeLookupContext context) {
         return matchesMold(recipe, context.mold())
-                && matchesItems(recipe, context.inputs(), context.operations())
+                && matchesItems(recipe, context.inputs(), context.keyInputs(), context.operations())
                 && matchesFluids(recipe, context.fluidInputs(), context.keyInputs(), context.operations())
                 && matchesKeys(recipe, context.keyInputs(), context.operations())
                 && matchesOutputConstraints(recipe, context.expectedOutputs());
@@ -489,8 +502,9 @@ public class AlloyFurnaceRecipeManager {
         return recipe.id().getPath().endsWith("_converted");
     }
 
-    private boolean matchesItems(AdvancedAlloyFurnaceRecipe recipe, List<ItemStack> inputs, long operations) {
-        return ItemIngredientAllocator.matches(recipe.inputs(), inputs, operations);
+    private boolean matchesItems(AdvancedAlloyFurnaceRecipe recipe, List<ItemStack> inputs,
+                                 List<GenericStack> keyInputs, long operations) {
+        return ItemIngredientAllocator.matches(recipe.inputs(), inputs, keyInputs, operations);
     }
 
     private boolean matchesFluids(AdvancedAlloyFurnaceRecipe recipe, List<FluidStack> inputs, long operations) {
@@ -504,7 +518,8 @@ public class AlloyFurnaceRecipeManager {
     }
 
     private boolean matchesKeys(AdvancedAlloyFurnaceRecipe recipe, List<GenericStack> inputs, long operations) {
-        return containsScaled(snapshotGenericStacks(inputs), snapshotGenericStacks(recipe.keyInputs()), operations);
+        return containsScaled(
+                snapshotNonStackKeyInputs(inputs), snapshotGenericStacks(recipe.keyInputs()), operations);
     }
 
     private static boolean containsScaled(Map<AEKey, Long> available, Map<AEKey, Long> required, long operations) {
@@ -533,9 +548,10 @@ public class AlloyFurnaceRecipeManager {
         if (recipe == null || operations <= 0L) {
             return false;
         }
-        return ItemIngredientAllocator.matches(recipe.inputs(), inputs, keyInputs, operations)
-                && FluidIngredientAllocator.matchesLong(recipe.inputFluids(), fluidInputs, keyInputs, operations)
-                && containsScaled(snapshotNonStackKeyInputs(keyInputs),
+        List<GenericStack> validKeyInputs = requireKeyInputs(keyInputs);
+        return ItemIngredientAllocator.matches(recipe.inputs(), inputs, validKeyInputs, operations)
+                && FluidIngredientAllocator.matchesLong(recipe.inputFluids(), fluidInputs, validKeyInputs, operations)
+                && containsScaled(snapshotNonStackKeyInputs(validKeyInputs),
                 snapshotGenericStacks(recipe.keyInputs()), operations);
     }
 
@@ -652,10 +668,23 @@ public class AlloyFurnaceRecipeManager {
         private RecipeLookupContext {
             inputs = inputs == null ? List.of() : inputs;
             fluidInputs = fluidInputs == null ? List.of() : fluidInputs;
-            keyInputs = keyInputs == null ? List.of() : keyInputs;
+            keyInputs = requireKeyInputs(keyInputs);
             expectedOutputs = expectedOutputs == null ? List.of() : expectedOutputs;
             operations = Math.max(1L, operations);
         }
+    }
+
+    private static List<GenericStack> requireKeyInputs(@Nullable List<GenericStack> inputs) {
+        if (inputs == null) {
+            return List.of();
+        }
+        for (GenericStack input : inputs) {
+            Objects.requireNonNull(input, "Recipe key input");
+            if (input.what() == null || input.amount() <= 0L) {
+                throw new IllegalArgumentException("Recipe key inputs must contain a key and positive amount");
+            }
+        }
+        return inputs;
     }
 
     /** 只保存不可变的 AEKey/数量快照，不持有调用方可变的 ItemStack。 */
@@ -672,9 +701,9 @@ public class AlloyFurnaceRecipeManager {
                     ? null
                     : GenericStack.fromItemStack(context.mold());
             return new RecipeCacheKey(
-                    snapshotItems(context.inputs()),
+                    snapshotItemInputs(context.inputs(), context.keyInputs()),
                     snapshotFluidInputs(context.fluidInputs(), context.keyInputs()),
-                    snapshotGenericStacks(context.keyInputs()),
+                    snapshotNonStackKeyInputs(context.keyInputs()),
                     moldStack == null ? null : moldStack.what(),
                     List.copyOf(context.expectedOutputs()),
                     context.operations()
@@ -711,6 +740,17 @@ public class AlloyFurnaceRecipeManager {
         return Map.copyOf(result);
     }
 
+    private static Map<AEKey, Long> snapshotItemInputs(
+            List<ItemStack> stacks, List<GenericStack> keyInputs) {
+        Map<AEKey, Long> result = new LinkedHashMap<>(snapshotItems(stacks));
+        for (GenericStack input : keyInputs) {
+            if (input.what() instanceof AEItemKey) {
+                result.merge(input.what(), input.amount(), AlloyFurnaceRecipeManager::saturatingAdd);
+            }
+        }
+        return Map.copyOf(result);
+    }
+
     private static Map<AEKey, Long> snapshotFluids(List<FluidStack> stacks) {
         Map<AEKey, Long> result = new LinkedHashMap<>();
         if (stacks == null) return Map.of();
@@ -727,9 +767,8 @@ public class AlloyFurnaceRecipeManager {
     private static Map<AEKey, Long> snapshotFluidInputs(
             List<FluidStack> stacks, List<GenericStack> keyInputs) {
         Map<AEKey, Long> result = new LinkedHashMap<>(snapshotFluids(stacks));
-        if (keyInputs != null) {
-            for (GenericStack input : keyInputs) {
-                if (input == null || input.amount() <= 0L || !(input.what() instanceof AEFluidKey)) continue;
+        for (GenericStack input : keyInputs) {
+            if (input.what() instanceof AEFluidKey) {
                 result.merge(input.what(), input.amount(), AlloyFurnaceRecipeManager::saturatingAdd);
             }
         }
@@ -746,11 +785,8 @@ public class AlloyFurnaceRecipeManager {
                 }
             }
         }
-        if (keyInputs != null) {
-            for (GenericStack input : keyInputs) {
-                if (input == null || input.amount() <= 0L || !(input.what() instanceof AEFluidKey fluidKey)) {
-                    continue;
-                }
+        for (GenericStack input : keyInputs) {
+            if (input.what() instanceof AEFluidKey fluidKey) {
                 mergeFluidAmount(result, fluidKey.toStack(1), input.amount());
             }
         }
@@ -770,10 +806,8 @@ public class AlloyFurnaceRecipeManager {
 
     private static Map<AEKey, Long> snapshotNonStackKeyInputs(List<GenericStack> stacks) {
         Map<AEKey, Long> result = new LinkedHashMap<>();
-        if (stacks == null) return Map.of();
         for (GenericStack stack : stacks) {
-            if (stack == null || stack.what() == null || stack.amount() <= 0L
-                    || stack.what() instanceof AEItemKey || stack.what() instanceof AEFluidKey) {
+            if (stack.what() instanceof AEItemKey || stack.what() instanceof AEFluidKey) {
                 continue;
             }
             result.merge(stack.what(), stack.amount(), AlloyFurnaceRecipeManager::saturatingAdd);
@@ -783,9 +817,7 @@ public class AlloyFurnaceRecipeManager {
 
     private static Map<AEKey, Long> snapshotGenericStacks(List<GenericStack> stacks) {
         Map<AEKey, Long> result = new LinkedHashMap<>();
-        if (stacks == null) return Map.of();
         for (GenericStack stack : stacks) {
-            if (stack == null || stack.what() == null || stack.amount() <= 0) continue;
             result.merge(stack.what(), stack.amount(), AlloyFurnaceRecipeManager::saturatingAdd);
         }
         return Map.copyOf(result);

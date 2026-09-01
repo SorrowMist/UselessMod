@@ -1,5 +1,7 @@
 package com.sorrowmist.useless.content.machines.advanced_alloy_furnace.io;
 
+import appeng.api.stacks.AEFluidKey;
+import appeng.api.stacks.AEItemKey;
 import appeng.api.stacks.AEKey;
 import appeng.api.stacks.GenericStack;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.chemical.ChemicalKeyProvider;
@@ -10,6 +12,7 @@ import net.neoforged.neoforge.fluids.FluidStack;
 import net.neoforged.neoforge.fluids.capability.IFluidHandler;
 import net.neoforged.neoforge.fluids.capability.templates.FluidTank;
 import net.neoforged.neoforge.items.ItemStackHandler;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.function.BiConsumer;
 
@@ -164,6 +167,40 @@ public final class FurnaceOutputPort {
     public static GenericStack outputKeyWithRemainder(GenericStack stack, AeOutput aeOutput,
                                                        FurnaceChemicalStorage outputChemicalStorage,
                                                        ChemicalKeyProvider chemicalKeyProvider) {
+        return outputExactKey(
+                stack, aeOutput, null, 0, 0, null, 0,
+                outputChemicalStorage, chemicalKeyProvider);
+    }
+
+    /**
+     * Outputs one exact AE key while projecting only the amount that can fit into the finite local destinations.
+     * The retained remainder stays compact regardless of its numeric size.
+     */
+    public static GenericStack outputKeyWithRemainder(
+            GenericStack stack,
+            AeOutput aeOutput,
+            ItemStackHandler itemHandler,
+            int slotsStart,
+            int slotsCount,
+            FluidTank[] fluidTanks,
+            int fluidTankCount,
+            FurnaceChemicalStorage outputChemicalStorage,
+            ChemicalKeyProvider chemicalKeyProvider) {
+        return outputExactKey(
+                stack, aeOutput, itemHandler, slotsStart, slotsCount, fluidTanks, fluidTankCount,
+                outputChemicalStorage, chemicalKeyProvider);
+    }
+
+    private static GenericStack outputExactKey(
+            GenericStack stack,
+            AeOutput aeOutput,
+            @Nullable ItemStackHandler itemHandler,
+            int slotsStart,
+            int slotsCount,
+            FluidTank @Nullable [] fluidTanks,
+            int fluidTankCount,
+            FurnaceChemicalStorage outputChemicalStorage,
+            ChemicalKeyProvider chemicalKeyProvider) {
         if (stack == null || stack.what() == null || stack.amount() <= 0L) return null;
 
         long requested = stack.amount();
@@ -171,7 +208,11 @@ public final class FurnaceOutputPort {
         long remaining = requested - inserted;
         if (remaining <= 0L) return null;
 
-        if (chemicalKeyProvider != null && chemicalKeyProvider.isChemicalKey(stack.what())) {
+        if (stack.what() instanceof AEItemKey itemKey && itemHandler != null) {
+            remaining = insertItemKeyIntoSlots(itemKey, remaining, itemHandler, slotsStart, slotsCount);
+        } else if (stack.what() instanceof AEFluidKey fluidKey && fluidTanks != null) {
+            remaining = fillFluidKeyIntoTanks(fluidKey, remaining, fluidTanks, fluidTankCount);
+        } else if (chemicalKeyProvider != null && chemicalKeyProvider.isChemicalKey(stack.what())) {
             var view = chemicalKeyProvider.fromGenericStack(new GenericStack(stack.what(), remaining));
             if (view != null && outputChemicalStorage != null) {
                 var remainder = outputChemicalStorage.insertChemical(view, false);
@@ -180,6 +221,59 @@ public final class FurnaceOutputPort {
             }
         }
         return remaining <= 0L ? null : new GenericStack(stack.what(), remaining);
+    }
+
+    private static long insertItemKeyIntoSlots(
+            AEItemKey key,
+            long amount,
+            ItemStackHandler itemHandler,
+            int slotsStart,
+            int slotsCount) {
+        long remaining = amount;
+        int slotsEnd = Math.min(itemHandler.getSlots(), Math.addExact(slotsStart, slotsCount));
+        for (int slot = slotsStart; slot < slotsEnd && remaining > 0L; slot++) {
+            ItemStack slotStack = itemHandler.getStackInSlot(slot);
+            if (slotStack.isEmpty() || !key.equals(AEItemKey.of(slotStack))) {
+                continue;
+            }
+            int space = itemHandler.getSlotLimit(slot) - slotStack.getCount();
+            if (space <= 0) {
+                continue;
+            }
+            int inserted = (int) Math.min(remaining, space);
+            slotStack.grow(inserted);
+            remaining -= inserted;
+        }
+        for (int slot = slotsStart; slot < slotsEnd && remaining > 0L; slot++) {
+            if (!itemHandler.getStackInSlot(slot).isEmpty()) {
+                continue;
+            }
+            int slotLimit = itemHandler.getSlotLimit(slot);
+            if (slotLimit <= 0) {
+                continue;
+            }
+            int inserted = (int) Math.min(remaining, slotLimit);
+            itemHandler.setStackInSlot(slot, key.toStack(inserted));
+            remaining -= inserted;
+        }
+        return remaining;
+    }
+
+    private static long fillFluidKeyIntoTanks(
+            AEFluidKey key,
+            long amount,
+            FluidTank[] tanks,
+            int tankCount) {
+        long remaining = amount;
+        int tanksEnd = Math.min(tanks.length, tankCount);
+        for (int index = 0; index < tanksEnd && remaining > 0L; index++) {
+            int offered = (int) Math.min(remaining, Integer.MAX_VALUE);
+            int inserted = tanks[index].fill(key.toStack(offered), IFluidHandler.FluidAction.EXECUTE);
+            if (inserted > 0) {
+                remaining -= inserted;
+            }
+        }
+        return remaining;
     }
 
     private static long clampInserted(long inserted, long requested) {

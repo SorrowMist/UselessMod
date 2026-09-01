@@ -288,11 +288,8 @@ public class CraftingTask {
         if (context.getLevel() == null) return null;
         if (cachedRecipe != null) return cachedRecipe;
 
-        List<ItemStack> tempInputs = new ArrayList<>(taskInputItems);
-        List<FluidStack> tempFluids = new ArrayList<>(taskInputFluids);
-
         cachedRecipe = context.resolveTaskRecipe(
-                pattern, tempInputs, tempFluids, toGenericStacks(taskInputKeys), craftCount);
+                pattern, taskInputItems, taskInputFluids, toGenericStacks(taskInputKeys), craftCount);
         return cachedRecipe;
     }
 
@@ -457,13 +454,29 @@ public class CraftingTask {
         FurnaceOutputPort.AeOutput port = context.createAeOutputPort();
 
         for (OutputKey keyToReturn : keys) {
-            long inserted = clampInserted(context.tryOutputKeyToAE(keyToReturn.key, keyToReturn.amount), keyToReturn.amount);
-            long remaining = keyToReturn.amount - inserted;
-            if (remaining > 0L && context.getChemicalKeyProvider().isChemicalKey(keyToReturn.key)) {
-                remaining -= insertChemicalFallback(context, keyToReturn.key, remaining, true);
+            GenericStack remainder;
+            if (keyToReturn.key instanceof AEItemKey || keyToReturn.key instanceof AEFluidKey) {
+                remainder = FurnaceOutputPort.outputKeyWithRemainder(
+                        new GenericStack(keyToReturn.key, keyToReturn.amount),
+                        port,
+                        context.getItemHandler(),
+                        context.getInputSlotsStart(),
+                        context.getInputSlotsCount(),
+                        context.getInputFluidTanks(),
+                        context.getFluidTankCount(),
+                        context.getInputChemicalStorage(),
+                        context.getChemicalKeyProvider());
+            } else {
+                long inserted = clampInserted(
+                        context.tryOutputKeyToAE(keyToReturn.key, keyToReturn.amount), keyToReturn.amount);
+                long remaining = keyToReturn.amount - inserted;
+                if (remaining > 0L && context.getChemicalKeyProvider().isChemicalKey(keyToReturn.key)) {
+                    remaining -= insertReturnedChemical(context, keyToReturn.key, remaining);
+                }
+                remainder = remaining > 0L ? new GenericStack(keyToReturn.key, remaining) : null;
             }
-            if (remaining > 0) {
-                context.stashUnreturnedInput(keyToReturn.key, remaining);
+            if (remainder != null) {
+                context.stashUnreturnedInput(remainder.what(), remainder.amount());
             }
         }
 
@@ -519,14 +532,18 @@ public class CraftingTask {
         }
 
         for (OutputKey keyToReturn : keys) {
-            long inserted = clampInserted(port.insertKey(keyToReturn.key, keyToReturn.amount),
-                    keyToReturn.amount);
-            long remaining = keyToReturn.amount - inserted;
-            if (remaining > 0L && context.getChemicalKeyProvider().isChemicalKey(keyToReturn.key)) {
-                remaining -= insertChemicalFallback(context, keyToReturn.key, remaining, false);
-            }
-            if (remaining > 0L) {
-                context.stashUnreturnedOutput(keyToReturn.key, remaining);
+            GenericStack remainder = FurnaceOutputPort.outputKeyWithRemainder(
+                    new GenericStack(keyToReturn.key, keyToReturn.amount),
+                    port,
+                    context.getItemHandler(),
+                    context.getOutputSlotsStart(),
+                    context.getOutputSlotsCount(),
+                    context.getOutputFluidTanks(),
+                    context.getFluidTankCount(),
+                    context.getOutputChemicalStorage(),
+                    context.getChemicalKeyProvider());
+            if (remainder != null) {
+                context.stashUnreturnedOutput(remainder.what(), remainder.amount());
             }
         }
         context.markChanged();
@@ -912,6 +929,11 @@ public class CraftingTask {
             OutputKey pending = pendingOutputKeys.get(i);
             GenericStack remainder = FurnaceOutputPort.outputKeyWithRemainder(
                     new GenericStack(pending.key, pending.amount), port,
+                    context.getItemHandler(),
+                    context.getOutputSlotsStart(),
+                    context.getOutputSlotsCount(),
+                    context.getOutputFluidTanks(),
+                    context.getFluidTankCount(),
                     context.getOutputChemicalStorage(), context.getChemicalKeyProvider());
             if (remainder == null || remainder.amount() <= 0L) {
                 pendingOutputKeys.remove(i);
@@ -926,16 +948,12 @@ public class CraftingTask {
         return flushed;
     }
 
-    private static long insertChemicalFallback(CraftingTaskContext context, AEKey key, long amount,
-                                                boolean inputFirst) {
+    private static long insertReturnedChemical(CraftingTaskContext context, AEKey key, long amount) {
         if (amount <= 0L || !context.getChemicalKeyProvider().isChemicalKey(key)) return 0L;
         ChemicalStackView view = context.getChemicalKeyProvider().fromGenericStack(new GenericStack(key, amount));
         if (view == null || view.isEmpty()) return 0L;
 
-        long inserted = 0L;
-        if (inputFirst) {
-            inserted += insertChemical(context.getInputChemicalStorage(), view.copyWithAmount(amount - inserted));
-        }
+        long inserted = insertChemical(context.getInputChemicalStorage(), view);
         if (inserted < amount) {
             inserted += insertChemical(context.getOutputChemicalStorage(), view.copyWithAmount(amount - inserted));
         }
@@ -1193,11 +1211,8 @@ public class CraftingTask {
     }
 
     private Set<AEKey> resolveComponentInputKeys() {
-        if (context != null && context.supportsLongAeAmounts()) {
-            return AdvancedAlloyFurnacePatternPolicy.componentInputKeysFromGenericStacks(
-                    pattern, toGenericStacks(taskInputKeys));
-        }
-        return AdvancedAlloyFurnacePatternPolicy.componentInputKeys(pattern, taskInputItems);
+        return AdvancedAlloyFurnacePatternPolicy.componentInputKeys(
+                pattern, taskInputItems, toGenericStacks(taskInputKeys));
     }
 
 }

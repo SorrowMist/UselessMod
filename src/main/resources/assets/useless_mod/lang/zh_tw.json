@@ -392,6 +392,8 @@
   "tooltip.useless_mod.auto_collect": "內建磁鐵功能",
   "tooltip.useless_mod.time_acceleration_mode": "時間加速模式",
   "tooltip.useless_mod.time_acceleration_hint": "開啟後按住 Shift 右鍵加速方塊和機器",
+  "tooltip.useless_mod.beef_teleport_mode": "傳送",
+  "tooltip.useless_mod.beef_teleport_hint": "開啟後按住 Shift 右鍵進行短距離傳送；安裝 Ender IO 時可傳送至旅行錨",
   "tooltip.useless_mod.beef_invulnerability_mode": "玩家保護",
   "tooltip.useless_mod.beef_capture_mode": "生物捕捉",
   "tooltip.useless_mod.crowbar_mode": "撬棍模式",

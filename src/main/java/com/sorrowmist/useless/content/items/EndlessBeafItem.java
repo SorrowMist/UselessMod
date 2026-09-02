@@ -4,6 +4,7 @@ import com.sorrowmist.useless.api.enums.tool.EnchantMode;
 import com.sorrowmist.useless.api.enums.tool.ToolTypeMode;
 import com.sorrowmist.useless.content.blocks.GlowPlasticBlock;
 import com.sorrowmist.useless.content.blocks.UselessGlassBlock;
+import com.sorrowmist.useless.compat.enderio.EnderIOTravelCompat;
 import com.sorrowmist.useless.content.recipe.AlloyFurnaceRecipeCatalog;
 import com.sorrowmist.useless.core.common.KeyBindings;
 import com.sorrowmist.useless.core.component.UComponents;
@@ -30,6 +31,7 @@ import net.minecraft.sounds.SoundSource;
 import net.minecraft.tags.BlockTags;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
+import net.minecraft.world.InteractionResultHolder;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.Entity;
@@ -92,6 +94,7 @@ import java.util.stream.Collectors;
 public class EndlessBeafItem extends TieredItem {
     private static final String AE2LT_NATURAL_LIGHTNING_TAG = "ae2lt.natural_weather_lightning";
     private static final Set<UUID> FORCE_KILL_DEATH_CONTEXT = ConcurrentHashMap.newKeySet();
+    private static final int TELEPORT_COOLDOWN_TICKS = 5;
     private final ToolTypeMode toolType;
 
     public EndlessBeafItem() {
@@ -99,39 +102,80 @@ public class EndlessBeafItem extends TieredItem {
     }
 
     public EndlessBeafItem(@Nullable ToolTypeMode toolType) {
-        super(Tiers.NETHERITE,
-              new Item.Properties()
-                      .attributes(DiggerItem.createAttributes(Tiers.NETHERITE, 0, 2.0F))
-                      .stacksTo(1)
-                      .rarity(Rarity.EPIC)
-                      .durability(0)
-                      .component(DataComponents.TOOL, new Tool(
-                                         List.of(
-                                                 Tool.Rule.deniesDrops(Tiers.NETHERITE.getIncorrectBlocksForDrops()),
-                                                 Tool.Rule.minesAndDrops(BlockTags.MINEABLE_WITH_PICKAXE,
-                                                                         Tiers.NETHERITE.getSpeed()
-                                                 ),
-                                                 Tool.Rule.minesAndDrops(BlockTags.MINEABLE_WITH_AXE, Tiers.NETHERITE.getSpeed()),
-                                                 Tool.Rule.minesAndDrops(BlockTags.MINEABLE_WITH_SHOVEL,
-                                                                         Tiers.NETHERITE.getSpeed()
-                                                 ),
-                                                 Tool.Rule.minesAndDrops(BlockTags.MINEABLE_WITH_HOE, Tiers.NETHERITE.getSpeed())
-                                         ),
-                                         1.0F, 0
-                                 )
-                      )
-                      .component(UComponents.EnchantModeComponent, EnchantMode.SILK_TOUCH)
-                      .component(UComponents.EnhancedChainMiningComponent, false)
-                      .component(UComponents.ForceMiningComponent, false)
-                      .component(UComponents.ForceKillEnabledComponent, false)
-                      .component(UComponents.BeefTimeAccelerationEnabledComponent, false)
-                      .component(UComponents.BeefInvulnerabilityEnabledComponent, true)
-                      .component(UComponents.BeefCaptureEnabledComponent, false)
-                      .component(UComponents.AEStoragePriorityComponent, false)
-                      .component(UComponents.CurrentToolTypeComponent, ToolTypeMode.NONE_MODE)
-                      .component(DataComponents.CUSTOM_MODEL_DATA, new CustomModelData(1))
-        );
+        super(Tiers.NETHERITE, createProperties());
         this.toolType = toolType;
+    }
+
+    private static Item.Properties createProperties() {
+        Item.Properties properties = new Item.Properties()
+                .attributes(DiggerItem.createAttributes(Tiers.NETHERITE, 0, 2.0F))
+                .stacksTo(1)
+                .rarity(Rarity.EPIC)
+                .durability(0)
+                .component(DataComponents.TOOL, new Tool(
+                        List.of(
+                                Tool.Rule.deniesDrops(Tiers.NETHERITE.getIncorrectBlocksForDrops()),
+                                Tool.Rule.minesAndDrops(BlockTags.MINEABLE_WITH_PICKAXE, Tiers.NETHERITE.getSpeed()),
+                                Tool.Rule.minesAndDrops(BlockTags.MINEABLE_WITH_AXE, Tiers.NETHERITE.getSpeed()),
+                                Tool.Rule.minesAndDrops(BlockTags.MINEABLE_WITH_SHOVEL, Tiers.NETHERITE.getSpeed()),
+                                Tool.Rule.minesAndDrops(BlockTags.MINEABLE_WITH_HOE, Tiers.NETHERITE.getSpeed())
+                        ),
+                        1.0F, 0
+                ))
+                .component(UComponents.EnchantModeComponent, EnchantMode.SILK_TOUCH)
+                .component(UComponents.EnhancedChainMiningComponent, false)
+                .component(UComponents.ForceMiningComponent, false)
+                .component(UComponents.ForceKillEnabledComponent, false)
+                .component(UComponents.BeefTimeAccelerationEnabledComponent, false)
+                .component(UComponents.BeefInvulnerabilityEnabledComponent, true)
+                .component(UComponents.BeefCaptureEnabledComponent, false)
+                .component(UComponents.BeefTeleportEnabledComponent, false)
+                .component(UComponents.AEStoragePriorityComponent, false)
+                .component(UComponents.CurrentToolTypeComponent, ToolTypeMode.NONE_MODE)
+                .component(DataComponents.CUSTOM_MODEL_DATA, new CustomModelData(1));
+
+        if (ModList.get().isLoaded(EnderIOTravelCompat.MOD_ID)) {
+            properties = EnderIOTravelCompat.markAsTravelItem(properties);
+        }
+        return properties;
+    }
+
+    public static boolean isTeleportEnabled(ItemStack stack) {
+        return stack.getOrDefault(UComponents.BeefTeleportEnabledComponent.get(), false);
+    }
+
+    public static void setTeleportEnabled(ItemStack stack, boolean enabled) {
+        stack.set(UComponents.BeefTeleportEnabledComponent.get(), enabled);
+        if (ModList.get().isLoaded(EnderIOTravelCompat.MOD_ID)) {
+            EnderIOTravelCompat.setTravelItemEnabled(stack, enabled);
+        }
+    }
+
+    public static InteractionResult tryTeleport(Level level, Player player, ItemStack stack) {
+        if (!isTeleportEnabled(stack) || player.getCooldowns().isOnCooldown(stack.getItem())) {
+            return InteractionResult.PASS;
+        }
+        InteractionResult result = BeefTeleportHandler.tryTeleport(
+                level,
+                player,
+                ModList.get().isLoaded(EnderIOTravelCompat.MOD_ID));
+        if (result != InteractionResult.PASS) {
+            player.getCooldowns().addCooldown(stack.getItem(), TELEPORT_COOLDOWN_TICKS);
+        }
+        return result;
+    }
+
+    @Override
+    public @NotNull InteractionResultHolder<ItemStack> use(
+            @NotNull Level level,
+            @NotNull Player player,
+            @NotNull InteractionHand hand) {
+        ItemStack stack = player.getItemInHand(hand);
+        InteractionResult teleportResult = tryTeleport(level, player, stack);
+        if (teleportResult != InteractionResult.PASS) {
+            return InteractionResultHolder.sidedSuccess(stack, level.isClientSide());
+        }
+        return super.use(level, player, hand);
     }
 
     public static AttributeModifier createAttackDamageModifier() {
@@ -518,6 +562,9 @@ public class EndlessBeafItem extends TieredItem {
 
         if (player == null) return InteractionResult.PASS;
 
+        InteractionResult teleportResult = tryTeleport(world, player, ctx.getItemInHand());
+        if (teleportResult != InteractionResult.PASS) return teleportResult;
+
         InteractionResult lightningCollectorResult = trySummonLightningForCollector(ctx.getLevel(), ctx.getClickedPos(), ctx.getPlayer());
         if (lightningCollectorResult != InteractionResult.PASS) return lightningCollectorResult;
 
@@ -585,6 +632,8 @@ public class EndlessBeafItem extends TieredItem {
 
     @Override
     public @NotNull InteractionResult onItemUseFirst(@NotNull ItemStack stack, @NotNull UseOnContext ctx) {
+        InteractionResult teleportResult = tryTeleport(ctx.getLevel(), ctx.getPlayer(), stack);
+        if (teleportResult != InteractionResult.PASS) return teleportResult;
         return BeefTimeAcceleration.tryUse(ctx);
     }
 
@@ -617,6 +666,9 @@ public class EndlessBeafItem extends TieredItem {
                                                            @NotNull Player player,
                                                            @NotNull LivingEntity entity,
                                                            @NotNull InteractionHand hand) {
+        InteractionResult teleportResult = tryTeleport(entity.level(), player, stack);
+        if (teleportResult != InteractionResult.PASS) return teleportResult;
+
         if (BeefTimeAcceleration.shouldBlockOtherRightClick(stack, player)) {
             return InteractionResult.FAIL;
         }
@@ -770,6 +822,15 @@ public class EndlessBeafItem extends TieredItem {
                                        ).withStyle(beefCaptureEnabled ? ChatFormatting.GREEN : ChatFormatting.GRAY))
                                        .withStyle(ChatFormatting.DARK_GREEN));
 
+        boolean beefTeleportEnabled = isTeleportEnabled(stack);
+        tooltipComponents.add(Component.translatable("tooltip.useless_mod.beef_teleport_mode")
+                                       .append(": ")
+                                       .append(Component.translatable(
+                                               beefTeleportEnabled ? "tooltip.useless_mod.enable" :
+                                                       "tooltip.useless_mod.disable"
+                                       ).withStyle(beefTeleportEnabled ? ChatFormatting.GREEN : ChatFormatting.GRAY))
+                                       .withStyle(ChatFormatting.LIGHT_PURPLE));
+
         // AE存储优先状态（仅当AE2模组存在时）
         if (ModList.get().isLoaded("ae2")) {
             boolean aeStorageEnabled = stack.getOrDefault(UComponents.AEStoragePriorityComponent.get(), false);
@@ -834,6 +895,8 @@ public class EndlessBeafItem extends TieredItem {
                 Component.translatable("tooltip.useless_mod.auto_collect").withStyle(ChatFormatting.GREEN));
         tooltipComponents.add(
                 Component.translatable("tooltip.useless_mod.time_acceleration_hint").withStyle(ChatFormatting.LIGHT_PURPLE));
+        tooltipComponents.add(
+                Component.translatable("tooltip.useless_mod.beef_teleport_hint").withStyle(ChatFormatting.LIGHT_PURPLE));
 
         // 可选：增强连锁说明
         // tooltipComponents.add(Component.translatable("tooltip.useless_mod.enhanced_chain_description").withStyle(ChatFormatting.BLUE));

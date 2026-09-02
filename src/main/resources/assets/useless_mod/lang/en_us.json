@@ -540,6 +540,8 @@
   "tooltip.useless_mod.auto_collect": "Built-in magnet function",
   "tooltip.useless_mod.time_acceleration_mode": "Time Acceleration",
   "tooltip.useless_mod.time_acceleration_hint": "Hold Shift and right-click to accelerate ticking blocks and machines when enabled",
+  "tooltip.useless_mod.beef_teleport_mode": "Teleport",
+  "tooltip.useless_mod.beef_teleport_hint": "Hold Shift and right-click to blink forward; with Ender IO, right-click to travel to an anchor",
   "tooltip.useless_mod.current_tool_mode": "Current Tool Mode",
   "tooltip.useless_mod.none_mode": "None",
   "tooltip.useless_mod.wrench_mode": "Wrench",

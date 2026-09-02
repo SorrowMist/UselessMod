@@ -539,6 +539,8 @@
   "tooltip.useless_mod.auto_collect": "自带磁力功能",
   "tooltip.useless_mod.time_acceleration_mode": "时间加速模式",
   "tooltip.useless_mod.time_acceleration_hint": "开启后按住 Shift 右键加速方块和机器",
+  "tooltip.useless_mod.beef_teleport_mode": "传送",
+  "tooltip.useless_mod.beef_teleport_hint": "开启后按住 Shift 右键进行短距离传送；安装 Ender IO 时可传送至旅行锚",
   "tooltip.useless_mod.current_tool_mode": "当前工具模式",
   "tooltip.useless_mod.none_mode": "未选择",
   "tooltip.useless_mod.wrench_mode": "扳手",

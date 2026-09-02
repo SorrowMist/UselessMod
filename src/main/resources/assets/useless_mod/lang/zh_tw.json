@@ -462,7 +462,6 @@
   "useless_mod.configuration.chain_mining_range_z.comment": "連鎖挖掘的 Z 軸範圍半徑",
   "useless_mod.configuration.chain_mining_range_z.tooltip": "連鎖挖掘的 Z 軸範圍半徑",
   "useless_mod.configuration.chain_mining_range_z": "連鎖挖掘 Z 軸範圍",
-  "useless_mod.configuration.custom_potion_effects.tooltip": "自定義藥水效果列表，格式：modid:effect_name,amplifier；多個效果用分號分隔",
   "useless_mod.configuration.custom_potion_effects": "自定義藥水效果",
   "useless_mod.configuration.decode_cache_capacity.comment": "每個世界保留的已解碼萬象樣板最大數量，重啟後生效，範圍為64至16384。",
   "useless_mod.configuration.decode_cache_capacity.tooltip": "每個世界保留的已解碼萬象樣板最大數量，重啟後生效，範圍為64至16384。",

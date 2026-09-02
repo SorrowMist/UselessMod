@@ -67,6 +67,7 @@ public class ModeWheelScreen extends Screen {
         boolean beefTimeAccelerationEnabled = this.mainHandItem.getOrDefault(UComponents.BeefTimeAccelerationEnabledComponent, false);
         boolean beefInvulnerabilityEnabled = this.mainHandItem.getOrDefault(UComponents.BeefInvulnerabilityEnabledComponent, false);
         boolean beefCaptureEnabled = this.mainHandItem.getOrDefault(UComponents.BeefCaptureEnabledComponent, false);
+        boolean beefTeleportEnabled = this.mainHandItem.getOrDefault(UComponents.BeefTeleportEnabledComponent, false);
 
         // 左：附魔模式
         for (EnchantMode m : EnchantMode.values())
@@ -94,6 +95,11 @@ public class ModeWheelScreen extends Screen {
                     ModeTypeEnum.getBeefCaptureMode(beefCaptureEnabled),
                     ModeTypeEnum.getBeefCaptureMode(beefCaptureEnabled).getTooltip(),
                     beefCaptureEnabled
+            ));
+            this.forceKillModes.add(new ModeData(
+                    ModeTypeEnum.getBeefTeleportMode(beefTeleportEnabled),
+                    ModeTypeEnum.getBeefTeleportMode(beefTeleportEnabled).getTooltip(),
+                    beefTeleportEnabled
             ));
         }
 
@@ -426,6 +432,14 @@ public class ModeWheelScreen extends Screen {
                     );
                     PacketDistributor.sendToServer(
                             new ModeTogglePacket(ModeTogglePacket.ModeType.BEEF_CAPTURE, !currentEnabled));
+                }
+                case BEEF_TELEPORT_ENABLED, BEEF_TELEPORT_DISABLED -> {
+                    boolean currentEnabled = this.mainHandItem.getOrDefault(
+                            UComponents.BeefTeleportEnabledComponent,
+                            false
+                    );
+                    PacketDistributor.sendToServer(
+                            new ModeTogglePacket(ModeTogglePacket.ModeType.BEEF_TELEPORT, !currentEnabled));
                 }
             }
         }

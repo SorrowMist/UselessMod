@@ -126,6 +126,15 @@ public final class UComponents {
                            ))
             );
 
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<Boolean>> BeefTeleportEnabledComponent =
+            register("beef_teleport_enabled", builder ->
+                    builder.persistent(Codec.BOOL)
+                           .networkSynchronized(StreamCodec.of(
+                                   FriendlyByteBuf::writeBoolean,
+                                   FriendlyByteBuf::readBoolean
+                           ))
+            );
+
     public static final DeferredHolder<DataComponentType<?>, DataComponentType<GlobalPos>> WIRELESS_LINK_TARGET = register(
             "wireless_link_target",
             builder ->

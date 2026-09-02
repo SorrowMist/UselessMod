@@ -262,6 +262,10 @@ public class CraftingRecipes extends RecipeProvider {
     }
 
     private void addAE2GiftPackageRecipe(RecipeOutput consumer) {
+        if (ModItems.AE2_GIFT_PACKAGE == null) {
+            return;
+        }
+
         ShapedRecipeBuilder.shaped(RecipeCategory.MISC, ModItems.AE2_GIFT_PACKAGE.get(), 1)
                            .pattern("SPS")
                            .pattern("PPP")

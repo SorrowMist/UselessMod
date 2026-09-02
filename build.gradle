@@ -196,15 +196,17 @@ dependencies {
     implementation "org.appliedenergistics:appliedenergistics2:19.2.17"
     implementation "org.appliedenergistics:guideme:21.1.17"
     implementation "de.mari_023:ae2wtlib_api:19.2.5"
-    implementation "curse.maven:oritech-1030830:8556549"
+
+    compileOnly "curse.maven:oritech-1030830:8556549"
+    compileOnly "curse.maven:ufo-future-1372445:8372110"
+    compileOnly "curse.maven:immersive-engineering-231951:6733669"
+    compileOnly "curse.maven:extreme-reactors-250277:7344744"
+    compileOnly "curse.maven:neovitae-1404763:8690909"
+
     implementation "curse.maven:athena-841890:8061947"
-    implementation "curse.maven:neovitae-1404763:8690909"
     implementation "curse.maven:modern-industrialization-405388:8597392"
-    implementation "curse.maven:ufo-future-1372445:8372110"
-    implementation "curse.maven:immersive-engineering-231951:6733669"
     implementation "curse.maven:pneumaticcraft-repressurized-281849:8519226"
-    implementation "curse.maven:applied-pneumatics-1355087:7723695"
-    implementation "curse.maven:extreme-reactors-250277:7344744"
+    compileOnly "curse.maven:applied-pneumatics-1355087:7723695"
     implementation "curse.maven:zerocore-247921:7344742"
 
     implementation "curse.maven:glodium-957920:5821676"
@@ -221,35 +223,32 @@ dependencies {
     implementation "curse.maven:item-obliterator-835861:6696097"
     runtimeOnly "curse.maven:necronomicon-586157:5772683"
 
-    implementation "curse.maven:ae2-crystal-science-1435174:8498888" // 1.21.1-1.2.1
-    implementation "curse.maven:ae2-lightning-tech-1527395:8638573"
+    compileOnly "curse.maven:ae2-crystal-science-1435174:8498888" // 1.21.1-1.2.1
+    compileOnly "curse.maven:ae2-lightning-tech-1527395:8638573"
     implementation "curse.maven:thunderbolt-core-1631756:8638565"
-    implementation "curse.maven:data-energistics-1565514:8613673" // 1.21.1-3.0.3
+    compileOnly "curse.maven:data-energistics-1565514:8613673" // 1.21.1-3.0.3
 
     //powah
-    implementation "curse.maven:powah-rearchitected-633483:8011715"
-    implementation "maven.modrinth:9s6osm5g:izKINKFg"
+    compileOnly "curse.maven:powah-rearchitected-633483:8011715"
+    compileOnly "maven.modrinth:9s6osm5g:izKINKFg"
 
     runtimeOnly "top.theillusivec4.curios:curios-neoforge:9.5.1+1.21.1"
     implementation "top.theillusivec4.curios:curios-neoforge:9.5.1+1.21.1:api"
 
     //合成拓展
-    implementation "maven.modrinth:5JMG1gql:Pb2OHQ8E"
-    implementation "maven.modrinth:Rw1NrDzF:8421rqFF"
+    compileOnly "maven.modrinth:5JMG1gql:Pb2OHQ8E"
+    compileOnly "maven.modrinth:Rw1NrDzF:8421rqFF"
 
 
     implementation "maven.modrinth:jade:15.1.2+neoforge"
     //龙之研究
-    implementation "curse.maven:codechicken-lib-1-8-242818:7281427"
-    implementation "curse.maven:brandons-core-231382:7130990"
-    implementation "curse.maven:draconic-evolution-223565:7584459"
+    compileOnly "curse.maven:codechicken-lib-1-8-242818:7281427"
+    compileOnly "curse.maven:brandons-core-231382:7130990"
+    compileOnly "curse.maven:draconic-evolution-223565:7584459"
 
     
     runtimeOnly "de.mari_023:ae2wtlib:19.5.1"
-    //任意门
-    implementation "curse.maven:tempad-514923:6517779"
-    implementation "curse.maven:resourceful-lib-570073:5973188"
-    implementation "curse.maven:resourceful-config-714059:6467772"
+
     //资源蜜蜂
     // Productive Bees 1.21.1-13.13.5. ProductiveLib is embedded with JarJar,
     // so expose the nested jar separately on the production compile classpath.
@@ -261,21 +260,25 @@ dependencies {
     compileOnly enderIoCompileFiles
 
     //eco
-    implementation "maven.modrinth:neoecoae:21.1.1"
+    compileOnly "maven.modrinth:neoecoae:21.1.1"
     implementation "maven.modrinth:ldlib:mc1.21.1-2.2.30-neoforge"
 
     // 实用拓展
-    implementation "maven.modrinth:actually-additions:1.3.22"
+    compileOnly "maven.modrinth:actually-additions:1.3.22"
     // 工业先锋
+    compileOnly "maven.modrinth:titanium:1.21-4.0.40"
     runtimeOnly "maven.modrinth:titanium:1.21-4.0.40"
     implementation "curse.maven:industrial-foregoing-266515:7073719"
     implementation "curse.maven:mifa-1086142:6288756"
+    implementation "curse.maven:industrial-foregoing-extra-upgrades-1161049:8428353"
+
+
     // 新生魔艺
-    implementation "curse.maven:ars-nouveau-401955:8152094"
+    compileOnly "curse.maven:ars-nouveau-401955:8152094"
 
     //禁忌与奥秘
-    implementation "curse.maven:forbidden-arcanus-309858:6875895"
-    implementation "curse.maven:valhelsia-core-416935:6296775"
+    compileOnly "curse.maven:forbidden-arcanus-309858:6875895"
+    compileOnly "curse.maven:valhelsia-core-416935:6296775"
 
     compileOnly "mekanism:Mekanism:1.21.1-10.7.19.85"
     runtimeOnly "mekanism:Mekanism:1.21.1-10.7.19.85"
@@ -287,7 +290,7 @@ dependencies {
     implementation "curse.maven:flux-networks-248020:6089446"
 
     implementation "curse.maven:botany-pots-353928:7115287"
-    implementation "curse.maven:create-328085:7963363"
+    compileOnly "curse.maven:create-328085:7963363"
     implementation "curse.maven:bookshelf-228525:7115332"
     runtimeOnly "maven.modrinth:prickle:EE1FHDyD"
 
@@ -296,12 +299,12 @@ dependencies {
 //    runtimeOnly "maven.modrinth:omnitools:1.21.1-1.2.1"
 //    runtimeOnly "curse.maven:ftb-ultimine-forge-386134:7188395"
     // 神秘农业
-    implementation "curse.maven:cucumber-272335:8035802"
-    implementation "curse.maven:mystical-agriculture-246640:8035819"
+    compileOnly "curse.maven:cucumber-272335:8035802"
+    compileOnly "curse.maven:mystical-agriculture-246640:8035819"
 
     //自然灵气
-    implementation "maven.modrinth:natures-aura:41.9"
-    implementation "maven.modrinth:patchouli:1.21.1-93-neoforge"
+    compileOnly "maven.modrinth:natures-aura:41.9"
+    compileOnly "maven.modrinth:patchouli:1.21.1-93-neoforge"
 
     // Occultism is an optional runtime integration. Keep it off the production
     // dependency graph while exposing its API for compilation and local development.
@@ -334,8 +337,8 @@ dependencies {
     implementation "curse.maven:ender-io-64578:8192838"
 
     //灵灾
-    implementation "maven.modrinth:malum:1.8.2"
-    implementation "maven.modrinth:bN3xUWdo:CohX6yP1"
+    compileOnly "maven.modrinth:malum:1.8.2"
+    compileOnly "maven.modrinth:bN3xUWdo:CohX6yP1"
 
     // 龙研
     compileOnly "com.brandon3055.brandonscore:BrandonsCore:1.21.1-3.2.1.309"
@@ -353,30 +356,30 @@ dependencies {
     implementation "curse.maven:placebo-283644:8463693"
     implementation "curse.maven:apothic-enchanting-1063926:8682996"
     implementation "curse.maven:apothic-attributes-898963:8502288"
-    implementation "curse.maven:gateways-to-eternity-417802:6926284"
+    compileOnly "curse.maven:gateways-to-eternity-417802:6926284"
 
 
     implementation "curse.maven:omnisequence-transfinite-1624558:8622739"
 
     // 乐事系列
-    implementation "maven.modrinth:farmers-delight:1.21.1-1.3.3"
-    implementation "maven.modrinth:ends-delight:2.6.1+neoforge.1.21.1"
-    implementation "maven.modrinth:enders-delight:1.3.1"
-    implementation "maven.modrinth:crabbers-delight:1.2.6"
-    implementation "maven.modrinth:ubes-delight:neoforge-1.21.1-0.4.14"
-    implementation "curse.maven:barbeques-delight-1007788:8004721"
-    implementation "curse.maven:gensokyo-delight-youkais-feasts-1309991:8004770"
-    implementation "curse.maven:casualness-delight-909519:7467708"
-    implementation "curse.maven:cultural-delights-574622:8126191"
-    implementation "maven.modrinth:expanded-delight:0.1.4-neoforge"
-    implementation "maven.modrinth:extradelight:2.6.6"
-    implementation "maven.modrinth:brewin-and-chewin:4.5.0+1.21.1-neoforge"
-    implementation "maven.modrinth:nomads-delight:1.0.2"
+    compileOnly "maven.modrinth:farmers-delight:1.21.1-1.3.3"
+    compileOnly "maven.modrinth:ends-delight:2.6.1+neoforge.1.21.1"
+    compileOnly "maven.modrinth:enders-delight:1.3.1"
+    compileOnly "maven.modrinth:crabbers-delight:1.2.6"
+    compileOnly "maven.modrinth:ubes-delight:neoforge-1.21.1-0.4.14"
+    compileOnly "curse.maven:barbeques-delight-1007788:8004721"
+    compileOnly "curse.maven:gensokyo-delight-youkais-feasts-1309991:8004770"
+    compileOnly "curse.maven:casualness-delight-909519:7467708"
+    compileOnly "curse.maven:cultural-delights-574622:8126191"
+    compileOnly "maven.modrinth:expanded-delight:0.1.4-neoforge"
+    compileOnly "maven.modrinth:extradelight:2.6.6"
+    compileOnly "maven.modrinth:brewin-and-chewin:4.5.0+1.21.1-neoforge"
+    compileOnly "maven.modrinth:nomads-delight:1.0.2"
 
     // 森罗物语
-    implementation "maven.modrinth:kaleidoscope-cookery:1.4.1-neoforge+mc1.21.1"
-    implementation "maven.modrinth:kaleidoscope-grilling:ao5iN7Jb"
-    implementation "maven.modrinth:kaleidoscopetavern:1.2.0-neoforge+mc1.21.1"
+    compileOnly "maven.modrinth:kaleidoscope-cookery:1.4.1-neoforge+mc1.21.1"
+    compileOnly "maven.modrinth:kaleidoscope-grilling:ao5iN7Jb"
+    compileOnly "maven.modrinth:kaleidoscopetavern:1.2.0-neoforge+mc1.21.1"
 
 
     implementation fileTree(dir: 'libs', includes: ['*.jar'], excludes: [])

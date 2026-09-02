@@ -73,6 +73,11 @@ public class ModeTogglePacket implements CustomPacketPayload {
                         stack.set(UComponents.BeefCaptureEnabledComponent.get(), msg.enabled);
                     }
                 }
+                case BEEF_TELEPORT -> {
+                    if (stack.getItem() instanceof EndlessBeafItem) {
+                        EndlessBeafItem.setTeleportEnabled(stack, msg.enabled);
+                    }
+                }
             }
 
             // 显式同步物品到客户端
@@ -92,6 +97,7 @@ public class ModeTogglePacket implements CustomPacketPayload {
         FORCE_KILL,
         BEEF_INVULNERABILITY,
         BEEF_CAPTURE,
-        BEEF_TIME_ACCELERATION
+        BEEF_TIME_ACCELERATION,
+        BEEF_TELEPORT
     }
 }

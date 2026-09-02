@@ -112,6 +112,14 @@ public class UselessMod {
     public void onRightClickBlock(PlayerInteractEvent.RightClickBlock event) {
         ItemStack stack = event.getItemStack();
         if (stack.getItem() instanceof EndlessBeafItem) {
+            InteractionResult teleportResult = EndlessBeafItem.tryTeleport(
+                    event.getLevel(), event.getEntity(), stack);
+            if (teleportResult != InteractionResult.PASS) {
+                event.setCanceled(true);
+                event.setCancellationResult(teleportResult);
+                return;
+            }
+
             InteractionResult timeAccelerationResult = BeefTimeAcceleration.tryUse(
                     new UseOnContext(event.getEntity(), event.getHand(), event.getHitVec()));
             if (timeAccelerationResult != InteractionResult.PASS) {

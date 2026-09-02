@@ -133,16 +133,18 @@ public class ConfigManager {
             BlockBlacklistMatcher.empty("beef tool force mining blacklist");
 
     static {
-        COMMON_BUILDER.push("game_mechanics");
-        BOTANY_POT_GROWTH_MULTIPLIER = COMMON_BUILDER
+        // Server config: these values change world or machine behavior.
+        SERVER_BUILDER.push("game_mechanics");
+        BOTANY_POT_GROWTH_MULTIPLIER = SERVER_BUILDER
                 .comment("植物盆生长倍率 - 1.0为原版速度, 2.0为2倍速度")
                 .defineInRange("botany_pot_growth_multiplier", 1, 1, Integer.MAX_VALUE);
 
-        MATRIX_PATTERN_COUNT = COMMON_BUILDER
+        MATRIX_PATTERN_COUNT = SERVER_BUILDER
                 .comment("矩阵样板槽位倍数 - 减少数量时请保持槽位空！否则可能会造成样板丢失")
                 .defineInRange("matrix_pattern_count", 1, 1, 100);
-        COMMON_BUILDER.pop();
+        SERVER_BUILDER.pop();
 
+        // Client config: rendering-only options must never affect server behavior.
         CLIENT_BUILDER.push("game_mechanics");
         ENABLE_BOTANY_POT_RENDERING = CLIENT_BUILDER
                 .comment("是否启用植物盆作物渲染")
@@ -216,123 +218,129 @@ public class ConfigManager {
         SERVER_BUILDER.pop();
 
         // 牛排工具连锁挖掘配置
-        COMMON_BUILDER.translation("useless_mod.configuration.beef_tool").push("beef_tool");
-        ENABLE_POTION_EFFECTS = COMMON_BUILDER
+        // Server config: gameplay options are authoritative on the logical server.
+        SERVER_BUILDER.translation("useless_mod.configuration.beef_tool").push("beef_tool");
+        ENABLE_POTION_EFFECTS = SERVER_BUILDER
                 .comment("是否启用药水效果")
                 .translation("useless_mod.configuration.enable_potion_effects")
                 .define("enable_potion_effects", true);
 
-        ENABLE_FLIGHT_EFFECT = COMMON_BUILDER
+        ENABLE_FLIGHT_EFFECT = SERVER_BUILDER
                 .comment("是否启用飞行效果")
                 .translation("useless_mod.configuration.enable_flight_effect")
                 .define("enable_flight_effect", true);
 
-        BEEF_TOOL_FLIGHT_SPEED = COMMON_BUILDER
+        BEEF_TOOL_FLIGHT_SPEED = SERVER_BUILDER
                 .comment("牛排工具飞行速度")
                 .translation("useless_mod.configuration.beef_tool_flight_speed")
                 .defineInRange("beef_tool_flight_speed", 0.05, 0.01, 1.0);
 
-        CHAIN_MINING_RANGE_X = COMMON_BUILDER
+        CHAIN_MINING_RANGE_X = SERVER_BUILDER
                 .comment("连锁挖掘的X轴范围半径")
                 .translation("useless_mod.configuration.chain_mining_range_x")
                 .defineInRange("chain_mining_range_x", 8, 1, 32);
 
-        CHAIN_MINING_RANGE_Y = COMMON_BUILDER
+        CHAIN_MINING_RANGE_Y = SERVER_BUILDER
                 .comment("连锁挖掘的Y轴范围半径")
                 .translation("useless_mod.configuration.chain_mining_range_y")
                 .defineInRange("chain_mining_range_y", 8, 1, 255);
 
-        CHAIN_MINING_RANGE_Z = COMMON_BUILDER
+        CHAIN_MINING_RANGE_Z = SERVER_BUILDER
                 .comment("连锁挖掘的Z轴范围半径")
                 .translation("useless_mod.configuration.chain_mining_range_z")
                 .defineInRange("chain_mining_range_z", 8, 1, 32);
 
-        CHAIN_MINING_MAX_BLOCKS = COMMON_BUILDER
+        CHAIN_MINING_MAX_BLOCKS = SERVER_BUILDER
                 .comment("连锁挖掘的最大方块数量")
                 .translation("useless_mod.configuration.chain_mining_max_blocks")
                 .defineInRange("chain_mining_max_blocks", 1000, 1, 1000000);
 
         // 牛排工具附魔等级配置
-        FORTUNE_LEVEL = COMMON_BUILDER
+        FORTUNE_LEVEL = SERVER_BUILDER
                 .comment("牛排工具时运附魔等级")
                 .translation("useless_mod.configuration.fortune_level")
                 .defineInRange("fortune_level", 10, 1, 127);
 
-        LOOTING_LEVEL = COMMON_BUILDER
+        LOOTING_LEVEL = SERVER_BUILDER
                 .comment("牛排工具抢夺附魔等级")
                 .translation("useless_mod.configuration.looting_level")
                 .defineInRange("looting_level", 10, 1, 127);
 
         // 战利品大爆发触发概率配置
-        FESTIVE_DROP_CHANCE = COMMON_BUILDER
+        FESTIVE_DROP_CHANCE = SERVER_BUILDER
                 .comment("战利品大爆发触发概率 (百分比, 1-100%)")
                 .translation("useless_mod.configuration.festive_drop_chance")
                 .defineInRange("festive_drop_chance", 5, 1, 100);
 
         // 牛排工具挖掘速度配置
-        BEEF_TOOL_MINING_SPEED = COMMON_BUILDER
+        BEEF_TOOL_MINING_SPEED = SERVER_BUILDER
                 .comment("牛排工具基础挖掘速度")
                 .translation("useless_mod.configuration.beef_tool_mining_speed")
                 .defineInRange("beef_tool_mining_speed", 10.0, 1.0, 1000.0);
 
-        BEEF_TOOL_ENTITY_INTERACTION_RANGE = COMMON_BUILDER
+        BEEF_TOOL_ENTITY_INTERACTION_RANGE = SERVER_BUILDER
                 .comment("牛排工具实体触及范围加成, 重启游戏生效")
                 .translation("useless_mod.configuration.beef_tool_entity_interaction_range")
                 .defineInRange("beef_tool_entity_interaction_range", 8.0, 0.0, 1024.0);
 
-        BEEF_TOOL_BLOCK_INTERACTION_RANGE = COMMON_BUILDER
+        BEEF_TOOL_BLOCK_INTERACTION_RANGE = SERVER_BUILDER
                 .comment("牛排工具方块触及范围加成, 重启游戏生效")
                 .translation("useless_mod.configuration.beef_tool_block_interaction_range")
                 .defineInRange("beef_tool_block_interaction_range", 8.0, 0.0, 1024.0);
 
-        BEEF_TOOL_FORCE_MINING_BLACKLIST = COMMON_BUILDER
+        BEEF_TOOL_FORCE_MINING_BLACKLIST = SERVER_BUILDER
                 .comment("牛排工具强制挖掘黑名单，不会被强制挖掘的方块",
                         "支持精确方块ID、#方块标签和*通配符")
                 .translation("useless_mod.configuration.beef_tool_force_mining_blacklist")
                 .defineListAllowEmpty("beef_tool_force_mining_blacklist", List.<String>of(), () -> "",
                         entry -> entry instanceof String);
 
-        BEEF_TOOL_FORCE_KILL_BLACKLIST = COMMON_BUILDER
+        BEEF_TOOL_FORCE_KILL_BLACKLIST = SERVER_BUILDER
                 .comment("牛排工具强制击杀黑名单, 多个实体ID用分号分隔, 例如 minecraft:wither;modid:boss")
                 .translation("useless_mod.configuration.beef_tool_force_kill_blacklist")
                 .define("beef_tool_force_kill_blacklist", "");
 
-        BEEF_TOOL_FORCE_KILL_NON_LIVING_WHITELIST = COMMON_BUILDER
+        BEEF_TOOL_FORCE_KILL_NON_LIVING_WHITELIST = SERVER_BUILDER
                 .comment("牛排工具非生物实体强制击杀白名单, 多个实体ID用分号分隔")
                 .translation("useless_mod.configuration.beef_tool_force_kill_non_living_whitelist")
                 .define("beef_tool_force_kill_non_living_whitelist", "draconicevolution:guardian_crystal");
-        COMMON_BUILDER.pop();
+        SERVER_BUILDER.pop();
 
-        COMMON_BUILDER.push("mekanism_upgrade");
-        TIME_MULTIPLIER = COMMON_BUILDER
+        SERVER_BUILDER.push("mekanism_upgrade");
+        TIME_MULTIPLIER = SERVER_BUILDER
                 .comment("速度升级增强倍率")
                 .defineInRange("time_multiplier", 1, 1, Integer.MAX_VALUE);
 
-        ELECTRICITY_MULTIPLIER = COMMON_BUILDER
+        ELECTRICITY_MULTIPLIER = SERVER_BUILDER
                 .comment("能量升级节电增强倍率")
                 .defineInRange("electricity_multiplier", 1, 1, Integer.MAX_VALUE);
 
-        CAPACITY_MULTIPLIER = COMMON_BUILDER
+        CAPACITY_MULTIPLIER = SERVER_BUILDER
                 .comment("能量升级储电增强倍率")
                 .defineInRange("capacity_multiplier", 1, 1, Integer.MAX_VALUE);
 
-        MAX_UPGRADE = COMMON_BUILDER
+        MAX_UPGRADE = SERVER_BUILDER
                 .comment("机器可接受的最大速度/能量升级数量, 重启游戏生效")
                 .defineInRange("max_upgrade", 16, 1, 64);
-        COMMON_BUILDER.pop();
+        SERVER_BUILDER.pop();
 
-        COMMON_BUILDER.push("advanced_alloy_furnace");
-        FURNACE_DRAW_APPFLUX_ENERGY = COMMON_BUILDER
+        SERVER_BUILDER.translation("useless_mod.configuration.advanced_alloy_furnace")
+                .push("advanced_alloy_furnace");
+        FURNACE_DRAW_APPFLUX_ENERGY = SERVER_BUILDER
                 .comment("万象炉是否自动从所在AE网络抽取AppliedFlux(应用通量)存储的FE能量",
                         "需要安装AppliedFlux且网络中有通量元件, 每tick抽取量受熔炉最大输入速率限制")
                 .define("draw_appflux_energy", true);
 
-        FURNACE_DRAW_AE_ENERGY = COMMON_BUILDER
+        FURNACE_DRAW_AE_ENERGY = SERVER_BUILDER
                 .comment("万象炉是否直接抽取AE网络自身的能量(按 1 AE = 2 FE 折算)",
                         "警告: 会与网络中其他设备争抢供电, 网络储能不足时可能导致设备频繁掉线",
                         "在AppliedFlux抽取之后作为补充, 每tick总抽取量受熔炉最大输入速率限制")
                 .define("draw_ae_energy", false);
+        SERVER_BUILDER.pop();
 
+        // Common config: adapter registration happens during common setup on both physical sides.
+        COMMON_BUILDER.translation("useless_mod.configuration.advanced_alloy_furnace")
+                .push("advanced_alloy_furnace");
         COMMON_BUILDER.translation("useless_mod.configuration.advanced_alloy_furnace.recipe_conversion")
                 .push("recipe_conversion");
         COMMON_BUILDER.translation("useless_mod.configuration.advanced_alloy_furnace.recipe_conversion.minecraft")
@@ -502,6 +510,7 @@ public class ConfigManager {
                 Map.entry("pneumaticcraft", ENABLE_PNEUMATICCRAFT_RECIPE_CONVERSION),
                 Map.entry("bigreactors", ENABLE_BIG_REACTORS_RECIPE_CONVERSION));
         COMMON_BUILDER.pop();
+        COMMON_BUILDER.pop();
 
         COMMON_SPEC = COMMON_BUILDER.build();
         CLIENT_SPEC = CLIENT_BUILDER.build();
@@ -594,81 +603,81 @@ public class ConfigManager {
     }
 
     public static int getBotanyPotGrowthMultiplier() {
-        return BOTANY_POT_GROWTH_MULTIPLIER.get();
+        return getConfigValue(BOTANY_POT_GROWTH_MULTIPLIER);
     }
 
     public static boolean shouldEnableBotanyPotRendering() {
-        return ENABLE_BOTANY_POT_RENDERING.get();
+        return getConfigValue(ENABLE_BOTANY_POT_RENDERING);
     }
 
     public static int getMatrixPatternCount() {
-        return MATRIX_PATTERN_COUNT.get();
+        return getConfigValue(MATRIX_PATTERN_COUNT);
     }
 
     public static int getTimeMultiplier() {
-        return TIME_MULTIPLIER.get();
+        return getConfigValue(TIME_MULTIPLIER);
     }
 
     public static int getElectricityMultiplier() {
-        return ELECTRICITY_MULTIPLIER.get();
+        return getConfigValue(ELECTRICITY_MULTIPLIER);
     }
 
     public static int getChainMiningMaxBlocks() {
-        return CHAIN_MINING_MAX_BLOCKS.get();
+        return getConfigValue(CHAIN_MINING_MAX_BLOCKS);
     }
 
     public static int getCapacityMultiplier() {
-        return CAPACITY_MULTIPLIER.get();
+        return getConfigValue(CAPACITY_MULTIPLIER);
     }
 
     public static int getMaxUpgrade() {
-        return MAX_UPGRADE.get();
+        return getConfigValue(MAX_UPGRADE);
     }
 
     // 万象炉AE网络抽电配置
     public static boolean isFurnaceDrawAppfluxEnergyEnabled() {
-        return FURNACE_DRAW_APPFLUX_ENERGY.get();
+        return getConfigValue(FURNACE_DRAW_APPFLUX_ENERGY);
     }
 
     public static boolean isFurnaceDrawAeEnergyEnabled() {
-        return FURNACE_DRAW_AE_ENERGY.get();
+        return getConfigValue(FURNACE_DRAW_AE_ENERGY);
     }
 
     public static boolean isCraftingRecipeConversionEnabled() {
-        return ENABLE_CRAFTING_RECIPE_CONVERSION.get();
+        return getConfigValue(ENABLE_CRAFTING_RECIPE_CONVERSION);
     }
 
     public static boolean isSmeltingRecipeConversionEnabled() {
-        return ENABLE_SMELTING_RECIPE_CONVERSION.get();
+        return getConfigValue(ENABLE_SMELTING_RECIPE_CONVERSION);
     }
 
     public static boolean isBrewingRecipeConversionEnabled() {
-        return ENABLE_BREWING_RECIPE_CONVERSION.get();
+        return getConfigValue(ENABLE_BREWING_RECIPE_CONVERSION);
     }
 
     public static boolean isRecipeConversionEnabled(String sourceId) {
         ModConfigSpec.BooleanValue option = RECIPE_CONVERSION_OPTIONS.get(sourceId);
-        return option == null || option.get();
+        return option == null || getConfigValue(option);
     }
 
     public static int getOmniversalPatternSlots() {
-        return normalizeInventorySlots(OMNIVERSAL_PATTERN_SLOTS.get());
+        return normalizeInventorySlots(getConfigValue(OMNIVERSAL_PATTERN_SLOTS));
     }
 
     public static int getOmniversalMoldSlots() {
-        return normalizeInventorySlots(OMNIVERSAL_MOLD_SLOTS.get());
+        return normalizeInventorySlots(getConfigValue(OMNIVERSAL_MOLD_SLOTS));
     }
 
     public static int getOmniversalPassivePatternSlots() {
-        return Math.max(1, Math.min(540, OMNIVERSAL_PASSIVE_PATTERN_SLOTS.get()));
+        return Math.max(1, Math.min(540, getConfigValue(OMNIVERSAL_PASSIVE_PATTERN_SLOTS)));
     }
 
     public static int getOmniversalDecodeCacheCapacity() {
-        return Math.max(64, Math.min(16384, OMNIVERSAL_DECODE_CACHE_CAPACITY.get()));
+        return Math.max(64, Math.min(16384, getConfigValue(OMNIVERSAL_DECODE_CACHE_CAPACITY)));
     }
 
     public static int getOreGeneratorSlots() {
-        return Math.max(1, Math.min(540, ORE_GENERATOR_SLOTS.get()));
+        return Math.max(1, Math.min(540, getConfigValue(ORE_GENERATOR_SLOTS)));
     }
 
     private static int normalizeInventorySlots(int value) {
@@ -678,46 +687,46 @@ public class ConfigManager {
 
     // 获取连锁挖掘范围配置
     public static int getChainMiningRangeX() {
-        return CHAIN_MINING_RANGE_X.get();
+        return getConfigValue(CHAIN_MINING_RANGE_X);
     }
 
     public static int getChainMiningRangeY() {
-        return CHAIN_MINING_RANGE_Y.get();
+        return getConfigValue(CHAIN_MINING_RANGE_Y);
     }
 
     public static int getChainMiningRangeZ() {
-        return CHAIN_MINING_RANGE_Z.get();
+        return getConfigValue(CHAIN_MINING_RANGE_Z);
     }
 
     public static double getBeefToolFlightSpeed() {
-        return BEEF_TOOL_FLIGHT_SPEED.get();
+        return getConfigValue(BEEF_TOOL_FLIGHT_SPEED);
     }
 
     // 获取牛排工具附魔等级配置
     public static int getFortuneLevel() {
-        return FORTUNE_LEVEL.get();
+        return getConfigValue(FORTUNE_LEVEL);
     }
 
     public static int getLootingLevel() {
-        return LOOTING_LEVEL.get();
+        return getConfigValue(LOOTING_LEVEL);
     }
 
     // 获取节日掉落触发概率
     public static int getFestiveDropChance() {
-        return FESTIVE_DROP_CHANCE.get();
+        return getConfigValue(FESTIVE_DROP_CHANCE);
     }
 
     // 获取牛排工具基础挖掘速度
     public static double getBeefToolMiningSpeed() {
-        return BEEF_TOOL_MINING_SPEED.get();
+        return getConfigValue(BEEF_TOOL_MINING_SPEED);
     }
 
     public static double getBeefToolEntityInteractionRange() {
-        return BEEF_TOOL_ENTITY_INTERACTION_RANGE.get();
+        return getConfigValue(BEEF_TOOL_ENTITY_INTERACTION_RANGE);
     }
 
     public static double getBeefToolBlockInteractionRange() {
-        return BEEF_TOOL_BLOCK_INTERACTION_RANGE.get();
+        return getConfigValue(BEEF_TOOL_BLOCK_INTERACTION_RANGE);
     }
 
     public static List<String> getBeefToolForceMiningBlacklist() {
@@ -759,20 +768,20 @@ public class ConfigManager {
     }
 
     public static List<String> getBeefToolForceKillBlacklist() {
-        return splitEntityIdList(BEEF_TOOL_FORCE_KILL_BLACKLIST.get());
+        return splitEntityIdList(getConfigValue(BEEF_TOOL_FORCE_KILL_BLACKLIST));
     }
 
     public static List<String> getBeefToolForceKillNonLivingWhitelist() {
-        return splitEntityIdList(BEEF_TOOL_FORCE_KILL_NON_LIVING_WHITELIST.get());
+        return splitEntityIdList(getConfigValue(BEEF_TOOL_FORCE_KILL_NON_LIVING_WHITELIST));
     }
 
     // 获取药水效果配置
     public static boolean shouldEnablePotionEffects() {
-        return ENABLE_POTION_EFFECTS.get();
+        return getConfigValue(ENABLE_POTION_EFFECTS);
     }
 
     public static boolean shouldEnableFlightEffect() {
-        return ENABLE_FLIGHT_EFFECT.get();
+        return getConfigValue(ENABLE_FLIGHT_EFFECT);
     }
 
     // 获取自定义药水效果配置列表
@@ -789,11 +798,15 @@ public class ConfigManager {
 
     private static List<String> readConfigList(
             ModConfigSpec.ConfigValue<List<? extends String>> value) {
+        List<? extends String> configured = getConfigValue(value);
+        return configured == null ? List.of() : List.copyOf(configured);
+    }
+
+    private static <T> T getConfigValue(ModConfigSpec.ConfigValue<T> value) {
         try {
-            List<? extends String> configured = value.get();
-            return configured == null ? List.of() : List.copyOf(configured);
+            return value.get();
         } catch (IllegalStateException ignored) {
-            return List.of();
+            return value.getDefault();
         }
     }
 

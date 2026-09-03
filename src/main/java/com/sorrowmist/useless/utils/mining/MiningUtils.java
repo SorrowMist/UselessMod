@@ -4,6 +4,7 @@ import com.sorrowmist.useless.api.enums.tool.EnchantMode;
 import com.sorrowmist.useless.compat.AE2Compat;
 import com.sorrowmist.useless.compat.DraconicEvolutionCompat;
 import com.sorrowmist.useless.core.component.UComponents;
+import com.sorrowmist.useless.core.config.ChainEquivalence;
 import com.sorrowmist.useless.core.config.ConfigManager;
 import com.sorrowmist.useless.utils.UComponentUtils;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
@@ -293,7 +294,8 @@ public class MiningUtils {
         int rangeY = ConfigManager.getChainMiningRangeY();
         int rangeZ = ConfigManager.getChainMiningRangeZ();
 
-        Block originBlock = originState.getBlock();
+        // 同类方块判定：命中配置的等价组时按组匹配，否则退回严格同方块
+        ChainEquivalence equivalence = ConfigManager.getChainMiningEquivalence(originState.getBlock());
         List<BlockPos> blocksToMine = new ArrayList<>(maxBlocks);
 
         // 检查原点方块是否可以被挖掘（工具等级检查）
@@ -337,8 +339,9 @@ public class MiningUtils {
                         BlockPos neighborPos = new BlockPos(nx, ny, nz);
                         BlockState nextState = level.getBlockState(neighborPos);
 
-                        if (nextState.is(originBlock)) {
-                            if (canMineBlock(nextState, stack, forceMining)) {
+                        if (equivalence.matches(nextState)) {
+                            if (canMineBlock(nextState, stack, forceMining)
+                                    && !(forceMining && isForceMiningBlacklisted(nextState))) {
                                 visited.add(nLong);
                                 queue.add(neighborPos);
                             }
@@ -379,7 +382,8 @@ public class MiningUtils {
         int rangeY = ConfigManager.getChainMiningRangeY();
         int rangeZ = ConfigManager.getChainMiningRangeZ();
 
-        Block originBlock = originState.getBlock();
+        // 同类方块判定：命中配置的等价组时按组匹配，否则退回严格同方块
+        ChainEquivalence equivalence = ConfigManager.getChainMiningEquivalence(originState.getBlock());
         List<BlockPos> blocksToMine = new ArrayList<>(maxBlocks);
 
         // 增强连锁：直接在范围内扫描所有相同方块，不需要相邻限制
@@ -394,8 +398,9 @@ public class MiningUtils {
                     BlockPos targetPos = new BlockPos(nx, ny, nz);
                     BlockState nextState = level.getBlockState(targetPos);
 
-                    if (nextState.is(originBlock)) {
-                        if (canMineBlock(nextState, stack, forceMining)) {
+                    if (equivalence.matches(nextState)) {
+                        if (canMineBlock(nextState, stack, forceMining)
+                                && !(forceMining && isForceMiningBlacklisted(nextState))) {
                             blocksToMine.add(targetPos);
                         }
                     }

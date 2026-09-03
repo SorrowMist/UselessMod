@@ -1,6 +1,7 @@
 package com.sorrowmist.useless.core.config;
 
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.level.block.Block;
 import net.neoforged.fml.ModList;
 import net.neoforged.neoforge.common.ModConfigSpec;
 
@@ -36,6 +37,8 @@ public class ConfigManager {
     private static final ModConfigSpec.IntValue CHAIN_MINING_RANGE_Y;
     private static final ModConfigSpec.IntValue CHAIN_MINING_RANGE_Z;
     private static final ModConfigSpec.IntValue CHAIN_MINING_MAX_BLOCKS;
+    // 连锁挖掘等价组：命中同一条目的方块视为同类
+    private static final ModConfigSpec.ConfigValue<List<? extends String>> CHAIN_MINING_EQUIVALENT_GROUPS;
     private static final ModConfigSpec.DoubleValue BEEF_TOOL_FLIGHT_SPEED;
     // 牛排工具附魔等级配置
     private static final ModConfigSpec.IntValue FORTUNE_LEVEL;
@@ -122,15 +125,19 @@ public class ConfigManager {
             USELESS_DIMENSION_FLOOR_BLOCK_WHITELIST;
     private static final ModConfigSpec.ConfigValue<List<? extends String>>
             AE2_GIFT_PACKAGE_ITEMS;
+    private static final String DIMENSION_FLOOR_BLACKLIST_NAME = "Useless Dimension floor block blacklist";
+    private static final String DIMENSION_FLOOR_WHITELIST_NAME = "Useless Dimension floor block whitelist";
     private static volatile List<String> cachedUselessDimensionFloorBlockBlacklist = List.of();
     private static volatile BlockBlacklistMatcher uselessDimensionFloorBlockBlacklistMatcher =
-            BlockBlacklistMatcher.empty("blacklist");
+            BlockBlacklistMatcher.empty(DIMENSION_FLOOR_BLACKLIST_NAME);
     private static volatile List<String> cachedUselessDimensionFloorBlockWhitelist = List.of();
     private static volatile BlockBlacklistMatcher uselessDimensionFloorBlockWhitelistMatcher =
-            BlockBlacklistMatcher.empty("whitelist");
+            BlockBlacklistMatcher.empty(DIMENSION_FLOOR_WHITELIST_NAME);
     private static volatile List<String> cachedBeefToolForceMiningBlacklist = List.of();
     private static volatile BlockBlacklistMatcher beefToolForceMiningBlacklistMatcher =
             BlockBlacklistMatcher.empty("beef tool force mining blacklist");
+    private static volatile List<String> cachedChainMiningEquivalentGroups = List.of();
+    private static volatile ChainMatchGroups chainMiningEquivalentGroups = ChainMatchGroups.empty();
 
     static {
         // Server config: these values change world or machine behavior.
@@ -254,6 +261,15 @@ public class ConfigManager {
                 .comment("连锁挖掘的最大方块数量")
                 .translation("useless_mod.configuration.chain_mining_max_blocks")
                 .defineInRange("chain_mining_max_blocks", 1000, 1, 1000000);
+
+        CHAIN_MINING_EQUIVALENT_GROUPS = SERVER_BUILDER
+                .comment("连锁挖掘等价组，命中同一条目的方块视为同类，可以一起连锁",
+                        "原点方块命中多条时取并集; 一条都不命中时仅连锁完全相同的方块",
+                        "支持精确方块ID、#方块标签和*通配符，留空则保持仅连锁相同方块",
+                        "示例: \"#minecraft:logs\", \"#c:ores\", \"*_ore\"")
+                .translation("useless_mod.configuration.chain_mining_equivalent_groups")
+                .defineListAllowEmpty("chain_mining_equivalent_groups", List.<String>of(), () -> "",
+                        entry -> entry instanceof String);
 
         // 牛排工具附魔等级配置
         FORTUNE_LEVEL = SERVER_BUILDER
@@ -698,6 +714,18 @@ public class ConfigManager {
         return getConfigValue(CHAIN_MINING_RANGE_Z);
     }
 
+    public static List<String> getChainMiningEquivalentGroups() {
+        return readConfigList(CHAIN_MINING_EQUIVALENT_GROUPS);
+    }
+
+    /**
+     * 构造本次连锁扫描使用的"同类方块"判定。
+     * 每次扫描调用一次，返回的对象内部带有单次扫描的判定缓存，不要跨扫描复用。
+     */
+    public static ChainEquivalence getChainMiningEquivalence(Block origin) {
+        return chainMiningEquivalentGroups().forOrigin(origin);
+    }
+
     public static double getBeefToolFlightSpeed() {
         return getConfigValue(BEEF_TOOL_FLIGHT_SPEED);
     }
@@ -815,7 +843,8 @@ public class ConfigManager {
         if (!configured.equals(cachedUselessDimensionFloorBlockBlacklist)) {
             synchronized (ConfigManager.class) {
                 if (!configured.equals(cachedUselessDimensionFloorBlockBlacklist)) {
-                    uselessDimensionFloorBlockBlacklistMatcher = new BlockBlacklistMatcher(configured);
+                    uselessDimensionFloorBlockBlacklistMatcher =
+                            new BlockBlacklistMatcher(configured, DIMENSION_FLOOR_BLACKLIST_NAME);
                     cachedUselessDimensionFloorBlockBlacklist = configured;
                 }
             }
@@ -829,7 +858,7 @@ public class ConfigManager {
             synchronized (ConfigManager.class) {
                 if (!configured.equals(cachedUselessDimensionFloorBlockWhitelist)) {
                     uselessDimensionFloorBlockWhitelistMatcher =
-                            new BlockBlacklistMatcher(configured, "whitelist");
+                            new BlockBlacklistMatcher(configured, DIMENSION_FLOOR_WHITELIST_NAME);
                     cachedUselessDimensionFloorBlockWhitelist = configured;
                 }
             }
@@ -849,6 +878,19 @@ public class ConfigManager {
             }
         }
         return beefToolForceMiningBlacklistMatcher;
+    }
+
+    private static ChainMatchGroups chainMiningEquivalentGroups() {
+        List<String> configured = getChainMiningEquivalentGroups();
+        if (!configured.equals(cachedChainMiningEquivalentGroups)) {
+            synchronized (ConfigManager.class) {
+                if (!configured.equals(cachedChainMiningEquivalentGroups)) {
+                    chainMiningEquivalentGroups = new ChainMatchGroups(configured);
+                    cachedChainMiningEquivalentGroups = configured;
+                }
+            }
+        }
+        return chainMiningEquivalentGroups;
     }
 
 }

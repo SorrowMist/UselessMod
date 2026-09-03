@@ -128,7 +128,6 @@ final class BlockBlacklistMatcher {
     }
 
     private void warn(String entry, String reason) {
-        UselessMod.LOGGER.warn(
-                "Ignoring Useless Dimension floor block {} entry '{}': {}", listName, entry, reason);
+        UselessMod.LOGGER.warn("Ignoring {} entry '{}': {}", listName, entry, reason);
     }
 }

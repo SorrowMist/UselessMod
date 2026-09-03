@@ -1,5 +1,7 @@
 package com.sorrowmist.useless.utils.mining;
 
+import com.sorrowmist.useless.core.config.ChainEquivalence;
+import com.sorrowmist.useless.core.config.ConfigManager;
 import com.sorrowmist.useless.data.PlayerMiningData;
 import com.sorrowmist.useless.utils.UComponentUtils;
 import net.minecraft.core.BlockPos;
@@ -83,11 +85,13 @@ public class ChainMiningStrategy implements MiningStrategy {
         List<ItemStack> allDrops = new ArrayList<>();
         int actualMinedCount = 0;
         int totalExperience = 0;
+        // 破坏前二次校验必须与扫描阶段使用同一套判定，否则等价组扩出的方块会在此被全部跳过
+        ChainEquivalence equivalence = ConfigManager.getChainMiningEquivalence(originState.getBlock());
 
         for (BlockPos targetPos : blocksToMine) {
             BlockState currentState = level.getBlockState(targetPos);
 
-            if (!currentState.is(originState.getBlock())) {
+            if (!equivalence.matches(currentState)) {
                 continue;
             }
 

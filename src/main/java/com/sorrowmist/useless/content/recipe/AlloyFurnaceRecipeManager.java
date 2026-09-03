@@ -5,6 +5,7 @@ import appeng.api.stacks.AEItemKey;
 import appeng.api.stacks.AEKey;
 import appeng.api.stacks.GenericStack;
 import com.sorrowmist.useless.init.ModRecipeTypes;
+import it.unimi.dsi.fastutil.objects.Object2LongLinkedOpenHashMap;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
@@ -15,6 +16,7 @@ import net.minecraft.world.item.crafting.RecipeHolder;
 import net.minecraft.world.item.crafting.RecipeManager;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.material.Fluid;
+import net.neoforged.neoforge.common.crafting.DataComponentIngredient;
 import net.neoforged.neoforge.fluids.FluidStack;
 import net.neoforged.neoforge.fluids.crafting.FluidIngredient;
 import org.jetbrains.annotations.Nullable;
@@ -557,7 +559,7 @@ public class AlloyFurnaceRecipeManager {
         }
 
         List<AdvancedAlloyFurnaceRecipe> candidates = new ArrayList<>();
-        Map<Ingredient, Long> mergedInputs = AdapterUtils.mergeInputs(context.inputs());
+        Map<Ingredient, Long> mergedInputs = mergeItemInputs(context.inputs(), context.keyInputs());
         Map<FluidStack, Long> mergedFluids = mergeFluidInputs(
                 context.fluidInputs(), context.keyInputs());
         Map<AEKey, Long> mergedKeys = AdapterUtils.mergeKeys(context.keyInputs());
@@ -1111,6 +1113,28 @@ public class AlloyFurnaceRecipeManager {
                     stack.getCount()));
         }
         return List.copyOf(result);
+    }
+
+    /** Gives item-based adapters the same long amounts for physical stacks and AE item keys. */
+    private static Map<Ingredient, Long> mergeItemInputs(
+            List<ItemStack> stacks, List<GenericStack> keyInputs) {
+        Object2LongLinkedOpenHashMap<AEItemKey> amounts = new Object2LongLinkedOpenHashMap<>();
+        for (ItemStack stack : stacks) {
+            if (stack == null || stack.isEmpty()) continue;
+            amounts.mergeLong(AEItemKey.of(stack),
+                    stack.getCount(), AlloyFurnaceRecipeManager::saturatingAdd);
+        }
+        for (GenericStack stack : keyInputs) {
+            if (stack.what() instanceof AEItemKey itemKey) {
+                amounts.mergeLong(itemKey,
+                        stack.amount(), AlloyFurnaceRecipeManager::saturatingAdd);
+            }
+        }
+        Object2LongLinkedOpenHashMap<Ingredient> result = new Object2LongLinkedOpenHashMap<>(amounts.size());
+        for (var entry : amounts.object2LongEntrySet()) {
+            result.put(DataComponentIngredient.of(true, entry.getKey().toStack(1)), entry.getLongValue());
+        }
+        return result;
     }
 
     private static Map<FluidStack, Long> mergeFluidInputs(

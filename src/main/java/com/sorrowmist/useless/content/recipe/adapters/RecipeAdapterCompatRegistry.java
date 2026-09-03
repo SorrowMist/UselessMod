@@ -24,6 +24,8 @@ import com.sorrowmist.useless.content.recipe.adapters.industrialforegoing.FluidS
 import com.sorrowmist.useless.content.recipe.adapters.industrialforegoing.WashingFactoryRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.industrialforegoing.LatexProcessingUnitRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.industrialforegoing.FluidExtractorRecipeAdapter;
+import com.sorrowmist.useless.content.recipe.adapters.industrialforegoing.LaserDrillOreRecipeAdapter;
+import com.sorrowmist.useless.content.recipe.adapters.industrialforegoing.LaserDrillFluidRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.industrialforegoing.InfuserRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.industrialforegoing.PrecisionShapedRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.industrialforegoing.PrecisionShapelessRecipeAdapter;
@@ -319,6 +321,8 @@ public final class RecipeAdapterCompatRegistry {
         register(new WashingFactoryRecipeAdapter());
         register(new LatexProcessingUnitRecipeAdapter());
         register(new FluidExtractorRecipeAdapter());
+        register(new LaserDrillOreRecipeAdapter());
+        register(new LaserDrillFluidRecipeAdapter());
         if (isLoaded("ifeu")) {
             register(new InfuserRecipeAdapter());
             register(new PrecisionShapedRecipeAdapter());

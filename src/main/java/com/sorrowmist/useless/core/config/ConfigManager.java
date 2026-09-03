@@ -50,6 +50,15 @@ public class ConfigManager {
     private static final ModConfigSpec.ConfigValue<List<? extends String>> BEEF_TOOL_FORCE_MINING_BLACKLIST;
     private static final ModConfigSpec.ConfigValue<String> BEEF_TOOL_FORCE_KILL_BLACKLIST;
     private static final ModConfigSpec.ConfigValue<String> BEEF_TOOL_FORCE_KILL_NON_LIVING_WHITELIST;
+    // 牛排工具范围伤害配置（半径）
+    private static final ModConfigSpec.IntValue BEEF_AOE_DAMAGE_RANGE_X;
+    private static final ModConfigSpec.IntValue BEEF_AOE_DAMAGE_RANGE_Y;
+    private static final ModConfigSpec.IntValue BEEF_AOE_DAMAGE_RANGE_Z;
+    private static final ModConfigSpec.IntValue BEEF_AOE_DAMAGE_MAX_TARGETS;
+    // 牛排工具范围磁力吸附配置（半径）
+    private static final ModConfigSpec.IntValue BEEF_MAGNET_RANGE_X;
+    private static final ModConfigSpec.IntValue BEEF_MAGNET_RANGE_Y;
+    private static final ModConfigSpec.IntValue BEEF_MAGNET_RANGE_Z;
 
     // 战利品大爆发触发概率配置 (百分比)
     private static final ModConfigSpec.IntValue FESTIVE_DROP_CHANCE;
@@ -256,6 +265,41 @@ public class ConfigManager {
                 .comment("连锁挖掘的Z轴范围半径")
                 .translation("useless_mod.configuration.chain_mining_range_z")
                 .defineInRange("chain_mining_range_z", 8, 1, 32);
+
+        BEEF_AOE_DAMAGE_RANGE_X = SERVER_BUILDER
+                .comment("范围伤害的X轴范围半径")
+                .translation("useless_mod.configuration.beef_aoe_damage_range_x")
+                .defineInRange("beef_aoe_damage_range_x", 5, 1, 64);
+
+        BEEF_AOE_DAMAGE_RANGE_Y = SERVER_BUILDER
+                .comment("范围伤害的Y轴范围半径")
+                .translation("useless_mod.configuration.beef_aoe_damage_range_y")
+                .defineInRange("beef_aoe_damage_range_y", 3, 1, 64);
+
+        BEEF_AOE_DAMAGE_RANGE_Z = SERVER_BUILDER
+                .comment("范围伤害的Z轴范围半径")
+                .translation("useless_mod.configuration.beef_aoe_damage_range_z")
+                .defineInRange("beef_aoe_damage_range_z", 5, 1, 64);
+
+        BEEF_AOE_DAMAGE_MAX_TARGETS = SERVER_BUILDER
+                .comment("范围伤害单次最多命中的实体数量")
+                .translation("useless_mod.configuration.beef_aoe_damage_max_targets")
+                .defineInRange("beef_aoe_damage_max_targets", 64, 1, 1024);
+
+        BEEF_MAGNET_RANGE_X = SERVER_BUILDER
+                .comment("击杀后范围磁力吸附的X轴范围半径")
+                .translation("useless_mod.configuration.beef_magnet_range_x")
+                .defineInRange("beef_magnet_range_x", 5, 1, 64);
+
+        BEEF_MAGNET_RANGE_Y = SERVER_BUILDER
+                .comment("击杀后范围磁力吸附的Y轴范围半径")
+                .translation("useless_mod.configuration.beef_magnet_range_y")
+                .defineInRange("beef_magnet_range_y", 3, 1, 64);
+
+        BEEF_MAGNET_RANGE_Z = SERVER_BUILDER
+                .comment("击杀后范围磁力吸附的Z轴范围半径")
+                .translation("useless_mod.configuration.beef_magnet_range_z")
+                .defineInRange("beef_magnet_range_z", 5, 1, 64);
 
         CHAIN_MINING_MAX_BLOCKS = SERVER_BUILDER
                 .comment("连锁挖掘的最大方块数量")
@@ -712,6 +756,36 @@ public class ConfigManager {
 
     public static int getChainMiningRangeZ() {
         return getConfigValue(CHAIN_MINING_RANGE_Z);
+    }
+
+    // 获取牛排工具范围伤害配置
+    public static int getBeefAoeDamageRangeX() {
+        return getConfigValue(BEEF_AOE_DAMAGE_RANGE_X);
+    }
+
+    public static int getBeefAoeDamageRangeY() {
+        return getConfigValue(BEEF_AOE_DAMAGE_RANGE_Y);
+    }
+
+    public static int getBeefAoeDamageRangeZ() {
+        return getConfigValue(BEEF_AOE_DAMAGE_RANGE_Z);
+    }
+
+    public static int getBeefAoeDamageMaxTargets() {
+        return getConfigValue(BEEF_AOE_DAMAGE_MAX_TARGETS);
+    }
+
+    // 获取牛排工具范围磁力吸附配置
+    public static int getBeefMagnetRangeX() {
+        return getConfigValue(BEEF_MAGNET_RANGE_X);
+    }
+
+    public static int getBeefMagnetRangeY() {
+        return getConfigValue(BEEF_MAGNET_RANGE_Y);
+    }
+
+    public static int getBeefMagnetRangeZ() {
+        return getConfigValue(BEEF_MAGNET_RANGE_Z);
     }
 
     public static List<String> getChainMiningEquivalentGroups() {

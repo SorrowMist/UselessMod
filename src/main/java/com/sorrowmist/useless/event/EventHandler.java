@@ -1,6 +1,7 @@
 package com.sorrowmist.useless.event;
 
 import com.sorrowmist.useless.UselessMod;
+import com.sorrowmist.useless.content.items.BeefMagnetHandler;
 import com.sorrowmist.useless.content.items.BeefTimeAcceleration;
 import com.sorrowmist.useless.content.items.EndlessBeafItem;
 import com.sorrowmist.useless.content.recipe.AlloyFurnaceRecipeManager;
@@ -116,6 +117,21 @@ public class EventHandler {
         }
 
         UselessItemUtils.tryCaptureSpawnEgg(event.getEntity(), player.getMainHandItem(), player);
+    }
+
+    @SubscribeEvent(priority = EventPriority.LOWEST)
+    public static void onBeefToolMagnetDeath(LivingDeathEvent event) {
+        if (event.isCanceled() || !(event.getEntity().level() instanceof ServerLevel level)) {
+            return;
+        }
+        if (!(event.getSource().getEntity() instanceof Player player)) {
+            return;
+        }
+
+        ItemStack mainHandItem = player.getMainHandItem();
+        if (mainHandItem.getItem() instanceof EndlessBeafItem) {
+            BeefMagnetHandler.onEntityKilled(level, player, mainHandItem, event.getEntity().position());
+        }
     }
 
     @SubscribeEvent(priority = EventPriority.HIGHEST)

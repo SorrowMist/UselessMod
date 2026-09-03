@@ -28,7 +28,13 @@ public enum ModeTypeEnum {
     BEEF_CAPTURE_DISABLED("beef_capture_disabled", "tooltip.useless_mod.beef_capture_mode"),
 
     BEEF_TELEPORT_ENABLED("beef_teleport_enabled", "tooltip.useless_mod.beef_teleport_mode"),
-    BEEF_TELEPORT_DISABLED("beef_teleport_disabled", "tooltip.useless_mod.beef_teleport_mode");
+    BEEF_TELEPORT_DISABLED("beef_teleport_disabled", "tooltip.useless_mod.beef_teleport_mode"),
+
+    BEEF_AOE_DAMAGE_ENABLED("beef_aoe_damage_enabled", "tooltip.useless_mod.beef_aoe_damage_mode"),
+    BEEF_AOE_DAMAGE_DISABLED("beef_aoe_damage_disabled", "tooltip.useless_mod.beef_aoe_damage_mode"),
+
+    BEEF_MAGNET_ENABLED("beef_magnet_enabled", "tooltip.useless_mod.beef_magnet_mode"),
+    BEEF_MAGNET_DISABLED("beef_magnet_disabled", "tooltip.useless_mod.beef_magnet_mode");
 
     private final String name;
     private final String tooltipKey;
@@ -69,6 +75,14 @@ public enum ModeTypeEnum {
         return enabled ? BEEF_TELEPORT_ENABLED : BEEF_TELEPORT_DISABLED;
     }
     
+    public static ModeTypeEnum getBeefAoeDamageMode(boolean enabled) {
+        return enabled ? BEEF_AOE_DAMAGE_ENABLED : BEEF_AOE_DAMAGE_DISABLED;
+    }
+
+    public static ModeTypeEnum getBeefMagnetMode(boolean enabled) {
+        return enabled ? BEEF_MAGNET_ENABLED : BEEF_MAGNET_DISABLED;
+    }
+
     public String getName() {return this.name;}
     
     public Component getTooltip() {return Component.translatable(this.tooltipKey);}

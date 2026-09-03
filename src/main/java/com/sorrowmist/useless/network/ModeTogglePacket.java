@@ -78,6 +78,16 @@ public class ModeTogglePacket implements CustomPacketPayload {
                         EndlessBeafItem.setTeleportEnabled(stack, msg.enabled);
                     }
                 }
+                case BEEF_AOE_DAMAGE -> {
+                    if (stack.getItem() instanceof EndlessBeafItem) {
+                        stack.set(UComponents.BeefAoeDamageEnabledComponent.get(), msg.enabled);
+                    }
+                }
+                case BEEF_MAGNET -> {
+                    if (stack.getItem() instanceof EndlessBeafItem) {
+                        stack.set(UComponents.BeefMagnetEnabledComponent.get(), msg.enabled);
+                    }
+                }
             }
 
             // 显式同步物品到客户端
@@ -98,6 +108,8 @@ public class ModeTogglePacket implements CustomPacketPayload {
         BEEF_INVULNERABILITY,
         BEEF_CAPTURE,
         BEEF_TIME_ACCELERATION,
-        BEEF_TELEPORT
+        BEEF_TELEPORT,
+        BEEF_AOE_DAMAGE,
+        BEEF_MAGNET
     }
 }

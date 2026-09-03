@@ -204,7 +204,7 @@ public class MiningUtils {
      * @param items 要合并的物品列表
      * @return 合并后的物品列表
      */
-    static List<ItemStack> mergeItemStacks(List<ItemStack> items) {
+    public static List<ItemStack> mergeItemStacks(List<ItemStack> items) {
         List<ItemStack> merged = new ArrayList<>();
         for (ItemStack item : items) {
             if (item.isEmpty()) continue;
@@ -241,7 +241,7 @@ public class MiningUtils {
      * @param player 玩家
      * @param drops  掉落物列表
      */
-    static void handleDrops(Player player, List<ItemStack> drops, ItemStack tool) {
+    public static void handleDrops(Player player, List<ItemStack> drops, ItemStack tool) {
         boolean isAE2Loaded = ModList.get().isLoaded("ae2");
 
         for (ItemStack drop : drops) {

@@ -135,6 +135,32 @@ public final class UComponents {
                            ))
             );
 
+    /**
+     * 范围伤害组件（BeefAoeDamage）
+     * 用于在物品上存储是否启用范围伤害（布尔类型）
+     */
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<Boolean>> BeefAoeDamageEnabledComponent =
+            register("beef_aoe_damage_enabled", builder ->
+                    builder.persistent(Codec.BOOL)
+                           .networkSynchronized(StreamCodec.of(
+                                   FriendlyByteBuf::writeBoolean,
+                                   FriendlyByteBuf::readBoolean
+                           ))
+            );
+
+    /**
+     * 范围磁力吸附组件（BeefMagnet）
+     * 用于在物品上存储是否启用击杀后的范围磁力吸附（布尔类型）
+     */
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<Boolean>> BeefMagnetEnabledComponent =
+            register("beef_magnet_enabled", builder ->
+                    builder.persistent(Codec.BOOL)
+                           .networkSynchronized(StreamCodec.of(
+                                   FriendlyByteBuf::writeBoolean,
+                                   FriendlyByteBuf::readBoolean
+                           ))
+            );
+
     public static final DeferredHolder<DataComponentType<?>, DataComponentType<GlobalPos>> WIRELESS_LINK_TARGET = register(
             "wireless_link_target",
             builder ->

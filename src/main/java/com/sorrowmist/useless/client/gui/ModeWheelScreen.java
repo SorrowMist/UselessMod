@@ -68,6 +68,8 @@ public class ModeWheelScreen extends Screen {
         boolean beefInvulnerabilityEnabled = this.mainHandItem.getOrDefault(UComponents.BeefInvulnerabilityEnabledComponent, false);
         boolean beefCaptureEnabled = this.mainHandItem.getOrDefault(UComponents.BeefCaptureEnabledComponent, false);
         boolean beefTeleportEnabled = this.mainHandItem.getOrDefault(UComponents.BeefTeleportEnabledComponent, false);
+        boolean beefAoeDamageEnabled = this.mainHandItem.getOrDefault(UComponents.BeefAoeDamageEnabledComponent, false);
+        boolean beefMagnetEnabled = this.mainHandItem.getOrDefault(UComponents.BeefMagnetEnabledComponent, false);
 
         // 左：附魔模式
         for (EnchantMode m : EnchantMode.values())
@@ -100,6 +102,16 @@ public class ModeWheelScreen extends Screen {
                     ModeTypeEnum.getBeefTeleportMode(beefTeleportEnabled),
                     ModeTypeEnum.getBeefTeleportMode(beefTeleportEnabled).getTooltip(),
                     beefTeleportEnabled
+            ));
+            this.forceKillModes.add(new ModeData(
+                    ModeTypeEnum.getBeefAoeDamageMode(beefAoeDamageEnabled),
+                    ModeTypeEnum.getBeefAoeDamageMode(beefAoeDamageEnabled).getTooltip(),
+                    beefAoeDamageEnabled
+            ));
+            this.forceKillModes.add(new ModeData(
+                    ModeTypeEnum.getBeefMagnetMode(beefMagnetEnabled),
+                    ModeTypeEnum.getBeefMagnetMode(beefMagnetEnabled).getTooltip(),
+                    beefMagnetEnabled
             ));
         }
 
@@ -440,6 +452,22 @@ public class ModeWheelScreen extends Screen {
                     );
                     PacketDistributor.sendToServer(
                             new ModeTogglePacket(ModeTogglePacket.ModeType.BEEF_TELEPORT, !currentEnabled));
+                }
+                case BEEF_AOE_DAMAGE_ENABLED, BEEF_AOE_DAMAGE_DISABLED -> {
+                    boolean currentEnabled = this.mainHandItem.getOrDefault(
+                            UComponents.BeefAoeDamageEnabledComponent,
+                            false
+                    );
+                    PacketDistributor.sendToServer(
+                            new ModeTogglePacket(ModeTogglePacket.ModeType.BEEF_AOE_DAMAGE, !currentEnabled));
+                }
+                case BEEF_MAGNET_ENABLED, BEEF_MAGNET_DISABLED -> {
+                    boolean currentEnabled = this.mainHandItem.getOrDefault(
+                            UComponents.BeefMagnetEnabledComponent,
+                            false
+                    );
+                    PacketDistributor.sendToServer(
+                            new ModeTogglePacket(ModeTogglePacket.ModeType.BEEF_MAGNET, !currentEnabled));
                 }
             }
         }

@@ -94,6 +94,8 @@ import java.util.stream.Collectors;
 public class EndlessBeafItem extends TieredItem {
     private static final String AE2LT_NATURAL_LIGHTNING_TAG = "ae2lt.natural_weather_lightning";
     private static final Set<UUID> FORCE_KILL_DEATH_CONTEXT = ConcurrentHashMap.newKeySet();
+    // 范围伤害重入保护：避免范围内实体受伤时再次触发范围伤害
+    private static final Set<UUID> AOE_DAMAGE_CONTEXT = ConcurrentHashMap.newKeySet();
     private static final int TELEPORT_COOLDOWN_TICKS = 5;
     private final ToolTypeMode toolType;
 
@@ -130,6 +132,8 @@ public class EndlessBeafItem extends TieredItem {
                 .component(UComponents.BeefInvulnerabilityEnabledComponent, true)
                 .component(UComponents.BeefCaptureEnabledComponent, false)
                 .component(UComponents.BeefTeleportEnabledComponent, false)
+                .component(UComponents.BeefAoeDamageEnabledComponent, false)
+                .component(UComponents.BeefMagnetEnabledComponent, false)
                 .component(UComponents.AEStoragePriorityComponent, false)
                 .component(UComponents.CurrentToolTypeComponent, ToolTypeMode.NONE_MODE)
                 .component(DataComponents.CUSTOM_MODEL_DATA, new CustomModelData(1));
@@ -286,8 +290,12 @@ public class EndlessBeafItem extends TieredItem {
 
     @Override
     public boolean hurtEnemy(@NotNull ItemStack stack, @NotNull LivingEntity target, @NotNull LivingEntity attacker) {
-        if (attacker instanceof Player player && forceKillLivingEntity(stack, target, player)) {
-            return true;
+        if (attacker instanceof Player player) {
+            boolean forceKilled = forceKillLivingEntity(stack, target, player);
+            applyAoeDamage(stack, player, target);
+            if (forceKilled) {
+                return true;
+            }
         }
         return super.hurtEnemy(stack, target, attacker);
     }
@@ -296,12 +304,73 @@ public class EndlessBeafItem extends TieredItem {
     public boolean onLeftClickEntity(@NotNull ItemStack stack, @NotNull Player player, @NotNull Entity entity) {
         Entity target = getForceKillTarget(entity);
         if (target instanceof LivingEntity livingEntity && forceKillLivingEntity(stack, livingEntity, player)) {
+            applyAoeDamage(stack, player, target);
             return true;
         }
         if (!(target instanceof LivingEntity) && forceKillNonLivingEntity(stack, target, player)) {
+            applyAoeDamage(stack, player, target);
             return true;
         }
         return super.onLeftClickEntity(stack, player, entity);
+    }
+
+    /**
+     * 对主目标周围范围内的实体结算全额攻击伤害。
+     * 若工具开启了强制击杀模式，范围内的实体同样走强制击杀逻辑。
+     *
+     * @param stack   工具
+     * @param player  攻击者
+     * @param primary 直接命中的目标（作为范围中心，本身不重复结算）
+     */
+    private static void applyAoeDamage(ItemStack stack, Player player, Entity primary) {
+        if (!(player.level() instanceof ServerLevel level)
+                || !stack.getOrDefault(UComponents.BeefAoeDamageEnabledComponent, false)) {
+            return;
+        }
+        // 重入保护：范围伤害过程中不再触发新的范围伤害
+        if (!AOE_DAMAGE_CONTEXT.add(player.getUUID())) {
+            return;
+        }
+
+        try {
+            double rangeX = ConfigManager.getBeefAoeDamageRangeX();
+            double rangeY = ConfigManager.getBeefAoeDamageRangeY();
+            double rangeZ = ConfigManager.getBeefAoeDamageRangeZ();
+            AABB area = AABB.ofSize(primary.position(), rangeX * 2 + 1, rangeY * 2 + 1, rangeZ * 2 + 1);
+
+            float damage = (float) player.getAttributeValue(Attributes.ATTACK_DAMAGE);
+            DamageSource damageSource = ModDamageTypes.beefTool(level, player);
+            int maxTargets = ConfigManager.getBeefAoeDamageMaxTargets();
+            int hit = 0;
+
+            for (LivingEntity victim : level.getEntitiesOfClass(LivingEntity.class, area)) {
+                if (hit >= maxTargets) {
+                    break;
+                }
+                if (victim == primary || victim == player || victim instanceof Player
+                        || !victim.isAlive() || player.isAlliedTo(victim)) {
+                    continue;
+                }
+
+                hit++;
+                if (forceKillLivingEntity(stack, victim, player)) {
+                    continue;
+                }
+                victim.invulnerableTime = 0;
+                victim.hurt(damageSource, damage);
+            }
+
+            if (hit > 0) {
+                // 主动登记一次吸附：范围取「AoE 半径 + 磁力半径」，保证最外圈被打死的怪的掉落也能覆盖到。
+                // 不依赖 LivingDeathEvent —— 强制击杀的 forceDie 分支根本不发这个事件。
+                BeefMagnetHandler.scheduleSweep(level, player, stack, primary.position(),
+                        rangeX + ConfigManager.getBeefMagnetRangeX(),
+                        rangeY + ConfigManager.getBeefMagnetRangeY(),
+                        rangeZ + ConfigManager.getBeefMagnetRangeZ());
+            }
+        } finally {
+            AOE_DAMAGE_CONTEXT.remove(player.getUUID());
+        }
     }
 
     private static Entity getForceKillTarget(Entity entity) {
@@ -325,16 +394,28 @@ public class EndlessBeafItem extends TieredItem {
         FORCE_KILL_DEATH_CONTEXT.add(target.getUUID());
         try {
             ServerLevel level = (ServerLevel) target.level();
+            Vec3 deathPos = target.position();
             DamageSource damageSource = ModDamageTypes.beefTool(level, player);
             executeForceKill(level, target, damageSource);
 
             if (target.isRemoved() || target.dead || !target.isAlive()) {
                 UselessItemUtils.tryCaptureSpawnEgg(target, stack, player);
             }
+            // forceDie 分支是自己手动 dropAllDeathLoot 的，不会触发 LivingDeathEvent，
+            // 所以这里主动登记吸附，避免强杀 boss 类实体时掉落物留在地上
+            scheduleMagnetSweep(level, player, stack, deathPos);
         } finally {
             FORCE_KILL_DEATH_CONTEXT.remove(target.getUUID());
         }
         return true;
+    }
+
+    /** 用配置的磁力半径登记一次吸附。 */
+    private static void scheduleMagnetSweep(ServerLevel level, Player player, ItemStack stack, Vec3 center) {
+        BeefMagnetHandler.scheduleSweep(level, player, stack, center,
+                ConfigManager.getBeefMagnetRangeX(),
+                ConfigManager.getBeefMagnetRangeY(),
+                ConfigManager.getBeefMagnetRangeZ());
     }
 
     private static void executeForceKill(ServerLevel level, LivingEntity target, DamageSource damageSource) {
@@ -445,9 +526,14 @@ public class EndlessBeafItem extends TieredItem {
             return false;
         }
 
+        Vec3 deathPos = target.position();
         target.kill();
         if (!target.isRemoved()) {
             target.remove(Entity.RemovalReason.KILLED);
+        }
+        // 非生物实体不会触发 LivingDeathEvent，同样需要主动登记吸附
+        if (target.level() instanceof ServerLevel level) {
+            scheduleMagnetSweep(level, player, stack, deathPos);
         }
         return true;
     }
@@ -830,6 +916,24 @@ public class EndlessBeafItem extends TieredItem {
                                                        "tooltip.useless_mod.disable"
                                        ).withStyle(beefTeleportEnabled ? ChatFormatting.GREEN : ChatFormatting.GRAY))
                                        .withStyle(ChatFormatting.LIGHT_PURPLE));
+
+        boolean beefAoeDamageEnabled = stack.getOrDefault(UComponents.BeefAoeDamageEnabledComponent.get(), false);
+        tooltipComponents.add(Component.translatable("tooltip.useless_mod.beef_aoe_damage_mode")
+                                       .append(": ")
+                                       .append(Component.translatable(
+                                               beefAoeDamageEnabled ? "tooltip.useless_mod.enable" :
+                                                       "tooltip.useless_mod.disable"
+                                       ).withStyle(beefAoeDamageEnabled ? ChatFormatting.GREEN : ChatFormatting.GRAY))
+                                       .withStyle(ChatFormatting.RED));
+
+        boolean beefMagnetEnabled = stack.getOrDefault(UComponents.BeefMagnetEnabledComponent.get(), false);
+        tooltipComponents.add(Component.translatable("tooltip.useless_mod.beef_magnet_mode")
+                                       .append(": ")
+                                       .append(Component.translatable(
+                                               beefMagnetEnabled ? "tooltip.useless_mod.enable" :
+                                                       "tooltip.useless_mod.disable"
+                                       ).withStyle(beefMagnetEnabled ? ChatFormatting.GREEN : ChatFormatting.GRAY))
+                                       .withStyle(ChatFormatting.YELLOW));
 
         // AE存储优先状态（仅当AE2模组存在时）
         if (ModList.get().isLoaded("ae2")) {

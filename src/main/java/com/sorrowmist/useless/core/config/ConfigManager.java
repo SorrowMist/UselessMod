@@ -107,6 +107,7 @@ public class ConfigManager {
     private static final ModConfigSpec.BooleanValue ENABLE_DRACONIC_EVOLUTION_RECIPE_CONVERSION;
     private static final ModConfigSpec.BooleanValue ENABLE_POWAH_RECIPE_CONVERSION;
     private static final ModConfigSpec.BooleanValue ENABLE_EXTENDED_CRAFTING_RECIPE_CONVERSION;
+    private static final ModConfigSpec.BooleanValue ENABLE_AVARITIA_RECIPE_CONVERSION;
     private static final ModConfigSpec.BooleanValue ENABLE_NEO_ECO_AE_RECIPE_CONVERSION;
     private static final ModConfigSpec.BooleanValue ENABLE_NATURES_AURA_RECIPE_CONVERSION;
     private static final ModConfigSpec.BooleanValue ENABLE_FORBIDDEN_ARCANUS_RECIPE_CONVERSION;
@@ -494,6 +495,8 @@ public class ConfigManager {
                 "enable_powah_recipe_conversion", true);
         ENABLE_EXTENDED_CRAFTING_RECIPE_CONVERSION = defineRecipeConversionOption(
                 "enable_extended_crafting_recipe_conversion", true);
+        ENABLE_AVARITIA_RECIPE_CONVERSION = defineRecipeConversionOption(
+                "enable_avaritia_recipe_conversion", true);
         ENABLE_NATURES_AURA_RECIPE_CONVERSION = defineRecipeConversionOption(
                 "enable_natures_aura_recipe_conversion", true);
         ENABLE_FORBIDDEN_ARCANUS_RECIPE_CONVERSION = defineRecipeConversionOption(
@@ -555,6 +558,7 @@ public class ConfigManager {
                 Map.entry("draconicevolution", ENABLE_DRACONIC_EVOLUTION_RECIPE_CONVERSION),
                 Map.entry("powah", ENABLE_POWAH_RECIPE_CONVERSION),
                 Map.entry("extendedcrafting", ENABLE_EXTENDED_CRAFTING_RECIPE_CONVERSION),
+                Map.entry("avaritia", ENABLE_AVARITIA_RECIPE_CONVERSION),
                 Map.entry("neoecoae", ENABLE_NEO_ECO_AE_RECIPE_CONVERSION),
                 Map.entry("naturesaura", ENABLE_NATURES_AURA_RECIPE_CONVERSION),
                 Map.entry("forbidden_arcanus", ENABLE_FORBIDDEN_ARCANUS_RECIPE_CONVERSION),
@@ -836,7 +840,121 @@ public class ConfigManager {
     }
 
     public static List<String> getAE2GiftPackageItems() {
-        return readConfigList(AE2_GIFT_PACKAGE_ITEMS);
+        return resolveAE2GiftPackageItems(readConfigList(AE2_GIFT_PACKAGE_ITEMS));
+    }
+
+    /**
+     * Upgrades the automatic fallback entries from older server configs when an
+     * AE2 addon is installed after the config was first created. Explicit custom
+     * entries are left untouched.
+     */
+    private static List<String> resolveAE2GiftPackageItems(List<String> configured) {
+        if (configured.isEmpty()) {
+            return configured;
+        }
+
+        List<String> resolved = new ArrayList<>(configured);
+        if (ModList.get().isLoaded("extendedae_plus")) {
+            replaceLegacyAE2GiftStorageCells(resolved);
+        }
+        if (ModList.get().isLoaded("extendedae")) {
+            replaceLegacyAE2GiftEntry(resolved,
+                    "ae2:drive", 1,
+                    "extendedae:ex_drive,1");
+        }
+
+        return List.copyOf(resolved);
+    }
+
+    private static void replaceLegacyAE2GiftStorageCells(List<String> entries) {
+        String replacement = "extendedae_plus:infinity_biginteger_cell,1";
+        if (containsAE2GiftItem(entries, "extendedae_plus:infinity_biginteger_cell")) {
+            return;
+        }
+
+        int firstLegacyEntry = -1;
+        for (int index = 0; index < entries.size(); index++) {
+            String entry = entries.get(index);
+            if (entry == null) {
+                continue;
+            }
+
+            String[] parts = entry.split(",", -1);
+            if (parts.length != 2 || !"ae2:item_storage_cell_256k".equals(parts[0].trim())) {
+                continue;
+            }
+
+            if (parsePositiveInteger(parts[1].trim()) != 8) {
+                continue;
+            }
+            if (firstLegacyEntry < 0) {
+                firstLegacyEntry = index;
+            }
+        }
+
+        if (firstLegacyEntry < 0) {
+            return;
+        }
+
+        for (int index = entries.size() - 1; index >= 0; index--) {
+            String entry = entries.get(index);
+            if (entry == null) {
+                continue;
+            }
+
+            String[] parts = entry.split(",", -1);
+            if (parts.length == 2
+                    && "ae2:item_storage_cell_256k".equals(parts[0].trim())
+                    && parsePositiveInteger(parts[1].trim()) == 8) {
+                entries.remove(index);
+            }
+        }
+        entries.add(firstLegacyEntry, replacement);
+    }
+
+    private static void replaceLegacyAE2GiftEntry(
+            List<String> entries, String legacyItemId, int legacyCount, String replacementEntry) {
+        String replacementItemId = replacementEntry.substring(0, replacementEntry.indexOf(','));
+        if (containsAE2GiftItem(entries, replacementItemId)) {
+            return;
+        }
+
+        for (int index = 0; index < entries.size(); index++) {
+            String entry = entries.get(index);
+            if (entry == null) {
+                continue;
+            }
+
+            String[] parts = entry.split(",", -1);
+            if (parts.length == 2
+                    && legacyItemId.equals(parts[0].trim())
+                    && parsePositiveInteger(parts[1].trim()) == legacyCount) {
+                entries.set(index, replacementEntry);
+                return;
+            }
+        }
+    }
+
+    private static int parsePositiveInteger(String value) {
+        try {
+            return Integer.parseInt(value);
+        } catch (NumberFormatException ignored) {
+            return -1;
+        }
+    }
+
+    private static boolean containsAE2GiftItem(List<String> entries, String itemId) {
+        for (String entry : entries) {
+            if (entry == null) {
+                continue;
+            }
+
+            int separator = entry.indexOf(',');
+            if (separator >= 0 && itemId.equals(entry.substring(0, separator).trim())) {
+                return true;
+            }
+        }
+        return false;
     }
 
     public static boolean isBeefToolForceMiningBlockBlacklisted(ResourceLocation blockId) {

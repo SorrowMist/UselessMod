@@ -54,6 +54,11 @@ import com.sorrowmist.useless.content.recipe.adapters.extendedcrafting.ExtendedC
 import com.sorrowmist.useless.content.recipe.adapters.extendedcrafting.ExtendedCraftingEnderCrafterRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.extendedcrafting.ExtendedCraftingFluxCrafterRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.extendedcrafting.ExtendedCraftingTableRecipeAdapter;
+import com.sorrowmist.useless.content.recipe.adapters.avaritia.ReAvaritiaCollectorRecipeAdapter;
+import com.sorrowmist.useless.content.recipe.adapters.avaritia.ReAvaritiaCompressorRecipeAdapter;
+import com.sorrowmist.useless.content.recipe.adapters.avaritia.ReAvaritiaExtremeSmithingRecipeAdapter;
+import com.sorrowmist.useless.content.recipe.adapters.avaritia.ReAvaritiaSculkCraftingRecipeAdapter;
+import com.sorrowmist.useless.content.recipe.adapters.avaritia.ReAvaritiaTableRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.enderio.AlloySmeltingRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.enderio.EnchanterRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.enderio.SlicingRecipeAdapter;
@@ -105,6 +110,7 @@ public final class RecipeAdapterCompatRegistry {
     public static final String DRACONIC_EVOLUTION = RecipeSourceIds.DRACONIC_EVOLUTION;
     public static final String POWAH = RecipeSourceIds.POWAH;
     public static final String EXTENDED_CRAFTING = RecipeSourceIds.EXTENDED_CRAFTING;
+    public static final String AVARITIA = RecipeSourceIds.AVARITIA;
     public static final String NEO_ECO_AE = RecipeSourceIds.NEO_ECO_AE;
     public static final String NATURES_AURA = RecipeSourceIds.NATURES_AURA;
     public static final String FORBIDDEN_ARCANUS = RecipeSourceIds.FORBIDDEN_ARCANUS;
@@ -151,6 +157,7 @@ public final class RecipeAdapterCompatRegistry {
             new CompatEntry(DRACONIC_EVOLUTION, RecipeAdapterCompatRegistry::registerDraconicEvolution),
             new CompatEntry(POWAH, RecipeAdapterCompatRegistry::registerPowah),
             new CompatEntry(EXTENDED_CRAFTING, RecipeAdapterCompatRegistry::registerExtendedCrafting),
+            new CompatEntry(AVARITIA, RecipeAdapterCompatRegistry::registerAvaritia),
             new CompatEntry(NEO_ECO_AE, RecipeAdapterCompatRegistry::registerNeoECOAE),
             new CompatEntry(NATURES_AURA, RecipeAdapterCompatRegistry::registerNaturesAura),
             new CompatEntry(FORBIDDEN_ARCANUS, RecipeAdapterCompatRegistry::registerForbiddenArcanus),
@@ -375,6 +382,14 @@ public final class RecipeAdapterCompatRegistry {
         register(new ExtendedCraftingCombinationRecipeAdapter());
         register(new ExtendedCraftingEnderCrafterRecipeAdapter());
         register(new ExtendedCraftingFluxCrafterRecipeAdapter());
+    }
+
+    private static void registerAvaritia() {
+        register(new ReAvaritiaSculkCraftingRecipeAdapter());
+        register(new ReAvaritiaTableRecipeAdapter());
+        register(new ReAvaritiaExtremeSmithingRecipeAdapter());
+        register(new ReAvaritiaCompressorRecipeAdapter());
+        register(new ReAvaritiaCollectorRecipeAdapter());
     }
 
     private static void registerNeoECOAE() {

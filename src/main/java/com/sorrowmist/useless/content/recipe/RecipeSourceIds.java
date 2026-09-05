@@ -36,6 +36,7 @@ public final class RecipeSourceIds {
     public static final String DRACONIC_EVOLUTION = "draconicevolution";
     public static final String POWAH = "powah";
     public static final String EXTENDED_CRAFTING = "extendedcrafting";
+    public static final String AVARITIA = "avaritia";
     public static final String NEO_ECO_AE = "neoecoae";
     public static final String NATURES_AURA = "naturesaura";
     public static final String FORBIDDEN_ARCANUS = "forbidden_arcanus";
@@ -89,6 +90,7 @@ public final class RecipeSourceIds {
         if (name.endsWith(".draconicevolution")) return DRACONIC_EVOLUTION;
         if (name.endsWith(".powah")) return POWAH;
         if (name.endsWith(".extendedcrafting")) return EXTENDED_CRAFTING;
+        if (name.endsWith(".avaritia")) return AVARITIA;
         if (name.endsWith(".eco")) return NEO_ECO_AE;
         if (name.endsWith(".naturesaura")) return NATURES_AURA;
         if (name.endsWith(".forbiddenarcanus")) return FORBIDDEN_ARCANUS;

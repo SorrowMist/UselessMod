@@ -2,6 +2,7 @@ package com.sorrowmist.useless.network;
 
 import com.sorrowmist.useless.UselessMod;
 import com.sorrowmist.useless.content.items.EndlessBeafItem;
+import com.sorrowmist.useless.content.items.BeefToolVariants;
 import com.sorrowmist.useless.core.component.UComponents;
 import com.sorrowmist.useless.event.EventHandler;
 import com.sorrowmist.useless.utils.UselessItemUtils;
@@ -56,6 +57,20 @@ public class ModeTogglePacket implements CustomPacketPayload {
                 case AE_STORAGE_PRIORITY -> {
                     stack.set(UComponents.AEStoragePriorityComponent.get(), msg.enabled);
                 }
+                case WRENCH_TAG -> {
+                    if (BeefToolVariants.isBaseVariant(stack)
+                            && BeefToolVariants.isWrenchTagEnabled(stack) != msg.enabled) {
+                        ItemStack replacement = BeefToolVariants.withWrenchTag(stack, msg.enabled);
+                        player.setItemInHand(entry.getValue(), replacement);
+                        stack = replacement;
+                    }
+                }
+                case CONSTRUCTION_WAND -> {
+                    if (stack.getItem() instanceof EndlessBeafItem
+                            && EndlessBeafItem.isConstructionWandAvailable()) {
+                        stack.set(UComponents.ConstructionWandEnabledComponent.get(), msg.enabled);
+                    }
+                }
                 case FORCE_KILL -> {
                     stack.set(UComponents.ForceKillEnabledComponent.get(), msg.enabled);
                 }
@@ -104,6 +119,8 @@ public class ModeTogglePacket implements CustomPacketPayload {
         CHAIN_MINING,
         FORCE_MINING,
         AE_STORAGE_PRIORITY,
+        WRENCH_TAG,
+        CONSTRUCTION_WAND,
         FORCE_KILL,
         BEEF_INVULNERABILITY,
         BEEF_CAPTURE,

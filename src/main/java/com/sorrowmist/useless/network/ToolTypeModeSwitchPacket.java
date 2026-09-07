@@ -2,6 +2,7 @@ package com.sorrowmist.useless.network;
 
 import com.sorrowmist.useless.UselessMod;
 import com.sorrowmist.useless.api.enums.tool.ToolTypeMode;
+import com.sorrowmist.useless.content.items.BeefToolVariants;
 import com.sorrowmist.useless.core.component.UComponents;
 import com.sorrowmist.useless.init.ModItems;
 import com.sorrowmist.useless.utils.UselessItemUtils;
@@ -40,11 +41,8 @@ public record ToolTypeModeSwitchPacket(ToolTypeMode mode) implements CustomPacke
 
             // 1. 创建新物品实例
             ItemStack newStack = switch (msg.mode) {
-                case WRENCH_MODE -> new ItemStack(ModItems.ENDLESS_BEAF_WRENCH.get());
-                case SCREWDRIVER_MODE -> new ItemStack(ModItems.ENDLESS_BEAF_SCREWDRIVER.get());
-                case MALLET_MODE -> new ItemStack(ModItems.ENDLESS_BEAF_MALLET.get());
-                case CROWBAR_MODE -> new ItemStack(ModItems.ENDLESS_BEAF_CROWBAR.get());
-                case HAMMER_MODE -> new ItemStack(ModItems.ENDLESS_BEAF_HAMMER.get());
+                case NONE_MODE, WRENCH_MODE, SCREWDRIVER_MODE, MALLET_MODE, CROWBAR_MODE, HAMMER_MODE ->
+                        BeefToolVariants.createForToolMode(targetItem, msg.mode);
                 case OMNITOOL_MODE -> {
                     ResourceLocation omnitoolId = ResourceLocation.fromNamespaceAndPath("omnitools", "omni_wrench");
                     Item toolItem = BuiltInRegistries.ITEM.get(omnitoolId);
@@ -54,7 +52,6 @@ public record ToolTypeModeSwitchPacket(ToolTypeMode mode) implements CustomPacke
                         yield new ItemStack(ModItems.ENDLESS_BEAF_WRENCH.get());
                     }
                 }
-                default -> new ItemStack(ModItems.ENDLESS_BEAF_ITEM.get());
             };
 
             // 2. 复制原有物品的所有NBT数据到新实例

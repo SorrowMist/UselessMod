@@ -24,6 +24,9 @@ import com.sorrowmist.useless.network.SelectOmniversalPatternRecipePacket;
 import com.sorrowmist.useless.network.TabKeyPressedPacket;
 import com.sorrowmist.useless.network.TankClearPacket;
 import com.sorrowmist.useless.network.ToolTypeModeSwitchPacket;
+import com.sorrowmist.useless.network.ConstructionWandCorePacket;
+import com.sorrowmist.useless.network.ConstructionWandPreviewPacket;
+import com.sorrowmist.useless.network.ConstructionWandPreviewRequestPacket;
 import com.sorrowmist.useless.network.DimensionConfigGhostSlotPacket;
 import com.sorrowmist.useless.network.DimensionConfigSubmitPacket;
 import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
@@ -36,6 +39,17 @@ public class ModNetwork {
         );
         registrar.playToServer(ToolTypeModeSwitchPacket.TYPE, ToolTypeModeSwitchPacket.STREAM_CODEC,
                                ToolTypeModeSwitchPacket::handle
+        );
+        registrar.playToServer(ConstructionWandCorePacket.TYPE, ConstructionWandCorePacket.STREAM_CODEC,
+                               ConstructionWandCorePacket::handle
+        );
+        registrar.playToServer(ConstructionWandPreviewRequestPacket.TYPE,
+                               ConstructionWandPreviewRequestPacket.STREAM_CODEC,
+                               ConstructionWandPreviewRequestPacket::handle
+        );
+        registrar.playToClient(ConstructionWandPreviewPacket.TYPE,
+                               ConstructionWandPreviewPacket.STREAM_CODEC,
+                               ConstructionWandPreviewPacket::handle
         );
         registrar.playToServer(TabKeyPressedPacket.TYPE, TabKeyPressedPacket.STREAM_CODEC,
                                TabKeyPressedPacket::handle

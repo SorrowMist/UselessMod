@@ -56,6 +56,10 @@ public final class ModItems {
             "endless_beaf_item",
             () -> new EndlessBeafItem()
     );
+    public static final DeferredItem<EndlessBeafItem> ENDLESS_BEAF_ITEM_NO_WRENCH = ITEMS.register(
+            "endless_beaf_item_no_wrench",
+            () -> new EndlessBeafItem(ToolTypeMode.NONE_MODE, false)
+    );
 
     static final List<DeferredItem<? extends Item>> CREATIVE_MAIN_TAB_ITEMS = new ArrayList<>();
     public static final DeferredItem<Item> USELESS_INGOT_TIER_1 = registerAndAdd(

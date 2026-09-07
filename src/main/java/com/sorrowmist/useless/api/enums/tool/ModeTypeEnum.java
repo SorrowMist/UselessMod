@@ -16,6 +16,14 @@ public enum ModeTypeEnum {
     AE_STORAGE_PRIORITY_ENABLED("ae_storage_priority_enabled", "tooltip.useless_mod.ae_storage_priority_mode"),
     AE_STORAGE_PRIORITY_DISABLED("ae_storage_priority_disabled", "tooltip.useless_mod.ae_storage_priority_mode"),
 
+    WRENCH_TAG_ENABLED("wrench_tag_enabled", "tooltip.useless_mod.wrench_tag_mode"),
+    WRENCH_TAG_DISABLED("wrench_tag_disabled", "tooltip.useless_mod.wrench_tag_mode"),
+
+    CONSTRUCTION_WAND_ENABLED("construction_wand_enabled", "tooltip.useless_mod.construction_wand_mode"),
+    CONSTRUCTION_WAND_DISABLED("construction_wand_disabled", "tooltip.useless_mod.construction_wand_mode"),
+    CONSTRUCTION_WAND_ANGEL_CORE("construction_wand_angel_core", "tooltip.useless_mod.construction_wand_angel_core"),
+    CONSTRUCTION_WAND_DESTRUCTION_CORE("construction_wand_destruction_core", "tooltip.useless_mod.construction_wand_destruction_core"),
+
     FORCE_KILL("force_kill", "tooltip.useless_mod.force_kill_enabled_mode"),
 
     BEEF_TIME_ACCELERATION_ENABLED("beef_time_acceleration_enabled", "tooltip.useless_mod.time_acceleration_mode"),
@@ -57,6 +65,14 @@ public enum ModeTypeEnum {
 
     public static ModeTypeEnum getAEStoragePriorityMode(boolean enabled) {
         return enabled ? AE_STORAGE_PRIORITY_ENABLED : AE_STORAGE_PRIORITY_DISABLED;
+    }
+
+    public static ModeTypeEnum getWrenchTagMode(boolean enabled) {
+        return enabled ? WRENCH_TAG_ENABLED : WRENCH_TAG_DISABLED;
+    }
+
+    public static ModeTypeEnum getConstructionWandMode(boolean enabled) {
+        return enabled ? CONSTRUCTION_WAND_ENABLED : CONSTRUCTION_WAND_DISABLED;
     }
 
     public static ModeTypeEnum getBeefInvulnerabilityMode(boolean enabled) {

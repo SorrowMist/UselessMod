@@ -47,6 +47,9 @@ public class ConfigManager {
     private static final ModConfigSpec.DoubleValue BEEF_TOOL_MINING_SPEED;
     private static final ModConfigSpec.DoubleValue BEEF_TOOL_ENTITY_INTERACTION_RANGE;
     private static final ModConfigSpec.DoubleValue BEEF_TOOL_BLOCK_INTERACTION_RANGE;
+    private static final ModConfigSpec.IntValue BEEF_CONSTRUCTION_WAND_BUILD_LIMIT;
+    private static final ModConfigSpec.IntValue BEEF_CONSTRUCTION_WAND_ANGEL_LIMIT;
+    private static final ModConfigSpec.IntValue BEEF_CONSTRUCTION_WAND_DESTRUCTION_LIMIT;
     private static final ModConfigSpec.ConfigValue<List<? extends String>> BEEF_TOOL_FORCE_MINING_BLACKLIST;
     private static final ModConfigSpec.ConfigValue<String> BEEF_TOOL_FORCE_KILL_BLACKLIST;
     private static final ModConfigSpec.ConfigValue<String> BEEF_TOOL_FORCE_KILL_NON_LIVING_WHITELIST;
@@ -349,6 +352,21 @@ public class ConfigManager {
                 .comment("牛排工具方块触及范围加成, 重启游戏生效")
                 .translation("useless_mod.configuration.beef_tool_block_interaction_range")
                 .defineInRange("beef_tool_block_interaction_range", 8.0, 0.0, 1024.0);
+
+        BEEF_CONSTRUCTION_WAND_BUILD_LIMIT = SERVER_BUILDER
+                .comment("牛排工具建筑手杖普通建造单次最大方块数")
+                .translation("useless_mod.configuration.beef_construction_wand_build_limit")
+                .defineInRange("construction_wand_build_limit", 1024, 1, 1_000_000);
+
+        BEEF_CONSTRUCTION_WAND_ANGEL_LIMIT = SERVER_BUILDER
+                .comment("牛排工具建筑手杖天使核心单次最大方块数")
+                .translation("useless_mod.configuration.beef_construction_wand_angel_limit")
+                .defineInRange("construction_wand_angel_limit", 16, 1, 1_000_000);
+
+        BEEF_CONSTRUCTION_WAND_DESTRUCTION_LIMIT = SERVER_BUILDER
+                .comment("牛排工具建筑手杖破坏核心单次最大方块数")
+                .translation("useless_mod.configuration.beef_construction_wand_destruction_limit")
+                .defineInRange("construction_wand_destruction_limit", 81, 1, 1_000_000);
 
         BEEF_TOOL_FORCE_MINING_BLACKLIST = SERVER_BUILDER
                 .comment("牛排工具强制挖掘黑名单，不会被强制挖掘的方块",
@@ -850,6 +868,18 @@ public class ConfigManager {
 
     public static double getBeefToolBlockInteractionRange() {
         return getConfigValue(BEEF_TOOL_BLOCK_INTERACTION_RANGE);
+    }
+
+    public static int getBeefConstructionWandBuildLimit() {
+        return getConfigValue(BEEF_CONSTRUCTION_WAND_BUILD_LIMIT);
+    }
+
+    public static int getBeefConstructionWandAngelLimit() {
+        return getConfigValue(BEEF_CONSTRUCTION_WAND_ANGEL_LIMIT);
+    }
+
+    public static int getBeefConstructionWandDestructionLimit() {
+        return getConfigValue(BEEF_CONSTRUCTION_WAND_DESTRUCTION_LIMIT);
     }
 
     public static List<String> getBeefToolForceMiningBlacklist() {

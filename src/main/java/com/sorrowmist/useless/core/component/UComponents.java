@@ -3,6 +3,7 @@ package com.sorrowmist.useless.core.component;
 import com.mojang.serialization.Codec;
 import com.sorrowmist.useless.UselessMod;
 import com.sorrowmist.useless.api.enums.tool.EnchantMode;
+import com.sorrowmist.useless.api.enums.tool.ConstructionWandCoreMode;
 import com.sorrowmist.useless.api.enums.tool.ToolTypeMode;
 import net.minecraft.core.GlobalPos;
 import net.minecraft.core.component.DataComponentType;
@@ -48,6 +49,33 @@ public final class UComponents {
                                     FriendlyByteBuf::writeEnum,
                                     buf -> buf.readEnum(ToolTypeMode.class)
                             ))
+            );
+
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<Boolean>> WrenchTagEnabledComponent =
+            register("wrench_tag_enabled", builder ->
+                    builder.persistent(Codec.BOOL)
+                           .networkSynchronized(StreamCodec.of(
+                                   FriendlyByteBuf::writeBoolean,
+                                   FriendlyByteBuf::readBoolean
+                           ))
+            );
+
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<Boolean>> ConstructionWandEnabledComponent =
+            register("construction_wand_enabled", builder ->
+                    builder.persistent(Codec.BOOL)
+                           .networkSynchronized(StreamCodec.of(
+                                   FriendlyByteBuf::writeBoolean,
+                                   FriendlyByteBuf::readBoolean
+                           ))
+            );
+
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<ConstructionWandCoreMode>> ConstructionWandCoreComponent =
+            register("construction_wand_core", builder ->
+                    builder.persistent(Codec.STRING.xmap(ConstructionWandCoreMode::valueOf, Enum::name))
+                           .networkSynchronized(StreamCodec.of(
+                                   FriendlyByteBuf::writeEnum,
+                                   buf -> buf.readEnum(ConstructionWandCoreMode.class)
+                           ))
             );
 
     /**

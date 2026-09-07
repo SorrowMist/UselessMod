@@ -1,6 +1,7 @@
 package com.sorrowmist.useless.content.items;
 
 import com.sorrowmist.useless.api.enums.tool.EnchantMode;
+import com.sorrowmist.useless.compat.constructionwand.ConstructionWandLogic;
 import com.sorrowmist.useless.api.enums.tool.ToolTypeMode;
 import com.sorrowmist.useless.content.blocks.GlowPlasticBlock;
 import com.sorrowmist.useless.content.blocks.UselessGlassBlock;
@@ -100,15 +101,19 @@ public class EndlessBeafItem extends TieredItem {
     private final ToolTypeMode toolType;
 
     public EndlessBeafItem() {
-        this(ToolTypeMode.NONE_MODE);
+        this(ToolTypeMode.NONE_MODE, true);
     }
 
     public EndlessBeafItem(@Nullable ToolTypeMode toolType) {
-        super(Tiers.NETHERITE, createProperties());
+        this(toolType, true);
+    }
+
+    public EndlessBeafItem(@Nullable ToolTypeMode toolType, boolean wrenchTagEnabled) {
+        super(Tiers.NETHERITE, createProperties(wrenchTagEnabled));
         this.toolType = toolType;
     }
 
-    private static Item.Properties createProperties() {
+    private static Item.Properties createProperties(boolean wrenchTagEnabled) {
         Item.Properties properties = new Item.Properties()
                 .attributes(DiggerItem.createAttributes(Tiers.NETHERITE, 0, 2.0F))
                 .stacksTo(1)
@@ -135,6 +140,10 @@ public class EndlessBeafItem extends TieredItem {
                 .component(UComponents.BeefAoeDamageEnabledComponent, false)
                 .component(UComponents.BeefMagnetEnabledComponent, false)
                 .component(UComponents.AEStoragePriorityComponent, false)
+                .component(UComponents.WrenchTagEnabledComponent, wrenchTagEnabled)
+                .component(UComponents.ConstructionWandEnabledComponent, false)
+                .component(UComponents.ConstructionWandCoreComponent,
+                           com.sorrowmist.useless.api.enums.tool.ConstructionWandCoreMode.DEFAULT)
                 .component(UComponents.CurrentToolTypeComponent, ToolTypeMode.NONE_MODE)
                 .component(DataComponents.CUSTOM_MODEL_DATA, new CustomModelData(1));
 
@@ -146,6 +155,10 @@ public class EndlessBeafItem extends TieredItem {
 
     public static boolean isTeleportEnabled(ItemStack stack) {
         return stack.getOrDefault(UComponents.BeefTeleportEnabledComponent.get(), false);
+    }
+
+    public static boolean isConstructionWandAvailable() {
+        return ConstructionWandLogic.isAvailable();
     }
 
     public static void setTeleportEnabled(ItemStack stack, boolean enabled) {

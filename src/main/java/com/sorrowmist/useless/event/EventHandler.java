@@ -4,6 +4,7 @@ import com.sorrowmist.useless.UselessMod;
 import com.sorrowmist.useless.content.items.BeefMagnetHandler;
 import com.sorrowmist.useless.content.items.BeefTimeAcceleration;
 import com.sorrowmist.useless.content.items.EndlessBeafItem;
+import com.sorrowmist.useless.compat.constructionwand.ConstructionWandLogic;
 import com.sorrowmist.useless.content.recipe.AlloyFurnaceRecipeManager;
 import com.sorrowmist.useless.content.recipe.AlloyFurnaceRecipeCatalog;
 import com.sorrowmist.useless.content.multiblock.OmniversalFurnaceAutoBuilder;
@@ -398,6 +399,7 @@ public class EventHandler {
     public static void onBlockInteract(PlayerInteractEvent.RightClickBlock event) {
         ItemStack stack = event.getItemStack();
         if (!(stack.getItem() instanceof EndlessBeafItem)) return;
+        if (event.isCanceled() || ConstructionWandLogic.isEnabled(stack)) return;
 
         Player player = event.getEntity();
         if (BeefTimeAcceleration.shouldBlockOtherRightClick(stack, player)) return;

@@ -4,6 +4,7 @@ import com.mojang.logging.LogUtils;
 import com.sorrowmist.useless.content.blocks.GlowPlasticBlock;
 import com.sorrowmist.useless.content.items.EndlessBeafItem;
 import com.sorrowmist.useless.content.items.BeefTimeAcceleration;
+import com.sorrowmist.useless.compat.constructionwand.ConstructionWandLogic;
 import com.sorrowmist.useless.content.recipe.adapters.RecipeAdapterCompatRegistry;
 import com.sorrowmist.useless.core.component.UComponents;
 import com.sorrowmist.useless.core.config.ConfigManager;
@@ -110,6 +111,8 @@ public class UselessMod {
 
     @SubscribeEvent(priority = EventPriority.HIGHEST, receiveCanceled = true)
     public void onRightClickBlock(PlayerInteractEvent.RightClickBlock event) {
+        if (ConstructionWandLogic.handleRightClickBlock(event)) return;
+
         ItemStack stack = event.getItemStack();
         if (stack.getItem() instanceof EndlessBeafItem) {
             InteractionResult teleportResult = EndlessBeafItem.tryTeleport(
@@ -142,6 +145,11 @@ public class UselessMod {
 
         event.setCanceled(true);
         event.setCancellationResult(result);
+    }
+
+    @SubscribeEvent(priority = EventPriority.HIGHEST, receiveCanceled = true)
+    public void onRightClickItem(PlayerInteractEvent.RightClickItem event) {
+        ConstructionWandLogic.handleRightClickItem(event);
     }
 
     private static InteractionResult trySpawnMarkedOccultismSpirit(PlayerInteractEvent.RightClickBlock event) {

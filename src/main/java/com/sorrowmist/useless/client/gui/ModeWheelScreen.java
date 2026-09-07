@@ -4,10 +4,13 @@ import com.mojang.blaze3d.platform.InputConstants;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.*;
 import com.sorrowmist.useless.api.enums.tool.EnchantMode;
+import com.sorrowmist.useless.api.enums.tool.ConstructionWandCoreMode;
 import com.sorrowmist.useless.api.enums.tool.ModeTypeEnum;
 import com.sorrowmist.useless.api.enums.tool.ToolTypeMode;
 import com.sorrowmist.useless.core.common.KeyBindings;
 import com.sorrowmist.useless.core.component.UComponents;
+import com.sorrowmist.useless.content.items.BeefToolVariants;
+import com.sorrowmist.useless.network.ConstructionWandCorePacket;
 import com.sorrowmist.useless.network.EnchantmentSwitchPacket;
 import com.sorrowmist.useless.network.ModeTogglePacket;
 import com.sorrowmist.useless.network.ToolTypeModeSwitchPacket;
@@ -35,10 +38,12 @@ public class ModeWheelScreen extends Screen {
     private static final boolean hasGtceuMod = ModList.get().isLoaded("gtceu");
     private static final boolean hasOmnitoolMod = ModList.get().isLoaded("omnitools");
     private static final boolean hasAE2 = ModList.get().isLoaded("ae2");
+    private static final boolean hasConstructionWand = ModList.get().isLoaded("constructionwand");
     private final List<ModeData> leftModes = new ArrayList<>();
     private final List<ModeData> middleModes = new ArrayList<>();
     private final List<ModeData> rightModes = new ArrayList<>();
     private final List<ModeData> forceKillModes = new ArrayList<>();
+    private final List<ModeData> constructionWandModes = new ArrayList<>();
     private ItemStack mainHandItem;
     private boolean showMiddleDisc;
     private float totalTime, prevTick, extraTick;
@@ -57,6 +62,7 @@ public class ModeWheelScreen extends Screen {
         this.middleModes.clear();
         this.rightModes.clear();
         this.forceKillModes.clear();
+        this.constructionWandModes.clear();
 
         EnchantMode currentEnchant = this.mainHandItem.get(UComponents.EnchantModeComponent);
         ToolTypeMode currentTool = this.mainHandItem.get(UComponents.CurrentToolTypeComponent);
@@ -70,6 +76,11 @@ public class ModeWheelScreen extends Screen {
         boolean beefTeleportEnabled = this.mainHandItem.getOrDefault(UComponents.BeefTeleportEnabledComponent, false);
         boolean beefAoeDamageEnabled = this.mainHandItem.getOrDefault(UComponents.BeefAoeDamageEnabledComponent, false);
         boolean beefMagnetEnabled = this.mainHandItem.getOrDefault(UComponents.BeefMagnetEnabledComponent, false);
+        boolean wrenchTagEnabled = this.mainHandItem.getOrDefault(UComponents.WrenchTagEnabledComponent, true);
+        boolean constructionWandEnabled = this.mainHandItem.getOrDefault(
+                UComponents.ConstructionWandEnabledComponent, false);
+        ConstructionWandCoreMode constructionWandCore = this.mainHandItem.getOrDefault(
+                UComponents.ConstructionWandCoreComponent, ConstructionWandCoreMode.DEFAULT);
 
         // 左：附魔模式
         for (EnchantMode m : EnchantMode.values())
@@ -156,6 +167,32 @@ public class ModeWheelScreen extends Screen {
                     aeStorageEnabled
             ));
         }
+
+        if (BeefToolVariants.isBaseVariant(this.mainHandItem)) {
+            this.rightModes.add(new ModeData(
+                    ModeTypeEnum.getWrenchTagMode(wrenchTagEnabled),
+                    ModeTypeEnum.getWrenchTagMode(wrenchTagEnabled).getTooltip(),
+                    wrenchTagEnabled
+            ));
+        }
+
+        if (hasConstructionWand && this.mainHandItem.getItem() instanceof com.sorrowmist.useless.content.items.EndlessBeafItem) {
+            this.constructionWandModes.add(new ModeData(
+                    ModeTypeEnum.getConstructionWandMode(constructionWandEnabled),
+                    ModeTypeEnum.getConstructionWandMode(constructionWandEnabled).getTooltip(),
+                    constructionWandEnabled
+            ));
+            this.constructionWandModes.add(new ModeData(
+                    ModeTypeEnum.CONSTRUCTION_WAND_ANGEL_CORE,
+                    ModeTypeEnum.CONSTRUCTION_WAND_ANGEL_CORE.getTooltip(),
+                    constructionWandCore == ConstructionWandCoreMode.ANGEL
+            ));
+            this.constructionWandModes.add(new ModeData(
+                    ModeTypeEnum.CONSTRUCTION_WAND_DESTRUCTION_CORE,
+                    ModeTypeEnum.CONSTRUCTION_WAND_DESTRUCTION_CORE.getTooltip(),
+                    constructionWandCore == ConstructionWandCoreMode.DESTRUCTION
+            ));
+        }
     }
 
     @Override
@@ -183,14 +220,16 @@ public class ModeWheelScreen extends Screen {
         int cy = this.height / 2;
         int centerX = this.width / 2;
 
-        int lx, mx, rx, fx;
+        int constructionX, lx, mx, rx, fx;
 
         if (this.showMiddleDisc) {
+            constructionX = (int) (centerX - DISC_SPACING * 2.5F);
             lx = (int) (centerX - DISC_SPACING * 1.5F);
             mx = (int) (centerX - DISC_SPACING * 0.5F);
             rx = (int) (centerX + DISC_SPACING * 0.5F);
             fx = (int) (centerX + DISC_SPACING * 1.5F);
         } else {
+            constructionX = (int) (centerX - DISC_SPACING * 2.0F);
             lx = (int) (centerX - DISC_SPACING);
             mx = centerX; // 不使用
             rx = centerX;
@@ -208,6 +247,7 @@ public class ModeWheelScreen extends Screen {
         Tesselator t = Tesselator.getInstance();
         BufferBuilder buf = t.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_COLOR);
 
+        this.drawDisc(buf, constructionX, cy, this.constructionWandModes, mouseX, mouseY, anim);
         this.drawDisc(buf, lx, cy, this.leftModes, mouseX, mouseY, anim);
         if (this.showMiddleDisc)
             this.drawDisc(buf, mx, cy, this.middleModes, mouseX, mouseY, anim);
@@ -217,6 +257,7 @@ public class ModeWheelScreen extends Screen {
         BufferUploader.drawWithShader(buf.buildOrThrow());
 
         buf = t.begin(VertexFormat.Mode.DEBUG_LINES, DefaultVertexFormat.POSITION_COLOR);
+        this.drawDividers(buf, constructionX, cy, this.constructionWandModes.size(), anim);
         this.drawDividers(buf, lx, cy, this.leftModes.size(), anim);
         if (this.showMiddleDisc)
             this.drawDividers(buf, mx, cy, this.middleModes.size(), anim);
@@ -229,12 +270,14 @@ public class ModeWheelScreen extends Screen {
         RenderSystem.enableCull();
         RenderSystem.disableBlend();
 
+        this.drawModeNames(g, constructionX, cy, this.constructionWandModes, anim);
         this.drawModeNames(g, lx, cy, this.leftModes, anim);
         if (this.showMiddleDisc)
             this.drawModeNames(g, mx, cy, this.middleModes, anim);
         this.drawModeNames(g, rx, cy, this.rightModes, anim);
         this.drawModeNames(g, fx, cy, this.forceKillModes, anim);
 
+        this.drawHover(g, constructionX, cy, this.constructionWandModes, mouseX, mouseY);
         this.drawHover(g, lx, cy, this.leftModes, mouseX, mouseY);
         if (this.showMiddleDisc)
             this.drawHover(g, mx, cy, this.middleModes, mouseX, mouseY);
@@ -346,6 +389,10 @@ public class ModeWheelScreen extends Screen {
         int cy = this.height / 2;
         int centerX = this.width / 2;
 
+        int constructionX = this.showMiddleDisc
+                ? (int) (centerX - DISC_SPACING * 2.5F)
+                : (int) (centerX - DISC_SPACING * 2.0F);
+
         int lx = this.showMiddleDisc
                 ? (int) (centerX - DISC_SPACING * 1.5F)
                 : (int) (centerX - DISC_SPACING);
@@ -362,7 +409,8 @@ public class ModeWheelScreen extends Screen {
                 ? (int) (centerX + DISC_SPACING * 1.5F)
                 : (int) (centerX + DISC_SPACING);
 
-        return this.checkClick((int) mx, (int) my, lx, cy, this.leftModes)
+        return this.checkClick((int) mx, (int) my, constructionX, cy, this.constructionWandModes)
+                || this.checkClick((int) mx, (int) my, lx, cy, this.leftModes)
                 || (this.showMiddleDisc && this.checkClick((int) mx, (int) my, midX, cy, this.middleModes))
                 || this.checkClick((int) mx, (int) my, rx, cy, this.rightModes)
                 || this.checkClick((int) mx, (int) my, fx, cy, this.forceKillModes)
@@ -412,6 +460,34 @@ public class ModeWheelScreen extends Screen {
                     );
                     PacketDistributor.sendToServer(
                             new ModeTogglePacket(ModeTogglePacket.ModeType.AE_STORAGE_PRIORITY, !currentEnabled));
+                }
+                case WRENCH_TAG_ENABLED, WRENCH_TAG_DISABLED -> {
+                    boolean currentEnabled = this.mainHandItem.getOrDefault(
+                            UComponents.WrenchTagEnabledComponent, true);
+                    PacketDistributor.sendToServer(
+                            new ModeTogglePacket(ModeTogglePacket.ModeType.WRENCH_TAG, !currentEnabled));
+                }
+                case CONSTRUCTION_WAND_ENABLED, CONSTRUCTION_WAND_DISABLED -> {
+                    boolean currentEnabled = this.mainHandItem.getOrDefault(
+                            UComponents.ConstructionWandEnabledComponent, false);
+                    PacketDistributor.sendToServer(
+                            new ModeTogglePacket(ModeTogglePacket.ModeType.CONSTRUCTION_WAND, !currentEnabled));
+                }
+                case CONSTRUCTION_WAND_ANGEL_CORE -> {
+                    ConstructionWandCoreMode current = this.mainHandItem.getOrDefault(
+                            UComponents.ConstructionWandCoreComponent, ConstructionWandCoreMode.DEFAULT);
+                    PacketDistributor.sendToServer(new ConstructionWandCorePacket(
+                            current == ConstructionWandCoreMode.ANGEL
+                                    ? ConstructionWandCoreMode.DEFAULT
+                                    : ConstructionWandCoreMode.ANGEL));
+                }
+                case CONSTRUCTION_WAND_DESTRUCTION_CORE -> {
+                    ConstructionWandCoreMode current = this.mainHandItem.getOrDefault(
+                            UComponents.ConstructionWandCoreComponent, ConstructionWandCoreMode.DEFAULT);
+                    PacketDistributor.sendToServer(new ConstructionWandCorePacket(
+                            current == ConstructionWandCoreMode.DESTRUCTION
+                                    ? ConstructionWandCoreMode.DEFAULT
+                                    : ConstructionWandCoreMode.DESTRUCTION));
                 }
                 case FORCE_KILL -> {
                     boolean currentEnabled = this.mainHandItem.getOrDefault(UComponents.ForceKillEnabledComponent,

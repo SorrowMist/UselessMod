@@ -1,46 +1,34 @@
 package com.sorrowmist.useless.content.recipe.adapters.industrialforegoing;
 
-import com.buuz135.industrial.config.machine.resourceproduction.FluidLaserBaseConfig;
-import com.buuz135.industrial.config.machine.resourceproduction.LaserDrillConfig;
-import com.buuz135.industrial.module.ModuleResourceProduction;
+import com.buuz135.industrial.config.machine.agriculturehusbandry.SlaughterFactoryConfig;
+import com.buuz135.industrial.module.ModuleAgricultureHusbandry;
+import com.buuz135.industrial.module.ModuleCore;
 import com.sorrowmist.useless.api.enums.AlloyFurnaceMode;
 import com.sorrowmist.useless.content.recipe.AdvancedAlloyFurnaceRecipe;
 import com.sorrowmist.useless.content.recipe.IRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.LongSizedFluidIngredient;
 import com.sorrowmist.useless.content.recipe.RecipeSourceIds;
-import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceLocation;
-import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.Items;
 import net.minecraft.world.item.crafting.Ingredient;
 import net.minecraft.world.item.crafting.RecipeHolder;
 import net.minecraft.world.level.Level;
-import net.minecraft.world.level.material.Fluid;
 import net.minecraft.world.level.material.Fluids;
 import net.neoforged.neoforge.fluids.FluidStack;
+import net.neoforged.neoforge.fluids.crafting.FluidIngredient;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
-/** Generates the fixed fluid-laser outputs that use special alloy-furnace molds. */
-public final class LaserDrillFluidRecipeAdapter
+/** Converts the dynamic Industrial Foregoing slaughter operation to a fixed fluid recipe. */
+public final class SlaughterFactoryRecipeAdapter
         implements IRecipeAdapter<IndustrialForegoingSyntheticRecipe> {
     private static final int WATER_AMOUNT = 1000;
-    private static final int OUTPUT_AMOUNT = 10;
-
-    private static final List<Target> TARGETS = List.of(
-            new Target(
-                    ResourceLocation.fromNamespaceAndPath("industrialforegoing", "ether_gas"),
-                    Items.NETHER_STAR),
-            new Target(
-                    ResourceLocation.fromNamespaceAndPath("ifeu", "liquid_sculk_matter"),
-                    Items.WARDEN_SPAWN_EGG),
-            new Target(
-                    ResourceLocation.fromNamespaceAndPath("ifeu", "liquid_dragon_breath"),
-                    Items.DRAGON_EGG));
+    private static final int MEAT_AMOUNT = 100;
+    private static final int PINK_SLIME_AMOUNT = 1000;
+    private static final int ENERGY_MULTIPLIER = 100;
 
     @Override
     public String sourceId() {
@@ -54,47 +42,40 @@ public final class LaserDrillFluidRecipeAdapter
 
     @Override
     public ItemStack getMoldItem() {
-        return new ItemStack(ModuleResourceProduction.FLUID_LASER_BASE.getBlock());
+        return new ItemStack(ModuleAgricultureHusbandry.SLAUGHTER_FACTORY.getBlock());
     }
 
     @Override
     public List<RecipeHolder<IndustrialForegoingSyntheticRecipe>> getGeneratedRecipes(Level level) {
         if (level == null) return List.of();
 
-        List<AdvancedAlloyFurnaceRecipe> recipes = new ArrayList<>(TARGETS.size());
-        for (Target target : TARGETS) {
-            BuiltInRegistries.FLUID.getOptional(target.fluidId()).ifPresent(fluid ->
-                    recipes.add(createRecipe(target, fluid)));
-        }
-        return IndustrialForegoingRecipeAdapterUtils.holders(recipes);
-    }
-
-    private static AdvancedAlloyFurnaceRecipe createRecipe(Target target, Fluid fluid) {
         ResourceLocation id = ResourceLocation.fromNamespaceAndPath(
-                RecipeSourceIds.INDUSTRIAL_FOREGOING,
-                "laser_drill_fluid_" + target.fluidId().getNamespace()
-                        + "_" + target.fluidId().getPath());
+                RecipeSourceIds.INDUSTRIAL_FOREGOING, "mob_slaughter_factory");
         int processTime = IndustrialForegoingRecipeAdapterUtils.positive(
-                FluidLaserBaseConfig.maxProgress);
-        long energy = IndustrialForegoingRecipeAdapterUtils.energyPerTick(
-                LaserDrillConfig.powerPerOperation, processTime);
-
-        return new AdvancedAlloyFurnaceRecipe(
+                SlaughterFactoryConfig.maxProgress);
+        long energy = Math.max(1L, IndustrialForegoingRecipeAdapterUtils.multiply(
+                IndustrialForegoingRecipeAdapterUtils.positive(
+                        SlaughterFactoryConfig.powerPerOperation),
+                ENERGY_MULTIPLIER));
+        AdvancedAlloyFurnaceRecipe recipe = new AdvancedAlloyFurnaceRecipe(
                 id,
                 List.of(),
-                List.of(LongSizedFluidIngredient.from(new FluidStack(Fluids.WATER, WATER_AMOUNT))),
+                List.of(new LongSizedFluidIngredient(
+                        FluidIngredient.single(Fluids.WATER), WATER_AMOUNT)),
                 List.of(),
                 List.of(),
-                List.of(new FluidStack(fluid, OUTPUT_AMOUNT)),
+                List.of(
+                        new FluidStack(ModuleCore.MEAT.getSourceFluid().get(), MEAT_AMOUNT),
+                        new FluidStack(ModuleCore.PINK_SLIME.getSourceFluid().get(), PINK_SLIME_AMOUNT)),
                 List.of(),
                 energy,
                 processTime,
                 Ingredient.EMPTY,
                 0,
-                List.of(
-                        Ingredient.of(new ItemStack(ModuleResourceProduction.FLUID_LASER_BASE.getBlock())),
-                        Ingredient.of(target.mold())),
+                List.of(Ingredient.of(new ItemStack(
+                        ModuleAgricultureHusbandry.SLAUGHTER_FACTORY.getBlock()))),
                 AlloyFurnaceMode.NORMAL);
+        return IndustrialForegoingRecipeAdapterUtils.holders(List.of(recipe));
     }
 
     @Override
@@ -119,8 +100,5 @@ public final class LaserDrillFluidRecipeAdapter
             }
         }
         return List.copyOf(matches);
-    }
-
-    private record Target(ResourceLocation fluidId, Item mold) {
     }
 }

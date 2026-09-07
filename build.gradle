@@ -278,6 +278,8 @@ dependencies {
     // 新生魔艺
     compileOnly "curse.maven:ars-nouveau-401955:8152094"
 
+    implementation "curse.maven:just-dire-things-1002348:7463040"
+
     //禁忌与奥秘
     compileOnly "curse.maven:forbidden-arcanus-309858:6875895"
     compileOnly "curse.maven:valhelsia-core-416935:6296775"
@@ -301,8 +303,8 @@ dependencies {
 //    runtimeOnly "maven.modrinth:omnitools:1.21.1-1.2.1"
 //    runtimeOnly "curse.maven:ftb-ultimine-forge-386134:7188395"
     // 神秘农业
-    compileOnly "curse.maven:cucumber-272335:8035802"
-    compileOnly "curse.maven:mystical-agriculture-246640:8035819"
+    implementation "curse.maven:cucumber-272335:8035802"
+    implementation "curse.maven:mystical-agriculture-246640:8035819"
 
     //自然灵气
     compileOnly "maven.modrinth:natures-aura:41.9"

@@ -476,7 +476,7 @@ public class AdvancedAlloyFurnaceRecipeCategory implements IRecipeCategory<Alloy
         float scale = 0.7f;
         guiGraphics.pose().scale(scale, scale, 1.0f);
 
-        int requiredTier = AlloyFurnaceTierRules.requiredTier(recipe.id());
+        int requiredTier = AlloyFurnaceTierRules.requiredTier(recipe.id(), recipe.tier());
         String requirementText = requiredTier > 0
                 ? Component.translatable("jei.useless_mod.gui.tier_required", requiredTier).getString()
                 : Component.translatable("jei.useless_mod.gui.tier_unrestricted").getString();

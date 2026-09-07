@@ -493,7 +493,7 @@ public final class MultiblockAlloyFurnaceCoreBlockEntity extends BlockEntity imp
             return CraftingTaskContext.TaskAvailability.unavailable(
                     "gui.useless_mod.advanced_alloy_furnace.ae_task_status.waiting_recipe", "");
         }
-        int requiredTier = AlloyFurnaceTierRules.requiredTier(recipe.id());
+        int requiredTier = AlloyFurnaceTierRules.requiredTier(recipe.id(), recipe.tier());
         if (coilTier < requiredTier) {
             return CraftingTaskContext.TaskAvailability.unavailable(
                     "gui.useless_mod.advanced_alloy_furnace.ae_task_status.waiting_tier", "");

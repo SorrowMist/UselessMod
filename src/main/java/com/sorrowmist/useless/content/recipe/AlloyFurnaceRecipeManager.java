@@ -411,7 +411,7 @@ public class AlloyFurnaceRecipeManager {
 
     private boolean matchesLookup(AdvancedAlloyFurnaceRecipe recipe,
                                   RecipeLookupContext context, LookupSnapshot snapshot) {
-        return AlloyFurnaceTierRules.allows(recipe.id(), context.machineTier())
+        return AlloyFurnaceTierRules.allows(recipe.id(), recipe.tier(), context.machineTier())
                 && matchesMold(recipe, context.mold())
                 && matchesOutputConstraints(recipe, context.expectedOutputs())
                 && matchesKeys(recipe, snapshot.keyInputs(), context.operations())

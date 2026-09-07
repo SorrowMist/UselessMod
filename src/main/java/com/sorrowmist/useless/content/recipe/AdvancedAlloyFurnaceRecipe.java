@@ -38,8 +38,14 @@ public record AdvancedAlloyFurnaceRecipe(
         Ingredient catalyst,
         int catalystUses,
         List<Ingredient> molds,
-        AlloyFurnaceMode mode
+        AlloyFurnaceMode mode,
+        int tier
 ) implements Recipe<RecipeInput> {
+
+    /** A negative tier means that the recipe uses the ID-based configuration rule. */
+    public static final int NO_EXPLICIT_TIER = -1;
+    public static final int MIN_TIER = 0;
+    public static final int MAX_TIER = 10;
 
     private static final int SIZED_FLUID_NETWORK_VERSION = -1;
     private static final int LONG_SIZED_FLUID_NETWORK_VERSION = -2;
@@ -51,6 +57,9 @@ public record AdvancedAlloyFurnaceRecipe(
                     list -> com.mojang.datafixers.util.Either.left(list));
 
     public AdvancedAlloyFurnaceRecipe {
+        if (tier < NO_EXPLICIT_TIER || tier > MAX_TIER) {
+            throw new IllegalArgumentException("Alloy-furnace recipe tier must be between -1 and " + MAX_TIER);
+        }
         List<Ingredient> normalizedMolds = new ArrayList<>();
         if (molds != null) {
             for (Ingredient mold : molds) {
@@ -89,6 +98,7 @@ public record AdvancedAlloyFurnaceRecipe(
                 ByteBufCodecs.VAR_INT.encode(buf, r.catalystUses());
                 CountedIngredient.INGREDIENT_STREAM_CODEC.apply(ByteBufCodecs.list()).encode(buf, r.molds());
                 ByteBufCodecs.STRING_UTF8.encode(buf, r.mode().getSerializedName());
+                ByteBufCodecs.VAR_INT.encode(buf, r.tier());
             },
             buf -> {
                 ResourceLocation id = ResourceLocation.STREAM_CODEC.decode(buf);
@@ -131,10 +141,11 @@ public record AdvancedAlloyFurnaceRecipe(
                 List<Ingredient> molds = CountedIngredient.INGREDIENT_STREAM_CODEC.apply(ByteBufCodecs.list()).decode(buf);
                 String modeStr = ByteBufCodecs.STRING_UTF8.decode(buf);
                 AlloyFurnaceMode mode = AlloyFurnaceMode.fromString(modeStr);
+                int tier = ByteBufCodecs.VAR_INT.decode(buf);
 
                 return new AdvancedAlloyFurnaceRecipe(
                         id, inputs, inputFluids, keyInputs, outputs, outputFluids, keyOutputs,
-                        energy, processTime, catalyst, catalystUses, molds, mode
+                        energy, processTime, catalyst, catalystUses, molds, mode, tier
                 );
             }
     );
@@ -171,7 +182,10 @@ public record AdvancedAlloyFurnaceRecipe(
                     Ingredient.CODEC.listOf().optionalFieldOf("molds")
                                     .forGetter(AdvancedAlloyFurnaceRecipe::multipleMolds),
                     AlloyFurnaceMode.CODEC.optionalFieldOf("mode", AlloyFurnaceMode.NORMAL)
-                                          .forGetter(AdvancedAlloyFurnaceRecipe::mode)
+                                          .forGetter(AdvancedAlloyFurnaceRecipe::mode),
+                    Codec.intRange(NO_EXPLICIT_TIER, MAX_TIER)
+                            .optionalFieldOf("tier", NO_EXPLICIT_TIER)
+                            .forGetter(AdvancedAlloyFurnaceRecipe::tier)
             ).apply(instance, AdvancedAlloyFurnaceRecipe::fromCodec));
 
     private static Optional<Ingredient> legacyMold(AdvancedAlloyFurnaceRecipe recipe) {
@@ -196,7 +210,8 @@ public record AdvancedAlloyFurnaceRecipe(
             int catalystUses,
             Optional<Ingredient> legacyMold,
             Optional<List<Ingredient>> multipleMolds,
-            AlloyFurnaceMode mode) {
+            AlloyFurnaceMode mode,
+            int tier) {
         if (legacyMold.isPresent() && multipleMolds.isPresent()) {
             throw new IllegalArgumentException("Advanced alloy-furnace recipe cannot define both mold and molds");
         }
@@ -204,7 +219,7 @@ public record AdvancedAlloyFurnaceRecipe(
                 legacyMold.map(List::of).orElseGet(List::of));
         return new AdvancedAlloyFurnaceRecipe(
                 id, inputs, inputFluids, keyInputs, outputs, outputFluids, keyOutputs,
-                energy, processTime, catalyst, catalystUses, molds, mode);
+                energy, processTime, catalyst, catalystUses, molds, mode, tier);
     }
 
     public AdvancedAlloyFurnaceRecipe(ResourceLocation id,
@@ -221,7 +236,7 @@ public record AdvancedAlloyFurnaceRecipe(
                                       List<Ingredient> molds,
                                       AlloyFurnaceMode mode) {
         this(id, inputs, convertLegacyFluids(inputFluids), keyInputs, outputs, outputFluids, keyOutputs,
-                energy, processTime, catalyst, catalystUses, molds, mode);
+                energy, processTime, catalyst, catalystUses, molds, mode, NO_EXPLICIT_TIER);
     }
 
     public AdvancedAlloyFurnaceRecipe(ResourceLocation id,
@@ -236,7 +251,7 @@ public record AdvancedAlloyFurnaceRecipe(
                                       Ingredient mold,
                                       AlloyFurnaceMode mode) {
         this(id, inputs, convertLegacyFluids(inputFluids), List.of(), outputs, outputFluids, List.of(), energy, processTime, catalyst, catalystUses,
-                mold == null ? List.of() : List.of(mold), mode);
+                mold == null ? List.of() : List.of(mold), mode, NO_EXPLICIT_TIER);
     }
 
     public AdvancedAlloyFurnaceRecipe(ResourceLocation id,
@@ -254,7 +269,7 @@ public record AdvancedAlloyFurnaceRecipe(
                                       AlloyFurnaceMode mode) {
         this(id, inputs, convertLegacyFluids(inputFluids), keyInputs, outputs, outputFluids, keyOutputs,
                 energy, processTime, catalyst, catalystUses,
-                mold == null ? List.of() : List.of(mold), mode);
+                mold == null ? List.of() : List.of(mold), mode, NO_EXPLICIT_TIER);
     }
 
     private static List<LongSizedFluidIngredient> convertLegacyFluids(Iterable<?> fluids) {

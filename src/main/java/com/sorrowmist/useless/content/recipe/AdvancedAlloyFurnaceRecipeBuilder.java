@@ -28,6 +28,7 @@ public class AdvancedAlloyFurnaceRecipeBuilder {
     private int catalystUses = 0;
     private final List<Ingredient> molds = new ArrayList<>();
     private AlloyFurnaceMode mode = AlloyFurnaceMode.NORMAL;
+    private int tier = AdvancedAlloyFurnaceRecipe.NO_EXPLICIT_TIER;
 
     public static AdvancedAlloyFurnaceRecipeBuilder create() {
         return new AdvancedAlloyFurnaceRecipeBuilder();
@@ -152,6 +153,11 @@ public class AdvancedAlloyFurnaceRecipeBuilder {
         return this;
     }
 
+    public AdvancedAlloyFurnaceRecipeBuilder tier(int tier) {
+        this.tier = tier;
+        return this;
+    }
+
     /** Builds an in-memory recipe for use by an adapter conversion method. */
     public AdvancedAlloyFurnaceRecipe build(ResourceLocation id) {
         Objects.requireNonNull(id, "id");
@@ -168,7 +174,8 @@ public class AdvancedAlloyFurnaceRecipeBuilder {
                 this.catalyst,
                 this.catalystUses,
                 List.copyOf(this.molds),
-                this.mode
+                this.mode,
+                this.tier
         );
     }
 

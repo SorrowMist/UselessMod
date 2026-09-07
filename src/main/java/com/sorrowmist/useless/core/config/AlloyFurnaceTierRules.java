@@ -24,6 +24,13 @@ public final class AlloyFurnaceTierRules {
     }
 
     public static int requiredTier(ResourceLocation recipeId) {
+        return requiredTier(recipeId, -1);
+    }
+
+    public static int requiredTier(ResourceLocation recipeId, int explicitTier) {
+        if (explicitTier >= MIN_TIER && explicitTier <= MAX_TIER) {
+            return explicitTier;
+        }
         if (recipeId == null) return 0;
 
         List<Rule> rules = rules();
@@ -38,8 +45,12 @@ public final class AlloyFurnaceTierRules {
     }
 
     public static boolean allows(ResourceLocation recipeId, int machineTier) {
+        return allows(recipeId, -1, machineTier);
+    }
+
+    public static boolean allows(ResourceLocation recipeId, int explicitTier, int machineTier) {
         return machineTier == NO_MACHINE_TIER
-                || machineTier >= requiredTier(recipeId);
+                || machineTier >= requiredTier(recipeId, explicitTier);
     }
 
     /** Changes whenever the raw config list changes, so recipe caches can include it. */

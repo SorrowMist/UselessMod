@@ -1,0 +1,1 @@
+com.sorrowmist.useless.compat.kubejs.UselessKubeJSPlugin

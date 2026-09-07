@@ -157,7 +157,7 @@ public interface CraftingTaskContext {
                     "gui.useless_mod.advanced_alloy_furnace.ae_task_status.waiting_recipe", "");
         }
         int machineTier = getMachineTier();
-        int requiredTier = AlloyFurnaceTierRules.requiredTier(recipe.id());
+        int requiredTier = AlloyFurnaceTierRules.requiredTier(recipe.id(), recipe.tier());
         if (machineTier != AlloyFurnaceTierRules.NO_MACHINE_TIER && machineTier < requiredTier) {
             return TaskAvailability.unavailable(
                     "gui.useless_mod.advanced_alloy_furnace.ae_task_status.waiting_tier", "");

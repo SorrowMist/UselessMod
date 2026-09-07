@@ -9,6 +9,11 @@ A Minecraft mod featuring various utilities and enhancements.
 - Thermal mod integrations and enhancements
 - Various utilities and tools
 
+## Wiki
+
+- [KubeJS 万象合金炉配方指南](wiki/KUBEJS_ALLOY_FURNACE_GUIDE_CN.md)
+- [KubeJS Advanced Alloy Furnace Recipe Guide](wiki/KUBEJS_ALLOY_FURNACE_GUIDE.md)
+
 ## License
 
 This mod is licensed under the MIT License. See the LICENSE file for details.

@@ -1,21 +1,21 @@
 {
-  "type": "minecraft:crafting_shaped",
-  "category": "building",
-  "key": {
-    "C": {
-      "item": "minecraft:cyan_concrete_powder"
+    "type": "minecraft:crafting_shaped",
+    "category": "building",
+    "key": {
+        "C": {
+            "item": "minecraft:cyan_concrete_powder"
+        },
+        "G": {
+            "item": "minecraft:glowstone_dust"
+        }
     },
-    "G": {
-      "item": "minecraft:glowstone_dust"
+    "pattern": [
+        "CCC",
+        "CGC",
+        "CCC"
+    ],
+    "result": {
+        "count": 8,
+        "id": "useless_mod:aqua_glow_plastic"
     }
-  },
-  "pattern": [
-    "CCC",
-    "CGC",
-    "CCC"
-  ],
-  "result": {
-    "count": 8,
-    "id": "useless_mod:aqua_glow_plastic"
-  }
 }

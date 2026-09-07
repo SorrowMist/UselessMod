@@ -28,6 +28,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.OptionalLong;
 import java.util.Set;
 import java.util.WeakHashMap;
 import java.util.concurrent.ConcurrentHashMap;
@@ -316,12 +317,28 @@ public final class AlloyFurnaceRecipeCatalog {
     }
 
     public static List<Entry> findPatternCandidates(Level level, IPatternDetails pattern) {
+        return findPatternCandidates(level, pattern, false);
+    }
+
+    /**
+     * Finds recipes represented by a processing pattern.
+     *
+     * <p>When {@code allowMissingOutputs} is true, the pattern may omit any recipe outputs, but it
+     * must still contain at least one valid output. This mode is intended for the omniversal
+     * pattern converter; the strict mode remains the default for normal recipe lookup.
+     */
+    public static List<Entry> findPatternCandidates(
+            Level level, IPatternDetails pattern, boolean allowMissingOutputs) {
         if (level == null || pattern == null) return List.of();
+        PatternContents contents = PatternContents.read(pattern);
+        if (contents == null) return List.of();
         // Resolved once per lookup: identifying dynamic slots scans every fusion recipe, and the
         // answer depends only on the pattern, not on the candidate being tested.
         Set<Integer> componentAgnosticOutputs = componentAgnosticOutputSlots(pattern, level);
         return entries(level).stream()
-                .filter(entry -> matchesPattern(entry.recipe, pattern, componentAgnosticOutputs, false))
+                .filter(entry -> findPatternScale(
+                        entry.recipe, pattern, contents,
+                        componentAgnosticOutputs, allowMissingOutputs).isPresent())
                 .sorted(Comparator.comparing(entry -> entry.identity.recipeId().toString()))
                 .toList();
     }
@@ -355,6 +372,23 @@ public final class AlloyFurnaceRecipeCatalog {
             Level level, String sourceId, AdvancedAlloyFurnaceRecipe recipe, IPatternDetails pattern) {
         if (level == null || recipe == null || pattern == null) return false;
         return matchesPattern(recipe, pattern,
+                componentAgnosticOutputSlots(pattern, level, sourceId), true);
+    }
+
+    /**
+     * Returns the positive integer number of base recipe operations represented by a pattern.
+     * The same proportional matcher used for recipe resolution is used here so callers can
+     * normalize a manually multiplied pattern without accepting a non-proportional edit.
+     */
+    public static OptionalLong findPatternScale(
+            Level level, AdvancedAlloyFurnaceRecipe recipe, IPatternDetails pattern) {
+        return findPatternScale(level, null, recipe, pattern);
+    }
+
+    public static OptionalLong findPatternScale(
+            Level level, String sourceId, AdvancedAlloyFurnaceRecipe recipe, IPatternDetails pattern) {
+        if (level == null || recipe == null || pattern == null) return OptionalLong.empty();
+        return findPatternScale(recipe, pattern,
                 componentAgnosticOutputSlots(pattern, level, sourceId), true);
     }
 
@@ -571,36 +605,49 @@ public final class AlloyFurnaceRecipeCatalog {
     private static boolean matchesPattern(AdvancedAlloyFurnaceRecipe recipe, IPatternDetails pattern,
                                           Set<Integer> componentAgnosticOutputs,
                                           boolean allowMissingOutputs) {
-        PatternContents contents = PatternContents.read(pattern);
-        if (contents == null) return false;
+        return findPatternScale(recipe, pattern, componentAgnosticOutputs, allowMissingOutputs).isPresent();
+    }
 
-        long requiredItemCount = recipe.inputs().stream().mapToLong(CountedIngredient::count).sum();
-        long actualItemCount = contents.items.stream().mapToLong(GenericStack::amount).sum();
-        if (requiredItemCount != actualItemCount
-                || !ItemIngredientAllocator.matches(recipe.inputs(), List.of(), contents.items, 1L)) return false;
+    private static OptionalLong findPatternScale(
+            AdvancedAlloyFurnaceRecipe recipe, IPatternDetails pattern,
+            Set<Integer> componentAgnosticOutputs, boolean allowMissingOutputs) {
+        return findPatternScale(recipe, pattern, PatternContents.read(pattern),
+                componentAgnosticOutputs, allowMissingOutputs);
+    }
 
-        if (!matchesFluidIngredients(contents.fluids, recipe.inputFluids())) return false;
-        if (!sameGeneric(contents.keys, recipe.keyInputs())) return false;
+    private static OptionalLong findPatternScale(
+            AdvancedAlloyFurnaceRecipe recipe, IPatternDetails pattern,
+            PatternContents contents, Set<Integer> componentAgnosticOutputs,
+            boolean allowMissingOutputs) {
+        if (contents == null) return OptionalLong.empty();
 
         List<GenericStack> expectedOutputs = new ArrayList<>();
         recipe.outputs().stream().map(GenericStack::fromItemStack).forEach(expectedOutputs::add);
         recipe.outputFluids().stream().map(GenericStack::fromFluidStack).forEach(expectedOutputs::add);
         expectedOutputs.addAll(recipe.keyOutputs());
-        // Outputs match component-exactly by default, mirroring the server-side identity built by
-        // AlloyFurnaceRecipeFingerprint.encodeExactOutput. Relaxing item components everywhere would
-        // collapse recipes that differ only by an output component (e.g. Productive Bees honeycomb
-        // carrying distinct bee_type values), so a single honeycomb pattern would match every bee
-        // recipe and candidate selection would pick the alphabetically-first one (black_quartz),
-        // encoding the wrong mold. Only the slots the resolver marked as item-id-only ignore
-        // components, which keeps Draconic Evolution's component-transferring fusion results working.
-        if (allowMissingOutputs) {
-            return matchesGenericSubset(
-                    pattern.getOutputs(), expectedOutputs, componentAgnosticOutputs);
+
+        // A manually multiplied AE processing pattern still represents the same recipe. Try only
+        // positive integer ratios derived from its outputs, then validate every input/output at
+        // that same ratio. This deliberately rejects division and arbitrary additions/removals.
+        for (long operations : candidatePatternScales(
+                pattern.getOutputs(), expectedOutputs, componentAgnosticOutputs)) {
+            if (!matchesScaledInputs(recipe, contents, operations)) continue;
+
+            // Outputs match component-exactly by default, mirroring the server-side identity built
+            // by AlloyFurnaceRecipeFingerprint.encodeExactOutput. Relaxing item components
+            // everywhere would collapse recipes that differ only by an output component, so only
+            // resolver-marked item-id-only slots ignore components.
+            boolean outputsMatch = allowMissingOutputs
+                    ? matchesGenericSubset(
+                            pattern.getOutputs(), expectedOutputs, componentAgnosticOutputs, operations)
+                    : componentAgnosticOutputs.isEmpty()
+                            ? sameGenericScaled(pattern.getOutputs(), expectedOutputs, operations)
+                            : sameGenericIgnoringSlotComponents(
+                                    pattern.getOutputs(), expectedOutputs,
+                                    componentAgnosticOutputs, operations);
+            if (outputsMatch) return OptionalLong.of(operations);
         }
-        return componentAgnosticOutputs.isEmpty()
-                ? sameGeneric(pattern.getOutputs(), expectedOutputs)
-                : sameGenericIgnoringSlotComponents(
-                        pattern.getOutputs(), expectedOutputs, componentAgnosticOutputs);
+        return OptionalLong.empty();
     }
 
     /**
@@ -614,22 +661,90 @@ public final class AlloyFurnaceRecipeCatalog {
         PatternContents contents = PatternContents.read(pattern);
         if (contents == null) return false;
 
-        long requiredItemCount = recipe.inputs().stream().mapToLong(CountedIngredient::count).sum();
-        long actualItemCount = contents.items.stream().mapToLong(GenericStack::amount).sum();
-        if (requiredItemCount != actualItemCount
-                || !ItemIngredientAllocator.matches(recipe.inputs(), List.of(), contents.items, 1L)) {
-            return false;
-        }
-        if (!matchesFluidIngredients(contents.fluids, recipe.inputFluids())
-                || !sameGeneric(contents.keys, recipe.keyInputs())) {
-            return false;
-        }
-
         List<GenericStack> expectedOutputs = new ArrayList<>();
         recipe.outputs().stream().map(GenericStack::fromItemStack).forEach(expectedOutputs::add);
         recipe.outputFluids().stream().map(GenericStack::fromFluidStack).forEach(expectedOutputs::add);
         expectedOutputs.addAll(recipe.keyOutputs());
-        return matchesGenericSubsetIgnoringItemComponents(pattern.getOutputs(), expectedOutputs);
+        for (long operations : candidatePatternScales(pattern.getOutputs(), expectedOutputs, Set.of())) {
+            if (matchesScaledInputs(recipe, contents, operations)
+                    && matchesGenericSubsetIgnoringItemComponents(
+                            pattern.getOutputs(), expectedOutputs, operations)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean matchesScaledInputs(
+            AdvancedAlloyFurnaceRecipe recipe, PatternContents contents, long operations) {
+        long requiredItemCount = multiplyAmount(sumItemRequirements(recipe.inputs()), operations);
+        long actualItemCount = sumGenericAmounts(contents.items);
+        return requiredItemCount >= 0L
+                && actualItemCount >= 0L
+                && requiredItemCount == actualItemCount
+                && ItemIngredientAllocator.matches(recipe.inputs(), List.of(), contents.items, operations)
+                && matchesFluidIngredients(contents.fluids, recipe.inputFluids(), operations)
+                && sameGenericScaled(contents.keys, recipe.keyInputs(), operations);
+    }
+
+    private static List<Long> candidatePatternScales(
+            List<GenericStack> actual, List<GenericStack> expected, Set<Integer> componentAgnosticSlots) {
+        if (actual == null || actual.isEmpty() || expected == null || expected.isEmpty()) {
+            return List.of();
+        }
+
+        LinkedHashSet<Long> candidates = new LinkedHashSet<>();
+        for (int actualSlot = 0; actualSlot < actual.size(); actualSlot++) {
+            GenericStack actualStack = actual.get(actualSlot);
+            if (actualStack == null || actualStack.what() == null || actualStack.amount() <= 0L) continue;
+
+            long matchingAmount = 0L;
+            for (GenericStack expectedStack : expected) {
+                if (expectedStack == null || expectedStack.what() == null || expectedStack.amount() <= 0L) {
+                    continue;
+                }
+                boolean matches = componentAgnosticSlots.contains(actualSlot)
+                        ? matchesItemId(actualStack.what(), expectedStack.what())
+                        : actualStack.what().equals(expectedStack.what());
+                if (!matches) continue;
+
+                if (actualStack.amount() % expectedStack.amount() == 0L) {
+                    candidates.add(actualStack.amount() / expectedStack.amount());
+                }
+                matchingAmount = addAmount(matchingAmount, expectedStack.amount());
+            }
+            if (matchingAmount > 0L && actualStack.amount() % matchingAmount == 0L) {
+                candidates.add(actualStack.amount() / matchingAmount);
+            }
+        }
+        return candidates.stream().filter(scale -> scale > 0L).toList();
+    }
+
+    private static long sumItemRequirements(List<CountedIngredient> requirements) {
+        long result = 0L;
+        if (requirements == null) return result;
+        for (CountedIngredient requirement : requirements) {
+            if (requirement == null || requirement.count() <= 0L) continue;
+            if (requirement.count() > Long.MAX_VALUE - result) return -1L;
+            result += requirement.count();
+        }
+        return result;
+    }
+
+    private static long sumGenericAmounts(List<GenericStack> stacks) {
+        long result = 0L;
+        if (stacks == null) return result;
+        for (GenericStack stack : stacks) {
+            if (stack == null || stack.amount() <= 0L) return -1L;
+            if (stack.amount() > Long.MAX_VALUE - result) return -1L;
+            result += stack.amount();
+        }
+        return result;
+    }
+
+    private static long multiplyAmount(long amount, long multiplier) {
+        if (amount < 0L || multiplier <= 0L || amount > Long.MAX_VALUE / multiplier) return -1L;
+        return amount * multiplier;
     }
 
     private static boolean hasComponentSensitiveItemOutputs(AdvancedAlloyFurnaceRecipe recipe) {
@@ -642,7 +757,7 @@ public final class AlloyFurnaceRecipeCatalog {
     }
 
     private static boolean matchesGenericSubsetIgnoringItemComponents(
-            List<GenericStack> actual, List<GenericStack> expected) {
+            List<GenericStack> actual, List<GenericStack> expected, long operations) {
         if (actual == null || actual.isEmpty() || expected == null || actual.size() > expected.size()) {
             return false;
         }
@@ -656,8 +771,10 @@ public final class AlloyFurnaceRecipeCatalog {
             for (int expectedSlot = 0; expectedSlot < expected.size(); expectedSlot++) {
                 if (matched[expectedSlot]) continue;
                 GenericStack expectedStack = expected.get(expectedSlot);
+                long expectedAmount = expectedStack == null
+                        ? -1L : multiplyAmount(expectedStack.amount(), operations);
                 if (expectedStack == null || expectedStack.what() == null
-                        || expectedStack.amount() != actualStack.amount()
+                        || expectedAmount < 0L || expectedAmount != actualStack.amount()
                         || !sameKeyIgnoringItemComponents(actualStack.what(), expectedStack.what())) {
                     continue;
                 }
@@ -667,6 +784,9 @@ public final class AlloyFurnaceRecipeCatalog {
             if (matchedSlot < 0) return false;
             matched[matchedSlot] = true;
         }
+        // At least one output was validated above. The retained output may be any recipe output;
+        // this also supports a pattern that intentionally keeps only a secondary product as a
+        // converter fallback.
         return true;
     }
 
@@ -678,12 +798,12 @@ public final class AlloyFurnaceRecipeCatalog {
     }
 
     /**
-     * Matches the outputs retained by a known recipe-bound pattern. The encoder may omit
-     * secondary outputs, but every retained stack must still match one complete recipe output.
+     * Matches the outputs retained by a known recipe-bound pattern. The encoder may omit any
+     * outputs, but every retained stack must still match one complete recipe output.
      */
     private static boolean matchesGenericSubset(
             List<GenericStack> actual, List<GenericStack> expected,
-            Set<Integer> componentAgnosticSlots) {
+            Set<Integer> componentAgnosticSlots, long operations) {
         if (actual == null || actual.isEmpty() || expected == null || actual.size() > expected.size()) {
             return false;
         }
@@ -701,8 +821,10 @@ public final class AlloyFurnaceRecipeCatalog {
                     continue;
                 }
                 GenericStack expectedOutput = expected.get(expectedSlot);
+                long expectedAmount = expectedOutput == null
+                        ? -1L : multiplyAmount(expectedOutput.amount(), operations);
                 if (expectedOutput == null || expectedOutput.what() == null
-                        || expectedOutput.amount() != actualOutput.amount()) {
+                        || expectedAmount < 0L || expectedAmount != actualOutput.amount()) {
                     continue;
                 }
 
@@ -719,6 +841,8 @@ public final class AlloyFurnaceRecipeCatalog {
             }
             matched[matchedSlot] = true;
         }
+        // At least one output was validated above. Any recipe output can be the retained fallback
+        // when the original primary output was removed from the pattern.
         return true;
     }
 
@@ -733,12 +857,15 @@ public final class AlloyFurnaceRecipeCatalog {
      * positional, so this cannot use the order-insensitive multiset comparison.
      */
     private static boolean sameGenericIgnoringSlotComponents(
-            List<GenericStack> patternOutputs, List<GenericStack> recipeOutputs, Set<Integer> ignoredSlots) {
+            List<GenericStack> patternOutputs, List<GenericStack> recipeOutputs,
+            Set<Integer> ignoredSlots, long operations) {
         if (patternOutputs.size() != recipeOutputs.size()) return false;
         for (int slot = 0; slot < patternOutputs.size(); slot++) {
             GenericStack left = patternOutputs.get(slot);
             GenericStack right = recipeOutputs.get(slot);
-            if (left == null || right == null || left.amount() != right.amount()) return false;
+            long expectedAmount = right == null ? -1L : multiplyAmount(right.amount(), operations);
+            if (left == null || right == null || expectedAmount < 0L
+                    || left.amount() != expectedAmount) return false;
             if (!ignoredSlots.contains(slot)) {
                 if (!left.what().equals(right.what())) return false;
             } else if (!(left.what() instanceof AEItemKey leftItem)
@@ -760,7 +887,7 @@ public final class AlloyFurnaceRecipeCatalog {
 
     private static boolean matchesFluidIngredients(
             List<PatternFluidInput> actual,
-            List<LongSizedFluidIngredient> required) {
+            List<LongSizedFluidIngredient> required, long operations) {
         long actualAmount = 0L;
         if (actual != null) {
             for (PatternFluidInput input : actual) {
@@ -775,23 +902,25 @@ public final class AlloyFurnaceRecipeCatalog {
                 if (ingredient != null) requiredAmount = addAmount(requiredAmount, ingredient.amount());
             }
         }
+        requiredAmount = multiplyAmount(requiredAmount, operations);
+        if (requiredAmount < 0L) return false;
         if (actualAmount != requiredAmount) return false;
-        return matchesFluidCandidates(actual, required, 0, new ArrayList<>());
+        return matchesFluidCandidates(actual, required, operations, 0, new ArrayList<>());
     }
 
     private static boolean matchesFluidCandidates(
             List<PatternFluidInput> actual,
             List<LongSizedFluidIngredient> required,
-            int index, List<GenericStack> selected) {
+            long operations, int index, List<GenericStack> selected) {
         if (index >= actual.size()) {
-            return FluidIngredientAllocator.matchesLong(required, List.of(), selected, 1L);
+            return FluidIngredientAllocator.matchesLong(required, List.of(), selected, operations);
         }
         PatternFluidInput input = actual.get(index);
         if (input == null || input.candidates().isEmpty()) return false;
         for (GenericStack candidate : input.candidates()) {
             if (candidate == null || candidate.what() == null || candidate.amount() <= 0L) continue;
             selected.add(candidate);
-            if (matchesFluidCandidates(actual, required, index + 1, selected)) return true;
+            if (matchesFluidCandidates(actual, required, operations, index + 1, selected)) return true;
             selected.removeLast();
         }
         return false;
@@ -805,6 +934,27 @@ public final class AlloyFurnaceRecipeCatalog {
         Map<AEKey, Long> leftMap = genericMap(left);
         Map<AEKey, Long> rightMap = genericMap(right);
         return leftMap.equals(rightMap);
+    }
+
+    private static boolean sameGenericScaled(
+            List<GenericStack> actual, List<GenericStack> expected, long operations) {
+        if (operations <= 0L) return false;
+
+        Map<AEKey, Long> actualMap = genericMap(actual);
+        Map<AEKey, Long> expectedMap = new LinkedHashMap<>();
+        if (expected != null) {
+            for (GenericStack stack : expected) {
+                if (stack == null || stack.what() == null || stack.amount() <= 0L) return false;
+                long amount = multiplyAmount(stack.amount(), operations);
+                if (amount < 0L) return false;
+                Long previous = expectedMap.putIfAbsent(stack.what(), amount);
+                if (previous != null) {
+                    if (amount > Long.MAX_VALUE - previous) return false;
+                    expectedMap.put(stack.what(), previous + amount);
+                }
+            }
+        }
+        return actualMap.equals(expectedMap);
     }
 
     private static Map<AEKey, Long> genericMap(List<GenericStack> stacks) {

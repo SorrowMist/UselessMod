@@ -4,15 +4,18 @@ import com.sorrowmist.useless.api.enums.AlloyFurnaceMode;
 import com.sorrowmist.useless.content.recipe.AdapterUtils;
 import com.sorrowmist.useless.content.recipe.AdvancedAlloyFurnaceRecipe;
 import com.sorrowmist.useless.content.recipe.IRecipeAdapter;
+import com.sorrowmist.useless.content.recipe.LongSizedFluidIngredient;
 import com.sorrowmist.useless.content.recipe.RecipeSourceIds;
 import committee.nova.mods.avaritia.init.registry.ModBlocks;
 import committee.nova.mods.avaritia.init.registry.enums.CollectorTier;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.tags.FluidTags;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.crafting.Ingredient;
 import net.minecraft.world.item.crafting.RecipeHolder;
 import net.minecraft.world.level.Level;
 import net.neoforged.neoforge.fluids.FluidStack;
+import net.neoforged.neoforge.fluids.crafting.FluidIngredient;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
@@ -22,6 +25,7 @@ import java.util.Map;
 /** Exposes the four passive neutron collector tiers as timed alloy-furnace recipes. */
 public final class ReAvaritiaCollectorRecipeAdapter
         implements IRecipeAdapter<ReAvaritiaSyntheticRecipe> {
+    private static final long WATER_AMOUNT = 1_000L;
 
     @Override
     public String sourceId() {
@@ -59,7 +63,8 @@ public final class ReAvaritiaCollectorRecipeAdapter
             AdvancedAlloyFurnaceRecipe converted = new AdvancedAlloyFurnaceRecipe(
                     id(tier),
                     List.of(),
-                    List.of(),
+                    List.of(new LongSizedFluidIngredient(
+                            FluidIngredient.tag(FluidTags.WATER), WATER_AMOUNT)),
                     List.of(output),
                     List.of(),
                     AdapterUtils.DEFAULT_ENERGY,

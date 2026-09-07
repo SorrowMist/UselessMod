@@ -10,6 +10,7 @@ import com.sorrowmist.useless.content.items.AE2GiftPackageItem;
 import com.sorrowmist.useless.content.items.AdvancedAlloyFurnaceBlockItem;
 import com.sorrowmist.useless.content.items.EndlessBeafItem;
 import com.sorrowmist.useless.content.items.IngotItem;
+import com.sorrowmist.useless.content.items.OmniversalPatternConverterItem;
 import com.sorrowmist.useless.content.items.RitualBlueprintItem;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.OmniversalPatternDetails;
 import appeng.api.crafting.PatternDetailsHelper;
@@ -246,6 +247,9 @@ public final class ModItems {
                     .invalidPatternTooltip(AEProcessingPattern::getInvalidPatternTooltip)
                     .itemProperties(new Item.Properties().stacksTo(1))
                     .build());
+    public static final DeferredItem<OmniversalPatternConverterItem> OMNIVERSAL_PATTERN_CONVERTER = registerAndAdd(
+            "omniversal_pattern_converter",
+            () -> new OmniversalPatternConverterItem());
     static {
         for (int tier = UselessCoilBlock.MIN_TIER; tier <= UselessCoilBlock.MAX_TIER; tier++) {
             int capturedTier = tier;

@@ -1,85 +1,129 @@
 {
-  "values": [
-    "useless_mod:metal_mold_plate",
-    "useless_mod:metal_mold_rod",
-    "useless_mod:metal_mold_gear",
-    "useless_mod:metal_mold_wire",
-    "useless_mod:metal_mold_block",
-    {
-      "id": "powah:energizing_orb",
-      "required": false
-    },
-    {
-      "id": "extendedcrafting:basic_table",
-      "required": false
-    },
-    {
-      "id": "extendedcrafting:advanced_table",
-      "required": false
-    },
-    {
-      "id": "extendedcrafting:elite_table",
-      "required": false
-    },
-    {
-      "id": "extendedcrafting:ultimate_table",
-      "required": false
-    },
-    {
-      "id": "extendedcrafting:compressor",
-      "required": false
-    },
-    {
-      "id": "extendedcrafting:crafting_core",
-      "required": false
-    },
-    {
-      "id": "extendedcrafting:ender_crafter",
-      "required": false
-    },
-    {
-      "id": "extendedcrafting:flux_crafter",
-      "required": false
-    },
-    {
-      "id": "neoecoae:integrated_working_station",
-      "required": false
-    },
-    {
-      "id": "naturesaura:wood_stand",
-      "required": false
-    },
-    {
-      "id": "naturesaura:nature_altar",
-      "required": false
-    },
-    {
-      "id": "naturesaura:animal_spawner",
-      "required": false
-    },
-    {
-      "id": "naturesaura:offering_table",
-      "required": false
-    },
-    {
-      "id": "naturesaura:conversion_catalyst",
-      "required": false
-    },
-    {
-      "id": "naturesaura:crushing_catalyst",
-      "required": false
-    },
-    {
-      "id": "malum:spirit_crucible",
-      "required": false
-    },
-    {
-      "id": "malum:spirit_altar",
-      "required": false
-    },
-    {
-      "id": "useless_mod:ritual_blueprint",
-      "required": false
-    }
-  ]
+    "values": [
+        "useless_mod:metal_mold_plate",
+        "useless_mod:metal_mold_rod",
+        "useless_mod:metal_mold_gear",
+        "useless_mod:metal_mold_wire",
+        "useless_mod:metal_mold_block",
+        {
+            "id": "powah:energizing_orb",
+            "required": false
+        },
+        {
+            "id": "extendedcrafting:basic_table",
+            "required": false
+        },
+        {
+            "id": "extendedcrafting:advanced_table",
+            "required": false
+        },
+        {
+            "id": "extendedcrafting:elite_table",
+            "required": false
+        },
+        {
+            "id": "extendedcrafting:ultimate_table",
+            "required": false
+        },
+        {
+            "id": "extendedcrafting:compressor",
+            "required": false
+        },
+        {
+            "id": "extendedcrafting:crafting_core",
+            "required": false
+        },
+        {
+            "id": "extendedcrafting:ender_crafter",
+            "required": false
+        },
+        {
+            "id": "extendedcrafting:flux_crafter",
+            "required": false
+        },
+        {
+            "id": "neoecoae:integrated_working_station",
+            "required": false
+        },
+        {
+            "id": "naturesaura:wood_stand",
+            "required": false
+        },
+        {
+            "id": "naturesaura:nature_altar",
+            "required": false
+        },
+        {
+            "id": "naturesaura:animal_spawner",
+            "required": false
+        },
+        {
+            "id": "naturesaura:offering_table",
+            "required": false
+        },
+        {
+            "id": "naturesaura:conversion_catalyst",
+            "required": false
+        },
+        {
+            "id": "naturesaura:crushing_catalyst",
+            "required": false
+        },
+        {
+            "id": "malum:spirit_crucible",
+            "required": false
+        },
+        {
+            "id": "malum:spirit_altar",
+            "required": false
+        },
+        {
+            "id": "create:spout",
+            "required": false
+        },
+        {
+            "id": "create:mechanical_press",
+            "required": false
+        },
+        {
+            "id": "create:mechanical_mixer",
+            "required": false
+        },
+        {
+            "id": "create:basin",
+            "required": false
+        },
+        {
+            "id": "create:millstone",
+            "required": false
+        },
+        {
+            "id": "create:crushing_wheel",
+            "required": false
+        },
+        {
+            "id": "create:encased_fan",
+            "required": false
+        },
+        {
+            "id": "create:mechanical_crafter",
+            "required": false
+        },
+        {
+            "id": "create:deployer",
+            "required": false
+        },
+        {
+            "id": "create:mechanical_saw",
+            "required": false
+        },
+        {
+            "id": "create:blaze_burner",
+            "required": false
+        },
+        {
+            "id": "useless_mod:ritual_blueprint",
+            "required": false
+        }
+    ]
 }

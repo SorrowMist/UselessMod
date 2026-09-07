@@ -1,48 +1,48 @@
 {
-  "type": "useless_mod:advanced_alloy_furnace",
-  "energy": 100000,
-  "id": "useless_mod:advanced_alloy/ingot/useless_ingot_tier_3",
-  "ingredients": [
-    {
-      "count": 2,
-      "ingredient": {
-        "item": "minecraft:nether_wart"
-      }
-    },
-    {
-      "count": 2,
-      "ingredient": {
-        "item": "minecraft:blaze_rod"
-      }
-    },
-    {
-      "count": 2,
-      "ingredient": {
-        "item": "minecraft:nether_brick"
-      }
-    },
-    {
-      "count": 2,
-      "ingredient": {
-        "item": "minecraft:gold_ingot"
-      }
-    },
-    {
-      "count": 2,
-      "ingredient": {
-        "item": "minecraft:diamond"
-      }
-    },
-    {
-      "ingredient": {
-        "item": "useless_mod:useless_ingot_tier_2"
-      }
-    }
-  ],
-  "outputs": [
-    {
-      "id": "useless_mod:useless_ingot_tier_3"
-    }
-  ],
-  "process_time": 1
+    "type": "useless_mod:advanced_alloy_furnace",
+    "energy": 100000,
+    "id": "useless_mod:advanced_alloy/ingot/useless_ingot_tier_3",
+    "ingredients": [
+        {
+            "count": 2,
+            "ingredient": {
+                "item": "minecraft:nether_wart"
+            }
+        },
+        {
+            "count": 2,
+            "ingredient": {
+                "item": "minecraft:blaze_rod"
+            }
+        },
+        {
+            "count": 2,
+            "ingredient": {
+                "item": "minecraft:nether_brick"
+            }
+        },
+        {
+            "count": 2,
+            "ingredient": {
+                "item": "minecraft:gold_ingot"
+            }
+        },
+        {
+            "count": 2,
+            "ingredient": {
+                "item": "minecraft:diamond"
+            }
+        },
+        {
+            "ingredient": {
+                "item": "useless_mod:useless_ingot_tier_2"
+            }
+        }
+    ],
+    "outputs": [
+        {
+            "id": "useless_mod:useless_ingot_tier_3"
+        }
+    ],
+    "process_time": 1
 }

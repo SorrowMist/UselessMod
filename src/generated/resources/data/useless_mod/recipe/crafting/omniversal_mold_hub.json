@@ -1,24 +1,24 @@
 {
-  "type": "minecraft:crafting_shaped",
-  "category": "building",
-  "key": {
-    "C": {
-      "item": "minecraft:chest"
+    "type": "minecraft:crafting_shaped",
+    "category": "building",
+    "key": {
+        "C": {
+            "item": "minecraft:chest"
+        },
+        "H": {
+            "item": "minecraft:hopper"
+        },
+        "R": {
+            "item": "minecraft:redstone"
+        }
     },
-    "H": {
-      "item": "minecraft:hopper"
-    },
-    "R": {
-      "item": "minecraft:redstone"
+    "pattern": [
+        " R ",
+        "CHR",
+        " R "
+    ],
+    "result": {
+        "count": 1,
+        "id": "useless_mod:omniversal_mold_hub"
     }
-  },
-  "pattern": [
-    " R ",
-    "CHR",
-    " R "
-  ],
-  "result": {
-    "count": 1,
-    "id": "useless_mod:omniversal_mold_hub"
-  }
 }

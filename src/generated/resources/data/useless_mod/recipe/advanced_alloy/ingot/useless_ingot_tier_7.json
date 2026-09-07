@@ -1,48 +1,48 @@
 {
-  "type": "useless_mod:advanced_alloy_furnace",
-  "energy": 10000000,
-  "id": "useless_mod:advanced_alloy/ingot/useless_ingot_tier_7",
-  "ingredients": [
-    {
-      "count": 2,
-      "ingredient": {
-        "item": "minecraft:nether_star"
-      }
-    },
-    {
-      "count": 2,
-      "ingredient": {
-        "item": "minecraft:wither_rose"
-      }
-    },
-    {
-      "count": 2,
-      "ingredient": {
-        "item": "minecraft:ghast_tear"
-      }
-    },
-    {
-      "count": 2,
-      "ingredient": {
-        "item": "minecraft:diamond_block"
-      }
-    },
-    {
-      "count": 2,
-      "ingredient": {
-        "item": "minecraft:netherite_ingot"
-      }
-    },
-    {
-      "ingredient": {
-        "item": "useless_mod:useless_ingot_tier_6"
-      }
-    }
-  ],
-  "outputs": [
-    {
-      "id": "useless_mod:useless_ingot_tier_7"
-    }
-  ],
-  "process_time": 1
+    "type": "useless_mod:advanced_alloy_furnace",
+    "energy": 10000000,
+    "id": "useless_mod:advanced_alloy/ingot/useless_ingot_tier_7",
+    "ingredients": [
+        {
+            "count": 2,
+            "ingredient": {
+                "item": "minecraft:nether_star"
+            }
+        },
+        {
+            "count": 2,
+            "ingredient": {
+                "item": "minecraft:wither_rose"
+            }
+        },
+        {
+            "count": 2,
+            "ingredient": {
+                "item": "minecraft:ghast_tear"
+            }
+        },
+        {
+            "count": 2,
+            "ingredient": {
+                "item": "minecraft:diamond_block"
+            }
+        },
+        {
+            "count": 2,
+            "ingredient": {
+                "item": "minecraft:netherite_ingot"
+            }
+        },
+        {
+            "ingredient": {
+                "item": "useless_mod:useless_ingot_tier_6"
+            }
+        }
+    ],
+    "outputs": [
+        {
+            "id": "useless_mod:useless_ingot_tier_7"
+        }
+    ],
+    "process_time": 1
 }

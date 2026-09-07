@@ -1,48 +1,48 @@
 {
-  "type": "useless_mod:advanced_alloy_furnace",
-  "energy": 500000,
-  "id": "useless_mod:advanced_alloy/ingot/useless_ingot_tier_4",
-  "ingredients": [
-    {
-      "count": 2,
-      "ingredient": {
-        "item": "minecraft:ender_pearl"
-      }
-    },
-    {
-      "count": 2,
-      "ingredient": {
-        "item": "minecraft:chorus_fruit"
-      }
-    },
-    {
-      "count": 2,
-      "ingredient": {
-        "item": "minecraft:shulker_shell"
-      }
-    },
-    {
-      "count": 2,
-      "ingredient": {
-        "item": "minecraft:gold_block"
-      }
-    },
-    {
-      "count": 2,
-      "ingredient": {
-        "item": "minecraft:diamond_block"
-      }
-    },
-    {
-      "ingredient": {
-        "item": "useless_mod:useless_ingot_tier_3"
-      }
-    }
-  ],
-  "outputs": [
-    {
-      "id": "useless_mod:useless_ingot_tier_4"
-    }
-  ],
-  "process_time": 1
+    "type": "useless_mod:advanced_alloy_furnace",
+    "energy": 500000,
+    "id": "useless_mod:advanced_alloy/ingot/useless_ingot_tier_4",
+    "ingredients": [
+        {
+            "count": 2,
+            "ingredient": {
+                "item": "minecraft:ender_pearl"
+            }
+        },
+        {
+            "count": 2,
+            "ingredient": {
+                "item": "minecraft:chorus_fruit"
+            }
+        },
+        {
+            "count": 2,
+            "ingredient": {
+                "item": "minecraft:shulker_shell"
+            }
+        },
+        {
+            "count": 2,
+            "ingredient": {
+                "item": "minecraft:gold_block"
+            }
+        },
+        {
+            "count": 2,
+            "ingredient": {
+                "item": "minecraft:diamond_block"
+            }
+        },
+        {
+            "ingredient": {
+                "item": "useless_mod:useless_ingot_tier_3"
+            }
+        }
+    ],
+    "outputs": [
+        {
+            "id": "useless_mod:useless_ingot_tier_4"
+        }
+    ],
+    "process_time": 1
 }

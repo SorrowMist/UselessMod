@@ -1,48 +1,48 @@
 {
-  "type": "useless_mod:advanced_alloy_furnace",
-  "energy": 100000000,
-  "id": "useless_mod:advanced_alloy/ingot/useless_ingot_tier_9",
-  "ingredients": [
-    {
-      "count": 2,
-      "ingredient": {
-        "item": "minecraft:turtle_helmet"
-      }
-    },
-    {
-      "count": 2,
-      "ingredient": {
-        "item": "minecraft:goat_horn"
-      }
-    },
-    {
-      "count": 2,
-      "ingredient": {
-        "item": "minecraft:rabbit_foot"
-      }
-    },
-    {
-      "count": 2,
-      "ingredient": {
-        "item": "minecraft:diamond_block"
-      }
-    },
-    {
-      "count": 2,
-      "ingredient": {
-        "item": "minecraft:netherite_block"
-      }
-    },
-    {
-      "ingredient": {
-        "item": "useless_mod:useless_ingot_tier_8"
-      }
-    }
-  ],
-  "outputs": [
-    {
-      "id": "useless_mod:useless_ingot_tier_9"
-    }
-  ],
-  "process_time": 1
+    "type": "useless_mod:advanced_alloy_furnace",
+    "energy": 100000000,
+    "id": "useless_mod:advanced_alloy/ingot/useless_ingot_tier_9",
+    "ingredients": [
+        {
+            "count": 2,
+            "ingredient": {
+                "item": "minecraft:turtle_helmet"
+            }
+        },
+        {
+            "count": 2,
+            "ingredient": {
+                "item": "minecraft:goat_horn"
+            }
+        },
+        {
+            "count": 2,
+            "ingredient": {
+                "item": "minecraft:rabbit_foot"
+            }
+        },
+        {
+            "count": 2,
+            "ingredient": {
+                "item": "minecraft:diamond_block"
+            }
+        },
+        {
+            "count": 2,
+            "ingredient": {
+                "item": "minecraft:netherite_block"
+            }
+        },
+        {
+            "ingredient": {
+                "item": "useless_mod:useless_ingot_tier_8"
+            }
+        }
+    ],
+    "outputs": [
+        {
+            "id": "useless_mod:useless_ingot_tier_9"
+        }
+    ],
+    "process_time": 1
 }

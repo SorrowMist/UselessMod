@@ -4,6 +4,7 @@ import com.sorrowmist.useless.content.blockentities.PagedMenuPageMemory;
 import com.sorrowmist.useless.content.blockentities.RecoverableItemStackHandler;
 import com.sorrowmist.useless.content.recipe.AdapterUtils;
 import com.sorrowmist.useless.content.recipe.AlloyFurnaceRecipeCatalog;
+import com.sorrowmist.useless.content.recipe.MoldMatcher;
 import com.sorrowmist.useless.core.config.ConfigManager;
 import com.sorrowmist.useless.init.ModBlockEntities;
 import com.sorrowmist.useless.init.ModTags;
@@ -24,8 +25,9 @@ import com.sorrowmist.useless.core.component.MultiblockPartData;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
-import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -37,7 +39,9 @@ public final class OmniversalMoldHubBlockEntity extends BlockEntity implements M
     private final PagedMenuPageMemory pageMemory = new PagedMenuPageMemory(this::setChanged);
     private final Map<List<Ingredient>, Boolean> moldMatchCache = new HashMap<>();
     @Nullable
-    private List<ItemStack> cachedAvailableMolds;
+    private Map<Integer, ItemStack> cachedAvailableMolds;
+    @Nullable
+    private MoldMatcher.PreparedMolds cachedPreparedMolds;
     private int cachedActiveSlots = -1;
     private long cachedRecipeCatalogGeneration = -1L;
     @Nullable
@@ -78,27 +82,35 @@ public final class OmniversalMoldHubBlockEntity extends BlockEntity implements M
 
     /** Returns whether the active mold slots can satisfy every independent requirement. */
     public boolean containsMolds(List<Ingredient> requirements) {
-        List<Ingredient> normalized = normalizeRequirements(requirements);
+        List<Ingredient> normalized = MoldMatcher.normalizeRequirements(requirements);
         if (normalized.isEmpty()) return true;
         refreshMoldMatchCache();
         Boolean cached = moldMatchCache.get(normalized);
         if (cached != null) return cached;
 
-        boolean matched = matchesMolds(normalized, getAvailableMolds());
+        boolean matched = getPreparedMolds().matches(normalized);
         moldMatchCache.put(normalized, matched);
         return matched;
     }
 
-    private List<ItemStack> getAvailableMolds() {
+    private Map<Integer, ItemStack> getAvailableMolds() {
         if (cachedAvailableMolds == null) {
             int activeSlots = molds.getActiveSlots();
-            List<ItemStack> available = new ArrayList<>(activeSlots);
+            Map<Integer, ItemStack> available = new LinkedHashMap<>();
             for (int slot = 0; slot < activeSlots; slot++) {
-                available.add(molds.getStackInSlot(slot).copy());
+                ItemStack mold = molds.getStackInSlot(slot);
+                if (!mold.isEmpty()) available.put(slot, mold.copy());
             }
-            cachedAvailableMolds = List.copyOf(available);
+            cachedAvailableMolds = Collections.unmodifiableMap(available);
         }
         return cachedAvailableMolds;
+    }
+
+    private MoldMatcher.PreparedMolds getPreparedMolds() {
+        if (cachedPreparedMolds == null) {
+            cachedPreparedMolds = MoldMatcher.prepare(getAvailableMolds());
+        }
+        return cachedPreparedMolds;
     }
 
     /**
@@ -106,42 +118,12 @@ public final class OmniversalMoldHubBlockEntity extends BlockEntity implements M
      * one device slot, regardless of its item count; augmenting paths handle overlapping ingredients.
      */
     public static boolean matchesMolds(List<Ingredient> requirements, List<ItemStack> available) {
-        List<Ingredient> normalized = normalizeRequirements(requirements);
-        if (normalized.isEmpty()) return true;
-        if (available == null || available.isEmpty() || normalized.size() > available.size()) return false;
-
-        int[] requirementBySlot = new int[available.size()];
-        Arrays.fill(requirementBySlot, -1);
-        for (int requirement = 0; requirement < normalized.size(); requirement++) {
-            if (!augment(normalized, available, requirement, requirementBySlot, new boolean[available.size()])) {
-                return false;
-            }
-        }
-        return true;
+        return MoldMatcher.matches(requirements, available);
     }
 
-    private static boolean augment(List<Ingredient> requirements, List<ItemStack> available,
-                                   int requirement, int[] requirementBySlot, boolean[] visited) {
-        Ingredient needed = requirements.get(requirement);
-        for (int slot = 0; slot < available.size(); slot++) {
-            if (visited[slot] || !AdapterUtils.matchesMold(needed, available.get(slot))) continue;
-            visited[slot] = true;
-            int previous = requirementBySlot[slot];
-            if (previous < 0 || augment(requirements, available, previous, requirementBySlot, visited)) {
-                requirementBySlot[slot] = requirement;
-                return true;
-            }
-        }
-        return false;
-    }
-
-    private static List<Ingredient> normalizeRequirements(List<Ingredient> requirements) {
-        if (requirements == null || requirements.isEmpty()) return List.of();
-        List<Ingredient> normalized = new ArrayList<>(requirements.size());
-        for (Ingredient requirement : requirements) {
-            if (requirement != null && !requirement.isEmpty()) normalized.add(requirement);
-        }
-        return List.copyOf(normalized);
+    public static boolean matchesMolds(
+            List<Ingredient> requirements, Map<Integer, ItemStack> available) {
+        return MoldMatcher.matches(requirements, available);
     }
 
     private void refreshMoldMatchCache() {
@@ -150,6 +132,7 @@ public final class OmniversalMoldHubBlockEntity extends BlockEntity implements M
         if (cachedActiveSlots != activeSlots || cachedRecipeCatalogGeneration != catalogGeneration) {
             moldMatchCache.clear();
             cachedAvailableMolds = null;
+            cachedPreparedMolds = null;
             cachedActiveSlots = activeSlots;
             cachedRecipeCatalogGeneration = catalogGeneration;
         }
@@ -158,6 +141,7 @@ public final class OmniversalMoldHubBlockEntity extends BlockEntity implements M
     private void moldInventoryChanged() {
         moldMatchCache.clear();
         cachedAvailableMolds = null;
+        cachedPreparedMolds = null;
         setChanged();
     }
 
@@ -197,6 +181,7 @@ public final class OmniversalMoldHubBlockEntity extends BlockEntity implements M
         molds.deserializeNBT(registries, tag.getCompound("Molds"));
         moldMatchCache.clear();
         cachedAvailableMolds = null;
+        cachedPreparedMolds = null;
         cachedActiveSlots = -1;
         cachedRecipeCatalogGeneration = -1L;
         controllerPos = tag.contains("Controller") ? BlockPos.of(tag.getLong("Controller")) : null;

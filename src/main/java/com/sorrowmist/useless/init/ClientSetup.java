@@ -18,6 +18,7 @@ import com.sorrowmist.useless.compat.jei.JEIPlugin;
 import com.sorrowmist.useless.content.blocks.GlowPlasticBlock;
 import com.sorrowmist.useless.content.items.EndlessBeafItem;
 import com.sorrowmist.useless.content.menus.AdvancedAlloyFurnaceMenu;
+import com.sorrowmist.useless.client.gui.PatternConverterScreen;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.OmniversalPatternEncoding;
 import com.sorrowmist.useless.content.recipe.AlloyFurnaceRecipeCatalog;
 import com.sorrowmist.useless.core.component.OmniversalPatternData;
@@ -88,6 +89,7 @@ public class ClientSetup {
         event.register(ModMenuType.PASSIVE_CRAFTING_HATCH_MENU.get(), PassiveCraftingHatchScreen::new);
         event.register(ModMenuType.ORE_GENERATOR_MENU.get(), OreGeneratorScreen::new);
         event.register(ModMenuType.DIMENSION_CONFIG_MENU.get(), DimensionConfigScreen::new);
+        event.register(ModMenuType.PATTERN_CONVERTER_MENU.get(), PatternConverterScreen::new);
     }
 
     @SubscribeEvent

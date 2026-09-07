@@ -807,7 +807,6 @@ public class EndlessBeafItem extends TieredItem {
                               boolean pIsSelected) {
         super.inventoryTick(pStack, pLevel, pEntity, pSlotId, pIsSelected);
         if (pEntity instanceof Player player) {
-            refreshEnchantments(pStack, pLevel);
             boolean hasItemInInventory = player.getInventory().items.stream().anyMatch(item -> item.getItem() == this);
             if (hasItemInInventory) {
                 UselessItemUtils.applyEndlessBeafEffects(player);

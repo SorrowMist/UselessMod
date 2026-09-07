@@ -2,11 +2,9 @@ package com.sorrowmist.useless.network;
 
 import com.sorrowmist.useless.UselessMod;
 import com.sorrowmist.useless.api.enums.tool.EnchantMode;
+import com.sorrowmist.useless.content.items.EndlessBeafItem;
 import com.sorrowmist.useless.core.component.UComponents;
-import com.sorrowmist.useless.core.config.ConfigManager;
-import com.sorrowmist.useless.utils.EnchantmentUtil;
 import com.sorrowmist.useless.utils.UselessItemUtils;
-import net.minecraft.core.Holder;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
@@ -15,9 +13,6 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.component.CustomModelData;
-import net.minecraft.world.item.enchantment.Enchantment;
-import net.minecraft.world.item.enchantment.EnchantmentHelper;
-import net.minecraft.world.item.enchantment.Enchantments;
 import net.minecraft.world.level.Level;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
 import org.jetbrains.annotations.NotNull;
@@ -49,9 +44,6 @@ public class EnchantmentSwitchPacket implements CustomPacketPayload {
 
             Level level = player.level();
 
-            Holder<Enchantment> fortune = EnchantmentUtil.getEnchantmentHolder(level, Enchantments.FORTUNE);
-            Holder<Enchantment> silk = EnchantmentUtil.getEnchantmentHolder(level, Enchantments.SILK_TOUCH);
-
             // 写入组件
             stack.set(UComponents.EnchantModeComponent.get(), msg.mode);
 
@@ -61,18 +53,7 @@ public class EnchantmentSwitchPacket implements CustomPacketPayload {
             );
 
             // 更新附魔
-            EnchantmentHelper.updateEnchantments(
-                    stack,
-                    ench -> {
-                        if (msg.mode == EnchantMode.FORTUNE) {
-                            ench.set(silk, 0);
-                            ench.set(fortune, ConfigManager.getFortuneLevel());
-                        } else {
-                            ench.set(silk, 1);
-                            ench.set(fortune, 0);
-                        }
-                    }
-            );
+            EndlessBeafItem.refreshEnchantments(stack, level);
 
             // 显式同步物品到客户端
             player.containerMenu.broadcastChanges();

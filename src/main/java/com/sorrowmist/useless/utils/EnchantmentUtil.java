@@ -46,6 +46,9 @@ public class EnchantmentUtil {
 
         // 获取当前物品的附魔组件
         ItemEnchantments currentEnchantments = stack.getOrDefault(DataComponents.ENCHANTMENTS, ItemEnchantments.EMPTY);
+        if (currentEnchantments.getLevel(holder) == level) {
+            return;
+        }
         ItemEnchantments.Mutable mutable = new ItemEnchantments.Mutable(currentEnchantments);
 
         // 设置等级并写回组件

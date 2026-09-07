@@ -20,6 +20,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.core.HolderLookup;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.core.particles.BlockParticleOption;
 import net.minecraft.core.particles.ParticleTypes;
@@ -166,6 +167,24 @@ public class EndlessBeafItem extends TieredItem {
         if (ModList.get().isLoaded(EnderIOTravelCompat.MOD_ID)) {
             EnderIOTravelCompat.setTravelItemEnabled(stack, enabled);
         }
+    }
+
+    /** Keeps the tool's fixed enchantments aligned with its selected mode and server config. */
+    public static void refreshEnchantments(ItemStack stack, Level level) {
+        if (stack.isEmpty() || level == null || level.isClientSide()) {
+            return;
+        }
+
+        EnchantMode mode = stack.getOrDefault(
+                UComponents.EnchantModeComponent.get(), EnchantMode.SILK_TOUCH);
+        HolderLookup.Provider lookup = level.registryAccess();
+        EnchantmentUtil.applyEnchantment(
+                stack, lookup, Enchantments.SILK_TOUCH, mode == EnchantMode.SILK_TOUCH ? 1 : 0);
+        EnchantmentUtil.applyEnchantment(
+                stack, lookup, Enchantments.FORTUNE,
+                mode == EnchantMode.FORTUNE ? ConfigManager.getFortuneLevel() : 0);
+        EnchantmentUtil.applyEnchantment(
+                stack, lookup, Enchantments.LOOTING, ConfigManager.getLootingLevel());
     }
 
     public static InteractionResult tryTeleport(Level level, Player player, ItemStack stack) {
@@ -811,10 +830,7 @@ public class EndlessBeafItem extends TieredItem {
     @Override
     public void onCraftedBy(@NotNull ItemStack stack, @NotNull Level level, @NotNull Player player) {
         super.onCraftedBy(stack, level, player);
-        stack.enchant(EnchantmentUtil.getEnchantmentHolder(level, Enchantments.SILK_TOUCH), 1);
-        stack.enchant(EnchantmentUtil.getEnchantmentHolder(level, Enchantments.LOOTING),
-                      ConfigManager.getLootingLevel()
-        );
+        refreshEnchantments(stack, level);
     }
 
     @Override

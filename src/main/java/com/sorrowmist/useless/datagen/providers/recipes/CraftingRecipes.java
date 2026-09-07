@@ -1,12 +1,13 @@
 package com.sorrowmist.useless.datagen.providers.recipes;
 
 import appeng.core.definitions.AEBlocks;
+import appeng.core.definitions.AEItems;
 import appeng.core.definitions.AEParts;
 import com.sorrowmist.useless.UselessMod;
 import com.sorrowmist.useless.api.enums.AlloyFurnaceMode;
 import com.sorrowmist.useless.api.enums.EnumColor;
-import com.sorrowmist.useless.content.blocks.multiblock.UselessCoilBlock;
 import com.sorrowmist.useless.content.blocks.GlowPlasticBlock;
+import com.sorrowmist.useless.content.blocks.multiblock.UselessCoilBlock;
 import com.sorrowmist.useless.content.recipe.AdvancedAlloyFurnaceRecipeBuilder;
 import com.sorrowmist.useless.init.ModBlocks;
 import com.sorrowmist.useless.init.ModItems;
@@ -44,6 +45,7 @@ public class CraftingRecipes extends RecipeProvider {
         this.addTeleportBlockRecipes(consumer);
         this.addSupervisorRecipe(consumer);
         this.addAE2GiftPackageRecipe(consumer);
+        this.addPatternConverterRecipe(consumer);
         this.addPlasticRecipes(consumer);
         this.addAdvancedAlloyFurnaceRecipes(consumer);
     }
@@ -274,6 +276,17 @@ public class CraftingRecipes extends RecipeProvider {
                            .define('S', Items.STICK)
                            .unlockedBy("has_planks", has(ItemTags.PLANKS))
                            .save(consumer, UselessMod.id("crafting/ae2_gift_package"));
+    }
+
+    private void addPatternConverterRecipe(RecipeOutput consumer) {
+        ShapedRecipeBuilder.shaped(RecipeCategory.MISC, ModItems.OMNIVERSAL_PATTERN_CONVERTER.get())
+                           .pattern("GPG")
+                           .pattern(" L ")
+                           .define('G', Items.YELLOW_DYE)
+                           .define('P', AEItems.BLANK_PATTERN)
+                           .define('L', AEItems.LOGIC_PROCESSOR)
+                           .unlockedBy("has_blank_pattern", has(AEItems.BLANK_PATTERN))
+                           .save(consumer, UselessMod.id("crafting/omniversal_pattern_converter"));
     }
 
     private void addSupervisorRecipe(RecipeOutput consumer) {

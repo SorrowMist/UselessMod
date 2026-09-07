@@ -35,6 +35,7 @@ import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.OptionalLong;
 import java.util.Set;
 import java.util.TreeSet;
 
@@ -62,7 +63,20 @@ public final class OmniversalPatternEncoding {
                 || decoded instanceof OmniversalPatternDetails) {
             return ItemStack.EMPTY;
         }
-        var encoded = sourcePattern.get(AEComponents.ENCODED_PROCESSING_PATTERN);
+
+        AdvancedAlloyFurnaceRecipe recipe = entry.recipe();
+        OptionalLong scale = AlloyFurnaceRecipeCatalog.findPatternScale(
+                level, entry.sourceId(), recipe, processing);
+        if (scale.isEmpty()) return ItemStack.EMPTY;
+        List<GenericStack> normalizedInputs = normalizeInputs(processing, scale.getAsLong());
+        List<GenericStack> normalizedOutputs = normalizeStacks(processing.getOutputs(), scale.getAsLong());
+        if (normalizedInputs.isEmpty() || normalizedOutputs.isEmpty()) return ItemStack.EMPTY;
+
+        // A manually multiplied processing pattern is accepted for conversion, but the
+        // omniversal result always represents one base recipe operation.
+        ItemStack normalizedSource = sourcePattern.copy();
+        AEProcessingPattern.encode(normalizedSource, normalizedInputs, normalizedOutputs);
+        var encoded = normalizedSource.get(AEComponents.ENCODED_PROCESSING_PATTERN);
         if (encoded == null) return ItemStack.EMPTY;
 
         List<Integer> dynamicInputs = new ArrayList<>();
@@ -78,7 +92,6 @@ public final class OmniversalPatternEncoding {
             }
         }
 
-        AdvancedAlloyFurnaceRecipe recipe = entry.recipe();
         dynamicInputs = resolveItemIdInputSlots(recipe, processing, dynamicInputs);
         Map<Integer, List<TagKey<Item>>> tagInputs =
                 resolveTagInputSlots(recipe, processing);
@@ -128,6 +141,42 @@ public final class OmniversalPatternEncoding {
         result.set(AEComponents.ENCODED_PROCESSING_PATTERN, encoded);
         result.set(UComponents.OMNIVERSAL_PATTERN_DATA.get(), data);
         return result;
+    }
+
+    private static List<GenericStack> normalizeInputs(
+            AEProcessingPattern source, long scale) {
+        if (source == null || scale <= 0L) return List.of();
+
+        List<GenericStack> result = new ArrayList<>();
+        for (IPatternDetails.IInput input : source.getInputs()) {
+            if (input == null || input.getMultiplier() <= 0L
+                    || input.getMultiplier() % scale != 0L) {
+                return List.of();
+            }
+            GenericStack[] possible = input.getPossibleInputs();
+            if (possible == null || possible.length == 0
+                    || possible[0] == null || possible[0].what() == null) {
+                return List.of();
+            }
+            result.add(new GenericStack(
+                    possible[0].what(), input.getMultiplier() / scale));
+        }
+        return List.copyOf(result);
+    }
+
+    private static List<GenericStack> normalizeStacks(
+            List<GenericStack> source, long scale) {
+        if (source == null || source.isEmpty() || scale <= 0L) return List.of();
+
+        List<GenericStack> result = new ArrayList<>(source.size());
+        for (GenericStack stack : source) {
+            if (stack == null || stack.what() == null || stack.amount() <= 0L
+                    || stack.amount() % scale != 0L) {
+                return List.of();
+            }
+            result.add(new GenericStack(stack.what(), stack.amount() / scale));
+        }
+        return List.copyOf(result);
     }
 
     private static Optional<AEItemKey> firstDisplayMold(Ingredient mold) {

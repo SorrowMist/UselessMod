@@ -210,6 +210,15 @@ public final class UComponents {
             register("omniversal_pattern_data", builder -> builder
                     .persistent(OmniversalPatternData.CODEC)
                     .networkSynchronized(OmniversalPatternData.STREAM_CODEC));
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<PatternConverterData>> PATTERN_CONVERTER_DATA =
+            register("pattern_converter_data", builder -> builder
+                    .persistent(PatternConverterData.CODEC)
+                    .networkSynchronized(PatternConverterData.STREAM_CODEC));
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<GlobalPos>> MOLD_HUB_LINK_TARGET = register(
+            "mold_hub_link_target",
+            builder -> builder
+                    .persistent(GlobalPos.CODEC)
+                    .networkSynchronized(GlobalPos.STREAM_CODEC));
     public static final DeferredHolder<DataComponentType<?>, DataComponentType<MultiblockRecoveryData>> MULTIBLOCK_RECOVERY_DATA =
             register("multiblock_recovery_data", builder -> builder
                     .persistent(MultiblockRecoveryData.CODEC)

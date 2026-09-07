@@ -4,13 +4,18 @@ import appeng.api.crafting.IPatternDetails;
 import appeng.api.crafting.PatternDetailsHelper;
 import appeng.crafting.pattern.AEProcessingPattern;
 import appeng.helpers.IPatternTerminalLogicHost;
+import appeng.helpers.IPatternTerminalMenuHost;
+import appeng.menu.me.items.PatternEncodingTermMenu;
 import appeng.util.inv.AppEngInternalInventory;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.OmniversalPatternDetails;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.OmniversalPatternEncoding;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.PendingOmniversalPatternHolder;
+import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.ProcessingPatternRecipeHolder;
 import com.sorrowmist.useless.content.recipe.AlloyFurnaceRecipeCatalog;
 import com.sorrowmist.useless.content.recipe.AlloyFurnaceRecipeIdentity;
 import com.sorrowmist.useless.content.recipe.RecipeSourceIds;
+import net.minecraft.network.chat.Component;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import org.jetbrains.annotations.Nullable;
@@ -63,6 +68,13 @@ public class PatternEncodingLogicMixin implements PendingOmniversalPatternHolder
     @Nullable
     private String uselessMod$pendingOmniversalSourceId;
 
+    @Unique
+    private boolean uselessMod$encodingFailureReported;
+
+    @Unique
+    @Nullable
+    private ItemStack uselessMod$reportedFailurePattern;
+
     @Override
     @Nullable
     public AlloyFurnaceRecipeIdentity uselessMod$getPendingOmniversalRecipe() {
@@ -72,6 +84,8 @@ public class PatternEncodingLogicMixin implements PendingOmniversalPatternHolder
     @Override
     public void uselessMod$setPendingOmniversalRecipe(@Nullable AlloyFurnaceRecipeIdentity identity) {
         this.uselessMod$pendingOmniversalRecipe = identity;
+        this.uselessMod$encodingFailureReported = false;
+        this.uselessMod$reportedFailurePattern = null;
     }
 
     @Override
@@ -104,32 +118,118 @@ public class PatternEncodingLogicMixin implements PendingOmniversalPatternHolder
         if (pending == null) return;
 
         ItemStack pattern = encodedPatternInv.getStackInSlot(0);
-        if (pattern.isEmpty()) return;
+        if (pattern.isEmpty()) {
+            uselessMod$encodingFailureReported = false;
+            uselessMod$reportedFailurePattern = null;
+            return;
+        }
 
         Level level = host.getLevel();
         if (level == null || level.isClientSide()) return;
 
-        IPatternDetails details = PatternDetailsHelper.decodePattern(pattern, level);
-        if (!(details instanceof AEProcessingPattern) || details instanceof OmniversalPatternDetails) return;
+        IPatternDetails details;
+        try {
+            details = PatternDetailsHelper.decodePattern(pattern, level);
+        } catch (RuntimeException exception) {
+            uselessMod$reportEncodingFailure("decode_exception", exception);
+            return;
+        }
+        if (details == null) {
+            uselessMod$reportEncodingFailure("decode_failed", null);
+            return;
+        }
+        if (details instanceof OmniversalPatternDetails) return;
+        if (!(details instanceof AEProcessingPattern)) {
+            uselessMod$reportEncodingFailure("not_processing_pattern", null);
+            return;
+        }
 
         String sourceId = uselessMod$pendingOmniversalSourceId;
         // The client and server can materialize a tag-backed Ingredient with different
         // representative items. Resolve the selected recipe by id and the encoded pattern
         // contents when the fingerprint differs, otherwise a shared chemical-conversion /
         // oxidizing recipe is indistinguishable from the plain AE2 pattern at this point.
-        Optional<AlloyFurnaceRecipeCatalog.Entry> entry = AlloyFurnaceRecipeCatalog
-                .resolvePattern(level, sourceId, pending, details)
-                .filter(candidate -> AlloyFurnaceRecipeCatalog.matchesRecipe(
-                        level, sourceId, candidate.recipe(), details));
-        if (entry.isEmpty()) return;
-
-        ItemStack omniversal = OmniversalPatternEncoding.encode(pattern, details, entry.get(), level);
-        if (!omniversal.isEmpty()) {
-            encodedPatternInv.setItemDirect(0, omniversal);
-            // A JEI selection applies to one encoding action. Do not let it upgrade a later
-            // ordinary AE2 pattern merely because that pattern happens to be uniquely matchable.
-            uselessMod$pendingOmniversalRecipe = null;
-            uselessMod$pendingOmniversalSourceId = null;
+        Optional<AlloyFurnaceRecipeCatalog.Entry> entry;
+        try {
+            entry = AlloyFurnaceRecipeCatalog.resolvePattern(level, sourceId, pending, details);
+        } catch (RuntimeException exception) {
+            uselessMod$reportEncodingFailure("recipe_lookup_exception", exception);
+            return;
         }
+        if (entry.isEmpty()) {
+            uselessMod$reportEncodingFailure("recipe_not_found", null);
+            return;
+        }
+        try {
+            if (!AlloyFurnaceRecipeCatalog.matchesRecipe(
+                    level, sourceId, entry.get().recipe(), details)) {
+                uselessMod$reportEncodingFailure("pattern_mismatch", null);
+                return;
+            }
+        } catch (RuntimeException exception) {
+            uselessMod$reportEncodingFailure("recipe_match_exception", exception);
+            return;
+        }
+
+        if (details instanceof ProcessingPatternRecipeHolder holder) {
+            holder.uselessMod$setRecipeIdentity(pending);
+        }
+
+        ItemStack omniversal;
+        try {
+            omniversal = OmniversalPatternEncoding.encode(pattern, details, entry.get(), level);
+        } catch (RuntimeException exception) {
+            uselessMod$reportEncodingFailure("conversion_exception", exception);
+            return;
+        }
+        if (omniversal.isEmpty()) {
+            uselessMod$reportEncodingFailure("conversion_unsupported", null);
+            return;
+        }
+
+        encodedPatternInv.setItemDirect(0, omniversal);
+        // A JEI selection applies to one encoding action. Do not let it upgrade a later
+        // ordinary AE2 pattern merely because that pattern happens to be uniquely matchable.
+        uselessMod$pendingOmniversalRecipe = null;
+        uselessMod$pendingOmniversalSourceId = null;
+    }
+
+    @Unique
+    private void uselessMod$reportEncodingFailure(
+            String reason, @Nullable RuntimeException exception) {
+        ItemStack pattern = encodedPatternInv.getStackInSlot(0);
+        if (uselessMod$encodingFailureReported && uselessMod$reportedFailurePattern == pattern) return;
+
+        ServerPlayer player = uselessMod$findEncodingPlayer();
+        if (player == null) return;
+
+        Component detail = Component.translatable(
+                "gui.useless_mod.omniversal_pattern.encoding_failed." + reason);
+        if (exception != null && exception.getMessage() != null && !exception.getMessage().isBlank()) {
+            detail = Component.translatable(
+                    "gui.useless_mod.omniversal_pattern.encoding_failed.with_detail",
+                    detail, Component.literal(exception.getMessage()));
+        }
+        player.displayClientMessage(Component.translatable(
+                "gui.useless_mod.omniversal_pattern.encoding_failed", detail), false);
+        uselessMod$encodingFailureReported = true;
+        uselessMod$reportedFailurePattern = pattern;
+    }
+
+    @Unique
+    @Nullable
+    private ServerPlayer uselessMod$findEncodingPlayer() {
+        Level level = host.getLevel();
+        if (level == null || level.getServer() == null) return null;
+
+        for (ServerPlayer player : level.getServer().getPlayerList().getPlayers()) {
+            if (!(player.containerMenu instanceof PatternEncodingTermMenu menu)) continue;
+            if (!(menu.getTarget() instanceof IPatternTerminalMenuHost menuHost)) continue;
+            if (menuHost.getLogic() instanceof PendingOmniversalPatternHolder holder
+                    && holder == this) {
+                return player;
+            }
+        }
+        return null;
     }
 }

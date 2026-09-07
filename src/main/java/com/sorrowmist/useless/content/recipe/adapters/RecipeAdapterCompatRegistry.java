@@ -17,54 +17,59 @@ import com.sorrowmist.useless.content.recipe.adapters.ae.extendedae.CircuitCutte
 import com.sorrowmist.useless.content.recipe.adapters.ae.extendedae.CrystalAssemblerRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.arsnouveau.EnchantingApparatusRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.arsnouveau.ImbuementRecipeAdapter;
-import com.sorrowmist.useless.content.recipe.adapters.industrialforegoing.DissolutionChamberRecipeAdapter;
-import com.sorrowmist.useless.content.recipe.adapters.industrialforegoing.BioReactorRecipeAdapter;
-import com.sorrowmist.useless.content.recipe.adapters.industrialforegoing.FermentationStationRecipeAdapter;
-import com.sorrowmist.useless.content.recipe.adapters.industrialforegoing.FluidSievingMachineRecipeAdapter;
-import com.sorrowmist.useless.content.recipe.adapters.industrialforegoing.WashingFactoryRecipeAdapter;
-import com.sorrowmist.useless.content.recipe.adapters.industrialforegoing.LatexProcessingUnitRecipeAdapter;
-import com.sorrowmist.useless.content.recipe.adapters.industrialforegoing.FluidExtractorRecipeAdapter;
-import com.sorrowmist.useless.content.recipe.adapters.industrialforegoing.LaserDrillOreRecipeAdapter;
-import com.sorrowmist.useless.content.recipe.adapters.industrialforegoing.LaserDrillFluidRecipeAdapter;
-import com.sorrowmist.useless.content.recipe.adapters.industrialforegoing.InfuserRecipeAdapter;
-import com.sorrowmist.useless.content.recipe.adapters.industrialforegoing.PrecisionShapedRecipeAdapter;
-import com.sorrowmist.useless.content.recipe.adapters.industrialforegoing.PrecisionShapelessRecipeAdapter;
-import com.sorrowmist.useless.content.recipe.adapters.industrialforegoing.FluidShapedRecipeAdapter;
-import com.sorrowmist.useless.content.recipe.adapters.industrialforegoing.FluidShapelessRecipeAdapter;
-import com.sorrowmist.useless.content.recipe.adapters.minecraft.CraftingRecipeAdapter;
-import com.sorrowmist.useless.content.recipe.adapters.minecraft.BrewingRecipeAdapter;
-import com.sorrowmist.useless.content.recipe.adapters.minecraft.SmeltingRecipeAdapter;
-import com.sorrowmist.useless.content.recipe.adapters.mysticalagriculture.AwakeningRecipeAdapter;
-import com.sorrowmist.useless.content.recipe.adapters.mysticalagriculture.InfusionRecipeAdapter;
-import com.sorrowmist.useless.content.recipe.adapters.mysticalagriculture.SeedEssenceRecipeAdapter;
-import com.sorrowmist.useless.content.recipe.adapters.productivebees.BeeProduceRecipeAdapter;
-import com.sorrowmist.useless.content.recipe.adapters.productivebees.CentrifugeRecipeAdapter;
-import com.sorrowmist.useless.content.recipe.adapters.draconicevolution.DraconicFusionRecipeAdapter;
-import com.sorrowmist.useless.content.recipe.adapters.eco.IntegratedWorkingStationRecipeAdapter;
-import com.sorrowmist.useless.content.recipe.adapters.powah.EnergizingRecipeAdapter;
-import com.sorrowmist.useless.content.recipe.adapters.naturesaura.AnimalSpawnerRecipeAdapter;
-import com.sorrowmist.useless.content.recipe.adapters.naturesaura.NatureAltarRecipeAdapter;
-import com.sorrowmist.useless.content.recipe.adapters.naturesaura.OfferingRecipeAdapter;
-import com.sorrowmist.useless.content.recipe.adapters.naturesaura.TreeRitualRecipeAdapter;
-import com.sorrowmist.useless.content.recipe.adapters.occultism.OccultismRitualRecipeAdapter;
-import com.sorrowmist.useless.content.recipe.adapters.malum.SpiritFocusingRecipeAdapter;
-import com.sorrowmist.useless.content.recipe.adapters.malum.SpiritInfusionRecipeAdapter;
-import com.sorrowmist.useless.content.recipe.adapters.extendedcrafting.ExtendedCraftingCombinationRecipeAdapter;
-import com.sorrowmist.useless.content.recipe.adapters.extendedcrafting.ExtendedCraftingCompressorRecipeAdapter;
-import com.sorrowmist.useless.content.recipe.adapters.extendedcrafting.ExtendedCraftingEnderCrafterRecipeAdapter;
-import com.sorrowmist.useless.content.recipe.adapters.extendedcrafting.ExtendedCraftingFluxCrafterRecipeAdapter;
-import com.sorrowmist.useless.content.recipe.adapters.extendedcrafting.ExtendedCraftingTableRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.avaritia.ReAvaritiaCollectorRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.avaritia.ReAvaritiaCompressorRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.avaritia.ReAvaritiaExtremeSmithingRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.avaritia.ReAvaritiaSculkCraftingRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.avaritia.ReAvaritiaTableRecipeAdapter;
+import com.sorrowmist.useless.content.recipe.adapters.draconicevolution.DraconicFusionRecipeAdapter;
+import com.sorrowmist.useless.content.recipe.adapters.eco.IntegratedWorkingStationRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.enderio.AlloySmeltingRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.enderio.EnchanterRecipeAdapter;
-import com.sorrowmist.useless.content.recipe.adapters.enderio.SlicingRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.enderio.SagMillingRecipeAdapter;
+import com.sorrowmist.useless.content.recipe.adapters.enderio.SlicingRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.enderio.SoulBindingRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.enderio.VatFermentingRecipeAdapter;
+import com.sorrowmist.useless.content.recipe.adapters.extendedcrafting.ExtendedCraftingCombinationRecipeAdapter;
+import com.sorrowmist.useless.content.recipe.adapters.extendedcrafting.ExtendedCraftingCompressorRecipeAdapter;
+import com.sorrowmist.useless.content.recipe.adapters.extendedcrafting.ExtendedCraftingEnderCrafterRecipeAdapter;
+import com.sorrowmist.useless.content.recipe.adapters.extendedcrafting.ExtendedCraftingFluxCrafterRecipeAdapter;
+import com.sorrowmist.useless.content.recipe.adapters.extendedcrafting.ExtendedCraftingTableRecipeAdapter;
+import com.sorrowmist.useless.content.recipe.adapters.industrialforegoing.BioReactorRecipeAdapter;
+import com.sorrowmist.useless.content.recipe.adapters.industrialforegoing.DissolutionChamberRecipeAdapter;
+import com.sorrowmist.useless.content.recipe.adapters.industrialforegoing.FermentationStationRecipeAdapter;
+import com.sorrowmist.useless.content.recipe.adapters.industrialforegoing.FluidExtractorRecipeAdapter;
+import com.sorrowmist.useless.content.recipe.adapters.industrialforegoing.FluidShapedRecipeAdapter;
+import com.sorrowmist.useless.content.recipe.adapters.industrialforegoing.FluidShapelessRecipeAdapter;
+import com.sorrowmist.useless.content.recipe.adapters.industrialforegoing.FluidSievingMachineRecipeAdapter;
+import com.sorrowmist.useless.content.recipe.adapters.industrialforegoing.InfuserRecipeAdapter;
+import com.sorrowmist.useless.content.recipe.adapters.industrialforegoing.LaserDrillFluidRecipeAdapter;
+import com.sorrowmist.useless.content.recipe.adapters.industrialforegoing.LaserDrillOreRecipeAdapter;
+import com.sorrowmist.useless.content.recipe.adapters.industrialforegoing.LatexProcessingUnitRecipeAdapter;
+import com.sorrowmist.useless.content.recipe.adapters.industrialforegoing.PrecisionShapedRecipeAdapter;
+import com.sorrowmist.useless.content.recipe.adapters.industrialforegoing.PrecisionShapelessRecipeAdapter;
+import com.sorrowmist.useless.content.recipe.adapters.industrialforegoing.SlaughterFactoryRecipeAdapter;
+import com.sorrowmist.useless.content.recipe.adapters.industrialforegoing.WashingFactoryRecipeAdapter;
+import com.sorrowmist.useless.content.recipe.adapters.justdirethings.FluidDropRecipeAdapter;
+import com.sorrowmist.useless.content.recipe.adapters.justdirethings.GooSpreadRecipeAdapter;
+import com.sorrowmist.useless.content.recipe.adapters.justdirethings.GooSpreadRecipeTagAdapter;
+import com.sorrowmist.useless.content.recipe.adapters.malum.SpiritFocusingRecipeAdapter;
+import com.sorrowmist.useless.content.recipe.adapters.malum.SpiritInfusionRecipeAdapter;
+import com.sorrowmist.useless.content.recipe.adapters.minecraft.BrewingRecipeAdapter;
+import com.sorrowmist.useless.content.recipe.adapters.minecraft.CraftingRecipeAdapter;
+import com.sorrowmist.useless.content.recipe.adapters.minecraft.SmeltingRecipeAdapter;
+import com.sorrowmist.useless.content.recipe.adapters.mysticalagriculture.AwakeningRecipeAdapter;
+import com.sorrowmist.useless.content.recipe.adapters.mysticalagriculture.InfusionRecipeAdapter;
+import com.sorrowmist.useless.content.recipe.adapters.mysticalagriculture.SeedEssenceRecipeAdapter;
+import com.sorrowmist.useless.content.recipe.adapters.mysticalagriculture.SoulJarRecipeAdapter;
+import com.sorrowmist.useless.content.recipe.adapters.naturesaura.AnimalSpawnerRecipeAdapter;
+import com.sorrowmist.useless.content.recipe.adapters.naturesaura.NatureAltarRecipeAdapter;
+import com.sorrowmist.useless.content.recipe.adapters.naturesaura.OfferingRecipeAdapter;
+import com.sorrowmist.useless.content.recipe.adapters.naturesaura.TreeRitualRecipeAdapter;
+import com.sorrowmist.useless.content.recipe.adapters.occultism.OccultismRitualRecipeAdapter;
+import com.sorrowmist.useless.content.recipe.adapters.powah.EnergizingRecipeAdapter;
+import com.sorrowmist.useless.content.recipe.adapters.productivebees.BeeProduceRecipeAdapter;
+import com.sorrowmist.useless.content.recipe.adapters.productivebees.CentrifugeRecipeAdapter;
 import com.sorrowmist.useless.core.config.ConfigManager;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.item.crafting.RecipeType;
@@ -125,6 +130,7 @@ public final class RecipeAdapterCompatRegistry {
     public static final String IMMERSIVE_ENGINEERING = RecipeSourceIds.IMMERSIVE_ENGINEERING;
     public static final String PNEUMATICCRAFT = RecipeSourceIds.PNEUMATICCRAFT;
     public static final String BIG_REACTORS = RecipeSourceIds.BIG_REACTORS;
+    public static final String JUSTDIRETHINGS = RecipeSourceIds.JUSTDIRETHINGS;
 
     private static final List<CompatEntry> ENTRIES = List.of(
             new CompatEntry(null, RecipeAdapterCompatRegistry::registerMinecraft),
@@ -171,7 +177,8 @@ public final class RecipeAdapterCompatRegistry {
             new CompatEntry(MODERN_INDUSTRIALIZATION, RecipeAdapterCompatRegistry::registerModernIndustrialization),
             new CompatEntry(IMMERSIVE_ENGINEERING, RecipeAdapterCompatRegistry::registerImmersiveEngineering),
             new CompatEntry(PNEUMATICCRAFT, RecipeAdapterCompatRegistry::registerPneumaticCraft),
-            new CompatEntry(BIG_REACTORS, RecipeAdapterCompatRegistry::registerBigReactors)
+            new CompatEntry(BIG_REACTORS, RecipeAdapterCompatRegistry::registerBigReactors),
+            new CompatEntry(JUSTDIRETHINGS, RecipeAdapterCompatRegistry::registerJustDireThings)
     );
 
     private RecipeAdapterCompatRegistry() {}
@@ -328,6 +335,7 @@ public final class RecipeAdapterCompatRegistry {
         register(new WashingFactoryRecipeAdapter());
         register(new LatexProcessingUnitRecipeAdapter());
         register(new FluidExtractorRecipeAdapter());
+        register(new SlaughterFactoryRecipeAdapter());
         register(new LaserDrillOreRecipeAdapter());
         register(new LaserDrillFluidRecipeAdapter());
         if (isLoaded("ifeu")) {
@@ -353,6 +361,7 @@ public final class RecipeAdapterCompatRegistry {
         register(new InfusionRecipeAdapter());
         register(new AwakeningRecipeAdapter());
         register(new SeedEssenceRecipeAdapter());
+        register(new SoulJarRecipeAdapter());
     }
 
     private static void registerAELightningTech() {
@@ -459,6 +468,12 @@ public final class RecipeAdapterCompatRegistry {
     private static void registerBigReactors() {
         invokeOptionalLoader(
                 "com.sorrowmist.useless.compat.extremereactors.ExtremeReactorsRecipeCompatLoader");
+    }
+
+    private static void registerJustDireThings() {
+        register(new GooSpreadRecipeAdapter());
+        register(new GooSpreadRecipeTagAdapter());
+        register(new FluidDropRecipeAdapter());
     }
 
     private record CompatEntry(@Nullable String modId, Runnable registerAction) {}

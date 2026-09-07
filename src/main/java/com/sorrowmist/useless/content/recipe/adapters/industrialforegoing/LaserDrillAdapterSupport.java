@@ -18,7 +18,7 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * Shared helpers for the two laser drill adapters.
+ * Helpers for the Industrial Foregoing ore laser drill adapter.
  *
  * <p>Industrial Foregoing picks a laser drill result by lens colour and weighted random. The alloy
  * furnace is deterministic, so the adapters group every source recipe by its catalyst lens (plus the

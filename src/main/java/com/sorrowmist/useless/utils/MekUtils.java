@@ -15,7 +15,7 @@ public class MekUtils {
     public static int MAX_UPGRADE = 32;
 
     static {
-        File file = FMLPaths.CONFIGDIR.get().resolve("useless_mod-common.toml").toFile();
+        File file = FMLPaths.CONFIGDIR.get().resolve("useless_mod-server.toml").toFile();
 
         CommentedFileConfig config = CommentedFileConfig.builder(file).autosave().sync().build();
         config.load();

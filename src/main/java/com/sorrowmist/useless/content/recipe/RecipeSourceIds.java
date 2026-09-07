@@ -51,6 +51,7 @@ public final class RecipeSourceIds {
     public static final String IMMERSIVE_ENGINEERING = "immersiveengineering";
     public static final String PNEUMATICCRAFT = "pneumaticcraft";
     public static final String BIG_REACTORS = "bigreactors";
+    public static final String JUSTDIRETHINGS = "justdirethings";
 
     private RecipeSourceIds() {
     }
@@ -105,6 +106,7 @@ public final class RecipeSourceIds {
         if (name.endsWith(".immersiveengineering")) return IMMERSIVE_ENGINEERING;
         if (name.endsWith(".pneumaticcraft")) return PNEUMATICCRAFT;
         if (name.endsWith(".extremereactors")) return BIG_REACTORS;
+        if (name.endsWith(".justdirethings")) return JUSTDIRETHINGS;
         if (name.endsWith(".mekanism") || name.endsWith(".generators")) return MEKANISM;
         return UNKNOWN;
     }

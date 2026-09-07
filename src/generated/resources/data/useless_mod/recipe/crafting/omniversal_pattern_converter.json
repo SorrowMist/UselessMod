@@ -1,0 +1,23 @@
+{
+    "type": "minecraft:crafting_shaped",
+    "category": "misc",
+    "key": {
+        "G": {
+            "item": "minecraft:yellow_dye"
+        },
+        "L": {
+            "item": "ae2:logic_processor"
+        },
+        "P": {
+            "item": "ae2:blank_pattern"
+        }
+    },
+    "pattern": [
+        "GPG",
+        " L "
+    ],
+    "result": {
+        "count": 1,
+        "id": "useless_mod:omniversal_pattern_converter"
+    }
+}

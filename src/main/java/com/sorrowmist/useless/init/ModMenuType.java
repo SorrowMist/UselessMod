@@ -2,6 +2,7 @@ package com.sorrowmist.useless.init;
 
 import com.sorrowmist.useless.UselessMod;
 import com.sorrowmist.useless.content.menus.AdvancedAlloyFurnaceMenu;
+import com.sorrowmist.useless.content.menus.ContainerPatternConverter;
 import com.sorrowmist.useless.content.menus.MePatternAssemblyMenu;
 import com.sorrowmist.useless.content.menus.OmniversalMoldHubMenu;
 import com.sorrowmist.useless.content.menus.MultiblockAlloyFurnaceMenu;
@@ -41,6 +42,9 @@ public final class ModMenuType {
     public static final Supplier<MenuType<DimensionConfigMenu>> DIMENSION_CONFIG_MENU =
             MENU_TYPES.register("dimension_config_menu",
                     () -> IMenuTypeExtension.create(DimensionConfigMenu::new));
+    public static final Supplier<MenuType<ContainerPatternConverter>> PATTERN_CONVERTER_MENU =
+            MENU_TYPES.register("omniversal_pattern_converter",
+                    () -> ContainerPatternConverter.TYPE);
 
     private ModMenuType() {}
 

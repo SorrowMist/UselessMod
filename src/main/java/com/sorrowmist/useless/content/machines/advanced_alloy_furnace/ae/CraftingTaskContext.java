@@ -9,6 +9,7 @@ import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.parallel.A
 import com.sorrowmist.useless.content.recipe.AdvancedAlloyFurnaceRecipe;
 import com.sorrowmist.useless.content.recipe.AdapterUtils;
 import com.sorrowmist.useless.content.recipe.AlloyFurnaceRecipeManager;
+import com.sorrowmist.useless.core.config.AlloyFurnaceTierRules;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.io.FurnaceOutputPort;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.chemical.ChemicalKeyProvider;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.chemical.ChemicalKeyProviders;
@@ -47,6 +48,10 @@ public interface CraftingTaskContext {
     net.minecraft.core.BlockPos getBlockPos();
     ItemStackHandler getItemHandler();
     IEnergyManager getEnergyManager();
+
+    default int getMachineTier() {
+        return AlloyFurnaceTierRules.NO_MACHINE_TIER;
+    }
     
     // 状态更新
     void markChanged();
@@ -138,7 +143,8 @@ public interface CraftingTaskContext {
         ItemStack mold = getItemHandler().getStackInSlot(getMoldSlot());
         return AlloyFurnaceRecipeManager.getInstance().findRecipeForCraftingWithConstraints(
                 getLevel(), items, fluids, keys, mold,
-                AdvancedAlloyFurnacePatternPolicy.outputConstraints(pattern), operations);
+                AdvancedAlloyFurnacePatternPolicy.outputConstraints(pattern), operations,
+                getMachineTier());
     }
 
     default boolean isTaskRecipeAvailable(AdvancedAlloyFurnaceRecipe recipe) {
@@ -149,6 +155,12 @@ public interface CraftingTaskContext {
         if (recipe == null) {
             return TaskAvailability.unavailable(
                     "gui.useless_mod.advanced_alloy_furnace.ae_task_status.waiting_recipe", "");
+        }
+        int machineTier = getMachineTier();
+        int requiredTier = AlloyFurnaceTierRules.requiredTier(recipe.id());
+        if (machineTier != AlloyFurnaceTierRules.NO_MACHINE_TIER && machineTier < requiredTier) {
+            return TaskAvailability.unavailable(
+                    "gui.useless_mod.advanced_alloy_furnace.ae_task_status.waiting_tier", "");
         }
         if (recipe.molds().isEmpty()) return TaskAvailability.ready();
         if (recipe.molds().size() > 1) {

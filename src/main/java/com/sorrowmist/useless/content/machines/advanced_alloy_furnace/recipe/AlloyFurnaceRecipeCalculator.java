@@ -10,6 +10,7 @@ import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.parallel.A
 import com.sorrowmist.useless.content.recipe.AdvancedAlloyFurnaceRecipe;
 import com.sorrowmist.useless.content.recipe.AdapterUtils;
 import com.sorrowmist.useless.content.recipe.AlloyFurnaceRecipeManager;
+import com.sorrowmist.useless.core.config.AlloyFurnaceTierRules;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.neoforged.neoforge.fluids.FluidStack;
@@ -73,6 +74,11 @@ public final class AlloyFurnaceRecipeCalculator {
      * @return 匹配的配方，如果没有则返回空
      */
     public Optional<AdvancedAlloyFurnaceRecipe> findMatchingRecipe(@Nullable Level level) {
+        return findMatchingRecipe(level, AlloyFurnaceTierRules.NO_MACHINE_TIER);
+    }
+
+    public Optional<AdvancedAlloyFurnaceRecipe> findMatchingRecipe(
+            @Nullable Level level, int machineTier) {
         if (level == null) return Optional.empty();
 
         // 构建输入列表（用于 AlloyFurnaceRecipeManager 查找）
@@ -104,10 +110,10 @@ public final class AlloyFurnaceRecipeCalculator {
         ItemStack moldStack = this.itemHandler.getStackInSlot(MOLD_SLOT);
 
         AdvancedAlloyFurnaceRecipe bestRecipe = AlloyFurnaceRecipeManager.getInstance().findRecipe(
-                level, currentInputs, currentFluids, currentChemicals, moldStack
+                level, currentInputs, currentFluids, currentChemicals, moldStack, machineTier
         );
 
-        if (bestRecipe != null && canProcessRecipe(bestRecipe)) {
+        if (bestRecipe != null && canProcessRecipe(bestRecipe, machineTier)) {
             return Optional.of(bestRecipe);
         }
 
@@ -120,7 +126,11 @@ public final class AlloyFurnaceRecipeCalculator {
      * 模具检查提前，便于快速失败。
      */
     public boolean canProcessRecipe(AdvancedAlloyFurnaceRecipe recipe) {
-        return this.canConsumeRecipeInputs(recipe, 1);
+        return this.canProcessRecipe(recipe, AlloyFurnaceTierRules.NO_MACHINE_TIER);
+    }
+
+    public boolean canProcessRecipe(AdvancedAlloyFurnaceRecipe recipe, int machineTier) {
+        return this.canConsumeRecipeInputs(recipe, 1, machineTier);
     }
 
     /**
@@ -131,7 +141,13 @@ public final class AlloyFurnaceRecipeCalculator {
      * @return 如果有足够的材料返回true
      */
     public boolean canConsumeRecipeInputs(AdvancedAlloyFurnaceRecipe recipe, int parallel) {
+        return canConsumeRecipeInputs(recipe, parallel, AlloyFurnaceTierRules.NO_MACHINE_TIER);
+    }
+
+    public boolean canConsumeRecipeInputs(
+            AdvancedAlloyFurnaceRecipe recipe, int parallel, int machineTier) {
         if (recipe == null || parallel <= 0) return false;
+        if (!AlloyFurnaceTierRules.allows(recipe.id(), machineTier)) return false;
         if (recipe.molds().size() > 1) return false;
         if (!recipe.mold().isEmpty()) {
             ItemStack moldStack = this.itemHandler.getStackInSlot(MOLD_SLOT);
@@ -148,7 +164,7 @@ public final class AlloyFurnaceRecipeCalculator {
      * （用于开始新配方前的检查）。
      */
     public boolean canConsumeRecipeInputs(AdvancedAlloyFurnaceRecipe recipe) {
-        return canConsumeRecipeInputs(recipe, 1);
+        return canConsumeRecipeInputs(recipe, 1, AlloyFurnaceTierRules.NO_MACHINE_TIER);
     }
 
     /**

@@ -526,6 +526,11 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
         return this.furnaceTier;
     }
 
+    @Override
+    public int getMachineTier() {
+        return this.furnaceTier;
+    }
+
     public void setClientFurnaceTier(int tier) {
         this.furnaceTier = Math.max(0, Math.min(MAX_FURNACE_TIER, tier));
     }
@@ -1431,7 +1436,7 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
      * @return 匹配的配方，如果没有则返回空
      */
     private Optional<AdvancedAlloyFurnaceRecipe> findMatchingRecipe() {
-        return this.recipeCalculator.findMatchingRecipe(this.level);
+        return this.recipeCalculator.findMatchingRecipe(this.level, this.furnaceTier);
     }
 
     /**
@@ -1439,11 +1444,11 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
      * （用于开始新配方前的检查，委托给配方计算器）。
      */
     private boolean canConsumeRecipeInputs(AdvancedAlloyFurnaceRecipe recipe) {
-        return this.recipeCalculator.canConsumeRecipeInputs(recipe);
+        return this.recipeCalculator.canConsumeRecipeInputs(recipe, 1, this.furnaceTier);
     }
 
     private boolean consumeRecipeInputs(AdvancedAlloyFurnaceRecipe recipe, int parallel) {
-        if (!this.recipeCalculator.canConsumeRecipeInputs(recipe, parallel)) return false;
+        if (!this.recipeCalculator.canConsumeRecipeInputs(recipe, parallel, this.furnaceTier)) return false;
         return FurnaceInputPort.consumeRecipeInputs(
                 recipe,
                 parallel,

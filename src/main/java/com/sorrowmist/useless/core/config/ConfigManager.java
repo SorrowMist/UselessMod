@@ -72,6 +72,7 @@ public class ConfigManager {
     // 万象炉从AE网络抽取能量配置
     private static final ModConfigSpec.BooleanValue FURNACE_DRAW_APPFLUX_ENERGY;
     private static final ModConfigSpec.BooleanValue FURNACE_DRAW_AE_ENERGY;
+    private static final ModConfigSpec.ConfigValue<List<? extends String>> FURNACE_RECIPE_TIER_RULES;
 
     // 万象炉配方转换配置
     private static final ModConfigSpec.BooleanValue ENABLE_CRAFTING_RECIPE_CONVERSION;
@@ -397,6 +398,14 @@ public class ConfigManager {
                         "警告: 会与网络中其他设备争抢供电, 网络储能不足时可能导致设备频繁掉线",
                         "在AppliedFlux抽取之后作为补充, 每tick总抽取量受熔炉最大输入速率限制")
                 .define("draw_ae_energy", false);
+
+        FURNACE_RECIPE_TIER_RULES = SERVER_BUILDER
+                .comment("万象炉配方等级限制，格式为 配方ID通配符,等级",
+                        "*可匹配任意字符；精确配方ID优先于通配符，匹配具体度相同时后面的规则覆盖前面的规则",
+                        "等级范围为0-10；未匹配规则的配方不受限制")
+                .translation("useless_mod.configuration.advanced_alloy_furnace.recipe_tier_rules")
+                .defineListAllowEmpty("recipe_tier_rules", List.<String>of(), () -> "",
+                        ConfigManager::isValidFurnaceRecipeTierRuleEntry);
         SERVER_BUILDER.pop();
 
         // Common config: adapter registration happens during common setup on both physical sides.
@@ -618,6 +627,10 @@ public class ConfigManager {
         }
     }
 
+    private static boolean isValidFurnaceRecipeTierRuleEntry(Object entry) {
+        return AlloyFurnaceTierRules.isValidEntry(entry);
+    }
+
     private static List<String> defaultAE2GiftPackageItems() {
         List<String> items = new ArrayList<>();
         items.add("ae2:creative_energy_cell,1");
@@ -705,6 +718,10 @@ public class ConfigManager {
 
     public static boolean isFurnaceDrawAeEnergyEnabled() {
         return getConfigValue(FURNACE_DRAW_AE_ENERGY);
+    }
+
+    public static List<String> getFurnaceRecipeTierRules() {
+        return readConfigList(FURNACE_RECIPE_TIER_RULES);
     }
 
     public static boolean isCraftingRecipeConversionEnabled() {

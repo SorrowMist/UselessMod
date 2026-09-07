@@ -270,7 +270,7 @@ dependencies {
     runtimeOnly "maven.modrinth:titanium:1.21-4.0.40"
     implementation "curse.maven:industrial-foregoing-266515:7073719"
     implementation "curse.maven:mifa-1086142:6288756"
-    implementation "curse.maven:industrial-foregoing-extra-upgrades-1161049:8428353"
+    compileOnly "curse.maven:industrial-foregoing-extra-upgrades-1161049:8428353"
 
 
     // 新生魔艺

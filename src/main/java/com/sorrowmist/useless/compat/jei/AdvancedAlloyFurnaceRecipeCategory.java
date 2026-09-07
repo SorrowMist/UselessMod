@@ -10,6 +10,7 @@ import com.sorrowmist.useless.content.recipe.CountedIngredient;
 import com.sorrowmist.useless.content.recipe.LongSizedFluidIngredient;
 import com.sorrowmist.useless.init.ModBlocks;
 import com.sorrowmist.useless.init.ModTags;
+import com.sorrowmist.useless.core.config.AlloyFurnaceTierRules;
 import mezz.jei.api.gui.builder.IRecipeLayoutBuilder;
 import mezz.jei.api.gui.builder.ITooltipBuilder;
 import mezz.jei.api.gui.drawable.IDrawable;
@@ -22,6 +23,7 @@ import mezz.jei.api.recipe.category.IRecipeCategory;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
@@ -100,7 +102,7 @@ public class AdvancedAlloyFurnaceRecipeCategory implements IRecipeCategory<Alloy
 
     // 文字提示位置
     private static final int CATALYST_TEXT_Y = 13;
-    private static final int MOLD_TEXT_Y = 32;
+    private static final int REQUIREMENT_TEXT_Y = 32;
 
     // 并行数显示位置
     private static final int PARALLEL_TEXT_X = 57;
@@ -300,6 +302,7 @@ public class AdvancedAlloyFurnaceRecipeCategory implements IRecipeCategory<Alloy
                         if (totalOutputCount > ITEM_GRID_MAX_SLOTS) {
                             tooltip.add(Component.translatable("jei.useless_mod.tooltip.key_output").withStyle(ChatFormatting.AQUA));
                         }
+                        addRecipeIdTooltip(tooltip, recipe.id());
                     });
         }
 
@@ -316,6 +319,7 @@ public class AdvancedAlloyFurnaceRecipeCategory implements IRecipeCategory<Alloy
                 slot.addRichTooltipCallback((slotView, tooltip) -> {
                     tooltip.add(Component.translatable("jei.useless_mod.tooltip.key_output").withStyle(ChatFormatting.AQUA));
                     tooltip.add(Component.translatable("jei.useless_mod.tooltip.amount", formatCount(amount)).withStyle(ChatFormatting.GRAY));
+                    addRecipeIdTooltip(tooltip, recipe.id());
                 });
             }
         }
@@ -370,6 +374,7 @@ public class AdvancedAlloyFurnaceRecipeCategory implements IRecipeCategory<Alloy
                        .addFluidStack(fluid.getFluid(), amount)
                        .addRichTooltipCallback((slot, tooltip) -> {
                            tooltip.add(Component.translatable("jei.useless_mod.tooltip.amount.mb", formatCount(amount)).withStyle(ChatFormatting.GRAY));
+                           addRecipeIdTooltip(tooltip, recipe.id());
                        });
             }
         }
@@ -467,20 +472,21 @@ public class AdvancedAlloyFurnaceRecipeCategory implements IRecipeCategory<Alloy
 
         
 
-        // 模具提示
-        if (!recipe.molds().isEmpty()) {
-            guiGraphics.pose().pushPose();
-            float scale = 0.7f;
-            guiGraphics.pose().scale(scale, scale, 1.0f);
+        guiGraphics.pose().pushPose();
+        float scale = 0.7f;
+        guiGraphics.pose().scale(scale, scale, 1.0f);
 
-            String moldText = Component.translatable("jei.useless_mod.gui.mold_required").getString();
-            int textWidth = minecraft.font.width(moldText);
-            int centeredX = (int) ((DISPLAY_WIDTH / 2.0f - textWidth * scale / 2) / scale);
-            int y = (int) (MOLD_TEXT_Y / scale);
+        int requiredTier = AlloyFurnaceTierRules.requiredTier(recipe.id());
+        String requirementText = requiredTier > 0
+                ? Component.translatable("jei.useless_mod.gui.tier_required", requiredTier).getString()
+                : Component.translatable("jei.useless_mod.gui.tier_unrestricted").getString();
+        int textWidth = minecraft.font.width(requirementText);
+        int centeredX = (int) ((DISPLAY_WIDTH / 2.0f - textWidth * scale / 2) / scale);
+        int y = (int) (REQUIREMENT_TEXT_Y / scale);
 
-            guiGraphics.drawString(minecraft.font, moldText, centeredX, y, 0xFF0000, false);
-            guiGraphics.pose().popPose();
-        }
+        guiGraphics.drawString(minecraft.font, requirementText, centeredX, y,
+                requiredTier > 0 ? 0xFF0000 : 0x404040, false);
+        guiGraphics.pose().popPose();
     }
 
     // 修改工具提示方法，添加并行数信息
@@ -518,6 +524,13 @@ public class AdvancedAlloyFurnaceRecipeCategory implements IRecipeCategory<Alloy
             tooltip.add(Component.translatable("jei.useless_mod.tooltip.parallel.desc3").withStyle(ChatFormatting.GRAY));
             tooltip.add(Component.translatable("jei.useless_mod.tooltip.parallel.desc4").withStyle(ChatFormatting.GRAY));
             tooltip.add(Component.translatable("jei.useless_mod.tooltip.parallel.warning").withStyle(ChatFormatting.RED));
+        }
+    }
+
+    private static void addRecipeIdTooltip(ITooltipBuilder tooltip, ResourceLocation recipeId) {
+        if (Screen.hasShiftDown()) {
+            tooltip.add(Component.translatable("jei.useless_mod.tooltip.recipe_id", recipeId.toString())
+                    .withStyle(ChatFormatting.GRAY));
         }
     }
 

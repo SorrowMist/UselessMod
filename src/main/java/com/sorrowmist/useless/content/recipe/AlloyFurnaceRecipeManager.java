@@ -5,6 +5,7 @@ import appeng.api.stacks.AEItemKey;
 import appeng.api.stacks.AEKey;
 import appeng.api.stacks.GenericStack;
 import com.sorrowmist.useless.init.ModRecipeTypes;
+import com.sorrowmist.useless.core.config.AlloyFurnaceTierRules;
 import it.unimi.dsi.fastutil.objects.Object2LongLinkedOpenHashMap;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.Item;
@@ -191,7 +192,15 @@ public class AlloyFurnaceRecipeManager {
     @Nullable
     public AdvancedAlloyFurnaceRecipe findRecipe(Level level, List<ItemStack> inputs,
                                                   List<FluidStack> fluidInputs, List<GenericStack> keyInputs, @Nullable ItemStack mold) {
-        return findRecipe(level, new RecipeLookupContext(inputs, fluidInputs, keyInputs, mold, List.of(), 1L));
+        return findRecipe(level, inputs, fluidInputs, keyInputs, mold, AlloyFurnaceTierRules.NO_MACHINE_TIER);
+    }
+
+    @Nullable
+    public AdvancedAlloyFurnaceRecipe findRecipe(Level level, List<ItemStack> inputs,
+                                                  List<FluidStack> fluidInputs, List<GenericStack> keyInputs,
+                                                  @Nullable ItemStack mold, int machineTier) {
+        return findRecipe(level, new RecipeLookupContext(
+                inputs, fluidInputs, keyInputs, mold, List.of(), 1L, machineTier));
     }
 
     /**
@@ -215,8 +224,19 @@ public class AlloyFurnaceRecipeManager {
             List<FluidStack> fluidInputs, List<GenericStack> keyInputs,
             @Nullable ItemStack mold, List<RecipeOutputConstraint> expectedOutputs,
             long operations) {
+        return findRecipeForCraftingWithConstraints(
+                level, inputs, fluidInputs, keyInputs, mold, expectedOutputs, operations,
+                AlloyFurnaceTierRules.NO_MACHINE_TIER);
+    }
+
+    @Nullable
+    public AdvancedAlloyFurnaceRecipe findRecipeForCraftingWithConstraints(
+            Level level, List<ItemStack> inputs,
+            List<FluidStack> fluidInputs, List<GenericStack> keyInputs,
+            @Nullable ItemStack mold, List<RecipeOutputConstraint> expectedOutputs,
+            long operations, int machineTier) {
         return findRecipe(level, new RecipeLookupContext(
-                inputs, fluidInputs, keyInputs, mold, expectedOutputs, operations));
+                inputs, fluidInputs, keyInputs, mold, expectedOutputs, operations, machineTier));
     }
 
     @Nullable
@@ -372,7 +392,8 @@ public class AlloyFurnaceRecipeManager {
                                                            List<GenericStack> expectedOutputs, long operations) {
         RecipeLookupContext context = new RecipeLookupContext(
                 inputs, fluidInputs, keyInputs, mold,
-                RecipeOutputConstraint.exact(expectedOutputs), operations);
+                RecipeOutputConstraint.exact(expectedOutputs), operations,
+                AlloyFurnaceTierRules.NO_MACHINE_TIER);
         return getInstance().selectBestRecipe(candidates, context);
     }
 
@@ -383,13 +404,15 @@ public class AlloyFurnaceRecipeManager {
             List<GenericStack> keyInputs, @Nullable ItemStack mold,
             List<RecipeOutputConstraint> expectedOutputs, long operations) {
         RecipeLookupContext context = new RecipeLookupContext(
-                inputs, fluidInputs, keyInputs, mold, expectedOutputs, operations);
+                inputs, fluidInputs, keyInputs, mold, expectedOutputs, operations,
+                AlloyFurnaceTierRules.NO_MACHINE_TIER);
         return getInstance().selectBestRecipe(candidates, context);
     }
 
     private boolean matchesLookup(AdvancedAlloyFurnaceRecipe recipe,
                                   RecipeLookupContext context, LookupSnapshot snapshot) {
-        return matchesMold(recipe, context.mold())
+        return AlloyFurnaceTierRules.allows(recipe.id(), context.machineTier())
+                && matchesMold(recipe, context.mold())
                 && matchesOutputConstraints(recipe, context.expectedOutputs())
                 && matchesKeys(recipe, snapshot.keyInputs(), context.operations())
                 && matchesItems(recipe, context.inputs(), context.keyInputs(), context.operations())
@@ -941,7 +964,8 @@ public class AlloyFurnaceRecipeManager {
             List<GenericStack> keyInputs,
             @Nullable ItemStack mold,
             List<RecipeOutputConstraint> expectedOutputs,
-            long operations
+            long operations,
+            int machineTier
     ) {
         private RecipeLookupContext {
             inputs = inputs == null ? List.of() : inputs;
@@ -949,6 +973,9 @@ public class AlloyFurnaceRecipeManager {
             keyInputs = requireKeyInputs(keyInputs);
             expectedOutputs = expectedOutputs == null ? List.of() : expectedOutputs;
             operations = Math.max(1L, operations);
+            machineTier = machineTier < AlloyFurnaceTierRules.NO_MACHINE_TIER
+                    ? AlloyFurnaceTierRules.NO_MACHINE_TIER
+                    : Math.min(AlloyFurnaceTierRules.MAX_TIER, machineTier);
         }
     }
 
@@ -1020,7 +1047,9 @@ public class AlloyFurnaceRecipeManager {
             Map<AEKey, Long> keys,
             @Nullable AEKey mold,
             List<RecipeOutputConstraint> expectedOutputs,
-            long operations
+            long operations,
+            int machineTier,
+            long tierRulesVersion
     ) {
         private static RecipeCacheKey from(RecipeLookupContext context) {
             LookupInputFingerprint fingerprint = LookupInputFingerprint.from(context);
@@ -1033,7 +1062,10 @@ public class AlloyFurnaceRecipeManager {
                     fingerprint.keys(),
                     moldStack == null ? null : moldStack.what(),
                     List.copyOf(context.expectedOutputs()),
-                    context.operations()
+                    context.operations(),
+                    context.machineTier(),
+                    context.machineTier() == AlloyFurnaceTierRules.NO_MACHINE_TIER
+                            ? 0L : AlloyFurnaceTierRules.configurationVersion()
             );
         }
 
@@ -1042,7 +1074,8 @@ public class AlloyFurnaceRecipeManager {
                                      List<GenericStack> expectedOutputs, long operations) {
             return from(new RecipeLookupContext(
                     inputs, fluidInputs, keyInputs, mold,
-                    RecipeOutputConstraint.exact(expectedOutputs), operations));
+                    RecipeOutputConstraint.exact(expectedOutputs), operations,
+                    AlloyFurnaceTierRules.NO_MACHINE_TIER));
         }
 
         static RecipeCacheKey createWithConstraints(
@@ -1050,7 +1083,8 @@ public class AlloyFurnaceRecipeManager {
                 List<GenericStack> keyInputs, @Nullable ItemStack mold,
                 List<RecipeOutputConstraint> expectedOutputs, long operations) {
             return from(new RecipeLookupContext(
-                    inputs, fluidInputs, keyInputs, mold, expectedOutputs, operations));
+                    inputs, fluidInputs, keyInputs, mold, expectedOutputs, operations,
+                    AlloyFurnaceTierRules.NO_MACHINE_TIER));
         }
     }
 

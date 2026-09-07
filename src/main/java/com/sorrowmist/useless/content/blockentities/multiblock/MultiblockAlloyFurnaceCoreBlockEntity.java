@@ -31,6 +31,7 @@ import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.parallel.A
 import com.sorrowmist.useless.content.multiblock.OmniversalCoilStats;
 import com.sorrowmist.useless.content.recipe.AdvancedAlloyFurnaceRecipe;
 import com.sorrowmist.useless.content.recipe.AlloyFurnaceRecipeCatalog;
+import com.sorrowmist.useless.core.config.AlloyFurnaceTierRules;
 import com.sorrowmist.useless.core.config.ConfigManager;
 import com.sorrowmist.useless.core.component.MultiblockRecoveryData;
 import com.sorrowmist.useless.energy.EnergyManager;
@@ -382,6 +383,11 @@ public final class MultiblockAlloyFurnaceCoreBlockEntity extends BlockEntity imp
         return coilTier;
     }
 
+    @Override
+    public int getMachineTier() {
+        return coilTier;
+    }
+
     public long getStructureGeneration() {
         return structureGeneration;
     }
@@ -486,6 +492,11 @@ public final class MultiblockAlloyFurnaceCoreBlockEntity extends BlockEntity imp
         if (recipe == null) {
             return CraftingTaskContext.TaskAvailability.unavailable(
                     "gui.useless_mod.advanced_alloy_furnace.ae_task_status.waiting_recipe", "");
+        }
+        int requiredTier = AlloyFurnaceTierRules.requiredTier(recipe.id());
+        if (coilTier < requiredTier) {
+            return CraftingTaskContext.TaskAvailability.unavailable(
+                    "gui.useless_mod.advanced_alloy_furnace.ae_task_status.waiting_tier", "");
         }
         if (recipe.molds().isEmpty()) {
             return CraftingTaskContext.TaskAvailability.ready();

@@ -288,14 +288,13 @@ dependencies {
     compileOnly "curse.maven:forbidden-arcanus-309858:6875895"
     compileOnly "curse.maven:valhelsia-core-416935:6296775"
 
-    compileOnly "mekanism:Mekanism:1.21.1-10.7.19.85"
-    runtimeOnly "mekanism:Mekanism:1.21.1-10.7.19.85"
-    compileOnly "mekanism:Mekanism:1.21.1-10.7.19.85:generators"
-    runtimeOnly "mekanism:Mekanism:1.21.1-10.7.19.85:generators"
-    compileOnly "curse.maven:applied-mekanistics-574300:7096962"
-    runtimeOnly "curse.maven:applied-mekanistics-574300:7096962"
+    implementation "mekanism:Mekanism:1.21.1-10.7.19.85"
+    implementation "mekanism:Mekanism:1.21.1-10.7.19.85:generators"
+    implementation "curse.maven:applied-mekanistics-574300:7096962"
     runtimeOnly "maven.modrinth:mekanism_extra:1.21.1-1.4.0"
     implementation "curse.maven:flux-networks-248020:6089446"
+
+    implementation "maven.modrinth:mekanismmoremachine:1.21.1-1.4.1"
 
     implementation "curse.maven:the-twilight-forest-227639:7797302"
 

@@ -3,6 +3,7 @@ package com.sorrowmist.useless.compat.mekanism;
 import com.sorrowmist.useless.UselessMod;
 import com.sorrowmist.useless.content.recipe.AlloyFurnaceRecipeManager;
 import com.sorrowmist.useless.content.recipe.RecipeSourceIds;
+import com.sorrowmist.useless.content.recipe.adapters.mekanism.CombinerRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.mekanism.CrusherRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.mekanism.EnrichmentChamberRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.mekanism.FluidToFluidRecipeAdapter;
@@ -19,6 +20,7 @@ public final class MekanismRecipeCompatLoader {
 
     public static void register() {
         AlloyFurnaceRecipeManager manager = AlloyFurnaceRecipeManager.getInstance();
+        manager.registerAdapter(new CombinerRecipeAdapter(), RecipeSourceIds.MEKANISM);
         manager.registerAdapter(new EnrichmentChamberRecipeAdapter(), RecipeSourceIds.MEKANISM);
         manager.registerAdapter(new CrusherRecipeAdapter(), RecipeSourceIds.MEKANISM);
         manager.registerAdapter(new PrecisionSawmillRecipeAdapter(), RecipeSourceIds.MEKANISM);
@@ -29,6 +31,21 @@ public final class MekanismRecipeCompatLoader {
         if (ModList.get().isLoaded("appmek")
                 && ConfigManager.isRecipeConversionEnabled(RecipeSourceIds.APP_MEK)) {
             invokeAppMekRecipes();
+        }
+
+        if (ModList.get().isLoaded("mekmm")) {
+            invokeMoreMachineRecipes();
+        }
+    }
+
+    private static void invokeMoreMachineRecipes() {
+        try {
+            Class<?> loader = Class.forName(
+                    "com.sorrowmist.useless.compat.mekanismmoremachine.MekanismMoreMachineRecipeCompatLoader",
+                    true, MekanismRecipeCompatLoader.class.getClassLoader());
+            loader.getMethod("register").invoke(null);
+        } catch (ReflectiveOperationException | LinkageError exception) {
+            UselessMod.LOGGER.error("Failed to register Mekanism More Machine recipe adapters", exception);
         }
     }
 

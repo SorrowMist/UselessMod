@@ -24,7 +24,6 @@ public record ConstructionWandCorePacket(ConstructionWandCoreMode mode) implemen
 
     public static void handle(ConstructionWandCorePacket message, IPayloadContext context) {
         context.enqueueWork(() -> {
-            if (!EndlessBeafItem.isConstructionWandAvailable()) return;
             ServerPlayer player = (ServerPlayer) context.player();
             var entry = UselessItemUtils.findTargetToolInHands(player);
             if (entry.isEmpty()) return;

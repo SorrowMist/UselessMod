@@ -38,7 +38,6 @@ public class ModeWheelScreen extends Screen {
     private static final boolean hasGtceuMod = ModList.get().isLoaded("gtceu");
     private static final boolean hasOmnitoolMod = ModList.get().isLoaded("omnitools");
     private static final boolean hasAE2 = ModList.get().isLoaded("ae2");
-    private static final boolean hasConstructionWand = ModList.get().isLoaded("constructionwand");
     private final List<ModeData> leftModes = new ArrayList<>();
     private final List<ModeData> middleModes = new ArrayList<>();
     private final List<ModeData> rightModes = new ArrayList<>();
@@ -176,7 +175,7 @@ public class ModeWheelScreen extends Screen {
             ));
         }
 
-        if (hasConstructionWand && this.mainHandItem.getItem() instanceof com.sorrowmist.useless.content.items.EndlessBeafItem) {
+        if (this.mainHandItem.getItem() instanceof com.sorrowmist.useless.content.items.EndlessBeafItem) {
             this.constructionWandModes.add(new ModeData(
                     ModeTypeEnum.getConstructionWandMode(constructionWandEnabled),
                     ModeTypeEnum.getConstructionWandMode(constructionWandEnabled).getTooltip(),

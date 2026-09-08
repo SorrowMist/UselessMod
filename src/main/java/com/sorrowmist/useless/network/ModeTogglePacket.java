@@ -66,8 +66,7 @@ public class ModeTogglePacket implements CustomPacketPayload {
                     }
                 }
                 case CONSTRUCTION_WAND -> {
-                    if (stack.getItem() instanceof EndlessBeafItem
-                            && EndlessBeafItem.isConstructionWandAvailable()) {
+                    if (stack.getItem() instanceof EndlessBeafItem) {
                         stack.set(UComponents.ConstructionWandEnabledComponent.get(), msg.enabled);
                     }
                 }

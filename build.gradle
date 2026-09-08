@@ -235,8 +235,6 @@ dependencies {
     runtimeOnly "top.theillusivec4.curios:curios-neoforge:9.5.1+1.21.1"
     implementation "top.theillusivec4.curios:curios-neoforge:9.5.1+1.21.1:api"
 
-    implementation "curse.maven:construction-wand-kots-1382688:8606447"
-
     //合成拓展
     compileOnly "maven.modrinth:5JMG1gql:Pb2OHQ8E"
     compileOnly "maven.modrinth:Rw1NrDzF:8421rqFF"

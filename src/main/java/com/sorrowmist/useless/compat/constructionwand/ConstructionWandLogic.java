@@ -19,7 +19,6 @@ import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.Vec3;
-import net.neoforged.fml.ModList;
 import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -37,20 +36,14 @@ import java.util.concurrent.ConcurrentHashMap;
 
 /** Independent construction-wand behavior for the beef tool. */
 public final class ConstructionWandLogic {
-    private static final String MOD_ID = "constructionwand";
     private static final int MAX_UNDO_OPERATIONS = 3;
     public static final int MAX_PREVIEW_BLOCKS = 4096;
     private static final Map<UUID, Deque<Operation>> HISTORY = new ConcurrentHashMap<>();
 
     private ConstructionWandLogic() {}
 
-    public static boolean isAvailable() {
-        return ModList.get().isLoaded(MOD_ID);
-    }
-
     public static boolean isEnabled(ItemStack stack) {
-        return isAvailable()
-                && stack.getItem() instanceof EndlessBeafItem
+        return stack.getItem() instanceof EndlessBeafItem
                 && stack.getOrDefault(UComponents.ConstructionWandEnabledComponent.get(), false);
     }
 

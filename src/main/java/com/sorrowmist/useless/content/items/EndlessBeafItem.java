@@ -1,7 +1,6 @@
 package com.sorrowmist.useless.content.items;
 
 import com.sorrowmist.useless.api.enums.tool.EnchantMode;
-import com.sorrowmist.useless.compat.constructionwand.ConstructionWandLogic;
 import com.sorrowmist.useless.api.enums.tool.ToolTypeMode;
 import com.sorrowmist.useless.content.blocks.GlowPlasticBlock;
 import com.sorrowmist.useless.content.blocks.UselessGlassBlock;
@@ -156,10 +155,6 @@ public class EndlessBeafItem extends TieredItem {
 
     public static boolean isTeleportEnabled(ItemStack stack) {
         return stack.getOrDefault(UComponents.BeefTeleportEnabledComponent.get(), false);
-    }
-
-    public static boolean isConstructionWandAvailable() {
-        return ConstructionWandLogic.isAvailable();
     }
 
     public static void setTeleportEnabled(ItemStack stack, boolean enabled) {

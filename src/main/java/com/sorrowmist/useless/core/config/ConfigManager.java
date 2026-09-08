@@ -66,6 +66,10 @@ public class ConfigManager {
     // 战利品大爆发触发概率配置 (百分比)
     private static final ModConfigSpec.IntValue FESTIVE_DROP_CHANCE;
 
+    // 打草掉落造化杖彩蛋配置
+    private static final ModConfigSpec.BooleanValue ENABLE_GRASS_WAND_DROP;
+    private static final ModConfigSpec.DoubleValue GRASS_WAND_DROP_PROBABILITY;
+
     // Mekanism 升级配置
     private static final ModConfigSpec.IntValue TIME_MULTIPLIER;
     private static final ModConfigSpec.IntValue ELECTRICITY_MULTIPLIER;
@@ -337,6 +341,16 @@ public class ConfigManager {
                 .comment("战利品大爆发触发概率 (百分比, 1-100%)")
                 .translation("useless_mod.configuration.festive_drop_chance")
                 .defineInRange("festive_drop_chance", 5, 1, 100);
+
+        ENABLE_GRASS_WAND_DROP = SERVER_BUILDER
+                .comment("是否启用打草掉落造化杖彩蛋")
+                .translation("useless_mod.configuration.enable_grass_wand_drop")
+                .define("enable_grass_wand_drop", true);
+
+        GRASS_WAND_DROP_PROBABILITY = SERVER_BUILDER
+                .comment("打草掉落造化杖的概率，0.00001为十万分之一")
+                .translation("useless_mod.configuration.grass_wand_drop_probability")
+                .defineInRange("grass_wand_drop_probability", 0.00001, 0.0, 1.0);
 
         // 牛排工具挖掘速度配置
         BEEF_TOOL_MINING_SPEED = SERVER_BUILDER
@@ -859,6 +873,14 @@ public class ConfigManager {
     // 获取节日掉落触发概率
     public static int getFestiveDropChance() {
         return getConfigValue(FESTIVE_DROP_CHANCE);
+    }
+
+    public static boolean shouldEnableGrassWandDrop() {
+        return getConfigValue(ENABLE_GRASS_WAND_DROP);
+    }
+
+    public static double getGrassWandDropProbability() {
+        return getConfigValue(GRASS_WAND_DROP_PROBABILITY);
     }
 
     // 获取牛排工具基础挖掘速度

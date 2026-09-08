@@ -50,6 +50,7 @@ import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent;
 import net.neoforged.neoforge.event.level.BlockEvent;
 import net.neoforged.neoforge.event.level.LevelEvent;
 import net.neoforged.neoforge.event.server.ServerStartedEvent;
+import net.neoforged.neoforge.event.server.ServerStoppedEvent;
 import net.neoforged.neoforge.event.tick.PlayerTickEvent;
 import net.neoforged.neoforge.network.PacketDistributor;
 import net.neoforged.neoforge.server.ServerLifecycleHooks;
@@ -370,6 +371,9 @@ public class EventHandler {
     @SubscribeEvent
     public static void onPlayerLoggedIn(PlayerEvent.PlayerLoggedInEvent event) {
         updateBeefInvulnerability(event.getEntity(), true);
+        if (event.getEntity() instanceof ServerPlayer player) {
+            GrassWandDropHandler.onPlayerLoggedIn(player);
+        }
     }
 
     @SubscribeEvent
@@ -393,6 +397,9 @@ public class EventHandler {
     @SubscribeEvent
     public static void onPlayerLoggedOut(PlayerEvent.PlayerLoggedOutEvent event) {
         BEEF_PROTECTED_PLAYERS.remove(event.getEntity().getUUID());
+        if (event.getEntity() instanceof ServerPlayer player) {
+            GrassWandDropHandler.onPlayerLoggedOut(player);
+        }
     }
 
     @SubscribeEvent(priority = EventPriority.HIGHEST)
@@ -440,10 +447,16 @@ public class EventHandler {
      */
     @SubscribeEvent
     public static void onServerStarted(ServerStartedEvent event) {
+        GrassWandDropHandler.clearCache();
         UselessDimensionConfigManager.applyAll(event.getServer());
         AlloyFurnaceRecipeManager.getInstance().buildIndex(event.getServer().overworld());
         AlloyFurnaceRecipeCatalog.prewarm(event.getServer().overworld());
         event.getServer().getPlayerList().getPlayers().forEach(EndlessBeafItem::refreshAttackDamage);
+    }
+
+    @SubscribeEvent
+    public static void onServerStopped(ServerStoppedEvent event) {
+        GrassWandDropHandler.clearCache();
     }
 
     /**

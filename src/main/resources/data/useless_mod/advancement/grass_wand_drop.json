@@ -1,0 +1,28 @@
+{
+  "display": {
+    "icon": {
+      "id": "useless_mod:endless_beaf_item"
+    },
+    "title": {
+      "translate": "advancements.useless_mod.grass_wand_drop.title"
+    },
+    "description": {
+      "translate": "advancements.useless_mod.grass_wand_drop.description"
+    },
+    "frame": "challenge",
+    "show_toast": true,
+    "announce_to_chat": true,
+    "hidden": true
+  },
+  "criteria": {
+    "main": {
+      "trigger": "minecraft:impossible"
+    }
+  },
+  "requirements": [
+    [
+      "main"
+    ]
+  ],
+  "sends_telemetry_event": false
+}

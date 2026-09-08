@@ -228,6 +228,9 @@ dependencies {
     implementation "curse.maven:thunderbolt-core-1631756:8638565"
     implementation "curse.maven:data-energistics-1565514:8613673" // 1.21.1-3.0.3
 
+
+    implementation "curse.maven:omnitool-1401075:8272031"
+
     //powah
     compileOnly "curse.maven:powah-rearchitected-633483:8011715"
     compileOnly "maven.modrinth:9s6osm5g:izKINKFg"

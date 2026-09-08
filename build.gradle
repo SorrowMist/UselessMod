@@ -342,8 +342,10 @@ dependencies {
     implementation "curse.maven:ender-io-64578:8192838"
 
     //灵灾
-    compileOnly "maven.modrinth:malum:1.8.2"
-    compileOnly "maven.modrinth:bN3xUWdo:CohX6yP1"
+    implementation "maven.modrinth:malum:1.8.2"
+    implementation "maven.modrinth:bN3xUWdo:CohX6yP1"
+
+    implementation "maven.modrinth:summoningrituals:1.21.1-3.14.2+neoforge"
 
     implementation "maven.modrinth:re-avaritia:1.21.1-1.4.1-release"
 

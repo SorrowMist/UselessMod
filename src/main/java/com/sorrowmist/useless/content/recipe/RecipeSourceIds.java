@@ -41,6 +41,7 @@ public final class RecipeSourceIds {
     public static final String NATURES_AURA = "naturesaura";
     public static final String FORBIDDEN_ARCANUS = "forbidden_arcanus";
     public static final String OCCULTISM = "occultism";
+    public static final String SUMMONING_RITUALS = "summoningrituals";
     public static final String MALUM = "malum";
     public static final String ENDER_IO = "enderio";
     public static final String CREATE = "create";
@@ -96,6 +97,7 @@ public final class RecipeSourceIds {
         if (name.endsWith(".naturesaura")) return NATURES_AURA;
         if (name.endsWith(".forbiddenarcanus")) return FORBIDDEN_ARCANUS;
         if (name.endsWith(".occultism")) return OCCULTISM;
+        if (name.endsWith(".summoningrituals")) return SUMMONING_RITUALS;
         if (name.endsWith(".malum")) return MALUM;
         if (name.endsWith(".enderio")) return ENDER_IO;
         if (name.endsWith(".create")) return CREATE;

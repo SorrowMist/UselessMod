@@ -116,6 +116,7 @@ public class ConfigManager {
     private static final ModConfigSpec.BooleanValue ENABLE_NATURES_AURA_RECIPE_CONVERSION;
     private static final ModConfigSpec.BooleanValue ENABLE_FORBIDDEN_ARCANUS_RECIPE_CONVERSION;
     private static final ModConfigSpec.BooleanValue ENABLE_OCCULTISM_RECIPE_CONVERSION;
+    private static final ModConfigSpec.BooleanValue ENABLE_SUMMONING_RITUALS_RECIPE_CONVERSION;
     private static final ModConfigSpec.BooleanValue ENABLE_MALUM_RECIPE_CONVERSION;
     private static final ModConfigSpec.BooleanValue ENABLE_ENDER_IO_RECIPE_CONVERSION;
     private static final ModConfigSpec.BooleanValue ENABLE_CREATE_RECIPE_CONVERSION;
@@ -530,6 +531,8 @@ public class ConfigManager {
                 "enable_forbidden_arcanus_recipe_conversion", true);
         ENABLE_OCCULTISM_RECIPE_CONVERSION = defineRecipeConversionOption(
                 "enable_occultism_recipe_conversion", true);
+        ENABLE_SUMMONING_RITUALS_RECIPE_CONVERSION = defineRecipeConversionOption(
+                "enable_summoningrituals_recipe_conversion", true);
         ENABLE_MALUM_RECIPE_CONVERSION = defineRecipeConversionOption(
                 "enable_malum_recipe_conversion", true);
         ENABLE_ENDER_IO_RECIPE_CONVERSION = defineRecipeConversionOption(
@@ -590,6 +593,7 @@ public class ConfigManager {
                 Map.entry("naturesaura", ENABLE_NATURES_AURA_RECIPE_CONVERSION),
                 Map.entry("forbidden_arcanus", ENABLE_FORBIDDEN_ARCANUS_RECIPE_CONVERSION),
                 Map.entry("occultism", ENABLE_OCCULTISM_RECIPE_CONVERSION),
+                Map.entry("summoningrituals", ENABLE_SUMMONING_RITUALS_RECIPE_CONVERSION),
                 Map.entry("malum", ENABLE_MALUM_RECIPE_CONVERSION),
                 Map.entry("enderio", ENABLE_ENDER_IO_RECIPE_CONVERSION),
                 Map.entry("create", ENABLE_CREATE_RECIPE_CONVERSION),

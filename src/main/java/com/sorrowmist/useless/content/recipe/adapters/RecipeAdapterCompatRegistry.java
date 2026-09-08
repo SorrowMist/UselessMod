@@ -55,6 +55,7 @@ import com.sorrowmist.useless.content.recipe.adapters.justdirethings.GooSpreadRe
 import com.sorrowmist.useless.content.recipe.adapters.justdirethings.GooSpreadRecipeTagAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.malum.SpiritFocusingRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.malum.SpiritInfusionRecipeAdapter;
+import com.sorrowmist.useless.content.recipe.adapters.malum.VoidFavorRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.minecraft.BrewingRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.minecraft.CraftingRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.minecraft.SmeltingRecipeAdapter;
@@ -70,6 +71,7 @@ import com.sorrowmist.useless.content.recipe.adapters.occultism.OccultismRitualR
 import com.sorrowmist.useless.content.recipe.adapters.powah.EnergizingRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.productivebees.BeeProduceRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.productivebees.CentrifugeRecipeAdapter;
+import com.sorrowmist.useless.content.recipe.adapters.summoningrituals.SummoningRitualsAltarRecipeAdapter;
 import com.sorrowmist.useless.core.config.ConfigManager;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.item.crafting.RecipeType;
@@ -120,6 +122,7 @@ public final class RecipeAdapterCompatRegistry {
     public static final String NATURES_AURA = RecipeSourceIds.NATURES_AURA;
     public static final String FORBIDDEN_ARCANUS = RecipeSourceIds.FORBIDDEN_ARCANUS;
     public static final String OCCULTISM = RecipeSourceIds.OCCULTISM;
+    public static final String SUMMONING_RITUALS = RecipeSourceIds.SUMMONING_RITUALS;
     public static final String MALUM = RecipeSourceIds.MALUM;
     public static final String ENDER_IO = RecipeSourceIds.ENDER_IO;
     public static final String CREATE = RecipeSourceIds.CREATE;
@@ -168,6 +171,7 @@ public final class RecipeAdapterCompatRegistry {
             new CompatEntry(NATURES_AURA, RecipeAdapterCompatRegistry::registerNaturesAura),
             new CompatEntry(FORBIDDEN_ARCANUS, RecipeAdapterCompatRegistry::registerForbiddenArcanus),
             new CompatEntry(OCCULTISM, RecipeAdapterCompatRegistry::registerOccultism),
+            new CompatEntry(SUMMONING_RITUALS, RecipeAdapterCompatRegistry::registerSummoningRituals),
             new CompatEntry(MALUM, RecipeAdapterCompatRegistry::registerMalum),
             new CompatEntry(ENDER_IO, RecipeAdapterCompatRegistry::registerEnderIO),
             new CompatEntry(CREATE, RecipeAdapterCompatRegistry::registerCreate),
@@ -420,9 +424,14 @@ public final class RecipeAdapterCompatRegistry {
         register(new OccultismRitualRecipeAdapter());
     }
 
+    private static void registerSummoningRituals() {
+        register(new SummoningRitualsAltarRecipeAdapter());
+    }
+
     private static void registerMalum() {
         register(new SpiritFocusingRecipeAdapter());
         register(new SpiritInfusionRecipeAdapter());
+        register(new VoidFavorRecipeAdapter());
     }
 
     private static void registerEnderIO() {

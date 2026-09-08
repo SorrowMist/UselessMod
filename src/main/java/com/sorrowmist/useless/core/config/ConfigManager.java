@@ -80,6 +80,14 @@ public class ConfigManager {
     private static final ModConfigSpec.BooleanValue FURNACE_DRAW_APPFLUX_ENERGY;
     private static final ModConfigSpec.BooleanValue FURNACE_DRAW_AE_ENERGY;
     private static final ModConfigSpec.ConfigValue<List<? extends String>> FURNACE_RECIPE_TIER_RULES;
+    private static final ModConfigSpec.IntValue[] FURNACE_TIER_THREADS =
+            new ModConfigSpec.IntValue[11];
+    private static final ModConfigSpec.IntValue[] CATALYST_TIER_PARALLEL =
+            new ModConfigSpec.IntValue[10];
+    private static final ModConfigSpec.IntValue[] CATALYST_TIER_ENERGY_DIVISOR =
+            new ModConfigSpec.IntValue[10];
+    private static final ModConfigSpec.DoubleValue[] CATALYST_TIER_TIME_MULTIPLIER =
+            new ModConfigSpec.DoubleValue[10];
 
     // 万象炉配方转换配置
     private static final ModConfigSpec.BooleanValue ENABLE_CRAFTING_RECIPE_CONVERSION;
@@ -137,6 +145,15 @@ public class ConfigManager {
     private static final ModConfigSpec.IntValue OMNIVERSAL_MOLD_SLOTS;
     private static final ModConfigSpec.IntValue OMNIVERSAL_PASSIVE_PATTERN_SLOTS;
     private static final ModConfigSpec.IntValue OMNIVERSAL_DECODE_CACHE_CAPACITY;
+    private static final ModConfigSpec.IntValue[] OMNIVERSAL_COIL_TIER_THREADS =
+            new ModConfigSpec.IntValue[9];
+    private static final ModConfigSpec.LongValue[] OMNIVERSAL_COIL_TIER_PARALLEL =
+            new ModConfigSpec.LongValue[9];
+    private static final ModConfigSpec.IntValue[] OMNIVERSAL_COIL_TIER_ENERGY_DIVISOR =
+            new ModConfigSpec.IntValue[9];
+    private static final ModConfigSpec.DoubleValue[] OMNIVERSAL_COIL_TIER_TIME_MULTIPLIER =
+            new ModConfigSpec.DoubleValue[9];
+    private static final ModConfigSpec.IntValue OMNIVERSAL_USEFUL_TIER_THREADS;
     private static final ModConfigSpec.IntValue ORE_GENERATOR_SLOTS;
     private static final ModConfigSpec.ConfigValue<List<? extends String>>
             USELESS_DIMENSION_FLOOR_BLOCK_BLACKLIST;
@@ -195,6 +212,26 @@ public class ConfigManager {
                 .comment("Maximum decoded omniversal pattern entries kept per level. Takes effect after restart.")
                 .translation("useless_mod.configuration.decode_cache_capacity")
                 .defineInRange("decode_cache_capacity", 2048, 64, 16384);
+        for (int tier = 1; tier <= 9; tier++) {
+            int index = tier - 1;
+            OMNIVERSAL_COIL_TIER_THREADS[index] = SERVER_BUILDER
+                    .comment("普通线圈 " + tier + " 阶的最大AE任务数")
+                    .defineInRange("coil_tier_" + tier + "_threads", tier + 1, 1, Integer.MAX_VALUE);
+            OMNIVERSAL_COIL_TIER_PARALLEL[index] = SERVER_BUILDER
+                    .comment("普通线圈 " + tier + " 阶的单任务最大并行数")
+                    .defineInRange("coil_tier_" + tier + "_single_task_parallel",
+                            1L << (tier * 2), 1L, Long.MAX_VALUE);
+            OMNIVERSAL_COIL_TIER_ENERGY_DIVISOR[index] = SERVER_BUILDER
+                    .comment("普通线圈 " + tier + " 阶的能耗除数")
+                    .defineInRange("coil_tier_" + tier + "_energy_divisor", 1 << tier, 1, Integer.MAX_VALUE);
+            OMNIVERSAL_COIL_TIER_TIME_MULTIPLIER[index] = SERVER_BUILDER
+                    .comment("普通线圈 " + tier + " 阶的处理时间倍率")
+                    .defineInRange("coil_tier_" + tier + "_time_multiplier",
+                            1.0 / (1L << tier), 0.0, 1.0);
+        }
+        OMNIVERSAL_USEFUL_TIER_THREADS = SERVER_BUILDER
+                .comment("有用级线圈的最大AE任务数")
+                .defineInRange("useful_tier_threads", 11, 1, Integer.MAX_VALUE);
         SERVER_BUILDER.pop();
 
         SERVER_BUILDER.translation("useless_mod.configuration.ore_generator")
@@ -431,6 +468,24 @@ public class ConfigManager {
                         "警告: 会与网络中其他设备争抢供电, 网络储能不足时可能导致设备频繁掉线",
                         "在AppliedFlux抽取之后作为补充, 每tick总抽取量受熔炉最大输入速率限制")
                 .define("draw_ae_energy", false);
+
+        for (int tier = 0; tier <= 10; tier++) {
+            FURNACE_TIER_THREADS[tier] = SERVER_BUILDER
+                    .comment("单方块熔炉 " + tier + " 阶的最大AE任务数")
+                    .defineInRange("furnace_tier_" + tier + "_threads", tier + 1, 1, Integer.MAX_VALUE);
+        }
+        for (int tier = 0; tier <= 9; tier++) {
+            CATALYST_TIER_PARALLEL[tier] = SERVER_BUILDER
+                    .comment("催化剂 " + tier + " 阶的普通配方并行数")
+                    .defineInRange("catalyst_tier_" + tier + "_parallel", 1 << tier, 1, Integer.MAX_VALUE);
+            CATALYST_TIER_ENERGY_DIVISOR[tier] = SERVER_BUILDER
+                    .comment("催化剂 " + tier + " 阶的能耗除数")
+                    .defineInRange("catalyst_tier_" + tier + "_energy_divisor", 1, 1, Integer.MAX_VALUE);
+            CATALYST_TIER_TIME_MULTIPLIER[tier] = SERVER_BUILDER
+                    .comment("催化剂 " + tier + " 阶的处理时间倍率")
+                    .defineInRange("catalyst_tier_" + tier + "_time_multiplier",
+                            Math.max(0.1, 1.0 - tier * 0.1), 0.0, 1.0);
+        }
 
         FURNACE_RECIPE_TIER_RULES = SERVER_BUILDER
                 .comment("万象炉配方等级限制，格式为 配方ID通配符,等级",
@@ -758,6 +813,42 @@ public class ConfigManager {
 
     public static List<String> getFurnaceRecipeTierRules() {
         return readConfigList(FURNACE_RECIPE_TIER_RULES);
+    }
+
+    public static int getAdvancedAlloyFurnaceTierThreads(int tier) {
+        return getConfigValue(FURNACE_TIER_THREADS[Math.max(0, Math.min(10, tier))]);
+    }
+
+    public static int getAdvancedAlloyFurnaceCatalystParallel(int tier) {
+        return getConfigValue(CATALYST_TIER_PARALLEL[Math.max(0, Math.min(9, tier))]);
+    }
+
+    public static int getAdvancedAlloyFurnaceCatalystEnergyDivisor(int tier) {
+        return getConfigValue(CATALYST_TIER_ENERGY_DIVISOR[Math.max(0, Math.min(9, tier))]);
+    }
+
+    public static double getAdvancedAlloyFurnaceCatalystTimeMultiplier(int tier) {
+        return getConfigValue(CATALYST_TIER_TIME_MULTIPLIER[Math.max(0, Math.min(9, tier))]);
+    }
+
+    public static int getOmniversalCoilThreads(int tier) {
+        return getConfigValue(OMNIVERSAL_COIL_TIER_THREADS[Math.max(1, Math.min(9, tier)) - 1]);
+    }
+
+    public static long getOmniversalCoilSingleTaskParallel(int tier) {
+        return getConfigValue(OMNIVERSAL_COIL_TIER_PARALLEL[Math.max(1, Math.min(9, tier)) - 1]);
+    }
+
+    public static int getOmniversalCoilEnergyDivisor(int tier) {
+        return getConfigValue(OMNIVERSAL_COIL_TIER_ENERGY_DIVISOR[Math.max(1, Math.min(9, tier)) - 1]);
+    }
+
+    public static double getOmniversalCoilTimeMultiplier(int tier) {
+        return getConfigValue(OMNIVERSAL_COIL_TIER_TIME_MULTIPLIER[Math.max(1, Math.min(9, tier)) - 1]);
+    }
+
+    public static int getOmniversalUsefulTierThreads() {
+        return getConfigValue(OMNIVERSAL_USEFUL_TIER_THREADS);
     }
 
     public static boolean isCraftingRecipeConversionEnabled() {

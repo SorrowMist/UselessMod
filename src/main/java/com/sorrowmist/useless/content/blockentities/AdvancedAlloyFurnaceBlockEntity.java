@@ -1652,7 +1652,7 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
 
     // 获取最大AE任务数量（基于熔炉等级）
     public int getMaxAETaskCount() {
-        return this.furnaceTier + 1;
+        return ConfigManager.getAdvancedAlloyFurnaceTierThreads(this.furnaceTier);
     }
 
     @Override

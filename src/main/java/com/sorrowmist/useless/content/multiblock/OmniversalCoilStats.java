@@ -6,8 +6,9 @@ import com.sorrowmist.useless.content.blocks.multiblock.UselessCoilBlock;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.catalyst.CatalystEffectResolver;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.catalyst.ResolvedCatalystEffect;
 import com.sorrowmist.useless.content.recipe.AdvancedAlloyFurnaceRecipe;
+import com.sorrowmist.useless.core.config.ConfigManager;
 
-/** Fixed coil properties: catalyst behavior apart from processing time plus independent threads. */
+/** Provides coil properties: catalyst behavior apart from processing time plus independent threads. */
 public record OmniversalCoilStats(
         int tier,
         CatalystType catalystType,
@@ -26,13 +27,34 @@ public record OmniversalCoilStats(
         return BY_TIER[tier - UselessCoilBlock.MIN_TIER];
     }
 
+    @Override
+    public long singleTaskParallel() {
+        return tier == UselessCoilBlock.USEFUL_TIER
+                ? Long.MAX_VALUE
+                : ConfigManager.getOmniversalCoilSingleTaskParallel(tier);
+    }
+
+    @Override
+    public int energyDivisor() {
+        return tier == UselessCoilBlock.USEFUL_TIER
+                ? 1 << tier
+                : ConfigManager.getOmniversalCoilEnergyDivisor(tier);
+    }
+
+    @Override
+    public int threads() {
+        return tier == UselessCoilBlock.USEFUL_TIER
+                ? ConfigManager.getOmniversalUsefulTierThreads()
+                : ConfigManager.getOmniversalCoilThreads(tier);
+    }
+
     public int processTime(int baseTime) {
         if (tier == UselessCoilBlock.USEFUL_TIER) {
             return 1;
         }
         long normalizedBaseTime = Math.max(1, baseTime);
-        long divisor = 1L << tier;
-        return (int) Math.max(1L, (normalizedBaseTime + divisor - 1L) / divisor);
+        double multiplier = ConfigManager.getOmniversalCoilTimeMultiplier(tier);
+        return Math.max(1, (int) Math.ceil(normalizedBaseTime * multiplier));
     }
 
     public ResolvedCatalystEffect resolveEffect(AdvancedAlloyFurnaceRecipe recipe) {
@@ -41,11 +63,11 @@ public record OmniversalCoilStats(
                 CatalystEffectResolver.resolveForType(recipe, catalystType, baseTime);
         return new ResolvedCatalystEffect(
                 catalystEffect.catalystType(),
-                singleTaskParallel,
-                singleTaskParallel,
+                singleTaskParallel(),
+                singleTaskParallel(),
                 processTime(baseTime),
                 catalystEffect.energyMultipliesWithParallel(),
-                energyDivisor,
+                energyDivisor(),
                 catalystEffect.uselessIngotRecipe(),
                 catalystEffect.targetUselessIngotTier());
     }

@@ -1,6 +1,7 @@
 package com.sorrowmist.useless.content.machines.advanced_alloy_furnace.catalyst;
 
 import com.sorrowmist.useless.api.enums.CatalystType;
+import com.sorrowmist.useless.core.config.ConfigManager;
 import com.sorrowmist.useless.content.recipe.AdvancedAlloyFurnaceRecipe;
 import net.minecraft.world.item.ItemStack;
 
@@ -30,13 +31,16 @@ public final class CatalystEffectResolver {
                 ? Math.max(CatalystParallelManager.calculateParallelForUselessIngotRecipe(targetTier),
                         catalystParallel)
                 : catalystParallel;
+        int energyDivisor = resolvedType.isUsefulIngot()
+                ? 1
+                : ConfigManager.getAdvancedAlloyFurnaceCatalystEnergyDivisor(resolvedType.getTier());
         return new ResolvedCatalystEffect(
                 resolvedType,
                 Math.max(1, catalystParallel),
                 Math.max(1, recipeParallel),
                 resolvedType.calculateProcessTime(baseProcessTime),
                 !resolvedType.isUsefulIngot(),
-                1,
+                energyDivisor,
                 uselessIngotRecipe,
                 targetTier
         );

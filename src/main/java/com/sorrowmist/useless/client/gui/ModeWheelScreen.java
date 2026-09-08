@@ -223,17 +223,17 @@ public class ModeWheelScreen extends Screen {
         int constructionX, lx, mx, rx, fx;
 
         if (this.showMiddleDisc) {
-            constructionX = (int) (centerX - DISC_SPACING * 2.5F);
-            lx = (int) (centerX - DISC_SPACING * 1.5F);
-            mx = (int) (centerX - DISC_SPACING * 0.5F);
-            rx = (int) (centerX + DISC_SPACING * 0.5F);
-            fx = (int) (centerX + DISC_SPACING * 1.5F);
-        } else {
             constructionX = (int) (centerX - DISC_SPACING * 2.0F);
             lx = (int) (centerX - DISC_SPACING);
+            mx = centerX;
+            rx = (int) (centerX + DISC_SPACING);
+            fx = (int) (centerX + DISC_SPACING * 2.0F);
+        } else {
+            constructionX = (int) (centerX - DISC_SPACING * 1.5F);
+            lx = (int) (centerX - DISC_SPACING * 0.5F);
             mx = centerX; // 不使用
-            rx = centerX;
-            fx = (int) (centerX + DISC_SPACING);
+            rx = (int) (centerX + DISC_SPACING * 0.5F);
+            fx = (int) (centerX + DISC_SPACING * 1.5F);
         }
 
         ms.pushPose();
@@ -390,24 +390,24 @@ public class ModeWheelScreen extends Screen {
         int centerX = this.width / 2;
 
         int constructionX = this.showMiddleDisc
-                ? (int) (centerX - DISC_SPACING * 2.5F)
-                : (int) (centerX - DISC_SPACING * 2.0F);
+                ? (int) (centerX - DISC_SPACING * 2.0F)
+                : (int) (centerX - DISC_SPACING * 1.5F);
 
         int lx = this.showMiddleDisc
-                ? (int) (centerX - DISC_SPACING * 1.5F)
-                : (int) (centerX - DISC_SPACING);
+                ? (int) (centerX - DISC_SPACING)
+                : (int) (centerX - DISC_SPACING * 0.5F);
 
         int midX = this.showMiddleDisc
-                ? (int) (centerX - DISC_SPACING * 0.5F)
+                ? centerX
                 : centerX;
 
         int rx = this.showMiddleDisc
-                ? (int) (centerX + DISC_SPACING * 0.5F)
-                : centerX;
+                ? (int) (centerX + DISC_SPACING)
+                : (int) (centerX + DISC_SPACING * 0.5F);
 
         int fx = this.showMiddleDisc
-                ? (int) (centerX + DISC_SPACING * 1.5F)
-                : (int) (centerX + DISC_SPACING);
+                ? (int) (centerX + DISC_SPACING * 2.0F)
+                : (int) (centerX + DISC_SPACING * 1.5F);
 
         return this.checkClick((int) mx, (int) my, constructionX, cy, this.constructionWandModes)
                 || this.checkClick((int) mx, (int) my, lx, cy, this.leftModes)

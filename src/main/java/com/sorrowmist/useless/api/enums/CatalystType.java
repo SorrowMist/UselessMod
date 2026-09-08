@@ -1,5 +1,6 @@
 package com.sorrowmist.useless.api.enums;
 
+import com.sorrowmist.useless.core.config.ConfigManager;
 import com.sorrowmist.useless.init.ModItems;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
@@ -8,7 +9,7 @@ import java.util.function.Supplier;
 
 /**
  * 高级合金炉可识别的催化剂类型枚举。
- * 统一维护催化剂的静态信息，例如等级、显示名、普通配方并行数和耗时规则。
+ * 统一维护催化剂的默认信息和配置驱动的运行参数。
  */
 public enum CatalystType {
     NONE(null, 0, "", 1, false),
@@ -21,7 +22,6 @@ public enum CatalystType {
     USELESS_INGOT_TIER_7(ModItems.USELESS_INGOT_TIER_7, 7, "七阶无用锭", 128, false),
     USELESS_INGOT_TIER_8(ModItems.USELESS_INGOT_TIER_8, 8, "八阶无用锭", 256, false),
     USELESS_INGOT_TIER_9(ModItems.USELESS_INGOT_TIER_9, 9, "九阶无用锭", 512, false),
-    POSSIBLE_USEFUL_INGOT(ModItems.POSSIBLE_USEFUL_INGOT, 10, "可能有用锭", 1024, false),
     USEFUL_INGOT(ModItems.USEFUL_INGOT, Integer.MAX_VALUE, "有用锭", Integer.MAX_VALUE, true);
 
     private final Supplier<? extends Item> itemSupplier;
@@ -74,7 +74,9 @@ public enum CatalystType {
     }
 
     public int getNormalRecipeParallel() {
-        return normalRecipeParallel;
+        return this == USEFUL_INGOT
+                ? normalRecipeParallel
+                : ConfigManager.getAdvancedAlloyFurnaceCatalystParallel(tier);
     }
 
     public boolean isInfiniteParallel() {
@@ -103,7 +105,7 @@ public enum CatalystType {
         if (tier <= 0) {
             return baseTime;
         }
-        double multiplier = Math.max(0.1, 1.0 - tier * 0.1);
+        double multiplier = ConfigManager.getAdvancedAlloyFurnaceCatalystTimeMultiplier(tier);
         return Math.max(1, (int) Math.ceil(baseTime * multiplier));
     }
 }

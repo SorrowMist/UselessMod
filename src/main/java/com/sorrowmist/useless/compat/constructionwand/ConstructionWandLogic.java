@@ -10,6 +10,7 @@ import net.minecraft.core.Direction;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
+import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.context.BlockPlaceContext;
@@ -48,15 +49,22 @@ public final class ConstructionWandLogic {
     }
 
     public static List<BlockPos> preview(ServerPlayer player, InteractionHand hand, BlockHitResult hit) {
+        return preview(player, hand, hit, false);
+    }
+
+    public static List<BlockPos> preview(ServerPlayer player, InteractionHand hand,
+                                         BlockHitResult hit, boolean air) {
         ItemStack tool = player.getItemInHand(hand);
         if (!isEnabled(tool)) return List.of();
 
         ConstructionWandCoreMode core = tool.getOrDefault(
                 UComponents.ConstructionWandCoreComponent.get(), ConstructionWandCoreMode.DEFAULT);
         return switch (core) {
-            case DEFAULT -> previewBuild(player.serverLevel(), player, hit, tool);
-            case ANGEL -> previewAngel(player.serverLevel(), player, hit, tool);
-            case DESTRUCTION -> previewDestroy(player.serverLevel(), hit);
+            case DEFAULT -> air ? List.of() : previewBuild(player.serverLevel(), player, hit, tool);
+            case ANGEL -> air
+                    ? previewAngelAir(player.serverLevel(), player, tool)
+                    : previewAngel(player.serverLevel(), player, hit, tool);
+            case DESTRUCTION -> air ? List.of() : previewDestroy(player.serverLevel(), hit);
         };
     }
 
@@ -112,7 +120,8 @@ public final class ConstructionWandLogic {
 
     private static Operation build(ServerLevel level, ServerPlayer player, BlockHitResult hit, ItemStack tool) {
         BlockState targetState = level.getBlockState(hit.getBlockPos());
-        if (!(targetState.getBlock().asItem() instanceof BlockItem targetItem)) return null;
+        if (!(targetState.getBlock().asItem() instanceof BlockItem clickedItem)) return null;
+        BlockItem targetItem = placementTarget(player, clickedItem);
 
         int limit = ConfigManager.getBeefConstructionWandBuildLimit();
         Direction face = hit.getDirection();
@@ -144,10 +153,16 @@ public final class ConstructionWandLogic {
     private static List<BlockPos> previewBuild(ServerLevel level, ServerPlayer player,
                                                BlockHitResult hit, ItemStack tool) {
         BlockState targetState = level.getBlockState(hit.getBlockPos());
-        if (!(targetState.getBlock().asItem() instanceof BlockItem targetItem)) return List.of();
+        if (!(targetState.getBlock().asItem() instanceof BlockItem clickedItem)) return List.of();
+        BlockItem targetItem = placementTarget(player, clickedItem);
 
         int limit = previewLimit(level, player, tool, targetItem, ConfigManager.getBeefConstructionWandBuildLimit());
         if (limit <= 0) return List.of();
+        Supply previewSupply = findSupply(player, tool, targetItem);
+        InteractionHand placementHand = previewSupply.hand;
+        ItemStack previewStack = previewSupply.stack.isEmpty()
+                ? new ItemStack(targetItem)
+                : previewSupply.stack.copyWithCount(1);
 
         Direction face = hit.getDirection();
         Direction[] planeDirections = planeDirections(face);
@@ -164,7 +179,7 @@ public final class ConstructionWandLogic {
             if (level.getBlockState(pos.relative(face.getOpposite())).getBlock() != targetState.getBlock()) {
                 continue;
             }
-            if (getPlacementState(level, player, pos, face, targetItem, new ItemStack(targetItem)) == null) {
+            if (getPlacementState(level, player, pos, face, targetItem, previewStack, placementHand) == null) {
                 continue;
             }
 
@@ -187,18 +202,18 @@ public final class ConstructionWandLogic {
             if (!(offhand.getItem() instanceof BlockItem blockItem)) return null;
             targetItem = blockItem;
             face = Direction.UP;
-            start = BlockPos.containing(player.getEyePosition().add(player.getLookAngle().scale(2.0)));
+            start = angelAirStart(player);
         } else {
             BlockState supportingState = level.getBlockState(hit.getBlockPos());
             if (!(supportingState.getBlock().asItem() instanceof BlockItem blockItem)) return null;
-            targetItem = blockItem;
+            targetItem = placementTarget(player, blockItem);
             face = hit.getDirection();
             start = hit.getBlockPos().relative(face.getOpposite());
         }
 
         int limit = ConfigManager.getBeefConstructionWandAngelLimit();
         List<SavedBlock> changed = new ArrayList<>();
-        Direction step = fromAir ? player.getDirection() : face.getOpposite();
+        Direction step = fromAir ? angelAirStep(player) : face.getOpposite();
         BlockPos pos = start;
         for (int i = 0; i < limit; i++) {
             if (place(level, player, tool, pos, face, targetItem, changed)) {
@@ -211,17 +226,52 @@ public final class ConstructionWandLogic {
 
     private static List<BlockPos> previewAngel(ServerLevel level, ServerPlayer player,
                                                BlockHitResult hit, ItemStack tool) {
+        if (hit == null) return previewAngelAir(level, player, tool);
+
         BlockState supportingState = level.getBlockState(hit.getBlockPos());
-        if (!(supportingState.getBlock().asItem() instanceof BlockItem targetItem)) return List.of();
+        if (!(supportingState.getBlock().asItem() instanceof BlockItem clickedItem)) return List.of();
+        BlockItem targetItem = placementTarget(player, clickedItem);
 
         int limit = previewLimit(level, player, tool, targetItem, ConfigManager.getBeefConstructionWandAngelLimit());
         if (limit <= 0) return List.of();
+        Supply previewSupply = findSupply(player, tool, targetItem);
+        InteractionHand placementHand = previewSupply.hand;
+        ItemStack previewStack = previewSupply.stack.isEmpty()
+                ? new ItemStack(targetItem)
+                : previewSupply.stack.copyWithCount(1);
         Direction face = hit.getDirection();
         Direction step = face.getOpposite();
         BlockPos pos = hit.getBlockPos().relative(step);
         List<BlockPos> preview = new ArrayList<>(Math.min(limit, MAX_PREVIEW_BLOCKS));
         for (int i = 0; i < limit && preview.size() < MAX_PREVIEW_BLOCKS; i++) {
-            if (getPlacementState(level, player, pos, face, targetItem, new ItemStack(targetItem)) != null) {
+            if (getPlacementState(level, player, pos, face, targetItem, previewStack, placementHand) != null) {
+                preview.add(pos.immutable());
+            }
+            pos = pos.relative(step);
+        }
+        return List.copyOf(preview);
+    }
+
+    private static List<BlockPos> previewAngelAir(ServerLevel level, ServerPlayer player, ItemStack tool) {
+        ItemStack offhand = player.getOffhandItem();
+        if (!(offhand.getItem() instanceof BlockItem targetItem)) return List.of();
+
+        int limit = previewLimit(level, player, tool, targetItem,
+                                 ConfigManager.getBeefConstructionWandAngelLimit());
+        if (limit <= 0) return List.of();
+        Supply previewSupply = findSupply(player, tool, targetItem);
+        InteractionHand placementHand = previewSupply.hand;
+        ItemStack previewStack = previewSupply.stack.isEmpty()
+                ? offhand.copyWithCount(1)
+                : previewSupply.stack.copyWithCount(1);
+
+        Direction face = Direction.UP;
+        Direction step = angelAirStep(player);
+        BlockPos pos = angelAirStart(player);
+        List<BlockPos> preview = new ArrayList<>(Math.min(limit, MAX_PREVIEW_BLOCKS));
+        for (int i = 0; i < limit && preview.size() < MAX_PREVIEW_BLOCKS; i++) {
+            if (getPlacementState(level, player, pos, face, targetItem,
+                                  previewStack, placementHand) != null) {
                 preview.add(pos.immutable());
             }
             pos = pos.relative(step);
@@ -297,7 +347,8 @@ public final class ConstructionWandLogic {
         if (!existing.canBeReplaced()) return false;
 
         ItemStack placementStack = supply.stack.isEmpty() ? new ItemStack(targetItem) : supply.stack;
-        BlockState placed = getPlacementState(level, player, pos, face, targetItem, placementStack);
+        BlockState placed = getPlacementState(level, player, pos, face, targetItem,
+                                              placementStack, supply.hand);
         if (placed == null) return false;
 
         SavedBlock saved = SavedBlock.capture(level, pos, existing,
@@ -326,21 +377,26 @@ public final class ConstructionWandLogic {
         }
 
         ItemStack offhand = player.getOffhandItem();
-        if (offhand.getItem() == targetItem && !offhand.isEmpty()) return new Supply(offhand, false);
+        if (offhand.getItem() == targetItem && !offhand.isEmpty()) {
+            return new Supply(offhand, false, InteractionHand.OFF_HAND);
+        }
 
         for (ItemStack stack : player.getInventory().items) {
-            if (stack.getItem() == targetItem && !stack.isEmpty()) return new Supply(stack, false);
+            if (stack.getItem() == targetItem && !stack.isEmpty()) {
+                return new Supply(stack, false, InteractionHand.MAIN_HAND);
+            }
         }
-        return aePriority ? new Supply(ItemStack.EMPTY, false) : aeSupply;
+        return aePriority ? emptySupply() : aeSupply;
     }
 
     private static BlockState getPlacementState(ServerLevel level, ServerPlayer player, BlockPos pos,
-                                                Direction face, BlockItem targetItem, ItemStack stack) {
+                                                Direction face, BlockItem targetItem, ItemStack stack,
+                                                InteractionHand hand) {
         if (!level.getBlockState(pos).canBeReplaced()) return null;
         BlockHitResult placeHit = new BlockHitResult(
                 Vec3.atCenterOf(pos), face, pos.relative(face.getOpposite()), false);
         BlockPlaceContext context = new BlockPlaceContext(
-                level, player, InteractionHand.MAIN_HAND, stack, placeHit);
+                level, player, hand, stack, placeHit);
         BlockState placed = targetItem.getBlock().getStateForPlacement(context);
         if (placed == null || !placed.canSurvive(level, pos)
                 || !level.isUnobstructed(placed, pos,
@@ -378,17 +434,34 @@ public final class ConstructionWandLogic {
 
     private static Supply findAeSupply(ServerPlayer player, ItemStack tool, BlockItem targetItem) {
         if (!tool.has(UComponents.WIRELESS_LINK_TARGET.get())) {
-            return new Supply(ItemStack.EMPTY, false);
+            return emptySupply();
         }
 
         ItemStack requested = new ItemStack(targetItem);
         try {
             if (AE2Compat.tryExtractFromLinkedGrid(tool, player, requested, Actionable.SIMULATE) > 0) {
-                return new Supply(requested, true);
+                return new Supply(requested, true, InteractionHand.MAIN_HAND);
             }
         } catch (Throwable ignored) {
         }
-        return new Supply(ItemStack.EMPTY, false);
+        return emptySupply();
+    }
+
+    private static Supply emptySupply() {
+        return new Supply(ItemStack.EMPTY, false, InteractionHand.MAIN_HAND);
+    }
+
+    private static BlockItem placementTarget(ServerPlayer player, BlockItem fallback) {
+        ItemStack offhand = player.getOffhandItem();
+        return offhand.getItem() instanceof BlockItem blockItem ? blockItem : fallback;
+    }
+
+    public static BlockPos angelAirStart(Player player) {
+        return BlockPos.containing(player.getEyePosition().add(player.getLookAngle().scale(2.0)));
+    }
+
+    public static Direction angelAirStep(Player player) {
+        return player.getDirection();
     }
 
     private static boolean isAeStoragePriorityEnabled(ItemStack tool) {
@@ -493,6 +566,6 @@ public final class ConstructionWandLogic {
         }
     }
 
-    private record Supply(ItemStack stack, boolean fromAe) {
+    private record Supply(ItemStack stack, boolean fromAe, InteractionHand hand) {
     }
 }

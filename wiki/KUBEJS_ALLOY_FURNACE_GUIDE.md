@@ -47,7 +47,7 @@ ServerEvents.recipes(event => {
 })
 ```
 
-The three required arguments are the recipe data ID, the input list, and the output list. An omitted `count` defaults to 1.
+The positional form takes the recipe data ID, item input list, and item output list. An omitted `count` defaults to 1. For fluid-only outputs, use object syntax and omit `outputs`.
 
 ### Items and Fluids Together
 
@@ -73,7 +73,7 @@ ServerEvents.recipes(event => {
 })
 ```
 
-For a fluid-only input or output, keep the other required list and set it to an empty array, such as `outputs: []`.
+For a fluid-only recipe, use object syntax and omit the unused item list. The `ingredients` field itself remains required by the schema; if there are no item inputs, set `ingredients: []`.
 
 ### Mold and Tier
 
@@ -113,8 +113,7 @@ ServerEvents.recipes(event => {
         ],
         tier: 5,
         energy: 500000,
-        process_time: 200,
-        mode: 'press'
+        process_time: 200
     })
 })
 ```
@@ -151,16 +150,14 @@ Do not define both `mold` and `molds`. Multiple mold requirements are handled by
 | `id` | String | Yes | - | Recipe data ID, for example `kubejs:iron_alloy` |
 | `ingredients` | Object[] | Yes | - | Input list; each entry has `ingredient` and an optional `count` |
 | `input_fluids` | Object[] | No | `[]` | Fluid input list; each entry has a fluid `ingredient` and `amount` |
-| `outputs` | ItemStack[] | Yes | - | Output list; strings and `Item.of(...)` are supported |
+| `outputs` | ItemStack[] | No | `[]` | Item output list; strings and `Item.of(...)` are supported |
 | `output_fluids` | FluidStack[] | No | `[]` | Fluid output list; `Fluid.of(...)` is supported |
 | `mold` | Ingredient | No | Empty | Single mold requirement; item IDs and tags are supported |
 | `molds` | Ingredient[] | No | Empty | Multiple independent mold requirements; mutually exclusive with `mold` |
 | `tier` | Integer | No | Unspecified | Minimum coil tier, from `0` to `10` |
 | `energy` | Long | No | `2000` | Energy consumed by one operation |
 | `process_time` | Integer | No | `200` | Processing time in ticks |
-| `catalyst` | Ingredient | No | Empty | Catalyst requirement |
-| `catalyst_uses` | Integer | No | `0` | Number of uses allowed for the catalyst |
-| `mode` | String | No | `normal` | Processing mode: `normal`, `insolator`, or `press` |
+| `catalyst` | Ingredient | No | Empty | Catalyst requirement; the current alloy-furnace runtime does not consume it |
 
 ### Item Input Format
 
@@ -207,6 +204,22 @@ output_fluids: [
     Fluid.of('minecraft:water', 1000),
     Fluid.of('minecraft:lava', 250)
 ]
+```
+
+Item outputs are optional, so a recipe may produce only fluids:
+
+```javascript
+ServerEvents.recipes(event => {
+    event.recipes.useless_mod.advanced_alloy_furnace({
+        id: 'kubejs:fluid_only_alloy',
+        ingredients: [
+            { ingredient: 'minecraft:iron_ingot', count: 1 }
+        ],
+        output_fluids: [
+            Fluid.of('minecraft:lava', 1000)
+        ]
+    })
+})
 ```
 
 ## Recipe Tiers
@@ -290,9 +303,7 @@ ServerEvents.recipes(event => {
         tier: 3,
         energy: 100000,
         process_time: 100,
-        catalyst: 'minecraft:diamond',
-        catalyst_uses: 8,
-        mode: 'normal'
+        catalyst: 'minecraft:diamond'
     })
 })
 ```
@@ -318,7 +329,6 @@ ServerEvents.recipes(event => {
                 amount: 1000
             }
         ],
-        outputs: [],
         output_fluids: [
             { id: 'minecraft:water', amount: 1000 }
         ],
@@ -332,7 +342,7 @@ ServerEvents.recipes(event => {
 ## Best Practices
 
 1. Prefix recipe IDs with your mod ID or `kubejs:` to avoid collisions.
-2. Use positive input counts and provide at least one valid output.
+2. Use positive input counts and provide at least one valid item or fluid output.
 3. When replacing a recipe, remove the old recipe before adding the replacement with the same `id`.
 4. Use object syntax for multiple molds.
 5. Only set `tier` when the recipe needs to override the server configuration; otherwise let `recipe_tier_rules` manage it.
@@ -344,8 +354,8 @@ If a recipe does not appear or the machine cannot process it:
 
 1. Check the game log for KubeJS recipe creation errors.
 2. Confirm that `id` is a valid resource location in the form `namespace:path`.
-3. Confirm that `id`, `ingredients`, and `outputs` are present.
+3. Confirm that `id` and `ingredients` are present, and that at least one valid entry exists in `outputs` or `output_fluids`.
 4. Confirm that `mold` and `molds` are not both defined.
-5. Check coil tier, molds, input counts, and processing mode.
+5. Check coil tier, molds, input counts, and catalyst requirements.
 6. For fluids or AE chemicals, verify the JSON field names and amount types passed to `event.custom`.
 7. Run `/reload` after editing the script and check for script exceptions.

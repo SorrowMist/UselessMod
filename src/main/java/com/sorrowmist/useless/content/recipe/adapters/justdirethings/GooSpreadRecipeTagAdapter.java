@@ -12,6 +12,7 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.crafting.Ingredient;
 import net.minecraft.world.item.crafting.RecipeHolder;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.material.Fluid;
 import net.neoforged.neoforge.fluids.FluidStack;
 import org.jetbrains.annotations.Nullable;
 
@@ -43,17 +44,24 @@ public final class GooSpreadRecipeTagAdapter implements IRecipeAdapter<GooSpread
 
         GooSpreadRecipeTag source = holder.value();
         Ingredient input = JustDireThingsRecipeAdapterUtils.blockTagInput(source.getInput());
-        ItemStack output = JustDireThingsRecipeAdapterUtils.rawOreDrop(source.getOutput());
+        ItemStack output = JustDireThingsRecipeAdapterUtils.blockOutput(source.getOutput());
+        Fluid outputFluid = output.isEmpty()
+                ? JustDireThingsRecipeAdapterUtils.fluid(source.getOutput()) : null;
         Ingredient mold = JustDireThingsRecipeAdapterUtils.gooMold(source.getTierRequirement());
-        if (input == null || input.isEmpty() || output.isEmpty() || mold.isEmpty()) return null;
+        if (input.isEmpty() || (output.isEmpty() && outputFluid == null) || mold.isEmpty()) return null;
+
+        List<ItemStack> itemOutputs = output.isEmpty() ? List.of() : List.of(output);
+        List<FluidStack> fluidOutputs = outputFluid == null
+                ? List.of()
+                : List.of(new FluidStack(outputFluid, JustDireThingsRecipeAdapterUtils.FLUID_AMOUNT));
 
         return new AdvancedAlloyFurnaceRecipe(
                 AdapterUtils.convertedId(holder.id()),
                 List.of(new CountedIngredient(input, 1L)),
                 List.of(),
                 List.of(),
-                List.of(output),
-                List.of(),
+                itemOutputs,
+                fluidOutputs,
                 List.of(),
                 AdapterUtils.DEFAULT_ENERGY,
                 Math.max(1, source.getCraftingDuration()),
@@ -73,12 +81,13 @@ public final class GooSpreadRecipeTagAdapter implements IRecipeAdapter<GooSpread
         for (RecipeHolder<GooSpreadRecipeTag> holder : level.getRecipeManager()
                 .getAllRecipesFor(Registration.GOO_SPREAD_RECIPE_TYPE_TAG.get())) {
             GooSpreadRecipeTag source = holder.value();
-            ItemStack output = JustDireThingsRecipeAdapterUtils.rawOreDrop(source.getOutput());
             Ingredient input = JustDireThingsRecipeAdapterUtils.blockTagInput(source.getInput());
+            ItemStack output = JustDireThingsRecipeAdapterUtils.blockOutput(source.getOutput());
             if (!input.isEmpty()
                     && JustDireThingsRecipeAdapterUtils.matchesMold(source.getTierRequirement(), mold)
                     && JustDireThingsRecipeAdapterUtils.matchesItem(input, mergedInputs)
-                    && !output.isEmpty()) {
+                    && (!output.isEmpty()
+                    || JustDireThingsRecipeAdapterUtils.fluid(source.getOutput()) != null)) {
                 matches.add(holder);
             }
         }

@@ -54,6 +54,15 @@ final class JustDireThingsRecipeAdapterUtils {
         return item == Items.AIR ? null : Ingredient.of(item);
     }
 
+    static ItemStack blockOutput(BlockState state) {
+        ItemStack rawOreDrop = rawOreDrop(state);
+        if (!rawOreDrop.isEmpty()) return rawOreDrop;
+        if (state == null) return ItemStack.EMPTY;
+
+        Item item = state.getBlock().asItem();
+        return item == Items.AIR ? ItemStack.EMPTY : new ItemStack(item);
+    }
+
     static Ingredient blockTagInput(BlockTagIngredient input) {
         if (input == null) return Ingredient.EMPTY;
         ItemStack[] items = input.getItems().toArray(ItemStack[]::new);
@@ -75,6 +84,20 @@ final class JustDireThingsRecipeAdapterUtils {
         if (fluid == null || available == null || available.isEmpty()) return false;
         return FluidIngredientAllocator.matchesLong(
                 fluidInput(fluid), available, 1L);
+    }
+
+    static boolean hasConvertibleInput(BlockState state) {
+        return blockInput(state) != null || fluid(state) != null;
+    }
+
+    static boolean matchesInput(BlockState state,
+                                @Nullable Map<Ingredient, Long> mergedInputs,
+                                @Nullable Map<FluidStack, Long> mergedFluids) {
+        Ingredient itemInput = blockInput(state);
+        if (itemInput != null) {
+            return matchesItem(itemInput, mergedInputs);
+        }
+        return matchesFluid(fluid(state), mergedFluids);
     }
 
     /**

@@ -167,7 +167,8 @@ public record AdvancedAlloyFurnaceRecipe(
                                     .forGetter(AdvancedAlloyFurnaceRecipe::inputFluids),
                     GenericStack.CODEC.listOf().optionalFieldOf("key_inputs", List.of())
                                     .forGetter(AdvancedAlloyFurnaceRecipe::keyInputs),
-                    ITEM_STACK_CODEC.listOf().fieldOf("outputs").forGetter(AdvancedAlloyFurnaceRecipe::outputs),
+                    ITEM_STACK_CODEC.listOf().optionalFieldOf("outputs", List.of())
+                            .forGetter(AdvancedAlloyFurnaceRecipe::outputs),
                     FluidStack.CODEC.listOf().optionalFieldOf("output_fluids", List.of())
                                     .forGetter(AdvancedAlloyFurnaceRecipe::outputFluids),
                     GenericStack.CODEC.listOf().optionalFieldOf("key_outputs", List.of())

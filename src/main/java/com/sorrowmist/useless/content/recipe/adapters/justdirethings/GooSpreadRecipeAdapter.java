@@ -7,11 +7,13 @@ import com.sorrowmist.useless.content.recipe.AdapterUtils;
 import com.sorrowmist.useless.content.recipe.AdvancedAlloyFurnaceRecipe;
 import com.sorrowmist.useless.content.recipe.CountedIngredient;
 import com.sorrowmist.useless.content.recipe.IRecipeAdapter;
+import com.sorrowmist.useless.content.recipe.LongSizedFluidIngredient;
 import com.sorrowmist.useless.content.recipe.RecipeSourceIds;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.crafting.Ingredient;
 import net.minecraft.world.item.crafting.RecipeHolder;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.material.Fluid;
 import net.neoforged.neoforge.fluids.FluidStack;
 import org.jetbrains.annotations.Nullable;
 
@@ -43,17 +45,34 @@ public final class GooSpreadRecipeAdapter implements IRecipeAdapter<GooSpreadRec
 
         GooSpreadRecipe source = holder.value();
         Ingredient input = JustDireThingsRecipeAdapterUtils.blockInput(source.getInput());
-        ItemStack output = JustDireThingsRecipeAdapterUtils.rawOreDrop(source.getOutput());
+        Fluid inputFluid = input == null
+                ? JustDireThingsRecipeAdapterUtils.fluid(source.getInput()) : null;
+        ItemStack output = JustDireThingsRecipeAdapterUtils.blockOutput(source.getOutput());
+        Fluid outputFluid = output.isEmpty()
+                ? JustDireThingsRecipeAdapterUtils.fluid(source.getOutput()) : null;
         Ingredient mold = JustDireThingsRecipeAdapterUtils.gooMold(source.getTierRequirement());
-        if (input == null || output.isEmpty() || mold.isEmpty()) return null;
+        if ((input == null && inputFluid == null)
+                || (output.isEmpty() && outputFluid == null)
+                || mold.isEmpty()) return null;
+
+        List<CountedIngredient> itemInputs = input == null
+                ? List.of()
+                : List.of(new CountedIngredient(input, 1L));
+        List<LongSizedFluidIngredient> inputFluids = inputFluid == null
+                ? List.of()
+                : JustDireThingsRecipeAdapterUtils.fluidInput(inputFluid);
+        List<ItemStack> itemOutputs = output.isEmpty() ? List.of() : List.of(output);
+        List<FluidStack> fluidOutputs = outputFluid == null
+                ? List.of()
+                : List.of(new FluidStack(outputFluid, JustDireThingsRecipeAdapterUtils.FLUID_AMOUNT));
 
         return new AdvancedAlloyFurnaceRecipe(
                 AdapterUtils.convertedId(holder.id()),
-                List.of(new CountedIngredient(input, 1L)),
+                itemInputs,
+                inputFluids,
                 List.of(),
-                List.of(),
-                List.of(output),
-                List.of(),
+                itemOutputs,
+                fluidOutputs,
                 List.of(),
                 AdapterUtils.DEFAULT_ENERGY,
                 Math.max(1, source.getCraftingDuration()),
@@ -75,12 +94,13 @@ public final class GooSpreadRecipeAdapter implements IRecipeAdapter<GooSpreadRec
         for (RecipeHolder<GooSpreadRecipe> holder : level.getRecipeManager()
                 .getAllRecipesFor(Registration.GOO_SPREAD_RECIPE_TYPE.get())) {
             GooSpreadRecipe source = holder.value();
-            Ingredient input = JustDireThingsRecipeAdapterUtils.blockInput(source.getInput());
-            if (input != null
+            ItemStack output = JustDireThingsRecipeAdapterUtils.blockOutput(source.getOutput());
+            if (JustDireThingsRecipeAdapterUtils.hasConvertibleInput(source.getInput())
+                    && (!output.isEmpty()
+                    || JustDireThingsRecipeAdapterUtils.fluid(source.getOutput()) != null)
                     && JustDireThingsRecipeAdapterUtils.matchesMold(source.getTierRequirement(), mold)
-                    && JustDireThingsRecipeAdapterUtils.matchesItem(input, mergedInputs)
-                    && JustDireThingsRecipeAdapterUtils.rawOreDrop(source.getOutput())
-                    .getCount() == JustDireThingsRecipeAdapterUtils.RAW_ORE_DROP_COUNT) {
+                    && JustDireThingsRecipeAdapterUtils.matchesInput(
+                    source.getInput(), mergedInputs, mergedFluids)) {
                 matches.add(holder);
             }
         }

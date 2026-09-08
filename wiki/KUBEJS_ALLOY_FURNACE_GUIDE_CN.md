@@ -47,7 +47,7 @@ ServerEvents.recipes(event => {
 })
 ```
 
-三个必填参数依次为：配方数据 ID、输入物列表、输出物列表。`count` 省略时，输入数量默认为 1。
+位置调用依次接收配方数据 ID、物品输入列表和物品输出列表。`count` 省略时，输入数量默认为 1。只有流体输出时，请使用对象写法并省略 `outputs`。
 
 ### 同时使用物品和流体
 
@@ -73,7 +73,7 @@ ServerEvents.recipes(event => {
 })
 ```
 
-如果配方只有流体输入或输出，仍需保留另一个必填列表，并将其设为空数组，例如 `outputs: []`。
+如果配方只有流体输入或输出，请使用对象写法并省略未使用的物品列表。`ingredients` 本身仍是 Schema 的必填字段；没有物品输入时写成 `ingredients: []` 即可。
 
 ### 添加模具和等级
 
@@ -113,8 +113,7 @@ ServerEvents.recipes(event => {
         ],
         tier: 5,
         energy: 500000,
-        process_time: 200,
-        mode: 'press'
+        process_time: 200
     })
 })
 ```
@@ -151,16 +150,14 @@ ServerEvents.recipes(event => {
 | `id` | String | 是 | - | 配方数据 ID，例如 `kubejs:iron_alloy` |
 | `ingredients` | Object[] | 是 | - | 输入物列表，每项包含 `ingredient` 和可选的 `count` |
 | `input_fluids` | Object[] | 否 | `[]` | 流体输入列表，每项包含流体 `ingredient` 和 `amount` |
-| `outputs` | ItemStack[] | 是 | - | 输出物列表，可使用字符串或 `Item.of(...)` |
+| `outputs` | ItemStack[] | 否 | `[]` | 输出物列表，可使用字符串或 `Item.of(...)` |
 | `output_fluids` | FluidStack[] | 否 | `[]` | 流体输出列表，可使用 `Fluid.of(...)` |
 | `mold` | Ingredient | 否 | 空 | 单个模具要求，可使用物品 ID 或标签 |
 | `molds` | Ingredient[] | 否 | 空 | 多个独立模具要求，不能与 `mold` 同时使用 |
 | `tier` | Integer | 否 | 未指定 | 线圈最低等级，范围为 `0-10` |
 | `energy` | Long | 否 | `2000` | 一次处理消耗的能量 |
 | `process_time` | Integer | 否 | `200` | 处理时间，单位为 tick |
-| `catalyst` | Ingredient | 否 | 空 | 催化剂要求 |
-| `catalyst_uses` | Integer | 否 | `0` | 催化剂可使用次数 |
-| `mode` | String | 否 | `normal` | 工作模式：`normal`、`insolator` 或 `press` |
+| `catalyst` | Ingredient | 否 | 空 | 催化剂要求；当前万象合金炉运行逻辑不会消耗催化剂 |
 
 ### 物品输入格式
 
@@ -207,6 +204,22 @@ output_fluids: [
     Fluid.of('minecraft:water', 1000),
     Fluid.of('minecraft:lava', 250)
 ]
+```
+
+物品输出不是必填项，因此配方也可以只产出流体：
+
+```javascript
+ServerEvents.recipes(event => {
+    event.recipes.useless_mod.advanced_alloy_furnace({
+        id: 'kubejs:fluid_only_alloy',
+        ingredients: [
+            { ingredient: 'minecraft:iron_ingot', count: 1 }
+        ],
+        output_fluids: [
+            Fluid.of('minecraft:lava', 1000)
+        ]
+    })
+})
 ```
 
 ## 配方等级
@@ -290,9 +303,7 @@ ServerEvents.recipes(event => {
         tier: 3,
         energy: 100000,
         process_time: 100,
-        catalyst: 'minecraft:diamond',
-        catalyst_uses: 8,
-        mode: 'normal'
+        catalyst: 'minecraft:diamond'
     })
 })
 ```
@@ -318,7 +329,6 @@ ServerEvents.recipes(event => {
                 amount: 1000
             }
         ],
-        outputs: [],
         output_fluids: [
             { id: 'minecraft:water', amount: 1000 }
         ],
@@ -332,7 +342,7 @@ ServerEvents.recipes(event => {
 ## 最佳实践
 
 1. 使用自己的模组 ID 或 `kubejs:` 作为配方 ID 前缀，避免覆盖其他配方。
-2. 输入物数量使用正数，并确认输出列表至少包含一个有效物品。
+2. 输入物数量使用正数，并确认 `outputs` 或 `output_fluids` 中至少有一个有效输出。
 3. 替换配方时先删除旧配方，再使用相同的 `id` 添加新配方。
 4. 多模具配方使用对象写法，避免依赖位置参数。
 5. 只有需要覆盖配置等级时才填写 `tier`；不填写可以继续由服务器配置统一管理。
@@ -344,8 +354,8 @@ ServerEvents.recipes(event => {
 
 1. 检查游戏日志中是否有 KubeJS 配方创建错误。
 2. 确认 `id` 是合法的资源位置格式：`namespace:path`。
-3. 确认 `ingredients`、`outputs` 和 `id` 都已填写。
+3. 确认 `ingredients` 和 `id` 已填写，并确认 `outputs` 或 `output_fluids` 中至少有一个有效输出。
 4. 确认没有同时填写 `mold` 和 `molds`。
-5. 检查线圈等级、模具、输入数量和处理模式是否满足配方要求。
+5. 检查线圈等级、模具、输入数量和催化剂要求是否满足配方条件。
 6. 使用流体或 AE 化学物时，检查 `event.custom` 中的 JSON 字段名称和数量类型。
 7. 修改脚本后执行 `/reload`，并确认日志中没有脚本异常。

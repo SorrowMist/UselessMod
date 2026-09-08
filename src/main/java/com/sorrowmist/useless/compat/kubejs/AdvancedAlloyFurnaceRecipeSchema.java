@@ -54,7 +54,7 @@ public final class AdvancedAlloyFurnaceRecipeSchema {
     public static final RecipeKey<List<List<CustomObjectRecipeComponent.Value>>> INPUT_FLUIDS =
             SIZED_FLUID_INGREDIENT.asList().inputKey("input_fluids").optional(List.of());
     public static final RecipeKey<List<ItemStack>> OUTPUTS =
-            ITEM_STACK_LIST.outputKey("outputs");
+            ITEM_STACK_LIST.outputKey("outputs").optional(List.of());
     public static final RecipeKey<List<FluidStack>> OUTPUT_FLUIDS =
             FLUID_STACK_LIST.outputKey("output_fluids").optional(List.of());
     public static final RecipeKey<Ingredient> MOLD =
@@ -73,17 +73,13 @@ public final class AdvancedAlloyFurnaceRecipeSchema {
     public static final RecipeKey<Ingredient> CATALYST =
             IngredientComponent.OPTIONAL_INGREDIENT.instance()
                     .inputKey("catalyst").optional(Ingredient.EMPTY);
-    public static final RecipeKey<Integer> CATALYST_USES =
-            NumberComponent.INT.inputKey("catalyst_uses").optional(0);
-    public static final RecipeKey<String> MODE =
-            StringComponent.STRING.inputKey("mode").optional("normal");
 
     private AdvancedAlloyFurnaceRecipeSchema() {
     }
 
     public static final RecipeSchema SCHEMA = new RecipeSchema(
             ID, INGREDIENTS, OUTPUTS, INPUT_FLUIDS, OUTPUT_FLUIDS, MOLD, MOLDS, TIER,
-            ENERGY, PROCESS_TIME, CATALYST, CATALYST_USES, MODE
+            ENERGY, PROCESS_TIME, CATALYST
     )
             .constructor(ID, INGREDIENTS, OUTPUTS)
             .constructor(ID, INGREDIENTS, OUTPUTS, MOLD)

@@ -82,7 +82,7 @@ public final class AdvancedAlloyFurnaceRecipeSchema {
     }
 
     public static final RecipeSchema SCHEMA = new RecipeSchema(
-            ID, INGREDIENTS, INPUT_FLUIDS, OUTPUTS, OUTPUT_FLUIDS, MOLD, MOLDS, TIER,
+            ID, INGREDIENTS, OUTPUTS, INPUT_FLUIDS, OUTPUT_FLUIDS, MOLD, MOLDS, TIER,
             ENERGY, PROCESS_TIME, CATALYST, CATALYST_USES, MODE
     )
             .constructor(ID, INGREDIENTS, OUTPUTS)

@@ -1,25 +1,22 @@
 package com.sorrowmist.useless.client.gui;
 
 import com.mojang.blaze3d.platform.InputConstants;
-import com.mojang.blaze3d.systems.RenderSystem;
-import com.mojang.blaze3d.vertex.*;
-import com.sorrowmist.useless.api.enums.tool.EnchantMode;
 import com.sorrowmist.useless.api.enums.tool.ConstructionWandCoreMode;
+import com.sorrowmist.useless.api.enums.tool.EnchantMode;
 import com.sorrowmist.useless.api.enums.tool.ModeTypeEnum;
 import com.sorrowmist.useless.api.enums.tool.ToolTypeMode;
-import com.sorrowmist.useless.core.common.KeyBindings;
-import com.sorrowmist.useless.core.component.UComponents;
 import com.sorrowmist.useless.content.items.BeefToolVariants;
+import com.sorrowmist.useless.content.items.EndlessBeafItem;
+import com.sorrowmist.useless.core.component.UComponents;
 import com.sorrowmist.useless.network.ConstructionWandCorePacket;
 import com.sorrowmist.useless.network.EnchantmentSwitchPacket;
 import com.sorrowmist.useless.network.ModeTogglePacket;
 import com.sorrowmist.useless.network.ToolTypeModeSwitchPacket;
-import net.minecraft.client.Minecraft;
+import com.sorrowmist.useless.utils.UselessItemUtils;
 import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.components.Renderable;
 import net.minecraft.client.gui.screens.Screen;
-import net.minecraft.client.renderer.GameRenderer;
 import net.minecraft.network.chat.Component;
-import net.minecraft.util.Mth;
 import net.minecraft.world.item.ItemStack;
 import net.neoforged.fml.ModList;
 import net.neoforged.neoforge.network.PacketDistributor;
@@ -28,264 +25,336 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class ModeWheelScreen extends Screen {
-    private static final float DISC_RADIUS = 60.0f;
-    private static final float DISC_SPACING = 150.0f;
-    private static final float PRECISION = 5.0f;
-
-    private static final int COL_ACTIVE_R = 80, COL_ACTIVE_G = 180, COL_ACTIVE_B = 80, COL_ACTIVE_A = 140;
-    private static final int COL_HOVER_R = 63, COL_HOVER_G = 161, COL_HOVER_B = 191, COL_HOVER_A = 160;
+    private static final int PANEL_MAX_WIDTH = 420;
+    private static final int PANEL_MARGIN = 8;
+    private static final int SECTION_COLUMN_GAP = 6;
+    private static final int SECTION_CONTENT_TOP = 21;
+    private static final int SECTION_TITLE_HEIGHT = 15;
+    private static final int SECTION_BOTTOM_PADDING = 6;
+    private static final int PANEL_BOTTOM_PADDING = 8;
+    private static final int DEFAULT_BUTTON_HEIGHT = 18;
 
     private static final boolean hasGtceuMod = ModList.get().isLoaded("gtceu");
     private static final boolean hasOmnitoolMod = ModList.get().isLoaded("omnitools");
     private static final boolean hasAE2 = ModList.get().isLoaded("ae2");
-    private final List<ModeData> leftModes = new ArrayList<>();
-    private final List<ModeData> middleModes = new ArrayList<>();
-    private final List<ModeData> rightModes = new ArrayList<>();
-    private final List<ModeData> forceKillModes = new ArrayList<>();
-    private final List<ModeData> constructionWandModes = new ArrayList<>();
-    private ItemStack mainHandItem;
-    private boolean showMiddleDisc;
-    private float totalTime, prevTick, extraTick;
 
-    public ModeWheelScreen(ItemStack mainHandItem) {
-        super(Component.literal("Mode Wheel"));
-        this.mainHandItem = mainHandItem;
-        this.minecraft = Minecraft.getInstance();
-        this.showMiddleDisc = false;
+    private final List<ModeData> toolModes = new ArrayList<>();
+    private final List<ModeData> miningModes = new ArrayList<>();
+    private final List<ModeData> combatModes = new ArrayList<>();
+    private final List<ModeData> auxiliaryModes = new ArrayList<>();
+    private final List<PressableAE2Button> modeButtons = new ArrayList<>();
+
+    private ItemStack targetItem;
+    private List<SectionLayout> sectionLayouts = List.of();
+    private String modeLayoutSignature = "";
+    private int panelLeft;
+    private int panelTop;
+    private int panelWidth;
+    private int panelHeight;
+    private int buttonHeight;
+    private int buttonGap;
+    private int sectionGap;
+
+    public ModeWheelScreen(ItemStack targetItem) {
+        super(Component.translatable("gui.useless_mod.mode_config.title"));
+        this.targetItem = targetItem;
         this.loadModesFromEnums();
     }
 
-
     private void loadModesFromEnums() {
-        this.leftModes.clear();
-        this.middleModes.clear();
-        this.rightModes.clear();
-        this.forceKillModes.clear();
-        this.constructionWandModes.clear();
+        this.toolModes.clear();
+        this.miningModes.clear();
+        this.combatModes.clear();
+        this.auxiliaryModes.clear();
 
-        EnchantMode currentEnchant = this.mainHandItem.get(UComponents.EnchantModeComponent);
-        ToolTypeMode currentTool = this.mainHandItem.get(UComponents.CurrentToolTypeComponent);
-        boolean chainMiningEnabled = this.mainHandItem.getOrDefault(UComponents.EnhancedChainMiningComponent, false);
-        boolean forceMiningEnabled = this.mainHandItem.getOrDefault(UComponents.ForceMiningComponent, false);
-        boolean aeStorageEnabled = this.mainHandItem.getOrDefault(UComponents.AEStoragePriorityComponent, false);
-        boolean forceKillEnabled = this.mainHandItem.getOrDefault(UComponents.ForceKillEnabledComponent, false);
-        boolean beefTimeAccelerationEnabled = this.mainHandItem.getOrDefault(UComponents.BeefTimeAccelerationEnabledComponent, false);
-        boolean beefInvulnerabilityEnabled = this.mainHandItem.getOrDefault(UComponents.BeefInvulnerabilityEnabledComponent, false);
-        boolean beefCaptureEnabled = this.mainHandItem.getOrDefault(UComponents.BeefCaptureEnabledComponent, false);
-        boolean beefTeleportEnabled = this.mainHandItem.getOrDefault(UComponents.BeefTeleportEnabledComponent, false);
-        boolean beefAoeDamageEnabled = this.mainHandItem.getOrDefault(UComponents.BeefAoeDamageEnabledComponent, false);
-        boolean beefMagnetEnabled = this.mainHandItem.getOrDefault(UComponents.BeefMagnetEnabledComponent, false);
-        boolean wrenchTagEnabled = this.mainHandItem.getOrDefault(UComponents.WrenchTagEnabledComponent, true);
-        boolean constructionWandEnabled = this.mainHandItem.getOrDefault(
+        if (this.targetItem == null || this.targetItem.isEmpty()) {
+            return;
+        }
+
+        EnchantMode currentEnchant = this.targetItem.get(UComponents.EnchantModeComponent);
+        ToolTypeMode currentTool = this.targetItem.get(UComponents.CurrentToolTypeComponent);
+        boolean chainMiningEnabled = this.targetItem.getOrDefault(UComponents.EnhancedChainMiningComponent, false);
+        boolean forceMiningEnabled = this.targetItem.getOrDefault(UComponents.ForceMiningComponent, false);
+        boolean aeStorageEnabled = this.targetItem.getOrDefault(UComponents.AEStoragePriorityComponent, false);
+        boolean forceKillEnabled = this.targetItem.getOrDefault(UComponents.ForceKillEnabledComponent, false);
+        boolean beefTimeAccelerationEnabled = this.targetItem.getOrDefault(
+                UComponents.BeefTimeAccelerationEnabledComponent, false);
+        boolean beefInvulnerabilityEnabled = this.targetItem.getOrDefault(
+                UComponents.BeefInvulnerabilityEnabledComponent, false);
+        boolean beefCaptureEnabled = this.targetItem.getOrDefault(UComponents.BeefCaptureEnabledComponent, false);
+        boolean beefTeleportEnabled = this.targetItem.getOrDefault(UComponents.BeefTeleportEnabledComponent, false);
+        boolean beefAoeDamageEnabled = this.targetItem.getOrDefault(UComponents.BeefAoeDamageEnabledComponent, false);
+        boolean beefMagnetEnabled = this.targetItem.getOrDefault(UComponents.BeefMagnetEnabledComponent, false);
+        boolean wrenchTagEnabled = this.targetItem.getOrDefault(UComponents.WrenchTagEnabledComponent, true);
+        boolean constructionWandEnabled = this.targetItem.getOrDefault(
                 UComponents.ConstructionWandEnabledComponent, false);
-        ConstructionWandCoreMode constructionWandCore = this.mainHandItem.getOrDefault(
+        ConstructionWandCoreMode constructionWandCore = this.targetItem.getOrDefault(
                 UComponents.ConstructionWandCoreComponent, ConstructionWandCoreMode.DEFAULT);
 
-        // 左：附魔模式
-        for (EnchantMode m : EnchantMode.values())
-            this.leftModes.add(new ModeData(m, m.getTooltip(), m == currentEnchant));
-
-        this.forceKillModes.add(new ModeData(
-                ModeTypeEnum.FORCE_KILL,
-                ModeTypeEnum.FORCE_KILL.getTooltip(),
-                forceKillEnabled
-        ));
-        if (this.mainHandItem.getItem() instanceof com.sorrowmist.useless.content.items.EndlessBeafItem) {
-            this.forceKillModes.add(new ModeData(
-                    ModeTypeEnum.getBeefTimeAccelerationMode(beefTimeAccelerationEnabled),
-                    ModeTypeEnum.getBeefTimeAccelerationMode(beefTimeAccelerationEnabled).getTooltip(),
-                    beefTimeAccelerationEnabled
-            ));
+        for (EnchantMode mode : EnchantMode.values()) {
+            this.toolModes.add(new ModeData(mode, mode.getTooltip(), mode == currentEnchant));
         }
-        this.forceKillModes.add(new ModeData(
-                ModeTypeEnum.getBeefInvulnerabilityMode(beefInvulnerabilityEnabled),
-                ModeTypeEnum.getBeefInvulnerabilityMode(beefInvulnerabilityEnabled).getTooltip(),
-                beefInvulnerabilityEnabled
-        ));
-        if (this.mainHandItem.getItem() instanceof com.sorrowmist.useless.content.items.EndlessBeafItem) {
-            this.forceKillModes.add(new ModeData(
-                    ModeTypeEnum.getBeefCaptureMode(beefCaptureEnabled),
-                    ModeTypeEnum.getBeefCaptureMode(beefCaptureEnabled).getTooltip(),
-                    beefCaptureEnabled
-            ));
-            this.forceKillModes.add(new ModeData(
-                    ModeTypeEnum.getBeefTeleportMode(beefTeleportEnabled),
-                    ModeTypeEnum.getBeefTeleportMode(beefTeleportEnabled).getTooltip(),
-                    beefTeleportEnabled
-            ));
-            this.forceKillModes.add(new ModeData(
-                    ModeTypeEnum.getBeefAoeDamageMode(beefAoeDamageEnabled),
-                    ModeTypeEnum.getBeefAoeDamageMode(beefAoeDamageEnabled).getTooltip(),
-                    beefAoeDamageEnabled
-            ));
-            this.forceKillModes.add(new ModeData(
-                    ModeTypeEnum.getBeefMagnetMode(beefMagnetEnabled),
-                    ModeTypeEnum.getBeefMagnetMode(beefMagnetEnabled).getTooltip(),
-                    beefMagnetEnabled
-            ));
-        }
-
-        for (ToolTypeMode m : ToolTypeMode.values()) {
-            boolean shouldAdd = switch (m) {
-                // NONE_MODE - 只有在有其他模式可用时才添加
+        for (ToolTypeMode mode : ToolTypeMode.values()) {
+            boolean shouldAdd = switch (mode) {
                 case NONE_MODE -> hasGtceuMod || hasOmnitoolMod;
-                // gtceu
                 case WRENCH_MODE, SCREWDRIVER_MODE, MALLET_MODE, CROWBAR_MODE, HAMMER_MODE -> hasGtceuMod;
-                // omnitool
                 case OMNITOOL_MODE -> hasOmnitoolMod;
             };
-            // 根据模式类型和模组依赖决定是否添加
             if (shouldAdd) {
-                this.middleModes.add(new ModeData(m, m.getTooltip(), m == currentTool));
+                this.toolModes.add(new ModeData(mode, mode.getTooltip(), mode == currentTool));
             }
         }
 
-        // 如果有可用的工具模式，则显示中间轮盘
-        this.showMiddleDisc = !this.middleModes.isEmpty();
-
-        // 右：功能模式
-        // 1. 增强连锁挖矿模式
-        this.rightModes.add(new ModeData(
-                ModeTypeEnum.getEnhancedChainMiningMode(chainMiningEnabled),
-                ModeTypeEnum.getEnhancedChainMiningMode(chainMiningEnabled).getTooltip(),
-                chainMiningEnabled
-        ));
-
-        // 2. 强制挖掘
-        this.rightModes.add(new ModeData(
-                ModeTypeEnum.getForceMiningMode(forceMiningEnabled),
-                ModeTypeEnum.getForceMiningMode(forceMiningEnabled).getTooltip(),
-                forceMiningEnabled
-        ));
-
-        // 3. AE存储优先（仅当AE2模组存在时）
-        if (hasAE2) {
-            this.rightModes.add(new ModeData(
-                    ModeTypeEnum.getAEStoragePriorityMode(aeStorageEnabled),
-                    ModeTypeEnum.getAEStoragePriorityMode(aeStorageEnabled).getTooltip(),
-                    aeStorageEnabled
-            ));
-        }
-
-        if (BeefToolVariants.isBaseVariant(this.mainHandItem)) {
-            this.rightModes.add(new ModeData(
-                    ModeTypeEnum.getWrenchTagMode(wrenchTagEnabled),
-                    ModeTypeEnum.getWrenchTagMode(wrenchTagEnabled).getTooltip(),
-                    wrenchTagEnabled
-            ));
-        }
-
-        if (this.mainHandItem.getItem() instanceof com.sorrowmist.useless.content.items.EndlessBeafItem) {
-            this.constructionWandModes.add(new ModeData(
+        if (this.targetItem.getItem() instanceof EndlessBeafItem) {
+            this.miningModes.add(new ModeData(
                     ModeTypeEnum.getConstructionWandMode(constructionWandEnabled),
                     ModeTypeEnum.getConstructionWandMode(constructionWandEnabled).getTooltip(),
-                    constructionWandEnabled
-            ));
-            this.constructionWandModes.add(new ModeData(
+                    constructionWandEnabled));
+            this.miningModes.add(new ModeData(
                     ModeTypeEnum.CONSTRUCTION_WAND_ANGEL_CORE,
                     ModeTypeEnum.CONSTRUCTION_WAND_ANGEL_CORE.getTooltip(),
-                    constructionWandCore == ConstructionWandCoreMode.ANGEL
-            ));
-            this.constructionWandModes.add(new ModeData(
+                    constructionWandCore == ConstructionWandCoreMode.ANGEL));
+            this.miningModes.add(new ModeData(
                     ModeTypeEnum.CONSTRUCTION_WAND_DESTRUCTION_CORE,
                     ModeTypeEnum.CONSTRUCTION_WAND_DESTRUCTION_CORE.getTooltip(),
-                    constructionWandCore == ConstructionWandCoreMode.DESTRUCTION
-            ));
+                    constructionWandCore == ConstructionWandCoreMode.DESTRUCTION));
+        }
+        this.miningModes.add(new ModeData(
+                ModeTypeEnum.getEnhancedChainMiningMode(chainMiningEnabled),
+                ModeTypeEnum.getEnhancedChainMiningMode(chainMiningEnabled).getTooltip(),
+                chainMiningEnabled));
+        this.miningModes.add(new ModeData(
+                ModeTypeEnum.getForceMiningMode(forceMiningEnabled),
+                ModeTypeEnum.getForceMiningMode(forceMiningEnabled).getTooltip(),
+                forceMiningEnabled));
+        if (hasAE2) {
+            this.miningModes.add(new ModeData(
+                    ModeTypeEnum.getAEStoragePriorityMode(aeStorageEnabled),
+                    ModeTypeEnum.getAEStoragePriorityMode(aeStorageEnabled).getTooltip(),
+                    aeStorageEnabled));
+        }
+        if (BeefToolVariants.isBaseVariant(this.targetItem)) {
+            this.miningModes.add(new ModeData(
+                    ModeTypeEnum.getWrenchTagMode(wrenchTagEnabled),
+                    ModeTypeEnum.getWrenchTagMode(wrenchTagEnabled).getTooltip(),
+                    wrenchTagEnabled));
+        }
+
+        this.combatModes.add(new ModeData(
+                ModeTypeEnum.FORCE_KILL,
+                ModeTypeEnum.FORCE_KILL.getTooltip(),
+                forceKillEnabled));
+        if (this.targetItem.getItem() instanceof EndlessBeafItem) {
+            this.combatModes.add(new ModeData(
+                    ModeTypeEnum.getBeefCaptureMode(beefCaptureEnabled),
+                    ModeTypeEnum.getBeefCaptureMode(beefCaptureEnabled).getTooltip(),
+                    beefCaptureEnabled));
+            this.combatModes.add(new ModeData(
+                    ModeTypeEnum.getBeefAoeDamageMode(beefAoeDamageEnabled),
+                    ModeTypeEnum.getBeefAoeDamageMode(beefAoeDamageEnabled).getTooltip(),
+                    beefAoeDamageEnabled));
+        }
+
+        if (this.targetItem.getItem() instanceof EndlessBeafItem) {
+            this.auxiliaryModes.add(new ModeData(
+                    ModeTypeEnum.getBeefTimeAccelerationMode(beefTimeAccelerationEnabled),
+                    ModeTypeEnum.getBeefTimeAccelerationMode(beefTimeAccelerationEnabled).getTooltip(),
+                    beefTimeAccelerationEnabled));
+        }
+        this.auxiliaryModes.add(new ModeData(
+                ModeTypeEnum.getBeefInvulnerabilityMode(beefInvulnerabilityEnabled),
+                ModeTypeEnum.getBeefInvulnerabilityMode(beefInvulnerabilityEnabled).getTooltip(),
+                beefInvulnerabilityEnabled));
+        if (this.targetItem.getItem() instanceof EndlessBeafItem) {
+            this.auxiliaryModes.add(new ModeData(
+                    ModeTypeEnum.getBeefTeleportMode(beefTeleportEnabled),
+                    ModeTypeEnum.getBeefTeleportMode(beefTeleportEnabled).getTooltip(),
+                    beefTeleportEnabled));
+            this.auxiliaryModes.add(new ModeData(
+                    ModeTypeEnum.getBeefMagnetMode(beefMagnetEnabled),
+                    ModeTypeEnum.getBeefMagnetMode(beefMagnetEnabled).getTooltip(),
+                    beefMagnetEnabled));
         }
     }
 
     @Override
-    public void render(GuiGraphics g, int mouseX, int mouseY, float pt) {
-        PoseStack ms = g.pose();
+    protected void init() {
+        super.init();
+        this.calculateLayout();
+        this.sectionLayouts = this.createSectionLayouts();
+        this.modeButtons.clear();
 
-        // 实时从玩家主手获取最新物品，确保获取到服务器端同步的最新状态
-        if (this.minecraft != null && this.minecraft.player != null) {
-            ItemStack currentMainHand = this.minecraft.player.getMainHandItem();
-            if (!currentMainHand.isEmpty() && currentMainHand.getItem() instanceof com.sorrowmist.useless.content.items.EndlessBeafItem) {
-                // 只有当主手物品是EndlessBeafItem时才更新
-                this.mainHandItem = currentMainHand;
-                this.loadModesFromEnums();
+        for (SectionLayout section : this.sectionLayouts) {
+            int buttonWidth = Math.max(1,
+                    (section.width() - 12 - this.buttonGap) / 2);
+            List<ModeData> modes = section.modes();
+            for (int i = 0; i < modes.size(); i++) {
+                ModeData mode = modes.get(i);
+                int column = i % 2;
+                int row = i / 2;
+                int x = section.left() + 6 + column * (buttonWidth + this.buttonGap);
+                int y = section.top() + SECTION_TITLE_HEIGHT + row * (this.buttonHeight + this.buttonGap);
+                PressableAE2Button button = this.addRenderableWidget(new PressableAE2Button(
+                        x, y, buttonWidth, this.buttonHeight, this.buttonMessage(mode),
+                        ignored -> this.onModeSelected(mode.mode())));
+                this.modeButtons.add(button);
             }
         }
-
-        float curr = this.minecraft != null ? this.minecraft.getFrameTimeNs() : 0;
-        this.totalTime += (curr + this.extraTick - this.prevTick) / 20f;
-        this.extraTick = 0;
-        this.prevTick = curr;
-
-        float anim = Mth.clamp(this.totalTime / 0.25f, 0, 1);
-        anim = (float) (1 - Math.pow(1 - anim, 3));
-
-        int cy = this.height / 2;
-        int centerX = this.width / 2;
-
-        int constructionX, lx, mx, rx, fx;
-
-        if (this.showMiddleDisc) {
-            constructionX = (int) (centerX - DISC_SPACING * 2.0F);
-            lx = (int) (centerX - DISC_SPACING);
-            mx = centerX;
-            rx = (int) (centerX + DISC_SPACING);
-            fx = (int) (centerX + DISC_SPACING * 2.0F);
-        } else {
-            constructionX = (int) (centerX - DISC_SPACING * 1.5F);
-            lx = (int) (centerX - DISC_SPACING * 0.5F);
-            mx = centerX; // 不使用
-            rx = (int) (centerX + DISC_SPACING * 0.5F);
-            fx = (int) (centerX + DISC_SPACING * 1.5F);
-        }
-
-        ms.pushPose();
-
-        RenderSystem.enableBlend();
-        RenderSystem.defaultBlendFunc();
-        RenderSystem.disableDepthTest();
-        RenderSystem.disableCull();
-        RenderSystem.setShader(GameRenderer::getPositionColorShader);
-
-        Tesselator t = Tesselator.getInstance();
-        BufferBuilder buf = t.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_COLOR);
-
-        this.drawDisc(buf, constructionX, cy, this.constructionWandModes, mouseX, mouseY, anim);
-        this.drawDisc(buf, lx, cy, this.leftModes, mouseX, mouseY, anim);
-        if (this.showMiddleDisc)
-            this.drawDisc(buf, mx, cy, this.middleModes, mouseX, mouseY, anim);
-        this.drawDisc(buf, rx, cy, this.rightModes, mouseX, mouseY, anim);
-        this.drawDisc(buf, fx, cy, this.forceKillModes, mouseX, mouseY, anim);
-
-        BufferUploader.drawWithShader(buf.buildOrThrow());
-
-        buf = t.begin(VertexFormat.Mode.DEBUG_LINES, DefaultVertexFormat.POSITION_COLOR);
-        this.drawDividers(buf, constructionX, cy, this.constructionWandModes.size(), anim);
-        this.drawDividers(buf, lx, cy, this.leftModes.size(), anim);
-        if (this.showMiddleDisc)
-            this.drawDividers(buf, mx, cy, this.middleModes.size(), anim);
-        this.drawDividers(buf, rx, cy, this.rightModes.size(), anim);
-        this.drawDividers(buf, fx, cy, this.forceKillModes.size(), anim);
-
-        BufferUploader.drawWithShader(buf.buildOrThrow());
-
-        RenderSystem.enableDepthTest();
-        RenderSystem.enableCull();
-        RenderSystem.disableBlend();
-
-        this.drawModeNames(g, constructionX, cy, this.constructionWandModes, anim);
-        this.drawModeNames(g, lx, cy, this.leftModes, anim);
-        if (this.showMiddleDisc)
-            this.drawModeNames(g, mx, cy, this.middleModes, anim);
-        this.drawModeNames(g, rx, cy, this.rightModes, anim);
-        this.drawModeNames(g, fx, cy, this.forceKillModes, anim);
-
-        this.drawHover(g, constructionX, cy, this.constructionWandModes, mouseX, mouseY);
-        this.drawHover(g, lx, cy, this.leftModes, mouseX, mouseY);
-        if (this.showMiddleDisc)
-            this.drawHover(g, mx, cy, this.middleModes, mouseX, mouseY);
-        this.drawHover(g, rx, cy, this.rightModes, mouseX, mouseY);
-        this.drawHover(g, fx, cy, this.forceKillModes, mouseX, mouseY);
-
-        ms.popPose();
+        this.modeLayoutSignature = this.modeLayoutSignature();
     }
 
+    private void calculateLayout() {
+        this.panelWidth = Math.max(1, Math.min(PANEL_MAX_WIDTH, this.width - PANEL_MARGIN * 2));
+        this.buttonHeight = DEFAULT_BUTTON_HEIGHT;
+        this.buttonGap = this.height < 260 ? 1 : 2;
+        this.sectionGap = this.height < 260 ? 4 : 6;
+
+        int availableHeight = Math.max(1, this.height - PANEL_MARGIN * 2);
+        int desiredHeight = this.calculatePanelHeight();
+        while (desiredHeight > availableHeight && this.buttonHeight > 10) {
+            this.buttonHeight--;
+            desiredHeight = this.calculatePanelHeight();
+        }
+        this.panelHeight = desiredHeight;
+        this.panelLeft = (this.width - this.panelWidth) / 2;
+        this.panelTop = Math.max(PANEL_MARGIN, (this.height - this.panelHeight) / 2);
+    }
+
+    private int calculatePanelHeight() {
+        int topRowHeight = Math.max(
+                this.sectionHeight(this.toolModes),
+                this.sectionHeight(this.miningModes));
+        int bottomRowHeight = Math.max(
+                this.sectionHeight(this.combatModes),
+                this.sectionHeight(this.auxiliaryModes));
+        return SECTION_CONTENT_TOP + topRowHeight + this.sectionGap
+                + bottomRowHeight + PANEL_BOTTOM_PADDING;
+    }
+
+    private int sectionHeight(List<ModeData> modes) {
+        int rows = Math.max(1, (modes.size() + 1) / 2);
+        return SECTION_TITLE_HEIGHT + rows * this.buttonHeight
+                + Math.max(0, rows - 1) * this.buttonGap + SECTION_BOTTOM_PADDING;
+    }
+
+    private List<SectionLayout> createSectionLayouts() {
+        int sectionWidth = Math.max(1,
+                (this.panelWidth - PANEL_MARGIN * 2 - SECTION_COLUMN_GAP) / 2);
+        int leftColumn = this.panelLeft + PANEL_MARGIN;
+        int rightColumn = leftColumn + sectionWidth + SECTION_COLUMN_GAP;
+        int top = this.panelTop + SECTION_CONTENT_TOP;
+        int topHeight = Math.max(this.sectionHeight(this.toolModes), this.sectionHeight(this.miningModes));
+        int bottom = top + topHeight + this.sectionGap;
+
+        return List.of(
+                new SectionLayout(Component.translatable("gui.useless_mod.mode_config.tools"),
+                        this.toolModes, leftColumn, top, sectionWidth, this.sectionHeight(this.toolModes)),
+                new SectionLayout(Component.translatable("gui.useless_mod.mode_config.mining"),
+                        this.miningModes, rightColumn, top, sectionWidth, this.sectionHeight(this.miningModes)),
+                new SectionLayout(Component.translatable("gui.useless_mod.mode_config.combat"),
+                        this.combatModes, leftColumn, bottom, sectionWidth, this.sectionHeight(this.combatModes)),
+                new SectionLayout(Component.translatable("gui.useless_mod.mode_config.auxiliary"),
+                        this.auxiliaryModes, rightColumn, bottom, sectionWidth,
+                        this.sectionHeight(this.auxiliaryModes))
+        );
+    }
+
+    private Component buttonMessage(ModeData mode) {
+        if (this.isExclusiveMode(mode.mode())) {
+            return mode.active()
+                    ? Component.translatable("gui.useless_mod.mode_config.current", mode.name())
+                    : mode.name();
+        }
+        return Component.translatable(
+                "gui.useless_mod.mode_config.state",
+                mode.name(),
+                Component.translatable(mode.active()
+                        ? "tooltip.useless_mod.enable"
+                        : "tooltip.useless_mod.disable"));
+    }
+
+    private boolean isExclusiveMode(Object mode) {
+        return mode instanceof EnchantMode
+                || mode instanceof ToolTypeMode
+                || mode == ModeTypeEnum.CONSTRUCTION_WAND_ANGEL_CORE
+                || mode == ModeTypeEnum.CONSTRUCTION_WAND_DESTRUCTION_CORE;
+    }
+
+    @Override
+    public void tick() {
+        super.tick();
+        this.refreshTargetAndModes();
+    }
+
+    private void refreshTargetAndModes() {
+        if (this.minecraft == null || this.minecraft.player == null) {
+            return;
+        }
+
+        var target = UselessItemUtils.findTargetToolInHands(this.minecraft.player);
+        if (target.isEmpty()) {
+            this.onClose();
+            return;
+        }
+
+        this.targetItem = target.get().getKey();
+        this.loadModesFromEnums();
+        String newSignature = this.modeLayoutSignature();
+        if (!newSignature.equals(this.modeLayoutSignature)
+                || this.modeButtons.size() != this.modeCount()) {
+            this.rebuildWidgets();
+        } else {
+            this.updateModeButtons();
+        }
+    }
+
+    private void updateModeButtons() {
+        int buttonIndex = 0;
+        for (SectionLayout section : this.createSectionLayouts()) {
+            for (ModeData mode : section.modes()) {
+                PressableAE2Button button = this.modeButtons.get(buttonIndex++);
+                button.setMessage(this.buttonMessage(mode));
+            }
+        }
+    }
+
+    private int modeCount() {
+        return this.toolModes.size() + this.miningModes.size()
+                + this.combatModes.size() + this.auxiliaryModes.size();
+    }
+
+    private String modeLayoutSignature() {
+        StringBuilder signature = new StringBuilder();
+        for (List<ModeData> section : List.of(
+                this.toolModes, this.miningModes, this.combatModes, this.auxiliaryModes)) {
+            signature.append('|');
+            for (ModeData mode : section) {
+                signature.append(mode.name().getString()).append(';');
+            }
+        }
+        return signature.toString();
+    }
+
+    @Override
+    public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
+        MachineScreenStyle.drawPanel(graphics, this.panelLeft, this.panelTop,
+                this.panelWidth, this.panelHeight);
+        graphics.drawString(this.font, this.title,
+                this.panelLeft + PANEL_MARGIN, this.panelTop + 7,
+                MachineScreenStyle.TEXT_COLOR, false);
+
+        for (SectionLayout section : this.sectionLayouts) {
+            MachineScreenStyle.drawInset(graphics, section.left(), section.top(),
+                    section.left() + section.width(), section.top() + section.height());
+            graphics.drawString(this.font, section.title(),
+                    section.left() + 6, section.top() + 4,
+                    MachineScreenStyle.TEXT_COLOR, false);
+        }
+
+        for (Renderable renderable : this.renderables) {
+            renderable.render(graphics, mouseX, mouseY, partialTick);
+        }
+    }
 
     @Override
     public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
@@ -296,184 +365,55 @@ public class ModeWheelScreen extends Screen {
         return super.keyPressed(keyCode, scanCode, modifiers);
     }
 
-    @Override public boolean shouldCloseOnEsc() {return true;}
-
     @Override
-    public void tick() {
-        if (this.totalTime < 0.25f)
-            this.extraTick++;
-
-        if (!InputConstants.isKeyDown(
-                Minecraft.getInstance().getWindow().getWindow(),
-                KeyBindings.SWITCH_MODE_WHEEL_KEY.get().getKey().getValue()
-        )) {
-            this.onClose();
-        }
-    }
-
-    @Override public boolean isPauseScreen() {return false;}
-
-    private void drawDisc(BufferBuilder buf, int cx, int cy,
-                          List<ModeData> modes,
-                          int mx, int my,
-                          float anim) {
-
-        if (modes.isEmpty()) return;
-
-        float rIn = 0.4f * DISC_RADIUS * anim;
-        float rOut = 1.0f * DISC_RADIUS * anim;
-
-        // 背景灰环
-        this.drawSlice(buf, cx, cy, 9, rIn, rOut, 0, 360, 80, 80, 80, 120);
-
-        int n = modes.size();
-
-        // —— 统一计算选中扇区 —— //
-        int sel = this.pickSliceIndex(mx, my, cx, cy, n, rIn, rOut);
-
-        for (int i = 0; i < n; i++) {
-
-            float aL = (((i - .5f) / n) + .25f) * 360;
-            float aR = (((i + .5f) / n) + .25f) * 360;
-
-            int adj = ((i + (n / 2 + 1)) % n) - 1;
-            if (adj == -1) adj = n - 1;
-
-            boolean active = modes.get(adj).active();
-            boolean hover = (sel == i);
-
-            // —— 绿色底色：已激活 —— //
-            if (active) {
-                this.drawSlice(buf, cx, cy, 10, rIn, rOut, aL, aR,
-                               COL_ACTIVE_R, COL_ACTIVE_G, COL_ACTIVE_B, COL_ACTIVE_A
-                );
-            }
-
-            // —— 蓝色覆盖层：悬停 —— //
-            if (hover) {
-                this.drawSlice(buf, cx, cy, 11, rIn, rOut, aL, aR,
-                               COL_HOVER_R, COL_HOVER_G, COL_HOVER_B, COL_HOVER_A
-                );
-            }
-        }
-    }
-
-    /**
-     * 统一计算扇区选择逻辑（渲染 / 点击复用）
-     */
-    private int pickSliceIndex(int mx, int my, int cx, int cy,
-                               int n, float rIn, float rOut) {
-
-        double ang = Math.toDegrees(Math.atan2(my - cy, mx - cx));
-        double dist = Math.hypot(mx - cx, my - cy);
-
-        if (dist < rIn || dist > rOut) return -1;
-
-        float slot0 = (((0 - .5f) / n) + .25f) * 360;
-        if (ang < slot0) ang += 360;
-
-        for (int i = 0; i < n; i++) {
-            float aL = (((i - .5f) / n) + .25f) * 360;
-            float aR = (((i + .5f) / n) + .25f) * 360;
-
-            if (ang >= aL && ang < aR)
-                return i;
-        }
-
-        return -1;
-    }
-
-    @Override
-    public boolean mouseClicked(double mx, double my, int btn) {
-        int cy = this.height / 2;
-        int centerX = this.width / 2;
-
-        int constructionX = this.showMiddleDisc
-                ? (int) (centerX - DISC_SPACING * 2.0F)
-                : (int) (centerX - DISC_SPACING * 1.5F);
-
-        int lx = this.showMiddleDisc
-                ? (int) (centerX - DISC_SPACING)
-                : (int) (centerX - DISC_SPACING * 0.5F);
-
-        int midX = this.showMiddleDisc
-                ? centerX
-                : centerX;
-
-        int rx = this.showMiddleDisc
-                ? (int) (centerX + DISC_SPACING)
-                : (int) (centerX + DISC_SPACING * 0.5F);
-
-        int fx = this.showMiddleDisc
-                ? (int) (centerX + DISC_SPACING * 2.0F)
-                : (int) (centerX + DISC_SPACING * 1.5F);
-
-        return this.checkClick((int) mx, (int) my, constructionX, cy, this.constructionWandModes)
-                || this.checkClick((int) mx, (int) my, lx, cy, this.leftModes)
-                || (this.showMiddleDisc && this.checkClick((int) mx, (int) my, midX, cy, this.middleModes))
-                || this.checkClick((int) mx, (int) my, rx, cy, this.rightModes)
-                || this.checkClick((int) mx, (int) my, fx, cy, this.forceKillModes)
-                || super.mouseClicked(mx, my, btn);
-    }
-
-    private boolean checkClick(int mx, int my, int cx, int cy, List<ModeData> modes) {
-        if (modes.isEmpty()) return false;
-
-        int n = modes.size();
-        int sel = this.pickSliceIndex(mx, my, cx, cy, n, DISC_RADIUS * 0.4f, DISC_RADIUS);
-        if (sel < 0) return false;
-
-        int adj = ((sel + (n / 2 + 1)) % n) - 1;
-        if (adj == -1) adj = n - 1;
-
-        Object mode = modes.get(adj).mode();
-
-        this.onModeSelected(mode);
-
-        this.onClose();
+    public boolean shouldCloseOnEsc() {
         return true;
     }
 
+    @Override
+    public boolean isPauseScreen() {
+        return false;
+    }
+
     private void onModeSelected(Object mode) {
-        if (mode instanceof EnchantMode em) {
-            PacketDistributor.sendToServer(new EnchantmentSwitchPacket(em));
-        } else if (mode instanceof ToolTypeMode tm) {
-            PacketDistributor.sendToServer(new ToolTypeModeSwitchPacket(tm));
-        } else if (mode instanceof ModeTypeEnum me) {
-            switch (me) {
+        if (mode instanceof EnchantMode enchantMode) {
+            PacketDistributor.sendToServer(new EnchantmentSwitchPacket(enchantMode));
+        } else if (mode instanceof ToolTypeMode toolTypeMode) {
+            PacketDistributor.sendToServer(new ToolTypeModeSwitchPacket(toolTypeMode));
+        } else if (mode instanceof ModeTypeEnum modeType) {
+            switch (modeType) {
                 case ENHANCED_CHAIN_MINING_ENABLED, ENHANCED_CHAIN_MINING_DISABLED -> {
-                    boolean currentEnabled = this.mainHandItem.getOrDefault(UComponents.EnhancedChainMiningComponent,
-                                                                            false
-                    );
-                    PacketDistributor.sendToServer(
-                            new ModeTogglePacket(ModeTogglePacket.ModeType.CHAIN_MINING, !currentEnabled));
+                    boolean currentEnabled = this.targetItem.getOrDefault(
+                            UComponents.EnhancedChainMiningComponent, false);
+                    PacketDistributor.sendToServer(new ModeTogglePacket(
+                            ModeTogglePacket.ModeType.CHAIN_MINING, !currentEnabled));
                 }
                 case FORCE_MINING_ENABLED, FORCE_MINING_DISABLED -> {
-                    boolean currentEnabled = this.mainHandItem.getOrDefault(UComponents.ForceMiningComponent, false);
-                    PacketDistributor.sendToServer(
-                            new ModeTogglePacket(ModeTogglePacket.ModeType.FORCE_MINING, !currentEnabled));
+                    boolean currentEnabled = this.targetItem.getOrDefault(
+                            UComponents.ForceMiningComponent, false);
+                    PacketDistributor.sendToServer(new ModeTogglePacket(
+                            ModeTogglePacket.ModeType.FORCE_MINING, !currentEnabled));
                 }
                 case AE_STORAGE_PRIORITY_ENABLED, AE_STORAGE_PRIORITY_DISABLED -> {
-                    boolean currentEnabled = this.mainHandItem.getOrDefault(UComponents.AEStoragePriorityComponent,
-                                                                            false
-                    );
-                    PacketDistributor.sendToServer(
-                            new ModeTogglePacket(ModeTogglePacket.ModeType.AE_STORAGE_PRIORITY, !currentEnabled));
+                    boolean currentEnabled = this.targetItem.getOrDefault(
+                            UComponents.AEStoragePriorityComponent, false);
+                    PacketDistributor.sendToServer(new ModeTogglePacket(
+                            ModeTogglePacket.ModeType.AE_STORAGE_PRIORITY, !currentEnabled));
                 }
                 case WRENCH_TAG_ENABLED, WRENCH_TAG_DISABLED -> {
-                    boolean currentEnabled = this.mainHandItem.getOrDefault(
+                    boolean currentEnabled = this.targetItem.getOrDefault(
                             UComponents.WrenchTagEnabledComponent, true);
-                    PacketDistributor.sendToServer(
-                            new ModeTogglePacket(ModeTogglePacket.ModeType.WRENCH_TAG, !currentEnabled));
+                    PacketDistributor.sendToServer(new ModeTogglePacket(
+                            ModeTogglePacket.ModeType.WRENCH_TAG, !currentEnabled));
                 }
                 case CONSTRUCTION_WAND_ENABLED, CONSTRUCTION_WAND_DISABLED -> {
-                    boolean currentEnabled = this.mainHandItem.getOrDefault(
+                    boolean currentEnabled = this.targetItem.getOrDefault(
                             UComponents.ConstructionWandEnabledComponent, false);
-                    PacketDistributor.sendToServer(
-                            new ModeTogglePacket(ModeTogglePacket.ModeType.CONSTRUCTION_WAND, !currentEnabled));
+                    PacketDistributor.sendToServer(new ModeTogglePacket(
+                            ModeTogglePacket.ModeType.CONSTRUCTION_WAND, !currentEnabled));
                 }
                 case CONSTRUCTION_WAND_ANGEL_CORE -> {
-                    ConstructionWandCoreMode current = this.mainHandItem.getOrDefault(
+                    ConstructionWandCoreMode current = this.targetItem.getOrDefault(
                             UComponents.ConstructionWandCoreComponent, ConstructionWandCoreMode.DEFAULT);
                     PacketDistributor.sendToServer(new ConstructionWandCorePacket(
                             current == ConstructionWandCoreMode.ANGEL
@@ -481,7 +421,7 @@ public class ModeWheelScreen extends Screen {
                                     : ConstructionWandCoreMode.ANGEL));
                 }
                 case CONSTRUCTION_WAND_DESTRUCTION_CORE -> {
-                    ConstructionWandCoreMode current = this.mainHandItem.getOrDefault(
+                    ConstructionWandCoreMode current = this.targetItem.getOrDefault(
                             UComponents.ConstructionWandCoreComponent, ConstructionWandCoreMode.DEFAULT);
                     PacketDistributor.sendToServer(new ConstructionWandCorePacket(
                             current == ConstructionWandCoreMode.DESTRUCTION
@@ -489,175 +429,63 @@ public class ModeWheelScreen extends Screen {
                                     : ConstructionWandCoreMode.DESTRUCTION));
                 }
                 case FORCE_KILL -> {
-                    boolean currentEnabled = this.mainHandItem.getOrDefault(UComponents.ForceKillEnabledComponent,
-                                                                            false);
-                    PacketDistributor.sendToServer(
-                            new ModeTogglePacket(ModeTogglePacket.ModeType.FORCE_KILL, !currentEnabled));
+                    boolean currentEnabled = this.targetItem.getOrDefault(
+                            UComponents.ForceKillEnabledComponent, false);
+                    PacketDistributor.sendToServer(new ModeTogglePacket(
+                            ModeTogglePacket.ModeType.FORCE_KILL, !currentEnabled));
                 }
                 case BEEF_TIME_ACCELERATION_ENABLED, BEEF_TIME_ACCELERATION_DISABLED -> {
-                    boolean currentEnabled = this.mainHandItem.getOrDefault(
-                            UComponents.BeefTimeAccelerationEnabledComponent,
-                            false
-                    );
-                    PacketDistributor.sendToServer(
-                            new ModeTogglePacket(ModeTogglePacket.ModeType.BEEF_TIME_ACCELERATION,
-                                                  !currentEnabled));
+                    boolean currentEnabled = this.targetItem.getOrDefault(
+                            UComponents.BeefTimeAccelerationEnabledComponent, false);
+                    PacketDistributor.sendToServer(new ModeTogglePacket(
+                            ModeTogglePacket.ModeType.BEEF_TIME_ACCELERATION, !currentEnabled));
                 }
                 case BEEF_INVULNERABILITY_ENABLED, BEEF_INVULNERABILITY_DISABLED -> {
-                    boolean currentEnabled = this.mainHandItem.getOrDefault(
-                            UComponents.BeefInvulnerabilityEnabledComponent,
-                            false
-                    );
-                    PacketDistributor.sendToServer(
-                            new ModeTogglePacket(ModeTogglePacket.ModeType.BEEF_INVULNERABILITY,
-                                                  !currentEnabled));
+                    boolean currentEnabled = this.targetItem.getOrDefault(
+                            UComponents.BeefInvulnerabilityEnabledComponent, false);
+                    PacketDistributor.sendToServer(new ModeTogglePacket(
+                            ModeTogglePacket.ModeType.BEEF_INVULNERABILITY, !currentEnabled));
                 }
                 case BEEF_CAPTURE_ENABLED, BEEF_CAPTURE_DISABLED -> {
-                    boolean currentEnabled = this.mainHandItem.getOrDefault(
-                            UComponents.BeefCaptureEnabledComponent,
-                            false
-                    );
-                    PacketDistributor.sendToServer(
-                            new ModeTogglePacket(ModeTogglePacket.ModeType.BEEF_CAPTURE, !currentEnabled));
+                    boolean currentEnabled = this.targetItem.getOrDefault(
+                            UComponents.BeefCaptureEnabledComponent, false);
+                    PacketDistributor.sendToServer(new ModeTogglePacket(
+                            ModeTogglePacket.ModeType.BEEF_CAPTURE, !currentEnabled));
                 }
                 case BEEF_TELEPORT_ENABLED, BEEF_TELEPORT_DISABLED -> {
-                    boolean currentEnabled = this.mainHandItem.getOrDefault(
-                            UComponents.BeefTeleportEnabledComponent,
-                            false
-                    );
-                    PacketDistributor.sendToServer(
-                            new ModeTogglePacket(ModeTogglePacket.ModeType.BEEF_TELEPORT, !currentEnabled));
+                    boolean currentEnabled = this.targetItem.getOrDefault(
+                            UComponents.BeefTeleportEnabledComponent, false);
+                    PacketDistributor.sendToServer(new ModeTogglePacket(
+                            ModeTogglePacket.ModeType.BEEF_TELEPORT, !currentEnabled));
                 }
                 case BEEF_AOE_DAMAGE_ENABLED, BEEF_AOE_DAMAGE_DISABLED -> {
-                    boolean currentEnabled = this.mainHandItem.getOrDefault(
-                            UComponents.BeefAoeDamageEnabledComponent,
-                            false
-                    );
-                    PacketDistributor.sendToServer(
-                            new ModeTogglePacket(ModeTogglePacket.ModeType.BEEF_AOE_DAMAGE, !currentEnabled));
+                    boolean currentEnabled = this.targetItem.getOrDefault(
+                            UComponents.BeefAoeDamageEnabledComponent, false);
+                    PacketDistributor.sendToServer(new ModeTogglePacket(
+                            ModeTogglePacket.ModeType.BEEF_AOE_DAMAGE, !currentEnabled));
                 }
                 case BEEF_MAGNET_ENABLED, BEEF_MAGNET_DISABLED -> {
-                    boolean currentEnabled = this.mainHandItem.getOrDefault(
-                            UComponents.BeefMagnetEnabledComponent,
-                            false
-                    );
-                    PacketDistributor.sendToServer(
-                            new ModeTogglePacket(ModeTogglePacket.ModeType.BEEF_MAGNET, !currentEnabled));
+                    boolean currentEnabled = this.targetItem.getOrDefault(
+                            UComponents.BeefMagnetEnabledComponent, false);
+                    PacketDistributor.sendToServer(new ModeTogglePacket(
+                            ModeTogglePacket.ModeType.BEEF_MAGNET, !currentEnabled));
                 }
             }
         }
     }
 
-    private void drawDividers(BufferBuilder buf, int cx, int cy, int n, float anim) {
-        if (n <= 0) return;
-
-        float rIn = DISC_RADIUS * 0.4f * anim;
-        float rOut = DISC_RADIUS * 1.0f * anim;
-
-        for (int i = 0; i < n; i++) {
-            float a = (float) Math.toRadians((((i - .5f) / n) + .25f) * 360);
-
-            float x1 = cx + rIn * (float) Math.cos(a);
-            float y1 = cy + rIn * (float) Math.sin(a);
-            float x2 = cx + rOut * (float) Math.cos(a);
-            float y2 = cy + rOut * (float) Math.sin(a);
-
-
-            buf.addVertex(x1, y1, 11).setColor(200, 200, 200, 100);
-            buf.addVertex(x2, y2, 11).setColor(200, 200, 200, 100);
+    @Override
+    public boolean mouseReleased(double mouseX, double mouseY, int button) {
+        for (PressableAE2Button modeButton : this.modeButtons) {
+            modeButton.releaseVisualState();
         }
+        return super.mouseReleased(mouseX, mouseY, button);
     }
 
-    private void drawModeNames(GuiGraphics g, int cx, int cy,
-                               List<ModeData> modes,
-                               float anim) {
-        if (modes.isEmpty()) return;
-
-        int n = modes.size();
-        float tr = DISC_RADIUS * 0.7f * anim;
-
-        for (int i = 0; i < n; i++) {
-
-            float ang = ((i / (float) n) - .25f) * 2 * (float) Math.PI;
-            if (n % 2 != 0) ang += (float) (Math.PI / n);
-
-            Component name = modes.get(i).name();
-            int w = this.font.width(name);
-
-            float x = cx - w / 2f + tr * (float) Math.cos(ang);
-            float y = cy - this.font.lineHeight / 2f + tr * (float) Math.sin(ang);
-
-            g.drawString(this.font, name, (int) x, (int) y, 0xFFFFFF, false);
-        }
+    private record ModeData(Object mode, Component name, boolean active) {
     }
 
-    private void drawHover(GuiGraphics g, int cx, int cy,
-                           List<ModeData> modes,
-                           int mx, int my) {
-        if (modes.isEmpty()) return;
-
-        int n = modes.size();
-        double ang = Math.toDegrees(Math.atan2(my - cy, mx - cx));
-        double dist = Math.hypot(mx - cx, my - cy);
-
-        float slot0 = (((0 - .5f) / n) + .25f) * 360;
-        if (ang < slot0) ang += 360;
-
-        int sel = -1;
-
-        for (int i = 0; i < n; i++) {
-            float aL = (((i - .5f) / n) + .25f) * 360;
-            float aR = (((i + .5f) / n) + .25f) * 360;
-
-            if (ang >= aL && ang < aR && dist >= DISC_RADIUS * 0.4f && dist < DISC_RADIUS)
-                sel = i;
-        }
-
-        if (sel >= 0) {
-            int adj = ((sel + (n / 2 + 1)) % n) - 1;
-            if (adj == -1) adj = n - 1;
-
-            Component name = modes.get(adj).name();
-            int w = this.font.width(name);
-
-            g.drawString(this.font, name,
-                         cx - w / 2,
-                         cy - this.font.lineHeight / 2,
-                         0xFFFFFF,
-                         false
-            );
-        }
+    private record SectionLayout(Component title, List<ModeData> modes,
+                                 int left, int top, int width, int height) {
     }
-
-    private void drawSlice(BufferBuilder buf,
-                           float x, float y, float z,
-                           float rIn, float rOut,
-                           float start, float end,
-                           int r, int g, int b, int a) {
-        float angle = end - start;
-        int sec = Math.max(1, Mth.ceil(angle / PRECISION));
-
-        for (int i = 0; i < sec; i++) {
-
-            float a1 = (float) Math.toRadians(start + (i / (float) sec) * angle);
-            float a2 = (float) Math.toRadians(start + ((i + 1f) / sec) * angle);
-
-            float x1i = x + rIn * (float) Math.cos(a1);
-            float y1i = y + rIn * (float) Math.sin(a1);
-            float x2i = x + rIn * (float) Math.cos(a2);
-            float y2i = y + rIn * (float) Math.sin(a2);
-
-            float x1o = x + rOut * (float) Math.cos(a1);
-            float y1o = y + rOut * (float) Math.sin(a1);
-            float x2o = x + rOut * (float) Math.cos(a2);
-            float y2o = y + rOut * (float) Math.sin(a2);
-
-            buf.addVertex(x1i, y1i, z).setColor(r, g, b, a);
-            buf.addVertex(x1o, y1o, z).setColor(r, g, b, a);
-            buf.addVertex(x2o, y2o, z).setColor(r, g, b, a);
-            buf.addVertex(x2i, y2i, z).setColor(r, g, b, a);
-        }
-    }
-
-    private record ModeData(Object mode, Component name, boolean active) {}
 }

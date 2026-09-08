@@ -231,6 +231,9 @@ dependencies {
 
     implementation "curse.maven:omnitool-1401075:8272031"
 
+
+    implementation "curse.maven:manaitaplus-legacy-1334654:8136932"
+
     //powah
     compileOnly "curse.maven:powah-rearchitected-633483:8011715"
     compileOnly "maven.modrinth:9s6osm5g:izKINKFg"

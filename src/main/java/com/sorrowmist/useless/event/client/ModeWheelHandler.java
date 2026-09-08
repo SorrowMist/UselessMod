@@ -30,11 +30,17 @@ public class ModeWheelHandler {
     @SubscribeEvent
     public static void onKeyPressed(InputEvent.Key event) {
         Minecraft minecraft = Minecraft.getInstance();
-        if (minecraft.player == null || minecraft.screen != null) return;
+        if (minecraft.player == null) return;
 
         // 检查是否是G键按下事件 (GLFW_PRESS = 1)
         if (event.getKey() == KeyBindings.SWITCH_MODE_WHEEL_KEY.get().getKey().getValue()
                 && event.getAction() == 1) {
+            if (minecraft.screen instanceof ModeWheelScreen) {
+                minecraft.setScreen(null);
+                return;
+            }
+            if (minecraft.screen != null) return;
+
             // 使用工具方法查找目标工具
             ItemStack targetItem = UselessItemUtils.findTargetToolInHands(minecraft.player)
                                                    .map(AbstractMap.SimpleImmutableEntry::getKey)

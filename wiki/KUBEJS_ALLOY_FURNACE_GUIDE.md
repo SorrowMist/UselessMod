@@ -20,6 +20,8 @@ Install a KubeJS build for NeoForge 1.21.1. Without KubeJS, Useless Mod remains 
 ## Table of Contents
 
 - [Basic Usage](#basic-usage)
+- [Input/Output Combinations](#inputoutput-combinations)
+- [AEKey Inputs and Outputs](#aekey-inputs-and-outputs)
 - [Field Description](#field-description)
 - [Recipe Tiers](#recipe-tiers)
 - [Replacing and Removing Recipes](#replacing-and-removing-recipes)
@@ -143,6 +145,120 @@ ServerEvents.recipes(event => {
 
 Do not define both `mold` and `molds`. Multiple mold requirements are handled by the Advanced Alloy Furnace mold hub; a regular single-mold slot does not support them.
 
+## Input/Output Combinations
+
+The recipe supports these combinations of item/fluid input and output shapes:
+
+| Test ID suffix | Inputs | Outputs |
+|---|---|---|
+| `item_to_item` | Item | Item |
+| `item_to_fluid` | Item | Fluid |
+| `item_fluid_to_item` | Item + Fluid | Item |
+| `item_fluid_to_fluid` | Item + Fluid | Fluid |
+| `item_to_item_fluid` | Item | Item + Fluid |
+| `item_fluid_to_item_fluid` | Item + Fluid | Item + Fluid |
+| `fluid_to_item` | Fluid | Item |
+| `fluid_to_fluid` | Fluid | Fluid |
+| `fluid_to_item_fluid` | Fluid | Item + Fluid |
+
+For example, an item and fluid input with both output types is:
+
+```javascript
+event.recipes.useless_mod.advanced_alloy_furnace({
+    id: 'kubejs:alloy_furnace_item_fluid_to_item_fluid_test',
+    ingredients: [
+        { ingredient: { item: 'minecraft:redstone' }, count: 1 }
+    ],
+    input_fluids: [
+        { ingredient: { fluid: 'minecraft:water' }, amount: 1000 }
+    ],
+    outputs: [
+        Item.of('minecraft:gold_nugget', 1)
+    ],
+    output_fluids: [
+        Fluid.of('minecraft:lava', 250)
+    ],
+    tier: 0
+})
+```
+
+When a test has no item input, keep the required `ingredients` field and set it to an empty array:
+
+```javascript
+event.recipes.useless_mod.advanced_alloy_furnace({
+    id: 'kubejs:alloy_furnace_fluid_to_item_test',
+    ingredients: [],
+    input_fluids: [
+        { ingredient: { fluid: 'minecraft:water' }, amount: 1000 }
+    ],
+    outputs: [Item.of('minecraft:coal', 1)],
+    tier: 0
+})
+```
+
+Mold requirements can contain one, two, or three independent entries:
+
+```javascript
+// One mold
+molds: [{ item: 'minecraft:stick' }]
+
+// Two molds
+molds: [
+    { item: 'minecraft:stick' },
+    { item: 'minecraft:stone' }
+]
+
+// Three molds
+molds: [
+    { item: 'minecraft:stick' },
+    { item: 'minecraft:stone' },
+    { item: 'minecraft:cobblestone' }
+]
+```
+
+Each mold entry is an independent requirement. Do not combine `mold` and `molds` in one recipe.
+
+## AEKey Inputs and Outputs
+
+The schema exposes AE2 generic stacks through `key_inputs` and `key_outputs`. Each entry is a `GenericStack`: `#t` selects the registered AEKey type and `#` is the amount. This supports custom key types without a hard-coded dependency on their mod.
+
+For a Data Energistics data flow recipe, install and load Data Energistics so that `data_energistics:data_flow` is registered before the recipe is parsed:
+
+```javascript
+ServerEvents.recipes(event => {
+    event.recipes.useless_mod.advanced_alloy_furnace({
+        id: 'kubejs:data_flow_alloy',
+        ingredients: [],
+        key_inputs: [
+            { '#t': 'data_energistics:data_flow', '#': 1200 }
+        ],
+        key_outputs: [
+            { '#t': 'data_energistics:data_flow', '#': 200 }
+        ],
+        tier: 0,
+        energy: 1000,
+        process_time: 20
+    })
+})
+```
+
+`data_energistics:data_flow` is an AEKey, not an item and not a normal fluid. Its amount therefore belongs in `key_inputs` or `key_outputs`. The recipe still needs `ingredients: []` when it has no item input, but ordinary `outputs` and `output_fluids` can remain omitted when `key_outputs` supplies the output.
+
+AE2 item and fluid keys use the same format:
+
+```javascript
+key_inputs: [
+    { '#t': 'ae2:i', id: 'minecraft:iron_ingot', '#': 1 },
+    { '#t': 'ae2:f', id: 'minecraft:water', '#': 1000 }
+],
+key_outputs: [
+    { '#t': 'ae2:i', id: 'minecraft:gold_ingot', '#': 1 },
+    { '#t': 'ae2:f', id: 'minecraft:lava', '#': 250 }
+]
+```
+
+Use `input_fluids` and `output_fluids` for the alloy furnace's ordinary machine fluid ports. Use `ae2:f` inside `key_inputs` and `key_outputs` when the fluid is meant to be transferred through the AE network as an AEKey.
+
 ## Field Description
 
 | Field | Type | Required | Default | Description |
@@ -150,8 +266,10 @@ Do not define both `mold` and `molds`. Multiple mold requirements are handled by
 | `id` | String | Yes | - | Recipe data ID, for example `kubejs:iron_alloy` |
 | `ingredients` | Object[] | Yes | - | Input list; each entry has `ingredient` and an optional `count` |
 | `input_fluids` | Object[] | No | `[]` | Fluid input list; each entry has a fluid `ingredient` and `amount` |
+| `key_inputs` | GenericStack[] | No | `[]` | AEKey input list; each entry uses the AE2 generic stack format |
 | `outputs` | ItemStack[] | No | `[]` | Item output list; strings and `Item.of(...)` are supported |
 | `output_fluids` | FluidStack[] | No | `[]` | Fluid output list; `Fluid.of(...)` is supported |
+| `key_outputs` | GenericStack[] | No | `[]` | AEKey output list; each entry uses the AE2 generic stack format |
 | `mold` | Ingredient | No | Empty | Single mold requirement; item IDs and tags are supported |
 | `molds` | Ingredient[] | No | Empty | Multiple independent mold requirements; mutually exclusive with `mold` |
 | `tier` | Integer | No | Unspecified | Minimum coil tier, from `0` to `10` |
@@ -310,7 +428,7 @@ ServerEvents.recipes(event => {
 
 ## Extended JSON
 
-The Schema covers item inputs, fluid inputs, item outputs, fluid outputs, molds, tiers, and common processing options. For AE chemical stacks or other fields not exposed by the Schema, use `event.custom` and provide the serializer JSON directly. The raw JSON shape for fluid fields is:
+The Schema covers item inputs, fluid inputs, AEKey inputs, item outputs, AEKey outputs, fluid outputs, molds, tiers, and common processing options. For other fields not exposed by the Schema, use `event.custom` and provide the serializer JSON directly. The raw JSON shape for fluid fields is:
 
 ```javascript
 ServerEvents.recipes(event => {
@@ -342,7 +460,7 @@ ServerEvents.recipes(event => {
 ## Best Practices
 
 1. Prefix recipe IDs with your mod ID or `kubejs:` to avoid collisions.
-2. Use positive input counts and provide at least one valid item or fluid output.
+2. Use positive input counts and provide at least one valid item, fluid, or AEKey output.
 3. When replacing a recipe, remove the old recipe before adding the replacement with the same `id`.
 4. Use object syntax for multiple molds.
 5. Only set `tier` when the recipe needs to override the server configuration; otherwise let `recipe_tier_rules` manage it.
@@ -354,8 +472,8 @@ If a recipe does not appear or the machine cannot process it:
 
 1. Check the game log for KubeJS recipe creation errors.
 2. Confirm that `id` is a valid resource location in the form `namespace:path`.
-3. Confirm that `id` and `ingredients` are present, and that at least one valid entry exists in `outputs` or `output_fluids`.
+3. Confirm that `id` and `ingredients` are present, and that at least one valid entry exists in `outputs`, `output_fluids`, or `key_outputs`.
 4. Confirm that `mold` and `molds` are not both defined.
 5. Check coil tier, molds, input counts, and catalyst requirements.
-6. For fluids or AE chemicals, verify the JSON field names and amount types passed to `event.custom`.
+6. For ordinary fluids, use `input_fluids`/`output_fluids`; for AEKey fluids or other AE resources, use `key_inputs`/`key_outputs` and verify the `#t` type is registered.
 7. Run `/reload` after editing the script and check for script exceptions.

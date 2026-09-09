@@ -20,6 +20,8 @@ event.recipes.useless_mod.advanced_alloy_furnace(...)
 ## 目录
 
 - [基础用法](#基础用法)
+- [输入输出组合](#输入输出组合)
+- [AEKey 输入和输出](#aekey-输入和输出)
 - [字段说明](#字段说明)
 - [配方等级](#配方等级)
 - [替换和删除配方](#替换和删除配方)
@@ -143,6 +145,120 @@ ServerEvents.recipes(event => {
 
 `mold` 和 `molds` 不能同时填写。多个模具由万象炉的模具仓/模具中心处理；普通单模具槽机器不支持多个模具要求。
 
+## 输入输出组合
+
+配方支持以下物品/流体输入和输出组合：
+
+| 测试 ID 后缀 | 输入 | 输出 |
+|---|---|---|
+| `item_to_item` | 物品 | 物品 |
+| `item_to_fluid` | 物品 | 流体 |
+| `item_fluid_to_item` | 物品 + 流体 | 物品 |
+| `item_fluid_to_fluid` | 物品 + 流体 | 流体 |
+| `item_to_item_fluid` | 物品 | 物品 + 流体 |
+| `item_fluid_to_item_fluid` | 物品 + 流体 | 物品 + 流体 |
+| `fluid_to_item` | 流体 | 物品 |
+| `fluid_to_fluid` | 流体 | 流体 |
+| `fluid_to_item_fluid` | 流体 | 物品 + 流体 |
+
+例如，同时使用物品和流体输入，并同时输出物品和流体：
+
+```javascript
+event.recipes.useless_mod.advanced_alloy_furnace({
+    id: 'kubejs:alloy_furnace_item_fluid_to_item_fluid_test',
+    ingredients: [
+        { ingredient: { item: 'minecraft:redstone' }, count: 1 }
+    ],
+    input_fluids: [
+        { ingredient: { fluid: 'minecraft:water' }, amount: 1000 }
+    ],
+    outputs: [
+        Item.of('minecraft:gold_nugget', 1)
+    ],
+    output_fluids: [
+        Fluid.of('minecraft:lava', 250)
+    ],
+    tier: 0
+})
+```
+
+如果测试配方没有物品输入，`ingredients` 仍然是必填字段，应明确写成空数组：
+
+```javascript
+event.recipes.useless_mod.advanced_alloy_furnace({
+    id: 'kubejs:alloy_furnace_fluid_to_item_test',
+    ingredients: [],
+    input_fluids: [
+        { ingredient: { fluid: 'minecraft:water' }, amount: 1000 }
+    ],
+    outputs: [Item.of('minecraft:coal', 1)],
+    tier: 0
+})
+```
+
+模具要求可以分别包含 1、2、3 个独立条目：
+
+```javascript
+// 1 个模具
+molds: [{ item: 'minecraft:stick' }]
+
+// 2 个模具
+molds: [
+    { item: 'minecraft:stick' },
+    { item: 'minecraft:stone' }
+]
+
+// 3 个模具
+molds: [
+    { item: 'minecraft:stick' },
+    { item: 'minecraft:stone' },
+    { item: 'minecraft:cobblestone' }
+]
+```
+
+每个模具条目都是独立要求。一个配方中不要同时使用 `mold` 和 `molds`。
+
+## AEKey 输入和输出
+
+Schema 通过 `key_inputs` 和 `key_outputs` 暴露 AE2 通用堆栈。每一项都是一个 `GenericStack`：`#t` 选择已注册的 AEKey 类型，`#` 表示数量。因此不需要在本模组中硬编码其他模组的 key 类。
+
+以 Data Energistics 数据流为例，需要安装并加载 Data Energistics，确保配方解析前已经注册 `data_energistics:data_flow`：
+
+```javascript
+ServerEvents.recipes(event => {
+    event.recipes.useless_mod.advanced_alloy_furnace({
+        id: 'kubejs:data_flow_alloy',
+        ingredients: [],
+        key_inputs: [
+            { '#t': 'data_energistics:data_flow', '#': 1200 }
+        ],
+        key_outputs: [
+            { '#t': 'data_energistics:data_flow', '#': 200 }
+        ],
+        tier: 0,
+        energy: 1000,
+        process_time: 20
+    })
+})
+```
+
+`data_energistics:data_flow` 是 AEKey，不是物品，也不是普通流体，所以数量必须写在 `key_inputs` 或 `key_outputs` 中。配方没有物品输入时仍需写 `ingredients: []`；如果 `key_outputs` 已经提供输出，普通的 `outputs` 和 `output_fluids` 可以省略。
+
+AE2 物品和流体 key 使用相同格式：
+
+```javascript
+key_inputs: [
+    { '#t': 'ae2:i', id: 'minecraft:iron_ingot', '#': 1 },
+    { '#t': 'ae2:f', id: 'minecraft:water', '#': 1000 }
+],
+key_outputs: [
+    { '#t': 'ae2:i', id: 'minecraft:gold_ingot', '#': 1 },
+    { '#t': 'ae2:f', id: 'minecraft:lava', '#': 250 }
+]
+```
+
+普通机器流体口使用 `input_fluids` 和 `output_fluids`；当流体需要作为 AE 网络中的 AEKey 传输时，才在 `key_inputs` 和 `key_outputs` 中使用 `ae2:f`。
+
 ## 字段说明
 
 | 字段 | 类型 | 必需 | 默认值 | 说明 |
@@ -150,8 +266,10 @@ ServerEvents.recipes(event => {
 | `id` | String | 是 | - | 配方数据 ID，例如 `kubejs:iron_alloy` |
 | `ingredients` | Object[] | 是 | - | 输入物列表，每项包含 `ingredient` 和可选的 `count` |
 | `input_fluids` | Object[] | 否 | `[]` | 流体输入列表，每项包含流体 `ingredient` 和 `amount` |
+| `key_inputs` | GenericStack[] | 否 | `[]` | AEKey 输入列表，每项使用 AE2 通用堆栈格式 |
 | `outputs` | ItemStack[] | 否 | `[]` | 输出物列表，可使用字符串或 `Item.of(...)` |
 | `output_fluids` | FluidStack[] | 否 | `[]` | 流体输出列表，可使用 `Fluid.of(...)` |
+| `key_outputs` | GenericStack[] | 否 | `[]` | AEKey 输出列表，每项使用 AE2 通用堆栈格式 |
 | `mold` | Ingredient | 否 | 空 | 单个模具要求，可使用物品 ID 或标签 |
 | `molds` | Ingredient[] | 否 | 空 | 多个独立模具要求，不能与 `mold` 同时使用 |
 | `tier` | Integer | 否 | 未指定 | 线圈最低等级，范围为 `0-10` |
@@ -310,7 +428,7 @@ ServerEvents.recipes(event => {
 
 ## 扩展 JSON
 
-当前 Schema 已覆盖物品输入、流体输入、物品输出、流体输出、模具、等级和常用处理参数。需要 AE 化学物或其他尚未暴露的字段时，可以用 `event.custom` 直接提交配方 JSON。流体字段的原始 JSON 形状如下：
+当前 Schema 已覆盖物品输入、流体输入、AEKey 输入、物品输出、AEKey 输出、流体输出、模具、等级和常用处理参数。需要其他尚未暴露的字段时，可以用 `event.custom` 直接提交配方 JSON。流体字段的原始 JSON 形状如下：
 
 ```javascript
 ServerEvents.recipes(event => {
@@ -342,7 +460,7 @@ ServerEvents.recipes(event => {
 ## 最佳实践
 
 1. 使用自己的模组 ID 或 `kubejs:` 作为配方 ID 前缀，避免覆盖其他配方。
-2. 输入物数量使用正数，并确认 `outputs` 或 `output_fluids` 中至少有一个有效输出。
+2. 输入物数量使用正数，并确认 `outputs`、`output_fluids` 或 `key_outputs` 中至少有一个有效输出。
 3. 替换配方时先删除旧配方，再使用相同的 `id` 添加新配方。
 4. 多模具配方使用对象写法，避免依赖位置参数。
 5. 只有需要覆盖配置等级时才填写 `tier`；不填写可以继续由服务器配置统一管理。
@@ -354,8 +472,8 @@ ServerEvents.recipes(event => {
 
 1. 检查游戏日志中是否有 KubeJS 配方创建错误。
 2. 确认 `id` 是合法的资源位置格式：`namespace:path`。
-3. 确认 `ingredients` 和 `id` 已填写，并确认 `outputs` 或 `output_fluids` 中至少有一个有效输出。
+3. 确认 `ingredients` 和 `id` 已填写，并确认 `outputs`、`output_fluids` 或 `key_outputs` 中至少有一个有效输出。
 4. 确认没有同时填写 `mold` 和 `molds`。
 5. 检查线圈等级、模具、输入数量和催化剂要求是否满足配方条件。
-6. 使用流体或 AE 化学物时，检查 `event.custom` 中的 JSON 字段名称和数量类型。
+6. 普通机器流体使用 `input_fluids`/`output_fluids`；AEKey 流体或其他 AE 资源使用 `key_inputs`/`key_outputs`，并检查 `#t` 对应的 key 类型已注册。
 7. 修改脚本后执行 `/reload`，并确认日志中没有脚本异常。

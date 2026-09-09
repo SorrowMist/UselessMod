@@ -248,9 +248,9 @@ dependencies {
 
     implementation "maven.modrinth:jade:15.1.2+neoforge"
     //龙之研究
-    compileOnly "curse.maven:codechicken-lib-1-8-242818:7281427"
-    compileOnly "curse.maven:brandons-core-231382:7130990"
-    compileOnly "curse.maven:draconic-evolution-223565:7584459"
+    implementation "curse.maven:codechicken-lib-1-8-242818:7281427"
+    implementation "curse.maven:brandons-core-231382:7130990"
+    implementation "curse.maven:draconic-evolution-223565:7584459"
 
     
     runtimeOnly "de.mari_023:ae2wtlib:19.5.1"
@@ -296,6 +296,8 @@ dependencies {
     runtimeOnly "curse.maven:applied-mekanistics-574300:7096962"
     runtimeOnly "maven.modrinth:mekanism_extra:1.21.1-1.4.0"
     implementation "curse.maven:flux-networks-248020:6089446"
+
+    implementation "curse.maven:the-twilight-forest-227639:7797302"
 
     implementation "curse.maven:botany-pots-353928:7115287"
     compileOnly "curse.maven:create-328085:7963363"

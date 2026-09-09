@@ -70,6 +70,10 @@ import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.entity.BrushableBlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.gameevent.GameEvent;
+import net.minecraft.world.level.entity.EntityLookup;
+import net.minecraft.world.level.entity.LevelEntityGetter;
+import net.minecraft.world.level.entity.LevelEntityGetterAdapter;
+import net.minecraft.world.level.entity.PersistentEntitySectionManager;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.HitResult;
@@ -489,11 +493,12 @@ public class EndlessBeafItem extends TieredItem {
                 context.deathEventCanceled = true;
             }
             restoreCanceledDeathHealth(context);
+            executeMaxHealthFallback(context);
             executeFallbackDeath(context);
             settleForceKillEffects(context);
 
             if (!target.isRemoved()) {
-                target.setRemoved(Entity.RemovalReason.DISCARDED);
+                removeEntityFromServerStorage(context.level, target);
                 context.removalCommitted = target.isRemoved();
             }
             return target.dead || context.removalCommitted;
@@ -569,6 +574,21 @@ public class EndlessBeafItem extends TieredItem {
         }
     }
 
+    private static void executeMaxHealthFallback(ForceKillContext context) {
+        LivingEntity target = context.target;
+        if (target.isRemoved() || target.dead) {
+            return;
+        }
+
+        AttributeInstance maxHealth = target.getAttribute(Attributes.MAX_HEALTH);
+        if (maxHealth != null) {
+            maxHealth.setBaseValue(0.0D);
+        }
+        target.setLastHurtByPlayer(context.player);
+        target.setHealth(0.0F);
+        target.die(context.damageSource);
+    }
+
     private static void executeFallbackDeath(ForceKillContext context) {
         LivingEntity target = context.target;
         if (target.isRemoved() || target.dead) {
@@ -620,6 +640,30 @@ public class EndlessBeafItem extends TieredItem {
         }
         level.broadcastEntityEvent(victim, (byte) 3);
         victim.setPose(Pose.DYING);
+    }
+
+    private static void removeEntityFromServerStorage(ServerLevel level, Entity target) {
+        if (target instanceof Player || target.isRemoved()) {
+            return;
+        }
+
+        PersistentEntitySectionManager<Entity> entityManager = level.entityManager;
+        EntityLookup<Entity> visibleEntities = entityManager.visibleEntityStorage;
+        visibleEntities.byId.remove(target.getId());
+        visibleEntities.byId.int2ObjectEntrySet().removeIf(entry -> entry.getValue() == target);
+        visibleEntities.byUuid.remove(target.getUUID());
+        visibleEntities.byUuid.entrySet().removeIf(entry -> entry.getValue() == target);
+        entityManager.knownUuids.remove(target.getUUID());
+
+        LevelEntityGetter<Entity> entityGetter = entityManager.entityGetter;
+        if (entityGetter instanceof LevelEntityGetterAdapter<Entity> adapter) {
+            adapter.visibleEntities.byId.remove(target.getId());
+            adapter.visibleEntities.byUuid.remove(target.getUUID());
+        }
+
+        level.entityTickList.remove(target);
+        target.setRemoved(Entity.RemovalReason.DISCARDED);
+        level.getChunkSource().removeEntity(target);
     }
 
     private static float getForceKillDamage(LivingEntity target) {

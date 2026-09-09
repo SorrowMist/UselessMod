@@ -26,9 +26,9 @@ import java.util.concurrent.ConcurrentHashMap;
  * {@link MiningUtils#handleDrops(Player, List, ItemStack)}，因此自动继承工具上的
  * "AE存储优先" 开关：绑定了无线接入点且开关打开时先存入 AE 网络，塞不下才进背包。</p>
  *
- * <p>吸附不依赖 {@code LivingDeathEvent}：强制击杀的 {@code forceDie} 分支和非生物实体的击杀
- * 都不会触发该事件，所以调用方在击杀后主动调用 {@link #scheduleSweep} 登记一次扫描。同一 tick 内
- * 的多次登记会合并成一个包围盒，AoE 一次打死几十只怪也只扫一遍。</p>
+ * <p>标准生物死亡由 {@code LivingDeathEvent} 登记扫描；强制击杀的兜底分支和非生物实体不会触发该事件，
+ * 因此调用方需要主动调用 {@link #scheduleSweep}。同一 tick 内的多次登记会合并成一个包围盒，
+ * AoE 一次打死几十只怪也只扫一遍。</p>
  */
 public final class BeefMagnetHandler {
     /** 每个玩家最多有一个待执行的扫描，键为玩家 UUID。仅在服务端主线程访问。 */

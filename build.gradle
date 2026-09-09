@@ -199,7 +199,7 @@ dependencies {
 
     compileOnly "curse.maven:oritech-1030830:8556549"
     compileOnly "curse.maven:ufo-future-1372445:8372110"
-    compileOnly "curse.maven:immersive-engineering-231951:6733669"
+    implementation "curse.maven:immersive-engineering-231951:6733669"
     compileOnly "curse.maven:extreme-reactors-250277:7344744"
     compileOnly "curse.maven:neovitae-1404763:8690909"
 

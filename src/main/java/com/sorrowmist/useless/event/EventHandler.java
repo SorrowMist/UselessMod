@@ -109,9 +109,14 @@ public class EventHandler {
         }
     }
 
-    @SubscribeEvent(priority = EventPriority.LOWEST)
+    @SubscribeEvent(priority = EventPriority.HIGHEST, receiveCanceled = true)
+    public static void onForceKillDeathObserved(LivingDeathEvent event) {
+        EndlessBeafItem.observeForceKillDeath(event);
+    }
+
+    @SubscribeEvent(priority = EventPriority.LOWEST, receiveCanceled = true)
     public static void onBeefToolLivingDeath(LivingDeathEvent event) {
-        if (EndlessBeafItem.isForceKillDeathInProgress(event.getEntity())) {
+        if (EndlessBeafItem.handleForceKillDeath(event)) {
             return;
         }
         if (!(event.getSource().getEntity() instanceof Player player)) {
@@ -121,8 +126,11 @@ public class EventHandler {
         UselessItemUtils.tryCaptureSpawnEgg(event.getEntity(), player.getMainHandItem(), player);
     }
 
-    @SubscribeEvent(priority = EventPriority.LOWEST)
+    @SubscribeEvent(priority = EventPriority.LOWEST, receiveCanceled = true)
     public static void onBeefToolMagnetDeath(LivingDeathEvent event) {
+        if (EndlessBeafItem.handleForceKillMagnetDeath(event)) {
+            return;
+        }
         if (event.isCanceled() || !(event.getEntity().level() instanceof ServerLevel level)) {
             return;
         }
@@ -143,8 +151,9 @@ public class EventHandler {
         }
     }
 
-    @SubscribeEvent
+    @SubscribeEvent(receiveCanceled = true)
     public static void onLivingDrops(LivingDropsEvent event) {
+        EndlessBeafItem.observeForceKillDrops(event);
         if (event.getSource().getEntity() instanceof Player player) {
             ItemStack mainHandItem = player.getMainHandItem();
             if (mainHandItem.getItem() instanceof EndlessBeafItem) {

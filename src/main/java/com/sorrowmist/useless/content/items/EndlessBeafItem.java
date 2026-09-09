@@ -82,11 +82,14 @@ import net.neoforged.neoforge.common.IShearable;
 import net.neoforged.neoforge.common.ItemAbilities;
 import net.neoforged.neoforge.common.ItemAbility;
 import net.neoforged.neoforge.common.util.Lazy;
+import net.neoforged.neoforge.event.entity.living.LivingDeathEvent;
+import net.neoforged.neoforge.event.entity.living.LivingDropsEvent;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -94,9 +97,10 @@ import java.util.stream.Collectors;
 
 public class EndlessBeafItem extends TieredItem {
     private static final String AE2LT_NATURAL_LIGHTNING_TAG = "ae2lt.natural_weather_lightning";
-    private static final Set<UUID> FORCE_KILL_DEATH_CONTEXT = ConcurrentHashMap.newKeySet();
+    private static final Map<UUID, ForceKillContext> FORCE_KILL_CONTEXTS = new ConcurrentHashMap<>();
     // 范围伤害重入保护：避免范围内实体受伤时再次触发范围伤害
     private static final Set<UUID> AOE_DAMAGE_CONTEXT = ConcurrentHashMap.newKeySet();
+    private static final int MAX_STANDARD_DAMAGE_ATTEMPTS = 100;
     private static final int TELEPORT_COOLDOWN_TICKS = 5;
     private final ToolTypeMode toolType;
 
@@ -389,7 +393,7 @@ public class EndlessBeafItem extends TieredItem {
 
             if (hit > 0) {
                 // 主动登记一次吸附：范围取「AoE 半径 + 磁力半径」，保证最外圈被打死的怪的掉落也能覆盖到。
-                // 不依赖 LivingDeathEvent —— 强制击杀的 forceDie 分支根本不发这个事件。
+                // 与单体死亡事件登记合并，覆盖强杀兜底和范围内普通伤害产生的掉落。
                 BeefMagnetHandler.scheduleSweep(level, player, stack, primary.position(),
                         rangeX + ConfigManager.getBeefMagnetRangeX(),
                         rangeY + ConfigManager.getBeefMagnetRangeY(),
@@ -407,8 +411,48 @@ public class EndlessBeafItem extends TieredItem {
         return entity;
     }
 
-    public static boolean isForceKillDeathInProgress(LivingEntity target) {
-        return FORCE_KILL_DEATH_CONTEXT.contains(target.getUUID());
+    public static void observeForceKillDeath(LivingDeathEvent event) {
+        ForceKillContext context = FORCE_KILL_CONTEXTS.get(event.getEntity().getUUID());
+        if (context != null) {
+            context.deathEventAttempted = true;
+        }
+    }
+
+    public static boolean handleForceKillDeath(LivingDeathEvent event) {
+        ForceKillContext context = FORCE_KILL_CONTEXTS.get(event.getEntity().getUUID());
+        if (context == null) {
+            return false;
+        }
+
+        context.deathEventAttempted = true;
+        context.deathEventCanceled = event.isCanceled();
+        if (!event.isCanceled() && !context.captureHandled) {
+            UselessItemUtils.tryCaptureSpawnEgg(context.target, context.stack, context.player);
+            context.captureHandled = true;
+        }
+        return true;
+    }
+
+    public static boolean handleForceKillMagnetDeath(LivingDeathEvent event) {
+        ForceKillContext context = FORCE_KILL_CONTEXTS.get(event.getEntity().getUUID());
+        if (context == null) {
+            return false;
+        }
+
+        if (event.isCanceled()) {
+            context.deathEventCanceled = true;
+        } else if (!context.magnetScheduled) {
+            scheduleMagnetSweep(context.level, context.player, context.stack, context.deathPos);
+            context.magnetScheduled = true;
+        }
+        return true;
+    }
+
+    public static void observeForceKillDrops(LivingDropsEvent event) {
+        ForceKillContext context = FORCE_KILL_CONTEXTS.get(event.getEntity().getUUID());
+        if (context != null) {
+            context.dropsAttempted = true;
+        }
     }
 
     private static boolean forceKillLivingEntity(ItemStack stack, LivingEntity target, Player player) {
@@ -418,23 +462,43 @@ public class EndlessBeafItem extends TieredItem {
             return false;
         }
 
-        FORCE_KILL_DEATH_CONTEXT.add(target.getUUID());
-        try {
-            ServerLevel level = (ServerLevel) target.level();
-            Vec3 deathPos = target.position();
-            DamageSource damageSource = ModDamageTypes.beefTool(level, player);
-            executeForceKill(level, target, damageSource);
-
-            if (target.isRemoved() || target.dead || !target.isAlive()) {
-                UselessItemUtils.tryCaptureSpawnEgg(target, stack, player);
-            }
-            // forceDie 分支是自己手动 dropAllDeathLoot 的，不会触发 LivingDeathEvent，
-            // 所以这里主动登记吸附，避免强杀 boss 类实体时掉落物留在地上
-            scheduleMagnetSweep(level, player, stack, deathPos);
-        } finally {
-            FORCE_KILL_DEATH_CONTEXT.remove(target.getUUID());
+        ServerLevel level = (ServerLevel) target.level();
+        DamageSource damageSource = ModDamageTypes.beefTool(level, player);
+        ForceKillContext context = new ForceKillContext(level, target, stack, player, damageSource);
+        if (FORCE_KILL_CONTEXTS.putIfAbsent(target.getUUID(), context) != null) {
+            return false;
         }
-        return true;
+
+        try {
+            executeForceKill(context);
+
+            if (!isDeathCommitted(target) && !context.deathEventAttempted) {
+                rememberPositiveHealth(context);
+                target.setHealth(0.0F);
+                target.die(damageSource);
+                restoreCanceledDeathHealth(context);
+            }
+
+            if (isDeathCommitted(target)) {
+                settleForceKillEffects(context);
+                return true;
+            }
+
+            if (context.deathEventAttempted) {
+                context.deathEventCanceled = true;
+            }
+            restoreCanceledDeathHealth(context);
+            executeFallbackDeath(context);
+            settleForceKillEffects(context);
+
+            if (!target.isRemoved()) {
+                target.setRemoved(Entity.RemovalReason.DISCARDED);
+                context.removalCommitted = target.isRemoved();
+            }
+            return target.dead || context.removalCommitted;
+        } finally {
+            FORCE_KILL_CONTEXTS.remove(target.getUUID(), context);
+        }
     }
 
     /** 用配置的磁力半径登记一次吸附。 */
@@ -445,75 +509,92 @@ public class EndlessBeafItem extends TieredItem {
                 ConfigManager.getBeefMagnetRangeZ());
     }
 
-    private static void executeForceKill(ServerLevel level, LivingEntity target, DamageSource damageSource) {
-        float damage = getForceKillDamage(target);
-
+    private static void executeForceKill(ForceKillContext context) {
+        LivingEntity target = context.target;
         if (target instanceof EnderDragon dragon) {
-            dragon.hurt(dragon.head, damageSource, damage);
-            if (!target.isAlive()) {
+            clearVanillaInvulnerability(target);
+            dragon.hurt(dragon.head, context.damageSource, getForceKillDamage(target));
+            if (shouldStopStandardDamage(context)) {
                 return;
             }
-        } else if (target instanceof WitherBoss wither) {
+        }
+
+        for (int i = 0; i < MAX_STANDARD_DAMAGE_ATTEMPTS; i++) {
+            if (shouldStopStandardDamage(context)) {
+                break;
+            }
+            rememberPositiveHealth(context);
+            context.standardDamageAttempts++;
+            clearVanillaInvulnerability(target);
+            target.hurt(context.damageSource, getForceKillDamage(target));
+        }
+    }
+
+    private static boolean shouldStopStandardDamage(ForceKillContext context) {
+        LivingEntity target = context.target;
+        return target.isRemoved()
+                || target.dead
+                || target.isDeadOrDying()
+                || context.deathEventAttempted;
+    }
+
+    private static void clearVanillaInvulnerability(LivingEntity target) {
+        target.invulnerableTime = 0;
+        if (target instanceof WitherBoss wither) {
             wither.setInvulnerableTicks(0);
         }
-
-        target.invulnerableTime = 0;
-        target.hurt(damageSource, damage);
-        if (!target.isAlive()) {
-            return;
-        }
-
-        directHurt(target, damageSource, damage);
-        if (!target.isAlive()) {
-            return;
-        }
-
-        target.kill();
-        if (!target.isAlive()) {
-            return;
-        }
-
-        target.setHealth(0.0F);
-        if (!target.isAlive()) {
-            return;
-        }
-
-        forceDie(level, target, damageSource);
     }
 
-    private static boolean directHurt(LivingEntity victim, DamageSource source, float amount) {
-        if (victim.level().isClientSide || victim.isDeadOrDying()) {
-            return false;
-        }
-
-        if (victim.isMultipartEntity()) {
-            for (Entity part : victim.getParts()) {
-                if (part instanceof PartEntity<?> partEntity && partEntity.getParent() == victim) {
-                    part.hurt(source, amount);
-                }
-            }
-        }
-        if (victim.isSleeping()) {
-            victim.stopSleeping();
-        }
-
-        victim.setNoActionTime(0);
-        victim.walkAnimation.setSpeed(1.5F);
-        victim.lastHurt = amount;
-        victim.invulnerableTime = 0;
-        victim.getCombatTracker().recordDamage(source, amount);
-        victim.setHealth(victim.getHealth() - amount);
-        victim.gameEvent(GameEvent.ENTITY_DAMAGE);
-        victim.hurtDuration = 10;
-        victim.hurtTime = victim.hurtDuration;
-
-        if (victim.isDeadOrDying()) {
-            forceDie((ServerLevel) victim.level(), victim, source);
-        }
-        return true;
+    private static boolean isDeathCommitted(LivingEntity target) {
+        return target.dead || target.isRemoved();
     }
 
-    private static void forceDie(ServerLevel level, LivingEntity victim, DamageSource source) {
+    private static void rememberPositiveHealth(ForceKillContext context) {
+        float health = context.target.getHealth();
+        if (Float.isFinite(health) && health > 0.0F) {
+            context.lastPositiveHealth = health;
+        }
+    }
+
+    private static void restoreCanceledDeathHealth(ForceKillContext context) {
+        LivingEntity target = context.target;
+        if (target.isRemoved() || target.dead || !target.isDeadOrDying()) {
+            return;
+        }
+
+        float health = Math.min(context.lastPositiveHealth, target.getMaxHealth());
+        if (Float.isFinite(health) && health > 0.0F) {
+            target.setHealth(health);
+        }
+    }
+
+    private static void executeFallbackDeath(ForceKillContext context) {
+        LivingEntity target = context.target;
+        if (target.isRemoved() || target.dead) {
+            return;
+        }
+
+        boolean dropLoot = !context.dropsAttempted;
+        context.dropsAttempted = true;
+        if (!target.isDeadOrDying()) {
+            target.setHealth(0.0F);
+        }
+        forceDie(context.level, target, context.damageSource, dropLoot);
+    }
+
+    private static void settleForceKillEffects(ForceKillContext context) {
+        if (!context.captureHandled) {
+            UselessItemUtils.tryCaptureSpawnEgg(context.target, context.stack, context.player);
+            context.captureHandled = true;
+        }
+
+        if (!context.magnetScheduled) {
+            scheduleMagnetSweep(context.level, context.player, context.stack, context.deathPos);
+            context.magnetScheduled = true;
+        }
+    }
+
+    private static void forceDie(ServerLevel level, LivingEntity victim, DamageSource source, boolean dropLoot) {
         if (victim.isRemoved() || victim.dead) {
             return;
         }
@@ -532,7 +613,9 @@ public class EndlessBeafItem extends TieredItem {
         Entity sourceEntity = source.getEntity();
         if (sourceEntity == null || sourceEntity.killedEntity(level, victim)) {
             victim.gameEvent(GameEvent.ENTITY_DIE);
-            victim.dropAllDeathLoot(level, source);
+            if (dropLoot) {
+                victim.dropAllDeathLoot(level, source);
+            }
         }
         level.broadcastEntityEvent(victim, (byte) 3);
         victim.setPose(Pose.DYING);
@@ -553,16 +636,44 @@ public class EndlessBeafItem extends TieredItem {
             return false;
         }
 
-        Vec3 deathPos = target.position();
-        target.kill();
-        if (!target.isRemoved()) {
-            target.remove(Entity.RemovalReason.KILLED);
-        }
-        // 非生物实体不会触发 LivingDeathEvent，同样需要主动登记吸附
         if (target.level() instanceof ServerLevel level) {
+            Vec3 deathPos = target.position();
+            target.setRemoved(Entity.RemovalReason.DISCARDED);
+            if (!target.isRemoved()) {
+                return false;
+            }
             scheduleMagnetSweep(level, player, stack, deathPos);
+            return true;
         }
-        return true;
+        return false;
+    }
+
+    private static final class ForceKillContext {
+        private final ServerLevel level;
+        private final LivingEntity target;
+        private final ItemStack stack;
+        private final Player player;
+        private final DamageSource damageSource;
+        private final Vec3 deathPos;
+        private float lastPositiveHealth;
+        private int standardDamageAttempts;
+        private boolean deathEventAttempted;
+        private boolean deathEventCanceled;
+        private boolean dropsAttempted;
+        private boolean captureHandled;
+        private boolean magnetScheduled;
+        private boolean removalCommitted;
+
+        private ForceKillContext(ServerLevel level, LivingEntity target, ItemStack stack,
+                                 Player player, DamageSource damageSource) {
+            this.level = level;
+            this.target = target;
+            this.stack = stack;
+            this.player = player;
+            this.damageSource = damageSource;
+            this.deathPos = target.position();
+            this.lastPositiveHealth = target.getHealth();
+        }
     }
 
     private static boolean isForceKillBlacklisted(Entity entity) {

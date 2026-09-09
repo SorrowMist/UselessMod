@@ -80,6 +80,16 @@ public class ModeTogglePacket implements CustomPacketPayload {
                 }
                 case BEEF_INVULNERABILITY -> {
                     stack.set(UComponents.BeefInvulnerabilityEnabledComponent.get(), msg.enabled);
+                    if (!msg.enabled) {
+                        stack.set(UComponents.BeefAdvancedStealthEnabledComponent.get(), false);
+                    }
+                    EventHandler.updateBeefInvulnerability(player, true);
+                }
+                case BEEF_ADVANCED_STEALTH -> {
+                    stack.set(UComponents.BeefAdvancedStealthEnabledComponent.get(), msg.enabled);
+                    if (msg.enabled) {
+                        stack.set(UComponents.BeefInvulnerabilityEnabledComponent.get(), true);
+                    }
                     EventHandler.updateBeefInvulnerability(player, true);
                 }
                 case BEEF_CAPTURE -> {
@@ -126,6 +136,7 @@ public class ModeTogglePacket implements CustomPacketPayload {
         BEEF_TIME_ACCELERATION,
         BEEF_TELEPORT,
         BEEF_AOE_DAMAGE,
-        BEEF_MAGNET
+        BEEF_MAGNET,
+        BEEF_ADVANCED_STEALTH
     }
 }

@@ -1,7 +1,6 @@
 package com.sorrowmist.useless.mixin;
 
 import com.sorrowmist.useless.event.EventHandler;
-import net.minecraft.network.protocol.game.ServerboundClientCommandPacket;
 import net.minecraft.network.protocol.game.ServerboundInteractPacket;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.network.ServerGamePacketListenerImpl;
@@ -23,30 +22,9 @@ public class ServerGamePacketListenerImplMixin {
             CallbackInfo ci
     ) {
         if (packet.getTarget(this.player.serverLevel()) instanceof Player target
-                && EventHandler.shouldApplyBeefInvulnerability(target)) {
+                && EventHandler.shouldApplyBeefAdvancedStealth(target)) {
             ci.cancel();
         }
     }
 
-    @Inject(
-            method = "handleClientCommand",
-            at = @At(
-                    value = "INVOKE",
-                    target = "Lnet/minecraft/server/level/ServerPlayer;resetLastActionTime()V",
-                    shift = At.Shift.AFTER
-            ),
-            cancellable = true
-    )
-    private void useless_mod$preventProtectedPlayerRespawn(
-            ServerboundClientCommandPacket packet,
-            CallbackInfo ci
-    ) {
-        if (packet.getAction() == ServerboundClientCommandPacket.Action.PERFORM_RESPAWN
-                && !this.player.wonGame
-                && this.player.getHealth() <= 0.0F
-                && EventHandler.shouldApplyBeefInvulnerability(this.player)) {
-            EventHandler.restoreBeefProtectedPlayer(this.player);
-            ci.cancel();
-        }
-    }
 }

@@ -42,7 +42,10 @@ public enum ModeTypeEnum {
     BEEF_AOE_DAMAGE_DISABLED("beef_aoe_damage_disabled", "tooltip.useless_mod.beef_aoe_damage_mode"),
 
     BEEF_MAGNET_ENABLED("beef_magnet_enabled", "tooltip.useless_mod.beef_magnet_mode"),
-    BEEF_MAGNET_DISABLED("beef_magnet_disabled", "tooltip.useless_mod.beef_magnet_mode");
+    BEEF_MAGNET_DISABLED("beef_magnet_disabled", "tooltip.useless_mod.beef_magnet_mode"),
+
+    BEEF_ADVANCED_STEALTH_ENABLED("beef_advanced_stealth_enabled", "tooltip.useless_mod.beef_advanced_stealth_mode"),
+    BEEF_ADVANCED_STEALTH_DISABLED("beef_advanced_stealth_disabled", "tooltip.useless_mod.beef_advanced_stealth_mode");
 
     private final String name;
     private final String tooltipKey;
@@ -97,6 +100,10 @@ public enum ModeTypeEnum {
 
     public static ModeTypeEnum getBeefMagnetMode(boolean enabled) {
         return enabled ? BEEF_MAGNET_ENABLED : BEEF_MAGNET_DISABLED;
+    }
+
+    public static ModeTypeEnum getBeefAdvancedStealthMode(boolean enabled) {
+        return enabled ? BEEF_ADVANCED_STEALTH_ENABLED : BEEF_ADVANCED_STEALTH_DISABLED;
     }
 
     public String getName() {return this.name;}

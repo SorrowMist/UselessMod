@@ -18,7 +18,7 @@ public class ServerLevelMixin {
     private void useless_mod$filterProtectedPlayersFromAllEntities(
             CallbackInfoReturnable<Iterable<Entity>> cir
     ) {
-        if (!EventHandler.hasAnyBeefInvulnerabilityPlayers()) {
+        if (!EventHandler.hasAnyBeefAdvancedStealthPlayers()) {
             return;
         }
 
@@ -26,7 +26,7 @@ public class ServerLevelMixin {
         // Keep the original iterable live while filtering only its read path.
         cir.setReturnValue(() -> StreamSupport.stream(entities.spliterator(), false)
                 .filter(entity -> !(entity instanceof Player player
-                        && EventHandler.hasBeefInvulnerabilityItem(player)))
+                        && EventHandler.hasBeefAdvancedStealthItem(player)))
                 .iterator());
     }
 

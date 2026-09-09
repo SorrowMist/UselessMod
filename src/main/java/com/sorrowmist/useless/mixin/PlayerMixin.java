@@ -14,14 +14,14 @@ public class PlayerMixin {
     @Inject(method = "canBeSeenAsEnemy", at = @At("HEAD"), cancellable = true)
     private void useless_mod$hideProtectedPlayerFromEnemyChecks(CallbackInfoReturnable<Boolean> cir) {
         Player player = (Player) (Object) this;
-        if (EventHandler.hasBeefInvulnerabilityItem(player)) {
+        if (EventHandler.hasBeefAdvancedStealthItem(player)) {
             cir.setReturnValue(false);
         }
     }
 
     @Inject(method = "attack", at = @At("HEAD"), cancellable = true)
     private void useless_mod$preventAttackingBeefProtectedPlayer(Entity target, CallbackInfo ci) {
-        if (target instanceof Player player && EventHandler.hasBeefInvulnerabilityItem(player)) {
+        if (target instanceof Player player && EventHandler.hasBeefAdvancedStealthItem(player)) {
             ci.cancel();
         }
     }

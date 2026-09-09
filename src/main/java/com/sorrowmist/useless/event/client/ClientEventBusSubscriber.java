@@ -53,7 +53,9 @@ public class ClientEventBusSubscriber {
     public static void onKeyInput(ClientTickEvent.Post event) {
         Minecraft mc = Minecraft.getInstance();
         LocalPlayer player = mc.player;
-        if (mc.player == null || mc.screen != null) return;
+        if (player == null) return;
+
+        if (mc.screen != null) return;
 
         // 检测Tab键状态变化
         boolean currentTabPressed = KeyBindings.TRIGGER_CHAIN_MINING_KEY.get().isDown();
@@ -123,7 +125,7 @@ public class ClientEventBusSubscriber {
 
     @SubscribeEvent
     public static void onClientLoggingIn(ClientPlayerNetworkEvent.LoggingIn event) {
-        clearClientBeefProtectionState();
+        lastTabPressed = false;
     }
 
     @SubscribeEvent
@@ -133,18 +135,18 @@ public class ClientEventBusSubscriber {
 
     @SubscribeEvent
     public static void onClientPlayerClone(ClientPlayerNetworkEvent.Clone event) {
-        clearClientBeefProtectionState();
+        lastTabPressed = false;
     }
 
     @SubscribeEvent
     public static void onEntityLeaveLevel(EntityLeaveLevelEvent event) {
         if (event.getLevel().isClientSide() && event.getEntity() instanceof net.minecraft.world.entity.player.Player player) {
-            EventHandler.setClientBeefInvulnerabilityState(player.getId(), false);
+            EventHandler.setClientBeefAdvancedStealthState(player.getId(), false);
         }
     }
 
     private static void clearClientBeefProtectionState() {
-        EventHandler.clearClientBeefInvulnerabilityStates();
+        EventHandler.clearClientBeefAdvancedStealthStates();
         lastTabPressed = false;
     }
 }

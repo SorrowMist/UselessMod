@@ -145,6 +145,15 @@ public final class UComponents {
                            ))
             );
 
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<Boolean>> BeefAdvancedStealthEnabledComponent =
+            register("beef_advanced_stealth_enabled", builder ->
+                    builder.persistent(Codec.BOOL)
+                           .networkSynchronized(StreamCodec.of(
+                                   FriendlyByteBuf::writeBoolean,
+                                   FriendlyByteBuf::readBoolean
+                           ))
+            );
+
     public static final DeferredHolder<DataComponentType<?>, DataComponentType<Boolean>> BeefCaptureEnabledComponent =
             register("beef_capture_enabled", builder ->
                     builder.persistent(Codec.BOOL)

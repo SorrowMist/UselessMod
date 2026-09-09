@@ -16,7 +16,7 @@ public class EntityMixin {
     @Inject(method = "isPickable", at = @At("HEAD"), cancellable = true)
     private void useless_mod$makeBeefPlayerUnpickable(CallbackInfoReturnable<Boolean> cir) {
         Entity entity = (Entity) (Object) this;
-        if (entity instanceof Player player && EventHandler.hasBeefInvulnerabilityItem(player)) {
+        if (entity instanceof Player player && EventHandler.hasBeefAdvancedStealthItem(player)) {
             cir.setReturnValue(false);
         }
     }
@@ -24,7 +24,7 @@ public class EntityMixin {
     @Inject(method = "isAttackable", at = @At("HEAD"), cancellable = true)
     private void useless_mod$makeBeefPlayerUnattackable(CallbackInfoReturnable<Boolean> cir) {
         Entity entity = (Entity) (Object) this;
-        if (entity instanceof Player player && EventHandler.hasBeefInvulnerabilityItem(player)) {
+        if (entity instanceof Player player && EventHandler.hasBeefAdvancedStealthItem(player)) {
             cir.setReturnValue(false);
         }
     }
@@ -32,7 +32,7 @@ public class EntityMixin {
     @Inject(method = "canBeHitByProjectile", at = @At("HEAD"), cancellable = true)
     private void useless_mod$makeBeefPlayerProjectileUntargetable(CallbackInfoReturnable<Boolean> cir) {
         Entity entity = (Entity) (Object) this;
-        if (entity instanceof Player player && EventHandler.hasBeefInvulnerabilityItem(player)) {
+        if (entity instanceof Player player && EventHandler.hasBeefAdvancedStealthItem(player)) {
             cir.setReturnValue(false);
         }
     }
@@ -65,7 +65,7 @@ public class EntityMixin {
     }
 
     private static boolean shouldProtectFromRemoval(Entity.RemovalReason reason) {
-        return reason == Entity.RemovalReason.KILLED || reason == Entity.RemovalReason.DISCARDED;
+        return reason == Entity.RemovalReason.DISCARDED;
     }
 
     private static boolean isUnsafePosition(Player player, double x, double y, double z) {

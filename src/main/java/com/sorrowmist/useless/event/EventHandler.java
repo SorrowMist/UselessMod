@@ -29,6 +29,8 @@ import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.Pose;
+import net.minecraft.world.entity.ai.attributes.AttributeInstance;
+import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.monster.warden.Warden;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
@@ -63,7 +65,9 @@ import java.util.concurrent.ConcurrentHashMap;
 @EventBusSubscriber(modid = UselessMod.MODID)
 public class EventHandler {
     private static final Set<UUID> BEEF_PROTECTED_PLAYERS = Collections.newSetFromMap(new ConcurrentHashMap<>());
-    private static final Set<Integer> CLIENT_BEEF_INVULNERABLE_ENTITY_IDS = Collections.newSetFromMap(new ConcurrentHashMap<>());
+    private static final Set<UUID> BEEF_ADVANCED_STEALTH_PLAYERS = Collections.newSetFromMap(new ConcurrentHashMap<>());
+    private static final Set<Integer> CLIENT_BEEF_ADVANCED_STEALTH_ENTITY_IDS = Collections.newSetFromMap(new ConcurrentHashMap<>());
+    private static final Set<UUID> RESTORING_BEEF_PROTECTED_PLAYERS = ConcurrentHashMap.newKeySet();
 
     @SubscribeEvent(priority = EventPriority.HIGHEST)
     public static void onLivingIncomingDamage(LivingIncomingDamageEvent event) {
@@ -77,7 +81,7 @@ public class EventHandler {
 
     @SubscribeEvent(priority = EventPriority.HIGHEST)
     public static void onLivingChangeTarget(LivingChangeTargetEvent event) {
-        if (event.getNewAboutToBeSetTarget() instanceof Player player && hasBeefInvulnerabilityItem(player)) {
+        if (event.getNewAboutToBeSetTarget() instanceof Player player && hasBeefAdvancedStealthItem(player)) {
             event.setCanceled(true);
         }
     }
@@ -146,7 +150,7 @@ public class EventHandler {
 
     @SubscribeEvent(priority = EventPriority.HIGHEST)
     public static void onAttackEntity(AttackEntityEvent event) {
-        if (event.getTarget() instanceof Player player && hasBeefInvulnerabilityItem(player)) {
+        if (event.getTarget() instanceof Player player && hasBeefAdvancedStealthItem(player)) {
             event.setCanceled(true);
         }
     }
@@ -237,28 +241,47 @@ public class EventHandler {
         migrateLegacyBeefInvulnerability(player);
 
         boolean hasItemInInventory = UselessItemUtils.hasInvulnerabilityEnabledTargetToolInInventory(player);
+        boolean hasAdvancedStealth = UselessItemUtils.hasAdvancedStealthEnabledTargetToolInInventory(player);
+        if (hasAdvancedStealth && !hasItemInInventory) {
+            UselessItemUtils.enableInvulnerabilityForAdvancedStealth(player);
+            hasItemInInventory = UselessItemUtils.hasInvulnerabilityEnabledTargetToolInInventory(player);
+        }
         UUID uuid = player.getUUID();
 
         if (hasItemInInventory) {
             boolean newlyTracked = BEEF_PROTECTED_PLAYERS.add(uuid);
             claimBeefInvulnerability(player);
             if (newlyTracked) {
-                clearBeefProtectionState(player);
+                clearBeefNegativeEffects(player);
             }
-            if (player instanceof ServerPlayer serverPlayer && (forceSync || newlyTracked || player.tickCount % 20 == 0)) {
-                PacketDistributor.sendToPlayersTrackingEntityAndSelf(serverPlayer, new BeefInvulnerabilityStatePacket(serverPlayer.getId(), true));
-            }
-            return;
+        } else {
+            BEEF_PROTECTED_PLAYERS.remove(uuid);
+            releaseBeefInvulnerability(player);
         }
 
-        boolean wasTracked = BEEF_PROTECTED_PLAYERS.remove(uuid);
-        boolean released = releaseBeefInvulnerability(player);
-        if (player instanceof ServerPlayer serverPlayer && (forceSync || wasTracked || released)) {
-            PacketDistributor.sendToPlayersTrackingEntityAndSelf(serverPlayer, new BeefInvulnerabilityStatePacket(serverPlayer.getId(), false));
+        boolean newlyStealthTracked = hasAdvancedStealth && BEEF_ADVANCED_STEALTH_PLAYERS.add(uuid);
+        boolean stealthReleased = !hasAdvancedStealth && BEEF_ADVANCED_STEALTH_PLAYERS.remove(uuid);
+        if (newlyStealthTracked) {
+            clearBeefAdvancedStealthState(player);
+        }
+        if (player instanceof ServerPlayer serverPlayer
+                && (forceSync || newlyStealthTracked || stealthReleased || player.tickCount % 20 == 0)) {
+            PacketDistributor.sendToPlayersTrackingEntityAndSelf(
+                    serverPlayer,
+                    new BeefInvulnerabilityStatePacket(serverPlayer.getId(), hasAdvancedStealth)
+            );
         }
     }
 
-    private static void clearBeefProtectionState(Player player) {
+    private static void clearBeefNegativeEffects(Player player) {
+        player.getActiveEffects().stream()
+                .filter(EventHandler::isNonBeneficialEffect)
+                .map(MobEffectInstance::getEffect)
+                .toList()
+                .forEach(player::removeEffect);
+    }
+
+    private static void clearBeefAdvancedStealthState(Player player) {
         if (player.level() instanceof ServerLevel serverLevel) {
             for (Entity entity : serverLevel.getAllEntities()) {
                 if (entity instanceof Warden warden
@@ -270,12 +293,6 @@ public class EventHandler {
                 }
             }
         }
-
-        player.getActiveEffects().stream()
-                .filter(EventHandler::isNonBeneficialEffect)
-                .map(MobEffectInstance::getEffect)
-                .toList()
-                .forEach(player::removeEffect);
     }
 
     static boolean isNonBeneficialEffect(MobEffectInstance effect) {
@@ -311,6 +328,10 @@ public class EventHandler {
 
     private static void claimBeefInvulnerability(Player player) {
         CompoundTag ownershipData = BeefInvulnerabilityOwnership.getOrCreate(player);
+        AttributeInstance maxHealth = player.getAttribute(Attributes.MAX_HEALTH);
+        if (maxHealth != null) {
+            BeefInvulnerabilityOwnership.rememberMaxHealthBase(ownershipData, maxHealth.getBaseValue());
+        }
         BeefInvulnerabilityOwnership.claim(ownershipData, player.isInvulnerable());
         if (!player.isInvulnerable()) {
             player.setInvulnerable(true);
@@ -332,55 +353,111 @@ public class EventHandler {
         return !player.level().isClientSide() && hasBeefInvulnerabilityItem(player);
     }
 
+    public static boolean isRestoringBeefProtectedPlayer(Player player) {
+        return RESTORING_BEEF_PROTECTED_PLAYERS.contains(player.getUUID());
+    }
+
     public static boolean hasBeefInvulnerabilityItem(Player player) {
         if (player.level().isClientSide()) {
-            return CLIENT_BEEF_INVULNERABLE_ENTITY_IDS.contains(player.getId());
+            return UselessItemUtils.hasInvulnerabilityEnabledTargetToolInInventory(player);
         }
-        return BEEF_PROTECTED_PLAYERS.contains(player.getUUID());
+        return BEEF_PROTECTED_PLAYERS.contains(player.getUUID())
+                || UselessItemUtils.hasInvulnerabilityEnabledTargetToolInInventory(player);
     }
 
-    public static boolean hasAnyBeefInvulnerabilityPlayers() {
-        return !BEEF_PROTECTED_PLAYERS.isEmpty() || !CLIENT_BEEF_INVULNERABLE_ENTITY_IDS.isEmpty();
+    public static boolean hasBeefAdvancedStealthItem(Player player) {
+        if (player.level().isClientSide()) {
+            return CLIENT_BEEF_ADVANCED_STEALTH_ENTITY_IDS.contains(player.getId())
+                    || UselessItemUtils.hasAdvancedStealthEnabledTargetToolInInventory(player);
+        }
+        return BEEF_ADVANCED_STEALTH_PLAYERS.contains(player.getUUID())
+                || UselessItemUtils.hasAdvancedStealthEnabledTargetToolInInventory(player);
     }
 
-    public static void setClientBeefInvulnerabilityState(int entityId, boolean protectedState) {
-        if (protectedState) {
-            CLIENT_BEEF_INVULNERABLE_ENTITY_IDS.add(entityId);
+    public static boolean shouldApplyBeefAdvancedStealth(Player player) {
+        return !player.level().isClientSide() && hasBeefAdvancedStealthItem(player);
+    }
+
+    public static boolean hasAnyBeefAdvancedStealthPlayers() {
+        return !BEEF_ADVANCED_STEALTH_PLAYERS.isEmpty()
+                || !CLIENT_BEEF_ADVANCED_STEALTH_ENTITY_IDS.isEmpty();
+    }
+
+    public static void setClientBeefAdvancedStealthState(int entityId, boolean stealthEnabled) {
+        if (stealthEnabled) {
+            CLIENT_BEEF_ADVANCED_STEALTH_ENTITY_IDS.add(entityId);
             return;
         }
-        CLIENT_BEEF_INVULNERABLE_ENTITY_IDS.remove(entityId);
+        CLIENT_BEEF_ADVANCED_STEALTH_ENTITY_IDS.remove(entityId);
     }
 
-    public static void clearClientBeefInvulnerabilityStates() {
-        CLIENT_BEEF_INVULNERABLE_ENTITY_IDS.clear();
+    public static void clearClientBeefAdvancedStealthStates() {
+        CLIENT_BEEF_ADVANCED_STEALTH_ENTITY_IDS.clear();
     }
 
     public static void restoreBeefProtectedPlayer(Player player) {
-        if (!player.level().isClientSide()) {
-            BEEF_PROTECTED_PLAYERS.add(player.getUUID());
-            migrateLegacyBeefInvulnerability(player);
-            claimBeefInvulnerability(player);
+        if (!RESTORING_BEEF_PROTECTED_PLAYERS.add(player.getUUID())) {
+            return;
         }
 
-        float maxHealth = player.getMaxHealth();
-        player.dead = false;
-        player.deathTime = 0;
-        player.hurtTime = 0;
-        player.hurtDuration = 0;
-        player.setHealth(maxHealth);
-        player.setPose(Pose.STANDING);
-        player.clearFire();
-        player.fallDistance = 0.0F;
-        if (player instanceof ServerPlayer serverPlayer) {
-            PacketDistributor.sendToPlayersTrackingEntityAndSelf(serverPlayer, new BeefInvulnerabilityStatePacket(serverPlayer.getId(), true));
-            PacketDistributor.sendToPlayersTrackingEntityAndSelf(serverPlayer, new BeefInvulnerabilitySyncPacket(serverPlayer.getId(), maxHealth));
+        try {
+            if (!player.level().isClientSide()) {
+                BEEF_PROTECTED_PLAYERS.add(player.getUUID());
+                migrateLegacyBeefInvulnerability(player);
+                claimBeefInvulnerability(player);
+                restoreCorruptedMaxHealth(player);
+            }
+
+            float maxHealth = player.getMaxHealth();
+            if (!Float.isFinite(maxHealth) || maxHealth <= 0.0F) {
+                restoreCorruptedMaxHealth(player);
+                maxHealth = player.getMaxHealth();
+            }
+            if (!Float.isFinite(maxHealth) || maxHealth <= 0.0F) {
+                return;
+            }
+
+            player.dead = false;
+            player.deathTime = 0;
+            player.hurtTime = 0;
+            player.hurtDuration = 0;
+            player.setHealth(maxHealth);
+            player.setPose(Pose.STANDING);
+            player.clearFire();
+            player.fallDistance = 0.0F;
+            if (player instanceof ServerPlayer serverPlayer) {
+                PacketDistributor.sendToPlayersTrackingEntityAndSelf(
+                        serverPlayer,
+                        new BeefInvulnerabilityStatePacket(
+                                serverPlayer.getId(), BEEF_ADVANCED_STEALTH_PLAYERS.contains(serverPlayer.getUUID()))
+                );
+                PacketDistributor.sendToPlayersTrackingEntityAndSelf(serverPlayer, new BeefInvulnerabilitySyncPacket(serverPlayer.getId(), maxHealth));
+            }
+        } finally {
+            RESTORING_BEEF_PROTECTED_PLAYERS.remove(player.getUUID());
         }
+    }
+
+    private static void restoreCorruptedMaxHealth(Player player) {
+        AttributeInstance maxHealth = player.getAttribute(Attributes.MAX_HEALTH);
+        if (maxHealth == null) {
+            return;
+        }
+
+        if (Double.isFinite(maxHealth.getBaseValue()) && maxHealth.getBaseValue() > 0.0D
+                && Float.isFinite(player.getMaxHealth()) && player.getMaxHealth() > 0.0F) {
+            return;
+        }
+
+        maxHealth.setBaseValue(BeefInvulnerabilityOwnership.previousMaxHealthBase(
+                BeefInvulnerabilityOwnership.get(player)));
     }
 
     @SubscribeEvent
     public static void onPlayerLoggedIn(PlayerEvent.PlayerLoggedInEvent event) {
         updateBeefInvulnerability(event.getEntity(), true);
         if (event.getEntity() instanceof ServerPlayer player) {
+            syncAdvancedStealthPlayersTo(player);
             GrassWandDropHandler.onPlayerLoggedIn(player);
         }
     }
@@ -396,6 +473,32 @@ public class EventHandler {
     }
 
     @SubscribeEvent
+    public static void onPlayerStartTracking(PlayerEvent.StartTracking event) {
+        if (!(event.getEntity() instanceof ServerPlayer trackingPlayer)
+                || !(event.getTarget() instanceof ServerPlayer target)
+                || !shouldApplyBeefAdvancedStealth(target)) {
+            return;
+        }
+
+        sendAdvancedStealthState(trackingPlayer, target);
+    }
+
+    private static void syncAdvancedStealthPlayersTo(ServerPlayer viewer) {
+        for (ServerPlayer target : viewer.serverLevel().players()) {
+            if (target != viewer && shouldApplyBeefAdvancedStealth(target)) {
+                sendAdvancedStealthState(viewer, target);
+            }
+        }
+    }
+
+    private static void sendAdvancedStealthState(ServerPlayer viewer, ServerPlayer target) {
+        PacketDistributor.sendToPlayer(
+                viewer,
+                new BeefInvulnerabilityStatePacket(target.getId(), true)
+        );
+    }
+
+    @SubscribeEvent
     public static void onLevelLoad(LevelEvent.Load event) {
         if (event.getLevel() instanceof ServerLevel level
                 && UselessDimensions.isUselessDimension(level.dimension())) {
@@ -406,6 +509,7 @@ public class EventHandler {
     @SubscribeEvent
     public static void onPlayerLoggedOut(PlayerEvent.PlayerLoggedOutEvent event) {
         BEEF_PROTECTED_PLAYERS.remove(event.getEntity().getUUID());
+        BEEF_ADVANCED_STEALTH_PLAYERS.remove(event.getEntity().getUUID());
         if (event.getEntity() instanceof ServerPlayer player) {
             GrassWandDropHandler.onPlayerLoggedOut(player);
         }
@@ -465,6 +569,8 @@ public class EventHandler {
 
     @SubscribeEvent
     public static void onServerStopped(ServerStoppedEvent event) {
+        BEEF_PROTECTED_PLAYERS.clear();
+        BEEF_ADVANCED_STEALTH_PLAYERS.clear();
         GrassWandDropHandler.clearCache();
     }
 

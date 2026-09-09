@@ -28,14 +28,14 @@ public interface EntityGetterMixin {
     )
     private static List<? extends Player> useless_mod$filterProtectedPlayers(EntityGetter getter) {
         List<? extends Player> players = getter.players();
-        if (!EventHandler.hasAnyBeefInvulnerabilityPlayers()) {
+        if (!EventHandler.hasAnyBeefAdvancedStealthPlayers()) {
             return players;
         }
 
         List<Player> filtered = null;
         for (int i = 0; i < players.size(); i++) {
             Player player = players.get(i);
-            if (EventHandler.hasBeefInvulnerabilityItem(player)) {
+            if (EventHandler.hasBeefAdvancedStealthItem(player)) {
                 if (filtered == null) {
                     filtered = new ArrayList<>(players.size() - 1);
                     filtered.addAll(players.subList(0, i));

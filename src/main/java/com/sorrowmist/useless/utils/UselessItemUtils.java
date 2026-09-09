@@ -249,7 +249,9 @@ public class UselessItemUtils {
             return false;
         }
 
-        return player.getInventory().items.stream().anyMatch(UselessItemUtils::isTargetTool);
+        return isTargetTool(player.getMainHandItem())
+                || isTargetTool(player.getOffhandItem())
+                || player.getInventory().items.stream().anyMatch(UselessItemUtils::isTargetTool);
     }
 
     public static boolean hasInvulnerabilityEnabledTargetToolInInventory(Player player) {
@@ -257,10 +259,58 @@ public class UselessItemUtils {
             return false;
         }
 
-        return player.getInventory().items.stream().anyMatch(UselessItemUtils::isInvulnerabilityEnabledTargetTool);
+        return isInvulnerabilityEnabledTargetTool(player.getMainHandItem())
+                || isInvulnerabilityEnabledTargetTool(player.getOffhandItem())
+                || player.getInventory().items.stream().anyMatch(UselessItemUtils::isInvulnerabilityEnabledTargetTool);
+    }
+
+    public static boolean hasAdvancedStealthEnabledTargetToolInInventory(Player player) {
+        if (player == null || player.getInventory() == null) {
+            return false;
+        }
+
+        return isAdvancedStealthEnabledTargetTool(player.getMainHandItem())
+                || isAdvancedStealthEnabledTargetTool(player.getOffhandItem())
+                || player.getInventory().items.stream().anyMatch(UselessItemUtils::isAdvancedStealthEnabledTargetTool);
+    }
+
+    public static boolean enableInvulnerabilityForAdvancedStealth(Player player) {
+        if (player == null || player.getInventory() == null) {
+            return false;
+        }
+
+        boolean changed = enableInvulnerabilityForAdvancedStealth(player.getMainHandItem());
+        changed |= enableInvulnerabilityForAdvancedStealth(player.getOffhandItem());
+        for (ItemStack itemStack : player.getInventory().items) {
+            changed |= enableInvulnerabilityForAdvancedStealth(itemStack);
+        }
+        if (changed) {
+            player.getInventory().setChanged();
+            player.containerMenu.broadcastChanges();
+        }
+        return changed;
     }
 
     private static boolean isInvulnerabilityEnabledTargetTool(ItemStack itemStack) {
-        return isTargetTool(itemStack) && itemStack.getOrDefault(UComponents.BeefInvulnerabilityEnabledComponent.get(), false);
+        if (!isTargetTool(itemStack)) {
+            return false;
+        }
+
+        Boolean enabled = itemStack.get(UComponents.BeefInvulnerabilityEnabledComponent.get());
+        return enabled != null ? enabled : itemStack.getItem() instanceof EndlessBeafItem;
+    }
+
+    private static boolean isAdvancedStealthEnabledTargetTool(ItemStack itemStack) {
+        return isTargetTool(itemStack)
+                && itemStack.getOrDefault(UComponents.BeefAdvancedStealthEnabledComponent.get(), false);
+    }
+
+    private static boolean enableInvulnerabilityForAdvancedStealth(ItemStack itemStack) {
+        if (!isAdvancedStealthEnabledTargetTool(itemStack)
+                || itemStack.getOrDefault(UComponents.BeefInvulnerabilityEnabledComponent.get(), false)) {
+            return false;
+        }
+        itemStack.set(UComponents.BeefInvulnerabilityEnabledComponent.get(), true);
+        return true;
     }
 }

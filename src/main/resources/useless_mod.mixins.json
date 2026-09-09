@@ -35,10 +35,10 @@
     "eae.TileAssemblerMatrixPatternMixin"
   ],
   "server": [
-    "PlayerListMixin",
     "ServerGamePacketListenerImplMixin"
   ],
   "client": [
+    "ClientLevelMixin",
     "botanypots.BotanyPotRendererMixin",
     "botanypots.PhasedDisplayStateRendererMixin",
     "eae.GuiAssemblerMatrixPatternInfoMixin"

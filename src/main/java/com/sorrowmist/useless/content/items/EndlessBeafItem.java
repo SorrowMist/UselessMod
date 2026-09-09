@@ -139,6 +139,7 @@ public class EndlessBeafItem extends TieredItem {
                 .component(UComponents.ForceKillEnabledComponent, false)
                 .component(UComponents.BeefTimeAccelerationEnabledComponent, false)
                 .component(UComponents.BeefInvulnerabilityEnabledComponent, true)
+                .component(UComponents.BeefAdvancedStealthEnabledComponent, false)
                 .component(UComponents.BeefCaptureEnabledComponent, false)
                 .component(UComponents.BeefTeleportEnabledComponent, false)
                 .component(UComponents.BeefAoeDamageEnabledComponent, false)
@@ -1025,7 +1026,10 @@ public class EndlessBeafItem extends TieredItem {
                                        ).withStyle(beefTimeAccelerationEnabled ? ChatFormatting.GREEN : ChatFormatting.GRAY))
                                        .withStyle(ChatFormatting.AQUA));
 
-        boolean beefInvulnerabilityEnabled = stack.getOrDefault(UComponents.BeefInvulnerabilityEnabledComponent.get(), false);
+        Boolean beefInvulnerabilityValue = stack.get(UComponents.BeefInvulnerabilityEnabledComponent.get());
+        boolean beefInvulnerabilityEnabled = beefInvulnerabilityValue != null
+                ? beefInvulnerabilityValue
+                : stack.getItem() instanceof EndlessBeafItem;
         tooltipComponents.add(Component.translatable("tooltip.useless_mod.beef_invulnerability_mode")
                                        .append(": ")
                                        .append(Component.translatable(
@@ -1033,6 +1037,16 @@ public class EndlessBeafItem extends TieredItem {
                                                        "tooltip.useless_mod.disable"
                                        ).withStyle(beefInvulnerabilityEnabled ? ChatFormatting.GREEN : ChatFormatting.GRAY))
                                        .withStyle(ChatFormatting.DARK_PURPLE));
+
+        boolean beefAdvancedStealthEnabled = stack.getOrDefault(
+                UComponents.BeefAdvancedStealthEnabledComponent.get(), false);
+        tooltipComponents.add(Component.translatable("tooltip.useless_mod.beef_advanced_stealth_mode")
+                                       .append(": ")
+                                       .append(Component.translatable(
+                                               beefAdvancedStealthEnabled ? "tooltip.useless_mod.enable" :
+                                                       "tooltip.useless_mod.disable"
+                                       ).withStyle(beefAdvancedStealthEnabled ? ChatFormatting.GREEN : ChatFormatting.GRAY))
+                                       .withStyle(ChatFormatting.LIGHT_PURPLE));
 
         boolean beefCaptureEnabled = stack.getOrDefault(UComponents.BeefCaptureEnabledComponent.get(), false);
         tooltipComponents.add(Component.translatable("tooltip.useless_mod.beef_capture_mode")

@@ -15,7 +15,7 @@ public class LivingEntityMixin {
     @Inject(method = "canBeSeenByAnyone", at = @At("HEAD"), cancellable = true)
     private void useless_mod$hideProtectedPlayerFromVisibilityChecks(CallbackInfoReturnable<Boolean> cir) {
         LivingEntity entity = (LivingEntity) (Object) this;
-        if (entity instanceof Player player && EventHandler.hasBeefInvulnerabilityItem(player)) {
+        if (entity instanceof Player player && EventHandler.hasBeefAdvancedStealthItem(player)) {
             cir.setReturnValue(false);
         }
     }
@@ -41,7 +41,10 @@ public class LivingEntityMixin {
     @Inject(method = "setHealth", at = @At("HEAD"), cancellable = true)
     private void useless_mod$protectBeefPlayerFromSetHealth(float health, CallbackInfo ci) {
         LivingEntity entity = (LivingEntity) (Object) this;
-        if ((health <= 0.0F || Float.isNaN(health)) && entity instanceof Player player && EventHandler.hasBeefInvulnerabilityItem(player)) {
+        if ((health <= 0.0F || Float.isNaN(health))
+                && entity instanceof Player player
+                && EventHandler.hasBeefInvulnerabilityItem(player)
+                && !EventHandler.isRestoringBeefProtectedPlayer(player)) {
             EventHandler.restoreBeefProtectedPlayer(player);
             ci.cancel();
         }
@@ -50,7 +53,10 @@ public class LivingEntityMixin {
     @Inject(method = "hurt", at = @At("HEAD"), cancellable = true)
     private void useless_mod$protectBeefPlayerFromHurt(DamageSource source, float amount, CallbackInfoReturnable<Boolean> cir) {
         LivingEntity entity = (LivingEntity) (Object) this;
-        if ((!Float.isFinite(amount) || amount >= entity.getMaxHealth() || entity.getHealth() - amount <= 0.0F) && entity instanceof Player player && EventHandler.hasBeefInvulnerabilityItem(player)) {
+        if ((!Float.isFinite(amount) || amount >= entity.getMaxHealth() || entity.getHealth() - amount <= 0.0F)
+                && entity instanceof Player player
+                && EventHandler.hasBeefInvulnerabilityItem(player)
+                && !EventHandler.isRestoringBeefProtectedPlayer(player)) {
             EventHandler.restoreBeefProtectedPlayer(player);
             cir.setReturnValue(false);
         }
@@ -59,7 +65,9 @@ public class LivingEntityMixin {
     @Inject(method = "die", at = @At("HEAD"), cancellable = true)
     private void useless_mod$protectBeefPlayerFromDie(DamageSource source, CallbackInfo ci) {
         LivingEntity entity = (LivingEntity) (Object) this;
-        if (entity instanceof Player player && EventHandler.hasBeefInvulnerabilityItem(player)) {
+        if (entity instanceof Player player
+                && EventHandler.hasBeefInvulnerabilityItem(player)
+                && !EventHandler.isRestoringBeefProtectedPlayer(player)) {
             EventHandler.restoreBeefProtectedPlayer(player);
             ci.cancel();
         }

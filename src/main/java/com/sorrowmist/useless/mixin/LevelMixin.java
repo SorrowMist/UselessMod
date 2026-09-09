@@ -20,15 +20,29 @@ import java.util.function.Predicate;
 public class LevelMixin {
     @Inject(method = "getEntities(Lnet/minecraft/world/level/entity/EntityTypeTest;Lnet/minecraft/world/phys/AABB;Ljava/util/function/Predicate;)Ljava/util/List;", at = @At("RETURN"), cancellable = true)
     private <T extends Entity> void useless_mod$filterBeefProtectedPlayers(EntityTypeTest<Entity, T> entityTypeTest, AABB area, Predicate<? super T> predicate, CallbackInfoReturnable<List<T>> cir) {
-        List<T> entities = cir.getReturnValue();
+        List<T> filtered = useless_mod$filterBeefProtectedPlayers(cir.getReturnValue());
+        if (filtered != null) {
+            cir.setReturnValue(filtered);
+        }
+    }
+
+    @Inject(method = "getEntities(Lnet/minecraft/world/entity/Entity;Lnet/minecraft/world/phys/AABB;Ljava/util/function/Predicate;)Ljava/util/List;", at = @At("RETURN"), cancellable = true)
+    private void useless_mod$filterBeefProtectedPlayersFromEntityQuery(Entity except, AABB area, Predicate<? super Entity> predicate, CallbackInfoReturnable<List<Entity>> cir) {
+        List<Entity> filtered = useless_mod$filterBeefProtectedPlayers(cir.getReturnValue());
+        if (filtered != null) {
+            cir.setReturnValue(filtered);
+        }
+    }
+
+    private static <T extends Entity> List<T> useless_mod$filterBeefProtectedPlayers(List<T> entities) {
         if (entities == null || entities.isEmpty()) {
-            return;
+            return null;
         }
 
         List<T> filtered = null;
         for (int i = 0; i < entities.size(); i++) {
             T entity = entities.get(i);
-            if (entity instanceof Player player && EventHandler.hasBeefInvulnerabilityItem(player)) {
+            if (entity instanceof Player player && EventHandler.hasBeefAdvancedStealthItem(player)) {
                 if (filtered == null) {
                     filtered = new ArrayList<>(entities.size());
                     for (T previous : entities.subList(0, i)) {
@@ -43,9 +57,7 @@ public class LevelMixin {
             }
         }
 
-        if (filtered != null) {
-            cir.setReturnValue(filtered);
-        }
+        return filtered;
     }
 
     @Inject(

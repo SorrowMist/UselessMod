@@ -80,7 +80,10 @@ public class ModeWheelScreen extends Screen {
         boolean beefTimeAccelerationEnabled = this.targetItem.getOrDefault(
                 UComponents.BeefTimeAccelerationEnabledComponent, false);
         boolean beefInvulnerabilityEnabled = this.targetItem.getOrDefault(
-                UComponents.BeefInvulnerabilityEnabledComponent, false);
+                UComponents.BeefInvulnerabilityEnabledComponent,
+                this.targetItem.getItem() instanceof EndlessBeafItem);
+        boolean beefAdvancedStealthEnabled = this.targetItem.getOrDefault(
+                UComponents.BeefAdvancedStealthEnabledComponent, false);
         boolean beefCaptureEnabled = this.targetItem.getOrDefault(UComponents.BeefCaptureEnabledComponent, false);
         boolean beefTeleportEnabled = this.targetItem.getOrDefault(UComponents.BeefTeleportEnabledComponent, false);
         boolean beefAoeDamageEnabled = this.targetItem.getOrDefault(UComponents.BeefAoeDamageEnabledComponent, false);
@@ -165,6 +168,10 @@ public class ModeWheelScreen extends Screen {
                 ModeTypeEnum.getBeefInvulnerabilityMode(beefInvulnerabilityEnabled),
                 ModeTypeEnum.getBeefInvulnerabilityMode(beefInvulnerabilityEnabled).getTooltip(),
                 beefInvulnerabilityEnabled));
+        this.auxiliaryModes.add(new ModeData(
+                ModeTypeEnum.getBeefAdvancedStealthMode(beefAdvancedStealthEnabled),
+                ModeTypeEnum.getBeefAdvancedStealthMode(beefAdvancedStealthEnabled).getTooltip(),
+                beefAdvancedStealthEnabled));
         if (this.targetItem.getItem() instanceof EndlessBeafItem) {
             this.auxiliaryModes.add(new ModeData(
                     ModeTypeEnum.getBeefTeleportMode(beefTeleportEnabled),
@@ -445,6 +452,12 @@ public class ModeWheelScreen extends Screen {
                             UComponents.BeefInvulnerabilityEnabledComponent, false);
                     PacketDistributor.sendToServer(new ModeTogglePacket(
                             ModeTogglePacket.ModeType.BEEF_INVULNERABILITY, !currentEnabled));
+                }
+                case BEEF_ADVANCED_STEALTH_ENABLED, BEEF_ADVANCED_STEALTH_DISABLED -> {
+                    boolean currentEnabled = this.targetItem.getOrDefault(
+                            UComponents.BeefAdvancedStealthEnabledComponent, false);
+                    PacketDistributor.sendToServer(new ModeTogglePacket(
+                            ModeTogglePacket.ModeType.BEEF_ADVANCED_STEALTH, !currentEnabled));
                 }
                 case BEEF_CAPTURE_ENABLED, BEEF_CAPTURE_DISABLED -> {
                     boolean currentEnabled = this.targetItem.getOrDefault(

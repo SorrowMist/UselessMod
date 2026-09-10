@@ -32,7 +32,6 @@ import java.util.OptionalLong;
 import java.util.Set;
 import java.util.WeakHashMap;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import org.slf4j.Logger;
@@ -129,38 +128,9 @@ public final class AlloyFurnaceRecipeCatalog {
 
     public static Optional<Entry> resolve(Level level, AlloyFurnaceRecipeIdentity identity) {
         if (level == null || identity == null) return Optional.empty();
-        Object cacheKey = level.getRecipeManager();
-        Snapshot snapshot = snapshot(level);
+        Snapshot snapshot = snapshotIfReady(level);
+        if (snapshot == null) return Optional.empty();
         Entry resolved = snapshot.byIdentity.get(identity);
-        if (resolved != null) {
-            return Optional.of(resolved);
-        }
-        if (!snapshot.misses.claimCompensationRebuild(identity)) {
-            return Optional.empty();
-        }
-
-        // A pattern can be decoded while a datapack/compat adapter is still
-        // finishing its recipe registration. Rebuild once on an identity miss
-        // for the whole snapshot generation. Use the same per-recipe-manager
-        // lock as the normal prewarm path so concurrent misses cannot build
-        // duplicate snapshots.
-        Snapshot rebuilt = rebuildAfterMiss(level, cacheKey, snapshot);
-        if (GENERATION.get() != snapshot.generation) {
-            return resolve(level, identity);
-        }
-        synchronized (CACHE) {
-            Snapshot current = CACHE.get(cacheKey);
-            if (current == snapshot) {
-                CACHE.put(cacheKey, rebuilt);
-                snapshot = rebuilt;
-            } else if (current != null) {
-                snapshot = current;
-            }
-        }
-        resolved = snapshot.byIdentity.get(identity);
-        if (resolved == null) {
-            snapshot.misses.remember(identity);
-        }
         return Optional.ofNullable(resolved);
     }
 
@@ -170,7 +140,8 @@ public final class AlloyFurnaceRecipeCatalog {
         if (level == null || identity == null) return Optional.empty();
         String normalizedSource = RecipeSourceIds.normalize(sourceId);
         if (RecipeSourceIds.UNKNOWN.equals(normalizedSource)) return resolve(level, identity);
-        Snapshot snapshot = snapshot(level);
+        Snapshot snapshot = snapshotIfReady(level);
+        if (snapshot == null) return Optional.empty();
         Entry resolved = snapshot.bySourceAndRecipeId
                 .getOrDefault(new SourceRecipeKey(normalizedSource, identity.recipeId()), List.of())
                 .stream()
@@ -181,10 +152,10 @@ public final class AlloyFurnaceRecipeCatalog {
     }
 
     /**
-     * Resolves a pattern binding, accepting a cross-side catalog rebuild when the stored fingerprint
-     * no longer exists locally but the recipe id and encoded processing contents identify exactly
-     * one current recipe. The exact identity remains the first choice; the fallback is deliberately
-     * unique-only so two recipes sharing a pattern cannot silently acquire the wrong mold.
+     * Resolves a pattern binding when the stored fingerprint differs across the client/server
+     * boundary but the recipe id and encoded processing contents identify exactly one current recipe.
+     * The exact identity remains the first choice; the fallback is deliberately unique-only so two
+     * recipes sharing a pattern cannot silently acquire the wrong mold.
      */
     public static Optional<Entry> resolvePattern(
             Level level, AlloyFurnaceRecipeIdentity identity, IPatternDetails pattern) {
@@ -193,7 +164,8 @@ public final class AlloyFurnaceRecipeCatalog {
         Optional<Entry> exact = resolve(level, identity);
         if (exact.isPresent()) return exact;
 
-        Snapshot snapshot = snapshot(level);
+        Snapshot snapshot = snapshotIfReady(level);
+        if (snapshot == null) return Optional.empty();
         Set<Integer> componentAgnosticOutputs = componentAgnosticOutputSlots(pattern, level, null);
         List<Entry> candidates = snapshot.byRecipeId
                 .getOrDefault(identity.recipeId(), List.of())
@@ -232,7 +204,8 @@ public final class AlloyFurnaceRecipeCatalog {
         }
         Optional<Entry> exact = resolve(level, normalizedSource, identity);
         if (exact.isPresent()) return exact;
-        Snapshot snapshot = snapshot(level);
+        Snapshot snapshot = snapshotIfReady(level);
+        if (snapshot == null) return Optional.empty();
         Set<Integer> componentAgnosticOutputs = componentAgnosticOutputSlots(pattern, level, normalizedSource);
         List<Entry> candidates = snapshot.bySourceAndRecipeId
                 .getOrDefault(new SourceRecipeKey(normalizedSource, identity.recipeId()), List.of())
@@ -257,7 +230,8 @@ public final class AlloyFurnaceRecipeCatalog {
     public static Optional<Entry> resolveLegacyPattern(
             Level level, AlloyFurnaceRecipeIdentity legacyIdentity, IPatternDetails pattern, int version) {
         if (level == null || legacyIdentity == null || pattern == null) return Optional.empty();
-        Snapshot snapshot = snapshot(level);
+        Snapshot snapshot = snapshotIfReady(level);
+        if (snapshot == null) return Optional.empty();
         Entry cached = snapshot.byIdentity.get(legacyIdentity);
         if (cached != null) return Optional.of(cached);
         cached = snapshot.compatibilityAliases.get(legacyIdentity);
@@ -293,7 +267,8 @@ public final class AlloyFurnaceRecipeCatalog {
         if (RecipeSourceIds.UNKNOWN.equals(normalizedSource)) {
             return resolveLegacyPattern(level, legacyIdentity, pattern, version);
         }
-        Snapshot snapshot = snapshot(level);
+        Snapshot snapshot = snapshotIfReady(level);
+        if (snapshot == null) return Optional.empty();
         Entry match = null;
         for (Entry entry : snapshot.bySourceAndRecipeId
                 .getOrDefault(new SourceRecipeKey(normalizedSource, legacyIdentity.recipeId()), List.of())) {
@@ -450,7 +425,7 @@ public final class AlloyFurnaceRecipeCatalog {
                         return cached;
                     }
                 }
-                Snapshot built = build(level, generation, false);
+                Snapshot built = build(level, generation);
                 if (GENERATION.get() != generation) continue;
                 synchronized (CACHE) {
                     cached = CACHE.get(cacheKey);
@@ -464,33 +439,17 @@ public final class AlloyFurnaceRecipeCatalog {
         }
     }
 
-    private static Snapshot rebuildAfterMiss(Level level, Object cacheKey, Snapshot expected) {
-        Object buildLock = buildLock(cacheKey);
-        synchronized (buildLock) {
-            long generation = GENERATION.get();
-            if (generation != expected.generation) {
-                return snapshot(level);
-            }
-
-            synchronized (CACHE) {
-                Snapshot current = CACHE.get(cacheKey);
-                if (current != null && current != expected && current.generation == generation) {
-                    return current;
-                }
-            }
-
-            Snapshot rebuilt = build(level, generation, true);
-            if (GENERATION.get() != generation) {
-                return snapshot(level);
-            }
-            synchronized (CACHE) {
-                Snapshot current = CACHE.get(cacheKey);
-                if (current != null && current != expected && current.generation == generation) {
-                    return current;
-                }
-                CACHE.put(cacheKey, rebuilt);
-                return rebuilt;
-            }
+    /**
+     * Returns the current catalog without doing work. Pattern decoding can run on the server
+     * thread, so a cache miss here must not turn into a synchronous scan of every adapter recipe.
+     */
+    private static Snapshot snapshotIfReady(Level level) {
+        if (level == null) return null;
+        Object cacheKey = level.getRecipeManager();
+        long generation = GENERATION.get();
+        synchronized (CACHE) {
+            Snapshot cached = CACHE.get(cacheKey);
+            return cached != null && cached.generation == generation ? cached : null;
         }
     }
 
@@ -500,7 +459,7 @@ public final class AlloyFurnaceRecipeCatalog {
         }
     }
 
-    private static Snapshot build(Level level, long generation, boolean compensationRebuildUsed) {
+    private static Snapshot build(Level level, long generation) {
         long startedAt = System.nanoTime();
         List<CollectedRecipe> recipes = new ArrayList<>();
         for (RecipeHolder<AdvancedAlloyFurnaceRecipe> holder : level.getRecipeManager()
@@ -562,8 +521,7 @@ public final class AlloyFurnaceRecipeCatalog {
         bySourceAndRecipeId.replaceAll((ignored, entries) -> List.copyOf(entries));
         Snapshot snapshot = new Snapshot(ordered, Map.copyOf(unique), Map.copyOf(byRecipeId),
                 Map.copyOf(bySource), Map.copyOf(bySourceAndRecipeId), generation,
-                new ConcurrentHashMap<>(),
-                new ResolutionMisses(compensationRebuildUsed), new ConcurrentHashMap<>(),
+                new ConcurrentHashMap<>(), new ConcurrentHashMap<>(),
                 ConcurrentHashMap.newKeySet());
         LOGGER.info("Built alloy-furnace recipe catalog: generation={}, recipes={}, sources={}, elapsed={} ms",
                 generation, ordered.size(), bySource.size(), (System.nanoTime() - startedAt) / 1_000_000L);
@@ -974,7 +932,6 @@ public final class AlloyFurnaceRecipeCatalog {
             Map<SourceRecipeKey, List<Entry>> bySourceAndRecipeId,
             long generation,
             Map<AEItemKey, Boolean> knownMoldCache,
-            ResolutionMisses misses,
             Map<AlloyFurnaceRecipeIdentity, Entry> compatibilityAliases,
             Set<AlloyFurnaceRecipeIdentity> legacyMisses) {
     }
@@ -988,24 +945,6 @@ public final class AlloyFurnaceRecipeCatalog {
     private record SourceRecipeKey(String sourceId, ResourceLocation recipeId) {
         private SourceRecipeKey {
             sourceId = RecipeSourceIds.normalize(sourceId);
-        }
-    }
-
-    static final class ResolutionMisses {
-        private final AtomicBoolean compensationRebuildClaimed;
-        private final Set<AlloyFurnaceRecipeIdentity> identities = ConcurrentHashMap.newKeySet();
-
-        ResolutionMisses(boolean compensationRebuildUsed) {
-            this.compensationRebuildClaimed = new AtomicBoolean(compensationRebuildUsed);
-        }
-
-        boolean claimCompensationRebuild(AlloyFurnaceRecipeIdentity identity) {
-            return !identities.contains(identity)
-                    && compensationRebuildClaimed.compareAndSet(false, true);
-        }
-
-        void remember(AlloyFurnaceRecipeIdentity identity) {
-            identities.add(identity);
         }
     }
 

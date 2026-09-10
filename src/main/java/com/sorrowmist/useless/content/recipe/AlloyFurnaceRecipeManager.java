@@ -709,6 +709,17 @@ public class AlloyFurnaceRecipeManager {
         AlloyFurnaceRecipeCatalog.invalidate();
     }
 
+    /** Invalidates only the recipe index and catalog owned by the supplied level. */
+    public synchronized void invalidateIndex(Level level) {
+        if (level == null) {
+            invalidateIndex();
+            return;
+        }
+        recipeIndexes.remove(level.getRecipeManager());
+        clearCache();
+        AlloyFurnaceRecipeCatalog.invalidate(level);
+    }
+
     private record LookupSnapshot(Map<AEKey, Long> keyInputs) {
         private static LookupSnapshot from(RecipeLookupContext context) {
             return new LookupSnapshot(snapshotNonStackKeyInputs(context.keyInputs()));

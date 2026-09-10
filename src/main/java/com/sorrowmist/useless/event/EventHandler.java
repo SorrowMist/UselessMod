@@ -585,12 +585,13 @@ public class EventHandler {
                 // 配方数据已变更：清空查找缓存并标记索引需要重建
                 // 索引会在下一次 findRecipe 时延迟重建（此处无法直接获取 Level）
                 AlloyFurnaceRecipeManager.getInstance().clearCache();
-                AlloyFurnaceRecipeManager.getInstance().invalidateIndex();
-                AlloyFurnaceRecipeCatalog.invalidate();
                 var server = ServerLifecycleHooks.getCurrentServer();
                 if (server != null) {
+                    AlloyFurnaceRecipeManager.getInstance().invalidateIndex(server.overworld());
                     AlloyFurnaceRecipeCatalog.prewarm(server.overworld());
                     server.getPlayerList().getPlayers().forEach(EndlessBeafItem::refreshAttackDamage);
+                } else {
+                    AlloyFurnaceRecipeManager.getInstance().invalidateIndex();
                 }
             }, gameExecutor);
         });

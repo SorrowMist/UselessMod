@@ -94,9 +94,10 @@ public class ClientSetup {
 
     @SubscribeEvent
     public static void onRecipesUpdated(RecipesUpdatedEvent event) {
-        AlloyFurnaceRecipeCatalog.invalidate();
-        if (Minecraft.getInstance().level != null) {
-            AlloyFurnaceRecipeCatalog.prewarm(Minecraft.getInstance().level);
+        Level level = Minecraft.getInstance().level;
+        if (level != null) {
+            AlloyFurnaceRecipeCatalog.invalidate(level);
+            AlloyFurnaceRecipeCatalog.prewarm(level);
             JEIPlugin.refreshAlloyFurnaceRecipes();
             if (Minecraft.getInstance().player != null) {
                 EndlessBeafItem.refreshAttackDamage(Minecraft.getInstance().player);
@@ -111,12 +112,14 @@ public class ClientSetup {
         if (level == observedClientLevel) return;
 
         observedClientLevel = level;
-        AlloyFurnaceRecipeCatalog.invalidate();
         if (level != null) {
             // The initial JEI registration can happen on the title screen, before a client level
             // exists. Rebuild once after joining a world so generated compat recipes are visible.
+            AlloyFurnaceRecipeCatalog.invalidate(level);
             AlloyFurnaceRecipeCatalog.prewarm(level);
             JEIPlugin.refreshAlloyFurnaceRecipes();
+        } else {
+            AlloyFurnaceRecipeCatalog.invalidate();
         }
     }
 
@@ -126,8 +129,9 @@ public class ClientSetup {
         // clientbound tag packet in some login paths, so refresh the catalog after those tags bind.
         if (Minecraft.getInstance().level == null) return;
 
-        AlloyFurnaceRecipeCatalog.invalidate();
-        AlloyFurnaceRecipeCatalog.prewarm(Minecraft.getInstance().level);
+        Level level = Minecraft.getInstance().level;
+        AlloyFurnaceRecipeCatalog.invalidate(level);
+        AlloyFurnaceRecipeCatalog.prewarm(level);
         JEIPlugin.refreshAlloyFurnaceRecipes();
         if (Minecraft.getInstance().player != null) {
             EndlessBeafItem.refreshAttackDamage(Minecraft.getInstance().player);

@@ -41,6 +41,12 @@ public final class AlloyFurnaceRecipeCatalog {
     private static final Logger LOGGER = LogUtils.getLogger();
     private static final Map<Object, Snapshot> CACHE = java.util.Collections.synchronizedMap(new WeakHashMap<>());
     private static final Map<Object, Object> BUILD_LOCKS = java.util.Collections.synchronizedMap(new WeakHashMap<>());
+    /**
+     * Client and integrated-server levels live in the same JVM but have different recipe managers.
+     * Their cache generations must therefore be independent: a client recipe update must not make
+     * the server catalog look stale while a pattern is being encoded.
+     */
+    private static final Map<Object, Long> GENERATIONS = new WeakHashMap<>();
     private static final AtomicInteger CURRENT_RECIPE_COUNT = new AtomicInteger();
     private static final AtomicLong GENERATION = new AtomicLong();
 
@@ -394,12 +400,33 @@ public final class AlloyFurnaceRecipeCatalog {
         return slots;
     }
 
+    /** Invalidates every recipe-manager catalog, used when no level-specific owner is available. */
     public static void invalidate() {
-        CACHE.clear();
+        synchronized (CACHE) {
+            CACHE.clear();
+            GENERATIONS.replaceAll((ignored, generation) -> generation + 1L);
+        }
         CURRENT_RECIPE_COUNT.set(0);
         GENERATION.incrementAndGet();
     }
 
+    /** Invalidates only the catalog owned by {@code level}. */
+    public static void invalidate(Level level) {
+        if (level == null) {
+            invalidate();
+            return;
+        }
+
+        Object cacheKey = level.getRecipeManager();
+        synchronized (CACHE) {
+            GENERATIONS.put(cacheKey, currentGenerationLocked(cacheKey) + 1L);
+            CACHE.remove(cacheKey);
+        }
+        CURRENT_RECIPE_COUNT.set(0);
+        GENERATION.incrementAndGet();
+    }
+
+    /** Returns the global invalidation count retained for diagnostics and compatibility. */
     public static long generation() {
         return GENERATION.get();
     }
@@ -407,9 +434,10 @@ public final class AlloyFurnaceRecipeCatalog {
     private static Snapshot snapshot(Level level) {
         Object cacheKey = level.getRecipeManager();
         while (true) {
-            long generation = GENERATION.get();
+            long generation;
             Snapshot cached;
             synchronized (CACHE) {
+                generation = currentGenerationLocked(cacheKey);
                 cached = CACHE.get(cacheKey);
             }
             if (cached != null && cached.generation == generation) {
@@ -418,16 +446,16 @@ public final class AlloyFurnaceRecipeCatalog {
 
             Object buildLock = buildLock(cacheKey);
             synchronized (buildLock) {
-                generation = GENERATION.get();
                 synchronized (CACHE) {
+                    generation = currentGenerationLocked(cacheKey);
                     cached = CACHE.get(cacheKey);
                     if (cached != null && cached.generation == generation) {
                         return cached;
                     }
                 }
                 Snapshot built = build(level, generation);
-                if (GENERATION.get() != generation) continue;
                 synchronized (CACHE) {
+                    if (currentGenerationLocked(cacheKey) != generation) continue;
                     cached = CACHE.get(cacheKey);
                     if (cached != null && cached.generation == generation) {
                         return cached;
@@ -446,11 +474,15 @@ public final class AlloyFurnaceRecipeCatalog {
     private static Snapshot snapshotIfReady(Level level) {
         if (level == null) return null;
         Object cacheKey = level.getRecipeManager();
-        long generation = GENERATION.get();
         synchronized (CACHE) {
+            long generation = currentGenerationLocked(cacheKey);
             Snapshot cached = CACHE.get(cacheKey);
             return cached != null && cached.generation == generation ? cached : null;
         }
+    }
+
+    private static long currentGenerationLocked(Object cacheKey) {
+        return GENERATIONS.computeIfAbsent(cacheKey, ignored -> 0L);
     }
 
     private static Object buildLock(Object cacheKey) {

@@ -1,6 +1,7 @@
 package com.sorrowmist.useless.client.gui;
 
 import com.mojang.blaze3d.platform.InputConstants;
+import com.mojang.blaze3d.systems.RenderSystem;
 import com.sorrowmist.useless.api.enums.tool.ConstructionWandCoreMode;
 import com.sorrowmist.useless.api.enums.tool.EnchantMode;
 import com.sorrowmist.useless.api.enums.tool.ToolTypeMode;
@@ -937,19 +938,23 @@ public class ModeWheelScreen extends Screen {
             graphics.drawString(font, Component.translatable("gui.useless_mod.mode_config.loading"),
                     panelLeft + PANEL_MARGIN, contentTop + 8, MachineScreenStyle.MUTED_TEXT_COLOR, false);
         } else {
-            graphics.enableScissor(contentLeft, contentTop, contentRight, contentBottom);
-            drawCards(graphics, mouseX, mouseY);
-            if (editing) {
-                drawEditorModules(graphics, mouseX, mouseY);
-                for (GroupNameField field : groupNameFields) {
-                    if (field.field().visible) field.field().render(graphics, mouseX, mouseY, partialTick);
+            enableContentScissor(graphics);
+            try {
+                drawCards(graphics, mouseX, mouseY);
+                if (editing) {
+                    drawEditorModules(graphics, mouseX, mouseY);
+                    for (GroupNameField field : groupNameFields) {
+                        if (field.field().visible) field.field().render(graphics, mouseX, mouseY, partialTick);
+                    }
+                } else {
+                    for (ModeButton modeButton : modeButtons) {
+                        if (modeButton.button().visible) modeButton.button().render(graphics, mouseX, mouseY, partialTick);
+                    }
                 }
-            } else {
-                for (ModeButton modeButton : modeButtons) {
-                    if (modeButton.button().visible) modeButton.button().render(graphics, mouseX, mouseY, partialTick);
-                }
+            } finally {
+                graphics.flush();
+                RenderSystem.disableScissor();
             }
-            graphics.disableScissor();
         }
 
         if (pageNameField != null && pageNameField.visible) {
@@ -963,6 +968,21 @@ public class ModeWheelScreen extends Screen {
         drawStatus(graphics);
         if (confirmImport) drawImportConfirmation(graphics, mouseX, mouseY);
         graphics.pose().popPose();
+    }
+
+    private void enableContentScissor(GuiGraphics graphics) {
+        graphics.flush();
+        var window = Minecraft.getInstance().getWindow();
+        double guiScale = window.getGuiScale();
+        double screenLeft = uiOffsetX + contentLeft * uiScale;
+        double screenTop = uiOffsetY + contentTop * uiScale;
+        double screenRight = uiOffsetX + contentRight * uiScale;
+        double screenBottom = uiOffsetY + contentBottom * uiScale;
+        RenderSystem.enableScissor(
+                (int) (screenLeft * guiScale),
+                (int) (window.getHeight() - screenBottom * guiScale),
+                Math.max(0, (int) ((screenRight - screenLeft) * guiScale)),
+                Math.max(0, (int) ((screenBottom - screenTop) * guiScale)));
     }
 
     private void drawCards(GuiGraphics graphics, int mouseX, int mouseY) {

@@ -8,6 +8,10 @@ import com.sorrowmist.useless.network.AETaskProgressRequestPacket;
 import com.sorrowmist.useless.network.AutoIOChangePacket;
 import com.sorrowmist.useless.network.BeefInvulnerabilitySyncPacket;
 import com.sorrowmist.useless.network.BeefInvulnerabilityStatePacket;
+import com.sorrowmist.useless.network.BeefToolLayoutRequestPacket;
+import com.sorrowmist.useless.network.BeefToolLayoutResultPacket;
+import com.sorrowmist.useless.network.BeefToolLayoutSyncPacket;
+import com.sorrowmist.useless.network.BeefToolLayoutUpdatePacket;
 import com.sorrowmist.useless.network.EnchantmentSwitchPacket;
 import com.sorrowmist.useless.network.FaceModeChangePacket;
 import com.sorrowmist.useless.network.ForceBreakKeyPacket;
@@ -33,7 +37,19 @@ import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
 
 public class ModNetwork {
     public static void registerPayloadHandlers(final RegisterPayloadHandlersEvent event) {
-        var registrar = event.registrar(UselessMod.MODID).versioned("4");
+        var registrar = event.registrar(UselessMod.MODID).versioned("5");
+        registrar.playToServer(BeefToolLayoutRequestPacket.TYPE,
+                               BeefToolLayoutRequestPacket.STREAM_CODEC,
+                               BeefToolLayoutRequestPacket::handle);
+        registrar.playToClient(BeefToolLayoutSyncPacket.TYPE,
+                               BeefToolLayoutSyncPacket.STREAM_CODEC,
+                               BeefToolLayoutSyncPacket::handle);
+        registrar.playToServer(BeefToolLayoutUpdatePacket.TYPE,
+                               BeefToolLayoutUpdatePacket.STREAM_CODEC,
+                               BeefToolLayoutUpdatePacket::handle);
+        registrar.playToClient(BeefToolLayoutResultPacket.TYPE,
+                               BeefToolLayoutResultPacket.STREAM_CODEC,
+                               BeefToolLayoutResultPacket::handle);
         registrar.playToServer(EnchantmentSwitchPacket.TYPE, EnchantmentSwitchPacket.STREAM_CODEC,
                                EnchantmentSwitchPacket::handle
         );

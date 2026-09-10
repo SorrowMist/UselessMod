@@ -201,7 +201,7 @@ dependencies {
     compileOnly "curse.maven:ufo-future-1372445:8372110"
     implementation "curse.maven:immersive-engineering-231951:6733669"
     compileOnly "curse.maven:extreme-reactors-250277:7344744"
-    compileOnly "curse.maven:neovitae-1404763:8690909"
+    implementation "curse.maven:neovitae-1404763:8690909"
 
     implementation "curse.maven:athena-841890:8061947"
     implementation "curse.maven:modern-industrialization-405388:8597392"
@@ -291,7 +291,7 @@ dependencies {
     implementation "mekanism:Mekanism:1.21.1-10.7.19.85"
     implementation "mekanism:Mekanism:1.21.1-10.7.19.85:generators"
     implementation "curse.maven:applied-mekanistics-574300:7096962"
-    runtimeOnly "maven.modrinth:mekanism_extra:1.21.1-1.4.0"
+//    runtimeOnly "maven.modrinth:mekanism_extra:1.21.1-1.4.0"
     implementation "curse.maven:flux-networks-248020:6089446"
 
     implementation "maven.modrinth:mekanismmoremachine:1.21.1-1.4.1"
@@ -331,8 +331,8 @@ dependencies {
 
     // kjs
     // KubeJS is optional at runtime; the plugin is discovered only when KubeJS is installed.
-    compileOnly "dev.latvian.mods:rhino:2101.2.7-build.77"
-    compileOnly "dev.latvian.mods:kubejs-neoforge:2101.7.2-build.336"
+    implementation "dev.latvian.mods:rhino:2101.2.7-build.77"
+    implementation "dev.latvian.mods:kubejs-neoforge:2101.7.2-build.336"
 
     runtimeOnly "curse.maven:ftb-library-forge-404465:7029003"
     compileOnly "dev.architectury:architectury-neoforge:13.0.8"

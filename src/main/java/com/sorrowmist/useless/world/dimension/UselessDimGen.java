@@ -22,14 +22,29 @@ public class UselessDimGen extends AbstractPlasticPlatformGenerator {
     @Override protected @NotNull MapCodec<? extends ChunkGenerator> codec() {return CODEC;}
 
     @Override
-    protected BlockState getPlatformBlockState(DimensionGenerationConfig configuration, int x, int z) {
+    protected PlatformRole getPlatformRole(int x, int z) {
         if (x == 8 && z == 8) {
-            return getCenterBlockState(configuration);
+            return PlatformRole.CENTER;
         } else if (x == 0 || z == 0) {
-            return getBorderBlockState(configuration);
+            return PlatformRole.BORDER;
         } else {
-            return getFillBlockState(configuration);
+            return PlatformRole.FILL;
         }
+    }
+
+    @Override
+    protected int getRoadStartBoundaryWidth() {
+        return 1;
+    }
+
+    @Override
+    protected int getRoadCenterLineWidth() {
+        return 1;
+    }
+
+    @Override
+    protected boolean useUnshiftedRoadIntersectionLayout() {
+        return true;
     }
 
     @Override

@@ -101,8 +101,9 @@ public final class JEIPlugin implements IModPlugin {
             ItemStack stack = ingredient.getItemStack().orElse(ItemStack.EMPTY);
             if (!(stack.getItem() instanceof BlockItem)) return List.of();
 
-            List<Target<I>> targets = new ArrayList<>(3);
-            for (int index = 0; index < 3; index++) {
+            List<Target<I>> targets = new ArrayList<>(DimensionConfigMenu.GHOST_SLOT_COUNT);
+            for (int index = 0; index < DimensionConfigMenu.GHOST_SLOT_COUNT; index++) {
+                if (!screen.getMenu().isGhostSlotActive(index)) continue;
                 int slotIndex = index;
                 DimensionConfigMenu.GhostSlot slot = screen.getMenu().getGhostSlot(slotIndex);
                 targets.add(new Target<>() {

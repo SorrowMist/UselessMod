@@ -265,14 +265,14 @@ public class ConfigManager {
         SERVER_BUILDER.translation("useless_mod.configuration.useless_dimension")
                 .push("useless_dimension");
         USELESS_DIMENSION_FLOOR_BLOCK_BLACKLIST = SERVER_BUILDER
-                .comment("Blocks that cannot be used for Useless Dimension borders, fills, or centers",
+                .comment("Blocks that cannot be used for Useless Dimension layers, borders, fills, roads, or center markers",
                         "A block matching this list remains blocked even if it matches the whitelist",
                         "Use exact block IDs, #block tags, or * wildcard patterns")
                 .translation("useless_mod.configuration.useless_dimension_floor_block_blacklist")
                 .defineListAllowEmpty("floor_block_blacklist", List.<String>of(), () -> "",
                         entry -> entry instanceof String);
         USELESS_DIMENSION_FLOOR_BLOCK_WHITELIST = SERVER_BUILDER
-                .comment("When non-empty, only matching blocks can be used for Useless Dimension borders, fills, or centers",
+                .comment("When non-empty, only matching blocks can be used for Useless Dimension layers, borders, fills, roads, or center markers",
                         "Leave empty to allow every block that is not on the blacklist",
                         "Use exact block IDs, #block tags, or * wildcard patterns")
                 .translation("useless_mod.configuration.useless_dimension_floor_block_whitelist")

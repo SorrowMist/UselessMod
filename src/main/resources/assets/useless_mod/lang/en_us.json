@@ -126,18 +126,10 @@
   "gui.useless_mod.multiblock_builder.commit_failed": "Construction failed; materials and blocks were restored",
   "gui.useless_mod.multiblock_builder.success": "Built an omniversal furnace with tier %s coils",
   "gui.useless_mod.omniversal_pattern.too_many_slots": "Recipe has more ingredients than the terminal has slots",
-  "gui.useless_mod.omniversal_pattern.encoding_failed": "Omniversal pattern encoding failed: %s",
-  "gui.useless_mod.omniversal_pattern.encoding_failed.with_detail": "%s (%s)",
-  "gui.useless_mod.omniversal_pattern.encoding_failed.decode_exception": "AE2 could not decode the encoded pattern",
-  "gui.useless_mod.omniversal_pattern.encoding_failed.decode_failed": "The encoded pattern is invalid or missing its processing data",
-  "gui.useless_mod.omniversal_pattern.encoding_failed.not_processing_pattern": "The encoded result is not a processing pattern",
-  "gui.useless_mod.omniversal_pattern.encoding_failed.recipe_lookup_exception": "The selected recipe could not be looked up",
-  "gui.useless_mod.omniversal_pattern.encoding_failed.recipe_not_found": "The selected recipe is missing or has changed",
-  "gui.useless_mod.omniversal_pattern.encoding_failed.pattern_mismatch": "The encoded inputs or outputs do not match the selected recipe",
-  "gui.useless_mod.omniversal_pattern.encoding_failed.recipe_match_exception": "The encoded pattern could not be checked against the recipe",
-  "gui.useless_mod.omniversal_pattern.encoding_failed.conversion_exception": "The recipe could not be converted",
-  "gui.useless_mod.omniversal_pattern.encoding_failed.conversion_unsupported": "The recipe contains data that cannot be stored in an omniversal pattern",
   "biome.useless_mod:useless_biome": "Useless Biome",
+  "dimension.useless_mod.uselessdim": "Even Dimension",
+  "dimension.useless_mod.uselessdim2": "Odd Dimension",
+  "dimension.useless_mod.uselessdim3": "Triple Dimension",
   "block.useless_mod.ore_generator_block": "Ore Generator",
   "block.useless_mod.teleport_block": "Even Dimension Teleport Block",
   "block.useless_mod.teleport_block_2": "Odd Dimension Teleport Block",
@@ -740,17 +732,42 @@
   ,"useless_mod.configuration.ore_generator_slots.tooltip": "Number of active ore generator sample slots. Contents above a reduced limit remain available on recovery pages."
   ,"useless_mod.configuration.useless_dimension": "Useless Dimension"
   ,"useless_mod.configuration.useless_dimension_floor_block_blacklist": "Useless Dimension Floor Block Blacklist"
-  ,"useless_mod.configuration.useless_dimension_floor_block_blacklist.comment": "Blocks that cannot be used for borders, fills, or centers. Blacklist entries always win. Supports exact IDs, #block tags, and * wildcard patterns."
-  ,"useless_mod.configuration.useless_dimension_floor_block_blacklist.tooltip": "Exact IDs, #block tags, or * wildcard patterns for blocks excluded from Useless Dimension floors."
+  ,"useless_mod.configuration.useless_dimension_floor_block_blacklist.comment": "Blocks that cannot be used for layers, borders, fills, roads, or center markers. Blacklist entries always win. Supports exact IDs, #block tags, and * wildcard patterns."
+  ,"useless_mod.configuration.useless_dimension_floor_block_blacklist.tooltip": "Exact IDs, #block tags, or * wildcard patterns for blocks excluded from Useless Dimension layers, borders, roads, and center markers."
   ,"useless_mod.configuration.useless_dimension_floor_block_whitelist": "Useless Dimension Floor Block Whitelist"
-  ,"useless_mod.configuration.useless_dimension_floor_block_whitelist.comment": "When non-empty, only matching blocks can be used for borders, fills, or centers. Leave empty to disable the whitelist. Supports exact IDs, #block tags, and * wildcard patterns."
-  ,"useless_mod.configuration.useless_dimension_floor_block_whitelist.tooltip": "When non-empty, only matching blocks can be used for Useless Dimension floors; the blacklist still takes priority."
+  ,"useless_mod.configuration.useless_dimension_floor_block_whitelist.comment": "When non-empty, only matching blocks can be used for layers, borders, fills, roads, or center markers. Leave empty to disable the whitelist. Supports exact IDs, #block tags, and * wildcard patterns."
+  ,"useless_mod.configuration.useless_dimension_floor_block_whitelist.tooltip": "When non-empty, only matching blocks can be used for Useless Dimension layers, borders, roads, and center markers; the blacklist still takes priority."
   ,"menu.useless_mod.dimension_config": "Useless Dimension Configuration"
   ,"gui.useless_mod.dimension_config.border_block": "Border"
   ,"gui.useless_mod.dimension_config.fill_block": "Fill"
   ,"gui.useless_mod.dimension_config.center_block": "Center"
   ,"gui.useless_mod.dimension_config.layers": "Layers"
   ,"gui.useless_mod.dimension_config.start_y": "Start Y"
+  ,"gui.useless_mod.dimension_config.boundary_alternate_1": "Boundary 1"
+  ,"gui.useless_mod.dimension_config.boundary_alternate_2": "Boundary 2"
+  ,"gui.useless_mod.dimension_config.road_surface": "Body"
+  ,"gui.useless_mod.dimension_config.road_edge": "Edge"
+  ,"gui.useless_mod.dimension_config.road_center_marking": "Center line"
+  ,"gui.useless_mod.dimension_config.center_marker": "Center marker"
+  ,"gui.useless_mod.dimension_config.boundary_interval_x": "Boundary interval X"
+  ,"gui.useless_mod.dimension_config.boundary_interval_z": "Boundary interval Z"
+  ,"gui.useless_mod.dimension_config.road_width": "Road width"
+  ,"gui.useless_mod.dimension_config.road_options": "Road options"
+  ,"gui.useless_mod.dimension_config.center_options": "Center options"
+  ,"gui.useless_mod.dimension_config.road_preset": "Mode: %s"
+  ,"gui.useless_mod.dimension_config.road_preset.road": "Road"
+  ,"gui.useless_mod.dimension_config.road_preset.solid": "Solid"
+  ,"gui.useless_mod.dimension_config.center_marker_on": "Center marker: on"
+  ,"gui.useless_mod.dimension_config.center_marker_off": "Center marker: off"
+  ,"gui.useless_mod.dimension_config.tooltip.decrease": "Decrease value by 1"
+  ,"gui.useless_mod.dimension_config.tooltip.increase": "Increase value by 1"
+  ,"gui.useless_mod.dimension_config.tooltip.bedrock": "Toggle generation of the bedrock layer"
+  ,"gui.useless_mod.dimension_config.tooltip.bottom": "Toggle placing the bedrock layer at the bottom"
+  ,"gui.useless_mod.dimension_config.tooltip.road_preset": "Cycle the road pattern mode"
+  ,"gui.useless_mod.dimension_config.tooltip.center_marker": "Toggle the center marker"
+  ,"gui.useless_mod.dimension_config.tooltip.apply": "Save this dimension configuration"
+  ,"gui.useless_mod.dimension_config.tooltip.apply_and_teleport": "Save the configuration and teleport"
+  ,"gui.useless_mod.dimension_config.tooltip.cancel": "Close without saving"
   ,"gui.useless_mod.dimension_config.bedrock_on": "Generate bedrock: on"
   ,"gui.useless_mod.dimension_config.bedrock_off": "Generate bedrock: off"
   ,"gui.useless_mod.dimension_config.bottom_on": "Bedrock at bottom: on"

@@ -116,6 +116,9 @@ public abstract class AbstractDimensionTeleporter {
         for (BlockPos.MutableBlockPos candidate : BlockPos.spiralAround(entryPos, 32, Direction.EAST, Direction.SOUTH)) {
             if (!level.getWorldBorder().isWithinBounds(candidate)) continue;
 
+            // ServerLevel#getHeight returns the minimum build height for an
+            // unloaded chunk, so generate the destination chunk first.
+            level.getChunk(candidate.getX() >> 4, candidate.getZ() >> 4);
             int y = level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, candidate.getX(), candidate.getZ());
             if (level.dimensionType().hasCeiling()) {
                 y = findSafeY(level, candidate.getX(), y, candidate.getZ(), candidate);
@@ -131,9 +134,8 @@ public abstract class AbstractDimensionTeleporter {
         }
 
         // 3. 回退到原始位置
-        BlockState teleportState = getTeleportBlock().get().defaultBlockState();
-        level.setBlockAndUpdate(entryPos, teleportState);
-        return entryPos;
+        // Never reuse the source dimension's Y coordinate as a destination.
+        return null;
     }
 
     // 在天花板维度（如下界）中查找安全的Y坐标

@@ -9,6 +9,8 @@ final class MachineScreenStyle {
     static final int HIGHLIGHT_COLOR = 0xFFF2F2F2;
     static final int SLOT_COLOR = 0xFFADB0C4;
     static final int SLOT_SHADOW_COLOR = 0xFF9A9FB4;
+    private static final int ROAD_SLOT_PRESSED = 0xFF8F93A7;
+    private static final int ROAD_SLOT_DISABLED = 0xFF777B8D;
     static final int TEXT_COLOR = 0xFF413F54;
     static final int MUTED_TEXT_COLOR = 0xFF878FA5;
     static final int SUBTLE_TEXT_COLOR = 0xFF6D7287;
@@ -28,10 +30,16 @@ final class MachineScreenStyle {
 
     static void drawSlotGroup(GuiGraphics graphics, int leftPos, int topPos,
                               int x, int y, int columns, int rows) {
+        drawSlotGroup(graphics, leftPos, topPos, x, y, columns, rows, 18, 18);
+    }
+
+    static void drawSlotGroup(GuiGraphics graphics, int leftPos, int topPos,
+                              int x, int y, int columns, int rows,
+                              int columnSpacing, int rowSpacing) {
         int left = leftPos + x - 1;
         int top = topPos + y - 1;
-        int right = leftPos + x + columns * 18 - 1;
-        int bottom = topPos + y + rows * 18 - 1;
+        int right = leftPos + x + (columns - 1) * columnSpacing + 17;
+        int bottom = topPos + y + (rows - 1) * rowSpacing + 17;
         drawInset(graphics, left, top, right, bottom);
     }
 
@@ -40,5 +48,13 @@ final class MachineScreenStyle {
         int top = topPos + slot.y;
         graphics.fill(left, top, left + 16, top + 16, SLOT_COLOR);
         graphics.fill(left, top, left + 16, top + 1, SLOT_SHADOW_COLOR);
+    }
+
+    static void drawRoadSlotBackground(GuiGraphics graphics, int leftPos, int topPos,
+                                        Slot slot, boolean active, boolean pressed) {
+        int left = leftPos + slot.x;
+        int top = topPos + slot.y;
+        int color = !active ? ROAD_SLOT_DISABLED : pressed ? ROAD_SLOT_PRESSED : SLOT_COLOR;
+        graphics.fill(left, top, left + 16, top + 16, color);
     }
 }

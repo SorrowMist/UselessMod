@@ -22,14 +22,27 @@ public class UselessDimGen2 extends AbstractPlasticPlatformGenerator {
     @Override protected @NotNull MapCodec<? extends ChunkGenerator> codec() {return CODEC;}
 
     @Override
-    protected BlockState getPlatformBlockState(DimensionGenerationConfig configuration, int x, int z) {
+    protected PlatformRole getPlatformRole(int x, int z) {
         if (x >= 7 && x <= 8 && z >= 7 && z <= 8) { // 中心 2x2
-            return getCenterBlockState(configuration);
+            return PlatformRole.CENTER;
         } else if (x >= 1 && x <= 14 && z >= 1 && z <= 14) { // 内层填充
-            return getFillBlockState(configuration);
+            return PlatformRole.FILL;
         } else {
-            return getBorderBlockState(configuration); // 最外边框
+            return PlatformRole.BORDER; // 最外边框
         }
+    }
+
+    @Override
+    protected boolean isCenterMarkerPosition(int areaX, int areaZ, int centerX, int centerZ) {
+        // An even boundary interval places the area center on a chunk seam.
+        // Cover the complete 2x2 center in that case (for example, 2x3).
+        if ((centerX & 15) == 0 || (centerZ & 15) == 0) {
+            return areaX >= centerX - 1 && areaX <= centerX
+                    && areaZ >= centerZ - 1 && areaZ <= centerZ;
+        }
+
+        // Keep the two-block marker centered on a fixed row.
+        return (areaX == centerX - 1 || areaX == centerX) && areaZ == centerZ;
     }
 
     @Override

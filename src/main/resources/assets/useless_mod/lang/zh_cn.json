@@ -126,18 +126,10 @@
   "gui.useless_mod.multiblock_builder.commit_failed": "搭建失败，材料与方块已还原",
   "gui.useless_mod.multiblock_builder.success": "已使用%s阶线圈搭建万象合金炉",
   "gui.useless_mod.omniversal_pattern.too_many_slots": "配方的原料数量超过了终端的槽位数量",
-  "gui.useless_mod.omniversal_pattern.encoding_failed": "万象样板编码失败：%s",
-  "gui.useless_mod.omniversal_pattern.encoding_failed.with_detail": "%s（%s）",
-  "gui.useless_mod.omniversal_pattern.encoding_failed.decode_exception": "AE2无法解码编码后的样板",
-  "gui.useless_mod.omniversal_pattern.encoding_failed.decode_failed": "编码后的样板无效或缺少处理配方数据",
-  "gui.useless_mod.omniversal_pattern.encoding_failed.not_processing_pattern": "编码结果不是处理样板",
-  "gui.useless_mod.omniversal_pattern.encoding_failed.recipe_lookup_exception": "无法查找已选择的配方",
-  "gui.useless_mod.omniversal_pattern.encoding_failed.recipe_not_found": "已选择的配方不存在或已经发生变化",
-  "gui.useless_mod.omniversal_pattern.encoding_failed.pattern_mismatch": "编码后的输入或输出与已选择的配方不匹配",
-  "gui.useless_mod.omniversal_pattern.encoding_failed.recipe_match_exception": "无法检查编码样板是否匹配配方",
-  "gui.useless_mod.omniversal_pattern.encoding_failed.conversion_exception": "无法转换该配方",
-  "gui.useless_mod.omniversal_pattern.encoding_failed.conversion_unsupported": "该配方包含无法保存到万象样板的数据",
   "biome.useless_mod:useless_biome": "无用之地",
+  "dimension.useless_mod.uselessdim": "奇数维度",
+  "dimension.useless_mod.uselessdim2": "偶数维度",
+  "dimension.useless_mod.uselessdim3": "三维度",
   "block.useless_mod.ore_generator_block": "矿石生成器",
   "block.useless_mod.teleport_block": "奇数维度传送方块",
   "block.useless_mod.teleport_block_2": "偶数维度传送方块",
@@ -740,17 +732,42 @@
   ,"useless_mod.configuration.ore_generator_slots.tooltip": "矿石生成器的活动样板槽位数量。降低配置后，超出范围的内容仍可在恢复页取出。"
   ,"useless_mod.configuration.useless_dimension": "无用维度"
   ,"useless_mod.configuration.useless_dimension_floor_block_blacklist": "无用维度地板方块黑名单"
-  ,"useless_mod.configuration.useless_dimension_floor_block_blacklist.comment": "不能用于边框、填充或中心的方块。黑名单优先于白名单。支持精确 ID、#方块标签和 * 通配符。"
-  ,"useless_mod.configuration.useless_dimension_floor_block_blacklist.tooltip": "排除出无用维度地板的方块，支持精确 ID、#方块标签或 * 通配符。"
+  ,"useless_mod.configuration.useless_dimension_floor_block_blacklist.comment": "不能用于边框、填充、层、道路或中心标记的方块。黑名单优先于白名单。支持精确 ID、#方块标签和 * 通配符。"
+  ,"useless_mod.configuration.useless_dimension_floor_block_blacklist.tooltip": "排除出无用维度层、边界、道路和中心标记的方块，支持精确 ID、#方块标签或 * 通配符。"
   ,"useless_mod.configuration.useless_dimension_floor_block_whitelist": "无用维度地板方块白名单"
-  ,"useless_mod.configuration.useless_dimension_floor_block_whitelist.comment": "非空时只有匹配的方块可以用于边框、填充或中心。留空可关闭白名单。支持精确 ID、#方块标签和 * 通配符。"
-  ,"useless_mod.configuration.useless_dimension_floor_block_whitelist.tooltip": "非空时仅允许匹配的方块用于无用维度地板，黑名单仍然优先。"
+  ,"useless_mod.configuration.useless_dimension_floor_block_whitelist.comment": "非空时只有匹配的方块可以用于边框、填充、层、道路或中心标记。留空可关闭白名单。支持精确 ID、#方块标签和 * 通配符。"
+  ,"useless_mod.configuration.useless_dimension_floor_block_whitelist.tooltip": "非空时仅允许匹配的方块用于无用维度层、边界、道路和中心标记，黑名单仍然优先。"
   ,"menu.useless_mod.dimension_config": "无用维度配置"
   ,"gui.useless_mod.dimension_config.border_block": "边框方块"
   ,"gui.useless_mod.dimension_config.fill_block": "填充方块"
   ,"gui.useless_mod.dimension_config.center_block": "中心方块"
   ,"gui.useless_mod.dimension_config.layers": "层数"
   ,"gui.useless_mod.dimension_config.start_y": "起始 Y"
+  ,"gui.useless_mod.dimension_config.boundary_alternate_1": "边界1"
+  ,"gui.useless_mod.dimension_config.boundary_alternate_2": "边界2"
+  ,"gui.useless_mod.dimension_config.road_surface": "主体"
+  ,"gui.useless_mod.dimension_config.road_edge": "边缘"
+  ,"gui.useless_mod.dimension_config.road_center_marking": "道路中心线"
+  ,"gui.useless_mod.dimension_config.center_marker": "中心标记"
+  ,"gui.useless_mod.dimension_config.boundary_interval_x": "边界间隔 X"
+  ,"gui.useless_mod.dimension_config.boundary_interval_z": "边界间隔 Z"
+  ,"gui.useless_mod.dimension_config.road_width": "道路宽度"
+  ,"gui.useless_mod.dimension_config.road_options": "道路选项"
+  ,"gui.useless_mod.dimension_config.center_options": "中心选项"
+  ,"gui.useless_mod.dimension_config.road_preset": "模式：%s"
+  ,"gui.useless_mod.dimension_config.road_preset.road": "马路"
+  ,"gui.useless_mod.dimension_config.road_preset.solid": "纯方块"
+  ,"gui.useless_mod.dimension_config.center_marker_on": "中心标记：开"
+  ,"gui.useless_mod.dimension_config.center_marker_off": "中心标记：关"
+  ,"gui.useless_mod.dimension_config.tooltip.decrease": "数值减少 1"
+  ,"gui.useless_mod.dimension_config.tooltip.increase": "数值增加 1"
+  ,"gui.useless_mod.dimension_config.tooltip.bedrock": "切换是否生成基岩层"
+  ,"gui.useless_mod.dimension_config.tooltip.bottom": "切换是否将基岩层放在底部"
+  ,"gui.useless_mod.dimension_config.tooltip.road_preset": "切换道路样式模式"
+  ,"gui.useless_mod.dimension_config.tooltip.center_marker": "切换中心标记"
+  ,"gui.useless_mod.dimension_config.tooltip.apply": "保存当前维度配置"
+  ,"gui.useless_mod.dimension_config.tooltip.apply_and_teleport": "保存配置并传送"
+  ,"gui.useless_mod.dimension_config.tooltip.cancel": "关闭且不保存"
   ,"gui.useless_mod.dimension_config.bedrock_on": "生成基岩层：开"
   ,"gui.useless_mod.dimension_config.bedrock_off": "生成基岩层：关"
   ,"gui.useless_mod.dimension_config.bottom_on": "基岩层置底：开"

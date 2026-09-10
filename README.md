@@ -16,14 +16,22 @@ A Minecraft mod featuring various utilities and enhancements.
 
 ## License
 
-This mod is licensed under the MIT License. See the LICENSE file for details.
+The original Useless Mod code is licensed under the MIT License. Third-party
+adaptations remain under their respective licenses described below.
 
 ### Third-party Code
 
-This mod includes code from several open-source projects, all licensed under the MIT License:
+This mod includes code from several open-source projects under their respective licenses:
 
 - **Mekanism** - Copyright (c) 2017-2025 Aidan C. Brady
 - **Mekanism Upgrades: Reborn** - Copyright (c) Y_Xiao233
+- **PersonalSpace** - Portions of the configurable boundary, road, and
+  center-marker generation model are adapted from
+  [GT New Horizons/PersonalSpace](https://github.com/GTNewHorizons/PersonalSpace),
+  licensed under the GNU LGPL v3.0. The Useless Mod interface, persistence,
+  networking, and platform-specific extensions are original code. See the
+  scoped notices in the affected generator/configuration files and
+  `LICENSES/PersonalSpace-LGPL-3.0.txt`.
 
 ## Contributing
 

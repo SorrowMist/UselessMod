@@ -204,7 +204,10 @@ public final class HellfireForgeRecipeAdapter implements IRecipeAdapter<ForgeRec
             if (output.isEmpty()) continue;
             List<CountedIngredient> inputs = NeoVitaeAdapterUtils.append(
                     NeoVitaeAdapterUtils.counted(source.getCraftingIngredients()),
-                    NeoVitaeAdapterUtils.exact(target));
+                    // Static variants are generated from default instances. Some third-party
+                    // default component sets cannot be encoded by DataComponentIngredient;
+                    // component-sensitive matching is handled by the dynamic pattern path.
+                    Ingredient.of(target.getItem()));
             result.add(createRecipe(
                     NeoVitaeAdapterUtils.variantId(id, target),
                     inputs,

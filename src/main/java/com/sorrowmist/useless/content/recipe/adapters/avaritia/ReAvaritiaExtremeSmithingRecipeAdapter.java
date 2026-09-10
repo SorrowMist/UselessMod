@@ -22,7 +22,8 @@ import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
+import java.util.Collections;
+import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -129,10 +130,25 @@ public final class ReAvaritiaExtremeSmithingRecipeAdapter
             return null;
         }
 
-        Map<Ingredient, Long> requirements = new LinkedHashMap<>();
-        AdapterUtils.mergeIngredient(requirements, source.template, 1L);
-        AdapterUtils.mergeIngredient(requirements, source.base, 1L);
-        AdapterUtils.mergeIngredient(requirements, source.additions, 3L);
+        List<Ingredient> slots;
+        try {
+            slots = source.getIngredients();
+        } catch (RuntimeException exception) {
+            return null;
+        }
+        if (slots == null || slots.size() != 5
+                || slots.stream().anyMatch(ingredient -> ingredient == null || ingredient.isEmpty())) {
+            return null;
+        }
+
+        // Extreme smithing has five physical slots. The additions Ingredient is a three-item
+        // display/matching predicate, so using it with count=3 loses the three displayed inputs.
+        List<CountedIngredient> inputs = new ArrayList<>(slots.size());
+        Map<Ingredient, Long> requirements = new IdentityHashMap<>();
+        for (Ingredient ingredient : slots) {
+            inputs.add(new CountedIngredient(ingredient, 1L));
+            requirements.put(ingredient, requirements.getOrDefault(ingredient, 0L) + 1L);
+        }
 
         ItemStack result = ExtendedCraftingAdapterUtils.copyResult(source);
         if (result.isEmpty() || result.getCount() <= 0) {
@@ -140,9 +156,9 @@ public final class ReAvaritiaExtremeSmithingRecipeAdapter
         }
 
         return new Converted(
-                ExtendedCraftingAdapterUtils.countedIngredients(requirements),
+                List.copyOf(inputs),
                 List.of(result),
-                requirements);
+                Collections.unmodifiableMap(requirements));
     }
 
     @Nullable

@@ -139,6 +139,7 @@ public class ConfigManager {
     private static final ModConfigSpec.BooleanValue ENABLE_IMMERSIVE_ENGINEERING_RECIPE_CONVERSION;
     private static final ModConfigSpec.BooleanValue ENABLE_PNEUMATICCRAFT_RECIPE_CONVERSION;
     private static final ModConfigSpec.BooleanValue ENABLE_BIG_REACTORS_RECIPE_CONVERSION;
+    private static final ModConfigSpec.BooleanValue ENABLE_IRONS_SPELLBOOKS_RECIPE_CONVERSION;
     private static final Map<String, ModConfigSpec.BooleanValue> RECIPE_CONVERSION_OPTIONS;
 
     private static final ModConfigSpec.IntValue OMNIVERSAL_PATTERN_SLOTS;
@@ -622,6 +623,8 @@ public class ConfigManager {
                 "enable_pneumaticcraft_recipe_conversion", true);
         ENABLE_BIG_REACTORS_RECIPE_CONVERSION = defineRecipeConversionOption(
                 "enable_bigreactors_recipe_conversion", true);
+        ENABLE_IRONS_SPELLBOOKS_RECIPE_CONVERSION = defineRecipeConversionOption(
+                "enable_irons_spellbooks_recipe_conversion", true);
         COMMON_BUILDER.pop();
 
         RECIPE_CONVERSION_OPTIONS = Map.ofEntries(
@@ -672,7 +675,8 @@ public class ConfigManager {
                 Map.entry("modern_industrialization", ENABLE_MODERN_INDUSTRIALIZATION_RECIPE_CONVERSION),
                 Map.entry("immersiveengineering", ENABLE_IMMERSIVE_ENGINEERING_RECIPE_CONVERSION),
                 Map.entry("pneumaticcraft", ENABLE_PNEUMATICCRAFT_RECIPE_CONVERSION),
-                Map.entry("bigreactors", ENABLE_BIG_REACTORS_RECIPE_CONVERSION));
+                Map.entry("bigreactors", ENABLE_BIG_REACTORS_RECIPE_CONVERSION),
+                Map.entry("irons_spellbooks", ENABLE_IRONS_SPELLBOOKS_RECIPE_CONVERSION));
         COMMON_BUILDER.pop();
         COMMON_BUILDER.pop();
 

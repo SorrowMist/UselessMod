@@ -29,6 +29,7 @@ import com.sorrowmist.useless.content.recipe.adapters.enderio.EnchanterRecipeAda
 import com.sorrowmist.useless.content.recipe.adapters.enderio.SagMillingRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.enderio.SlicingRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.enderio.SoulBindingRecipeAdapter;
+import com.sorrowmist.useless.content.recipe.adapters.enderio.SoulVialRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.enderio.VatFermentingRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.extendedcrafting.ExtendedCraftingCombinationRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.extendedcrafting.ExtendedCraftingCompressorRecipeAdapter;
@@ -70,6 +71,8 @@ import com.sorrowmist.useless.content.recipe.adapters.naturesaura.TreeRitualReci
 import com.sorrowmist.useless.content.recipe.adapters.occultism.OccultismRitualRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.powah.EnergizingRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.productivebees.BeeProduceRecipeAdapter;
+import com.sorrowmist.useless.content.recipe.adapters.productivebees.BeeBreedingRecipeAdapter;
+import com.sorrowmist.useless.content.recipe.adapters.productivebees.BeeConversionRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.productivebees.CentrifugeRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.summoningrituals.SummoningRitualsAltarRecipeAdapter;
 import com.sorrowmist.useless.core.config.ConfigManager;
@@ -134,6 +137,7 @@ public final class RecipeAdapterCompatRegistry {
     public static final String PNEUMATICCRAFT = RecipeSourceIds.PNEUMATICCRAFT;
     public static final String BIG_REACTORS = RecipeSourceIds.BIG_REACTORS;
     public static final String JUSTDIRETHINGS = RecipeSourceIds.JUSTDIRETHINGS;
+    public static final String IRONS_SPELLBOOKS = RecipeSourceIds.IRONS_SPELLBOOKS;
 
     private static final List<CompatEntry> ENTRIES = List.of(
             new CompatEntry(null, RecipeAdapterCompatRegistry::registerMinecraft),
@@ -182,7 +186,8 @@ public final class RecipeAdapterCompatRegistry {
             new CompatEntry(IMMERSIVE_ENGINEERING, RecipeAdapterCompatRegistry::registerImmersiveEngineering),
             new CompatEntry(PNEUMATICCRAFT, RecipeAdapterCompatRegistry::registerPneumaticCraft),
             new CompatEntry(BIG_REACTORS, RecipeAdapterCompatRegistry::registerBigReactors),
-            new CompatEntry(JUSTDIRETHINGS, RecipeAdapterCompatRegistry::registerJustDireThings)
+            new CompatEntry(JUSTDIRETHINGS, RecipeAdapterCompatRegistry::registerJustDireThings),
+            new CompatEntry(IRONS_SPELLBOOKS, RecipeAdapterCompatRegistry::registerIronsSpellbooks)
     );
 
     private RecipeAdapterCompatRegistry() {}
@@ -379,6 +384,8 @@ public final class RecipeAdapterCompatRegistry {
     private static void registerProductiveBees() {
         register(new BeeProduceRecipeAdapter());
         register(new CentrifugeRecipeAdapter());
+        register(new BeeBreedingRecipeAdapter());
+        register(new BeeConversionRecipeAdapter());
     }
 
     private static void registerDraconicEvolution() {
@@ -439,6 +446,7 @@ public final class RecipeAdapterCompatRegistry {
         register(new AlloySmeltingRecipeAdapter());
         register(new SlicingRecipeAdapter());
         register(new SagMillingRecipeAdapter());
+        register(new SoulVialRecipeAdapter());
         register(new SoulBindingRecipeAdapter());
         register(new VatFermentingRecipeAdapter());
     }
@@ -483,6 +491,15 @@ public final class RecipeAdapterCompatRegistry {
         register(new GooSpreadRecipeAdapter());
         register(new GooSpreadRecipeTagAdapter());
         register(new FluidDropRecipeAdapter());
+        if (isLoaded("jdte")) {
+            invokeOptionalLoader(
+                    "com.sorrowmist.useless.content.recipe.adapters.justdirethings.jdte.JDTERecipeCompatLoader");
+        }
+    }
+
+    private static void registerIronsSpellbooks() {
+        invokeOptionalLoader(
+                "com.sorrowmist.useless.compat.ironsspellbooks.IronsSpellbooksRecipeCompatLoader");
     }
 
     private record CompatEntry(@Nullable String modId, Runnable registerAction) {}

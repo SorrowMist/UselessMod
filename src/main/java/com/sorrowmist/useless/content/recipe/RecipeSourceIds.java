@@ -53,6 +53,7 @@ public final class RecipeSourceIds {
     public static final String PNEUMATICCRAFT = "pneumaticcraft";
     public static final String BIG_REACTORS = "bigreactors";
     public static final String JUSTDIRETHINGS = "justdirethings";
+    public static final String IRONS_SPELLBOOKS = "irons_spellbooks";
 
     private RecipeSourceIds() {
     }
@@ -109,6 +110,7 @@ public final class RecipeSourceIds {
         if (name.endsWith(".pneumaticcraft")) return PNEUMATICCRAFT;
         if (name.endsWith(".extremereactors")) return BIG_REACTORS;
         if (name.endsWith(".justdirethings")) return JUSTDIRETHINGS;
+        if (name.endsWith(".ironsspellbooks")) return IRONS_SPELLBOOKS;
         if (name.endsWith(".mekanism") || name.endsWith(".generators")) return MEKANISM;
         return UNKNOWN;
     }

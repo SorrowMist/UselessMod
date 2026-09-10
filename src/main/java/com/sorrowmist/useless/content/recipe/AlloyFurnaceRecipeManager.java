@@ -264,16 +264,12 @@ public class AlloyFurnaceRecipeManager {
 
         RecipeIndex index = ensureIndex(level);
         List<AdvancedAlloyFurnaceRecipe> indexedCandidates = getCandidateRecipes(index, context);
-        Iterable<AdvancedAlloyFurnaceRecipe> candidates = indexedCandidates;
-        if (hasMold) {
-            RecipeAccumulator mergedCandidates = new RecipeAccumulator(indexedCandidates.size());
-            mergedCandidates.addAll(indexedCandidates);
-            mergedCandidates.addAll(findAdaptedRecipes(level, context, cacheKey));
-            candidates = mergedCandidates.toList();
-        }
+        RecipeAccumulator mergedCandidates = new RecipeAccumulator(indexedCandidates.size());
+        mergedCandidates.addAll(indexedCandidates);
+        mergedCandidates.addAll(findAdaptedRecipes(level, context, cacheKey));
 
         AdvancedAlloyFurnaceRecipe recipe = selectBestRecipe(
-                candidates, context, new LookupSnapshot(cacheKey.keys()));
+                mergedCandidates.toList(), context, new LookupSnapshot(cacheKey.keys()));
         if (recipe != null) {
             cacheRecipe(lookupKey, recipe);
             return recipe;
@@ -571,12 +567,8 @@ public class AlloyFurnaceRecipeManager {
     private List<AdvancedAlloyFurnaceRecipe> findAdaptedRecipes(
             Level level, RecipeLookupContext context, RecipeCacheKey cacheKey) {
         ItemStack mold = context.mold();
-        if (mold == null || mold.isEmpty()) {
-            return List.of();
-        }
-
         List<com.sorrowmist.useless.api.recipe.IRecipeAdapter<?>> exactAdapters =
-                moldAdapterMap.get(mold.getItem());
+                mold == null || mold.isEmpty() ? null : moldAdapterMap.get(mold.getItem());
         if ((exactAdapters == null || exactAdapters.isEmpty()) && fallbackAdapters.isEmpty()) {
             return List.of();
         }

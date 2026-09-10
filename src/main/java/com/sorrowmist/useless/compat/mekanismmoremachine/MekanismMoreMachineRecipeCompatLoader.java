@@ -2,8 +2,8 @@ package com.sorrowmist.useless.compat.mekanismmoremachine;
 
 import com.sorrowmist.useless.content.recipe.AlloyFurnaceRecipeManager;
 import com.sorrowmist.useless.content.recipe.RecipeSourceIds;
-import com.sorrowmist.useless.content.recipe.adapters.mekanism.AmbientGasCollectorRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.mekanism.RecyclerRecipeAdapter;
+import com.sorrowmist.useless.content.recipe.adapters.mekanism.mekanismmoremachine.AmbientGasCollectorRecipeAdapter;
 
 /** Registers recipe adapters backed by Mekanism More Machine. */
 public final class MekanismMoreMachineRecipeCompatLoader {

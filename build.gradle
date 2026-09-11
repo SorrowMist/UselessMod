@@ -232,9 +232,7 @@ dependencies {
     implementation "curse.maven:thunderbolt-core-1631756:8638565"
     implementation "curse.maven:data-energistics-1565514:8613673" // 1.21.1-3.0.3
 
-
     implementation "curse.maven:omnitool-1401075:8272031"
-
 
     implementation "curse.maven:manaitaplus-legacy-1334654:8136932"
 
@@ -315,6 +313,8 @@ dependencies {
     // 神秘农业
     implementation "curse.maven:cucumber-272335:8035802"
     implementation "curse.maven:mystical-agriculture-246640:8035819"
+
+    implementation "maven.modrinth:hostile-neural-networks:1.21.1-6.5.1"
 
     //自然灵气
     compileOnly "maven.modrinth:natures-aura:41.9"

@@ -75,6 +75,7 @@ import com.sorrowmist.useless.content.recipe.adapters.productivebees.BeeBreeding
 import com.sorrowmist.useless.content.recipe.adapters.productivebees.BeeConversionRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.productivebees.CentrifugeRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.summoningrituals.SummoningRitualsAltarRecipeAdapter;
+import com.sorrowmist.useless.content.recipe.adapters.hostilenetworks.HostileNetworksRecipeAdapter;
 import com.sorrowmist.useless.core.config.ConfigManager;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.item.crafting.RecipeType;
@@ -138,6 +139,7 @@ public final class RecipeAdapterCompatRegistry {
     public static final String BIG_REACTORS = RecipeSourceIds.BIG_REACTORS;
     public static final String JUSTDIRETHINGS = RecipeSourceIds.JUSTDIRETHINGS;
     public static final String IRONS_SPELLBOOKS = RecipeSourceIds.IRONS_SPELLBOOKS;
+    public static final String HOSTILE_NETWORKS = RecipeSourceIds.HOSTILE_NETWORKS;
 
     private static final List<CompatEntry> ENTRIES = List.of(
             new CompatEntry(null, RecipeAdapterCompatRegistry::registerMinecraft),
@@ -187,7 +189,8 @@ public final class RecipeAdapterCompatRegistry {
             new CompatEntry(PNEUMATICCRAFT, RecipeAdapterCompatRegistry::registerPneumaticCraft),
             new CompatEntry(BIG_REACTORS, RecipeAdapterCompatRegistry::registerBigReactors),
             new CompatEntry(JUSTDIRETHINGS, RecipeAdapterCompatRegistry::registerJustDireThings),
-            new CompatEntry(IRONS_SPELLBOOKS, RecipeAdapterCompatRegistry::registerIronsSpellbooks)
+            new CompatEntry(IRONS_SPELLBOOKS, RecipeAdapterCompatRegistry::registerIronsSpellbooks),
+            new CompatEntry(HOSTILE_NETWORKS, RecipeAdapterCompatRegistry::registerHostileNetworks)
     );
 
     private RecipeAdapterCompatRegistry() {}
@@ -500,6 +503,10 @@ public final class RecipeAdapterCompatRegistry {
     private static void registerIronsSpellbooks() {
         invokeOptionalLoader(
                 "com.sorrowmist.useless.compat.ironsspellbooks.IronsSpellbooksRecipeCompatLoader");
+    }
+
+    private static void registerHostileNetworks() {
+        register(new HostileNetworksRecipeAdapter());
     }
 
     private record CompatEntry(@Nullable String modId, Runnable registerAction) {}

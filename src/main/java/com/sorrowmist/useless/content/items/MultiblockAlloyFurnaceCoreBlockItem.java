@@ -53,7 +53,7 @@ public final class MultiblockAlloyFurnaceCoreBlockItem extends BlockItem {
 
     @Override
     public Component getName(ItemStack stack) {
-        return animate(super.getName(stack), NAME_COLORS, 80L);
+        return rainbowName(super.getName(stack));
     }
 
     @Override
@@ -67,15 +67,15 @@ public final class MultiblockAlloyFurnaceCoreBlockItem extends BlockItem {
         }
     }
 
-    private static Component animate(Component source, ChatFormatting[] colors, long delay) {
+    public static Component rainbowName(Component source) {
         String text = ChatFormatting.stripFormatting(source.getString());
-        int offset = (int) Math.floor((System.currentTimeMillis() & 16383L) / (double) delay)
-                % colors.length;
+        int offset = (int) Math.floor((System.currentTimeMillis() & 16383L) / 80.0D)
+                % NAME_COLORS.length;
         MutableComponent result = Component.empty();
         for (int index = 0; index < text.length(); index++) {
-            int colorIndex = (index + colors.length - offset) % colors.length;
+            int colorIndex = (index + NAME_COLORS.length - offset) % NAME_COLORS.length;
             result.append(Component.literal(String.valueOf(text.charAt(index)))
-                    .withStyle(colors[colorIndex]));
+                    .withStyle(NAME_COLORS[colorIndex]));
         }
         return result;
     }

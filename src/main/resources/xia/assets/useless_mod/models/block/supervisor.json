@@ -132,9 +132,9 @@
       64
     ],
     "textures": {
-      "2": "xbai2024",
+      "2": "iava_user",
       "3": "pluto",
-      "particle": "xbai2024"
+      "particle": "iava_user"
     },
     "elements": [
       {

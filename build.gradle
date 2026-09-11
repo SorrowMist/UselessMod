@@ -294,10 +294,10 @@ dependencies {
     implementation "mekanism:Mekanism:1.21.1-10.7.19.85"
     implementation "mekanism:Mekanism:1.21.1-10.7.19.85:generators"
     implementation "curse.maven:applied-mekanistics-574300:7096962"
-//    runtimeOnly "maven.modrinth:mekanism_extra:1.21.1-1.4.0"
-    implementation "curse.maven:flux-networks-248020:6089446"
-
+    implementation "maven.modrinth:mekanism_extra:1.21.1-1.4.1"
     implementation "maven.modrinth:mekanismmoremachine:1.21.1-1.4.1"
+
+    implementation "curse.maven:flux-networks-248020:6089446"
 
     implementation "curse.maven:the-twilight-forest-227639:7797302"
 

@@ -10,6 +10,7 @@ import com.sorrowmist.useless.content.items.AE2GiftPackageItem;
 import com.sorrowmist.useless.content.items.AdvancedAlloyFurnaceBlockItem;
 import com.sorrowmist.useless.content.items.EndlessBeafItem;
 import com.sorrowmist.useless.content.items.IngotItem;
+import com.sorrowmist.useless.content.items.MultiblockAlloyFurnaceCoreBlockItem;
 import com.sorrowmist.useless.content.items.OmniversalPatternConverterItem;
 import com.sorrowmist.useless.content.items.RitualBlueprintItem;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.OmniversalPatternDetails;
@@ -230,7 +231,8 @@ public final class ModItems {
     );
     public static final DeferredItem<BlockItem> MULTIBLOCK_ALLOY_FURNACE_CORE = registerAndAdd(
             "multiblock_alloy_furnace_core",
-            () -> new BlockItem(ModBlocks.MULTIBLOCK_ALLOY_FURNACE_CORE.get(), new Item.Properties()));
+            () -> new MultiblockAlloyFurnaceCoreBlockItem(
+                    ModBlocks.MULTIBLOCK_ALLOY_FURNACE_CORE.get(), new Item.Properties()));
     public static final DeferredItem<BlockItem> ME_PATTERN_ASSEMBLY = registerAndAdd(
             "me_pattern_assembly",
             () -> new BlockItem(ModBlocks.ME_PATTERN_ASSEMBLY.get(), new Item.Properties()));

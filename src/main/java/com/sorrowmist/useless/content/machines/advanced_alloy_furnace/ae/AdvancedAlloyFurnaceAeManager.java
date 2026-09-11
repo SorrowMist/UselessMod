@@ -1,6 +1,7 @@
 package com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae;
 
 import appeng.api.crafting.IPatternDetails;
+import appeng.api.networking.IManagedGridNode;
 import appeng.api.stacks.AEFluidKey;
 import appeng.api.stacks.AEItemKey;
 import appeng.api.stacks.AEKey;
@@ -631,9 +632,26 @@ public final class AdvancedAlloyFurnaceAeManager {
         if (level == null || level.isClientSide) {
             return;
         }
-        this.patternRefreshPending = false;
+        if (!isPublishReady()) {
+            // AE2 snapshots what a provider can craft, so publishing before the node joined a grid
+            // would index this machine as unable to craft anything. Keep the request pending.
+            return;
+        }
         rebuildPatterns();
-        this.owner.onPatternsRebuilt();
+        try {
+            this.owner.onPatternsRebuilt();
+        } catch (RuntimeException exception) {
+            LOGGER.warn("Failed to publish alloy furnace patterns at {}", this.owner.getBlockPos(), exception);
+            return;
+        }
+        this.patternRefreshPending = false;
+    }
+
+    /** True when the owner's node is on a grid, i.e. when AE2 can actually index its patterns. */
+    private boolean isPublishReady() {
+        IManagedGridNode node = this.owner.getMainNode();
+        return node != null && node.isActive() && node.getNode() != null
+                && node.getNode().getGrid() != null;
     }
 
     /** Rebuilds the provider snapshot without touching AE's live grid index. */
@@ -646,12 +664,16 @@ public final class AdvancedAlloyFurnaceAeManager {
         }
         this.patterns.clear();
         if (!this.owner.canPublishPatterns()) {
+            OmniversalPatternDiagnostics.notPublished("alloy furnace " + this.owner.getBlockPos(), "<all>",
+                    "this machine cannot publish patterns yet");
             return;
         }
 
         int seen = 0;
         int decoded = 0;
+        int slot = -1;
         for (ItemStack stack : this.owner.getPatternStacks()) {
+            slot++;
             if (!stack.isEmpty()) {
                 seen++;
                 try {
@@ -662,6 +684,10 @@ public final class AdvancedAlloyFurnaceAeManager {
                     } else {
                         LOGGER.debug("Ignoring non-publishable alloy furnace pattern at {} (item={}, decoded={})",
                                 this.owner.getBlockPos(), stack.getItem(), pattern != null);
+                        OmniversalPatternDiagnostics.notPublished("alloy furnace " + this.owner.getBlockPos(),
+                                slot, pattern == null
+                                        ? "the pattern could not be decoded"
+                                        : "the pattern is not accepted by this machine");
                     }
                 } catch (RuntimeException exception) {
                     // A malformed pattern must not prevent the remaining

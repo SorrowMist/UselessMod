@@ -4,6 +4,7 @@ import appeng.api.crafting.IPatternDetails;
 import appeng.api.crafting.PatternDetailsHelper;
 import appeng.api.stacks.AEItemKey;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.OccultismBoundBookPatternDetails;
+import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.OmniversalPatternDiagnostics;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import org.spongepowered.asm.mixin.Mixin;
@@ -18,8 +19,12 @@ public abstract class PatternDetailsHelperOccultismMixin {
             at = @At("RETURN"), cancellable = true)
     private static void uselessMod$wrapBoundBookKey(
             AEItemKey definition, Level level, CallbackInfoReturnable<IPatternDetails> callback) {
-        callback.setReturnValue(OccultismBoundBookPatternDetails.wrap(
-                callback.getReturnValue(), level));
+        try {
+            callback.setReturnValue(OccultismBoundBookPatternDetails.wrap(
+                    callback.getReturnValue(), level));
+        } catch (Exception exception) {
+            OmniversalPatternDiagnostics.wrapFailed("bound-book", definition, exception);
+        }
     }
 
     @Inject(
@@ -27,7 +32,11 @@ public abstract class PatternDetailsHelperOccultismMixin {
             at = @At("RETURN"), cancellable = true)
     private static void uselessMod$wrapBoundBookStack(
             ItemStack stack, Level level, CallbackInfoReturnable<IPatternDetails> callback) {
-        callback.setReturnValue(OccultismBoundBookPatternDetails.wrap(
-                callback.getReturnValue(), level));
+        try {
+            callback.setReturnValue(OccultismBoundBookPatternDetails.wrap(
+                    callback.getReturnValue(), level));
+        } catch (Exception exception) {
+            OmniversalPatternDiagnostics.wrapFailed("bound-book", AEItemKey.of(stack), exception);
+        }
     }
 }

@@ -1,9 +1,8 @@
 package com.sorrowmist.useless.network;
 
 import com.sorrowmist.useless.UselessMod;
-import com.sorrowmist.useless.client.gui.ModeWheelScreen;
+import com.sorrowmist.useless.client.network.ClientPacketHandlers;
 import com.sorrowmist.useless.data.BeefToolLayout;
-import net.minecraft.client.Minecraft;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
@@ -22,21 +21,11 @@ public record BeefToolLayoutSyncPacket(String json) implements CustomPacketPaylo
                     buffer -> new BeefToolLayoutSyncPacket(buffer.readUtf(BeefToolLayout.MAX_TEXT_LENGTH)));
 
     public static void handle(BeefToolLayoutSyncPacket packet, IPayloadContext context) {
+        // 客户端类型统一收敛到 ClientPacketHandlers，避免专用服务器加载类时解析到客户端类。
         if (FMLEnvironment.dist != Dist.CLIENT) {
             return;
         }
-        context.enqueueWork(() -> {
-            try {
-                BeefToolLayout layout = BeefToolLayout.fromJson(packet.json);
-                if (Minecraft.getInstance().screen instanceof ModeWheelScreen screen) {
-                    screen.receiveLayout(layout);
-                }
-            } catch (BeefToolLayout.LayoutException ignored) {
-                if (Minecraft.getInstance().screen instanceof ModeWheelScreen screen) {
-                    screen.receiveLayoutError(BeefToolLayout.Error.INVALID_TEXT);
-                }
-            }
-        });
+        context.enqueueWork(() -> ClientPacketHandlers.handleBeefToolLayoutSync(packet));
     }
 
     @Override

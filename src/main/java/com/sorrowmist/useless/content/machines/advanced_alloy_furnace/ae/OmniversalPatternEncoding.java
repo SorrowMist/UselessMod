@@ -67,17 +67,26 @@ public final class OmniversalPatternEncoding {
         AdvancedAlloyFurnaceRecipe recipe = entry.recipe();
         OptionalLong scale = AlloyFurnaceRecipeCatalog.findPatternScale(
                 level, entry.sourceId(), recipe, processing);
-        if (scale.isEmpty()) return ItemStack.EMPTY;
+        if (scale.isEmpty()) {
+            OmniversalPatternDiagnostics.skip("findPatternScale empty", recipe.id());
+            return ItemStack.EMPTY;
+        }
         List<GenericStack> normalizedInputs = normalizeInputs(processing, scale.getAsLong());
         List<GenericStack> normalizedOutputs = normalizeStacks(processing.getOutputs(), scale.getAsLong());
-        if (normalizedInputs.isEmpty() || normalizedOutputs.isEmpty()) return ItemStack.EMPTY;
+        if (normalizedInputs.isEmpty() || normalizedOutputs.isEmpty()) {
+            OmniversalPatternDiagnostics.skip("pattern could not be normalized", recipe.id());
+            return ItemStack.EMPTY;
+        }
 
         // A manually multiplied processing pattern is accepted for conversion, but the
         // omniversal result always represents one base recipe operation.
         ItemStack normalizedSource = sourcePattern.copy();
         AEProcessingPattern.encode(normalizedSource, normalizedInputs, normalizedOutputs);
         var encoded = normalizedSource.get(AEComponents.ENCODED_PROCESSING_PATTERN);
-        if (encoded == null) return ItemStack.EMPTY;
+        if (encoded == null) {
+            OmniversalPatternDiagnostics.skip("re-encoded pattern lost its payload", recipe.id());
+            return ItemStack.EMPTY;
+        }
 
         List<Integer> dynamicInputs = new ArrayList<>();
         List<Integer> dynamicOutputs = new ArrayList<>();

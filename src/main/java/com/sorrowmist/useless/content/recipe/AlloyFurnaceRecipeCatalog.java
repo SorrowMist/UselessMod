@@ -186,13 +186,19 @@ public final class AlloyFurnaceRecipeCatalog {
             // component-insensitive shape check only when the normal exact candidate search found
             // none. This still refuses ambiguous ids and never turns an unrelated pattern into a
             // recipe binding.
-            if (!candidates.isEmpty()) return Optional.empty();
-            candidates = snapshot.byRecipeId
+            if (!candidates.isEmpty()) {
+                debugResolvePattern(identity, "primary match ambiguous", candidates.size(), -1);
+                return Optional.empty();
+            }
+            List<Entry> shapeCandidates = snapshot.byRecipeId
                     .getOrDefault(identity.recipeId(), List.of())
                     .stream()
-                    .filter(entry -> !hasComponentSensitiveItemOutputs(entry.recipe())
+                    .filter(entry -> ignoresItemOutputComponents(entry.recipe(), componentAgnosticOutputs)
                             && matchesPatternShape(entry.recipe(), pattern))
                     .toList();
+            debugResolvePattern(identity, "shape fallback", shapeCandidates.size(),
+                    snapshot.byRecipeId.getOrDefault(identity.recipeId(), List.of()).size());
+            candidates = shapeCandidates;
         }
         if (candidates.size() != 1) return Optional.empty();
 
@@ -390,12 +396,21 @@ public final class AlloyFurnaceRecipeCatalog {
     private static Set<Integer> componentAgnosticOutputSlots(
             IPatternDetails pattern, Level level, String sourceId) {
         IPatternDetails resolved = AdvancedAlloyFurnacePatternResolver.resolve(pattern, level, sourceId);
-        if (!(resolved instanceof DynamicComponentPattern dynamic)) return Set.of();
+        if (!(resolved instanceof DynamicComponentPattern dynamic)) {
+            if (LOGGER.isDebugEnabled()) {
+                LOGGER.debug("componentAgnosticOutputSlots: no dynamic pattern for sourceId={} (resolved={})",
+                        sourceId, resolved == null ? "<null>" : resolved.getClass().getSimpleName());
+            }
+            return Set.of();
+        }
 
         Set<Integer> slots = new LinkedHashSet<>();
         List<GenericStack> outputs = resolved.getOutputs();
         for (int slot = 0; slot < outputs.size(); slot++) {
             if (dynamic.isItemIdOutput(slot)) slots.add(slot);
+        }
+        if (LOGGER.isDebugEnabled()) {
+            LOGGER.debug("componentAgnosticOutputSlots: sourceId={} idOnlyOutputSlots={}", sourceId, slots);
         }
         return slots;
     }
@@ -744,6 +759,37 @@ public final class AlloyFurnaceRecipeCatalog {
             }
         }
         return false;
+    }
+
+    /**
+     * Whether the shape fallback may ignore this recipe's item output components.
+     *
+     * <p>A component-bearing output is only safe to compare by shape when every such output slot is
+     * already excluded from component comparison, i.e. the resolver marked it item-id-only.
+     * Blanket-refusing every component-bearing output also refused precisely the dynamic recipes that
+     * depend on this fallback - miner spirits, repair and upgrade variants all carry runtime generated
+     * components on their result - so their slot provenance is checked instead.
+     */
+    private static boolean ignoresItemOutputComponents(
+            AdvancedAlloyFurnaceRecipe recipe, Set<Integer> componentAgnosticOutputs) {
+        if (!hasComponentSensitiveItemOutputs(recipe)) return true;
+        if (componentAgnosticOutputs == null || componentAgnosticOutputs.isEmpty()) return false;
+        List<ItemStack> outputs = recipe.outputs();
+        for (int slot = 0; slot < outputs.size(); slot++) {
+            ItemStack output = outputs.get(slot);
+            if (output != null && !output.isEmpty() && !output.getComponentsPatch().isEmpty()
+                    && !componentAgnosticOutputs.contains(slot)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static void debugResolvePattern(
+            AlloyFurnaceRecipeIdentity identity, String stage, int candidates, int sameIdCount) {
+        if (!LOGGER.isDebugEnabled()) return;
+        LOGGER.debug("resolvePattern {} for {} (fingerprint={}): candidates={}, recipesWithSameId={}",
+                stage, identity.recipeId(), identity.fingerprint(), candidates, sameIdCount);
     }
 
     private static boolean matchesGenericSubsetIgnoringItemComponents(

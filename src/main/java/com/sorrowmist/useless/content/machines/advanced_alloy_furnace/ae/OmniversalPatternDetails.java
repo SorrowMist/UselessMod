@@ -12,6 +12,7 @@ import com.sorrowmist.useless.core.config.ConfigManager;
 import net.minecraft.world.level.Level;
 import net.neoforged.fml.ModList;
 
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -27,13 +28,18 @@ public final class OmniversalPatternDetails extends DynamicComponentPatternDetai
     private static final int DEFAULT_DECODE_CACHE_CAPACITY = 2048;
     private static final Object DECODE_CACHE_LOCK = new Object();
     private static final Map<Level, LevelDecodeCache> DECODE_CACHES = new WeakHashMap<>();
+    /**
+     * Widest set of id-only input slots each definition ever decoded to. Re-deriving the slots can
+     * only lose some of them, and a lost slot makes the pattern require the exact NBT its inputs
+     * were encoded to ignore.
+     */
+    private static final Map<AEItemKey, List<Integer>> PROVEN_ITEM_ID_INPUT_SLOTS = new ConcurrentHashMap<>();
 
     private final OmniversalPatternData data;
     private final AdvancedAlloyFurnaceRecipe recipe;
 
     private OmniversalPatternDetails(Decoded decoded) {
-        super(decoded.source, OmniversalPatternEncoding.resolveItemIdInputSlots(
-                        decoded.entry.recipe(), decoded.source, decoded.data.itemIdInputSlots()),
+        super(decoded.source, decoded.itemIdInputSlots,
                 decoded.data.itemIdOutputSlots(),
                 tagInputTags(decoded.data),
                 fluidTagInputTags(decoded.data),
@@ -89,8 +95,12 @@ public final class OmniversalPatternDetails extends DynamicComponentPatternDetai
                     result = CachedDecode.success(decodeUncached(definition, level));
                 } catch (RuntimeException exception) {
                     result = CachedDecode.failure(exception);
+                    OmniversalPatternDiagnostics.decodeFailed(definition,
+                            definition.get(UComponents.OMNIVERSAL_PATTERN_DATA.get()), exception);
                 }
-                if (generation == AlloyFurnaceRecipeCatalog.generation()) {
+                // Only successes are cached: a transient failure must not disable the pattern for
+                // the rest of the session.
+                if (result.details != null && generation == AlloyFurnaceRecipeCatalog.generation()) {
                     cache.putIfCurrent(definition, result, generation);
                 }
                 ownerFuture.complete(result);
@@ -130,8 +140,30 @@ public final class OmniversalPatternDetails extends DynamicComponentPatternDetai
         AlloyFurnaceRecipeCatalog.Entry entry = resolved
                 .orElseThrow(() -> new IllegalArgumentException(
                         "The bound alloy-furnace recipe is missing or has changed: " + data.recipeId()));
+        List<Integer> itemIdInputSlots = widenItemIdInputSlots(definition,
+                OmniversalPatternEncoding.resolveItemIdInputSlots(
+                        entry.recipe(), source, data.itemIdInputSlots()));
         return new OmniversalPatternDetails(new Decoded(
-                source, data, entry, level));
+                source, data, entry, level, itemIdInputSlots));
+    }
+
+    private static List<Integer> widenItemIdInputSlots(AEItemKey definition, List<Integer> derived) {
+        List<Integer> proven = PROVEN_ITEM_ID_INPUT_SLOTS.compute(definition, (key, stored) -> {
+            if (stored == null) return derived;
+            if (stored.containsAll(derived)) return stored;
+            List<Integer> widened = new ArrayList<>(stored);
+            for (Integer slot : derived) {
+                if (!widened.contains(slot)) {
+                    widened.add(slot);
+                }
+            }
+            widened.sort(null);
+            return List.copyOf(widened);
+        });
+        if (!proven.equals(derived)) {
+            OmniversalPatternDiagnostics.idOnlySlotsNarrowed(definition, proven, derived);
+        }
+        return proven;
     }
 
     private static final class LevelDecodeCache {
@@ -287,6 +319,7 @@ public final class OmniversalPatternDetails extends DynamicComponentPatternDetai
     }
 
     private record Decoded(AEProcessingPattern source, OmniversalPatternData data,
-                           AlloyFurnaceRecipeCatalog.Entry entry, Level level) {
+                           AlloyFurnaceRecipeCatalog.Entry entry, Level level,
+                           List<Integer> itemIdInputSlots) {
     }
 }

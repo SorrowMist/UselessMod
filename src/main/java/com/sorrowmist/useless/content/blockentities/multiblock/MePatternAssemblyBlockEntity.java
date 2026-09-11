@@ -21,6 +21,7 @@ import com.mojang.logging.LogUtils;
 import com.sorrowmist.useless.api.crafting.SmartDoublingCraftingProvider;
 import com.sorrowmist.useless.content.blockentities.PagedMenuPageMemory;
 import com.sorrowmist.useless.content.blockentities.RecoverableItemStackHandler;
+import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.OmniversalPatternDiagnostics;
 import com.sorrowmist.useless.core.config.ConfigManager;
 import com.sorrowmist.useless.core.component.MultiblockPartData;
 import com.sorrowmist.useless.init.ModBlockEntities;
@@ -66,6 +67,11 @@ public final class MePatternAssemblyBlockEntity extends AEBaseBlockEntity
      * is actually usable.
      */
     private boolean providerRefreshPending = true;
+    /**
+     * Number of patterns in the last snapshot published to AE2.  An empty snapshot still has to be
+     * published when it clears a previous one, but not when nothing was indexed at all.
+     */
+    private int publishedPatternCount;
     private boolean unloading;
 
     public MePatternAssemblyBlockEntity(BlockPos pos, BlockState state) {
@@ -168,12 +174,24 @@ public final class MePatternAssemblyBlockEntity extends AEBaseBlockEntity
             return;
         }
 
+        List<IPatternDetails> available = getAvailablePatterns();
+        boolean controllerUnresolvable = getController() == null;
+        if (controllerUnresolvable && publishedPatternCount == 0) {
+            // The snapshot only looks empty because the link to the controller is not resolvable
+            // yet.  Publishing it would index this provider as unable to craft anything, so stay
+            // dirty and publish on a later tick instead.
+            OmniversalPatternDiagnostics.notPublished("me_pattern_assembly@" + worldPosition, "<all>",
+                    "the controller link is not resolvable yet");
+            return;
+        }
+
         providerRefreshPending = false;
         try {
             ICraftingProvider.requestUpdate(mainNode);
+            publishedPatternCount = available.size();
             LOGGER.debug("Refreshed multiblock alloy furnace provider at {} (patterns={})",
-                    worldPosition, getAvailablePatterns().size());
-            for (IPatternDetails pattern : getAvailablePatterns()) {
+                    worldPosition, available.size());
+            for (IPatternDetails pattern : available) {
                 var output = pattern.getPrimaryOutput();
                 if (!node.getGrid().getCraftingService().getCraftingFor(output.what()).contains(pattern)) {
                     LOGGER.warn("AE grid did not index multiblock alloy furnace pattern at {} (output={})",
@@ -185,6 +203,13 @@ public final class MePatternAssemblyBlockEntity extends AEBaseBlockEntity
             // transient grid/pathing update.
             providerRefreshPending = true;
             LOGGER.debug("Deferred multiblock alloy furnace provider refresh at {}", worldPosition, exception);
+        }
+        if (controllerUnresolvable) {
+            // A previous snapshot had to be cleared because the controller link went away; keep
+            // retrying so the node is not left indexed as an unlinked provider.
+            OmniversalPatternDiagnostics.notPublished("me_pattern_assembly@" + worldPosition, "<all>",
+                    "cleared the published patterns because the controller link is gone");
+            providerRefreshPending = true;
         }
     }
 

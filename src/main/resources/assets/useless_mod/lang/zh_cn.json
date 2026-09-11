@@ -57,6 +57,7 @@
   "useless_mod.configuration.enable_kaleidoscope_cookery_recipe_conversion.tooltip": "是否启用森罗物语厨艺厨房配方转换，修改后重启游戏生效",
   "itemGroup.useless_mod.main": "Useless",
   "block.useless_mod.multiblock_alloy_furnace_core": "多方块万象合金炉核心",
+  "config.jade.plugin_useless_mod.multiblock_alloy_furnace_core_name": "显示多方块万象合金炉核心名称",
   "tooltip.useless_mod.multiblock_alloy_furnace_core.prayer.1": "不朽的合成之神，聆听我们的祈祷。",
   "tooltip.useless_mod.multiblock_alloy_furnace_core.prayer.2": "我们是您的孩子，是行走于机械与奥术道路上的工程师。",
   "tooltip.useless_mod.multiblock_alloy_furnace_core.prayer.3": "我们珍视配方胜过一切，因为那是您赐予最永恒的礼物。",

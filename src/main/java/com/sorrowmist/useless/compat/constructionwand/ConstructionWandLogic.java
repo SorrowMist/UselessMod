@@ -370,10 +370,19 @@ public final class ConstructionWandLogic {
     }
 
     private static Supply findSupply(ServerPlayer player, ItemStack tool, BlockItem targetItem) {
-        boolean aePriority = isAeStoragePriorityEnabled(tool);
-        Supply aeSupply = findAeSupply(player, tool, targetItem);
-        if (aePriority && !aeSupply.stack.isEmpty()) {
-            return aeSupply;
+        // AE storage is consulted only while the "AE storage priority" toggle is enabled.
+        if (isAeStoragePriorityEnabled(tool)) {
+            Supply aeSupply = findAeSupply(player, tool, targetItem);
+            if (!aeSupply.stack.isEmpty()) {
+                return aeSupply;
+            }
+        }
+
+        // Prefer non-offhand items: consume the main inventory before falling back to the offhand.
+        for (ItemStack stack : player.getInventory().items) {
+            if (stack.getItem() == targetItem && !stack.isEmpty()) {
+                return new Supply(stack, false, InteractionHand.MAIN_HAND);
+            }
         }
 
         ItemStack offhand = player.getOffhandItem();
@@ -381,12 +390,7 @@ public final class ConstructionWandLogic {
             return new Supply(offhand, false, InteractionHand.OFF_HAND);
         }
 
-        for (ItemStack stack : player.getInventory().items) {
-            if (stack.getItem() == targetItem && !stack.isEmpty()) {
-                return new Supply(stack, false, InteractionHand.MAIN_HAND);
-            }
-        }
-        return aePriority ? emptySupply() : aeSupply;
+        return emptySupply();
     }
 
     private static BlockState getPlacementState(ServerLevel level, ServerPlayer player, BlockPos pos,
@@ -412,7 +416,7 @@ public final class ConstructionWandLogic {
         if (player.isCreative()) return limit;
 
         long available = countLocalSupply(player, targetItem);
-        if (tool.has(UComponents.WIRELESS_LINK_TARGET.get())) {
+        if (isAeStoragePriorityEnabled(tool)) {
             try {
                 available += AE2Compat.tryExtractFromLinkedGrid(
                         tool, player, new ItemStack(targetItem, limit), Actionable.SIMULATE);
@@ -433,7 +437,7 @@ public final class ConstructionWandLogic {
     }
 
     private static Supply findAeSupply(ServerPlayer player, ItemStack tool, BlockItem targetItem) {
-        if (!tool.has(UComponents.WIRELESS_LINK_TARGET.get())) {
+        if (!isAeStoragePriorityEnabled(tool)) {
             return emptySupply();
         }
 

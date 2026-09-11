@@ -6,6 +6,7 @@ import appeng.crafting.pattern.AEProcessingPattern;
 import appeng.helpers.IPatternTerminalLogicHost;
 import appeng.util.inv.AppEngInternalInventory;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.OmniversalPatternDetails;
+import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.OmniversalPatternDiagnostics;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.OmniversalPatternEncoding;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.PendingOmniversalPatternHolder;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.ProcessingPatternRecipeHolder;
@@ -102,29 +103,46 @@ public class PatternEncodingLogicMixin implements PendingOmniversalPatternHolder
     @Unique
     private void uselessMod$tryConvertToOmniversal() {
         AlloyFurnaceRecipeIdentity pending = uselessMod$pendingOmniversalRecipe;
-        if (pending == null) return;
+        if (pending == null) {
+            OmniversalPatternDiagnostics.skip("no pending JEI recipe pick");
+            return;
+        }
 
         ItemStack pattern = encodedPatternInv.getStackInSlot(0);
-        if (pattern.isEmpty()) return;
+        if (pattern.isEmpty()) {
+            OmniversalPatternDiagnostics.skip("encoded group is empty");
+            return;
+        }
 
         Level level = host.getLevel();
-        if (level == null || level.isClientSide()) return;
+        if (level == null || level.isClientSide()) {
+            OmniversalPatternDiagnostics.skip("no server level");
+            return;
+        }
 
         IPatternDetails details;
         try {
             details = PatternDetailsHelper.decodePattern(pattern, level);
         } catch (RuntimeException exception) {
+            OmniversalPatternDiagnostics.skip("pattern failed to decode", exception.getMessage());
             return;
         }
         if (details == null) {
+            OmniversalPatternDiagnostics.skip("pattern decoded to null");
             return;
         }
-        if (details instanceof OmniversalPatternDetails) return;
+        if (details instanceof OmniversalPatternDetails) {
+            OmniversalPatternDiagnostics.skip("already an omniversal pattern");
+            return;
+        }
         if (!(details instanceof AEProcessingPattern)) {
+            OmniversalPatternDiagnostics.skip("not a processing pattern",
+                    details.getClass().getSimpleName());
             return;
         }
 
         String sourceId = uselessMod$pendingOmniversalSourceId;
+        OmniversalPatternDiagnostics.attempt(pending, sourceId);
         // The client and server can materialize a tag-backed Ingredient with different
         // representative items. Resolve the selected recipe by id and the encoded pattern
         // contents when the fingerprint differs, otherwise a shared chemical-conversion /
@@ -133,15 +151,22 @@ public class PatternEncodingLogicMixin implements PendingOmniversalPatternHolder
         try {
             entry = AlloyFurnaceRecipeCatalog.resolvePattern(level, sourceId, pending, details);
         } catch (RuntimeException exception) {
+            OmniversalPatternDiagnostics.blocked("resolvePattern threw", exception.toString());
             return;
         }
-        if (entry.isEmpty()) return;
+        if (entry.isEmpty()) {
+            OmniversalPatternDiagnostics.blocked("recipe identity not resolved", pending.recipeId());
+            return;
+        }
         try {
             if (!AlloyFurnaceRecipeCatalog.matchesRecipe(
                     level, sourceId, entry.get().recipe(), details)) {
+                OmniversalPatternDiagnostics.blocked(
+                        "encoded slots do not match the recipe", entry.get().identity().recipeId());
                 return;
             }
         } catch (RuntimeException exception) {
+            OmniversalPatternDiagnostics.blocked("matchesRecipe threw", exception.toString());
             return;
         }
 
@@ -153,9 +178,15 @@ public class PatternEncodingLogicMixin implements PendingOmniversalPatternHolder
         try {
             omniversal = OmniversalPatternEncoding.encode(pattern, details, entry.get(), level);
         } catch (RuntimeException exception) {
+            OmniversalPatternDiagnostics.blocked("encoder threw", exception.toString());
             return;
         }
-        if (omniversal.isEmpty()) return;
+        if (omniversal.isEmpty()) {
+            OmniversalPatternDiagnostics.blocked(
+                    "encoder refused the pattern", entry.get().identity().recipeId());
+            return;
+        }
+        OmniversalPatternDiagnostics.converted(entry.get().identity());
 
         encodedPatternInv.setItemDirect(0, omniversal);
         // A JEI selection applies to one encoding action. Do not let it upgrade a later

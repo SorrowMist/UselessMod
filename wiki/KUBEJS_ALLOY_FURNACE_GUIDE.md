@@ -98,6 +98,47 @@ ServerEvents.recipes(event => {
 
 The fourth positional argument is a single `mold`; the fifth is `tier`. This recipe requires a coil tier of at least 3.
 
+### Pentacle Molds (Components Required)
+
+`mold` / `molds` are plain Ingredients: **a bare item ID or tag carries no NBT/components**, so it degrades to "any ritual blueprint matches". To bind a specific Occultism pentacle you must include the `useless_mod:ritual_blueprint_pentacle` component:
+
+```javascript
+ServerEvents.recipes(event => {
+    event.recipes.useless_mod.advanced_alloy_furnace({
+        id: 'kubejs:foliot_miner',
+        ingredients: [
+            { ingredient: 'occultism:book_of_binding_bound_foliot', count: 1 },
+            { ingredient: 'occultism:iesnium_pickaxe', count: 1 },
+            { ingredient: 'occultism:magic_lamp_empty', count: 1 }
+        ],
+        outputs: [Item.of('occultism:miner_foliot_unspecialized', 1)],
+        mold: Item.of('useless_mod:ritual_blueprint', {
+            'useless_mod:ritual_blueprint_pentacle': ['occultism:craft_foliot']
+        }),
+        tier: 0
+    })
+})
+```
+
+The equivalent SNBT string form:
+
+```javascript
+mold: 'useless_mod:ritual_blueprint{useless_mod:ritual_blueprint_pentacle:["occultism:craft_foliot"]}'
+```
+
+Every entry of `molds` accepts the same component form and can be mixed with ordinary molds:
+
+```javascript
+molds: [
+    Item.of('useless_mod:ritual_blueprint', {
+        'useless_mod:ritual_blueprint_pentacle': ['occultism:craft_foliot']
+    }),
+    'useless_mod:metal_mold_gear'
+]
+```
+
+> Matching only requires the blueprint's pentacle set to **contain** the required pentacles, so one blueprint imprinted with several pentacles can satisfy multiple recipes.
+
 ### Object Syntax
 
 Object syntax is recommended when setting a tier without a mold, multiple molds, or several optional fields:
@@ -270,8 +311,8 @@ Use `input_fluids` and `output_fluids` for the alloy furnace's ordinary machine 
 | `outputs` | ItemStack[] | No | `[]` | Item output list; strings and `Item.of(...)` are supported |
 | `output_fluids` | FluidStack[] | No | `[]` | Fluid output list; `Fluid.of(...)` is supported |
 | `key_outputs` | GenericStack[] | No | `[]` | AEKey output list; each entry uses the AE2 generic stack format |
-| `mold` | Ingredient | No | Empty | Single mold requirement; item IDs and tags are supported |
-| `molds` | Ingredient[] | No | Empty | Multiple independent mold requirements; mutually exclusive with `mold` |
+| `mold` | Ingredient | No | Empty | Single mold requirement: item ID, tag, or `Item.of(...)` with components; binding a pentacle requires `useless_mod:ritual_blueprint_pentacle` |
+| `molds` | Ingredient[] | No | Empty | Multiple independent mold requirements; mutually exclusive with `mold`; components are supported per entry |
 | `tier` | Integer | No | Unspecified | Minimum coil tier, from `0` to `10` |
 | `energy` | Long | No | `2000` | Energy consumed by one operation |
 | `process_time` | Integer | No | `200` | Processing time in ticks |
@@ -288,6 +329,23 @@ ingredients: [
 ```
 
 `ingredient` uses the standard KubeJS Ingredient syntax. It may be an item ID, a tag, or another Ingredient expression supported by KubeJS. Each input is checked independently.
+
+NBT-bearing inputs must use `Item.of(...)` or the SNBT string form:
+
+```javascript
+ingredients: [
+    // Components: every listed component must exist with the same value; extra components are allowed
+    { ingredient: Item.of('occultism:book_of_binding_bound_foliot', {
+        'occultism:spirit_name': 'Some Name'
+    }), count: 1 },
+    // Equivalent SNBT string form
+    { ingredient: 'occultism:book_of_binding_bound_foliot{occultism:spirit_name:"Some Name"}', count: 1 },
+    // No components: any instance of the item matches
+    { ingredient: 'minecraft:iron_ingot', count: 4 }
+]
+```
+
+> A bare item ID (for example `'occultism:book_of_binding_bound_foliot'`) does **not** keep NBT, so any instance matches. The same applies to molds; include the components when you need an exact match.
 
 ### Fluid Input Format
 
@@ -360,6 +418,8 @@ recipe_tier_rules = [
 ```
 
 The configuration only applies to recipes without an explicit `tier`. Reload the configuration or restart the game according to the configuration screen message.
+
+> ⚠️ In the example above, `kubejs:*,2` forces **every** recipe whose id starts with `kubejs:` to require a coil tier of at least 2. On a low-tier machine those recipes stay visible in JEI but the machine will not start them. Check `recipe_tier_rules` first when a recipe is visible yet refuses to run.
 
 ## Replacing and Removing Recipes
 
@@ -477,3 +537,5 @@ If a recipe does not appear or the machine cannot process it:
 5. Check coil tier, molds, input counts, and catalyst requirements.
 6. For ordinary fluids, use `input_fluids`/`output_fluids`; for AEKey fluids or other AE resources, use `key_inputs`/`key_outputs` and verify the `#t` type is registered.
 7. Run `/reload` after editing the script and check for script exceptions.
+8. A `mold`/`molds` entry written as a bare item ID with no components degrades to "any blueprint" and can collide with other pentacle recipes; follow [Pentacle Molds](#pentacle-molds-components-required) and include the components.
+9. When re-registering Occultism rituals with `occultism_kubejs`, note that `event.recipes.occultism.ritual(...)` writes `ritual_type = occultism:craft` by default (the built-in miner rituals use `occultism:craft_miner_spirit`), and the recipe id becomes your own namespace (for example `cdp2:recipes/occultism/ritual/...`). This mod identifies miner-spirit rituals semantically ("is the output a miner spirit / what is the `ritual_type`"), **not by recipe id**, so re-registered miner spirits still convert correctly.

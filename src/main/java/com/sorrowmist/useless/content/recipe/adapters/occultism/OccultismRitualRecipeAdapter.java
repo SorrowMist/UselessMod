@@ -3,6 +3,7 @@ package com.sorrowmist.useless.content.recipe.adapters.occultism;
 import appeng.api.stacks.GenericStack;
 import com.klikli_dev.occultism.common.entity.spirit.SpiritEntity;
 import com.klikli_dev.occultism.common.item.spirit.BookOfBindingBoundItem;
+import com.klikli_dev.occultism.common.item.spirit.MinerSpiritItem;
 import com.klikli_dev.occultism.crafting.recipe.RitualRecipe;
 import com.klikli_dev.occultism.registry.OccultismDataComponents;
 import com.klikli_dev.occultism.registry.OccultismEntities;
@@ -63,12 +64,11 @@ public final class OccultismRitualRecipeAdapter implements IRecipeAdapter<Ritual
     private static final ResourceLocation CRAFT_MINER_SPIRIT = id("craft_miner_spirit");
     private static final ResourceLocation RESURRECT_FAMILIAR = id("resurrect_familiar");
     private static final ResourceLocation COMMAND = id("execute_command");
-    private static final Set<ResourceLocation> MINER_SPIRIT_RECIPE_IDS = Set.of(
-            id("craft_miner_foliot_unspecialized"),
-            id("craft_miner_djinni_ores"),
-            id("craft_miner_afrit_deeps"),
-            id("craft_miner_marid_master"),
-            id("misc_miner_ancient_eldritch"));
+    // Miner-spirit rituals are deliberately NOT matched by a hard-coded recipe id list anymore:
+    // Occultism's built-in ids are occultism:ritual/craft_miner_* (the old list used the wrong
+    // occultism:craft_miner_* shape) and modpack authors re-register those rituals through KubeJS
+    // with both a new id and the schema's default ritual_type (occultism:craft). Detection is now
+    // semantic, see isMinerSpiritRecipe / isMinerSpiritResult.
     public static final String AUTO_TAME_MARKER = "useless_mod_occultism_auto_tame";
     private static final Set<ResourceLocation> WARNED_SKIPPED_RECIPES = ConcurrentHashMap.newKeySet();
 
@@ -255,6 +255,17 @@ public final class OccultismRitualRecipeAdapter implements IRecipeAdapter<Ritual
                 return Optional.empty();
             }
         }
+        if (matches.isEmpty() && LOGGER.isDebugEnabled()) {
+            List<ResourceLocation> supported = new ArrayList<>();
+            for (RecipeHolder<RitualRecipe> holder : recipes) {
+                if (isSupported(holder)) {
+                    supported.add(holder.id());
+                }
+            }
+            LOGGER.debug(
+                    "No dynamic alloy-furnace pattern profile matched the occultism pattern; considered {} supported ritual(s): {}",
+                    supported.size(), supported);
+        }
         return matches.isEmpty() ? Optional.empty() : Optional.of(matches.getFirst());
     }
 
@@ -263,10 +274,24 @@ public final class OccultismRitualRecipeAdapter implements IRecipeAdapter<Ritual
             List<DynamicPatternProfile> matches) {
         Converted data = convert(source, null, null, null);
         List<ItemStack> patternOutputs = pattern.outputRepresentatives();
-        if (data == null || data.outputs().size() != 1
-                || !matchesOutputItem(data.outputs().getFirst(), pattern.outputs().getFirst(),
-                patternOutputs.getFirst())
-                || !matchesPatternInputs(data.inputs(), pattern)) {
+        if (data == null || data.outputs().size() != 1) {
+            logMinerProfileReject(source, "no single static output");
+            return;
+        }
+        if (patternOutputs.isEmpty() || pattern.outputs().isEmpty()) {
+            logMinerProfileReject(source, "pattern has no output representative");
+            return;
+        }
+        if (!matchesOutputItem(data.outputs().getFirst(), pattern.outputs().getFirst(),
+                patternOutputs.getFirst())) {
+            logMinerProfileReject(source, "output mismatch: expected=" + data.outputs().getFirst()
+                    + " pattern=" + patternOutputs.getFirst()
+                    + " x" + pattern.outputs().getFirst().amount());
+            return;
+        }
+        if (!matchesPatternInputs(data.inputs(), pattern)) {
+            logMinerProfileReject(source, "input mismatch: required=" + totalRequiredItems(data.inputs())
+                    + " pattern=" + totalPatternItems(pattern.inputs()));
             return;
         }
 
@@ -281,6 +306,16 @@ public final class OccultismRitualRecipeAdapter implements IRecipeAdapter<Ritual
         }
         if (activationSlots.size() == 1) {
             matches.add(new DynamicPatternProfile(activationSlots, Set.of(0)));
+        } else {
+            logMinerProfileReject(source, "activation slots=" + activationSlots);
+        }
+    }
+
+    /** Diagnostics for the miner pattern-resolution gate; only emitted when debug logging is on. */
+    private static void logMinerProfileReject(RitualRecipe source, String reason) {
+        if (LOGGER.isDebugEnabled()) {
+            LOGGER.debug("Miner ritual {} produced no dynamic pattern profile: {}",
+                    source == null ? "<null>" : source.getPentacleId(), reason);
         }
     }
 
@@ -377,17 +412,27 @@ public final class OccultismRitualRecipeAdapter implements IRecipeAdapter<Ritual
 
     private static boolean matchesPatternInputs(
             List<CountedIngredient> requirements, PatternStackView pattern) {
-        return totalRequiredItems(requirements) == totalPatternItems(pattern.inputs())
-                && ItemIngredientAllocator.matches(requirements, List.of(), pattern.inputs(), 1L);
+        long required = totalRequiredItems(requirements);
+        long actual = totalPatternItems(pattern.inputs());
+        if (required <= 0L || actual <= 0L || actual % required != 0L) {
+            return false;
+        }
+        // A manually multiplied pattern is still the same recipe. AlloyFurnaceRecipeCatalog
+        // .findPatternScale resolves integer multiples, so the dynamic profiles must use the same
+        // scaling rule instead of demanding a 1x pattern.
+        return ItemIngredientAllocator.matches(
+                requirements, List.of(), pattern.inputs(), actual / required);
     }
 
     private static boolean matchesOutputItem(
             ItemStack expected, GenericStack patternOutput, ItemStack patternOutputRepresentative) {
         return expected != null && !expected.isEmpty()
+                && expected.getCount() > 0
                 && patternOutput != null && patternOutput.amount() > 0L
                 && patternOutputRepresentative != null && !patternOutputRepresentative.isEmpty()
                 && expected.is(patternOutputRepresentative.getItem())
-                && expected.getCount() == patternOutput.amount();
+                // Stay proportional rather than exactly equal, mirroring findPatternScale.
+                && patternOutput.amount() % expected.getCount() == 0L;
     }
 
     private static boolean matchesStaticOutput(
@@ -506,14 +551,15 @@ public final class OccultismRitualRecipeAdapter implements IRecipeAdapter<Ritual
         }
         Map<Ingredient, Long> requirements = new LinkedHashMap<>();
         Ingredient activation = repairActivation != null
-                ? exact(repairActivation)
-                : upgradeActivation != null ? exact(upgradeActivation) : source.getActivationItem();
+                ? itemOnly(repairActivation)
+                : upgradeActivation != null ? itemOnly(upgradeActivation) : source.getActivationItem();
         if (!add(requirements, activation)) {
             return null;
         }
         List<Ingredient> ingredients = source.getIngredients();
         for (int index = 0; index < ingredients.size(); index++) {
-            Ingredient ingredient = index == 0 && upgradeBase != null ? exact(upgradeBase) : ingredients.get(index);
+            Ingredient ingredient = index == 0 && upgradeBase != null
+                    ? itemOnly(upgradeBase) : ingredients.get(index);
             if (!add(requirements, ingredient)) {
                 return null;
             }
@@ -801,9 +847,49 @@ public final class OccultismRitualRecipeAdapter implements IRecipeAdapter<Ritual
         return source != null && CRAFT_MINER_SPIRIT.equals(source.getRitualType());
     }
 
-    private static boolean isMinerSpiritRecipe(RecipeHolder<RitualRecipe> holder) {
-        return holder != null && MINER_SPIRIT_RECIPE_IDS.contains(holder.id())
-                && isCraftMinerSpirit(holder.value());
+    /**
+     * Detects a miner-spirit ritual without relying on hard-coded recipe ids.
+     * <p>
+     * Occultism's built-in miner rituals use {@code ritual_type = occultism:craft_miner_spirit} and live under
+     * {@code occultism:ritual/...}. Modpacks that re-register a miner ritual through KubeJS (occultism_kubejs)
+     * end up with a brand new recipe id and the schema's default {@code ritual_type = occultism:craft}, so an
+     * id- or type-only check silently misses them. A missed miner ritual keeps the strict, component-exact
+     * output match, which fails because the miner spirit item carries a runtime generated
+     * {@code occultism:spirit_name} component - that is what made every miner tier uncraftable. Matching on the
+     * result item class covers both the built-in rituals and any renamed / re-typed re-registration.
+     */
+    private static boolean isMinerSpiritRecipe(@Nullable RecipeHolder<RitualRecipe> holder) {
+        if (holder == null || holder.value() == null) {
+            return false;
+        }
+        RitualRecipe source = holder.value();
+        if (isCraftMinerSpirit(source)) {
+            return true;
+        }
+        return isMinerSpiritResult(resultItem(source));
+    }
+
+    /** Static item result of a ritual, or {@link ItemStack#EMPTY} when it has none. */
+    private static ItemStack resultItem(RitualRecipe source) {
+        try {
+            ItemStack result = source.getResultItem(null);
+            return result == null ? ItemStack.EMPTY : result;
+        } catch (RuntimeException ignored) {
+            // getResultItem may need a registry lookup that is not available at this stage.
+            return ItemStack.EMPTY;
+        }
+    }
+
+    /** True when the given stack is an Occultism miner spirit, whose identity includes generated NBT. */
+    private static boolean isMinerSpiritResult(ItemStack result) {
+        if (result == null || result.isEmpty()) {
+            return false;
+        }
+        try {
+            return result.getItem() instanceof MinerSpiritItem;
+        } catch (RuntimeException ignored) {
+            return false;
+        }
     }
 
     private static Ingredient upgradeBaseIngredient(RitualRecipe source) {
@@ -818,8 +904,20 @@ public final class OccultismRitualRecipeAdapter implements IRecipeAdapter<Ritual
         return true;
     }
 
-    private static Ingredient exact(ItemStack stack) {
-        return DataComponentIngredient.of(true, stack.copyWithCount(1));
+    /**
+     * Item-id-only requirement for a per-variant source item.
+     *
+     * <p>The repair / upgrade / miner variants exist to bind the output computation to one concrete
+     * item, not to demand a byte-identical instance. Requiring the components of the catalogued
+     * representative made these variants unmatchable by the item the player actually owns: a damaged
+     * pickaxe can never equal a pristine one, and a miner spirit carries its own bound
+     * {@code occultism:spirit_name}. That is also why the machine crafts them while pattern
+     * encoding refused them - the machine recomputes the requirement from the real input stack,
+     * whereas encoding matches the pattern against the catalogued recipe. {@code DynamicPatternProfile}
+     * already declares these slots id-only, so the recipe now says the same thing.
+     */
+    private static Ingredient itemOnly(ItemStack stack) {
+        return Ingredient.of(stack.getItem());
     }
 
     private static Ingredient blueprintMold(ResourceLocation pentacle) {

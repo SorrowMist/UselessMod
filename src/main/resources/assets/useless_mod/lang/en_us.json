@@ -57,6 +57,7 @@
   "useless_mod.configuration.enable_kaleidoscope_cookery_recipe_conversion.tooltip": "Whether to enable conversion of Kaleidoscope Cookery kitchen recipes. Takes effect after restarting the game.",
   "itemGroup.useless_mod.main": "Useless",
   "block.useless_mod.multiblock_alloy_furnace_core": "Omniversal Alloy Furnace Core",
+  "config.jade.plugin_useless_mod.multiblock_alloy_furnace_core_name": "Show Omniversal Alloy Furnace Core name",
   "tooltip.useless_mod.multiblock_alloy_furnace_core.prayer.1": "Immortal god of synthesis, hear our prayer.",
   "tooltip.useless_mod.multiblock_alloy_furnace_core.prayer.2": "We are your children, engineers walking the paths of machinery and arcana.",
   "tooltip.useless_mod.multiblock_alloy_furnace_core.prayer.3": "We treasure recipes above all, for they are your most eternal gift.",

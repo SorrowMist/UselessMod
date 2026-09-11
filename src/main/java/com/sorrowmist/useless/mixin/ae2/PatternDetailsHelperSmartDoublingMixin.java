@@ -3,6 +3,7 @@ package com.sorrowmist.useless.mixin.ae2;
 import appeng.api.crafting.IPatternDetails;
 import appeng.api.crafting.PatternDetailsHelper;
 import appeng.api.stacks.AEItemKey;
+import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.OmniversalPatternDiagnostics;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.SmartDoublingPatterns;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
@@ -18,8 +19,13 @@ public abstract class PatternDetailsHelperSmartDoublingMixin {
             at = @At("HEAD"), cancellable = true)
     private static void uselessMod$decodeScaledKey(
             AEItemKey definition, Level level, CallbackInfoReturnable<IPatternDetails> callback) {
-        if (SmartDoublingPatterns.definitionOperations(definition) != null) {
+        if (SmartDoublingPatterns.definitionOperations(definition) == null) {
+            return;
+        }
+        try {
             callback.setReturnValue(SmartDoublingPatterns.restore(definition, level));
+        } catch (Exception exception) {
+            OmniversalPatternDiagnostics.wrapFailed("smart-doubling", definition, exception);
         }
     }
 
@@ -29,8 +35,13 @@ public abstract class PatternDetailsHelperSmartDoublingMixin {
     private static void uselessMod$decodeScaledStack(
             ItemStack stack, Level level, CallbackInfoReturnable<IPatternDetails> callback) {
         AEItemKey definition = AEItemKey.of(stack);
-        if (definition != null && SmartDoublingPatterns.definitionOperations(definition) != null) {
+        if (definition == null || SmartDoublingPatterns.definitionOperations(definition) == null) {
+            return;
+        }
+        try {
             callback.setReturnValue(SmartDoublingPatterns.restore(definition, level));
+        } catch (Exception exception) {
+            OmniversalPatternDiagnostics.wrapFailed("smart-doubling", definition, exception);
         }
     }
 }

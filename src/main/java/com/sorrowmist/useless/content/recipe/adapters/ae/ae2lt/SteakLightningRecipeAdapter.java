@@ -3,11 +3,10 @@ package com.sorrowmist.useless.content.recipe.adapters.ae.ae2lt;
 import appeng.api.stacks.GenericStack;
 import com.moakiee.ae2lt.me.key.LightningKey;
 import com.sorrowmist.useless.api.enums.AlloyFurnaceMode;
-import com.sorrowmist.useless.content.items.EndlessBeafItem;
+import com.sorrowmist.useless.content.items.BeefToolVariants;
 import com.sorrowmist.useless.content.recipe.AdvancedAlloyFurnaceRecipe;
 import com.sorrowmist.useless.content.recipe.CountedIngredient;
 import com.sorrowmist.useless.content.recipe.IRecipeAdapter;
-import com.sorrowmist.useless.init.ModItems;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
@@ -17,6 +16,7 @@ import net.minecraft.world.item.crafting.RecipeHolder;
 import net.minecraft.world.item.crafting.RecipeInput;
 import net.minecraft.world.item.crafting.RecipeSerializer;
 import net.minecraft.world.item.crafting.RecipeType;
+import net.minecraft.world.level.ItemLike;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.material.Fluid;
 import net.minecraft.world.level.material.Fluids;
@@ -81,13 +81,7 @@ public class SteakLightningRecipeAdapter implements IRecipeAdapter<SteakLightnin
 
     private static Ingredient createSteakMold() {
         return Ingredient.of(
-                ModItems.ENDLESS_BEAF_ITEM.get(),
-                ModItems.ENDLESS_BEAF_WRENCH.get(),
-                ModItems.ENDLESS_BEAF_SCREWDRIVER.get(),
-                ModItems.ENDLESS_BEAF_MALLET.get(),
-                ModItems.ENDLESS_BEAF_CROWBAR.get(),
-                ModItems.ENDLESS_BEAF_HAMMER.get()
-        );
+                BeefToolVariants.allVariantItems().toArray(ItemLike[]::new));
     }
 
     public List<AdvancedAlloyFurnaceRecipe> getAllRecipes() {
@@ -107,7 +101,7 @@ public class SteakLightningRecipeAdapter implements IRecipeAdapter<SteakLightnin
 
     @Override
     public boolean matchesMold(@Nullable ItemStack mold) {
-        return mold != null && !mold.isEmpty() && mold.getItem() instanceof EndlessBeafItem;
+        return BeefToolVariants.isBeafTool(mold);
     }
 
     @Override

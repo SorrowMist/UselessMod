@@ -1,15 +1,14 @@
 package com.sorrowmist.useless.network;
 
 import com.sorrowmist.useless.UselessMod;
-import com.sorrowmist.useless.content.blockentities.AdvancedAlloyFurnaceBlockEntity;
-import com.sorrowmist.useless.content.blockentities.multiblock.MultiblockAlloyFurnaceCoreBlockEntity;
-import com.sorrowmist.useless.content.menus.MultiblockAlloyFurnaceMenu;
-import net.minecraft.client.Minecraft;
+import com.sorrowmist.useless.client.network.ClientPacketHandlers;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.ResourceLocation;
+import net.neoforged.api.distmarker.Dist;
+import net.neoforged.fml.loading.FMLEnvironment;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
 import org.jetbrains.annotations.NotNull;
 
@@ -87,22 +86,11 @@ public record AETaskProgressPacket(BlockPos pos, List<AETaskProgressPacket.TaskP
     }
 
     public static void handle(AETaskProgressPacket msg, IPayloadContext ctx) {
-        ctx.enqueueWork(() -> {
-            Minecraft mc = Minecraft.getInstance();
-            if (mc.player != null
-                    && mc.player.containerMenu instanceof MultiblockAlloyFurnaceMenu menu
-                    && menu.getBlockPos().equals(msg.pos)) {
-                menu.updateTaskProgress(msg.tasks);
-            }
-            if (mc.level != null) {
-                var blockEntity = mc.level.getBlockEntity(msg.pos);
-                if (blockEntity instanceof AdvancedAlloyFurnaceBlockEntity furnace) {
-                    furnace.updateClientTaskProgress(msg.tasks);
-                } else if (blockEntity instanceof MultiblockAlloyFurnaceCoreBlockEntity furnace) {
-                    furnace.updateClientTaskProgress(msg.tasks);
-                }
-            }
-        });
+        // 客户端类型统一收敛到 ClientPacketHandlers，避免专用服务器加载类时解析到客户端类。
+        if (FMLEnvironment.dist != Dist.CLIENT) {
+            return;
+        }
+        ctx.enqueueWork(() -> ClientPacketHandlers.handleAETaskProgress(msg));
     }
 
     @Override

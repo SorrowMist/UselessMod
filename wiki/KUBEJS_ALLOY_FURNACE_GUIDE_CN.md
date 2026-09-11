@@ -98,6 +98,47 @@ ServerEvents.recipes(event => {
 
 位置调用的第四个参数是单个 `mold`，第五个参数是 `tier`。上面的配方要求线圈等级至少为 3。
 
+### 五芒星模具（必须带组件）
+
+`mold` / `molds` 是标准 Ingredient：**只写物品 ID 或标签时不包含任何 NBT/组件**，会退化为“任意仪式蓝图都满足”。要绑定特定的神秘学五芒星，必须带上 `useless_mod:ritual_blueprint_pentacle` 组件：
+
+```javascript
+ServerEvents.recipes(event => {
+    event.recipes.useless_mod.advanced_alloy_furnace({
+        id: 'kubejs:foliot_miner',
+        ingredients: [
+            { ingredient: 'occultism:book_of_binding_bound_foliot', count: 1 },
+            { ingredient: 'occultism:iesnium_pickaxe', count: 1 },
+            { ingredient: 'occultism:magic_lamp_empty', count: 1 }
+        ],
+        outputs: [Item.of('occultism:miner_foliot_unspecialized', 1)],
+        mold: Item.of('useless_mod:ritual_blueprint', {
+            'useless_mod:ritual_blueprint_pentacle': ['occultism:craft_foliot']
+        }),
+        tier: 0
+    })
+})
+```
+
+等价的 SNBT 字符串写法：
+
+```javascript
+mold: 'useless_mod:ritual_blueprint{useless_mod:ritual_blueprint_pentacle:["occultism:craft_foliot"]}'
+```
+
+`molds` 的每一项目同样需要带组件，可以与普通模具混用：
+
+```javascript
+molds: [
+    Item.of('useless_mod:ritual_blueprint', {
+        'useless_mod:ritual_blueprint_pentacle': ['occultism:craft_foliot']
+    }),
+    'useless_mod:metal_mold_gear'
+]
+```
+
+> 匹配时只要玩家蓝图上的五芒星**包含**配方要求的五芒星即算满足，所以一张刻印了多个五芒星的蓝图可以同时满足多条配方。
+
 ### 对象写法
 
 对象写法适合同时指定等级、模具和其他可选字段，也可以在没有模具时直接指定 `tier`：
@@ -270,8 +311,8 @@ key_outputs: [
 | `outputs` | ItemStack[] | 否 | `[]` | 输出物列表，可使用字符串或 `Item.of(...)` |
 | `output_fluids` | FluidStack[] | 否 | `[]` | 流体输出列表，可使用 `Fluid.of(...)` |
 | `key_outputs` | GenericStack[] | 否 | `[]` | AEKey 输出列表，每项使用 AE2 通用堆栈格式 |
-| `mold` | Ingredient | 否 | 空 | 单个模具要求，可使用物品 ID 或标签 |
-| `molds` | Ingredient[] | 否 | 空 | 多个独立模具要求，不能与 `mold` 同时使用 |
+| `mold` | Ingredient | 否 | 空 | 单个模具要求：物品 ID、标签或带组件的 `Item.of(...)`；绑定五芒星必须带 `useless_mod:ritual_blueprint_pentacle` |
+| `molds` | Ingredient[] | 否 | 空 | 多个独立模具要求，不能与 `mold` 同时使用；每项同样支持组件 |
 | `tier` | Integer | 否 | 未指定 | 线圈最低等级，范围为 `0-10` |
 | `energy` | Long | 否 | `2000` | 一次处理消耗的能量 |
 | `process_time` | Integer | 否 | `200` | 处理时间，单位为 tick |
@@ -288,6 +329,23 @@ ingredients: [
 ```
 
 `ingredient` 使用 KubeJS 标准 Ingredient 写法，可以是物品 ID、标签或其他受 KubeJS 支持的 Ingredient 表达式。每种输入物会分别检查数量。
+
+需要带 NBT/组件的输入时，必须使用 `Item.of(...)` 或 SNBT 字符串形式：
+
+```javascript
+ingredients: [
+    // 带组件：只要求这些组件存在且值相同，其它组件可以额外存在
+    { ingredient: Item.of('occultism:book_of_binding_bound_foliot', {
+        'occultism:spirit_name': 'Some Name'
+    }), count: 1 },
+    // 等价的 SNBT 字符串写法
+    { ingredient: 'occultism:book_of_binding_bound_foliot{occultism:spirit_name:"Some Name"}', count: 1 },
+    // 不带组件：任意该物品都满足
+    { ingredient: 'minecraft:iron_ingot', count: 4 }
+]
+```
+
+> 只写物品 ID（例如 `'occultism:book_of_binding_bound_foliot'`）**不会**保留 NBT，任何该物品都会匹配；模具同理。需要精确匹配时请带上组件。
 
 ### 流体输入格式
 
@@ -360,6 +418,8 @@ recipe_tier_rules = [
 ```
 
 配置只对未显式指定 `tier` 的配方生效。修改配置后需要重新加载配置或重启游戏，具体取决于配置界面提示。
+
+> ⚠️ 上面示例里的 `kubejs:*,2` 会让**所有** `kubejs:` 开头的配方都要求至少 2 级线圈。低阶线圈的机器上，这些配方在 JEI 里看得见但机器不会启动——排查“配方能看见却不工作”时请先检查 `recipe_tier_rules`。
 
 ## 替换和删除配方
 
@@ -477,3 +537,5 @@ ServerEvents.recipes(event => {
 5. 检查线圈等级、模具、输入数量和催化剂要求是否满足配方条件。
 6. 普通机器流体使用 `input_fluids`/`output_fluids`；AEKey 流体或其他 AE 资源使用 `key_inputs`/`key_outputs`，并检查 `#t` 对应的 key 类型已注册。
 7. 修改脚本后执行 `/reload`，并确认日志中没有脚本异常。
+8. `mold`/`molds` 只写了物品 ID 而没有组件时会退化为“任意蓝图”，可能与其它五芒星配方互相冲突；绑定五芒星请按[五芒星模具](#五芒星模具必须带组件)带上组件。
+9. 用 `occultism_kubejs` 重加神秘学仪式时注意：`event.recipes.occultism.ritual(...)` 会把 `ritual_type` 默认写成 `occultism:craft`（原版矿工仪式是 `occultism:craft_miner_spirit`），并且配方 ID 会变成你自己的命名空间（例如 `cdp2:recipes/occultism/ritual/...`）。本模组按“输出物品是否为矿工之灵 / `ritual_type`”语义识别矿工仪式，**不依赖配方 ID**，因此重加后矿工之灵仍可正常转化。

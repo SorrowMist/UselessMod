@@ -13,6 +13,7 @@ import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.item.ItemStack;
+import net.neoforged.fml.ModList;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
 import org.jetbrains.annotations.NotNull;
 
@@ -73,6 +74,22 @@ public class ModeTogglePacket implements CustomPacketPayload {
                 case FORCE_KILL -> {
                     stack.set(UComponents.ForceKillEnabledComponent.get(), msg.enabled);
                 }
+                case BEEF_MALUM_SPIRIT -> {
+                    if (ModList.get().isLoaded("malum") && stack.getItem() instanceof EndlessBeafItem) {
+                        stack.set(UComponents.BeefMalumSpiritEnabledComponent.get(), msg.enabled);
+                    }
+                }
+                case BEEF_MYSTICAL_AGRICULTURE -> {
+                    if (ModList.get().isLoaded("mysticalagriculture")
+                            && stack.getItem() instanceof EndlessBeafItem) {
+                        stack.set(UComponents.BeefMysticalAgricultureEnabledComponent.get(), msg.enabled);
+                    }
+                }
+                case BEEF_BEHEADING -> {
+                    if (stack.getItem() instanceof EndlessBeafItem) {
+                        stack.set(UComponents.BeefBeheadingEnabledComponent.get(), msg.enabled);
+                    }
+                }
                 case BEEF_TIME_ACCELERATION -> {
                     if (stack.getItem() instanceof EndlessBeafItem) {
                         stack.set(UComponents.BeefTimeAccelerationEnabledComponent.get(), msg.enabled);
@@ -131,6 +148,9 @@ public class ModeTogglePacket implements CustomPacketPayload {
         WRENCH_TAG,
         CONSTRUCTION_WAND,
         FORCE_KILL,
+        BEEF_MALUM_SPIRIT,
+        BEEF_MYSTICAL_AGRICULTURE,
+        BEEF_BEHEADING,
         BEEF_INVULNERABILITY,
         BEEF_CAPTURE,
         BEEF_TIME_ACCELERATION,

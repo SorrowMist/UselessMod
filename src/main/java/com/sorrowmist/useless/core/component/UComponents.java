@@ -163,6 +163,33 @@ public final class UComponents {
                            ))
             );
 
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<Boolean>> BeefMalumSpiritEnabledComponent =
+            register("beef_malum_spirit_enabled", builder ->
+                    builder.persistent(Codec.BOOL)
+                           .networkSynchronized(StreamCodec.of(
+                                   FriendlyByteBuf::writeBoolean,
+                                   FriendlyByteBuf::readBoolean
+                           ))
+            );
+
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<Boolean>> BeefMysticalAgricultureEnabledComponent =
+            register("beef_mystical_agriculture_enabled", builder ->
+                    builder.persistent(Codec.BOOL)
+                           .networkSynchronized(StreamCodec.of(
+                                   FriendlyByteBuf::writeBoolean,
+                                   FriendlyByteBuf::readBoolean
+                           ))
+            );
+
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<Boolean>> BeefBeheadingEnabledComponent =
+            register("beef_beheading_enabled", builder ->
+                    builder.persistent(Codec.BOOL)
+                           .networkSynchronized(StreamCodec.of(
+                                   FriendlyByteBuf::writeBoolean,
+                                   FriendlyByteBuf::readBoolean
+                           ))
+            );
+
     public static final DeferredHolder<DataComponentType<?>, DataComponentType<Boolean>> BeefTeleportEnabledComponent =
             register("beef_teleport_enabled", builder ->
                     builder.persistent(Codec.BOOL)

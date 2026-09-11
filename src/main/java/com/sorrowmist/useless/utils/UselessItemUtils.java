@@ -9,6 +9,8 @@ import net.minecraft.core.Holder;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.core.component.DataComponents;
+import net.minecraft.world.item.component.ResolvableProfile;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.effect.MobEffect;
 import net.minecraft.world.effect.MobEffectInstance;
@@ -133,7 +135,8 @@ public class UselessItemUtils {
     }
 
     public static void tryAddCognizantDustDrop(LivingDropsEvent event, ItemStack stack) {
-        if (!(stack.getItem() instanceof EndlessBeafItem)) {
+        if (!(stack.getItem() instanceof EndlessBeafItem)
+                || !stack.getOrDefault(UComponents.BeefMysticalAgricultureEnabledComponent.get(), false)) {
             return;
         }
 
@@ -159,6 +162,61 @@ public class UselessItemUtils {
                     new ItemStack(cognizantDust, count)
             ));
         }
+    }
+
+    public static void tryAddBeheadingDrop(LivingDropsEvent event, ItemStack stack) {
+        if (!(stack.getItem() instanceof EndlessBeafItem)
+                || !stack.getOrDefault(UComponents.BeefBeheadingEnabledComponent.get(), false)) {
+            return;
+        }
+
+        LivingEntity killedEntity = event.getEntity();
+        Level level = killedEntity.level();
+        if (event.isCanceled() || level.isClientSide()
+                || !level.getGameRules().getBoolean(GameRules.RULE_DOMOBLOOT)) {
+            return;
+        }
+
+        ItemStack head = beheadingDrop(killedEntity);
+        if (!head.isEmpty()) {
+            event.getDrops().add(new ItemEntity(
+                    level,
+                    killedEntity.getX(),
+                    killedEntity.getY(),
+                    killedEntity.getZ(),
+                    head
+            ));
+        }
+    }
+
+    private static ItemStack beheadingDrop(LivingEntity entity) {
+        if (entity instanceof Player player) {
+            ItemStack head = new ItemStack(Items.PLAYER_HEAD);
+            head.set(DataComponents.PROFILE, new ResolvableProfile(player.getGameProfile()));
+            return head;
+        }
+
+        EntityType<?> type = entity.getType();
+        if (type == EntityType.SKELETON || type == EntityType.STRAY || type == EntityType.BOGGED) {
+            return new ItemStack(Items.SKELETON_SKULL);
+        }
+        if (type == EntityType.WITHER_SKELETON) {
+            return new ItemStack(Items.WITHER_SKELETON_SKULL);
+        }
+        if (type == EntityType.ZOMBIE || type == EntityType.ZOMBIE_VILLAGER
+                || type == EntityType.HUSK || type == EntityType.DROWNED) {
+            return new ItemStack(Items.ZOMBIE_HEAD);
+        }
+        if (type == EntityType.CREEPER) {
+            return new ItemStack(Items.CREEPER_HEAD);
+        }
+        if (type == EntityType.PIGLIN || type == EntityType.PIGLIN_BRUTE) {
+            return new ItemStack(Items.PIGLIN_HEAD);
+        }
+        if (type == EntityType.ENDER_DRAGON) {
+            return new ItemStack(Items.DRAGON_HEAD);
+        }
+        return ItemStack.EMPTY;
     }
 
     public static void tryCaptureSpawnEgg(LivingEntity killedEntity, ItemStack stack, Player player) {

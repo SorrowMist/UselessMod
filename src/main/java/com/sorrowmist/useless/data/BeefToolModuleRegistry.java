@@ -34,6 +34,9 @@ public final class BeefToolModuleRegistry {
     public static final String AE_STORAGE_PRIORITY = "mode.ae_storage_priority";
     public static final String WRENCH_TAG = "mode.wrench_tag";
     public static final String FORCE_KILL = "mode.force_kill";
+    public static final String BEEF_MALUM_SPIRIT = "mode.beef_malum_spirit";
+    public static final String BEEF_MYSTICAL_AGRICULTURE = "mode.beef_mystical_agriculture";
+    public static final String BEEF_BEHEADING = "mode.beef_beheading";
     public static final String BEEF_TIME_ACCELERATION = "mode.beef_time_acceleration";
     public static final String BEEF_INVULNERABILITY = "mode.beef_invulnerability";
     public static final String BEEF_ADVANCED_STEALTH = "mode.beef_advanced_stealth";
@@ -77,6 +80,13 @@ public final class BeefToolModuleRegistry {
                     Availability.BASE, false),
             new Definition(FORCE_KILL, ModeTypeEnum.FORCE_KILL.getTooltip(), GroupKind.COMBAT,
                     Availability.ALWAYS, false),
+            new Definition(BEEF_MALUM_SPIRIT, ModeTypeEnum.BEEF_MALUM_SPIRIT_ENABLED.getTooltip(), GroupKind.COMBAT,
+                    Availability.MALUM, false),
+            new Definition(BEEF_MYSTICAL_AGRICULTURE,
+                    ModeTypeEnum.BEEF_MYSTICAL_AGRICULTURE_ENABLED.getTooltip(), GroupKind.COMBAT,
+                    Availability.MYSTICAL_AGRICULTURE, false),
+            new Definition(BEEF_BEHEADING, ModeTypeEnum.BEEF_BEHEADING_ENABLED.getTooltip(), GroupKind.COMBAT,
+                    Availability.ENDLESS, false),
             new Definition(BEEF_CAPTURE, ModeTypeEnum.BEEF_CAPTURE_ENABLED.getTooltip(), GroupKind.COMBAT,
                     Availability.ENDLESS, false),
             new Definition(BEEF_AOE_DAMAGE, ModeTypeEnum.BEEF_AOE_DAMAGE_ENABLED.getTooltip(), GroupKind.COMBAT,
@@ -92,6 +102,10 @@ public final class BeefToolModuleRegistry {
             new Definition(BEEF_MAGNET, ModeTypeEnum.BEEF_MAGNET_ENABLED.getTooltip(), GroupKind.AUXILIARY,
                     Availability.ENDLESS, false)
     );
+    private static final List<String> AUTO_COMBAT_MODULES = List.of(
+            BEEF_MALUM_SPIRIT,
+            BEEF_MYSTICAL_AGRICULTURE,
+            BEEF_BEHEADING);
 
     private static final Map<String, Definition> BY_ID;
 
@@ -149,13 +163,98 @@ public final class BeefToolModuleRegistry {
         return new BeefToolLayout(0, pages, List.of());
     }
 
-    /** Adds newly available modules without disturbing any existing order. */
+    /** Adds newly available modules to their default group without disturbing any existing order. */
     public static void addMissingAvailableModules(BeefToolLayout layout, ItemStack target) {
-        for (Definition definition : DEFINITIONS) {
-            if (definition.availability().isAvailable(target) && !layout.containsModule(definition.id())) {
-                layout.unassignedModules().add(definition.id());
+        for (String moduleId : AUTO_COMBAT_MODULES) {
+            if (!isAvailable(moduleId, target)) {
+                continue;
+            }
+
+            boolean inUnassigned = layout.unassignedModules().contains(moduleId);
+            if (!inUnassigned && layout.containsModule(moduleId)) {
+                continue;
+            }
+
+            BeefToolLayout.Group combat = findOrCreateCombatGroup(layout);
+            if (combat == null || combat.modules().size() >= BeefToolLayout.MAX_MODULES_PER_GROUP) {
+                continue;
+            }
+
+            if (inUnassigned) {
+                layout.unassignedModules().remove(moduleId);
+            }
+            combat.modules().add(moduleId);
+        }
+    }
+
+    private static BeefToolLayout.Group findOrCreateCombatGroup(BeefToolLayout layout) {
+        BeefToolLayout.Group combat = findNamedCombatGroup(layout);
+        if (combat != null) return combat;
+
+        combat = findRenamedCombatGroup(layout);
+        if (combat != null) return combat;
+
+        return createCombatGroup(layout);
+    }
+
+    private static BeefToolLayout.Group findNamedCombatGroup(BeefToolLayout layout) {
+        for (BeefToolLayout.Page page : layout.pages()) {
+            for (BeefToolLayout.Group group : page.groups()) {
+                if (GroupKind.COMBAT.defaultName().equals(group.name())
+                        && group.modules().size() < BeefToolLayout.MAX_MODULES_PER_GROUP) {
+                    return group;
+                }
             }
         }
+        return null;
+    }
+
+    private static BeefToolLayout.Group findRenamedCombatGroup(BeefToolLayout layout) {
+        for (BeefToolLayout.Page page : layout.pages()) {
+            for (BeefToolLayout.Group group : page.groups()) {
+                if (group.modules().size() >= BeefToolLayout.MAX_MODULES_PER_GROUP) continue;
+                for (String moduleId : group.modules()) {
+                    Definition definition = get(moduleId);
+                    if (definition != null && definition.group() == GroupKind.COMBAT
+                            && !AUTO_COMBAT_MODULES.contains(moduleId)) {
+                        return group;
+                    }
+                }
+            }
+        }
+        return null;
+    }
+
+    private static BeefToolLayout.Group createCombatGroup(BeefToolLayout layout) {
+        BeefToolLayout.Page page = layout.pages().stream()
+                .filter(candidate -> candidate.groups().size() < BeefToolLayout.MAX_GROUPS_PER_PAGE)
+                .findFirst()
+                .orElse(null);
+
+        if (page == null) {
+            if (layout.pages().size() >= BeefToolLayout.MAX_PAGES) return null;
+            page = new BeefToolLayout.Page("Page " + (layout.pages().size() + 1));
+            layout.pages().add(page);
+        }
+
+        String name = GroupKind.COMBAT.defaultName();
+        int suffix = 2;
+        while (hasGroupName(layout, name)) {
+            name = GroupKind.COMBAT.defaultName() + " " + suffix++;
+        }
+
+        BeefToolLayout.Group combat = new BeefToolLayout.Group(name);
+        page.groups().add(combat);
+        return combat;
+    }
+
+    private static boolean hasGroupName(BeefToolLayout layout, String name) {
+        for (BeefToolLayout.Page page : layout.pages()) {
+            for (BeefToolLayout.Group group : page.groups()) {
+                if (name.equals(group.name())) return true;
+            }
+        }
+        return false;
     }
 
     public enum GroupKind {
@@ -202,6 +301,20 @@ public final class BeefToolModuleRegistry {
             @Override
             boolean isAvailable(ItemStack target) {
                 return ModList.get().isLoaded("ae2") && target != null && !target.isEmpty();
+            }
+        },
+        MALUM {
+            @Override
+            boolean isAvailable(ItemStack target) {
+                return ModList.get().isLoaded("malum") && target != null
+                        && target.getItem() instanceof EndlessBeafItem;
+            }
+        },
+        MYSTICAL_AGRICULTURE {
+            @Override
+            boolean isAvailable(ItemStack target) {
+                return ModList.get().isLoaded("mysticalagriculture") && target != null
+                        && target.getItem() instanceof EndlessBeafItem;
             }
         },
         REMOVED {

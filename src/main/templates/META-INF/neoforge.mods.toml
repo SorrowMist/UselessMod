@@ -64,6 +64,10 @@ requiredMods=["jade"]
 config="${mod_id}.item_obliterator.mixins.json"
 requiredMods=["item_obliterator"]
 
+[[mixins]]
+config="${mod_id}.malum.mixins.json"
+requiredMods=["malum"]
+
 # The [[accessTransformers]] block allows you to declare where your AT file is.
 # If this block is omitted, a fallback attempt will be made to load an AT from META-INF/accesstransformer.cfg
 #[[accessTransformers]]

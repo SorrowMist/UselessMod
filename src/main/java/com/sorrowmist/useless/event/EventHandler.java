@@ -163,6 +163,7 @@ public class EventHandler {
             if (mainHandItem.getItem() instanceof EndlessBeafItem) {
                 UselessItemUtils.tryAddCognizantDustDrop(event, mainHandItem);
                 UselessItemUtils.onLivingDrops(event, mainHandItem, player);
+                UselessItemUtils.tryAddBeheadingDrop(event, mainHandItem);
             }
         }
     }

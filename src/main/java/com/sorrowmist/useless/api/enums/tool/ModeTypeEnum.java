@@ -26,6 +26,17 @@ public enum ModeTypeEnum {
 
     FORCE_KILL("force_kill", "tooltip.useless_mod.force_kill_enabled_mode"),
 
+    BEEF_MALUM_SPIRIT_ENABLED("beef_malum_spirit_enabled", "tooltip.useless_mod.beef_malum_spirit_mode"),
+    BEEF_MALUM_SPIRIT_DISABLED("beef_malum_spirit_disabled", "tooltip.useless_mod.beef_malum_spirit_mode"),
+
+    BEEF_MYSTICAL_AGRICULTURE_ENABLED("beef_mystical_agriculture_enabled",
+            "tooltip.useless_mod.beef_mystical_agriculture_mode"),
+    BEEF_MYSTICAL_AGRICULTURE_DISABLED("beef_mystical_agriculture_disabled",
+            "tooltip.useless_mod.beef_mystical_agriculture_mode"),
+
+    BEEF_BEHEADING_ENABLED("beef_beheading_enabled", "tooltip.useless_mod.beef_beheading_mode"),
+    BEEF_BEHEADING_DISABLED("beef_beheading_disabled", "tooltip.useless_mod.beef_beheading_mode"),
+
     BEEF_TIME_ACCELERATION_ENABLED("beef_time_acceleration_enabled", "tooltip.useless_mod.time_acceleration_mode"),
     BEEF_TIME_ACCELERATION_DISABLED("beef_time_acceleration_disabled", "tooltip.useless_mod.time_acceleration_mode"),
 
@@ -84,6 +95,18 @@ public enum ModeTypeEnum {
 
     public static ModeTypeEnum getBeefTimeAccelerationMode(boolean enabled) {
         return enabled ? BEEF_TIME_ACCELERATION_ENABLED : BEEF_TIME_ACCELERATION_DISABLED;
+    }
+
+    public static ModeTypeEnum getBeefMalumSpiritMode(boolean enabled) {
+        return enabled ? BEEF_MALUM_SPIRIT_ENABLED : BEEF_MALUM_SPIRIT_DISABLED;
+    }
+
+    public static ModeTypeEnum getBeefMysticalAgricultureMode(boolean enabled) {
+        return enabled ? BEEF_MYSTICAL_AGRICULTURE_ENABLED : BEEF_MYSTICAL_AGRICULTURE_DISABLED;
+    }
+
+    public static ModeTypeEnum getBeefBeheadingMode(boolean enabled) {
+        return enabled ? BEEF_BEHEADING_ENABLED : BEEF_BEHEADING_DISABLED;
     }
 
     public static ModeTypeEnum getBeefCaptureMode(boolean enabled) {

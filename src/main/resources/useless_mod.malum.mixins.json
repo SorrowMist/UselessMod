@@ -1,0 +1,12 @@
+{
+  "required": false,
+  "package": "com.sorrowmist.useless.mixin.malum",
+  "compatibilityLevel": "JAVA_21",
+  "mixins": [
+    "SoulHarvestHandlerMixin",
+    "SoulHarvestDropMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

@@ -554,6 +554,12 @@ public class ModeWheelScreen extends Screen {
             case BeefToolModuleRegistry.AE_STORAGE_PRIORITY -> bool(UComponents.AEStoragePriorityComponent, false);
             case BeefToolModuleRegistry.WRENCH_TAG -> bool(UComponents.WrenchTagEnabledComponent, true);
             case BeefToolModuleRegistry.FORCE_KILL -> bool(UComponents.ForceKillEnabledComponent, false);
+            case BeefToolModuleRegistry.BEEF_MALUM_SPIRIT ->
+                    bool(UComponents.BeefMalumSpiritEnabledComponent, false);
+            case BeefToolModuleRegistry.BEEF_MYSTICAL_AGRICULTURE ->
+                    bool(UComponents.BeefMysticalAgricultureEnabledComponent, false);
+            case BeefToolModuleRegistry.BEEF_BEHEADING ->
+                    bool(UComponents.BeefBeheadingEnabledComponent, false);
             case BeefToolModuleRegistry.BEEF_TIME_ACCELERATION ->
                     bool(UComponents.BeefTimeAccelerationEnabledComponent, false);
             case BeefToolModuleRegistry.BEEF_INVULNERABILITY ->
@@ -876,6 +882,15 @@ public class ModeWheelScreen extends Screen {
                     UComponents.WrenchTagEnabledComponent, true);
             case BeefToolModuleRegistry.FORCE_KILL -> toggle(ModeTogglePacket.ModeType.FORCE_KILL,
                     UComponents.ForceKillEnabledComponent, false);
+            case BeefToolModuleRegistry.BEEF_MALUM_SPIRIT ->
+                    toggle(ModeTogglePacket.ModeType.BEEF_MALUM_SPIRIT,
+                            UComponents.BeefMalumSpiritEnabledComponent, false);
+            case BeefToolModuleRegistry.BEEF_MYSTICAL_AGRICULTURE ->
+                    toggle(ModeTogglePacket.ModeType.BEEF_MYSTICAL_AGRICULTURE,
+                            UComponents.BeefMysticalAgricultureEnabledComponent, false);
+            case BeefToolModuleRegistry.BEEF_BEHEADING ->
+                    toggle(ModeTogglePacket.ModeType.BEEF_BEHEADING,
+                            UComponents.BeefBeheadingEnabledComponent, false);
             case BeefToolModuleRegistry.BEEF_TIME_ACCELERATION -> toggle(ModeTogglePacket.ModeType.BEEF_TIME_ACCELERATION,
                     UComponents.BeefTimeAccelerationEnabledComponent, false);
             case BeefToolModuleRegistry.BEEF_INVULNERABILITY -> toggle(ModeTogglePacket.ModeType.BEEF_INVULNERABILITY,

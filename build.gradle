@@ -190,7 +190,7 @@ def enderIoCompileFiles = files(
 ).builtBy(extractEnderIoApi)
 
 dependencies {
-    implementation "mezz.jei:jei-1.21.1-neoforge:19.39.0.372"
+    implementation "mezz.jei:jei-1.21.1-neoforge:19.54.0.429"
     implementation "curse.maven:ae2-jei-integration-1074338:7727898"
 
     implementation "org.appliedenergistics:appliedenergistics2:19.2.17"
@@ -228,9 +228,12 @@ dependencies {
     runtimeOnly "curse.maven:necronomicon-586157:5772683"
 
     implementation "curse.maven:ae2-crystal-science-1435174:8498888" // 1.21.1-1.2.1
-    implementation "curse.maven:ae2-lightning-tech-1527395:8638573"
-    implementation "curse.maven:thunderbolt-core-1631756:8638565"
-    implementation "curse.maven:data-energistics-1565514:8613673" // 1.21.1-3.0.3
+    implementation "maven.modrinth:ae2-lightning-tech:2.1.0-beta.5"
+    implementation "maven.modrinth:thunderbolt-core:2.0.0-beta.4"
+    implementation "curse.maven:data-energistics-1565514:8841396" // 1.21.1-3.2.2
+    implementation"curse.maven:not-enough-dataenergitic-and-ae2lighteningtech-1671687:8752847"
+    implementation"curse.maven:not-enough-dataenergitic-and-ae2lighteningtech-service-1671683:8752820"
+    additionalRuntimeClasspath "curse.maven:not-enough-dataenergitic-and-ae2lighteningtech-service-1671683:8752820"
 
     implementation "curse.maven:omnitool-1401075:8272031"
 
@@ -248,7 +251,7 @@ dependencies {
     compileOnly "maven.modrinth:Rw1NrDzF:8421rqFF"
 
 
-    implementation "maven.modrinth:jade:15.1.2+neoforge"
+    implementation "curse.maven:jade-324717:8591319"
     //龙之研究
     implementation "curse.maven:codechicken-lib-1-8-242818:7281427"
     implementation "curse.maven:brandons-core-231382:7130990"
@@ -269,7 +272,7 @@ dependencies {
 
     //eco
     implementation "maven.modrinth:neoecoae:21.1.1"
-    implementation "maven.modrinth:ldlib:mc1.21.1-2.2.30-neoforge"
+    implementation "maven.modrinth:ldlib:mc1.21.1-2.2.38.a-neoforge"
 
     // 实用拓展
     compileOnly "maven.modrinth:actually-additions:1.3.22"
@@ -282,7 +285,7 @@ dependencies {
 
 
     // 新生魔艺
-    compileOnly "curse.maven:ars-nouveau-401955:8152094"
+    implementation "curse.maven:ars-nouveau-401955:8152094"
 
     implementation "curse.maven:just-dire-things-1002348:7463040"
     implementation "curse.maven:jdte-1566414:8776309"
@@ -295,6 +298,8 @@ dependencies {
     implementation "mekanism:Mekanism:1.21.1-10.7.19.85:generators"
     implementation "curse.maven:applied-mekanistics-574300:7096962"
     implementation "maven.modrinth:mekanism_extra:1.21.1-1.4.1"
+    implementation "curse.maven:flux-networks-248020:6089446"
+
     implementation "maven.modrinth:mekanismmoremachine:1.21.1-1.4.1"
 
     implementation "curse.maven:flux-networks-248020:6089446"

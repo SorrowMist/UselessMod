@@ -8,6 +8,7 @@ import appeng.api.stacks.AEKey;
 import appeng.api.stacks.GenericStack;
 import appeng.api.stacks.KeyCounter;
 import com.mojang.logging.LogUtils;
+import com.sorrowmist.useless.core.config.ConfigManager;
 import com.sorrowmist.useless.network.AETaskProgressPacket;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.chemical.ChemicalStackView;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.chemical.FurnaceChemicalStorage;
@@ -44,8 +45,15 @@ import org.slf4j.Logger;
  */
 public final class AdvancedAlloyFurnaceAeManager {
     private static final Logger LOGGER = LogUtils.getLogger();
-    private static final int BATCH_RIPE_TICKS = 10;
     private static final int UNRETURNED_RETRY_TICKS = 20;
+
+    /**
+     * 批次成熟窗口（tick）：把 AE 的连续推送合并成一个任务，避免每次推送都单独开工。
+     * 由配置项 {@code advanced_alloy_furnace.ae_batch_ripe_ticks} 控制，0 表示推送即刻投入执行。
+     */
+    private static int batchRipeTicks() {
+        return ConfigManager.getAdvancedAlloyFurnaceAeBatchRipeTicks();
+    }
 
     private final AlloyFurnaceAeHost owner;
     private final ConcurrentHashMap<Integer, CraftingTask> activeTasks = new ConcurrentHashMap<>();
@@ -591,17 +599,20 @@ public final class AdvancedAlloyFurnaceAeManager {
 
     void flushAEBatches(Runnable syncProgress) {
         List<PendingAEBatch> ripe;
+        // 一个活跃任务都没有时，成熟窗口没有可合并的对象，只是纯粹的等待开销，直接放行。
+        // 后续推送仍会由 tickAETasks 合并进刚启动的任务，批量语义不变。
+        boolean idle = this.activeTasks.isEmpty();
         synchronized (this.aePendingBatches) {
             var it = this.aePendingBatches.entrySet().iterator();
             ripe = new ArrayList<>();
             while (it.hasNext()) {
                 var entry = it.next();
                 PendingAEBatch batch = entry.getValue();
-                batch.ripeTimer--;
-                if (batch.ripeTimer <= 0) {
-                    ripe.add(batch);
-                    it.remove();
+                if (!idle && --batch.ripeTimer > 0) {
+                    continue;
                 }
+                ripe.add(batch);
+                it.remove();
             }
         }
 
@@ -823,7 +834,7 @@ public final class AdvancedAlloyFurnaceAeManager {
             target.allInputs.addAll(batch.allInputs);
             target.statusKey = batch.statusKey;
             target.statusDetail = batch.statusDetail;
-            target.ripeTimer = BATCH_RIPE_TICKS;
+            target.ripeTimer = batchRipeTicks();
         }
     }
 
@@ -1081,7 +1092,7 @@ public final class AdvancedAlloyFurnaceAeManager {
         final IPatternDetails pattern;
         final long operationsPerPush;
         final List<KeyCounter[]> allInputs = new ArrayList<>();
-        int ripeTimer = BATCH_RIPE_TICKS;
+        int ripeTimer = batchRipeTicks();
         String statusKey = "gui.useless_mod.advanced_alloy_furnace.ae_task_status.queued";
         String statusDetail = "";
 

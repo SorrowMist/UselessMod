@@ -270,15 +270,37 @@ public class CraftingTask {
             List<FluidStack> fluids,
             List<KeyAmount> keys,
             boolean keepLongAmounts) {
-        if (keepLongAmounts || amount.amount() > Integer.MAX_VALUE) {
-            keys.add(new KeyAmount(amount.what(), amount.amount()));
-        } else if (amount.what() instanceof AEItemKey itemKey) {
-            items.add(itemKey.toStack((int) amount.amount()));
-        } else if (amount.what() instanceof AEFluidKey fluidKey) {
-            fluids.add(fluidKey.toStack((int) amount.amount()));
-        } else {
-            keys.add(new KeyAmount(amount.what(), amount.amount()));
+        if (!keepLongAmounts && fitsInSingleStack(amount)) {
+            if (amount.what() instanceof AEItemKey itemKey) {
+                items.add(itemKey.toStack((int) amount.amount()));
+                return;
+            }
+            if (amount.what() instanceof AEFluidKey fluidKey) {
+                fluids.add(fluidKey.toStack((int) amount.amount()));
+                return;
+            }
         }
+        keys.add(new KeyAmount(amount.what(), amount.amount()));
+    }
+
+    /**
+     * 只有确实能装进"一个合法栈"的数量才允许物化成 ItemStack / FluidStack。
+     * <p>
+     * 1.21 的物品单栈上限是 {@code Item.ABSOLUTE_MAX_STACK_SIZE}（99），AE2 的物品槽容量
+     * （{@code InternalInventory#getSlotLimit}、{@code GenericSlotCapacities}）也取同一个值；
+     * 而 {@code ItemStack.CODEC} 的 count 是 {@code ExtraCodecs.intRange(1, 99)}，
+     * {@code ItemStack#save} 又走 {@code getOrThrow()}。因此 count 超限的栈是越界状态：
+     * 一旦它被存档（例如掉在地上变成 ItemEntity）就会抛异常，物化成千上万个栈更是性能灾难。
+     * 超限数量一律留在 AEKey + long 表示里，由 {@link FurnaceOutputPort#outputKeyWithRemainder}
+     * 按槽位容量分片。
+     * <p>
+     * FluidStack 的数量本身是 int，没有 99 级限制，只需防 int 溢出。
+     */
+    private static boolean fitsInSingleStack(GenericStack amount) {
+        if (amount.what() instanceof AEItemKey itemKey) {
+            return amount.amount() <= itemKey.getMaxStackSize();
+        }
+        return amount.amount() <= Integer.MAX_VALUE;
     }
 
     /**
@@ -502,7 +524,9 @@ public class CraftingTask {
     /**
      * 返还材料，与产物一致地尊重“产物返回AE”开关：开关开启时优先写回 AE 网络，
      * 其次本地输入槽/流体槽。任何路径都不允许静默丢失 ——
-     * 物品放不下时掉落到机器上方；流体最后尝试输出流体槽，仍有剩余则进暂存缓冲重试；
+     * 物品的剩余部分交给 {@link CraftingTaskContext#handleUnreturnedItem}（多方块核心、被动样板舱
+     * 与单方块炉会暂存成 key + 数量逐 tick 重试，只有未覆写的实现才会掉落）；
+     * 流体最后尝试输出流体槽，仍有剩余则进暂存缓冲重试；
      * key 类材料（如化学品）没有本地槽位可回退，无视开关直接尝试 AE，失败部分进暂存缓冲。
      */
     private static void returnMaterials(CraftingTaskContext context, List<ItemStack> items, List<FluidStack> fluids, List<KeyAmount> keys) {
@@ -541,11 +565,8 @@ public class CraftingTask {
         }
 
         for (ItemStack stack : items) {
-            ItemStack leftover = FurnaceOutputPort.outputItemWithRemainder(stack, port,
-                    context.getItemHandler(), context.getInputSlotsStart(), context.getInputSlotsCount());
-            if (!leftover.isEmpty()) {
-                context.handleUnreturnedItem(leftover);
-            }
+            returnItemStack(context, port, stack,
+                    context.getInputSlotsStart(), context.getInputSlotsCount());
         }
 
         for (FluidStack fluidStack : fluids) {
@@ -562,6 +583,34 @@ public class CraftingTask {
         context.markChanged();
     }
 
+    /**
+     * 返还一个物品堆：正常情况（数量已保证不超过单栈上限）走 AE → 本地槽 → 掉落三级回退；
+     * 万一拿到超限栈，则改走 AEKey + long 投影，剩余暂存成 key 由管理器逐 tick 重试，
+     * 避免越界栈进入本地槽或 {@code Containers#dropItemStack}（后者会按 10~30 拆成大量实体）。
+     */
+    private static void returnItemStack(
+            CraftingTaskContext context, FurnaceOutputPort.AeOutput port,
+            ItemStack stack, int slotsStart, int slotsCount) {
+        if (stack == null || stack.isEmpty()) {
+            return;
+        }
+        AEItemKey key = AEItemKey.of(stack);
+        if (key != null && stack.getCount() > key.getMaxStackSize()) {
+            GenericStack remainder = FurnaceOutputPort.outputKeyWithRemainder(
+                    new GenericStack(key, stack.getCount()), port,
+                    context.getItemHandler(), slotsStart, slotsCount, null, 0, null, null);
+            if (remainder != null) {
+                context.stashUnreturnedInput(remainder.what(), remainder.amount());
+            }
+            return;
+        }
+        ItemStack leftover = FurnaceOutputPort.outputItemWithRemainder(stack, port,
+                context.getItemHandler(), slotsStart, slotsCount);
+        if (!leftover.isEmpty()) {
+            context.handleUnreturnedItem(leftover);
+        }
+    }
+
     /** Returns already-produced outputs without putting chemical products into input slots. */
     private static void returnOutputMaterials(CraftingTaskContext context, List<ItemStack> items,
                                                List<FluidStack> fluids, List<KeyAmount> keys) {
@@ -572,11 +621,8 @@ public class CraftingTask {
 
         FurnaceOutputPort.AeOutput port = context.createAeOutputPort();
         for (ItemStack stack : items) {
-            ItemStack leftover = FurnaceOutputPort.outputItemWithRemainder(stack, port,
-                    context.getItemHandler(), context.getOutputSlotsStart(), context.getOutputSlotsCount());
-            if (!leftover.isEmpty()) {
-                context.handleUnreturnedItem(leftover);
-            }
+            returnItemStack(context, port, stack,
+                    context.getOutputSlotsStart(), context.getOutputSlotsCount());
         }
 
         for (FluidStack fluidStack : fluids) {
@@ -915,7 +961,10 @@ public class CraftingTask {
         if (key == null) {
             throw new IllegalStateException("A recipe item output must have an AE item key");
         }
-        if (context.supportsLongAeAmounts() || amount.compareTo(MAX_INT_AMOUNT) > 0) {
+        // 判据是"能否装进一个合法栈"（1.21 物品单栈上限 99），而不是 int 上限：
+        // 超过单栈上限的数量留在 key + 数量表示里，绝不物化成越界 ItemStack。
+        if (context.supportsLongAeAmounts()
+                || amount.compareTo(BigInteger.valueOf(key.getMaxStackSize())) > 0) {
             addPendingKey(key, amount);
         } else {
             pendingOutputItems.add(template.copyWithCount(amount.intValueExact()));

@@ -80,6 +80,8 @@ public class ConfigManager {
     private static final ModConfigSpec.BooleanValue FURNACE_DRAW_APPFLUX_ENERGY;
     private static final ModConfigSpec.BooleanValue FURNACE_DRAW_AE_ENERGY;
     private static final ModConfigSpec.ConfigValue<List<? extends String>> FURNACE_RECIPE_TIER_RULES;
+    // 万象炉 AE 批次成熟等待窗口
+    private static final ModConfigSpec.IntValue FURNACE_AE_BATCH_RIPE_TICKS;
     private static final ModConfigSpec.IntValue[] FURNACE_TIER_THREADS =
             new ModConfigSpec.IntValue[11];
     private static final ModConfigSpec.IntValue[] CATALYST_TIER_PARALLEL =
@@ -471,6 +473,13 @@ public class ConfigManager {
                         "在AppliedFlux抽取之后作为补充, 每tick总抽取量受熔炉最大输入速率限制")
                 .define("draw_ae_energy", false);
 
+        FURNACE_AE_BATCH_RIPE_TICKS = SERVER_BUILDER
+                .comment("万象炉收到 AE 推送的批次后，先等待多少个 tick 再投入执行",
+                        "这个窗口用于把连续推送合并成一个任务，等待期间 GUI 显示为「排队」",
+                        "设为 0 表示推送即刻投入执行；机器完全空闲（无任何运行中任务）时会跳过该窗口")
+                .translation("useless_mod.configuration.ae_batch_ripe_ticks")
+                .defineInRange("ae_batch_ripe_ticks", 10, 0, 200);
+
         for (int tier = 0; tier <= 10; tier++) {
             FURNACE_TIER_THREADS[tier] = SERVER_BUILDER
                     .comment("单方块熔炉 " + tier + " 阶的最大AE任务数")
@@ -825,6 +834,11 @@ public class ConfigManager {
 
     public static int getAdvancedAlloyFurnaceTierThreads(int tier) {
         return getConfigValue(FURNACE_TIER_THREADS[Math.max(0, Math.min(10, tier))]);
+    }
+
+    /** 万象炉 AE 批次成熟等待窗口（tick）；0 表示推送即刻投入执行 */
+    public static int getAdvancedAlloyFurnaceAeBatchRipeTicks() {
+        return Math.max(0, getConfigValue(FURNACE_AE_BATCH_RIPE_TICKS));
     }
 
     public static int getAdvancedAlloyFurnaceCatalystParallel(int tier) {

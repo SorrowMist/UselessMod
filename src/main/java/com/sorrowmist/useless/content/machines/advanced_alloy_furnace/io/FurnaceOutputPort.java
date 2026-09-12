@@ -62,23 +62,47 @@ public final class FurnaceOutputPort {
                                     BiConsumer<AEKey, Long> onKeyRemainder) {
         for (ItemStack output : recipe.outputs()) {
             long totalCountLong = (long) output.getCount() * parallel;
-            int totalCount = totalCountLong > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) totalCountLong;
-            if (totalCount <= 0) {
+            if (totalCountLong <= 0L) {
+                continue;
+            }
+            AEItemKey outputKey = AEItemKey.of(output);
+            if (outputKey != null && totalCountLong > outputKey.getMaxStackSize()) {
+                // 超过单栈上限的数量不允许物化成越界 ItemStack（1.21 上限 99，
+                // ItemStack.CODEC 的 count 是 intRange(1, 99) 且 save() 走 getOrThrow），
+                // 一律以 AEKey + long 投影，剩余交给 onKeyRemainder。
+                GenericStack remainder = outputKeyWithRemainder(
+                        new GenericStack(outputKey, totalCountLong), aeOutput,
+                        itemHandler, outputSlotsStart, outputSlotsCount, null, 0,
+                        outputChemicalStorage, chemicalKeyProvider);
+                if (remainder != null && onKeyRemainder != null) {
+                    onKeyRemainder.accept(remainder.what(), remainder.amount());
+                }
                 continue;
             }
             ItemStack toOutput = output.copy();
-            toOutput.setCount(totalCount);
+            toOutput.setCount((int) totalCountLong);
             outputItem(toOutput, aeOutput, itemHandler, outputSlotsStart, outputSlotsCount);
         }
 
         for (FluidStack outputFluid : recipe.outputFluids()) {
             long totalAmountLong = (long) outputFluid.getAmount() * parallel;
-            int totalAmount = totalAmountLong > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) totalAmountLong;
-            if (totalAmount <= 0) {
+            if (totalAmountLong <= 0L) {
+                continue;
+            }
+            AEFluidKey outputFluidKey = AEFluidKey.of(outputFluid);
+            if (outputFluidKey != null && totalAmountLong > Integer.MAX_VALUE) {
+                // FluidStack 的数量是 int：超过 int 的部分不再截断丢弃，改以 AEKey + long 投影。
+                GenericStack remainder = outputKeyWithRemainder(
+                        new GenericStack(outputFluidKey, totalAmountLong), aeOutput,
+                        null, 0, 0, outputFluidTanks, fluidTankCount,
+                        outputChemicalStorage, chemicalKeyProvider);
+                if (remainder != null && onKeyRemainder != null) {
+                    onKeyRemainder.accept(remainder.what(), remainder.amount());
+                }
                 continue;
             }
             FluidStack toOutput = outputFluid.copy();
-            toOutput.setAmount(totalAmount);
+            toOutput.setAmount((int) totalAmountLong);
             outputFluid(toOutput, aeOutput, outputFluidTanks, fluidTankCount);
         }
 

@@ -1024,6 +1024,31 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
         this.aeManager.stashUnreturnedOutput(key, amount);
     }
 
+    /**
+     * 与多方块核心、被动样板舱保持一致：AE 任务的输入/产物统一以 AEKey + long 表示，
+     * 不再按数量物化成 ItemStack。否则取消大批量任务时，退出路径会把百万级材料塞进
+     * 一个越界栈，本地槽放不下就会掉成成千上万个物品实体。
+     */
+    @Override
+    public boolean supportsLongAeAmounts() {
+        return true;
+    }
+
+    /**
+     * 回退顺序的最后一级不再掉落世界，而是并入暂存的 key + 数量，
+     * 由 aeManager 逐 tick 重试写回（暂存随 AeTasks 一并持久化，破坏/搬运不会丢失）。
+     */
+    @Override
+    public void handleUnreturnedItem(ItemStack stack) {
+        if (stack == null || stack.isEmpty()) {
+            return;
+        }
+        AEItemKey key = AEItemKey.of(stack);
+        if (key != null) {
+            stashUnreturnedInput(key, stack.getCount());
+        }
+    }
+
     public IEnergyStorage getEnergyStorage() {
         return this.energyManager;
     }

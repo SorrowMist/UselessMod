@@ -6,6 +6,9 @@ import appeng.items.AEBaseItem;
 import appeng.menu.MenuOpener;
 import appeng.menu.locator.ItemMenuHostLocator;
 import appeng.menu.locator.MenuLocators;
+import com.sorrowmist.useless.content.blockentities.AdvancedAlloyFurnaceBlockEntity;
+import com.sorrowmist.useless.content.blockentities.multiblock.MultiblockAlloyFurnaceCoreBlockEntity;
+import com.sorrowmist.useless.content.blockentities.multiblock.OmniversalMoldHubBlockEntity;
 import com.sorrowmist.useless.content.menus.ContainerPatternConverter;
 import com.sorrowmist.useless.content.menus.HostPatternConverter;
 import com.sorrowmist.useless.core.component.UComponents;
@@ -20,6 +23,7 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.TooltipFlag;
 import net.minecraft.world.item.context.UseOnContext;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.phys.BlockHitResult;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -38,8 +42,8 @@ public final class OmniversalPatternConverterItem extends AEBaseItem implements 
         if (player.isShiftKeyDown()) {
             if (!level.isClientSide()) {
                 ItemStack stack = player.getItemInHand(hand);
-                if (stack.get(UComponents.MOLD_HUB_LINK_TARGET.get()) != null) {
-                    stack.remove(UComponents.MOLD_HUB_LINK_TARGET.get());
+                if (stack.get(UComponents.PATTERN_CONVERTER_LINK_TARGET.get()) != null) {
+                    stack.remove(UComponents.PATTERN_CONVERTER_LINK_TARGET.get());
                     player.displayClientMessage(Component.translatable(
                             "message.useless_mod.pattern_converter.unlinked"), true);
                 } else {
@@ -63,13 +67,14 @@ public final class OmniversalPatternConverterItem extends AEBaseItem implements 
         Level level = context.getLevel();
         if (player == null || !player.isShiftKeyDown()) return InteractionResult.PASS;
 
-        if (level.getBlockEntity(context.getClickedPos())
-                instanceof com.sorrowmist.useless.content.blockentities.multiblock.OmniversalMoldHubBlockEntity) {
+        BlockEntity targetBlockEntity = level.getBlockEntity(context.getClickedPos());
+        if (isLinkableTarget(targetBlockEntity)) {
             if (!level.isClientSide()) {
                 GlobalPos target = GlobalPos.of(level.dimension(), context.getClickedPos());
-                stack.set(UComponents.MOLD_HUB_LINK_TARGET.get(), target);
+                stack.set(UComponents.PATTERN_CONVERTER_LINK_TARGET.get(), target);
                 player.displayClientMessage(Component.translatable(
-                        "message.useless_mod.pattern_converter.linked"), true);
+                        "message.useless_mod.pattern_converter.linked",
+                        targetBlockEntity.getBlockState().getBlock().getName()), true);
             }
             return InteractionResult.sidedSuccess(level.isClientSide());
         }
@@ -80,7 +85,7 @@ public final class OmniversalPatternConverterItem extends AEBaseItem implements 
     @Override
     public void appendHoverText(
             ItemStack stack, Item.TooltipContext context, List<Component> tooltip, TooltipFlag flag) {
-        GlobalPos target = stack.get(UComponents.MOLD_HUB_LINK_TARGET.get());
+        GlobalPos target = stack.get(UComponents.PATTERN_CONVERTER_LINK_TARGET.get());
         if (target == null) {
             tooltip.add(Component.translatable("tooltip.useless_mod.pattern_converter.unlinked"));
             tooltip.add(Component.translatable("tooltip.useless_mod.pattern_converter.bind_hint"));
@@ -90,6 +95,12 @@ public final class OmniversalPatternConverterItem extends AEBaseItem implements 
                     target.dimension().location().toString(),
                     target.pos().getX(), target.pos().getY(), target.pos().getZ()));
         }
+    }
+
+    private static boolean isLinkableTarget(@Nullable BlockEntity blockEntity) {
+        return blockEntity instanceof OmniversalMoldHubBlockEntity
+                || blockEntity instanceof AdvancedAlloyFurnaceBlockEntity
+                || blockEntity instanceof MultiblockAlloyFurnaceCoreBlockEntity;
     }
 
     @Override

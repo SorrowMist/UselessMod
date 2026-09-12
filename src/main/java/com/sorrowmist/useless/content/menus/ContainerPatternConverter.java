@@ -80,7 +80,7 @@ public final class ContainerPatternConverter extends AEBaseMenu {
     private static Component createResultMessage(HostPatternConverter.ConversionResult result) {
         return switch (result.failure()) {
             case UNBOUND -> Component.translatable("message.useless_mod.pattern_converter.unbound");
-            case HUB_UNAVAILABLE -> Component.translatable("message.useless_mod.pattern_converter.hub_unavailable");
+            case TARGET_UNAVAILABLE -> Component.translatable("message.useless_mod.pattern_converter.target_unavailable");
             case NO_PATTERNS -> Component.translatable("message.useless_mod.pattern_converter.no_patterns");
             case INVALID_CONTEXT -> Component.translatable("message.useless_mod.pattern_converter.invalid_context");
             case NONE -> Component.translatable(

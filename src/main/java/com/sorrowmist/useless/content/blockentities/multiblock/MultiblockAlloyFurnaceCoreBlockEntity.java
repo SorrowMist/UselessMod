@@ -275,6 +275,13 @@ public final class MultiblockAlloyFurnaceCoreBlockEntity extends BlockEntity imp
         return level.getBlockEntity(moldHubPos) instanceof OmniversalMoldHubBlockEntity hub ? hub : null;
     }
 
+    @Nullable
+    public OmniversalMoldHubBlockEntity getLinkedMoldHub() {
+        if (!formed) return null;
+        OmniversalMoldHubBlockEntity hub = getMoldHub();
+        return hub != null && hub.getController() == this ? hub : null;
+    }
+
     public void onAeGridChanged() {
         if (unloading || isRemoved()) return;
         setChanged();

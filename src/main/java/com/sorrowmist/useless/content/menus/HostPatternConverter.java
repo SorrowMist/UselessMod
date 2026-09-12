@@ -7,6 +7,8 @@ import appeng.api.implementations.menuobjects.ItemMenuHost;
 import appeng.menu.locator.ItemMenuHostLocator;
 import appeng.util.inv.AppEngInternalInventory;
 import appeng.util.inv.InternalInventoryHost;
+import com.sorrowmist.useless.content.blockentities.AdvancedAlloyFurnaceBlockEntity;
+import com.sorrowmist.useless.content.blockentities.multiblock.MultiblockAlloyFurnaceCoreBlockEntity;
 import com.sorrowmist.useless.content.blockentities.multiblock.OmniversalMoldHubBlockEntity;
 import com.sorrowmist.useless.content.items.OmniversalPatternConverterItem;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.OmniversalPatternEncoding;
@@ -20,11 +22,14 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.block.entity.BlockEntity;
 
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+
+import static com.sorrowmist.useless.content.machines.advanced_alloy_furnace.layout.AdvancedAlloyFurnaceLayout.MOLD_SLOT;
 
 /** Server-side state and conversion logic for the converter item menu. */
 public final class HostPatternConverter extends ItemMenuHost<OmniversalPatternConverterItem>
@@ -71,15 +76,14 @@ public final class HostPatternConverter extends ItemMenuHost<OmniversalPatternCo
             return new ConversionResult(0, 0, false, Failure.INVALID_CONTEXT);
         }
 
-        HubTarget target = findHub(player);
+        ConversionTarget target = findTarget(player);
         if (target == null) {
             return new ConversionResult(0, 0, false, getItemStack()
-                    .get(UComponents.MOLD_HUB_LINK_TARGET.get()) == null
-                    ? Failure.UNBOUND : Failure.HUB_UNAVAILABLE);
+                    .get(UComponents.PATTERN_CONVERTER_LINK_TARGET.get()) == null
+                    ? Failure.UNBOUND : Failure.TARGET_UNAVAILABLE);
         }
 
-        Map<Integer, ItemStack> molds = getAvailableMolds(target.hub());
-        MoldMatcher.PreparedMolds preparedMolds = MoldMatcher.prepare(molds);
+        MoldMatcher.PreparedMolds preparedMolds = MoldMatcher.prepare(target.molds());
         int converted = 0;
         int skipped = 0;
         boolean hasPatterns = false;
@@ -133,13 +137,26 @@ public final class HostPatternConverter extends ItemMenuHost<OmniversalPatternCo
         return Collections.unmodifiableMap(result);
     }
 
-    private HubTarget findHub(ServerPlayer player) {
-        GlobalPos link = getItemStack().get(UComponents.MOLD_HUB_LINK_TARGET.get());
+    private static Map<Integer, ItemStack> getAvailableMolds(AdvancedAlloyFurnaceBlockEntity furnace) {
+        ItemStack mold = furnace.getItemHandler().getStackInSlot(MOLD_SLOT);
+        return mold.isEmpty() ? Map.of() : Map.of(0, mold.copy());
+    }
+
+    private ConversionTarget findTarget(ServerPlayer player) {
+        GlobalPos link = getItemStack().get(UComponents.PATTERN_CONVERTER_LINK_TARGET.get());
         if (link == null) return null;
         ServerLevel level = player.getServer() == null ? null : player.getServer().getLevel(link.dimension());
         if (level == null || !level.isLoaded(link.pos())) return null;
-        if (level.getBlockEntity(link.pos()) instanceof OmniversalMoldHubBlockEntity hub) {
-            return new HubTarget(level, hub);
+        BlockEntity blockEntity = level.getBlockEntity(link.pos());
+        if (blockEntity instanceof OmniversalMoldHubBlockEntity hub) {
+            return new ConversionTarget(level, getAvailableMolds(hub));
+        }
+        if (blockEntity instanceof AdvancedAlloyFurnaceBlockEntity furnace) {
+            return new ConversionTarget(level, getAvailableMolds(furnace));
+        }
+        if (blockEntity instanceof MultiblockAlloyFurnaceCoreBlockEntity core) {
+            OmniversalMoldHubBlockEntity hub = core.getLinkedMoldHub();
+            if (hub != null) return new ConversionTarget(level, getAvailableMolds(hub));
         }
         return null;
     }
@@ -150,11 +167,11 @@ public final class HostPatternConverter extends ItemMenuHost<OmniversalPatternCo
     public enum Failure {
         NONE,
         UNBOUND,
-        HUB_UNAVAILABLE,
+        TARGET_UNAVAILABLE,
         NO_PATTERNS,
         INVALID_CONTEXT
     }
 
-    private record HubTarget(ServerLevel level, OmniversalMoldHubBlockEntity hub) {
+    private record ConversionTarget(ServerLevel level, Map<Integer, ItemStack> molds) {
     }
 }

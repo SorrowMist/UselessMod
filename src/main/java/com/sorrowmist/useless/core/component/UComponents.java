@@ -250,7 +250,8 @@ public final class UComponents {
             register("pattern_converter_data", builder -> builder
                     .persistent(PatternConverterData.CODEC)
                     .networkSynchronized(PatternConverterData.STREAM_CODEC));
-    public static final DeferredHolder<DataComponentType<?>, DataComponentType<GlobalPos>> MOLD_HUB_LINK_TARGET = register(
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<GlobalPos>> PATTERN_CONVERTER_LINK_TARGET = register(
+            // Keep the serialized ID so existing converter links remain valid.
             "mold_hub_link_target",
             builder -> builder
                     .persistent(GlobalPos.CODEC)

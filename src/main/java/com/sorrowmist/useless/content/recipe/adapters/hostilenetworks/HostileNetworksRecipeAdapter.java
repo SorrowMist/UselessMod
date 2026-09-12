@@ -4,6 +4,7 @@ import com.sorrowmist.useless.api.enums.AlloyFurnaceMode;
 import com.sorrowmist.useless.content.recipe.AdapterUtils;
 import com.sorrowmist.useless.content.recipe.AdvancedAlloyFurnaceRecipe;
 import com.sorrowmist.useless.content.recipe.CountedIngredient;
+import com.sorrowmist.useless.content.recipe.ExpectedOutputScaler;
 import com.sorrowmist.useless.content.recipe.IRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.ItemIngredientAllocator;
 import com.sorrowmist.useless.content.recipe.RecipeSourceIds;
@@ -27,6 +28,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 /** Converts Hostile Neural Networks simulation and fabricator operations. */
 public final class HostileNetworksRecipeAdapter
@@ -67,7 +69,7 @@ public final class HostileNetworksRecipeAdapter
         List<RecipeHolder<HostileNetworksSyntheticRecipe>> result = new ArrayList<>();
         for (DataModel model : DataModelRegistry.INSTANCE.getValues()) {
             addTrainingRecipe(result, model);
-            addInferenceRecipe(result, model);
+            addInferenceRecipes(result, model);
             addFabricatorRecipes(result, model);
         }
         return List.copyOf(result);
@@ -166,43 +168,70 @@ public final class HostileNetworksRecipeAdapter
     }
 
     /**
-     * Self-aware inference keeps the model as a second mold so it is not consumed.
-     * The matching prediction is guaranteed; the base drop is always produced by HNN inference.
+     * Adds one deterministic inference recipe for every model tier that the Simulation Chamber
+     * can actually run. The model is a normal input and output so the single mold slot can remain
+     * occupied by the Simulation Chamber while the model is preserved across the operation.
      */
-    private static void addInferenceRecipe(
+    private static void addInferenceRecipes(
             List<RecipeHolder<HostileNetworksSyntheticRecipe>> result, DataModel model) {
-        ModelTier maxTier = selfAwareTier();
-        if (maxTier == null) return;
+        for (ModelTier tier : ModelTierRegistry.getSortedTiers()) {
+            addInferenceRecipe(result, model, tier);
+        }
+    }
+
+    private static void addInferenceRecipe(
+            List<RecipeHolder<HostileNetworksSyntheticRecipe>> result,
+            DataModel model, ModelTier tier) {
+        // The real Simulation Chamber rejects faulty models and any custom non-simulatable tier.
+        if (tier == null || !tier.canSim()) return;
 
         Ingredient matrix = model.input();
-        if (AdapterUtils.isIngredientEmpty(matrix)) return;
+        float accuracy = tier.accuracy();
+        if (AdapterUtils.isIngredientEmpty(matrix)
+                || !Float.isFinite(accuracy) || accuracy <= 0F) {
+            // A zero-accuracy tier has no finite deterministic batch that can produce a
+            // prediction, so it cannot have a prediction recipe.
+            return;
+        }
 
-        ItemStack selfAwareModel = modelStack(model, model.getRequiredData(maxTier));
+        int modelData = model.getRequiredData(tier);
+        ItemStack modelStack = modelStack(model, modelData);
+        Optional<ExpectedOutputScaler.ScaledOutputs> scaled = inferenceOutputs(model, accuracy);
+        if (scaled.isEmpty()) return;
+
+        ExpectedOutputScaler.ScaledOutputs outputsFor = scaled.get();
+        int operations = outputsFor.operations();
         List<ItemStack> outputs = new ArrayList<>();
-        if (!model.baseDrop().isEmpty()) outputs.add(model.baseDrop().copy());
-        ItemStack prediction = model.getPredictionDrop();
-        if (!prediction.isEmpty()) outputs.add(prediction.copy());
-        if (outputs.isEmpty()) return;
+        // One model enters and one identical model leaves. This models the Simulation Chamber's
+        // non-consumable model slot without requiring a second mold slot in the alloy furnace.
+        if (!addCountedOutput(outputs, modelStack, 1L)
+                || !addAllOutputs(outputs, outputsFor.outputs())) {
+            return;
+        }
 
-        long energy = multiply(model.simCost(), SIMULATION_INFERENCE_TIME);
-        if (energy < 0L) return;
+        long perRunEnergy = multiply(model.simCost(), SIMULATION_INFERENCE_TIME);
+        long energy = multiply(perRunEnergy, operations);
+        int processTime = safeProcessTime(multiply(SIMULATION_INFERENCE_TIME, operations));
+        if (energy < 0L || processTime <= 0) return;
 
-        ResourceLocation id = recipeId(model, "inference");
+        ResourceLocation id = recipeId(model, "inference/" + tier.name());
         if (id == null) return;
 
         AdvancedAlloyFurnaceRecipe recipe = new AdvancedAlloyFurnaceRecipe(
                 id,
-                List.of(new CountedIngredient(matrix, 1L)),
+                List.of(
+                        new CountedIngredient(exact(modelStack), 1L),
+                        new CountedIngredient(matrix, operations)),
                 List.of(),
                 List.of(),
                 outputs,
                 List.of(),
                 List.of(),
                 energy,
-                SIMULATION_INFERENCE_TIME,
+                processTime,
                 Ingredient.EMPTY,
                 0,
-                List.of(simChamberMold(), exact(selfAwareModel)),
+                List.of(simChamberMold()),
                 AlloyFurnaceMode.NORMAL);
         result.add(holder(recipe));
     }
@@ -239,6 +268,50 @@ public final class HostileNetworksRecipeAdapter
                     AlloyFurnaceMode.NORMAL);
             result.add(holder(recipe));
         }
+    }
+
+    /**
+     * Calculates the smallest deterministic inference batch with the same expected outputs as
+     * the Simulation Chamber. A base drop is guaranteed for each operation; prediction drops
+     * use the tier accuracy, including accuracies above 100%.
+     */
+    private static Optional<ExpectedOutputScaler.ScaledOutputs> inferenceOutputs(
+            DataModel model, float accuracy) {
+        List<ExpectedOutputScaler.WeightedItemOutput> weightedOutputs = new ArrayList<>();
+        addGuaranteedWeightedOutput(weightedOutputs, model.baseDrop());
+
+        ItemStack prediction = model.getPredictionDrop();
+        if (!prediction.isEmpty()) {
+            int guaranteed = (int) Math.floor(accuracy);
+            double fractional = accuracy - guaranteed;
+            if (guaranteed > 0) {
+                weightedOutputs.add(new ExpectedOutputScaler.WeightedItemOutput(
+                        prediction.copyWithCount(1), guaranteed, guaranteed, 1.0D));
+            }
+            if (fractional > 1.0E-9D) {
+                weightedOutputs.add(new ExpectedOutputScaler.WeightedItemOutput(
+                        prediction.copyWithCount(1), 1, 1, fractional));
+            }
+        }
+        return ExpectedOutputScaler.scale(weightedOutputs);
+    }
+
+    private static void addGuaranteedWeightedOutput(
+            List<ExpectedOutputScaler.WeightedItemOutput> weightedOutputs, ItemStack stack) {
+        if (stack == null || stack.isEmpty() || stack.getCount() <= 0) return;
+        int count = stack.getCount();
+        weightedOutputs.add(new ExpectedOutputScaler.WeightedItemOutput(
+                stack.copyWithCount(1), count, count, 1.0D));
+    }
+
+    private static boolean addAllOutputs(List<ItemStack> outputs, List<ItemStack> additions) {
+        if (additions == null) return true;
+        for (ItemStack addition : additions) {
+            if (addition == null || addition.isEmpty()) continue;
+            // The scaler has already materialized the complete batch count into this stack.
+            if (!addCountedOutput(outputs, addition, 1L)) return false;
+        }
+        return true;
     }
 
     /**
@@ -279,8 +352,16 @@ public final class HostileNetworksRecipeAdapter
     private static boolean addCountedOutput(List<ItemStack> outputs, ItemStack stack, long count) {
         if (count <= 0L) return true;
         if (stack == null || stack.isEmpty() || count > Integer.MAX_VALUE) return false;
+        long stackCount = Math.max(1L, stack.getCount());
+        long total;
+        try {
+            total = Math.multiplyExact(stackCount, count);
+        } catch (ArithmeticException exception) {
+            return false;
+        }
+        if (total > Integer.MAX_VALUE) return false;
         ItemStack output = stack.copy();
-        output.setCount((int) count);
+        output.setCount((int) total);
         outputs.add(output);
         return true;
     }

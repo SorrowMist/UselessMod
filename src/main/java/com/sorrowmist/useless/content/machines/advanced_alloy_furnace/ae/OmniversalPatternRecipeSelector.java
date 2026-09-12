@@ -1,10 +1,19 @@
 package com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae;
 
 import appeng.api.crafting.IPatternDetails;
+import appeng.api.ids.AEComponents;
+import appeng.crafting.pattern.AECraftingPattern;
+import appeng.crafting.pattern.EncodedCraftingPattern;
+import com.sorrowmist.useless.content.recipe.AdapterUtils;
 import com.sorrowmist.useless.content.recipe.AdvancedAlloyFurnaceRecipe;
 import com.sorrowmist.useless.content.recipe.AlloyFurnaceRecipeCatalog;
 import com.sorrowmist.useless.content.recipe.MoldMatcher;
+import com.sorrowmist.useless.content.recipe.RecipeSourceIds;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.crafting.CraftingInput;
+import net.minecraft.world.item.crafting.CraftingRecipe;
+import net.minecraft.world.item.crafting.RecipeHolder;
 import net.minecraft.world.level.Level;
 
 import java.math.BigInteger;
@@ -43,6 +52,77 @@ public final class OmniversalPatternRecipeSelector {
             candidates = AlloyFurnaceRecipeCatalog.findPatternCandidates(level, pattern, true);
         }
         if (candidates.isEmpty()) return Optional.empty();
+
+        return selectCandidate(candidates, availableMolds);
+    }
+
+    /**
+     * Selects the existing workbench conversion represented by an AE crafting pattern.
+     *
+     * <p>Crafting patterns retain the source workbench recipe id, while the alloy-furnace
+     * catalogue stores the corresponding converted recipe with the standard {@code _converted}
+     * suffix. Restricting this lookup to that exact id and the Minecraft source prevents a crafting
+     * pattern from being converted merely because another adapter happens to have the same input
+     * and output shape.</p>
+     */
+    public static Optional<AlloyFurnaceRecipeCatalog.Entry> selectCrafting(
+            Level level, AECraftingPattern pattern, MoldMatcher.PreparedMolds availableMolds) {
+        if (level == null || pattern == null) return Optional.empty();
+
+        var encoded = pattern.getDefinition().get(AEComponents.ENCODED_CRAFTING_PATTERN);
+        if (encoded == null) return Optional.empty();
+
+        RecipeHolder<?> sourceHolder = level.getRecipeManager().byKey(encoded.recipeId()).orElse(null);
+        if (!(sourceHolder != null && sourceHolder.value() instanceof CraftingRecipe sourceRecipe)
+                || !matchesSourcePattern(sourceRecipe, encoded, level)) {
+            return Optional.empty();
+        }
+
+        ResourceLocation convertedId;
+        try {
+            convertedId = AdapterUtils.convertedId(encoded.recipeId());
+        } catch (RuntimeException exception) {
+            return Optional.empty();
+        }
+
+        List<AlloyFurnaceRecipeCatalog.Entry> candidates = AlloyFurnaceRecipeCatalog
+                .entries(level, RecipeSourceIds.MINECRAFT).stream()
+                .filter(entry -> entry != null
+                        && convertedId.equals(entry.identity().recipeId()))
+                .toList();
+        if (candidates.isEmpty()) return Optional.empty();
+
+        return selectCandidate(candidates, availableMolds);
+    }
+
+    /** Validates the actual encoded 3x3 grid before trusting its recipe id. */
+    private static boolean matchesSourcePattern(
+            CraftingRecipe recipe, EncodedCraftingPattern encoded, Level level) {
+        List<ItemStack> encodedInputs = encoded.inputs();
+        if (encodedInputs == null || encodedInputs.size() > 9) return false;
+
+        List<ItemStack> grid = new java.util.ArrayList<>(9);
+        for (ItemStack input : encodedInputs) {
+            if (input == null) return false;
+            grid.add(input.copy());
+        }
+        while (grid.size() < 9) grid.add(ItemStack.EMPTY);
+
+        try {
+            CraftingInput input = CraftingInput.of(3, 3, grid);
+            if (!recipe.matches(input, level)) return false;
+            ItemStack assembled = recipe.assemble(input, level.registryAccess());
+            return assembled != null && !assembled.isEmpty()
+                    && ItemStack.isSameItemSameComponents(assembled, encoded.result());
+        } catch (RuntimeException exception) {
+            return false;
+        }
+    }
+
+    private static Optional<AlloyFurnaceRecipeCatalog.Entry> selectCandidate(
+            List<AlloyFurnaceRecipeCatalog.Entry> candidates,
+            MoldMatcher.PreparedMolds availableMolds) {
+        if (candidates == null || candidates.isEmpty()) return Optional.empty();
 
         // Prefer the most specific and most productive recipe. For example, a SAG Mill + grinding
         // ball recipe must be checked before the plain SAG Mill recipe, otherwise the latter would

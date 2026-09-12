@@ -2,6 +2,7 @@ package com.sorrowmist.useless.content.menus;
 
 import appeng.api.crafting.IPatternDetails;
 import appeng.api.crafting.PatternDetailsHelper;
+import appeng.crafting.pattern.AECraftingPattern;
 import appeng.crafting.pattern.AEProcessingPattern;
 import appeng.api.implementations.menuobjects.ItemMenuHost;
 import appeng.menu.locator.ItemMenuHostLocator;
@@ -94,13 +95,17 @@ public final class HostPatternConverter extends ItemMenuHost<OmniversalPatternCo
 
             try {
                 IPatternDetails details = PatternDetailsHelper.decodePattern(source, target.level());
-                if (!(details instanceof AEProcessingPattern)) {
+                if (!(details instanceof AEProcessingPattern)
+                        && !(details instanceof AECraftingPattern)) {
                     skipped++;
                     continue;
                 }
 
-                var entry = OmniversalPatternRecipeSelector.select(
-                        target.level(), details, preparedMolds);
+                var entry = details instanceof AECraftingPattern crafting
+                        ? OmniversalPatternRecipeSelector.selectCrafting(
+                                target.level(), crafting, preparedMolds)
+                        : OmniversalPatternRecipeSelector.select(
+                                target.level(), details, preparedMolds);
                 if (entry.isEmpty()) {
                     skipped++;
                     continue;

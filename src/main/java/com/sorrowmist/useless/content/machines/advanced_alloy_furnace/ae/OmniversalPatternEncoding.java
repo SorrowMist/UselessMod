@@ -5,6 +5,7 @@ import appeng.api.crafting.PatternDetailsHelper;
 import appeng.api.ids.AEComponents;
 import appeng.api.stacks.AEItemKey;
 import appeng.api.stacks.GenericStack;
+import appeng.crafting.pattern.AECraftingPattern;
 import appeng.crafting.pattern.AEProcessingPattern;
 import com.mojang.datafixers.util.Pair;
 import com.sorrowmist.useless.content.recipe.AdapterUtils;
@@ -59,8 +60,39 @@ public final class OmniversalPatternEncoding {
                 || entry == null || level == null) {
             return ItemStack.EMPTY;
         }
-        if (!(decoded instanceof AEProcessingPattern processing)
-                || decoded instanceof OmniversalPatternDetails) {
+        if (decoded instanceof OmniversalPatternDetails) {
+            return ItemStack.EMPTY;
+        }
+
+        if (decoded instanceof AECraftingPattern) {
+            ItemStack processingPattern = createProcessingPattern(entry.recipe());
+            if (processingPattern.isEmpty()) {
+                OmniversalPatternDiagnostics.skip("crafting recipe has no encodable processing form",
+                        entry.recipe().id());
+                return ItemStack.EMPTY;
+            }
+
+            IPatternDetails processingDetails = PatternDetailsHelper.decodePattern(
+                    processingPattern, level);
+            if (!(processingDetails instanceof AEProcessingPattern processing)) {
+                OmniversalPatternDiagnostics.skip("generated crafting processing pattern is invalid",
+                        entry.recipe().id());
+                return ItemStack.EMPTY;
+            }
+            return encodeProcessingPattern(processingPattern, processing, entry, level);
+        }
+
+        if (!(decoded instanceof AEProcessingPattern processing)) {
+            return ItemStack.EMPTY;
+        }
+
+        return encodeProcessingPattern(sourcePattern, processing, entry, level);
+    }
+
+    private static ItemStack encodeProcessingPattern(
+            ItemStack sourcePattern, AEProcessingPattern processing,
+            AlloyFurnaceRecipeCatalog.Entry entry, Level level) {
+        if (sourcePattern == null || processing == null || entry == null || level == null) {
             return ItemStack.EMPTY;
         }
 
@@ -88,10 +120,23 @@ public final class OmniversalPatternEncoding {
             return ItemStack.EMPTY;
         }
 
+        AEItemKey normalizedDefinition = AEItemKey.of(normalizedSource);
+        if (normalizedDefinition == null) {
+            OmniversalPatternDiagnostics.skip("re-encoded pattern has no definition", recipe.id());
+            return ItemStack.EMPTY;
+        }
+        AEProcessingPattern normalizedPattern;
+        try {
+            normalizedPattern = new AEProcessingPattern(normalizedDefinition);
+        } catch (RuntimeException exception) {
+            OmniversalPatternDiagnostics.skip("re-encoded pattern could not be decoded", recipe.id());
+            return ItemStack.EMPTY;
+        }
+
         List<Integer> dynamicInputs = new ArrayList<>();
         List<Integer> dynamicOutputs = new ArrayList<>();
         IPatternDetails resolved = AdvancedAlloyFurnacePatternResolver.resolve(
-                processing, level, entry.sourceId());
+                normalizedPattern, level, entry.sourceId());
         if (resolved instanceof DynamicComponentPattern dynamic) {
             for (int slot = 0; slot < resolved.getInputs().length; slot++) {
                 if (dynamic.isItemIdInput(slot)) dynamicInputs.add(slot);
@@ -101,11 +146,11 @@ public final class OmniversalPatternEncoding {
             }
         }
 
-        dynamicInputs = resolveItemIdInputSlots(recipe, processing, dynamicInputs);
+        dynamicInputs = resolveItemIdInputSlots(recipe, normalizedPattern, dynamicInputs);
         Map<Integer, List<TagKey<Item>>> tagInputs =
-                resolveTagInputSlots(recipe, processing);
+                resolveTagInputSlots(recipe, normalizedPattern);
         Map<Integer, List<TagKey<Fluid>>> fluidTagInputs =
-                resolveFluidTagInputSlots(recipe, processing);
+                resolveFluidTagInputSlots(recipe, normalizedPattern);
         List<OmniversalPatternData.MoldTagInputSlot> moldTagInputs =
                 resolveMoldTagInputSlots(recipe);
         List<OmniversalPatternData.TagInputSlot> encodedTagInputs = new ArrayList<>();

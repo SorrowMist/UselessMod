@@ -12,24 +12,24 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 @Mixin(value = MekanismUtils.class, remap = false)
 public class MekanismUtilsMixin {
 
-    @Inject(method = "getTicksD", at = @At("RETURN"), cancellable = true)
+    @Inject(method = "getTicksD", at = @At("HEAD"), cancellable = true)
     private static void modifyTicks(IUpgradeTile tile, int def, CallbackInfoReturnable<Double> cir) {
         if (tile.supportsUpgrades()) {
-            cir.setReturnValue(cir.getReturnValue() * MekUtils.time(tile));
+            cir.setReturnValue(def * MekUtils.time(tile));
         }
     }
 
-    @Inject(method = "getEnergyPerTick", at = @At("RETURN"), cancellable = true)
+    @Inject(method = "getEnergyPerTick", at = @At("HEAD"), cancellable = true)
     private static void modifyEnergyPerTick(IUpgradeTile tile, long def, CallbackInfoReturnable<Long> cir) {
         if (tile.supportsUpgrades()) {
-            cir.setReturnValue(MathUtils.ceilToLong(cir.getReturnValue() * MekUtils.electricity(tile)));
+            cir.setReturnValue(MathUtils.ceilToLong(def * MekUtils.electricity(tile)));
         }
     }
 
-    @Inject(method = "getMaxEnergy*", at = @At("RETURN"), cancellable = true)
+    @Inject(method = "getMaxEnergy", at = @At("HEAD"), cancellable = true)
     private static void modifyMaxEnergy(IUpgradeTile tile, long def, CallbackInfoReturnable<Long> cir) {
         if (tile.supportsUpgrades()) {
-            cir.setReturnValue(MathUtils.ceilToLong(cir.getReturnValue() * MekUtils.capacity(tile)));
+            cir.setReturnValue(MathUtils.ceilToLong(def * MekUtils.capacity(tile)));
         }
     }
 }

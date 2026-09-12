@@ -12,7 +12,7 @@ import java.io.File;
 
 public class MekUtils {
 
-    public static int MAX_UPGRADE = 32;
+    public static int MAX_UPGRADE = 16;
 
     static {
         File file = FMLPaths.CONFIGDIR.get().resolve("useless_mod-server.toml").toFile();

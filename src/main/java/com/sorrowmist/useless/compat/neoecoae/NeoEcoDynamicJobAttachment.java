@@ -1,8 +1,8 @@
 package com.sorrowmist.useless.compat.neoecoae;
 
-import cn.dancingsnow.neoecoae.api.me.ECOCraftingJobAttachment;
-import cn.dancingsnow.neoecoae.api.me.ECOCraftingJobContext;
-import cn.dancingsnow.neoecoae.api.me.ECOCraftingJobResult;
+import cn.dancingsnow.neoecoae.api.me.attachment.ECOCraftingJobAttachment;
+import cn.dancingsnow.neoecoae.api.me.lifecycle.ECOCraftingJobContext;
+import cn.dancingsnow.neoecoae.api.me.lifecycle.ECOCraftingJobResult;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.DynamicPatternCpuStateManager;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;

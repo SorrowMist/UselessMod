@@ -96,7 +96,7 @@ public class UselessMod {
     private void commonSetup(FMLCommonSetupEvent event) {
         if (ModList.get().isLoaded("neoecoae") && !isSupportedNeoEcoVersion()) {
             throw new IllegalStateException(
-                    "Useless Mod requires Neo ECO AE Extension 21.2.0-preview16 or newer.");
+                    "Useless Mod requires Neo ECO AE Extension 21.2.0 or newer.");
         }
         RecipeAdapterCompatRegistry.init(event);
         if (ModList.get().isLoaded("neoecoae")) {
@@ -119,11 +119,7 @@ public class UselessMod {
         if (major != 21 || minor != 2 || patch != 0) {
             return major > 21 || major == 21 && minor > 2;
         }
-        int preview = version.indexOf("preview");
-        if (preview < 0) {
-            return true;
-        }
-        return parseVersionPart(version.substring(preview + "preview".length())) >= 16;
+        return true;
     }
 
     private static int parseVersionPart(String value) {

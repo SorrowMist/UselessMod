@@ -4,8 +4,8 @@ import appeng.api.config.Actionable;
 import appeng.api.stacks.AEItemKey;
 import appeng.api.stacks.AEKey;
 import cn.dancingsnow.neoecoae.api.me.ECOCraftingCPU;
-import cn.dancingsnow.neoecoae.api.me.ECOCraftingOutputClaimRequest;
-import cn.dancingsnow.neoecoae.api.me.ECOCraftingOutputClaimResult;
+import cn.dancingsnow.neoecoae.api.me.output.ECOCraftingOutputClaimRequest;
+import cn.dancingsnow.neoecoae.api.me.output.ECOCraftingOutputClaimResult;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.DynamicPatternCpuStateManager;
 import org.jetbrains.annotations.Nullable;
 

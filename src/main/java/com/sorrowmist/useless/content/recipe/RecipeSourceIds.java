@@ -55,6 +55,7 @@ public final class RecipeSourceIds {
     public static final String JUSTDIRETHINGS = "justdirethings";
     public static final String IRONS_SPELLBOOKS = "irons_spellbooks";
     public static final String HOSTILE_NETWORKS = "hostilenetworks";
+    public static final String APOTHIC_FLUX = "apothic_flux";
 
     private RecipeSourceIds() {
     }
@@ -113,6 +114,7 @@ public final class RecipeSourceIds {
         if (name.endsWith(".justdirethings")) return JUSTDIRETHINGS;
         if (name.endsWith(".ironsspellbooks")) return IRONS_SPELLBOOKS;
         if (name.endsWith(".hostilenetworks")) return HOSTILE_NETWORKS;
+        if (name.endsWith(".apothicflux")) return APOTHIC_FLUX;
         if (name.endsWith(".mekanism") || name.endsWith(".generators")) return MEKANISM;
         return UNKNOWN;
     }

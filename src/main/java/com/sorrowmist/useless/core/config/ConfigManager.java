@@ -143,6 +143,7 @@ public class ConfigManager {
     private static final ModConfigSpec.BooleanValue ENABLE_BIG_REACTORS_RECIPE_CONVERSION;
     private static final ModConfigSpec.BooleanValue ENABLE_IRONS_SPELLBOOKS_RECIPE_CONVERSION;
     private static final ModConfigSpec.BooleanValue ENABLE_HOSTILE_NETWORKS_RECIPE_CONVERSION;
+    private static final ModConfigSpec.BooleanValue ENABLE_APOTHIC_FLUX_RECIPE_CONVERSION;
     private static final Map<String, ModConfigSpec.BooleanValue> RECIPE_CONVERSION_OPTIONS;
 
     private static final ModConfigSpec.IntValue OMNIVERSAL_PATTERN_SLOTS;
@@ -637,6 +638,8 @@ public class ConfigManager {
                 "enable_irons_spellbooks_recipe_conversion", true);
         ENABLE_HOSTILE_NETWORKS_RECIPE_CONVERSION = defineRecipeConversionOption(
                 "enable_hostilenetworks_recipe_conversion", true);
+        ENABLE_APOTHIC_FLUX_RECIPE_CONVERSION = defineRecipeConversionOption(
+                "enable_apothic_flux_recipe_conversion", true);
         COMMON_BUILDER.pop();
 
         RECIPE_CONVERSION_OPTIONS = Map.ofEntries(
@@ -689,7 +692,8 @@ public class ConfigManager {
                 Map.entry("pneumaticcraft", ENABLE_PNEUMATICCRAFT_RECIPE_CONVERSION),
                 Map.entry("bigreactors", ENABLE_BIG_REACTORS_RECIPE_CONVERSION),
                 Map.entry("irons_spellbooks", ENABLE_IRONS_SPELLBOOKS_RECIPE_CONVERSION),
-                Map.entry("hostilenetworks", ENABLE_HOSTILE_NETWORKS_RECIPE_CONVERSION));
+                Map.entry("hostilenetworks", ENABLE_HOSTILE_NETWORKS_RECIPE_CONVERSION),
+                Map.entry("apothic_flux", ENABLE_APOTHIC_FLUX_RECIPE_CONVERSION));
         COMMON_BUILDER.pop();
         COMMON_BUILDER.pop();
 

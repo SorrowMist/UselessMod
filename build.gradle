@@ -382,6 +382,7 @@ dependencies {
     implementation "curse.maven:apothic-enchanting-1063926:8682996"
     implementation "curse.maven:apothic-attributes-898963:8502288"
     runtimeOnly "curse.maven:gateways-to-eternity-417802:6926284"
+    implementation "curse.maven:apothic-flux-1483497:8820187"
 
 
     implementation "curse.maven:omnisequence-transfinite-1624558:8622739"

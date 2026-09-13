@@ -144,6 +144,7 @@ public final class RecipeAdapterCompatRegistry {
     public static final String JUSTDIRETHINGS = RecipeSourceIds.JUSTDIRETHINGS;
     public static final String IRONS_SPELLBOOKS = RecipeSourceIds.IRONS_SPELLBOOKS;
     public static final String HOSTILE_NETWORKS = RecipeSourceIds.HOSTILE_NETWORKS;
+    public static final String APOTHIC_FLUX = RecipeSourceIds.APOTHIC_FLUX;
 
     private static final List<CompatEntry> ENTRIES = List.of(
             new CompatEntry(null, RecipeAdapterCompatRegistry::registerMinecraft),
@@ -194,7 +195,8 @@ public final class RecipeAdapterCompatRegistry {
             new CompatEntry(BIG_REACTORS, RecipeAdapterCompatRegistry::registerBigReactors),
             new CompatEntry(JUSTDIRETHINGS, RecipeAdapterCompatRegistry::registerJustDireThings),
             new CompatEntry(IRONS_SPELLBOOKS, RecipeAdapterCompatRegistry::registerIronsSpellbooks),
-            new CompatEntry(HOSTILE_NETWORKS, RecipeAdapterCompatRegistry::registerHostileNetworks)
+            new CompatEntry(HOSTILE_NETWORKS, RecipeAdapterCompatRegistry::registerHostileNetworks),
+            new CompatEntry(APOTHIC_FLUX, RecipeAdapterCompatRegistry::registerApothicFlux)
     );
 
     private RecipeAdapterCompatRegistry() {}
@@ -517,6 +519,11 @@ public final class RecipeAdapterCompatRegistry {
 
     private static void registerHostileNetworks() {
         register(new HostileNetworksRecipeAdapter());
+    }
+
+    private static void registerApothicFlux() {
+        invokeOptionalLoader(
+                "com.sorrowmist.useless.compat.apothicflux.ApothicFluxRecipeCompatLoader");
     }
 
     private record CompatEntry(@Nullable String modId, Runnable registerAction) {}

@@ -1,5 +1,7 @@
 package com.sorrowmist.useless.content.blockentities;
 
+import net.minecraft.core.HolderLookup;
+import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.item.ItemStack;
 import net.neoforged.neoforge.items.ItemStackHandler;
 
@@ -9,7 +11,7 @@ import java.util.function.Predicate;
 
 /** Fixed backing storage whose configured overflow becomes withdraw-only recovery storage. */
 public class RecoverableItemStackHandler extends ItemStackHandler {
-    public static final int MAX_SLOTS = 540;
+    public static final int MAX_SLOTS = 4096;
 
     private final IntSupplier activeSlots;
     private final int minimumActiveSlots;
@@ -69,6 +71,13 @@ public class RecoverableItemStackHandler extends ItemStackHandler {
         } else {
             changeListener.run();
         }
+    }
+
+    @Override
+    public void deserializeNBT(HolderLookup.Provider provider, CompoundTag nbt) {
+        CompoundTag copy = nbt.copy();
+        copy.remove("Size");
+        super.deserializeNBT(provider, copy);
     }
 
     private static int validateCapacity(int capacity) {

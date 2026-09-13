@@ -24,7 +24,10 @@ import com.sorrowmist.useless.content.blockentities.PagedMenuPageMemory;
 import com.sorrowmist.useless.content.blockentities.RecoverableItemStackHandler;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.OmniversalPatternDiagnostics;
 import com.sorrowmist.useless.core.config.ConfigManager;
+import com.sorrowmist.useless.core.component.ExternalInventoryKind;
+import com.sorrowmist.useless.core.component.ExternalInventoryReference;
 import com.sorrowmist.useless.core.component.MultiblockPartData;
+import com.sorrowmist.useless.world.inventory.ExternalInventoryStore;
 import com.sorrowmist.useless.init.ModBlockEntities;
 import com.sorrowmist.useless.init.ModItems;
 import net.minecraft.core.BlockPos;
@@ -74,6 +77,11 @@ public final class MePatternAssemblyBlockEntity extends AEBaseBlockEntity
      */
     private int publishedPatternCount;
     private boolean unloading;
+    @Nullable
+    private ExternalInventoryReference inventoryReference;
+    @Nullable
+    private CompoundTag pendingLegacyInventory;
+    private boolean externalInventoryLoaded;
 
     public MePatternAssemblyBlockEntity(BlockPos pos, BlockState state) {
         super(ModBlockEntities.ME_PATTERN_ASSEMBLY.get(), pos, state);
@@ -86,6 +94,9 @@ public final class MePatternAssemblyBlockEntity extends AEBaseBlockEntity
 
     private void inventoryChanged() {
         if (unloading || isRemoved()) return;
+        if (externalInventoryLoaded && level != null && !level.isClientSide) {
+            ExternalInventoryStore.save(level, inventoryReference, patterns, level.registryAccess());
+        }
         patternStorageRevision++;
         setChanged();
         if (level == null || level.isClientSide) return;
@@ -110,6 +121,7 @@ public final class MePatternAssemblyBlockEntity extends AEBaseBlockEntity
     }
 
     public RecoverableItemStackHandler getPatterns() {
+        ensureExternalInventory();
         return patterns;
     }
 
@@ -129,6 +141,39 @@ public final class MePatternAssemblyBlockEntity extends AEBaseBlockEntity
         if (data == null) return;
         data.restoreInventory(patterns, registries);
         inventoryChanged();
+    }
+
+    public void bindExternalInventory(@Nullable ExternalInventoryReference requested,
+                                      @Nullable CompoundTag legacyInventory,
+                                      HolderLookup.Provider registries) {
+        if (externalInventoryLoaded || level == null || level.isClientSide) return;
+        inventoryReference = ExternalInventoryStore.bindAt(
+                level, ExternalInventoryKind.PATTERN_ASSEMBLY, requested, worldPosition,
+                patterns, legacyInventory, registries);
+        ExternalInventoryStore.setReference(this, inventoryReference);
+        pendingLegacyInventory = null;
+        externalInventoryLoaded = true;
+        inventoryChanged();
+    }
+
+    private void ensureExternalInventory() {
+        if (externalInventoryLoaded || level == null || level.isClientSide) return;
+        bindExternalInventory(
+                ExternalInventoryStore.getReference(this),
+                pendingLegacyInventory,
+                level.registryAccess());
+    }
+
+    @Nullable
+    public ExternalInventoryReference getExternalInventoryReference() {
+        ensureExternalInventory();
+        return inventoryReference;
+    }
+
+    public void releaseExternalInventory() {
+        if (level != null) {
+            ExternalInventoryStore.release(level, inventoryReference);
+        }
     }
 
     public @NotNull IManagedGridNode getMainNode() {
@@ -381,8 +426,8 @@ public final class MePatternAssemblyBlockEntity extends AEBaseBlockEntity
     @Override
     public void loadTag(CompoundTag tag, HolderLookup.Provider registries) {
         super.loadTag(tag, registries);
-        patterns.deserializeNBT(registries, tag.getCompound("Patterns"));
-        patternStorageRevision++;
+        pendingLegacyInventory = tag.contains("Patterns")
+                ? tag.getCompound("Patterns").copy() : null;
         controllerPos = tag.contains("Controller") ? BlockPos.of(tag.getLong("Controller")) : null;
         structureGeneration = tag.getLong("StructureGeneration");
         pageMemory.load(tag);
@@ -392,7 +437,6 @@ public final class MePatternAssemblyBlockEntity extends AEBaseBlockEntity
     @Override
     public void saveAdditional(CompoundTag tag, HolderLookup.Provider registries) {
         super.saveAdditional(tag, registries);
-        tag.put("Patterns", patterns.serializeNBT(registries));
         if (controllerPos != null) tag.putLong("Controller", controllerPos.asLong());
         tag.putLong("StructureGeneration", structureGeneration);
         pageMemory.save(tag);
@@ -410,6 +454,12 @@ public final class MePatternAssemblyBlockEntity extends AEBaseBlockEntity
             blockEntity.requestProviderRefresh();
             blockEntity.inventoryChanged();
         });
+    }
+
+    @Override
+    public void onLoad() {
+        super.onLoad();
+        ensureExternalInventory();
     }
 
     @Override

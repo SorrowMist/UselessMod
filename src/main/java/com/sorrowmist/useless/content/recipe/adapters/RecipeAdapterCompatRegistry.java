@@ -62,6 +62,7 @@ import com.sorrowmist.useless.content.recipe.adapters.minecraft.CraftingRecipeAd
 import com.sorrowmist.useless.content.recipe.adapters.minecraft.SmeltingRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.mysticalagriculture.AwakeningRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.mysticalagriculture.InfusionRecipeAdapter;
+import com.sorrowmist.useless.content.recipe.adapters.mysticalagriculture.OmniaUniversalSeedRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.mysticalagriculture.SeedEssenceRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.mysticalagriculture.SoulJarRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.naturesaura.AnimalSpawnerRecipeAdapter;
@@ -374,6 +375,9 @@ public final class RecipeAdapterCompatRegistry {
         register(new AwakeningRecipeAdapter());
         register(new SeedEssenceRecipeAdapter());
         register(new SoulJarRecipeAdapter());
+        if (isLoaded("omnia")) {
+            register(new OmniaUniversalSeedRecipeAdapter());
+        }
     }
 
     private static void registerAELightningTech() {

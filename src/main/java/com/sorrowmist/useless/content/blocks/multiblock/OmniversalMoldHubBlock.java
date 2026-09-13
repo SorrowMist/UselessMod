@@ -1,8 +1,11 @@
 package com.sorrowmist.useless.content.blocks.multiblock;
 
 import com.sorrowmist.useless.content.blockentities.multiblock.OmniversalMoldHubBlockEntity;
+import com.sorrowmist.useless.core.component.ExternalInventoryKind;
+import com.sorrowmist.useless.core.component.ExternalInventoryReference;
 import com.sorrowmist.useless.core.component.MultiblockPartData;
 import com.sorrowmist.useless.core.component.UComponents;
+import com.sorrowmist.useless.world.inventory.ExternalInventoryStore;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.item.ItemStack;
@@ -31,16 +34,27 @@ public final class OmniversalMoldHubBlock extends DirectionalMultiblockPartBlock
     }
 
     @Override
+    protected void onRemove(BlockState state, Level level, BlockPos pos,
+                            BlockState newState, boolean movedByPiston) {
+        if (!state.is(newState.getBlock()) && !level.isClientSide
+                && level.getBlockEntity(pos) instanceof OmniversalMoldHubBlockEntity hub) {
+            hub.releaseExternalInventory();
+        }
+        super.onRemove(state, level, pos, newState, movedByPiston);
+    }
+
+    @Override
     public List<ItemStack> getDrops(BlockState state, LootParams.Builder params) {
         List<ItemStack> drops = super.getDrops(state, params);
         if (params.getOptionalParameter(LootContextParams.BLOCK_ENTITY)
                 instanceof OmniversalMoldHubBlockEntity hub) {
-            MultiblockPartData itemData = hub.createItemData(params.getLevel().registryAccess());
-            if (!itemData.isEmpty()) {
-                for (ItemStack drop : drops) {
-                    if (drop.is(asItem())) {
-                        drop.set(UComponents.MULTIBLOCK_PART_DATA.get(), itemData);
+            ExternalInventoryReference reference = hub.getExternalInventoryReference();
+            for (ItemStack drop : drops) {
+                if (drop.is(asItem())) {
+                    if (reference != null) {
+                        drop.set(UComponents.EXTERNAL_INVENTORY_REFERENCE.get(), reference);
                     }
+                    break;
                 }
             }
         }
@@ -52,10 +66,11 @@ public final class OmniversalMoldHubBlock extends DirectionalMultiblockPartBlock
                             @Nullable LivingEntity placer, ItemStack stack) {
         super.setPlacedBy(level, pos, state, placer, stack);
         if (!level.isClientSide && level.getBlockEntity(pos) instanceof OmniversalMoldHubBlockEntity hub) {
+            ExternalInventoryReference reference = stack.get(UComponents.EXTERNAL_INVENTORY_REFERENCE.get());
             MultiblockPartData itemData = stack.get(UComponents.MULTIBLOCK_PART_DATA.get());
-            if (itemData != null) {
-                hub.restoreItemData(itemData, level.registryAccess());
-            }
+            hub.bindExternalInventory(reference,
+                    itemData == null ? null : itemData.inventory(), level.registryAccess());
+            ExternalInventoryStore.clearLegacyComponent(hub, ExternalInventoryKind.MOLD_HUB);
         }
     }
 

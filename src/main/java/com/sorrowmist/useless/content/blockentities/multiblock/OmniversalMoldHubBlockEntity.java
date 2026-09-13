@@ -2,10 +2,11 @@ package com.sorrowmist.useless.content.blockentities.multiblock;
 
 import com.sorrowmist.useless.content.blockentities.PagedMenuPageMemory;
 import com.sorrowmist.useless.content.blockentities.RecoverableItemStackHandler;
-import com.sorrowmist.useless.content.recipe.AdapterUtils;
 import com.sorrowmist.useless.content.recipe.AlloyFurnaceRecipeCatalog;
 import com.sorrowmist.useless.content.recipe.MoldMatcher;
 import com.sorrowmist.useless.core.config.ConfigManager;
+import com.sorrowmist.useless.core.component.ExternalInventoryKind;
+import com.sorrowmist.useless.core.component.ExternalInventoryReference;
 import com.sorrowmist.useless.init.ModBlockEntities;
 import com.sorrowmist.useless.init.ModTags;
 import net.minecraft.core.BlockPos;
@@ -22,9 +23,9 @@ import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.network.chat.Component;
 import com.sorrowmist.useless.content.menus.OmniversalMoldHubMenu;
 import com.sorrowmist.useless.core.component.MultiblockPartData;
+import com.sorrowmist.useless.world.inventory.ExternalInventoryStore;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -48,12 +49,18 @@ public final class OmniversalMoldHubBlockEntity extends BlockEntity implements M
     private BlockPos controllerPos;
     private long structureGeneration;
     private boolean unloading;
+    @Nullable
+    private ExternalInventoryReference inventoryReference;
+    @Nullable
+    private CompoundTag pendingLegacyInventory;
+    private boolean externalInventoryLoaded;
 
     public OmniversalMoldHubBlockEntity(BlockPos pos, BlockState state) {
         super(ModBlockEntities.OMNIVERSAL_MOLD_HUB.get(), pos, state);
     }
 
     public RecoverableItemStackHandler getMolds() {
+        ensureExternalInventory();
         return molds;
     }
 
@@ -69,6 +76,37 @@ public final class OmniversalMoldHubBlockEntity extends BlockEntity implements M
         if (data == null) return;
         data.restoreInventory(molds, registries);
         moldInventoryChanged();
+    }
+
+    public void bindExternalInventory(@Nullable ExternalInventoryReference requested,
+                                      @Nullable CompoundTag legacyInventory,
+                                      HolderLookup.Provider registries) {
+        if (externalInventoryLoaded || level == null || level.isClientSide) return;
+        inventoryReference = ExternalInventoryStore.bindAt(
+                level, ExternalInventoryKind.MOLD_HUB, requested, worldPosition,
+                molds, legacyInventory, registries);
+        ExternalInventoryStore.setReference(this, inventoryReference);
+        pendingLegacyInventory = null;
+        externalInventoryLoaded = true;
+        moldInventoryChanged();
+    }
+
+    private void ensureExternalInventory() {
+        if (externalInventoryLoaded || level == null || level.isClientSide) return;
+        bindExternalInventory(
+                ExternalInventoryStore.getReference(this),
+                pendingLegacyInventory,
+                level.registryAccess());
+    }
+
+    @Nullable
+    public ExternalInventoryReference getExternalInventoryReference() {
+        ensureExternalInventory();
+        return inventoryReference;
+    }
+
+    public void releaseExternalInventory() {
+        if (level != null) ExternalInventoryStore.release(level, inventoryReference);
     }
 
     private boolean isValidMold(ItemStack stack) {
@@ -93,7 +131,7 @@ public final class OmniversalMoldHubBlockEntity extends BlockEntity implements M
         return matched;
     }
 
-    private Map<Integer, ItemStack> getAvailableMolds() {
+    private Map<Integer, ItemStack> getPreparedMoldMap() {
         if (cachedAvailableMolds == null) {
             int activeSlots = molds.getActiveSlots();
             Map<Integer, ItemStack> available = new LinkedHashMap<>();
@@ -108,7 +146,7 @@ public final class OmniversalMoldHubBlockEntity extends BlockEntity implements M
 
     private MoldMatcher.PreparedMolds getPreparedMolds() {
         if (cachedPreparedMolds == null) {
-            cachedPreparedMolds = MoldMatcher.prepare(getAvailableMolds());
+            cachedPreparedMolds = MoldMatcher.prepare(getPreparedMoldMap());
         }
         return cachedPreparedMolds;
     }
@@ -142,6 +180,9 @@ public final class OmniversalMoldHubBlockEntity extends BlockEntity implements M
         moldMatchCache.clear();
         cachedAvailableMolds = null;
         cachedPreparedMolds = null;
+        if (externalInventoryLoaded && level != null && !level.isClientSide) {
+            ExternalInventoryStore.save(level, inventoryReference, molds, level.registryAccess());
+        }
         setChanged();
     }
 
@@ -178,7 +219,8 @@ public final class OmniversalMoldHubBlockEntity extends BlockEntity implements M
     @Override
     protected void loadAdditional(CompoundTag tag, HolderLookup.Provider registries) {
         super.loadAdditional(tag, registries);
-        molds.deserializeNBT(registries, tag.getCompound("Molds"));
+        pendingLegacyInventory = tag.contains("Molds")
+                ? tag.getCompound("Molds").copy() : null;
         moldMatchCache.clear();
         cachedAvailableMolds = null;
         cachedPreparedMolds = null;
@@ -192,7 +234,6 @@ public final class OmniversalMoldHubBlockEntity extends BlockEntity implements M
     @Override
     protected void saveAdditional(CompoundTag tag, HolderLookup.Provider registries) {
         super.saveAdditional(tag, registries);
-        tag.put("Molds", molds.serializeNBT(registries));
         if (controllerPos != null) tag.putLong("Controller", controllerPos.asLong());
         tag.putLong("StructureGeneration", structureGeneration);
         pageMemory.save(tag);
@@ -202,6 +243,13 @@ public final class OmniversalMoldHubBlockEntity extends BlockEntity implements M
     public void clearRemoved() {
         super.clearRemoved();
         unloading = false;
+        ensureExternalInventory();
+    }
+
+    @Override
+    public void onLoad() {
+        super.onLoad();
+        ensureExternalInventory();
     }
 
     @Override

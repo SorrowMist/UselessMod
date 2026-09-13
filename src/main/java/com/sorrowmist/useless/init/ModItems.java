@@ -223,7 +223,7 @@ public final class ModItems {
     );
     static final DeferredItem<BlockItem> ADVANCED_ALLOY_FURNACE_BLOCK = registerAndAdd(
             "advanced_alloy_furnace_block",
-            () -> new AdvancedAlloyFurnaceBlockItem(ModBlocks.ADVANCED_ALLOY_FURNACE_BLOCK.get(), new Item.Properties())
+            () -> new AdvancedAlloyFurnaceBlockItem(ModBlocks.ADVANCED_ALLOY_FURNACE_BLOCK.get(), new Item.Properties().stacksTo(1))
     );
     public static final DeferredItem<BlockItem> SUPERVISOR = registerAndAdd(
             "supervisor",
@@ -235,13 +235,13 @@ public final class ModItems {
                     ModBlocks.MULTIBLOCK_ALLOY_FURNACE_CORE.get(), new Item.Properties()));
     public static final DeferredItem<BlockItem> ME_PATTERN_ASSEMBLY = registerAndAdd(
             "me_pattern_assembly",
-            () -> new BlockItem(ModBlocks.ME_PATTERN_ASSEMBLY.get(), new Item.Properties()));
+            () -> new BlockItem(ModBlocks.ME_PATTERN_ASSEMBLY.get(), new Item.Properties().stacksTo(1)));
     public static final DeferredItem<BlockItem> OMNIVERSAL_MOLD_HUB = registerAndAdd(
             "omniversal_mold_hub",
-            () -> new BlockItem(ModBlocks.OMNIVERSAL_MOLD_HUB.get(), new Item.Properties()));
+            () -> new BlockItem(ModBlocks.OMNIVERSAL_MOLD_HUB.get(), new Item.Properties().stacksTo(1)));
     public static final DeferredItem<BlockItem> PASSIVE_CRAFTING_HATCH = registerAndAdd(
             "passive_crafting_hatch",
-            () -> new BlockItem(ModBlocks.PASSIVE_CRAFTING_HATCH.get(), new Item.Properties()));
+            () -> new BlockItem(ModBlocks.PASSIVE_CRAFTING_HATCH.get(), new Item.Properties().stacksTo(1)));
     public static final DeferredItem<BlockItem> OMNIVERSAL_FURNACE_CASING = registerAndAdd(
             "omniversal_furnace_casing",
             () -> new BlockItem(ModBlocks.OMNIVERSAL_FURNACE_CASING.get(), new Item.Properties()));

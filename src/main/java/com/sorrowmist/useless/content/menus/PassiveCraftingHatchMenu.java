@@ -18,7 +18,7 @@ public final class PassiveCraftingHatchMenu extends PagedRecoverableMenu {
     private final @Nullable PassiveCraftingHatchBlockEntity hatch;
     private final ContainerData data;
     private final PassiveCraftingHatchBlockEntity.SlotStatus[] slotStatuses =
-            new PassiveCraftingHatchBlockEntity.SlotStatus[PassiveCraftingHatchBlockEntity.MAX_PATTERN_SLOTS];
+            new PassiveCraftingHatchBlockEntity.SlotStatus[PagedRecoverableMenu.SLOTS_PER_PAGE];
 
     public PassiveCraftingHatchMenu(int containerId, Inventory inventory, FriendlyByteBuf buffer) {
         this(containerId, inventory, buffer.readBlockPos());
@@ -108,13 +108,15 @@ public final class PassiveCraftingHatchMenu extends PagedRecoverableMenu {
     }
 
     public PassiveCraftingHatchBlockEntity.SlotStatus getSlotStatus(int slot) {
-        return slot >= 0 && slot < slotStatuses.length ? slotStatuses[slot] : emptyStatus(slot);
+        int relative = Math.floorMod(slot, PagedRecoverableMenu.SLOTS_PER_PAGE);
+        return slot >= 0 && relative < slotStatuses.length ? slotStatuses[relative] : emptyStatus(slot);
     }
 
     public void updateSlotStatuses(Iterable<PassiveCraftingHatchBlockEntity.SlotStatus> statuses) {
         for (PassiveCraftingHatchBlockEntity.SlotStatus status : statuses) {
-            if (status.slot() >= 0 && status.slot() < slotStatuses.length) {
-                slotStatuses[status.slot()] = status;
+            int relative = Math.floorMod(status.slot(), PagedRecoverableMenu.SLOTS_PER_PAGE);
+            if (relative >= 0 && relative < slotStatuses.length) {
+                slotStatuses[relative] = status;
             }
         }
     }

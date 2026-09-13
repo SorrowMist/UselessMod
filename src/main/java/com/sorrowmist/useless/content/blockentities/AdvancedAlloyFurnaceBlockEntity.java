@@ -62,6 +62,8 @@ import com.sorrowmist.useless.content.recipe.AdvancedAlloyFurnaceRecipe;
 import com.sorrowmist.useless.content.recipe.AlloyFurnaceRecipeCatalog;
 import com.sorrowmist.useless.core.config.ConfigManager;
 import com.sorrowmist.useless.core.constants.NBTConstants;
+import com.sorrowmist.useless.core.component.ExternalInventoryKind;
+import com.sorrowmist.useless.core.component.ExternalInventoryReference;
 import com.sorrowmist.useless.energy.EnergyManager;
 import com.sorrowmist.useless.energy.IEnergyManager;
 import com.sorrowmist.useless.init.ModBlockEntities;
@@ -83,6 +85,7 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
+import com.sorrowmist.useless.world.inventory.ExternalInventoryStore;
 import net.neoforged.fml.ModList;
 import net.neoforged.neoforge.capabilities.Capabilities;
 import net.neoforged.neoforge.energy.IEnergyStorage;
@@ -191,6 +194,11 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
     // 产物是否回AE
     private boolean returnOutputToAe = true;
     private boolean dropDataCaptured;
+    @Nullable
+    private ExternalInventoryReference inventoryReference;
+    @Nullable
+    private CompoundTag pendingLegacyInventory;
+    private boolean externalInventoryLoaded;
 
     public AdvancedAlloyFurnaceBlockEntity(BlockPos pos, BlockState state) {
         super(ModBlockEntities.ADVANCED_ALLOY_FURNACE.get(), pos, state);
@@ -845,7 +853,49 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
     }
 
     public ItemStackHandler getItemHandler() {
+        ensureExternalInventory();
         return this.itemHandler;
+    }
+
+    @Nullable
+    public ExternalInventoryReference getExternalInventoryReference() {
+        ensureExternalInventory();
+        return inventoryReference;
+    }
+
+    public void bindExternalInventory(@Nullable ExternalInventoryReference requested,
+                                      @Nullable CompoundTag legacyInventory,
+                                      HolderLookup.Provider registries) {
+        if (externalInventoryLoaded || level == null || level.isClientSide) return;
+        inventoryReference = ExternalInventoryStore.bindAt(
+                level, ExternalInventoryKind.FURNACE, requested, worldPosition,
+                itemHandler, legacyInventory, registries);
+        ExternalInventoryStore.setReference(this, inventoryReference);
+        pendingLegacyInventory = null;
+        externalInventoryLoaded = true;
+        itemStorageRevision++;
+        updateMoldState();
+        updatePatterns();
+        setChanged();
+    }
+
+    private void ensureExternalInventory() {
+        if (externalInventoryLoaded || level == null || level.isClientSide) return;
+        bindExternalInventory(
+                ExternalInventoryStore.getReference(this),
+                pendingLegacyInventory,
+                level.registryAccess());
+    }
+
+    public void saveExternalInventory() {
+        if (level != null && !level.isClientSide && externalInventoryLoaded) {
+            ExternalInventoryStore.save(level, inventoryReference, itemHandler, level.registryAccess());
+        }
+    }
+
+    public void releaseExternalInventory() {
+        saveExternalInventory();
+        if (level != null) ExternalInventoryStore.release(level, inventoryReference);
     }
 
     public long getItemStorageRevision() {
@@ -1268,8 +1318,7 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
         }
 
         if (tag.contains(NBTConstants.INVENTORY)) {
-            this.itemHandler.deserializeNBT(registries, tag.getCompound(NBTConstants.INVENTORY));
-            this.itemStorageRevision++;
+            this.pendingLegacyInventory = tag.getCompound(NBTConstants.INVENTORY).copy();
         }
 
         if (tag.contains(NBTConstants.ENERGY)) {
@@ -1348,7 +1397,6 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
         super.saveAdditional(tag, registries);
 
         tag.putInt(NBTConstants.FURNACE_TIER, this.furnaceTier);
-        tag.put(NBTConstants.INVENTORY, this.itemHandler.serializeNBT(registries));
         tag.putLong(NBTConstants.ENERGY, this.energyManager.getEnergyStoredLong());
         tag.putInt(NBTConstants.PROGRESS, this.progress);
         tag.putInt(NBTConstants.MAX_PROGRESS, this.maxProgress);
@@ -1414,8 +1462,7 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
 
     @Override
     public @NotNull CompoundTag getUpdateTag(HolderLookup.@NotNull Provider registries) {
-        CompoundTag tag = new CompoundTag();
-        this.saveAdditional(tag, registries);
+        CompoundTag tag = this.saveWithoutMetadata(registries);
         // AE 合成任务数据体积大且客户端无需，网络更新包中剥离
         tag.remove("AeTasks");
         return tag;
@@ -1445,7 +1492,6 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
     @Override
     public void handleUpdateTag(@NotNull CompoundTag tag, HolderLookup.@NotNull Provider registries) {
         super.handleUpdateTag(tag, registries);
-        this.loadAdditional(tag, registries);
     }
 
     @Override
@@ -1458,6 +1504,7 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
     @Override
     public void onLoad() {
         super.onLoad();
+        ensureExternalInventory();
         // 节点创建由clearRemoved中的GridHelper.onFirstTick处理，确保只创建一次
     }
 
@@ -1772,6 +1819,7 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
 
     private void onItemStorageChanged() {
         this.itemStorageRevision++;
+        saveExternalInventory();
         this.setChanged();
     }
 

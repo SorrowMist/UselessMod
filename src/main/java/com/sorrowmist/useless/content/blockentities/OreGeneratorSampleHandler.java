@@ -7,6 +7,8 @@ import java.util.function.Predicate;
 
 /** Sample storage for the ore generator. Every active slot holds one template item. */
 public final class OreGeneratorSampleHandler extends RecoverableItemStackHandler {
+    public static final int MAX_SLOTS = 540;
+
     public OreGeneratorSampleHandler(IntSupplier activeSlots, Predicate<ItemStack> validator,
                                      Runnable changeListener) {
         super(MAX_SLOTS, 0, activeSlots, validator, changeListener);

@@ -203,15 +203,15 @@ public class ConfigManager {
         OMNIVERSAL_PATTERN_SLOTS = SERVER_BUILDER
                 .comment("ME pattern assembly slots. Values are normalized to pages of 27.")
                 .translation("useless_mod.configuration.pattern_slots")
-                .defineInRange("pattern_slots", 108, 27, 540);
+                .defineInRange("pattern_slots", 108, 27, 4096);
         OMNIVERSAL_MOLD_SLOTS = SERVER_BUILDER
                 .comment("Omniversal mold hub slots. Values are normalized to pages of 27.")
                 .translation("useless_mod.configuration.mold_slots")
-                .defineInRange("mold_slots", 108, 27, 540);
+                .defineInRange("mold_slots", 108, 27, 4096);
         OMNIVERSAL_PASSIVE_PATTERN_SLOTS = SERVER_BUILDER
                 .comment("Passive crafting hatch slots. Higher coil tiers unlock this capacity gradually.")
                 .translation("useless_mod.configuration.passive_pattern_slots")
-                .defineInRange("passive_pattern_slots", 30, 1, 540);
+                .defineInRange("passive_pattern_slots", 30, 1, 4096);
         OMNIVERSAL_DECODE_CACHE_CAPACITY = SERVER_BUILDER
                 .comment("Maximum decoded omniversal pattern entries kept per level. Takes effect after restart.")
                 .translation("useless_mod.configuration.decode_cache_capacity")
@@ -899,7 +899,7 @@ public class ConfigManager {
     }
 
     public static int getOmniversalPassivePatternSlots() {
-        return Math.max(1, Math.min(540, getConfigValue(OMNIVERSAL_PASSIVE_PATTERN_SLOTS)));
+        return Math.max(1, Math.min(4096, getConfigValue(OMNIVERSAL_PASSIVE_PATTERN_SLOTS)));
     }
 
     public static int getOmniversalDecodeCacheCapacity() {
@@ -911,7 +911,7 @@ public class ConfigManager {
     }
 
     private static int normalizeInventorySlots(int value) {
-        int clamped = Math.max(27, Math.min(540, value));
+        int clamped = Math.max(27, Math.min(4096, value));
         return Math.max(27, clamped / 27 * 27);
     }
 

@@ -264,6 +264,10 @@ public final class UComponents {
             register("multiblock_part_data", builder -> builder
                     .persistent(MultiblockPartData.CODEC)
                     .networkSynchronized(MultiblockPartData.STREAM_CODEC));
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<ExternalInventoryReference>> EXTERNAL_INVENTORY_REFERENCE =
+            register("external_inventory_reference", builder -> builder
+                    .persistent(ExternalInventoryReference.CODEC)
+                    .networkSynchronized(ExternalInventoryReference.STREAM_CODEC));
     public static final DeferredHolder<DataComponentType<?>, DataComponentType<Long>> SMART_DOUBLING_OPERATIONS =
             register("smart_doubling_operations", builder -> builder
                     .persistent(Codec.LONG)

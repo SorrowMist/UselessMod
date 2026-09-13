@@ -11,9 +11,12 @@ import com.sorrowmist.useless.api.enums.RedstoneControlMode;
 import com.sorrowmist.useless.content.blockentities.AdvancedAlloyFurnaceBlockEntity;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.layout.AdvancedAlloyFurnaceLayout;
 import com.sorrowmist.useless.core.component.FurnaceDataComponent;
+import com.sorrowmist.useless.core.component.ExternalInventoryKind;
+import com.sorrowmist.useless.core.component.ExternalInventoryReference;
 import com.sorrowmist.useless.core.component.UComponents;
 import com.sorrowmist.useless.core.constants.NBTConstants;
 import com.sorrowmist.useless.init.ModMenuType;
+import com.sorrowmist.useless.world.inventory.ExternalInventoryStore;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.component.DataComponents;
@@ -104,12 +107,18 @@ public class AdvancedAlloyFurnaceBlock extends Block implements EntityBlock {
         if (!state.is(newState.getBlock())) {
             BlockEntity blockEntity = level.getBlockEntity(pos);
             if (blockEntity instanceof AdvancedAlloyFurnaceBlockEntity furnace) {
+                if (!level.isClientSide) {
+                    furnace.saveExternalInventory();
+                }
                 // 掉落物品（不包括容器内的物品，它们会保存在方块物品中）
                 // 注意：使用精准采集时，物品会通过 getDrops 保存到方块物品中
                 // AE 任务数据不随掉落物保存，必须在此返还材料：
                 // onRemove 先于 setRemoved 执行，此时 AE 节点仍然存活，材料能真正写回网络
                 if (!level.isClientSide && !furnace.isDropDataCaptured()) {
                     furnace.cancelAllAETasks();
+                }
+                if (!level.isClientSide) {
+                    furnace.releaseExternalInventory();
                 }
             }
         }
@@ -148,10 +157,6 @@ public class AdvancedAlloyFurnaceBlock extends Block implements EntityBlock {
                     CompoundTag blockEntityData = new CompoundTag();
                     // 保存所有数据到NBT
                     blockEntityData.putInt(NBTConstants.FURNACE_TIER, furnace.getFurnaceTier());
-                    
-                    // 保存物品栏（使用自定义序列化支持大堆叠）
-                    blockEntityData.put(NBTConstants.INVENTORY,
-                            furnace.getItemHandler().serializeNBT(params.getLevel().registryAccess()));
                     
                     // 保存能量
                     blockEntityData.putLong(NBTConstants.ENERGY, furnace.getEnergy());
@@ -199,6 +204,11 @@ public class AdvancedAlloyFurnaceBlock extends Block implements EntityBlock {
 
                     // 保存红石控制模式
                     blockEntityData.putInt("RedstoneControlMode", furnace.getRedstoneControlMode().ordinal());
+
+                    ExternalInventoryReference inventoryReference = furnace.getExternalInventoryReference();
+                    if (inventoryReference != null) {
+                        drop.set(UComponents.EXTERNAL_INVENTORY_REFERENCE.get(), inventoryReference);
+                    }
                     
                     // 使用Data Component存储数据
                     FurnaceDataComponent component = new FurnaceDataComponent(
@@ -207,6 +217,7 @@ public class AdvancedAlloyFurnaceBlock extends Block implements EntityBlock {
                     );
                     drop.set(UComponents.FURNACE_DATA.get(), component);
                     furnace.markDropDataCaptured();
+                    break;
                 }
             }
         }
@@ -406,6 +417,7 @@ public class AdvancedAlloyFurnaceBlock extends Block implements EntityBlock {
         
         // 从Data Component中恢复数据
         FurnaceDataComponent component = stack.get(UComponents.FURNACE_DATA.get());
+        ExternalInventoryReference requestedReference = stack.get(UComponents.EXTERNAL_INVENTORY_REFERENCE.get());
         if (component != null) {
             CompoundTag blockEntityData = component.data();
             BlockEntity blockEntity = level.getBlockEntity(pos);
@@ -417,11 +429,11 @@ public class AdvancedAlloyFurnaceBlock extends Block implements EntityBlock {
                     furnace.tryUpgrade(tier);
                 }
                 
-                // 恢复物品栏（使用自定义格式支持大堆叠）
-                if (blockEntityData.contains(NBTConstants.INVENTORY)) {
-                    CompoundTag inventoryTag = blockEntityData.getCompound(NBTConstants.INVENTORY);
-                    furnace.restoreInventory(inventoryTag, level.registryAccess());
-                }
+                furnace.bindExternalInventory(
+                        requestedReference,
+                        blockEntityData.contains(NBTConstants.INVENTORY)
+                                ? blockEntityData.getCompound(NBTConstants.INVENTORY) : null,
+                        level.registryAccess());
                 
                 // 恢复能量
                 if (blockEntityData.contains(NBTConstants.ENERGY)) {
@@ -501,6 +513,11 @@ public class AdvancedAlloyFurnaceBlock extends Block implements EntityBlock {
 
                 furnace.setChanged();
             }
+        } else if (placedBlockEntity instanceof AdvancedAlloyFurnaceBlockEntity furnace) {
+            furnace.bindExternalInventory(requestedReference, null, level.registryAccess());
+        }
+        if (placedBlockEntity instanceof AdvancedAlloyFurnaceBlockEntity furnace) {
+            ExternalInventoryStore.clearLegacyComponent(furnace, ExternalInventoryKind.FURNACE);
         }
     }
 }

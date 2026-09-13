@@ -1,8 +1,11 @@
 package com.sorrowmist.useless.content.blocks.multiblock;
 
 import com.sorrowmist.useless.content.blockentities.multiblock.PassiveCraftingHatchBlockEntity;
+import com.sorrowmist.useless.core.component.ExternalInventoryKind;
+import com.sorrowmist.useless.core.component.ExternalInventoryReference;
 import com.sorrowmist.useless.core.component.MultiblockPartData;
 import com.sorrowmist.useless.core.component.UComponents;
+import com.sorrowmist.useless.world.inventory.ExternalInventoryStore;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.MenuProvider;
@@ -50,6 +53,7 @@ public final class PassiveCraftingHatchBlock extends DirectionalMultiblockPartBl
                 && level.getBlockEntity(pos) instanceof PassiveCraftingHatchBlockEntity hatch) {
             if (!level.isClientSide) {
                 hatch.prepareForRemoval();
+                hatch.releaseExternalInventory();
             }
         }
         super.onRemove(state, level, pos, newState, movedByPiston);
@@ -61,14 +65,24 @@ public final class PassiveCraftingHatchBlock extends DirectionalMultiblockPartBl
         if (params.getOptionalParameter(LootContextParams.BLOCK_ENTITY)
                 instanceof PassiveCraftingHatchBlockEntity hatch) {
             hatch.prepareForRemoval();
-            MultiblockPartData itemData = hatch.createItemData(params.getLevel().registryAccess());
-            boolean hasCustomData = itemData.hasInventoryContents()
+            MultiblockPartData itemData = hatch.createSettingsItemData();
+            ExternalInventoryReference reference = hatch.getExternalInventoryReference();
+            boolean hasCustomData = reference != null
                     || itemData.intervalTicks() != PassiveCraftingHatchBlockEntity.DEFAULT_INTERVAL_TICKS
                     || itemData.multiplier() != 1L;
             if (hasCustomData) {
                 for (ItemStack drop : drops) {
                     if (drop.is(asItem())) {
-                        drop.set(UComponents.MULTIBLOCK_PART_DATA.get(), itemData);
+                        if (reference != null) {
+                            drop.set(UComponents.EXTERNAL_INVENTORY_REFERENCE.get(), reference);
+                        }
+                        if (itemData.intervalTicks() != PassiveCraftingHatchBlockEntity.DEFAULT_INTERVAL_TICKS
+                                || itemData.multiplier() != 1L) {
+                            drop.set(UComponents.MULTIBLOCK_PART_DATA.get(),
+                                    new MultiblockPartData(itemData.version(), new net.minecraft.nbt.CompoundTag(),
+                                            itemData.intervalTicks(), itemData.multiplier()));
+                        }
+                        break;
                     }
                 }
             }
@@ -82,10 +96,12 @@ public final class PassiveCraftingHatchBlock extends DirectionalMultiblockPartBl
         super.setPlacedBy(level, pos, state, placer, stack);
         if (!level.isClientSide
                 && level.getBlockEntity(pos) instanceof PassiveCraftingHatchBlockEntity hatch) {
+            ExternalInventoryReference reference = stack.get(UComponents.EXTERNAL_INVENTORY_REFERENCE.get());
             MultiblockPartData itemData = stack.get(UComponents.MULTIBLOCK_PART_DATA.get());
-            if (itemData != null) {
-                hatch.restoreItemData(itemData, level.registryAccess());
-            }
+            hatch.bindExternalInventory(reference,
+                    itemData == null ? null : itemData.inventory(), level.registryAccess());
+            hatch.restoreSettings(itemData);
+            ExternalInventoryStore.clearLegacyComponent(hatch, ExternalInventoryKind.PASSIVE_HATCH);
         }
     }
 

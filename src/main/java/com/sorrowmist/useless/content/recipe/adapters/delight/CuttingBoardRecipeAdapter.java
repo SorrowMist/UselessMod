@@ -6,7 +6,6 @@ import com.sorrowmist.useless.content.recipe.AdvancedAlloyFurnaceRecipe;
 import com.sorrowmist.useless.content.recipe.CountedIngredient;
 import com.sorrowmist.useless.content.recipe.ExpectedOutputScaler;
 import com.sorrowmist.useless.content.recipe.IRecipeAdapter;
-import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.crafting.Ingredient;
 import net.minecraft.world.item.crafting.RecipeHolder;
@@ -18,20 +17,14 @@ import vectorwing.farmersdelight.common.crafting.CuttingBoardRecipe;
 import vectorwing.farmersdelight.common.crafting.ingredient.ChanceResult;
 import vectorwing.farmersdelight.common.registry.ModItems;
 import vectorwing.farmersdelight.common.registry.ModRecipeTypes;
-import vectorwing.farmersdelight.common.tag.CommonTags;
-import vectorwing.farmersdelight.common.tag.ModTags;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-/** Converts knife-based Cutting Board recipes into alloy-furnace recipes. */
+/** Converts Cutting Board recipes into alloy-furnace recipes. */
 public final class CuttingBoardRecipeAdapter implements IRecipeAdapter<CuttingBoardRecipe> {
-    private static final Ingredient KNIFE_TOOL = Ingredient.of(ModTags.Items.KNIVES);
-    private static final ResourceLocation FORGE_KNIFE_TAG =
-            ResourceLocation.fromNamespaceAndPath("forge", "tools/knives");
-
     @Override
     public Class<CuttingBoardRecipe> getRecipeClass() {
         return CuttingBoardRecipe.class;
@@ -56,7 +49,7 @@ public final class CuttingBoardRecipeAdapter implements IRecipeAdapter<CuttingBo
         }
 
         CuttingBoardRecipe source = holder.value();
-        if (!isKnifeRecipe(source)) {
+        if (!hasTool(source)) {
             return List.of();
         }
 
@@ -122,7 +115,7 @@ public final class CuttingBoardRecipeAdapter implements IRecipeAdapter<CuttingBo
         for (RecipeHolder<CuttingBoardRecipe> holder : recipeManager.getAllRecipesFor(
                 ModRecipeTypes.CUTTING.get())) {
             CuttingBoardRecipe source = holder.value();
-            if (source == null || !isKnifeRecipe(source)) {
+            if (!hasTool(source)) {
                 continue;
             }
 
@@ -171,37 +164,11 @@ public final class CuttingBoardRecipeAdapter implements IRecipeAdapter<CuttingBo
     }
 
     /**
-     * Cutting Board also supports tool-action ingredients. Only recipes whose tool accepts at
-     * least one knife are safe to represent with the alloy furnace's cutting-board mold.
+     * The tool is a non-consumed requirement of the original Cutting Board recipe. The board mold
+     * replaces that workstation in the converted recipe, so every non-empty tool ingredient is
+     * supported, including tool-action ingredients used by axes, pickaxes, hoes and shears.
      */
-    private static boolean isKnifeRecipe(CuttingBoardRecipe recipe) {
-        if (recipe == null || recipe.getTool() == null || recipe.getTool().isEmpty()) {
-            return false;
-        }
-
-        Ingredient tool = recipe.getTool();
-        try {
-            for (Ingredient.Value value : tool.getValues()) {
-                if (value instanceof Ingredient.TagValue tagValue
-                        && isKnifeTag(tagValue.tag().location())) {
-                    return true;
-                }
-            }
-
-            for (ItemStack knife : KNIFE_TOOL.getItems()) {
-                if (!knife.isEmpty() && tool.test(knife)) {
-                    return true;
-                }
-            }
-        } catch (RuntimeException ignored) {
-            return false;
-        }
-        return false;
-    }
-
-    private static boolean isKnifeTag(ResourceLocation tag) {
-        return tag.equals(ModTags.Items.KNIVES.location())
-                || tag.equals(CommonTags.Items.TOOLS_KNIFE.location())
-                || tag.equals(FORGE_KNIFE_TAG);
+    private static boolean hasTool(CuttingBoardRecipe recipe) {
+        return recipe != null && recipe.getTool() != null && !recipe.getTool().isEmpty();
     }
 }

@@ -26,7 +26,7 @@ public final class PassiveCraftingHatchMenu extends PagedRecoverableMenu {
 
     public PassiveCraftingHatchMenu(int containerId, Inventory inventory, BlockPos pos) {
         super(ModMenuType.PASSIVE_CRAFTING_HATCH_MENU.get(), containerId, inventory,
-                handler(inventory, pos), pos, 8, 22, 44, 158, 44, 218,
+                handler(inventory, pos), pos, 8, 22, 44, 254, 44, 312,
                 pageMemory(inventory, pos));
         hatch = inventory.player.level().getBlockEntity(pos)
                 instanceof PassiveCraftingHatchBlockEntity found ? found : null;

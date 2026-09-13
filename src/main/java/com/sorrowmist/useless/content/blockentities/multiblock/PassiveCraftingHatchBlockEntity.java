@@ -148,7 +148,7 @@ public final class PassiveCraftingHatchBlockEntity extends BlockEntity
 
     public PassiveCraftingHatchBlockEntity(BlockPos pos, BlockState state) {
         super(ModBlockEntities.PASSIVE_CRAFTING_HATCH.get(), pos, state);
-        for (int slot = 0; slot < PATTERN_SLOTS; slot++) {
+        for (int slot = 0; slot < statusCapacity; slot++) {
             idleStates[slot] = SlotState.EMPTY;
             idleDetails[slot] = "";
         }

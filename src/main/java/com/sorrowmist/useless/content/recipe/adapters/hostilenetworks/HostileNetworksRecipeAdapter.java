@@ -59,7 +59,9 @@ public final class HostileNetworksRecipeAdapter
     @Override
     public boolean matchesMold(@Nullable ItemStack mold) {
         if (mold == null || mold.isEmpty()) return false;
-        return mold.is(Hostile.Items.SIM_CHAMBER) || mold.is(Hostile.Items.LOOT_FABRICATOR);
+        return mold.is(Hostile.Items.SIM_CHAMBER)
+                || mold.is(Hostile.Items.LOOT_FABRICATOR)
+                || isSelfAwareModel(mold);
     }
 
     @Override
@@ -70,6 +72,7 @@ public final class HostileNetworksRecipeAdapter
         for (DataModel model : DataModelRegistry.INSTANCE.getValues()) {
             addTrainingRecipe(result, model);
             addInferenceRecipes(result, model);
+            addSelfAwareMoldInferenceRecipe(result, model);
             addFabricatorRecipes(result, model);
         }
         return List.copyOf(result);
@@ -236,6 +239,50 @@ public final class HostileNetworksRecipeAdapter
         result.add(holder(recipe));
     }
 
+    /**
+     * Keeps a self-aware model in the mold hub and consumes only one prediction matrix per run.
+     * This is the compact form of Simulation Chamber inference that is useful for AE patterns:
+     * the trained model is a reusable mold instead of a second consumed input.
+     */
+    private static void addSelfAwareMoldInferenceRecipe(
+            List<RecipeHolder<HostileNetworksSyntheticRecipe>> result, DataModel model) {
+        ModelTier tier = selfAwareTier();
+        if (tier == null) return;
+
+        Ingredient matrix = model.input();
+        int modelData = model.getRequiredData(tier);
+        if (AdapterUtils.isIngredientEmpty(matrix) || modelData < 0) return;
+
+        ItemStack selfAwareModel = modelStack(model, modelData);
+        List<ItemStack> outputs = new ArrayList<>();
+        if (!addCountedOutput(outputs, model.baseDrop(), 1L)
+                || !addCountedOutput(outputs, model.getPredictionDrop(), 1L)) {
+            return;
+        }
+
+        long energy = multiply(model.simCost(), SIMULATION_INFERENCE_TIME);
+        if (energy < 0L) return;
+
+        ResourceLocation id = recipeId(model, "inference/self_aware_mold");
+        if (id == null) return;
+
+        AdvancedAlloyFurnaceRecipe recipe = new AdvancedAlloyFurnaceRecipe(
+                id,
+                List.of(new CountedIngredient(matrix, 1L)),
+                List.of(),
+                List.of(),
+                outputs,
+                List.of(),
+                List.of(),
+                energy,
+                SIMULATION_INFERENCE_TIME,
+                Ingredient.EMPTY,
+                0,
+                List.of(exact(selfAwareModel)),
+                AlloyFurnaceMode.NORMAL);
+        result.add(holder(recipe));
+    }
+
     private static void addFabricatorRecipes(
             List<RecipeHolder<HostileNetworksSyntheticRecipe>> result, DataModel model) {
         ItemStack prediction = model.getPredictionDrop();
@@ -394,6 +441,23 @@ public final class HostileNetworksRecipeAdapter
 
     private static boolean matchesMold(AdvancedAlloyFurnaceRecipe recipe, ItemStack mold) {
         return AdapterUtils.matchesMold(recipe.mold(), mold);
+    }
+
+    private static boolean isSelfAwareModel(ItemStack mold) {
+        if (!mold.is(Hostile.Items.DATA_MODEL)) return false;
+
+        try {
+            var storedModel = DataModelItem.getStoredModel(mold);
+            if (!storedModel.isBound()) return false;
+
+            DataModel model = storedModel.get();
+            if (DataModelRegistry.INSTANCE.getKey(model) == null) return false;
+
+            ModelTier tier = selfAwareTier();
+            return tier != null && DataModelItem.getData(mold) >= model.getRequiredData(tier);
+        } catch (RuntimeException exception) {
+            return false;
+        }
     }
 
     private static boolean matchesMergedInputs(

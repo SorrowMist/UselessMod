@@ -213,6 +213,7 @@ dependencies {
     implementation "curse.maven:ex-pattern-provider-892005:8025439"  // 2.2.32
     implementation "curse.maven:applied-flux-965012:5614830"
 //    implementation "curse.maven:applied-flux-965012:7429565"
+    implementation "maven.modrinth:mega:4.11.0"
 
     // 高级ae
     implementation "curse.maven:geckolib-388172:8350073"

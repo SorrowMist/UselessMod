@@ -6,7 +6,9 @@ import com.sorrowmist.useless.content.recipe.RecipeSourceIds;
 import com.sorrowmist.useless.content.recipe.adapters.actuallyadditions.EmpowererRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.actuallyadditions.LaserRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.ae.advancedae.ReactionChamberRecipeAdapter;
+import com.sorrowmist.useless.content.recipe.adapters.ae.ae2.ChargerRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.ae.ae2.InscriberRecipeAdapter;
+import com.sorrowmist.useless.content.recipe.adapters.ae.ae2.WorldInteractionRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.ae.ae2cs.CircuitEtcherRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.ae.ae2cs.CrystalAggregatorRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.ae.ae2cs.CrystalGrowthRecipeAdapter;
@@ -15,6 +17,7 @@ import com.sorrowmist.useless.content.recipe.adapters.ae.ae2lt.AELightningTechCo
 import com.sorrowmist.useless.content.recipe.adapters.ae.dataenergistics.DataReassemblerRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.ae.extendedae.CircuitCutterRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.ae.extendedae.CrystalAssemblerRecipeAdapter;
+import com.sorrowmist.useless.content.recipe.adapters.ae.extendedae.CrystalFixerRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.arsnouveau.EnchantingApparatusRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.arsnouveau.ImbuementRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.avaritia.ReAvaritiaCollectorRecipeAdapter;
@@ -304,6 +307,7 @@ public final class RecipeAdapterCompatRegistry {
     private static void registerExtendedAE() {
         register(new CircuitCutterRecipeAdapter());
         register(new CrystalAssemblerRecipeAdapter());
+        register(new CrystalFixerRecipeAdapter());
     }
 
     private static void registerAdvancedAE() {
@@ -330,7 +334,9 @@ public final class RecipeAdapterCompatRegistry {
     }
 
     private static void registerAE2() {
+        register(new ChargerRecipeAdapter());
         register(new InscriberRecipeAdapter());
+        register(new WorldInteractionRecipeAdapter());
     }
 
     private static void registerAECrystalScience() {

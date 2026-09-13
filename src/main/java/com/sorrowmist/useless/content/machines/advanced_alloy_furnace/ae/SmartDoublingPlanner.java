@@ -22,7 +22,8 @@ public final class SmartDoublingPlanner {
         for (var entry : crafts.entrySet()) {
             IPatternDetails pattern = entry.getKey();
             long totalOperations = entry.getValue();
-            if (totalOperations <= 1L || pattern instanceof ScaledProcessingPattern) {
+            if (totalOperations <= 1L || pattern instanceof ScaledPattern
+                    || !SmartDoublingPatterns.canScale(pattern)) {
                 merge(rewritten, pattern, totalOperations);
                 continue;
             }

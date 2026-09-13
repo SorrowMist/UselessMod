@@ -14,6 +14,7 @@ import org.jetbrains.annotations.Nullable;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -26,8 +27,12 @@ import java.util.WeakHashMap;
 public final class DynamicPatternCpuStateManager {
     public static final DynamicPatternCpuStateManager INSTANCE = new DynamicPatternCpuStateManager();
     public static final String NBT_KEY = "uselessModDynamicComponentState";
+    private static final String ECO_CPU_LOGIC_CLASS =
+            "cn.dancingsnow.neoecoae.api.me.ECOCraftingCPULogic";
 
     private final Map<Object, CpuState> states = new WeakHashMap<>();
+    private final Map<UUID, EcoState> ecoStates = new LinkedHashMap<>();
+    private final Map<UUID, LinkedHashSet<Object>> stagedEcoOwners = new HashMap<>();
 
     private DynamicPatternCpuStateManager() {
     }
@@ -65,6 +70,9 @@ public final class DynamicPatternCpuStateManager {
             states.put(logic, state);
         }
         state.register(pattern, finalOutputKey, pushedCopies);
+        if (ECO_CPU_LOGIC_CLASS.equals(logic.getClass().getName())) {
+            stagedEcoOwners.computeIfAbsent(craftingId, ignored -> new LinkedHashSet<>()).add(logic);
+        }
     }
 
     public synchronized ClaimResult claim(
@@ -90,6 +98,10 @@ public final class DynamicPatternCpuStateManager {
     public synchronized void clear(Object logic) {
         Objects.requireNonNull(logic, "logic");
         states.remove(logic);
+        stagedEcoOwners.values().removeIf(owners -> {
+            owners.remove(logic);
+            return owners.isEmpty();
+        });
     }
 
     @Nullable
@@ -123,6 +135,131 @@ public final class DynamicPatternCpuStateManager {
         return state == null ? List.of() : state.snapshots();
     }
 
+    /** Creates or refreshes the public-API state for one ECO job. */
+    public synchronized void ensureEcoJob(UUID craftingId, Object cpu, Object grid) {
+        Objects.requireNonNull(craftingId, "craftingId");
+        EcoState state = ecoStates.get(craftingId);
+        if (state == null) {
+            state = new EcoState(craftingId, cpu, grid, new CpuState(craftingId));
+            ecoStates.put(craftingId, state);
+        } else {
+            state.cpu = cpu;
+            state.grid = grid;
+        }
+    }
+
+    /** Restores one ECO job attachment without exposing ECO's CPU internals. */
+    public synchronized void readEcoJob(
+            UUID craftingId, Object cpu, Object grid, CompoundTag tag, HolderLookup.Provider registries) {
+        Objects.requireNonNull(craftingId, "craftingId");
+        Objects.requireNonNull(tag, "tag");
+        Objects.requireNonNull(registries, "registries");
+        ecoStates.put(craftingId, new EcoState(
+                craftingId, cpu, grid, CpuState.fromTag(craftingId, tag, registries)));
+    }
+
+    @Nullable
+    public synchronized CompoundTag writeEcoJob(UUID craftingId, HolderLookup.Provider registries) {
+        Objects.requireNonNull(craftingId, "craftingId");
+        Objects.requireNonNull(registries, "registries");
+        EcoState state = ecoStates.get(craftingId);
+        return state == null || state.pending.isEmpty() ? null : state.pending.toTag(registries);
+    }
+
+    public synchronized void clearEcoJob(UUID craftingId) {
+        Objects.requireNonNull(craftingId, "craftingId");
+        ecoStates.remove(craftingId);
+        stagedEcoOwners.remove(craftingId);
+        states.entrySet().removeIf(entry -> craftingId.equals(entry.getValue().craftingId));
+    }
+
+    /**
+     * Binds a successful ECO dispatch to its job attachment. The legacy staged state is consumed when
+     * P16's optional fast-path bridge called the compatibility methods below before this event arrived.
+     */
+    public synchronized void bindEcoDispatch(
+            UUID craftingId,
+            Object cpu,
+            Object grid,
+            DynamicComponentPattern pattern,
+            @Nullable AEKey finalOutputKey,
+            long pushedCopies) {
+        Objects.requireNonNull(craftingId, "craftingId");
+        Objects.requireNonNull(pattern, "pattern");
+        if (pushedCopies <= 0L) {
+            throw new IllegalArgumentException("pushedCopies must be > 0");
+        }
+
+        EcoState state = ecoStates.get(craftingId);
+        if (state == null) {
+            CpuState staged = takeStagedState(craftingId);
+            state = new EcoState(craftingId, cpu, grid, staged == null ? new CpuState(craftingId) : staged);
+            state.wasStaged = staged != null;
+            ecoStates.put(craftingId, state);
+        } else {
+            state.cpu = cpu;
+            state.grid = grid;
+            CpuState staged = takeStagedState(craftingId);
+            if (staged != null) {
+                if (state.pending.isEmpty()) {
+                    state.pending = staged;
+                } else {
+                    state.pending.mergeFrom(staged);
+                }
+                state.wasStaged = true;
+            }
+        }
+
+        if (!state.wasStaged) {
+            state.pending.register(pattern, finalOutputKey, pushedCopies);
+        }
+        state.wasStaged = false;
+    }
+
+    public synchronized boolean hasEcoPendingOnGrid(Object grid) {
+        if (grid == null) {
+            return false;
+        }
+        for (EcoState state : ecoStates.values()) {
+            if (state.grid == grid && !state.pending.isEmpty()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public synchronized List<EcoCandidate> ecoCandidates(Object grid, ResourceLocation itemId) {
+        if (grid == null || itemId == null) {
+            return List.of();
+        }
+        List<EcoCandidate> result = new ArrayList<>();
+        for (EcoState state : ecoStates.values()) {
+            if (state.grid != grid) {
+                continue;
+            }
+            for (PendingSnapshot pending : state.pending.snapshots()) {
+                if (itemId.equals(pending.itemId()) && pending.remainingAmount() > 0L) {
+                    result.add(new EcoCandidate(
+                            state.craftingId,
+                            state.cpu,
+                            pending.exactExpectedKey(),
+                            pending.remainingAmount()));
+                }
+            }
+        }
+        return List.copyOf(result);
+    }
+
+    public synchronized ClaimResult claimEcoExact(UUID craftingId, AEKey expectedKey, long amount) {
+        Objects.requireNonNull(craftingId, "craftingId");
+        Objects.requireNonNull(expectedKey, "expectedKey");
+        if (amount <= 0L) {
+            return ClaimResult.EMPTY;
+        }
+        EcoState state = ecoStates.get(craftingId);
+        return state == null ? ClaimResult.EMPTY : state.pending.claimExact(expectedKey, amount, true);
+    }
+
     public record PendingSnapshot(
             String patternIdentity,
             int outputSlot,
@@ -131,6 +268,13 @@ public final class DynamicPatternCpuStateManager {
             long remainingAmount,
             boolean routesToRequester,
             long registeredOrder) {
+    }
+
+    public record EcoCandidate(
+            UUID craftingId,
+            Object cpu,
+            AEKey exactExpectedKey,
+            long remainingAmount) {
     }
 
     public record Claim(
@@ -335,6 +479,49 @@ public final class DynamicPatternCpuStateManager {
                     .toList();
         }
 
+        private ClaimResult claimExact(AEKey expectedKey, long amount, boolean mutate) {
+            if (amount <= 0L) {
+                return ClaimResult.EMPTY;
+            }
+            PendingOutput selected = pendingByKey.values().stream()
+                    .filter(pending -> pending.exactExpectedKey.equals(expectedKey)
+                            && pending.remainingAmount > 0L)
+                    .min(Comparator.comparingLong(pending -> pending.registeredOrder))
+                    .orElse(null);
+            if (selected == null) {
+                return ClaimResult.EMPTY;
+            }
+            long claimed = Math.min(amount, selected.remainingAmount);
+            if (mutate) {
+                selected.remainingAmount -= claimed;
+                if (selected.remainingAmount <= 0L) {
+                    remove(selected);
+                }
+            }
+            return new ClaimResult(claimed, List.of(new Claim(
+                    claimed, selected.routesToRequester, selected.exactExpectedKey)));
+        }
+
+        private void mergeFrom(CpuState other) {
+            for (PendingOutput incoming : other.pendingByKey.values()) {
+                PendingOutput existing = pendingByKey.get(incoming.key);
+                if (existing == null) {
+                    PendingOutput copy = new PendingOutput(
+                            incoming.key,
+                            incoming.itemId,
+                            incoming.exactExpectedKey,
+                            incoming.remainingAmount,
+                            incoming.routesToRequester,
+                            incoming.registeredOrder);
+                    pendingByKey.put(copy.key, copy);
+                    pendingByItem.computeIfAbsent(copy.itemId, ignored -> new LinkedHashSet<>()).add(copy.key);
+                } else {
+                    existing.addExpected(incoming.remainingAmount);
+                }
+                nextSequence = Math.max(nextSequence, incoming.registeredOrder + 1L);
+            }
+        }
+
         private CompoundTag toTag(HolderLookup.Provider registries) {
             CompoundTag tag = new CompoundTag();
             tag.putLong(TAG_NEXT_SEQUENCE, nextSequence);
@@ -416,6 +603,37 @@ public final class DynamicPatternCpuStateManager {
                 remainingAmount = saturatingAdd(remainingAmount, amount);
             }
         }
+    }
+
+    private static final class EcoState {
+        private final UUID craftingId;
+        private Object cpu;
+        private Object grid;
+        private CpuState pending;
+        private boolean wasStaged;
+
+        private EcoState(UUID craftingId, Object cpu, Object grid, CpuState pending) {
+            this.craftingId = craftingId;
+            this.cpu = cpu;
+            this.grid = grid;
+            this.pending = pending;
+            this.wasStaged = false;
+        }
+    }
+
+    @Nullable
+    private CpuState takeStagedState(UUID craftingId) {
+        LinkedHashSet<Object> owners = stagedEcoOwners.remove(craftingId);
+        if (owners == null) {
+            return null;
+        }
+        for (Object owner : owners) {
+            CpuState state = states.remove(owner);
+            if (state != null) {
+                return state;
+            }
+        }
+        return null;
     }
 
     private static long saturatingAdd(long first, long second) {

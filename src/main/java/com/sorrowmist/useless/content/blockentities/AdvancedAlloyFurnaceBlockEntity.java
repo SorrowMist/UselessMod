@@ -37,6 +37,7 @@ import com.sorrowmist.useless.content.blocks.AdvancedAlloyFurnaceBlock;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.AdvancedAlloyFurnaceAeManager;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.CraftingTaskContext;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.AlloyFurnaceAeHost;
+import com.sorrowmist.useless.compat.neoecoae.NeoEcoDynamicOutputCompat;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.chemical.ChemicalHandlerView;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.chemical.ChemicalCompatProviders;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.chemical.ChemicalKeyProvider;
@@ -82,6 +83,7 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
+import net.neoforged.fml.ModList;
 import net.neoforged.neoforge.capabilities.Capabilities;
 import net.neoforged.neoforge.energy.IEnergyStorage;
 import net.neoforged.neoforge.fluids.FluidStack;
@@ -389,6 +391,7 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
         entity.aeManager.tickAETasks();
         entity.aeManager.tickUnreturnedInputs();
         entity.aeManager.tickUnreturnedOutputs();
+        entity.aeManager.tickQueuedCraftingOutputs();
 
         // 每tick尝试自动输入输出物品和流体
         entity.autoOutputTickCounter++;
@@ -1124,6 +1127,11 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
         return CatalystType.fromStack(catalystStack).getNormalRecipeParallel();
     }
 
+    @Override
+    public long getCraftingPatternCapacity() {
+        return Math.max(1L, getCatalystMaxParallel());
+    }
+
     private int calculateDisplayParallel() {
         // 使用缓存减少UI查询时的配方查找开销
         if (this.level != null) {
@@ -1644,7 +1652,13 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
             return 0;
         }
 
-        return storage.insert(key, amount, Actionable.MODULATE, actionSource);
+        long claimed = ModList.get().isLoaded("neoecoae")
+                ? NeoEcoDynamicOutputCompat.claim(getAeGrid(), key, amount) : 0L;
+        long remaining = amount - Math.min(amount, claimed);
+        if (remaining <= 0L) {
+            return amount;
+        }
+        return Math.min(amount, claimed) + storage.insert(key, remaining, Actionable.MODULATE, actionSource);
     }
 
     @Override
@@ -1673,6 +1687,10 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
 
     public int getActiveAETaskCount() {
         return this.aeManager.getActiveAETaskCount();
+    }
+
+    public int getRemainingAETaskCount(boolean craftingPattern) {
+        return this.aeManager.getRemainingAETaskCount(craftingPattern);
     }
 
     // 获取最大AE任务数量（基于熔炉等级）
@@ -1878,6 +1896,12 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
     @Nullable
     public IGrid getGrid() {
         return mainNode.getGrid();
+    }
+
+    @Override
+    @Nullable
+    public IGrid getAeGrid() {
+        return getGrid();
     }
 
     @Override

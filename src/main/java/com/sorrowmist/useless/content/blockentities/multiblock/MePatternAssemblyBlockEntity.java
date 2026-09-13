@@ -16,6 +16,7 @@ import appeng.api.stacks.AEItemKey;
 import appeng.api.stacks.KeyCounter;
 import appeng.api.util.AECableType;
 import appeng.blockentity.AEBaseBlockEntity;
+import appeng.core.definitions.AEItems;
 import appeng.helpers.patternprovider.PatternContainer;
 import com.mojang.logging.LogUtils;
 import com.sorrowmist.useless.api.crafting.SmartDoublingCraftingProvider;
@@ -52,7 +53,7 @@ public final class MePatternAssemblyBlockEntity extends AEBaseBlockEntity
     private static final Logger LOGGER = LogUtils.getLogger();
     private final RecoverableItemStackHandler patterns = new RecoverableItemStackHandler(
             ConfigManager::getOmniversalPatternSlots,
-            stack -> stack.is(ModItems.OMNIVERSAL_PATTERN.get()),
+            MePatternAssemblyBlockEntity::isAcceptedPattern,
             this::inventoryChanged);
     private final PagedMenuPageMemory pageMemory = new PagedMenuPageMemory(this::setChanged);
     private final IManagedGridNode mainNode;
@@ -94,6 +95,18 @@ public final class MePatternAssemblyBlockEntity extends AEBaseBlockEntity
         } else {
             requestProviderRefresh();
         }
+    }
+
+    /**
+     * 样板总成接受万象样板与本模组的编码样板，以及 AE2 的合成样板。
+     *
+     * <p>合成样板由样板总成自己在虚拟工作台上装配（万象合金炉没有合成台），处理样板仍由
+     * 万象样板体系承担，因此只放行 AE2 的合成样板物品。能否真正发布由解码结果决定：
+     * 解码失败或不是合成样板的栈会在重建样板快照时被跳过。</p>
+     */
+    private static boolean isAcceptedPattern(ItemStack stack) {
+        return stack.is(ModItems.OMNIVERSAL_PATTERN.get())
+                || stack.is(AEItems.CRAFTING_PATTERN.get());
     }
 
     public RecoverableItemStackHandler getPatterns() {

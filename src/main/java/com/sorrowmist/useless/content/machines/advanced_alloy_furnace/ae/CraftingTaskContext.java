@@ -16,12 +16,14 @@ import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.chemical.C
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.chemical.ChemicalStackView;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.chemical.FurnaceChemicalStorage;
 import com.sorrowmist.useless.energy.IEnergyManager;
+import appeng.api.networking.IGrid;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.crafting.Ingredient;
 import net.minecraft.world.level.Level;
 import net.neoforged.neoforge.fluids.FluidStack;
 import net.neoforged.neoforge.fluids.capability.templates.FluidTank;
 import net.neoforged.neoforge.items.ItemStackHandler;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.ArrayList;
@@ -48,6 +50,11 @@ public interface CraftingTaskContext {
     net.minecraft.core.BlockPos getBlockPos();
     ItemStackHandler getItemHandler();
     IEnergyManager getEnergyManager();
+
+    @Nullable
+    default IGrid getAeGrid() {
+        return null;
+    }
 
     default int getMachineTier() {
         return AlloyFurnaceTierRules.NO_MACHINE_TIER;
@@ -229,6 +236,11 @@ public interface CraftingTaskContext {
     default long getTaskParallel(AdvancedAlloyFurnaceRecipe recipe, ResolvedCatalystEffect effect) {
         return recipe == null || effect == null ? 1
                 : AlloyFurnaceParallelCalculator.calculateAeTaskParallel(recipe, effect);
+    }
+
+    /** Maximum number of crafting-pattern operations one furnace thread may accept in one push. */
+    default long getCraftingPatternCapacity() {
+        return 1L;
     }
 
     /** Long-count AE contexts keep item and fluid amounts as AE keys instead of int-sized stacks. */

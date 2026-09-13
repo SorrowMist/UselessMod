@@ -1,6 +1,7 @@
 package com.sorrowmist.useless.content.blockentities.multiblock;
 
 import appeng.api.crafting.IPatternDetails;
+import appeng.api.networking.IGrid;
 import appeng.api.stacks.AEFluidKey;
 import appeng.api.stacks.AEItemKey;
 import appeng.api.stacks.AEKey;
@@ -221,6 +222,11 @@ public final class PassiveCraftingHatchBlockEntity extends BlockEntity
     public long getCurrentMaxParallel() {
         MultiblockAlloyFurnaceCoreBlockEntity controller = getController();
         return controller == null ? 1L : Math.max(1L, controller.getPassiveCraftingMaxParallel());
+    }
+
+    @Override
+    public long getCraftingPatternCapacity() {
+        return getCurrentMaxParallel();
     }
 
     public void applySettings(int requestedInterval, long requestedMultiplier) {
@@ -930,6 +936,13 @@ public final class PassiveCraftingHatchBlockEntity extends BlockEntity
     @Override
     public FluidTank[] getOutputFluidTanks() {
         return EMPTY_TANKS;
+    }
+
+    @Override
+    @Nullable
+    public IGrid getAeGrid() {
+        MultiblockAlloyFurnaceCoreBlockEntity controller = getRawController();
+        return controller == null ? null : controller.getAeGrid();
     }
 
     @Override

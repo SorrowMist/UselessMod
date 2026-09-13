@@ -13,7 +13,7 @@ import java.util.List;
 import java.util.Objects;
 
 /** One processing-pattern push representing multiple operations. */
-public final class ScaledProcessingPattern implements IPatternDetails {
+public class ScaledProcessingPattern implements IPatternDetails, ScaledPattern {
     private final IPatternDetails original;
     private final long operationsPerPush;
     private final AEItemKey definition;
@@ -46,10 +46,12 @@ public final class ScaledProcessingPattern implements IPatternDetails {
         this.outputs = List.copyOf(scaledOutputs);
     }
 
+    @Override
     public IPatternDetails getOriginal() {
         return original;
     }
 
+    @Override
     public long getOperationsPerPush() {
         return operationsPerPush;
     }
@@ -88,8 +90,14 @@ public final class ScaledProcessingPattern implements IPatternDetails {
 
     @Override
     public boolean equals(Object object) {
-        return object == this || object instanceof ScaledProcessingPattern other
-                && operationsPerPush == other.operationsPerPush
+        if (object == this) {
+            return true;
+        }
+        if (object == null || getClass() != object.getClass()) {
+            return false;
+        }
+        ScaledProcessingPattern other = (ScaledProcessingPattern) object;
+        return operationsPerPush == other.operationsPerPush
                 && original.equals(other.original);
     }
 
@@ -100,7 +108,7 @@ public final class ScaledProcessingPattern implements IPatternDetails {
 
     @Override
     public String toString() {
-        return "ScaledProcessingPattern[operationsPerPush=" + operationsPerPush
+        return getClass().getSimpleName() + "[operationsPerPush=" + operationsPerPush
                 + ", original=" + original + ']';
     }
 

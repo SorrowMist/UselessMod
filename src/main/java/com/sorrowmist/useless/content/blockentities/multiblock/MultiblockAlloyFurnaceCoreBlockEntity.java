@@ -15,6 +15,7 @@ import appeng.api.stacks.AEKey;
 import appeng.api.stacks.GenericStack;
 import appeng.api.stacks.KeyCounter;
 import appeng.api.storage.MEStorage;
+import appeng.blockentity.crafting.IMolecularAssemblerSupportedPattern;
 import com.sorrowmist.useless.api.enums.RedstoneControlMode;
 import com.sorrowmist.useless.compat.AppFluxCompat;
 import com.sorrowmist.useless.content.blocks.multiblock.MultiblockAlloyFurnaceCoreBlock;
@@ -25,6 +26,7 @@ import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.Advance
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.AlloyFurnaceAeHost;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.CraftingTaskContext;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.OmniversalPatternDetails;
+import com.sorrowmist.useless.compat.neoecoae.NeoEcoDynamicOutputCompat;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.SmartDoublingPatterns;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.catalyst.ResolvedCatalystEffect;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.parallel.AlloyFurnaceParallelCalculator;
@@ -47,6 +49,7 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
+import net.neoforged.fml.ModList;
 import net.minecraft.world.MenuProvider;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
@@ -152,6 +155,9 @@ public final class MultiblockAlloyFurnaceCoreBlockEntity extends BlockEntity imp
             progressed = aeManager.tickAETasks();
             aeManager.tickUnreturnedInputs();
         }
+        // 合成样板的产物必须在 AE2 记录完本批预期产物之后才能回网，所以不受上面的开关影响：
+        // 即使任务执行被关闭，已经装配好的产物也必须继续投递。
+        aeManager.tickQueuedCraftingOutputs();
         PassiveCraftingHatchBlockEntity passiveHatch = getPassiveHatch();
         if (passiveHatch != null) {
             progressed |= passiveHatch.serverTickFromController(this);
@@ -403,6 +409,11 @@ public final class MultiblockAlloyFurnaceCoreBlockEntity extends BlockEntity imp
         return formed ? OmniversalCoilStats.forTier(coilTier).singleTaskParallel() : 1;
     }
 
+    @Override
+    public long getCraftingPatternCapacity() {
+        return Math.max(1L, getPassiveCraftingMaxParallel());
+    }
+
     public boolean isPatternAssemblyLinked(BlockPos pos, long generation) {
         return formed && patternAssemblyPos != null && patternAssemblyPos.equals(pos)
                 && structureGeneration == generation;
@@ -452,8 +463,18 @@ public final class MultiblockAlloyFurnaceCoreBlockEntity extends BlockEntity imp
     }
 
     @Override
+    public @Nullable IGrid getAeGrid() {
+        MePatternAssemblyBlockEntity assembly = getAssembly();
+        return assembly == null ? null : assembly.getMainNode().getGrid();
+    }
+
+    @Override
     public int getMaxAETaskCount() {
         return formed ? OmniversalCoilStats.forTier(coilTier).threads() : 0;
+    }
+
+    public int getRemainingAETaskCount(boolean craftingPattern) {
+        return aeManager.getRemainingAETaskCount(craftingPattern);
     }
 
     @Override
@@ -474,7 +495,10 @@ public final class MultiblockAlloyFurnaceCoreBlockEntity extends BlockEntity imp
 
     @Override
     public boolean acceptsPattern(IPatternDetails pattern) {
-        return SmartDoublingPatterns.unwrap(pattern) instanceof OmniversalPatternDetails;
+        IPatternDetails original = SmartDoublingPatterns.unwrap(pattern);
+        // 万象样板交给合金炉加工；AE2 合成样板由样板总成在虚拟工作台上自执行。
+        return original instanceof OmniversalPatternDetails
+                || original instanceof IMolecularAssemblerSupportedPattern;
     }
 
     @Override
@@ -626,8 +650,13 @@ public final class MultiblockAlloyFurnaceCoreBlockEntity extends BlockEntity imp
     public long tryOutputKeyToAE(AEKey key, long amount) {
         if (key == null || amount <= 0) return 0L;
         AeNetworkAccess access = getAeNetworkAccess();
-        return access == null ? 0L
-                : access.storage().insert(key, amount, Actionable.MODULATE, access.source());
+        if (access == null) return 0L;
+        long claimed = ModList.get().isLoaded("neoecoae")
+                ? NeoEcoDynamicOutputCompat.claim(getAeGrid(), key, amount) : 0L;
+        long remaining = amount - Math.min(amount, claimed);
+        if (remaining <= 0L) return amount;
+        return Math.min(amount, claimed)
+                + access.storage().insert(key, remaining, Actionable.MODULATE, access.source());
     }
 
     @Nullable

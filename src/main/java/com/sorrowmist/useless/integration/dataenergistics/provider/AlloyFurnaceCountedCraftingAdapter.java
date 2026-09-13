@@ -5,6 +5,7 @@ import appeng.api.networking.crafting.ICraftingProvider;
 import appeng.api.stacks.AEKey;
 import appeng.api.stacks.GenericStack;
 import appeng.api.stacks.KeyCounter;
+import appeng.blockentity.crafting.IMolecularAssemblerSupportedPattern;
 import com.fish_dan_.data_energistics.api.crafting.dispatch.CountedCraftingAdmission;
 import com.fish_dan_.data_energistics.api.crafting.dispatch.CountedCraftingCapacity;
 import com.fish_dan_.data_energistics.api.crafting.dispatch.CountedCraftingProviderAdapter;
@@ -16,7 +17,6 @@ import com.sorrowmist.useless.content.blockentities.multiblock.MePatternAssembly
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.CraftingTaskContext;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.DynamicComponentPattern;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.OmniversalPatternDetails;
-import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.ScaledProcessingPattern;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.SmartDoublingPatterns;
 import com.sorrowmist.useless.content.recipe.AdvancedAlloyFurnaceRecipe;
 import it.unimi.dsi.fastutil.objects.Object2ObjectLinkedOpenHashMap;
@@ -30,6 +30,7 @@ import java.util.List;
 import java.util.OptionalLong;
 import java.util.function.BooleanSupplier;
 import java.util.function.Supplier;
+import java.util.function.ToIntFunction;
 
 /**
  * Bridges one alloy-furnace AE provider to Data Energistics counted Trinity dispatch.
@@ -42,23 +43,26 @@ final class AlloyFurnaceCountedCraftingAdapter implements CountedCraftingProvide
     private final BooleanSupplier online;
     private final CountedCraftingTarget target;
     private final Supplier<@Nullable CraftingTaskContext> taskContext;
+    private final ToIntFunction<Boolean> remainingThreads;
 
     AlloyFurnaceCountedCraftingAdapter(
             @NotNull ICraftingProvider provider,
             @NotNull BooleanSupplier online,
             @NotNull CountedCraftingTarget target) {
-        this(provider, online, target, () -> null);
+        this(provider, online, target, () -> null, ignored -> Integer.MAX_VALUE);
     }
 
     AlloyFurnaceCountedCraftingAdapter(
             @NotNull ICraftingProvider provider,
             @NotNull BooleanSupplier online,
             @NotNull CountedCraftingTarget target,
-            @NotNull Supplier<@Nullable CraftingTaskContext> taskContext) {
+            @NotNull Supplier<@Nullable CraftingTaskContext> taskContext,
+            @NotNull ToIntFunction<Boolean> remainingThreads) {
         this.provider = provider;
         this.online = online;
         this.target = target;
         this.taskContext = taskContext;
+        this.remainingThreads = remainingThreads;
     }
 
     /** Creates the live adapter used by one standalone advanced alloy furnace. */
@@ -69,7 +73,8 @@ final class AlloyFurnaceCountedCraftingAdapter implements CountedCraftingProvide
                 provider,
                 () -> isAdvancedAlloyFurnaceOnline(provider),
                 targetFor(identity),
-                () -> provider);
+                () -> provider,
+                provider::getRemainingAETaskCount);
     }
 
     /** Creates the live adapter used by one ME pattern assembly and its linked multiblock controller. */
@@ -80,7 +85,11 @@ final class AlloyFurnaceCountedCraftingAdapter implements CountedCraftingProvide
                 provider,
                 () -> isMePatternAssemblyOnline(provider),
                 targetFor(identity),
-                provider::getController);
+                provider::getController,
+                craftingPattern -> {
+                    var controller = provider.getController();
+                    return controller == null ? 0 : controller.getRemainingAETaskCount(craftingPattern);
+                });
     }
 
     @Override
@@ -92,15 +101,15 @@ final class AlloyFurnaceCountedCraftingAdapter implements CountedCraftingProvide
     @Override
     public @NotNull List<@NotNull CountedCraftingCapacity> captureCapacity(
             @NotNull IPatternDetails patternDetails, KeyCounter @NotNull [] prototype, long requestedCount) {
-        long acceptedCount = availableCount(patternDetails, prototype, requestedCount);
-        if (acceptedCount == 0L) {
+        AvailableCapacity capacity = availableCapacity(patternDetails, prototype, requestedCount);
+        if (capacity.logicalCrafts() == 0L) {
             return List.of();
         }
         return List.of(new CountedCraftingCapacity(
                 target,
                 CountedCraftingRoutingMode.TARGETED,
-                OptionalLong.of(acceptedCount),
-                OptionalLong.of(acceptedCount)));
+                OptionalLong.of(capacity.logicalCrafts()),
+                OptionalLong.of(capacity.maximumSingleBatch())));
     }
 
     @Override
@@ -172,29 +181,70 @@ final class AlloyFurnaceCountedCraftingAdapter implements CountedCraftingProvide
             @NotNull IPatternDetails patternDetails,
             KeyCounter @NotNull [] prototype,
             long requestedCount) {
+        return availableCapacity(patternDetails, prototype, requestedCount).logicalCrafts();
+    }
+
+    private AvailableCapacity availableCapacity(
+            @NotNull IPatternDetails patternDetails,
+            KeyCounter @NotNull [] prototype,
+            long requestedCount) {
         validateRequestedCount(requestedCount);
         if (!online.getAsBoolean()) {
-            return 0L;
+            return AvailableCapacity.EMPTY;
         }
         IPatternDetails original = SmartDoublingPatterns.unwrap(patternDetails);
         if (!provider.getAvailablePatterns().contains(original)) {
-            return 0L;
+            return AvailableCapacity.EMPTY;
         }
-        return maximumRecipeBatchCount(
+        long arithmeticMaximum = maximumBatchCount(
                 patternDetails,
                 prototype,
-                maximumBatchCount(patternDetails, prototype, requestedCount));
+                requestedCount);
+        CapacityLimits limits = maximumRecipeBatchCount(patternDetails, prototype, arithmeticMaximum);
+        if (limits.logicalMaximum() == 0L) {
+            return AvailableCapacity.EMPTY;
+        }
+
+        IPatternDetails executionPattern = SmartDoublingPatterns.unwrap(patternDetails);
+        boolean craftingPattern = executionPattern instanceof IMolecularAssemblerSupportedPattern;
+        int availableThreads = Math.max(0, this.remainingThreads.applyAsInt(craftingPattern));
+        if (craftingPattern) {
+            CraftingTaskContext context = this.taskContext.get();
+            long perThreadCapacity = context == null
+                    ? 1L : Math.max(1L, context.getCraftingPatternCapacity());
+            long aggregateCapacity = saturatingMultiply(perThreadCapacity, availableThreads);
+            long logicalCrafts = Math.min(limits.logicalMaximum(), aggregateCapacity);
+            long maximumSingleBatch = logicalCrafts;
+            return logicalCrafts == 0L || maximumSingleBatch == 0L
+                    ? AvailableCapacity.EMPTY
+                    : new AvailableCapacity(logicalCrafts, maximumSingleBatch);
+        }
+        if (limits.singleThreadMaximum() == 0L) {
+            return AvailableCapacity.EMPTY;
+        }
+        long aggregateMaximum = saturatingMultiply(limits.singleThreadMaximum(), availableThreads);
+        long logicalCrafts = Math.min(limits.logicalMaximum(), aggregateMaximum);
+        long maximumSingleBatch = Math.min(limits.logicalMaximum(), limits.singleThreadMaximum());
+        return logicalCrafts == 0L || maximumSingleBatch == 0L
+                ? AvailableCapacity.EMPTY
+                : new AvailableCapacity(logicalCrafts, maximumSingleBatch);
     }
 
-    private long maximumRecipeBatchCount(
+    private CapacityLimits maximumRecipeBatchCount(
             IPatternDetails patternDetails,
             KeyCounter[] prototype,
             long arithmeticMaximum) {
         CraftingTaskContext context = this.taskContext.get();
-        if (context == null || arithmeticMaximum == 0L) {
-            return arithmeticMaximum;
+        if (arithmeticMaximum == 0L) {
+            return CapacityLimits.EMPTY;
         }
         SmartDoublingPatterns.Resolved execution = SmartDoublingPatterns.resolve(patternDetails);
+        if (execution.pattern() instanceof IMolecularAssemblerSupportedPattern) {
+            return new CapacityLimits(arithmeticMaximum, arithmeticMaximum);
+        }
+        if (context == null) {
+            return new CapacityLimits(arithmeticMaximum, arithmeticMaximum);
+        }
         AdvancedAlloyFurnaceRecipe recipe = context.resolveTaskRecipe(
                 patternDetails,
                 List.of(),
@@ -202,41 +252,51 @@ final class AlloyFurnaceCountedCraftingAdapter implements CountedCraftingProvide
                 compactInputs(prototype),
                 execution.operationsPerPush());
         if (recipe == null) {
-            return 0L;
+            return CapacityLimits.EMPTY;
         }
 
         long manualOperations = SmartDoublingPatterns.manualOperationsPerPattern(
                 recipe, execution.pattern());
         if (manualOperations == 0L) {
-            return 0L;
+            return CapacityLimits.EMPTY;
         }
         BigInteger wrapperOperations = BigInteger.valueOf(execution.operationsPerPush());
         BigInteger operations = wrapperOperations
                 .multiply(BigInteger.valueOf(manualOperations));
+        long maximum;
         if (usesRecipeOutputs(execution.pattern())) {
             Object2ObjectLinkedOpenHashMap<AEKey, BigInteger> outputs = new Object2ObjectLinkedOpenHashMap<>();
             recipe.outputs().forEach(output -> mergeOutput(outputs, GenericStack.fromItemStack(output)));
             recipe.outputFluids().forEach(output -> mergeOutput(outputs, GenericStack.fromFluidStack(output)));
             recipe.keyOutputs().forEach(output -> mergeOutput(outputs, output));
-            return limitByOutputs(arithmeticMaximum, outputs, operations);
-        }
-
-        Object2ObjectLinkedOpenHashMap<AEKey, BigInteger> declaredOutputs = new Object2ObjectLinkedOpenHashMap<>();
-        execution.pattern().getOutputs().forEach(output -> mergeOutput(declaredOutputs, output));
-        long maximum = limitByOutputs(arithmeticMaximum, declaredOutputs, wrapperOperations);
-        if (maximum == 0L) {
-            return 0L;
-        }
-
-        Object2ObjectLinkedOpenHashMap<AEKey, BigInteger> hiddenOutputs = new Object2ObjectLinkedOpenHashMap<>();
-        for (GenericStack output : recipe.keyOutputs()) {
-            boolean declared = execution.pattern().getOutputs().stream()
-                    .anyMatch(patternOutput -> output.what().equals(patternOutput.what()));
-            if (!declared) {
-                mergeOutput(hiddenOutputs, output);
+            maximum = limitByOutputs(arithmeticMaximum, outputs, operations);
+        } else {
+            Object2ObjectLinkedOpenHashMap<AEKey, BigInteger> declaredOutputs = new Object2ObjectLinkedOpenHashMap<>();
+            execution.pattern().getOutputs().forEach(output -> mergeOutput(declaredOutputs, output));
+            maximum = limitByOutputs(arithmeticMaximum, declaredOutputs, wrapperOperations);
+            if (maximum == 0L) {
+                return CapacityLimits.EMPTY;
             }
+
+            Object2ObjectLinkedOpenHashMap<AEKey, BigInteger> hiddenOutputs = new Object2ObjectLinkedOpenHashMap<>();
+            for (GenericStack output : recipe.keyOutputs()) {
+                boolean declared = execution.pattern().getOutputs().stream()
+                        .anyMatch(patternOutput -> output.what().equals(patternOutput.what()));
+                if (!declared) {
+                    mergeOutput(hiddenOutputs, output);
+                }
+            }
+            maximum = limitByOutputs(maximum, hiddenOutputs, operations);
         }
-        return limitByOutputs(maximum, hiddenOutputs, operations);
+
+        if (maximum == 0L) {
+            return CapacityLimits.EMPTY;
+        }
+        long parallel = Math.max(1L, context.getTaskParallel(recipe, context.resolveTaskEffect(recipe)));
+        long singleThreadMaximum = divideByBigInteger(parallel, operations);
+        return singleThreadMaximum == 0L
+                ? CapacityLimits.EMPTY
+                : new CapacityLimits(maximum, singleThreadMaximum);
     }
 
     private static long limitByOutputs(
@@ -298,7 +358,9 @@ final class AlloyFurnaceCountedCraftingAdapter implements CountedCraftingProvide
         if (availableCount(patternDetails, prototype, count) < count) {
             return false;
         }
-        ScaledProcessingPattern scaledPattern = new ScaledProcessingPattern(patternDetails, count);
+        // 统一走 SmartDoublingPatterns.scale：合成样板必须保留 IMolecularAssemblerSupportedPattern 身份，
+        // 否则接收方会把它当成处理样板去查合金炉配方。
+        IPatternDetails scaledPattern = SmartDoublingPatterns.scale(patternDetails, count);
         KeyCounter[] scaledPrototype = scalePrototype(prototype, count);
         return provider.pushPattern(scaledPattern, scaledPrototype);
     }
@@ -329,6 +391,30 @@ final class AlloyFurnaceCountedCraftingAdapter implements CountedCraftingProvide
         if (requestedCount <= 0L) {
             throw new IllegalArgumentException("Requested counted crafting amount must be positive");
         }
+    }
+
+    private static long saturatingMultiply(long left, int right) {
+        if (left <= 0L || right <= 0) {
+            return 0L;
+        }
+        return left > Long.MAX_VALUE / right ? Long.MAX_VALUE : left * right;
+    }
+
+    private static long divideByBigInteger(long dividend, BigInteger divisor) {
+        if (dividend <= 0L || divisor.signum() <= 0) {
+            return 0L;
+        }
+        BigInteger result = BigInteger.valueOf(dividend).divide(divisor);
+        return result.compareTo(BigInteger.valueOf(Long.MAX_VALUE)) >= 0
+                ? Long.MAX_VALUE : result.longValueExact();
+    }
+
+    private record CapacityLimits(long logicalMaximum, long singleThreadMaximum) {
+        private static final CapacityLimits EMPTY = new CapacityLimits(0L, 0L);
+    }
+
+    private record AvailableCapacity(long logicalCrafts, long maximumSingleBatch) {
+        private static final AvailableCapacity EMPTY = new AvailableCapacity(0L, 0L);
     }
 
     /** One-shot admission that owns only temporary dispatch references until it is committed. */

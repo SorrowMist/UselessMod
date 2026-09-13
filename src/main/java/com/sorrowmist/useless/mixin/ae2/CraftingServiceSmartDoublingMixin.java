@@ -4,7 +4,7 @@ import appeng.api.crafting.IPatternDetails;
 import appeng.api.networking.crafting.ICraftingPlan;
 import appeng.api.networking.crafting.ICraftingProvider;
 import appeng.me.service.CraftingService;
-import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.ScaledProcessingPattern;
+import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.ScaledPattern;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.SmartDoublingPlanner;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.SmartDoublingPlans;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.SmartDoublingPatterns;
@@ -25,7 +25,7 @@ public abstract class CraftingServiceSmartDoublingMixin {
     @Inject(method = "getProviders", at = @At("HEAD"), cancellable = true)
     private void uselessMod$getSmartDoublingProviders(
             IPatternDetails pattern, CallbackInfoReturnable<Iterable<ICraftingProvider>> callback) {
-        if (!(pattern instanceof ScaledProcessingPattern)) {
+        if (!(pattern instanceof ScaledPattern)) {
             return;
         }
 

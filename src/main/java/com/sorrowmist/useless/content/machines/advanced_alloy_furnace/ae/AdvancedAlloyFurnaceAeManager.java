@@ -7,6 +7,9 @@ import appeng.api.stacks.AEItemKey;
 import appeng.api.stacks.AEKey;
 import appeng.api.stacks.GenericStack;
 import appeng.api.stacks.KeyCounter;
+import appeng.blockentity.crafting.IMolecularAssemblerSupportedPattern;
+import appeng.crafting.CraftingEvent;
+import appeng.menu.AutoCraftingMenu;
 import com.mojang.logging.LogUtils;
 import com.sorrowmist.useless.core.config.ConfigManager;
 import com.sorrowmist.useless.network.AETaskProgressPacket;
@@ -16,12 +19,15 @@ import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.io.Furnace
 import it.unimi.dsi.fastutil.objects.Object2LongMap;
 import it.unimi.dsi.fastutil.objects.Object2LongOpenHashMap;
 import net.minecraft.core.HolderLookup;
+import net.minecraft.core.NonNullList;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.inventory.TransientCraftingContainer;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.crafting.CraftingInput;
 import net.minecraft.world.level.Level;
 import net.neoforged.neoforge.network.PacketDistributor;
 import org.jetbrains.annotations.Nullable;
@@ -46,6 +52,19 @@ import org.slf4j.Logger;
 public final class AdvancedAlloyFurnaceAeManager {
     private static final Logger LOGGER = LogUtils.getLogger();
     private static final int UNRETURNED_RETRY_TICKS = 20;
+    /**
+     * 合成样板的虚拟工作台格数。注意 AE2 传给供应器的输入计数器是<b>压缩后</b>的
+     * （相同原料会并成一个输入位），长度不固定，网格才是固定 9 格。
+     */
+    private static final int CRAFTING_GRID_SIZE = 9;
+    /**
+     * 一个倍率批次里最多真实装配多少次。
+     *
+     * <p>正常配方第一次铺料后材料就是整齐的重复，一次即可折叠整批；只有一批里混着不同变体
+     * （例如耐久各异的工具）才会多试几次，试到剩下的材料重新变整齐为止。这个上限只用于兜底
+     * 病态输入，防止主线程被拖住。</p>
+     */
+    private static final int MAX_CRAFTING_PROBES = 64;
 
     /**
      * 批次成熟窗口（tick）：把 AE 的连续推送合并成一个任务，避免每次推送都单独开工。
@@ -70,6 +89,15 @@ public final class AdvancedAlloyFurnaceAeManager {
     // 返还失败的输入暂存（防丢失），逐 tick 重试写回 AE 网络；仅服务端主线程访问
     private final List<GenericStack> unreturnedInputs = new ArrayList<>();
     private final List<GenericStack> unreturnedOutputs = new ArrayList<>();
+    /**
+     * 合成样板自执行的产物队列。
+     *
+     * <p>合成样板由本机在虚拟 3×3 工作台上装配（万象合金炉没有合成台）。AE2 只在
+     * {@code pushPattern} 返回 true 之后才把本批的预期产物写入 CPU 的 {@code waitingFor}，
+     * 所以产物必须至少延后一个 tick 再注入网络，否则会被写进通用存储、绕过当前合成任务，
+     * 表现为任务永久等待 + 产物翻倍。</p>
+     */
+    private final List<PendingCraftingOutput> queuedCraftingOutputs = new ArrayList<>();
     private int unreturnedInputRetryTimer = 0;
     private int unreturnedOutputRetryTimer = 0;
     private int patternPriority = 0;
@@ -110,6 +138,10 @@ public final class AdvancedAlloyFurnaceAeManager {
             this.aePendingBatches.clear();
         }
         CraftingTask.returnInputsToAE(pendingInputs, this.owner);
+
+        // 合成样板的产物是已经装配完成的实物，AE 任务取消后必须写回网络，否则材料凭空消失。
+        // 写不进去的部分留在队列里（随 NBT 持久化），等后续 tick 或重载后继续重试。
+        this.flushQueuedCraftingOutputs(true);
 
         this.owner.markChanged();
         // 全部清空后主动同步一次，否则客户端会残留已取消的排队任务
@@ -284,6 +316,19 @@ public final class AdvancedAlloyFurnaceAeManager {
             unreturnedOutputsTag.add(GenericStack.writeTag(registries, gs));
         }
         tag.put("UnreturnedOutputs", unreturnedOutputsTag);
+
+        ListTag craftingOutputsTag = new ListTag();
+        for (PendingCraftingOutput pending : this.queuedCraftingOutputs) {
+            ListTag outputTag = new ListTag();
+            for (GenericStack gs : pending.outputs) {
+                outputTag.add(GenericStack.writeTag(registries, gs));
+            }
+            CompoundTag entry = new CompoundTag();
+            entry.putLong("QueuedTick", pending.queuedTick);
+            entry.put("Outputs", outputTag);
+            craftingOutputsTag.add(entry);
+        }
+        tag.put("QueuedCraftingOutputs", craftingOutputsTag);
         tag.putInt("NextTaskId", this.nextTaskId);
     }
 
@@ -292,6 +337,7 @@ public final class AdvancedAlloyFurnaceAeManager {
                 || !this.aePendingBatches.isEmpty()
                 || !this.unreturnedInputs.isEmpty()
                 || !this.unreturnedOutputs.isEmpty()
+                || !this.queuedCraftingOutputs.isEmpty()
                 || this.deferredTasksTag != null;
     }
 
@@ -379,6 +425,25 @@ public final class AdvancedAlloyFurnaceAeManager {
             }
         }
         this.unreturnedOutputs.addAll(unreturnedOutputAmounts.segments());
+
+        ListTag craftingOutputsTag = tag.getList("QueuedCraftingOutputs", Tag.TAG_COMPOUND);
+        for (int i = 0; i < craftingOutputsTag.size(); i++) {
+            CompoundTag entry = craftingOutputsTag.getCompound(i);
+            ListTag outputTag = entry.getList("Outputs", Tag.TAG_COMPOUND);
+            CraftingAeAmountAccumulator amounts = new CraftingAeAmountAccumulator();
+            for (int j = 0; j < outputTag.size(); j++) {
+                GenericStack gs = GenericStack.readTag(registries, outputTag.getCompound(j));
+                if (gs != null && gs.amount() > 0L) {
+                    amounts.add(gs);
+                }
+            }
+            List<GenericStack> outputs = amounts.segments();
+            if (!outputs.isEmpty()) {
+                // 重载后重新计时：这批产物尚未回网，必须再等至少一个 tick 才能注入
+                this.queuedCraftingOutputs.add(new PendingCraftingOutput(
+                        level.getGameTime(), outputs));
+            }
+        }
     }
 
     private void returnSavedBatchMaterials(CompoundTag tag, HolderLookup.Provider registries) {
@@ -476,6 +541,12 @@ public final class AdvancedAlloyFurnaceAeManager {
             return false;
         }
 
+        // AE2 合成样板：万象合金炉没有合成台，由本机在虚拟 3×3 工作台上自执行。
+        // 倍率来自推送方：AE2 会把样板包装成“一次推送代表 N 次合成”，此时输入与预期产物都已按 N 放大。
+        if (original instanceof IMolecularAssemblerSupportedPattern craftingPattern) {
+            return this.pushCraftingPattern(craftingPattern, execution.operationsPerPush(), inputHolder);
+        }
+
         synchronized (this.aePendingBatches) {
             PendingAEBatch batch = this.findOrCreateBatch(
                     original, execution.operationsPerPush(), inputHolder);
@@ -486,7 +557,332 @@ public final class AdvancedAlloyFurnaceAeManager {
     }
 
     public boolean isBusy() {
-        return this.activeTasks.size() >= this.owner.getMaxAETaskCount();
+        return this.activeTasks.size() >= this.owner.getMaxAETaskCount()
+                || this.queuedCraftingOutputs.size() >= this.owner.getMaxAETaskCount();
+    }
+
+    /**
+     * Returns the number of provider slots that can accept another physical AE submission.
+     * Processing patterns use active furnace tasks. Crafting patterns finish synchronously;
+     * their queue only provides bounded output backpressure.
+     */
+    public int getRemainingAETaskCount(boolean craftingPattern) {
+        int maximum = Math.max(0, this.owner.getMaxAETaskCount());
+        if (craftingPattern) {
+            return this.queuedCraftingOutputs.size() >= maximum ? 0 : maximum;
+        }
+        int occupied = Math.max(0, this.activeAETaskCount.get());
+        return Math.max(0, maximum - Math.min(maximum, occupied));
+    }
+
+    // ==================== 合成样板自执行 ====================
+
+    /**
+     * 在虚拟 3×3 工作台上装配合成样板，并把产物交给延迟回网队列。
+     *
+     * <p>检验与铺料都在输入副本上进行：任何一步失败都直接返回 {@code false}，
+     * AE2 抽出的原材料保持原样，由上层继续寻找其它供应器或重试。</p>
+     *
+     * <p>倍率 N &gt; 1 时按「可重复的一份」折叠：铺一份料后，如果剩下的材料逐键都恰好是这一份消耗量的
+     * (N-1) 倍（模具、可复用催化剂这类同键返还同样适用），说明整批的每一份输入完全一样，
+     * 于是只装配一次、把产物与返还款整体放大 N 倍。一批里混着不同变体（例如耐久各异的工具）时这条
+     * 不变量先不成立，此时就真实地一份一份装配，直到剩下的材料再次变成整齐的重复 ——
+     * 这样连混合变体也能得到与逐份装配一致的结果。探针次数有上限，真撞上病态输入时
+     * 按最近一份的产出整体放大，语义与批量合并保持一致。</p>
+     *
+     * @param operationsPerPush 本次推送代表的合成次数，恒为正
+     */
+    private boolean pushCraftingPattern(IMolecularAssemblerSupportedPattern pattern, long operationsPerPush,
+                                        KeyCounter[] inputHolder) {
+        Level level = this.owner.getLevel();
+        if (level == null || level.isClientSide || !this.owner.isTaskExecutionEnabled()) {
+            return false;
+        }
+        if (inputHolder == null) {
+            return false;
+        }
+        // 背压：上一批产物还没能写回网络时不再接收新批次，避免材料滞留在队列里。
+        int taskLimit = this.owner.getMaxAETaskCount();
+        if (this.queuedCraftingOutputs.size() >= taskLimit) {
+            return false;
+        }
+
+        KeyCounter[] working = copyCounters(inputHolder);
+        List<GenericStack> produced = new ArrayList<>();
+        List<GenericStack> lastUnitOutputs = null;
+        long craftsLeft = Math.max(1L, operationsPerPush);
+        int probes = 0;
+
+        while (craftsLeft > 0L && probes < MAX_CRAFTING_PROBES) {
+            probes++;
+            Object2LongMap<AEKey> before = snapshotAmounts(working);
+            List<ItemStack> grid = emptyCraftingGrid();
+            pattern.fillCraftingGrid(working, (slot, stack) -> {
+                if (slot >= 0 && slot < CRAFTING_GRID_SIZE) {
+                    grid.set(slot, stack);
+                }
+            });
+
+            long repeat = 1L;
+            if (matchesBatchShape(before, working, craftsLeft)) {
+                // 整批材料都是这一份的整齐重复，可以一次算完
+                repeat = craftsLeft;
+                craftsLeft = 0L;
+                clearCounters(working);
+            } else {
+                craftsLeft--;
+            }
+
+            List<GenericStack> unitOutputs = assembleCraftingPattern(pattern, grid, level);
+            if (unitOutputs == null) {
+                return false;
+            }
+            lastUnitOutputs = unitOutputs;
+            addScaled(produced, unitOutputs, repeat);
+        }
+
+        if (craftsLeft > 0L) {
+            // 探针预算耗尽：按最近一份的产出整体放大（兜底语义与三位一体式批量一致）
+            if (lastUnitOutputs == null) {
+                return false;
+            }
+            addScaled(produced, lastUnitOutputs, craftsLeft);
+        }
+        if (produced.isEmpty()) {
+            return false;
+        }
+
+        // 走到这里才算接收：AE2 随后会把本批预期产物写入 CPU 的 waitingFor。
+        for (KeyCounter counter : inputHolder) {
+            counter.clear();
+        }
+        this.queuedCraftingOutputs.add(new PendingCraftingOutput(
+                level.getGameTime(), produced));
+        this.owner.markChanged();
+        return true;
+    }
+
+    /**
+     * 判断铺完一份之后，剩下的材料是否正好是这一份消耗量的 (craftsLeft - 1) 倍 —— 逐键比对。
+     *
+     * <p>成立时整批的每一份输入完全相同（含同键返还的模具与催化剂），所以「装配一次再整体 ×N」
+     * 与真的装配 N 次结果一致。只要有一个键的剩余量对不上（例如一批里混着不同耐久的工具），
+     * 就返回 {@code false}，交由调用方继续逐份装配。</p>
+     */
+    private static boolean matchesBatchShape(Object2LongMap<AEKey> before, KeyCounter[] after, long craftsLeft) {
+        Object2LongMap<AEKey> remaining = snapshotAmounts(after);
+        long previousCrafts = craftsLeft - 1L;
+        for (var entry : before.object2LongEntrySet()) {
+            long left = remaining.getLong(entry.getKey());
+            long consumed = entry.getLongValue() - left;
+            if (consumed <= 0L) {
+                return false;
+            }
+            long expected;
+            try {
+                expected = Math.multiplyExact(consumed, previousCrafts);
+            } catch (ArithmeticException exception) {
+                return false;
+            }
+            if (left != expected) {
+                return false;
+            }
+        }
+        return remaining.isEmpty();
+    }
+
+    /**
+     * 装配一份，返回「主产物 + 容器余料」。
+     *
+     * <p>与 AE2 分子装配室的装配流程保持一致：用工作台自身的定位输入裁掉空白边距，
+     * 先触发合成事件再取余料。异常或空产物都返回 {@code null}，调用方据此放弃本次接管。</p>
+     */
+    @Nullable
+    private List<GenericStack> assembleCraftingPattern(IMolecularAssemblerSupportedPattern pattern,
+                                                       List<ItemStack> grid, Level level) {
+        TransientCraftingContainer container = new TransientCraftingContainer(new AutoCraftingMenu(), 3, 3);
+        for (int slot = 0; slot < CRAFTING_GRID_SIZE; slot++) {
+            container.setItem(slot, grid.get(slot).copy());
+        }
+        CraftingInput craftingInput = container.asPositionedCraftInput().input();
+
+        ItemStack output;
+        NonNullList<ItemStack> remainders;
+        try {
+            output = pattern.assemble(craftingInput, level);
+            if (output.isEmpty()) {
+                return null;
+            }
+            output.onCraftedBySystem(level);
+            CraftingEvent.fireAutoCraftingEvent(level, pattern, output, container);
+            remainders = pattern.getRemainingItems(craftingInput);
+        } catch (RuntimeException exception) {
+            LOGGER.warn("Failed to self-assemble a crafting pattern at {}", this.owner.getBlockPos(), exception);
+            return null;
+        }
+
+        List<GenericStack> unitOutputs = new ArrayList<>(remainders.size() + 1);
+        collectProduced(unitOutputs, output, 1L);
+        for (ItemStack remainder : remainders) {
+            collectProduced(unitOutputs, remainder, 1L);
+        }
+        return unitOutputs.isEmpty() ? null : unitOutputs;
+    }
+
+    private static List<ItemStack> emptyCraftingGrid() {
+        List<ItemStack> grid = new ArrayList<>(CRAFTING_GRID_SIZE);
+        for (int slot = 0; slot < CRAFTING_GRID_SIZE; slot++) {
+            grid.add(ItemStack.EMPTY);
+        }
+        return grid;
+    }
+
+    private static void clearCounters(KeyCounter[] counters) {
+        for (KeyCounter counter : counters) {
+            if (counter != null) {
+                counter.clear();
+            }
+        }
+    }
+
+    /** 把一组输入计数器按 AE 键汇总；键仍保留各自的变体身份。 */
+    private static Object2LongMap<AEKey> snapshotAmounts(KeyCounter[] counters) {
+        Object2LongOpenHashMap<AEKey> amounts = new Object2LongOpenHashMap<>();
+        for (KeyCounter counter : counters) {
+            if (counter == null) {
+                continue;
+            }
+            for (var entry : counter) {
+                if (entry.getKey() == null || entry.getLongValue() <= 0L) {
+                    continue;
+                }
+                long existing = amounts.getLong(entry.getKey());
+                amounts.put(entry.getKey(), existing > Long.MAX_VALUE - entry.getLongValue()
+                        ? Long.MAX_VALUE : existing + entry.getLongValue());
+            }
+        }
+        return amounts;
+    }
+
+    /** 把一份装配的产物流按倍率并入队列。 */
+    private static void addScaled(List<GenericStack> target, List<GenericStack> unitOutputs, long multiplier) {
+        long scale = Math.max(1L, multiplier);
+        for (GenericStack unit : unitOutputs) {
+            long amount;
+            try {
+                amount = Math.multiplyExact(unit.amount(), scale);
+            } catch (ArithmeticException exception) {
+                // 倍率在包装阶段已过 maximumSafeMultiplier 校验，这里只做兜底：宁可少记也不写坏账
+                continue;
+            }
+            mergeProduced(target, unit.what(), amount);
+        }
+    }
+
+    /**
+     * 把已经装配完成、等待回网的合成样板产物写入 AE。
+     *
+     * <p>该方法只由方块实体 tick 调用；provider 的 push/commit 已在此之前返回，
+     * 所以不需要额外等待一个 tick。写不进去的部分留在队列里逐 tick 重试，
+     * 队列满时通过批次数背压新的合成提交，直到产物真正回网。</p>
+     */
+    public void tickQueuedCraftingOutputs() {
+        flushQueuedCraftingOutputs(false);
+    }
+
+    /**
+     * @param force true 时忽略“必须晚一个 tick”的保护（只用于取消/拆除任务：此时 CPU 已放弃这批产物，
+     *              产物落进通用存储也不会被错认，但绝不能丢）
+     */
+    private void flushQueuedCraftingOutputs(boolean force) {
+        if (this.queuedCraftingOutputs.isEmpty()) {
+            return;
+        }
+        Level level = this.owner.getLevel();
+        if (level == null || level.isClientSide) {
+            return;
+        }
+        long now = level.getGameTime();
+        boolean changed = false;
+        var iterator = this.queuedCraftingOutputs.iterator();
+        while (iterator.hasNext()) {
+            PendingCraftingOutput pending = iterator.next();
+            if (!force && pending.queuedTick >= now) {
+                continue;
+            }
+            List<GenericStack> remaining = new ArrayList<>(pending.outputs.size());
+            for (GenericStack stack : pending.outputs) {
+                long requested = stack.amount();
+                long inserted = clampInserted(this.owner.tryOutputKeyToAE(stack.what(), requested), requested);
+                long left = requested - inserted;
+                if (left > 0L) {
+                    remaining.add(new GenericStack(stack.what(), left));
+                }
+            }
+            changed = true;
+            if (remaining.isEmpty()) {
+                iterator.remove();
+            } else {
+                pending.replaceOutputs(remaining);
+            }
+        }
+        if (changed) {
+            this.owner.markChanged();
+        }
+    }
+
+    /**
+     * 复制 AE2 传入的输入计数器。
+     *
+     * <p>必须用 {@link KeyCounter#addAll}：它保留同一主键下的变体子表与迭代顺序，
+     * 直接遍历再 add 会丢掉这个结构，从而在可替代输入上挑到与 AE2 不同的那一种。</p>
+     */
+    private static KeyCounter[] copyCounters(KeyCounter[] source) {
+        KeyCounter[] copy = new KeyCounter[source.length];
+        for (int index = 0; index < source.length; index++) {
+            KeyCounter counter = new KeyCounter();
+            KeyCounter original = source[index];
+            if (original != null) {
+                counter.addAll(original);
+            }
+            copy[index] = counter;
+        }
+        return copy;
+    }
+
+    /**
+     * 把一次装配的单份产出按倍率累加进队列。单份产出乘倍率后可能远超单栈上限，
+     * 所以一律以 {@link GenericStack} 的 long 数量表达，不做物化。
+     */
+    private static void collectProduced(List<GenericStack> target, ItemStack stack, long multiplier) {
+        if (stack == null || stack.isEmpty() || stack.getCount() <= 0) {
+            return;
+        }
+        AEItemKey key = AEItemKey.of(stack);
+        if (key == null) {
+            return;
+        }
+        long amount;
+        try {
+            amount = Math.multiplyExact((long) stack.getCount(), Math.max(1L, multiplier));
+        } catch (ArithmeticException exception) {
+            // 倍率在包装阶段已经过 maximumSafeMultiplier 校验，这里只做兜底：宁可少记也不写坏账
+            return;
+        }
+        mergeProduced(target, key, amount);
+    }
+
+    private static void mergeProduced(List<GenericStack> target, AEKey key, long amount) {
+        for (int index = 0; index < target.size(); index++) {
+            GenericStack existing = target.get(index);
+            if (existing.what().equals(key)) {
+                long merged = existing.amount() > Long.MAX_VALUE - amount
+                        ? Long.MAX_VALUE : existing.amount() + amount;
+                target.set(index, new GenericStack(key, merged));
+                return;
+            }
+        }
+        target.add(new GenericStack(key, amount));
     }
 
     public boolean tickAETasks() {
@@ -536,7 +932,8 @@ public final class AdvancedAlloyFurnaceAeManager {
 
     public boolean hasWork() {
         if (!this.activeTasks.isEmpty() || this.deferredTasksTag != null
-                || !this.unreturnedInputs.isEmpty() || !this.unreturnedOutputs.isEmpty()) {
+                || !this.unreturnedInputs.isEmpty() || !this.unreturnedOutputs.isEmpty()
+                || !this.queuedCraftingOutputs.isEmpty()) {
             return true;
         }
         synchronized (this.aePendingBatches) {
@@ -1085,6 +1482,22 @@ public final class AdvancedAlloyFurnaceAeManager {
         public void updateCraftCount(long newCraftCount) {
             this.craftCount = newCraftCount;
             this.totalOutputCount = saturatingMultiply(newCraftCount, outputCount);
+        }
+    }
+
+    /** 一次合成样板自执行的产出（主产物 + 容器余料），等待在安全时机注入 AE 网络。 */
+    static final class PendingCraftingOutput {
+        final long queuedTick;
+        final List<GenericStack> outputs;
+
+        PendingCraftingOutput(long queuedTick, List<GenericStack> outputs) {
+            this.queuedTick = queuedTick;
+            this.outputs = new ArrayList<>(outputs);
+        }
+
+        void replaceOutputs(List<GenericStack> remaining) {
+            this.outputs.clear();
+            this.outputs.addAll(remaining);
         }
     }
 

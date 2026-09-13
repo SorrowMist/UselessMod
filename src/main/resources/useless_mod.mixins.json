@@ -26,8 +26,6 @@
     "advancedae.AdvancedCraftingCpuAccessor",
     "advancedae.CraftingCpuLogicMixin",
     "advancedae.ExecutingCraftingJobMixin",
-    "eco.EcoCraftingCpuAccessor",
-    "eco.CraftingCpuLogicMixin",
     "botanypots.AbstractBotanyPotBlockEntityAccessor",
     "botanypots.BotanyPotBlockEntityAccessor",
     "botanypots.BotanyPotBlockEntityMixin",

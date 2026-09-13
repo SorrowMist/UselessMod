@@ -17,7 +17,7 @@ import java.util.Optional;
 
 public final class OreGeneratorScreen extends AbstractContainerScreen<OreGeneratorMenu> {
     private static final int PANEL_WIDTH = 250;
-    private static final int PANEL_HEIGHT = 242;
+    private static final int PANEL_HEIGHT = 336;
 
     private EditBox rateField;
     private PressableAE2Button rateDown;
@@ -36,7 +36,7 @@ public final class OreGeneratorScreen extends AbstractContainerScreen<OreGenerat
         imageWidth = PANEL_WIDTH;
         imageHeight = PANEL_HEIGHT;
         inventoryLabelX = 44;
-        inventoryLabelY = 146;
+        inventoryLabelY = 242;
         titleLabelX = 8;
         titleLabelY = 7;
     }
@@ -210,9 +210,9 @@ public final class OreGeneratorScreen extends AbstractContainerScreen<OreGenerat
         MachineScreenStyle.drawPanel(graphics, leftPos, topPos, imageWidth, imageHeight);
         MachineScreenStyle.drawInset(graphics,
                 leftPos + 172, topPos + 18, leftPos + 246, topPos + 142);
-        MachineScreenStyle.drawSlotGroup(graphics, leftPos, topPos, 8, 22, 9, 3);
-        MachineScreenStyle.drawSlotGroup(graphics, leftPos, topPos, 44, 158, 9, 3);
-        MachineScreenStyle.drawSlotGroup(graphics, leftPos, topPos, 44, 218, 9, 1);
+        MachineScreenStyle.drawSlotGroup(graphics, leftPos, topPos, 8, 22, 9, 10);
+        MachineScreenStyle.drawSlotGroup(graphics, leftPos, topPos, 44, 254, 9, 3);
+        MachineScreenStyle.drawSlotGroup(graphics, leftPos, topPos, 44, 312, 9, 1);
         for (Slot slot : menu.slots) {
             MachineScreenStyle.drawSlotBackground(graphics, leftPos, topPos, slot);
         }
@@ -240,11 +240,11 @@ public final class OreGeneratorScreen extends AbstractContainerScreen<OreGenerat
                 menu.isAeOnline() ? 0xFF2E7D32 : MachineScreenStyle.ERROR_TEXT_COLOR, false);
         graphics.drawString(font, Component.translatable(
                         "gui.useless_mod.ore_generator.countdown", menu.getCountdownTicks()),
-                8, 91, MachineScreenStyle.MUTED_TEXT_COLOR, false);
+                8, 204, MachineScreenStyle.MUTED_TEXT_COLOR, false);
         graphics.drawString(font, Component.translatable(
                         "gui.useless_mod.ore_generator.active_slots",
                         menu.getActiveSlots(), menu.getConfiguredSlots()),
-                8, 103, MachineScreenStyle.MUTED_TEXT_COLOR, false);
+                8, 215, MachineScreenStyle.MUTED_TEXT_COLOR, false);
         graphics.drawString(font, Component.translatable(
                         menu.isOutputToAe() ? "gui.useless_mod.ore_generator.ae_enabled"
                                 : "gui.useless_mod.ore_generator.ae_disabled"),

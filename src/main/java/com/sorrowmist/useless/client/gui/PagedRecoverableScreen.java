@@ -16,8 +16,8 @@ public class PagedRecoverableScreen<T extends PagedRecoverableMenu> extends Abst
     public PagedRecoverableScreen(T menu, Inventory inventory, Component title) {
         super(menu, inventory, title);
         imageWidth = 176;
-        imageHeight = 166;
-        inventoryLabelY = 73;
+        imageHeight = 292;
+        inventoryLabelY = 199;
     }
 
     @Override
@@ -51,9 +51,9 @@ public class PagedRecoverableScreen<T extends PagedRecoverableMenu> extends Abst
     @Override
     protected void renderBg(GuiGraphics graphics, float partialTick, int mouseX, int mouseY) {
         MachineScreenStyle.drawPanel(graphics, leftPos, topPos, imageWidth, imageHeight);
-        MachineScreenStyle.drawSlotGroup(graphics, leftPos, topPos, 8, 18, 9, 3);
-        MachineScreenStyle.drawSlotGroup(graphics, leftPos, topPos, 8, 85, 9, 3);
-        MachineScreenStyle.drawSlotGroup(graphics, leftPos, topPos, 8, 143, 9, 1);
+        MachineScreenStyle.drawSlotGroup(graphics, leftPos, topPos, 8, 18, 9, 10);
+        MachineScreenStyle.drawSlotGroup(graphics, leftPos, topPos, 8, 211, 9, 3);
+        MachineScreenStyle.drawSlotGroup(graphics, leftPos, topPos, 8, 269, 9, 1);
         for (var slot : menu.slots) {
             MachineScreenStyle.drawSlotBackground(graphics, leftPos, topPos, slot);
         }

@@ -21,7 +21,8 @@ import java.util.Objects;
 import java.util.function.IntSupplier;
 
 public class PagedRecoverableMenu extends AbstractContainerMenu {
-    public static final int SLOTS_PER_PAGE = 27;
+    /** Ten rows keep a full 4096-slot inventory practical while retaining paging. */
+    public static final int SLOTS_PER_PAGE = 90;
     public static final int PREVIOUS_PAGE = 0;
     public static final int NEXT_PAGE = 1;
 
@@ -61,14 +62,14 @@ public class PagedRecoverableMenu extends AbstractContainerMenu {
     protected PagedRecoverableMenu(MenuType<?> type, int containerId, Inventory playerInventory,
                                    RecoverableItemStackHandler inventory, BlockPos blockPos) {
         this(type, containerId, playerInventory, inventory, blockPos,
-                8, 18, 8, 85, 8, 143, null);
+                8, 18, 8, 211, 8, 269, null);
     }
 
     protected PagedRecoverableMenu(MenuType<?> type, int containerId, Inventory playerInventory,
                                    RecoverableItemStackHandler inventory, BlockPos blockPos,
                                    @Nullable PagedMenuPageMemory pageMemory) {
         this(type, containerId, playerInventory, inventory, blockPos,
-                8, 18, 8, 85, 8, 143, pageMemory);
+                8, 18, 8, 211, 8, 269, pageMemory);
     }
 
     protected PagedRecoverableMenu(MenuType<?> type, int containerId, Inventory playerInventory,
@@ -103,7 +104,7 @@ public class PagedRecoverableMenu extends AbstractContainerMenu {
             }
         }
         IItemHandler pageView = new PageView(inventory, () -> page, clientSide);
-        for (int row = 0; row < 3; row++) {
+        for (int row = 0; row < 10; row++) {
             for (int column = 0; column < 9; column++) {
                 addSlot(new SlotItemHandler(pageView, column + row * 9,
                         storageX + column * 18, storageY + row * 18));
@@ -255,7 +256,7 @@ public class PagedRecoverableMenu extends AbstractContainerMenu {
     /**
      * SlotItemHandler writes initial/container updates through
      * IItemHandlerModifiable. On the server this view follows the selected
-     * backing page; on the client it is a fixed 27-slot packet buffer. The
+     * backing page; on the client it is a fixed 90-slot packet buffer. The
      * latter is deliberately independent of {@link #page}, because page-data
      * and slot-data packets are allowed to arrive in either order.
      */

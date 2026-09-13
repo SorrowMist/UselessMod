@@ -41,9 +41,9 @@ public final class PassiveCraftingHatchScreen
             PassiveCraftingHatchMenu menu, Inventory inventory, Component title) {
         super(menu, inventory, title);
         imageWidth = 250;
-        imageHeight = 242;
+        imageHeight = 336;
         inventoryLabelX = 44;
-        inventoryLabelY = 146;
+        inventoryLabelY = 242;
         titleLabelX = 8;
         titleLabelY = 7;
     }
@@ -252,9 +252,9 @@ public final class PassiveCraftingHatchScreen
         MachineScreenStyle.drawPanel(graphics, leftPos, topPos, imageWidth, imageHeight);
         MachineScreenStyle.drawInset(graphics,
                 leftPos + 172, topPos + 18, leftPos + 246, topPos + 142);
-        MachineScreenStyle.drawSlotGroup(graphics, leftPos, topPos, 8, 22, 9, 3);
-        MachineScreenStyle.drawSlotGroup(graphics, leftPos, topPos, 44, 158, 9, 3);
-        MachineScreenStyle.drawSlotGroup(graphics, leftPos, topPos, 44, 218, 9, 1);
+        MachineScreenStyle.drawSlotGroup(graphics, leftPos, topPos, 8, 22, 9, 10);
+        MachineScreenStyle.drawSlotGroup(graphics, leftPos, topPos, 44, 254, 9, 3);
+        MachineScreenStyle.drawSlotGroup(graphics, leftPos, topPos, 44, 312, 9, 1);
 
         for (Slot slot : menu.slots) {
             MachineScreenStyle.drawSlotBackground(graphics, leftPos, topPos, slot);
@@ -304,34 +304,34 @@ public final class PassiveCraftingHatchScreen
         graphics.drawString(font,
                 Component.translatable("gui.useless_mod.passive_crafting.max_multiplier",
                         ScaledEnergyAmount.format(menu.getMaxMultiplier())),
-                8, 91, MachineScreenStyle.MUTED_TEXT_COLOR, false);
+                8, 204, MachineScreenStyle.MUTED_TEXT_COLOR, false);
         graphics.drawString(font,
                 Component.translatable("gui.useless_mod.passive_crafting.countdown",
                         menu.getCountdownTicks()),
-                8, 102, MachineScreenStyle.MUTED_TEXT_COLOR, false);
+                8, 215, MachineScreenStyle.MUTED_TEXT_COLOR, false);
 
         int patternSlot = menu.getPatternSlotIndex(hoveredSlot);
         if (patternSlot >= 0) {
             var status = menu.getSlotStatus(patternSlot);
             Component statusText = statusComponent(status);
             graphics.drawString(font, font.split(statusText, 156).getFirst(),
-                    8, 116, statusColor(status.state()), false);
+                    8, 227, statusColor(status.state()), false);
             if (status.maxProgress() > 0) {
                 graphics.drawString(font,
                         Component.translatable("gui.useless_mod.passive_crafting.progress",
                                 status.progress(), status.maxProgress()),
-                        8, 128, MachineScreenStyle.MUTED_TEXT_COLOR, false);
+                        8, 239, MachineScreenStyle.MUTED_TEXT_COLOR, false);
             }
         } else {
             Component state = Component.translatable(menu.isFormed()
                     ? "gui.useless_mod.passive_crafting.connected"
                     : "gui.useless_mod.passive_crafting.unformed");
-            graphics.drawString(font, state, 8, 116,
+            graphics.drawString(font, state, 8, 227,
                     menu.isFormed() ? 0xFF2E7D32 : 0xFFA66A00, false);
             graphics.drawString(font,
                     Component.translatable("gui.useless_mod.passive_crafting.active_slots",
                             menu.getActivePatternSlots(), menu.getConfiguredPatternSlots()),
-                    8, 128, MachineScreenStyle.MUTED_TEXT_COLOR, false);
+                    8, 239, MachineScreenStyle.MUTED_TEXT_COLOR, false);
         }
     }
 

@@ -172,7 +172,8 @@ public final class MePatternAssemblyBlockEntity extends AEBaseBlockEntity
 
     public void releaseExternalInventory() {
         if (level != null) {
-            ExternalInventoryStore.release(level, inventoryReference);
+            ExternalInventoryStore.save(level, inventoryReference, patterns, level.registryAccess());
+            ExternalInventoryStore.release(level, worldPosition, inventoryReference);
         }
     }
 

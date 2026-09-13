@@ -268,6 +268,10 @@ public final class UComponents {
             register("external_inventory_reference", builder -> builder
                     .persistent(ExternalInventoryReference.CODEC)
                     .networkSynchronized(ExternalInventoryReference.STREAM_CODEC));
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<PassiveHatchSettings>> PASSIVE_HATCH_SETTINGS =
+            register("passive_hatch_settings", builder -> builder
+                    .persistent(PassiveHatchSettings.CODEC)
+                    .networkSynchronized(PassiveHatchSettings.STREAM_CODEC));
     public static final DeferredHolder<DataComponentType<?>, DataComponentType<Long>> SMART_DOUBLING_OPERATIONS =
             register("smart_doubling_operations", builder -> builder
                     .persistent(Codec.LONG)

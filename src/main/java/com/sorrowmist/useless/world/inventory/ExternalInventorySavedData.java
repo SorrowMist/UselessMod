@@ -61,20 +61,25 @@ public final class ExternalInventorySavedData extends SavedData {
 
     public boolean claimAt(Level level, BlockPos pos) {
         String dimension = level.dimension().location().toString();
-        if (claimed && (!dimension.equals(ownerDimension) || pos.asLong() != ownerPos)) {
-            return false;
+        if (claimed) {
+            return ownerDimension != null
+                    && dimension.equals(ownerDimension)
+                    && pos.asLong() == ownerPos;
         }
-        if (!claimed || !dimension.equals(ownerDimension) || pos.asLong() != ownerPos) {
-            claimed = true;
-            ownerDimension = dimension;
-            ownerPos = pos.asLong();
-            setDirty();
-        }
+        claimed = true;
+        ownerDimension = dimension;
+        ownerPos = pos.asLong();
+        setDirty();
         return true;
     }
 
-    public void releaseClaim() {
-        if (!claimed) return;
+    public void releaseAt(Level level, BlockPos pos) {
+        if (!claimed
+                || ownerDimension == null
+                || !ownerDimension.equals(level.dimension().location().toString())
+                || ownerPos != pos.asLong()) {
+            return;
+        }
         claimed = false;
         ownerDimension = null;
         ownerPos = 0L;

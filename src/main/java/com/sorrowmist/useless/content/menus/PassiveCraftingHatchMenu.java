@@ -109,7 +109,11 @@ public final class PassiveCraftingHatchMenu extends PagedRecoverableMenu {
 
     public PassiveCraftingHatchBlockEntity.SlotStatus getSlotStatus(int slot) {
         int relative = Math.floorMod(slot, PagedRecoverableMenu.SLOTS_PER_PAGE);
-        return slot >= 0 && relative < slotStatuses.length ? slotStatuses[relative] : emptyStatus(slot);
+        if (slot < 0 || relative >= slotStatuses.length) {
+            return emptyStatus(slot);
+        }
+        PassiveCraftingHatchBlockEntity.SlotStatus status = slotStatuses[relative];
+        return status.slot() == slot ? status : emptyStatus(slot);
     }
 
     public void updateSlotStatuses(Iterable<PassiveCraftingHatchBlockEntity.SlotStatus> statuses) {

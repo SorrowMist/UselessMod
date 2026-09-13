@@ -895,7 +895,9 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
 
     public void releaseExternalInventory() {
         saveExternalInventory();
-        if (level != null) ExternalInventoryStore.release(level, inventoryReference);
+        if (level != null) {
+            ExternalInventoryStore.release(level, worldPosition, inventoryReference);
+        }
     }
 
     public long getItemStorageRevision() {
@@ -911,6 +913,7 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
      * @return 物品处理器
      */
     public IItemHandler getItemHandler(@Nullable Direction side) {
+        ensureExternalInventory();
         return new FurnaceSidedItemHandler(this.itemHandler, side, this);
     }
 

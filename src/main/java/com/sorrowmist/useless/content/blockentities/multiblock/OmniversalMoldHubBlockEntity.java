@@ -106,7 +106,10 @@ public final class OmniversalMoldHubBlockEntity extends BlockEntity implements M
     }
 
     public void releaseExternalInventory() {
-        if (level != null) ExternalInventoryStore.release(level, inventoryReference);
+        if (level != null) {
+            ExternalInventoryStore.save(level, inventoryReference, molds, level.registryAccess());
+            ExternalInventoryStore.release(level, worldPosition, inventoryReference);
+        }
     }
 
     private boolean isValidMold(ItemStack stack) {

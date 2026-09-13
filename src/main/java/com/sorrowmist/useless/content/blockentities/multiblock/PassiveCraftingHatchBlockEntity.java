@@ -25,6 +25,7 @@ import com.sorrowmist.useless.core.config.ConfigManager;
 import com.sorrowmist.useless.core.component.ExternalInventoryKind;
 import com.sorrowmist.useless.core.component.ExternalInventoryReference;
 import com.sorrowmist.useless.core.component.MultiblockPartData;
+import com.sorrowmist.useless.core.component.PassiveHatchSettings;
 import com.sorrowmist.useless.world.inventory.ExternalInventoryStore;
 import com.sorrowmist.useless.energy.EnergyManager;
 import com.sorrowmist.useless.energy.IEnergyManager;
@@ -81,12 +82,11 @@ public final class PassiveCraftingHatchBlockEntity extends BlockEntity
             stack -> stack.is(ModItems.OMNIVERSAL_PATTERN.get()), this::inventoryChanged);
     private final PagedMenuPageMemory pageMemory = new PagedMenuPageMemory(this::setChanged);
     private final Map<Integer, CraftingTask> activeTasks = new HashMap<>();
-    private final int statusCapacity = Math.max(1,
-            Math.min(MAX_PATTERN_SLOTS, ConfigManager.getOmniversalPassivePatternSlots()));
-    private final SlotState[] idleStates = new SlotState[statusCapacity];
-    private final String[] idleDetails = new String[statusCapacity];
-    private final OmniversalPatternDetails[] decodedPatterns = new OmniversalPatternDetails[statusCapacity];
-    private final boolean[] patternDecodeCached = new boolean[statusCapacity];
+    private int statusCapacity = configuredStatusCapacity();
+    private SlotState[] idleStates = new SlotState[statusCapacity];
+    private String[] idleDetails = new String[statusCapacity];
+    private OmniversalPatternDetails[] decodedPatterns = new OmniversalPatternDetails[statusCapacity];
+    private boolean[] patternDecodeCached = new boolean[statusCapacity];
     private final ConcurrentHashMap<Integer, AdvancedAlloyFurnaceAeManager.AETaskProgress> taskProgress =
             new ConcurrentHashMap<>();
     private final AtomicInteger totalProgress = new AtomicInteger();
@@ -148,7 +148,7 @@ public final class PassiveCraftingHatchBlockEntity extends BlockEntity
 
     public PassiveCraftingHatchBlockEntity(BlockPos pos, BlockState state) {
         super(ModBlockEntities.PASSIVE_CRAFTING_HATCH.get(), pos, state);
-        for (int slot = 0; slot < statusCapacity; slot++) {
+        for (int slot = 0; slot < PATTERN_SLOTS; slot++) {
             idleStates[slot] = SlotState.EMPTY;
             idleDetails[slot] = "";
         }
@@ -202,10 +202,19 @@ public final class PassiveCraftingHatchBlockEntity extends BlockEntity
 
     public void restoreSettings(MultiblockPartData data) {
         if (data == null) return;
-        intervalTicks = data.intervalTicks() > 0
-                ? Math.max(MIN_INTERVAL_TICKS, Math.min(MAX_INTERVAL_TICKS, data.intervalTicks()))
+        restoreSettings(data.intervalTicks(), data.multiplier());
+    }
+
+    public void restoreSettings(PassiveHatchSettings settings) {
+        if (settings == null) return;
+        restoreSettings(settings.intervalTicks(), settings.multiplier());
+    }
+
+    private void restoreSettings(int requestedInterval, long requestedMultiplier) {
+        intervalTicks = requestedInterval > 0
+                ? Math.max(MIN_INTERVAL_TICKS, Math.min(MAX_INTERVAL_TICKS, requestedInterval))
                 : DEFAULT_INTERVAL_TICKS;
-        multiplier = Math.max(1L, data.multiplier());
+        multiplier = Math.max(1L, requestedMultiplier);
         countdownTicks = intervalTicks;
         statusDirty = true;
         setChanged();
@@ -239,7 +248,28 @@ public final class PassiveCraftingHatchBlockEntity extends BlockEntity
     }
 
     public void releaseExternalInventory() {
-        if (level != null) ExternalInventoryStore.release(level, inventoryReference);
+        if (level != null) {
+            ExternalInventoryStore.save(level, inventoryReference, patterns, level.registryAccess());
+            ExternalInventoryStore.release(level, worldPosition, inventoryReference);
+        }
+    }
+
+    private static int configuredStatusCapacity() {
+        return Math.max(1, Math.min(MAX_PATTERN_SLOTS,
+                ConfigManager.getOmniversalPassivePatternSlots()));
+    }
+
+    private void ensureStatusCapacity() {
+        int configured = configuredStatusCapacity();
+        if (configured <= statusCapacity) return;
+        int oldCapacity = statusCapacity;
+        statusCapacity = configured;
+        idleStates = java.util.Arrays.copyOf(idleStates, statusCapacity);
+        idleDetails = java.util.Arrays.copyOf(idleDetails, statusCapacity);
+        decodedPatterns = java.util.Arrays.copyOf(decodedPatterns, statusCapacity);
+        patternDecodeCached = java.util.Arrays.copyOf(patternDecodeCached, statusCapacity);
+        java.util.Arrays.fill(idleStates, oldCapacity, statusCapacity, SlotState.EMPTY);
+        java.util.Arrays.fill(idleDetails, oldCapacity, statusCapacity, "");
     }
 
     public ContainerData getMenuData() {
@@ -662,9 +692,8 @@ public final class PassiveCraftingHatchBlockEntity extends BlockEntity
 
     @Nullable
     private OmniversalPatternDetails decodePattern(int slot, ItemStack stack) {
-        if (slot < 0 || slot >= statusCapacity) {
-            return null;
-        }
+        ensureStatusCapacity();
+        if (slot < 0 || slot >= statusCapacity) return null;
         if (!patternDecodeCached[slot]) {
             IPatternDetails decoded = AdvancedAlloyFurnacePatternResolver.decode(stack, level);
             decodedPatterns[slot] = decoded instanceof OmniversalPatternDetails omniversal
@@ -680,7 +709,9 @@ public final class PassiveCraftingHatchBlockEntity extends BlockEntity
     }
 
     private void resetIdleStates() {
-        for (int slot = 0; slot < statusCapacity; slot++) {
+        ensureStatusCapacity();
+        for (int slot = 0; slot < PATTERN_SLOTS; slot++) {
+            if (slot >= statusCapacity) break;
             if (!activeTasks.containsKey(slot)) {
                 setIdleState(slot, patterns.getStackInSlot(slot).isEmpty()
                         ? SlotState.EMPTY : SlotState.READY, "");
@@ -689,9 +720,11 @@ public final class PassiveCraftingHatchBlockEntity extends BlockEntity
     }
 
     private void setIdleState(int slot, SlotState state, String detail) {
-        if (slot < 0 || slot >= statusCapacity) {
+        ensureStatusCapacity();
+        if (slot < 0 || slot >= PATTERN_SLOTS) {
             return;
         }
+        if (slot >= statusCapacity) return;
         String safeDetail = detail == null ? "" : detail;
         if (idleStates[slot] != state || !Objects.equals(idleDetails[slot], safeDetail)) {
             idleStates[slot] = state;
@@ -701,6 +734,7 @@ public final class PassiveCraftingHatchBlockEntity extends BlockEntity
     }
 
     private List<SlotStatus> getSlotStatusSnapshot(int firstSlot, int count) {
+        ensureStatusCapacity();
         int start = Math.max(0, Math.min(PATTERN_SLOTS, firstSlot));
         int end = Math.max(start, Math.min(PATTERN_SLOTS, start + Math.max(0, count)));
         List<SlotStatus> result = new ArrayList<>(end - start);
@@ -708,9 +742,11 @@ public final class PassiveCraftingHatchBlockEntity extends BlockEntity
         for (int slot = start; slot < end; slot++) {
             CraftingTask task = activeTasks.get(slot);
             if (task == null) {
-                result.add(slot < statusCapacity
-                        ? new SlotStatus(slot, idleStates[slot], 0, 0, idleDetails[slot])
-                        : new SlotStatus(slot, SlotState.EMPTY, 0, 0, ""));
+                if (slot >= statusCapacity) {
+                    result.add(new SlotStatus(slot, SlotState.EMPTY, 0, 0, ""));
+                    continue;
+                }
+                result.add(new SlotStatus(slot, idleStates[slot], 0, 0, idleDetails[slot]));
                 continue;
             }
             AdvancedAlloyFurnaceAeManager.AETaskProgress progress = taskProgress.get(slot);

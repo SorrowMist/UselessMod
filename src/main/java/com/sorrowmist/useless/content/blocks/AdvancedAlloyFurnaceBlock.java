@@ -9,6 +9,7 @@ import com.sorrowmist.useless.api.enums.FurnaceFace;
 import com.sorrowmist.useless.api.enums.FurnaceFaceMode;
 import com.sorrowmist.useless.api.enums.RedstoneControlMode;
 import com.sorrowmist.useless.content.blockentities.AdvancedAlloyFurnaceBlockEntity;
+import com.sorrowmist.useless.content.blockentities.AdvancedAlloyFurnaceData;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.layout.AdvancedAlloyFurnaceLayout;
 import com.sorrowmist.useless.core.component.FurnaceDataComponent;
 import com.sorrowmist.useless.core.component.ExternalInventoryKind;
@@ -186,7 +187,8 @@ public class AdvancedAlloyFurnaceBlock extends Block implements EntityBlock {
                     // 保存其他状态
                     blockEntityData.putInt(NBTConstants.PROGRESS, furnace.getProgress());
                     blockEntityData.putInt(NBTConstants.MAX_PROGRESS, furnace.getMaxProgress());
-                    blockEntityData.putInt(NBTConstants.CURRENT_PARALLEL, furnace.getData().get(0)); // 从data获取
+                    blockEntityData.putInt(NBTConstants.CURRENT_PARALLEL,
+                            furnace.getData().get(AdvancedAlloyFurnaceData.DATA_CURRENT_PARALLEL));
                     blockEntityData.putBoolean(NBTConstants.HAS_MOLD, furnace.hasMold());
 
                     // 保存面模式

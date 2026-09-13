@@ -4,6 +4,7 @@ import com.sorrowmist.useless.content.blockentities.multiblock.PassiveCraftingHa
 import com.sorrowmist.useless.core.component.ExternalInventoryKind;
 import com.sorrowmist.useless.core.component.ExternalInventoryReference;
 import com.sorrowmist.useless.core.component.MultiblockPartData;
+import com.sorrowmist.useless.core.component.PassiveHatchSettings;
 import com.sorrowmist.useless.core.component.UComponents;
 import com.sorrowmist.useless.world.inventory.ExternalInventoryStore;
 import net.minecraft.core.BlockPos;
@@ -78,9 +79,8 @@ public final class PassiveCraftingHatchBlock extends DirectionalMultiblockPartBl
                         }
                         if (itemData.intervalTicks() != PassiveCraftingHatchBlockEntity.DEFAULT_INTERVAL_TICKS
                                 || itemData.multiplier() != 1L) {
-                            drop.set(UComponents.MULTIBLOCK_PART_DATA.get(),
-                                    new MultiblockPartData(itemData.version(), new net.minecraft.nbt.CompoundTag(),
-                                            itemData.intervalTicks(), itemData.multiplier()));
+                            drop.set(UComponents.PASSIVE_HATCH_SETTINGS.get(),
+                                    new PassiveHatchSettings(itemData.intervalTicks(), itemData.multiplier()));
                         }
                         break;
                     }
@@ -97,10 +97,15 @@ public final class PassiveCraftingHatchBlock extends DirectionalMultiblockPartBl
         if (!level.isClientSide
                 && level.getBlockEntity(pos) instanceof PassiveCraftingHatchBlockEntity hatch) {
             ExternalInventoryReference reference = stack.get(UComponents.EXTERNAL_INVENTORY_REFERENCE.get());
+            PassiveHatchSettings settings = stack.get(UComponents.PASSIVE_HATCH_SETTINGS.get());
             MultiblockPartData itemData = stack.get(UComponents.MULTIBLOCK_PART_DATA.get());
             hatch.bindExternalInventory(reference,
                     itemData == null ? null : itemData.inventory(), level.registryAccess());
-            hatch.restoreSettings(itemData);
+            if (settings != null) {
+                hatch.restoreSettings(settings);
+            } else {
+                hatch.restoreSettings(itemData);
+            }
             ExternalInventoryStore.clearLegacyComponent(hatch, ExternalInventoryKind.PASSIVE_HATCH);
         }
     }

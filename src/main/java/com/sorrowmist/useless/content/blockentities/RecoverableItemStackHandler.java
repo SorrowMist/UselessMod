@@ -6,6 +6,7 @@ import net.minecraft.world.item.ItemStack;
 import net.neoforged.neoforge.items.ItemStackHandler;
 
 import java.util.Objects;
+import java.util.Collections;
 import java.util.function.IntSupplier;
 import java.util.function.Predicate;
 
@@ -77,6 +78,7 @@ public class RecoverableItemStackHandler extends ItemStackHandler {
     public void deserializeNBT(HolderLookup.Provider provider, CompoundTag nbt) {
         CompoundTag copy = nbt.copy();
         copy.remove("Size");
+        Collections.fill(this.stacks, ItemStack.EMPTY);
         super.deserializeNBT(provider, copy);
     }
 

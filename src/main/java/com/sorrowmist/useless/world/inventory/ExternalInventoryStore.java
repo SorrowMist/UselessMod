@@ -82,8 +82,9 @@ public final class ExternalInventoryStore {
         ExternalInventorySavedData.get(level.getServer(), reference).saveFrom(inventory, registries);
     }
 
-    public static void release(Level level, @Nullable ExternalInventoryReference reference) {
+    public static void release(Level level, BlockPos pos,
+                               @Nullable ExternalInventoryReference reference) {
         if (reference == null || level.isClientSide() || level.getServer() == null) return;
-        ExternalInventorySavedData.get(level.getServer(), reference).releaseClaim();
+        ExternalInventorySavedData.get(level.getServer(), reference).releaseAt(level, pos);
     }
 }

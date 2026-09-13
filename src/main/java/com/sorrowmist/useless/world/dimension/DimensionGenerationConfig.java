@@ -274,12 +274,21 @@ public record DimensionGenerationConfig(
         return !hasCenterMarkerFeature() || isAllowedBlockId(centerMarkerBlockId());
     }
 
+    /**
+     * Boundary and road slots are editable only when the generator can actually
+     * place the corresponding layout.
+     */
+    public static boolean areBoundaryAndRoadFeaturesEnabled(
+            int boundaryIntervalX, int boundaryIntervalZ, int roadWidth) {
+        return roadWidth > 0 && (boundaryIntervalX > 0 || boundaryIntervalZ > 0);
+    }
+
     private boolean hasBoundaryFeatures() {
-        return boundaryIntervalX() > 0 || boundaryIntervalZ() > 0;
+        return areBoundaryAndRoadFeaturesEnabled(boundaryIntervalX(), boundaryIntervalZ(), roadWidth());
     }
 
     private boolean hasRoadFeatures() {
-        return roadWidth() > 0 && (boundaryIntervalX() > 0 || boundaryIntervalZ() > 0);
+        return areBoundaryAndRoadFeaturesEnabled(boundaryIntervalX(), boundaryIntervalZ(), roadWidth());
     }
 
     private boolean hasCenterMarkerFeature() {

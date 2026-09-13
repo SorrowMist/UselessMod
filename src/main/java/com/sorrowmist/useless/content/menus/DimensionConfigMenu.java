@@ -241,6 +241,7 @@ public final class DimensionConfigMenu extends AbstractContainerMenu {
     }
 
     public boolean isGhostSlotActive(int index) {
+        if (index < 0 || index >= GHOST_SLOT_COUNT) return false;
         return switch (index) {
             case BOUNDARY_A_SLOT, BOUNDARY_B_SLOT, ROAD_A_SLOT -> isRoadFeatureEnabled();
             case ROAD_B_SLOT, ROAD_C_SLOT -> isRoadFeatureEnabled()
@@ -250,7 +251,8 @@ public final class DimensionConfigMenu extends AbstractContainerMenu {
     }
 
     private boolean isRoadFeatureEnabled() {
-        return roadWidth > 0 && (boundaryIntervalX > 0 || boundaryIntervalZ > 0);
+        return DimensionGenerationConfig.areBoundaryAndRoadFeaturesEnabled(
+                boundaryIntervalX, boundaryIntervalZ, roadWidth);
     }
 
     public boolean isCompleteConfiguration() {

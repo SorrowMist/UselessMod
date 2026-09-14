@@ -20,6 +20,7 @@ import com.sorrowmist.useless.network.ModeTogglePacket;
 import com.sorrowmist.useless.network.MultiblockAlloyFurnaceEnergyLimitPacket;
 import com.sorrowmist.useless.network.PatternPageChangePacket;
 import com.sorrowmist.useless.network.PassiveCraftingSettingsPacket;
+import com.sorrowmist.useless.network.PassiveCraftingSlotMultiplierPacket;
 import com.sorrowmist.useless.network.PassiveCraftingStatusPacket;
 import com.sorrowmist.useless.network.OreGeneratorOutputTogglePacket;
 import com.sorrowmist.useless.network.OreGeneratorSettingsPacket;
@@ -117,6 +118,9 @@ public class ModNetwork {
         registrar.playToServer(PassiveCraftingSettingsPacket.TYPE,
                                PassiveCraftingSettingsPacket.STREAM_CODEC,
                                PassiveCraftingSettingsPacket::handle);
+        registrar.playToServer(PassiveCraftingSlotMultiplierPacket.TYPE,
+                               PassiveCraftingSlotMultiplierPacket.STREAM_CODEC,
+                               PassiveCraftingSlotMultiplierPacket::handle);
         registrar.playToServer(MultiblockAlloyFurnaceEnergyLimitPacket.TYPE,
                                MultiblockAlloyFurnaceEnergyLimitPacket.STREAM_CODEC,
                                MultiblockAlloyFurnaceEnergyLimitPacket::handle);

@@ -45,6 +45,8 @@ public record PassiveCraftingStatusPacket(
             buf.writeVarInt(status.progress());
             buf.writeVarInt(status.maxProgress());
             buf.writeUtf(status.detail(), 256);
+            // 0 means "follow the global multiplier"; the client resolves the effective value.
+            buf.writeVarLong(status.multiplier());
         }
     }
 
@@ -66,8 +68,15 @@ public record PassiveCraftingStatusPacket(
             if (stateIndex >= states.length) {
                 throw new IllegalArgumentException("Invalid passive crafting state: " + stateIndex);
             }
+            int progress = buf.readVarInt();
+            int maxProgress = buf.readVarInt();
+            String detail = buf.readUtf(256);
+            long multiplier = buf.readVarLong();
+            if (multiplier < 0L) {
+                throw new IllegalArgumentException("Invalid passive crafting slot multiplier: " + multiplier);
+            }
             statuses.add(new PassiveCraftingHatchBlockEntity.SlotStatus(
-                    slot, states[stateIndex], buf.readVarInt(), buf.readVarInt(), buf.readUtf(256)));
+                    slot, states[stateIndex], progress, maxProgress, detail, multiplier));
         }
         return new PassiveCraftingStatusPacket(containerId, pos, statuses);
     }

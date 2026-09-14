@@ -93,6 +93,21 @@ public final class PassiveCraftingHatchMenu extends PagedRecoverableMenu {
         return join(data.get(5), data.get(6));
     }
 
+    /** {@code 0} means the slot follows {@link #getMultiplier()}; any other value is an override. */
+    public long getSlotMultiplierOverride(int slot) {
+        return slot < 0 ? 0L : getSlotStatus(slot).multiplier();
+    }
+
+    public boolean hasOwnSlotMultiplier(int slot) {
+        return getSlotMultiplierOverride(slot) > 0L;
+    }
+
+    /** Batch size the screen should display for a slot while the server snapshot is in flight. */
+    public long getSlotMultiplier(int slot) {
+        long override = getSlotMultiplierOverride(slot);
+        return override > 0L ? override : Math.max(1L, getMultiplier());
+    }
+
     public long getMaxMultiplier() {
         return Math.max(1L, join(data.get(7), data.get(8)));
     }

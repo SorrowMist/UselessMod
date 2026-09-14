@@ -82,6 +82,11 @@ public final class PassiveCraftingHatchBlockEntity extends BlockEntity
             stack -> stack.is(ModItems.OMNIVERSAL_PATTERN.get()), this::inventoryChanged);
     private final PagedMenuPageMemory pageMemory = new PagedMenuPageMemory(this::setChanged);
     private final Map<Integer, CraftingTask> activeTasks = new HashMap<>();
+    /**
+     * Sparse per-slot batch sizes. A missing entry means the slot follows {@link #multiplier},
+     * the global default, so clearing an override never has to guess what the default was.
+     */
+    private final Map<Integer, Long> slotMultiplierOverrides = new HashMap<>();
     private int statusCapacity = configuredStatusCapacity();
     private SlotState[] idleStates = new SlotState[statusCapacity];
     private String[] idleDetails = new String[statusCapacity];
@@ -190,6 +195,8 @@ public final class PassiveCraftingHatchBlockEntity extends BlockEntity
                 ? Math.max(MIN_INTERVAL_TICKS, Math.min(MAX_INTERVAL_TICKS, data.intervalTicks()))
                 : DEFAULT_INTERVAL_TICKS;
         multiplier = Math.max(1L, data.multiplier());
+        // MultiblockPartData predates per-slot multipliers, so a full restore starts clean.
+        slotMultiplierOverrides.clear();
         countdownTicks = intervalTicks;
         deferredTasksTag = null;
         localUnreturnedInputs.clear();
@@ -202,19 +209,29 @@ public final class PassiveCraftingHatchBlockEntity extends BlockEntity
 
     public void restoreSettings(MultiblockPartData data) {
         if (data == null) return;
-        restoreSettings(data.intervalTicks(), data.multiplier());
+        restoreSettings(data.intervalTicks(), data.multiplier(), null);
     }
 
     public void restoreSettings(PassiveHatchSettings settings) {
         if (settings == null) return;
-        restoreSettings(settings.intervalTicks(), settings.multiplier());
+        restoreSettings(settings.intervalTicks(), settings.multiplier(), settings.slotMultipliers());
     }
 
-    private void restoreSettings(int requestedInterval, long requestedMultiplier) {
+    private void restoreSettings(int requestedInterval, long requestedMultiplier,
+                                 @Nullable List<PassiveHatchSettings.SlotMultiplier> requestedOverrides) {
         intervalTicks = requestedInterval > 0
                 ? Math.max(MIN_INTERVAL_TICKS, Math.min(MAX_INTERVAL_TICKS, requestedInterval))
                 : DEFAULT_INTERVAL_TICKS;
         multiplier = Math.max(1L, requestedMultiplier);
+        slotMultiplierOverrides.clear();
+        if (requestedOverrides != null) {
+            for (PassiveHatchSettings.SlotMultiplier entry : requestedOverrides) {
+                if (entry == null || !entry.valid() || entry.slot() >= PATTERN_SLOTS) {
+                    continue;
+                }
+                slotMultiplierOverrides.put(entry.slot(), entry.multiplier());
+            }
+        }
         countdownTicks = intervalTicks;
         statusDirty = true;
         setChanged();
@@ -286,6 +303,71 @@ public final class PassiveCraftingHatchBlockEntity extends BlockEntity
 
     public long getMultiplier() {
         return multiplier;
+    }
+
+    /** Batch size a slot actually runs at: its own override, otherwise the global default. */
+    public long getSlotMultiplier(int slot) {
+        long override = getSlotMultiplierOverride(slot);
+        return override > 0L ? override : multiplier;
+    }
+
+    /** {@code 0} means "follow the global multiplier"; any other value is an explicit override. */
+    public long getSlotMultiplierOverride(int slot) {
+        if (slot < 0 || slot >= PATTERN_SLOTS) {
+            return 0L;
+        }
+        Long value = slotMultiplierOverrides.get(slot);
+        return value == null ? 0L : Math.max(0L, value);
+    }
+
+    public boolean hasSlotMultiplierOverride(int slot) {
+        return getSlotMultiplierOverride(slot) > 0L;
+    }
+
+    /** Sorted snapshot used for item data, so drops stay byte-for-byte stable. */
+    public List<PassiveHatchSettings.SlotMultiplier> slotMultiplierSettings() {
+        List<PassiveHatchSettings.SlotMultiplier> result = new ArrayList<>(slotMultiplierOverrides.size());
+        for (Map.Entry<Integer, Long> entry : new java.util.TreeMap<>(slotMultiplierOverrides).entrySet()) {
+            long value = entry.getValue() == null ? 0L : entry.getValue();
+            if (value > 0L) {
+                result.add(new PassiveHatchSettings.SlotMultiplier(entry.getKey(), value));
+            }
+        }
+        return List.copyOf(result);
+    }
+
+    /**
+     * Pins one slot to its own batch size. {@code requested <= 0} clears the override so the slot
+     * returns to following the global multiplier. The value is clamped to the coil-tier parallel
+     * limit, because a passive batch larger than the machine could ever run is never useful.
+     */
+    public void setSlotMultiplier(int slot, long requested) {
+        if (slot < 0 || slot >= PATTERN_SLOTS) {
+            return;
+        }
+        long clamped = requested <= 0L
+                ? 0L : Math.max(1L, Math.min(getCurrentMaxParallel(), requested));
+        long previous = getSlotMultiplierOverride(slot);
+        if (clamped == previous) {
+            return;
+        }
+        if (clamped <= 0L) {
+            slotMultiplierOverrides.remove(slot);
+        } else {
+            slotMultiplierOverrides.put(slot, clamped);
+        }
+        statusDirty = true;
+        setChanged();
+    }
+
+    /** Drops every override, making all slots follow the global multiplier again. */
+    public void clearSlotMultipliers() {
+        if (slotMultiplierOverrides.isEmpty()) {
+            return;
+        }
+        slotMultiplierOverrides.clear();
+        statusDirty = true;
+        setChanged();
     }
 
     public int getActivePatternSlots() {
@@ -487,7 +569,8 @@ public final class PassiveCraftingHatchBlockEntity extends BlockEntity
                 setIdleState(slot, SlotState.INVALID_PATTERN, "");
                 continue;
             }
-            if (!amountsFit(omniversal, multiplier)) {
+            long slotMultiplier = getSlotMultiplier(slot);
+            if (!amountsFit(omniversal, slotMultiplier)) {
                 setIdleState(slot, SlotState.INVALID_PATTERN, "amount_overflow");
                 continue;
             }
@@ -495,7 +578,7 @@ public final class PassiveCraftingHatchBlockEntity extends BlockEntity
                 setIdleState(slot, SlotState.MISSING_MOLD, "");
                 continue;
             }
-            candidates.add(new Candidate(slot, omniversal));
+            candidates.add(new Candidate(slot, omniversal, slotMultiplier));
         }
 
         if (candidates.isEmpty()) {
@@ -511,8 +594,9 @@ public final class PassiveCraftingHatchBlockEntity extends BlockEntity
 
         List<PassivePatternInputTransaction.Result> extractions =
                 PassivePatternInputTransaction.extractAll(
-                        candidates.stream().map(Candidate::pattern).toList(), multiplier, level,
-                        access.storage(), access::cachedInventory, access.source(),
+                        candidates.stream().map(Candidate::pattern).toList(),
+                        candidates.stream().mapToLong(Candidate::multiplier).toArray(),
+                        level, access.storage(), access::cachedInventory, access.source(),
                         this::stashUnreturnedInput);
         for (int index = 0; index < candidates.size(); index++) {
             Candidate candidate = candidates.get(index);
@@ -524,19 +608,19 @@ public final class PassiveCraftingHatchBlockEntity extends BlockEntity
                         ? SlotState.INVALID_PATTERN : SlotState.AE_OFFLINE;
                 String detail = extraction.missingKey() == null
                         ? "" : extraction.missingKey().getDisplayName().getString();
-                setIdleState(candidate.slot, state, detail);
+                setIdleState(candidate.slot(), state, detail);
                 continue;
             }
 
             CraftingTask task = new CraftingTask(
-                    candidate.slot, candidate.pattern, extraction.inputs(), multiplier, this);
+                    candidate.slot(), candidate.pattern(), extraction.inputs(), candidate.multiplier(), this);
             if (!task.canStartNow()) {
                 CraftingTask.returnInputsToAE(Collections.singletonList(extraction.inputs()), this);
-                setIdleState(candidate.slot, SlotState.MISSING_MOLD, task.getWaitingDetail());
+                setIdleState(candidate.slot(), SlotState.MISSING_MOLD, task.getWaitingDetail());
                 continue;
             }
-            activeTasks.put(candidate.slot, task);
-            setIdleState(candidate.slot, SlotState.RUNNING, "");
+            activeTasks.put(candidate.slot(), task);
+            setIdleState(candidate.slot(), SlotState.RUNNING, "");
             setChanged();
         }
     }
@@ -741,12 +825,13 @@ public final class PassiveCraftingHatchBlockEntity extends BlockEntity
         boolean enabled = isTaskExecutionEnabled();
         for (int slot = start; slot < end; slot++) {
             CraftingTask task = activeTasks.get(slot);
+            long slotMultiplier = getSlotMultiplierOverride(slot);
             if (task == null) {
                 if (slot >= statusCapacity) {
-                    result.add(new SlotStatus(slot, SlotState.EMPTY, 0, 0, ""));
+                    result.add(new SlotStatus(slot, SlotState.EMPTY, 0, 0, "", slotMultiplier));
                     continue;
                 }
-                result.add(new SlotStatus(slot, idleStates[slot], 0, 0, idleDetails[slot]));
+                result.add(new SlotStatus(slot, idleStates[slot], 0, 0, idleDetails[slot], slotMultiplier));
                 continue;
             }
             AdvancedAlloyFurnaceAeManager.AETaskProgress progress = taskProgress.get(slot);
@@ -763,7 +848,8 @@ public final class PassiveCraftingHatchBlockEntity extends BlockEntity
             result.add(new SlotStatus(slot, state,
                     progress == null ? 0 : progress.getProgress(),
                     progress == null ? 1 : progress.getMaxProgress(),
-                    progress == null ? "" : progress.getStatusDetail()));
+                    progress == null ? "" : progress.getStatusDetail(),
+                    slotMultiplier));
         }
         return List.copyOf(result);
     }
@@ -804,10 +890,27 @@ public final class PassiveCraftingHatchBlockEntity extends BlockEntity
         if (controller == null) {
             return;
         }
-        long clamped = Math.max(1L,
-                Math.min(multiplier, controller.getPassiveCraftingMaxParallel()));
-        if (clamped != multiplier) {
-            multiplier = clamped;
+        long limit = Math.max(1L, controller.getPassiveCraftingMaxParallel());
+        boolean changed = false;
+        if (multiplier > limit) {
+            multiplier = limit;
+            changed = true;
+        }
+        for (var iterator = slotMultiplierOverrides.entrySet().iterator(); iterator.hasNext(); ) {
+            Map.Entry<Integer, Long> entry = iterator.next();
+            long value = entry.getValue() == null ? 0L : entry.getValue();
+            if (value <= 0L) {
+                iterator.remove();
+                changed = true;
+                continue;
+            }
+            if (value > limit) {
+                entry.setValue(limit);
+                changed = true;
+            }
+        }
+        if (changed) {
+            statusDirty = true;
             setChanged();
         }
     }
@@ -850,6 +953,16 @@ public final class PassiveCraftingHatchBlockEntity extends BlockEntity
             intervalTicks = DEFAULT_INTERVAL_TICKS;
         }
         multiplier = Math.max(1L, tag.getLong("Multiplier"));
+        slotMultiplierOverrides.clear();
+        ListTag slotMultipliers = tag.getList("SlotMultipliers", Tag.TAG_COMPOUND);
+        for (int index = 0; index < slotMultipliers.size(); index++) {
+            CompoundTag entry = slotMultipliers.getCompound(index);
+            int slot = entry.getInt("Slot");
+            long value = entry.getLong("Multiplier");
+            if (slot >= 0 && slot < PATTERN_SLOTS && value > 0L) {
+                slotMultiplierOverrides.put(slot, value);
+            }
+        }
         countdownTicks = intervalTicks;
         deferredTasksTag = tag.contains("PassiveTasks") ? tag.getCompound("PassiveTasks") : null;
         localUnreturnedInputs.clear();
@@ -876,6 +989,20 @@ public final class PassiveCraftingHatchBlockEntity extends BlockEntity
         tag.putLong("StructureGeneration", structureGeneration);
         tag.putInt("IntervalTicks", intervalTicks);
         tag.putLong("Multiplier", multiplier);
+        ListTag slotMultipliers = new ListTag();
+        if (!slotMultiplierOverrides.isEmpty()) {
+            for (Map.Entry<Integer, Long> entry : new java.util.TreeMap<>(slotMultiplierOverrides).entrySet()) {
+                long value = entry.getValue() == null ? 0L : entry.getValue();
+                if (value <= 0L) {
+                    continue;
+                }
+                CompoundTag slotEntry = new CompoundTag();
+                slotEntry.putInt("Slot", entry.getKey());
+                slotEntry.putLong("Multiplier", value);
+                slotMultipliers.add(slotEntry);
+            }
+        }
+        tag.put("SlotMultipliers", slotMultipliers);
         tag.put("PassiveTasks", saveTasks(registries));
         ListTag unreturned = new ListTag();
         for (GenericStack stack : localUnreturnedInputs) {
@@ -1130,15 +1257,26 @@ public final class PassiveCraftingHatchBlockEntity extends BlockEntity
         WAITING_OUTPUT
     }
 
-    public record SlotStatus(int slot, SlotState state, int progress, int maxProgress, String detail) {
+    public record SlotStatus(int slot, SlotState state, int progress, int maxProgress, String detail,
+                             long multiplier) {
         public SlotStatus {
             state = Objects.requireNonNull(state, "state");
             progress = Math.max(0, progress);
             maxProgress = Math.max(0, maxProgress);
             detail = detail == null ? "" : detail;
+            multiplier = Math.max(0L, multiplier);
+        }
+
+        public SlotStatus(int slot, SlotState state, int progress, int maxProgress, String detail) {
+            this(slot, state, progress, maxProgress, detail, 0L);
+        }
+
+        /** True when this slot is pinned to its own batch size instead of the global default. */
+        public boolean hasOwnMultiplier() {
+            return multiplier > 0L;
         }
     }
 
-    private record Candidate(int slot, OmniversalPatternDetails pattern) {
+    private record Candidate(int slot, OmniversalPatternDetails pattern, long multiplier) {
     }
 }

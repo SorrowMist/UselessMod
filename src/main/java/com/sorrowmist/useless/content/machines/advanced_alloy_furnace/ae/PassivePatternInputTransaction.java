@@ -66,18 +66,39 @@ public final class PassivePatternInputTransaction {
                                           @Nullable Level level, MEStorage storage,
                                           Supplier<KeyCounter> cachedInventory, IActionSource source,
                                           UnreturnedInputSink unreturnedInputSink) {
+        long[] perPatternOperations = new long[patterns.size()];
+        Arrays.fill(perPatternOperations, operations);
+        return extractAll(patterns, perPatternOperations, level, storage, cachedInventory, source,
+                unreturnedInputSink);
+    }
+
+    /**
+     * Simulates and commits each pattern in order without enumerating the network for exact inputs.
+     * {@code operations} carries one batch size per pattern, so callers can run every slot at its
+     * own configured multiplier within the same cycle.
+     */
+    public static List<Result> extractAll(List<? extends IPatternDetails> patterns,
+                                          long[] operations,
+                                          @Nullable Level level, MEStorage storage,
+                                          Supplier<KeyCounter> cachedInventory, IActionSource source,
+                                          UnreturnedInputSink unreturnedInputSink) {
         Objects.requireNonNull(patterns, "patterns");
+        Objects.requireNonNull(operations, "operations");
         Objects.requireNonNull(storage, "storage");
         Objects.requireNonNull(cachedInventory, "cachedInventory");
         Objects.requireNonNull(source, "source");
         Objects.requireNonNull(unreturnedInputSink, "unreturnedInputSink");
+        if (operations.length != patterns.size()) {
+            throw new IllegalArgumentException("Expected one operation count per pattern: "
+                    + operations.length + " != " + patterns.size());
+        }
 
         AvailableInputIndex inputIndex = new AvailableInputIndex(cachedInventory);
         List<Result> results = new ArrayList<>(patterns.size());
-        for (IPatternDetails pattern : patterns) {
-            Objects.requireNonNull(pattern, "pattern");
+        for (int index = 0; index < patterns.size(); index++) {
+            IPatternDetails pattern = Objects.requireNonNull(patterns.get(index), "pattern");
             PlannedExtraction entry = plan(
-                    pattern, operations, level, storage, source, inputIndex);
+                    pattern, operations[index], level, storage, source, inputIndex);
             if (entry.failure != Failure.NONE) {
                 results.add(new Result(entry.failure, entry.inputs, entry.missingKey));
                 continue;

@@ -68,19 +68,22 @@ public final class PassiveCraftingHatchBlock extends DirectionalMultiblockPartBl
             hatch.prepareForRemoval();
             MultiblockPartData itemData = hatch.createSettingsItemData();
             ExternalInventoryReference reference = hatch.getExternalInventoryReference();
-            boolean hasCustomData = reference != null
-                    || itemData.intervalTicks() != PassiveCraftingHatchBlockEntity.DEFAULT_INTERVAL_TICKS
-                    || itemData.multiplier() != 1L;
+            List<PassiveHatchSettings.SlotMultiplier> slotMultipliers = hatch.slotMultiplierSettings();
+            boolean customInterval = itemData.intervalTicks()
+                    != PassiveCraftingHatchBlockEntity.DEFAULT_INTERVAL_TICKS;
+            boolean customMultiplier = itemData.multiplier() != 1L;
+            boolean hasCustomData = reference != null || customInterval || customMultiplier
+                    || !slotMultipliers.isEmpty();
             if (hasCustomData) {
                 for (ItemStack drop : drops) {
                     if (drop.is(asItem())) {
                         if (reference != null) {
                             drop.set(UComponents.EXTERNAL_INVENTORY_REFERENCE.get(), reference);
                         }
-                        if (itemData.intervalTicks() != PassiveCraftingHatchBlockEntity.DEFAULT_INTERVAL_TICKS
-                                || itemData.multiplier() != 1L) {
+                        if (customInterval || customMultiplier || !slotMultipliers.isEmpty()) {
                             drop.set(UComponents.PASSIVE_HATCH_SETTINGS.get(),
-                                    new PassiveHatchSettings(itemData.intervalTicks(), itemData.multiplier()));
+                                    new PassiveHatchSettings(itemData.intervalTicks(),
+                                            itemData.multiplier(), slotMultipliers));
                         }
                         break;
                     }

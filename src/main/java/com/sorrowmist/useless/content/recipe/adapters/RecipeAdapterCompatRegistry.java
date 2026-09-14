@@ -63,6 +63,7 @@ import com.sorrowmist.useless.content.recipe.adapters.malum.VoidFavorRecipeAdapt
 import com.sorrowmist.useless.content.recipe.adapters.minecraft.BrewingRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.minecraft.CraftingRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.minecraft.SmeltingRecipeAdapter;
+import com.sorrowmist.useless.content.recipe.adapters.minecraft.VillagerTradeRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.mysticalagriculture.AwakeningRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.mysticalagriculture.InfusionRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.mysticalagriculture.OmniaUniversalSeedRecipeAdapter;
@@ -238,6 +239,9 @@ public final class RecipeAdapterCompatRegistry {
         }
         if (ConfigManager.isBrewingRecipeConversionEnabled()) {
             register(new BrewingRecipeAdapter());
+        }
+        if (ConfigManager.isVillagerTradeRecipeConversionEnabled()) {
+            register(new VillagerTradeRecipeAdapter());
         }
     }
 

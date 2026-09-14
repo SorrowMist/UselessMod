@@ -95,6 +95,7 @@ public class ConfigManager {
     private static final ModConfigSpec.BooleanValue ENABLE_CRAFTING_RECIPE_CONVERSION;
     private static final ModConfigSpec.BooleanValue ENABLE_SMELTING_RECIPE_CONVERSION;
     private static final ModConfigSpec.BooleanValue ENABLE_BREWING_RECIPE_CONVERSION;
+    private static final ModConfigSpec.BooleanValue ENABLE_VILLAGER_TRADE_RECIPE_CONVERSION;
     private static final ModConfigSpec.BooleanValue ENABLE_FARMERS_DELIGHT_RECIPE_CONVERSION;
     private static final ModConfigSpec.BooleanValue ENABLE_EXTRA_DELIGHT_RECIPE_CONVERSION;
     private static final ModConfigSpec.BooleanValue ENABLE_CRABBERS_DELIGHT_RECIPE_CONVERSION;
@@ -521,6 +522,8 @@ public class ConfigManager {
                 "enable_smelting_recipe_conversion", true);
         ENABLE_BREWING_RECIPE_CONVERSION = defineRecipeConversionOption(
                 "enable_brewing_recipe_conversion", true);
+        ENABLE_VILLAGER_TRADE_RECIPE_CONVERSION = defineRecipeConversionOption(
+                "enable_villager_trade_recipe_conversion", true);
         COMMON_BUILDER.pop();
 
         COMMON_BUILDER.translation("useless_mod.configuration.advanced_alloy_furnace.recipe_conversion.farmers_delight")
@@ -887,6 +890,10 @@ public class ConfigManager {
 
     public static boolean isBrewingRecipeConversionEnabled() {
         return getConfigValue(ENABLE_BREWING_RECIPE_CONVERSION);
+    }
+
+    public static boolean isVillagerTradeRecipeConversionEnabled() {
+        return getConfigValue(ENABLE_VILLAGER_TRADE_RECIPE_CONVERSION);
     }
 
     public static boolean isRecipeConversionEnabled(String sourceId) {

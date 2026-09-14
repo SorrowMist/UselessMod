@@ -9,5 +9,8 @@ public final class JDTERecipeCompatLoader {
 
     public static void register() {
         AlloyFurnaceRecipeManager.getInstance().registerAdapter(new InfusionRecipeAdapter());
+        AlloyFurnaceRecipeManager.getInstance().registerAdapter(new LifeSynthesisRecipeAdapter());
+        AlloyFurnaceRecipeManager.getInstance().registerAdapter(new BioFactoryRecipeAdapter());
+        AlloyFurnaceRecipeManager.getInstance().registerAdapter(new GreenhouseRecipeAdapter());
     }
 }

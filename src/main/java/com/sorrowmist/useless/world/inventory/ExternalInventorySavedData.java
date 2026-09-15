@@ -9,12 +9,14 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.saveddata.SavedData;
 import net.neoforged.neoforge.items.ItemStackHandler;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.Objects;
 
 public final class ExternalInventorySavedData extends SavedData {
     private static final int CURRENT_VERSION = 1;
     private static final String INVENTORY = "Inventory";
+    private static final String PAYLOAD = "Payload";
     private static final String KIND = "Kind";
     private static final String VERSION = "Version";
     private static final String BOUND = "Bound";
@@ -23,6 +25,12 @@ public final class ExternalInventorySavedData extends SavedData {
 
     private final ExternalInventoryReference reference;
     private CompoundTag inventory = new CompoundTag();
+    /**
+     * 非物品栏的通用载荷：给「一整块任意 NBT」用（紧凑 F9 的 176 条影子样板总线数据）。
+     * 它和 {@link #inventory} 互不影响，同一个文件里只会用到其中一种。
+     */
+    private CompoundTag payload = new CompoundTag();
+    private boolean hasPayload;
     private boolean initialized;
     private boolean claimed;
     private String ownerDimension;
@@ -46,6 +54,10 @@ public final class ExternalInventorySavedData extends SavedData {
         if (tag.contains(INVENTORY, Tag.TAG_COMPOUND)) {
             data.inventory = tag.getCompound(INVENTORY).copy();
             data.initialized = true;
+        }
+        if (tag.contains(PAYLOAD, Tag.TAG_COMPOUND)) {
+            data.payload = tag.getCompound(PAYLOAD).copy();
+            data.hasPayload = true;
         }
         data.claimed = tag.getBoolean(BOUND);
         if (tag.contains(OWNER_DIMENSION, Tag.TAG_STRING)) {
@@ -98,9 +110,29 @@ public final class ExternalInventorySavedData extends SavedData {
         setDirty();
     }
 
+    // ---------------------------------------------------------------- 通用载荷
+
+    /** 写入一段原始 NBT（调用方保证它已经是完整的一份，内部会再拷一次避免外部改动）。 */
+    public void saveRawPayload(CompoundTag value) {
+        payload = value.copy();
+        hasPayload = true;
+        initialized = true;
+        setDirty();
+    }
+
+    /** 取出上次写入的原始 NBT；没写过时返回 {@code null}。 */
+    @Nullable
+    public CompoundTag rawPayload() {
+        return hasPayload ? payload.copy() : null;
+    }
+
     public void copyInventoryTo(ExternalInventorySavedData target) {
         target.inventory = inventory.copy();
         target.initialized = initialized;
+        if (hasPayload) {
+            target.payload = payload.copy();
+            target.hasPayload = true;
+        }
         target.setDirty();
     }
 
@@ -119,6 +151,9 @@ public final class ExternalInventorySavedData extends SavedData {
             tag.putLong(OWNER_POS, ownerPos);
         }
         tag.put(INVENTORY, inventory.copy());
+        if (hasPayload) {
+            tag.put(PAYLOAD, payload.copy());
+        }
         return tag;
     }
 }

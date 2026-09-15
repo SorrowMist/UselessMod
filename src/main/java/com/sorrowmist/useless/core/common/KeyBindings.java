@@ -78,4 +78,22 @@ public class KeyBindings {
             GLFW.GLFW_KEY_TAB,
             CATEGORY
     ));
+    // 耕地/草径模式切换（右键泥土时的优先行为）
+    private static final String SWITCH_FARMLAND_MODE = "key.useless_mod.switch_farmland_mode";
+    public static final Lazy<KeyMapping> SWITCH_FARMLAND_MODE_KEY = Lazy.of(() -> new KeyMapping(
+            SWITCH_FARMLAND_MODE,
+            KeyConflictContext.IN_GAME,
+            InputConstants.Type.KEYSYM,
+            GLFW.GLFW_KEY_H,
+            CATEGORY
+    ));
+    // 顺手收菜开关
+    private static final String TOGGLE_CROP_HARVEST = "key.useless_mod.toggle_crop_harvest";
+    public static final Lazy<KeyMapping> TOGGLE_CROP_HARVEST_KEY = Lazy.of(() -> new KeyMapping(
+            TOGGLE_CROP_HARVEST,
+            KeyConflictContext.IN_GAME,
+            InputConstants.Type.KEYSYM,
+            GLFW.GLFW_KEY_J,
+            CATEGORY
+    ));
 }

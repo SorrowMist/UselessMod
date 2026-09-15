@@ -2,10 +2,13 @@ package com.sorrowmist.useless;
 
 import com.mojang.logging.LogUtils;
 import com.sorrowmist.useless.content.blocks.GlowPlasticBlock;
+import com.sorrowmist.useless.content.items.BeefCropHarvest;
 import com.sorrowmist.useless.content.items.EndlessBeafItem;
 import com.sorrowmist.useless.content.items.BeefTimeAcceleration;
+import com.sorrowmist.useless.utils.mining.RightClickChainer;
 import com.sorrowmist.useless.compat.constructionwand.ConstructionWandLogic;
 import com.sorrowmist.useless.compat.neoecoae.NeoEcoCompat;
+import com.sorrowmist.useless.compat.neoecoae.compact.NeoEcoCompactRegistry;
 import com.sorrowmist.useless.content.recipe.adapters.RecipeAdapterCompatRegistry;
 import com.sorrowmist.useless.core.component.UComponents;
 import com.sorrowmist.useless.core.config.ConfigManager;
@@ -24,6 +27,7 @@ import com.sorrowmist.useless.init.ModSounds;
 import com.sorrowmist.useless.world.dimension.UselessDimensions;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.packs.PackType;
 import net.minecraft.server.packs.repository.Pack;
 import net.minecraft.server.packs.repository.PackSource;
@@ -77,6 +81,15 @@ public class UselessMod {
 
         GlowPlasticBlock.BLOCKS.register(modEventBus);
         GlowPlasticBlock.ITEMS.register(modEventBus);
+
+        // 无用型紧凑 C9/F9/L9：只在 ECO 存在时注册。
+        // 这里的类加载是条件性的——ECO 缺席时 NeoEcoCompactRegistry 永远不会被初始化。
+        if (ModList.get().isLoaded("neoecoae")) {
+            NeoEcoCompactRegistry.init(modEventBus);
+            ModCreativeTabs.EXTRA_TAB_ITEMS.add(NeoEcoCompactRegistry.COMPACT_C9_ITEM);
+            ModCreativeTabs.EXTRA_TAB_ITEMS.add(NeoEcoCompactRegistry.COMPACT_F9_ITEM);
+            ModCreativeTabs.EXTRA_TAB_ITEMS.add(NeoEcoCompactRegistry.COMPACT_L9_ITEM);
+        }
 
         // 纬度注册
         UselessDimensions.init(modEventBus);
@@ -150,6 +163,28 @@ public class UselessMod {
         if (ConstructionWandLogic.handleRightClickBlock(event)) return;
 
         ItemStack stack = event.getItemStack();
+
+        // 顺手收菜：在其它模组的右键收菜逻辑之前先把成熟作物收掉，并把种子留在地里，
+        // 避免部分整合包的收菜功能在造化杖上把作物连根拔起。
+        // 潜行右键时不接管，方便玩家把这次交互让给其它模组。
+        // 按住连锁键（Tab）时按连锁范围整片收。
+        if (!event.isCanceled()
+                && stack.getItem() instanceof EndlessBeafItem
+                && EndlessBeafItem.isCropHarvestEnabled(stack)
+                && !event.getEntity().isShiftKeyDown()
+                && BeefCropHarvest.isHarvestable(event.getLevel().getBlockState(event.getPos()))) {
+            if (event.getLevel() instanceof ServerLevel serverLevel) {
+                if (RightClickChainer.shouldChain(event.getEntity(), stack)) {
+                    RightClickChainer.harvestCrops(serverLevel, event.getPos(), event.getEntity(), stack);
+                } else {
+                    BeefCropHarvest.harvest(serverLevel, event.getPos(), event.getEntity(), stack);
+                }
+            }
+            event.setCanceled(true);
+            event.setCancellationResult(InteractionResult.sidedSuccess(event.getLevel().isClientSide()));
+            return;
+        }
+
         if (stack.getItem() instanceof EndlessBeafItem) {
             InteractionResult teleportResult = EndlessBeafItem.tryTeleport(
                     event.getLevel(), event.getEntity(), stack);

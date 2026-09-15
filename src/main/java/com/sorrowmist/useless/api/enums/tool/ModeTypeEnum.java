@@ -56,7 +56,15 @@ public enum ModeTypeEnum {
     BEEF_MAGNET_DISABLED("beef_magnet_disabled", "tooltip.useless_mod.beef_magnet_mode"),
 
     BEEF_ADVANCED_STEALTH_ENABLED("beef_advanced_stealth_enabled", "tooltip.useless_mod.beef_advanced_stealth_mode"),
-    BEEF_ADVANCED_STEALTH_DISABLED("beef_advanced_stealth_disabled", "tooltip.useless_mod.beef_advanced_stealth_mode");
+    BEEF_ADVANCED_STEALTH_DISABLED("beef_advanced_stealth_disabled", "tooltip.useless_mod.beef_advanced_stealth_mode"),
+
+    // 土壤右键模式：true = 锄头优先（耕地），false = 铲子优先（草径）
+    BEEF_FARMLAND_MODE_ENABLED("beef_farmland_mode_enabled", "tooltip.useless_mod.beef_farmland_mode"),
+    BEEF_FARMLAND_MODE_DISABLED("beef_farmland_mode_disabled", "tooltip.useless_mod.beef_farmland_mode"),
+
+    // 顺手收菜：true = 右键成熟作物时收菜并保留种子在地里
+    BEEF_CROP_HARVEST_ENABLED("beef_crop_harvest_enabled", "tooltip.useless_mod.beef_crop_harvest_mode"),
+    BEEF_CROP_HARVEST_DISABLED("beef_crop_harvest_disabled", "tooltip.useless_mod.beef_crop_harvest_mode");
 
     private final String name;
     private final String tooltipKey;
@@ -127,6 +135,14 @@ public enum ModeTypeEnum {
 
     public static ModeTypeEnum getBeefAdvancedStealthMode(boolean enabled) {
         return enabled ? BEEF_ADVANCED_STEALTH_ENABLED : BEEF_ADVANCED_STEALTH_DISABLED;
+    }
+
+    public static ModeTypeEnum getBeefFarmlandMode(boolean enabled) {
+        return enabled ? BEEF_FARMLAND_MODE_ENABLED : BEEF_FARMLAND_MODE_DISABLED;
+    }
+
+    public static ModeTypeEnum getBeefCropHarvestMode(boolean enabled) {
+        return enabled ? BEEF_CROP_HARVEST_ENABLED : BEEF_CROP_HARVEST_DISABLED;
     }
 
     public String getName() {return this.name;}

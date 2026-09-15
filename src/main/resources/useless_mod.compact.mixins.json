@@ -1,0 +1,11 @@
+{
+  "required": true,
+  "package": "com.sorrowmist.useless.mixin.compact",
+  "compatibilityLevel": "JAVA_21",
+  "mixins": [
+    "GridMachineClassMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

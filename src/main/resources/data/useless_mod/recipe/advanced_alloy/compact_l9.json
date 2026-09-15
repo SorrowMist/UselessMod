@@ -1,0 +1,67 @@
+{
+    "type": "useless_mod:advanced_alloy_furnace",
+    "neoforge:conditions": [
+        {
+            "type": "neoforge:mod_loaded",
+            "modid": "neoecoae"
+        }
+    ],
+    "energy": 4000000,
+    "id": "useless_mod:advanced_alloy/compact_l9",
+    "ingredients": [
+        {
+            "count": 22,
+            "ingredient": {
+                "item": "neoecoae:storage_casing"
+            }
+        },
+        {
+            "count": 1,
+            "ingredient": {
+                "item": "neoecoae:storage_system_l9"
+            }
+        },
+        {
+            "count": 1,
+            "ingredient": {
+                "item": "neoecoae:storage_interface"
+            }
+        },
+        {
+            "count": 33,
+            "ingredient": {
+                "item": "neoecoae:eco_drive"
+            }
+        },
+        {
+            "count": 22,
+            "ingredient": {
+                "item": "neoecoae:energy_cell_l9"
+            }
+        },
+        {
+            "count": 11,
+            "ingredient": {
+                "item": "neoecoae:storage_vent"
+            }
+        },
+        {
+            "count": 64,
+            "ingredient": {
+                "item": "neoecoae:eco_infinite_cell_component"
+            }
+        },
+        {
+            "count": 12,
+            "ingredient": {
+                "item": "neoecoae:eco_item_storage_cell_256m"
+            }
+        }
+    ],
+    "outputs": [
+        {
+            "id": "useless_mod:useless_compact_l9"
+        }
+    ],
+    "process_time": 200
+}

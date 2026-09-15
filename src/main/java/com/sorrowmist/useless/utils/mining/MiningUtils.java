@@ -281,11 +281,38 @@ public class MiningUtils {
      */
     static List<BlockPos> scanBlocksToMine(BlockPos originPos, BlockState originState, Level level, ItemStack stack,
                                            boolean forceMining, boolean enhanced) {
+        return scanBlocks(originPos, originState, level, stack, forceMining, enhanced, true);
+    }
+
+    /**
+     * 右键连锁用的扫描：等价组 / 范围 / 数量上限与连锁挖掘完全共用，
+     * 区别只是不做「工具能否挖掘该方块」的门槛判定
+     * （右键要作用的是耕地、原木、作物这些「工具动作能生效」的方块，
+     * 而它们未必是当前工具能正确采集的方块）。
+     *
+     * @param originPos   原点位置
+     * @param originState 原点方块状态
+     * @param level       世界
+     * @param enhanced    是否增强连锁（增强模式取消相邻限制，改为范围内扫描）
+     * @return 连锁范围（含原点，按距离从近到远排序）
+     */
+    static List<BlockPos> scanBlocksForUse(BlockPos originPos, BlockState originState, Level level, boolean enhanced) {
+        return scanBlocks(originPos, originState, level, ItemStack.EMPTY, false, enhanced, false);
+    }
+
+    /**
+     * 连锁扫描主流程
+     *
+     * @param requireMineable true = 挖矿语义（额外做工具等级 / 强制挖掘黑名单判定），
+     *                        false = 右键语义（只看等价组与范围）
+     */
+    private static List<BlockPos> scanBlocks(BlockPos originPos, BlockState originState, Level level, ItemStack stack,
+                                             boolean forceMining, boolean enhanced, boolean requireMineable) {
         if (forceMining && isForceMiningBlacklisted(originState)) {
             return List.of();
         }
         if (enhanced) {
-            return scanAreaBlocks(originPos, originState, level, stack, forceMining);
+            return scanAreaBlocks(originPos, originState, level, stack, forceMining, requireMineable);
         }
         // 最大连锁数量
         int maxBlocks = ConfigManager.getChainMiningMaxBlocks();
@@ -299,7 +326,7 @@ public class MiningUtils {
         List<BlockPos> blocksToMine = new ArrayList<>(maxBlocks);
 
         // 检查原点方块是否可以被挖掘（工具等级检查）
-        if (!canMineBlock(originState, stack, forceMining)) {
+        if (requireMineable && !canMineBlock(originState, stack, forceMining)) {
             return blocksToMine; // 返回空列表
         }
 
@@ -340,7 +367,7 @@ public class MiningUtils {
                         BlockState nextState = level.getBlockState(neighborPos);
 
                         if (equivalence.matches(nextState)) {
-                            if (canMineBlock(nextState, stack, forceMining)
+                            if ((!requireMineable || canMineBlock(nextState, stack, forceMining))
                                     && !(forceMining && isForceMiningBlacklisted(nextState))) {
                                 visited.add(nLong);
                                 queue.add(neighborPos);
@@ -374,7 +401,7 @@ public class MiningUtils {
      * @return 需要破坏的方块列表
      */
     private static List<BlockPos> scanAreaBlocks(BlockPos originPos, BlockState originState, Level level,
-                                                 ItemStack stack, boolean forceMining) {
+                                                 ItemStack stack, boolean forceMining, boolean requireMineable) {
         // 最大连锁数量（包含原点方块）
         int maxBlocks = ConfigManager.getChainMiningMaxBlocks();
         // 获取连锁挖掘范围
@@ -399,7 +426,7 @@ public class MiningUtils {
                     BlockState nextState = level.getBlockState(targetPos);
 
                     if (equivalence.matches(nextState)) {
-                        if (canMineBlock(nextState, stack, forceMining)
+                        if ((!requireMineable || canMineBlock(nextState, stack, forceMining))
                                 && !(forceMining && isForceMiningBlacklisted(nextState))) {
                             blocksToMine.add(targetPos);
                         }

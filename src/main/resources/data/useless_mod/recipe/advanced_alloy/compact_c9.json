@@ -1,0 +1,73 @@
+{
+    "type": "useless_mod:advanced_alloy_furnace",
+    "neoforge:conditions": [
+        {
+            "type": "neoforge:mod_loaded",
+            "modid": "neoecoae"
+        }
+    ],
+    "energy": 4000000,
+    "id": "useless_mod:advanced_alloy/compact_c9",
+    "ingredients": [
+        {
+            "count": 168,
+            "ingredient": {
+                "item": "neoecoae:computation_casing"
+            }
+        },
+        {
+            "count": 8,
+            "ingredient": {
+                "item": "neoecoae:computation_system_l9"
+            }
+        },
+        {
+            "count": 8,
+            "ingredient": {
+                "item": "neoecoae:computation_interface"
+            }
+        },
+        {
+            "count": 88,
+            "ingredient": {
+                "item": "neoecoae:computation_transmitter"
+            }
+        },
+        {
+            "count": 176,
+            "ingredient": {
+                "item": "neoecoae:computation_drive"
+            }
+        },
+        {
+            "count": 176,
+            "ingredient": {
+                "item": "neoecoae:computation_parallel_core_l9"
+            }
+        },
+        {
+            "count": 88,
+            "ingredient": {
+                "item": "neoecoae:computation_threading_core_l9"
+            }
+        },
+        {
+            "count": 8,
+            "ingredient": {
+                "item": "neoecoae:computation_cooling_controller_l9"
+            }
+        },
+        {
+            "count": 176,
+            "ingredient": {
+                "item": "neoecoae:eco_computation_cell_l9"
+            }
+        }
+    ],
+    "outputs": [
+        {
+            "id": "useless_mod:useless_compact_c9"
+        }
+    ],
+    "process_time": 200
+}

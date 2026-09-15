@@ -12,6 +12,7 @@ import com.sorrowmist.useless.core.config.ConfigManager;
 import com.sorrowmist.useless.init.ModDamageTypes;
 import com.sorrowmist.useless.utils.EnchantmentUtil;
 import com.sorrowmist.useless.utils.UselessItemUtils;
+import com.sorrowmist.useless.utils.mining.RightClickChainer;
 import net.minecraft.ChatFormatting;
 import net.minecraft.advancements.CriteriaTriggers;
 import net.minecraft.client.KeyMapping;
@@ -151,6 +152,8 @@ public class EndlessBeafItem extends TieredItem {
                 .component(UComponents.BeefTeleportEnabledComponent, false)
                 .component(UComponents.BeefAoeDamageEnabledComponent, false)
                 .component(UComponents.BeefMagnetEnabledComponent, false)
+                .component(UComponents.BeefFarmlandModeComponent, false)
+                .component(UComponents.BeefCropHarvestComponent, true)
                 .component(UComponents.AEStoragePriorityComponent, false)
                 .component(UComponents.WrenchTagEnabledComponent, wrenchTagEnabled)
                 .component(UComponents.ConstructionWandEnabledComponent, false)
@@ -174,6 +177,46 @@ public class EndlessBeafItem extends TieredItem {
         if (ModList.get().isLoaded(EnderIOTravelCompat.MOD_ID)) {
             EnderIOTravelCompat.setTravelItemEnabled(stack, enabled);
         }
+    }
+
+    /**
+     * 右键泥土/草方块时的优先行为。
+     *
+     * <p>false（默认）= 铲子优先，泥土/草方块变成草径；true = 锄头优先，变成耕地。
+     * 造化杖同时具备铲子与锄头能力，而两条工具动作链是「谁先生效谁赢」，
+     * 所以用这个开关决定顺序。
+     */
+    public static boolean isFarmlandMode(ItemStack stack) {
+        return stack.getOrDefault(UComponents.BeefFarmlandModeComponent.get(), false);
+    }
+
+    public static void setFarmlandMode(ItemStack stack, boolean enabled) {
+        stack.set(UComponents.BeefFarmlandModeComponent.get(), enabled);
+    }
+
+    /**
+     * 「右键泥土」当前状态的文案：锄头优先（→ 耕地）或 铲子优先（→ 草径）。
+     * 物品 tooltip 与模式轮盘共用同一份文案，避免两处口径不一致。
+     */
+    public static Component farmlandStateText(ItemStack stack) {
+        boolean farmland = isFarmlandMode(stack);
+        return Component.translatable(farmland
+                ? "tooltip.useless_mod.beef_farmland_state.hoe"
+                : "tooltip.useless_mod.beef_farmland_state.shovel"
+        ).withStyle(farmland ? ChatFormatting.GREEN : ChatFormatting.YELLOW);
+    }
+
+    /**
+     * 是否由造化杖自己完成「右键收菜」：收获成熟作物并把种子留在地里。
+     *
+     * <p>用于避免部分整合包的右键收菜功能在造化杖上把作物连根拔起。
+     */
+    public static boolean isCropHarvestEnabled(ItemStack stack) {
+        return stack.getOrDefault(UComponents.BeefCropHarvestComponent.get(), true);
+    }
+
+    public static void setCropHarvestEnabled(ItemStack stack, boolean enabled) {
+        stack.set(UComponents.BeefCropHarvestComponent.get(), enabled);
     }
 
     /** Keeps the tool's fixed enchantments aligned with its selected mode and server config. */
@@ -856,28 +899,53 @@ public class EndlessBeafItem extends TieredItem {
             }
         }
 
+        // 按住连锁键（Tab）时，下面的右键操作也会连锁：
+        // 等价组 / 范围 / 数量上限与连锁挖掘完全共用（潜行时不连锁，只作用一块）。
+        ItemStack tool = ctx.getItemInHand();
+        boolean chainUse = RightClickChainer.shouldChain(player, tool);
+
         // ============================================================
-        // 2. 统一工具行为链 (铲子 -> 锄头 -> 斧头)
+        // 2. 顺手收菜 (右键成熟作物：收获并把种子留在地里，不拔根)
         // ============================================================
+        if (isCropHarvestEnabled(tool) && !player.isShiftKeyDown()
+                && BeefCropHarvest.isHarvestable(world.getBlockState(ctx.getClickedPos()))) {
+            if (world instanceof ServerLevel serverLevel) {
+                if (chainUse) {
+                    RightClickChainer.harvestCrops(serverLevel, ctx.getClickedPos(), player, tool);
+                } else {
+                    BeefCropHarvest.harvest(serverLevel, ctx.getClickedPos(), player, tool);
+                }
+            }
+            // 两端都消费本次交互，避免客户端反复摆动
+            return InteractionResult.sidedSuccess(world.isClientSide);
+        }
 
-        // 2.1 铲子 (铺路)
-        InteractionResult res = this.tryToolAction(ctx, ItemAbilities.SHOVEL_FLATTEN, SoundEvents.SHOVEL_FLATTEN);
+        // ============================================================
+        // 3. 统一工具行为链 (铲子 / 锄头 顺序由耕地模式决定，随后是斧头)
+        // ============================================================
+        boolean farmlandMode = isFarmlandMode(tool);
+        ItemAbility firstSoilAction = farmlandMode ? ItemAbilities.HOE_TILL : ItemAbilities.SHOVEL_FLATTEN;
+        SoundEvent firstSoilSound = farmlandMode ? SoundEvents.HOE_TILL : SoundEvents.SHOVEL_FLATTEN;
+        ItemAbility secondSoilAction = farmlandMode ? ItemAbilities.SHOVEL_FLATTEN : ItemAbilities.HOE_TILL;
+        SoundEvent secondSoilSound = farmlandMode ? SoundEvents.SHOVEL_FLATTEN : SoundEvents.HOE_TILL;
+
+        // 3.1 土壤交互（耕地模式：锄头优先；草径模式：铲子优先）
+        InteractionResult res = this.tryToolAction(ctx, firstSoilAction, firstSoilSound, chainUse);
         if (res != InteractionResult.PASS) return res;
 
-        // 2.2 锄头 (耕地)
-        res = this.tryToolAction(ctx, ItemAbilities.HOE_TILL, SoundEvents.HOE_TILL);
+        res = this.tryToolAction(ctx, secondSoilAction, secondSoilSound, chainUse);
         if (res != InteractionResult.PASS) return res;
 
-        // 2.3 斧头 (剥皮)
-        res = this.tryToolAction(ctx, ItemAbilities.AXE_STRIP, SoundEvents.AXE_STRIP);
+        // 3.2 斧头 (剥皮)
+        res = this.tryToolAction(ctx, ItemAbilities.AXE_STRIP, SoundEvents.AXE_STRIP, chainUse);
         if (res != InteractionResult.PASS) return res;
 
-        // 2.4 斧头 (刮铜)
-        res = this.tryScrapeOrWaxOff(ctx, ItemAbilities.AXE_SCRAPE, SoundEvents.AXE_SCRAPE, 3005);
+        // 3.3 斧头 (刮铜)
+        res = this.tryScrapeOrWaxOff(ctx, ItemAbilities.AXE_SCRAPE, SoundEvents.AXE_SCRAPE, 3005, chainUse);
         if (res != InteractionResult.PASS) return res;
 
-        // 2.5 斧头 (去蜡)
-        return this.tryScrapeOrWaxOff(ctx, ItemAbilities.AXE_WAX_OFF, SoundEvents.AXE_WAX_OFF, 3004);
+        // 3.4 斧头 (去蜡)
+        return this.tryScrapeOrWaxOff(ctx, ItemAbilities.AXE_WAX_OFF, SoundEvents.AXE_WAX_OFF, 3004, chainUse);
     }
 
     public static InteractionResult trySummonLightningForCollector(Level level, BlockPos clickedPos, @Nullable Player player) {
@@ -1143,6 +1211,22 @@ public class EndlessBeafItem extends TieredItem {
                                            .withStyle(ChatFormatting.BLUE));
         }
 
+        // 右键泥土：锄头优先（变耕地）/ 铲子优先（变草径）
+        tooltipComponents.add(Component.translatable("tooltip.useless_mod.beef_farmland_mode")
+                                       .append(": ")
+                                       .append(farmlandStateText(stack))
+                                       .withStyle(ChatFormatting.GOLD));
+
+        // 顺手收菜：右键成熟作物时收获并保留种子在地里
+        boolean beefCropHarvest = isCropHarvestEnabled(stack);
+        tooltipComponents.add(Component.translatable("tooltip.useless_mod.beef_crop_harvest_mode")
+                                       .append(": ")
+                                       .append(Component.translatable(
+                                               beefCropHarvest ? "tooltip.useless_mod.enable" :
+                                                       "tooltip.useless_mod.disable"
+                                       ).withStyle(beefCropHarvest ? ChatFormatting.GREEN : ChatFormatting.GRAY))
+                                       .withStyle(ChatFormatting.GREEN));
+
         tooltipComponents.add(Component.empty());
 
         // 3. 动态按键提示（Shift 展开）
@@ -1162,10 +1246,19 @@ public class EndlessBeafItem extends TieredItem {
             this.addKeyTooltip(tooltipComponents, KeyBindings.SWITCH_FORCE_MINING_KEY,
                                "tooltip.useless_mod.key.switch_force_mining"
             );
+            this.addKeyTooltip(tooltipComponents, KeyBindings.SWITCH_FARMLAND_MODE_KEY,
+                               "tooltip.useless_mod.key.switch_farmland_mode"
+            );
+            this.addKeyTooltip(tooltipComponents, KeyBindings.TOGGLE_CROP_HARVEST_KEY,
+                               "tooltip.useless_mod.key.toggle_crop_harvest"
+            );
 
             // 触发按键
             this.addKeyTooltip(tooltipComponents, KeyBindings.TRIGGER_CHAIN_MINING_KEY,
                                "tooltip.useless_mod.key.trigger_chain_mining"
+            );
+            this.addKeyTooltip(tooltipComponents, KeyBindings.TRIGGER_CHAIN_MINING_KEY,
+                               "tooltip.useless_mod.key.chain_use"
             );
             this.addKeyTooltip(tooltipComponents, KeyBindings.TRIGGER_FORCE_MINING_KEY,
                                "tooltip.useless_mod.key.trigger_force_mining"
@@ -1197,6 +1290,10 @@ public class EndlessBeafItem extends TieredItem {
                 Component.translatable("tooltip.useless_mod.time_acceleration_hint").withStyle(ChatFormatting.LIGHT_PURPLE));
         tooltipComponents.add(
                 Component.translatable("tooltip.useless_mod.beef_teleport_hint").withStyle(ChatFormatting.LIGHT_PURPLE));
+        tooltipComponents.add(
+                Component.translatable("tooltip.useless_mod.beef_farmland_hint").withStyle(ChatFormatting.GOLD));
+        tooltipComponents.add(
+                Component.translatable("tooltip.useless_mod.beef_crop_harvest_hint").withStyle(ChatFormatting.GREEN));
 
         // 可选：增强连锁说明
         // tooltipComponents.add(Component.translatable("tooltip.useless_mod.enhanced_chain_description").withStyle(ChatFormatting.BLUE));
@@ -1232,11 +1329,15 @@ public class EndlessBeafItem extends TieredItem {
     /**
      * 通用工具动作逻辑
      */
-    private InteractionResult tryToolAction(UseOnContext ctx, ItemAbility ability, SoundEvent sound) {
+    private InteractionResult tryToolAction(UseOnContext ctx, ItemAbility ability, SoundEvent sound, boolean chain) {
         Level world = ctx.getLevel();
         BlockPos pos = ctx.getClickedPos();
         BlockState modified = world.getBlockState(pos).getToolModifiedState(ctx, ability, false);
         if (modified != null) {
+            if (chain) {
+                // 连锁：交给 RightClickChainer 按连锁范围整片处理
+                return RightClickChainer.applyToolAction(ctx, ability, sound, -1);
+            }
             world.playSound(ctx.getPlayer(), pos, sound, SoundSource.BLOCKS, 1.0F, 1.0F);
             if (!world.isClientSide) {
                 world.setBlock(pos, modified, 11);
@@ -1253,11 +1354,15 @@ public class EndlessBeafItem extends TieredItem {
      * 针对铜块刮擦和去蜡的特殊逻辑 (带 LevelEvent 粒子效果)
      */
     private InteractionResult tryScrapeOrWaxOff(UseOnContext ctx, ItemAbility ability, SoundEvent sound,
-                                                int levelEvent) {
+                                                int levelEvent, boolean chain) {
         Level world = ctx.getLevel();
         BlockPos pos = ctx.getClickedPos();
         BlockState modified = world.getBlockState(pos).getToolModifiedState(ctx, ability, false);
         if (modified != null) {
+            if (chain) {
+                // 连锁：交给 RightClickChainer 按连锁范围整片处理（粒子按块给，音效只响一次）
+                return RightClickChainer.applyToolAction(ctx, ability, sound, levelEvent);
+            }
             world.playSound(ctx.getPlayer(), pos, sound, SoundSource.BLOCKS, 1.0F, 1.0F);
             world.levelEvent(ctx.getPlayer(), levelEvent, pos, 0);
             if (!world.isClientSide) {

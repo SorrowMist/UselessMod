@@ -1,0 +1,73 @@
+{
+    "type": "useless_mod:advanced_alloy_furnace",
+    "neoforge:conditions": [
+        {
+            "type": "neoforge:mod_loaded",
+            "modid": "neoecoae"
+        }
+    ],
+    "energy": 4000000,
+    "id": "useless_mod:advanced_alloy/compact_f9",
+    "ingredients": [
+        {
+            "count": 160,
+            "ingredient": {
+                "item": "neoecoae:crafting_casing"
+            }
+        },
+        {
+            "count": 8,
+            "ingredient": {
+                "item": "neoecoae:crafting_system_l9"
+            }
+        },
+        {
+            "count": 8,
+            "ingredient": {
+                "item": "neoecoae:output_hatch"
+            }
+        },
+        {
+            "count": 8,
+            "ingredient": {
+                "item": "neoecoae:crafting_interface"
+            }
+        },
+        {
+            "count": 8,
+            "ingredient": {
+                "item": "neoecoae:input_hatch"
+            }
+        },
+        {
+            "count": 88,
+            "ingredient": {
+                "item": "neoecoae:crafting_worker"
+            }
+        },
+        {
+            "count": 176,
+            "ingredient": {
+                "item": "neoecoae:crafting_parallel_core_l9"
+            }
+        },
+        {
+            "count": 176,
+            "ingredient": {
+                "item": "neoecoae:crafting_pattern_bus"
+            }
+        },
+        {
+            "count": 88,
+            "ingredient": {
+                "item": "neoecoae:crafting_vent"
+            }
+        }
+    ],
+    "outputs": [
+        {
+            "id": "useless_mod:useless_compact_f9"
+        }
+    ],
+    "process_time": 200
+}

@@ -44,6 +44,8 @@ public final class BeefToolModuleRegistry {
     public static final String BEEF_TELEPORT = "mode.beef_teleport";
     public static final String BEEF_AOE_DAMAGE = "mode.beef_aoe_damage";
     public static final String BEEF_MAGNET = "mode.beef_magnet";
+    public static final String BEEF_FARMLAND_MODE = "mode.beef_farmland";
+    public static final String BEEF_CROP_HARVEST = "mode.beef_crop_harvest";
 
     private static final List<Definition> DEFINITIONS = List.of(
             new Definition(ENCHANT_SILK_TOUCH, EnchantMode.SILK_TOUCH.getTooltip(), GroupKind.TOOLS,
@@ -100,12 +102,20 @@ public final class BeefToolModuleRegistry {
             new Definition(BEEF_TELEPORT, ModeTypeEnum.BEEF_TELEPORT_ENABLED.getTooltip(), GroupKind.AUXILIARY,
                     Availability.ENDLESS, false),
             new Definition(BEEF_MAGNET, ModeTypeEnum.BEEF_MAGNET_ENABLED.getTooltip(), GroupKind.AUXILIARY,
-                    Availability.ENDLESS, false)
+                    Availability.ENDLESS, false),
+            new Definition(BEEF_FARMLAND_MODE, ModeTypeEnum.BEEF_FARMLAND_MODE_ENABLED.getTooltip(),
+                    GroupKind.AUXILIARY, Availability.ALWAYS, false),
+            new Definition(BEEF_CROP_HARVEST, ModeTypeEnum.BEEF_CROP_HARVEST_ENABLED.getTooltip(),
+                    GroupKind.AUXILIARY, Availability.ALWAYS, false)
     );
     private static final List<String> AUTO_COMBAT_MODULES = List.of(
             BEEF_MALUM_SPIRIT,
             BEEF_MYSTICAL_AGRICULTURE,
             BEEF_BEHEADING);
+    /** 新增的辅助类模块：老存档的布局里没有它们，进游戏时自动补进「辅助」分组。 */
+    private static final List<String> AUTO_AUXILIARY_MODULES = List.of(
+            BEEF_FARMLAND_MODE,
+            BEEF_CROP_HARVEST);
 
     private static final Map<String, Definition> BY_ID;
 
@@ -185,6 +195,43 @@ public final class BeefToolModuleRegistry {
             }
             combat.modules().add(moduleId);
         }
+
+        addMissingAuxiliaryModules(layout, target);
+    }
+
+    /**
+     * 把新增的辅助类模块补进「辅助」分组；找不到合适分组时先放进未分配区，
+     * 玩家可以在模式配置界面里自行拖拽。
+     */
+    private static void addMissingAuxiliaryModules(BeefToolLayout layout, ItemStack target) {
+        for (String moduleId : AUTO_AUXILIARY_MODULES) {
+            if (!isAvailable(moduleId, target) || layout.containsModule(moduleId)) {
+                continue;
+            }
+
+            BeefToolLayout.Group auxiliary = findAuxiliaryGroup(layout);
+            if (auxiliary != null) {
+                auxiliary.modules().add(moduleId);
+            } else if (layout.unassignedModules().size() < BeefToolLayout.MAX_TOTAL_MODULES) {
+                layout.unassignedModules().add(moduleId);
+            }
+        }
+    }
+
+    /** 找到已经放着辅助类模块、并且还有余量的分组（分组被改名也不影响）。 */
+    private static BeefToolLayout.Group findAuxiliaryGroup(BeefToolLayout layout) {
+        for (BeefToolLayout.Page page : layout.pages()) {
+            for (BeefToolLayout.Group group : page.groups()) {
+                if (group.modules().size() >= BeefToolLayout.MAX_MODULES_PER_GROUP) continue;
+                for (String moduleId : group.modules()) {
+                    Definition definition = get(moduleId);
+                    if (definition != null && definition.group() == GroupKind.AUXILIARY) {
+                        return group;
+                    }
+                }
+            }
+        }
+        return null;
     }
 
     private static BeefToolLayout.Group findOrCreateCombatGroup(BeefToolLayout layout) {

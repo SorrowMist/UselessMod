@@ -15,9 +15,19 @@ import net.neoforged.neoforge.registries.DeferredItem;
 import net.neoforged.neoforge.registries.DeferredRegister;
 import org.jetbrains.annotations.NotNull;
 
+import java.util.ArrayList;
+import java.util.List;
+
 public class ModCreativeTabs {
     public static final DeferredRegister<CreativeModeTab> CREATIVE_TAB =
             DeferredRegister.create(Registries.CREATIVE_MODE_TAB, UselessMod.MODID);
+
+    /**
+     * 由条件加载的兼容模块（例如 ECO 已安装时的紧凑方块）追加的创造栏条目。
+     * 这些物品只在对应前置存在时才会被注册，因此这里必须允许运行时追加。
+     */
+    public static final List<DeferredItem<? extends net.minecraft.world.item.Item>> EXTRA_TAB_ITEMS =
+            new ArrayList<>();
 
     public static final DeferredHolder<CreativeModeTab, CreativeModeTab> MAIN = CREATIVE_TAB.register(
             "main",
@@ -34,6 +44,7 @@ public class ModCreativeTabs {
                                      }
 
                                      ModItems.CREATIVE_MAIN_TAB_ITEMS.forEach(pOutput::accept);
+                                     EXTRA_TAB_ITEMS.forEach(item -> pOutput.accept(item.get()));
                                  })
                                  .build()
     );

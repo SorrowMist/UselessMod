@@ -40,6 +40,8 @@ public class ClientEventBusSubscriber {
         // 模式开关
         event.register(KeyBindings.TOGGLE_CHAIN_MODE_KEY.get());
         event.register(KeyBindings.SWITCH_FORCE_MINING_KEY.get());
+        event.register(KeyBindings.SWITCH_FARMLAND_MODE_KEY.get());
+        event.register(KeyBindings.TOGGLE_CROP_HARVEST_KEY.get());
 
         // 触发按键
         event.register(KeyBindings.TRIGGER_CHAIN_MINING_KEY.get());
@@ -99,6 +101,26 @@ public class ClientEventBusSubscriber {
                 boolean currentEnabled = mainHandItem.getOrDefault(UComponents.ForceMiningComponent.get(), false);
                 PacketDistributor.sendToServer(
                         new ModeTogglePacket(ModeTogglePacket.ModeType.FORCE_MINING, !currentEnabled));
+            }
+        }
+
+        if (KeyBindings.SWITCH_FARMLAND_MODE_KEY.get().consumeClick()) {
+            ItemStack mainHandItem = player.getMainHandItem();
+            if (mainHandItem.getItem() instanceof EndlessBeafItem) {
+                // 切换右键泥土的结果：草径(铲子) <-> 耕地(锄头)
+                boolean currentFarmland = EndlessBeafItem.isFarmlandMode(mainHandItem);
+                PacketDistributor.sendToServer(
+                        new ModeTogglePacket(ModeTogglePacket.ModeType.BEEF_FARMLAND_MODE, !currentFarmland));
+            }
+        }
+
+        if (KeyBindings.TOGGLE_CROP_HARVEST_KEY.get().consumeClick()) {
+            ItemStack mainHandItem = player.getMainHandItem();
+            if (mainHandItem.getItem() instanceof EndlessBeafItem) {
+                // 切换顺手收菜（右键成熟作物：收获并保留种子在地里）
+                boolean currentHarvest = EndlessBeafItem.isCropHarvestEnabled(mainHandItem);
+                PacketDistributor.sendToServer(
+                        new ModeTogglePacket(ModeTogglePacket.ModeType.BEEF_CROP_HARVEST, !currentHarvest));
             }
         }
 

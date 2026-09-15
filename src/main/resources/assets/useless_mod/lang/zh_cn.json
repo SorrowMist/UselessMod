@@ -679,6 +679,8 @@
   "key.useless_mod.force_mining": "强制挖掘模式切换",
   "key.useless_mod.switch_mode_wheel": "打开模式选择轮盘",
   "key.useless_mod.trigger_force_mining": "触发强制挖掘",
+  "key.useless_mod.switch_farmland_mode": "切换耕地/草径模式",
+  "key.useless_mod.toggle_crop_harvest": "顺手收菜开关",
   "tooltip.useless_mod.festive_affix": "5% 概率在击杀时触发战利品大爆发",
   "tooltip.useless_mod.auto_collect": "自带磁力功能",
   "tooltip.useless_mod.time_acceleration_mode": "时间加速模式",
@@ -686,6 +688,12 @@
   "tooltip.useless_mod.beef_teleport_mode": "传送",
   "tooltip.useless_mod.beef_aoe_damage_mode": "范围伤害",
   "tooltip.useless_mod.beef_magnet_mode": "范围磁力",
+  "tooltip.useless_mod.beef_farmland_mode": "右键",
+  "tooltip.useless_mod.beef_farmland_state.hoe": "锄头优先",
+  "tooltip.useless_mod.beef_farmland_state.shovel": "铲子优先",
+  "tooltip.useless_mod.beef_farmland_hint": "右键泥土 / 草方块时优先用哪个工具：锄头优先变耕地，铲子优先变草径",
+  "tooltip.useless_mod.beef_crop_harvest_mode": "顺手收菜",
+  "tooltip.useless_mod.beef_crop_harvest_hint": "右键成熟作物直接收获、种子留在地里；潜行右键把这次交互让给其它模组",
   "tooltip.useless_mod.beef_teleport_hint": "开启后按住 Shift 右键进行短距离传送；安装 Ender IO 时可传送至旅行锚",
   "tooltip.useless_mod.current_tool_mode": "当前工具模式",
   "tooltip.useless_mod.none_mode": "未选择",
@@ -719,7 +727,10 @@
   "tooltip.useless_mod.key.switch_fortune": "§d按下 %s 切换到时运模式",
   "tooltip.useless_mod.key.toggle_chain_mode": "§d按下 %s 切换连锁挖掘（普通 ↔ 增强）",
   "tooltip.useless_mod.key.switch_force_mining": "§d按下 %s 切换强制挖掘模式",
+  "tooltip.useless_mod.key.switch_farmland_mode": "§d按下 %s 切换泥土右键优先（锄头 / 铲子）",
+  "tooltip.useless_mod.key.toggle_crop_harvest": "§d按下 %s 切换顺手收菜",
   "tooltip.useless_mod.key.trigger_chain_mining": "§c按住 %s 临时激活连锁挖掘",
+  "tooltip.useless_mod.key.chain_use": "§c按住 %s 右键操作（耕地/铺路、剥皮/刮铜/去蜡、收菜）同样连锁",
   "tooltip.useless_mod.key.trigger_force_mining": "§c按住 %s 临时激活强制挖掘",
   "tooltip.useless_mod.key.open_mode_wheel": "§e按下 %s 打开模式选择轮盘",
   "tooltip.useless_mod.furnace_tier": "阶级: %s",
@@ -932,5 +943,11 @@
   ,"useless_mod.configuration.coil_tier_9_single_task_parallel": "多方块线圈 9 阶单任务并行数"
   ,"useless_mod.configuration.coil_tier_9_energy_divisor": "多方块线圈 9 阶能耗除数"
   ,"useless_mod.configuration.coil_tier_9_time_multiplier": "多方块线圈 9 阶时间倍率"
-  ,"useless_mod.configuration.useful_tier_threads": "多方块有用级线程数"
+  ,"useless_mod.configuration.useful_tier_threads": "多方块有用级线程数",
+  "block.useless_mod.useless_compact_c9": "无用型紧凑C9",
+  "block.useless_mod.useless_compact_f9": "无用型紧凑F9",
+  "block.useless_mod.useless_compact_l9": "无用型紧凑L9",
+  "tooltip.useless_mod.useless_compact_c9": "单方块等价于八联满配 C9：8 台满长高能网络交换主机合并后的极限模式。",
+  "tooltip.useless_mod.useless_compact_f9": "单方块等价于八联满配 F9：8 台满长高能网络交换主机，88 条 FX 执行通道，虚拟合成。",
+  "tooltip.useless_mod.useless_compact_l9": "单方块 L9 存储主机，直接运行 ECO 无限存储。"
 }

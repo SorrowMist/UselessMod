@@ -8,7 +8,12 @@ public enum ExternalInventoryKind {
     FURNACE(0, "furnace"),
     PATTERN_ASSEMBLY(1, "pattern_assembly"),
     MOLD_HUB(2, "mold_hub"),
-    PASSIVE_HATCH(3, "passive_hatch");
+    PASSIVE_HATCH(3, "passive_hatch"),
+    /**
+     * 紧凑 F9 内部 176 条影子样板总线的整份持久化数据（不是物品栏，而是一段原始 NBT）。
+     * 它跟着主机身上的 UUID 引用走，方块被拆掉时数据留在外置存储里等掉落物把它带回来。
+     */
+    COMPACT_PATTERN_BUS(4, "compact_pattern_bus");
 
     public static final Codec<ExternalInventoryKind> CODEC = Codec.STRING.xmap(
             ExternalInventoryKind::fromName,

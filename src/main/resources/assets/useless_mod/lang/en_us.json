@@ -678,6 +678,8 @@
   "key.useless_mod.force_mining": "Force Mining Toggle",
   "key.useless_mod.switch_mode_wheel": "Open Mode Selection Wheel",
   "key.useless_mod.trigger_force_mining": "Trigger Force Mining",
+  "key.useless_mod.switch_farmland_mode": "Toggle Farmland / Path Mode",
+  "key.useless_mod.toggle_crop_harvest": "Toggle Quick Harvest",
   "tooltip.useless_mod.fast_break_plastic": "Shift + Right Click to quickly break plastic blocks",
   "tooltip.useless_mod.ae_storage_priority_bind_hint": "§aShift+Right-click§rME Wireless Access Point to bind",
   "tooltip.useless_mod.festive_affix": "5% chance to trigger loot explosion on kill",
@@ -687,6 +689,12 @@
   "tooltip.useless_mod.beef_teleport_mode": "Teleport",
   "tooltip.useless_mod.beef_aoe_damage_mode": "AoE Damage",
   "tooltip.useless_mod.beef_magnet_mode": "Ranged Magnet",
+  "tooltip.useless_mod.beef_farmland_mode": "Right-Click",
+  "tooltip.useless_mod.beef_farmland_state.hoe": "Hoe Priority",
+  "tooltip.useless_mod.beef_farmland_state.shovel": "Shovel Priority",
+  "tooltip.useless_mod.beef_farmland_hint": "Which tool wins when right-clicking dirt / grass: hoe priority makes farmland, shovel priority makes a dirt path",
+  "tooltip.useless_mod.beef_crop_harvest_mode": "Quick Harvest",
+  "tooltip.useless_mod.beef_crop_harvest_hint": "Right-click a mature crop to harvest it and leave the seed in the ground; sneak + right-click hands the interaction back to other mods",
   "tooltip.useless_mod.beef_teleport_hint": "Hold Shift and right-click to blink forward; with Ender IO, right-click to travel to an anchor",
   "tooltip.useless_mod.current_tool_mode": "Current Tool Mode",
   "tooltip.useless_mod.none_mode": "None",
@@ -720,7 +728,10 @@
   "tooltip.useless_mod.key.switch_fortune": "§dPress %s to switch to Fortune mode",
   "tooltip.useless_mod.key.toggle_chain_mode": "§dPress %s to toggle Chain Mining (Normal ↔ Enhanced)",
   "tooltip.useless_mod.key.switch_force_mining": "§dPress %s to toggle Force Mining mode",
+  "tooltip.useless_mod.key.switch_farmland_mode": "§dPress %s to switch the Right-Click Dirt priority (Hoe / Shovel)",
+  "tooltip.useless_mod.key.toggle_crop_harvest": "§dPress %s to toggle Quick Harvest",
   "tooltip.useless_mod.key.trigger_chain_mining": "§cHold %s to temporarily activate Chain Mining",
+  "tooltip.useless_mod.key.chain_use": "§cHold %s to chain right-click actions too (soil, stripping/scraping/wax off, harvesting)",
   "tooltip.useless_mod.key.trigger_force_mining": "§cHold %s to temporarily activate Force Mining",
   "tooltip.useless_mod.key.open_mode_wheel": "§ePress %s to open Mode Selection Wheel",
   "tooltip.useless_mod.furnace_tier": "Tier: %s",
@@ -932,5 +943,11 @@
   ,"useless_mod.configuration.coil_tier_9_single_task_parallel": "Multiblock Coil Tier 9 Single-task Parallelism"
   ,"useless_mod.configuration.coil_tier_9_energy_divisor": "Multiblock Coil Tier 9 Energy Divisor"
   ,"useless_mod.configuration.coil_tier_9_time_multiplier": "Multiblock Coil Tier 9 Time Multiplier"
-  ,"useless_mod.configuration.useful_tier_threads": "Multiblock Useful Tier Thread Count"
+  ,"useless_mod.configuration.useful_tier_threads": "Multiblock Useful Tier Thread Count",
+  "block.useless_mod.useless_compact_c9": "Useless Compact C9",
+  "block.useless_mod.useless_compact_f9": "Useless Compact F9",
+  "block.useless_mod.useless_compact_l9": "Useless Compact L9",
+  "tooltip.useless_mod.useless_compact_c9": "Single block equivalent to eight fully configured C9 computation hosts (endgame mode).",
+  "tooltip.useless_mod.useless_compact_f9": "Single block equivalent to eight fully extended F9 crafting hosts (virtual crafting).",
+  "tooltip.useless_mod.useless_compact_l9": "Single block L9 storage host running ECO infinite storage."
 }

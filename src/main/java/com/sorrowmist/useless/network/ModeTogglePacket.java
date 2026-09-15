@@ -129,6 +129,16 @@ public class ModeTogglePacket implements CustomPacketPayload {
                         stack.set(UComponents.BeefMagnetEnabledComponent.get(), msg.enabled);
                     }
                 }
+                case BEEF_FARMLAND_MODE -> {
+                    if (stack.getItem() instanceof EndlessBeafItem) {
+                        stack.set(UComponents.BeefFarmlandModeComponent.get(), msg.enabled);
+                    }
+                }
+                case BEEF_CROP_HARVEST -> {
+                    if (stack.getItem() instanceof EndlessBeafItem) {
+                        stack.set(UComponents.BeefCropHarvestComponent.get(), msg.enabled);
+                    }
+                }
             }
 
             // 显式同步物品到客户端
@@ -157,6 +167,8 @@ public class ModeTogglePacket implements CustomPacketPayload {
         BEEF_TELEPORT,
         BEEF_AOE_DAMAGE,
         BEEF_MAGNET,
-        BEEF_ADVANCED_STEALTH
+        BEEF_ADVANCED_STEALTH,
+        BEEF_FARMLAND_MODE,
+        BEEF_CROP_HARVEST
     }
 }

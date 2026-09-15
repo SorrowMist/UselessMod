@@ -40,9 +40,12 @@ public final class PassiveCraftingHatchScreen
         extends AbstractContainerScreen<PassiveCraftingHatchMenu> {
     /** Multiplier edits are optimistic on the client until the next server status snapshot. */
     private static final int PENDING_TICKS = 40;
-    private static final int BADGE_BACKDROP = 0x99000000;
+    /**
+     * Above {@code PatternSlotRenderer}'s 300 so a pattern's own display amount cannot cover it.
+     */
+    private static final float BADGE_Z = 400.0F;
     private static final int MULTIPLIER_CUSTOM_COLOR = 0xFFFFC65C;
-    private static final int MULTIPLIER_INHERITED_COLOR = 0xFFE6E9F2;
+    private static final int MULTIPLIER_INHERITED_COLOR = 0xFFFFFFFF;
     private static final int SELECTION_COLOR = 0xFFCC7A00;
     /** Widest text the right-hand readout can hold without spilling out of its inset. */
     private static final int READOUT_WIDTH = 70;
@@ -566,8 +569,13 @@ public final class PassiveCraftingHatchScreen
     }
 
     /**
-     * Draws the compact batch-size badge of one slot. Slots that merely follow the global
-     * multiplier stay quiet when empty, so a configured slot is recognisable at a glance.
+     * Draws the batch-size badge of one slot. Slots that merely follow the global multiplier stay
+     * quiet when empty, so a configured slot is recognisable at a glance.
+     *
+     * <p>The badge has no backdrop and is pushed above the pattern render. A pattern slot shows its
+     * own display amount in the bottom-right corner (drawn at z 300 by {@code PatternSlotRenderer}),
+     * so the multiplier sits in the top-right corner at z 400: transparent, floating over the icon,
+     * and with a drop shadow for contrast against bright item sprites.
      */
     private void renderSlotMultiplier(GuiGraphics graphics, Slot slot, int patternSlot) {
         boolean configured = displayedSlotMultiplierIsCustom(patternSlot);
@@ -580,17 +588,13 @@ public final class PassiveCraftingHatchScreen
         }
         float scale = Math.min(0.75F, 14.0F / Math.max(1, font.width(text)));
         int textWidth = Math.max(1, Math.round(font.width(text) * scale));
-        int textHeight = Math.max(1, Math.round(font.lineHeight * scale));
-        // Stop above the two-pixel progress underline, which is drawn after the badge.
-        int bottom = slot.y + 14;
-        int top = bottom - textHeight;
-        graphics.fill(slot.x + 1, top - 1, slot.x + 16, bottom, BADGE_BACKDROP);
         var pose = graphics.pose();
         pose.pushPose();
-        pose.translate(slot.x + 16 - textWidth - 1, top, 100.0F);
+        pose.translate(0.0F, 0.0F, BADGE_Z);
+        pose.translate(slot.x + 16 - textWidth - 1, slot.y + 1, 0.0F);
         pose.scale(scale, scale, 1.0F);
         graphics.drawString(font, text, 0, 0,
-                configured ? MULTIPLIER_CUSTOM_COLOR : MULTIPLIER_INHERITED_COLOR, false);
+                configured ? MULTIPLIER_CUSTOM_COLOR : MULTIPLIER_INHERITED_COLOR, true);
         pose.popPose();
     }
 

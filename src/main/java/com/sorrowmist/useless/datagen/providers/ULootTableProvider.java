@@ -59,6 +59,16 @@ public class ULootTableProvider extends LootTableProvider {
             for (var entry : ModBlocks.USELESS_GLASS_BLOCKS.entrySet()) {
                 this.dropSelf(entry.getValue().get());
             }
+
+            // ECO 已安装时才有「无用型紧凑 C9/F9/L9」
+            if (net.neoforged.fml.ModList.get().isLoaded("neoecoae")) {
+                this.dropSelf(com.sorrowmist.useless.compat.neoecoae.compact.NeoEcoCompactRegistry
+                                      .COMPACT_C9.get());
+                this.dropSelf(com.sorrowmist.useless.compat.neoecoae.compact.NeoEcoCompactRegistry
+                                      .COMPACT_F9.get());
+                this.dropSelf(com.sorrowmist.useless.compat.neoecoae.compact.NeoEcoCompactRegistry
+                                      .COMPACT_L9.get());
+            }
         }
 
         @Override
@@ -80,6 +90,14 @@ public class ULootTableProvider extends LootTableProvider {
             blocks.add(ModBlocks.OMNIVERSAL_MOLD_HUB.get());
             blocks.add(ModBlocks.PASSIVE_CRAFTING_HATCH.get());
             blocks.add(ModBlocks.OMNIVERSAL_FURNACE_CASING.get());
+            if (net.neoforged.fml.ModList.get().isLoaded("neoecoae")) {
+                blocks.add(com.sorrowmist.useless.compat.neoecoae.compact.NeoEcoCompactRegistry
+                                   .COMPACT_C9.get());
+                blocks.add(com.sorrowmist.useless.compat.neoecoae.compact.NeoEcoCompactRegistry
+                                   .COMPACT_F9.get());
+                blocks.add(com.sorrowmist.useless.compat.neoecoae.compact.NeoEcoCompactRegistry
+                                   .COMPACT_L9.get());
+            }
             return blocks.build().toList();
         }
     }

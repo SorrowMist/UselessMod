@@ -6,6 +6,7 @@ import com.sorrowmist.useless.api.enums.tool.ConstructionWandCoreMode;
 import com.sorrowmist.useless.api.enums.tool.EnchantMode;
 import com.sorrowmist.useless.api.enums.tool.ToolTypeMode;
 import com.sorrowmist.useless.core.component.UComponents;
+import com.sorrowmist.useless.content.items.EndlessBeafItem;
 import com.sorrowmist.useless.data.BeefToolLayout;
 import com.sorrowmist.useless.data.BeefToolModuleRegistry;
 import com.sorrowmist.useless.network.BeefToolLayoutRequestPacket;
@@ -522,10 +523,20 @@ public class ModeWheelScreen extends Screen {
                     ? Component.translatable("gui.useless_mod.mode_config.current", name)
                     : name;
         }
-        return Component.translatable("gui.useless_mod.mode_config.state", name,
-                Component.translatable(isActive(id)
-                        ? "tooltip.useless_mod.enable"
-                        : "tooltip.useless_mod.disable"));
+        return Component.translatable("gui.useless_mod.mode_config.state", name, stateMessage(id));
+    }
+
+    /**
+     * 模块的状态文案。绝大多数模块是「开启 / 关闭」，
+     * 但「右键泥土」这类模块是在两种行为之间切换，会用工具优先级的说法（锄头优先 / 铲子优先）。
+     */
+    private Component stateMessage(String id) {
+        if (BeefToolModuleRegistry.BEEF_FARMLAND_MODE.equals(id)) {
+            return EndlessBeafItem.farmlandStateText(targetItem);
+        }
+        return Component.translatable(isActive(id)
+                ? "tooltip.useless_mod.enable"
+                : "tooltip.useless_mod.disable");
     }
 
     private boolean isActive(String id) {
@@ -571,6 +582,8 @@ public class ModeWheelScreen extends Screen {
             case BeefToolModuleRegistry.BEEF_TELEPORT -> bool(UComponents.BeefTeleportEnabledComponent, false);
             case BeefToolModuleRegistry.BEEF_AOE_DAMAGE -> bool(UComponents.BeefAoeDamageEnabledComponent, false);
             case BeefToolModuleRegistry.BEEF_MAGNET -> bool(UComponents.BeefMagnetEnabledComponent, false);
+            case BeefToolModuleRegistry.BEEF_FARMLAND_MODE -> bool(UComponents.BeefFarmlandModeComponent, false);
+            case BeefToolModuleRegistry.BEEF_CROP_HARVEST -> bool(UComponents.BeefCropHarvestComponent, true);
             default -> false;
         };
     }
@@ -906,6 +919,10 @@ public class ModeWheelScreen extends Screen {
                     UComponents.BeefAoeDamageEnabledComponent, false);
             case BeefToolModuleRegistry.BEEF_MAGNET -> toggle(ModeTogglePacket.ModeType.BEEF_MAGNET,
                     UComponents.BeefMagnetEnabledComponent, false);
+            case BeefToolModuleRegistry.BEEF_FARMLAND_MODE -> toggle(ModeTogglePacket.ModeType.BEEF_FARMLAND_MODE,
+                    UComponents.BeefFarmlandModeComponent, false);
+            case BeefToolModuleRegistry.BEEF_CROP_HARVEST -> toggle(ModeTogglePacket.ModeType.BEEF_CROP_HARVEST,
+                    UComponents.BeefCropHarvestComponent, true);
             default -> {
             }
         }

@@ -79,6 +79,34 @@ public final class UComponents {
             );
 
     /**
+     * 土壤右键模式组件（BeefFarmlandMode）
+     * 造化杖同时具备铲子与锄头能力，右键泥土/草方块时谁先生效由此决定：
+     * false = 铲子优先（变为草径），true = 锄头优先（变为耕地）。
+     */
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<Boolean>> BeefFarmlandModeComponent =
+            register("beef_farmland_mode", builder ->
+                    builder.persistent(Codec.BOOL)
+                           .networkSynchronized(StreamCodec.of(
+                                   FriendlyByteBuf::writeBoolean,
+                                   FriendlyByteBuf::readBoolean
+                           ))
+            );
+
+    /**
+     * 顺手收菜组件（BeefCropHarvest）
+     * true = 右键成熟作物时由造化杖自己收菜，并保留种子在地里（作物重置为 0 龄），
+     * 避免整合包的右键收菜功能把作物连根拔起。
+     */
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<Boolean>> BeefCropHarvestComponent =
+            register("beef_crop_harvest", builder ->
+                    builder.persistent(Codec.BOOL)
+                           .networkSynchronized(StreamCodec.of(
+                                   FriendlyByteBuf::writeBoolean,
+                                   FriendlyByteBuf::readBoolean
+                           ))
+            );
+
+    /**
      * 增强连锁挖矿模式组件（EnhancedChainMiningMode）
      * 用于在物品上存储是否启用增强连锁挖掘（布尔类型）
      * true = 启用增强连锁挖掘，false = 使用普通连锁挖掘

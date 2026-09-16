@@ -7,12 +7,14 @@ import com.sorrowmist.useless.core.config.ConfigManager;
 import com.sorrowmist.useless.content.items.EndlessBeafItem;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.core.component.DataComponents;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.component.BlockItemStateProperties;
 import net.minecraft.world.item.context.BlockPlaceContext;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
@@ -351,12 +353,16 @@ public final class ConstructionWandLogic {
                                               placementStack, supply.hand);
         if (placed == null) return false;
 
+        // 先在消耗前留一份快照：消耗后源栈可能变成空栈，空栈上再 copyWithCount
+        // 会直接得到 ItemStack.EMPTY，物品自带的组件（NBT）就跟着丢了。
+        ItemStack consumed = placementStack.copyWithCount(1);
+
         SavedBlock saved = SavedBlock.capture(level, pos, existing,
-                player.isCreative() ? ItemStack.EMPTY : placementStack.copyWithCount(1), supply.fromAe);
+                player.isCreative() ? ItemStack.EMPTY : consumed.copy(), supply.fromAe);
         if (!level.setBlock(pos, placed, Block.UPDATE_ALL)) return false;
         if (!player.isCreative() && supply.fromAe) {
             long extracted = AE2Compat.tryExtractFromLinkedGrid(
-                    tool, player, placementStack.copyWithCount(1), Actionable.MODULATE);
+                    tool, player, consumed, Actionable.MODULATE);
             if (extracted != 1) {
                 saved.restore(level);
                 return false;
@@ -364,9 +370,38 @@ public final class ConstructionWandLogic {
         } else if (!player.isCreative()) {
             placementStack.shrink(1);
         }
+        applyPlacedItemData(level, player, pos, placed, consumed);
         saved.afterState = level.getBlockState(pos);
         changed.add(saved);
         return true;
+    }
+
+    /**
+     * 复刻 {@link BlockItem#place} 落地之后的收尾步骤，把物品自带的组件写回放下的方块：
+     * 方块状态组件、BLOCK_ENTITY_DATA（方块实体 NBT）、方块实体暴露的隐式组件，以及 setPlacedBy 回调。
+     * 手杖只做 setBlock，少了这几步，任何靠 NBT/组件承载数据的方块
+     * （箱子、潜影盒、已配置的机器、带外置存储引用的方块等）放下后都会变成默认的空方块。
+     */
+    private static void applyPlacedItemData(ServerLevel level, ServerPlayer player, BlockPos pos,
+                                            BlockState state, ItemStack stack) {
+        if (stack.isEmpty()) return;
+
+        BlockState effective = state;
+        BlockItemStateProperties stateProperties =
+                stack.getOrDefault(DataComponents.BLOCK_STATE, BlockItemStateProperties.EMPTY);
+        if (!stateProperties.isEmpty()) {
+            effective = stateProperties.apply(state);
+            if (effective != state) {
+                level.setBlock(pos, effective, Block.UPDATE_CLIENTS);
+            }
+        }
+
+        BlockItem.updateCustomBlockEntityTag(level, player, pos, stack);
+        if (level.getBlockEntity(pos) instanceof BlockEntity blockEntity) {
+            blockEntity.applyComponentsFromItemStack(stack);
+            blockEntity.setChanged();
+        }
+        effective.getBlock().setPlacedBy(level, pos, effective, player, stack);
     }
 
     private static Supply findSupply(ServerPlayer player, ItemStack tool, BlockItem targetItem) {

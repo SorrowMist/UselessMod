@@ -12,6 +12,7 @@ import appeng.crafting.CraftingEvent;
 import appeng.menu.AutoCraftingMenu;
 import com.mojang.logging.LogUtils;
 import com.sorrowmist.useless.core.config.ConfigManager;
+import com.sorrowmist.useless.integration.dataenergistics.TrinityDispatchDiagnostics;
 import com.sorrowmist.useless.network.AETaskProgressPacket;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.chemical.ChemicalStackView;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.chemical.FurnaceChemicalStorage;
@@ -32,6 +33,7 @@ import net.minecraft.world.level.Level;
 import net.neoforged.neoforge.network.PacketDistributor;
 import org.jetbrains.annotations.Nullable;
 
+import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -558,18 +560,33 @@ public final class AdvancedAlloyFurnaceAeManager {
 
     public boolean isBusy() {
         return this.activeTasks.size() >= this.owner.getMaxAETaskCount()
-                || this.queuedCraftingOutputs.size() >= this.owner.getMaxAETaskCount();
+                || this.queuedCraftingOutputs.size() >= craftingPatternQueueCap();
+    }
+
+    /**
+     * 合成样板「回网队列」的容量 = 本机的线圈线程数。
+     *
+     * <p>线程数既是炉子的并行度、也是它一 tick 能接多少个合成样板窗口：三位一体按窗口派发，
+     * 每个窗口的产物要在这里排一次队再回网，所以队列深度跟线程数对齐（想更快就升级线圈线程数）。
+     * 超过这个深度时同时通过 {@code isBusy()} 与容量上报挡住，避免材料滞留在队列里。</p>
+     */
+    private int craftingPatternQueueCap() {
+        return Math.max(1, this.owner.getMaxAETaskCount());
     }
 
     /**
      * Returns the number of provider slots that can accept another physical AE submission.
      * Processing patterns use active furnace tasks. Crafting patterns finish synchronously;
      * their queue only provides bounded output backpressure.
+     *
+     * <p>两个分支都返回<b>真实剩余</b>槽位而不是「未满就返回满」：上层会把每一条剩余槽位
+     * 当成一条独立的 TARGETED route 上报给三位一体，报多了等于超卖自己的并发。</p>
      */
     public int getRemainingAETaskCount(boolean craftingPattern) {
         int maximum = Math.max(0, this.owner.getMaxAETaskCount());
         if (craftingPattern) {
-            return this.queuedCraftingOutputs.size() >= maximum ? 0 : maximum;
+            int cap = craftingPatternQueueCap();
+            return Math.max(0, cap - Math.min(cap, this.queuedCraftingOutputs.size()));
         }
         int occupied = Math.max(0, this.activeAETaskCount.get());
         return Math.max(0, maximum - Math.min(maximum, occupied));
@@ -602,13 +619,14 @@ public final class AdvancedAlloyFurnaceAeManager {
             return false;
         }
         // 背压：上一批产物还没能写回网络时不再接收新批次，避免材料滞留在队列里。
-        int taskLimit = this.owner.getMaxAETaskCount();
+        int taskLimit = craftingPatternQueueCap();
         if (this.queuedCraftingOutputs.size() >= taskLimit) {
             return false;
         }
 
         KeyCounter[] working = copyCounters(inputHolder);
-        List<GenericStack> produced = new ArrayList<>();
+        // 产出一律先并入 BigInteger 账本再切段：倍率可以到 long 上限，逐条 long 累加一定会丢账。
+        CraftingAeAmountAccumulator produced = new CraftingAeAmountAccumulator();
         List<GenericStack> lastUnitOutputs = null;
         long craftsLeft = Math.max(1L, operationsPerPush);
         int probes = 0;
@@ -638,7 +656,7 @@ public final class AdvancedAlloyFurnaceAeManager {
                 return false;
             }
             lastUnitOutputs = unitOutputs;
-            addScaled(produced, unitOutputs, repeat);
+            accumulateScaled(produced, unitOutputs, repeat);
         }
 
         if (craftsLeft > 0L) {
@@ -646,18 +664,21 @@ public final class AdvancedAlloyFurnaceAeManager {
             if (lastUnitOutputs == null) {
                 return false;
             }
-            addScaled(produced, lastUnitOutputs, craftsLeft);
+            accumulateScaled(produced, lastUnitOutputs, craftsLeft);
         }
         if (produced.isEmpty()) {
             return false;
         }
+        List<GenericStack> producedSegments = produced.segments();
 
         // 走到这里才算接收：AE2 随后会把本批预期产物写入 CPU 的 waitingFor。
         for (KeyCounter counter : inputHolder) {
             counter.clear();
         }
         this.queuedCraftingOutputs.add(new PendingCraftingOutput(
-                level.getGameTime(), produced));
+                level.getGameTime(), producedSegments));
+        TrinityDispatchDiagnostics.reportCraftingPatternWindow(
+                level.getGameTime(), Math.max(1L, operationsPerPush), probes);
         this.owner.markChanged();
         return true;
     }
@@ -688,7 +709,15 @@ public final class AdvancedAlloyFurnaceAeManager {
                 return false;
             }
         }
-        return remaining.isEmpty();
+        // 逐键核对完之后只允许「before 之外的键」为空：铺料前的材料必须被完整解释掉。
+        // 注意不能用 remaining.isEmpty()——remaining 是铺完一份后剩下的 (craftsLeft-1) 份材料，
+        // 它天然非空，那样写会让倍率折叠永不生效（每次推送都退化成最多 64 次真实装配）。
+        for (var entry : remaining.object2LongEntrySet()) {
+            if (!before.containsKey(entry.getKey())) {
+                return false;
+            }
+        }
+        return true;
     }
 
     /**
@@ -764,18 +793,25 @@ public final class AdvancedAlloyFurnaceAeManager {
         return amounts;
     }
 
-    /** 把一份装配的产物流按倍率并入队列。 */
-    private static void addScaled(List<GenericStack> target, List<GenericStack> unitOutputs, long multiplier) {
+    /**
+     * 把一份装配的产物流按倍率并入 BigInteger 账本。
+     *
+     * <p>倍率可以一路到 {@code long} 上限，单键总量会超过 {@code long}：这里只用
+     * {@link BigInteger} 做乘法与累加，最后由 {@link CraftingAeAmountAccumulator#segments()}
+     * 切成若干 long 条目。绝不能像旧实现那样在 {@code Math.multiplyExact} 溢出时丢弃条目——
+     * 少记的产物就是 AE2 账本上对不上的缺口。（手法与 Data Energistics 内部
+     * {@code TrinityItemAmount.multiply} 的分段放大一致。）</p>
+     */
+    private static void accumulateScaled(CraftingAeAmountAccumulator target,
+                                        List<GenericStack> unitOutputs,
+                                        long multiplier) {
         long scale = Math.max(1L, multiplier);
+        BigInteger factor = BigInteger.valueOf(scale);
         for (GenericStack unit : unitOutputs) {
-            long amount;
-            try {
-                amount = Math.multiplyExact(unit.amount(), scale);
-            } catch (ArithmeticException exception) {
-                // 倍率在包装阶段已过 maximumSafeMultiplier 校验，这里只做兜底：宁可少记也不写坏账
+            if (unit.amount() <= 0L) {
                 continue;
             }
-            mergeProduced(target, unit.what(), amount);
+            target.add(unit.what(), BigInteger.valueOf(unit.amount()).multiply(factor));
         }
     }
 

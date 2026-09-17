@@ -14,12 +14,16 @@ import com.fish_dan_.data_energistics.api.crafting.dispatch.CountedCraftingTarge
 import com.fish_dan_.data_energistics.api.registry.provider.runtime.PatternProviderIdentity;
 import com.sorrowmist.useless.content.blockentities.AdvancedAlloyFurnaceBlockEntity;
 import com.sorrowmist.useless.content.blockentities.multiblock.MePatternAssemblyBlockEntity;
+import com.sorrowmist.useless.content.blockentities.multiblock.MultiblockAlloyFurnaceCoreBlockEntity;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.CraftingTaskContext;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.DynamicComponentPattern;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.OmniversalPatternDetails;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.SmartDoublingPatterns;
 import com.sorrowmist.useless.content.recipe.AdvancedAlloyFurnaceRecipe;
+import com.sorrowmist.useless.integration.dataenergistics.TrinityDispatchAcceleration;
 import it.unimi.dsi.fastutil.objects.Object2ObjectLinkedOpenHashMap;
+import net.minecraft.core.BlockPos;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.level.Level;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -29,6 +33,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.OptionalLong;
 import java.util.function.BooleanSupplier;
+import java.util.function.IntSupplier;
 import java.util.function.Supplier;
 import java.util.function.ToIntFunction;
 
@@ -37,6 +42,13 @@ import java.util.function.ToIntFunction;
  *
  * <p>The adapter converts one accepted logical batch into a single scaled pattern push. This preserves the
  * furnace's native queueing and task-splitting behavior while avoiding per-craft provider calls.</p>
+ *
+ * <p><b>不要再按 lane 上报多条 route。</b>DE 的每 tick 上限不在 provider 容量上：同一个 stage
+ * 被 {@code IntSet inspectedStages} 限制为每 tick 只派发一次，而一次派发的物理窗口是
+ * {@code Long.MAX / 每次合成消耗的该键数量}（{@code TrinityDataCoreCpuLogic#limitByInputAvailability}），
+ * 窗口由 {@code TrinityExactWorkingInventory#refillPhysicalWindows} 每 pass 从 BigInteger 溢出量补一次。
+ * 切片器收到的 {@code remainingCrafts} 已经被这个窗口卡死，所以多条 lane 只会把同一个窗口切成多份，
+ * 总量分毫不增，还白白多出队列背压与容量捕获开销。</p>
  */
 final class AlloyFurnaceCountedCraftingAdapter implements CountedCraftingProviderAdapter {
     private final ICraftingProvider provider;
@@ -44,51 +56,54 @@ final class AlloyFurnaceCountedCraftingAdapter implements CountedCraftingProvide
     private final CountedCraftingTarget target;
     private final Supplier<@Nullable CraftingTaskContext> taskContext;
     private final ToIntFunction<Boolean> remainingThreads;
-
-    AlloyFurnaceCountedCraftingAdapter(
-            @NotNull ICraftingProvider provider,
-            @NotNull BooleanSupplier online,
-            @NotNull CountedCraftingTarget target) {
-        this(provider, online, target, () -> null, ignored -> Integer.MAX_VALUE);
-    }
+    private final IntSupplier totalThreads;
 
     AlloyFurnaceCountedCraftingAdapter(
             @NotNull ICraftingProvider provider,
             @NotNull BooleanSupplier online,
             @NotNull CountedCraftingTarget target,
             @NotNull Supplier<@Nullable CraftingTaskContext> taskContext,
-            @NotNull ToIntFunction<Boolean> remainingThreads) {
+            @NotNull ToIntFunction<Boolean> remainingThreads,
+            @NotNull IntSupplier totalThreads) {
         this.provider = provider;
         this.online = online;
         this.target = target;
         this.taskContext = taskContext;
         this.remainingThreads = remainingThreads;
+        this.totalThreads = totalThreads;
     }
 
     /** Creates the live adapter used by one standalone advanced alloy furnace. */
     static AlloyFurnaceCountedCraftingAdapter forAdvancedAlloyFurnace(
             @NotNull AdvancedAlloyFurnaceBlockEntity provider,
             @NotNull PatternProviderIdentity identity) {
+        String digest = identity.digest();
         return new AlloyFurnaceCountedCraftingAdapter(
                 provider,
                 () -> isAdvancedAlloyFurnaceOnline(provider),
-                targetFor(identity),
+                targetFor(digest, machineIdentity(digest, provider.getLevel(), provider.getBlockPos())),
                 () -> provider,
-                provider::getRemainingAETaskCount);
+                provider::getRemainingAETaskCount,
+                provider::getMaxAETaskCount);
     }
 
     /** Creates the live adapter used by one ME pattern assembly and its linked multiblock controller. */
     static AlloyFurnaceCountedCraftingAdapter forMePatternAssembly(
             @NotNull MePatternAssemblyBlockEntity provider,
             @NotNull PatternProviderIdentity identity) {
+        String digest = identity.digest();
         return new AlloyFurnaceCountedCraftingAdapter(
                 provider,
                 () -> isMePatternAssemblyOnline(provider),
-                targetFor(identity),
+                targetFor(digest, machineIdentity(digest, provider.getLevel(), provider.getBlockPos())),
                 provider::getController,
                 craftingPattern -> {
-                    var controller = provider.getController();
+                    MultiblockAlloyFurnaceCoreBlockEntity controller = provider.getController();
                     return controller == null ? 0 : controller.getRemainingAETaskCount(craftingPattern);
+                },
+                () -> {
+                    MultiblockAlloyFurnaceCoreBlockEntity controller = provider.getController();
+                    return controller == null ? 0 : controller.getMaxAETaskCount();
                 });
     }
 
@@ -105,6 +120,9 @@ final class AlloyFurnaceCountedCraftingAdapter implements CountedCraftingProvide
         if (capacity.logicalCrafts() == 0L) {
             return List.of();
         }
+        // 作用域信号：只有「我们真的给出了容量」这一次派发才允许 DE 侧走加速路径，
+        // 同一 CPU 上其它机器的派发拿不到这个信号、完整保留原行为。
+        TrinityDispatchAcceleration.noteOurCapacityCaptured();
         return List.of(new CountedCraftingCapacity(
                 target,
                 CountedCraftingRoutingMode.TARGETED,
@@ -171,17 +189,10 @@ final class AlloyFurnaceCountedCraftingAdapter implements CountedCraftingProvide
             @NotNull IPatternDetails patternDetails,
             KeyCounter @NotNull [] prototype,
             long requestedCount) {
-        long acceptedCount = availableCount(patternDetails, prototype, requestedCount);
+        long acceptedCount = availableCapacity(patternDetails, prototype, requestedCount).logicalCrafts();
         return acceptedCount == 0L
                 ? null
                 : new AlloyFurnaceCountedCraftingAdmission(this, patternDetails, prototype, acceptedCount);
-    }
-
-    private long availableCount(
-            @NotNull IPatternDetails patternDetails,
-            KeyCounter @NotNull [] prototype,
-            long requestedCount) {
-        return availableCapacity(patternDetails, prototype, requestedCount).logicalCrafts();
     }
 
     private AvailableCapacity availableCapacity(
@@ -208,6 +219,8 @@ final class AlloyFurnaceCountedCraftingAdapter implements CountedCraftingProvide
         IPatternDetails executionPattern = SmartDoublingPatterns.unwrap(patternDetails);
         boolean craftingPattern = executionPattern instanceof IMolecularAssemblerSupportedPattern;
         int availableThreads = Math.max(0, this.remainingThreads.applyAsInt(craftingPattern));
+        int totalThreads = Math.max(0, this.totalThreads.getAsInt());
+        availableThreads = Math.min(availableThreads, totalThreads);
         if (craftingPattern) {
             CraftingTaskContext context = this.taskContext.get();
             long perThreadCapacity = context == null
@@ -240,6 +253,7 @@ final class AlloyFurnaceCountedCraftingAdapter implements CountedCraftingProvide
         }
         SmartDoublingPatterns.Resolved execution = SmartDoublingPatterns.resolve(patternDetails);
         if (execution.pattern() instanceof IMolecularAssemblerSupportedPattern) {
+            // 合成样板由本机在虚拟 3×3 上自执行，一次推送就能折叠整批，没有配方侧并行概念。
             return new CapacityLimits(arithmeticMaximum, arithmeticMaximum);
         }
         if (context == null) {
@@ -355,7 +369,7 @@ final class AlloyFurnaceCountedCraftingAdapter implements CountedCraftingProvide
             @NotNull IPatternDetails patternDetails,
             KeyCounter @NotNull [] prototype,
             long count) {
-        if (availableCount(patternDetails, prototype, count) < count) {
+        if (availableCapacity(patternDetails, prototype, count).logicalCrafts() < count) {
             return false;
         }
         // 统一走 SmartDoublingPatterns.scale：合成样板必须保留 IMolecularAssemblerSupportedPattern 身份，
@@ -365,9 +379,17 @@ final class AlloyFurnaceCountedCraftingAdapter implements CountedCraftingProvide
         return provider.pushPattern(scaledPattern, scaledPrototype);
     }
 
-    static CountedCraftingTarget targetFor(@NotNull PatternProviderIdentity identity) {
-        String digest = identity.digest();
-        return CountedCraftingTarget.machine(digest, digest);
+    static CountedCraftingTarget targetFor(@NotNull String digest, @NotNull String machineIdentity) {
+        return CountedCraftingTarget.machine(digest, machineIdentity);
+    }
+
+    private static @NotNull String machineIdentity(
+            @NotNull String fallback, @Nullable Level level, @NotNull BlockPos pos) {
+        if (level == null) {
+            return fallback;
+        }
+        ResourceLocation dimension = level.dimension().location();
+        return dimension + "@" + pos.getX() + "," + pos.getY() + "," + pos.getZ();
     }
 
     private static boolean isAdvancedAlloyFurnaceOnline(@NotNull AdvancedAlloyFurnaceBlockEntity provider) {

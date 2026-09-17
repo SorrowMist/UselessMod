@@ -73,6 +73,14 @@ requiredMods=["item_obliterator"]
 config="${mod_id}.malum.mixins.json"
 requiredMods=["malum"]
 
+# 数据能源 Trinity 派发加速：放开「同一个样板 stage 每 tick 只被派发一次」的限制，
+# 让单个合成样板一 tick 能吃到多个 AE2 long 物理窗口（大数合成用）。
+# 这里刻意**不**要求注入成功：mixin 配置 required=false、injectors.defaultRequire=0，
+# 数据能源更新导致注入点失配时只是失去加速并打一条日志，不会崩游戏。
+[[mixins]]
+config="${mod_id}.dataenergistics.mixins.json"
+requiredMods=["data_energistics"]
+
 # The [[accessTransformers]] block allows you to declare where your AT file is.
 # If this block is omitted, a fallback attempt will be made to load an AT from META-INF/accesstransformer.cfg
 #[[accessTransformers]]

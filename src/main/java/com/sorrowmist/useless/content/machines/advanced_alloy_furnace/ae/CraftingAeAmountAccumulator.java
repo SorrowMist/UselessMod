@@ -78,6 +78,10 @@ final class CraftingAeAmountAccumulator {
         return true;
     }
 
+    boolean isEmpty() {
+        return this.amounts.isEmpty();
+    }
+
     List<GenericStack> segments() {
         ArrayList<GenericStack> result = new ArrayList<>(this.amounts.size());
         for (var entry : this.amounts.object2ObjectEntrySet()) {

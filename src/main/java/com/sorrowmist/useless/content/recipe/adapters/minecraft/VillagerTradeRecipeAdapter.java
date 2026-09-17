@@ -46,21 +46,6 @@ public final class VillagerTradeRecipeAdapter
     private static final int MIN_VILLAGER_LEVEL = 1;
     private static final int MAX_VILLAGER_LEVEL = 5;
 
-    private static final List<ProfessionWorkstation> PROFESSIONS = List.of(
-            new ProfessionWorkstation(VillagerProfession.ARMORER, Items.BLAST_FURNACE),
-            new ProfessionWorkstation(VillagerProfession.BUTCHER, Items.SMOKER),
-            new ProfessionWorkstation(VillagerProfession.CARTOGRAPHER, Items.CARTOGRAPHY_TABLE),
-            new ProfessionWorkstation(VillagerProfession.CLERIC, Items.BREWING_STAND),
-            new ProfessionWorkstation(VillagerProfession.FARMER, Items.COMPOSTER),
-            new ProfessionWorkstation(VillagerProfession.FISHERMAN, Items.BARREL),
-            new ProfessionWorkstation(VillagerProfession.FLETCHER, Items.FLETCHING_TABLE),
-            new ProfessionWorkstation(VillagerProfession.LEATHERWORKER, Items.CAULDRON),
-            new ProfessionWorkstation(VillagerProfession.LIBRARIAN, Items.LECTERN),
-            new ProfessionWorkstation(VillagerProfession.MASON, Items.STONECUTTER),
-            new ProfessionWorkstation(VillagerProfession.SHEPHERD, Items.LOOM),
-            new ProfessionWorkstation(VillagerProfession.TOOLSMITH, Items.SMITHING_TABLE),
-            new ProfessionWorkstation(VillagerProfession.WEAPONSMITH, Items.GRINDSTONE));
-
     private volatile Cached cached;
 
     @Override
@@ -83,8 +68,51 @@ public final class VillagerTradeRecipeAdapter
         if (mold.is(Items.VILLAGER_SPAWN_EGG)) {
             return true;
         }
-        return PROFESSIONS.stream().anyMatch(
-                profession -> mold.is(profession.workstation()));
+        return registeredProfessions().stream()
+                .flatMap(profession -> profession.workstations().stream())
+                .anyMatch(workstation -> mold.is(workstation));
+    }
+
+    /**
+     * Builds the profession/workstation pairs from the live registries. This also covers
+     * professions added by mods whose POI is registered after the vanilla professions.
+     */
+    private static List<ProfessionWorkstation> registeredProfessions() {
+        List<ProfessionWorkstation> professions = new ArrayList<>();
+        for (VillagerProfession profession : BuiltInRegistries.VILLAGER_PROFESSION) {
+            List<Item> workstations = BuiltInRegistries.POINT_OF_INTEREST_TYPE.holders()
+                    .filter(profession.heldJobSite())
+                    .flatMap(holder -> holder.value().matchingStates().stream())
+                    .map(state -> state.getBlock().asItem())
+                    .filter(item -> item != Items.AIR)
+                    .distinct()
+                    .sorted(Comparator.comparing(VillagerTradeRecipeAdapter::itemKey))
+                    .toList();
+            professions.add(new ProfessionWorkstation(profession, workstations));
+        }
+        professions.sort(Comparator.comparing(
+                profession -> professionKey(profession.profession())));
+        return List.copyOf(professions);
+    }
+
+    private static String professionKey(VillagerProfession profession) {
+        net.minecraft.resources.ResourceLocation id =
+                BuiltInRegistries.VILLAGER_PROFESSION.getKey(profession);
+        return id == null ? profession.toString() : id.toString();
+    }
+
+    private static String itemKey(Item item) {
+        net.minecraft.resources.ResourceLocation id = BuiltInRegistries.ITEM.getKey(item);
+        return id == null ? item.toString() : id.toString();
+    }
+
+    /** Keeps the villager spawn egg and all valid workstation blocks as two mold slots. */
+    private static List<Ingredient> villagerMolds(ProfessionWorkstation profession) {
+        Ingredient workstation = Ingredient.of(profession.workstations().stream()
+                .map(Item::getDefaultInstance));
+        return List.of(
+                AdapterUtils.toMoldIngredient(new ItemStack(Items.VILLAGER_SPAWN_EGG)),
+                workstation);
     }
 
     @Override
@@ -174,7 +202,10 @@ public final class VillagerTradeRecipeAdapter
 
         addSupplementalVillagerRecipe(recipes);
 
-        for (ProfessionWorkstation profession : PROFESSIONS) {
+        for (ProfessionWorkstation profession : registeredProfessions()) {
+            if (profession.workstations().isEmpty()) {
+                continue;
+            }
             for (int villagerLevel = MIN_VILLAGER_LEVEL;
                     villagerLevel <= MAX_VILLAGER_LEVEL; villagerLevel++) {
                 VillagerTrades.ItemListing[] listings = listingsFor(
@@ -201,8 +232,7 @@ public final class VillagerTradeRecipeAdapter
                             AdvancedAlloyFurnaceRecipe converted = convertOffer(
                                     recipeId(profession.profession(), villagerLevel, listingIndex,
                                             context.villagerType(), experimental),
-                                    offer, List.of(Items.VILLAGER_SPAWN_EGG,
-                                            profession.workstation()));
+                                    offer, villagerMolds(profession));
                             if (converted != null) {
                                 RecipeHolder<VillagerTradeSyntheticRecipe> holder =
                                         new RecipeHolder<>(converted.id(),
@@ -265,7 +295,8 @@ public final class VillagerTradeRecipeAdapter
                 MerchantOffer offer = createWanderingTraderOffer(level, listing);
                 AdvancedAlloyFurnaceRecipe converted = convertOffer(
                         wanderingRecipeId(experimental, groupIndex, listingIndex), offer,
-                        List.of(Items.WANDERING_TRADER_SPAWN_EGG));
+                        List.of(AdapterUtils.toMoldIngredient(
+                                new ItemStack(Items.WANDERING_TRADER_SPAWN_EGG))));
                 if (converted != null) {
                     RecipeHolder<VillagerTradeSyntheticRecipe> holder =
                             new RecipeHolder<>(converted.id(), new VillagerTradeSyntheticRecipe(converted));
@@ -361,7 +392,8 @@ public final class VillagerTradeRecipeAdapter
 
     private static int tradeTableSignature(boolean experimental) {
         int signature = experimental ? 1 : 0;
-        for (ProfessionWorkstation profession : PROFESSIONS) {
+        for (ProfessionWorkstation profession : registeredProfessions()) {
+            signature = appendProfessionSignature(signature, profession);
             for (int villagerLevel = MIN_VILLAGER_LEVEL;
                     villagerLevel <= MAX_VILLAGER_LEVEL; villagerLevel++) {
                 VillagerTrades.ItemListing[] listings = listingsFor(
@@ -391,6 +423,15 @@ public final class VillagerTradeRecipeAdapter
         return signature;
     }
 
+    private static int appendProfessionSignature(
+            int signature, ProfessionWorkstation profession) {
+        signature = 31 * signature + professionKey(profession.profession()).hashCode();
+        for (Item workstation : profession.workstations()) {
+            signature = 31 * signature + itemKey(workstation).hashCode();
+        }
+        return signature;
+    }
+
     private static int appendListingSignature(
             int signature, @Nullable VillagerTrades.ItemListing[] listings) {
         if (listings == null) {
@@ -407,7 +448,7 @@ public final class VillagerTradeRecipeAdapter
     private static AdvancedAlloyFurnaceRecipe convertOffer(
             net.minecraft.resources.ResourceLocation id,
             MerchantOffer offer,
-            List<Item> moldItems) {
+            List<Ingredient> moldIngredients) {
         if (offer == null || offer.getResult() == null || offer.getResult().isEmpty()) {
             return null;
         }
@@ -418,10 +459,10 @@ public final class VillagerTradeRecipeAdapter
         }
 
         List<Ingredient> molds = new ArrayList<>();
-        if (moldItems != null) {
-            for (Item moldItem : moldItems) {
-                if (moldItem != null) {
-                    molds.add(AdapterUtils.toMoldIngredient(new ItemStack(moldItem)));
+        if (moldIngredients != null) {
+            for (Ingredient moldIngredient : moldIngredients) {
+                if (moldIngredient != null && !moldIngredient.isEmpty()) {
+                    molds.add(moldIngredient);
                 }
             }
         }
@@ -490,8 +531,15 @@ public final class VillagerTradeRecipeAdapter
             boolean experimental) {
         net.minecraft.resources.ResourceLocation professionId =
                 net.minecraft.core.registries.BuiltInRegistries.VILLAGER_PROFESSION.getKey(profession);
-        String professionPart = professionId == null
-                ? profession.toString() : professionId.getPath();
+        String professionPart;
+        if (professionId == null) {
+            professionPart = profession.toString();
+        } else if ("minecraft".equals(professionId.getNamespace())) {
+            professionPart = professionId.getPath();
+        } else {
+            // Include the namespace so different mods can use the same profession path safely.
+            professionPart = professionId.getNamespace() + "_" + professionId.getPath();
+        }
         String path = "villager_trade/"
                 + (experimental ? "experimental" : "vanilla") + "/"
                 + pathPart(professionPart) + "/level_" + villagerLevel
@@ -526,7 +574,7 @@ public final class VillagerTradeRecipeAdapter
         return result.isEmpty() ? "unknown" : result.toString();
     }
 
-    private record ProfessionWorkstation(VillagerProfession profession, Item workstation) {
+    private record ProfessionWorkstation(VillagerProfession profession, List<Item> workstations) {
     }
 
     private record TradeContext(@Nullable VillagerType villagerType) {

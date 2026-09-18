@@ -125,17 +125,26 @@ public class ClientSetup {
 
     @SubscribeEvent
     public static void onTagsUpdated(TagsUpdatedEvent event) {
+        // Only react to the tag packet the client actually received. The integrated server also
+        // fires this event on its own thread for data-pack loads (including /reload); touching the
+        // client recipe catalog or JEI from there fails the reload.
+        if (event.getUpdateCause() != TagsUpdatedEvent.UpdateCause.CLIENT_PACKET_RECEIVED) return;
+
         // Optional recipe adapters may read synced item tags. Recipes are updated before the
         // clientbound tag packet in some login paths, so refresh the catalog after those tags bind.
-        if (Minecraft.getInstance().level == null) return;
+        Minecraft minecraft = Minecraft.getInstance();
+        minecraft.execute(() -> {
+            Level level = minecraft.level;
+            if (level == null) return;
 
-        Level level = Minecraft.getInstance().level;
-        AlloyFurnaceRecipeCatalog.invalidate(level);
-        AlloyFurnaceRecipeCatalog.prewarm(level);
-        JEIPlugin.refreshAlloyFurnaceRecipes();
-        if (Minecraft.getInstance().player != null) {
-            EndlessBeafItem.refreshAttackDamage(Minecraft.getInstance().player);
-        }
+            AlloyFurnaceRecipeCatalog.invalidate(level);
+            AlloyFurnaceRecipeCatalog.prewarm(level);
+
+            JEIPlugin.refreshAlloyFurnaceRecipes();
+            if (minecraft.player != null) {
+                EndlessBeafItem.refreshAttackDamage(minecraft.player);
+            }
+        });
     }
 
     @SubscribeEvent

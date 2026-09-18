@@ -223,9 +223,17 @@ public final class JEIPlugin implements IModPlugin {
 
     /** Adds recipes generated after JEI's initial registration, such as data-driven compat data. */
     public static void refreshAlloyFurnaceRecipes() {
+        // TagsUpdatedEvent is fired on the server thread during /reload, but JEI's recipe manager
+        // must be mutated on the client render thread. Hop back before touching JEI.
+        Minecraft minecraft = Minecraft.getInstance();
+        if (!minecraft.isSameThread()) {
+            minecraft.execute(JEIPlugin::refreshAlloyFurnaceRecipes);
+            return;
+        }
+
         if (runtime == null) return;
 
-        Level level = Minecraft.getInstance().level;
+        Level level = minecraft.level;
         if (level == null) return;
 
         List<AlloyFurnaceRecipeCatalog.Entry> additions = new ArrayList<>();

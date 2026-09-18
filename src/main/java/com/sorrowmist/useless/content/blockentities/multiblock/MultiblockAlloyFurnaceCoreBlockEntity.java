@@ -16,6 +16,7 @@ import appeng.api.stacks.GenericStack;
 import appeng.api.stacks.KeyCounter;
 import appeng.api.storage.MEStorage;
 import appeng.blockentity.crafting.IMolecularAssemblerSupportedPattern;
+import com.sorrowmist.useless.api.crafting.bigint.cpu.AlloyFurnaceBigIntegerCpuBinding;
 import com.sorrowmist.useless.api.enums.RedstoneControlMode;
 import com.sorrowmist.useless.compat.AppFluxCompat;
 import com.sorrowmist.useless.content.blocks.multiblock.MultiblockAlloyFurnaceCoreBlock;
@@ -24,7 +25,9 @@ import com.sorrowmist.useless.content.blocks.multiblock.OmniversalAlloyFurnaceSt
 import com.sorrowmist.useless.content.blocks.multiblock.UselessCoilBlock;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.AdvancedAlloyFurnaceAeManager;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.AlloyFurnaceAeHost;
+import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.CraftingAeOutputTarget;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.CraftingTaskContext;
+import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.OmniversalBigIntegerTarget;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.OmniversalPatternDetails;
 import com.sorrowmist.useless.compat.neoecoae.NeoEcoDynamicOutputCompat;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.SmartDoublingPatterns;
@@ -95,6 +98,9 @@ public final class MultiblockAlloyFurnaceCoreBlockEntity extends BlockEntity imp
     private boolean deferredTasksLoaded;
     private long recipeCatalogGeneration = -1L;
     private boolean unloading;
+    /** 对外公开 API 的目标视图缓存：视图很轻（核心引用 + 一个路由字符串），一个实例即可。 */
+    @Nullable
+    private OmniversalBigIntegerTarget bigIntegerTarget;
     private boolean coilActivitySynchronized;
     private RedstoneControlMode redstoneControlMode = RedstoneControlMode.DISABLED;
     private long automaticEnergyLimit = Long.MAX_VALUE;
@@ -484,6 +490,38 @@ public final class MultiblockAlloyFurnaceCoreBlockEntity extends BlockEntity imp
         return aeManager.getRemainingAETaskCount(craftingPattern);
     }
 
+    /**
+     * 对外公开 API（{@code api.crafting.bigint}）的提交入口。
+     *
+     * <p>与数据能源适配器走同一条折叠路径，区别只是多带一个 CPU 回执绑定；{@code cpuBinding} 为
+     * {@code null} 时产物只切段写回 ME 网络。万象样板与 AE2 合成样板都由这一个入口处理
+     * （合成样板不收能量）。</p>
+     */
+    public boolean pushBigIntegerBatch(IPatternDetails pattern, BigInteger count,
+                                       KeyCounter[] unitPrototype,
+                                       @Nullable AlloyFurnaceBigIntegerCpuBinding cpuBinding) {
+        return aeManager.pushBigIntegerBatch(pattern, count, unitPrototype, cpuBinding);
+    }
+
+    /**
+     * 对外公开 API 的目标视图：第三方 CPU 通过
+     * {@code AlloyFurnaceBigIntegerApi.findTargets(grid)} 拿到的就是这个对象。
+     *
+     * <p>视图本身很轻（只持有本核心与一个路由字符串），实例缓存在核心上即可；机器未成形或正在卸载时
+     * 返回 {@code null}，这样发现流程不会拿到一台已经没了的机器。</p>
+     */
+    @Nullable
+    public OmniversalBigIntegerTarget bigIntegerTarget() {
+        if (!formed || unloading) {
+            return null;
+        }
+        if (bigIntegerTarget == null) {
+            bigIntegerTarget = new OmniversalBigIntegerTarget(
+                    this, "useless_mod:multiblock_alloy_furnace@" + worldPosition.asLong());
+        }
+        return bigIntegerTarget;
+    }
+
     @Override
     public Iterable<ItemStack> getPatternStacks() {
         MePatternAssemblyBlockEntity assembly = getAssembly();
@@ -564,6 +602,27 @@ public final class MultiblockAlloyFurnaceCoreBlockEntity extends BlockEntity imp
     @Override
     public boolean supportsLongAeAmounts() {
         return true;
+    }
+
+    /**
+     * 多方块支持把万象样板折叠成 BigInteger 批次（一次解析配方、产物 ×count、按 count 收能量）。
+     *
+     * <p>单方块高级合金炉不覆写该方法 ⇒ 保持 {@code false}，其万象样板继续走长版 counted 路径。</p>
+     */
+    @Override
+    public boolean supportsBigIntegerRecipeBatches() {
+        return true;
+    }
+
+    /**
+     * 本 tick 允许单批产生的产物分段数（AIMD 控制器，转发给 AE 管理器）。
+     *
+     * <p>它是「超大量合成不丝滑」的解药：单批规模由实测反馈探测出来，
+     * 收敛到「一批大约一两个 tick 交付完」，而不是用固定值猜。</p>
+     */
+    @Override
+    public long outputSegmentBudget() {
+        return aeManager.outputSegmentBudget();
     }
 
     @Override
@@ -655,15 +714,40 @@ public final class MultiblockAlloyFurnaceCoreBlockEntity extends BlockEntity imp
 
     @Override
     public long tryOutputKeyToAE(AEKey key, long amount) {
-        if (key == null || amount <= 0) return 0L;
+        CraftingAeOutputTarget target = resolveAeOutputTarget();
+        return target == null ? 0L : target.insert(key, amount);
+    }
+
+    /**
+     * 解析一次 ME 网络写入目标，供一次「产物回网」刷写 pass 内复用。
+     *
+     * <p>原来每写一个分段都要重解析一次（{@link #getAeNetworkAccess()} 里 2 次方块实体查询 +
+     * 2 次分配，再加 {@link #getAeGrid()} 又一次装配体查询）。而可持续吞吐直接由「每 tick 能插多少次」
+     * 决定，一 tick 可能插数千次 ⇒ 这段解析成本直接吃吞吐，必须提到 pass 外只做一次。</p>
+     */
+    @Override
+    public @Nullable CraftingAeOutputTarget resolveAeOutputTarget() {
         AeNetworkAccess access = getAeNetworkAccess();
-        if (access == null) return 0L;
-        long claimed = ModList.get().isLoaded("neoecoae")
-                ? NeoEcoDynamicOutputCompat.claim(getAeGrid(), key, amount) : 0L;
-        long remaining = amount - Math.min(amount, claimed);
-        if (remaining <= 0L) return amount;
-        return Math.min(amount, claimed)
-                + access.storage().insert(key, remaining, Actionable.MODULATE, access.source());
+        if (access == null) {
+            return null;
+        }
+        MEStorage storage = access.storage();
+        IActionSource source = access.source();
+        boolean neoecoae = ModList.get().isLoaded("neoecoae");
+        // 网格也一并解析一次（getAeGrid() 内部又是一次装配体查询）。
+        IGrid grid = getAeGrid();
+        return (key, amount) -> {
+            if (key == null || amount <= 0L) {
+                return 0L;
+            }
+            long claimed = neoecoae ? NeoEcoDynamicOutputCompat.claim(grid, key, amount) : 0L;
+            long accepted = Math.min(amount, claimed);
+            long remaining = amount - accepted;
+            if (remaining <= 0L) {
+                return amount;
+            }
+            return accepted + storage.insert(key, remaining, Actionable.MODULATE, source);
+        };
     }
 
     @Nullable

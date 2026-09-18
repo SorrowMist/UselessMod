@@ -248,6 +248,37 @@ public interface CraftingTaskContext {
         return false;
     }
 
+    /**
+     * 多方块核心返回 {@code true}：本机支持把万象样板折叠成 BigInteger 批次，并按 count 一次性计费。
+     *
+     * <p>单方块高级合金炉保持 {@code false} —— 它的万象样板仍走长版 counted 路径。这个能力位同时被
+     * Data Energistics 适配器与对外公开 API 用来决定「是否给万象样板发布 machine identity」，
+     * 因此**不能**与 {@link #supportsLongAeAmounts()} 混用（后者单方块与多方块都是 true，无法区分）。</p>
+     *
+     * <p>为什么需要它：DE 的 exact 分支一旦接管某个 provider 就不会再回落长版路径，所以必须能
+     * 精确判断「本机是否真的实现了 bigint 语义」，否则会给没有 bigint 能力的机器发布 machine identity。</p>
+     */
+    default boolean supportsBigIntegerRecipeBatches() {
+        return false;
+    }
+
+    /**
+     * 本 tick 允许<b>单个批次</b>产生的产物分段数（AIMD 控制器的输出）。
+     *
+     * <p>调用方约定：把它当作「本批最多产生多少段」传进容量计算
+     * （{@code AlloyFurnaceBigIntegerCrafting.maximumSegmentedCount}）。</p>
+     *
+     * <p><b>为什么由机器给出而不是调用方自己定</b>：单批该多大取决于<b>本机的交付能力</b>
+     * （回网每 tick 能插多少次）与<b>调度侧的派发频率</b>，两者都只有机器自己测得到。
+     * 机器用 TCP 拥塞控制那套（慢启动 / 乘法减小 / 线性回升）探测出合适值，
+     * 收敛到「一批大约一两个 tick 交付完」—— 那是最平滑的形态。</p>
+     *
+     * <p>实现方必须保证返回值 <b>≥ 1</b>：容量永不因积压归零，调度侧才不会停一拍再重启。</p>
+     */
+    default long outputSegmentBudget() {
+        return 1L;
+    }
+
     default boolean isTaskExecutionEnabled() {
         return true;
     }

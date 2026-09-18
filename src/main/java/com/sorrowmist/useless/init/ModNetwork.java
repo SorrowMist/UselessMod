@@ -5,6 +5,8 @@ import com.sorrowmist.useless.network.AECancelPacket;
 import com.sorrowmist.useless.network.AEReturnOutputTogglePacket;
 import com.sorrowmist.useless.network.AETaskProgressPacket;
 import com.sorrowmist.useless.network.AETaskProgressRequestPacket;
+import com.sorrowmist.useless.network.AeLinkPreviewPacket;
+import com.sorrowmist.useless.network.AeLinkPreviewRequestPacket;
 import com.sorrowmist.useless.network.AutoIOChangePacket;
 import com.sorrowmist.useless.network.BeefInvulnerabilitySyncPacket;
 import com.sorrowmist.useless.network.BeefInvulnerabilityStatePacket;
@@ -59,6 +61,12 @@ public class ModNetwork {
         );
         registrar.playToServer(ConstructionWandCorePacket.TYPE, ConstructionWandCorePacket.STREAM_CODEC,
                                ConstructionWandCorePacket::handle
+        );
+        registrar.playToServer(AeLinkPreviewRequestPacket.TYPE, AeLinkPreviewRequestPacket.STREAM_CODEC,
+                               AeLinkPreviewRequestPacket::handle
+        );
+        registrar.playToClient(AeLinkPreviewPacket.TYPE, AeLinkPreviewPacket.STREAM_CODEC,
+                               AeLinkPreviewPacket::handle
         );
         registrar.playToServer(ConstructionWandPreviewRequestPacket.TYPE,
                                ConstructionWandPreviewRequestPacket.STREAM_CODEC,

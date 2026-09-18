@@ -11,6 +11,15 @@ import appeng.blockentity.crafting.IMolecularAssemblerSupportedPattern;
 import appeng.crafting.CraftingEvent;
 import appeng.menu.AutoCraftingMenu;
 import com.mojang.logging.LogUtils;
+import com.sorrowmist.useless.api.crafting.bigint.AlloyFurnaceBigIntegerOutput;
+import com.sorrowmist.useless.api.crafting.bigint.cpu.AlloyFurnaceBigIntegerBatchContext;
+import com.sorrowmist.useless.api.crafting.bigint.cpu.AlloyFurnaceBigIntegerBatchResult;
+import com.sorrowmist.useless.api.crafting.bigint.cpu.AlloyFurnaceBigIntegerCpuAdapter;
+import com.sorrowmist.useless.api.crafting.bigint.cpu.AlloyFurnaceBigIntegerCpuAdapters;
+import com.sorrowmist.useless.api.crafting.bigint.cpu.AlloyFurnaceBigIntegerCpuBinding;
+import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.catalyst.ResolvedCatalystEffect;
+import com.sorrowmist.useless.content.recipe.AdvancedAlloyFurnaceRecipe;
+import com.sorrowmist.useless.energy.IEnergyManager;
 import com.sorrowmist.useless.core.config.ConfigManager;
 import com.sorrowmist.useless.integration.dataenergistics.TrinityDispatchDiagnostics;
 import com.sorrowmist.useless.network.AETaskProgressPacket;
@@ -24,6 +33,7 @@ import net.minecraft.core.NonNullList;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.inventory.TransientCraftingContainer;
@@ -31,6 +41,7 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.crafting.CraftingInput;
 import net.minecraft.world.level.Level;
 import net.neoforged.neoforge.network.PacketDistributor;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.math.BigInteger;
@@ -42,6 +53,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.ReentrantLock;
@@ -67,6 +79,98 @@ public final class AdvancedAlloyFurnaceAeManager {
      * 病态输入，防止主线程被拖住。</p>
      */
     private static final int MAX_CRAFTING_PROBES = 64;
+    /**
+     * 回网队列里单条 pending 的持久化格式版本。
+     *
+     * <p>1（隐式，无 {@code Format} 标签）= 逐段写的 {@code GenericStack} 列表；
+     * 2 = 按键聚合的 BigInteger（见 {@link CraftingAeAmountAccumulator#writeCompactTag}）。</p>
+     *
+     * <p>为什么必须换格式：产物总量可以远超 {@code long}，按 {@code Long.MAX} 切段后
+     * 1e22 个物品就是上千条 NBT，而队列深度等于线程数 —— 整条队列能到 GB 级，
+     * 每次区块存盘都要重写。聚合后每个键只占一条，重载时再展开，语义完全等价。</p>
+     */
+    private static final byte QUEUED_OUTPUT_FORMAT_COMPACT = 2;
+
+    /** AE 存储 API 的单次上限，也是切段粒度（与数据能源的 {@code PHYSICAL_CHUNK} 一致）。 */
+    private static final BigInteger MAX_OUTPUT_CHUNK = BigInteger.valueOf(Long.MAX_VALUE);
+    /**
+     * 连续多少个键被拒收（插入返回 0）就认为网络整体饱和，提前结束本轮。
+     *
+     * <p>没有它就只能在「网络不可达 + 键很多」时逐键空转。正常键数很小，影响可忽略。</p>
+     */
+    private static final int MAX_EMPTY_KEY_PROBES = 8;
+
+    // ==================== 回网单批规模：AIMD 控制器 ====================
+    //
+    // 为什么用控制器而不是公式：单批规模该多大取决于「交付能力」与「调度侧派发频率」，
+    // 前者随存储/网络变化，后者是调度侧内部行为 —— 两者都无法在编译期算准。
+    // 所以改成**用实测反馈探测**（TCP 拥塞控制那一套）：
+    //   慢启动：无积压时每 tick ×10，快速探到可用上限；
+    //   乘法减小：一旦积压超过「一批在飞」的规模就减半，并退出慢启动；
+    //   线性回升：之后无积压时逐步 +step 缓升。
+    // 收敛点是「一批大约一两个 tick 就交付完」，也就是最平滑的形态。
+
+    /** 慢启动的每 tick 增长倍数。 */
+    private static final long OUTPUT_BUDGET_SLOW_START_FACTOR = 10L;
+    /** 线性回升的步长占上限的比例（上限 / 本值）。 */
+    private static final long OUTPUT_BUDGET_RECOVERY_STEP_DIVISOR = 64L;
+    /**
+     * 乘法减小的<b>下限</b>（不超上限）。
+     *
+     * <p>没有它时，「积压超一批就减半」会在积压持续时<b>每 tick 减半</b>，
+     * 一路塌到 1 段 —— 那意味着 DE 每批只产出 1 段，而它每次派发都有固定开销
+     * （能量结算、账本、提交），得不偿失。有了下限后预算在「下限 ↔ 交付速率」之间小幅摆动，
+     * 而不是大起大落。</p>
+     */
+    private static final long OUTPUT_BUDGET_MIN = 64L;
+    /** 起步预算占上限的比例（上限 / 本值）—— 刻意保守，先小后快增。 */
+    private static final long OUTPUT_BUDGET_INITIAL_DIVISOR = 100L;
+    /**
+     * 机器彻底空闲多少 tick 后，把控制器复位到保守起步。
+     *
+     * <p><b>为什么必须复位</b>：机器空闲时积压恒为 0，控制器会一路慢启动涨到上限并停在那里 ——
+     * 于是<b>下一次合成开头的第一批仍然是满额的</b>，首批过大 ⇒ 交付要十几秒 ⇒ 开头一段停顿。
+     * 复位后每次新合成都从保守值起步、几 tick 内涨到合适规模，正好对上「起步保守、无积压快增」。</p>
+     *
+     * <p>取 40 tick（2 秒）：足够跨过合成过程中的瞬时排空，不会把「忙里偷闲」误判成空闲。</p>
+     */
+    private static final long OUTPUT_BUDGET_IDLE_RESET_TICKS = 40L;
+    /**
+     * 回网积压硬上限相对「单批预算上限」的倍数：<b>只作内存 / NBT 兜底</b>。
+     *
+     * <p>控制器正常工作时积压收敛在「一两批在飞」（≈2×当前预算），离这里极远。</p>
+     */
+    private static final long OUTPUT_BACKLOG_HARD_MULTIPLIER = 8L;
+    /**
+     * 回网积压的<b>绝对</b>硬上限（分段数）：约 256K 段 ≈ 10MB NBT。
+     *
+     * <p>刻意用绝对值而不是「单批上限 × 倍数」：单批上限会随交付能力调整，
+     * 若硬上限跟着放大，内存 / NBT 兜底就形同虚设。</p>
+     */
+    private static final long HARD_OUTPUT_CHUNK_BUDGET = 262_144L;
+    /**
+     * 每台机器每 tick 的刷网时间预算<b>基准值</b>（纳秒）。
+     *
+     * <p>实际生效的预算还要按 {@link AlloyFurnaceTickBudget#scaledFlushBudget(long)} 动态收窄：
+     * 全局预算被打满时按比例缩小（下限 250µs）。否则 N 台机器各自吃满 4ms，10 台就能吃掉大半个 tick。</p>
+     *
+     * <p><b>为什么这里可以真截断</b>：刷网是幂等的 —— 未投递的余额原样留在队列并持久化，
+     * 没有任何外部方依赖「本轮必须投完」。这与准入路径的「至少收 1 份」完全不同：那边对数据能源
+     * 报容量 0 会触发「无容量 → 重新提交」的空转（见 {@link AlloyFurnaceTickBudget} 的说明）。</p>
+     */
+    /**
+     * 每台机器每 tick 的产物回网时间预算（纳秒），由配置项
+     * {@code advanced_alloy_furnace.ae_output_return_budget_millis} 给出。
+     *
+     * <p><b>它直接决定可持续合成速度</b>：AE2 存储接口单次只能写一个 {@code long} 分段，
+     * 产物必须逐段插入，所以每 tick 能插多少次就决定了能跑多快。</p>
+     *
+     * <p>实际生效值还要按 {@link AlloyFurnaceTickBudget#scaledFlushBudget(long)} 动态收窄：
+     * 全局预算被打满时按比例缩小（下限 250µs）。</p>
+     */
+    private static long flushBudgetNanos() {
+        return ConfigManager.getAdvancedAlloyFurnaceAeOutputReturnBudgetMillis() * 1_000_000L;
+    }
 
     /**
      * 批次成熟窗口（tick）：把 AE 的连续推送合并成一个任务，避免每次推送都单独开工。
@@ -100,6 +204,36 @@ public final class AdvancedAlloyFurnaceAeManager {
      * 表现为任务永久等待 + 产物翻倍。</p>
      */
     private final List<PendingCraftingOutput> queuedCraftingOutputs = new ArrayList<>();
+    /**
+     * 回网积压的<b>真实工作量</b>：队列里所有条目还欠的产物总量（精确 BigInteger）。
+     *
+     * <p><b>为什么不能用「条目数」当积压度量</b>：一个条目可以装着上百万段
+     * （线圈并行上百万时，单批产物就是百万段），条目数离阈值差着六个数量级，
+     * 按条目数降级永远不触发 —— 表现为「首批过大、降频追不上积压」。</p>
+     *
+     * <p>用<b>金额</b>而不是「分段计数」是为了<b>零漂移</b>：入队加总量、交付减实际交付量，
+     * 两者都是精确值；而分段计数在「部分吸收」时无法精确扣减，会越用越偏。
+     * 需要分段口径时按 {@code 金额 / Long.MAX} 现算即可。</p>
+     *
+     * <p>只在服务端主线程维护：入队加、交付减、读档重算。</p>
+     */
+    private BigInteger pendingOutputAmount = BigInteger.ZERO;
+    /** AIMD 控制器的当前输出：本 tick 允许单批产生的分段数；负值表示还没初始化。 */
+    private long outputSegmentBudget = -1L;
+    /** 是否还在慢启动阶段（还没遇到过拥塞）。 */
+    private boolean outputBudgetInSlowStart = true;
+    /** 连续空闲的 tick 数（达到 {@link #OUTPUT_BUDGET_IDLE_RESET_TICKS} 就复位控制器）。 */
+    private long outputBudgetIdleTicks;
+    /**
+     * 回网诊断日志的上报间隔（tick）。
+     *
+     * <p>回网每 tick 都跑，逐 tick 打日志会刷屏；20 tick 一条足够看出积压趋势。</p>
+     */
+    private static final long OUTPUT_DIAGNOSTICS_INTERVAL_TICKS = 20L;
+    /** 上次回网诊断日志的 tick；{@link Long#MIN_VALUE} 表示还没打过。 */
+    private long lastOutputDiagnosticsTick = Long.MIN_VALUE;
+    /** 当前是否处于「回网积压」状态（用于状态跃迁日志的迟滞，避免刷屏）。 */
+    private boolean outputBacklogNoticed;
     private int unreturnedInputRetryTimer = 0;
     private int unreturnedOutputRetryTimer = 0;
     private int patternPriority = 0;
@@ -143,6 +277,10 @@ public final class AdvancedAlloyFurnaceAeManager {
 
         // 合成样板的产物是已经装配完成的实物，AE 任务取消后必须写回网络，否则材料凭空消失。
         // 写不进去的部分留在队列里（随 NBT 持久化），等后续 tick 或重载后继续重试。
+        // 大数批次先给 CPU 侧一个终局信号：产物照样会强制写回，不会丢，只是不再走逐 tick 节奏。
+        for (PendingCraftingOutput pending : this.queuedCraftingOutputs) {
+            notifyCpuBatchCancelled(pending);
+        }
         this.flushQueuedCraftingOutputs(true);
 
         this.owner.markChanged();
@@ -321,13 +459,11 @@ public final class AdvancedAlloyFurnaceAeManager {
 
         ListTag craftingOutputsTag = new ListTag();
         for (PendingCraftingOutput pending : this.queuedCraftingOutputs) {
-            ListTag outputTag = new ListTag();
-            for (GenericStack gs : pending.outputs) {
-                outputTag.add(GenericStack.writeTag(registries, gs));
-            }
             CompoundTag entry = new CompoundTag();
             entry.putLong("QueuedTick", pending.queuedTick);
-            entry.put("Outputs", outputTag);
+            entry.putByte("Format", QUEUED_OUTPUT_FORMAT_COMPACT);
+            // 内存里就是按键 BigInteger 账本，与紧凑格式 1:1，直接写即可（无需再聚合）。
+            entry.put("Outputs", pending.ledger.writeCompactTag(registries));
             craftingOutputsTag.add(entry);
         }
         tag.put("QueuedCraftingOutputs", craftingOutputsTag);
@@ -432,20 +568,30 @@ public final class AdvancedAlloyFurnaceAeManager {
         for (int i = 0; i < craftingOutputsTag.size(); i++) {
             CompoundTag entry = craftingOutputsTag.getCompound(i);
             ListTag outputTag = entry.getList("Outputs", Tag.TAG_COMPOUND);
-            CraftingAeAmountAccumulator amounts = new CraftingAeAmountAccumulator();
-            for (int j = 0; j < outputTag.size(); j++) {
-                GenericStack gs = GenericStack.readTag(registries, outputTag.getCompound(j));
-                if (gs != null && gs.amount() > 0L) {
-                    amounts.add(gs);
-                }
-            }
-            List<GenericStack> outputs = amounts.segments();
-            if (!outputs.isEmpty()) {
-                // 重载后重新计时：这批产物尚未回网，必须再等至少一个 tick 才能注入
-                this.queuedCraftingOutputs.add(new PendingCraftingOutput(
-                        level.getGameTime(), outputs));
+            // 老存档没有 Format 标签（getByte 返回 0），自动走逐段格式的读取分支。
+            CraftingAeAmountAccumulator amounts = entry.getByte("Format") >= QUEUED_OUTPUT_FORMAT_COMPACT
+                    ? CraftingAeAmountAccumulator.readCompactTag(registries, outputTag)
+                    : readLegacyCraftingOutputs(registries, outputTag);
+            if (!amounts.isEmpty()) {
+                // 重载后重新计时：这批产物尚未回网，必须再等至少一个 tick 才能注入。
+                // 账本直接交给条目（构造函数会拷贝一份隔离）。
+                enqueueCraftingOutput(new PendingCraftingOutput(
+                        level.getGameTime(), amounts));
             }
         }
+    }
+
+    /** 旧存档格式（Format &lt; 2）：逐段写的 {@code GenericStack} 列表，每个 {@code Long.MAX} 一段。 */
+    private static CraftingAeAmountAccumulator readLegacyCraftingOutputs(
+            HolderLookup.Provider registries, ListTag outputTag) {
+        CraftingAeAmountAccumulator amounts = new CraftingAeAmountAccumulator();
+        for (int index = 0; index < outputTag.size(); index++) {
+            GenericStack stack = GenericStack.readTag(registries, outputTag.getCompound(index));
+            if (stack != null && stack.amount() > 0L) {
+                amounts.add(stack);
+            }
+        }
+        return amounts;
     }
 
     private void returnSavedBatchMaterials(CompoundTag tag, HolderLookup.Provider registries) {
@@ -559,8 +705,10 @@ public final class AdvancedAlloyFurnaceAeManager {
     }
 
     public boolean isBusy() {
+        // 只有到「硬上限」才报忙：在此之前单批规模由 AIMD 控制器收敛，容量不会归零。
+        // 报忙会让 AE2 直接跳过本供应器（又一个二元门），把控制器的意义抵消掉。
         return this.activeTasks.size() >= this.owner.getMaxAETaskCount()
-                || this.queuedCraftingOutputs.size() >= craftingPatternQueueCap();
+                || isOutputBacklogFull();
     }
 
     /**
@@ -574,6 +722,189 @@ public final class AdvancedAlloyFurnaceAeManager {
         return Math.max(1, this.owner.getMaxAETaskCount());
     }
 
+    /** 单批分段预算的<b>天花板</b>：线程数（保留「一份窗口一段」语义）与硬上限取小。 */
+    private long outputSegmentBudgetCap() {
+        return Math.max(1L, Math.min(this.owner.getMaxAETaskCount(),
+                AlloyFurnaceBigIntegerCrafting.MAX_OUTPUT_SEGMENT_BUDGET));
+    }
+
+    /** 起步预算：上限的 {@link #OUTPUT_BUDGET_INITIAL_DIVISOR} 分之一，刻意保守（先小后快增）。 */
+    private long initialOutputSegmentBudget() {
+        return Math.max(1L, outputSegmentBudgetCap() / OUTPUT_BUDGET_INITIAL_DIVISOR);
+    }
+
+    /** 线性回升步长：上限的 {@link #OUTPUT_BUDGET_RECOVERY_STEP_DIVISOR} 分之一。 */
+    private long outputSegmentBudgetRecoveryStep() {
+        return Math.max(1L, outputSegmentBudgetCap() / OUTPUT_BUDGET_RECOVERY_STEP_DIVISOR);
+    }
+
+    /**
+     * 回网积压的硬上限（分段数）：<b>只作内存 / NBT 兜底</b>。
+     *
+     * <p>控制器正常工作时积压收敛在「一两批在飞」的量级，离这里很远；只有网络长期不可达
+     * （交付速率 0、积压只增不减）时才会碰到 —— 那种情况下拒收才是对的（产物没地方放）。</p>
+     */
+    private long hardOutputChunkBudget() {
+        return HARD_OUTPUT_CHUNK_BUDGET;
+    }
+
+    /** 回网队列的<b>条目数</b>硬上限：与分段硬上限互为双保险。 */
+    private int hardOutputQueueCap() {
+        long cap = (long) craftingPatternQueueCap() * OUTPUT_BACKLOG_HARD_MULTIPLIER;
+        return (int) Math.max(2L, Math.min(Integer.MAX_VALUE, cap));
+    }
+
+    /** 回网积压是否已到硬上限（真拒收）。分段与条目两个维度任一越界即算满。 */
+    private boolean isOutputBacklogFull() {
+        return backlogChunks(this.pendingOutputAmount) >= hardOutputChunkBudget()
+                || this.queuedCraftingOutputs.size() >= hardOutputQueueCap();
+    }
+
+    /** 把产物总量换算成 {@code long} 分段数（饱和 long）。 */
+    private static long backlogChunks(BigInteger amount) {
+        if (amount == null || amount.signum() <= 0) {
+            return 0L;
+        }
+        BigInteger[] quotientAndRemainder = amount.divideAndRemainder(MAX_OUTPUT_CHUNK);
+        long whole = quotientAndRemainder[0].compareTo(MAX_OUTPUT_CHUNK) >= 0
+                ? Long.MAX_VALUE : quotientAndRemainder[0].longValueExact();
+        return saturatingAdd(whole, quotientAndRemainder[1].signum() > 0 ? 1L : 0L);
+    }
+
+    /** 增减回网积压总量（不会低于 0）。 */
+    private void addPendingOutputAmount(BigInteger delta) {
+        if (delta == null || delta.signum() == 0) {
+            return;
+        }
+        BigInteger updated = this.pendingOutputAmount.add(delta);
+        this.pendingOutputAmount = updated.signum() <= 0 ? BigInteger.ZERO : updated;
+    }
+
+    /**
+     * 把一条待回网产物入队，并同步积压总量。
+     *
+     * <p>所有入队都必须走这里 —— 漏一处就会让 {@link #updateOutputSegmentBudget()} 的度量失真。</p>
+     */
+    private void enqueueCraftingOutput(PendingCraftingOutput pending) {
+        this.queuedCraftingOutputs.add(pending);
+        addPendingOutputAmount(pending.ledger.totalAmount());
+    }
+
+    /**
+     * 本 tick 允许<b>单个批次</b>产生的分段数（AIMD 控制器的输出，见 {@link #updateOutputSegmentBudget()}）。
+     *
+     * <p>它直接决定单批规模：批次的份数上限 = {@code Long.MAX × 本值 / 单位产出量}。
+     * 由宿主方块实体通过 {@link CraftingTaskContext#outputSegmentBudget()} 转发给上层，
+     * 再传进 {@link AlloyFurnaceBigIntegerCrafting#maximumSegmentedCount}。</p>
+     *
+     * <p><b>为什么不用固定值</b>：单批该多大取决于「交付能力」与「调度侧派发频率」，
+     * 两者都无法在编译期算准。固定值要么过大（首批交付几十秒 ⇒ 任务之间停顿），
+     * 要么过小（吞吐浪费）。改成控制器后由实测反馈收敛。</p>
+     */
+    public long outputSegmentBudget() {
+        if (this.outputSegmentBudget < 0L) {
+            this.outputSegmentBudget = initialOutputSegmentBudget();
+        }
+        return this.outputSegmentBudget;
+    }
+
+    /**
+     * AIMD 控制器：每 tick 调一次，按「积压是否超过一批在飞」调整单批分段预算。
+     *
+     * <p>四条规则（TCP 拥塞控制那一套）：</p>
+     * <ol>
+     *   <li><b>慢启动</b>：积压未超一批时每 tick ×{@link #OUTPUT_BUDGET_SLOW_START_FACTOR}，
+     *       快速探到可用上限；</li>
+     *   <li><b>乘法减小</b>：积压超过一批在飞就减半，并<b>退出慢启动</b>（不再激进倍增）；</li>
+     *   <li><b>线性回升</b>：之后积压回落时每次 +step 缓升，避免「一有空间就暴涨」再次冲垮；</li>
+     *   <li><b>空闲复位</b>：连续空闲 {@link #OUTPUT_BUDGET_IDLE_RESET_TICKS} tick 后回到保守起步 ——
+     *       否则空闲期会一路涨到上限并停住，让<b>下一次合成开头的第一批仍是满额的</b>。</li>
+     * </ol>
+     *
+     * <p><b>为什么用「积压 &gt; 当前预算」当拥塞信号</b>：预算本身就是「一批的规模」，
+     * 积压超过它就说明<b>不止一批在飞</b>，即交付跟不上派发。用这个相对量而不是绝对值，
+     * 是因为它随预算自适应 —— 预算小的时候同样能识别拥塞。</p>
+     *
+     * <p>收敛点：预算稳定在「一批大约一两个 tick 交付完」的规模，也就是最平滑的形态。
+     * 总吞吐不受影响（交付总量由 AE2 的 long-only 接口决定，与批次划分无关）。</p>
+     */
+    private void updateOutputSegmentBudget() {
+        long cap = outputSegmentBudgetCap();
+        long current = outputSegmentBudget();
+        long pending = backlogChunks(this.pendingOutputAmount);
+        boolean idle = pending <= 0L && this.queuedCraftingOutputs.isEmpty()
+                && this.activeTasks.isEmpty();
+        if (idle) {
+            // 空闲复位：机器长时间没活时把控制器打回保守起步，
+            // 否则下一次合成开头的第一批仍是满额的（首批过大 ⇒ 开头一段停顿）。
+            if (++this.outputBudgetIdleTicks >= OUTPUT_BUDGET_IDLE_RESET_TICKS) {
+                this.outputBudgetIdleTicks = 0;
+                this.outputSegmentBudget = initialOutputSegmentBudget();
+                this.outputBudgetInSlowStart = true;
+            }
+            return;
+        }
+        this.outputBudgetIdleTicks = 0;
+
+        boolean congested = pending > Math.max(1L, current);
+        if (congested) {
+            // 下限避免「每 tick 减半」一路塌到 1 段（DE 每批固定开销会吃掉收益）。
+            long floor = Math.min(cap, OUTPUT_BUDGET_MIN);
+            this.outputSegmentBudget = Math.max(floor, current / 2L);
+            this.outputBudgetInSlowStart = false;
+        } else if (this.outputBudgetInSlowStart) {
+            this.outputSegmentBudget = Math.min(cap,
+                    saturatingMultiply(current, OUTPUT_BUDGET_SLOW_START_FACTOR));
+        } else {
+            this.outputSegmentBudget = Math.min(cap,
+                    saturatingAdd(current, outputSegmentBudgetRecoveryStep()));
+        }
+        this.outputSegmentBudget = Math.max(1L, Math.min(cap, this.outputSegmentBudget));
+    }
+
+    /**
+     * 回网诊断（DEBUG，每 {@link #OUTPUT_DIAGNOSTICS_INTERVAL_TICKS} tick 最多一条）。
+     *
+     * <p><b>为什么需要它</b>：超大量合成时「任务之间的停顿」很难从游戏里看出根因 ——
+     * 是回网积压把新批次压小了？还是调度侧本身慢？这条日志把四个关键量一次打出来：</p>
+     * <ul>
+     *   <li>{@code pending} —— 待回网分段数（积压）；持续上涨说明交付跟不上派发；</li>
+     *   <li>{@code delivered} —— 本 tick 实际交付的分段数（交付速率）；</li>
+     *   <li>{@code budgetUs} —— 本 tick 生效的回网时间预算（µs）；被降到下限说明服务端整体过载；</li>
+     *   <li>{@code segmentBudget} —— AIMD 控制器当前给出的单批分段预算；
+     *       贴近交付速率说明已收敛，贴近下限说明正在为积压大幅让路。</li>
+     * </ul>
+     *
+     * <p>打开方式：日志配置里把 {@code com.sorrowmist.useless} 设为 {@code DEBUG}。</p>
+     */
+    private void logOutputReturnDiagnostics(long now, long flushStartedNanos, long flushBudgetNanos,
+                                            long insertWorkNanos, BigInteger deliveredTotal) {
+        if (deliveredTotal.signum() <= 0 || !LOGGER.isDebugEnabled()) {
+            return;
+        }
+        if (this.lastOutputDiagnosticsTick != Long.MIN_VALUE
+                && now - this.lastOutputDiagnosticsTick < OUTPUT_DIAGNOSTICS_INTERVAL_TICKS) {
+            return;
+        }
+        this.lastOutputDiagnosticsTick = now;
+        long spentNanos = System.nanoTime() - flushStartedNanos;
+        long deliveredChunks = backlogChunks(deliveredTotal);
+        // insertUs/deliveredChunks 就是每次插入的真实成本 —— 它决定了吞吐的物理上限
+        // （吞吐 ≈ 每 tick 可插入次数 × 每段物品数）。
+        LOGGER.debug(
+                "Alloy furnace output return at {}: entries={}, pendingChunks={}, deliveredChunks={}, "
+                        + "spentUs={}, insertUs={}, budgetUs={}, segmentBudget={}, throttleScale={}",
+                this.owner.getBlockPos(),
+                this.queuedCraftingOutputs.size(),
+                backlogChunks(this.pendingOutputAmount),
+                deliveredChunks,
+                spentNanos / 1_000L,
+                insertWorkNanos / 1_000L,
+                flushBudgetNanos / 1_000L,
+                outputSegmentBudget(),
+                AlloyFurnaceTickBudget.scale());
+    }
+
     /**
      * Returns the number of provider slots that can accept another physical AE submission.
      * Processing patterns use active furnace tasks. Crafting patterns finish synchronously;
@@ -585,7 +916,9 @@ public final class AdvancedAlloyFurnaceAeManager {
     public int getRemainingAETaskCount(boolean craftingPattern) {
         int maximum = Math.max(0, this.owner.getMaxAETaskCount());
         if (craftingPattern) {
-            int cap = craftingPatternQueueCap();
+            // 用「硬上限」而不是软阈值算槽位：回网积压不该把可用槽位直接打到 0
+            //（那会让调度侧停一拍再重启，表现为合成不丝滑）；单批规模由 AIMD 控制器收敛。
+            int cap = hardOutputQueueCap();
             return Math.max(0, cap - Math.min(cap, this.queuedCraftingOutputs.size()));
         }
         int occupied = Math.max(0, this.activeAETaskCount.get());
@@ -619,8 +952,9 @@ public final class AdvancedAlloyFurnaceAeManager {
             return false;
         }
         // 背压：上一批产物还没能写回网络时不再接收新批次，避免材料滞留在队列里。
-        int taskLimit = craftingPatternQueueCap();
-        if (this.queuedCraftingOutputs.size() >= taskLimit) {
+        // 只在「硬上限」拒收 —— 在此之前单批规模由 AIMD 控制器收敛，容量不会归零，
+        // 所以正常永远走不到这里（它只是网络长期不可达时的兜底）。
+        if (isOutputBacklogFull()) {
             return false;
         }
 
@@ -669,14 +1003,13 @@ public final class AdvancedAlloyFurnaceAeManager {
         if (produced.isEmpty()) {
             return false;
         }
-        List<GenericStack> producedSegments = produced.segments();
 
         // 走到这里才算接收：AE2 随后会把本批预期产物写入 CPU 的 waitingFor。
         for (KeyCounter counter : inputHolder) {
             counter.clear();
         }
-        this.queuedCraftingOutputs.add(new PendingCraftingOutput(
-                level.getGameTime(), producedSegments));
+        enqueueCraftingOutput(new PendingCraftingOutput(
+                level.getGameTime(), produced));
         TrinityDispatchDiagnostics.reportCraftingPatternWindow(
                 level.getGameTime(), Math.max(1L, operationsPerPush), probes);
         this.owner.markChanged();
@@ -698,9 +1031,34 @@ public final class AdvancedAlloyFurnaceAeManager {
      *
      * <p>只处理合成样板；其它样板返回 {@code false}，继续由长版 counted 路径服务。</p>
      */
+    /**
+     * 数据能源适配器的 bigint 提交入口（{@code BigIntegerPush}，无 CPU 回执）。
+     *
+     * @see #pushBigIntegerBatch(IPatternDetails, BigInteger, KeyCounter[], AlloyFurnaceBigIntegerCpuBinding)
+     */
     public boolean pushBigIntegerCraftingPattern(IPatternDetails patternDetails,
                                                  BigInteger count,
                                                  KeyCounter[] unitPrototype) {
+        return pushBigIntegerBatch(patternDetails, count, unitPrototype, null);
+    }
+
+    /**
+     * 原生 bigint 批次的<b>统一入口</b>：按样板种类路由到对应的折叠实现。
+     *
+     * <ul>
+     *   <li><b>万象样板</b>（{@link OmniversalPatternDetails}）：解析绑定配方一次 → 产物 ×count，
+     *       按 {@code count × 单份能耗} 收能量；</li>
+     *   <li><b>AE2 合成样板</b>（{@link IMolecularAssemblerSupportedPattern}）：在虚拟 3×3 工作台上
+     *       装配一次 → 产物 ×count，<b>不收能量</b>；</li>
+     *   <li>其它样板返回 {@code false}，由长版 counted 路径继续服务。</li>
+     * </ul>
+     *
+     * @param cpuBinding CPU 侧回执绑定；{@code null} 表示产物只切段写回 ME 网络
+     */
+    public boolean pushBigIntegerBatch(IPatternDetails patternDetails,
+                                       BigInteger count,
+                                       KeyCounter[] unitPrototype,
+                                       @Nullable AlloyFurnaceBigIntegerCpuBinding cpuBinding) {
         Level level = this.owner.getLevel();
         if (level == null || level.isClientSide || !this.owner.isTaskExecutionEnabled()) {
             return false;
@@ -709,11 +1067,29 @@ public final class AdvancedAlloyFurnaceAeManager {
             return false;
         }
         IPatternDetails original = SmartDoublingPatterns.unwrap(patternDetails);
-        if (!(original instanceof IMolecularAssemblerSupportedPattern craftingPattern)) {
+        if (original instanceof OmniversalPatternDetails omniversal) {
+            return commitOmniversalBatch(omniversal, count, unitPrototype, cpuBinding);
+        }
+        return original instanceof IMolecularAssemblerSupportedPattern craftingPattern
+                && commitCraftingBatch(craftingPattern, count, unitPrototype, cpuBinding);
+    }
+
+    /**
+     * 合成样板的 bigint 折叠：在虚拟 3×3 工作台上装配<b>一次</b>，产物整体 ×count。
+     *
+     * <p>不按 count 收能量 —— 与长版 counted 路径的合成样板分支一致（那条路同样是装配一次后按倍率
+     * 折叠，不建真实加工任务）。</p>
+     */
+    private boolean commitCraftingBatch(IMolecularAssemblerSupportedPattern craftingPattern,
+                                        BigInteger count,
+                                        KeyCounter[] unitPrototype,
+                                        @Nullable AlloyFurnaceBigIntegerCpuBinding cpuBinding) {
+        Level level = this.owner.getLevel();
+        if (level == null || level.isClientSide) {
             return false;
         }
-        // 背压：与长版路径同一套上限
-        if (this.queuedCraftingOutputs.size() >= craftingPatternQueueCap()) {
+        // 背压：只在「硬上限」拒收。在此之前单批规模由 AIMD 控制器收敛，容量不会归零。
+        if (isOutputBacklogFull()) {
             return false;
         }
 
@@ -736,16 +1112,197 @@ public final class AdvancedAlloyFurnaceAeManager {
             return false;
         }
 
-        // 走到这里才算接收：清空收到的单位原型（count-1 份由 DE 的账本扣除），产物进回网队列。
+        // 走到这里才算接收：清空收到的单位原型（count-1 份由调用方的账本扣除），产物进回网队列。
+        AlloyFurnaceBigIntegerBatchContext cpuContext = cpuBinding == null
+                ? null : buildCpuContext(craftingPattern, count, 0L, cpuBinding);
+        PendingCraftingOutput pending = new PendingCraftingOutput(
+                level.getGameTime(),
+                produced,
+                AlloyFurnaceBigIntegerCrafting.scaledOutputs(unitOutputs, count),
+                cpuContext,
+                cpuBinding == null ? null : cpuBinding.adapterId());
         for (KeyCounter counter : unitPrototype) {
             counter.clear();
         }
-        this.queuedCraftingOutputs.add(new PendingCraftingOutput(level.getGameTime(), produced.segments()));
+        enqueueCraftingOutput(pending);
+        if (cpuContext != null) {
+            notifyCpuBatchAdmitted(cpuContext, cpuBinding.adapterId());
+        }
         TrinityDispatchDiagnostics.reportCraftingPatternWindow(level.getGameTime(), count, 1);
         // 报账给「每 tick 时间预算」：超预算时后续批次的窗口预算会被自动收窄
         AlloyFurnaceTickBudget.addWork(System.nanoTime() - useless$bigintStarted);
         this.owner.markChanged();
         return true;
+    }
+
+    // ==================== 万象样板的原生 bigint（exact）批次 ====================
+
+    /**
+     * 接收万象样板的原生 bigint 批次（<b>折叠</b>语义）。
+     *
+     * <p>与合成样板那条 bigint 路径的区别：万象样板绑定了一个合金炉配方，所以「单份产出」直接来自
+     * 配方（主产物 + 流体 + 隐藏键产出），代价是本机要按 {@code count × 单份能耗} 收能量；
+     * 合成样板则是虚拟工作台装配一次再放大，不收能量。</p>
+     *
+     * <p><b>检查顺序不能改</b>：配方可用性（档次/模具）、回网背压、能量这三类可能失败的事全部排在
+     * 「清空原型」之前 —— 返回 {@code false} 时调用方手里的原型完好无损，它自己扣掉的那
+     * {@code count - 1} 份也能安全回滚。</p>
+     *
+     * @param count         份数，可以超过 {@code long}
+     * @param unitPrototype <b>单次推送</b>的原型（不是 ×count 的整批材料）
+     * @param cpuBinding    CPU 侧回执绑定；{@code null} 表示产物只切段写回 ME 网络
+     */
+    private boolean commitOmniversalBatch(OmniversalPatternDetails pattern,
+                                          BigInteger count,
+                                          KeyCounter[] unitPrototype,
+                                          @Nullable AlloyFurnaceBigIntegerCpuBinding cpuBinding) {
+        Level level = this.owner.getLevel();
+        if (level == null || level.isClientSide || !this.owner.isTaskExecutionEnabled()) {
+            return false;
+        }
+        if (!this.owner.supportsBigIntegerRecipeBatches()) {
+            return false;
+        }
+        AdvancedAlloyFurnaceRecipe recipe = pattern.recipe();
+        if (recipe == null || !this.owner.isTaskRecipeAvailable(recipe)) {
+            return false;
+        }
+        // 背压：与合成样板共用「回网队列」，同样只在硬上限拒收（折叠语义不建长任务，不占 activeTasks 名额）。
+        if (isOutputBacklogFull()) {
+            return false;
+        }
+        long manualOperations = SmartDoublingPatterns.manualOperationsPerPattern(recipe, pattern);
+        if (manualOperations <= 0L) {
+            return false;
+        }
+        List<GenericStack> unitOutputs = AlloyFurnaceBigIntegerCrafting.unitOutputs(recipe, manualOperations);
+        if (unitOutputs.isEmpty()) {
+            return false;
+        }
+        // 先把产出算出来（纯计算、不改状态），再扣能量 —— 这样任何一条失败路径都不会「扣了能量却不接收」。
+        CraftingAeAmountAccumulator produced = new CraftingAeAmountAccumulator();
+        accumulateScaled(produced, unitOutputs, count);
+        if (produced.isEmpty()) {
+            return false;
+        }
+        // 能量：口径与长版任务的 calculateTargetTotalEnergy 完全一致（与并行相关时按 count 放大）。
+        ResolvedCatalystEffect effect = this.owner.resolveTaskEffect(recipe);
+        long totalEnergy = AlloyFurnaceBigIntegerCrafting.totalEnergy(recipe, count, effect);
+        if (totalEnergy > 0L) {
+            IEnergyManager energy = this.owner.getEnergyManager();
+            if (totalEnergy > energy.getEnergyStoredLong() || !energy.tryConsumeEnergy(totalEnergy)) {
+                return false;
+            }
+        }
+
+        long useless$bigintStarted = System.nanoTime();
+
+        // 走到这里才算接收：只消费手里那一份原型（count-1 份由调用方的 BigInteger 账本扣除），
+        // 产物进回网队列。回执上下文先建好，成功入队后再通知 CPU 侧「已受理」。
+        AlloyFurnaceBigIntegerBatchContext cpuContext = cpuBinding == null
+                ? null : buildCpuContext(pattern, count, totalEnergy, cpuBinding);
+        PendingCraftingOutput pending = new PendingCraftingOutput(
+                level.getGameTime(),
+                produced,
+                AlloyFurnaceBigIntegerCrafting.scaledOutputs(unitOutputs, count),
+                cpuContext,
+                cpuBinding == null ? null : cpuBinding.adapterId());
+        for (KeyCounter counter : unitPrototype) {
+            counter.clear();
+        }
+        enqueueCraftingOutput(pending);
+        if (cpuContext != null) {
+            notifyCpuBatchAdmitted(cpuContext, cpuBinding.adapterId());
+        }
+        TrinityDispatchDiagnostics.reportCraftingPatternWindow(level.getGameTime(), count, 1);
+        // 报账给「每 tick 时间预算」：超预算时后续批次的窗口预算会被自动收窄
+        AlloyFurnaceTickBudget.addWork(System.nanoTime() - useless$bigintStarted);
+        this.owner.markChanged();
+        return true;
+    }
+
+    /** 组装一次大数批次的 CPU 回执上下文（合成样板与万象样板共用）。 */
+    private @NotNull AlloyFurnaceBigIntegerBatchContext buildCpuContext(
+            IPatternDetails pattern,
+            BigInteger count,
+            long energyCharged,
+            AlloyFurnaceBigIntegerCpuBinding binding) {
+        return new AlloyFurnaceBigIntegerBatchContext(
+                UUID.randomUUID(),
+                binding.cpuToken(),
+                AlloyFurnaceBigIntegerCrafting.machineIdentity(
+                        "machine@" + this.owner.getBlockPos().asLong(),
+                        this.owner.getLevel(),
+                        this.owner.getBlockPos()),
+                pattern,
+                count,
+                AlloyFurnaceBigIntegerCrafting.plannedOutputs(pattern, count),
+                energyCharged);
+    }
+
+    // ==================== CPU 侧回执 ====================
+
+    private static void notifyCpuBatchAdmitted(AlloyFurnaceBigIntegerBatchContext context,
+                                               ResourceLocation adapterId) {
+        AlloyFurnaceBigIntegerCpuAdapter adapter =
+                AlloyFurnaceBigIntegerCpuAdapters.find(adapterId).orElse(null);
+        if (adapter != null) {
+            runCpuCallback(() -> adapter.onBatchAdmitted(context), adapterId, "onBatchAdmitted");
+        }
+    }
+
+    /**
+     * 产物全部回网后通知 CPU 侧。
+     *
+     * <p>实际产出直接取入队时算好的 BigInteger 精确值，<b>不</b>去累加 long 分段 —— 那会溢出。</p>
+     */
+    private static void notifyCpuBatchCompleted(PendingCraftingOutput pending) {
+        AlloyFurnaceBigIntegerBatchContext context = pending.cpuContext;
+        ResourceLocation adapterId = pending.cpuAdapterId;
+        if (context == null || adapterId == null || pending.cpuNotified) {
+            return;
+        }
+        // 取消流程可能已经发过 CANCELLED；一个批次只能有一个终局。
+        pending.cpuNotified = true;
+        AlloyFurnaceBigIntegerCpuAdapter adapter =
+                AlloyFurnaceBigIntegerCpuAdapters.find(adapterId).orElse(null);
+        if (adapter == null) {
+            return;
+        }
+        List<AlloyFurnaceBigIntegerOutput> outputs = pending.bigIntegerOutputs;
+        if (outputs != null && !outputs.isEmpty()) {
+            runCpuCallback(() -> adapter.onBatchOutputs(context, outputs), adapterId, "onBatchOutputs");
+        }
+        runCpuCallback(() -> adapter.onBatchFinished(context, AlloyFurnaceBigIntegerBatchResult.SUCCESS),
+                adapterId, "onBatchFinished");
+    }
+
+    /** 批次被取消时给 CPU 侧一个明确的终局信号，避免它一直等回执。 */
+    private static void notifyCpuBatchCancelled(PendingCraftingOutput pending) {
+        AlloyFurnaceBigIntegerBatchContext context = pending.cpuContext;
+        ResourceLocation adapterId = pending.cpuAdapterId;
+        if (context == null || adapterId == null || pending.cpuNotified) {
+            return;
+        }
+        pending.cpuNotified = true;
+        AlloyFurnaceBigIntegerCpuAdapter adapter =
+                AlloyFurnaceBigIntegerCpuAdapters.find(adapterId).orElse(null);
+        if (adapter != null) {
+            runCpuCallback(() -> adapter.onBatchFinished(context, AlloyFurnaceBigIntegerBatchResult.CANCELLED),
+                    adapterId, "onBatchFinished");
+        }
+    }
+
+    /**
+     * 回调必须隔离：第三方适配器抛异常绝不能影响机器的产物回网。
+     * 记日志并吞掉，语义与 AE2 对供应器的容错一致。
+     */
+    private static void runCpuCallback(Runnable callback, ResourceLocation adapterId, String name) {
+        try {
+            callback.run();
+        } catch (RuntimeException exception) {
+            LOGGER.error("BigInteger crafting CPU adapter {} threw in {}", adapterId, name, exception);
+        }
     }
 
     /**
@@ -900,10 +1457,26 @@ public final class AdvancedAlloyFurnaceAeManager {
     }
 
     /**
-     * @param force true 时忽略“必须晚一个 tick”的保护（只用于取消/拆除任务：此时 CPU 已放弃这批产物，
-     *              产物落进通用存储也不会被错认，但绝不能丢）
+     * 把已装配完成、等待回网的产物写入 AE。
+     *
+     * <p><b>BigInteger 优先</b>：整条可回网队列先按键聚合成一本账，每个键只投递一次，且只在真正
+     * 插入的那一刻才把余额切成 {@code long} 分段（AE 存储 API 只有 long，这是硬边界）。
+     * 投递成功后把实际投递量按队列 <b>FIFO</b> 归因回各条目，条目余额清零才移除并发终局回调。</p>
+     *
+     * <p>归因是精确的：令可回网条目为 {@code e₁..eₙ}，键 k 的余额为 {@code Eᵢ}、聚合为
+     * {@code T=ΣEᵢ}、本轮投递为 {@code D∈[0,T]}；按 FIFO 依次扣 {@code min(剩余, Eᵢ)}，
+     * 因 {@code D ≤ ΣEᵢ} 故累计扣减恰为 {@code D}，单条扣减又不会超过其实际余额 ⇒ 不丢不重。</p>
+     *
+     * @param force true 时忽略「必须晚一个 tick」的保护，且<b>不受</b>每 tick 预算与单键分段上限约束。
+     *              只用于取消/拆除：此时 CPU 已放弃这批产物（落进通用存储也不会被错认），
+     *              但方块实体与 NBT 随后就消失，产物必须尽量一次全部写回，否则就丢了。
      */
     private void flushQueuedCraftingOutputs(boolean force) {
+        // AIMD 控制器每 tick 都要跑一次 —— 必须放在下面的早退之前，
+        // 否则「队列已空」时预算永远不会回升（那正是最该回升的时候）。
+        if (!force) {
+            updateOutputSegmentBudget();
+        }
         if (this.queuedCraftingOutputs.isEmpty()) {
             return;
         }
@@ -912,33 +1485,128 @@ public final class AdvancedAlloyFurnaceAeManager {
             return;
         }
         long now = level.getGameTime();
-        boolean changed = false;
+
+        // 1) 收集本轮可刷条目，保持队列 FIFO 顺序（归因依赖这个顺序）。
+        List<PendingCraftingOutput> flushable = new ArrayList<>();
+        for (PendingCraftingOutput pending : this.queuedCraftingOutputs) {
+            if (force || pending.queuedTick < now) {
+                flushable.add(pending);
+            }
+        }
+        if (flushable.isEmpty()) {
+            return;
+        }
+
+        // 2) 跨条目按键聚合：整条队列里同一个键只投递一次。
+        CraftingAeAmountAccumulator total = new CraftingAeAmountAccumulator();
+        for (PendingCraftingOutput pending : flushable) {
+            total.addAll(pending.ledger);
+        }
+        if (total.isEmpty()) {
+            return;
+        }
+
+        // 3) 解析一次网络写入目标，整趟刷写复用。
+        //    原来每写一个分段都要重解析（多方块侧 2 次方块实体查询 + 2 次分配），
+        //    而可持续吞吐直接由「每 tick 能插多少次」决定（一 tick 数千次）⇒ 不缓存就直接吃吞吐。
+        //    不可达时直接返回、不触碰任何状态（旧实现会逐段空转并标脏）。
+        CraftingAeOutputTarget target = this.owner.resolveAeOutputTarget();
+        if (target == null) {
+            return;
+        }
+
+        // 4) 逐键投递。offer 取 min(余额, Long.MAX_VALUE)：存储 API 单次只有 long。
+        long flushStarted = System.nanoTime();
+        // 预算按全局系数动态收窄（下限 250µs）：回网预算是每台机器的，
+        // 写死会让 N 台机器各自吃满基准值（10 台就是 40ms/tick）。
+        long flushBudgetNanos = AlloyFurnaceTickBudget.scaledFlushBudget(flushBudgetNanos());
+        boolean deliveredAny = false;
+        int emptyKeyProbes = 0;
+        BigInteger deliveredTotal = BigInteger.ZERO;
+        // 插入耗时先本地累计，整趟结束再上报一次：addWork 是 synchronized，
+        // 而一 tick 可能插数千次，逐段加锁本身就是可观开销。
+        long insertWorkNanos = 0L;
+        for (var entry : total.snapshotEntries()) {
+            if (!force && insertWorkNanos >= flushBudgetNanos) {
+                break; // 预算已用尽：本 tick 到此为止（首个键因累计为 0 必定会被尝试）
+            }
+            AEKey key = entry.getKey();
+            BigInteger remaining = entry.getValue();
+            // 不设段数上限：**只由时间预算决定何时停**。
+            // 直接拿累计插入耗时当预算信号，这样每段只需一对 nanoTime（原来还要额外的预算检查）。
+            // 循环条件在插入前判定，所以第一个分段总会尝试（预算为 0 时也进得去）。
+            while (remaining.signum() > 0 && (force || insertWorkNanos < flushBudgetNanos)) {
+                BigInteger offer = remaining.min(MAX_OUTPUT_CHUNK);
+                long offerLong = offer.longValueExact(); // ≤ Long.MAX_VALUE，安全
+                long insertStarted = System.nanoTime();
+                long inserted = clampInserted(target.insert(key, offerLong), offerLong);
+                insertWorkNanos += System.nanoTime() - insertStarted;
+                if (inserted <= 0L) {
+                    break; // 本键被拒收：本轮不再尝试它
+                }
+                deliveredAny = true;
+                emptyKeyProbes = 0;
+                remaining = remaining.subtract(BigInteger.valueOf(inserted));
+                if (inserted < offerLong) {
+                    break; // 只吸收了部分 ⇒ 存储已饱和，继续喂只会空转
+                }
+            }
+
+            // 4) 把本键实际投递量按 FIFO 归因回各条目（队首条目先被清空）。
+            BigInteger delivered = entry.getValue().subtract(remaining);
+            if (delivered.signum() > 0) {
+                attributeDeliveredOutputs(flushable, key, delivered);
+                deliveredTotal = deliveredTotal.add(delivered);
+            } else if (++emptyKeyProbes >= MAX_EMPTY_KEY_PROBES) {
+                break; // 连续多个键都拒收 ⇒ 网络整体饱和，提前收手
+            }
+
+            if (!force && insertWorkNanos >= flushBudgetNanos) {
+                break; // 预算已用尽：跳出键循环
+            }
+        }
+
+        // 整趟的插入耗时一次性上报（见上面 insertWorkNanos 的说明）。
+        AlloyFurnaceTickBudget.addWork(insertWorkNanos);
+
+        // 5) 清空条目：产物全部回网后发一次终局回调，并从队列移除。
+        //    没有投递任何东西时这里不会命中，也不会 markChanged（旧实现会空转并标脏）。
+        boolean changed = deliveredAny;
+        if (deliveredTotal.signum() > 0) {
+            // 同步积压总量（精确减）：它是 AIMD 控制器的度量来源。
+            addPendingOutputAmount(deliveredTotal.negate());
+        }
+        logOutputReturnDiagnostics(now, flushStarted, flushBudgetNanos, insertWorkNanos, deliveredTotal);
         var iterator = this.queuedCraftingOutputs.iterator();
         while (iterator.hasNext()) {
             PendingCraftingOutput pending = iterator.next();
-            if (!force && pending.queuedTick >= now) {
-                continue;
-            }
-            List<GenericStack> remaining = new ArrayList<>(pending.outputs.size());
-            for (GenericStack stack : pending.outputs) {
-                long requested = stack.amount();
-                long useless$insertStarted = System.nanoTime();
-                long inserted = clampInserted(this.owner.tryOutputKeyToAE(stack.what(), requested), requested);
-                AlloyFurnaceTickBudget.addWork(System.nanoTime() - useless$insertStarted);
-                long left = requested - inserted;
-                if (left > 0L) {
-                    remaining.add(new GenericStack(stack.what(), left));
-                }
-            }
-            changed = true;
-            if (remaining.isEmpty()) {
+            if (pending.isEmpty()) {
                 iterator.remove();
-            } else {
-                pending.replaceOutputs(remaining);
+                // 产物全部回网：给 CPU 侧发实际产出与终局通知（没有绑定时是空操作）。
+                notifyCpuBatchCompleted(pending);
+                changed = true;
             }
         }
         if (changed) {
             this.owner.markChanged();
+        }
+    }
+
+    /**
+     * 把某个键本轮实际投递的量按队列 FIFO 记回各条目。
+     *
+     * <p>调用方保证 {@code delivered ≤ Σᵢ entryᵢ.ledger.amount(key)}（因为 delivered 由聚合余额
+     * 逐次扣减得到）。逐条取 {@code min(剩余投递量, 该条余额)} 扣减，累计恰好等于 {@code delivered}
+     * —— 既不会少记（丢物品），也不会多记（凭空扣账）。</p>
+     */
+    private static void attributeDeliveredOutputs(List<PendingCraftingOutput> entries,
+                                                 AEKey key, BigInteger delivered) {
+        BigInteger left = delivered;
+        for (PendingCraftingOutput pending : entries) {
+            if (left.signum() <= 0) {
+                break;
+            }
+            left = left.subtract(pending.ledger.consume(key, left));
         }
     }
 
@@ -1596,19 +2264,70 @@ public final class AdvancedAlloyFurnaceAeManager {
         }
     }
 
-    /** 一次合成样板自执行的产出（主产物 + 容器余料），等待在安全时机注入 AE 网络。 */
+    /**
+     * 一次自执行（合成样板装配 / 万象样板折叠）的产出，等待在安全时机注入 AE 网络。
+     *
+     * <p><b>BigInteger 优先</b>：产物以按键 {@link CraftingAeAmountAccumulator 余额账本} 保存，
+     * 不预先物化 long 分段。旧实现把产物按 {@code Long.MAX_VALUE} 切成 {@code List<GenericStack>}
+     * 再逐段插入，最坏情况（队列深度 = 线程数、每条约千段）会达到每 tick 千万次插入调用；
+     * 现在只在真正插入的那一刻才切段，且同一个键在整条队列里只投递一次。</p>
+     *
+     * <p>大数批次额外带两样东西：{@code bigIntegerOutputs} 是本批产出的 BigInteger <b>精确</b>值
+     * （回调专用 —— long 分段相加会溢出，且它与投递结果无关，commit 时就算好了）；
+     * {@code cpuContext} + {@code cpuAdapterId} 用来在产物全部回网后驱动
+     * {@code onBatchOutputs} / {@code onBatchFinished}。</p>
+     *
+     * <p>CPU 回执绑定<b>不随 NBT 持久化</b>：产物队列本身照常存盘（不会丢物品），但重载后不再补发
+     * 回调。这是刻意的 —— 回调只是本会话内的便利信号，产物最终仍会经 ME 网络正常入账，
+     * 调用方以网络实际入账为准即可。</p>
+     */
     static final class PendingCraftingOutput {
         final long queuedTick;
-        final List<GenericStack> outputs;
+        /** 剩余待回网的按键 BigInteger 余额。回网刷新时原地扣减，扣空即条目完成。 */
+        final CraftingAeAmountAccumulator ledger;
+        /** 本批的实际产出（BigInteger 精确值）；非大数批次为 {@code null}。 */
+        @Nullable
+        final List<AlloyFurnaceBigIntegerOutput> bigIntegerOutputs;
+        /** CPU 回执上下文；没有绑定时为 {@code null}。 */
+        @Nullable
+        final AlloyFurnaceBigIntegerBatchContext cpuContext;
+        /** 已注册的适配器 id，与 {@link #cpuContext} 同时存在。 */
+        @Nullable
+        final ResourceLocation cpuAdapterId;
+        /**
+         * 是否已经给 CPU 侧发过终局通知。
+         *
+         * <p>必须有这个位：取消流程会先发 {@code CANCELLED}，紧接着
+         * {@link #flushQueuedCraftingOutputs(boolean)} 以 {@code force=true} 强制回网，
+         * 若这一条刚好被刷空就会再发一次 {@code SUCCESS} —— 同一个批次出现两个互相矛盾的终局。
+         * 一个批次只能有一个终局。</p>
+         */
+        boolean cpuNotified;
 
-        PendingCraftingOutput(long queuedTick, List<GenericStack> outputs) {
-            this.queuedTick = queuedTick;
-            this.outputs = new ArrayList<>(outputs);
+        PendingCraftingOutput(long queuedTick, CraftingAeAmountAccumulator ledger) {
+            this(queuedTick, ledger, null, null, null);
         }
 
-        void replaceOutputs(List<GenericStack> remaining) {
-            this.outputs.clear();
-            this.outputs.addAll(remaining);
+        PendingCraftingOutput(long queuedTick, CraftingAeAmountAccumulator ledger,
+                              @Nullable List<AlloyFurnaceBigIntegerOutput> bigIntegerOutputs) {
+            this(queuedTick, ledger, bigIntegerOutputs, null, null);
+        }
+
+        PendingCraftingOutput(long queuedTick, CraftingAeAmountAccumulator ledger,
+                              @Nullable List<AlloyFurnaceBigIntegerOutput> bigIntegerOutputs,
+                              @Nullable AlloyFurnaceBigIntegerBatchContext cpuContext,
+                              @Nullable ResourceLocation cpuAdapterId) {
+            this.queuedTick = queuedTick;
+            // 拷贝隔离：调用方的 produced 账本随后就被丢弃，但别让它与队列条目共享可变状态。
+            this.ledger = ledger.copy();
+            this.bigIntegerOutputs = bigIntegerOutputs;
+            this.cpuContext = cpuContext;
+            this.cpuAdapterId = cpuAdapterId;
+        }
+
+        /** 本条目是否已全部回网（账本扣空）。 */
+        boolean isEmpty() {
+            return this.ledger.isEmpty();
         }
     }
 

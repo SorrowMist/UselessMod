@@ -4,6 +4,7 @@ import com.sorrowmist.useless.UselessMod;
 import com.sorrowmist.useless.content.items.BeefMagnetHandler;
 import com.sorrowmist.useless.content.items.BeefTimeAcceleration;
 import com.sorrowmist.useless.content.items.EndlessBeafItem;
+import com.sorrowmist.useless.compat.ae.AeDeviceLinker;
 import com.sorrowmist.useless.compat.constructionwand.ConstructionWandLogic;
 import com.sorrowmist.useless.content.recipe.AlloyFurnaceRecipeManager;
 import com.sorrowmist.useless.content.recipe.AlloyFurnaceRecipeCatalog;
@@ -22,6 +23,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.GlobalPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
+import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.InteractionResult;
@@ -54,6 +56,7 @@ import net.neoforged.neoforge.event.level.LevelEvent;
 import net.neoforged.neoforge.event.server.ServerStartedEvent;
 import net.neoforged.neoforge.event.server.ServerStoppedEvent;
 import net.neoforged.neoforge.event.tick.PlayerTickEvent;
+import net.neoforged.neoforge.event.tick.ServerTickEvent;
 import net.neoforged.neoforge.network.PacketDistributor;
 import net.neoforged.neoforge.server.ServerLifecycleHooks;
 
@@ -554,6 +557,44 @@ public class EventHandler {
         event.setCanceled(true);
         // 设置结果，告知系统处理已成功，停止后续传播
         event.setCancellationResult(InteractionResult.sidedSuccess(world.isClientSide));
+    }
+
+    /**
+     * AE 连接模式：右键「能连入 AE 网络」的机器，把它的 AE 节点并入工具绑定的那张网。
+     *
+     * <p>必须拦在 {@link PlayerInteractEvent.RightClickBlock} 这一层，而不是 {@code Item#useOn}：
+     * 右键 ME 设备默认会开方块 GUI，只有取消本次交互才拦得住。
+     * 潜行时直接让位给既有的「Shift + 右键绑定无线访问点 / 自动装配合金炉」。</p>
+     */
+    @SubscribeEvent(priority = EventPriority.HIGHEST)
+    public static void onAeConnectInteract(PlayerInteractEvent.RightClickBlock event) {
+        if (event.isCanceled() || event.getEntity().isShiftKeyDown()) return;
+
+        ItemStack stack = event.getItemStack();
+        if (!(stack.getItem() instanceof EndlessBeafItem)) return;
+        if (!stack.getOrDefault(UComponents.AeNetworkConnectComponent.get(), false)) return;
+
+        Level level = event.getLevel();
+        BlockPos pos = event.getPos();
+        // 目标不是 AE 节点宿主就不接管，交给原有的右键链路（收菜 / 工具动作等）。
+        if (!AeDeviceLinker.isLinkTarget(level, pos)) return;
+
+        if (level instanceof ServerLevel serverLevel && event.getEntity() instanceof ServerPlayer serverPlayer) {
+            AeDeviceLinker.toggle(serverLevel, serverPlayer, stack, pos);
+        }
+        event.setCanceled(true);
+        event.setCancellationResult(InteractionResult.sidedSuccess(level.isClientSide()));
+    }
+
+    /**
+     * AE 连接的续命闹钟：AE2 不保存非空间网格连接，区块 / 存档重载后要把登记过的连接补回来。
+     * 每 20 tick 跑一次，链接表为空时几乎零开销。
+     */
+    @SubscribeEvent
+    public static void onServerTick(ServerTickEvent.Post event) {
+        MinecraftServer server = event.getServer();
+        if (server.getTickCount() % 20 != 0) return;
+        AeDeviceLinker.ensureLinks(server);
     }
 
     /**

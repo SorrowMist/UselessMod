@@ -13,6 +13,8 @@ A Minecraft mod featuring various utilities and enhancements.
 
 - [KubeJS 万象合金炉配方指南](wiki/KUBEJS_ALLOY_FURNACE_GUIDE_CN.md)
 - [KubeJS Advanced Alloy Furnace Recipe Guide](wiki/KUBEJS_ALLOY_FURNACE_GUIDE.md)
+- [万象合金炉 BigInteger 发配 API 使用指南](wiki/ALLOY_FURNACE_BIGINT_API_ZH_CN.md)
+- [Multiblock Alloy Furnace BigInteger Dispatch API Guide](wiki/ALLOY_FURNACE_BIGINT_API.md)
 
 ## License
 

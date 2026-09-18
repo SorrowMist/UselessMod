@@ -20,6 +20,8 @@ import appeng.core.definitions.AEItems;
 import appeng.helpers.patternprovider.PatternContainer;
 import com.mojang.logging.LogUtils;
 import com.sorrowmist.useless.api.crafting.SmartDoublingCraftingProvider;
+import com.sorrowmist.useless.api.crafting.bigint.AlloyFurnaceBigIntegerProvider;
+import com.sorrowmist.useless.api.crafting.bigint.AlloyFurnaceBigIntegerTarget;
 import com.sorrowmist.useless.content.blockentities.PagedMenuPageMemory;
 import com.sorrowmist.useless.content.blockentities.RecoverableItemStackHandler;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.OmniversalPatternDiagnostics;
@@ -53,7 +55,8 @@ import java.util.Objects;
 /** AE node and pattern inventory for the multiblock furnace. */
 public final class MePatternAssemblyBlockEntity extends AEBaseBlockEntity
         implements ICraftingProvider, SmartDoublingCraftingProvider, IInWorldGridNodeHost,
-        IGridNodeListener<MePatternAssemblyBlockEntity>, IActionHost, PatternContainer, MenuProvider {
+        IGridNodeListener<MePatternAssemblyBlockEntity>, IActionHost, PatternContainer, MenuProvider,
+        AlloyFurnaceBigIntegerProvider {
     private static final Logger LOGGER = LogUtils.getLogger();
     private final RecoverableItemStackHandler patterns = new RecoverableItemStackHandler(
             ConfigManager::getOmniversalPatternSlots,
@@ -307,6 +310,19 @@ public final class MePatternAssemblyBlockEntity extends AEBaseBlockEntity
                                                  KeyCounter[] unitPrototype) {
         MultiblockAlloyFurnaceCoreBlockEntity controller = getController();
         return controller != null && controller.pushBigIntegerCraftingPattern(patternDetails, count, unitPrototype);
+    }
+
+    /**
+     * 对外公开 API（{@code api.crafting.bigint}）的发现入口。
+     *
+     * <p>本机是这张 AE 网格上真正挂节点的方块，所以第三方 CPU 遍历网格节点时找到的是它；
+     * 真正的 bigint 能力在多方块核心上，这里只是把请求转发过去。核心未成形或链接未解析时返回
+     * {@code null}，调用方据此跳过本机。</p>
+     */
+    @Override
+    public @Nullable AlloyFurnaceBigIntegerTarget bigIntegerTarget() {
+        MultiblockAlloyFurnaceCoreBlockEntity controller = getController();
+        return controller == null ? null : controller.bigIntegerTarget();
     }
 
     @Override

@@ -563,6 +563,7 @@ public class ModeWheelScreen extends Screen {
             case BeefToolModuleRegistry.ENHANCED_CHAIN_MINING -> bool(UComponents.EnhancedChainMiningComponent, false);
             case BeefToolModuleRegistry.FORCE_MINING -> bool(UComponents.ForceMiningComponent, false);
             case BeefToolModuleRegistry.AE_STORAGE_PRIORITY -> bool(UComponents.AEStoragePriorityComponent, false);
+            case BeefToolModuleRegistry.AE_NETWORK_CONNECT -> bool(UComponents.AeNetworkConnectComponent, false);
             case BeefToolModuleRegistry.WRENCH_TAG -> bool(UComponents.WrenchTagEnabledComponent, true);
             case BeefToolModuleRegistry.FORCE_KILL -> bool(UComponents.ForceKillEnabledComponent, false);
             case BeefToolModuleRegistry.BEEF_MALUM_SPIRIT ->
@@ -891,6 +892,8 @@ public class ModeWheelScreen extends Screen {
                     UComponents.ForceMiningComponent, false);
             case BeefToolModuleRegistry.AE_STORAGE_PRIORITY -> toggle(ModeTogglePacket.ModeType.AE_STORAGE_PRIORITY,
                     UComponents.AEStoragePriorityComponent, false);
+            case BeefToolModuleRegistry.AE_NETWORK_CONNECT -> toggle(ModeTogglePacket.ModeType.AE_NETWORK_CONNECT,
+                    UComponents.AeNetworkConnectComponent, false);
             case BeefToolModuleRegistry.WRENCH_TAG -> toggle(ModeTogglePacket.ModeType.WRENCH_TAG,
                     UComponents.WrenchTagEnabledComponent, true);
             case BeefToolModuleRegistry.FORCE_KILL -> toggle(ModeTogglePacket.ModeType.FORCE_KILL,

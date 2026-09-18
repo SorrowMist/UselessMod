@@ -37,6 +37,7 @@ import com.sorrowmist.useless.content.blocks.AdvancedAlloyFurnaceBlock;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.AdvancedAlloyFurnaceAeManager;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.CraftingTaskContext;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.AlloyFurnaceAeHost;
+import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.CraftingAeOutputTarget;
 import com.sorrowmist.useless.compat.neoecoae.NeoEcoDynamicOutputCompat;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.chemical.ChemicalHandlerView;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.chemical.ChemicalCompatProviders;
@@ -1693,23 +1694,41 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
     }
 
     public long tryOutputKeyToAE(AEKey key, long amount) {
-        if (key == null || amount <= 0 || !isConnectedToAE || actionSource == null) {
-            return 0;
-        }
+        CraftingAeOutputTarget target = resolveAeOutputTarget();
+        return target == null ? 0L : target.insert(key, amount);
+    }
 
+    /**
+     * 解析一次 ME 网络写入目标，供一次「产物回网」刷写 pass 内复用。
+     *
+     * <p>原来每写一个分段都要重解析一次（连接检查 + 存储服务查询 + 装配体查询）。
+     * 可持续吞吐直接由「每 tick 能插多少次」决定，一 tick 可能插数千次 ⇒ 这段解析成本直接吃吞吐。</p>
+     */
+    @Override
+    public @Nullable CraftingAeOutputTarget resolveAeOutputTarget() {
+        if (!isConnectedToAE || actionSource == null) {
+            return null;
+        }
         MEStorage storage = getStorageService();
-
         if (storage == null) {
-            return 0;
+            return null;
         }
-
-        long claimed = ModList.get().isLoaded("neoecoae")
-                ? NeoEcoDynamicOutputCompat.claim(getAeGrid(), key, amount) : 0L;
-        long remaining = amount - Math.min(amount, claimed);
-        if (remaining <= 0L) {
-            return amount;
-        }
-        return Math.min(amount, claimed) + storage.insert(key, remaining, Actionable.MODULATE, actionSource);
+        IActionSource source = actionSource;
+        boolean neoecoae = ModList.get().isLoaded("neoecoae");
+        // 网格也一并解析一次（getAeGrid() 内部还有一次装配体查询）。
+        IGrid grid = getAeGrid();
+        return (key, amount) -> {
+            if (key == null || amount <= 0L) {
+                return 0L;
+            }
+            long claimed = neoecoae ? NeoEcoDynamicOutputCompat.claim(grid, key, amount) : 0L;
+            long accepted = Math.min(amount, claimed);
+            long remaining = amount - accepted;
+            if (remaining <= 0L) {
+                return amount;
+            }
+            return accepted + storage.insert(key, remaining, Actionable.MODULATE, source);
+        };
     }
 
     @Override
@@ -1742,6 +1761,16 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
 
     public int getRemainingAETaskCount(boolean craftingPattern) {
         return this.aeManager.getRemainingAETaskCount(craftingPattern);
+    }
+
+    /**
+     * 本 tick 允许单批产生的产物分段数（AIMD 控制器，转发给 AE 管理器）。
+     *
+     * <p>单方块同样有合成样板的自执行回网队列，所以同样受益于「由实测反馈决定单批规模」。</p>
+     */
+    @Override
+    public long outputSegmentBudget() {
+        return this.aeManager.outputSegmentBudget();
     }
 
     // 获取最大AE任务数量（基于熔炉等级）

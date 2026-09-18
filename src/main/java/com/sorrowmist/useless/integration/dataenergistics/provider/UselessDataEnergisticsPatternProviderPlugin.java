@@ -49,6 +49,9 @@ public final class UselessDataEnergisticsPatternProviderPlugin implements DataEn
                 mePatternAssemblyTypeId,
                 mePatternAssemblyItemId));
         registerSearchTerms(registry.trinityPatternSearch());
+        // 万象样板的 id-only 产物槽：把「声明键只是模板、实际键来自配方」这件事告诉数据能源，
+        // 否则它的 bigint（exact）分支会把声明键写进 waitingFor，而实际键对不上 ⇒ 永远等待。
+        registry.dynamicCraftingOutputs().register(new OmniversalDynamicCraftingOutputAdapter());
     }
 
     /** Creates the two immutable provider declarations used by this integration. */

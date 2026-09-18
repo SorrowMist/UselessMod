@@ -146,6 +146,20 @@ public final class UComponents {
                            ))
             );
 
+    /**
+     * AE 连接模式组件（AeNetworkConnect）
+     * 开启后右键一台「拥有 AE 网格节点」的机器，把它的节点接入工具绑定无线访问点所在的那张网。
+     * 与顺手收菜 / 时间加速 / 建筑魔杖互斥（同一时刻只能有一个占用右键）。
+     */
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<Boolean>> AeNetworkConnectComponent =
+            register("ae_network_connect", builder ->
+                    builder.persistent(Codec.BOOL)
+                           .networkSynchronized(StreamCodec.of(
+                                   FriendlyByteBuf::writeBoolean,
+                                   FriendlyByteBuf::readBoolean
+                           ))
+            );
+
     public static final DeferredHolder<DataComponentType<?>, DataComponentType<Boolean>> ForceKillEnabledComponent =
             register("force_kill_enabled", builder ->
                     builder.persistent(Codec.BOOL)

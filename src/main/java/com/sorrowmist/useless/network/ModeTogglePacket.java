@@ -58,6 +58,14 @@ public class ModeTogglePacket implements CustomPacketPayload {
                 case AE_STORAGE_PRIORITY -> {
                     stack.set(UComponents.AEStoragePriorityComponent.get(), msg.enabled);
                 }
+                case AE_NETWORK_CONNECT -> {
+                    if (stack.getItem() instanceof EndlessBeafItem) {
+                        stack.set(UComponents.AeNetworkConnectComponent.get(), msg.enabled);
+                        if (msg.enabled) {
+                            disableRightClickConflicts(stack);
+                        }
+                    }
+                }
                 case WRENCH_TAG -> {
                     if (BeefToolVariants.isBaseVariant(stack)
                             && BeefToolVariants.isWrenchTagEnabled(stack) != msg.enabled) {
@@ -69,6 +77,9 @@ public class ModeTogglePacket implements CustomPacketPayload {
                 case CONSTRUCTION_WAND -> {
                     if (stack.getItem() instanceof EndlessBeafItem) {
                         stack.set(UComponents.ConstructionWandEnabledComponent.get(), msg.enabled);
+                        if (msg.enabled) {
+                            disableAeNetworkConnect(stack);
+                        }
                     }
                 }
                 case FORCE_KILL -> {
@@ -137,6 +148,9 @@ public class ModeTogglePacket implements CustomPacketPayload {
                 case BEEF_CROP_HARVEST -> {
                     if (stack.getItem() instanceof EndlessBeafItem) {
                         stack.set(UComponents.BeefCropHarvestComponent.get(), msg.enabled);
+                        if (msg.enabled) {
+                            disableAeNetworkConnect(stack);
+                        }
                     }
                 }
             }
@@ -144,6 +158,23 @@ public class ModeTogglePacket implements CustomPacketPayload {
             // 显式同步物品到客户端
             player.containerMenu.broadcastChanges();
         });
+    }
+
+    /**
+     * AE 连接模式与「顺手收菜 / 时间加速 / 建筑魔杖」互斥：
+     * 打开它时把这三个占用右键的开关关掉。
+     */
+    private static void disableRightClickConflicts(ItemStack stack) {
+        stack.set(UComponents.BeefCropHarvestComponent.get(), false);
+        stack.set(UComponents.BeefTimeAccelerationEnabledComponent.get(), false);
+        stack.set(UComponents.ConstructionWandEnabledComponent.get(), false);
+    }
+
+    /** 反过来：打开其它占用右键的模式时，关掉 AE 连接模式。 */
+    private static void disableAeNetworkConnect(ItemStack stack) {
+        if (stack.getOrDefault(UComponents.AeNetworkConnectComponent.get(), false)) {
+            stack.set(UComponents.AeNetworkConnectComponent.get(), false);
+        }
     }
 
     @Override
@@ -155,6 +186,7 @@ public class ModeTogglePacket implements CustomPacketPayload {
         CHAIN_MINING,
         FORCE_MINING,
         AE_STORAGE_PRIORITY,
+        AE_NETWORK_CONNECT,
         WRENCH_TAG,
         CONSTRUCTION_WAND,
         FORCE_KILL,

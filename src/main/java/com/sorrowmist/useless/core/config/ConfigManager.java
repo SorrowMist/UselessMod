@@ -82,6 +82,8 @@ public class ConfigManager {
     private static final ModConfigSpec.ConfigValue<List<? extends String>> FURNACE_RECIPE_TIER_RULES;
     // 万象炉 AE 批次成熟等待窗口
     private static final ModConfigSpec.IntValue FURNACE_AE_BATCH_RIPE_TICKS;
+    // 万象炉产物回网每 tick 时间预算
+    private static final ModConfigSpec.IntValue FURNACE_AE_OUTPUT_RETURN_BUDGET_MILLIS;
     private static final ModConfigSpec.IntValue[] FURNACE_TIER_THREADS =
             new ModConfigSpec.IntValue[11];
     private static final ModConfigSpec.IntValue[] CATALYST_TIER_PARALLEL =
@@ -482,6 +484,16 @@ public class ConfigManager {
                 .translation("useless_mod.configuration.ae_batch_ripe_ticks")
                 .defineInRange("ae_batch_ripe_ticks", 10, 0, 200);
 
+        FURNACE_AE_OUTPUT_RETURN_BUDGET_MILLIS = SERVER_BUILDER
+                .comment("万象炉每 tick 最多花多少毫秒把产物写回 ME 网络",
+                        "这个值直接决定「可持续合成速度」：AE2 存储接口单次只能写一个 long 分段，",
+                        "产物必须逐段插入，所以每 tick 能插多少次就决定了能跑多快",
+                        "调大 = 合成更快，但单 tick 更重（可能掉 TPS）；调小 = 更省 tick，但合成变慢",
+                        "机器或服务端过载时，本预算还会被全局降频系数按比例收窄（下限 250 微秒）",
+                        "全局降频基准会跟随本值放大（= 本值×2，下限 10 毫秒），所以调大本值确实能生效")
+                .translation("useless_mod.configuration.ae_output_return_budget_millis")
+                .defineInRange("ae_output_return_budget_millis", 8, 1, 50);
+
         for (int tier = 0; tier <= 10; tier++) {
             FURNACE_TIER_THREADS[tier] = SERVER_BUILDER
                     .comment("单方块熔炉 " + tier + " 阶的最大AE任务数")
@@ -846,6 +858,16 @@ public class ConfigManager {
     /** 万象炉 AE 批次成熟等待窗口（tick）；0 表示推送即刻投入执行 */
     public static int getAdvancedAlloyFurnaceAeBatchRipeTicks() {
         return Math.max(0, getConfigValue(FURNACE_AE_BATCH_RIPE_TICKS));
+    }
+
+    /**
+     * 万象炉每 tick 的产物回网时间预算（毫秒）。
+     *
+     * <p>它直接决定可持续合成速度：AE2 存储接口单次只能写一个 long 分段，产物必须逐段插入，
+     * 所以每 tick 能插多少次就决定了能跑多快。</p>
+     */
+    public static int getAdvancedAlloyFurnaceAeOutputReturnBudgetMillis() {
+        return Math.max(1, getConfigValue(FURNACE_AE_OUTPUT_RETURN_BUDGET_MILLIS));
     }
 
     public static int getAdvancedAlloyFurnaceCatalystParallel(int tier) {

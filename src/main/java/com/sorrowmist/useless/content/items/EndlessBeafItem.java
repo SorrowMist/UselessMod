@@ -155,6 +155,7 @@ public class EndlessBeafItem extends TieredItem {
                 .component(UComponents.BeefFarmlandModeComponent, false)
                 .component(UComponents.BeefCropHarvestComponent, true)
                 .component(UComponents.AEStoragePriorityComponent, false)
+                .component(UComponents.AeNetworkConnectComponent, false)
                 .component(UComponents.WrenchTagEnabledComponent, wrenchTagEnabled)
                 .component(UComponents.ConstructionWandEnabledComponent, false)
                 .component(UComponents.ConstructionWandCoreComponent,
@@ -1209,6 +1210,16 @@ public class EndlessBeafItem extends TieredItem {
                                                            "tooltip.useless_mod.disable"
                                            ).withStyle(aeStorageEnabled ? ChatFormatting.GREEN : ChatFormatting.GRAY))
                                            .withStyle(ChatFormatting.BLUE));
+
+            // AE 连接模式：右键有 AE 节点的机器，把它并入工具绑定的那张网
+            boolean aeConnectEnabled = stack.getOrDefault(UComponents.AeNetworkConnectComponent.get(), false);
+            tooltipComponents.add(Component.translatable("tooltip.useless_mod.ae_network_connect_mode")
+                                           .append(": ")
+                                           .append(Component.translatable(
+                                                   aeConnectEnabled ? "tooltip.useless_mod.enable" :
+                                                           "tooltip.useless_mod.disable"
+                                           ).withStyle(aeConnectEnabled ? ChatFormatting.GREEN : ChatFormatting.GRAY))
+                                           .withStyle(ChatFormatting.BLUE));
         }
 
         // 右键泥土：锄头优先（变耕地）/ 铲子优先（变草径）
@@ -1281,6 +1292,8 @@ public class EndlessBeafItem extends TieredItem {
         if (ModList.get().isLoaded("ae2")) {
             tooltipComponents.add(
                     Component.translatable("tooltip.useless_mod.ae_storage_priority_bind_hint").withStyle(ChatFormatting.GREEN));
+            tooltipComponents.add(
+                    Component.translatable("tooltip.useless_mod.ae_network_connect_hint").withStyle(ChatFormatting.BLUE));
         }
         tooltipComponents.add(
                 Component.translatable("tooltip.useless_mod.festive_affix").withStyle(ChatFormatting.BLUE));

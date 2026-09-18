@@ -32,6 +32,7 @@ public final class BeefToolModuleRegistry {
     public static final String ENHANCED_CHAIN_MINING = "mode.enhanced_chain_mining";
     public static final String FORCE_MINING = "mode.force_mining";
     public static final String AE_STORAGE_PRIORITY = "mode.ae_storage_priority";
+    public static final String AE_NETWORK_CONNECT = "mode.ae_network_connect";
     public static final String WRENCH_TAG = "mode.wrench_tag";
     public static final String FORCE_KILL = "mode.force_kill";
     public static final String BEEF_MALUM_SPIRIT = "mode.beef_malum_spirit";
@@ -78,6 +79,8 @@ public final class BeefToolModuleRegistry {
                     Availability.ALWAYS, false),
             new Definition(AE_STORAGE_PRIORITY, ModeTypeEnum.AE_STORAGE_PRIORITY_ENABLED.getTooltip(), GroupKind.MINING,
                     Availability.AE2, false),
+            new Definition(AE_NETWORK_CONNECT, ModeTypeEnum.AE_NETWORK_CONNECT_ENABLED.getTooltip(), GroupKind.MINING,
+                    Availability.AE2, false),
             new Definition(WRENCH_TAG, ModeTypeEnum.WRENCH_TAG_ENABLED.getTooltip(), GroupKind.MINING,
                     Availability.BASE, false),
             new Definition(FORCE_KILL, ModeTypeEnum.FORCE_KILL.getTooltip(), GroupKind.COMBAT,
@@ -116,6 +119,9 @@ public final class BeefToolModuleRegistry {
     private static final List<String> AUTO_AUXILIARY_MODULES = List.of(
             BEEF_FARMLAND_MODE,
             BEEF_CROP_HARVEST);
+    /** 新增的挖掘类模块：老存档的布局里没有它们，进游戏时自动补进「挖掘」分组。 */
+    private static final List<String> AUTO_MINING_MODULES = List.of(
+            AE_NETWORK_CONNECT);
 
     private static final Map<String, Definition> BY_ID;
 
@@ -196,36 +202,38 @@ public final class BeefToolModuleRegistry {
             combat.modules().add(moduleId);
         }
 
-        addMissingAuxiliaryModules(layout, target);
+        addMissingModules(layout, target, AUTO_AUXILIARY_MODULES, GroupKind.AUXILIARY);
+        addMissingModules(layout, target, AUTO_MINING_MODULES, GroupKind.MINING);
     }
 
     /**
-     * 把新增的辅助类模块补进「辅助」分组；找不到合适分组时先放进未分配区，
+     * 把新增模块补进对应分组；找不到合适分组时先放进未分配区，
      * 玩家可以在模式配置界面里自行拖拽。
      */
-    private static void addMissingAuxiliaryModules(BeefToolLayout layout, ItemStack target) {
-        for (String moduleId : AUTO_AUXILIARY_MODULES) {
+    private static void addMissingModules(BeefToolLayout layout, ItemStack target,
+                                          List<String> moduleIds, GroupKind kind) {
+        for (String moduleId : moduleIds) {
             if (!isAvailable(moduleId, target) || layout.containsModule(moduleId)) {
                 continue;
             }
 
-            BeefToolLayout.Group auxiliary = findAuxiliaryGroup(layout);
-            if (auxiliary != null) {
-                auxiliary.modules().add(moduleId);
+            BeefToolLayout.Group group = findGroupContainingKind(layout, kind);
+            if (group != null) {
+                group.modules().add(moduleId);
             } else if (layout.unassignedModules().size() < BeefToolLayout.MAX_TOTAL_MODULES) {
                 layout.unassignedModules().add(moduleId);
             }
         }
     }
 
-    /** 找到已经放着辅助类模块、并且还有余量的分组（分组被改名也不影响）。 */
-    private static BeefToolLayout.Group findAuxiliaryGroup(BeefToolLayout layout) {
+    /** 找到已经放着某一类模块、并且还有余量的分组（分组被改名也不影响）。 */
+    private static BeefToolLayout.Group findGroupContainingKind(BeefToolLayout layout, GroupKind kind) {
         for (BeefToolLayout.Page page : layout.pages()) {
             for (BeefToolLayout.Group group : page.groups()) {
                 if (group.modules().size() >= BeefToolLayout.MAX_MODULES_PER_GROUP) continue;
                 for (String moduleId : group.modules()) {
                     Definition definition = get(moduleId);
-                    if (definition != null && definition.group() == GroupKind.AUXILIARY) {
+                    if (definition != null && definition.group() == kind) {
                         return group;
                     }
                 }

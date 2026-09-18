@@ -16,6 +16,10 @@ public enum ModeTypeEnum {
     AE_STORAGE_PRIORITY_ENABLED("ae_storage_priority_enabled", "tooltip.useless_mod.ae_storage_priority_mode"),
     AE_STORAGE_PRIORITY_DISABLED("ae_storage_priority_disabled", "tooltip.useless_mod.ae_storage_priority_mode"),
 
+    // AE 连接模式：右键有 AE 节点的机器，把它接入工具绑定的那张网
+    AE_NETWORK_CONNECT_ENABLED("ae_network_connect_enabled", "tooltip.useless_mod.ae_network_connect_mode"),
+    AE_NETWORK_CONNECT_DISABLED("ae_network_connect_disabled", "tooltip.useless_mod.ae_network_connect_mode"),
+
     WRENCH_TAG_ENABLED("wrench_tag_enabled", "tooltip.useless_mod.wrench_tag_mode"),
     WRENCH_TAG_DISABLED("wrench_tag_disabled", "tooltip.useless_mod.wrench_tag_mode"),
 
@@ -87,6 +91,10 @@ public enum ModeTypeEnum {
 
     public static ModeTypeEnum getAEStoragePriorityMode(boolean enabled) {
         return enabled ? AE_STORAGE_PRIORITY_ENABLED : AE_STORAGE_PRIORITY_DISABLED;
+    }
+
+    public static ModeTypeEnum getAeNetworkConnectMode(boolean enabled) {
+        return enabled ? AE_NETWORK_CONNECT_ENABLED : AE_NETWORK_CONNECT_DISABLED;
     }
 
     public static ModeTypeEnum getWrenchTagMode(boolean enabled) {

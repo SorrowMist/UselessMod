@@ -57,6 +57,20 @@ public record OmniversalCoilStats(
         return Math.max(1, (int) Math.ceil(normalizedBaseTime * multiplier));
     }
 
+    /**
+     * 解析本档次线圈在某个配方上的运行参数。
+     *
+     * <p><b>不变式：有用线圈（{@link UselessCoilBlock#USEFUL_TIER}）的
+     * {@code energyMultipliesWithParallel} 必须保持 {@code false}。</b></p>
+     *
+     * <p>它来自 {@code CatalystEffectResolver} 的 {@code !isUsefulIngot()}，而本档次（tier 10）的
+     * {@code catalystType} 正是 {@link CatalystType#USEFUL_INGOT}，于是整批只收一次固定能耗
+     * （{@code ceil(recipeEnergy / 1024)}），<b>与合成次数无关</b>。</p>
+     *
+     * <p>这条性质是 bigint（原生大数）批次能在有用线圈上吃到完整规模的前提：能量不随 count 放大，
+     * 容量就不会被能量闸压小。反过来，若把这里改成按并行计费，大数批次会被
+     * {@code 可用能量 / 单份能耗} 卡回小规模。改本方法或改催化剂解析前请先确认这一点。</p>
+     */
     public ResolvedCatalystEffect resolveEffect(AdvancedAlloyFurnaceRecipe recipe) {
         int baseTime = recipe == null ? 200 : Math.max(1, recipe.processTime());
         ResolvedCatalystEffect catalystEffect =

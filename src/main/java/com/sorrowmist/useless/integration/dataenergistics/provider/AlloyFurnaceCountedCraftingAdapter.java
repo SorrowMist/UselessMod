@@ -16,6 +16,7 @@ import com.fish_dan_.data_energistics.api.registry.provider.runtime.PatternProvi
 import com.sorrowmist.useless.content.blockentities.AdvancedAlloyFurnaceBlockEntity;
 import com.sorrowmist.useless.content.blockentities.multiblock.MePatternAssemblyBlockEntity;
 import com.sorrowmist.useless.content.blockentities.multiblock.MultiblockAlloyFurnaceCoreBlockEntity;
+import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.AlloyFurnaceBigIntegerCrafting;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.AlloyFurnaceTickBudget;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.CraftingTaskContext;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.DynamicComponentPattern;
@@ -25,8 +26,6 @@ import com.sorrowmist.useless.content.recipe.AdvancedAlloyFurnaceRecipe;
 import it.unimi.dsi.fastutil.objects.Object2ObjectLinkedOpenHashMap;
 import it.unimi.dsi.fastutil.objects.ObjectList;
 import it.unimi.dsi.fastutil.objects.ObjectLists;
-import net.minecraft.core.BlockPos;
-import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.level.Level;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -53,10 +52,19 @@ import java.util.function.ToIntFunction;
  *       剩余 count-1 份材料由 DE 自己的 BigInteger 账本扣除，我们只消费手里那一份原型。</li>
  * </ul>
  *
- * <p><b>为什么只有合成样板发布 machine identity</b>：DE 的 exact 分支要求容量快照带
+ * <p><b>哪些样板发布 machine identity</b>：DE 的 exact 分支要求容量快照带
  * provider 无关的 machine identity（排他预留的前提），而它一旦生效就会<b>完全接管</b>该 provider
- * 的派发（不会再回落长版路径）。所以只有真正实现了 bigint 语义的合成样板才发 machine target；
- * 万象样板/处理样板继续用 {@code route(...)} 目标走长版路径。</p>
+ * 的派发（不会再回落长版路径）。所以只给真正实现了 bigint 语义的样板发 machine target：</p>
+ * <ul>
+ *   <li><b>AE2 合成样板</b>：本机一次装配即可折叠任意份数，始终发布 machine target；</li>
+ *   <li><b>万象样板</b>：只有宿主声明了 {@link CraftingTaskContext#supportsBigIntegerRecipeBatches()}
+ *       （目前只有多方块核心）才发布 —— 它把配方折叠成 BigInteger 批次并按 count 收能量；</li>
+ *   <li>其余样板（含单方块的万象样板）继续用 {@code route(...)} 目标走长版路径。</li>
+ * </ul>
+ *
+ * <p><b>安全阀</b>：因为接管后不回落，「本机此刻吃不下」必须体现为<b>容量为零</b>，
+ * 而不是先发布带 machine identity 的容量再在提交时拒绝 —— 后者会把该 provider 卡死在 exact 分支。
+ * 见 {@link #maximumRecipeBatchCount} 里的可用性/能量闸。</p>
  */
 final class AlloyFurnaceCountedCraftingAdapter implements BigIntegerCraftingProviderAdapter {
     private final ICraftingProvider provider;
@@ -105,7 +113,7 @@ final class AlloyFurnaceCountedCraftingAdapter implements BigIntegerCraftingProv
                 provider,
                 () -> isAdvancedAlloyFurnaceOnline(provider),
                 digest,
-                machineIdentity(digest, provider.getLevel(), provider.getBlockPos()),
+                AlloyFurnaceBigIntegerCrafting.machineIdentity(digest, provider.getLevel(), provider.getBlockPos()),
                 () -> provider,
                 provider::getRemainingAETaskCount,
                 provider::getMaxAETaskCount,
@@ -121,7 +129,7 @@ final class AlloyFurnaceCountedCraftingAdapter implements BigIntegerCraftingProv
                 provider,
                 () -> isMePatternAssemblyOnline(provider),
                 digest,
-                machineIdentity(digest, provider.getLevel(), provider.getBlockPos()),
+                AlloyFurnaceBigIntegerCrafting.machineIdentity(digest, provider.getLevel(), provider.getBlockPos()),
                 provider::getController,
                 craftingPattern -> {
                     MultiblockAlloyFurnaceCoreBlockEntity controller = provider.getController();
@@ -185,8 +193,16 @@ final class AlloyFurnaceCountedCraftingAdapter implements BigIntegerCraftingProv
     }
 
     /**
-     * bigint 批次的可接受量：只对合成样板开放（本机能一次装配折叠任意份数），
-     * 上限由产物分段预算反推；其它样板返回 0，让 DE 继续走长版 counted 路径。
+     * bigint 批次的可接受量。
+     *
+     * <p>合成样板：本机能一次装配折叠任意份数，上限由产物分段预算反推。</p>
+     * <p>万象样板：只有宿主声明了 bigint 能力（多方块）才接，上限交给
+     * {@link AlloyFurnaceBigIntegerCrafting#maximumCount} —— 它把配方可用性、材料窗口、
+     * 产物分段与能量四道闸一起算完。其它样板返回 0，让 DE 继续走长版 counted 路径。</p>
+     *
+     * <p>「产物分段预算」由宿主的 AIMD 控制器给出（见 {@code CraftingTaskContext#outputSegmentBudget}）：
+     * 它把单批规模收敛到「一批大约一两个 tick 交付完」，所以容量永不因积压归零，
+     * 调度侧不会停一拍再重启。</p>
      */
     private @NotNull BigInteger availableBigIntegerCount(
             @NotNull IPatternDetails patternDetails,
@@ -199,53 +215,30 @@ final class AlloyFurnaceCountedCraftingAdapter implements BigIntegerCraftingProv
         if (!provider.getAvailablePatterns().contains(original)) {
             return BigInteger.ZERO;
         }
-        if (!(original instanceof IMolecularAssemblerSupportedPattern craftingPattern)) {
-            return BigInteger.ZERO;
-        }
         if (prototype == null || prototype.length == 0) {
             return BigInteger.ZERO;
         }
-        // 回网队列有空位才收新批次（跟长版路径同一套背压）。
-        if (this.remainingThreads.applyAsInt(true) <= 0) {
-            return BigInteger.ZERO;
+        int threads = machineThreads();
+        long segmentBudget = segmentBudget();
+        if (original instanceof IMolecularAssemblerSupportedPattern) {
+            return requestedCount.min(AlloyFurnaceBigIntegerCrafting.maximumCraftingPatternCount(
+                    original, prototype, threads, segmentBudget));
         }
-        return requestedCount.min(maximumWindowedCount(craftingPattern, prototype, machineThreads()));
+        if (original instanceof OmniversalPatternDetails omniversal) {
+            CraftingTaskContext context = this.taskContext.get();
+            if (!AlloyFurnaceBigIntegerCrafting.supports(context)) {
+                return BigInteger.ZERO;
+            }
+            return requestedCount.min(AlloyFurnaceBigIntegerCrafting.maximumCount(
+                    context, omniversal, prototype, threads, segmentBudget));
+        }
+        return BigInteger.ZERO;
     }
 
-    /**
-     * bigint 批次的次数上限：**一个线程一份 long 总量的材料窗口**。
-     *
-     * <p>语义（用户定的）：线程数 N ⇒ 这批最多吃下 N 份「每种材料各 {@code Long.MAX}」的量。
-     * 九合一配方每 craft 消耗 9 个同种材料，于是单批 = {@code N × Long.MAX / 9} 次合成
-     * （N=10000 时 ≈ 1.02e22），正好对应「每线程一个老物理窗口、整批一次交付」。
-     * 逐键取最小：每个材料键各自都不能越过它那份 long 窗口。</p>
-     *
-     * <p>另外再叠一层产物分段上限（{@link #maximumSegmentedCount}，同样跟随线程数而非固定值），
-     * 防「一次合成产出很多个物品」的配方把回网分段列表撑得过大 —— 正常配方下它不生效。</p>
-     *
-     * <p>传入的 {@code prototype} 是<b>单次合成的原型</b>，所以逐键的数量就是「每次合成的消耗量」。</p>
-     */
-    private static @NotNull BigInteger maximumWindowedCount(@NotNull IPatternDetails pattern,
-                                                            KeyCounter @NotNull [] prototype,
-                                                            int threads) {
-        BigInteger window = BigInteger.valueOf(Long.MAX_VALUE)
-                .multiply(BigInteger.valueOf(Math.max(1, threads)));
-        BigInteger limit = null;
-        for (KeyCounter counter : prototype) {
-            for (var entry : counter) {
-                long amount = entry.getLongValue();
-                if (amount <= 0L) {
-                    continue;
-                }
-                BigInteger allowed = window.divide(BigInteger.valueOf(amount));
-                limit = limit == null ? allowed : limit.min(allowed);
-            }
-        }
-        BigInteger segmented = maximumSegmentedCount(pattern, threads);
-        // 动态降频：本机最近实测耗时超预算时，按比例收窄本批次的窗口预算
-        // （仿数据能源的 30ms 提交预算，见 AlloyFurnaceTickBudget）。
-        BigInteger limitWithBudget = limit == null ? segmented : limit.min(segmented);
-        return AlloyFurnaceTickBudget.applyScale(limitWithBudget);
+    /** 宿主的单批分段预算；没有宿主时退回 1（最保守，只影响容量不会崩）。 */
+    private long segmentBudget() {
+        CraftingTaskContext context = this.taskContext.get();
+        return context == null ? 1L : Math.max(1L, context.outputSegmentBudget());
     }
 
     /**
@@ -257,32 +250,6 @@ final class AlloyFurnaceCountedCraftingAdapter implements BigIntegerCraftingProv
      */
     private int machineThreads() {
         return Math.max(1, this.totalThreads.getAsInt());
-    }
-
-    /** 由「每键最多切多少段」反推单批次数上限，避免产物分段列表被打爆。 */
-    /**
-     * bigint 批次的次数上限：由「本机当前线程数」反推能安全承载的产物分段数。
-     *
-     * <p>产物按 {@code CraftingAeAmountAccumulator#segments()} 切成 ≤ long 的段入队，
-     * 段数随 count 线性增长，所以上限 = {@code Long.MAX × 分段预算 / 单位产出量}；
-     * 分段预算就是本机线程数（见 {@link #machineThreads()}）—— 一个窗口的产物通常只占一段，
-     * 于是「线程数份窗口」量级刚好对应一段/窗口，不需要也不应该写死常数。</p>
-     *
-     * <p>真正该卡住多少由数据能源自己算：{@code maximumExactLogicalFirings} 已按精确库存、
-     * {@code MAX_EXACT_DISPATCH_AMOUNT} 与可用能量逐项取过最小值。</p>
-     */
-    private static @NotNull BigInteger maximumSegmentedCount(@NotNull IPatternDetails pattern, int threads) {
-        BigInteger maximumLong = BigInteger.valueOf(Long.MAX_VALUE);
-        BigInteger segments = BigInteger.valueOf(Math.max(1, threads));
-        BigInteger limit = null;
-        for (GenericStack output : pattern.getOutputs()) {
-            if (output == null || output.amount() <= 0L) {
-                continue;
-            }
-            BigInteger allowed = maximumLong.multiply(segments).divide(BigInteger.valueOf(output.amount()));
-            limit = limit == null ? allowed : limit.min(allowed);
-        }
-        return limit == null ? maximumLong.multiply(segments) : limit;
     }
 
     /** exact 批次的实际提交：把单位原型与 BigInteger 次数交给机器。 */
@@ -297,8 +264,9 @@ final class AlloyFurnaceCountedCraftingAdapter implements BigIntegerCraftingProv
     // ==================== 共用：目标与容量 ====================
 
     /**
-     * 合成样板发布带 machine identity 的 TARGETED 目标（exact 派发的前提），
-     * 其余样板只发 route 目标 —— 这样 DE 不会对它们启用 exact 分支（那会跳过长版路径）。
+     * 合成样板、以及声明了 bigint 能力的万象样板，发布带 machine identity 的 TARGETED 目标
+     * （exact 派发的前提）；其余样板只发 route 目标 —— 这样 DE 不会对它们启用 exact 分支
+     * （那会跳过长版路径，而它们没有 bigint 语义）。
      */
     private @NotNull CountedCraftingTarget targetFor(@NotNull IPatternDetails patternDetails) {
         return supportsExactBatch(patternDetails)
@@ -306,8 +274,20 @@ final class AlloyFurnaceCountedCraftingAdapter implements BigIntegerCraftingProv
                 : CountedCraftingTarget.route(this.routeIdentity);
     }
 
-    private static boolean supportsExactBatch(@NotNull IPatternDetails patternDetails) {
-        return SmartDoublingPatterns.unwrap(patternDetails) instanceof IMolecularAssemblerSupportedPattern;
+    /**
+     * 该样板是否具备 bigint（exact）语义。
+     *
+     * <p>万象样板只有在宿主声明了 {@link CraftingTaskContext#supportsBigIntegerRecipeBatches()}
+     * 时才算 —— 单方块高级合金炉没有实现折叠语义，给它发布 machine identity 会让 DE 切进
+     * exact 分支且永不回落，而那边根本没有 bigint 接收入口。</p>
+     */
+    private boolean supportsExactBatch(@NotNull IPatternDetails patternDetails) {
+        IPatternDetails original = SmartDoublingPatterns.unwrap(patternDetails);
+        if (original instanceof IMolecularAssemblerSupportedPattern) {
+            return true;
+        }
+        return original instanceof OmniversalPatternDetails
+                && AlloyFurnaceBigIntegerCrafting.supports(this.taskContext.get());
     }
 
     /** Returns the largest safe count for one physical scaled-pattern submission. */
@@ -387,10 +367,15 @@ final class AlloyFurnaceCountedCraftingAdapter implements BigIntegerCraftingProv
 
         IPatternDetails executionPattern = SmartDoublingPatterns.unwrap(patternDetails);
         boolean craftingPattern = executionPattern instanceof IMolecularAssemblerSupportedPattern;
-        int availableThreads = Math.max(0, this.remainingThreads.applyAsInt(craftingPattern));
+        int remaining = Math.max(0, this.remainingThreads.applyAsInt(craftingPattern));
         int totalThreads = Math.max(0, this.totalThreads.getAsInt());
-        availableThreads = Math.min(availableThreads, totalThreads);
+        int availableThreads = Math.min(remaining, totalThreads);
         if (craftingPattern) {
+            // 合成样板/大数批次的槽位来自「回网队列」。积压时不再把槽位打到 0
+            //（那等于二元拒绝，调度侧会停一拍再重启），而是保留 1 条 ——
+            // 单批规模由宿主的 AIMD 分段预算控制，它会把批次收敛到「一两个 tick 交付完」，
+            // 所以保留 1 条不会真的压垮队列。
+            availableThreads = Math.max(1, availableThreads);
             CraftingTaskContext context = this.taskContext.get();
             long perThreadCapacity = context == null
                     ? 1L : Math.max(1L, context.getCraftingPatternCapacity());
@@ -436,6 +421,20 @@ final class AlloyFurnaceCountedCraftingAdapter implements BigIntegerCraftingProv
                 execution.operationsPerPush());
         if (recipe == null) {
             return CapacityLimits.EMPTY;
+        }
+
+        if (execution.pattern() instanceof OmniversalPatternDetails
+                && AlloyFurnaceBigIntegerCrafting.supports(context)) {
+            // 安全阀：本机一旦吃不下（档次/模具/能量任一不满足），必须发布「零容量」而不是带
+            // machine identity 的容量 —— DE 的 exact 分支一旦接管就不会再回落长版路径，
+            // 先发布容量再在提交时拒绝会把该 provider 卡死。
+            if (!context.isTaskRecipeAvailable(recipe)) {
+                return CapacityLimits.EMPTY;
+            }
+            BigInteger energyCap = AlloyFurnaceBigIntegerCrafting.maximumCountForEnergy(context, recipe);
+            if (energyCap != null && energyCap.signum() <= 0) {
+                return CapacityLimits.EMPTY;
+            }
         }
 
         long manualOperations = SmartDoublingPatterns.manualOperationsPerPattern(
@@ -546,15 +545,6 @@ final class AlloyFurnaceCountedCraftingAdapter implements BigIntegerCraftingProv
         IPatternDetails scaledPattern = SmartDoublingPatterns.scale(patternDetails, count);
         KeyCounter[] scaledPrototype = scalePrototype(prototype, count);
         return provider.pushPattern(scaledPattern, scaledPrototype);
-    }
-
-    private static @NotNull String machineIdentity(
-            @NotNull String fallback, @Nullable Level level, @NotNull BlockPos pos) {
-        if (level == null) {
-            return fallback;
-        }
-        ResourceLocation dimension = level.dimension().location();
-        return dimension + "@" + pos.getX() + "," + pos.getY() + "," + pos.getZ();
     }
 
     private static boolean isAdvancedAlloyFurnaceOnline(@NotNull AdvancedAlloyFurnaceBlockEntity provider) {

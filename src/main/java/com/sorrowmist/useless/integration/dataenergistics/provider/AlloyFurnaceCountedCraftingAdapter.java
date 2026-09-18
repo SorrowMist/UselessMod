@@ -6,22 +6,25 @@ import appeng.api.stacks.AEKey;
 import appeng.api.stacks.GenericStack;
 import appeng.api.stacks.KeyCounter;
 import appeng.blockentity.crafting.IMolecularAssemblerSupportedPattern;
+import com.fish_dan_.data_energistics.api.crafting.dispatch.BigIntegerCraftingAdmission;
+import com.fish_dan_.data_energistics.api.crafting.dispatch.BigIntegerCraftingProviderAdapter;
 import com.fish_dan_.data_energistics.api.crafting.dispatch.CountedCraftingAdmission;
 import com.fish_dan_.data_energistics.api.crafting.dispatch.CountedCraftingCapacity;
-import com.fish_dan_.data_energistics.api.crafting.dispatch.CountedCraftingProviderAdapter;
 import com.fish_dan_.data_energistics.api.crafting.dispatch.CountedCraftingRoutingMode;
 import com.fish_dan_.data_energistics.api.crafting.dispatch.CountedCraftingTarget;
 import com.fish_dan_.data_energistics.api.registry.provider.runtime.PatternProviderIdentity;
 import com.sorrowmist.useless.content.blockentities.AdvancedAlloyFurnaceBlockEntity;
 import com.sorrowmist.useless.content.blockentities.multiblock.MePatternAssemblyBlockEntity;
 import com.sorrowmist.useless.content.blockentities.multiblock.MultiblockAlloyFurnaceCoreBlockEntity;
+import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.AlloyFurnaceTickBudget;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.CraftingTaskContext;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.DynamicComponentPattern;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.OmniversalPatternDetails;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.SmartDoublingPatterns;
 import com.sorrowmist.useless.content.recipe.AdvancedAlloyFurnaceRecipe;
-import com.sorrowmist.useless.integration.dataenergistics.TrinityDispatchAcceleration;
 import it.unimi.dsi.fastutil.objects.Object2ObjectLinkedOpenHashMap;
+import it.unimi.dsi.fastutil.objects.ObjectList;
+import it.unimi.dsi.fastutil.objects.ObjectLists;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.level.Level;
@@ -40,37 +43,57 @@ import java.util.function.ToIntFunction;
 /**
  * Bridges one alloy-furnace AE provider to Data Energistics counted Trinity dispatch.
  *
- * <p>The adapter converts one accepted logical batch into a single scaled pattern push. This preserves the
- * furnace's native queueing and task-splitting behavior while avoiding per-craft provider calls.</p>
+ * <p><b>两条路径并存</b>：</p>
+ * <ul>
+ *   <li><b>长版 counted</b>（{@link #prepareBatch} / {@link #prepareBatchForTarget}）：一次物理提交最多
+ *       {@code Long.MAX / 每次合成消耗量} 个合成（= 一个 AE2 long 物理窗口），由本机在虚拟 3×3 上折叠。</li>
+ *   <li><b>原生 bigint</b>（{@link #prepareBigIntegerBatch}，仅合成样板）：DE 3.3.0 的 exact 派发。
+ *       它只在「本 target 已被异步提案排他预留」时触发，一次能交付<b>超过 long</b> 的批次；
+ *       关键是这里拿到的 prototype 是<b>单次合成的原型</b>，count 只通过 {@code exactCount()} 传递，
+ *       剩余 count-1 份材料由 DE 自己的 BigInteger 账本扣除，我们只消费手里那一份原型。</li>
+ * </ul>
  *
- * <p><b>不要再按 lane 上报多条 route。</b>DE 的每 tick 上限不在 provider 容量上：同一个 stage
- * 被 {@code IntSet inspectedStages} 限制为每 tick 只派发一次，而一次派发的物理窗口是
- * {@code Long.MAX / 每次合成消耗的该键数量}（{@code TrinityDataCoreCpuLogic#limitByInputAvailability}），
- * 窗口由 {@code TrinityExactWorkingInventory#refillPhysicalWindows} 每 pass 从 BigInteger 溢出量补一次。
- * 切片器收到的 {@code remainingCrafts} 已经被这个窗口卡死，所以多条 lane 只会把同一个窗口切成多份，
- * 总量分毫不增，还白白多出队列背压与容量捕获开销。</p>
+ * <p><b>为什么只有合成样板发布 machine identity</b>：DE 的 exact 分支要求容量快照带
+ * provider 无关的 machine identity（排他预留的前提），而它一旦生效就会<b>完全接管</b>该 provider
+ * 的派发（不会再回落长版路径）。所以只有真正实现了 bigint 语义的合成样板才发 machine target；
+ * 万象样板/处理样板继续用 {@code route(...)} 目标走长版路径。</p>
  */
-final class AlloyFurnaceCountedCraftingAdapter implements CountedCraftingProviderAdapter {
+final class AlloyFurnaceCountedCraftingAdapter implements BigIntegerCraftingProviderAdapter {
     private final ICraftingProvider provider;
     private final BooleanSupplier online;
-    private final CountedCraftingTarget target;
+    /** provider 局部稳定 route 身份。 */
+    private final String routeIdentity;
+    /** provider 无关的物理机器身份（维度@坐标）。 */
+    private final String machineIdentity;
     private final Supplier<@Nullable CraftingTaskContext> taskContext;
     private final ToIntFunction<Boolean> remainingThreads;
     private final IntSupplier totalThreads;
+    /** 机器侧的大数推送入口：单位原型 + BigInteger 次数。 */
+    private final BigIntegerPush bigIntegerPush;
+
+    /** Pushes one homogeneous bigint batch into the machine. */
+    @FunctionalInterface
+    interface BigIntegerPush {
+        boolean push(@NotNull IPatternDetails pattern, @NotNull BigInteger count, KeyCounter @NotNull [] unitPrototype);
+    }
 
     AlloyFurnaceCountedCraftingAdapter(
             @NotNull ICraftingProvider provider,
             @NotNull BooleanSupplier online,
-            @NotNull CountedCraftingTarget target,
+            @NotNull String routeIdentity,
+            @NotNull String machineIdentity,
             @NotNull Supplier<@Nullable CraftingTaskContext> taskContext,
             @NotNull ToIntFunction<Boolean> remainingThreads,
-            @NotNull IntSupplier totalThreads) {
+            @NotNull IntSupplier totalThreads,
+            @NotNull BigIntegerPush bigIntegerPush) {
         this.provider = provider;
         this.online = online;
-        this.target = target;
+        this.routeIdentity = routeIdentity;
+        this.machineIdentity = machineIdentity;
         this.taskContext = taskContext;
         this.remainingThreads = remainingThreads;
         this.totalThreads = totalThreads;
+        this.bigIntegerPush = bigIntegerPush;
     }
 
     /** Creates the live adapter used by one standalone advanced alloy furnace. */
@@ -81,10 +104,12 @@ final class AlloyFurnaceCountedCraftingAdapter implements CountedCraftingProvide
         return new AlloyFurnaceCountedCraftingAdapter(
                 provider,
                 () -> isAdvancedAlloyFurnaceOnline(provider),
-                targetFor(digest, machineIdentity(digest, provider.getLevel(), provider.getBlockPos())),
+                digest,
+                machineIdentity(digest, provider.getLevel(), provider.getBlockPos()),
                 () -> provider,
                 provider::getRemainingAETaskCount,
-                provider::getMaxAETaskCount);
+                provider::getMaxAETaskCount,
+                provider::pushBigIntegerCraftingPattern);
     }
 
     /** Creates the live adapter used by one ME pattern assembly and its linked multiblock controller. */
@@ -95,7 +120,8 @@ final class AlloyFurnaceCountedCraftingAdapter implements CountedCraftingProvide
         return new AlloyFurnaceCountedCraftingAdapter(
                 provider,
                 () -> isMePatternAssemblyOnline(provider),
-                targetFor(digest, machineIdentity(digest, provider.getLevel(), provider.getBlockPos())),
+                digest,
+                machineIdentity(digest, provider.getLevel(), provider.getBlockPos()),
                 provider::getController,
                 craftingPattern -> {
                     MultiblockAlloyFurnaceCoreBlockEntity controller = provider.getController();
@@ -104,8 +130,11 @@ final class AlloyFurnaceCountedCraftingAdapter implements CountedCraftingProvide
                 () -> {
                     MultiblockAlloyFurnaceCoreBlockEntity controller = provider.getController();
                     return controller == null ? 0 : controller.getMaxAETaskCount();
-                });
+                },
+                provider::pushBigIntegerCraftingPattern);
     }
+
+    // ==================== 长版 counted 路径 ====================
 
     @Override
     public @Nullable CountedCraftingAdmission prepareBatch(
@@ -114,17 +143,14 @@ final class AlloyFurnaceCountedCraftingAdapter implements CountedCraftingProvide
     }
 
     @Override
-    public @NotNull List<@NotNull CountedCraftingCapacity> captureCapacity(
+    public @NotNull ObjectList<@NotNull CountedCraftingCapacity> captureCapacityFast(
             @NotNull IPatternDetails patternDetails, KeyCounter @NotNull [] prototype, long requestedCount) {
         AvailableCapacity capacity = availableCapacity(patternDetails, prototype, requestedCount);
         if (capacity.logicalCrafts() == 0L) {
-            return List.of();
+            return ObjectLists.emptyList();
         }
-        // 作用域信号：只有「我们真的给出了容量」这一次派发才允许 DE 侧走加速路径，
-        // 同一 CPU 上其它机器的派发拿不到这个信号、完整保留原行为。
-        TrinityDispatchAcceleration.noteOurCapacityCaptured();
-        return List.of(new CountedCraftingCapacity(
-                target,
+        return ObjectLists.singleton(new CountedCraftingCapacity(
+                targetFor(patternDetails),
                 CountedCraftingRoutingMode.TARGETED,
                 OptionalLong.of(capacity.logicalCrafts()),
                 OptionalLong.of(capacity.maximumSingleBatch())));
@@ -136,9 +162,152 @@ final class AlloyFurnaceCountedCraftingAdapter implements CountedCraftingProvide
             KeyCounter @NotNull [] prototype,
             long requestedCount,
             @NotNull CountedCraftingTarget requestedTarget) {
-        return target.equals(requestedTarget)
+        return targetFor(patternDetails).equals(requestedTarget)
                 ? prepareAdmission(patternDetails, prototype, requestedCount)
                 : null;
+    }
+
+    // ==================== 原生 bigint（exact）路径 ====================
+
+    @Override
+    public @Nullable BigIntegerCraftingAdmission prepareBigIntegerBatch(
+            @NotNull IPatternDetails patternDetails,
+            KeyCounter @NotNull [] prototype,
+            @NotNull BigInteger requestedCount,
+            @NotNull CountedCraftingTarget requestedTarget) {
+        if (requestedCount.signum() <= 0 || !targetFor(patternDetails).equals(requestedTarget)) {
+            return null;
+        }
+        BigInteger accepted = availableBigIntegerCount(patternDetails, prototype, requestedCount);
+        return accepted.signum() <= 0
+                ? null
+                : new AlloyFurnaceBigIntegerAdmission(this, patternDetails, prototype, accepted);
+    }
+
+    /**
+     * bigint 批次的可接受量：只对合成样板开放（本机能一次装配折叠任意份数），
+     * 上限由产物分段预算反推；其它样板返回 0，让 DE 继续走长版 counted 路径。
+     */
+    private @NotNull BigInteger availableBigIntegerCount(
+            @NotNull IPatternDetails patternDetails,
+            KeyCounter @NotNull [] prototype,
+            @NotNull BigInteger requestedCount) {
+        if (!online.getAsBoolean()) {
+            return BigInteger.ZERO;
+        }
+        IPatternDetails original = SmartDoublingPatterns.unwrap(patternDetails);
+        if (!provider.getAvailablePatterns().contains(original)) {
+            return BigInteger.ZERO;
+        }
+        if (!(original instanceof IMolecularAssemblerSupportedPattern craftingPattern)) {
+            return BigInteger.ZERO;
+        }
+        if (prototype == null || prototype.length == 0) {
+            return BigInteger.ZERO;
+        }
+        // 回网队列有空位才收新批次（跟长版路径同一套背压）。
+        if (this.remainingThreads.applyAsInt(true) <= 0) {
+            return BigInteger.ZERO;
+        }
+        return requestedCount.min(maximumWindowedCount(craftingPattern, prototype, machineThreads()));
+    }
+
+    /**
+     * bigint 批次的次数上限：**一个线程一份 long 总量的材料窗口**。
+     *
+     * <p>语义（用户定的）：线程数 N ⇒ 这批最多吃下 N 份「每种材料各 {@code Long.MAX}」的量。
+     * 九合一配方每 craft 消耗 9 个同种材料，于是单批 = {@code N × Long.MAX / 9} 次合成
+     * （N=10000 时 ≈ 1.02e22），正好对应「每线程一个老物理窗口、整批一次交付」。
+     * 逐键取最小：每个材料键各自都不能越过它那份 long 窗口。</p>
+     *
+     * <p>另外再叠一层产物分段上限（{@link #maximumSegmentedCount}，同样跟随线程数而非固定值），
+     * 防「一次合成产出很多个物品」的配方把回网分段列表撑得过大 —— 正常配方下它不生效。</p>
+     *
+     * <p>传入的 {@code prototype} 是<b>单次合成的原型</b>，所以逐键的数量就是「每次合成的消耗量」。</p>
+     */
+    private static @NotNull BigInteger maximumWindowedCount(@NotNull IPatternDetails pattern,
+                                                            KeyCounter @NotNull [] prototype,
+                                                            int threads) {
+        BigInteger window = BigInteger.valueOf(Long.MAX_VALUE)
+                .multiply(BigInteger.valueOf(Math.max(1, threads)));
+        BigInteger limit = null;
+        for (KeyCounter counter : prototype) {
+            for (var entry : counter) {
+                long amount = entry.getLongValue();
+                if (amount <= 0L) {
+                    continue;
+                }
+                BigInteger allowed = window.divide(BigInteger.valueOf(amount));
+                limit = limit == null ? allowed : limit.min(allowed);
+            }
+        }
+        BigInteger segmented = maximumSegmentedCount(pattern, threads);
+        // 动态降频：本机最近实测耗时超预算时，按比例收窄本批次的窗口预算
+        // （仿数据能源的 30ms 提交预算，见 AlloyFurnaceTickBudget）。
+        BigInteger limitWithBudget = limit == null ? segmented : limit.min(segmented);
+        return AlloyFurnaceTickBudget.applyScale(limitWithBudget);
+    }
+
+    /**
+     * 本机当前线程数：多方块跟随线圈线程（{@code coil_tier_N_threads}），单方块跟随炉子等级线程
+     * （{@code furnace_tier_N_threads}）。
+     *
+     * <p>它就是「一台机器一 tick 能接几份窗口」的并行度，bigint 批次的窗口预算直接用它 ——
+     * 不设上限：线程数配到多少就吃多少，代价（产物分段规模、内存、NBT 体积）由配置者承担。</p>
+     */
+    private int machineThreads() {
+        return Math.max(1, this.totalThreads.getAsInt());
+    }
+
+    /** 由「每键最多切多少段」反推单批次数上限，避免产物分段列表被打爆。 */
+    /**
+     * bigint 批次的次数上限：由「本机当前线程数」反推能安全承载的产物分段数。
+     *
+     * <p>产物按 {@code CraftingAeAmountAccumulator#segments()} 切成 ≤ long 的段入队，
+     * 段数随 count 线性增长，所以上限 = {@code Long.MAX × 分段预算 / 单位产出量}；
+     * 分段预算就是本机线程数（见 {@link #machineThreads()}）—— 一个窗口的产物通常只占一段，
+     * 于是「线程数份窗口」量级刚好对应一段/窗口，不需要也不应该写死常数。</p>
+     *
+     * <p>真正该卡住多少由数据能源自己算：{@code maximumExactLogicalFirings} 已按精确库存、
+     * {@code MAX_EXACT_DISPATCH_AMOUNT} 与可用能量逐项取过最小值。</p>
+     */
+    private static @NotNull BigInteger maximumSegmentedCount(@NotNull IPatternDetails pattern, int threads) {
+        BigInteger maximumLong = BigInteger.valueOf(Long.MAX_VALUE);
+        BigInteger segments = BigInteger.valueOf(Math.max(1, threads));
+        BigInteger limit = null;
+        for (GenericStack output : pattern.getOutputs()) {
+            if (output == null || output.amount() <= 0L) {
+                continue;
+            }
+            BigInteger allowed = maximumLong.multiply(segments).divide(BigInteger.valueOf(output.amount()));
+            limit = limit == null ? allowed : limit.min(allowed);
+        }
+        return limit == null ? maximumLong.multiply(segments) : limit;
+    }
+
+    /** exact 批次的实际提交：把单位原型与 BigInteger 次数交给机器。 */
+    private boolean dispatchBigInteger(
+            @NotNull IPatternDetails patternDetails, KeyCounter @NotNull [] unitPrototype, @NotNull BigInteger count) {
+        if (availableBigIntegerCount(patternDetails, unitPrototype, count).compareTo(count) < 0) {
+            return false;
+        }
+        return this.bigIntegerPush.push(patternDetails, count, unitPrototype);
+    }
+
+    // ==================== 共用：目标与容量 ====================
+
+    /**
+     * 合成样板发布带 machine identity 的 TARGETED 目标（exact 派发的前提），
+     * 其余样板只发 route 目标 —— 这样 DE 不会对它们启用 exact 分支（那会跳过长版路径）。
+     */
+    private @NotNull CountedCraftingTarget targetFor(@NotNull IPatternDetails patternDetails) {
+        return supportsExactBatch(patternDetails)
+                ? CountedCraftingTarget.machine(this.routeIdentity, this.machineIdentity)
+                : CountedCraftingTarget.route(this.routeIdentity);
+    }
+
+    private static boolean supportsExactBatch(@NotNull IPatternDetails patternDetails) {
+        return SmartDoublingPatterns.unwrap(patternDetails) instanceof IMolecularAssemblerSupportedPattern;
     }
 
     /** Returns the largest safe count for one physical scaled-pattern submission. */
@@ -379,10 +548,6 @@ final class AlloyFurnaceCountedCraftingAdapter implements CountedCraftingProvide
         return provider.pushPattern(scaledPattern, scaledPrototype);
     }
 
-    static CountedCraftingTarget targetFor(@NotNull String digest, @NotNull String machineIdentity) {
-        return CountedCraftingTarget.machine(digest, machineIdentity);
-    }
-
     private static @NotNull String machineIdentity(
             @NotNull String fallback, @Nullable Level level, @NotNull BlockPos pos) {
         if (level == null) {
@@ -492,6 +657,63 @@ final class AlloyFurnaceCountedCraftingAdapter implements CountedCraftingProvide
 
         /** Drops all temporary references as soon as the only commit attempt begins. */
         private enum ReleasedAdmissionState implements AdmissionState {
+            RELEASED
+        }
+    }
+
+    /**
+     * bigint 批次的准入：{@code exactCount()} 可以超过 {@code long}，因此 {@code count()} 保持接口默认
+     * （{@code longValueExact()} 会在超限时抛异常而不是截断）—— exact 路径的记账一律读 {@code exactCount()}。
+     */
+    private static final class AlloyFurnaceBigIntegerAdmission implements BigIntegerCraftingAdmission {
+        private AdmissionState state;
+        private final BigInteger count;
+        private boolean transferredInputOwnership;
+
+        private AlloyFurnaceBigIntegerAdmission(
+                @NotNull AlloyFurnaceCountedCraftingAdapter adapter,
+                @NotNull IPatternDetails patternDetails,
+                KeyCounter @NotNull [] preparedPrototype,
+                @NotNull BigInteger count) {
+            this.state = new PreparedState(adapter, patternDetails, preparedPrototype);
+            this.count = count;
+        }
+
+        @Override
+        public @NotNull BigInteger exactCount() {
+            return count;
+        }
+
+        @Override
+        public boolean hasTransferredInputOwnership() {
+            return transferredInputOwnership;
+        }
+
+        @Override
+        public boolean commit(KeyCounter @NotNull [] prototype) {
+            if (!(state instanceof PreparedState(
+                    AlloyFurnaceCountedCraftingAdapter adapter,
+                    IPatternDetails patternDetails,
+                    KeyCounter[] preparedPrototype))) {
+                throw new IllegalStateException("Exact admission has already been committed");
+            }
+            if (prototype != preparedPrototype) {
+                throw new IllegalArgumentException("Exact admission must be committed with its prepared prototype");
+            }
+            state = ReleasedState.RELEASED;
+            boolean accepted = adapter.dispatchBigInteger(patternDetails, prototype, count);
+            transferredInputOwnership = accepted;
+            return accepted;
+        }
+
+        private sealed interface AdmissionState permits PreparedState, ReleasedState {}
+
+        private record PreparedState(
+                @NotNull AlloyFurnaceCountedCraftingAdapter adapter,
+                @NotNull IPatternDetails patternDetails,
+                KeyCounter @NotNull [] prototype) implements AdmissionState {}
+
+        private enum ReleasedState implements AdmissionState {
             RELEASED
         }
     }

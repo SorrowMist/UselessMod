@@ -1,8 +1,12 @@
 package com.sorrowmist.useless.integration.dataenergistics.search;
 
+import com.fish_dan_.data_energistics.api.registry.search.TrinityPatternSearchTermContributor;
 import com.sorrowmist.useless.core.component.OmniversalPatternData;
 import com.sorrowmist.useless.core.component.UComponents;
 
+import it.unimi.dsi.fastutil.objects.ObjectArrayList;
+import it.unimi.dsi.fastutil.objects.ObjectList;
+import it.unimi.dsi.fastutil.objects.ObjectLists;
 import net.minecraft.world.item.ItemStack;
 
 import java.util.ArrayList;
@@ -16,6 +20,19 @@ import java.util.Set;
 public final class OmniversalPatternMoldSearchTerms {
 
     private OmniversalPatternMoldSearchTerms() {}
+
+    /**
+     * 数据能源 3.3.0 的 {@code TrinityPatternSearchTermContributor} 实现。
+     *
+     * <p>3.3.0 起该接口的两个方法都是 default（新增了 FastUtil 版 {@code searchTermsFast}），
+     * 所以它<b>不再是函数接口</b>，不能再用方法引用注册，必须给出实现类型。</p>
+     */
+    public static final class Contributor implements TrinityPatternSearchTermContributor {
+        @Override
+        public ObjectList<String> searchTermsFast(ItemStack encodedPattern) {
+            return ObjectLists.unmodifiable(new ObjectArrayList<>(searchTerms(encodedPattern)));
+        }
+    }
 
     /**
      * Returns mold display names stored in one Omniversal Pattern, when that pattern needs molds.

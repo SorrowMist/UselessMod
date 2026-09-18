@@ -89,7 +89,7 @@ public final class UselessDataEnergisticsPatternProviderPlugin implements DataEn
     static void registerSearchTerms(@NotNull TrinityPatternSearchRegistry registry) {
         registry.register(new TrinityPatternSearchTermRegistration(
                 OMNIVERSAL_PATTERN_MOLD_SEARCH_REGISTRATION_ID,
-                OmniversalPatternMoldSearchTerms::searchTerms));
+                new OmniversalPatternMoldSearchTerms.Contributor()));
     }
 
     private static @NotNull PatternProviderMetadata metadata(

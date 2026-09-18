@@ -683,6 +683,71 @@ public final class AdvancedAlloyFurnaceAeManager {
         return true;
     }
 
+    // ==================== 原生 bigint（exact）批次 ====================
+
+    /**
+     * 接收数据能源 3.3.0 的原生 bigint 批次（{@code BigIntegerCraftingProviderAdapter}）。
+     *
+     * <p>与 {@link #pushPattern} 的长版倍率路径有两处关键差异：</p>
+     * <ul>
+     *   <li>拿到的 prototype 是<b>单次合成的原型</b>：DE 只把次数通过 {@code exactCount()} 交给我们，
+     *       剩下的 {@code count-1} 份材料由 DE 自己的 BigInteger 账本扣除，所以我们只消费手里这一份原型；</li>
+     *   <li>批次是「完整的同质批」：DE 保证整批输入完全一致，因此装配一次再整体 ×count 就是精确结果
+     *       —— 不需要 {@link #matchesBatchShape} 那套逐键折叠探测。</li>
+     * </ul>
+     *
+     * <p>只处理合成样板；其它样板返回 {@code false}，继续由长版 counted 路径服务。</p>
+     */
+    public boolean pushBigIntegerCraftingPattern(IPatternDetails patternDetails,
+                                                 BigInteger count,
+                                                 KeyCounter[] unitPrototype) {
+        Level level = this.owner.getLevel();
+        if (level == null || level.isClientSide || !this.owner.isTaskExecutionEnabled()) {
+            return false;
+        }
+        if (count == null || count.signum() <= 0 || unitPrototype == null) {
+            return false;
+        }
+        IPatternDetails original = SmartDoublingPatterns.unwrap(patternDetails);
+        if (!(original instanceof IMolecularAssemblerSupportedPattern craftingPattern)) {
+            return false;
+        }
+        // 背压：与长版路径同一套上限
+        if (this.queuedCraftingOutputs.size() >= craftingPatternQueueCap()) {
+            return false;
+        }
+
+        long useless$bigintStarted = System.nanoTime();
+        KeyCounter[] working = copyCounters(unitPrototype);
+        List<ItemStack> grid = emptyCraftingGrid();
+        craftingPattern.fillCraftingGrid(working, (slot, stack) -> {
+            if (slot >= 0 && slot < CRAFTING_GRID_SIZE) {
+                grid.set(slot, stack);
+            }
+        });
+        List<GenericStack> unitOutputs = assembleCraftingPattern(craftingPattern, grid, level);
+        if (unitOutputs == null) {
+            return false;
+        }
+
+        CraftingAeAmountAccumulator produced = new CraftingAeAmountAccumulator();
+        accumulateScaled(produced, unitOutputs, count);
+        if (produced.isEmpty()) {
+            return false;
+        }
+
+        // 走到这里才算接收：清空收到的单位原型（count-1 份由 DE 的账本扣除），产物进回网队列。
+        for (KeyCounter counter : unitPrototype) {
+            counter.clear();
+        }
+        this.queuedCraftingOutputs.add(new PendingCraftingOutput(level.getGameTime(), produced.segments()));
+        TrinityDispatchDiagnostics.reportCraftingPatternWindow(level.getGameTime(), count, 1);
+        // 报账给「每 tick 时间预算」：超预算时后续批次的窗口预算会被自动收窄
+        AlloyFurnaceTickBudget.addWork(System.nanoTime() - useless$bigintStarted);
+        this.owner.markChanged();
+        return true;
+    }
+
     /**
      * 判断铺完一份之后，剩下的材料是否正好是这一份消耗量的 (craftsLeft - 1) 倍 —— 逐键比对。
      *
@@ -805,13 +870,21 @@ public final class AdvancedAlloyFurnaceAeManager {
     private static void accumulateScaled(CraftingAeAmountAccumulator target,
                                         List<GenericStack> unitOutputs,
                                         long multiplier) {
-        long scale = Math.max(1L, multiplier);
-        BigInteger factor = BigInteger.valueOf(scale);
+        accumulateScaled(target, unitOutputs, BigInteger.valueOf(Math.max(1L, multiplier)));
+    }
+
+    /** BigInteger 倍率版本：数据能源的原生 bigint 批次一次可能交付超过 {@code long} 的次数。 */
+    private static void accumulateScaled(CraftingAeAmountAccumulator target,
+                                        List<GenericStack> unitOutputs,
+                                        BigInteger multiplier) {
+        if (multiplier.signum() <= 0) {
+            throw new IllegalArgumentException("Crafting batch multiplier must be positive");
+        }
         for (GenericStack unit : unitOutputs) {
             if (unit.amount() <= 0L) {
                 continue;
             }
-            target.add(unit.what(), BigInteger.valueOf(unit.amount()).multiply(factor));
+            target.add(unit.what(), BigInteger.valueOf(unit.amount()).multiply(multiplier));
         }
     }
 
@@ -849,7 +922,9 @@ public final class AdvancedAlloyFurnaceAeManager {
             List<GenericStack> remaining = new ArrayList<>(pending.outputs.size());
             for (GenericStack stack : pending.outputs) {
                 long requested = stack.amount();
+                long useless$insertStarted = System.nanoTime();
                 long inserted = clampInserted(this.owner.tryOutputKeyToAE(stack.what(), requested), requested);
+                AlloyFurnaceTickBudget.addWork(System.nanoTime() - useless$insertStarted);
                 long left = requested - inserted;
                 if (left > 0L) {
                     remaining.add(new GenericStack(stack.what(), left));

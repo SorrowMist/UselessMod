@@ -46,6 +46,7 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 
+import java.math.BigInteger;
 import java.util.List;
 import java.util.Objects;
 
@@ -299,6 +300,13 @@ public final class MePatternAssemblyBlockEntity extends AEBaseBlockEntity
     public boolean pushPattern(IPatternDetails patternDetails, KeyCounter[] inputHolder) {
         MultiblockAlloyFurnaceCoreBlockEntity controller = getController();
         return controller != null && controller.pushPattern(patternDetails, inputHolder);
+    }
+
+    /** 数据能源原生 bigint 批次入口（单位原型 + 可能超过 long 的次数），转发给多方块核心。 */
+    public boolean pushBigIntegerCraftingPattern(IPatternDetails patternDetails, BigInteger count,
+                                                 KeyCounter[] unitPrototype) {
+        MultiblockAlloyFurnaceCoreBlockEntity controller = getController();
+        return controller != null && controller.pushBigIntegerCraftingPattern(patternDetails, count, unitPrototype);
     }
 
     @Override

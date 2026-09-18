@@ -543,7 +543,14 @@ public final class AlloyFurnaceRecipeCatalog {
                         recipe.id(), AlloyFurnaceRecipeFingerprint.create(recipe, level.registryAccess()));
                 unique.putIfAbsent(identity, new Entry(identity, recipe, collected.sourceId()));
             } catch (RuntimeException exception) {
-                LOGGER.warn("Skipping alloy-furnace recipe with an unencodable identity: {}", recipe.id(), exception);
+                // 只在配方无法编码出指纹时发生（例如某个数值字段被 codec 判定非法）。
+                // 这是「可预期的坏配方」而不是故障：只留一行 WARN，明细放 DEBUG 的配方字段 dump，
+                // 不再把整条异常栈刷进日志。
+                LOGGER.warn("Skipping alloy-furnace recipe with an unencodable identity: {} ({})",
+                        recipe.id(), exception.getMessage());
+                if (LOGGER.isDebugEnabled()) {
+                    LOGGER.debug("Unencodable alloy-furnace recipe contents: {}", recipe);
+                }
             }
         }
         List<Entry> ordered = unique.values().stream()

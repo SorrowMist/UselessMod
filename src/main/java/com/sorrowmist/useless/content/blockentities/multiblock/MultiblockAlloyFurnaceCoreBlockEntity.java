@@ -63,6 +63,7 @@ import net.neoforged.neoforge.fluids.capability.templates.FluidTank;
 import net.neoforged.neoforge.items.ItemStackHandler;
 import org.jetbrains.annotations.Nullable;
 
+import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
@@ -318,6 +319,12 @@ public final class MultiblockAlloyFurnaceCoreBlockEntity extends BlockEntity imp
 
     public boolean pushPattern(IPatternDetails pattern, KeyCounter[] inputs) {
         return aeManager.pushPattern(pattern, inputs);
+    }
+
+    /** 数据能源原生 bigint 批次入口（单位原型 + 可能超过 long 的次数）。 */
+    public boolean pushBigIntegerCraftingPattern(IPatternDetails pattern, BigInteger count,
+                                                 KeyCounter[] unitPrototype) {
+        return aeManager.pushBigIntegerCraftingPattern(pattern, count, unitPrototype);
     }
 
     public boolean isBusy() {

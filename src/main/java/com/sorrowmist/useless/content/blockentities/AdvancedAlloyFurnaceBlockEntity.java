@@ -97,6 +97,7 @@ import net.neoforged.neoforge.items.ItemStackHandler;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.math.BigInteger;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
@@ -1809,6 +1810,17 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
     @Override
     public boolean pushPattern(IPatternDetails patternDetails, KeyCounter[] inputHolder) {
         return this.aeManager.pushPattern(patternDetails, inputHolder);
+    }
+
+    /**
+     * 数据能源原生 bigint 批次入口。
+     *
+     * <p>与 {@link #pushPattern} 的区别：这里收到的是<b>单次合成的原型</b> + 一个可以超过 {@code long} 的次数，
+     * 由 {@code AdvancedAlloyFurnaceAeManager#pushBigIntegerCraftingPattern} 一次装配后整体放大。</p>
+     */
+    public boolean pushBigIntegerCraftingPattern(IPatternDetails patternDetails, BigInteger count,
+                                                 KeyCounter[] unitPrototype) {
+        return this.aeManager.pushBigIntegerCraftingPattern(patternDetails, count, unitPrototype);
     }
 
     @Override

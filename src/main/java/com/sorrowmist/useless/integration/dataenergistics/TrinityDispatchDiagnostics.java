@@ -1,80 +1,66 @@
 package com.sorrowmist.useless.integration.dataenergistics;
 
 import com.mojang.logging.LogUtils;
+import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.AlloyFurnaceTickBudget;
 import org.slf4j.Logger;
 
+import java.math.BigInteger;
 import java.util.Locale;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
- * Trinity 派发加速的诊断埋点。
+ * 三位一体合成样板派发的诊断埋点。
  *
- * <p>背景：一个 pattern 每 tick 能拿到多少合成量由 DE 一侧决定（单次派发 = 一个 AE2 long 物理窗口，
- * 且 {@code inspectedStages} 让同一 stage 每 tick 只被 poll 一次）。我们的 mixin 只放开后者，
- * 所以「装了之后界面还是 1E」有几种完全不同的原因，必须能区分开：</p>
- * <ul>
- *   <li><b>mixin 没被应用</b>（配置没加载 / 目标方法找不到）：没有「已生效」日志，且每 tick 只有 1 次推送；</li>
- *   <li><b>mixin 生效了但 DE 还有第二道门</b>（异步提案许可 {@code proposalCoordinator.dispatchable}）：
- *       有「已生效」日志，但每 tick 仍然只有 1 次推送；</li>
- *   <li><b>真的多窗口</b>：有「已生效」日志，且每 tick 推送次数 &gt; 1。</li>
- * </ul>
+ * <p>用来确认三件事：</p>
+ * <ol>
+ *   <li>一 tick 收到几个批次（DE 的 bigint 批次节奏）；</li>
+ *   <li>每批真实装配了几次 —— {@code 1} 表示整批被折叠成一次装配再按 N 放大（本机的核心优化）；</li>
+ *   <li>「本机每 tick 时间预算」有没有在降频（见 {@link AlloyFurnaceTickBudget}）。</li>
+ * </ol>
+ *
+ * <p><b>累加一律用 {@link BigInteger}</b>：单批就能到 1e20 以上，用 long 会溢出成负数，
+ * 用 double 会丢尾数精度（两者都在这个文件里踩过）。显示时才转科学计数 —— 而且是按十进制位数
+ * 直接构造，不经过浮点，日志里看到的就是精确值。</p>
+ *
+ * <p>界面上的「正在合成 N」只是<b>单个批次</b>的量级，不等于一 tick 的总量，所以验收请看这里的汇总。</p>
  */
 public final class TrinityDispatchDiagnostics {
     private static final Logger LOGGER = LogUtils.getLogger();
     /** 有推送才汇总，避免空闲时刷屏。 */
     private static final long SUMMARY_INTERVAL_TICKS = 40L;
+    /** 科学计数保留的尾数位数（仅显示用）。 */
+    private static final int SCI_DIGITS = 4;
 
-    private static final AtomicBoolean ACCELERATION_REPORTED = new AtomicBoolean();
-
-    private static long lastSummaryTick = Long.MIN_VALUE;
-    private static long windows;
-    /** 必须用 double：一个窗口就是 ~1e18，几秒累加就溢出 long 了（0.1 版埋点踩过）。 */
-    private static double craftsTotal;
-    private static long craftsLargest;
-    private static int probesMax;
+    private static BigInteger craftsTotal = BigInteger.ZERO;
+    private static BigInteger craftsLargest = BigInteger.ZERO;
+    private static long batches;
     private static long probesTotal;
-    private static long gateReopens;
+    private static int probesMax;
+    private static long lastSummaryTick = Long.MIN_VALUE;
 
     private TrinityDispatchDiagnostics() {}
 
-    /** mixin 第一次真正执行到注入点时调用：证明配置已加载、目标方法已找到、注入成功。 */
-    public static void reportAccelerationApplied(int windowsPerTick) {
-        if (ACCELERATION_REPORTED.compareAndSet(false, true)) {
-            LOGGER.info(
-                    "[trinity] 派发加速 mixin 已生效：每 tick 窗口预算 {}（跟随线圈线程数，设为 1 即关闭）",
-                    windowsPerTick);
-        }
-    }
-
-    /**
-     * mixin 真的清空了 stage 去重集合时调用一次，用来判断「同 tick 的第二次 pass 到底有没有发生」。
-     */
-    public static synchronized void reportGateReopened() {
-        gateReopens++;
-    }
-
-    /**
-     * 记录一次抵达本机的合成样板推送。
-     *
-     * @param tick   当前游戏刻
-     * @param crafts 本次推送代表的合成次数
-     * @param probes 本次真实装配了多少份（1 = 整批折叠成功，说明 P0 的折叠修复在起作用）
-     */
+    /** 长版 counted 路径的一次物理派发。 */
     public static synchronized void reportCraftingPatternWindow(long tick, long crafts, int probes) {
-        windows++;
-        craftsTotal += crafts;
-        craftsLargest = Math.max(craftsLargest, crafts);
-        probesMax = Math.max(probesMax, probes);
+        report(tick, BigInteger.valueOf(crafts), probes);
+    }
+
+    /** bigint 批次（{@code BigIntegerCraftingProviderAdapter}）的一次派发。 */
+    public static synchronized void reportCraftingPatternWindow(long tick, BigInteger crafts, int probes) {
+        report(tick, crafts, probes);
+    }
+
+    private static void report(long tick, BigInteger crafts, int probes) {
+        BigInteger amount = crafts.signum() < 0 ? BigInteger.ZERO : crafts;
+        batches++;
+        craftsTotal = craftsTotal.add(amount);
+        craftsLargest = craftsLargest.max(amount);
         probesTotal += probes;
+        probesMax = Math.max(probesMax, probes);
 
-        if (windows == 1L) {
-            // 本会话第一笔：立刻给一条，便于确认「机器确实在收 DE 的合成样板推送」
-            LOGGER.info(
-                    "[trinity] 首次合成样板推送：{} 次合成、真实装配 {} 次（1 = 整批折叠成功）",
-                    format("%.3e", (double) crafts),
-                    probes);
+        if (batches == 1L) {
+            LOGGER.info("[trinity] 首次合成样板批次：{} 次合成、真实装配 {} 次（1 = 整批折叠成功）",
+                    scientific(amount), probes);
         }
-
         if (lastSummaryTick == Long.MIN_VALUE) {
             lastSummaryTick = tick;
             return;
@@ -84,23 +70,48 @@ public final class TrinityDispatchDiagnostics {
             return;
         }
         LOGGER.info(
-                "[trinity] 近 {} tick：合成样板推送 {} 次（{} 次/tick）、合计 {} 次合成、单次最大 {}、"
-                        + "真实装配合计 {} 次 / 单批最多 {} 次（1 = 整批折叠成功）、闸门重开 {} 次",
+                "[trinity] 近 {} tick：合成样板批次 {} 个（{} 个/tick）、合计 {} 次合成、单批最大 {}、"
+                        + "真实装配合计 {} 次 / 单批最多 {} 次（1 = 整批折叠成功）、降频系数 {}（本机每 tick 实测 {} ms / 预算 {} ms）",
                 span,
-                windows,
-                format("%.2f", (double) windows / span),
-                format("%.3e", craftsTotal),
-                format("%.3e", (double) craftsLargest),
+                batches,
+                format("%.2f", (double) batches / span),
+                scientific(craftsTotal),
+                scientific(craftsLargest),
                 probesTotal,
                 probesMax,
-                gateReopens);
-        windows = 0L;
-        craftsTotal = 0.0D;
-        craftsLargest = 0L;
+                format("%.3f", AlloyFurnaceTickBudget.scale()),
+                format("%.2f", AlloyFurnaceTickBudget.spentMillis()),
+                format("%.2f", AlloyFurnaceTickBudget.budgetMillis()));
+        batches = 0L;
+        craftsTotal = BigInteger.ZERO;
+        craftsLargest = BigInteger.ZERO;
         probesTotal = 0L;
         probesMax = 0;
-        gateReopens = 0L;
         lastSummaryTick = tick;
+    }
+
+    /**
+     * 精确科学计数：按十进制位数直接构造，不经过 double。
+     *
+     * @param value 任意大小的计数
+     * @return 形如 {@code 5.902e+20} 的字符串
+     */
+    private static String scientific(BigInteger value) {
+        if (value == null || value.signum() == 0) {
+            return "0";
+        }
+        boolean negative = value.signum() < 0;
+        String digits = value.abs().toString();
+        int exponent = digits.length() - 1;
+        StringBuilder out = new StringBuilder();
+        if (negative) {
+            out.append('-');
+        }
+        out.append(digits.charAt(0));
+        if (digits.length() > 1) {
+            out.append('.').append(digits, 1, Math.min(digits.length(), 1 + SCI_DIGITS));
+        }
+        return out.append("e+").append(exponent).toString();
     }
 
     private static String format(String pattern, double value) {

@@ -110,31 +110,48 @@ public final class AdvancedAlloyFurnaceAeManager {
     //   线性回升：之后无积压时逐步 +step 缓升。
     // 收敛点是「一批大约一两个 tick 就交付完」，也就是最平滑的形态。
 
-    /** 慢启动的每 tick 增长倍数。 */
-    private static final long OUTPUT_BUDGET_SLOW_START_FACTOR = 10L;
-    /** 线性回升的步长占上限的比例（上限 / 本值）。 */
-    private static final long OUTPUT_BUDGET_RECOVERY_STEP_DIVISOR = 64L;
     /**
-     * 乘法减小的<b>下限</b>（不超上限）。
+     * 还没测到插入成本前的初始估计（纳秒/段）。
      *
-     * <p>没有它时，「积压超一批就减半」会在积压持续时<b>每 tick 减半</b>，
-     * 一路塌到 1 段 —— 那意味着 DE 每批只产出 1 段，而它每次派发都有固定开销
-     * （能量结算、账本、提交），得不偿失。有了下限后预算在「下限 ↔ 交付速率」之间小幅摆动，
-     * 而不是大起大落。</p>
+     * <p>偏大 ⇒ 起步批次偏小、爬坡慢；偏小 ⇒ 首批偏大、可能积压。取 1000ns（略保守于实测的
+     * 650ns）：起步批次约为目标的 2/3，几批之内就被实测值取代，既不浪费爬坡时间也不冒险。</p>
      */
-    private static final long OUTPUT_BUDGET_MIN = 64L;
-    /** 起步预算占上限的比例（上限 / 本值）—— 刻意保守，先小后快增。 */
-    private static final long OUTPUT_BUDGET_INITIAL_DIVISOR = 100L;
+    private static final double DEFAULT_INSERT_NANOS_PER_CHUNK = 1_000.0D;
+    /** 实测插入成本的平滑系数（新样本占 1/8）。 */
+    private static final double INSERT_COST_SMOOTHING = 0.125D;
     /**
-     * 机器彻底空闲多少 tick 后，把控制器复位到保守起步。
+     * 有效样本要求的最少交付段数。
      *
-     * <p><b>为什么必须复位</b>：机器空闲时积压恒为 0，控制器会一路慢启动涨到上限并停在那里 ——
-     * 于是<b>下一次合成开头的第一批仍然是满额的</b>，首批过大 ⇒ 交付要十几秒 ⇒ 开头一段停顿。
-     * 复位后每次新合成都从保守值起步、几 tick 内涨到合适规模，正好对上「起步保守、无积压快增」。</p>
-     *
-     * <p>取 40 tick（2 秒）：足够跨过合成过程中的瞬时排空，不会把「忙里偷闲」误判成空闲。</p>
+     * <p><b>为什么必须有这个门槛</b>：样本是 {@code 插入耗时 ÷ 交付段数}，而<b>每 tick 有固定开销</b>
+     * （首次插入的缓存冷、跨存储遍历等）。交付段数很少时固定开销会主导样本 ——
+     * 实测日志里出现过 {@code deliveredChunks=1, insertUs=41}，即 41µs/段，
+     * 是真实值（0.65µs）的 <b>63 倍</b>。一个这样的样本会把单批预算直接砸下去，
+     * 再慢慢爬回来 —— 正是用户反馈的「降档一次降得太多、再爬坡也慢」。
+     * 要求至少 256 段后，固定开销被摊薄到可忽略（41µs/256 ≈ 160ns）。</p>
      */
-    private static final long OUTPUT_BUDGET_IDLE_RESET_TICKS = 40L;
+    private static final long MIN_INSERT_SAMPLE_CHUNKS = 1_024L;
+    /**
+     * 单次采样允许「成本估计」上升的最大比例 —— 也就是<b>限制降档幅度</b>。
+     *
+     * <p><b>为什么必须非对称</b>：成本估计升高通常来自<b>噪声</b>（首次插入缓存冷、GC、
+     * 跨存储遍历的固定开销），而不是真的变慢；而它一旦升高，单批预算就立刻按比例下降。
+     * 无限制时会看到「一次降档降太多，再爬坡又慢」。
+     * 所以：<b>升档不限速</b>（成本下降立刻放大批次，不浪费爬坡时间），
+     * <b>降档每次最多 1%</b>（噪声最多造成 1% 损失，且下一批就能恢复）。</p>
+     *
+     * <p>代价：存储真的永久变慢时，预算要 ~70 批才收敛到位 —— 这期间积压会略涨，
+     * 由 {@link #hardOutputChunkBudget()} 兜底。之所以敢取这么慢：噪声是<b>单侧</b>的
+     * （只会让耗时偏高），而真的变慢会持续出现，慢慢收即可。</p>
+     */
+    private static final double MAX_INSERT_COST_RISE_PER_SAMPLE = 1.01D;
+    /** 成本估计下限：防止除零与荒谬的大批次。 */
+    private static final double MIN_INSERT_NANOS_PER_CHUNK = 50.0D;
+    /**
+     * 安全系数：单批按「半 tick 可交付量」定尺。
+     *
+     * <p>调度侧可能一 tick 派发不止一批；取一半可保证到达 ≤ 交付，积压自然收敛在一两批。</p>
+     */
+    private static final long OUTPUT_BUDGET_SAFETY_DIVISOR = 2L;
     /**
      * 回网积压硬上限相对「单批预算上限」的倍数：<b>只作内存 / NBT 兜底</b>。
      *
@@ -148,16 +165,6 @@ public final class AdvancedAlloyFurnaceAeManager {
      * 若硬上限跟着放大，内存 / NBT 兜底就形同虚设。</p>
      */
     private static final long HARD_OUTPUT_CHUNK_BUDGET = 262_144L;
-    /**
-     * 每台机器每 tick 的刷网时间预算<b>基准值</b>（纳秒）。
-     *
-     * <p>实际生效的预算还要按 {@link AlloyFurnaceTickBudget#scaledFlushBudget(long)} 动态收窄：
-     * 全局预算被打满时按比例缩小（下限 250µs）。否则 N 台机器各自吃满 4ms，10 台就能吃掉大半个 tick。</p>
-     *
-     * <p><b>为什么这里可以真截断</b>：刷网是幂等的 —— 未投递的余额原样留在队列并持久化，
-     * 没有任何外部方依赖「本轮必须投完」。这与准入路径的「至少收 1 份」完全不同：那边对数据能源
-     * 报容量 0 会触发「无容量 → 重新提交」的空转（见 {@link AlloyFurnaceTickBudget} 的说明）。</p>
-     */
     /**
      * 每台机器每 tick 的产物回网时间预算（纳秒），由配置项
      * {@code advanced_alloy_furnace.ae_output_return_budget_millis} 给出。
@@ -218,12 +225,15 @@ public final class AdvancedAlloyFurnaceAeManager {
      * <p>只在服务端主线程维护：入队加、交付减、读档重算。</p>
      */
     private BigInteger pendingOutputAmount = BigInteger.ZERO;
-    /** AIMD 控制器的当前输出：本 tick 允许单批产生的分段数；负值表示还没初始化。 */
-    private long outputSegmentBudget = -1L;
-    /** 是否还在慢启动阶段（还没遇到过拥塞）。 */
-    private boolean outputBudgetInSlowStart = true;
-    /** 连续空闲的 tick 数（达到 {@link #OUTPUT_BUDGET_IDLE_RESET_TICKS} 就复位控制器）。 */
-    private long outputBudgetIdleTicks;
+    /**
+     * 实测「写回一个分段」的平均耗时（纳秒/段，指数平滑）。
+     *
+     * <p>单批分段预算由它<b>前馈</b>算出：{@code 时间预算 ÷ 本值 ÷ 安全系数}。
+     * 没有闭环就没有振荡，也不会像反馈环那样卡在低位；存储快慢一变它会自动跟上。</p>
+     */
+    private double measuredInsertNanosPerChunk = DEFAULT_INSERT_NANOS_PER_CHUNK;
+    /** 是否已经采到过有效样本（首个有效样本直接采纳，不走平滑，避免慢慢爬坡）。 */
+    private boolean insertCostMeasured;
     /**
      * 回网诊断日志的上报间隔（tick）。
      *
@@ -728,16 +738,6 @@ public final class AdvancedAlloyFurnaceAeManager {
                 AlloyFurnaceBigIntegerCrafting.MAX_OUTPUT_SEGMENT_BUDGET));
     }
 
-    /** 起步预算：上限的 {@link #OUTPUT_BUDGET_INITIAL_DIVISOR} 分之一，刻意保守（先小后快增）。 */
-    private long initialOutputSegmentBudget() {
-        return Math.max(1L, outputSegmentBudgetCap() / OUTPUT_BUDGET_INITIAL_DIVISOR);
-    }
-
-    /** 线性回升步长：上限的 {@link #OUTPUT_BUDGET_RECOVERY_STEP_DIVISOR} 分之一。 */
-    private long outputSegmentBudgetRecoveryStep() {
-        return Math.max(1L, outputSegmentBudgetCap() / OUTPUT_BUDGET_RECOVERY_STEP_DIVISOR);
-    }
-
     /**
      * 回网积压的硬上限（分段数）：<b>只作内存 / NBT 兜底</b>。
      *
@@ -783,7 +783,7 @@ public final class AdvancedAlloyFurnaceAeManager {
     /**
      * 把一条待回网产物入队，并同步积压总量。
      *
-     * <p>所有入队都必须走这里 —— 漏一处就会让 {@link #updateOutputSegmentBudget()} 的度量失真。</p>
+     * <p>所有入队都必须走这里 —— 漏一处就会让积压度量失真（进而影响 {@link #outputSegmentBudget()} 的判断）。</p>
      */
     private void enqueueCraftingOutput(PendingCraftingOutput pending) {
         this.queuedCraftingOutputs.add(pending);
@@ -791,76 +791,26 @@ public final class AdvancedAlloyFurnaceAeManager {
     }
 
     /**
-     * 本 tick 允许<b>单个批次</b>产生的分段数（AIMD 控制器的输出，见 {@link #updateOutputSegmentBudget()}）。
+     * 本 tick 允许<b>单个批次</b>产生的分段数。
      *
-     * <p>它直接决定单批规模：批次的份数上限 = {@code Long.MAX × 本值 / 单位产出量}。
-     * 由宿主方块实体通过 {@link CraftingTaskContext#outputSegmentBudget()} 转发给上层，
+     * <p>由宿主方块实体通过 {@link CraftingTaskContext#outputSegmentBudget()} 转发给上层，
      * 再传进 {@link AlloyFurnaceBigIntegerCrafting#maximumSegmentedCount}。</p>
      *
-     * <p><b>为什么不用固定值</b>：单批该多大取决于「交付能力」与「调度侧派发频率」，
-     * 两者都无法在编译期算准。固定值要么过大（首批交付几十秒 ⇒ 任务之间停顿），
-     * 要么过小（吞吐浪费）。改成控制器后由实测反馈收敛。</p>
+     * <p><b>前馈算出，不用反馈环</b>：{@code 时间预算 ÷ 实测单段插入耗时 ÷ 安全系数}
+     * —— 也就是「半个 tick 能交付多少段」。单批恰好能在一两个 tick 内交付完，
+     * 既不会因首批过大而长时间积压，也不会因单批过小而浪费吞吐。</p>
+     *
+     * <p><b>为什么删掉反馈环</b>：先后试过「开关式 AIMD」与「比例调节」两版反馈控制 ——
+     * 前者必然锯齿（拥塞信号与被控量同量级），后者增长太慢且目标自引用导致恢复力弱、会卡在低位。
+     * 而交付能力其实<b>可以直接测出来</b>（实测单段插入 0.65µs），所以不需要「试」：
+     * 前馈没有闭环就没有振荡，也不会卡死。</p>
      */
     public long outputSegmentBudget() {
-        if (this.outputSegmentBudget < 0L) {
-            this.outputSegmentBudget = initialOutputSegmentBudget();
-        }
-        return this.outputSegmentBudget;
-    }
-
-    /**
-     * AIMD 控制器：每 tick 调一次，按「积压是否超过一批在飞」调整单批分段预算。
-     *
-     * <p>四条规则（TCP 拥塞控制那一套）：</p>
-     * <ol>
-     *   <li><b>慢启动</b>：积压未超一批时每 tick ×{@link #OUTPUT_BUDGET_SLOW_START_FACTOR}，
-     *       快速探到可用上限；</li>
-     *   <li><b>乘法减小</b>：积压超过一批在飞就减半，并<b>退出慢启动</b>（不再激进倍增）；</li>
-     *   <li><b>线性回升</b>：之后积压回落时每次 +step 缓升，避免「一有空间就暴涨」再次冲垮；</li>
-     *   <li><b>空闲复位</b>：连续空闲 {@link #OUTPUT_BUDGET_IDLE_RESET_TICKS} tick 后回到保守起步 ——
-     *       否则空闲期会一路涨到上限并停住，让<b>下一次合成开头的第一批仍是满额的</b>。</li>
-     * </ol>
-     *
-     * <p><b>为什么用「积压 &gt; 当前预算」当拥塞信号</b>：预算本身就是「一批的规模」，
-     * 积压超过它就说明<b>不止一批在飞</b>，即交付跟不上派发。用这个相对量而不是绝对值，
-     * 是因为它随预算自适应 —— 预算小的时候同样能识别拥塞。</p>
-     *
-     * <p>收敛点：预算稳定在「一批大约一两个 tick 交付完」的规模，也就是最平滑的形态。
-     * 总吞吐不受影响（交付总量由 AE2 的 long-only 接口决定，与批次划分无关）。</p>
-     */
-    private void updateOutputSegmentBudget() {
         long cap = outputSegmentBudgetCap();
-        long current = outputSegmentBudget();
-        long pending = backlogChunks(this.pendingOutputAmount);
-        boolean idle = pending <= 0L && this.queuedCraftingOutputs.isEmpty()
-                && this.activeTasks.isEmpty();
-        if (idle) {
-            // 空闲复位：机器长时间没活时把控制器打回保守起步，
-            // 否则下一次合成开头的第一批仍是满额的（首批过大 ⇒ 开头一段停顿）。
-            if (++this.outputBudgetIdleTicks >= OUTPUT_BUDGET_IDLE_RESET_TICKS) {
-                this.outputBudgetIdleTicks = 0;
-                this.outputSegmentBudget = initialOutputSegmentBudget();
-                this.outputBudgetInSlowStart = true;
-            }
-            return;
-        }
-        this.outputBudgetIdleTicks = 0;
-
-        boolean congested = pending > Math.max(1L, current);
-        if (congested) {
-            // 下限避免「每 tick 减半」一路塌到 1 段（DE 每批固定开销会吃掉收益）。
-            long floor = Math.min(cap, OUTPUT_BUDGET_MIN);
-            this.outputSegmentBudget = Math.max(floor, current / 2L);
-            this.outputBudgetInSlowStart = false;
-        } else if (this.outputBudgetInSlowStart) {
-            this.outputSegmentBudget = Math.min(cap,
-                    saturatingMultiply(current, OUTPUT_BUDGET_SLOW_START_FACTOR));
-        } else {
-            this.outputSegmentBudget = Math.min(cap,
-                    saturatingAdd(current, outputSegmentBudgetRecoveryStep()));
-        }
-        this.outputSegmentBudget = Math.max(1L, Math.min(cap, this.outputSegmentBudget));
+        long perTick = (long) (flushBudgetNanos() / Math.max(1.0D, this.measuredInsertNanosPerChunk));
+        return Math.max(1L, Math.min(cap, perTick / OUTPUT_BUDGET_SAFETY_DIVISOR));
     }
+
 
     /**
      * 回网诊断（DEBUG，每 {@link #OUTPUT_DIAGNOSTICS_INTERVAL_TICKS} tick 最多一条）。
@@ -1472,11 +1422,6 @@ public final class AdvancedAlloyFurnaceAeManager {
      *              但方块实体与 NBT 随后就消失，产物必须尽量一次全部写回，否则就丢了。
      */
     private void flushQueuedCraftingOutputs(boolean force) {
-        // AIMD 控制器每 tick 都要跑一次 —— 必须放在下面的早退之前，
-        // 否则「队列已空」时预算永远不会回升（那正是最该回升的时候）。
-        if (!force) {
-            updateOutputSegmentBudget();
-        }
         if (this.queuedCraftingOutputs.isEmpty()) {
             return;
         }
@@ -1568,6 +1513,23 @@ public final class AdvancedAlloyFurnaceAeManager {
 
         // 整趟的插入耗时一次性上报（见上面 insertWorkNanos 的说明）。
         AlloyFurnaceTickBudget.addWork(insertWorkNanos);
+
+        // 更新实测单段插入成本：单批分段预算由它前馈算出。
+        // 门槛见 MIN_INSERT_SAMPLE_CHUNKS：样本太小时固定开销会主导，会把预算砸下去。
+        long deliveredChunksNow = backlogChunks(deliveredTotal);
+        if (deliveredChunksNow >= MIN_INSERT_SAMPLE_CHUNKS && insertWorkNanos > 0L) {
+            double sample = (double) insertWorkNanos / (double) deliveredChunksNow;
+            double previous = this.measuredInsertNanosPerChunk;
+            double updated = this.insertCostMeasured
+                    // 首个有效样本直接采纳：否则要从初始估计慢慢爬，白等几十批。
+                    ? previous * (1.0D - INSERT_COST_SMOOTHING) + sample * INSERT_COST_SMOOTHING
+                    : sample;
+            // 非对称：成本（= 耗时）上升受限，等价于「降档每次最多 5%」；
+            // 下降不限速，所以批次放大是即时的。
+            updated = Math.min(updated, previous * MAX_INSERT_COST_RISE_PER_SAMPLE);
+            this.measuredInsertNanosPerChunk = Math.max(MIN_INSERT_NANOS_PER_CHUNK, updated);
+            this.insertCostMeasured = true;
+        }
 
         // 5) 清空条目：产物全部回网后发一次终局回调，并从队列移除。
         //    没有投递任何东西时这里不会命中，也不会 markChanged（旧实现会空转并标脏）。

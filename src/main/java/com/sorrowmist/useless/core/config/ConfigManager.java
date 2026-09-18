@@ -492,7 +492,7 @@ public class ConfigManager {
                         "机器或服务端过载时，本预算还会被全局降频系数按比例收窄（下限 250 微秒）",
                         "全局降频基准会跟随本值放大（= 本值×2，下限 10 毫秒），所以调大本值确实能生效")
                 .translation("useless_mod.configuration.ae_output_return_budget_millis")
-                .defineInRange("ae_output_return_budget_millis", 8, 1, 50);
+                .defineInRange("ae_output_return_budget_millis", 8, 1, 200);
 
         for (int tier = 0; tier <= 10; tier++) {
             FURNACE_TIER_THREADS[tier] = SERVER_BUILDER

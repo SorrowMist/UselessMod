@@ -118,7 +118,7 @@ Capacity is the minimum of up to four gates:
 | Gate | Meaning |
 | --- | --- |
 | Recipe availability | Whether the coil tier is high enough and required molds are present (**omniversal patterns only**) |
-| Material window | Thread count N ⇒ this batch absorbs at most N × (`Long.MAX` of every material) |
+| Material window | Thread count N ⇒ this batch absorbs at most N × (`Long.MAX` of every material). **This is a balance gate and can be lifted via the machine's `ae_unlimited_bigint_parallelism` config** (once lifted, batch size is decided solely by delivery capacity) |
 | Output delivery capacity | A single batch's size is decided by the machine from its **current delivery capacity** and floats over time (see below) |
 | **Energy** | `count × per-craft energy` must be affordable (**omniversal patterns only**) |
 

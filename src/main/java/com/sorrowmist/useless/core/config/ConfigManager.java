@@ -84,6 +84,8 @@ public class ConfigManager {
     private static final ModConfigSpec.IntValue FURNACE_AE_BATCH_RIPE_TICKS;
     // 万象炉产物回网每 tick 时间预算
     private static final ModConfigSpec.IntValue FURNACE_AE_OUTPUT_RETURN_BUDGET_MILLIS;
+    // 万象炉是否解除「材料窗口」对单批规模的限制
+    private static final ModConfigSpec.BooleanValue FURNACE_AE_UNLIMITED_BIGINT_PARALLELISM;
     private static final ModConfigSpec.IntValue[] FURNACE_TIER_THREADS =
             new ModConfigSpec.IntValue[11];
     private static final ModConfigSpec.IntValue[] CATALYST_TIER_PARALLEL =
@@ -484,6 +486,15 @@ public class ConfigManager {
                 .translation("useless_mod.configuration.ae_batch_ripe_ticks")
                 .defineInRange("ae_batch_ripe_ticks", 10, 0, 200);
 
+        FURNACE_AE_UNLIMITED_BIGINT_PARALLELISM = SERVER_BUILDER
+                .comment("是否解除「材料窗口」对单批规模的限制（即去掉 线程数 × Long.MAX 这道闸）",
+                        "开启后单批规模只由「产物交付能力」决定，可以一次吃下任意大的份数，",
+                        "不必再靠堆线程数来抬高单批上限",
+                        "代价：单次准入可能吃下极大量材料（由调用方自己的 BigInteger 账本扣除）；",
+                        "低档线圈会转而受「能量」闸限制，有用线圈无能量闸、不受影响")
+                .translation("useless_mod.configuration.ae_unlimited_bigint_parallelism")
+                .define("ae_unlimited_bigint_parallelism", false);
+
         FURNACE_AE_OUTPUT_RETURN_BUDGET_MILLIS = SERVER_BUILDER
                 .comment("万象炉每 tick 最多花多少毫秒把产物写回 ME 网络",
                         "这个值直接决定「可持续合成速度」：AE2 存储接口单次只能写一个 long 分段，",
@@ -868,6 +879,15 @@ public class ConfigManager {
      */
     public static int getAdvancedAlloyFurnaceAeOutputReturnBudgetMillis() {
         return Math.max(1, getConfigValue(FURNACE_AE_OUTPUT_RETURN_BUDGET_MILLIS));
+    }
+
+    /**
+     * 是否解除「材料窗口」对单批规模的限制。
+     *
+     * <p>开启后 {@code maximumWindowedCount} 返回哨兵值，单批规模只受产物交付能力约束。</p>
+     */
+    public static boolean isFurnaceAeUnlimitedBigintParallelism() {
+        return getConfigValue(FURNACE_AE_UNLIMITED_BIGINT_PARALLELISM);
     }
 
     public static int getAdvancedAlloyFurnaceCatalystParallel(int tier) {

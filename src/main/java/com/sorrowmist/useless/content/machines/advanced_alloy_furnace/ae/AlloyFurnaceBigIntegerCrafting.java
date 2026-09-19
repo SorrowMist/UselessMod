@@ -4,6 +4,7 @@ import appeng.api.crafting.IPatternDetails;
 import appeng.api.stacks.AEKey;
 import appeng.api.stacks.GenericStack;
 import appeng.api.stacks.KeyCounter;
+import com.sorrowmist.useless.core.config.ConfigManager;
 import com.sorrowmist.useless.api.crafting.bigint.AlloyFurnaceBigIntegerOutput;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.catalyst.ResolvedCatalystEffect;
 import com.sorrowmist.useless.content.recipe.AdvancedAlloyFurnaceRecipe;
@@ -270,12 +271,30 @@ public final class AlloyFurnaceBigIntegerCrafting {
      * @param prototype     单次装配的原型（不是 ×count 的整批材料）
      * @param segmentBudget 本批允许产生的分段数（AIMD 控制器给出）
      */
+    /**
+     * 把「材料窗口」并入已有上限；<b>配置开关开启时完全跳过这道闸</b>（不留任何有限上限）。
+     *
+     * <p><b>为什么材料窗口可以被跳过</b>：它本质是一道<b>配平</b>闸（"每个线程一个 {@code Long} 窗口"），
+     * 而不是物理限制 —— 折叠语义下机器只消费一份原型，整批材料由调用方的 BigInteger 账本扣除。</p>
+     *
+     * <p><b>跳过它仍然安全</b>：{@code limit} 里已经含「产物交付能力」这道物理闸
+     * （AE2 存储接口单次只收 {@code long}，每 tick 能写回多少是有限的），
+     * 所以批次规模不会失控，只是不再受线程数制约。</p>
+     */
+    public static @NotNull BigInteger applyMaterialWindow(@NotNull BigInteger limit,
+                                                          @NotNull KeyCounter @NotNull [] prototype,
+                                                          int threads) {
+        return ConfigManager.isFurnaceAeUnlimitedBigintParallelism()
+                ? limit
+                : limit.min(maximumWindowedCount(prototype, threads));
+    }
+
     public static @NotNull BigInteger maximumCraftingPatternCount(@NotNull IPatternDetails pattern,
                                                                   @NotNull KeyCounter @NotNull [] prototype,
                                                                   int threads,
                                                                   long segmentBudget) {
-        BigInteger limit = maximumWindowedCount(prototype, threads)
-                .min(maximumSegmentedCount(pattern.getOutputs(), segmentBudget));
+        BigInteger limit = applyMaterialWindow(
+                maximumSegmentedCount(pattern.getOutputs(), segmentBudget), prototype, threads);
         return limit.signum() <= 0 ? BigInteger.ZERO : AlloyFurnaceTickBudget.applyScale(limit);
     }
 
@@ -307,8 +326,8 @@ public final class AlloyFurnaceBigIntegerCrafting {
         if (unitOutputs.isEmpty()) {
             return BigInteger.ZERO;
         }
-        BigInteger limit = maximumWindowedCount(prototype, threads)
-                .min(maximumSegmentedCount(unitOutputs, segmentBudget));
+        BigInteger limit = applyMaterialWindow(
+                maximumSegmentedCount(unitOutputs, segmentBudget), prototype, threads);
         BigInteger energyCap = maximumCountForEnergy(context, recipe);
         if (energyCap != null) {
             limit = limit.min(energyCap);

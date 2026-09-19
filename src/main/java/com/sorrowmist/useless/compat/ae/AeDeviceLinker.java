@@ -4,9 +4,9 @@ import appeng.api.AECapabilities;
 import appeng.api.networking.GridHelper;
 import appeng.api.networking.IGrid;
 import appeng.api.networking.IGridConnection;
-import appeng.api.networking.IGridMultiblock;
 import appeng.api.networking.IGridNode;
 import appeng.api.networking.IInWorldGridNodeHost;
+import appeng.blockentity.networking.ControllerBlockEntity;
 import appeng.blockentity.networking.WirelessAccessPointBlockEntity;
 import com.sorrowmist.useless.core.component.UComponents;
 import com.sorrowmist.useless.world.ae.AeConnectLinkSavedData;
@@ -26,10 +26,6 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.neoforged.fml.ModList;
 import org.jetbrains.annotations.Nullable;
-
-import java.util.Collections;
-import java.util.IdentityHashMap;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
 
@@ -146,46 +142,40 @@ public final class AeDeviceLinker {
     /**
      * 目标现在算不算「已经进了别的网」。
      *
-     * <p><b>不能直接看 {@code getConnections()} 是否为空</b>：cluster 型多方块（AE2 / 高级AE 的合成 CPU、
-     * 量子计算机、空间塔）的部件<b>本身</b>就带着节点连接（结构内部部件之间），所以一座完全孤立的多方块
-     * 也会「有连接」——这正是「无论是否已接入网络都提示已接入其它网络」的根因。</p>
+     * <p>判据只看「这张网是不是一张真正在用的网」，不看网格里有几个节点 ——
+     * <b>线缆与终端本身就是独立节点</b>（线缆的 owner 是 {@code CablePart}、终端是
+     * {@code AbstractTerminalPart}，都是部件而非方块实体），所以按「有别的节点就拒绝」会把
+     * 「目标身上挂了根线」也误判成「已接入别的网络」，且与供电状态无关。</p>
      *
-     * <p>改成看整张网：用 AE2 自己的 {@link IGridMultiblock} 服务取出「本节点所属结构的全部节点」，
-     * 网格里还存在不属于这个集合的节点，才算真的接进了别人的网（线缆、控制器、存储、别的机器……）。</p>
+     * <p>现行判据只有两条：① 网格里有控制器（<b>离线也算</b>，并进来会变成「多控制器冲突」把两张网一起搞瘫）；
+     * ② 整网已经通电（{@code isPowered()} 就是问网格有没有电）。其余一律允许并入，
+     * 目标身上的线缆 / 终端会一起进来 —— 那正是「连进来」的本意。</p>
+     *
+     * <p>历史坑：cluster 型多方块（AE2 / 高级AE 的合成 CPU、量子计算机）的部件之间天然带连接，
+     * 曾经因此误报过「已接入其它网络」；现在的判据不再看节点数量，这个问题顺带消失。</p>
      */
     private static NetworkState networkState(IGridNode machineNode) {
         IGrid grid;
-        Set<IGridNode> own;
         try {
             grid = machineNode.getGrid();
-            own = structureNodes(machineNode);
         } catch (Throwable notReady) {
             // 节点还没初始化完（getGrid 会抛 IllegalStateException），这一轮判断不了。
             return NetworkState.UNKNOWN;
         }
-        Object owner = machineNode.getOwner();
-        for (IGridNode other : grid.getNodes()) {
-            // 同一个方块实体自己的其它节点（有些机器不止一个节点）也算「自带」，不算别人。
-            if (other == machineNode || other.getOwner() == owner || own.contains(other)) {
-                continue;
-            }
+
+        // ① 目标那张网有控制器 ⇒ 一律拒绝（**离线的控制器也算**）：
+        //    AE2 一张网只允许一个控制器，并进来会变成「多控制器冲突」，两张网一起瘫。
+        if (grid.getMachineNodes(ControllerBlockEntity.class).iterator().hasNext()) {
             return NetworkState.ALREADY_NETWORKED;
         }
-        return NetworkState.STANDALONE;
-    }
 
-    /** 本体「自带」的节点：多方块结构返回整座结构的所有节点，普通机器就是它自己。 */
-    private static Set<IGridNode> structureNodes(IGridNode machineNode) {
-        Set<IGridNode> own = Collections.newSetFromMap(new IdentityHashMap<>());
-        own.add(machineNode);
-        IGridMultiblock multiblock = machineNode.getService(IGridMultiblock.class);
-        if (multiblock != null) {
-            Iterator<IGridNode> nodes = multiblock.getMultiblockNodes();
-            while (nodes.hasNext()) {
-                own.add(nodes.next());
-            }
+        // ② 整网已经通电、正在运行 ⇒ 当成一张真在工作的网，不并。
+        if (machineNode.isPowered()) {
+            return NetworkState.ALREADY_NETWORKED;
         }
-        return own;
+
+        // 其余情况（只是挂着线缆 / 终端 / 部件，且没通电）⇒ 可以并入。
+        return NetworkState.STANDALONE;
     }
 
     /** 静默解析访问点节点：没加载 / 方块不对 / 离线都只返回 null。 */
@@ -338,9 +328,9 @@ public final class AeDeviceLinker {
 
     /** 目标机器的网络归属判定结果。 */
     private enum NetworkState {
-        /** 孤立节点 / 孤立多方块：可以并入工具绑定的网络。 */
+        /** 没有控制器、也没通电（顶多挂着线缆 / 终端）：可以并入工具绑定的网络。 */
         STANDALONE,
-        /** 网格里已经有本结构之外的东西：拒绝，避免把两张网误并成一张。 */
+        /** 有控制器、或整网已经在跑：拒绝，避免把两张网误并成一张。 */
         ALREADY_NETWORKED,
         /** 节点尚未就绪，这一轮判断不了。 */
         UNKNOWN

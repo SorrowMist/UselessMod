@@ -747,7 +747,7 @@
   "tooltip.useless_mod.furnace_upgrade_effect": "§7第 10 階：§a能量容量與輸入速率§7提升至 long 上限",
   "tooltip.useless_mod.fast_break_plastic": "Shift + 右鍵以快速破壞塑膠方塊",
   "tooltip.useless_mod.ae_storage_priority_bind_hint": "§aShift + 右鍵§r ME 無線存取點進行綁定",
-  "tooltip.useless_mod.ae_network_connect_hint": "§9AE 連接模式§r下右鍵有 AE 節點的機器接入/再右鍵斷開，已連接的會顯示邊框",
+  "tooltip.useless_mod.ae_network_connect_hint": "§9AE 連接模式§r下右鍵有 AE 節點的機器接入/再右鍵斷開，已連接的會顯示邊框，且不受通道上限約束",
   "jei.useless_mod.catalyst_info": "催化劑並行數資訊",
   "jei.useless_mod.tooltip.amount": "數量: %s",
   "jei.useless_mod.tooltip.amount.mb": "數量: %s mB",

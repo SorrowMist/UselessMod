@@ -751,7 +751,7 @@
   "tooltip.useless_mod.furnace_upgrade_effect": "§7第10阶：§a能量容量与输入速率§7提升至 long 上限",
   "tooltip.useless_mod.fast_break_plastic": "Shift + 右键点击快速破坏塑料方块",
   "tooltip.useless_mod.ae_storage_priority_bind_hint": "§aShift + 右键§rME无线访问点进行绑定",
-  "tooltip.useless_mod.ae_network_connect_hint": "§9AE连接模式§r下右键有 AE 节点的机器接入/再右键断开，已连接的会显示边框",
+  "tooltip.useless_mod.ae_network_connect_hint": "§9AE连接模式§r下右键有 AE 节点的机器接入/再右键断开，已连接的会显示边框，且不受通道上限约束",
   "jei.useless_mod.catalyst_info": "催化剂与线圈信息",
   "jei.useless_mod.tooltip.amount": "数量: %s",
   "jei.useless_mod.tooltip.amount.mb": "数量: %s mB",

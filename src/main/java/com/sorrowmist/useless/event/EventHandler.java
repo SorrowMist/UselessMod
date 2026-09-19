@@ -5,6 +5,7 @@ import com.sorrowmist.useless.content.items.BeefMagnetHandler;
 import com.sorrowmist.useless.content.items.BeefTimeAcceleration;
 import com.sorrowmist.useless.content.items.EndlessBeafItem;
 import com.sorrowmist.useless.compat.ae.AeDeviceLinker;
+import com.sorrowmist.useless.compat.ae.AeLinkChannelBypass;
 import com.sorrowmist.useless.compat.constructionwand.ConstructionWandLogic;
 import com.sorrowmist.useless.content.recipe.AlloyFurnaceRecipeManager;
 import com.sorrowmist.useless.content.recipe.AlloyFurnaceRecipeCatalog;
@@ -614,6 +615,8 @@ public class EventHandler {
         BEEF_PROTECTED_PLAYERS.clear();
         BEEF_ADVANCED_STEALTH_PLAYERS.clear();
         GrassWandDropHandler.clearCache();
+        // 通道豁免索引里存的是网格节点引用，别把它们留到下一局。
+        AeLinkChannelBypass.clear();
     }
 
     /**

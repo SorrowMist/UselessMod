@@ -694,7 +694,7 @@
   "key.useless_mod.toggle_crop_harvest": "Toggle Quick Harvest",
   "tooltip.useless_mod.fast_break_plastic": "Shift + Right Click to quickly break plastic blocks",
   "tooltip.useless_mod.ae_storage_priority_bind_hint": "§aShift+Right-click§rME Wireless Access Point to bind",
-  "tooltip.useless_mod.ae_network_connect_hint": "In §9AE Connection Mode§r, right-click a machine with an AE node to toggle its link; linked machines are outlined",
+  "tooltip.useless_mod.ae_network_connect_hint": "In §9AE Connection Mode§r, right-click a machine with an AE node to toggle its link; linked machines are outlined and ignore channel limits",
   "tooltip.useless_mod.festive_affix": "5% chance to trigger loot explosion on kill",
   "tooltip.useless_mod.auto_collect": "Built-in magnet function",
   "tooltip.useless_mod.time_acceleration_mode": "Time Acceleration",

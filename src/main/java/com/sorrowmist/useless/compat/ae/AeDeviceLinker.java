@@ -295,18 +295,27 @@ public final class AeDeviceLinker {
 
     static boolean createLink(IGridNode accessNode, IGridNode machineNode) {
         if (hasConnection(accessNode, machineNode)) {
+            // 连接已经在了（自愈重跑 / 重复触发）：通道豁免索引也要补登记，别漏。
+            AeLinkChannelBypass.register(accessNode, machineNode);
             return true;
         }
         try {
             GridHelper.createConnection(accessNode, machineNode);
         } catch (IllegalStateException alreadyConnected) {
-            return hasConnection(accessNode, machineNode);
+            boolean connected = hasConnection(accessNode, machineNode);
+            if (connected) {
+                AeLinkChannelBypass.register(accessNode, machineNode);
+            }
+            return connected;
         }
+        AeLinkChannelBypass.register(accessNode, machineNode);
         return true;
     }
 
     /** 只拆我们自己建的非空间连接，绝不动世界内的线缆连接。 */
     static boolean destroyLink(IGridNode accessNode, IGridNode machineNode) {
+        // 先注销通道豁免，再拆连接：避免重算通道时还按「这条连接在」来豁免。
+        AeLinkChannelBypass.unregister(accessNode, machineNode);
         boolean destroyed = false;
         for (IGridConnection connection : List.copyOf(accessNode.getConnections())) {
             if (connection.isInWorld() || connection.getOtherSide(accessNode) != machineNode) {

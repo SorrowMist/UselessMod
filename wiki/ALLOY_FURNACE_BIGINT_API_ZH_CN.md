@@ -112,7 +112,7 @@ BigInteger accepted = capacity.accepted(); // 可能小于 requestedCount，也�
 | --- | --- |
 | 配方可用性 | 线圈档次是否够、所需模具是否就位（**仅万象样板**） |
 | 材料窗口 | 线程数 N ⇒ 本批最多吃下 N 份「每种材料各 `Long.MAX`」的量 |
-| 产物分段预算 | **单批最多约 131072 个 `Long.MAX` 分段**（与线程数无关）—— 防止超大批次交付要几十秒 |
+| 产物分段预算 | **由「回网时间预算 ÷ 实测单次插入成本」前馈算出**（不再有固定上限）—— 单批规模自动跟随真实交付能力 |
 | **能量** | `count × 单份能耗` 必须付得起（**仅万象样板**） |
 
 **AE2 合成样板只有「材料窗口 + 产物分段预算」两道闸**：它在虚拟 3×3 工作台上装配一次就折叠完，
@@ -335,12 +335,178 @@ public static BigInteger dispatch(IGrid grid, IPatternDetails pattern,
 其余可能压小容量的原因：线圈档次不够、缺模具中枢或模具、回网队列被背压占满、正在动态降频
 （用 `isThrottled()` 区分最后一种）。
 
+## 附：两条 bigint 调度路径的差异（实测对比笔记）
+
+本机的大数能力目前只实现了**数据能源（Data Energistics）**的调度 API
+（`BigIntegerCraftingProviderAdapter` 等，见 `integration/dataenergistics/`）。
+其它模组的 BigInteger 合成 CPU 走的是各自的通道，行为差异很大 —— 记录如下，供选型参考。
+
+### OmniSequence: Transfinite（`molecularmanipulator`）为什么快得多
+
+拆包对比后有三个机制性差异：
+
+| 机制 | 数据能源 Trinity | OmniSequence 超限算枢 |
+| --- | --- | --- |
+| **CPU 车道** | 每个 CPU 每 tick 派发一次 | **一个方块虚拟出多个 AE2 CPU**，自建 `dispatchLaneRotation` / `dispatchLaneAllowances` 轮转分配工作单元 ⇒ 同一 tick 内多次派发 |
+| **过载策略** | `MeasuredCraftingServerDispatchBudget(50ms, 1ms)` —— **测量真实 tick 时长，超过 50ms 就砍到 1ms/tick**，合成近乎停摆 | compat 窗口只设 45ms 目标 + 250µs 下限，**不做过载降速** |
+| **AE2 侧上限** | 常规 | `INFINITE_STORAGE` / `INFINITE_PARALLELISM = Long.MAX_VALUE`，永不受存储/并行度限制 |
+
+**结论**：服务端越卡，数据能源缩得越狠、OmniSequence 照跑。所以「超限算枢比三位一体快很多」主要不是算得快，
+而是**它不肯降速**，以及**一 tick 内派发更多次**。
+
+### 实测基线（2026-09-19，超限算枢 + 200ms 回网预算）
+
+**删除「单批段数天花板」常量前后的对比**（这是本模块第 8 次「固定上限变成隐藏瓶颈」）：
+
+| 指标 | 删天花板前 | 删天花板后 |
+| --- | --- | --- |
+| 单批最大 | 3.9999e+24 | **3.1999e+25**（8.0 倍） |
+| 吞吐 | 3.80e26 次/tick | **2.95e27 次/tick**（7.8 倍） |
+| `segmentBudget` | 恒等于 131072（上限） | **浮动 63k / 109k / 123k** ✅ 不再被常量钉住 |
+| 派发频率 | 832~893 批次/tick | 876~920 批次/tick |
+| 本机降频系数 | 1.000 | 1.000（实测 4.8~5.4ms / 45ms，仍有余量） |
+
+**真实单次插入成本 = `insertUs ÷ insertCalls` ≈ 2.6 µs/次**
+（此前记的 0.36µs 是**被逐段 `System.nanoTime()` 埋点污染的假数**，已修）。
+单 tick 27,110 次插入 ≈ 70ms。
+
+**当前剩余瓶颈（按优先级）**：
+1. **插入成本 2.6µs/次偏高** —— 单 tick 27k 次就是 70ms；
+2. **批量通道（claim）不可用 —— 但这<b>不是限制、也不是缺陷</b>**：
+   实测 `insertCalls ≈ deliveredChunks`（27111 vs 27110），说明产物走的是**正常的 AE2 存储插入路径**。
+   原因见下方「认领链路」—— claim 只对 neoecoae 的合成 CPU 生效；用其它 CPU 时它<b>正确地返回 0</b>，
+   产物照常经 `insertRaw`（= `storage.insert`）落网。**这是正常路径，不是降级**，
+   兼容层也没有因此限制任何东西（无 ECO 任务时扫描会 `ecoStates.isEmpty()` 早退，开销≈0）；
+
+3. `measuredInsertNanosPerChunk` 因「降档限 1%」的上升限速而估值偏低
+   （约 811ns vs 真实 2.6µs）⇒ 批次偏大。当前 `pendingChunks=0` 所以无害，
+   但若出现积压，应放宽上升限速。
+
+### 新增：落网前的「整批接收」通道（`claimOutputs`）
+
+这是**唯一能跳过逐段插入**的公开通道。CPU 适配器实现它即可直接收下整批产物，
+机器只把余额写回网络：
+
+```java
+// AlloyFurnaceBigIntegerCpuAdapter（新增，默认返回空 Map ⇒ 行为零变化）
+default @NotNull Map<AEKey, BigInteger> claimOutputs(
+        @NotNull AlloyFurnaceBigIntegerBatchContext context,
+        @NotNull List<AlloyFurnaceBigIntegerOutput> outputs) {
+    return Map.of();
+}
+```
+
+**调用时机**：产物写回网络**之前**，按键调用；返回量从待回网账本扣除，余额才逐段插入。
+
+**⚠️ 接收即接管**：收下的物品**不进 ME 网络**，只存在于你的账本 ⇒
+你必须负责其后续去向；**机器无法退还**（账本在返回时已扣减），批次被取消时已收部分由你自行处理。
+实现必须不抛异常。
+
+**触发条件**：只有当本批是通过 `admit(..., cpuBinding)` **绑定了适配器**、
+且整趟刷写绑定的都是同一个适配器时才会调用（多 CPU 混绑时退回逐段写回）。
+
+### 认领（claim）链路：认领量由 **neoecoae** 决定
+
+```
+GridOutputTarget.claim(key, amount)
+  → NeoEcoDynamicOutputCompat.claim(grid, key, amount)              本机兼容层
+  → DynamicPatternCpuStateManager.ecoCandidates(grid, itemId)        遍历 neoecoae 的 ECO CPU
+  → cn.dancingsnow.neoecoae 的 ECOCraftingOutputClaimSink.claimCraftingOutput(request)
+     → claimedAmount()                                               ★ 认领量在此决定
+```
+
+- `GridOutputTarget.supportsClaimHoisting()` = `ModList.get().isLoaded("neoecoae")` ——
+  **它只表示"模组已加载"，语义是「把认领扫描从每段一次提到每键一次」这个<b>优化</b>是否可用**，
+  与"有没有可认领的东西"无关。所以它返回 true 时不会限制任何东西。
+- **只有 crafter 是 neoecoae 的合成 CPU 时才找得到候选**；用其它 CPU（如超限算枢）时
+  `ecoCandidates` 为空 ⇒ `claim` **正确地**返回 0 ⇒ 产物走正常的 `insertRaw`（`storage.insert`）。
+- 也就是说：**这条路径上没有"该修而没修的 bug"**。逐段插入是 AE2 `long` 接口的固有代价，
+  想绕开它只能由 CPU 侧提供「插入前按 BigInteger 整批接收」的通道（neoecoae 的 claim 就是这种通道）。
+- **注意区分**：超限算枢的「直取 / direct return」是**另一套机制**（插入之后再反射借记本机账本），
+  **不能省掉插入**。二者名字相近但无关。
+
+**想减少逐段插入的三条路**：① 改用 neoecoae 的合成 CPU（认领链路才生效）；
+② 让第三方 CPU 把「直取」提到插入之前（真正跳过插入）；③ 降低本机插入成本。
+
+
+
+| 指标 | 实测值 | 备注 |
+| --- | --- | --- |
+| 派发频率 | **832~893 批次/tick** | 数据能源约 0.85 批次/tick ⇒ 高约 **1000 倍**（快的根本原因） |
+| 上报吞吐 | 1.52e28 / 40 tick = **3.8e26 次/tick** | |
+| 单批上限 | **3.9999e+24** | 正好等于超限算枢的 `outputWindow=4e24` |
+| 本机降频系数 | **1.000**（实测 5~14ms / 预算 45ms） | **本机限流未被触发** |
+| 积压 | `pendingChunks=0`、`oldestAgeTicks=0` | 零积压、零停顿 |
+| 直取开销 | `elapsedUs=22~27`（处理 2.25e24 物品） | 纯账本运算，几乎免费 |
+| 单段插入成本 | **0.36~0.45 µs/段** | |
+| 单 tick 插入量 | 最多 **241,235 段 = 87ms** | ⇒ 一个 tick ≥87ms ⇒ **TPS 约 11** |
+
+**⚠️ 代价**：配置的 200ms 回网预算使单 tick 插入耗时达 87ms，TPS 掉到约 11。
+且 `throttleScale≈0.52` 说明回网自身一 tick 就撑爆 50ms 统计窗口，下一 tick 预算被砍半。
+由于**本机降频系数是 1.000**（限流未被触发），**降低该配置不会损失吞吐**，但会显著改善 TPS。
+
+**⚠️ 待核对**：上报合成量 3.8e26/tick 对应产物分段约 1.77e8/tick，
+而实测交付仅约 2.4e5/tick —— **差约 700 倍**。需用 GUI 产出速率或网络物品实际增长核对
+（也可能是诊断日志被限流为每 20 tick 一条、采样不到真实平均）。
+
+### 可用的机会：原生 BigInteger 输出通道
+
+OmniSequence 还提供了一套**原生 BigInteger 通道**，产物可以一次交付：
+
+```java
+interface OmniBigIntegerOutputReceiver {
+    BigInteger transferOutput(IGrid, AEKey, BigInteger, Consumer<BigInteger>);
+}
+interface OmniBigIntegerBatchCallbacks {
+    void onOutputs(List<OmniBigIntegerOutput>);   // (键, BigInteger) 列表 —— 一次交付
+}
+interface OmniBigIntegerCraftingProvider extends ICraftingProvider {
+    BigInteger getMaximumBigIntegerCrafts(IPatternDetails, KeyCounter[], BigInteger);
+    boolean pushBigIntegerCraftingPattern(IPatternDetails, BigInteger, KeyCounter[]);
+    default boolean usesNativeBigIntegerBatch();
+}
+```
+
+**本机确实已经有对应的公开 API**（`com.sorrowmist.useless.api.crafting.bigint`：
+`AlloyFurnaceBigIntegerTarget` / `AlloyFurnaceBigIntegerBatch` / `AlloyFurnaceBigIntegerOutput` /
+`cpu.AlloyFurnaceBigIntegerCpuAdapter` 等），OmniSequence 就是通过它接入的 ——
+其 jar 内含 `integration/useless/UselessBigIntegerApiBridge`，日志会打
+`Registered UselessMod public BigInteger API bridge with same-tick direct return`。
+
+**但要分清两层，别混淆**：
+
+| 层 | 语义 | 是否绕开 AE2 的 `long` 上限 |
+| --- | --- | --- |
+| **公开 API 的 `onBatchOutputs(ctx, List<AlloyFurnaceBigIntegerOutput>)`** | 产物**已全部写回网络之后**，把精确 BigInteger 总数**通知**给 CPU 供其核账 | **不绕开** —— 产物仍逐段插入网络 |
+| **`UselessExactOutputReturn`（反射直取内部）** | 反射读取本机队列条目的账本字段并**直接借记**，把整批收进自己的 BigInteger 账本 | **绕开** —— 完全不经过 `IMEInventory.insert` |
+
+⇒ 后者才是「超限算枢快得多」的根本原因：**1e24 个物品一次交付，而不是 1e6 次分段插入**。
+物品此后留在 CPU 自己的账本里；等到需要暴露给 AE2 存储（玩家取出等）时 `long` 上限仍然适用，
+但那已不在合成热路径上。
+
+> ⚠️ **维护提醒：这 16 个名字是事实上的 ABI，改动会静默打断外部集成。**
+>
+> OmniSequence 的 `UselessExactOutputReturn$Layout` 用反射按**具体名字**读取本机内部。
+> 已逐个核对（当前代码全部存在）：
+>
+> | 类别 | 名字 |
+> | --- | --- |
+> | 字段 | `queuedCraftingOutputs`、`owner`、`pendingOutputAmount`、`queuedTick`、`cpuNotified`、`cpuContext`、`ledger`、`amounts` |
+> | 方法 | `getLevel`、`getAeGrid`、`resolveAeOutputTarget`、`supportsBigIntegerRecipeBatches`、`markChanged`、`cpuToken`、`notifyCpuBatchCompleted`、`addWork` |
+>
+> 任何一个改名，该层就会静默失效（日志出现 `UselessMod public BigInteger API is unavailable`，
+> 合成仍能跑，但会退回逐段写回网络，吞吐大幅下降）。
+> **重命名这些成员前必须先与 OmniSequence 侧对齐**；改完建议在游戏里确认日志出现
+> `Registered UselessMod public BigInteger API bridge with same-tick direct return`。
+
 ### 线圈并行上百万时，容量为什么也被限制？
 
-因为**产物分段预算与线程数无关**。分段的物理来源是「AE2 存储接口单次只能收 `long`」，所以
+因为**产物分段预算由交付能力前馈算出**。分段的物理来源是「AE2 存储接口单次只能收 `long`」，所以
 1e24 个物品必然要切成约 100 万段；而回网每 tick 只能插那么多次 —— **交付能力不随线程数增长**。
 
-所以单批被限制在约 131072 段（上限值刻意高于「时间预算 ÷ 单次插入成本」，让时间预算而不是它成为真正的限流者）。
+所以单批规模 ≈ `回网时间预算 ÷ 实测单次插入成本 ÷ 2`（半个 tick 的可交付量）。
+**该处曾长期设固定上限（16 → 1024 → 8192 → 20480 → 131072 → 524288），每次都被实测证明成了隐藏瓶颈**
+（`segmentBudget` 恒等于那个常量）；现已彻底删除固定上限，天花板只保留「本机线程数」这个物理量。
 若不限制，线圈并行上百万时单批会产生百万段，
 交付要几十秒，表现为「每个任务之间一段停顿」，而且首批过大之后按积压降频也追不上积压速度。
 

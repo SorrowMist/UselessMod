@@ -120,6 +120,16 @@ public final class AdvancedAlloyFurnaceAeManager {
     /** 实测插入成本的平滑系数（新样本占 1/8）。 */
     private static final double INSERT_COST_SMOOTHING = 0.125D;
     /**
+     * 预算探测的采样间隔（段）。
+     *
+     * <p><b>为什么不能逐段取时间</b>：{@code System.nanoTime()} 在 Windows 上单次约 100~150ns，
+     * 而一 tick 可能插入 24 万段 —— 逐段一对时间戳就是 <b>48 万次调用 ≈ 50~70ms</b>，
+     * 也就是<b>埋点本身比被测代码还贵</b>，日志里那个「insertUs=87ms」绝大部分其实是它。
+     * 每 {@code 256} 段采样一次后开销降到 1/256，预算判定精度损失可忽略（256 段 ≈ 0.1ms）。</p>
+     */
+    private static final long BUDGET_PROBE_INTERVAL_CHUNKS = 256L;
+
+    /**
      * 有效样本要求的最少交付段数。
      *
      * <p><b>为什么必须有这个门槛</b>：样本是 {@code 插入耗时 ÷ 交付段数}，而<b>每 tick 有固定开销</b>
@@ -163,8 +173,12 @@ public final class AdvancedAlloyFurnaceAeManager {
      *
      * <p>刻意用绝对值而不是「单批上限 × 倍数」：单批上限会随交付能力调整，
      * 若硬上限跟着放大，内存 / NBT 兜底就形同虚设。</p>
+     *
+     * <p>正常永远碰不到：单批规模由「时间预算 ÷ 实测插入成本」前馈给出，积压控制器把它维持在
+     * 「一两批在飞」。只有下游停摆（网络不可达 / CPU 不认领）时批次才会持续堆积 ——
+     * 那时拒收才是对的（产物没地方放）。</p>
      */
-    private static final long HARD_OUTPUT_CHUNK_BUDGET = 262_144L;
+    private static final long HARD_OUTPUT_CHUNK_BUDGET = 2_097_152L;
     /**
      * 每台机器每 tick 的产物回网时间预算（纳秒），由配置项
      * {@code advanced_alloy_furnace.ae_output_return_budget_millis} 给出。
@@ -732,10 +746,16 @@ public final class AdvancedAlloyFurnaceAeManager {
         return Math.max(1, this.owner.getMaxAETaskCount());
     }
 
-    /** 单批分段预算的<b>天花板</b>：线程数（保留「一份窗口一段」语义）与硬上限取小。 */
+    /**
+     * 单批分段预算的天花板 = 本机线程数。
+     *
+     * <p>这是<b>物理上限</b>（一份窗口最多产出一段），不是人为旋钮。原来还额外取了一个固定常量
+     * （先后是 20480 / 131072 / 524288）作天花板，但它与「时间预算」<b>重复</b>：
+     * 时间预算已限定每 tick 能交付多少，前馈公式又把它换算成段数，再叠一层常量只会变成隐藏瓶颈
+     * ——实测踩过两次（{@code segmentBudget} 恒等于那个常量）。<b>已删除该常量。</b></p>
+     */
     private long outputSegmentBudgetCap() {
-        return Math.max(1L, Math.min(this.owner.getMaxAETaskCount(),
-                AlloyFurnaceBigIntegerCrafting.MAX_OUTPUT_SEGMENT_BUDGET));
+        return Math.max(1L, this.owner.getMaxAETaskCount());
     }
 
     /**
@@ -806,9 +826,12 @@ public final class AdvancedAlloyFurnaceAeManager {
      * 前馈没有闭环就没有振荡，也不会卡死。</p>
      */
     public long outputSegmentBudget() {
-        long cap = outputSegmentBudgetCap();
-        long perTick = (long) (flushBudgetNanos() / Math.max(1.0D, this.measuredInsertNanosPerChunk));
-        return Math.max(1L, Math.min(cap, perTick / OUTPUT_BUDGET_SAFETY_DIVISOR));
+        // 用「实际生效的预算」（已按全局降频收窄）而不是配置原值：批次规模自动跟随真实交付能力，
+        // 降频时批次同步变小 —— 所以不再需要叠一层固定天花板常量。
+        long effectiveNanos = AlloyFurnaceTickBudget.scaledFlushBudget(flushBudgetNanos());
+        long perTick = (long) (effectiveNanos / Math.max(1.0D, this.measuredInsertNanosPerChunk));
+        return Math.max(1L, Math.min(outputSegmentBudgetCap(),
+                perTick / OUTPUT_BUDGET_SAFETY_DIVISOR));
     }
 
 
@@ -828,7 +851,8 @@ public final class AdvancedAlloyFurnaceAeManager {
      * <p>打开方式：日志配置里把 {@code com.sorrowmist.useless} 设为 {@code DEBUG}。</p>
      */
     private void logOutputReturnDiagnostics(long now, long flushStartedNanos, long flushBudgetNanos,
-                                            long insertWorkNanos, BigInteger deliveredTotal) {
+                                            long insertWorkNanos, long insertCalls,
+                                            BigInteger deliveredTotal) {
         if (deliveredTotal.signum() <= 0 || !LOGGER.isDebugEnabled()) {
             return;
         }
@@ -843,13 +867,14 @@ public final class AdvancedAlloyFurnaceAeManager {
         // （吞吐 ≈ 每 tick 可插入次数 × 每段物品数）。
         LOGGER.debug(
                 "Alloy furnace output return at {}: entries={}, pendingChunks={}, deliveredChunks={}, "
-                        + "spentUs={}, insertUs={}, budgetUs={}, segmentBudget={}, throttleScale={}",
+                        + "spentUs={}, insertUs={}, insertCalls={}, budgetUs={}, segmentBudget={}, throttleScale={}",
                 this.owner.getBlockPos(),
                 this.queuedCraftingOutputs.size(),
                 backlogChunks(this.pendingOutputAmount),
                 deliveredChunks,
                 spentNanos / 1_000L,
                 insertWorkNanos / 1_000L,
+                insertCalls,
                 flushBudgetNanos / 1_000L,
                 outputSegmentBudget(),
                 AlloyFurnaceTickBudget.scale());
@@ -1247,6 +1272,30 @@ public final class AdvancedAlloyFurnaceAeManager {
      * 回调必须隔离：第三方适配器抛异常绝不能影响机器的产物回网。
      * 记日志并吞掉，语义与 AE2 对供应器的容错一致。
      */
+    /**
+     * 调 {@link AlloyFurnaceBigIntegerCpuAdapter#claimOutputs}，把异常吞掉并记日志。
+     *
+     * <p>契约要求实现不抛异常（见接口 Javadoc）；真抛了也不能让回网中断 ——
+     * 那会让整台机器卡住。返回 {@link BigInteger#ZERO} 表示「这次没收」，退回逐段写回。</p>
+     */
+    private static @NotNull BigInteger claimOutputsFromCpu(@NotNull AlloyFurnaceBigIntegerCpuAdapter adapter,
+                                                           @NotNull AlloyFurnaceBigIntegerBatchContext context,
+                                                           @NotNull AEKey key,
+                                                           @NotNull BigInteger amount) {
+        try {
+            Map<AEKey, BigInteger> taken = adapter.claimOutputs(context,
+                    List.of(new AlloyFurnaceBigIntegerOutput(key, amount)));
+            if (taken == null) {
+                return BigInteger.ZERO;
+            }
+            BigInteger accepted = taken.get(key);
+            return accepted == null || accepted.signum() <= 0 ? BigInteger.ZERO : accepted;
+        } catch (RuntimeException exception) {
+            LOGGER.error("BigInteger crafting CPU adapter {} threw in claimOutputs", adapter.id(), exception);
+            return BigInteger.ZERO;
+        }
+    }
+
     private static void runCpuCallback(Runnable callback, ResourceLocation adapterId, String name) {
         try {
             callback.run();
@@ -1464,6 +1513,28 @@ public final class AdvancedAlloyFurnaceAeManager {
         //（N ≈ 6 千/tick @8ms 预算，≈ 7 万/tick @100ms 预算）。
         final boolean hoistClaim = target.supportsClaimHoisting();
 
+        // 落网前的整批接收机会（见 AlloyFurnaceBigIntegerCpuAdapter#claimOutputs）：
+        // 这是唯一能跳过逐段插入的通道 —— 愿意整批收下的 CPU 直接把量接走，我们只把余额写回网络。
+        // 只在「整趟绑定的都是同一个适配器」时才给：多 CPU 混绑同一台机器时无法安全归因，退回逐段写回。
+        AlloyFurnaceBigIntegerCpuAdapter handoverAdapter = null;
+        AlloyFurnaceBigIntegerBatchContext handoverContext = null;
+        ResourceLocation sharedAdapterId = null;
+        for (PendingCraftingOutput pending : flushable) {
+            ResourceLocation id = pending.cpuAdapterId;
+            if (id == null) {
+                continue;
+            }
+            if (sharedAdapterId == null) {
+                sharedAdapterId = id;
+                handoverAdapter = AlloyFurnaceBigIntegerCpuAdapters.find(id).orElse(null);
+                handoverContext = pending.cpuContext;
+            } else if (!sharedAdapterId.equals(id)) {
+                handoverAdapter = null;
+                handoverContext = null;
+                break;
+            }
+        }
+
         // 4) 逐键投递。offer 取 min(余额, Long.MAX_VALUE)：存储 API 单次只有 long。
         long flushStarted = System.nanoTime();
         // 预算按全局系数动态收窄（下限 250µs）：回网预算是每台机器的，
@@ -1475,6 +1546,8 @@ public final class AdvancedAlloyFurnaceAeManager {
         // 插入耗时先本地累计，整趟结束再上报一次：addWork 是 synchronized，
         // 而一 tick 可能插数千次，逐段加锁本身就是可观开销。
         long insertWorkNanos = 0L;
+        /** 真实插入调用次数（与「被直取走的段数」区分开，用于估算单段成本）。 */
+        long insertCalls = 0L;
         for (var entry : total.snapshotEntries()) {
             if (!force && insertWorkNanos >= flushBudgetNanos) {
                 break; // 预算已用尽：本 tick 到此为止（首个键因累计为 0 必定会被尝试）
@@ -1492,23 +1565,38 @@ public final class AdvancedAlloyFurnaceAeManager {
                     remaining = remaining.subtract(BigInteger.valueOf(claimed));
                 }
             }
+            // 整批接收：把本键的**全部**余额交给绑定的 CPU 适配器（不切段）。
+            // 收下的量从待回网账本扣除，只有余额才走下面的逐段插入。
+            if (handoverAdapter != null && handoverContext != null && remaining.signum() > 0) {
+                BigInteger accepted = claimOutputsFromCpu(handoverAdapter, handoverContext, key, remaining);
+                if (accepted.signum() > 0) {
+                    deliveredAny = true;
+                    emptyKeyProbes = 0;
+                    remaining = remaining.subtract(accepted.min(remaining));
+                }
+            }
             // 不设段数上限：**只由时间预算决定何时停**。
             // 直接拿累计插入耗时当预算信号，这样每段只需一对 nanoTime（原来还要额外的预算检查）。
             // 循环条件在插入前判定，所以第一个分段总会尝试（预算为 0 时也进得去）。
+            long chunksSinceProbe = 0L;
             while (remaining.signum() > 0 && (force || insertWorkNanos < flushBudgetNanos)) {
                 BigInteger offer = remaining.min(MAX_OUTPUT_CHUNK);
                 long offerLong = offer.longValueExact(); // ≤ Long.MAX_VALUE，安全
-                long insertStarted = System.nanoTime();
                 long inserted = clampInserted(
                         hoistClaim ? target.insertRaw(key, offerLong) : target.insert(key, offerLong),
                         offerLong);
-                insertWorkNanos += System.nanoTime() - insertStarted;
+                insertCalls++;
                 if (inserted <= 0L) {
                     break; // 本键被拒收：本轮不再尝试它
                 }
                 deliveredAny = true;
                 emptyKeyProbes = 0;
                 remaining = remaining.subtract(BigInteger.valueOf(inserted));
+                // 按间隔采样预算信号（见 BUDGET_PROBE_INTERVAL_CHUNKS：逐段取时间比插入本身还贵）。
+                if (++chunksSinceProbe >= BUDGET_PROBE_INTERVAL_CHUNKS) {
+                    chunksSinceProbe = 0L;
+                    insertWorkNanos = System.nanoTime() - flushStarted;
+                }
                 if (inserted < offerLong) {
                     break; // 只吸收了部分 ⇒ 存储已饱和，继续喂只会空转
                 }
@@ -1528,14 +1616,14 @@ public final class AdvancedAlloyFurnaceAeManager {
             }
         }
 
-        // 整趟的插入耗时一次性上报（见上面 insertWorkNanos 的说明）。
+        // 整趟墙钟即插入耗时，收尾取一次并上报。
+        insertWorkNanos = System.nanoTime() - flushStarted;
         AlloyFurnaceTickBudget.addWork(insertWorkNanos);
 
         // 更新实测单段插入成本：单批分段预算由它前馈算出。
         // 门槛见 MIN_INSERT_SAMPLE_CHUNKS：样本太小时固定开销会主导，会把预算砸下去。
-        long deliveredChunksNow = backlogChunks(deliveredTotal);
-        if (deliveredChunksNow >= MIN_INSERT_SAMPLE_CHUNKS && insertWorkNanos > 0L) {
-            double sample = (double) insertWorkNanos / (double) deliveredChunksNow;
+        if (insertCalls >= MIN_INSERT_SAMPLE_CHUNKS && insertWorkNanos > 0L) {
+            double sample = (double) insertWorkNanos / (double) insertCalls;
             double previous = this.measuredInsertNanosPerChunk;
             double updated = this.insertCostMeasured
                     // 首个有效样本直接采纳：否则要从初始估计慢慢爬，白等几十批。
@@ -1555,7 +1643,8 @@ public final class AdvancedAlloyFurnaceAeManager {
             // 同步积压总量（精确减）：它是 AIMD 控制器的度量来源。
             addPendingOutputAmount(deliveredTotal.negate());
         }
-        logOutputReturnDiagnostics(now, flushStarted, flushBudgetNanos, insertWorkNanos, deliveredTotal);
+        logOutputReturnDiagnostics(now, flushStarted, flushBudgetNanos, insertWorkNanos, insertCalls,
+                deliveredTotal);
         var iterator = this.queuedCraftingOutputs.iterator();
         while (iterator.hasNext()) {
             PendingCraftingOutput pending = iterator.next();

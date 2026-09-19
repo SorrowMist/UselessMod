@@ -63,4 +63,42 @@ public interface AlloyFurnaceBigIntegerCpuAdapter {
      */
     void onBatchFinished(@NotNull AlloyFurnaceBigIntegerBatchContext context,
                          @NotNull AlloyFurnaceBigIntegerBatchResult result);
+
+    /**
+     * 产物<b>落网之前</b>的「整批接收」机会 —— 这是唯一能<b>跳过逐段插入</b>的通道。
+     *
+     * <h2>为什么需要它</h2>
+     * <p>AE2 的存储接口单次只收 {@code long}（{@code IMEInventory#insert(AEKey, long, Actionable)}），
+     * 所以本机默认要把产物按 {@code Long.MAX_VALUE} 切段、<b>逐段</b>写回网络
+     * （实测约 2.6µs/段，一 tick 两万多段就是几十毫秒）。若你愿意直接收下整批，
+     * 这段插入就完全不需要发生。</p>
+     *
+     * <h2>调用时机与语义</h2>
+     * <ul>
+     *   <li>在产物写回网络<b>之前</b>、按<b>键</b>调用；返回你收下的量。</li>
+     *   <li>机器会把收下的量从待回网账本中<b>扣除</b>，只把余额写回网络。</li>
+     *   <li>默认返回空 Map ⇒ 行为与不实现本方法<b>完全一致</b>（全部写回网络）。</li>
+     * </ul>
+     *
+     * <h2>⚠️ 接收即接管：责任随之转移</h2>
+     * <p><b>收下的物品不会进入 ME 网络</b>，只存在于你自己的账本里。因此：</p>
+     * <ul>
+     *   <li>你必须负责它们后续的去向（自行落网、或作为中间产物消耗）；</li>
+     *   <li><b>机器无法退还</b> —— 账本在调用返回时已被扣减。若批次随后被取消
+     *       （{@link #onBatchFinished} 收到 {@code CANCELLED}），已收下的部分需由你自行处理；</li>
+     *   <li>实现必须<b>不抛异常</b>；抛出的异常会被记录并吞掉，但可能造成产物归属不一致。</li>
+     * </ul>
+     *
+     * <p>出于安全考虑，本机只会在「整趟刷写绑定的都是同一个适配器」时调用本方法；
+     * 多 CPU 混绑同一台机器时不会调用（退回逐段写回）。</p>
+     *
+     * @param context 本批上下文（与其它回调同一个）
+     * @param outputs 本次<b>准备写回网络</b>的产物；可只收其中一部分（返回量 ≤ 这里的量）
+     * @return 你实际收下的量，按 key 计；未列出的 key 视为不收
+     */
+    default @NotNull java.util.Map<appeng.api.stacks.AEKey, java.math.BigInteger> claimOutputs(
+            @NotNull AlloyFurnaceBigIntegerBatchContext context,
+            @NotNull java.util.List<AlloyFurnaceBigIntegerOutput> outputs) {
+        return java.util.Map.of();
+    }
 }

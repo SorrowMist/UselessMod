@@ -172,27 +172,6 @@ public final class AlloyFurnaceBigIntegerCrafting {
     }
 
     /**
-     * 单批产物的分段预算<b>上限</b>（与线程数无关）。
-     *
-     * <p><b>为什么必须有上限</b>：分段预算原本按「一份窗口一段」设计，于是等于线程数。但
-     * <b>交付能力与线程数无关</b> —— 回网每 tick 只能插那么多次（由
-     * {@code AdvancedAlloyFurnaceAeManager} 的每 tick 时间预算决定）。线程数上百万时，
-     * 单批会产生<b>百万段</b>，交付要几十秒，表现为「每个任务之间一段停顿」。</p>
-     *
-     * <p><b>实际生效的预算由 AIMD 控制器动态给出</b>（见
-     * {@code AdvancedAlloyFurnaceAeManager.outputSegmentBudget()}），本常量只是它的天花板：
-     * 控制器从 {@code 上限/100} 起步、无积压时每 tick ×10 探到上限、遇积压则减半、
-     * 之后线性回升。所以「一批多大」是<b>实测收敛</b>出来的，不靠猜。</p>
-     *
-     * <p><b>取值依据（实测）</b>：插入一次分段的实测成本约 <b>0.65 微秒</b>
-     * （见诊断日志的 {@code insertUs / deliveredChunks}）。于是每 tick 可交付量 ≈
-     * {@code 回网时间预算 ÷ 0.65µs} —— 默认 8ms 预算约 12,000 段，配置到 50ms 约 77,000 段。
-     * 本值必须<b>高于</b>这个量，否则就会像原先的 20480 那样「时间预算只用掉三成就被卡住」。
-     * 取 131072 是给 50ms 预算留一倍余量，让<b>时间预算</b>而不是本值成为真正的限流者。</p>
-     */
-    public static final long MAX_OUTPUT_SEGMENT_BUDGET = 131_072L;
-
-    /**
      * 「产物分段」上限：由「分段预算」反推能安全承载的推送次数。
      *
      * <p>产物按 {@code CraftingAeAmountAccumulator#segments()} 切成 ≤ long 的段入队，段数随 count

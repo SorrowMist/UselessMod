@@ -81,7 +81,14 @@ public final class OmniversalMoldHubBlockEntity extends BlockEntity implements M
     public void bindExternalInventory(@Nullable ExternalInventoryReference requested,
                                       @Nullable CompoundTag legacyInventory,
                                       HolderLookup.Provider registries) {
-        if (externalInventoryLoaded || level == null || level.isClientSide) return;
+        if (level == null || level.isClientSide) return;
+        if (externalInventoryLoaded) {
+            // 放置方块时 vanilla 会先调 clearRemoved()、后调 setPlacedBy()，前者可能在物品上的引用
+            // 还没落到 BE 组件里时就抢绑了一个临时占位。这里必须让物品带回来的引用顶掉它，
+            // 否则原数据永远不被加载（拆掉重放后内容物"消失"）。
+            if (requested == null || requested.equals(inventoryReference)) return;
+            ExternalInventoryStore.release(level, worldPosition, inventoryReference);
+        }
         inventoryReference = ExternalInventoryStore.bindAt(
                 level, ExternalInventoryKind.MOLD_HUB, requested, worldPosition,
                 molds, legacyInventory, registries);
@@ -246,7 +253,11 @@ public final class OmniversalMoldHubBlockEntity extends BlockEntity implements M
     public void clearRemoved() {
         super.clearRemoved();
         unloading = false;
-        ensureExternalInventory();
+        // 这里**不要**调 ensureExternalInventory()：放置方块时 vanilla 的调用顺序是
+        // Level.setBlock → clearRemoved() → updateBlockEntityComponents → setPlacedBy()，
+        // 本方法执行时 BE 组件还是空的（物品上的引用要等 updateBlockEntityComponents 才搬进来），
+        // 提前 bindAt(null) 会抢一个空 UUID 并置 externalInventoryLoaded，让 setPlacedBy 的
+        // adopt 早退 —— 结果就是拆掉重放后内容物丢失。绑定交给 setPlacedBy / onLoad 即可。
     }
 
     @Override

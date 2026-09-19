@@ -1,6 +1,8 @@
 package com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae;
 
 import com.sorrowmist.useless.core.config.ConfigManager;
+import net.minecraft.server.MinecraftServer;
+import net.neoforged.neoforge.server.ServerLifecycleHooks;
 
 import java.math.BigInteger;
 
@@ -26,6 +28,34 @@ public final class AlloyFurnaceTickBudget {
     private static final long GLOBAL_BUDGET_MULTIPLIER = 2L;
     /** 全局预算下限：即使配置很小也不低于此值（保持原有量级）。 */
     private static final long MIN_GLOBAL_BUDGET_NANOS = 10_000_000L;
+    /**
+     * 一个满速服务器 tick 的时长（20 TPS）。统计窗口本来就按一个 tick 折算，
+     * 所以「每 tick 花多少」与「每窗口花多少」是同一个量。
+     */
+    private static final long NOMINAL_TICK_NANOS = 50_000_000L;
+    /**
+     * 整套机器 + 其它负载一起，允许用到的一个满速 tick 的比例。
+     *
+     * <p><b>为什么必须有这条闸</b>：本预算被两个方向同时用来定尺 —— 回网路径按它收窄
+     * 「本 tick 愿意花的时间」，准入路径按 {@code perTick ÷ OUTPUT_BUDGET_SAFETY_DIVISOR}
+     * 收窄「单批规模」。于是：</p>
+     *
+     * <ul>
+     *   <li><b>单批实际耗时 ≈ 回网预算 ÷ 2</b>；</li>
+     *   <li><b>降频阈值 = 回网预算 × 2</b>。</li>
+     * </ul>
+     *
+     * <p>两者恒差 4 倍 ⇒ 单机（乃至 4 台）满载时阈值在结构上不可能被触及，
+     * {@link #scale()} 永远是 1.0，这条闸形同虚设。</p>
+     *
+     * <p><b>实测印证</b>：回网预算配 100ms 时，回网每 tick 稳定吃掉 <b>50ms</b>（等于整条 tick），
+     * 而 {@code throttleScale} 仍是 1.0，服务器掉到 17.4 TPS。</p>
+     *
+     * <p><b>它没有直接乘一个固定 tick 时长</b>：固定值会误判 —— 实测这台服务器其它负载只有
+     * ~7.5ms，固定 30ms 的闸会把回网预算压在 ×3.9 吞吐上，而实际还能再榨 2.5 倍。
+     * 所以按<b>真实空闲时间</b>算，见 {@link #freeTickAllowanceNanos()}。</p>
+     */
+    private static final double MAX_TICK_FRACTION = 0.9D;
 
     /**
      * 每窗口（{@link #WINDOW_NANOS}）愿意花在这套机器合成上的时间。
@@ -36,14 +66,45 @@ public final class AlloyFurnaceTickBudget {
      * 折算到 50ms 窗口约 50ms ⇒ {@code scale = 10/50 = 0.2} ⇒ 实际只剩 4ms，<b>配置文件形同虚设</b>。</p>
      *
      * <p>现在按配置推导：全局 = 每台机器回网预算 × {@link #GLOBAL_BUDGET_MULTIPLIER}，
-     * 下限 {@link #MIN_GLOBAL_BUDGET_NANOS}。这样配置就是唯一真相来源，同时仍保留
-     * 「多台机器总耗时共同把降频压下去」的全局保护。</p>
+     * 下限 {@link #MIN_GLOBAL_BUDGET_NANOS}，<b>再夹到真实空闲 tick 时间</b>
+     * （{@link #freeTickAllowanceNanos()}）。这样配置仍是主要真相来源，同时仍保留
+     * 「多台机器总耗时共同把降频压下去」的全局保护，并且不允许「把回网预算配大」
+     * 变成「允许抢整条 tick」—— 见 {@link #MAX_TICK_FRACTION}。</p>
      */
     private static long budgetNanos() {
         long perMachine = ConfigManager.getAdvancedAlloyFurnaceAeOutputReturnBudgetMillis() * 1_000_000L;
         long derived = perMachine > Long.MAX_VALUE / GLOBAL_BUDGET_MULTIPLIER
                 ? Long.MAX_VALUE : perMachine * GLOBAL_BUDGET_MULTIPLIER;
-        return Math.max(MIN_GLOBAL_BUDGET_NANOS, derived);
+        return Math.max(MIN_GLOBAL_BUDGET_NANOS, Math.min(derived, freeTickAllowanceNanos()));
+    }
+
+    /**
+     * 按<b>真实空闲 tick 时间</b>算出本套机器还能吃多少。
+     *
+     * <p>公式：{@code 目标占用(MAX_TICK_FRACTION × 一个满速 tick) − 其它负载耗时}。</p>
+     *
+     * <p><b>为什么要扣掉「我们自己的耗时」</b>：{@code getCurrentSmoothedTickTime()} 量的是
+     * 整个服务器每 tick 的<i>工作</i>时间（不含 tick 循环的 sleep），它<b>已经包含</b>我们这套机器
+     * 自己的花费。若直接拿它当「其它负载」，就会形成自反馈 —— 我们花得越多、空闲越少、
+     * 预算越紧，最后把自己掐到接近零。所以必须减掉 {@link #spentMillis()} 才是真正的「别人」。</p>
+     *
+     * <p>两个量的平滑窗口不同（服务器是 ~100 tick，我们是 ~1 tick），所以这是一个粗估；
+     * 外面还套着 {@link #MIN_GLOBAL_BUDGET_NANOS} 下限与配置推导的上限兜底，
+     * 估算偏了只会让吞吐略保守或略激进，不会失控。</p>
+     *
+     * <p>服务器不可用（未启动 / 客户端）时退回 {@code MAX_TICK_FRACTION × 一个 tick}，
+     * 与旧行为一致。</p>
+     */
+    private static long freeTickAllowanceNanos() {
+        long target = (long) (NOMINAL_TICK_NANOS * MAX_TICK_FRACTION);
+        MinecraftServer server = ServerLifecycleHooks.getCurrentServer();
+        if (server == null) {
+            return target;
+        }
+        long serverWork = (long) (server.getCurrentSmoothedTickTime() * 1_000_000.0F);
+        long ourWork = (long) (spentMillis() * 1_000_000.0D);
+        long otherWork = Math.max(0L, serverWork - ourWork);
+        return Math.max(0L, target - otherWork);
     }
     /** 平滑系数：新窗口实测占 1/4，兼顾响应与抗抖。 */
     private static final double SMOOTHING = 0.25D;

@@ -24,4 +24,40 @@ public interface CraftingAeOutputTarget {
      * @return 实际写入量，恒 ∈ [0, amount]
      */
     long insert(@NotNull AEKey key, long amount);
+
+    /**
+     * 实现是否支持把「兼容层认领」提到逐段插入之前（{@link #claim} + {@link #insertRaw}）。
+     *
+     * <p>默认 {@code false} ⇒ 调用方继续只用 {@link #insert}，行为与拆分前完全一致。
+     * 只有返回 {@code true} 时，调用方才可以用「先 {@link #claim} 一次整键总量、再逐段
+     * {@link #insertRaw}」的组合替代逐段 {@link #insert} —— 省下 N-1 次认领调用。</p>
+     */
+    default boolean supportsClaimHoisting() {
+        return false;
+    }
+
+    /**
+     * 只做「兼容层认领」（neoecoae 的动态产物认领），不写 ME 存储。
+     *
+     * <p><b>只应在 {@link #supportsClaimHoisting()} 为 true 时调用</b>，且每个键在一次刷写 pass 里
+     * 只调用一次，传入该键本趟的<b>全部</b>待投递量（不低于 {@code Long.MAX_VALUE} 即可）。
+     * 认领量由兼容层自己的待满足需求封顶，与传入量无关，所以提前到循环外不改变结果。</p>
+     *
+     * @return 被兼容层认领的量，恒 ∈ [0, totalAmount]
+     */
+    default long claim(@NotNull AEKey key, long totalAmount) {
+        return 0L;
+    }
+
+    /**
+     * 只写 ME 存储，不做兼容层认领。
+     *
+     * <p>默认实现退回 {@link #insert}：对没有兼容层认领的实现（{@link #claim} 恒返回 0）
+     * 语义完全相同。</p>
+     *
+     * @return 实际写入量，恒 ∈ [0, amount]
+     */
+    default long insertRaw(@NotNull AEKey key, long amount) {
+        return insert(key, amount);
+    }
 }

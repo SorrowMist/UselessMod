@@ -26,6 +26,7 @@ import com.sorrowmist.useless.content.blocks.multiblock.UselessCoilBlock;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.AdvancedAlloyFurnaceAeManager;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.AlloyFurnaceAeHost;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.CraftingAeOutputTarget;
+import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.GridOutputTarget;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.CraftingTaskContext;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.OmniversalBigIntegerTarget;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.OmniversalPatternDetails;
@@ -733,21 +734,10 @@ public final class MultiblockAlloyFurnaceCoreBlockEntity extends BlockEntity imp
         }
         MEStorage storage = access.storage();
         IActionSource source = access.source();
-        boolean neoecoae = ModList.get().isLoaded("neoecoae");
         // 网格也一并解析一次（getAeGrid() 内部又是一次装配体查询）。
-        IGrid grid = getAeGrid();
-        return (key, amount) -> {
-            if (key == null || amount <= 0L) {
-                return 0L;
-            }
-            long claimed = neoecoae ? NeoEcoDynamicOutputCompat.claim(grid, key, amount) : 0L;
-            long accepted = Math.min(amount, claimed);
-            long remaining = amount - accepted;
-            if (remaining <= 0L) {
-                return amount;
-            }
-            return accepted + storage.insert(key, remaining, Actionable.MODULATE, source);
-        };
+        // 返回的 GridOutputTarget 支持「认领提升」：刷写 pass 会把 neoecoae 的逐段认领
+        // 提到逐键一次（见 CraftingAeOutputTarget#supportsClaimHoisting）。
+        return new GridOutputTarget(getAeGrid(), storage, source);
     }
 
     @Nullable

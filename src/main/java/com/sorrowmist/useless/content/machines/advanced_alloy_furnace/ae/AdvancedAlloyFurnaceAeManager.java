@@ -1459,6 +1459,10 @@ public final class AdvancedAlloyFurnaceAeManager {
         if (target == null) {
             return;
         }
+        // 认领提升：见 CraftingAeOutputTarget#supportsClaimHoisting —— 把 neoecoae 兼容层的认领
+        // 从「每段一次」提到「每键一次」，省下 N-1 次 synchronized + 集合分配
+        //（N ≈ 6 千/tick @8ms 预算，≈ 7 万/tick @100ms 预算）。
+        final boolean hoistClaim = target.supportsClaimHoisting();
 
         // 4) 逐键投递。offer 取 min(余额, Long.MAX_VALUE)：存储 API 单次只有 long。
         long flushStarted = System.nanoTime();
@@ -1477,6 +1481,17 @@ public final class AdvancedAlloyFurnaceAeManager {
             }
             AEKey key = entry.getKey();
             BigInteger remaining = entry.getValue();
+            // 认领提升：按整键总量认领一次（见上方 hoistClaim）。
+            // 认领量由兼容层自己的待满足需求封顶、与传入量无关，所以与「逐段各认领一次」结果完全相同。
+            if (hoistClaim) {
+                long offerWhole = remaining.min(MAX_OUTPUT_CHUNK).longValueExact();
+                long claimed = clampInserted(target.claim(key, offerWhole), offerWhole);
+                if (claimed > 0L) {
+                    deliveredAny = true;
+                    emptyKeyProbes = 0;
+                    remaining = remaining.subtract(BigInteger.valueOf(claimed));
+                }
+            }
             // 不设段数上限：**只由时间预算决定何时停**。
             // 直接拿累计插入耗时当预算信号，这样每段只需一对 nanoTime（原来还要额外的预算检查）。
             // 循环条件在插入前判定，所以第一个分段总会尝试（预算为 0 时也进得去）。
@@ -1484,7 +1499,9 @@ public final class AdvancedAlloyFurnaceAeManager {
                 BigInteger offer = remaining.min(MAX_OUTPUT_CHUNK);
                 long offerLong = offer.longValueExact(); // ≤ Long.MAX_VALUE，安全
                 long insertStarted = System.nanoTime();
-                long inserted = clampInserted(target.insert(key, offerLong), offerLong);
+                long inserted = clampInserted(
+                        hoistClaim ? target.insertRaw(key, offerLong) : target.insert(key, offerLong),
+                        offerLong);
                 insertWorkNanos += System.nanoTime() - insertStarted;
                 if (inserted <= 0L) {
                     break; // 本键被拒收：本轮不再尝试它

@@ -12,9 +12,8 @@
  *   <li><b>原生 bigint 路径</b>（本 API）：一次派发就能交付<b>超过 long</b> 的批次。</li>
  * </ol>
  *
- * <p>数据能源（Data Energistics）3.3.0 的 Trinity 数据核心走的是第 2 条，但它依赖自己那套
- * {@code BigIntegerCraftingProviderAdapter}。本 API 把这套能力做成<b>本模组自己的公开契约</b>，
- * 让任意第三方 CPU 不必依赖数据能源也能做 bigint 发配。</p>
+ * <p>本 API 把第 2 条做成<b>本模组自己的公开契约</b>：任意第三方合成 CPU 只要实现一个适配器接口，
+ * 就能做 bigint 发配，<b>不需要依赖任何第三方调度框架</b>，也不需要往 AE2 的 CPU 逻辑里写 mixin。</p>
  *
  * <h2>包结构</h2>
  *
@@ -50,10 +49,10 @@
  *       提交失败时要回滚。详见 {@link com.sorrowmist.useless.api.crafting.bigint.AlloyFurnaceBigIntegerBatch}。</li>
  *   <li><b>一次提交只能用一个凭据一次</b>。凭据是一次性的，不要复用、不要并发提交。</li>
  *   <li><b>产物会切段写回 ME 网络</b>。因为 AE2 存储接口单次最多 {@code long}，超出部分按
- *       {@code Long.MAX_VALUE} 切段、逐 tick 写入；切段粒度与数据能源自己的约定一致。
+ *       {@code Long.MAX_VALUE} 切段、逐 tick 写入。
  *       若你在 CPU 侧注册了适配器，还会额外收到<b>完整</b>的 BigInteger 产物回执。</li>
- *   <li><b>容量会被动态降频收窄</b>。本模组对每条 bigint 路径都有「每 tick 时间预算」的降频
- *       （思路仿数据能源的提交预算），实测耗时超预算时后续批次容量按比例收窄。用
+ *   <li><b>容量会被动态降频收窄</b>。本模组对每条 bigint 路径都有「每 tick 时间预算」的降频，
+ *       实测耗时超预算时后续批次容量按比例收窄。用
  *       {@link com.sorrowmist.useless.api.crafting.bigint.AlloyFurnaceBigIntegerTarget#isThrottled()}
  *       可以区分「机器能力就这么多」与「机器正忙」，从而主动延后非紧急批次。
  *       降频不会把容量压到 0（完全无容量会引发调度侧空转），要不要停手由你决定。</li>

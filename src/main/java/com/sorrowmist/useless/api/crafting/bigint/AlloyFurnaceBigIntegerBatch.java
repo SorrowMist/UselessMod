@@ -17,9 +17,8 @@ import java.math.BigInteger;
  *       {@link IllegalArgumentException}。</li>
  *   <li><b>我们只消费手里那一份原型</b>。{@code admit} 传入的原型是<b>单次推送</b>的材料，
  *       不是整批的 {@code count} 倍。整批里剩下的 {@code count - 1} 份材料由
- *       <b>调用方自己的 BigInteger 账本</b>负责扣除（数据能源的 Trinity 数据核心就是这么做的：
- *       它用 {@code TrinityExactInputTransaction} 扣账，并在我们提交失败时回滚）。
- *       <b>绝不要把 count 乘进原型</b>。</li>
+ *       <b>调用方自己的 BigInteger 账本</b>负责扣除，并在我们提交失败时回滚。
+ *       这个账本怎么实现由调用方决定。<b>绝不要把 count 乘进原型</b>。</li>
  *   <li><b>提交失败不代表材料丢失</b>：{@link #commit} 返回 {@code false} 时我们不会清空原型，
  *       调用方应据此回滚它自己的那 {@code count - 1} 份扣账，并稍后重试或改走别的供应器。</li>
  *   <li><b>提交返回 true 即转移所有权</b>：此后原型里的材料归本机所有（我们会清空它），

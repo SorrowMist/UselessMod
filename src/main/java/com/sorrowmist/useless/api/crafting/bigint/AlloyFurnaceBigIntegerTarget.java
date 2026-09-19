@@ -29,7 +29,7 @@ public interface AlloyFurnaceBigIntegerTarget {
      * @return provider 无关的<b>物理机器身份</b>，格式 {@code 维度@x,y,z}。
      *
      * <p>同一台物理机器无论从哪个 provider 暴露，都必须给出同一个字符串，调用方据此避免超卖
-     * 同一台机器。本模组内部的数据能源适配器用的是同一个公式，所以两条入口认的是同一台机器。</p>
+     * 同一台机器。本模组的所有入口都用同一个公式，所以它们认的是同一台机器。</p>
      */
     @NotNull String machineIdentity();
 
@@ -56,7 +56,7 @@ public interface AlloyFurnaceBigIntegerTarget {
     /**
      * 本机是否正在<b>动态降频</b>。
      *
-     * <p>本模组对每条 bigint 路径都做了「每 tick 时间预算」的动态降频（思路仿数据能源的提交预算）：
+     * <p>本模组对每条 bigint 路径都做了「每 tick 时间预算」的动态降频：
      * 实测耗时超预算时，后续批次的容量会被按比例收窄。降频状态下 {@link #capacity} 返回的数字
      * 会明显小于机器的真实能力。</p>
      *

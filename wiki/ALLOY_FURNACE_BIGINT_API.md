@@ -22,7 +22,7 @@ genuinely large numbers (say `1e22` items):
 2. **The native bigint path** (this API) — a single dispatch can deliver a batch **larger than `long`**.
 
 This API turns option 2 into Useless Mod's own public contract, so you do **not** need to depend on
-Data Energistics, and you do **not** need to write mixins into AE2's crafting CPU logic.
+any third-party dispatch framework, and you do **not** need to write mixins into AE2's crafting CPU logic.
 
 > **Scope**: only the **multiblock Omniversal Alloy Furnace** (ME pattern assembly + multiblock core).
 > The single-block advanced alloy furnace does not support bigint batches and will not appear in
@@ -38,7 +38,6 @@ Data Energistics, and you do **not** need to write mixins into AE2's crafting CP
 - [4. Receiving output callbacks (CPU side)](#4-receiving-output-callbacks-cpu-side)
 - [5. Complete example](#5-complete-example)
 - [FAQ](#faq)
-- [Relationship with Data Energistics](#relationship-with-data-energistics)
 
 ## Package layout
 
@@ -54,7 +53,8 @@ Data Energistics, and you do **not** need to write mixins into AE2's crafting CP
 | `AlloyFurnaceBigIntegerTarget` | One machine: query capacity / request a batch |
 | `AlloyFurnaceBigIntegerCapacity` | Capacity query result |
 | `AlloyFurnaceBigIntegerBatch` | One-shot admission ticket |
-| `AlloyFurnaceBigIntegerOutput` | A BigInteger-scale output |
+| `AlloyFurnaceBigIntegerOutput` | A BigInteger-scale output (key + exact amount) |
+| `AlloyFurnaceBigIntegerProvider` | Provider-side marker interface (use it for `instanceof` checks) |
 | `AlloyFurnaceBigIntegerCpuAdapter` | The callback interface you implement |
 | `AlloyFurnaceBigIntegerCpuAdapters` | Explicit registry |
 | `AlloyFurnaceBigIntegerCpuBinding` | Binds your adapter id and context to a batch |
@@ -119,10 +119,10 @@ Capacity is the minimum of up to four gates:
 | --- | --- |
 | Recipe availability | Whether the coil tier is high enough and required molds are present (**omniversal patterns only**) |
 | Material window | Thread count N ⇒ this batch absorbs at most N × (`Long.MAX` of every material) |
-| Output segmentation budget | A single batch produces at most **~131072 `Long.MAX` chunks** (independent of thread count) — prevents an enormous batch from taking tens of seconds to deliver |
+| Output delivery capacity | A single batch's size is decided by the machine from its **current delivery capacity** and floats over time (see below) |
 | **Energy** | `count × per-craft energy` must be affordable (**omniversal patterns only**) |
 
-**AE2 crafting patterns only have the "material window + output segmentation" gates**: they are folded
+**AE2 crafting patterns only have the "material window + delivery capacity" gates**: they are folded
 after a single assembly on the virtual 3×3 grid, with no bound recipe and no energy cost, so their
 capacity is usually far larger than an omniversal pattern's.
 
@@ -161,30 +161,20 @@ Whether to stop is your call.
 
 **`capacity` has no side effects** and may be called every tick.
 
-### A single batch's size is machine-adaptive (AIMD); capacity never drops to zero from backlog
+### A single batch's size floats with delivery capacity
 
-The machine uses a **congestion-control-style** adaptive controller to size a single batch (measured in
-output chunks):
-
-| Phase | Behaviour |
-| --- | --- |
-| Slow start | Starts small (1/100 of the ceiling); while the backlog stays under one batch in flight it multiplies by 10 each tick, quickly probing the usable ceiling |
-| Multiplicative decrease | As soon as the backlog exceeds "one batch in flight", it halves and exits slow start |
-| Linear recovery | Afterwards it steps back up gradually while the backlog stays low, so it cannot flood again the moment there is room |
-
-It converges on "**a batch drains in about one or two ticks**" — the smoothest possible shape.
+The machine sizes a single batch according to its **current delivery capacity** — outputs must be
+written back to the ME network chunk by chunk, so how much can be written per tick is limited.
 
 **What this means for you**:
-- `capacity` is **always positive** (unless a hard condition fails: invalid recipe, coil tier too low,
-  missing molds, no energy), so the scheduler never has to pause and restart;
-- during extremely large crafts `capacity` will float within a range — that is the machine probing the
-  right batch size, and it is **normal**;
-- do **not** treat `capacity` as a fixed measure of machine capability.
 
-**Why not a fixed value**: the right batch size depends on delivery capacity and on the scheduler's
-dispatch rate, and neither can be known at compile time. A fixed value is either too large (the first
-batch takes tens of seconds to deliver ⇒ pauses between tasks) or too small (wasted throughput). The
-controller converges using measured feedback instead.
+- during extremely large crafts `capacity` floats within a range — this is **normal**; do **not** treat
+  it as a fixed measure of machine capability;
+- `capacity` **never drops to zero because of backlog** (only hard conditions — invalid recipe, coil tier
+  too low, missing molds, no energy — can make it zero), so your scheduling loop does not need to
+  "pause a tick and wait for the queue to drain before restarting";
+- to get larger batches, raise the machine's **output-return time budget** in its config rather than
+  retrying repeatedly. Raising it also raises the per-tick write-back cost.
 
 ## 3. Admission and commit
 
@@ -209,8 +199,8 @@ if (batch.commit(unitPrototype)) {
    `IllegalArgumentException`.
 3. **The machine consumes only the one prototype it holds.** The prototype passed to `admit` is the
    material for a **single push**, not `count` copies. The remaining `count - 1` copies are withdrawn by
-   **your own BigInteger ledger**. Data Energistics' Trinity Data Core does exactly this: it withdraws
-   via `TrinityExactInputTransaction` and rolls back when our commit fails.
+   **your own BigInteger ledger**, and roll it back yourself when our commit fails. How you keep that
+   ledger is entirely up to you.
 4. **A failed commit does not lose material**: when `commit` returns `false` the machine does not clear
    the prototype, so you should roll back your own `count - 1` withdrawal and retry later or try a
    different provider.
@@ -221,16 +211,17 @@ if (batch.commit(unitPrototype)) {
    checks run again at `commit` (machine state may change in between — the `commit` return value is
    authoritative).
 
-### How outputs return to the network
-
-AE2's storage interface accepts at most `long` per call, so outputs are split into `Long.MAX_VALUE`
-chunks and written back to the ME network **across ticks**. The chunk size matches Data Energistics'
-own `PHYSICAL_CHUNK` convention.
-
-If you registered an adapter on the CPU side, you additionally receive the **complete** BigInteger
-output callback (see the next section).
-
 ## 4. Receiving output callbacks (CPU side)
+
+Outputs have **two** delivery paths. By default the first one is used; if you implement an adapter and
+are willing to take ownership, you can use the second.
+
+**1. Default — chunked write-back.** AE2's storage interface accepts at most `long` per call
+(`IMEInventory#insert(AEKey, long, Actionable)`), so the machine splits outputs into `Long.MAX_VALUE`
+chunks and writes them back to the ME network **across ticks**. You do not need to do anything —
+outputs land in the ME network as usual.
+
+**2. Bulk — `claimOutputs` (optional, skips the chunked write-back).** See section 4.2.
 
 ### 4.1 Implement the adapter
 
@@ -261,7 +252,53 @@ public final class MyCpuAdapter implements AlloyFurnaceBigIntegerCpuAdapter {
 }
 ```
 
-### 4.2 Registering
+### 4.2 Claiming outputs in bulk (optional)
+
+If your CPU is willing to **take a whole batch directly** (for example because you already keep a
+BigInteger ledger and do not need the items to pass through the ME network first), implement this
+callback and the machine will skip the chunked write-back:
+
+```java
+@Override
+public @NotNull Map<AEKey, BigInteger> claimOutputs(
+        @NotNull AlloyFurnaceBigIntegerBatchContext context,
+        @NotNull List<AlloyFurnaceBigIntegerOutput> outputs) {
+    // `outputs` is what the machine is about to write back to the network.
+    // Return how much you take, keyed by AEKey; the machine deducts it from its pending ledger and
+    // writes only the remainder back to the network.
+    Map<AEKey, BigInteger> taken = new HashMap<>();
+    for (AlloyFurnaceBigIntegerOutput output : outputs) {
+        BigInteger accept = decideHowMuchToTake(output);   // your policy; partial is fine
+        if (accept.signum() > 0) {
+            taken.put(output.what(), accept);
+        }
+    }
+    return taken;
+}
+```
+
+**When it is called**: **before** outputs are written to the network, once per key. The default
+implementation returns an empty map, so behaviour is **identical** to not implementing it.
+
+**Applies to both pattern kinds**: omniversal patterns and AE2 crafting patterns share the same output
+queue and the same delivery path, so both trigger this callback as long as the batch was admitted with
+an adapter binding. The `key` you receive is the **actual key** (an omniversal pattern's dynamic
+outputs only resolve to their real keys when the batch is folded), so just book against it.
+
+> **⚠️ Taking is taking ownership.** Items you accept do **not** enter the ME network — they exist only
+> in your own ledger. Therefore:
+> - you are responsible for what happens to them next (return them to the network yourself, or consume
+>   them as intermediates);
+> - **the machine cannot refund them** — the ledger is deducted when the call returns. If the batch is
+>   later cancelled (`onBatchFinished` receives `CANCELLED`), anything you already took is yours to handle;
+> - the implementation **must not throw**; if it does, the machine logs it and falls back to the chunked
+>   write-back (no interruption, but ownership may become inconsistent).
+
+**Trigger conditions**: only when the batch was bound to an adapter via `admit(..., cpuBinding)` **and**
+every entry in the write-back pass is bound to the same adapter. With several CPUs mixed on one machine
+it is not called (falling back to the chunked write-back).
+
+### 4.3 Registering
 
 Register once during your mod's common init:
 
@@ -275,7 +312,7 @@ public static void onCommonSetup(FMLCommonSetupEvent event) {
 The registry is global and process-wide; it is not cleared by save or world reloads. If your mod can be
 disabled at runtime, remove it with `AlloyFurnaceBigIntegerCpuAdapters.unregister(id)`.
 
-### 4.3 Callback ordering
+### 4.4 Callback ordering
 
 | When | Callback |
 | --- | --- |
@@ -298,16 +335,16 @@ cancelled, even if the outputs happen to be force-flushed within the same tick, 
 the ME network, just without the per-tick pacing. On `CANCELLED`, treat it as "the machine delivered
 this batch, but I did not get per-item receipts" and do **not** re-record the outputs.
 
-### 4.4 Save reload
+### 4.5 Save reload
 
 `cpuToken` is not serializable and is `null` after a reload; the machine's output queue itself is
 persisted as usual (**no items are lost**), but **callbacks are not re-sent**. Use the ME network's
 actual balance as the source of truth, or reconcile by `batchId()`.
 
-### 4.5 What happens without an adapter
+### 4.6 What happens without an adapter
 
 There is no degradation risk at all: if you register no adapter (or pass `cpu = null` to `admit`),
-outputs are still chunked back into the ME network as usual — the callbacks simply are not sent.
+outputs are still chunked back into the ME network as usual — the callbacks are simply not sent and `claimOutputs` is never called.
 
 ## 5. Complete example
 
@@ -367,20 +404,16 @@ last one).
 
 ### With millions of coil threads, why is capacity still limited?
 
-Because the **output segmentation budget is independent of the thread count**. The physical reason
-chunks exist at all is that "AE2's storage interface accepts at most `long` per call", so 1e24 items
-necessarily split into roughly a million chunks — and the return path can only make so many insert
-calls per tick. **Delivery capacity does not grow with thread count.**
+Because **outputs must be written back to the ME network chunk by chunk** (AE2's storage interface
+accepts at most `long` per call), and the return path can only make so many insert calls per tick.
+**Delivery capacity does not grow with thread count.**
 
-So a single batch is limited to about 131072 chunks (deliberately above "time budget ÷ per-insert cost",
-so that the time budget — not this cap — is the real limiter). Without that limit, a
-million-thread coil would produce million-chunk batches taking tens of seconds to deliver — visible as
-"a pause between tasks", and once the first batch is oversized, backlog-based grading cannot catch up.
+So a single batch's size is decided by "output-return time budget ÷ per-insert cost", not by the thread
+count. **Your million threads still determine the material window** (one long window per thread) —
+they simply no longer determine a single batch's **delivery size**.
 
-**This does not reduce total throughput**: the total number of chunks is unchanged; a huge batch is
-simply split into several batches that can each be delivered promptly. Your million threads still
-determine the **material window** (one long window per thread) — they just no longer determine a single
-batch's **delivery size**.
+To get larger batches, raise the machine's **output-return time budget** in its config; raising it also
+raises the per-tick write-back cost.
 
 ### Why does the machine return `waiting_mold_hub` / `waiting_tier`?
 
@@ -412,54 +445,3 @@ BigInteger), then chunks them at `Long.MAX_VALUE` back into the network; energy 
 
 Yes. AE2 crafting patterns support bigint batches too, and they **cost no energy** (the machine
 assembles once on the virtual 3×3 grid and scales the result).
-
-## Relationship with Data Energistics
-
-Data Energistics 3.3.0's Trinity Data Core uses its own `BigIntegerCraftingProviderAdapter`; this mod's
-DE adapter and the public API described here **share the same capacity and energy decisions**, so both
-entry points compute the same result for the same machine.
-
-If you also use Data Energistics, nothing extra is required — the two paths do not interfere:
-
-- DE's exact branch requires "the target has been exclusively reserved by an async proposal" and only
-  fires when that holds;
-- this API is called by you directly and is independent of DE's scheduling.
-
-> This mod only publishes a machine identity for pattern kinds that **truly implement bigint
-> semantics**. Because DE's exact branch, once it takes over a provider, **never falls back** to the
-> long path, "this machine cannot serve right now" must be expressed as **zero capacity** rather than
-> publishing capacity and rejecting at commit. That is also why `capacity` returns 0 when energy or
-> molds are missing.
-
-### Does Data Energistics need extra adaptation for omniversal patterns?
-
-**No.** This is something this mod decides on its own; no DE-side change is required. Every gate of
-DE's exact branch is driven by **the identity the provider publishes** — DE does not inspect the
-pattern kind:
-
-| DE-side step | Source |
-| --- | --- |
-| `ProviderCapacitySnapshot.machineTargetId` | Taken directly from the `CountedCraftingTarget.machineIdentity()` returned by `captureCapacityFast` |
-| exact adapter lookup | The adapter registered through the DE entrypoint (which implements `BigIntegerCraftingProviderAdapter`) |
-| the target passed back to `prepareBigIntegerBatch` | Rebuilt verbatim from the route / machine identity strings above |
-
-In other words, as long as this mod publishes `TARGETED` capacity carrying a machine identity for
-omniversal patterns, DE's `usingSelectedProposal && machineTargetId.isPresent() && exactContext != null`
-conditions are satisfied and it enters the exact branch. **Conversely**, if this mod publishes no
-machine identity (for example the single-block advanced alloy furnace), DE's `machineTargetId` is empty
-and omniversal patterns can only use the long counted path — one `long` window per tick.
-
-### When does it still not reach bigint?
-
-Never for compatibility reasons, but **at runtime** three situations send a given batch back to the
-long path. None of them is a defect:
-
-1. **This machine's capacity is 0**: missing molds, tier too low, no energy, or the return queue is
-   saturated by backpressure.
-2. **DE's async proposal did not pick this machine**: when `usingSelectedProposal` is false, DE falls
-   back to synchronous dispatch and does not enter the exact branch this tick (it retries next tick).
-3. **DE's own dispatch budget is exhausted**: DE's dispatch window / budget ran out.
-
-Also note that **energy is billed in two places**: DE charges its own power for the CPU, and this
-machine charges its own buffer as `count × per-craft energy`. This matches the long path exactly (which
-also has "CPU power + machine power") and is not a newly introduced double charge.

@@ -13,8 +13,7 @@ import java.util.Objects;
  * {@code long}。本模组内部用 BigInteger 记账、再按 {@code Long.MAX_VALUE} 切段写回网络，
  * 对外则用这个不可变记录暴露<b>完整</b>数量，让第三方 CPU 能自己核账，而不必去猜分段。</p>
  *
- * <p>切段粒度与数据能源（Data Energistics）自己的
- * {@code PlayerInventoryRefundDelivery#PHYSICAL_CHUNK} 一致，都是 {@code Long.MAX_VALUE}。</p>
+ * <p>切段粒度为 {@code Long.MAX_VALUE} —— 这是 AE2 存储接口单次能接受的量。</p>
  *
  * @param what   资源键（物品 / 流体 / 其它 AE 键）
  * @param amount 精确数量，必须为正

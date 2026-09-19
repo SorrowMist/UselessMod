@@ -6,10 +6,9 @@ import appeng.api.stacks.AEKey;
 import appeng.api.stacks.GenericStack;
 import appeng.api.stacks.KeyCounter;
 import appeng.blockentity.crafting.IMolecularAssemblerSupportedPattern;
-import com.fish_dan_.data_energistics.api.crafting.dispatch.BigIntegerCraftingAdmission;
-import com.fish_dan_.data_energistics.api.crafting.dispatch.BigIntegerCraftingProviderAdapter;
 import com.fish_dan_.data_energistics.api.crafting.dispatch.CountedCraftingAdmission;
 import com.fish_dan_.data_energistics.api.crafting.dispatch.CountedCraftingCapacity;
+import com.fish_dan_.data_energistics.api.crafting.dispatch.CountedCraftingProviderAdapter;
 import com.fish_dan_.data_energistics.api.crafting.dispatch.CountedCraftingRoutingMode;
 import com.fish_dan_.data_energistics.api.crafting.dispatch.CountedCraftingTarget;
 import com.fish_dan_.data_energistics.api.registry.provider.runtime.PatternProviderIdentity;
@@ -46,7 +45,8 @@ import java.util.function.ToIntFunction;
  * <ul>
  *   <li><b>长版 counted</b>（{@link #prepareBatch} / {@link #prepareBatchForTarget}）：一次物理提交最多
  *       {@code Long.MAX / 每次合成消耗量} 个合成（= 一个 AE2 long 物理窗口），由本机在虚拟 3×3 上折叠。</li>
- *   <li><b>原生 bigint</b>（{@link #prepareBigIntegerBatch}，仅合成样板）：DE 3.3.0 的 exact 派发。
+ *   <li><b>原生 bigint</b>（子类 {@link AlloyFurnaceBigIntegerCraftingAdapter} 的
+ *       {@code prepareBigIntegerBatch}）：DE 3.3.0 的 exact 派发。
  *       它只在「本 target 已被异步提案排他预留」时触发，一次能交付<b>超过 long</b> 的批次；
  *       关键是这里拿到的 prototype 是<b>单次合成的原型</b>，count 只通过 {@code exactCount()} 传递，
  *       剩余 count-1 份材料由 DE 自己的 BigInteger 账本扣除，我们只消费手里那一份原型。</li>
@@ -65,8 +65,19 @@ import java.util.function.ToIntFunction;
  * <p><b>安全阀</b>：因为接管后不回落，「本机此刻吃不下」必须体现为<b>容量为零</b>，
  * 而不是先发布带 machine identity 的容量再在提交时拒绝 —— 后者会把该 provider 卡死在 exact 分支。
  * 见 {@link #maximumRecipeBatchCount} 里的可用性/能量闸。</p>
+ *
+ * <h2>为什么 bigint 部分在子类里</h2>
+ *
+ * <p>{@code BigIntegerCraftingProviderAdapter} 是数据能源 <b>3.3.0 才引入</b>的接口，3.2.2 及更早没有。
+ * 所以本类刻意<b>只依赖两个版本都存在的 API</b>（注意它实现的 {@link CountedCraftingProviderAdapter}
+ * 两版都有）—— 这样旧版数据能源下这个类仍能正常加载并走长版 counted 路径。bigint 专属的
+ * {@code prepareBigIntegerBatch} / {@code captureCapacityFast} 放在子类
+ * {@link AlloyFurnaceBigIntegerCraftingAdapter}，且子类<b>只在能力探针通过时才会被加载</b>：
+ * 引用它的唯一地方是 {@link AlloyFurnaceBigIntegerAdapterFactory}，而那个类只在探针为真的分支里被触达。
+ * 结果是：旧版能启动（功能降级），数据能源升级到 3.3.0 后重启即自动恢复 bigint，
+ * 无需改代码或配置。</p>
  */
-final class AlloyFurnaceCountedCraftingAdapter implements BigIntegerCraftingProviderAdapter {
+class AlloyFurnaceCountedCraftingAdapter implements CountedCraftingProviderAdapter {
     private final ICraftingProvider provider;
     private final BooleanSupplier online;
     /** provider 局部稳定 route 身份。 */
@@ -104,17 +115,39 @@ final class AlloyFurnaceCountedCraftingAdapter implements BigIntegerCraftingProv
         this.bigIntegerPush = bigIntegerPush;
     }
 
-    /** Creates the live adapter used by one standalone advanced alloy furnace. */
+    /**
+     * Creates the live adapter used by one standalone advanced alloy furnace.
+     *
+     * <p>按能力探针二选一：3.3.0 的 bigint API 存在 ⇒ 子类（含 exact 派发）；
+     * 不存在 ⇒ 本类（只走长版 counted）。子类引用只出现在探针通过的那条分支里，
+     * 旧版数据能源下那一行永远不会执行，于是子类也永远不会被加载。</p>
+     */
     static AlloyFurnaceCountedCraftingAdapter forAdvancedAlloyFurnace(
             @NotNull AdvancedAlloyFurnaceBlockEntity provider,
             @NotNull PatternProviderIdentity identity) {
         String digest = identity.digest();
+        BooleanSupplier online = () -> isAdvancedAlloyFurnaceOnline(provider);
+        String machineIdentity =
+                AlloyFurnaceBigIntegerCrafting.machineIdentity(digest, provider.getLevel(), provider.getBlockPos());
+        Supplier<@Nullable CraftingTaskContext> taskContext = () -> provider;
+        if (DataEnergisticsBigIntSupport.AVAILABLE) {
+            // 子类引用只出现在 holder 里：探针为假时这一行不执行 ⇒ holder 与子类都不会被加载。
+            return (AlloyFurnaceCountedCraftingAdapter) AlloyFurnaceBigIntegerAdapterFactory.create(
+                    provider,
+                    online,
+                    digest,
+                    machineIdentity,
+                    taskContext,
+                    provider::getRemainingAETaskCount,
+                    provider::getMaxAETaskCount,
+                    provider::pushBigIntegerCraftingPattern);
+        }
         return new AlloyFurnaceCountedCraftingAdapter(
                 provider,
-                () -> isAdvancedAlloyFurnaceOnline(provider),
+                online,
                 digest,
-                AlloyFurnaceBigIntegerCrafting.machineIdentity(digest, provider.getLevel(), provider.getBlockPos()),
-                () -> provider,
+                machineIdentity,
+                taskContext,
                 provider::getRemainingAETaskCount,
                 provider::getMaxAETaskCount,
                 provider::pushBigIntegerCraftingPattern);
@@ -125,20 +158,38 @@ final class AlloyFurnaceCountedCraftingAdapter implements BigIntegerCraftingProv
             @NotNull MePatternAssemblyBlockEntity provider,
             @NotNull PatternProviderIdentity identity) {
         String digest = identity.digest();
+        BooleanSupplier online = () -> isMePatternAssemblyOnline(provider);
+        String machineIdentity =
+                AlloyFurnaceBigIntegerCrafting.machineIdentity(digest, provider.getLevel(), provider.getBlockPos());
+        Supplier<@Nullable CraftingTaskContext> taskContext = provider::getController;
+        ToIntFunction<Boolean> remainingThreads = craftingPattern -> {
+            MultiblockAlloyFurnaceCoreBlockEntity controller = provider.getController();
+            return controller == null ? 0 : controller.getRemainingAETaskCount(craftingPattern);
+        };
+        IntSupplier totalThreads = () -> {
+            MultiblockAlloyFurnaceCoreBlockEntity controller = provider.getController();
+            return controller == null ? 0 : controller.getMaxAETaskCount();
+        };
+        if (DataEnergisticsBigIntSupport.AVAILABLE) {
+            // 同上：子类引用只出现在 holder 里。
+            return (AlloyFurnaceCountedCraftingAdapter) AlloyFurnaceBigIntegerAdapterFactory.create(
+                    provider,
+                    online,
+                    digest,
+                    machineIdentity,
+                    taskContext,
+                    remainingThreads,
+                    totalThreads,
+                    provider::pushBigIntegerCraftingPattern);
+        }
         return new AlloyFurnaceCountedCraftingAdapter(
                 provider,
-                () -> isMePatternAssemblyOnline(provider),
+                online,
                 digest,
-                AlloyFurnaceBigIntegerCrafting.machineIdentity(digest, provider.getLevel(), provider.getBlockPos()),
-                provider::getController,
-                craftingPattern -> {
-                    MultiblockAlloyFurnaceCoreBlockEntity controller = provider.getController();
-                    return controller == null ? 0 : controller.getRemainingAETaskCount(craftingPattern);
-                },
-                () -> {
-                    MultiblockAlloyFurnaceCoreBlockEntity controller = provider.getController();
-                    return controller == null ? 0 : controller.getMaxAETaskCount();
-                },
+                machineIdentity,
+                taskContext,
+                remainingThreads,
+                totalThreads,
                 provider::pushBigIntegerCraftingPattern);
     }
 
@@ -150,18 +201,38 @@ final class AlloyFurnaceCountedCraftingAdapter implements BigIntegerCraftingProv
         return prepareAdmission(patternDetails, prototype, requestedCount);
     }
 
+    /**
+     * 长版 counted 的容量上报（3.2.2 与 3.3.0 都存在的那个入口）。
+     *
+     * <p><b>必须实现它</b>，否则旧版数据能源会落到接口的 default 实现 —— 那个 default 返回
+     * {@code CountedCraftingCapacity.aggregateUnknown()}，即「未知容量 + 保守单次派发」，
+     * 功能能用但吞吐极差。3.3.0 的调度器改走子类的 {@code captureCapacityFast}，
+     * 两者共用 {@link #capacityEntry}，口径不会漂移。</p>
+     *
+     * <p>3.3.0 里这个方法已标记 {@code @Deprecated(forRemoval)}，这里是<b>刻意保留</b>的：
+     * 它就是 3.2.2 唯一可用的容量入口，删掉就等于放弃旧版兼容。等数据能源真的移除它时，
+     * 只需要把最短支持版本抬到 3.3.0 并删掉本方法。</p>
+     */
     @Override
-    public @NotNull ObjectList<@NotNull CountedCraftingCapacity> captureCapacityFast(
+    @SuppressWarnings("removal")
+    public @NotNull List<@NotNull CountedCraftingCapacity> captureCapacity(
+            @NotNull IPatternDetails patternDetails, KeyCounter @NotNull [] prototype, long requestedCount) {
+        CountedCraftingCapacity single = capacityEntry(patternDetails, prototype, requestedCount);
+        return single == null ? List.of() : List.of(single);
+    }
+
+    /** 单条容量上报；容量为 0 时返回 {@code null}（两个版本的容量入口共用）。 */
+    final @Nullable CountedCraftingCapacity capacityEntry(
             @NotNull IPatternDetails patternDetails, KeyCounter @NotNull [] prototype, long requestedCount) {
         AvailableCapacity capacity = availableCapacity(patternDetails, prototype, requestedCount);
         if (capacity.logicalCrafts() == 0L) {
-            return ObjectLists.emptyList();
+            return null;
         }
-        return ObjectLists.singleton(new CountedCraftingCapacity(
+        return new CountedCraftingCapacity(
                 targetFor(patternDetails),
                 CountedCraftingRoutingMode.TARGETED,
                 OptionalLong.of(capacity.logicalCrafts()),
-                OptionalLong.of(capacity.maximumSingleBatch())));
+                OptionalLong.of(capacity.maximumSingleBatch()));
     }
 
     @Override
@@ -173,23 +244,6 @@ final class AlloyFurnaceCountedCraftingAdapter implements BigIntegerCraftingProv
         return targetFor(patternDetails).equals(requestedTarget)
                 ? prepareAdmission(patternDetails, prototype, requestedCount)
                 : null;
-    }
-
-    // ==================== 原生 bigint（exact）路径 ====================
-
-    @Override
-    public @Nullable BigIntegerCraftingAdmission prepareBigIntegerBatch(
-            @NotNull IPatternDetails patternDetails,
-            KeyCounter @NotNull [] prototype,
-            @NotNull BigInteger requestedCount,
-            @NotNull CountedCraftingTarget requestedTarget) {
-        if (requestedCount.signum() <= 0 || !targetFor(patternDetails).equals(requestedTarget)) {
-            return null;
-        }
-        BigInteger accepted = availableBigIntegerCount(patternDetails, prototype, requestedCount);
-        return accepted.signum() <= 0
-                ? null
-                : new AlloyFurnaceBigIntegerAdmission(this, patternDetails, prototype, accepted);
     }
 
     /**
@@ -204,7 +258,7 @@ final class AlloyFurnaceCountedCraftingAdapter implements BigIntegerCraftingProv
      * 它把单批规模收敛到「一批大约一两个 tick 交付完」，所以容量永不因积压归零，
      * 调度侧不会停一拍再重启。</p>
      */
-    private @NotNull BigInteger availableBigIntegerCount(
+    @NotNull BigInteger availableBigIntegerCount(
             @NotNull IPatternDetails patternDetails,
             KeyCounter @NotNull [] prototype,
             @NotNull BigInteger requestedCount) {
@@ -253,7 +307,7 @@ final class AlloyFurnaceCountedCraftingAdapter implements BigIntegerCraftingProv
     }
 
     /** exact 批次的实际提交：把单位原型与 BigInteger 次数交给机器。 */
-    private boolean dispatchBigInteger(
+    boolean dispatchBigInteger(
             @NotNull IPatternDetails patternDetails, KeyCounter @NotNull [] unitPrototype, @NotNull BigInteger count) {
         if (availableBigIntegerCount(patternDetails, unitPrototype, count).compareTo(count) < 0) {
             return false;
@@ -268,7 +322,7 @@ final class AlloyFurnaceCountedCraftingAdapter implements BigIntegerCraftingProv
      * （exact 派发的前提）；其余样板只发 route 目标 —— 这样 DE 不会对它们启用 exact 分支
      * （那会跳过长版路径，而它们没有 bigint 语义）。
      */
-    private @NotNull CountedCraftingTarget targetFor(@NotNull IPatternDetails patternDetails) {
+    @NotNull CountedCraftingTarget targetFor(@NotNull IPatternDetails patternDetails) {
         return supportsExactBatch(patternDetails)
                 ? CountedCraftingTarget.machine(this.routeIdentity, this.machineIdentity)
                 : CountedCraftingTarget.route(this.routeIdentity);
@@ -344,7 +398,7 @@ final class AlloyFurnaceCountedCraftingAdapter implements BigIntegerCraftingProv
                 : new AlloyFurnaceCountedCraftingAdmission(this, patternDetails, prototype, acceptedCount);
     }
 
-    private AvailableCapacity availableCapacity(
+    AvailableCapacity availableCapacity(
             @NotNull IPatternDetails patternDetails,
             KeyCounter @NotNull [] prototype,
             long requestedCount) {
@@ -651,60 +705,4 @@ final class AlloyFurnaceCountedCraftingAdapter implements BigIntegerCraftingProv
         }
     }
 
-    /**
-     * bigint 批次的准入：{@code exactCount()} 可以超过 {@code long}，因此 {@code count()} 保持接口默认
-     * （{@code longValueExact()} 会在超限时抛异常而不是截断）—— exact 路径的记账一律读 {@code exactCount()}。
-     */
-    private static final class AlloyFurnaceBigIntegerAdmission implements BigIntegerCraftingAdmission {
-        private AdmissionState state;
-        private final BigInteger count;
-        private boolean transferredInputOwnership;
-
-        private AlloyFurnaceBigIntegerAdmission(
-                @NotNull AlloyFurnaceCountedCraftingAdapter adapter,
-                @NotNull IPatternDetails patternDetails,
-                KeyCounter @NotNull [] preparedPrototype,
-                @NotNull BigInteger count) {
-            this.state = new PreparedState(adapter, patternDetails, preparedPrototype);
-            this.count = count;
-        }
-
-        @Override
-        public @NotNull BigInteger exactCount() {
-            return count;
-        }
-
-        @Override
-        public boolean hasTransferredInputOwnership() {
-            return transferredInputOwnership;
-        }
-
-        @Override
-        public boolean commit(KeyCounter @NotNull [] prototype) {
-            if (!(state instanceof PreparedState(
-                    AlloyFurnaceCountedCraftingAdapter adapter,
-                    IPatternDetails patternDetails,
-                    KeyCounter[] preparedPrototype))) {
-                throw new IllegalStateException("Exact admission has already been committed");
-            }
-            if (prototype != preparedPrototype) {
-                throw new IllegalArgumentException("Exact admission must be committed with its prepared prototype");
-            }
-            state = ReleasedState.RELEASED;
-            boolean accepted = adapter.dispatchBigInteger(patternDetails, prototype, count);
-            transferredInputOwnership = accepted;
-            return accepted;
-        }
-
-        private sealed interface AdmissionState permits PreparedState, ReleasedState {}
-
-        private record PreparedState(
-                @NotNull AlloyFurnaceCountedCraftingAdapter adapter,
-                @NotNull IPatternDetails patternDetails,
-                KeyCounter @NotNull [] prototype) implements AdmissionState {}
-
-        private enum ReleasedState implements AdmissionState {
-            RELEASED
-        }
-    }
 }

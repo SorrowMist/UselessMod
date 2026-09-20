@@ -56,13 +56,15 @@ public final class DimensionConfigMenu extends AbstractContainerMenu {
     @Nullable
     private final AbstractDimensionTeleporter teleporter;
     private final GhostSlot[] ghostSlots = new GhostSlot[GHOST_SLOT_COUNT];
+    /** 打开菜单时该维度的原始配置，用于多联模式下保留边界与道路方块设置。 */
+    private DimensionGenerationConfig initialConfig;
 
     private int platformLayers;
     private int platformStartY;
     private int boundaryIntervalX;
     private int boundaryIntervalZ;
     private int roadWidth;
-    private DimensionGenerationConfig.RoadPreset roadPreset;
+    private DimensionGenerationConfig.Mode mode;
     private boolean centerMarkerEnabled;
     private boolean generateBedrock;
     private boolean bedrockAtBottom;
@@ -82,12 +84,13 @@ public final class DimensionConfigMenu extends AbstractContainerMenu {
         this.teleporter = context.teleporter();
 
         DimensionGenerationConfig config = context.initialConfig().normalized();
+        this.initialConfig = config;
         this.platformLayers = config.platformLayers();
         this.platformStartY = config.platformStartY();
         this.boundaryIntervalX = config.boundaryIntervalX();
         this.boundaryIntervalZ = config.boundaryIntervalZ();
         this.roadWidth = config.roadWidth();
-        this.roadPreset = config.roadPreset();
+        this.mode = config.mode();
         this.centerMarkerEnabled = config.centerMarkerEnabled();
         this.generateBedrock = config.generateBedrock();
         this.bedrockAtBottom = config.bedrockAtBottom();
@@ -102,6 +105,7 @@ public final class DimensionConfigMenu extends AbstractContainerMenu {
         ghostSlots[ROAD_C_SLOT] = new GhostSlot(config.roadBlockCId(), 16, 182);
         ghostSlots[CENTER_MARKER_SLOT] = new GhostSlot(config.centerMarkerBlockId(), 16, 212);
         for (GhostSlot slot : ghostSlots) addSlot(slot);
+        updateSlotVisibility();
         addPlayerInventory(inventory);
     }
 
@@ -129,11 +133,12 @@ public final class DimensionConfigMenu extends AbstractContainerMenu {
 
     public static void openForEdit(ServerPlayer player, AbstractDimensionTeleporter teleporter,
                                    BlockPos sourcePos) {
-        ResourceKey<Level> current = player.level().dimension();
-        ResourceKey<Level> target = UselessDimensions.isUselessDimension(current)
-                ? current : teleporter.dimensionKey();
+        // 以传送方块自身所属的维度为准，而不是玩家当前所在的维度：
+        // 玩家可以在任一维度里放置并编辑属于其它维度的传送方块，
+        // 若按玩家所在维度取目标，界面会显示并写入错误的维度配置。
+        ResourceKey<Level> target = teleporter.dimensionKey();
         open(player, new Context(target, teleporter,
-                current, sourcePos, true,
+                player.level().dimension(), sourcePos, true,
                 !UselessDimensionConfigManager.isConfigured(player.server, target),
                 UselessDimensionConfigManager.get(player.server, target)));
     }
@@ -182,8 +187,26 @@ public final class DimensionConfigMenu extends AbstractContainerMenu {
         return roadWidth;
     }
 
-    public DimensionGenerationConfig.RoadPreset getRoadPreset() {
-        return roadPreset;
+    public DimensionGenerationConfig.Mode getMode() {
+        return mode;
+    }
+
+    /** 是否处于多联模式：此时边界与道路配置整体隐藏。 */
+    public boolean isMultiMode() {
+        return mode == DimensionGenerationConfig.Mode.MULTI;
+    }
+
+    /** 模式按钮：在马路与多联之间循环。 */
+    public void cycleMode() {
+        mode = mode.next();
+        updateSlotVisibility();
+    }
+
+    /** 按当前模式刷新幽灵槽位的显示状态：多联模式隐藏边界与道路相关槽位。 */
+    private void updateSlotVisibility() {
+        for (int index = 0; index < GHOST_SLOT_COUNT; index++) {
+            ghostSlots[index].setHidden(!isGhostSlotActive(index));
+        }
     }
 
     public boolean isCenterMarkerEnabled() {
@@ -218,10 +241,29 @@ public final class DimensionConfigMenu extends AbstractContainerMenu {
         roadWidth = value;
     }
 
-    public void cycleRoadPreset() {
-        roadPreset = roadPreset == DimensionGenerationConfig.RoadPreset.ROAD
-                ? DimensionGenerationConfig.RoadPreset.SOLID
-                : DimensionGenerationConfig.RoadPreset.ROAD;
+    /** 边界间隔配置在马路模式下表示道路间隔，在多联模式下表示合并尺寸，因此始终显示。 */
+    public boolean isBoundaryIntervalVisible() {
+        return true;
+    }
+
+    /** 边界交替方块仅在马路模式使用；多联模式的合并组内部不再显示边框。 */
+    public boolean isBoundarySlotVisible() {
+        return mode != DimensionGenerationConfig.Mode.MULTI;
+    }
+
+    /** 道路宽度属于道路布局，仅马路模式可配置。 */
+    public boolean isRoadWidthVisible() {
+        return mode == DimensionGenerationConfig.Mode.ROAD;
+    }
+
+    /** 仅马路模式需要道路主体与中心标线配置。 */
+    public boolean isRoadPatternSelected() {
+        return mode == DimensionGenerationConfig.Mode.ROAD;
+    }
+
+    /** 中心标记仅马路模式可配置；多联模式不需要。 */
+    public boolean isCenterMarkerVisible() {
+        return mode != DimensionGenerationConfig.Mode.MULTI;
     }
 
     public void toggleCenterMarker() {
@@ -245,12 +287,15 @@ public final class DimensionConfigMenu extends AbstractContainerMenu {
         return switch (index) {
             case BOUNDARY_A_SLOT, BOUNDARY_B_SLOT, ROAD_A_SLOT -> isRoadFeatureEnabled();
             case ROAD_B_SLOT, ROAD_C_SLOT -> isRoadFeatureEnabled()
-                    && roadPreset == DimensionGenerationConfig.RoadPreset.ROAD;
+                    && isRoadPatternSelected();
+            case CENTER_MARKER_SLOT -> isCenterMarkerVisible();
             default -> true;
         };
     }
 
     private boolean isRoadFeatureEnabled() {
+        // 多联模式不使用道路布局，相关槽位整体隐藏。
+        if (mode == DimensionGenerationConfig.Mode.MULTI) return false;
         return DimensionGenerationConfig.areBoundaryAndRoadFeaturesEnabled(
                 boundaryIntervalX, boundaryIntervalZ, roadWidth);
     }
@@ -265,20 +310,23 @@ public final class DimensionConfigMenu extends AbstractContainerMenu {
             blocks[i] = DimensionGenerationConfig.blockId(ghostSlots[i].getItem());
             if (blocks[i] == null) return Optional.empty();
         }
-        DimensionGenerationConfig defaults = DimensionGenerationConfig.defaults();
-        blocks[BOUNDARY_A_SLOT] = optionalBlock(BOUNDARY_A_SLOT, defaults.boundaryBlockAId());
-        blocks[BOUNDARY_B_SLOT] = optionalBlock(BOUNDARY_B_SLOT, defaults.boundaryBlockBId());
-        blocks[ROAD_A_SLOT] = optionalBlock(ROAD_A_SLOT, defaults.roadBlockAId());
-        blocks[ROAD_B_SLOT] = optionalBlock(ROAD_B_SLOT, defaults.roadBlockBId());
-        blocks[ROAD_C_SLOT] = optionalBlock(ROAD_C_SLOT, defaults.roadBlockCId());
-        blocks[CENTER_MARKER_SLOT] = optionalBlock(CENTER_MARKER_SLOT, defaults.centerMarkerBlockId());
+        // 多联模式下这些槽位被隐藏，必须以该维度的原始配置回落，
+        // 否则保存多联模式会把其他维度已有的边界与道路方块覆盖成全局默认值。
+        DimensionGenerationConfig fallback = isMultiMode()
+                ? initialConfig : DimensionGenerationConfig.defaults();
+        blocks[BOUNDARY_A_SLOT] = optionalBlock(BOUNDARY_A_SLOT, fallback.boundaryBlockAId());
+        blocks[BOUNDARY_B_SLOT] = optionalBlock(BOUNDARY_B_SLOT, fallback.boundaryBlockBId());
+        blocks[ROAD_A_SLOT] = optionalBlock(ROAD_A_SLOT, fallback.roadBlockAId());
+        blocks[ROAD_B_SLOT] = optionalBlock(ROAD_B_SLOT, fallback.roadBlockBId());
+        blocks[ROAD_C_SLOT] = optionalBlock(ROAD_C_SLOT, fallback.roadBlockCId());
+        blocks[CENTER_MARKER_SLOT] = optionalBlock(CENTER_MARKER_SLOT, fallback.centerMarkerBlockId());
         DimensionGenerationConfig.Features features = new DimensionGenerationConfig.Features(
                 blocks[BOUNDARY_A_SLOT],
                 blocks[BOUNDARY_B_SLOT],
                 boundaryIntervalX,
                 boundaryIntervalZ,
                 roadWidth,
-                roadPreset,
+                mode,
                 blocks[ROAD_A_SLOT],
                 blocks[ROAD_B_SLOT],
                 blocks[ROAD_C_SLOT],
@@ -340,13 +388,23 @@ public final class DimensionConfigMenu extends AbstractContainerMenu {
         player.closeContainer();
     }
 
+    /**
+     * 套用导入的预设到当前编辑状态，但不提交给服务端：
+     * 玩家仍需点击「应用」才会写入世界配置。
+     */
+    public void applyPreset(DimensionGenerationConfig config) {
+        copyFrom(config);
+    }
+
     private void copyFrom(DimensionGenerationConfig config) {
+        initialConfig = config;
         platformLayers = config.platformLayers();
         platformStartY = config.platformStartY();
         boundaryIntervalX = config.boundaryIntervalX();
         boundaryIntervalZ = config.boundaryIntervalZ();
         roadWidth = config.roadWidth();
-        roadPreset = config.roadPreset();
+        mode = config.mode();
+        updateSlotVisibility();
         centerMarkerEnabled = config.centerMarkerEnabled();
         generateBedrock = config.generateBedrock();
         bedrockAtBottom = config.bedrockAtBottom();
@@ -415,6 +473,16 @@ public final class DimensionConfigMenu extends AbstractContainerMenu {
 
     public static final class GhostSlot extends Slot {
         private ItemStack stack;
+        /** 隐藏的槽位既不渲染底板也不响应点击，用于多联模式下整体移除边界与道路配置。 */
+        private boolean hidden;
+
+        public boolean isHidden() {
+            return hidden;
+        }
+
+        public void setHidden(boolean hidden) {
+            this.hidden = hidden;
+        }
 
         GhostSlot(ResourceLocation blockId, int x, int y) {
             super(new SimpleContainer(1), 0, x, y);
@@ -468,6 +536,12 @@ public final class DimensionConfigMenu extends AbstractContainerMenu {
         @Override
         public boolean isFake() {
             return true;
+        }
+
+        /** 隐藏后既不可渲染也不可交互，等同于该槽位不存在。 */
+        @Override
+        public boolean isActive() {
+            return !hidden;
         }
     }
 }

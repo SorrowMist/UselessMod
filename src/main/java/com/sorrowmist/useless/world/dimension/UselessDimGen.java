@@ -32,6 +32,12 @@ public class UselessDimGen extends AbstractPlasticPlatformGenerator {
         }
     }
 
+    /** 一维度多联中心：偶数区块数占 2×2，奇数占 1 格，两轴各自判定。 */
+    @Override
+    protected boolean isMultiCenterMarker(int groupX, int groupZ, int widthX, int widthZ) {
+        return isEvenSizedMultiCenterMarker(groupX, groupZ, widthX, widthZ);
+    }
+
     @Override
     protected int getRoadStartBoundaryWidth() {
         return 1;

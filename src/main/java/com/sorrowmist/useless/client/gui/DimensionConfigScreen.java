@@ -2,6 +2,7 @@ package com.sorrowmist.useless.client.gui;
 
 import com.sorrowmist.useless.content.menus.DimensionConfigMenu;
 import com.sorrowmist.useless.network.DimensionConfigSubmitPacket;
+import com.sorrowmist.useless.world.dimension.DimensionGenerationConfig;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
@@ -12,8 +13,6 @@ import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.inventory.Slot;
 import net.neoforged.neoforge.network.PacketDistributor;
 import org.lwjgl.glfw.GLFW;
-
-import java.util.Locale;
 
 public final class DimensionConfigScreen extends AbstractContainerScreen<DimensionConfigMenu> {
     private static final int PANEL_WIDTH = 420;
@@ -36,13 +35,20 @@ public final class DimensionConfigScreen extends AbstractContainerScreen<Dimensi
     private PressableAE2Button roadWidthUp;
     private PressableAE2Button bedrockButton;
     private PressableAE2Button bottomButton;
-    private PressableAE2Button roadPresetButton;
+    private PressableAE2Button modeButton;
     private PressableAE2Button centerEnabledButton;
     private PressableAE2Button applyButton;
     private PressableAE2Button teleportButton;
     private PressableAE2Button cancelButton;
+    private PressableAE2Button exportButton;
+    private PressableAE2Button importButton;
     private Slot pressedSlot;
     private boolean updatingFields;
+    /** 待确认导入的预设；非空时界面显示二次确认层。 */
+    private DimensionGenerationConfig pendingImport;
+    /** 状态提示的语言键与剩余显示时间（tick）。 */
+    private String statusKey;
+    private int statusTicks;
 
     public DimensionConfigScreen(DimensionConfigMenu menu, Inventory inventory, Component title) {
         super(menu, inventory, title);
@@ -69,7 +75,7 @@ public final class DimensionConfigScreen extends AbstractContainerScreen<Dimensi
         boundaryZField = createNumberField(250, 82, 52,
                 Component.translatable("gui.useless_mod.dimension_config.boundary_interval_z"),
                 menu.getBoundaryIntervalZ(), menu::setBoundaryIntervalZ, false);
-        roadWidthField = createNumberField(106, 128, 52,
+        roadWidthField = createNumberField(250, 128, 52,
                 Component.translatable("gui.useless_mod.dimension_config.road_width"),
                 menu.getRoadWidth(), menu::setRoadWidth, false);
 
@@ -90,25 +96,27 @@ public final class DimensionConfigScreen extends AbstractContainerScreen<Dimensi
                 "gui.useless_mod.dimension_config.tooltip.decrease");
         boundaryZUp = addStepButton(278, 100, "+", boundaryZField, 1, 0, 256,
                 "gui.useless_mod.dimension_config.tooltip.increase");
-        roadWidthDown = addStepButton(106, 146, "-", roadWidthField, -1, 0, 16,
+        roadWidthDown = addStepButton(250, 146, "-", roadWidthField, -1, 0, 16,
                 "gui.useless_mod.dimension_config.tooltip.decrease");
-        roadWidthUp = addStepButton(134, 146, "+", roadWidthField, 1, 0, 16,
+        roadWidthUp = addStepButton(278, 146, "+", roadWidthField, 1, 0, 16,
                 "gui.useless_mod.dimension_config.tooltip.increase");
 
-        bedrockButton = addButton(252, 36, 78, 16, bedrockText(),
+        bedrockButton = addButton(236, 36, 84, 16, bedrockText(),
                 "gui.useless_mod.dimension_config.tooltip.bedrock", button -> {
                     menu.toggleGenerateBedrock();
                     updateToggleButtons();
                 });
-        bottomButton = addButton(334, 36, 72, 16, bottomText(),
+        bottomButton = addButton(326, 36, 84, 16, bottomText(),
                 "gui.useless_mod.dimension_config.tooltip.bottom", button -> {
                     menu.toggleBedrockAtBottom();
                     updateToggleButtons();
                 });
-        roadPresetButton = addButton(178, 128, 78, 16, roadPresetText(),
-                "gui.useless_mod.dimension_config.tooltip.road_preset", button -> {
-                    menu.cycleRoadPreset();
+        
+        modeButton = addButton(106, 128, 100, 16, modeText(),
+                "gui.useless_mod.dimension_config.tooltip.mode", button -> {
+                    menu.cycleMode();
                     updateFeatureButtons();
+                    updateControls();
                 });
         centerEnabledButton = addButton(106, 176, 100, 16, centerEnabledText(),
                 "gui.useless_mod.dimension_config.tooltip.center_marker", button -> {
@@ -125,6 +133,13 @@ public final class DimensionConfigScreen extends AbstractContainerScreen<Dimensi
         cancelButton = addButton(224, 280, 182, 18,
                 Component.translatable("gui.useless_mod.dimension_config.cancel"),
                 "gui.useless_mod.dimension_config.tooltip.cancel", button -> onClose());
+        // 右下角：把当前配置导出到剪贴板，或从剪贴板导入一份预设。
+        exportButton = addButton(224, 302, 88, 18,
+                Component.translatable("gui.useless_mod.dimension_config.export"),
+                "gui.useless_mod.dimension_config.tooltip.export", button -> exportPreset());
+        importButton = addButton(318, 302, 88, 18,
+                Component.translatable("gui.useless_mod.dimension_config.import"),
+                "gui.useless_mod.dimension_config.tooltip.import", button -> importPreset());
         teleportButton.visible = menu.canTeleport();
         updateToggleButtons();
         updateFeatureButtons();
@@ -178,10 +193,11 @@ public final class DimensionConfigScreen extends AbstractContainerScreen<Dimensi
                 : "gui.useless_mod.dimension_config.bottom_off");
     }
 
-    private Component roadPresetText() {
-        return Component.translatable("gui.useless_mod.dimension_config.road_preset",
-                Component.translatable("gui.useless_mod.dimension_config.road_preset."
-                        + menu.getRoadPreset().name().toLowerCase(Locale.ROOT)));
+    /** 模式按钮文本：马路 / 多联。标签 "模式" 已单独绘制，按钮内不再重复。 */
+    private Component modeText() {
+        String key = menu.getMode() == DimensionGenerationConfig.Mode.MULTI
+                ? "multi" : "road";
+        return Component.translatable("gui.useless_mod.dimension_config.mode." + key);
     }
 
     private Component centerEnabledText() {
@@ -196,8 +212,22 @@ public final class DimensionConfigScreen extends AbstractContainerScreen<Dimensi
     }
 
     private void updateFeatureButtons() {
-        roadPresetButton.setMessage(roadPresetText());
+        modeButton.setMessage(modeText());
         centerEnabledButton.setMessage(centerEnabledText());
+        // 边界间隔在多联模式下表示合并尺寸，因此始终保留；道路宽度只在马路模式出现。
+        boolean boundary = menu.isBoundaryIntervalVisible();
+        boolean roadWidthVisible = menu.isRoadWidthVisible();
+        boundaryXField.visible = boundary;
+        boundaryZField.visible = boundary;
+        boundaryXDown.visible = boundary;
+        boundaryXUp.visible = boundary;
+        boundaryZDown.visible = boundary;
+        boundaryZUp.visible = boundary;
+        roadWidthField.visible = roadWidthVisible;
+        roadWidthDown.visible = roadWidthVisible;
+        roadWidthUp.visible = roadWidthVisible;
+        centerEnabledButton.visible = menu.isCenterMarkerVisible();
+        centerEnabledButton.active = menu.isCenterMarkerVisible();
     }
 
     private void updateControls() {
@@ -216,6 +246,74 @@ public final class DimensionConfigScreen extends AbstractContainerScreen<Dimensi
         }
         menu.createConfiguration().ifPresent(config -> PacketDistributor.sendToServer(
                 new DimensionConfigSubmitPacket(menu.containerId, config, teleport)));
+    }
+
+    /** 把当前界面上的配置序列化后写入系统剪贴板。 */
+    private void exportPreset() {
+        DimensionGenerationConfig config = menu.createConfiguration().orElse(null);
+        if (config == null) {
+            setStatus("gui.useless_mod.dimension_config.export_invalid");
+            return;
+        }
+        String text = config.toPresetJson();
+        if (text.getBytes(java.nio.charset.StandardCharsets.UTF_8).length
+                > DimensionGenerationConfig.MAX_PRESET_BYTES) {
+            setStatus("gui.useless_mod.dimension_config.error.limit");
+            return;
+        }
+        if (minecraft != null) minecraft.keyboardHandler.setClipboard(text);
+        setStatus("gui.useless_mod.dimension_config.exported");
+    }
+
+    /** 读取剪贴板并解析预设；成功时先进入二次确认，避免误覆盖当前配置。 */
+    private void importPreset() {
+        if (minecraft == null) return;
+        String text = minecraft.keyboardHandler.getClipboard();
+        try {
+            pendingImport = DimensionGenerationConfig.fromPresetJson(text);
+            setStatus("gui.useless_mod.dimension_config.import_confirm");
+        } catch (DimensionGenerationConfig.PresetException exception) {
+            setStatus(presetErrorKey(exception.error()));
+        }
+    }
+
+    /** 确认导入：套用到界面编辑状态，仍需点「应用」才会保存到世界。 */
+    private void confirmImport(boolean accepted) {
+        if (accepted && pendingImport != null) {
+            menu.applyPreset(pendingImport);
+            syncFieldsFromMenu();
+            updateToggleButtons();
+            updateFeatureButtons();
+            updateControls();
+            setStatus("gui.useless_mod.dimension_config.imported");
+        }
+        pendingImport = null;
+    }
+
+    /** 把菜单当前的数值同步回输入框，导入后界面才不会与配置脱节。 */
+    private void syncFieldsFromMenu() {
+        updatingFields = true;
+        layersField.setValue(Integer.toString(menu.getPlatformLayers()));
+        startYField.setValue(Integer.toString(menu.getPlatformStartY()));
+        boundaryXField.setValue(Integer.toString(menu.getBoundaryIntervalX()));
+        boundaryZField.setValue(Integer.toString(menu.getBoundaryIntervalZ()));
+        roadWidthField.setValue(Integer.toString(menu.getRoadWidth()));
+        updatingFields = false;
+    }
+
+    private static String presetErrorKey(DimensionGenerationConfig.PresetError error) {
+        return switch (error) {
+            case INVALID_TEXT -> "gui.useless_mod.dimension_config.error.invalid_text";
+            case UNSUPPORTED_VERSION -> "gui.useless_mod.dimension_config.error.unsupported_version";
+            case INVALID_STRUCTURE -> "gui.useless_mod.dimension_config.error.invalid_structure";
+            case BLOCKED_BLOCK -> "gui.useless_mod.dimension_config.error.blocked_block";
+            case LIMIT -> "gui.useless_mod.dimension_config.error.limit";
+        };
+    }
+
+    private void setStatus(String key) {
+        statusKey = key;
+        statusTicks = 100;
     }
 
     private void adjust(EditBox field, int delta, int min, int max) {
@@ -240,7 +338,71 @@ public final class DimensionConfigScreen extends AbstractContainerScreen<Dimensi
     @Override
     protected void containerTick() {
         super.containerTick();
+        if (statusTicks > 0) statusTicks--;
         updateControls();
+    }
+
+    @Override
+    public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
+        super.render(graphics, mouseX, mouseY, partialTick);
+        if (pendingImport != null) renderImportConfirm(graphics, mouseX, mouseY);
+    }
+
+    /** 底部状态提示，导入导出后短暂显示结果；画在标签层以免盖住物品提示。 */
+    private void renderStatus(GuiGraphics graphics) {
+        if (statusTicks <= 0 || statusKey == null) return;
+        String text = Component.translatable(statusKey).getString();
+        if (font.width(text) > 404) text = font.plainSubstrByWidth(text, 401) + "...";
+        graphics.drawString(font, text, 8, 336, MachineScreenStyle.TEXT_COLOR, false);
+    }
+
+    /** 导入二次确认层：遮住面板并给出确认/取消两个按钮。 */
+    private void renderImportConfirm(GuiGraphics graphics, int mouseX, int mouseY) {
+        graphics.fill(leftPos, topPos, leftPos + imageWidth, topPos + imageHeight, 0xAA000000);
+        int boxLeft = leftPos + 90;
+        int boxTop = topPos + 140;
+        int boxRight = leftPos + imageWidth - 90;
+        int boxBottom = topPos + 200;
+        graphics.fill(boxLeft, boxTop, boxRight, boxBottom, 0xFF1B1B1B);
+        graphics.renderOutline(boxLeft, boxTop, boxRight - boxLeft, boxBottom - boxTop,
+                MachineScreenStyle.TEXT_COLOR);
+        String prompt = Component.translatable(
+                "gui.useless_mod.dimension_config.import_confirm").getString();
+        graphics.drawCenteredString(font, prompt, leftPos + imageWidth / 2,
+                boxTop + 14, MachineScreenStyle.TEXT_COLOR);
+        boolean overConfirm = isInside(mouseX, mouseY, confirmX(), confirmY());
+        boolean overCancel = isInside(mouseX, mouseY, cancelImportX(), cancelImportY());
+        drawConfirmButton(graphics, confirmX(), confirmY(),
+                "gui.useless_mod.dimension_config.confirm", overConfirm);
+        drawConfirmButton(graphics, cancelImportX(), cancelImportY(),
+                "gui.useless_mod.dimension_config.cancel_import", overCancel);
+    }
+
+    private void drawConfirmButton(GuiGraphics graphics, int x, int y, String key, boolean hovered) {
+        graphics.fill(x, y, x + 84, y + 18, hovered ? 0xFF3A3A3A : 0xFF262626);
+        graphics.renderOutline(x, y, 84, 18, MachineScreenStyle.TEXT_COLOR);
+        graphics.drawCenteredString(font, Component.translatable(key).getString(),
+                x + 42, y + 5, MachineScreenStyle.TEXT_COLOR);
+    }
+
+    private int confirmX() {
+        return leftPos + imageWidth / 2 - 90;
+    }
+
+    private int confirmY() {
+        return topPos + 168;
+    }
+
+    private int cancelImportX() {
+        return leftPos + imageWidth / 2 + 6;
+    }
+
+    private int cancelImportY() {
+        return topPos + 168;
+    }
+
+    private static boolean isInside(double mouseX, double mouseY, int x, int y) {
+        return mouseX >= x && mouseX < x + 84 && mouseY >= y && mouseY < y + 18;
     }
 
     @Override
@@ -249,14 +411,22 @@ public final class DimensionConfigScreen extends AbstractContainerScreen<Dimensi
         MachineScreenStyle.drawInset(graphics, leftPos + 4, topPos + 18, leftPos + 94, topPos + 230);
         MachineScreenStyle.drawInset(graphics, leftPos + 98, topPos + 18, leftPos + imageWidth - 4, topPos + 230);
         MachineScreenStyle.drawSlotGroup(graphics, leftPos, topPos, 16, 34, 1, 3);
-        MachineScreenStyle.drawSlotGroup(graphics, leftPos, topPos, 16, 100, 1, 2);
-        MachineScreenStyle.drawSlotGroup(graphics, leftPos, topPos, 16, 148, 1, 3, 18, 17);
-        MachineScreenStyle.drawSlotGroup(graphics, leftPos, topPos, 16, 212, 1, 1);
+        // 多联模式隐藏边界交替、道路主体与中心标记槽位，连同其槽位底板一起隐藏。
+        if (menu.isBoundarySlotVisible()) {
+            MachineScreenStyle.drawSlotGroup(graphics, leftPos, topPos, 16, 100, 1, 2);
+        }
+        if (menu.isRoadPatternSelected()) {
+            MachineScreenStyle.drawSlotGroup(graphics, leftPos, topPos, 16, 148, 1, 3, 18, 17);
+        }
+        if (menu.isCenterMarkerVisible()) {
+            MachineScreenStyle.drawSlotGroup(graphics, leftPos, topPos, 16, 212, 1, 1);
+        }
         MachineScreenStyle.drawInset(graphics, leftPos + 4, topPos + 236,
                 leftPos + 198, topPos + 334);
         MachineScreenStyle.drawInset(graphics, leftPos + 220, topPos + 236,
                 leftPos + imageWidth - 4, topPos + 334);
         for (Slot slot : menu.slots) {
+            if (!slot.isActive()) continue;
             if (isRoadSlot(slot)) {
                 MachineScreenStyle.drawRoadSlotBackground(graphics, leftPos, topPos, slot,
                         isRoadSlotActive(slot), slot == pressedSlot);
@@ -279,22 +449,36 @@ public final class DimensionConfigScreen extends AbstractContainerScreen<Dimensi
         drawLeftLabel(graphics, "gui.useless_mod.dimension_config.border_block", 36);
         drawLeftLabel(graphics, "gui.useless_mod.dimension_config.fill_block", 54);
         drawLeftLabel(graphics, "gui.useless_mod.dimension_config.center_block", 72);
-        drawLeftLabel(graphics, "gui.useless_mod.dimension_config.boundary_alternate_1", 102);
-        drawLeftLabel(graphics, "gui.useless_mod.dimension_config.boundary_alternate_2", 120);
-        drawLeftLabel(graphics, "gui.useless_mod.dimension_config.road_surface", 150);
-        drawLeftLabel(graphics, "gui.useless_mod.dimension_config.road_edge", 167);
-        drawLeftLabel(graphics, "gui.useless_mod.dimension_config.road_center_marking", 184);
-        drawLeftLabel(graphics, "gui.useless_mod.dimension_config.center_marker", 214);
+        boolean boundarySlot = menu.isBoundarySlotVisible();
+        boolean centerMarkerVisible = menu.isCenterMarkerVisible();
+        boolean roadPattern = menu.isRoadPatternSelected();
+        if (boundarySlot) {
+            drawLeftLabel(graphics, "gui.useless_mod.dimension_config.boundary_alternate_1", 102);
+            drawLeftLabel(graphics, "gui.useless_mod.dimension_config.boundary_alternate_2", 120);
+        }
+        if (roadPattern) {
+            drawLeftLabel(graphics, "gui.useless_mod.dimension_config.road_surface", 150);
+            drawLeftLabel(graphics, "gui.useless_mod.dimension_config.road_edge", 167);
+            drawLeftLabel(graphics, "gui.useless_mod.dimension_config.road_center_marking", 184);
+        }
+        if (centerMarkerVisible) {
+            drawLeftLabel(graphics, "gui.useless_mod.dimension_config.center_marker", 214);
+        }
 
         drawLabel(graphics, "gui.useless_mod.dimension_config.layers", 106, 26);
         drawLabel(graphics, "gui.useless_mod.dimension_config.start_y", 178, 26);
         drawLabel(graphics, "gui.useless_mod.dimension_config.boundary_interval_x", 106, 72);
         drawLabel(graphics, "gui.useless_mod.dimension_config.boundary_interval_z", 250, 72);
-        drawLabel(graphics, "gui.useless_mod.dimension_config.road_width", 106, 118);
-        drawLabel(graphics, "gui.useless_mod.dimension_config.road_options", 178, 118);
-        drawLabel(graphics, "gui.useless_mod.dimension_config.center_options", 106, 166);
+        drawLabel(graphics, "gui.useless_mod.dimension_config.mode", 106, 118);
+        if (roadPattern) {
+            drawLabel(graphics, "gui.useless_mod.dimension_config.road_width", 250, 118);
+        }
+        if (centerMarkerVisible) {
+            drawLabel(graphics, "gui.useless_mod.dimension_config.center_options", 106, 166);
+        }
         graphics.drawString(font, playerInventoryTitle, inventoryLabelX, inventoryLabelY,
                 MachineScreenStyle.TEXT_COLOR, false);
+        renderStatus(graphics);
     }
 
     private void drawLabel(GuiGraphics graphics, String key, int x, int y) {
@@ -345,6 +529,7 @@ public final class DimensionConfigScreen extends AbstractContainerScreen<Dimensi
         double localX = mouseX - leftPos;
         double localY = mouseY - topPos;
         for (Slot slot : menu.slots) {
+            if (slot instanceof DimensionConfigMenu.GhostSlot ghost && ghost.isHidden()) continue;
             if (slot.isActive() && localX >= slot.x && localX < slot.x + 16
                     && localY >= slot.y && localY < slot.y + 16) {
                 return slot;
@@ -363,6 +548,11 @@ public final class DimensionConfigScreen extends AbstractContainerScreen<Dimensi
 
     @Override
     public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+        // 确认层存在时，ESC 只取消导入，不关闭整个界面。
+        if (pendingImport != null && keyCode == GLFW.GLFW_KEY_ESCAPE) {
+            confirmImport(false);
+            return true;
+        }
         if (keyCode != GLFW.GLFW_KEY_ESCAPE) {
             EditBox[] fields = {layersField, startYField,
                     boundaryXField, boundaryZField, roadWidthField};
@@ -376,7 +566,17 @@ public final class DimensionConfigScreen extends AbstractContainerScreen<Dimensi
 
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
+        // 二次确认层存在时独占点击，避免误触底下的槽位与按钮。
+        if (pendingImport != null) {
+            if (isInside(mouseX, mouseY, confirmX(), confirmY())) {
+                confirmImport(true);
+            } else if (isInside(mouseX, mouseY, cancelImportX(), cancelImportY())) {
+                confirmImport(false);
+            }
+            return true;
+        }
         Slot slot = slotAt(mouseX, mouseY);
+        if (slot == null || !slot.isActive()) return super.mouseClicked(mouseX, mouseY, button);
         if (isRoadSlot(slot) && !isRoadSlotActive(slot)) return true;
         pressedSlot = isRoadSlot(slot) && isRoadSlotActive(slot) ? slot : null;
         boolean handled = super.mouseClicked(mouseX, mouseY, button);
@@ -399,11 +599,13 @@ public final class DimensionConfigScreen extends AbstractContainerScreen<Dimensi
         roadWidthUp.releaseVisualState();
         bedrockButton.releaseVisualState();
         bottomButton.releaseVisualState();
-        roadPresetButton.releaseVisualState();
+        modeButton.releaseVisualState();
         centerEnabledButton.releaseVisualState();
         applyButton.releaseVisualState();
         teleportButton.releaseVisualState();
         cancelButton.releaseVisualState();
+        exportButton.releaseVisualState();
+        importButton.releaseVisualState();
         return super.mouseReleased(mouseX, mouseY, button);
     }
 }

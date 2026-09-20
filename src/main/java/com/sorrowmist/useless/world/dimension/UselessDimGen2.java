@@ -32,6 +32,24 @@ public class UselessDimGen2 extends AbstractPlasticPlatformGenerator {
         }
     }
 
+    /** 二维度多联边框固定为 2 格宽。 */
+    @Override
+    protected int getMultiBorderThickness() {
+        return 2;
+    }
+
+    /**
+     * 二维度多联中心固定为 2×2，与其单区块中心（x∈7..8, z∈7..8）的风格一致。
+     * 不再按合并尺寸奇偶收缩成 1 格，因此偶数与奇数区块数下都是 4 格。
+     */
+    @Override
+    protected boolean isMultiCenterMarker(int groupX, int groupZ, int widthX, int widthZ) {
+        int centerX = widthX / 2;
+        int centerZ = widthZ / 2;
+        return (groupX == centerX - 1 || groupX == centerX)
+                && (groupZ == centerZ - 1 || groupZ == centerZ);
+    }
+
     @Override
     protected boolean isCenterMarkerPosition(int areaX, int areaZ, int centerX, int centerZ) {
         // An even boundary interval places the area center on a chunk seam.

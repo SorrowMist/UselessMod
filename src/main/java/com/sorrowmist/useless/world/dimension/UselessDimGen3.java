@@ -32,6 +32,12 @@ public class UselessDimGen3 extends AbstractPlasticPlatformGenerator {
         }
     }
 
+    /** 三维度多联边框固定为 3 格宽。 */
+    @Override
+    protected int getMultiBorderThickness() {
+        return 3;
+    }
+
     @Override
     protected int getRoadStartBoundaryWidth() {
         return 1;

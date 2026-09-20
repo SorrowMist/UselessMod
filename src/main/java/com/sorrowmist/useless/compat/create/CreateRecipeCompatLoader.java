@@ -3,6 +3,7 @@ package com.sorrowmist.useless.compat.create;
 import com.sorrowmist.useless.content.recipe.RecipeSourceIds;
 import com.sorrowmist.useless.content.recipe.AlloyFurnaceRecipeManager;
 import com.sorrowmist.useless.content.recipe.adapters.create.CreateBlastingRecipeAdapter;
+import com.sorrowmist.useless.content.recipe.adapters.create.CreateItemApplicationRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.create.CreateMechanicalCraftingRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.create.CreateProcessingRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.create.CreateSequencedAssemblyRecipeAdapter;
@@ -18,5 +19,6 @@ public final class CreateRecipeCompatLoader {
         manager.registerAdapter(new CreateBlastingRecipeAdapter(), RecipeSourceIds.CREATE);
         manager.registerAdapter(new CreateMechanicalCraftingRecipeAdapter(), RecipeSourceIds.CREATE);
         manager.registerAdapter(new CreateSequencedAssemblyRecipeAdapter(), RecipeSourceIds.CREATE);
+        manager.registerAdapter(new CreateItemApplicationRecipeAdapter(), RecipeSourceIds.CREATE);
     }
 }

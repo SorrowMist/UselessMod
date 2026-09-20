@@ -1,5 +1,6 @@
 package com.sorrowmist.useless.utils.mining;
 
+import com.mojang.logging.LogUtils;
 import com.sorrowmist.useless.api.enums.tool.EnchantMode;
 import com.sorrowmist.useless.compat.AE2Compat;
 import com.sorrowmist.useless.compat.DraconicEvolutionCompat;
@@ -27,6 +28,7 @@ import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.HitResult;
 import net.neoforged.fml.ModList;
+import org.slf4j.Logger;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -36,12 +38,34 @@ import java.util.List;
 import java.util.Queue;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 public class MiningUtils {
+    private static final Logger LOGGER = LogUtils.getLogger();
+
     record MiningResult(List<ItemStack> drops, int experience, boolean mined) {
         private static final MiningResult NOT_MINED = new MiningResult(List.of(), 0, false);
     }
+
+    /**
+     * 一次破坏尝试的结果：方块是否真的被移除，以及本次新生成的掉落。
+     *
+     * <p>和 {@link MiningResult} 的区别：这个只描述「破坏回调 + removeBlock」这一步，
+     * 不带经验等上层语义，专门用来表达「模组拒绝了这次移除」。</p>
+     */
+    record BreakOutcome(boolean removed, List<ItemStack> drops) {
+        private static final BreakOutcome REFUSED = new BreakOutcome(false, List.of());
+    }
+
+    /**
+     * 已经报过「破坏回调抛异常」的方块类型。
+     *
+     * <p>连锁挖掘一次可能命中同一类型的几十个方块，每个都抛一次异常就等于往日志里灌几十条栈。
+     * 这里按方块类型去重：第一次带异常对象报，之后同类只累计次数。</p>
+     */
+    private static final Set<Block> REPORTED_BREAK_FAILURES = ConcurrentHashMap.newKeySet();
+    private static final Set<Block> REPORTED_REFUSED_REMOVALS = ConcurrentHashMap.newKeySet();
 
     /**
      * 获取强制挖掘兜底掉落物
@@ -120,12 +144,18 @@ public class MiningUtils {
             return;
         }
 
-        MiningResult result = forceMining
-                ? forceMineBlock(level, pos, state, player, tool)
-                : mineBlock(level, pos, state, player, tool);
-        handleDrops(player, result.drops(), tool);
-        if (result.experience() > 0) {
-            player.giveExperiencePoints(result.experience());
+        // 这条路径是从方块破坏事件里直接进来的：任何一个模组的破坏回调抛异常，
+        // 异常都会一路冒回事件总线，把整 tick 打断。所以在这里就把异常挡住并上报。
+        try {
+            MiningResult result = forceMining
+                    ? forceMineBlock(level, pos, state, player, tool)
+                    : mineBlock(level, pos, state, player, tool);
+            handleDrops(player, result.drops(), tool);
+            if (result.experience() > 0) {
+                player.giveExperiencePoints(result.experience());
+            }
+        } catch (Throwable failure) {
+            reportBlockBreakFailure(state, pos, failure);
         }
     }
 
@@ -135,8 +165,10 @@ public class MiningUtils {
         }
 
         int experience = getExperience(level, pos, state, player, tool);
-        List<ItemStack> drops = destroyBlockAndCollectDrops(level, pos, state, player, tool);
-        return new MiningResult(drops, experience, true);
+        BreakOutcome outcome = destroyBlockAndCollectDrops(level, pos, state, player, tool);
+        return outcome.removed()
+                ? new MiningResult(outcome.drops(), experience, true)
+                : MiningResult.NOT_MINED;
     }
 
     static MiningResult forceMineBlock(ServerLevel level, BlockPos pos, BlockState state, Player player, ItemStack tool) {
@@ -151,8 +183,10 @@ public class MiningUtils {
         int experience = getExperience(level, pos, state, player, tool);
         if (isSilkTouch(tool)) {
             List<ItemStack> fallbackDrops = getForcedFallbackDrops(state, level, pos);
-            destroyBlockAndCollectDrops(level, pos, state, player, tool);
-            return new MiningResult(fallbackDrops, 0, true);
+            // 被方块自身拒绝移除时不发兜底掉落，否则等于凭空刷出一个核心物品。
+            return destroyBlockAndCollectDrops(level, pos, state, player, tool).removed()
+                    ? new MiningResult(fallbackDrops, 0, true)
+                    : MiningResult.NOT_MINED;
         }
 
         BlockEntity blockEntity = level.getBlockEntity(pos);
@@ -161,8 +195,11 @@ public class MiningUtils {
         List<ItemStack> fallbackDrops = useFallback
                 ? getForcedFallbackDrops(state, level, pos)
                 : List.of();
-        List<ItemStack> actualDrops = destroyBlockAndCollectDrops(level, pos, state, player, tool);
-        List<ItemStack> drops = selectForcedDrops(naturalDrops, actualDrops, fallbackDrops);
+        BreakOutcome outcome = destroyBlockAndCollectDrops(level, pos, state, player, tool);
+        if (!outcome.removed()) {
+            return MiningResult.NOT_MINED;
+        }
+        List<ItemStack> drops = selectForcedDrops(naturalDrops, outcome.drops(), fallbackDrops);
         return new MiningResult(drops, experience, true);
     }
 
@@ -192,10 +229,16 @@ public class MiningUtils {
         ServerLevel serverLevel = (ServerLevel) world;
         BlockEntity blockEntity = world.getBlockEntity(pos);
 
-        List<ItemStack> drops = Block.getDrops(state, serverLevel, pos, blockEntity, player, tool);
-        handleDrops(player, drops, tool);
+        // 同样要把模组回调的异常挡在事件链之外：数据能源的三位一体样板核心在状态未就绪时
+        // getDrops / playerWillDestroy 都会抛，异常冒回事件总线就会打断整 tick。
+        try {
+            List<ItemStack> drops = Block.getDrops(state, serverLevel, pos, blockEntity, player, tool);
+            handleDrops(player, drops, tool);
 
-        world.destroyBlock(pos, false, player);
+            world.destroyBlock(pos, false, player);
+        } catch (Throwable failure) {
+            reportBlockBreakFailure(state, pos, failure);
+        }
     }
 
     /**
@@ -455,10 +498,10 @@ public class MiningUtils {
      * @param state  方块状态
      * @param player 玩家
      * @param tool   工具
-     * @return 本次破坏生成的掉落物列表
+     * @return 本次破坏的结果（方块是否真的被移除 + 掉落物列表）
      */
-    static List<ItemStack> destroyBlockAndCollectDrops(ServerLevel level, BlockPos pos, BlockState state,
-                                                       Player player, ItemStack tool) {
+    static BreakOutcome destroyBlockAndCollectDrops(ServerLevel level, BlockPos pos, BlockState state,
+                                                    Player player, ItemStack tool) {
         // 采用破坏前后 2 格膨胀范围内 ItemEntity 的差集来收集本次掉落，
         // 2 格可覆盖部分模组把掉落物生成在方块中心 1 格外的情况；before/after 差集保证不会误收邻近方块的已有掉落。
         AABB area = new AABB(pos).inflate(2.0);
@@ -471,7 +514,10 @@ public class MiningUtils {
                                           .map(Entity::getUUID)
                                           .collect(Collectors.toSet());
 
-        destroyBlockWithoutDrops(level, pos, state, player, tool);
+        if (!destroyBlockWithoutDrops(level, pos, state, player, tool)) {
+            // 方块被模组拒绝移除：这次没有产生任何东西，也就没有掉落可收。
+            return BreakOutcome.REFUSED;
+        }
 
         for (ExperienceOrb experienceOrb : level.getEntitiesOfClass(ExperienceOrb.class, area)) {
             if (!experienceBefore.contains(experienceOrb.getUUID())) {
@@ -489,25 +535,68 @@ public class MiningUtils {
                  }
                  entity.discard();
              });
-        return drops;
+        return new BreakOutcome(true, drops);
     }
 
     /**
      * 执行方块破坏回调并移除方块
      * 用于集中走 playerWillDestroy 和 playerDestroy，避免直接 removeBlock 跳过模组自定义破坏逻辑。
      *
-     * @param level  世界
-     * @param pos    方块位置
-     * @param state  方块状态
-     * @param player 玩家
-     * @param tool   工具
+     * <p><b>两个回调都可能抛</b>：数据能源的三位一体样板核心在持久化状态读不出来时，
+     * {@code playerWillDestroy} / {@code getDrops} 会抛 {@link IllegalStateException}
+     * （并在自己的日志里写明「拒绝移除 / 拒绝给出空白核心掉落」）。原来的写法一旦抛异常，
+     * 后面的 {@code removeBlock} 就永远走不到 —— 方块留在原地，而异常一路冒到事件总线，
+     * 把整批连锁挖掘一起打断。</p>
+     *
+     * <p>现在的语义是：<b>回调抛异常 = 模组拒绝这次移除，尊重它</b>（不强行 removeBlock，
+     * 否则对方要保留的样板 / 待输出内容会被静默丢掉），但把异常收在这一层，
+     * 按方块类型去重后只报一次，剩下的方块照常挖。</p>
+     *
+     * @return {@code true} 表示方块已被移除；{@code false} 表示被方块自身的回调拒绝
      */
-    static void destroyBlockWithoutDrops(ServerLevel level, BlockPos pos, BlockState state,
-                                         Player player, ItemStack tool) {
+    static boolean destroyBlockWithoutDrops(ServerLevel level, BlockPos pos, BlockState state,
+                                            Player player, ItemStack tool) {
         BlockEntity be = level.getBlockEntity(pos);
-        state.getBlock().playerWillDestroy(level, pos, state, player);
-        state.getBlock().playerDestroy(level, player, pos, state, be, tool);
+        Block block = state.getBlock();
+        boolean accepted = true;
+        try {
+            block.playerWillDestroy(level, pos, state, player);
+        } catch (Throwable refusal) {
+            accepted = false;
+            reportRefusedRemoval(block, pos, "playerWillDestroy", refusal);
+        }
+        try {
+            block.playerDestroy(level, player, pos, state, be, tool);
+        } catch (Throwable refusal) {
+            accepted = false;
+            reportRefusedRemoval(block, pos, "playerDestroy", refusal);
+        }
+        if (!accepted) {
+            return false;
+        }
         level.removeBlock(pos, false);
+        return true;
+    }
+
+    /** 方块自身拒绝被移除：按类型去重上报，别让一次连锁挖掘灌出一屏栈。 */
+    private static void reportRefusedRemoval(Block block, BlockPos pos, String callback, Throwable refusal) {
+        if (REPORTED_REFUSED_REMOVALS.add(block)) {
+            LOGGER.warn("Block {} refused removal at {} ({} threw {}: {}); skipping it, chain mining continues",
+                    BuiltInRegistries.BLOCK.getKey(block), pos, callback,
+                    refusal.getClass().getSimpleName(), refusal.getMessage(), refusal);
+        }
+    }
+
+    /**
+     * 单个方块在连锁挖掘里出错时的兜底上报：把异常挡在这一格，后面的方块继续挖。
+     * 同样是按方块类型去重。
+     */
+    static void reportBlockBreakFailure(BlockState state, BlockPos pos, Throwable failure) {
+        Block block = state.getBlock();
+        if (REPORTED_BREAK_FAILURES.add(block)) {
+            LOGGER.warn("Failed to break {} at {}; skipping it, chain mining continues",
+                    BuiltInRegistries.BLOCK.getKey(block), pos, failure);
+        }
     }
 
     /**

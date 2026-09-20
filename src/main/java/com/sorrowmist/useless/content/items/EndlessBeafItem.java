@@ -10,6 +10,7 @@ import com.sorrowmist.useless.core.common.KeyBindings;
 import com.sorrowmist.useless.core.component.UComponents;
 import com.sorrowmist.useless.core.config.ConfigManager;
 import com.sorrowmist.useless.init.ModDamageTypes;
+import com.sorrowmist.useless.init.ModTags;
 import com.sorrowmist.useless.utils.EnchantmentUtil;
 import com.sorrowmist.useless.utils.UselessItemUtils;
 import com.sorrowmist.useless.utils.mining.RightClickChainer;
@@ -128,9 +129,13 @@ public class EndlessBeafItem extends TieredItem {
                 .stacksTo(1)
                 .rarity(Rarity.EPIC)
                 .durability(0)
+                // 这里刻意「只声明能挖什么」，不写任何 deniesDrops 规则。
+                // 原版 Tool 组件是按顺序取第一条命中规则，而所有新增挖掘等级的模组都会把自己的
+                // 方块并入 #minecraft:incorrect_for_<tier>_tool；一旦把某个等级的拒绝清单写进来，
+                // 就等于给造化杖挂上一份会随整合包变化的黑名单（ATM 的 vibranium / unobtainium
+                // 矿即因此被误伤）。等级判定改由 isCorrectToolForDrops 覆写统一声明。
                 .component(DataComponents.TOOL, new Tool(
                         List.of(
-                                Tool.Rule.deniesDrops(Tiers.NETHERITE.getIncorrectBlocksForDrops()),
                                 Tool.Rule.minesAndDrops(BlockTags.MINEABLE_WITH_PICKAXE, Tiers.NETHERITE.getSpeed()),
                                 Tool.Rule.minesAndDrops(BlockTags.MINEABLE_WITH_AXE, Tiers.NETHERITE.getSpeed()),
                                 Tool.Rule.minesAndDrops(BlockTags.MINEABLE_WITH_SHOVEL, Tiers.NETHERITE.getSpeed()),
@@ -988,7 +993,23 @@ public class EndlessBeafItem extends TieredItem {
 
         float hardness = state.getDestroySpeed(null, null);
         if (hardness < 0) {
-            return 0.0F;
+            // hardness == -1 是模组圈里通行的「伪不可破坏」约定：原版层面不可破坏，是否可挖
+            // 由方块自己重写的 getDestroyProgress 决定。ATM 的三种矿与 ancient_stone 系列
+            // 就是 strength(-1.0f, ...) 配一段自写进度公式（hasCorrectToolForDrops ? 250 : 1500）。
+            //
+            // 这里原来直接 return 0.0F，会让 getDigSpeed 归零，进而让那类方块的破坏进度恒为 0
+            // —— 表现就是「方块完全挖不动」，与掉落判定无关。
+            //
+            // 但只返回 baseSpeed 又会明显偏慢：普通方块走原版的「硬度 x 30」除数，而这类方块
+            // 自写的除数大得多（ATM 用 250，且额外 /2），同样的 baseSpeed 会慢十几倍。所以这里
+            // 用一个「名义硬度」替代哨兵值 -1，让 baseSpeed x 硬度 这条公式继续成立：
+            //   ATM 矿：getDigSpeed / 2 / 250 = (baseSpeed x 15) / 500 ≈ 0.30/tick（约 3.3 tick）
+            //   普通方块：baseSpeed / 30 ≈ 0.33/tick（约 3 tick）
+            // 手感因此基本一致。名义硬度可用 beef_tool_pseudo_hardness 调整。
+            //
+            // 原版基岩 / 屏障 / 传送门框不会因此变得可挖：BlockBehaviour.getDestroyProgress
+            // 在 destroySpeed == -1 时直接 return 0（字节码确认），根本用不到我们给的速度。
+            return baseSpeed * (float) ConfigManager.getBeefToolPseudoHardness();
         }
 
         float speed = baseSpeed * hardness;
@@ -999,6 +1020,29 @@ public class EndlessBeafItem extends TieredItem {
         }
 
         return speed;
+    }
+
+    /**
+     * 造化杖是「无等级万能工具」：不继承任何工具等级的 incorrect_for_*_tool 限制。
+     *
+     * <p>原版 {@link Tool} 组件按顺序取「第一条命中的规则」，而所有新增挖掘等级的模组都会把
+     * 自己的方块并入 {@code #minecraft:incorrect_for_<tier>_tool}。若把某个等级的拒绝清单写进
+     * 规则表，就等于给造化杖挂上一份会随整合包变化的黑名单（AllTheModium 的 vibranium /
+     * unobtainium 矿即因此被误伤，表现为方块被移除但不掉落、连锁挖掘直接跳过）。
+     *
+     * <p>这里反过来声明「永远是正确工具」，任何模组、任何未来新增的挖掘等级都自动生效，
+     * 代码里不需要出现任何模组专属 ID。需要保留进度门槛时，把方块加进
+     * {@link ModTags#BEEF_TOOL_TIER_LOCKED} 即可；也可以用配置项
+     * {@code beef_tool_ignores_tool_tier} 整体回退到原版语义。
+     */
+    @Override
+    public boolean isCorrectToolForDrops(@NotNull ItemStack stack, @NotNull BlockState state) {
+        if (ConfigManager.isBeefToolIgnoresToolTier() && !state.is(ModTags.BEEF_TOOL_TIER_LOCKED)) {
+            return true;
+        }
+        // 开关关闭 / 方块在锁定标签内：回到「下界合金层级」的原版语义
+        return super.isCorrectToolForDrops(stack, state)
+                && !state.is(Tiers.NETHERITE.getIncorrectBlocksForDrops());
     }
 
     @Override

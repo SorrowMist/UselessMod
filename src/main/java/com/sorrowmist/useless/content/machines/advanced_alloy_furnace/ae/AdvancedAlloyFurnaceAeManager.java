@@ -120,6 +120,18 @@ public final class AdvancedAlloyFurnaceAeManager {
     /** 实测插入成本的平滑系数（新样本占 1/8）。 */
     private static final double INSERT_COST_SMOOTHING = 0.125D;
     /**
+     * 排空延迟诊断的打印间隔（tick）。
+     *
+     * <p>「一批产物从入队到被完全接走」用了几个 tick，是外部 CPU 自适应窗口能否继续放大的关键量：
+     * 它按「一批必须在 2 tick 内返回完」来决定是否允许窗口翻倍。所以这里把它直接量出来，
+     * 免得再靠推测。</p>
+     */
+    private static final long DRAIN_DIAGNOSTICS_INTERVAL_TICKS = 40L;
+
+    /** 上次打印排空延迟的 tick。 */
+    private long lastDrainDiagnosticsTick = Long.MIN_VALUE;
+
+    /**
      * 预算探测的采样间隔（段）。
      *
      * <p><b>为什么不能逐段取时间</b>：{@code System.nanoTime()} 在 Windows 上单次约 100~150ns，
@@ -150,7 +162,7 @@ public final class AdvancedAlloyFurnaceAeManager {
      * <b>降档每次最多 1%</b>（噪声最多造成 1% 损失，且下一批就能恢复）。</p>
      *
      * <p>代价：存储真的永久变慢时，预算要 ~70 批才收敛到位 —— 这期间积压会略涨，
-     * 由 {@link #hardOutputChunkBudget()} 兜底。之所以敢取这么慢：噪声是<b>单侧</b>的
+     * 由队列条目数硬上限（{@link #hardOutputQueueCap()}）兜底。之所以敢取这么慢：噪声是<b>单侧</b>的
      * （只会让耗时偏高），而真的变慢会持续出现，慢慢收即可。</p>
      */
     private static final double MAX_INSERT_COST_RISE_PER_SAMPLE = 1.01D;
@@ -168,17 +180,6 @@ public final class AdvancedAlloyFurnaceAeManager {
      * <p>控制器正常工作时积压收敛在「一两批在飞」（≈2×当前预算），离这里极远。</p>
      */
     private static final long OUTPUT_BACKLOG_HARD_MULTIPLIER = 8L;
-    /**
-     * 回网积压的<b>绝对</b>硬上限（分段数）：约 256K 段 ≈ 10MB NBT。
-     *
-     * <p>刻意用绝对值而不是「单批上限 × 倍数」：单批上限会随交付能力调整，
-     * 若硬上限跟着放大，内存 / NBT 兜底就形同虚设。</p>
-     *
-     * <p>正常永远碰不到：单批规模由「时间预算 ÷ 实测插入成本」前馈给出，积压控制器把它维持在
-     * 「一两批在飞」。只有下游停摆（网络不可达 / CPU 不认领）时批次才会持续堆积 ——
-     * 那时拒收才是对的（产物没地方放）。</p>
-     */
-    private static final long HARD_OUTPUT_CHUNK_BUDGET = 2_097_152L;
     /**
      * 每台机器每 tick 的产物回网时间预算（纳秒），由配置项
      * {@code advanced_alloy_furnace.ae_output_return_budget_millis} 给出。
@@ -758,26 +759,31 @@ public final class AdvancedAlloyFurnaceAeManager {
         return Math.max(1L, this.owner.getMaxAETaskCount());
     }
 
-    /**
-     * 回网积压的硬上限（分段数）：<b>只作内存 / NBT 兜底</b>。
-     *
-     * <p>控制器正常工作时积压收敛在「一两批在飞」的量级，离这里很远；只有网络长期不可达
-     * （交付速率 0、积压只增不减）时才会碰到 —— 那种情况下拒收才是对的（产物没地方放）。</p>
-     */
-    private long hardOutputChunkBudget() {
-        return HARD_OUTPUT_CHUNK_BUDGET;
-    }
-
-    /** 回网队列的<b>条目数</b>硬上限：与分段硬上限互为双保险。 */
+    /** 回网队列的<b>条目数</b>硬上限 —— 这是唯一真正对应内存占用的维度。 */
     private int hardOutputQueueCap() {
         long cap = (long) craftingPatternQueueCap() * OUTPUT_BACKLOG_HARD_MULTIPLIER;
         return (int) Math.max(2L, Math.min(Integer.MAX_VALUE, cap));
     }
 
-    /** 回网积压是否已到硬上限（真拒收）。分段与条目两个维度任一越界即算满。 */
+    /**
+     * 回网队列是否已满（真拒收）。
+     *
+     * <p><b>只按「条目数」判定，不看分段数。</b> 原因：</p>
+     * <ul>
+     *   <li>待回网账本是 {@code Map<AEKey, BigInteger>}，<b>内存是 O(键数) 而不是 O(段数)</b> ——
+     *       分段数（{@code Σ ceil(量 / Long.MAX)}）是<b>推导出来的数字</b>，不是分配量，
+     *       拿它当内存代理是错的。</li>
+     *   <li>单批的段数本来就可以很大：例如 32Y（3.2e25）份就是约 <b>347 万段</b>，
+     *       这属于<b>正常体量</b>，不该被当成「积压异常」而拒收。</li>
+     *   <li>「一批太大导致回网耗时」已由每 tick 时间预算管住：回网在预算处停下、
+     *       跨 tick 摊开，不会卡住 tick。</li>
+     * </ul>
+     *
+     * <p>曾经按分段数判定的 {@code HARD_OUTPUT_CHUNK_BUDGET} 正是因为这条误判，
+     * 把大数批次当成积压拒收，成为外部 CPU 侧「提交被拒」的真正原因。<b>已删除。</b></p>
+     */
     private boolean isOutputBacklogFull() {
-        return backlogChunks(this.pendingOutputAmount) >= hardOutputChunkBudget()
-                || this.queuedCraftingOutputs.size() >= hardOutputQueueCap();
+        return this.queuedCraftingOutputs.size() >= hardOutputQueueCap();
     }
 
     /** 把产物总量换算成 {@code long} 分段数（饱和 long）。 */
@@ -1650,6 +1656,19 @@ public final class AdvancedAlloyFurnaceAeManager {
             PendingCraftingOutput pending = iterator.next();
             if (pending.isEmpty()) {
                 iterator.remove();
+                // 排空延迟 = 从入队到被完全接走用了几个 tick。
+                // 这是外部 CPU 自适应窗口能否继续放大的关键量（它要求「一批 ≤2 tick 返回完」），
+                // 直接量出来，不再靠推测。
+                if (LOGGER.isDebugEnabled() && now - this.lastDrainDiagnosticsTick
+                        >= DRAIN_DIAGNOSTICS_INTERVAL_TICKS) {
+                    this.lastDrainDiagnosticsTick = now;
+                    LOGGER.debug("Alloy furnace drain latency at {}: batch={}, drainTicks={}, "
+                                    + "handoverActive={}",
+                            this.owner.getBlockPos(),
+                            pending.cpuContext == null ? "unbound" : pending.cpuContext.batchId(),
+                            Math.max(0L, now - pending.queuedTick),
+                            pending.cpuAdapterId != null);
+                }
                 // 产物全部回网：给 CPU 侧发实际产出与终局通知（没有绑定时是空操作）。
                 notifyCpuBatchCompleted(pending);
                 changed = true;

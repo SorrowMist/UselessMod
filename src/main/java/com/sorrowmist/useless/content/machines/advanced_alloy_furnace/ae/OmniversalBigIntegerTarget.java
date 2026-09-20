@@ -83,7 +83,7 @@ public final class OmniversalBigIntegerTarget implements AlloyFurnaceBigIntegerT
         IPatternDetails original = pattern == null ? null : SmartDoublingPatterns.unwrap(pattern);
         if (original instanceof OmniversalPatternDetails omniversal) {
             BigInteger accepted = AlloyFurnaceBigIntegerCrafting.maximumCount(
-                    this.core, omniversal, prototype, threads(), segmentBudget);
+                    this.core, omniversal, prototype, threads(), segmentBudget, requested);
             if (accepted.signum() <= 0) {
                 // 报 0 时给出原因（档次不够 / 缺模具 / 没能量），供调用方提示玩家。
                 AdvancedAlloyFurnaceRecipe recipe = omniversal.recipe();
@@ -95,7 +95,7 @@ public final class OmniversalBigIntegerTarget implements AlloyFurnaceBigIntegerT
         if (original instanceof IMolecularAssemblerSupportedPattern) {
             // 合成样板：一次装配折叠任意份数、不收能量，所以只看材料窗口与产物分段预算。
             BigInteger accepted = AlloyFurnaceBigIntegerCrafting.maximumCraftingPatternCount(
-                    original, prototype, threads(), segmentBudget);
+                    original, prototype, threads(), segmentBudget, requested);
             return accepted.signum() <= 0
                     ? AlloyFurnaceBigIntegerCapacity.none("")
                     : AlloyFurnaceBigIntegerCapacity.of(requested.min(accepted));

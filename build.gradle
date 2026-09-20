@@ -312,6 +312,9 @@ dependencies {
     implementation "curse.maven:bookshelf-228525:7115332"
     runtimeOnly "maven.modrinth:prickle:EE1FHDyD"
 
+    implementation "curse.maven:allthemodium-364466:7974403"
+    implementation "curse.maven:ato-405593:7825464"
+
 //    runtimeOnly "maven.modrinth:allthemodium:2.9.5"
     implementation "maven.modrinth:extendedae-plus:1.5.5"
 //    runtimeOnly "maven.modrinth:omnitools:1.21.1-1.2.1"

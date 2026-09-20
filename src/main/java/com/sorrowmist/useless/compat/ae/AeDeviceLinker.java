@@ -219,43 +219,45 @@ public final class AeDeviceLinker {
      */
     public static void ensureLinks(MinecraftServer server) {
         AeConnectLinkSavedData data = AeConnectLinkSavedData.get(server);
-        if (data.isEmpty()) {
-            return;
+        if (!data.isEmpty()) {
+            for (AeConnectLinkSavedData.Link link : data.snapshot()) {
+                // 访问点与机器可能在不同维度，两边都要按各自的维度解析。
+                ServerLevel accessLevel = server.getLevel(link.accessPointDimension());
+                ServerLevel machineLevel = server.getLevel(link.machineDimension());
+                if (accessLevel == null || machineLevel == null) {
+                    continue;
+                }
+                if (!accessLevel.isLoaded(link.accessPoint()) || !machineLevel.isLoaded(link.machine())) {
+                    continue;
+                }
+
+                BlockEntity accessEntity = accessLevel.getBlockEntity(link.accessPoint());
+                if (!(accessEntity instanceof WirelessAccessPointBlockEntity accessPoint)) {
+                    data.removeByAccessPoint(link.accessPointDimension(), link.accessPoint());
+                    continue;
+                }
+
+                IInWorldGridNodeHost host = machineLevel.getCapability(
+                        AECapabilities.IN_WORLD_GRID_NODE_HOST, link.machine(), null);
+                if (host == null) {
+                    data.removeByMachine(link.machineDimension(), link.machine());
+                    continue;
+                }
+
+                IGridNode machineNode = resolveNode(host);
+                IGridNode accessNode = accessPoint.getMainNode().getNode();
+                if (machineNode == null || accessNode == null || !accessPoint.getMainNode().isOnline()) {
+                    // 节点还没就绪（AE2 会把建节点推迟到首个 tick），等下一轮再试，别误删登记。
+                    continue;
+                }
+
+                createLink(accessNode, machineNode);
+            }
         }
 
-        for (AeConnectLinkSavedData.Link link : data.snapshot()) {
-            // 访问点与机器可能在不同维度，两边都要按各自的维度解析。
-            ServerLevel accessLevel = server.getLevel(link.accessPointDimension());
-            ServerLevel machineLevel = server.getLevel(link.machineDimension());
-            if (accessLevel == null || machineLevel == null) {
-                continue;
-            }
-            if (!accessLevel.isLoaded(link.accessPoint()) || !machineLevel.isLoaded(link.machine())) {
-                continue;
-            }
-
-            BlockEntity accessEntity = accessLevel.getBlockEntity(link.accessPoint());
-            if (!(accessEntity instanceof WirelessAccessPointBlockEntity accessPoint)) {
-                data.removeByAccessPoint(link.accessPointDimension(), link.accessPoint());
-                continue;
-            }
-
-            IInWorldGridNodeHost host = machineLevel.getCapability(
-                    AECapabilities.IN_WORLD_GRID_NODE_HOST, link.machine(), null);
-            if (host == null) {
-                data.removeByMachine(link.machineDimension(), link.machine());
-                continue;
-            }
-
-            IGridNode machineNode = resolveNode(host);
-            IGridNode accessNode = accessPoint.getMainNode().getNode();
-            if (machineNode == null || accessNode == null || !accessPoint.getMainNode().isOnline()) {
-                // 节点还没就绪（AE2 会把建节点推迟到首个 tick），等下一轮再试，别误删登记。
-                continue;
-            }
-
-            createLink(accessNode, machineNode);
-        }
+        // 豁免索引按节点身份查：AE2 换掉节点后旧条目再也匹配不上，但会一直持有引用，
+        // 而且每次通道重算都要被遍历一遍。趁这个低频闹钟顺手清掉失效条目。
+        AeLinkChannelBypass.pruneStaleLinks();
     }
 
     /**

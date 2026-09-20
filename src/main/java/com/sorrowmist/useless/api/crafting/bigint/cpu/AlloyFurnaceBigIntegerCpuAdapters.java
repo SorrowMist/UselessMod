@@ -2,6 +2,8 @@ package com.sorrowmist.useless.api.crafting.bigint.cpu;
 
 import net.minecraft.resources.ResourceLocation;
 import org.jetbrains.annotations.NotNull;
+
+import java.util.List;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.Collections;
@@ -90,6 +92,31 @@ public final class AlloyFurnaceBigIntegerCpuAdapters {
     }
 
     /** @return 当前已注册的全部适配器（只读视图） */
+    /**
+     * 是否存在「会整批接走产物」的适配器（即覆写了 {@link AlloyFurnaceBigIntegerCpuAdapter#claimOutputs}）。
+     *
+     * <p><b>为什么要探测它</b>：本机的「产物交付能力」闸（{@code maximumSegmentedCount}）假设
+     * <b>产物由本机逐段写回网络</b>。若已有 CPU 适配器整批接走产物，这条闸就失去意义 ——
+     * 交付由对方负责，再按它限制单批规模只会白白压小批次。</p>
+     *
+     * <p>用「声明类是否还是接口本身」判断是否覆写了 default 方法，是标准做法，
+     * 这样调用方不必额外实现一个声明方法。</p>
+     */
+    public static boolean hasBulkOutputAdapter() {
+        for (AlloyFurnaceBigIntegerCpuAdapter adapter : ADAPTERS.values()) {
+            try {
+                if (adapter.getClass()
+                        .getMethod("claimOutputs", AlloyFurnaceBigIntegerBatchContext.class, List.class)
+                        .getDeclaringClass() != AlloyFurnaceBigIntegerCpuAdapter.class) {
+                    return true;
+                }
+            } catch (NoSuchMethodException ignored) {
+                // 老版本接口没有这个方法：视为不支持整批接收。
+            }
+        }
+        return false;
+    }
+
     public static @NotNull Map<ResourceLocation, AlloyFurnaceBigIntegerCpuAdapter> registered() {
         return Collections.unmodifiableMap(ADAPTERS);
     }

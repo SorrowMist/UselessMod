@@ -32,6 +32,9 @@ public class UBlockTagsProvider extends BlockTagsProvider {
             .replace(false)
             .add(ModBlocks.OMNIVERSAL_FURNACE_CASING.get())
             .add(ModBlocks.PASSIVE_CRAFTING_HATCH.get());
+
+        // 造化杖「无视等级」的例外清单：默认留空，整合包往生成的 json 里加方块即可。
+        this.tag(ModTags.BEEF_TOOL_TIER_LOCKED).replace(false);
     }
 
     private void addMinecraftTags() {

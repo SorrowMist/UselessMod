@@ -95,13 +95,19 @@ public class ChainMiningStrategy implements MiningStrategy {
                 continue;
             }
 
-            MiningUtils.MiningResult result = forceMining
-                    ? MiningUtils.forceMineBlock(level, targetPos, currentState, player, hand)
-                    : MiningUtils.mineBlock(level, targetPos, currentState, player, hand);
-            if (result.mined()) {
-                allDrops.addAll(result.drops());
-                totalExperience += result.experience();
-                actualMinedCount++;
+            // 单个方块不能拖垮整批：模组的破坏回调抛异常（数据能源的三位一体样板核心
+            // 在状态未就绪时会抛）或方块拒绝被移除，都只跳过这一格，继续挖剩下的。
+            try {
+                MiningUtils.MiningResult result = forceMining
+                        ? MiningUtils.forceMineBlock(level, targetPos, currentState, player, hand)
+                        : MiningUtils.mineBlock(level, targetPos, currentState, player, hand);
+                if (result.mined()) {
+                    allDrops.addAll(result.drops());
+                    totalExperience += result.experience();
+                    actualMinedCount++;
+                }
+            } catch (Throwable failure) {
+                MiningUtils.reportBlockBreakFailure(currentState, targetPos, failure);
             }
         }
 

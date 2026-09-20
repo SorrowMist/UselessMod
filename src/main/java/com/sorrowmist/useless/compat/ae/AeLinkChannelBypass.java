@@ -10,6 +10,7 @@ import java.util.ArrayDeque;
 import java.util.Collections;
 import java.util.Deque;
 import java.util.IdentityHashMap;
+import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
 
@@ -66,6 +67,53 @@ public final class AeLinkChannelBypass {
 
     public static boolean hasLinks() {
         return !MACHINES_BY_ACCESS.isEmpty();
+    }
+
+    /**
+     * 清掉已经失效的登记。
+     *
+     * <p>AE2 的节点与连接在区块卸载、方块实体重建时会被整体换掉（连接更是连存档都不写），
+     * 而我们这张表是按<b>身份</b>查的：旧条目再也匹配不上任何新连接（所以不会误判），
+     * 但会一直把旧节点强引用住，并且 {@link #farSideNodes()} 每次通道重算都要遍历一遍 ——
+     * 连接反复重建时表会一直长。低频清一次即可。</p>
+     *
+     * <p>判据只看「那条连接还在不在」：连接被拆掉就说明这条链路已经不成立，
+     * 对应登记本来也再也匹配不上任何东西。重建连接时 {@code AeDeviceLinker#createLink} 会重新登记，
+     * 所以清掉是幂等且自愈的。</p>
+     */
+    public static void pruneStaleLinks() {
+        if (MACHINES_BY_ACCESS.isEmpty()) {
+            return;
+        }
+        boolean changed = false;
+        Iterator<Map.Entry<IGridNode, Set<IGridNode>>> entries = MACHINES_BY_ACCESS.entrySet().iterator();
+        while (entries.hasNext()) {
+            Map.Entry<IGridNode, Set<IGridNode>> entry = entries.next();
+            if (entry.getValue().removeIf(machine -> !isStillLinked(entry.getKey(), machine))) {
+                changed = true;
+            }
+            if (entry.getValue().isEmpty()) {
+                entries.remove();
+                changed = true;
+            }
+        }
+        if (changed) {
+            invalidate();
+        }
+    }
+
+    /** 访问点与机器之间是否还有一条「我们建的」非空间连接（节点已销毁按失效处理）。 */
+    private static boolean isStillLinked(IGridNode accessNode, IGridNode machineNode) {
+        try {
+            for (IGridConnection connection : accessNode.getConnections()) {
+                if (!connection.isInWorld() && connection.getOtherSide(accessNode) == machineNode) {
+                    return true;
+                }
+            }
+        } catch (Throwable broken) {
+            // 节点可能在这次清理前被销毁，按失效处理。
+        }
+        return false;
     }
 
     /** 每次通道重算开始时把「链路节点」缓存作废。 */

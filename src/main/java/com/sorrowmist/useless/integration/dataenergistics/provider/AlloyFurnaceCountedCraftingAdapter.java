@@ -275,16 +275,16 @@ class AlloyFurnaceCountedCraftingAdapter implements CountedCraftingProviderAdapt
         int threads = machineThreads();
         long segmentBudget = segmentBudget();
         if (original instanceof IMolecularAssemblerSupportedPattern) {
-            return requestedCount.min(AlloyFurnaceBigIntegerCrafting.maximumCraftingPatternCount(
-                    original, prototype, threads, segmentBudget));
+            return AlloyFurnaceBigIntegerCrafting.maximumCraftingPatternCount(
+                    original, prototype, threads, segmentBudget, requestedCount);
         }
         if (original instanceof OmniversalPatternDetails omniversal) {
             CraftingTaskContext context = this.taskContext.get();
             if (!AlloyFurnaceBigIntegerCrafting.supports(context)) {
                 return BigInteger.ZERO;
             }
-            return requestedCount.min(AlloyFurnaceBigIntegerCrafting.maximumCount(
-                    context, omniversal, prototype, threads, segmentBudget));
+            return AlloyFurnaceBigIntegerCrafting.maximumCount(
+                    context, omniversal, prototype, threads, segmentBudget, requestedCount);
         }
         return BigInteger.ZERO;
     }

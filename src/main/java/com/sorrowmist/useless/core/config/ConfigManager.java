@@ -45,6 +45,8 @@ public class ConfigManager {
     private static final ModConfigSpec.IntValue LOOTING_LEVEL;
     // 牛排工具挖掘速度配置
     private static final ModConfigSpec.DoubleValue BEEF_TOOL_MINING_SPEED;
+    private static final ModConfigSpec.BooleanValue BEEF_TOOL_IGNORES_TOOL_TIER;
+    private static final ModConfigSpec.DoubleValue BEEF_TOOL_PSEUDO_HARDNESS;
     private static final ModConfigSpec.DoubleValue BEEF_TOOL_ENTITY_INTERACTION_RANGE;
     private static final ModConfigSpec.DoubleValue BEEF_TOOL_BLOCK_INTERACTION_RANGE;
     private static final ModConfigSpec.IntValue BEEF_CONSTRUCTION_WAND_BUILD_LIMIT;
@@ -404,6 +406,24 @@ public class ConfigManager {
                 .comment("牛排工具基础挖掘速度")
                 .translation("useless_mod.configuration.beef_tool_mining_speed")
                 .defineInRange("beef_tool_mining_speed", 10.0, 1.0, 1000.0);
+
+        // 造化杖是否无视工具挖掘等级（含其它模组自定义的等级）
+        BEEF_TOOL_IGNORES_TOOL_TIER = SERVER_BUILDER
+                .comment("造化杖是否无视所有工具挖掘等级限制（含其它模组自定义的等级）",
+                        "开启：可正常挖掘任何需要特定工具等级的方块；关闭：回到下界合金层级的原版语义",
+                        "无论开关如何，useless_mod:beef_tool_tier_locked 标签内的方块始终按等级判定")
+                .translation("useless_mod.configuration.beef_tool_ignores_tool_tier")
+                .define("beef_tool_ignores_tool_tier", true);
+
+        // 「伪不可破坏」方块（hardness = -1）的名义硬度：speed = baseSpeed × 本值
+        BEEF_TOOL_PSEUDO_HARDNESS = SERVER_BUILDER
+                .comment("牛排工具挖掘「伪不可破坏」方块（hardness = -1）时使用的名义硬度",
+                        "这类方块原版层面不可破坏，靠自写 getDestroyProgress 决定进度，其进度除数远大于普通方块",
+                        "（如 AllTheModium 的三矿与远古石用 250，而普通方块相当于硬度x30），",
+                        "所以需要更大的挖掘速度才能手感一致：speed = beef_tool_mining_speed × 本值",
+                        "15 约等于挖普通方块的手感；调大 = 更快")
+                .translation("useless_mod.configuration.beef_tool_pseudo_hardness")
+                .defineInRange("beef_tool_pseudo_hardness", 15.0, 1.0, 1000.0);
 
         BEEF_TOOL_ENTITY_INTERACTION_RANGE = SERVER_BUILDER
                 .comment("牛排工具实体触及范围加成, 重启游戏生效")
@@ -1052,6 +1072,16 @@ public class ConfigManager {
     // 获取牛排工具基础挖掘速度
     public static double getBeefToolMiningSpeed() {
         return getConfigValue(BEEF_TOOL_MINING_SPEED);
+    }
+
+    // 造化杖是否无视工具挖掘等级
+    public static boolean isBeefToolIgnoresToolTier() {
+        return getConfigValue(BEEF_TOOL_IGNORES_TOOL_TIER);
+    }
+
+    // 造化杖挖掘「伪不可破坏」方块时使用的名义硬度
+    public static double getBeefToolPseudoHardness() {
+        return getConfigValue(BEEF_TOOL_PSEUDO_HARDNESS);
     }
 
     public static double getBeefToolEntityInteractionRange() {

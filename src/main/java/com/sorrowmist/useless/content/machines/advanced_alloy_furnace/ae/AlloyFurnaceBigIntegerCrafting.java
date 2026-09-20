@@ -4,6 +4,7 @@ import appeng.api.crafting.IPatternDetails;
 import appeng.api.stacks.AEKey;
 import appeng.api.stacks.GenericStack;
 import appeng.api.stacks.KeyCounter;
+import com.sorrowmist.useless.api.crafting.bigint.cpu.AlloyFurnaceBigIntegerCpuAdapters;
 import com.sorrowmist.useless.core.config.ConfigManager;
 import com.sorrowmist.useless.api.crafting.bigint.AlloyFurnaceBigIntegerOutput;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.catalyst.ResolvedCatalystEffect;
@@ -289,12 +290,38 @@ public final class AlloyFurnaceBigIntegerCrafting {
                 : limit.min(maximumWindowedCount(prototype, threads));
     }
 
+    /**
+     * 把「产物交付能力」并入上限；**若已有 CPU 适配器整批接走产物，则跳过这道闸**。
+     *
+     * <p>这道闸的假设是「产物由本机逐段写回网络」。一旦有人整批接走，交付责任就转移到对方，
+     * 再按本机的写回速率限制单批规模只会白白压小批次 —— 而且会把外部 CPU 的自适应窗口
+     * 一起压住（它的窗口增长要求「一批能在 2 tick 内返回完」，批次被我们压小后，
+     * 它按「返回量 × 2 ≥ 窗口」判定的增长门就会失败）。</p>
+     */
+    public static @NotNull BigInteger applyDeliveryLimit(@NotNull BigInteger limit,
+                                                         @NotNull List<GenericStack> outputs,
+                                                         long segmentBudget) {
+        return AlloyFurnaceBigIntegerCpuAdapters.hasBulkOutputAdapter()
+                ? limit
+                : limit.min(maximumSegmentedCount(outputs, segmentBudget));
+    }
+
+    /**
+     * 本机对一批合成样板的份数上限。
+     *
+     * <p><b>为什么把 {@code requested} 也传进来</b>：两道闸（材料窗口 / 产物交付）都可以被配置或
+     * 外部适配器解除，那时"上限"就等于调用方请求的量本身。用 {@code requested} 当基准，
+     * 就不需要任何"足够大的哨兵值"来表达"不受限"。</p>
+     *
+     * @param requested 调用方请求的份数（上限不会超过它）
+     */
     public static @NotNull BigInteger maximumCraftingPatternCount(@NotNull IPatternDetails pattern,
                                                                   @NotNull KeyCounter @NotNull [] prototype,
                                                                   int threads,
-                                                                  long segmentBudget) {
-        BigInteger limit = applyMaterialWindow(
-                maximumSegmentedCount(pattern.getOutputs(), segmentBudget), prototype, threads);
+                                                                  long segmentBudget,
+                                                                  @NotNull BigInteger requested) {
+        BigInteger limit = applyMaterialWindow(requested, prototype, threads);
+        limit = applyDeliveryLimit(limit, pattern.getOutputs(), segmentBudget);
         return limit.signum() <= 0 ? BigInteger.ZERO : AlloyFurnaceTickBudget.applyScale(limit);
     }
 
@@ -308,11 +335,18 @@ public final class AlloyFurnaceBigIntegerCrafting {
      * @param threads       本机当前线程数（多方块跟随线圈线程）
      * @param segmentBudget 本批允许产生的分段数（AIMD 控制器给出）
      */
+    /**
+     * 本机对一批万象样板的份数上限。
+     *
+     * @param requested 调用方请求的份数（上限不会超过它）；见
+     *                  {@link #maximumCraftingPatternCount} 里关于"为什么不用哨兵"的说明
+     */
     public static @NotNull BigInteger maximumCount(@NotNull CraftingTaskContext context,
                                                    @NotNull OmniversalPatternDetails pattern,
                                                    @NotNull KeyCounter @NotNull [] prototype,
                                                    int threads,
-                                                   long segmentBudget) {
+                                                   long segmentBudget,
+                                                   @NotNull BigInteger requested) {
         AdvancedAlloyFurnaceRecipe recipe = pattern.recipe();
         if (recipe == null || !context.isTaskRecipeAvailable(recipe)) {
             return BigInteger.ZERO;
@@ -326,8 +360,8 @@ public final class AlloyFurnaceBigIntegerCrafting {
         if (unitOutputs.isEmpty()) {
             return BigInteger.ZERO;
         }
-        BigInteger limit = applyMaterialWindow(
-                maximumSegmentedCount(unitOutputs, segmentBudget), prototype, threads);
+        BigInteger limit = applyMaterialWindow(requested, prototype, threads);
+        limit = applyDeliveryLimit(limit, unitOutputs, segmentBudget);
         BigInteger energyCap = maximumCountForEnergy(context, recipe);
         if (energyCap != null) {
             limit = limit.min(energyCap);

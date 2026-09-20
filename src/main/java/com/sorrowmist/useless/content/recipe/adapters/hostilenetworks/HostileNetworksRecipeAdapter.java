@@ -59,9 +59,10 @@ public final class HostileNetworksRecipeAdapter
     @Override
     public boolean matchesMold(@Nullable ItemStack mold) {
         if (mold == null || mold.isEmpty()) return false;
+        // 数据模型整体作为模具参与匹配，具体品级交给模具原料的数据区间判定。
         return mold.is(Hostile.Items.SIM_CHAMBER)
                 || mold.is(Hostile.Items.LOOT_FABRICATOR)
-                || isSelfAwareModel(mold);
+                || mold.is(Hostile.Items.DATA_MODEL);
     }
 
     @Override
@@ -70,9 +71,8 @@ public final class HostileNetworksRecipeAdapter
 
         List<RecipeHolder<HostileNetworksSyntheticRecipe>> result = new ArrayList<>();
         for (DataModel model : DataModelRegistry.INSTANCE.getValues()) {
-            addTrainingRecipe(result, model);
+            addTrainingRecipes(result, model);
             addInferenceRecipes(result, model);
-            addSelfAwareMoldInferenceRecipe(result, model);
             addFabricatorRecipes(result, model);
         }
         return List.copyOf(result);
@@ -117,45 +117,66 @@ public final class HostileNetworksRecipeAdapter
     }
 
     /**
-     * One recipe covers the full defective-to-self-aware training path.
+     * 按品级为模型生成升级配方。
      *
-     * <p>Simulation training always adds exactly {@code +1} data, so one defective model and
-     * that many prediction matrices become one self-aware model. Each simmable training also
-     * always yields the model's generalized prediction (overworld/nether/end/etc.), while the
-     * matching mob prediction is the expected value of that tier's accuracy, rounded to a
-     * single craft.
+     * <p>每个品级本身就是一个数据区间 {@code [req(T), req(next(T)) - 1]}，与
+     * {@code ModelTierRegistry.getByData} 的判定保持一致。升级到下一品级消耗的矩阵数固定为
+     * 该品级的跨度 {@code req(next(T)) - req(T)}，产出的模型数据正好落在下一品级起点。
+     *
+     * <p>这样任意数据值的模型都能被唯一一条升级配方命中，不再要求数据精确等于某个阈值。
      */
-    private static void addTrainingRecipe(
+    private static void addTrainingRecipes(
             List<RecipeHolder<HostileNetworksSyntheticRecipe>> result, DataModel model) {
-        ModelTier maxTier = selfAwareTier();
-        if (maxTier == null) return;
-
-        int targetData = model.getRequiredData(maxTier);
         Ingredient matrix = model.input();
-        if (targetData <= 0 || AdapterUtils.isIngredientEmpty(matrix)) return;
+        if (AdapterUtils.isIngredientEmpty(matrix)) return;
 
-        TrainingYield training = trainingYield(model, maxTier, targetData);
-        if (training == null) return;
+        List<ModelTier> tiers = ModelTierRegistry.getSortedTiers();
+        for (int index = 0; index + 1 < tiers.size(); index++) {
+            addTrainingRecipe(result, model, tiers.get(index), tiers.get(index + 1), matrix);
+        }
+    }
+
+    /** 生成由 {@code tier} 升到 {@code nextTier} 的单条配方。 */
+    private static void addTrainingRecipe(
+            List<RecipeHolder<HostileNetworksSyntheticRecipe>> result, DataModel model,
+            ModelTier tier, ModelTier nextTier, Ingredient matrix) {
+        // 真实模拟室拒绝无法模拟的品级，这些品级不存在升级配方。
+        if (tier == null || nextTier == null || !tier.canSim()) return;
+
+        int fromData = Math.max(0, model.getRequiredData(tier));
+        int targetData = model.getRequiredData(nextTier);
+        int span = targetData - fromData;
+        if (span <= 0) return;
+
+        Ingredient inputModel = DataModelRangeIngredient.of(model, tier);
+        if (inputModel == null) return;
+
+        // 每次模拟必定产出一个基础掉落，预测掉落按该品级准确率的期望值取整。
+        long predictions = 0L;
+        float accuracy = tier.accuracy();
+        if (Float.isFinite(accuracy) && accuracy > 0F) {
+            predictions = Math.round(span * (double) accuracy);
+        }
 
         List<ItemStack> outputs = new ArrayList<>();
         outputs.add(modelStack(model, targetData));
-        if (!addCountedOutput(outputs, model.baseDrop(), training.baseDrops())
-                || !addCountedOutput(outputs, model.getPredictionDrop(), training.predictions())) {
+        if (!addOptionalOutput(outputs, model.baseDrop(), span)
+                || !addOptionalOutput(outputs, model.getPredictionDrop(), predictions)) {
             return;
         }
 
-        long energy = trainingEnergy(model.simCost(), targetData, 1);
-        int processTime = safeProcessTime(multiply(SIMULATION_TRAINING_TIME, targetData));
+        long energy = trainingEnergy(model.simCost(), span, 1);
+        int processTime = safeProcessTime(multiply(SIMULATION_TRAINING_TIME, span));
         if (energy < 0L || processTime <= 0) return;
 
-        ResourceLocation id = recipeId(model, "training");
+        ResourceLocation id = recipeId(model, "training/" + tier.name());
         if (id == null) return;
 
         AdvancedAlloyFurnaceRecipe recipe = new AdvancedAlloyFurnaceRecipe(
                 id,
                 List.of(
-                        new CountedIngredient(exact(modelStack(model, 0)), 1L),
-                        new CountedIngredient(matrix, targetData)),
+                        new CountedIngredient(inputModel, 1L),
+                        new CountedIngredient(matrix, span)),
                 List.of(),
                 List.of(),
                 outputs,
@@ -171,9 +192,11 @@ public final class HostileNetworksRecipeAdapter
     }
 
     /**
-     * Adds one deterministic inference recipe for every model tier that the Simulation Chamber
-     * can actually run. The model is a normal input and output so the single mold slot can remain
-     * occupied by the Simulation Chamber while the model is preserved across the operation.
+     * 为每个可模拟品级生成一条推理配方。
+     *
+     * <p>模型放在模具槽中不被消耗，数据也保持不变，因此每个品级对应一条以该品级数据区间
+     * 为模具的配方。这样处于品级区间内任意数据值的模型都能推理，不再要求数据精确等于
+     * 品级起点。
      */
     private static void addInferenceRecipes(
             List<RecipeHolder<HostileNetworksSyntheticRecipe>> result, DataModel model) {
@@ -185,32 +208,27 @@ public final class HostileNetworksRecipeAdapter
     private static void addInferenceRecipe(
             List<RecipeHolder<HostileNetworksSyntheticRecipe>> result,
             DataModel model, ModelTier tier) {
-        // The real Simulation Chamber rejects faulty models and any custom non-simulatable tier.
+        // 真实模拟室拒绝故障模型和不可模拟的自定义品级。
         if (tier == null || !tier.canSim()) return;
 
         Ingredient matrix = model.input();
         float accuracy = tier.accuracy();
         if (AdapterUtils.isIngredientEmpty(matrix)
                 || !Float.isFinite(accuracy) || accuracy <= 0F) {
-            // A zero-accuracy tier has no finite deterministic batch that can produce a
-            // prediction, so it cannot have a prediction recipe.
+            // 零准确率品级没有有限的确定性批量能产出预测，因此不存在推理配方。
             return;
         }
 
-        int modelData = model.getRequiredData(tier);
-        ItemStack modelStack = modelStack(model, modelData);
         Optional<ExpectedOutputScaler.ScaledOutputs> scaled = inferenceOutputs(model, accuracy);
         if (scaled.isEmpty()) return;
 
         ExpectedOutputScaler.ScaledOutputs outputsFor = scaled.get();
         int operations = outputsFor.operations();
         List<ItemStack> outputs = new ArrayList<>();
-        // One model enters and one identical model leaves. This models the Simulation Chamber's
-        // non-consumable model slot without requiring a second mold slot in the alloy furnace.
-        if (!addCountedOutput(outputs, modelStack, 1L)
-                || !addAllOutputs(outputs, outputsFor.outputs())) {
-            return;
-        }
+        if (!addAllOutputs(outputs, outputsFor.outputs()) || outputs.isEmpty()) return;
+
+        Ingredient mold = DataModelRangeIngredient.of(model, tier);
+        if (mold == null) return;
 
         long perRunEnergy = multiply(model.simCost(), SIMULATION_INFERENCE_TIME);
         long energy = multiply(perRunEnergy, operations);
@@ -222,9 +240,7 @@ public final class HostileNetworksRecipeAdapter
 
         AdvancedAlloyFurnaceRecipe recipe = new AdvancedAlloyFurnaceRecipe(
                 id,
-                List.of(
-                        new CountedIngredient(exact(modelStack), 1L),
-                        new CountedIngredient(matrix, operations)),
+                List.of(new CountedIngredient(matrix, operations)),
                 List.of(),
                 List.of(),
                 outputs,
@@ -234,51 +250,7 @@ public final class HostileNetworksRecipeAdapter
                 processTime,
                 Ingredient.EMPTY,
                 0,
-                List.of(simChamberMold()),
-                AlloyFurnaceMode.NORMAL);
-        result.add(holder(recipe));
-    }
-
-    /**
-     * Keeps a self-aware model in the mold hub and consumes only one prediction matrix per run.
-     * This is the compact form of Simulation Chamber inference that is useful for AE patterns:
-     * the trained model is a reusable mold instead of a second consumed input.
-     */
-    private static void addSelfAwareMoldInferenceRecipe(
-            List<RecipeHolder<HostileNetworksSyntheticRecipe>> result, DataModel model) {
-        ModelTier tier = selfAwareTier();
-        if (tier == null) return;
-
-        Ingredient matrix = model.input();
-        int modelData = model.getRequiredData(tier);
-        if (AdapterUtils.isIngredientEmpty(matrix) || modelData < 0) return;
-
-        ItemStack selfAwareModel = modelStack(model, modelData);
-        List<ItemStack> outputs = new ArrayList<>();
-        if (!addCountedOutput(outputs, model.baseDrop(), 1L)
-                || !addCountedOutput(outputs, model.getPredictionDrop(), 1L)) {
-            return;
-        }
-
-        long energy = multiply(model.simCost(), SIMULATION_INFERENCE_TIME);
-        if (energy < 0L) return;
-
-        ResourceLocation id = recipeId(model, "inference/self_aware_mold");
-        if (id == null) return;
-
-        AdvancedAlloyFurnaceRecipe recipe = new AdvancedAlloyFurnaceRecipe(
-                id,
-                List.of(new CountedIngredient(matrix, 1L)),
-                List.of(),
-                List.of(),
-                outputs,
-                List.of(),
-                List.of(),
-                energy,
-                SIMULATION_INFERENCE_TIME,
-                Ingredient.EMPTY,
-                0,
-                List.of(exact(selfAwareModel)),
+                List.of(mold),
                 AlloyFurnaceMode.NORMAL);
         result.add(holder(recipe));
     }
@@ -362,38 +334,16 @@ public final class HostileNetworksRecipeAdapter
     }
 
     /**
-     * Generalized predictions are guaranteed on every simmable training. Mob predictions use
-     * that tier's accuracy, including values above 100%.
+     * 追加一个可选产物：数量为零或产物为空时静默跳过，不会导致整条配方失效。
+     *
+     * <p>部分模型没有预测掉落或基础掉落，这类模型仍应保留升级与推理配方，
+     * 只是缺少对应产物，因此这里与 {@link #addCountedOutput} 的失败语义区分开。
+     *
+     * @return 仅在数值溢出等无法继续的情况下返回 false
      */
-    @Nullable
-    private static TrainingYield trainingYield(DataModel model, ModelTier maxTier, int targetData) {
-        double expectedPredictions = 0.0;
-        long expectedBaseDrops = 0L;
-        List<ModelTier> tiers = ModelTierRegistry.getSortedTiers();
-        for (int index = 0; index < tiers.size(); index++) {
-            ModelTier tier = tiers.get(index);
-            if (tier == maxTier || tier.isMax()) break;
-            if (!tier.canSim()) continue;
-
-            int tierStart = Math.max(0, model.getRequiredData(tier));
-            int tierEnd = index + 1 < tiers.size()
-                    ? Math.min(targetData, model.getRequiredData(tiers.get(index + 1)))
-                    : targetData;
-            int actions = Math.max(0, tierEnd - tierStart);
-            if (actions <= 0) continue;
-
-            expectedBaseDrops += actions;
-            float accuracy = tier.accuracy();
-            if (Float.isFinite(accuracy) && accuracy > 0F) {
-                expectedPredictions += actions * (double) accuracy;
-            }
-        }
-        if (expectedBaseDrops < 0L || !Double.isFinite(expectedPredictions) || expectedPredictions < 0.0) {
-            return null;
-        }
-        long predictions = Math.round(expectedPredictions);
-        if (predictions < 0L) return null;
-        return new TrainingYield(expectedBaseDrops, predictions);
+    private static boolean addOptionalOutput(List<ItemStack> outputs, ItemStack stack, long count) {
+        if (count <= 0L || stack == null || stack.isEmpty()) return true;
+        return addCountedOutput(outputs, stack, count);
     }
 
     private static boolean addCountedOutput(List<ItemStack> outputs, ItemStack stack, long count) {
@@ -411,9 +361,6 @@ public final class HostileNetworksRecipeAdapter
         output.setCount((int) total);
         outputs.add(output);
         return true;
-    }
-
-    private record TrainingYield(long baseDrops, long predictions) {
     }
 
     private static RecipeHolder<HostileNetworksSyntheticRecipe> holder(AdvancedAlloyFurnaceRecipe recipe) {
@@ -443,23 +390,6 @@ public final class HostileNetworksRecipeAdapter
         return AdapterUtils.matchesMold(recipe.mold(), mold);
     }
 
-    private static boolean isSelfAwareModel(ItemStack mold) {
-        if (!mold.is(Hostile.Items.DATA_MODEL)) return false;
-
-        try {
-            var storedModel = DataModelItem.getStoredModel(mold);
-            if (!storedModel.isBound()) return false;
-
-            DataModel model = storedModel.get();
-            if (DataModelRegistry.INSTANCE.getKey(model) == null) return false;
-
-            ModelTier tier = selfAwareTier();
-            return tier != null && DataModelItem.getData(mold) >= model.getRequiredData(tier);
-        } catch (RuntimeException exception) {
-            return false;
-        }
-    }
-
     private static boolean matchesMergedInputs(
             List<CountedIngredient> requirements, Map<Ingredient, Long> available) {
         Map<Ingredient, Long> required = new LinkedHashMap<>();
@@ -478,18 +408,6 @@ public final class HostileNetworksRecipeAdapter
             if (amount > 0L) result.add(new appeng.api.stacks.GenericStack(entry.getKey(), amount));
         }
         return result;
-    }
-
-    @Nullable
-    private static ModelTier selfAwareTier() {
-        try {
-            for (ModelTier tier : ModelTierRegistry.getSortedTiers()) {
-                if ("self_aware".equals(tier.name())) return tier;
-            }
-            return ModelTierRegistry.getMaxTier();
-        } catch (RuntimeException exception) {
-            return null;
-        }
     }
 
     @Nullable

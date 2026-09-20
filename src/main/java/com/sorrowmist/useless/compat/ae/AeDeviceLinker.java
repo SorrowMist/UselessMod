@@ -6,8 +6,11 @@ import appeng.api.networking.IGrid;
 import appeng.api.networking.IGridConnection;
 import appeng.api.networking.IGridNode;
 import appeng.api.networking.IInWorldGridNodeHost;
+import appeng.api.parts.IPart;
+import appeng.api.parts.IPartHost;
 import appeng.blockentity.networking.ControllerBlockEntity;
 import appeng.blockentity.networking.WirelessAccessPointBlockEntity;
+import appeng.util.Platform;
 import com.sorrowmist.useless.core.component.UComponents;
 import com.sorrowmist.useless.world.ae.AeConnectLinkSavedData;
 import net.minecraft.ChatFormatting;
@@ -261,11 +264,27 @@ public final class AeDeviceLinker {
     }
 
     /**
-     * 取宿主的网格节点。契约允许 {@code getGridNode(null)}，但第三方实现未必守规矩，
-     * 所以退回逐个方向问一遍。
+     * 取宿主的网格节点。
+     *
+     * <p>三条路径按优先级依次尝试，前一条拿到就返回：</p>
+     *
+     * <ol>
+     *   <li><b>契约路径</b>：{@code getGridNode(null)} —— 方块实体自身的主节点，
+     *       以及挂在 CableBus <b>中心位</b>的线缆（{@code CableBusContainer.getGridNode(null)}
+     *       会兜底到 {@code storage.getCenter()}）。</li>
+     *   <li><b>对外朝向节点</b>：逐个方向问 {@code getGridNode(side)}。只有重写了
+     *       {@code IPart.getExternalFacingNode()} 的部件才在这条路上有值 ——
+     *       目前是 P2P 隧道、石英纤维、开关总线三类。</li>
+     *   <li><b>侧挂部件自身节点</b>（新增）：终端、各类总线、接口这些普通部件
+     *       <b>没有</b>重写 {@code getExternalFacingNode()}（接口默认返回 null），
+     *       它们的真实节点只在 {@code IPart.getGridNode()} 上。这类部件通常挂在 CableBus
+     *       <b>侧面</b>，若该方块又没有中心线缆，前两条路径会一路 fallthrough 返回 null，
+     *       表现为「孤立终端 / 孤立总线连不上」。这里直接遍历部件补回。</li>
+     * </ol>
      */
     @Nullable
     private static IGridNode resolveNode(IInWorldGridNodeHost host) {
+        // ① 契约路径：方块实体主节点 / 中心线缆。
         try {
             IGridNode node = host.getGridNode(null);
             if (node != null) {
@@ -273,6 +292,8 @@ public final class AeDeviceLinker {
             }
         } catch (Throwable ignored) {
         }
+
+        // ② 对外朝向节点：P2P 隧道 / 石英纤维 / 开关总线。
         for (Direction direction : Direction.values()) {
             try {
                 IGridNode node = host.getGridNode(direction);
@@ -282,7 +303,46 @@ public final class AeDeviceLinker {
             } catch (Throwable ignored) {
             }
         }
+
+        // ③ 侧挂部件自身节点：终端 / 各类总线 / 接口。
+        //    这些部件没重写 getExternalFacingNode()，CableBus 的 getGridNode(side)
+        //    会在 ① 里返回 null，只能从部件本身取。
+        if (host instanceof IPartHost partHost) {
+            IGridNode firstAny = null;
+            for (Direction side : Platform.DIRECTIONS_WITH_NULL) {
+                try {
+                    IPart part = partHost.getPart(side);
+                    if (part == null) {
+                        continue;
+                    }
+                    IGridNode node = part.getGridNode();
+                    if (node == null) {
+                        continue;
+                    }
+                    // 优先取已就绪（已挂上网格）的节点；没就绪的先记着，
+                    // 万一整块方块都还没初始化完，交给 ensureLinks() 下一轮重试。
+                    if (isNodeReady(node)) {
+                        return node;
+                    }
+                    if (firstAny == null) {
+                        firstAny = node;
+                    }
+                } catch (Throwable ignored) {
+                }
+            }
+            return firstAny;
+        }
+
         return null;
+    }
+
+    /** 节点是否已经挂上网格：未 create 的节点 {@code getGrid()} 会抛异常。 */
+    private static boolean isNodeReady(IGridNode node) {
+        try {
+            return node.getGrid() != null;
+        } catch (Throwable notReady) {
+            return false;
+        }
     }
 
     static boolean createLink(IGridNode accessNode, IGridNode machineNode) {

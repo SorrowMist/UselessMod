@@ -20,6 +20,7 @@ import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.Vec3;
 import net.neoforged.neoforge.common.ItemAbility;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -119,11 +120,24 @@ public final class RightClickChainer {
         List<BlockPos> targets = MiningUtils.scanBlocksForUse(
                 origin, originState, level, UComponentUtils.isEnhancedChainMiningEnabled(tool));
 
+        // 需要接管掉落（范围磁力或 AE 存储优先任一开启）时先整片收集、合并同类项，
+        // 最后只调一次 handleDrops，避免逐株向 AE 发高频请求。
+        boolean collect = UComponentUtils.shouldCollectDrops(tool);
+        List<ItemStack> collected = collect ? new ArrayList<>() : null;
+
         int harvested = 0;
         for (BlockPos targetPos : targets) {
-            if (BeefCropHarvest.harvest(level, targetPos, player, tool)) {
+            if (collect) {
+                if (BeefCropHarvest.harvestAndCollect(level, targetPos, player, tool, collected)) {
+                    harvested++;
+                }
+            } else if (BeefCropHarvest.harvest(level, targetPos, player, tool)) {
                 harvested++;
             }
+        }
+
+        if (collect && collected != null && !collected.isEmpty()) {
+            MiningUtils.handleDrops(player, MiningUtils.mergeItemStacks(collected), tool, Vec3.atCenterOf(origin));
         }
         return harvested;
     }

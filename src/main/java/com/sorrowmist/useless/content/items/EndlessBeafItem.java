@@ -13,6 +13,7 @@ import com.sorrowmist.useless.init.ModDamageTypes;
 import com.sorrowmist.useless.init.ModTags;
 import com.sorrowmist.useless.utils.EnchantmentUtil;
 import com.sorrowmist.useless.utils.UselessItemUtils;
+import com.sorrowmist.useless.utils.mining.MiningUtils;
 import com.sorrowmist.useless.utils.mining.RightClickChainer;
 import net.minecraft.ChatFormatting;
 import net.minecraft.advancements.CriteriaTriggers;
@@ -156,7 +157,7 @@ public class EndlessBeafItem extends TieredItem {
                 .component(UComponents.BeefBeheadingEnabledComponent, false)
                 .component(UComponents.BeefTeleportEnabledComponent, false)
                 .component(UComponents.BeefAoeDamageEnabledComponent, false)
-                .component(UComponents.BeefMagnetEnabledComponent, false)
+                .component(UComponents.BeefMagnetEnabledComponent, true)
                 .component(UComponents.BeefFarmlandModeComponent, false)
                 .component(UComponents.BeefCropHarvestComponent, true)
                 .component(UComponents.AEStoragePriorityComponent, false)
@@ -860,17 +861,19 @@ public class EndlessBeafItem extends TieredItem {
 
                 // 只有刷完那一刻才回收掉落
                 if (finished) {
+                    List<ItemStack> collected = new java.util.ArrayList<>();
                     level.getEntitiesOfClass(ItemEntity.class, area).stream()
                          .filter(e -> !before.contains(e.getUUID()))
                          .forEach(entity -> {
                              ItemStack drop = entity.getItem().copy();
                              if (!drop.isEmpty()) {
-                                 if (!player.getInventory().add(drop)) {
-                                     player.drop(drop, false);
-                                 }
+                                 collected.add(drop);
                              }
                              entity.discard();
                          });
+                    // 产物走统一的「AE 存储优先 / 范围磁力」处理，与挖掘、杀怪保持一致
+                    MiningUtils.handleDrops(player, MiningUtils.mergeItemStacks(collected), stack,
+                            Vec3.atCenterOf(blockPos));
                 }
             }
         }
@@ -1064,13 +1067,8 @@ public class EndlessBeafItem extends TieredItem {
             if (target.isShearable(player, stack, entity.level(), pos)) {
                 List<ItemStack> drops = target.onSheared(player, stack, entity.level(), pos);
                 if (!isClient) {
-                    for (ItemStack drop : drops) {
-                        if (!drop.isEmpty()) {
-                            if (!player.getInventory().add(drop)) {
-                                player.drop(drop, false);
-                            }
-                        }
-                    }
+                    // 产物走统一的「AE 存储优先 / 范围磁力」处理，与挖掘、杀怪保持一致
+                    MiningUtils.handleDrops(player, MiningUtils.mergeItemStacks(drops), stack, entity.position());
                 }
                 entity.gameEvent(GameEvent.SHEAR, player);
                 return InteractionResult.sidedSuccess(isClient);
@@ -1235,7 +1233,7 @@ public class EndlessBeafItem extends TieredItem {
                                        ).withStyle(beefAoeDamageEnabled ? ChatFormatting.GREEN : ChatFormatting.GRAY))
                                        .withStyle(ChatFormatting.RED));
 
-        boolean beefMagnetEnabled = stack.getOrDefault(UComponents.BeefMagnetEnabledComponent.get(), false);
+        boolean beefMagnetEnabled = stack.getOrDefault(UComponents.BeefMagnetEnabledComponent.get(), true);
         tooltipComponents.add(Component.translatable("tooltip.useless_mod.beef_magnet_mode")
                                        .append(": ")
                                        .append(Component.translatable(

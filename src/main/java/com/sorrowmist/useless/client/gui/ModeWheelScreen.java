@@ -582,7 +582,7 @@ public class ModeWheelScreen extends Screen {
             case BeefToolModuleRegistry.BEEF_CAPTURE -> bool(UComponents.BeefCaptureEnabledComponent, false);
             case BeefToolModuleRegistry.BEEF_TELEPORT -> bool(UComponents.BeefTeleportEnabledComponent, false);
             case BeefToolModuleRegistry.BEEF_AOE_DAMAGE -> bool(UComponents.BeefAoeDamageEnabledComponent, false);
-            case BeefToolModuleRegistry.BEEF_MAGNET -> bool(UComponents.BeefMagnetEnabledComponent, false);
+            case BeefToolModuleRegistry.BEEF_MAGNET -> bool(UComponents.BeefMagnetEnabledComponent, true);
             case BeefToolModuleRegistry.BEEF_FARMLAND_MODE -> bool(UComponents.BeefFarmlandModeComponent, false);
             case BeefToolModuleRegistry.BEEF_CROP_HARVEST -> bool(UComponents.BeefCropHarvestComponent, true);
             default -> false;
@@ -921,7 +921,7 @@ public class ModeWheelScreen extends Screen {
             case BeefToolModuleRegistry.BEEF_AOE_DAMAGE -> toggle(ModeTogglePacket.ModeType.BEEF_AOE_DAMAGE,
                     UComponents.BeefAoeDamageEnabledComponent, false);
             case BeefToolModuleRegistry.BEEF_MAGNET -> toggle(ModeTogglePacket.ModeType.BEEF_MAGNET,
-                    UComponents.BeefMagnetEnabledComponent, false);
+                    UComponents.BeefMagnetEnabledComponent, true);
             case BeefToolModuleRegistry.BEEF_FARMLAND_MODE -> toggle(ModeTogglePacket.ModeType.BEEF_FARMLAND_MODE,
                     UComponents.BeefFarmlandModeComponent, false);
             case BeefToolModuleRegistry.BEEF_CROP_HARVEST -> toggle(ModeTogglePacket.ModeType.BEEF_CROP_HARVEST,

@@ -5,6 +5,7 @@ import com.sorrowmist.useless.compat.productivebees.ProductiveBeesCaptureCompat;
 import com.sorrowmist.useless.content.items.EndlessBeafItem;
 import com.sorrowmist.useless.core.component.UComponents;
 import com.sorrowmist.useless.core.config.ConfigManager;
+import com.sorrowmist.useless.utils.mining.MiningUtils;
 import net.minecraft.core.Holder;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
@@ -243,9 +244,7 @@ public class UselessItemUtils {
             return;
         }
 
-        if (!player.getInventory().add(spawnEggStack)) {
-            player.drop(spawnEggStack, false);
-        }
+        MiningUtils.handleDrops(player, java.util.List.of(spawnEggStack), stack, killedEntity.position());
     }
 
     // 显示触发提示

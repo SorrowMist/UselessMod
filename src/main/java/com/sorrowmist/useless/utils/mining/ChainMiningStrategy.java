@@ -10,6 +10,7 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.phys.Vec3;
 import net.neoforged.neoforge.event.level.BlockEvent;
 
 import java.util.ArrayList;
@@ -112,7 +113,8 @@ public class ChainMiningStrategy implements MiningStrategy {
         }
 
         if (!MiningUtils.hasNoValidDrops(allDrops)) {
-            MiningUtils.handleDrops(player, MiningUtils.mergeItemStacks(allDrops), hand);
+            // 汇总后单次处理：AE 只收到一次请求；磁力关闭时统一落在连锁原点。
+            MiningUtils.handleDrops(player, MiningUtils.mergeItemStacks(allDrops), hand, Vec3.atCenterOf(pos));
         }
 
         if (totalExperience > 0) {

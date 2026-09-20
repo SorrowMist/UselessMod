@@ -27,6 +27,7 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.HitResult;
+import net.minecraft.world.phys.Vec3;
 import net.neoforged.fml.ModList;
 import org.slf4j.Logger;
 
@@ -150,7 +151,7 @@ public class MiningUtils {
             MiningResult result = forceMining
                     ? forceMineBlock(level, pos, state, player, tool)
                     : mineBlock(level, pos, state, player, tool);
-            handleDrops(player, result.drops(), tool);
+            handleDrops(player, result.drops(), tool, Vec3.atCenterOf(pos));
             if (result.experience() > 0) {
                 player.giveExperiencePoints(result.experience());
             }
@@ -233,7 +234,7 @@ public class MiningUtils {
         // getDrops / playerWillDestroy 都会抛，异常冒回事件总线就会打断整 tick。
         try {
             List<ItemStack> drops = Block.getDrops(state, serverLevel, pos, blockEntity, player, tool);
-            handleDrops(player, drops, tool);
+            handleDrops(player, drops, tool, Vec3.atCenterOf(pos));
 
             world.destroyBlock(pos, false, player);
         } catch (Throwable failure) {
@@ -279,13 +280,39 @@ public class MiningUtils {
     }
 
     /**
-     * 处理掉落物（添加到背包或掉落）
+     * 处理掉落物（优先入 AE，其次按磁力开关决定进背包还是留在原地）。
+     *
+     * <p>兼容旧调用：落地点退回玩家脚下。</p>
      *
      * @param player 玩家
      * @param drops  掉落物列表
+     * @param tool   工具
      */
     public static void handleDrops(Player player, List<ItemStack> drops, ItemStack tool) {
+        handleDrops(player, drops, tool, player.position());
+    }
+
+    /**
+     * 处理掉落物（优先入 AE，其次按磁力开关决定进背包还是留在原地）。
+     *
+     * <p>行为矩阵：</p>
+     * <ul>
+     *   <li>AE 存储优先开启且绑定了无线访问点：先尝试存入 AE，塞不下的继续下一步。</li>
+     *   <li>范围磁力开启：剩余物品进背包，背包满则掉在玩家脚下。</li>
+     *   <li>范围磁力关闭：剩余物品在 {@code dropOrigin} 处落地，走原版拾取。</li>
+     * </ul>
+     *
+     * <p>注意 AE 存储优先是独立于范围磁力生效的：即使磁力关闭，只要 AE 优先开启，
+     * 产物仍会优先存入 AE，只有 AE 塞不下的部分才落地。</p>
+     *
+     * @param player     玩家
+     * @param drops      掉落物列表
+     * @param tool       工具
+     * @param dropOrigin 磁力关闭时的落地点（AE 塞不下的部分也会落在这里）
+     */
+    public static void handleDrops(Player player, List<ItemStack> drops, ItemStack tool, Vec3 dropOrigin) {
         boolean isAE2Loaded = ModList.get().isLoaded("ae2");
+        boolean magnetEnabled = UComponentUtils.isBeefMagnetEnabled(tool);
 
         for (ItemStack drop : drops) {
             if (drop.isEmpty()) continue;
@@ -303,13 +330,36 @@ public class MiningUtils {
                 }
             }
 
-            // 2. 剩余进入背包
-            if (!drop.isEmpty()) {
+            if (drop.isEmpty()) continue;
+
+            // 2. 磁力开启：剩余进入背包
+            if (magnetEnabled) {
                 if (!player.getInventory().add(drop)) {
                     player.drop(drop, false);
                 }
+                continue;
             }
+
+            // 3. 磁力关闭：剩余留在原地走原版拾取
+            dropAtOrigin(player.level(), dropOrigin, drop);
         }
+    }
+
+    /**
+     * 在指定位置生成一个掉落实体，让它走原版拾取流程。
+     *
+     * <p>仅在服务端生效；客户端调用会被忽略。</p>
+     *
+     * @param level  世界
+     * @param origin 落点
+     * @param stack  掉落物
+     */
+    private static void dropAtOrigin(Level level, Vec3 origin, ItemStack stack) {
+        if (stack.isEmpty() || !(level instanceof ServerLevel serverLevel)) {
+            return;
+        }
+        ItemEntity entity = new ItemEntity(serverLevel, origin.x, origin.y, origin.z, stack.copy());
+        serverLevel.addFreshEntity(entity);
     }
 
     /**

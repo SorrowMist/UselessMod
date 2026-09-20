@@ -30,4 +30,30 @@ public class UComponentUtils {
     public static boolean isAEStoragePriorityEnabled(ItemStack stack) {
         return stack.getOrDefault(UComponents.AEStoragePriorityComponent.get(), false);
     }
+
+    /**
+     * 获取物品的「范围磁力」状态
+     *
+     * <p>默认开启：没有显式写入组件时按启用处理，与物品属性初始化保持一致。</p>
+     *
+     * @param stack 物品栈
+     * @return 范围磁力是否启用
+     */
+    public static boolean isBeefMagnetEnabled(ItemStack stack) {
+        return stack.getOrDefault(UComponents.BeefMagnetEnabledComponent.get(), true);
+    }
+
+    /**
+     * 判断本次产出是否需要「接管」——即是否要把掉落物收起来而不是留在原地走原版拾取。
+     *
+     * <p>范围磁力是所有掉落物的总开关，AE 存储优先独立生效：只要两者任一开启，
+     * 造化杖产生的掉落物就需要经过 {@code MiningUtils.handleDrops} 处理
+     * （AE 优先存入，塞不下的按磁力开关决定进背包还是落地）。</p>
+     *
+     * @param stack 工具
+     * @return 是否需要接管本次掉落
+     */
+    public static boolean shouldCollectDrops(ItemStack stack) {
+        return isBeefMagnetEnabled(stack) || isAEStoragePriorityEnabled(stack);
+    }
 }

@@ -1,5 +1,6 @@
 package com.sorrowmist.useless.content.items;
 
+import com.sorrowmist.useless.utils.mining.MiningUtils;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.server.level.ServerLevel;
@@ -53,11 +54,15 @@ public final class BeefCropHarvest {
     }
 
     /**
-     * 服务端执行一次「收获但保留植株」。
+     * 服务端执行一次「收获但保留植株」，把产物收集进 {@code out}。
+     *
+     * <p>只负责「算出掉落 + 重置作物」，产物去向交由调用方决定，这样收菜才能和挖掘/杀怪
+     * 共用同一套「AE 存储优先 / 范围磁力」处理。</p>
      *
      * @return 是否真的收获成功（非成熟作物或不受支持的方块返回 false）
      */
-    public static boolean harvest(ServerLevel level, BlockPos pos, Player player, ItemStack tool) {
+    public static boolean harvestAndCollect(ServerLevel level, BlockPos pos, Player player, ItemStack tool,
+                                            List<ItemStack> out) {
         BlockState state = level.getBlockState(pos);
         if (!isHarvestable(state)) {
             return false;
@@ -89,12 +94,26 @@ public final class BeefCropHarvest {
             if (drop.isEmpty()) {
                 continue;
             }
-            if (!player.getInventory().add(drop)) {
-                player.drop(drop, false);
-            }
+            out.add(drop);
         }
 
         level.playSound(null, pos, SoundEvents.CROP_BREAK, SoundSource.BLOCKS, 1.0F, 1.0F);
+        return true;
+    }
+
+    /**
+     * 服务端执行一次「收获但保留植株」，产物按工具的 AE 存储优先 / 范围磁力设置处理。
+     *
+     * @return 是否真的收获成功（非成熟作物或不受支持的方块返回 false）
+     */
+    public static boolean harvest(ServerLevel level, BlockPos pos, Player player, ItemStack tool) {
+        List<ItemStack> drops = new java.util.ArrayList<>();
+        if (!harvestAndCollect(level, pos, player, tool, drops)) {
+            return false;
+        }
+        if (!drops.isEmpty()) {
+            MiningUtils.handleDrops(player, MiningUtils.mergeItemStacks(drops), tool, Vec3.atCenterOf(pos));
+        }
         return true;
     }
 

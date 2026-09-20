@@ -1,7 +1,7 @@
 package com.sorrowmist.useless.content.items;
 
-import com.sorrowmist.useless.core.component.UComponents;
 import com.sorrowmist.useless.core.config.ConfigManager;
+import com.sorrowmist.useless.utils.UComponentUtils;
 import com.sorrowmist.useless.utils.mining.MiningUtils;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.TickTask;
@@ -38,7 +38,7 @@ public final class BeefMagnetHandler {
     }
 
     public static boolean isEnabled(ItemStack tool) {
-        return tool.getOrDefault(UComponents.BeefMagnetEnabledComponent, false);
+        return UComponentUtils.isBeefMagnetEnabled(tool);
     }
 
     /**
@@ -69,7 +69,7 @@ public final class BeefMagnetHandler {
      */
     public static void scheduleSweep(ServerLevel level, Player player, ItemStack tool, Vec3 center,
                                      double rangeX, double rangeY, double rangeZ) {
-        if (!isEnabled(tool)) {
+        if (!UComponentUtils.shouldCollectDrops(tool)) {
             return;
         }
         MinecraftServer server = level.getServer();
@@ -111,11 +111,14 @@ public final class BeefMagnetHandler {
             itemEntity.discard();
         }
         if (!drops.isEmpty()) {
-            MiningUtils.handleDrops(player, MiningUtils.mergeItemStacks(drops), tool);
+            MiningUtils.handleDrops(player, MiningUtils.mergeItemStacks(drops), tool, area.getCenter());
         }
 
-        // 2. 经验球：每次清零拾取冷却，绕过原版"每2 tick 只能吃一个"的限制，
+        // 2. 经验球：磁力开启时才自动收取。每次清零拾取冷却，绕过原版"每2 tick 只能吃一个"的限制，
         //    同时保留经验修补等原版行为
+        if (!isEnabled(tool)) {
+            return;
+        }
         for (ExperienceOrb orb : level.getEntitiesOfClass(ExperienceOrb.class, area)) {
             if (!orb.isAlive()) {
                 continue;

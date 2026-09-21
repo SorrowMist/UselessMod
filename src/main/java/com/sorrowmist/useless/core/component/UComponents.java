@@ -107,6 +107,33 @@ public final class UComponents {
             );
 
     /**
+     * 剪刀功能组件（BeefShears）
+     * true = 造化杖具备剪刀能力：可对羊、哞菇等 IShearable 实体剪毛/剪掉落，
+     * 也向依赖 ItemAbility 的模组暴露 DEFAULT_SHEARS_ACTIONS。
+     */
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<Boolean>> BeefShearsComponent =
+            register("beef_shears", builder ->
+                    builder.persistent(Codec.BOOL)
+                           .networkSynchronized(StreamCodec.of(
+                                   FriendlyByteBuf::writeBoolean,
+                                   FriendlyByteBuf::readBoolean
+                           ))
+            );
+
+    /**
+     * 打火石功能组件（BeefFlintAndSteel）
+     * true = 造化杖具备打火石能力：右键可点燃营火/蜡烛，或在可放置火的位置点火。
+     */
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<Boolean>> BeefFlintAndSteelComponent =
+            register("beef_flint_and_steel", builder ->
+                    builder.persistent(Codec.BOOL)
+                           .networkSynchronized(StreamCodec.of(
+                                   FriendlyByteBuf::writeBoolean,
+                                   FriendlyByteBuf::readBoolean
+                           ))
+            );
+
+    /**
      * 增强连锁挖矿模式组件（EnhancedChainMiningMode）
      * 用于在物品上存储是否启用增强连锁挖掘（布尔类型）
      * true = 启用增强连锁挖掘，false = 使用普通连锁挖掘

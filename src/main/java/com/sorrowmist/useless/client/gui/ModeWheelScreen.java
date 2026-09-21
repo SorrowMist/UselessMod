@@ -585,6 +585,9 @@ public class ModeWheelScreen extends Screen {
             case BeefToolModuleRegistry.BEEF_MAGNET -> bool(UComponents.BeefMagnetEnabledComponent, true);
             case BeefToolModuleRegistry.BEEF_FARMLAND_MODE -> bool(UComponents.BeefFarmlandModeComponent, false);
             case BeefToolModuleRegistry.BEEF_CROP_HARVEST -> bool(UComponents.BeefCropHarvestComponent, true);
+            case BeefToolModuleRegistry.BEEF_SHEARS -> bool(UComponents.BeefShearsComponent, true);
+            case BeefToolModuleRegistry.BEEF_FLINT_AND_STEEL ->
+                    bool(UComponents.BeefFlintAndSteelComponent, true);
             default -> false;
         };
     }
@@ -926,6 +929,11 @@ public class ModeWheelScreen extends Screen {
                     UComponents.BeefFarmlandModeComponent, false);
             case BeefToolModuleRegistry.BEEF_CROP_HARVEST -> toggle(ModeTogglePacket.ModeType.BEEF_CROP_HARVEST,
                     UComponents.BeefCropHarvestComponent, true);
+            case BeefToolModuleRegistry.BEEF_SHEARS -> toggle(ModeTogglePacket.ModeType.BEEF_SHEARS,
+                    UComponents.BeefShearsComponent, true);
+            case BeefToolModuleRegistry.BEEF_FLINT_AND_STEEL ->
+                    toggle(ModeTogglePacket.ModeType.BEEF_FLINT_AND_STEEL,
+                            UComponents.BeefFlintAndSteelComponent, true);
             default -> {
             }
         }

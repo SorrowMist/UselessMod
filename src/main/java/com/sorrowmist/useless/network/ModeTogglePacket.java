@@ -153,6 +153,16 @@ public class ModeTogglePacket implements CustomPacketPayload {
                         }
                     }
                 }
+                case BEEF_SHEARS -> {
+                    if (stack.getItem() instanceof EndlessBeafItem) {
+                        EndlessBeafItem.setShearsEnabled(stack, msg.enabled);
+                    }
+                }
+                case BEEF_FLINT_AND_STEEL -> {
+                    if (stack.getItem() instanceof EndlessBeafItem) {
+                        EndlessBeafItem.setFlintAndSteelEnabled(stack, msg.enabled);
+                    }
+                }
             }
 
             // 显式同步物品到客户端
@@ -201,6 +211,8 @@ public class ModeTogglePacket implements CustomPacketPayload {
         BEEF_MAGNET,
         BEEF_ADVANCED_STEALTH,
         BEEF_FARMLAND_MODE,
-        BEEF_CROP_HARVEST
+        BEEF_CROP_HARVEST,
+        BEEF_SHEARS,
+        BEEF_FLINT_AND_STEEL
     }
 }

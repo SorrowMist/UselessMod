@@ -124,6 +124,27 @@ public class ClientEventBusSubscriber {
             }
         }
 
+        if (KeyBindings.TOGGLE_SHEARS_KEY.get().consumeClick()) {
+            ItemStack mainHandItem = player.getMainHandItem();
+            if (mainHandItem.getItem() instanceof EndlessBeafItem) {
+                // 切换剪刀功能（剪羊毛 / 剪掉落，并对外声明剪刀能力）
+                boolean currentShears = EndlessBeafItem.isShearsEnabled(mainHandItem);
+                PacketDistributor.sendToServer(
+                        new ModeTogglePacket(ModeTogglePacket.ModeType.BEEF_SHEARS, !currentShears));
+            }
+        }
+
+        if (KeyBindings.TOGGLE_FLINT_AND_STEEL_KEY.get().consumeClick()) {
+            ItemStack mainHandItem = player.getMainHandItem();
+            if (mainHandItem.getItem() instanceof EndlessBeafItem) {
+                // 切换打火石功能（点亮营火/蜡烛，或在点击面点火）
+                boolean currentFlintAndSteel = EndlessBeafItem.isFlintAndSteelEnabled(mainHandItem);
+                PacketDistributor.sendToServer(
+                        new ModeTogglePacket(ModeTogglePacket.ModeType.BEEF_FLINT_AND_STEEL,
+                                !currentFlintAndSteel));
+            }
+        }
+
         // 检测R键按下（触发强制破坏）
         if (KeyBindings.TRIGGER_FORCE_MINING_KEY.get().consumeClick()) {
             ItemStack mainHandItem = player.getMainHandItem();

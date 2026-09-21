@@ -160,6 +160,8 @@ public class EndlessBeafItem extends TieredItem {
                 .component(UComponents.BeefMagnetEnabledComponent, true)
                 .component(UComponents.BeefFarmlandModeComponent, false)
                 .component(UComponents.BeefCropHarvestComponent, true)
+                .component(UComponents.BeefShearsComponent, true)
+                .component(UComponents.BeefFlintAndSteelComponent, true)
                 .component(UComponents.AEStoragePriorityComponent, false)
                 .component(UComponents.AeNetworkConnectComponent, false)
                 .component(UComponents.WrenchTagEnabledComponent, wrenchTagEnabled)
@@ -224,6 +226,32 @@ public class EndlessBeafItem extends TieredItem {
 
     public static void setCropHarvestEnabled(ItemStack stack, boolean enabled) {
         stack.set(UComponents.BeefCropHarvestComponent.get(), enabled);
+    }
+
+    /**
+     * 是否启用剪刀功能：允许对羊、哞菇等 {@link IShearable} 实体剪毛/剪掉落，
+     * 并对外声明 {@code DEFAULT_SHEARS_ACTIONS} 能力。
+     */
+    public static boolean isShearsEnabled(ItemStack stack) {
+        return stack.getOrDefault(UComponents.BeefShearsComponent.get(), true);
+    }
+
+    public static void setShearsEnabled(ItemStack stack, boolean enabled) {
+        stack.set(UComponents.BeefShearsComponent.get(), enabled);
+    }
+
+    /**
+     * 是否启用打火石功能：允许点燃营火/蜡烛，或在可放置火的位置点火。
+     *
+     * <p>默认开启，与其他辅助功能（收菜、剪刀）保持一致；右键只有瞄准
+     * 营火/蜡烛或可点火位置时才会生效，不影响普通方块交互。</p>
+     */
+    public static boolean isFlintAndSteelEnabled(ItemStack stack) {
+        return stack.getOrDefault(UComponents.BeefFlintAndSteelComponent.get(), true);
+    }
+
+    public static void setFlintAndSteelEnabled(ItemStack stack, boolean enabled) {
+        stack.set(UComponents.BeefFlintAndSteelComponent.get(), enabled);
     }
 
     /** Keeps the tool's fixed enchantments aligned with its selected mode and server config. */
@@ -329,9 +357,13 @@ public class EndlessBeafItem extends TieredItem {
                 ItemAbilities.DEFAULT_SHOVEL_ACTIONS.contains(ability) ||
                 ItemAbilities.DEFAULT_HOE_ACTIONS.contains(ability) ||
                 ItemAbilities.DEFAULT_BRUSH_ACTIONS.contains(ability) ||
-                ItemAbilities.DEFAULT_SHEARS_ACTIONS.contains(ability) ||
                 ability == ItemAbilities.SWORD_SWEEP) {
             return true;
+        }
+
+        // 剪刀能力受「剪刀功能」开关控制：关掉后不再对外声明剪刀能力
+        if (ItemAbilities.DEFAULT_SHEARS_ACTIONS.contains(ability)) {
+            return isShearsEnabled(stack);
         }
 
         // 根据工具类型返回特定能力
@@ -896,6 +928,14 @@ public class EndlessBeafItem extends TieredItem {
         if (timeAccelerationResult != InteractionResult.PASS) return timeAccelerationResult;
 
         // ============================================================
+        // 0. 打火石功能 (点亮营火/蜡烛，或在点击面放火；潜行时让给其它模组)
+        // ============================================================
+        if (isFlintAndSteelEnabled(ctx.getItemInHand()) && !player.isShiftKeyDown()) {
+            InteractionResult flintResult = BeefFlintAndSteel.tryUse(ctx);
+            if (flintResult != InteractionResult.PASS) return flintResult;
+        }
+
+        // ============================================================
         // 1. 刷子功能 (对 BrushableBlock 生效)
         // ============================================================
         HitResult hitresult = ProjectileUtil.getHitResultOnViewVector(
@@ -1061,7 +1101,7 @@ public class EndlessBeafItem extends TieredItem {
             return InteractionResult.FAIL;
         }
 
-        if (entity instanceof IShearable target) {
+        if (isShearsEnabled(stack) && entity instanceof IShearable target) {
             BlockPos pos = entity.blockPosition();
             boolean isClient = entity.level().isClientSide();
             if (target.isShearable(player, stack, entity.level(), pos)) {
@@ -1264,6 +1304,26 @@ public class EndlessBeafItem extends TieredItem {
                                            .withStyle(ChatFormatting.BLUE));
         }
 
+        // 剪刀功能：开启后可剪羊毛/剪掉落，并对外声明剪刀能力
+        boolean beefShears = isShearsEnabled(stack);
+        tooltipComponents.add(Component.translatable("tooltip.useless_mod.beef_shears_mode")
+                                       .append(": ")
+                                       .append(Component.translatable(
+                                               beefShears ? "tooltip.useless_mod.enable" :
+                                                       "tooltip.useless_mod.disable"
+                                       ).withStyle(beefShears ? ChatFormatting.GREEN : ChatFormatting.GRAY))
+                                       .withStyle(ChatFormatting.AQUA));
+
+        // 打火石功能：开启后右键可点亮营火/蜡烛，或在点击面放火
+        boolean beefFlintAndSteel = isFlintAndSteelEnabled(stack);
+        tooltipComponents.add(Component.translatable("tooltip.useless_mod.beef_flint_and_steel_mode")
+                                       .append(": ")
+                                       .append(Component.translatable(
+                                               beefFlintAndSteel ? "tooltip.useless_mod.enable" :
+                                                       "tooltip.useless_mod.disable"
+                                       ).withStyle(beefFlintAndSteel ? ChatFormatting.GREEN : ChatFormatting.GRAY))
+                                       .withStyle(ChatFormatting.RED));
+
         // 右键泥土：锄头优先（变耕地）/ 铲子优先（变草径）
         tooltipComponents.add(Component.translatable("tooltip.useless_mod.beef_farmland_mode")
                                        .append(": ")
@@ -1304,6 +1364,12 @@ public class EndlessBeafItem extends TieredItem {
             );
             this.addKeyTooltip(tooltipComponents, KeyBindings.TOGGLE_CROP_HARVEST_KEY,
                                "tooltip.useless_mod.key.toggle_crop_harvest"
+            );
+            this.addKeyTooltip(tooltipComponents, KeyBindings.TOGGLE_SHEARS_KEY,
+                               "tooltip.useless_mod.key.toggle_shears"
+            );
+            this.addKeyTooltip(tooltipComponents, KeyBindings.TOGGLE_FLINT_AND_STEEL_KEY,
+                               "tooltip.useless_mod.key.toggle_flint_and_steel"
             );
 
             // 触发按键
@@ -1349,6 +1415,8 @@ public class EndlessBeafItem extends TieredItem {
                 Component.translatable("tooltip.useless_mod.beef_farmland_hint").withStyle(ChatFormatting.GOLD));
         tooltipComponents.add(
                 Component.translatable("tooltip.useless_mod.beef_crop_harvest_hint").withStyle(ChatFormatting.GREEN));
+        tooltipComponents.add(
+                Component.translatable("tooltip.useless_mod.beef_shears_hint").withStyle(ChatFormatting.AQUA));
 
         // 可选：增强连锁说明
         // tooltipComponents.add(Component.translatable("tooltip.useless_mod.enhanced_chain_description").withStyle(ChatFormatting.BLUE));

@@ -68,7 +68,15 @@ public enum ModeTypeEnum {
 
     // 顺手收菜：true = 右键成熟作物时收菜并保留种子在地里
     BEEF_CROP_HARVEST_ENABLED("beef_crop_harvest_enabled", "tooltip.useless_mod.beef_crop_harvest_mode"),
-    BEEF_CROP_HARVEST_DISABLED("beef_crop_harvest_disabled", "tooltip.useless_mod.beef_crop_harvest_mode");
+    BEEF_CROP_HARVEST_DISABLED("beef_crop_harvest_disabled", "tooltip.useless_mod.beef_crop_harvest_mode"),
+
+    // 剪刀功能：true = 造化杖可剪羊毛/剪掉落，并对外声明剪刀能力
+    BEEF_SHEARS_ENABLED("beef_shears_enabled", "tooltip.useless_mod.beef_shears_mode"),
+    BEEF_SHEARS_DISABLED("beef_shears_disabled", "tooltip.useless_mod.beef_shears_mode"),
+
+    // 打火石功能：true = 右键可点燃营火/蜡烛，或在可点火位置放火
+    BEEF_FLINT_AND_STEEL_ENABLED("beef_flint_and_steel_enabled", "tooltip.useless_mod.beef_flint_and_steel_mode"),
+    BEEF_FLINT_AND_STEEL_DISABLED("beef_flint_and_steel_disabled", "tooltip.useless_mod.beef_flint_and_steel_mode");
 
     private final String name;
     private final String tooltipKey;
@@ -151,6 +159,14 @@ public enum ModeTypeEnum {
 
     public static ModeTypeEnum getBeefCropHarvestMode(boolean enabled) {
         return enabled ? BEEF_CROP_HARVEST_ENABLED : BEEF_CROP_HARVEST_DISABLED;
+    }
+
+    public static ModeTypeEnum getBeefShearsMode(boolean enabled) {
+        return enabled ? BEEF_SHEARS_ENABLED : BEEF_SHEARS_DISABLED;
+    }
+
+    public static ModeTypeEnum getBeefFlintAndSteelMode(boolean enabled) {
+        return enabled ? BEEF_FLINT_AND_STEEL_ENABLED : BEEF_FLINT_AND_STEEL_DISABLED;
     }
 
     public String getName() {return this.name;}

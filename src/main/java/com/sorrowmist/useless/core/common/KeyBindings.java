@@ -96,4 +96,22 @@ public class KeyBindings {
             GLFW.GLFW_KEY_J,
             CATEGORY
     ));
+    // 剪刀功能开关
+    private static final String TOGGLE_SHEARS = "key.useless_mod.toggle_shears";
+    public static final Lazy<KeyMapping> TOGGLE_SHEARS_KEY = Lazy.of(() -> new KeyMapping(
+            TOGGLE_SHEARS,
+            KeyConflictContext.IN_GAME,
+            InputConstants.Type.KEYSYM,
+            GLFW.GLFW_KEY_K,
+            CATEGORY
+    ));
+    // 打火石功能开关
+    private static final String TOGGLE_FLINT_AND_STEEL = "key.useless_mod.toggle_flint_and_steel";
+    public static final Lazy<KeyMapping> TOGGLE_FLINT_AND_STEEL_KEY = Lazy.of(() -> new KeyMapping(
+            TOGGLE_FLINT_AND_STEEL,
+            KeyConflictContext.IN_GAME,
+            InputConstants.Type.KEYSYM,
+            GLFW.GLFW_KEY_L,
+            CATEGORY
+    ));
 }

@@ -35,6 +35,7 @@ import net.minecraft.world.entity.Pose;
 import net.minecraft.world.entity.ai.attributes.AttributeInstance;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.monster.warden.Warden;
+import net.minecraft.world.entity.player.Abilities;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
@@ -195,43 +196,96 @@ public class EventHandler {
         event.setNewSpeed(newSpeed);
     }
 
+    private static final float DEFAULT_FLYING_SPEED = 0.05F;
+    private static final float FLYING_SPEED_EPSILON = 1.0E-6F;
+    /**
+     * 游戏模式切换后需要强制重发一次能力包的玩家。
+     * 原版/NeoForge 会在切换时重置 abilities，客户端收到 CHANGE_GAME_MODE 后
+     * 还会本地再重置一遍；如果服务端之后不再主动重发，客户端就会一直停在
+     * 「没有 mayfly」的状态上，表现为造化杖飞行失效。
+     */
+    private static final Set<UUID> PENDING_FLIGHT_RESYNC = ConcurrentHashMap.newKeySet();
+
+    @SubscribeEvent
+    public static void onPlayerChangeGameMode(PlayerEvent.PlayerChangeGameModeEvent event) {
+        if (event.getEntity() instanceof ServerPlayer serverPlayer) {
+            PENDING_FLIGHT_RESYNC.add(serverPlayer.getUUID());
+        }
+    }
+
     @SubscribeEvent
     public static void onPlayerTick(PlayerTickEvent.Post event) {
         Player player = event.getEntity();
         if (player.level().isClientSide()) return;
 
-        if (!player.isCreative()) {
-            boolean hasItemInInventory = ConfigManager.shouldEnableFlightEffect()
-                    && UselessItemUtils.hasTargetToolInInventory(player);
-
-            if (hasItemInInventory) {
-                FlyEffectedHolder.add(player.getUUID());
-                float flightSpeed = (float) ConfigManager.getBeefToolFlightSpeed();
-                boolean abilitiesChanged = player.getAbilities().getFlyingSpeed() != flightSpeed;
-                if (abilitiesChanged) {
-                    player.getAbilities().setFlyingSpeed(flightSpeed);
-                }
-                if (!player.getAbilities().mayfly) {
-                    player.getAbilities().mayfly = true;
-                    abilitiesChanged = true;
-                }
-                if (abilitiesChanged) {
-                    player.onUpdateAbilities();
-                }
-            } else {
-                if (player.getAbilities().mayfly && FlyEffectedHolder.contains(player.getUUID())) {
-                    player.getAbilities().mayfly = false;
-                    player.getAbilities().flying = false;
-                    player.getAbilities().setFlyingSpeed(0.05F);
-                    player.onUpdateAbilities();
-                }
-                FlyEffectedHolder.remove(player.getUUID());
-            }
-        }
+        updateBeefToolFlight(player);
 
         updateBeefInvulnerability(player);
         
         MiningDispatcher.tickCacheUpdate(player);
+    }
+
+    /**
+     * 造化杖飞行状态维护。
+     * <p>
+     * 关键点：能力包只在「服务端状态发生变化」时才发是不够的——客户端那份 abilities 会被
+     * {@link net.minecraft.client.multiplayer.MultiPlayerGameMode#setLocalMode} 单独重置，
+     * 服务端不知情也就永远不会补发。所以这里每 tick 把 abilities 对齐到目标值，
+     * 只要有任何一项不一致（或刚切换过游戏模式）就重发一次能力包。
+     */
+    private static void updateBeefToolFlight(Player player) {
+        boolean hasItemInInventory = ConfigManager.shouldEnableFlightEffect()
+                && UselessItemUtils.hasTargetToolInInventory(player);
+
+        // 创造/旁观模式自带飞行，这份能力归原版管，模组不接管也不撤销。
+        // 待重发标记故意保留到离开该模式后的第一 tick，那才是真正需要补发能力包的时机。
+        if (player.isCreative() || player.isSpectator()) {
+            if (hasItemInInventory) {
+                FlyEffectedHolder.add(player);
+            } else {
+                FlyEffectedHolder.remove(player);
+            }
+            return;
+        }
+
+        boolean forceSync = PENDING_FLIGHT_RESYNC.remove(player.getUUID());
+
+        if (hasItemInInventory) {
+            FlyEffectedHolder.add(player);
+            float flightSpeed = (float) ConfigManager.getBeefToolFlightSpeed();
+            applyFlightAbilities(player, true, player.getAbilities().flying, flightSpeed, forceSync);
+            return;
+        }
+
+        // 没有造化杖时只回收模组自己授予过的飞行，避免抢走其它来源的飞行能力。
+        // 归属标记落在玩家持久化数据里，所以「带着模组授予的飞行离线后重登」也能正确回收。
+        if (FlyEffectedHolder.remove(player)) {
+            applyFlightAbilities(player, false, false, DEFAULT_FLYING_SPEED, true);
+        }
+    }
+
+    private static void applyFlightAbilities(Player player,
+                                             boolean mayfly,
+                                             boolean flying,
+                                             float flyingSpeed,
+                                             boolean forceSync) {
+        Abilities abilities = player.getAbilities();
+        boolean abilitiesChanged = false;
+        if (abilities.mayfly != mayfly) {
+            abilities.mayfly = mayfly;
+            abilitiesChanged = true;
+        }
+        if (abilities.flying != flying) {
+            abilities.flying = flying;
+            abilitiesChanged = true;
+        }
+        if (Math.abs(abilities.getFlyingSpeed() - flyingSpeed) > FLYING_SPEED_EPSILON) {
+            abilities.setFlyingSpeed(flyingSpeed);
+            abilitiesChanged = true;
+        }
+        if (abilitiesChanged || forceSync) {
+            player.onUpdateAbilities();
+        }
     }
 
     public static void updateBeefInvulnerability(Player player) {
@@ -515,6 +569,8 @@ public class EventHandler {
     public static void onPlayerLoggedOut(PlayerEvent.PlayerLoggedOutEvent event) {
         BEEF_PROTECTED_PLAYERS.remove(event.getEntity().getUUID());
         BEEF_ADVANCED_STEALTH_PLAYERS.remove(event.getEntity().getUUID());
+        // 玩家若在创造模式下离线，飞行待重发标记不会被消费，这里顺手清掉
+        PENDING_FLIGHT_RESYNC.remove(event.getEntity().getUUID());
         if (event.getEntity() instanceof ServerPlayer player) {
             GrassWandDropHandler.onPlayerLoggedOut(player);
         }

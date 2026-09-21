@@ -127,13 +127,13 @@ public final class ConstructionWandLogic {
 
         int limit = ConfigManager.getBeefConstructionWandBuildLimit();
         Direction face = hit.getDirection();
-        Direction[] planeDirections = planeDirections(face);
+        BlockPos[] offsets = planeOffsets(face);
         Deque<BlockPos> pending = new ArrayDeque<>();
         Set<BlockPos> visited = new HashSet<>();
         List<SavedBlock> changed = new ArrayList<>();
         pending.add(hit.getBlockPos().relative(face));
         int attempts = 0;
-        int maxAttempts = Math.max(64, Math.min(100_000, limit * 8));
+        int maxAttempts = Math.max(64, Math.min(200_000, limit * 16));
 
         while (!pending.isEmpty() && changed.size() < limit && attempts++ < maxAttempts) {
             if (!player.isCreative() && findSupply(player, tool, targetItem).stack.isEmpty()) break;
@@ -145,8 +145,8 @@ public final class ConstructionWandLogic {
             if (!place(level, player, tool, pos, face, targetItem, changed)) continue;
             if (changed.size() >= limit) break;
 
-            for (Direction direction : planeDirections) {
-                pending.addLast(pos.relative(direction));
+            for (BlockPos offset : offsets) {
+                pending.addLast(pos.offset(offset));
             }
         }
         return changed.isEmpty() ? null : new Operation(changed, tool.copy());
@@ -167,14 +167,14 @@ public final class ConstructionWandLogic {
                 : previewSupply.stack.copyWithCount(1);
 
         Direction face = hit.getDirection();
-        Direction[] planeDirections = planeDirections(face);
+        BlockPos[] offsets = planeOffsets(face);
         Deque<BlockPos> pending = new ArrayDeque<>();
         Set<BlockPos> visited = new HashSet<>();
         List<BlockPos> preview = new ArrayList<>(Math.min(limit, MAX_PREVIEW_BLOCKS));
         pending.add(hit.getBlockPos().relative(face));
 
         int attempts = 0;
-        int maxAttempts = Math.max(64, Math.min(100_000, limit * 8));
+        int maxAttempts = Math.max(64, Math.min(200_000, limit * 16));
         while (!pending.isEmpty() && preview.size() < limit && attempts++ < maxAttempts) {
             BlockPos pos = pending.removeFirst();
             if (!visited.add(pos)) continue;
@@ -186,8 +186,8 @@ public final class ConstructionWandLogic {
             }
 
             preview.add(pos.immutable());
-            for (Direction direction : planeDirections) {
-                pending.addLast(pos.relative(direction));
+            for (BlockPos offset : offsets) {
+                pending.addLast(pos.offset(offset));
             }
         }
         return List.copyOf(preview);
@@ -287,13 +287,16 @@ public final class ConstructionWandLogic {
         if (target.isAir()) return null;
 
         int limit = ConfigManager.getBeefConstructionWandDestructionLimit();
-        Direction[] planeDirections = planeDirections(hit.getDirection());
+        BlockPos[] offsets = planeOffsets(hit.getDirection());
         Deque<BlockPos> pending = new ArrayDeque<>();
         Set<BlockPos> visited = new HashSet<>();
         List<SavedBlock> changed = new ArrayList<>();
         pending.add(hit.getBlockPos());
+        int attempts = 0;
+        // 8 邻域会访问更多非目标方块，给 BFS 一个与上限成比例的尝试预算，避免在开阔区域无界扩散。
+        int maxAttempts = Math.max(64, Math.min(200_000, limit * 16));
 
-        while (!pending.isEmpty() && changed.size() < limit) {
+        while (!pending.isEmpty() && changed.size() < limit && attempts++ < maxAttempts) {
             BlockPos pos = pending.removeFirst();
             if (!visited.add(pos)) continue;
 
@@ -308,8 +311,8 @@ public final class ConstructionWandLogic {
                 }
             }
             if (!destroyed) continue;
-            for (Direction direction : planeDirections) {
-                pending.addLast(pos.relative(direction));
+            for (BlockPos offset : offsets) {
+                pending.addLast(pos.offset(offset));
             }
         }
         return changed.isEmpty() ? null : new Operation(changed, tool.copy());
@@ -320,21 +323,23 @@ public final class ConstructionWandLogic {
         if (target.isAir()) return List.of();
 
         int limit = Math.min(ConfigManager.getBeefConstructionWandDestructionLimit(), MAX_PREVIEW_BLOCKS);
-        Direction[] planeDirections = planeDirections(hit.getDirection());
+        BlockPos[] offsets = planeOffsets(hit.getDirection());
         Deque<BlockPos> pending = new ArrayDeque<>();
         Set<BlockPos> visited = new HashSet<>();
         List<BlockPos> preview = new ArrayList<>(limit);
         pending.add(hit.getBlockPos());
+        int attempts = 0;
+        int maxAttempts = Math.max(64, Math.min(200_000, limit * 16));
 
-        while (!pending.isEmpty() && preview.size() < limit) {
+        while (!pending.isEmpty() && preview.size() < limit && attempts++ < maxAttempts) {
             BlockPos pos = pending.removeFirst();
             if (!visited.add(pos)) continue;
             BlockState state = level.getBlockState(pos);
             if (state.isAir() || state.getBlock() != target.getBlock()) continue;
 
             preview.add(pos.immutable());
-            for (Direction direction : planeDirections) {
-                pending.addLast(pos.relative(direction));
+            for (BlockPos offset : offsets) {
+                pending.addLast(pos.offset(offset));
             }
         }
         return List.copyOf(preview);
@@ -508,12 +513,31 @@ public final class ConstructionWandLogic {
                 && tool.has(UComponents.WIRELESS_LINK_TARGET.get());
     }
 
-    private static Direction[] planeDirections(Direction face) {
-        return switch (face.getAxis()) {
-            case X -> new Direction[]{Direction.UP, Direction.DOWN, Direction.NORTH, Direction.SOUTH};
-            case Y -> new Direction[]{Direction.NORTH, Direction.SOUTH, Direction.EAST, Direction.WEST};
-            case Z -> new Direction[]{Direction.UP, Direction.DOWN, Direction.EAST, Direction.WEST};
+    /**
+     * 与 {@code face} 垂直的平面内、相对目标方块的 8 邻域偏移（4 个轴向 + 4 个对角）。
+     * 只沿 4 个轴向扩展会漏掉仅通过角点相连的同类方块（斜向/L 形的平面），
+     * 所以这里把对角也算作相邻，建造、破坏及其预览共用同一套邻域。
+     */
+    private static BlockPos[] planeOffsets(Direction face) {
+        Direction[] axes = switch (face.getAxis()) {
+            case X -> new Direction[]{Direction.UP, Direction.NORTH};
+            case Y -> new Direction[]{Direction.NORTH, Direction.EAST};
+            case Z -> new Direction[]{Direction.UP, Direction.EAST};
         };
+        Direction first = axes[0];
+        Direction second = axes[1];
+        List<BlockPos> offsets = new ArrayList<>(8);
+        for (Direction axis : new Direction[]{first, first.getOpposite(), second, second.getOpposite()}) {
+            offsets.add(new BlockPos(axis.getStepX(), axis.getStepY(), axis.getStepZ()));
+        }
+        for (Direction a : new Direction[]{first, first.getOpposite()}) {
+            for (Direction b : new Direction[]{second, second.getOpposite()}) {
+                offsets.add(new BlockPos(a.getStepX() + b.getStepX(),
+                        a.getStepY() + b.getStepY(),
+                        a.getStepZ() + b.getStepZ()));
+            }
+        }
+        return offsets.toArray(BlockPos[]::new);
     }
 
     private static void remember(ServerPlayer player, Operation operation) {

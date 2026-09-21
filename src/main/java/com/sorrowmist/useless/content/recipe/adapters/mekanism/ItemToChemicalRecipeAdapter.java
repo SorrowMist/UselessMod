@@ -73,6 +73,11 @@ public final class ItemToChemicalRecipeAdapter implements IRecipeAdapter<ItemSta
     }
 
     @Override
+    public String registrationKey() {
+        return name;
+    }
+
+    @Override
     public List<AdvancedAlloyFurnaceRecipe> convertAll(RecipeHolder<ItemStackToChemicalRecipe> holder, Level level) {
         if (holder == null || level == null || holder.value().getType() != recipeType) return List.of();
         ItemStackToChemicalRecipe original = holder.value();

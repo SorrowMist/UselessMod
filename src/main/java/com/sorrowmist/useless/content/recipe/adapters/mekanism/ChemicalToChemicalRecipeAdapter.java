@@ -58,6 +58,11 @@ public final class ChemicalToChemicalRecipeAdapter implements IRecipeAdapter<Che
     }
 
     @Override
+    public String registrationKey() {
+        return name;
+    }
+
+    @Override
     public @Nullable ItemStack getMoldItem() {
         return mold.copy();
     }

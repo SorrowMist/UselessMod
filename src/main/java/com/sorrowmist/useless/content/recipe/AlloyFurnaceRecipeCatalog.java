@@ -25,6 +25,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.ConcurrentModificationException;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -149,6 +150,7 @@ public final class AlloyFurnaceRecipeCatalog {
         // 第一次正在跑的成果整份作废，于是同一份目录被从头算两遍。构建循环自身已经处理了「构建期间
         // 世代变了」的情况，因此跳过重复入队不会漏建。
         if (!BUILD_PENDING.add(cacheKey)) return;
+        prepareGeneratedRecipes(level);
         BUILD_EXECUTOR.execute(() -> {
             try {
                 snapshot(level);
@@ -159,6 +161,22 @@ public final class AlloyFurnaceRecipeCatalog {
                 BUILD_PENDING.remove(cacheKey);
             }
         });
+    }
+
+    /**
+     * Give adapters a game-thread handoff point for runtime data that cannot be traversed safely
+     * by the catalog worker. The expensive conversion and fingerprint pass remains asynchronous.
+     */
+    private static void prepareGeneratedRecipes(Level level) {
+        for (com.sorrowmist.useless.api.recipe.IRecipeAdapter<?> adapter
+                : AlloyFurnaceRecipeManager.getInstance().getRegisteredAdapters()) {
+            try {
+                adapter.prepareGeneratedRecipes(level);
+            } catch (RuntimeException exception) {
+                LOGGER.warn("Failed to prepare generated recipes: adapter={}",
+                        adapter.getClass().getName(), exception);
+            }
+        }
     }
 
     public static List<AdvancedAlloyFurnaceRecipe> recipes(Level level) {
@@ -692,10 +710,20 @@ public final class AlloyFurnaceRecipeCatalog {
                     recipe.id(), AlloyFurnaceRecipeFingerprint.create(recipe, level.registryAccess()));
             return new FingerprintedRecipe(identity, recipe, collected.sourceId());
         } catch (RuntimeException exception) {
+            String recipeId;
+            try {
+                recipeId = String.valueOf(recipe.id());
+            } catch (RuntimeException idFailure) {
+                recipeId = "<unreadable:" + idFailure.getClass().getName() + ">";
+            }
             LOGGER.warn("Skipping alloy-furnace recipe with an unencodable identity: {} ({})",
-                    recipe.id(), exception.getMessage());
+                    recipeId, exception.getMessage());
             if (LOGGER.isDebugEnabled()) {
-                LOGGER.debug("Unencodable alloy-furnace recipe contents: {}", recipe);
+                try {
+                    LOGGER.debug("Unencodable alloy-furnace recipe contents: {}", recipe);
+                } catch (RuntimeException ignored) {
+                    LOGGER.debug("Unencodable alloy-furnace recipe contents could not be formatted");
+                }
             }
             return null;
         }
@@ -756,6 +784,10 @@ public final class AlloyFurnaceRecipeCatalog {
         List<? extends RecipeHolder<?>> generated;
         try {
             generated = adapter.getGeneratedRecipes(level);
+        } catch (ConcurrentModificationException exception) {
+            // A transient concurrent read must fail the build, rather than publishing a catalog
+            // that silently omits every generated recipe owned by this adapter.
+            throw exception;
         } catch (RuntimeException exception) {
             LOGGER.warn("Skipping generated recipes: adapter={}", adapter.getClass().getName(), exception);
             return;

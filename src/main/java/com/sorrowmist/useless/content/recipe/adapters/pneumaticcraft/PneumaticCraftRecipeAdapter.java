@@ -141,6 +141,11 @@ public final class PneumaticCraftRecipeAdapter<T extends PneumaticCraftRecipe>
     }
 
     @Override
+    public String registrationKey() {
+        return kind.name();
+    }
+
+    @Override
     public ItemStack getMoldItem() {
         return moldItem.copy();
     }

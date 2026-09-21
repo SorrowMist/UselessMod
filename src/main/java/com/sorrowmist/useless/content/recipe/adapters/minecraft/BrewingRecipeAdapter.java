@@ -37,6 +37,7 @@ import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.WeakHashMap;
 
 /** Converts brewing-stand recipes into fixed three-bottle alloy-furnace batches. */
 public final class BrewingRecipeAdapter implements IRecipeAdapter<BrewingSyntheticRecipe> {
@@ -48,8 +49,9 @@ public final class BrewingRecipeAdapter implements IRecipeAdapter<BrewingSynthet
             Items.LINGERING_POTION
     };
 
-    private volatile PotionBrewing cachedBrewing;
-    private volatile List<RecipeHolder<BrewingSyntheticRecipe>> cachedRecipes = List.of();
+    /** The integrated server and client use different PotionBrewing instances. */
+    private final Map<PotionBrewing, List<RecipeHolder<BrewingSyntheticRecipe>>> recipeCache =
+            new WeakHashMap<>();
 
     @Override
     public Class<BrewingSyntheticRecipe> getRecipeClass() {
@@ -61,6 +63,15 @@ public final class BrewingRecipeAdapter implements IRecipeAdapter<BrewingSynthet
         return new ItemStack(Items.BREWING_STAND);
     }
 
+    /**
+     * PotionBrewing's legacy potion-mix lists are owned by the game thread while brewing data is
+     * being assembled. Materialize them before the catalog worker starts traversing the result.
+     */
+    @Override
+    public void prepareGeneratedRecipes(Level level) {
+        getGeneratedRecipes(level);
+    }
+
     @Override
     public List<RecipeHolder<BrewingSyntheticRecipe>> getGeneratedRecipes(Level level) {
         if (level == null || level.potionBrewing() == null) {
@@ -68,17 +79,14 @@ public final class BrewingRecipeAdapter implements IRecipeAdapter<BrewingSynthet
         }
 
         PotionBrewing brewing = level.potionBrewing();
-        if (cachedBrewing == brewing) {
-            return cachedRecipes;
-        }
-
         synchronized (this) {
-            if (cachedBrewing != brewing) {
-                cachedRecipes = createStaticRecipes(
-                        brewing, level.registryAccess(), level.enabledFeatures());
-                cachedBrewing = brewing;
-            }
-            return cachedRecipes;
+            List<RecipeHolder<BrewingSyntheticRecipe>> cached = recipeCache.get(brewing);
+            if (cached != null) return cached;
+
+            List<RecipeHolder<BrewingSyntheticRecipe>> generated = createStaticRecipes(
+                    brewing, level.registryAccess(), level.enabledFeatures());
+            recipeCache.put(brewing, generated);
+            return generated;
         }
     }
 

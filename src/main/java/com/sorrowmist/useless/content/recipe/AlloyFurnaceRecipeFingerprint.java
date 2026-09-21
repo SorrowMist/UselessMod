@@ -1,14 +1,17 @@
 package com.sorrowmist.useless.content.recipe;
 
 import appeng.api.stacks.AEItemKey;
+import appeng.api.stacks.AEKey;
+import appeng.api.stacks.GenericStack;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
+import com.mojang.serialization.Codec;
 import com.mojang.serialization.JsonOps;
 import net.minecraft.core.HolderLookup;
+import net.minecraft.core.component.DataComponentPatch;
+import net.minecraft.core.component.DataComponentType;
 import net.minecraft.core.registries.BuiltInRegistries;
-import net.minecraft.tags.TagKey;
-import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.crafting.Ingredient;
 import net.neoforged.neoforge.fluids.FluidStack;
@@ -18,9 +21,12 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.Arrays;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HexFormat;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.TreeMap;
 
 public final class AlloyFurnaceRecipeFingerprint {
@@ -53,7 +59,28 @@ public final class AlloyFurnaceRecipeFingerprint {
             boolean preserveTags) {
         Objects.requireNonNull(recipe, "recipe");
         Objects.requireNonNull(registries, "registries");
+        try {
+            return createEncoded(recipe, registries, normalizeIngredientSemantics, preserveTags);
+        } catch (RuntimeException ignored) {
+            // Keep the historical encoded fingerprint above untouched. This path is only for a
+            // runtime recipe that the historical codec cannot represent.
+            try {
+                return createStructuralFallback(recipe, registries, normalizeIngredientSemantics, preserveTags);
+            } catch (RuntimeException structuralFailure) {
+                // This is still deterministic: a runtime object address must never be part of a
+                // persisted pattern identity.
+                return createFinalFallback(recipe);
+            }
+        }
+    }
+
+    private static String createEncoded(
+            AdvancedAlloyFurnaceRecipe recipe,
+            HolderLookup.Provider registries,
+            boolean normalizeIngredientSemantics,
+            boolean preserveTags) {
         var context = registries.createSerializationContext(JsonOps.INSTANCE);
+        // Do not change this successful path: old patterns depend on its exact JSON shape.
         JsonElement encoded = AdvancedAlloyFurnaceRecipe.CODEC.codec()
                 .encodeStart(context, recipe)
                 .getOrThrow();
@@ -74,6 +101,371 @@ public final class AlloyFurnaceRecipeFingerprint {
         byte[] canonical = canonicalize(encoded).toString().getBytes(StandardCharsets.UTF_8);
         try {
             return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(canonical));
+        } catch (NoSuchAlgorithmException exception) {
+            throw new IllegalStateException("SHA-256 is unavailable", exception);
+        }
+    }
+
+    /**
+     * Builds an identity without invoking a codec. This is deliberately a last resort for
+     * malformed third-party data, so every individual field is guarded and a bad component cannot
+     * discard the whole recipe.
+     */
+    private static String createStructuralFallback(
+            AdvancedAlloyFurnaceRecipe recipe,
+            HolderLookup.Provider registries,
+            boolean normalizeIngredientSemantics,
+            boolean preserveTags) {
+        StringBuilder value = new StringBuilder("alloy_furnace_fingerprint_fallback_v1|");
+        append(value, "id", recipe.id());
+        append(value, "inputs", recipe.inputs(), input -> safeCountedIngredient(input, registries,
+                normalizeIngredientSemantics, preserveTags));
+        append(value, "input_fluids", recipe.inputFluids(), input -> safeFluidIngredient(input, registries));
+        append(value, "key_inputs", recipe.keyInputs(), input -> safeGenericStack(input, registries));
+        append(value, "outputs", recipe.outputs(), output -> safeItemStack(output, registries));
+        append(value, "output_fluids", recipe.outputFluids(), fluid -> safeFluidStack(fluid, registries));
+        append(value, "key_outputs", recipe.keyOutputs(), output -> safeGenericStack(output, registries));
+        append(value, "energy", recipe.energy());
+        append(value, "process_time", recipe.processTime());
+        append(value, "catalyst", safeIngredient(recipe.catalyst(), registries, normalizeIngredientSemantics,
+                preserveTags));
+        append(value, "catalyst_uses", recipe.catalystUses());
+        append(value, "molds", recipe.molds(), mold -> safeIngredient(mold, registries,
+                normalizeIngredientSemantics, preserveTags));
+        append(value, "mode", recipe.mode());
+        append(value, "tier", recipe.tier());
+        return digest(value.toString());
+    }
+
+    private static String safeCountedIngredient(
+            CountedIngredient input,
+            HolderLookup.Provider registries,
+            boolean normalizeIngredientSemantics,
+            boolean preserveTags) {
+        if (input == null) return "null";
+        return safeIngredient(input.ingredient(), registries, normalizeIngredientSemantics, preserveTags)
+                + "#" + input.count();
+    }
+
+    private static String safeFluidIngredient(
+            LongSizedFluidIngredient input,
+            HolderLookup.Provider registries) {
+        if (input == null) return "null";
+        return safeFluidIngredientValue(input.ingredient(), registries) + "#" + input.amount();
+    }
+
+    private static String safeIngredient(
+            Ingredient ingredient,
+            HolderLookup.Provider registries,
+            boolean normalizeIngredientSemantics,
+            boolean preserveTags) {
+        if (ingredient == null) return "empty";
+        try {
+            if (ingredient.isEmpty()) return "empty";
+        } catch (RuntimeException exception) {
+            return "ingredient_error:" + ingredient.getClass().getName()
+                    + ":" + exception.getClass().getName();
+        }
+        try {
+            if (normalizeIngredientSemantics && ingredient.isSimple() && !(preserveTags && hasDirectTag(ingredient))) {
+                String[] itemIds = Arrays.stream(ingredient.getItems())
+                        .filter(stack -> stack != null && !stack.isEmpty())
+                        .map(ItemStack::getItem)
+                        .map(BuiltInRegistries.ITEM::getKey)
+                        .filter(Objects::nonNull)
+                        .map(Object::toString)
+                        .distinct()
+                        .sorted()
+                        .toArray(String[]::new);
+                return String.join(",", itemIds);
+            }
+        } catch (RuntimeException ignored) {
+            // Continue with the codec or textual fallback.
+        }
+        try {
+            var context = registries.createSerializationContext(JsonOps.INSTANCE);
+            var encoded = Ingredient.CODEC.encodeStart(context, ingredient);
+            if (encoded.result().isPresent()) return canonicalize(encoded.result().get()).toString();
+        } catch (RuntimeException ignored) {
+            // Continue with the representative stack fallback.
+        }
+        try {
+            String items = Arrays.stream(ingredient.getItems())
+                    .map(stack -> safeItemStack(stack, registries))
+                    .sorted()
+                    .reduce((left, right) -> left + "," + right)
+                    .orElse(ingredient.getClass().getName());
+            return ingredient.getClass().getName() + "[" + items + "]";
+        } catch (RuntimeException ignored) {
+            return ingredient.getClass().getName();
+        }
+    }
+
+    private static String safeFluidIngredientValue(
+            net.neoforged.neoforge.fluids.crafting.FluidIngredient ingredient,
+            HolderLookup.Provider registries) {
+        if (ingredient == null) return "empty";
+        try {
+            if (ingredient.isEmpty()) return "empty";
+        } catch (RuntimeException exception) {
+            return "fluid_ingredient_error:" + ingredient.getClass().getName()
+                    + ":" + exception.getClass().getName();
+        }
+        try {
+            var context = registries.createSerializationContext(JsonOps.INSTANCE);
+            var encoded = net.neoforged.neoforge.fluids.crafting.FluidIngredient.CODEC
+                    .encodeStart(context, ingredient);
+            if (encoded.result().isPresent()) return canonicalize(encoded.result().get()).toString();
+        } catch (RuntimeException ignored) {
+            // Use representatives below.
+        }
+        try {
+            return Arrays.stream(ingredient.getStacks())
+                    .map(stack -> safeFluidStack(stack, registries))
+                    .sorted()
+                    .reduce((left, right) -> left + "," + right)
+                    .orElse(ingredient.getClass().getName());
+        } catch (RuntimeException ignored) {
+            return ingredient.getClass().getName();
+        }
+    }
+
+    private static String safeItemStack(ItemStack stack, HolderLookup.Provider registries) {
+        if (stack == null) return "null";
+        String itemId;
+        try {
+            var key = BuiltInRegistries.ITEM.getKey(stack.getItem());
+            itemId = key == null
+                    ? "unregistered_item:" + stack.getItem().getClass().getName()
+                    : key.toString();
+        } catch (RuntimeException exception) {
+            itemId = "item_error:" + exception.getClass().getName();
+        }
+        String components;
+        try {
+            var context = registries.createSerializationContext(JsonOps.INSTANCE);
+            var encoded = net.minecraft.core.component.DataComponentPatch.CODEC
+                    .encodeStart(context, stack.getComponentsPatch());
+            components = encoded.result().map(AlloyFurnaceRecipeFingerprint::canonicalize)
+                    .map(JsonElement::toString)
+                    .orElseGet(() -> stableComponentPatch(stack.getComponentsPatch(), registries));
+        } catch (RuntimeException exception) {
+            components = stableComponentPatch(stack.getComponentsPatch(), registries);
+        }
+        String count;
+        try {
+            count = String.valueOf(stack.getCount());
+        } catch (RuntimeException exception) {
+            count = "count_error:" + exception.getClass().getName();
+        }
+        return itemId + "#" + count + "#" + components;
+    }
+
+    private static String safeFluidStack(FluidStack stack, HolderLookup.Provider registries) {
+        if (stack == null) return "null";
+        String fluidId;
+        try {
+            var key = BuiltInRegistries.FLUID.getKey(stack.getFluid());
+            fluidId = key == null
+                    ? "unregistered_fluid:" + stack.getFluid().getClass().getName()
+                    : key.toString();
+        } catch (RuntimeException exception) {
+            fluidId = "fluid_error:" + exception.getClass().getName();
+        }
+        String components;
+        try {
+            var context = registries.createSerializationContext(JsonOps.INSTANCE);
+            var encoded = FluidStack.CODEC.encodeStart(context, stack);
+            components = encoded.result().map(AlloyFurnaceRecipeFingerprint::canonicalize)
+                    .map(JsonElement::toString)
+                    .orElseGet(() -> stableComponentPatch(stack.getComponentsPatch(), registries));
+        } catch (RuntimeException exception) {
+            components = stableComponentPatch(stack.getComponentsPatch(), registries);
+        }
+        String amount;
+        try {
+            amount = String.valueOf(stack.getAmount());
+        } catch (RuntimeException exception) {
+            amount = "amount_error:" + exception.getClass().getName();
+        }
+        return fluidId + "#" + amount + "#" + components;
+    }
+
+    private static String safeGenericStack(GenericStack stack, HolderLookup.Provider registries) {
+        if (stack == null) return "null";
+        try {
+            var context = registries.createSerializationContext(JsonOps.INSTANCE);
+            var encoded = GenericStack.CODEC.encodeStart(context, stack);
+            if (encoded.result().isPresent()) {
+                return canonicalize((JsonElement) encoded.result().get()).toString();
+            }
+        } catch (RuntimeException exception) {
+            // Try the key codec separately so a broken amount or wrapper does not erase the key.
+        }
+        try {
+            var context = registries.createSerializationContext(JsonOps.INSTANCE);
+            var encoded = AEKey.CODEC.encodeStart(context, stack.what());
+            if (encoded.result().isPresent()) {
+                return "key=" + canonicalize(encoded.result().get()) + ";amount=" + stack.amount();
+            }
+        } catch (RuntimeException exception) {
+            // Use registry identity and scalar metadata as the final stable representation.
+        }
+        AEKey key = stack.what();
+        return "key_type=" + (key == null ? "null" : key.getClass().getName())
+                + ";key_id=" + safeKeyId(key)
+                + ";has_components=" + safeKeyHasComponents(key)
+                + ";amount=" + safeLong(() -> stack.amount());
+    }
+
+    private static String safeKeyId(AEKey key) {
+        if (key == null) return "null";
+        try {
+            return safeText(key.getId());
+        } catch (RuntimeException exception) {
+            return "id_error:" + exception.getClass().getName();
+        }
+    }
+
+    private static String safeKeyHasComponents(AEKey key) {
+        if (key == null) return "false";
+        try {
+            return Boolean.toString(key.hasComponents());
+        } catch (RuntimeException exception) {
+            return "error:" + exception.getClass().getName();
+        }
+    }
+
+    private static String stableComponentPatch(
+            DataComponentPatch patch, HolderLookup.Provider registries) {
+        if (patch == null) return "null";
+        try {
+            var context = registries.createSerializationContext(JsonOps.INSTANCE);
+            var encoded = DataComponentPatch.CODEC.encodeStart(context, patch);
+            if (encoded.result().isPresent()) {
+                return canonicalize(encoded.result().get()).toString();
+            }
+        } catch (RuntimeException ignored) {
+            // Encode entries independently below so one invalid component cannot erase the stack.
+        }
+
+        List<String> entries = new ArrayList<>();
+        for (Map.Entry<DataComponentType<?>, Optional<?>> entry : patch.entrySet()) {
+            String type = encodeComponentType(entry.getKey(), registries);
+            String value = entry.getValue().isEmpty()
+                    ? "removed"
+                    : encodeComponentValue(entry.getKey(), entry.getValue().get(), registries);
+            entries.add(type + "=" + value);
+        }
+        entries.sort(Comparator.naturalOrder());
+        return "component_patch_v1[" + String.join(",", entries) + "]";
+    }
+
+    private static String encodeComponentType(
+            DataComponentType<?> type, HolderLookup.Provider registries) {
+        try {
+            var context = registries.createSerializationContext(JsonOps.INSTANCE);
+            var encoded = DataComponentType.CODEC.encodeStart(context, type);
+            if (encoded.result().isPresent()) {
+                return canonicalize(encoded.result().get()).toString();
+            }
+        } catch (RuntimeException ignored) {
+            // Fall through to the stable implementation class name.
+        }
+        return "type=" + (type == null ? "null" : type.getClass().getName());
+    }
+
+    @SuppressWarnings({"rawtypes", "unchecked"})
+    private static String encodeComponentValue(
+            DataComponentType<?> type, Object value, HolderLookup.Provider registries) {
+        try {
+            var context = registries.createSerializationContext(JsonOps.INSTANCE);
+            Codec codec = type.codec();
+            var encoded = codec.encodeStart(context, value);
+            if (encoded.result().isPresent()) {
+                return canonicalize((JsonElement) encoded.result().get()).toString();
+            }
+        } catch (RuntimeException ignored) {
+            // A component without a working codec is represented by type and value class only.
+        }
+        return "value_type=" + (value == null ? "null" : value.getClass().getName());
+    }
+
+    private static String safeLong(java.util.function.LongSupplier supplier) {
+        try {
+            return Long.toString(supplier.getAsLong());
+        } catch (RuntimeException exception) {
+            return "long_error:" + exception.getClass().getName();
+        }
+    }
+
+    private static <T> void append(StringBuilder value, String name, T field) {
+        value.append(name).append('=');
+        appendToken(value, safeText(field));
+        value.append(';');
+    }
+
+    private static <T> void append(
+            StringBuilder value, String name, List<T> fields,
+            java.util.function.Function<T, String> encoder) {
+        value.append(name).append('[');
+        if (fields != null) {
+            int index = 0;
+            for (T field : fields) {
+                value.append(index++).append(':');
+                try {
+                    appendToken(value, encoder.apply(field));
+                } catch (RuntimeException exception) {
+                    appendToken(value, "field_error:" + exception.getClass().getName());
+                }
+                value.append('|');
+            }
+        }
+        value.append("];");
+    }
+
+    private static void appendToken(StringBuilder value, String token) {
+        String safe = token == null ? "null" : token;
+        value.append(safe.length()).append(':').append(safe);
+    }
+
+    private static String safeText(Object value) {
+        try {
+            return String.valueOf(value);
+        } catch (RuntimeException exception) {
+            return "text_error:" + exception.getClass().getName();
+        }
+    }
+
+    private static String createFinalFallback(AdvancedAlloyFurnaceRecipe recipe) {
+        return digest("alloy_furnace_fingerprint_emergency_v1"
+                + "|class=" + recipe.getClass().getName()
+                + "|id=" + safeText(recipe.id())
+                + "|inputs=" + safeListSize(recipe.inputs())
+                + "|input_fluids=" + safeListSize(recipe.inputFluids())
+                + "|key_inputs=" + safeListSize(recipe.keyInputs())
+                + "|outputs=" + safeListSize(recipe.outputs())
+                + "|output_fluids=" + safeListSize(recipe.outputFluids())
+                + "|key_outputs=" + safeListSize(recipe.keyOutputs())
+                + "|energy=" + safeText(recipe.energy())
+                + "|process_time=" + safeText(recipe.processTime())
+                + "|catalyst_uses=" + safeText(recipe.catalystUses())
+                + "|mode=" + safeText(recipe.mode())
+                + "|tier=" + safeText(recipe.tier()));
+    }
+
+    private static String safeListSize(List<?> values) {
+        try {
+            return values == null ? "null" : Integer.toString(values.size());
+        } catch (RuntimeException exception) {
+            return "size_error:" + exception.getClass().getName();
+        }
+    }
+
+    private static String digest(String value) {
+        try {
+            return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256")
+                    .digest(value.getBytes(StandardCharsets.UTF_8)));
         } catch (NoSuchAlgorithmException exception) {
             throw new IllegalStateException("SHA-256 is unavailable", exception);
         }

@@ -30,12 +30,30 @@ public interface IRecipeAdapter<T extends Recipe<?>> {
         return DEFAULT_SOURCE_ID;
     }
 
+    /**
+     * Stable identifier for adapter variants that share a class, source and mold but handle
+     * different recipe configurations.
+     */
+    default String registrationKey() {
+        return "";
+    }
+
     /** Returns the source recipe class enumerated from the level's RecipeManager. */
     Class<T> getRecipeClass();
 
     /** Returns recipes synthesized from runtime data instead of RecipeManager entries. */
     default List<RecipeHolder<T>> getGeneratedRecipes(Level level) {
         return List.of();
+    }
+
+    /**
+     * Prepares runtime-generated recipes before the catalog is built off-thread.
+     *
+     * <p>Most adapters only read immutable recipe-manager data and can leave this method alone.
+     * An adapter that reads a game-thread-owned mutable registry can override it to materialize an
+     * immutable cache while the caller is still on the game thread.</p>
+     */
+    default void prepareGeneratedRecipes(Level level) {
     }
 
     /** Converts one source recipe, or returns {@code null} when it is unsupported. */

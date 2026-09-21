@@ -143,6 +143,7 @@ public final class RecipeAdapterCompatRegistry {
     public static final String PNEUMATICCRAFT = RecipeSourceIds.PNEUMATICCRAFT;
     public static final String BIG_REACTORS = RecipeSourceIds.BIG_REACTORS;
     public static final String JUSTDIRETHINGS = RecipeSourceIds.JUSTDIRETHINGS;
+    public static final String JDTE = RecipeSourceIds.JDTE;
     public static final String IRONS_SPELLBOOKS = RecipeSourceIds.IRONS_SPELLBOOKS;
     public static final String HOSTILE_NETWORKS = RecipeSourceIds.HOSTILE_NETWORKS;
     public static final String APOTHIC_FLUX = RecipeSourceIds.APOTHIC_FLUX;
@@ -510,7 +511,9 @@ public final class RecipeAdapterCompatRegistry {
         register(new GooSpreadRecipeAdapter());
         register(new GooSpreadRecipeTagAdapter());
         register(new FluidDropRecipeAdapter());
-        if (isLoaded("jdte")) {
+        // 附属开关需在此二次判定：外层 CompatEntry 只看本体（justdirethings）的开关，
+        // 本体开启时附属仍可能被玩家单独关闭，所以这里必须再查一次 JDTE 自己的开关。
+        if (isLoaded(JDTE) && ConfigManager.isRecipeConversionEnabled(JDTE)) {
             invokeOptionalLoader(
                     "com.sorrowmist.useless.content.recipe.adapters.justdirethings.jdte.JDTERecipeCompatLoader");
         }

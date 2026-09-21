@@ -151,6 +151,8 @@ public class ConfigManager {
     private static final ModConfigSpec.BooleanValue ENABLE_IRONS_SPELLBOOKS_RECIPE_CONVERSION;
     private static final ModConfigSpec.BooleanValue ENABLE_HOSTILE_NETWORKS_RECIPE_CONVERSION;
     private static final ModConfigSpec.BooleanValue ENABLE_APOTHIC_FLUX_RECIPE_CONVERSION;
+    private static final ModConfigSpec.BooleanValue ENABLE_JUSTDIRETHINGS_RECIPE_CONVERSION;
+    private static final ModConfigSpec.BooleanValue ENABLE_JDTE_RECIPE_CONVERSION;
     private static final Map<String, ModConfigSpec.BooleanValue> RECIPE_CONVERSION_OPTIONS;
 
     private static final ModConfigSpec.IntValue OMNIVERSAL_PATTERN_SLOTS;
@@ -557,40 +559,55 @@ public class ConfigManager {
                 .push("advanced_alloy_furnace");
         COMMON_BUILDER.translation("useless_mod.configuration.advanced_alloy_furnace.recipe_conversion")
                 .push("recipe_conversion");
-        COMMON_BUILDER.translation("useless_mod.configuration.advanced_alloy_furnace.recipe_conversion.minecraft")
-                .push("minecraft");
-        ENABLE_CRAFTING_RECIPE_CONVERSION = defineRecipeConversionOption(
-                "enable_crafting_recipe_conversion", false);
-        ENABLE_SMELTING_RECIPE_CONVERSION = defineRecipeConversionOption(
-                "enable_smelting_recipe_conversion", true);
-        ENABLE_BREWING_RECIPE_CONVERSION = defineRecipeConversionOption(
-                "enable_brewing_recipe_conversion", true);
-        ENABLE_VILLAGER_TRADE_RECIPE_CONVERSION = defineRecipeConversionOption(
-                "enable_villager_trade_recipe_conversion", true);
+        COMMON_BUILDER.translation("useless_mod.configuration.advanced_alloy_furnace.recipe_conversion.ae")
+                .push("ae");
+        ENABLE_ADVANCED_AE_RECIPE_CONVERSION = defineRecipeConversionOption(
+                "enable_advanced_ae_recipe_conversion", true);
+        ENABLE_AE2_RECIPE_CONVERSION = defineRecipeConversionOption(
+                "enable_ae2_recipe_conversion", true);
+        ENABLE_AE2CS_RECIPE_CONVERSION = defineRecipeConversionOption(
+                "enable_ae2cs_recipe_conversion", true);
+        ENABLE_AE2LT_RECIPE_CONVERSION = defineRecipeConversionOption(
+                "enable_ae2lt_recipe_conversion", true);
+        ENABLE_DATA_ENERGISTICS_RECIPE_CONVERSION = defineRecipeConversionOption(
+                "enable_data_energistics_recipe_conversion", true);
+        ENABLE_EXTENDED_AE_RECIPE_CONVERSION = defineRecipeConversionOption(
+                "enable_extendedae_recipe_conversion", true);
+        ENABLE_NEO_ECO_AE_RECIPE_CONVERSION = defineRecipeConversionOption(
+                "enable_neo_eco_ae_recipe_conversion", true);
         COMMON_BUILDER.pop();
 
         COMMON_BUILDER.translation("useless_mod.configuration.advanced_alloy_furnace.recipe_conversion.farmers_delight")
                 .push("farmers_delight");
-        ENABLE_FARMERS_DELIGHT_RECIPE_CONVERSION = defineRecipeConversionOption(
-                "enable_farmersdelight_recipe_conversion", true);
-        ENABLE_EXTRA_DELIGHT_RECIPE_CONVERSION = defineRecipeConversionOption(
-                "enable_extradelight_recipe_conversion", true);
-        ENABLE_CRABBERS_DELIGHT_RECIPE_CONVERSION = defineRecipeConversionOption(
-                "enable_crabbersdelight_recipe_conversion", true);
-        ENABLE_CASUALNESS_DELIGHT_RECIPE_CONVERSION = defineRecipeConversionOption(
-                "enable_casualnessdelight_recipe_conversion", true);
-        ENABLE_EXPANDED_DELIGHT_RECIPE_CONVERSION = defineRecipeConversionOption(
-                "enable_expandeddelight_recipe_conversion", true);
+        ENABLE_BARBEQUES_DELIGHT_RECIPE_CONVERSION = defineRecipeConversionOption(
+                "enable_barbequesdelight_recipe_conversion", true);
         ENABLE_BREWIN_AND_CHEWIN_RECIPE_CONVERSION = defineRecipeConversionOption(
                 "enable_brewinandchewin_recipe_conversion", true);
+        ENABLE_CASUALNESS_DELIGHT_RECIPE_CONVERSION = defineRecipeConversionOption(
+                "enable_casualnessdelight_recipe_conversion", true);
+        ENABLE_CRABBERS_DELIGHT_RECIPE_CONVERSION = defineRecipeConversionOption(
+                "enable_crabbersdelight_recipe_conversion", true);
+        ENABLE_EXPANDED_DELIGHT_RECIPE_CONVERSION = defineRecipeConversionOption(
+                "enable_expandeddelight_recipe_conversion", true);
+        ENABLE_EXTRA_DELIGHT_RECIPE_CONVERSION = defineRecipeConversionOption(
+                "enable_extradelight_recipe_conversion", true);
+        ENABLE_FARMERS_DELIGHT_RECIPE_CONVERSION = defineRecipeConversionOption(
+                "enable_farmersdelight_recipe_conversion", true);
         ENABLE_NOMADS_DELIGHT_RECIPE_CONVERSION = defineRecipeConversionOption(
                 "enable_nomadsdelight_recipe_conversion", true);
         ENABLE_UBES_DELIGHT_RECIPE_CONVERSION = defineRecipeConversionOption(
                 "enable_ubesdelight_recipe_conversion", true);
-        ENABLE_BARBEQUES_DELIGHT_RECIPE_CONVERSION = defineRecipeConversionOption(
-                "enable_barbequesdelight_recipe_conversion", true);
         ENABLE_YOUKAI_HOMECOMING_RECIPE_CONVERSION = defineRecipeConversionOption(
                 "enable_youkaishomecoming_recipe_conversion", true);
+        COMMON_BUILDER.pop();
+
+        // Just Dire Things 及其附属独立成组，与 AE、Mekanism 的分组方式保持一致
+        COMMON_BUILDER.translation("useless_mod.configuration.advanced_alloy_furnace.recipe_conversion.justdirethings")
+                .push("justdirethings");
+        ENABLE_JDTE_RECIPE_CONVERSION = defineRecipeConversionOption(
+                "enable_jdte_recipe_conversion", true);
+        ENABLE_JUSTDIRETHINGS_RECIPE_CONVERSION = defineRecipeConversionOption(
+                "enable_justdirethings_recipe_conversion", true);
         COMMON_BUILDER.pop();
 
         COMMON_BUILDER.translation("useless_mod.configuration.advanced_alloy_furnace.recipe_conversion.kaleidoscope")
@@ -603,143 +620,139 @@ public class ConfigManager {
                 "enable_kaleidoscope_tavern_recipe_conversion", true);
         COMMON_BUILDER.pop();
 
-        COMMON_BUILDER.translation("useless_mod.configuration.advanced_alloy_furnace.recipe_conversion.ae")
-                .push("ae");
-        ENABLE_EXTENDED_AE_RECIPE_CONVERSION = defineRecipeConversionOption(
-                "enable_extendedae_recipe_conversion", true);
-        ENABLE_ADVANCED_AE_RECIPE_CONVERSION = defineRecipeConversionOption(
-                "enable_advanced_ae_recipe_conversion", true);
-        ENABLE_APP_MEK_RECIPE_CONVERSION = defineRecipeConversionOption(
-                "enable_appmek_recipe_conversion", true);
-        ENABLE_AE2_RECIPE_CONVERSION = defineRecipeConversionOption(
-                "enable_ae2_recipe_conversion", true);
-        ENABLE_AE2CS_RECIPE_CONVERSION = defineRecipeConversionOption(
-                "enable_ae2cs_recipe_conversion", true);
-
-        ENABLE_AE2LT_RECIPE_CONVERSION = defineRecipeConversionOption(
-                "enable_ae2lt_recipe_conversion", true);
-        ENABLE_DATA_ENERGISTICS_RECIPE_CONVERSION = defineRecipeConversionOption(
-                "enable_data_energistics_recipe_conversion", true);
-        ENABLE_NEO_ECO_AE_RECIPE_CONVERSION = defineRecipeConversionOption(
-                "enable_neo_eco_ae_recipe_conversion", true);
-        COMMON_BUILDER.pop();
-
         COMMON_BUILDER.translation("useless_mod.configuration.advanced_alloy_furnace.recipe_conversion.mekanism")
                 .push("mekanism");
-        ENABLE_MEKANISM_RECIPE_CONVERSION = defineRecipeConversionOption(
-                "enable_mekanism_recipe_conversion", true);
+        // AppMek 属 Mekanism 家族：其配方转换开关归入本分组，避免落在 AE 分组下造成误导
+        ENABLE_APP_MEK_RECIPE_CONVERSION = defineRecipeConversionOption(
+                "enable_appmek_recipe_conversion", true);
         ENABLE_MEKANISM_GENERATORS_RECIPE_CONVERSION = defineRecipeConversionOption(
                 "enable_mekanism_generators_recipe_conversion", true);
+        ENABLE_MEKANISM_RECIPE_CONVERSION = defineRecipeConversionOption(
+                "enable_mekanism_recipe_conversion", true);
+        COMMON_BUILDER.pop();
+
+        COMMON_BUILDER.translation("useless_mod.configuration.advanced_alloy_furnace.recipe_conversion.minecraft")
+                .push("minecraft");
+        ENABLE_BREWING_RECIPE_CONVERSION = defineRecipeConversionOption(
+                "enable_brewing_recipe_conversion", true);
+        ENABLE_CRAFTING_RECIPE_CONVERSION = defineRecipeConversionOption(
+                "enable_crafting_recipe_conversion", false);
+        ENABLE_SMELTING_RECIPE_CONVERSION = defineRecipeConversionOption(
+                "enable_smelting_recipe_conversion", true);
+        ENABLE_VILLAGER_TRADE_RECIPE_CONVERSION = defineRecipeConversionOption(
+                "enable_villager_trade_recipe_conversion", true);
         COMMON_BUILDER.pop();
 
         COMMON_BUILDER.translation("useless_mod.configuration.advanced_alloy_furnace.recipe_conversion.other")
                 .push("other");
-        ENABLE_INDUSTRIAL_FOREGOING_RECIPE_CONVERSION = defineRecipeConversionOption(
-                "enable_industrial_foregoing_recipe_conversion", true);
         ENABLE_ACTUALLY_ADDITIONS_RECIPE_CONVERSION = defineRecipeConversionOption(
                 "enable_actually_additions_recipe_conversion", true);
-        ENABLE_ARS_NOUVEAU_RECIPE_CONVERSION = defineRecipeConversionOption(
-                "enable_ars_nouveau_recipe_conversion", true);
-        ENABLE_MYSTICAL_AGRICULTURE_RECIPE_CONVERSION = defineRecipeConversionOption(
-                "enable_mystical_agriculture_recipe_conversion", true);
-        ENABLE_PRODUCTIVE_BEES_RECIPE_CONVERSION = defineRecipeConversionOption(
-                "enable_productive_bees_recipe_conversion", true);
-        ENABLE_DRACONIC_EVOLUTION_RECIPE_CONVERSION = defineRecipeConversionOption(
-                "enable_draconic_evolution_recipe_conversion", true);
-        ENABLE_POWAH_RECIPE_CONVERSION = defineRecipeConversionOption(
-                "enable_powah_recipe_conversion", true);
-        ENABLE_EXTENDED_CRAFTING_RECIPE_CONVERSION = defineRecipeConversionOption(
-                "enable_extended_crafting_recipe_conversion", true);
-        ENABLE_AVARITIA_RECIPE_CONVERSION = defineRecipeConversionOption(
-                "enable_avaritia_recipe_conversion", true);
-        ENABLE_NATURES_AURA_RECIPE_CONVERSION = defineRecipeConversionOption(
-                "enable_natures_aura_recipe_conversion", true);
-        ENABLE_FORBIDDEN_ARCANUS_RECIPE_CONVERSION = defineRecipeConversionOption(
-                "enable_forbidden_arcanus_recipe_conversion", true);
-        ENABLE_OCCULTISM_RECIPE_CONVERSION = defineRecipeConversionOption(
-                "enable_occultism_recipe_conversion", true);
-        ENABLE_SUMMONING_RITUALS_RECIPE_CONVERSION = defineRecipeConversionOption(
-                "enable_summoningrituals_recipe_conversion", true);
-        ENABLE_MALUM_RECIPE_CONVERSION = defineRecipeConversionOption(
-                "enable_malum_recipe_conversion", true);
-        ENABLE_ENDER_IO_RECIPE_CONVERSION = defineRecipeConversionOption(
-                "enable_ender_io_recipe_conversion", true);
-        ENABLE_CREATE_RECIPE_CONVERSION = defineRecipeConversionOption(
-                "enable_create_recipe_conversion", true);
-        ENABLE_ORITECH_RECIPE_CONVERSION = defineRecipeConversionOption(
-                "enable_oritech_recipe_conversion", true);
-        ENABLE_NEOVITAE_RECIPE_CONVERSION = defineRecipeConversionOption(
-                "enable_neovitae_recipe_conversion", true);
-        ENABLE_UFO_RECIPE_CONVERSION = defineRecipeConversionOption(
-                "enable_ufo_recipe_conversion", true);
-        ENABLE_MODERN_INDUSTRIALIZATION_RECIPE_CONVERSION = defineRecipeConversionOption(
-                "enable_modern_industrialization_recipe_conversion", true);
-        ENABLE_IMMERSIVE_ENGINEERING_RECIPE_CONVERSION = defineRecipeConversionOption(
-                "enable_immersiveengineering_recipe_conversion", true);
-        ENABLE_PNEUMATICCRAFT_RECIPE_CONVERSION = defineRecipeConversionOption(
-                "enable_pneumaticcraft_recipe_conversion", true);
-        ENABLE_BIG_REACTORS_RECIPE_CONVERSION = defineRecipeConversionOption(
-                "enable_bigreactors_recipe_conversion", true);
-        ENABLE_IRONS_SPELLBOOKS_RECIPE_CONVERSION = defineRecipeConversionOption(
-                "enable_irons_spellbooks_recipe_conversion", true);
-        ENABLE_HOSTILE_NETWORKS_RECIPE_CONVERSION = defineRecipeConversionOption(
-                "enable_hostilenetworks_recipe_conversion", true);
         ENABLE_APOTHIC_FLUX_RECIPE_CONVERSION = defineRecipeConversionOption(
                 "enable_apothic_flux_recipe_conversion", true);
+        ENABLE_ARS_NOUVEAU_RECIPE_CONVERSION = defineRecipeConversionOption(
+                "enable_ars_nouveau_recipe_conversion", true);
+        ENABLE_AVARITIA_RECIPE_CONVERSION = defineRecipeConversionOption(
+                "enable_avaritia_recipe_conversion", true);
+        ENABLE_BIG_REACTORS_RECIPE_CONVERSION = defineRecipeConversionOption(
+                "enable_bigreactors_recipe_conversion", true);
+        ENABLE_CREATE_RECIPE_CONVERSION = defineRecipeConversionOption(
+                "enable_create_recipe_conversion", true);
+        ENABLE_DRACONIC_EVOLUTION_RECIPE_CONVERSION = defineRecipeConversionOption(
+                "enable_draconic_evolution_recipe_conversion", true);
+        ENABLE_ENDER_IO_RECIPE_CONVERSION = defineRecipeConversionOption(
+                "enable_ender_io_recipe_conversion", true);
+        ENABLE_EXTENDED_CRAFTING_RECIPE_CONVERSION = defineRecipeConversionOption(
+                "enable_extended_crafting_recipe_conversion", true);
+        ENABLE_FORBIDDEN_ARCANUS_RECIPE_CONVERSION = defineRecipeConversionOption(
+                "enable_forbidden_arcanus_recipe_conversion", true);
+        ENABLE_HOSTILE_NETWORKS_RECIPE_CONVERSION = defineRecipeConversionOption(
+                "enable_hostilenetworks_recipe_conversion", true);
+        ENABLE_IMMERSIVE_ENGINEERING_RECIPE_CONVERSION = defineRecipeConversionOption(
+                "enable_immersiveengineering_recipe_conversion", true);
+        ENABLE_INDUSTRIAL_FOREGOING_RECIPE_CONVERSION = defineRecipeConversionOption(
+                "enable_industrial_foregoing_recipe_conversion", true);
+        ENABLE_IRONS_SPELLBOOKS_RECIPE_CONVERSION = defineRecipeConversionOption(
+                "enable_irons_spellbooks_recipe_conversion", true);
+        ENABLE_MALUM_RECIPE_CONVERSION = defineRecipeConversionOption(
+                "enable_malum_recipe_conversion", true);
+        ENABLE_MODERN_INDUSTRIALIZATION_RECIPE_CONVERSION = defineRecipeConversionOption(
+                "enable_modern_industrialization_recipe_conversion", true);
+        ENABLE_MYSTICAL_AGRICULTURE_RECIPE_CONVERSION = defineRecipeConversionOption(
+                "enable_mystical_agriculture_recipe_conversion", true);
+        ENABLE_NATURES_AURA_RECIPE_CONVERSION = defineRecipeConversionOption(
+                "enable_natures_aura_recipe_conversion", true);
+        ENABLE_NEOVITAE_RECIPE_CONVERSION = defineRecipeConversionOption(
+                "enable_neovitae_recipe_conversion", true);
+        ENABLE_OCCULTISM_RECIPE_CONVERSION = defineRecipeConversionOption(
+                "enable_occultism_recipe_conversion", true);
+        ENABLE_ORITECH_RECIPE_CONVERSION = defineRecipeConversionOption(
+                "enable_oritech_recipe_conversion", true);
+        ENABLE_PNEUMATICCRAFT_RECIPE_CONVERSION = defineRecipeConversionOption(
+                "enable_pneumaticcraft_recipe_conversion", true);
+        ENABLE_POWAH_RECIPE_CONVERSION = defineRecipeConversionOption(
+                "enable_powah_recipe_conversion", true);
+        ENABLE_PRODUCTIVE_BEES_RECIPE_CONVERSION = defineRecipeConversionOption(
+                "enable_productive_bees_recipe_conversion", true);
+        ENABLE_SUMMONING_RITUALS_RECIPE_CONVERSION = defineRecipeConversionOption(
+                "enable_summoningrituals_recipe_conversion", true);
+        ENABLE_UFO_RECIPE_CONVERSION = defineRecipeConversionOption(
+                "enable_ufo_recipe_conversion", true);
         COMMON_BUILDER.pop();
 
         RECIPE_CONVERSION_OPTIONS = Map.ofEntries(
-                Map.entry("farmersdelight", ENABLE_FARMERS_DELIGHT_RECIPE_CONVERSION),
-                Map.entry("extradelight", ENABLE_EXTRA_DELIGHT_RECIPE_CONVERSION),
-                Map.entry("crabbersdelight", ENABLE_CRABBERS_DELIGHT_RECIPE_CONVERSION),
-                Map.entry("casualnessdelight", ENABLE_CASUALNESS_DELIGHT_RECIPE_CONVERSION),
-                Map.entry("expandeddelight", ENABLE_EXPANDED_DELIGHT_RECIPE_CONVERSION),
-                Map.entry("brewinandchewin", ENABLE_BREWIN_AND_CHEWIN_RECIPE_CONVERSION),
-                Map.entry("nomads_delight", ENABLE_NOMADS_DELIGHT_RECIPE_CONVERSION),
-                Map.entry("nomadsdelight", ENABLE_NOMADS_DELIGHT_RECIPE_CONVERSION),
-                Map.entry("ubesdelight", ENABLE_UBES_DELIGHT_RECIPE_CONVERSION),
+                Map.entry("actuallyadditions", ENABLE_ACTUALLY_ADDITIONS_RECIPE_CONVERSION),
+                Map.entry("advanced_ae", ENABLE_ADVANCED_AE_RECIPE_CONVERSION),
+                Map.entry("ae2", ENABLE_AE2_RECIPE_CONVERSION),
+                Map.entry("ae2cs", ENABLE_AE2CS_RECIPE_CONVERSION),
+                Map.entry("ae2lt", ENABLE_AE2LT_RECIPE_CONVERSION),
+                Map.entry("apothic_flux", ENABLE_APOTHIC_FLUX_RECIPE_CONVERSION),
+                Map.entry("appmek", ENABLE_APP_MEK_RECIPE_CONVERSION),
+                Map.entry("ars_nouveau", ENABLE_ARS_NOUVEAU_RECIPE_CONVERSION),
+                Map.entry("avaritia", ENABLE_AVARITIA_RECIPE_CONVERSION),
                 Map.entry("barbequesdelight", ENABLE_BARBEQUES_DELIGHT_RECIPE_CONVERSION),
-                Map.entry("youkaisfeasts", ENABLE_YOUKAI_HOMECOMING_RECIPE_CONVERSION),
-                Map.entry("youkaishomecoming", ENABLE_YOUKAI_HOMECOMING_RECIPE_CONVERSION),
+                Map.entry("bigreactors", ENABLE_BIG_REACTORS_RECIPE_CONVERSION),
+                Map.entry("brewinandchewin", ENABLE_BREWIN_AND_CHEWIN_RECIPE_CONVERSION),
+                Map.entry("casualnessdelight", ENABLE_CASUALNESS_DELIGHT_RECIPE_CONVERSION),
+                Map.entry("crabbersdelight", ENABLE_CRABBERS_DELIGHT_RECIPE_CONVERSION),
+                Map.entry("create", ENABLE_CREATE_RECIPE_CONVERSION),
+                Map.entry("data_energistics", ENABLE_DATA_ENERGISTICS_RECIPE_CONVERSION),
+                Map.entry("draconicevolution", ENABLE_DRACONIC_EVOLUTION_RECIPE_CONVERSION),
+                Map.entry("enderio", ENABLE_ENDER_IO_RECIPE_CONVERSION),
+                Map.entry("expandeddelight", ENABLE_EXPANDED_DELIGHT_RECIPE_CONVERSION),
+                Map.entry("extendedae", ENABLE_EXTENDED_AE_RECIPE_CONVERSION),
+                Map.entry("extendedcrafting", ENABLE_EXTENDED_CRAFTING_RECIPE_CONVERSION),
+                Map.entry("extradelight", ENABLE_EXTRA_DELIGHT_RECIPE_CONVERSION),
+                Map.entry("farmersdelight", ENABLE_FARMERS_DELIGHT_RECIPE_CONVERSION),
+                Map.entry("forbidden_arcanus", ENABLE_FORBIDDEN_ARCANUS_RECIPE_CONVERSION),
+                Map.entry("hostilenetworks", ENABLE_HOSTILE_NETWORKS_RECIPE_CONVERSION),
+                Map.entry("immersiveengineering", ENABLE_IMMERSIVE_ENGINEERING_RECIPE_CONVERSION),
+                Map.entry("industrialforegoing", ENABLE_INDUSTRIAL_FOREGOING_RECIPE_CONVERSION),
+                Map.entry("irons_spellbooks", ENABLE_IRONS_SPELLBOOKS_RECIPE_CONVERSION),
+                Map.entry("jdte", ENABLE_JDTE_RECIPE_CONVERSION),
+                Map.entry("justdirethings", ENABLE_JUSTDIRETHINGS_RECIPE_CONVERSION),
                 Map.entry("kaleidoscope_cookery", ENABLE_KALEIDOSCOPE_COOKERY_RECIPE_CONVERSION),
                 Map.entry("kaleidoscope_grilling", ENABLE_KALEIDOSCOPE_GRILLING_RECIPE_CONVERSION),
                 Map.entry("kaleidoscope_tavern", ENABLE_KALEIDOSCOPE_TAVERN_RECIPE_CONVERSION),
-                Map.entry("extendedae", ENABLE_EXTENDED_AE_RECIPE_CONVERSION),
-                Map.entry("advanced_ae", ENABLE_ADVANCED_AE_RECIPE_CONVERSION),
+                Map.entry("malum", ENABLE_MALUM_RECIPE_CONVERSION),
                 Map.entry("mekanism", ENABLE_MEKANISM_RECIPE_CONVERSION),
                 Map.entry("mekanismgenerators", ENABLE_MEKANISM_GENERATORS_RECIPE_CONVERSION),
-                Map.entry("appmek", ENABLE_APP_MEK_RECIPE_CONVERSION),
-                Map.entry("ae2", ENABLE_AE2_RECIPE_CONVERSION),
-                Map.entry("ae2cs", ENABLE_AE2CS_RECIPE_CONVERSION),
-                Map.entry("industrialforegoing", ENABLE_INDUSTRIAL_FOREGOING_RECIPE_CONVERSION),
-                Map.entry("actuallyadditions", ENABLE_ACTUALLY_ADDITIONS_RECIPE_CONVERSION),
-                Map.entry("ars_nouveau", ENABLE_ARS_NOUVEAU_RECIPE_CONVERSION),
-                Map.entry("mysticalagriculture", ENABLE_MYSTICAL_AGRICULTURE_RECIPE_CONVERSION),
-                Map.entry("ae2lt", ENABLE_AE2LT_RECIPE_CONVERSION),
-                Map.entry("data_energistics", ENABLE_DATA_ENERGISTICS_RECIPE_CONVERSION),
-                Map.entry("productivebees", ENABLE_PRODUCTIVE_BEES_RECIPE_CONVERSION),
-                Map.entry("draconicevolution", ENABLE_DRACONIC_EVOLUTION_RECIPE_CONVERSION),
-                Map.entry("powah", ENABLE_POWAH_RECIPE_CONVERSION),
-                Map.entry("extendedcrafting", ENABLE_EXTENDED_CRAFTING_RECIPE_CONVERSION),
-                Map.entry("avaritia", ENABLE_AVARITIA_RECIPE_CONVERSION),
-                Map.entry("neoecoae", ENABLE_NEO_ECO_AE_RECIPE_CONVERSION),
-                Map.entry("naturesaura", ENABLE_NATURES_AURA_RECIPE_CONVERSION),
-                Map.entry("forbidden_arcanus", ENABLE_FORBIDDEN_ARCANUS_RECIPE_CONVERSION),
-                Map.entry("occultism", ENABLE_OCCULTISM_RECIPE_CONVERSION),
-                Map.entry("summoningrituals", ENABLE_SUMMONING_RITUALS_RECIPE_CONVERSION),
-                Map.entry("malum", ENABLE_MALUM_RECIPE_CONVERSION),
-                Map.entry("enderio", ENABLE_ENDER_IO_RECIPE_CONVERSION),
-                Map.entry("create", ENABLE_CREATE_RECIPE_CONVERSION),
-                Map.entry("oritech", ENABLE_ORITECH_RECIPE_CONVERSION),
-                Map.entry("neovitae", ENABLE_NEOVITAE_RECIPE_CONVERSION),
-                Map.entry("ufo", ENABLE_UFO_RECIPE_CONVERSION),
                 Map.entry("modern_industrialization", ENABLE_MODERN_INDUSTRIALIZATION_RECIPE_CONVERSION),
-                Map.entry("immersiveengineering", ENABLE_IMMERSIVE_ENGINEERING_RECIPE_CONVERSION),
+                Map.entry("mysticalagriculture", ENABLE_MYSTICAL_AGRICULTURE_RECIPE_CONVERSION),
+                Map.entry("naturesaura", ENABLE_NATURES_AURA_RECIPE_CONVERSION),
+                Map.entry("neoecoae", ENABLE_NEO_ECO_AE_RECIPE_CONVERSION),
+                Map.entry("neovitae", ENABLE_NEOVITAE_RECIPE_CONVERSION),
+                Map.entry("nomads_delight", ENABLE_NOMADS_DELIGHT_RECIPE_CONVERSION),
+                Map.entry("nomadsdelight", ENABLE_NOMADS_DELIGHT_RECIPE_CONVERSION),
+                Map.entry("occultism", ENABLE_OCCULTISM_RECIPE_CONVERSION),
+                Map.entry("oritech", ENABLE_ORITECH_RECIPE_CONVERSION),
                 Map.entry("pneumaticcraft", ENABLE_PNEUMATICCRAFT_RECIPE_CONVERSION),
-                Map.entry("bigreactors", ENABLE_BIG_REACTORS_RECIPE_CONVERSION),
-                Map.entry("irons_spellbooks", ENABLE_IRONS_SPELLBOOKS_RECIPE_CONVERSION),
-                Map.entry("hostilenetworks", ENABLE_HOSTILE_NETWORKS_RECIPE_CONVERSION),
-                Map.entry("apothic_flux", ENABLE_APOTHIC_FLUX_RECIPE_CONVERSION));
+                Map.entry("powah", ENABLE_POWAH_RECIPE_CONVERSION),
+                Map.entry("productivebees", ENABLE_PRODUCTIVE_BEES_RECIPE_CONVERSION),
+                Map.entry("summoningrituals", ENABLE_SUMMONING_RITUALS_RECIPE_CONVERSION),
+                Map.entry("ubesdelight", ENABLE_UBES_DELIGHT_RECIPE_CONVERSION),
+                Map.entry("ufo", ENABLE_UFO_RECIPE_CONVERSION),
+                Map.entry("youkaisfeasts", ENABLE_YOUKAI_HOMECOMING_RECIPE_CONVERSION),
+                Map.entry("youkaishomecoming", ENABLE_YOUKAI_HOMECOMING_RECIPE_CONVERSION));
         COMMON_BUILDER.pop();
         COMMON_BUILDER.pop();
 

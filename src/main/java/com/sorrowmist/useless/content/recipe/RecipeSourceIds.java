@@ -53,6 +53,7 @@ public final class RecipeSourceIds {
     public static final String PNEUMATICCRAFT = "pneumaticcraft";
     public static final String BIG_REACTORS = "bigreactors";
     public static final String JUSTDIRETHINGS = "justdirethings";
+    public static final String JDTE = "jdte";
     public static final String IRONS_SPELLBOOKS = "irons_spellbooks";
     public static final String HOSTILE_NETWORKS = "hostilenetworks";
     public static final String APOTHIC_FLUX = "apothic_flux";

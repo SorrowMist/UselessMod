@@ -110,9 +110,26 @@ public class AlloyFurnaceRecipeManager {
 
     public void registerAdapter(com.sorrowmist.useless.api.recipe.IRecipeAdapter<?> adapter, String sourceId) {
         if (adapter == null) return;
+        String normalizedSource = RecipeSourceIds.normalize(sourceId);
         ItemStack moldItem = adapter.getMoldItem();
 
-        String normalizedSource = RecipeSourceIds.normalize(sourceId);
+        // 同一「适配器类 + 来源 + 模具」重复登记不构成构建输入的变化，直接忽略。
+        //
+        // 判据必须带上模具：SmeltingRecipeAdapter 会被合法地注册三次，分别对应熔炉、高炉与烟熏炉
+        // 三种模具，只比「类 + 来源」会把后两个整类吞掉（实测配方数因此少了 629 条）。
+        //
+        // 而每次登记都会走到 invalidateIndex() → 全局 invalidate，目录构建却要几十秒；若某个 compat
+        // loader 被两个入口各调一次（或惰性类加载在后台构建窗口内又跑了一遍注册），正在构建的那份
+        // 就会被整份作废重算，且重算结果逐字相同——实测这会让同一份目录在一次登录里构建三次
+        // （generation 0/1/2，后两次 recipes 与 sources 完全一致）。
+        for (var existing : allAdapters) {
+            if (existing.getClass() == adapter.getClass()
+                    && normalizedSource.equals(adapterSourceIds.get(existing))
+                    && sameMold(existing.getMoldItem(), moldItem)) {
+                return;
+            }
+        }
+
         allAdapters.add(adapter);
         adapterSourceIds.put(adapter, normalizedSource);
         if (moldItem != null && !moldItem.isEmpty()) {
@@ -123,6 +140,14 @@ public class AlloyFurnaceRecipeManager {
         }
         clearCache();
         invalidateIndex();
+    }
+
+    /** 比较两个模具物品栈是否为同一物品，忽略数量与组件。 */
+    private static boolean sameMold(ItemStack first, ItemStack second) {
+        boolean firstEmpty = first == null || first.isEmpty();
+        boolean secondEmpty = second == null || second.isEmpty();
+        if (firstEmpty || secondEmpty) return firstEmpty && secondEmpty;
+        return first.is(second.getItem());
     }
 
     /** @deprecated Use the public API adapter type. */

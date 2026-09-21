@@ -19,6 +19,7 @@ import com.sorrowmist.useless.api.crafting.bigint.cpu.AlloyFurnaceBigIntegerCpuA
 import com.sorrowmist.useless.api.crafting.bigint.cpu.AlloyFurnaceBigIntegerCpuBinding;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.catalyst.ResolvedCatalystEffect;
 import com.sorrowmist.useless.content.recipe.AdvancedAlloyFurnaceRecipe;
+import com.sorrowmist.useless.content.recipe.AlloyFurnaceRecipeCatalog;
 import com.sorrowmist.useless.energy.IEnergyManager;
 import com.sorrowmist.useless.core.config.ConfigManager;
 import com.sorrowmist.useless.integration.dataenergistics.TrinityDispatchDiagnostics;
@@ -1909,6 +1910,12 @@ public final class AdvancedAlloyFurnaceAeManager {
         if (!isPublishReady()) {
             // AE2 snapshots what a provider can craft, so publishing before the node joined a grid
             // would index this machine as unable to craft anything. Keep the request pending.
+            return;
+        }
+        if (!AlloyFurnaceRecipeCatalog.isReady(level)) {
+            // 目录仍在后台构建（服务器启动那次实测要 30 秒以上）。此刻解码拿不到配方，
+            // 会把完好的样板误判成「missing or has changed」直接丢弃——实测启动时有 6 条
+            // 样板因此被丢掉。保持请求挂起，等目录就绪后的 tick 再重建。
             return;
         }
         rebuildPatterns();

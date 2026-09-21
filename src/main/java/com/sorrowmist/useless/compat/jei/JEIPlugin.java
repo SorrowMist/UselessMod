@@ -58,9 +58,10 @@ public final class JEIPlugin implements IModPlugin {
     @Override
     public void registerRecipes(@NotNull IRecipeRegistration registration) {
         Level level = Minecraft.getInstance().level;
-        List<AlloyFurnaceRecipeCatalog.Entry> recipes = level == null
-                ? List.of()
-                : AlloyFurnaceRecipeCatalog.entries(level);
+        // 这里刻意用 entriesIfReady 而不是 entries：本方法跑在客户端渲染线程上，同步构建数万条
+        // 配方会把加载界面卡住二十多秒。目录未就绪时先注册空类别，随后由
+        // refreshAlloyFurnaceRecipes 增量补齐即可。
+        List<AlloyFurnaceRecipeCatalog.Entry> recipes = AlloyFurnaceRecipeCatalog.entriesIfReady(level);
         registeredAlloyFurnaceRecipes.clear();
         for (AlloyFurnaceRecipeCatalog.Entry recipe : recipes) {
             registeredAlloyFurnaceRecipes.put(recipe.identity(), recipe);
@@ -236,8 +237,12 @@ public final class JEIPlugin implements IModPlugin {
         Level level = minecraft.level;
         if (level == null) return;
 
+        // 同样刻意用 entriesIfReady：本方法跑在客户端渲染线程上，目录若尚未就绪，
+        // 这里同步构建会把加载界面再卡二十多秒——而 tick 的合并点随后还会因脏标记
+        // 把这份目录作废重建，等于白算一遍。未就绪时先不补，等目录就绪后
+        // onRecipeCatalogReady 会再调用本方法完成增量补齐。
         List<AlloyFurnaceRecipeCatalog.Entry> additions = new ArrayList<>();
-        for (AlloyFurnaceRecipeCatalog.Entry recipe : AlloyFurnaceRecipeCatalog.entries(level)) {
+        for (AlloyFurnaceRecipeCatalog.Entry recipe : AlloyFurnaceRecipeCatalog.entriesIfReady(level)) {
             if (!registeredAlloyFurnaceRecipes.containsKey(recipe.identity())) {
                 registeredAlloyFurnaceRecipes.put(recipe.identity(), recipe);
                 additions.add(recipe);

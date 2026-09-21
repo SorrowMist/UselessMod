@@ -202,6 +202,12 @@ public class ClientSetup {
         // Optional recipe adapters may read synced item tags. Recipes are updated before the
         // clientbound tag packet in some login paths, so refresh the catalog after those tags bind.
         //
+        // 只在「首次收到标签包」时登记重建。目录已经按完整标签建好之后，本事件还会因各种
+        // 原因重复触发（例如 JEI 注册期间的数据同步），此时再置脏只会让同一份目录被完整
+        // 重建一遍——实测那次重复构建白白多花了 5.7 秒。配方数据的真正变更由
+        // onRecipesUpdated 负责登记，这里只负责补齐标签依赖。
+        if (clientTagsReceived) return;
+
         // 先置位「标签已到达」再登记重建：onClientTick 的合并点据此放行，避免在标签缺失时
         // 建出一份依赖标签的 adapter 全空的残缺目录。
         clientTagsReceived = true;
@@ -279,8 +285,11 @@ public class ClientSetup {
                 }
             }
             if (entry.isEmpty()) {
+                // 用 entriesIfReady 而不是 entries：本方法跑在物品提示框渲染路径上（渲染线程），
+                // 目录尚未就绪时同步构建会把画面卡住二十多秒。未就绪就直接放弃这次兜底，
+                // 提示框少显示一行远比卡住主线程可接受。
                 List<AlloyFurnaceRecipeCatalog.Entry> byId =
-                        AlloyFurnaceRecipeCatalog.entries(level).stream()
+                        AlloyFurnaceRecipeCatalog.entriesIfReady(level).stream()
                                 .filter(candidate -> candidate.identity().recipeId().equals(data.recipeId()))
                                 .toList();
                 if (byId.size() == 1) {

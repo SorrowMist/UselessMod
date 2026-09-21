@@ -606,7 +606,9 @@ public class EventHandler {
         GrassWandDropHandler.clearCache();
         UselessDimensionConfigManager.applyAll(event.getServer());
         AlloyFurnaceRecipeManager.getInstance().buildIndex(event.getServer().overworld());
-        AlloyFurnaceRecipeCatalog.prewarm(event.getServer().overworld());
+        // 目录构建是数万条配方的 CPU 密集工作（实测 20 秒），同步执行会直接卡住世界加载。
+        // 放到后台构建：查询路径读的是 snapshotIfReady，未就绪只会返回空，不会读到半成品。
+        AlloyFurnaceRecipeCatalog.prewarmAsync(event.getServer().overworld());
         event.getServer().getPlayerList().getPlayers().forEach(EndlessBeafItem::refreshAttackDamage);
     }
 
@@ -633,7 +635,8 @@ public class EventHandler {
                 var server = ServerLifecycleHooks.getCurrentServer();
                 if (server != null) {
                     AlloyFurnaceRecipeManager.getInstance().invalidateIndex(server.overworld());
-                    AlloyFurnaceRecipeCatalog.prewarm(server.overworld());
+                    // 同上：数据包重载不该被整段目录重建阻塞，交给后台构建。
+                    AlloyFurnaceRecipeCatalog.prewarmAsync(server.overworld());
                     server.getPlayerList().getPlayers().forEach(EndlessBeafItem::refreshAttackDamage);
                 } else {
                     AlloyFurnaceRecipeManager.getInstance().invalidateIndex();

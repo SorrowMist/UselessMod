@@ -49,6 +49,25 @@ public class ClientSetup {
     private static Level observedClientLevel;
     /** 客户端配方目录的待重建标记；登录、标签包与数据包重载都会置位，由 onClientTick 统一消费。 */
     private static volatile boolean recipeCatalogDirty;
+    /**
+     * 本次客户端会话是否已经收到过标签包。
+     *
+     * <p>部分可选 adapter 依赖同步下来的物品标签。配方包先于标签包到达，若此时就构建，
+     * 依赖标签的 adapter 会全部产出为空，得到一份不完整的目录，并在标签到达后立刻被推翻重建。</p>
+     */
+    private static volatile boolean clientTagsReceived;
+    /** 脏标记置位后经过的 tick 数，用于标签包迟迟不到时兜底构建。 */
+    private static int recipeCatalogDirtyTicks;
+    /** 等待标签包的上限（tick）。超过后不再等待，避免标签包缺失时目录永远构建不出来。 */
+    private static final int TAG_WAIT_TICKS = 100;
+    /**
+     * 已在后台发起构建、正等待目录就绪以刷新 JEI。
+     *
+     * <p>构建本身已经挪到后台线程（见 {@link AlloyFurnaceRecipeCatalog#prewarmAsync}），
+     * 但 JEI 的展示刷新必须在客户端线程做，因此这里记住「欠一次刷新」，在后续 tick 里
+     * 等目录就绪后再补上，而不是在渲染线程上同步等构建完成。</p>
+     */
+    private static boolean awaitingCatalogRefresh;
 
     @SubscribeEvent
     public static void modifyBakedModels(ModelEvent.ModifyBakingResult event) {
@@ -114,13 +133,37 @@ public class ClientSetup {
             } else {
                 AlloyFurnaceRecipeCatalog.invalidate();
                 recipeCatalogDirty = false;
+                // 离开世界：标签会随下一次登录重新下发，必须把「已收到」重置掉，
+                // 否则下次进世界会跳过等待、又在标签落地前建出残缺目录。
+                clientTagsReceived = false;
+                recipeCatalogDirtyTicks = 0;
+                awaitingCatalogRefresh = false;
             }
         }
 
+        if (level == null) {
+            recipeCatalogDirtyTicks = 0;
+            return;
+        }
+
         // 合并点：无论脏标记来自登录、标签包还是数据包重载，都在这里统一重建一次。
-        if (recipeCatalogDirty && level != null) {
+        if (recipeCatalogDirty) {
+            // 登录路径里配方包会先于标签包到达。若在标签包落地前就构建，依赖标签的 adapter 会
+            // 整批产出为空，得到一份随即被推翻的残缺目录（实测那次白跑花了 13.8 秒）。
+            // 因此这里等到标签包到达再建；标签包始终不来时按 TAG_WAIT_TICKS 兜底。
+            if (!clientTagsReceived && ++recipeCatalogDirtyTicks < TAG_WAIT_TICKS) {
+                return;
+            }
             recipeCatalogDirty = false;
-            refreshRecipeCatalog(level);
+            recipeCatalogDirtyTicks = 0;
+            beginRecipeCatalogRebuild(level);
+        }
+
+        // 构建在后台线程进行，主线程不再被数万条配方的转换与指纹计算阻塞。
+        // 就绪后再回到客户端线程刷新 JEI 展示与物品属性。
+        if (awaitingCatalogRefresh && AlloyFurnaceRecipeCatalog.isReady(level)) {
+            awaitingCatalogRefresh = false;
+            onRecipeCatalogReady();
         }
     }
 
@@ -129,11 +172,20 @@ public class ClientSetup {
         recipeCatalogDirty = true;
     }
 
-    /** 失效并重建一次目录，同时刷新依赖它的 JEI 展示与物品属性。 */
-    private static void refreshRecipeCatalog(Level level) {
+    /**
+     * 失效目录并把重建交给后台线程，同时记下「欠一次 JEI 刷新」。
+     *
+     * <p>失效必须发生在主线程、且与后续构建之间不插入读取：后台构建会按当时读到的
+     * RecipeManager 内容产出快照，若这中间有人触发同步构建，就会白算一份。</p>
+     */
+    private static void beginRecipeCatalogRebuild(Level level) {
         AlloyFurnaceRecipeCatalog.invalidate(level);
-        AlloyFurnaceRecipeCatalog.prewarm(level);
+        awaitingCatalogRefresh = true;
+        AlloyFurnaceRecipeCatalog.prewarmAsync(level);
+    }
 
+    /** 目录已就绪：在客户端线程刷新依赖它的 JEI 展示与物品属性。 */
+    private static void onRecipeCatalogReady() {
         JEIPlugin.refreshAlloyFurnaceRecipes();
         if (Minecraft.getInstance().player != null) {
             EndlessBeafItem.refreshAttackDamage(Minecraft.getInstance().player);
@@ -149,6 +201,10 @@ public class ClientSetup {
 
         // Optional recipe adapters may read synced item tags. Recipes are updated before the
         // clientbound tag packet in some login paths, so refresh the catalog after those tags bind.
+        //
+        // 先置位「标签已到达」再登记重建：onClientTick 的合并点据此放行，避免在标签缺失时
+        // 建出一份依赖标签的 adapter 全空的残缺目录。
+        clientTagsReceived = true;
         markRecipeCatalogDirty();
     }
 

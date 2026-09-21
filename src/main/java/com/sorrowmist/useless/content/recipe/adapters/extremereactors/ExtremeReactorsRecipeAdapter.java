@@ -42,6 +42,7 @@ import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -326,9 +327,17 @@ public final class ExtremeReactorsRecipeAdapter implements IRecipeAdapter<ModRec
     }
 
     private List<RecipeHolder<ModRecipe>> createGeneratedRecipes() {
+        // ReactionsRegistry 底层是 HashMap，getReactions() 的迭代顺序由 Reactant 的哈希决定；
+        // 而 Reactant.hashCode() 含 ReactantType 枚举，枚举沿用 Object 的身份哈希，跨 JVM 重启
+        // 并不保证一致。若把该顺序编进配方 id，重启后同一个反应会拿到不同的 id，玩家已编码的
+        // 万象样板就会因 id 失配而解析失败。这里先按反应自身的名字排序，让下面的 reactionIndex
+        // 只由数据内容决定，从而跨会话稳定。
+        List<Reaction> reactions = new ArrayList<>(ReactionsRegistry.getReactions());
+        reactions.sort(Comparator.comparing(ExtremeReactorsRecipeAdapter::reactionKey));
+
         List<RecipeHolder<ModRecipe>> result = new ArrayList<>();
         int reactionIndex = 0;
-        for (Reaction reaction : ReactionsRegistry.getReactions()) {
+        for (Reaction reaction : reactions) {
             Reactant fuel = reaction.getSource();
             Reactant waste = reaction.getProduct();
             if (fuel == null || waste == null
@@ -363,7 +372,17 @@ public final class ExtremeReactorsRecipeAdapter implements IRecipeAdapter<ModRec
                 .ifPresent(mappings -> mappings.forEach(mapping -> result.add(new PhysicalMapping(false, mapping))));
         ReactantMappingsRegistry.getToFluid(reactant)
                 .ifPresent(mappings -> mappings.forEach(mapping -> result.add(new PhysicalMapping(true, mapping))));
+        // 映射列表按数据包注册顺序追加，同一集合在不同会话中的先后并不保证一致；而配方 id 里
+        // 编入了该列表的下标，所以必须先按 tag 位置排序，下标才是稳定的。
+        result.sort(Comparator.comparing(PhysicalMapping::sortKey));
         return result;
+    }
+
+    /** 排序键：只依赖固/液类型与 tag 位置，与注册顺序无关。 */
+    private static String reactionKey(Reaction reaction) {
+        Reactant fuel = reaction == null ? null : reaction.getSource();
+        Reactant waste = reaction == null ? null : reaction.getProduct();
+        return (fuel == null ? "" : fuel.getName()) + "->" + (waste == null ? "" : waste.getName());
     }
 
     @Nullable
@@ -483,6 +502,12 @@ public final class ExtremeReactorsRecipeAdapter implements IRecipeAdapter<ModRec
     }
 
     private record PhysicalMapping(boolean fluid, IMapping<?, ?> mapping) {
+        /** 排序键：只依赖固/液类型与 tag 位置，与数据包注册顺序无关。 */
+        private String sortKey() {
+            Object product = mapping == null ? null : mapping.getProduct();
+            String location = product instanceof TagKey<?> tag ? tag.location().toString() : "";
+            return (fluid ? "1" : "0") + location;
+        }
     }
 
     private record Batch(int inputAmount, int outputAmount) {

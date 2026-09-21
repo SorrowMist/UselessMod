@@ -28,11 +28,14 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalLong;
 import java.util.Set;
 import java.util.WeakHashMap;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import org.slf4j.Logger;
@@ -50,6 +53,19 @@ public final class AlloyFurnaceRecipeCatalog {
     private static final Map<Object, Long> GENERATIONS = new WeakHashMap<>();
     private static final AtomicInteger CURRENT_RECIPE_COUNT = new AtomicInteger();
     private static final AtomicLong GENERATION = new AtomicLong();
+    /**
+     * 后台目录构建器。目录构建是纯 CPU 密集工作（数万条配方的转换与指纹计算），若放在世界
+     * 加载的关键路径上会直接阻塞玩家进入（实测服务端启动那次耗时 20 秒）。
+     *
+     * <p>刻意用独立的单线程执行器而不是 {@code ForkJoinPool.commonPool()}：后者是全局共享
+     * 资源，不该被一次目录构建长时间占满；单线程也天然保证同一时刻只有一个后台构建在跑。
+     * 守护线程避免进程退出时被这类构建任务拖住。</p>
+     */
+    private static final ExecutorService BUILD_EXECUTOR = Executors.newSingleThreadExecutor(runnable -> {
+        Thread thread = new Thread(runnable, "useless-recipe-catalog-builder");
+        thread.setDaemon(true);
+        return thread;
+    });
 
     private AlloyFurnaceRecipeCatalog() {
     }
@@ -78,6 +94,38 @@ public final class AlloyFurnaceRecipeCatalog {
     /** Builds and publishes the immutable current-generation snapshot synchronously. */
     public static void prewarm(Level level) {
         if (level != null) snapshot(level);
+    }
+
+    /**
+     * 返回当前世代快照是否已构建完成、可供查询。
+     *
+     * <p>供调用方在把构建挪到后台后轮询「何时可以安全地消费目录」——例如客户端要在目录就绪
+     * 后再刷新 JEI 展示，而不是在构建中途读到空列表。</p>
+     */
+    public static boolean isReady(Level level) {
+        return level != null && snapshotIfReady(level) != null;
+    }
+
+    /**
+     * 在后台线程构建并发布当前世代快照，立即返回。
+     *
+     * <p>用于「只是想让目录早点就绪、但没人正在等它」的场合，典型就是服务器启动与数据包重载：
+     * 那里调用 {@link #prewarm} 会把整段构建时间压在世界加载的关键路径上。查询路径本身是安全的——
+     * 所有 {@code resolve*} 都走 {@link #snapshotIfReady}（未就绪返回空），只有 {@link #entries}
+     * 才触发同步构建，所以后台构建期间不会有查询读到半成品。</p>
+     *
+     * <p>构建若失败只记日志：目录随后会由查询路径按需重建，不该因为一次预热失败而中断世界加载。</p>
+     */
+    public static void prewarmAsync(Level level) {
+        if (level == null) return;
+        BUILD_EXECUTOR.execute(() -> {
+            try {
+                snapshot(level);
+            } catch (RuntimeException exception) {
+                LOGGER.warn("Background alloy-furnace recipe catalog build failed; "
+                        + "it will be rebuilt on demand", exception);
+            }
+        });
     }
 
     public static List<AdvancedAlloyFurnaceRecipe> recipes(Level level) {
@@ -538,24 +586,17 @@ public final class AlloyFurnaceRecipeCatalog {
                     .forEach(recipe -> recipes.add(new CollectedRecipe(recipe, RecipeSourceIds.AE2LT)));
         }
 
+        // 指纹计算是纯 CPU 密集操作（codec 整条编码 + 成分规范化 + canonicalize + SHA-256），
+        // 数万条配方时它占据了目录构建剩余耗时的绝大部分。这里并行计算指纹，再按原有先后
+        // 顺序合并：putIfAbsent 的次序与串行版本完全一致，去重结果因此保持不变。
+        // 每条配方各自创建序列化上下文（create 内部完成），故并行不存在共享可变状态。
+        List<FingerprintedRecipe> fingerprinted = recipes.parallelStream()
+                .map(collected -> fingerprint(collected, level))
+                .filter(Objects::nonNull)
+                .toList();
         Map<AlloyFurnaceRecipeIdentity, Entry> unique = new LinkedHashMap<>();
-        for (CollectedRecipe collected : recipes) {
-            AdvancedAlloyFurnaceRecipe recipe = collected.recipe();
-            if (recipe == null) continue;
-            try {
-                AlloyFurnaceRecipeIdentity identity = new AlloyFurnaceRecipeIdentity(
-                        recipe.id(), AlloyFurnaceRecipeFingerprint.create(recipe, level.registryAccess()));
-                unique.putIfAbsent(identity, new Entry(identity, recipe, collected.sourceId()));
-            } catch (RuntimeException exception) {
-                // 只在配方无法编码出指纹时发生（例如某个数值字段被 codec 判定非法）。
-                // 这是「可预期的坏配方」而不是故障：只留一行 WARN，明细放 DEBUG 的配方字段 dump，
-                // 不再把整条异常栈刷进日志。
-                LOGGER.warn("Skipping alloy-furnace recipe with an unencodable identity: {} ({})",
-                        recipe.id(), exception.getMessage());
-                if (LOGGER.isDebugEnabled()) {
-                    LOGGER.debug("Unencodable alloy-furnace recipe contents: {}", recipe);
-                }
-            }
+        for (FingerprintedRecipe item : fingerprinted) {
+            unique.putIfAbsent(item.identity(), new Entry(item.identity(), item.recipe(), item.sourceId()));
         }
         List<Entry> ordered = unique.values().stream()
                 .sorted(Comparator.comparing((Entry entry) -> entry.identity.recipeId().toString())
@@ -588,6 +629,34 @@ public final class AlloyFurnaceRecipeCatalog {
 
     /** 一个待做配方转换的 adapter 及其来源标识。 */
     private record AdapterSource(com.sorrowmist.useless.api.recipe.IRecipeAdapter<?> adapter, String sourceId) {
+    }
+
+    /** 已完成指纹计算的配方，用于在并行计算后按原顺序合并。 */
+    private record FingerprintedRecipe(
+            AlloyFurnaceRecipeIdentity identity, AdvancedAlloyFurnaceRecipe recipe, String sourceId) {
+    }
+
+    /**
+     * 为单条配方计算身份指纹。无法编码的配方返回 {@code null} 并只记一行日志：这是
+     * 「可预期的坏配方」而不是故障，明细放 DEBUG 的配方字段 dump，不刷整条异常栈。
+     *
+     * <p>本方法被并行调用，因此只读取入参、不触碰任何可变共享状态。</p>
+     */
+    private static FingerprintedRecipe fingerprint(CollectedRecipe collected, Level level) {
+        AdvancedAlloyFurnaceRecipe recipe = collected.recipe();
+        if (recipe == null) return null;
+        try {
+            AlloyFurnaceRecipeIdentity identity = new AlloyFurnaceRecipeIdentity(
+                    recipe.id(), AlloyFurnaceRecipeFingerprint.create(recipe, level.registryAccess()));
+            return new FingerprintedRecipe(identity, recipe, collected.sourceId());
+        } catch (RuntimeException exception) {
+            LOGGER.warn("Skipping alloy-furnace recipe with an unencodable identity: {} ({})",
+                    recipe.id(), exception.getMessage());
+            if (LOGGER.isDebugEnabled()) {
+                LOGGER.debug("Unencodable alloy-furnace recipe contents: {}", recipe);
+            }
+            return null;
+        }
     }
 
     /**

@@ -4,10 +4,10 @@ package com.sorrowmist.useless.world.dimension;
 import com.mojang.serialization.MapCodec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import net.minecraft.world.level.biome.BiomeSource;
-import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.ChunkGenerator;
 import org.jetbrains.annotations.NotNull;
 
+/** 一维度生成器。布局细节见 {@link PlatformStyle#STYLE_1} 与 {@link PlatformLayout}。 */
 public class UselessDimGen extends AbstractPlasticPlatformGenerator {
     static final MapCodec<UselessDimGen> CODEC = RecordCodecBuilder.mapCodec(
             instance ->
@@ -22,39 +22,7 @@ public class UselessDimGen extends AbstractPlasticPlatformGenerator {
     @Override protected @NotNull MapCodec<? extends ChunkGenerator> codec() {return CODEC;}
 
     @Override
-    protected PlatformRole getPlatformRole(int x, int z) {
-        if (x == 8 && z == 8) {
-            return PlatformRole.CENTER;
-        } else if (x == 0 || z == 0) {
-            return PlatformRole.BORDER;
-        } else {
-            return PlatformRole.FILL;
-        }
-    }
-
-    /** 一维度多联中心：偶数区块数占 2×2，奇数占 1 格，两轴各自判定。 */
-    @Override
-    protected boolean isMultiCenterMarker(int groupX, int groupZ, int widthX, int widthZ) {
-        return isEvenSizedMultiCenterMarker(groupX, groupZ, widthX, widthZ);
-    }
-
-    @Override
-    protected int getRoadStartBoundaryWidth() {
-        return 1;
-    }
-
-    @Override
-    protected int getRoadCenterLineWidth() {
-        return 1;
-    }
-
-    @Override
-    protected boolean useUnshiftedRoadIntersectionLayout() {
-        return true;
-    }
-
-    @Override
-    protected String getDebugName() {
-        return "Plastic Platform - Style 1 (2x2 Center)";
+    protected PlatformStyle style() {
+        return PlatformStyle.STYLE_1;
     }
 }

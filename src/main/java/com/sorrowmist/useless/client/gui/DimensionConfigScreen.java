@@ -3,6 +3,8 @@ package com.sorrowmist.useless.client.gui;
 import com.sorrowmist.useless.content.menus.DimensionConfigMenu;
 import com.sorrowmist.useless.network.DimensionConfigSubmitPacket;
 import com.sorrowmist.useless.world.dimension.DimensionGenerationConfig;
+import com.sorrowmist.useless.world.dimension.PlatformStyle;
+import com.sorrowmist.useless.world.dimension.UselessDimensions;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
@@ -11,12 +13,29 @@ import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.inventory.Slot;
+import net.minecraft.world.level.block.state.BlockState;
 import net.neoforged.neoforge.network.PacketDistributor;
 import org.lwjgl.glfw.GLFW;
 
 public final class DimensionConfigScreen extends AbstractContainerScreen<DimensionConfigMenu> {
     private static final int PANEL_WIDTH = 420;
     private static final int PANEL_HEIGHT = 346;
+
+    /* 生成预览弹窗：不常驻占位，点「预览」按钮后以覆盖层显示，避免撑宽配置面板。 */
+    private static final int POPUP_WIDTH = 420;
+    private static final int POPUP_HEIGHT = 330;
+    private static final int POPUP_PAD = 10;
+    private static final int VIEW_W = POPUP_WIDTH - POPUP_PAD * 2;
+    private static final int TOP_VIEW_H = 170;
+    private static final int SIDE_VIEW_H = 52;
+    private static final int INFO_LINE_HEIGHT = 11;
+    private static final int CLOSE_BUTTON_W = 80;
+    private static final int CLOSE_BUTTON_H = 18;
+    private static final int DIALOG_BUTTON_W = 84;
+    private static final int DIALOG_BUTTON_H = 18;
+
+    private final PlatformPreview preview =
+            new PlatformPreview(VIEW_W, TOP_VIEW_H, VIEW_W, SIDE_VIEW_H);
 
     private EditBox layersField;
     private EditBox startYField;
@@ -42,8 +61,16 @@ public final class DimensionConfigScreen extends AbstractContainerScreen<Dimensi
     private PressableAE2Button cancelButton;
     private PressableAE2Button exportButton;
     private PressableAE2Button importButton;
+    private PressableAE2Button previewButton;
+    /* 覆盖层按钮只用 addWidget 进 children，不放进 renderables：它们由覆盖层自己渲染，
+       否则会在 super.render() 阶段被画到底层 UI 下面。 */
+    private PressableAE2Button closePreviewButton;
+    private PressableAE2Button confirmImportButton;
+    private PressableAE2Button cancelImportButton;
     private Slot pressedSlot;
     private boolean updatingFields;
+    /** 预览弹窗是否打开；打开时独占点击与 ESC。 */
+    private boolean previewOpen;
     /** 待确认导入的预设；非空时界面显示二次确认层。 */
     private DimensionGenerationConfig pendingImport;
     /** 状态提示的语言键与剩余显示时间（tick）。 */
@@ -123,6 +150,11 @@ public final class DimensionConfigScreen extends AbstractContainerScreen<Dimensi
                     menu.toggleCenterMarker();
                     updateFeatureButtons();
                 });
+        // 主配置区 y>=196 是空的，正好放预览入口，不必撑宽面板。
+        previewButton = addButton(106, 200, 100, 18,
+                Component.translatable("gui.useless_mod.dimension_config.preview"),
+                "gui.useless_mod.dimension_config.tooltip.preview",
+                button -> setPreviewOpen(true));
 
         applyButton = addButton(224, 258, 88, 18,
                 Component.translatable("gui.useless_mod.dimension_config.apply"),
@@ -140,10 +172,47 @@ public final class DimensionConfigScreen extends AbstractContainerScreen<Dimensi
         importButton = addButton(318, 302, 88, 18,
                 Component.translatable("gui.useless_mod.dimension_config.import"),
                 "gui.useless_mod.dimension_config.tooltip.import", button -> importPreset());
+        // 覆盖层按钮只进 children（addWidget），由覆盖层自己渲染；放进 renderables 会被
+        // super.render() 画到底层 UI 下面，反而看不见。
+        closePreviewButton = addWidget(new PressableAE2Button(
+                closeButtonX(), closeButtonY(), CLOSE_BUTTON_W, CLOSE_BUTTON_H,
+                Component.translatable("gui.useless_mod.dimension_config.preview.close"),
+                button -> setPreviewOpen(false)));
+        confirmImportButton = addWidget(new PressableAE2Button(
+                confirmX(), confirmY(), DIALOG_BUTTON_W, DIALOG_BUTTON_H,
+                Component.translatable("gui.useless_mod.dimension_config.confirm"),
+                button -> confirmImport(true)));
+        cancelImportButton = addWidget(new PressableAE2Button(
+                cancelImportX(), cancelImportY(), DIALOG_BUTTON_W, DIALOG_BUTTON_H,
+                Component.translatable("gui.useless_mod.dimension_config.cancel_import"),
+                button -> confirmImport(false)));
+        syncOverlayButtons();
+
         teleportButton.visible = menu.canTeleport();
         updateToggleButtons();
         updateFeatureButtons();
         updateControls();
+        refreshPreview();
+    }
+
+    /** 覆盖层按钮的 visible 同时决定是否响应点击，所以每次开关覆盖层都要同步。 */
+    private void syncOverlayButtons() {
+        closePreviewButton.visible = previewOpen;
+        boolean importing = pendingImport != null;
+        confirmImportButton.visible = importing;
+        cancelImportButton.visible = importing;
+    }
+
+    /**
+     * 把界面当前的编辑状态喂给预览。样式按传送方块所属维度取，与配置写入的目标维度一致。
+     * {@code createConfiguration()} 在方块槽位不全时返回空，此时预览显示提示而不是旧图。
+     */
+    private void refreshPreview() {
+        PlatformStyle style = UselessDimensions.styleFor(menu.getTargetDimension());
+        DimensionGenerationConfig config = menu.createConfiguration()
+                .map(DimensionGenerationConfig::normalized)
+                .orElse(null);
+        preview.refresh(style, config);
     }
 
     private PressableAE2Button addStepButton(int x, int y, String text, EditBox field,
@@ -275,6 +344,7 @@ public final class DimensionConfigScreen extends AbstractContainerScreen<Dimensi
         } catch (DimensionGenerationConfig.PresetException exception) {
             setStatus(presetErrorKey(exception.error()));
         }
+        syncOverlayButtons();
     }
 
     /** 确认导入：套用到界面编辑状态，仍需点「应用」才会保存到世界。 */
@@ -288,6 +358,7 @@ public final class DimensionConfigScreen extends AbstractContainerScreen<Dimensi
             setStatus("gui.useless_mod.dimension_config.imported");
         }
         pendingImport = null;
+        syncOverlayButtons();
     }
 
     /** 把菜单当前的数值同步回输入框，导入后界面才不会与配置脱节。 */
@@ -340,12 +411,162 @@ public final class DimensionConfigScreen extends AbstractContainerScreen<Dimensi
         super.containerTick();
         if (statusTicks > 0) statusTicks--;
         updateControls();
+        refreshPreview();
+    }
+
+    /** 界面移除时释放预览占用的动态贴图，避免泄漏。 */
+    @Override
+    public void removed() {
+        super.removed();
+        preview.close();
     }
 
     @Override
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
         super.render(graphics, mouseX, mouseY, partialTick);
-        if (pendingImport != null) renderImportConfirm(graphics, mouseX, mouseY);
+        if (pendingImport != null) {
+            // 必须先 flush：底层 UI 里的方块物品走的是 RenderBuffers 的固定缓冲
+            // （solid / cutout / translucent），不主动提交的话它们会在帧末才绘制，
+            // 结果盖在覆盖层上面。
+            graphics.flush();
+            renderImportConfirm(graphics, mouseX, mouseY, partialTick);
+        } else if (previewOpen) {
+            graphics.flush();
+            renderPreviewPopup(graphics, mouseX, mouseY, partialTick);
+        }
+    }
+
+    /* ================= 生成预览弹窗 ================= */
+
+    private int popupX() {
+        return (width - POPUP_WIDTH) / 2;
+    }
+
+    private int popupY() {
+        return Math.max(4, (height - POPUP_HEIGHT) / 2);
+    }
+
+    private int closeButtonX() {
+        return popupX() + POPUP_WIDTH - POPUP_PAD - CLOSE_BUTTON_W;
+    }
+
+    private int closeButtonY() {
+        return popupY() + POPUP_HEIGHT - 24;
+    }
+
+    private void setPreviewOpen(boolean open) {
+        previewOpen = open;
+        syncOverlayButtons();
+        if (open) refreshPreview();
+    }
+
+    /** 遮住整个界面并居中显示俯视示意图与侧视剖面。 */
+    private void renderPreviewPopup(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
+        // 遮罩用 fill（排队），而 drawPanel 走 AE2 BackgroundGenerator 的 blitSprite（立即），
+        // 不先提交遮罩的话它会在帧末才绘制，反而盖住弹窗。
+        graphics.fill(0, 0, width, height, 0x99000000);
+        graphics.flush();
+        int x = popupX();
+        int y = popupY();
+        MachineScreenStyle.drawPanel(graphics, x, y, POPUP_WIDTH, POPUP_HEIGHT);
+        graphics.drawString(font, Component.translatable("gui.useless_mod.dimension_config.preview"),
+                x + POPUP_PAD, y + 7, MachineScreenStyle.TEXT_COLOR, false);
+
+        int viewX = x + POPUP_PAD;
+        int topY = y + 30;
+        int sideY = topY + TOP_VIEW_H + 14;
+        int infoY = sideY + SIDE_VIEW_H + 7;
+
+        if (!preview.isValid()) {
+            drawPopupLine(graphics, Component.translatable(
+                            "gui.useless_mod.dimension_config.preview.empty"),
+                    viewX, topY + 4, MachineScreenStyle.MUTED_TEXT_COLOR);
+            graphics.flush();
+            closePreviewButton.render(graphics, mouseX, mouseY, partialTick);
+            return;
+        }
+
+        drawPopupLabel(graphics, "gui.useless_mod.dimension_config.preview.top", viewX, topY - 10);
+        drawPopupLabel(graphics, "gui.useless_mod.dimension_config.preview.side", viewX, sideY - 10);
+        graphics.renderOutline(viewX - 1, topY - 1, VIEW_W + 2, TOP_VIEW_H + 2,
+                MachineScreenStyle.SLOT_SHADOW_COLOR);
+        graphics.renderOutline(viewX - 1, sideY - 1, VIEW_W + 2, SIDE_VIEW_H + 2,
+                MachineScreenStyle.SLOT_SHADOW_COLOR);
+        // 预览贴图走的是立即绘制（GuiGraphics 的 blit 内部直接 drawWithShader），
+        // 先把上面这些排队的内容提交掉，否则它们会在帧末提交时压住预览。
+        graphics.flush();
+        preview.renderTop(graphics, viewX, topY);
+        preview.renderSide(graphics, viewX, sideY);
+
+        int line = 0;
+        drawPopupLine(graphics, Component.translatable(
+                        "gui.useless_mod.dimension_config.preview.period",
+                        preview.periodBlocksX(), preview.periodBlocksZ()),
+                viewX, infoY + line++ * INFO_LINE_HEIGHT, MachineScreenStyle.SUBTLE_TEXT_COLOR);
+        drawPopupLine(graphics, renderModeText(),
+                viewX, infoY + line++ * INFO_LINE_HEIGHT, MachineScreenStyle.SUBTLE_TEXT_COLOR);
+        drawPopupLine(graphics, Component.translatable(
+                        "gui.useless_mod.dimension_config.preview.range",
+                        preview.bottomY(), preview.topY(), preview.topY() - preview.bottomY()),
+                viewX, infoY + line++ * INFO_LINE_HEIGHT, MachineScreenStyle.SUBTLE_TEXT_COLOR);
+        if (preview.bedrockY() != Integer.MIN_VALUE) {
+            drawPopupLine(graphics, Component.translatable(
+                            "gui.useless_mod.dimension_config.preview.bedrock", preview.bedrockY()),
+                    viewX, infoY + line * INFO_LINE_HEIGHT, MachineScreenStyle.SUBTLE_TEXT_COLOR);
+        }
+        graphics.flush();
+        closePreviewButton.render(graphics, mouseX, mouseY, partialTick);
+        renderPreviewTooltip(graphics, mouseX, mouseY, viewX, topY);
+    }
+
+    private void drawPopupLabel(GuiGraphics graphics, String key, int x, int y) {
+        graphics.drawString(font, Component.translatable(key), x, y,
+                MachineScreenStyle.MUTED_TEXT_COLOR, false);
+    }
+
+    private void drawPopupLine(GuiGraphics graphics, Component text, int x, int y, int color) {
+        String value = text.getString();
+        if (font.width(value) > VIEW_W) {
+            value = font.plainSubstrByWidth(value, VIEW_W - 3) + "...";
+        }
+        graphics.drawString(font, value, x, y, color, false);
+    }
+
+    /** 说明当前是真实材质还是降级成了色块；色块时顺便给出一个像素代表多少格。 */
+    private Component renderModeText() {
+        if (preview.isTextured()) {
+            return Component.translatable("gui.useless_mod.dimension_config.preview.textured");
+        }
+        int blocksPerPixel = preview.blocksPerPixel();
+        if (blocksPerPixel <= 1) {
+            return Component.translatable("gui.useless_mod.dimension_config.preview.color");
+        }
+        return Component.translatable("gui.useless_mod.dimension_config.preview.blocks",
+                blocksPerPixel);
+    }
+
+    /** 悬停俯视图时提示所指格子的坐标、方块与角色。 */
+    private void renderPreviewTooltip(GuiGraphics graphics, int mouseX, int mouseY,
+                                      int viewX, int viewY) {
+        if (!preview.isValid()) return;
+        int localX = mouseX - viewX;
+        int localY = mouseY - viewY;
+        if (localX < 0 || localY < 0 || localX >= VIEW_W || localY >= TOP_VIEW_H) return;
+        int[] block = preview.blockAt(localX, localY);
+        if (block == null) return;
+        BlockState state = preview.stateAtBlock(block[0], block[1]);
+        if (state == null) return;
+
+        Component tooltip = Component.literal("X=" + block[0] + ", Z=" + block[1])
+                .append(Component.literal("\n"))
+                .append(state.getBlock().getName());
+        String role = preview.roleKey(state);
+        if (role != null) {
+            tooltip = tooltip.copy().append(Component.literal("\n"))
+                    .append(Component.translatable(
+                            "gui.useless_mod.dimension_config.preview.role." + role));
+        }
+        graphics.renderTooltip(font, tooltip, mouseX, mouseY);
     }
 
     /** 底部状态提示，导入导出后短暂显示结果；画在标签层以免盖住物品提示。 */
@@ -356,33 +577,19 @@ public final class DimensionConfigScreen extends AbstractContainerScreen<Dimensi
         graphics.drawString(font, text, 8, 336, MachineScreenStyle.TEXT_COLOR, false);
     }
 
-    /** 导入二次确认层：遮住面板并给出确认/取消两个按钮。 */
-    private void renderImportConfirm(GuiGraphics graphics, int mouseX, int mouseY) {
-        graphics.fill(leftPos, topPos, leftPos + imageWidth, topPos + imageHeight, 0xAA000000);
+    /** 导入二次确认层：遮住整个界面，底板与按钮都用本模组统一的面板与按钮样式。 */
+    private void renderImportConfirm(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
+        graphics.fill(0, 0, width, height, 0x99000000);
+        graphics.flush();
         int boxLeft = leftPos + 90;
         int boxTop = topPos + 140;
-        int boxRight = leftPos + imageWidth - 90;
-        int boxBottom = topPos + 200;
-        graphics.fill(boxLeft, boxTop, boxRight, boxBottom, 0xFF1B1B1B);
-        graphics.renderOutline(boxLeft, boxTop, boxRight - boxLeft, boxBottom - boxTop,
-                MachineScreenStyle.TEXT_COLOR);
-        String prompt = Component.translatable(
-                "gui.useless_mod.dimension_config.import_confirm").getString();
-        graphics.drawCenteredString(font, prompt, leftPos + imageWidth / 2,
-                boxTop + 14, MachineScreenStyle.TEXT_COLOR);
-        boolean overConfirm = isInside(mouseX, mouseY, confirmX(), confirmY());
-        boolean overCancel = isInside(mouseX, mouseY, cancelImportX(), cancelImportY());
-        drawConfirmButton(graphics, confirmX(), confirmY(),
-                "gui.useless_mod.dimension_config.confirm", overConfirm);
-        drawConfirmButton(graphics, cancelImportX(), cancelImportY(),
-                "gui.useless_mod.dimension_config.cancel_import", overCancel);
-    }
-
-    private void drawConfirmButton(GuiGraphics graphics, int x, int y, String key, boolean hovered) {
-        graphics.fill(x, y, x + 84, y + 18, hovered ? 0xFF3A3A3A : 0xFF262626);
-        graphics.renderOutline(x, y, 84, 18, MachineScreenStyle.TEXT_COLOR);
-        graphics.drawCenteredString(font, Component.translatable(key).getString(),
-                x + 42, y + 5, MachineScreenStyle.TEXT_COLOR);
+        MachineScreenStyle.drawPanel(graphics, boxLeft, boxTop, imageWidth - 180, 60);
+        graphics.drawCenteredString(font, Component.translatable(
+                        "gui.useless_mod.dimension_config.import_confirm"),
+                leftPos + imageWidth / 2, boxTop + 12, MachineScreenStyle.TEXT_COLOR);
+        graphics.flush();
+        confirmImportButton.render(graphics, mouseX, mouseY, partialTick);
+        cancelImportButton.render(graphics, mouseX, mouseY, partialTick);
     }
 
     private int confirmX() {
@@ -399,10 +606,6 @@ public final class DimensionConfigScreen extends AbstractContainerScreen<Dimensi
 
     private int cancelImportY() {
         return topPos + 168;
-    }
-
-    private static boolean isInside(double mouseX, double mouseY, int x, int y) {
-        return mouseX >= x && mouseX < x + 84 && mouseY >= y && mouseY < y + 18;
     }
 
     @Override
@@ -553,6 +756,11 @@ public final class DimensionConfigScreen extends AbstractContainerScreen<Dimensi
             confirmImport(false);
             return true;
         }
+        // 预览弹窗同理：ESC 只关弹窗。
+        if (previewOpen && keyCode == GLFW.GLFW_KEY_ESCAPE) {
+            setPreviewOpen(false);
+            return true;
+        }
         if (keyCode != GLFW.GLFW_KEY_ESCAPE) {
             EditBox[] fields = {layersField, startYField,
                     boundaryXField, boundaryZField, roadWidthField};
@@ -566,13 +774,14 @@ public final class DimensionConfigScreen extends AbstractContainerScreen<Dimensi
 
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
-        // 二次确认层存在时独占点击，避免误触底下的槽位与按钮。
+        // 覆盖层独占点击：只转发给覆盖层自己的按钮，避免穿透到底下的槽位与控件。
         if (pendingImport != null) {
-            if (isInside(mouseX, mouseY, confirmX(), confirmY())) {
-                confirmImport(true);
-            } else if (isInside(mouseX, mouseY, cancelImportX(), cancelImportY())) {
-                confirmImport(false);
-            }
+            confirmImportButton.mouseClicked(mouseX, mouseY, button);
+            cancelImportButton.mouseClicked(mouseX, mouseY, button);
+            return true;
+        }
+        if (previewOpen) {
+            closePreviewButton.mouseClicked(mouseX, mouseY, button);
             return true;
         }
         Slot slot = slotAt(mouseX, mouseY);
@@ -586,6 +795,19 @@ public final class DimensionConfigScreen extends AbstractContainerScreen<Dimensi
 
     @Override
     public boolean mouseReleased(double mouseX, double mouseY, int button) {
+        // 覆盖层按钮不在 renderables 里，事件也要手动转发，否则按下后松手不会触发。
+        if (pendingImport != null) {
+            confirmImportButton.mouseReleased(mouseX, mouseY, button);
+            confirmImportButton.releaseVisualState();
+            cancelImportButton.mouseReleased(mouseX, mouseY, button);
+            cancelImportButton.releaseVisualState();
+            return true;
+        }
+        if (previewOpen) {
+            closePreviewButton.mouseReleased(mouseX, mouseY, button);
+            closePreviewButton.releaseVisualState();
+            return true;
+        }
         pressedSlot = null;
         layersDown.releaseVisualState();
         layersUp.releaseVisualState();
@@ -601,6 +823,7 @@ public final class DimensionConfigScreen extends AbstractContainerScreen<Dimensi
         bottomButton.releaseVisualState();
         modeButton.releaseVisualState();
         centerEnabledButton.releaseVisualState();
+        previewButton.releaseVisualState();
         applyButton.releaseVisualState();
         teleportButton.releaseVisualState();
         cancelButton.releaseVisualState();

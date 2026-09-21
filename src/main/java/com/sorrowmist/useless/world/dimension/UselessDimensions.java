@@ -47,6 +47,17 @@ public class UselessDimensions {
         return null;
     }
 
+    /**
+     * 该维度的平台样式。样式是纯数据、双侧安全，客户端可直接用它驱动生成预览，
+     * 无需实例化 {@code ChunkGenerator}。非本模组维度返回 {@code null}。
+     */
+    public static PlatformStyle styleFor(ResourceKey<Level> dimension) {
+        if (USELESSDIM_KEY.equals(dimension)) return PlatformStyle.STYLE_1;
+        if (USELESSDIM_2_KEY.equals(dimension)) return PlatformStyle.STYLE_2;
+        if (USELESSDIM_3_KEY.equals(dimension)) return PlatformStyle.STYLE_3;
+        return null;
+    }
+
     private static ResourceKey<Level> key(String path) {
         return ResourceKey.create(Registries.DIMENSION,
                 ResourceLocation.fromNamespaceAndPath(UselessMod.MODID, path));

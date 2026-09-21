@@ -1124,11 +1124,10 @@ public class EndlessBeafItem extends TieredItem {
                               int pSlotId,
                               boolean pIsSelected) {
         super.inventoryTick(pStack, pLevel, pEntity, pSlotId, pIsSelected);
-        if (pEntity instanceof Player player) {
-            boolean hasItemInInventory = player.getInventory().items.stream().anyMatch(item -> item.getItem() == this);
-            if (hasItemInInventory) {
-                UselessItemUtils.applyEndlessBeafEffects(player);
-            }
+        // 注意不能用 getInventory().items 判断携带：那只有主背包 36 格，不含副手
+        if (pEntity instanceof Player player
+                && UselessItemUtils.hasItemInInventory(player, this)) {
+            UselessItemUtils.applyEndlessBeafEffects(player);
         }
     }
 

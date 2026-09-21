@@ -311,6 +311,23 @@ public class UselessItemUtils {
                 || player.getInventory().items.stream().anyMatch(UselessItemUtils::isTargetTool);
     }
 
+    /**
+     * 玩家身上是否带着指定物品（主手 / 副手 / 主背包）。
+     * <p>
+     * 注意 {@code player.getInventory().items} 只有主背包那 36 格，<b>不含副手</b>
+     * （副手在 {@code getInventory().offhand} 里）。凡是「玩家是否携带」的判定都必须走这里，
+     * 否则造化杖放进副手就会失效。
+     */
+    public static boolean hasItemInInventory(Player player, Item item) {
+        if (player == null || player.getInventory() == null || item == null) {
+            return false;
+        }
+
+        return player.getMainHandItem().is(item)
+                || player.getOffhandItem().is(item)
+                || player.getInventory().items.stream().anyMatch(stack -> stack.is(item));
+    }
+
     public static boolean hasInvulnerabilityEnabledTargetToolInInventory(Player player) {
         if (player == null || player.getInventory() == null) {
             return false;

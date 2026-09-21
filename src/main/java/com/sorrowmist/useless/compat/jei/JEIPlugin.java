@@ -222,6 +222,22 @@ public final class JEIPlugin implements IModPlugin {
         registeredAlloyFurnaceRecipes.clear();
     }
 
+    /** Hides recipes owned by the previous client world before dropping their bookkeeping. */
+    public static void resetAlloyFurnaceRecipes() {
+        Minecraft minecraft = Minecraft.getInstance();
+        if (!minecraft.isSameThread()) {
+            minecraft.execute(JEIPlugin::resetAlloyFurnaceRecipes);
+            return;
+        }
+
+        if (runtime != null && !registeredAlloyFurnaceRecipes.isEmpty()) {
+            runtime.getRecipeManager().hideRecipes(
+                    AdvancedAlloyFurnaceRecipeCategory.TYPE,
+                    registeredAlloyFurnaceRecipes.values());
+        }
+        registeredAlloyFurnaceRecipes.clear();
+    }
+
     /** Adds recipes generated after JEI's initial registration, such as data-driven compat data. */
     public static void refreshAlloyFurnaceRecipes() {
         // TagsUpdatedEvent is fired on the server thread during /reload, but JEI's recipe manager
@@ -237,21 +253,43 @@ public final class JEIPlugin implements IModPlugin {
         Level level = minecraft.level;
         if (level == null) return;
 
+        // Keep the currently visible JEI set until a complete replacement snapshot is available.
+        if (!AlloyFurnaceRecipeCatalog.isReady(level)) return;
+
         // 同样刻意用 entriesIfReady：本方法跑在客户端渲染线程上，目录若尚未就绪，
         // 这里同步构建会把加载界面再卡二十多秒——而 tick 的合并点随后还会因脏标记
         // 把这份目录作废重建，等于白算一遍。未就绪时先不补，等目录就绪后
         // onRecipeCatalogReady 会再调用本方法完成增量补齐。
-        List<AlloyFurnaceRecipeCatalog.Entry> additions = new ArrayList<>();
-        for (AlloyFurnaceRecipeCatalog.Entry recipe : AlloyFurnaceRecipeCatalog.entriesIfReady(level)) {
-            if (!registeredAlloyFurnaceRecipes.containsKey(recipe.identity())) {
-                registeredAlloyFurnaceRecipes.put(recipe.identity(), recipe);
-                additions.add(recipe);
-            }
+        List<AlloyFurnaceRecipeCatalog.Entry> currentRecipes =
+                AlloyFurnaceRecipeCatalog.entriesIfReady(level);
+        Map<AlloyFurnaceRecipeIdentity, AlloyFurnaceRecipeCatalog.Entry> currentByIdentity =
+                new LinkedHashMap<>();
+        for (AlloyFurnaceRecipeCatalog.Entry recipe : currentRecipes) {
+            currentByIdentity.put(recipe.identity(), recipe);
+        }
+
+        List<AlloyFurnaceRecipeCatalog.Entry> removals = registeredAlloyFurnaceRecipes.entrySet()
+                .stream()
+                .filter(entry -> !currentByIdentity.containsKey(entry.getKey()))
+                .map(Map.Entry::getValue)
+                .toList();
+        List<AlloyFurnaceRecipeCatalog.Entry> additions = currentByIdentity.entrySet().stream()
+                .filter(entry -> !registeredAlloyFurnaceRecipes.containsKey(entry.getKey()))
+                .map(Map.Entry::getValue)
+                .toList();
+
+        if (!removals.isEmpty()) {
+            runtime.getRecipeManager().hideRecipes(
+                    AdvancedAlloyFurnaceRecipeCategory.TYPE,
+                    removals);
         }
         if (!additions.isEmpty()) {
             runtime.getRecipeManager().addRecipes(
                     AdvancedAlloyFurnaceRecipeCategory.TYPE, additions);
         }
+
+        registeredAlloyFurnaceRecipes.clear();
+        registeredAlloyFurnaceRecipes.putAll(currentByIdentity);
     }
 
     public static IJeiRuntime getRuntime() {

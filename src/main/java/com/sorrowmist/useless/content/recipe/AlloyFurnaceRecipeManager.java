@@ -108,12 +108,14 @@ public class AlloyFurnaceRecipeManager {
         registerAdapter((com.sorrowmist.useless.api.recipe.IRecipeAdapter<?>) adapter);
     }
 
-    public void registerAdapter(com.sorrowmist.useless.api.recipe.IRecipeAdapter<?> adapter, String sourceId) {
+    public synchronized void registerAdapter(
+            com.sorrowmist.useless.api.recipe.IRecipeAdapter<?> adapter, String sourceId) {
         if (adapter == null) return;
         String normalizedSource = RecipeSourceIds.normalize(sourceId);
         ItemStack moldItem = adapter.getMoldItem();
+        String registrationKey = adapter.registrationKey();
 
-        // 同一「适配器类 + 来源 + 模具」重复登记不构成构建输入的变化，直接忽略。
+        // 同一「适配器类 + 来源 + 模具 + 适配器变体」重复登记不构成构建输入的变化，直接忽略。
         //
         // 判据必须带上模具：SmeltingRecipeAdapter 会被合法地注册三次，分别对应熔炉、高炉与烟熏炉
         // 三种模具，只比「类 + 来源」会把后两个整类吞掉（实测配方数因此少了 629 条）。
@@ -125,7 +127,8 @@ public class AlloyFurnaceRecipeManager {
         for (var existing : allAdapters) {
             if (existing.getClass() == adapter.getClass()
                     && normalizedSource.equals(adapterSourceIds.get(existing))
-                    && sameMold(existing.getMoldItem(), moldItem)) {
+                    && sameMold(existing.getMoldItem(), moldItem)
+                    && Objects.equals(existing.registrationKey(), registrationKey)) {
                 return;
             }
         }

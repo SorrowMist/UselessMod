@@ -55,11 +55,16 @@ public class ClientSetup {
      * <p>部分可选 adapter 依赖同步下来的物品标签。配方包先于标签包到达，若此时就构建，
      * 依赖标签的 adapter 会全部产出为空，得到一份不完整的目录，并在标签到达后立刻被推翻重建。</p>
      */
-    private static volatile boolean clientTagsReceived;
+    private static volatile boolean awaitingClientTags;
+    /** Prevents a tag packet from triggering a rebuild before the current world's recipe packet. */
+    private static volatile boolean awaitingRecipeUpdate;
     /** 脏标记置位后经过的 tick 数，用于标签包迟迟不到时兜底构建。 */
     private static int recipeCatalogDirtyTicks;
     /** 等待标签包的上限（tick）。超过后不再等待，避免标签包缺失时目录永远构建不出来。 */
     private static final int TAG_WAIT_TICKS = 100;
+    /** Prevents a missed recipe event from blocking catalog construction forever. */
+    private static int recipeUpdateWaitTicks;
+    private static final int RECIPE_WAIT_TICKS = 100;
     /**
      * 已在后台发起构建、正等待目录就绪以刷新 JEI。
      *
@@ -117,6 +122,12 @@ public class ClientSetup {
     public static void onRecipesUpdated(RecipesUpdatedEvent event) {
         // 只登记待刷新，不在这里直接重建：登录路径里本事件、标签包事件与 level 切换会在极短时间
         // 内接连触发，逐次重建等于把同一份目录完整算好几遍。
+        // Recipe updates can arrive before the matching client tag packet. A value left over from
+        // the previous world or reload must never allow a tag-dependent adapter to build early.
+        awaitingRecipeUpdate = false;
+        awaitingClientTags = true;
+        recipeCatalogDirtyTicks = 0;
+        recipeUpdateWaitTicks = 0;
         markRecipeCatalogDirty();
     }
 
@@ -128,15 +139,25 @@ public class ClientSetup {
             observedClientLevel = level;
             if (level != null) {
                 // The initial JEI registration can happen on the title screen, before a client level
-                // exists. Rebuild once after joining a world so generated compat recipes are visible.
+                // exists. Wait for this world's recipe packet before rebuilding its compat catalog.
+                // RecipeManager instances may be reused across a client world transition. The
+                // identity check is therefore not proof that this world's recipe packet arrived.
+                awaitingRecipeUpdate = true;
+                awaitingClientTags = true;
+                recipeCatalogDirtyTicks = 0;
+                recipeUpdateWaitTicks = 0;
+                awaitingCatalogRefresh = false;
                 markRecipeCatalogDirty();
             } else {
                 AlloyFurnaceRecipeCatalog.invalidate();
+                JEIPlugin.resetAlloyFurnaceRecipes();
                 recipeCatalogDirty = false;
+                awaitingRecipeUpdate = false;
                 // 离开世界：标签会随下一次登录重新下发，必须把「已收到」重置掉，
                 // 否则下次进世界会跳过等待、又在标签落地前建出残缺目录。
-                clientTagsReceived = false;
+                awaitingClientTags = false;
                 recipeCatalogDirtyTicks = 0;
+                recipeUpdateWaitTicks = 0;
                 awaitingCatalogRefresh = false;
             }
         }
@@ -148,12 +169,24 @@ public class ClientSetup {
 
         // 合并点：无论脏标记来自登录、标签包还是数据包重载，都在这里统一重建一次。
         if (recipeCatalogDirty) {
+            if (awaitingRecipeUpdate) {
+                if (++recipeUpdateWaitTicks < RECIPE_WAIT_TICKS) {
+                    return;
+                }
+                UselessMod.LOGGER.warn(
+                        "Client recipe update event was not observed within {} ticks; "
+                                + "building the alloy-furnace catalog from the current manager.",
+                        RECIPE_WAIT_TICKS);
+                awaitingRecipeUpdate = false;
+                recipeUpdateWaitTicks = 0;
+            }
             // 登录路径里配方包会先于标签包到达。若在标签包落地前就构建，依赖标签的 adapter 会
             // 整批产出为空，得到一份随即被推翻的残缺目录（实测那次白跑花了 13.8 秒）。
             // 因此这里等到标签包到达再建；标签包始终不来时按 TAG_WAIT_TICKS 兜底。
-            if (!clientTagsReceived && ++recipeCatalogDirtyTicks < TAG_WAIT_TICKS) {
+            if (awaitingClientTags && ++recipeCatalogDirtyTicks < TAG_WAIT_TICKS) {
                 return;
             }
+            awaitingClientTags = false;
             recipeCatalogDirty = false;
             recipeCatalogDirtyTicks = 0;
             beginRecipeCatalogRebuild(level);
@@ -206,11 +239,14 @@ public class ClientSetup {
         // 原因重复触发（例如 JEI 注册期间的数据同步），此时再置脏只会让同一份目录被完整
         // 重建一遍——实测那次重复构建白白多花了 5.7 秒。配方数据的真正变更由
         // onRecipesUpdated 负责登记，这里只负责补齐标签依赖。
-        if (clientTagsReceived) return;
+        // Every client packet may change a tag-driven adapter's output. Keep this separate from
+        // the recipe-update event so /reload and later data-pack changes are handled as well.
 
         // 先置位「标签已到达」再登记重建：onClientTick 的合并点据此放行，避免在标签缺失时
         // 建出一份依赖标签的 adapter 全空的残缺目录。
-        clientTagsReceived = true;
+        // If tags arrive first, onClientTick waits for RecipesUpdatedEvent before rebuilding.
+        awaitingClientTags = false;
+        recipeCatalogDirtyTicks = 0;
         markRecipeCatalogDirty();
     }
 

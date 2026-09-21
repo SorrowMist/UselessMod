@@ -16,6 +16,7 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.crafting.Ingredient;
 import net.neoforged.neoforge.common.crafting.ICustomIngredient;
 import net.neoforged.neoforge.common.crafting.IngredientType;
+import net.neoforged.neoforge.registries.DeferredHolder;
 
 import java.util.List;
 import java.util.Objects;
@@ -29,8 +30,11 @@ import java.util.stream.Stream;
  * {@code [requiredData(当前品级), requiredData(下一品级) - 1]}，最高品级没有上界。
  *
  * <p>{@code DataComponentIngredient} 只能表达精确值，无法表达区间，因此这里自建实现。
- * 序列化时只保存模型 id 与数据上下界，静态初始化不触碰 HNN 的注册表，
- * 避免 HNN 未安装时加载本类失败。
+ * 序列化时只保存模型 id 与数据上下界。
+ *
+ * <p>本类引用了 HNN 与 Placebo 的类型，因此<b>只能在 HNN 存在时被加载</b>：
+ * 注册入口 {@code ModIngredientTypes.DATA_MODEL_RANGE} 已经做了加载检查，
+ * 不要在任何无条件执行的静态初始化里触碰本类。
  */
 public final class DataModelRangeIngredient implements ICustomIngredient {
 
@@ -138,7 +142,14 @@ public final class DataModelRangeIngredient implements ICustomIngredient {
 
     @Override
     public IngredientType<?> getType() {
-        return ModIngredientTypes.DATA_MODEL_RANGE.get();
+        DeferredHolder<IngredientType<?>, IngredientType<DataModelRangeIngredient>> holder =
+                ModIngredientTypes.DATA_MODEL_RANGE;
+        if (holder == null) {
+            // 该类型只在 HNN 存在时才会被注册和实例化，走到这里说明前置缺失。
+            throw new IllegalStateException(
+                    "data_model_range 需要 Hostile Neural Networks，但该模组未安装");
+        }
+        return holder.get();
     }
 
     @Override

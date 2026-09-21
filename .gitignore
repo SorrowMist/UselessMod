@@ -39,7 +39,7 @@ crashreport
 .codex
 # external reference code
 references/
-
+.crashinfo
 .dsh-drop
 .workbuddy
 .workbuddy-ai

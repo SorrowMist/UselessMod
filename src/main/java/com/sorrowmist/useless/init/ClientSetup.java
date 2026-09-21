@@ -47,6 +47,8 @@ import java.util.Set;
 @EventBusSubscriber(modid = UselessMod.MODID, value = Dist.CLIENT)
 public class ClientSetup {
     private static Level observedClientLevel;
+    /** 客户端配方目录的待重建标记；登录、标签包与数据包重载都会置位，由 onClientTick 统一消费。 */
+    private static volatile boolean recipeCatalogDirty;
 
     @SubscribeEvent
     public static void modifyBakedModels(ModelEvent.ModifyBakingResult event) {
@@ -94,32 +96,47 @@ public class ClientSetup {
 
     @SubscribeEvent
     public static void onRecipesUpdated(RecipesUpdatedEvent event) {
-        Level level = Minecraft.getInstance().level;
-        if (level != null) {
-            AlloyFurnaceRecipeCatalog.invalidate(level);
-            AlloyFurnaceRecipeCatalog.prewarm(level);
-            JEIPlugin.refreshAlloyFurnaceRecipes();
-            if (Minecraft.getInstance().player != null) {
-                EndlessBeafItem.refreshAttackDamage(Minecraft.getInstance().player);
-            }
-        }
+        // 只登记待刷新，不在这里直接重建：登录路径里本事件、标签包事件与 level 切换会在极短时间
+        // 内接连触发，逐次重建等于把同一份目录完整算好几遍。
+        markRecipeCatalogDirty();
     }
 
     @SubscribeEvent
     public static void onClientTick(ClientTickEvent.Post event) {
         Minecraft minecraft = Minecraft.getInstance();
         Level level = minecraft.level;
-        if (level == observedClientLevel) return;
+        if (level != observedClientLevel) {
+            observedClientLevel = level;
+            if (level != null) {
+                // The initial JEI registration can happen on the title screen, before a client level
+                // exists. Rebuild once after joining a world so generated compat recipes are visible.
+                markRecipeCatalogDirty();
+            } else {
+                AlloyFurnaceRecipeCatalog.invalidate();
+                recipeCatalogDirty = false;
+            }
+        }
 
-        observedClientLevel = level;
-        if (level != null) {
-            // The initial JEI registration can happen on the title screen, before a client level
-            // exists. Rebuild once after joining a world so generated compat recipes are visible.
-            AlloyFurnaceRecipeCatalog.invalidate(level);
-            AlloyFurnaceRecipeCatalog.prewarm(level);
-            JEIPlugin.refreshAlloyFurnaceRecipes();
-        } else {
-            AlloyFurnaceRecipeCatalog.invalidate();
+        // 合并点：无论脏标记来自登录、标签包还是数据包重载，都在这里统一重建一次。
+        if (recipeCatalogDirty && level != null) {
+            recipeCatalogDirty = false;
+            refreshRecipeCatalog(level);
+        }
+    }
+
+    /** 标记客户端配方目录需要在下一个 tick 重建。 */
+    private static void markRecipeCatalogDirty() {
+        recipeCatalogDirty = true;
+    }
+
+    /** 失效并重建一次目录，同时刷新依赖它的 JEI 展示与物品属性。 */
+    private static void refreshRecipeCatalog(Level level) {
+        AlloyFurnaceRecipeCatalog.invalidate(level);
+        AlloyFurnaceRecipeCatalog.prewarm(level);
+
+        JEIPlugin.refreshAlloyFurnaceRecipes();
+        if (Minecraft.getInstance().player != null) {
+            EndlessBeafItem.refreshAttackDamage(Minecraft.getInstance().player);
         }
     }
 
@@ -132,19 +149,7 @@ public class ClientSetup {
 
         // Optional recipe adapters may read synced item tags. Recipes are updated before the
         // clientbound tag packet in some login paths, so refresh the catalog after those tags bind.
-        Minecraft minecraft = Minecraft.getInstance();
-        minecraft.execute(() -> {
-            Level level = minecraft.level;
-            if (level == null) return;
-
-            AlloyFurnaceRecipeCatalog.invalidate(level);
-            AlloyFurnaceRecipeCatalog.prewarm(level);
-
-            JEIPlugin.refreshAlloyFurnaceRecipes();
-            if (minecraft.player != null) {
-                EndlessBeafItem.refreshAttackDamage(minecraft.player);
-            }
-        });
+        markRecipeCatalogDirty();
     }
 
     @SubscribeEvent

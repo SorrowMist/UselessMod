@@ -32,11 +32,13 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 
+import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 /** Converts the active vanilla villager trade tables into alloy-furnace recipes. */
 public final class VillagerTradeRecipeAdapter
@@ -45,6 +47,11 @@ public final class VillagerTradeRecipeAdapter
     private static final String RECIPE_NAMESPACE = "useless_mod";
     private static final int MIN_VILLAGER_LEVEL = 1;
     private static final int MAX_VILLAGER_LEVEL = 5;
+    // 静态合成藏宝图报价时使用的原版默认值，取自 TreasureMapForEmeralds 的常规构造参数。
+    private static final int DEFAULT_TREASURE_MAP_MAX_USES = 12;
+    private static final int DEFAULT_TREASURE_MAP_XP = 5;
+    private static final int DEFAULT_TREASURE_MAP_EMERALD_COST = 13;
+    private static final float TREASURE_MAP_PRICE_MULTIPLIER = 0.2F;
 
     private volatile Cached cached;
 
@@ -74,10 +81,33 @@ public final class VillagerTradeRecipeAdapter
     }
 
     /**
+     * 职业 / 工作站配对在运行期是稳定的：POI 注册表在启动后不再变化。
+     */
+    private static volatile List<ProfessionWorkstation> professionCache;
+
+    /**
      * Builds the profession/workstation pairs from the live registries. This also covers
      * professions added by mods whose POI is registered after the vanilla professions.
+     *
+     * <p>结果按注册表内容缓存一次：{@link #matchesMold} 与交易表签名在每次配方查找时都会用到它，
+     * 每次都重新遍历全部 POI 类型及其匹配状态是纯浪费。</p>
      */
     private static List<ProfessionWorkstation> registeredProfessions() {
+        List<ProfessionWorkstation> cachedProfessions = professionCache;
+        if (cachedProfessions != null) {
+            return cachedProfessions;
+        }
+        synchronized (VillagerTradeRecipeAdapter.class) {
+            cachedProfessions = professionCache;
+            if (cachedProfessions == null) {
+                cachedProfessions = buildProfessions();
+                professionCache = cachedProfessions;
+            }
+            return cachedProfessions;
+        }
+    }
+
+    private static List<ProfessionWorkstation> buildProfessions() {
         List<ProfessionWorkstation> professions = new ArrayList<>();
         for (VillagerProfession profession : BuiltInRegistries.VILLAGER_PROFESSION) {
             List<Item> workstations = BuiltInRegistries.POINT_OF_INTEREST_TYPE.holders()
@@ -370,6 +400,15 @@ public final class VillagerTradeRecipeAdapter
             int villagerLevel,
             VillagerTrades.ItemListing listing,
             @Nullable VillagerType villagerType) {
+        // 制图师的藏宝图报价在 getOffer 里会对整张结构分布图做一次 findNearestMapStructure。
+        // 那既昂贵（每次重建目录都要跑若干次 100 区块半径的结构搜索），又依赖世界种子与执行侧：
+        // 客户端拿到的 Level 不是 ServerLevel，原版会直接返回 null，于是客户端与服务端会生成出
+        // 不同的配方集合。这类报价改用 listing 的静态参数合成，不再查询世界。
+        MerchantOffer staticOffer = createWorldIndependentOffer(listing);
+        if (staticOffer != null) {
+            return staticOffer;
+        }
+
         Villager villager = EntityType.VILLAGER.create(level);
         if (villager == null) {
             return null;
@@ -386,8 +425,57 @@ public final class VillagerTradeRecipeAdapter
     @Nullable
     private static MerchantOffer createWanderingTraderOffer(
             Level level, VillagerTrades.ItemListing listing) {
+        // 漫游商人在实验性交易表里同样出售藏宝图，走一样的静态合成路径。
+        MerchantOffer staticOffer = createWorldIndependentOffer(listing);
+        if (staticOffer != null) {
+            return staticOffer;
+        }
+
         WanderingTrader trader = EntityType.WANDERING_TRADER.create(level);
         return trader == null ? null : listing.getOffer(trader, new MinimumRandomSource());
+    }
+
+    /**
+     * 为不查询世界也能确定的报价生成一个代表性 MerchantOffer。
+     *
+     * <p>目前覆盖 {@link VillagerTrades.TreasureMapForEmeralds}：它的 getOffer 会在 100 区块半径内
+     * 查找最近的海洋纪念碑 / 林地府邸 / 试炼密室，结果随世界种子、村民所在位置与已生成区块而变。
+     * 配方只需要「若干绿宝石 + 指南针 → 藏宝图」这一稳定的输入输出关系，因此输出使用不带 map
+     * 数据组件的藏宝图——组件里是具体坐标与地图 id，属于一次交易的运行时状态，不能进入配方定义。</p>
+     *
+     * @return 静态可构造的报价；该 listing 需要世界查询时返回 null
+     */
+    @Nullable
+    private static MerchantOffer createWorldIndependentOffer(VillagerTrades.ItemListing listing) {
+        if (!(listing instanceof VillagerTrades.TreasureMapForEmeralds)) {
+            return null;
+        }
+        // 即使读不到字段也必须给出静态报价：回退到 getOffer 会重新引入结构遍历，
+        // 宁可让价格取默认值，也不能让它回到查询世界的那条路径上。
+        Integer emeraldCost = readIntField(listing, "emeraldCost");
+        Integer maxUses = readIntField(listing, "maxUses");
+        Integer villagerXp = readIntField(listing, "villagerXp");
+        return new MerchantOffer(
+                new ItemCost(Items.EMERALD,
+                        emeraldCost == null ? DEFAULT_TREASURE_MAP_EMERALD_COST : emeraldCost),
+                Optional.of(new ItemCost(Items.COMPASS)),
+                new ItemStack(Items.FILLED_MAP),
+                maxUses == null ? DEFAULT_TREASURE_MAP_MAX_USES : maxUses,
+                villagerXp == null ? DEFAULT_TREASURE_MAP_XP : villagerXp,
+                TREASURE_MAP_PRICE_MULTIPLIER);
+    }
+
+    /** 读取原版交易 listing 的私有 int 字段；字段名或类型随版本变化时返回 null 而不是中断构建。 */
+    @Nullable
+    private static Integer readIntField(Object target, String name) {
+        try {
+            Field field = target.getClass().getDeclaredField(name);
+            field.setAccessible(true);
+            return field.getInt(target);
+        } catch (ReflectiveOperationException | RuntimeException exception) {
+            LOGGER.debug("无法读取 {} 的字段 {}", target.getClass().getName(), name, exception);
+            return null;
+        }
     }
 
     private static int tradeTableSignature(boolean experimental) {

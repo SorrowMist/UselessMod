@@ -23,6 +23,7 @@ import net.neoforged.neoforge.fluids.FluidStack;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -514,7 +515,9 @@ public final class AlloyFurnaceRecipeCatalog {
             recipes.add(new CollectedRecipe(holder.value(), RecipeSourceIds.CORE));
         }
 
-        Collection<RecipeHolder<?>> sourceRecipes = level.getRecipeManager().getRecipes();
+        // 先把 adapter 分成「合成配方」与「转换配方」两类。转换类只在这里登记，稍后对全表做单次遍历，
+        // 避免每个 adapter 都把整张配方表扫一遍（adapter 数量 × 全服配方数）。
+        List<AdapterSource> converting = new ArrayList<>();
         for (com.sorrowmist.useless.api.recipe.IRecipeAdapter<?> adapter : AlloyFurnaceRecipeManager.getInstance().getRegisteredAdapters()) {
             if (adapter.getClass().getPackageName().contains(".ae.ae2lt")) continue;
             String sourceId = AlloyFurnaceRecipeManager.getInstance().getAdapterSourceId(adapter);
@@ -527,8 +530,9 @@ public final class AlloyFurnaceRecipeCatalog {
                 continue;
             }
             collectGenerated(adapter, sourceId, level, recipes);
-            collectConverted(adapter, sourceId, sourceRecipes, level, recipes);
+            converting.add(new AdapterSource(adapter, sourceId));
         }
+        collectConverted(converting, level.getRecipeManager().getRecipes(), level, recipes);
         if (RecipeAdapterCompatRegistry.isLoaded(RecipeAdapterCompatRegistry.AE2LT)) {
             AELightningTechCompatLoader.getJeiRecipes(level.getRecipeManager(), level)
                     .forEach(recipe -> recipes.add(new CollectedRecipe(recipe, RecipeSourceIds.AE2LT)));
@@ -582,14 +586,57 @@ public final class AlloyFurnaceRecipeCatalog {
         return snapshot;
     }
 
-    private static void collectConverted(com.sorrowmist.useless.api.recipe.IRecipeAdapter<?> adapter, String sourceId,
-                                         Collection<RecipeHolder<?>> holders, Level level,
-                                         List<CollectedRecipe> output) {
-        Class<?> recipeClass = adapter.getRecipeClass();
+    /** 一个待做配方转换的 adapter 及其来源标识。 */
+    private record AdapterSource(com.sorrowmist.useless.api.recipe.IRecipeAdapter<?> adapter, String sourceId) {
+    }
+
+    /**
+     * 单次遍历全部源配方，按配方类分派给对应的 adapter。
+     *
+     * <p>这里刻意反过来组织循环：外层是配方、内层是按类索引的 adapter 列表。原先每个 adapter 都
+     * 自己扫一遍 {@code holders}，复杂度是 adapter 数 × 全服配方数；整合包里 adapter 有数十个、
+     * 配方上万条时这一项会主导整个目录构建耗时。</p>
+     */
+    private static void collectConverted(List<AdapterSource> sources, Collection<RecipeHolder<?>> holders,
+                                         Level level, List<CollectedRecipe> output) {
+        if (sources.isEmpty() || holders.isEmpty()) return;
+
+        // 同一个具体配方类只需解析一次「哪些 adapter 能处理它」。配方类型数远小于配方条数，
+        // 因此类型判断的总次数从「配方条数 × adapter 数」降到「配方类型数 × adapter 数」。
+        Map<Class<?>, List<AdapterSource>> resolvedByRecipeClass = new HashMap<>();
         for (RecipeHolder<?> holder : holders) {
-            if (!recipeClass.isInstance(holder.value())) continue;
-            RecipeConversionUtils.convertAll(adapter, holder, level)
-                    .forEach(recipe -> output.add(new CollectedRecipe(recipe, sourceId)));
+            Object value = holder.value();
+            if (value == null) continue;
+            List<AdapterSource> matched = resolvedByRecipeClass.computeIfAbsent(
+                    value.getClass(), recipeClass -> resolveAdapters(sources, recipeClass));
+            if (matched.isEmpty()) continue;
+            convertWith(matched, holder, level, output);
+        }
+    }
+
+    /**
+     * 返回所有能处理 {@code recipeClass} 的 adapter。
+     *
+     * <p>按 {@code sources} 的注册顺序返回，与原先「每个 adapter 各扫一遍全表」时的执行次序一致；
+     * 同一个配方被多个 adapter 命中时，转换结果的先后顺序因此保持不变。</p>
+     */
+    private static List<AdapterSource> resolveAdapters(List<AdapterSource> sources, Class<?> recipeClass) {
+        List<AdapterSource> matched = new ArrayList<>();
+        for (AdapterSource source : sources) {
+            Class<?> declared = source.adapter().getRecipeClass();
+            // adapter 声明的源配方类可能是抽象基类，实际配方是其子类，所以要按可赋值方向判断。
+            if (declared != null && declared.isAssignableFrom(recipeClass)) {
+                matched.add(source);
+            }
+        }
+        return List.copyOf(matched);
+    }
+
+    private static void convertWith(List<AdapterSource> sources, RecipeHolder<?> holder, Level level,
+                                    List<CollectedRecipe> output) {
+        for (AdapterSource source : sources) {
+            RecipeConversionUtils.convertAll(source.adapter(), holder, level)
+                    .forEach(recipe -> output.add(new CollectedRecipe(recipe, source.sourceId())));
         }
     }
 

@@ -3,6 +3,7 @@ package com.sorrowmist.useless.core.common;
 import com.mojang.blaze3d.platform.InputConstants;
 import net.minecraft.client.KeyMapping;
 import net.neoforged.neoforge.client.settings.KeyConflictContext;
+import net.neoforged.neoforge.client.settings.KeyModifier;
 import net.neoforged.neoforge.common.util.Lazy;
 import org.lwjgl.glfw.GLFW;
 
@@ -112,6 +113,19 @@ public class KeyBindings {
             KeyConflictContext.IN_GAME,
             InputConstants.Type.KEYSYM,
             GLFW.GLFW_KEY_L,
+            CATEGORY
+    ));
+    // 短距传送：真正的组合键，默认 Shift + 鼠标右键。
+    // NeoForge 的 KeyModifier 会在按键分发阶段就按修饰键分桶（见 KeyMappingLookup.getAll），
+    // 不按住 Shift 时 clickCount 根本不会增加，因此无需在代码里再判断 Shift。
+    // 玩家可在按键设置里单独修改修饰键与主键，两者都会被 Options 持久化。
+    private static final String SHORT_TELEPORT = "key.useless_mod.short_teleport";
+    public static final Lazy<KeyMapping> SHORT_TELEPORT_KEY = Lazy.of(() -> new KeyMapping(
+            SHORT_TELEPORT,
+            KeyConflictContext.IN_GAME,
+            KeyModifier.SHIFT,
+            InputConstants.Type.MOUSE,
+            GLFW.GLFW_MOUSE_BUTTON_RIGHT,
             CATEGORY
     ));
 }

@@ -714,6 +714,7 @@
   "key.useless_mod.toggle_crop_harvest": "Toggle Quick Harvest",
   "key.useless_mod.toggle_shears": "Toggle Shears",
   "key.useless_mod.toggle_flint_and_steel": "Toggle Flint and Steel",
+  "key.useless_mod.short_teleport": "Short-Range Teleport",
   "tooltip.useless_mod.fast_break_plastic": "Shift + Right Click to quickly break plastic blocks",
   "tooltip.useless_mod.ae_storage_priority_bind_hint": "§aShift+Right-click§rME Wireless Access Point to bind",
   "tooltip.useless_mod.ae_network_connect_hint": "In §9AE Connection Mode§r, right-click a machine with an AE node to toggle its link; linked machines are outlined and ignore channel limits",

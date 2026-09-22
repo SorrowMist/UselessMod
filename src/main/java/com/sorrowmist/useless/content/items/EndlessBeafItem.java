@@ -273,11 +273,50 @@ public class EndlessBeafItem extends TieredItem {
                 stack, lookup, Enchantments.LOOTING, ConfigManager.getLootingLevel());
     }
 
+    /**
+     * 右键触发的传送入口。
+     *
+     * <p>短距闪现已改由独立快捷键驱动（见 {@link #performShortTeleport}），这里只剩不潜行时的
+     * Ender IO 锚点传送；潜行时直接放行，避免与快捷键重复触发同一次传送。</p>
+     */
     public static InteractionResult tryTeleport(Level level, Player player, ItemStack stack) {
+        if (player.isShiftKeyDown()) {
+            return InteractionResult.PASS;
+        }
         if (!isTeleportEnabled(stack) || player.getCooldowns().isOnCooldown(stack.getItem())) {
             return InteractionResult.PASS;
         }
-        InteractionResult result = BeefTeleportHandler.tryTeleport(
+        InteractionResult result = BeefTeleportHandler.tryAnchorTeleport(
+                level,
+                player,
+                ModList.get().isLoaded(EnderIOTravelCompat.MOD_ID));
+        if (result != InteractionResult.PASS) {
+            player.getCooldowns().addCooldown(stack.getItem(), TELEPORT_COOLDOWN_TICKS);
+        }
+        return result;
+    }
+
+    /**
+     * 快捷键触发的短距闪现入口（服务端执行）。
+     *
+     * <p>按键包只上报「按下了」，落点由服务端自行计算与校验，客户端不参与目的地判定。</p>
+     */
+    public static void performShortTeleport(ServerPlayer player) {
+        ItemStack stack = player.getMainHandItem();
+        if (!(stack.getItem() instanceof EndlessBeafItem)) {
+            return;
+        }
+        tryShortTeleport(player.level(), player, stack);
+    }
+
+    /**
+     * 执行一次短距闪现，成功时套用物品冷却。
+     */
+    public static InteractionResult tryShortTeleport(Level level, Player player, ItemStack stack) {
+        if (!isTeleportEnabled(stack) || player.getCooldowns().isOnCooldown(stack.getItem())) {
+            return InteractionResult.PASS;
+        }
+        InteractionResult result = BeefTeleportHandler.tryShortTeleport(
                 level,
                 player,
                 ModList.get().isLoaded(EnderIOTravelCompat.MOD_ID));

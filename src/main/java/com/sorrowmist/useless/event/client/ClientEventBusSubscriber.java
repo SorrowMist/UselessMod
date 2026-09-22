@@ -11,6 +11,7 @@ import com.sorrowmist.useless.network.EnchantmentSwitchPacket;
 import com.sorrowmist.useless.network.ForceBreakKeyPacket;
 import com.sorrowmist.useless.network.ModeTogglePacket;
 import com.sorrowmist.useless.network.TabKeyPressedPacket;
+import com.sorrowmist.useless.network.TeleportKeyPacket;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.resources.ResourceLocation;
@@ -46,6 +47,9 @@ public class ClientEventBusSubscriber {
         // 触发按键
         event.register(KeyBindings.TRIGGER_CHAIN_MINING_KEY.get());
         event.register(KeyBindings.TRIGGER_FORCE_MINING_KEY.get());
+
+        // 短距传送（默认 Shift + 鼠标右键，组合键由 KeyModifier 匹配）
+        event.register(KeyBindings.SHORT_TELEPORT_KEY.get());
 
         // UI
         event.register(KeyBindings.SWITCH_MODE_WHEEL_KEY.get());
@@ -153,6 +157,17 @@ public class ClientEventBusSubscriber {
                 // R键按下，发送强制破坏请求，同时传入当前Tab键状态
                 boolean tabPressed = KeyBindings.TRIGGER_CHAIN_MINING_KEY.get().isDown();
                 PacketDistributor.sendToServer(new ForceBreakKeyPacket(tabPressed));
+            }
+        }
+
+        // 短距传送：默认 Shift + 鼠标右键的组合键。
+        // KeyModifier.SHIFT 已在 NeoForge 按键分发层分桶，不按住 Shift 时
+        // consumeClick() 不会返回 true，因此这里无需再判断 Shift。
+        // 用 consumeClick() 而非 isDown()，保证按住右键只触发一次。
+        if (KeyBindings.SHORT_TELEPORT_KEY.get().consumeClick()) {
+            ItemStack mainHandItem = player.getMainHandItem();
+            if (mainHandItem.getItem() instanceof EndlessBeafItem) {
+                PacketDistributor.sendToServer(new TeleportKeyPacket());
             }
         }
     }

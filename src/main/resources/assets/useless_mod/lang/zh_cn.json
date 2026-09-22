@@ -715,6 +715,7 @@
   "key.useless_mod.toggle_crop_harvest": "顺手收菜开关",
   "key.useless_mod.toggle_shears": "剪刀功能开关",
   "key.useless_mod.toggle_flint_and_steel": "打火石功能开关",
+  "key.useless_mod.short_teleport": "短距传送",
   "tooltip.useless_mod.festive_affix": "5% 概率在击杀时触发战利品大爆发",
   "tooltip.useless_mod.auto_collect": "自带磁力功能",
   "tooltip.useless_mod.time_acceleration_mode": "时间加速模式",

@@ -35,13 +35,22 @@ final class BeefTeleportHandler {
     private BeefTeleportHandler() {
     }
 
-    static InteractionResult tryTeleport(Level level, Player player, boolean enderIoLoaded) {
-        if (player.isShiftKeyDown()) {
-            return enderIoLoaded
-                    ? EnderIOTravelCompat.tryShortTeleport(level, player)
-                    : tryShortTeleport(level, player);
-        }
+    /**
+     * 短距闪现（24 格 blink）。
+     *
+     * <p>潜行判定已经上移到快捷键路径，这里不再读取潜行状态：闪现由独立快捷键触发，
+     * 服务端收到按键包后直接调用本方法。</p>
+     */
+    static InteractionResult tryShortTeleport(Level level, Player player, boolean enderIoLoaded) {
+        return enderIoLoaded
+                ? EnderIOTravelCompat.tryShortTeleport(level, player)
+                : tryShortTeleport(level, player);
+    }
 
+    /**
+     * 锚点传送（不潜行时的右键传送），只在装载 Ender IO 时可用。
+     */
+    static InteractionResult tryAnchorTeleport(Level level, Player player, boolean enderIoLoaded) {
         return enderIoLoaded
                 ? EnderIOTravelCompat.tryAnchorTeleport(level, player)
                 : InteractionResult.PASS;

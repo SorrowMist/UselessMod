@@ -29,6 +29,7 @@ import com.sorrowmist.useless.network.OreGeneratorSettingsPacket;
 import com.sorrowmist.useless.network.RedstoneControlPacket;
 import com.sorrowmist.useless.network.SelectOmniversalPatternRecipePacket;
 import com.sorrowmist.useless.network.TabKeyPressedPacket;
+import com.sorrowmist.useless.network.TeleportKeyPacket;
 import com.sorrowmist.useless.network.TankClearPacket;
 import com.sorrowmist.useless.network.ToolTypeModeSwitchPacket;
 import com.sorrowmist.useless.network.ConstructionWandCorePacket;
@@ -78,6 +79,9 @@ public class ModNetwork {
         );
         registrar.playToServer(TabKeyPressedPacket.TYPE, TabKeyPressedPacket.STREAM_CODEC,
                                TabKeyPressedPacket::handle
+        );
+        registrar.playToServer(TeleportKeyPacket.TYPE, TeleportKeyPacket.STREAM_CODEC,
+                               TeleportKeyPacket::handle
         );
         registrar.playToServer(ModeTogglePacket.TYPE, ModeTogglePacket.STREAM_CODEC,
                                ModeTogglePacket::handle

@@ -45,7 +45,6 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.WeakHashMap;
 
 /** Generates item-only recipes for the dynamic alchemist-cauldron interactions. */
 public final class AlchemistCauldronDynamicRecipeAdapter
@@ -58,9 +57,9 @@ public final class AlchemistCauldronDynamicRecipeAdapter
             Items.LINGERING_POTION
     };
 
-    /** The integrated server and client can expose different potion-brewing registries. */
-    private final Map<PotionBrewing, Map<Boolean, List<RecipeHolder<DynamicRecipe>>>> recipeCache =
-            new WeakHashMap<>();
+    private volatile PotionBrewing cachedBrewing;
+    private volatile boolean cachedCauldronBrewing;
+    private volatile List<RecipeHolder<DynamicRecipe>> cachedRecipes = List.of();
 
     @Override
     public String sourceId() {
@@ -78,11 +77,6 @@ public final class AlchemistCauldronDynamicRecipeAdapter
     }
 
     @Override
-    public void prepareGeneratedRecipes(Level level) {
-        getGeneratedRecipes(level);
-    }
-
-    @Override
     public List<RecipeHolder<DynamicRecipe>> getGeneratedRecipes(Level level) {
         if (level == null) {
             return List.of();
@@ -90,11 +84,17 @@ public final class AlchemistCauldronDynamicRecipeAdapter
 
         PotionBrewing brewing = level.potionBrewing();
         boolean allowCauldronBrewing = ServerConfigs.ALLOW_CAULDRON_BREWING.get();
+        if (cachedBrewing == brewing && cachedCauldronBrewing == allowCauldronBrewing) {
+            return cachedRecipes;
+        }
+
         synchronized (this) {
-            Map<Boolean, List<RecipeHolder<DynamicRecipe>>> variants = recipeCache.computeIfAbsent(
-                    brewing, ignored -> new LinkedHashMap<>());
-            return variants.computeIfAbsent(
-                    allowCauldronBrewing, enabled -> createRecipes(brewing, enabled));
+            if (cachedBrewing != brewing || cachedCauldronBrewing != allowCauldronBrewing) {
+                cachedRecipes = createRecipes(brewing, allowCauldronBrewing);
+                cachedBrewing = brewing;
+                cachedCauldronBrewing = allowCauldronBrewing;
+            }
+            return cachedRecipes;
         }
     }
 

@@ -5,27 +5,24 @@ import appeng.api.stacks.AEFluidKey;
 import appeng.api.stacks.AEItemKey;
 import appeng.api.stacks.AEKey;
 import appeng.api.stacks.GenericStack;
-import com.mojang.logging.LogUtils;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.AdvancedAlloyFurnacePatternResolver;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.DynamicComponentPattern;
+import com.sorrowmist.useless.core.component.OmniversalPatternData;
 import com.sorrowmist.useless.content.recipe.adapters.RecipeAdapterCompatRegistry;
 import com.sorrowmist.useless.content.recipe.adapters.ae.ae2cs.CrystalGrowthRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.ae.ae2lt.AELightningTechCompatLoader;
 import com.sorrowmist.useless.content.recipe.adapters.mysticalagriculture.SeedEssenceRecipeAdapter;
-import com.sorrowmist.useless.core.component.OmniversalPatternData;
 import com.sorrowmist.useless.init.ModRecipeTypes;
+import com.mojang.logging.LogUtils;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.crafting.RecipeHolder;
 import net.minecraft.world.level.Level;
 import net.neoforged.neoforge.fluids.FluidStack;
-import org.slf4j.Logger;
 
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.Comparator;
-import java.util.ConcurrentModificationException;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -41,6 +38,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
+import org.slf4j.Logger;
 
 /** Server/client recipe directory used by JEI, the encoder and pattern validation. */
 public final class AlloyFurnaceRecipeCatalog {
@@ -55,14 +53,6 @@ public final class AlloyFurnaceRecipeCatalog {
     private static final Map<Object, Long> GENERATIONS = new WeakHashMap<>();
     private static final AtomicInteger CURRENT_RECIPE_COUNT = new AtomicInteger();
     private static final AtomicLong GENERATION = new AtomicLong();
-    /**
-     * 已排队或正在后台构建的 cacheKey，用于合并重复的预热请求。
-     *
-     * <p>服务端启动与数据包重载会在极短时间内各请求一次预热，而目录构建是几十秒的纯 CPU
-     * 工作。重复入队不仅让后一次在构建锁上白等，还常伴随一次失效，把已完成成果整份丢弃重算。</p>
-     */
-    private static final Set<Object> BUILD_PENDING =
-            Collections.synchronizedSet(Collections.newSetFromMap(new WeakHashMap<>()));
     /**
      * 后台目录构建器。目录构建是纯 CPU 密集工作（数万条配方的转换与指纹计算），若放在世界
      * 加载的关键路径上会直接阻塞玩家进入（实测服务端启动那次耗时 20 秒）。
@@ -101,20 +91,6 @@ public final class AlloyFurnaceRecipeCatalog {
         return snapshot(level).bySource.getOrDefault(normalizedSource, List.of());
     }
 
-    /**
-     * 只在快照已就绪时返回全部条目，绝不触发构建；未就绪返回空列表。
-     *
-     * <p>供「不能等待、也不该负责构建」的调用方使用，典型是 JEI 的初始配方注册：它跑在客户端
-     * 渲染线程上，若在这里同步构建，数万条配方的转换与指纹计算会整段卡在加载界面上。改为读到
-     * 空列表就先注册空类别，等目录在后台建好后再由 {@code JEIPlugin.refreshAlloyFurnaceRecipes}
-     * 增量补齐——JEI 支持后续 {@code addRecipes}，因此不需要在注册阶段拿到完整列表。</p>
-     */
-    public static List<Entry> entriesIfReady(Level level) {
-        if (level == null) return List.of();
-        Snapshot snapshot = snapshotIfReady(level);
-        return snapshot == null ? List.of() : snapshot.entries;
-    }
-
     /** Builds and publishes the immutable current-generation snapshot synchronously. */
     public static void prewarm(Level level) {
         if (level != null) snapshot(level);
@@ -142,41 +118,14 @@ public final class AlloyFurnaceRecipeCatalog {
      */
     public static void prewarmAsync(Level level) {
         if (level == null) return;
-        Object cacheKey = level.getRecipeManager();
-        // 同一份目录只允许一个预热在途。
-        //
-        // 服务端启动（onServerStarted）与数据包重载（onAddReloadListener）会在同一瞬间各请求一次，
-        // 而这份目录要跑几十秒。第二次入队除了在构建锁上白等，更常见的是它自带的 invalidate 会把
-        // 第一次正在跑的成果整份作废，于是同一份目录被从头算两遍。构建循环自身已经处理了「构建期间
-        // 世代变了」的情况，因此跳过重复入队不会漏建。
-        if (!BUILD_PENDING.add(cacheKey)) return;
-        prepareGeneratedRecipes(level);
         BUILD_EXECUTOR.execute(() -> {
             try {
                 snapshot(level);
             } catch (RuntimeException exception) {
                 LOGGER.warn("Background alloy-furnace recipe catalog build failed; "
                         + "it will be rebuilt on demand", exception);
-            } finally {
-                BUILD_PENDING.remove(cacheKey);
             }
         });
-    }
-
-    /**
-     * Give adapters a game-thread handoff point for runtime data that cannot be traversed safely
-     * by the catalog worker. The expensive conversion and fingerprint pass remains asynchronous.
-     */
-    private static void prepareGeneratedRecipes(Level level) {
-        for (com.sorrowmist.useless.api.recipe.IRecipeAdapter<?> adapter
-                : AlloyFurnaceRecipeManager.getInstance().getRegisteredAdapters()) {
-            try {
-                adapter.prepareGeneratedRecipes(level);
-            } catch (RuntimeException exception) {
-                LOGGER.warn("Failed to prepare generated recipes: adapter={}",
-                        adapter.getClass().getName(), exception);
-            }
-        }
     }
 
     public static List<AdvancedAlloyFurnaceRecipe> recipes(Level level) {
@@ -570,16 +519,7 @@ public final class AlloyFurnaceRecipeCatalog {
                 }
                 Snapshot built = build(level, generation);
                 synchronized (CACHE) {
-                    long current = currentGenerationLocked(cacheKey);
-                    if (current != generation) {
-                        // 构建期间本世代被作废：这份成果只能丢弃重算。该日志是排查「同一份目录被
-                        // 接连构建多次」的关键证据——正常情况不应出现；一旦出现，就说明有代码在
-                        // 构建窗口内触发了失效，而重算结果往往与丢弃的那份逐字相同。
-                        LOGGER.info("Discarding alloy-furnace recipe catalog built for generation {} "
-                                + "because it was invalidated mid-build (now generation {}); rebuilding",
-                                generation, current);
-                        continue;
-                    }
+                    if (currentGenerationLocked(cacheKey) != generation) continue;
                     cached = CACHE.get(cacheKey);
                     if (cached != null && cached.generation == generation) {
                         return cached;
@@ -710,20 +650,10 @@ public final class AlloyFurnaceRecipeCatalog {
                     recipe.id(), AlloyFurnaceRecipeFingerprint.create(recipe, level.registryAccess()));
             return new FingerprintedRecipe(identity, recipe, collected.sourceId());
         } catch (RuntimeException exception) {
-            String recipeId;
-            try {
-                recipeId = String.valueOf(recipe.id());
-            } catch (RuntimeException idFailure) {
-                recipeId = "<unreadable:" + idFailure.getClass().getName() + ">";
-            }
             LOGGER.warn("Skipping alloy-furnace recipe with an unencodable identity: {} ({})",
-                    recipeId, exception.getMessage());
+                    recipe.id(), exception.getMessage());
             if (LOGGER.isDebugEnabled()) {
-                try {
-                    LOGGER.debug("Unencodable alloy-furnace recipe contents: {}", recipe);
-                } catch (RuntimeException ignored) {
-                    LOGGER.debug("Unencodable alloy-furnace recipe contents could not be formatted");
-                }
+                LOGGER.debug("Unencodable alloy-furnace recipe contents: {}", recipe);
             }
             return null;
         }
@@ -784,10 +714,6 @@ public final class AlloyFurnaceRecipeCatalog {
         List<? extends RecipeHolder<?>> generated;
         try {
             generated = adapter.getGeneratedRecipes(level);
-        } catch (ConcurrentModificationException exception) {
-            // A transient concurrent read must fail the build, rather than publishing a catalog
-            // that silently omits every generated recipe owned by this adapter.
-            throw exception;
         } catch (RuntimeException exception) {
             LOGGER.warn("Skipping generated recipes: adapter={}", adapter.getClass().getName(), exception);
             return;

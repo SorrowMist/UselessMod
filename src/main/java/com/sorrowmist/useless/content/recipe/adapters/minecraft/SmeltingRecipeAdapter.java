@@ -49,13 +49,6 @@ public class SmeltingRecipeAdapter implements IRecipeAdapter<AbstractCookingReci
     }
 
     @Override
-    public String registrationKey() {
-        if (recipeType == RecipeType.BLASTING) return "blasting";
-        if (recipeType == RecipeType.SMOKING) return "smoking";
-        return "smelting";
-    }
-
-    @Override
     @Nullable
     public AdvancedAlloyFurnaceRecipe convert(RecipeHolder<AbstractCookingRecipe> holder, Level level) {
         if (holder == null) return null;

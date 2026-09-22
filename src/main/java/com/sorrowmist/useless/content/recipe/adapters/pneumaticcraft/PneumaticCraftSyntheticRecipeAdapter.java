@@ -57,11 +57,6 @@ public final class PneumaticCraftSyntheticRecipeAdapter
     }
 
     @Override
-    public String registrationKey() {
-        return kind.name();
-    }
-
-    @Override
     public ItemStack getMoldItem() {
         return new ItemStack(kind == Kind.ETCHING
                 ? ModBlocks.ETCHING_TANK.get()

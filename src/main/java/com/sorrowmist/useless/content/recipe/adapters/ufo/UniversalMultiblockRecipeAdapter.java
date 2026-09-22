@@ -34,11 +34,6 @@ public final class UniversalMultiblockRecipeAdapter
     }
 
     @Override
-    public String registrationKey() {
-        return machine.name();
-    }
-
-    @Override
     protected RecipeType<UniversalMultiblockRecipe> recipeType() {
         return ModRecipes.UNIVERSAL_MULTIBLOCK_TYPE.get();
     }

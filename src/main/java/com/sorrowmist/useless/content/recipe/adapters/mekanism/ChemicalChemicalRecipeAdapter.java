@@ -58,11 +58,6 @@ public final class ChemicalChemicalRecipeAdapter implements IRecipeAdapter<Chemi
     }
 
     @Override
-    public String registrationKey() {
-        return name;
-    }
-
-    @Override
     public @Nullable ItemStack getMoldItem() {
         return mold.isEmpty() ? null : mold.copy();
     }

@@ -569,7 +569,7 @@ public class EventHandler {
     public static void onPlayerLoggedOut(PlayerEvent.PlayerLoggedOutEvent event) {
         BEEF_PROTECTED_PLAYERS.remove(event.getEntity().getUUID());
         BEEF_ADVANCED_STEALTH_PLAYERS.remove(event.getEntity().getUUID());
-        // 玩家若在创造模式下离线，飞行待重发标记不会被消费，这里顺手清掉
+        // 玩家在创造模式下离线时，飞行待重发标记不会被消费，故在此一并清除
         PENDING_FLIGHT_RESYNC.remove(event.getEntity().getUUID());
         if (event.getEntity() instanceof ServerPlayer player) {
             GrassWandDropHandler.onPlayerLoggedOut(player);
@@ -662,8 +662,8 @@ public class EventHandler {
         GrassWandDropHandler.clearCache();
         UselessDimensionConfigManager.applyAll(event.getServer());
         AlloyFurnaceRecipeManager.getInstance().buildIndex(event.getServer().overworld());
-        // 目录构建是数万条配方的 CPU 密集工作（实测 20 秒），同步执行会直接卡住世界加载。
-        // 放到后台构建：查询路径读的是 snapshotIfReady，未就绪只会返回空，不会读到半成品。
+        // 目录构建是数万条配方的 CPU 密集工作（实测耗时 20 秒），同步执行会阻塞世界加载。
+        // 改为后台构建：查询路径读取 snapshotIfReady，未就绪时返回空，不会读到半成品。
         AlloyFurnaceRecipeCatalog.prewarmAsync(event.getServer().overworld());
         event.getServer().getPlayerList().getPlayers().forEach(EndlessBeafItem::refreshAttackDamage);
     }

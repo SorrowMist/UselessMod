@@ -152,6 +152,7 @@ public class ConfigManager {
     private static final ModConfigSpec.BooleanValue ENABLE_IRONS_SPELLBOOKS_RECIPE_CONVERSION;
     private static final ModConfigSpec.BooleanValue ENABLE_HOSTILE_NETWORKS_RECIPE_CONVERSION;
     private static final ModConfigSpec.BooleanValue ENABLE_APOTHIC_FLUX_RECIPE_CONVERSION;
+    private static final ModConfigSpec.BooleanValue ENABLE_FLUX_NETWORKS_RECIPE_CONVERSION;
     private static final ModConfigSpec.BooleanValue ENABLE_JUSTDIRETHINGS_RECIPE_CONVERSION;
     private static final ModConfigSpec.BooleanValue ENABLE_JDTE_RECIPE_CONVERSION;
     private static final Map<String, ModConfigSpec.BooleanValue> RECIPE_CONVERSION_OPTIONS;
@@ -652,6 +653,8 @@ public class ConfigManager {
                 "enable_actually_additions_recipe_conversion", true);
         ENABLE_APOTHIC_FLUX_RECIPE_CONVERSION = defineRecipeConversionOption(
                 "enable_apothic_flux_recipe_conversion", true);
+        ENABLE_FLUX_NETWORKS_RECIPE_CONVERSION = defineRecipeConversionOption(
+                "enable_fluxnetworks_recipe_conversion", true);
         ENABLE_ARS_NOUVEAU_RECIPE_CONVERSION = defineRecipeConversionOption(
                 "enable_ars_nouveau_recipe_conversion", true);
         ENABLE_AVARITIA_RECIPE_CONVERSION = defineRecipeConversionOption(
@@ -727,6 +730,7 @@ public class ConfigManager {
                 Map.entry("extradelight", ENABLE_EXTRA_DELIGHT_RECIPE_CONVERSION),
                 Map.entry("farmersdelight", ENABLE_FARMERS_DELIGHT_RECIPE_CONVERSION),
                 Map.entry("forbidden_arcanus", ENABLE_FORBIDDEN_ARCANUS_RECIPE_CONVERSION),
+                Map.entry("fluxnetworks", ENABLE_FLUX_NETWORKS_RECIPE_CONVERSION),
                 Map.entry("hostilenetworks", ENABLE_HOSTILE_NETWORKS_RECIPE_CONVERSION),
                 Map.entry("immersiveengineering", ENABLE_IMMERSIVE_ENGINEERING_RECIPE_CONVERSION),
                 Map.entry("industrialforegoing", ENABLE_INDUSTRIAL_FOREGOING_RECIPE_CONVERSION),

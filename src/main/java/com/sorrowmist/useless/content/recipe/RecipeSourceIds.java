@@ -59,6 +59,8 @@ public final class RecipeSourceIds {
     public static final String IRONS_SPELLBOOKS = "irons_spellbooks";
     public static final String HOSTILE_NETWORKS = "hostilenetworks";
     public static final String APOTHIC_FLUX = "apothic_flux";
+    /** Flux Networks 硬编码的通量粉尘转化机制。 */
+    public static final String FLUX_NETWORKS = "fluxnetworks";
 
     private RecipeSourceIds() {
     }
@@ -118,6 +120,7 @@ public final class RecipeSourceIds {
         if (name.endsWith(".ironsspellbooks")) return IRONS_SPELLBOOKS;
         if (name.endsWith(".hostilenetworks")) return HOSTILE_NETWORKS;
         if (name.endsWith(".apothicflux")) return APOTHIC_FLUX;
+        if (name.endsWith(".fluxnetworks")) return FLUX_NETWORKS;
         if (name.endsWith(".mekanism") || name.endsWith(".generators")) return MEKANISM;
         return UNKNOWN;
     }

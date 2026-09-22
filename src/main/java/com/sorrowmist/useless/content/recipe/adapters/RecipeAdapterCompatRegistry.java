@@ -83,6 +83,7 @@ import com.sorrowmist.useless.content.recipe.adapters.productivebees.BeeConversi
 import com.sorrowmist.useless.content.recipe.adapters.productivebees.BeeFishingRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.productivebees.CentrifugeRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.summoningrituals.SummoningRitualsAltarRecipeAdapter;
+import com.sorrowmist.useless.content.recipe.adapters.fluxnetworks.FluxNetworksRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.hostilenetworks.HostileNetworksRecipeAdapter;
 import com.sorrowmist.useless.core.config.ConfigManager;
 import net.minecraft.world.item.Items;
@@ -150,6 +151,7 @@ public final class RecipeAdapterCompatRegistry {
     public static final String IRONS_SPELLBOOKS = RecipeSourceIds.IRONS_SPELLBOOKS;
     public static final String HOSTILE_NETWORKS = RecipeSourceIds.HOSTILE_NETWORKS;
     public static final String APOTHIC_FLUX = RecipeSourceIds.APOTHIC_FLUX;
+    public static final String FLUX_NETWORKS = RecipeSourceIds.FLUX_NETWORKS;
 
     private static final List<CompatEntry> ENTRIES = List.of(
             new CompatEntry(null, RecipeAdapterCompatRegistry::registerMinecraft),
@@ -201,7 +203,8 @@ public final class RecipeAdapterCompatRegistry {
             new CompatEntry(JUSTDIRETHINGS, RecipeAdapterCompatRegistry::registerJustDireThings),
             new CompatEntry(IRONS_SPELLBOOKS, RecipeAdapterCompatRegistry::registerIronsSpellbooks),
             new CompatEntry(HOSTILE_NETWORKS, RecipeAdapterCompatRegistry::registerHostileNetworks),
-            new CompatEntry(APOTHIC_FLUX, RecipeAdapterCompatRegistry::registerApothicFlux)
+            new CompatEntry(APOTHIC_FLUX, RecipeAdapterCompatRegistry::registerApothicFlux),
+            new CompatEntry(FLUX_NETWORKS, RecipeAdapterCompatRegistry::registerFluxNetworks)
     );
 
     private RecipeAdapterCompatRegistry() {}
@@ -539,6 +542,10 @@ public final class RecipeAdapterCompatRegistry {
     private static void registerApothicFlux() {
         invokeOptionalLoader(
                 "com.sorrowmist.useless.compat.apothicflux.ApothicFluxRecipeCompatLoader");
+    }
+
+    private static void registerFluxNetworks() {
+        register(new FluxNetworksRecipeAdapter());
     }
 
     private record CompatEntry(@Nullable String modId, Runnable registerAction) {}

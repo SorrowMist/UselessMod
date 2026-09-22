@@ -28,9 +28,17 @@ public final class OmniversalPatternMoldSearchTerms {
      * 所以它<b>不再是函数接口</b>，不能再用方法引用注册，必须给出实现类型。</p>
      */
     public static final class Contributor implements TrinityPatternSearchTermContributor {
+        /**
+         * {@inheritDoc}
+         *
+         * <p>必须经由 {@link OmniversalPatternMoldSearchTerms#searchTerms(ItemStack)} 限定调用外层类的静态方法。
+         * 接口自带的同名 default 方法返回空列表，而继承来的实例方法在本类作用域内优先于外层类的静态方法；
+         * 若以非限定名调用，编译为虚调用并静默落入该空实现，模具名候选将恒为空。</p>
+         */
         @Override
         public ObjectList<String> searchTermsFast(ItemStack encodedPattern) {
-            return ObjectLists.unmodifiable(new ObjectArrayList<>(searchTerms(encodedPattern)));
+            return ObjectLists.unmodifiable(new ObjectArrayList<>(
+                    OmniversalPatternMoldSearchTerms.searchTerms(encodedPattern)));
         }
     }
 

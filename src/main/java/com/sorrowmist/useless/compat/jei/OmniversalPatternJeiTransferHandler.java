@@ -14,6 +14,7 @@ import com.sorrowmist.useless.content.recipe.CountedIngredient;
 import com.sorrowmist.useless.content.recipe.LongSizedFluidIngredient;
 import com.sorrowmist.useless.network.SelectOmniversalPatternRecipePacket;
 import mezz.jei.api.gui.ingredient.IRecipeSlotsView;
+import mezz.jei.api.recipe.transfer.IRecipeTransferContext;
 import mezz.jei.api.recipe.transfer.IRecipeTransferError;
 import mezz.jei.api.recipe.transfer.IRecipeTransferHandler;
 import mezz.jei.api.recipe.transfer.IRecipeTransferHandlerHelper;
@@ -77,6 +78,17 @@ public final class OmniversalPatternJeiTransferHandler<T extends PatternEncoding
         return AdvancedAlloyFurnaceRecipeCategory.TYPE;
     }
 
+    /**
+     * 旧版传输入口，仅保留以满足接口中仍为抽象方法的该重载。
+     *
+     * <p>JEI 自 19.52.0 起改用 {@link #transferRecipe(IRecipeTransferContext, boolean)}，但该重载在
+     * {@link IRecipeTransferHandler} 中仅为标记待删除，并未改为默认方法，实现类仍须提供覆写，否则无法编译。
+     * JEI 运行时只调用新重载，本方法不再被框架调用。
+     *
+     * @deprecated 由 {@link #transferRecipe(IRecipeTransferContext, boolean)} 取代
+     */
+    @Deprecated(since = "19.52.0", forRemoval = true)
+    @SuppressWarnings("removal")
     @Override
     public @Nullable IRecipeTransferError transferRecipe(
             T menu,
@@ -85,13 +97,34 @@ public final class OmniversalPatternJeiTransferHandler<T extends PatternEncoding
             Player player,
             boolean maxTransfer,
             boolean doTransfer) {
-        // 骚货压力锅出来受精
-        if (doTransfer) {
-            if (ModList.get().isLoaded("extendedae_plus")) {
-                ExtendedAEPlusJeiCompat.presetAlloyFurnaceSearchKey();
-            }
-        }
         return transferOmniversalRecipe(menu, entry, recipeSlots, player, maxTransfer, doTransfer, this.helper);
+    }
+
+    /**
+     * 当前传输入口，JEI 19.52.0 起由框架调用。
+     *
+     * <p>与旧重载相比，除参数改为由 {@link IRecipeTransferContext} 携带外行为完全一致。本实现不发起 JEI 的
+     * 服务端结果回包，因此无需调用 {@link IRecipeTransferContext#completeRecipeTransfer}：该回调只在
+     * JEI 登记了待回包传输并等待服务器确认时才有意义。
+     *
+     * <p>ExtendedAE Plus 的搜索键需在真正执行传输时预置；仅探测能否传输（{@code doTransfer} 为
+     * {@code false}）时不得写入，否则会在玩家尚未确认时污染上传记录。
+     */
+    @Override
+    public @Nullable IRecipeTransferError transferRecipe(
+            IRecipeTransferContext<AlloyFurnaceRecipeCatalog.Entry, T> context,
+            boolean doTransfer) {
+        if (doTransfer && ModList.get().isLoaded("extendedae_plus")) {
+            ExtendedAEPlusJeiCompat.presetAlloyFurnaceSearchKey();
+        }
+        return transferOmniversalRecipe(
+                context.getContainer(),
+                context.getRecipe(),
+                context.getRecipeSlots(),
+                context.getPlayer(),
+                context.isMaxTransfer(),
+                doTransfer,
+                this.helper);
     }
 
     /**

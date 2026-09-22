@@ -12,7 +12,7 @@ import java.util.List;
  * 把紧凑 F9 内部所有影子样板总线的「终端样板库存」串成一个连续库存。
  *
  * <p>对外的槽位编号是各总线顺序拼接后的绝对下标，读写一律经底层总线自己的
- * {@code setPatternDirect}，这样每条总线的空槽索引、内容版本与目录通知都照常发生。</p>
+ * {@code setPatternDirect}，从而保证每条总线的空槽索引、内容版本与目录通知正常更新。</p>
  */
 public final class CombinedPatternInventory extends BaseInternalInventory {
 

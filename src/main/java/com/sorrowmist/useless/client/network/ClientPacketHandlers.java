@@ -32,7 +32,7 @@ import net.minecraft.world.entity.player.Player;
 public final class ClientPacketHandlers {
     private ClientPacketHandlers() {}
 
-    /** 同步被保护玩家的血量与状态（吃掉死亡/无敌帧，保持存活表现）。 */
+    /** 同步被保护玩家的血量与状态（抑制死亡与无敌帧，维持存活表现）。 */
     public static void handleBeefInvulnerabilitySync(BeefInvulnerabilitySyncPacket msg) {
         Minecraft minecraft = Minecraft.getInstance();
         if (minecraft.level == null) {

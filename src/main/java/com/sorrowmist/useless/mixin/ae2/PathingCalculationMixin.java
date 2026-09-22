@@ -29,8 +29,8 @@ import java.util.Set;
  *       而 {@code meetsChannelRequirements()} = {@code usedChannels > 0} 才是设备活着的唯一依据。</li>
  * </ul>
  *
- * <p>别改成「只把容量抬成 MAX、照常记账」—— 那样远端流量会把绑定网络线缆的计数顶满，
- * 反而把绑定侧自己的设备挤到没通道。</p>
+ * <p>不应改为「仅将容量抬升至 MAX 并按原逻辑记账」：那样远端流量会占满绑定网络线缆的计数，
+ * 导致绑定侧自身设备分配不到通道。</p>
  */
 @Mixin(targets = "appeng.me.pathfinding.PathingCalculation", remap = false)
 public abstract class PathingCalculationMixin {

@@ -84,8 +84,8 @@ public final class OmniversalMoldHubBlockEntity extends BlockEntity implements M
         if (level == null || level.isClientSide) return;
         if (externalInventoryLoaded) {
             // 放置方块时 vanilla 会先调 clearRemoved()、后调 setPlacedBy()，前者可能在物品上的引用
-            // 还没落到 BE 组件里时就抢绑了一个临时占位。这里必须让物品带回来的引用顶掉它，
-            // 否则原数据永远不被加载（拆掉重放后内容物"消失"）。
+            // 尚未写入 BE 组件字段时抢先绑定了临时占位。此处必须用物品携带的引用覆盖它，
+            // 否则原数据不会被加载（拆除后重新放置将表现为内容物丢失）。
             if (requested == null || requested.equals(inventoryReference)) return;
             ExternalInventoryStore.release(level, worldPosition, inventoryReference);
         }

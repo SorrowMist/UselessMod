@@ -206,11 +206,11 @@ class AlloyFurnaceCountedCraftingAdapter implements CountedCraftingProviderAdapt
      *
      * <p><b>必须实现它</b>，否则旧版数据能源会落到接口的 default 实现 —— 那个 default 返回
      * {@code CountedCraftingCapacity.aggregateUnknown()}，即「未知容量 + 保守单次派发」，
-     * 功能能用但吞吐极差。3.3.0 的调度器改走子类的 {@code captureCapacityFast}，
+     * 功能可用但吞吐极低。3.3.0 的调度器改走子类的 {@code captureCapacityFast}，
      * 两者共用 {@link #capacityEntry}，口径不会漂移。</p>
      *
      * <p>3.3.0 里这个方法已标记 {@code @Deprecated(forRemoval)}，这里是<b>刻意保留</b>的：
-     * 它就是 3.2.2 唯一可用的容量入口，删掉就等于放弃旧版兼容。等数据能源真的移除它时，
+     * 它是 3.2.2 唯一可用的容量入口，删除即放弃旧版兼容。待数据能源正式移除它时，
      * 只需要把最短支持版本抬到 3.3.0 并删掉本方法。</p>
      */
     @Override
@@ -461,7 +461,7 @@ class AlloyFurnaceCountedCraftingAdapter implements CountedCraftingProviderAdapt
         }
         SmartDoublingPatterns.Resolved execution = SmartDoublingPatterns.resolve(patternDetails);
         if (execution.pattern() instanceof IMolecularAssemblerSupportedPattern) {
-            // 合成样板由本机在虚拟 3×3 上自执行，一次推送就能折叠整批，没有配方侧并行概念。
+            // 合成样板由本机在虚拟 3×3 上自执行，单次推送即可折叠整批，不存在配方侧并行概念。
             return new CapacityLimits(arithmeticMaximum, arithmeticMaximum);
         }
         if (context == null) {

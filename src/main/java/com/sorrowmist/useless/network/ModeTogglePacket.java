@@ -175,7 +175,7 @@ public class ModeTogglePacket implements CustomPacketPayload {
                     if (ModList.get().isLoaded("occultism") && stack.getItem() instanceof EndlessBeafItem) {
                         stack.set(UComponents.BeefRitualSatchelComponent.get(), msg.enabled);
                         if (msg.enabled) {
-                            // 摆阵要占用右键，打开时把其它右键模式让开
+                            // 仪式摆放会占用右键，启用时关闭其它右键模式
                             disableAeNetworkConnect(stack);
                             disableRightClickConflicts(stack);
                         }

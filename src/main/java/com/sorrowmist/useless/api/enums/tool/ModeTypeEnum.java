@@ -70,7 +70,7 @@ public enum ModeTypeEnum {
     BEEF_FARMLAND_MODE_ENABLED("beef_farmland_mode_enabled", "tooltip.useless_mod.beef_farmland_mode"),
     BEEF_FARMLAND_MODE_DISABLED("beef_farmland_mode_disabled", "tooltip.useless_mod.beef_farmland_mode"),
 
-    // 顺手收菜：true = 右键成熟作物时收菜并保留种子在地里
+    // 「顺手收菜」：true = 右键成熟作物时收获并保留种子于耕地
     BEEF_CROP_HARVEST_ENABLED("beef_crop_harvest_enabled", "tooltip.useless_mod.beef_crop_harvest_mode"),
     BEEF_CROP_HARVEST_DISABLED("beef_crop_harvest_disabled", "tooltip.useless_mod.beef_crop_harvest_mode"),
 

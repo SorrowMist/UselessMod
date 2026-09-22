@@ -45,15 +45,15 @@ public final class AlloyFurnaceTickBudget {
      *   <li><b>降频阈值 = 回网预算 × 2</b>。</li>
      * </ul>
      *
-     * <p>两者恒差 4 倍 ⇒ 单机（乃至 4 台）满载时阈值在结构上不可能被触及，
-     * {@link #scale()} 永远是 1.0，这条闸形同虚设。</p>
+     * <p>两者恒差 4 倍 ⇒ 单机（乃至 4 台）满载时阈值在结构上无法被触及，
+     * {@link #scale()} 恒为 1.0，该限制实际不起作用。</p>
      *
-     * <p><b>实测印证</b>：回网预算配 100ms 时，回网每 tick 稳定吃掉 <b>50ms</b>（等于整条 tick），
-     * 而 {@code throttleScale} 仍是 1.0，服务器掉到 17.4 TPS。</p>
+     * <p><b>实测印证</b>：回网预算配置为 100ms 时，回网每 tick 稳定占用 <b>50ms</b>（等于整条 tick），
+     * 而 {@code throttleScale} 仍为 1.0，服务器降至 17.4 TPS。</p>
      *
-     * <p><b>它没有直接乘一个固定 tick 时长</b>：固定值会误判 —— 实测这台服务器其它负载只有
-     * ~7.5ms，固定 30ms 的闸会把回网预算压在 ×3.9 吞吐上，而实际还能再榨 2.5 倍。
-     * 所以按<b>真实空闲时间</b>算，见 {@link #freeTickAllowanceNanos()}。</p>
+     * <p><b>未直接乘以固定 tick 时长</b>：固定值会误判 —— 实测该服务器其它负载仅
+     * ~7.5ms，固定 30ms 的限制会把回网预算压在 ×3.9 吞吐上，而实际仍可再提升 2.5 倍。
+     * 因此按<b>真实空闲时间</b>计算，见 {@link #freeTickAllowanceNanos()}。</p>
      */
     private static final double MAX_TICK_FRACTION = 0.9D;
 
@@ -83,14 +83,14 @@ public final class AlloyFurnaceTickBudget {
      *
      * <p>公式：{@code 目标占用(MAX_TICK_FRACTION × 一个满速 tick) − 其它负载耗时}。</p>
      *
-     * <p><b>为什么要扣掉「我们自己的耗时」</b>：{@code getCurrentSmoothedTickTime()} 量的是
-     * 整个服务器每 tick 的<i>工作</i>时间（不含 tick 循环的 sleep），它<b>已经包含</b>我们这套机器
-     * 自己的花费。若直接拿它当「其它负载」，就会形成自反馈 —— 我们花得越多、空闲越少、
-     * 预算越紧，最后把自己掐到接近零。所以必须减掉 {@link #spentMillis()} 才是真正的「别人」。</p>
+     * <p><b>需扣除「本机自身耗时」的原因</b>：{@code getCurrentSmoothedTickTime()} 度量的是
+     * 整个服务器每 tick 的<i>工作</i>时间（不含 tick 循环的 sleep），其中<b>已包含</b>本套机器
+     * 自身的开销。若直接将其视为「其它负载」，会形成自反馈 —— 本机耗时越多、空闲越少、
+     * 预算越紧，最终将自身压制至接近零。因此必须减去 {@link #spentMillis()} 才代表真正的「其它」负载。</p>
      *
-     * <p>两个量的平滑窗口不同（服务器是 ~100 tick，我们是 ~1 tick），所以这是一个粗估；
-     * 外面还套着 {@link #MIN_GLOBAL_BUDGET_NANOS} 下限与配置推导的上限兜底，
-     * 估算偏了只会让吞吐略保守或略激进，不会失控。</p>
+     * <p>两个量的平滑窗口不同（服务器约 100 tick，本机约 1 tick），因此该值为粗估；
+     * 外层还有 {@link #MIN_GLOBAL_BUDGET_NANOS} 下限与配置推导的上限作为边界，
+     * 估算偏差只会使吞吐略偏保守或略偏激进，不会失控。</p>
      *
      * <p>服务器不可用（未启动 / 客户端）时退回 {@code MAX_TICK_FRACTION × 一个 tick}，
      * 与旧行为一致。</p>
@@ -108,7 +108,7 @@ public final class AlloyFurnaceTickBudget {
     }
     /** 平滑系数：新窗口实测占 1/4，兼顾响应与抗抖。 */
     private static final double SMOOTHING = 0.25D;
-    /** 收窄下限：再忙也保留一点吞吐，避免完全停手（否则 DE 会走「无容量 → 重新提交」的空转）。 */
+    /** 收窄下限：高负载时仍保留一定吞吐量，避免完全停止导致数据能源进入「无容量 → 重新提交」循环。 */
     private static final double MIN_SCALE = 0.02D;
     /** 定点缩放精度。 */
     private static final long SCALE_UNITS = 10_000L;
@@ -160,8 +160,8 @@ public final class AlloyFurnaceTickBudget {
      * <p>对应数据能源 dispatch window 的 {@code BUDGET_EXHAUSTED} 语义：让调用方知道
      * 「容量变小是因为我忙，不是我的能力只有这么多」，从而可以主动延后非紧急批次。</p>
      *
-     * <p><b>为什么降频时仍然至少收 1 份</b>（{@link #applyScale} 的 {@code MIN_SCALE} 下限）：
-     * 完全报「无容量」会让数据能源走「无容量 → 重新提交」的空转，反而更亏。
+     * <p><b>降频时仍至少接受 1 份的原因</b>（{@link #applyScale} 的 {@code MIN_SCALE} 下限）：
+     * 完全上报「无容量」会触发数据能源「无容量 → 重新提交」的空转，代价更高。
      * 所以降频只收窄批次规模，不彻底停手 —— 调用方要停手请自行判断 {@link #isThrottled()}。</p>
      */
     public static synchronized boolean isThrottled() {
@@ -177,16 +177,16 @@ public final class AlloyFurnaceTickBudget {
      * <p>准入路径用 {@link #applyScale(BigInteger)} 收窄<b>批次规模</b>，回网路径收窄的是
      * <b>本 tick 愿意花的时间</b>。两者共用同一个预算信号，但目的相反：</p>
      * <ul>
-     *   <li>准入收窄 ⇒ 少收新活（保护本 tick）；</li>
-     *   <li>回网收窄 ⇒ 少投递已完成的产物（同样保护本 tick）。</li>
+     *   <li>准入收窄 ⇒ 减少接收新任务（保护本 tick）；</li>
+     *   <li>回网收窄 ⇒ 减少投递已完成的产物（同样保护本 tick）。</li>
      * </ul>
      *
-     * <p><b>为什么必须收窄</b>：回网预算是<b>每台机器</b>的。若写死一个固定值（例如 4ms），
-     * N 台机器最坏就是 N×4ms/tick —— 10 台满载能吃掉大半个 tick。按全局系数收窄后总量自然收敛。</p>
+     * <p><b>必须收窄的原因</b>：回网预算是<b>每台机器</b>的。若固定为某个常量（例如 4ms），
+     * N 台机器最坏为 N×4ms/tick —— 10 台满载即占用大半个 tick。按全局系数收窄后总量自然收敛。</p>
      *
-     * <p><b>为什么保留下限</b>：回网是幂等的，理论上可以截断到零；但那样在持续重载下会饿死队列
-     * （队列不空 ⇒ 背压一直压着准入 ⇒ 容量 0 ⇒ 整机停摆）。所以保留一个下限保证每 tick 仍有推进。
-     * 调用方另有一层保险：预算检查排在第一次插入之后，所以任何情况下每 tick 至少会尝试一次插入。</p>
+     * <p><b>保留下限的原因</b>：回网是幂等的，理论上可截断至零；但在持续重载下会使队列无法推进
+     * （队列非空 ⇒ 背压持续压制准入 ⇒ 容量 0 ⇒ 整机停摆）。因此保留下限以保证每 tick 仍有推进。
+     * 调用方另有一层保障：预算检查位于第一次插入之后，因此每 tick 至少会尝试一次插入。</p>
      *
      * @param baseBudgetNanos 本机的基础回网预算（正数）
      * @return 收窄后的预算，恒 ∈ [{@code min(MIN_FLUSH_BUDGET_NANOS, baseBudgetNanos)}, baseBudgetNanos]

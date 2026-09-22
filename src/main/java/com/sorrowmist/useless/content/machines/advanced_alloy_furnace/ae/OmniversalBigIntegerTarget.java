@@ -112,8 +112,8 @@ public final class OmniversalBigIntegerTarget implements AlloyFurnaceBigIntegerT
         if (!capacity.isAvailable()) {
             return null;
         }
-        // 真正的检查（配方可用性 / 背压 / 能量）会在 commit 时再跑一遍：期间机器状态可能变化，
-        // 最终以 commit 的返回值为准，这也是 DE 那边 BigIntegerCraftingAdmission 的同一套语义。
+        // 完整检查（配方可用性 / 背压 / 能量）在 commit 时重新执行：期间机器状态可能变化，
+        // 最终以 commit 的返回值为准，与 DE 侧 BigIntegerCraftingAdmission 的语义一致。
         return new Batch(pattern, prototype, capacity.accepted(), cpu);
     }
 

@@ -3,12 +3,12 @@
  *
  * <h2>这个包解决什么问题</h2>
  *
- * <p>你的合成 CPU 一次发配了超过 {@code long} 的份数，机器也确实产出了那么多东西 —— 但 AE2 的
- * 存储接口单次最多接受 {@code long}，所以产物是切成 {@code Long.MAX_VALUE} 的段、逐 tick 写回网络的。
- * 如果你的 CPU 自己维护 BigInteger 账本，光看网络里的分段是拼不回精确总数的。</p>
+ * <p>合成 CPU 单次发配的份数可以超过 {@code long}，机器也按该数量产出，但 AE2 的
+ * 存储接口单次最多接受 {@code long}，因此产物按 {@code Long.MAX_VALUE} 切段、逐 tick 写回网络。
+ * 若 CPU 自行维护 BigInteger 账本，仅凭网络中的分段无法还原精确总数。</p>
  *
  * <p>实现 {@link com.sorrowmist.useless.api.crafting.bigint.cpu.AlloyFurnaceBigIntegerCpuAdapter}
- * 并注册，就能收到<b>完整</b>的 BigInteger 产物回执与批次终局通知。</p>
+ * 并注册，即可收到<b>完整</b>的 BigInteger 产物回执与批次终局通知。</p>
  *
  * <h2>包结构</h2>
  *
@@ -61,7 +61,7 @@
  *   <li><b>存档重载后 {@code cpuToken} 为 {@code null}</b>（它不可序列化）。请用
  *       {@link com.sorrowmist.useless.api.crafting.bigint.cpu.AlloyFurnaceBigIntegerBatchContext#batchId()}
  *       重新绑定；找不到对应批次就当作「机器仍在替我保管产物」处理。</li>
- *   <li><b>没注册适配器不会有任何降级问题</b>：产物照常切段写回 ME 网络，只是不发回调。</li>
+ *   <li><b>未注册适配器不会引起任何降级问题</b>：产物仍按段写回 ME 网络，仅不发送回调。</li>
  * </ol>
  */
 package com.sorrowmist.useless.api.crafting.bigint.cpu;

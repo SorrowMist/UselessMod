@@ -273,7 +273,7 @@ public interface CraftingTaskContext {
      * 机器用 TCP 拥塞控制那套（慢启动 / 乘法减小 / 线性回升）探测出合适值，
      * 收敛到「一批大约一两个 tick 交付完」—— 那是最平滑的形态。</p>
      *
-     * <p>实现方必须保证返回值 <b>≥ 1</b>：容量永不因积压归零，调度侧才不会停一拍再重启。</p>
+     * <p>实现方必须保证返回值 <b>≥ 1</b>：容量不会因积压归零，调度侧才能持续派发而无需停顿重启。</p>
      */
     default long outputSegmentBudget() {
         return 1L;

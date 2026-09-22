@@ -93,9 +93,9 @@ public final class UComponents {
             );
 
     /**
-     * 顺手收菜组件（BeefCropHarvest）
-     * true = 右键成熟作物时由造化杖自己收菜，并保留种子在地里（作物重置为 0 龄），
-     * 避免整合包的右键收菜功能把作物连根拔起。
+     * 「顺手收菜」组件（BeefCropHarvest）
+     * true = 右键成熟作物时由造化杖自身执行收获，并将种子保留于耕地（作物重置为 0 龄），
+     * 以避免整合包的右键收菜功能将作物连根拔起。
      */
     public static final DeferredHolder<DataComponentType<?>, DataComponentType<Boolean>> BeefCropHarvestComponent =
             register("beef_crop_harvest", builder ->
@@ -190,7 +190,7 @@ public final class UComponents {
     /**
      * AE 连接模式组件（AeNetworkConnect）
      * 开启后右键一台「拥有 AE 网格节点」的机器，把它的节点接入工具绑定无线访问点所在的那张网。
-     * 与顺手收菜 / 时间加速 / 建筑魔杖互斥（同一时刻只能有一个占用右键）。
+     * 与「顺手收菜 / 时间加速 / 建筑魔杖」互斥（同一时刻仅允许一项占用右键）。
      */
     public static final DeferredHolder<DataComponentType<?>, DataComponentType<Boolean>> AeNetworkConnectComponent =
             register("ae_network_connect", builder ->
@@ -203,7 +203,7 @@ public final class UComponents {
 
     /**
      * 匠心仪式挎包模式（RitualSatchel）
-     * 开启后右键已用魔典预览过的五芒星，可直接从绑定的 AE 网络取方块把整座仪式摆出来。
+     * 开启后右键已用魔典预览过的五芒星，可直接从绑定的 AE 网络取用方块摆放整座仪式。
      * 仅在安装了 occultism 时才会出现在模式轮盘里。
      */
     public static final DeferredHolder<DataComponentType<?>, DataComponentType<Boolean>> BeefRitualSatchelComponent =

@@ -39,7 +39,7 @@ public abstract class BotanyPotBlockEntityMixin {
             Level level, BlockPos pos, BlockState state, BotanyPotBlockEntity pot,
             CallbackInfo ci) {
 
-        // 蜡封花盆或还没开始生长直接走原逻辑
+        // 蜡封花盆或尚未开始生长时交由原逻辑处理
         if (pot.growthTime() < 0) return;
 
         int mul = ConfigManager.getBotanyPotGrowthMultiplier();

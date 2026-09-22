@@ -53,8 +53,8 @@ import java.util.UUID;
  * <p><b>成形方式</b>：ECO 的主机基类在构造函数里把 {@code calculator} 硬编码成了多方块计算器
  * （字段 final，无法替换），所以这里不依赖计算器，而是自己接管成形生命周期：
  * {@link #onReady()} 之后调用 {@link #formCompactStructure()} 建出只含自己的集群；
- * 同时掐掉 {@code updateMultiBlock} / {@code rebuildMultiBlock}，
- * 否则邻居一变 ECO 的多方块计算器就会判定结构不合法并把集群拆掉。</p>
+ * 同时停用 {@code updateMultiBlock} / {@code rebuildMultiBlock}，
+ * 否则邻居变化时 ECO 的多方块计算器会判定结构不合法并拆除集群。</p>
  */
 public class CompactL9BlockEntity extends ECOStorageSystemBlockEntity
         implements CompactHost<NEStorageCluster>, CompactTicker, IGridTickable {
@@ -191,7 +191,7 @@ public class CompactL9BlockEntity extends ECOStorageSystemBlockEntity
     private boolean requestStorageUpdate() {
         IGridNode node = getActionableNode();
         if (node == null || node.getGrid() == null) {
-            // requestUpdate 内部不做空判断，网格还没就绪时必须等。
+            // requestUpdate 内部不做空值判断，网格未就绪时必须等待。
             return false;
         }
         IStorageProvider.requestUpdate(getMainNode());
@@ -199,7 +199,7 @@ public class CompactL9BlockEntity extends ECOStorageSystemBlockEntity
     }
 
     /**
-     * 自愈：只要方块里还留着内建的 64 个无限组件（取出通道已被 {@link #canExtractInfiniteComponents()} 封掉），
+     * 自愈：只要方块中仍保留内建的 64 个无限组件（取出通道已由 {@link #canExtractInfiniteComponents()} 封禁），
      * 这台方块就<b>定义上</b>是无限存储主机；ECO 的状态机若被外部因素推离
      * {@code formed_infinite}，这里把它拉回来。
      */
@@ -215,8 +215,8 @@ public class CompactL9BlockEntity extends ECOStorageSystemBlockEntity
     /**
      * 内建的 64 个无限组件不允许被玩家取出。
      *
-     * <p>否则「取出 64 个 → 下一 tick 自动补满」就成了无限复制；
-     * 而且紧凑 L9 的定位就是「永远处于无限存储」，本来也不该能退回普通模式。</p>
+     * <p>否则「取出 64 个 → 下一 tick 自动补满」将构成无限复制；
+     * 且紧凑 L9 的设计定位是「始终处于无限存储」，不应支持退回普通模式。</p>
      */
 
 

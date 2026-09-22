@@ -27,16 +27,16 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 把资源蜜蜂的钓鱼配方（{@code productivebees:bee_fishing}）转换成合金炉配方。
+ * 将资源蜜蜂的钓鱼配方（{@code productivebees:bee_fishing}）转换为合金炉配方。
  *
- * <p>资源蜜蜂钓鱼不会往原版 {@code minecraft:fishing} 战利品表里塞条目，而是监听
- * {@code ItemFishedEvent} 后按生物群系抽取独立配方并直接生成蜜蜂实体。因此这里单独读取
- * 该配方类型，并把产物从「蜜蜂实体」改成对应的<b>蜜蜂刷怪蛋</b>物品。</p>
+ * <p>资源蜜蜂钓鱼不会向原版 {@code minecraft:fishing} 战利品表添加条目，而是监听
+ * {@code ItemFishedEvent} 后按生物群系抽取独立配方并直接生成蜜蜂实体。因此此处单独读取
+ * 该配方类型，并将产物由「蜜蜂实体」改为对应的<b>蜜蜂刷怪蛋</b>物品。</p>
  *
- * <p>配方按 {@link ResourceLocation} 稳定 id 转换：id 只取自数据包里的配方 id，
+ * <p>配方按 {@link ResourceLocation} 稳定 id 转换：id 仅取自数据包中的配方 id，
  * 不依赖生物群系集合的迭代顺序，避免万象样板在重建索引后失效。</p>
  *
- * <p>由于原版钓鱼适配器（{@code FishingLootRecipeAdapter}）不涉及该配方类型，两者不会重复转换。</p>
+ * <p>原版钓鱼适配器（{@code FishingLootRecipeAdapter}）不涉及该配方类型，两者不会重复转换。</p>
  */
 public final class BeeFishingRecipeAdapter implements IRecipeAdapter<BeeFishingRecipe> {
     private static final Logger LOGGER = LogUtils.getLogger();
@@ -116,7 +116,7 @@ public final class BeeFishingRecipeAdapter implements IRecipeAdapter<BeeFishingR
         return matches;
     }
 
-    /** 把配方产物（蜜蜂）解析成对应的刷怪蛋物品；无法解析时返回空堆。 */
+    /** 将配方产物（蜜蜂）解析为对应的刷怪蛋物品；无法解析时返回空堆。 */
     private static ItemStack resolveSpawnEgg(BeeFishingRecipe source) {
         BeeIngredient bee = source.output == null ? null : source.output.get();
         if (bee == null) {
@@ -126,9 +126,9 @@ public final class BeeFishingRecipeAdapter implements IRecipeAdapter<BeeFishingR
         if (beeType == null) {
             return ItemStack.EMPTY;
         }
-        // 资源蜜蜂的刷怪蛋可能不是原版 SpawnEggItem，这里只判空，避免误杀可配置蜂种。
+        // 资源蜜蜂的刷怪蛋可能不是原版 SpawnEggItem，因此仅判空，避免误排除可配置蜂种。
         // 该 API 在蜂种未注册刷怪蛋时可能返回 null，统一兜底为空气：
-        // 否则空指针会发生在配方生成阶段，拖垮整个配方目录构建。
+        // 否则空指针将发生在配方生成阶段，导致整个配方目录构建失败。
         ItemStack egg = BeeCreator.getSpawnEgg(beeType);
         return egg == null ? ItemStack.EMPTY : egg;
     }

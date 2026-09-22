@@ -63,7 +63,7 @@ import java.util.Set;
  * 每台 11 条物理 FX 执行通道（共 88 条）。
  *
  * <p>本类不做任何合成逻辑。它只做一件事：装配出 8 个 {@link NECraftingCluster}
- * （第 1 个是真实主机自己，另外 7 个只带影子组件）并塞进同一个 ECO
+ * （第 1 个是真实主机自身，另外 7 个仅带影子组件）并注册到同一个 ECO
  * {@link NECraftingNetworkCluster}。于是 ECO 自己的
  * {@code CraftingCapabilitySnapshot#isVirtualTopologyEligible()} 自然成立 →
  * 进入虚拟合成模式：无限批量、任务在首个 tick 完成。</p>
@@ -76,7 +76,7 @@ import java.util.Set;
  *
  * <p><b>样板数据不放在本机 NBT 里</b>：176 条影子总线的完整持久化数据是 MB 级的，
  * 而方块实体自身的 NBT 既要跟着区块存盘、又会被 {@code getUpdateTag} 整包发给客户端，
- * 装满样板后必然把区块包撑爆。所以本机只留一个 16 字节的 UUID 引用，真正的内容放在
+ * 装满样板后将超出区块包容量上限。因此本机仅保留一个 16 字节的 UUID 引用，实际内容存放于
  * {@link ExternalInventoryStore} 里那份 UUID 键控的外置存档中（见 {@link #PATTERN_BUS_KEY}）。</p>
  */
 public class CompactF9BlockEntity extends ECOCraftingSystemBlockEntity
@@ -89,14 +89,14 @@ public class CompactF9BlockEntity extends ECOCraftingSystemBlockEntity
     /**
      * 外置存储载荷里那段样板总线的键名。
      *
-     * <p>它在老存档里是方块实体自己的标签名（历史实现把 176 条总线的整份数据直接塞在主机 NBT 里），
-     * 现在只作为「迁移来源」被读取一次，不再写回。</p>
+     * <p>该键在旧存档中是方块实体自身的标签名（历史实现将 176 条总线的完整数据直接写入主机 NBT），
+     * 现仅作为「迁移来源」读取一次，不再写回。</p>
      */
     static final String PATTERN_BUS_KEY = "useless_compact_pattern_buses";
     /**
      * 满长建造的列数。ECO 的结构定义里 {@code expandMax = craftingSystemMaxLength - 4}，
-     * 而虚拟合成判定要求「实际 FX 通道数 == 该上限」，所以这里必须每次都按当前上限取，
-     * 否则玩家改配置后虚拟模式会静默失效。
+     * 而虚拟合成判定要求「实际 FX 通道数 == 该上限」，因此此处每次都按当前上限取值，
+     * 否则玩家修改配置后虚拟模式会静默失效。
      */
     private int buildLength() {
         return Math.max(1, getMaxBuildLength());
@@ -322,8 +322,8 @@ public class CompactF9BlockEntity extends ECOCraftingSystemBlockEntity
             bus.flushScheduledPatternDetails();
         }
         installExposedBus(level);
-        // 刚恢复出来的内容不算「变化」：把版本基准对齐到现在，避免存档一读进来就先白写一遍。
-        // （是否真的需要写外置存储由 restorePatternBusData 判断，它认得「迁移」和「本来就在存储里」的区别。）
+        // 刚恢复的内容不计为「变化」：将版本基准对齐到当前值，避免存档载入时立即触发一次无谓写入。
+        // （是否确实需要写入外置存储由 restorePatternBusData 判断，它可区分「迁移」与「数据本就在存储中」两种情况。）
         if (exposedBus != null) {
             lastPatternContentRevision = exposedBus.getPatternContentRevision();
         }
@@ -511,7 +511,7 @@ public class CompactF9BlockEntity extends ECOCraftingSystemBlockEntity
         patternStoreDirty = true;
     }
 
-    /** 供方块掉落物携带：带上它，新位置就能把同一份外置样板数据接回来。 */
+    /** 供方块掉落物携带：新位置可凭此引用接续同一份外置样板数据。 */
     @Nullable
     public ExternalInventoryReference patternStoreReference() {
         return patternStoreReference;

@@ -188,8 +188,8 @@ public final class CompactInterfaceAttachment<C extends NECluster<C>> {
             shadow = new ShadowInterfaceBlockEntity<>(host.getType(), host.getBlockPos(),
                     host.getBlockState(), calculator);
         }
-        // 存档恢复（loadTag）早于 setLevel，客户端则根本没有 attach：两条时序都要拿到真实世界，
-        // 影子才认得出菜单 viewer（isViewer 比 level），服务端也才能在正确的世界里 tick。
+        // 存档恢复（loadTag）早于 setLevel，客户端则不存在 attach 过程：两条时序都需要取得真实世界，
+        // 影子实体才能识别菜单 viewer（isViewer 会比对 level），服务端也才能在正确的维度中 tick。
         if (shadow.getLevel() != host.getLevel()) {
             shadow.setLevel(host.getLevel());
         }

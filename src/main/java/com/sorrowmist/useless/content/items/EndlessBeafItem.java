@@ -962,8 +962,8 @@ public class EndlessBeafItem extends TieredItem {
         InteractionResult teleportResult = tryTeleport(world, player, ctx.getItemInHand());
         if (teleportResult != InteractionResult.PASS) return teleportResult;
 
-        // 匠心仪式挎包模式：右键魔典预览的五芒星，把整座仪式从 AE 网络摆出来。
-        // 预览只存在于客户端，所以这里在客户端认出目标格并把预览信息发给服务端。
+        // 匠心仪式挎包模式：右键魔典预览的五芒星，从 AE 网络取出材料摆放整座仪式。
+        // 预览仅存在于客户端，因此由客户端识别目标格并将预览信息发送至服务端。
         if (world.isClientSide && !player.isShiftKeyDown()
                 && ctx.getItemInHand().getOrDefault(UComponents.BeefRitualSatchelComponent.get(), false)
                 && ModList.get().isLoaded("occultism")
@@ -1005,7 +1005,7 @@ public class EndlessBeafItem extends TieredItem {
         boolean chainUse = RightClickChainer.shouldChain(player, tool);
 
         // ============================================================
-        // 2. 顺手收菜 (右键成熟作物：收获并把种子留在地里，不拔根)
+        // 2. 顺手收菜（右键成熟作物：收获并将种子保留在地里，不连根拔除）
         // ============================================================
         if (isCropHarvestEnabled(tool) && !player.isShiftKeyDown()
                 && BeefCropHarvest.isHarvestable(world.getBlockState(ctx.getClickedPos()))) {
@@ -1016,7 +1016,7 @@ public class EndlessBeafItem extends TieredItem {
                     BeefCropHarvest.harvest(serverLevel, ctx.getClickedPos(), player, tool);
                 }
             }
-            // 两端都消费本次交互，避免客户端反复摆动
+            // 两端均消费本次交互，避免客户端重复触发
             return InteractionResult.sidedSuccess(world.isClientSide);
         }
 
@@ -1099,10 +1099,10 @@ public class EndlessBeafItem extends TieredItem {
             // 用一个「名义硬度」替代哨兵值 -1，让 baseSpeed x 硬度 这条公式继续成立：
             //   ATM 矿：getDigSpeed / 2 / 250 = (baseSpeed x 15) / 500 ≈ 0.30/tick（约 3.3 tick）
             //   普通方块：baseSpeed / 30 ≈ 0.33/tick（约 3 tick）
-            // 手感因此基本一致。名义硬度可用 beef_tool_pseudo_hardness 调整。
+            // 两者的实际挖掘耗时因此基本一致。名义硬度可用 beef_tool_pseudo_hardness 调整。
             //
             // 原版基岩 / 屏障 / 传送门框不会因此变得可挖：BlockBehaviour.getDestroyProgress
-            // 在 destroySpeed == -1 时直接 return 0（字节码确认），根本用不到我们给的速度。
+            // 在 destroySpeed == -1 时直接 return 0（字节码确认），不会使用此处返回的速度值。
             return baseSpeed * (float) ConfigManager.getBeefToolPseudoHardness();
         }
 
@@ -1380,7 +1380,7 @@ public class EndlessBeafItem extends TieredItem {
                                        .append(farmlandStateText(stack))
                                        .withStyle(ChatFormatting.GOLD));
 
-        // 顺手收菜：右键成熟作物时收获并保留种子在地里
+        // 顺手收菜：右键成熟作物时收获并保留种子于耕地
         boolean beefCropHarvest = isCropHarvestEnabled(stack);
         tooltipComponents.add(Component.translatable("tooltip.useless_mod.beef_crop_harvest_mode")
                                        .append(": ")

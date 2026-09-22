@@ -129,8 +129,8 @@ public final class ExampleBigIntegerCpuAdapter implements AlloyFurnaceBigInteger
         }
         AlloyFurnaceBigIntegerCpuBinding binding = new AlloyFurnaceBigIntegerCpuBinding(ID, jobHandle);
         for (AlloyFurnaceBigIntegerTarget target : AlloyFurnaceBigIntegerApi.findTargets(grid)) {
-            // 机器正忙（全局每 tick 时间预算被打满）时，容量会变小 —— 这里按需延后非紧急批次。
-            // 降频永远不会把容量压到 0，所以「要不要停手」由你决定。
+            // 机器正忙（全局每 tick 时间预算已耗尽）时容量收窄，此处按需延后非紧急批次。
+            // 降频不会将容量降至 0，是否停止提交由调用方决定。
             if (target.isThrottled() && !urgent) {
                 continue;
             }

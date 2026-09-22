@@ -19,10 +19,10 @@ import org.jetbrains.annotations.Nullable;
  *
  * <h2>为什么要把认领拆出来</h2>
  *
- * <p>「产物回网」的可持续吞吐完全由「每 tick 能插多少次」决定，而每个分段的固定成本里包含一次
+ * <p>「产物回网」的可持续吞吐完全由「每 tick 可插入次数」决定，而每个分段的固定成本包含一次
  * {@link NeoEcoDynamicOutputCompat#claim}：它是一次 {@code synchronized} 调用加若干次集合遍历与分配，
- * 在没有 ECO 候选时返回 0。原来这段成本<b>每个 {@code Long.MAX} 分段都要付一次</b>
- * —— 8ms 回网预算下约 6 千次/tick，100ms 下约 7 万次/tick，绝大多数是纯浪费。</p>
+ * 在没有 ECO 候选时返回 0。此前该成本<b>每个 {@code Long.MAX} 分段都要支付一次</b>
+ * —— 8ms 回网预算下约 6 千次/tick，100ms 下约 7 万次/tick，其中绝大多数为无效开销。</p>
  *
  * <p><b>提到循环外为什么不改行为</b>：认领量只取决于 ECO 任务自己的剩余需求
  * （{@code pending.remainingAmount()} 封顶），与传入的 {@code amount} 无关。

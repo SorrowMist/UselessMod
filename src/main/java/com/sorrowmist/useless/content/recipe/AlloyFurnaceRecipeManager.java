@@ -122,7 +122,7 @@ public class AlloyFurnaceRecipeManager {
         //
         // 而每次登记都会走到 invalidateIndex() → 全局 invalidate，目录构建却要几十秒；若某个 compat
         // loader 被两个入口各调一次（或惰性类加载在后台构建窗口内又跑了一遍注册），正在构建的那份
-        // 就会被整份作废重算，且重算结果逐字相同——实测这会让同一份目录在一次登录里构建三次
+        // 就会被整体作废并重算，且重算结果完全一致——实测这会导致同一份目录在一次登录中构建三次
         // （generation 0/1/2，后两次 recipes 与 sources 完全一致）。
         for (var existing : allAdapters) {
             if (existing.getClass() == adapter.getClass()

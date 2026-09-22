@@ -75,9 +75,9 @@ public final class AdvancedAlloyFurnaceAeManager {
     /**
      * 一个倍率批次里最多真实装配多少次。
      *
-     * <p>正常配方第一次铺料后材料就是整齐的重复，一次即可折叠整批；只有一批里混着不同变体
-     * （例如耐久各异的工具）才会多试几次，试到剩下的材料重新变整齐为止。这个上限只用于兜底
-     * 病态输入，防止主线程被拖住。</p>
+     * <p>正常配方首次铺料后材料即为规整的重复，一次即可折叠整批；仅当一批中混有不同变体
+     * （例如耐久各异的工具）时才需多次尝试，直至剩余材料重新规整。该上限仅用于兜底
+     * 异常输入，避免主线程长时间阻塞。</p>
      */
     private static final int MAX_CRAFTING_PROBES = 64;
     /**
@@ -97,7 +97,7 @@ public final class AdvancedAlloyFurnaceAeManager {
     /**
      * 连续多少个键被拒收（插入返回 0）就认为网络整体饱和，提前结束本轮。
      *
-     * <p>没有它就只能在「网络不可达 + 键很多」时逐键空转。正常键数很小，影响可忽略。</p>
+     * <p>缺少该上限时，「网络不可达 + 键数量较多」的场景会退化为逐键无效重试。正常键数很小，影响可忽略。</p>
      */
     private static final int MAX_EMPTY_KEY_PROBES = 8;
 
@@ -112,10 +112,10 @@ public final class AdvancedAlloyFurnaceAeManager {
     // 收敛点是「一批大约一两个 tick 就交付完」，也就是最平滑的形态。
 
     /**
-     * 还没测到插入成本前的初始估计（纳秒/段）。
+     * 尚未测得插入成本时使用的初始估计（纳秒/段）。
      *
      * <p>偏大 ⇒ 起步批次偏小、爬坡慢；偏小 ⇒ 首批偏大、可能积压。取 1000ns（略保守于实测的
-     * 650ns）：起步批次约为目标的 2/3，几批之内就被实测值取代，既不浪费爬坡时间也不冒险。</p>
+     * 650ns）：起步批次约为目标的 2/3，若干批后即由实测值取代，既不浪费爬坡时间也不引入风险。</p>
      */
     private static final double DEFAULT_INSERT_NANOS_PER_CHUNK = 1_000.0D;
     /** 实测插入成本的平滑系数（新样本占 1/8）。 */
@@ -124,8 +124,8 @@ public final class AdvancedAlloyFurnaceAeManager {
      * 排空延迟诊断的打印间隔（tick）。
      *
      * <p>「一批产物从入队到被完全接走」用了几个 tick，是外部 CPU 自适应窗口能否继续放大的关键量：
-     * 它按「一批必须在 2 tick 内返回完」来决定是否允许窗口翻倍。所以这里把它直接量出来，
-     * 免得再靠推测。</p>
+     * 它按「一批必须在 2 tick 内返回完」来决定是否允许窗口翻倍。因此此处直接量化该延迟，
+     * 无需依赖推测。</p>
      */
     private static final long DRAIN_DIAGNOSTICS_INTERVAL_TICKS = 40L;
 
@@ -135,36 +135,36 @@ public final class AdvancedAlloyFurnaceAeManager {
     /**
      * 预算探测的采样间隔（段）。
      *
-     * <p><b>为什么不能逐段取时间</b>：{@code System.nanoTime()} 在 Windows 上单次约 100~150ns，
-     * 而一 tick 可能插入 24 万段 —— 逐段一对时间戳就是 <b>48 万次调用 ≈ 50~70ms</b>，
-     * 也就是<b>埋点本身比被测代码还贵</b>，日志里那个「insertUs=87ms」绝大部分其实是它。
-     * 每 {@code 256} 段采样一次后开销降到 1/256，预算判定精度损失可忽略（256 段 ≈ 0.1ms）。</p>
+     * <p><b>不能逐段取时间的原因</b>：{@code System.nanoTime()} 在 Windows 上单次约 100~150ns，
+     * 而一 tick 可能插入 24 万段 —— 逐段取一对时间戳即 <b>48 万次调用 ≈ 50~70ms</b>，
+     * 即<b>埋点开销高于被测代码本身</b>，日志中的「insertUs=87ms」绝大部分来自该开销。
+     * 每 {@code 256} 段采样一次后开销降至 1/256，预算判定精度损失可忽略（256 段 ≈ 0.1ms）。</p>
      */
     private static final long BUDGET_PROBE_INTERVAL_CHUNKS = 256L;
 
     /**
      * 有效样本要求的最少交付段数。
      *
-     * <p><b>为什么必须有这个门槛</b>：样本是 {@code 插入耗时 ÷ 交付段数}，而<b>每 tick 有固定开销</b>
+     * <p><b>需要该门槛的原因</b>：样本为 {@code 插入耗时 ÷ 交付段数}，而<b>每 tick 存在固定开销</b>
      * （首次插入的缓存冷、跨存储遍历等）。交付段数很少时固定开销会主导样本 ——
-     * 实测日志里出现过 {@code deliveredChunks=1, insertUs=41}，即 41µs/段，
-     * 是真实值（0.65µs）的 <b>63 倍</b>。一个这样的样本会把单批预算直接砸下去，
-     * 再慢慢爬回来 —— 正是用户反馈的「降档一次降得太多、再爬坡也慢」。
-     * 要求至少 256 段后，固定开销被摊薄到可忽略（41µs/256 ≈ 160ns）。</p>
+     * 实测日志中出现过 {@code deliveredChunks=1, insertUs=41}，即 41µs/段，
+     * 为真实值（0.65µs）的 <b>63 倍</b>。此类样本会使单批预算骤降，
+     * 随后缓慢回升 —— 即用户反馈的「降档幅度过大、回升缓慢」。
+     * 要求至少 256 段后，固定开销被摊薄至可忽略（41µs/256 ≈ 160ns）。</p>
      */
     private static final long MIN_INSERT_SAMPLE_CHUNKS = 1_024L;
     /**
      * 单次采样允许「成本估计」上升的最大比例 —— 也就是<b>限制降档幅度</b>。
      *
-     * <p><b>为什么必须非对称</b>：成本估计升高通常来自<b>噪声</b>（首次插入缓存冷、GC、
-     * 跨存储遍历的固定开销），而不是真的变慢；而它一旦升高，单批预算就立刻按比例下降。
-     * 无限制时会看到「一次降档降太多，再爬坡又慢」。
-     * 所以：<b>升档不限速</b>（成本下降立刻放大批次，不浪费爬坡时间），
-     * <b>降档每次最多 1%</b>（噪声最多造成 1% 损失，且下一批就能恢复）。</p>
+     * <p><b>必须非对称的原因</b>：成本估计升高通常来自<b>噪声</b>（首次插入缓存冷、GC、
+     * 跨存储遍历的固定开销），而非真实变慢；一旦升高，单批预算即按比例下降。
+     * 不限制时会出现「降档幅度过大、回升缓慢」的现象。
+     * 因此：<b>升档不限速</b>（成本下降立即放大批次，不浪费爬坡时间），
+     * <b>降档每次最多 1%</b>（噪声最多造成 1% 损失，且下一批即可恢复）。</p>
      *
-     * <p>代价：存储真的永久变慢时，预算要 ~70 批才收敛到位 —— 这期间积压会略涨，
-     * 由队列条目数硬上限（{@link #hardOutputQueueCap()}）兜底。之所以敢取这么慢：噪声是<b>单侧</b>的
-     * （只会让耗时偏高），而真的变慢会持续出现，慢慢收即可。</p>
+     * <p>代价：存储确实永久变慢时，预算需约 70 批才能收敛 —— 期间积压会略有增长，
+     * 由队列条目数硬上限（{@link #hardOutputQueueCap()}）兜底。取该幅度是因为噪声<b>单侧</b>
+     * （只会使耗时偏高），而真实变慢会持续出现，缓慢收敛即可。</p>
      */
     private static final double MAX_INSERT_COST_RISE_PER_SAMPLE = 1.01D;
     /** 成本估计下限：防止除零与荒谬的大批次。 */
@@ -176,7 +176,7 @@ public final class AdvancedAlloyFurnaceAeManager {
      */
     private static final long OUTPUT_BUDGET_SAFETY_DIVISOR = 2L;
     /**
-     * 回网积压硬上限相对「单批预算上限」的倍数：<b>只作内存 / NBT 兜底</b>。
+     * 回网积压硬上限相对「单批预算上限」的倍数：<b>仅作内存 / NBT 保护</b>。
      *
      * <p>控制器正常工作时积压收敛在「一两批在飞」（≈2×当前预算），离这里极远。</p>
      */
@@ -253,12 +253,12 @@ public final class AdvancedAlloyFurnaceAeManager {
     /**
      * 回网诊断日志的上报间隔（tick）。
      *
-     * <p>回网每 tick 都跑，逐 tick 打日志会刷屏；20 tick 一条足够看出积压趋势。</p>
+     * <p>回网每 tick 都执行，逐 tick 输出日志会造成大量冗余输出；20 tick 一条即可反映积压趋势。</p>
      */
     private static final long OUTPUT_DIAGNOSTICS_INTERVAL_TICKS = 20L;
-    /** 上次回网诊断日志的 tick；{@link Long#MIN_VALUE} 表示还没打过。 */
+    /** 上次回网诊断日志的 tick；{@link Long#MIN_VALUE} 表示尚未输出过。 */
     private long lastOutputDiagnosticsTick = Long.MIN_VALUE;
-    /** 当前是否处于「回网积压」状态（用于状态跃迁日志的迟滞，避免刷屏）。 */
+    /** 当前是否处于「回网积压」状态（用于状态跃迁日志的迟滞，避免冗余输出）。 */
     private boolean outputBacklogNoticed;
     private int unreturnedInputRetryTimer = 0;
     private int unreturnedOutputRetryTimer = 0;
@@ -301,7 +301,7 @@ public final class AdvancedAlloyFurnaceAeManager {
         }
         CraftingTask.returnInputsToAE(pendingInputs, this.owner);
 
-        // 合成样板的产物是已经装配完成的实物，AE 任务取消后必须写回网络，否则材料凭空消失。
+        // 合成样板的产物是已经装配完成的实物，AE 任务取消后必须写回网络，否则材料将无故丢失。
         // 写不进去的部分留在队列里（随 NBT 持久化），等后续 tick 或重载后继续重试。
         // 大数批次先给 CPU 侧一个终局信号：产物照样会强制写回，不会丢，只是不再走逐 tick 节奏。
         for (PendingCraftingOutput pending : this.queuedCraftingOutputs) {
@@ -754,7 +754,7 @@ public final class AdvancedAlloyFurnaceAeManager {
      * <p>这是<b>物理上限</b>（一份窗口最多产出一段），不是人为旋钮。原来还额外取了一个固定常量
      * （先后是 20480 / 131072 / 524288）作天花板，但它与「时间预算」<b>重复</b>：
      * 时间预算已限定每 tick 能交付多少，前馈公式又把它换算成段数，再叠一层常量只会变成隐藏瓶颈
-     * ——实测踩过两次（{@code segmentBudget} 恒等于那个常量）。<b>已删除该常量。</b></p>
+     * ——实测已两次出现该常量恒等于 {@code segmentBudget} 的情况。<b>该常量已删除。</b></p>
      */
     private long outputSegmentBudgetCap() {
         return Math.max(1L, this.owner.getMaxAETaskCount());
@@ -773,15 +773,15 @@ public final class AdvancedAlloyFurnaceAeManager {
      * <ul>
      *   <li>待回网账本是 {@code Map<AEKey, BigInteger>}，<b>内存是 O(键数) 而不是 O(段数)</b> ——
      *       分段数（{@code Σ ceil(量 / Long.MAX)}）是<b>推导出来的数字</b>，不是分配量，
-     *       拿它当内存代理是错的。</li>
-     *   <li>单批的段数本来就可以很大：例如 32Y（3.2e25）份就是约 <b>347 万段</b>，
-     *       这属于<b>正常体量</b>，不该被当成「积压异常」而拒收。</li>
+     *       以分段数作为内存占用的代理指标是错误的。</li>
+     *   <li>单批的段数本身可以很大：例如 32Y（3.2e25）份约为 <b>347 万段</b>，
+     *       这属于<b>正常体量</b>，不应按「积压异常」拒收。</li>
      *   <li>「一批太大导致回网耗时」已由每 tick 时间预算管住：回网在预算处停下、
-     *       跨 tick 摊开，不会卡住 tick。</li>
+     *       跨 tick 摊开，不会阻塞 tick。</li>
      * </ul>
      *
-     * <p>曾经按分段数判定的 {@code HARD_OUTPUT_CHUNK_BUDGET} 正是因为这条误判，
-     * 把大数批次当成积压拒收，成为外部 CPU 侧「提交被拒」的真正原因。<b>已删除。</b></p>
+     * <p>此前按分段数判定的 {@code HARD_OUTPUT_CHUNK_BUDGET} 即因该误判，
+     * 将大数批次视为积压并拒收，是外部 CPU 侧「提交被拒」的根因。<b>该常量已删除。</b></p>
      */
     private boolean isOutputBacklogFull() {
         return this.queuedCraftingOutputs.size() >= hardOutputQueueCap();
@@ -898,8 +898,8 @@ public final class AdvancedAlloyFurnaceAeManager {
     public int getRemainingAETaskCount(boolean craftingPattern) {
         int maximum = Math.max(0, this.owner.getMaxAETaskCount());
         if (craftingPattern) {
-            // 用「硬上限」而不是软阈值算槽位：回网积压不该把可用槽位直接打到 0
-            //（那会让调度侧停一拍再重启，表现为合成不丝滑）；单批规模由 AIMD 控制器收敛。
+            // 以「硬上限」而非软阈值计算槽位：回网积压不应使可用槽位直接归零
+            //（否则调度侧会停顿一拍再重启，表现为合成不连续）；单批规模由 AIMD 控制器收敛。
             int cap = hardOutputQueueCap();
             return Math.max(0, cap - Math.min(cap, this.queuedCraftingOutputs.size()));
         }
@@ -933,7 +933,7 @@ public final class AdvancedAlloyFurnaceAeManager {
         if (inputHolder == null) {
             return false;
         }
-        // 背压：上一批产物还没能写回网络时不再接收新批次，避免材料滞留在队列里。
+        // 背压：上一批产物尚未写回网络时不接收新批次，避免材料滞留在队列中。
         // 只在「硬上限」拒收 —— 在此之前单批规模由 AIMD 控制器收敛，容量不会归零，
         // 所以正常永远走不到这里（它只是网络长期不可达时的兜底）。
         if (isOutputBacklogFull()) {
@@ -1283,7 +1283,7 @@ public final class AdvancedAlloyFurnaceAeManager {
      * 调 {@link AlloyFurnaceBigIntegerCpuAdapter#claimOutputs}，把异常吞掉并记日志。
      *
      * <p>契约要求实现不抛异常（见接口 Javadoc）；真抛了也不能让回网中断 ——
-     * 那会让整台机器卡住。返回 {@link BigInteger#ZERO} 表示「这次没收」，退回逐段写回。</p>
+     * 那会导致整台机器停滞。返回 {@link BigInteger#ZERO} 表示本次未接管，退回逐段写回。</p>
      */
     private static @NotNull BigInteger claimOutputsFromCpu(@NotNull AlloyFurnaceBigIntegerCpuAdapter adapter,
                                                            @NotNull AlloyFurnaceBigIntegerBatchContext context,
@@ -1475,7 +1475,7 @@ public final class AdvancedAlloyFurnaceAeManager {
      *
      * @param force true 时忽略「必须晚一个 tick」的保护，且<b>不受</b>每 tick 预算与单键分段上限约束。
      *              只用于取消/拆除：此时 CPU 已放弃这批产物（落进通用存储也不会被错认），
-     *              但方块实体与 NBT 随后就消失，产物必须尽量一次全部写回，否则就丢了。
+     *              但方块实体与 NBT 随后即被移除，产物须尽量一次性全部写回，否则将永久丢失。
      */
     private void flushQueuedCraftingOutputs(boolean force) {
         if (this.queuedCraftingOutputs.isEmpty()) {
@@ -1508,15 +1508,15 @@ public final class AdvancedAlloyFurnaceAeManager {
         }
 
         // 3) 解析一次网络写入目标，整趟刷写复用。
-        //    原来每写一个分段都要重解析（多方块侧 2 次方块实体查询 + 2 次分配），
-        //    而可持续吞吐直接由「每 tick 能插多少次」决定（一 tick 数千次）⇒ 不缓存就直接吃吞吐。
-        //    不可达时直接返回、不触碰任何状态（旧实现会逐段空转并标脏）。
+        //    此前每写一个分段都重新解析（多方块侧 2 次方块实体查询 + 2 次分配），
+        //    而可持续吞吐直接由「每 tick 可插入次数」决定（一 tick 数千次）⇒ 不缓存将直接影响吞吐。
+        //    不可达时直接返回且不修改任何状态（旧实现会逐段做无效重试并标脏）。
         CraftingAeOutputTarget target = this.owner.resolveAeOutputTarget();
         if (target == null) {
             return;
         }
         // 认领提升：见 CraftingAeOutputTarget#supportsClaimHoisting —— 把 neoecoae 兼容层的认领
-        // 从「每段一次」提到「每键一次」，省下 N-1 次 synchronized + 集合分配
+        // 从「每段一次」提升到「每键一次」，可减少 N-1 次 synchronized 与集合分配
         //（N ≈ 6 千/tick @8ms 预算，≈ 7 万/tick @100ms 预算）。
         final boolean hoistClaim = target.supportsClaimHoisting();
 
@@ -1605,7 +1605,7 @@ public final class AdvancedAlloyFurnaceAeManager {
                     insertWorkNanos = System.nanoTime() - flushStarted;
                 }
                 if (inserted < offerLong) {
-                    break; // 只吸收了部分 ⇒ 存储已饱和，继续喂只会空转
+                    break; // 只吸收了部分 ⇒ 存储已饱和，继续投递不会再有进展
                 }
             }
 
@@ -1633,7 +1633,7 @@ public final class AdvancedAlloyFurnaceAeManager {
             double sample = (double) insertWorkNanos / (double) insertCalls;
             double previous = this.measuredInsertNanosPerChunk;
             double updated = this.insertCostMeasured
-                    // 首个有效样本直接采纳：否则要从初始估计慢慢爬，白等几十批。
+                    // 首个有效样本直接采纳：否则需从初始估计逐步收敛，期间数十批次的测量结果不可用。
                     ? previous * (1.0D - INSERT_COST_SMOOTHING) + sample * INSERT_COST_SMOOTHING
                     : sample;
             // 非对称：成本（= 耗时）上升受限，等价于「降档每次最多 5%」；
@@ -1644,7 +1644,7 @@ public final class AdvancedAlloyFurnaceAeManager {
         }
 
         // 5) 清空条目：产物全部回网后发一次终局回调，并从队列移除。
-        //    没有投递任何东西时这里不会命中，也不会 markChanged（旧实现会空转并标脏）。
+        //    没有投递任何内容时这里不会命中，也不会 markChanged（旧实现会做无效重试并标脏）。
         boolean changed = deliveredAny;
         if (deliveredTotal.signum() > 0) {
             // 同步积压总量（精确减）：它是 AIMD 控制器的度量来源。
@@ -1685,7 +1685,7 @@ public final class AdvancedAlloyFurnaceAeManager {
      *
      * <p>调用方保证 {@code delivered ≤ Σᵢ entryᵢ.ledger.amount(key)}（因为 delivered 由聚合余额
      * 逐次扣减得到）。逐条取 {@code min(剩余投递量, 该条余额)} 扣减，累计恰好等于 {@code delivered}
-     * —— 既不会少记（丢物品），也不会多记（凭空扣账）。</p>
+     * —— 既不会少记（丢失物品），也不会多记（虚增扣减）。</p>
      */
     private static void attributeDeliveredOutputs(List<PendingCraftingOutput> entries,
                                                  AEKey key, BigInteger delivered) {
@@ -1702,7 +1702,7 @@ public final class AdvancedAlloyFurnaceAeManager {
      * 复制 AE2 传入的输入计数器。
      *
      * <p>必须用 {@link KeyCounter#addAll}：它保留同一主键下的变体子表与迭代顺序，
-     * 直接遍历再 add 会丢掉这个结构，从而在可替代输入上挑到与 AE2 不同的那一种。</p>
+     * 直接遍历后逐个 add 会丢失该结构，从而在可替代输入上选中与 AE2 不同的变体。</p>
      */
     private static KeyCounter[] copyCounters(KeyCounter[] source) {
         KeyCounter[] copy = new KeyCounter[source.length];
@@ -1733,7 +1733,7 @@ public final class AdvancedAlloyFurnaceAeManager {
         try {
             amount = Math.multiplyExact((long) stack.getCount(), Math.max(1L, multiplier));
         } catch (ArithmeticException exception) {
-            // 倍率在包装阶段已经过 maximumSafeMultiplier 校验，这里只做兜底：宁可少记也不写坏账
+            // 倍率在包装阶段已由 maximumSafeMultiplier 校验，此处仅作保护：宁可少记也不写入错误账目
             return;
         }
         mergeProduced(target, key, amount);
@@ -1913,9 +1913,9 @@ public final class AdvancedAlloyFurnaceAeManager {
             return;
         }
         if (!AlloyFurnaceRecipeCatalog.isReady(level)) {
-            // 目录仍在后台构建（服务器启动那次实测要 30 秒以上）。此刻解码拿不到配方，
-            // 会把完好的样板误判成「missing or has changed」直接丢弃——实测启动时有 6 条
-            // 样板因此被丢掉。保持请求挂起，等目录就绪后的 tick 再重建。
+            // 目录仍在后台构建（服务器启动阶段实测耗时 30 秒以上）。此时解码无法取得配方，
+            // 会将完好的样板误判为「missing or has changed」并直接丢弃——实测启动阶段有 6 条
+            // 样板因此失效。应保持请求挂起，待目录就绪后的 tick 再重建。
             return;
         }
         rebuildPatterns();
@@ -2371,9 +2371,9 @@ public final class AdvancedAlloyFurnaceAeManager {
      * {@code cpuContext} + {@code cpuAdapterId} 用来在产物全部回网后驱动
      * {@code onBatchOutputs} / {@code onBatchFinished}。</p>
      *
-     * <p>CPU 回执绑定<b>不随 NBT 持久化</b>：产物队列本身照常存盘（不会丢物品），但重载后不再补发
-     * 回调。这是刻意的 —— 回调只是本会话内的便利信号，产物最终仍会经 ME 网络正常入账，
-     * 调用方以网络实际入账为准即可。</p>
+     * <p>CPU 回执绑定<b>不随 NBT 持久化</b>：产物队列本身正常存盘（物品不会丢失），但重载后不再补发
+     * 回调。此为刻意设计 —— 回调仅是本会话内的便利信号，产物最终仍经 ME 网络正常入账，
+     * 调用方以网络实际入账为准。</p>
      */
     static final class PendingCraftingOutput {
         final long queuedTick;
@@ -2412,7 +2412,7 @@ public final class AdvancedAlloyFurnaceAeManager {
                               @Nullable AlloyFurnaceBigIntegerBatchContext cpuContext,
                               @Nullable ResourceLocation cpuAdapterId) {
             this.queuedTick = queuedTick;
-            // 拷贝隔离：调用方的 produced 账本随后就被丢弃，但别让它与队列条目共享可变状态。
+            // 拷贝隔离：调用方的 produced 账本随后即被丢弃，但不能与队列条目共享可变状态。
             this.ledger = ledger.copy();
             this.bigIntegerOutputs = bigIntegerOutputs;
             this.cpuContext = cpuContext;

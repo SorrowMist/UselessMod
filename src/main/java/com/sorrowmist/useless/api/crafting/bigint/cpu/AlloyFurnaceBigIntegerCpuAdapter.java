@@ -7,14 +7,14 @@ import org.jetbrains.annotations.NotNull;
 import java.util.List;
 
 /**
- * CPU 侧的产物回执通道：实现它并在 mod 初始化阶段注册，就能收到大数批次的产物与终局通知。
+ * CPU 侧的产物回执通道：实现它并在 mod 初始化阶段注册，即可收到大数批次的产物与终局通知。
  *
  * <h2>为什么需要它</h2>
  *
  * <p>机器产出的总量可以超过 {@code long}，而 AE2 的存储接口单次最多接受 {@code long}，
- * 所以产物是按 {@code Long.MAX_VALUE} 切段、逐 tick 写回 ME 网络的。若你的 CPU 自己维护一份
- * BigInteger 账本（例如给「超长合成任务」记账），只靠网络里的分段是拼不回精确总数的 ——
- * 这个通道会把<b>完整</b>的 BigInteger 产物直接告诉你。</p>
+ * 因此产物按 {@code Long.MAX_VALUE} 切段、逐 tick 写回 ME 网络。若 CPU 自行维护
+ * BigInteger 账本（例如为「超长合成任务」记账），仅凭网络中的分段无法还原精确总数 ——
+ * 本通道直接提供<b>完整</b>的 BigInteger 产物。</p>
  *
  * <h2>回调约定</h2>
  *
@@ -32,7 +32,7 @@ import java.util.List;
  * <h2>没有适配器时会怎样</h2>
  *
  * <p>完全没有降级风险：不注册适配器（或 {@code admit} 时传 {@code cpu = null}）时，
- * 产物依旧照常切段写回 ME 网络，只是不发这些回调。</p>
+ * 产物仍按段写回 ME 网络，仅不发送这些回调。</p>
  */
 public interface AlloyFurnaceBigIntegerCpuAdapter {
 

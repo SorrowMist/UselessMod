@@ -10,18 +10,18 @@ import java.util.Locale;
 /**
  * 三位一体合成样板派发的诊断埋点。
  *
- * <p>用来确认三件事：</p>
+ * <p>用于确认三件事：</p>
  * <ol>
- *   <li>一 tick 收到几个批次（DE 的 bigint 批次节奏）；</li>
- *   <li>每批真实装配了几次 —— {@code 1} 表示整批被折叠成一次装配再按 N 放大（本机的核心优化）；</li>
- *   <li>「本机每 tick 时间预算」有没有在降频（见 {@link AlloyFurnaceTickBudget}）。</li>
+ *   <li>一 tick 收到的批次数量（DE 的 bigint 批次节奏）；</li>
+ *   <li>每批的实际装配次数 —— {@code 1} 表示整批折叠为一次装配再按 N 放大（本机的核心优化）；</li>
+ *   <li>「本机每 tick 时间预算」是否正在降频（见 {@link AlloyFurnaceTickBudget}）。</li>
  * </ol>
  *
- * <p><b>累加一律用 {@link BigInteger}</b>：单批就能到 1e20 以上，用 long 会溢出成负数，
- * 用 double 会丢尾数精度（两者都在这个文件里踩过）。显示时才转科学计数 —— 而且是按十进制位数
- * 直接构造，不经过浮点，日志里看到的就是精确值。</p>
+ * <p><b>累加一律用 {@link BigInteger}</b>：单批规模即可超过 1e20，用 long 会溢出为负数，
+ * 用 double 会丢失尾数精度（两种写法都曾在本文件中造成缺陷）。仅在显示时转换为科学计数法，
+ * 且按十进制位数直接构造、不经过浮点，因此日志中输出的是精确值。</p>
  *
- * <p>界面上的「正在合成 N」只是<b>单个批次</b>的量级，不等于一 tick 的总量，所以验收请看这里的汇总。</p>
+ * <p>界面上的「正在合成 N」仅表示<b>单个批次</b>的量级，不等于一 tick 的总量，验收应以本处汇总为准。</p>
  */
 public final class TrinityDispatchDiagnostics {
     private static final Logger LOGGER = LogUtils.getLogger();

@@ -64,12 +64,12 @@ public interface AlloyFurnaceBigIntegerTarget {
      * <ul>
      *   <li>容量小且 {@code isThrottled() == false} —— 机器能力就这样（材料窗口 / 能量 / 产物分段
      *       或配置的线程数限制）；</li>
-     *   <li>容量小且 {@code isThrottled() == true} —— 机器正忙（其它机器或本机的耗时把全局预算
-     *       打满了）。此时可以主动延后非紧急批次，缓过来再发。</li>
+     *   <li>容量小且 {@code isThrottled() == true} —— 机器正忙（其它机器或本机的耗时占满了全局
+     *       预算）。此时可以主动延后非紧急批次，待预算恢复后再提交。</li>
      * </ul>
      *
-     * <p>注意降频<b>不会</b>让容量变成 0：完全报「无容量」会引发调度侧「无容量 → 重新提交」的空转，
-     * 所以降频只收窄批次规模。要不要停手由调用方决定。</p>
+     * <p>注意降频<b>不会</b>将容量降至 0：完全上报「无容量」会引发调度侧「无容量 → 重新提交」的
+     * 空转，因此降频只收窄批次规模。是否停止提交由调用方决定。</p>
      *
      * @return 是否正在降频
      */
@@ -79,13 +79,13 @@ public interface AlloyFurnaceBigIntegerTarget {
      * 申请一批大数合成，成功时返回一次性凭据（见 {@link AlloyFurnaceBigIntegerBatch} 的调用契约）。
      *
      * <p>本方法<b>不消费材料、不扣能量</b>，只是做一次快照式检查；真正的检查会在
-     * {@code commit} 时再跑一遍（期间机器状态可能变化，最终以 commit 的返回值为准）。</p>
+     * {@code commit} 时重新执行（期间机器状态可能变化，最终以 commit 的返回值为准）。</p>
      *
      * @param pattern   已解开的样板
      * @param prototype 单次推送的原型（提交时必须原样传回同一个数组对象）
      * @param requested 期望的份数，必须为正
      * @param cpu       CPU 侧绑定，用于接收产物回执；{@code null} 表示不需要回调
-     *                  （产物仍会照常切段写回 ME 网络）
+     *                  （产物仍会按段写回 ME 网络）
      * @return 准入凭据；{@code null} 表示此刻不可接受
      */
     @Nullable AlloyFurnaceBigIntegerBatch admit(IPatternDetails pattern,

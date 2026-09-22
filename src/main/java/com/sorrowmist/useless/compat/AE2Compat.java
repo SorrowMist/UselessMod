@@ -100,14 +100,14 @@ public class AE2Compat {
     }
 
     /**
-     * 从绑定网络里取出「一件满足条件的真实物品」。
+     * 从绑定网络提取一件满足条件的物品。
      *
-     * <p>这里必须按网络上那一件自己的 key 来提取：带耐久的物品（例如 occultism 的粉笔）
-     * 其 key 包含耐久等组件，用一件全新的同类物品去提取是找不到的。取出后返回的栈
-     * 也带着它原本的耐久，方便用完再原样放回。</p>
+     * <p>提取必须按网络中该件物品自身的 key 进行：带耐久的物品（例如 occultism 的粉笔）
+     * 其 key 包含耐久等组件，使用全新的同类物品无法匹配。返回的物品栈保留其原有耐久，
+     * 以便使用后原样放回。</p>
      *
-     * @param matcher 判断某一件是否可用；参数为带原始耐久的物品栈
-     * @return 取出的那一件；网络不可用或没有匹配项时返回 null
+     * @param matcher 判断某件物品是否可用；参数为带原始耐久的物品栈
+     * @return 提取到的物品；网络不可用或无匹配项时返回 null
      */
     @Nullable
     public static ItemStack extractMatchingFromLinkedGrid(ItemStack tool, Player player,
@@ -117,7 +117,7 @@ public class AE2Compat {
 
         var inventory = access.grid.getStorageService().getInventory();
 
-        // 先只挑出目标 key，避免在遍历库存的过程中做修改
+        // 先定位目标 key，避免在遍历库存期间修改库存
         AEItemKey matched = null;
         for (var entry : inventory.getAvailableStacks()) {
             if (entry.getLongValue() <= 0L) continue;

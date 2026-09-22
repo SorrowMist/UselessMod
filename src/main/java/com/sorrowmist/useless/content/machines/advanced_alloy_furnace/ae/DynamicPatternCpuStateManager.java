@@ -230,8 +230,8 @@ public final class DynamicPatternCpuStateManager {
 
     public synchronized List<EcoCandidate> ecoCandidates(Object grid, ResourceLocation itemId) {
         if (grid == null || itemId == null || ecoStates.isEmpty()) {
-            // 空表早退：本方法在产物回网路径上被高频调用（提到逐键一次之前是每段一次），
-            // 没有 ECO 任务时连集合遍历与 List.copyOf 的分配都不该付。
+            // 空表提前返回：本方法在产物回网路径上被高频调用（在改为逐键一次之前为每段一次），
+            // 无 ECO 任务时不应承担集合遍历与 List.copyOf 的分配开销。
             return List.of();
         }
         List<EcoCandidate> result = new ArrayList<>();

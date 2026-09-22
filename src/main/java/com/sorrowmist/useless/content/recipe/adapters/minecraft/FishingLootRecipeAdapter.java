@@ -131,8 +131,8 @@ public final class FishingLootRecipeAdapter implements IRecipeAdapter<FishingLoo
                 continue;
             }
 
-            // 原版表用顶层 pool 包住 fish/junk/treasure 三个子表，必须按子表拆分，
-            // 否则鱼类、杂物与宝藏会被合并成一个产物多达二十余种的配方。
+            // 原版表以顶层 pool 包含 fish/junk/treasure 三个子表，必须按子表拆分，
+            // 否则鱼类、杂物与宝藏会合并为单个产物超过二十种的配方。
             Map<String, List<ItemStack>> grouped = new LinkedHashMap<>();
             // 直接写在顶层 pool 里的物品归入 misc，子表引用会各自带上自己的分组名。
             collectGroupedOutputs(itemRegistry, resourceManager, pool.get("entries"),
@@ -377,7 +377,7 @@ public final class FishingLootRecipeAdapter implements IRecipeAdapter<FishingLoo
                     // 原版钓鱼表用子表拆分鱼类/杂物/宝藏，递归读取子表的 pools。
                     // 子表引用上的 conditions 只决定「是否抽取该子表」——例如原版宝藏要求
                     // 必须在开阔水域——它不影响子表内产物的确定性，因此这里忽略条件继续递归，
-                    // 否则原版宝藏会被整个丢掉。
+                    // 否则原版宝藏条目会被整体丢弃。
                     ResourceLocation childId = ResourceLocation.tryParse(
                             firstNonBlank(stringValue(entry.get("value")),
                                     stringValue(entry.get("name"))));

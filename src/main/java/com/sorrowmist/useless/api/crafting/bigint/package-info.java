@@ -9,11 +9,11 @@
  * <ol>
  *   <li><b>长版 counted 路径</b>：每 tick 派发一个 {@code long} 窗口，靠多次派发累加到 bigint 总量
  *       —— 接口决定的回退路径，慢且占调度；</li>
- *   <li><b>原生 bigint 路径</b>（本 API）：一次派发就能交付<b>超过 long</b> 的批次。</li>
+ *   <li><b>原生 bigint 路径</b>（本 API）：单次派发即可交付<b>超过 long</b> 的批次。</li>
  * </ol>
  *
  * <p>本 API 把第 2 条做成<b>本模组自己的公开契约</b>：任意第三方合成 CPU 只要实现一个适配器接口，
- * 就能做 bigint 发配，<b>不需要依赖任何第三方调度框架</b>，也不需要往 AE2 的 CPU 逻辑里写 mixin。</p>
+ * 即可实现 bigint 发配，<b>不需要依赖任何第三方调度框架</b>，也不需要往 AE2 的 CPU 逻辑里写 mixin。</p>
  *
  * <h2>包结构</h2>
  *
@@ -55,7 +55,7 @@
  *       实测耗时超预算时后续批次容量按比例收窄。用
  *       {@link com.sorrowmist.useless.api.crafting.bigint.AlloyFurnaceBigIntegerTarget#isThrottled()}
  *       可以区分「机器能力就这么多」与「机器正忙」，从而主动延后非紧急批次。
- *       降频不会把容量压到 0（完全无容量会引发调度侧空转），要不要停手由你决定。</li>
+ *       降频不会将容量压至 0（完全无容量会引发调度侧重提交空转），是否停止提交由调用方决定。</li>
  * </ol>
  *
  * <h2>能量闸随线圈档次不同</h2>

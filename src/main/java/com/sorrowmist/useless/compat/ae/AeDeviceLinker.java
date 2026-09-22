@@ -49,7 +49,7 @@ import java.util.Set;
  *   <li>AE2 的网格节点销毁后不可重建，所以这里只创建/销毁<b>连接</b>，绝不碰别人的节点。</li>
  *   <li>断开只认「登记表里那条 + 非空间 + 另一端正好是这台机器」的连接：
  *       世界内的线缆连接（{@code isInWorld() == true}）和其它模组建的连接一律不动。
- *       已登记的连接必然是我们建的——机器当时若已经带着连接，压根不会被登记。</li>
+ *       已登记的连接必然由本模组建立：机器若在登记时已带有连接，则不会进入登记表。</li>
  * </ul>
  */
 public final class AeDeviceLinker {
@@ -150,34 +150,34 @@ public final class AeDeviceLinker {
      * {@code AbstractTerminalPart}，都是部件而非方块实体），所以按「有别的节点就拒绝」会把
      * 「目标身上挂了根线」也误判成「已接入别的网络」，且与供电状态无关。</p>
      *
-     * <p>现行判据只有两条：① 网格里有控制器（<b>离线也算</b>，并进来会变成「多控制器冲突」把两张网一起搞瘫）；
-     * ② 整网已经通电（{@code isPowered()} 就是问网格有没有电）。其余一律允许并入，
-     * 目标身上的线缆 / 终端会一起进来 —— 那正是「连进来」的本意。</p>
+     * <p>现行判据只有两条：① 网格中存在控制器（<b>离线亦计入</b>，并入后会产生「多控制器冲突」导致两张网同时失效）；
+     * ② 整网已通电（{@code isPowered()} 即判断网格是否供电）。其余情况一律允许并入，
+     * 目标身上的线缆 / 终端会一并接入 —— 这正是「连进来」的本意。</p>
      *
-     * <p>历史坑：cluster 型多方块（AE2 / 高级AE 的合成 CPU、量子计算机）的部件之间天然带连接，
-     * 曾经因此误报过「已接入其它网络」；现在的判据不再看节点数量，这个问题顺带消失。</p>
+     * <p>历史问题：cluster 型多方块（AE2 / 高级AE 的合成 CPU、量子计算机）的部件之间天然存在连接，
+     * 曾因此误报「已接入其它网络」；现行判据不再依据节点数量，该误报不再出现。</p>
      */
     private static NetworkState networkState(IGridNode machineNode) {
         IGrid grid;
         try {
             grid = machineNode.getGrid();
         } catch (Throwable notReady) {
-            // 节点还没初始化完（getGrid 会抛 IllegalStateException），这一轮判断不了。
+            // 节点尚未完成初始化（getGrid 抛出 IllegalStateException），本轮无法判定。
             return NetworkState.UNKNOWN;
         }
 
-        // ① 目标那张网有控制器 ⇒ 一律拒绝（**离线的控制器也算**）：
-        //    AE2 一张网只允许一个控制器，并进来会变成「多控制器冲突」，两张网一起瘫。
+        // ① 目标网络存在控制器 ⇒ 一律拒绝（**离线控制器亦计入**）：
+        //    AE2 单个网络只允许一个控制器，并入后会产生「多控制器冲突」，导致两张网同时失效。
         if (grid.getMachineNodes(ControllerBlockEntity.class).iterator().hasNext()) {
             return NetworkState.ALREADY_NETWORKED;
         }
 
-        // ② 整网已经通电、正在运行 ⇒ 当成一张真在工作的网，不并。
+        // ② 整网已通电并处于运行状态 ⇒ 视为正在使用的网络，不并入。
         if (machineNode.isPowered()) {
             return NetworkState.ALREADY_NETWORKED;
         }
 
-        // 其余情况（只是挂着线缆 / 终端 / 部件，且没通电）⇒ 可以并入。
+        // 其余情况（仅挂有线缆 / 终端 / 部件且未通电）⇒ 允许并入。
         return NetworkState.STANDALONE;
     }
 
@@ -218,7 +218,7 @@ public final class AeDeviceLinker {
 
     /**
      * 低频自愈：AE2 不保存连接，区块或存档重载后要把登记过的连接重建回来。
-     * 机器/访问点已经不存在时顺手把死登记清掉。
+     * 机器/访问点已不存在时，一并清除失效登记。
      */
     public static void ensureLinks(MinecraftServer server) {
         AeConnectLinkSavedData data = AeConnectLinkSavedData.get(server);
@@ -250,7 +250,7 @@ public final class AeDeviceLinker {
                 IGridNode machineNode = resolveNode(host);
                 IGridNode accessNode = accessPoint.getMainNode().getNode();
                 if (machineNode == null || accessNode == null || !accessPoint.getMainNode().isOnline()) {
-                    // 节点还没就绪（AE2 会把建节点推迟到首个 tick），等下一轮再试，别误删登记。
+                    // 节点尚未就绪（AE2 将节点创建推迟到首个 tick），留待下一轮重试，避免误删登记。
                     continue;
                 }
 
@@ -258,8 +258,8 @@ public final class AeDeviceLinker {
             }
         }
 
-        // 豁免索引按节点身份查：AE2 换掉节点后旧条目再也匹配不上，但会一直持有引用，
-        // 而且每次通道重算都要被遍历一遍。趁这个低频闹钟顺手清掉失效条目。
+        // 豁免索引按节点身份查询：AE2 更换节点后旧条目无法再匹配，但会持续持有引用，
+        // 且每次通道重算都会遍历一次。因此在该低频周期中一并清理失效条目。
         AeLinkChannelBypass.pruneStaleLinks();
     }
 
@@ -271,7 +271,7 @@ public final class AeDeviceLinker {
      * <ol>
      *   <li><b>契约路径</b>：{@code getGridNode(null)} —— 方块实体自身的主节点，
      *       以及挂在 CableBus <b>中心位</b>的线缆（{@code CableBusContainer.getGridNode(null)}
-     *       会兜底到 {@code storage.getCenter()}）。</li>
+     *       会回退到 {@code storage.getCenter()}）。</li>
      *   <li><b>对外朝向节点</b>：逐个方向问 {@code getGridNode(side)}。只有重写了
      *       {@code IPart.getExternalFacingNode()} 的部件才在这条路上有值 ——
      *       目前是 P2P 隧道、石英纤维、开关总线三类。</li>
@@ -319,8 +319,8 @@ public final class AeDeviceLinker {
                     if (node == null) {
                         continue;
                     }
-                    // 优先取已就绪（已挂上网格）的节点；没就绪的先记着，
-                    // 万一整块方块都还没初始化完，交给 ensureLinks() 下一轮重试。
+                    // 优先返回已就绪（已挂上网格）的节点；未就绪的暂存，
+                    // 若整个方块尚未完成初始化，则由 ensureLinks() 在下一轮重试。
                     if (isNodeReady(node)) {
                         return node;
                     }
@@ -347,7 +347,7 @@ public final class AeDeviceLinker {
 
     static boolean createLink(IGridNode accessNode, IGridNode machineNode) {
         if (hasConnection(accessNode, machineNode)) {
-            // 连接已经在了（自愈重跑 / 重复触发）：通道豁免索引也要补登记，别漏。
+            // 连接已存在（自愈重跑或重复触发）：仍需补登记通道豁免索引，避免遗漏。
             AeLinkChannelBypass.register(accessNode, machineNode);
             return true;
         }
@@ -390,7 +390,7 @@ public final class AeDeviceLinker {
 
     /** 目标机器的网络归属判定结果。 */
     private enum NetworkState {
-        /** 没有控制器、也没通电（顶多挂着线缆 / 终端）：可以并入工具绑定的网络。 */
+        /** 没有控制器、也未通电（至多连接线缆 / 终端）：可以并入工具绑定的网络。 */
         STANDALONE,
         /** 有控制器、或整网已经在跑：拒绝，避免把两张网误并成一张。 */
         ALREADY_NETWORKED,

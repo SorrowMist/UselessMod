@@ -189,8 +189,8 @@ public class CompactC9BlockEntity extends ECOComputationSystemBlockEntity
         if (!pendingCpuAnnounce) {
             return;
         }
-        // 成型那一刻节点可能还没真正挂到网格上（AE2 的节点入网要等网格 tick），
-        // 所以这里不能一次失败就放弃，要重试到真正入网为止。
+        // 成型时节点可能尚未挂载到网格（AE2 的节点入网需等待网格 tick），
+        // 因此单次失败不可放弃，需重试至入网完成。
         if (cpuAnnounceAttempts++ > 100) {
             pendingCpuAnnounce = false;
             return;

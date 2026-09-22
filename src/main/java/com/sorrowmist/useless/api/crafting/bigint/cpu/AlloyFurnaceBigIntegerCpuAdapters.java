@@ -95,12 +95,12 @@ public final class AlloyFurnaceBigIntegerCpuAdapters {
     /**
      * 是否存在「会整批接走产物」的适配器（即覆写了 {@link AlloyFurnaceBigIntegerCpuAdapter#claimOutputs}）。
      *
-     * <p><b>为什么要探测它</b>：本机的「产物交付能力」闸（{@code maximumSegmentedCount}）假设
-     * <b>产物由本机逐段写回网络</b>。若已有 CPU 适配器整批接走产物，这条闸就失去意义 ——
-     * 交付由对方负责，再按它限制单批规模只会白白压小批次。</p>
+     * <p><b>探测该项的原因</b>：本机的「产物交付能力」闸（{@code maximumSegmentedCount}）假定
+     * <b>产物由本机逐段写回网络</b>。若已有 CPU 适配器整批接走产物，该闸即失去意义 ——
+     * 交付由对方负责，再按其限制单批规模只会无谓地压小批次。</p>
      *
-     * <p>用「声明类是否还是接口本身」判断是否覆写了 default 方法，是标准做法，
-     * 这样调用方不必额外实现一个声明方法。</p>
+     * <p>以「声明类是否仍为接口本身」判断 default 方法是否被覆写，是标准做法，
+     * 调用方因此无需额外实现声明方法。</p>
      */
     public static boolean hasBulkOutputAdapter() {
         for (AlloyFurnaceBigIntegerCpuAdapter adapter : ADAPTERS.values()) {

@@ -96,8 +96,8 @@ public class ChainMiningStrategy implements MiningStrategy {
                 continue;
             }
 
-            // 单个方块不能拖垮整批：模组的破坏回调抛异常（数据能源的三位一体样板核心
-            // 在状态未就绪时会抛）或方块拒绝被移除，都只跳过这一格，继续挖剩下的。
+            // 单格失败不得中断整批：模组的破坏回调抛出异常（数据能源的三位一体样板核心
+            // 在状态未就绪时会抛出）或方块拒绝被移除时，仅跳过该格并继续处理其余目标。
             try {
                 MiningUtils.MiningResult result = forceMining
                         ? MiningUtils.forceMineBlock(level, targetPos, currentState, player, hand)

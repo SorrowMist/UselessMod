@@ -29,7 +29,7 @@ public final class ModIngredientTypes {
      * 整个 RegisterEvent 派发随之失败，NeoForge 把本模组标记为 broken mod state 并崩溃。
      *
      * <p>因此注册本身也必须放在加载检查之后：HNN 缺席时该字段为 {@code null}，
-     * supplier 根本不会被创建，HNN 与 Placebo 的类永远不会被解析。
+     * supplier 不会被创建，HNN 与 Placebo 的类不会被解析。
      * 使用方见 {@code DataModelRangeIngredient#getType()}。
      */
     @Nullable

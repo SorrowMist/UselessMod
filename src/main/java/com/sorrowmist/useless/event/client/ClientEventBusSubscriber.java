@@ -121,7 +121,7 @@ public class ClientEventBusSubscriber {
         if (KeyBindings.TOGGLE_CROP_HARVEST_KEY.get().consumeClick()) {
             ItemStack mainHandItem = player.getMainHandItem();
             if (mainHandItem.getItem() instanceof EndlessBeafItem) {
-                // 切换顺手收菜（右键成熟作物：收获并保留种子在地里）
+                // 切换「顺手收菜」（右键成熟作物：收获并保留种子于耕地）
                 boolean currentHarvest = EndlessBeafItem.isCropHarvestEnabled(mainHandItem);
                 PacketDistributor.sendToServer(
                         new ModeTogglePacket(ModeTogglePacket.ModeType.BEEF_CROP_HARVEST, !currentHarvest));

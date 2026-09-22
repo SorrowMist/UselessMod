@@ -34,7 +34,7 @@ import java.util.concurrent.atomic.AtomicInteger;
  * 与实际生成结果不会脱节；侧视图显示层数、起始 Y 与基岩位置。
  *
  * <p><b>两种渲染模式</b>：一格方块能分到的屏幕像素足够（≥ {@link #MIN_TEXTURE_CELL}）时
- * 画真实材质，否则自动降级为平均色块——周期很大时贴图会退化成噪点，色块反而更清晰。
+ * 绘制真实材质，否则自动降级为平均色块——采样周期很大时贴图会退化为噪点，此时色块的辨识度更高。
  *
  * <p><b>为什么烘焙成贴图</b>：{@code GuiGraphics} 的每次 blit 都会单独提交一次绘制，
  * 逐格画材质在密集网格下会到上千次 draw call；所以配置变化时把整个预览烘焙进一张
@@ -243,7 +243,7 @@ final class PlatformPreview implements AutoCloseable {
                 if (px >= viewW) break;
                 int baseX = PlatformLayout.mod((cx - offsetCols) * stepX, periodX);
                 BlockState state = sampleState(baseX, baseZ);
-                // 边缘上的格子按整格缩放、只裁掉越界像素，否则会被压扁。
+                // 边缘格子按整格缩放并裁掉越界像素，否则会被压缩变形。
                 if (textured) {
                     TextureAtlasSprite sprite = spriteFor(state);
                     if (sprite != null) {
@@ -258,8 +258,8 @@ final class PlatformPreview implements AutoCloseable {
     }
 
     /**
-     * 超采样时取子网格里最常见的方块，而不是平均值——平均会把一格宽的道路或
-     * 边界线混进周围的填充色里，反而看不见。
+     * 超采样时取子网格里最常见的方块，而不是平均值——平均值会把一格宽的道路或
+     * 边界线混入周围填充色，导致其在预览图中不可见。
      */
     private BlockState sampleState(int baseX, int baseZ) {
         if (stepX == 1 && stepZ == 1) return stateAt(baseX, baseZ);

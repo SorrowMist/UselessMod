@@ -35,7 +35,7 @@ import java.util.Set;
  * <p><b>全部按身份比较</b>：网格重建时节点/连接都会被换成新对象，{@code equals} 在这套体系里不可靠。</p>
  */
 public final class AeLinkChannelBypass {
-    /** 走路由时的最大步数，只用来兜住「控制器节点自己也有 route 指针」造成的环。 */
+    /** 路由遍历的最大步数，仅用于防御控制器节点自身也持有 route 指针所形成的环。 */
     private static final int MAX_ROUTE_STEPS = 512;
 
     /** 访问点侧节点 → 它连着的机器侧节点们（一个访问点通常连多台机器）。 */
@@ -179,7 +179,7 @@ public final class AeLinkChannelBypass {
 
     /**
      * 该节点是否在「链路」上：机器侧整片子网，以及从机器节点一路到控制器的祖先链。
-     * 这些节点正是因为造化杖连接才会超容，静音它们的自检日志才不会掩盖 AE2 的真实问题。
+     * 这些节点因造化杖连接而超容，静音其自检日志可避免掩盖 AE2 的真实问题。
      */
     public static boolean carriesLinkTraffic(GridNode node) {
         if (MACHINES_BY_ACCESS.isEmpty()) {

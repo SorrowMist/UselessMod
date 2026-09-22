@@ -8,8 +8,8 @@ import net.minecraft.world.entity.player.Player;
  * 造化杖飞行授予标记。
  * <p>
  * 标记写在玩家的持久化数据里，而不是内存集合里。原因：{@code Abilities.mayfly} 本身会被写进
- * 玩家 NBT，如果「这份飞行是模组授予的」只记在内存中，服务器重启 / 单人存档重载后标记就丢了，
- * 玩家离线时带着的 mayfly 再也回收不掉，表现为不拿造化杖也能永久创造飞行。
+ * 玩家 NBT。若「该飞行由模组授予」只记录在内存中，则服务器重启或单人存档重载后该标记即丢失，
+ * 玩家离线期间保留的 mayfly 无法回收，表现为未持有造化杖仍可永久创造飞行。
  */
 public final class FlyEffectedHolder {
     private static final String ROOT_TAG = "useless_mod:beef_tool_flight";

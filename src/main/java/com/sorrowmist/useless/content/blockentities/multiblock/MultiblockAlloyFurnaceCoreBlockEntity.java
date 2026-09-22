@@ -618,8 +618,8 @@ public final class MultiblockAlloyFurnaceCoreBlockEntity extends BlockEntity imp
     /**
      * 本 tick 允许单批产生的产物分段数（AIMD 控制器，转发给 AE 管理器）。
      *
-     * <p>它是「超大量合成不丝滑」的解药：单批规模由实测反馈探测出来，
-     * 收敛到「一批大约一两个 tick 交付完」，而不是用固定值猜。</p>
+     * <p>用于解决超大量合成过程中交付不连续的问题：单批规模由实测反馈探测得出，
+     * 收敛至「一批约在一到两个 tick 内交付完成」，而非使用固定值估算。</p>
      */
     @Override
     public long outputSegmentBudget() {
@@ -722,9 +722,9 @@ public final class MultiblockAlloyFurnaceCoreBlockEntity extends BlockEntity imp
     /**
      * 解析一次 ME 网络写入目标，供一次「产物回网」刷写 pass 内复用。
      *
-     * <p>原来每写一个分段都要重解析一次（{@link #getAeNetworkAccess()} 里 2 次方块实体查询 +
-     * 2 次分配，再加 {@link #getAeGrid()} 又一次装配体查询）。而可持续吞吐直接由「每 tick 能插多少次」
-     * 决定，一 tick 可能插数千次 ⇒ 这段解析成本直接吃吞吐，必须提到 pass 外只做一次。</p>
+     * <p>此前每写一个分段都重新解析一次（{@link #getAeNetworkAccess()} 中 2 次方块实体查询 +
+     * 2 次分配，再加 {@link #getAeGrid()} 又一次装配体查询）。可持续吞吐直接由「每 tick 可插入次数」
+     * 决定，一 tick 可能插入数千次 ⇒ 该解析成本直接影响吞吐，必须在 pass 外仅执行一次。</p>
      */
     @Override
     public @Nullable CraftingAeOutputTarget resolveAeOutputTarget() {

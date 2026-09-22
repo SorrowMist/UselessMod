@@ -115,10 +115,10 @@ public class KeyBindings {
             GLFW.GLFW_KEY_L,
             CATEGORY
     ));
-    // 短距传送：真正的组合键，默认 Shift + 鼠标右键。
-    // NeoForge 的 KeyModifier 会在按键分发阶段就按修饰键分桶（见 KeyMappingLookup.getAll），
-    // 不按住 Shift 时 clickCount 根本不会增加，因此无需在代码里再判断 Shift。
-    // 玩家可在按键设置里单独修改修饰键与主键，两者都会被 Options 持久化。
+    // 短距传送：组合键，默认 Shift + 鼠标右键。
+    // NeoForge 的 KeyModifier 在按键分发阶段即按修饰键分桶（见 KeyMappingLookup.getAll），
+    // 未按住 Shift 时 clickCount 不会增加，因此代码中无需再次判定 Shift。
+    // 修饰键与主键均可在按键设置中单独修改，并由 Options 持久化。
     private static final String SHORT_TELEPORT = "key.useless_mod.short_teleport";
     public static final Lazy<KeyMapping> SHORT_TELEPORT_KEY = Lazy.of(() -> new KeyMapping(
             SHORT_TELEPORT,

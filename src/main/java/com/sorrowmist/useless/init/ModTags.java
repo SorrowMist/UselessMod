@@ -27,7 +27,7 @@ public final class ModTags {
      * 塑料方块总标签：涵盖全部四类塑料方块（普通 / 发光 / 连接纹理 / 发光连接纹理）。
      *
      * <p>用于需要整体引用塑料方块的场合，例如把 <code>#useless_mod:plastic_blocks</code>
-     * 填进维度地板白名单即可一次放行所有塑料方块。
+     * 填入维度地板白名单即可一次放行全部塑料方块。
      */
     public static final TagKey<Block> PLASTIC_BLOCKS = createBlockTag("plastic_blocks");
 

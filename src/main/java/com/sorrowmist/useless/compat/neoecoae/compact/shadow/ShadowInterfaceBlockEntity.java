@@ -39,7 +39,7 @@ public class ShadowInterfaceBlockEntity<C extends NECluster<C>> extends ECOMachi
         // grid.getActiveMachines(...) 就会漏掉它（界面样板列表与模糊过滤全空）。
         getMainNode().setFlags();
         // 影子节点不进世界也不做邻居扫描：它靠宿主节点显式连接入网，
-        // 免得每个影子都去 load 邻居区块、并把自己算成"占用该区块"的网络节点。
+        // 以避免每个影子节点加载邻居区块、并将自身登记为占用该区块的网络节点。
         getMainNode().setInWorldNode(false);
     }
 

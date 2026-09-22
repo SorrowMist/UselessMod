@@ -164,9 +164,9 @@ public class UselessMod {
 
         ItemStack stack = event.getItemStack();
 
-        // 顺手收菜：在其它模组的右键收菜逻辑之前先把成熟作物收掉，并把种子留在地里，
-        // 避免部分整合包的收菜功能在造化杖上把作物连根拔起。
-        // 潜行右键时不接管，方便玩家把这次交互让给其它模组。
+        // 顺手收菜：先于其它模组的右键收菜逻辑收获成熟作物，并将种子保留在地里，
+        // 避免部分整合包的收菜功能对造化杖连根拔除作物。
+        // 潜行右键时不接管，以便将本次交互让给其它模组。
         // 按住连锁键（Tab）时按连锁范围整片收。
         if (!event.isCanceled()
                 && stack.getItem() instanceof EndlessBeafItem

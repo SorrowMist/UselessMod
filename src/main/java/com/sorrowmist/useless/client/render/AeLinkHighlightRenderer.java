@@ -124,7 +124,7 @@ public final class AeLinkHighlightRenderer {
         return false;
     }
 
-    /** 收工：清掉缓存，并把计数器顶满，这样下次手持的当 tick 就会立刻要一次最新数据。 */
+    /** 清空缓存并将刷新计数器置为上限，使下一次手持当 tick 立即请求一次最新数据。 */
     private static void clear() {
         dimension = null;
         accessPoint = null;

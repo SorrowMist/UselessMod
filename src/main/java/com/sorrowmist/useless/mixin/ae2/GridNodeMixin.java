@@ -24,11 +24,11 @@ import org.spongepowered.asm.mixin.injection.Redirect;
  *
  * <h2>为什么是 {@code @Redirect} 而不是 {@code @Inject(cancellable = true)}</h2>
  *
- * <p>踩过一次：{@code propagateChannelsUpwards(boolean)} 返回 {@code int}，
+ * <p>已知约束：{@code propagateChannelsUpwards(boolean)} 返回 {@code int}，
  * 用 {@code @Inject} + {@code CallbackInfo} 会在应用 mixin 时直接抛
  * {@code InvalidInjectionException: CallbackInfoReturnable is required}，
  * <b>整个 mixin 静默失效</b>（配置里 {@code required = false}，所以只有一条 WARN，不崩），
- * 于是「静音」从来没生效过 —— 造化杖一接上就满屏 AE2 的通道自检报错。</p>
+ * 导致日志静音从未生效：接入造化杖后 AE2 的通道自检报错会持续刷屏。</p>
  *
  * <p>改用 {@code @Redirect} 有两个好处：</p>
  * <ul>

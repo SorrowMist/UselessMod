@@ -145,8 +145,8 @@ public class MiningUtils {
             return;
         }
 
-        // 这条路径是从方块破坏事件里直接进来的：任何一个模组的破坏回调抛异常，
-        // 异常都会一路冒回事件总线，把整 tick 打断。所以在这里就把异常挡住并上报。
+        // 本方法由方块破坏事件直接调用：任一模组的破坏回调抛出异常，异常都会沿事件
+        // 分发链回传并中断整个 tick。因此在此处捕获并上报异常。
         try {
             MiningResult result = forceMining
                     ? forceMineBlock(level, pos, state, player, tool)
@@ -184,7 +184,7 @@ public class MiningUtils {
         int experience = getExperience(level, pos, state, player, tool);
         if (isSilkTouch(tool)) {
             List<ItemStack> fallbackDrops = getForcedFallbackDrops(state, level, pos);
-            // 被方块自身拒绝移除时不发兜底掉落，否则等于凭空刷出一个核心物品。
+            // 方块自身拒绝移除时不发放回退掉落，否则等同于无中生有地生成一个核心物品。
             return destroyBlockAndCollectDrops(level, pos, state, player, tool).removed()
                     ? new MiningResult(fallbackDrops, 0, true)
                     : MiningResult.NOT_MINED;
@@ -271,7 +271,7 @@ public class MiningUtils {
                 }
             }
 
-            // 如果还没合并完（或者组件不同/空间不够），作为新的一堆加入
+            // 未完成合并（组件不同或空间不足）时，作为新堆加入
             if (!mergedFlag && !item.isEmpty()) {
                 merged.add(item.copy());
             }
@@ -297,18 +297,18 @@ public class MiningUtils {
      *
      * <p>行为矩阵：</p>
      * <ul>
-     *   <li>AE 存储优先开启且绑定了无线访问点：先尝试存入 AE，塞不下的继续下一步。</li>
+     *   <li>AE 存储优先开启且已绑定无线访问点：先尝试存入 AE，未能存入的继续下一步。</li>
      *   <li>范围磁力开启：剩余物品进背包，背包满则掉在玩家脚下。</li>
      *   <li>范围磁力关闭：剩余物品在 {@code dropOrigin} 处落地，走原版拾取。</li>
      * </ul>
      *
      * <p>注意 AE 存储优先是独立于范围磁力生效的：即使磁力关闭，只要 AE 优先开启，
-     * 产物仍会优先存入 AE，只有 AE 塞不下的部分才落地。</p>
+     * 产物仍会优先存入 AE，仅 AE 无法存入的部分落地。</p>
      *
      * @param player     玩家
      * @param drops      掉落物列表
      * @param tool       工具
-     * @param dropOrigin 磁力关闭时的落地点（AE 塞不下的部分也会落在这里）
+     * @param dropOrigin 磁力关闭时的落地点（AE 无法存入的部分亦落于此）
      */
     public static void handleDrops(Player player, List<ItemStack> drops, ItemStack tool, Vec3 dropOrigin) {
         boolean isAE2Loaded = ModList.get().isLoaded("ae2");
@@ -598,13 +598,13 @@ public class MiningUtils {
      *
      * <p><b>两个回调都可能抛</b>：数据能源的三位一体样板核心在持久化状态读不出来时，
      * {@code playerWillDestroy} / {@code getDrops} 会抛 {@link IllegalStateException}
-     * （并在自己的日志里写明「拒绝移除 / 拒绝给出空白核心掉落」）。原来的写法一旦抛异常，
-     * 后面的 {@code removeBlock} 就永远走不到 —— 方块留在原地，而异常一路冒到事件总线，
-     * 把整批连锁挖掘一起打断。</p>
+     * （并在其日志中写明「拒绝移除 / 拒绝给出空白核心掉落」）。此前的写法在抛出异常后，
+     * 后续 {@code removeBlock} 不会被执行 —— 方块留在原地，且异常传播至事件总线，
+     * 导致整批连锁挖掘中断。</p>
      *
      * <p>现在的语义是：<b>回调抛异常 = 模组拒绝这次移除，尊重它</b>（不强行 removeBlock，
-     * 否则对方要保留的样板 / 待输出内容会被静默丢掉），但把异常收在这一层，
-     * 按方块类型去重后只报一次，剩下的方块照常挖。</p>
+     * 否则对方需保留的样板 / 待输出内容会被静默丢弃），但将异常拦截在本层，
+     * 按方块类型去重后仅上报一次，其余方块继续挖掘。</p>
      *
      * @return {@code true} 表示方块已被移除；{@code false} 表示被方块自身的回调拒绝
      */
@@ -632,7 +632,7 @@ public class MiningUtils {
         return true;
     }
 
-    /** 方块自身拒绝被移除：按类型去重上报，别让一次连锁挖掘灌出一屏栈。 */
+    /** 方块自身拒绝被移除：按类型去重上报，避免一次连锁挖掘产生大量重复日志。 */
     private static void reportRefusedRemoval(Block block, BlockPos pos, String callback, Throwable refusal) {
         if (REPORTED_REFUSED_REMOVALS.add(block)) {
             LOGGER.warn("Block {} refused removal at {} ({} threw {}: {}); skipping it, chain mining continues",
@@ -642,7 +642,7 @@ public class MiningUtils {
     }
 
     /**
-     * 单个方块在连锁挖掘里出错时的兜底上报：把异常挡在这一格，后面的方块继续挖。
+     * 单个方块在连锁挖掘中出错时的保护性上报：异常拦截于本格，后续方块继续挖掘。
      * 同样是按方块类型去重。
      */
     static void reportBlockBreakFailure(BlockState state, BlockPos pos, Throwable failure) {

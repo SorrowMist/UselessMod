@@ -18,10 +18,10 @@ import net.neoforged.neoforge.network.handling.IPayloadContext;
 import org.jetbrains.annotations.NotNull;
 
 /**
- * 客户端在魔典预览的五芒星上右键后，把「要摆哪座仪式」告诉服务端。
+ * 客户端在魔典预览的五芒星上右键后，将「要摆放哪座仪式」上报给服务端。
  *
- * <p>方块的实际摆放与 AE 扣料全部在服务端完成，客户端只负责上报预览信息，
- * 避免客户端伪造摆放结果。</p>
+ * <p>方块的实际摆放与 AE 扣料全部在服务端完成，客户端仅负责上报预览信息，
+ * 以避免客户端伪造摆放结果。</p>
  */
 public class RitualSatchelPlacePacket implements CustomPacketPayload {
 

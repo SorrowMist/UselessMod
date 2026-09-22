@@ -479,7 +479,7 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
             IEnergyService energyService = grid.getEnergyService();
             double aeWanted = PowerUnit.FE.convertTo(PowerUnit.AE, wanted);
             double aeGot = energyService.extractAEPower(aeWanted, Actionable.MODULATE, PowerMultiplier.ONE);
-            // 以实际抽取量入账并向下取整，宁可丢弃不足1FE的零头也不凭空多记能量
+            // 以实际抽取量入账并向下取整：丢弃不足 1FE 的零头，避免虚增能量记账
             long feGot = Math.min(wanted, (long) Math.floor(PowerUnit.AE.convertTo(PowerUnit.FE, aeGot)));
             if (feGot > 0L) {
                 this.energyManager.modifyEnergy(feGot);
@@ -1085,8 +1085,8 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
 
     /**
      * 与多方块核心、被动样板舱保持一致：AE 任务的输入/产物统一以 AEKey + long 表示，
-     * 不再按数量物化成 ItemStack。否则取消大批量任务时，退出路径会把百万级材料塞进
-     * 一个越界栈，本地槽放不下就会掉成成千上万个物品实体。
+     * 不再按数量物化成 ItemStack。否则取消大批量任务时，退出路径会尝试将百万级材料写入
+     * 超出容量上限的单个栈，本地槽无法容纳时会掉落为大量物品实体。
      */
     @Override
     public boolean supportsLongAeAmounts() {
@@ -1702,8 +1702,8 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
     /**
      * 解析一次 ME 网络写入目标，供一次「产物回网」刷写 pass 内复用。
      *
-     * <p>原来每写一个分段都要重解析一次（连接检查 + 存储服务查询 + 装配体查询）。
-     * 可持续吞吐直接由「每 tick 能插多少次」决定，一 tick 可能插数千次 ⇒ 这段解析成本直接吃吞吐。</p>
+     * <p>此前每写一个分段都重新解析一次（连接检查 + 存储服务查询 + 装配体查询）。
+     * 可持续吞吐直接由「每 tick 可插入次数」决定，一 tick 可能插入数千次 ⇒ 该解析成本直接影响吞吐。</p>
      */
     @Override
     public @Nullable CraftingAeOutputTarget resolveAeOutputTarget() {

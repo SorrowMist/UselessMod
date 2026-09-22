@@ -27,18 +27,17 @@ import net.minecraft.world.phys.BlockHitResult;
 /**
  * 「匠心仪式挎包」能力的造化杖兼容实现。
  *
- * <p>occultism 的仪式挎包（RitualSatchelItem）能在玩家用魔典预览了某个五芒星后，
- * 一次性把整座仪式所需的方块从挎包内物品栏摆出来。这里把「挎包内物品栏」换成
- * 「玩家背包 + 工具绑定的 AE2 无线网络」：摆阵时优先用玩家背包里的方块，
- * 不够的再从 ME 网络取。</p>
+ * <p>occultism 的仪式挎包（RitualSatchelItem）可在玩家用魔典预览某个五芒星后，
+ * 一次性摆放出整座仪式所需的方块。本实现以「玩家背包 + 工具绑定的 AE2 无线网络」
+ * 替代挎包内物品栏：摆放时优先取用玩家背包内的方块，不足部分从 ME 网络提取。</p>
  *
- * <p>识别与扣料规则严格对齐挎包 {@code RitualSatchelItem#tryPlaceBlockForMatcher}：
- * 先用候选物品解析出「它将要放置出来的方块状态」，再拿该格的 stateMatcher 判定是否吻合，
- * 吻合才真正放置。对粉笔而言颜色与符号由 {@link ChalkItem#getGlyphBlock()} 决定，
- * 所以这一步天然就能挑出正确颜色的那一支。</p>
+ * <p>识别与扣料规则对齐挎包 {@code RitualSatchelItem#tryPlaceBlockForMatcher}：
+ * 先将候选物品解析为其将放置出的方块状态，再由该格的 stateMatcher 判定是否吻合，
+ * 吻合时才执行放置。对粉笔而言，颜色与符号由 {@link ChalkItem#getGlyphBlock()} 决定，
+ * 因此该步骤即可筛选出颜色正确的粉笔。</p>
  *
- * <p>整个类只在 occultism 已加载时才会被 JVM 解析：调用方一律先经
- * {@code ModList.get().isLoaded("occultism")} 守卫，避免硬依赖。</p>
+ * <p>本类仅在 occultism 已加载时才会被 JVM 解析：调用方一律先经
+ * {@code ModList.get().isLoaded("occultism")} 守卫，避免形成硬依赖。</p>
  */
 public final class RitualSatchelCompat {
 
@@ -48,9 +47,9 @@ public final class RitualSatchelCompat {
     }
 
     /**
-     * 按已预览的五芒星，从玩家背包与 AE 网络取方块并把整座仪式摆出来。
+     * 依据已预览的五芒星，从玩家背包与 AE 网络提取方块并摆放整座仪式。
      *
-     * @param multiblockId 魔典预览里的多方块结构 id
+     * @param multiblockId 魔典预览中的多方块结构 id
      * @param anchor       预览锚点（玩家放置预览时的起始位置）
      * @param facing       预览朝向
      */
@@ -67,7 +66,7 @@ public final class RitualSatchelCompat {
         var simulation = multiblock.simulate(level, anchor, facing, false, false);
         boolean placedAnything = false;
         for (var targetMatcher : simulation.getSecond()) {
-            // 「任意方块」与「仅显示」两类占位不需要真的放东西
+            // 「任意方块」与「仅显示」两类占位不参与实际放置
             var type = targetMatcher.getStateMatcher().getType();
             if (type.equals(AnyMatcher.TYPE) || type.equals(DisplayOnlyMatcher.TYPE)) continue;
 
@@ -84,34 +83,34 @@ public final class RitualSatchelCompat {
     }
 
     /**
-     * 为单个多方块占位找一个匹配方块并放下：先翻玩家背包，再问 AE 网络。
+     * 为单个多方块占位查找匹配方块并放置：优先查询玩家背包，其次查询 AE 网络。
      *
-     * <p>放置上下文的坐标语义完全对齐挎包：命中位置取目标格的中心，
-     * 被点击的方块是目标格<b>上方</b>那一格，inside 为 false。
-     * 而 stateMatcher 判定用的位置仍是目标格本身——这一对坐标是挎包
-     * 经实验确定的行为，照搬才能让粉笔的颜色与符号判定正确。</p>
+     * <p>放置上下文的坐标语义与挎包保持一致：命中位置取目标格中心，
+     * 被点击的方块为目标格<b>上方</b>那一格，inside 为 false；
+     * 而 stateMatcher 判定所用的位置仍是目标格本身。该坐标组合与挎包行为一致，
+     * 是粉笔颜色与符号判定正确的前提。</p>
      *
-     * @return 是否真的放下了一个方块
+     * @return 是否成功放置一个方块
      */
     private static boolean placeForMatcher(ServerLevel level, ServerPlayer player, ItemStack tool,
                                            Multiblock.SimulateResult targetMatcher) {
         BlockPos worldPos = targetMatcher.getWorldPosition();
 
-        // 这一格已经摆对了就直接跳过。
-        // 没有这一步的话，重复右键会把方块越堆越高：目标格已有正确方块时它不再可替换，
-        // 放置点就会被算到上一格去。
+        // 目标格已是正确方块时直接跳过。
+        // 缺少该判定时，重复右键会在目标格上方继续放置：目标格已有正确方块即不可替换，
+        // BlockPlaceContext 会把放置点上移到相邻格。
         if (targetMatcher.getStateMatcher().getStatePredicate()
                 .test(level, worldPos, level.getBlockState(worldPos))) {
             return false;
         }
 
-        // 命中格必须是目标格本身，且 inside=true，放置点才会落在 worldPos 上。
-        // 若把命中格写成 worldPos.above()（可替换），BlockPlaceContext 会把放置点
-        // 定在命中格上，结果整座仪式统统高出一格。
+        // 命中格必须取目标格本身且 inside=true，放置点才会落在 worldPos 上。
+        // 若命中格改为 worldPos.above()（该位置可替换），BlockPlaceContext 会把放置点
+        // 上移到命中格，导致整座仪式整体偏移一格。
         BlockHitResult placeHit = new BlockHitResult(
                 worldPos.getCenter(), Direction.UP, worldPos, true);
 
-        // 一、优先用玩家背包里的方块
+        // 优先从玩家背包取用
         Inventory inventory = player.getInventory();
         for (int i = 0; i < inventory.getContainerSize(); i++) {
             ItemStack stack = inventory.getItem(i);
@@ -120,23 +119,23 @@ public final class RitualSatchelCompat {
             if (consumeFromInventory(player, inventory, stack, level, placeHit)) return true;
         }
 
-        // 二、背包里没有，再从绑定的 AE 网络取
+        // 背包内无匹配项时，改从绑定的 AE 网络提取
         return placeFromAe(level, player, tool, worldPos, placeHit, targetMatcher);
     }
 
     /**
-     * 判定一件物品是不是这一格要的方块。
+     * 判定一件物品是否满足该格所需方块。
      *
-     * <p>与挎包一致：先把候选解析成「它将要放置出来的方块状态」，
-     * 再用该格的状态匹配器判定。粉笔的颜色信息就在这一步体现出来，
+     * <p>与挎包一致：先将候选物品解析为其将放置出的方块状态，
+     * 再由该格的状态匹配器判定。粉笔的颜色信息即在此步骤体现，
      * 白色粉笔不会匹配需要其它颜色粉笔的格子。</p>
      *
-     * <p>粉笔额外要求它能在目标格上方存活（下方有支撑），否则会放出一个立刻消失的符号。</p>
+     * <p>粉笔额外要求能在目标格上方存活（下方有支撑），否则放置出的符号方块会立即消失。</p>
      */
     private static boolean matches(ItemStack stack, ServerPlayer player, ServerLevel level, BlockPos worldPos,
                                    BlockHitResult placeHit, Multiblock.SimulateResult targetMatcher) {
-        // 必须用真实玩家构造判定上下文：粉笔的朝向取自玩家朝向，
-        // 若这里传 null，判定用的朝向会与实际放置时不一致，进而挑错方块。
+        // 必须使用真实玩家构造判定上下文：粉笔朝向取自玩家朝向；
+        // 若此处传 null，判定朝向与实际放置时不一致，会选中不匹配的物品。
         BlockPlaceContext placeContext = new BlockPlaceContext(
                 new UseOnContext(level, player, InteractionHand.MAIN_HAND, stack, placeHit));
         BlockState stateToPlace = resolveState(stack, placeContext);
@@ -147,39 +146,39 @@ public final class RitualSatchelCompat {
             return false;
         }
 
-        // 放置点就是目标格本身，所以存活判定也看这一格
+        // 放置点即目标格本身，存活判定同样针对该格
         return stateToPlace.canSurvive(level, worldPos);
     }
 
     /**
-     * 用玩家背包里的这一件完成一次放置。
+     * 使用玩家背包内的该件物品完成一次放置。
      *
-     * <p>关键点：直接在该玩家<b>真实的物品栈</b>上执行 {@code useOn}，
-     * 让物品自己处理耐久与音效，然后回写背包。带耐久的物品（粉笔）因此
-     * 只会掉一点耐久，而不是整件消失；创造模式或配置成不破坏时则不扣。</p>
+     * <p>直接在该玩家<b>真实的物品栈</b>上执行 {@code useOn}，由物品自身处理
+     * 耐久消耗与音效，随后回写背包。带耐久的物品（粉笔）因此只消耗少量耐久，
+     * 而非整件消失；创造模式或配置为不消耗时不扣除。</p>
      *
      * @return 是否成功放置
      */
     private static boolean consumeFromInventory(ServerPlayer player, Inventory inventory,
                                                 ItemStack stack, ServerLevel level,
                                                 BlockHitResult placeHit) {
-        // 只差一点就损坏的物品不用，避免摆到一半碎掉
+        // 剩余耐久不足 1 点的物品跳过，避免放置中途损坏
         if (stack.isDamageableItem() && stack.getMaxDamage() - stack.getDamageValue() <= 1) {
             return false;
         }
 
         stack.useOn(new UseOnContext(level, player, InteractionHand.MAIN_HAND, stack, placeHit));
-        // 强制回写：放置可能消耗了耐久，也可能把整件用掉
+        // 强制回写：放置可能消耗耐久，也可能耗尽整件物品
         inventory.setChanged();
         return true;
     }
 
     /**
-     * 从绑定的 AE 网络取一件匹配方块并放置。
+     * 从绑定的 AE 网络提取一件匹配方块并放置。
      *
-     * <p>取料时按网络上那一件自己的 key 精确提取，因此拿到的栈带着它原有的耐久；
-     * 放置直接作用在这个真实栈上，物品自己决定掉多少耐久，随后再原样放回网络。
-     * 这样耐久就是被正确扣除的，而不是整件消失。</p>
+     * <p>提取时按网络中该件物品自身的 key 精确匹配，因此取得的物品栈保留其原有耐久；
+     * 放置直接作用于该真实物品栈，由物品自身决定耐久消耗，随后原样放回网络。
+     * 由此耐久扣除正确，而非整件消失。</p>
      *
      * @return 是否成功放置
      */
@@ -190,7 +189,7 @@ public final class RitualSatchelCompat {
                 candidate -> matches(candidate, player, level, worldPos, placeHit, targetMatcher));
         if (extracted == null || extracted.isEmpty()) return false;
 
-        // 只差一点就损坏的粉笔不参与，原样放回网络
+        // 剩余耐久不足 1 点的粉笔不参与，原样放回网络
         if (extracted.isDamageableItem()
                 && extracted.getMaxDamage() - extracted.getDamageValue() <= 1) {
             AE2Compat.tryInsertIntoLinkedGrid(tool, player, extracted, Actionable.MODULATE);
@@ -199,7 +198,7 @@ public final class RitualSatchelCompat {
 
         extracted.useOn(new UseOnContext(level, player, InteractionHand.MAIN_HAND, extracted, placeHit));
 
-        // 还没用完就带着新耐久放回网络；用尽了则不放回，等价于消耗掉这一件
+        // 未耗尽则携带新耐久放回网络；已耗尽则不放回，等价于消耗该件物品
         if (!extracted.isEmpty()) {
             AE2Compat.tryInsertIntoLinkedGrid(tool, player, extracted, Actionable.MODULATE);
         }
@@ -207,10 +206,10 @@ public final class RitualSatchelCompat {
     }
 
     /**
-     * 把一个候选物品解析成它将要放置出来的方块状态。
+     * 将候选物品解析为其将放置出的方块状态。
      *
-     * <p>普通方块走 {@link BlockItem} 的标准流程；occultism 的粉笔不是方块物品，
-     * 它画出来的符号方块要单独问 {@link ChalkItem#getGlyphBlock()}。</p>
+     * <p>普通方块经 {@link BlockItem} 的标准流程；occultism 的粉笔不属于方块物品，
+     * 其绘制的符号方块需单独经 {@link ChalkItem#getGlyphBlock()} 获取。</p>
      */
     private static BlockState resolveState(ItemStack stack, BlockPlaceContext placeContext) {
         if (stack.getItem() instanceof BlockItem blockItem) {

@@ -172,8 +172,8 @@ public final class DimensionConfigScreen extends AbstractContainerScreen<Dimensi
         importButton = addButton(318, 302, 88, 18,
                 Component.translatable("gui.useless_mod.dimension_config.import"),
                 "gui.useless_mod.dimension_config.tooltip.import", button -> importPreset());
-        // 覆盖层按钮只进 children（addWidget），由覆盖层自己渲染；放进 renderables 会被
-        // super.render() 画到底层 UI 下面，反而看不见。
+        // 覆盖层按钮只进 children（addWidget），由覆盖层自行渲染；若放进 renderables，会被
+        // super.render() 绘制到底层 UI 之下，导致不可见。
         closePreviewButton = addWidget(new PressableAE2Button(
                 closeButtonX(), closeButtonY(), CLOSE_BUTTON_W, CLOSE_BUTTON_H,
                 Component.translatable("gui.useless_mod.dimension_config.preview.close"),
@@ -361,7 +361,7 @@ public final class DimensionConfigScreen extends AbstractContainerScreen<Dimensi
         syncOverlayButtons();
     }
 
-    /** 把菜单当前的数值同步回输入框，导入后界面才不会与配置脱节。 */
+    /** 将菜单当前数值同步回输入框，避免导入后界面与配置不一致。 */
     private void syncFieldsFromMenu() {
         updatingFields = true;
         layersField.setValue(Integer.toString(menu.getPlatformLayers()));
@@ -463,7 +463,7 @@ public final class DimensionConfigScreen extends AbstractContainerScreen<Dimensi
     /** 遮住整个界面并居中显示俯视示意图与侧视剖面。 */
     private void renderPreviewPopup(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
         // 遮罩用 fill（排队），而 drawPanel 走 AE2 BackgroundGenerator 的 blitSprite（立即），
-        // 不先提交遮罩的话它会在帧末才绘制，反而盖住弹窗。
+        // 若不先提交遮罩，它会在帧末才绘制，从而覆盖弹窗。
         graphics.fill(0, 0, width, height, 0x99000000);
         graphics.flush();
         int x = popupX();

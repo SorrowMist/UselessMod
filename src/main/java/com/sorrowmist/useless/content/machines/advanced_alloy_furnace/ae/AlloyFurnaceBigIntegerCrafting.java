@@ -55,8 +55,8 @@ public final class AlloyFurnaceBigIntegerCrafting {
      * <p>与 {@code CraftingTask#generatePendingOutputs} 的口径一致：一律取 <b>配方</b> 的产出，
      * 而不是样板声明的模板键 —— 样板声明的 id-only 产物槽只是模板，真正落进网络的是配方产出。</p>
      *
-     * <p>同键合并时按 long 饱和：单份产出里同一个键同时出现在 {@code outputs()} 与
-     * {@code keyOutputs()} 才会叠加，实际配方不可能越过 long，这里只是兜底不写坏账。</p>
+     * <p>同键合并时按 long 饱和：仅当同一键同时出现在单份产出的 {@code outputs()} 与
+     * {@code keyOutputs()} 时才会叠加；实际配方不会越过 long，此处仅作饱和保护以避免错误账目。</p>
      *
      * @param manualOperations 一次样板推送代表多少次基础配方操作（手动放大样板 &gt; 1，普通为 1）
      */
@@ -235,8 +235,8 @@ public final class AlloyFurnaceBigIntegerCrafting {
     /**
      * 本批实际要扣的总能量（BigInteger 版 {@code calculateTargetTotalEnergy}）。
      *
-     * <p>正常路径下 {@code count} 已经被 {@link #maximumCountForEnergy} 收窄过，所以结果必然落在
-     * long 内；这里仍然做饱和兜底，避免调用方传入任意 count 时抛异常。</p>
+     * <p>正常路径下 {@code count} 已由 {@link #maximumCountForEnergy} 收窄，结果必然落在
+     * long 范围内；此处仍做饱和保护，避免调用方传入任意 count 时抛出异常。</p>
      *
      * <p><b>有用线圈（tier 10）不会因 count 翻倍</b>：它的催化剂是有用锭，
      * {@code energyMultipliesWithParallel == false} ⇒ 这里走「整批一次固定能耗」分支，
@@ -293,10 +293,10 @@ public final class AlloyFurnaceBigIntegerCrafting {
     /**
      * 把「产物交付能力」并入上限；**若已有 CPU 适配器整批接走产物，则跳过这道闸**。
      *
-     * <p>这道闸的假设是「产物由本机逐段写回网络」。一旦有人整批接走，交付责任就转移到对方，
-     * 再按本机的写回速率限制单批规模只会白白压小批次 —— 而且会把外部 CPU 的自适应窗口
-     * 一起压住（它的窗口增长要求「一批能在 2 tick 内返回完」，批次被我们压小后，
-     * 它按「返回量 × 2 ≥ 窗口」判定的增长门就会失败）。</p>
+     * <p>该限制的前提是「产物由本机逐段写回网络」。一旦有适配器整批接走，交付责任即转移至对方，
+     * 此时再按本机写回速率限制单批规模只会无谓地压小批次 —— 并会同时压制外部 CPU 的自适应窗口
+     * （其窗口增长要求「一批能在 2 tick 内返回完」；批次被压小后，
+     * 按「返回量 × 2 ≥ 窗口」判定的增长条件即无法满足）。</p>
      */
     public static @NotNull BigInteger applyDeliveryLimit(@NotNull BigInteger limit,
                                                          @NotNull List<GenericStack> outputs,

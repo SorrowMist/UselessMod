@@ -58,9 +58,9 @@ public final class JEIPlugin implements IModPlugin {
     @Override
     public void registerRecipes(@NotNull IRecipeRegistration registration) {
         Level level = Minecraft.getInstance().level;
-        // 这里刻意用 entriesIfReady 而不是 entries：本方法跑在客户端渲染线程上，同步构建数万条
-        // 配方会把加载界面卡住二十多秒。目录未就绪时先注册空类别，随后由
-        // refreshAlloyFurnaceRecipes 增量补齐即可。
+        // 此处刻意使用 entriesIfReady 而非 entries：本方法运行在客户端渲染线程上，同步构建
+        // 数万条配方会阻塞加载界面二十余秒。目录未就绪时先注册空类别，随后由
+        // refreshAlloyFurnaceRecipes 增量补齐。
         List<AlloyFurnaceRecipeCatalog.Entry> recipes = AlloyFurnaceRecipeCatalog.entriesIfReady(level);
         registeredAlloyFurnaceRecipes.clear();
         for (AlloyFurnaceRecipeCatalog.Entry recipe : recipes) {
@@ -256,10 +256,10 @@ public final class JEIPlugin implements IModPlugin {
         // Keep the currently visible JEI set until a complete replacement snapshot is available.
         if (!AlloyFurnaceRecipeCatalog.isReady(level)) return;
 
-        // 同样刻意用 entriesIfReady：本方法跑在客户端渲染线程上，目录若尚未就绪，
-        // 这里同步构建会把加载界面再卡二十多秒——而 tick 的合并点随后还会因脏标记
-        // 把这份目录作废重建，等于白算一遍。未就绪时先不补，等目录就绪后
-        // onRecipeCatalogReady 会再调用本方法完成增量补齐。
+        // 此处同样刻意使用 entriesIfReady：本方法运行在客户端渲染线程，目录尚未就绪时
+        // 同步构建会使加载界面再阻塞二十余秒——而 tick 的合并点随后仍会因脏标记
+        // 将该目录作废重建，本次结果随即失效。未就绪时暂不补充，待目录就绪后
+        // onRecipeCatalogReady 会再次调用本方法完成增量补齐。
         List<AlloyFurnaceRecipeCatalog.Entry> currentRecipes =
                 AlloyFurnaceRecipeCatalog.entriesIfReady(level);
         Map<AlloyFurnaceRecipeIdentity, AlloyFurnaceRecipeCatalog.Entry> currentByIdentity =

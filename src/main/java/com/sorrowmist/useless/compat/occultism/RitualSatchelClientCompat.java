@@ -10,12 +10,12 @@ import net.minecraft.world.level.Level;
 import net.neoforged.neoforge.network.PacketDistributor;
 
 /**
- * 匠心仪式挎包的客户端侧：识别玩家魔典预览里有没有可摆放的五芒星。
+ * 匠心仪式挎包的客户端侧：识别魔典预览中是否存在可摆放的五芒星。
  *
- * <p>预览信息只存在于客户端，所以这里只负责「认出玩家点的是哪座仪式的哪一格」
- * 并把预览三元组（结构 id / 锚点 / 朝向）发给服务端；真正的取料与摆放全在服务端完成。</p>
+ * <p>预览信息仅存在于客户端，此处只负责识别玩家点击的仪式与格位，并将预览三元组
+ * （结构 id / 锚点 / 朝向）发送至服务端；取料与摆放均在服务端完成。</p>
  *
- * <p>该类只在 occultism 已加载且处于客户端环境时才会被加载。</p>
+ * <p>本类仅在 occultism 已加载且处于客户端环境时才会被加载。</p>
  */
 public final class RitualSatchelClientCompat {
 
@@ -23,13 +23,13 @@ public final class RitualSatchelClientCompat {
     }
 
     /**
-     * 玩家右键某个方块时，判断它是不是当前魔典预览五芒星上的一格。
+     * 玩家右键方块时，判断该方块是否为当前魔典预览五芒星的一格。
      *
-     * @return true 表示已经接管这次右键（并已把摆放请求发给服务端）
+     * @return true 表示已接管该次右键，并已将摆放请求发送至服务端
      */
     public static boolean trySendPlacement(Level level, Player player, BlockPos pos) {
         var preview = ModonomiconAPI.get().getCurrentPreviewMultiblock();
-        // 世界里没有锚定好的预览就没得摆
+        // 预览未锚定时不参与摆放
         if (preview == null || !preview.isAnchored()) return false;
 
         var simulation = preview.multiblock().simulate(level, preview.anchor(), preview.facing(), false, false);
@@ -38,7 +38,7 @@ public final class RitualSatchelClientCompat {
                 .findFirst();
         if (target.isEmpty()) return false;
 
-        // 「任意方块」与「仅显示」两类占位不需要真的摆东西，交给原版右键链路
+        // 「任意方块」与「仅显示」两类占位无需实际放置，交由原版右键链路处理
         var matcher = target.get().getStateMatcher();
         if (matcher.getType().equals(AnyMatcher.TYPE) || matcher.getType().equals(DisplayOnlyMatcher.TYPE)) {
             return false;

@@ -23,6 +23,26 @@ public final class ModTags {
      */
     public static final TagKey<Block> BEEF_TOOL_TIER_LOCKED = createBlockTag("beef_tool_tier_locked");
 
+    /**
+     * 塑料方块总标签：涵盖全部四类塑料方块（普通 / 发光 / 连接纹理 / 发光连接纹理）。
+     *
+     * <p>用于需要整体引用塑料方块的场合，例如把 <code>#useless_mod:plastic_blocks</code>
+     * 填进维度地板白名单即可一次放行所有塑料方块。
+     */
+    public static final TagKey<Block> PLASTIC_BLOCKS = createBlockTag("plastic_blocks");
+
+    /** 普通塑料方块（不发光、无连接纹理）。 */
+    public static final TagKey<Block> PLASTIC = createBlockTag("plastic");
+
+    /** 发光塑料方块。 */
+    public static final TagKey<Block> GLOW_PLASTIC = createBlockTag("glow_plastic");
+
+    /** 连接纹理塑料方块（CTM）。 */
+    public static final TagKey<Block> PLASTIC_CTM = createBlockTag("plastic_ctm");
+
+    /** 发光连接纹理塑料方块（CTM）。 */
+    public static final TagKey<Block> GLOW_PLASTIC_CTM = createBlockTag("glow_plastic_ctm");
+
     private static TagKey<Item> createItemTag(String path) {
         return ItemTags.create(ResourceLocation.fromNamespaceAndPath(UselessMod.MODID, path));
     }

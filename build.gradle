@@ -395,7 +395,7 @@ dependencies {
     implementation "maven.modrinth:farmers-delight:1.21.1-1.3.3"
     compileOnly "maven.modrinth:ends-delight:2.6.1+neoforge.1.21.1"
     compileOnly "maven.modrinth:enders-delight:1.3.1"
-    compileOnly "maven.modrinth:crabbers-delight:1.2.6"
+    implementation "maven.modrinth:crabbers-delight:1.2.6"
     compileOnly "maven.modrinth:ubes-delight:neoforge-1.21.1-0.4.14"
     compileOnly "curse.maven:barbeques-delight-1007788:8004721"
     compileOnly "curse.maven:gensokyo-delight-youkais-feasts-1309991:8004770"

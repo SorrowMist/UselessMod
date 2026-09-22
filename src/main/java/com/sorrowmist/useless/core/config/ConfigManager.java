@@ -101,6 +101,7 @@ public class ConfigManager {
     private static final ModConfigSpec.BooleanValue ENABLE_CRAFTING_RECIPE_CONVERSION;
     private static final ModConfigSpec.BooleanValue ENABLE_SMELTING_RECIPE_CONVERSION;
     private static final ModConfigSpec.BooleanValue ENABLE_BREWING_RECIPE_CONVERSION;
+    private static final ModConfigSpec.BooleanValue ENABLE_FISHING_RECIPE_CONVERSION;
     private static final ModConfigSpec.BooleanValue ENABLE_VILLAGER_TRADE_RECIPE_CONVERSION;
     private static final ModConfigSpec.BooleanValue ENABLE_FARMERS_DELIGHT_RECIPE_CONVERSION;
     private static final ModConfigSpec.BooleanValue ENABLE_EXTRA_DELIGHT_RECIPE_CONVERSION;
@@ -637,6 +638,8 @@ public class ConfigManager {
                 "enable_brewing_recipe_conversion", true);
         ENABLE_CRAFTING_RECIPE_CONVERSION = defineRecipeConversionOption(
                 "enable_crafting_recipe_conversion", false);
+        ENABLE_FISHING_RECIPE_CONVERSION = defineRecipeConversionOption(
+                "enable_fishing_recipe_conversion", true);
         ENABLE_SMELTING_RECIPE_CONVERSION = defineRecipeConversionOption(
                 "enable_smelting_recipe_conversion", true);
         ENABLE_VILLAGER_TRADE_RECIPE_CONVERSION = defineRecipeConversionOption(
@@ -736,6 +739,7 @@ public class ConfigManager {
                 Map.entry("malum", ENABLE_MALUM_RECIPE_CONVERSION),
                 Map.entry("mekanism", ENABLE_MEKANISM_RECIPE_CONVERSION),
                 Map.entry("mekanismgenerators", ENABLE_MEKANISM_GENERATORS_RECIPE_CONVERSION),
+                Map.entry("minecraft_fishing", ENABLE_FISHING_RECIPE_CONVERSION),
                 Map.entry("modern_industrialization", ENABLE_MODERN_INDUSTRIALIZATION_RECIPE_CONVERSION),
                 Map.entry("mysticalagriculture", ENABLE_MYSTICAL_AGRICULTURE_RECIPE_CONVERSION),
                 Map.entry("naturesaura", ENABLE_NATURES_AURA_RECIPE_CONVERSION),
@@ -969,6 +973,10 @@ public class ConfigManager {
 
     public static boolean isVillagerTradeRecipeConversionEnabled() {
         return getConfigValue(ENABLE_VILLAGER_TRADE_RECIPE_CONVERSION);
+    }
+
+    public static boolean isFishingRecipeConversionEnabled() {
+        return getConfigValue(ENABLE_FISHING_RECIPE_CONVERSION);
     }
 
     public static boolean isRecipeConversionEnabled(String sourceId) {

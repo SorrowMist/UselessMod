@@ -165,6 +165,7 @@ public class EndlessBeafItem extends TieredItem {
                 .component(UComponents.BeefFlintAndSteelComponent, true)
                 .component(UComponents.AEStoragePriorityComponent, false)
                 .component(UComponents.AeNetworkConnectComponent, false)
+                .component(UComponents.BeefRitualSatchelComponent, false)
                 .component(UComponents.WrenchTagEnabledComponent, wrenchTagEnabled)
                 .component(UComponents.ConstructionWandEnabledComponent, false)
                 .component(UComponents.ConstructionWandCoreComponent,
@@ -960,6 +961,16 @@ public class EndlessBeafItem extends TieredItem {
 
         InteractionResult teleportResult = tryTeleport(world, player, ctx.getItemInHand());
         if (teleportResult != InteractionResult.PASS) return teleportResult;
+
+        // 匠心仪式挎包模式：右键魔典预览的五芒星，把整座仪式从 AE 网络摆出来。
+        // 预览只存在于客户端，所以这里在客户端认出目标格并把预览信息发给服务端。
+        if (world.isClientSide && !player.isShiftKeyDown()
+                && ctx.getItemInHand().getOrDefault(UComponents.BeefRitualSatchelComponent.get(), false)
+                && ModList.get().isLoaded("occultism")
+                && com.sorrowmist.useless.compat.occultism.RitualSatchelClientCompat
+                        .trySendPlacement(world, player, ctx.getClickedPos())) {
+            return InteractionResult.SUCCESS;
+        }
 
         InteractionResult lightningCollectorResult = trySummonLightningForCollector(ctx.getLevel(), ctx.getClickedPos(), ctx.getPlayer());
         if (lightningCollectorResult != InteractionResult.PASS) return lightningCollectorResult;

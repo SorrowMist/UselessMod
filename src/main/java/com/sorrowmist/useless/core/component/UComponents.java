@@ -201,6 +201,20 @@ public final class UComponents {
                            ))
             );
 
+    /**
+     * 匠心仪式挎包模式（RitualSatchel）
+     * 开启后右键已用魔典预览过的五芒星，可直接从绑定的 AE 网络取方块把整座仪式摆出来。
+     * 仅在安装了 occultism 时才会出现在模式轮盘里。
+     */
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<Boolean>> BeefRitualSatchelComponent =
+            register("beef_ritual_satchel", builder ->
+                    builder.persistent(Codec.BOOL)
+                           .networkSynchronized(StreamCodec.of(
+                                   FriendlyByteBuf::writeBoolean,
+                                   FriendlyByteBuf::readBoolean
+                           ))
+            );
+
     public static final DeferredHolder<DataComponentType<?>, DataComponentType<Boolean>> ForceKillEnabledComponent =
             register("force_kill_enabled", builder ->
                     builder.persistent(Codec.BOOL)

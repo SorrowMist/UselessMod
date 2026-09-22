@@ -5,6 +5,7 @@ import appeng.api.networking.IGrid;
 import appeng.api.networking.security.IActionSource;
 import appeng.api.networking.storage.IStorageService;
 import appeng.api.stacks.AEItemKey;
+import appeng.api.stacks.AEKey;
 import appeng.blockentity.networking.WirelessAccessPointBlockEntity;
 import com.sorrowmist.useless.core.component.UComponents;
 import net.minecraft.core.BlockPos;
@@ -16,6 +17,8 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import org.jetbrains.annotations.Nullable;
+
+import java.util.function.Predicate;
 
 public class AE2Compat {
 
@@ -94,6 +97,42 @@ public class AE2Compat {
         );
 
         return (int) inserted;
+    }
+
+    /**
+     * 从绑定网络里取出「一件满足条件的真实物品」。
+     *
+     * <p>这里必须按网络上那一件自己的 key 来提取：带耐久的物品（例如 occultism 的粉笔）
+     * 其 key 包含耐久等组件，用一件全新的同类物品去提取是找不到的。取出后返回的栈
+     * 也带着它原本的耐久，方便用完再原样放回。</p>
+     *
+     * @param matcher 判断某一件是否可用；参数为带原始耐久的物品栈
+     * @return 取出的那一件；网络不可用或没有匹配项时返回 null
+     */
+    @Nullable
+    public static ItemStack extractMatchingFromLinkedGrid(ItemStack tool, Player player,
+                                                          Predicate<ItemStack> matcher) {
+        LinkedGridAccess access = resolveLinkedGrid(tool, player);
+        if (access == null) return null;
+
+        var inventory = access.grid.getStorageService().getInventory();
+
+        // 先只挑出目标 key，避免在遍历库存的过程中做修改
+        AEItemKey matched = null;
+        for (var entry : inventory.getAvailableStacks()) {
+            if (entry.getLongValue() <= 0L) continue;
+            if (!(entry.getKey() instanceof AEItemKey itemKey)) continue;
+
+            ItemStack candidate = itemKey.toStack(1);
+            if (candidate.isEmpty() || !matcher.test(candidate)) continue;
+
+            matched = itemKey;
+            break;
+        }
+        if (matched == null) return null;
+
+        if (inventory.extract(matched, 1L, Actionable.MODULATE, access.source) <= 0L) return null;
+        return matched.toStack(1);
     }
 
     @Nullable

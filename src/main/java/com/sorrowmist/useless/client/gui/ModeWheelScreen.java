@@ -589,6 +589,8 @@ public class ModeWheelScreen extends Screen {
             case BeefToolModuleRegistry.BEEF_SHEARS -> bool(UComponents.BeefShearsComponent, true);
             case BeefToolModuleRegistry.BEEF_FLINT_AND_STEEL ->
                     bool(UComponents.BeefFlintAndSteelComponent, true);
+            case BeefToolModuleRegistry.BEEF_RITUAL_SATCHEL ->
+                    bool(UComponents.BeefRitualSatchelComponent, false);
             default -> false;
         };
     }
@@ -937,6 +939,9 @@ public class ModeWheelScreen extends Screen {
             case BeefToolModuleRegistry.BEEF_FLINT_AND_STEEL ->
                     toggle(ModeTogglePacket.ModeType.BEEF_FLINT_AND_STEEL,
                             UComponents.BeefFlintAndSteelComponent, true);
+            case BeefToolModuleRegistry.BEEF_RITUAL_SATCHEL ->
+                    toggle(ModeTogglePacket.ModeType.BEEF_RITUAL_SATCHEL,
+                            UComponents.BeefRitualSatchelComponent, false);
             default -> {
             }
         }

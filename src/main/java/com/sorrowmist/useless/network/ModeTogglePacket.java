@@ -107,6 +107,9 @@ public class ModeTogglePacket implements CustomPacketPayload {
                 case BEEF_TIME_ACCELERATION -> {
                     if (stack.getItem() instanceof EndlessBeafItem) {
                         stack.set(UComponents.BeefTimeAccelerationEnabledComponent.get(), msg.enabled);
+                        if (msg.enabled) {
+                            disableRitualSatchel(stack);
+                        }
                     }
                 }
                 case BEEF_INVULNERABILITY -> {
@@ -153,6 +156,7 @@ public class ModeTogglePacket implements CustomPacketPayload {
                         stack.set(UComponents.BeefCropHarvestComponent.get(), msg.enabled);
                         if (msg.enabled) {
                             disableAeNetworkConnect(stack);
+                            disableRitualSatchel(stack);
                         }
                     }
                 }
@@ -164,6 +168,17 @@ public class ModeTogglePacket implements CustomPacketPayload {
                 case BEEF_FLINT_AND_STEEL -> {
                     if (stack.getItem() instanceof EndlessBeafItem) {
                         EndlessBeafItem.setFlintAndSteelEnabled(stack, msg.enabled);
+                    }
+                }
+                case BEEF_RITUAL_SATCHEL -> {
+                    // 该能力依赖 occultism 的仪式挎包机制，未加载时直接忽略，避免写入无人读取的组件
+                    if (ModList.get().isLoaded("occultism") && stack.getItem() instanceof EndlessBeafItem) {
+                        stack.set(UComponents.BeefRitualSatchelComponent.get(), msg.enabled);
+                        if (msg.enabled) {
+                            // 摆阵要占用右键，打开时把其它右键模式让开
+                            disableAeNetworkConnect(stack);
+                            disableRightClickConflicts(stack);
+                        }
                     }
                 }
             }
@@ -187,6 +202,13 @@ public class ModeTogglePacket implements CustomPacketPayload {
     private static void disableAeNetworkConnect(ItemStack stack) {
         if (stack.getOrDefault(UComponents.AeNetworkConnectComponent.get(), false)) {
             stack.set(UComponents.AeNetworkConnectComponent.get(), false);
+        }
+    }
+
+    /** 匠心仪式挎包同样占用右键，开启其它右键模式时要把它关掉。 */
+    private static void disableRitualSatchel(ItemStack stack) {
+        if (stack.getOrDefault(UComponents.BeefRitualSatchelComponent.get(), false)) {
+            stack.set(UComponents.BeefRitualSatchelComponent.get(), false);
         }
     }
 
@@ -217,6 +239,7 @@ public class ModeTogglePacket implements CustomPacketPayload {
         BEEF_FARMLAND_MODE,
         BEEF_CROP_HARVEST,
         BEEF_SHEARS,
-        BEEF_FLINT_AND_STEEL
+        BEEF_FLINT_AND_STEEL,
+        BEEF_RITUAL_SATCHEL
     }
 }

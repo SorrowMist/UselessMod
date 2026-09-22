@@ -26,6 +26,7 @@ import com.sorrowmist.useless.network.PassiveCraftingSlotMultiplierPacket;
 import com.sorrowmist.useless.network.PassiveCraftingStatusPacket;
 import com.sorrowmist.useless.network.OreGeneratorOutputTogglePacket;
 import com.sorrowmist.useless.network.OreGeneratorSettingsPacket;
+import com.sorrowmist.useless.network.RitualSatchelPlacePacket;
 import com.sorrowmist.useless.network.RedstoneControlPacket;
 import com.sorrowmist.useless.network.SelectOmniversalPatternRecipePacket;
 import com.sorrowmist.useless.network.TabKeyPressedPacket;
@@ -151,5 +152,8 @@ public class ModNetwork {
         registrar.playToServer(DimensionConfigSubmitPacket.TYPE,
                                DimensionConfigSubmitPacket.STREAM_CODEC,
                                DimensionConfigSubmitPacket::handle);
+        registrar.playToServer(RitualSatchelPlacePacket.TYPE,
+                               RitualSatchelPlacePacket.STREAM_CODEC,
+                               RitualSatchelPlacePacket::handle);
     }
 }

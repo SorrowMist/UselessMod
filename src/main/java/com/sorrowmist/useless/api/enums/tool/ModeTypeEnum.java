@@ -80,7 +80,11 @@ public enum ModeTypeEnum {
 
     // 打火石功能：true = 右键可点燃营火/蜡烛，或在可点火位置放火
     BEEF_FLINT_AND_STEEL_ENABLED("beef_flint_and_steel_enabled", "tooltip.useless_mod.beef_flint_and_steel_mode"),
-    BEEF_FLINT_AND_STEEL_DISABLED("beef_flint_and_steel_disabled", "tooltip.useless_mod.beef_flint_and_steel_mode");
+    BEEF_FLINT_AND_STEEL_DISABLED("beef_flint_and_steel_disabled", "tooltip.useless_mod.beef_flint_and_steel_mode"),
+
+    // 匠心仪式挎包：true = 右键魔典预览的五芒星，从绑定的 AE 网络取方块摆出整座仪式
+    BEEF_RITUAL_SATCHEL_ENABLED("beef_ritual_satchel_enabled", "tooltip.useless_mod.beef_ritual_satchel_mode"),
+    BEEF_RITUAL_SATCHEL_DISABLED("beef_ritual_satchel_disabled", "tooltip.useless_mod.beef_ritual_satchel_mode");
 
     private final String name;
     private final String tooltipKey;
@@ -175,6 +179,10 @@ public enum ModeTypeEnum {
 
     public static ModeTypeEnum getBeefFlintAndSteelMode(boolean enabled) {
         return enabled ? BEEF_FLINT_AND_STEEL_ENABLED : BEEF_FLINT_AND_STEEL_DISABLED;
+    }
+
+    public static ModeTypeEnum getBeefRitualSatchelMode(boolean enabled) {
+        return enabled ? BEEF_RITUAL_SATCHEL_ENABLED : BEEF_RITUAL_SATCHEL_DISABLED;
     }
 
     public String getName() {return this.name;}

@@ -5,6 +5,8 @@ public final class RecipeSourceIds {
     public static final String CORE = "core";
     public static final String UNKNOWN = "compatibility";
     public static final String MINECRAFT = "minecraft";
+    /** 原版钓鱼战利品表转换来源。 */
+    public static final String MINECRAFT_FISHING = "minecraft_fishing";
     public static final String FARMERS_DELIGHT = "farmersdelight";
     public static final String EXTRA_DELIGHT = "extradelight";
     public static final String CRABBERS_DELIGHT = "crabbersdelight";

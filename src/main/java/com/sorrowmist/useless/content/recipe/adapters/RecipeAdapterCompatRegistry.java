@@ -62,6 +62,7 @@ import com.sorrowmist.useless.content.recipe.adapters.malum.SpiritInfusionRecipe
 import com.sorrowmist.useless.content.recipe.adapters.malum.VoidFavorRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.minecraft.BrewingRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.minecraft.CraftingRecipeAdapter;
+import com.sorrowmist.useless.content.recipe.adapters.minecraft.FishingLootRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.minecraft.SmeltingRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.minecraft.VillagerTradeRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.mysticalagriculture.AwakeningRecipeAdapter;
@@ -78,6 +79,7 @@ import com.sorrowmist.useless.content.recipe.adapters.powah.EnergizingRecipeAdap
 import com.sorrowmist.useless.content.recipe.adapters.productivebees.BeeProduceRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.productivebees.BeeBreedingRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.productivebees.BeeConversionRecipeAdapter;
+import com.sorrowmist.useless.content.recipe.adapters.productivebees.BeeFishingRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.productivebees.CentrifugeRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.summoningrituals.SummoningRitualsAltarRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.hostilenetworks.HostileNetworksRecipeAdapter;
@@ -244,6 +246,9 @@ public final class RecipeAdapterCompatRegistry {
         if (ConfigManager.isVillagerTradeRecipeConversionEnabled()) {
             register(new VillagerTradeRecipeAdapter());
         }
+        if (ConfigManager.isFishingRecipeConversionEnabled()) {
+            register(new FishingLootRecipeAdapter());
+        }
     }
 
     private static void registerFarmersDelight() {
@@ -406,6 +411,7 @@ public final class RecipeAdapterCompatRegistry {
         register(new CentrifugeRecipeAdapter());
         register(new BeeBreedingRecipeAdapter());
         register(new BeeConversionRecipeAdapter());
+        register(new BeeFishingRecipeAdapter());
     }
 
     private static void registerDraconicEvolution() {

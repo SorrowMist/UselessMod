@@ -29,6 +29,7 @@ import com.sorrowmist.useless.content.recipe.adapters.draconicevolution.Draconic
 import com.sorrowmist.useless.content.recipe.adapters.eco.IntegratedWorkingStationRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.enderio.AlloySmeltingRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.enderio.EnchanterRecipeAdapter;
+import com.sorrowmist.useless.content.recipe.adapters.enderio.FireCraftingRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.enderio.SagMillingRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.enderio.SlicingRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.enderio.SoulBindingRecipeAdapter;
@@ -469,6 +470,7 @@ public final class RecipeAdapterCompatRegistry {
 
     private static void registerEnderIO() {
         register(new EnchanterRecipeAdapter());
+        register(new FireCraftingRecipeAdapter());
         register(new AlloySmeltingRecipeAdapter());
         register(new SlicingRecipeAdapter());
         register(new SagMillingRecipeAdapter());

@@ -55,6 +55,9 @@ public class ModeTogglePacket implements CustomPacketPayload {
                     MiningDispatcher.clearPlayerCache(player);
                     stack.set(UComponents.ForceMiningComponent.get(), msg.enabled);
                 }
+                case AUTO_SMELT -> {
+                    stack.set(UComponents.AutoSmeltComponent.get(), msg.enabled);
+                }
                 case AE_STORAGE_PRIORITY -> {
                     stack.set(UComponents.AEStoragePriorityComponent.get(), msg.enabled);
                 }
@@ -195,6 +198,7 @@ public class ModeTogglePacket implements CustomPacketPayload {
     public enum ModeType {
         CHAIN_MINING,
         FORCE_MINING,
+        AUTO_SMELT,
         AE_STORAGE_PRIORITY,
         AE_NETWORK_CONNECT,
         WRENCH_TAG,

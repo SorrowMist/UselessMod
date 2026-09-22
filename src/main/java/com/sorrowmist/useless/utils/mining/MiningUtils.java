@@ -314,6 +314,10 @@ public class MiningUtils {
         boolean isAE2Loaded = ModList.get().isLoaded("ae2");
         boolean magnetEnabled = UComponentUtils.isBeefMagnetEnabled(tool);
 
+        // 自动熔炼：在入库/落地之前先把掉落物炼一遍，
+        // 这样后续的 AE 优先与磁力拾取拿到的都是成品，不需要各自再处理。
+        drops = AutoSmeltHelper.smeltDrops(player.level(), drops, tool);
+
         for (ItemStack drop : drops) {
             if (drop.isEmpty()) continue;
 

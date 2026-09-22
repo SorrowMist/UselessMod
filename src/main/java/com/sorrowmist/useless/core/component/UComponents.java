@@ -134,6 +134,20 @@ public final class UComponents {
             );
 
     /**
+     * 自动熔炼组件（AutoSmelt）
+     * true = 挖掘产生的掉落物先按原版烹饪配方（熔炉/高炉/烟熏炉）炼一遍再入包。
+     * 只影响挖掘掉落，不改变方块本身的行为。
+     */
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<Boolean>> AutoSmeltComponent =
+            register("auto_smelt", builder ->
+                    builder.persistent(Codec.BOOL)
+                           .networkSynchronized(StreamCodec.of(
+                                   FriendlyByteBuf::writeBoolean,
+                                   FriendlyByteBuf::readBoolean
+                           ))
+            );
+
+    /**
      * 增强连锁挖矿模式组件（EnhancedChainMiningMode）
      * 用于在物品上存储是否启用增强连锁挖掘（布尔类型）
      * true = 启用增强连锁挖掘，false = 使用普通连锁挖掘

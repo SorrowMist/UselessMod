@@ -23,6 +23,18 @@ public class UComponentUtils {
     }
 
     /**
+     * 获取物品的自动熔炼状态
+     *
+     * <p>开启后，造化杖挖掘产生的掉落物会先按熔炉配方熔炼一次再入库。</p>
+     *
+     * @param stack 物品栈
+     * @return 自动熔炼是否启用
+     */
+    public static boolean isAutoSmeltEnabled(ItemStack stack) {
+        return stack.getOrDefault(UComponents.AutoSmeltComponent.get(), false);
+    }
+
+    /**
      * 获取物品的AE存储优先状态
      * @param stack 物品栈
      * @return AE存储优先是否启用

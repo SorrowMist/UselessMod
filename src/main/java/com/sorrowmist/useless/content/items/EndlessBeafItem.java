@@ -147,6 +147,7 @@ public class EndlessBeafItem extends TieredItem {
                 .component(UComponents.EnchantModeComponent, EnchantMode.SILK_TOUCH)
                 .component(UComponents.EnhancedChainMiningComponent, false)
                 .component(UComponents.ForceMiningComponent, false)
+                .component(UComponents.AutoSmeltComponent, false)
                 .component(UComponents.ForceKillEnabledComponent, false)
                 .component(UComponents.BeefTimeAccelerationEnabledComponent, false)
                 .component(UComponents.BeefInvulnerabilityEnabledComponent, true)

@@ -31,6 +31,7 @@ public final class BeefToolModuleRegistry {
     public static final String CONSTRUCTION_WAND_DESTRUCTION = "mode.construction_wand_destruction";
     public static final String ENHANCED_CHAIN_MINING = "mode.enhanced_chain_mining";
     public static final String FORCE_MINING = "mode.force_mining";
+    public static final String AUTO_SMELT = "mode.auto_smelt";
     public static final String AE_STORAGE_PRIORITY = "mode.ae_storage_priority";
     public static final String AE_NETWORK_CONNECT = "mode.ae_network_connect";
     public static final String WRENCH_TAG = "mode.wrench_tag";
@@ -78,6 +79,8 @@ public final class BeefToolModuleRegistry {
             new Definition(ENHANCED_CHAIN_MINING, ModeTypeEnum.ENHANCED_CHAIN_MINING_ENABLED.getTooltip(), GroupKind.MINING,
                     Availability.ALWAYS, false),
             new Definition(FORCE_MINING, ModeTypeEnum.FORCE_MINING_ENABLED.getTooltip(), GroupKind.MINING,
+                    Availability.ALWAYS, false),
+            new Definition(AUTO_SMELT, ModeTypeEnum.AUTO_SMELT_ENABLED.getTooltip(), GroupKind.MINING,
                     Availability.ALWAYS, false),
             new Definition(AE_STORAGE_PRIORITY, ModeTypeEnum.AE_STORAGE_PRIORITY_ENABLED.getTooltip(), GroupKind.MINING,
                     Availability.AE2, false),
@@ -129,7 +132,8 @@ public final class BeefToolModuleRegistry {
             BEEF_FLINT_AND_STEEL);
     /** 新增的挖掘类模块：老存档的布局里没有它们，进游戏时自动补进「挖掘」分组。 */
     private static final List<String> AUTO_MINING_MODULES = List.of(
-            AE_NETWORK_CONNECT);
+            AE_NETWORK_CONNECT,
+            AUTO_SMELT);
 
     private static final Map<String, Definition> BY_ID;
 

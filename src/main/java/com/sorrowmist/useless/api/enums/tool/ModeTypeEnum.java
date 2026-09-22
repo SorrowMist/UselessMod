@@ -11,6 +11,10 @@ public enum ModeTypeEnum {
     // 强制挖掘模式
     FORCE_MINING_ENABLED("force_mining_enabled", "tooltip.useless_mod.force_mining_mode"),
     FORCE_MINING_DISABLED("force_mining_disabled", "tooltip.useless_mod.force_mining_mode"),
+
+    // 自动熔炼：true = 挖掘掉落物按熔炉配方熔炼后再入库
+    AUTO_SMELT_ENABLED("auto_smelt_enabled", "tooltip.useless_mod.auto_smelt_mode"),
+    AUTO_SMELT_DISABLED("auto_smelt_disabled", "tooltip.useless_mod.auto_smelt_mode"),
     
     // AE存储优先模式
     AE_STORAGE_PRIORITY_ENABLED("ae_storage_priority_enabled", "tooltip.useless_mod.ae_storage_priority_mode"),
@@ -95,6 +99,10 @@ public enum ModeTypeEnum {
 
     public static ModeTypeEnum getForceMiningMode(boolean enabled) {
         return enabled ? FORCE_MINING_ENABLED : FORCE_MINING_DISABLED;
+    }
+
+    public static ModeTypeEnum getAutoSmeltMode(boolean enabled) {
+        return enabled ? AUTO_SMELT_ENABLED : AUTO_SMELT_DISABLED;
     }
 
     public static ModeTypeEnum getAEStoragePriorityMode(boolean enabled) {

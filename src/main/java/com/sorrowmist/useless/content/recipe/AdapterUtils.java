@@ -21,6 +21,7 @@ import net.neoforged.neoforge.fluids.crafting.SizedFluidIngredient;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
+import java.util.ConcurrentModificationException;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -60,15 +61,44 @@ public class AdapterUtils {
             if (item == null) {
                 continue;
             }
-            try {
-                if (brewing.isIngredient(item.getDefaultInstance())) {
-                    candidates.add(item);
-                }
-            } catch (RuntimeException ignored) {
-                // 第三方注册的异常混合配方不得中断其余试剂的收集。
+            if (isIngredientWithRetry(brewing, item)) {
+                candidates.add(item);
             }
         }
         return List.copyOf(candidates);
+    }
+
+    /** 单个试剂的最大重试次数。 */
+    private static final int REAGENT_PROBE_ATTEMPTS = 32;
+
+    /**
+     * 判定试剂是否被当前酿造实例接受，并在并发注册窗口内重试。
+     *
+     * <p>PotionBrewing 的查询方法直接迭代其内部列表，主线程注册混合配方与后台线程查询重叠时
+     * 会抛出 ConcurrentModificationException。此处若与第三方异常一并无视，候选列表会静默缩水，
+     * 调用方无法察觉产出缺失；因此对并发修改单独重试。其余异常仍按第三方异常配方忽略，
+     * 不得中断其余试剂的收集。</p>
+     *
+     * @return 该试剂是否被接受；重试耗尽或抛出其他异常时返回 false
+     */
+    private static boolean isIngredientWithRetry(PotionBrewing brewing, Item item) {
+        for (int attempt = 0; ; attempt++) {
+            try {
+                return brewing.isIngredient(item.getDefaultInstance());
+            } catch (ConcurrentModificationException exception) {
+                if (attempt >= REAGENT_PROBE_ATTEMPTS - 1) {
+                    return false;
+                }
+                try {
+                    Thread.sleep(1L);
+                } catch (InterruptedException interrupted) {
+                    Thread.currentThread().interrupt();
+                    return false;
+                }
+            } catch (RuntimeException ignored) {
+                return false;
+            }
+        }
     }
 
     /** AE 能量到 FE 的转换系数 */

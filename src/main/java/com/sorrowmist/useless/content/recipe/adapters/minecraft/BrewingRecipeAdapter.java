@@ -33,6 +33,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
+import java.util.ConcurrentModificationException;
 import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -42,6 +43,8 @@ import java.util.Map;
 public final class BrewingRecipeAdapter implements IRecipeAdapter<BrewingSyntheticRecipe> {
     private static final int INPUT_BOTTLES = 3;
     private static final int BREWING_TIME_TICKS = PotionBrewing.BREWING_TIME_SECONDS * 20;
+    /** 单个建造在遇到并发修改时的最大重试次数。 */
+    private static final int MAX_BUILD_ATTEMPTS = 32;
     private static final Item[] POTION_CONTAINERS = {
             Items.POTION,
             Items.SPLASH_POTION,
@@ -74,11 +77,40 @@ public final class BrewingRecipeAdapter implements IRecipeAdapter<BrewingSynthet
 
         synchronized (this) {
             if (cachedBrewing != brewing) {
-                cachedRecipes = createStaticRecipes(
-                        brewing, level.registryAccess(), level.enabledFeatures());
+                cachedRecipes = buildStaticRecipes(brewing, level);
                 cachedBrewing = brewing;
             }
             return cachedRecipes;
+        }
+    }
+
+    /**
+     * 在 PotionBrewing 上构建静态配方，并在并发注册窗口内重试。
+     *
+     * <p>本方法由后台线程调用，而登录与数据包同步期间主线程会向 PotionBrewing 注册混合配方。
+     * 该类的查询方法直接迭代其内部列表，没有可供复制快照的入口，因此注册与查询重叠时
+     * 迭代器会抛出 {@link ConcurrentModificationException}，导致整个 adapter 的产出被丢弃。
+     * 注册是一次性且短暂的，让出 CPU 后重试即可读到完整列表。</p>
+     *
+     * @throws ConcurrentModificationException 重试耗尽后仍处于并发修改状态
+     */
+    private static List<RecipeHolder<BrewingSyntheticRecipe>> buildStaticRecipes(
+            PotionBrewing brewing, Level level) {
+        for (int attempt = 0; ; attempt++) {
+            try {
+                return createStaticRecipes(
+                        brewing, level.registryAccess(), level.enabledFeatures());
+            } catch (ConcurrentModificationException exception) {
+                if (attempt >= MAX_BUILD_ATTEMPTS - 1) {
+                    throw exception;
+                }
+                try {
+                    Thread.sleep(1L);
+                } catch (InterruptedException interrupted) {
+                    Thread.currentThread().interrupt();
+                    throw exception;
+                }
+            }
         }
     }
 

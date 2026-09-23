@@ -17,6 +17,7 @@ import com.mojang.logging.LogUtils;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.crafting.RecipeHolder;
+import net.minecraft.world.item.crafting.RecipeManager;
 import net.minecraft.world.level.Level;
 import net.neoforged.neoforge.fluids.FluidStack;
 
@@ -557,15 +558,21 @@ public final class AlloyFurnaceRecipeCatalog {
 
     private static Snapshot build(Level level, long generation) {
         long startedAt = System.nanoTime();
+        RecipeManager recipeManager = level.getRecipeManager();
+        int totalHolders = recipeManager.getRecipes().size();
+
         List<CollectedRecipe> recipes = new ArrayList<>();
-        for (RecipeHolder<AdvancedAlloyFurnaceRecipe> holder : level.getRecipeManager()
+        for (RecipeHolder<AdvancedAlloyFurnaceRecipe> holder : recipeManager
                 .getAllRecipesFor(ModRecipeTypes.ADVANCED_ALLOY_FURNACE_TYPE.get())) {
             recipes.add(new CollectedRecipe(holder.value(), RecipeSourceIds.CORE));
         }
+        int coreCount = recipes.size();
+        long afterCore = System.nanoTime();
 
         // 先把 adapter 分成「合成配方」与「转换配方」两类。转换类只在这里登记，稍后对全表做单次遍历，
         // 避免每个 adapter 都把整张配方表扫一遍（adapter 数量 × 全服配方数）。
         List<AdapterSource> converting = new ArrayList<>();
+        Map<String, AdapterCost> generatedCosts = new LinkedHashMap<>();
         for (com.sorrowmist.useless.api.recipe.IRecipeAdapter<?> adapter : AlloyFurnaceRecipeManager.getInstance().getRegisteredAdapters()) {
             if (adapter.getClass().getPackageName().contains(".ae.ae2lt")) continue;
             String sourceId = AlloyFurnaceRecipeManager.getInstance().getAdapterSourceId(adapter);
@@ -577,23 +584,37 @@ public final class AlloyFurnaceRecipeCatalog {
                 synthetic.getAllRecipes().forEach(recipe -> recipes.add(new CollectedRecipe(recipe, sourceId)));
                 continue;
             }
+            long generateStart = System.nanoTime();
+            int beforeGenerated = recipes.size();
             collectGenerated(adapter, sourceId, level, recipes);
+            generatedCosts.put(adapterLabel(adapter), new AdapterCost(
+                    System.nanoTime() - generateStart, recipes.size() - beforeGenerated));
             converting.add(new AdapterSource(adapter, sourceId));
         }
-        collectConverted(converting, level.getRecipeManager().getRecipes(), level, recipes);
+        int generatedCount = recipes.size() - coreCount;
+        long afterGenerated = System.nanoTime();
+
+        Map<String, AdapterCost> convertedCosts = new LinkedHashMap<>();
+        collectConverted(converting, recipeManager.getRecipes(), level, recipes, convertedCosts);
+        int convertedCount = recipes.size() - coreCount - generatedCount;
+        long afterConverted = System.nanoTime();
+
         if (RecipeAdapterCompatRegistry.isLoaded(RecipeAdapterCompatRegistry.AE2LT)) {
-            AELightningTechCompatLoader.getJeiRecipes(level.getRecipeManager(), level)
+            AELightningTechCompatLoader.getJeiRecipes(recipeManager, level)
                     .forEach(recipe -> recipes.add(new CollectedRecipe(recipe, RecipeSourceIds.AE2LT)));
         }
+        long afterCompat = System.nanoTime();
 
         // 指纹计算是纯 CPU 密集操作（codec 整条编码 + 成分规范化 + canonicalize + SHA-256），
         // 数万条配方时它占据了目录构建剩余耗时的绝大部分。这里并行计算指纹，再按原有先后
         // 顺序合并：putIfAbsent 的次序与串行版本完全一致，去重结果因此保持不变。
         // 每条配方各自创建序列化上下文（create 内部完成），故并行不存在共享可变状态。
+        long fingerprintStart = System.nanoTime();
         List<FingerprintedRecipe> fingerprinted = recipes.parallelStream()
                 .map(collected -> fingerprint(collected, level))
                 .filter(Objects::nonNull)
                 .toList();
+        long afterFingerprint = System.nanoTime();
         Map<AlloyFurnaceRecipeIdentity, Entry> unique = new LinkedHashMap<>();
         for (FingerprintedRecipe item : fingerprinted) {
             unique.putIfAbsent(item.identity(), new Entry(item.identity(), item.recipe(), item.sourceId()));
@@ -622,13 +643,56 @@ public final class AlloyFurnaceRecipeCatalog {
                 Map.copyOf(bySource), Map.copyOf(bySourceAndRecipeId), generation,
                 new ConcurrentHashMap<>(), new ConcurrentHashMap<>(),
                 ConcurrentHashMap.newKeySet());
+        long afterAssembly = System.nanoTime();
         LOGGER.info("Built alloy-furnace recipe catalog: generation={}, recipes={}, sources={}, elapsed={} ms",
                 generation, ordered.size(), bySource.size(), (System.nanoTime() - startedAt) / 1_000_000L);
+
+        // 全链路分段计时：定位目录构建耗时集中在哪一段。整合包环境下单条日志即可判断瓶颈，
+        // 不必再逐段插桩复测。
+        logBuildPhase("total", startedAt, afterAssembly);
+        logBuildPhase("core-recipes", startedAt, afterCore);
+        logBuildPhase("generate-" + generatedCosts.size() + "-adapters", afterCore, afterGenerated);
+        logBuildPhase("convert-" + converting.size() + "-adapters", afterGenerated, afterConverted);
+        logBuildPhase("ae2lt-compat", afterConverted, afterCompat);
+        logBuildPhase("fingerprint-" + recipes.size() + "-candidates", afterCompat, afterFingerprint);
+        logBuildPhase("dedup-index-assemble", afterFingerprint, afterAssembly);
+        LOGGER.info("Alloy-furnace catalog counts: sourceHolders={}, core={}, generated={}, converted={}, beforeFingerprint={}",
+                totalHolders, coreCount, generatedCount, convertedCount, recipes.size());
+        logSlowestAdapters("generated", generatedCosts, 10);
+        logSlowestAdapters("converted", convertedCosts, 10);
         return snapshot;
+    }
+
+    /** 输出单个构建阶段耗时，便于按阶段定位瓶颈。 */
+    private static void logBuildPhase(String phase, long fromNanos, long toNanos) {
+        LOGGER.info("Alloy-furnace catalog phase [{}]: {} ms", phase,
+                (toNanos - fromNanos) / 1_000_000L);
+    }
+
+    /** 输出耗时最高的若干个 adapter，用于定位单点拖慢的转换器。 */
+    private static void logSlowestAdapters(String stage, Map<String, AdapterCost> costs, int limit) {
+        if (costs.isEmpty()) return;
+        costs.entrySet().stream()
+                .sorted(Comparator.comparingLong((Map.Entry<String, AdapterCost> entry) ->
+                        entry.getValue().nanos()).reversed())
+                .limit(limit)
+                .forEach(entry -> LOGGER.info(
+                        "Alloy-furnace catalog slowest {} adapter: {} -> {} ms (recipes={})",
+                        stage, entry.getKey(), entry.getValue().nanos() / 1_000_000L,
+                        entry.getValue().recipes()));
+    }
+
+    /** 稳定的 adapter 显示名，用于耗时归因。 */
+    private static String adapterLabel(com.sorrowmist.useless.api.recipe.IRecipeAdapter<?> adapter) {
+        return adapter.getClass().getSimpleName();
     }
 
     /** 一个待做配方转换的 adapter 及其来源标识。 */
     private record AdapterSource(com.sorrowmist.useless.api.recipe.IRecipeAdapter<?> adapter, String sourceId) {
+    }
+
+    /** 单个 adapter 的耗时与产出条数。 */
+    private record AdapterCost(long nanos, int recipes) {
     }
 
     /** 已完成指纹计算的配方，用于在并行计算后按原顺序合并。 */
@@ -667,20 +731,33 @@ public final class AlloyFurnaceRecipeCatalog {
      * 配方上万条时这一项会主导整个目录构建耗时。</p>
      */
     private static void collectConverted(List<AdapterSource> sources, Collection<RecipeHolder<?>> holders,
-                                         Level level, List<CollectedRecipe> output) {
+                                         Level level, List<CollectedRecipe> output,
+                                         Map<String, AdapterCost> costs) {
         if (sources.isEmpty() || holders.isEmpty()) return;
 
         // 同一个具体配方类只需解析一次「哪些 adapter 能处理它」。配方类型数远小于配方条数，
         // 因此类型判断的总次数从「配方条数 × adapter 数」降到「配方类型数 × adapter 数」。
         Map<Class<?>, List<AdapterSource>> resolvedByRecipeClass = new HashMap<>();
+        Map<String, long[]> accumulator = new LinkedHashMap<>();
+        Map<String, Integer> produced = new LinkedHashMap<>();
         for (RecipeHolder<?> holder : holders) {
             Object value = holder.value();
             if (value == null) continue;
             List<AdapterSource> matched = resolvedByRecipeClass.computeIfAbsent(
                     value.getClass(), recipeClass -> resolveAdapters(sources, recipeClass));
             if (matched.isEmpty()) continue;
-            convertWith(matched, holder, level, output);
+            for (AdapterSource source : matched) {
+                long adapterStart = System.nanoTime();
+                int before = output.size();
+                RecipeConversionUtils.convertAll(source.adapter(), holder, level)
+                        .forEach(recipe -> output.add(new CollectedRecipe(recipe, source.sourceId())));
+                String label = adapterLabel(source.adapter());
+                accumulator.computeIfAbsent(label, ignored -> new long[1])[0] += System.nanoTime() - adapterStart;
+                produced.merge(label, output.size() - before, Integer::sum);
+            }
         }
+        accumulator.forEach((label, nanos) -> costs.put(label,
+                new AdapterCost(nanos[0], produced.getOrDefault(label, 0))));
     }
 
     /**

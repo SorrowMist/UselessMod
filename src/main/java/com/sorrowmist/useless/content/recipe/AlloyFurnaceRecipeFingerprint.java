@@ -230,7 +230,14 @@ public final class AlloyFurnaceRecipeFingerprint {
         }
     }
 
-    private static String safeItemStack(ItemStack stack, HolderLookup.Provider registries) {
+    /**
+     * 把 ItemStack 编码成只由数据内容决定的稳定字符串。
+     *
+     * <p>编码结果交给 {@link #canonicalize(JsonElement)} 递归排序，因此组件映射、嵌套容器内容等
+     * 任何深度的迭代顺序差异都会被消除。需要为物品栈生成跨进程一致的签名时（例如派生配方 id）
+     * 应复用本方法，而不要直接拼接组件映射的字符串表示。
+     */
+    public static String safeItemStack(ItemStack stack, HolderLookup.Provider registries) {
         if (stack == null) return "null";
         String itemId;
         try {
@@ -261,7 +268,11 @@ public final class AlloyFurnaceRecipeFingerprint {
         return itemId + "#" + count + "#" + components;
     }
 
-    private static String safeFluidStack(FluidStack stack, HolderLookup.Provider registries) {
+    /**
+     * 把 FluidStack 编码成只由数据内容决定的稳定字符串；与 {@link #safeItemStack(ItemStack, HolderLookup.Provider)}
+     * 同源，供派生配方 id 等需要跨进程一致的场景复用。
+     */
+    public static String safeFluidStack(FluidStack stack, HolderLookup.Provider registries) {
         if (stack == null) return "null";
         String fluidId;
         try {

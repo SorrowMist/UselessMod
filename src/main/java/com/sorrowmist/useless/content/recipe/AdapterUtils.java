@@ -10,6 +10,7 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.tags.TagKey;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.alchemy.PotionBrewing;
 import net.minecraft.world.item.crafting.Ingredient;
 import net.minecraft.world.level.material.Fluid;
 import net.neoforged.neoforge.common.crafting.DataComponentIngredient;
@@ -19,6 +20,7 @@ import net.neoforged.neoforge.fluids.crafting.FluidIngredient;
 import net.neoforged.neoforge.fluids.crafting.SizedFluidIngredient;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -41,6 +43,33 @@ public class AdapterUtils {
     public static final int MEKANISM_METALLURGIC_INFUSER_TICKS_REQUIRED = MEKANISM_BASE_TICKS_REQUIRED;
     public static final int MEKANISM_ENRICHMENT_CHAMBER_ENERGY_PER_TICK = 50;
     public static final int MEKANISM_METALLURGIC_INFUSER_ENERGY_PER_TICK = 50;
+
+    /**
+     * 收集全量物品注册表中可作为酿造试剂的物品，用于收窄后续遍历范围。
+     * <p>
+     * hasPotionMix 与 hasContainerMix 的通过者必然满足 isPotionIngredient 或
+     * isContainerIngredient，而 isIngredient 为二者与自定义酿造配方的并集，
+     * 因此以 isIngredient 预筛不会排除任何可产出配方的试剂。
+     *
+     * @param brewing 当前等级的药水酿造实例
+     * @return 预筛后的试剂候选列表
+     */
+    public static List<Item> reagentCandidates(PotionBrewing brewing) {
+        List<Item> candidates = new ArrayList<>();
+        for (Item item : BuiltInRegistries.ITEM) {
+            if (item == null) {
+                continue;
+            }
+            try {
+                if (brewing.isIngredient(item.getDefaultInstance())) {
+                    candidates.add(item);
+                }
+            } catch (RuntimeException ignored) {
+                // 第三方注册的异常混合配方不得中断其余试剂的收集。
+            }
+        }
+        return List.copyOf(candidates);
+    }
 
     /** AE 能量到 FE 的转换系数 */
     public static final int AE_TO_FE_CONVERSION = 2;

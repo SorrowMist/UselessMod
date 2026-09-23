@@ -139,7 +139,7 @@ public final class BrewingRecipeAdapter implements IRecipeAdapter<BrewingSynthet
         PotionBrewing.addVanillaMixes(recording);
 
         List<Holder<Potion>> potions = potionHolders();
-        List<Item> registeredItems = BuiltInRegistries.ITEM.stream().toList();
+        List<Item> registeredItems = AdapterUtils.reagentCandidates(brewing);
         for (CapturedPotionMix mix : recording.potionMixes) {
             for (Item container : POTION_CONTAINERS) {
                 ItemStack input = PotionContents.createItemStack(container, mix.input());

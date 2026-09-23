@@ -41,10 +41,8 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 /** Generates item-only recipes for the dynamic alchemist-cauldron interactions. */
 public final class AlchemistCauldronDynamicRecipeAdapter
@@ -184,7 +182,7 @@ public final class AlchemistCauldronDynamicRecipeAdapter
     private static void addPotionRecipes(
             Map<ResourceLocation, RecipeHolder<DynamicRecipe>> recipes,
             PotionBrewing brewing) {
-        List<Item> reagents = brewingReagents(brewing);
+        List<Item> reagents = AdapterUtils.reagentCandidates(brewing);
         List<Holder<Potion>> potions = potionHolders();
         for (Item container : POTION_CONTAINERS) {
             for (Holder<Potion> potion : potions) {
@@ -234,28 +232,6 @@ public final class AlchemistCauldronDynamicRecipeAdapter
                 }
             }
         }
-    }
-
-    private static List<Item> brewingReagents(PotionBrewing brewing) {
-        Set<Item> reagents = new LinkedHashSet<>();
-        List<Item> registeredItems = BuiltInRegistries.ITEM.stream().toList();
-        for (Item container : POTION_CONTAINERS) {
-            for (Holder<Potion> potion : potionHolders()) {
-                ItemStack input = PotionContents.createItemStack(container, potion);
-                for (Item reagent : registeredItems) {
-                    ItemStack reagentStack = reagent.getDefaultInstance();
-                    try {
-                        if (brewing.hasPotionMix(input, reagentStack)
-                                || brewing.hasContainerMix(input, reagentStack)) {
-                            reagents.add(reagent);
-                        }
-                    } catch (RuntimeException ignored) {
-                        // A broken third-party mix must not prevent other recipes from loading.
-                    }
-                }
-            }
-        }
-        return List.copyOf(reagents);
     }
 
     private static List<Holder<Potion>> potionHolders() {

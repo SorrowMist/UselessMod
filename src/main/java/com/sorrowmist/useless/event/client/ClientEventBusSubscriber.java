@@ -1,8 +1,12 @@
 package com.sorrowmist.useless.event.client;
 
+import com.mojang.blaze3d.platform.InputConstants;
 import com.sorrowmist.useless.UselessMod;
 import com.sorrowmist.useless.api.enums.tool.EnchantMode;
 import com.sorrowmist.useless.client.gui.MiningStatusGui;
+import com.sorrowmist.useless.content.blockentities.multiblock.MultiblockAlloyFurnaceCoreBlockEntity;
+import com.sorrowmist.useless.content.blocks.TeleportPadBlock;
+import com.sorrowmist.useless.content.items.BeefTimeAcceleration;
 import com.sorrowmist.useless.content.items.EndlessBeafItem;
 import com.sorrowmist.useless.core.common.KeyBindings;
 import com.sorrowmist.useless.core.component.UComponents;
@@ -12,20 +16,28 @@ import com.sorrowmist.useless.network.ForceBreakKeyPacket;
 import com.sorrowmist.useless.network.ModeTogglePacket;
 import com.sorrowmist.useless.network.TabKeyPressedPacket;
 import com.sorrowmist.useless.network.TeleportKeyPacket;
+import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.player.LocalPlayer;
+import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.world.phys.HitResult;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
-import net.neoforged.neoforge.client.event.ClientTickEvent;
 import net.neoforged.neoforge.client.event.ClientPlayerNetworkEvent;
+import net.neoforged.neoforge.client.event.ClientTickEvent;
+import net.neoforged.neoforge.client.event.InputEvent;
 import net.neoforged.neoforge.client.event.RegisterGuiLayersEvent;
 import net.neoforged.neoforge.client.event.RegisterKeyMappingsEvent;
 import net.neoforged.neoforge.client.gui.VanillaGuiLayers;
 import net.neoforged.neoforge.event.entity.EntityLeaveLevelEvent;
 import net.neoforged.neoforge.network.PacketDistributor;
+import org.lwjgl.glfw.GLFW;
 
 @EventBusSubscriber(modid = UselessMod.MODID, value = Dist.CLIENT)
 public class ClientEventBusSubscriber {
@@ -48,7 +60,7 @@ public class ClientEventBusSubscriber {
         event.register(KeyBindings.TRIGGER_CHAIN_MINING_KEY.get());
         event.register(KeyBindings.TRIGGER_FORCE_MINING_KEY.get());
 
-        // 短距传送（默认 Shift + 鼠标右键，组合键由 KeyModifier 匹配）
+        // 短距传送（造化杖）
         event.register(KeyBindings.SHORT_TELEPORT_KEY.get());
 
         // UI
@@ -160,16 +172,63 @@ public class ClientEventBusSubscriber {
             }
         }
 
-        // 短距传送：默认 Shift + 鼠标右键的组合键。
-        // KeyModifier.SHIFT 已在 NeoForge 按键分发层分桶，不按住 Shift 时
-        // consumeClick() 不会返回 true，因此这里无需再判断 Shift。
-        // 用 consumeClick() 而非 isDown()，保证按住右键只触发一次。
-        if (KeyBindings.SHORT_TELEPORT_KEY.get().consumeClick()) {
-            ItemStack mainHandItem = player.getMainHandItem();
-            if (mainHandItem.getItem() instanceof EndlessBeafItem) {
-                PacketDistributor.sendToServer(new TeleportKeyPacket());
-            }
+    }
+
+    /**
+     * 短距传送的鼠标触发入口。
+     *
+     * <p>该绑定挂在恒为非激活的冲突上下文上，不参与按键分发，因此按下时原版 keyUse
+     * 仍能取得点击，方块交互不受影响；此处只上报传送请求，不取消该事件。
+     * 是否触发取决于绑定自身配置的主键与修饰键，玩家在按键设置中的改动即时生效。</p>
+     */
+    @SubscribeEvent
+    public static void onMouseButtonPre(InputEvent.MouseButton.Pre event) {
+        if (event.getAction() != GLFW.GLFW_PRESS) return;
+
+        Minecraft mc = Minecraft.getInstance();
+        LocalPlayer player = mc.player;
+        if (player == null || mc.screen != null) return;
+
+        KeyMapping mapping = KeyBindings.SHORT_TELEPORT_KEY.get();
+        InputConstants.Key pressedKey = InputConstants.Type.MOUSE.getOrCreate(event.getButton());
+        if (!pressedKey.equals(mapping.getKey())) return;
+        if (!mapping.getKeyModifier().isActive(mapping.getKeyConflictContext())) return;
+
+        ItemStack mainHandItem = player.getMainHandItem();
+        if (!(mainHandItem.getItem() instanceof EndlessBeafItem)) return;
+        if (!EndlessBeafItem.isTeleportEnabled(mainHandItem)) return;
+        // 时间加速同样绑定 Shift + 右键，两者不可同时触发：启用时交由方块交互处理。
+        if (BeefTimeAcceleration.shouldBlockOtherRightClick(mainHandItem, player)) return;
+        // 仅当准星命中的方块自身要独占该组合键时让位，普通方块不拦截闪现。
+        if (isBlockInteractionPriority(mc)) return;
+
+        PacketDistributor.sendToServer(new TeleportKeyPacket());
+    }
+
+    /**
+     * 判断准星命中的方块是否要独占该组合键。
+     *
+     * <p>仅三类既有交互需要让位：维度传送方块（潜行右键编辑配置）、合金炉核心
+     * （潜行右键自动搭建）与无线接入点（潜行右键绑定目标）。其余方块不消费该组合键，
+     * 闪现照常执行。未命中方块时按未命中处理。</p>
+     */
+    private static boolean isBlockInteractionPriority(Minecraft mc) {
+        Level level = mc.level;
+        if (level == null) return false;
+        if (!(mc.hitResult instanceof BlockHitResult hit)
+                || hit.getType() != HitResult.Type.BLOCK) {
+            return false;
         }
+        BlockPos pos = hit.getBlockPos();
+        if (level.getBlockState(pos).getBlock() instanceof TeleportPadBlock) {
+            return true;
+        }
+        BlockEntity blockEntity = level.getBlockEntity(pos);
+        if (blockEntity instanceof MultiblockAlloyFurnaceCoreBlockEntity) {
+            return true;
+        }
+        return blockEntity != null
+                && blockEntity.getClass().getName().contains("WirelessAccessPoint");
     }
 
     @SubscribeEvent

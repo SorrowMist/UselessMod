@@ -2,6 +2,7 @@ package com.sorrowmist.useless.core.common;
 
 import com.mojang.blaze3d.platform.InputConstants;
 import net.minecraft.client.KeyMapping;
+import net.neoforged.neoforge.client.settings.IKeyConflictContext;
 import net.neoforged.neoforge.client.settings.KeyConflictContext;
 import net.neoforged.neoforge.client.settings.KeyModifier;
 import net.neoforged.neoforge.common.util.Lazy;
@@ -115,17 +116,44 @@ public class KeyBindings {
             GLFW.GLFW_KEY_L,
             CATEGORY
     ));
-    // 短距传送：组合键，默认 Shift + 鼠标右键。
-    // NeoForge 的 KeyModifier 在按键分发阶段即按修饰键分桶（见 KeyMappingLookup.getAll），
-    // 未按住 Shift 时 clickCount 不会增加，因此代码中无需再次判定 Shift。
-    // 修饰键与主键均可在按键设置中单独修改，并由 Options 持久化。
+    /**
+     * 恒为非激活的冲突上下文。
+     *
+     * <p>用于保留组合键在按键设置中的可配置性，同时使其不参与运行时分发。
+     * 若改用 {@code KeyConflictContext.IN_GAME}，按住 Shift 时同键位的原版
+     * {@code keyUse} 会被该修饰键桶遮蔽，方块交互将整体失效。</p>
+     */
+    private static final IKeyConflictContext ALWAYS_INACTIVE = new IKeyConflictContext() {
+        @Override
+        public boolean isActive() {
+            return false;
+        }
+
+        @Override
+        public boolean conflicts(IKeyConflictContext other) {
+            return false;
+        }
+    };
+
+    // 短距传送（造化杖）
     private static final String SHORT_TELEPORT = "key.useless_mod.short_teleport";
+
+    /**
+     * 短距传送绑定。
+     *
+     * <p>该绑定挂在恒为非激活的冲突上下文上：它在按键设置界面中可见、可改键，
+     * 但无法通过 {@code KeyMappingLookup} 的激活过滤。按住 Shift 时其所在修饰键桶
+     * 过滤后为空，查找逻辑转而回退到无修饰键桶，原版 {@code keyUse} 因而仍能取得
+     * 该次点击，方块交互不受影响。触发判定由 {@code InputEvent.MouseButton.Pre}
+     * 按鼠标按下边沿完成，见 {@code ClientEventBusSubscriber}。</p>
+     */
     public static final Lazy<KeyMapping> SHORT_TELEPORT_KEY = Lazy.of(() -> new KeyMapping(
             SHORT_TELEPORT,
-            KeyConflictContext.IN_GAME,
+            ALWAYS_INACTIVE,
             KeyModifier.SHIFT,
             InputConstants.Type.MOUSE,
             GLFW.GLFW_MOUSE_BUTTON_RIGHT,
             CATEGORY
     ));
+
 }

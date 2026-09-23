@@ -49,6 +49,8 @@ public class ConfigManager {
     private static final ModConfigSpec.DoubleValue BEEF_TOOL_PSEUDO_HARDNESS;
     private static final ModConfigSpec.DoubleValue BEEF_TOOL_ENTITY_INTERACTION_RANGE;
     private static final ModConfigSpec.DoubleValue BEEF_TOOL_BLOCK_INTERACTION_RANGE;
+    // 造化杖短距闪现的最大距离
+    private static final ModConfigSpec.IntValue BEEF_SHORT_TELEPORT_RANGE;
     private static final ModConfigSpec.IntValue BEEF_CONSTRUCTION_WAND_BUILD_LIMIT;
     private static final ModConfigSpec.IntValue BEEF_CONSTRUCTION_WAND_ANGEL_LIMIT;
     private static final ModConfigSpec.IntValue BEEF_CONSTRUCTION_WAND_DESTRUCTION_LIMIT;
@@ -438,6 +440,13 @@ public class ConfigManager {
                 .comment("牛排工具方块触及范围加成, 重启游戏生效")
                 .translation("useless_mod.configuration.beef_tool_block_interaction_range")
                 .defineInRange("beef_tool_block_interaction_range", 8.0, 0.0, 1024.0);
+
+        BEEF_SHORT_TELEPORT_RANGE = SERVER_BUILDER
+                .comment("造化杖短距闪现的最大距离（格）",
+                        "该值为上限而非保证距离：准星方向若在中途命中方块或缺少可站立空间，落点会相应前移",
+                        "未命中任何方块时按该距离取最远落点")
+                .translation("useless_mod.configuration.beef_short_teleport_range")
+                .defineInRange("beef_short_teleport_range", 24, 4, 512);
 
         BEEF_CONSTRUCTION_WAND_BUILD_LIMIT = SERVER_BUILDER
                 .comment("牛排工具建筑手杖普通建造单次最大方块数")
@@ -1115,6 +1124,11 @@ public class ConfigManager {
 
     public static double getBeefToolBlockInteractionRange() {
         return getConfigValue(BEEF_TOOL_BLOCK_INTERACTION_RANGE);
+    }
+
+    // 造化杖短距闪现的最大距离（格）
+    public static int getBeefShortTeleportRange() {
+        return getConfigValue(BEEF_SHORT_TELEPORT_RANGE);
     }
 
     public static int getBeefConstructionWandBuildLimit() {

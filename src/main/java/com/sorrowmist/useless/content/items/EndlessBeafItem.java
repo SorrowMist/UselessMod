@@ -317,10 +317,7 @@ public class EndlessBeafItem extends TieredItem {
         if (!isTeleportEnabled(stack) || player.getCooldowns().isOnCooldown(stack.getItem())) {
             return InteractionResult.PASS;
         }
-        InteractionResult result = BeefTeleportHandler.tryShortTeleport(
-                level,
-                player,
-                ModList.get().isLoaded(EnderIOTravelCompat.MOD_ID));
+        InteractionResult result = BeefTeleportHandler.tryShortTeleport(level, player);
         if (result != InteractionResult.PASS) {
             player.getCooldowns().addCooldown(stack.getItem(), TELEPORT_COOLDOWN_TICKS);
         }

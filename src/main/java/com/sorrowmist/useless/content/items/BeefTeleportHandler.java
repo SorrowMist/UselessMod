@@ -1,6 +1,7 @@
 package com.sorrowmist.useless.content.items;
 
 import com.sorrowmist.useless.compat.enderio.EnderIOTravelCompat;
+import com.sorrowmist.useless.core.config.ConfigManager;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.server.level.ServerPlayer;
@@ -30,21 +31,17 @@ import java.util.Optional;
  * <a href="https://github.com/Team-EnderIO/EnderIO/blob/dev/1.21.1/enderio/src/main/java/com/enderio/enderio/content/travel/TravelHandler.java">Ender IO TravelHandler</a>.</p>
  */
 final class BeefTeleportHandler {
-    private static final int BLINK_RANGE = 24;
-
     private BeefTeleportHandler() {
     }
 
     /**
-     * 短距闪现（24 格 blink）。
+     * 读取本次闪现使用的最大距离。
      *
-     * <p>潜行判定已经上移到快捷键路径，这里不再读取潜行状态：闪现由独立快捷键触发，
-     * 服务端收到按键包后直接调用本方法。</p>
+     * <p>距离由本模组的 {@code beef_short_teleport_range} 配置项决定，不再委托 Ender IO 的
+     * {@code TravelHandler.shortTeleport}：后者的距离固定取自其自身配置，无法受本模组控制。</p>
      */
-    static InteractionResult tryShortTeleport(Level level, Player player, boolean enderIoLoaded) {
-        return enderIoLoaded
-                ? EnderIOTravelCompat.tryShortTeleport(level, player)
-                : tryShortTeleport(level, player);
+    private static int blinkRange() {
+        return ConfigManager.getBeefShortTeleportRange();
     }
 
     /**
@@ -56,7 +53,14 @@ final class BeefTeleportHandler {
                 : InteractionResult.PASS;
     }
 
-    private static InteractionResult tryShortTeleport(Level level, Player player) {
+    /**
+     * 短距闪现（默认 24 格，距离由 {@code beef_short_teleport_range} 配置）。
+     *
+     * <p>潜行判定已经上移到快捷键路径，这里不再读取潜行状态：闪现由独立快捷键触发，
+     * 服务端收到按键包后直接调用本方法。落点始终由本模组计算，以保证配置项生效——
+     * Ender IO 的 {@code TravelHandler.shortTeleport} 只读取其自身配置，不受本模组控制。</p>
+     */
+    static InteractionResult tryShortTeleport(Level level, Player player) {
         Optional<Vec3> target = teleportPosition(level, player);
         if (target.isEmpty()) {
             return InteractionResult.PASS;
@@ -94,7 +98,7 @@ final class BeefTeleportHandler {
 
         Vec3 playerPosition = player.getEyePosition();
         Vec3 look = player.getLookAngle().normalize();
-        Vec3 end = playerPosition.add(look.scale(BLINK_RANGE));
+        Vec3 end = playerPosition.add(look.scale(blinkRange()));
         ClipContext clipContext = new ClipContext(
                 playerPosition,
                 end,

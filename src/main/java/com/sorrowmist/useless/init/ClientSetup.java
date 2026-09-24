@@ -68,8 +68,6 @@ public class ClientSetup {
      * 等目录就绪后再补上，而不是在渲染线程上同步等构建完成。</p>
      */
     private static boolean awaitingCatalogRefresh;
-    /** 本次后台目录构建的发起时刻（纳秒）；用于在目录就绪时拆分后台构建与 JEI 刷新耗时。 */
-    private static long catalogRebuildStartedAt;
 
     @SubscribeEvent
     public static void modifyBakedModels(ModelEvent.ModifyBakingResult event) {
@@ -181,10 +179,6 @@ public class ClientSetup {
      * RecipeManager 内容产出快照，若这中间有人触发同步构建，就会白算一份。</p>
      */
     private static void beginRecipeCatalogRebuild(Level level) {
-        // 全链路日志：记录目录重建的发起时刻，用于与后台构建完成时刻对齐。
-        UselessMod.LOGGER.info("Alloy-furnace client catalog rebuild requested (tagsReceived={}, waitedTicks={})",
-                clientTagsReceived, recipeCatalogDirtyTicks);
-        catalogRebuildStartedAt = System.nanoTime();
         AlloyFurnaceRecipeCatalog.invalidate(level);
         awaitingCatalogRefresh = true;
         AlloyFurnaceRecipeCatalog.prewarmAsync(level);
@@ -192,18 +186,10 @@ public class ClientSetup {
 
     /** 目录已就绪：在客户端线程刷新依赖它的 JEI 展示与物品属性。 */
     private static void onRecipeCatalogReady() {
-        long refreshStart = System.nanoTime();
         JEIPlugin.refreshAlloyFurnaceRecipes();
-        long refreshDone = System.nanoTime();
         if (Minecraft.getInstance().player != null) {
             EndlessBeafItem.refreshAttackDamage(Minecraft.getInstance().player);
         }
-        // 全链路日志：区分「后台构建耗时」与「客户端线程上 JEI 刷新耗时」，后者偏大即为卡顿来源。
-        UselessMod.LOGGER.info("Alloy-furnace client catalog ready: backgroundBuild={} ms, jeiRefresh={} ms, recipes={}",
-                catalogRebuildStartedAt == 0L ? -1L : (refreshStart - catalogRebuildStartedAt) / 1_000_000L,
-                (refreshDone - refreshStart) / 1_000_000L,
-                AlloyFurnaceRecipeCatalog.currentRecipeCount());
-        catalogRebuildStartedAt = 0L;
     }
 
     @SubscribeEvent

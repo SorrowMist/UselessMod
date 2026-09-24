@@ -236,28 +236,17 @@ public final class JEIPlugin implements IModPlugin {
         Level level = minecraft.level;
         if (level == null || !AlloyFurnaceRecipeCatalog.isReady(level)) return;
 
-        // 全链路日志：entries() 在目录未就绪时会触发同步构建，这是渲染线程卡顿的候选来源，
-        // 因此单独计时以便与后台构建耗时区分。
-        long entriesStart = System.nanoTime();
-        List<AlloyFurnaceRecipeCatalog.Entry> all = AlloyFurnaceRecipeCatalog.entries(level);
-        long entriesDone = System.nanoTime();
-
         List<AlloyFurnaceRecipeCatalog.Entry> additions = new ArrayList<>();
-        for (AlloyFurnaceRecipeCatalog.Entry recipe : all) {
+        for (AlloyFurnaceRecipeCatalog.Entry recipe : AlloyFurnaceRecipeCatalog.entries(level)) {
             if (!registeredAlloyFurnaceRecipes.containsKey(recipe.identity())) {
                 registeredAlloyFurnaceRecipes.put(recipe.identity(), recipe);
                 additions.add(recipe);
             }
         }
-        long diffDone = System.nanoTime();
         if (!additions.isEmpty()) {
             runtime.getRecipeManager().addRecipes(
                     AdvancedAlloyFurnaceRecipeCategory.TYPE, additions);
         }
-        UselessMod.LOGGER.info(
-                "Alloy-furnace JEI refresh: entries={} ms, diff={} ms, newRecipes={}, total={}",
-                (entriesDone - entriesStart) / 1_000_000L, (diffDone - entriesDone) / 1_000_000L,
-                additions.size(), all.size());
     }
 
     public static IJeiRuntime getRuntime() {

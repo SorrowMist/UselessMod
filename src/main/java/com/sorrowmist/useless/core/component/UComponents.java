@@ -381,6 +381,34 @@ public final class UComponents {
                     .persistent(RitualBlueprintPentacles.CODEC)
                     .networkSynchronized(RitualBlueprintPentacles.STREAM_CODEC));
 
+    /**
+     * 催熟模式组件（BeefRipen）
+     * true = 右键时一键催熟目标：可骨粉方块循环施加骨粉直到长满，
+     * 幼年动物直接催至成年；潜行右键把这次交互让给其它模组。
+     */
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<Boolean>> BeefRipenComponent =
+            register("beef_ripen", builder ->
+                    builder.persistent(Codec.BOOL)
+                           .networkSynchronized(StreamCodec.of(
+                                   FriendlyByteBuf::writeBoolean,
+                                   FriendlyByteBuf::readBoolean
+                           ))
+            );
+
+    /**
+     * 连点模式组件（BeefAutoClick）
+     * true = 客户端手持造化杖时以最快速度重复触发右键，再次按下绑定按键关闭。
+     * 只存状态，真正的连点循环在客户端 {@code BeefAutoClicker} 中执行。
+     */
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<Boolean>> BeefAutoClickComponent =
+            register("beef_auto_click", builder ->
+                    builder.persistent(Codec.BOOL)
+                           .networkSynchronized(StreamCodec.of(
+                                   FriendlyByteBuf::writeBoolean,
+                                   FriendlyByteBuf::readBoolean
+                           ))
+            );
+
     // 私有构造器，防止外部实例化（该类仅用于注册静态组件）
     private UComponents() {}
 

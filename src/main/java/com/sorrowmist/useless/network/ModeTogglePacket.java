@@ -181,6 +181,16 @@ public class ModeTogglePacket implements CustomPacketPayload {
                         }
                     }
                 }
+                case BEEF_RIPEN -> {
+                    if (stack.getItem() instanceof EndlessBeafItem) {
+                        EndlessBeafItem.setRipenEnabled(stack, msg.enabled);
+                    }
+                }
+                case BEEF_AUTO_CLICK -> {
+                    if (stack.getItem() instanceof EndlessBeafItem) {
+                        EndlessBeafItem.setAutoClickEnabled(stack, msg.enabled);
+                    }
+                }
             }
 
             // 显式同步物品到客户端
@@ -240,6 +250,9 @@ public class ModeTogglePacket implements CustomPacketPayload {
         BEEF_CROP_HARVEST,
         BEEF_SHEARS,
         BEEF_FLINT_AND_STEEL,
-        BEEF_RITUAL_SATCHEL
+        BEEF_RITUAL_SATCHEL,
+        // 新增值必须追加在末尾：writeEnum 按 ordinal 编码
+        BEEF_RIPEN,
+        BEEF_AUTO_CLICK
     }
 }

@@ -156,4 +156,13 @@ public class KeyBindings {
             CATEGORY
     ));
 
+    // 连点模式开关（默认未绑定，由玩家在「按键设置」里自行指定）
+    private static final String TOGGLE_AUTO_CLICK = "key.useless_mod.toggle_auto_click";
+    public static final Lazy<KeyMapping> TOGGLE_AUTO_CLICK_KEY = Lazy.of(() -> new KeyMapping(
+            TOGGLE_AUTO_CLICK,
+            KeyConflictContext.IN_GAME,
+            InputConstants.Type.KEYSYM,
+            GLFW.GLFW_KEY_UNKNOWN,
+            CATEGORY
+    ));
 }

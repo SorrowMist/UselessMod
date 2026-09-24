@@ -3,6 +3,7 @@ package com.sorrowmist.useless.event.client;
 import com.mojang.blaze3d.platform.InputConstants;
 import com.sorrowmist.useless.UselessMod;
 import com.sorrowmist.useless.api.enums.tool.EnchantMode;
+import com.sorrowmist.useless.client.BeefAutoClicker;
 import com.sorrowmist.useless.client.gui.MiningStatusGui;
 import com.sorrowmist.useless.content.blockentities.multiblock.MultiblockAlloyFurnaceCoreBlockEntity;
 import com.sorrowmist.useless.content.blocks.TeleportPadBlock;
@@ -55,6 +56,11 @@ public class ClientEventBusSubscriber {
         event.register(KeyBindings.SWITCH_FORCE_MINING_KEY.get());
         event.register(KeyBindings.SWITCH_FARMLAND_MODE_KEY.get());
         event.register(KeyBindings.TOGGLE_CROP_HARVEST_KEY.get());
+        // 这两个按键此前只被 onKeyInput / tooltip 使用，却漏了注册，导致按键实际不生效
+        event.register(KeyBindings.TOGGLE_SHEARS_KEY.get());
+        event.register(KeyBindings.TOGGLE_FLINT_AND_STEEL_KEY.get());
+        // 连点模式（默认未绑定）
+        event.register(KeyBindings.TOGGLE_AUTO_CLICK_KEY.get());
 
         // 触发按键
         event.register(KeyBindings.TRIGGER_CHAIN_MINING_KEY.get());
@@ -161,6 +167,16 @@ public class ClientEventBusSubscriber {
             }
         }
 
+        if (KeyBindings.TOGGLE_AUTO_CLICK_KEY.get().consumeClick()) {
+            ItemStack mainHandItem = player.getMainHandItem();
+            if (mainHandItem.getItem() instanceof EndlessBeafItem) {
+                // 切换连点模式（开启后客户端以最快速度重复触发右键，再按一次关闭）
+                boolean currentAutoClick = EndlessBeafItem.isAutoClickEnabled(mainHandItem);
+                PacketDistributor.sendToServer(
+                        new ModeTogglePacket(ModeTogglePacket.ModeType.BEEF_AUTO_CLICK, !currentAutoClick));
+            }
+        }
+
         // 检测R键按下（触发强制破坏）
         if (KeyBindings.TRIGGER_FORCE_MINING_KEY.get().consumeClick()) {
             ItemStack mainHandItem = player.getMainHandItem();
@@ -172,6 +188,8 @@ public class ClientEventBusSubscriber {
             }
         }
 
+        // 连点模式：手持造化杖时按配置速率重复触发右键（开关本身走 ModeTogglePacket）
+        BeefAutoClicker.tick(mc);
     }
 
     /**

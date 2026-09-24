@@ -84,7 +84,15 @@ public enum ModeTypeEnum {
 
     // 匠心仪式挎包：true = 右键魔典预览的五芒星，从绑定的 AE 网络取方块摆出整座仪式
     BEEF_RITUAL_SATCHEL_ENABLED("beef_ritual_satchel_enabled", "tooltip.useless_mod.beef_ritual_satchel_mode"),
-    BEEF_RITUAL_SATCHEL_DISABLED("beef_ritual_satchel_disabled", "tooltip.useless_mod.beef_ritual_satchel_mode");
+    BEEF_RITUAL_SATCHEL_DISABLED("beef_ritual_satchel_disabled", "tooltip.useless_mod.beef_ritual_satchel_mode"),
+
+    // 催熟：true = 右键可骨粉方块一键催到成熟，右键幼年动物直接催至成年
+    BEEF_RIPEN_ENABLED("beef_ripen_enabled", "tooltip.useless_mod.beef_ripen_mode"),
+    BEEF_RIPEN_DISABLED("beef_ripen_disabled", "tooltip.useless_mod.beef_ripen_mode"),
+
+    // 连点：true = 手持造化杖时以最快速度重复触发右键
+    BEEF_AUTO_CLICK_ENABLED("beef_auto_click_enabled", "tooltip.useless_mod.beef_auto_click_mode"),
+    BEEF_AUTO_CLICK_DISABLED("beef_auto_click_disabled", "tooltip.useless_mod.beef_auto_click_mode");
 
     private final String name;
     private final String tooltipKey;
@@ -183,6 +191,14 @@ public enum ModeTypeEnum {
 
     public static ModeTypeEnum getBeefRitualSatchelMode(boolean enabled) {
         return enabled ? BEEF_RITUAL_SATCHEL_ENABLED : BEEF_RITUAL_SATCHEL_DISABLED;
+    }
+
+    public static ModeTypeEnum getBeefRipenMode(boolean enabled) {
+        return enabled ? BEEF_RIPEN_ENABLED : BEEF_RIPEN_DISABLED;
+    }
+
+    public static ModeTypeEnum getBeefAutoClickMode(boolean enabled) {
+        return enabled ? BEEF_AUTO_CLICK_ENABLED : BEEF_AUTO_CLICK_DISABLED;
     }
 
     public String getName() {return this.name;}

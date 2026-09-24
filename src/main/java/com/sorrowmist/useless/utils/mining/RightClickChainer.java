@@ -1,6 +1,7 @@
 package com.sorrowmist.useless.utils.mining;
 
 import com.sorrowmist.useless.content.items.BeefCropHarvest;
+import com.sorrowmist.useless.content.items.BeefRipen;
 import com.sorrowmist.useless.content.items.EndlessBeafItem;
 import com.sorrowmist.useless.data.PlayerMiningData;
 import com.sorrowmist.useless.utils.UComponentUtils;
@@ -25,7 +26,7 @@ import java.util.List;
 
 /**
  * 右键连锁：按住连锁键（Tab，与连锁挖掘同一个触发键）时，把造化杖自己的方块右键操作
- * ——土壤（锄头耕地 / 铲子铺路）、斧头（剥皮 / 刮铜 / 去蜡），以及顺手收菜——
+ * ——土壤（锄头耕地 / 铲子铺路）、斧头（剥皮 / 刮铜 / 去蜡）、顺手收菜，以及催熟——
  * 按连锁挖掘那套「等价组 + X/Y/Z 范围 + 数量上限」整片执行。
  *
  * <p>只覆盖工具自身的方块操作：扳手等其它方块交互、放置方块都不在此列。
@@ -43,6 +44,9 @@ public final class RightClickChainer {
      *
      * <p>判定条件：手持造化杖 + 按住连锁键 + 未潜行。Tab 状态由服务端维护并同步到客户端，
      * 因此两端判定一致（客户端同样按连锁整片预测，不会闪烁）。
+     *
+     * <p>连点模式触发的右键走的也是同一条 {@code useOn} 路径，所以按住连锁键时
+     * 连点同样会连锁，不需要额外处理。
      */
     public static boolean shouldChain(Player player, ItemStack stack) {
         if (player == null || player.isShiftKeyDown()) {
@@ -140,6 +144,31 @@ public final class RightClickChainer {
             MiningUtils.handleDrops(player, MiningUtils.mergeItemStacks(collected), tool, Vec3.atCenterOf(origin));
         }
         return harvested;
+    }
+
+    /**
+     * 连锁催熟：把催熟作用到连锁范围内所有可催熟方块（含原点）。
+     *
+     * <p>与连锁收菜共用同一套扫描（等价组 + X/Y/Z 范围 + 数量上限）。等价组按方块种类
+     * 匹配，因此不同生长阶段的同一作物会被一起催熟；范围内本来就长满、或不受骨粉影响的
+     * 方块会被逐块跳过（{@link BeefRipen#ripenAt} 内部判定）。
+     *
+     * <p>音效由调用方整片只播一次，这里只负责逐块催熟与粒子。
+     *
+     * @return 实际催动的方块数量
+     */
+    public static int ripenBlocks(ServerLevel level, BlockPos origin, Player player, ItemStack tool) {
+        BlockState originState = level.getBlockState(origin);
+        List<BlockPos> targets = MiningUtils.scanBlocksForUse(
+                origin, originState, level, UComponentUtils.isEnhancedChainMiningEnabled(tool));
+
+        int ripened = 0;
+        for (BlockPos targetPos : targets) {
+            if (BeefRipen.ripenAt(level, targetPos, player, tool)) {
+                ripened++;
+            }
+        }
+        return ripened;
     }
 
     /** 以原上下文为准，为连锁中的另一个方块构造右键上下文（沿用同一朝向与手）。 */

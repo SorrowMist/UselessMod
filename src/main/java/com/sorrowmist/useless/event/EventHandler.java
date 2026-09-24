@@ -518,6 +518,7 @@ public class EventHandler {
         if (event.getEntity() instanceof ServerPlayer player) {
             syncAdvancedStealthPlayersTo(player);
             GrassWandDropHandler.onPlayerLoggedIn(player);
+            resetAutoClickState(player);
         }
     }
 
@@ -574,6 +575,31 @@ public class EventHandler {
         if (event.getEntity() instanceof ServerPlayer player) {
             GrassWandDropHandler.onPlayerLoggedOut(player);
         }
+    }
+
+    /**
+     * 连点模式的状态存在物品组件上，会跨会话保留；若玩家带着「开启」状态重登，
+     * 一进游戏就会立刻开始自动右键（叠加打火石等功能后果更明显）。
+     * 这里在登录时统一重置一次，保证每次进入游戏都是关闭状态。
+     */
+    private static void resetAutoClickState(ServerPlayer player) {
+        boolean changed = clearAutoClickFlag(player.getInventory().items);
+        changed |= clearAutoClickFlag(player.getInventory().offhand);
+        changed |= clearAutoClickFlag(player.getInventory().armor);
+        if (changed) {
+            player.containerMenu.broadcastChanges();
+        }
+    }
+
+    private static boolean clearAutoClickFlag(Iterable<ItemStack> stacks) {
+        boolean changed = false;
+        for (ItemStack stack : stacks) {
+            if (stack.getItem() instanceof EndlessBeafItem && EndlessBeafItem.isAutoClickEnabled(stack)) {
+                EndlessBeafItem.setAutoClickEnabled(stack, false);
+                changed = true;
+            }
+        }
+        return changed;
     }
 
     @SubscribeEvent(priority = EventPriority.HIGHEST)

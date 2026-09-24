@@ -37,6 +37,7 @@ import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.InteractionResultHolder;
 import net.minecraft.world.damagesource.DamageSource;
+import net.minecraft.world.entity.AgeableMob;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.HumanoidArm;
@@ -163,6 +164,8 @@ public class EndlessBeafItem extends TieredItem {
                 .component(UComponents.BeefCropHarvestComponent, true)
                 .component(UComponents.BeefShearsComponent, true)
                 .component(UComponents.BeefFlintAndSteelComponent, true)
+                .component(UComponents.BeefRipenComponent, false)
+                .component(UComponents.BeefAutoClickComponent, false)
                 .component(UComponents.AEStoragePriorityComponent, false)
                 .component(UComponents.AeNetworkConnectComponent, false)
                 .component(UComponents.BeefRitualSatchelComponent, false)
@@ -254,6 +257,33 @@ public class EndlessBeafItem extends TieredItem {
 
     public static void setFlintAndSteelEnabled(ItemStack stack, boolean enabled) {
         stack.set(UComponents.BeefFlintAndSteelComponent.get(), enabled);
+    }
+
+    /**
+     * 是否启用催熟功能：右键可骨粉方块时一键催到成熟，右键幼年动物时直接催至成年。
+     *
+     * <p>默认关闭；潜行右键时把这次交互让给其它模组（与收菜、打火石一致）。</p>
+     */
+    public static boolean isRipenEnabled(ItemStack stack) {
+        return stack.getOrDefault(UComponents.BeefRipenComponent.get(), false);
+    }
+
+    public static void setRipenEnabled(ItemStack stack, boolean enabled) {
+        stack.set(UComponents.BeefRipenComponent.get(), enabled);
+    }
+
+    /**
+     * 是否启用连点模式：手持造化杖时客户端会以最快速度重复触发右键。
+     *
+     * <p>真正的连点循环在客户端 {@code BeefAutoClicker} 中执行，这里只存状态，
+     * 以便随物品持久化、在 tooltip 与模式轮盘中显示。</p>
+     */
+    public static boolean isAutoClickEnabled(ItemStack stack) {
+        return stack.getOrDefault(UComponents.BeefAutoClickComponent.get(), false);
+    }
+
+    public static void setAutoClickEnabled(ItemStack stack, boolean enabled) {
+        stack.set(UComponents.BeefAutoClickComponent.get(), enabled);
     }
 
     /** Keeps the tool's fixed enchantments aligned with its selected mode and server config. */
@@ -1018,7 +1048,16 @@ public class EndlessBeafItem extends TieredItem {
         }
 
         // ============================================================
-        // 3. 统一工具行为链 (铲子 / 锄头 顺序由耕地模式决定，随后是斧头)
+        // 3. 催熟 (右键可骨粉方块：一键催到成熟；按住连锁键时整片催熟)
+        // ============================================================
+        // 与上面的打火石一致，先判开关再进行为，避免连点模式下每次都白做一次方块查询
+        if (isRipenEnabled(tool) && !player.isShiftKeyDown()) {
+            InteractionResult ripenResult = BeefRipen.tryUse(ctx);
+            if (ripenResult != InteractionResult.PASS) return ripenResult;
+        }
+
+        // ============================================================
+        // 4. 统一工具行为链 (铲子 / 锄头 顺序由耕地模式决定，随后是斧头)
         // ============================================================
         boolean farmlandMode = isFarmlandMode(tool);
         ItemAbility firstSoilAction = farmlandMode ? ItemAbilities.HOE_TILL : ItemAbilities.SHOVEL_FLATTEN;
@@ -1026,22 +1065,22 @@ public class EndlessBeafItem extends TieredItem {
         ItemAbility secondSoilAction = farmlandMode ? ItemAbilities.SHOVEL_FLATTEN : ItemAbilities.HOE_TILL;
         SoundEvent secondSoilSound = farmlandMode ? SoundEvents.SHOVEL_FLATTEN : SoundEvents.HOE_TILL;
 
-        // 3.1 土壤交互（耕地模式：锄头优先；草径模式：铲子优先）
+        // 4.1 土壤交互（耕地模式：锄头优先；草径模式：铲子优先）
         InteractionResult res = this.tryToolAction(ctx, firstSoilAction, firstSoilSound, chainUse);
         if (res != InteractionResult.PASS) return res;
 
         res = this.tryToolAction(ctx, secondSoilAction, secondSoilSound, chainUse);
         if (res != InteractionResult.PASS) return res;
 
-        // 3.2 斧头 (剥皮)
+        // 4.2 斧头 (剥皮)
         res = this.tryToolAction(ctx, ItemAbilities.AXE_STRIP, SoundEvents.AXE_STRIP, chainUse);
         if (res != InteractionResult.PASS) return res;
 
-        // 3.3 斧头 (刮铜)
+        // 4.3 斧头 (刮铜)
         res = this.tryScrapeOrWaxOff(ctx, ItemAbilities.AXE_SCRAPE, SoundEvents.AXE_SCRAPE, 3005, chainUse);
         if (res != InteractionResult.PASS) return res;
 
-        // 3.4 斧头 (去蜡)
+        // 4.4 斧头 (去蜡)
         return this.tryScrapeOrWaxOff(ctx, ItemAbilities.AXE_WAX_OFF, SoundEvents.AXE_WAX_OFF, 3004, chainUse);
     }
 
@@ -1147,6 +1186,27 @@ public class EndlessBeafItem extends TieredItem {
 
         if (BeefTimeAcceleration.shouldBlockOtherRightClick(stack, player)) {
             return InteractionResult.FAIL;
+        }
+
+        // 催熟：右键幼年动物直接催至成年
+        if (isRipenEnabled(stack) && !player.isShiftKeyDown()
+                && entity instanceof AgeableMob ageable && ageable.isBaby()) {
+            boolean isClient = entity.level().isClientSide();
+            if (!isClient) {
+                ageable.setBaby(false);
+                if (entity.level() instanceof ServerLevel serverLevel) {
+                    serverLevel.sendParticles(
+                            ParticleTypes.HAPPY_VILLAGER,
+                            entity.getX(),
+                            entity.getY() + entity.getBbHeight() * 0.5D,
+                            entity.getZ(),
+                            12, 0.3D, 0.3D, 0.3D, 0.0D
+                    );
+                    serverLevel.playSound(null, entity.blockPosition(), SoundEvents.BONE_MEAL_USE,
+                                          SoundSource.PLAYERS, 1.0F, 1.0F);
+                }
+            }
+            return InteractionResult.sidedSuccess(isClient);
         }
 
         if (isShearsEnabled(stack) && entity instanceof IShearable target) {
@@ -1387,6 +1447,27 @@ public class EndlessBeafItem extends TieredItem {
                                        ).withStyle(beefCropHarvest ? ChatFormatting.GREEN : ChatFormatting.GRAY))
                                        .withStyle(ChatFormatting.GREEN));
 
+        // 催熟：右键可骨粉方块一键催到成熟，右键幼年动物直接催至成年
+        boolean beefRipen = isRipenEnabled(stack);
+        tooltipComponents.add(Component.translatable("tooltip.useless_mod.beef_ripen_mode")
+                                       .append(": ")
+                                       .append(Component.translatable(
+                                               beefRipen ? "tooltip.useless_mod.enable" :
+                                                       "tooltip.useless_mod.disable"
+                                       ).withStyle(beefRipen ? ChatFormatting.GREEN : ChatFormatting.GRAY))
+                                       .withStyle(ChatFormatting.GOLD));
+
+        // 连点：手持造化杖时以最快速度重复触发右键
+        boolean beefAutoClick = isAutoClickEnabled(stack);
+        tooltipComponents.add(Component.translatable("tooltip.useless_mod.beef_auto_click_mode")
+                                       .append(": ")
+                                       .append(Component.translatable(
+                                               beefAutoClick ? "tooltip.useless_mod.enable" :
+                                                       "tooltip.useless_mod.disable"
+                                       ).withStyle(beefAutoClick ? ChatFormatting.GREEN : ChatFormatting.GRAY))
+                                       .withStyle(beefAutoClick ? ChatFormatting.LIGHT_PURPLE
+                                                                : ChatFormatting.DARK_PURPLE));
+
         tooltipComponents.add(Component.empty());
 
         // 3. 动态按键提示（Shift 展开）
@@ -1417,6 +1498,9 @@ public class EndlessBeafItem extends TieredItem {
             );
             this.addKeyTooltip(tooltipComponents, KeyBindings.TOGGLE_FLINT_AND_STEEL_KEY,
                                "tooltip.useless_mod.key.toggle_flint_and_steel"
+            );
+            this.addKeyTooltip(tooltipComponents, KeyBindings.TOGGLE_AUTO_CLICK_KEY,
+                               "tooltip.useless_mod.key.toggle_auto_click"
             );
 
             // 触发按键
@@ -1464,6 +1548,12 @@ public class EndlessBeafItem extends TieredItem {
                 Component.translatable("tooltip.useless_mod.beef_crop_harvest_hint").withStyle(ChatFormatting.GREEN));
         tooltipComponents.add(
                 Component.translatable("tooltip.useless_mod.beef_shears_hint").withStyle(ChatFormatting.AQUA));
+        tooltipComponents.add(
+                Component.translatable("tooltip.useless_mod.beef_flint_and_steel_hint").withStyle(ChatFormatting.GOLD));
+        tooltipComponents.add(
+                Component.translatable("tooltip.useless_mod.beef_ripen_hint").withStyle(ChatFormatting.GOLD));
+        tooltipComponents.add(
+                Component.translatable("tooltip.useless_mod.beef_auto_click_hint").withStyle(ChatFormatting.LIGHT_PURPLE));
 
         // 可选：增强连锁说明
         // tooltipComponents.add(Component.translatable("tooltip.useless_mod.enhanced_chain_description").withStyle(ChatFormatting.BLUE));

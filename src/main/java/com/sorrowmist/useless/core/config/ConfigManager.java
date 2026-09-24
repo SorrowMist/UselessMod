@@ -20,6 +20,8 @@ public class ConfigManager {
     private static final ModConfigSpec.IntValue BOTANY_POT_GROWTH_MULTIPLIER;
     // 植物盆渲染配置
     private static final ModConfigSpec.BooleanValue ENABLE_BOTANY_POT_RENDERING;
+    // 造化杖连点模式：每个客户端 tick 触发多少次右键（客户端行为，放 CLIENT 配置）
+    private static final ModConfigSpec.IntValue BEEF_AUTOCLICK_CLICKS_PER_TICK;
 
     // 矩阵样板数量配置
     private static final ModConfigSpec.IntValue MATRIX_PATTERN_COUNT;
@@ -210,6 +212,15 @@ public class ConfigManager {
         ENABLE_BOTANY_POT_RENDERING = CLIENT_BUILDER
                 .comment("是否启用植物盆作物渲染")
                 .define("enable_botany_pot_rendering", true);
+        CLIENT_BUILDER.pop();
+
+        CLIENT_BUILDER.push("beef_tool");
+        BEEF_AUTOCLICK_CLICKS_PER_TICK = CLIENT_BUILDER
+                .comment("造化杖连点模式每个客户端 tick 触发多少次右键",
+                        "调大 = 更快（默认 4 约等于 80 次/秒），调小 = 降低服务端压力",
+                        "仅在客户端生效，无需服务端同意")
+                .translation("useless_mod.configuration.beef_autoclick_clicks_per_tick")
+                .defineInRange("beef_autoclick_clicks_per_tick", 4, 1, 20);
         CLIENT_BUILDER.pop();
 
         SERVER_BUILDER.translation("useless_mod.configuration.omniversal_multiblock_alloy_furnace")
@@ -1116,6 +1127,11 @@ public class ConfigManager {
     // 造化杖挖掘「伪不可破坏」方块时使用的名义硬度
     public static double getBeefToolPseudoHardness() {
         return getConfigValue(BEEF_TOOL_PSEUDO_HARDNESS);
+    }
+
+    // 造化杖连点模式：每个客户端 tick 触发多少次右键
+    public static int getBeefAutoClickClicksPerTick() {
+        return getConfigValue(BEEF_AUTOCLICK_CLICKS_PER_TICK);
     }
 
     public static double getBeefToolEntityInteractionRange() {

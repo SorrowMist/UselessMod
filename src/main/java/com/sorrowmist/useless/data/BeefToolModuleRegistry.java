@@ -52,6 +52,7 @@ public final class BeefToolModuleRegistry {
     public static final String BEEF_FLINT_AND_STEEL = "mode.beef_flint_and_steel";
     public static final String BEEF_RITUAL_SATCHEL = "mode.beef_ritual_satchel";
     public static final String BEEF_RIPEN = "mode.beef_ripen";
+    public static final String BEEF_FORCE_GROW = "mode.beef_force_grow";
     public static final String BEEF_AUTO_CLICK = "mode.beef_auto_click";
 
     private static final List<Definition> DEFINITIONS = List.of(
@@ -126,6 +127,8 @@ public final class BeefToolModuleRegistry {
                     GroupKind.MINING, Availability.OCCULTISM, false),
             new Definition(BEEF_RIPEN, ModeTypeEnum.BEEF_RIPEN_ENABLED.getTooltip(),
                     GroupKind.AUXILIARY, Availability.ALWAYS, false),
+            new Definition(BEEF_FORCE_GROW, ModeTypeEnum.BEEF_FORCE_GROW_ENABLED.getTooltip(),
+                    GroupKind.AUXILIARY, Availability.ALWAYS, false),
             new Definition(BEEF_AUTO_CLICK, ModeTypeEnum.BEEF_AUTO_CLICK_ENABLED.getTooltip(),
                     GroupKind.AUXILIARY, Availability.ALWAYS, false)
     );
@@ -140,6 +143,7 @@ public final class BeefToolModuleRegistry {
             BEEF_SHEARS,
             BEEF_FLINT_AND_STEEL,
             BEEF_RIPEN,
+            BEEF_FORCE_GROW,
             BEEF_AUTO_CLICK);
     /** 新增的挖掘类模块：老存档的布局里没有它们，进游戏时自动补进「挖掘」分组。 */
     private static final List<String> AUTO_MINING_MODULES = List.of(

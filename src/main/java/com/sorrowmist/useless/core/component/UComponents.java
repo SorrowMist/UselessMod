@@ -409,6 +409,21 @@ public final class UComponents {
                            ))
             );
 
+    /**
+     * 强制生长组件（BeefForceGrow）
+     * true = 催熟时额外用「随机刻」推进方块，可作用于甘蔗、仙人掌、竹子等
+     * 原版骨粉无效的方块。代价是它不挑方块——树叶枯萎、火蔓延、雪冰融化、
+     * 耕地退化这些随机刻行为同样会被推，是否开启由玩家自行抉择。
+     */
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<Boolean>> BeefForceGrowComponent =
+            register("beef_force_grow", builder ->
+                    builder.persistent(Codec.BOOL)
+                           .networkSynchronized(StreamCodec.of(
+                                   FriendlyByteBuf::writeBoolean,
+                                   FriendlyByteBuf::readBoolean
+                           ))
+            );
+
     // 私有构造器，防止外部实例化（该类仅用于注册静态组件）
     private UComponents() {}
 

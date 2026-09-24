@@ -165,6 +165,7 @@ public class EndlessBeafItem extends TieredItem {
                 .component(UComponents.BeefShearsComponent, true)
                 .component(UComponents.BeefFlintAndSteelComponent, true)
                 .component(UComponents.BeefRipenComponent, false)
+                .component(UComponents.BeefForceGrowComponent, false)
                 .component(UComponents.BeefAutoClickComponent, false)
                 .component(UComponents.AEStoragePriorityComponent, false)
                 .component(UComponents.AeNetworkConnectComponent, false)
@@ -270,6 +271,23 @@ public class EndlessBeafItem extends TieredItem {
 
     public static void setRipenEnabled(ItemStack stack, boolean enabled) {
         stack.set(UComponents.BeefRipenComponent.get(), enabled);
+    }
+
+    /**
+     * 是否启用「强制生长」：催熟时额外用随机刻推进方块。
+     *
+     * <p>催熟本身只走原版骨粉判定，对甘蔗、仙人掌、竹子这类<b>原版骨粉无效</b>的方块
+     * 不起作用。开启本项后会改用随机刻把它们也推起来。
+     *
+     * <p>注意它<b>不挑方块</b>：凡是会随机刻的方块都会被推，包括树叶枯萎、火蔓延、
+     * 雪冰融化、耕地退化。因此默认关闭，是否开启由玩家自行抉择。</p>
+     */
+    public static boolean isForceGrowEnabled(ItemStack stack) {
+        return stack.getOrDefault(UComponents.BeefForceGrowComponent.get(), false);
+    }
+
+    public static void setForceGrowEnabled(ItemStack stack, boolean enabled) {
+        stack.set(UComponents.BeefForceGrowComponent.get(), enabled);
     }
 
     /**
@@ -1048,10 +1066,11 @@ public class EndlessBeafItem extends TieredItem {
         }
 
         // ============================================================
-        // 3. 催熟 (右键可骨粉方块：一键催到成熟；按住连锁键时整片催熟)
+        // 3. 催熟 / 强制生长 (右键可骨粉方块一键催到成熟；开启强制生长后
+        //    额外用随机刻推进甘蔗、仙人掌、竹子等骨粉无效的方块；按住连锁键时整片作用)
         // ============================================================
         // 与上面的打火石一致，先判开关再进行为，避免连点模式下每次都白做一次方块查询
-        if (isRipenEnabled(tool) && !player.isShiftKeyDown()) {
+        if ((isRipenEnabled(tool) || isForceGrowEnabled(tool)) && !player.isShiftKeyDown()) {
             InteractionResult ripenResult = BeefRipen.tryUse(ctx);
             if (ripenResult != InteractionResult.PASS) return ripenResult;
         }
@@ -1457,6 +1476,17 @@ public class EndlessBeafItem extends TieredItem {
                                        ).withStyle(beefRipen ? ChatFormatting.GREEN : ChatFormatting.GRAY))
                                        .withStyle(ChatFormatting.GOLD));
 
+        // 强制生长：催熟时额外用随机刻推进（可作用于甘蔗/仙人掌/竹子等骨粉无效的方块）
+        boolean beefForceGrow = isForceGrowEnabled(stack);
+        tooltipComponents.add(Component.translatable("tooltip.useless_mod.beef_force_grow_mode")
+                                       .append(": ")
+                                       .append(Component.translatable(
+                                               beefForceGrow ? "tooltip.useless_mod.enable" :
+                                                       "tooltip.useless_mod.disable"
+                                       ).withStyle(beefForceGrow ? ChatFormatting.GREEN : ChatFormatting.GRAY))
+                                       .withStyle(beefForceGrow ? ChatFormatting.GOLD
+                                                                : ChatFormatting.DARK_GRAY));
+
         // 连点：手持造化杖时以最快速度重复触发右键
         boolean beefAutoClick = isAutoClickEnabled(stack);
         tooltipComponents.add(Component.translatable("tooltip.useless_mod.beef_auto_click_mode")
@@ -1552,6 +1582,8 @@ public class EndlessBeafItem extends TieredItem {
                 Component.translatable("tooltip.useless_mod.beef_flint_and_steel_hint").withStyle(ChatFormatting.GOLD));
         tooltipComponents.add(
                 Component.translatable("tooltip.useless_mod.beef_ripen_hint").withStyle(ChatFormatting.GOLD));
+        tooltipComponents.add(
+                Component.translatable("tooltip.useless_mod.beef_force_grow_hint").withStyle(ChatFormatting.RED));
         tooltipComponents.add(
                 Component.translatable("tooltip.useless_mod.beef_auto_click_hint").withStyle(ChatFormatting.LIGHT_PURPLE));
 

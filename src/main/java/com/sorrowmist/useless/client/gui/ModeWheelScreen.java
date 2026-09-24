@@ -592,6 +592,7 @@ public class ModeWheelScreen extends Screen {
             case BeefToolModuleRegistry.BEEF_RITUAL_SATCHEL ->
                     bool(UComponents.BeefRitualSatchelComponent, false);
             case BeefToolModuleRegistry.BEEF_RIPEN -> bool(UComponents.BeefRipenComponent, false);
+            case BeefToolModuleRegistry.BEEF_FORCE_GROW -> bool(UComponents.BeefForceGrowComponent, false);
             case BeefToolModuleRegistry.BEEF_AUTO_CLICK -> bool(UComponents.BeefAutoClickComponent, false);
             default -> false;
         };
@@ -946,6 +947,8 @@ public class ModeWheelScreen extends Screen {
                             UComponents.BeefRitualSatchelComponent, false);
             case BeefToolModuleRegistry.BEEF_RIPEN -> toggle(ModeTogglePacket.ModeType.BEEF_RIPEN,
                     UComponents.BeefRipenComponent, false);
+            case BeefToolModuleRegistry.BEEF_FORCE_GROW -> toggle(ModeTogglePacket.ModeType.BEEF_FORCE_GROW,
+                    UComponents.BeefForceGrowComponent, false);
             case BeefToolModuleRegistry.BEEF_AUTO_CLICK -> toggle(ModeTogglePacket.ModeType.BEEF_AUTO_CLICK,
                     UComponents.BeefAutoClickComponent, false);
             default -> {

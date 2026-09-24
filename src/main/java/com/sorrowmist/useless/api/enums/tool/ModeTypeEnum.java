@@ -92,7 +92,11 @@ public enum ModeTypeEnum {
 
     // 连点：true = 手持造化杖时以最快速度重复触发右键
     BEEF_AUTO_CLICK_ENABLED("beef_auto_click_enabled", "tooltip.useless_mod.beef_auto_click_mode"),
-    BEEF_AUTO_CLICK_DISABLED("beef_auto_click_disabled", "tooltip.useless_mod.beef_auto_click_mode");
+    BEEF_AUTO_CLICK_DISABLED("beef_auto_click_disabled", "tooltip.useless_mod.beef_auto_click_mode"),
+
+    // 强制生长：true = 催熟时额外用随机刻推进（可作用于甘蔗/仙人掌/竹子等骨粉无效的方块）
+    BEEF_FORCE_GROW_ENABLED("beef_force_grow_enabled", "tooltip.useless_mod.beef_force_grow_mode"),
+    BEEF_FORCE_GROW_DISABLED("beef_force_grow_disabled", "tooltip.useless_mod.beef_force_grow_mode");
 
     private final String name;
     private final String tooltipKey;
@@ -199,6 +203,10 @@ public enum ModeTypeEnum {
 
     public static ModeTypeEnum getBeefAutoClickMode(boolean enabled) {
         return enabled ? BEEF_AUTO_CLICK_ENABLED : BEEF_AUTO_CLICK_DISABLED;
+    }
+
+    public static ModeTypeEnum getBeefForceGrowMode(boolean enabled) {
+        return enabled ? BEEF_FORCE_GROW_ENABLED : BEEF_FORCE_GROW_DISABLED;
     }
 
     public String getName() {return this.name;}

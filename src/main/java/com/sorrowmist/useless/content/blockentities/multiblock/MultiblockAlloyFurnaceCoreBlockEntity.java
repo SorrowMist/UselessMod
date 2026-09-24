@@ -142,8 +142,8 @@ public final class MultiblockAlloyFurnaceCoreBlockEntity extends BlockEntity imp
             validateStructure();
         }
         if (!deferredTasksLoaded) {
-            deferredTasksLoaded = true;
-            aeManager.loadDeferredTasks();
+            // 目录未就绪时保持未加载状态，下一 tick 重试；否则完好样板会被误判失效并退还材料。
+            deferredTasksLoaded = aeManager.loadDeferredTasks();
         }
         long currentCatalogGeneration = AlloyFurnaceRecipeCatalog.generation();
         if (recipeCatalogGeneration != currentCatalogGeneration) {

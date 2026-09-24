@@ -660,7 +660,7 @@ public final class PassiveCraftingHatchBlockEntity extends BlockEntity
     }
 
     public void prepareForRemoval() {
-        loadDeferredTasks();
+        loadDeferredTasks(true);
         cancelAllTasks();
         MultiblockAlloyFurnaceCoreBlockEntity controller = getRawController();
         if (controller != null) {
@@ -673,7 +673,7 @@ public final class PassiveCraftingHatchBlockEntity extends BlockEntity
                 || getRawController() != controller) {
             return;
         }
-        loadDeferredTasks();
+        loadDeferredTasks(true);
         cancelAllTasks();
         flushLocalUnreturnedInputs(controller);
     }
@@ -692,12 +692,32 @@ public final class PassiveCraftingHatchBlockEntity extends BlockEntity
         setChanged();
     }
 
-    private void loadDeferredTasks() {
+    /**
+     * 在 level 与配方目录均可用后加载延迟的任务数据（样板解码同时依赖二者）。
+     *
+     * @return true 表示已处理完毕（含无待恢复数据）；false 表示前提条件未满足，需稍后重试
+     */
+    private boolean loadDeferredTasks() {
+        return loadDeferredTasks(false);
+    }
+
+    /**
+     * @param force 方块即将被移除时传 true：这是退还材料的最后机会，必须立即解码，
+     *              否则随后的 cancelAllTasks 会清空标签，材料将无声丢失
+     */
+    private boolean loadDeferredTasks(boolean force) {
         CompoundTag tasksTag = deferredTasksTag;
-        deferredTasksTag = null;
-        if (tasksTag == null || level == null) {
-            return;
+        if (tasksTag == null) {
+            return true;
         }
+        if (level == null) {
+            return false;
+        }
+        // 目录由后台线程构建，未就绪时解码会把完好样板判为失效并退还材料，故挂起重试。
+        if (!force && !AlloyFurnaceRecipeCatalog.isReady(level)) {
+            return false;
+        }
+        deferredTasksTag = null;
         HolderLookup.Provider registries = level.registryAccess();
         ListTag tasks = tasksTag.getList("Tasks", Tag.TAG_COMPOUND);
         for (int index = 0; index < tasks.size(); index++) {
@@ -716,6 +736,7 @@ public final class PassiveCraftingHatchBlockEntity extends BlockEntity
             }
         }
         statusDirty = true;
+        return true;
     }
 
     /**

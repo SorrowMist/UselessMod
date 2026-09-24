@@ -63,6 +63,7 @@ import net.neoforged.neoforge.network.PacketDistributor;
 import net.neoforged.neoforge.server.ServerLifecycleHooks;
 
 import java.util.Collections;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -199,17 +200,19 @@ public class EventHandler {
     private static final float DEFAULT_FLYING_SPEED = 0.05F;
     private static final float FLYING_SPEED_EPSILON = 1.0E-6F;
     /**
-     * 游戏模式切换后需要强制重发一次能力包的玩家。
-     * 原版/NeoForge 会在切换时重置 abilities，客户端收到 CHANGE_GAME_MODE 后
-     * 还会本地再重置一遍；如果服务端之后不再主动重发，客户端就会一直停在
-     * 「没有 mayfly」的状态上，表现为造化杖飞行失效。
+     * 游戏模式切换后，接下来这么多个 tick 内每 tick 都强制重发一次能力包。
+     * <p>
+     * 只补发一次是不够的：原版/NeoForge 在切换时重置 abilities，客户端收到 CHANGE_GAME_MODE 后
+     * 还会通过 {@code MultiPlayerGameMode#setLocalMode} 在本地再重置一遍，而这次本地重置
+     * 服务端完全不知情。留一个窗口反复对齐，才能盖住客户端那次重置。
      */
-    private static final Set<UUID> PENDING_FLIGHT_RESYNC = ConcurrentHashMap.newKeySet();
+    private static final int FLIGHT_RESYNC_WINDOW = 20;
+    private static final Map<UUID, Integer> FLIGHT_RESYNC_QUEUE = new ConcurrentHashMap<>();
 
     @SubscribeEvent
     public static void onPlayerChangeGameMode(PlayerEvent.PlayerChangeGameModeEvent event) {
         if (event.getEntity() instanceof ServerPlayer serverPlayer) {
-            PENDING_FLIGHT_RESYNC.add(serverPlayer.getUUID());
+            FLIGHT_RESYNC_QUEUE.put(serverPlayer.getUUID(), FLIGHT_RESYNC_WINDOW);
         }
     }
 
@@ -231,14 +234,14 @@ public class EventHandler {
      * 关键点：能力包只在「服务端状态发生变化」时才发是不够的——客户端那份 abilities 会被
      * {@link net.minecraft.client.multiplayer.MultiPlayerGameMode#setLocalMode} 单独重置，
      * 服务端不知情也就永远不会补发。所以这里每 tick 把 abilities 对齐到目标值，
-     * 只要有任何一项不一致（或刚切换过游戏模式）就重发一次能力包。
+     * 只要有任何一项不一致、或处在游戏模式切换后的重发窗口内，就重发一次能力包。
      */
     private static void updateBeefToolFlight(Player player) {
         boolean hasItemInInventory = ConfigManager.shouldEnableFlightEffect()
                 && UselessItemUtils.hasTargetToolInInventory(player);
 
         // 创造/旁观模式自带飞行，这份能力归原版管，模组不接管也不撤销。
-        // 待重发标记故意保留到离开该模式后的第一 tick，那才是真正需要补发能力包的时机。
+        // 重发窗口故意保留到离开该模式之后才开始倒数，那才是真正需要补发能力包的时机。
         if (player.isCreative() || player.isSpectator()) {
             if (hasItemInInventory) {
                 FlyEffectedHolder.add(player);
@@ -248,12 +251,23 @@ public class EventHandler {
             return;
         }
 
-        boolean forceSync = PENDING_FLIGHT_RESYNC.remove(player.getUUID());
+        UUID uuid = player.getUUID();
+        Integer remaining = FLIGHT_RESYNC_QUEUE.get(uuid);
+        boolean resyncing = remaining != null && remaining > 0;
+        if (resyncing) {
+            if (remaining <= 1) {
+                FLIGHT_RESYNC_QUEUE.remove(uuid);
+            } else {
+                FLIGHT_RESYNC_QUEUE.put(uuid, remaining - 1);
+            }
+        }
 
         if (hasItemInInventory) {
             FlyEffectedHolder.add(player);
             float flightSpeed = (float) ConfigManager.getBeefToolFlightSpeed();
-            applyFlightAbilities(player, true, player.getAbilities().flying, flightSpeed, forceSync);
+            // 保留当前 flying：创造模式在飞时切回生存，NeoForge 会把 flying 原样带过来，
+            // 玩家继续悬停——这是期望行为，之后由玩家自己的开关键控制。
+            applyFlightAbilities(player, true, player.getAbilities().flying, flightSpeed, resyncing);
             return;
         }
 
@@ -570,8 +584,8 @@ public class EventHandler {
     public static void onPlayerLoggedOut(PlayerEvent.PlayerLoggedOutEvent event) {
         BEEF_PROTECTED_PLAYERS.remove(event.getEntity().getUUID());
         BEEF_ADVANCED_STEALTH_PLAYERS.remove(event.getEntity().getUUID());
-        // 玩家在创造模式下离线时，飞行待重发标记不会被消费，故在此一并清除
-        PENDING_FLIGHT_RESYNC.remove(event.getEntity().getUUID());
+        // 玩家在创造模式下离线时，飞行重发窗口不会开始倒数，故在此一并清除
+        FLIGHT_RESYNC_QUEUE.remove(event.getEntity().getUUID());
         if (event.getEntity() instanceof ServerPlayer player) {
             GrassWandDropHandler.onPlayerLoggedOut(player);
         }

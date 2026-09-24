@@ -208,11 +208,42 @@ public class EventHandler {
      */
     private static final int FLIGHT_RESYNC_WINDOW = 20;
     private static final Map<UUID, Integer> FLIGHT_RESYNC_QUEUE = new ConcurrentHashMap<>();
+    /**
+     * 「粘滞飞行」玩家：<b>客户端自己上报正在飞行</b>的造化杖携带者。
+     * <p>
+     * 只要玩家还处在这个状态，服务端的 {@code flying} 就不允许被清掉。原因是实测 <b>Re-Avaritia</b> 的
+     * {@code committee.nova.mods.avaritia.init.handler.AbilityHandler#updateClientServerFlight}
+     * 会<b>每秒 1~2 次</b>把 {@code mayfly} / {@code flying} 一起清成 false 并回传客户端，
+     * 把 NeoForge 保留的悬停（创造→生存切换）和玩家自己的起飞都冲掉。
+     * <p>
+     * 开关来自 {@link #onClientFlightIntent}（客户端发的 {@code ServerboundPlayerAbilitiesPacket}）：
+     * 玩家落地或空中双击关飞行时客户端会上报 false，粘滞随之解除，
+     * 所以<b>落地行走、普通起跳、主动关飞行都不受影响</b>；而被其它 mod 在服务端偷偷清掉的情况
+     * 不经过那条上报路径，于是能被我们拉回来。
+     * <p>
+     * 注意不要用 {@code player.onGround()} 做落地判断：{@code handleMovePlayer} 里
+     * {@code setOnGround(flag4)} 的 flag4 含 {@code !player.mayFly()}，只要 mayfly 开着，
+     * 服务端 onGround 就恒为 false，粘滞将永远解除不掉。
+     */
+    private static final Set<UUID> STICKY_FLIGHT = ConcurrentHashMap.newKeySet();
+
+    /** 客户端上报飞行意图时更新粘滞状态（由 {@code ServerGamePacketListenerImplFlightMixin} 调用）。 */
+    public static void onClientFlightIntent(Player player, boolean flying) {
+        if (flying) {
+            STICKY_FLIGHT.add(player.getUUID());
+        } else {
+            STICKY_FLIGHT.remove(player.getUUID());
+        }
+    }
 
     @SubscribeEvent
     public static void onPlayerChangeGameMode(PlayerEvent.PlayerChangeGameModeEvent event) {
         if (event.getEntity() instanceof ServerPlayer serverPlayer) {
             FLIGHT_RESYNC_QUEUE.put(serverPlayer.getUUID(), FLIGHT_RESYNC_WINDOW);
+            // 本事件在 changeGameModeForPlayer 之前触发，此刻读到的就是「切换前」的状态
+            if (serverPlayer.getAbilities().flying) {
+                STICKY_FLIGHT.add(serverPlayer.getUUID());
+            }
         }
     }
 
@@ -226,6 +257,18 @@ public class EventHandler {
         updateBeefInvulnerability(player);
         
         MiningDispatcher.tickCacheUpdate(player);
+    }
+
+    /**
+     * 游戏模式切换的瞬间把飞行状态刷成目标值。
+     * <p>
+     * 供 {@code ServerPlayerGameModeMixin} 调用。服务端在切模式时会先按新模式重置 abilities，
+     * 而紧接着 {@code ServerPlayer#setGameMode} 就会把这个状态发给客户端（能力包 A/C）。
+     * 如果不在这里立刻补回去，客户端会先收到 {@code mayfly=false}，要等下一个 tick 模组的补发
+     * 才恢复 —— 中间 1 帧双击空格起不了飞。在这里补掉，客户端从头到尾看不到 false。
+     */
+    public static void applyBeefToolFlightNow(Player player) {
+        updateBeefToolFlight(player);
     }
 
     /**
@@ -265,14 +308,19 @@ public class EventHandler {
         if (hasItemInInventory) {
             FlyEffectedHolder.add(player);
             float flightSpeed = (float) ConfigManager.getBeefToolFlightSpeed();
-            // 保留当前 flying：创造模式在飞时切回生存，NeoForge 会把 flying 原样带过来，
-            // 玩家继续悬停——这是期望行为，之后由玩家自己的开关键控制。
-            applyFlightAbilities(player, true, player.getAbilities().flying, flightSpeed, resyncing);
+
+            // 粘滞飞行（见 STICKY_FLIGHT 注释）：只要客户端自己还报着「我在飞」，
+            // 就不允许 flying 被外力（Re-Avaritia 每秒一次）清掉。
+            // 玩家落地 / 主动关飞行时客户端会上报 false，粘滞随之解除。
+            boolean flying = player.getAbilities().flying || STICKY_FLIGHT.contains(uuid);
+
+            applyFlightAbilities(player, true, flying, flightSpeed, resyncing);
             return;
         }
 
         // 没有造化杖时只回收模组自己授予过的飞行，避免抢走其它来源的飞行能力。
         // 归属标记落在玩家持久化数据里，所以「带着模组授予的飞行离线后重登」也能正确回收。
+        STICKY_FLIGHT.remove(uuid);
         if (FlyEffectedHolder.remove(player)) {
             applyFlightAbilities(player, false, false, DEFAULT_FLYING_SPEED, true);
         }
@@ -586,6 +634,7 @@ public class EventHandler {
         BEEF_ADVANCED_STEALTH_PLAYERS.remove(event.getEntity().getUUID());
         // 玩家在创造模式下离线时，飞行重发窗口不会开始倒数，故在此一并清除
         FLIGHT_RESYNC_QUEUE.remove(event.getEntity().getUUID());
+        STICKY_FLIGHT.remove(event.getEntity().getUUID());
         if (event.getEntity() instanceof ServerPlayer player) {
             GrassWandDropHandler.onPlayerLoggedOut(player);
         }

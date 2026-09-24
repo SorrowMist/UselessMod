@@ -1036,5 +1036,5 @@
   "gui.useless_mod.dimension_config.preview.role.center": "Center",
   "gui.useless_mod.dimension_config.preview.role.fill": "Fill",
   "gui.useless_mod.dimension_config.preview.close": "Close",
-  "gui.useless_mod.dimension_config.tooltip.preview": "Preview what the current configuration will generate"
+  "gui.useless_mod.dimension_config.tooltip.preview": "Preview the generation result of the current configuration"
 }

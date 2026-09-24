@@ -1031,5 +1031,5 @@
   "gui.useless_mod.dimension_config.preview.role.center": "中心",
   "gui.useless_mod.dimension_config.preview.role.fill": "填充",
   "gui.useless_mod.dimension_config.preview.close": "關閉",
-  "gui.useless_mod.dimension_config.tooltip.preview": "檢視目前設定會生成成什麼樣"
+  "gui.useless_mod.dimension_config.tooltip.preview": "預覽目前設定的生成結果"
 }

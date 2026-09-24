@@ -21,7 +21,8 @@ public final class DimensionConfigScreen extends AbstractContainerScreen<Dimensi
     private static final int PANEL_WIDTH = 420;
     private static final int PANEL_HEIGHT = 346;
 
-    /* 生成预览弹窗：不常驻占位，点「预览」按钮后以覆盖层显示，避免撑宽配置面板。 */
+    /* 生成预览弹窗：不常驻占位，点「预览」按钮后以全屏覆盖层显示，避免撑宽配置面板；
+       显示期间底层配置界面与玩家背包均不渲染。 */
     private static final int POPUP_WIDTH = 420;
     private static final int POPUP_HEIGHT = 330;
     private static final int POPUP_PAD = 10;
@@ -33,6 +34,12 @@ public final class DimensionConfigScreen extends AbstractContainerScreen<Dimensi
     private static final int CLOSE_BUTTON_H = 18;
     private static final int DIALOG_BUTTON_W = 84;
     private static final int DIALOG_BUTTON_H = 18;
+    /**
+     * 预览弹窗的全屏底板颜色：不透明黑，用于完全遮挡底层界面。
+     * 预览弹窗是窗口内的全屏覆盖层，其底板与内容按普通渲染类型提交，无法覆盖已提交的
+     * 底层内容，因此底层槽位中的方块与玩家背包物品只能在绘制底层界面之前被阻断。
+     */
+    private static final int PREVIEW_BACKDROP_COLOR = 0xFF000000;
 
     private final PlatformPreview preview =
             new PlatformPreview(VIEW_W, TOP_VIEW_H, VIEW_W, SIDE_VIEW_H);
@@ -423,6 +430,15 @@ public final class DimensionConfigScreen extends AbstractContainerScreen<Dimensi
 
     @Override
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
+        // 预览以全屏覆盖层呈现，此时不渲染底层界面。底层槽位中的预设方块与玩家背包物品
+        // 在提交时进入 RenderBuffers 的固定缓冲，无法被随后绘制的覆盖层遮挡，因此只能从
+        // 绘制阶段跳过；缺少该分支时两者会显示在预览内容之上。
+        if (previewOpen) {
+            graphics.fill(0, 0, width, height, PREVIEW_BACKDROP_COLOR);
+            graphics.flush();
+            renderPreviewPopup(graphics, mouseX, mouseY, partialTick);
+            return;
+        }
         super.render(graphics, mouseX, mouseY, partialTick);
         if (pendingImport != null) {
             // 必须先 flush：底层 UI 里的方块物品走的是 RenderBuffers 的固定缓冲
@@ -430,9 +446,6 @@ public final class DimensionConfigScreen extends AbstractContainerScreen<Dimensi
             // 结果盖在覆盖层上面。
             graphics.flush();
             renderImportConfirm(graphics, mouseX, mouseY, partialTick);
-        } else if (previewOpen) {
-            graphics.flush();
-            renderPreviewPopup(graphics, mouseX, mouseY, partialTick);
         }
     }
 
@@ -460,12 +473,8 @@ public final class DimensionConfigScreen extends AbstractContainerScreen<Dimensi
         if (open) refreshPreview();
     }
 
-    /** 遮住整个界面并居中显示俯视示意图与侧视剖面。 */
+    /** 居中显示俯视示意图与侧视剖面；全屏底板由 {@link #render} 绘制。 */
     private void renderPreviewPopup(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
-        // 遮罩用 fill（排队），而 drawPanel 走 AE2 BackgroundGenerator 的 blitSprite（立即），
-        // 若不先提交遮罩，它会在帧末才绘制，从而覆盖弹窗。
-        graphics.fill(0, 0, width, height, 0x99000000);
-        graphics.flush();
         int x = popupX();
         int y = popupY();
         MachineScreenStyle.drawPanel(graphics, x, y, POPUP_WIDTH, POPUP_HEIGHT);
@@ -756,9 +765,11 @@ public final class DimensionConfigScreen extends AbstractContainerScreen<Dimensi
             confirmImport(false);
             return true;
         }
-        // 预览弹窗同理：ESC 只关弹窗。
-        if (previewOpen && keyCode == GLFW.GLFW_KEY_ESCAPE) {
-            setPreviewOpen(false);
+        // 预览弹窗同理：ESC 只关弹窗；弹窗期间独占按键，数字键等不再作用于底层槽位。
+        if (previewOpen) {
+            if (keyCode == GLFW.GLFW_KEY_ESCAPE) {
+                setPreviewOpen(false);
+            }
             return true;
         }
         if (keyCode != GLFW.GLFW_KEY_ESCAPE) {

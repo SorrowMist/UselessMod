@@ -136,11 +136,6 @@ public class ExposedPatternBusBlockEntity extends ECOCraftingPatternBusBlockEnti
     // ---------------------------------------------------------------- 合并视图
 
     @Override
-    public InternalInventory getPatternSlotInventory() {
-        return mergedPatternInventory;
-    }
-
-    @Override
     public InternalInventory getTerminalPatternInventory() {
         return mergedPatternInventory;
     }

@@ -152,6 +152,8 @@ public final class RecipeAdapterCompatRegistry {
     public static final String HOSTILE_NETWORKS = RecipeSourceIds.HOSTILE_NETWORKS;
     public static final String APOTHIC_FLUX = RecipeSourceIds.APOTHIC_FLUX;
     public static final String FLUX_NETWORKS = RecipeSourceIds.FLUX_NETWORKS;
+    public static final String APOTHEOSIS = RecipeSourceIds.APOTHEOSIS;
+    public static final String LYCHEE = RecipeSourceIds.LYCHEE;
 
     private static final List<CompatEntry> ENTRIES = List.of(
             new CompatEntry(null, RecipeAdapterCompatRegistry::registerMinecraft),
@@ -204,7 +206,9 @@ public final class RecipeAdapterCompatRegistry {
             new CompatEntry(IRONS_SPELLBOOKS, RecipeAdapterCompatRegistry::registerIronsSpellbooks),
             new CompatEntry(HOSTILE_NETWORKS, RecipeAdapterCompatRegistry::registerHostileNetworks),
             new CompatEntry(APOTHIC_FLUX, RecipeAdapterCompatRegistry::registerApothicFlux),
-            new CompatEntry(FLUX_NETWORKS, RecipeAdapterCompatRegistry::registerFluxNetworks)
+            new CompatEntry(FLUX_NETWORKS, RecipeAdapterCompatRegistry::registerFluxNetworks),
+            new CompatEntry(APOTHEOSIS, RecipeAdapterCompatRegistry::registerApotheosis),
+            new CompatEntry(LYCHEE, RecipeAdapterCompatRegistry::registerLychee)
     );
 
     private RecipeAdapterCompatRegistry() {}
@@ -546,6 +550,16 @@ public final class RecipeAdapterCompatRegistry {
 
     private static void registerFluxNetworks() {
         register(new FluxNetworksRecipeAdapter());
+    }
+
+    private static void registerApotheosis() {
+        invokeOptionalLoader(
+                "com.sorrowmist.useless.compat.apotheosis.ApotheosisRecipeCompatLoader");
+    }
+
+    private static void registerLychee() {
+        invokeOptionalLoader(
+                "com.sorrowmist.useless.compat.lychee.LycheeRecipeCompatLoader");
     }
 
     private record CompatEntry(@Nullable String modId, Runnable registerAction) {}

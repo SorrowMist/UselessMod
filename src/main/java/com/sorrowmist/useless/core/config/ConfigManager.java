@@ -157,6 +157,8 @@ public class ConfigManager {
     private static final ModConfigSpec.BooleanValue ENABLE_HOSTILE_NETWORKS_RECIPE_CONVERSION;
     private static final ModConfigSpec.BooleanValue ENABLE_APOTHIC_FLUX_RECIPE_CONVERSION;
     private static final ModConfigSpec.BooleanValue ENABLE_FLUX_NETWORKS_RECIPE_CONVERSION;
+    private static final ModConfigSpec.BooleanValue ENABLE_APOTHEOSIS_RECIPE_CONVERSION;
+    private static final ModConfigSpec.BooleanValue ENABLE_LYCHEE_RECIPE_CONVERSION;
     private static final ModConfigSpec.BooleanValue ENABLE_JUSTDIRETHINGS_RECIPE_CONVERSION;
     private static final ModConfigSpec.BooleanValue ENABLE_JDTE_RECIPE_CONVERSION;
     private static final Map<String, ModConfigSpec.BooleanValue> RECIPE_CONVERSION_OPTIONS;
@@ -675,6 +677,10 @@ public class ConfigManager {
                 "enable_apothic_flux_recipe_conversion", true);
         ENABLE_FLUX_NETWORKS_RECIPE_CONVERSION = defineRecipeConversionOption(
                 "enable_fluxnetworks_recipe_conversion", true);
+        ENABLE_APOTHEOSIS_RECIPE_CONVERSION = defineRecipeConversionOption(
+                "enable_apotheosis_recipe_conversion", true);
+        ENABLE_LYCHEE_RECIPE_CONVERSION = defineRecipeConversionOption(
+                "enable_lychee_recipe_conversion", true);
         ENABLE_ARS_NOUVEAU_RECIPE_CONVERSION = defineRecipeConversionOption(
                 "enable_ars_nouveau_recipe_conversion", true);
         ENABLE_AVARITIA_RECIPE_CONVERSION = defineRecipeConversionOption(
@@ -731,6 +737,7 @@ public class ConfigManager {
                 Map.entry("ae2", ENABLE_AE2_RECIPE_CONVERSION),
                 Map.entry("ae2cs", ENABLE_AE2CS_RECIPE_CONVERSION),
                 Map.entry("ae2lt", ENABLE_AE2LT_RECIPE_CONVERSION),
+                Map.entry("apotheosis", ENABLE_APOTHEOSIS_RECIPE_CONVERSION),
                 Map.entry("apothic_flux", ENABLE_APOTHIC_FLUX_RECIPE_CONVERSION),
                 Map.entry("appmek", ENABLE_APP_MEK_RECIPE_CONVERSION),
                 Map.entry("ars_nouveau", ENABLE_ARS_NOUVEAU_RECIPE_CONVERSION),
@@ -760,6 +767,7 @@ public class ConfigManager {
                 Map.entry("kaleidoscope_cookery", ENABLE_KALEIDOSCOPE_COOKERY_RECIPE_CONVERSION),
                 Map.entry("kaleidoscope_grilling", ENABLE_KALEIDOSCOPE_GRILLING_RECIPE_CONVERSION),
                 Map.entry("kaleidoscope_tavern", ENABLE_KALEIDOSCOPE_TAVERN_RECIPE_CONVERSION),
+                Map.entry("lychee", ENABLE_LYCHEE_RECIPE_CONVERSION),
                 Map.entry("malum", ENABLE_MALUM_RECIPE_CONVERSION),
                 Map.entry("mekanism", ENABLE_MEKANISM_RECIPE_CONVERSION),
                 Map.entry("mekanismgenerators", ENABLE_MEKANISM_GENERATORS_RECIPE_CONVERSION),

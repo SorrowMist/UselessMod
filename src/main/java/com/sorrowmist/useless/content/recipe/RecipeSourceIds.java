@@ -61,6 +61,10 @@ public final class RecipeSourceIds {
     public static final String APOTHIC_FLUX = "apothic_flux";
     /** Flux Networks 硬编码的通量粉尘转化机制。 */
     public static final String FLUX_NETWORKS = "fluxnetworks";
+    /** 神化铁砧砸碎宝石的硬编码机制。 */
+    public static final String APOTHEOSIS = "apotheosis";
+    /** Lychee 数据驱动的方块压碎配方。 */
+    public static final String LYCHEE = "lychee";
 
     private RecipeSourceIds() {
     }

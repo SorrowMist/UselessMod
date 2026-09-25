@@ -2,6 +2,7 @@ package com.sorrowmist.useless.init;
 
 import com.sorrowmist.useless.UselessMod;
 import com.sorrowmist.useless.content.recipe.RecipeSourceIds;
+import com.sorrowmist.useless.content.recipe.adapters.apotheosis.ApotheosisGemIngredient;
 import com.sorrowmist.useless.content.recipe.adapters.enderio.SoulVialSetIngredient;
 import com.sorrowmist.useless.content.recipe.adapters.hostilenetworks.DataModelRangeIngredient;
 import net.neoforged.fml.ModList;
@@ -36,6 +37,21 @@ public final class ModIngredientTypes {
     public static final DeferredHolder<IngredientType<?>, IngredientType<DataModelRangeIngredient>>
             DATA_MODEL_RANGE = ModList.get().isLoaded(RecipeSourceIds.HOSTILE_NETWORKS)
                     ? INGREDIENT_TYPES.register("data_model_range", () -> DataModelRangeIngredient.TYPE)
+                    : null;
+
+    /**
+     * 匹配任意神化宝石的原料。
+     *
+     * <p>与 {@code DATA_MODEL_RANGE} 同理：{@code ApotheosisGemIngredient} 的类层级引用了
+     * 神化的 {@code GemItem} 与 {@code GemRegistry}。神化缺席时注册该类型会在 RegisterEvent
+     * 派发阶段抛出 {@code NoClassDefFoundError}，导致本模组进入 broken mod state，
+     * 因此仅在神化存在时创建 supplier，缺席时该字段为 {@code null}。
+     * 使用方见 {@code ApotheosisGemIngredient#getType()}。
+     */
+    @Nullable
+    public static final DeferredHolder<IngredientType<?>, IngredientType<ApotheosisGemIngredient>>
+            APOTHEOSIS_GEM = ModList.get().isLoaded(RecipeSourceIds.APOTHEOSIS)
+                    ? INGREDIENT_TYPES.register("apotheosis_gem", () -> ApotheosisGemIngredient.TYPE)
                     : null;
 
     private ModIngredientTypes() {

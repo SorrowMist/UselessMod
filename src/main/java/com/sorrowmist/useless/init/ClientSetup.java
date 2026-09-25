@@ -62,11 +62,10 @@ public class ClientSetup {
     /** 等待标签包的上限（tick）。超过后不再等待，避免标签包缺失时目录永远构建不出来。 */
     private static final int TAG_WAIT_TICKS = 100;
     /**
-     * 已在后台发起构建、正等待目录就绪以刷新 JEI。
+     * 已在本线程发起目录构建、正等待就绪以刷新 JEI。
      *
-     * <p>构建本身已经挪到后台线程（见 {@link AlloyFurnaceRecipeCatalog#prewarmAsync}），
-     * 但 JEI 的展示刷新必须在客户端线程做，因此这里记住「欠一次刷新」，在后续 tick 里
-     * 等目录就绪后再补上，而不是在渲染线程上同步等构建完成。</p>
+     * <p>目录构建由 {@link AlloyFurnaceRecipeCatalog#prewarm} 同步完成，JEI 的展示刷新须在
+     * 客户端线程执行，因此这里记住「欠一次刷新」，在后续 tick 确认目录就绪后补上。</p>
      */
     private static boolean awaitingCatalogRefresh;
 
@@ -161,8 +160,8 @@ public class ClientSetup {
             beginRecipeCatalogRebuild(level);
         }
 
-        // 构建在后台线程进行，主线程不再被数万条配方的转换与指纹计算阻塞。
-        // 就绪后再回到客户端线程刷新 JEI 展示与物品属性。
+        // 目录构建已在 beginRecipeCatalogRebuild 中同步完成，此处只负责在客户端线程
+        // 刷新依赖目录的 JEI 展示与物品属性。
         if (awaitingCatalogRefresh && AlloyFurnaceRecipeCatalog.isReady(level)) {
             awaitingCatalogRefresh = false;
             onRecipeCatalogReady();
@@ -175,15 +174,15 @@ public class ClientSetup {
     }
 
     /**
-     * 失效目录并把重建交给后台线程，同时记下「欠一次 JEI 刷新」。
+     * 失效目录并同步重建，同时记下「欠一次 JEI 刷新」。
      *
-     * <p>失效必须发生在主线程、且与后续构建之间不插入读取：后台构建会按当时读到的
-     * RecipeManager 内容产出快照，若这中间有人触发同步构建，就会白算一份。</p>
+     * <p>失效与构建之间不插入读取：构建按当时读到的 RecipeManager 内容产出快照，若中间有人触发
+     * 同步构建，就会白算一份。</p>
      */
     private static void beginRecipeCatalogRebuild(Level level) {
         AlloyFurnaceRecipeCatalog.invalidate(level);
         awaitingCatalogRefresh = true;
-        AlloyFurnaceRecipeCatalog.prewarmAsync(level);
+        AlloyFurnaceRecipeCatalog.prewarm(level);
     }
 
     /** 目录已就绪：在客户端线程刷新依赖它的 JEI 展示与物品属性。 */

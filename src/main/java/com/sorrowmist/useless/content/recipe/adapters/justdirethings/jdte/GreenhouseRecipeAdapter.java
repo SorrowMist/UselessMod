@@ -181,7 +181,6 @@ public final class GreenhouseRecipeAdapter implements IRecipeAdapter<GreenhouseR
             }
             addStaticSeeds(seen, holder.value().seed());
         }
-
         Map<ResourceLocation, RecipeHolder<GreenhouseRecipe>> generated = new LinkedHashMap<>();
         if (ModList.get().isLoaded("mysticalagriculture")) {
             List<Map.Entry<Item, GreenhouseCropDefinition>> crops = new ArrayList<>(
@@ -212,7 +211,6 @@ public final class GreenhouseRecipeAdapter implements IRecipeAdapter<GreenhouseR
                         botanyRecipeId(crop.recipeId(), seed), seed, crop.definition());
             }
         }
-
         for (Item item : BuiltInRegistries.ITEM) {
             if (item == null || seen.contains(item) || !(item instanceof BlockItem)) continue;
 

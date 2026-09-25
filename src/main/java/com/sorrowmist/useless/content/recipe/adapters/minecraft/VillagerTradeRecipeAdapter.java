@@ -386,6 +386,29 @@ public final class VillagerTradeRecipeAdapter
         return List.of(new TradeContext(null));
     }
 
+    /**
+     * 判定交易条目是否属于地图类。
+     *
+     * <p>地图交易的报价在 {@code getOffer} 内部会执行一次结构定位（原版为
+     * {@code VillagerTrades.TreasureMapForEmeralds}，模组侧如 Supplementaries 的探险家地图），
+     * 该操作需要加载区块。目录构建运行在后台线程，而区块加载依赖服务器主线程推进，两者相互等待
+     * 会导致服务器 tick 停滞。此外结构定位结果取决于世界种子与执行侧，同一 listing 在客户端与
+     * 服务端会产出不同的配方集合，目录无法保持稳定。因此地图类交易一律不参与转换。</p>
+     *
+     * <p>除原版类型外，模组侧的地图交易无法通过类型引用判定，只能依据类名。判据刻意放宽为
+     * 「类名含有 {@code Map}」：此前按交易条目后缀（{@code Listing} / {@code Trade} /
+     * {@code Offer}）逐个列举的写法已被证明不收敛，Supplementaries 的
+     * {@code RandomAdventurerMapListing} 与 Goety 的 {@code TreasureMapForEmeralds} 先后漏网，
+     * 二者内部同样会调用 {@code findNearestMapStructure}。放宽的代价是极少数名称含
+     * {@code Map} 却无结构定位的交易被跳过，其后果仅为目录条目缺失，不影响正确性。</p>
+     */
+    private static boolean isMapTrade(VillagerTrades.ItemListing listing) {
+        if (listing instanceof VillagerTrades.TreasureMapForEmeralds) {
+            return true;
+        }
+        return listing.getClass().getSimpleName().contains("Map");
+    }
+
     @Nullable
     private static MerchantOffer createOffer(
             Level level,
@@ -393,10 +416,7 @@ public final class VillagerTradeRecipeAdapter
             int villagerLevel,
             VillagerTrades.ItemListing listing,
             @Nullable VillagerType villagerType) {
-        // 藏宝图报价在 getOffer 里会做一次 findNearestMapStructure，结果依赖世界种子与执行侧；
-        // 同一 listing 在客户端与服务端会生成出不同的配方集合，目录因此无法保持稳定。该交易不参与
-        // 转换，直接跳过，避免它进入配方目录。
-        if (listing instanceof VillagerTrades.TreasureMapForEmeralds) {
+        if (isMapTrade(listing)) {
             return null;
         }
 
@@ -416,8 +436,7 @@ public final class VillagerTradeRecipeAdapter
     @Nullable
     private static MerchantOffer createWanderingTraderOffer(
             Level level, VillagerTrades.ItemListing listing) {
-        // 漫游商人在实验性交易表里同样出售藏宝图，与普通村民一致地跳过，理由见 createOffer。
-        if (listing instanceof VillagerTrades.TreasureMapForEmeralds) {
+        if (isMapTrade(listing)) {
             return null;
         }
 

@@ -116,21 +116,10 @@ requiredMods=["malum"]
     ordering="AFTER"
     side="BOTH"
 
-# Recipe and energy integrations are discovered at runtime with ModList and
-# registered only when the corresponding mod is present.  They intentionally
-# do not appear as NeoForge dependencies: an integration must not reject an
-# otherwise valid modpack just because it ships an older compatible version.
-#
-# JDTE 是唯一例外：JDTEContentControl 这个内部类从 0.6.0-pre2 才开始提供，
-# 更低版本（含 0.5.9-Fix）里根本没有 com.jdte.common.content 包。
-# 一旦玩家的 JDTE 过旧，JDTERecipeCompatLoader 加载时就会抛
-# NoClassDefFoundError，直接炸掉服务端 tick 循环。
-# 这里用 optional 而不是 required：不强制安装 JDTE，但只要装了就必须达到
-# 最低版本，把运行时的崩溃提前成加载期清晰的版本错误。
-[[dependencies.useless_mod]]
+[[dependencies.${mod_id}]]
     modId="jdte"
     type="optional"
-    versionRange="[0.6.0-pre2,)"
+    versionRange="[0.6.0,)"
     ordering="AFTER"
     side="BOTH"
 

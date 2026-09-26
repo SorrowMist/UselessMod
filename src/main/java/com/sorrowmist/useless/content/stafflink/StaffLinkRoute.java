@@ -103,7 +103,11 @@ public record StaffLinkRoute(
      * 放一个化学品罐就是「只搬那种化学品」。能量与魔源没有合适的标记物，因此不参与过滤。</p>
      */
     public boolean filterApplies() {
-        return medium == LinkMedium.ITEM || medium == LinkMedium.FLUID || medium == LinkMedium.CHEMICAL;
+        return switch (medium) {
+            case ITEM, AE_ITEM, FLUID, AE_FLUID, CHEMICAL, AE_CHEMICAL -> true;
+            // 能量与魔源没有合适的标记物，因此不参与过滤。
+            case ENERGY, SOURCE, AE_SOURCE -> false;
+        };
     }
 
     /** 非空的过滤标记；为空表示「不限制」。 */

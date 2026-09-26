@@ -57,6 +57,14 @@ public final class StaffLinkMenu extends AbstractContainerMenu {
     private GlobalPos selectedAnchor;
     private int selectedRoute;
 
+    /**
+     * 多选出来的锚点（批量编辑用）。
+     *
+     * <p>它和 {@link #selectedAnchor} 是两套东西：单选锚点决定右边配置区显示谁的配置，
+     * 多选集合决定「一次改动要写到哪些容器上」。集合为空时只改单选那一个。</p>
+     */
+    private final List<GlobalPos> multiSelection = new ArrayList<>();
+
     /** 服务端每秒推一次「上次搬运」读数，界面上直接显示，省得靠猜。 */
     private StaffLinkEngine.TransferStats lastStats = StaffLinkEngine.TransferStats.NONE;
 
@@ -99,6 +107,22 @@ public final class StaffLinkMenu extends AbstractContainerMenu {
 
     public UUID getNetworkId() {
         return networkId;
+    }
+
+    /**
+     * 服务端专用：把界面绑定的网络换成另一张。
+     *
+     * <p>玩家在界面里切网络（{@code <}/{@code >}、新建、解散）改的是杖上的「当前网络」组件，
+     * 而后续所有编辑包都靠服务端菜单里的这个 ID 寻址。不同步它，切到 B 之后的编辑仍会打到 A 上——
+     * 表现就是「在 B 里点一下，界面跳回 A」。</p>
+     */
+    public void setNetworkId(@Nullable UUID networkId) {
+        if (networkId != null && !networkId.equals(this.networkId)) {
+            this.networkId = networkId;
+            this.selectedAnchor = null;
+            this.snapshot = null;
+            this.filterMirror = emptyFilter();
+        }
     }
 
     @Nullable
@@ -235,16 +259,118 @@ public final class StaffLinkMenu extends AbstractContainerMenu {
         }
     }
 
-    /** 写入/覆盖当前选中线路的配置，并提交给服务端。 */
+    /**
+     * 写入/覆盖配置，并提交给服务端。
+     *
+     * <p>多选为空时只写 {@code route} 自己那一条；多选非空时，把 {@code route} 相对
+     * <b>单选锚点现有配置</b>变化过的字段，逐个刷到每个被选锚点的同号线路上。</p>
+     *
+     * <p>这里刻意做字段级 diff 而不是整条覆盖：多选批量改「流量」时，各台机器原本
+     * 各不相同的介质、方向、过滤器不该被一起抹平。没被玩家碰过的字段保持各机原样。</p>
+     */
     public void applyRoute(StaffLinkRoute route) {
+        List<GlobalPos> targets = getEditTargets();
+        for (GlobalPos target : targets) {
+            StaffLinkRoute existing = snapshot == null ? null : snapshot.routeAt(target, route.route());
+            StaffLinkRoute written = existing == null
+                    ? copyFor(target, route)
+                    : patch(existing, route);
+            if (snapshot != null) {
+                snapshot.putRoute(written);
+            }
+            if (clientSide) {
+                PacketDistributor.sendToServer(new StaffLinkConfigurePacket(
+                        target, written.route(), written));
+            }
+        }
+        refreshFilterMirror();
+    }
+
+    /** 把一条配置原样搬到另一个锚点上（用于给还没有配置的目标补默认值）。 */
+    private static StaffLinkRoute copyFor(GlobalPos anchor, StaffLinkRoute route) {
+        return new StaffLinkRoute(anchor, route.route(), route.enabled(), route.flow(), route.medium(),
+                route.amount(), route.interval(), route.side(), route.trigger(), route.weight(),
+                route.filter());
+    }
+
+    /**
+     * 字段级合并：{@code edited} 相对 {@code base} 变过哪个字段，就采用哪个字段。
+     *
+     * <p>「变过」靠直接比相等判断，因此值没动过的字段一律保留 {@code base}（也就是目标机器
+     * 自己的原值），只有玩家真正改动的字段才会被批量同步过去。</p>
+     */
+    private static StaffLinkRoute patch(StaffLinkRoute base, StaffLinkRoute edited) {
+        return new StaffLinkRoute(
+                base.anchor(), base.route(),
+                base.enabled() != edited.enabled() ? edited.enabled() : base.enabled(),
+                base.flow() != edited.flow() ? edited.flow() : base.flow(),
+                base.medium() != edited.medium() ? edited.medium() : base.medium(),
+                base.amount() != edited.amount() ? edited.amount() : base.amount(),
+                base.interval() != edited.interval() ? edited.interval() : base.interval(),
+                base.side() != edited.side() ? edited.side() : base.side(),
+                base.trigger() != edited.trigger() ? edited.trigger() : base.trigger(),
+                base.weight() != edited.weight() ? edited.weight() : base.weight(),
+                base.filter().equals(edited.filter()) ? base.filter() : edited.filter());
+    }
+
+    /**
+     * 只写一个锚点的配置，不参与批量。
+     *
+     * <p>给「刚选中一台还没配过的机器、顺手补一条默认配置」用。这种补默认值的动作必须
+     * 限定在单选那一台上：否则多选期间点一下别的机器，就会把一堆默认值糊到所有选中的机器上。</p>
+     */
+    public void applyRouteSingle(GlobalPos anchor, StaffLinkRoute route) {
         if (snapshot != null) {
             snapshot.putRoute(route);
         }
-        refreshFilterMirror();
         if (clientSide) {
-            PacketDistributor.sendToServer(new StaffLinkConfigurePacket(
-                    route.anchor(), route.route(), route));
+            PacketDistributor.sendToServer(new StaffLinkConfigurePacket(anchor, route.route(), route));
         }
+    }
+
+    // ------------------------------------------------------------------ 多选
+
+    /** 当前多选出来的锚点（只读视图）。 */
+    public List<GlobalPos> getMultiSelection() {
+        return List.copyOf(multiSelection);
+    }
+
+    public boolean isMultiSelected(GlobalPos anchor) {
+        return multiSelection.contains(anchor);
+    }
+
+    /** 点一下加/减一个锚点；被减掉的正好是单选那个时，把单选让给集合里的下一个。 */
+    public void toggleMultiSelection(GlobalPos anchor) {
+        if (!multiSelection.remove(anchor)) {
+            multiSelection.add(anchor);
+        }
+        if (selectedAnchor != null && !multiSelection.isEmpty()
+                && !multiSelection.contains(selectedAnchor)) {
+            selectedAnchor = multiSelection.get(0);
+            refreshFilterMirror();
+        }
+    }
+
+    public void clearMultiSelection() {
+        multiSelection.clear();
+    }
+
+    /** 解绑时把它从多选里一并摘掉，免得集合里留着一个不存在的锚点。 */
+    private void forgetMultiSelection(GlobalPos anchor) {
+        multiSelection.remove(anchor);
+    }
+
+    /**
+     * 一次编辑要落到哪些锚点上。
+     *
+     * <p>多选为空 = 只改单选那个；多选非空 = 改所有被选的。多选里如果没包含单选锚点，
+     * 单选那个不参与批量（界面上的配置区显示的是它，但改动只发给被选中的容器）。</p>
+     */
+    public List<GlobalPos> getEditTargets() {
+        if (!multiSelection.isEmpty()) {
+            return List.copyOf(multiSelection);
+        }
+        return selectedAnchor == null ? List.of() : List.of(selectedAnchor);
     }
 
     /** 改一个过滤器槽；没有选中配置或该线路不用过滤器时忽略。 */
@@ -291,7 +417,8 @@ public final class StaffLinkMenu extends AbstractContainerMenu {
         }
     }
 
-    private void refreshFilterMirror() {        StaffLinkRoute config = getSelectedConfig();
+    private void refreshFilterMirror() {
+        StaffLinkRoute config = getSelectedConfig();
         if (config == null) {
             filterMirror = emptyFilter();
             return;

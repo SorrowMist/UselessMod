@@ -234,7 +234,9 @@ public final class StaffLinkEngine {
 
                 List<StaffLinkRoute> targets = new ArrayList<>(absorbs.size());
                 for (StaffLinkRoute absorb : absorbs) {
-                    if (absorb.medium() == release.medium()) {
+                    // 按 family 配对而不是按 medium：箱子（ITEM）与 AE 网络（AE_ITEM）
+                    // 都是「物品」，能互相搬运；同一种资源类型自己配自己也照常成立。
+                    if (absorb.medium().family() == release.medium().family()) {
                         targets.add(absorb);
                     }
                 }
@@ -308,10 +310,14 @@ public final class StaffLinkEngine {
     /**
      * 清理「锚点方块已经不在」的线路配置。
      *
-     * <p>只在区块已加载时下结论：未加载的坐标一律保留，否则玩家跑远一点就会把整张网清空。
-     * 判定刻意用「不指定面」探测——线路配了某个面并不代表方块本身失效，若按线路的面去探，
-     * 一个只在侧面暴露库存的机器会被误删。资源类型当前不受支持时也跳过（不能因为没装
-     * Mekanism 就把化学品线路删掉）。</p>
+     * <p>只在区块已加载时下结论：未加载的坐标一律保留，否则玩家跑远一点就会把整张网清空。</p>
+     *
+     * <p><b>判据是「方块本身没了」，不是「当前介质解析不出」。</b> 这一点必须说清楚，因为早先
+     * 正是拿 {@code resolve(...) == null} 当判据，才出现了「过几秒容器被自动删掉」：解析失败
+     * 的原因太多了——方块确实被挖掉只是其中之一，此外还有「这一格本来就不是该介质的容器」
+     * 「ME 接口选了 AE 化学品而附属没装」「AE 网络暂时离线」等等。这些情况下方块都还立在那里，
+     * 玩家配的线不该被抹掉。搬运失败会自己失败并在界面显示卡在哪一步，条件恢复又自动继续，
+     * 不需要自愈来「帮忙」。资源类型当前不受支持时也跳过（不能因为没装 Mekanism 就删化学品线路）。</p>
      */
     private static void pruneStaleRoutes(MinecraftServer server, StaffLinkSavedData data,
                                          List<StaffLinkNetwork> networks) {
@@ -330,7 +336,7 @@ public final class StaffLinkEngine {
                 if (level == null || !level.isLoaded(route.anchor().pos())) {
                     continue;
                 }
-                if (StaffLinkTargets.resolve(level, route.anchor().pos(), null, route.medium()) == null) {
+                if (!StaffLinkTargets.anchorPresent(level, route.anchor().pos())) {
                     stale.add(route);
                 }
             }

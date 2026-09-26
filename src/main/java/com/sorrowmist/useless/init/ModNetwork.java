@@ -38,6 +38,7 @@ import com.sorrowmist.useless.network.ConstructionWandPreviewPacket;
 import com.sorrowmist.useless.network.ConstructionWandPreviewRequestPacket;
 import com.sorrowmist.useless.network.DimensionConfigGhostSlotPacket;
 import com.sorrowmist.useless.network.DimensionConfigSubmitPacket;
+import com.sorrowmist.useless.network.StaffLinkBindPacket;
 import com.sorrowmist.useless.network.StaffLinkConfigurePacket;
 import com.sorrowmist.useless.network.StaffLinkCyclePacket;
 import com.sorrowmist.useless.network.StaffLinkDetachPacket;
@@ -166,6 +167,9 @@ public class ModNetwork {
         registrar.playToServer(StaffLinkOpenPacket.TYPE,
                                StaffLinkOpenPacket.STREAM_CODEC,
                                StaffLinkOpenPacket::handle);
+        registrar.playToServer(StaffLinkBindPacket.TYPE,
+                               StaffLinkBindPacket.STREAM_CODEC,
+                               StaffLinkBindPacket::handle);
         registrar.playToServer(StaffLinkDetachPacket.TYPE,
                                StaffLinkDetachPacket.STREAM_CODEC,
                                StaffLinkDetachPacket::handle);

@@ -4,7 +4,8 @@ import com.sorrowmist.useless.client.network.ClientPacketHandlers;
 import com.sorrowmist.useless.client.render.StaffLinkHighlightRenderer;
 import com.sorrowmist.useless.content.items.EndlessBeafItem;
 import com.sorrowmist.useless.content.menus.StaffLinkMenu;
-import com.sorrowmist.useless.content.stafflink.LinkFlow;import com.sorrowmist.useless.content.stafflink.LinkMedium;
+import com.sorrowmist.useless.content.stafflink.LinkFlow;
+import com.sorrowmist.useless.content.stafflink.LinkMedium;
 import com.sorrowmist.useless.content.stafflink.LinkTrigger;
 import com.sorrowmist.useless.content.stafflink.StaffLinkEngine;
 import com.sorrowmist.useless.content.stafflink.StaffLinkRoute;
@@ -14,8 +15,8 @@ import com.sorrowmist.useless.world.stafflink.StaffLinkNetwork;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.EditBox;
+import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
-import net.minecraft.ChatFormatting;
 import net.minecraft.core.Direction;
 import net.minecraft.core.GlobalPos;
 import net.minecraft.network.chat.Component;
@@ -96,16 +97,9 @@ public final class StaffLinkScreen extends AbstractContainerScreen<StaffLinkMenu
     /** 输入框停手多久后自动提交（tick）。玩家填了值却没失焦时靠它兜底。 */
     private static final int AUTO_COMMIT_TICKS = 10;
 
-    /**
-     * 超过 int 上限就开始提示。
-     *
-     * <p>原版容器接口（{@code extractItem} / {@code drain} / {@code extractEnergy}）一次只收
-     * {@code int}，超过的部分只能靠外层循环反复搬。数值越大，一次运行里要跑的「源格 × 目标格」
-     * 组合越多，单 tick 的耗时会明显上升——尤其当「周期」也调得很小时。</p>
-     */
-    private static final long INT_LIMIT = Integer.MAX_VALUE;
-    private static final int AMOUNT_TEXT_COLOR = 0xE0E0E0;
-    private static final int AMOUNT_WARN_COLOR = 0xFFB06000;
+    /** 批量编辑选中行的底色与标记色（半透明青，和单选的蓝、高亮的绿都分得开）。 */
+    private static final int MULTI_SELECT_COLOR = 0x5532C8C8;
+    private static final int MULTI_SELECT_TEXT_COLOR = 0xFF32C8C8;
 
     // ---- 过滤器 + 解散
     private static final int FILTER_X = 8;
@@ -348,7 +342,8 @@ public final class StaffLinkScreen extends AbstractContainerScreen<StaffLinkMenu
     private void ensureRouteConfig() {
         GlobalPos anchor = menu.getSelectedAnchor();
         if (anchor != null && menu.isAnchorBound(anchor) && menu.getSelectedConfig() == null) {
-            menu.applyRoute(menu.defaultRouteFor(anchor, menu.getSelectedRoute()));
+            // 只给这一台补默认值，不能走批量：多选期间点一下别的机器不该把默认值糊到全体上。
+            menu.applyRouteSingle(anchor, menu.defaultRouteFor(anchor, menu.getSelectedRoute()));
         }
     }
 
@@ -440,11 +435,6 @@ public final class StaffLinkScreen extends AbstractContainerScreen<StaffLinkMenu
         return parseScaled(amountField.getValue(), 0L, 0L);
     }
 
-    /** 超过 int 上限时给输入框上色提醒（数值越大，单次运行的搬运趟数越多）。 */
-    private void updateAmountWarning() {
-        amountField.setTextColor(currentAmount() > INT_LIMIT ? AMOUNT_WARN_COLOR : AMOUNT_TEXT_COLOR);
-    }
-
     /**
      * 「数量」的显示形式。
      *
@@ -487,7 +477,6 @@ public final class StaffLinkScreen extends AbstractContainerScreen<StaffLinkMenu
         weightField.setEditable(hasConfig);
         amountField.setEditable(initiates);
         intervalField.setEditable(initiates);
-        updateAmountWarning();
 
         // 正在输入的框不要被同步覆盖，否则打字会被打断。
         if (!networkNameField.isFocused()) {
@@ -660,6 +649,7 @@ public final class StaffLinkScreen extends AbstractContainerScreen<StaffLinkMenu
             case TARGET_UNREACHABLE -> "gui.useless_mod.wireless_logistics.blocker.target_unreachable";
             case FILTERED -> "gui.useless_mod.wireless_logistics.blocker.filtered";
             case SOURCE_EMPTY -> "gui.useless_mod.wireless_logistics.blocker.source_empty";
+            case SOURCE_REJECTED -> "gui.useless_mod.wireless_logistics.blocker.source_rejected";
             case TARGET_REJECTED -> "gui.useless_mod.wireless_logistics.blocker.target_rejected";
             case NONE -> "gui.useless_mod.wireless_logistics.stats_none";
         };
@@ -816,11 +806,17 @@ public final class StaffLinkScreen extends AbstractContainerScreen<StaffLinkMenu
             return;
         }
         GlobalPos anchor = anchors.get(index);
-        graphics.renderTooltip(font,
-                List.of(anchorDisplayName(anchor),
-                        Component.literal(anchor.dimension().location() + " " + anchor.pos().toShortString()),
-                        Component.translatable("gui.useless_mod.wireless_logistics.highlight_hint")),
-                Optional.empty(), mouseX, mouseY);
+        List<Component> lines = new ArrayList<>(4);
+        lines.add(anchorDisplayName(anchor));
+        lines.add(Component.literal(
+                anchor.dimension().location() + " " + anchor.pos().toShortString()));
+        lines.add(Component.translatable("gui.useless_mod.wireless_logistics.highlight_hint"));
+        lines.add(Component.translatable("gui.useless_mod.wireless_logistics.multi_select_hint"));
+        if (menu.isMultiSelected(anchor)) {
+            lines.add(Component.translatable(
+                    "gui.useless_mod.wireless_logistics.multi_select_active"));
+        }
+        graphics.renderTooltip(font, lines, Optional.empty(), mouseX, mouseY);
     }
 
     /** 过滤器槽的说明：槽里放的是「容器标记」而不是要搬运的东西本身，得讲清楚。 */
@@ -874,12 +870,6 @@ public final class StaffLinkScreen extends AbstractContainerScreen<StaffLinkMenu
                     ? Component.translatable("gui.useless_mod.wireless_logistics.range_min", spec.min())
                     : Component.translatable("gui.useless_mod.wireless_logistics.range",
                             spec.min(), spec.max()));
-            if (spec.scaled() && currentAmount() > INT_LIMIT) {
-                lines.add(Component.translatable(
-                                "gui.useless_mod.wireless_logistics.amount_int_warning",
-                                ScaledEnergyAmount.format(INT_LIMIT))
-                        .withStyle(ChatFormatting.GOLD));
-            }
             graphics.renderTooltip(font, lines, Optional.empty(), mouseX, mouseY);
             return;
         }
@@ -962,11 +952,18 @@ public final class StaffLinkScreen extends AbstractContainerScreen<StaffLinkMenu
                     menu.detach(anchor);
                     StaffLinkHighlightRenderer.clear();
                     clampScroll();
+                } else if (Screen.hasControlDown()) {
+                    // Ctrl + 点击：把这一台加进 / 移出批量编辑的集合。
+                    menu.toggleMultiSelection(anchor);
+                    menu.setSelection(anchor, menu.getSelectedRoute());
+                    ensureRouteConfig();
                 } else {
                     // 双击：在世界里高亮 / 取消高亮；单击只做选中。
                     if (isDoubleClick(anchor)) {
                         StaffLinkHighlightRenderer.toggle(anchor);
                     }
+                    // 普通点击是「重新单选」：顺手清掉上一次的批量选择，语义才不粘。
+                    menu.clearMultiSelection();
                     menu.setSelection(anchor, menu.getSelectedRoute());
                     ensureRouteConfig();
                 }

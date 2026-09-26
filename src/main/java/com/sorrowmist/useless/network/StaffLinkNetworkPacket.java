@@ -80,6 +80,10 @@ public record StaffLinkNetworkPacket(Action action, String name) implements Cust
             return;
         }
         player.containerMenu.broadcastChanges();
+        // 新网络成了杖上的当前网络，服务端菜单也要一起切过去。
+        if (player.containerMenu instanceof StaffLinkMenu menu) {
+            menu.setNetworkId(created.id());
+        }
         PacketDistributor.sendToPlayer(player, new StaffLinkSyncPacket(created));
     }
 
@@ -96,6 +100,10 @@ public record StaffLinkNetworkPacket(Action action, String name) implements Cust
             // 一张都不剩了：界面没有可编辑的对象，直接关掉。
             player.closeContainer();
             return;
+        }
+        // 解散后会自动切到相邻的一张，服务端菜单必须跟着走。
+        if (player.containerMenu instanceof StaffLinkMenu menu) {
+            menu.setNetworkId(next.id());
         }
         PacketDistributor.sendToPlayer(player, new StaffLinkSyncPacket(next));
     }

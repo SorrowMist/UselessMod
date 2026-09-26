@@ -2,6 +2,7 @@ package com.sorrowmist.useless.network;
 
 import com.sorrowmist.useless.UselessMod;
 import com.sorrowmist.useless.content.items.EndlessBeafItem;
+import com.sorrowmist.useless.content.menus.StaffLinkMenu;
 import com.sorrowmist.useless.utils.UselessItemUtils;
 import com.sorrowmist.useless.world.stafflink.StaffLinkManager;
 import com.sorrowmist.useless.world.stafflink.StaffLinkNetwork;
@@ -54,6 +55,10 @@ public record StaffLinkCyclePacket(int delta) implements CustomPacketPayload {
             StaffLinkNetwork network = StaffLinkManager.activeNetwork(player.server, staff);
             if (network != null) {
                 // 界面开着时要跟着换一张网络，否则后续的编辑还是打到旧网络上。
+                // 服务端菜单也必须换：所有编辑包都按菜单里的 networkId 寻址。
+                if (player.containerMenu instanceof StaffLinkMenu menu) {
+                    menu.setNetworkId(network.id());
+                }
                 PacketDistributor.sendToPlayer(player, new StaffLinkSyncPacket(network));
             }
             player.displayClientMessage(Component.translatable(

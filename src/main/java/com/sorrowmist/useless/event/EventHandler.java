@@ -1,10 +1,10 @@
 package com.sorrowmist.useless.event;
 
 import com.sorrowmist.useless.UselessMod;
+import com.sorrowmist.useless.client.StaffLinkClientHooks;
 import com.sorrowmist.useless.content.items.BeefMagnetHandler;
 import com.sorrowmist.useless.content.items.BeefTimeAcceleration;
 import com.sorrowmist.useless.content.items.EndlessBeafItem;
-import com.sorrowmist.useless.content.stafflink.StaffLinkBinding;
 import com.sorrowmist.useless.content.stafflink.StaffLinkEngine;
 import com.sorrowmist.useless.content.stafflink.StaffLinkTargets;
 import com.sorrowmist.useless.content.menus.StaffLinkMenu;
@@ -20,6 +20,7 @@ import com.sorrowmist.useless.core.component.UComponents;
 import com.sorrowmist.useless.core.config.ConfigManager;
 import com.sorrowmist.useless.network.BeefInvulnerabilitySyncPacket;
 import com.sorrowmist.useless.network.BeefInvulnerabilityStatePacket;
+import com.sorrowmist.useless.network.StaffLinkBindPacket;
 import com.sorrowmist.useless.network.StaffLinkStatusPacket;
 import com.sorrowmist.useless.utils.UselessItemUtils;
 import com.sorrowmist.useless.utils.mining.MiningDispatcher;
@@ -699,6 +700,18 @@ public class EventHandler {
         String className = be.getClass().getName();
         if (!className.contains("WirelessAccessPoint")) return;
 
+        // 「Shift + 右键无线访问点 = 给 AE 连接模式定一个绑定目标」只在 AE 连接模式开启时成立。
+        //
+        // 这里必须判模式，否则它会无条件抢走这次交互：无线物流模式同样用 Shift + 右键绑定容器，
+        // 而无线访问点本身就是合法的 AE 端点（现在也允许绑进物流网络）。两者撞在同一个手势上，
+        // 谁先跑取决于事件注册顺序——早先这里不判模式，于是「想绑访问点进物流网络」时，
+        // 事件被本方法吃掉并设成 AE 连接目标，onStaffLinkBind 看到 isCanceled 直接返回，
+        // 表现就是「Shift 右键访问点会把杖子连到该网络，按键冲突」。
+        //
+        // 两个模式本身已经互斥（开一个会关掉另一个），所以判模式就足以把语义分开：
+        // AE 连接模式 → 设绑定目标；无线物流模式 → 落到 onStaffLinkBind 绑进物流网络。
+        if (!stack.getOrDefault(UComponents.AeNetworkConnectComponent.get(), false)) return;
+
         if (!world.isClientSide) {
             GlobalPos globalPos = GlobalPos.of(world.dimension(), pos);
             stack.set(UComponents.WIRELESS_LINK_TARGET.get(), globalPos);
@@ -781,6 +794,10 @@ public class EventHandler {
      *
      * <p>与 {@link #onBlockInteract} 分开实现：那个方法分支多且早返回，这里目标类型完全不同
      * （探测的是物品/流体/能量/化学品/魔源能力，无线访问点不具备这些）。</p>
+     *
+     * <p><b>绑定动作由客户端发起。</b>「按住 Ctrl 批量」这个修饰键状态只存在于客户端，
+     * 服务端在事件里读不到，所以两边分工：客户端判断按键并发包，服务端只负责取消原版交互
+     * 与校验后执行。否则服务端会用自己的判断再绑一次，批量就变成了重复绑定。</p>
      */
     @SubscribeEvent(priority = EventPriority.HIGHEST)
     public static void onStaffLinkBind(PlayerInteractEvent.RightClickBlock event) {
@@ -795,13 +812,22 @@ public class EventHandler {
 
         Level level = event.getLevel();
         BlockPos pos = event.getPos();
-        if (!StaffLinkTargets.isBindable(level, pos)) return;
 
-        if (level instanceof ServerLevel serverLevel && player instanceof ServerPlayer serverPlayer) {
-            StaffLinkBinding.toggle(serverLevel, serverPlayer, stack, pos);
+        if (level.isClientSide()) {
+            // 客户端这一侧没有可靠的能力信息（方块实体未必已同步），所以只发坐标 + 修饰键，
+            // 「这个位置能不能绑」交给服务端用真世界判断。
+            boolean batch = StaffLinkClientHooks.isBatchModifierDown();
+            PacketDistributor.sendToServer(new StaffLinkBindPacket(pos, batch));
+            event.setCanceled(true);
+            event.setCancellationResult(InteractionResult.SUCCESS);
+            return;
         }
+
+        // 服务端：只在确实可绑时才吞掉交互。否则玩家会发现「右键没反应」——那其实是
+        // 一次本该正常工作的方块交互被我们吃掉了。
+        if (!StaffLinkTargets.isBindable(level, pos)) return;
         event.setCanceled(true);
-        event.setCancellationResult(InteractionResult.sidedSuccess(level.isClientSide()));
+        event.setCancellationResult(InteractionResult.SUCCESS);
     }
 
     /**

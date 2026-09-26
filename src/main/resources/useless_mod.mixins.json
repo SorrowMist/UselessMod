@@ -9,6 +9,8 @@
     "PlayerMixin",
     "ServerLevelMixin",
     "LevelMixin",
+    "ServerPlayerGameModeMixin",
+    "ServerGamePacketListenerImplFlightMixin",
     "ae2.CraftingCpuLogicAccessor",
     "ae2.CraftingCalculationSmartDoublingMixin",
     "ae2.CraftingSimulationStateAccessor",
@@ -40,6 +42,9 @@
   ],
   "client": [
     "ClientLevelMixin",
+    "ClientPacketListenerMixin",
+    "LocalPlayerMixin",
+    "MultiPlayerGameModeMixin",
     "botanypots.BotanyPotRendererMixin",
     "botanypots.PhasedDisplayStateRendererMixin",
     "eae.GuiAssemblerMatrixPatternInfoMixin"

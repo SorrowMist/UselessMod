@@ -202,6 +202,8 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
     @Nullable
     private CompoundTag pendingLegacyInventory;
     private boolean externalInventoryLoaded;
+    /** 延迟任务数据是否已处理完毕；配方目录未就绪时保持 false，由 tick 逐 tick 重试。 */
+    private boolean deferredTasksLoaded;
 
     public AdvancedAlloyFurnaceBlockEntity(BlockPos pos, BlockState state) {
         super(ModBlockEntities.ADVANCED_ALLOY_FURNACE.get(), pos, state);
@@ -358,6 +360,11 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
      */
     public static void tick(Level level, AdvancedAlloyFurnaceBlockEntity entity) {
         if (level.isClientSide) return;
+
+        if (!entity.deferredTasksLoaded) {
+            // 配方目录由后台线程构建，未就绪时解码会把完好样板判为失效并退还材料，故在此重试。
+            entity.deferredTasksLoaded = entity.aeManager.loadDeferredTasks();
+        }
 
         long currentCatalogGeneration = AlloyFurnaceRecipeCatalog.generation();
         if (entity.recipeCatalogGeneration != currentCatalogGeneration) {
@@ -1064,6 +1071,7 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
 
     public void readAETasks(CompoundTag tag) {
         this.aeManager.readTasksTag(tag);
+        this.deferredTasksLoaded = false;
     }
 
     public void markDropDataCaptured() {
@@ -1395,7 +1403,7 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
 
         // 记录 AE 合成任务数据，推迟到 level 可用（首 tick）时解码
         this.aeManager.readTasksTag(tag);
-
+        this.deferredTasksLoaded = false;
     }
 
     @Override
@@ -1489,8 +1497,8 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
                                    be.mainNode.create(getLevel(), getBlockPos());
                                    // 节点创建后重新解析样板并通知AE网络
                                    be.updatePatterns();
-                                   // level 已可用，加载持久化的 AE 合成任务
-                                   be.aeManager.loadDeferredTasks();
+                                   // level 已可用，加载持久化的 AE 合成任务；目录未就绪时由 tick 重试
+                                   be.deferredTasksLoaded = be.aeManager.loadDeferredTasks();
                                }
         );
     }

@@ -26,12 +26,6 @@ public enum PlatformStyle {
                     ? PlatformLayout.Role.BORDER : PlatformLayout.Role.FILL;
         }
 
-        /** 一维度多联中心：偶数区块数占 2×2，奇数占 1 格，两轴各自判定。 */
-        @Override
-        public boolean isMultiCenterMarker(int groupX, int groupZ, int widthX, int widthZ) {
-            return evenSizedMultiCenterMarker(groupX, groupZ, widthX, widthZ);
-        }
-
         @Override
         public int roadStartBoundaryWidth() {
             return 1;
@@ -70,18 +64,6 @@ public enum PlatformStyle {
         @Override
         public int multiBorderThickness() {
             return 2;
-        }
-
-        /**
-         * 二维度多联中心固定为 2×2，与其单区块中心（x∈7..8, z∈7..8）的风格一致。
-         * 不再按合并尺寸奇偶收缩成 1 格，因此偶数与奇数区块数下都是 4 格。
-         */
-        @Override
-        public boolean isMultiCenterMarker(int groupX, int groupZ, int widthX, int widthZ) {
-            int centerX = widthX / 2;
-            int centerZ = widthZ / 2;
-            return (groupX == centerX - 1 || groupX == centerX)
-                    && (groupZ == centerZ - 1 || groupZ == centerZ);
         }
 
         @Override
@@ -164,9 +146,25 @@ public enum PlatformStyle {
         return 1;
     }
 
-    /** 多联合并组的中心标记判定。默认只占正中心 1 格，各轴独立计算。 */
-    public boolean isMultiCenterMarker(int groupX, int groupZ, int widthX, int widthZ) {
-        return groupX == widthX / 2 && groupZ == widthZ / 2;
+    /**
+     * 多联合并组的中心标记判定，以填充区（合并区域去掉起始侧边框后的部分）居中。
+     *
+     * <p>填充区宽度为奇数时中心格唯一，取 1 格；为偶数时中心落在两格之间，
+     * 两格一并取用以保持左右对称。两轴各自独立判定，因此非正方形的合并尺寸
+     * 也能在每条轴上分别取到正确的中心位置。
+     *
+     * @param thickness 合并组起始侧的边框宽度（格），与布局算法使用同一数值
+     */
+    public boolean isMultiCenterMarker(int groupX, int groupZ,
+                                       int widthX, int widthZ, int thickness) {
+        int innerX = Math.max(1, widthX - thickness);
+        int innerZ = Math.max(1, widthZ - thickness);
+        int centerX = thickness + innerX / 2;
+        int centerZ = thickness + innerZ / 2;
+        int minX = innerX % 2 == 0 ? centerX - 1 : centerX;
+        int minZ = innerZ % 2 == 0 ? centerZ - 1 : centerZ;
+        return groupX >= minX && groupX <= centerX
+                && groupZ >= minZ && groupZ <= centerZ;
     }
 
     /** 马路模式下单个平台区域内的中心标记判定。默认只占正中心 1 格。 */
@@ -176,17 +174,4 @@ public enum PlatformStyle {
 
     /** 调试界面显示的名称。 */
     public abstract String debugName();
-
-    /**
-     * 偶数区块数的轴中心占 2 格、奇数占 1 格，两个轴各自独立判定，
-     * 因此非正方形的合并尺寸也能在每条轴上分别取到正确的中心位置。
-     */
-    public static boolean evenSizedMultiCenterMarker(
-            int groupX, int groupZ, int widthX, int widthZ) {
-        int centerX = widthX / 2;
-        int centerZ = widthZ / 2;
-        int minX = widthX % 32 == 0 ? centerX - 1 : centerX;
-        int minZ = widthZ % 32 == 0 ? centerZ - 1 : centerZ;
-        return groupX >= minX && groupX <= centerX && groupZ >= minZ && groupZ <= centerZ;
-    }
 }

@@ -322,12 +322,13 @@ dependencies {
     // 神秘农业
     implementation "curse.maven:cucumber-272335:8035802"
     implementation "curse.maven:mystical-agriculture-246640:8035819"
+    implementation "curse.maven:mystical-agradditions-256247:8515974"
 
     implementation "maven.modrinth:hostile-neural-networks:1.21.1-6.5.1"
 
     //自然灵气
-    compileOnly "maven.modrinth:natures-aura:41.9"
-    compileOnly "maven.modrinth:patchouli:1.21.1-93-neoforge"
+    implementation "maven.modrinth:natures-aura:41.9"
+    implementation "maven.modrinth:patchouli:1.21.1-93-neoforge"
 
     // Occultism is an optional runtime integration. Keep it off the production
     // dependency graph while exposing its API for compilation and local development.

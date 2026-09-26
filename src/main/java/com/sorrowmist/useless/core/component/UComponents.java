@@ -6,14 +6,18 @@ import com.sorrowmist.useless.api.enums.tool.EnchantMode;
 import com.sorrowmist.useless.api.enums.tool.ConstructionWandCoreMode;
 import com.sorrowmist.useless.api.enums.tool.ToolTypeMode;
 import net.minecraft.core.GlobalPos;
+import net.minecraft.core.UUIDUtil;
 import net.minecraft.core.component.DataComponentType;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.neoforge.registries.DeferredHolder;
 import net.neoforged.neoforge.registries.DeferredRegister;
 
+import java.util.List;
+import java.util.UUID;
 import java.util.function.UnaryOperator;
 
 public final class UComponents {
@@ -380,6 +384,86 @@ public final class UComponents {
             register("ritual_blueprint_pentacle", builder -> builder
                     .persistent(RitualBlueprintPentacles.CODEC)
                     .networkSynchronized(RitualBlueprintPentacles.STREAM_CODEC));
+
+    /**
+     * 催熟模式组件（BeefRipen）
+     * true = 右键时一键催熟目标：可骨粉方块循环施加骨粉直到长满，
+     * 幼年动物直接催至成年；潜行右键把这次交互让给其它模组。
+     */
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<Boolean>> BeefRipenComponent =
+            register("beef_ripen", builder ->
+                    builder.persistent(Codec.BOOL)
+                           .networkSynchronized(StreamCodec.of(
+                                   FriendlyByteBuf::writeBoolean,
+                                   FriendlyByteBuf::readBoolean
+                           ))
+            );
+
+    /**
+     * 连点模式组件（BeefAutoClick）
+     * true = 客户端手持造化杖时以最快速度重复触发右键，再次按下绑定按键关闭。
+     * 只存状态，真正的连点循环在客户端 {@code BeefAutoClicker} 中执行。
+     */
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<Boolean>> BeefAutoClickComponent =
+            register("beef_auto_click", builder ->
+                    builder.persistent(Codec.BOOL)
+                           .networkSynchronized(StreamCodec.of(
+                                   FriendlyByteBuf::writeBoolean,
+                                   FriendlyByteBuf::readBoolean
+                           ))
+            );
+
+    /**
+     * 强制生长组件（BeefForceGrow）
+     * true = 催熟时额外用「随机刻」推进方块，可作用于甘蔗、仙人掌、竹子等
+     * 原版骨粉无效的方块。代价是它不挑方块——树叶枯萎、火蔓延、雪冰融化、
+     * 耕地退化这些随机刻行为同样会被推，是否开启由玩家自行抉择。
+     */
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<Boolean>> BeefForceGrowComponent =
+            register("beef_force_grow", builder ->
+                    builder.persistent(Codec.BOOL)
+                           .networkSynchronized(StreamCodec.of(
+                                   FriendlyByteBuf::writeBoolean,
+                                   FriendlyByteBuf::readBoolean
+                           ))
+            );
+
+    /**
+     * 无线物流模式组件（StaffLink）
+     * true = 开启「无线物流」：潜行右键容器方块可把它绑进/解绑出造化杖的物流网络，
+     * 网络内的搬运规则在独立界面里配置。真正的搬运由服务端引擎执行。
+     */
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<Boolean>> StaffLinkEnabledComponent =
+            register("beef_wireless_logistics", builder ->
+                    builder.persistent(Codec.BOOL)
+                           .networkSynchronized(StreamCodec.of(
+                                   FriendlyByteBuf::writeBoolean,
+                                   FriendlyByteBuf::readBoolean
+                           ))
+            );
+
+    /**
+     * 造化杖持有的物流网络列表（StaffLink）。
+     *
+     * <p>一把杖可以同时挂多张互相独立的网络，靠 {@link #STAFF_LINK_ACTIVE} 指定当前生效的那张。
+     * 物品上只存这些 16 字节的 UUID；网络本体（锚点与线路配置）存在服务端的
+     * {@code StaffLinkSavedData} 里。这样杖被放进箱子、区块卸载都不影响物流运行。</p>
+     */
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<List<UUID>>> STAFF_LINK_NETWORKS =
+            register("staff_link_networks", builder ->
+                    builder.persistent(UUIDUtil.CODEC.listOf())
+                           .networkSynchronized(UUIDUtil.STREAM_CODEC.apply(ByteBufCodecs.list()))
+            );
+
+    /** {@link #STAFF_LINK_NETWORKS} 里当前生效的下标；超出范围时按 0 处理。 */
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<Integer>> STAFF_LINK_ACTIVE =
+            register("staff_link_active", builder ->
+                    builder.persistent(Codec.INT)
+                           .networkSynchronized(StreamCodec.of(
+                                   FriendlyByteBuf::writeVarInt,
+                                   FriendlyByteBuf::readVarInt
+                           ))
+            );
 
     // 私有构造器，防止外部实例化（该类仅用于注册静态组件）
     private UComponents() {}

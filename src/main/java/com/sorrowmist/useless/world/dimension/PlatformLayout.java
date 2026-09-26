@@ -85,8 +85,8 @@ public final class PlatformLayout {
      * 多联模式：把边界间隔当作合并尺寸，把 sizeX×sizeZ 个区块当成一个整体平台。
      * 边框只铺在每个合并组的起始列与起始行上，相邻合并组共用同一条边框带，
      * 因此交界处不会叠加出两条边框；边框厚度沿用具体生成器自己的边框语义，
-     * 例如三维度仍是 2 格厚、一维度是 1 格厚。组内部（包括区块之间的接缝）
-     * 全部是填充方块，中心方块按合并尺寸的奇偶占 1 格或 2×2 格。
+     * 例如三维度是 3 格厚、二维度是 2 格厚、一维度是 1 格厚。组内部（包括区块
+     * 之间的接缝）全部是填充方块，中心方块以填充区居中，占 1 格或 2×2 格。
      */
     private static BlockState multiModePlatformState(PlatformStyle style,
                                                      DimensionGenerationConfig config,
@@ -97,14 +97,14 @@ public final class PlatformLayout {
         // 合并区域内的相对坐标，范围分别是 [0, sizeX * 16) 与 [0, sizeZ * 16)。
         int groupX = mod(chunkX, sizeX) * 16 + localX;
         int groupZ = mod(chunkZ, sizeZ) * 16 + localZ;
-
-        if (style.isMultiCenterMarker(groupX, groupZ, sizeX * 16, sizeZ * 16)) {
-            return centerState(config);
-        }
         // 只铺起始列与起始行：相邻合并组共用同一条边框带，交界处不会出现两条边框。
         // 厚度由具体生成器声明的多联边框宽度决定，并且不会超过半个合并组。
         int thickness = Math.min(style.multiBorderThickness(),
                 (Math.min(sizeX, sizeZ) * 16 - 1) / 2);
+
+        if (style.isMultiCenterMarker(groupX, groupZ, sizeX * 16, sizeZ * 16, thickness)) {
+            return centerState(config);
+        }
         boolean onBorder = groupX < thickness || groupZ < thickness;
         return onBorder ? borderState(config) : fillState(config);
     }

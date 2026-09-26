@@ -12,6 +12,7 @@ import com.sorrowmist.useless.client.gui.MultiblockAlloyFurnaceScreen;
 import com.sorrowmist.useless.client.gui.PassiveCraftingHatchScreen;
 import com.sorrowmist.useless.client.gui.OreGeneratorScreen;
 import com.sorrowmist.useless.client.gui.DimensionConfigScreen;
+import com.sorrowmist.useless.client.gui.StaffLinkScreen;
 import com.sorrowmist.useless.client.render.ctm.CtmModelRegistrar;
 import com.sorrowmist.useless.client.render.supervisor.SupervisorModelLoader;
 import com.sorrowmist.useless.compat.jei.JEIPlugin;
@@ -111,6 +112,7 @@ public class ClientSetup {
         event.register(ModMenuType.ORE_GENERATOR_MENU.get(), OreGeneratorScreen::new);
         event.register(ModMenuType.DIMENSION_CONFIG_MENU.get(), DimensionConfigScreen::new);
         event.register(ModMenuType.PATTERN_CONVERTER_MENU.get(), PatternConverterScreen::new);
+        event.register(ModMenuType.STAFF_LINK_MENU.get(), StaffLinkScreen::new);
     }
 
     @SubscribeEvent

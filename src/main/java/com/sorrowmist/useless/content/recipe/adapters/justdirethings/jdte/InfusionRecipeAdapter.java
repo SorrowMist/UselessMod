@@ -12,11 +12,13 @@ import com.jdte.setup.JDTERecipes;
 import com.sorrowmist.useless.api.enums.AlloyFurnaceMode;
 import com.sorrowmist.useless.content.recipe.AdapterUtils;
 import com.sorrowmist.useless.content.recipe.AdvancedAlloyFurnaceRecipe;
+import com.sorrowmist.useless.content.recipe.AlloyFurnaceRecipeFingerprint;
 import com.sorrowmist.useless.content.recipe.CountedIngredient;
 import com.sorrowmist.useless.content.recipe.FluidIngredientAllocator;
 import com.sorrowmist.useless.content.recipe.IRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.LongSizedFluidIngredient;
 import com.sorrowmist.useless.content.recipe.RecipeSourceIds;
+import net.minecraft.core.HolderLookup;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
@@ -146,8 +148,8 @@ public final class InfusionRecipeAdapter implements IRecipeAdapter<InfusionRecip
         Map<FluidStack, Long> availableFluids = mergedFluids == null ? Map.of() : mergedFluids;
         for (ItemStack input : actualInputs) {
             if (input == null || input.isEmpty()) continue;
-            addRuntimeContainerMatches(matches, input, availableFluids);
-            addRuntimeBottleMatches(matches, input, availableFluids);
+            addRuntimeContainerMatches(level, matches, input, availableFluids);
+            addRuntimeBottleMatches(level, matches, input, availableFluids);
             addRuntimeSpawnEggMatch(matches, level, input, availableFluids);
         }
         return List.copyOf(matches.values());
@@ -155,13 +157,15 @@ public final class InfusionRecipeAdapter implements IRecipeAdapter<InfusionRecip
 
     private static List<RecipeHolder<InfusionRecipe>> baseGeneratedRecipes(Level level) {
         RecipeManager recipeManager = level.getRecipeManager();
+        HolderLookup.Provider registries = level.registryAccess();
         synchronized (GENERATED_BASE_RECIPES) {
             return GENERATED_BASE_RECIPES.computeIfAbsent(
-                    recipeManager, ignored -> buildBaseGeneratedRecipes());
+                    recipeManager, ignored -> buildBaseGeneratedRecipes(registries));
         }
     }
 
-    private static List<RecipeHolder<InfusionRecipe>> buildBaseGeneratedRecipes() {
+    private static List<RecipeHolder<InfusionRecipe>> buildBaseGeneratedRecipes(
+            HolderLookup.Provider registries) {
         Map<ResourceLocation, RecipeHolder<InfusionRecipe>> recipes = new LinkedHashMap<>();
 
         for (Item item : BuiltInRegistries.ITEM) {
@@ -172,7 +176,7 @@ public final class InfusionRecipeAdapter implements IRecipeAdapter<InfusionRecip
                 if (!InfusionFluidHelper.isFillableSourceFluid(fluid)) continue;
                 try {
                     RecipeHolder<InfusionRecipe> holder = createFluidContainerRecipe(
-                            input, new FluidStack(fluid, InfusionMachineBE.BASE_FLUID_CAPACITY));
+                            registries, input, new FluidStack(fluid, InfusionMachineBE.BASE_FLUID_CAPACITY));
                     if (holder != null) recipes.putIfAbsent(holder.id(), holder);
                 } catch (RuntimeException ignored) {
                     // A third-party fluid container may reject capability probing.
@@ -180,28 +184,29 @@ public final class InfusionRecipeAdapter implements IRecipeAdapter<InfusionRecip
             }
         }
 
-        addBottleRecipe(recipes, new FluidStack(Fluids.WATER,
+        addBottleRecipe(registries, recipes, new FluidStack(Fluids.WATER,
                 InfusionFluidHelper.BOTTLE_FLUID_AMOUNT));
         for (Fluid fluid : BuiltInRegistries.FLUID) {
             if (fluid == Fluids.EMPTY || !InfusionFluidHelper.isFillableSourceFluid(fluid)
                     || !InfusionFluidHelper.isHoneyFluid(fluid)) {
                 continue;
             }
-            addBottleRecipe(recipes, new FluidStack(fluid,
+            addBottleRecipe(registries, recipes, new FluidStack(fluid,
                     InfusionFluidHelper.BOTTLE_FLUID_AMOUNT));
         }
         return List.copyOf(recipes.values());
     }
 
     private static void addBottleRecipe(
+            HolderLookup.Provider registries,
             Map<ResourceLocation, RecipeHolder<InfusionRecipe>> recipes, FluidStack fluid) {
-        RecipeHolder<InfusionRecipe> holder = createBottleRecipe(fluid);
+        RecipeHolder<InfusionRecipe> holder = createBottleRecipe(registries, fluid);
         if (holder != null) recipes.putIfAbsent(holder.id(), holder);
     }
 
     @Nullable
     private static RecipeHolder<InfusionRecipe> createFluidContainerRecipe(
-            ItemStack input, FluidStack available) {
+            HolderLookup.Provider registries, ItemStack input, FluidStack available) {
         if (input == null || input.isEmpty() || available == null || available.isEmpty()) return null;
 
         ItemStack container = input.copyWithCount(1);
@@ -221,13 +226,14 @@ public final class InfusionRecipeAdapter implements IRecipeAdapter<InfusionRecip
             return null;
         }
         result.setCount(1);
-        return holder("container", originalContainer,
+        return holder(registries, "container", originalContainer,
                 available.copyWithAmount(filled), result,
                 AdvancedInfusionMachineBE.BASE_ENERGY_COST);
     }
 
     @Nullable
-    private static RecipeHolder<InfusionRecipe> createBottleRecipe(FluidStack fluid) {
+    private static RecipeHolder<InfusionRecipe> createBottleRecipe(
+            HolderLookup.Provider registries, FluidStack fluid) {
         if (fluid == null || fluid.isEmpty()
                 || fluid.getAmount() < InfusionFluidHelper.BOTTLE_FLUID_AMOUNT) return null;
 
@@ -240,13 +246,14 @@ public final class InfusionRecipeAdapter implements IRecipeAdapter<InfusionRecip
             return null;
         }
         output.setCount(1);
-        return holder("bottle", Items.GLASS_BOTTLE.getDefaultInstance(),
+        return holder(registries, "bottle", Items.GLASS_BOTTLE.getDefaultInstance(),
                 fluid.copyWithAmount(InfusionFluidHelper.BOTTLE_FLUID_AMOUNT), output,
                 AdvancedInfusionMachineBE.BASE_ENERGY_COST);
     }
 
     private static void addSpawnEggRecipes(
             Level level, List<RecipeHolder<InfusionRecipe>> result) {
+        HolderLookup.Provider registries = level.registryAccess();
         for (Map.Entry<Item, ItemStack> entry : spawnEggRecipes(level).entrySet()) {
             Item inputItem = entry.getKey();
             ItemStack output = entry.getValue();
@@ -256,7 +263,7 @@ public final class InfusionRecipeAdapter implements IRecipeAdapter<InfusionRecip
             if (input.isEmpty() || input.getMaxStackSize() <= 1) continue;
             input.setCount(input.getMaxStackSize());
             RecipeHolder<InfusionRecipe> holder = holder(
-                    "spawn_egg", input,
+                    registries, "spawn_egg", input,
                     new FluidStack(JDTEFluids.LIFE_FLUID_SOURCE.get(),
                             MobLootSpawnEggHelper.LIFE_FLUID_COST),
                     output.copyWithCount(1), MobLootSpawnEggHelper.ENERGY_COST);
@@ -265,12 +272,13 @@ public final class InfusionRecipeAdapter implements IRecipeAdapter<InfusionRecip
     }
 
     private static void addRuntimeContainerMatches(
-            Map<ResourceLocation, RecipeHolder<InfusionRecipe>> matches,
+            Level level, Map<ResourceLocation, RecipeHolder<InfusionRecipe>> matches,
             ItemStack input, Map<FluidStack, Long> availableFluids) {
+        HolderLookup.Provider registries = level.registryAccess();
         for (FluidStack available : simulationFluids(availableFluids)) {
             RecipeHolder<InfusionRecipe> holder;
             try {
-                holder = createFluidContainerRecipe(input, available);
+                holder = createFluidContainerRecipe(registries, input, available);
             } catch (RuntimeException ignored) {
                 continue;
             }
@@ -279,11 +287,12 @@ public final class InfusionRecipeAdapter implements IRecipeAdapter<InfusionRecip
     }
 
     private static void addRuntimeBottleMatches(
-            Map<ResourceLocation, RecipeHolder<InfusionRecipe>> matches,
+            Level level, Map<ResourceLocation, RecipeHolder<InfusionRecipe>> matches,
             ItemStack input, Map<FluidStack, Long> availableFluids) {
         if (!input.is(Items.GLASS_BOTTLE)) return;
+        HolderLookup.Provider registries = level.registryAccess();
         for (FluidStack available : simulationFluids(availableFluids)) {
-            RecipeHolder<InfusionRecipe> holder = createBottleRecipe(available);
+            RecipeHolder<InfusionRecipe> holder = createBottleRecipe(registries, available);
             addIfFluidIsAvailable(matches, holder, availableFluids);
         }
     }
@@ -299,7 +308,7 @@ public final class InfusionRecipeAdapter implements IRecipeAdapter<InfusionRecip
         }
 
         RecipeHolder<InfusionRecipe> holder = holder(
-                "spawn_egg", input.copyWithCount(input.getMaxStackSize()),
+                level.registryAccess(), "spawn_egg", input.copyWithCount(input.getMaxStackSize()),
                 new FluidStack(JDTEFluids.LIFE_FLUID_SOURCE.get(),
                         MobLootSpawnEggHelper.LIFE_FLUID_COST),
                 output.copyWithCount(1), MobLootSpawnEggHelper.ENERGY_COST);
@@ -364,29 +373,31 @@ public final class InfusionRecipeAdapter implements IRecipeAdapter<InfusionRecip
     }
 
     private static RecipeHolder<InfusionRecipe> holder(
+            HolderLookup.Provider registries,
             String kind, ItemStack input, FluidStack fluid, ItemStack output, int energyCost) {
-        ResourceLocation id = dynamicId(kind, input, fluid, output);
+        ResourceLocation id = dynamicId(registries, kind, input, fluid, output);
         return new RecipeHolder<>(id, new InfusionRecipe(
                 id, input.copy(), fluid.copy(), output.copy(), Math.max(1, energyCost)));
     }
 
+    /**
+     * 由参与方数据派生的配方 id。
+     *
+     * <p>物品栈与流体栈的组件映射（含组件值内部嵌套的映射）迭代顺序取决于引用哈希，跨 JVM 重启
+     * 并不保证一致。若直接拼接组件映射的字符串表示，这些栈会在每次启动时得到不同签名，进而生成
+     * 不同 id；已按旧 id 编码的万象样板会因失配被判为缺失并丢弃，表现为重启后样板随机失效。
+     * 这里复用指纹模块的编解码路径（组件补丁 codec + JSON 递归排序），使签名只由数据内容决定。
+     */
     private static ResourceLocation dynamicId(
+            HolderLookup.Provider registries,
             String kind, ItemStack input, FluidStack fluid, ItemStack output) {
-        String signature = kind + "|" + stackSignature(input)
-                + "|" + fluidSignature(fluid) + "|" + stackSignature(output);
+        String signature = kind
+                + "|" + AlloyFurnaceRecipeFingerprint.safeItemStack(input, registries)
+                + "|" + AlloyFurnaceRecipeFingerprint.safeFluidStack(fluid, registries)
+                + "|" + AlloyFurnaceRecipeFingerprint.safeItemStack(output, registries);
         return ResourceLocation.fromNamespaceAndPath(
                 "jdte", "infusion/" + kind + "/"
                         + Integer.toUnsignedString(signature.hashCode(), 16));
-    }
-
-    private static String stackSignature(ItemStack stack) {
-        return BuiltInRegistries.ITEM.getKey(stack.getItem()) + "@"
-                + stack.getCount() + "@" + stack.getComponents();
-    }
-
-    private static String fluidSignature(FluidStack stack) {
-        return BuiltInRegistries.FLUID.getKey(stack.getFluid()) + "@"
-                + stack.getAmount() + "@" + stack.getComponents();
     }
 
     private static Map<Item, ItemStack> spawnEggRecipes(Level level) {

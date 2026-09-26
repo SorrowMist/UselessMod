@@ -10,6 +10,7 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.tags.TagKey;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.alchemy.PotionBrewing;
 import net.minecraft.world.item.crafting.Ingredient;
 import net.minecraft.world.level.material.Fluid;
 import net.neoforged.neoforge.common.crafting.DataComponentIngredient;
@@ -19,6 +20,8 @@ import net.neoforged.neoforge.fluids.crafting.FluidIngredient;
 import net.neoforged.neoforge.fluids.crafting.SizedFluidIngredient;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.ArrayList;
+import java.util.ConcurrentModificationException;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -41,6 +44,62 @@ public class AdapterUtils {
     public static final int MEKANISM_METALLURGIC_INFUSER_TICKS_REQUIRED = MEKANISM_BASE_TICKS_REQUIRED;
     public static final int MEKANISM_ENRICHMENT_CHAMBER_ENERGY_PER_TICK = 50;
     public static final int MEKANISM_METALLURGIC_INFUSER_ENERGY_PER_TICK = 50;
+
+    /**
+     * 收集全量物品注册表中可作为酿造试剂的物品，用于收窄后续遍历范围。
+     * <p>
+     * hasPotionMix 与 hasContainerMix 的通过者必然满足 isPotionIngredient 或
+     * isContainerIngredient，而 isIngredient 为二者与自定义酿造配方的并集，
+     * 因此以 isIngredient 预筛不会排除任何可产出配方的试剂。
+     *
+     * @param brewing 当前等级的药水酿造实例
+     * @return 预筛后的试剂候选列表
+     */
+    public static List<Item> reagentCandidates(PotionBrewing brewing) {
+        List<Item> candidates = new ArrayList<>();
+        for (Item item : BuiltInRegistries.ITEM) {
+            if (item == null) {
+                continue;
+            }
+            if (isIngredientWithRetry(brewing, item)) {
+                candidates.add(item);
+            }
+        }
+        return List.copyOf(candidates);
+    }
+
+    /** 单个试剂的最大重试次数。 */
+    private static final int REAGENT_PROBE_ATTEMPTS = 32;
+
+    /**
+     * 判定试剂是否被当前酿造实例接受，并在并发注册窗口内重试。
+     *
+     * <p>PotionBrewing 的查询方法直接迭代其内部列表，主线程注册混合配方与后台线程查询重叠时
+     * 会抛出 ConcurrentModificationException。此处若与第三方异常一并无视，候选列表会静默缩水，
+     * 调用方无法察觉产出缺失；因此对并发修改单独重试。其余异常仍按第三方异常配方忽略，
+     * 不得中断其余试剂的收集。</p>
+     *
+     * @return 该试剂是否被接受；重试耗尽或抛出其他异常时返回 false
+     */
+    private static boolean isIngredientWithRetry(PotionBrewing brewing, Item item) {
+        for (int attempt = 0; ; attempt++) {
+            try {
+                return brewing.isIngredient(item.getDefaultInstance());
+            } catch (ConcurrentModificationException exception) {
+                if (attempt >= REAGENT_PROBE_ATTEMPTS - 1) {
+                    return false;
+                }
+                try {
+                    Thread.sleep(1L);
+                } catch (InterruptedException interrupted) {
+                    Thread.currentThread().interrupt();
+                    return false;
+                }
+            } catch (RuntimeException ignored) {
+                return false;
+            }
+        }
+    }
 
     /** AE 能量到 FE 的转换系数 */
     public static final int AE_TO_FE_CONVERSION = 2;

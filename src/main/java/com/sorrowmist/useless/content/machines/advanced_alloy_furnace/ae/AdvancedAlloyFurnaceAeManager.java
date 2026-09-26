@@ -515,16 +515,25 @@ public final class AdvancedAlloyFurnaceAeManager {
     }
 
     /**
-     * 在 level 可用后加载延迟的任务数据（样板解码需要 level）。
+     * 在 level 与配方目录均可用后加载延迟的任务数据（样板解码同时依赖二者）。
+     *
+     * <p>目录由 {@code prewarmAsync} 在后台线程构建，服务端启动阶段实测耗时二十秒以上。若在目录
+     * 就绪前解码，{@code resolvePattern} 会因快照未就绪返回空，随即把完好的样板判为
+     * 「missing or has changed」并退还材料，任务因此被取消。故此处挂起，由调用方在后续 tick 重试。</p>
+     *
+     * @return true 表示已处理完毕（含无待恢复数据）；false 表示前提条件未满足，需稍后重试
      */
-    public void loadDeferredTasks() {
+    public boolean loadDeferredTasks() {
         CompoundTag tag = this.deferredTasksTag;
         if (tag == null) {
-            return;
+            return true;
         }
         Level level = this.owner.getLevel();
         if (level == null) {
-            return;
+            return false;
+        }
+        if (!AlloyFurnaceRecipeCatalog.isReady(level)) {
+            return false;
         }
         this.deferredTasksTag = null;
         HolderLookup.Provider registries = level.registryAccess();
@@ -605,6 +614,7 @@ public final class AdvancedAlloyFurnaceAeManager {
                         level.getGameTime(), amounts));
             }
         }
+        return true;
     }
 
     /** 旧存档格式（Format &lt; 2）：逐段写的 {@code GenericStack} 列表，每个 {@code Long.MAX} 一段。 */

@@ -33,17 +33,6 @@ public final class EnderIOTravelCompat {
         stack.set(EIODataComponents.TRAVEL_ITEM, enabled);
     }
 
-    public static InteractionResult tryShortTeleport(Level level, Player player) {
-        if (level.isClientSide()) {
-            return TravelHandler.teleportPosition(level, player).isPresent()
-                    ? InteractionResult.SUCCESS
-                    : InteractionResult.PASS;
-        }
-        return TravelHandler.shortTeleport(level, player)
-                ? InteractionResult.SUCCESS
-                : InteractionResult.PASS;
-    }
-
     public static InteractionResult tryAnchorTeleport(Level level, Player player) {
         boolean success = TravelHandler.blockTeleport(level, player)
                 || TravelHandler.interact(level, player);

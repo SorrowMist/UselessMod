@@ -58,6 +58,14 @@ public final class DimensionConfigMenu extends AbstractContainerMenu {
     private final GhostSlot[] ghostSlots = new GhostSlot[GHOST_SLOT_COUNT];
     /** 打开菜单时该维度的原始配置，用于多联模式下保留边界与道路方块设置。 */
     private DimensionGenerationConfig initialConfig;
+    /**
+     * 菜单打开时该维度配置的只读快照。
+     *
+     * <p>多联模式下边界与道路槽位被隐藏，其方块值无法从槽位读取，必须以该维度的
+     * 原始配置兜底。{@link #initialConfig} 会在每次提交或导入后被重写为当前编辑
+     * 结果，无法承担该职责，因此单独保留一份不随编辑变化的快照。
+     */
+    private final DimensionGenerationConfig preservedConfig;
 
     private int platformLayers;
     private int platformStartY;
@@ -85,6 +93,7 @@ public final class DimensionConfigMenu extends AbstractContainerMenu {
 
         DimensionGenerationConfig config = context.initialConfig().normalized();
         this.initialConfig = config;
+        this.preservedConfig = config;
         this.platformLayers = config.platformLayers();
         this.platformStartY = config.platformStartY();
         this.boundaryIntervalX = config.boundaryIntervalX();
@@ -306,14 +315,25 @@ public final class DimensionConfigMenu extends AbstractContainerMenu {
 
     public Optional<DimensionGenerationConfig> createConfiguration() {
         ResourceLocation[] blocks = new ResourceLocation[GHOST_SLOT_COUNT];
+        // 基础方块槽位在界面中始终可见，正常情况下必定有值；仅当槽位为空或
+        // 引用了已失效的方块时才回落到该维度的原始配置，避免整份配置被判为
+        // 不完整而让预览与保存一并失效。
         for (int i = BORDER_SLOT; i <= CENTER_SLOT; i++) {
             blocks[i] = DimensionGenerationConfig.blockId(ghostSlots[i].getItem());
-            if (blocks[i] == null) return Optional.empty();
+            if (blocks[i] == null) {
+                blocks[i] = switch (i) {
+                    case BORDER_SLOT -> preservedConfig.borderBlockId();
+                    case FILL_SLOT -> preservedConfig.fillBlockId();
+                    default -> preservedConfig.centerBlockId();
+                };
+            }
         }
-        // 多联模式下这些槽位被隐藏，必须以该维度的原始配置回落，
-        // 否则保存多联模式会把其他维度已有的边界与道路方块覆盖成全局默认值。
+        // 多联模式下这些槽位被隐藏，槽位可能为空或已被导入预设改写，
+        // 必须以该维度打开菜单时的原始配置回落，否则保存多联模式会把该维度
+        // 已有的边界与道路方块覆盖成全局默认值，或覆盖成预设里的值。
+        // 该回落基准不能使用 initialConfig：它在每次提交与导入后都会被改写。
         DimensionGenerationConfig fallback = isMultiMode()
-                ? initialConfig : DimensionGenerationConfig.defaults();
+                ? preservedConfig : DimensionGenerationConfig.defaults();
         blocks[BOUNDARY_A_SLOT] = optionalBlock(BOUNDARY_A_SLOT, fallback.boundaryBlockAId());
         blocks[BOUNDARY_B_SLOT] = optionalBlock(BOUNDARY_B_SLOT, fallback.boundaryBlockBId());
         blocks[ROAD_A_SLOT] = optionalBlock(ROAD_A_SLOT, fallback.roadBlockAId());

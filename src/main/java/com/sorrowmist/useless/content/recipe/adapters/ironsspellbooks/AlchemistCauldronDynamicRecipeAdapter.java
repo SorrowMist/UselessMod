@@ -40,11 +40,10 @@ import net.neoforged.neoforge.fluids.FluidStack;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
+import java.util.ConcurrentModificationException;
 import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 /** Generates item-only recipes for the dynamic alchemist-cauldron interactions. */
 public final class AlchemistCauldronDynamicRecipeAdapter
@@ -56,6 +55,8 @@ public final class AlchemistCauldronDynamicRecipeAdapter
             Items.SPLASH_POTION,
             Items.LINGERING_POTION
     };
+    /** 单次构建在遇到并发修改时的最大重试次数。 */
+    private static final int MAX_BUILD_ATTEMPTS = 32;
 
     private volatile PotionBrewing cachedBrewing;
     private volatile boolean cachedCauldronBrewing;
@@ -90,11 +91,40 @@ public final class AlchemistCauldronDynamicRecipeAdapter
 
         synchronized (this) {
             if (cachedBrewing != brewing || cachedCauldronBrewing != allowCauldronBrewing) {
-                cachedRecipes = createRecipes(brewing, allowCauldronBrewing);
+                cachedRecipes = buildRecipesWithRetry(brewing, allowCauldronBrewing);
                 cachedBrewing = brewing;
                 cachedCauldronBrewing = allowCauldronBrewing;
             }
             return cachedRecipes;
+        }
+    }
+
+    /**
+     * 在 PotionBrewing 上构建配方，并在并发注册窗口内重试。
+     *
+     * <p>本方法由后台线程调用，而登录与数据包同步期间主线程会向 PotionBrewing 注册混合配方。
+     * 该类的查询方法直接迭代其内部列表，没有可供复制快照的入口，因此注册与查询重叠时
+     * 迭代器会抛出 {@link ConcurrentModificationException}，使对应条目被跳过。注册是一次性
+     * 且短暂的，让出 CPU 后重试即可读到完整列表。</p>
+     *
+     * @throws ConcurrentModificationException 重试耗尽后仍处于并发修改状态
+     */
+    private static List<RecipeHolder<DynamicRecipe>> buildRecipesWithRetry(
+            @Nullable PotionBrewing brewing, boolean allowCauldronBrewing) {
+        for (int attempt = 0; ; attempt++) {
+            try {
+                return createRecipes(brewing, allowCauldronBrewing);
+            } catch (ConcurrentModificationException exception) {
+                if (attempt >= MAX_BUILD_ATTEMPTS - 1) {
+                    throw exception;
+                }
+                try {
+                    Thread.sleep(1L);
+                } catch (InterruptedException interrupted) {
+                    Thread.currentThread().interrupt();
+                    throw exception;
+                }
+            }
         }
     }
 
@@ -184,7 +214,7 @@ public final class AlchemistCauldronDynamicRecipeAdapter
     private static void addPotionRecipes(
             Map<ResourceLocation, RecipeHolder<DynamicRecipe>> recipes,
             PotionBrewing brewing) {
-        List<Item> reagents = brewingReagents(brewing);
+        List<Item> reagents = AdapterUtils.reagentCandidates(brewing);
         List<Holder<Potion>> potions = potionHolders();
         for (Item container : POTION_CONTAINERS) {
             for (Holder<Potion> potion : potions) {
@@ -199,6 +229,10 @@ public final class AlchemistCauldronDynamicRecipeAdapter
                     try {
                         hasPotionMix = brewing.hasPotionMix(input, reagentStack)
                                 || brewing.hasContainerMix(input, reagentStack);
+                    } catch (ConcurrentModificationException exception) {
+                        // 并发注册窗口内的读取失败不能按「该组合无配方」处理，否则条目会静默缺失；
+                        // 交由外层重试，读到完整列表后重新判定。
+                        throw exception;
                     } catch (RuntimeException ignored) {
                         continue;
                     }
@@ -209,6 +243,9 @@ public final class AlchemistCauldronDynamicRecipeAdapter
                     ItemStack result;
                     try {
                         result = brewing.mix(reagentStack, input);
+                    } catch (ConcurrentModificationException exception) {
+                        // 同上：并发修改不是「无配方」，交由外层重试。
+                        throw exception;
                     } catch (RuntimeException ignored) {
                         continue;
                     }
@@ -234,28 +271,6 @@ public final class AlchemistCauldronDynamicRecipeAdapter
                 }
             }
         }
-    }
-
-    private static List<Item> brewingReagents(PotionBrewing brewing) {
-        Set<Item> reagents = new LinkedHashSet<>();
-        List<Item> registeredItems = BuiltInRegistries.ITEM.stream().toList();
-        for (Item container : POTION_CONTAINERS) {
-            for (Holder<Potion> potion : potionHolders()) {
-                ItemStack input = PotionContents.createItemStack(container, potion);
-                for (Item reagent : registeredItems) {
-                    ItemStack reagentStack = reagent.getDefaultInstance();
-                    try {
-                        if (brewing.hasPotionMix(input, reagentStack)
-                                || brewing.hasContainerMix(input, reagentStack)) {
-                            reagents.add(reagent);
-                        }
-                    } catch (RuntimeException ignored) {
-                        // A broken third-party mix must not prevent other recipes from loading.
-                    }
-                }
-            }
-        }
-        return List.copyOf(reagents);
     }
 
     private static List<Holder<Potion>> potionHolders() {

@@ -591,6 +591,11 @@ public class ModeWheelScreen extends Screen {
                     bool(UComponents.BeefFlintAndSteelComponent, true);
             case BeefToolModuleRegistry.BEEF_RITUAL_SATCHEL ->
                     bool(UComponents.BeefRitualSatchelComponent, false);
+            case BeefToolModuleRegistry.BEEF_RIPEN -> bool(UComponents.BeefRipenComponent, false);
+            case BeefToolModuleRegistry.BEEF_FORCE_GROW -> bool(UComponents.BeefForceGrowComponent, false);
+            case BeefToolModuleRegistry.BEEF_AUTO_CLICK -> bool(UComponents.BeefAutoClickComponent, false);
+            case BeefToolModuleRegistry.BEEF_WIRELESS_LOGISTICS ->
+                    bool(UComponents.StaffLinkEnabledComponent, false);
             default -> false;
         };
     }
@@ -942,6 +947,15 @@ public class ModeWheelScreen extends Screen {
             case BeefToolModuleRegistry.BEEF_RITUAL_SATCHEL ->
                     toggle(ModeTogglePacket.ModeType.BEEF_RITUAL_SATCHEL,
                             UComponents.BeefRitualSatchelComponent, false);
+            case BeefToolModuleRegistry.BEEF_RIPEN -> toggle(ModeTogglePacket.ModeType.BEEF_RIPEN,
+                    UComponents.BeefRipenComponent, false);
+            case BeefToolModuleRegistry.BEEF_FORCE_GROW -> toggle(ModeTogglePacket.ModeType.BEEF_FORCE_GROW,
+                    UComponents.BeefForceGrowComponent, false);
+            case BeefToolModuleRegistry.BEEF_AUTO_CLICK -> toggle(ModeTogglePacket.ModeType.BEEF_AUTO_CLICK,
+                    UComponents.BeefAutoClickComponent, false);
+            case BeefToolModuleRegistry.BEEF_WIRELESS_LOGISTICS ->
+                    toggle(ModeTogglePacket.ModeType.BEEF_WIRELESS_LOGISTICS,
+                            UComponents.StaffLinkEnabledComponent, false);
             default -> {
             }
         }

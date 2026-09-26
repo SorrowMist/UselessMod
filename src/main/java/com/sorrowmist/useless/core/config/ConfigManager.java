@@ -20,6 +20,8 @@ public class ConfigManager {
     private static final ModConfigSpec.IntValue BOTANY_POT_GROWTH_MULTIPLIER;
     // 植物盆渲染配置
     private static final ModConfigSpec.BooleanValue ENABLE_BOTANY_POT_RENDERING;
+    // 造化杖连点模式：每个客户端 tick 触发多少次右键（客户端行为，放 CLIENT 配置）
+    private static final ModConfigSpec.IntValue BEEF_AUTOCLICK_CLICKS_PER_TICK;
 
     // 矩阵样板数量配置
     private static final ModConfigSpec.IntValue MATRIX_PATTERN_COUNT;
@@ -49,6 +51,8 @@ public class ConfigManager {
     private static final ModConfigSpec.DoubleValue BEEF_TOOL_PSEUDO_HARDNESS;
     private static final ModConfigSpec.DoubleValue BEEF_TOOL_ENTITY_INTERACTION_RANGE;
     private static final ModConfigSpec.DoubleValue BEEF_TOOL_BLOCK_INTERACTION_RANGE;
+    // 造化杖短距闪现的最大距离
+    private static final ModConfigSpec.IntValue BEEF_SHORT_TELEPORT_RANGE;
     private static final ModConfigSpec.IntValue BEEF_CONSTRUCTION_WAND_BUILD_LIMIT;
     private static final ModConfigSpec.IntValue BEEF_CONSTRUCTION_WAND_ANGEL_LIMIT;
     private static final ModConfigSpec.IntValue BEEF_CONSTRUCTION_WAND_DESTRUCTION_LIMIT;
@@ -208,6 +212,15 @@ public class ConfigManager {
         ENABLE_BOTANY_POT_RENDERING = CLIENT_BUILDER
                 .comment("是否启用植物盆作物渲染")
                 .define("enable_botany_pot_rendering", true);
+        CLIENT_BUILDER.pop();
+
+        CLIENT_BUILDER.push("beef_tool");
+        BEEF_AUTOCLICK_CLICKS_PER_TICK = CLIENT_BUILDER
+                .comment("造化杖连点模式每个客户端 tick 触发多少次右键",
+                        "调大 = 更快（默认 4 约等于 80 次/秒），调小 = 降低服务端压力",
+                        "仅在客户端生效，无需服务端同意")
+                .translation("useless_mod.configuration.beef_autoclick_clicks_per_tick")
+                .defineInRange("beef_autoclick_clicks_per_tick", 4, 1, 20);
         CLIENT_BUILDER.pop();
 
         SERVER_BUILDER.translation("useless_mod.configuration.omniversal_multiblock_alloy_furnace")
@@ -438,6 +451,13 @@ public class ConfigManager {
                 .comment("牛排工具方块触及范围加成, 重启游戏生效")
                 .translation("useless_mod.configuration.beef_tool_block_interaction_range")
                 .defineInRange("beef_tool_block_interaction_range", 8.0, 0.0, 1024.0);
+
+        BEEF_SHORT_TELEPORT_RANGE = SERVER_BUILDER
+                .comment("造化杖短距闪现的最大距离（格）",
+                        "该值为上限而非保证距离：准星方向若在中途命中方块或缺少可站立空间，落点会相应前移",
+                        "未命中任何方块时按该距离取最远落点")
+                .translation("useless_mod.configuration.beef_short_teleport_range")
+                .defineInRange("beef_short_teleport_range", 24, 4, 512);
 
         BEEF_CONSTRUCTION_WAND_BUILD_LIMIT = SERVER_BUILDER
                 .comment("牛排工具建筑手杖普通建造单次最大方块数")
@@ -1109,12 +1129,22 @@ public class ConfigManager {
         return getConfigValue(BEEF_TOOL_PSEUDO_HARDNESS);
     }
 
+    // 造化杖连点模式：每个客户端 tick 触发多少次右键
+    public static int getBeefAutoClickClicksPerTick() {
+        return getConfigValue(BEEF_AUTOCLICK_CLICKS_PER_TICK);
+    }
+
     public static double getBeefToolEntityInteractionRange() {
         return getConfigValue(BEEF_TOOL_ENTITY_INTERACTION_RANGE);
     }
 
     public static double getBeefToolBlockInteractionRange() {
         return getConfigValue(BEEF_TOOL_BLOCK_INTERACTION_RANGE);
+    }
+
+    // 造化杖短距闪现的最大距离（格）
+    public static int getBeefShortTeleportRange() {
+        return getConfigValue(BEEF_SHORT_TELEPORT_RANGE);
     }
 
     public static int getBeefConstructionWandBuildLimit() {

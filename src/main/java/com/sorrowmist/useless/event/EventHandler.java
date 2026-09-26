@@ -4,6 +4,10 @@ import com.sorrowmist.useless.UselessMod;
 import com.sorrowmist.useless.content.items.BeefMagnetHandler;
 import com.sorrowmist.useless.content.items.BeefTimeAcceleration;
 import com.sorrowmist.useless.content.items.EndlessBeafItem;
+import com.sorrowmist.useless.content.stafflink.StaffLinkBinding;
+import com.sorrowmist.useless.content.stafflink.StaffLinkEngine;
+import com.sorrowmist.useless.content.stafflink.StaffLinkTargets;
+import com.sorrowmist.useless.content.menus.StaffLinkMenu;
 import com.sorrowmist.useless.compat.ae.AeDeviceLinker;
 import com.sorrowmist.useless.compat.ae.AeLinkChannelBypass;
 import com.sorrowmist.useless.compat.constructionwand.ConstructionWandLogic;
@@ -16,6 +20,7 @@ import com.sorrowmist.useless.core.component.UComponents;
 import com.sorrowmist.useless.core.config.ConfigManager;
 import com.sorrowmist.useless.network.BeefInvulnerabilitySyncPacket;
 import com.sorrowmist.useless.network.BeefInvulnerabilityStatePacket;
+import com.sorrowmist.useless.network.StaffLinkStatusPacket;
 import com.sorrowmist.useless.utils.UselessItemUtils;
 import com.sorrowmist.useless.utils.mining.MiningDispatcher;
 import com.sorrowmist.useless.world.dimension.UselessDimensionConfigManager;
@@ -63,6 +68,7 @@ import net.neoforged.neoforge.network.PacketDistributor;
 import net.neoforged.neoforge.server.ServerLifecycleHooks;
 
 import java.util.Collections;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -199,17 +205,50 @@ public class EventHandler {
     private static final float DEFAULT_FLYING_SPEED = 0.05F;
     private static final float FLYING_SPEED_EPSILON = 1.0E-6F;
     /**
-     * 游戏模式切换后需要强制重发一次能力包的玩家。
-     * 原版/NeoForge 会在切换时重置 abilities，客户端收到 CHANGE_GAME_MODE 后
-     * 还会本地再重置一遍；如果服务端之后不再主动重发，客户端就会一直停在
-     * 「没有 mayfly」的状态上，表现为造化杖飞行失效。
+     * 游戏模式切换后，接下来这么多个 tick 内每 tick 都强制重发一次能力包。
+     * <p>
+     * 只补发一次是不够的：原版/NeoForge 在切换时重置 abilities，客户端收到 CHANGE_GAME_MODE 后
+     * 还会通过 {@code MultiPlayerGameMode#setLocalMode} 在本地再重置一遍，而这次本地重置
+     * 服务端完全不知情。留一个窗口反复对齐，才能盖住客户端那次重置。
      */
-    private static final Set<UUID> PENDING_FLIGHT_RESYNC = ConcurrentHashMap.newKeySet();
+    private static final int FLIGHT_RESYNC_WINDOW = 20;
+    private static final Map<UUID, Integer> FLIGHT_RESYNC_QUEUE = new ConcurrentHashMap<>();
+    /**
+     * 「粘滞飞行」玩家：<b>客户端自己上报正在飞行</b>的造化杖携带者。
+     * <p>
+     * 只要玩家还处在这个状态，服务端的 {@code flying} 就不允许被清掉。原因是实测 <b>Re-Avaritia</b> 的
+     * {@code committee.nova.mods.avaritia.init.handler.AbilityHandler#updateClientServerFlight}
+     * 会<b>每秒 1~2 次</b>把 {@code mayfly} / {@code flying} 一起清成 false 并回传客户端，
+     * 把 NeoForge 保留的悬停（创造→生存切换）和玩家自己的起飞都冲掉。
+     * <p>
+     * 开关来自 {@link #onClientFlightIntent}（客户端发的 {@code ServerboundPlayerAbilitiesPacket}）：
+     * 玩家落地或空中双击关飞行时客户端会上报 false，粘滞随之解除，
+     * 所以<b>落地行走、普通起跳、主动关飞行都不受影响</b>；而被其它 mod 在服务端偷偷清掉的情况
+     * 不经过那条上报路径，于是能被我们拉回来。
+     * <p>
+     * 注意不要用 {@code player.onGround()} 做落地判断：{@code handleMovePlayer} 里
+     * {@code setOnGround(flag4)} 的 flag4 含 {@code !player.mayFly()}，只要 mayfly 开着，
+     * 服务端 onGround 就恒为 false，粘滞将永远解除不掉。
+     */
+    private static final Set<UUID> STICKY_FLIGHT = ConcurrentHashMap.newKeySet();
+
+    /** 客户端上报飞行意图时更新粘滞状态（由 {@code ServerGamePacketListenerImplFlightMixin} 调用）。 */
+    public static void onClientFlightIntent(Player player, boolean flying) {
+        if (flying) {
+            STICKY_FLIGHT.add(player.getUUID());
+        } else {
+            STICKY_FLIGHT.remove(player.getUUID());
+        }
+    }
 
     @SubscribeEvent
     public static void onPlayerChangeGameMode(PlayerEvent.PlayerChangeGameModeEvent event) {
         if (event.getEntity() instanceof ServerPlayer serverPlayer) {
-            PENDING_FLIGHT_RESYNC.add(serverPlayer.getUUID());
+            FLIGHT_RESYNC_QUEUE.put(serverPlayer.getUUID(), FLIGHT_RESYNC_WINDOW);
+            // 本事件在 changeGameModeForPlayer 之前触发，此刻读到的就是「切换前」的状态
+            if (serverPlayer.getAbilities().flying) {
+                STICKY_FLIGHT.add(serverPlayer.getUUID());
+            }
         }
     }
 
@@ -226,19 +265,31 @@ public class EventHandler {
     }
 
     /**
+     * 游戏模式切换的瞬间把飞行状态刷成目标值。
+     * <p>
+     * 供 {@code ServerPlayerGameModeMixin} 调用。服务端在切模式时会先按新模式重置 abilities，
+     * 而紧接着 {@code ServerPlayer#setGameMode} 就会把这个状态发给客户端（能力包 A/C）。
+     * 如果不在这里立刻补回去，客户端会先收到 {@code mayfly=false}，要等下一个 tick 模组的补发
+     * 才恢复 —— 中间 1 帧双击空格起不了飞。在这里补掉，客户端从头到尾看不到 false。
+     */
+    public static void applyBeefToolFlightNow(Player player) {
+        updateBeefToolFlight(player);
+    }
+
+    /**
      * 造化杖飞行状态维护。
      * <p>
      * 关键点：能力包只在「服务端状态发生变化」时才发是不够的——客户端那份 abilities 会被
      * {@link net.minecraft.client.multiplayer.MultiPlayerGameMode#setLocalMode} 单独重置，
      * 服务端不知情也就永远不会补发。所以这里每 tick 把 abilities 对齐到目标值，
-     * 只要有任何一项不一致（或刚切换过游戏模式）就重发一次能力包。
+     * 只要有任何一项不一致、或处在游戏模式切换后的重发窗口内，就重发一次能力包。
      */
     private static void updateBeefToolFlight(Player player) {
         boolean hasItemInInventory = ConfigManager.shouldEnableFlightEffect()
                 && UselessItemUtils.hasTargetToolInInventory(player);
 
         // 创造/旁观模式自带飞行，这份能力归原版管，模组不接管也不撤销。
-        // 待重发标记故意保留到离开该模式后的第一 tick，那才是真正需要补发能力包的时机。
+        // 重发窗口故意保留到离开该模式之后才开始倒数，那才是真正需要补发能力包的时机。
         if (player.isCreative() || player.isSpectator()) {
             if (hasItemInInventory) {
                 FlyEffectedHolder.add(player);
@@ -248,17 +299,33 @@ public class EventHandler {
             return;
         }
 
-        boolean forceSync = PENDING_FLIGHT_RESYNC.remove(player.getUUID());
+        UUID uuid = player.getUUID();
+        Integer remaining = FLIGHT_RESYNC_QUEUE.get(uuid);
+        boolean resyncing = remaining != null && remaining > 0;
+        if (resyncing) {
+            if (remaining <= 1) {
+                FLIGHT_RESYNC_QUEUE.remove(uuid);
+            } else {
+                FLIGHT_RESYNC_QUEUE.put(uuid, remaining - 1);
+            }
+        }
 
         if (hasItemInInventory) {
             FlyEffectedHolder.add(player);
             float flightSpeed = (float) ConfigManager.getBeefToolFlightSpeed();
-            applyFlightAbilities(player, true, player.getAbilities().flying, flightSpeed, forceSync);
+
+            // 粘滞飞行（见 STICKY_FLIGHT 注释）：只要客户端自己还报着「我在飞」，
+            // 就不允许 flying 被外力（Re-Avaritia 每秒一次）清掉。
+            // 玩家落地 / 主动关飞行时客户端会上报 false，粘滞随之解除。
+            boolean flying = player.getAbilities().flying || STICKY_FLIGHT.contains(uuid);
+
+            applyFlightAbilities(player, true, flying, flightSpeed, resyncing);
             return;
         }
 
         // 没有造化杖时只回收模组自己授予过的飞行，避免抢走其它来源的飞行能力。
         // 归属标记落在玩家持久化数据里，所以「带着模组授予的飞行离线后重登」也能正确回收。
+        STICKY_FLIGHT.remove(uuid);
         if (FlyEffectedHolder.remove(player)) {
             applyFlightAbilities(player, false, false, DEFAULT_FLYING_SPEED, true);
         }
@@ -518,6 +585,7 @@ public class EventHandler {
         if (event.getEntity() instanceof ServerPlayer player) {
             syncAdvancedStealthPlayersTo(player);
             GrassWandDropHandler.onPlayerLoggedIn(player);
+            resetAutoClickState(player);
         }
     }
 
@@ -569,11 +637,37 @@ public class EventHandler {
     public static void onPlayerLoggedOut(PlayerEvent.PlayerLoggedOutEvent event) {
         BEEF_PROTECTED_PLAYERS.remove(event.getEntity().getUUID());
         BEEF_ADVANCED_STEALTH_PLAYERS.remove(event.getEntity().getUUID());
-        // 玩家在创造模式下离线时，飞行待重发标记不会被消费，故在此一并清除
-        PENDING_FLIGHT_RESYNC.remove(event.getEntity().getUUID());
+        // 玩家在创造模式下离线时，飞行重发窗口不会开始倒数，故在此一并清除
+        FLIGHT_RESYNC_QUEUE.remove(event.getEntity().getUUID());
+        STICKY_FLIGHT.remove(event.getEntity().getUUID());
         if (event.getEntity() instanceof ServerPlayer player) {
             GrassWandDropHandler.onPlayerLoggedOut(player);
         }
+    }
+
+    /**
+     * 连点模式的状态存在物品组件上，会跨会话保留；若玩家带着「开启」状态重登，
+     * 一进游戏就会立刻开始自动右键（叠加打火石等功能后果更明显）。
+     * 这里在登录时统一重置一次，保证每次进入游戏都是关闭状态。
+     */
+    private static void resetAutoClickState(ServerPlayer player) {
+        boolean changed = clearAutoClickFlag(player.getInventory().items);
+        changed |= clearAutoClickFlag(player.getInventory().offhand);
+        changed |= clearAutoClickFlag(player.getInventory().armor);
+        if (changed) {
+            player.containerMenu.broadcastChanges();
+        }
+    }
+
+    private static boolean clearAutoClickFlag(Iterable<ItemStack> stacks) {
+        boolean changed = false;
+        for (ItemStack stack : stacks) {
+            if (stack.getItem() instanceof EndlessBeafItem && EndlessBeafItem.isAutoClickEnabled(stack)) {
+                EndlessBeafItem.setAutoClickEnabled(stack, false);
+                changed = true;
+            }
+        }
+        return changed;
     }
 
     @SubscribeEvent(priority = EventPriority.HIGHEST)
@@ -655,6 +749,62 @@ public class EventHandler {
     }
 
     /**
+     * 无线物流搬运引擎。
+     *
+     * <p>单独一个订阅而不是并进 {@link #onServerTick}：那条路径有 20 tick 的闸门，
+     * 而线路的搬运周期最短是 1 tick。</p>
+     */
+    @SubscribeEvent
+    public static void onStaffLinkTick(ServerTickEvent.Post event) {
+        MinecraftServer server = event.getServer();
+        StaffLinkEngine.tick(server);
+        if (server.getTickCount() % 20 == 0) {
+            pushStaffLinkStatus(server);
+        }
+    }
+
+    /** 把「上次搬了多少」推给开着无线物流界面的玩家，界面上有一行读数。 */
+    private static void pushStaffLinkStatus(MinecraftServer server) {
+        for (ServerPlayer player : server.getPlayerList().getPlayers()) {
+            if (!(player.containerMenu instanceof StaffLinkMenu menu)) {
+                continue;
+            }
+            StaffLinkEngine.TransferStats stats = StaffLinkEngine.lastTransfer(menu.getNetworkId());
+            PacketDistributor.sendToPlayer(player, new StaffLinkStatusPacket(
+                    menu.getNetworkId(), stats.requested(), stats.moved(), stats.targets(),
+                    stats.tick(), stats.blocker()));
+        }
+    }
+
+    /**
+     * 无线物流模式：潜行右键容器方块，把它绑进/解绑出这把杖的物流网络。
+     *
+     * <p>与 {@link #onBlockInteract} 分开实现：那个方法分支多且早返回，这里目标类型完全不同
+     * （探测的是物品/流体/能量/化学品/魔源能力，无线访问点不具备这些）。</p>
+     */
+    @SubscribeEvent(priority = EventPriority.HIGHEST)
+    public static void onStaffLinkBind(PlayerInteractEvent.RightClickBlock event) {
+        if (event.isCanceled()) return;
+
+        ItemStack stack = event.getItemStack();
+        if (!(stack.getItem() instanceof EndlessBeafItem)) return;
+        if (!EndlessBeafItem.isStaffLinkEnabled(stack)) return;
+
+        Player player = event.getEntity();
+        if (!player.isShiftKeyDown()) return;
+
+        Level level = event.getLevel();
+        BlockPos pos = event.getPos();
+        if (!StaffLinkTargets.isBindable(level, pos)) return;
+
+        if (level instanceof ServerLevel serverLevel && player instanceof ServerPlayer serverPlayer) {
+            StaffLinkBinding.toggle(serverLevel, serverPlayer, stack, pos);
+        }
+        event.setCanceled(true);
+        event.setCancellationResult(InteractionResult.sidedSuccess(level.isClientSide()));
+    }
+
+    /**
      * 服务器启动时构建配方索引
      */
     @SubscribeEvent
@@ -675,6 +825,8 @@ public class EventHandler {
         GrassWandDropHandler.clearCache();
         // 通道豁免索引里存的是网格节点引用，别把它们留到下一局。
         AeLinkChannelBypass.clear();
+        // 无线物流的调度表按 tick 计数，同样不能跨局沿用。
+        StaffLinkEngine.clearRuntimeState();
     }
 
     /**

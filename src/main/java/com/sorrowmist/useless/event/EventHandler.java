@@ -4,6 +4,10 @@ import com.sorrowmist.useless.UselessMod;
 import com.sorrowmist.useless.content.items.BeefMagnetHandler;
 import com.sorrowmist.useless.content.items.BeefTimeAcceleration;
 import com.sorrowmist.useless.content.items.EndlessBeafItem;
+import com.sorrowmist.useless.content.stafflink.StaffLinkBinding;
+import com.sorrowmist.useless.content.stafflink.StaffLinkEngine;
+import com.sorrowmist.useless.content.stafflink.StaffLinkTargets;
+import com.sorrowmist.useless.content.menus.StaffLinkMenu;
 import com.sorrowmist.useless.compat.ae.AeDeviceLinker;
 import com.sorrowmist.useless.compat.ae.AeLinkChannelBypass;
 import com.sorrowmist.useless.compat.constructionwand.ConstructionWandLogic;
@@ -16,6 +20,7 @@ import com.sorrowmist.useless.core.component.UComponents;
 import com.sorrowmist.useless.core.config.ConfigManager;
 import com.sorrowmist.useless.network.BeefInvulnerabilitySyncPacket;
 import com.sorrowmist.useless.network.BeefInvulnerabilityStatePacket;
+import com.sorrowmist.useless.network.StaffLinkStatusPacket;
 import com.sorrowmist.useless.utils.UselessItemUtils;
 import com.sorrowmist.useless.utils.mining.MiningDispatcher;
 import com.sorrowmist.useless.world.dimension.UselessDimensionConfigManager;
@@ -744,6 +749,62 @@ public class EventHandler {
     }
 
     /**
+     * 无线物流搬运引擎。
+     *
+     * <p>单独一个订阅而不是并进 {@link #onServerTick}：那条路径有 20 tick 的闸门，
+     * 而线路的搬运周期最短是 1 tick。</p>
+     */
+    @SubscribeEvent
+    public static void onStaffLinkTick(ServerTickEvent.Post event) {
+        MinecraftServer server = event.getServer();
+        StaffLinkEngine.tick(server);
+        if (server.getTickCount() % 20 == 0) {
+            pushStaffLinkStatus(server);
+        }
+    }
+
+    /** 把「上次搬了多少」推给开着无线物流界面的玩家，界面上有一行读数。 */
+    private static void pushStaffLinkStatus(MinecraftServer server) {
+        for (ServerPlayer player : server.getPlayerList().getPlayers()) {
+            if (!(player.containerMenu instanceof StaffLinkMenu menu)) {
+                continue;
+            }
+            StaffLinkEngine.TransferStats stats = StaffLinkEngine.lastTransfer(menu.getNetworkId());
+            PacketDistributor.sendToPlayer(player, new StaffLinkStatusPacket(
+                    menu.getNetworkId(), stats.requested(), stats.moved(), stats.targets(),
+                    stats.tick(), stats.blocker()));
+        }
+    }
+
+    /**
+     * 无线物流模式：潜行右键容器方块，把它绑进/解绑出这把杖的物流网络。
+     *
+     * <p>与 {@link #onBlockInteract} 分开实现：那个方法分支多且早返回，这里目标类型完全不同
+     * （探测的是物品/流体/能量/化学品/魔源能力，无线访问点不具备这些）。</p>
+     */
+    @SubscribeEvent(priority = EventPriority.HIGHEST)
+    public static void onStaffLinkBind(PlayerInteractEvent.RightClickBlock event) {
+        if (event.isCanceled()) return;
+
+        ItemStack stack = event.getItemStack();
+        if (!(stack.getItem() instanceof EndlessBeafItem)) return;
+        if (!EndlessBeafItem.isStaffLinkEnabled(stack)) return;
+
+        Player player = event.getEntity();
+        if (!player.isShiftKeyDown()) return;
+
+        Level level = event.getLevel();
+        BlockPos pos = event.getPos();
+        if (!StaffLinkTargets.isBindable(level, pos)) return;
+
+        if (level instanceof ServerLevel serverLevel && player instanceof ServerPlayer serverPlayer) {
+            StaffLinkBinding.toggle(serverLevel, serverPlayer, stack, pos);
+        }
+        event.setCanceled(true);
+        event.setCancellationResult(InteractionResult.sidedSuccess(level.isClientSide()));
+    }
+
+    /**
      * 服务器启动时构建配方索引
      */
     @SubscribeEvent
@@ -764,6 +825,8 @@ public class EventHandler {
         GrassWandDropHandler.clearCache();
         // 通道豁免索引里存的是网格节点引用，别把它们留到下一局。
         AeLinkChannelBypass.clear();
+        // 无线物流的调度表按 tick 计数，同样不能跨局沿用。
+        StaffLinkEngine.clearRuntimeState();
     }
 
     /**

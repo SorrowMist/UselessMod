@@ -170,6 +170,7 @@ public class EndlessBeafItem extends TieredItem {
                 .component(UComponents.AEStoragePriorityComponent, false)
                 .component(UComponents.AeNetworkConnectComponent, false)
                 .component(UComponents.BeefRitualSatchelComponent, false)
+                .component(UComponents.StaffLinkEnabledComponent, false)
                 .component(UComponents.WrenchTagEnabledComponent, wrenchTagEnabled)
                 .component(UComponents.ConstructionWandEnabledComponent, false)
                 .component(UComponents.ConstructionWandCoreComponent,
@@ -302,6 +303,20 @@ public class EndlessBeafItem extends TieredItem {
 
     public static void setAutoClickEnabled(ItemStack stack, boolean enabled) {
         stack.set(UComponents.BeefAutoClickComponent.get(), enabled);
+    }
+
+    /**
+     * 是否启用无线物流模式。
+     *
+     * <p>开启后潜行右键容器方块可把它绑进/解绑出这把杖的物流网络；网络的搬运规则在
+     * 独立界面里配置，真正的搬运由服务端引擎执行。</p>
+     */
+    public static boolean isStaffLinkEnabled(ItemStack stack) {
+        return stack.getOrDefault(UComponents.StaffLinkEnabledComponent.get(), false);
+    }
+
+    public static void setStaffLinkEnabled(ItemStack stack, boolean enabled) {
+        stack.set(UComponents.StaffLinkEnabledComponent.get(), enabled);
     }
 
     /** Keeps the tool's fixed enchantments aligned with its selected mode and server config. */

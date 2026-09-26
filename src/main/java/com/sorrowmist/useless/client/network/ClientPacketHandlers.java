@@ -2,6 +2,7 @@ package com.sorrowmist.useless.client.network;
 
 import com.sorrowmist.useless.UselessMod;
 import com.sorrowmist.useless.client.gui.ModeWheelScreen;
+import com.sorrowmist.useless.client.gui.StaffLinkScreen;
 import com.sorrowmist.useless.content.blockentities.AdvancedAlloyFurnaceBlockEntity;
 import com.sorrowmist.useless.content.blockentities.multiblock.MultiblockAlloyFurnaceCoreBlockEntity;
 import com.sorrowmist.useless.content.menus.MultiblockAlloyFurnaceMenu;
@@ -10,10 +11,14 @@ import com.sorrowmist.useless.network.AETaskProgressPacket;
 import com.sorrowmist.useless.network.BeefInvulnerabilitySyncPacket;
 import com.sorrowmist.useless.network.BeefToolLayoutResultPacket;
 import com.sorrowmist.useless.network.BeefToolLayoutSyncPacket;
+import com.sorrowmist.useless.network.StaffLinkStatusPacket;
+import com.sorrowmist.useless.network.StaffLinkSyncPacket;
+import com.sorrowmist.useless.world.stafflink.StaffLinkNetwork;
 import net.minecraft.client.Minecraft;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.Pose;
 import net.minecraft.world.entity.player.Player;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * 客户端专用的载荷（Packet）处理逻辑。
@@ -106,4 +111,39 @@ public final class ClientPacketHandlers {
             screen.receiveLayoutError(packet.error());
         }
     }
+
+    /** 无线物流：把服务端下发的整网快照交给已打开的配置界面。 */
+    public static void handleStaffLinkSync(StaffLinkSyncPacket packet) {
+        lastStaffLinkSync = packet.network();
+        if (Minecraft.getInstance().screen instanceof StaffLinkScreen screen) {
+            screen.receiveSync(packet.network());
+        }
+    }
+
+    /** 无线物流：把「上次搬了多少」的读数交给已打开的配置界面。 */
+    public static void handleStaffLinkStatus(StaffLinkStatusPacket packet) {
+        if (Minecraft.getInstance().screen instanceof StaffLinkScreen screen) {
+            screen.receiveStatus(packet.networkId(), packet.requested(), packet.moved(),
+                    packet.targets(), packet.tick(), packet.blocker());
+        }
+    }
+
+    /**
+     * 取走「界面还没建好时先到的」那份快照。
+     *
+     * <p>开界面与下发快照是两个包，正常情况下顺序到达；这里兜底的是极端情况下快照先到、
+     * 界面尚未创建的那一瞬——否则界面会一直空着直到下一次同步。</p>
+     */
+    @Nullable
+    public static StaffLinkNetwork consumePendingStaffLinkSync(java.util.UUID networkId) {
+        StaffLinkNetwork pending = lastStaffLinkSync;
+        if (pending == null || !pending.id().equals(networkId)) {
+            return null;
+        }
+        lastStaffLinkSync = null;
+        return pending;
+    }
+
+    @Nullable
+    private static StaffLinkNetwork lastStaffLinkSync;
 }

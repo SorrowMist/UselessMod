@@ -6,14 +6,18 @@ import com.sorrowmist.useless.api.enums.tool.EnchantMode;
 import com.sorrowmist.useless.api.enums.tool.ConstructionWandCoreMode;
 import com.sorrowmist.useless.api.enums.tool.ToolTypeMode;
 import net.minecraft.core.GlobalPos;
+import net.minecraft.core.UUIDUtil;
 import net.minecraft.core.component.DataComponentType;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.neoforge.registries.DeferredHolder;
 import net.neoforged.neoforge.registries.DeferredRegister;
 
+import java.util.List;
+import java.util.UUID;
 import java.util.function.UnaryOperator;
 
 public final class UComponents {
@@ -421,6 +425,43 @@ public final class UComponents {
                            .networkSynchronized(StreamCodec.of(
                                    FriendlyByteBuf::writeBoolean,
                                    FriendlyByteBuf::readBoolean
+                           ))
+            );
+
+    /**
+     * 无线物流模式组件（StaffLink）
+     * true = 开启「无线物流」：潜行右键容器方块可把它绑进/解绑出造化杖的物流网络，
+     * 网络内的搬运规则在独立界面里配置。真正的搬运由服务端引擎执行。
+     */
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<Boolean>> StaffLinkEnabledComponent =
+            register("beef_wireless_logistics", builder ->
+                    builder.persistent(Codec.BOOL)
+                           .networkSynchronized(StreamCodec.of(
+                                   FriendlyByteBuf::writeBoolean,
+                                   FriendlyByteBuf::readBoolean
+                           ))
+            );
+
+    /**
+     * 造化杖持有的物流网络列表（StaffLink）。
+     *
+     * <p>一把杖可以同时挂多张互相独立的网络，靠 {@link #STAFF_LINK_ACTIVE} 指定当前生效的那张。
+     * 物品上只存这些 16 字节的 UUID；网络本体（锚点与线路配置）存在服务端的
+     * {@code StaffLinkSavedData} 里。这样杖被放进箱子、区块卸载都不影响物流运行。</p>
+     */
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<List<UUID>>> STAFF_LINK_NETWORKS =
+            register("staff_link_networks", builder ->
+                    builder.persistent(UUIDUtil.CODEC.listOf())
+                           .networkSynchronized(UUIDUtil.STREAM_CODEC.apply(ByteBufCodecs.list()))
+            );
+
+    /** {@link #STAFF_LINK_NETWORKS} 里当前生效的下标；超出范围时按 0 处理。 */
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<Integer>> STAFF_LINK_ACTIVE =
+            register("staff_link_active", builder ->
+                    builder.persistent(Codec.INT)
+                           .networkSynchronized(StreamCodec.of(
+                                   FriendlyByteBuf::writeVarInt,
+                                   FriendlyByteBuf::readVarInt
                            ))
             );
 

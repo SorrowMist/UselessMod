@@ -15,8 +15,11 @@ import mekanism.api.Action;
 import mekanism.api.chemical.ChemicalStack;
 import mekanism.api.chemical.IChemicalHandler;
 import mekanism.common.capabilities.Capabilities;
+import mekanism.common.tier.ChemicalTankTier;
+import mekanism.common.util.ChemicalUtil;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
@@ -62,6 +65,48 @@ public final class MekanismChemicalCompat {
                                                                 BlockEntity entity, @Nullable Direction side) {
             return MekanismChemicalCompat.getAdjacentHandler(level, pos, state, entity, side);
         }
+
+        @Override
+        public @Nullable ChemicalStackView chemicalInItem(ItemStack stack) {
+            return MekanismChemicalCompat.chemicalInItem(stack);
+        }
+
+        @Override
+        public ItemStack markerForChemical(Object chemicalIngredient) {
+            return MekanismChemicalCompat.markerForChemical(chemicalIngredient);
+        }
+    }
+
+    /** 物品（化学品罐、气体罐等）里装的化学品；用来当无线物流的过滤标记物。 */
+    @Nullable
+    public static ChemicalStackView chemicalInItem(ItemStack stack) {
+        if (stack == null || stack.isEmpty()) {
+            return null;
+        }
+        IChemicalHandler handler = stack.getCapability(Capabilities.CHEMICAL.item());
+        if (handler == null) {
+            return null;
+        }
+        for (int tank = 0; tank < handler.getChemicalTanks(); tank++) {
+            ChemicalStack chemical = handler.getChemicalInTank(tank);
+            if (chemical != null && !chemical.isEmpty()) {
+                return new MekanismChemicalStackView(chemical);
+            }
+        }
+        return null;
+    }
+
+    /**
+     * JEI 拖来的化学品 → 基础化学品储罐（装满该化学品）。
+     *
+     * <p>化学品种类本身没有「桶」，所以从 JEI 的化学品原料反推标记物只能造一个储罐出来；
+     * 玩家当然也可以直接把手上现成的储罐物品拖进过滤槽。</p>
+     */
+    public static ItemStack markerForChemical(Object chemicalIngredient) {
+        if (!(chemicalIngredient instanceof ChemicalStack chemical) || chemical.isEmpty()) {
+            return ItemStack.EMPTY;
+        }
+        return ChemicalUtil.getFullChemicalTank(ChemicalTankTier.BASIC, chemical.getChemicalHolder());
     }
 
     @Nullable

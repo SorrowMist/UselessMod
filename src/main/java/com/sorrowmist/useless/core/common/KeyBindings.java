@@ -165,4 +165,14 @@ public class KeyBindings {
             GLFW.GLFW_KEY_UNKNOWN,
             CATEGORY
     ));
+
+    // 打开无线物流配置界面（仅手持造化杖时生效）
+    private static final String OPEN_WIRELESS_LOGISTICS = "key.useless_mod.open_wireless_logistics";
+    public static final Lazy<KeyMapping> OPEN_WIRELESS_LOGISTICS_KEY = Lazy.of(() -> new KeyMapping(
+            OPEN_WIRELESS_LOGISTICS,
+            KeyConflictContext.IN_GAME,
+            InputConstants.Type.KEYSYM,
+            GLFW.GLFW_KEY_B,
+            CATEGORY
+    ));
 }

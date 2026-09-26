@@ -54,6 +54,7 @@ public final class BeefToolModuleRegistry {
     public static final String BEEF_RIPEN = "mode.beef_ripen";
     public static final String BEEF_FORCE_GROW = "mode.beef_force_grow";
     public static final String BEEF_AUTO_CLICK = "mode.beef_auto_click";
+    public static final String BEEF_WIRELESS_LOGISTICS = "mode.beef_wireless_logistics";
 
     private static final List<Definition> DEFINITIONS = List.of(
             new Definition(ENCHANT_SILK_TOUCH, EnchantMode.SILK_TOUCH.getTooltip(), GroupKind.TOOLS,
@@ -130,7 +131,9 @@ public final class BeefToolModuleRegistry {
             new Definition(BEEF_FORCE_GROW, ModeTypeEnum.BEEF_FORCE_GROW_ENABLED.getTooltip(),
                     GroupKind.AUXILIARY, Availability.ALWAYS, false),
             new Definition(BEEF_AUTO_CLICK, ModeTypeEnum.BEEF_AUTO_CLICK_ENABLED.getTooltip(),
-                    GroupKind.AUXILIARY, Availability.ALWAYS, false)
+                    GroupKind.AUXILIARY, Availability.ALWAYS, false),
+            new Definition(BEEF_WIRELESS_LOGISTICS, ModeTypeEnum.BEEF_WIRELESS_LOGISTICS_ENABLED.getTooltip(),
+                    GroupKind.AUXILIARY, Availability.ENDLESS, false)
     );
     private static final List<String> AUTO_COMBAT_MODULES = List.of(
             BEEF_MALUM_SPIRIT,
@@ -144,7 +147,8 @@ public final class BeefToolModuleRegistry {
             BEEF_FLINT_AND_STEEL,
             BEEF_RIPEN,
             BEEF_FORCE_GROW,
-            BEEF_AUTO_CLICK);
+            BEEF_AUTO_CLICK,
+            BEEF_WIRELESS_LOGISTICS);
     /** 新增的挖掘类模块：老存档的布局里没有它们，进游戏时自动补进「挖掘」分组。 */
     private static final List<String> AUTO_MINING_MODULES = List.of(
             AE_NETWORK_CONNECT,

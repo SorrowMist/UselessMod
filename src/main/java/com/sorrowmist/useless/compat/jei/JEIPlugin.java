@@ -3,6 +3,9 @@ package com.sorrowmist.useless.compat.jei;
 import appeng.menu.me.items.PatternEncodingTermMenu;
 import com.sorrowmist.useless.UselessMod;
 import com.sorrowmist.useless.client.gui.DimensionConfigScreen;
+import com.sorrowmist.useless.client.gui.StaffLinkScreen;
+import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.chemical.ChemicalCompatProvider;
+import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.chemical.ChemicalCompatProviders;
 import com.sorrowmist.useless.content.menus.DimensionConfigMenu;
 import com.sorrowmist.useless.content.recipe.AlloyFurnaceRecipeCatalog;
 import com.sorrowmist.useless.content.recipe.AlloyFurnaceRecipeIdentity;
@@ -25,9 +28,12 @@ import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.inventory.MenuType;
 import net.minecraft.world.item.BlockItem;
+import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
 import net.minecraft.world.level.Level;
 import net.neoforged.fml.ModList;
+import net.neoforged.neoforge.fluids.FluidStack;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.ArrayList;
@@ -90,6 +96,63 @@ public final class JEIPlugin implements IModPlugin {
     public void registerGuiHandlers(IGuiHandlerRegistration registration) {
         registration.addGhostIngredientHandler(DimensionConfigScreen.class,
                 new DimensionConfigGhostHandler());
+        registration.addGhostIngredientHandler(StaffLinkScreen.class,
+                new StaffLinkGhostHandler());
+    }
+
+    /**
+     * 无线物流的过滤槽接受 JEI 拖拽。
+     *
+     * <p>槽里存的是「标记物」：物品线路存物品本身，流体/化学品线路存「装着它的容器」。
+     * 所以流体原料要先换成它的桶；化学品原料由化学品集成换成一只装满它的储罐。</p>
+     */
+    private static final class StaffLinkGhostHandler
+            implements IGhostIngredientHandler<StaffLinkScreen> {
+        @Override
+        public <I> List<Target<I>> getTargetsTyped(StaffLinkScreen screen,
+                                                   ITypedIngredient<I> ingredient,
+                                                   boolean doStart) {
+            if (!screen.getMenu().isFilterActive()) return List.of();
+            ItemStack marker = markerFor(ingredient);
+            if (marker.isEmpty()) return List.of();
+
+            List<Target<I>> targets = new ArrayList<>(StaffLinkScreen.filterSlotCount());
+            for (int index = 0; index < StaffLinkScreen.filterSlotCount(); index++) {
+                final int slotIndex = index;
+                targets.add(new Target<>() {
+                    @Override
+                    public Rect2i getArea() {
+                        return new Rect2i(screen.filterSlotScreenX(slotIndex),
+                                screen.filterSlotScreenY(slotIndex),
+                                StaffLinkScreen.filterSlotSize(), StaffLinkScreen.filterSlotSize());
+                    }
+
+                    @Override
+                    public void accept(I value) {
+                        screen.getMenu().setFilterSlot(slotIndex, marker);
+                    }
+                });
+            }
+            return targets;
+        }
+
+        private static ItemStack markerFor(ITypedIngredient<?> ingredient) {
+            Object raw = ingredient.getIngredient();
+            if (raw instanceof ItemStack stack) {
+                return stack.isEmpty() ? ItemStack.EMPTY : stack;
+            }
+            if (raw instanceof FluidStack fluid) {
+                if (fluid.isEmpty()) return ItemStack.EMPTY;
+                Item bucket = fluid.getFluid().getBucket();
+                return bucket == Items.AIR ? ItemStack.EMPTY : new ItemStack(bucket);
+            }
+            ChemicalCompatProvider provider = ChemicalCompatProviders.get();
+            return provider.isAvailable() ? provider.markerForChemical(raw) : ItemStack.EMPTY;
+        }
+
+        @Override
+        public void onComplete() {
+        }
     }
 
     private static final class DimensionConfigGhostHandler

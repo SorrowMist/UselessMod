@@ -96,7 +96,13 @@ public enum ModeTypeEnum {
 
     // 强制生长：true = 催熟时额外用随机刻推进（可作用于甘蔗/仙人掌/竹子等骨粉无效的方块）
     BEEF_FORCE_GROW_ENABLED("beef_force_grow_enabled", "tooltip.useless_mod.beef_force_grow_mode"),
-    BEEF_FORCE_GROW_DISABLED("beef_force_grow_disabled", "tooltip.useless_mod.beef_force_grow_mode");
+    BEEF_FORCE_GROW_DISABLED("beef_force_grow_disabled", "tooltip.useless_mod.beef_force_grow_mode"),
+
+    // 无线物流：潜行右键容器绑定/解绑，界面里配置搬运规则
+    BEEF_WIRELESS_LOGISTICS_ENABLED("beef_wireless_logistics_enabled",
+            "tooltip.useless_mod.beef_wireless_logistics_mode"),
+    BEEF_WIRELESS_LOGISTICS_DISABLED("beef_wireless_logistics_disabled",
+            "tooltip.useless_mod.beef_wireless_logistics_mode");
 
     private final String name;
     private final String tooltipKey;
@@ -207,6 +213,10 @@ public enum ModeTypeEnum {
 
     public static ModeTypeEnum getBeefForceGrowMode(boolean enabled) {
         return enabled ? BEEF_FORCE_GROW_ENABLED : BEEF_FORCE_GROW_DISABLED;
+    }
+
+    public static ModeTypeEnum getBeefWirelessLogisticsMode(boolean enabled) {
+        return enabled ? BEEF_WIRELESS_LOGISTICS_ENABLED : BEEF_WIRELESS_LOGISTICS_DISABLED;
     }
 
     public String getName() {return this.name;}

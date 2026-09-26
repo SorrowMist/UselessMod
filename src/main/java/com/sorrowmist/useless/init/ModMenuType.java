@@ -8,6 +8,7 @@ import com.sorrowmist.useless.content.menus.OmniversalMoldHubMenu;
 import com.sorrowmist.useless.content.menus.MultiblockAlloyFurnaceMenu;
 import com.sorrowmist.useless.content.menus.OreGeneratorMenu;
 import com.sorrowmist.useless.content.menus.PassiveCraftingHatchMenu;
+import com.sorrowmist.useless.content.menus.StaffLinkMenu;
 import com.sorrowmist.useless.content.menus.DimensionConfigMenu;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.world.inventory.MenuType;
@@ -45,6 +46,9 @@ public final class ModMenuType {
     public static final Supplier<MenuType<ContainerPatternConverter>> PATTERN_CONVERTER_MENU =
             MENU_TYPES.register("omniversal_pattern_converter",
                     () -> ContainerPatternConverter.TYPE);
+    public static final Supplier<MenuType<StaffLinkMenu>> STAFF_LINK_MENU =
+            MENU_TYPES.register("staff_link_menu",
+                    () -> IMenuTypeExtension.create(StaffLinkMenu::new));
 
     private ModMenuType() {}
 

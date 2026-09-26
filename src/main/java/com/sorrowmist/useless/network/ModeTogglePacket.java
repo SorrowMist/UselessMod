@@ -82,6 +82,8 @@ public class ModeTogglePacket implements CustomPacketPayload {
                         stack.set(UComponents.ConstructionWandEnabledComponent.get(), msg.enabled);
                         if (msg.enabled) {
                             disableAeNetworkConnect(stack);
+                            // 建筑魔杖的「潜行右键 = 撤销」会抢走绑定容器的那次交互。
+                            disableStaffLink(stack);
                         }
                     }
                 }
@@ -109,6 +111,8 @@ public class ModeTogglePacket implements CustomPacketPayload {
                         stack.set(UComponents.BeefTimeAccelerationEnabledComponent.get(), msg.enabled);
                         if (msg.enabled) {
                             disableRitualSatchel(stack);
+                            // 时间加速同样绑定「潜行右键」。
+                            disableStaffLink(stack);
                         }
                     }
                 }
@@ -196,6 +200,16 @@ public class ModeTogglePacket implements CustomPacketPayload {
                         EndlessBeafItem.setAutoClickEnabled(stack, msg.enabled);
                     }
                 }
+                case BEEF_WIRELESS_LOGISTICS -> {
+                    if (stack.getItem() instanceof EndlessBeafItem) {
+                        EndlessBeafItem.setStaffLinkEnabled(stack, msg.enabled);
+                        if (msg.enabled) {
+                            // 潜行右键已被建筑魔杖（撤销）与时间加速占用，AE 连接又同属「网络」语义，
+                            // 全部关掉，保证这次潜行右键只会落到绑定容器上。
+                            disableStaffLinkConflicts(stack);
+                        }
+                    }
+                }
             }
 
             // 显式同步物品到客户端
@@ -211,6 +225,23 @@ public class ModeTogglePacket implements CustomPacketPayload {
         stack.set(UComponents.BeefCropHarvestComponent.get(), false);
         stack.set(UComponents.BeefTimeAccelerationEnabledComponent.get(), false);
         stack.set(UComponents.ConstructionWandEnabledComponent.get(), false);
+        disableStaffLink(stack);
+    }
+
+    /** 无线物流与 AE 连接同为「网络」类模式，互斥以免右键意图混淆。 */
+    private static void disableStaffLink(ItemStack stack) {
+        if (stack.getOrDefault(UComponents.StaffLinkEnabledComponent.get(), false)) {
+            stack.set(UComponents.StaffLinkEnabledComponent.get(), false);
+        }
+    }
+
+    /** 开启无线物流时，关掉所有会抢占右键或语义重叠的其它模式（不含它自己）。 */
+    private static void disableStaffLinkConflicts(ItemStack stack) {
+        stack.set(UComponents.BeefCropHarvestComponent.get(), false);
+        stack.set(UComponents.BeefTimeAccelerationEnabledComponent.get(), false);
+        stack.set(UComponents.ConstructionWandEnabledComponent.get(), false);
+        disableAeNetworkConnect(stack);
+        disableRitualSatchel(stack);
     }
 
     /** 反过来：打开其它占用右键的模式时，关掉 AE 连接模式。 */
@@ -259,6 +290,8 @@ public class ModeTogglePacket implements CustomPacketPayload {
         // 新增值必须追加在末尾：writeEnum 按 ordinal 编码
         BEEF_RIPEN,
         BEEF_AUTO_CLICK,
-        BEEF_FORCE_GROW
+        BEEF_FORCE_GROW,
+        // 无线物流：潜行右键容器绑定/解绑，界面里配置搬运规则
+        BEEF_WIRELESS_LOGISTICS
     }
 }

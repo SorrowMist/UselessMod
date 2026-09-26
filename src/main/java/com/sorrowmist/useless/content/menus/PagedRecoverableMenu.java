@@ -62,14 +62,14 @@ public class PagedRecoverableMenu extends AbstractContainerMenu {
     protected PagedRecoverableMenu(MenuType<?> type, int containerId, Inventory playerInventory,
                                    RecoverableItemStackHandler inventory, BlockPos blockPos) {
         this(type, containerId, playerInventory, inventory, blockPos,
-                8, 18, 8, 211, 8, 269, null);
+                8, 32, 8, 225, 8, 283, null);
     }
 
     protected PagedRecoverableMenu(MenuType<?> type, int containerId, Inventory playerInventory,
                                    RecoverableItemStackHandler inventory, BlockPos blockPos,
                                    @Nullable PagedMenuPageMemory pageMemory) {
         this(type, containerId, playerInventory, inventory, blockPos,
-                8, 18, 8, 211, 8, 269, pageMemory);
+                8, 32, 8, 225, 8, 283, pageMemory);
     }
 
     protected PagedRecoverableMenu(MenuType<?> type, int containerId, Inventory playerInventory,
@@ -149,12 +149,40 @@ public class PagedRecoverableMenu extends AbstractContainerMenu {
         return clientSide ? syncedActivePageCount : calculateActivePageCount();
     }
 
+    /**
+     * 后备库存中的活跃槽位数，即非恢复槽位数量。
+     *
+     * <p>搜索只应覆盖可正常回填的活跃槽位；超出该数量的槽位是只读恢复区，客户端据此截断
+     * 参与过滤的槽位范围。</p>
+     */
+    public int getActiveSlotCount() {
+        return inventory.getActiveSlots();
+    }
+
     private int calculateActivePageCount() {
         return Math.max(1, (inventory.getActiveSlots() + SLOTS_PER_PAGE - 1) / SLOTS_PER_PAGE);
     }
 
     public boolean isRecoveryPage() {
         return getPage() >= getActivePageCount();
+    }
+
+    /**
+     * 当前是否处于搜索高亮状态。
+     *
+     * <p>服务端只把当前页内容写进同步槽位，因此搜索在客户端完成，菜单只记录该状态供屏幕查询。
+     * 槽位本身始终绑定服务端同步的原槽位，高亮不改变排布，交互不受影响。</p>
+     */
+    private boolean searchActive;
+
+    /** 设置当前是否处于搜索高亮状态。 */
+    public void setSearchActive(boolean active) {
+        searchActive = active;
+    }
+
+    /** 当前是否处于搜索高亮状态。 */
+    public boolean isFiltered() {
+        return searchActive;
     }
 
     @Override

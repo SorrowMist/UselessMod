@@ -452,6 +452,23 @@ public class EndlessBeafItem extends TieredItem {
             return isShearsEnabled(stack);
         }
 
+        // 打火石能力，同样受「打火石功能」开关控制。
+        //
+        // 必须对外声明，否则依赖「物品能否点火」判断的模组不会介入交互：
+        // 以神秘学(Occultism) 为例，它的灵火(Spiritfire) 生成处理器会检查
+        // 手上物品是否具备点火能力，只有具备时才拦下这次右键、把地上的
+        // 魔鬼之梦果换成灵火；否则会落到造化杖自己的打火石逻辑上，直接在
+        // 果实所在位置放一团普通火，把果实烧掉。
+        //
+        // 注意命名：NeoForge 21.1 的正式能力名是 firestarter_light，而
+        // Occultism 仍在检查旧版 Forge 时代的 light_fire / light_campfire，
+        // 两者经 ItemAbility.get() 得到的是不同实例，因此三个都要声明。
+        if (ability == ItemAbilities.FIRESTARTER_LIGHT
+                || ability == ItemAbility.get("light_fire")
+                || ability == ItemAbility.get("light_campfire")) {
+            return isFlintAndSteelEnabled(stack);
+        }
+
         // 根据工具类型返回特定能力
         if (this.toolType == null) {
             return false;

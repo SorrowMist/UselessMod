@@ -159,6 +159,7 @@ public class ConfigManager {
     private static final ModConfigSpec.BooleanValue ENABLE_FLUX_NETWORKS_RECIPE_CONVERSION;
     private static final ModConfigSpec.BooleanValue ENABLE_APOTHEOSIS_RECIPE_CONVERSION;
     private static final ModConfigSpec.BooleanValue ENABLE_LYCHEE_RECIPE_CONVERSION;
+    private static final ModConfigSpec.BooleanValue ENABLE_ASTRAL_SORCERY_RECIPE_CONVERSION;
     private static final ModConfigSpec.BooleanValue ENABLE_JUSTDIRETHINGS_RECIPE_CONVERSION;
     private static final ModConfigSpec.BooleanValue ENABLE_JDTE_RECIPE_CONVERSION;
     private static final Map<String, ModConfigSpec.BooleanValue> RECIPE_CONVERSION_OPTIONS;
@@ -681,6 +682,8 @@ public class ConfigManager {
                 "enable_apotheosis_recipe_conversion", true);
         ENABLE_LYCHEE_RECIPE_CONVERSION = defineRecipeConversionOption(
                 "enable_lychee_recipe_conversion", true);
+        ENABLE_ASTRAL_SORCERY_RECIPE_CONVERSION = defineRecipeConversionOption(
+                "enable_astralsorcery_recipe_conversion", true);
         ENABLE_ARS_NOUVEAU_RECIPE_CONVERSION = defineRecipeConversionOption(
                 "enable_ars_nouveau_recipe_conversion", true);
         ENABLE_AVARITIA_RECIPE_CONVERSION = defineRecipeConversionOption(
@@ -741,6 +744,7 @@ public class ConfigManager {
                 Map.entry("apothic_flux", ENABLE_APOTHIC_FLUX_RECIPE_CONVERSION),
                 Map.entry("appmek", ENABLE_APP_MEK_RECIPE_CONVERSION),
                 Map.entry("ars_nouveau", ENABLE_ARS_NOUVEAU_RECIPE_CONVERSION),
+                Map.entry("astralsorcery", ENABLE_ASTRAL_SORCERY_RECIPE_CONVERSION),
                 Map.entry("avaritia", ENABLE_AVARITIA_RECIPE_CONVERSION),
                 Map.entry("barbequesdelight", ENABLE_BARBEQUES_DELIGHT_RECIPE_CONVERSION),
                 Map.entry("bigreactors", ENABLE_BIG_REACTORS_RECIPE_CONVERSION),

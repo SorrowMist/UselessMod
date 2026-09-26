@@ -133,6 +133,17 @@ public final class RecipeAdapterCompatRegistry {
     public static final String POWAH = RecipeSourceIds.POWAH;
     public static final String EXTENDED_CRAFTING = RecipeSourceIds.EXTENDED_CRAFTING;
     public static final String AVARITIA = RecipeSourceIds.AVARITIA;
+
+    /**
+     * Re-Avaritia 与 AvaritiaNeo 均声明 modId {@code avaritia}，但包结构互不兼容：前者位于
+     * {@code committee.nova.mods.avaritia}，后者位于 {@code net.byAqua3.avaritia}。二者的显示名
+     * 分别为 {@code Re-Avaritia} 与 {@code Avaritia}，该差异不足以作为可靠判据，故改以 Re-Avaritia
+     * 独有的注册类作为判定依据：仅当该类可加载时才注册针对 Re-Avaritia 编写的适配器，否则适配器会在
+     * 取模具物品时抛出 {@link NoClassDefFoundError}。
+     */
+    private static final String RE_AVARITIA_REGISTRY_CLASS =
+            "committee.nova.mods.avaritia.init.registry.ModBlocks";
+
     public static final String NEO_ECO_AE = RecipeSourceIds.NEO_ECO_AE;
     public static final String NATURES_AURA = RecipeSourceIds.NATURES_AURA;
     public static final String FORBIDDEN_ARCANUS = RecipeSourceIds.FORBIDDEN_ARCANUS;
@@ -225,6 +236,22 @@ public final class RecipeAdapterCompatRegistry {
 
     public static boolean isLoaded(String modId) {
         return ModList.get().isLoaded(modId);
+    }
+
+    /**
+     * 探测指定类能否被当前类加载器解析。传入 {@code initialize=false} 以避免触发目标类的静态初始化，
+     * 因此该探测本身不产生副作用；类缺失或其依赖不满足时返回 {@code false}，不向调用方抛出异常。
+     */
+    private static boolean isClassAvailable(String className) {
+        if (className == null || className.isBlank()) {
+            return false;
+        }
+        try {
+            Class.forName(className, false, RecipeAdapterCompatRegistry.class.getClassLoader());
+            return true;
+        } catch (ClassNotFoundException | LinkageError exception) {
+            return false;
+        }
     }
 
     private static void initCompat(FMLCommonSetupEvent event, @Nullable String modId, Runnable registerAction) {
@@ -443,6 +470,15 @@ public final class RecipeAdapterCompatRegistry {
     }
 
     private static void registerAvaritia() {
+        // 二级门禁：外层 CompatEntry 已确认 modId "avaritia" 存在，但 AvaritiaNeo 同样使用该 modId
+        // 且包结构完全不兼容。缺失该判定时，下列适配器会在取模具物品时抛出 NoClassDefFoundError，
+        // 该错误属于 Error 而非 Exception，会穿透 initCompat 的捕获并导致整局加载失败。
+        if (!isClassAvailable(RE_AVARITIA_REGISTRY_CLASS)) {
+            LOGGER.warn("Mod id {} is present but {} is not loadable; skipping Re-Avaritia recipe adapters. "
+                    + "A non Re-Avaritia implementation of this mod id is likely installed.",
+                    AVARITIA, RE_AVARITIA_REGISTRY_CLASS);
+            return;
+        }
         register(new ReAvaritiaSculkCraftingRecipeAdapter());
         register(new ReAvaritiaTableRecipeAdapter());
         register(new ReAvaritiaExtremeSmithingRecipeAdapter());

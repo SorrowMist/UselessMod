@@ -65,6 +65,8 @@ public final class RecipeSourceIds {
     public static final String APOTHEOSIS = "apotheosis";
     /** Lychee 数据驱动的方块压碎配方。 */
     public static final String LYCHEE = "lychee";
+    /** Astral Sorcery 的星能注入与聚星缸配方。 */
+    public static final String ASTRAL_SORCERY = "astralsorcery";
 
     private RecipeSourceIds() {
     }
@@ -103,6 +105,7 @@ public final class RecipeSourceIds {
         if (name.endsWith(".productivebees")) return PRODUCTIVE_BEES;
         if (name.endsWith(".draconicevolution")) return DRACONIC_EVOLUTION;
         if (name.endsWith(".powah")) return POWAH;
+        if (name.endsWith(".astralsorcery")) return ASTRAL_SORCERY;
         if (name.endsWith(".extendedcrafting")) return EXTENDED_CRAFTING;
         if (name.endsWith(".avaritia")) return AVARITIA;
         if (name.endsWith(".eco")) return NEO_ECO_AE;

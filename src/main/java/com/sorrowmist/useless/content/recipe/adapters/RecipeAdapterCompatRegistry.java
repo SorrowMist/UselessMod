@@ -76,6 +76,8 @@ import com.sorrowmist.useless.content.recipe.adapters.naturesaura.NatureAltarRec
 import com.sorrowmist.useless.content.recipe.adapters.naturesaura.OfferingRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.naturesaura.TreeRitualRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.occultism.OccultismRitualRecipeAdapter;
+import com.sorrowmist.useless.content.recipe.adapters.astralsorcery.AltarRecipeAdapter;
+import com.sorrowmist.useless.content.recipe.adapters.astralsorcery.LightwellRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.powah.EnergizingRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.productivebees.BeeProduceRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.productivebees.BeeBreedingRecipeAdapter;
@@ -154,6 +156,7 @@ public final class RecipeAdapterCompatRegistry {
     public static final String FLUX_NETWORKS = RecipeSourceIds.FLUX_NETWORKS;
     public static final String APOTHEOSIS = RecipeSourceIds.APOTHEOSIS;
     public static final String LYCHEE = RecipeSourceIds.LYCHEE;
+    public static final String ASTRAL_SORCERY = RecipeSourceIds.ASTRAL_SORCERY;
 
     private static final List<CompatEntry> ENTRIES = List.of(
             new CompatEntry(null, RecipeAdapterCompatRegistry::registerMinecraft),
@@ -208,7 +211,8 @@ public final class RecipeAdapterCompatRegistry {
             new CompatEntry(APOTHIC_FLUX, RecipeAdapterCompatRegistry::registerApothicFlux),
             new CompatEntry(FLUX_NETWORKS, RecipeAdapterCompatRegistry::registerFluxNetworks),
             new CompatEntry(APOTHEOSIS, RecipeAdapterCompatRegistry::registerApotheosis),
-            new CompatEntry(LYCHEE, RecipeAdapterCompatRegistry::registerLychee)
+            new CompatEntry(LYCHEE, RecipeAdapterCompatRegistry::registerLychee),
+            new CompatEntry(ASTRAL_SORCERY, RecipeAdapterCompatRegistry::registerAstralSorcery)
     );
 
     private RecipeAdapterCompatRegistry() {}
@@ -560,6 +564,13 @@ public final class RecipeAdapterCompatRegistry {
     private static void registerLychee() {
         invokeOptionalLoader(
                 "com.sorrowmist.useless.compat.lychee.LycheeRecipeCompatLoader");
+    }
+
+    private static void registerAstralSorcery() {
+        // 植物魔法（Mystical Agriculture）存在同名适配器，此处必须使用全限定名以避免简名冲突。
+        register(new com.sorrowmist.useless.content.recipe.adapters.astralsorcery.InfusionRecipeAdapter());
+        register(new LightwellRecipeAdapter());
+        register(new AltarRecipeAdapter());
     }
 
     private record CompatEntry(@Nullable String modId, Runnable registerAction) {}

@@ -63,6 +63,15 @@ repositories {
     maven {
         url = uri("https://jitpack.io")
     }
+    // Astral Sorcery 及其硬前置 ObserverLib 仅在该仓库发布
+    maven {
+        name = "HellFirePvP Maven"
+        url = "https://maven.hellfiredev.net/"
+        content {
+            includeGroup "hellfirepvp.observerlib"
+            includeGroup "hellfirepvp.astralsorcery"
+        }
+    }
     mavenCentral()
 }
 
@@ -283,8 +292,7 @@ dependencies {
     compileOnly "curse.maven:industrial-foregoing-266515:7073719"
     compileOnly "curse.maven:mifa-1086142:6288756"
     compileOnly "curse.maven:industrial-foregoing-extra-upgrades-1161049:8428353"
-
-
+    
     // 新生魔艺
     compileOnly "curse.maven:ars-nouveau-401955:8152094"
 
@@ -415,6 +423,10 @@ dependencies {
     compileOnly "maven.modrinth:kaleidoscope-grilling:ao5iN7Jb"
     compileOnly "maven.modrinth:kaleidoscopetavern:1.2.0-neoforge+mc1.21.1"
 
+
+    // 星辉魔法及其硬前置 ObserverLib
+    runtimeOnly "hellfirepvp.observerlib:ObserverLib:1.10.3.31"
+    implementation "hellfirepvp.astralsorcery:AstralSorcery:2.0.0.14"
 
     implementation fileTree(dir: 'libs', includes: ['*.jar'], excludes: [])
     compileOnly fileTree(dir: 'libs/compile', includes: ['*.jar'], excludes: [])

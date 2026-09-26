@@ -1,7 +1,6 @@
 package com.sorrowmist.useless.content.recipe.adapters.justdirethings.jdte;
 
 import com.jdte.common.content.JDTEContentControl;
-import com.jdte.common.integrations.BotanyPotsGreenhouseIntegration;
 import com.jdte.common.integrations.MysticalAgricultureGreenhouseIntegration;
 import com.jdte.common.recipes.GreenhouseCropDefinition;
 import com.jdte.common.recipes.GreenhouseCropResolver;
@@ -197,20 +196,6 @@ public final class GreenhouseRecipeAdapter implements IRecipeAdapter<GreenhouseR
                         item.getDefaultInstance(), definition);
             }
         }
-
-        if (ModList.get().isLoaded("botanypots")) {
-            for (BotanyPotsGreenhouseIntegration.DiscoveredCrop crop
-                    : BotanyPotsGreenhouseIntegration.getCrops(level)) {
-                if (crop == null || crop.seed() == null || crop.seed().isEmpty()
-                        || !seen.add(crop.seed().getItem()) || crop.definition() == null
-                        || crop.definition().outputs().isEmpty()) {
-                    continue;
-                }
-                ItemStack seed = crop.seed().copyWithCount(1);
-                addGeneratedRecipe(generated,
-                        botanyRecipeId(crop.recipeId(), seed), seed, crop.definition());
-            }
-        }
         for (Item item : BuiltInRegistries.ITEM) {
             if (item == null || seen.contains(item) || !(item instanceof BlockItem)) continue;
 
@@ -264,15 +249,6 @@ public final class GreenhouseRecipeAdapter implements IRecipeAdapter<GreenhouseR
         ResourceLocation itemId = itemId(item);
         return ResourceLocation.fromNamespaceAndPath("jdte",
                 "jei/greenhouse/" + itemId.getNamespace() + "/" + itemId.getPath());
-    }
-
-    private static ResourceLocation botanyRecipeId(ResourceLocation source, ItemStack seed) {
-        ResourceLocation sourceId = source == null
-                ? dynamicRecipeId(seed.getItem()) : source;
-        ResourceLocation seedId = itemId(seed.getItem());
-        return ResourceLocation.fromNamespaceAndPath("jdte",
-                "jei/greenhouse/botanypots/" + sourceId.getNamespace() + "/"
-                        + sourceId.getPath() + "/" + seedId.getNamespace() + "/" + seedId.getPath());
     }
 
     private static ResourceLocation itemId(Item item) {

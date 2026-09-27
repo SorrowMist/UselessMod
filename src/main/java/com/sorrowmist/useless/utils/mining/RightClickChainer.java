@@ -78,7 +78,8 @@ public final class RightClickChainer {
         BlockState originState = level.getBlockState(origin);
 
         List<BlockPos> targets = MiningUtils.scanBlocksForUse(
-                origin, originState, level, UComponentUtils.isEnhancedChainMiningEnabled(ctx.getItemInHand()));
+                origin, originState, level, UComponentUtils.isEnhancedChainMiningEnabled(ctx.getItemInHand()),
+                ctx.getPlayer());
 
         boolean soundPlayed = false;
         int applied = 0;
@@ -122,7 +123,7 @@ public final class RightClickChainer {
     public static int harvestCrops(ServerLevel level, BlockPos origin, Player player, ItemStack tool) {
         BlockState originState = level.getBlockState(origin);
         List<BlockPos> targets = MiningUtils.scanBlocksForUse(
-                origin, originState, level, UComponentUtils.isEnhancedChainMiningEnabled(tool));
+                origin, originState, level, UComponentUtils.isEnhancedChainMiningEnabled(tool), player);
 
         // 需要接管掉落（范围磁力或 AE 存储优先任一开启）时先整片收集、合并同类项，
         // 最后只调一次 handleDrops，避免逐株向 AE 发高频请求。
@@ -160,7 +161,7 @@ public final class RightClickChainer {
     public static int ripenBlocks(ServerLevel level, BlockPos origin, Player player, ItemStack tool) {
         BlockState originState = level.getBlockState(origin);
         List<BlockPos> targets = MiningUtils.scanBlocksForUse(
-                origin, originState, level, UComponentUtils.isEnhancedChainMiningEnabled(tool));
+                origin, originState, level, UComponentUtils.isEnhancedChainMiningEnabled(tool), player);
 
         int ripened = 0;
         for (BlockPos targetPos : targets) {

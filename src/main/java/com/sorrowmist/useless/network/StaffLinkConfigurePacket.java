@@ -50,6 +50,10 @@ public record StaffLinkConfigurePacket(GlobalPos anchor, int route, StaffLinkRou
             if (!(player.containerMenu instanceof StaffLinkMenu menu)) {
                 return;
             }
+            // 越权校验：界面所属的网络必须挂在他（或他队伍）名下。
+            if (!StaffLinkManager.canAccess(player.server, player, menu.getNetworkId())) {
+                return;
+            }
             StaffLinkNetwork network = StaffLinkManager.networkById(player.server, menu.getNetworkId());
             if (network == null || !network.isBound(packet.anchor())) {
                 return;
@@ -79,7 +83,8 @@ public record StaffLinkConfigurePacket(GlobalPos anchor, int route, StaffLinkRou
             StaffLinkSavedData.get(player.server).markDirty();
             // 改完立刻重跑：新开的配对不该等上一次排定的退避。
             StaffLinkEngine.wake(network.id());
-            PacketDistributor.sendToPlayer(player, new StaffLinkSyncPacket(network));
+            PacketDistributor.sendToPlayer(player, StaffLinkSyncPacket.of(
+                    player.server, StaffLinkManager.ownerIdOf(player), network));
         });
     }
 

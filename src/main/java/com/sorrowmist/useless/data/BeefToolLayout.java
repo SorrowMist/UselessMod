@@ -18,23 +18,41 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
-/** The player-owned layout of the beef tool mode screen. */
+/**
+ * The player-owned layout of the beef tool mode screen.
+ *
+ * <p>本类同时承载「连锁挖掘等价组」——两者都是造化杖的玩家个人设置，存在同一份
+ * persistent data 里，因此共用一套校验、同步与导入导出通道。</p>
+ */
 public final class BeefToolLayout {
-    public static final int FORMAT_VERSION = 1;
+    /** 当前写出的格式版本。 */
+    public static final int FORMAT_VERSION = 2;
+    /** 仍然接受读取的最低版本（v1 没有 {@code chainGroups}，读进来就是空）。 */
+    public static final int MIN_FORMAT_VERSION = 1;
     public static final int MAX_PAGES = 32;
     public static final int MAX_GROUPS_PER_PAGE = 16;
     public static final int MAX_MODULES_PER_GROUP = 32;
     public static final int MAX_TOTAL_MODULES = 128;
     public static final int MAX_NAME_LENGTH = 32;
-    public static final int MAX_TEXT_LENGTH = 32 * 1024;
+    public static final int MAX_CHAIN_GROUPS = 16;
+    public static final int MAX_CHAIN_ENTRIES_PER_GROUP = 16;
+    public static final int MAX_CHAIN_ENTRY_LENGTH = 128;
+    public static final int MAX_TOTAL_CHAIN_ENTRIES = 128;
+    public static final int MAX_TEXT_LENGTH = 64 * 1024;
 
     private static final Gson GSON = new GsonBuilder().disableHtmlEscaping().create();
 
     private int selectedPage;
     private final List<Page> pages;
     private final List<String> unassignedModules;
+    private final List<List<String>> chainGroups;
 
     public BeefToolLayout(int selectedPage, List<Page> pages, List<String> unassignedModules) {
+        this(selectedPage, pages, unassignedModules, List.of());
+    }
+
+    public BeefToolLayout(int selectedPage, List<Page> pages, List<String> unassignedModules,
+                          List<List<String>> chainGroups) {
         this.selectedPage = selectedPage;
         this.pages = new ArrayList<>();
         if (pages != null) {
@@ -45,6 +63,12 @@ public final class BeefToolLayout {
         this.unassignedModules = unassignedModules == null
                 ? new ArrayList<>()
                 : new ArrayList<>(unassignedModules);
+        this.chainGroups = new ArrayList<>();
+        if (chainGroups != null) {
+            for (List<String> group : chainGroups) {
+                this.chainGroups.add(group == null ? new ArrayList<>() : new ArrayList<>(group));
+            }
+        }
     }
 
     public int selectedPage() {
@@ -63,8 +87,16 @@ public final class BeefToolLayout {
         return unassignedModules;
     }
 
+    /**
+     * 连锁挖掘等价组。外层列表的每一项是一个「组」，内层是该组的条目
+     * （精确方块 ID、{@code #方块标签} 或 {@code *} 通配符），组内条目互相连锁。
+     */
+    public List<List<String>> chainGroups() {
+        return chainGroups;
+    }
+
     public BeefToolLayout copy() {
-        return new BeefToolLayout(selectedPage, pages, unassignedModules);
+        return new BeefToolLayout(selectedPage, pages, unassignedModules, chainGroups);
     }
 
     public boolean containsModule(String moduleId) {
@@ -123,6 +155,28 @@ public final class BeefToolLayout {
         if (moduleCount > MAX_TOTAL_MODULES) {
             throw new LayoutException(Error.LIMIT);
         }
+
+        // 等价组只做结构校验；条目语法与方块注册表相关的判定交给 ChainGroupManager。
+        if (chainGroups.size() > MAX_CHAIN_GROUPS) {
+            throw new LayoutException(Error.LIMIT);
+        }
+        int chainEntryCount = 0;
+        for (List<String> group : chainGroups) {
+            if (group == null || group.size() > MAX_CHAIN_ENTRIES_PER_GROUP) {
+                throw new LayoutException(Error.LIMIT);
+            }
+            for (String entry : group) {
+                if (entry == null || entry.isBlank()
+                        || entry.length() > MAX_CHAIN_ENTRY_LENGTH
+                        || entry.indexOf('\n') >= 0 || entry.indexOf('\r') >= 0) {
+                    throw new LayoutException(Error.INVALID_STRUCTURE);
+                }
+                chainEntryCount++;
+            }
+        }
+        if (chainEntryCount > MAX_TOTAL_CHAIN_ENTRIES) {
+            throw new LayoutException(Error.LIMIT);
+        }
     }
 
     public CompoundTag toNbt() {
@@ -155,15 +209,28 @@ public final class BeefToolLayout {
             unassigned.add(StringTag.valueOf(module));
         }
         root.put("unassigned", unassigned);
+
+        ListTag chainGroupList = new ListTag();
+        for (List<String> group : chainGroups) {
+            ListTag entryList = new ListTag();
+            for (String entry : group) {
+                entryList.add(StringTag.valueOf(entry));
+            }
+            chainGroupList.add(entryList);
+        }
+        root.put("chain_groups", chainGroupList);
         return root;
     }
 
     public static BeefToolLayout fromNbt(CompoundTag root) throws LayoutException {
         if (!root.contains("version", Tag.TAG_INT)
-                || root.getInt("version") != FORMAT_VERSION
                 || !root.contains("selected_page", Tag.TAG_INT)
                 || !root.contains("pages", Tag.TAG_LIST)
                 || !root.contains("unassigned", Tag.TAG_LIST)) {
+            throw new LayoutException(Error.UNSUPPORTED_VERSION);
+        }
+        int version = root.getInt("version");
+        if (version < MIN_FORMAT_VERSION || version > FORMAT_VERSION) {
             throw new LayoutException(Error.UNSUPPORTED_VERSION);
         }
 
@@ -190,7 +257,11 @@ public final class BeefToolLayout {
         }
 
         List<String> unassigned = readStringList(root.getList("unassigned", Tag.TAG_STRING));
-        BeefToolLayout layout = new BeefToolLayout(root.getInt("selected_page"), pages, unassigned);
+        List<List<String>> chainGroups = version >= 2 && root.contains("chain_groups", Tag.TAG_LIST)
+                ? readNestedStringList(root.getList("chain_groups", Tag.TAG_LIST))
+                : List.of();
+        BeefToolLayout layout = new BeefToolLayout(
+                root.getInt("selected_page"), pages, unassigned, chainGroups);
         layout.validate();
         return layout;
     }
@@ -225,6 +296,16 @@ public final class BeefToolLayout {
             unassigned.add(module);
         }
         root.add("unassigned", unassigned);
+
+        JsonArray chainGroupArray = new JsonArray();
+        for (List<String> group : chainGroups) {
+            JsonArray entryArray = new JsonArray();
+            for (String entry : group) {
+                entryArray.add(entry);
+            }
+            chainGroupArray.add(entryArray);
+        }
+        root.add("chainGroups", chainGroupArray);
         return GSON.toJson(root);
     }
 
@@ -239,8 +320,12 @@ public final class BeefToolLayout {
                 throw new LayoutException(Error.INVALID_TEXT);
             }
             JsonObject root = parsed.getAsJsonObject();
-            if (!root.has("version") || root.get("version").getAsInt() != FORMAT_VERSION
-                    || !root.has("selectedPage") || !root.has("pages") || !root.has("unassigned")) {
+            if (!root.has("version") || !root.has("selectedPage")
+                    || !root.has("pages") || !root.has("unassigned")) {
+                throw new LayoutException(Error.UNSUPPORTED_VERSION);
+            }
+            int version = root.get("version").getAsInt();
+            if (version < MIN_FORMAT_VERSION || version > FORMAT_VERSION) {
                 throw new LayoutException(Error.UNSUPPORTED_VERSION);
             }
 
@@ -269,8 +354,22 @@ public final class BeefToolLayout {
                 unassigned.add(requireString(module));
             }
 
+            List<List<String>> chainGroups = new ArrayList<>();
+            if (version >= 2 && root.has("chainGroups")) {
+                for (JsonElement groupElement : requireArray(root, "chainGroups")) {
+                    if (groupElement == null || !groupElement.isJsonArray()) {
+                        throw new LayoutException(Error.INVALID_STRUCTURE);
+                    }
+                    List<String> entries = new ArrayList<>();
+                    for (JsonElement entry : groupElement.getAsJsonArray()) {
+                        entries.add(requireString(entry));
+                    }
+                    chainGroups.add(entries);
+                }
+            }
+
             BeefToolLayout layout = new BeefToolLayout(
-                    root.get("selectedPage").getAsInt(), pages, unassigned);
+                    root.get("selectedPage").getAsInt(), pages, unassigned, chainGroups);
             layout.validate();
             return layout;
         } catch (LayoutException exception) {
@@ -320,6 +419,18 @@ public final class BeefToolLayout {
             values.add(list.getString(i));
         }
         return values;
+    }
+
+    /** 读取「组 → 条目」的嵌套字符串列表（外层与内层都是 TAG_LIST）。 */
+    private static List<List<String>> readNestedStringList(ListTag list) throws LayoutException {
+        List<List<String>> groups = new ArrayList<>();
+        for (int i = 0; i < list.size(); i++) {
+            if (!(list.get(i) instanceof ListTag entryList)) {
+                throw new LayoutException(Error.INVALID_STRUCTURE);
+            }
+            groups.add(readStringList(entryList));
+        }
+        return groups;
     }
 
     private static void validateName(String name) throws LayoutException {

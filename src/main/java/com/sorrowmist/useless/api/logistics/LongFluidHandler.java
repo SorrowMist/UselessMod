@@ -36,4 +36,24 @@ public interface LongFluidHandler extends LongResourceHandler {
      * @return 实际注入量；{@code simulate} 为真时只试算
      */
     long fill(FluidStack type, long amount, boolean simulate);
+
+    /**
+     * 找出「和给定流体同类型」的储罐；找不到返回 -1。
+     *
+     * <p>理由同 {@link LongItemHandler#findSlot(net.minecraft.world.item.ItemStack)}：
+     * 过滤器驱动时按类型直接定位，不要靠扫描——AE 端点的 {@code getTanks()} 是网络里的
+     * 流体种类数，扫描会被调用方的预算截断，排在后面的那些永远找不到。</p>
+     */
+    default int findTank(FluidStack type) {
+        if (type == null || type.isEmpty()) {
+            return -1;
+        }
+        for (int tank = 0; tank < getTanks(); tank++) {
+            if (amountIn(tank) > 0L
+                    && FluidStack.isSameFluidSameComponents(getFluidInTank(tank), type)) {
+                return tank;
+            }
+        }
+        return -1;
+    }
 }

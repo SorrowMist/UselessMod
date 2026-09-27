@@ -5,7 +5,9 @@ import com.mojang.blaze3d.systems.RenderSystem;
 import com.sorrowmist.useless.api.enums.tool.ConstructionWandCoreMode;
 import com.sorrowmist.useless.api.enums.tool.EnchantMode;
 import com.sorrowmist.useless.api.enums.tool.ToolTypeMode;
+import com.sorrowmist.useless.content.menus.ChainGroupMenu;
 import com.sorrowmist.useless.core.component.UComponents;
+import com.sorrowmist.useless.core.config.ChainGroupManager;
 import com.sorrowmist.useless.content.items.EndlessBeafItem;
 import com.sorrowmist.useless.data.BeefToolLayout;
 import com.sorrowmist.useless.data.BeefToolModuleRegistry;
@@ -23,6 +25,7 @@ import net.minecraft.client.gui.components.Renderable;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.util.Mth;
+import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.item.ItemStack;
 import net.neoforged.neoforge.network.PacketDistributor;
 import org.lwjgl.glfw.GLFW;
@@ -43,6 +46,8 @@ public class ModeWheelScreen extends Screen {
     private static final int CARD_BOTTOM_PADDING = 6;
     private static final int MODULE_HEIGHT = 18;
     private static final int MODULE_GAP = 2;
+    /** 连锁等价组齿轮图标的边长（画在连锁挖掘模块按钮右端）。 */
+    private static final int GEAR_SIZE = 12;
     private static final int PAGE_TAB_HEIGHT = 15;
     private static final int PAGE_TAB_WIDTH = 82;
     private static final int DRAG_THRESHOLD = 4;
@@ -845,6 +850,9 @@ public class ModeWheelScreen extends Screen {
 
     private static void validateKnownModules(BeefToolLayout candidate) throws BeefToolLayout.LayoutException {
         candidate.validate();
+        // 等价组与布局同进同出，导入时也要在本地先拦下非法内容，
+        // 免得等服务器回一个笼统的 INVALID_STRUCTURE。
+        ChainGroupManager.validateEntries(candidate.chainGroups());
         for (BeefToolLayout.Page page : candidate.pages()) {
             for (BeefToolLayout.Group group : page.groups()) {
                 for (String id : group.modules()) validateKnown(id);
@@ -1015,12 +1023,15 @@ public class ModeWheelScreen extends Screen {
                     for (ModeButton modeButton : modeButtons) {
                         if (modeButton.button().visible) modeButton.button().render(graphics, mouseX, mouseY, partialTick);
                     }
+                    drawChainGroupGear(graphics, mouseX, mouseY);
                 }
             } finally {
                 graphics.flush();
                 RenderSystem.disableScissor();
             }
         }
+
+        drawChainGroupGearTooltip(graphics, mouseX, mouseY);
 
         if (pageNameField != null && pageNameField.visible) {
             pageNameField.render(graphics, mouseX, mouseY, partialTick);
@@ -1155,7 +1166,10 @@ public class ModeWheelScreen extends Screen {
         int top = (uiHeight - modalHeight) / 2;
         graphics.fill(0, 0, uiWidth, uiHeight, 0x99000000);
         MachineScreenStyle.drawPanel(graphics, left, top, modalWidth, modalHeight);
-        graphics.drawString(font, Component.translatable("gui.useless_mod.mode_config.import_confirm"),
+        graphics.drawString(font,
+                font.plainSubstrByWidth(
+                        Component.translatable("gui.useless_mod.mode_config.import_confirm").getString(),
+                        modalWidth - 16),
                 left + 8, top + 10, MachineScreenStyle.TEXT_COLOR, false);
         drawManualButton(graphics, left + 10, top + 48, 110, 18,
                 Component.translatable("gui.useless_mod.mode_config.confirm"),
@@ -1194,6 +1208,20 @@ public class ModeWheelScreen extends Screen {
             return true;
         }
         if (awaitingLayout) return true;
+
+        // 连锁挖掘模块右端的齿轮：进入「连锁等价组」编辑子界面。
+        // 必须在 super.mouseClicked 之前拦截，否则点击会被模块按钮先吃掉。
+        if (!editing && button == GLFW.GLFW_MOUSE_BUTTON_LEFT) {
+            ModuleLayout chainModule = findModule(BeefToolModuleRegistry.ENHANCED_CHAIN_MINING);
+            if (chainModule != null && intersectsContent(chainModule.rect())
+                    && chainGroupGearRect(chainModule).contains(mouseX, mouseY)) {
+                // 菜单是空的、只在客户端本地建，不下发；界面继承容器屏是为了让 JEI/EMI 的侧栏出现。
+                Inventory playerInventory = Minecraft.getInstance().player.getInventory();
+                Minecraft.getInstance().setScreen(new ChainGroupScreen(
+                        new ChainGroupMenu(0, playerInventory), playerInventory, targetItem, layout.copy()));
+                return true;
+            }
+        }
 
         int pageTab = pageAt(mouseX, mouseY);
         if (pageTab >= 0 && button == GLFW.GLFW_MOUSE_BUTTON_LEFT) {
@@ -1418,6 +1446,61 @@ public class ModeWheelScreen extends Screen {
             if (module.rect().contains(mouseX, mouseY) && intersectsContent(module.rect())) return module;
         }
         return null;
+    }
+
+    /** 按模块 ID 找当前页的模块布局，找不到返回 null。 */
+    private ModuleLayout findModule(String id) {
+        for (ModuleLayout module : moduleLayouts) {
+            if (module.id().equals(id)) {
+                return module;
+            }
+        }
+        return null;
+    }
+
+    /** 连锁等价组齿轮的命中区域：贴在模块按钮右端内侧。 */
+    private Rect chainGroupGearRect(ModuleLayout module) {
+        Rect rect = module.rect();
+        return new Rect(rect.right() - GEAR_SIZE - 1, rect.top() + (rect.height() - GEAR_SIZE) / 2,
+                GEAR_SIZE, GEAR_SIZE);
+    }
+
+    /**
+     * 在连锁挖掘模块按钮右端画一个齿轮，提示这里可以点开连锁等价组配置。
+     *
+     * <p>用 {@code fill} 拼出轮廓，不新增贴图。</p>
+     */
+    private void drawChainGroupGear(GuiGraphics graphics, int mouseX, int mouseY) {
+        ModuleLayout module = findModule(BeefToolModuleRegistry.ENHANCED_CHAIN_MINING);
+        if (module == null || !intersectsContent(module.rect())) {
+            return;
+        }
+        Rect gear = chainGroupGearRect(module);
+        int color = gear.contains(mouseX, mouseY)
+                ? MachineScreenStyle.TEXT_COLOR
+                : MachineScreenStyle.SUBTLE_TEXT_COLOR;
+
+        int cx = gear.left() + GEAR_SIZE / 2;
+        int cy = gear.top() + GEAR_SIZE / 2;
+        graphics.fill(cx - 2, cy - 2, cx + 2, cy + 2, color);
+        graphics.fill(cx - 1, gear.top(), cx + 1, cy - 2, color);
+        graphics.fill(cx - 1, cy + 2, cx + 1, gear.bottom(), color);
+        graphics.fill(gear.left(), cy - 1, cx - 2, cy + 1, color);
+        graphics.fill(cx + 2, cy - 1, gear.right(), cy + 1, color);
+    }
+
+    /** 齿轮的悬停提示画在裁剪区之外，免得提示框被内容区裁掉。 */
+    private void drawChainGroupGearTooltip(GuiGraphics graphics, int mouseX, int mouseY) {
+        if (awaitingLayout || editing) {
+            return;
+        }
+        ModuleLayout module = findModule(BeefToolModuleRegistry.ENHANCED_CHAIN_MINING);
+        if (module == null || !intersectsContent(module.rect())
+                || !chainGroupGearRect(module).contains(mouseX, mouseY)) {
+            return;
+        }
+        graphics.renderTooltip(font,
+                Component.translatable("gui.useless_mod.chain_group.gear_tooltip"), mouseX, mouseY);
     }
 
     private CardLayout groupAt(double mouseX, double mouseY) {

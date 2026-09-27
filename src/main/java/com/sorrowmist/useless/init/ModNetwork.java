@@ -42,9 +42,12 @@ import com.sorrowmist.useless.network.StaffLinkBindPacket;
 import com.sorrowmist.useless.network.StaffLinkConfigurePacket;
 import com.sorrowmist.useless.network.StaffLinkCyclePacket;
 import com.sorrowmist.useless.network.StaffLinkDetachPacket;
+import com.sorrowmist.useless.network.StaffLinkHighlightPacket;
+import com.sorrowmist.useless.network.StaffLinkHighlightRequestPacket;
 import com.sorrowmist.useless.network.StaffLinkNetworkPacket;
 import com.sorrowmist.useless.network.StaffLinkOpenPacket;
 import com.sorrowmist.useless.network.StaffLinkRenamePacket;
+import com.sorrowmist.useless.network.StaffLinkReorderPacket;
 import com.sorrowmist.useless.network.StaffLinkStatusPacket;
 import com.sorrowmist.useless.network.StaffLinkSyncPacket;
 import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
@@ -173,6 +176,9 @@ public class ModNetwork {
         registrar.playToServer(StaffLinkDetachPacket.TYPE,
                                StaffLinkDetachPacket.STREAM_CODEC,
                                StaffLinkDetachPacket::handle);
+        registrar.playToServer(StaffLinkReorderPacket.TYPE,
+                               StaffLinkReorderPacket.STREAM_CODEC,
+                               StaffLinkReorderPacket::handle);
         registrar.playToServer(StaffLinkConfigurePacket.TYPE,
                                StaffLinkConfigurePacket.STREAM_CODEC,
                                StaffLinkConfigurePacket::handle);
@@ -191,5 +197,11 @@ public class ModNetwork {
         registrar.playToClient(StaffLinkStatusPacket.TYPE,
                                StaffLinkStatusPacket.STREAM_CODEC,
                                StaffLinkStatusPacket::handle);
+        registrar.playToServer(StaffLinkHighlightRequestPacket.TYPE,
+                               StaffLinkHighlightRequestPacket.STREAM_CODEC,
+                               StaffLinkHighlightRequestPacket::handle);
+        registrar.playToClient(StaffLinkHighlightPacket.TYPE,
+                               StaffLinkHighlightPacket.STREAM_CODEC,
+                               StaffLinkHighlightPacket::handle);
     }
 }

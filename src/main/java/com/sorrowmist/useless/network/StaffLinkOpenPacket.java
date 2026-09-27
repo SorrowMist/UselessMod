@@ -21,6 +21,8 @@ import net.neoforged.neoforge.network.PacketDistributor;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
 import org.jetbrains.annotations.NotNull;
 
+import java.util.UUID;
+
 /** 客户端请求打开无线物流界面（仅手持造化杖时发送）。 */
 public class StaffLinkOpenPacket implements CustomPacketPayload {
 
@@ -38,6 +40,7 @@ public class StaffLinkOpenPacket implements CustomPacketPayload {
             if (!(ctx.player() instanceof ServerPlayer player)) {
                 return;
             }
+            // 杖是「打开配置界面」的钥匙，所以仍然要求手持。
             var toolEntry = UselessItemUtils.findTargetToolInHands(player);
             if (toolEntry.isEmpty()) {
                 return;
@@ -47,7 +50,12 @@ public class StaffLinkOpenPacket implements CustomPacketPayload {
                 return;
             }
 
-            StaffLinkNetwork network = StaffLinkManager.activeNetwork(player.server, staff, true);
+            // 但网络挂在归属者（玩家或队伍）名下，与手上这把杖无关。
+            // 先并一次队：玩家可能刚被拉进队伍，不等 20 tick 的周期刷新也能立刻看到合并后的结果，
+            // 否则这里会先给他新建一张空网络，看着像「配置全没了」。
+            StaffLinkManager.mergePersonalIntoTeam(player.server, player);
+            UUID ownerId = StaffLinkManager.ownerIdOf(player);
+            StaffLinkNetwork network = StaffLinkManager.activeNetwork(player.server, ownerId, true);
             if (network == null) {
                 return;
             }
@@ -64,7 +72,7 @@ public class StaffLinkOpenPacket implements CustomPacketPayload {
                 }
             }, buffer -> buffer.writeUUID(network.id()));
 
-            PacketDistributor.sendToPlayer(player, new StaffLinkSyncPacket(network));
+            PacketDistributor.sendToPlayer(player, StaffLinkSyncPacket.of(player.server, ownerId, network));
         });
     }
 

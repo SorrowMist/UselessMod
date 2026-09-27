@@ -4,6 +4,7 @@ import com.sorrowmist.useless.UselessMod;
 import com.sorrowmist.useless.content.items.EndlessBeafItem;
 import com.sorrowmist.useless.content.stafflink.StaffLinkBinding;
 import com.sorrowmist.useless.utils.UselessItemUtils;
+import com.sorrowmist.useless.world.stafflink.StaffLinkManager;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
@@ -14,6 +15,8 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.item.ItemStack;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
 import org.jetbrains.annotations.NotNull;
+
+import java.util.UUID;
 
 /**
  * 客户端请求绑定 / 解绑一个（或一批）锚点。
@@ -57,10 +60,14 @@ public record StaffLinkBindPacket(BlockPos pos, boolean batch) implements Custom
             if (!EndlessBeafItem.isStaffLinkEnabled(staff)) {
                 return;
             }
+            // 网络挂在归属者（玩家或队伍）名下，不再挂在杖上；杖只是「拿着它才能操作」的凭据。
+            // 先并一次队，免得刚组队时这里先新建一张空网络。
+            StaffLinkManager.mergePersonalIntoTeam(player.server, player);
+            UUID ownerId = StaffLinkManager.ownerIdOf(player);
             if (packet.batch()) {
-                StaffLinkBinding.toggleBatch(level, player, staff, packet.pos());
+                StaffLinkBinding.toggleBatch(level, player, ownerId, packet.pos());
             } else {
-                StaffLinkBinding.toggle(level, player, staff, packet.pos());
+                StaffLinkBinding.toggle(level, player, ownerId, packet.pos());
             }
         });
     }

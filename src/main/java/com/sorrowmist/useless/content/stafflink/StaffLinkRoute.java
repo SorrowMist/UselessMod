@@ -17,6 +17,7 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.Mth;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
+import net.neoforged.neoforge.fluids.FluidStack;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
@@ -44,7 +45,7 @@ public record StaffLinkRoute(
         @Nullable Direction side,
         LinkTrigger trigger,
         int weight,
-        List<ItemStack> filter
+        List<LinkFilterSlot> filter
 ) {
     /** 线路总数；线路号取值 {@code 0 .. ROUTE_COUNT - 1}。 */
     public static final int ROUTE_COUNT = 9;
@@ -76,6 +77,10 @@ public record StaffLinkRoute(
     private static final String TAG_TRIGGER = "Trigger";
     private static final String TAG_WEIGHT = "Weight";
     private static final String TAG_FILTER = "Filter";
+    /** 一格标记里的物品（化学品线路的储罐也走这里）。 */
+    private static final String TAG_MARKER_ITEM = "MarkerItem";
+    /** 一格标记里的流体。 */
+    private static final String TAG_MARKER_FLUID = "MarkerFluid";
 
     public StaffLinkRoute {
         Objects.requireNonNull(anchor, "anchor");
@@ -88,10 +93,10 @@ public record StaffLinkRoute(
         interval = Mth.clamp(interval, MIN_INTERVAL, MAX_INTERVAL);
         weight = Mth.clamp(weight, MIN_WEIGHT, MAX_WEIGHT);
 
-        List<ItemStack> normalized = new ArrayList<>(FILTER_LIMIT);
+        List<LinkFilterSlot> normalized = new ArrayList<>(FILTER_LIMIT);
         for (int slot = 0; slot < FILTER_LIMIT; slot++) {
-            ItemStack stack = filter != null && slot < filter.size() ? filter.get(slot) : null;
-            normalized.add(stack == null ? ItemStack.EMPTY : stack.copyWithCount(1));
+            LinkFilterSlot value = filter != null && slot < filter.size() ? filter.get(slot) : null;
+            normalized.add(value == null ? LinkFilterSlot.EMPTY : value);
         }
         filter = List.copyOf(normalized);
     }
@@ -99,33 +104,33 @@ public record StaffLinkRoute(
     /**
      * 过滤器适用的资源类型。
      *
-     * <p>物品比物品本身；流体/化学品比「标记物里装的东西」——放一个水桶就是「只搬水」，
-     * 放一个化学品罐就是「只搬那种化学品」。能量与魔源没有合适的标记物，因此不参与过滤。</p>
+     * <p>标记物按线路类型分开存：物品线路放物品本身，流体线路放<b>流体本身</b>（不是装它的桶），
+     * 化学品线路放一只装有该化学品的储罐。能量与魔源没有合适的标记物，因此不参与过滤。</p>
      */
     public boolean filterApplies() {
         return switch (medium) {
             case ITEM, AE_ITEM, FLUID, AE_FLUID, CHEMICAL, AE_CHEMICAL -> true;
             // 能量与魔源没有合适的标记物，因此不参与过滤。
-            case ENERGY, SOURCE, AE_SOURCE -> false;
+            case ENERGY, AE_ENERGY, SOURCE, AE_SOURCE -> false;
         };
     }
 
     /** 非空的过滤标记；为空表示「不限制」。 */
-    public List<ItemStack> activeFilters() {
+    public List<LinkFilterSlot> activeFilters() {
         if (!filterApplies()) {
             return List.of();
         }
-        List<ItemStack> active = new ArrayList<>(filter.size());
-        for (ItemStack stack : filter) {
-            if (!stack.isEmpty()) {
-                active.add(stack);
+        List<LinkFilterSlot> active = new ArrayList<>(filter.size());
+        for (LinkFilterSlot slot : filter) {
+            if (!slot.isEmpty()) {
+                active.add(slot);
             }
         }
         return active;
     }
 
     /** 换一份过滤器，其余不变。 */
-    public StaffLinkRoute withFilter(List<ItemStack> newFilter) {
+    public StaffLinkRoute withFilter(List<LinkFilterSlot> newFilter) {
         return new StaffLinkRoute(anchor, route, enabled, flow, medium, amount, interval,
                 side, trigger, weight, newFilter);
     }
@@ -147,9 +152,14 @@ public record StaffLinkRoute(
         tag.putInt(TAG_WEIGHT, weight);
 
         ListTag filterTag = new ListTag();
-        for (ItemStack stack : filter) {
+        for (LinkFilterSlot slot : filter) {
+            CompoundTag entry = new CompoundTag();
             // 空槽位写空 tag：saveOptional 对空栈返回空 CompoundTag，parseOptional 会还原成 EMPTY。
-            filterTag.add(stack.saveOptional(registries));
+            entry.put(TAG_MARKER_ITEM, slot.item().saveOptional(registries));
+            if (!slot.fluid().isEmpty()) {
+                entry.put(TAG_MARKER_FLUID, slot.fluid().save(registries));
+            }
+            filterTag.add(entry);
         }
         tag.put(TAG_FILTER, filterTag);
         return tag;
@@ -166,12 +176,15 @@ public record StaffLinkRoute(
                 ResourceKey.create(Registries.DIMENSION, dimensionId),
                 BlockPos.of(tag.getLong(TAG_POS)));
 
-        List<ItemStack> filter = new ArrayList<>(FILTER_LIMIT);
+        // 资源类型要先读：旧格式的过滤器迁移要知道这条线路搬的是什么。
+        LinkMedium medium = readEnum(LinkMedium.class, tag.getString(TAG_MEDIUM), LinkMedium.ITEM);
+
+        List<LinkFilterSlot> filter = new ArrayList<>(FILTER_LIMIT);
         ListTag filterTag = tag.getList(TAG_FILTER, Tag.TAG_COMPOUND);
         for (int slot = 0; slot < FILTER_LIMIT; slot++) {
             filter.add(slot < filterTag.size()
-                    ? ItemStack.parseOptional(registries, filterTag.getCompound(slot))
-                    : ItemStack.EMPTY);
+                    ? readFilterSlot(filterTag.getCompound(slot), medium, registries)
+                    : LinkFilterSlot.EMPTY);
         }
 
         return new StaffLinkRoute(
@@ -179,13 +192,42 @@ public record StaffLinkRoute(
                 tag.getInt(TAG_ROUTE),
                 tag.getBoolean(TAG_ENABLED),
                 readEnum(LinkFlow.class, tag.getString(TAG_FLOW), LinkFlow.ABSORB),
-                readEnum(LinkMedium.class, tag.getString(TAG_MEDIUM), LinkMedium.ITEM),
+                medium,
                 readAmount(tag),
                 tag.getInt(TAG_INTERVAL),
                 readSide(tag.getString(TAG_SIDE)),
                 readEnum(LinkTrigger.class, tag.getString(TAG_TRIGGER), LinkTrigger.ALWAYS),
                 tag.getInt(TAG_WEIGHT),
                 filter);
+    }
+
+    /**
+     * 读一格过滤标记。
+     *
+     * <p><b>兼容旧格式。</b>早先这一格就是一个 ItemStack（流体线路存的是「装它的桶」），
+     * 整个 CompoundTag 只有 {@code id}/{@code count}/{@code components} 这几个键。这里用
+     * 「有没有新格式的标记键」来区分：没有就按旧格式读，并且对流体线路顺手把桶里的流体取出来
+     * ——否则升级之后玩家配好的流体过滤会整片失效（标记全成了物品，一个流体也匹配不上）。</p>
+     */
+    private static LinkFilterSlot readFilterSlot(CompoundTag entry, LinkMedium medium,
+                                                 HolderLookup.Provider registries) {
+        if (entry.contains(TAG_MARKER_ITEM) || entry.contains(TAG_MARKER_FLUID)) {
+            ItemStack item = ItemStack.parseOptional(registries, entry.getCompound(TAG_MARKER_ITEM));
+            FluidStack fluid = entry.contains(TAG_MARKER_FLUID)
+                    ? FluidStack.parseOptional(registries, entry.getCompound(TAG_MARKER_FLUID))
+                    : FluidStack.EMPTY;
+            return fluid.isEmpty() ? LinkFilterSlot.ofItem(item) : LinkFilterSlot.ofFluid(fluid);
+        }
+
+        ItemStack legacy = ItemStack.parseOptional(registries, entry);
+        if (legacy.isEmpty()) {
+            return LinkFilterSlot.EMPTY;
+        }
+        if (medium.family() == ResourceFamily.FLUID) {
+            FluidStack fluid = StaffLinkFilters.fluidInItem(legacy);
+            return fluid.isEmpty() ? LinkFilterSlot.EMPTY : LinkFilterSlot.ofFluid(fluid);
+        }
+        return LinkFilterSlot.ofItem(legacy);
     }
 
     /** 读单次搬运量；老存档里存的是 TAG_Int，两种都要认，否则会读成 0。 */
@@ -209,8 +251,28 @@ public record StaffLinkRoute(
 
     // ------------------------------------------------------------------ 网络同步
 
-    private static final StreamCodec<RegistryFriendlyByteBuf, List<ItemStack>> FILTER_CODEC =
-            ItemStack.OPTIONAL_STREAM_CODEC.apply(ByteBufCodecs.list(FILTER_LIMIT));
+    /**
+     * 一格过滤标记的编解码。
+     *
+     * <p>先用一个布尔说清这格是流体还是物品，再按对应类型写——这样不必给两种栈各写一个
+     * 「是否为空」，也就不会出现「流体的空栈被当成物品」这种含糊状态。</p>
+     */
+    private static final StreamCodec<RegistryFriendlyByteBuf, LinkFilterSlot> FILTER_SLOT_CODEC =
+            StreamCodec.of(
+                    (buf, slot) -> {
+                        buf.writeBoolean(slot.isFluid());
+                        if (slot.isFluid()) {
+                            FluidStack.STREAM_CODEC.encode(buf, slot.fluid());
+                        } else {
+                            ItemStack.OPTIONAL_STREAM_CODEC.encode(buf, slot.item());
+                        }
+                    },
+                    buf -> buf.readBoolean()
+                            ? LinkFilterSlot.ofFluid(FluidStack.STREAM_CODEC.decode(buf))
+                            : LinkFilterSlot.ofItem(ItemStack.OPTIONAL_STREAM_CODEC.decode(buf)));
+
+    private static final StreamCodec<RegistryFriendlyByteBuf, List<LinkFilterSlot>> FILTER_CODEC =
+            FILTER_SLOT_CODEC.apply(ByteBufCodecs.list(FILTER_LIMIT));
 
     /** 锚点（维度 + 坐标）的网络编解码；手写以避开 {@code GlobalPos.STREAM_CODEC} 的泛型歧义。 */
     public static void writeAnchor(FriendlyByteBuf buf, GlobalPos anchor) {
@@ -227,8 +289,8 @@ public record StaffLinkRoute(
     /**
      * 网络编解码。
      *
-     * <p>过滤器的 {@link ItemStack} 只能走 {@code OPTIONAL_STREAM_CODEC}——它依赖
-     * {@link RegistryFriendlyByteBuf} 携带的物品注册表，所以整条编解码器也按该类型声明。
+     * <p>过滤器里的物品与流体都依赖 {@link RegistryFriendlyByteBuf} 携带的注册表
+     * （{@code OPTIONAL_STREAM_CODEC} / {@code STREAM_CODEC}），所以整条编解码器也按该类型声明。
      * 存档侧则走 {@code saveOptional}/{@code parseOptional} 与 {@code HolderLookup.Provider}。</p>
      */
     public static final StreamCodec<RegistryFriendlyByteBuf, StaffLinkRoute> STREAM_CODEC = StreamCodec.of(
@@ -259,7 +321,7 @@ public record StaffLinkRoute(
                 Direction side = buf.readBoolean() ? buf.readEnum(Direction.class) : null;
                 LinkTrigger trigger = buf.readEnum(LinkTrigger.class);
                 int weight = buf.readVarInt();
-                List<ItemStack> filter = FILTER_CODEC.decode(buf);
+                List<LinkFilterSlot> filter = FILTER_CODEC.decode(buf);
                 return new StaffLinkRoute(anchor, route, enabled, flow, medium, amount, interval,
                         side, trigger, weight, filter);
             });

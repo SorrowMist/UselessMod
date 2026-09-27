@@ -110,7 +110,7 @@ public final class StaffLinkEngine {
 
         long now = server.getTickCount();
         if (now % LIVE_REFRESH_INTERVAL == 0) {
-            // 刷新「本局被杖引用过的网络」；没被引用过的孤儿网络一律不跑。
+            // 刷新「归属者本局有成员在线的网络」；没有归属者认领的孤儿网络一律不跑。
             StaffLinkManager.refreshLiveNetworks(server);
         }
 
@@ -244,7 +244,9 @@ public final class StaffLinkEngine {
                     continue;
                 }
 
-                Distribution result = distribute(releaseLevel, release, targets, server);                requestedTotal += release.amount();
+                Distribution result = distribute(releaseLevel, release, targets, server);
+                // 「数量」是每个输出各搬多少，所以这一轮请求的总量是 数量 × 输出数。
+                requestedTotal += release.amount() * targets.size();
                 movedTotal += result.moved();
                 targetTotal += targets.size();
                 if (result.blocker() != StaffLinkTargets.TransferBlocker.NONE) {
@@ -263,23 +265,25 @@ public final class StaffLinkEngine {
     }
 
     /**
-     * 把一次搬运的总量分给同线路的多个输出。
+     * 把这次搬运分给同线路的多个输出。
      *
-     * <p>「数量」是<b>这一次搬运的总量</b>，不是「每个输出各搬多少」——按后者写，一个输入接
-     * 多个输出时总搬运量会变成 N 倍，而且先被遍历到的那个输出会把源抽干，后面的一个也拿不到
-     * （表现就是「全送到了一个里面」）。</p>
+     * <p><b>「数量」是每个输出各搬多少</b>，不是这次搬运的总量：每个输出最多搬 {@code amount}，
+     * 相互之间不瓜分。所以一个输入接 N 个输出时，这一轮的搬运上限是 {@code N × 数量}。</p>
      *
-     * <p>平分时余数留给靠前的（也就是权重高的）输出：总量 5、两个输出 → 3 + 2；
-     * 总量 2、五个输出 → 前两个各 1。某个输出装不下时，它少拿的部分会留给后面的。</p>
+     * <p>这样改是因为<b>接收端各自设了不同的过滤时，它们本来就不争抢同一批货</b>：
+     * 一台只收铁、一台只收金，按总量平分等于让它们互相「占额度」，各自只能拿到 1/N。</p>
+     *
+     * <p>代价要讲清楚：<b>源端的库存仍然是共享的</b>，前面的输出先取、取完为止，后面的只能拿到
+     * 剩下的。源不够分时表现就是「东西全进了靠前的那个」（也就是权重高的那个）。要避免它，
+     * 要么把数量调小，要么给接收端设过滤让它们各取所需。</p>
      */
     private static Distribution distribute(ServerLevel releaseLevel, StaffLinkRoute release,
                                            List<StaffLinkRoute> targets, MinecraftServer server) {
-        long remaining = release.amount();
+        long amount = release.amount();
         long moved = 0;
         StaffLinkTargets.TransferBlocker blocker = StaffLinkTargets.TransferBlocker.NONE;
 
-        for (int index = 0; index < targets.size() && remaining > 0; index++) {
-            StaffLinkRoute target = targets.get(index);
+        for (StaffLinkRoute target : targets) {
             ServerLevel targetLevel = levelOf(server, target.anchor());
             if (targetLevel == null) {
                 if (blocker == StaffLinkTargets.TransferBlocker.NONE) {
@@ -287,16 +291,8 @@ public final class StaffLinkEngine {
                 }
                 continue;
             }
-            long slotsLeft = targets.size() - index;
-            // 向上取整的整数除法：余数留给靠前的（权重高的）。用整数算避免 double 在大数值上丢精度。
-            long share = remaining / slotsLeft + (remaining % slotsLeft == 0 ? 0 : 1);
-            share = Math.min(remaining, share);
-            if (share <= 0) {
-                break;
-            }
-            long transferred = StaffLinkTargets.transfer(releaseLevel, release, targetLevel, target, share);
+            long transferred = StaffLinkTargets.transfer(releaseLevel, release, targetLevel, target, amount);
             moved += transferred;
-            remaining -= Math.min(transferred, share);
             if (transferred <= 0 && blocker == StaffLinkTargets.TransferBlocker.NONE) {
                 // 没搬动：探一下卡在哪，界面上直接显示原因。
                 blocker = StaffLinkTargets.diagnose(releaseLevel, release, targetLevel, target);

@@ -3,6 +3,9 @@ package com.sorrowmist.useless.content.stafflink;
 import net.minecraft.network.chat.Component;
 import net.neoforged.fml.ModList;
 
+import java.util.ArrayList;
+import java.util.List;
+
 /**
  * 一条线路搬运的资源类型。
  *
@@ -11,8 +14,9 @@ import net.neoforged.fml.ModList;
  * 因此「AE 网络 ↔ 箱子」可以正常配对。</p>
  *
  * <p>每种资源能否走 AE 取决于「谁把这种资源带进了 ME 网络」：物品与流体是 AE2 自带，
- * 化学品需要 Applied Mekanistics，魔源需要 Ars Énergistique。因此 {@code AE_CHEMICAL}
- * 的可用条件比 {@link #CHEMICAL} 更严（还要 AE2 与 appmek）。</p>
+ * 化学品需要 Applied Mekanistics，魔源需要 Ars Énergistique，<b>能量需要 AppliedFlux</b>
+ * （FE 以通量元件的形式存进网络）。因此 {@code AE_CHEMICAL} 的可用条件比 {@link #CHEMICAL}
+ * 更严（还要 AE2 与 appmek）。</p>
  */
 public enum LinkMedium {
     ITEM("gui.useless_mod.wireless_logistics.medium.item", ResourceFamily.ITEM),
@@ -23,13 +27,21 @@ public enum LinkMedium {
     CHEMICAL("gui.useless_mod.wireless_logistics.medium.chemical", ResourceFamily.CHEMICAL),
     AE_CHEMICAL("gui.useless_mod.wireless_logistics.medium.ae_chemical", ResourceFamily.CHEMICAL),
     SOURCE("gui.useless_mod.wireless_logistics.medium.source", ResourceFamily.SOURCE),
-    AE_SOURCE("gui.useless_mod.wireless_logistics.medium.ae_source", ResourceFamily.SOURCE);
+    AE_SOURCE("gui.useless_mod.wireless_logistics.medium.ae_source", ResourceFamily.SOURCE),
+    /**
+     * 接在 ME 网络上的 FE（AppliedFlux 通量元件）。
+     *
+     * <p><b>必须追加在末尾</b>：{@code StaffLinkRoute.STREAM_CODEC} 用 {@code writeEnum} 按
+     * ordinal 编码，往中间插值会让新旧版本之间把「能量」读成别的资源。</p>
+     */
+    AE_ENERGY("gui.useless_mod.wireless_logistics.medium.ae_energy", ResourceFamily.ENERGY);
 
     private static final String MEKANISM = "mekanism";
     private static final String ARS_NOUVEAU = "ars_nouveau";
     private static final String AE2 = "ae2";
     private static final String APPLIED_MEKANISTICS = "appmek";
     private static final String ARS_ENERGISTIQUE = "arseng";
+    private static final String APPLIED_FLUX = "appflux";
 
     private final String translationKey;
     private final ResourceFamily family;
@@ -55,7 +67,8 @@ public enum LinkMedium {
      * 物品，让玩家在源端（网络侧）列白名单既繁琐又容易漏；「要从网里拿什么」由接收端说了算更自然。</p>
      */
     public boolean isAe() {
-        return this == AE_ITEM || this == AE_FLUID || this == AE_CHEMICAL || this == AE_SOURCE;
+        return this == AE_ITEM || this == AE_FLUID || this == AE_CHEMICAL || this == AE_SOURCE
+                || this == AE_ENERGY;
     }
 
     /** 当前环境是否支持这种资源。可选集成缺失时界面跳过、服务端拒绝。 */
@@ -64,23 +77,38 @@ public enum LinkMedium {
             case CHEMICAL -> ModList.get().isLoaded(MEKANISM);
             case SOURCE -> ModList.get().isLoaded(ARS_NOUVEAU);
             case AE_ITEM, AE_FLUID -> ModList.get().isLoaded(AE2);
-            // 化学品/魔源要进 ME 网络，除了 AE2 还得有把它们带进网络的那个附属。
+            // 化学品/魔源/能量要进 ME 网络，除了 AE2 还得有把它们带进网络的那个附属。
             case AE_CHEMICAL -> ModList.get().isLoaded(AE2) && ModList.get().isLoaded(APPLIED_MEKANISTICS);
             case AE_SOURCE -> ModList.get().isLoaded(AE2) && ModList.get().isLoaded(ARS_ENERGISTIQUE);
+            case AE_ENERGY -> ModList.get().isLoaded(AE2) && ModList.get().isLoaded(APPLIED_FLUX);
             default -> true;
         };
     }
 
-    /** 循环到下一个当前环境支持的资源类型。 */
-    public LinkMedium nextSupported() {
-        LinkMedium[] values = values();
-        LinkMedium candidate = this;
-        for (int i = 0; i < values.length; i++) {
-            candidate = values[(candidate.ordinal() + 1) % values.length];
-            if (candidate.isSupported()) {
-                return candidate;
+    /**
+     * 下拉菜单里的排列次序：同一个资源族的普通形态与 AE 形态相邻。
+     *
+     * <p>刻意不直接用 {@code values()}：{@link #AE_ENERGY} 是为了保持网络编解码的 ordinal
+     * 稳定才追加在末尾的，直接枚举会把它排到「AE 魔源」后面，读起来莫名其妙。</p>
+     */
+    private static final LinkMedium[] MENU_ORDER = {
+            ITEM, AE_ITEM, FLUID, AE_FLUID, ENERGY, AE_ENERGY,
+            CHEMICAL, AE_CHEMICAL, SOURCE, AE_SOURCE
+    };
+
+    /**
+     * 当前环境支持的类型，按下拉菜单的次序。
+     *
+     * <p>界面拿它铺下拉列表：装了化学品 / 魔源 / 通量之后类型能到十种，靠「点一下换一个」
+     * 轮换太费手。</p>
+     */
+    public static List<LinkMedium> supported() {
+        List<LinkMedium> result = new ArrayList<>(MENU_ORDER.length);
+        for (LinkMedium medium : MENU_ORDER) {
+            if (medium.isSupported()) {
+                result.add(medium);
             }
         }
-        return ITEM;
+        return List.copyOf(result);
     }
 }

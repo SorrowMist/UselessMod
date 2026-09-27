@@ -38,4 +38,27 @@ public interface LongItemHandler extends LongResourceHandler {
      * @return 实际插入的数量（可能小于请求量）；{@code simulate} 为真时只试算不改动
      */
     long insert(ItemStack template, long amount, boolean simulate);
+
+    /**
+     * 找出「和给定物品同类型」的槽位；找不到返回 -1。
+     *
+     * <p>过滤器驱动的搬运靠它直接定位：有过滤器时「要搬什么」已经完全确定，直接问
+     * 「源端有没有这一种」即可，不必扫全表。</p>
+     *
+     * <p><b>对条目数很大的实现必须覆写。</b>默认实现是线性扫描，而 AE 端点的
+     * {@link #getSlots()} 是整个 ME 网络的资源种类数（动辄上千），靠扫描找某一种既慢，
+     * 又会因为调用方的扫描预算而永远找不到排在后面的那些。AE 端点按资源键定位。</p>
+     */
+    default int findSlot(ItemStack template) {
+        if (template == null || template.isEmpty()) {
+            return -1;
+        }
+        for (int slot = 0; slot < getSlots(); slot++) {
+            if (amountIn(slot) > 0L
+                    && ItemStack.isSameItemSameComponents(getStackInSlot(slot), template)) {
+                return slot;
+            }
+        }
+        return -1;
+    }
 }

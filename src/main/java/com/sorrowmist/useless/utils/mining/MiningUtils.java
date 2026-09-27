@@ -6,6 +6,7 @@ import com.sorrowmist.useless.compat.AE2Compat;
 import com.sorrowmist.useless.compat.DraconicEvolutionCompat;
 import com.sorrowmist.useless.core.component.UComponents;
 import com.sorrowmist.useless.core.config.ChainEquivalence;
+import com.sorrowmist.useless.core.config.ChainGroupManager;
 import com.sorrowmist.useless.core.config.ConfigManager;
 import com.sorrowmist.useless.utils.UComponentUtils;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
@@ -374,11 +375,12 @@ public class MiningUtils {
      * @param level       世界
      * @param stack       工具
      * @param forceMining 是否为强制挖掘模式
+     * @param player      触发连锁的玩家，用于取该玩家自己的等价组
      * @return 需要破坏的方块列表
      */
     static List<BlockPos> scanBlocksToMine(BlockPos originPos, BlockState originState, Level level, ItemStack stack,
-                                           boolean forceMining, boolean enhanced) {
-        return scanBlocks(originPos, originState, level, stack, forceMining, enhanced, true);
+                                           boolean forceMining, boolean enhanced, Player player) {
+        return scanBlocks(originPos, originState, level, stack, forceMining, enhanced, true, player);
     }
 
     /**
@@ -391,10 +393,12 @@ public class MiningUtils {
      * @param originState 原点方块状态
      * @param level       世界
      * @param enhanced    是否增强连锁（增强模式取消相邻限制，改为范围内扫描）
+     * @param player      触发连锁的玩家，用于取该玩家自己的等价组
      * @return 连锁范围（含原点，按距离从近到远排序）
      */
-    static List<BlockPos> scanBlocksForUse(BlockPos originPos, BlockState originState, Level level, boolean enhanced) {
-        return scanBlocks(originPos, originState, level, ItemStack.EMPTY, false, enhanced, false);
+    static List<BlockPos> scanBlocksForUse(BlockPos originPos, BlockState originState, Level level,
+                                           boolean enhanced, Player player) {
+        return scanBlocks(originPos, originState, level, ItemStack.EMPTY, false, enhanced, false, player);
     }
 
     /**
@@ -404,12 +408,13 @@ public class MiningUtils {
      *                        false = 右键语义（只看等价组与范围）
      */
     private static List<BlockPos> scanBlocks(BlockPos originPos, BlockState originState, Level level, ItemStack stack,
-                                             boolean forceMining, boolean enhanced, boolean requireMineable) {
+                                             boolean forceMining, boolean enhanced, boolean requireMineable,
+                                             Player player) {
         if (forceMining && isForceMiningBlacklisted(originState)) {
             return List.of();
         }
         if (enhanced) {
-            return scanAreaBlocks(originPos, originState, level, stack, forceMining, requireMineable);
+            return scanAreaBlocks(originPos, originState, level, stack, forceMining, requireMineable, player);
         }
         // 最大连锁数量
         int maxBlocks = ConfigManager.getChainMiningMaxBlocks();
@@ -418,8 +423,8 @@ public class MiningUtils {
         int rangeY = ConfigManager.getChainMiningRangeY();
         int rangeZ = ConfigManager.getChainMiningRangeZ();
 
-        // 同类方块判定：命中配置的等价组时按组匹配，否则退回严格同方块
-        ChainEquivalence equivalence = ConfigManager.getChainMiningEquivalence(originState.getBlock());
+        // 同类方块判定：玩家自己的等价组命中时按组匹配，否则退回严格同方块
+        ChainEquivalence equivalence = ChainGroupManager.equivalenceFor(player, originState.getBlock());
         List<BlockPos> blocksToMine = new ArrayList<>(maxBlocks);
 
         // 检查原点方块是否可以被挖掘（工具等级检查）
@@ -495,10 +500,12 @@ public class MiningUtils {
      * @param level       世界
      * @param stack       工具
      * @param forceMining 是否为强制挖掘模式
+     * @param player      触发连锁的玩家，用于取该玩家自己的等价组
      * @return 需要破坏的方块列表
      */
     private static List<BlockPos> scanAreaBlocks(BlockPos originPos, BlockState originState, Level level,
-                                                 ItemStack stack, boolean forceMining, boolean requireMineable) {
+                                                 ItemStack stack, boolean forceMining, boolean requireMineable,
+                                                 Player player) {
         // 最大连锁数量（包含原点方块）
         int maxBlocks = ConfigManager.getChainMiningMaxBlocks();
         // 获取连锁挖掘范围
@@ -506,8 +513,8 @@ public class MiningUtils {
         int rangeY = ConfigManager.getChainMiningRangeY();
         int rangeZ = ConfigManager.getChainMiningRangeZ();
 
-        // 同类方块判定：命中配置的等价组时按组匹配，否则退回严格同方块
-        ChainEquivalence equivalence = ConfigManager.getChainMiningEquivalence(originState.getBlock());
+        // 同类方块判定：玩家自己的等价组命中时按组匹配，否则退回严格同方块
+        ChainEquivalence equivalence = ChainGroupManager.equivalenceFor(player, originState.getBlock());
         List<BlockPos> blocksToMine = new ArrayList<>(maxBlocks);
 
         // 增强连锁：直接在范围内扫描所有相同方块，不需要相邻限制

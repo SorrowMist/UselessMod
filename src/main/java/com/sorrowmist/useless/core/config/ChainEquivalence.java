@@ -10,7 +10,8 @@ import java.util.List;
 
 /**
  * 连锁挖掘的"同类方块"判定。
- * 由 {@link ConfigManager#getChainMiningEquivalence(Block)} 在每次扫描前构造一次，扫描结束即丢弃。
+ * 由 {@link ChainGroupManager#equivalenceFor(net.minecraft.world.entity.player.Player, Block)}
+ * 在每次扫描前构造一次，扫描结束即丢弃。
  *
  * <p>原点方块命中的等价组决定判定范围：命中多条取并集，一条都不命中时退回严格同方块匹配。
  * 单次扫描内用 memo 缓存每种方块的判定结果——增强连锁一次可扫十几万格，

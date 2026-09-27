@@ -10,16 +10,21 @@ import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.world.item.ItemStack;
 import net.neoforged.neoforge.network.PacketDistributor;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
 import org.jetbrains.annotations.NotNull;
+
+import java.util.UUID;
 
 /**
  * 网络级别的操作：新建一张、解散当前这张、给当前这张改名。
  *
  * <p>三件事共用一条包：它们的作用对象都是「界面上当前那张网络」，参数形状也一样
  * （一个动作 + 一个可选名字），拆成三条包只会多两份样板。</p>
+ *
+ * <p>网络挂在<b>归属者</b>（玩家或队伍）名下，所以新建 / 解散只需要归属者 ID，
+ * 不再需要「在玩家身上找一把登记了这张网络的杖」。每个动作前都过一遍
+ * {@link StaffLinkManager#canAccess}，防止伪造包去动别人的网络。</p>
  */
 public record StaffLinkNetworkPacket(Action action, String name) implements CustomPacketPayload {
 
@@ -52,50 +57,49 @@ public record StaffLinkNetworkPacket(Action action, String name) implements Cust
             if (!(player.containerMenu instanceof StaffLinkMenu menu)) {
                 return;
             }
+            UUID networkId = menu.getNetworkId();
+            // 越权校验：只能动自己（或自己队伍）名下的网络。
+            if (!StaffLinkManager.canAccess(player.server, player, networkId)) {
+                return;
+            }
             switch (packet.action()) {
-                case RENAME -> rename(player, menu.getNetworkId(), packet.name());
-                case NEW -> create(player, menu.getNetworkId());
-                case DISSOLVE -> dissolve(player, menu.getNetworkId());
+                case RENAME -> rename(player, networkId, packet.name());
+                case NEW -> create(player);
+                case DISSOLVE -> dissolve(player, networkId);
             }
         });
     }
 
-    private static void rename(ServerPlayer player, java.util.UUID networkId, String name) {
+    private static void rename(ServerPlayer player, UUID networkId, String name) {
         StaffLinkNetwork network = StaffLinkManager.networkById(player.server, networkId);
         if (network == null) {
             return;
         }
         network.setName(name);
         StaffLinkSavedData.get(player.server).markDirty();
-        PacketDistributor.sendToPlayer(player, new StaffLinkSyncPacket(network));
+        PacketDistributor.sendToPlayer(player, StaffLinkSyncPacket.of(
+                player.server, StaffLinkManager.ownerIdOf(player), network));
     }
 
-    private static void create(ServerPlayer player, java.util.UUID networkId) {
-        ItemStack staff = StaffLinkManager.findStaffWithNetwork(player, networkId);
-        if (staff.isEmpty()) {
-            return;
-        }
-        StaffLinkNetwork created = StaffLinkManager.createNetwork(player.server, staff);
+    private static void create(ServerPlayer player) {
+        UUID ownerId = StaffLinkManager.ownerIdOf(player);
+        StaffLinkNetwork created = StaffLinkManager.createNetwork(player.server, ownerId);
         if (created == null) {
             return;
         }
-        player.containerMenu.broadcastChanges();
-        // 新网络成了杖上的当前网络，服务端菜单也要一起切过去。
+        // 新网络成了当前网络，服务端菜单也要一起切过去。
         if (player.containerMenu instanceof StaffLinkMenu menu) {
             menu.setNetworkId(created.id());
         }
-        PacketDistributor.sendToPlayer(player, new StaffLinkSyncPacket(created));
+        PacketDistributor.sendToPlayer(player,
+                StaffLinkSyncPacket.of(player.server, ownerId, created));
     }
 
-    private static void dissolve(ServerPlayer player, java.util.UUID networkId) {
-        ItemStack staff = StaffLinkManager.findStaffWithNetwork(player, networkId);
-        if (staff.isEmpty()) {
-            return;
-        }
-        StaffLinkManager.dissolveActive(player.server, staff);
-        player.containerMenu.broadcastChanges();
+    private static void dissolve(ServerPlayer player, UUID networkId) {
+        UUID ownerId = StaffLinkManager.ownerIdOf(player);
+        StaffLinkManager.dissolveActive(player.server, ownerId);
 
-        StaffLinkNetwork next = StaffLinkManager.activeNetwork(player.server, staff);
+        StaffLinkNetwork next = StaffLinkManager.activeNetwork(player.server, ownerId);
         if (next == null) {
             // 一张都不剩了：界面没有可编辑的对象，直接关掉。
             player.closeContainer();
@@ -105,7 +109,7 @@ public record StaffLinkNetworkPacket(Action action, String name) implements Cust
         if (player.containerMenu instanceof StaffLinkMenu menu) {
             menu.setNetworkId(next.id());
         }
-        PacketDistributor.sendToPlayer(player, new StaffLinkSyncPacket(next));
+        PacketDistributor.sendToPlayer(player, StaffLinkSyncPacket.of(player.server, ownerId, next));
     }
 
     @Override

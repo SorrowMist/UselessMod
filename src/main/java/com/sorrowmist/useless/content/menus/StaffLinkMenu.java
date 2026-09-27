@@ -1,6 +1,7 @@
 package com.sorrowmist.useless.content.menus;
 
 import com.sorrowmist.useless.content.stafflink.LinkFlow;
+import com.sorrowmist.useless.content.stafflink.LinkFilterSlot;
 import com.sorrowmist.useless.content.stafflink.LinkMedium;
 import com.sorrowmist.useless.content.stafflink.LinkTrigger;
 import com.sorrowmist.useless.content.stafflink.StaffLinkEngine;
@@ -12,11 +13,13 @@ import com.sorrowmist.useless.network.StaffLinkCyclePacket;
 import com.sorrowmist.useless.network.StaffLinkDetachPacket;
 import com.sorrowmist.useless.network.StaffLinkNetworkPacket;
 import com.sorrowmist.useless.network.StaffLinkRenamePacket;
+import com.sorrowmist.useless.network.StaffLinkReorderPacket;
 import com.sorrowmist.useless.world.stafflink.StaffLinkManager;
 import com.sorrowmist.useless.world.stafflink.StaffLinkNetwork;
 import net.minecraft.core.GlobalPos;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.server.MinecraftServer;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.AbstractContainerMenu;
@@ -51,7 +54,10 @@ public final class StaffLinkMenu extends AbstractContainerMenu {
 
     @Nullable
     private StaffLinkNetwork snapshot;
-    private List<ItemStack> filterMirror = emptyFilter();
+    /** 当前网络在归属者列表里的位置（由同步包带来，客户端没有那份列表）。 */
+    private int networkIndex;
+    private int networkCount = 1;
+    private List<LinkFilterSlot> filterMirror = emptyFilter();
 
     @Nullable
     private GlobalPos selectedAnchor;
@@ -95,10 +101,10 @@ public final class StaffLinkMenu extends AbstractContainerMenu {
         }
     }
 
-    private static List<ItemStack> emptyFilter() {
-        List<ItemStack> filter = new ArrayList<>(StaffLinkRoute.FILTER_LIMIT);
+    private static List<LinkFilterSlot> emptyFilter() {
+        List<LinkFilterSlot> filter = new ArrayList<>(StaffLinkRoute.FILTER_LIMIT);
         for (int i = 0; i < StaffLinkRoute.FILTER_LIMIT; i++) {
-            filter.add(ItemStack.EMPTY);
+            filter.add(LinkFilterSlot.EMPTY);
         }
         return filter;
     }
@@ -112,9 +118,9 @@ public final class StaffLinkMenu extends AbstractContainerMenu {
     /**
      * 服务端专用：把界面绑定的网络换成另一张。
      *
-     * <p>玩家在界面里切网络（{@code <}/{@code >}、新建、解散）改的是杖上的「当前网络」组件，
-     * 而后续所有编辑包都靠服务端菜单里的这个 ID 寻址。不同步它，切到 B 之后的编辑仍会打到 A 上——
-     * 表现就是「在 B 里点一下，界面跳回 A」。</p>
+     * <p>玩家在界面里切网络（{@code <}/{@code >}、新建、解散）改的是<b>归属者</b>（玩家或队伍）
+     * 名下的「当前网络」，而后续所有编辑包都靠服务端菜单里的这个 ID 寻址。不同步它，
+     * 切到 B 之后的编辑仍会打到 A 上——表现就是「在 B 里点一下，界面跳回 A」。</p>
      */
     public void setNetworkId(@Nullable UUID networkId) {
         if (networkId != null && !networkId.equals(this.networkId)) {
@@ -164,8 +170,15 @@ public final class StaffLinkMenu extends AbstractContainerMenu {
     }
 
     /** 过滤器显示用的镜像（长度固定为 {@link StaffLinkRoute#FILTER_LIMIT}）。 */
-    public List<ItemStack> getFilterMirror() {
+    public List<LinkFilterSlot> getFilterMirror() {
         return filterMirror;
+    }
+
+    /** 当前选中线路的资源类型；没有选中配置时返回 {@code null}。 */
+    @Nullable
+    public LinkMedium getSelectedMedium() {
+        StaffLinkRoute config = getSelectedConfig();
+        return config == null ? null : config.medium();
     }
 
     public boolean isFilterActive() {
@@ -174,14 +187,26 @@ public final class StaffLinkMenu extends AbstractContainerMenu {
     }
 
     /** 客户端收到服务端快照。 */
-    public void receiveSync(StaffLinkNetwork network) {
+    public void receiveSync(StaffLinkNetwork network, int index, int count) {
         // 服务端可能刚切到另一张网络（新建 / 解散），界面跟着走。
         this.networkId = network.id();
         this.snapshot = network;
+        this.networkIndex = Math.max(0, index);
+        this.networkCount = Math.max(1, count);
         if (selectedAnchor != null && !network.isBound(selectedAnchor)) {
             selectedAnchor = null;
         }
         refreshFilterMirror();
+    }
+
+    /** 当前网络在该归属者网络列表里的下标（0 起）。 */
+    public int getNetworkIndex() {
+        return networkIndex;
+    }
+
+    /** 该归属者名下共有几张网络。 */
+    public int getNetworkCount() {
+        return networkCount;
     }
 
     /** 界面切换选中锚点/线路。 */
@@ -262,14 +287,27 @@ public final class StaffLinkMenu extends AbstractContainerMenu {
     /**
      * 写入/覆盖配置，并提交给服务端。
      *
-     * <p>多选为空时只写 {@code route} 自己那一条；多选非空时，把 {@code route} 相对
-     * <b>单选锚点现有配置</b>变化过的字段，逐个刷到每个被选锚点的同号线路上。</p>
-     *
-     * <p>这里刻意做字段级 diff 而不是整条覆盖：多选批量改「流量」时，各台机器原本
-     * 各不相同的介质、方向、过滤器不该被一起抹平。没被玩家碰过的字段保持各机原样。</p>
+     * <p>多选为空时只写 {@code route} 自己那一条；多选非空时写到所有被选锚点的同号线路上。
+     * 具体写法见 {@link #applyRouteTo}。</p>
      */
     public void applyRoute(StaffLinkRoute route) {
-        List<GlobalPos> targets = getEditTargets();
+        applyRouteTo(getEditTargets(), route);
+    }
+
+    /**
+     * 把一条配置写到给定的一批锚点上。
+     *
+     * <p>目标已有该线路配置时走 {@link #patch}，没有时用 {@link #copyFor} 整条补上。</p>
+     *
+     * <p><b>语义是整条覆盖</b>：{@code patch(base, edited)} 逐字段取「与 edited 不同就采用 edited」，
+     * 而相等的字段取谁都一样，所以结果恒等于 {@code edited} 的字段——即目标的介质、方向、
+     * 过滤器等都会被刷成 {@code edited} 的值。批量改「流量」时，各机原本不同的介质/方向
+     * 会一起被抹平，这是有意的：批量编辑的期望就是「让这批机器一致」。</p>
+     *
+     * <p>本方法<b>不读取也不修改</b> {@link #multiSelection}，所以「应用到全部」可以传一份
+     * 临时目标列表进来，不会改变玩家当前的多选状态。</p>
+     */
+    public void applyRouteTo(List<GlobalPos> targets, StaffLinkRoute route) {
         for (GlobalPos target : targets) {
             StaffLinkRoute existing = snapshot == null ? null : snapshot.routeAt(target, route.route());
             StaffLinkRoute written = existing == null
@@ -294,10 +332,11 @@ public final class StaffLinkMenu extends AbstractContainerMenu {
     }
 
     /**
-     * 字段级合并：{@code edited} 相对 {@code base} 变过哪个字段，就采用哪个字段。
+     * 逐字段取「与 {@code edited} 不同的那个值」。
      *
-     * <p>「变过」靠直接比相等判断，因此值没动过的字段一律保留 {@code base}（也就是目标机器
-     * 自己的原值），只有玩家真正改动的字段才会被批量同步过去。</p>
+     * <p>注意：相等的字段取 {@code base} 还是 {@code edited} 结果一样，所以本方法实际上
+     * 等价于<b>整条覆盖</b>（只保留 {@code base} 的锚点与线路号）。保留这个写法是为了
+     * 与 {@link #copyFor} 共用同一个「逐字段构造」的形状，别指望它能实现字段级 diff。</p>
      */
     private static StaffLinkRoute patch(StaffLinkRoute base, StaffLinkRoute edited) {
         return new StaffLinkRoute(
@@ -355,6 +394,26 @@ public final class StaffLinkMenu extends AbstractContainerMenu {
         multiSelection.clear();
     }
 
+    /**
+     * 直接把批量选择集合替换成给定的一组锚点（「全选」/ Shift 范围选择用）。
+     *
+     * <p>去重；若当前单选锚点不在新集合里（或还没有单选），把单选让给集合的第一个，
+     * 保证配置区显示的永远是集合内的机器。</p>
+     */
+    public void setMultiSelection(List<GlobalPos> anchors) {
+        multiSelection.clear();
+        for (GlobalPos anchor : anchors) {
+            if (anchor != null && !multiSelection.contains(anchor)) {
+                multiSelection.add(anchor);
+            }
+        }
+        if (!multiSelection.isEmpty()
+                && (selectedAnchor == null || !multiSelection.contains(selectedAnchor))) {
+            selectedAnchor = multiSelection.get(0);
+            refreshFilterMirror();
+        }
+    }
+
     /** 解绑时把它从多选里一并摘掉，免得集合里留着一个不存在的锚点。 */
     private void forgetMultiSelection(GlobalPos anchor) {
         multiSelection.remove(anchor);
@@ -374,7 +433,7 @@ public final class StaffLinkMenu extends AbstractContainerMenu {
     }
 
     /** 改一个过滤器槽；没有选中配置或该线路不用过滤器时忽略。 */
-    public void setFilterSlot(int index, ItemStack stack) {
+    public void setFilterSlot(int index, LinkFilterSlot slot) {
         StaffLinkRoute config = getSelectedConfig();
         if (config == null || !config.filterApplies()) {
             return;
@@ -382,8 +441,8 @@ public final class StaffLinkMenu extends AbstractContainerMenu {
         if (index < 0 || index >= StaffLinkRoute.FILTER_LIMIT) {
             return;
         }
-        List<ItemStack> filter = new ArrayList<>(config.filter());
-        filter.set(index, stack.isEmpty() ? ItemStack.EMPTY : stack.copyWithCount(1));
+        List<LinkFilterSlot> filter = new ArrayList<>(config.filter());
+        filter.set(index, slot == null ? LinkFilterSlot.EMPTY : slot);
         applyRoute(config.withFilter(filter));
     }
 
@@ -417,16 +476,29 @@ public final class StaffLinkMenu extends AbstractContainerMenu {
         }
     }
 
+    /**
+     * 客户端：把某个锚点挪到列表里的指定位置。
+     *
+     * <p>本地不先改：服务端改完会回发整网快照，以它为准，避免两边次序短暂不一致。</p>
+     *
+     * @param targetIndex 目标位置（在完整锚点列表里的下标）
+     */
+    public void moveAnchorTo(GlobalPos anchor, int targetIndex) {
+        if (clientSide) {
+            PacketDistributor.sendToServer(new StaffLinkReorderPacket(anchor, targetIndex));
+        }
+    }
+
     private void refreshFilterMirror() {
         StaffLinkRoute config = getSelectedConfig();
         if (config == null) {
             filterMirror = emptyFilter();
             return;
         }
-        List<ItemStack> filter = new ArrayList<>(StaffLinkRoute.FILTER_LIMIT);
-        List<ItemStack> source = config.filter();
+        List<LinkFilterSlot> filter = new ArrayList<>(StaffLinkRoute.FILTER_LIMIT);
+        List<LinkFilterSlot> source = config.filter();
         for (int index = 0; index < StaffLinkRoute.FILTER_LIMIT; index++) {
-            filter.add(index < source.size() ? source.get(index) : ItemStack.EMPTY);
+            filter.add(index < source.size() ? source.get(index) : LinkFilterSlot.EMPTY);
         }
         filterMirror = List.copyOf(filter);
     }
@@ -448,6 +520,8 @@ public final class StaffLinkMenu extends AbstractContainerMenu {
             // 客户端不做权威判定，交给服务端关闭。
             return true;
         }
-        return StaffLinkManager.networkById(server, networkId) != null;
+        // 网络必须还在，而且必须挂在这名玩家（或他队伍）名下；否则界面该关掉。
+        return player instanceof ServerPlayer serverPlayer
+                && StaffLinkManager.canAccess(server, serverPlayer, networkId);
     }
 }

@@ -9,8 +9,11 @@ import java.util.List;
 
 /**
  * 连锁挖掘等价组集合。
- * 配置列表中的每一条目就是一个独立的等价组，复用 {@link BlockBlacklistMatcher}
- * 解析精确方块ID、{@code #方块标签} 和 {@code *} 通配符。
+ * 每个「组」是一个条目列表，组内条目复用 {@link BlockBlacklistMatcher} 解析
+ * 精确方块ID、{@code #方块标签} 和 {@code *} 通配符；命中同一个组的方块互相连锁。
+ *
+ * <p>组由玩家在「模式轮盘 → 连锁挖掘 → 齿轮」界面里编辑，存在玩家个人的
+ * {@code BeefToolLayout} 里，见 {@link ChainGroupManager}。</p>
  */
 final class ChainMatchGroups {
     private static final ChainMatchGroups EMPTY = new ChainMatchGroups(List.of());
@@ -21,19 +24,29 @@ final class ChainMatchGroups {
         return EMPTY;
     }
 
-    ChainMatchGroups(List<? extends String> entries) {
+    private ChainMatchGroups(List<BlockBlacklistMatcher> groups) {
+        this.groups = groups;
+    }
+
+    /**
+     * 由「组 → 条目」的嵌套列表构造。空组与解析后为空的组直接丢弃。
+     */
+    static ChainMatchGroups ofGroups(List<List<String>> groupEntries) {
+        if (groupEntries == null || groupEntries.isEmpty()) {
+            return EMPTY;
+        }
+
         List<BlockBlacklistMatcher> parsed = new ArrayList<>();
-        if (entries != null) {
-            for (String entry : entries) {
-                BlockBlacklistMatcher matcher = new BlockBlacklistMatcher(
-                        List.of(entry == null ? "" : entry),
-                        "chain mining equivalent group '" + entry + "'");
-                if (!matcher.isEmpty()) {
-                    parsed.add(matcher);
-                }
+        for (int i = 0; i < groupEntries.size(); i++) {
+            List<String> entries = groupEntries.get(i);
+            BlockBlacklistMatcher matcher = new BlockBlacklistMatcher(
+                    entries == null ? List.of() : entries,
+                    "chain mining equivalent group #" + (i + 1));
+            if (!matcher.isEmpty()) {
+                parsed.add(matcher);
             }
         }
-        this.groups = List.copyOf(parsed);
+        return parsed.isEmpty() ? EMPTY : new ChainMatchGroups(List.copyOf(parsed));
     }
 
     /**

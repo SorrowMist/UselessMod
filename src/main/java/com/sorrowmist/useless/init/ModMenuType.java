@@ -2,6 +2,7 @@ package com.sorrowmist.useless.init;
 
 import com.sorrowmist.useless.UselessMod;
 import com.sorrowmist.useless.content.menus.AdvancedAlloyFurnaceMenu;
+import com.sorrowmist.useless.content.menus.ChainGroupMenu;
 import com.sorrowmist.useless.content.menus.ContainerPatternConverter;
 import com.sorrowmist.useless.content.menus.MePatternAssemblyMenu;
 import com.sorrowmist.useless.content.menus.OmniversalMoldHubMenu;
@@ -49,6 +50,13 @@ public final class ModMenuType {
     public static final Supplier<MenuType<StaffLinkMenu>> STAFF_LINK_MENU =
             MENU_TYPES.register("staff_link_menu",
                     () -> IMenuTypeExtension.create(StaffLinkMenu::new));
+    /**
+     * 连锁等价组界面用的空菜单：只为让界面继承 {@code AbstractContainerScreen}
+     * （JEI / EMI 的原料侧栏只画在容器界面旁边），不承载任何数据、也不下发。
+     */
+    public static final Supplier<MenuType<ChainGroupMenu>> CHAIN_GROUP_MENU =
+            MENU_TYPES.register("chain_group_menu",
+                    () -> IMenuTypeExtension.create(ChainGroupMenu::new));
 
     private ModMenuType() {}
 

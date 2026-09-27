@@ -13,7 +13,6 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
-import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.state.BlockState;
 import net.neoforged.neoforge.network.PacketDistributor;
 
@@ -23,6 +22,7 @@ import java.util.Deque;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.UUID;
 
 /**
  * 潜行右键容器 → 绑定 / 解绑。
@@ -49,8 +49,8 @@ public final class StaffLinkBinding {
     private StaffLinkBinding() {
     }
 
-    public static void toggle(ServerLevel level, ServerPlayer player, ItemStack staff, BlockPos pos) {
-        StaffLinkNetwork network = StaffLinkManager.activeNetwork(level.getServer(), staff, true);
+    public static void toggle(ServerLevel level, ServerPlayer player, UUID ownerId, BlockPos pos) {
+        StaffLinkNetwork network = StaffLinkManager.activeNetwork(level.getServer(), ownerId, true);
         if (network == null) {
             return;
         }
@@ -71,7 +71,7 @@ public final class StaffLinkBinding {
             chime(level, pos, true);
         }
 
-        finish(level, player, network, data);
+        finish(level, player, ownerId, network, data);
     }
 
     /**
@@ -80,8 +80,8 @@ public final class StaffLinkBinding {
      * <p>方向由起点决定——起点已经绑过了就当「整批解绑」，否则整批绑定。这样玩家
      * 不用先想清楚「我现在是在加还是在减」，看一眼起点状态就知道结果。</p>
      */
-    public static void toggleBatch(ServerLevel level, ServerPlayer player, ItemStack staff, BlockPos origin) {
-        StaffLinkNetwork network = StaffLinkManager.activeNetwork(level.getServer(), staff, true);
+    public static void toggleBatch(ServerLevel level, ServerPlayer player, UUID ownerId, BlockPos origin) {
+        StaffLinkNetwork network = StaffLinkManager.activeNetwork(level.getServer(), ownerId, true);
         if (network == null) {
             return;
         }
@@ -124,7 +124,7 @@ public final class StaffLinkBinding {
                 .withStyle(ChatFormatting.GREEN), true);
         chime(level, origin, !unbinding);
 
-        finish(level, player, network, data);
+        finish(level, player, ownerId, network, data);
     }
 
     /**
@@ -196,12 +196,11 @@ public final class StaffLinkBinding {
     }
 
     /** 收尾：同步界面、唤醒引擎。所有绑定路径都必须走这里。 */
-    private static void finish(ServerLevel level, ServerPlayer player, StaffLinkNetwork network,
-                               StaffLinkSavedData data) {
-        // activeNetwork 可能刚给杖写上了新网络 ID，显式同步一次。
-        player.containerMenu.broadcastChanges();
+    private static void finish(ServerLevel level, ServerPlayer player, UUID ownerId,
+                               StaffLinkNetwork network, StaffLinkSavedData data) {
         // 界面开着时同步刷新，避免显示的还是旧锚点列表。
-        PacketDistributor.sendToPlayer(player, new StaffLinkSyncPacket(network));
+        PacketDistributor.sendToPlayer(player,
+                StaffLinkSyncPacket.of(level.getServer(), ownerId, network));
         // 立刻让引擎重跑一遍：新加进来的配对不该等上一次排定的退避。
         StaffLinkEngine.wake(network.id());
     }

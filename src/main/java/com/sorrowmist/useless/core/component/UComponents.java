@@ -443,11 +443,11 @@ public final class UComponents {
             );
 
     /**
-     * 造化杖持有的物流网络列表（StaffLink）。
+     * <b>旧格式</b>：造化杖曾经把物流网络列表挂在自己身上。
      *
-     * <p>一把杖可以同时挂多张互相独立的网络，靠 {@link #STAFF_LINK_ACTIVE} 指定当前生效的那张。
-     * 物品上只存这些 16 字节的 UUID；网络本体（锚点与线路配置）存在服务端的
-     * {@code StaffLinkSavedData} 里。这样杖被放进箱子、区块卸载都不影响物流运行。</p>
+     * <p>网络归属已经改成跟着<b>玩家/队伍</b>走（存在服务端的 {@code StaffLinkSavedData} 归属
+     * 登记里），所以这两个组件现在只用于<b>迁移</b>：玩家登录（或每 20 tick 的活跃刷新）时把
+     * 杖上残留的列表迁到归属者名下，然后就地清空。新代码不要再读写它们。</p>
      */
     public static final DeferredHolder<DataComponentType<?>, DataComponentType<List<UUID>>> STAFF_LINK_NETWORKS =
             register("staff_link_networks", builder ->
@@ -455,7 +455,7 @@ public final class UComponents {
                            .networkSynchronized(UUIDUtil.STREAM_CODEC.apply(ByteBufCodecs.list()))
             );
 
-    /** {@link #STAFF_LINK_NETWORKS} 里当前生效的下标；超出范围时按 0 处理。 */
+    /** <b>旧格式</b>：{@link #STAFF_LINK_NETWORKS} 里当前生效的下标。只用于迁移。 */
     public static final DeferredHolder<DataComponentType<?>, DataComponentType<Integer>> STAFF_LINK_ACTIVE =
             register("staff_link_active", builder ->
                     builder.persistent(Codec.INT)

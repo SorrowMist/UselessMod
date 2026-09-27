@@ -159,7 +159,7 @@ public class MiningDispatcher {
                 boolean enhancedChainMining = UComponentUtils.isEnhancedChainMiningEnabled(hand);
 
                 List<BlockPos> blocks = MiningUtils.scanBlocksToMine(
-                        currentPos, state, level, hand, false, enhancedChainMining);
+                        currentPos, state, level, hand, false, enhancedChainMining, player);
 
                 data.setCachedPos(currentPos);
                 data.setCachedBlocks(blocks);

@@ -177,6 +177,30 @@ public final class AeLogisticsCompat implements AeLogisticsBridge {
             return slot < 0 || slot >= entries.size() ? 0L : entries.get(slot).amount;
         }
 
+        /**
+         * 按资源键定位，不经过 {@link ItemStack}。
+         *
+         * <p>扫描上千条时这一步不能有额外分配——默认实现每条都要 {@code toStack(1)} 造一个栈。</p>
+         */
+        @Override
+        public int findSlot(ItemStack template) {
+            if (template == null || template.isEmpty()) {
+                return -1;
+            }
+            AEItemKey wanted = AEItemKey.of(template);
+            if (wanted == null) {
+                return -1;
+            }
+            List<Entry> entries = snapshot();
+            for (int slot = 0; slot < entries.size(); slot++) {
+                Entry entry = entries.get(slot);
+                if (entry.amount > 0L && entry.key.equals(wanted)) {
+                    return slot;
+                }
+            }
+            return -1;
+        }
+
         @Override
         public long extract(int slot, long amount, boolean simulate) {
             List<Entry> entries = snapshot();
@@ -279,6 +303,26 @@ public final class AeLogisticsCompat implements AeLogisticsBridge {
         public long amountIn(int tank) {
             List<Entry> entries = snapshot();
             return tank < 0 || tank >= entries.size() ? 0L : entries.get(tank).amount;
+        }
+
+        /** 按资源键定位，不经过 {@link FluidStack}；理由同物品端点的 {@code findSlot}。 */
+        @Override
+        public int findTank(FluidStack type) {
+            if (type == null || type.isEmpty()) {
+                return -1;
+            }
+            AEFluidKey wanted = AEFluidKey.of(type);
+            if (wanted == null) {
+                return -1;
+            }
+            List<Entry> entries = snapshot();
+            for (int tank = 0; tank < entries.size(); tank++) {
+                Entry entry = entries.get(tank);
+                if (entry.amount > 0L && entry.key.equals(wanted)) {
+                    return tank;
+                }
+            }
+            return -1;
         }
 
         @Override

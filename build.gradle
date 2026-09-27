@@ -297,7 +297,7 @@ dependencies {
     compileOnly "curse.maven:industrial-foregoing-extra-upgrades-1161049:8428353"
     
     // 新生魔艺
-    compileOnly "curse.maven:ars-nouveau-401955:8152094"
+    implementation "curse.maven:ars-nouveau-401955:8152094"
     implementation "curse.maven:ars-energistique-905641:6203425"
 
     compileOnly "curse.maven:just-dire-things-1002348:7463040"

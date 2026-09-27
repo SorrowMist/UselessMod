@@ -1,10 +1,13 @@
 package com.sorrowmist.useless.data;
 
+import com.sorrowmist.useless.core.config.ChainGroupManager;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.Tag;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
+
+import java.util.List;
 
 /** Loads and stores the beef tool layout in a player's persistent save data. */
 public final class BeefToolLayoutManager {
@@ -48,6 +51,33 @@ public final class BeefToolLayoutManager {
     public static void validateForSave(BeefToolLayout layout) throws BeefToolLayout.LayoutException {
         layout.validate();
         validateKnownModules(layout);
+        ChainGroupManager.validateEntries(layout.chainGroups());
+    }
+
+    /**
+     * 读取玩家已有的布局；不存在或解析失败返回 {@code null}（不创建、不写回）。
+     */
+    public static BeefToolLayout load(ServerPlayer player) {
+        CompoundTag root = get(player);
+        if (root == null) {
+            return null;
+        }
+        try {
+            return BeefToolLayout.fromNbt(root);
+        } catch (BeefToolLayout.LayoutException exception) {
+            return null;
+        }
+    }
+
+    /**
+     * 只读地取出玩家的连锁等价组：不 normalize、不写回。
+     *
+     * <p>供连锁判定的缓存未命中路径使用，避免在读路径上产生写副作用。
+     * 存档缺失或解析失败一律返回空列表（等价于「没有任何等价组」）。</p>
+     */
+    public static List<List<String>> chainGroups(ServerPlayer player) {
+        BeefToolLayout layout = load(player);
+        return layout == null ? List.of() : layout.chainGroups();
     }
 
     public static void save(ServerPlayer player, BeefToolLayout layout) {

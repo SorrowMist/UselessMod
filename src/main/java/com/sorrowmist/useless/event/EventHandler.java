@@ -18,8 +18,12 @@ import com.sorrowmist.useless.content.blockentities.multiblock.MultiblockAlloyFu
 import com.sorrowmist.useless.core.common.FlyEffectedHolder;
 import com.sorrowmist.useless.core.component.UComponents;
 import com.sorrowmist.useless.core.config.ConfigManager;
+import com.sorrowmist.useless.core.config.ChainGroupManager;
+import com.sorrowmist.useless.data.BeefToolLayout;
+import com.sorrowmist.useless.data.BeefToolLayoutManager;
 import com.sorrowmist.useless.network.BeefInvulnerabilitySyncPacket;
 import com.sorrowmist.useless.network.BeefInvulnerabilityStatePacket;
+import com.sorrowmist.useless.network.BeefToolLayoutSyncPacket;
 import com.sorrowmist.useless.network.StaffLinkBindPacket;
 import com.sorrowmist.useless.network.StaffLinkStatusPacket;
 import com.sorrowmist.useless.utils.UselessItemUtils;
@@ -587,6 +591,12 @@ public class EventHandler {
             syncAdvancedStealthPlayersTo(player);
             GrassWandDropHandler.onPlayerLoggedIn(player);
             resetAutoClickState(player);
+            // 连锁等价组是玩家个人设置，客户端要靠它做右键连锁的本地预测，
+            // 因此登录时就把整份布局下发一次（没有存档的玩家不下发，等价于无等价组）。
+            BeefToolLayout layout = BeefToolLayoutManager.load(player);
+            if (layout != null) {
+                PacketDistributor.sendToPlayer(player, new BeefToolLayoutSyncPacket(layout.toJson()));
+            }
         }
     }
 
@@ -853,6 +863,8 @@ public class EventHandler {
         AeLinkChannelBypass.clear();
         // 无线物流的调度表按 tick 计数，同样不能跨局沿用。
         StaffLinkEngine.clearRuntimeState();
+        // 连锁等价组的解析缓存按玩家 UUID 索引，别留到下一局。
+        ChainGroupManager.clearAll();
     }
 
     /**

@@ -311,9 +311,17 @@ public final class ChainGroupScreen extends AbstractContainerScreen<ChainGroupMe
 
     @Override
     public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+        // 回车提交输入框内容，提交后不关闭界面。
         if ((keyCode == GLFW.GLFW_KEY_ENTER || keyCode == GLFW.GLFW_KEY_KP_ENTER)
                 && entryField != null && entryField.isFocused()) {
             commitField();
+            return true;
+        }
+        // 输入框聚焦期间不把按键转交父类：AbstractContainerScreen 在子控件未消费按键时
+        // 会比对容器快捷键（默认 E 打开物品栏），命中即调用 onClose 关闭本界面，
+        // 导致该字母无法输入。Esc 仍然放行，保持「Esc 关闭界面」的既有行为。
+        if (keyCode != GLFW.GLFW_KEY_ESCAPE && entryField != null
+                && (entryField.keyPressed(keyCode, scanCode, modifiers) || entryField.canConsumeInput())) {
             return true;
         }
         return super.keyPressed(keyCode, scanCode, modifiers);
@@ -463,8 +471,12 @@ public final class ChainGroupScreen extends AbstractContainerScreen<ChainGroupMe
     private void renderGroupList(GuiGraphics graphics) {
         List<List<String>> groups = layout.chainGroups();
         if (groups.isEmpty()) {
-            graphics.drawString(font, Component.translatable("gui.useless_mod.chain_group.empty"),
-                    leftPos + CONTENT_LEFT + 2, topPos + LIST_TOP,
+            // 与正常条目行同基线（LIST_TOP + 4），否则会比列表内衬顶边高出 4px 而压在那条边框线上；
+            // 同时按列宽截断，避免提示文字越过列边界画进条目列。
+            int budget = GROUP_COLUMN_RIGHT - (CONTENT_LEFT + 2) - 2;
+            graphics.drawString(font,
+                    font.plainSubstrByWidth(Component.translatable("gui.useless_mod.chain_group.empty").getString(), budget),
+                    leftPos + CONTENT_LEFT + 2, topPos + LIST_TOP + 4,
                     MachineScreenStyle.MUTED_TEXT_COLOR, false);
             return;
         }
@@ -505,8 +517,13 @@ public final class ChainGroupScreen extends AbstractContainerScreen<ChainGroupMe
     private void renderEntryList(GuiGraphics graphics) {
         List<String> entries = selectedEntries();
         if (entries.isEmpty()) {
-            graphics.drawString(font, Component.translatable("gui.useless_mod.chain_group.entry_empty"),
-                    leftPos + ENTRY_COLUMN_LEFT + 2, topPos + LIST_TOP,
+            // 与正常条目行同基线（LIST_TOP + 4），否则会比列表内衬顶边高出 4px 而压在那条边框线上；
+            // 同时按列宽截断，避免提示文字越过列边界。
+            int budget = CONTENT_RIGHT - (ENTRY_COLUMN_LEFT + 2) - 2;
+            graphics.drawString(font,
+                    font.plainSubstrByWidth(
+                            Component.translatable("gui.useless_mod.chain_group.entry_empty").getString(), budget),
+                    leftPos + ENTRY_COLUMN_LEFT + 2, topPos + LIST_TOP + 4,
                     MachineScreenStyle.MUTED_TEXT_COLOR, false);
             return;
         }

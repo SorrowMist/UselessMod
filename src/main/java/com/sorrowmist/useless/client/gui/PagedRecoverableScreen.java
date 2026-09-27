@@ -9,6 +9,7 @@ import net.minecraft.util.Mth;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.inventory.Slot;
 import org.jetbrains.annotations.Nullable;
+import org.lwjgl.glfw.GLFW;
 
 /**
  * 带分页、只读恢复页与搜索框的容器界面基类。
@@ -201,6 +202,18 @@ public class PagedRecoverableScreen<T extends PagedRecoverableMenu> extends Abst
     /** 当前生效的规范化查询串。 */
     protected final String normalizedQuery() {
         return PatternSearchMatcher.normalize(searchQuery);
+    }
+
+    @Override
+    public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+        // 搜索框聚焦期间不把按键转交父类：AbstractContainerScreen 在子控件未消费按键时
+        // 会比对容器快捷键（默认 E 打开物品栏），命中即调用 onClose 关闭本界面，
+        // 导致该字母无法输入。Esc 仍然放行，保持「Esc 关闭界面」的既有行为。
+        if (keyCode != GLFW.GLFW_KEY_ESCAPE && searchField != null
+                && (searchField.keyPressed(keyCode, scanCode, modifiers) || searchField.canConsumeInput())) {
+            return true;
+        }
+        return super.keyPressed(keyCode, scanCode, modifiers);
     }
 
     @Override

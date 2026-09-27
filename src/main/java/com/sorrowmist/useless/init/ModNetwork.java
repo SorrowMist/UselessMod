@@ -29,6 +29,7 @@ import com.sorrowmist.useless.network.OreGeneratorSettingsPacket;
 import com.sorrowmist.useless.network.RitualSatchelPlacePacket;
 import com.sorrowmist.useless.network.RedstoneControlPacket;
 import com.sorrowmist.useless.network.SelectOmniversalPatternRecipePacket;
+import com.sorrowmist.useless.network.ShapeSwitchPacket;
 import com.sorrowmist.useless.network.TabKeyPressedPacket;
 import com.sorrowmist.useless.network.TeleportKeyPacket;
 import com.sorrowmist.useless.network.TankClearPacket;
@@ -54,7 +55,7 @@ import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
 
 public class ModNetwork {
     public static void registerPayloadHandlers(final RegisterPayloadHandlersEvent event) {
-        var registrar = event.registrar(UselessMod.MODID).versioned("13");
+        var registrar = event.registrar(UselessMod.MODID).versioned("14");
         registrar.playToServer(BeefToolLayoutRequestPacket.TYPE,
                                BeefToolLayoutRequestPacket.STREAM_CODEC,
                                BeefToolLayoutRequestPacket::handle);
@@ -98,6 +99,9 @@ public class ModNetwork {
         );
         registrar.playToServer(ModeTogglePacket.TYPE, ModeTogglePacket.STREAM_CODEC,
                                ModeTogglePacket::handle
+        );
+        registrar.playToServer(ShapeSwitchPacket.TYPE, ShapeSwitchPacket.STREAM_CODEC,
+                               ShapeSwitchPacket::handle
         );
         registrar.playToServer(ForceBreakKeyPacket.TYPE, ForceBreakKeyPacket.STREAM_CODEC,
                                ForceBreakKeyPacket::handle

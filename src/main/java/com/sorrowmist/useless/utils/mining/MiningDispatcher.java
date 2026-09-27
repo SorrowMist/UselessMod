@@ -1,13 +1,16 @@
 package com.sorrowmist.useless.utils.mining;
 
+import com.sorrowmist.useless.core.config.ConfigManager;
 import com.sorrowmist.useless.data.PlayerMiningData;
 import com.sorrowmist.useless.network.MiningDataSyncPacket;
 import com.sorrowmist.useless.utils.UComponentUtils;
+import com.sorrowmist.useless.utils.mining.shape.ChainMiningShapes;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.network.chat.Component;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.state.BlockState;
 import net.neoforged.bus.api.SubscribeEvent;
@@ -63,6 +66,51 @@ public class MiningDispatcher {
     }
 
     /**
+     * 把玩家当前的挖矿数据同步到其客户端。
+     *
+     * <p>形状与 Tab 状态都参与客户端预测，任何一处变化都必须下发，否则两端判定不一致
+     * 会出现整片高亮闪烁或实际破坏范围与预览不符。
+     *
+     * @param player 玩家
+     */
+    public static void syncToClient(Player player) {
+        if (player instanceof ServerPlayer serverPlayer) {
+            PlayerMiningData data = getOrCreatePlayerData(serverPlayer);
+            // 数量上限在此刷新而非构造时固化：配置可在运行时被 OP 修改，随每次同步取当前值
+            data.setMaxBlocks(ConfigManager.getChainMiningMaxBlocks());
+            PacketDistributor.sendToPlayer(serverPlayer, new MiningDataSyncPacket(data));
+        }
+    }
+
+    /**
+     * 按滚动方向循环切换连锁形状。
+     *
+     * <p>形状属于玩家状态而非物品状态：同一根造化杖在不同玩家手里、甚至同一玩家换手后，
+     * 都应当保持各自的选择，因此写入 {@link PlayerMiningData} 而不是物品组件。
+     * 切换后立即清空方块缓存并同步，避免沿用旧形状的扫描结果。
+     *
+     * @param player 玩家
+     * @param delta  滚动步数，正数为向后一个形状
+     */
+    public static void cycleShape(Player player, int delta) {
+        if (delta == 0) {
+            return;
+        }
+        PlayerMiningData data = getOrCreatePlayerData(player);
+        ChainMiningShapes shape = data.getShape().cycle(delta);
+        data.setShape(shape);
+        data.clearCache();
+        syncToClient(player);
+
+        // 切换后回一条 actionbar：形状名与方向说明缺一不可，隧道类形状的实际走向取决于
+        // 点击面与玩家朝向，仅凭名称无法判断会向哪个方向挖掘。
+        player.displayClientMessage(Component.translatable(
+                "gui.useless_mod.shape_switched",
+                Component.translatable(shape.getTranslationKey()),
+                Component.translatable(shape.getDescriptionKey())), true);
+    }
+
+    /**
      * 设置玩家的Tab键状态
      *
      * @param player  玩家
@@ -72,11 +120,7 @@ public class MiningDispatcher {
         PlayerMiningData playerData = getOrCreatePlayerData(player);
         playerData.setTabPressed(pressed);
 
-        // 同步到客户端
-        if (player instanceof ServerPlayer serverPlayer) {
-            MiningDataSyncPacket packet = new MiningDataSyncPacket(playerData);
-            PacketDistributor.sendToPlayer(serverPlayer, packet);
-        }
+        syncToClient(player);
     }
 
     /**
@@ -159,7 +203,8 @@ public class MiningDispatcher {
                 boolean enhancedChainMining = UComponentUtils.isEnhancedChainMiningEnabled(hand);
 
                 List<BlockPos> blocks = MiningUtils.scanBlocksToMine(
-                        currentPos, state, level, hand, false, enhancedChainMining, player);
+                        currentPos, state, level, hand, false, enhancedChainMining,
+                        data.getShape(), MiningUtils.getTargetFace(player), player);
 
                 data.setCachedPos(currentPos);
                 data.setCachedBlocks(blocks);

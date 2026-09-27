@@ -5,6 +5,7 @@ import com.sorrowmist.useless.content.items.BeefRipen;
 import com.sorrowmist.useless.content.items.EndlessBeafItem;
 import com.sorrowmist.useless.data.PlayerMiningData;
 import com.sorrowmist.useless.utils.UComponentUtils;
+import com.sorrowmist.useless.utils.mining.shape.ChainMiningShapes;
 import net.minecraft.advancements.CriteriaTriggers;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
@@ -77,9 +78,10 @@ public final class RightClickChainer {
         BlockPos origin = ctx.getClickedPos();
         BlockState originState = level.getBlockState(origin);
 
+        Player player = ctx.getPlayer();
         List<BlockPos> targets = MiningUtils.scanBlocksForUse(
                 origin, originState, level, UComponentUtils.isEnhancedChainMiningEnabled(ctx.getItemInHand()),
-                ctx.getPlayer());
+                chainShape(player), ctx.getClickedFace(), player);
 
         boolean soundPlayed = false;
         int applied = 0;
@@ -123,7 +125,8 @@ public final class RightClickChainer {
     public static int harvestCrops(ServerLevel level, BlockPos origin, Player player, ItemStack tool) {
         BlockState originState = level.getBlockState(origin);
         List<BlockPos> targets = MiningUtils.scanBlocksForUse(
-                origin, originState, level, UComponentUtils.isEnhancedChainMiningEnabled(tool), player);
+                origin, originState, level, UComponentUtils.isEnhancedChainMiningEnabled(tool),
+                chainShape(player), player.getDirection(), player);
 
         // 需要接管掉落（范围磁力或 AE 存储优先任一开启）时先整片收集、合并同类项，
         // 最后只调一次 handleDrops，避免逐株向 AE 发高频请求。
@@ -161,7 +164,8 @@ public final class RightClickChainer {
     public static int ripenBlocks(ServerLevel level, BlockPos origin, Player player, ItemStack tool) {
         BlockState originState = level.getBlockState(origin);
         List<BlockPos> targets = MiningUtils.scanBlocksForUse(
-                origin, originState, level, UComponentUtils.isEnhancedChainMiningEnabled(tool), player);
+                origin, originState, level, UComponentUtils.isEnhancedChainMiningEnabled(tool),
+                chainShape(player), player.getDirection(), player);
 
         int ripened = 0;
         for (BlockPos targetPos : targets) {
@@ -170,6 +174,23 @@ public final class RightClickChainer {
             }
         }
         return ripened;
+    }
+
+    /**
+     * 取玩家当前选中的连锁形状，供右键连锁与挖掘共用同一套布局。
+     *
+     * <p>形状保存在玩家挖矿数据中；数据缺失（例如右键路径尚未经过 Tab 同步）时回退到默认形状，
+     * 保证扫描入口不会因空引用而退化为单块处理。
+     *
+     * @param player 玩家，允许为 null
+     * @return 当前形状，不可用时为默认形状
+     */
+    private static ChainMiningShapes chainShape(Player player) {
+        if (player == null) {
+            return ChainMiningShapes.SHAPELESS;
+        }
+        PlayerMiningData data = MiningDispatcher.getPlayerData(player);
+        return data != null ? data.getShape() : ChainMiningShapes.SHAPELESS;
     }
 
     /** 以原上下文为准，为连锁中的另一个方块构造右键上下文（沿用同一朝向与手）。 */

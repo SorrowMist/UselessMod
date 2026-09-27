@@ -10,7 +10,10 @@ import com.sorrowmist.useless.core.config.ChainGroupManager;
 import com.sorrowmist.useless.core.config.ConfigManager;
 import com.sorrowmist.useless.utils.UComponentUtils;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
+import com.sorrowmist.useless.utils.mining.shape.ChainMiningShapeContext;
+import com.sorrowmist.useless.utils.mining.shape.ChainMiningShapes;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.sounds.SoundSource;
@@ -111,7 +114,7 @@ public class MiningUtils {
         return drops.isEmpty() || drops.stream().allMatch(stack -> stack.isEmpty() || stack.is(Items.AIR));
     }
 
-    static boolean canMineBlock(BlockState state, ItemStack tool, boolean forceMining) {
+    public static boolean canMineBlock(BlockState state, ItemStack tool, boolean forceMining) {
         return forceMining || !state.requiresCorrectToolForDrops() || tool.isCorrectToolForDrops(state);
     }
 
@@ -375,12 +378,15 @@ public class MiningUtils {
      * @param level       世界
      * @param stack       工具
      * @param forceMining 是否为强制挖掘模式
+     * @param shape       连锁形状
+     * @param face        玩家点击的面
      * @param player      触发连锁的玩家，用于取该玩家自己的等价组
      * @return 需要破坏的方块列表
      */
     static List<BlockPos> scanBlocksToMine(BlockPos originPos, BlockState originState, Level level, ItemStack stack,
-                                           boolean forceMining, boolean enhanced, Player player) {
-        return scanBlocks(originPos, originState, level, stack, forceMining, enhanced, true, player);
+                                           boolean forceMining, boolean enhanced, ChainMiningShapes shape,
+                                           Direction face, Player player) {
+        return scanBlocks(originPos, originState, level, stack, forceMining, enhanced, true, shape, face, player);
     }
 
     /**
@@ -393,12 +399,14 @@ public class MiningUtils {
      * @param originState 原点方块状态
      * @param level       世界
      * @param enhanced    是否增强连锁（增强模式取消相邻限制，改为范围内扫描）
-     * @param player      触发连锁的玩家，用于取该玩家自己的等价组
-     * @return 连锁范围（含原点，按距离从近到远排序）
+     * @param shape       连锁形状
+     * @param face        玩家点击的面
+     * @param player      触发连锁的玩家
+     * @return 连锁范围（含原点，按挖掘顺序排列）
      */
-    static List<BlockPos> scanBlocksForUse(BlockPos originPos, BlockState originState, Level level,
-                                           boolean enhanced, Player player) {
-        return scanBlocks(originPos, originState, level, ItemStack.EMPTY, false, enhanced, false, player);
+    static List<BlockPos> scanBlocksForUse(BlockPos originPos, BlockState originState, Level level, boolean enhanced,
+                                           ChainMiningShapes shape, Direction face, Player player) {
+        return scanBlocks(originPos, originState, level, ItemStack.EMPTY, false, enhanced, false, shape, face, player);
     }
 
     /**
@@ -409,9 +417,12 @@ public class MiningUtils {
      */
     private static List<BlockPos> scanBlocks(BlockPos originPos, BlockState originState, Level level, ItemStack stack,
                                              boolean forceMining, boolean enhanced, boolean requireMineable,
-                                             Player player) {
+ChainMiningShapes shape, Direction face, Player player) {
         if (forceMining && isForceMiningBlacklisted(originState)) {
             return List.of();
+        }
+        if (shape != null && !shape.usesBuiltinScan()) {
+            return scanShapeBlocks(originPos, originState, level, stack, forceMining, requireMineable, shape, face, player);
         }
         if (enhanced) {
             return scanAreaBlocks(originPos, originState, level, stack, forceMining, requireMineable, player);
@@ -486,9 +497,63 @@ public class MiningUtils {
         return blocksToMine;
     }
 
-    private static boolean isForceMiningBlacklisted(BlockState state) {
+    public static boolean isForceMiningBlacklisted(BlockState state) {
         return ConfigManager.isBeefToolForceMiningBlockBlacklisted(
                 BuiltInRegistries.BLOCK.getKey(state.getBlock()));
+    }
+
+    /**
+     * 按指定形状查找需要破坏的方块。
+     *
+     * <p>形状负责布局，某个坐标是否可用仍由 {@link ChainMiningShapeContext#check} 依据等价组、
+     * 范围、工具可采集与强制挖掘黑名单判定，因此形状实现无需重复这些规则。
+     *
+     * <p>返回序列保持形状给出的挖掘顺序并截断到数量上限；布局重叠导致的重复坐标会被去重，
+     * 避免同一格被破坏两次。原点方块不可采集时返回空列表，与相邻扩散扫描的既有语义一致。
+     *
+     * @param originPos       原点位置
+     * @param originState     原点方块状态
+     * @param level           世界
+     * @param stack           工具
+     * @param forceMining     是否为强制挖掘模式
+     * @param requireMineable 是否需要「工具可采集」门槛
+     * @param shape           连锁形状
+     * @param face            玩家点击的面
+     * @param player          触发连锁的玩家
+     * @return 需要破坏的方块列表
+     */
+    private static List<BlockPos> scanShapeBlocks(BlockPos originPos, BlockState originState, Level level,
+                                                  ItemStack stack, boolean forceMining, boolean requireMineable,
+                                                  ChainMiningShapes shape, Direction face, Player player) {
+        if (requireMineable && !canMineBlock(originState, stack, forceMining)) {
+            return List.of();
+        }
+
+        int maxBlocks = ConfigManager.getChainMiningMaxBlocks();
+        ChainEquivalence equivalence = ConfigManager.getChainMiningEquivalence(originState.getBlock());
+        ChainMiningShapeContext context = new ChainMiningShapeContext(
+                level, originPos, originState, face, player, stack, equivalence,
+                forceMining, requireMineable, maxBlocks,
+                ConfigManager.getChainMiningRangeX(), ConfigManager.getChainMiningRangeY(),
+                ConfigManager.getChainMiningRangeZ());
+
+        List<BlockPos> shapeBlocks = shape.getBlocks(context);
+        List<BlockPos> blocksToMine = new ArrayList<>(Math.min(shapeBlocks.size(), maxBlocks));
+        LongOpenHashSet seen = new LongOpenHashSet(Math.max(16, shapeBlocks.size() * 2));
+        for (BlockPos pos : shapeBlocks) {
+            if (blocksToMine.size() >= maxBlocks) {
+                break;
+            }
+            if (!seen.add(pos.asLong())) {
+                continue;
+            }
+            if (forceMining && isForceMiningBlacklisted(level.getBlockState(pos))) {
+                continue;
+            }
+            blocksToMine.add(pos);
+        }
+
+        return blocksToMine;
     }
 
     /**
@@ -674,5 +739,28 @@ public class MiningUtils {
             return ((BlockHitResult) hitResult).getBlockPos();
         }
         return null;
+    }
+
+    /**
+     * 获取形状推进所依据的面。
+     *
+     * <p>隧道类形状按「该面的反方向」推进，因此命中方块时取点击面，其反方向即远离玩家、
+     * 指向方块内部的方向，与玩家对连锁走向的预期一致。
+     *
+     * <p>未命中任何方块时没有真实点击面可用，此时退化为玩家朝向的反方向：该方向的反方向
+     * 恰为玩家朝向，使推进仍沿视线向前。若直接返回玩家朝向，推进方向会反转成玩家背后，
+     * 与视线方向相反。
+     *
+     * @param player 玩家
+     * @return 命中面，未命中时为玩家朝向的反方向
+     */
+    static Direction getTargetFace(Player player) {
+        double reach = player.getAttributeValue(Attributes.BLOCK_INTERACTION_RANGE);
+        HitResult hitResult = player.pick(reach, 0.0f, false);
+
+        if (hitResult.getType() == HitResult.Type.BLOCK) {
+            return ((BlockHitResult) hitResult).getDirection();
+        }
+        return player.getDirection().getOpposite();
     }
 }

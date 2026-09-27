@@ -75,7 +75,8 @@ public class ChainMiningStrategy implements MiningStrategy {
             blocksToMine = playerData.getCachedBlocks();
         } else {
             blocksToMine = MiningUtils.scanBlocksToMine(
-                    pos, originState, level, hand, forceMining, this.enhanced, player);
+                    pos, originState, level, hand, forceMining, this.enhanced,
+                    playerData.getShape(), MiningUtils.getTargetFace(player), player);
         }
 
         if (blocksToMine.isEmpty()) {

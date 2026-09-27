@@ -15,6 +15,7 @@ import com.sorrowmist.useless.event.EventHandler;
 import com.sorrowmist.useless.network.EnchantmentSwitchPacket;
 import com.sorrowmist.useless.network.ForceBreakKeyPacket;
 import com.sorrowmist.useless.network.ModeTogglePacket;
+import com.sorrowmist.useless.network.ShapeSwitchPacket;
 import com.sorrowmist.useless.network.StaffLinkCyclePacket;
 import com.sorrowmist.useless.network.StaffLinkOpenPacket;
 import com.sorrowmist.useless.network.TabKeyPressedPacket;
@@ -220,10 +221,21 @@ public class ClientEventBusSubscriber {
 
         ItemStack mainHandItem = player.getMainHandItem();
         if (!(mainHandItem.getItem() instanceof EndlessBeafItem)) return;
+
+        int delta = event.getScrollDeltaY() > 0.0 ? 1 : -1;
+
+        // 按住连锁键时 Shift + 滚轮切换连锁形状。该分支先于无线物流判定：
+        // 两者虽然共用 Shift + 滚轮，但触发前提互斥（连锁键按下 / 未按下），不会同时命中。
+        if (KeyBindings.TRIGGER_CHAIN_MINING_KEY.get().isDown()) {
+            event.setCanceled(true);
+            PacketDistributor.sendToServer(new ShapeSwitchPacket(delta));
+            return;
+        }
+
         if (!EndlessBeafItem.isStaffLinkEnabled(mainHandItem)) return;
 
         event.setCanceled(true);
-        PacketDistributor.sendToServer(new StaffLinkCyclePacket(event.getScrollDeltaY() > 0.0 ? 1 : -1));
+        PacketDistributor.sendToServer(new StaffLinkCyclePacket(delta));
     }
 
     /**
@@ -287,7 +299,7 @@ public class ClientEventBusSubscriber {
     public static void registerGuiLayers(RegisterGuiLayersEvent event) {
         event.registerAbove(
                 VanillaGuiLayers.HOTBAR,
-                ResourceLocation.fromNamespaceAndPath(UselessMod.MODID, "ultimine_status"),
+                ResourceLocation.fromNamespaceAndPath(UselessMod.MODID, "chain_mining_status"),
                 MiningStatusGui::render
         );
     }

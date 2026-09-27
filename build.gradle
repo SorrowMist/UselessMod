@@ -241,8 +241,8 @@ dependencies {
     runtimeOnly "curse.maven:necronomicon-586157:5772683"
 
     implementation "curse.maven:ae2-crystal-science-1435174:8498888" // 1.21.1-1.2.1
-    compileOnly "maven.modrinth:ae2-lightning-tech:2.1.0-beta.5"
-    compileOnly "maven.modrinth:thunderbolt-core:2.0.0-beta.4"
+    implementation "maven.modrinth:ae2-lightning-tech:2.1.0-beta.5"
+    implementation "maven.modrinth:thunderbolt-core:2.0.0-beta.4"
     //implementation "curse.maven:data-energistics-1565514:8841396" // 1.21.1-3.2.2
     //implementation"curse.maven:not-enough-dataenergitic-and-ae2lighteningtech-1671687:8752847"
     //implementation"curse.maven:not-enough-dataenergitic-and-ae2lighteningtech-service-1671683:8752820"
@@ -432,7 +432,7 @@ dependencies {
     runtimeOnly "hellfirepvp.observerlib:ObserverLib:1.10.3.31"
     implementation "hellfirepvp.astralsorcery:AstralSorcery:2.0.0.14"
 
-    implementation fileTree(dir: 'libs', includes: ['*.jar'], excludes: [])
+    compileOnly fileTree(dir: 'libs', includes: ['*.jar'], excludes: [])
     compileOnly fileTree(dir: 'libs/compile', includes: ['*.jar'], excludes: [])
 }
 

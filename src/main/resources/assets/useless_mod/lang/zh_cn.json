@@ -426,6 +426,7 @@
   "gui.useless_mod.mode_config.tools": "工具",
   "gui.useless_mod.mode_config.mining": "挖掘",
   "gui.useless_mod.mode_config.combat": "战斗",
+  "gui.useless_mod.mode_config.vanilla": "原版",
   "gui.useless_mod.mode_config.auxiliary": "辅助",
   "gui.useless_mod.mode_config.current": "%s（当前）",
   "gui.useless_mod.mode_config.state": "%s：%s",

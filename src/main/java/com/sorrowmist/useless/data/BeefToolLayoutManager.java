@@ -12,6 +12,7 @@ import java.util.List;
 /** Loads and stores the beef tool layout in a player's persistent save data. */
 public final class BeefToolLayoutManager {
     private static final String ROOT_TAG = "useless_mod:beef_tool_layout";
+    private static final String VANILLA_GROUP_MIGRATION_TAG = "useless_mod:beef_tool_vanilla_group";
 
     private BeefToolLayoutManager() {
     }
@@ -40,12 +41,28 @@ public final class BeefToolLayoutManager {
     }
 
     public static BeefToolLayout normalizeForPlayer(ServerPlayer player, BeefToolLayout layout) {
+        migrateVanillaModulesOnce(player, layout);
         BeefToolModuleRegistry.addMissingAvailableModules(layout, findTarget(player));
         if (!layout.pages().isEmpty()) {
             layout.setSelectedPage(Math.max(0,
                     Math.min(layout.selectedPage(), layout.pages().size() - 1)));
         }
         return layout;
+    }
+
+    /**
+     * 首次加载既有存档时，把归在其它分组的原版工具动作迁入「原版」分组。
+     *
+     * <p>迁移结果写入持久标记，每个玩家只执行一次，
+     * 以免覆盖玩家此后在模式配置界面中对分组的调整。
+     */
+    private static void migrateVanillaModulesOnce(ServerPlayer player, BeefToolLayout layout) {
+        CompoundTag playerData = playerData(player);
+        if (playerData != null && playerData.getBoolean(VANILLA_GROUP_MIGRATION_TAG)) {
+            return;
+        }
+        BeefToolModuleRegistry.migrateVanillaModules(layout);
+        setFlag(player, VANILLA_GROUP_MIGRATION_TAG);
     }
 
     public static void validateForSave(BeefToolLayout layout) throws BeefToolLayout.LayoutException {
@@ -94,15 +111,27 @@ public final class BeefToolLayoutManager {
         persistentData.getCompound(Player.PERSISTED_NBT_TAG).put(ROOT_TAG, layout.toNbt());
     }
 
-    private static CompoundTag get(ServerPlayer player) {
+    private static CompoundTag playerData(ServerPlayer player) {
         CompoundTag persistentData = player.getPersistentData();
         if (!persistentData.contains(Player.PERSISTED_NBT_TAG, Tag.TAG_COMPOUND)) {
             return null;
         }
-        CompoundTag playerData = persistentData.getCompound(Player.PERSISTED_NBT_TAG);
-        return playerData.contains(ROOT_TAG, Tag.TAG_COMPOUND)
+        return persistentData.getCompound(Player.PERSISTED_NBT_TAG);
+    }
+
+    private static CompoundTag get(ServerPlayer player) {
+        CompoundTag playerData = playerData(player);
+        return playerData != null && playerData.contains(ROOT_TAG, Tag.TAG_COMPOUND)
                 ? playerData.getCompound(ROOT_TAG)
                 : null;
+    }
+
+    private static void setFlag(ServerPlayer player, String key) {
+        CompoundTag persistentData = player.getPersistentData();
+        if (!persistentData.contains(Player.PERSISTED_NBT_TAG, Tag.TAG_COMPOUND)) {
+            persistentData.put(Player.PERSISTED_NBT_TAG, new CompoundTag());
+        }
+        persistentData.getCompound(Player.PERSISTED_NBT_TAG).putBoolean(key, true);
     }
 
     private static void validateKnownModules(BeefToolLayout layout) throws BeefToolLayout.LayoutException {

@@ -425,6 +425,7 @@
   "gui.useless_mod.mode_config.tools": "Tools",
   "gui.useless_mod.mode_config.mining": "Mining",
   "gui.useless_mod.mode_config.combat": "Combat",
+  "gui.useless_mod.mode_config.vanilla": "Vanilla",
   "gui.useless_mod.mode_config.auxiliary": "Auxiliary",
   "gui.useless_mod.mode_config.current": "%s (Current)",
   "gui.useless_mod.mode_config.state": "%s: %s",

@@ -117,19 +117,19 @@ public final class BeefToolModuleRegistry {
             new Definition(BEEF_MAGNET, ModeTypeEnum.BEEF_MAGNET_ENABLED.getTooltip(), GroupKind.AUXILIARY,
                     Availability.ENDLESS, false),
             new Definition(BEEF_FARMLAND_MODE, ModeTypeEnum.BEEF_FARMLAND_MODE_ENABLED.getTooltip(),
-                    GroupKind.AUXILIARY, Availability.ALWAYS, false),
+                    GroupKind.VANILLA, Availability.ALWAYS, false),
             new Definition(BEEF_CROP_HARVEST, ModeTypeEnum.BEEF_CROP_HARVEST_ENABLED.getTooltip(),
-                    GroupKind.AUXILIARY, Availability.ALWAYS, false),
+                    GroupKind.VANILLA, Availability.ALWAYS, false),
             new Definition(BEEF_SHEARS, ModeTypeEnum.BEEF_SHEARS_ENABLED.getTooltip(),
-                    GroupKind.AUXILIARY, Availability.ALWAYS, false),
+                    GroupKind.VANILLA, Availability.ALWAYS, false),
             new Definition(BEEF_FLINT_AND_STEEL, ModeTypeEnum.BEEF_FLINT_AND_STEEL_ENABLED.getTooltip(),
-                    GroupKind.AUXILIARY, Availability.ALWAYS, false),
+                    GroupKind.VANILLA, Availability.ALWAYS, false),
             new Definition(BEEF_RITUAL_SATCHEL, ModeTypeEnum.BEEF_RITUAL_SATCHEL_ENABLED.getTooltip(),
                     GroupKind.MINING, Availability.OCCULTISM, false),
             new Definition(BEEF_RIPEN, ModeTypeEnum.BEEF_RIPEN_ENABLED.getTooltip(),
-                    GroupKind.AUXILIARY, Availability.ALWAYS, false),
+                    GroupKind.VANILLA, Availability.ALWAYS, false),
             new Definition(BEEF_FORCE_GROW, ModeTypeEnum.BEEF_FORCE_GROW_ENABLED.getTooltip(),
-                    GroupKind.AUXILIARY, Availability.ALWAYS, false),
+                    GroupKind.VANILLA, Availability.ALWAYS, false),
             new Definition(BEEF_AUTO_CLICK, ModeTypeEnum.BEEF_AUTO_CLICK_ENABLED.getTooltip(),
                     GroupKind.AUXILIARY, Availability.ALWAYS, false),
             new Definition(BEEF_WIRELESS_LOGISTICS, ModeTypeEnum.BEEF_WIRELESS_LOGISTICS_ENABLED.getTooltip(),
@@ -141,14 +141,16 @@ public final class BeefToolModuleRegistry {
             BEEF_BEHEADING);
     /** 新增的辅助类模块：老存档的布局里没有它们，进游戏时自动补进「辅助」分组。 */
     private static final List<String> AUTO_AUXILIARY_MODULES = List.of(
+            BEEF_AUTO_CLICK,
+            BEEF_WIRELESS_LOGISTICS);
+    /** 「原版」分组的模块：承载原版工具动作（右键、剪羊毛、点火、催熟等），老存档自动补组。 */
+    private static final List<String> AUTO_VANILLA_MODULES = List.of(
             BEEF_FARMLAND_MODE,
             BEEF_CROP_HARVEST,
             BEEF_SHEARS,
             BEEF_FLINT_AND_STEEL,
             BEEF_RIPEN,
-            BEEF_FORCE_GROW,
-            BEEF_AUTO_CLICK,
-            BEEF_WIRELESS_LOGISTICS);
+            BEEF_FORCE_GROW);
     /** 新增的挖掘类模块：老存档的布局里没有它们，进游戏时自动补进「挖掘」分组。 */
     private static final List<String> AUTO_MINING_MODULES = List.of(
             AE_NETWORK_CONNECT,
@@ -235,11 +237,12 @@ public final class BeefToolModuleRegistry {
         }
 
         addMissingModules(layout, target, AUTO_AUXILIARY_MODULES, GroupKind.AUXILIARY);
+        addMissingModules(layout, target, AUTO_VANILLA_MODULES, GroupKind.VANILLA);
         addMissingModules(layout, target, AUTO_MINING_MODULES, GroupKind.MINING);
     }
 
     /**
-     * 把新增模块补进对应分组；找不到合适分组时先放进未分配区，
+     * 把布局中尚不存在的模块补进对应类别的分组；分组无法创建或已满时放入未分配区，
      * 玩家可以在模式配置界面里自行拖拽。
      */
     private static void addMissingModules(BeefToolLayout layout, ItemStack target,
@@ -249,8 +252,8 @@ public final class BeefToolModuleRegistry {
                 continue;
             }
 
-            BeefToolLayout.Group group = findGroupContainingKind(layout, kind);
-            if (group != null) {
+            BeefToolLayout.Group group = findOrCreateGroup(layout, kind);
+            if (group != null && group.modules().size() < BeefToolLayout.MAX_MODULES_PER_GROUP) {
                 group.modules().add(moduleId);
             } else if (layout.unassignedModules().size() < BeefToolLayout.MAX_TOTAL_MODULES) {
                 layout.unassignedModules().add(moduleId);
@@ -258,11 +261,28 @@ public final class BeefToolModuleRegistry {
         }
     }
 
-    /** 找到已经放着某一类模块、并且还有余量的分组（分组被改名也不影响）。 */
+    /**
+     * 找到可以接收某一类模块、并且还有余量的分组。
+     *
+     * <p>判定分两轮：先按默认分组名匹配，使分组归属不因其中模块构成变化而漂移；
+     * 名称都不匹配时，再按分组内已有模块的类别推断，以兼容被玩家改名的分组。
+     * 第二轮会跳过使用其它类别默认名的分组，否则模块被重新归类后，
+     * 承载它的旧分组会被误判为仍属于新类别。
+     */
     private static BeefToolLayout.Group findGroupContainingKind(BeefToolLayout layout, GroupKind kind) {
         for (BeefToolLayout.Page page : layout.pages()) {
             for (BeefToolLayout.Group group : page.groups()) {
                 if (group.modules().size() >= BeefToolLayout.MAX_MODULES_PER_GROUP) continue;
+                if (matchesDefaultName(group.name(), kind)) {
+                    return group;
+                }
+            }
+        }
+
+        for (BeefToolLayout.Page page : layout.pages()) {
+            for (BeefToolLayout.Group group : page.groups()) {
+                if (group.modules().size() >= BeefToolLayout.MAX_MODULES_PER_GROUP) continue;
+                if (hasKnownDefaultName(group.name())) continue;
                 for (String moduleId : group.modules()) {
                     Definition definition = get(moduleId);
                     if (definition != null && definition.group() == kind) {
@@ -274,6 +294,95 @@ public final class BeefToolModuleRegistry {
         return null;
     }
 
+    /** 分组名是否等于该类别的默认名，或为其追加序号后的形式。 */
+    private static boolean matchesDefaultName(String name, GroupKind kind) {
+        String defaultName = kind.defaultName();
+        return defaultName.equals(name) || name.startsWith(defaultName + " ");
+    }
+
+    /** 分组名是否已被某个类别占用为默认名。 */
+    private static boolean hasKnownDefaultName(String name) {
+        for (GroupKind kind : GroupKind.values()) {
+            if (matchesDefaultName(name, kind)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * 把老存档中归在其它分组的原版工具动作迁入「原版」分组。
+     *
+     * <p>补缺逻辑只处理布局中尚不存在的模块：旧版本把这些模块归在「辅助」分组，
+     * 它们因此不会自行出现在新增的原版分组中，需要在首次加载时显式迁移。
+     */
+    public static void migrateVanillaModules(BeefToolLayout layout) {
+        migrateModulesToGroup(layout, AUTO_VANILLA_MODULES, GroupKind.VANILLA);
+    }
+
+    /**
+     * 把指定类别的模块统一搬入该类别的分组。
+     *
+     * <p>迁移只搬动模块本身，不改动分组顺序、分组名称与分组数量；
+     * 目标分组已满或无法创建时保留原有归属，不做部分迁移。
+     */
+    private static void migrateModulesToGroup(BeefToolLayout layout, List<String> moduleIds, GroupKind kind) {
+        List<String> pending = new ArrayList<>();
+        for (String moduleId : moduleIds) {
+            Definition definition = get(moduleId);
+            if (definition == null || definition.group() != kind) continue;
+            if (isInGroupOfKind(layout, moduleId, kind)) continue;
+            pending.add(moduleId);
+        }
+        if (pending.isEmpty()) return;
+
+        BeefToolLayout.Group target = findOrCreateGroup(layout, kind);
+        if (target == null) return;
+        if (target.modules().size() + pending.size() > BeefToolLayout.MAX_MODULES_PER_GROUP) return;
+
+        for (String moduleId : pending) {
+            removeModuleFromLayout(layout, moduleId);
+            target.modules().add(moduleId);
+        }
+    }
+
+    /** 模块是否已经位于名称与该类别默认名一致的分组中。 */
+    private static boolean isInGroupOfKind(BeefToolLayout layout, String moduleId, GroupKind kind) {
+        for (BeefToolLayout.Page page : layout.pages()) {
+            for (BeefToolLayout.Group group : page.groups()) {
+                if (matchesDefaultName(group.name(), kind) && group.modules().contains(moduleId)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    /** 把模块从布局中的任意分组与未分配区移除。 */
+    private static void removeModuleFromLayout(BeefToolLayout layout, String moduleId) {
+        for (BeefToolLayout.Page page : layout.pages()) {
+            for (BeefToolLayout.Group group : page.groups()) {
+                group.modules().remove(moduleId);
+            }
+        }
+        layout.unassignedModules().remove(moduleId);
+    }
+
+    /**
+     * 取得可以接收指定类别模块的分组：优先复用已承载该类别的分组，
+     * 不存在时新建一个以默认名命名的分组。
+     *
+     * <p>既有存档由旧版本写入，其中不存在「原版」这类新增分组，
+     * 若仅查找复用会把这些模块推进未分配区，因此需要在此补建。
+     */
+    private static BeefToolLayout.Group findOrCreateGroup(BeefToolLayout layout, GroupKind kind) {
+        BeefToolLayout.Group existing = findGroupContainingKind(layout, kind);
+        if (existing != null) {
+            return existing;
+        }
+        return createGroup(layout, kind);
+    }
+
     private static BeefToolLayout.Group findOrCreateCombatGroup(BeefToolLayout layout) {
         BeefToolLayout.Group combat = findNamedCombatGroup(layout);
         if (combat != null) return combat;
@@ -281,7 +390,7 @@ public final class BeefToolModuleRegistry {
         combat = findRenamedCombatGroup(layout);
         if (combat != null) return combat;
 
-        return createCombatGroup(layout);
+        return createGroup(layout, GroupKind.COMBAT);
     }
 
     private static BeefToolLayout.Group findNamedCombatGroup(BeefToolLayout layout) {
@@ -312,7 +421,14 @@ public final class BeefToolModuleRegistry {
         return null;
     }
 
-    private static BeefToolLayout.Group createCombatGroup(BeefToolLayout layout) {
+    /**
+     * 新建一个指定类别的分组：优先放入尚未占满的既有页面，全部占满时另开新页；
+     * 默认名已被占用时追加序号，避免同页出现重名分组。
+     *
+     * <p>「原版」分组插入到同页战斗分组之后，使它在界面上的位置紧随战斗分组，
+     * 而非按创建顺序落到页面末尾。
+     */
+    private static BeefToolLayout.Group createGroup(BeefToolLayout layout, GroupKind kind) {
         BeefToolLayout.Page page = layout.pages().stream()
                 .filter(candidate -> candidate.groups().size() < BeefToolLayout.MAX_GROUPS_PER_PAGE)
                 .findFirst()
@@ -324,15 +440,28 @@ public final class BeefToolModuleRegistry {
             layout.pages().add(page);
         }
 
-        String name = GroupKind.COMBAT.defaultName();
+        String name = kind.defaultName();
         int suffix = 2;
         while (hasGroupName(layout, name)) {
-            name = GroupKind.COMBAT.defaultName() + " " + suffix++;
+            name = kind.defaultName() + " " + suffix++;
         }
 
-        BeefToolLayout.Group combat = new BeefToolLayout.Group(name);
-        page.groups().add(combat);
-        return combat;
+        BeefToolLayout.Group group = new BeefToolLayout.Group(name);
+        page.groups().add(insertionIndex(page, kind), group);
+        return group;
+    }
+
+    /** 新建分组在同页中的插入位置：原版分组紧随战斗分组，其余类别追加到末尾。 */
+    private static int insertionIndex(BeefToolLayout.Page page, GroupKind kind) {
+        if (kind != GroupKind.VANILLA) {
+            return page.groups().size();
+        }
+        for (int i = 0; i < page.groups().size(); i++) {
+            if (matchesDefaultName(page.groups().get(i).name(), GroupKind.COMBAT)) {
+                return i + 1;
+            }
+        }
+        return page.groups().size();
     }
 
     private static boolean hasGroupName(BeefToolLayout layout, String name) {
@@ -344,10 +473,15 @@ public final class BeefToolModuleRegistry {
         return false;
     }
 
+    /**
+     * 分组类别。枚举声明顺序即 {@link #defaultLayout()} 生成的分组顺序，
+     * 因此同时决定模式配置界面中分组的默认排布。
+     */
     public enum GroupKind {
         TOOLS("Tools"),
         MINING("Mining"),
         COMBAT("Combat"),
+        VANILLA("Vanilla"),
         AUXILIARY("Auxiliary");
 
         private final String defaultName;

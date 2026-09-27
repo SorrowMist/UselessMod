@@ -12,9 +12,11 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.context.UseOnContext;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.BaseFireBlock;
+import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.CampfireBlock;
 import net.minecraft.world.level.block.CandleBlock;
 import net.minecraft.world.level.block.CandleCakeBlock;
+import net.minecraft.world.level.block.TntBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 
@@ -45,6 +47,16 @@ public final class BeefFlintAndSteel {
         Player player = ctx.getPlayer();
         BlockPos pos = ctx.getClickedPos();
         BlockState state = level.getBlockState(pos);
+
+        // TNT 的引爆入口位于 TntBlock 重写的 useItemOn 内，且该重写仅识别 Items.FLINT_AND_STEEL 与
+        // Items.FIRE_CHARGE 两种物品；造化杖不属于二者，该重写会退化为 super 调用，TNT 方块因此完全不响应。
+        // 缺少本分支时，对 TNT 右键只会落入下方的放火路径，在点击面的相邻位置生成火焰而非引爆方块。
+        if (state.getBlock() instanceof TntBlock tnt) {
+            tnt.onCaughtFire(state, level, pos, ctx.getClickedFace(), player);
+            level.setBlock(pos, Blocks.AIR.defaultBlockState(), 11);
+            awardStat(level, player, ctx.getItemInHand());
+            return InteractionResult.sidedSuccess(level.isClientSide);
+        }
 
         if (CampfireBlock.canLight(state) || CandleBlock.canLight(state) || CandleCakeBlock.canLight(state)) {
             level.playSound(player, pos, SoundEvents.FLINTANDSTEEL_USE, SoundSource.BLOCKS, 1.0F,

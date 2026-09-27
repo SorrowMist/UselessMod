@@ -51,6 +51,7 @@ import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.boss.enderdragon.EnderDragon;
 import net.minecraft.world.entity.boss.wither.WitherBoss;
 import net.minecraft.world.entity.item.ItemEntity;
+import net.minecraft.world.entity.monster.Creeper;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.entity.projectile.ProjectileUtil;
 import net.minecraft.world.item.DiggerItem;
@@ -69,6 +70,7 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.level.LevelReader;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.BrushableBlock;
+import net.minecraft.world.level.block.CandleCakeBlock;
 import net.minecraft.world.level.block.RenderShape;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.entity.BrushableBlockEntity;
@@ -1161,7 +1163,24 @@ public class EndlessBeafItem extends TieredItem {
     public @NotNull InteractionResult onItemUseFirst(@NotNull ItemStack stack, @NotNull UseOnContext ctx) {
         InteractionResult teleportResult = tryTeleport(ctx.getLevel(), ctx.getPlayer(), stack);
         if (teleportResult != InteractionResult.PASS) return teleportResult;
-        return BeefTimeAcceleration.tryUse(ctx);
+
+        InteractionResult timeAccelerationResult = BeefTimeAcceleration.tryUse(ctx);
+        if (timeAccelerationResult != InteractionResult.PASS) return timeAccelerationResult;
+
+        // 蜡烛蛋糕的点亮必须在 useItemOn 之前处理：CandleCakeBlock.useItemOn 仅在物品为
+        // Items.FLINT_AND_STEEL 或 Items.FIRE_CHARGE 时返回 SKIP_DEFAULT_BLOCK_INTERACTION，
+        // 造化杖不属于二者，该方块会返回 PASS_TO_DEFAULT_BLOCK_INTERACTION 并转交
+        // CandleCakeBlock.useWithoutItem 处理；玩家饱食度未满时因此先吃掉一块蛋糕而非点亮蜡烛。
+        // 在此提前点亮可绕开该分支，行为与原版打火石保持一致。
+        Player player = ctx.getPlayer();
+        BlockState clickedState = ctx.getLevel().getBlockState(ctx.getClickedPos());
+        if (player != null && isFlintAndSteelEnabled(stack) && !player.isShiftKeyDown()
+                && clickedState.getBlock() instanceof CandleCakeBlock && CandleCakeBlock.canLight(clickedState)) {
+            InteractionResult flintResult = BeefFlintAndSteel.tryUse(ctx);
+            if (flintResult != InteractionResult.PASS) return flintResult;
+        }
+
+        return InteractionResult.PASS;
     }
 
     @Override
@@ -1237,6 +1256,21 @@ public class EndlessBeafItem extends TieredItem {
 
         if (BeefTimeAcceleration.shouldBlockOtherRightClick(stack, player)) {
             return InteractionResult.FAIL;
+        }
+
+        // 打火石能力对苦力怕生效：原版由 Creeper.mobInteract 依据 #minecraft:creeper_igniters
+        // 物品标签处理，造化杖不属于该标签，该分支不会命中，需在物品侧补齐同等行为。
+        // 已点燃的苦力怕不再重复触发，否则引信会被反复重置而无法爆炸。
+        if (isFlintAndSteelEnabled(stack) && !player.isShiftKeyDown()
+                && entity instanceof Creeper creeper && !creeper.isIgnited()) {
+            boolean isClient = entity.level().isClientSide();
+            entity.level().playSound(player, entity.getX(), entity.getY(), entity.getZ(),
+                    SoundEvents.FLINTANDSTEEL_USE, entity.getSoundSource(), 1.0F,
+                    entity.level().getRandom().nextFloat() * 0.4F + 0.8F);
+            if (!isClient) {
+                creeper.ignite();
+            }
+            return InteractionResult.sidedSuccess(isClient);
         }
 
         // 催熟：右键幼年动物直接催至成年

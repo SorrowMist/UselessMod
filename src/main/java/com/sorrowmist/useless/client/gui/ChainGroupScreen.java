@@ -14,6 +14,7 @@ import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.network.chat.Component;
+import net.minecraft.util.FormattedCharSequence;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.tags.TagKey;
 import net.minecraft.util.Mth;
@@ -471,13 +472,11 @@ public final class ChainGroupScreen extends AbstractContainerScreen<ChainGroupMe
     private void renderGroupList(GuiGraphics graphics) {
         List<List<String>> groups = layout.chainGroups();
         if (groups.isEmpty()) {
-            // 与正常条目行同基线（LIST_TOP + 4），否则会比列表内衬顶边高出 4px 而压在那条边框线上；
-            // 同时按列宽截断，避免提示文字越过列边界画进条目列。
+            // 与正常条目行同基线（LIST_TOP + 4），否则会比列表内衬顶边高出 4px 而压在那条边框线上。
+            // 提示按列宽折行：该文案长于列宽，截断会丢失后半句语义。
             int budget = GROUP_COLUMN_RIGHT - (CONTENT_LEFT + 2) - 2;
-            graphics.drawString(font,
-                    font.plainSubstrByWidth(Component.translatable("gui.useless_mod.chain_group.empty").getString(), budget),
-                    leftPos + CONTENT_LEFT + 2, topPos + LIST_TOP + 4,
-                    MachineScreenStyle.MUTED_TEXT_COLOR, false);
+            drawWrapped(graphics, Component.translatable("gui.useless_mod.chain_group.empty"),
+                    leftPos + CONTENT_LEFT + 2, topPos + LIST_TOP + 4, budget);
             return;
         }
 
@@ -517,14 +516,11 @@ public final class ChainGroupScreen extends AbstractContainerScreen<ChainGroupMe
     private void renderEntryList(GuiGraphics graphics) {
         List<String> entries = selectedEntries();
         if (entries.isEmpty()) {
-            // 与正常条目行同基线（LIST_TOP + 4），否则会比列表内衬顶边高出 4px 而压在那条边框线上；
-            // 同时按列宽截断，避免提示文字越过列边界。
+            // 与正常条目行同基线（LIST_TOP + 4），否则会比列表内衬顶边高出 4px 而压在那条边框线上。
+            // 提示按列宽折行：该文案在窄列下可能放不下，截断会丢失后半句语义。
             int budget = CONTENT_RIGHT - (ENTRY_COLUMN_LEFT + 2) - 2;
-            graphics.drawString(font,
-                    font.plainSubstrByWidth(
-                            Component.translatable("gui.useless_mod.chain_group.entry_empty").getString(), budget),
-                    leftPos + ENTRY_COLUMN_LEFT + 2, topPos + LIST_TOP + 4,
-                    MachineScreenStyle.MUTED_TEXT_COLOR, false);
+            drawWrapped(graphics, Component.translatable("gui.useless_mod.chain_group.entry_empty"),
+                    leftPos + ENTRY_COLUMN_LEFT + 2, topPos + LIST_TOP + 4, budget);
             return;
         }
 
@@ -604,6 +600,20 @@ public final class ChainGroupScreen extends AbstractContainerScreen<ChainGroupMe
     }
 
     // ------------------------------------------------------------------ 工具方法
+
+    /**
+     * 按给定宽度折行绘制提示文本。
+     *
+     * <p>列表空态提示长于列宽，直接截断会丢失后半句语义，因此折行完整呈现。
+     * 行距取字体行高加 1 像素，避免相邻两行贴连；不使用列表行高，否则行距过疏。</p>
+     */
+    private void drawWrapped(GuiGraphics graphics, Component text, int x, int y, int width) {
+        List<FormattedCharSequence> lines = font.split(text, width);
+        for (int i = 0; i < lines.size(); i++) {
+            graphics.drawString(font, lines.get(i), x, y + i * (font.lineHeight + 1),
+                    MachineScreenStyle.MUTED_TEXT_COLOR, false);
+        }
+    }
 
     private List<String> selectedEntries() {
         if (selectedGroup < 0 || selectedGroup >= layout.chainGroups().size()) {

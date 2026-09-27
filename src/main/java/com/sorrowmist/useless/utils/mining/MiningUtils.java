@@ -530,7 +530,8 @@ ChainMiningShapes shape, Direction face, Player player) {
         }
 
         int maxBlocks = ConfigManager.getChainMiningMaxBlocks();
-        ChainEquivalence equivalence = ConfigManager.getChainMiningEquivalence(originState.getBlock());
+        // 同类方块判定：玩家自己的等价组命中时按组匹配，否则退回严格同方块
+        ChainEquivalence equivalence = ChainGroupManager.equivalenceFor(player, originState.getBlock());
         ChainMiningShapeContext context = new ChainMiningShapeContext(
                 level, originPos, originState, face, player, stack, equivalence,
                 forceMining, requireMineable, maxBlocks,

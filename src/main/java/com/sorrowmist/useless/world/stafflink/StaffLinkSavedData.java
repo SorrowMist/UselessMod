@@ -9,7 +9,6 @@ import net.minecraft.world.level.saveddata.SavedData;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -133,7 +132,13 @@ public final class StaffLinkSavedData extends SavedData {
         return networks.get(id);
     }
 
-    public Collection<StaffLinkNetwork> all() {
+    /**
+     * 全部网络的一份快照。
+     *
+     * <p>返回 {@link List} 而不是 {@code Collection}：调用方（引擎 tick）本来就要按顺序遍历，
+     * 声明成 List 就不必在那边再 {@code List.copyOf} 复制一次。</p>
+     */
+    public List<StaffLinkNetwork> all() {
         return List.copyOf(networks.values());
     }
 

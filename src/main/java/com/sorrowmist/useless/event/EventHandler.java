@@ -7,7 +7,6 @@ import com.sorrowmist.useless.content.items.BeefTimeAcceleration;
 import com.sorrowmist.useless.content.items.EndlessBeafItem;
 import com.sorrowmist.useless.content.stafflink.StaffLinkEngine;
 import com.sorrowmist.useless.content.stafflink.StaffLinkTargets;
-import com.sorrowmist.useless.content.menus.StaffLinkMenu;
 import com.sorrowmist.useless.compat.ae.AeDeviceLinker;
 import com.sorrowmist.useless.compat.ae.AeLinkChannelBypass;
 import com.sorrowmist.useless.compat.constructionwand.ConstructionWandLogic;
@@ -25,7 +24,6 @@ import com.sorrowmist.useless.network.BeefInvulnerabilitySyncPacket;
 import com.sorrowmist.useless.network.BeefInvulnerabilityStatePacket;
 import com.sorrowmist.useless.network.BeefToolLayoutSyncPacket;
 import com.sorrowmist.useless.network.StaffLinkBindPacket;
-import com.sorrowmist.useless.network.StaffLinkStatusPacket;
 import com.sorrowmist.useless.utils.UselessItemUtils;
 import com.sorrowmist.useless.utils.mining.MiningDispatcher;
 import com.sorrowmist.useless.world.dimension.UselessDimensionConfigManager;
@@ -779,24 +777,7 @@ public class EventHandler {
      */
     @SubscribeEvent
     public static void onStaffLinkTick(ServerTickEvent.Post event) {
-        MinecraftServer server = event.getServer();
-        StaffLinkEngine.tick(server);
-        if (server.getTickCount() % 20 == 0) {
-            pushStaffLinkStatus(server);
-        }
-    }
-
-    /** 把「上次搬了多少」推给开着无线物流界面的玩家，界面上有一行读数。 */
-    private static void pushStaffLinkStatus(MinecraftServer server) {
-        for (ServerPlayer player : server.getPlayerList().getPlayers()) {
-            if (!(player.containerMenu instanceof StaffLinkMenu menu)) {
-                continue;
-            }
-            StaffLinkEngine.TransferStats stats = StaffLinkEngine.lastTransfer(menu.getNetworkId());
-            PacketDistributor.sendToPlayer(player, new StaffLinkStatusPacket(
-                    menu.getNetworkId(), stats.requested(), stats.moved(), stats.targets(),
-                    stats.tick(), stats.blocker()));
-        }
+        StaffLinkEngine.tick(event.getServer());
     }
 
     /**

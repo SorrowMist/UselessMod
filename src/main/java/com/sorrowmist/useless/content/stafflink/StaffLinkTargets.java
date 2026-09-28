@@ -17,6 +17,7 @@ import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.chemical.C
 import com.sorrowmist.useless.energy.IEnergyManager;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
@@ -30,7 +31,9 @@ import net.neoforged.neoforge.fluids.FluidStack;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * 造化杖无线物流的「容器能力」解析与搬运实现。
@@ -92,141 +95,6 @@ public final class StaffLinkTargets {
     private StaffLinkTargets() {
     }
 
-    /** 一个都没搬动时，卡在哪一步。给界面显示用，方便一眼定位。 */
-    public enum TransferBlocker {
-        /** 没问题（搬动了，或还没跑过）。 */
-        NONE,
-        /** 源那边解析不出库存：区块没加载 / 方块没了 / 没有对应能力。 */
-        SOURCE_UNREACHABLE,
-        /** 目标那边解析不出库存。 */
-        TARGET_UNREACHABLE,
-        /** 源里确实有东西，但全被过滤器挡住了。 */
-        FILTERED,
-        /** 源里确实有东西，也通过了过滤，但源自己拒绝抽出（只进不出 / 只读）。 */
-        SOURCE_REJECTED,
-        /** 源里没有可搬的东西。 */
-        SOURCE_EMPTY,
-        /** 源有东西、过滤也过了，但目标不收（装满 / 只认别的物品）。 */
-        TARGET_REJECTED
-    }
-
-    /**
-     * 搬运量为 0 时判断卡在哪一步。
-     *
-     * <p>只在真的一次都没搬动时调用，正常路径不付代价。</p>
-     */
-    public static TransferBlocker diagnose(ServerLevel sourceLevel, StaffLinkRoute source,
-                                           ServerLevel targetLevel, StaffLinkRoute target) {
-        Object from = resolve(sourceLevel, source.anchor().pos(), source.side(), source.medium());
-        if (from == null) {
-            return TransferBlocker.SOURCE_UNREACHABLE;
-        }
-        Object to = resolve(targetLevel, target.anchor().pos(), target.side(), target.medium());
-        if (to == null) {
-            return TransferBlocker.TARGET_UNREACHABLE;
-        }
-        // 与 transfer 同一套语义：从 AE 取出时源端过滤器不参与判定，只看接收端白名单。
-        List<LinkFilterSlot> sourceFilter = source.medium().isAe() ? List.of() : source.activeFilters();
-        List<LinkFilterSlot> targetFilter = target.activeFilters();
-        return switch (source.medium()) {
-            case ITEM, AE_ITEM -> diagnoseItems((LongItemHandler) from, (LongItemHandler) to,
-                    sourceFilter, targetFilter);
-            case FLUID, AE_FLUID -> diagnoseFluid((LongFluidHandler) from, (LongFluidHandler) to,
-                    sourceFilter, targetFilter);
-            case ENERGY, AE_ENERGY -> diagnoseEnergy((LongEnergyHandler) from);
-            case CHEMICAL, AE_CHEMICAL -> diagnoseChemical((ChemicalHandlerView) from, sourceFilter, targetFilter);
-            // 魔源的端点就是「一个量」，没有条目列表可查；有量就一定搬得动，没量就是源空。
-            case SOURCE, AE_SOURCE -> ((SourceHandlerView) from).amount() > 0
-                    ? TransferBlocker.TARGET_REJECTED : TransferBlocker.SOURCE_EMPTY;
-        };
-    }
-
-    /**
-     * 物品卡在哪一步。
-     *
-     * <p><b>必须真的去试一次</b>，理由同 {@link #diagnoseFluid}：早先这里只要「存在一个通过过滤的
-     * 物品」就直接断言 {@code TARGET_REJECTED}，等于把「我没查到别的原因」写成了「目标不收」
-     * ——源抽不抽得出来、目标是不是满了，一次都没问过。玩家照着这个提示去查目标，方向从一开始
-     * 就是错的。现在每一步都实际探测。</p>
-     */
-    private static TransferBlocker diagnoseItems(LongItemHandler from, LongItemHandler to,
-                                                 List<LinkFilterSlot> sourceFilter,
-                                                 List<LinkFilterSlot> targetFilter) {
-        boolean anyItem = false;
-        for (int slot = 0; slot < from.getSlots(); slot++) {
-            ItemStack probe = from.getStackInSlot(slot);
-            if (probe.isEmpty() || from.amountIn(slot) <= 0L) {
-                continue;
-            }
-            anyItem = true;
-            // 两端的过滤器都放行，才谈得上「目标不收」；任一端挡住就是被过滤。
-            if (!matches(sourceFilter, probe) || !matches(targetFilter, probe)) {
-                continue;
-            }
-            // 源真的抽得出来吗？探测量取存量与 1000 的较小值，够判断可行性又不惊动容器。
-            long probeAmount = Math.min(1000L, from.amountIn(slot));
-            if (from.extract(slot, probeAmount, true) <= 0L) {
-                // 源有物品却抽不动：只读权限、被别的面独占、或是只进不出的容器。
-                return TransferBlocker.SOURCE_REJECTED;
-            }
-            // 目标真的收得下吗？用同一个探测量问它。
-            if (to.insert(probe, probeAmount, true) <= 0L) {
-                return TransferBlocker.TARGET_REJECTED;
-            }
-            return TransferBlocker.NONE;
-        }
-        return anyItem ? TransferBlocker.FILTERED : TransferBlocker.SOURCE_EMPTY;
-    }
-
-    /**
-     * 流体卡在哪一步。
-     *
-     * <p><b>必须真的去试一次。</b> 早先这里只验证「源里有流体、过滤器放行」就直接断言
-     * {@code TARGET_REJECTED}，等于把「我没查到别的原因」写成了「目标不收」——目标满没满、
-     * 收不收这种流体，一次都没问过。于是界面会把「源抽不出来」「目标类型不符」乃至纯粹的
-     * 方向配反，统统显示成「目标不收」，把人往错的方向引。现在每一步都实际探测：
-     * 源能否抽出、目标能否接收，得出的结论才是可执行的。</p>
-     */
-    private static TransferBlocker diagnoseFluid(LongFluidHandler from, LongFluidHandler to,
-                                                 List<LinkFilterSlot> sourceFilter,
-                                                 List<LinkFilterSlot> targetFilter) {
-        for (int tank = 0; tank < from.getTanks(); tank++) {
-            FluidStack probe = from.getFluidInTank(tank);
-            if (probe.isEmpty() || from.amountIn(tank) <= 0L) {
-                continue;
-            }
-            if (!matchesFluid(sourceFilter, probe) || !matchesFluid(targetFilter, probe)) {
-                return TransferBlocker.FILTERED;
-            }
-            // 源真的抽得出来吗？探测量取存量与 1000 的较小值，够判断可行性又不惊动容器。
-            long drainable = from.drain(tank, Math.min(1000L, from.amountIn(tank)), true);
-            if (drainable <= 0L) {
-                // 源有流体却抽不动：只读权限、被别的面独占、或是只进不出的容器。
-                return TransferBlocker.SOURCE_REJECTED;
-            }
-            // 目标真的收得下吗？用同一个探测量问它。
-            if (to.fill(probe, drainable, true) <= 0L) {
-                return TransferBlocker.TARGET_REJECTED;
-            }
-            return TransferBlocker.NONE;
-        }
-        return TransferBlocker.SOURCE_EMPTY;
-    }
-
-    private static TransferBlocker diagnoseEnergy(LongEnergyHandler from) {
-        return from.stored() > 0L ? TransferBlocker.TARGET_REJECTED : TransferBlocker.SOURCE_EMPTY;
-    }
-
-    private static TransferBlocker diagnoseChemical(ChemicalHandlerView from, List<LinkFilterSlot> sourceFilter,
-                                                    List<LinkFilterSlot> targetFilter) {
-        ChemicalStackView probe = from.extractChemical(1L, true);
-        if (probe == null || probe.isEmpty()) {
-            return TransferBlocker.SOURCE_EMPTY;
-        }
-        boolean allowed = matchesChemical(sourceFilter, probe) && matchesChemical(targetFilter, probe);
-        return allowed ? TransferBlocker.TARGET_REJECTED : TransferBlocker.FILTERED;
-    }
-
     // ------------------------------------------------------------------ 解析
 
     /** 该坐标是不是「有东西可搬」的容器——决定潜行右键要不要接管。 */
@@ -283,9 +151,9 @@ public final class StaffLinkTargets {
             return null;
         }
         return switch (medium) {
-            case ITEM -> items(capability(level, Capabilities.ItemHandler.BLOCK, pos, side));
-            case FLUID -> fluids(capability(level, Capabilities.FluidHandler.BLOCK, pos, side));
-            case ENERGY -> energyHandler(level, pos, side);
+            case ITEM -> items(capability(level, Capabilities.ItemHandler.BLOCK, pos, side, medium));
+            case FLUID -> fluids(capability(level, Capabilities.FluidHandler.BLOCK, pos, side, medium));
+            case ENERGY -> energyHandler(level, pos, side, medium);
             case CHEMICAL -> chemicalHandler(level, pos, side);
             case SOURCE -> ArsSourceCompatLoader.sourceHandler(level, pos);
             // AE 这一端交给桥去解析：常驻代码只拿到一个 long 契约的端点，
@@ -324,8 +192,9 @@ public final class StaffLinkTargets {
      * </ol>
      */
     @Nullable
-    private static LongEnergyHandler energyHandler(Level level, BlockPos pos, @Nullable Direction side) {
-        IEnergyStorage storage = capability(level, Capabilities.EnergyStorage.BLOCK, pos, side);
+    private static LongEnergyHandler energyHandler(Level level, BlockPos pos, @Nullable Direction side,
+                                                   LinkMedium medium) {
+        IEnergyStorage storage = capability(level, Capabilities.EnergyStorage.BLOCK, pos, side, medium);
         if (storage instanceof IEnergyManager manager) {
             return LongResourceAdapters.energy(manager);
         }
@@ -337,21 +206,66 @@ public final class StaffLinkTargets {
 
     @Nullable
     private static <T> T capability(Level level, BlockCapability<T, Direction> capability,
-                                    BlockPos pos, @Nullable Direction side) {
+                                    BlockPos pos, @Nullable Direction side, LinkMedium medium) {
         if (side != null) {
             return level.getCapability(capability, pos, side);
         }
+        CapabilityHint hint = new CapabilityHint(level.dimension(), pos.immutable(), medium);
+        if (CAPABILITY_HINTS.containsKey(hint)) {
+            // 上次命中的那个面：先试它，命中就省下最多 6 次 getCapability。
+            Direction remembered = CAPABILITY_HINTS.get(hint);
+            T found = remembered == null
+                    ? level.getCapability(capability, pos, null)
+                    : level.getCapability(capability, pos, remembered);
+            if (found != null) {
+                return found;
+            }
+            // 提示失手：方块多半被换过了。退回下面的完整扫描并重新记，所以绝不会读错，
+            // 最多多付一次查找。
+            CAPABILITY_HINTS.remove(hint);
+        }
         T unspecified = level.getCapability(capability, pos, null);
         if (unspecified != null) {
+            CAPABILITY_HINTS.put(hint, null);
             return unspecified;
         }
         for (Direction direction : DIRECTIONS) {
             T found = level.getCapability(capability, pos, direction);
             if (found != null) {
+                CAPABILITY_HINTS.put(hint, direction);
                 return found;
             }
         }
         return null;
+    }
+
+    /**
+     * 「上次哪个面解析成功」的提示表。
+     *
+     * <p>{@link #capability} 在 {@code side == null} 时要依次试「不限面 + 6 个方向」，最坏 7 次
+     * {@code getCapability}；而一个锚点的可用面在方块没被换掉之前是稳定的。这里只记「上次命中
+     * 的那个面」，下次先试它。</p>
+     *
+     * <p><b>提示失手一律退回完整扫描</b>，所以方块被换掉、能力被撤回都不会读错，最多多付一次
+     * 查找。值写 {@code null} 表示「不限面那次就命中了」——用 {@code containsKey} 区分
+     * 「没记过」与「记的是 null」。</p>
+     *
+     * <p>键里带 {@code medium}：不同资源类型可能落在不同的面上。只在服务端线程访问
+     * （右键判定、绑定包、引擎 tick 都在服务端线程）。</p>
+     */
+    private static final Map<CapabilityHint, Direction> CAPABILITY_HINTS = new HashMap<>();
+
+    private record CapabilityHint(ResourceKey<Level> dimension, BlockPos pos, LinkMedium medium) {
+    }
+
+    /**
+     * 清空「上次命中的面」提示表。
+     *
+     * <p>提示本身不会读错（失手就退回完整扫描），这里只是防止它随着历史锚点无限增长。
+     * 引擎在自愈周期与服务器停止时调用。</p>
+     */
+    public static void clearCapabilityHints() {
+        CAPABILITY_HINTS.clear();
     }
 
     @Nullable
@@ -371,25 +285,56 @@ public final class StaffLinkTargets {
     // ------------------------------------------------------------------ 搬运
 
     /**
+     * 解析释放端（源）的端点。解析不出来返回 {@code null}。
+     *
+     * <p>单独暴露是因为一次分配里源端要发给多个接收端：源端点只需解析一次，
+     * 由 {@link StaffLinkEngine#distribute} 拿到后交给
+     * {@link #transfer(Object, ServerLevel, StaffLinkRoute, ServerLevel, StaffLinkRoute, long)} 复用。
+     * AE 端点尤其要紧 —— 它每次解析都要走「取方块实体 → 取能力」，还会新建一份端点实例。</p>
+     */
+    @Nullable
+    public static Object resolveSource(ServerLevel sourceLevel, StaffLinkRoute source) {
+        return resolve(sourceLevel, source.anchor().pos(), source.side(), source.medium());
+    }
+
+    /**
      * 把资源从 {@code source} 搬到 {@code target}。
      *
-     * <p>先模拟后提交：模拟阶段算出目标能接多少，提交阶段只搬那个数量；万一提交时目标
-     * 仍然吐回余量（同 tick 内不该发生），余量会退回源，源也塞不回时掉落到源脚边，
+     * <p><b>默认「先模拟后提交」</b>：模拟阶段算出目标能接多少，提交阶段只搬那个数量；万一提交时
+     * 目标仍然吐回余量（同 tick 内不该发生），余量会退回源，源也塞不回时掉落到源脚边，
      * 保证不凭空消失。</p>
+     *
+     * <p><b>源端是 ME 网络时跳过「先问目标能收多少」这一步</b>（{@code skipTargetProbe}）。
+     * 理由有两条：</p>
+     *
+     * <ol>
+     *   <li><b>模拟本来就是纯开销。</b>它存在的意义是「别从源里抽出超过目标能收的量」，
+     *       而那要靠「抽出来的东西能塞回源」兜底。ME 网络的 {@code insert} 一定收得下刚刚
+     *       从它里面抽出来的东西（同一 tick 内），所以这条底线本来就成立。</li>
+     *   <li><b>模拟很贵。</b>目标端的 {@code insert(..., true)} 会完整走一遍
+     *       {@code AEItemKey.of} + 槽位试算；实测一次搬运里「源试算 + 目标试算 + 源抽 +
+     *       目标提交」四次调用中，目标那两次占了目标端总耗时的全部。去掉模拟等于把
+     *       「每次搬运问两遍」变成「问一遍」。</li>
+     * </ol>
+     *
+     * <p><b>为什么只按源端判断，不按目标端判断。</b>余量退回的是<b>源</b>，所以风险只取决于源端
+     * 收不收得回：源是 ME 网络 ⇒ 稳；源是普通容器 ⇒ 有可能塞不回（例如机器的输出槽只出不进），
+     * 那时东西会掉在源脚边。目标端是不是 AE 与这条底线无关，所以不看它。</p>
      *
      * <p><b>数量全程 long。</b> {@code limit} 多大就请求多大，不存在「先截断成 int、剩下的
      * 交给外层循环」这一步。</p>
      *
+     * <p><b>源端由调用方先解析好再传进来</b>（见 {@link #resolveSource}）。一个释放端往往要发给
+     * 多个接收端，源端点解析一次就够；AE 端点尤其要紧 —— 它每次解析都要走「取方块实体 → 取能力」
+     * 并新建一份端点实例，按接收端个数重复付这笔钱没有意义。</p>
+     *
+     * @param from 源端点，{@code null} 视为解析失败、直接不搬
      * @return 实际搬运量（0 表示没搬）
      */
-    public static long transfer(ServerLevel sourceLevel, StaffLinkRoute source,
+    public static long transfer(@Nullable Object from, ServerLevel sourceLevel, StaffLinkRoute source,
                                 ServerLevel targetLevel, StaffLinkRoute target, long limit) {
         // 配对按 family 而不是 medium：ITEM 与 AE_ITEM 都是「物品」，箱子接 AE 网络才配得起来。
-        if (limit <= 0L || source.medium().family() != target.medium().family()) {
-            return 0L;
-        }
-        Object from = resolve(sourceLevel, source.anchor().pos(), source.side(), source.medium());
-        if (from == null) {
+        if (from == null || limit <= 0L || source.medium().family() != target.medium().family()) {
             return 0L;
         }
         Object to = resolve(targetLevel, target.anchor().pos(), target.side(), target.medium());
@@ -404,11 +349,14 @@ public final class StaffLinkTargets {
         // 白名单既繁琐又容易漏，而「我要往这个箱子拿什么」本来就该由接收端说。
         List<LinkFilterSlot> sourceFilter = source.medium().isAe() ? List.of() : source.activeFilters();
         List<LinkFilterSlot> targetFilter = target.activeFilters();
+        // 源端是 ME 网络 ⇒ 抽出来的东西一定塞得回去 ⇒ 不必先问目标能收多少。见方法说明。
+        boolean skipTargetProbe = source.medium().isAe();
         return switch (source.medium()) {
             case ITEM, AE_ITEM -> moveItems(sourceLevel, source.anchor().pos(),
-                    (LongItemHandler) from, (LongItemHandler) to, limit, sourceFilter, targetFilter);
+                    (LongItemHandler) from, (LongItemHandler) to, limit, sourceFilter, targetFilter,
+                    skipTargetProbe);
             case FLUID, AE_FLUID -> moveFluid((LongFluidHandler) from, (LongFluidHandler) to, limit,
-                    sourceFilter, targetFilter);
+                    sourceFilter, targetFilter, skipTargetProbe);
             case ENERGY, AE_ENERGY -> moveEnergy((LongEnergyHandler) from, (LongEnergyHandler) to, limit);
             case CHEMICAL, AE_CHEMICAL -> moveChemical((ChemicalHandlerView) from,
                     (ChemicalHandlerView) to, limit, sourceFilter, targetFilter);
@@ -419,15 +367,21 @@ public final class StaffLinkTargets {
 
     private static long moveItems(ServerLevel sourceLevel, BlockPos sourcePos,
                                   LongItemHandler from, LongItemHandler to, long limit,
-                                  List<LinkFilterSlot> sourceFilter, List<LinkFilterSlot> targetFilter) {
-        // ---- 有过滤器：按类型直接定位，绝不扫描 ----
+                                  List<LinkFilterSlot> sourceFilter, List<LinkFilterSlot> targetFilter,
+                                  boolean skipTargetProbe) {
+        // ---- 有过滤器：按类型直接抽，绝不扫描 ----
         //
-        // 「要搬什么」已经被过滤器完全确定了，直接问源端「有没有这一种」即可。
+        // 「要搬什么」已经被过滤器完全确定了，直接问源端「有没有这一种」即可 ——
+        // 这一步合并进了 moveOneItemStackByType（源端试算一次）。
         //
         // 不能改成「扫源端槽位、挑匹配的」：AE 端点的 getSlots() 是整个 ME 网络的资源种类数
         // （成熟网络上千种很常见），而扫描有 MAX_SCAN_SLOTS 预算。靠扫描找过滤器指定的那一种，
         // 只要它在网络里的序号超过预算就<b>永远</b>搬不过来 —— 表现就是「接收端设了过滤的机器
         // 一直收不到东西」，而没设过滤的机器（第一种就命中）一切正常。
+        //
+        // 同样不能改成「先 findSlot 定位槽位、再 extract(slot)」：AE 端点的 findSlot 需要先抓
+        // 一份整网快照（MEStorage.getAvailableStacks()），等于每次搬运遍历一遍网络里每一种资源。
+        // 实测这一条就占了无线物流总耗时的 32%（见 wiki/WIRELESS_LOGISTICS_PERF_REPORT.md 第十节）。
         List<ItemStack> wanted = filteredItemMarkers(sourceFilter, targetFilter);
         if (!wanted.isEmpty()) {
             long moved = 0L;
@@ -439,12 +393,8 @@ public final class StaffLinkTargets {
                 if (!matches(sourceFilter, template) || !matches(targetFilter, template)) {
                     continue;
                 }
-                int slot = from.findSlot(template);
-                if (slot < 0) {
-                    continue;
-                }
-                moved += moveOneItemStack(sourceLevel, sourcePos, from, to, slot,
-                        limit - moved, template);
+                moved += moveOneItemStackByType(sourceLevel, sourcePos, from, to,
+                        limit - moved, template, skipTargetProbe);
             }
             return moved;
         }
@@ -460,34 +410,28 @@ public final class StaffLinkTargets {
             if (template.isEmpty()) {
                 continue;
             }
-            moved += moveOneItemStack(sourceLevel, sourcePos, from, to, slot, limit - moved, template);
+            // 数量顺手从刚拿到的模板上取（见 LongItemHandler#amountIn(int, ItemStack)）：
+            // 通用实现里模板的 count 就是槽内真实数量，不必再把同一个槽位读第二遍。
+            long available = from.amountIn(slot, template);
+            moved += moveOneItemStack(sourceLevel, sourcePos, from, to, slot,
+                    limit - moved, template, available, skipTargetProbe);
         }
         return moved;
     }
 
-    /** 从指定槽位搬走最多 {@code want} 个 {@code template}；返回实际搬走的数量。 */
-    private static long moveOneItemStack(ServerLevel sourceLevel, BlockPos sourcePos,
-                                         LongItemHandler from, LongItemHandler to, int slot,
-                                         long want, ItemStack template) {
-        if (want <= 0L) {
-            return 0L;
-        }
-        long available = from.amountIn(slot);
-        if (available <= 0L) {
-            return 0L;
-        }
-        long request = Math.min(want, available);
-        // 模拟：目标最多能接多少（long，跨槽累加精确）。
-        long accepted = to.insert(template, request, true);
-        if (accepted <= 0L) {
-            return 0L;
-        }
-
-        long extracted = from.extract(slot, accepted, false);
-        if (extracted <= 0L) {
-            return 0L;
-        }
-        long leftover = extracted - to.insert(template, extracted, false);
+    /**
+     * 处理「已经抽出来了、但目标没全收下」的余量：退回源，退不回就掉在源脚边。返回实际搬走的量。
+     *
+     * <p>抽出来之后才发现目标不收，是<b>跳过目标试算</b>那条路的正常分支（见
+     * {@link #transfer(Object, ServerLevel, StaffLinkRoute, ServerLevel, StaffLinkRoute, long)}）。</p>
+     *
+     * @param extracted 从源里实际抽出的量
+     * @param accepted  目标实际收下的量（调用方已经拿到，不必再问一次）
+     */
+    private static long settleItemLeftover(ServerLevel sourceLevel, BlockPos sourcePos,
+                                           LongItemHandler from, ItemStack template,
+                                           long extracted, long accepted) {
+        long leftover = extracted - accepted;
         long actuallyMoved = extracted;
         if (leftover > 0L) {
             long unreturned = leftover - from.insert(template, leftover, false);
@@ -497,6 +441,87 @@ public final class StaffLinkTargets {
             }
         }
         return Math.max(0L, actuallyMoved);
+    }
+
+    /**
+     * 从指定槽位搬走最多 {@code want} 个 {@code template}；返回实际搬走的数量。
+     *
+     * <p>只给<b>无过滤器的扫描路径</b>用（有过滤器的走 {@link #moveOneItemStackByType}）。</p>
+     *
+     * @param available 该槽位的存量；扫描路径已经连同模板一起取过，避免重复读同一个槽位
+     */
+    private static long moveOneItemStack(ServerLevel sourceLevel, BlockPos sourcePos,
+                                         LongItemHandler from, LongItemHandler to, int slot,
+                                         long want, ItemStack template, long available,
+                                         boolean skipTargetProbe) {
+        if (want <= 0L || available <= 0L) {
+            return 0L;
+        }
+        long request = Math.min(want, available);
+        if (skipTargetProbe) {
+            long extracted = from.extract(slot, request, false);
+            if (extracted <= 0L) {
+                return 0L;
+            }
+            return settleItemLeftover(sourceLevel, sourcePos, from, template, extracted,
+                    to.insert(template, extracted, false));
+        }
+        // 模拟：目标最多能接多少（long，跨槽累加精确）。
+        long accepted = to.insert(template, request, true);
+        if (accepted <= 0L) {
+            return 0L;
+        }
+        long extracted = from.extract(slot, accepted, false);
+        if (extracted <= 0L) {
+            return 0L;
+        }
+        return settleItemLeftover(sourceLevel, sourcePos, from, template, extracted,
+                to.insert(template, extracted, false));
+    }
+
+    /**
+     * 从源端按<b>类型</b>搬走最多 {@code want} 个 {@code template}；返回实际搬走的数量。
+     *
+     * <p>与 {@link #moveOneItemStack} 的区别是<b>不经过「第几号槽」</b>：定位与试算合并成
+     * {@link LongItemHandler#extractMatching(ItemStack, long, boolean)} 一次调用。对 AE 端点
+     * 这一步是一次按资源键的哈希查找；走槽位的话得先抓一份整网快照，也就是把 ME 网络里的
+     * 每一种资源遍历一遍（实测占无线物流总耗时的 32%）。</p>
+     *
+     * <p><b>{@code skipTargetProbe} 为真时只问两次</b>（源抽一次、目标收一次），不为真的话
+     * 是四次（源试算 → 目标试算 → 源抽 → 目标收）。判据见
+     * {@link #transfer(Object, ServerLevel, StaffLinkRoute, ServerLevel, StaffLinkRoute, long)}。</p>
+     */
+    private static long moveOneItemStackByType(ServerLevel sourceLevel, BlockPos sourcePos,
+                                               LongItemHandler from, LongItemHandler to,
+                                               long want, ItemStack template,
+                                               boolean skipTargetProbe) {
+        if (want <= 0L) {
+            return 0L;
+        }
+        if (skipTargetProbe) {
+            // 源端一次调用完成「定位 + 抽取」：抽到多少就是多少，目标收不下的余量退回源。
+            long extracted = from.extractMatching(template, want, false);
+            if (extracted <= 0L) {
+                return 0L;
+            }
+            return settleItemLeftover(sourceLevel, sourcePos, from, template, extracted,
+                    to.insert(template, extracted, false));
+        }
+        // 源端试算：既回答「有没有这一种」，也给出实际可抽量。
+        long available = from.extractMatching(template, want, true);
+        if (available <= 0L) {
+            return 0L;
+        }
+        long accepted = to.insert(template, available, true);
+        if (accepted <= 0L) {
+            return 0L;
+        }
+        long extracted = from.extractMatching(template, accepted, false);
+        if (extracted <= 0L) {
+            return 0L;
+        }
+        return settleItemLeftover(sourceLevel, sourcePos, from, template, extracted,
+                to.insert(template, extracted, false));
     }
 
     /**
@@ -547,20 +572,17 @@ public final class StaffLinkTargets {
      * <p>模拟阶段两边都给的是 long 精确上限，因此 {@code limit} 能一次性用满。</p>
      */
     private static long moveFluid(LongFluidHandler from, LongFluidHandler to, long limit,
-                                  List<LinkFilterSlot> sourceFilter, List<LinkFilterSlot> targetFilter) {
-        // 有过滤器时按类型直接定位，理由同 moveItems：AE 端点的 getTanks() 是网络里的流体
-        // 种类数，靠扫描会被预算截断，排在后面的那些永远搬不过来。
+                                  List<LinkFilterSlot> sourceFilter, List<LinkFilterSlot> targetFilter,
+                                  boolean skipTargetProbe) {
+        // 有过滤器时按类型直接抽，理由同 moveItems：AE 端点的 getTanks() 是网络里的流体
+        // 种类数，靠扫描会被预算截断，排在后面的那些永远搬不过来；而 findTank 又要先抓整网快照。
         List<FluidStack> wanted = filteredFluidMarkers(sourceFilter, targetFilter);
         if (!wanted.isEmpty()) {
             for (FluidStack type : wanted) {
                 if (!matchesFluid(sourceFilter, type) || !matchesFluid(targetFilter, type)) {
                     continue;
                 }
-                int tank = from.findTank(type);
-                if (tank < 0) {
-                    continue;
-                }
-                long moved = moveOneFluid(from, to, tank, limit, type);
+                long moved = moveOneFluidByType(from, to, limit, type, skipTargetProbe);
                 if (moved > 0L) {
                     // 一次只搬一种：搬动了就收工。
                     return moved;
@@ -575,7 +597,7 @@ public final class StaffLinkTargets {
             if (type.isEmpty()) {
                 continue;
             }
-            long moved = moveOneFluid(from, to, tank, limit, type);
+            long moved = moveOneFluid(from, to, tank, limit, type, skipTargetProbe);
             if (moved > 0L) {
                 return moved;
             }
@@ -583,14 +605,43 @@ public final class StaffLinkTargets {
         return 0L;
     }
 
+    /**
+     * 处理「已经抽出来了、但目标没全收下」的余量：退回源，退不回就记一条警告。返回实际搬走的量。
+     *
+     * @param drained 从源里实际抽出的量
+     * @param filled  目标实际收下的量
+     */
+    private static long settleFluidLeftover(LongFluidHandler from, LongFluidHandler to,
+                                            FluidStack type, long drained, long filled) {
+        if (filled < drained) {
+            long leftover = drained - filled;
+            long returned = from.fill(type, leftover, false);
+            if (returned < leftover) {
+                UselessMod.LOGGER.warn(
+                        "无线物流：流体回填失败，{} mB {} 无法回收（源 {}，目标 {}）",
+                        leftover - returned, type.getFluid(),
+                        from.getClass().getSimpleName(), to.getClass().getSimpleName());
+            }
+        }
+        return Math.max(0L, filled);
+    }
+
     /** 从指定储罐搬走最多 {@code limit} 的 {@code type}；返回实际搬走的量（0 = 没搬动）。 */
     private static long moveOneFluid(LongFluidHandler from, LongFluidHandler to, int tank,
-                                     long limit, FluidStack type) {
+                                     long limit, FluidStack type, boolean skipTargetProbe) {
         long available = from.amountIn(tank);
         if (available <= 0L) {
             return 0L;
         }
-        long drainable = from.drain(tank, Math.min(limit, available), true);
+        long request = Math.min(limit, available);
+        if (skipTargetProbe) {
+            long drained = from.drain(tank, request, false);
+            if (drained <= 0L) {
+                return 0L;
+            }
+            return settleFluidLeftover(from, to, type, drained, to.fill(type, drained, false));
+        }
+        long drainable = from.drain(tank, request, true);
         if (drainable <= 0L) {
             return 0L;
         }
@@ -604,20 +655,38 @@ public final class StaffLinkTargets {
         if (drained <= 0L) {
             return 0L;
         }
-        long filled = to.fill(type, drained, false);
-        if (filled < drained) {
-            // 目标在执行阶段吐回了余量。模拟与执行走的是同一组调用，正常情况下不该发生；
-            // 一旦发生就必须把余量退回源，退不回也不能让它凭空消失。
-            long leftover = drained - filled;
-            long returned = from.fill(type, leftover, false);
-            if (returned < leftover) {
-                UselessMod.LOGGER.warn(
-                        "无线物流：流体回填失败，{} mB {} 无法回收（源 {}，目标 {}）",
-                        leftover - returned, type.getFluid(),
-                        from.getClass().getSimpleName(), to.getClass().getSimpleName());
+        return settleFluidLeftover(from, to, type, drained, to.fill(type, drained, false));
+    }
+
+    /**
+     * 从源端按<b>类型</b>搬走最多 {@code limit} 的 {@code type}；返回实际搬走的量。
+     *
+     * <p>理由同 {@link #moveOneItemStackByType}：不经过「第几号罐」，定位与试算合并成
+     * {@link LongFluidHandler#drainMatching(FluidStack, long, boolean)} 一次调用。</p>
+     */
+    private static long moveOneFluidByType(LongFluidHandler from, LongFluidHandler to,
+                                           long limit, FluidStack type, boolean skipTargetProbe) {
+        if (skipTargetProbe) {
+            long drained = from.drainMatching(type, limit, false);
+            if (drained <= 0L) {
+                return 0L;
             }
+            return settleFluidLeftover(from, to, type, drained, to.fill(type, drained, false));
         }
-        return Math.max(0L, filled);
+        long drainable = from.drainMatching(type, limit, true);
+        if (drainable <= 0L) {
+            return 0L;
+        }
+        long fillable = to.fill(type, drainable, true);
+        long target = Math.min(drainable, fillable);
+        if (target <= 0L) {
+            return 0L;
+        }
+        long drained = from.drainMatching(type, target, false);
+        if (drained <= 0L) {
+            return 0L;
+        }
+        return settleFluidLeftover(from, to, type, drained, to.fill(type, drained, false));
     }
 
     /** 收集两端过滤器里列出的流体种类（按类型去重）。 */

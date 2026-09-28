@@ -7,10 +7,8 @@ import com.sorrowmist.useless.content.stafflink.LinkFlow;
 import com.sorrowmist.useless.content.stafflink.LinkMedium;
 import com.sorrowmist.useless.content.stafflink.LinkTrigger;
 import com.sorrowmist.useless.content.stafflink.ResourceFamily;
-import com.sorrowmist.useless.content.stafflink.StaffLinkEngine;
 import com.sorrowmist.useless.content.stafflink.StaffLinkFilters;
 import com.sorrowmist.useless.content.stafflink.StaffLinkRoute;
-import com.sorrowmist.useless.content.stafflink.StaffLinkTargets;
 import com.sorrowmist.useless.network.StaffLinkSyncPacket;
 import com.sorrowmist.useless.world.stafflink.StaffLinkNetwork;
 import net.minecraft.client.Minecraft;
@@ -38,7 +36,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.OptionalLong;
-import java.util.UUID;
 
 /**
  * 无线物流配置界面。
@@ -402,15 +399,6 @@ public final class StaffLinkScreen extends AbstractContainerScreen<StaffLinkMenu
         updateControls();
     }
 
-    /** 界面收到服务端的「上次搬运」读数。 */
-    public void receiveStatus(UUID networkId, long requested, long moved, int targets, long tick,
-                              StaffLinkTargets.TransferBlocker blocker) {
-        if (!networkId.equals(menu.getNetworkId())) {
-            return;
-        }
-        menu.receiveStatus(tick, requested, moved, targets, blocker);
-    }
-
     @Override
     public void onClose() {
         applyEdits();
@@ -704,7 +692,6 @@ public final class StaffLinkScreen extends AbstractContainerScreen<StaffLinkMenu
         graphics.drawString(font, Component.translatable("gui.useless_mod.wireless_logistics.filter"),
                 FILTER_X + FILTER_COLUMNS * FILTER_SLOT_STEP + 2, FILTER_Y + 4,
                 MachineScreenStyle.MUTED_TEXT_COLOR, false);
-        renderTransferStats(graphics);
         renderSelectionCount(graphics);
         renderNotice(graphics);
     }
@@ -728,63 +715,6 @@ public final class StaffLinkScreen extends AbstractContainerScreen<StaffLinkMenu
                 "gui.useless_mod.wireless_logistics.multi_select_count", count);
         graphics.drawString(font, text, CONTENT_RIGHT - font.width(text), FILTER_Y + 22,
                 MULTI_SELECT_TEXT_COLOR, false);
-    }
-
-    /**
-     * 「上次搬运」读数：实际搬走 / 请求，搬不动时补一句卡在哪。
-     *
-     * <p>有这行数字就能一眼分清「设置没送到服务端」（请求量还是旧值）和
-     * 「送过去了但搬不动」（请求量对、搬走 0，并给出原因）。</p>
-     */
-    private void renderTransferStats(GuiGraphics graphics) {
-        StaffLinkEngine.TransferStats stats = menu.getLastStats();
-        Component text;
-        int color = MachineScreenStyle.MUTED_TEXT_COLOR;
-        if (stats.tick() < 0) {
-            text = Component.translatable("gui.useless_mod.wireless_logistics.stats_none");
-        } else if (stats.blocker() != StaffLinkTargets.TransferBlocker.NONE) {
-            text = Component.translatable("gui.useless_mod.wireless_logistics.stats_blocked",
-                    stats.moved(), stats.requested(),
-                    Component.translatable(blockerKey(stats.blocker())));
-            color = MachineScreenStyle.ERROR_TEXT_COLOR;
-        } else {
-            text = Component.translatable("gui.useless_mod.wireless_logistics.stats",
-                    stats.moved(), stats.requested());
-            if (stats.moved() > 0) {
-                color = 0xFF2E7D32;
-            } else if (stats.requested() > 0) {
-                color = MachineScreenStyle.ERROR_TEXT_COLOR;
-            }
-        }
-        graphics.drawString(font, text, FILTER_X + FILTER_COLUMNS * FILTER_SLOT_STEP + 2, FILTER_Y + 20,
-                color, false);
-    }
-
-    private static String blockerKey(StaffLinkTargets.TransferBlocker blocker) {
-        return switch (blocker) {
-            case SOURCE_UNREACHABLE -> "gui.useless_mod.wireless_logistics.blocker.source_unreachable";
-            case TARGET_UNREACHABLE -> "gui.useless_mod.wireless_logistics.blocker.target_unreachable";
-            case FILTERED -> "gui.useless_mod.wireless_logistics.blocker.filtered";
-            case SOURCE_EMPTY -> "gui.useless_mod.wireless_logistics.blocker.source_empty";
-            case SOURCE_REJECTED -> "gui.useless_mod.wireless_logistics.blocker.source_rejected";
-            case TARGET_REJECTED -> "gui.useless_mod.wireless_logistics.blocker.target_rejected";
-            case NONE -> "gui.useless_mod.wireless_logistics.stats_none";
-        };
-    }
-
-    /** 悬停读数时给出完整含义（含分给了几个输出）。 */
-    private void renderStatsTooltip(GuiGraphics graphics, int mouseX, int mouseY) {
-        double localX = mouseX - leftPos;
-        double localY = mouseY - topPos;
-        int statsX = FILTER_X + FILTER_COLUMNS * FILTER_SLOT_STEP + 2;
-        if (localX < statsX || localX > CONTENT_RIGHT || localY < FILTER_Y + 18 || localY > FILTER_Y + 32) {
-            return;
-        }
-        StaffLinkEngine.TransferStats stats = menu.getLastStats();
-        graphics.renderTooltip(font,
-                List.of(Component.translatable("gui.useless_mod.wireless_logistics.stats_hint",
-                        stats.moved(), stats.requested(), stats.targets())),
-                Optional.empty(), mouseX, mouseY);
     }
 
     /** 第一行右侧：「网络 2/3」，右对齐到面板右边。 */
@@ -970,7 +900,6 @@ public final class StaffLinkScreen extends AbstractContainerScreen<StaffLinkMenu
         renderAnchorTooltip(graphics, mouseX, mouseY);
         renderFilterTooltip(graphics, mouseX, mouseY);
         renderNumericTooltip(graphics, mouseX, mouseY);
-        renderStatsTooltip(graphics, mouseX, mouseY);
         renderNetworkTooltip(graphics, mouseX, mouseY);
         renderRouteTooltip(graphics, mouseX, mouseY);
         renderTooltip(graphics, mouseX, mouseY);

@@ -56,4 +56,20 @@ public interface LongFluidHandler extends LongResourceHandler {
         }
         return -1;
     }
+
+    /**
+     * 按类型直接抽走 {@code amount}，不经过「第几号罐」。语义与
+     * {@link LongItemHandler#extractMatching(net.minecraft.world.item.ItemStack, long, boolean)}
+     * 完全对称：一次调用同时回答「有没有这一种」和「能抽多少」，默认实现 =
+     * {@link #findTank(FluidStack)} + {@link #drain(int, long, boolean)}。
+     *
+     * <p>AE 端点必须覆写它 —— 否则每次都会先抓一份整网快照（遍历 ME 网络里的每一种流体）。</p>
+     */
+    default long drainMatching(FluidStack type, long amount, boolean simulate) {
+        if (type == null || type.isEmpty() || amount <= 0L) {
+            return 0L;
+        }
+        int tank = findTank(type);
+        return tank < 0 ? 0L : drain(tank, amount, simulate);
+    }
 }

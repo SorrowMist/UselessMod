@@ -15,7 +15,6 @@ import com.sorrowmist.useless.network.BeefInvulnerabilitySyncPacket;
 import com.sorrowmist.useless.network.BeefToolLayoutResultPacket;
 import com.sorrowmist.useless.network.BeefToolLayoutSyncPacket;
 import com.sorrowmist.useless.network.StaffLinkHighlightPacket;
-import com.sorrowmist.useless.network.StaffLinkStatusPacket;
 import com.sorrowmist.useless.network.StaffLinkSyncPacket;
 import com.sorrowmist.useless.world.stafflink.StaffLinkNetwork;
 import net.minecraft.client.Minecraft;
@@ -128,14 +127,6 @@ public final class ClientPacketHandlers {
         lastStaffLinkSync = packet;
         if (Minecraft.getInstance().screen instanceof StaffLinkScreen screen) {
             screen.receiveSync(packet);
-        }
-    }
-
-    /** 无线物流：把「上次搬了多少」的读数交给已打开的配置界面。 */
-    public static void handleStaffLinkStatus(StaffLinkStatusPacket packet) {
-        if (Minecraft.getInstance().screen instanceof StaffLinkScreen screen) {
-            screen.receiveStatus(packet.networkId(), packet.requested(), packet.moved(),
-                    packet.targets(), packet.tick(), packet.blocker());
         }
     }
 

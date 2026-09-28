@@ -4,9 +4,7 @@ import com.sorrowmist.useless.content.stafflink.LinkFlow;
 import com.sorrowmist.useless.content.stafflink.LinkFilterSlot;
 import com.sorrowmist.useless.content.stafflink.LinkMedium;
 import com.sorrowmist.useless.content.stafflink.LinkTrigger;
-import com.sorrowmist.useless.content.stafflink.StaffLinkEngine;
 import com.sorrowmist.useless.content.stafflink.StaffLinkRoute;
-import com.sorrowmist.useless.content.stafflink.StaffLinkTargets;
 import com.sorrowmist.useless.init.ModMenuType;
 import com.sorrowmist.useless.network.StaffLinkConfigurePacket;
 import com.sorrowmist.useless.network.StaffLinkCyclePacket;
@@ -31,6 +29,7 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 
 /**
@@ -70,9 +69,6 @@ public final class StaffLinkMenu extends AbstractContainerMenu {
      * 多选集合决定「一次改动要写到哪些容器上」。集合为空时只改单选那一个。</p>
      */
     private final List<GlobalPos> multiSelection = new ArrayList<>();
-
-    /** 服务端每秒推一次「上次搬运」读数，界面上直接显示，省得靠猜。 */
-    private StaffLinkEngine.TransferStats lastStats = StaffLinkEngine.TransferStats.NONE;
 
     /** 服务端构造：直接绑定到存档里的那张网络。 */
     public StaffLinkMenu(int containerId, Inventory inventory, UUID networkId) {
@@ -194,9 +190,12 @@ public final class StaffLinkMenu extends AbstractContainerMenu {
         this.networkIndex = Math.max(0, index);
         this.networkCount = Math.max(1, count);
         if (selectedAnchor != null && !network.isBound(selectedAnchor)) {
-            selectedAnchor = null;
+            // 选中的锚点已经不在新快照里了。走 setSelection 而不是直接清字段：它顺手把过滤器
+            // 镜像一起刷新了。
+            setSelection(null, selectedRoute);
+        } else {
+            refreshFilterMirror();
         }
-        refreshFilterMirror();
     }
 
     /** 当前网络在该归属者网络列表里的下标（0 起）。 */
@@ -209,10 +208,16 @@ public final class StaffLinkMenu extends AbstractContainerMenu {
         return networkCount;
     }
 
-    /** 界面切换选中锚点/线路。 */
+    /**
+     * 界面切换选中锚点 / 线路。
+     *
+     * <p>纯客户端状态：右边配置区显示谁的配置，以及过滤槽镜像的是谁，都由它决定。
+     * 服务端不需要知道——搬运引擎按存档里的网络配置自己跑，与玩家在看哪个容器无关。</p>
+     */
     public void setSelection(@Nullable GlobalPos anchor, int route) {
+        int clamped = Math.max(0, Math.min(route, StaffLinkNetwork.ROUTE_COUNT - 1));
         this.selectedAnchor = anchor;
-        this.selectedRoute = Math.max(0, Math.min(route, StaffLinkNetwork.ROUTE_COUNT - 1));
+        this.selectedRoute = clamped;
         refreshFilterMirror();
     }
 
@@ -236,17 +241,6 @@ public final class StaffLinkMenu extends AbstractContainerMenu {
     /** 当前网络名（没起过名时为空串）。 */
     public String getNetworkName() {
         return snapshot == null ? "" : snapshot.name();
-    }
-
-    /** 最近一次搬运读数（请求量 / 实际搬走量 / 输出个数）。 */
-    public StaffLinkEngine.TransferStats getLastStats() {
-        return lastStats;
-    }
-
-    /** 客户端收到服务端推来的搬运读数。 */
-    public void receiveStatus(long tick, long requested, long moved, int targets,
-                              StaffLinkTargets.TransferBlocker blocker) {
-        lastStats = new StaffLinkEngine.TransferStats(tick, requested, moved, targets, blocker);
     }
 
     /** 给当前网络改名。 */
@@ -468,9 +462,11 @@ public final class StaffLinkMenu extends AbstractContainerMenu {
             snapshot.detach(anchor);
         }
         if (anchor.equals(selectedAnchor)) {
-            selectedAnchor = null;
+            // 走 setSelection 而不是直接改字段：它顺手把过滤器镜像一起刷新了。
+            setSelection(null, selectedRoute);
+        } else {
+            refreshFilterMirror();
         }
-        refreshFilterMirror();
         if (clientSide) {
             PacketDistributor.sendToServer(new StaffLinkDetachPacket(anchor));
         }

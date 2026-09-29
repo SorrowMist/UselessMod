@@ -112,6 +112,20 @@ public final class StaffLinkScreen extends AbstractContainerScreen<StaffLinkMenu
     private static final int MEDIUM_MENU_Y = ROW_SECOND_Y + ROW_HEIGHT + 1;
     private static final int MEDIUM_MENU_WIDTH = FLOW_WIDTH;
     private static final int MEDIUM_MENU_ROW_HEIGHT = ROW_HEIGHT;
+
+    /**
+     * 下拉菜单的绘制 z。
+     *
+     * <p>GUI 的深度测试是开着的（{@code RenderType.GUI}、文字与 AE2 面板都走 LEQUAL），
+     * 而 {@link GuiGraphics} 给容器内容定的 z 依次是：槽位物品 150、堆叠数字 200、
+     * 手持拖动物品 232（其数字再 +200）。下拉若留在 z=0，就比这些内容全都远，
+     * 片段会被深度测试直接丢掉 —— 光 {@code flush()} 只保证「后画」，救不回来，
+     * 表现就是下拉被背包物品和栏位数字盖住。</p>
+     *
+     * <p>抬到 500 可稳定压过全部容器内容（原版 tooltip 用 400；下拉展开期间不弹 tooltip，
+     * 所以不必迁就它）。</p>
+     */
+    private static final float MEDIUM_MENU_Z = 500.0F;
     private static final int SIDE_WIDTH = 113;
     private static final int SIDE_TRIGGER_GAP = 6;
 
@@ -925,6 +939,13 @@ public final class StaffLinkScreen extends AbstractContainerScreen<StaffLinkMenu
         // 提交时仍会按图层顺序排到弹出层前面（表现就是物品和输入框盖在下拉菜单上）。
         // 先 flush 一次把它们定型，弹出层随后单独成一批。
         graphics.flush();
+
+        // 再整体抬 z。flush() 只解决「谁后画」，解决不了深度测试：
+        // 槽位物品画在 z=150、堆叠数字画在 z=200（见 GuiGraphics#renderItem 与
+        // #renderItemDecorations），下拉留在 z=0 会比它们都远，片段照样被丢掉。
+        // 两者都要做：先 flush 定序，再抬 z 让深度测试放行。
+        graphics.pose().pushPose();
+        graphics.pose().translate(0.0F, 0.0F, MEDIUM_MENU_Z);
         MachineScreenStyle.drawPanel(graphics, x, y, MEDIUM_MENU_WIDTH,
                 mediumOptions.size() * MEDIUM_MENU_ROW_HEIGHT);
 
@@ -947,6 +968,7 @@ public final class StaffLinkScreen extends AbstractContainerScreen<StaffLinkMenu
                     option == current ? MachineScreenStyle.TEXT_COLOR : MachineScreenStyle.SUBTLE_TEXT_COLOR,
                     false);
         }
+        graphics.pose().popPose();
         // 再落一次地，让弹出层立刻定型——否则本帧后面还有内容入批时会重新排到它前面。
         graphics.flush();
     }

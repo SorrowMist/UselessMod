@@ -282,10 +282,26 @@ public class PagedRecoverableScreen<T extends PagedRecoverableMenu> extends Abst
         super.render(graphics, mouseX, mouseY, partialTick);
         // 物品与提示框均由原版在 super.render 中绘制，先提交其批次再绘制高亮，
         // 否则同批次内的绘制顺序无法保证高亮位于物品之上。
+        // 注意 flush 只解决「谁后画」，深度测试还得靠 SEARCH_HIGHLIGHT_Z 抬 z，
+        // 两件事缺一不可。
         graphics.flush();
         renderSearchHighlights(graphics, partialTick);
         renderTooltip(graphics, mouseX, mouseY);
     }
+
+    /**
+     * 命中槽位高亮的绘制 z。
+     *
+     * <p>GUI 的深度测试是开着的（{@code RenderType.GUI} 走 {@code LEQUAL_DEPTH_TEST}），
+     * 而槽位物品画在 z=150 附近（{@code GuiGraphics#renderItem} 的 +150，再叠模型自身
+     * 经 {@code display.gui} 变换后的几个像素）。高亮边框留在 z=0 会比物品<b>远</b>，
+     * 压在物品贴图上的那几条边会被深度测试直接丢掉 —— 贴图铺满整格的方块类物品上
+     * 高亮基本看不见，且光 {@code flush()} 修不好（它只管先后，不管远近）。</p>
+     *
+     * <p>取 170：压过物品并留出余量，又刻意<b>低于</b>堆叠数字的 z=200 ——
+     * 数量是搜索时最要紧的信息，不该被半透明高亮染色；同时也低于原版 tooltip 的 400。</p>
+     */
+    private static final float SEARCH_HIGHLIGHT_Z = 170.0F;
 
     /**
      * 高亮命中当前查询的槽位。
@@ -298,6 +314,9 @@ public class PagedRecoverableScreen<T extends PagedRecoverableMenu> extends Abst
     private void renderSearchHighlights(GuiGraphics graphics, float partialTick) {
         if (!menu.isFiltered() || menu.isRecoveryPage()) return;
         int limit = Math.min(filterableSlots, menu.slots.size());
+        // 抬 z 放在这里而不是 highlightSlot 内部，是为了让子类覆写的标记样式一并生效。
+        graphics.pose().pushPose();
+        graphics.pose().translate(0.0F, 0.0F, SEARCH_HIGHLIGHT_Z);
         int order = 0;
         for (int menuSlot = 0; menuSlot < limit; menuSlot++) {
             if (!matchesSearch(menuSlot)) continue;
@@ -305,6 +324,7 @@ public class PagedRecoverableScreen<T extends PagedRecoverableMenu> extends Abst
             if (slot.getItem().isEmpty()) continue;
             highlightSlot(graphics, slot, order++, partialTick);
         }
+        graphics.pose().popPose();
     }
 
     /**

@@ -157,6 +157,7 @@ public class ConfigManager {
     private static final ModConfigSpec.BooleanValue ENABLE_APOTHEOSIS_RECIPE_CONVERSION;
     private static final ModConfigSpec.BooleanValue ENABLE_LYCHEE_RECIPE_CONVERSION;
     private static final ModConfigSpec.BooleanValue ENABLE_ASTRAL_SORCERY_RECIPE_CONVERSION;
+    private static final ModConfigSpec.BooleanValue ENABLE_EX_DEORUM_RECIPE_CONVERSION;
     private static final ModConfigSpec.BooleanValue ENABLE_JUSTDIRETHINGS_RECIPE_CONVERSION;
     private static final ModConfigSpec.BooleanValue ENABLE_JDTE_RECIPE_CONVERSION;
     private static final Map<String, ModConfigSpec.BooleanValue> RECIPE_CONVERSION_OPTIONS;
@@ -672,6 +673,8 @@ public class ConfigManager {
                 "enable_astralsorcery_recipe_conversion", true);
         ENABLE_ARS_NOUVEAU_RECIPE_CONVERSION = defineRecipeConversionOption(
                 "enable_ars_nouveau_recipe_conversion", true);
+        ENABLE_EX_DEORUM_RECIPE_CONVERSION = defineRecipeConversionOption(
+                "enable_ex_deorum_recipe_conversion", true);
         ENABLE_AVARITIA_RECIPE_CONVERSION = defineRecipeConversionOption(
                 "enable_avaritia_recipe_conversion", true);
         ENABLE_BIG_REACTORS_RECIPE_CONVERSION = defineRecipeConversionOption(
@@ -734,6 +737,7 @@ public class ConfigManager {
                 Map.entry("avaritia", ENABLE_AVARITIA_RECIPE_CONVERSION),
                 Map.entry("barbequesdelight", ENABLE_BARBEQUES_DELIGHT_RECIPE_CONVERSION),
                 Map.entry("bigreactors", ENABLE_BIG_REACTORS_RECIPE_CONVERSION),
+                Map.entry("exdeorum", ENABLE_EX_DEORUM_RECIPE_CONVERSION),
                 Map.entry("brewinandchewin", ENABLE_BREWIN_AND_CHEWIN_RECIPE_CONVERSION),
                 Map.entry("casualnessdelight", ENABLE_CASUALNESS_DELIGHT_RECIPE_CONVERSION),
                 Map.entry("crabbersdelight", ENABLE_CRABBERS_DELIGHT_RECIPE_CONVERSION),

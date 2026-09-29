@@ -168,6 +168,7 @@ public final class RecipeAdapterCompatRegistry {
     public static final String APOTHEOSIS = RecipeSourceIds.APOTHEOSIS;
     public static final String LYCHEE = RecipeSourceIds.LYCHEE;
     public static final String ASTRAL_SORCERY = RecipeSourceIds.ASTRAL_SORCERY;
+    public static final String EX_DEORUM = RecipeSourceIds.EX_DEORUM;
 
     private static final List<CompatEntry> ENTRIES = List.of(
             new CompatEntry(null, RecipeAdapterCompatRegistry::registerMinecraft),
@@ -223,7 +224,8 @@ public final class RecipeAdapterCompatRegistry {
             new CompatEntry(FLUX_NETWORKS, RecipeAdapterCompatRegistry::registerFluxNetworks),
             new CompatEntry(APOTHEOSIS, RecipeAdapterCompatRegistry::registerApotheosis),
             new CompatEntry(LYCHEE, RecipeAdapterCompatRegistry::registerLychee),
-            new CompatEntry(ASTRAL_SORCERY, RecipeAdapterCompatRegistry::registerAstralSorcery)
+            new CompatEntry(ASTRAL_SORCERY, RecipeAdapterCompatRegistry::registerAstralSorcery),
+            new CompatEntry(EX_DEORUM, RecipeAdapterCompatRegistry::registerExDeorum)
     );
 
     private RecipeAdapterCompatRegistry() {}
@@ -607,6 +609,26 @@ public final class RecipeAdapterCompatRegistry {
         register(new com.sorrowmist.useless.content.recipe.adapters.astralsorcery.InfusionRecipeAdapter());
         register(new LightwellRecipeAdapter());
         register(new AltarRecipeAdapter());
+    }
+
+    /**
+     * 注册 Ex Deorum 的桶、坩埚、筛子与锤子配方适配器。
+     *
+     * <p>桶的四类配方（堆肥、物品混合、流体混合、流体转化）共用 {@code exdeorum:barrels}
+     * 物品标签作为模具，因此无需按石桶与木桶分别登记；坩埚与筛子的模具由材料注册表在运行时枚举。
+     * 筛子适配同时覆盖普通筛子与重型筛子，其模具由配方限定的筛网决定。</p>
+     *
+     * <p>锤子适配覆盖普通锤与压缩锤两类配方，模具按配方实际类型在转换阶段选定，固定为钻石锤与
+     * 钻石压缩锤。该适配器以生成配方方式提供结果，必须在此登记，否则其配方不会进入合金炉配方目录。</p>
+     */
+    private static void registerExDeorum() {
+        register(new com.sorrowmist.useless.content.recipe.adapters.exdeorum.BarrelCompostRecipeAdapter());
+        register(new com.sorrowmist.useless.content.recipe.adapters.exdeorum.BarrelMixingRecipeAdapter());
+        register(new com.sorrowmist.useless.content.recipe.adapters.exdeorum.BarrelFluidMixingRecipeAdapter());
+        register(new com.sorrowmist.useless.content.recipe.adapters.exdeorum.FluidTransformationRecipeAdapter());
+        register(new com.sorrowmist.useless.content.recipe.adapters.exdeorum.CrucibleRecipeAdapter());
+        register(new com.sorrowmist.useless.content.recipe.adapters.exdeorum.SieveRecipeAdapter());
+        register(new com.sorrowmist.useless.content.recipe.adapters.exdeorum.HammerRecipeAdapter());
     }
 
     private record CompatEntry(@Nullable String modId, Runnable registerAction) {}

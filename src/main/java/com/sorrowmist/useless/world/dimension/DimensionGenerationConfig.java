@@ -100,7 +100,7 @@ public record DimensionGenerationConfig(
                         .forGetter(Features::boundaryIntervalX),
                 Codec.INT.optionalFieldOf("boundary_interval_z", 1)
                         .forGetter(Features::boundaryIntervalZ),
-                Codec.INT.optionalFieldOf("road_width", 0)
+                Codec.INT.optionalFieldOf("road_width", 1)
                         .forGetter(Features::roadWidth),
                 Codec.STRING.optionalFieldOf("mode", Mode.ROAD.name())
                         .forGetter(features -> features.mode().name()),
@@ -136,7 +136,7 @@ public record DimensionGenerationConfig(
                     DEFAULT_BOUNDARY_BLOCK_B,
                     1,
                     1,
-                    0,
+                    1,
                     Mode.ROAD,
                     DEFAULT_ROAD_SURFACE_BLOCK,
                     DEFAULT_ROAD_MARKING_BLOCK,

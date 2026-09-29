@@ -2,6 +2,7 @@ package com.sorrowmist.useless.mixin.ae2;
 
 import appeng.api.crafting.IPatternDetails;
 import appeng.api.crafting.PatternDetailsHelper;
+import appeng.core.definitions.AEItems;
 import appeng.crafting.pattern.AEProcessingPattern;
 import appeng.helpers.IPatternTerminalLogicHost;
 import appeng.util.inv.AppEngInternalInventory;
@@ -15,7 +16,7 @@ import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.Process
 import com.sorrowmist.useless.content.recipe.AlloyFurnaceRecipeCatalog;
 import com.sorrowmist.useless.content.recipe.AlloyFurnaceRecipeIdentity;
 import com.sorrowmist.useless.content.recipe.RecipeSourceIds;
-import net.minecraft.core.BlockPos;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import org.jetbrains.annotations.Nullable;
@@ -55,6 +56,10 @@ public class PatternEncodingLogicMixin implements PendingOmniversalPatternHolder
     @Shadow(remap = false)
     @Final
     private AppEngInternalInventory encodedPatternInv;
+
+    @Shadow(remap = false)
+    @Final
+    private AppEngInternalInventory blankPatternInv;
 
     /**
      * Not persisted: a pending pick only makes sense within the session that made it, and a stale
@@ -204,10 +209,25 @@ public class PatternEncodingLogicMixin implements PendingOmniversalPatternHolder
         // 因此回写槽位与写入总成均不会再次触发本回调。
         // 提示在槽位清空之后发送：玩家看到的顺序应为「样板已进入多方块合金炉」，
         // 而不是先收到提示、再看到槽位被清空。
-        BlockPos uploadedTo = OmniversalPatternUploader.upload(host, omniversal);
-        if (uploadedTo != null) {
+        ServerPlayer player = PatternUploadNotice.resolvePlayer(this, host);
+        OmniversalPatternUploader.Result result = OmniversalPatternUploader.upload(host, omniversal);
+        if (result.outcome() == OmniversalPatternUploader.Outcome.UPLOADED) {
             encodedPatternInv.setItemDirect(0, ItemStack.EMPTY);
-            PatternUploadNotice.notifyPlayer(this, host, uploadedTo);
+            PatternUploadNotice.notifyUploaded(player, result.target());
+            return;
+        }
+        // 网络中已有等价样板：本次编码不再写入，同时把这次消耗的空白样板还给玩家。
+        // 找不到玩家时无法退还，此时保留样板，避免玩家在无提示的情况下净亏一个空白样板。
+        if (result.outcome() == OmniversalPatternUploader.Outcome.DUPLICATE && player != null) {
+            encodedPatternInv.setItemDirect(0, ItemStack.EMPTY);
+            // 空白样板优先回到终端自带的空白样板槽：那里本就是玩家放置空白样板的位置，
+            // 刚被本次编码消耗掉一个，通常正好空出来。该槽被占用或放不下时再退背包。
+            ItemStack refund = AEItems.BLANK_PATTERN.stack(1);
+            ItemStack remain = blankPatternInv.addItems(refund);
+            if (!remain.isEmpty()) {
+                player.getInventory().placeItemBackInInventory(remain, false);
+            }
+            PatternUploadNotice.notifyDuplicate(player);
         }
     }
 

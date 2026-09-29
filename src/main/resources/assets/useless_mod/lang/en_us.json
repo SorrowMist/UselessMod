@@ -1213,5 +1213,6 @@
   "gui.useless_mod.wireless_logistics.unbound": "Unbound %s from the wireless logistics network",
   "gui.useless_mod.wireless_logistics.not_bindable": "This block has no movable storage",
   "gui.useless_mod.omniversal_pattern.uploaded": "Omniversal pattern uploaded to the multiblock alloy furnace at: %s, Dim: %s (%s blocks away)",
+  "gui.useless_mod.omniversal_pattern.duplicate": "An identical omniversal pattern already exists in the multiblock alloy furnace; it was not uploaded and the blank pattern was refunded",
   "gui.useless_mod.omniversal_pattern.uploaded.tooltip": "Click to teleport to that multiblock alloy furnace"
 }

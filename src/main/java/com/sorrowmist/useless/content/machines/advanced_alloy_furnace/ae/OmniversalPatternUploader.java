@@ -4,7 +4,7 @@ import appeng.api.networking.IGrid;
 import appeng.helpers.IPatternTerminalLogicHost;
 import appeng.parts.AEBasePart;
 import com.sorrowmist.useless.content.blockentities.multiblock.MePatternAssemblyBlockEntity;
-import net.minecraft.core.BlockPos;
+import net.minecraft.core.GlobalPos;
 import net.minecraft.world.item.ItemStack;
 import org.jetbrains.annotations.Nullable;
 
@@ -25,49 +25,103 @@ import java.util.Set;
  * <p>目标发现方式与 AE2 样板访问终端一致：以 {@code getMachineClasses()} 过滤出
  * 目标宿主类，再按该类取已通电机器。写入前先以 {@code simulateAdd} 确认可容纳，
  * 避免在多个总成上留下部分插入。</p>
+ *
+ * <p>写入前还要对网格上的全部总成查重：只要任一总成已存有输入、输出、模具与配方
+ * 完全一致的万象样板，本次便不再写入。等价样板在总成内并存没有意义——它们会各自参与
+ * 合成派发，使同一次请求被重复满足，同时白占一份样板槽位。</p>
  */
 public final class OmniversalPatternUploader {
 
     private OmniversalPatternUploader() {
     }
 
+    /** 一次移交尝试的结局。 */
+    public enum Outcome {
+        /** 样板已写入某个总成。 */
+        UPLOADED,
+        /** 网格上已存在等价样板，本次未写入。 */
+        DUPLICATE,
+        /** 没有可接收的总成：网格上没有已成型总成，或全部总成已满。 */
+        SKIPPED
+    }
+
+    /**
+     * @param outcome 本次移交的结局
+     * @param target  接收样板的总成位置，仅 {@link Outcome#UPLOADED} 时非空
+     */
+    public record Result(Outcome outcome, @Nullable GlobalPos target) {
+    }
+
     /**
      * 尝试把样板移交给网格上的多方块合金炉样板总成。
      *
-     * <p>本方法只负责移交，不产生任何玩家可见效果；调用方依据返回值决定是否清空终端槽位，
-     * 并按 {@link PatternUploadNotice} 提示发起编码的玩家。</p>
+     * <p>本方法只负责移交，不产生任何玩家可见效果；调用方依据结局决定是否清空终端槽位、
+     * 是否退回空白样板，并按 {@link PatternUploadNotice} 提示发起编码的玩家。</p>
      *
      * @param host    编码终端的逻辑宿主，用于解析所在网格
      * @param pattern 刚编码完成的万象样板
-     * @return 接收样板的总成坐标；不存在可接收的总成时返回 {@code null}，样板应保留在终端内
+     * @return 移交结局；{@link Outcome#SKIPPED} 时样板应保留在终端内
      */
-    public static @Nullable BlockPos upload(IPatternTerminalLogicHost host, ItemStack pattern) {
+    public static Result upload(IPatternTerminalLogicHost host, ItemStack pattern) {
         if (pattern.isEmpty()) {
-            return null;
+            return new Result(Outcome.SKIPPED, null);
         }
         IGrid grid = resolveGrid(host);
         if (grid == null) {
             OmniversalPatternDiagnostics.uploadSkipped("the encoding terminal is not attached to a grid");
-            return null;
+            return new Result(Outcome.SKIPPED, null);
         }
         List<MePatternAssemblyBlockEntity> targets = collectAssemblies(grid);
         if (targets.isEmpty()) {
             OmniversalPatternDiagnostics.uploadSkipped("no online multiblock pattern assembly");
-            return null;
+            return new Result(Outcome.SKIPPED, null);
+        }
+        if (containsEquivalent(targets, pattern)) {
+            OmniversalPatternDiagnostics.uploadDuplicate();
+            return new Result(Outcome.DUPLICATE, null);
         }
         for (MePatternAssemblyBlockEntity target : targets) {
+            if (target.getLevel() == null) {
+                continue;
+            }
             var terminalInventory = target.getTerminalPatternInventory();
             if (!terminalInventory.simulateAdd(pattern).isEmpty()) {
                 continue;
             }
             if (terminalInventory.addItems(pattern).isEmpty()) {
-                BlockPos targetPos = target.getBlockPos().immutable();
-                OmniversalPatternDiagnostics.uploaded(targetPos.toShortString());
-                return targetPos;
+                GlobalPos targetPos = GlobalPos.of(
+                        target.getLevel().dimension(), target.getBlockPos().immutable());
+                OmniversalPatternDiagnostics.uploaded(targetPos.pos().toShortString());
+                return new Result(Outcome.UPLOADED, targetPos);
             }
         }
         OmniversalPatternDiagnostics.uploadSkipped("every multiblock pattern assembly is full");
-        return null;
+        return new Result(Outcome.SKIPPED, null);
+    }
+
+    /**
+     * 判定总成内是否已存有与待移交样板等价的万象样板。
+     *
+     * <p>判等直接比较物品与全部组件：万象样板的输入输出存于
+     * {@code AEComponents.ENCODED_PROCESSING_PATTERN}，配方 id、语义指纹与模具存于
+     * {@code UComponents.OMNIVERSAL_PATTERN_DATA}，二者都是值语义的 record。因此
+     * 「组件全等」恰好等价于「输入、输出、模具、配方全一致」，既不需要逐个字段比对，
+     * 也不会漏掉模具标签这类隐式差异。</p>
+     *
+     * <p>只扫描总成自身发布的样板库存，即玩家在样板访问终端中能看到的那一份，
+     * 不涉及终端内尚未移交的样板。</p>
+     */
+    private static boolean containsEquivalent(List<MePatternAssemblyBlockEntity> targets, ItemStack pattern) {
+        for (MePatternAssemblyBlockEntity target : targets) {
+            var inventory = target.getTerminalPatternInventory();
+            for (int slot = 0; slot < inventory.size(); slot++) {
+                ItemStack stored = inventory.getStackInSlot(slot);
+                if (!stored.isEmpty() && ItemStack.isSameItemSameComponents(stored, pattern)) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     /**

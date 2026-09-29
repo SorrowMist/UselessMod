@@ -122,6 +122,13 @@ public final class OmniversalPatternDiagnostics {
         }
     }
 
+    /** 网络中已存在输入、输出、模具与配方完全一致的万象样板，本次未写入总成。 */
+    public static void uploadDuplicate() {
+        if (LOGGER.isDebugEnabled()) {
+            LOGGER.debug("omniversal pattern upload skipped: an equivalent pattern already exists");
+        }
+    }
+
     /** 未执行移交，样板保留在编码终端内。常见于网格上没有多方块样板总成的情形。 */
     public static void uploadSkipped(String reason) {
         if (LOGGER.isDebugEnabled()) {

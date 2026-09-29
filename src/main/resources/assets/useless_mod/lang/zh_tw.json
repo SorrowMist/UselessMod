@@ -1215,5 +1215,6 @@
   "gui.useless_mod.wireless_logistics.unbound": "已從無線物流網路解綁 %s",
   "gui.useless_mod.wireless_logistics.not_bindable": "該方塊沒有可搬運的庫存",
   "gui.useless_mod.omniversal_pattern.uploaded": "萬象樣板已上傳至多方塊合金爐：%s，維度：%s（%s 格外）",
+  "gui.useless_mod.omniversal_pattern.duplicate": "多方塊合金爐中已存在相同的萬象樣板，本次不再上傳，已退回空白樣板",
   "gui.useless_mod.omniversal_pattern.uploaded.tooltip": "點擊傳送至該多方塊合金爐"
 }

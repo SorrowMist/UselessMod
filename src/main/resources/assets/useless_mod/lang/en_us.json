@@ -1211,5 +1211,7 @@
   "gui.useless_mod.wireless_logistics.dissolve": "Dissolve",
   "gui.useless_mod.wireless_logistics.bound": "Bound %s to the wireless logistics network",
   "gui.useless_mod.wireless_logistics.unbound": "Unbound %s from the wireless logistics network",
-  "gui.useless_mod.wireless_logistics.not_bindable": "This block has no movable storage"
+  "gui.useless_mod.wireless_logistics.not_bindable": "This block has no movable storage",
+  "gui.useless_mod.omniversal_pattern.uploaded": "Omniversal pattern uploaded to the multiblock alloy furnace at: %s, Dim: %s (%s blocks away)",
+  "gui.useless_mod.omniversal_pattern.uploaded.tooltip": "Click to teleport to that multiblock alloy furnace"
 }

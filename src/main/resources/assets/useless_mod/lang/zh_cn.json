@@ -1215,5 +1215,7 @@
   "gui.useless_mod.wireless_logistics.dissolve": "解散网络",
   "gui.useless_mod.wireless_logistics.bound": "已绑定 %s 到无线物流网络",
   "gui.useless_mod.wireless_logistics.unbound": "已从无线物流网络解绑 %s",
-  "gui.useless_mod.wireless_logistics.not_bindable": "该方块没有可搬运的库存"
+  "gui.useless_mod.wireless_logistics.not_bindable": "该方块没有可搬运的库存",
+  "gui.useless_mod.omniversal_pattern.uploaded": "万象样板已上传至多方块合金炉：%s，维度：%s（%s 格外）",
+  "gui.useless_mod.omniversal_pattern.uploaded.tooltip": "点击传送到该多方块合金炉"
 }

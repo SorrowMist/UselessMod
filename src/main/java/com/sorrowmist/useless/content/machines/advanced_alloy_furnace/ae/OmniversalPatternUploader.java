@@ -4,6 +4,7 @@ import appeng.api.networking.IGrid;
 import appeng.helpers.IPatternTerminalLogicHost;
 import appeng.parts.AEBasePart;
 import com.sorrowmist.useless.content.blockentities.multiblock.MePatternAssemblyBlockEntity;
+import net.minecraft.core.BlockPos;
 import net.minecraft.world.item.ItemStack;
 import org.jetbrains.annotations.Nullable;
 
@@ -33,24 +34,26 @@ public final class OmniversalPatternUploader {
     /**
      * 尝试把样板移交给网格上的多方块合金炉样板总成。
      *
+     * <p>本方法只负责移交，不产生任何玩家可见效果；调用方依据返回值决定是否清空终端槽位，
+     * 并按 {@link PatternUploadNotice} 提示发起编码的玩家。</p>
+     *
      * @param host    编码终端的逻辑宿主，用于解析所在网格
      * @param pattern 刚编码完成的万象样板
-     * @return {@code true} 表示样板已被某个总成接收，调用方应清空终端中的源槽位；
-     *         {@code false} 表示不存在可接收的总成，样板应保留在终端内
+     * @return 接收样板的总成坐标；不存在可接收的总成时返回 {@code null}，样板应保留在终端内
      */
-    public static boolean upload(IPatternTerminalLogicHost host, ItemStack pattern) {
+    public static @Nullable BlockPos upload(IPatternTerminalLogicHost host, ItemStack pattern) {
         if (pattern.isEmpty()) {
-            return false;
+            return null;
         }
         IGrid grid = resolveGrid(host);
         if (grid == null) {
             OmniversalPatternDiagnostics.uploadSkipped("the encoding terminal is not attached to a grid");
-            return false;
+            return null;
         }
         List<MePatternAssemblyBlockEntity> targets = collectAssemblies(grid);
         if (targets.isEmpty()) {
             OmniversalPatternDiagnostics.uploadSkipped("no online multiblock pattern assembly");
-            return false;
+            return null;
         }
         for (MePatternAssemblyBlockEntity target : targets) {
             var terminalInventory = target.getTerminalPatternInventory();
@@ -58,12 +61,13 @@ public final class OmniversalPatternUploader {
                 continue;
             }
             if (terminalInventory.addItems(pattern).isEmpty()) {
-                OmniversalPatternDiagnostics.uploaded(target.getBlockPos().toShortString());
-                return true;
+                BlockPos targetPos = target.getBlockPos().immutable();
+                OmniversalPatternDiagnostics.uploaded(targetPos.toShortString());
+                return targetPos;
             }
         }
         OmniversalPatternDiagnostics.uploadSkipped("every multiblock pattern assembly is full");
-        return false;
+        return null;
     }
 
     /**
@@ -78,7 +82,7 @@ public final class OmniversalPatternUploader {
     /**
      * 收集网格上已通电的多方块样板总成，并按终端排序值升序排列。
      *
-     * <p>排序使「第一个放得下的」这一选择在多次上传之间保持稳定：机器索引本身是无序集合，
+     * <p>排序使「首个可容纳目标」的选择在多次上传之间保持稳定：机器索引本身是无序集合，
      * 不排序时同一网格上的多个总成会随节点遍历顺序变化而轮流成为目标。</p>
      */
     private static List<MePatternAssemblyBlockEntity> collectAssemblies(IGrid grid) {

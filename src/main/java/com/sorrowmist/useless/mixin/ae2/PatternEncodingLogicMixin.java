@@ -9,11 +9,13 @@ import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.Omniver
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.OmniversalPatternDiagnostics;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.OmniversalPatternEncoding;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.OmniversalPatternUploader;
+import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.PatternUploadNotice;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.PendingOmniversalPatternHolder;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.ProcessingPatternRecipeHolder;
 import com.sorrowmist.useless.content.recipe.AlloyFurnaceRecipeCatalog;
 import com.sorrowmist.useless.content.recipe.AlloyFurnaceRecipeIdentity;
 import com.sorrowmist.useless.content.recipe.RecipeSourceIds;
+import net.minecraft.core.BlockPos;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import org.jetbrains.annotations.Nullable;
@@ -200,8 +202,12 @@ public class PatternEncodingLogicMixin implements PendingOmniversalPatternHolder
         // 全部总成已满时保留样板，玩家仍可按原有方式自行取出。此处仍处于
         // onChangeInventory 回调内，AppEngInternalInventory.notifyingChanges 已为 true，
         // 因此回写槽位与写入总成均不会再次触发本回调。
-        if (OmniversalPatternUploader.upload(host, omniversal)) {
+        // 提示在槽位清空之后发送：玩家看到的顺序应为「样板已进入多方块合金炉」，
+        // 而不是先收到提示、再看到槽位被清空。
+        BlockPos uploadedTo = OmniversalPatternUploader.upload(host, omniversal);
+        if (uploadedTo != null) {
             encodedPatternInv.setItemDirect(0, ItemStack.EMPTY);
+            PatternUploadNotice.notifyPlayer(this, host, uploadedTo);
         }
     }
 

@@ -16,6 +16,7 @@ import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.Process
 import com.sorrowmist.useless.content.recipe.AlloyFurnaceRecipeCatalog;
 import com.sorrowmist.useless.content.recipe.AlloyFurnaceRecipeIdentity;
 import com.sorrowmist.useless.content.recipe.RecipeSourceIds;
+import com.sorrowmist.useless.core.config.ConfigManager;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
@@ -209,6 +210,13 @@ public class PatternEncodingLogicMixin implements PendingOmniversalPatternHolder
         // 因此回写槽位与写入总成均不会再次触发本回调。
         // 提示在槽位清空之后发送：玩家看到的顺序应为「样板已进入多方块合金炉」，
         // 而不是先收到提示、再看到槽位被清空。
+        // 上传总开关：关闭时样板留在编码终端内，由玩家自行取出，
+        // 与引入自动上传之前的行为完全一致。此处样板已写入槽位、pending 已清空，
+        // 因此直接返回即可，不需要额外的回滚。
+        if (!ConfigManager.isOmniversalPatternAutoUploadEnabled()) {
+            return;
+        }
+
         ServerPlayer player = PatternUploadNotice.resolvePlayer(this, host);
         OmniversalPatternUploader.Result result = OmniversalPatternUploader.upload(host, omniversal);
         if (result.outcome() == OmniversalPatternUploader.Outcome.UPLOADED) {

@@ -167,6 +167,7 @@ public class ConfigManager {
     private static final ModConfigSpec.IntValue OMNIVERSAL_MOLD_SLOTS;
     private static final ModConfigSpec.IntValue OMNIVERSAL_PASSIVE_PATTERN_SLOTS;
     private static final ModConfigSpec.IntValue OMNIVERSAL_DECODE_CACHE_CAPACITY;
+    private static final ModConfigSpec.BooleanValue OMNIVERSAL_PATTERN_AUTO_UPLOAD;
     private static final ModConfigSpec.IntValue[] OMNIVERSAL_COIL_TIER_THREADS =
             new ModConfigSpec.IntValue[9];
     private static final ModConfigSpec.LongValue[] OMNIVERSAL_COIL_TIER_PARALLEL =
@@ -261,6 +262,18 @@ public class ConfigManager {
         OMNIVERSAL_USEFUL_TIER_THREADS = SERVER_BUILDER
                 .comment("有用级线圈的最大AE任务数")
                 .defineInRange("useful_tier_threads", 11, 1, Integer.MAX_VALUE);
+        SERVER_BUILDER.pop();
+
+        // 万象样板自动上传：单独成组，便于只开关上传行为，
+        // 而不必连带改动多方块结构自身的容量与线圈参数。
+        SERVER_BUILDER.translation("useless_mod.configuration.omniversal_pattern_upload")
+                .push("omniversal_pattern_upload");
+        OMNIVERSAL_PATTERN_AUTO_UPLOAD = SERVER_BUILDER
+                .comment("Whether a freshly encoded omniversal pattern is uploaded to a pattern assembly",
+                        "on the same AE grid. When disabled, the pattern stays in the encoding terminal",
+                        "and the player moves it manually, as before.")
+                .translation("useless_mod.configuration.omniversal_pattern_auto_upload")
+                .define("omniversal_pattern_auto_upload", true);
         SERVER_BUILDER.pop();
 
         SERVER_BUILDER.translation("useless_mod.configuration.ore_generator")
@@ -1028,6 +1041,15 @@ public class ConfigManager {
 
     public static int getOmniversalDecodeCacheCapacity() {
         return Math.max(64, Math.min(16384, getConfigValue(OMNIVERSAL_DECODE_CACHE_CAPACITY)));
+    }
+
+    /**
+     * 万象样板编码后是否自动上传到同网格的样板总成。
+     *
+     * <p>关闭时样板保留在编码终端内，由玩家自行取出，行为与引入上传功能之前一致。</p>
+     */
+    public static boolean isOmniversalPatternAutoUploadEnabled() {
+        return getConfigValue(OMNIVERSAL_PATTERN_AUTO_UPLOAD);
     }
 
     public static int getOreGeneratorSlots() {

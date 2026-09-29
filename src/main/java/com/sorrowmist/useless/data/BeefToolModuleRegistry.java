@@ -57,6 +57,9 @@ public final class BeefToolModuleRegistry {
     public static final String BEEF_WIRELESS_LOGISTICS = "mode.beef_wireless_logistics";
     public static final String BEEF_KILL_AURA = "mode.beef_kill_aura";
     public static final String BEEF_PROTECT_MODE = "mode.beef_protect_mode";
+    public static final String EXDEORUM_CROOK = "mode.exdeorum_crook";
+    public static final String EXDEORUM_HAMMER = "mode.exdeorum_hammer";
+    public static final String EXDEORUM_COMPRESSED_HAMMER = "mode.exdeorum_compressed_hammer";
 
     private static final List<Definition> DEFINITIONS = List.of(
             new Definition(ENCHANT_SILK_TOUCH, EnchantMode.SILK_TOUCH.getTooltip(), GroupKind.TOOLS,
@@ -89,6 +92,12 @@ public final class BeefToolModuleRegistry {
                     Availability.ALWAYS, false),
             new Definition(AUTO_SMELT, ModeTypeEnum.AUTO_SMELT_ENABLED.getTooltip(), GroupKind.MINING,
                     Availability.ALWAYS, false),
+            new Definition(EXDEORUM_CROOK, ModeTypeEnum.EXDEORUM_CROOK_ENABLED.getTooltip(), GroupKind.EXDEORUM,
+                    Availability.EXDEORUM, false),
+            new Definition(EXDEORUM_HAMMER, ModeTypeEnum.EXDEORUM_HAMMER_ENABLED.getTooltip(), GroupKind.EXDEORUM,
+                    Availability.EXDEORUM, false),
+            new Definition(EXDEORUM_COMPRESSED_HAMMER, ModeTypeEnum.EXDEORUM_COMPRESSED_HAMMER_ENABLED.getTooltip(),
+                    GroupKind.EXDEORUM, Availability.EXDEORUM, false),
             new Definition(AE_STORAGE_PRIORITY, ModeTypeEnum.AE_STORAGE_PRIORITY_ENABLED.getTooltip(), GroupKind.MINING,
                     Availability.AE2, false),
             new Definition(AE_NETWORK_CONNECT, ModeTypeEnum.AE_NETWORK_CONNECT_ENABLED.getTooltip(), GroupKind.MINING,
@@ -164,6 +173,14 @@ public final class BeefToolModuleRegistry {
             AE_NETWORK_CONNECT,
             AUTO_SMELT,
             BEEF_RITUAL_SATCHEL);
+    /**
+     * Ex Deorum 专属分组的模块：三者共用同一套配方体系，单独成组承载，
+     * 既不必在按钮上标注所属模组，也避免其较长的功能名撑宽通用分组的按钮。
+     */
+    private static final List<String> AUTO_EXDEORUM_MODULES = List.of(
+            EXDEORUM_CROOK,
+            EXDEORUM_HAMMER,
+            EXDEORUM_COMPRESSED_HAMMER);
 
     private static final Map<String, Definition> BY_ID;
 
@@ -209,6 +226,9 @@ public final class BeefToolModuleRegistry {
         List<BeefToolLayout.Page> pages = new ArrayList<>();
         BeefToolLayout.Page page = new BeefToolLayout.Page("Page 1");
         for (GroupKind kind : GroupKind.values()) {
+            if (!kind.isLoaded()) {
+                continue;
+            }
             BeefToolLayout.Group group = new BeefToolLayout.Group(kind.defaultName());
             for (Definition definition : DEFINITIONS) {
                 if (definition.group() == kind && definition.availability() != Availability.REMOVED) {
@@ -247,6 +267,7 @@ public final class BeefToolModuleRegistry {
         addMissingModules(layout, target, AUTO_AUXILIARY_MODULES, GroupKind.AUXILIARY);
         addMissingModules(layout, target, AUTO_VANILLA_MODULES, GroupKind.VANILLA);
         addMissingModules(layout, target, AUTO_MINING_MODULES, GroupKind.MINING);
+        addMissingModules(layout, target, AUTO_EXDEORUM_MODULES, GroupKind.EXDEORUM);
     }
 
     /**
@@ -326,6 +347,19 @@ public final class BeefToolModuleRegistry {
      */
     public static void migrateVanillaModules(BeefToolLayout layout) {
         migrateModulesToGroup(layout, AUTO_VANILLA_MODULES, GroupKind.VANILLA);
+    }
+
+    /**
+     * 把 Ex Deorum 工具模式迁入其专属分组。
+     *
+     * <p>三项在旧版本中归入「挖掘」分组，且已随存档落盘，因此不能只靠补缺逻辑
+     * 让它们进入新建的专属分组，需要在首次加载时显式迁移。</p>
+     */
+    public static void migrateExDeorumModules(BeefToolLayout layout) {
+        if (!GroupKind.EXDEORUM.isLoaded()) {
+            return;
+        }
+        migrateModulesToGroup(layout, AUTO_EXDEORUM_MODULES, GroupKind.EXDEORUM);
     }
 
     /**
@@ -486,20 +520,34 @@ public final class BeefToolModuleRegistry {
      * 因此同时决定模式配置界面中分组的默认排布。
      */
     public enum GroupKind {
-        TOOLS("Tools"),
-        MINING("Mining"),
-        COMBAT("Combat"),
-        VANILLA("Vanilla"),
-        AUXILIARY("Auxiliary");
+        TOOLS("Tools", null),
+        MINING("Mining", null),
+        COMBAT("Combat", null),
+        VANILLA("Vanilla", null),
+        AUXILIARY("Auxiliary", null),
+        /**
+         * Ex Deorum 专属分组，承载其三项工具模式。
+         *
+         * <p>该分组的模块全部来自 exdeorum，因此绑定 {@code exdeorum} 作为前置模组：
+         * 未加载时默认布局不生成该分组，避免出现一个没有任何按钮的空分组。</p>
+         */
+        EXDEORUM("Ex Deorum", "exdeorum");
 
         private final String defaultName;
+        private final String requiredMod;
 
-        GroupKind(String defaultName) {
+        GroupKind(String defaultName, String requiredMod) {
             this.defaultName = defaultName;
+            this.requiredMod = requiredMod;
         }
 
         public String defaultName() {
             return defaultName;
+        }
+
+        /** 分组的前置模组是否已加载；不绑定前置模组的类别恒为 {@code true}。 */
+        public boolean isLoaded() {
+            return requiredMod == null || ModList.get().isLoaded(requiredMod);
         }
     }
 
@@ -530,6 +578,14 @@ public final class BeefToolModuleRegistry {
             @Override
             boolean isAvailable(ItemStack target) {
                 return ModList.get().isLoaded("ae2") && target != null && !target.isEmpty();
+            }
+        },
+        EXDEORUM {
+            @Override
+            boolean isAvailable(ItemStack target) {
+                // 三项 Ex Deorum 工具模式均依赖其配方体系，缺该模组时不在轮盘中出现
+                return ModList.get().isLoaded("exdeorum") && target != null
+                        && target.getItem() instanceof EndlessBeafItem;
             }
         },
         MALUM {

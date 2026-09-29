@@ -104,7 +104,10 @@ public class ChainMiningStrategy implements MiningStrategy {
                         ? MiningUtils.forceMineBlock(level, targetPos, currentState, player, hand)
                         : MiningUtils.mineBlock(level, targetPos, currentState, player, hand);
                 if (result.mined()) {
-                    allDrops.addAll(result.drops());
+                    // 逐格改写：Ex Deorum 的锤子与钩子配方均以方块为索引键，
+                    // 连锁覆盖的不同方块可能命中不同配方，故不能汇总后再统一处理。
+                    allDrops.addAll(MiningUtils.applyExDeorumDrops(
+                            level, currentState, result.drops(), hand, targetPos, player));
                     totalExperience += result.experience();
                     actualMinedCount++;
                 }

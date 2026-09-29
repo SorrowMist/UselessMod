@@ -14,6 +14,7 @@ import java.util.List;
 public final class BeefToolLayoutManager {
     private static final String ROOT_TAG = "useless_mod:beef_tool_layout";
     private static final String VANILLA_GROUP_MIGRATION_TAG = "useless_mod:beef_tool_vanilla_group";
+    private static final String EXDEORUM_GROUP_MIGRATION_TAG = "useless_mod:beef_tool_exdeorum_group";
 
     private BeefToolLayoutManager() {
     }
@@ -43,6 +44,7 @@ public final class BeefToolLayoutManager {
 
     public static BeefToolLayout normalizeForPlayer(ServerPlayer player, BeefToolLayout layout) {
         migrateVanillaModulesOnce(player, layout);
+        migrateExDeorumModulesOnce(player, layout);
         BeefToolModuleRegistry.addMissingAvailableModules(layout, findTarget(player));
         if (!layout.pages().isEmpty()) {
             layout.setSelectedPage(Math.max(0,
@@ -64,6 +66,21 @@ public final class BeefToolLayoutManager {
         }
         BeefToolModuleRegistry.migrateVanillaModules(layout);
         setFlag(player, VANILLA_GROUP_MIGRATION_TAG);
+    }
+
+    /**
+     * 首次加载既有存档时，把 Ex Deorum 工具模式迁入其专属分组。
+     *
+     * <p>三项在旧版本中归入「挖掘」分组并已随存档落盘，补缺逻辑只处理布局中
+     * 尚不存在的模块，因此需要显式迁移；迁移结果同样写入持久标记，每个玩家只执行一次。</p>
+     */
+    private static void migrateExDeorumModulesOnce(ServerPlayer player, BeefToolLayout layout) {
+        CompoundTag playerData = playerData(player);
+        if (playerData != null && playerData.getBoolean(EXDEORUM_GROUP_MIGRATION_TAG)) {
+            return;
+        }
+        BeefToolModuleRegistry.migrateExDeorumModules(layout);
+        setFlag(player, EXDEORUM_GROUP_MIGRATION_TAG);
     }
 
     public static void validateForSave(BeefToolLayout layout) throws BeefToolLayout.LayoutException {

@@ -338,6 +338,8 @@ dependencies {
 
     implementation "maven.modrinth:hostile-neural-networks:1.21.1-6.5.1"
 
+    implementation "maven.modrinth:ex-deorum:3.12"
+
     //自然灵气
     implementation "maven.modrinth:natures-aura:41.9"
     implementation "maven.modrinth:patchouli:1.21.1-93-neoforge"

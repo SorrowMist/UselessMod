@@ -131,6 +131,15 @@ requiredMods=["malum"]
     ordering="AFTER"
     side="BOTH"
 
+# Ex Deorum 兼容层引用 3.12 起提供的实例缓存 API（RecipeUtil.getCaches 返回 RecipeCaches）。
+# 3.12 之前为静态查询形态（RecipeUtil.getHammerRecipe 等），与本模组的调用方式不兼容，
+[[dependencies.${mod_id}]]
+    modId="exdeorum"
+    type="optional"
+    versionRange="[3.12,)"
+    ordering="AFTER"
+    side="BOTH"
+
 # Features are specific properties of the game environment, that you may want to declare you require. This example declares
 # that your mod requires GL version 3.2 or higher. Other features will be added. They are side aware so declaring this won't
 # stop your mod loading on the server for example.

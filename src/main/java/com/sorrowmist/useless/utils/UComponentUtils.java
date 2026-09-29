@@ -35,6 +35,42 @@ public class UComponentUtils {
     }
 
     /**
+     * 获取物品的 Ex Deorum 钩子模式状态。
+     *
+     * <p>开启后，破坏方块时按 Ex Deorum 的钩子配方在其原有掉落之外追加产物。</p>
+     *
+     * @param stack 物品栈
+     * @return Ex Deorum 钩子模式是否启用
+     */
+    public static boolean isExDeorumCrookEnabled(ItemStack stack) {
+        return stack.getOrDefault(UComponents.ExDeorumCrookComponent.get(), false);
+    }
+
+    /**
+     * 获取物品的 Ex Deorum 锤子模式状态。
+     *
+     * <p>开启后，破坏方块时按 Ex Deorum 的锤子配方改写掉落。</p>
+     *
+     * @param stack 物品栈
+     * @return Ex Deorum 锤子模式是否启用
+     */
+    public static boolean isExDeorumHammerEnabled(ItemStack stack) {
+        return stack.getOrDefault(UComponents.ExDeorumHammerComponent.get(), false);
+    }
+
+    /**
+     * 获取物品的 Ex Deorum 压缩锤模式状态。
+     *
+     * <p>压缩锤配方与普通锤配方是两套独立数据，因此分列为独立开关。</p>
+     *
+     * @param stack 物品栈
+     * @return Ex Deorum 压缩锤模式是否启用
+     */
+    public static boolean isExDeorumCompressedHammerEnabled(ItemStack stack) {
+        return stack.getOrDefault(UComponents.ExDeorumCompressedHammerComponent.get(), false);
+    }
+
+    /**
      * 获取物品的AE存储优先状态
      * @param stack 物品栈
      * @return AE存储优先是否启用

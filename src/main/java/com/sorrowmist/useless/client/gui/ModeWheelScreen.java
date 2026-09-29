@@ -231,6 +231,9 @@ public class ModeWheelScreen extends Screen {
         return width;
     }
 
+    
+
+    /** 整页统一的按钮宽度：所有含两个以上按钮的分组取齐，保证各分组外观一致。 */
     private int commonModuleWidth(BeefToolLayout.Page page) {
         int width = 50;
         for (BeefToolLayout.Group group : page.groups()) {
@@ -388,7 +391,7 @@ public class ModeWheelScreen extends Screen {
             List<String> visibleModules = visibleModules(group.modules());
             int column = columnBottoms[0] <= columnBottoms[1] ? 0 : 1;
             int left = contentLeft + (column == 0 ? 0 : columnWidths[0] + CARD_GAP);
-            int cardWidth = Math.min(columnWidths[column], naturalGroupWidth(group));
+            int cardWidth = columnWidths[column];
             int height = cardHeight(cardWidth, visibleModules.size(), moduleColumns(visibleModules.size()));
             int top = columnBottoms[column];
             rawCards.add(new RawCard(currentPage(), groupIndex, left, top,
@@ -437,7 +440,7 @@ public class ModeWheelScreen extends Screen {
         List<String> sourceModules = card.unassigned()
                 ? layout.unassignedModules()
                 : groupAt(card.pageIndex(), card.groupIndex()).modules();
-        int buttonWidth = card.modules().size() == 1
+        int buttonWidth = visibleModules(sourceModules).size() == 1
                 ? moduleButtonWidth(sourceModules)
                 : commonModuleWidth(currentPageObject());
         int column = index % columns;
@@ -570,6 +573,10 @@ public class ModeWheelScreen extends Screen {
             case BeefToolModuleRegistry.ENHANCED_CHAIN_MINING -> bool(UComponents.EnhancedChainMiningComponent, false);
             case BeefToolModuleRegistry.FORCE_MINING -> bool(UComponents.ForceMiningComponent, false);
             case BeefToolModuleRegistry.AUTO_SMELT -> bool(UComponents.AutoSmeltComponent, false);
+            case BeefToolModuleRegistry.EXDEORUM_CROOK -> bool(UComponents.ExDeorumCrookComponent, false);
+            case BeefToolModuleRegistry.EXDEORUM_HAMMER -> bool(UComponents.ExDeorumHammerComponent, false);
+            case BeefToolModuleRegistry.EXDEORUM_COMPRESSED_HAMMER ->
+                    bool(UComponents.ExDeorumCompressedHammerComponent, false);
             case BeefToolModuleRegistry.AE_STORAGE_PRIORITY -> bool(UComponents.AEStoragePriorityComponent, false);
             case BeefToolModuleRegistry.AE_NETWORK_CONNECT -> bool(UComponents.AeNetworkConnectComponent, false);
             case BeefToolModuleRegistry.WRENCH_TAG -> bool(UComponents.WrenchTagEnabledComponent, true);
@@ -917,6 +924,13 @@ public class ModeWheelScreen extends Screen {
                     UComponents.ForceMiningComponent, false);
             case BeefToolModuleRegistry.AUTO_SMELT -> toggle(ModeTogglePacket.ModeType.AUTO_SMELT,
                     UComponents.AutoSmeltComponent, false);
+            case BeefToolModuleRegistry.EXDEORUM_CROOK -> toggle(ModeTogglePacket.ModeType.EXDEORUM_CROOK,
+                    UComponents.ExDeorumCrookComponent, false);
+            case BeefToolModuleRegistry.EXDEORUM_HAMMER -> toggle(ModeTogglePacket.ModeType.EXDEORUM_HAMMER,
+                    UComponents.ExDeorumHammerComponent, false);
+            case BeefToolModuleRegistry.EXDEORUM_COMPRESSED_HAMMER ->
+                    toggle(ModeTogglePacket.ModeType.EXDEORUM_COMPRESSED_HAMMER,
+                            UComponents.ExDeorumCompressedHammerComponent, false);
             case BeefToolModuleRegistry.AE_STORAGE_PRIORITY -> toggle(ModeTogglePacket.ModeType.AE_STORAGE_PRIORITY,
                     UComponents.AEStoragePriorityComponent, false);
             case BeefToolModuleRegistry.AE_NETWORK_CONNECT -> toggle(ModeTogglePacket.ModeType.AE_NETWORK_CONNECT,

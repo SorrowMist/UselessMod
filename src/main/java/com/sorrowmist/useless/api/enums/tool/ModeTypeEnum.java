@@ -104,6 +104,20 @@ public enum ModeTypeEnum {
     BEEF_WIRELESS_LOGISTICS_DISABLED("beef_wireless_logistics_disabled",
             "tooltip.useless_mod.beef_wireless_logistics_mode"),
 
+    // Ex Deorum 钩子：true = 挖掘时按 exdeorum 的钩子配方追加掉落
+    EXDEORUM_CROOK_ENABLED("exdeorum_crook_enabled", "tooltip.useless_mod.exdeorum_crook_mode"),
+    EXDEORUM_CROOK_DISABLED("exdeorum_crook_disabled", "tooltip.useless_mod.exdeorum_crook_mode"),
+
+    // Ex Deorum 锤子：true = 挖掘时按 exdeorum 的锤子配方改写掉落
+    EXDEORUM_HAMMER_ENABLED("exdeorum_hammer_enabled", "tooltip.useless_mod.exdeorum_hammer_mode"),
+    EXDEORUM_HAMMER_DISABLED("exdeorum_hammer_disabled", "tooltip.useless_mod.exdeorum_hammer_mode"),
+
+    // Ex Deorum 压缩锤：配方体系与普通锤相互独立，单列一项开关
+    EXDEORUM_COMPRESSED_HAMMER_ENABLED("exdeorum_compressed_hammer_enabled",
+            "tooltip.useless_mod.exdeorum_compressed_hammer_mode"),
+    EXDEORUM_COMPRESSED_HAMMER_DISABLED("exdeorum_compressed_hammer_disabled",
+            "tooltip.useless_mod.exdeorum_compressed_hammer_mode"),
+
     // 杀戮光环：手持造化杖每 20 tick 对「范围伤害」配置范围内生物结算一次攻击伤害
     BEEF_KILL_AURA_ENABLED("beef_kill_aura_enabled", "tooltip.useless_mod.beef_kill_aura_mode"),
     BEEF_KILL_AURA_DISABLED("beef_kill_aura_disabled", "tooltip.useless_mod.beef_kill_aura_mode"),

@@ -4,6 +4,7 @@ import com.mojang.logging.LogUtils;
 import com.sorrowmist.useless.api.enums.tool.EnchantMode;
 import com.sorrowmist.useless.compat.AE2Compat;
 import com.sorrowmist.useless.compat.DraconicEvolutionCompat;
+import com.sorrowmist.useless.compat.exdeorum.ExDeorumCompat;
 import com.sorrowmist.useless.core.component.UComponents;
 import com.sorrowmist.useless.core.config.ChainEquivalence;
 import com.sorrowmist.useless.core.config.ChainGroupManager;
@@ -155,13 +156,51 @@ public class MiningUtils {
             MiningResult result = forceMining
                     ? forceMineBlock(level, pos, state, player, tool)
                     : mineBlock(level, pos, state, player, tool);
-            handleDrops(player, result.drops(), tool, Vec3.atCenterOf(pos));
+            List<ItemStack> drops = applyExDeorumDrops(level, state, result.drops(), tool, pos, player);
+            handleDrops(player, drops, tool, Vec3.atCenterOf(pos));
             if (result.experience() > 0) {
                 player.giveExperiencePoints(result.experience());
             }
         } catch (Throwable failure) {
             reportBlockBreakFailure(state, pos, failure);
         }
+    }
+
+    /**
+     * 按造化杖上启用的 Ex Deorum 模式改写破坏掉落。
+     *
+     * <p>Ex Deorum 的三个工具效果由其 GlobalLootModifier 依工具标签触发，
+     * 而造化杖不在这些标签内，故此处显式调用其配方缓存完成等价改写。</p>
+     *
+     * <p>未安装 Ex Deorum 或三个模式均未启用时原样返回入参，
+     * 保证未启用该兼容时的行为与改动前完全一致。</p>
+     *
+     * <p>此处不以原始掉落为空作为提前返回条件：锤子与压缩锤以配方产物替换掉落，
+     * 而 Ex Deorum 的锤子配方可覆盖自身无自然掉落的方块（如圆石产出沙砾），
+     * 若在此跳过，此类方块将无法获得配方产物。</p>
+     *
+     * @param level  服务端世界
+     * @param state  被破坏的方块状态
+     * @param drops  原始掉落
+     * @param tool   造化杖
+     * @return 改写后的掉落列表
+     */
+    static List<ItemStack> applyExDeorumDrops(ServerLevel level, BlockState state,
+                                              List<ItemStack> drops, ItemStack tool,
+                                              BlockPos pos, Player player) {
+        if (!ExDeorumCompat.isLoaded()) {
+            return drops;
+        }
+
+        boolean hammer = UComponentUtils.isExDeorumHammerEnabled(tool);
+        boolean compressedHammer = UComponentUtils.isExDeorumCompressedHammerEnabled(tool);
+        boolean crook = UComponentUtils.isExDeorumCrookEnabled(tool);
+        if (!hammer && !compressedHammer && !crook) {
+            return drops;
+        }
+
+        return ExDeorumCompat.rewriteDrops(level, state, drops, tool,
+                hammer, compressedHammer, crook, pos, player);
     }
 
     static MiningResult mineBlock(ServerLevel level, BlockPos pos, BlockState state, Player player, ItemStack tool) {
@@ -238,6 +277,7 @@ public class MiningUtils {
         // getDrops / playerWillDestroy 都会抛，异常冒回事件总线就会打断整 tick。
         try {
             List<ItemStack> drops = Block.getDrops(state, serverLevel, pos, blockEntity, player, tool);
+            drops = applyExDeorumDrops(serverLevel, state, drops, tool, pos, player);
             handleDrops(player, drops, tool, Vec3.atCenterOf(pos));
 
             world.destroyBlock(pos, false, player);

@@ -219,6 +219,48 @@ public final class UComponents {
                            ))
             );
 
+    /**
+     * Ex Deorum 钩子模式（ExDeorumCrook）
+     * true = 破坏方块时按 Ex Deorum 的钩子配方额外产出掉落（如树叶的蚕、线）。
+     * 仅在安装了 exdeorum 时该模式才会出现在模式轮盘里。
+     */
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<Boolean>> ExDeorumCrookComponent =
+            register("exdeorum_crook", builder ->
+                    builder.persistent(Codec.BOOL)
+                           .networkSynchronized(StreamCodec.of(
+                                   FriendlyByteBuf::writeBoolean,
+                                   FriendlyByteBuf::readBoolean
+                           ))
+            );
+
+    /**
+     * Ex Deorum 锤子模式（ExDeorumHammer）
+     * true = 破坏方块时按 Ex Deorum 的锤子配方改写掉落，替代方块原有掉落。
+     * 仅在安装了 exdeorum 时该模式才会出现在模式轮盘里。
+     */
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<Boolean>> ExDeorumHammerComponent =
+            register("exdeorum_hammer", builder ->
+                    builder.persistent(Codec.BOOL)
+                           .networkSynchronized(StreamCodec.of(
+                                   FriendlyByteBuf::writeBoolean,
+                                   FriendlyByteBuf::readBoolean
+                           ))
+            );
+
+    /**
+     * Ex Deorum 压缩锤模式（ExDeorumCompressedHammer）
+     * true = 破坏方块时按 Ex Deorum 的压缩锤配方改写掉落。压缩锤配方与普通锤配方是两套
+     * 独立数据，因此单列为一项开关。仅在安装了 exdeorum 时该模式才会出现在模式轮盘里。
+     */
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<Boolean>> ExDeorumCompressedHammerComponent =
+            register("exdeorum_compressed_hammer", builder ->
+                    builder.persistent(Codec.BOOL)
+                           .networkSynchronized(StreamCodec.of(
+                                   FriendlyByteBuf::writeBoolean,
+                                   FriendlyByteBuf::readBoolean
+                           ))
+            );
+
     public static final DeferredHolder<DataComponentType<?>, DataComponentType<Boolean>> ForceKillEnabledComponent =
             register("force_kill_enabled", builder ->
                     builder.persistent(Codec.BOOL)

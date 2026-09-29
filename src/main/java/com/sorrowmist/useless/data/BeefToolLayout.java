@@ -25,9 +25,9 @@ import java.util.Set;
  * persistent data 里，因此共用一套校验、同步与导入导出通道。</p>
  */
 public final class BeefToolLayout {
-    /** 当前写出的格式版本。 */
-    public static final int FORMAT_VERSION = 2;
-    /** 仍然接受读取的最低版本（v1 没有 {@code chainGroups}，读进来就是空）。 */
+    /** 当前写出的格式版本。v3 新增「生物保护名单」。 */
+    public static final int FORMAT_VERSION = 3;
+    /** 仍然接受读取的最低版本（v1 没有 {@code chainGroups}、v3 之前没有保护名单，读进来都是空）。 */
     public static final int MIN_FORMAT_VERSION = 1;
     public static final int MAX_PAGES = 32;
     public static final int MAX_GROUPS_PER_PAGE = 16;
@@ -38,6 +38,9 @@ public final class BeefToolLayout {
     public static final int MAX_CHAIN_ENTRIES_PER_GROUP = 16;
     public static final int MAX_CHAIN_ENTRY_LENGTH = 128;
     public static final int MAX_TOTAL_CHAIN_ENTRIES = 128;
+    public static final int MAX_PROTECTED_TYPES = 64;
+    public static final int MAX_PROTECTED_ENTITIES = 128;
+    public static final int MAX_PROTECTED_ENTRY_LENGTH = 128;
     public static final int MAX_TEXT_LENGTH = 64 * 1024;
 
     private static final Gson GSON = new GsonBuilder().disableHtmlEscaping().create();
@@ -46,13 +49,23 @@ public final class BeefToolLayout {
     private final List<Page> pages;
     private final List<String> unassignedModules;
     private final List<List<String>> chainGroups;
+    /** 受保护的生物「种类」：{@code EntityType} 注册名，如 {@code minecraft:villager}。 */
+    private final List<String> protectedTypes;
+    /** 受保护的生物「个体」：UUID 字符串。 */
+    private final List<String> protectedEntities;
 
     public BeefToolLayout(int selectedPage, List<Page> pages, List<String> unassignedModules) {
-        this(selectedPage, pages, unassignedModules, List.of());
+        this(selectedPage, pages, unassignedModules, List.of(), List.of(), List.of());
     }
 
     public BeefToolLayout(int selectedPage, List<Page> pages, List<String> unassignedModules,
                           List<List<String>> chainGroups) {
+        this(selectedPage, pages, unassignedModules, chainGroups, List.of(), List.of());
+    }
+
+    public BeefToolLayout(int selectedPage, List<Page> pages, List<String> unassignedModules,
+                          List<List<String>> chainGroups,
+                          List<String> protectedTypes, List<String> protectedEntities) {
         this.selectedPage = selectedPage;
         this.pages = new ArrayList<>();
         if (pages != null) {
@@ -69,6 +82,12 @@ public final class BeefToolLayout {
                 this.chainGroups.add(group == null ? new ArrayList<>() : new ArrayList<>(group));
             }
         }
+        this.protectedTypes = protectedTypes == null
+                ? new ArrayList<>()
+                : new ArrayList<>(protectedTypes);
+        this.protectedEntities = protectedEntities == null
+                ? new ArrayList<>()
+                : new ArrayList<>(protectedEntities);
     }
 
     public int selectedPage() {
@@ -95,8 +114,22 @@ public final class BeefToolLayout {
         return chainGroups;
     }
 
+    /**
+     * 受保护的生物「种类」：{@code EntityType} 注册名（如 {@code minecraft:villager}）。
+     * 光环、范围伤害与强制击杀都会跳过这些种类。
+     */
+    public List<String> protectedTypes() {
+        return protectedTypes;
+    }
+
+    /** 受保护的生物「个体」：UUID 字符串。 */
+    public List<String> protectedEntities() {
+        return protectedEntities;
+    }
+
     public BeefToolLayout copy() {
-        return new BeefToolLayout(selectedPage, pages, unassignedModules, chainGroups);
+        return new BeefToolLayout(selectedPage, pages, unassignedModules, chainGroups,
+                protectedTypes, protectedEntities);
     }
 
     public boolean containsModule(String moduleId) {
@@ -177,6 +210,10 @@ public final class BeefToolLayout {
         if (chainEntryCount > MAX_TOTAL_CHAIN_ENTRIES) {
             throw new LayoutException(Error.LIMIT);
         }
+
+        // 保护名单同样只做结构校验；实体 ID 语法与 UUID 可解析性交给 BeefToolProtectionManager。
+        validateProtectionList(protectedTypes, MAX_PROTECTED_TYPES);
+        validateProtectionList(protectedEntities, MAX_PROTECTED_ENTITIES);
     }
 
     public CompoundTag toNbt() {
@@ -219,6 +256,18 @@ public final class BeefToolLayout {
             chainGroupList.add(entryList);
         }
         root.put("chain_groups", chainGroupList);
+
+        ListTag protectedTypeList = new ListTag();
+        for (String type : protectedTypes) {
+            protectedTypeList.add(StringTag.valueOf(type));
+        }
+        root.put("protected_types", protectedTypeList);
+
+        ListTag protectedEntityList = new ListTag();
+        for (String uuid : protectedEntities) {
+            protectedEntityList.add(StringTag.valueOf(uuid));
+        }
+        root.put("protected_entities", protectedEntityList);
         return root;
     }
 
@@ -260,8 +309,15 @@ public final class BeefToolLayout {
         List<List<String>> chainGroups = version >= 2 && root.contains("chain_groups", Tag.TAG_LIST)
                 ? readNestedStringList(root.getList("chain_groups", Tag.TAG_LIST))
                 : List.of();
+        List<String> protectedTypes = version >= 3 && root.contains("protected_types", Tag.TAG_LIST)
+                ? readStringList(root.getList("protected_types", Tag.TAG_STRING))
+                : List.of();
+        List<String> protectedEntities = version >= 3 && root.contains("protected_entities", Tag.TAG_LIST)
+                ? readStringList(root.getList("protected_entities", Tag.TAG_STRING))
+                : List.of();
         BeefToolLayout layout = new BeefToolLayout(
-                root.getInt("selected_page"), pages, unassigned, chainGroups);
+                root.getInt("selected_page"), pages, unassigned, chainGroups,
+                protectedTypes, protectedEntities);
         layout.validate();
         return layout;
     }
@@ -306,6 +362,18 @@ public final class BeefToolLayout {
             chainGroupArray.add(entryArray);
         }
         root.add("chainGroups", chainGroupArray);
+
+        JsonArray protectedTypeArray = new JsonArray();
+        for (String type : protectedTypes) {
+            protectedTypeArray.add(type);
+        }
+        root.add("protectedTypes", protectedTypeArray);
+
+        JsonArray protectedEntityArray = new JsonArray();
+        for (String uuid : protectedEntities) {
+            protectedEntityArray.add(uuid);
+        }
+        root.add("protectedEntities", protectedEntityArray);
         return GSON.toJson(root);
     }
 
@@ -368,8 +436,23 @@ public final class BeefToolLayout {
                 }
             }
 
+            List<String> protectedTypes = new ArrayList<>();
+            if (version >= 3 && root.has("protectedTypes")) {
+                for (JsonElement entry : requireArray(root, "protectedTypes")) {
+                    protectedTypes.add(requireString(entry));
+                }
+            }
+
+            List<String> protectedEntities = new ArrayList<>();
+            if (version >= 3 && root.has("protectedEntities")) {
+                for (JsonElement entry : requireArray(root, "protectedEntities")) {
+                    protectedEntities.add(requireString(entry));
+                }
+            }
+
             BeefToolLayout layout = new BeefToolLayout(
-                    root.get("selectedPage").getAsInt(), pages, unassigned, chainGroups);
+                    root.get("selectedPage").getAsInt(), pages, unassigned, chainGroups,
+                    protectedTypes, protectedEntities);
             layout.validate();
             return layout;
         } catch (LayoutException exception) {
@@ -445,6 +528,25 @@ public final class BeefToolLayout {
         if (module == null || module.isBlank() || module.length() > 64
                 || module.indexOf('\n') >= 0 || module.indexOf('\r') >= 0) {
             throw new LayoutException(Error.INVALID_STRUCTURE);
+        }
+    }
+
+    /**
+     * 保护名单的纯结构校验：数量上限 + 条目非空、长度、无换行。
+     *
+     * <p>刻意不查实体注册表、不解析 UUID —— 与连锁等价组「语法合法但当前解析不到的条目
+     * 允许保存」的宽容语义一致，也不会因为某个模组没装就写不进去。</p>
+     */
+    private static void validateProtectionList(List<String> list, int max) throws LayoutException {
+        if (list == null || list.size() > max) {
+            throw new LayoutException(Error.LIMIT);
+        }
+        for (String entry : list) {
+            if (entry == null || entry.isBlank()
+                    || entry.length() > MAX_PROTECTED_ENTRY_LENGTH
+                    || entry.indexOf('\n') >= 0 || entry.indexOf('\r') >= 0) {
+                throw new LayoutException(Error.INVALID_STRUCTURE);
+            }
         }
     }
 

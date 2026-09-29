@@ -8,6 +8,7 @@ import com.sorrowmist.useless.client.render.StaffLinkHighlightRenderer;
 import com.sorrowmist.useless.content.blockentities.AdvancedAlloyFurnaceBlockEntity;
 import com.sorrowmist.useless.content.blockentities.multiblock.MultiblockAlloyFurnaceCoreBlockEntity;
 import com.sorrowmist.useless.content.menus.MultiblockAlloyFurnaceMenu;
+import com.sorrowmist.useless.core.config.BeefToolProtectionManager;
 import com.sorrowmist.useless.core.config.ChainGroupManager;
 import com.sorrowmist.useless.data.BeefToolLayout;
 import com.sorrowmist.useless.network.AETaskProgressPacket;
@@ -101,6 +102,8 @@ public final class ClientPacketHandlers {
             // 等价组必须无条件刷新：右键连锁走 Item#useOn，客户端也会本地预测，
             // 界面开着还是关着都需要这份数据，否则客户端预测的范围会小于服务端实际破坏的范围。
             ChainGroupManager.setClientMirror(layout.chainGroups());
+            // 生物保护名单同理：tooltip 的「已保护 N 种 / N 只」直接读这份镜像。
+            BeefToolProtectionManager.setClientMirror(layout.protectedTypes(), layout.protectedEntities());
             if (Minecraft.getInstance().screen instanceof ModeWheelScreen screen) {
                 screen.receiveLayout(layout);
             } else if (Minecraft.getInstance().screen instanceof ChainGroupScreen screen) {

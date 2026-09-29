@@ -113,6 +113,7 @@ public class UselessItemUtils {
 
         Collection<ItemEntity> drops = event.getDrops();
         List<ItemEntity> remainingDrops = new ArrayList<>(); // 保留原样掉落的（可损坏物品）
+        List<ItemStack> amplifiedDrops = new ArrayList<>();  // ×20 后的战利品
 
         for (ItemEntity itemEntity : drops) {
             ItemStack dropStack = itemEntity.getItem();
@@ -121,18 +122,23 @@ public class UselessItemUtils {
                 // 可损坏物品（如剑、弓、护甲）保持原版掉落行为
                 remainingDrops.add(itemEntity);
             } else {
-                // 非可损坏物品：数量 ×20，直接尝试进玩家背包
+                // 非可损坏物品：数量 ×20，交给统一的掉落通道处理
                 ItemStack amplifiedStack = dropStack.copy();
                 amplifiedStack.setCount(dropStack.getCount() * 20);
-
-                // 原版 API：优先进背包，满了自动掉落在玩家脚下
-                player.getInventory().placeItemBackInInventory(amplifiedStack);
+                amplifiedDrops.add(amplifiedStack);
             }
         }
 
         // 清空原掉落物，重新添加只需掉在地上的部分（主要是可损坏物品）
         drops.clear();
         drops.addAll(remainingDrops);
+
+        if (!amplifiedDrops.isEmpty()) {
+            // 走 handleDrops 而不是直接 placeItemBackInInventory：
+            // 这样战利品大爆发才会像普通掉落一样受「AE 存储优先」与「范围磁力」影响
+            // （AE 优先且已绑定 → 进 AE；否则磁力开 → 进背包；都没开 → 落在尸体处走原版拾取）。
+            MiningUtils.handleDrops(player, amplifiedDrops, stack, killedEntity.position());
+        }
     }
 
     public static void tryAddCognizantDustDrop(LivingDropsEvent event, ItemStack stack) {
@@ -244,7 +250,10 @@ public class UselessItemUtils {
             return;
         }
 
-        MiningUtils.handleDrops(player, java.util.List.of(spawnEggStack), stack, killedEntity.position());
+        // 只按「范围磁力」决定去留，刻意绕过「AE 存储优先」：
+        // 刷怪蛋是玩家想立刻拿在手上的东西，不该被吸进 AE 网络。
+        MiningUtils.handleDrops(player, java.util.List.of(spawnEggStack), stack,
+                killedEntity.position(), false);
     }
 
     // 显示触发提示

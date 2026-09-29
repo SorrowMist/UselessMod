@@ -11,24 +11,30 @@ import com.sorrowmist.useless.content.items.BeefTimeAcceleration;
 import com.sorrowmist.useless.content.items.EndlessBeafItem;
 import com.sorrowmist.useless.core.common.KeyBindings;
 import com.sorrowmist.useless.core.component.UComponents;
+import com.sorrowmist.useless.core.config.BeefToolProtectionManager;
 import com.sorrowmist.useless.event.EventHandler;
 import com.sorrowmist.useless.network.EnchantmentSwitchPacket;
 import com.sorrowmist.useless.network.ForceBreakKeyPacket;
 import com.sorrowmist.useless.network.ModeTogglePacket;
+import com.sorrowmist.useless.network.ProtectEntityPacket;
 import com.sorrowmist.useless.network.ShapeSwitchPacket;
 import com.sorrowmist.useless.network.StaffLinkCyclePacket;
 import com.sorrowmist.useless.network.StaffLinkOpenPacket;
 import com.sorrowmist.useless.network.TabKeyPressedPacket;
 import com.sorrowmist.useless.network.TeleportKeyPacket;
+import com.sorrowmist.useless.utils.UselessItemUtils;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.world.phys.EntityHitResult;
 import net.minecraft.world.phys.HitResult;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
@@ -64,6 +70,8 @@ public class ClientEventBusSubscriber {
         event.register(KeyBindings.TOGGLE_FLINT_AND_STEEL_KEY.get());
         // 连点模式（默认未绑定）
         event.register(KeyBindings.TOGGLE_AUTO_CLICK_KEY.get());
+        // 杀戮光环（默认未绑定）
+        event.register(KeyBindings.TOGGLE_KILL_AURA_KEY.get());
 
         // 触发按键
         event.register(KeyBindings.TRIGGER_CHAIN_MINING_KEY.get());
@@ -189,6 +197,18 @@ public class ClientEventBusSubscriber {
             }
         }
 
+        if (KeyBindings.TOGGLE_KILL_AURA_KEY.get().consumeClick()) {
+            // 主手或副手都认，与 tickKillAura / 服务端 findTargetToolInHands 的判定保持一致
+            UselessItemUtils.findTargetToolInHands(player).ifPresent(entry -> {
+                ItemStack staff = entry.getKey();
+                if (staff.getItem() instanceof EndlessBeafItem) {
+                    boolean currentAura = EndlessBeafItem.isKillAuraEnabled(staff);
+                    PacketDistributor.sendToServer(
+                            new ModeTogglePacket(ModeTogglePacket.ModeType.BEEF_KILL_AURA, !currentAura));
+                }
+            });
+        }
+
         // 检测R键按下（触发强制破坏）
         if (KeyBindings.TRIGGER_FORCE_MINING_KEY.get().consumeClick()) {
             ItemStack mainHandItem = player.getMainHandItem();
@@ -247,9 +267,13 @@ public class ClientEventBusSubscriber {
      */
     @SubscribeEvent
     public static void onMouseButtonPre(InputEvent.MouseButton.Pre event) {
+        Minecraft mc = Minecraft.getInstance();
+        // 保护手势必须最先判定：命中即取消并 return，短距传送分支不会执行。
+        // 两者共用 Shift + 右键，命中生物时约定「保护优先」。
+        if (tryProtectGesture(mc, event)) return;
+
         if (event.getAction() != GLFW.GLFW_PRESS) return;
 
-        Minecraft mc = Minecraft.getInstance();
         LocalPlayer player = mc.player;
         if (player == null || mc.screen != null) return;
 
@@ -267,6 +291,54 @@ public class ClientEventBusSubscriber {
         if (isBlockInteractionPriority(mc)) return;
 
         PacketDistributor.sendToServer(new TeleportKeyPacket());
+    }
+
+    /**
+     * Ctrl / Shift + 右键生物：切换生物保护名单。
+     *
+     * <p>为什么用 {@code MouseButton.Pre} 而不是 {@code PlayerInteractEvent.EntityInteract}：
+     * <ul>
+     *   <li>Ctrl 不会被 {@code ServerboundInteractPacket} 传输（它只带 {@code isShiftKeyDown()}），
+     *       服务端根本区分不出 Ctrl 与普通右键，只能用 {@code getModifiers()} 在客户端判断；</li>
+     *   <li>取消本事件发生在 {@code KeyMapping.click} 之前，{@code keyUse} 从不被按下，
+     *       于是 {@code startUseItem()} 不会被调用 —— 交互包不会发出，村民交易 GUI、
+     *       剪羊毛等原版行为都不会发生；</li>
+     *   <li>GLFW 鼠标按键没有键盘那样的 repeat，每次物理按下只触发一次，因此不需要去抖。</li>
+     * </ul>
+     *
+     * @return true 表示本次右键已被保护手势消费，调用方应立即 return
+     */
+    private static boolean tryProtectGesture(Minecraft mc, InputEvent.MouseButton.Pre event) {
+        if (event.getAction() != GLFW.GLFW_PRESS) return false;
+        if (event.getButton() != GLFW.GLFW_MOUSE_BUTTON_RIGHT) return false;
+
+        LocalPlayer player = mc.player;
+        if (player == null || mc.level == null || mc.screen != null || mc.getOverlay() != null) return false;
+
+        // Ctrl 优先：两个修饰键同时按下时按「种类」处理
+        boolean byType = (event.getModifiers() & InputConstants.MOD_CONTROL) != 0;
+        boolean byEntity = !byType && player.isShiftKeyDown();
+        if (!byType && !byEntity) return false;
+
+        // 必须手持造化杖（主手优先，其次副手）
+        ItemStack staff = player.getMainHandItem();
+        if (!(staff.getItem() instanceof EndlessBeafItem)) {
+            staff = player.getOffhandItem();
+            if (!(staff.getItem() instanceof EndlessBeafItem)) return false;
+        }
+        // 杀戮光环、范围伤害或保护名单模式至少开一个，否则完全让给原版交互
+        if (!EndlessBeafItem.isProtectGestureAvailable(staff)) return false;
+
+        // 用当前帧重算准星命中，避免用到上一 tick 的旧 hitResult
+        mc.gameRenderer.pick(1.0F);
+        if (!(mc.hitResult instanceof EntityHitResult hit)) return false;
+
+        Entity target = EndlessBeafItem.unwrapPartEntity(hit.getEntity());
+        if (!(target instanceof LivingEntity) || target == player) return false;
+
+        event.setCanceled(true);
+        PacketDistributor.sendToServer(new ProtectEntityPacket(target.getId(), byType));
+        return true;
     }
 
     /**
@@ -328,6 +400,7 @@ public class ClientEventBusSubscriber {
 
     private static void clearClientBeefProtectionState() {
         EventHandler.clearClientBeefAdvancedStealthStates();
+        BeefToolProtectionManager.clearAll();
         lastTabPressed = false;
     }
 }

@@ -326,6 +326,34 @@ public final class UComponents {
                            ))
             );
 
+    /**
+     * 杀戮光环组件（BeefKillAura）
+     * 用于在物品上存储是否启用杀戮光环（布尔类型）
+     * true = 手持造化杖时每 20 tick 对「范围伤害」配置范围内生物结算一次攻击伤害
+     */
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<Boolean>> BeefKillAuraComponent =
+            register("beef_kill_aura", builder ->
+                    builder.persistent(Codec.BOOL)
+                           .networkSynchronized(StreamCodec.of(
+                                   FriendlyByteBuf::writeBoolean,
+                                   FriendlyByteBuf::readBoolean
+                           ))
+            );
+
+    /**
+     * 保护名单模式组件（BeefProtectMode）
+     * true = 开启：暂停杀戮光环与范围伤害的结算，方便玩家从容地 Ctrl/Shift 右键添加保护名单，
+     * 不会出现「怪先被光环打死、来不及加名单」的情况。
+     */
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<Boolean>> BeefProtectModeComponent =
+            register("beef_protect_mode", builder ->
+                    builder.persistent(Codec.BOOL)
+                           .networkSynchronized(StreamCodec.of(
+                                   FriendlyByteBuf::writeBoolean,
+                                   FriendlyByteBuf::readBoolean
+                           ))
+            );
+
     public static final DeferredHolder<DataComponentType<?>, DataComponentType<GlobalPos>> WIRELESS_LINK_TARGET = register(
             "wireless_link_target",
             builder ->

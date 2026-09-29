@@ -175,4 +175,14 @@ public class KeyBindings {
             GLFW.GLFW_KEY_B,
             CATEGORY
     ));
+
+    // 杀戮光环开关（默认未绑定，由玩家在「按键设置」里自行指定）
+    private static final String TOGGLE_KILL_AURA = "key.useless_mod.toggle_kill_aura";
+    public static final Lazy<KeyMapping> TOGGLE_KILL_AURA_KEY = Lazy.of(() -> new KeyMapping(
+            TOGGLE_KILL_AURA,
+            KeyConflictContext.IN_GAME,
+            InputConstants.Type.KEYSYM,
+            GLFW.GLFW_KEY_UNKNOWN,
+            CATEGORY
+    ));
 }

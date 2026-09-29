@@ -1,6 +1,7 @@
 package com.sorrowmist.useless.network;
 
 import com.sorrowmist.useless.UselessMod;
+import com.sorrowmist.useless.core.config.BeefToolProtectionManager;
 import com.sorrowmist.useless.core.config.ChainGroupManager;
 import com.sorrowmist.useless.data.BeefToolLayout;
 import com.sorrowmist.useless.data.BeefToolLayoutManager;
@@ -42,6 +43,7 @@ public record BeefToolLayoutUpdatePacket(String json) implements CustomPacketPay
                 // 布局与连锁等价组共用同一份存档：改动后必须丢弃等价组解析缓存，
                 // 并清掉 Tab 高亮缓存，否则玩家会看到按旧等价组算出来的连锁范围。
                 ChainGroupManager.invalidate(player.getUUID());
+                BeefToolProtectionManager.invalidate(player.getUUID());
                 MiningDispatcher.clearPlayerCache(player);
                 PacketDistributor.sendToPlayer(player, new BeefToolLayoutSyncPacket(layout.toJson()));
             } catch (BeefToolLayout.LayoutException exception) {

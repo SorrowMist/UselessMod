@@ -6,7 +6,9 @@ import com.sorrowmist.useless.api.enums.tool.ConstructionWandCoreMode;
 import com.sorrowmist.useless.api.enums.tool.EnchantMode;
 import com.sorrowmist.useless.api.enums.tool.ToolTypeMode;
 import com.sorrowmist.useless.content.menus.ChainGroupMenu;
+import com.sorrowmist.useless.core.common.KeyBindings;
 import com.sorrowmist.useless.core.component.UComponents;
+import com.sorrowmist.useless.core.config.BeefToolProtectionManager;
 import com.sorrowmist.useless.core.config.ChainGroupManager;
 import com.sorrowmist.useless.content.items.EndlessBeafItem;
 import com.sorrowmist.useless.data.BeefToolLayout;
@@ -601,6 +603,8 @@ public class ModeWheelScreen extends Screen {
             case BeefToolModuleRegistry.BEEF_AUTO_CLICK -> bool(UComponents.BeefAutoClickComponent, false);
             case BeefToolModuleRegistry.BEEF_WIRELESS_LOGISTICS ->
                     bool(UComponents.StaffLinkEnabledComponent, false);
+            case BeefToolModuleRegistry.BEEF_KILL_AURA -> bool(UComponents.BeefKillAuraComponent, false);
+            case BeefToolModuleRegistry.BEEF_PROTECT_MODE -> bool(UComponents.BeefProtectModeComponent, false);
             default -> false;
         };
     }
@@ -853,6 +857,8 @@ public class ModeWheelScreen extends Screen {
         // 等价组与布局同进同出，导入时也要在本地先拦下非法内容，
         // 免得等服务器回一个笼统的 INVALID_STRUCTURE。
         ChainGroupManager.validateEntries(candidate.chainGroups());
+        // 保护名单同样随布局导入导出，本地先拦下非法内容。
+        BeefToolProtectionManager.validateEntries(candidate.protectedTypes(), candidate.protectedEntities());
         for (BeefToolLayout.Page page : candidate.pages()) {
             for (BeefToolLayout.Group group : page.groups()) {
                 for (String id : group.modules()) validateKnown(id);
@@ -964,6 +970,12 @@ public class ModeWheelScreen extends Screen {
             case BeefToolModuleRegistry.BEEF_WIRELESS_LOGISTICS ->
                     toggle(ModeTogglePacket.ModeType.BEEF_WIRELESS_LOGISTICS,
                             UComponents.StaffLinkEnabledComponent, false);
+            case BeefToolModuleRegistry.BEEF_KILL_AURA ->
+                    toggle(ModeTogglePacket.ModeType.BEEF_KILL_AURA,
+                            UComponents.BeefKillAuraComponent, false);
+            case BeefToolModuleRegistry.BEEF_PROTECT_MODE ->
+                    toggle(ModeTogglePacket.ModeType.BEEF_PROTECT_MODE,
+                            UComponents.BeefProtectModeComponent, false);
             default -> {
             }
         }
@@ -1032,6 +1044,7 @@ public class ModeWheelScreen extends Screen {
         }
 
         drawChainGroupGearTooltip(graphics, mouseX, mouseY);
+        drawModeButtonTooltips(graphics, mouseX, mouseY);
 
         if (pageNameField != null && pageNameField.visible) {
             pageNameField.render(graphics, mouseX, mouseY, partialTick);
@@ -1501,6 +1514,50 @@ public class ModeWheelScreen extends Screen {
         }
         graphics.renderTooltip(font,
                 Component.translatable("gui.useless_mod.chain_group.gear_tooltip"), mouseX, mouseY);
+    }
+
+    /** 少数「光看名字不知道该怎么用」的模式按钮，悬停时给出说明。 */
+    private void drawModeButtonTooltips(GuiGraphics graphics, int mouseX, int mouseY) {
+        if (awaitingLayout || editing) {
+            return;
+        }
+        for (ModeButton modeButton : modeButtons) {
+            PressableAE2Button button = modeButton.button();
+            if (!button.visible || !button.isMouseOver(mouseX, mouseY)) continue;
+            if (!intersectsContent(new Rect(button.getX(), button.getY(), button.getWidth(), button.getHeight()))) {
+                return;
+            }
+            List<Component> tooltip = modeButtonTooltip(modeButton.id());
+            if (tooltip != null && !tooltip.isEmpty()) {
+                graphics.renderComponentTooltip(font, tooltip, mouseX, mouseY);
+            }
+            return;
+        }
+    }
+
+    /**
+     * 模式按钮的悬停说明，返回 {@code null} 表示不显示。
+     *
+     * <p>只有需要额外说明「怎么操作」的模块才登记，其余一律不显示，免得把轮盘糊满。</p>
+     *
+     * <p><b>必须「一行一个 Component」</b>：{@code GuiGraphics#renderTooltip(Font, Component, int, int)}
+     * 走的是 {@code Component#getVisualOrderText()}，它把整串文字当成<b>一行</b>做 bidi 重排，
+     * 翻译文本里的 {@code \n} 不会变成换行（只会渲染成一个缺字形）。
+     * 只有传多行列表（{@code renderComponentTooltip}）才会逐行渲染。</p>
+     */
+    private List<Component> modeButtonTooltip(String id) {
+        return switch (id) {
+            case BeefToolModuleRegistry.BEEF_PROTECT_MODE -> List.of(
+                    Component.translatable("gui.useless_mod.mode_config.beef_protect_mode.title"),
+                    Component.translatable("gui.useless_mod.mode_config.beef_protect_mode.ctrl"),
+                    Component.translatable("gui.useless_mod.mode_config.beef_protect_mode.shift"),
+                    Component.translatable("gui.useless_mod.mode_config.beef_protect_mode.auto"));
+            case BeefToolModuleRegistry.BEEF_WIRELESS_LOGISTICS -> List.of(
+                    Component.translatable("gui.useless_mod.mode_config.wireless_logistics.title"),
+                    Component.translatable("gui.useless_mod.mode_config.wireless_logistics.key",
+                            KeyBindings.OPEN_WIRELESS_LOGISTICS_KEY.get().getTranslatedKeyMessage()));
+            default -> null;
+        };
     }
 
     private CardLayout groupAt(double mouseX, double mouseY) {

@@ -8,6 +8,7 @@ import com.sorrowmist.useless.compat.enderio.EnderIOTravelCompat;
 import com.sorrowmist.useless.content.recipe.AlloyFurnaceRecipeCatalog;
 import com.sorrowmist.useless.core.common.KeyBindings;
 import com.sorrowmist.useless.core.component.UComponents;
+import com.sorrowmist.useless.core.config.BeefToolProtectionManager;
 import com.sorrowmist.useless.core.config.ConfigManager;
 import com.sorrowmist.useless.init.ModDamageTypes;
 import com.sorrowmist.useless.init.ModTags;
@@ -44,6 +45,7 @@ import net.minecraft.world.entity.HumanoidArm;
 import net.minecraft.world.entity.LightningBolt;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.Mob;
+import net.minecraft.world.entity.OwnableEntity;
 import net.minecraft.world.entity.Pose;
 import net.minecraft.world.entity.ai.attributes.AttributeInstance;
 import net.minecraft.world.entity.ai.attributes.AttributeModifier;
@@ -161,6 +163,8 @@ public class EndlessBeafItem extends TieredItem {
                 .component(UComponents.BeefBeheadingEnabledComponent, false)
                 .component(UComponents.BeefTeleportEnabledComponent, false)
                 .component(UComponents.BeefAoeDamageEnabledComponent, false)
+                .component(UComponents.BeefKillAuraComponent, false)
+                .component(UComponents.BeefProtectModeComponent, false)
                 .component(UComponents.BeefMagnetEnabledComponent, true)
                 .component(UComponents.BeefFarmlandModeComponent, false)
                 .component(UComponents.BeefCropHarvestComponent, true)
@@ -319,6 +323,35 @@ public class EndlessBeafItem extends TieredItem {
 
     public static void setStaffLinkEnabled(ItemStack stack, boolean enabled) {
         stack.set(UComponents.StaffLinkEnabledComponent.get(), enabled);
+    }
+
+    /**
+     * 是否启用杀戮光环。
+     *
+     * <p>开启后手持造化杖每 20 tick 对「范围伤害」配置范围内生物结算一次攻击伤害；
+     * 范围与目标上限沿用范围伤害的配置，并兼容强制击杀与范围磁力。</p>
+     */
+    public static boolean isKillAuraEnabled(ItemStack stack) {
+        return stack.getOrDefault(UComponents.BeefKillAuraComponent.get(), false);
+    }
+
+    public static void setKillAuraEnabled(ItemStack stack, boolean enabled) {
+        stack.set(UComponents.BeefKillAuraComponent.get(), enabled);
+    }
+
+    /**
+     * 是否处于「保护名单模式」。
+     *
+     * <p>开启时暂停杀戮光环与范围伤害的结算（{@link #damageArea} 直接返回），
+     * 这样玩家可以走到怪堆里从容地用 Ctrl/Shift + 右键把生物加进保护名单，
+     * 而不会出现「刚瞄准就被光环打死」的情况。</p>
+     */
+    public static boolean isProtectModeEnabled(ItemStack stack) {
+        return stack.getOrDefault(UComponents.BeefProtectModeComponent.get(), false);
+    }
+
+    public static void setProtectModeEnabled(ItemStack stack, boolean enabled) {
+        stack.set(UComponents.BeefProtectModeComponent.get(), enabled);
     }
 
     /** Keeps the tool's fixed enchantments aligned with its selected mode and server config. */
@@ -556,28 +589,38 @@ public class EndlessBeafItem extends TieredItem {
     }
 
     /**
-     * 对主目标周围范围内的实体结算全额攻击伤害。
-     * 若工具开启了强制击杀模式，范围内的实体同样走强制击杀逻辑。
+     * 共享的范围结算：以 {@code center} 为中心，对范围内生物结算一次攻击伤害；命中后登记磁力吸附。
      *
-     * @param stack   工具
-     * @param player  攻击者
-     * @param primary 直接命中的目标（作为范围中心，本身不重复结算）
+     * <p>「范围伤害」（左键命中触发）与「杀戮光环」（每 20 tick 触发）共用本方法，
+     * 因此保护名单、强制击杀、范围磁力这三件事只需在这里接一次，两条路径同时生效。</p>
+     *
+     * @param stack          工具
+     * @param player         攻击者（同时作为重入保护键与友军判定方）
+     * @param level          服务端世界
+     * @param center         范围中心（左键=命中点；光环=玩家自身）
+     * @param excluded       需要跳过的实体（左键=直接命中的主目标，避免重复结算；光环=null）
+     * @param requireAoeFlag true=要求「范围伤害」开关为开（左键路径）；false=不门控（光环路径）
+     * @return 实际命中的目标数
      */
-    private static void applyAoeDamage(ItemStack stack, Player player, Entity primary) {
-        if (!(player.level() instanceof ServerLevel level)
-                || !stack.getOrDefault(UComponents.BeefAoeDamageEnabledComponent, false)) {
-            return;
+    private static int damageArea(ItemStack stack, Player player, ServerLevel level, Vec3 center,
+                                  @Nullable Entity excluded, boolean requireAoeFlag) {
+        // 保护名单模式：光环与范围伤害都停手，让玩家能从容地把生物加进名单
+        if (isProtectModeEnabled(stack)) {
+            return 0;
         }
-        // 重入保护：范围伤害过程中不再触发新的范围伤害
+        if (requireAoeFlag && !stack.getOrDefault(UComponents.BeefAoeDamageEnabledComponent, false)) {
+            return 0;
+        }
+        // 重入保护：左键范围伤害与杀戮光环共用同一把锁，避免同一次结算里互相嵌套
         if (!AOE_DAMAGE_CONTEXT.add(player.getUUID())) {
-            return;
+            return 0;
         }
 
         try {
             double rangeX = ConfigManager.getBeefAoeDamageRangeX();
             double rangeY = ConfigManager.getBeefAoeDamageRangeY();
             double rangeZ = ConfigManager.getBeefAoeDamageRangeZ();
-            AABB area = AABB.ofSize(primary.position(), rangeX * 2 + 1, rangeY * 2 + 1, rangeZ * 2 + 1);
+            AABB area = AABB.ofSize(center, rangeX * 2 + 1, rangeY * 2 + 1, rangeZ * 2 + 1);
 
             float damage = (float) player.getAttributeValue(Attributes.ATTACK_DAMAGE);
             DamageSource damageSource = ModDamageTypes.beefTool(level, player);
@@ -588,8 +631,11 @@ public class EndlessBeafItem extends TieredItem {
                 if (hit >= maxTargets) {
                     break;
                 }
-                if (victim == primary || victim == player || victim instanceof Player
-                        || !victim.isAlive() || player.isAlliedTo(victim)) {
+                if (victim == excluded || !victim.isAlive()) {
+                    continue;
+                }
+                // 统一的保护判定：玩家/盟友/自己的宠物与坐骑/手动维护的保护名单
+                if (isProtectedTarget(player, victim)) {
                     continue;
                 }
 
@@ -604,17 +650,65 @@ public class EndlessBeafItem extends TieredItem {
             if (hit > 0) {
                 // 主动登记一次吸附：范围取「AoE 半径 + 磁力半径」，保证最外圈被打死的怪的掉落也能覆盖到。
                 // 与单体死亡事件登记合并，覆盖强杀兜底和范围内普通伤害产生的掉落。
-                BeefMagnetHandler.scheduleSweep(level, player, stack, primary.position(),
+                BeefMagnetHandler.scheduleSweep(level, player, stack, center,
                         rangeX + ConfigManager.getBeefMagnetRangeX(),
                         rangeY + ConfigManager.getBeefMagnetRangeY(),
                         rangeZ + ConfigManager.getBeefMagnetRangeZ());
             }
+            return hit;
         } finally {
             AOE_DAMAGE_CONTEXT.remove(player.getUUID());
         }
     }
 
+    /**
+     * 左键范围伤害：以命中目标为中心结算。语义与抽出 {@link #damageArea} 之前完全一致。
+     *
+     * @param primary 直接命中的目标（作为范围中心，本身不重复结算）
+     */
+    private static void applyAoeDamage(ItemStack stack, Player player, Entity primary) {
+        if (!(player.level() instanceof ServerLevel level)) {
+            return;
+        }
+        damageArea(stack, player, level, primary.position(), primary, true);
+    }
+
+    /**
+     * 杀戮光环：由 {@code EventHandler#onPlayerTick} 每 20 tick 调用一次，
+     * 以玩家自身为中心结算一次范围伤害。
+     *
+     * <p>必须手持（主手或副手）造化杖且光环开关为开才生效。范围沿用「范围伤害」的配置，
+     * 因此打开「强制击杀」时走强杀、「范围磁力」开启时自动吸附掉落。</p>
+     */
+    public static void tickKillAura(Player player) {
+        if (player.isSpectator() || player.isDeadOrDying()) {
+            return;
+        }
+        if (!(player.level() instanceof ServerLevel level)) {
+            return;
+        }
+        var toolEntry = UselessItemUtils.findTargetToolInHands(player);
+        if (toolEntry.isEmpty()) {
+            return;
+        }
+        ItemStack stack = toolEntry.get().getKey();
+        if (!(stack.getItem() instanceof EndlessBeafItem) || !isKillAuraEnabled(stack)) {
+            return;
+        }
+        damageArea(stack, player, level, player.position(), null, false);
+    }
+
     private static Entity getForceKillTarget(Entity entity) {
+        return unwrapPartEntity(entity);
+    }
+
+    /**
+     * 拆掉 {@link PartEntity}（末影龙之类的部位实体）取本体。
+     *
+     * <p>客户端手势与服务端解析共用：命中部位实体时要落到本体上，
+     * 否则保护名单里记的 UUID / 种类会与真正参与结算的实体对不上。</p>
+     */
+    public static Entity unwrapPartEntity(@Nullable Entity entity) {
         if (entity instanceof PartEntity<?> partEntity) {
             return partEntity.getParent();
         }
@@ -668,6 +762,8 @@ public class EndlessBeafItem extends TieredItem {
     private static boolean forceKillLivingEntity(ItemStack stack, LivingEntity target, Player player) {
         if (target.level().isClientSide || target instanceof Player || !target.isAlive()
                 || isForceKillBlacklisted(target)
+                // 保护名单与「自己的宠物/坐骑」同样拦下直接强杀：保护应当是全局语义
+                || isProtectedTarget(player, target)
                 || !stack.getOrDefault(UComponents.ForceKillEnabledComponent, false)) {
             return false;
         }
@@ -934,8 +1030,57 @@ public class EndlessBeafItem extends TieredItem {
         return ConfigManager.getBeefToolForceKillNonLivingWhitelist().contains(getEntityId(entity));
     }
 
-    private static String getEntityId(Entity entity) {
+    /** 实体类型注册名（如 {@code minecraft:villager}），保护名单与强制击杀黑名单共用同一套 key。 */
+    public static String getEntityId(Entity entity) {
         return entity.getType().builtInRegistryHolder().key().location().toString();
+    }
+
+    /**
+     * 「保护名单手势」是否可用：杀戮光环、范围伤害或保护名单模式至少开一个。
+     *
+     * <p>供客户端手势判定与服务端二次校验共用：只有这三个开关之一开着时，
+     * Ctrl/Shift + 右键生物才被解释为「切换保护名单」，否则完全让给原版交互。</p>
+     */
+    public static boolean isProtectGestureAvailable(ItemStack stack) {
+        return stack.getOrDefault(UComponents.BeefAoeDamageEnabledComponent, false)
+                || stack.getOrDefault(UComponents.BeefKillAuraComponent, false)
+                || isProtectModeEnabled(stack);
+    }
+
+    /**
+     * 统一的保护判定：光环、范围伤害与强制击杀都以此为准。
+     *
+     * <p>覆盖五类：玩家自己、其它玩家、同队盟友、自动保护的宠物与坐骑，
+     * 以及玩家手动维护的「种类 / 个体」保护名单。</p>
+     *
+     * <p>注意 {@code player.isAlliedTo(victim)} 保护不了自己的宠物 ——
+     * {@code TamableAnimal#isAlliedTo} 判断的是「对方是不是我的主人」（方向相反），
+     * 而 {@code AbstractHorse} 完全没有覆写，所以归属判定必须走 {@link OwnableEntity#getOwnerUUID()}。</p>
+     */
+    public static boolean isProtectedTarget(Player player, Entity victim) {
+        if (victim == player || victim instanceof Player) {
+            return true;
+        }
+        if (player.isAlliedTo(victim)) {
+            return true;
+        }
+        // 自动保护：自己驯服的宠物（狼/猫/鹦鹉/已驯服的马等）
+        if (victim instanceof OwnableEntity ownable && player.getUUID().equals(ownable.getOwnerUUID())) {
+            return true;
+        }
+        // 自动保护：当前骑乘的坐骑（未驯服的猪/船等不属于 OwnableEntity）
+        if (victim == player.getVehicle()) {
+            return true;
+        }
+
+        BeefToolProtectionManager.Protection protection = BeefToolProtectionManager.protectionFor(player);
+        if (protection.isEmpty()) {
+            return false;
+        }
+        if (protection.types().contains(getEntityId(victim))) {
+            return true;
+        }
+        return protection.entities().contains(victim.getUUID());
     }
 
     @Override
@@ -1465,6 +1610,33 @@ public class EndlessBeafItem extends TieredItem {
                                        ).withStyle(beefAoeDamageEnabled ? ChatFormatting.GREEN : ChatFormatting.GRAY))
                                        .withStyle(ChatFormatting.RED));
 
+        boolean beefKillAuraEnabled = isKillAuraEnabled(stack);
+        tooltipComponents.add(Component.translatable("tooltip.useless_mod.beef_kill_aura_mode")
+                                       .append(": ")
+                                       .append(Component.translatable(
+                                               beefKillAuraEnabled ? "tooltip.useless_mod.enable" :
+                                                       "tooltip.useless_mod.disable"
+                                       ).withStyle(beefKillAuraEnabled ? ChatFormatting.GREEN : ChatFormatting.GRAY))
+                                       .withStyle(ChatFormatting.DARK_RED));
+
+        boolean beefProtectModeEnabled = isProtectModeEnabled(stack);
+        tooltipComponents.add(Component.translatable("tooltip.useless_mod.beef_protect_toggle_mode")
+                                       .append(": ")
+                                       .append(Component.translatable(
+                                               beefProtectModeEnabled ? "tooltip.useless_mod.enable" :
+                                                       "tooltip.useless_mod.disable"
+                                       ).withStyle(beefProtectModeEnabled ? ChatFormatting.GREEN : ChatFormatting.GRAY))
+                                       .withStyle(ChatFormatting.BLUE));
+
+        BeefToolProtectionManager.Protection protection = BeefToolProtectionManager.clientProtection();
+        tooltipComponents.add(Component.translatable("tooltip.useless_mod.beef_protect_mode")
+                                       .append(": ")
+                                       .append(Component.translatable("tooltip.useless_mod.beef_protect_count",
+                                                       protection.types().size(), protection.entities().size())
+                                               .withStyle(protection.isEmpty()
+                                                       ? ChatFormatting.GRAY : ChatFormatting.AQUA))
+                                       .withStyle(ChatFormatting.BLUE));
+
         boolean beefMagnetEnabled = stack.getOrDefault(UComponents.BeefMagnetEnabledComponent.get(), true);
         tooltipComponents.add(Component.translatable("tooltip.useless_mod.beef_magnet_mode")
                                        .append(": ")
@@ -1598,6 +1770,9 @@ public class EndlessBeafItem extends TieredItem {
             this.addKeyTooltip(tooltipComponents, KeyBindings.TOGGLE_AUTO_CLICK_KEY,
                                "tooltip.useless_mod.key.toggle_auto_click"
             );
+            this.addKeyTooltip(tooltipComponents, KeyBindings.TOGGLE_KILL_AURA_KEY,
+                               "tooltip.useless_mod.key.toggle_kill_aura"
+            );
 
             // 触发按键
             this.addKeyTooltip(tooltipComponents, KeyBindings.TRIGGER_CHAIN_MINING_KEY,
@@ -1652,6 +1827,12 @@ public class EndlessBeafItem extends TieredItem {
                 Component.translatable("tooltip.useless_mod.beef_force_grow_hint").withStyle(ChatFormatting.RED));
         tooltipComponents.add(
                 Component.translatable("tooltip.useless_mod.beef_auto_click_hint").withStyle(ChatFormatting.LIGHT_PURPLE));
+        tooltipComponents.add(
+                Component.translatable("tooltip.useless_mod.beef_kill_aura_hint").withStyle(ChatFormatting.DARK_RED));
+        tooltipComponents.add(
+                Component.translatable("tooltip.useless_mod.beef_protect_hint").withStyle(ChatFormatting.BLUE));
+        tooltipComponents.add(
+                Component.translatable("tooltip.useless_mod.beef_protect_toggle_hint").withStyle(ChatFormatting.BLUE));
 
         // 可选：增强连锁说明
         // tooltipComponents.add(Component.translatable("tooltip.useless_mod.enhanced_chain_description").withStyle(ChatFormatting.BLUE));

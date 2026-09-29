@@ -315,6 +315,19 @@ public class MiningUtils {
      * @param dropOrigin 磁力关闭时的落地点（AE 无法存入的部分亦落于此）
      */
     public static void handleDrops(Player player, List<ItemStack> drops, ItemStack tool, Vec3 dropOrigin) {
+        handleDrops(player, drops, tool, dropOrigin, true);
+    }
+
+    /**
+     * 与 {@link #handleDrops(Player, List, ItemStack, Vec3)} 相同，但可以关掉 AE 分支。
+     *
+     * <p>捕捉（刷怪蛋）走的是 {@code allowAe = false}：刷怪蛋是玩家想立刻拿在手上的东西，
+     * 不该被「AE 存储优先」吸进网络里，只按「范围磁力」决定进背包还是落地。</p>
+     *
+     * @param allowAe 是否允许走「AE 存储优先」分支
+     */
+    public static void handleDrops(Player player, List<ItemStack> drops, ItemStack tool, Vec3 dropOrigin,
+                                   boolean allowAe) {
         boolean isAE2Loaded = ModList.get().isLoaded("ae2");
         boolean magnetEnabled = UComponentUtils.isBeefMagnetEnabled(tool);
 
@@ -326,7 +339,8 @@ public class MiningUtils {
             if (drop.isEmpty()) continue;
 
             // 1. 尝试存入 AE2 (内部处理跨维度)
-            if (isAE2Loaded
+            if (allowAe
+                    && isAE2Loaded
                     && UComponentUtils.isAEStoragePriorityEnabled(tool)
                     && tool.has(UComponents.WIRELESS_LINK_TARGET.get())) {
                 try {

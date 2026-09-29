@@ -1,5 +1,6 @@
 package com.sorrowmist.useless.data;
 
+import com.sorrowmist.useless.core.config.BeefToolProtectionManager;
 import com.sorrowmist.useless.core.config.ChainGroupManager;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.Tag;
@@ -69,6 +70,7 @@ public final class BeefToolLayoutManager {
         layout.validate();
         validateKnownModules(layout);
         ChainGroupManager.validateEntries(layout.chainGroups());
+        BeefToolProtectionManager.validateEntries(layout.protectedTypes(), layout.protectedEntities());
     }
 
     /**

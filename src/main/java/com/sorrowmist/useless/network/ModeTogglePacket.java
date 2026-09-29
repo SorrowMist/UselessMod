@@ -5,6 +5,7 @@ import com.sorrowmist.useless.content.items.EndlessBeafItem;
 import com.sorrowmist.useless.content.items.BeefToolVariants;
 import com.sorrowmist.useless.core.component.UComponents;
 import com.sorrowmist.useless.event.EventHandler;
+import com.sorrowmist.useless.init.ModSounds;
 import com.sorrowmist.useless.utils.UselessItemUtils;
 import com.sorrowmist.useless.utils.mining.MiningDispatcher;
 import net.minecraft.network.FriendlyByteBuf;
@@ -12,6 +13,7 @@ import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.item.ItemStack;
 import net.neoforged.fml.ModList;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
@@ -210,6 +212,21 @@ public class ModeTogglePacket implements CustomPacketPayload {
                         }
                     }
                 }
+                case BEEF_KILL_AURA -> {
+                    if (stack.getItem() instanceof EndlessBeafItem) {
+                        EndlessBeafItem.setKillAuraEnabled(stack, msg.enabled);
+                        // 光环不占右键，无需接入 disable* 互斥。
+                        // 音效只发给操作者本人：这是个人 UI 反馈，不该打扰周围玩家。
+                        player.playNotifySound(
+                                (msg.enabled ? ModSounds.KILL_AURA_ON : ModSounds.KILL_AURA_OFF).get(),
+                                SoundSource.MASTER, 1.0F, 1.0F);
+                    }
+                }
+                case BEEF_PROTECT_MODE -> {
+                    if (stack.getItem() instanceof EndlessBeafItem) {
+                        EndlessBeafItem.setProtectModeEnabled(stack, msg.enabled);
+                    }
+                }
             }
 
             // 显式同步物品到客户端
@@ -292,6 +309,10 @@ public class ModeTogglePacket implements CustomPacketPayload {
         BEEF_AUTO_CLICK,
         BEEF_FORCE_GROW,
         // 无线物流：潜行右键容器绑定/解绑，界面里配置搬运规则
-        BEEF_WIRELESS_LOGISTICS
+        BEEF_WIRELESS_LOGISTICS,
+        // 杀戮光环：手持造化杖每 20 tick 对「范围伤害」配置范围内生物结算一次攻击伤害
+        BEEF_KILL_AURA,
+        // 保护名单模式：暂停光环与范围伤害，方便从容添加保护名单
+        BEEF_PROTECT_MODE
     }
 }

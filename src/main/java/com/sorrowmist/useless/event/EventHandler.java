@@ -16,6 +16,7 @@ import com.sorrowmist.useless.content.multiblock.OmniversalFurnaceAutoBuilder;
 import com.sorrowmist.useless.content.blockentities.multiblock.MultiblockAlloyFurnaceCoreBlockEntity;
 import com.sorrowmist.useless.core.common.FlyEffectedHolder;
 import com.sorrowmist.useless.core.component.UComponents;
+import com.sorrowmist.useless.core.config.BeefToolProtectionManager;
 import com.sorrowmist.useless.core.config.ConfigManager;
 import com.sorrowmist.useless.core.config.ChainGroupManager;
 import com.sorrowmist.useless.data.BeefToolLayout;
@@ -265,6 +266,11 @@ public class EventHandler {
         updateBeefInvulnerability(player);
         
         MiningDispatcher.tickCacheUpdate(player);
+
+        // 杀戮光环：按玩家自身的 tickCount 错开相位，避免全服玩家在同一 tick 集中结算
+        if (player.tickCount % 20 == 0) {
+            EndlessBeafItem.tickKillAura(player);
+        }
     }
 
     /**
@@ -846,6 +852,8 @@ public class EventHandler {
         StaffLinkEngine.clearRuntimeState();
         // 连锁等价组的解析缓存按玩家 UUID 索引，别留到下一局。
         ChainGroupManager.clearAll();
+        // 生物保护名单的解析缓存与客户端镜像同理。
+        BeefToolProtectionManager.clearAll();
     }
 
     /**

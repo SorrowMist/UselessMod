@@ -55,6 +55,8 @@ public final class BeefToolModuleRegistry {
     public static final String BEEF_FORCE_GROW = "mode.beef_force_grow";
     public static final String BEEF_AUTO_CLICK = "mode.beef_auto_click";
     public static final String BEEF_WIRELESS_LOGISTICS = "mode.beef_wireless_logistics";
+    public static final String BEEF_KILL_AURA = "mode.beef_kill_aura";
+    public static final String BEEF_PROTECT_MODE = "mode.beef_protect_mode";
 
     private static final List<Definition> DEFINITIONS = List.of(
             new Definition(ENCHANT_SILK_TOUCH, EnchantMode.SILK_TOUCH.getTooltip(), GroupKind.TOOLS,
@@ -133,12 +135,18 @@ public final class BeefToolModuleRegistry {
             new Definition(BEEF_AUTO_CLICK, ModeTypeEnum.BEEF_AUTO_CLICK_ENABLED.getTooltip(),
                     GroupKind.AUXILIARY, Availability.ALWAYS, false),
             new Definition(BEEF_WIRELESS_LOGISTICS, ModeTypeEnum.BEEF_WIRELESS_LOGISTICS_ENABLED.getTooltip(),
-                    GroupKind.AUXILIARY, Availability.ENDLESS, false)
+                    GroupKind.AUXILIARY, Availability.ENDLESS, false),
+            new Definition(BEEF_KILL_AURA, ModeTypeEnum.BEEF_KILL_AURA_ENABLED.getTooltip(),
+                    GroupKind.COMBAT, Availability.ENDLESS, false),
+            new Definition(BEEF_PROTECT_MODE, ModeTypeEnum.BEEF_PROTECT_MODE_ENABLED.getTooltip(),
+                    GroupKind.COMBAT, Availability.ENDLESS, false)
     );
     private static final List<String> AUTO_COMBAT_MODULES = List.of(
             BEEF_MALUM_SPIRIT,
             BEEF_MYSTICAL_AGRICULTURE,
-            BEEF_BEHEADING);
+            BEEF_BEHEADING,
+            BEEF_KILL_AURA,
+            BEEF_PROTECT_MODE);
     /** 新增的辅助类模块：老存档的布局里没有它们，进游戏时自动补进「辅助」分组。 */
     private static final List<String> AUTO_AUXILIARY_MODULES = List.of(
             BEEF_AUTO_CLICK,

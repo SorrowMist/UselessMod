@@ -15,6 +15,18 @@ public final class ModSounds {
             () -> SoundEvent.createVariableRangeEvent(UselessMod.id("howl"))
     );
 
+    /** 杀戮光环开启提示音。 */
+    public static final DeferredHolder<SoundEvent, SoundEvent> KILL_AURA_ON = SOUNDS.register(
+            "kill_aura_on",
+            () -> SoundEvent.createVariableRangeEvent(UselessMod.id("kill_aura_on"))
+    );
+
+    /** 杀戮光环关闭提示音。 */
+    public static final DeferredHolder<SoundEvent, SoundEvent> KILL_AURA_OFF = SOUNDS.register(
+            "kill_aura_off",
+            () -> SoundEvent.createVariableRangeEvent(UselessMod.id("kill_aura_off"))
+    );
+
     private ModSounds() {
     }
 }

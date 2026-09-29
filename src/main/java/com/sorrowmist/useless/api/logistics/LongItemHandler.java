@@ -22,6 +22,25 @@ public interface LongItemHandler extends LongResourceHandler {
      */
     ItemStack getStackInSlot(int slot);
 
+    /**
+     * 扫描路径专用的读取入口：只用于判断类型，数量看 {@link #amountIn(int)}。
+     *
+     * <p>与 {@link #getStackInSlot(int)} 的唯一区别是<b>返回值不保证是副本</b>——实现可以直接
+     * 交出自己内部的对象。因此调用方<b>不得长期持有它</b>，也<b>不得在 extract 之后依赖它</b>：
+     * 槽位可能被就地清空，手里那个对象会跟着一起变空（典型是原生 {@code IItemHandler} 的
+     * 引用型返回值）。需要在抽取之后继续用的话，先自己 {@code copy()} 一份。</p>
+     *
+     * <p>存在的理由：有的实现（例如 AE2 的 {@code GenericStackItemStorage}）每次
+     * {@code getStackInSlot} 都<b>新建</b>一个 {@code ItemStack}，外层再 copy 一遍纯属浪费——
+     * 在 1.21 的组件化物品栈上，一次 copy 要连带复制整份 DataComponent 映射，实测占无线物流
+     * 总耗时的 13%（见 {@code wiki/WIRELESS_LOGISTICS_PERF_REPORT.md} 第十二节）。</p>
+     *
+     * <p>默认实现委托 {@link #getStackInSlot(int)}，因此旧实现的行为逐字节不变。</p>
+     */
+    default ItemStack peekStack(int slot) {
+        return getStackInSlot(slot);
+    }
+
     /** 槽内实际数量（long 语义）。空槽返回 0。 */
     long amountIn(int slot);
 
@@ -42,6 +61,28 @@ public interface LongItemHandler extends LongResourceHandler {
      */
     default long amountIn(int slot, ItemStack stackFromSlot) {
         return amountIn(slot);
+    }
+
+    /**
+     * 该处理器里<b>一共有多少</b>这种物品（跨槽累加，long 语义）。
+     *
+     * <p>存在的理由：过滤器的「源端保留 X 个」「接收端最多 Y 个」需要知道「现在有多少」，
+     * 而这既不是某个槽位的数字（可能分散在多个槽），也不是 {@code extract(..., simulate)}
+     * 的返回值（那个还叠了容量上限）。</p>
+     *
+     * <p>默认实现 = {@link #findSlot(ItemStack)} + {@link #amountIn(int)}，只回答「第一个
+     * 同类型槽位的存量」。对「同一种物品最多出现在一个槽位」的实现（原版容器、本模组的
+     * 大容量容器）这已经是正确答案；对可能分散的实现应覆写。</p>
+     *
+     * <p><b>调用方只在真的需要限制时才调它</b>：AE 端点覆写后要抓一次整网快照，
+     * 那是线性开销，不能当成免费查询。</p>
+     */
+    default long amountOf(ItemStack template) {
+        if (template == null || template.isEmpty()) {
+            return 0L;
+        }
+        int slot = findSlot(template);
+        return slot < 0 ? 0L : amountIn(slot);
     }
 
     /**

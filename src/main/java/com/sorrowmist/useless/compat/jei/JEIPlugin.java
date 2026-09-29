@@ -151,6 +151,10 @@ public final class JEIPlugin implements IModPlugin {
      * <p>标记按线路的资源类型分流：物品线路收物品，流体线路收<b>流体本身</b>（不是装它的桶），
      * 化学品线路收一只装满它的储罐。类型对不上的原料直接不接受——不接，比悄悄塞进一个
      * 语义不对的东西好。</p>
+     *
+     * <p>拖进来的只能是<b>具体标记</b>。{@code #tag} / 通配符那类模式表达的是「一整类」，
+     * 从 JEI 拖某个具体物品过来时玩家要的显然是那个物品，所以这里不替玩家猜「你是不是想要
+     * 这个物品的标签」——要模式请右键格子手打。</p>
      */
     private static final class StaffLinkGhostHandler
             implements IGhostIngredientHandler<StaffLinkScreen> {
@@ -158,11 +162,27 @@ public final class JEIPlugin implements IModPlugin {
         public <I> List<Target<I>> getTargetsTyped(StaffLinkScreen screen,
                                                    ITypedIngredient<I> ingredient,
                                                    boolean doStart) {
+            // 过滤格住在覆盖层面板里。面板没开时那些坐标指向的是主界面别的地方，
+            // 拖过去会莫名其妙地落到空处（甚至落到底下某个控件上），所以直接不给目标。
+            if (!screen.isFilterPanelOpen()) {
+                screen.setJeiDragActive(false);
+                return List.of();
+            }
             StaffLinkRoute config = screen.getMenu().getSelectedConfig();
-            if (config == null || !config.filterApplies()) return List.of();
+            if (config == null || !config.filterApplies()) {
+                screen.setJeiDragActive(false);
+                return List.of();
+            }
             LinkFilterSlot marker = StaffLinkFilters.fromIngredient(
                     config.medium(), ingredient.getIngredient());
-            if (marker == null) return List.of();
+            if (marker == null) {
+                screen.setJeiDragActive(false);
+                return List.of();
+            }
+            // 真的要开始拖了（doStart=true）才点亮拖拽高亮；doStart=false 那次只是问「有没有目标」。
+            if (doStart) {
+                screen.setJeiDragActive(true);
+            }
 
             List<Target<I>> targets = new ArrayList<>(StaffLinkScreen.filterSlotCount());
             for (int index = 0; index < StaffLinkScreen.filterSlotCount(); index++) {

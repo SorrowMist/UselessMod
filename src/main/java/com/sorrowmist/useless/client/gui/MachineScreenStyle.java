@@ -15,6 +15,9 @@ final class MachineScreenStyle {
     static final int MUTED_TEXT_COLOR = 0xFF878FA5;
     static final int SUBTLE_TEXT_COLOR = 0xFF6D7287;
     static final int ERROR_TEXT_COLOR = 0xFFCE2401;
+    /** 输入框底 / 描边：比 PANEL_COLOR 深一档，用来在浅色面板上圈出「这里能填」。 */
+    static final int FIELD_BORDER_COLOR = 0xFF8B8FA3;
+    static final int FIELD_FILL_COLOR = 0xFFE4E5EA;
 
     private MachineScreenStyle() {
     }

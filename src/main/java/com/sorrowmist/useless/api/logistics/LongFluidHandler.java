@@ -26,6 +26,23 @@ public interface LongFluidHandler extends LongResourceHandler {
     /** 储罐容量（long 语义）。 */
     long capacityOf(int tank);
 
+    /**
+     * 该处理器里<b>一共有多少</b>这种流体（跨罐累加，long 语义）。
+     *
+     * <p>语义与 {@link LongItemHandler#amountOf(net.minecraft.world.item.ItemStack)} 完全对称：
+     * 给过滤器的「源端保留」「接收端上限」提供「现在有多少」这个基准。</p>
+     *
+     * <p>默认实现 = {@link #findTank(FluidStack)} + {@link #amountIn(int)}；
+     * <b>AE 端点必须覆写</b>（否则要抓整网快照，且按类型跨罐累加才算得对）。</p>
+     */
+    default long amountOf(FluidStack type) {
+        if (type == null || type.isEmpty()) {
+            return 0L;
+        }
+        int tank = findTank(type);
+        return tank < 0 ? 0L : amountIn(tank);
+    }
+
     /** 从指定储罐抽出 {@code amount}。返回值是实际抽出量；{@code simulate} 为真时只试算。 */
     long drain(int tank, long amount, boolean simulate);
 

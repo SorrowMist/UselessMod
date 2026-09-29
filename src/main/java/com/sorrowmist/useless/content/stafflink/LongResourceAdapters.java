@@ -76,6 +76,17 @@ public final class LongResourceAdapters {
             }
 
             @Override
+            public ItemStack peekStack(int slot) {
+                // 扫描路径专用，故意不 copy：调用方用完即弃，且 extract 之后不再依赖它。
+                //
+                // 原生实现的引用型返回值在这里是安全的 —— 唯一的「抽取后还要用这个模板」的地方
+                // 是 settleItemLeftover 的余量退回，那边会在退回前自己固化一份。
+                // AE2 的 GenericStackItemStorage 本来就每次新建对象，这里连那次新建都省不出，
+                // 但省掉的是我们自己叠加的那次 copy（实测占无线物流总耗时的 13%）。
+                return handler.getStackInSlot(slot);
+            }
+
+            @Override
             public long amountIn(int slot) {
                 if (slot < 0 || slot >= handler.getSlots()) {
                     return 0L;
@@ -85,11 +96,32 @@ public final class LongResourceAdapters {
 
             @Override
             public long amountIn(int slot, ItemStack stackFromSlot) {
-                // 本适配器的 getStackInSlot 交出的就是「handler.getStackInSlot(slot) 的副本」，
-                // 因此它的 count 必然等于 amountIn(slot)。扫描路径已经付过那次读取了，直接复用
-                // —— 对底层容器这是一次多余的 getStackInSlot，对 AE 这种底层是资源键的实现
-                // 则是一次完整的 ItemStack 物化。
+                // 无论模板是 getStackInSlot 交出的副本，还是 peekStack 交出的底层对象，
+                // 它的 count 都必然等于 amountIn(slot)（原生实现里槽内栈的 count 就是真实数量）。
+                // 扫描路径已经付过那次读取了，直接复用 —— 对底层容器这是一次多余的
+                // getStackInSlot，对 AE 这种底层是资源键的实现则是一次完整的 ItemStack 物化。
                 return stackFromSlot == null ? 0L : stackFromSlot.getCount();
+            }
+
+            @Override
+            public long amountOf(ItemStack template) {
+                if (template == null || template.isEmpty()) {
+                    return 0L;
+                }
+                // 必须跨槽累加，不能只答「第一个同类型槽」：原版容器（含本模组的大容量容器）
+                // 经常把同一种物品分散在好几个槽里（每个槽各自封顶）。只答一个槽会让玩家设的
+                // 「源端保留 8 个」算少存量，于是多搬 —— 那是真的把不该出去的搬走了。
+                //
+                // 用固定槽位遍历 + peekStack：这里只判类型，不需要副本。本模组的容器为了
+                // 「同种物品先填满旧槽」而故意把同类型的槽相邻，所以不必提前剪枝。
+                long total = 0L;
+                for (int slot = 0; slot < handler.getSlots(); slot++) {
+                    ItemStack inSlot = handler.getStackInSlot(slot);
+                    if (!inSlot.isEmpty() && ItemStack.isSameItemSameComponents(inSlot, template)) {
+                        total += inSlot.getCount();
+                    }
+                }
+                return total;
             }
 
             @Override
@@ -195,6 +227,23 @@ public final class LongResourceAdapters {
                     return 0L;
                 }
                 return Math.max(0L, handler.getTankCapacity(tank));
+            }
+
+            @Override
+            public long amountOf(FluidStack type) {
+                if (type == null || type.isEmpty()) {
+                    return 0L;
+                }
+                // 同物品侧：跨罐累加。流体容器把同一种流体分散在多个罐里同样常见
+                // （机器自己的输入/输出罐、多方块的储罐阵列）。
+                long total = 0L;
+                for (int tank = 0; tank < handler.getTanks(); tank++) {
+                    FluidStack inTank = handler.getFluidInTank(tank);
+                    if (!inTank.isEmpty() && FluidStack.isSameFluidSameComponents(inTank, type)) {
+                        total += inTank.getAmount();
+                    }
+                }
+                return total;
             }
 
             @Override

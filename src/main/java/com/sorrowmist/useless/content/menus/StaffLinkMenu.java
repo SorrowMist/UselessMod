@@ -3,7 +3,6 @@ package com.sorrowmist.useless.content.menus;
 import com.sorrowmist.useless.content.stafflink.LinkFlow;
 import com.sorrowmist.useless.content.stafflink.LinkFilterSlot;
 import com.sorrowmist.useless.content.stafflink.LinkMedium;
-import com.sorrowmist.useless.content.stafflink.LinkTrigger;
 import com.sorrowmist.useless.content.stafflink.StaffLinkRoute;
 import com.sorrowmist.useless.init.ModMenuType;
 import com.sorrowmist.useless.network.StaffLinkConfigurePacket;
@@ -45,6 +44,12 @@ import java.util.UUID;
  */
 public final class StaffLinkMenu extends AbstractContainerMenu {
     private static final int PLAYER_INVENTORY_X = 44;
+    /**
+     * 背包第一行的 y。
+     *
+     * <p>过滤槽不画在主界面上（改成覆盖层里的面板），所以面板高度维持原值，
+     * 背包位置也就不必下移。</p>
+     */
     private static final int PLAYER_INVENTORY_Y = 254;
     private static final int PLAYER_HOTBAR_Y = 312;
 
@@ -235,7 +240,7 @@ public final class StaffLinkMenu extends AbstractContainerMenu {
         LinkFlow flow = snapshot != null && snapshot.hasReleaseRoute() ? LinkFlow.ABSORB : LinkFlow.RELEASE;
         // 新线路默认关闭，由玩家显式打开。
         return new StaffLinkRoute(anchor, route, false, flow, medium, 16, 5, null,
-                LinkTrigger.ALWAYS, 0, List.of());
+                0, List.of());
     }
 
     /** 当前网络名（没起过名时为空串）。 */
@@ -321,7 +326,7 @@ public final class StaffLinkMenu extends AbstractContainerMenu {
     /** 把一条配置原样搬到另一个锚点上（用于给还没有配置的目标补默认值）。 */
     private static StaffLinkRoute copyFor(GlobalPos anchor, StaffLinkRoute route) {
         return new StaffLinkRoute(anchor, route.route(), route.enabled(), route.flow(), route.medium(),
-                route.amount(), route.interval(), route.side(), route.trigger(), route.weight(),
+                route.amount(), route.interval(), route.side(), route.weight(),
                 route.filter());
     }
 
@@ -341,7 +346,6 @@ public final class StaffLinkMenu extends AbstractContainerMenu {
                 base.amount() != edited.amount() ? edited.amount() : base.amount(),
                 base.interval() != edited.interval() ? edited.interval() : base.interval(),
                 base.side() != edited.side() ? edited.side() : base.side(),
-                base.trigger() != edited.trigger() ? edited.trigger() : base.trigger(),
                 base.weight() != edited.weight() ? edited.weight() : base.weight(),
                 base.filter().equals(edited.filter()) ? base.filter() : edited.filter());
     }
@@ -437,6 +441,25 @@ public final class StaffLinkMenu extends AbstractContainerMenu {
         }
         List<LinkFilterSlot> filter = new ArrayList<>(config.filter());
         filter.set(index, slot == null ? LinkFilterSlot.EMPTY : slot);
+        applyRoute(config.withFilter(filter));
+    }
+
+    /**
+     * 改一个过滤器槽的「源端保留 / 接收端上限」，标记本身不动。
+     *
+     * <p>给界面上下方那两个数字输入框用；{@code 0} = 不限制。</p>
+     */
+    public void setFilterSlotLimits(int index, long keepAtSource, long maxInto) {
+        StaffLinkRoute config = getSelectedConfig();
+        if (config == null || !config.filterApplies()) {
+            return;
+        }
+        if (index < 0 || index >= StaffLinkRoute.FILTER_LIMIT) {
+            return;
+        }
+        List<LinkFilterSlot> filter = new ArrayList<>(config.filter());
+        LinkFilterSlot current = index < filter.size() ? filter.get(index) : LinkFilterSlot.EMPTY;
+        filter.set(index, current.withLimits(keepAtSource, maxInto));
         applyRoute(config.withFilter(filter));
     }
 

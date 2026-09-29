@@ -149,7 +149,7 @@ public final class StaffLinkBinding {
         LinkFlow flow = network.hasReleaseRoute() ? LinkFlow.ABSORB : LinkFlow.RELEASE;
         // 新锚点默认关闭：要搬什么由玩家显式打开，免得一绑上就开始动别人的库存。
         network.putRoute(new StaffLinkRoute(anchor, 0, false, flow, medium,
-                DEFAULT_AMOUNT, DEFAULT_INTERVAL, null, LinkTrigger.ALWAYS, 0, List.of()));
+                DEFAULT_AMOUNT, DEFAULT_INTERVAL, null, 0, List.of()));
         return true;
     }
 

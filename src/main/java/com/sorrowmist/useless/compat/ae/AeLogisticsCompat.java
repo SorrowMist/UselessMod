@@ -271,6 +271,35 @@ public final class AeLogisticsCompat implements AeLogisticsBridge {
             return Math.max(0L, extracted);
         }
 
+        /**
+         * 网络里这一种物品有多少。
+         *
+         * <p><b>要抓一份整网快照</b>（{@code getAvailableStacks()} 遍历网络里每一种资源），
+         * 所以只有玩家的过滤器真的勾了「源端保留」或「接收端上限」时才会被调用；
+         * 没勾就一次都不进来（见 {@code StaffLinkTargets}）。</p>
+         *
+         * <p>默认实现（{@code findSlot} + {@code amountIn}）在这里等价但要抓两次快照——
+         * 一次 {@code findSlot}、一次 {@code amountIn}。直接查 {@code snapshot()} 的缓存
+         * 只抓一次。ME 网络的 {@code getAvailableStacks} 对同一种 key 只报一个条目
+         * （{@code KeyCounter} 按 key 聚拢），所以「第一个命中的条目」就是全部存量。</p>
+         */
+        @Override
+        public long amountOf(ItemStack template) {
+            if (template == null || template.isEmpty()) {
+                return 0L;
+            }
+            AEItemKey wanted = AEItemKey.of(template);
+            if (wanted == null) {
+                return 0L;
+            }
+            for (Entry entry : snapshot()) {
+                if (entry.key.equals(wanted)) {
+                    return Math.max(0L, entry.amount);
+                }
+            }
+            return 0L;
+        }
+
         @Override
         public long extract(int slot, long amount, boolean simulate) {
             List<Entry> entries = snapshot();
@@ -441,6 +470,26 @@ public final class AeLogisticsCompat implements AeLogisticsBridge {
                 snapshot = null;
             }
             return Math.max(0L, drained);
+        }
+
+        /**
+         * 网络里这一种流体有多少；理由与代价同 {@link ItemEndpoint#amountOf(ItemStack)}。
+         */
+        @Override
+        public long amountOf(FluidStack type) {
+            if (type == null || type.isEmpty()) {
+                return 0L;
+            }
+            AEFluidKey wanted = AEFluidKey.of(type);
+            if (wanted == null) {
+                return 0L;
+            }
+            for (Entry entry : snapshot()) {
+                if (entry.key.equals(wanted)) {
+                    return Math.max(0L, entry.amount);
+                }
+            }
+            return 0L;
         }
 
         @Override

@@ -781,3 +781,393 @@ public boolean isEmpty() {
 里的**短路判断**（false 就原样返回，不做过滤）；真正「这个玩家要不要隐身」的判定是
 `hasBeefAdvancedStealthItem(player)`，与它无关。所以只要返回值相同，行为逐位相同 ——
 风险全部来自「镜像标志和集合不同步」，而不是来自判断本身。
+
+---
+
+## 十二、第七轮采样：介质选成「物品」的 ME 接口（2026-09-29）
+
+采样 `GLjn5sc8LH.sparkprofile`（14:48，300.2 s / 6000 tick），运行 jar
+`useless_mod-1.21.1-2.4.4.1.jar`（13:23）。
+
+### 12.1 这次的装置换了，结论也跟着换
+
+| | 源端 | 目标端 | 介质 |
+|---|---|---|---|
+| 第十一节（`WrdepzSsAw`） | ME 网络直连 | AE2 库存方块 | AE 物品 |
+| **本次（`GLjn5sc8LH`）** | **ME 接口（走 `IItemHandler`）** | 虚空垃圾桶 | **物品**，无过滤器 |
+
+| 指标 | 值 | 对比 |
+|---|---|---|
+| `onStaffLinkTick` | **2,796 ms** | 第十一节 3,568、第十节 9,396 |
+| 占 `tickServer`（32,464） | **8.6%** | 第十一节 10.7% |
+| 每 60 s 稳态窗 | ~540 ms | 第十一节 712 |
+
+**目前最好的一轮。** 但要注意：**这不是同一套装置的 A/B**，别把它当成「又降了 22%」。
+
+### 12.2 关键事实：AE 路径的优化这次一条都没生效
+
+`AeLogisticsCompat$ItemEndpoint` 在整份 profile 里**一个帧都没有**。玩家把 ME 接口的资源
+类型选成了「物品」，于是走通用 `LongResourceAdapters$1` 适配器。于是：
+
+| 编号 | 本次生效? | 原因 |
+|---|---|---|
+| O1 红石短路 | ✅ | `getBestNeighborSignal` **0 ms**（基线 312） |
+| O2 `amountIn(slot, template)` | ✅ | 适配器未进热点，只读一遍槽 |
+| O4a insert 暂存栈 | ✅ | 我们的 copy 只剩 56 ms |
+| O5 / O6 | ✅ | `anyNodeDue` 8、`setNextRun` 36 |
+| **P1** `extractMatching` | ❌ | **只在有过滤器时走**；本次无过滤器 → 扫描路径 |
+| **P2** `storage()` 缓存 | ❌ | `ItemEndpoint` 零帧 |
+| **P3** 源端点复用 | ⚠️ | 生效但无收益（只有 1 个接收端） |
+| **P6** 跳过目标试算 | ❌ | 判据 `source.medium().isAe()` = **false** |
+
+**一句话**：P1/P2/P6 这套针对 AE 路径的优化，在一个「选了物品介质的 ME 接口」上一条都
+不起作用。这正是 4.4 那句「**ITEM 这条路的浪费必须直接修**」的现实验证。
+
+### 12.3 开销拆解（共 2,796）
+
+| 位置 | ms | 占比 | 构成 |
+|---|---|---|---|
+| `moveItems` | 2,324 | 83% | —— |
+| ├ `moveOneItemStack` | 1,468 | 52% | —— |
+| │ ├ `LongResourceAdapters$1.extract` | 1,116 | 40% | `GenericStackInv.extract` 704 + `toStack(extracted)` 412 |
+| │ └ `LongResourceAdapters$1.insert` | 344 | 12% | 垃圾桶 `insertItem` 164 + `isSameItemSameComponents` 124 |
+| └ `getStackInSlot` | **840** | **30%** | **AE2 `toStack(1)` 464 + 我们自己的 `.copy()` 376** |
+| `resolveSource` / `resolve` | 288 | 10% | `getBlockState` 100 + `getBlockEntity` 80（都是 vanilla 读取） |
+| 其它 | ~120 | 4% | —— |
+
+**本质**：这次是「AE2 的 `GenericStackItemStorage` 用 `AEKey ⇄ ItemStack` 做桥，而 1.21 +
+owo-lib 下造/拷 `ItemStack` 极贵」——和第十节的「整网枚举 / `AEItemKey.of` 哈希」是**两类
+不同的开销**。
+
+### 12.4 根因核实（读了 AE2 源码）
+
+`references/Applied-Energistics-2-1.21.1/.../GenericStackItemStorage.java:33-39`：
+
+```java
+public ItemStack getStackInSlot(int slot) {
+    if (inv.getKey(slot) instanceof AEItemKey what) {
+        return what.toStack(Ints.saturatedCast(inv.getAmount(slot)));   // ← 每次新建对象
+    }
+    return ItemStack.EMPTY;
+}
+```
+
+**`toStack` 每次返回全新对象**，所以我们在适配器里再叠加的 `.copy()`（376 ms）对本容器
+**纯属浪费**。
+
+`GenericStackInv.extract`（`:181-213`）在 `MODULATE` 时必然走
+`setStack → onChange → notifyListener`，而 listener 是 `InterfaceLogic` 构造期注入的
+（→ `onStorageChanged → updatePlan`）。**`IItemHandler` 这条路上没有合法绕法**：
+`notifyListener` 是 `protected`，中间没有任何插入点；用 Mixin 压制 `onChange` 会让接口的
+`plannedWork` 与实际库存静默不一致 → 接口停止补货，**比性能问题严重得多，不做**。
+
+### 12.5 已实施：扫描路径去掉冗余 copy（`peekStack`）
+
+| 文件 | 改动 |
+|---|---|
+| `api/logistics/LongItemHandler.java` | 新增 `default ItemStack peekStack(int slot)`，默认委托 `getStackInSlot` → **旧实现行为逐字节不变** |
+| `content/stafflink/LongResourceAdapters.java` | `items()` 覆写 `peekStack`，直接交出底层对象、**不 copy** |
+| `content/stafflink/StaffLinkTargets.java` | 扫描路径改调 `peekStack`；`settleItemLeftover` 在**真有余量**退回前先 `template.copy()` 固化 |
+
+**为什么`settleItemLeftover`必须加固**：`peekStack` 的返回值不保证是副本，原生
+`IItemHandler` 一旦被 `extract` 清空槽位，手里那个对象会跟着变空栈 —— 拿它退回等于塞空气，
+物品凭空蒸发。所以只在 `extracted > accepted` 时固化一份，**正常路径（抽多少收多少）完全不付**。
+
+**为什么不动 `getStackInSlot` 本身**：那是对外契约，`findSlot` 的默认实现也调它（迭代期间
+必须持副本），改面不可控。新增一个语义明确的原语更安全。
+
+**为什么不动 `findSlot`**：它必须在遍历中持有模板，走 `getStackInSlot`（带 copy）是对的。
+
+### 12.6 明确不做
+
+| 不做 | 理由 |
+|---|---|
+| Mixin / 反射压制 `GenericStackInv.onChange` | 接口 `plannedWork` 与库存静默不一致 → 接口停止补货 |
+| 扫描路径「缓存非空槽」 | 一次 `moveItems` 内前面的 extract 会抽空槽位，缓存会读到失效类型 |
+| 动 `MAX_SCAN_SLOTS` | 有事故记录；本次 `min(9, 256)` 本就没触发截断 |
+| 扩展 `skipTargetProbe` 到「目标是垃圾桶」 | 与 11.6 冲突：判据必须是「余量退得回源」，源端是 ITEM 介质接口时退回会再触发 `updatePlan` |
+| 跨 tick 端点 / 能力对象缓存 | 第七节静默错误结论不推翻，为 10% 不值 |
+| 默认给 AE 设备 `AE_ITEM` 介质 | 参见下面 12.7，会把玩家推进不确定的网络规模陷阱 |
+
+### 12.7 关于「把介质切成 AE 物品」（= C1 / P4 的再次评估）：**不做**
+
+切 `AE_ITEM` 后提取走 `MEStorage.extract`，**完全不碰接口的 9 格库存**，`updatePlan`
+（704）整条消失，理论省 ~1,116（40%）。**但这是第十节陷阱的重演**：切过去之后，
+**无过滤器**的扫描路径要靠 `ItemEndpoint.snapshot()` → `getAvailableStacks()`
+**枚举整张 ME 网络**，第十节实测这一项单独就占 **32%（2,988 ms）**。
+
+**所以这不是「免费提速」，是「把一类开销换成另一类」**，取决于网络规模：
+
+| 网络规模 | 更优 |
+|---|---|
+| 小（几十种资源） | `AE_ITEM` |
+| 大（上千种资源） | `ITEM`（本次的 2,796 就是 `ITEM` 的成绩） |
+
+**也不要把默认值改成「AE 设备就给 `AE_ITEM`」**：这等于替玩家赌网络规模。
+`StaffLinkMenu.defaultRouteFor` 保持 `ITEM` 优先。以后可以做的只是在绑定界面加一句
+「这是 AE 设备，网络小的话建议选 AE 物品」的提示（对应 O7 / 4.4），**而不是改默认值**。
+
+### 12.8 验证
+
+```bash
+./gradlew --stop; ./gradlew compileJava processResources jar --no-daemon   # BUILD SUCCESSFUL
+python -c "..."   # 自检 jar 内三个类都含 peekStack
+```
+
+产物 `build/libs/useless_mod-1.21.1-2.4.4.1.jar`（15:01，3761734 字节）。
+
+**预期**（同一套装置再采）：
+
+| 帧 | 现在 | 预期 |
+|---|---|---|
+| `onStaffLinkTick` | 2,796 | **~2,420（−13%）** |
+| `LongResourceAdapters$1.getStackInSlot` | 840 | **~464** |
+| 其下 `ItemStack.copy` | 376 | **0** |
+| `extract` / `insert` / `updatePlan` | 1116 / 344 / 704 | 不变（属于另一类开销） |
+
+### 12.9 按责任方归集：我们自己的代码只占 4.1%
+
+把无线物流子树里每个节点的 **self time** 按归属方分类：
+
+| 归属 | self ms | 占比 |
+|---|---|---|
+| **vanilla / MC**（`ItemStack` 构造与拷贝、组件映射） | 1,164 | **41.6%** |
+| **库/其它**（fastutil `Reference2ObjectMap`、owo `DerivedComponentMap`） | 852 | **30.5%** |
+| **AE2**（`InterfaceLogic.updatePlan`、`GenericStackInv`、`TickManagerService`） | 664 | **23.7%** |
+| **本模组**（`StaffLinkEngine` / `StaffLinkTargets` / 适配器） | **116** | **4.1%** |
+
+**这个比例决定了后面的天花板**：我们已经把自己能控的部分压到 116 ms（4%），
+剩下 96% 都在别人的代码里。想再榨，只能减少**「让别人的代码被调用」的次数**，
+而不能指望优化我们自己的算法。
+
+### 12.10 剩余的三个可做项（按性价比）
+
+#### ① `extract` 白造一个 `ItemStack` 然后扔掉 —— 412 ms（14.7%）
+
+`LongResourceAdapters.java:120-126`：
+
+```java
+ItemStack got = handler.extractItem(slot, chunk, false);   // ← AE2 造一个完整 ItemStack
+if (got.isEmpty() || got.getCount() <= 0) break;           // ← 我们只读 count
+moved += got.getCount();                                   // ← 然后对象丢掉
+```
+
+`GenericStackItemStorage.extractItem`（AE2 源码 `:56-64`）的最后一行是
+`return what.toStack(extracted);` —— 为了回答「抽出来多少」，**AE2 每次都物化一个完整
+`ItemStack`**（`copyWithCount` → `copy` → `ItemStack.<init>` → 复制整份组件映射）。
+profile 里这个 `toStack` 是 **412 ms**。
+
+**同样的问题在 `:113-115` 的模拟探针里也有一份。**
+
+**改法**：给 `LongItemHandler` 加一个「只回答数量、不物化物品」的抽取原语，例如
+`long extractCount(int slot, long amount, boolean simulate)`，默认实现 = `extract(...)`。
+
+**可行性已核实**（不是空想）：`references/.../appeng/init/InitCapabilityProviders.java:94-101`
+里，AE2 为同一个方块**同时**注册了两种能力：
+
+```java
+if (event.isBlockRegistered(AECapabilities.GENERIC_INTERNAL_INV, block)) {
+    registerGenericInvAdapter(event, block, Capabilities.ItemHandler.BLOCK,
+                              GenericStackItemStorage::new);          // ← 我们现在拿到的、会物化 ItemStack 的包装
+    registerGenericInvAdapter(event, block, Capabilities.FluidHandler.BLOCK,
+                              GenericStackFluidStorage::new);
+}
+```
+
+也就是说，**方块身上还挂着一个 `AECapabilities.GENERIC_INTERNAL_INV`**，它交出的是
+`GenericInternalInventory` —— 而 `GenericStackInv.extract(int slot, AEKey what, long amount, Actionable)`
+的返回值就是 **`long`**，**整条路不碰 `ItemStack`**。
+
+**做法**：照本模组 `AeLogisticsCompatLoader` 那套「可选依赖桥」的既有模式，新增一个
+`AeGenericInvCompat`——在 `StaffLinkTargets.resolve` 的 `ITEM`/`FLUID` 分支里，**优先**探
+`GENERIC_INTERNAL_INV`；探到就用它构造一个 long 原生端点（内部按 `slot` 索引持 `AEKey`），
+探不到再退回现在的 `IItemHandler` 包装。这样：
+
+- **只有 AE 库存走新路径**，箱子 / 机器 / 垃圾桶等原生容器完全不受影响（仍走 `IItemHandler`）
+- 没有 AE2 时该类不加载（沿用 Loader 模式），**不会变成硬依赖**
+- `getStackInSlot`（464 ms 的 `toStack(1)`）也能一起省掉 —— 改成从快照直接读 `AEKey`
+
+**预期**：省 ~412（抽）+ ~100（模拟探针）+ ~464（`getStackInSlot`）≈ **~980 ms（35%）**。
+**这是目前找到的最大单项。**
+
+**风险**：按 `slot` 持 `AEKey` 需要一份「槽位 → key」的映射。`GenericStackInv` 的
+`getKey(slot)` 是 O(1) 且**不物化对象**，所以可以在解析时抓一次（9 个槽，可忽略），
+之后全程用 key。要小心的是**同一 tick 内 extract 会改变槽位内容** —— 沿用现在
+「一次搬运内快照固定」的语义即可，与 `ItemEndpoint` 的既有做法一致。
+
+#### ② `getStackInSlot` 的 464 ms —— 已无法再省
+
+上一轮我已经省掉了**我们自己**叠加的 376 ms。剩下的 464 是 AE2 的 `toStack(1)`，
+**绕不开**：`IItemHandler#getStackInSlot` 的返回类型就是 `ItemStack`。
+
+唯一能绕的办法是「扫描不问 `getStackInSlot`，改成一次拿到整份 key+amount 序列」
+（即让适配器暴露一个「快照」原语），但这会引入一个**新的抽象层**，且与
+`LongItemHandler` 的槽位语义冲突。**收益 464（16.6%），成本是接口复杂度 —— 排在 ① 之后考虑。**
+
+#### ③ 目标端 `insert` 的 344 ms —— 我们的部分已是最优
+
+拆开：垃圾桶 `insertItem` 164（别人的）+ `isSameItemSameComponents` 124 + 我们的 copy 56。
+`isSameItemSameComponents` 那 124 是我们 scratch 栈复用（O4a）引入的比对成本 ——
+**它是 O4a 的代价，而 O4a 省下的 copy 远多于 124**，所以维持现状。
+
+### 12.11 明确不建议做
+
+| 不做 | 理由 |
+|---|---|
+| `InterfaceLogic.updatePlan`（644，其中 516 是 AE2 自耗） | 见 12.4：`notifyListener` 无合法插入点，压制会导致接口停止补货 |
+| `TickManagerService.alertDevice`（116） | 同在 `updatePlan` 里，是 AE2 的重排队列逻辑 |
+| `resolve` 的 288 | 拆开只有 `getBlockState` 100 + `getBlockEntity` 80（vanilla 读取本身）+ 试错面 44，已是下限 |
+| 引擎自身的 ~40 ms | O5/O6 之后已可忽略（`anyNodeDue` 8、`setNextRun` 16） |
+| `StaffLinkRoute.activeFilters` 8 ms | record 加不了惰性缓存字段，为 0.3% 改普通类不划算 |
+
+### 12.12 结论
+
+**无线物流这一项已经接近「我们这个模组的责任边界」。** 4.1% 是我们的代码，96% 是
+「我们让 AE2 / vanilla 干了多少活」。后续唯一有意义的方向是 **12.10 的 ①**
+（让 AE 库存的抽取走 long 返回、不物化 `ItemStack`），预计再省 ~18%。
+
+剩下真正的大头在**无线物流之外**（本次整个 tick 32,464 ms，无线物流只占 8.6%）：
+刷怪、区块、事件总线、Architectury 代理 —— 见 11.8 节，那些才是继续压 MSPT 的地方。
+
+---
+
+## 十三、第八轮：GENERIC_INTERNAL_INV 原生实现 + 过滤器重做（2026-09-29）
+
+对应 jar `useless_mod-1.21.1-2.4.4.1.jar`（17:46，3,789,065 字节）。
+本轮**没有新采样**，依据仍是第十二节那份 `GLjn5sc8LH.sparkprofile`（14:48）；
+改进属「按 12.3 的开销表定点拆除」，效果待下一轮采样验证。
+
+### 13.1 `GENERIC_INTERNAL_INV` 原生端点：把 12.3 的 30% 与 40% 一起削掉
+
+12.3 表里两笔最大的自有开销，根因都是同一个：**「物品」介质 + ME 接口时，我们走的是
+AE2 用 `AEKey ⇄ ItemStack` 临时搭的桥**（`GenericStackItemStorage`），每次读槽都要
+`toStack()` 造一个新 `ItemStack`。
+
+新增的 `AeGenericInvCompat` 改为**直接挂在 AE2 的 `GenericInternalInventory` 上**
+（`AECapabilities.GENERIC_INTERNAL_INV`，见 `AECapabilities.java:46`），它是 long 级契约：
+
+| 旧路径（`LongResourceAdapters`） | 新路径（`GenericInvItemEndpoint`） |
+|---|---|
+| `getStackInSlot` → `toStack(1)` → 我们 `.copy()` | `amountIn(slot)` 纯 long，**零物化** |
+| `extract` → `GenericStackInv.extract` 造栈再转 long | 直接 `extract(slot, amount, simulate)` 返回 long |
+| `getSlots()` 触发整网快照 | 固定 9 格（ME 接口的 `InterfaceLogic.storage`） |
+
+**已核实**：ME 接口的 generic 就是它自己那 **9 格局部库存**
+（`InitCapabilityProviders.java:122-126` → `InterfaceLogic.getStorage()`；
+`InterfaceLogic.java:97,100,106` 里 `slots = 9`），**不是**整张网络。
+
+三条硬约束（写进 `AeGenericInvCompat` 注释）：
+
+1. `beginBatch()/endBatch()` **只在 `!simulate` 且包在 `try/finally` 里**。
+   `GenericStackInv` 用 `Preconditions.checkState(suppressOnChange)` 守卫
+   （`:368`/`:377`），嵌套会直接崩；漏调 `endBatch` 则 `suppressOnChange` 永久为真，
+   **接口再也不会刷新**。
+2. `insert` 逐槽 `isAllowedIn` 判断时**不 break**（同一 key 可以落多格）。
+3. `catch (Throwable)` 只用在能力查询处（AE2 那块 API 标注 `@ApiStatus.Experimental`），
+   业务逻辑里一律不吞。
+
+### 13.2 删掉扫描预算：截断问题的真正根因不是那个数字
+
+`MAX_SCAN_SLOTS = 256` 被删除，扫描改成**一轮内的完整 sweep**。
+
+**根因**：无过滤器路径「扫到第一个能搬的种类就可能把 `limit` 用满，而下一轮的扫描
+**又从 slot 0 开始**」——排在后面的资源不是「慢」，是**永远轮不到**。256 只是把这个 bug
+的边界显性化了。
+
+**修法**：`moveItems` / `moveFluid` 的循环退出条件本就是 `moved < limit`，
+去掉 `Math.min(_, 256)` 即得完整 sweep。`getSlots()` 触发的那次整网枚举**本来就已付**。
+「一直搬不动」由**指数退避**兜底：`StaffLinkEngine.scheduleNextRun` 在 `moved == 0` 时
+记为空转，`backoff = min(backoff + 1, 5)`、`wait = interval << backoff`、上限 32 倍。
+**这是删预算的前置条件**（已在 `scheduleNextRun` 的 javadoc 里写明第二职责）。
+
+> 结论修正：早先「预算删不掉」的判断是错的。删得掉，而且只有删掉才不丢资源。
+
+### 13.3 过滤器重做（18 格 + 两种限制 + `#tag` / 通配符）
+
+- **`LinkFilterSlot` 变成 5 字段 record**：`(item, fluid, pattern, keepAtSource, maxInto)`。
+  三态互斥（模式 > 流体 > 物品）；**空槽强制限制为 0**，让「空槽」与「有限制的空槽」
+  不可能共存。存档新键 `MarkerPattern` / `KeepAtSource` / `MaxInto`，
+  旧格式（只有 `MarkerItem`/`MarkerFluid`）自动迁移。
+- **`LinkFilterPattern`**（新，零依赖）：`#ns:path` 走静态注册表标签查询
+  （`BuiltInRegistries.ITEM.getTagOrEmpty`，**不需要 `HolderLookup.Provider`**，因此能直接在
+  服务端搬运路径里用）；含 `*`/`?` 的走手写两指针回溯 glob（**先比 id，未命中才构造显示名**）。
+  **纯字面量 id 解析失败返回 `null`**：一个不带组件的裸 id 表达不了「铁锭（带某某附魔）」，
+  接受了只会骗玩家。
+- **未知标签 = 匹配不上任何东西**（不是「不限制」）。打错一个字就灌满目标容器，
+  破坏性后果不可逆；宁可「什么都不搬」（界面上看得见、改得回来）。
+- **两种限制**：`request = min(want, max(0, available - keepAtSource))`，再
+  `min(request, max(0, maxInto - targetStored))`。`0` = 不限制，**且 `0` 时一次都不调
+  `amountOf`** —— 性能特性与改动前逐字节一致。
+- **`amountOf` 新增**（`LongItemHandler`/`LongFluidHandler` 各一个 default）：
+  `LongResourceAdapters` **跨槽累加**（原版容器同种物品常分散多槽）；`AeLogisticsCompat`
+  覆写成走一次 `snapshot()`；`GenericInvItemEndpoint` 走 9 格纯 long。
+- **Req3**：源端模式为 `aeXX` 且目标端**没有适用白名单** ⇒ **不搬**（前置判定，
+  放在 `resolve(target)` 之前省一次解析）。`hasApplicableWhitelist()` 里模式恒命中，
+  能量 / 魔源恒 false。**不动 `matches*` 的「无标记 = 不限制」默认** —— Req3 是搬运前置
+  条件，不是匹配语义。
+- **三路径分叉**（模式无法变成单一模板）：
+  - 有 pattern 格 → **扫描源端 + 谓词**（`sweepItems` / `sweepFluids`，无预算）
+  - 只有具体标记（无 pattern）→ **`extractMatching`**（零枚举，性能特性保持）
+  - 完全没有标记 → **扫描**（不限制）
+- **化学品标签不生效**：Mekanism 没有跨模组通用 TagKey，`#` 形式对化学品恒不匹配；
+  `*` 只按 id 匹配（`chemicalIdOf` 默认返回 `null` ⇒ 恒不匹配，UI 明确提示）。
+
+### 13.4 界面：主界面只留按钮，18 格住覆盖层面板
+
+**第一版做错了**：我把格数从 9 加到 18 就直接往主界面上铺，还把面板加高到 460。
+用户否掉：「*是点击过滤按钮后弹出二级子菜单，参考维度方块的预览界面，这样就不会占用那么多
+主界面的空间*」。于是照 `DimensionConfigScreen` 的 `previewOpen` 覆盖层骨架重做。
+
+- **主界面**：`PANEL_HEIGHT` 回到 **336**（不再是 460）。配置区那一行只留三个按钮并排——
+  「过滤器 (已用 N 格)」`8..74`、「应用: 同名容器」`82..174`、「解散网络」`180..240`，
+  全在 `FILTER_Y = 204`、高 16。过滤槽**一个都不画在主界面上**。
+- **覆盖层面板 250×228，跟一级菜单同宽**。宽度取 `PANEL_WIDTH`（250）是为了**侧栏能排出 2 列**：
+  GUI 缩放 2 / 3 时窗口逻辑宽只有 427，而 JEI 的原料侧栏**只画在 `guiRight` 右侧、
+  至少 48px** 才显示。250 的面板居中后右侧还剩 89px ✓。
+- **18 格 = 3 列 × 6 行**（用户指定）。列距 `(250-2×8)/3 = 78`、行距 30。
+  每格：槽位 **18×18**（原版槽位大小），模式框贴槽位右边、宽 `78-18-2 = 58`；
+  两个限制框**并排**在槽位下方（各 34×10、间隔 2），用「留 / 存」单字标出哪头是哪头。
+- **右键格子**弹出该格的模式输入框（`#tag` / 通配符）；在 `init()` 里预建
+  18×3 个框。模式框内容非法时**不改配置**，只弹一次性提示（`filter_pattern_invalid`）。
+- **覆盖层的硬约束**（`render` 覆写里）：
+
+  > ⚠️ **一条曾经写错的结论，已纠正。** 早先这里是「`filterPanelOpen` 时**完全跳过**
+  > `super.render()`」，理由是「底层槽位物品走 RenderBuffers 固定缓冲，只靠后画压不住」。
+  > **这条是错的，而且直接造成了「JEI 侧栏不显示」这个 bug。**
+  > **JEI 的原料侧栏是在 `ContainerScreenEvent.Render.Background / Foreground` 里画的，
+  > 这两个事件由 `super.render()` 触发** —— 一跳过，侧栏就整个不画，
+  > 玩家也就没法从 JEI 往过滤格里拖物品（而这本来正是过滤面板存在的意义）。
+
+  正确的数据是「后画压不住」的**真正原因不是没跳过 `super.render()`，而是只 `flush()` 没抬 z**：
+
+  1. **先 `super.render()`**（保 JEI 侧栏）→ `graphics.flush()`（底层内容落地定型）
+     → `pushPose(); translate(0, 0, FILTER_PANEL_Z = 500)`（压过物品 z=150 / 堆叠数字 z=200）
+     → 画压暗层 + 面板 → `popPose()` → `flush()`；
+  2. **底板用半透明、且只画面板四周**（`FILTER_DIM_COLOR = 0x99000000` 的 `renderFilterDim()`）。
+     原先的 `FILTER_BACKDROP_COLOR = 0xFF000000` 铺满全屏有两个后果：
+     ① 把 JEI 侧栏一起涂掉；② 面板只有 250 宽居中后左右各露 88px 死黑，
+     用户反馈「背景也是纯黑」。而 `DimensionConfigScreen` 的预览弹窗是 **420×330，
+     在 427×240 的窗口里几乎盖满全屏**，所以它「看着没问题」——
+     它其实是同一个毛病，**不是可以照抄的正面范例**；正面范例是 `ChainGroupScreen`
+     （288 宽 + `SIDEBAR_RESERVE = 120` 左移）；
+  3. 面板按钮**只 `addWidget` 进 children、不进 renderables**（进了会被 `super.render()` 画到下面），
+     所以要在 `renderFilterPanel` 里手动 `render`，事件在 `mouseClicked/mouseReleased` 手动转发；
+  4. **过滤框也得自己画**——覆盖层阶段不在 `super.render()` 的渲染序列里，我们有一堆框要逐个 `render`。
+- **事件转发补齐**：`mouseDragged`（框选文本）也要转发给聚焦的框；
+  `mouseScrolled` / `keyPressed` 在面板开着时吞掉；ESC 先关面板、不关界面。
+- **切换为「应用到全部同名容器」**：同名按**界面显示的那个名字**算
+  （`anchorDisplayName`：玩家改过用改过的，没改过是方块本名），跟列表里看到的一致。
+- **JEI 拖拽**：`StaffLinkGhostHandler` 在面板**没开时返回 `List.of()`**——
+  否则那些屏幕坐标指向的是主界面别的地方，拖过去会莫名落到空处。
+
+### 13.5 仍不做：能力句柄跨 tick 缓存
+
+p2p 式「缓存源 / 目标的能力句柄到下一个 tick」**明确不做**：方块被换掉后，缓存的旧对象
+指向的是**已经脱世的容器**，往里插/往外取的东西会**静默消失**。这是数据安全问题，
+不是性能取舍问题。
+
+### 13.6 下一步
+
+本节改动（特别是「物品介质 + ME 接口」现在该走 `GenericInvItemEndpoint` 了）
+**需要一轮新采样**来确认 12.3 的 30% / 40% 两笔是否如预期塌掉。
+采样装置的介质请保持在「物品」，这样才能与 `GLjn5sc8LH` 直接 A/B。

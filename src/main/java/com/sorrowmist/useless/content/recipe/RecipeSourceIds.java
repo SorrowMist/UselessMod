@@ -67,6 +67,8 @@ public final class RecipeSourceIds {
     public static final String LYCHEE = "lychee";
     /** Astral Sorcery 的星能注入与聚星缸配方。 */
     public static final String ASTRAL_SORCERY = "astralsorcery";
+    /** Botany Pots 的作物生长配方。 */
+    public static final String BOTANY_POTS = "botanypots";
     /** Ex Deorum 的桶堆肥、桶混合、流体转化与坩埚熔化配方。 */
     public static final String EX_DEORUM = "exdeorum";
 

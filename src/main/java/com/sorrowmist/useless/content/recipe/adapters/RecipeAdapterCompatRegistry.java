@@ -78,6 +78,7 @@ import com.sorrowmist.useless.content.recipe.adapters.naturesaura.TreeRitualReci
 import com.sorrowmist.useless.content.recipe.adapters.occultism.OccultismRitualRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.astralsorcery.AltarRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.astralsorcery.LightwellRecipeAdapter;
+import com.sorrowmist.useless.content.recipe.adapters.botanypots.BotanyPotsRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.powah.EnergizingRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.productivebees.BeeProduceRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.productivebees.BeeBreedingRecipeAdapter;
@@ -168,6 +169,7 @@ public final class RecipeAdapterCompatRegistry {
     public static final String APOTHEOSIS = RecipeSourceIds.APOTHEOSIS;
     public static final String LYCHEE = RecipeSourceIds.LYCHEE;
     public static final String ASTRAL_SORCERY = RecipeSourceIds.ASTRAL_SORCERY;
+    public static final String BOTANY_POTS = RecipeSourceIds.BOTANY_POTS;
     public static final String EX_DEORUM = RecipeSourceIds.EX_DEORUM;
 
     private static final List<CompatEntry> ENTRIES = List.of(
@@ -225,6 +227,7 @@ public final class RecipeAdapterCompatRegistry {
             new CompatEntry(APOTHEOSIS, RecipeAdapterCompatRegistry::registerApotheosis),
             new CompatEntry(LYCHEE, RecipeAdapterCompatRegistry::registerLychee),
             new CompatEntry(ASTRAL_SORCERY, RecipeAdapterCompatRegistry::registerAstralSorcery),
+            new CompatEntry(BOTANY_POTS, RecipeAdapterCompatRegistry::registerBotanyPots),
             new CompatEntry(EX_DEORUM, RecipeAdapterCompatRegistry::registerExDeorum)
     );
 
@@ -609,6 +612,10 @@ public final class RecipeAdapterCompatRegistry {
         register(new com.sorrowmist.useless.content.recipe.adapters.astralsorcery.InfusionRecipeAdapter());
         register(new LightwellRecipeAdapter());
         register(new AltarRecipeAdapter());
+    }
+
+    private static void registerBotanyPots() {
+        register(new BotanyPotsRecipeAdapter());
     }
 
     /**

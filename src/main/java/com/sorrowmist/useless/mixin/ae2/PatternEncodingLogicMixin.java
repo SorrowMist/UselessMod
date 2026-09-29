@@ -8,6 +8,7 @@ import appeng.util.inv.AppEngInternalInventory;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.OmniversalPatternDetails;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.OmniversalPatternDiagnostics;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.OmniversalPatternEncoding;
+import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.OmniversalPatternUploader;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.PendingOmniversalPatternHolder;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.ProcessingPatternRecipeHolder;
 import com.sorrowmist.useless.content.recipe.AlloyFurnaceRecipeCatalog;
@@ -193,6 +194,15 @@ public class PatternEncodingLogicMixin implements PendingOmniversalPatternHolder
         // ordinary AE2 pattern merely because that pattern happens to be uniquely matchable.
         uselessMod$pendingOmniversalRecipe = null;
         uselessMod$pendingOmniversalSourceId = null;
+
+        // 样板生成后立即移交同网格的多方块合金炉样板总成，玩家无需再手动搬运。
+        // 移交成功后清空终端槽位，使终端保持「已上传」的语义；不存在可接收的总成或
+        // 全部总成已满时保留样板，玩家仍可按原有方式自行取出。此处仍处于
+        // onChangeInventory 回调内，AppEngInternalInventory.notifyingChanges 已为 true，
+        // 因此回写槽位与写入总成均不会再次触发本回调。
+        if (OmniversalPatternUploader.upload(host, omniversal)) {
+            encodedPatternInv.setItemDirect(0, ItemStack.EMPTY);
+        }
     }
 
 }

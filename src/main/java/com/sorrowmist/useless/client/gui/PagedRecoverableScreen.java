@@ -255,9 +255,35 @@ public class PagedRecoverableScreen<T extends PagedRecoverableMenu> extends Abst
         MachineScreenStyle.drawSlotGroup(graphics, leftPos, topPos, 8, SLOT_GRID_Y, 9, 10);
         MachineScreenStyle.drawSlotGroup(graphics, leftPos, topPos, 8, 225, 9, 3);
         MachineScreenStyle.drawSlotGroup(graphics, leftPos, topPos, 8, 283, 9, 1);
-        for (var slot : menu.slots) {
-            MachineScreenStyle.drawSlotBackground(graphics, leftPos, topPos, slot);
+        // 槽位序号取自菜单槽位而非 Slot.index：玩家背包槽位的 index 同样落在存储区范围内，
+        // 按 index 判定会把背包槽位误画成恢复槽位。
+        for (int index = 0; index < menu.slots.size(); index++) {
+            Slot slot = menu.getSlot(index);
+            if (menu.isRecoverySlot(index)) {
+                MachineScreenStyle.drawDisabledSlotBackground(graphics, leftPos, topPos, slot);
+            } else {
+                MachineScreenStyle.drawSlotBackground(graphics, leftPos, topPos, slot);
+            }
         }
+    }
+
+    /**
+     * 绘制鼠标悬停高亮。
+     *
+     * <p>只读恢复槽位不绘制悬停高亮：该区域只允许取出，高亮会给出「可以放入」的错误暗示，
+     * 与未启用样式的底板相互矛盾。悬停本身仍被原版记录，因此恢复区中已有条目的物品提示与
+     * 取出操作不受影响。</p>
+     *
+     * <p>槽位序号经 {@code menu.slots} 反查而非取自 {@code Slot.index}，后者是页视图内的相对
+     * 序号，对玩家背包槽位同样落在存储区区间内。反查失败时返回 {@code -1}，判定结果一律为
+     * {@code false}，不会误伤非存储区槽位。</p>
+     */
+    @Override
+    protected void renderSlotHighlight(GuiGraphics graphics, Slot slot, int mouseX, int mouseY, float partialTick) {
+        if (menu.isRecoverySlot(menu.slots.indexOf(slot))) {
+            return;
+        }
+        super.renderSlotHighlight(graphics, slot, mouseX, mouseY, partialTick);
     }
 
     @Override

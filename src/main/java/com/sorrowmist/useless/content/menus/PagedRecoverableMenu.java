@@ -159,6 +159,18 @@ public class PagedRecoverableMenu extends AbstractContainerMenu {
         return inventory.getActiveSlots();
     }
 
+    /**
+     * 当前页内指定菜单槽位是否属于只读恢复区。
+     *
+     * <p>恢复槽位超出后备库存的活跃槽位数量，只允许取出，放入会被拒绝。界面据此选用未启用样式
+     * 绘制底板，使玩家在交互前即可分辨。参数以菜单槽位序号计，样板存储区之外的槽位
+     * （玩家背包与快捷栏）返回 {@code false}。</p>
+     */
+    public boolean isRecoverySlot(int menuSlot) {
+        if (menuSlot < 0 || menuSlot >= SLOTS_PER_PAGE) return false;
+        return getPage() * SLOTS_PER_PAGE + menuSlot >= getActiveSlotCount();
+    }
+
     private int calculateActivePageCount() {
         return Math.max(1, (inventory.getActiveSlots() + SLOTS_PER_PAGE - 1) / SLOTS_PER_PAGE);
     }

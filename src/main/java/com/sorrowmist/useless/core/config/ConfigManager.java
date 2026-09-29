@@ -674,7 +674,7 @@ public class ConfigManager {
         ENABLE_ARS_NOUVEAU_RECIPE_CONVERSION = defineRecipeConversionOption(
                 "enable_ars_nouveau_recipe_conversion", true);
         ENABLE_EX_DEORUM_RECIPE_CONVERSION = defineRecipeConversionOption(
-                "enable_ex_deorum_recipe_conversion", true);
+                "enable_exdeorum_recipe_conversion", true);
         ENABLE_AVARITIA_RECIPE_CONVERSION = defineRecipeConversionOption(
                 "enable_avaritia_recipe_conversion", true);
         ENABLE_BIG_REACTORS_RECIPE_CONVERSION = defineRecipeConversionOption(

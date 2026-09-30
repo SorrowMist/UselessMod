@@ -1,6 +1,6 @@
 package com.sorrowmist.useless.client.gui;
 
-import com.sorrowmist.useless.content.items.EndlessBeafItem;
+import com.sorrowmist.useless.content.items.BeefToolVariants;
 import com.sorrowmist.useless.core.common.KeyBindings;
 import com.sorrowmist.useless.data.PlayerMiningData;
 import com.sorrowmist.useless.utils.UComponentUtils;
@@ -10,7 +10,9 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.network.chat.Component;
+import net.minecraft.world.InteractionHand;
 import net.minecraft.world.item.ItemStack;
+import org.jetbrains.annotations.Nullable;
 
 public class MiningStatusGui {
     private static final int BG_MAIN = 0xB0202020;
@@ -19,7 +21,6 @@ public class MiningStatusGui {
 
     private static final int COLOR_ENHANCED = 0xFF4DD0E1;
     private static final int COLOR_NORMAL = 0xFF66BB6A;
-    private static final int COLOR_OFF = 0xFFEF5350;
     private static final int COLOR_FORCE_ON = 0xFFFF7043;
     private static final int COLOR_MUTED = 0xFF9E9E9E;
 
@@ -29,27 +30,23 @@ public class MiningStatusGui {
         if (player == null || mc.screen != null) return;
         if (!KeyBindings.TRIGGER_CHAIN_MINING_KEY.get().isDown()) return;
 
-        ItemStack stack = player.getMainHandItem();
-        boolean isEndlessBeaf = stack.getItem() instanceof EndlessBeafItem;
+        // 该面板描述的是造化杖自身的连锁状态，未持有该工具时不存在可展示的内容，
+        // 因此在绘制前直接返回，避免出现与手持物品无关的状态读数。
+        ItemStack stack = resolveHeldBeafTool(player);
+        if (stack == null) return;
+
         boolean enhancedChainMining = UComponentUtils.isEnhancedChainMiningEnabled(stack);
         boolean forceMiningEnabled = UComponentUtils.isForceMiningEnabled(stack);
 
         String statusKey;
         int statusColor;
 
-        if (isEndlessBeaf) {
-            // 主手手持 EndlessBeafItem 时，根据 ChainMiningComponent 显示状态
-            if (enhancedChainMining) {
-                statusKey = "gui.useless_mod.status.enhanced";
-                statusColor = COLOR_ENHANCED;
-            } else {
-                statusKey = "gui.useless_mod.status.normal";
-                statusColor = COLOR_NORMAL;
-            }
+        if (enhancedChainMining) {
+            statusKey = "gui.useless_mod.status.enhanced";
+            statusColor = COLOR_ENHANCED;
         } else {
-            // 未手持 EndlessBeafItem 时，显示未激活
-            statusKey = "gui.useless_mod.status.inactive";
-            statusColor = COLOR_OFF;
+            statusKey = "gui.useless_mod.status.normal";
+            statusColor = COLOR_NORMAL;
         }
 
         Component statusValue = Component.translatable(statusKey);
@@ -67,19 +64,15 @@ public class MiningStatusGui {
         PlayerMiningData data = MiningDispatcher.getPlayerData(player);
         int count = data != null ? data.getCachedBlocks().size() : 0;
 
-        // 形状行：仅在手持造化杖时显示，未持杖时该行无意义，直接留空以避免面板无谓增高。
         // 名称后附方向说明：隧道与对角类形状的走向取决于点击面与玩家朝向，仅凭名称无法预判。
-        Component shapeText = isEndlessBeaf && data != null
+        Component shapeText = data != null
                 ? Component.translatable("gui.useless_mod.shape_label",
                                          Component.translatable(data.getShape().getTranslationKey()),
                                          Component.translatable(data.getShape().getDescriptionKey()))
                 : Component.empty();
 
-        // 切换提示行：与形状行同样只在手持造化杖时出现，说明滚轮组合键，
-        // 否则玩家没有任何途径得知形状可以切换。
-        Component hintText = isEndlessBeaf
-                ? Component.translatable("gui.useless_mod.shape_hint")
-                : Component.empty();
+        // 切换提示行：说明滚轮组合键，缺少该提示时玩家没有任何途径得知形状可以切换。
+        Component hintText = Component.translatable("gui.useless_mod.shape_hint");
 
         // 数量行显示「本次预览 / 配置上限」。上限为 0 表示客户端尚未收到同步，
         // 此时只显示当前数量，避免出现「N / 0」这类无意义读数。
@@ -104,9 +97,8 @@ public class MiningStatusGui {
                 )
         ) + padding * 2 + 6;
 
-        // 形状行与切换提示行仅在手持造化杖时存在，面板高度随之增减两行，避免空行占位
-        int extraLines = shapeText.getString().isEmpty() ? 0 : 2;
-        int height = padding * 2 + lineHeight * (3 + extraLines) + lineSpacing * (2 + extraLines) + 1;
+        // 形状行与切换提示行在持有造化杖期间恒定存在，面板高度固定包含这两行。
+        int height = padding * 2 + lineHeight * 5 + lineSpacing * 4 + 1;
 
         int x = 0;
         int y = 0;
@@ -160,11 +152,26 @@ public class MiningStatusGui {
                      true
         );
 
-        // 第四、五行：连锁形状与切换提示（仅手持造化杖时绘制）
-        if (extraLines > 0) {
-            int shapeY = line3Y + lineHeight + lineSpacing;
-            g.drawString(mc.font, shapeText, textX, shapeY, 0xFFFFFFFF, true);
-            g.drawString(mc.font, hintText, textX, shapeY + lineHeight + lineSpacing, COLOR_MUTED, true);
+        // 第四、五行：连锁形状与切换提示
+        int shapeY = line3Y + lineHeight + lineSpacing;
+        g.drawString(mc.font, shapeText, textX, shapeY, 0xFFFFFFFF, true);
+        g.drawString(mc.font, hintText, textX, shapeY + lineHeight + lineSpacing, COLOR_MUTED, true);
+    }
+
+    /**
+     * 取玩家当前持有的造化杖。
+     * <p>
+     * 主手与副手依次查找，任一持有即返回对应物品；双手均未持有时返回 {@code null}。
+     * 判定范围与连锁高亮一致，覆盖基础形态与全部工具模式变体。
+     */
+    @Nullable
+    private static ItemStack resolveHeldBeafTool(LocalPlayer player) {
+        for (InteractionHand hand : InteractionHand.values()) {
+            ItemStack stack = player.getItemInHand(hand);
+            if (BeefToolVariants.isBeafTool(stack)) {
+                return stack;
+            }
         }
+        return null;
     }
 }

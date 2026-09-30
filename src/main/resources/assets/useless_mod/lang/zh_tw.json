@@ -379,7 +379,6 @@
   "gui.useless_mod.mining_count": "挖掘數量: %s",
   "gui.useless_mod.status.enhanced": "強化連鎖",
   "gui.useless_mod.status.normal": "普通連鎖",
-  "gui.useless_mod.status.inactive": "未啟用",
   "gui.useless_mod.shape_label": "形狀: %s（%s）",
   "gui.useless_mod.shape_hint": "按住連鎖鍵 + Shift + 滾輪 切換形狀",
   "gui.useless_mod.shape_switched": "連鎖形狀: %s（%s）",

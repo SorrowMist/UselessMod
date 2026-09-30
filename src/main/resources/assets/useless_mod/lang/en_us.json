@@ -382,7 +382,6 @@
   "gui.useless_mod.mining_count": "Mining Count: %s",
   "gui.useless_mod.status.enhanced": "Enhanced Chain",
   "gui.useless_mod.status.normal": "Normal Chain",
-  "gui.useless_mod.status.inactive": "Inactive",
   "gui.useless_mod.shape_label": "Shape: %s (%s)",
   "gui.useless_mod.shape_hint": "Hold chain key + Shift + scroll to switch shape",
   "gui.useless_mod.shape_switched": "Chain Shape: %s (%s)",

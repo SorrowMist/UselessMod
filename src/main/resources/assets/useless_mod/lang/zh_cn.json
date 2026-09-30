@@ -383,7 +383,6 @@
   "gui.useless_mod.mining_count": "挖掘数量: %s",
   "gui.useless_mod.status.enhanced": "增强连锁",
   "gui.useless_mod.status.normal": "普通连锁",
-  "gui.useless_mod.status.inactive": "未激活",
   "gui.useless_mod.shape_label": "形状: %s（%s）",
   "gui.useless_mod.shape_hint": "按住连锁键 + Shift + 滚轮 切换形状",
   "gui.useless_mod.shape_switched": "连锁形状: %s（%s）",

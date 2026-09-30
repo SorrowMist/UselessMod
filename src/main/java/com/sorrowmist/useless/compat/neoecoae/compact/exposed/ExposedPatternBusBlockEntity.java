@@ -135,7 +135,6 @@ public class ExposedPatternBusBlockEntity extends ECOCraftingPatternBusBlockEnti
 
     // ---------------------------------------------------------------- 合并视图
 
-    @Override
     public InternalInventory getPatternSlotInventory() {
         return mergedPatternInventory;
     }
@@ -226,6 +225,18 @@ public class ExposedPatternBusBlockEntity extends ECOCraftingPatternBusBlockEnti
     }
 
     // ---------------------------------------------------------------- 目录 / 终端读路径
+
+    @Override
+    public List<IPatternDetails> getAvailablePatterns() {
+        return List.of();
+    }
+
+    public void refreshAdvertisedPatterns() {
+        refreshPatternDetailsForCatalog();
+        if (hostNode != null && hostNode.getGrid() != null) {
+            ICraftingProvider.requestUpdate(hostNode);
+        }
+    }
 
     /** 内容版本取各内部总线版本的滚动哈希：任何一条变了，样板目录就会重建本视图的索引。 */
     @Override

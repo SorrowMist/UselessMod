@@ -52,8 +52,6 @@ import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent;
 import net.neoforged.neoforge.event.server.ServerStartingEvent;
 import org.slf4j.Logger;
 
-import java.util.Locale;
-
 @Mod(UselessMod.MODID)
 public class UselessMod {
     public static final String MODID = "useless_mod";
@@ -107,39 +105,9 @@ public class UselessMod {
     }
 
     private void commonSetup(FMLCommonSetupEvent event) {
-        if (ModList.get().isLoaded("neoecoae") && !isSupportedNeoEcoVersion()) {
-            throw new IllegalStateException(
-                    "Useless Mod requires Neo ECO AE Extension 21.2.0 or newer.");
-        }
         RecipeAdapterCompatRegistry.init(event);
         if (ModList.get().isLoaded("neoecoae")) {
             NeoEcoCompat.initialize();
-        }
-    }
-
-    private static boolean isSupportedNeoEcoVersion() {
-        String version = ModList.get().getModContainerById("neoecoae")
-                .map(container -> container.getModInfo().getVersion().toString())
-                .orElse("")
-                .toLowerCase(Locale.ROOT);
-        String[] numeric = version.split("[-+]")[0].split("\\.");
-        if (numeric.length < 3) {
-            return false;
-        }
-        int major = parseVersionPart(numeric[0]);
-        int minor = parseVersionPart(numeric[1]);
-        int patch = parseVersionPart(numeric[2]);
-        if (major != 21 || minor != 2 || patch != 0) {
-            return major > 21 || major == 21 && minor > 2;
-        }
-        return true;
-    }
-
-    private static int parseVersionPart(String value) {
-        try {
-            return Integer.parseInt(value);
-        } catch (NumberFormatException ignored) {
-            return -1;
         }
     }
 

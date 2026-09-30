@@ -117,6 +117,13 @@ requiredMods=["malum"]
     side="BOTH"
 
 [[dependencies.${mod_id}]]
+    modId="neoecoae"
+    type="optional"
+    versionRange="[21.2.0,)"
+    ordering="NONE"
+    side="BOTH"
+
+[[dependencies.${mod_id}]]
     modId="jdte"
     type="optional"
     versionRange="[0.6.0,)"

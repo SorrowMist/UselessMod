@@ -334,6 +334,40 @@ public final class BeefToolModuleRegistry {
         return defaultName.equals(name) || name.startsWith(defaultName + " ");
     }
 
+    /**
+     * 该分组在当前环境下是否应当隐藏。
+     *
+     * <p>模组专属分组绑定前置模组。前置模组未加载时组内模块全部不可用，
+     * 分组会退化为一张没有任何按钮的空卡片；这类分组一旦随存档落盘
+     * （加载过该模组后又被卸载），布局计算与绘制都必须跳过它。</p>
+     */
+    public static boolean isGroupHidden(BeefToolLayout.Group group) {
+        GroupKind kind = groupKindOf(group);
+        return kind != null && !kind.isLoaded();
+    }
+
+    /**
+     * 推断分组所属的类别。
+     *
+     * <p>先按分组名匹配默认名，使归属判定不因组内模块构成变化而漂移；
+     * 名称与任何默认名都不符时，退化为按组内首个可识别模块的类别判定，
+     * 以兼容被玩家改名的分组。</p>
+     */
+    private static GroupKind groupKindOf(BeefToolLayout.Group group) {
+        for (GroupKind kind : GroupKind.values()) {
+            if (matchesDefaultName(group.name(), kind)) {
+                return kind;
+            }
+        }
+        for (String moduleId : group.modules()) {
+            Definition definition = get(moduleId);
+            if (definition != null) {
+                return definition.group();
+            }
+        }
+        return null;
+    }
+
     /** 分组名是否已被某个类别占用为默认名。 */
     private static boolean hasKnownDefaultName(String name) {
         for (GroupKind kind : GroupKind.values()) {

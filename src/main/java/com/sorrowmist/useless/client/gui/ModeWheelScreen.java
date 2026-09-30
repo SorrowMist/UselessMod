@@ -181,6 +181,7 @@ public class ModeWheelScreen extends Screen {
         }
         int[] bottoms = {rawY, rawY};
         for (BeefToolLayout.Group group : page.groups()) {
+            if (BeefToolModuleRegistry.isGroupHidden(group)) continue;
             List<String> modules = visibleModules(group.modules());
             int column = bottoms[0] <= bottoms[1] ? 0 : 1;
             bottoms[column] += cardHeight(1, modules.size(), moduleColumns(modules.size())) + CARD_GAP;
@@ -191,9 +192,11 @@ public class ModeWheelScreen extends Screen {
     private int[] sumGroupColumnWidths(BeefToolLayout.Page page) {
         int left = 0;
         int right = 0;
-        for (int index = 0; index < page.groups().size(); index++) {
-            int width = naturalGroupWidth(page.groups().get(index));
-            if ((index & 1) == 0) left = Math.max(left, width);
+        int visibleIndex = 0;
+        for (BeefToolLayout.Group group : page.groups()) {
+            if (BeefToolModuleRegistry.isGroupHidden(group)) continue;
+            int width = naturalGroupWidth(group);
+            if ((visibleIndex++ & 1) == 0) left = Math.max(left, width);
             else right = Math.max(right, width);
         }
         return new int[]{left, right};
@@ -237,6 +240,7 @@ public class ModeWheelScreen extends Screen {
     private int commonModuleWidth(BeefToolLayout.Page page) {
         int width = 50;
         for (BeefToolLayout.Group group : page.groups()) {
+            if (BeefToolModuleRegistry.isGroupHidden(group)) continue;
             List<String> modules = visibleModules(group.modules());
             if (modules.size() < 2) continue;
             for (String id : modules) {
@@ -388,6 +392,7 @@ public class ModeWheelScreen extends Screen {
         int[] columnBottoms = {rawY, rawY};
         for (int groupIndex = 0; groupIndex < page.groups().size(); groupIndex++) {
             BeefToolLayout.Group group = page.groups().get(groupIndex);
+            if (BeefToolModuleRegistry.isGroupHidden(group)) continue;
             List<String> visibleModules = visibleModules(group.modules());
             int column = columnBottoms[0] <= columnBottoms[1] ? 0 : 1;
             int left = contentLeft + (column == 0 ? 0 : columnWidths[0] + CARD_GAP);

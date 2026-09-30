@@ -282,15 +282,56 @@ public class ClientEventBusSubscriber {
         if (!pressedKey.equals(mapping.getKey())) return;
         if (!mapping.getKeyModifier().isActive(mapping.getKeyConflictContext())) return;
 
+        tryTriggerShortTeleport(mc, player, true);
+    }
+
+    /**
+     * 短距传送的键盘触发入口。
+     *
+     * <p>该绑定不参与 {@code KeyMapping} 分发，触发判定只能由原始输入事件完成。
+     * 若仅保留鼠标分支，玩家把主键改绑为键盘按键后不会产生任何触发：鼠标事件
+     * 携带的按键恒为鼠标键，与绑定主键不相等。此处按物理按下边沿补上键盘分支，
+     * 与鼠标分支共用同一套前置校验。键盘主键不与方块交互共用同一次点击，
+     * 故不让位于准星命中的方块。</p>
+     */
+    @SubscribeEvent
+    public static void onKeyInputEvent(InputEvent.Key event) {
+        if (event.getAction() != GLFW.GLFW_PRESS) return;
+        if (event.getKey() == GLFW.GLFW_KEY_UNKNOWN) return;
+
+        Minecraft mc = Minecraft.getInstance();
+        LocalPlayer player = mc.player;
+        if (player == null || mc.screen != null) return;
+
+        KeyMapping mapping = KeyBindings.SHORT_TELEPORT_KEY.get();
+        InputConstants.Key pressedKey = InputConstants.Type.KEYSYM.getOrCreate(event.getKey());
+        if (!pressedKey.equals(mapping.getKey())) return;
+        if (!mapping.getKeyModifier().isActive(mapping.getKeyConflictContext())) return;
+
+        tryTriggerShortTeleport(mc, player, false);
+    }
+
+    /**
+     * 校验短距闪现的前置条件并上报按键包。
+     *
+     * @param respectBlockPriority 是否让位于共用同一次点击的方块交互与时间加速；
+     *                             鼠标右键需要让位，键盘主键不需要
+     * @return true 表示本次按键已上报
+     */
+    private static boolean tryTriggerShortTeleport(Minecraft mc, LocalPlayer player, boolean respectBlockPriority) {
         ItemStack mainHandItem = player.getMainHandItem();
-        if (!(mainHandItem.getItem() instanceof EndlessBeafItem)) return;
-        if (!EndlessBeafItem.isTeleportEnabled(mainHandItem)) return;
-        // 时间加速同样绑定 Shift + 右键，两者不可同时触发：启用时交由方块交互处理。
-        if (BeefTimeAcceleration.shouldBlockOtherRightClick(mainHandItem, player)) return;
-        // 仅当准星命中的方块自身要独占该组合键时让位，普通方块不拦截闪现。
-        if (isBlockInteractionPriority(mc)) return;
+        if (!(mainHandItem.getItem() instanceof EndlessBeafItem)) return false;
+        if (!EndlessBeafItem.isTeleportEnabled(mainHandItem)) return false;
+
+        if (respectBlockPriority) {
+            // 时间加速同样绑定 Shift + 右键，两者不可同时触发：启用时交由方块交互处理。
+            if (BeefTimeAcceleration.shouldBlockOtherRightClick(mainHandItem, player)) return false;
+            // 仅当准星命中的方块自身要独占该组合键时让位，普通方块不拦截闪现。
+            if (isBlockInteractionPriority(mc)) return false;
+        }
 
         PacketDistributor.sendToServer(new TeleportKeyPacket());
+        return true;
     }
 
     /**

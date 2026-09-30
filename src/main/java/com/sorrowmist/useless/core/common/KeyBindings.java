@@ -144,8 +144,9 @@ public class KeyBindings {
      * <p>该绑定挂在恒为非激活的冲突上下文上：它在按键设置界面中可见、可改键，
      * 但无法通过 {@code KeyMappingLookup} 的激活过滤。按住 Shift 时其所在修饰键桶
      * 过滤后为空，查找逻辑转而回退到无修饰键桶，原版 {@code keyUse} 因而仍能取得
-     * 该次点击，方块交互不受影响。触发判定由 {@code InputEvent.MouseButton.Pre}
-     * 按鼠标按下边沿完成，见 {@code ClientEventBusSubscriber}。</p>
+     * 该次点击，方块交互不受影响。触发判定不经过按键分发，改由
+     * {@code ClientEventBusSubscriber} 在 {@code InputEvent.MouseButton.Pre} 与
+     * {@code InputEvent.Key} 中按物理按下边沿完成，使鼠标主键与键盘主键均可触发。</p>
      */
     public static final Lazy<KeyMapping> SHORT_TELEPORT_KEY = Lazy.of(() -> new KeyMapping(
             SHORT_TELEPORT,

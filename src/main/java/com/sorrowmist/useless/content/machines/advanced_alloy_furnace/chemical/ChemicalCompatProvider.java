@@ -53,6 +53,22 @@ public interface ChemicalCompatProvider {
         return ItemStack.EMPTY;
     }
 
+    /**
+     * 把一个 {@link ChemicalStackView#typeKey() typeKey} 翻成注册表 id，供过滤器的通配符匹配用。
+     *
+     * <p>{@code typeKey()} 是个不透明对象（Mekanism 那边是它自己的 {@code Chemical}），
+     * 常驻代码拿不到显示名或 id，所以只能由集成自己翻译。返回 {@code null} 表示
+     * 「这一端给不出 id」：此时过滤器里的通配符对化学品恒不匹配——宁可「什么都不搬」
+     * （可观察、玩家能改），也不要因为拿不到 id 就当「不限制」而把整张网络灌出去。</p>
+     *
+     * <p>注意化学品<b>没有</b> {@code #tag} 形式：Mekanism 的化学品注册表没有跨模组的
+     * 通用 TagKey，界面会明确提示这一点。</p>
+     */
+    @Nullable
+    default net.minecraft.resources.ResourceLocation chemicalIdOf(Object typeKey) {
+        return null;
+    }
+
     default boolean isAvailable() {
         return true;
     }

@@ -24,6 +24,18 @@ final class PressableAE2Button extends AE2Button {
         return handled;
     }
 
+    /**
+     * 触发点击并复位按下状态。
+     *
+     * <p>按下态若只依赖屏幕的 {@code mouseReleased} 复位，在鼠标移出界面后松开等路径下不会触发，
+     * 按钮将停留在按下态。此处以点击回调作为复位兜底，保证任何一次成功点击后都会弹起。</p>
+     */
+    @Override
+    public void onPress() {
+        releaseVisualState();
+        super.onPress();
+    }
+
     void releaseVisualState() {
         pressed = false;
     }

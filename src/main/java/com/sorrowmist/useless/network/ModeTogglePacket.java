@@ -5,6 +5,7 @@ import com.sorrowmist.useless.content.items.EndlessBeafItem;
 import com.sorrowmist.useless.content.items.BeefToolVariants;
 import com.sorrowmist.useless.core.component.UComponents;
 import com.sorrowmist.useless.event.EventHandler;
+import com.sorrowmist.useless.init.ModSounds;
 import com.sorrowmist.useless.utils.UselessItemUtils;
 import com.sorrowmist.useless.utils.mining.MiningDispatcher;
 import net.minecraft.network.FriendlyByteBuf;
@@ -12,6 +13,7 @@ import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.item.ItemStack;
 import net.neoforged.fml.ModList;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
@@ -57,6 +59,22 @@ public class ModeTogglePacket implements CustomPacketPayload {
                 }
                 case AUTO_SMELT -> {
                     stack.set(UComponents.AutoSmeltComponent.get(), msg.enabled);
+                }
+                case EXDEORUM_CROOK -> {
+                    // 能力由 exdeorum 的配方体系提供，未加载时忽略，避免写入无人读取的组件
+                    if (ModList.get().isLoaded("exdeorum") && stack.getItem() instanceof EndlessBeafItem) {
+                        stack.set(UComponents.ExDeorumCrookComponent.get(), msg.enabled);
+                    }
+                }
+                case EXDEORUM_HAMMER -> {
+                    if (ModList.get().isLoaded("exdeorum") && stack.getItem() instanceof EndlessBeafItem) {
+                        stack.set(UComponents.ExDeorumHammerComponent.get(), msg.enabled);
+                    }
+                }
+                case EXDEORUM_COMPRESSED_HAMMER -> {
+                    if (ModList.get().isLoaded("exdeorum") && stack.getItem() instanceof EndlessBeafItem) {
+                        stack.set(UComponents.ExDeorumCompressedHammerComponent.get(), msg.enabled);
+                    }
                 }
                 case AE_STORAGE_PRIORITY -> {
                     stack.set(UComponents.AEStoragePriorityComponent.get(), msg.enabled);
@@ -210,6 +228,21 @@ public class ModeTogglePacket implements CustomPacketPayload {
                         }
                     }
                 }
+                case BEEF_KILL_AURA -> {
+                    if (stack.getItem() instanceof EndlessBeafItem) {
+                        EndlessBeafItem.setKillAuraEnabled(stack, msg.enabled);
+                        // 光环不占右键，无需接入 disable* 互斥。
+                        // 音效只发给操作者本人：这是个人 UI 反馈，不该打扰周围玩家。
+                        player.playNotifySound(
+                                (msg.enabled ? ModSounds.KILL_AURA_ON : ModSounds.KILL_AURA_OFF).get(),
+                                SoundSource.MASTER, 1.0F, 1.0F);
+                    }
+                }
+                case BEEF_PROTECT_MODE -> {
+                    if (stack.getItem() instanceof EndlessBeafItem) {
+                        EndlessBeafItem.setProtectModeEnabled(stack, msg.enabled);
+                    }
+                }
             }
 
             // 显式同步物品到客户端
@@ -292,6 +325,14 @@ public class ModeTogglePacket implements CustomPacketPayload {
         BEEF_AUTO_CLICK,
         BEEF_FORCE_GROW,
         // 无线物流：潜行右键容器绑定/解绑，界面里配置搬运规则
-        BEEF_WIRELESS_LOGISTICS
+        BEEF_WIRELESS_LOGISTICS,
+        // Ex Deorum 钩子 / 锤子 / 压缩锤：按对应配方体系改写挖掘掉落
+        EXDEORUM_CROOK,
+        EXDEORUM_HAMMER,
+        EXDEORUM_COMPRESSED_HAMMER,
+        // 杀戮光环：手持造化杖每 20 tick 对「范围伤害」配置范围内生物结算一次攻击伤害
+        BEEF_KILL_AURA,
+        // 保护名单模式：暂停光环与范围伤害，方便从容添加保护名单
+        BEEF_PROTECT_MODE
     }
 }

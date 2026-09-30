@@ -2,13 +2,15 @@ package com.sorrowmist.useless.compat.jei;
 
 import appeng.menu.me.items.PatternEncodingTermMenu;
 import com.sorrowmist.useless.UselessMod;
+import com.sorrowmist.useless.client.gui.ChainGroupScreen;
 import com.sorrowmist.useless.client.gui.DimensionConfigScreen;
 import com.sorrowmist.useless.client.gui.StaffLinkScreen;
-import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.chemical.ChemicalCompatProvider;
-import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.chemical.ChemicalCompatProviders;
 import com.sorrowmist.useless.content.menus.DimensionConfigMenu;
 import com.sorrowmist.useless.content.recipe.AlloyFurnaceRecipeCatalog;
 import com.sorrowmist.useless.content.recipe.AlloyFurnaceRecipeIdentity;
+import com.sorrowmist.useless.content.stafflink.LinkFilterSlot;
+import com.sorrowmist.useless.content.stafflink.StaffLinkFilters;
+import com.sorrowmist.useless.content.stafflink.StaffLinkRoute;
 import com.sorrowmist.useless.init.ModBlocks;
 import com.sorrowmist.useless.init.ModTags;
 import mezz.jei.api.IModPlugin;
@@ -28,12 +30,9 @@ import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.inventory.MenuType;
 import net.minecraft.world.item.BlockItem;
-import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.Items;
 import net.minecraft.world.level.Level;
 import net.neoforged.fml.ModList;
-import net.neoforged.neoforge.fluids.FluidStack;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.ArrayList;
@@ -98,13 +97,64 @@ public final class JEIPlugin implements IModPlugin {
                 new DimensionConfigGhostHandler());
         registration.addGhostIngredientHandler(StaffLinkScreen.class,
                 new StaffLinkGhostHandler());
+        registration.addGhostIngredientHandler(ChainGroupScreen.class,
+                new ChainGroupGhostHandler());
+        // 等价组界面继承了 AbstractContainerScreen，JEI 内置的容器屏 handler 会自动接管，
+        // 不需要（也不该）再注册 IScreenHandler——两套 handler 会互相抢。
+    }
+
+    /**
+     * 连锁等价组界面接受 JEI 拖拽。
+     *
+     * <p>每个组行右端有一个拖拽槽，把方块拖进去就作为一条精确方块 ID 追加到该组。
+     * 非方块物品直接不接受——等价组判定的是方块，收一个没有方块的物品没有意义。</p>
+     */
+    private static final class ChainGroupGhostHandler
+            implements IGhostIngredientHandler<ChainGroupScreen> {
+        @Override
+        public <I> List<Target<I>> getTargetsTyped(ChainGroupScreen screen,
+                                                   ITypedIngredient<I> ingredient,
+                                                   boolean doStart) {
+            ItemStack stack = ingredient.getItemStack().orElse(ItemStack.EMPTY);
+            if (!(stack.getItem() instanceof BlockItem blockItem)) return List.of();
+            ResourceLocation blockId = BuiltInRegistries.BLOCK.getKey(blockItem.getBlock());
+
+            List<Target<I>> targets = new ArrayList<>(screen.chainGroupCount());
+            for (int index = 0; index < screen.chainGroupCount(); index++) {
+                if (!screen.isGroupRowVisible(index)) continue;
+                final int groupIndex = index;
+                targets.add(new Target<>() {
+                    @Override
+                    public Rect2i getArea() {
+                        return new Rect2i(screen.groupDropZoneScreenX(groupIndex),
+                                screen.groupDropZoneScreenY(groupIndex),
+                                screen.dropZoneSize(), screen.dropZoneSize());
+                    }
+
+                    @Override
+                    public void accept(I value) {
+                        screen.addEntryFromBlock(groupIndex, blockId);
+                    }
+                });
+            }
+            return targets;
+        }
+
+        @Override
+        public void onComplete() {
+        }
     }
 
     /**
      * 无线物流的过滤槽接受 JEI 拖拽。
      *
-     * <p>槽里存的是「标记物」：物品线路存物品本身，流体/化学品线路存「装着它的容器」。
-     * 所以流体原料要先换成它的桶；化学品原料由化学品集成换成一只装满它的储罐。</p>
+     * <p>标记按线路的资源类型分流：物品线路收物品，流体线路收<b>流体本身</b>（不是装它的桶），
+     * 化学品线路收一只装满它的储罐。类型对不上的原料直接不接受——不接，比悄悄塞进一个
+     * 语义不对的东西好。</p>
+     *
+     * <p>拖进来的只能是<b>具体标记</b>。{@code #tag} / 通配符那类模式表达的是「一整类」，
+     * 从 JEI 拖某个具体物品过来时玩家要的显然是那个物品，所以这里不替玩家猜「你是不是想要
+     * 这个物品的标签」——要模式请右键格子手打。</p>
      */
     private static final class StaffLinkGhostHandler
             implements IGhostIngredientHandler<StaffLinkScreen> {
@@ -112,9 +162,27 @@ public final class JEIPlugin implements IModPlugin {
         public <I> List<Target<I>> getTargetsTyped(StaffLinkScreen screen,
                                                    ITypedIngredient<I> ingredient,
                                                    boolean doStart) {
-            if (!screen.getMenu().isFilterActive()) return List.of();
-            ItemStack marker = markerFor(ingredient);
-            if (marker.isEmpty()) return List.of();
+            // 过滤格住在覆盖层面板里。面板没开时那些坐标指向的是主界面别的地方，
+            // 拖过去会莫名其妙地落到空处（甚至落到底下某个控件上），所以直接不给目标。
+            if (!screen.isFilterPanelOpen()) {
+                screen.setJeiDragActive(false);
+                return List.of();
+            }
+            StaffLinkRoute config = screen.getMenu().getSelectedConfig();
+            if (config == null || !config.filterApplies()) {
+                screen.setJeiDragActive(false);
+                return List.of();
+            }
+            LinkFilterSlot marker = StaffLinkFilters.fromIngredient(
+                    config.medium(), ingredient.getIngredient());
+            if (marker == null) {
+                screen.setJeiDragActive(false);
+                return List.of();
+            }
+            // 真的要开始拖了（doStart=true）才点亮拖拽高亮；doStart=false 那次只是问「有没有目标」。
+            if (doStart) {
+                screen.setJeiDragActive(true);
+            }
 
             List<Target<I>> targets = new ArrayList<>(StaffLinkScreen.filterSlotCount());
             for (int index = 0; index < StaffLinkScreen.filterSlotCount(); index++) {
@@ -134,20 +202,6 @@ public final class JEIPlugin implements IModPlugin {
                 });
             }
             return targets;
-        }
-
-        private static ItemStack markerFor(ITypedIngredient<?> ingredient) {
-            Object raw = ingredient.getIngredient();
-            if (raw instanceof ItemStack stack) {
-                return stack.isEmpty() ? ItemStack.EMPTY : stack;
-            }
-            if (raw instanceof FluidStack fluid) {
-                if (fluid.isEmpty()) return ItemStack.EMPTY;
-                Item bucket = fluid.getFluid().getBucket();
-                return bucket == Items.AIR ? ItemStack.EMPTY : new ItemStack(bucket);
-            }
-            ChemicalCompatProvider provider = ChemicalCompatProviders.get();
-            return provider.isAvailable() ? provider.markerForChemical(raw) : ItemStack.EMPTY;
         }
 
         @Override

@@ -21,6 +21,7 @@ import com.sorrowmist.useless.network.MiningDataSyncPacket;
 import com.sorrowmist.useless.network.ModeTogglePacket;
 import com.sorrowmist.useless.network.MultiblockAlloyFurnaceEnergyLimitPacket;
 import com.sorrowmist.useless.network.PatternPageChangePacket;
+import com.sorrowmist.useless.network.ProtectEntityPacket;
 import com.sorrowmist.useless.network.PassiveCraftingSettingsPacket;
 import com.sorrowmist.useless.network.PassiveCraftingSlotMultiplierPacket;
 import com.sorrowmist.useless.network.PassiveCraftingStatusPacket;
@@ -29,6 +30,7 @@ import com.sorrowmist.useless.network.OreGeneratorSettingsPacket;
 import com.sorrowmist.useless.network.RitualSatchelPlacePacket;
 import com.sorrowmist.useless.network.RedstoneControlPacket;
 import com.sorrowmist.useless.network.SelectOmniversalPatternRecipePacket;
+import com.sorrowmist.useless.network.ShapeSwitchPacket;
 import com.sorrowmist.useless.network.TabKeyPressedPacket;
 import com.sorrowmist.useless.network.TeleportKeyPacket;
 import com.sorrowmist.useless.network.TankClearPacket;
@@ -38,19 +40,22 @@ import com.sorrowmist.useless.network.ConstructionWandPreviewPacket;
 import com.sorrowmist.useless.network.ConstructionWandPreviewRequestPacket;
 import com.sorrowmist.useless.network.DimensionConfigGhostSlotPacket;
 import com.sorrowmist.useless.network.DimensionConfigSubmitPacket;
+import com.sorrowmist.useless.network.StaffLinkBindPacket;
 import com.sorrowmist.useless.network.StaffLinkConfigurePacket;
 import com.sorrowmist.useless.network.StaffLinkCyclePacket;
 import com.sorrowmist.useless.network.StaffLinkDetachPacket;
+import com.sorrowmist.useless.network.StaffLinkHighlightPacket;
+import com.sorrowmist.useless.network.StaffLinkHighlightRequestPacket;
 import com.sorrowmist.useless.network.StaffLinkNetworkPacket;
 import com.sorrowmist.useless.network.StaffLinkOpenPacket;
 import com.sorrowmist.useless.network.StaffLinkRenamePacket;
-import com.sorrowmist.useless.network.StaffLinkStatusPacket;
+import com.sorrowmist.useless.network.StaffLinkReorderPacket;
 import com.sorrowmist.useless.network.StaffLinkSyncPacket;
 import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
 
 public class ModNetwork {
     public static void registerPayloadHandlers(final RegisterPayloadHandlersEvent event) {
-        var registrar = event.registrar(UselessMod.MODID).versioned("13");
+        var registrar = event.registrar(UselessMod.MODID).versioned("15");
         registrar.playToServer(BeefToolLayoutRequestPacket.TYPE,
                                BeefToolLayoutRequestPacket.STREAM_CODEC,
                                BeefToolLayoutRequestPacket::handle);
@@ -94,6 +99,12 @@ public class ModNetwork {
         );
         registrar.playToServer(ModeTogglePacket.TYPE, ModeTogglePacket.STREAM_CODEC,
                                ModeTogglePacket::handle
+        );
+        registrar.playToServer(ProtectEntityPacket.TYPE, ProtectEntityPacket.STREAM_CODEC,
+                               ProtectEntityPacket::handle
+        );
+        registrar.playToServer(ShapeSwitchPacket.TYPE, ShapeSwitchPacket.STREAM_CODEC,
+                               ShapeSwitchPacket::handle
         );
         registrar.playToServer(ForceBreakKeyPacket.TYPE, ForceBreakKeyPacket.STREAM_CODEC,
                                ForceBreakKeyPacket::handle
@@ -166,9 +177,15 @@ public class ModNetwork {
         registrar.playToServer(StaffLinkOpenPacket.TYPE,
                                StaffLinkOpenPacket.STREAM_CODEC,
                                StaffLinkOpenPacket::handle);
+        registrar.playToServer(StaffLinkBindPacket.TYPE,
+                               StaffLinkBindPacket.STREAM_CODEC,
+                               StaffLinkBindPacket::handle);
         registrar.playToServer(StaffLinkDetachPacket.TYPE,
                                StaffLinkDetachPacket.STREAM_CODEC,
                                StaffLinkDetachPacket::handle);
+        registrar.playToServer(StaffLinkReorderPacket.TYPE,
+                               StaffLinkReorderPacket.STREAM_CODEC,
+                               StaffLinkReorderPacket::handle);
         registrar.playToServer(StaffLinkConfigurePacket.TYPE,
                                StaffLinkConfigurePacket.STREAM_CODEC,
                                StaffLinkConfigurePacket::handle);
@@ -184,8 +201,11 @@ public class ModNetwork {
         registrar.playToClient(StaffLinkSyncPacket.TYPE,
                                StaffLinkSyncPacket.STREAM_CODEC,
                                StaffLinkSyncPacket::handle);
-        registrar.playToClient(StaffLinkStatusPacket.TYPE,
-                               StaffLinkStatusPacket.STREAM_CODEC,
-                               StaffLinkStatusPacket::handle);
+        registrar.playToServer(StaffLinkHighlightRequestPacket.TYPE,
+                               StaffLinkHighlightRequestPacket.STREAM_CODEC,
+                               StaffLinkHighlightRequestPacket::handle);
+        registrar.playToClient(StaffLinkHighlightPacket.TYPE,
+                               StaffLinkHighlightPacket.STREAM_CODEC,
+                               StaffLinkHighlightPacket::handle);
     }
 }

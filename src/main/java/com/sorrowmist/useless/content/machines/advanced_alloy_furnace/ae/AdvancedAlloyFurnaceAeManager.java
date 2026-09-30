@@ -517,8 +517,8 @@ public final class AdvancedAlloyFurnaceAeManager {
     /**
      * 在 level 与配方目录均可用后加载延迟的任务数据（样板解码同时依赖二者）。
      *
-     * <p>目录由 {@code prewarmAsync} 在后台线程构建，服务端启动阶段实测耗时二十秒以上。若在目录
-     * 就绪前解码，{@code resolvePattern} 会因快照未就绪返回空，随即把完好的样板判为
+     * <p>目录在服务端启动阶段才构建完毕，期间查询路径一律返回未就绪。若在目录就绪前解码，
+     * {@code resolvePattern} 会因快照未就绪返回空，随即把完好的样板判为
      * 「missing or has changed」并退还材料，任务因此被取消。故此处挂起，由调用方在后续 tick 重试。</p>
      *
      * @return true 表示已处理完毕（含无待恢复数据）；false 表示前提条件未满足，需稍后重试

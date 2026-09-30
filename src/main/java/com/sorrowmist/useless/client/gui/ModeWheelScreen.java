@@ -5,7 +5,11 @@ import com.mojang.blaze3d.systems.RenderSystem;
 import com.sorrowmist.useless.api.enums.tool.ConstructionWandCoreMode;
 import com.sorrowmist.useless.api.enums.tool.EnchantMode;
 import com.sorrowmist.useless.api.enums.tool.ToolTypeMode;
+import com.sorrowmist.useless.content.menus.ChainGroupMenu;
+import com.sorrowmist.useless.core.common.KeyBindings;
 import com.sorrowmist.useless.core.component.UComponents;
+import com.sorrowmist.useless.core.config.BeefToolProtectionManager;
+import com.sorrowmist.useless.core.config.ChainGroupManager;
 import com.sorrowmist.useless.content.items.EndlessBeafItem;
 import com.sorrowmist.useless.data.BeefToolLayout;
 import com.sorrowmist.useless.data.BeefToolModuleRegistry;
@@ -23,6 +27,7 @@ import net.minecraft.client.gui.components.Renderable;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.util.Mth;
+import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.item.ItemStack;
 import net.neoforged.neoforge.network.PacketDistributor;
 import org.lwjgl.glfw.GLFW;
@@ -43,6 +48,8 @@ public class ModeWheelScreen extends Screen {
     private static final int CARD_BOTTOM_PADDING = 6;
     private static final int MODULE_HEIGHT = 18;
     private static final int MODULE_GAP = 2;
+    /** 连锁等价组齿轮图标的边长（画在连锁挖掘模块按钮右端）。 */
+    private static final int GEAR_SIZE = 12;
     private static final int PAGE_TAB_HEIGHT = 15;
     private static final int PAGE_TAB_WIDTH = 82;
     private static final int DRAG_THRESHOLD = 4;
@@ -224,6 +231,9 @@ public class ModeWheelScreen extends Screen {
         return width;
     }
 
+    
+
+    /** 整页统一的按钮宽度：所有含两个以上按钮的分组取齐，保证各分组外观一致。 */
     private int commonModuleWidth(BeefToolLayout.Page page) {
         int width = 50;
         for (BeefToolLayout.Group group : page.groups()) {
@@ -381,7 +391,7 @@ public class ModeWheelScreen extends Screen {
             List<String> visibleModules = visibleModules(group.modules());
             int column = columnBottoms[0] <= columnBottoms[1] ? 0 : 1;
             int left = contentLeft + (column == 0 ? 0 : columnWidths[0] + CARD_GAP);
-            int cardWidth = Math.min(columnWidths[column], naturalGroupWidth(group));
+            int cardWidth = columnWidths[column];
             int height = cardHeight(cardWidth, visibleModules.size(), moduleColumns(visibleModules.size()));
             int top = columnBottoms[column];
             rawCards.add(new RawCard(currentPage(), groupIndex, left, top,
@@ -430,7 +440,7 @@ public class ModeWheelScreen extends Screen {
         List<String> sourceModules = card.unassigned()
                 ? layout.unassignedModules()
                 : groupAt(card.pageIndex(), card.groupIndex()).modules();
-        int buttonWidth = card.modules().size() == 1
+        int buttonWidth = visibleModules(sourceModules).size() == 1
                 ? moduleButtonWidth(sourceModules)
                 : commonModuleWidth(currentPageObject());
         int column = index % columns;
@@ -563,6 +573,10 @@ public class ModeWheelScreen extends Screen {
             case BeefToolModuleRegistry.ENHANCED_CHAIN_MINING -> bool(UComponents.EnhancedChainMiningComponent, false);
             case BeefToolModuleRegistry.FORCE_MINING -> bool(UComponents.ForceMiningComponent, false);
             case BeefToolModuleRegistry.AUTO_SMELT -> bool(UComponents.AutoSmeltComponent, false);
+            case BeefToolModuleRegistry.EXDEORUM_CROOK -> bool(UComponents.ExDeorumCrookComponent, false);
+            case BeefToolModuleRegistry.EXDEORUM_HAMMER -> bool(UComponents.ExDeorumHammerComponent, false);
+            case BeefToolModuleRegistry.EXDEORUM_COMPRESSED_HAMMER ->
+                    bool(UComponents.ExDeorumCompressedHammerComponent, false);
             case BeefToolModuleRegistry.AE_STORAGE_PRIORITY -> bool(UComponents.AEStoragePriorityComponent, false);
             case BeefToolModuleRegistry.AE_NETWORK_CONNECT -> bool(UComponents.AeNetworkConnectComponent, false);
             case BeefToolModuleRegistry.WRENCH_TAG -> bool(UComponents.WrenchTagEnabledComponent, true);
@@ -596,6 +610,8 @@ public class ModeWheelScreen extends Screen {
             case BeefToolModuleRegistry.BEEF_AUTO_CLICK -> bool(UComponents.BeefAutoClickComponent, false);
             case BeefToolModuleRegistry.BEEF_WIRELESS_LOGISTICS ->
                     bool(UComponents.StaffLinkEnabledComponent, false);
+            case BeefToolModuleRegistry.BEEF_KILL_AURA -> bool(UComponents.BeefKillAuraComponent, false);
+            case BeefToolModuleRegistry.BEEF_PROTECT_MODE -> bool(UComponents.BeefProtectModeComponent, false);
             default -> false;
         };
     }
@@ -845,6 +861,11 @@ public class ModeWheelScreen extends Screen {
 
     private static void validateKnownModules(BeefToolLayout candidate) throws BeefToolLayout.LayoutException {
         candidate.validate();
+        // 等价组与布局同进同出，导入时也要在本地先拦下非法内容，
+        // 免得等服务器回一个笼统的 INVALID_STRUCTURE。
+        ChainGroupManager.validateEntries(candidate.chainGroups());
+        // 保护名单同样随布局导入导出，本地先拦下非法内容。
+        BeefToolProtectionManager.validateEntries(candidate.protectedTypes(), candidate.protectedEntities());
         for (BeefToolLayout.Page page : candidate.pages()) {
             for (BeefToolLayout.Group group : page.groups()) {
                 for (String id : group.modules()) validateKnown(id);
@@ -903,6 +924,13 @@ public class ModeWheelScreen extends Screen {
                     UComponents.ForceMiningComponent, false);
             case BeefToolModuleRegistry.AUTO_SMELT -> toggle(ModeTogglePacket.ModeType.AUTO_SMELT,
                     UComponents.AutoSmeltComponent, false);
+            case BeefToolModuleRegistry.EXDEORUM_CROOK -> toggle(ModeTogglePacket.ModeType.EXDEORUM_CROOK,
+                    UComponents.ExDeorumCrookComponent, false);
+            case BeefToolModuleRegistry.EXDEORUM_HAMMER -> toggle(ModeTogglePacket.ModeType.EXDEORUM_HAMMER,
+                    UComponents.ExDeorumHammerComponent, false);
+            case BeefToolModuleRegistry.EXDEORUM_COMPRESSED_HAMMER ->
+                    toggle(ModeTogglePacket.ModeType.EXDEORUM_COMPRESSED_HAMMER,
+                            UComponents.ExDeorumCompressedHammerComponent, false);
             case BeefToolModuleRegistry.AE_STORAGE_PRIORITY -> toggle(ModeTogglePacket.ModeType.AE_STORAGE_PRIORITY,
                     UComponents.AEStoragePriorityComponent, false);
             case BeefToolModuleRegistry.AE_NETWORK_CONNECT -> toggle(ModeTogglePacket.ModeType.AE_NETWORK_CONNECT,
@@ -956,6 +984,12 @@ public class ModeWheelScreen extends Screen {
             case BeefToolModuleRegistry.BEEF_WIRELESS_LOGISTICS ->
                     toggle(ModeTogglePacket.ModeType.BEEF_WIRELESS_LOGISTICS,
                             UComponents.StaffLinkEnabledComponent, false);
+            case BeefToolModuleRegistry.BEEF_KILL_AURA ->
+                    toggle(ModeTogglePacket.ModeType.BEEF_KILL_AURA,
+                            UComponents.BeefKillAuraComponent, false);
+            case BeefToolModuleRegistry.BEEF_PROTECT_MODE ->
+                    toggle(ModeTogglePacket.ModeType.BEEF_PROTECT_MODE,
+                            UComponents.BeefProtectModeComponent, false);
             default -> {
             }
         }
@@ -1015,12 +1049,16 @@ public class ModeWheelScreen extends Screen {
                     for (ModeButton modeButton : modeButtons) {
                         if (modeButton.button().visible) modeButton.button().render(graphics, mouseX, mouseY, partialTick);
                     }
+                    drawChainGroupGear(graphics, mouseX, mouseY);
                 }
             } finally {
                 graphics.flush();
                 RenderSystem.disableScissor();
             }
         }
+
+        drawChainGroupGearTooltip(graphics, mouseX, mouseY);
+        drawModeButtonTooltips(graphics, mouseX, mouseY);
 
         if (pageNameField != null && pageNameField.visible) {
             pageNameField.render(graphics, mouseX, mouseY, partialTick);
@@ -1155,7 +1193,10 @@ public class ModeWheelScreen extends Screen {
         int top = (uiHeight - modalHeight) / 2;
         graphics.fill(0, 0, uiWidth, uiHeight, 0x99000000);
         MachineScreenStyle.drawPanel(graphics, left, top, modalWidth, modalHeight);
-        graphics.drawString(font, Component.translatable("gui.useless_mod.mode_config.import_confirm"),
+        graphics.drawString(font,
+                font.plainSubstrByWidth(
+                        Component.translatable("gui.useless_mod.mode_config.import_confirm").getString(),
+                        modalWidth - 16),
                 left + 8, top + 10, MachineScreenStyle.TEXT_COLOR, false);
         drawManualButton(graphics, left + 10, top + 48, 110, 18,
                 Component.translatable("gui.useless_mod.mode_config.confirm"),
@@ -1194,6 +1235,20 @@ public class ModeWheelScreen extends Screen {
             return true;
         }
         if (awaitingLayout) return true;
+
+        // 连锁挖掘模块右端的齿轮：进入「连锁等价组」编辑子界面。
+        // 必须在 super.mouseClicked 之前拦截，否则点击会被模块按钮先吃掉。
+        if (!editing && button == GLFW.GLFW_MOUSE_BUTTON_LEFT) {
+            ModuleLayout chainModule = findModule(BeefToolModuleRegistry.ENHANCED_CHAIN_MINING);
+            if (chainModule != null && intersectsContent(chainModule.rect())
+                    && chainGroupGearRect(chainModule).contains(mouseX, mouseY)) {
+                // 菜单是空的、只在客户端本地建，不下发；界面继承容器屏是为了让 JEI/EMI 的侧栏出现。
+                Inventory playerInventory = Minecraft.getInstance().player.getInventory();
+                Minecraft.getInstance().setScreen(new ChainGroupScreen(
+                        new ChainGroupMenu(0, playerInventory), playerInventory, targetItem, layout.copy()));
+                return true;
+            }
+        }
 
         int pageTab = pageAt(mouseX, mouseY);
         if (pageTab >= 0 && button == GLFW.GLFW_MOUSE_BUTTON_LEFT) {
@@ -1418,6 +1473,105 @@ public class ModeWheelScreen extends Screen {
             if (module.rect().contains(mouseX, mouseY) && intersectsContent(module.rect())) return module;
         }
         return null;
+    }
+
+    /** 按模块 ID 找当前页的模块布局，找不到返回 null。 */
+    private ModuleLayout findModule(String id) {
+        for (ModuleLayout module : moduleLayouts) {
+            if (module.id().equals(id)) {
+                return module;
+            }
+        }
+        return null;
+    }
+
+    /** 连锁等价组齿轮的命中区域：贴在模块按钮右端内侧。 */
+    private Rect chainGroupGearRect(ModuleLayout module) {
+        Rect rect = module.rect();
+        return new Rect(rect.right() - GEAR_SIZE - 1, rect.top() + (rect.height() - GEAR_SIZE) / 2,
+                GEAR_SIZE, GEAR_SIZE);
+    }
+
+    /**
+     * 在连锁挖掘模块按钮右端画一个齿轮，提示这里可以点开连锁等价组配置。
+     *
+     * <p>用 {@code fill} 拼出轮廓，不新增贴图。</p>
+     */
+    private void drawChainGroupGear(GuiGraphics graphics, int mouseX, int mouseY) {
+        ModuleLayout module = findModule(BeefToolModuleRegistry.ENHANCED_CHAIN_MINING);
+        if (module == null || !intersectsContent(module.rect())) {
+            return;
+        }
+        Rect gear = chainGroupGearRect(module);
+        int color = gear.contains(mouseX, mouseY)
+                ? MachineScreenStyle.TEXT_COLOR
+                : MachineScreenStyle.SUBTLE_TEXT_COLOR;
+
+        int cx = gear.left() + GEAR_SIZE / 2;
+        int cy = gear.top() + GEAR_SIZE / 2;
+        graphics.fill(cx - 2, cy - 2, cx + 2, cy + 2, color);
+        graphics.fill(cx - 1, gear.top(), cx + 1, cy - 2, color);
+        graphics.fill(cx - 1, cy + 2, cx + 1, gear.bottom(), color);
+        graphics.fill(gear.left(), cy - 1, cx - 2, cy + 1, color);
+        graphics.fill(cx + 2, cy - 1, gear.right(), cy + 1, color);
+    }
+
+    /** 齿轮的悬停提示画在裁剪区之外，免得提示框被内容区裁掉。 */
+    private void drawChainGroupGearTooltip(GuiGraphics graphics, int mouseX, int mouseY) {
+        if (awaitingLayout || editing) {
+            return;
+        }
+        ModuleLayout module = findModule(BeefToolModuleRegistry.ENHANCED_CHAIN_MINING);
+        if (module == null || !intersectsContent(module.rect())
+                || !chainGroupGearRect(module).contains(mouseX, mouseY)) {
+            return;
+        }
+        graphics.renderTooltip(font,
+                Component.translatable("gui.useless_mod.chain_group.gear_tooltip"), mouseX, mouseY);
+    }
+
+    /** 少数「光看名字不知道该怎么用」的模式按钮，悬停时给出说明。 */
+    private void drawModeButtonTooltips(GuiGraphics graphics, int mouseX, int mouseY) {
+        if (awaitingLayout || editing) {
+            return;
+        }
+        for (ModeButton modeButton : modeButtons) {
+            PressableAE2Button button = modeButton.button();
+            if (!button.visible || !button.isMouseOver(mouseX, mouseY)) continue;
+            if (!intersectsContent(new Rect(button.getX(), button.getY(), button.getWidth(), button.getHeight()))) {
+                return;
+            }
+            List<Component> tooltip = modeButtonTooltip(modeButton.id());
+            if (tooltip != null && !tooltip.isEmpty()) {
+                graphics.renderComponentTooltip(font, tooltip, mouseX, mouseY);
+            }
+            return;
+        }
+    }
+
+    /**
+     * 模式按钮的悬停说明，返回 {@code null} 表示不显示。
+     *
+     * <p>只有需要额外说明「怎么操作」的模块才登记，其余一律不显示，免得把轮盘糊满。</p>
+     *
+     * <p><b>必须「一行一个 Component」</b>：{@code GuiGraphics#renderTooltip(Font, Component, int, int)}
+     * 走的是 {@code Component#getVisualOrderText()}，它把整串文字当成<b>一行</b>做 bidi 重排，
+     * 翻译文本里的 {@code \n} 不会变成换行（只会渲染成一个缺字形）。
+     * 只有传多行列表（{@code renderComponentTooltip}）才会逐行渲染。</p>
+     */
+    private List<Component> modeButtonTooltip(String id) {
+        return switch (id) {
+            case BeefToolModuleRegistry.BEEF_PROTECT_MODE -> List.of(
+                    Component.translatable("gui.useless_mod.mode_config.beef_protect_mode.title"),
+                    Component.translatable("gui.useless_mod.mode_config.beef_protect_mode.ctrl"),
+                    Component.translatable("gui.useless_mod.mode_config.beef_protect_mode.shift"),
+                    Component.translatable("gui.useless_mod.mode_config.beef_protect_mode.auto"));
+            case BeefToolModuleRegistry.BEEF_WIRELESS_LOGISTICS -> List.of(
+                    Component.translatable("gui.useless_mod.mode_config.wireless_logistics.title"),
+                    Component.translatable("gui.useless_mod.mode_config.wireless_logistics.key",
+                            KeyBindings.OPEN_WIRELESS_LOGISTICS_KEY.get().getTranslatedKeyMessage()));
+            default -> null;
+        };
     }
 
     private CardLayout groupAt(double mouseX, double mouseY) {

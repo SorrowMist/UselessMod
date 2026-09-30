@@ -1,17 +1,21 @@
 package com.sorrowmist.useless.client.network;
 
 import com.sorrowmist.useless.UselessMod;
+import com.sorrowmist.useless.client.gui.ChainGroupScreen;
 import com.sorrowmist.useless.client.gui.ModeWheelScreen;
 import com.sorrowmist.useless.client.gui.StaffLinkScreen;
+import com.sorrowmist.useless.client.render.StaffLinkHighlightRenderer;
 import com.sorrowmist.useless.content.blockentities.AdvancedAlloyFurnaceBlockEntity;
 import com.sorrowmist.useless.content.blockentities.multiblock.MultiblockAlloyFurnaceCoreBlockEntity;
 import com.sorrowmist.useless.content.menus.MultiblockAlloyFurnaceMenu;
+import com.sorrowmist.useless.core.config.BeefToolProtectionManager;
+import com.sorrowmist.useless.core.config.ChainGroupManager;
 import com.sorrowmist.useless.data.BeefToolLayout;
 import com.sorrowmist.useless.network.AETaskProgressPacket;
 import com.sorrowmist.useless.network.BeefInvulnerabilitySyncPacket;
 import com.sorrowmist.useless.network.BeefToolLayoutResultPacket;
 import com.sorrowmist.useless.network.BeefToolLayoutSyncPacket;
-import com.sorrowmist.useless.network.StaffLinkStatusPacket;
+import com.sorrowmist.useless.network.StaffLinkHighlightPacket;
 import com.sorrowmist.useless.network.StaffLinkSyncPacket;
 import com.sorrowmist.useless.world.stafflink.StaffLinkNetwork;
 import net.minecraft.client.Minecraft;
@@ -95,8 +99,15 @@ public final class ClientPacketHandlers {
     public static void handleBeefToolLayoutSync(BeefToolLayoutSyncPacket packet) {
         try {
             BeefToolLayout layout = BeefToolLayout.fromJson(packet.json());
+            // 等价组必须无条件刷新：右键连锁走 Item#useOn，客户端也会本地预测，
+            // 界面开着还是关着都需要这份数据，否则客户端预测的范围会小于服务端实际破坏的范围。
+            ChainGroupManager.setClientMirror(layout.chainGroups());
+            // 生物保护名单同理：tooltip 的「已保护 N 种 / N 只」直接读这份镜像。
+            BeefToolProtectionManager.setClientMirror(layout.protectedTypes(), layout.protectedEntities());
             if (Minecraft.getInstance().screen instanceof ModeWheelScreen screen) {
                 screen.receiveLayout(layout);
+            } else if (Minecraft.getInstance().screen instanceof ChainGroupScreen screen) {
+                screen.receiveSync(layout);
             }
         } catch (BeefToolLayout.LayoutException ignored) {
             if (Minecraft.getInstance().screen instanceof ModeWheelScreen screen) {
@@ -109,23 +120,26 @@ public final class ClientPacketHandlers {
     public static void handleBeefToolLayoutResult(BeefToolLayoutResultPacket packet) {
         if (Minecraft.getInstance().screen instanceof ModeWheelScreen screen) {
             screen.receiveLayoutError(packet.error());
+        } else if (Minecraft.getInstance().screen instanceof ChainGroupScreen screen) {
+            screen.receiveError(packet.error());
         }
     }
 
     /** 无线物流：把服务端下发的整网快照交给已打开的配置界面。 */
     public static void handleStaffLinkSync(StaffLinkSyncPacket packet) {
-        lastStaffLinkSync = packet.network();
+        lastStaffLinkSync = packet;
         if (Minecraft.getInstance().screen instanceof StaffLinkScreen screen) {
-            screen.receiveSync(packet.network());
+            screen.receiveSync(packet);
         }
     }
 
-    /** 无线物流：把「上次搬了多少」的读数交给已打开的配置界面。 */
-    public static void handleStaffLinkStatus(StaffLinkStatusPacket packet) {
-        if (Minecraft.getInstance().screen instanceof StaffLinkScreen screen) {
-            screen.receiveStatus(packet.networkId(), packet.requested(), packet.moved(),
-                    packet.targets(), packet.tick(), packet.blocker());
-        }
+    /**
+     * 无线物流：服务端回发的「当前网络内容器按流向分类」结果，交给世界高亮渲染器。
+     *
+     * <p>与界面无关：只要手持杖、开着无线物流模式，界面关着也要能看见框。</p>
+     */
+    public static void handleStaffLinkHighlight(StaffLinkHighlightPacket packet) {
+        StaffLinkHighlightRenderer.setHighlights(packet.release(), packet.absorb(), packet.disabled());
     }
 
     /**
@@ -135,9 +149,9 @@ public final class ClientPacketHandlers {
      * 界面尚未创建的那一瞬——否则界面会一直空着直到下一次同步。</p>
      */
     @Nullable
-    public static StaffLinkNetwork consumePendingStaffLinkSync(java.util.UUID networkId) {
-        StaffLinkNetwork pending = lastStaffLinkSync;
-        if (pending == null || !pending.id().equals(networkId)) {
+    public static StaffLinkSyncPacket consumePendingStaffLinkSync(java.util.UUID networkId) {
+        StaffLinkSyncPacket pending = lastStaffLinkSync;
+        if (pending == null || !pending.network().id().equals(networkId)) {
             return null;
         }
         lastStaffLinkSync = null;
@@ -145,5 +159,5 @@ public final class ClientPacketHandlers {
     }
 
     @Nullable
-    private static StaffLinkNetwork lastStaffLinkSync;
+    private static StaffLinkSyncPacket lastStaffLinkSync;
 }

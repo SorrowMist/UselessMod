@@ -1,7 +1,6 @@
 package com.sorrowmist.useless.core.config;
 
 import net.minecraft.resources.ResourceLocation;
-import net.minecraft.world.level.block.Block;
 import net.neoforged.fml.ModList;
 import net.neoforged.neoforge.common.ModConfigSpec;
 
@@ -39,8 +38,6 @@ public class ConfigManager {
     private static final ModConfigSpec.IntValue CHAIN_MINING_RANGE_Y;
     private static final ModConfigSpec.IntValue CHAIN_MINING_RANGE_Z;
     private static final ModConfigSpec.IntValue CHAIN_MINING_MAX_BLOCKS;
-    // 连锁挖掘等价组：命中同一条目的方块视为同类
-    private static final ModConfigSpec.ConfigValue<List<? extends String>> CHAIN_MINING_EQUIVALENT_GROUPS;
     private static final ModConfigSpec.DoubleValue BEEF_TOOL_FLIGHT_SPEED;
     // 牛排工具附魔等级配置
     private static final ModConfigSpec.IntValue FORTUNE_LEVEL;
@@ -157,6 +154,11 @@ public class ConfigManager {
     private static final ModConfigSpec.BooleanValue ENABLE_HOSTILE_NETWORKS_RECIPE_CONVERSION;
     private static final ModConfigSpec.BooleanValue ENABLE_APOTHIC_FLUX_RECIPE_CONVERSION;
     private static final ModConfigSpec.BooleanValue ENABLE_FLUX_NETWORKS_RECIPE_CONVERSION;
+    private static final ModConfigSpec.BooleanValue ENABLE_APOTHEOSIS_RECIPE_CONVERSION;
+    private static final ModConfigSpec.BooleanValue ENABLE_LYCHEE_RECIPE_CONVERSION;
+    private static final ModConfigSpec.BooleanValue ENABLE_ASTRAL_SORCERY_RECIPE_CONVERSION;
+    private static final ModConfigSpec.BooleanValue ENABLE_BOTANY_POTS_RECIPE_CONVERSION;
+    private static final ModConfigSpec.BooleanValue ENABLE_EX_DEORUM_RECIPE_CONVERSION;
     private static final ModConfigSpec.BooleanValue ENABLE_JUSTDIRETHINGS_RECIPE_CONVERSION;
     private static final ModConfigSpec.BooleanValue ENABLE_JDTE_RECIPE_CONVERSION;
     private static final Map<String, ModConfigSpec.BooleanValue> RECIPE_CONVERSION_OPTIONS;
@@ -165,6 +167,7 @@ public class ConfigManager {
     private static final ModConfigSpec.IntValue OMNIVERSAL_MOLD_SLOTS;
     private static final ModConfigSpec.IntValue OMNIVERSAL_PASSIVE_PATTERN_SLOTS;
     private static final ModConfigSpec.IntValue OMNIVERSAL_DECODE_CACHE_CAPACITY;
+    private static final ModConfigSpec.BooleanValue OMNIVERSAL_PATTERN_AUTO_UPLOAD;
     private static final ModConfigSpec.IntValue[] OMNIVERSAL_COIL_TIER_THREADS =
             new ModConfigSpec.IntValue[9];
     private static final ModConfigSpec.LongValue[] OMNIVERSAL_COIL_TIER_PARALLEL =
@@ -192,8 +195,6 @@ public class ConfigManager {
     private static volatile List<String> cachedBeefToolForceMiningBlacklist = List.of();
     private static volatile BlockBlacklistMatcher beefToolForceMiningBlacklistMatcher =
             BlockBlacklistMatcher.empty("beef tool force mining blacklist");
-    private static volatile List<String> cachedChainMiningEquivalentGroups = List.of();
-    private static volatile ChainMatchGroups chainMiningEquivalentGroups = ChainMatchGroups.empty();
 
     static {
         // Server config: these values change world or machine behavior.
@@ -261,6 +262,18 @@ public class ConfigManager {
         OMNIVERSAL_USEFUL_TIER_THREADS = SERVER_BUILDER
                 .comment("有用级线圈的最大AE任务数")
                 .defineInRange("useful_tier_threads", 11, 1, Integer.MAX_VALUE);
+        SERVER_BUILDER.pop();
+
+        // 万象样板自动上传：单独成组，便于只开关上传行为，
+        // 而不必连带改动多方块结构自身的容量与线圈参数。
+        SERVER_BUILDER.translation("useless_mod.configuration.omniversal_pattern_upload")
+                .push("omniversal_pattern_upload");
+        OMNIVERSAL_PATTERN_AUTO_UPLOAD = SERVER_BUILDER
+                .comment("Whether a freshly encoded omniversal pattern is uploaded to a pattern assembly",
+                        "on the same AE grid. When disabled, the pattern stays in the encoding terminal",
+                        "and the player moves it manually, as before.")
+                .translation("useless_mod.configuration.omniversal_pattern_auto_upload")
+                .define("omniversal_pattern_auto_upload", true);
         SERVER_BUILDER.pop();
 
         SERVER_BUILDER.translation("useless_mod.configuration.ore_generator")
@@ -381,15 +394,6 @@ public class ConfigManager {
                 .comment("连锁挖掘的最大方块数量")
                 .translation("useless_mod.configuration.chain_mining_max_blocks")
                 .defineInRange("chain_mining_max_blocks", 1000, 1, 1000000);
-
-        CHAIN_MINING_EQUIVALENT_GROUPS = SERVER_BUILDER
-                .comment("连锁挖掘等价组，命中同一条目的方块视为同类，可以一起连锁",
-                        "原点方块命中多条时取并集; 一条都不命中时仅连锁完全相同的方块",
-                        "支持精确方块ID、#方块标签和*通配符，留空则保持仅连锁相同方块",
-                        "示例: \"#minecraft:logs\", \"#c:ores\", \"*_ore\"")
-                .translation("useless_mod.configuration.chain_mining_equivalent_groups")
-                .defineListAllowEmpty("chain_mining_equivalent_groups", List.<String>of(), () -> "",
-                        entry -> entry instanceof String);
 
         // 牛排工具附魔等级配置
         FORTUNE_LEVEL = SERVER_BUILDER
@@ -675,8 +679,18 @@ public class ConfigManager {
                 "enable_apothic_flux_recipe_conversion", true);
         ENABLE_FLUX_NETWORKS_RECIPE_CONVERSION = defineRecipeConversionOption(
                 "enable_fluxnetworks_recipe_conversion", true);
+        ENABLE_APOTHEOSIS_RECIPE_CONVERSION = defineRecipeConversionOption(
+                "enable_apotheosis_recipe_conversion", true);
+        ENABLE_LYCHEE_RECIPE_CONVERSION = defineRecipeConversionOption(
+                "enable_lychee_recipe_conversion", true);
+        ENABLE_ASTRAL_SORCERY_RECIPE_CONVERSION = defineRecipeConversionOption(
+                "enable_astralsorcery_recipe_conversion", true);
         ENABLE_ARS_NOUVEAU_RECIPE_CONVERSION = defineRecipeConversionOption(
                 "enable_ars_nouveau_recipe_conversion", true);
+        ENABLE_BOTANY_POTS_RECIPE_CONVERSION = defineRecipeConversionOption(
+                "enable_botany_pots_recipe_conversion", true);
+        ENABLE_EX_DEORUM_RECIPE_CONVERSION = defineRecipeConversionOption(
+                "enable_exdeorum_recipe_conversion", true);
         ENABLE_AVARITIA_RECIPE_CONVERSION = defineRecipeConversionOption(
                 "enable_avaritia_recipe_conversion", true);
         ENABLE_BIG_REACTORS_RECIPE_CONVERSION = defineRecipeConversionOption(
@@ -731,12 +745,16 @@ public class ConfigManager {
                 Map.entry("ae2", ENABLE_AE2_RECIPE_CONVERSION),
                 Map.entry("ae2cs", ENABLE_AE2CS_RECIPE_CONVERSION),
                 Map.entry("ae2lt", ENABLE_AE2LT_RECIPE_CONVERSION),
+                Map.entry("apotheosis", ENABLE_APOTHEOSIS_RECIPE_CONVERSION),
                 Map.entry("apothic_flux", ENABLE_APOTHIC_FLUX_RECIPE_CONVERSION),
                 Map.entry("appmek", ENABLE_APP_MEK_RECIPE_CONVERSION),
                 Map.entry("ars_nouveau", ENABLE_ARS_NOUVEAU_RECIPE_CONVERSION),
+                Map.entry("astralsorcery", ENABLE_ASTRAL_SORCERY_RECIPE_CONVERSION),
                 Map.entry("avaritia", ENABLE_AVARITIA_RECIPE_CONVERSION),
                 Map.entry("barbequesdelight", ENABLE_BARBEQUES_DELIGHT_RECIPE_CONVERSION),
                 Map.entry("bigreactors", ENABLE_BIG_REACTORS_RECIPE_CONVERSION),
+                Map.entry("botanypots", ENABLE_BOTANY_POTS_RECIPE_CONVERSION),
+                Map.entry("exdeorum", ENABLE_EX_DEORUM_RECIPE_CONVERSION),
                 Map.entry("brewinandchewin", ENABLE_BREWIN_AND_CHEWIN_RECIPE_CONVERSION),
                 Map.entry("casualnessdelight", ENABLE_CASUALNESS_DELIGHT_RECIPE_CONVERSION),
                 Map.entry("crabbersdelight", ENABLE_CRABBERS_DELIGHT_RECIPE_CONVERSION),
@@ -760,6 +778,7 @@ public class ConfigManager {
                 Map.entry("kaleidoscope_cookery", ENABLE_KALEIDOSCOPE_COOKERY_RECIPE_CONVERSION),
                 Map.entry("kaleidoscope_grilling", ENABLE_KALEIDOSCOPE_GRILLING_RECIPE_CONVERSION),
                 Map.entry("kaleidoscope_tavern", ENABLE_KALEIDOSCOPE_TAVERN_RECIPE_CONVERSION),
+                Map.entry("lychee", ENABLE_LYCHEE_RECIPE_CONVERSION),
                 Map.entry("malum", ENABLE_MALUM_RECIPE_CONVERSION),
                 Map.entry("mekanism", ENABLE_MEKANISM_RECIPE_CONVERSION),
                 Map.entry("mekanismgenerators", ENABLE_MEKANISM_GENERATORS_RECIPE_CONVERSION),
@@ -1024,6 +1043,15 @@ public class ConfigManager {
         return Math.max(64, Math.min(16384, getConfigValue(OMNIVERSAL_DECODE_CACHE_CAPACITY)));
     }
 
+    /**
+     * 万象样板编码后是否自动上传到同网格的样板总成。
+     *
+     * <p>关闭时样板保留在编码终端内，由玩家自行取出，行为与引入上传功能之前一致。</p>
+     */
+    public static boolean isOmniversalPatternAutoUploadEnabled() {
+        return getConfigValue(OMNIVERSAL_PATTERN_AUTO_UPLOAD);
+    }
+
     public static int getOreGeneratorSlots() {
         return Math.max(1, Math.min(540, getConfigValue(ORE_GENERATOR_SLOTS)));
     }
@@ -1074,18 +1102,6 @@ public class ConfigManager {
 
     public static int getBeefMagnetRangeZ() {
         return getConfigValue(BEEF_MAGNET_RANGE_Z);
-    }
-
-    public static List<String> getChainMiningEquivalentGroups() {
-        return readConfigList(CHAIN_MINING_EQUIVALENT_GROUPS);
-    }
-
-    /**
-     * 构造本次连锁扫描使用的"同类方块"判定。
-     * 每次扫描调用一次，返回的对象内部带有单次扫描的判定缓存，不要跨扫描复用。
-     */
-    public static ChainEquivalence getChainMiningEquivalence(Block origin) {
-        return chainMiningEquivalentGroups().forOrigin(origin);
     }
 
     public static double getBeefToolFlightSpeed() {
@@ -1394,19 +1410,6 @@ public class ConfigManager {
             }
         }
         return beefToolForceMiningBlacklistMatcher;
-    }
-
-    private static ChainMatchGroups chainMiningEquivalentGroups() {
-        List<String> configured = getChainMiningEquivalentGroups();
-        if (!configured.equals(cachedChainMiningEquivalentGroups)) {
-            synchronized (ConfigManager.class) {
-                if (!configured.equals(cachedChainMiningEquivalentGroups)) {
-                    chainMiningEquivalentGroups = new ChainMatchGroups(configured);
-                    cachedChainMiningEquivalentGroups = configured;
-                }
-            }
-        }
-        return chainMiningEquivalentGroups;
     }
 
 }

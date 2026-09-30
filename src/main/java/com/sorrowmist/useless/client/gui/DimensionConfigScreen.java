@@ -111,7 +111,11 @@ public final class DimensionConfigScreen extends AbstractContainerScreen<Dimensi
                 menu.getBoundaryIntervalZ(), menu::setBoundaryIntervalZ, false);
         roadWidthField = createNumberField(250, 128, 52,
                 Component.translatable("gui.useless_mod.dimension_config.road_width"),
-                menu.getRoadWidth(), menu::setRoadWidth, false);
+                menu.getRoadWidth(), value -> {
+                    menu.setRoadWidth(value);
+                    // 输入值低于下限时菜单会钳制，此处把输入框同步回实际生效值。
+                    if (menu.getRoadWidth() != value) syncFieldsFromMenu();
+                }, false);
 
         layersDown = addStepButton(106, 54, "-", layersField, -1, 1, 256,
                 "gui.useless_mod.dimension_config.tooltip.decrease");
@@ -130,9 +134,11 @@ public final class DimensionConfigScreen extends AbstractContainerScreen<Dimensi
                 "gui.useless_mod.dimension_config.tooltip.decrease");
         boundaryZUp = addStepButton(278, 100, "+", boundaryZField, 1, 0, 256,
                 "gui.useless_mod.dimension_config.tooltip.increase");
-        roadWidthDown = addStepButton(250, 146, "-", roadWidthField, -1, 0, 16,
+        roadWidthDown = addStepButton(250, 146, "-", roadWidthField, -1,
+                DimensionConfigMenu.MIN_ROAD_WIDTH, DimensionConfigMenu.MAX_ROAD_WIDTH,
                 "gui.useless_mod.dimension_config.tooltip.decrease");
-        roadWidthUp = addStepButton(278, 146, "+", roadWidthField, 1, 0, 16,
+        roadWidthUp = addStepButton(278, 146, "+", roadWidthField, 1,
+                DimensionConfigMenu.MIN_ROAD_WIDTH, DimensionConfigMenu.MAX_ROAD_WIDTH,
                 "gui.useless_mod.dimension_config.tooltip.increase");
 
         bedrockButton = addButton(236, 36, 84, 16, bedrockText(),
@@ -149,6 +155,8 @@ public final class DimensionConfigScreen extends AbstractContainerScreen<Dimensi
         modeButton = addButton(106, 128, 100, 16, modeText(),
                 "gui.useless_mod.dimension_config.tooltip.mode", button -> {
                     menu.cycleMode();
+                    // 切回马路模式时菜单会把道路宽度提升到下限，输入框需同步显示该值。
+                    syncFieldsFromMenu();
                     updateFeatureButtons();
                     updateControls();
                 });

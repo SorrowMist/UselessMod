@@ -147,6 +147,62 @@ public final class StaffLinkNetwork {
         return List.copyOf(seen.keySet());
     }
 
+    /**
+     * 把某个锚点挪到列表里的指定位置。
+     *
+     * <p>次序不是纯装饰：引擎在同一条线路上先按<b>权重</b>降序排，权重相同时保持这里的次序，
+     * 而 {@code distribute} 会把除不尽的余数留给靠前的那个 —— 所以同权重下「谁在前谁先拿」。</p>
+     *
+     * <p>参数是<b>目标下标</b>而不是「上移/下移一格」：界面上可能开着搜索过滤，可见邻居未必是
+     * 列表里的邻居。由客户端把「越过上一个可见行」翻译成目标下标，服务端只管照做，
+     * 这样过滤状态下也是「眼睛看到的那样动」。</p>
+     *
+     * <p>实现上是<b>重排 {@code routes} 本身</b>（锚点列表就是从它去重出来的）：这样不必再维护
+     * 一份独立的「顺序」数据，也就不会和增删锚点走岔；存档与网络同步本来就按列表顺序走，
+     * 于是自动一起生效。</p>
+     *
+     * @param targetIndex 目标位置，会被夹到合法范围内
+     * @return 是否真的移动了
+     */
+    public boolean moveAnchorTo(GlobalPos anchor, int targetIndex) {
+        List<GlobalPos> order = new ArrayList<>(anchors());
+        int index = order.indexOf(anchor);
+        if (index < 0 || order.isEmpty()) {
+            return false;
+        }
+        int target = Math.max(0, Math.min(targetIndex, order.size() - 1));
+        if (target == index) {
+            return false;
+        }
+        order.remove(index);
+        order.add(target, anchor);
+
+        // 按新的锚点顺序把各锚点的线路重新拼起来；锚点内部各线路的相对次序保持不变。
+        Map<GlobalPos, List<StaffLinkRoute>> grouped = new LinkedHashMap<>();
+        for (GlobalPos position : order) {
+            grouped.put(position, new ArrayList<>());
+        }
+        List<StaffLinkRoute> leftovers = new ArrayList<>();
+        for (StaffLinkRoute route : routes) {
+            List<StaffLinkRoute> bucket = grouped.get(route.anchor());
+            if (bucket == null) {
+                // 理论上不会发生（anchors() 就是从 routes 去重出来的）；真发生了也绝不能丢。
+                leftovers.add(route);
+            } else {
+                bucket.add(route);
+            }
+        }
+        List<StaffLinkRoute> reordered = new ArrayList<>(routes.size());
+        for (List<StaffLinkRoute> bucket : grouped.values()) {
+            reordered.addAll(bucket);
+        }
+        reordered.addAll(leftovers);
+
+        routes.clear();
+        routes.addAll(reordered);
+        return true;
+    }
+
     public boolean isBound(GlobalPos anchor) {
         for (StaffLinkRoute route : routes) {
             if (route.anchor().equals(anchor)) {

@@ -76,6 +76,9 @@ import com.sorrowmist.useless.content.recipe.adapters.naturesaura.NatureAltarRec
 import com.sorrowmist.useless.content.recipe.adapters.naturesaura.OfferingRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.naturesaura.TreeRitualRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.occultism.OccultismRitualRecipeAdapter;
+import com.sorrowmist.useless.content.recipe.adapters.astralsorcery.AltarRecipeAdapter;
+import com.sorrowmist.useless.content.recipe.adapters.astralsorcery.LightwellRecipeAdapter;
+import com.sorrowmist.useless.content.recipe.adapters.botanypots.BotanyPotsRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.powah.EnergizingRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.productivebees.BeeProduceRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.productivebees.BeeBreedingRecipeAdapter;
@@ -131,6 +134,17 @@ public final class RecipeAdapterCompatRegistry {
     public static final String POWAH = RecipeSourceIds.POWAH;
     public static final String EXTENDED_CRAFTING = RecipeSourceIds.EXTENDED_CRAFTING;
     public static final String AVARITIA = RecipeSourceIds.AVARITIA;
+
+    /**
+     * Re-Avaritia 与 AvaritiaNeo 均声明 modId {@code avaritia}，但包结构互不兼容：前者位于
+     * {@code committee.nova.mods.avaritia}，后者位于 {@code net.byAqua3.avaritia}。二者的显示名
+     * 分别为 {@code Re-Avaritia} 与 {@code Avaritia}，该差异不足以作为可靠判据，故改以 Re-Avaritia
+     * 独有的注册类作为判定依据：仅当该类可加载时才注册针对 Re-Avaritia 编写的适配器，否则适配器会在
+     * 取模具物品时抛出 {@link NoClassDefFoundError}。
+     */
+    private static final String RE_AVARITIA_REGISTRY_CLASS =
+            "committee.nova.mods.avaritia.init.registry.ModBlocks";
+
     public static final String NEO_ECO_AE = RecipeSourceIds.NEO_ECO_AE;
     public static final String NATURES_AURA = RecipeSourceIds.NATURES_AURA;
     public static final String FORBIDDEN_ARCANUS = RecipeSourceIds.FORBIDDEN_ARCANUS;
@@ -152,6 +166,11 @@ public final class RecipeAdapterCompatRegistry {
     public static final String HOSTILE_NETWORKS = RecipeSourceIds.HOSTILE_NETWORKS;
     public static final String APOTHIC_FLUX = RecipeSourceIds.APOTHIC_FLUX;
     public static final String FLUX_NETWORKS = RecipeSourceIds.FLUX_NETWORKS;
+    public static final String APOTHEOSIS = RecipeSourceIds.APOTHEOSIS;
+    public static final String LYCHEE = RecipeSourceIds.LYCHEE;
+    public static final String ASTRAL_SORCERY = RecipeSourceIds.ASTRAL_SORCERY;
+    public static final String BOTANY_POTS = RecipeSourceIds.BOTANY_POTS;
+    public static final String EX_DEORUM = RecipeSourceIds.EX_DEORUM;
 
     private static final List<CompatEntry> ENTRIES = List.of(
             new CompatEntry(null, RecipeAdapterCompatRegistry::registerMinecraft),
@@ -204,7 +223,12 @@ public final class RecipeAdapterCompatRegistry {
             new CompatEntry(IRONS_SPELLBOOKS, RecipeAdapterCompatRegistry::registerIronsSpellbooks),
             new CompatEntry(HOSTILE_NETWORKS, RecipeAdapterCompatRegistry::registerHostileNetworks),
             new CompatEntry(APOTHIC_FLUX, RecipeAdapterCompatRegistry::registerApothicFlux),
-            new CompatEntry(FLUX_NETWORKS, RecipeAdapterCompatRegistry::registerFluxNetworks)
+            new CompatEntry(FLUX_NETWORKS, RecipeAdapterCompatRegistry::registerFluxNetworks),
+            new CompatEntry(APOTHEOSIS, RecipeAdapterCompatRegistry::registerApotheosis),
+            new CompatEntry(LYCHEE, RecipeAdapterCompatRegistry::registerLychee),
+            new CompatEntry(ASTRAL_SORCERY, RecipeAdapterCompatRegistry::registerAstralSorcery),
+            new CompatEntry(BOTANY_POTS, RecipeAdapterCompatRegistry::registerBotanyPots),
+            new CompatEntry(EX_DEORUM, RecipeAdapterCompatRegistry::registerExDeorum)
     );
 
     private RecipeAdapterCompatRegistry() {}
@@ -217,6 +241,22 @@ public final class RecipeAdapterCompatRegistry {
 
     public static boolean isLoaded(String modId) {
         return ModList.get().isLoaded(modId);
+    }
+
+    /**
+     * 探测指定类能否被当前类加载器解析。传入 {@code initialize=false} 以避免触发目标类的静态初始化，
+     * 因此该探测本身不产生副作用；类缺失或其依赖不满足时返回 {@code false}，不向调用方抛出异常。
+     */
+    private static boolean isClassAvailable(String className) {
+        if (className == null || className.isBlank()) {
+            return false;
+        }
+        try {
+            Class.forName(className, false, RecipeAdapterCompatRegistry.class.getClassLoader());
+            return true;
+        } catch (ClassNotFoundException | LinkageError exception) {
+            return false;
+        }
     }
 
     private static void initCompat(FMLCommonSetupEvent event, @Nullable String modId, Runnable registerAction) {
@@ -435,6 +475,15 @@ public final class RecipeAdapterCompatRegistry {
     }
 
     private static void registerAvaritia() {
+        // 二级门禁：外层 CompatEntry 已确认 modId "avaritia" 存在，但 AvaritiaNeo 同样使用该 modId
+        // 且包结构完全不兼容。缺失该判定时，下列适配器会在取模具物品时抛出 NoClassDefFoundError，
+        // 该错误属于 Error 而非 Exception，会穿透 initCompat 的捕获并导致整局加载失败。
+        if (!isClassAvailable(RE_AVARITIA_REGISTRY_CLASS)) {
+            LOGGER.warn("Mod id {} is present but {} is not loadable; skipping Re-Avaritia recipe adapters. "
+                    + "A non Re-Avaritia implementation of this mod id is likely installed.",
+                    AVARITIA, RE_AVARITIA_REGISTRY_CLASS);
+            return;
+        }
         register(new ReAvaritiaSculkCraftingRecipeAdapter());
         register(new ReAvaritiaTableRecipeAdapter());
         register(new ReAvaritiaExtremeSmithingRecipeAdapter());
@@ -546,6 +595,47 @@ public final class RecipeAdapterCompatRegistry {
 
     private static void registerFluxNetworks() {
         register(new FluxNetworksRecipeAdapter());
+    }
+
+    private static void registerApotheosis() {
+        invokeOptionalLoader(
+                "com.sorrowmist.useless.compat.apotheosis.ApotheosisRecipeCompatLoader");
+    }
+
+    private static void registerLychee() {
+        invokeOptionalLoader(
+                "com.sorrowmist.useless.compat.lychee.LycheeRecipeCompatLoader");
+    }
+
+    private static void registerAstralSorcery() {
+        // 植物魔法（Mystical Agriculture）存在同名适配器，此处必须使用全限定名以避免简名冲突。
+        register(new com.sorrowmist.useless.content.recipe.adapters.astralsorcery.InfusionRecipeAdapter());
+        register(new LightwellRecipeAdapter());
+        register(new AltarRecipeAdapter());
+    }
+
+    private static void registerBotanyPots() {
+        register(new BotanyPotsRecipeAdapter());
+    }
+
+    /**
+     * 注册 Ex Deorum 的桶、坩埚、筛子与锤子配方适配器。
+     *
+     * <p>桶的四类配方（堆肥、物品混合、流体混合、流体转化）共用 {@code exdeorum:barrels}
+     * 物品标签作为模具，因此无需按石桶与木桶分别登记；坩埚与筛子的模具由材料注册表在运行时枚举。
+     * 筛子适配同时覆盖普通筛子与重型筛子，其模具由配方限定的筛网决定。</p>
+     *
+     * <p>锤子适配覆盖普通锤与压缩锤两类配方，模具按配方实际类型在转换阶段选定，固定为钻石锤与
+     * 钻石压缩锤。该适配器以生成配方方式提供结果，必须在此登记，否则其配方不会进入合金炉配方目录。</p>
+     */
+    private static void registerExDeorum() {
+        register(new com.sorrowmist.useless.content.recipe.adapters.exdeorum.BarrelCompostRecipeAdapter());
+        register(new com.sorrowmist.useless.content.recipe.adapters.exdeorum.BarrelMixingRecipeAdapter());
+        register(new com.sorrowmist.useless.content.recipe.adapters.exdeorum.BarrelFluidMixingRecipeAdapter());
+        register(new com.sorrowmist.useless.content.recipe.adapters.exdeorum.FluidTransformationRecipeAdapter());
+        register(new com.sorrowmist.useless.content.recipe.adapters.exdeorum.CrucibleRecipeAdapter());
+        register(new com.sorrowmist.useless.content.recipe.adapters.exdeorum.SieveRecipeAdapter());
+        register(new com.sorrowmist.useless.content.recipe.adapters.exdeorum.HammerRecipeAdapter());
     }
 
     private record CompatEntry(@Nullable String modId, Runnable registerAction) {}

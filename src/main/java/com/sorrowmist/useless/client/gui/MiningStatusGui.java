@@ -53,8 +53,9 @@ public class MiningStatusGui {
         }
 
         Component statusValue = Component.translatable(statusKey);
+        // 翻译键与显示名均使用本项目自有命名，不沿用 FTB Ultimine 的名称，以避免与该外部项目产生关联。
         Component statusLine = Component.translatable(
-                "gui.useless_mod.ultimine_status",
+                "gui.useless_mod.chain_mining_status",
                 statusValue
         );
 
@@ -66,10 +67,26 @@ public class MiningStatusGui {
         PlayerMiningData data = MiningDispatcher.getPlayerData(player);
         int count = data != null ? data.getCachedBlocks().size() : 0;
 
-        Component countText = Component.translatable(
-                "gui.useless_mod.mining_count",
-                count
-        );
+        // 形状行：仅在手持造化杖时显示，未持杖时该行无意义，直接留空以避免面板无谓增高。
+        // 名称后附方向说明：隧道与对角类形状的走向取决于点击面与玩家朝向，仅凭名称无法预判。
+        Component shapeText = isEndlessBeaf && data != null
+                ? Component.translatable("gui.useless_mod.shape_label",
+                                         Component.translatable(data.getShape().getTranslationKey()),
+                                         Component.translatable(data.getShape().getDescriptionKey()))
+                : Component.empty();
+
+        // 切换提示行：与形状行同样只在手持造化杖时出现，说明滚轮组合键，
+        // 否则玩家没有任何途径得知形状可以切换。
+        Component hintText = isEndlessBeaf
+                ? Component.translatable("gui.useless_mod.shape_hint")
+                : Component.empty();
+
+        // 数量行显示「本次预览 / 配置上限」。上限为 0 表示客户端尚未收到同步，
+        // 此时只显示当前数量，避免出现「N / 0」这类无意义读数。
+        int maxBlocks = data != null ? data.getMaxBlocks() : 0;
+        Component countText = maxBlocks > 0
+                ? Component.translatable("gui.useless_mod.mining_count_limit", count, maxBlocks)
+                : Component.translatable("gui.useless_mod.mining_count", count);
 
         int forceColor = forceMiningEnabled ? COLOR_FORCE_ON : COLOR_MUTED;
 
@@ -82,11 +99,14 @@ public class MiningStatusGui {
                 mc.font.width(statusLine),
                 Math.max(
                         mc.font.width(forceLabel) + mc.font.width(forceValue),
-                        mc.font.width(countText)
+                        Math.max(mc.font.width(countText),
+                                 Math.max(mc.font.width(shapeText), mc.font.width(hintText)))
                 )
         ) + padding * 2 + 6;
 
-        int height = padding * 2 + lineHeight * 3 + lineSpacing * 2 + 1;
+        // 形状行与切换提示行仅在手持造化杖时存在，面板高度随之增减两行，避免空行占位
+        int extraLines = shapeText.getString().isEmpty() ? 0 : 2;
+        int height = padding * 2 + lineHeight * (3 + extraLines) + lineSpacing * (2 + extraLines) + 1;
 
         int x = 0;
         int y = 0;
@@ -139,5 +159,12 @@ public class MiningStatusGui {
                      0xFFFFFFFF,
                      true
         );
+
+        // 第四、五行：连锁形状与切换提示（仅手持造化杖时绘制）
+        if (extraLines > 0) {
+            int shapeY = line3Y + lineHeight + lineSpacing;
+            g.drawString(mc.font, shapeText, textX, shapeY, 0xFFFFFFFF, true);
+            g.drawString(mc.font, hintText, textX, shapeY + lineHeight + lineSpacing, COLOR_MUTED, true);
+        }
     }
 }

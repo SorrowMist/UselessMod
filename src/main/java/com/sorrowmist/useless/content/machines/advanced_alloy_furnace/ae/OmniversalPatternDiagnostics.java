@@ -115,6 +115,27 @@ public final class OmniversalPatternDiagnostics {
         }
     }
 
+    /** 编码终端产出的万象样板已移交至多方块样板总成，终端源槽位随即清空。 */
+    public static void uploaded(Object target) {
+        if (LOGGER.isDebugEnabled()) {
+            LOGGER.debug("omniversal pattern uploaded to pattern assembly at {}", target);
+        }
+    }
+
+    /** 网络中已存在输入、输出、模具与配方完全一致的万象样板，本次未写入总成。 */
+    public static void uploadDuplicate() {
+        if (LOGGER.isDebugEnabled()) {
+            LOGGER.debug("omniversal pattern upload skipped: an equivalent pattern already exists");
+        }
+    }
+
+    /** 未执行移交，样板保留在编码终端内。常见于网格上没有多方块样板总成的情形。 */
+    public static void uploadSkipped(String reason) {
+        if (LOGGER.isDebugEnabled()) {
+            LOGGER.debug("omniversal pattern upload skipped: {}", reason);
+        }
+    }
+
     private static boolean warnLimited(String key) {
         int count = WARNING_COUNTS.computeIfAbsent(key, ignored -> new AtomicInteger()).incrementAndGet();
         return count <= MAX_WARNINGS_PER_KEY;

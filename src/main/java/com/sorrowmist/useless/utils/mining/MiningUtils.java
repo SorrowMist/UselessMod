@@ -4,12 +4,17 @@ import com.mojang.logging.LogUtils;
 import com.sorrowmist.useless.api.enums.tool.EnchantMode;
 import com.sorrowmist.useless.compat.AE2Compat;
 import com.sorrowmist.useless.compat.DraconicEvolutionCompat;
+import com.sorrowmist.useless.compat.exdeorum.ExDeorumCompat;
 import com.sorrowmist.useless.core.component.UComponents;
 import com.sorrowmist.useless.core.config.ChainEquivalence;
+import com.sorrowmist.useless.core.config.ChainGroupManager;
 import com.sorrowmist.useless.core.config.ConfigManager;
 import com.sorrowmist.useless.utils.UComponentUtils;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
+import com.sorrowmist.useless.utils.mining.shape.ChainMiningShapeContext;
+import com.sorrowmist.useless.utils.mining.shape.ChainMiningShapes;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.sounds.SoundSource;
@@ -110,7 +115,7 @@ public class MiningUtils {
         return drops.isEmpty() || drops.stream().allMatch(stack -> stack.isEmpty() || stack.is(Items.AIR));
     }
 
-    static boolean canMineBlock(BlockState state, ItemStack tool, boolean forceMining) {
+    public static boolean canMineBlock(BlockState state, ItemStack tool, boolean forceMining) {
         return forceMining || !state.requiresCorrectToolForDrops() || tool.isCorrectToolForDrops(state);
     }
 
@@ -151,13 +156,51 @@ public class MiningUtils {
             MiningResult result = forceMining
                     ? forceMineBlock(level, pos, state, player, tool)
                     : mineBlock(level, pos, state, player, tool);
-            handleDrops(player, result.drops(), tool, Vec3.atCenterOf(pos));
+            List<ItemStack> drops = applyExDeorumDrops(level, state, result.drops(), tool, pos, player);
+            handleDrops(player, drops, tool, Vec3.atCenterOf(pos));
             if (result.experience() > 0) {
                 player.giveExperiencePoints(result.experience());
             }
         } catch (Throwable failure) {
             reportBlockBreakFailure(state, pos, failure);
         }
+    }
+
+    /**
+     * 按造化杖上启用的 Ex Deorum 模式改写破坏掉落。
+     *
+     * <p>Ex Deorum 的三个工具效果由其 GlobalLootModifier 依工具标签触发，
+     * 而造化杖不在这些标签内，故此处显式调用其配方缓存完成等价改写。</p>
+     *
+     * <p>未安装 Ex Deorum 或三个模式均未启用时原样返回入参，
+     * 保证未启用该兼容时的行为与改动前完全一致。</p>
+     *
+     * <p>此处不以原始掉落为空作为提前返回条件：锤子与压缩锤以配方产物替换掉落，
+     * 而 Ex Deorum 的锤子配方可覆盖自身无自然掉落的方块（如圆石产出沙砾），
+     * 若在此跳过，此类方块将无法获得配方产物。</p>
+     *
+     * @param level  服务端世界
+     * @param state  被破坏的方块状态
+     * @param drops  原始掉落
+     * @param tool   造化杖
+     * @return 改写后的掉落列表
+     */
+    static List<ItemStack> applyExDeorumDrops(ServerLevel level, BlockState state,
+                                              List<ItemStack> drops, ItemStack tool,
+                                              BlockPos pos, Player player) {
+        if (!ExDeorumCompat.isLoaded()) {
+            return drops;
+        }
+
+        boolean hammer = UComponentUtils.isExDeorumHammerEnabled(tool);
+        boolean compressedHammer = UComponentUtils.isExDeorumCompressedHammerEnabled(tool);
+        boolean crook = UComponentUtils.isExDeorumCrookEnabled(tool);
+        if (!hammer && !compressedHammer && !crook) {
+            return drops;
+        }
+
+        return ExDeorumCompat.rewriteDrops(level, state, drops, tool,
+                hammer, compressedHammer, crook, pos, player);
     }
 
     static MiningResult mineBlock(ServerLevel level, BlockPos pos, BlockState state, Player player, ItemStack tool) {
@@ -234,6 +277,7 @@ public class MiningUtils {
         // getDrops / playerWillDestroy 都会抛，异常冒回事件总线就会打断整 tick。
         try {
             List<ItemStack> drops = Block.getDrops(state, serverLevel, pos, blockEntity, player, tool);
+            drops = applyExDeorumDrops(serverLevel, state, drops, tool, pos, player);
             handleDrops(player, drops, tool, Vec3.atCenterOf(pos));
 
             world.destroyBlock(pos, false, player);
@@ -311,6 +355,19 @@ public class MiningUtils {
      * @param dropOrigin 磁力关闭时的落地点（AE 无法存入的部分亦落于此）
      */
     public static void handleDrops(Player player, List<ItemStack> drops, ItemStack tool, Vec3 dropOrigin) {
+        handleDrops(player, drops, tool, dropOrigin, true);
+    }
+
+    /**
+     * 与 {@link #handleDrops(Player, List, ItemStack, Vec3)} 相同，但可以关掉 AE 分支。
+     *
+     * <p>捕捉（刷怪蛋）走的是 {@code allowAe = false}：刷怪蛋是玩家想立刻拿在手上的东西，
+     * 不该被「AE 存储优先」吸进网络里，只按「范围磁力」决定进背包还是落地。</p>
+     *
+     * @param allowAe 是否允许走「AE 存储优先」分支
+     */
+    public static void handleDrops(Player player, List<ItemStack> drops, ItemStack tool, Vec3 dropOrigin,
+                                   boolean allowAe) {
         boolean isAE2Loaded = ModList.get().isLoaded("ae2");
         boolean magnetEnabled = UComponentUtils.isBeefMagnetEnabled(tool);
 
@@ -322,7 +379,8 @@ public class MiningUtils {
             if (drop.isEmpty()) continue;
 
             // 1. 尝试存入 AE2 (内部处理跨维度)
-            if (isAE2Loaded
+            if (allowAe
+                    && isAE2Loaded
                     && UComponentUtils.isAEStoragePriorityEnabled(tool)
                     && tool.has(UComponents.WIRELESS_LINK_TARGET.get())) {
                 try {
@@ -374,11 +432,15 @@ public class MiningUtils {
      * @param level       世界
      * @param stack       工具
      * @param forceMining 是否为强制挖掘模式
+     * @param shape       连锁形状
+     * @param face        玩家点击的面
+     * @param player      触发连锁的玩家，用于取该玩家自己的等价组
      * @return 需要破坏的方块列表
      */
     static List<BlockPos> scanBlocksToMine(BlockPos originPos, BlockState originState, Level level, ItemStack stack,
-                                           boolean forceMining, boolean enhanced) {
-        return scanBlocks(originPos, originState, level, stack, forceMining, enhanced, true);
+                                           boolean forceMining, boolean enhanced, ChainMiningShapes shape,
+                                           Direction face, Player player) {
+        return scanBlocks(originPos, originState, level, stack, forceMining, enhanced, true, shape, face, player);
     }
 
     /**
@@ -391,10 +453,14 @@ public class MiningUtils {
      * @param originState 原点方块状态
      * @param level       世界
      * @param enhanced    是否增强连锁（增强模式取消相邻限制，改为范围内扫描）
-     * @return 连锁范围（含原点，按距离从近到远排序）
+     * @param shape       连锁形状
+     * @param face        玩家点击的面
+     * @param player      触发连锁的玩家
+     * @return 连锁范围（含原点，按挖掘顺序排列）
      */
-    static List<BlockPos> scanBlocksForUse(BlockPos originPos, BlockState originState, Level level, boolean enhanced) {
-        return scanBlocks(originPos, originState, level, ItemStack.EMPTY, false, enhanced, false);
+    static List<BlockPos> scanBlocksForUse(BlockPos originPos, BlockState originState, Level level, boolean enhanced,
+                                           ChainMiningShapes shape, Direction face, Player player) {
+        return scanBlocks(originPos, originState, level, ItemStack.EMPTY, false, enhanced, false, shape, face, player);
     }
 
     /**
@@ -404,12 +470,16 @@ public class MiningUtils {
      *                        false = 右键语义（只看等价组与范围）
      */
     private static List<BlockPos> scanBlocks(BlockPos originPos, BlockState originState, Level level, ItemStack stack,
-                                             boolean forceMining, boolean enhanced, boolean requireMineable) {
+                                             boolean forceMining, boolean enhanced, boolean requireMineable,
+ChainMiningShapes shape, Direction face, Player player) {
         if (forceMining && isForceMiningBlacklisted(originState)) {
             return List.of();
         }
+        if (shape != null && !shape.usesBuiltinScan()) {
+            return scanShapeBlocks(originPos, originState, level, stack, forceMining, requireMineable, shape, face, player);
+        }
         if (enhanced) {
-            return scanAreaBlocks(originPos, originState, level, stack, forceMining, requireMineable);
+            return scanAreaBlocks(originPos, originState, level, stack, forceMining, requireMineable, player);
         }
         // 最大连锁数量
         int maxBlocks = ConfigManager.getChainMiningMaxBlocks();
@@ -418,8 +488,8 @@ public class MiningUtils {
         int rangeY = ConfigManager.getChainMiningRangeY();
         int rangeZ = ConfigManager.getChainMiningRangeZ();
 
-        // 同类方块判定：命中配置的等价组时按组匹配，否则退回严格同方块
-        ChainEquivalence equivalence = ConfigManager.getChainMiningEquivalence(originState.getBlock());
+        // 同类方块判定：玩家自己的等价组命中时按组匹配，否则退回严格同方块
+        ChainEquivalence equivalence = ChainGroupManager.equivalenceFor(player, originState.getBlock());
         List<BlockPos> blocksToMine = new ArrayList<>(maxBlocks);
 
         // 检查原点方块是否可以被挖掘（工具等级检查）
@@ -481,9 +551,64 @@ public class MiningUtils {
         return blocksToMine;
     }
 
-    private static boolean isForceMiningBlacklisted(BlockState state) {
+    public static boolean isForceMiningBlacklisted(BlockState state) {
         return ConfigManager.isBeefToolForceMiningBlockBlacklisted(
                 BuiltInRegistries.BLOCK.getKey(state.getBlock()));
+    }
+
+    /**
+     * 按指定形状查找需要破坏的方块。
+     *
+     * <p>形状负责布局，某个坐标是否可用仍由 {@link ChainMiningShapeContext#check} 依据等价组、
+     * 范围、工具可采集与强制挖掘黑名单判定，因此形状实现无需重复这些规则。
+     *
+     * <p>返回序列保持形状给出的挖掘顺序并截断到数量上限；布局重叠导致的重复坐标会被去重，
+     * 避免同一格被破坏两次。原点方块不可采集时返回空列表，与相邻扩散扫描的既有语义一致。
+     *
+     * @param originPos       原点位置
+     * @param originState     原点方块状态
+     * @param level           世界
+     * @param stack           工具
+     * @param forceMining     是否为强制挖掘模式
+     * @param requireMineable 是否需要「工具可采集」门槛
+     * @param shape           连锁形状
+     * @param face            玩家点击的面
+     * @param player          触发连锁的玩家
+     * @return 需要破坏的方块列表
+     */
+    private static List<BlockPos> scanShapeBlocks(BlockPos originPos, BlockState originState, Level level,
+                                                  ItemStack stack, boolean forceMining, boolean requireMineable,
+                                                  ChainMiningShapes shape, Direction face, Player player) {
+        if (requireMineable && !canMineBlock(originState, stack, forceMining)) {
+            return List.of();
+        }
+
+        int maxBlocks = ConfigManager.getChainMiningMaxBlocks();
+        // 同类方块判定：玩家自己的等价组命中时按组匹配，否则退回严格同方块
+        ChainEquivalence equivalence = ChainGroupManager.equivalenceFor(player, originState.getBlock());
+        ChainMiningShapeContext context = new ChainMiningShapeContext(
+                level, originPos, originState, face, player, stack, equivalence,
+                forceMining, requireMineable, maxBlocks,
+                ConfigManager.getChainMiningRangeX(), ConfigManager.getChainMiningRangeY(),
+                ConfigManager.getChainMiningRangeZ());
+
+        List<BlockPos> shapeBlocks = shape.getBlocks(context);
+        List<BlockPos> blocksToMine = new ArrayList<>(Math.min(shapeBlocks.size(), maxBlocks));
+        LongOpenHashSet seen = new LongOpenHashSet(Math.max(16, shapeBlocks.size() * 2));
+        for (BlockPos pos : shapeBlocks) {
+            if (blocksToMine.size() >= maxBlocks) {
+                break;
+            }
+            if (!seen.add(pos.asLong())) {
+                continue;
+            }
+            if (forceMining && isForceMiningBlacklisted(level.getBlockState(pos))) {
+                continue;
+            }
+            blocksToMine.add(pos);
+        }
+
+        return blocksToMine;
     }
 
     /**
@@ -495,10 +620,12 @@ public class MiningUtils {
      * @param level       世界
      * @param stack       工具
      * @param forceMining 是否为强制挖掘模式
+     * @param player      触发连锁的玩家，用于取该玩家自己的等价组
      * @return 需要破坏的方块列表
      */
     private static List<BlockPos> scanAreaBlocks(BlockPos originPos, BlockState originState, Level level,
-                                                 ItemStack stack, boolean forceMining, boolean requireMineable) {
+                                                 ItemStack stack, boolean forceMining, boolean requireMineable,
+                                                 Player player) {
         // 最大连锁数量（包含原点方块）
         int maxBlocks = ConfigManager.getChainMiningMaxBlocks();
         // 获取连锁挖掘范围
@@ -506,8 +633,8 @@ public class MiningUtils {
         int rangeY = ConfigManager.getChainMiningRangeY();
         int rangeZ = ConfigManager.getChainMiningRangeZ();
 
-        // 同类方块判定：命中配置的等价组时按组匹配，否则退回严格同方块
-        ChainEquivalence equivalence = ConfigManager.getChainMiningEquivalence(originState.getBlock());
+        // 同类方块判定：玩家自己的等价组命中时按组匹配，否则退回严格同方块
+        ChainEquivalence equivalence = ChainGroupManager.equivalenceFor(player, originState.getBlock());
         List<BlockPos> blocksToMine = new ArrayList<>(maxBlocks);
 
         // 增强连锁：直接在范围内扫描所有相同方块，不需要相邻限制
@@ -667,5 +794,28 @@ public class MiningUtils {
             return ((BlockHitResult) hitResult).getBlockPos();
         }
         return null;
+    }
+
+    /**
+     * 获取形状推进所依据的面。
+     *
+     * <p>隧道类形状按「该面的反方向」推进，因此命中方块时取点击面，其反方向即远离玩家、
+     * 指向方块内部的方向，与玩家对连锁走向的预期一致。
+     *
+     * <p>未命中任何方块时没有真实点击面可用，此时退化为玩家朝向的反方向：该方向的反方向
+     * 恰为玩家朝向，使推进仍沿视线向前。若直接返回玩家朝向，推进方向会反转成玩家背后，
+     * 与视线方向相反。
+     *
+     * @param player 玩家
+     * @return 命中面，未命中时为玩家朝向的反方向
+     */
+    static Direction getTargetFace(Player player) {
+        double reach = player.getAttributeValue(Attributes.BLOCK_INTERACTION_RANGE);
+        HitResult hitResult = player.pick(reach, 0.0f, false);
+
+        if (hitResult.getType() == HitResult.Type.BLOCK) {
+            return ((BlockHitResult) hitResult).getDirection();
+        }
+        return player.getDirection().getOpposite();
     }
 }

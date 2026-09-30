@@ -3,5 +3,17 @@
     "sounds": [
       "useless_mod:howl"
     ]
+  },
+  "kill_aura_on": {
+    "subtitle": "subtitles.useless_mod.kill_aura_on",
+    "sounds": [
+      "useless_mod:kill_aura_on"
+    ]
+  },
+  "kill_aura_off": {
+    "subtitle": "subtitles.useless_mod.kill_aura_off",
+    "sounds": [
+      "useless_mod:kill_aura_off"
+    ]
   }
 }

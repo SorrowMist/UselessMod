@@ -34,8 +34,6 @@ import java.util.OptionalLong;
 import java.util.Set;
 import java.util.WeakHashMap;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import org.slf4j.Logger;
@@ -53,19 +51,6 @@ public final class AlloyFurnaceRecipeCatalog {
     private static final Map<Object, Long> GENERATIONS = new WeakHashMap<>();
     private static final AtomicInteger CURRENT_RECIPE_COUNT = new AtomicInteger();
     private static final AtomicLong GENERATION = new AtomicLong();
-    /**
-     * 后台目录构建器。目录构建是纯 CPU 密集工作（数万条配方的转换与指纹计算），若放在世界
-     * 加载的关键路径上会直接阻塞玩家进入（实测服务端启动那次耗时 20 秒）。
-     *
-     * <p>刻意用独立的单线程执行器而不是 {@code ForkJoinPool.commonPool()}：后者是全局共享
-     * 资源，不该被一次目录构建长时间占满；单线程也天然保证同一时刻只有一个后台构建在跑。
-     * 守护线程避免进程退出时被这类构建任务拖住。</p>
-     */
-    private static final ExecutorService BUILD_EXECUTOR = Executors.newSingleThreadExecutor(runnable -> {
-        Thread thread = new Thread(runnable, "useless-recipe-catalog-builder");
-        thread.setDaemon(true);
-        return thread;
-    });
 
     private AlloyFurnaceRecipeCatalog() {
     }
@@ -99,33 +84,11 @@ public final class AlloyFurnaceRecipeCatalog {
     /**
      * 返回当前世代快照是否已构建完成、可供查询。
      *
-     * <p>供调用方在把构建挪到后台后轮询「何时可以安全地消费目录」——例如客户端要在目录就绪
-     * 后再刷新 JEI 展示，而不是在构建中途读到空列表。</p>
+     * <p>供调用方判断「此刻能否安全消费目录」——例如客户端要在目录就绪后再刷新 JEI 展示，
+     * 以及延迟任务要在目录就绪后再解码样板，避免在构建完成前读到空列表。</p>
      */
     public static boolean isReady(Level level) {
         return level != null && snapshotIfReady(level) != null;
-    }
-
-    /**
-     * 在后台线程构建并发布当前世代快照，立即返回。
-     *
-     * <p>用于「只是想让目录早点就绪、但没人正在等它」的场合，典型就是服务器启动与数据包重载：
-     * 那里调用 {@link #prewarm} 会把整段构建时间压在世界加载的关键路径上。查询路径本身是安全的——
-     * 所有 {@code resolve*} 都走 {@link #snapshotIfReady}（未就绪返回空），只有 {@link #entries}
-     * 才触发同步构建，所以后台构建期间不会有查询读到半成品。</p>
-     *
-     * <p>构建若失败只记日志：目录随后会由查询路径按需重建，不该因为一次预热失败而中断世界加载。</p>
-     */
-    public static void prewarmAsync(Level level) {
-        if (level == null) return;
-        BUILD_EXECUTOR.execute(() -> {
-            try {
-                snapshot(level);
-            } catch (RuntimeException exception) {
-                LOGGER.warn("Background alloy-furnace recipe catalog build failed; "
-                        + "it will be rebuilt on demand", exception);
-            }
-        });
     }
 
     public static List<AdvancedAlloyFurnaceRecipe> recipes(Level level) {
@@ -562,7 +525,6 @@ public final class AlloyFurnaceRecipeCatalog {
                 .getAllRecipesFor(ModRecipeTypes.ADVANCED_ALLOY_FURNACE_TYPE.get())) {
             recipes.add(new CollectedRecipe(holder.value(), RecipeSourceIds.CORE));
         }
-
         // 先把 adapter 分成「合成配方」与「转换配方」两类。转换类只在这里登记，稍后对全表做单次遍历，
         // 避免每个 adapter 都把整张配方表扫一遍（adapter 数量 × 全服配方数）。
         List<AdapterSource> converting = new ArrayList<>();
@@ -580,12 +542,12 @@ public final class AlloyFurnaceRecipeCatalog {
             collectGenerated(adapter, sourceId, level, recipes);
             converting.add(new AdapterSource(adapter, sourceId));
         }
+
         collectConverted(converting, level.getRecipeManager().getRecipes(), level, recipes);
         if (RecipeAdapterCompatRegistry.isLoaded(RecipeAdapterCompatRegistry.AE2LT)) {
             AELightningTechCompatLoader.getJeiRecipes(level.getRecipeManager(), level)
                     .forEach(recipe -> recipes.add(new CollectedRecipe(recipe, RecipeSourceIds.AE2LT)));
         }
-
         // 指纹计算是纯 CPU 密集操作（codec 整条编码 + 成分规范化 + canonicalize + SHA-256），
         // 数万条配方时它占据了目录构建剩余耗时的绝大部分。这里并行计算指纹，再按原有先后
         // 顺序合并：putIfAbsent 的次序与串行版本完全一致，去重结果因此保持不变。

@@ -12,6 +12,7 @@ import net.minecraft.core.registries.Registries;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceKey;
+import net.minecraft.util.Mth;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.MenuProvider;
@@ -46,6 +47,10 @@ public final class DimensionConfigMenu extends AbstractContainerMenu {
     public static final int ROAD_C_SLOT = 7;
     public static final int CENTER_MARKER_SLOT = 8;
     public static final int GHOST_SLOT_COUNT = 9;
+    /** 道路宽度下限：为零时道路布局不生成，道路与边界槽位也会随之隐藏。 */
+    public static final int MIN_ROAD_WIDTH = 1;
+    /** 道路宽度上限，与 {@link DimensionGenerationConfig.Features#normalized()} 的钳制范围一致。 */
+    public static final int MAX_ROAD_WIDTH = 16;
 
     private final UUID playerId;
     private final ResourceKey<Level> targetDimension;
@@ -100,6 +105,7 @@ public final class DimensionConfigMenu extends AbstractContainerMenu {
         this.boundaryIntervalZ = config.boundaryIntervalZ();
         this.roadWidth = config.roadWidth();
         this.mode = config.mode();
+        normalizeRoadWidth();
         this.centerMarkerEnabled = config.centerMarkerEnabled();
         this.generateBedrock = config.generateBedrock();
         this.bedrockAtBottom = config.bedrockAtBottom();
@@ -208,7 +214,22 @@ public final class DimensionConfigMenu extends AbstractContainerMenu {
     /** 模式按钮：在马路与多联之间循环。 */
     public void cycleMode() {
         mode = mode.next();
+        normalizeRoadWidth();
         updateSlotVisibility();
+    }
+
+    /**
+     * 马路模式下道路宽度至少为 1。
+     *
+     * <p>边界与道路槽位的可见性依赖 {@link #isRoadFeatureEnabled()}，而该判定包含
+     * 道路宽度大于零这一条件。若宽度为零，切换到马路模式后这些槽位仍整体隐藏，
+     * 玩家必须先手动把宽度改为正值才能看到其方块预设。因此在进入马路模式时
+     * 直接把宽度提升到最小值，使槽位随模式切换一同出现。
+     */
+    private void normalizeRoadWidth() {
+        if (mode == DimensionGenerationConfig.Mode.ROAD && roadWidth < 1) {
+            roadWidth = 1;
+        }
     }
 
     /** 按当前模式刷新幽灵槽位的显示状态：多联模式隐藏边界与道路相关槽位。 */
@@ -247,7 +268,7 @@ public final class DimensionConfigMenu extends AbstractContainerMenu {
     }
 
     public void setRoadWidth(int value) {
-        roadWidth = value;
+        roadWidth = Mth.clamp(value, MIN_ROAD_WIDTH, MAX_ROAD_WIDTH);
     }
 
     /** 边界间隔配置在马路模式下表示道路间隔，在多联模式下表示合并尺寸，因此始终显示。 */
@@ -424,6 +445,7 @@ public final class DimensionConfigMenu extends AbstractContainerMenu {
         boundaryIntervalZ = config.boundaryIntervalZ();
         roadWidth = config.roadWidth();
         mode = config.mode();
+        normalizeRoadWidth();
         updateSlotVisibility();
         centerMarkerEnabled = config.centerMarkerEnabled();
         generateBedrock = config.generateBedrock();

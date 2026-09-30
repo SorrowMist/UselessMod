@@ -1,6 +1,9 @@
 package com.sorrowmist.useless.compat.ars;
 
 import com.sorrowmist.useless.UselessMod;
+import com.sorrowmist.useless.content.stafflink.SourceHandlerView;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.level.Level;
 import net.neoforged.fml.ModList;
 import org.jetbrains.annotations.Nullable;
 
@@ -42,5 +45,12 @@ public final class ArsSourceCompatLoader {
 
     public static boolean isAvailable() {
         return bridge() != null;
+    }
+
+    /** 该坐标的方块魔源端点；不是魔源容器或未加载 Ars Nouveau 时返回 {@code null}。 */
+    @Nullable
+    public static SourceHandlerView sourceHandler(Level level, BlockPos pos) {
+        SourceBridge resolved = bridge();
+        return resolved == null ? null : resolved.sourceHandler(level, pos);
     }
 }

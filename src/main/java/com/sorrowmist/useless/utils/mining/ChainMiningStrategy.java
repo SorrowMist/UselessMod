@@ -1,7 +1,7 @@
 package com.sorrowmist.useless.utils.mining;
 
 import com.sorrowmist.useless.core.config.ChainEquivalence;
-import com.sorrowmist.useless.core.config.ConfigManager;
+import com.sorrowmist.useless.core.config.ChainGroupManager;
 import com.sorrowmist.useless.data.PlayerMiningData;
 import com.sorrowmist.useless.utils.UComponentUtils;
 import net.minecraft.core.BlockPos;
@@ -75,7 +75,8 @@ public class ChainMiningStrategy implements MiningStrategy {
             blocksToMine = playerData.getCachedBlocks();
         } else {
             blocksToMine = MiningUtils.scanBlocksToMine(
-                    pos, originState, level, hand, forceMining, this.enhanced);
+                    pos, originState, level, hand, forceMining, this.enhanced,
+                    playerData.getShape(), MiningUtils.getTargetFace(player), player);
         }
 
         if (blocksToMine.isEmpty()) {
@@ -87,7 +88,7 @@ public class ChainMiningStrategy implements MiningStrategy {
         int actualMinedCount = 0;
         int totalExperience = 0;
         // 破坏前二次校验必须与扫描阶段使用同一套判定，否则等价组扩出的方块会在此被全部跳过
-        ChainEquivalence equivalence = ConfigManager.getChainMiningEquivalence(originState.getBlock());
+        ChainEquivalence equivalence = ChainGroupManager.equivalenceFor(player, originState.getBlock());
 
         for (BlockPos targetPos : blocksToMine) {
             BlockState currentState = level.getBlockState(targetPos);
@@ -103,7 +104,10 @@ public class ChainMiningStrategy implements MiningStrategy {
                         ? MiningUtils.forceMineBlock(level, targetPos, currentState, player, hand)
                         : MiningUtils.mineBlock(level, targetPos, currentState, player, hand);
                 if (result.mined()) {
-                    allDrops.addAll(result.drops());
+                    // 逐格改写：Ex Deorum 的锤子与钩子配方均以方块为索引键，
+                    // 连锁覆盖的不同方块可能命中不同配方，故不能汇总后再统一处理。
+                    allDrops.addAll(MiningUtils.applyExDeorumDrops(
+                            level, currentState, result.drops(), hand, targetPos, player));
                     totalExperience += result.experience();
                     actualMinedCount++;
                 }

@@ -219,6 +219,48 @@ public final class UComponents {
                            ))
             );
 
+    /**
+     * Ex Deorum 钩子模式（ExDeorumCrook）
+     * true = 破坏方块时按 Ex Deorum 的钩子配方额外产出掉落（如树叶的蚕、线）。
+     * 仅在安装了 exdeorum 时该模式才会出现在模式轮盘里。
+     */
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<Boolean>> ExDeorumCrookComponent =
+            register("exdeorum_crook", builder ->
+                    builder.persistent(Codec.BOOL)
+                           .networkSynchronized(StreamCodec.of(
+                                   FriendlyByteBuf::writeBoolean,
+                                   FriendlyByteBuf::readBoolean
+                           ))
+            );
+
+    /**
+     * Ex Deorum 锤子模式（ExDeorumHammer）
+     * true = 破坏方块时按 Ex Deorum 的锤子配方改写掉落，替代方块原有掉落。
+     * 仅在安装了 exdeorum 时该模式才会出现在模式轮盘里。
+     */
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<Boolean>> ExDeorumHammerComponent =
+            register("exdeorum_hammer", builder ->
+                    builder.persistent(Codec.BOOL)
+                           .networkSynchronized(StreamCodec.of(
+                                   FriendlyByteBuf::writeBoolean,
+                                   FriendlyByteBuf::readBoolean
+                           ))
+            );
+
+    /**
+     * Ex Deorum 压缩锤模式（ExDeorumCompressedHammer）
+     * true = 破坏方块时按 Ex Deorum 的压缩锤配方改写掉落。压缩锤配方与普通锤配方是两套
+     * 独立数据，因此单列为一项开关。仅在安装了 exdeorum 时该模式才会出现在模式轮盘里。
+     */
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<Boolean>> ExDeorumCompressedHammerComponent =
+            register("exdeorum_compressed_hammer", builder ->
+                    builder.persistent(Codec.BOOL)
+                           .networkSynchronized(StreamCodec.of(
+                                   FriendlyByteBuf::writeBoolean,
+                                   FriendlyByteBuf::readBoolean
+                           ))
+            );
+
     public static final DeferredHolder<DataComponentType<?>, DataComponentType<Boolean>> ForceKillEnabledComponent =
             register("force_kill_enabled", builder ->
                     builder.persistent(Codec.BOOL)
@@ -319,6 +361,34 @@ public final class UComponents {
      */
     public static final DeferredHolder<DataComponentType<?>, DataComponentType<Boolean>> BeefMagnetEnabledComponent =
             register("beef_magnet_enabled", builder ->
+                    builder.persistent(Codec.BOOL)
+                           .networkSynchronized(StreamCodec.of(
+                                   FriendlyByteBuf::writeBoolean,
+                                   FriendlyByteBuf::readBoolean
+                           ))
+            );
+
+    /**
+     * 杀戮光环组件（BeefKillAura）
+     * 用于在物品上存储是否启用杀戮光环（布尔类型）
+     * true = 手持造化杖时每 20 tick 对「范围伤害」配置范围内生物结算一次攻击伤害
+     */
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<Boolean>> BeefKillAuraComponent =
+            register("beef_kill_aura", builder ->
+                    builder.persistent(Codec.BOOL)
+                           .networkSynchronized(StreamCodec.of(
+                                   FriendlyByteBuf::writeBoolean,
+                                   FriendlyByteBuf::readBoolean
+                           ))
+            );
+
+    /**
+     * 保护名单模式组件（BeefProtectMode）
+     * true = 开启：暂停杀戮光环与范围伤害的结算，方便玩家从容地 Ctrl/Shift 右键添加保护名单，
+     * 不会出现「怪先被光环打死、来不及加名单」的情况。
+     */
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<Boolean>> BeefProtectModeComponent =
+            register("beef_protect_mode", builder ->
                     builder.persistent(Codec.BOOL)
                            .networkSynchronized(StreamCodec.of(
                                    FriendlyByteBuf::writeBoolean,
@@ -443,11 +513,11 @@ public final class UComponents {
             );
 
     /**
-     * 造化杖持有的物流网络列表（StaffLink）。
+     * <b>旧格式</b>：造化杖曾经把物流网络列表挂在自己身上。
      *
-     * <p>一把杖可以同时挂多张互相独立的网络，靠 {@link #STAFF_LINK_ACTIVE} 指定当前生效的那张。
-     * 物品上只存这些 16 字节的 UUID；网络本体（锚点与线路配置）存在服务端的
-     * {@code StaffLinkSavedData} 里。这样杖被放进箱子、区块卸载都不影响物流运行。</p>
+     * <p>网络归属已经改成跟着<b>玩家/队伍</b>走（存在服务端的 {@code StaffLinkSavedData} 归属
+     * 登记里），所以这两个组件现在只用于<b>迁移</b>：玩家登录（或每 20 tick 的活跃刷新）时把
+     * 杖上残留的列表迁到归属者名下，然后就地清空。新代码不要再读写它们。</p>
      */
     public static final DeferredHolder<DataComponentType<?>, DataComponentType<List<UUID>>> STAFF_LINK_NETWORKS =
             register("staff_link_networks", builder ->
@@ -455,7 +525,7 @@ public final class UComponents {
                            .networkSynchronized(UUIDUtil.STREAM_CODEC.apply(ByteBufCodecs.list()))
             );
 
-    /** {@link #STAFF_LINK_NETWORKS} 里当前生效的下标；超出范围时按 0 处理。 */
+    /** <b>旧格式</b>：{@link #STAFF_LINK_NETWORKS} 里当前生效的下标。只用于迁移。 */
     public static final DeferredHolder<DataComponentType<?>, DataComponentType<Integer>> STAFF_LINK_ACTIVE =
             register("staff_link_active", builder ->
                     builder.persistent(Codec.INT)

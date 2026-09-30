@@ -19,6 +19,9 @@ import mekanism.common.tier.ChemicalTankTier;
 import mekanism.common.util.ChemicalUtil;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.core.Holder;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BlockEntity;
@@ -75,6 +78,30 @@ public final class MekanismChemicalCompat {
         public ItemStack markerForChemical(Object chemicalIngredient) {
             return MekanismChemicalCompat.markerForChemical(chemicalIngredient);
         }
+
+        @Override
+        public @Nullable ResourceLocation chemicalIdOf(Object typeKey) {
+            return MekanismChemicalCompat.chemicalIdOf(typeKey);
+        }
+    }
+
+    /**
+     * {@link ChemicalStackView#typeKey() typeKey} → 注册表 id，供过滤器的通配符匹配用。
+     *
+     * <p>Mekanism 的 {@code typeKey()} 是 {@code Holder<Chemical>}（见
+     * {@link MekanismChemicalStackView#typeKey()}），拿 {@code unwrapKey()} 就能得到
+     * {@code ResourceKey<Chemical>}，再取 location 即可——不需要去碰化学品注册表本身，
+     * 因此也就不必担心「注册表尚未初始化」。</p>
+     *
+     * <p>返回 {@code null} 表示给不出 id（空栈的 {@code EmptyType.INSTANCE}、或不是 Holder
+     * 的异类实现）。此时过滤器里的通配符对化学品恒不匹配。</p>
+     */
+    @Nullable
+    public static ResourceLocation chemicalIdOf(Object typeKey) {
+        if (typeKey instanceof Holder<?> holder) {
+            return holder.unwrapKey().map(ResourceKey::location).orElse(null);
+        }
+        return null;
     }
 
     /** 物品（化学品罐、气体罐等）里装的化学品；用来当无线物流的过滤标记物。 */

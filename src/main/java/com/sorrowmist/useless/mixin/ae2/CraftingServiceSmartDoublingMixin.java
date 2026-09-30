@@ -1,6 +1,7 @@
 package com.sorrowmist.useless.mixin.ae2;
 
 import appeng.api.crafting.IPatternDetails;
+import appeng.api.networking.IGrid;
 import appeng.api.networking.crafting.ICraftingPlan;
 import appeng.api.networking.crafting.ICraftingProvider;
 import appeng.me.service.CraftingService;
@@ -19,7 +20,12 @@ public abstract class CraftingServiceSmartDoublingMixin {
     @ModifyVariable(method = "submitJob", at = @At("HEAD"), argsOnly = true, ordinal = 0)
     private ICraftingPlan uselessMod$rewriteSubmittedPlan(ICraftingPlan plan) {
         CraftingService service = (CraftingService) (Object) this;
-        return SmartDoublingPlans.rewriteForSubmission(plan, service::getProviders);
+        // 本方法跑在服务端线程上，取关卡安全。改写后的样板会按关卡把「可复用输入」
+        // （注魔水晶这类用完还回来、且还回来还能用的槽）的倍率钉在 1 份上 —— 拿不到关卡时
+        // 退回保守判据，只少修一类，不会错修。
+        IGrid grid = ((CraftingServiceGridAccessor) (Object) this).uselessMod$getGrid();
+        return SmartDoublingPlans.rewriteForSubmission(
+                plan, service::getProviders, SmartDoublingPatterns.levelOf(grid));
     }
 
     @Inject(method = "getProviders", at = @At("HEAD"), cancellable = true)

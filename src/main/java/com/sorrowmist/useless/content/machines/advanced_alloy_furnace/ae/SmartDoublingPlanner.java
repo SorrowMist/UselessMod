@@ -3,6 +3,8 @@ package com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae;
 import appeng.api.crafting.IPatternDetails;
 import appeng.api.networking.crafting.ICraftingProvider;
 import com.sorrowmist.useless.api.crafting.SmartDoublingCraftingProvider;
+import net.minecraft.world.level.Level;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.LinkedHashMap;
 import java.util.ArrayList;
@@ -15,9 +17,21 @@ public final class SmartDoublingPlanner {
     private SmartDoublingPlanner() {
     }
 
+    /** 不带 {@code Level} 的重载：只认原样返还的可复用输入，见 {@link ReusablePatternInputs}。 */
     public static Map<IPatternDetails, Long> rewrite(
             Map<IPatternDetails, Long> crafts,
             Function<IPatternDetails, Iterable<ICraftingProvider>> providerLookup) {
+        return rewrite(crafts, providerLookup, null);
+    }
+
+    /**
+     * @param level 判定「可复用输入」用的关卡；带耐久返还的催化剂（注魔水晶）只有拿到它才能
+     *              把倍率钉在 1 份上，否则抽不出材料。可为 {@code null}
+     */
+    public static Map<IPatternDetails, Long> rewrite(
+            Map<IPatternDetails, Long> crafts,
+            Function<IPatternDetails, Iterable<ICraftingProvider>> providerLookup,
+            @Nullable Level level) {
         Map<IPatternDetails, Long> rewritten = new LinkedHashMap<>();
         for (var entry : crafts.entrySet()) {
             IPatternDetails pattern = entry.getKey();
@@ -42,11 +56,11 @@ public final class SmartDoublingPlanner {
             long remainder = totalOperations % batchCount;
 
             if (remainder > 0L) {
-                merge(rewritten, SmartDoublingPatterns.scale(pattern, baseMultiplier + 1L), remainder);
+                merge(rewritten, SmartDoublingPatterns.scale(pattern, baseMultiplier + 1L, level), remainder);
             }
             long baseBatchCount = batchCount - remainder;
             if (baseBatchCount > 0L) {
-                merge(rewritten, SmartDoublingPatterns.scale(pattern, baseMultiplier), baseBatchCount);
+                merge(rewritten, SmartDoublingPatterns.scale(pattern, baseMultiplier, level), baseBatchCount);
             }
         }
         return rewritten;

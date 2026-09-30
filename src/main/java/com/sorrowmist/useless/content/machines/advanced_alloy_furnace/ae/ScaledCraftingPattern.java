@@ -7,6 +7,7 @@ import net.minecraft.core.NonNullList;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.crafting.CraftingInput;
 import net.minecraft.world.level.Level;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * 一次推送代表 N 次工作台合成的 AE2 合成样板包装。
@@ -18,7 +19,16 @@ public final class ScaledCraftingPattern extends ScaledProcessingPattern
         implements IMolecularAssemblerSupportedPattern {
 
     public ScaledCraftingPattern(IMolecularAssemblerSupportedPattern pattern, long operationsPerPush) {
-        super(pattern, operationsPerPush);
+        this(pattern, operationsPerPush, null);
+    }
+
+    /**
+     * @param level 判定「可复用输入」用的关卡；带耐久返还的催化剂（注魔水晶）只有拿到
+     *              {@code Level} 才能判成可复用，见 {@link ReusablePatternInputs}
+     */
+    public ScaledCraftingPattern(IMolecularAssemblerSupportedPattern pattern, long operationsPerPush,
+                                 @Nullable Level level) {
+        super(pattern, operationsPerPush, level);
         if (!(getOriginal() instanceof IMolecularAssemblerSupportedPattern)) {
             throw new IllegalArgumentException("Scaled crafting pattern requires a crafting pattern base");
         }

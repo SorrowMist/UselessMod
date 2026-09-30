@@ -26,6 +26,7 @@ import it.unimi.dsi.fastutil.objects.Object2ObjectLinkedOpenHashMap;
 import it.unimi.dsi.fastutil.objects.ObjectList;
 import it.unimi.dsi.fastutil.objects.ObjectLists;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.entity.BlockEntity;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -33,6 +34,7 @@ import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.OptionalLong;
+import java.util.Set;
 import java.util.function.BooleanSupplier;
 import java.util.function.IntSupplier;
 import java.util.function.Supplier;
@@ -367,21 +369,33 @@ class AlloyFurnaceCountedCraftingAdapter implements CountedCraftingProviderAdapt
         return Math.min(requestedCount, maximumCount);
     }
 
-    /** Creates a deep, exact scaled input snapshot without changing the caller-owned prototype. */
-    static KeyCounter[] scalePrototype(KeyCounter @NotNull [] prototype, long count) {
+    /**
+     * Creates a deep, exact scaled input snapshot without changing the caller-owned prototype.
+     *
+     * <p><b>可复用输入不放大</b>：{@code prototype} 按契约是<b>单次合成</b>的原型，注魔水晶这类
+     * 「返还物仍能当同一个槽的输入」的槽在这里只有 1 个，而 AE2 的合成计划对它也只算 1 份
+     * （见 {@code ReusablePatternInputs}）。照倍率放大等于<b>凭空造出 count-1 份催化剂</b>再让机器
+     * 原样返还 —— 既是「向机器索要 N 个」，也是净增物品。机器侧会复用这一份并只记一次返还。</p>
+     */
+    static KeyCounter[] scalePrototype(@NotNull IPatternDetails pattern,
+                                       KeyCounter @NotNull [] prototype,
+                                       long count,
+                                       @Nullable Level level) {
         if (count <= 0L) {
             throw new IllegalArgumentException("Counted crafting batch size must be positive");
         }
+        Set<Integer> reusableSlots = SmartDoublingPatterns.reusableInputSlots(pattern, level);
         KeyCounter[] scaled = new KeyCounter[prototype.length];
         for (int index = 0; index < prototype.length; index++) {
             KeyCounter source = prototype[index];
             KeyCounter targetCounter = new KeyCounter();
+            long multiplier = reusableSlots.contains(index) ? 1L : count;
             for (var entry : source) {
                 long amount = entry.getLongValue();
                 if (amount < 0L) {
                     throw new IllegalArgumentException("Crafting input amounts must not be negative");
                 }
-                targetCounter.add(entry.getKey(), Math.multiplyExact(amount, count));
+                targetCounter.add(entry.getKey(), Math.multiplyExact(amount, multiplier));
             }
             scaled[index] = targetCounter;
         }
@@ -594,11 +608,18 @@ class AlloyFurnaceCountedCraftingAdapter implements CountedCraftingProviderAdapt
         if (availableCapacity(patternDetails, prototype, count).logicalCrafts() < count) {
             return false;
         }
+        // 判定「可复用输入」要关卡：注魔水晶这类带耐久返还的催化剂只有拿到 Level 才认得出来。
+        Level level = providerLevel();
         // 统一走 SmartDoublingPatterns.scale：合成样板必须保留 IMolecularAssemblerSupportedPattern 身份，
         // 否则接收方会把它当成处理样板去查合金炉配方。
-        IPatternDetails scaledPattern = SmartDoublingPatterns.scale(patternDetails, count);
-        KeyCounter[] scaledPrototype = scalePrototype(prototype, count);
+        IPatternDetails scaledPattern = SmartDoublingPatterns.scale(patternDetails, count, level);
+        KeyCounter[] scaledPrototype = scalePrototype(patternDetails, prototype, count, level);
         return provider.pushPattern(scaledPattern, scaledPrototype);
+    }
+
+    /** 取 provider 所在关卡；非方块实体返回 {@code null}（退回保守判据，只少修一类）。 */
+    private @Nullable Level providerLevel() {
+        return this.provider instanceof BlockEntity blockEntity ? blockEntity.getLevel() : null;
     }
 
     private static boolean isAdvancedAlloyFurnaceOnline(@NotNull AdvancedAlloyFurnaceBlockEntity provider) {

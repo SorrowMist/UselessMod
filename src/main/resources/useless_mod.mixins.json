@@ -16,6 +16,7 @@
     "ae2.CraftingSimulationStateAccessor",
     "ae2.CraftingSimulationStateSmartDoublingMixin",
     "ae2.CraftingServiceSmartDoublingMixin",
+    "ae2.CraftingServiceGridAccessor",
     "ae2.CraftingTreeProcessMixin",
     "ae2.ExecutingCraftingJobAccessor",
     "ae2.ElapsedTimeTrackerAccessor",

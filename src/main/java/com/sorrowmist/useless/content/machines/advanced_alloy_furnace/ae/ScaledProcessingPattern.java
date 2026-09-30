@@ -11,6 +11,7 @@ import org.jetbrains.annotations.Nullable;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 
 /** One processing-pattern push representing multiple operations. */
 public class ScaledProcessingPattern implements IPatternDetails, ScaledPattern {
@@ -20,7 +21,20 @@ public class ScaledProcessingPattern implements IPatternDetails, ScaledPattern {
     private final IInput[] inputs;
     private final List<GenericStack> outputs;
 
+    /**
+     * 不带 {@link Level} 的重载：只认「原样返还」的可复用输入，带耐久受损的返还物（注魔水晶这类）
+     * 判不出来。会走这条路的调用方都应改成带 {@code level} 的那个。
+     */
     public ScaledProcessingPattern(IPatternDetails pattern, long operationsPerPush) {
+        this(pattern, operationsPerPush, null);
+    }
+
+    /**
+     * @param level 判定「可复用输入」用的关卡；可复用的输入整批只需要 1 份，倍率不能放大
+     *              （见 {@link ReusablePatternInputs}），{@code null} 时退回保守判据
+     */
+    public ScaledProcessingPattern(IPatternDetails pattern, long operationsPerPush,
+                                   @Nullable Level level) {
         SmartDoublingPatterns.Resolved resolved = SmartDoublingPatterns.resolve(pattern);
         this.original = resolved.pattern();
         this.operationsPerPush = SmartDoublingPatterns.multiplyExactPositive(
@@ -31,9 +45,12 @@ public class ScaledProcessingPattern implements IPatternDetails, ScaledPattern {
 
         this.definition = SmartDoublingPatterns.executionDefinition(this.original, this.operationsPerPush);
         IInput[] originalInputs = this.original.getInputs();
+        Set<Integer> reusableSlots =
+                ReusablePatternInputs.reusableRemainders(this.original, level).keySet();
         this.inputs = new IInput[originalInputs.length];
         for (int index = 0; index < originalInputs.length; index++) {
-            this.inputs[index] = new ScaledInput(originalInputs[index], this.operationsPerPush);
+            this.inputs[index] = new ScaledInput(originalInputs[index], this.operationsPerPush,
+                    reusableSlots.contains(index));
         }
 
         List<GenericStack> scaledOutputs = new ArrayList<>(this.original.getOutputs().size());
@@ -112,7 +129,7 @@ public class ScaledProcessingPattern implements IPatternDetails, ScaledPattern {
                 + ", original=" + original + ']';
     }
 
-    private record ScaledInput(IInput original, long operationsPerPush) implements IInput {
+    private record ScaledInput(IInput original, long operationsPerPush, boolean reusable) implements IInput {
         private ScaledInput {
             Objects.requireNonNull(original, "original");
         }
@@ -122,9 +139,15 @@ public class ScaledProcessingPattern implements IPatternDetails, ScaledPattern {
             return original.getPossibleInputs();
         }
 
+        /**
+         * 可复用输入（注魔水晶这类）整批只需要 1 份：AE2 的合成计划对它只算 1 份
+         * （见 {@link ReusablePatternInputs}），这里放大就抽不出材料、一次推送都发不出去。
+         * 其余输入照旧 ×倍率，AE2 才会一次抽出 N 份、把 N 份预期产物写进 CPU 的 waitingFor。
+         */
         @Override
         public long getMultiplier() {
-            return Math.multiplyExact(original.getMultiplier(), operationsPerPush);
+            long base = original.getMultiplier();
+            return reusable ? base : Math.multiplyExact(base, operationsPerPush);
         }
 
         @Override

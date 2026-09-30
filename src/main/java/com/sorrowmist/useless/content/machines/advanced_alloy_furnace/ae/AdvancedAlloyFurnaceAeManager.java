@@ -51,6 +51,8 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -926,11 +928,16 @@ public final class AdvancedAlloyFurnaceAeManager {
      * AE2 抽出的原材料保持原样，由上层继续寻找其它供应器或重试。</p>
      *
      * <p>倍率 N &gt; 1 时按「可重复的一份」折叠：铺一份料后，如果剩下的材料逐键都恰好是这一份消耗量的
-     * (N-1) 倍（模具、可复用催化剂这类同键返还同样适用），说明整批的每一份输入完全一样，
-     * 于是只装配一次、把产物与返还款整体放大 N 倍。一批里混着不同变体（例如耐久各异的工具）时这条
-     * 不变量先不成立，此时就真实地一份一份装配，直到剩下的材料再次变成整齐的重复 ——
-     * 这样连混合变体也能得到与逐份装配一致的结果。探针次数有上限，真撞上病态输入时
+     * (N-1) 倍，说明整批的每一份输入完全一样，于是只装配一次、把产物整体放大 N 倍。一批里混着不同
+     * 变体（例如耐久各异的工具）时这条不变量先不成立，此时就真实地一份一份装配，直到剩下的材料再次
+     * 变成整齐的重复 —— 这样连混合变体也能得到与逐份装配一致的结果。探针次数有上限，真撞上病态输入时
      * 按最近一份的产出整体放大，语义与批量合并保持一致。</p>
+     *
+     * <p><b>可复用输入（注魔水晶这类）单独处理</b>：它们的返还物仍能当同一个槽的输入
+     * （见 {@link ReusablePatternInputs}），所以 AE2 的合成计划对它们只算 1 份、也就只给 1 份。
+     * 这类槽位从「这一批消耗了什么」里摘出来单独存放，供每一轮装配复用；返还物整批只记一次、
+     * <b>不参与倍率放大</b> —— AE2 的 {@code expectedContainerItems} 只期望收回那一份。
+     * 这与 AE2 自己的 {@code limitQty}（遇到容器物品就一次只模拟一件）语义一致。</p>
      *
      * @param operationsPerPush 本次推送代表的合成次数，恒为正
      */
@@ -951,9 +958,56 @@ public final class AdvancedAlloyFurnaceAeManager {
         }
 
         KeyCounter[] working = copyCounters(inputHolder);
+        // 可复用输入（注魔水晶这类「用完还回来、且还回来还能用」的槽）：AE2 的合成计划对它只算 1 份
+        // （见 ReusablePatternInputs），所以整批复用同一份、账本里只记一次返还，倍率不能放大它。
+        // 没有这类槽位时，下面每一条都退化成原来的路径。
+        Map<Integer, AEKey> reusableSlots = ReusablePatternInputs.reusableRemainders(pattern, level);
+        boolean hasReusableInputs = !reusableSlots.isEmpty();
+        KeyCounter[] reusableStock = new KeyCounter[inputHolder.length];
+        for (int slot : reusableSlots.keySet()) {
+            if (slot < 0 || slot >= inputHolder.length) {
+                // 输入计数器与样板输入不匹配（不该发生）：按错槽位装配会静默错算，宁可拒收。
+                return false;
+            }
+            KeyCounter source = working[slot];
+            if (source.isEmpty()) {
+                // AE2 按计划抽料，这份催化剂本该在这里；没给就拒收，让它重投或换供应器。
+                return false;
+            }
+            reusableStock[slot] = new KeyCounter();
+            reusableStock[slot].addAll(source);
+            // 从 working 里摘掉：它不该被算成「这一批消耗掉的材料」，
+            // 否则 matchesBatchShape 会看到它没被消耗而放弃整批折叠。
+            source.clear();
+        }
+        // 与 AE2 的 expectedContainerItems 精确对齐：AE2 按「抽到的每个模板 × 数量」累加
+        // getRemainingKey(模板)，这里同样逐键逐量算一次；算不出来（该键已用尽、这一击会碎掉）就拒收。
+        Map<AEKey, Long> reusableRemainders = new LinkedHashMap<>();
+        Set<AEKey> reusableOutputKeys = new LinkedHashSet<>();
+        for (int slot : reusableSlots.keySet()) {
+            for (var entry : reusableStock[slot]) {
+                long amount = entry.getLongValue();
+                if (amount <= 0L) {
+                    continue;
+                }
+                AEKey received = entry.getKey();
+                AEKey remainder = pattern.getInputs()[slot].getRemainingKey(received);
+                if (remainder == null) {
+                    return false;
+                }
+                reusableRemainders.merge(remainder, amount, AdvancedAlloyFurnaceAeManager::saturatingAdd);
+                // 收到的那批键本身也要摘掉：带耐久返还的物品附了「耐久」时有概率原样返还，
+                // 那时装配产生的返还键就是收到的那一个 —— 不摘掉会跟着倍率放大成 N 份。
+                reusableOutputKeys.add(received);
+                reusableOutputKeys.add(remainder);
+            }
+        }
+
         // 产出一律先并入 BigInteger 账本再切段：倍率可以到 long 上限，逐条 long 累加一定会丢账。
         CraftingAeAmountAccumulator produced = new CraftingAeAmountAccumulator();
+        // 不含返还物的那份产出：探针兜底放大时绝不能再把返还物乘一遍。
         List<GenericStack> lastUnitOutputs = null;
+        boolean reusableRemainderRecorded = false;
         long craftsLeft = Math.max(1L, operationsPerPush);
         int probes = 0;
 
@@ -961,11 +1015,21 @@ public final class AdvancedAlloyFurnaceAeManager {
             probes++;
             Object2LongMap<AEKey> before = snapshotAmounts(working);
             List<ItemStack> grid = emptyCraftingGrid();
-            pattern.fillCraftingGrid(working, (slot, stack) -> {
+            // 可复用槽位由 reusableStock 单独供料；每轮新建合并副本，扣料只扣在副本上。
+            KeyCounter[] fillSource = hasReusableInputs
+                    ? mergeWithReusableStock(working, reusableStock) : working;
+            pattern.fillCraftingGrid(fillSource, (slot, stack) -> {
                 if (slot >= 0 && slot < CRAFTING_GRID_SIZE) {
                     grid.set(slot, stack);
                 }
             });
+            if (hasReusableInputs) {
+                for (int slot = 0; slot < working.length; slot++) {
+                    if (!reusableSlots.containsKey(slot)) {
+                        working[slot] = fillSource[slot];
+                    }
+                }
+            }
 
             long repeat = 1L;
             if (matchesBatchShape(before, working, craftsLeft)) {
@@ -981,8 +1045,15 @@ public final class AdvancedAlloyFurnaceAeManager {
             if (unitOutputs == null) {
                 return false;
             }
-            lastUnitOutputs = unitOutputs;
-            accumulateScaled(produced, unitOutputs, repeat);
+            lastUnitOutputs = withoutKeys(unitOutputs, reusableOutputKeys);
+            accumulateScaled(produced, lastUnitOutputs, repeat);
+            if (!reusableRemainderRecorded) {
+                // 返还物整批只记一次、不随倍率放大：AE2 对这类输入只期望收回抽出去的那几份。
+                for (var entry : reusableRemainders.entrySet()) {
+                    produced.add(entry.getKey(), BigInteger.valueOf(entry.getValue()));
+                }
+                reusableRemainderRecorded = true;
+            }
         }
 
         if (craftsLeft > 0L) {
@@ -1402,6 +1473,51 @@ public final class AdvancedAlloyFurnaceAeManager {
             grid.add(ItemStack.EMPTY);
         }
         return grid;
+    }
+
+    /**
+     * 填格用的合并副本：消耗品取 {@code working}，可复用槽位并入 {@code reusableStock}。
+     *
+     * <p>每轮都要新建副本：{@code fillCraftingGrid} 会从传进去的计数器里扣料，扣在副本上才不会把
+     * 「这一批消耗了什么」和「这份催化剂还在手里」两件事搞混。用 {@link KeyCounter#addAll} 而不是
+     * 逐个 {@code add}，保住底层映射结构（原因见 {@link #copyCounters} 的说明）。</p>
+     */
+    private static KeyCounter[] mergeWithReusableStock(KeyCounter[] working, KeyCounter[] reusableStock) {
+        KeyCounter[] merged = new KeyCounter[working.length];
+        for (int slot = 0; slot < working.length; slot++) {
+            KeyCounter counter = new KeyCounter();
+            if (working[slot] != null) {
+                counter.addAll(working[slot]);
+            }
+            if (reusableStock[slot] != null) {
+                counter.addAll(reusableStock[slot]);
+            }
+            merged[slot] = counter;
+        }
+        return merged;
+    }
+
+    /**
+     * 把可复用槽位的产出从单份产出里摘掉。
+     *
+     * <p>{@code excluded} 同时包含「收到的那批键」与「它们的返还键」：返还物在正常情况是受损后的
+     * 另一个键，但附了「耐久」的物品有概率原样返还，那时装配产生的就是收到的那一个键。
+     * 两种都要摘掉，否则它会被当成普通产物跟着倍率放大成 N 份。</p>
+     *
+     * <p>摘掉之后由调用方按 {@code getRemainingKey(收到的键) × 数量} 精确补记一次，
+     * 与 AE2 的 {@code expectedContainerItems} 对齐。</p>
+     */
+    private static List<GenericStack> withoutKeys(List<GenericStack> outputs, Set<AEKey> excluded) {
+        if (excluded.isEmpty()) {
+            return outputs;
+        }
+        List<GenericStack> filtered = new ArrayList<>(outputs.size());
+        for (GenericStack output : outputs) {
+            if (output != null && !excluded.contains(output.what())) {
+                filtered.add(output);
+            }
+        }
+        return filtered;
     }
 
     private static void clearCounters(KeyCounter[] counters) {

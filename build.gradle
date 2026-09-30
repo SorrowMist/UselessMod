@@ -405,7 +405,8 @@ dependencies {
     implementation "maven.modrinth:lychee:6.7.0+neoforge"
     implementation "maven.modrinth:kiwi:15.8.7+neoforge"
 
-    implementation "curse.maven:omnisequence-transfinite-1624558:8622739"
+    implementation "curse.maven:omnisequence-transfinite-1624558:8991983"
+    implementation "curse.maven:applied-enhancements-1665696:8990232"
 
     implementation "curse.maven:mystical-agriculture-omnia-1684008:8824904"
 

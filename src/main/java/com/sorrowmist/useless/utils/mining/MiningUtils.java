@@ -188,6 +188,8 @@ public class MiningUtils {
     static List<ItemStack> applyExDeorumDrops(ServerLevel level, BlockState state,
                                               List<ItemStack> drops, ItemStack tool,
                                               BlockPos pos, Player player) {
+        // 门面类不引用 exdeorum 的任何类型，故可安全用于守卫；
+        // 引用外部类型的实现隔离在 ExDeorumCompatImpl，仅在确认该模组已加载后经反射调用。
         if (!ExDeorumCompat.isLoaded()) {
             return drops;
         }

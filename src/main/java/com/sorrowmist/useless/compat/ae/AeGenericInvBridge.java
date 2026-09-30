@@ -30,8 +30,7 @@ import org.jetbrains.annotations.Nullable;
  *
  * <p>{@code GenericInternalInventory} 的 {@code getAmount} / {@code insert} / {@code extract}
  * <b>本来就是 long 签名，而且不碰 {@code ItemStack}</b>。走它就能把「抽取」这一步的物化整个
- * 去掉——实测那一段占无线物流总耗时的相当一块（见
- * {@code wiki/WIRELESS_LOGISTICS_PERF_REPORT.md} 第十三节）。</p>
+ * 去掉——实测那一段占无线物流总耗时的相当一块（见内部无线物流性能分析报告第十三节）。</p>
  *
  * <h2>优先级</h2>
  *

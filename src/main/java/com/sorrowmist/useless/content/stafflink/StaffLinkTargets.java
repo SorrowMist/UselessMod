@@ -171,7 +171,7 @@ public final class StaffLinkTargets {
      * <p>ME 接口这类方块同时有两条路可达：AE2 为它们额外注册了 {@code ItemHandler.BLOCK}
      * （把 generic 库存投影成 {@code GenericStackItemStorage}），于是原先走的是投影。直接走
      * generic 能省掉「每次读数量 / 抽取都要 {@code AEKey → ItemStack} 物化」的那一大笔
-     * （见 {@code wiki/WIRELESS_LOGISTICS_PERF_REPORT.md} 第十三节）。</p>
+     * （见内部无线物流性能分析报告第十三节）。</p>
      *
      * <p><b>两条路谁赢结果一样</b>：投影本就是 generic 的纯视图，且没有方块会同时是「真容器」
      * 和「generic 库存」（{@code AEBaseInvBlockEntity} 的子类如驱动器/箱子只注册后者中的
@@ -423,7 +423,7 @@ public final class StaffLinkTargets {
         //
         // 同样不能改成「先 findSlot 定位槽位、再 extract(slot)」：AE 端点的 findSlot 需要先抓
         // 一份整网快照（MEStorage.getAvailableStacks()），等于每次搬运遍历一遍网络里每一种资源。
-        // 实测这一条就占了无线物流总耗时的 32%（见 wiki/WIRELESS_LOGISTICS_PERF_REPORT.md 第十节）。
+        // 实测这一条就占了无线物流总耗时的 32%（见内部无线物流性能分析报告第十节）。
         List<ItemStack> wanted = filteredItemMarkers(sourceFilter, targetFilter);
         if (!wanted.isEmpty()) {
             long moved = 0L;

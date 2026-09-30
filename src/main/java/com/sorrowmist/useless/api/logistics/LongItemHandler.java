@@ -33,7 +33,7 @@ public interface LongItemHandler extends LongResourceHandler {
      * <p>存在的理由：有的实现（例如 AE2 的 {@code GenericStackItemStorage}）每次
      * {@code getStackInSlot} 都<b>新建</b>一个 {@code ItemStack}，外层再 copy 一遍纯属浪费——
      * 在 1.21 的组件化物品栈上，一次 copy 要连带复制整份 DataComponent 映射，实测占无线物流
-     * 总耗时的 13%（见 {@code wiki/WIRELESS_LOGISTICS_PERF_REPORT.md} 第十二节）。</p>
+     * 总耗时的 13%（见内部无线物流性能分析报告第十二节）。</p>
      *
      * <p>默认实现委托 {@link #getStackInSlot(int)}，因此旧实现的行为逐字节不变。</p>
      */

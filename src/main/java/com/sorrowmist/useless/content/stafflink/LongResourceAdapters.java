@@ -172,7 +172,7 @@ public final class LongResourceAdapters {
                 //   「尽量往这个槽里塞，塞不下的退回来」——所以**收到的比给出去的少，就说明这个槽满了**，
                 //   拿剩下的量再问同一个槽必然被拒。原实现用 while 反复问同一个槽（上限
                 //   MAX_CHUNK_STEPS 次），实测对 ME 接口这种 9 格容器，每个槽问 2 次、其中 1 次白问，
-                //   提交路径一半的 insertItem 调用都是浪费（见 wiki/WIRELESS_LOGISTICS_PERF_REPORT.md 11.7）。
+                //   提交路径一半的 insertItem 调用都是浪费（见内部无线物流性能分析报告 11.7）。
                 //
                 // 反过来，收到的正好等于给出去的，说明 inserted == amount，外层循环条件自然不成立，
                 // 也不需要再问。所以「每槽一次」在两种情况下都够用，且与旧行为等价。

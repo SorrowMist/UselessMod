@@ -1,24 +1,37 @@
 package com.sorrowmist.useless.content.items;
 
+import com.sorrowmist.useless.utils.mining.MiningUtils;
 import com.sorrowmist.useless.utils.mining.RightClickChainer;
 import net.minecraft.advancements.CriteriaTriggers;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.stats.Stats;
+import net.minecraft.util.RandomSource;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.context.UseOnContext;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.LevelReader;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.BonemealableBlock;
+import net.minecraft.world.level.block.FlowerBlock;
+import net.minecraft.world.level.block.MultifaceBlock;
+import net.minecraft.world.level.block.VineBlock;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.state.properties.BooleanProperty;
+import net.minecraft.world.phys.Vec3;
 import net.neoforged.neoforge.common.CommonHooks;
 import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.event.entity.player.BonemealEvent;
+
+import javax.annotation.Nullable;
+import java.util.List;
 
 /**
  * 造化杖的「催熟 / 强制生长」行为。
@@ -81,6 +94,13 @@ public final class BeefRipen {
     /** 骨粉粒子（happy villager）的 LevelEvent id。 */
     private static final int BONE_MEAL_PARTICLES = 2005;
 
+    /**
+     * 藤蔓「强制蔓延」每次作用最多新增几株。
+     *
+     * <p>按住连锁键（Tab）时整片作用，每株都会按这个上限放大，取值不宜太大。</p>
+     */
+    private static final int MAX_VINE_SPREAD_PER_ACTION = 4;
+
     private BeefRipen() {
     }
 
@@ -138,13 +158,33 @@ public final class BeefRipen {
     /**
      * 该方块状态当前是否可被作用（客户端也用它做交互预测）。
      *
-     * <p>判定完全取决于两个开关：催熟只认骨粉目标，强制生长只认「会随机刻」。
+     * <p>判定完全取决于两个开关：催熟只认骨粉目标与「特殊催生目标」（藤蔓 / 花），
+     * 强制生长只认「会随机刻」。</p>
      */
     public static boolean canRipen(BlockState state, LevelReader level, BlockPos pos, ItemStack stack) {
-        if (EndlessBeafItem.isRipenEnabled(stack) && isBonemealTarget(state, level, pos)) {
+        if (EndlessBeafItem.isRipenEnabled(stack)
+                && (isBonemealTarget(state, level, pos) || isSpecialRipenTarget(state))) {
             return true;
         }
         return EndlessBeafItem.isForceGrowEnabled(stack) && state.isRandomlyTicking();
+    }
+
+    /**
+     * 「特殊催生目标」：既不是原版骨粉目标、也不靠随机刻的植物，需要自写逻辑。
+     *
+     * <ul>
+     *   <li><b>藤蔓 {@link VineBlock}</b>：不是 {@code BonemealableBlock}，催熟路径完全覆盖不到；
+     *       强制生长虽能靠随机刻推它，但受游戏规则 {@code doVinesSpread}、25% 概率与
+     *       「9×3×9 内最多 5 株」三重限制。</li>
+     *   <li><b>花 {@link FlowerBlock}</b>：既不是 {@code BonemealableBlock}，也没有
+     *       {@code randomTicks()}，两个开关原本都无效。原版对花本身没有任何骨粉行为。</li>
+     * </ul>
+     *
+     * <p>凋灵玫瑰 {@code WitherRoseBlock} 继承自 {@link FlowerBlock}，同样包含在内。</p>
+     */
+    private static boolean isSpecialRipenTarget(BlockState state) {
+        Block block = state.getBlock();
+        return block instanceof VineBlock || block instanceof FlowerBlock;
     }
 
     /**
@@ -157,6 +197,19 @@ public final class BeefRipen {
      * @return 是否真的产生了作用（没有可作用目标、或事件被取消且未标记成功时返回 false）
      */
     public static boolean ripenAt(ServerLevel level, BlockPos pos, Player player, ItemStack stack) {
+        return ripenAt(level, pos, player, stack, null);
+    }
+
+    /**
+     * 与 {@link #ripenAt(ServerLevel, BlockPos, Player, ItemStack)} 相同，但可以把花的掉落物
+     * 收集到 {@code dropCollector} 里延迟提交。
+     *
+     * <p>连锁（Tab）时由 {@code RightClickChainer#ripenBlocks} 传入一个列表、整片收集后
+     * 只调一次 {@code MiningUtils.handleDrops}，避免逐株向 AE 发上千次请求；
+     * 传 {@code null} 表示立即走统一掉落出口。</p>
+     */
+    public static boolean ripenAt(ServerLevel level, BlockPos pos, Player player, ItemStack stack,
+                                  @Nullable List<ItemStack> dropCollector) {
         boolean bonemealMode = EndlessBeafItem.isRipenEnabled(stack);
         boolean forceGrowMode = EndlessBeafItem.isForceGrowEnabled(stack);
 
@@ -195,6 +248,18 @@ public final class BeefRipen {
                     break;
                 }
                 changed = true;
+            }
+        }
+
+        // ---------- 路径 1.5：藤蔓 / 花的特殊催生（仅「催熟」开关下） ----------
+        // 两者都不是原版骨粉目标：藤蔓不是 BonemealableBlock，花既非骨粉目标也无随机刻，
+        // 路径 1、2 都覆盖不到。挂在「催熟」开关下，与用户对「催生」的认知一致。
+        if (bonemealMode && !changed) {
+            BlockState current = level.getBlockState(pos);
+            if (current.getBlock() instanceof VineBlock) {
+                changed = ripenVine(level, pos, current);
+            } else if (current.getBlock() instanceof FlowerBlock) {
+                changed = ripenFlower(level, pos, current, player, stack, dropCollector);
             }
         }
 
@@ -244,5 +309,127 @@ public final class BeefRipen {
             return SPREADER_RANDOM_TICKS;
         }
         return MAX_RANDOM_TICKS;
+    }
+
+    /**
+     * 藤蔓的「强制蔓延」：<b>不看</b>游戏规则 {@code doVinesSpread}、<b>不看</b>原版 25% 概率、
+     * 也<b>不看</b>原版「9×3×9 内最多 5 株」的上限，每次点击必定长出新藤蔓。
+     *
+     * <p>原版逻辑在 {@code VineBlock#randomTick}（protected，无法直接调用），这里用公开 API
+     * 复刻它的三条分支：向上补面、向水平邻格蔓延、向下复制一份。每次调用最多新增
+     * {@link #MAX_VINE_SPREAD_PER_ACTION} 株。</p>
+     *
+     * <p>成功判定直接取 {@code level.setBlock} 的返回值 —— 蔓延改的可能是<b>邻居</b>方块，
+     * 只比较 {@code pos} 自身状态会漏判。</p>
+     */
+    private static boolean ripenVine(ServerLevel level, BlockPos pos, BlockState state) {
+        RandomSource random = level.getRandom();
+        boolean acted = false;
+
+        for (int placed = 0; placed < MAX_VINE_SPREAD_PER_ACTION; placed++) {
+            BlockState current = level.getBlockState(pos);
+            if (!(current.getBlock() instanceof VineBlock)) {
+                break;
+            }
+
+            // ① 上方能附着 → 给自己补一个 UP 面（藤蔓自上方垂下）
+            if (!current.getValue(VineBlock.UP)
+                    && MultifaceBlock.canAttachTo(level, Direction.DOWN, pos.above(),
+                                                  level.getBlockState(pos.above()))) {
+                acted |= level.setBlock(pos, current.setValue(VineBlock.UP, true), 3);
+                continue;
+            }
+
+            Direction direction = Direction.Plane.HORIZONTAL.getRandomDirection(random);
+            BlockPos side = pos.relative(direction);
+            BlockState sideState = level.getBlockState(side);
+
+            if (sideState.isAir()) {
+                // 在空气邻格放一株新藤蔓：找一个相邻的实体方块作为附着面
+                if (tryPlaceVineAt(level, side, random)) {
+                    acted = true;
+                    continue;
+                }
+            } else if (!current.getValue(VineBlock.getPropertyForFace(direction))
+                    && MultifaceBlock.canAttachTo(level, direction, side, sideState)) {
+                // 邻格能支撑 → 给自己这一面也长上藤蔓
+                acted |= level.setBlock(pos, current.setValue(VineBlock.getPropertyForFace(direction), true), 3);
+                continue;
+            }
+
+            // ③ 向下蔓延：把当前各面复制一份到下方（下方是空气或藤蔓）
+            BlockPos below = pos.below();
+            BlockState belowState = level.getBlockState(below);
+            if (belowState.isAir() || belowState.getBlock() instanceof VineBlock) {
+                BlockState base = belowState.getBlock() instanceof VineBlock
+                        ? belowState
+                        : Blocks.VINE.defaultBlockState();
+                BlockState copied = copyVineFaces(current, base, random);
+                if (hasHorizontalFace(copied)) {
+                    acted |= level.setBlock(below, copied, 3);
+                }
+            }
+        }
+
+        return acted;
+    }
+
+    /**
+     * 在空气格 {@code pos} 放一株藤蔓：找一个相邻实体方块作为附着面，必要时退化为一株自上方垂下的藤蔓。
+     *
+     * @return 是否真的放下了
+     */
+    private static boolean tryPlaceVineAt(ServerLevel level, BlockPos pos, RandomSource random) {
+        for (Direction face : Direction.Plane.HORIZONTAL) {
+            BlockPos anchor = pos.relative(face);
+            if (MultifaceBlock.canAttachTo(level, face, anchor, level.getBlockState(anchor))) {
+                return level.setBlock(pos, Blocks.VINE.defaultBlockState()
+                                                       .setValue(VineBlock.getPropertyForFace(face), true), 3);
+            }
+        }
+        if (MultifaceBlock.canAttachTo(level, Direction.DOWN, pos.above(), level.getBlockState(pos.above()))) {
+            return level.setBlock(pos, Blocks.VINE.defaultBlockState().setValue(VineBlock.UP, true), 3);
+        }
+        return false;
+    }
+
+    /** 复刻原版 {@code VineBlock#copyRandomFaces}：随机把源藤蔓的水平面复制到目标上。 */
+    private static BlockState copyVineFaces(BlockState source, BlockState target, RandomSource random) {
+        BlockState result = target;
+        for (Direction direction : Direction.Plane.HORIZONTAL) {
+            if (random.nextBoolean()) {
+                BooleanProperty property = VineBlock.getPropertyForFace(direction);
+                if (source.getValue(property)) {
+                    result = result.setValue(property, true);
+                }
+            }
+        }
+        return result;
+    }
+
+    private static boolean hasHorizontalFace(BlockState state) {
+        return state.getValue(VineBlock.NORTH) || state.getValue(VineBlock.EAST)
+                || state.getValue(VineBlock.SOUTH) || state.getValue(VineBlock.WEST);
+    }
+
+    /**
+     * 花的「催生」：只产出该花的掉落物，<b>花本体原地保留、也不增殖新花</b>。
+     *
+     * <p>掉落走统一出口 {@code MiningUtils.handleDrops}（AE 存储优先 → 范围磁力），
+     * 与挖掘、杀怪、收菜保持一致。连锁时改为收集到 {@code dropCollector} 延迟提交。</p>
+     */
+    private static boolean ripenFlower(ServerLevel level, BlockPos pos, BlockState state, Player player,
+                                       ItemStack stack, @Nullable List<ItemStack> dropCollector) {
+        List<ItemStack> drops = Block.getDrops(state, level, pos, null, player, stack);
+        if (drops.isEmpty()) {
+            return false;
+        }
+
+        if (dropCollector != null) {
+            dropCollector.addAll(drops);
+        } else {
+            MiningUtils.handleDrops(player, MiningUtils.mergeItemStacks(drops), stack, Vec3.atCenterOf(pos));
+        }
+        return true;
     }
 }

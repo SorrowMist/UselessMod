@@ -55,7 +55,7 @@ import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
 
 public class ModNetwork {
     public static void registerPayloadHandlers(final RegisterPayloadHandlersEvent event) {
-        var registrar = event.registrar(UselessMod.MODID).versioned("15");
+        var registrar = event.registrar(UselessMod.MODID).versioned("16");
         registrar.playToServer(BeefToolLayoutRequestPacket.TYPE,
                                BeefToolLayoutRequestPacket.STREAM_CODEC,
                                BeefToolLayoutRequestPacket::handle);

@@ -612,6 +612,8 @@ public class ModeWheelScreen extends Screen {
                     bool(UComponents.StaffLinkEnabledComponent, false);
             case BeefToolModuleRegistry.BEEF_KILL_AURA -> bool(UComponents.BeefKillAuraComponent, false);
             case BeefToolModuleRegistry.BEEF_PROTECT_MODE -> bool(UComponents.BeefProtectModeComponent, false);
+            case BeefToolModuleRegistry.BEEF_ENTITY_TIME_ACCELERATION ->
+                    bool(UComponents.BeefEntityTimeAccelerationComponent, false);
             default -> false;
         };
     }
@@ -990,6 +992,9 @@ public class ModeWheelScreen extends Screen {
             case BeefToolModuleRegistry.BEEF_PROTECT_MODE ->
                     toggle(ModeTogglePacket.ModeType.BEEF_PROTECT_MODE,
                             UComponents.BeefProtectModeComponent, false);
+            case BeefToolModuleRegistry.BEEF_ENTITY_TIME_ACCELERATION ->
+                    toggle(ModeTogglePacket.ModeType.BEEF_ENTITY_TIME_ACCELERATION,
+                            UComponents.BeefEntityTimeAccelerationComponent, false);
             default -> {
             }
         }

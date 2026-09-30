@@ -499,6 +499,24 @@ public final class UComponents {
             );
 
     /**
+     * 生物加速模式组件（BeefEntityTimeAcceleration）
+     * true = 潜行右键生物时加速其「计时器」类数值：幼年成长 / 繁殖后冷却、
+     * 鸡下蛋间隔、羊剪毛后长毛、村民补货、蜜蜂采蜜、海龟下蛋。
+     * 只改数值，<b>不跑 AI / 寻路 / 移动 / 物理</b>。
+     *
+     * <p>该模式与「保护名单」的 Shift 手势互斥：开启后 Shift+右键生物被解释为
+     * 加速，而不是切换保护名单（Ctrl 按种类的手势不受影响）。</p>
+     */
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<Boolean>> BeefEntityTimeAccelerationComponent =
+            register("beef_entity_time_acceleration", builder ->
+                    builder.persistent(Codec.BOOL)
+                           .networkSynchronized(StreamCodec.of(
+                                   FriendlyByteBuf::writeBoolean,
+                                   FriendlyByteBuf::readBoolean
+                           ))
+            );
+
+    /**
      * 无线物流模式组件（StaffLink）
      * true = 开启「无线物流」：潜行右键容器方块可把它绑进/解绑出造化杖的物流网络，
      * 网络内的搬运规则在独立界面里配置。真正的搬运由服务端引擎执行。

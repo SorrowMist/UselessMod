@@ -57,6 +57,7 @@ public final class BeefToolModuleRegistry {
     public static final String BEEF_WIRELESS_LOGISTICS = "mode.beef_wireless_logistics";
     public static final String BEEF_KILL_AURA = "mode.beef_kill_aura";
     public static final String BEEF_PROTECT_MODE = "mode.beef_protect_mode";
+    public static final String BEEF_ENTITY_TIME_ACCELERATION = "mode.beef_entity_time_acceleration";
     public static final String EXDEORUM_CROOK = "mode.exdeorum_crook";
     public static final String EXDEORUM_HAMMER = "mode.exdeorum_hammer";
     public static final String EXDEORUM_COMPRESSED_HAMMER = "mode.exdeorum_compressed_hammer";
@@ -119,6 +120,9 @@ public final class BeefToolModuleRegistry {
                     Availability.ENDLESS, false),
             new Definition(BEEF_TIME_ACCELERATION, ModeTypeEnum.BEEF_TIME_ACCELERATION_ENABLED.getTooltip(), GroupKind.AUXILIARY,
                     Availability.ENDLESS, false),
+            new Definition(BEEF_ENTITY_TIME_ACCELERATION,
+                    ModeTypeEnum.BEEF_ENTITY_TIME_ACCELERATION_ENABLED.getTooltip(), GroupKind.AUXILIARY,
+                    Availability.ENDLESS, false),
             new Definition(BEEF_INVULNERABILITY, ModeTypeEnum.BEEF_INVULNERABILITY_ENABLED.getTooltip(), GroupKind.AUXILIARY,
                     Availability.ALWAYS, false),
             new Definition(BEEF_ADVANCED_STEALTH, ModeTypeEnum.BEEF_ADVANCED_STEALTH_ENABLED.getTooltip(), GroupKind.AUXILIARY,
@@ -159,7 +163,8 @@ public final class BeefToolModuleRegistry {
     /** 新增的辅助类模块：老存档的布局里没有它们，进游戏时自动补进「辅助」分组。 */
     private static final List<String> AUTO_AUXILIARY_MODULES = List.of(
             BEEF_AUTO_CLICK,
-            BEEF_WIRELESS_LOGISTICS);
+            BEEF_WIRELESS_LOGISTICS,
+            BEEF_ENTITY_TIME_ACCELERATION);
     /** 「原版」分组的模块：承载原版工具动作（右键、剪羊毛、点火、催熟等），老存档自动补组。 */
     private static final List<String> AUTO_VANILLA_MODULES = List.of(
             BEEF_FARMLAND_MODE,

@@ -36,7 +36,9 @@
     "botanypots.BotanyPotBlockEntityAccessor",
     "botanypots.BotanyPotBlockEntityMixin",
     "eae.PatternSlotTrackerMixin",
-    "eae.TileAssemblerMatrixPatternMixin"
+    "eae.TileAssemblerMatrixPatternMixin",
+    "accessor.BeeAccessor",
+    "accessor.TurtleAccessor"
   ],
   "server": [
     "ServerGamePacketListenerImplMixin"

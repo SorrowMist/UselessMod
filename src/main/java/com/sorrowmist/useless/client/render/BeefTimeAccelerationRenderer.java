@@ -32,17 +32,51 @@ public final class BeefTimeAccelerationRenderer extends EntityRenderer<BeefTimeA
                        PoseStack poseStack,
                        MultiBufferSource buffer,
                        int packedLight) {
-        if (entity.level().getBlockState(entity.getTargetPos()).isAir()) {
+        String speedText = String.format(Locale.ROOT, "x%.1f", (float) (1 << entity.getTickSpeed()));
+        String timeText = String.format(Locale.ROOT, "%.2fs", entity.getRemainingTime() / 20.0F);
+
+        // 生物目标：载体悬在目标头顶，画始终朝向摄像机的悬浮文字（billboard）
+        if (entity.isEntityTarget()) {
+            poseStack.pushPose();
+            poseStack.mulPose(this.entityRenderDispatcher.cameraOrientation());
+            poseStack.scale(TEXT_SCALE, -TEXT_SCALE, TEXT_SCALE);
+            drawBillboardLine(poseStack, buffer, speedText, -0.28F, 0xFFFFFF, packedLight);
+            drawBillboardLine(poseStack, buffer, timeText, 0.12F, 0xD0D0D0, packedLight);
+            poseStack.popPose();
             return;
         }
 
-        String speedText = String.format(Locale.ROOT, "x%.1f", (float) (1 << entity.getTickSpeed()));
-        String timeText = String.format(Locale.ROOT, "%.2fs", entity.getRemainingTime() / 20.0F);
+        // 方块目标：目标方块被挖掉/替换后不再显示
+        if (entity.level().getBlockState(entity.getTargetPos()).isAir()) {
+            return;
+        }
 
         for (Direction face : Direction.values()) {
             renderText(poseStack, buffer, speedText, face, -0.08F, 0xFFFFFF, packedLight);
             renderText(poseStack, buffer, timeText, face, 0.12F, 0xD0D0D0, packedLight);
         }
+    }
+
+    /** 画一行朝向摄像机的文字（调用方已应用 cameraOrientation 与缩放）。 */
+    private void drawBillboardLine(PoseStack poseStack,
+                                   MultiBufferSource buffer,
+                                   String text,
+                                   float y,
+                                   int color,
+                                   int packedLight) {
+        float x = -this.font.width(text) / 2.0F;
+        this.font.drawInBatch(
+                text,
+                x,
+                y / TEXT_SCALE,
+                color,
+                false,
+                poseStack.last().pose(),
+                buffer,
+                Font.DisplayMode.NORMAL,
+                0,
+                packedLight
+        );
     }
 
     private void renderText(PoseStack poseStack,

@@ -243,6 +243,13 @@ public class ModeTogglePacket implements CustomPacketPayload {
                         EndlessBeafItem.setProtectModeEnabled(stack, msg.enabled);
                     }
                 }
+                case BEEF_ENTITY_TIME_ACCELERATION -> {
+                    if (stack.getItem() instanceof EndlessBeafItem) {
+                        EndlessBeafItem.setEntityTimeAccelerationEnabled(stack, msg.enabled);
+                        // 它只作用于「潜行右键生物」，而建筑魔杖/时间加速/收菜等只管「潜行右键方块」，
+                        // 作用对象不重叠，因此不接入 disable* 互斥。
+                    }
+                }
             }
 
             // 显式同步物品到客户端
@@ -333,6 +340,8 @@ public class ModeTogglePacket implements CustomPacketPayload {
         // 杀戮光环：手持造化杖每 20 tick 对「范围伤害」配置范围内生物结算一次攻击伤害
         BEEF_KILL_AURA,
         // 保护名单模式：暂停光环与范围伤害，方便从容添加保护名单
-        BEEF_PROTECT_MODE
+        BEEF_PROTECT_MODE,
+        // 生物加速：潜行右键生物加速其「计时器」（生长/繁殖冷却/下蛋/补货/长毛…），不跑 AI 与移动
+        BEEF_ENTITY_TIME_ACCELERATION
     }
 }

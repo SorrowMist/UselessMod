@@ -329,6 +329,11 @@ public class ClientEventBusSubscriber {
         // 杀戮光环、范围伤害或保护名单模式至少开一个，否则完全让给原版交互
         if (!EndlessBeafItem.isProtectGestureAvailable(staff)) return false;
 
+        // 「生物加速」模式开启时，Shift+右键生物让给生物加速（与闪现键让位同款）。
+        // 用 byEntity 判定：Ctrl 按种类的手势不受影响。漏了这一步，生物加速永远不会触发——
+        // 本事件被取消发生在 KeyMapping.click 之前，keyUse 不按下，交互包根本不会发出。
+        if (byEntity && EndlessBeafItem.isEntityTimeAccelerationEnabled(staff)) return false;
+
         // 用当前帧重算准星命中，避免用到上一 tick 的旧 hitResult
         mc.gameRenderer.pick(1.0F);
         if (!(mc.hitResult instanceof EntityHitResult hit)) return false;

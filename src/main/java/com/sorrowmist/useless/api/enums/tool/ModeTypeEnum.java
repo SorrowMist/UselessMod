@@ -124,7 +124,13 @@ public enum ModeTypeEnum {
 
     // 保护名单模式：开启时暂停光环与范围伤害，方便从容添加保护名单
     BEEF_PROTECT_MODE_ENABLED("beef_protect_mode_enabled", "tooltip.useless_mod.beef_protect_toggle_mode"),
-    BEEF_PROTECT_MODE_DISABLED("beef_protect_mode_disabled", "tooltip.useless_mod.beef_protect_toggle_mode");
+    BEEF_PROTECT_MODE_DISABLED("beef_protect_mode_disabled", "tooltip.useless_mod.beef_protect_toggle_mode"),
+
+    // 生物加速：潜行右键生物加速其「计时器」（生长/繁殖冷却/下蛋/补货/长毛…），不跑 AI 与移动
+    BEEF_ENTITY_TIME_ACCELERATION_ENABLED("beef_entity_time_acceleration_enabled",
+            "tooltip.useless_mod.beef_entity_time_acceleration_mode"),
+    BEEF_ENTITY_TIME_ACCELERATION_DISABLED("beef_entity_time_acceleration_disabled",
+            "tooltip.useless_mod.beef_entity_time_acceleration_mode");
 
     private final String name;
     private final String tooltipKey;
@@ -247,6 +253,10 @@ public enum ModeTypeEnum {
 
     public static ModeTypeEnum getBeefProtectMode(boolean enabled) {
         return enabled ? BEEF_PROTECT_MODE_ENABLED : BEEF_PROTECT_MODE_DISABLED;
+    }
+
+    public static ModeTypeEnum getBeefEntityTimeAccelerationMode(boolean enabled) {
+        return enabled ? BEEF_ENTITY_TIME_ACCELERATION_ENABLED : BEEF_ENTITY_TIME_ACCELERATION_DISABLED;
     }
 
     public String getName() {return this.name;}

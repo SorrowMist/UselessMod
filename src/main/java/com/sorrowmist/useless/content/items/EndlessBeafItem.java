@@ -172,6 +172,7 @@ public class EndlessBeafItem extends TieredItem {
                 .component(UComponents.BeefFlintAndSteelComponent, true)
                 .component(UComponents.BeefRipenComponent, false)
                 .component(UComponents.BeefForceGrowComponent, false)
+                .component(UComponents.BeefEntityTimeAccelerationComponent, false)
                 .component(UComponents.BeefAutoClickComponent, false)
                 .component(UComponents.AEStoragePriorityComponent, false)
                 .component(UComponents.AeNetworkConnectComponent, false)
@@ -298,6 +299,25 @@ public class EndlessBeafItem extends TieredItem {
 
     public static void setForceGrowEnabled(ItemStack stack, boolean enabled) {
         stack.set(UComponents.BeefForceGrowComponent.get(), enabled);
+    }
+
+    /**
+     * 是否启用「生物加速」：潜行右键生物时加速其「计时器」类数值。
+     *
+     * <p>只改数值，<b>不跑 AI / 寻路 / 移动 / 物理</b>：幼年成长与繁殖后冷却走
+     * {@code AgeableMob.age}，鸡下蛋走 {@code Chicken.eggTime}，羊剪毛后长毛、
+     * 村民补货（原版门槛绑在 {@code gameTime} 上，必须直接调 {@code restock()}）、
+     * 蜜蜂采蜜、海龟下蛋。</p>
+     *
+     * <p>与「保护名单」的 Shift 手势互斥：本项开启时 Shift+右键生物被解释为加速，
+     * 保护名单手势让位（Ctrl 按种类的手势不受影响）。</p>
+     */
+    public static boolean isEntityTimeAccelerationEnabled(ItemStack stack) {
+        return stack.getOrDefault(UComponents.BeefEntityTimeAccelerationComponent.get(), false);
+    }
+
+    public static void setEntityTimeAccelerationEnabled(ItemStack stack, boolean enabled) {
+        stack.set(UComponents.BeefEntityTimeAccelerationComponent.get(), enabled);
     }
 
     /**
@@ -1402,6 +1422,13 @@ public class EndlessBeafItem extends TieredItem {
         InteractionResult teleportResult = tryTeleport(entity.level(), player, stack);
         if (teleportResult != InteractionResult.PASS) return teleportResult;
 
+        // 生物加速（独立模式）：潜行右键生物 → 只推它的「计时器」，不跑 AI / 寻路 / 移动。
+        // 必须排在下面「时间加速拦截」之前：两个模式可同时开启，作用对象分别是方块与生物。
+        if (isEntityTimeAccelerationEnabled(stack) && player.isShiftKeyDown()) {
+            if (entity instanceof Player) return InteractionResult.PASS;
+            return BeefTimeAcceleration.tryUseOnEntity(stack, player, entity);
+        }
+
         if (BeefTimeAcceleration.shouldBlockOtherRightClick(stack, player)) {
             return InteractionResult.FAIL;
         }
@@ -1562,6 +1589,16 @@ public class EndlessBeafItem extends TieredItem {
                                                beefTimeAccelerationEnabled ? "tooltip.useless_mod.enable" :
                                                        "tooltip.useless_mod.disable"
                                        ).withStyle(beefTimeAccelerationEnabled ? ChatFormatting.GREEN : ChatFormatting.GRAY))
+                                       .withStyle(ChatFormatting.AQUA));
+
+        boolean beefEntityTimeAccelerationEnabled = isEntityTimeAccelerationEnabled(stack);
+        tooltipComponents.add(Component.translatable("tooltip.useless_mod.beef_entity_time_acceleration_mode")
+                                       .append(": ")
+                                       .append(Component.translatable(
+                                               beefEntityTimeAccelerationEnabled ? "tooltip.useless_mod.enable" :
+                                                       "tooltip.useless_mod.disable"
+                                       ).withStyle(beefEntityTimeAccelerationEnabled ? ChatFormatting.GREEN
+                                                                                     : ChatFormatting.GRAY))
                                        .withStyle(ChatFormatting.AQUA));
 
         Boolean beefInvulnerabilityValue = stack.get(UComponents.BeefInvulnerabilityEnabledComponent.get());
@@ -1834,6 +1871,9 @@ public class EndlessBeafItem extends TieredItem {
                 Component.translatable("tooltip.useless_mod.beef_kill_aura_hint").withStyle(ChatFormatting.DARK_RED));
         tooltipComponents.add(
                 Component.translatable("tooltip.useless_mod.beef_protect_hint").withStyle(ChatFormatting.BLUE));
+        tooltipComponents.add(
+                Component.translatable("tooltip.useless_mod.beef_entity_time_acceleration_hint")
+                         .withStyle(ChatFormatting.LIGHT_PURPLE));
         tooltipComponents.add(
                 Component.translatable("tooltip.useless_mod.beef_protect_toggle_hint").withStyle(ChatFormatting.BLUE));
 

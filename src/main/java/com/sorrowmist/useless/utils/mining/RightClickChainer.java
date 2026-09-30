@@ -168,10 +168,16 @@ public final class RightClickChainer {
                 chainShape(player), player.getDirection(), player);
 
         int ripened = 0;
+        // 花的掉落物整片收集、末尾只提交一次（与 harvestCrops 同款写法），
+        // 避免逐株向 AE 发上千次请求。
+        List<ItemStack> collected = new ArrayList<>();
         for (BlockPos targetPos : targets) {
-            if (BeefRipen.ripenAt(level, targetPos, player, tool)) {
+            if (BeefRipen.ripenAt(level, targetPos, player, tool, collected)) {
                 ripened++;
             }
+        }
+        if (!collected.isEmpty()) {
+            MiningUtils.handleDrops(player, MiningUtils.mergeItemStacks(collected), tool, Vec3.atCenterOf(origin));
         }
         return ripened;
     }

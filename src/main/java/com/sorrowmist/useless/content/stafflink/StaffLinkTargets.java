@@ -35,6 +35,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * 造化杖无线物流的「容器能力」解析与搬运实现。
@@ -555,10 +556,11 @@ public final class StaffLinkTargets {
      * <p>抽出来之后才发现目标不收，是<b>跳过目标试算</b>那条路的正常分支（见
      * {@link #transfer(Object, ServerLevel, StaffLinkRoute, ServerLevel, StaffLinkRoute, long)}）。</p>
      *
-     * <p><b>{@code template} 不保证是副本</b>：无过滤器的扫描路径用的是
-     * {@link LongItemHandler#peekStack(int)}，它可以直接交出底层对象。而原生实现一旦被
-     * {@code extract} 清空槽位，那个对象本身就会变成空栈 —— 拿它去退回等于塞空气，
-     * 物品凭空蒸发。所以退回前先固化一份。</p>
+     * <p><b>{@code template} 可能是源容器持有的活对象</b>（无过滤器的扫描路径用的是
+     * {@link LongItemHandler#peekStack(int)}，它不 copy）。被抽空时那个对象会就地变成空栈，
+     * 拿它去退回等于塞空气、物品凭空蒸发 —— 所以退回前这里再固化一份。
+     * <b>「写进目标端」那一步同样依赖模板</b>，而它发生在调用方那一侧，所以那边必须<b>在抽取
+     * 之前</b>就固化（见 {@code stabilize}）；这里的 copy 是余量路径的最后一道防线。</p>
      *
      * <p>这次 copy 只在<b>真有余量</b>时才会付，正常路径（抽多少收多少）完全不付。</p>
      *
@@ -575,6 +577,11 @@ public final class StaffLinkTargets {
             ItemStack stable = template.copy();
             long unreturned = leftover - from.insert(stable, leftover, false);
             if (unreturned > 0L) {
+                // 退回不了就落地。这条以前是静默的，而「东西抽出来了、目标没收、源也塞不回」
+                // 正是最容易被误当成「凭空消失」的场景（其实是在源脚边），必须留痕。
+                UselessMod.LOGGER.warn(
+                        "无线物流：{} 个 {} 未能写入目标端、也退不回源端，已掉落在源容器脚边",
+                        unreturned, stable.getItem());
                 dropItems(sourceLevel, sourcePos, stable, unreturned);
                 actuallyMoved -= unreturned;
             }
@@ -610,20 +617,83 @@ public final class StaffLinkTargets {
             if (extracted <= 0L) {
                 return 0L;
             }
+            // 这条分支只在源端是 AE 时才会走到（skipTargetProbe 就是 sourceIsAe），
+            // 而 AE 端点交出的模板一律是新对象（{@code toStack(1)} / {@code key.toStack(1)}），
+            // 抽取不会动它 —— 所以这里不需要下面那次固化。
             return settleItemLeftover(sourceLevel, sourcePos, from, template, extracted,
-                    to.insert(template, extracted, false));
+                    insertInto(to, template, extracted));
         }
         // 模拟：目标最多能接多少（long，跨槽累加精确）。
         long accepted = to.insert(template, request, true);
         if (accepted <= 0L) {
             return 0L;
         }
+        // ⚠️ 抽取前必须先固化模板（见 stabilize 的说明）。
+        ItemStack stable = accepted >= available ? stabilize(template) : template;
         long extracted = from.extract(slot, accepted, false);
         if (extracted <= 0L) {
             return 0L;
         }
-        return settleItemLeftover(sourceLevel, sourcePos, from, template, extracted,
-                to.insert(template, extracted, false));
+        return settleItemLeftover(sourceLevel, sourcePos, from, stable, extracted,
+                insertInto(to, stable, extracted));
+    }
+
+    /**
+     * 抽取前把源容器持有的那只模板栈固化一份。
+     *
+     * <p><b>为什么必须固化。</b>扫描路径的模板来自 {@link LongItemHandler#peekStack(int)}，它
+     * <b>故意不 copy</b>（省掉实测占无线物流总耗时 13% 的一次拷贝），交出的可能就是源容器
+     * <b>槽里那只对象本身</b>。而容器抽空一个槽时就地改写这只栈是家常便饭 —— 最典型的就是
+     * <b>原版箱子 / 木桶</b>：{@code InvWrapper.extractItem} 走 {@code Container#removeItem}，
+     * 即 {@code ContainerHelper.removeItem} 里的 {@code stack.split(amount)}，而
+     * {@code split} 的语义就是<b>就地 shrink 自己</b>。于是我们手里那只模板跟着变成空栈。</p>
+     *
+     * <p>模板在抽取之后还要用<b>两次</b>：写进目标端、以及余量退回源端。变成空栈之后这两步都会
+     * 静默失败（{@code insert} 见到空栈直接返回 0，连日志都不会打），结果就是
+     * <b>「东西从源里抽走了，却既没进目标也没退回，凭空蒸发」</b>。流体侧没有这个问题，是因为
+     * {@code getFluidInTank} 一律返回副本，注释里写明了同样的理由。</p>
+     *
+     * <p><b>只在真会被抽空时才付这次拷贝。</b>抽取请求量恒 ≤ 该槽存量，所以
+     * {@code accepted >= available}（等价于「目标全要、这一抽正好把槽清空」）是「模板会被就地
+     * 抽空」的充要条件；其余情况槽里必然还剩东西，模板对象依旧可用（数量在这条路上不参与任何
+     * 判定：写入方一律自己设 count，退回/掉落也走 {@code copyWithCount}）。</p>
+     *
+     * <p>另一个方向的保守性：容器若每次只让渡 1 个（SophisticatedCore 那类），
+     * {@code extract} 会因 {@code MAX_CHUNK_STEPS} 提前收手、槽其实没被抽空，这时多付的这次
+     * 拷贝只是浪费，不会改变行为。</p>
+     */
+    private static ItemStack stabilize(ItemStack template) {
+        return template.copy();
+    }
+
+    /**
+     * 写进目标端，并盯住「模板在抽取途中被抽坏」这种本该不可能发生的死账。
+     *
+     * <p>正常路径只是转发一次调用、零开销。模板真被抽空时（{@link #stabilize} 的判据没覆盖到
+     * 的异常容器：报了部分抽取却把槽清空了），{@code insert} 会静默返回 0，随后余量退回同样
+     * 静默失败 —— 物品就此消失且不留任何痕迹。这里补一条限流警告，让这种损失至少可见。</p>
+     */
+    private static long insertInto(LongItemHandler to, ItemStack template, long amount) {
+        if (template.isEmpty()) {
+            warnTemplateVoided(amount);
+            return 0L;
+        }
+        return to.insert(template, amount, false);
+    }
+
+    /** 「模板被抽空」告警的限流：每 {@link #TEMPLATE_WARN_INTERVAL_MS} 毫秒最多一条。 */
+    private static final long TEMPLATE_WARN_INTERVAL_MS = 5000L;
+    private static final AtomicLong LAST_TEMPLATE_WARN_AT = new AtomicLong();
+
+    private static void warnTemplateVoided(long amount) {
+        long now = System.currentTimeMillis();
+        long last = LAST_TEMPLATE_WARN_AT.get();
+        if (now - last < TEMPLATE_WARN_INTERVAL_MS || !LAST_TEMPLATE_WARN_AT.compareAndSet(last, now)) {
+            return;
+        }
+        UselessMod.LOGGER.warn(
+                "无线物流：源容器抽取时就地清空了模板栈，{} 个物品无法写入目标端（模板固化判据未覆盖）",
+                amount);
     }
 
     /**

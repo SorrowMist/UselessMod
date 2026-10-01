@@ -77,12 +77,12 @@ public final class LongResourceAdapters {
 
             @Override
             public ItemStack peekStack(int slot) {
-                // 扫描路径专用，故意不 copy：调用方用完即弃，且 extract 之后不再依赖它。
+                // 扫描路径专用，故意不 copy：省掉我们自己叠加的那次 copy（实测占无线物流总耗时的 13%）。
                 //
-                // 原生实现的引用型返回值在这里是安全的 —— 唯一的「抽取后还要用这个模板」的地方
-                // 是 settleItemLeftover 的余量退回，那边会在退回前自己固化一份。
-                // AE2 的 GenericStackItemStorage 本来就每次新建对象，这里连那次新建都省不出，
-                // 但省掉的是我们自己叠加的那次 copy（实测占无线物流总耗时的 13%）。
+                // ⚠️ 交出的就是容器槽里那只对象本身，所以调用方在**抽取之后**再拿它用是不安全的：
+                //    原生容器的 extractItem 抽空一个槽时常把这只栈就地 shrink 成空。扫描路径因此
+                //    在「这一抽会把槽抽空」时先固化一份（StaffLinkTargets#stabilize），而不是
+                //    依赖这里返回副本。流体侧没有这个问题，是因为 getFluidInTank 一律返回副本。
                 return handler.getStackInSlot(slot);
             }
 

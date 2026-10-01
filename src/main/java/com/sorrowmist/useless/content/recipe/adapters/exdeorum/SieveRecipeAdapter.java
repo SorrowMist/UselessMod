@@ -7,6 +7,7 @@ import com.sorrowmist.useless.content.recipe.CountedIngredient;
 import com.sorrowmist.useless.content.recipe.ExpectedOutputScaler;
 import com.sorrowmist.useless.content.recipe.IRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.RecipeSourceIds;
+import net.minecraft.core.HolderLookup;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.crafting.Ingredient;
@@ -17,9 +18,14 @@ import thedarkcolour.exdeorum.recipe.sieve.CompressedSieveRecipe;
 import thedarkcolour.exdeorum.recipe.sieve.SieveRecipe;
 
 import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalDouble;
+import java.util.Set;
+import java.util.TreeSet;
 
 /**
  * 把 Ex Deorum 的筛子与重型筛子配方转换为合金炉配方。
@@ -94,7 +100,7 @@ public final class SieveRecipeAdapter implements IRecipeAdapter<SieveSyntheticRe
         }
 
         List<RecipeHolder<SieveSyntheticRecipe>> recipes = new ArrayList<>();
-        for (AdvancedAlloyFurnaceRecipe converted : convertSieves(sources)) {
+        for (AdvancedAlloyFurnaceRecipe converted : convertSieves(sources, level.registryAccess())) {
             recipes.add(new RecipeHolder<>(converted.id(), new SieveSyntheticRecipe(converted)));
         }
         return List.copyOf(recipes);
@@ -112,11 +118,12 @@ public final class SieveRecipeAdapter implements IRecipeAdapter<SieveSyntheticRe
     /**
      * 按「输入材料 + 具体筛网」分组并转换全部筛子配方。
      *
-     * @param sources 运行期枚举到的筛子配方
+     * @param sources    运行期枚举到的筛子配方
+     * @param registries 注册表访问器，用于编码材料组件以派生配方 id
      * @return 转换后的合金炉配方列表
      */
     private static List<AdvancedAlloyFurnaceRecipe> convertSieves(
-            List<RecipeHolder<SieveRecipe>> sources) {
+            List<RecipeHolder<SieveRecipe>> sources, HolderLookup.Provider registries) {
         List<SieveGroup> groups = new ArrayList<>();
 
         for (RecipeHolder<SieveRecipe> holder : sources) {
@@ -144,16 +151,29 @@ public final class SieveRecipeAdapter implements IRecipeAdapter<SieveSyntheticRe
             for (ItemStack mesh : meshes) {
                 SieveGroup group = findGroup(groups, compressed, mesh, recipe.ingredient());
                 if (group == null) {
-                    group = new SieveGroup(compressed, mesh, recipe.ingredient(), holder.id());
+                    group = new SieveGroup(compressed, mesh, recipe.ingredient(), registries);
                     groups.add(group);
                 }
                 group.add(recipe.result, expected.getAsDouble());
+                group.addSourceId(holder.id());
             }
         }
 
+        // 分组顺序由源配方枚举顺序决定，而该顺序在客户端与服务端不保证一致。转换结果本身
+        // 不依赖顺序，但排序后可以让配方目录的条目次序保持稳定，便于比对与缓存。
+        groups.sort(Comparator.comparing(SieveGroup::sortKey));
+
+        // 内容键相同的分组无法共存：分组判等的三个分量与内容键一一对应，因此该统计只用于
+        // 识别材料以物品级键表达、无法区分组件差异的碰撞，正常结果为全部为 1。
+        Map<String, Integer> pathCounts = new HashMap<>();
+        for (SieveGroup group : groups) {
+            pathCounts.merge(group.idPath(), 1, Integer::sum);
+        }
+
         List<AdvancedAlloyFurnaceRecipe> recipes = new ArrayList<>();
-        for (int index = 0; index < groups.size(); index++) {
-            AdvancedAlloyFurnaceRecipe converted = groups.get(index).toRecipe(index);
+        for (SieveGroup group : groups) {
+            AdvancedAlloyFurnaceRecipe converted =
+                    group.toRecipe(pathCounts.getOrDefault(group.idPath(), 1) > 1);
             if (converted != null) {
                 recipes.add(converted);
             }
@@ -178,15 +198,42 @@ public final class SieveRecipeAdapter implements IRecipeAdapter<SieveSyntheticRe
         private final boolean compressed;
         private final ItemStack mesh;
         private final Ingredient input;
-        private final ResourceLocation sourceId;
+        private final String contentKey;
+        private final Set<ResourceLocation> sourceIds = new TreeSet<>();
         private final List<ExpectedOutputScaler.WeightedItemOutput> weightedOutputs = new ArrayList<>();
 
         private SieveGroup(boolean compressed, ItemStack mesh, Ingredient input,
-                           ResourceLocation sourceId) {
+                           HolderLookup.Provider registries) {
             this.compressed = compressed;
             this.mesh = mesh;
             this.input = input;
-            this.sourceId = sourceId;
+            // 分组判等的三个分量即配方身份的全部内容来源，故 id 只由它们派生。
+            this.contentKey = (compressed ? "compressed_sieve_" : "sieve_")
+                    + ExDeorumRecipeAdapterUtils.stableItemKey(mesh) + "_"
+                    + ExDeorumRecipeAdapterUtils.stableIngredientKey(input, registries);
+        }
+
+        /** 与配方枚举顺序无关的排序键。 */
+        private String sortKey() {
+            return contentKey;
+        }
+
+        /**
+         * 记录合入本分组的源配方 id。
+         *
+         * <p>源配方 id 仅在内容键发生碰撞时用于消歧，正常路径不进入配方 id：分组合并时哪条
+         * 源配方先被枚举到由遍历顺序决定，若把它作为 id 的固定组成部分，两端就会生成不同的
+         * 配方 id。此处用有序集合消除记录顺序的影响。</p>
+         */
+        private void addSourceId(ResourceLocation id) {
+            if (id != null) {
+                sourceIds.add(id);
+            }
+        }
+
+        /** 配方 id 的主体路径，不含命名空间。 */
+        private String idPath() {
+            return contentKey + "_converted";
         }
 
         private boolean matches(boolean compressed, ItemStack mesh, Ingredient input) {
@@ -201,7 +248,7 @@ public final class SieveRecipeAdapter implements IRecipeAdapter<SieveSyntheticRe
         }
 
         @Nullable
-        private AdvancedAlloyFurnaceRecipe toRecipe(int index) {
+        private AdvancedAlloyFurnaceRecipe toRecipe(boolean disambiguate) {
             List<Ingredient> deviceMolds = compressed
                     ? ExDeorumRecipeAdapterUtils.compressedSieveMolds()
                     : ExDeorumRecipeAdapterUtils.sieveMolds();
@@ -225,9 +272,16 @@ public final class SieveRecipeAdapter implements IRecipeAdapter<SieveSyntheticRe
 
             int processTime = ExDeorumRecipeAdapterUtils.processTimeFor(operations);
 
-            // 同一源配方会按筛网拆分为多条，序号用于保证转换后的配方 id 互不相同。
+            // 同一源配方会按筛网拆分为多条，配方 id 必须由分组内容派生：源配方与筛网的枚举
+            // 顺序在客户端与服务端不保证一致，若改用集合下标或「首条源配方 id」，两端会把
+            // 同一个 id 指向不同的配方，导致 JEI 侧选中的配方在服务端目录中无法解析。
+            String path = idPath();
+            if (disambiguate) {
+                path = path + "_" + AdapterUtils.stableHash(
+                        String.join("|", sourceIds.stream().map(ResourceLocation::toString).toList()));
+            }
             ResourceLocation recipeId = ResourceLocation.fromNamespaceAndPath(
-                    sourceId.getNamespace(), sourceId.getPath() + "_mesh_" + index + "_converted");
+                    RecipeSourceIds.EX_DEORUM, path);
 
             return new AdvancedAlloyFurnaceRecipe(
                     recipeId,

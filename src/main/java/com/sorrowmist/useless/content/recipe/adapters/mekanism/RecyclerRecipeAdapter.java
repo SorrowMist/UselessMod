@@ -5,7 +5,10 @@ import com.jerry.mekmm.api.recipes.RecyclerRecipe;
 import com.jerry.mekmm.common.config.MoreMachineConfig;
 import com.jerry.mekmm.common.registries.MoreMachineBlocks;
 import com.jerry.mekmm.common.tile.machine.TileEntityRecycler;
+import com.sorrowmist.useless.content.recipe.AdapterUtils;
 import com.sorrowmist.useless.content.recipe.AdvancedAlloyFurnaceRecipe;
+import com.sorrowmist.useless.content.recipe.AlloyFurnaceRecipeFingerprint;
+import net.minecraft.core.HolderLookup;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.tags.FluidTags;
@@ -56,9 +59,8 @@ public final class RecyclerRecipeAdapter extends MekanismSyntheticRecipeAdapter 
         }
 
         List<RecipeHolder<MekanismSyntheticRecipe>> result = new ArrayList<>(outputs.size());
-        for (int index = 0; index < outputs.size(); index++) {
-            ItemStack output = outputs.get(index);
-            ResourceLocation id = recipeId(index, output);
+        for (ItemStack output : outputs) {
+            ResourceLocation id = recipeId(output, level.registryAccess());
             AdvancedAlloyFurnaceRecipe converted = MekanismChemicalRecipeSupport.recipe(
                     id,
                     List.of(),
@@ -91,12 +93,23 @@ public final class RecyclerRecipeAdapter extends MekanismSyntheticRecipeAdapter 
         return false;
     }
 
-    private static ResourceLocation recipeId(int index, ItemStack output) {
+    /**
+     * 由产物内容构造配方 id。
+     *
+     * <p>id 不得包含产物列表下标：客户端与服务端的回收配方枚举顺序不保证一致，位置派生的 id
+     * 会让同一个 id 在两端指向不同的产物，导致万象样板在服务端无法解析。判重依据必须与
+     * {@link #containsOutput} 完全一致——它以「物品 + 组件 + 数量」判定产物是否相同，因此 id
+     * 只含物品注册名与数量是不够的：同物品同数量而组件不同的产物会同时存在并产生相同 id。
+     * 此处复用指纹模块的物品栈编码，它递归规范化组件映射，只由数据内容决定结果。</p>
+     */
+    private static ResourceLocation recipeId(ItemStack output, HolderLookup.Provider registries) {
         ResourceLocation itemId = BuiltInRegistries.ITEM.getKey(output.getItem());
-        String suffix = itemId == null
-                ? "output_" + index
+        String prefix = itemId == null
+                ? "unregistered"
                 : itemId.getNamespace() + "_" + itemId.getPath().replace('/', '_');
         return ResourceLocation.fromNamespaceAndPath(
-                "mekmm", "recycler_water_" + index + "_" + suffix);
+                "mekmm", "recycler_water_" + prefix + "_" + output.getCount() + "_"
+                        + AdapterUtils.stableHash(
+                                AlloyFurnaceRecipeFingerprint.safeItemStack(output, registries)));
     }
 }

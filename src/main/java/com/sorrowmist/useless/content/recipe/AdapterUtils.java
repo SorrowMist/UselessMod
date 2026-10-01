@@ -20,8 +20,12 @@ import net.neoforged.neoforge.fluids.crafting.FluidIngredient;
 import net.neoforged.neoforge.fluids.crafting.SizedFluidIngredient;
 import org.jetbrains.annotations.Nullable;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.ConcurrentModificationException;
+import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -554,6 +558,26 @@ public class AdapterUtils {
                 .map(entry -> new CountedIngredient(entry.getKey(), entry.getValue()))
                 .toList();
         return ItemIngredientAllocator.matches(requirements, inputs, 1L);
+    }
+
+    /**
+     * 计算文本的 SHA-256 摘要并截断为定长片段，供构造长度受限的稳定配方 id 使用。
+     *
+     * <p>配方 id 必须只由内容特征派生：客户端与服务端各自构建一次配方目录，任何依赖遍历
+     * 顺序的组成部分都会让同一个 id 在两端指向不同配方，表现为万象样板在服务端无法解析。
+     * 内容特征拼接过长或含资源路径不允许的字符时，用摘要替代。</p>
+     *
+     * @param value 参与摘要的文本
+     * @return 32 个十六进制字符的摘要片段
+     */
+    public static String stableHash(String value) {
+        try {
+            byte[] hash = MessageDigest.getInstance("SHA-256")
+                    .digest(value.getBytes(StandardCharsets.UTF_8));
+            return HexFormat.of().formatHex(hash).substring(0, 32);
+        } catch (NoSuchAlgorithmException exception) {
+            throw new IllegalStateException("SHA-256 is unavailable", exception);
+        }
     }
 
     /**

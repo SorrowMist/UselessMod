@@ -4,11 +4,13 @@ import com.mojang.logging.LogUtils;
 import com.sorrowmist.useless.api.enums.AlloyFurnaceMode;
 import com.sorrowmist.useless.content.recipe.AdapterUtils;
 import com.sorrowmist.useless.content.recipe.AdvancedAlloyFurnaceRecipe;
+import com.sorrowmist.useless.content.recipe.AlloyFurnaceRecipeFingerprint;
 import com.sorrowmist.useless.content.recipe.CountedIngredient;
 import com.sorrowmist.useless.content.recipe.IRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.ItemIngredientAllocator;
 import com.sorrowmist.useless.init.ModItems;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
+import net.minecraft.core.HolderLookup;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.entity.EntityType;
@@ -253,8 +255,9 @@ public final class VillagerTradeRecipeAdapter
                             }
 
                             AdvancedAlloyFurnaceRecipe converted = convertOffer(
-                                    recipeId(profession.profession(), villagerLevel, listingIndex,
-                                            context.villagerType(), experimental),
+                                    recipeId(profession.profession(), villagerLevel,
+                                            context.villagerType(), experimental, offer,
+                                            level.registryAccess()),
                                     offer, villagerMolds(profession));
                             if (converted != null) {
                                 RecipeHolder<VillagerTradeSyntheticRecipe> holder =
@@ -316,8 +319,11 @@ public final class VillagerTradeRecipeAdapter
             }
             try {
                 MerchantOffer offer = createWanderingTraderOffer(level, listing);
+                if (offer == null) {
+                    continue;
+                }
                 AdvancedAlloyFurnaceRecipe converted = convertOffer(
-                        wanderingRecipeId(experimental, groupIndex, listingIndex), offer,
+                        wanderingRecipeId(experimental, offer, level.registryAccess()), offer,
                         List.of(AdapterUtils.toMoldIngredient(
                                 new ItemStack(Items.WANDERING_TRADER_SPAWN_EGG))));
                 if (converted != null) {
@@ -577,12 +583,22 @@ public final class VillagerTradeRecipeAdapter
         return ItemIngredientAllocator.matches(mergedInputs, required);
     }
 
+    /**
+     * 由交易内容构造村民交易配方的 id。
+     *
+     * <p>id 不得包含交易条目在数组中的下标：客户端与服务端的目录各自独立构建，交易表的枚举
+     * 顺序不保证一致，位置派生的 id 会让同一个 id 在两端指向不同的交易，导致万象样板在服务端
+     * 无法解析。此处以报价的实际内容（产物与两项成本）派生后缀，职业、等级与村民类型仍作为
+     * 可读前缀保留。内容完全相同的两条报价会得到相同 id，由调用方的 {@code putIfAbsent} 合并，
+     * 与二者配方等价的事实一致。</p>
+     */
     private static net.minecraft.resources.ResourceLocation recipeId(
             VillagerProfession profession,
             int villagerLevel,
-            int listingIndex,
             @Nullable VillagerType villagerType,
-            boolean experimental) {
+            boolean experimental,
+            MerchantOffer offer,
+            HolderLookup.Provider registries) {
         net.minecraft.resources.ResourceLocation professionId =
                 net.minecraft.core.registries.BuiltInRegistries.VILLAGER_PROFESSION.getKey(profession);
         String professionPart;
@@ -597,7 +613,7 @@ public final class VillagerTradeRecipeAdapter
         String path = "villager_trade/"
                 + (experimental ? "experimental" : "vanilla") + "/"
                 + pathPart(professionPart) + "/level_" + villagerLevel
-                + "/trade_" + listingIndex;
+                + "/trade_" + offerKey(offer, registries);
         if (villagerType != null) {
             path += "/type_" + pathPart(villagerType.toString());
         }
@@ -607,13 +623,30 @@ public final class VillagerTradeRecipeAdapter
     }
 
     private static net.minecraft.resources.ResourceLocation wanderingRecipeId(
-            boolean experimental, int groupIndex, int listingIndex) {
+            boolean experimental, MerchantOffer offer, HolderLookup.Provider registries) {
         String path = "villager_trade/"
                 + (experimental ? "experimental" : "vanilla")
-                + "/wandering_trader/group_" + groupIndex
-                + "/trade_" + listingIndex + "/mold_spawn_egg";
+                + "/wandering_trader/trade_" + offerKey(offer, registries)
+                + "/mold_spawn_egg";
         return net.minecraft.resources.ResourceLocation.fromNamespaceAndPath(
                 RECIPE_NAMESPACE, path);
+    }
+
+    /**
+     * 把报价内容摘要为定长片段，作为配方 id 的内容特征部分。
+     *
+     * <p>编码复用 {@link AlloyFurnaceRecipeFingerprint#safeItemStack}，它会递归规范化组件映射，
+     * 因此组件内部任何迭代顺序差异都不会影响结果。数量必须计入——成本数量是配方输入的一部分，
+     * 同物品同组件而数量不同的报价是两条不同配方。</p>
+     */
+    private static String offerKey(MerchantOffer offer, HolderLookup.Provider registries) {
+        StringBuilder value = new StringBuilder();
+        value.append(AlloyFurnaceRecipeFingerprint.safeItemStack(offer.getResult(), registries));
+        value.append('|').append(AlloyFurnaceRecipeFingerprint.safeItemStack(
+                offer.getBaseCostA(), registries));
+        offer.getItemCostB().map(ItemCost::itemStack).ifPresent(cost -> value.append('|')
+                .append(AlloyFurnaceRecipeFingerprint.safeItemStack(cost, registries)));
+        return AdapterUtils.stableHash(value.toString());
     }
 
     private static String pathPart(String value) {

@@ -1,6 +1,7 @@
 package com.sorrowmist.useless.content.recipe.adapters.exdeorum;
 
 import com.sorrowmist.useless.content.recipe.AdapterUtils;
+import com.sorrowmist.useless.content.recipe.AlloyFurnaceRecipeFingerprint;
 import com.sorrowmist.useless.content.recipe.CountedIngredient;
 import com.sorrowmist.useless.content.recipe.ExpectedOutputScaler;
 import com.sorrowmist.useless.content.recipe.FluidIngredientAllocator;
@@ -12,6 +13,7 @@ import net.minecraft.world.item.crafting.Ingredient;
 import net.minecraft.world.item.crafting.Recipe;
 import net.minecraft.world.item.crafting.RecipeHolder;
 import net.minecraft.world.item.crafting.RecipeManager;
+import net.minecraft.core.HolderLookup;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.level.ItemLike;
@@ -356,6 +358,84 @@ public final class ExDeorumRecipeAdapterUtils {
             items.add(new ItemStack(candidate.getItem()));
         }
         return List.copyOf(items);
+    }
+
+    /**
+     * 取物品的稳定标识片段，用于构造与遍历顺序无关的配方 id。
+     *
+     * <p>筛网与输入材料可以以标签或候选列表的形式声明，其展开顺序在客户端与服务端不保证
+     * 一致，因此配方 id 只能由物品注册名一类的内容特征派生，不能使用集合下标。未注册物品
+     * 回退为占位片段：该情形仅出现在注册表尚未就绪时，此时转换结果本身也不会被采纳。</p>
+     *
+     * @param stack 参与构成配方身份的物品栈
+     * @return 由注册名拼成的稳定片段，命名空间与路径中的分隔符统一替换为下划线
+     */
+    public static String stableItemKey(@Nullable ItemStack stack) {
+        if (stack == null || stack.isEmpty()) {
+            return "empty";
+        }
+
+        ResourceLocation key = BuiltInRegistries.ITEM.getKey(stack.getItem());
+        if (key == null) {
+            return "unregistered";
+        }
+        return key.getNamespace() + "_" + key.getPath().replace('/', '_');
+    }
+
+    /**
+     * 取输入材料的稳定标识片段，用于构造与遍历顺序无关的配方 id。
+     *
+     * <p>材料以 {@link Ingredient} 声明，可以是标签或候选列表，其候选展开顺序在客户端与
+     * 服务端不保证一致。此处对候选物品排序去重后再拼接，使结果只取决于材料集合本身。
+     *
+     * <p>候选的编码必须与 {@link AdapterUtils#areIngredientsEqual} 的判等口径一致——后者以
+     * 「物品 + 组件」判定材料是否相同，因此仅取注册名不足以区分组件不同的候选，会让两条不同
+     * 材料映射到同一个 id。单候选且无组件时直接使用注册名以保持可读；其余情形用集合内容的
+     * SHA-256 摘要表达，避免拼接结果含资源路径不允许的分隔符或长度不可控。</p>
+     *
+     * @param ingredient 参与构成配方身份的输入材料
+     * @param registries 注册表访问器，用于编码物品栈组件
+     * @return 与候选展开顺序无关的稳定片段
+     */
+    public static String stableIngredientKey(
+            @Nullable Ingredient ingredient, HolderLookup.Provider registries) {
+        if (ingredient == null || ingredient.isEmpty()) {
+            return "empty";
+        }
+
+        ItemStack[] candidates;
+        try {
+            candidates = ingredient.getItems();
+        } catch (RuntimeException exception) {
+            return "unavailable";
+        }
+
+        Set<String> keys = new HashSet<>();
+        @Nullable ItemStack single = null;
+        boolean simple = true;
+        for (ItemStack candidate : candidates) {
+            if (candidate == null || candidate.isEmpty()) {
+                continue;
+            }
+            keys.add(AlloyFurnaceRecipeFingerprint.safeItemStack(candidate, registries));
+            if (single == null) {
+                single = candidate;
+            }
+            if (candidate.getComponentsPatch() != null
+                    && !candidate.getComponentsPatch().isEmpty()) {
+                simple = false;
+            }
+        }
+        if (keys.isEmpty() || single == null) {
+            return "empty";
+        }
+        if (simple && keys.size() == 1) {
+            return stableItemKey(single);
+        }
+
+        List<String> sorted = new ArrayList<>(keys);
+        sorted.sort(Comparator.naturalOrder());
+        return AdapterUtils.stableHash(String.join("|", sorted));
     }
 
     /**

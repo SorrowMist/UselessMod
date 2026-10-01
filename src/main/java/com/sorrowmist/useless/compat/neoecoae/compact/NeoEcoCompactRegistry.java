@@ -25,6 +25,8 @@ import com.sorrowmist.useless.compat.neoecoae.compact.shadow.ShadowComputationPa
 import com.sorrowmist.useless.compat.neoecoae.compact.shadow.ShadowCraftingHostBlockEntity;
 import com.sorrowmist.useless.compat.neoecoae.compact.shadow.ShadowCraftingParallelCoreBlockEntity;
 import com.sorrowmist.useless.compat.neoecoae.compact.shadow.ShadowCraftingWorkerBlockEntity;
+import com.sorrowmist.useless.compat.neoecoae.compact.shadow.ShadowFluidInputHatchBlockEntity;
+import com.sorrowmist.useless.compat.neoecoae.compact.shadow.ShadowFluidOutputHatchBlockEntity;
 import com.sorrowmist.useless.compat.neoecoae.compact.shadow.ShadowInterfaceBlockEntity;
 import com.sorrowmist.useless.compat.neoecoae.compact.shadow.ShadowPatternBusBlockEntity;
 import com.sorrowmist.useless.compat.neoecoae.compact.shadow.ShadowThreadingCoreBlockEntity;
@@ -40,6 +42,7 @@ import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.state.BlockBehaviour;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent;
+import net.neoforged.neoforge.capabilities.Capabilities;
 import net.neoforged.neoforge.capabilities.RegisterCapabilitiesEvent;
 import net.neoforged.neoforge.registries.DeferredBlock;
 import net.neoforged.neoforge.registries.DeferredHolder;
@@ -171,6 +174,20 @@ public final class NeoEcoCompactRegistry {
                             NeoEcoCompactRegistry.SHADOW_PATTERN_BUS.get(), pos, state),
                     COMPACT_F9.get()).build(null));
 
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<ShadowFluidInputHatchBlockEntity>>
+            SHADOW_FLUID_INPUT_HATCH = BLOCK_ENTITY_TYPES.register("compact_shadow_fluid_input_hatch",
+            () -> BlockEntityType.Builder.of(
+                    (pos, state) -> new ShadowFluidInputHatchBlockEntity(
+                            NeoEcoCompactRegistry.SHADOW_FLUID_INPUT_HATCH.get(), pos, state),
+                    COMPACT_F9.get()).build(null));
+
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<ShadowFluidOutputHatchBlockEntity>>
+            SHADOW_FLUID_OUTPUT_HATCH = BLOCK_ENTITY_TYPES.register("compact_shadow_fluid_output_hatch",
+            () -> BlockEntityType.Builder.of(
+                    (pos, state) -> new ShadowFluidOutputHatchBlockEntity(
+                            NeoEcoCompactRegistry.SHADOW_FLUID_OUTPUT_HATCH.get(), pos, state),
+                    COMPACT_F9.get()).build(null));
+
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<ExposedPatternBusBlockEntity>>
             COMPACT_EXPOSED_PATTERN_BUS = BLOCK_ENTITY_TYPES.register("compact_exposed_pattern_bus",
             () -> BlockEntityType.Builder.of(
@@ -208,6 +225,8 @@ public final class NeoEcoCompactRegistry {
                 (blockEntity, side) -> (IInWorldGridNodeHost) blockEntity);
         event.registerBlockEntity(AECapabilities.IN_WORLD_GRID_NODE_HOST, COMPACT_F9_BE.get(),
                 (blockEntity, side) -> (IInWorldGridNodeHost) blockEntity);
+        event.registerBlockEntity(Capabilities.FluidHandler.BLOCK, COMPACT_F9_BE.get(),
+                (blockEntity, side) -> blockEntity.getFluidHandler());
         event.registerBlockEntity(AECapabilities.IN_WORLD_GRID_NODE_HOST, COMPACT_L9_BE.get(),
                 (blockEntity, side) -> (IInWorldGridNodeHost) blockEntity);
     }

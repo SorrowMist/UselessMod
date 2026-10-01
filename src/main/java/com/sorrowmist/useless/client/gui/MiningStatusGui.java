@@ -28,7 +28,7 @@ public class MiningStatusGui {
         Minecraft mc = Minecraft.getInstance();
         LocalPlayer player = mc.player;
         if (player == null || mc.screen != null) return;
-        if (!KeyBindings.TRIGGER_CHAIN_MINING_KEY.get().isDown()) return;
+        if (!KeyBindings.isChainMiningKeyDown()) return;
 
         // 该面板描述的是造化杖自身的连锁状态，未持有该工具时不存在可展示的内容，
         // 因此在绘制前直接返回，避免出现与手持物品无关的状态读数。

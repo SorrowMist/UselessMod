@@ -330,7 +330,7 @@ dependencies {
 //    runtimeOnly "maven.modrinth:allthemodium:2.9.5"
     implementation "maven.modrinth:extendedae-plus:AtuOmKkV"
 //    runtimeOnly "maven.modrinth:omnitools:1.21.1-1.2.1"
-//    runtimeOnly "curse.maven:ftb-ultimine-forge-386134:7188395"
+    implementation "curse.maven:ftb-ultimine-forge-386134:7188395"
     // 神秘农业
     implementation "curse.maven:cucumber-272335:8035802"
     implementation "curse.maven:mystical-agriculture-246640:8035819"
@@ -338,7 +338,7 @@ dependencies {
 
     implementation "maven.modrinth:hostile-neural-networks:1.21.1-6.5.1"
 
-    compileOnly "maven.modrinth:ex-deorum:3.12"
+    implementation "maven.modrinth:ex-deorum:3.12"
 
     //自然灵气
     implementation "maven.modrinth:natures-aura:41.9"

@@ -80,6 +80,30 @@ public class KeyBindings {
             GLFW.GLFW_KEY_TAB,
             CATEGORY
     ));
+    // 连锁挖掘接管键
+    //
+    // 造化杖已加入 #ftbultimine:excluded_tools，FTB Ultimine 不再对其实施连锁，
+    // 其默认连锁键（重音符 `）因此空出。本键默认复用该键位，使玩家的操作习惯保持不变：
+    // 手持造化杖按下它即触发本模组的连锁挖掘，而其它工具按下它仍由 FTB 正常连锁。
+    private static final String TRIGGER_FTB_CHAIN_MINING = "key.useless_mod.trigger_ftb_chain_mining";
+    public static final Lazy<KeyMapping> TRIGGER_FTB_CHAIN_MINING_KEY = Lazy.of(() -> new KeyMapping(
+            TRIGGER_FTB_CHAIN_MINING,
+            KeyConflictContext.IN_GAME,
+            InputConstants.Type.KEYSYM,
+            GLFW.GLFW_KEY_GRAVE_ACCENT,
+            CATEGORY
+    ));
+    /**
+     * 连锁键是否按下。
+     *
+     * <p>连锁可由 Tab 键或接管键触发，两者语义等价。所有连锁相关判定——发送按键包、
+     * 高亮预览、状态面板、Shift 滚轮切换形状、R 键连锁——都必须经由此方法，
+     * 否则会出现「能挖掘但无高亮」这类两端不一致的表现。</p>
+     */
+    public static boolean isChainMiningKeyDown() {
+        return TRIGGER_CHAIN_MINING_KEY.get().isDown() || TRIGGER_FTB_CHAIN_MINING_KEY.get().isDown();
+    }
+
     // 耕地/草径模式切换（右键泥土时的优先行为）
     private static final String SWITCH_FARMLAND_MODE = "key.useless_mod.switch_farmland_mode";
     public static final Lazy<KeyMapping> SWITCH_FARMLAND_MODE_KEY = Lazy.of(() -> new KeyMapping(

@@ -1855,6 +1855,10 @@ public class EndlessBeafItem extends TieredItem {
             this.addKeyTooltip(tooltipComponents, KeyBindings.TRIGGER_CHAIN_MINING_KEY,
                                "tooltip.useless_mod.key.trigger_chain_mining"
             );
+            // 接管键沿用 FTB 连锁的默认键位，需一并列出，否则习惯该键位的玩家无从得知它同样可用
+            this.addKeyTooltip(tooltipComponents, KeyBindings.TRIGGER_FTB_CHAIN_MINING_KEY,
+                               "tooltip.useless_mod.key.trigger_ftb_chain_mining"
+            );
             this.addKeyTooltip(tooltipComponents, KeyBindings.TRIGGER_CHAIN_MINING_KEY,
                                "tooltip.useless_mod.key.chain_use"
             );

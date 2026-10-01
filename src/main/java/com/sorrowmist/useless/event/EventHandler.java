@@ -184,8 +184,24 @@ public class EventHandler {
         }
     }
 
-    @SubscribeEvent
+    /**
+     * 造化杖的方块破坏入口。
+     *
+     * <p>该监听器的优先级必须高于 architectury 转发 {@code BlockEvent.BREAK} 所用的 {@code HIGH}：
+     * FTB Ultimine 经该桥接注册连锁回调，其回调签名不接收事件对象，无法感知本模组的取消，
+     * 一旦其先行执行便会按自身流程再破坏同一批方块并投出原版掉落，
+     * 与本模组改写后的掉落并存，表现为连锁挖掘同一方块产出两份物品。</p>
+     *
+     * <p>同时需要接收已被取消的事件：该场景下取消由本模组自身或其它连锁模组发出，
+     * 前者必须被忽略以免重复处理，后者则要求本模组放弃破坏以避免与对方争夺同一批方块。</p>
+     */
+    @SubscribeEvent(priority = EventPriority.HIGHEST, receiveCanceled = true)
     public static void onBlockBreak(BlockEvent.BreakEvent event) {
+        // 事件已被取消说明该次破坏不由本模组结算：自行发出的取消会在这里被拦下以避免递归，
+        // 其它模组发出的取消同样在此让路，否则同一方块会被两套连锁逻辑各破坏一次。
+        if (event.isCanceled()) {
+            return;
+        }
         Player player = event.getPlayer();
         ItemStack mainHandItem = player.getMainHandItem();
         if (mainHandItem.getItem() instanceof EndlessBeafItem) {

@@ -112,7 +112,7 @@ public final class ChainMiningHighlightRenderer {
         }
 
         // 仅按住连锁键时显示：缓存会在松开按键后保留，若不加该判定，高亮会常驻在屏幕上。
-        if (!KeyBindings.TRIGGER_CHAIN_MINING_KEY.get().isDown()) {
+        if (!KeyBindings.isChainMiningKeyDown()) {
             return;
         }
         if (!holdsBeafTool(player)) {

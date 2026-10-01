@@ -75,6 +75,7 @@ public class ClientEventBusSubscriber {
 
         // 触发按键
         event.register(KeyBindings.TRIGGER_CHAIN_MINING_KEY.get());
+        event.register(KeyBindings.TRIGGER_FTB_CHAIN_MINING_KEY.get());
         event.register(KeyBindings.TRIGGER_FORCE_MINING_KEY.get());
 
         // 短距传送（造化杖）
@@ -101,8 +102,9 @@ public class ClientEventBusSubscriber {
             }
         }
 
-        // 检测Tab键状态变化
-        boolean currentTabPressed = KeyBindings.TRIGGER_CHAIN_MINING_KEY.get().isDown();
+        // 检测连锁键状态变化。接管键与 Tab 键并列：前者沿用 FTB 的默认键位，
+        // 使习惯该键位的玩家无需改键；两者任一按下即视为连锁激活。
+        boolean currentTabPressed = KeyBindings.isChainMiningKeyDown();
         if (currentTabPressed != lastTabPressed) {
             PacketDistributor.sendToServer(new TabKeyPressedPacket(currentTabPressed));
             lastTabPressed = currentTabPressed;
@@ -215,7 +217,7 @@ public class ClientEventBusSubscriber {
             if (mainHandItem.getItem() instanceof EndlessBeafItem
                     && mainHandItem.getOrDefault(UComponents.ForceMiningComponent.get(), false)) {
                 // R键按下，发送强制破坏请求，同时传入当前Tab键状态
-                boolean tabPressed = KeyBindings.TRIGGER_CHAIN_MINING_KEY.get().isDown();
+                boolean tabPressed = KeyBindings.isChainMiningKeyDown();
                 PacketDistributor.sendToServer(new ForceBreakKeyPacket(tabPressed));
             }
         }
@@ -246,7 +248,7 @@ public class ClientEventBusSubscriber {
 
         // 按住连锁键时 Shift + 滚轮切换连锁形状。该分支先于无线物流判定：
         // 两者虽然共用 Shift + 滚轮，但触发前提互斥（连锁键按下 / 未按下），不会同时命中。
-        if (KeyBindings.TRIGGER_CHAIN_MINING_KEY.get().isDown()) {
+        if (KeyBindings.isChainMiningKeyDown()) {
             event.setCanceled(true);
             PacketDistributor.sendToServer(new ShapeSwitchPacket(delta));
             return;

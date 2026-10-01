@@ -32,6 +32,8 @@ import com.sorrowmist.useless.compat.neoecoae.compact.shadow.CompactInterfaceAtt
 import com.sorrowmist.useless.compat.neoecoae.compact.shadow.ShadowCraftingHostBlockEntity;
 import com.sorrowmist.useless.compat.neoecoae.compact.shadow.ShadowCraftingParallelCoreBlockEntity;
 import com.sorrowmist.useless.compat.neoecoae.compact.shadow.ShadowCraftingWorkerBlockEntity;
+import com.sorrowmist.useless.compat.neoecoae.compact.shadow.ShadowFluidInputHatchBlockEntity;
+import com.sorrowmist.useless.compat.neoecoae.compact.shadow.ShadowFluidOutputHatchBlockEntity;
 import com.sorrowmist.useless.compat.neoecoae.compact.shadow.ShadowNodeLink;
 import com.sorrowmist.useless.core.component.ExternalInventoryKind;
 import com.sorrowmist.useless.core.component.ExternalInventoryReference;
@@ -48,6 +50,7 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.state.BlockState;
+import net.neoforged.neoforge.fluids.capability.IFluidHandler;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -93,6 +96,8 @@ public class CompactF9BlockEntity extends ECOCraftingSystemBlockEntity
      * 现仅作为「迁移来源」读取一次，不再写回。</p>
      */
     static final String PATTERN_BUS_KEY = "useless_compact_pattern_buses";
+    private static final String FLUID_INPUT_KEY = "useless_compact_f9_fluid_input";
+    private static final String FLUID_OUTPUT_KEY = "useless_compact_f9_fluid_output";
     /**
      * 满长建造的列数。ECO 的结构定义里 {@code expandMax = craftingSystemMaxLength - 4}，
      * 而虚拟合成判定要求「实际 FX 通道数 == 该上限」，因此此处每次都按当前上限取值，
@@ -107,6 +112,10 @@ public class CompactF9BlockEntity extends ECOCraftingSystemBlockEntity
     private final List<ECOCraftingWorkerBlockEntity> shadowWorkers = new ArrayList<>();
     private final List<ShadowNodeLink> shadowWorkerLinks = new ArrayList<>();
     private final List<ECOCraftingPatternBusBlockEntity> shadowBuses = new ArrayList<>();
+    /** F9 的冷却液输入/输出仓，作为影子成员加入真实主机所在的集群。 */
+    private final ShadowFluidInputHatchBlockEntity fluidInputHatch;
+    private final ShadowFluidOutputHatchBlockEntity fluidOutputHatch;
+    private final IFluidHandler fluidHandler;
     @Nullable
     private NECraftingNetworkCluster compactNetworkCluster;
     private long lastCompactTick = Long.MIN_VALUE;
@@ -139,6 +148,11 @@ public class CompactF9BlockEntity extends ECOCraftingSystemBlockEntity
 
     public CompactF9BlockEntity(BlockEntityType<?> type, BlockPos pos, BlockState blockState) {
         super(type, pos, blockState, ECOTier.L9);
+        fluidInputHatch = new ShadowFluidInputHatchBlockEntity(
+                NeoEcoCompactRegistry.SHADOW_FLUID_INPUT_HATCH.get(), pos, blockState);
+        fluidOutputHatch = new ShadowFluidOutputHatchBlockEntity(
+                NeoEcoCompactRegistry.SHADOW_FLUID_OUTPUT_HATCH.get(), pos, blockState);
+        fluidHandler = new CompactF9FluidHandler(fluidInputHatch.tank, fluidOutputHatch.tank);
         getMainNode().setFlags(GridFlags.REQUIRE_CHANNEL);
         // 关键：网格服务必须挂在「本机自己」身上，而不是一个独立对象。
         // ECO 的样板总线就是这么做的（总线 BE 既实现 ICraftingProvider 又实现 IECOPatternStorage），
@@ -293,6 +307,10 @@ public class CompactF9BlockEntity extends ECOCraftingSystemBlockEntity
         // 先拿到外置存储的引用，后面的恢复才有地方读。
         ensurePatternStore(level);
 
+        fluidInputHatch.setLevel(level);
+        fluidOutputHatch.setLevel(level);
+        cluster.addBlockEntity(fluidInputHatch);
+        cluster.addBlockEntity(fluidOutputHatch);
         installHostHardware(cluster, level);
         // 集群一定是我们自己创建的 CompactCraftingCluster。
         fleet.add((CompactCraftingCluster) cluster);
@@ -626,6 +644,11 @@ public class CompactF9BlockEntity extends ECOCraftingSystemBlockEntity
         return patternProvider;
     }
 
+    /** 暴露给 NeoForge 的 F9 流体能力：填充冷却液、抽取冷却副产物。 */
+    public IFluidHandler getFluidHandler() {
+        return fluidHandler;
+    }
+
     // ------------------------------------------------ 通讯接口界面（影子接口）入口
 
     @Override
@@ -654,12 +677,26 @@ public class CompactF9BlockEntity extends ECOCraftingSystemBlockEntity
         // 样板内容不再进方块实体自己的 NBT——那份 NBT 会跟着区块存盘，也会被 getUpdateTag
         // 整包同步给客户端。这里只在内容真的变过之后，把数据写进 UUID 键控的外置存储。
         flushPatternStore(false);
+        CompoundTag inputFluid = new CompoundTag();
+        fluidInputHatch.tank.writeToNBT(registries, inputFluid);
+        data.put(FLUID_INPUT_KEY, inputFluid);
+        CompoundTag outputFluid = new CompoundTag();
+        fluidOutputHatch.tank.writeToNBT(registries, outputFluid);
+        data.put(FLUID_OUTPUT_KEY, outputFluid);
         compactInterface.save(registries, data);
     }
 
     @Override
     public void loadTag(CompoundTag data, HolderLookup.Provider registries) {
         super.loadTag(data, registries);
+        if (data.contains(FLUID_INPUT_KEY, Tag.TAG_COMPOUND)) {
+            fluidInputHatch.tank.readFromNBT(registries,
+                    data.getCompound(FLUID_INPUT_KEY));
+        }
+        if (data.contains(FLUID_OUTPUT_KEY, Tag.TAG_COMPOUND)) {
+            fluidOutputHatch.tank.readFromNBT(registries,
+                    data.getCompound(FLUID_OUTPUT_KEY));
+        }
         // 老存档：整份样板数据曾经直接写在这个标签里，读出来交给装配流程搬进外置存储。
         // 迁移之后本机 NBT 里不会再出现这个键（saveAdditional 不再写它）。
         if (data.contains(PATTERN_BUS_KEY, Tag.TAG_LIST)) {

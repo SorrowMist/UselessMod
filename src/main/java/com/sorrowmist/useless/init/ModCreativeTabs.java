@@ -52,7 +52,8 @@ public class ModCreativeTabs {
     private static @NotNull ItemStack getItemStack(CreativeModeTab.ItemDisplayParameters pParameters) {
         HolderLookup.Provider lookup = pParameters.holders();
         ItemStack endlessBeef = new ItemStack(ModItems.ENDLESS_BEAF_ITEM.get());
-        EnchantmentUtil.applyEnchantment(endlessBeef, lookup, Enchantments.SILK_TOUCH, 1);
+        // 与物品默认附魔模式保持一致：默认时运
+        EnchantmentUtil.applyEnchantment(endlessBeef, lookup, Enchantments.FORTUNE, ConfigManager.getFortuneLevel());
         EnchantmentUtil.applyEnchantment(endlessBeef, lookup, Enchantments.LOOTING, ConfigManager.getLootingLevel());
         return endlessBeef;
     }

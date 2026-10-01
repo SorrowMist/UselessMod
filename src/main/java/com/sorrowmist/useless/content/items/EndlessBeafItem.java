@@ -152,7 +152,8 @@ public class EndlessBeafItem extends TieredItem {
                         ),
                         1.0F, 0
                 ))
-                .component(UComponents.EnchantModeComponent, EnchantMode.SILK_TOUCH)
+                // 默认附魔模式：时运（FORTUNE）。精准采集由轮盘/快捷键手动切换。
+                .component(UComponents.EnchantModeComponent, EnchantMode.FORTUNE)
                 .component(UComponents.EnhancedChainMiningComponent, false)
                 .component(UComponents.ForceMiningComponent, false)
                 .component(UComponents.AutoSmeltComponent, false)
@@ -189,7 +190,8 @@ public class EndlessBeafItem extends TieredItem {
                 .component(UComponents.ConstructionWandCoreComponent,
                            com.sorrowmist.useless.api.enums.tool.ConstructionWandCoreMode.DEFAULT)
                 .component(UComponents.CurrentToolTypeComponent, ToolTypeMode.NONE_MODE)
-                .component(DataComponents.CUSTOM_MODEL_DATA, new CustomModelData(1));
+                // 自定义模型数据与附魔模式一一对应：0 = 时运（默认），1 = 精准采集
+                .component(DataComponents.CUSTOM_MODEL_DATA, new CustomModelData(0));
 
         if (ModList.get().isLoaded(EnderIOTravelCompat.MOD_ID)) {
             properties = EnderIOTravelCompat.markAsTravelItem(properties);
@@ -387,7 +389,7 @@ public class EndlessBeafItem extends TieredItem {
         }
 
         EnchantMode mode = stack.getOrDefault(
-                UComponents.EnchantModeComponent.get(), EnchantMode.SILK_TOUCH);
+                UComponents.EnchantModeComponent.get(), EnchantMode.FORTUNE);
         HolderLookup.Provider lookup = level.registryAccess();
         EnchantmentUtil.applyEnchantment(
                 stack, lookup, Enchantments.SILK_TOUCH, mode == EnchantMode.SILK_TOUCH ? 1 : 0);

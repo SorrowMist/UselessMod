@@ -100,8 +100,21 @@ public final class StaffLinkStressState {
     private final Map<Long, Float> inputStress = new HashMap<>();
     /** 本 tick 各目标网络被驱动的转速；用来发现「同一网络两个转速」的冲突。 */
     private final Map<Long, Float> outputSpeed = new HashMap<>();
-    /** 本 tick 碰过的网络对象；下一 tick 开头要按「没有虚拟贡献」重算一次。 */
-    private final Map<Long, KineticNetwork> touched = new HashMap<>();
+    /** 本 tick 碰过的网络对象（已经用本 tick 的贡献重算过）。 */
+    private Map<Long, KineticNetwork> touched = new HashMap<>();
+    /**
+     * 上一 tick 碰过的网络。
+     *
+     * <p>这一 tick 若不再有虚拟贡献，就要在引擎跑完之后把它们重算一次，把多出来的容量退掉。</p>
+     *
+     * <p><b>退容量不能在 tick 开头做。</b>那时贡献是空的，网络会被判成过载（容量掉到真实值），
+     * 而动力学把「过载状态翻转」也算作一次转速变化：{@code getSpeed()} 从 0 变回来 →
+     * {@code onSpeedChanged} 里 {@code fromOrToZero} 成立 → {@code flickerTally += 5}。
+     * 紧接着本 tick 又把贡献写回去、再翻转一次，于是<b>每 tick +10、衰减只 -1</b>，
+     * 十几 tick 后 flickerScore 越过阈值，传播逻辑就会 {@code destroyBlock} 把方块打掉。
+     * （实测症状：成排的动力合成器变成掉落物 —— 它们的应力占用是 2.0/RPM，网络一定会过载。）</p>
+     */
+    private Map<Long, KineticNetwork> pendingRelease = new HashMap<>();
     /** 界面用：暂停原因（键 = 网络 + 线路 + 锚点）。 */
     private final Map<String, String> pauseReasons = new HashMap<>();
     /** 界面用：源网络里有无限动力源的线路。 */
@@ -162,7 +175,14 @@ public final class StaffLinkStressState {
                 inputStates.put(release.anchor(), STATE_NOT_KINETIC);
             } else if (!entity.hasNetwork()) {
                 inputStates.put(release.anchor(), STATE_NO_NETWORK);
-            } else if (Math.abs(entity.getSpeed()) <= 0.0F) {
+            } else if (!hasAnySource(entity.getOrCreateNetwork())) {
+                // 判据是「网络里有没有动力源」，<b>不是</b>「现在转不转」。
+                //
+                // 源网络自己过载时转速是 0，但它仍然是个合法的输入端：算出来的富余就是 0，
+                // 目标端自然拿不到容量而停 —— 这正是「源不够时两边一起停」。
+                // 若按「转不转」判，源一过载输入端就被判成闲置 → 回馈被撤 → 源恢复 →
+                // 再被推过载，两边以 tick 为周期来回抖；而每次过载翻转都会给网络成员记一次
+                // flicker，抖久了就会触发动力学那边的「方块变更太频繁」保护，把方块打掉。
                 inputStates.put(release.anchor(), STATE_IDLE);
             } else {
                 inputs.add(new InputEndpoint(entity, release));
@@ -319,6 +339,7 @@ public final class StaffLinkStressState {
      * {@link #applyRoute} 就不会再来续期，只能靠这里把方块身上的虚拟转速清掉。</p>
      */
     public void sweep(MinecraftServer server) {
+        releaseStaleContributions(server);
         if (claims.isEmpty()) {
             return;
         }
@@ -335,6 +356,42 @@ public final class StaffLinkStressState {
         for (Claim claim : expired) {
             stopDriving(server, claim);
         }
+    }
+
+    /**
+     * 把「上一轮借出去、这一轮不再借」的虚拟容量退掉。
+     *
+     * <p>放在 sweep（引擎跑完之后）而不是 tick 开头，是为了让本 tick 的新贡献先写好：
+     * 仍然被借用的网络不会被动到，只有真正不再有贡献的网络才翻转一次过载状态。</p>
+     */
+    private void releaseStaleContributions(MinecraftServer server) {
+        long now = server.getTickCount();
+        // 本 tick 引擎压根没跑（应力线路被删光 / 网络不再活跃）：上一轮的贡献还挂着，
+        // 一并退掉，否则那些网络会一直留着借来的容量。
+        if (lastTick != now && !grants.isEmpty()) {
+            grants.clear();
+            inputStress.clear();
+            for (KineticNetwork network : touched.values()) {
+                if (network != null) {
+                    network.updateNetwork();
+                }
+            }
+            touched.clear();
+        }
+        if (pendingRelease.isEmpty()) {
+            return;
+        }
+        for (Map.Entry<Long, KineticNetwork> entry : pendingRelease.entrySet()) {
+            if (grants.containsKey(entry.getKey())) {
+                // 这一轮还在借用：留给下一轮再判。
+                continue;
+            }
+            KineticNetwork network = entry.getValue();
+            if (network != null) {
+                network.updateNetwork();
+            }
+        }
+        pendingRelease.clear();
     }
 
     // ------------------------------------------------------------------ 动力学侧的两个钩子
@@ -391,7 +448,8 @@ public final class StaffLinkStressState {
         grants.clear();
         inputStress.clear();
         outputSpeed.clear();
-        touched.clear();
+        touched = new HashMap<>();
+        pendingRelease = new HashMap<>();
         pauseReasons.clear();
         infiniteSupply.clear();
         status.clear();
@@ -406,17 +464,14 @@ public final class StaffLinkStressState {
             return;
         }
         lastTick = tick;
+        // 只把集合换新，<b>不在这里重算任何网络</b>。原因见 pendingRelease 的注释：
+        // 此刻贡献是空的，重算会把网络判成过载，翻转出来的 flicker 会累积到把方块打掉。
+        // 真正该退的容量交给 sweep()：那时本 tick 的新贡献已经写好，仍被借用的网络不会被动到。
+        pendingRelease = touched;
+        touched = new HashMap<>();
         grants.clear();
         inputStress.clear();
         outputSpeed.clear();
-        // 上一轮碰过的网络：先让它们按「本 tick 还没有任何虚拟贡献」重算一次。
-        // 少了这一步，某个输出被关掉之后，它所在网络会一直留着上一轮加进去的容量。
-        for (KineticNetwork network : touched.values()) {
-            if (network != null) {
-                network.updateNetwork();
-            }
-        }
-        touched.clear();
     }
 
     // ------------------------------------------------------------------ 内部：驱动与释放
@@ -655,6 +710,16 @@ public final class StaffLinkStressState {
     private static boolean hasInfiniteSource(KineticNetwork network) {
         for (KineticBlockEntity source : network.sources.keySet()) {
             if (isPresent(source) && isInfiniteSource(source)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** 这张网络里有没有（还在世界里的）动力源。没有源就根本不会转，也就没东西可借。 */
+    private static boolean hasAnySource(KineticNetwork network) {
+        for (KineticBlockEntity source : network.sources.keySet()) {
+            if (isPresent(source)) {
                 return true;
             }
         }

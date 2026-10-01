@@ -4,6 +4,7 @@ import com.sorrowmist.useless.UselessMod;
 import com.sorrowmist.useless.content.menus.StaffLinkMenu;
 import com.sorrowmist.useless.content.stafflink.LinkFilterPattern;
 import com.sorrowmist.useless.content.stafflink.LinkFilterSlot;
+import com.sorrowmist.useless.content.stafflink.ResourceFamily;
 import com.sorrowmist.useless.content.stafflink.StaffLinkEngine;
 import com.sorrowmist.useless.content.stafflink.StaffLinkRoute;
 import com.sorrowmist.useless.world.stafflink.StaffLinkManager;
@@ -74,8 +75,8 @@ public record StaffLinkConfigurePacket(GlobalPos anchor, int route, StaffLinkRou
                     packet.config().enabled(),
                     packet.config().flow(),
                     packet.config().medium(),
-                    packet.config().amount(),
-                    packet.config().interval(),
+                    sanitizeAmount(packet.config()),
+                    sanitizeInterval(packet.config()),
                     packet.config().side(),
                     packet.config().weight(),
                     sanitizeFilter(packet.config().filter()));
@@ -87,6 +88,35 @@ public record StaffLinkConfigurePacket(GlobalPos anchor, int route, StaffLinkRou
             PacketDistributor.sendToPlayer(player, StaffLinkSyncPacket.of(
                     player.server, StaffLinkManager.ownerIdOf(player), network));
         });
+    }
+
+    /**
+     * 应力线路上「数量」承载的是目标转速，要夹进合理区间。
+     *
+     * <p>这里只做一个<b>绝对上界</b>的粗夹：真正的上限是动力学配置里的最高转速，那是可选集成
+     * 侧才知道的事，由桥在运行时再夹一次。别的介质保持原值——它们的「数量」本来就没有上限。</p>
+     */
+    private static long sanitizeAmount(StaffLinkRoute config) {
+        if (config.medium().family() != ResourceFamily.STRESS) {
+            return config.amount();
+        }
+        return Math.max(StaffLinkRoute.MIN_AMOUNT,
+                Math.min(StaffLinkRoute.STRESS_RPM_HARD_LIMIT, config.amount()));
+    }
+
+    /**
+     * 应力线路上「周期」承载的是旋转方向，只允许「顺时针 / 逆时针」两个取值。
+     *
+     * <p>别的取值一律收敛成顺时针，而不是拒绝整条配置：玩家可能只是刚从别的介质切过来，
+     * 那两个数字还没改，为此把配置打回去反而更让人困惑。</p>
+     */
+    private static int sanitizeInterval(StaffLinkRoute config) {
+        if (config.medium().family() != ResourceFamily.STRESS) {
+            return config.interval();
+        }
+        return config.interval() == StaffLinkRoute.STRESS_COUNTER_CLOCKWISE
+                ? StaffLinkRoute.STRESS_COUNTER_CLOCKWISE
+                : StaffLinkRoute.STRESS_CLOCKWISE;
     }
 
     /**

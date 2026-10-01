@@ -51,6 +51,7 @@ import com.sorrowmist.useless.network.StaffLinkOpenPacket;
 import com.sorrowmist.useless.network.StaffLinkRenamePacket;
 import com.sorrowmist.useless.network.StaffLinkReorderPacket;
 import com.sorrowmist.useless.network.StaffLinkSyncPacket;
+import com.sorrowmist.useless.network.StaffLinkStressStatusPacket;
 import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
 
 public class ModNetwork {
@@ -207,5 +208,8 @@ public class ModNetwork {
         registrar.playToClient(StaffLinkHighlightPacket.TYPE,
                                StaffLinkHighlightPacket.STREAM_CODEC,
                                StaffLinkHighlightPacket::handle);
+        registrar.playToClient(StaffLinkStressStatusPacket.TYPE,
+                               StaffLinkStressStatusPacket.STREAM_CODEC,
+                               StaffLinkStressStatusPacket::handle);
     }
 }

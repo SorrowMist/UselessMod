@@ -1,0 +1,15 @@
+{
+  "required": false,
+  "package": "com.sorrowmist.useless.mixin.create",
+  "compatibilityLevel": "JAVA_21",
+  "mixins": [
+    "KineticBlockEntityMixin",
+    "KineticNetworkMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  },
+  "overwrites": {
+    "requireAnnotations": true
+  }
+}

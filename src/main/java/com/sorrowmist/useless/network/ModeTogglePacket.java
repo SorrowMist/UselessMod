@@ -197,9 +197,11 @@ public class ModeTogglePacket implements CustomPacketPayload {
                     if (ModList.get().isLoaded("occultism") && stack.getItem() instanceof EndlessBeafItem) {
                         stack.set(UComponents.BeefRitualSatchelComponent.get(), msg.enabled);
                         if (msg.enabled) {
-                            // 仪式摆放会占用右键，启用时关闭其它右键模式
+                            // 仪式摆放走的是「不潜行右键」手势，所以只关同样占该手势的模式。
+                            // 时间加速与无线物流都是潜行手势，与它不撞，不该被连坐关掉。
+                            stack.set(UComponents.BeefCropHarvestComponent.get(), false);
+                            stack.set(UComponents.ConstructionWandEnabledComponent.get(), false);
                             disableAeNetworkConnect(stack);
-                            disableRightClickConflicts(stack);
                         }
                     }
                 }
@@ -222,9 +224,15 @@ public class ModeTogglePacket implements CustomPacketPayload {
                     if (stack.getItem() instanceof EndlessBeafItem) {
                         EndlessBeafItem.setStaffLinkEnabled(stack, msg.enabled);
                         if (msg.enabled) {
-                            // 潜行右键已被建筑魔杖（撤销）与时间加速占用，AE 连接又同属「网络」语义，
-                            // 全部关掉，保证这次潜行右键只会落到绑定容器上。
-                            disableStaffLinkConflicts(stack);
+                            // 无线物流只用「潜行右键方块」这一个手势，所以只关掉同样占用它的模式：
+                            // 时间加速、建筑魔杖（潜行右键 = 撤销）、AE 连接（潜行右键访问点 = 定绑定目标）。
+                            //
+                            // <b>顺手收菜与匠心仪式挎包刻意不关</b>：它们都要求「不潜行」
+                            // （见 EndlessBeafItem#useOn 里的 !player.isShiftKeyDown() 守卫），
+                            // 与潜行手势天然错开，关掉只会让玩家白丢一个功能。
+                            stack.set(UComponents.BeefTimeAccelerationEnabledComponent.get(), false);
+                            stack.set(UComponents.ConstructionWandEnabledComponent.get(), false);
+                            disableAeNetworkConnect(stack);
                         }
                     }
                 }
@@ -258,8 +266,11 @@ public class ModeTogglePacket implements CustomPacketPayload {
     }
 
     /**
-     * AE 连接模式与「顺手收菜 / 时间加速 / 建筑魔杖」互斥：
-     * 打开它时把这三个占用右键的开关关掉。
+     * AE 连接模式与其它右键模式互斥：打开它时把「顺手收菜 / 时间加速 / 建筑魔杖 / 无线物流」关掉。
+     *
+     * <p>它<b>两种手势都用</b>：不潜行右键有 AE 节点的机器是「并入网络」，潜行右键无线访问点
+     * 是「给连接模式定一个绑定目标」（见 {@code EventHandler} 里那段的说明）。因此两个手势上的
+     * 模式都得让位 —— 这也是本方法比下面那几个「单手势」开关管得宽的原因。</p>
      */
     private static void disableRightClickConflicts(ItemStack stack) {
         stack.set(UComponents.BeefCropHarvestComponent.get(), false);
@@ -268,20 +279,17 @@ public class ModeTogglePacket implements CustomPacketPayload {
         disableStaffLink(stack);
     }
 
-    /** 无线物流与 AE 连接同为「网络」类模式，互斥以免右键意图混淆。 */
+    /**
+     * 关掉无线物流模式。
+     *
+     * <p>它与 AE 连接撞的是<b>同一次潜行右键</b>：无线访问点既是 AE 端点（AE 连接模式下潜行右键
+     * 会把它设成绑定目标并取消事件），现在也允许绑进物流网络。两者都开着时谁赢取决于事件顺序，
+     * 表现就是「想绑访问点进物流网络，结果杖子连到该网络去了」。</p>
+     */
     private static void disableStaffLink(ItemStack stack) {
         if (stack.getOrDefault(UComponents.StaffLinkEnabledComponent.get(), false)) {
             stack.set(UComponents.StaffLinkEnabledComponent.get(), false);
         }
-    }
-
-    /** 开启无线物流时，关掉所有会抢占右键或语义重叠的其它模式（不含它自己）。 */
-    private static void disableStaffLinkConflicts(ItemStack stack) {
-        stack.set(UComponents.BeefCropHarvestComponent.get(), false);
-        stack.set(UComponents.BeefTimeAccelerationEnabledComponent.get(), false);
-        stack.set(UComponents.ConstructionWandEnabledComponent.get(), false);
-        disableAeNetworkConnect(stack);
-        disableRitualSatchel(stack);
     }
 
     /** 反过来：打开其它占用右键的模式时，关掉 AE 连接模式。 */
@@ -291,7 +299,12 @@ public class ModeTogglePacket implements CustomPacketPayload {
         }
     }
 
-    /** 匠心仪式挎包同样占用右键，开启其它右键模式时要把它关掉。 */
+    /**
+     * 关掉匠心仪式挎包模式。
+     *
+     * <p>它走「不潜行右键」手势，因此只该被同样占该手势的模式（顺手收菜、建筑魔杖、AE 连接）关掉；
+     * 潜行手势的时间加速与无线物流与它不撞。</p>
+     */
     private static void disableRitualSatchel(ItemStack stack) {
         if (stack.getOrDefault(UComponents.BeefRitualSatchelComponent.get(), false)) {
             stack.set(UComponents.BeefRitualSatchelComponent.get(), false);

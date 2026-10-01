@@ -34,7 +34,16 @@ public enum LinkMedium {
      * <p><b>必须追加在末尾</b>：{@code StaffLinkRoute.STREAM_CODEC} 用 {@code writeEnum} 按
      * ordinal 编码，往中间插值会让新旧版本之间把「能量」读成别的资源。</p>
      */
-    AE_ENERGY("gui.useless_mod.wireless_logistics.medium.ae_energy", ResourceFamily.ENERGY);
+    AE_ENERGY("gui.useless_mod.wireless_logistics.medium.ae_energy", ResourceFamily.ENERGY),
+    /**
+     * 机械动力的转速与应力容量。
+     *
+     * <p>与能量、魔源一样，是「源头出来只有一种」的连续量，因此同样<b>不参与过滤</b>
+     * （{@link StaffLinkRoute#filterApplies()} 恒 {@code false}，界面不给填标记）。</p>
+     *
+     * <p><b>同样必须追加在末尾</b>，理由见 {@link #AE_ENERGY}。</p>
+     */
+    STRESS("gui.useless_mod.wireless_logistics.medium.stress", ResourceFamily.STRESS);
 
     private static final String MEKANISM = "mekanism";
     private static final String ARS_NOUVEAU = "ars_nouveau";
@@ -42,6 +51,7 @@ public enum LinkMedium {
     private static final String APPLIED_MEKANISTICS = "appmek";
     private static final String ARS_ENERGISTIQUE = "arseng";
     private static final String APPLIED_FLUX = "appflux";
+    private static final String CREATE = "create";
 
     private final String translationKey;
     private final ResourceFamily family;
@@ -81,6 +91,7 @@ public enum LinkMedium {
             case AE_CHEMICAL -> ModList.get().isLoaded(AE2) && ModList.get().isLoaded(APPLIED_MEKANISTICS);
             case AE_SOURCE -> ModList.get().isLoaded(AE2) && ModList.get().isLoaded(ARS_ENERGISTIQUE);
             case AE_ENERGY -> ModList.get().isLoaded(AE2) && ModList.get().isLoaded(APPLIED_FLUX);
+            case STRESS -> ModList.get().isLoaded(CREATE);
             default -> true;
         };
     }
@@ -93,7 +104,7 @@ public enum LinkMedium {
      */
     private static final LinkMedium[] MENU_ORDER = {
             ITEM, AE_ITEM, FLUID, AE_FLUID, ENERGY, AE_ENERGY,
-            CHEMICAL, AE_CHEMICAL, SOURCE, AE_SOURCE
+            CHEMICAL, AE_CHEMICAL, SOURCE, AE_SOURCE, STRESS
     };
 
     /**

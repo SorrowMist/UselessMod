@@ -1,6 +1,7 @@
 package com.sorrowmist.useless.client.gui;
 
 import com.sorrowmist.useless.client.network.ClientPacketHandlers;
+import com.sorrowmist.useless.client.stafflink.StaffLinkStressClientState;
 import com.sorrowmist.useless.content.menus.StaffLinkMenu;
 import com.sorrowmist.useless.content.stafflink.LinkFilterPattern;
 import com.sorrowmist.useless.content.stafflink.LinkFilterSlot;
@@ -10,6 +11,7 @@ import com.sorrowmist.useless.content.stafflink.ResourceFamily;
 import com.sorrowmist.useless.content.stafflink.StaffLinkFilters;
 import com.sorrowmist.useless.content.stafflink.StaffLinkRoute;
 import com.sorrowmist.useless.network.StaffLinkSyncPacket;
+import com.sorrowmist.useless.network.StaffLinkStressStatusPacket;
 import com.sorrowmist.useless.world.stafflink.StaffLinkNetwork;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
@@ -34,7 +36,9 @@ import org.jetbrains.annotations.Nullable;
 import org.lwjgl.glfw.GLFW;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalLong;
 
@@ -168,6 +172,16 @@ public final class StaffLinkScreen extends AbstractContainerScreen<StaffLinkMenu
     private static final int APPLY_ALL_WIDTH = 92;
     private static final int DISSOLVE_X = 180;
     private static final int DISSOLVE_WIDTH = CONTENT_RIGHT - DISSOLVE_X;
+
+    /**
+     * 应力运行状态两行文字的位置。
+     *
+     * <p>取在「过滤」按钮那一行（{@link #FILTER_Y} + 16 = 220）与背包标题（242）之间的空白里：
+     * 上面已经排满了四行配置，下面紧跟着背包，只有这一段是空的。</p>
+     */
+    private static final int STRESS_STATUS_Y = 224;
+    /** 状态文字用色：出问题时换成醒目的琥珀色，正常时与其它次要文字一致。 */
+    private static final int STRESS_WARN_COLOR = 0xFFB26A00;
 
     // ---- 过滤面板（覆盖层）几何
     /**
@@ -309,6 +323,22 @@ public final class StaffLinkScreen extends AbstractContainerScreen<StaffLinkMenu
                                boolean scaled) {
     }
 
+    /**
+     * 数值框在应力线路上的替代标签与提示。
+     *
+     * <p>应力线路里同一行两个框的含义完全不同（目标转速、旋转方向），而标签是建框时就定死的，
+     * 因此这里按框覆盖一层。替代标签刻意取得比原名短，这样画在框左边不会越过格子左边界。</p>
+     */
+    private record NumericOverride(Component label, Component hint) {
+    }
+
+    /** 需要替代标签的数值框；不在表里就按默认标签画。 */
+    private final Map<EditBox, NumericOverride> numericOverrides = new HashMap<>();
+    /** 当前数值区是不是按应力的语义在画；用来避免每帧重复设置。 */
+    private boolean stressFields;
+    /** 应力线路的方向按钮：与周期输入框共用同一格，两者互斥显示。 */
+    private PressableAE2Button stressDirectionButton;
+
     private int scrollOffset;
     private String controlSignature = "";
     /** 上一 tick 有焦点的输入框，用来捕捉「焦点离开」这一刻。 */
@@ -391,6 +421,16 @@ public final class StaffLinkScreen extends AbstractContainerScreen<StaffLinkMenu
         intervalField = addNumericField(2, "interval_label",
                 StaffLinkRoute.MIN_INTERVAL, StaffLinkRoute.MAX_INTERVAL, false, false);
 
+        // 应力线路上这一格放的是旋转方向，用按钮比让人输 1 / 2 直观。
+        // 它与周期输入框共用同一格位置，靠 visible 互斥显示。
+        stressDirectionButton = addRenderableWidget(new PressableAE2Button(
+                intervalField.getX(), intervalField.getY(),
+                intervalField.getWidth(), intervalField.getHeight(),
+                Component.empty(),
+                button -> edit(config -> withNumbers(config, config.weight(), config.amount(),
+                        nextStressDirection(config.interval())))));
+        stressDirectionButton.visible = false;
+
         newNetworkButton = addRenderableWidget(new PressableAE2Button(
                 leftPos + NEW_BUTTON_X, topPos + NETWORK_ROW_Y, NEW_BUTTON_WIDTH, SMALL_FIELD_HEIGHT,
                 Component.translatable("gui.useless_mod.wireless_logistics.network_new"),
@@ -442,6 +482,11 @@ public final class StaffLinkScreen extends AbstractContainerScreen<StaffLinkMenu
             menu.receiveSync(pending.network(), pending.index(), pending.count());
         }
 
+        // init() 会重建全部控件（缩放窗口也会走这里），而新的周期输入框默认是可见的。
+        // 这里把「已按应力渲染过」的状态清掉，让下面的 updateControls 重新套用一次，
+        // 否则缩放之后周期输入框会重新冒出来、压在方向按钮上。
+        stressFields = false;
+        numericOverrides.clear();
         updateControls();
     }
 
@@ -821,6 +866,9 @@ public final class StaffLinkScreen extends AbstractContainerScreen<StaffLinkMenu
     @Override
     public void onClose() {
         applyEdits();
+        // 应力状态是服务端按「谁开着界面」推下来的，关掉就该忘掉，
+        // 免得下次打开界面先闪一屏上一次的旧数字。
+        StaffLinkStressClientState.clear();
         super.onClose();
     }
 
@@ -976,15 +1024,31 @@ public final class StaffLinkScreen extends AbstractContainerScreen<StaffLinkMenu
                 filterFilledCount()));
         networkNameField.setEditable(true);
         nameField.setEditable(hasAnchor);
-        // 推模型里只有「释放」端发起搬运：吸收端的「数量 / 周期」不参与，禁掉以免误解。
+        // 一般介质是「释放端发起搬运」，所以「数量 / 周期」只在释放端可编辑，吸收端的禁掉以免误解。
+        // 应力<b>正好相反</b>：它的目标转速与旋转方向是每个输出端各自的事（同一条线路上
+        // 不同机器可以转不同的速度），所以这两个框配在吸收端。
         // （「权重」对两端都有意义：输入端之间排序、输出端之间排序都看它。）
         boolean initiates = hasConfig && config.flow() == LinkFlow.RELEASE;
+        boolean stress = hasConfig && config.medium().family() == ResourceFamily.STRESS;
+        boolean numbersEditable = stress ? !initiates : initiates;
         weightField.active = hasConfig;
-        amountField.active = initiates;
-        intervalField.active = initiates;
+        amountField.active = numbersEditable;
+        // 应力时这一格被方向按钮顶掉，输入框整个隐起来（它的值仍由同步逻辑维持，按钮改的就是它）。
+        intervalField.active = numbersEditable && !stress;
         weightField.setEditable(hasConfig);
-        amountField.setEditable(initiates);
-        intervalField.setEditable(initiates);
+        amountField.setEditable(numbersEditable);
+        intervalField.setEditable(numbersEditable && !stress);
+        applyStressFields(stress);
+        if (stressDirectionButton != null) {
+            stressDirectionButton.visible = stress && hasConfig;
+            stressDirectionButton.active = stress && hasConfig && numbersEditable;
+            if (stress) {
+                stressDirectionButton.setMessage(Component.translatable(
+                        config.interval() == StaffLinkRoute.STRESS_COUNTER_CLOCKWISE
+                                ? "gui.useless_mod.wireless_logistics.stress.counter_clockwise"
+                                : "gui.useless_mod.wireless_logistics.stress.clockwise"));
+            }
+        }
 
         // 正在输入的框不要被同步覆盖，否则打字会被打断。
         if (!networkNameField.isFocused()) {
@@ -1316,6 +1380,7 @@ public final class StaffLinkScreen extends AbstractContainerScreen<StaffLinkMenu
         renderNetworkLabel(graphics);
         renderAnchorList(graphics);
         renderNumericLabels(graphics);
+        renderStressStatus(graphics);
         renderAeWhitelistWarning(graphics);
         renderSelectionCount(graphics);
         renderNotice(graphics);
@@ -1516,10 +1581,56 @@ public final class StaffLinkScreen extends AbstractContainerScreen<StaffLinkMenu
         return level.getBlockState(anchor.pos()).getBlock().getName().getString();
     }
 
+    /**
+     * 按资源类型切换数值区的语义。
+     *
+     * <p>应力线路上「数量 / 周期」两个格子改叫「转速 / 方向」：转速是纯整数（不再接受
+     * K / M / G 这类缩写），方向只认 1 / 2，而且方向那一格整个换成按钮。</p>
+     *
+     * <p>只在语义真的变了的时候动手：这些设置会清掉输入焦点与光标位置，每帧重设等于让人没法打字。</p>
+     */
+    private void applyStressFields(boolean stress) {
+        if (stressFields == stress) {
+            return;
+        }
+        stressFields = stress;
+        if (stress) {
+            numericOverrides.put(amountField, new NumericOverride(
+                    Component.translatable("gui.useless_mod.wireless_logistics.stress.rpm_label"),
+                    Component.translatable("gui.useless_mod.wireless_logistics.stress.rpm_hint")));
+            amountField.setMaxLength(6);
+            amountField.setFilter(value -> value.isEmpty() || value.matches("\\d{0,6}"));
+            intervalField.setMaxLength(1);
+            intervalField.setFilter(value -> value.isEmpty() || value.matches("[12]?"));
+            intervalField.visible = false;
+        } else {
+            numericOverrides.remove(amountField);
+            amountField.setMaxLength(24);
+            amountField.setFilter(ScaledEnergyAmount::isValidInput);
+            intervalField.setMaxLength(6);
+            intervalField.setFilter(value -> value.isEmpty() || value.matches("\\d{0,5}"));
+            intervalField.visible = true;
+        }
+    }
+
+    private Component numericLabel(NumericSpec spec) {
+        NumericOverride override = numericOverrides.get(spec.field());
+        return override == null ? spec.label() : override.label();
+    }
+
+    private Component numericHint(NumericSpec spec) {
+        NumericOverride override = numericOverrides.get(spec.field());
+        return override == null ? spec.hint() : override.hint();
+    }
+
     private void renderNumericLabels(GuiGraphics graphics) {
         for (NumericSpec spec : numericFields) {
-            int labelX = spec.field().getX() - leftPos - font.width(spec.label()) - 4;
-            graphics.drawString(font, spec.label(), labelX, ROW_FOURTH_Y + 4,
+            if (!spec.field().visible) {
+                continue;
+            }
+            Component label = numericLabel(spec);
+            int labelX = spec.field().getX() - leftPos - font.width(label) - 4;
+            graphics.drawString(font, label, labelX, ROW_FOURTH_Y + 4,
                     MachineScreenStyle.MUTED_TEXT_COLOR, false);
             if (!spec.field().active) {
                 // 不生效的输入框压一层暗色，一眼能看出来它不可编辑。
@@ -1528,6 +1639,70 @@ public final class StaffLinkScreen extends AbstractContainerScreen<StaffLinkMenu
                         spec.field().getY() + spec.field().getHeight(), 0x66000000);
             }
         }
+        // 应力时周期框被方向按钮顶掉，它的标签在这里单独补一次：按钮上写的是当前方向，
+        // 而「方向」这两个字才是告诉玩家这一格是什么的那个标签。
+        if (stressFields && stressDirectionButton != null && stressDirectionButton.visible) {
+            Component direction = Component.translatable(
+                    "gui.useless_mod.wireless_logistics.stress.direction_label");
+            int labelX = stressDirectionButton.getX() - leftPos - font.width(direction) - 4;
+            graphics.drawString(font, direction, labelX, ROW_FOURTH_Y + 4,
+                    MachineScreenStyle.MUTED_TEXT_COLOR, false);
+        }
+    }
+
+    /**
+     * 应力线路的运行状态：源网络能提供多少、目标网络需要多少、这一端现在怎么样。
+     *
+     * <p>这些是服务端每 20 tick 推下来的<b>运行时数字</b>，不属于线路配置，因此整网快照里没有它们。
+     * 还没收到过就什么都不画——显示一排 0 只会让人以为线路坏了。</p>
+     *
+     * <p>第二行只在出问题时才换成醒目的琥珀色：玩家最需要一眼看到的就是「为什么没转」。</p>
+     */
+    private void renderStressStatus(GuiGraphics graphics) {
+        StaffLinkRoute config = menu.getSelectedConfig();
+        GlobalPos anchor = menu.getSelectedAnchor();
+        if (config == null || anchor == null || config.medium().family() != ResourceFamily.STRESS) {
+            return;
+        }
+        StaffLinkStressStatusPacket.Entry entry =
+                StaffLinkStressClientState.find(menu.getNetworkId(), anchor, config.route());
+        if (entry == null) {
+            // 线路关着的时候服务端根本不会为它记状态（桥只跑已启用的线路），快照里自然没有它。
+            // 这时补一句「已关闭」——否则玩家看到一片空白，很容易以为功能坏了。
+            if (!config.enabled()) {
+                graphics.drawString(font, Component.translatable(
+                                "gui.useless_mod.wireless_logistics.stress.status",
+                                Component.translatable(
+                                        "gui.useless_mod.wireless_logistics.stress.state.disabled")),
+                        CONTENT_LEFT, STRESS_STATUS_Y, MachineScreenStyle.MUTED_TEXT_COLOR, false);
+            }
+            return;
+        }
+        Component numbers = Component.translatable(
+                "gui.useless_mod.wireless_logistics.stress.status_numbers",
+                formatStress(entry.available()), formatStress(entry.demand()));
+        graphics.drawString(font, numbers, CONTENT_LEFT, STRESS_STATUS_Y,
+                MachineScreenStyle.MUTED_TEXT_COLOR, false);
+
+        Component state = Component.translatable("gui.useless_mod.wireless_logistics.stress.status",
+                stressStateName(entry.state()));
+        graphics.drawString(font, state, CONTENT_LEFT, STRESS_STATUS_Y + 9,
+                entry.state().isEmpty() ? MachineScreenStyle.MUTED_TEXT_COLOR : STRESS_WARN_COLOR, false);
+    }
+
+    /** 应力量的显示：太大就写无穷，否则整数或一位小数。 */
+    private static String formatStress(float value) {
+        if (value >= 1.0E9F) {
+            return "\u221e";
+        }
+        return value >= 100.0F ? String.valueOf(Math.round(value)) : String.format("%.1f", value);
+    }
+
+    /** 状态码 → 可读文字；空串表示一切正常。 */
+    private static Component stressStateName(@Nullable String state) {
+        return state == null || state.isEmpty()
+                ? Component.translatable("gui.useless_mod.wireless_logistics.stress.state.ok")
+                : Component.translatable("gui.useless_mod.wireless_logistics.stress.state." + state);
     }
 
     @Override
@@ -1964,18 +2139,20 @@ public final class StaffLinkScreen extends AbstractContainerScreen<StaffLinkMenu
     /** 悬停数值框时给出完整含义与可填范围（英文标签是短名，靠这里补全）。 */
     private void renderNumericTooltip(GuiGraphics graphics, int mouseX, int mouseY) {
         for (NumericSpec spec : numericFields) {
-            if (!spec.field().isMouseOver(mouseX, mouseY)) {
+            if (!spec.field().visible || !spec.field().isMouseOver(mouseX, mouseY)) {
                 continue;
             }
+            boolean overridden = numericOverrides.containsKey(spec.field());
             List<Component> lines = new ArrayList<>(4);
-            lines.add(spec.label());
-            lines.add(spec.hint());
+            lines.add(numericLabel(spec));
+            lines.add(numericHint(spec));
             if (!spec.field().active) {
-                lines.add(Component.translatable(
-                        "gui.useless_mod.wireless_logistics.release_only_hint"));
+                lines.add(Component.translatable(stressFields
+                        ? "gui.useless_mod.wireless_logistics.stress.input_side_hint"
+                        : "gui.useless_mod.wireless_logistics.release_only_hint"));
             }
-            // 「数量」没有上限，只提示下限。
-            lines.add(spec.scaled()
+            // 「数量」与应力转速都没有静态上限，只提示下限。
+            lines.add(overridden || spec.scaled()
                     ? Component.translatable("gui.useless_mod.wireless_logistics.range_min", spec.min())
                     : Component.translatable("gui.useless_mod.wireless_logistics.range",
                             spec.min(), spec.max()));
@@ -2591,9 +2768,14 @@ public final class StaffLinkScreen extends AbstractContainerScreen<StaffLinkMenu
     }
 
     private static StaffLinkRoute withMedium(StaffLinkRoute config, LinkMedium medium) {
+        boolean stress = medium.family() == ResourceFamily.STRESS;
+        // 换到应力时顺手给一对有意义的初值：原来的「16 / 5」在应力语义下读作「16 RPM、方向 5」，
+        // 而方向只认 1 / 2，5 会被服务端收敛掉——不如直接给对，免得玩家看到配置被悄悄改了。
         return new StaffLinkRoute(config.anchor(), config.route(), config.enabled(), config.flow(),
-                medium, config.amount(), config.interval(), config.side(),
-                config.weight(), pruneFilter(config.filter(), medium));
+                medium,
+                stress ? StaffLinkRoute.STRESS_DEFAULT_RPM : config.amount(),
+                stress ? StaffLinkRoute.STRESS_CLOCKWISE : config.interval(),
+                config.side(), config.weight(), pruneFilter(config.filter(), medium));
     }
 
     /**
@@ -2632,5 +2814,12 @@ public final class StaffLinkScreen extends AbstractContainerScreen<StaffLinkMenu
         return new StaffLinkRoute(config.anchor(), config.route(), config.enabled(), config.flow(),
                 config.medium(), amount, interval, config.side(),
                 weight, config.filter());
+    }
+
+    /** 顺时针 ↔ 逆时针。 */
+    private static int nextStressDirection(int current) {
+        return current == StaffLinkRoute.STRESS_COUNTER_CLOCKWISE
+                ? StaffLinkRoute.STRESS_CLOCKWISE
+                : StaffLinkRoute.STRESS_COUNTER_CLOCKWISE;
     }
 }

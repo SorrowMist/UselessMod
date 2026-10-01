@@ -1,5 +1,6 @@
 package com.sorrowmist.useless.content.stafflink;
 
+import com.sorrowmist.useless.compat.create.CreateStressCompatLoader;
 import com.sorrowmist.useless.world.stafflink.StaffLinkManager;
 import com.sorrowmist.useless.world.stafflink.StaffLinkNetwork;
 import com.sorrowmist.useless.world.stafflink.StaffLinkSavedData;
@@ -300,7 +301,7 @@ public final class StaffLinkEngine {
             if (!StaffLinkManager.isLive(network.id())) {
                 continue;
             }
-            if (!anyNodeDue(network.id(), now)) {
+            if (!anyNodeDue(network.id(), now) && !network.hasStressRoute()) {
                 continue;
             }
             // 预算按「真正跑过的网络」计：跑过的会写下一次可运行时间，因此本 tick 没轮到的
@@ -370,6 +371,46 @@ public final class StaffLinkEngine {
                 continue;
             }
 
+            // ---- 应力：整条线路一起处理，每 tick 一次，不吃周期也不吃退避 ----
+            //
+            // 转速与应力容量是「网络的状态」而不是「一轮搬多少」：同一个网络上所有机器共享一个
+            // 转速，输出端能拿到多少容量又取决于输入端网络的富余量，还要在多个输出之间分配。
+            // 这些都得拿到「同线路上全部输入与全部输出」才算得出来，因此它走的是「跑一整条线路」
+            // 而不是逐对搬运。
+            //
+            // 也正因为是状态量，它<b>不能</b>进 scheduleNextRun：一旦按周期退避，源端停转之后
+            // 目标端要等几十秒才会跟着停，而玩家的预期是立刻停。
+            //
+            // <b>`enabled()` 必须在这里判。</b>新绑定的线路默认是关闭的（由玩家显式打开），
+            // 漏掉这一条就会「一绑上目标端就转起来」—— 开关形同虚设。
+            // 关掉的线路不进 releases / absorbs，桥那边拿到空表就会释放认领、把转速摘掉。
+            List<StaffLinkRoute> stressReleases = null;
+            List<StaffLinkRoute> stressAbsorbs = null;
+            for (StaffLinkRoute candidate : onRoute) {
+                if (!candidate.enabled()
+                        || candidate.medium().family() != ResourceFamily.STRESS
+                        || !candidate.medium().isSupported()
+                        || !passesGate(server, candidate)) {
+                    continue;
+                }
+                if (candidate.flow() == LinkFlow.RELEASE) {
+                    if (stressReleases == null) {
+                        stressReleases = new ArrayList<>(2);
+                    }
+                    stressReleases.add(candidate);
+                } else {
+                    if (stressAbsorbs == null) {
+                        stressAbsorbs = new ArrayList<>(2);
+                    }
+                    stressAbsorbs.add(candidate);
+                }
+            }
+            if (stressReleases != null || stressAbsorbs != null) {
+                CreateStressCompatLoader.applyRoute(server, network.id(), routeIndex,
+                        stressReleases == null ? List.of() : stressReleases,
+                        stressAbsorbs == null ? List.of() : stressAbsorbs);
+            }
+
             // ---- 第一遍：只挑「这一 tick 真的到点」的释放端 ----
             //
             // 顺序很要紧：周期判定必须排在解析世界与读红石之前。绝大多数 tick 里一条线路都
@@ -382,6 +423,7 @@ public final class StaffLinkEngine {
             List<StaffLinkRoute> dueReleases = null;
             for (StaffLinkRoute candidate : onRoute) {
                 if (!candidate.enabled() || !candidate.medium().isSupported()
+                        || candidate.medium().family() == ResourceFamily.STRESS
                         || candidate.flow() != LinkFlow.RELEASE) {
                     continue;
                 }
@@ -409,6 +451,7 @@ public final class StaffLinkEngine {
             List<StaffLinkRoute> absorbs = new ArrayList<>(2);
             for (StaffLinkRoute candidate : onRoute) {
                 if (candidate.enabled() && candidate.medium().isSupported()
+                        && candidate.medium().family() != ResourceFamily.STRESS
                         && candidate.flow() != LinkFlow.RELEASE
                         && passesGate(server, candidate)) {
                     absorbs.add(candidate);

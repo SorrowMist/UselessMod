@@ -10,6 +10,7 @@ import com.sorrowmist.useless.compat.ae.AeGenericInvCompatLoader;
 import com.sorrowmist.useless.compat.ae.AeLogisticsCompatLoader;
 import com.sorrowmist.useless.compat.ae.AeSourceCompatLoader;
 import com.sorrowmist.useless.compat.ars.ArsSourceCompatLoader;
+import com.sorrowmist.useless.compat.create.CreateStressCompatLoader;
 import com.sorrowmist.useless.compat.modernindustrialization.MiEnergyCompatLoader;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.chemical.ChemicalCompatProvider;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.chemical.ChemicalCompatProviders;
@@ -77,7 +78,10 @@ public final class StaffLinkTargets {
     private static final LinkMedium[] DEFAULT_ORDER = {
             LinkMedium.ITEM, LinkMedium.FLUID, LinkMedium.ENERGY, LinkMedium.CHEMICAL,
             LinkMedium.SOURCE, LinkMedium.AE_ITEM, LinkMedium.AE_FLUID,
-            LinkMedium.AE_CHEMICAL, LinkMedium.AE_SOURCE, LinkMedium.AE_ENERGY
+            LinkMedium.AE_CHEMICAL, LinkMedium.AE_SOURCE, LinkMedium.AE_ENERGY,
+            // 应力排在最后：它只对动力学方块解析得出，而动力学方块永远不是容器，
+            // 所以放在哪一位都不会抢走别的介质；放最后纯粹是让「默认介质」的语义保持好读。
+            LinkMedium.STRESS
     };
 
     private StaffLinkTargets() {
@@ -153,6 +157,9 @@ public final class StaffLinkTargets {
             case AE_CHEMICAL -> AeChemicalCompatLoader.chemicalEndpoint(level, pos);
             case AE_SOURCE -> AeSourceCompatLoader.sourceEndpoint(level, pos);
             case AE_ENERGY -> AeEnergyCompatLoader.energyEndpoint(level, pos);
+            // 应力没有「能力」可查：它的端点是动力学方块实体本身，交给桥去判定。
+            // 常驻代码只拿到一个不透明的对象做 null 判断，因此没装对应模组时这段照常加载。
+            case STRESS -> CreateStressCompatLoader.resolveEndpoint(level, pos);
         };
     }
 
@@ -401,6 +408,10 @@ public final class StaffLinkTargets {
                     (ChemicalHandlerView) to, limit, sourceFilter, targetFilter);
             // 魔源那边的接口是 int，超出的部分只能夹掉——魔源本身也到不了那么大的量。
             case SOURCE, AE_SOURCE -> moveSource((SourceHandlerView) from, (SourceHandlerView) to, limit);
+            // 应力<b>不走逐对搬运</b>：转速与应力容量是整张网络的连续状态量，不是「一轮搬多少」，
+            // 必须拿到同线路上全部输入与输出才能分配。它由 StaffLinkEngine#runNetwork 里的
+            // 专用分支整条处理，永远走不到这里。
+            case STRESS -> 0L;
         };
     }
 

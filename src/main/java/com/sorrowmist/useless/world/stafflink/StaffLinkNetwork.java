@@ -1,6 +1,7 @@
 package com.sorrowmist.useless.world.stafflink;
 
 import com.sorrowmist.useless.content.stafflink.LinkFlow;
+import com.sorrowmist.useless.content.stafflink.ResourceFamily;
 import com.sorrowmist.useless.content.stafflink.StaffLinkRoute;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.GlobalPos;
@@ -79,6 +80,9 @@ public final class StaffLinkNetwork {
     private final List<StaffLinkRoute> routes = new ArrayList<>();
     /** 玩家给锚点起的名字；没起名时不出现在表里，界面回落到方块名。 */
     private final Map<GlobalPos, String> anchorNames = new LinkedHashMap<>();
+    /** 「这张网络里有没有应力线路」的缓存；{@code null} 表示还没算过。 */
+    @Nullable
+    private Boolean hasStressRoute;
 
     public StaffLinkNetwork(UUID id) {
         this(id, "");
@@ -125,6 +129,27 @@ public final class StaffLinkNetwork {
 
     public List<StaffLinkRoute> routes() {
         return List.copyOf(routes);
+    }
+
+    /**
+     * 这张网络里有没有应力线路。
+     *
+     * <p>应力线路<b>不受周期与退避调度</b>（它承载的是网络状态而不是一轮搬运量），
+     * 因此引擎在「这张网络这一 tick 要不要跑」的判断里要额外看它一眼。这个询问每 tick 都会发生，
+     * 而答案只在网络被改动时才变，所以缓存起来。</p>
+     */
+    public boolean hasStressRoute() {
+        if (hasStressRoute == null) {
+            boolean found = false;
+            for (StaffLinkRoute route : routes) {
+                if (route.medium().family() == ResourceFamily.STRESS) {
+                    found = true;
+                    break;
+                }
+            }
+            hasStressRoute = found;
+        }
+        return hasStressRoute;
     }
 
     /** 同一线路号下的全部配置。 */
@@ -229,6 +254,7 @@ public final class StaffLinkNetwork {
      * 末尾，界面上这个容器就会「跳」到列表最下面。</p>
      */
     public void putRoute(StaffLinkRoute route) {
+        hasStressRoute = null;
         for (int index = 0; index < routes.size(); index++) {
             StaffLinkRoute existing = routes.get(index);
             if (existing.route() == route.route() && existing.anchor().equals(route.anchor())) {
@@ -241,6 +267,7 @@ public final class StaffLinkNetwork {
 
     /** 解绑：移除该锚点的全部线路配置与自定义名。 */
     public void detach(GlobalPos anchor) {
+        hasStressRoute = null;
         routes.removeIf(candidate -> candidate.anchor().equals(anchor));
         anchorNames.remove(anchor);
     }

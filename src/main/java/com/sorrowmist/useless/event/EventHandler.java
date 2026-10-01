@@ -10,6 +10,7 @@ import com.sorrowmist.useless.content.stafflink.StaffLinkTargets;
 import com.sorrowmist.useless.compat.ae.AeDeviceLinker;
 import com.sorrowmist.useless.compat.ae.AeLinkChannelBypass;
 import com.sorrowmist.useless.compat.constructionwand.ConstructionWandLogic;
+import com.sorrowmist.useless.compat.create.CreateStressCompatLoader;
 import com.sorrowmist.useless.content.recipe.AlloyFurnaceRecipeManager;
 import com.sorrowmist.useless.content.recipe.AlloyFurnaceRecipeCatalog;
 import com.sorrowmist.useless.content.multiblock.OmniversalFurnaceAutoBuilder;
@@ -783,7 +784,14 @@ public class EventHandler {
      */
     @SubscribeEvent
     public static void onStaffLinkTick(ServerTickEvent.Post event) {
-        StaffLinkEngine.tick(event.getServer());
+        MinecraftServer server = event.getServer();
+        StaffLinkEngine.tick(server);
+        // 应力的驱动认领必须每 tick 续期/清理：桥一旦停手，只有这里能把方块身上的虚拟转速摘掉。
+        CreateStressCompatLoader.sweep(server);
+        // 界面上的可用应力 / 需求是给人看的数字，20 tick 一次足够。
+        if (server.getTickCount() % 20 == 0) {
+            CreateStressCompatLoader.syncStatus(server);
+        }
     }
 
     /**
@@ -850,6 +858,8 @@ public class EventHandler {
         AeLinkChannelBypass.clear();
         // 无线物流的调度表按 tick 计数，同样不能跨局沿用。
         StaffLinkEngine.clearRuntimeState();
+        // 应力的驱动认领里记着「哪个方块被驱动成了什么转速」，跨局必须清空。
+        CreateStressCompatLoader.clearRuntimeState();
         // 连锁等价组的解析缓存按玩家 UUID 索引，别留到下一局。
         ChainGroupManager.clearAll();
         // 生物保护名单的解析缓存与客户端镜像同理。

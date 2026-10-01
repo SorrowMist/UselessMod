@@ -73,6 +73,12 @@ requiredMods=["item_obliterator"]
 config="${mod_id}.malum.mixins.json"
 requiredMods=["malum"]
 
+# 无线物流的「应力」介质要在动力学方块的自身转速入口与网络合计处注入，
+# 因此这份配置只在动力学模组在场时才加载。
+[[mixins]]
+config="${mod_id}.create.mixins.json"
+requiredMods=["create"]
+
 # The [[accessTransformers]] block allows you to declare where your AT file is.
 # If this block is omitted, a fallback attempt will be made to load an AT from META-INF/accesstransformer.cfg
 #[[accessTransformers]]
@@ -151,6 +157,15 @@ requiredMods=["malum"]
     modId="botanypots"
     type="optional"
     versionRange="[21.1.34,)"
+    ordering="AFTER"
+    side="BOTH"
+
+# 无线物流的「应力」介质：转速与应力容量都靠动力学方块实体之间的传播机制承载。
+# 缺了它，该介质会从下拉列表里消失、服务端也会拒绝写入。
+[[dependencies.${mod_id}]]
+    modId="create"
+    type="optional"
+    versionRange="[6.0.0,6.1.0)"
     ordering="AFTER"
     side="BOTH"
 

@@ -147,9 +147,13 @@ public final class StaffLinkBinding {
         }
         // 网络里还没有释放端时，第一个绑定的容器就当释放端——绑两个容器即可跑起来。
         LinkFlow flow = network.hasReleaseRoute() ? LinkFlow.ABSORB : LinkFlow.RELEASE;
+        // 应力线路的两个数值是「目标转速 / 旋转方向」，语义与别的介质不同，默认值也要跟着换。
+        boolean stress = medium.family() == ResourceFamily.STRESS;
         // 新锚点默认关闭：要搬什么由玩家显式打开，免得一绑上就开始动别人的库存。
         network.putRoute(new StaffLinkRoute(anchor, 0, false, flow, medium,
-                DEFAULT_AMOUNT, DEFAULT_INTERVAL, null, 0, List.of()));
+                stress ? StaffLinkRoute.STRESS_DEFAULT_RPM : DEFAULT_AMOUNT,
+                stress ? StaffLinkRoute.STRESS_CLOCKWISE : DEFAULT_INTERVAL,
+                null, 0, List.of()));
         return true;
     }
 

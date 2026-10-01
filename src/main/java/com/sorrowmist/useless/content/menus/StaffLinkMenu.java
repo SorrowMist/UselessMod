@@ -3,6 +3,7 @@ package com.sorrowmist.useless.content.menus;
 import com.sorrowmist.useless.content.stafflink.LinkFlow;
 import com.sorrowmist.useless.content.stafflink.LinkFilterSlot;
 import com.sorrowmist.useless.content.stafflink.LinkMedium;
+import com.sorrowmist.useless.content.stafflink.ResourceFamily;
 import com.sorrowmist.useless.content.stafflink.StaffLinkRoute;
 import com.sorrowmist.useless.init.ModMenuType;
 import com.sorrowmist.useless.network.StaffLinkConfigurePacket;
@@ -238,9 +239,14 @@ public final class StaffLinkMenu extends AbstractContainerMenu {
             }
         }
         LinkFlow flow = snapshot != null && snapshot.hasReleaseRoute() ? LinkFlow.ABSORB : LinkFlow.RELEASE;
+        // 应力线路的两个数值是「目标转速 / 旋转方向」，语义与别的介质不同，初值也要跟着换；
+        // 沿用 16 / 5 的话，那个 5 会被服务端当成非法方向收敛成 1，玩家会看到配置被悄悄改掉。
+        boolean stress = medium.family() == ResourceFamily.STRESS;
         // 新线路默认关闭，由玩家显式打开。
-        return new StaffLinkRoute(anchor, route, false, flow, medium, 16, 5, null,
-                0, List.of());
+        return new StaffLinkRoute(anchor, route, false, flow, medium,
+                stress ? StaffLinkRoute.STRESS_DEFAULT_RPM : 16,
+                stress ? StaffLinkRoute.STRESS_CLOCKWISE : 5,
+                null, 0, List.of());
     }
 
     /** 当前网络名（没起过名时为空串）。 */

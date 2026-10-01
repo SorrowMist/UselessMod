@@ -5,6 +5,7 @@ import com.sorrowmist.useless.client.gui.ChainGroupScreen;
 import com.sorrowmist.useless.client.gui.ModeWheelScreen;
 import com.sorrowmist.useless.client.gui.StaffLinkScreen;
 import com.sorrowmist.useless.client.render.StaffLinkHighlightRenderer;
+import com.sorrowmist.useless.client.stafflink.StaffLinkStressClientState;
 import com.sorrowmist.useless.content.blockentities.AdvancedAlloyFurnaceBlockEntity;
 import com.sorrowmist.useless.content.blockentities.multiblock.MultiblockAlloyFurnaceCoreBlockEntity;
 import com.sorrowmist.useless.content.menus.MultiblockAlloyFurnaceMenu;
@@ -17,6 +18,7 @@ import com.sorrowmist.useless.network.BeefToolLayoutResultPacket;
 import com.sorrowmist.useless.network.BeefToolLayoutSyncPacket;
 import com.sorrowmist.useless.network.StaffLinkHighlightPacket;
 import com.sorrowmist.useless.network.StaffLinkSyncPacket;
+import com.sorrowmist.useless.network.StaffLinkStressStatusPacket;
 import com.sorrowmist.useless.world.stafflink.StaffLinkNetwork;
 import net.minecraft.client.Minecraft;
 import net.minecraft.world.entity.Entity;
@@ -131,6 +133,16 @@ public final class ClientPacketHandlers {
         if (Minecraft.getInstance().screen instanceof StaffLinkScreen screen) {
             screen.receiveSync(packet);
         }
+    }
+
+    /**
+     * 无线物流：应力线路各端点的运行状态。
+     *
+     * <p>纯展示数据，不参与任何判定——「能不能搬」永远是服务端说了算。界面每帧自己去读，
+     * 所以这里只把缓存换掉，不需要回调。</p>
+     */
+    public static void handleStaffLinkStressStatus(StaffLinkStressStatusPacket packet) {
+        StaffLinkStressClientState.replace(packet.entries());
     }
 
     /**

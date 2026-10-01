@@ -70,6 +70,35 @@ public record StaffLinkRoute(
     public static final int MIN_WEIGHT = -99;
     public static final int MAX_WEIGHT = 99;
 
+    /**
+     * 应力线路上 {@link #interval} 字段承载「方向」，取值 {@link #STRESS_CLOCKWISE} /
+     * {@link #STRESS_COUNTER_CLOCKWISE}。
+     *
+     * <p>为什么复用而不是新加一个布尔字段：{@code amount} 与 {@code interval} 在别的介质上
+     * 分别表示「一轮搬多少」与「多久一轮」，而转速与方向正是应力这种连续量对应的两样东西，
+     * 语义刚好对得上；复用可以让存档、网络编解码与界面控件都不必新增字段。
+     * {@code interval} 的既有夹取区间 {@code [1, 1200]} 对这两个取值是安全的。</p>
+     */
+    public static final int STRESS_CLOCKWISE = 1;
+
+    /** 应力线路上 {@link #interval} 字段表示逆时针。 */
+    public static final int STRESS_COUNTER_CLOCKWISE = 2;
+
+    /**
+     * 应力线路上 {@link #amount} 字段承载「目标转速（RPM）」时的默认值。
+     *
+     * <p>取 256 是因为它是常见的最高档转速；真正可用的上限由桥在运行时按动力学配置夹取。</p>
+     */
+    public static final long STRESS_DEFAULT_RPM = 256L;
+
+    /**
+     * 应力线路目标转速的**粗**上限，只用于服务端清洗客户端提交的值。
+     *
+     * <p>真正的上限是动力学配置里的最高转速，那是可选集成侧才知道的事，因此这里先给一个
+     * 绝对上界挡住离谱数值，再由桥按实际配置夹一次。</p>
+     */
+    public static final long STRESS_RPM_HARD_LIMIT = 1_000_000L;
+
     private static final String TAG_DIMENSION = "Dimension";
     private static final String TAG_POS = "Pos";
     private static final String TAG_ROUTE = "Route";
@@ -114,13 +143,14 @@ public record StaffLinkRoute(
      * 过滤器适用的资源类型。
      *
      * <p>标记物按线路类型分开存：物品线路放物品本身，流体线路放<b>流体本身</b>（不是装它的桶），
-     * 化学品线路放一只装有该化学品的储罐。能量与魔源没有合适的标记物，因此不参与过滤。</p>
+     * 化学品线路放一只装有该化学品的储罐。能量、魔源与应力都没有合适的标记物，
+     * 因此不参与过滤。</p>
      */
     public boolean filterApplies() {
         return switch (medium) {
             case ITEM, AE_ITEM, FLUID, AE_FLUID, CHEMICAL, AE_CHEMICAL -> true;
-            // 能量与魔源没有合适的标记物，因此不参与过滤。
-            case ENERGY, AE_ENERGY, SOURCE, AE_SOURCE -> false;
+            // 能量、魔源、应力没有合适的标记物，因此不参与过滤。
+            case ENERGY, AE_ENERGY, SOURCE, AE_SOURCE, STRESS -> false;
         };
     }
 
@@ -161,7 +191,7 @@ public record StaffLinkRoute(
      *       能不能匹配到具体资源静态判不了，交给运行时的谓词。</li>
      *   <li>物品族看 {@link LinkFilterSlot#isItem()}，流体族看 {@link LinkFilterSlot#isFluid()}，
      *       化学品看物品标记（化学品只有「储罐物品」这一种表示）。</li>
-     *   <li>能量 / 魔源不参与过滤（{@link #filterApplies()} 为 {@code false}），恒 {@code false}。</li>
+     *   <li>能量 / 魔源 / 应力不参与过滤（{@link #filterApplies()} 为 {@code false}），恒 {@code false}。</li>
      * </ul>
      */
     public boolean hasApplicableWhitelist() {
@@ -172,7 +202,7 @@ public record StaffLinkRoute(
             case ITEM -> hasMarker(slot -> slot.isItem() || slot.isPattern());
             case FLUID -> hasMarker(slot -> slot.isFluid() || slot.isPattern());
             case CHEMICAL -> hasMarker(slot -> slot.isItem() || slot.isPattern());
-            case ENERGY, SOURCE -> false;
+            case ENERGY, SOURCE, STRESS -> false;
         };
     }
 

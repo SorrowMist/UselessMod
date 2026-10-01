@@ -13,5 +13,7 @@ public enum ResourceFamily {
     FLUID,
     ENERGY,
     CHEMICAL,
-    SOURCE
+    SOURCE,
+    /** 转速 + 应力容量；只有方块形态，没有 AE 形态。 */
+    STRESS
 }

@@ -2,6 +2,8 @@ package com.sorrowmist.useless.content.items;
 
 import com.sorrowmist.useless.api.enums.tool.EnchantMode;
 import com.sorrowmist.useless.api.enums.tool.ToolTypeMode;
+import com.sorrowmist.useless.client.BeefTooltipPager;
+import com.sorrowmist.useless.client.TooltipPageState;
 import com.sorrowmist.useless.content.blocks.GlowPlasticBlock;
 import com.sorrowmist.useless.content.blocks.UselessGlassBlock;
 import com.sorrowmist.useless.compat.enderio.EnderIOTravelCompat;
@@ -99,6 +101,7 @@ import net.neoforged.neoforge.event.entity.living.LivingDropsEvent;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -1540,6 +1543,40 @@ public class EndlessBeafItem extends TieredItem {
     public void appendHoverText(@NotNull ItemStack stack, @NotNull TooltipContext context,
                                 @NotNull List<Component> tooltipComponents,
                                 @NotNull TooltipFlag tooltipFlag) {
+        // 提示行数已超过屏幕可用高度，原版会把超出部分裁掉。此处先把全部内容写进暂存列表，
+        // 再按当前页裁取并追加翻页指示，避免逐行改动各分支的写入目标。
+        List<Component> fullTooltip = new ArrayList<>();
+        this.buildFullTooltip(stack, context, fullTooltip, tooltipFlag);
+        // 置位可见性标记：按键事件无法得知提示框是否真的在绘制，只能由渲染路径告知
+        TooltipPageState.markTooltipVisible();
+        // 绑定本次渲染的物品栈：提示框渲染与按键事件分属两个阶段，按键处理期间只能凭
+        // 主手/副手物品重新推断被查看的物品；把引用记录在此，按键入口可直接取用，
+        // 避免提示框渲染的并非手持物品（如创造模式物品栏）时页码写到错误的键上。
+        TooltipPageState.setViewedStack(stack);
+
+        int totalPages = BeefTooltipPager.pageCount(fullTooltip.size());
+        int[] range = BeefTooltipPager.pageRange(stack, fullTooltip.size(), totalPages);
+        tooltipComponents.addAll(fullTooltip.subList(range[0], range[1]));
+        if (totalPages > 1) {
+            // 页码由 pageRange 回绕后写回，直接读取即为当前页
+            int page = BeefTooltipPager.getPage(stack);
+            tooltipComponents.add(Component.empty());
+            tooltipComponents.add(BeefTooltipPager.pageIndicator(page, totalPages)
+                                                    .withStyle(ChatFormatting.DARK_GRAY));
+        }
+
+        super.appendHoverText(stack, context, tooltipComponents, tooltipFlag);
+    }
+
+    /**
+     * 构建造化杖的完整提示内容。
+     *
+     * <p>与 {@link #appendHoverText} 分离，使分页逻辑只需处理「全部行」这一种输入。</p>
+     */
+    @OnlyIn(Dist.CLIENT)
+    private void buildFullTooltip(@NotNull ItemStack stack, @NotNull TooltipContext context,
+                                  @NotNull List<Component> tooltipComponents,
+                                  @NotNull TooltipFlag tooltipFlag) {
         if (ModList.get().isLoaded("gtceu")) {
             ToolTypeMode currentToolType = stack.getOrDefault(
                     UComponents.CurrentToolTypeComponent.get(),

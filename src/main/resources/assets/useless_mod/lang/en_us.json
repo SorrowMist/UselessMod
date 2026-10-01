@@ -857,6 +857,7 @@
   "tooltip.useless_mod.exdeorum_hammer_mode": "Hammer",
   "tooltip.useless_mod.exdeorum_compressed_hammer_mode": "Compressed Hammer",
   "tooltip.useless_mod.press_shift_for_keys": "Hold Shift to show key bindings",
+  "tooltip.useless_mod.tooltip_page": "Page %s/%s  Press %s %s to turn pages",
   "tooltip.useless_mod.silk_touch_mode": "Silk Touch",
   "tooltip.useless_mod.fortune_mode": "Fortune",
   "tooltip.useless_mod.key.switch_silk_touch": "§dPress %s to switch to Silk Touch mode",

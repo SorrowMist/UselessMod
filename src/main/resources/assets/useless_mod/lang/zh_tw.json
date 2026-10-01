@@ -847,6 +847,7 @@
   "tooltip.useless_mod.exdeorum_hammer_mode": "錘子",
   "tooltip.useless_mod.exdeorum_compressed_hammer_mode": "壓縮錘",
   "tooltip.useless_mod.press_shift_for_keys": "按住 Shift 顯示按鍵綁定",
+  "tooltip.useless_mod.tooltip_page": "第 %s/%s 頁　按 %s %s 翻頁",
   "tooltip.useless_mod.silk_touch_mode": "絲綢之觸",
   "tooltip.useless_mod.fortune_mode": "幸運",
   "tooltip.useless_mod.key.switch_silk_touch": "§d按下 %s 切換至絲綢之觸模式",

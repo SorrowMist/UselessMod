@@ -161,7 +161,7 @@ public record StaffLinkRoute(
      *       能不能匹配到具体资源静态判不了，交给运行时的谓词。</li>
      *   <li>物品族看 {@link LinkFilterSlot#isItem()}，流体族看 {@link LinkFilterSlot#isFluid()}，
      *       化学品看物品标记（化学品只有「储罐物品」这一种表示）。</li>
-     *   <li>能量 / 魔源不参与过滤，恒 {@code false}。</li>
+     *   <li>能量 / 魔源不参与过滤（{@link #filterApplies()} 为 {@code false}），恒 {@code false}。</li>
      * </ul>
      */
     public boolean hasApplicableWhitelist() {
@@ -174,6 +174,31 @@ public record StaffLinkRoute(
             case CHEMICAL -> hasMarker(slot -> slot.isItem() || slot.isPattern());
             case ENERGY, SOURCE -> false;
         };
+    }
+
+    /**
+     * 「源端是 ME 网络、这条线路又拿不出白名单」是否应当<b>整条线路一个也不搬</b>。
+     *
+     * <p>{@link #hasApplicableWhitelist()} 判的是「有没有白名单」，这里判的是「<b>需不需要</b>
+     * 白名单」——两者的差就在能量与魔源上。</p>
+     *
+     * <p>「没有白名单就一个也不搬」这条规则的由来是：源端是 ME 网络时，拿什么完全由接收端白名单
+     * 决定，白名单为空就退化成「把整张网络灌进这个容器」——而网络里可能有几千种东西。
+     * 但这条理由<b>只对「网络里能装多种资源」的族成立</b>：</p>
+     *
+     * <ul>
+     *   <li>物品 / 流体 / 化学品：网络里能有上千种 ⇒ 需要白名单。</li>
+     *   <li><b>能量 / 魔源：从网络里出来就一种</b>（FE / 魔源），「灌满」根本无从谈起；
+     *       而且它们<b>没有合适的标记物</b>（{@link #filterApplies()} 恒 {@code false}，
+     *       界面压根不给填）。对它们套这条规则等于把整条线路<b>锁死</b>——
+     *       玩家既搬不动、也无处可填来解锁。</li>
+     * </ul>
+     *
+     * <p>因此判据是「本族吃过滤器」∧「没填出有效白名单」。界面那条同样的警告也用它，
+     * 免得能量 / 魔源线路一边能搬一边报错。</p>
+     */
+    public boolean blocksAeSourceWithoutWhitelist() {
+        return filterApplies() && !hasApplicableWhitelist();
     }
 
     private boolean hasMarker(java.util.function.Predicate<LinkFilterSlot> predicate) {

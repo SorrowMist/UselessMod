@@ -1332,9 +1332,10 @@ public final class StaffLinkScreen extends AbstractContainerScreen<StaffLinkMenu
         if (config == null) {
             return;
         }
-        // hasApplicableWhitelist 内部已经处理了「本资源类型根本不吃过滤器」（能量 / 魔源恒 false）
-        // 以及「源端不是 AE 就无所谓」这两件事的前半段，这里只补「源端是不是 AE」。
-        if (config.medium().isAe() && !config.hasApplicableWhitelist()) {
+        // blocksAeSourceWithoutWhitelist 内部已经处理了「本资源类型根本不吃过滤器」这件事
+        // （能量 / 魔源恒 false —— 它们从网络出来只有一种，不需要白名单，也标记不上），
+        // 这里只补「源端是不是 AE」。
+        if (config.medium().isAe() && config.blocksAeSourceWithoutWhitelist()) {
             Component text = Component.translatable(
                     "gui.useless_mod.wireless_logistics.ae_whitelist_warning");
             graphics.drawString(font, text, CONTENT_LEFT, FILTER_Y - 11,

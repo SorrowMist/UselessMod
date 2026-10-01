@@ -374,8 +374,12 @@ public final class StaffLinkTargets {
         // 这是个破坏性后果。所以「没有白名单」在 AE 源这一侧必须解释为「不搬」，
         // 而不是「不限制」（后者是非 AE 源的语义，保持不变）。
         //
+        // ⚠️ 这条规则<b>只对「网络里能装多种资源」的族成立</b>：能量与魔源从网络里出来只有一种，
+        // 既没有灌满容器的风险，也根本没有可标记物（界面不给填）。对它们套这条规则 = 把线路锁死，
+        // 玩家搬不动又无处解锁。判据封装在 StaffLinkRoute#blocksAeSourceWithoutWhitelist。
+        //
         // 放在 resolve(target) 之前：省一次目标端解析。
-        if (sourceIsAe && !target.hasApplicableWhitelist()) {
+        if (sourceIsAe && target.blocksAeSourceWithoutWhitelist()) {
             return 0L;
         }
 

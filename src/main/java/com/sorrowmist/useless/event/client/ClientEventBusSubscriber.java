@@ -75,7 +75,6 @@ public class ClientEventBusSubscriber {
 
         // 触发按键
         event.register(KeyBindings.TRIGGER_CHAIN_MINING_KEY.get());
-        event.register(KeyBindings.TRIGGER_FTB_CHAIN_MINING_KEY.get());
         event.register(KeyBindings.TRIGGER_FORCE_MINING_KEY.get());
 
         // 短距传送（造化杖）
@@ -102,8 +101,8 @@ public class ClientEventBusSubscriber {
             }
         }
 
-        // 检测连锁键状态变化。接管键与 Tab 键并列：前者沿用 FTB 的默认键位，
-        // 使习惯该键位的玩家无需改键；两者任一按下即视为连锁激活。
+        // 检测连锁键状态变化。Tab 键与 FTB 的连锁键并列，任一按下即视为连锁激活；
+        // 后者直接读取 FTB 自己的绑定，不在此处另行注册。
         boolean currentTabPressed = KeyBindings.isChainMiningKeyDown();
         if (currentTabPressed != lastTabPressed) {
             PacketDistributor.sendToServer(new TabKeyPressedPacket(currentTabPressed));

@@ -34,16 +34,24 @@ public record StaffLinkStressStatusPacket(List<Entry> entries) implements Custom
     /** 状态码长度上限；状态是固定的几个短标识，不是自由文本。 */
     public static final int MAX_STATE = 32;
 
+    /** 三个应力量：提供 / 消耗 / 第三个（语义随角色变）。 */
+    public record Numbers(float supplied, float consumed, float extra) {
+        public static final Numbers ZERO = new Numbers(0.0F, 0.0F, 0.0F);
+    }
+
     /**
      * 一个端点的运行状态。
      *
-     * @param input     这一端是释放端（源）还是吸收端（输出）
-     * @param available 所在线路源网络能提供的应力总量
-     * @param demand    所在线路全部输出需要的应力总量
-     * @param state     状态码；空串表示正常。界面按它取翻译键
+     * @param input 这一端是释放端（源）还是吸收端（输出）
+     * @param local <b>本锚点</b>的三个数，用于容器列表里那一行：
+     *              释放端 = 它所在网络自己提供了多少；吸收端 = 目标网络需要多少
+     * @param line  <b>整条线路</b>的三个数，用于配置区的状态行：
+     *              提供（各源网络容量合计）/ 消耗（各源网络自身负载合计）/ 可用（两者之差，
+     *              也就是这条链路真正能借出去的额度）。吸收端不使用，恒为 0
+     * @param state 状态码；空串表示正常。界面按它取翻译键
      */
     public record Entry(UUID networkId, GlobalPos anchor, int route, boolean input,
-                        float available, float demand, String state) {
+                        Numbers local, Numbers line, String state) {
     }
 
     public static final Type<StaffLinkStressStatusPacket> TYPE = new Type<>(
@@ -58,8 +66,8 @@ public record StaffLinkStressStatusPacket(List<Entry> entries) implements Custom
                             StaffLinkRoute.writeAnchor(buffer, entry.anchor());
                             buffer.writeVarInt(entry.route());
                             buffer.writeBoolean(entry.input());
-                            buffer.writeFloat(entry.available());
-                            buffer.writeFloat(entry.demand());
+                            writeNumbers(buffer, entry.local());
+                            writeNumbers(buffer, entry.line());
                             buffer.writeUtf(entry.state(), MAX_STATE);
                         }
                     },
@@ -71,13 +79,24 @@ public record StaffLinkStressStatusPacket(List<Entry> entries) implements Custom
                             GlobalPos anchor = StaffLinkRoute.readAnchor(buffer);
                             int route = buffer.readVarInt();
                             boolean input = buffer.readBoolean();
-                            float available = buffer.readFloat();
-                            float demand = buffer.readFloat();
+                            Numbers local = readNumbers(buffer);
+                            Numbers routeNumbers = readNumbers(buffer);
                             String state = buffer.readUtf(MAX_STATE);
-                            entries.add(new Entry(networkId, anchor, route, input, available, demand, state));
+                            entries.add(new Entry(networkId, anchor, route, input,
+                                    local, routeNumbers, state));
                         }
                         return new StaffLinkStressStatusPacket(List.copyOf(entries));
                     });
+
+    private static void writeNumbers(RegistryFriendlyByteBuf buffer, Numbers numbers) {
+        buffer.writeFloat(numbers.supplied());
+        buffer.writeFloat(numbers.consumed());
+        buffer.writeFloat(numbers.extra());
+    }
+
+    private static Numbers readNumbers(RegistryFriendlyByteBuf buffer) {
+        return new Numbers(buffer.readFloat(), buffer.readFloat(), buffer.readFloat());
+    }
 
     public static void handle(StaffLinkStressStatusPacket packet, IPayloadContext context) {
         // 客户端类型统一收敛到 ClientPacketHandlers，避免专用服务器加载类时解析到客户端类。

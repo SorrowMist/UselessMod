@@ -1,5 +1,6 @@
 package com.sorrowmist.useless.compat.create;
 
+import com.sorrowmist.useless.UselessMod;
 import com.sorrowmist.useless.content.stafflink.StaffLinkRoute;
 import com.sorrowmist.useless.network.StaffLinkStressStatusPacket;
 import com.sorrowmist.useless.world.stafflink.StaffLinkManager;
@@ -83,6 +84,12 @@ public final class StaffLinkStressState {
     private static final String STATE_MISSING_IO = "missing_io";
     /** 源网络一点容量都给不出来。 */
     private static final String STATE_NO_POWER = "no_power";
+    /** 源网络有富余，但按优先级轮到它时已经被别的输出分完了。 */
+    private static final String STATE_NO_SHARE = "no_share";
+    /** 目标网络已经有容量了（同一条线路上别的输出补进去的），这一个输出无需再注入。 */
+    private static final String STATE_FED_ELSEWHERE = "fed_elsewhere";
+    /** 目标网络自己就带着动力源，压根不需要外部补应力。 */
+    private static final String STATE_SELF_FED = "self_fed";
     /** 目标网络已经有真实动力源。 */
     private static final String STATE_REAL_SOURCE = "real_source";
     /** 同一张目标网络已被另一条输出用别的转速驱动。 */
@@ -201,23 +208,85 @@ public final class StaffLinkStressState {
             outputs.add(new OutputEndpoint(entity, absorb, reverse ? -rpm : rpm));
         }
 
+        // ---- 源网络各自的「提供 / 消耗 / 可用」 ----
+        //
+        // 放在「有没有输出」的判定<b>之前</b>：这一步与输出无关，而只绑了源、还没绑目标时，
+        // 界面也应该看得到源网络的真实状况 —— 那正是玩家判断「怎么只有这么点」的依据。
+        //
+        // 三个细节不能省：
+        //  1. 容量要减掉自己上一轮加进去的虚拟容量（那部分不是源网络自己产的）；
+        //  2. 负载要减掉自己上一轮回馈的那一份（否则「可用」会被自己压小，看起来凭空少一块）；
+        //  3. 可用量用「容量 − 负载」而不是「容量」：源网络自己带的机器也要吃应力，
+        //     只看容量等于把已经被占用的部分又借了一遍。
+        Set<Long> infiniteNetworks = new HashSet<>();
+        Map<Long, float[]> numbersByNetwork = new HashMap<>();
+        Map<GlobalPos, float[]> inputLocal = new HashMap<>();
+        float capacitySum = 0.0F;
+        float consumedSum = 0.0F;
+        float spare = 0.0F;
+        for (InputEndpoint input : inputs) {
+            KineticNetwork network = input.entity.getOrCreateNetwork();
+            long id = networkIdOf(network, input.entity);
+            if (hasInfiniteSource(network)) {
+                infiniteNetworks.add(id);
+                infiniteSupply.add(prefix + input.route.anchor());
+            }
+            float[] numbers = numbersByNetwork.get(id);
+            if (numbers == null) {
+                if (infiniteNetworks.contains(id)) {
+                    numbers = new float[]{INFINITE_POWER, 0.0F, INFINITE_POWER};
+                } else {
+                    float capacity = Math.max(0.0F, network.calculateCapacity() - additionalCapacity(id));
+                    float reflected = inputStress.getOrDefault(id, 0.0F);
+                    float consumed = Math.max(0.0F, network.calculateStress() - reflected);
+                    numbers = new float[]{capacity, consumed, Math.max(0.0F, capacity - consumed)};
+                }
+                numbersByNetwork.put(id, numbers);
+                // 同一张网络只累加一次：四个锚点接在同一根轴上的话，它是「一张 32768 的网络」，
+                // 不是「四张 8192 的网络」。
+                capacitySum += numbers[0];
+                consumedSum += numbers[1];
+                spare += numbers[2];
+            }
+            // 「自身」= <b>这一台所在那张动力网络</b>的量，不是单块自己的。
+            //
+            // 动力合成器这类机器是「一片共用一个网络」的：单块 2.0 × 256 = 512 没有意义，
+            // 玩家要的是「我这片装置一共吃多少」。源端同理 —— 看的是它所在网络能提供多少。
+            // （同一张网络上绑了多个锚点时，它们显示的就是同一个数，这是刻意的。）
+            inputLocal.put(input.route.anchor(), new float[]{numbers[0], 0.0F, 0.0F});
+        }
+        if (!infiniteNetworks.isEmpty()) {
+            spare = INFINITE_POWER;
+            capacitySum = INFINITE_POWER;
+        }
+
+        // 诊断：把每个输入网络的真实构成打出来（每 20 tick 一行）。
+        //
+        // Create 6.0.x 的应力口径和直觉不一样，出问题时光看汇总数根本定位不到：
+        //   · `calculateStress()` 遍历 `members` 时**不跳过动力源**，而 `add()` 会把所有方块
+        //     （含源）都放进 `members`，取值是**加入时缓存的** `calculateStressApplied()`；
+        //   · `calculateCapacity()` 用 `sources` 里缓存的容量 × **`getGeneratedSpeed()`**；
+        //   · 两者都还要加上 `unloadedStress` / `unloadedCapacity`（区块未加载的成员残值）。
+        // 所以「谁贡献了多少」必须逐块打出来才能对上账。
+        logNetworkBreakdown(inputs, routeIndex, spare);
+
+        // 配置区状态行用<b>整条线路</b>汇总的三个数。
+        //
+        // 玩家想知道的是「这条无线链路总共能借出多少」。四台风车轴承各自成网时，只看单个锚点
+        // 会显示 8192，让人以为总量只有一台的量；汇总后才是 32768，与「每台 8192、共四台」对得上。
+        // 汇总出来的「可用」也正是下面分配时用的那个数，于是界面和实际行为不会再互相矛盾。
+        float[] routeNumbers = {capacitySum, consumedSum, spare};
+
+        Map<GlobalPos, float[]> outputNumbers = new HashMap<>();
+
         if (inputs.isEmpty() || outputs.isEmpty()) {
             releaseRoute(server, networkId, routeIndex);
             for (OutputEndpoint output : outputs) {
                 outputStates.put(output.route.anchor(), STATE_MISSING_IO);
             }
-            writeStatus(networkId, routeIndex, releases, absorbs, inputStates, outputStates, 0.0F, 0.0F);
+            writeStatus(networkId, routeIndex, releases, absorbs, inputStates, outputStates,
+                    inputLocal, routeNumbers, outputNumbers);
             return;
-        }
-
-        // ---- 源网络里有没有「无限动力源」 ----
-        Set<Long> infiniteNetworks = new HashSet<>();
-        for (InputEndpoint input : inputs) {
-            KineticNetwork network = input.entity.getOrCreateNetwork();
-            if (hasInfiniteSource(network)) {
-                infiniteNetworks.add(networkIdOf(network, input.entity));
-                infiniteSupply.add(prefix + input.route.anchor());
-            }
         }
 
         // ---- 逐个输出：先查冲突，没冲突才驱动 ----
@@ -245,55 +314,34 @@ public final class StaffLinkStressState {
                 impact += Math.max(0.0F, value);
             }
             String key = output.route.anchor().toString();
+            // 目标网络<b>自己</b>已有的容量（含本 tick 里先前已经喂给它的那一部分）。
+            // 扣掉它才是「还需要我们补多少」—— 目标网络本来就有动力的话，我们不该再注入一份，
+            // 那等于白占源网络的额度（回馈会把它算成源网络的负载）。
+            float ownCapacity = network.calculateCapacity();
+            float totalPower = StressAllocationMath.power(impact, output.signedSpeed);
             drives.add(new Drive(key, network, networkId2, output.route, output.signedSpeed));
             demands.add(new StressAllocationMath.OutputDemand(
                     key,
-                    StressAllocationMath.power(impact, output.signedSpeed),
+                    Math.max(0.0F, totalPower - ownCapacity),
+                    totalPower,
                     output.route.weight(),
                     nearestInputDistance(inputs, output.route)));
         }
 
         if (drives.isEmpty()) {
-            writeStatus(networkId, routeIndex, releases, absorbs, inputStates, outputStates, 0.0F, 0.0F);
+            writeStatus(networkId, routeIndex, releases, absorbs, inputStates, outputStates,
+                    inputLocal, routeNumbers, outputNumbers);
             return;
-        }
-
-        // ---- 源网络还有多少<b>富余</b>应力可以借出去 ----
-        //
-        // 两个细节都不能省：
-        //  1. 用「容量 − 应力」而不是「容量」：源网络自己带着的机器也要吃应力，只看容量
-        //     等于把已经被占用的部分又借了一遍。
-        //  2. 把自己上一轮回馈进去的那一份加回来：那一份本来就是我们自己造成的，
-        //     不减掉它的话，第二 tick 算出来的富余会凭空少一块，两边来回跳。
-        float spare = 0.0F;
-        boolean infinite = false;
-        Set<Long> counted = new HashSet<>();
-        for (InputEndpoint input : inputs) {
-            KineticNetwork network = input.entity.getOrCreateNetwork();
-            long id = networkIdOf(network, input.entity);
-            if (!counted.add(id)) {
-                continue;
-            }
-            if (infiniteNetworks.contains(id)) {
-                infinite = true;
-                continue;
-            }
-            float reflected = inputStress.getOrDefault(id, 0.0F);
-            spare += Math.max(0.0F, network.calculateCapacity() - network.calculateStress() + reflected);
-        }
-        if (infinite) {
-            spare = INFINITE_POWER;
-        }
-
-        float requested = 0.0F;
-        for (StressAllocationMath.OutputDemand demand : demands) {
-            requested += demand.requestedPower();
         }
 
         // ---- 按权重分配，并登记虚拟容量 ----
         Map<String, Float> allocated = new HashMap<>();
         for (StressAllocationMath.Allocation allocation : StressAllocationMath.allocate(demands, spare)) {
             allocated.put(allocation.key(), allocation.power());
+        }
+        Map<String, StressAllocationMath.OutputDemand> demandByKey = new HashMap<>();
+        for (StressAllocationMath.OutputDemand demand : demands) {
+            demandByKey.put(demand.key(), demand);
         }
         float granted = 0.0F;
         for (Drive drive : drives) {
@@ -302,8 +350,23 @@ public final class StaffLinkStressState {
             grants.computeIfAbsent(drive.networkId, id -> new ArrayList<>())
                     .add(new StressGrant(power, drive.signedSpeed));
             touched.put(drive.networkId, drive.network);
-            outputStates.put(drive.route.anchor(), power > 0.0F ? STATE_OK : STATE_NO_POWER);
+            StressAllocationMath.OutputDemand demand = demandByKey.get(drive.key);
+            float networkCapacity = drive.network.calculateCapacity();
+            outputStates.put(drive.route.anchor(), power > 0.0F ? STATE_OK : idleOutputState(
+                    spare,
+                    demand == null ? 0.0F : demand.requestedPower(),
+                    networkCapacity,
+                    additionalCapacity(drive.networkId) > 0.0F));
+            // 「自身」= 这一台<b>所在那张动力网络</b>总共需要多少应力（整片装置的耗力合计），
+            // 不是单块自己的 —— 见上面 inputLocal 处的说明。
+            // 「网络总计 / 剩余」是整条无线线路的量，由 routeNumbers 统一给出，两处分工不同。
+            outputNumbers.put(drive.route.anchor(), new float[]{
+                    demand == null ? 0.0F : demand.totalPower(), 0.0F, 0.0F});
         }
+
+        // 「剩余」= 这条链路可借总额 − 已经借出去的。
+        // 要等上面登记完才知道借出去多少，所以在这里回填（「网络总计」那一格不动）。
+        routeNumbers[2] = Math.max(0.0F, spare - granted);
 
         // ---- 回馈：源网络承担它<b>实际给出的</b>那一份 ----
         //
@@ -318,7 +381,9 @@ public final class StaffLinkStressState {
             long id = networkIdOf(network, input.entity);
             inputStress.merge(id, shared, Float::sum);
             touched.put(id, network);
-            inputStates.put(input.route.anchor(), STATE_OK);
+            // 源网络自己就没有富余（容量被它自己带的机器吃满）时如实报出来 ——
+            // 否则玩家只看到「已连接」和一个 0，不知道卡在哪一步。
+            inputStates.put(input.route.anchor(), spare > 0.0F ? STATE_OK : STATE_NO_POWER);
         }
 
         // ---- 让动力学按新的贡献重算容量与应力 ----
@@ -329,7 +394,8 @@ public final class StaffLinkStressState {
             input.entity.getOrCreateNetwork().updateNetwork();
         }
 
-        writeStatus(networkId, routeIndex, releases, absorbs, inputStates, outputStates, spare, requested);
+        writeStatus(networkId, routeIndex, releases, absorbs, inputStates, outputStates,
+                inputLocal, routeNumbers, outputNumbers);
     }
 
     /**
@@ -395,6 +461,34 @@ public final class StaffLinkStressState {
     }
 
     // ------------------------------------------------------------------ 动力学侧的两个钩子
+
+    /**
+     * 补一个「临时认领」：方块上次退出前是无线驱动的，而认领表是运行时状态、重启后就没了。
+     *
+     * <p><b>为什么必须补。</b>认领丢了之后，这些方块在这一 tick 里会出现一种矛盾状态：
+     * 身上还留着上次同步过去的转速（方块实体自己的 {@code speed} 存在存档里），
+     * 但 {@code getGeneratedSpeed()} 因为查不到认领而返回 0 —— 于是动力学既不当它是动力源，
+     * 又看到它在转。随后 {@code validateKinetics()} 会把它的转速清零、依赖它的邻居会去
+     * {@code propagateMissingSource}，而传播逻辑把「同一张网络里转速不一致」判成环路，
+     * 直接 {@code destroyBlock} 把方块打掉。实测症状：**重进游戏后成排的动力合成器两侧变掉落物**。</p>
+     *
+     * <p>补上之后它从第一 tick 起就仍然表现为动力源，网络状态与存档前一致；引擎随后会把它
+     * 换成正式的认领。若这条线路已经不在了，临时认领会在 40 tick 后自然过期并被停掉。</p>
+     */
+    public void reseedClaim(KineticBlockEntity entity) {
+        Level level = entity.getLevel();
+        if (level == null) {
+            return;
+        }
+        ClaimKey key = new ClaimKey(level.dimension().location(), entity.getBlockPos().asLong());
+        if (claims.containsKey(key)) {
+            return;
+        }
+        MinecraftServer server = level.getServer();
+        long now = server == null ? 0L : server.getTickCount();
+        claims.put(key, new Claim(null, -1, null, level.dimension().location(),
+                entity.getBlockPos(), entity.getTheoreticalSpeed(), now, true));
+    }
 
     /** 目标网络在本 tick 额外获得的容量。 */
     public float additionalCapacity(long networkId) {
@@ -484,9 +578,10 @@ public final class StaffLinkStressState {
         }
         ClaimKey key = new ClaimKey(level.dimension().location(), entity.getBlockPos().asLong());
         Claim claim = claims.get(key);
-        if (claim == null) {
-            claims.put(key, new Claim(networkId, routeIndex, anchor,
-                    level.dimension().location(), entity.getBlockPos(), signedSpeed, tick));
+        if (claim == null || claim.restored) {
+            // 临时认领（重启后补的）没有真正的归属，第一次被驱动时直接换成正式的。
+            claims.put(key, new Claim(networkId, routeIndex, anchor, level.dimension().location(),
+                    entity.getBlockPos(), signedSpeed, tick));
         } else {
             claim.speed = signedSpeed;
             claim.lastSeen = tick;
@@ -656,22 +751,68 @@ public final class StaffLinkStressState {
 
     // ------------------------------------------------------------------ 内部：工具
 
+    /**
+     * 写界面用的状态条目。
+     *
+     * @param inputLocal    按锚点索引的「本锚点所在网络」三个数：提供 / 消耗 / 可用
+     * @param routeNumbers  整条线路源侧汇总的三个数，同上
+     * @param outputNumbers 按锚点索引的「注入 / 需求 / 容量」
+     */
     private void writeStatus(UUID networkId, int routeIndex,
                              List<StaffLinkRoute> releases, List<StaffLinkRoute> absorbs,
                              Map<GlobalPos, String> inputStates, Map<GlobalPos, String> outputStates,
-                             float available, float requested) {
+                             Map<GlobalPos, float[]> inputLocal, float[] routeNumbers,
+                             Map<GlobalPos, float[]> outputNumbers) {
+        StaffLinkStressStatusPacket.Numbers route = numbers(routeNumbers);
         for (StaffLinkRoute release : releases) {
             String state = inputStates.get(release.anchor());
             status.put(new StatusKey(networkId, release.anchor(), routeIndex),
-                    new StaffLinkStressStatusPacket.Entry(networkId, release.anchor(), routeIndex,
-                            true, available, requested, state == null ? STATE_OK : state));
+                    new StaffLinkStressStatusPacket.Entry(networkId, release.anchor(), routeIndex, true,
+                            numbers(inputLocal.get(release.anchor())), route,
+                            state == null ? STATE_OK : state));
         }
         for (StaffLinkRoute absorb : absorbs) {
             String state = outputStates.get(absorb.anchor());
+            // 「网络总计 / 剩余」是<b>整条线路</b>的量，吸收端同样要看 —— 它回答的是
+            // 「这条链路能给我多少、还剩多少」，与本机自己需要多少（local）是两回事。
             status.put(new StatusKey(networkId, absorb.anchor(), routeIndex),
-                    new StaffLinkStressStatusPacket.Entry(networkId, absorb.anchor(), routeIndex,
-                            false, available, requested, state == null ? STATE_OK : state));
+                    new StaffLinkStressStatusPacket.Entry(networkId, absorb.anchor(), routeIndex, false,
+                            numbers(outputNumbers.get(absorb.anchor())), route,
+                            state == null ? STATE_OK : state));
         }
+    }
+
+    private static StaffLinkStressStatusPacket.Numbers numbers(@Nullable float[] values) {
+        return values == null
+                ? StaffLinkStressStatusPacket.Numbers.ZERO
+                : new StaffLinkStressStatusPacket.Numbers(values[0], values[1], values[2]);
+    }
+
+    /**
+     * 某个输出端这一份「没注入」时，给出真正的原因。
+     *
+     * <p>判据是<b>目标网络够不够用</b>，而不是「我们这一份有没有给出去」。同一个网络上绑了多个
+     * 输出时，只有第一个会拿到额度、后面的都是 0，但机器照样在转 —— 那时候报「故障」是错的。
+     * 同理，额度也可能是同一条线路上别的输出补进去的，说成「别人供电」也不对。</p>
+     *
+     * @param spare        源侧汇总出来的可用量
+     * @param shortfall    这个输出端还需要补多少（扣掉目标网络自有容量之后的缺口）
+     * @param capacity     目标网络加总后的容量（含已经喂给它的那一部分）
+     * @param wirelessFed  目标网络当前的容量里有没有我们（任意一条线路）补进去的那一份
+     */
+    private static String idleOutputState(float spare, float shortfall, float capacity, boolean wirelessFed) {
+        if (shortfall <= 0.0F) {
+            // 目标网络已经够了，这一份压根不需要注入。
+            if (capacity <= 0.0F) {
+                return STATE_OK;
+            }
+            return wirelessFed ? STATE_FED_ELSEWHERE : STATE_SELF_FED;
+        }
+        if (spare <= 0.0F) {
+            // 源网络自己就满了：容量被它自己带的机器吃干净，没有富余可以借出去。
+            return STATE_NO_POWER;
+        }
+        return STATE_NO_SHARE;
     }
 
     private static double nearestInputDistance(List<InputEndpoint> inputs, StaffLinkRoute output) {
@@ -716,7 +857,9 @@ public final class StaffLinkStressState {
         return false;
     }
 
-    /** 这张网络里有没有（还在世界里的）动力源。没有源就根本不会转，也就没东西可借。 */
+    /**
+     * 这张网络里有没有（还在世界里的）动力源。没有源就根本不会转，也就没东西可借。
+     */
     private static boolean hasAnySource(KineticNetwork network) {
         for (KineticBlockEntity source : network.sources.keySet()) {
             if (isPresent(source)) {
@@ -724,6 +867,71 @@ public final class StaffLinkStressState {
             }
         }
         return false;
+    }
+
+    /**
+     * 诊断日志：逐块打印输入网络的构成，用来核对「提供 / 消耗」到底是谁贡献的。
+     *
+     * <p>每 20 tick 一次、每条线路一行，开销可以忽略；排查这类「数值对不上」的问题时，
+     * 没有它就只能在代码里猜。</p>
+     */
+    private void logNetworkBreakdown(List<InputEndpoint> inputs, int routeIndex, float spare) {
+        if (inputs.isEmpty()) {
+            return;
+        }
+        KineticBlockEntity probe = inputs.get(0).entity;
+        Level level = probe.getLevel();
+        if (level == null || level.getServer() == null
+                || level.getServer().getTickCount() % 20 != 0) {
+            return;
+        }
+        Set<Long> seen = new HashSet<>();
+        StringBuilder report = new StringBuilder();
+        for (InputEndpoint input : inputs) {
+            KineticNetwork network = input.entity.getOrCreateNetwork();
+            long id = networkIdOf(network, input.entity);
+            if (!seen.add(id)) {
+                continue;
+            }
+            float presentCapacity = 0.0F;
+            for (KineticBlockEntity source : network.sources.keySet()) {
+                float contribution = source.calculateAddedStressCapacity()
+                        * Math.abs(source.getGeneratedSpeed());
+                presentCapacity += contribution;
+                report.append("\n    SRC ").append(blockName(source))
+                        .append(' ').append(source.getBlockPos().toShortString())
+                        .append(" gen=").append(source.getGeneratedSpeed())
+                        .append(" capNow=").append(source.calculateAddedStressCapacity())
+                        .append(" -> ").append(contribution);
+            }
+            float presentStress = 0.0F;
+            for (Map.Entry<KineticBlockEntity, Float> member : network.members.entrySet()) {
+                KineticBlockEntity entity = member.getKey();
+                float contribution = member.getValue() * Math.abs(entity.getTheoreticalSpeed());
+                presentStress += contribution;
+                report.append("\n    MEM ").append(blockName(entity))
+                        .append(' ').append(entity.getBlockPos().toShortString())
+                        .append(" theo=").append(entity.getTheoreticalSpeed())
+                        .append(" cached=").append(member.getValue())
+                        .append(" -> ").append(contribution);
+            }
+            float totalCapacity = network.calculateCapacity();
+            float totalStress = network.calculateStress();
+            report.append("\n  net ").append(id)
+                    .append(" cap=").append(totalCapacity)
+                    .append("(present=").append(presentCapacity)
+                    .append(" orphan=").append(totalCapacity - presentCapacity).append(')')
+                    .append(" stress=").append(totalStress)
+                    .append("(present=").append(presentStress)
+                    .append(" orphan=").append(totalStress - presentStress).append(')')
+                    .append(" addCap=").append(additionalCapacity(id))
+                    .append(" addStress=").append(additionalStress(id));
+        }
+        UselessMod.LOGGER.info("[stafflink-stress] route {} spare={}{}", routeIndex, spare, report);
+    }
+
+    private static String blockName(KineticBlockEntity entity) {
+        return String.valueOf(BuiltInRegistries.BLOCK.getKey(entity.getBlockState().getBlock()));
     }
 
     /** 目标转速的夹取：至少 1 RPM，至多取动力学配置里的最高转速。 */
@@ -779,9 +987,22 @@ public final class StaffLinkStressState {
         private float speed;
         private long lastSeen;
         private boolean released;
+        /**
+         * 「临时认领」：重启后按存档里的转速补出来的，还没有真正的线路归属。
+         *
+         * <p>它不跟任何线路冲突（{@link #owns} 恒真），也不会被解绑/释放逻辑摘掉
+         * （{@link #ownsRoute} 恒假）；引擎第一次驱动它时会被替换成正式认领，
+         * 若一直没人认领就会像普通认领一样过期、被停掉。</p>
+         */
+        private boolean restored;
 
         private Claim(UUID networkId, int routeIndex, GlobalPos anchor, ResourceLocation dimension,
                       BlockPos pos, float speed, long lastSeen) {
+            this(networkId, routeIndex, anchor, dimension, pos, speed, lastSeen, false);
+        }
+
+        private Claim(UUID networkId, int routeIndex, GlobalPos anchor, ResourceLocation dimension,
+                      BlockPos pos, float speed, long lastSeen, boolean restored) {
             this.networkId = networkId;
             this.routeIndex = routeIndex;
             this.anchor = anchor;
@@ -789,13 +1010,22 @@ public final class StaffLinkStressState {
             this.pos = pos;
             this.speed = speed;
             this.lastSeen = lastSeen;
+            this.restored = restored;
         }
 
         private boolean ownsRoute(UUID networkId, int routeIndex) {
+            // 临时认领不属于任何线路：解绑/释放逻辑摘不到它，只能等它自己过期。
+            if (restored) {
+                return false;
+            }
             return this.networkId.equals(networkId) && this.routeIndex == routeIndex;
         }
 
         private boolean owns(UUID networkId, int routeIndex, GlobalPos anchor) {
+            // 临时认领也不跟任何人冲突 —— 它只代表「这个方块上次是被无线驱动的」这个事实。
+            if (restored) {
+                return true;
+            }
             return ownsRoute(networkId, routeIndex) && this.anchor.equals(anchor);
         }
 

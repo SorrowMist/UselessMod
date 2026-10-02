@@ -57,9 +57,18 @@ public final class StressAllocationMath {
 
         float remaining = available;
         for (OutputDemand demand : ordered) {
-            float amount = Math.min(Math.max(0.0F, demand.requestedPower()), remaining);
-            result.add(new Allocation(demand.key(), amount));
-            remaining -= amount;
+            float need = Math.max(0.0F, demand.requestedPower());
+            // <b>全给或一点不给。</b>
+            //
+            // Create 里一张网络的容量只要小于它的应力，整张网络就过载停转 —— 给一半并不能让它
+            // 半速运行，那一半纯属白占：回馈会把「已经给出去的量」算成源网络的负载，
+            // 于是源网络少了一份额度、目标端却一点没转起来。所以宁可把这份留给后面能吃饱的输出。
+            if (need <= remaining) {
+                result.add(new Allocation(demand.key(), need));
+                remaining -= need;
+            } else {
+                result.add(new Allocation(demand.key(), 0.0F));
+            }
         }
         return result;
     }
@@ -71,10 +80,12 @@ public final class StressAllocationMath {
     /**
      * 一个输出端的需求。
      *
-     * @param requestedPower 它自己需要的应力（按目标转速算）
-     * @param priority       权重，越大越优先
+     * @param requestedPower  它<b>还需要我们补多少</b>（已经扣掉目标网络自己已有的容量）
+     * @param totalPower      它在目标转速下总共需要多少，只用于界面显示
+     * @param priority        权重，越大越优先
      * @param distanceSquared 到最近输入端的距离平方，仅作同权重时的次序依据
      */
-    public record OutputDemand(String key, float requestedPower, int priority, double distanceSquared) {
+    public record OutputDemand(String key, float requestedPower, float totalPower,
+                               int priority, double distanceSquared) {
     }
 }

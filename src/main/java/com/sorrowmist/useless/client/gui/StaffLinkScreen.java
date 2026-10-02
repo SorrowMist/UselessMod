@@ -107,6 +107,8 @@ public final class StaffLinkScreen extends AbstractContainerScreen<StaffLinkMenu
     private static final int LIST_TEXT_SHIFT = LIST_MOVE_WIDTH * LIST_MOVE_COUNT + 2;
     private static final int LIST_GLYPH_X = CONTENT_LEFT + 2 + LIST_TEXT_SHIFT;
     private static final int LIST_NAME_X = CONTENT_LEFT + 10 + LIST_TEXT_SHIFT;
+    /** 应力线路上容器行尾那个数字占的宽度（紧凑写法最多 4~5 个字符）。 */
+    private static final int STRESS_ROW_VALUE_WIDTH = 36;
 
     // ---- 线路配置
     private static final int CONFIG_INSET_TOP = 130;
@@ -1497,15 +1499,34 @@ public final class StaffLinkScreen extends AbstractContainerScreen<StaffLinkMenu
             }
             graphics.drawString(font, glyph, LIST_GLYPH_X, y, glyphColor, false);
 
+            // 应力线路上行尾还要放一个「这一台自己」的应力量，名字预算里先给它留出位置。
+            // 用紧凑写法（8.2k）—— 13px 高的行放不下长数字。
+            StaffLinkStressStatusPacket.Entry stress = null;
+            int valueWidth = 0;
+            if (routeConfig != null && routeConfig.medium().family() == ResourceFamily.STRESS) {
+                stress = StaffLinkStressClientState.find(
+                        menu.getNetworkId(), anchor, menu.getSelectedRoute());
+                valueWidth = STRESS_ROW_VALUE_WIDTH;
+            }
+
             // 名字后面缀上坐标：多个同名容器（都叫「箱子」）光看名字根本分不出来。
             // 额外预留 8px 给行尾的批量 ✓，无条件预留，免得勾选/取消时名字左右跳。
             String coord = anchor.pos().toShortString();
             int nameBudget = Math.max(24,
-                    CONTENT_WIDTH - LIST_TEXT_SHIFT - LIST_UNBIND_WIDTH - 16 - 8 - font.width(coord));
+                    CONTENT_WIDTH - LIST_TEXT_SHIFT - LIST_UNBIND_WIDTH - 16 - 8 - valueWidth
+                            - font.width(coord));
             String name = font.plainSubstrByWidth(anchorDisplayName(anchor).getString(), nameBudget);
             graphics.drawString(font, name, LIST_NAME_X, y, MachineScreenStyle.TEXT_COLOR, false);
             graphics.drawString(font, coord, LIST_NAME_X + font.width(name) + 4, y,
                     MachineScreenStyle.MUTED_TEXT_COLOR, false);
+            if (stress != null) {
+                // 一行一台、各看各的：源看「这一台提供了多少」，目标看「这一台需要多少」。
+                // 整条线路的合计在配置区的状态行里，两处分工不同。
+                String value = formatStressCompact(stress.local().supplied());
+                graphics.drawString(font, value,
+                        CONTENT_RIGHT - LIST_UNBIND_WIDTH - 8 - 4 - font.width(value), y,
+                        MachineScreenStyle.MUTED_TEXT_COLOR, false);
+            }
             if (isMulti) {
                 graphics.drawString(font, "✓", CONTENT_RIGHT - LIST_UNBIND_WIDTH - 8, y,
                         MULTI_SELECT_TEXT_COLOR, false);
@@ -1678,24 +1699,64 @@ public final class StaffLinkScreen extends AbstractContainerScreen<StaffLinkMenu
             }
             return;
         }
+        // 第一行三个数，两种角色口径一致：
+        //   自身     —— 这一台自己提供 / 消耗多少（源看它的容量 × 生成转速，目标看它的耗力 × 转速）
+        //   网络总计 —— 这条线路上所有源网络能提供的容量合计
+        //   剩余     —— 这条链路还能借出去多少（源网络自身负载扣掉之后的富余）
+        // 「自身」与「网络总计」分开显示，是因为同一张网络上并了好几个源 / 好几台机器时，
+        // 这两个数不是一回事。
         Component numbers = Component.translatable(
-                "gui.useless_mod.wireless_logistics.stress.status_numbers",
-                formatStress(entry.available()), formatStress(entry.demand()));
+                "gui.useless_mod.wireless_logistics.stress.status_breakdown",
+                formatStress(entry.local().supplied()),
+                formatStress(entry.line().supplied()),
+                formatStress(entry.line().extra()));
         graphics.drawString(font, numbers, CONTENT_LEFT, STRESS_STATUS_Y,
                 MachineScreenStyle.MUTED_TEXT_COLOR, false);
 
         Component state = Component.translatable("gui.useless_mod.wireless_logistics.stress.status",
                 stressStateName(entry.state()));
         graphics.drawString(font, state, CONTENT_LEFT, STRESS_STATUS_Y + 9,
-                entry.state().isEmpty() ? MachineScreenStyle.MUTED_TEXT_COLOR : STRESS_WARN_COLOR, false);
+                isStressWarning(entry.state()) ? STRESS_WARN_COLOR : MachineScreenStyle.MUTED_TEXT_COLOR, false);
     }
 
-    /** 应力量的显示：太大就写无穷，否则整数或一位小数。 */
+    /**
+     * 这个状态码是「出问题了」还是「只是说明情况」。
+     *
+     * <p>服务端把状态码当普通字符串发过来，所以这里只能按字面认。
+     * {@code fed_elsewhere}（应力由其它无线输出补足）与 {@code self_fed}（网络自身有动力）
+     * 都说明机器转得好好的，用醒目的琥珀色会让人以为坏了。</p>
+     */
+    private static boolean isStressWarning(@Nullable String state) {
+        if (state == null || state.isEmpty()) {
+            return false;
+        }
+        return !"fed_elsewhere".equals(state) && !"self_fed".equals(state);
+    }
+
+    /** 应力量的显示：太大就写无穷，整数就不带小数点，否则保留一位小数。 */
     private static String formatStress(float value) {
         if (value >= 1.0E9F) {
             return "\u221e";
         }
-        return value >= 100.0F ? String.valueOf(Math.round(value)) : String.format("%.1f", value);
+        // 650.0 写成「650」而不是「650.0」——「注入 0.0」这种显示看起来像是坏了。
+        if (value >= 100.0F || Math.abs(value - Math.round(value)) < 0.05F) {
+            return String.valueOf(Math.round(value));
+        }
+        return String.format("%.1f", value);
+    }
+
+    /** 容器列表行尾的应力量：紧凑写法（8.2k / 1.5M），一行只有 13px 高，放不下长数字。 */
+    private static String formatStressCompact(float value) {
+        if (value >= 1.0E9F) {
+            return "\u221e";
+        }
+        if (value >= 1_000_000.0F) {
+            return String.format("%.1fM", value / 1_000_000.0F);
+        }
+        if (value >= 1_000.0F) {
+            return String.format("%.1fk", value / 1_000.0F);
+        }
+        return String.valueOf(Math.round(value));
     }
 
     /** 状态码 → 可读文字；空串表示一切正常。 */

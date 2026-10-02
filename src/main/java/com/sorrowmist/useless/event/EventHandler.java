@@ -2,6 +2,7 @@ package com.sorrowmist.useless.event;
 
 import com.sorrowmist.useless.UselessMod;
 import com.sorrowmist.useless.client.StaffLinkClientHooks;
+import com.sorrowmist.useless.content.items.BeefCraftingHandler;
 import com.sorrowmist.useless.content.items.BeefMagnetHandler;
 import com.sorrowmist.useless.content.items.BeefTimeAcceleration;
 import com.sorrowmist.useless.content.items.EndlessBeafItem;
@@ -271,6 +272,22 @@ public class EventHandler {
                 STICKY_FLIGHT.add(serverPlayer.getUUID());
             }
         }
+    }
+
+    /**
+     * 造化杖作为材料参与 3x3 工作台合成时，让本次产出物品变为不可破坏（无限耐久）。
+     * <p>
+     * 走事件而不是 mixin {@code ResultSlot}：整合包里的 FastWorkbench 用
+     * {@code CraftResultSlotExt extends ResultSlot} 覆写了 {@code onTake}，注入父类会被绕过；
+     * 而本事件的触发点 {@code ResultSlot#checkTakeAchievements -> EventHooks.firePlayerCraftingEvent}
+     * 被 FastWorkbench 保留，因此事件路径可靠。
+     */
+    @SubscribeEvent
+    public static void onItemCrafted(PlayerEvent.ItemCraftedEvent event) {
+        if (event.getEntity().level().isClientSide()) {
+            return;
+        }
+        BeefCraftingHandler.applyUnbreakableToCraftResult(event.getCrafting(), event.getInventory());
     }
 
     @SubscribeEvent

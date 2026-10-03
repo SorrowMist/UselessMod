@@ -23,8 +23,8 @@ public final class ScaledCraftingPattern extends ScaledProcessingPattern
     }
 
     /**
-     * @param level 判定「可复用输入」用的关卡；带耐久返还的催化剂（注魔水晶）只有拿到
-     *              {@code Level} 才能判成可复用，见 {@link ReusablePatternInputs}
+     * @param level 判定「可复用输入」用的关卡，<b>由本模组自己的机器提供</b>（见
+     *              {@link ScaledProcessingPattern} 的说明）；{@code null} 时退回保守判据
      */
     public ScaledCraftingPattern(IMolecularAssemblerSupportedPattern pattern, long operationsPerPush,
                                  @Nullable Level level) {

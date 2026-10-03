@@ -38,6 +38,9 @@ public final class SmartDoublingPatterns {
      * 带 {@link Level} 的包装：只有拿到关卡才能认出「带耐久受损的返还物」这类可复用输入
      * （注魔水晶），并把它们的倍率钉在 1 份上。见 {@link ReusablePatternInputs}。
      *
+     * <p><b>关卡由本模组自己的机器提供</b>（供应器方块实体的 {@code getLevel()}），
+     * 不从 AE2 网格取 —— 见 {@code SmartDoublingPlanner#levelOfProviders} 的说明。</p>
+     *
      * @param level 可为 {@code null}，此时退回保守判据（只认原样返还）
      */
     public static ScaledProcessingPattern scale(IPatternDetails pattern, long operationsPerPush,
@@ -54,7 +57,7 @@ public final class SmartDoublingPatterns {
      * 从网格取判定可复用输入所需的关卡。
      *
      * <p>规划入口（{@code CraftingService#submitJob}）跑在服务端线程上，取关卡是安全的；
-     * 取不到时返回 {@code null}，包装会退回保守判据 —— 只少修一类，不会错修。</p>
+     * 取不到时返回 {@code null}，判定会退回保守判据 —— 只少认一类，不会误认。</p>
      */
     public static @Nullable Level levelOf(@Nullable IGrid grid) {
         try {
@@ -70,8 +73,13 @@ public final class SmartDoublingPatterns {
     /**
      * 样板里「整批只需要 1 份、倍率不能放大」的输入槽位（注魔水晶这类可复用催化剂）。
      *
-     * <p>任何按倍率放大输入的地方（本模组的包装、数据能源 counted 派发的原型放大）都必须跳过这些槽位，
-     * 否则会凭空造出 {@code count - 1} 份催化剂。判定见 {@link ReusablePatternInputs}。</p>
+     * <p><b>判定它的目的只有一个：把这类样板挡在批量之外。</b>它的返还物仍能当同一个槽的输入，
+     * 而 AE2 的合成计划对这类输入只算 1 份（{@code CraftingTreeProcess#updateLimitQty} 遇到
+     * 非空 {@code getRemainingKey} 就置 {@code limitQty}，{@code times = 1}）。任何按倍率放大输入的
+     * 通路（本模组的样板包装、数据能源 counted 派发的原型放大、bigint 批次）都必须跳过这类样板，
+     * 否则会向机器索要 {@code count} 份催化剂而实际只有 1 份 ⇒ 一次推送都发不出去。</p>
+     *
+     * <p>判定见 {@link ReusablePatternInputs}。</p>
      */
     public static Set<Integer> reusableInputSlots(@Nullable IPatternDetails pattern,
                                                  @Nullable Level level) {

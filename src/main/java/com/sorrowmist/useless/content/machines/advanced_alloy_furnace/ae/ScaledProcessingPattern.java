@@ -30,8 +30,13 @@ public class ScaledProcessingPattern implements IPatternDetails, ScaledPattern {
     }
 
     /**
-     * @param level 判定「可复用输入」用的关卡；可复用的输入整批只需要 1 份，倍率不能放大
-     *              （见 {@link ReusablePatternInputs}），{@code null} 时退回保守判据
+     * @param pattern           被包装的原始样板
+     * @param operationsPerPush 本次推送代表的原始操作次数，恒为正
+     * @param level             判定「可复用输入」用的关卡。<b>由本模组自己的机器提供</b>
+     *                          （`AlloyFurnaceCountedCraftingAdapter#providerLevel` /
+     *                          `SmartDoublingPlanner` 从供应器方块实体取），
+     *                          <b>不从 AE2 网格上取</b> —— 那条路要在 `CraftingService` 上挂 mixin，
+     *                          会静默顶掉 OmniSequence 的注入。{@code null} 时退回保守判据
      */
     public ScaledProcessingPattern(IPatternDetails pattern, long operationsPerPush,
                                    @Nullable Level level) {
@@ -142,7 +147,7 @@ public class ScaledProcessingPattern implements IPatternDetails, ScaledPattern {
         /**
          * 可复用输入（注魔水晶这类）整批只需要 1 份：AE2 的合成计划对它只算 1 份
          * （见 {@link ReusablePatternInputs}），这里放大就抽不出材料、一次推送都发不出去。
-         * 其余输入照旧 ×倍率，AE2 才会一次抽出 N 份、把 N 份预期产物写进 CPU 的 waitingFor。
+         * 其余输入照旧 ×倍率，AE2 才会一次抽出 N 份、把 N 份预期产物写进 CPU 的 {@code waitingFor}。
          */
         @Override
         public long getMultiplier() {

@@ -81,6 +81,13 @@ public final class OmniversalBigIntegerTarget implements AlloyFurnaceBigIntegerT
         // 它把「一批大约多少 tick 交付完」收敛到最平滑的形态，而不是用固定值猜。
         long segmentBudget = this.core.outputSegmentBudget();
         IPatternDetails original = pattern == null ? null : SmartDoublingPatterns.unwrap(pattern);
+        // 含返还物的样板一律不接 bigint 批次：AE2 对这类输入只算 1 份，按倍率折叠会向机器索要
+        // count 份催化剂而实际只有 1 份。这里「退让」（报无容量）而不是拒收 ——
+        // 上层会回落 AE2 原生单份路径，永远正确，只是慢。
+        // 关卡从本机取（core.getLevel()），不从 AE2 网格取。
+        if (!SmartDoublingPatterns.reusableInputSlots(original, this.core.getLevel()).isEmpty()) {
+            return AlloyFurnaceBigIntegerCapacity.none("");
+        }
         if (original instanceof OmniversalPatternDetails omniversal) {
             BigInteger accepted = AlloyFurnaceBigIntegerCrafting.maximumCount(
                     this.core, omniversal, prototype, threads(), segmentBudget, requested);

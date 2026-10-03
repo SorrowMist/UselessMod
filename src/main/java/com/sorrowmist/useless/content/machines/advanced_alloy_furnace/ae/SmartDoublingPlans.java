@@ -4,8 +4,6 @@ import appeng.api.crafting.IPatternDetails;
 import appeng.api.networking.crafting.ICraftingPlan;
 import appeng.api.networking.crafting.ICraftingProvider;
 import appeng.crafting.CraftingPlan;
-import net.minecraft.world.level.Level;
-import org.jetbrains.annotations.Nullable;
 
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -18,26 +16,25 @@ public final class SmartDoublingPlans {
     private SmartDoublingPlans() {
     }
 
-    /** 不带 {@code Level} 的重载：只认原样返还的可复用输入，见 {@link ReusablePatternInputs}。 */
-    public static ICraftingPlan rewriteForSubmission(
-            ICraftingPlan plan,
-            Function<IPatternDetails, Iterable<ICraftingProvider>> providerLookup) {
-        return rewriteForSubmission(plan, providerLookup, null);
-    }
-
     /**
-     * @param level 判定「可复用输入」用的关卡。改写后的样板会按它决定哪些输入不放大倍率；
-     *              执行期重建同一样板时必须传同一个关卡，否则倍率与计划对不上。
+     * 改写提交给 CPU 的计划，把可放大的样板换成「一次推送代表多份操作」的包装。
+     *
+     * <p>判定「可复用输入」所需的关卡由 {@link SmartDoublingPlanner#rewrite} 从<b>供应器本身</b>取
+     * （也就是本模组自己的机器），所以这里不需要关卡参数 —— 也就避免了为此在
+     * {@code CraftingService} 上挂 mixin（那会静默顶掉 OmniSequence 的注入，
+     * 详见 {@link SmartDoublingPlanner#rewrite} 的说明）。</p>
+     *
+     * <p><b>注意</b>：一旦这里改写了样板就会构造新的 {@link CraftingPlan}，
+     * 从而丢掉 AppliedEnhancements 的 AELIS 精确（BigInteger）计划 —— 两者互斥。</p>
      */
     public static ICraftingPlan rewriteForSubmission(
             ICraftingPlan plan,
-            Function<IPatternDetails, Iterable<ICraftingProvider>> providerLookup,
-            @Nullable Level level) {
+            Function<IPatternDetails, Iterable<ICraftingProvider>> providerLookup) {
         Objects.requireNonNull(plan, "plan");
         Objects.requireNonNull(providerLookup, "providerLookup");
 
         Map<IPatternDetails, Long> rewritten = SmartDoublingPlanner.rewrite(
-                plan.patternTimes(), providerLookup, level);
+                plan.patternTimes(), providerLookup);
         if (rewritten.equals(plan.patternTimes())) {
             return plan;
         }

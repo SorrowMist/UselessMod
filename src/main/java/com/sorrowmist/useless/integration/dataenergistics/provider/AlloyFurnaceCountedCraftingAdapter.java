@@ -372,10 +372,8 @@ class AlloyFurnaceCountedCraftingAdapter implements CountedCraftingProviderAdapt
     /**
      * Creates a deep, exact scaled input snapshot without changing the caller-owned prototype.
      *
-     * <p><b>可复用输入不放大</b>：{@code prototype} 按契约是<b>单次合成</b>的原型，注魔水晶这类
-     * 「返还物仍能当同一个槽的输入」的槽在这里只有 1 个，而 AE2 的合成计划对它也只算 1 份
-     * （见 {@code ReusablePatternInputs}）。照倍率放大等于<b>凭空造出 count-1 份催化剂</b>再让机器
-     * 原样返还 —— 既是「向机器索要 N 个」，也是净增物品。机器侧会复用这一份并只记一次返还。</p>
+     * <p>一律按倍率放大：含返还物的样板已被 {@link #availableCapacity} 挡在 counted 批量之外
+     * （见 {@link SmartDoublingPatterns#reusableInputSlots}），走不到这里。</p>
      */
     static KeyCounter[] scalePrototype(@NotNull IPatternDetails pattern,
                                        KeyCounter @NotNull [] prototype,
@@ -384,18 +382,16 @@ class AlloyFurnaceCountedCraftingAdapter implements CountedCraftingProviderAdapt
         if (count <= 0L) {
             throw new IllegalArgumentException("Counted crafting batch size must be positive");
         }
-        Set<Integer> reusableSlots = SmartDoublingPatterns.reusableInputSlots(pattern, level);
         KeyCounter[] scaled = new KeyCounter[prototype.length];
         for (int index = 0; index < prototype.length; index++) {
             KeyCounter source = prototype[index];
             KeyCounter targetCounter = new KeyCounter();
-            long multiplier = reusableSlots.contains(index) ? 1L : count;
             for (var entry : source) {
                 long amount = entry.getLongValue();
                 if (amount < 0L) {
                     throw new IllegalArgumentException("Crafting input amounts must not be negative");
                 }
-                targetCounter.add(entry.getKey(), Math.multiplyExact(amount, multiplier));
+                targetCounter.add(entry.getKey(), Math.multiplyExact(amount, count));
             }
             scaled[index] = targetCounter;
         }
@@ -422,6 +418,13 @@ class AlloyFurnaceCountedCraftingAdapter implements CountedCraftingProviderAdapt
         }
         IPatternDetails original = SmartDoublingPatterns.unwrap(patternDetails);
         if (!provider.getAvailablePatterns().contains(original)) {
+            return AvailableCapacity.EMPTY;
+        }
+        // 含返还物的样板一律不接 counted 批量：AE2 对这类输入只算 1 份，按倍率放大原型会向机器
+        // 索要 count 份催化剂而实际只有 1 份。这里「退让」（容量 0）而不是拒收 ——
+        // 上层会回落 AE2 原生单份路径，永远正确，只是慢。
+        // 关卡从本机取（providerLevel），不从 AE2 网格取（那要挂 CraftingService 的 mixin）。
+        if (!SmartDoublingPatterns.reusableInputSlots(original, providerLevel()).isEmpty()) {
             return AvailableCapacity.EMPTY;
         }
         long arithmeticMaximum = maximumBatchCount(
@@ -612,7 +615,7 @@ class AlloyFurnaceCountedCraftingAdapter implements CountedCraftingProviderAdapt
         Level level = providerLevel();
         // 统一走 SmartDoublingPatterns.scale：合成样板必须保留 IMolecularAssemblerSupportedPattern 身份，
         // 否则接收方会把它当成处理样板去查合金炉配方。
-        IPatternDetails scaledPattern = SmartDoublingPatterns.scale(patternDetails, count, level);
+        IPatternDetails scaledPattern = SmartDoublingPatterns.scale(patternDetails, count);
         KeyCounter[] scaledPrototype = scalePrototype(patternDetails, prototype, count, level);
         return provider.pushPattern(scaledPattern, scaledPrototype);
     }

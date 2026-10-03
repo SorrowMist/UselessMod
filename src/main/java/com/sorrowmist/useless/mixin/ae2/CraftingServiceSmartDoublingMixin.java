@@ -1,7 +1,6 @@
 package com.sorrowmist.useless.mixin.ae2;
 
 import appeng.api.crafting.IPatternDetails;
-import appeng.api.networking.IGrid;
 import appeng.api.networking.crafting.ICraftingPlan;
 import appeng.api.networking.crafting.ICraftingProvider;
 import appeng.me.service.CraftingService;
@@ -20,12 +19,11 @@ public abstract class CraftingServiceSmartDoublingMixin {
     @ModifyVariable(method = "submitJob", at = @At("HEAD"), argsOnly = true, ordinal = 0)
     private ICraftingPlan uselessMod$rewriteSubmittedPlan(ICraftingPlan plan) {
         CraftingService service = (CraftingService) (Object) this;
-        // 本方法跑在服务端线程上，取关卡安全。改写后的样板会按关卡把「可复用输入」
-        // （注魔水晶这类用完还回来、且还回来还能用的槽）的倍率钉在 1 份上 —— 拿不到关卡时
-        // 退回保守判据，只少修一类，不会错修。
-        IGrid grid = ((CraftingServiceGridAccessor) (Object) this).uselessMod$getGrid();
-        return SmartDoublingPlans.rewriteForSubmission(
-                plan, service::getProviders, SmartDoublingPatterns.levelOf(grid));
+        // 判定「可复用输入」所需的关卡不在这里取：SmartDoublingPlanner 会从供应器方块实体
+        // （本模组自己的机器）拿。⛔ 千万不要为了拿关卡往 CraftingService 上再挂 mixin ——
+        // 该类上已有 OmniSequence 的 OmniCraftingServiceMixin，多加一个会静默顶掉对方的注入，
+        // 导致 AppliedEnhancements 的 AELIS 精确规划器不参与、计划退化成 long 饱和值、任务卡在 0。
+        return SmartDoublingPlans.rewriteForSubmission(plan, service::getProviders);
     }
 
     @Inject(method = "getProviders", at = @At("HEAD"), cancellable = true)

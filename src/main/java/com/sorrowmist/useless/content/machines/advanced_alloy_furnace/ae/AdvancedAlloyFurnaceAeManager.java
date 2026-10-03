@@ -960,47 +960,45 @@ public final class AdvancedAlloyFurnaceAeManager {
         KeyCounter[] working = copyCounters(inputHolder);
         // 可复用输入（注魔水晶这类「用完还回来、且还回来还能用」的槽）：AE2 的合成计划对它只算 1 份
         // （见 ReusablePatternInputs），所以整批复用同一份、账本里只记一次返还，倍率不能放大它。
-        // 没有这类槽位时，下面每一条都退化成原来的路径。
+        // 关卡从本机取（owner.getLevel()），与计划期从供应器方块实体取到的是同一台机器。
+        //
+        // ⚠️ 这里<只能降级、不能拒收>：本方法返回 false 会让 AE2 下一 tick 拿同一批料重试同一个
+        // 供应器，而重试条件与上一次完全相同 —— 于是每 tick 都拒收，任务永远不推进
+        // （表现为「下单后不合成」，且日志里一行错误都没有）。
         Map<Integer, AEKey> reusableSlots = ReusablePatternInputs.reusableRemainders(pattern, level);
-        boolean hasReusableInputs = !reusableSlots.isEmpty();
         KeyCounter[] reusableStock = new KeyCounter[inputHolder.length];
-        for (int slot : reusableSlots.keySet()) {
-            if (slot < 0 || slot >= inputHolder.length) {
-                // 输入计数器与样板输入不匹配（不该发生）：按错槽位装配会静默错算，宁可拒收。
-                return false;
-            }
-            KeyCounter source = working[slot];
-            if (source.isEmpty()) {
-                // AE2 按计划抽料，这份催化剂本该在这里；没给就拒收，让它重投或换供应器。
-                return false;
-            }
-            reusableStock[slot] = new KeyCounter();
-            reusableStock[slot].addAll(source);
-            // 从 working 里摘掉：它不该被算成「这一批消耗掉的材料」，
-            // 否则 matchesBatchShape 会看到它没被消耗而放弃整批折叠。
-            source.clear();
-        }
-        // 与 AE2 的 expectedContainerItems 精确对齐：AE2 按「抽到的每个模板 × 数量」累加
-        // getRemainingKey(模板)，这里同样逐键逐量算一次；算不出来（该键已用尽、这一击会碎掉）就拒收。
         Map<AEKey, Long> reusableRemainders = new LinkedHashMap<>();
         Set<AEKey> reusableOutputKeys = new LinkedHashSet<>();
-        for (int slot : reusableSlots.keySet()) {
-            for (var entry : reusableStock[slot]) {
+        boolean hasReusableInputs = false;
+        for (var reusable : reusableSlots.entrySet()) {
+            int slot = reusable.getKey();
+            if (slot < 0 || slot >= inputHolder.length || working[slot] == null || working[slot].isEmpty()) {
+                // 输入计数器与样板输入不匹配，或 AE2 这次没给这份催化剂：跳过该槽的特殊处理，
+                // 交给下面的普通路径。绝不拒收。
+                continue;
+            }
+            KeyCounter stock = new KeyCounter();
+            stock.addAll(working[slot]);
+            reusableStock[slot] = stock;
+            // 从 working 里摘掉：它不该被算成「这一批消耗掉的材料」，
+            // 否则 matchesBatchShape 会看到它没被消耗而放弃整批折叠。
+            working[slot].clear();
+            hasReusableInputs = true;
+            // 返还键直接采用<计划期同一函数>算出的那一个，不再拿实际抽到的键去 getRemainingKey：
+            // 后者对「计划期候选之外的变体」会返回 null，而这里一旦拒收就是永久卡死。
+            AEKey plannedRemainder = reusable.getValue();
+            for (var entry : stock) {
                 long amount = entry.getLongValue();
                 if (amount <= 0L) {
                     continue;
                 }
-                AEKey received = entry.getKey();
-                AEKey remainder = pattern.getInputs()[slot].getRemainingKey(received);
-                if (remainder == null) {
-                    return false;
-                }
-                reusableRemainders.merge(remainder, amount, AdvancedAlloyFurnaceAeManager::saturatingAdd);
+                reusableRemainders.merge(plannedRemainder, amount,
+                        AdvancedAlloyFurnaceAeManager::saturatingAdd);
                 // 收到的那批键本身也要摘掉：带耐久返还的物品附了「耐久」时有概率原样返还，
                 // 那时装配产生的返还键就是收到的那一个 —— 不摘掉会跟着倍率放大成 N 份。
-                reusableOutputKeys.add(received);
-                reusableOutputKeys.add(remainder);
+                reusableOutputKeys.add(entry.getKey());
             }
+            reusableOutputKeys.add(plannedRemainder);
         }
 
         // 产出一律先并入 BigInteger 账本再切段：倍率可以到 long 上限，逐条 long 累加一定会丢账。
@@ -1504,8 +1502,8 @@ public final class AdvancedAlloyFurnaceAeManager {
      * 另一个键，但附了「耐久」的物品有概率原样返还，那时装配产生的就是收到的那一个键。
      * 两种都要摘掉，否则它会被当成普通产物跟着倍率放大成 N 份。</p>
      *
-     * <p>摘掉之后由调用方按 {@code getRemainingKey(收到的键) × 数量} 精确补记一次，
-     * 与 AE2 的 {@code expectedContainerItems} 对齐。</p>
+     * <p>摘掉之后由调用方按计划期算好的返还键精确补记一次，与 AE2 的
+     * {@code expectedContainerItems} 对齐。</p>
      */
     private static List<GenericStack> withoutKeys(List<GenericStack> outputs, Set<AEKey> excluded) {
         if (excluded.isEmpty()) {

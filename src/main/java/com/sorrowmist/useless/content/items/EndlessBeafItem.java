@@ -401,6 +401,9 @@ public class EndlessBeafItem extends TieredItem {
      * <p>改代码只影响之后新建的物品，存档里已有的杖子仍带着这对组件，必须在运行时
      * 就地剥离，否则玩家手上那根依旧会消失。移除后组件回落到物品原型（已带
      * {@code UNBREAKABLE}、不含 {@code MAX_DAMAGE}），此处再显式补一次以兼容变体物品。</p>
+     *
+     * <p>TODO：本方法属临时兼容措施，仅用于修复旧存档中已生成的杖子。待活跃存档均完成
+     * 一次迁移后，可连同 {@code inventoryTick} 中的调用一并删除。</p>
      */
     private static void migrateLegacyDurability(ItemStack stack) {
         if (!stack.has(DataComponents.MAX_DAMAGE) && !stack.has(DataComponents.DAMAGE)) {

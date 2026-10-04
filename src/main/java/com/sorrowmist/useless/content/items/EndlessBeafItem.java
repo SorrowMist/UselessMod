@@ -68,6 +68,7 @@ import net.minecraft.world.item.TooltipFlag;
 import net.minecraft.world.item.UseAnim;
 import net.minecraft.world.item.component.CustomModelData;
 import net.minecraft.world.item.component.Tool;
+import net.minecraft.world.item.component.Unbreakable;
 import net.minecraft.world.item.context.UseOnContext;
 import net.minecraft.world.item.enchantment.Enchantments;
 import net.minecraft.world.level.Level;
@@ -137,7 +138,13 @@ public class EndlessBeafItem extends TieredItem {
                 .attributes(DiggerItem.createAttributes(Tiers.NETHERITE, 0, 2.0F))
                 .stacksTo(1)
                 .rarity(Rarity.EPIC)
-                .durability(0)
+                // 不可损坏必须用 UNBREAKABLE 组件表达，绝不能用 durability(0)：
+                // Item.Properties#durability 会无条件写入 MAX_DAMAGE=0 与 DAMAGE=0，而
+                // ItemStack#isDamageableItem 是纯组件判定（MAX_DAMAGE + DAMAGE 存在即真，
+                // 且不读 Item#isDamageable 覆写）。于是 hurtAndBreak 里
+                // i = DAMAGE(0) + n >= getMaxDamage()(0) 恒成立，任何一次耐久结算都会
+                // 立即 shrink(1) 把杖子销毁——表现就是右键某类方块后手持杖凭空消失。
+                .component(DataComponents.UNBREAKABLE, new Unbreakable(true))
                 // 这里刻意「只声明能挖什么」，不写任何 deniesDrops 规则。
                 // 原版 Tool 组件是按顺序取第一条命中规则，而所有新增挖掘等级的模组都会把自己的
                 // 方块并入 #minecraft:incorrect_for_<tier>_tool；一旦把某个等级的拒绝清单写进来，
@@ -380,6 +387,30 @@ public class EndlessBeafItem extends TieredItem {
 
     public static void setProtectModeEnabled(ItemStack stack, boolean enabled) {
         stack.set(UComponents.BeefProtectModeComponent.get(), enabled);
+    }
+
+    /**
+     * 旧存档迁移：剥离历史版本 {@code durability(0)} 留下的耐久组件。
+     *
+     * <p>1.21 的「不可损坏」只有 {@link DataComponents#UNBREAKABLE} 一种正确表达。
+     * 早期版本改用 {@code Item.Properties#durability(0)}，而它会<b>无条件</b>写入
+     * {@code MAX_DAMAGE=0} 与 {@code DAMAGE=0}；{@code ItemStack#isDamageableItem()}
+     * 是纯组件判定，于是杖子被当成「零耐久可损坏物」，任何一次 {@code hurtAndBreak}
+     * 都因 {@code 0 + n >= 0} 恒成立而立即 {@code shrink(1)} 销毁。</p>
+     *
+     * <p>改代码只影响之后新建的物品，存档里已有的杖子仍带着这对组件，必须在运行时
+     * 就地剥离，否则玩家手上那根依旧会消失。移除后组件回落到物品原型（已带
+     * {@code UNBREAKABLE}、不含 {@code MAX_DAMAGE}），此处再显式补一次以兼容变体物品。</p>
+     */
+    private static void migrateLegacyDurability(ItemStack stack) {
+        if (!stack.has(DataComponents.MAX_DAMAGE) && !stack.has(DataComponents.DAMAGE)) {
+            return;
+        }
+        stack.remove(DataComponents.MAX_DAMAGE);
+        stack.remove(DataComponents.DAMAGE);
+        if (!stack.has(DataComponents.UNBREAKABLE)) {
+            stack.set(DataComponents.UNBREAKABLE, new Unbreakable(true));
+        }
     }
 
     /** Keeps the tool's fixed enchantments aligned with its selected mode and server config. */
@@ -1497,6 +1528,11 @@ public class EndlessBeafItem extends TieredItem {
                               int pSlotId,
                               boolean pIsSelected) {
         super.inventoryTick(pStack, pLevel, pEntity, pSlotId, pIsSelected);
+        // 旧存档的杖子带着 durability(0) 留下的 MAX_DAMAGE=0 / DAMAGE=0，会在下一次
+        // 耐久结算时被直接销毁；每 tick 就地迁移一次，剥离后本判定立即不再命中。
+        if (!pLevel.isClientSide) {
+            migrateLegacyDurability(pStack);
+        }
         // 注意不能用 getInventory().items 判断携带：那只有主背包 36 格，不含副手
         if (pEntity instanceof Player player
                 && UselessItemUtils.hasItemInInventory(player, this)) {

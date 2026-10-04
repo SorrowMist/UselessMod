@@ -215,7 +215,6 @@ dependencies {
     implementation "curse.maven:athena-841890:8061947"
     implementation "curse.maven:modern-industrialization-405388:8597392"
     implementation "curse.maven:pneumaticcraft-repressurized-281849:8519226"
-    compileOnly "curse.maven:applied-pneumatics-1355087:7723695"
     implementation "curse.maven:zerocore-247921:7344742"
 
     implementation "curse.maven:sophisticated-core-618298:8838842"
@@ -407,6 +406,8 @@ dependencies {
 
     implementation "curse.maven:omnisequence-transfinite-1624558:8991983"
     implementation "curse.maven:applied-enhancements-1665696:8990232"
+
+    implementation "curse.maven:applied-pneumatics-1355087:8812885"
 
     implementation "curse.maven:mystical-agriculture-omnia-1684008:8824904"
 

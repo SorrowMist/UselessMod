@@ -213,10 +213,14 @@ public final class AlloyFurnaceBigIntegerCrafting {
      * {@link com.sorrowmist.useless.api.enums.CatalystType#USEFUL_INGOT}。
      * <b>改这两处任一处都会让有用线圈的能量变成按 count 翻倍，从而把 bigint 批次压回小规模。</b></p>
      *
+     * @param operationsPerPush 一次推送代表的<b>基础配方操作次数</b>（智能倍增倍率 × 手动放大倍率）；
+     *                          容量单位是「推送次数」，能量闸必须按这个口径折算，否则倍率样板的
+     *                          能耗会被少算，容量被高估
      * @return 上限；{@code null} 表示「不设限」，{@link BigInteger#ZERO} 表示完全没能量
      */
     public static @Nullable BigInteger maximumCountForEnergy(@NotNull CraftingTaskContext context,
-                                                             @NotNull AdvancedAlloyFurnaceRecipe recipe) {
+                                                             @NotNull AdvancedAlloyFurnaceRecipe recipe,
+                                                             long operationsPerPush) {
         long recipeEnergy = Math.max(0L, recipe.energy());
         if (recipeEnergy <= 0L) {
             return null;
@@ -225,28 +229,31 @@ public final class AlloyFurnaceBigIntegerCrafting {
         ResolvedCatalystEffect effect = context.resolveTaskEffect(recipe);
         int divisor = divisorOf(effect);
         if (multipliesWithParallel(effect)) {
+            BigInteger perPushEnergy = BigInteger.valueOf(recipeEnergy)
+                    .multiply(BigInteger.valueOf(Math.max(1L, operationsPerPush)));
             return BigInteger.valueOf(available)
                     .multiply(BigInteger.valueOf(divisor))
-                    .divide(BigInteger.valueOf(recipeEnergy));
+                    .divide(perPushEnergy);
         }
+        // 与并行无关：整批只收一次固定能耗，与一次推送代表多少次操作无关。
         return available >= divideRoundUp(recipeEnergy, divisor) ? null : BigInteger.ZERO;
     }
 
     /**
      * 本批实际要扣的总能量（BigInteger 版 {@code calculateTargetTotalEnergy}）。
      *
-     * <p>正常路径下 {@code count} 已由 {@link #maximumCountForEnergy} 收窄，结果必然落在
-     * long 范围内；此处仍做饱和保护，避免调用方传入任意 count 时抛出异常。</p>
+     * <p>正常路径下 {@code operations} 已由 {@link #maximumCountForEnergy} 收窄，结果必然落在
+     * long 范围内；此处仍做饱和保护，避免调用方传入任意操作数时抛出异常。</p>
      *
-     * <p><b>有用线圈（tier 10）不会因 count 翻倍</b>：它的催化剂是有用锭，
+     * <p><b>有用线圈（tier 10）不会因操作数翻倍</b>：它的催化剂是有用锭，
      * {@code energyMultipliesWithParallel == false} ⇒ 这里走「整批一次固定能耗」分支，
-     * 结果 = {@code ceil(recipeEnergy / 1024)}，与 {@code count} 无关。所以即使一批发配
-     * {@code 1e22} 份，也只收这么一点能量 —— 与长版 counted 路径同一口径。</p>
+     * 结果 = {@code ceil(recipeEnergy / 1024)}，与操作数无关。所以即使一批发配
+     * {@code 1e22} 次操作，也只收这么一点能量 —— 与长版 counted 路径同一口径。</p>
      *
-     * @param count 本批的推送次数，必须为正
+     * @param operations 本批包含的<b>基础配方操作总次数</b>（推送次数 × 每次推送的操作数），必须为正
      */
     public static long totalEnergy(@NotNull AdvancedAlloyFurnaceRecipe recipe,
-                                   @NotNull BigInteger count,
+                                   @NotNull BigInteger operations,
                                    @Nullable ResolvedCatalystEffect effect) {
         long recipeEnergy = Math.max(0L, recipe.energy());
         if (recipeEnergy <= 0L) {
@@ -257,7 +264,7 @@ public final class AlloyFurnaceBigIntegerCrafting {
             return divideRoundUp(recipeEnergy, divisor);
         }
         BigInteger total = BigInteger.valueOf(recipeEnergy)
-                .multiply(count)
+                .multiply(operations)
                 .add(BigInteger.valueOf(divisor - 1L))
                 .divide(BigInteger.valueOf(divisor));
         return total.compareTo(MAX_LONG) >= 0 ? Long.MAX_VALUE : total.longValueExact();
@@ -338,11 +345,18 @@ public final class AlloyFurnaceBigIntegerCrafting {
     /**
      * 本机对一批万象样板的份数上限。
      *
+     * @param operationsPerPush 一次推送代表的智能倍增操作数（未被包装的普通样板为 1）。
+     *                          <b>必须按这个口径折算单次推送的实际产出与能耗</b>：调用方
+     *                          （如 Thunderbolt）可能直接把本模组规划阶段包装过的
+     *                          {@link ScaledProcessingPattern} 传进来，此时 {@code requested}
+     *                          的单位是「这种倍率样板的推送次数」，一次推送代表
+     *                          {@code operationsPerPush} 次基础配方操作
      * @param requested 调用方请求的份数（上限不会超过它）；见
      *                  {@link #maximumCraftingPatternCount} 里关于"为什么不用哨兵"的说明
      */
     public static @NotNull BigInteger maximumCount(@NotNull CraftingTaskContext context,
                                                    @NotNull OmniversalPatternDetails pattern,
+                                                   long operationsPerPush,
                                                    @NotNull KeyCounter @NotNull [] prototype,
                                                    int threads,
                                                    long segmentBudget,
@@ -356,13 +370,15 @@ public final class AlloyFurnaceBigIntegerCrafting {
             // 与长版容量侧同一口径：无法证明「一次推送 = 整数次配方操作」时不接这批。
             return BigInteger.ZERO;
         }
-        List<GenericStack> unitOutputs = unitOutputs(recipe, manualOperations);
+        // 一次推送 = 智能倍增倍率 × 手动放大倍率 次基础配方操作。
+        long perPushOperations = saturatingMultiply(Math.max(1L, operationsPerPush), manualOperations);
+        List<GenericStack> unitOutputs = unitOutputs(recipe, perPushOperations);
         if (unitOutputs.isEmpty()) {
             return BigInteger.ZERO;
         }
         BigInteger limit = applyMaterialWindow(requested, prototype, threads);
         limit = applyDeliveryLimit(limit, unitOutputs, segmentBudget);
-        BigInteger energyCap = maximumCountForEnergy(context, recipe);
+        BigInteger energyCap = maximumCountForEnergy(context, recipe, perPushOperations);
         if (energyCap != null) {
             limit = limit.min(energyCap);
         }
@@ -396,5 +412,12 @@ public final class AlloyFurnaceBigIntegerCrafting {
 
     private static long saturatingAdd(long left, long right) {
         return right > 0L && left > Long.MAX_VALUE - right ? Long.MAX_VALUE : left + right;
+    }
+
+    private static long saturatingMultiply(long amount, long multiplier) {
+        if (amount <= 0L || multiplier <= 0L) {
+            return 0L;
+        }
+        return amount > Long.MAX_VALUE / multiplier ? Long.MAX_VALUE : amount * multiplier;
     }
 }

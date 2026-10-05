@@ -1128,11 +1128,22 @@ public final class AdvancedAlloyFurnaceAeManager {
             return false;
         }
         IPatternDetails original = SmartDoublingPatterns.unwrap(patternDetails);
+        // 规划阶段的智能倍增会把样板包装成「一次推送 = N 次操作」。长版 pushPattern 会解开这个
+        // 倍率，但 bigint 入口以前只解开样板、不折叠倍率：调用方（Thunderbolt 等）传来 1 次
+        // 倍率样板推送时，机器只按 1 次基础操作出货，于是 N 份材料进、1 份产出出，
+        // AE2 任务永远等不齐 remaining（实测：10 珍珠 → 1 末影粉尘）。
+        // 这里先取出倍率，两个 commit 都按「每推操作数」折算产出、能量与 CPU 回执。
+        long operationsPerPush = SmartDoublingPatterns.operationsPerPush(patternDetails);
+        if (operationsPerPush > 1L && LOGGER.isDebugEnabled()) {
+            LOGGER.debug("Alloy furnace bigint batch folded smart-doubling multiplier at {}: "
+                            + "operationsPerPush={}, requestedPushes={}, pattern={}",
+                    this.owner.getBlockPos(), operationsPerPush, count, patternDetails.getDefinition());
+        }
         if (original instanceof OmniversalPatternDetails omniversal) {
-            return commitOmniversalBatch(omniversal, count, unitPrototype, cpuBinding);
+            return commitOmniversalBatch(omniversal, operationsPerPush, count, unitPrototype, cpuBinding);
         }
         return original instanceof IMolecularAssemblerSupportedPattern craftingPattern
-                && commitCraftingBatch(craftingPattern, count, unitPrototype, cpuBinding);
+                && commitCraftingBatch(craftingPattern, operationsPerPush, count, unitPrototype, cpuBinding);
     }
 
     /**
@@ -1140,8 +1151,11 @@ public final class AdvancedAlloyFurnaceAeManager {
      *
      * <p>不按 count 收能量 —— 与长版 counted 路径的合成样板分支一致（那条路同样是装配一次后按倍率
      * 折叠，不建真实加工任务）。</p>
+     *
+     * @param operationsPerPush 本次收到的样板每次推送代表的装配次数（智能倍增包装）；未包装时为 1
      */
     private boolean commitCraftingBatch(IMolecularAssemblerSupportedPattern craftingPattern,
+                                        long operationsPerPush,
                                         BigInteger count,
                                         KeyCounter[] unitPrototype,
                                         @Nullable AlloyFurnaceBigIntegerCpuBinding cpuBinding) {
@@ -1167,19 +1181,24 @@ public final class AdvancedAlloyFurnaceAeManager {
             return false;
         }
 
+        // 一次倍率样板推送 = operationsPerPush 次装配；整批 = count × operationsPerPush 次。
+        BigInteger totalOperations = count.multiply(
+                BigInteger.valueOf(Math.max(1L, operationsPerPush)));
         CraftingAeAmountAccumulator produced = new CraftingAeAmountAccumulator();
-        accumulateScaled(produced, unitOutputs, count);
+        accumulateScaled(produced, unitOutputs, totalOperations);
         if (produced.isEmpty()) {
             return false;
         }
 
         // 走到这里才算接收：清空收到的单位原型（count-1 份由调用方的账本扣除），产物进回网队列。
+        List<AlloyFurnaceBigIntegerOutput> plannedOutputs =
+                AlloyFurnaceBigIntegerCrafting.scaledOutputs(unitOutputs, totalOperations);
         AlloyFurnaceBigIntegerBatchContext cpuContext = cpuBinding == null
-                ? null : buildCpuContext(craftingPattern, count, 0L, cpuBinding);
+                ? null : buildCpuContext(craftingPattern, count, plannedOutputs, 0L, cpuBinding);
         PendingCraftingOutput pending = new PendingCraftingOutput(
                 level.getGameTime(),
                 produced,
-                AlloyFurnaceBigIntegerCrafting.scaledOutputs(unitOutputs, count),
+                plannedOutputs,
                 cpuContext,
                 cpuBinding == null ? null : cpuBinding.adapterId());
         for (KeyCounter counter : unitPrototype) {
@@ -1202,18 +1221,21 @@ public final class AdvancedAlloyFurnaceAeManager {
      * 接收万象样板的原生 bigint 批次（<b>折叠</b>语义）。
      *
      * <p>与合成样板那条 bigint 路径的区别：万象样板绑定了一个合金炉配方，所以「单份产出」直接来自
-     * 配方（主产物 + 流体 + 隐藏键产出），代价是本机要按 {@code count × 单份能耗} 收能量；
+     * 配方（主产物 + 流体 + 隐藏键产出），代价是本机要按 {@code 总操作次数 × 单份能耗} 收能量；
      * 合成样板则是虚拟工作台装配一次再放大，不收能量。</p>
      *
      * <p><b>检查顺序不能改</b>：配方可用性（档次/模具）、回网背压、能量这三类可能失败的事全部排在
      * 「清空原型」之前 —— 返回 {@code false} 时调用方手里的原型完好无损，它自己扣掉的那
      * {@code count - 1} 份也能安全回滚。</p>
      *
+     * @param operationsPerPush 本次收到的样板每次推送代表的智能倍增操作数（未包装时为 1）；
+     *                          {@code count} 的单位是「该样板的推送次数」，实际产出与能耗都要再乘它
      * @param count         份数，可以超过 {@code long}
      * @param unitPrototype <b>单次推送</b>的原型（不是 ×count 的整批材料）
      * @param cpuBinding    CPU 侧回执绑定；{@code null} 表示产物只切段写回 ME 网络
      */
     private boolean commitOmniversalBatch(OmniversalPatternDetails pattern,
+                                          long operationsPerPush,
                                           BigInteger count,
                                           KeyCounter[] unitPrototype,
                                           @Nullable AlloyFurnaceBigIntegerCpuBinding cpuBinding) {
@@ -1236,7 +1258,9 @@ public final class AdvancedAlloyFurnaceAeManager {
         if (manualOperations <= 0L) {
             return false;
         }
-        List<GenericStack> unitOutputs = AlloyFurnaceBigIntegerCrafting.unitOutputs(recipe, manualOperations);
+        // 一次推送 = 智能倍增倍率 × 手动放大倍率 次基础配方操作；整批总操作次数 = count × perPushOperations。
+        long perPushOperations = saturatingMultiply(Math.max(1L, operationsPerPush), manualOperations);
+        List<GenericStack> unitOutputs = AlloyFurnaceBigIntegerCrafting.unitOutputs(recipe, perPushOperations);
         if (unitOutputs.isEmpty()) {
             return false;
         }
@@ -1246,9 +1270,10 @@ public final class AdvancedAlloyFurnaceAeManager {
         if (produced.isEmpty()) {
             return false;
         }
-        // 能量：口径与长版任务的 calculateTargetTotalEnergy 完全一致（与并行相关时按 count 放大）。
+        // 能量：口径与长版任务的 calculateTargetTotalEnergy 完全一致（与并行相关时按总操作次数放大）。
+        BigInteger totalOperations = count.multiply(BigInteger.valueOf(perPushOperations));
         ResolvedCatalystEffect effect = this.owner.resolveTaskEffect(recipe);
-        long totalEnergy = AlloyFurnaceBigIntegerCrafting.totalEnergy(recipe, count, effect);
+        long totalEnergy = AlloyFurnaceBigIntegerCrafting.totalEnergy(recipe, totalOperations, effect);
         if (totalEnergy > 0L) {
             IEnergyManager energy = this.owner.getEnergyManager();
             if (totalEnergy > energy.getEnergyStoredLong() || !energy.tryConsumeEnergy(totalEnergy)) {
@@ -1260,12 +1285,14 @@ public final class AdvancedAlloyFurnaceAeManager {
 
         // 走到这里才算接收：只消费手里那一份原型（count-1 份由调用方的 BigInteger 账本扣除），
         // 产物进回网队列。回执上下文先建好，成功入队后再通知 CPU 侧「已受理」。
+        List<AlloyFurnaceBigIntegerOutput> plannedOutputs =
+                AlloyFurnaceBigIntegerCrafting.scaledOutputs(unitOutputs, count);
         AlloyFurnaceBigIntegerBatchContext cpuContext = cpuBinding == null
-                ? null : buildCpuContext(pattern, count, totalEnergy, cpuBinding);
+                ? null : buildCpuContext(pattern, count, plannedOutputs, totalEnergy, cpuBinding);
         PendingCraftingOutput pending = new PendingCraftingOutput(
                 level.getGameTime(),
                 produced,
-                AlloyFurnaceBigIntegerCrafting.scaledOutputs(unitOutputs, count),
+                plannedOutputs,
                 cpuContext,
                 cpuBinding == null ? null : cpuBinding.adapterId());
         for (KeyCounter counter : unitPrototype) {
@@ -1286,6 +1313,7 @@ public final class AdvancedAlloyFurnaceAeManager {
     private @NotNull AlloyFurnaceBigIntegerBatchContext buildCpuContext(
             IPatternDetails pattern,
             BigInteger count,
+            List<AlloyFurnaceBigIntegerOutput> plannedOutputs,
             long energyCharged,
             AlloyFurnaceBigIntegerCpuBinding binding) {
         return new AlloyFurnaceBigIntegerBatchContext(
@@ -1297,7 +1325,7 @@ public final class AdvancedAlloyFurnaceAeManager {
                         this.owner.getBlockPos()),
                 pattern,
                 count,
-                AlloyFurnaceBigIntegerCrafting.plannedOutputs(pattern, count),
+                plannedOutputs,
                 energyCharged);
     }
 

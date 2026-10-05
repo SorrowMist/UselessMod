@@ -277,16 +277,20 @@ class AlloyFurnaceCountedCraftingAdapter implements CountedCraftingProviderAdapt
         int threads = machineThreads();
         long segmentBudget = segmentBudget();
         if (original instanceof IMolecularAssemblerSupportedPattern) {
+            // 传收到的样板：倍率样板的 getOutputs() 已按每推操作数放大，产物分段闸必须按该口径计算。
             return AlloyFurnaceBigIntegerCrafting.maximumCraftingPatternCount(
-                    original, prototype, threads, segmentBudget, requestedCount);
+                    patternDetails, prototype, threads, segmentBudget, requestedCount);
         }
         if (original instanceof OmniversalPatternDetails omniversal) {
             CraftingTaskContext context = this.taskContext.get();
             if (!AlloyFurnaceBigIntegerCrafting.supports(context)) {
                 return BigInteger.ZERO;
             }
+            // requestedCount 的单位是「这种样板的推送次数」；一次推送的实际产出与能耗都要乘上
+            // 智能倍增倍率，否则倍率样板（例如一次推送 = 10 次操作）会被当成 1 次操作。
+            long operationsPerPush = SmartDoublingPatterns.operationsPerPush(patternDetails);
             return AlloyFurnaceBigIntegerCrafting.maximumCount(
-                    context, omniversal, prototype, threads, segmentBudget, requestedCount);
+                    context, omniversal, operationsPerPush, prototype, threads, segmentBudget, requestedCount);
         }
         return BigInteger.ZERO;
     }
@@ -494,6 +498,12 @@ class AlloyFurnaceCountedCraftingAdapter implements CountedCraftingProviderAdapt
             return CapacityLimits.EMPTY;
         }
 
+        long manualOperations = SmartDoublingPatterns.manualOperationsPerPattern(
+                recipe, execution.pattern());
+        if (manualOperations == 0L) {
+            return CapacityLimits.EMPTY;
+        }
+
         if (execution.pattern() instanceof OmniversalPatternDetails
                 && AlloyFurnaceBigIntegerCrafting.supports(context)) {
             // 安全阀：本机一旦吃不下（档次/模具/能量任一不满足），必须发布「零容量」而不是带
@@ -502,17 +512,16 @@ class AlloyFurnaceCountedCraftingAdapter implements CountedCraftingProviderAdapt
             if (!context.isTaskRecipeAvailable(recipe)) {
                 return CapacityLimits.EMPTY;
             }
-            BigInteger energyCap = AlloyFurnaceBigIntegerCrafting.maximumCountForEnergy(context, recipe);
+            // 能量口径必须按「一次推送代表多少次基础操作」折算，否则倍率样板的能耗会被少算。
+            long perPushOperations = saturatingMultiply(
+                    execution.operationsPerPush(), manualOperations);
+            BigInteger energyCap = AlloyFurnaceBigIntegerCrafting.maximumCountForEnergy(
+                    context, recipe, perPushOperations);
             if (energyCap != null && energyCap.signum() <= 0) {
                 return CapacityLimits.EMPTY;
             }
         }
 
-        long manualOperations = SmartDoublingPatterns.manualOperationsPerPattern(
-                recipe, execution.pattern());
-        if (manualOperations == 0L) {
-            return CapacityLimits.EMPTY;
-        }
         BigInteger wrapperOperations = BigInteger.valueOf(execution.operationsPerPush());
         BigInteger operations = wrapperOperations
                 .multiply(BigInteger.valueOf(manualOperations));
@@ -650,6 +659,13 @@ class AlloyFurnaceCountedCraftingAdapter implements CountedCraftingProviderAdapt
 
     private static long saturatingMultiply(long left, int right) {
         if (left <= 0L || right <= 0) {
+            return 0L;
+        }
+        return left > Long.MAX_VALUE / right ? Long.MAX_VALUE : left * right;
+    }
+
+    private static long saturatingMultiply(long left, long right) {
+        if (left <= 0L || right <= 0L) {
             return 0L;
         }
         return left > Long.MAX_VALUE / right ? Long.MAX_VALUE : left * right;

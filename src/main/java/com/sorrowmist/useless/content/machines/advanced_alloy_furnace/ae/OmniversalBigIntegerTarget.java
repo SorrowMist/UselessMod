@@ -89,8 +89,13 @@ public final class OmniversalBigIntegerTarget implements AlloyFurnaceBigIntegerT
             return AlloyFurnaceBigIntegerCapacity.none("");
         }
         if (original instanceof OmniversalPatternDetails omniversal) {
+            // 调用方可能把规划阶段包装过的倍率样板直接传进来（例如 Thunderbolt 拿到的是
+            // 本模组 CraftingSimulationState mixin 改写后的 ScaledProcessingPattern）：
+            // requested 的单位是「这种样板的推送次数」，容量与产物口径都要乘上每推操作数，
+            // 否则 N 次操作被当成 1 次，机器只产 1 份（表现为「10 珍珠进、1 粉尘出」）。
+            long operationsPerPush = SmartDoublingPatterns.operationsPerPush(pattern);
             BigInteger accepted = AlloyFurnaceBigIntegerCrafting.maximumCount(
-                    this.core, omniversal, prototype, threads(), segmentBudget, requested);
+                    this.core, omniversal, operationsPerPush, prototype, threads(), segmentBudget, requested);
             if (accepted.signum() <= 0) {
                 // 报 0 时给出原因（档次不够 / 缺模具 / 没能量），供调用方提示玩家。
                 AdvancedAlloyFurnaceRecipe recipe = omniversal.recipe();
@@ -101,8 +106,10 @@ public final class OmniversalBigIntegerTarget implements AlloyFurnaceBigIntegerT
         }
         if (original instanceof IMolecularAssemblerSupportedPattern) {
             // 合成样板：一次装配折叠任意份数、不收能量，所以只看材料窗口与产物分段预算。
+            // 传<b>收到的</b>样板而不是解开后的原始样板：倍率样板的 getOutputs() 已按每推操作数放大，
+            // 产物分段闸必须按这个口径计算，否则容量会被高估。
             BigInteger accepted = AlloyFurnaceBigIntegerCrafting.maximumCraftingPatternCount(
-                    original, prototype, threads(), segmentBudget, requested);
+                    pattern, prototype, threads(), segmentBudget, requested);
             return accepted.signum() <= 0
                     ? AlloyFurnaceBigIntegerCapacity.none("")
                     : AlloyFurnaceBigIntegerCapacity.of(requested.min(accepted));

@@ -44,7 +44,10 @@ public interface AlloyFurnaceBigIntegerTarget {
      *
      * <p>本方法<b>不产生任何副作用</b>，可以随时调用（例如每次 tick 做一次规划）。</p>
      *
-     * @param pattern   已<b>解开</b>的样板（不要把倍率包装类传进来；本 API 只认原始样板）
+     * @param pattern   样板。推荐传已解开的原始样板；若传入了本模组的智能倍增包装类
+     *                  （{@code ScaledProcessingPattern}），实现会自动解开并按其中的
+     *                  {@code operationsPerPush} 折算容量（{@code requested} 的单位随之变为
+     *                  「该包装样板的推送次数」，一次推送代表 N 次基础配方操作）
      * @param prototype <b>单次推送</b>的原型材料，不是整批的 count 倍
      * @param requested 期望的份数，必须为正
      * @return 容量结果；为 0 时 {@link AlloyFurnaceBigIntegerCapacity#statusKey()} 给出原因
@@ -81,7 +84,7 @@ public interface AlloyFurnaceBigIntegerTarget {
      * <p>本方法<b>不消费材料、不扣能量</b>，只是做一次快照式检查；真正的检查会在
      * {@code commit} 时重新执行（期间机器状态可能变化，最终以 commit 的返回值为准）。</p>
      *
-     * @param pattern   已解开的样板
+     * @param pattern   样板，语义同 {@link #capacity}：推荐原始样板，倍率包装类会被自动折算
      * @param prototype 单次推送的原型（提交时必须原样传回同一个数组对象）
      * @param requested 期望的份数，必须为正
      * @param cpu       CPU 侧绑定，用于接收产物回执；{@code null} 表示不需要回调

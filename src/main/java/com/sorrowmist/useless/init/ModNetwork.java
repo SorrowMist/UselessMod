@@ -21,6 +21,7 @@ import com.sorrowmist.useless.network.MiningDataSyncPacket;
 import com.sorrowmist.useless.network.ModeTogglePacket;
 import com.sorrowmist.useless.network.MultiblockAlloyFurnaceEnergyLimitPacket;
 import com.sorrowmist.useless.network.PatternPageChangePacket;
+import com.sorrowmist.useless.network.PlasticThermostatSetPacket;
 import com.sorrowmist.useless.network.ProtectEntityPacket;
 import com.sorrowmist.useless.network.PassiveCraftingSettingsPacket;
 import com.sorrowmist.useless.network.PassiveCraftingSlotMultiplierPacket;
@@ -56,7 +57,7 @@ import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
 
 public class ModNetwork {
     public static void registerPayloadHandlers(final RegisterPayloadHandlersEvent event) {
-        var registrar = event.registrar(UselessMod.MODID).versioned("16");
+        var registrar = event.registrar(UselessMod.MODID).versioned("17");
         registrar.playToServer(BeefToolLayoutRequestPacket.TYPE,
                                BeefToolLayoutRequestPacket.STREAM_CODEC,
                                BeefToolLayoutRequestPacket::handle);
@@ -211,5 +212,8 @@ public class ModNetwork {
         registrar.playToClient(StaffLinkStressStatusPacket.TYPE,
                                StaffLinkStressStatusPacket.STREAM_CODEC,
                                StaffLinkStressStatusPacket::handle);
+        registrar.playToServer(PlasticThermostatSetPacket.TYPE,
+                               PlasticThermostatSetPacket.STREAM_CODEC,
+                               PlasticThermostatSetPacket::handle);
     }
 }

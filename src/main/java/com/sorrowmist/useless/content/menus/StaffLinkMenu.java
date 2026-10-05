@@ -242,9 +242,12 @@ public final class StaffLinkMenu extends AbstractContainerMenu {
         // 应力线路的两个数值是「目标转速 / 旋转方向」，语义与别的介质不同，初值也要跟着换；
         // 沿用 16 / 5 的话，那个 5 会被服务端当成非法方向收敛成 1，玩家会看到配置被悄悄改掉。
         boolean stress = medium.family() == ResourceFamily.STRESS;
+        // 气压线路的「数量」是「目标气压（毫巴）」：默认 2 bar，同样不能沿用 16（那是 0.016 bar）。
+        boolean pressure = medium.family() == ResourceFamily.PRESSURE;
         // 新线路默认关闭，由玩家显式打开。
         return new StaffLinkRoute(anchor, route, false, flow, medium,
-                stress ? StaffLinkRoute.STRESS_DEFAULT_RPM : 16,
+                stress ? StaffLinkRoute.STRESS_DEFAULT_RPM
+                        : pressure ? StaffLinkRoute.PRESSURE_DEFAULT_MBAR : 16,
                 stress ? StaffLinkRoute.STRESS_CLOCKWISE : 5,
                 null, 0, List.of());
     }

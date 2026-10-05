@@ -2,9 +2,12 @@ package com.sorrowmist.useless.content.blocks;
 
 import com.sorrowmist.useless.UselessMod;
 import com.sorrowmist.useless.api.enums.EnumColor;
+import com.sorrowmist.useless.content.blockentities.PlasticThermostatBlockEntity;
+import com.sorrowmist.useless.content.blockentities.PlasticThermostatHeatHook;
 import com.sorrowmist.useless.content.items.EndlessBeafItem;
 import com.sorrowmist.useless.utils.mining.MiningUtils;
 import net.minecraft.core.BlockPos;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.ItemInteractionResult;
 import net.minecraft.world.entity.player.Player;
@@ -13,6 +16,10 @@ import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.EntityBlock;
+import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.world.level.block.entity.BlockEntityTicker;
+import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.state.BlockBehaviour;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.BlockHitResult;
@@ -20,12 +27,14 @@ import net.neoforged.neoforge.registries.DeferredBlock;
 import net.neoforged.neoforge.registries.DeferredItem;
 import net.neoforged.neoforge.registries.DeferredRegister;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-public class GlowPlasticBlock extends Block implements IColoredBlock {
+public class GlowPlasticBlock extends Block implements IColoredBlock, EntityBlock {
 
     public static final DeferredRegister.Blocks BLOCKS = DeferredRegister.createBlocks(UselessMod.MODID);
     public static final DeferredRegister.Items ITEMS = DeferredRegister.createItems(UselessMod.MODID);
@@ -122,5 +131,54 @@ public class GlowPlasticBlock extends Block implements IColoredBlock {
                 registryName,
                 () -> new BlockItem(block.get(), new Item.Properties()));
         items.put(color, item);
+    }
+
+    // ------------------------------------------------------------------ 恒温源
+
+    /**
+     * 全部塑料方块（18 色 × 4 变体 = 72 个），供 {@code BlockEntityType} 注册使用。
+     *
+     * <p>一个 BE 类型服务全部变体，因此不必给每种颜色各注册一份。</p>
+     */
+    public static Block[] allBlocks() {
+        List<Block> blocks = new ArrayList<>(72);
+        for (Map<EnumColor, DeferredBlock<GlowPlasticBlock>> map : ALL_BLOCK_MAPS) {
+            for (DeferredBlock<GlowPlasticBlock> holder : map.values()) {
+                blocks.add(holder.get());
+            }
+        }
+        return blocks.toArray(new Block[0]);
+    }
+
+    @Nullable
+    @Override
+    public BlockEntity newBlockEntity(@NotNull BlockPos pos, @NotNull BlockState state) {
+        return new PlasticThermostatBlockEntity(pos, state);
+    }
+
+    /**
+     * 恒温源的「主动驱动」tick。
+     *
+     * <p>Mekanism 的传热是<b>发送方驱动</b>（见 {@link PlasticThermostatHeatHook}），所以必须由方块
+     * 自己每 tick 把热推给邻居。未配置（{@code enabled == false}）时直接返回——绝大多数塑料方块
+     * 从未被配置过，因此这一条几乎零开销。</p>
+     */
+    @Nullable
+    @Override
+    public <T extends BlockEntity> BlockEntityTicker<T> getTicker(@NotNull Level level,
+                                                                  @NotNull BlockState state,
+                                                                  @NotNull BlockEntityType<T> type) {
+        if (level.isClientSide) {
+            return null;
+        }
+        return (tickLevel, pos, tickState, blockEntity) -> {
+            if (!(blockEntity instanceof PlasticThermostatBlockEntity thermostat) || !thermostat.isEnabled()) {
+                return;
+            }
+            PlasticThermostatHeatHook.HeatDriver driver = PlasticThermostatHeatHook.driver;
+            if (driver != null && tickLevel instanceof ServerLevel serverLevel) {
+                driver.tick(serverLevel, pos, thermostat);
+            }
+        };
     }
 }

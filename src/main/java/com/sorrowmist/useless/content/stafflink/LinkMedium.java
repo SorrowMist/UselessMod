@@ -43,7 +43,28 @@ public enum LinkMedium {
      *
      * <p><b>同样必须追加在末尾</b>，理由见 {@link #AE_ENERGY}。</p>
      */
-    STRESS("gui.useless_mod.wireless_logistics.medium.stress", ResourceFamily.STRESS);
+    STRESS("gui.useless_mod.wireless_logistics.medium.stress", ResourceFamily.STRESS),
+    /**
+     * 气动工艺的气压（空气）。
+     *
+     * <p>与能量、魔源、应力一样是「源头出来只有一种」的连续量，因此同样<b>不参与过滤</b>
+     * （{@link StaffLinkRoute#filterApplies()} 恒 {@code false}，界面不给填标记）。</p>
+     *
+     * <p>它是<b>状态量</b>：搬运的目标是让接收端达到某个气压，而不是每轮固定搬一批，
+     * 因此走 {@link StaffLinkEngine} 的专用分支，不经过逐对 {@code transfer}。</p>
+     *
+     * <p><b>同样必须追加在末尾</b>，理由见 {@link #AE_ENERGY}。</p>
+     */
+    PRESSURE("gui.useless_mod.wireless_logistics.medium.pressure", ResourceFamily.PRESSURE),
+    /**
+     * 存进 ME 网络的空气（Applied Pneumatics 的 {@code AirKey}）。
+     *
+     * <p>网络里只有一堆空气、没有体积，因此没有压力概念；目标气压对它无意义，
+     * 它只作为「气源 / 气库」参与搬运。</p>
+     *
+     * <p><b>同样必须追加在末尾</b>，理由见 {@link #AE_ENERGY}。</p>
+     */
+    AE_PRESSURE("gui.useless_mod.wireless_logistics.medium.ae_pressure", ResourceFamily.PRESSURE);
 
     private static final String MEKANISM = "mekanism";
     private static final String ARS_NOUVEAU = "ars_nouveau";
@@ -52,6 +73,8 @@ public enum LinkMedium {
     private static final String ARS_ENERGISTIQUE = "arseng";
     private static final String APPLIED_FLUX = "appflux";
     private static final String CREATE = "create";
+    private static final String PNEUMATICRAFT = "pneumaticcraft";
+    private static final String APPLIED_PNEUMATICS = "appliedpneumatics";
 
     private final String translationKey;
     private final ResourceFamily family;
@@ -78,7 +101,7 @@ public enum LinkMedium {
      */
     public boolean isAe() {
         return this == AE_ITEM || this == AE_FLUID || this == AE_CHEMICAL || this == AE_SOURCE
-                || this == AE_ENERGY;
+                || this == AE_ENERGY || this == AE_PRESSURE;
     }
 
     /** 当前环境是否支持这种资源。可选集成缺失时界面跳过、服务端拒绝。 */
@@ -92,6 +115,9 @@ public enum LinkMedium {
             case AE_SOURCE -> ModList.get().isLoaded(AE2) && ModList.get().isLoaded(ARS_ENERGISTIQUE);
             case AE_ENERGY -> ModList.get().isLoaded(AE2) && ModList.get().isLoaded(APPLIED_FLUX);
             case STRESS -> ModList.get().isLoaded(CREATE);
+            case PRESSURE -> ModList.get().isLoaded(PNEUMATICRAFT);
+            // 空气要进 ME 网络得靠 Applied Pneumatics，只有 AE2 是不够的。
+            case AE_PRESSURE -> ModList.get().isLoaded(AE2) && ModList.get().isLoaded(APPLIED_PNEUMATICS);
             default -> true;
         };
     }
@@ -103,7 +129,7 @@ public enum LinkMedium {
      * 稳定才追加在末尾的，直接枚举会把它排到「AE 魔源」后面，读起来莫名其妙。</p>
      */
     private static final LinkMedium[] MENU_ORDER = {
-            ITEM, AE_ITEM, FLUID, AE_FLUID, ENERGY, AE_ENERGY,
+            ITEM, AE_ITEM, FLUID, AE_FLUID, ENERGY, AE_ENERGY, PRESSURE, AE_PRESSURE,
             CHEMICAL, AE_CHEMICAL, SOURCE, AE_SOURCE, STRESS
     };
 

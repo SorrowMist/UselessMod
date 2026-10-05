@@ -338,6 +338,8 @@ public final class StaffLinkScreen extends AbstractContainerScreen<StaffLinkMenu
     private final Map<EditBox, NumericOverride> numericOverrides = new HashMap<>();
     /** 当前数值区是不是按应力的语义在画；用来避免每帧重复设置。 */
     private boolean stressFields;
+    /** 当前数值区是不是按气压的语义在画（数量格 = 目标气压 bar）；同样避免每帧重复设置。 */
+    private boolean pressureFields;
     /** 应力线路的方向按钮：与周期输入框共用同一格，两者互斥显示。 */
     private PressableAE2Button stressDirectionButton;
 
@@ -488,6 +490,7 @@ public final class StaffLinkScreen extends AbstractContainerScreen<StaffLinkMenu
         // 这里把「已按应力渲染过」的状态清掉，让下面的 updateControls 重新套用一次，
         // 否则缩放之后周期输入框会重新冒出来、压在方向按钮上。
         stressFields = false;
+        pressureFields = false;
         numericOverrides.clear();
         updateControls();
     }
@@ -949,7 +952,9 @@ public final class StaffLinkScreen extends AbstractContainerScreen<StaffLinkMenu
         }
         long weight = parsePlain(weightField.getValue(), config.weight(),
                 StaffLinkRoute.MIN_WEIGHT, StaffLinkRoute.MAX_WEIGHT);
-        long amount = parseScaled(amountField.getValue(), config.amount(), StaffLinkRoute.MIN_AMOUNT);
+        long amount = config.medium().family() == ResourceFamily.PRESSURE
+                ? parsePressureMbar(amountField.getValue(), config.amount())
+                : parseScaled(amountField.getValue(), config.amount(), StaffLinkRoute.MIN_AMOUNT);
         long interval = parsePlain(intervalField.getValue(), config.interval(),
                 StaffLinkRoute.MIN_INTERVAL, StaffLinkRoute.MAX_INTERVAL);
         if (weight != config.weight() || amount != config.amount() || interval != config.interval()) {
@@ -992,6 +997,28 @@ public final class StaffLinkScreen extends AbstractContainerScreen<StaffLinkMenu
                 ? scaled : String.valueOf(amount);
     }
 
+    /**
+     * 「目标气压」输入框：界面按 <b>bar</b> 输入，内部按毫巴（{@code amount}）。
+     *
+     * <p>解析不了（空串 / 只输了个负号）就回落到原值，与 {@link #parseScaled} 一致；
+     * 解析成功则夹到 {@code [-1.0, 20.0]} bar——气动的物理下限是 -1 bar 的绝对真空。</p>
+     */
+    private static long parsePressureMbar(String text, long fallback) {
+        try {
+            double bar = Double.parseDouble(text.trim());
+            return Math.round(Mth.clamp(bar, -1.0D, 20.0D) * 1000.0D);
+        } catch (NumberFormatException notANumber) {
+            return fallback;
+        }
+    }
+
+    /** 毫巴 → bar 的显示形式；整 bar 不带小数点。 */
+    private static String formatPressureMbar(long mbar) {
+        return mbar % 1000L == 0L
+                ? String.valueOf(mbar / 1000L)
+                : String.valueOf(mbar / 1000.0D);
+    }
+
     private void updateControls() {
         StaffLinkRoute config = menu.getSelectedConfig();
         boolean hasConfig = config != null;
@@ -1029,10 +1056,12 @@ public final class StaffLinkScreen extends AbstractContainerScreen<StaffLinkMenu
         // 一般介质是「释放端发起搬运」，所以「数量 / 周期」只在释放端可编辑，吸收端的禁掉以免误解。
         // 应力<b>正好相反</b>：它的目标转速与旋转方向是每个输出端各自的事（同一条线路上
         // 不同机器可以转不同的速度），所以这两个框配在吸收端。
+        // 气压同理：这一格是「接收端要调到多少气压」，属于接收端，所以也配在吸收端。
         // （「权重」对两端都有意义：输入端之间排序、输出端之间排序都看它。）
         boolean initiates = hasConfig && config.flow() == LinkFlow.RELEASE;
         boolean stress = hasConfig && config.medium().family() == ResourceFamily.STRESS;
-        boolean numbersEditable = stress ? !initiates : initiates;
+        boolean pressure = hasConfig && config.medium().family() == ResourceFamily.PRESSURE;
+        boolean numbersEditable = (stress || pressure) ? !initiates : initiates;
         weightField.active = hasConfig;
         amountField.active = numbersEditable;
         // 应力时这一格被方向按钮顶掉，输入框整个隐起来（它的值仍由同步逻辑维持，按钮改的就是它）。
@@ -1040,7 +1069,7 @@ public final class StaffLinkScreen extends AbstractContainerScreen<StaffLinkMenu
         weightField.setEditable(hasConfig);
         amountField.setEditable(numbersEditable);
         intervalField.setEditable(numbersEditable && !stress);
-        applyStressFields(stress);
+        applyNumericSemantics(stress, pressure);
         if (stressDirectionButton != null) {
             stressDirectionButton.visible = stress && hasConfig;
             stressDirectionButton.active = stress && hasConfig && numbersEditable;
@@ -1066,7 +1095,10 @@ public final class StaffLinkScreen extends AbstractContainerScreen<StaffLinkMenu
             if (!intervalField.isFocused()) setFieldValue(intervalField, "");
         } else {
             if (!weightField.isFocused()) setFieldValue(weightField, String.valueOf(config.weight()));
-            if (!amountField.isFocused()) setFieldValue(amountField, formatAmount(config.amount()));
+            if (!amountField.isFocused()) setFieldValue(amountField,
+                    config.medium().family() == ResourceFamily.PRESSURE
+                            ? formatPressureMbar(config.amount())
+                            : formatAmount(config.amount()));
             if (!intervalField.isFocused()) setFieldValue(intervalField, String.valueOf(config.interval()));
         }
 
@@ -1608,13 +1640,17 @@ public final class StaffLinkScreen extends AbstractContainerScreen<StaffLinkMenu
      * <p>应力线路上「数量 / 周期」两个格子改叫「转速 / 方向」：转速是纯整数（不再接受
      * K / M / G 这类缩写），方向只认 1 / 2，而且方向那一格整个换成按钮。</p>
      *
+     * <p>气压线路上「数量」改叫「目标气压」：界面按 <b>bar</b> 显示与输入（-1.0 ~ 20.0），
+     * 内部仍存毫巴（{@code amount}），因此过滤器要接受小数与负号。</p>
+     *
      * <p>只在语义真的变了的时候动手：这些设置会清掉输入焦点与光标位置，每帧重设等于让人没法打字。</p>
      */
-    private void applyStressFields(boolean stress) {
-        if (stressFields == stress) {
+    private void applyNumericSemantics(boolean stress, boolean pressure) {
+        if (stressFields == stress && pressureFields == pressure) {
             return;
         }
         stressFields = stress;
+        pressureFields = pressure;
         if (stress) {
             numericOverrides.put(amountField, new NumericOverride(
                     Component.translatable("gui.useless_mod.wireless_logistics.stress.rpm_label"),
@@ -1624,6 +1660,16 @@ public final class StaffLinkScreen extends AbstractContainerScreen<StaffLinkMenu
             intervalField.setMaxLength(1);
             intervalField.setFilter(value -> value.isEmpty() || value.matches("[12]?"));
             intervalField.visible = false;
+        } else if (pressure) {
+            numericOverrides.put(amountField, new NumericOverride(
+                    Component.translatable("gui.useless_mod.wireless_logistics.pressure.target_label"),
+                    Component.translatable("gui.useless_mod.wireless_logistics.pressure.target_hint")));
+            amountField.setMaxLength(6);
+            amountField.setFilter(value -> value.isEmpty()
+                    || value.matches("-?\\d{0,2}(\\.\\d{0,2})?"));
+            intervalField.setMaxLength(6);
+            intervalField.setFilter(value -> value.isEmpty() || value.matches("\\d{0,5}"));
+            intervalField.visible = true;
         } else {
             numericOverrides.remove(amountField);
             amountField.setMaxLength(24);
@@ -2212,11 +2258,16 @@ public final class StaffLinkScreen extends AbstractContainerScreen<StaffLinkMenu
                         ? "gui.useless_mod.wireless_logistics.stress.input_side_hint"
                         : "gui.useless_mod.wireless_logistics.release_only_hint"));
             }
-            // 「数量」与应力转速都没有静态上限，只提示下限。
-            lines.add(overridden || spec.scaled()
-                    ? Component.translatable("gui.useless_mod.wireless_logistics.range_min", spec.min())
-                    : Component.translatable("gui.useless_mod.wireless_logistics.range",
-                            spec.min(), spec.max()));
+            if (pressureFields && spec.field() == amountField) {
+                // 气压的「数量」是目标气压，界面单位是 bar，范围就是气动的物理区间。
+                lines.add(Component.translatable("gui.useless_mod.wireless_logistics.pressure.range"));
+            } else {
+                // 「数量」与应力转速都没有静态上限，只提示下限。
+                lines.add(overridden || spec.scaled()
+                        ? Component.translatable("gui.useless_mod.wireless_logistics.range_min", spec.min())
+                        : Component.translatable("gui.useless_mod.wireless_logistics.range",
+                                spec.min(), spec.max()));
+            }
             graphics.renderTooltip(font, lines, Optional.empty(), mouseX, mouseY);
             return;
         }
@@ -2832,9 +2883,12 @@ public final class StaffLinkScreen extends AbstractContainerScreen<StaffLinkMenu
         boolean stress = medium.family() == ResourceFamily.STRESS;
         // 换到应力时顺手给一对有意义的初值：原来的「16 / 5」在应力语义下读作「16 RPM、方向 5」，
         // 而方向只认 1 / 2，5 会被服务端收敛掉——不如直接给对，免得玩家看到配置被悄悄改了。
+        boolean pressure = medium.family() == ResourceFamily.PRESSURE;
+        // 气压同理：原来的「16」在气压语义下读作 0.016 bar（几乎没压力），直接给 2 bar 更合理。
         return new StaffLinkRoute(config.anchor(), config.route(), config.enabled(), config.flow(),
                 medium,
-                stress ? StaffLinkRoute.STRESS_DEFAULT_RPM : config.amount(),
+                stress ? StaffLinkRoute.STRESS_DEFAULT_RPM
+                        : pressure ? StaffLinkRoute.PRESSURE_DEFAULT_MBAR : config.amount(),
                 stress ? StaffLinkRoute.STRESS_CLOCKWISE : config.interval(),
                 config.side(), config.weight(), pruneFilter(config.filter(), medium));
     }

@@ -4,14 +4,17 @@ import com.sorrowmist.useless.UselessMod;
 import com.sorrowmist.useless.api.logistics.LongEnergyHandler;
 import com.sorrowmist.useless.api.logistics.LongFluidHandler;
 import com.sorrowmist.useless.api.logistics.LongItemHandler;
+import com.sorrowmist.useless.api.logistics.LongPressureHandler;
 import com.sorrowmist.useless.compat.ae.AeChemicalCompatLoader;
 import com.sorrowmist.useless.compat.ae.AeEnergyCompatLoader;
 import com.sorrowmist.useless.compat.ae.AeGenericInvCompatLoader;
 import com.sorrowmist.useless.compat.ae.AeLogisticsCompatLoader;
+import com.sorrowmist.useless.compat.ae.AePressureCompatLoader;
 import com.sorrowmist.useless.compat.ae.AeSourceCompatLoader;
 import com.sorrowmist.useless.compat.ars.ArsSourceCompatLoader;
 import com.sorrowmist.useless.compat.create.CreateStressCompatLoader;
 import com.sorrowmist.useless.compat.modernindustrialization.MiEnergyCompatLoader;
+import com.sorrowmist.useless.compat.pneumaticcraft.PneumaticCraftPressureCompatLoader;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.chemical.ChemicalCompatProvider;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.chemical.ChemicalCompatProviders;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.chemical.ChemicalHandlerView;
@@ -81,7 +84,10 @@ public final class StaffLinkTargets {
             LinkMedium.AE_CHEMICAL, LinkMedium.AE_SOURCE, LinkMedium.AE_ENERGY,
             // 应力排在最后：它只对动力学方块解析得出，而动力学方块永远不是容器，
             // 所以放在哪一位都不会抢走别的介质；放最后纯粹是让「默认介质」的语义保持好读。
-            LinkMedium.STRESS
+            LinkMedium.STRESS,
+            // 气压同样排最后：它只对气动方块 / AE 网络解析得出，而气动方块通常也带物品能力
+            // （升级槽），排最后才不会把「绑定一台气动机器」默认判成物品线路。
+            LinkMedium.PRESSURE, LinkMedium.AE_PRESSURE
     };
 
     private StaffLinkTargets() {
@@ -160,6 +166,9 @@ public final class StaffLinkTargets {
             // 应力没有「能力」可查：它的端点是动力学方块实体本身，交给桥去判定。
             // 常驻代码只拿到一个不透明的对象做 null 判断，因此没装对应模组时这段照常加载。
             case STRESS -> CreateStressCompatLoader.resolveEndpoint(level, pos);
+            // 气压：方块侧走气动工艺的空气处理器，网络侧走 Applied Pneumatics 存进 ME 网络的空气。
+            case PRESSURE -> PneumaticCraftPressureCompatLoader.pressureEndpoint(level, pos, side);
+            case AE_PRESSURE -> AePressureCompatLoader.pressureEndpoint(level, pos);
         };
     }
 
@@ -412,6 +421,10 @@ public final class StaffLinkTargets {
             // 必须拿到同线路上全部输入与输出才能分配。它由 StaffLinkEngine#runNetwork 里的
             // 专用分支整条处理，永远走不到这里。
             case STRESS -> 0L;
+            // 气压也不走逐对搬运：它是「把接收端伺服到目标气压」的状态量，可能要把接收端的空气
+            // 抽掉（排到环境），且搬运量来自压力差而不是 amount（amount 已被复用为目标气压）。
+            // 它由 StaffLinkEngine#runNetwork 里的专用分支整条处理，永远走不到这里。
+            case PRESSURE, AE_PRESSURE -> 0L;
         };
     }
 

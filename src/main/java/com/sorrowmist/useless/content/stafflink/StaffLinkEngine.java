@@ -1,5 +1,6 @@
 package com.sorrowmist.useless.content.stafflink;
 
+import com.sorrowmist.useless.api.logistics.LongPressureHandler;
 import com.sorrowmist.useless.compat.create.CreateStressCompatLoader;
 import com.sorrowmist.useless.world.stafflink.StaffLinkManager;
 import com.sorrowmist.useless.world.stafflink.StaffLinkNetwork;
@@ -411,6 +412,40 @@ public final class StaffLinkEngine {
                         stressAbsorbs == null ? List.of() : stressAbsorbs);
             }
 
+            // ---- 气压：双向伺服 ----
+            //
+            // 气压与应力一样是状态量，目标不是「一轮搬多少」而是「把接收端调到某个气压」。
+            // 逐对搬运模型只有「源 → 目标」一个方向，表达不了「把接收端的空气抽掉」，
+            // 所以同样走「跑一整条线路」。
+            //
+            // 与应力不同的是它<b>吃 interval 与退避</b>：伺服是周期性的（多久调一次），
+            // 不像转速那样必须每 tick 对齐。
+            List<StaffLinkRoute> pressureReleases = null;
+            List<StaffLinkRoute> pressureAbsorbs = null;
+            for (StaffLinkRoute candidate : onRoute) {
+                if (!candidate.enabled()
+                        || candidate.medium().family() != ResourceFamily.PRESSURE
+                        || !candidate.medium().isSupported()
+                        || !passesGate(server, candidate)) {
+                    continue;
+                }
+                if (candidate.flow() == LinkFlow.RELEASE) {
+                    if (pressureReleases == null) {
+                        pressureReleases = new ArrayList<>(2);
+                    }
+                    pressureReleases.add(candidate);
+                } else {
+                    if (pressureAbsorbs == null) {
+                        pressureAbsorbs = new ArrayList<>(2);
+                    }
+                    pressureAbsorbs.add(candidate);
+                }
+            }
+            if (pressureAbsorbs != null) {
+                applyPressureRoute(server, network.id(), routeIndex, now, pressureAbsorbs,
+                        pressureReleases == null ? List.of() : pressureReleases);
+            }
+
             // ---- 第一遍：只挑「这一 tick 真的到点」的释放端 ----
             //
             // 顺序很要紧：周期判定必须排在解析世界与读红石之前。绝大多数 tick 里一条线路都
@@ -424,6 +459,7 @@ public final class StaffLinkEngine {
             for (StaffLinkRoute candidate : onRoute) {
                 if (!candidate.enabled() || !candidate.medium().isSupported()
                         || candidate.medium().family() == ResourceFamily.STRESS
+                        || candidate.medium().family() == ResourceFamily.PRESSURE
                         || candidate.flow() != LinkFlow.RELEASE) {
                     continue;
                 }
@@ -452,6 +488,7 @@ public final class StaffLinkEngine {
             for (StaffLinkRoute candidate : onRoute) {
                 if (candidate.enabled() && candidate.medium().isSupported()
                         && candidate.medium().family() != ResourceFamily.STRESS
+                        && candidate.medium().family() != ResourceFamily.PRESSURE
                         && candidate.flow() != LinkFlow.RELEASE
                         && passesGate(server, candidate)) {
                     absorbs.add(candidate);
@@ -530,6 +567,109 @@ public final class StaffLinkEngine {
             moved += StaffLinkTargets.transfer(from, releaseLevel, release, targetLevel, target, amount);
         }
         return new Distribution(moved);
+    }
+
+    // ------------------------------------------------------------------ 气压伺服
+
+    /**
+     * 气压的双向伺服：把每个「接收端」调到它设定的目标气压。
+     *
+     * <p>规则：</p>
+     * <ul>
+     *   <li><b>高于目标</b> ⇒ 把多余的空气 {@code setAirTo} <b>排到环境</b>（按用户决定，不回收）。</li>
+     *   <li><b>低于目标</b> ⇒ 从同线路的释放端补气，最多补到目标。</li>
+     *   <li><b>接收端是 AE 网络</b>（{@code volume() == 0}）⇒ 没有压力概念，退化为「把源端能给的
+     *       空气尽量搬进网络」。</li>
+     * </ul>
+     *
+     * <p>搬运量来自「目标 − 当前」而不是 {@link StaffLinkRoute#amount()}：气压线路的 {@code amount}
+     * 已被复用为<b>目标气压（毫巴）</b>。</p>
+     */
+    private static void applyPressureRoute(MinecraftServer server, UUID networkId, int routeIndex, long now,
+                                           List<StaffLinkRoute> absorbs, List<StaffLinkRoute> releases) {
+        for (StaffLinkRoute absorb : absorbs) {
+            if (now < nextRunAt(networkId, routeIndex, absorb.anchor())) {
+                continue;
+            }
+            ServerLevel targetLevel = levelOf(server, absorb.anchor());
+            if (targetLevel == null) {
+                continue;
+            }
+            Object endpoint = StaffLinkTargets.resolve(targetLevel, absorb.anchor().pos(),
+                    absorb.side(), absorb.medium());
+            if (!(endpoint instanceof LongPressureHandler target)) {
+                // 解析不出端点（方块没了 / 介质装错）：按空转退避，别每 tick 白跑。
+                scheduleNextRun(networkId, routeIndex, absorb.anchor(), now, absorb.interval(), false);
+                continue;
+            }
+
+            boolean moved;
+            if (target.volume() > 0L) {
+                long targetAir = Math.round((double) absorb.amount() / 1000.0D * (double) target.volume());
+                long current = target.stored();
+                if (current > targetAir) {
+                    // 高于目标：把多余空气排到环境（可为负压：setAirTo 允许越过 0 继续降）。
+                    moved = target.setAirTo(targetAir, false) != 0L;
+                } else if (current < targetAir) {
+                    moved = fillPressure(server, target, targetAir - current, releases);
+                } else {
+                    moved = false;
+                }
+            } else {
+                // AE 网络：没有压力概念，把源端能给的空气尽量搬进来。
+                moved = fillPressure(server, target, Long.MAX_VALUE, releases);
+            }
+            scheduleNextRun(networkId, routeIndex, absorb.anchor(), now, absorb.interval(), moved);
+        }
+    }
+
+    /**
+     * 从同线路的释放端把空气搬进 {@code target}，最多 {@code need} mL。
+     *
+     * <p><b>先模拟后提交</b>：先从源端试算能抽多少，再真抽，最后写进目标；目标没全收下的部分
+     * 退回源端，保证空气不凭空消失（「排到环境」是另一条明确的路，不走这里）。</p>
+     *
+     * @return 是否真的搬动了（决定下一轮走正常周期还是退避）
+     */
+    private static boolean fillPressure(MinecraftServer server, LongPressureHandler target, long need,
+                                        List<StaffLinkRoute> releases) {
+        if (need <= 0L || releases.isEmpty()) {
+            return false;
+        }
+        long remaining = need;
+        boolean moved = false;
+        for (StaffLinkRoute release : releases) {
+            if (remaining <= 0L) {
+                break;
+            }
+            ServerLevel releaseLevel = levelOf(server, release.anchor());
+            if (releaseLevel == null) {
+                continue;
+            }
+            Object endpoint = StaffLinkTargets.resolve(releaseLevel, release.anchor().pos(),
+                    release.side(), release.medium());
+            if (!(endpoint instanceof LongPressureHandler source)) {
+                continue;
+            }
+            long available = source.extract(remaining, true);
+            if (available <= 0L) {
+                continue;
+            }
+            long taken = source.extract(available, false);
+            if (taken <= 0L) {
+                continue;
+            }
+            long accepted = target.receive(taken, false);
+            if (accepted < taken) {
+                // 目标没收下：把剩下的退回源端，别让它凭空消失。
+                source.receive(taken - accepted, false);
+            }
+            if (accepted > 0L) {
+                moved = true;
+                remaining -= accepted;
+            }
+        }
+        return moved;
     }
 
     // ------------------------------------------------------------------ 自愈

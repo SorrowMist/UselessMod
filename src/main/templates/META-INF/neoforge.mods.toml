@@ -169,6 +169,24 @@ requiredMods=["create"]
     ordering="AFTER"
     side="BOTH"
 
+# 无线物流的「气压」介质：方块侧走气动工艺的空气处理器（IAirHandlerMachine）。
+# 缺了它，PRESSURE 会从下拉列表里消失、服务端也会拒绝写入。
+[[dependencies.${mod_id}]]
+    modId="pneumaticcraft"
+    type="optional"
+    versionRange="[8.2.0,)"
+    ordering="AFTER"
+    side="BOTH"
+
+# 无线物流的「AE 气压」介质：空气要进 ME 网络得靠 Applied Pneumatics 的 AirKey。
+# 缺了它，AE_PRESSURE 会从下拉列表里消失、服务端也会拒绝写入。
+[[dependencies.${mod_id}]]
+    modId="appliedpneumatics"
+    type="optional"
+    versionRange="[1.0.0,)"
+    ordering="AFTER"
+    side="BOTH"
+
 # Features are specific properties of the game environment, that you may want to declare you require. This example declares
 # that your mod requires GL version 3.2 or higher. Other features will be added. They are side aware so declaring this won't
 # stop your mod loading on the server for example.

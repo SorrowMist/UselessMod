@@ -5,7 +5,9 @@ import com.sorrowmist.useless.UselessMod;
 import com.sorrowmist.useless.api.enums.tool.EnchantMode;
 import com.sorrowmist.useless.client.BeefAutoClicker;
 import com.sorrowmist.useless.client.gui.MiningStatusGui;
+import com.sorrowmist.useless.client.gui.PlasticThermostatScreen;
 import com.sorrowmist.useless.content.blockentities.multiblock.MultiblockAlloyFurnaceCoreBlockEntity;
+import com.sorrowmist.useless.content.blocks.GlowPlasticBlock;
 import com.sorrowmist.useless.content.blocks.TeleportPadBlock;
 import com.sorrowmist.useless.content.items.BeefTimeAcceleration;
 import com.sorrowmist.useless.content.items.EndlessBeafItem;
@@ -272,6 +274,8 @@ public class ClientEventBusSubscriber {
         // 保护手势必须最先判定：命中即取消并 return，短距传送分支不会执行。
         // 两者共用 Shift + 右键，命中生物时约定「保护优先」。
         if (tryProtectGesture(mc, event)) return;
+        // 权杖 Alt + 右键塑料方块：打开恒温配置界面。它同样要取消事件，否则原版右键照发。
+        if (tryThermostatGesture(mc, event)) return;
 
         if (event.getAction() != GLFW.GLFW_PRESS) return;
 
@@ -385,6 +389,44 @@ public class ClientEventBusSubscriber {
 
         event.setCanceled(true);
         PacketDistributor.sendToServer(new ProtectEntityPacket(target.getId(), byType));
+        return true;
+    }
+
+    /**
+     * 权杖 <b>Alt + 右键</b> 塑料方块：打开恒温源配置界面。
+     *
+     * <p><b>Alt 判定用 GLFW 位域而不是 {@code InputConstants}。</b> 本版本的
+     * {@code InputConstants} 只有 {@code MOD_CONTROL}，没有 {@code MOD_ALT}，所以直接读
+     * {@link InputEvent.MouseButton.Pre#getModifiers()} 里的 {@code GLFW_MOD_ALT}。</p>
+     *
+     * <p>取消本事件发生在 {@code KeyMapping.click} 之前，{@code keyUse} 从不被按下，
+     * 于是原版右键交互包不会发出——权杖的 {@code useOn} 链、方块自身的 {@code useItemOn}、
+     * 以及 {@code UselessMod#onRightClickBlock} 都不会跑。这与保护手势同一套机制。</p>
+     *
+     * @return true 表示本次右键已被恒温手势消费，调用方应立即 return
+     */
+    private static boolean tryThermostatGesture(Minecraft mc, InputEvent.MouseButton.Pre event) {
+        if (event.getAction() != GLFW.GLFW_PRESS) return false;
+        if (event.getButton() != GLFW.GLFW_MOUSE_BUTTON_RIGHT) return false;
+        if ((event.getModifiers() & GLFW.GLFW_MOD_ALT) == 0) return false;
+
+        LocalPlayer player = mc.player;
+        if (player == null || mc.level == null || mc.screen != null || mc.getOverlay() != null) return false;
+
+        // 必须手持造化杖（主手优先，其次副手），与保护手势同一把尺子。
+        ItemStack staff = player.getMainHandItem();
+        if (!(staff.getItem() instanceof EndlessBeafItem)) {
+            staff = player.getOffhandItem();
+            if (!(staff.getItem() instanceof EndlessBeafItem)) return false;
+        }
+
+        // 用当前帧重算准星命中，避免用到上一 tick 的旧 hitResult。
+        mc.gameRenderer.pick(1.0F);
+        if (!(mc.hitResult instanceof BlockHitResult hit)) return false;
+        if (!(mc.level.getBlockState(hit.getBlockPos()).getBlock() instanceof GlowPlasticBlock)) return false;
+
+        event.setCanceled(true);
+        mc.setScreen(new PlasticThermostatScreen(hit.getBlockPos()));
         return true;
     }
 

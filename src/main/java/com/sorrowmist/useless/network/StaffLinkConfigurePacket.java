@@ -95,8 +95,15 @@ public record StaffLinkConfigurePacket(GlobalPos anchor, int route, StaffLinkRou
      *
      * <p>这里只做一个<b>绝对上界</b>的粗夹：真正的上限是动力学配置里的最高转速，那是可选集成
      * 侧才知道的事，由桥在运行时再夹一次。别的介质保持原值——它们的「数量」本来就没有上限。</p>
+     *
+     * <p><b>气压是例外</b>：它的「数量」承载的是目标气压（毫巴），<b>真空是负值</b>，
+     * 所以必须夹到 {@code [-1000, 20000]}（-1 ~ 20 bar）而不是「至少 1」。</p>
      */
     private static long sanitizeAmount(StaffLinkRoute config) {
+        if (config.medium().family() == ResourceFamily.PRESSURE) {
+            return Math.max(StaffLinkRoute.PRESSURE_MIN_MBAR,
+                    Math.min(StaffLinkRoute.PRESSURE_MAX_MBAR, config.amount()));
+        }
         if (config.medium().family() != ResourceFamily.STRESS) {
             return config.amount();
         }

@@ -99,6 +99,24 @@ public record StaffLinkRoute(
      */
     public static final long STRESS_RPM_HARD_LIMIT = 1_000_000L;
 
+    /**
+     * 气压线路上 {@link #amount} 字段承载「目标气压（毫巴）」。
+     *
+     * <p>与应力复用 {@code amount} 承载「目标转速」同一个思路：{@code amount} 在别的介质上表示
+     * 「一轮搬多少」，而气压的搬运目标本身就是「让接收端达到某个压力」，语义刚好对得上；
+     * 复用可以让存档、网络编解码都不必新增字段。</p>
+     *
+     * <p><b>注意与 {@link #MIN_AMOUNT} 的冲突</b>：真空是负压，因此气压线路的 {@code amount}
+     * 必须允许负数，构造器里对气压族单独夹取（见 {@link #StaffLinkRoute}）。</p>
+     */
+    public static final long PRESSURE_MIN_MBAR = -1_000L;
+
+    /** 气压线路上 {@link #amount} 的粗上限：20 bar。真正的物理上限由气动方块自身决定。 */
+    public static final long PRESSURE_MAX_MBAR = 20_000L;
+
+    /** 气压线路的默认目标气压：2 bar（气动工艺常见的起步工作压力）。 */
+    public static final long PRESSURE_DEFAULT_MBAR = 2_000L;
+
     private static final String TAG_DIMENSION = "Dimension";
     private static final String TAG_POS = "Pos";
     private static final String TAG_ROUTE = "Route";
@@ -127,7 +145,10 @@ public record StaffLinkRoute(
         Objects.requireNonNull(medium, "medium");
 
         route = Mth.clamp(route, 0, ROUTE_COUNT - 1);
-        amount = Math.max(MIN_AMOUNT, amount);
+        // 气压的 amount 是「目标气压（毫巴）」，真空是负值，因此不能套用 MIN_AMOUNT 的下限。
+        amount = medium.family() == ResourceFamily.PRESSURE
+                ? Mth.clamp(amount, PRESSURE_MIN_MBAR, PRESSURE_MAX_MBAR)
+                : Math.max(MIN_AMOUNT, amount);
         interval = Mth.clamp(interval, MIN_INTERVAL, MAX_INTERVAL);
         weight = Mth.clamp(weight, MIN_WEIGHT, MAX_WEIGHT);
 
@@ -149,8 +170,8 @@ public record StaffLinkRoute(
     public boolean filterApplies() {
         return switch (medium) {
             case ITEM, AE_ITEM, FLUID, AE_FLUID, CHEMICAL, AE_CHEMICAL -> true;
-            // 能量、魔源、应力没有合适的标记物，因此不参与过滤。
-            case ENERGY, AE_ENERGY, SOURCE, AE_SOURCE, STRESS -> false;
+            // 能量、魔源、应力、气压没有合适的标记物，因此不参与过滤。
+            case ENERGY, AE_ENERGY, SOURCE, AE_SOURCE, STRESS, PRESSURE, AE_PRESSURE -> false;
         };
     }
 
@@ -202,7 +223,7 @@ public record StaffLinkRoute(
             case ITEM -> hasMarker(slot -> slot.isItem() || slot.isPattern());
             case FLUID -> hasMarker(slot -> slot.isFluid() || slot.isPattern());
             case CHEMICAL -> hasMarker(slot -> slot.isItem() || slot.isPattern());
-            case ENERGY, SOURCE, STRESS -> false;
+            case ENERGY, SOURCE, STRESS, PRESSURE -> false;
         };
     }
 

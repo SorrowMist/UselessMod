@@ -1,0 +1,113 @@
+name: Bug report / 错误报告
+description: 游戏崩溃、行为异常或模组冲突？请在这里报告。/ Found a crash or an unexpected behaviour? Report it here.
+title: "[Bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        请在上方标题中概括问题现象。**只报告一个 bug**——多个无关问题请分开提交，便于定位与关闭。
+
+  - type: checkboxes
+    id: existing-issue
+    attributes:
+      label: 已检查现有问题 / Checked for existing issues
+      description: 提交前请先搜索 open 与 closed 的 issue，避免重复报告。
+      options:
+        - label: 我已搜索过现有 issue，未发现相同报告。/ I have searched existing issues and found none.
+          required: true
+        - label: 我确认这是本模组自身的问题，而非其它模组、启动器或整合包配置导致。/ I confirmed this originates from this mod, not another mod, launcher or modpack config.
+          required: true
+
+  - type: input
+    id: mod-version
+    attributes:
+      label: 模组版本 / Mod version
+      description: 见文件名或 mods 列表中显示的版本号。
+      placeholder: "例如 1.21.1-2.4.5.8"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: environment
+    attributes:
+      label: 运行环境 / Environment
+      description: 混合端（如 Mohist、CatServer）不受支持。/ Hybrid server cores are unsupported.
+      options:
+        - "单人游戏 / Singleplayer"
+        - "多人游戏 - 局域网 / Multiplayer - Open to LAN"
+        - "多人游戏 - 专用服务器 / Multiplayer - Dedicated Server"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: side
+    attributes:
+      label: 问题出现在哪一侧 / Affected side
+      options:
+        - "客户端与服务器均出现 / Both client and server"
+        - "仅客户端 / Client only"
+        - "仅服务器 / Server only"
+        - "不确定 / Not sure"
+    validations:
+      required: true
+
+  - type: textarea
+    id: other-mods
+    attributes:
+      label: 其他已安装模组 / Other installed mods
+      description: 填写整合包名称，或列出关键模组（尤其 AE2、Mekanism、KubeJS、JEI/EMI/REI 及其版本）。
+      placeholder: |
+        - 整合包名称或「自制整合包」
+        - AE2:
+        - Mekanism:
+        - KubeJS:
+        - 配方查看器（JEI/EMI/REI）:
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: 问题描述 / Describe the bug
+      description: 尽可能详细地说明发生了什么，附上相关方块、物品或界面名称。
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: 预期行为 / Expected behavior
+      description: 你认为应当发生什么。
+    validations:
+      required: true
+
+  - type: textarea
+    id: result
+    attributes:
+      label: 实际行为 / Actual behavior
+      description: 实际发生了什么。必要时附截图。
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: 复现步骤 / Steps to reproduce
+      description: 缺少复现步骤的报告通常无法修复，请逐步写清。
+      value: |
+        1.
+        2.
+        3.
+    validations:
+      required: true
+
+  - type: input
+    id: logs
+    attributes:
+      label: 日志或崩溃报告 / Log or crash report
+      description: |
+        请提供链接（[Gist](https://gist.github.com/)、[pastebin](https://pastebin.com/) 等），不要直接粘贴大段文本，也不要用会过期的链接。
+        非崩溃问题时可在游戏中按住 F3+C 十秒以上强制生成一份报告。
+    validations:
+      required: true

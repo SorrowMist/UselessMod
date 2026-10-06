@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 使用疑问 / Questions & Support
+    url: https://github.com/SorrowMist/UselessMod/discussions
+    about: 使用方式、配置与兼容性疑问请走 Discussions；issue 区只处理可复现的缺陷与功能建议。
+  - name: 模组 Wiki / Documentation
+    url: https://github.com/SorrowMist/UselessMod/tree/1.21/wiki
+    about: KubeJS 与数据包 API 的使用文档，提交前请先查阅。

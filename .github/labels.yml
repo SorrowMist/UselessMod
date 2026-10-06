@@ -1,0 +1,49 @@
+# GitHub 标签定义（用于 gh label sync / labeler 工具）
+#
+# 同步方式（需要已登录的 gh CLI，且对仓库有 write 权限）：
+#   gh label sync --file .github/labels.yml
+#
+# 注意：gh label sync 会以本文件为准，删除仓库中未在此声明的其它标签。
+# 若只想新增而不想删除现有标签，请改用：
+#   gh label create bug --color D73A4A --description "..." --force
+#   gh label create feat --color 0E8A16 --description "..." --force
+
+- name: bug
+  color: d73a4a
+  description: 确认或疑似由本模组导致的缺陷、崩溃与行为异常
+
+- name: feat
+  color: 0e8a16
+  description: 新功能、功能改进与体验优化建议
+
+- name: question
+  color: d876e3
+  description: 使用方式、配置与兼容性疑问（优先走 Discussions）
+
+- name: documentation
+  color: 0075ca
+  description: 文档、Wiki 与指南相关
+
+- name: compatibility
+  color: fbca04
+  description: 与其它模组、加载器或服务端的兼容性问题
+
+- name: crash
+  color: b60205
+  description: 游戏启动或运行崩溃
+
+- name: duplicate
+  color: cfd3d7
+  description: 与已有 issue 重复
+
+- name: invalid
+  color: e4e669
+  description: 描述不清、无法复现或不属于本模组范围
+
+- name: wontfix
+  color: ffffff
+  description: 已确认但不会处理
+
+- name: stale
+  color: ededed
+  description: 长期无回应，待关闭

@@ -385,7 +385,6 @@
   "gui.useless_mod.shape_label": "Shape: %s (%s)",
   "gui.useless_mod.shape_hint": "Hold chain key + Shift + scroll to switch shape",
   "gui.useless_mod.shape_switched": "Chain Shape: %s (%s)",
-  "gui.useless_mod.shape_unsupported": "Shape %s is not supported here; using shapeless chain",
   "gui.useless_mod.mining_count_limit": "Mining Count: %s / %s",
   "gui.useless_mod.shape.shapeless": "Shapeless Chain",
   "gui.useless_mod.shape.shapeless.desc": "Adjacent-spread scan; range and limit follow config",

@@ -3,6 +3,7 @@ package com.sorrowmist.useless.core.common;
 import com.mojang.blaze3d.platform.InputConstants;
 import com.sorrowmist.useless.compat.ftbultimine.FtbUltimineChainKeyCompat;
 import net.minecraft.client.KeyMapping;
+import net.neoforged.fml.ModList;
 import net.neoforged.neoforge.client.settings.IKeyConflictContext;
 import net.neoforged.neoforge.client.settings.KeyConflictContext;
 import net.neoforged.neoforge.client.settings.KeyModifier;
@@ -95,7 +96,9 @@ public class KeyBindings {
      * 都必须经由此方法，否则会出现「能挖掘但无高亮」这类两端不一致的表现。
      */
     public static boolean isChainMiningKeyDown() {
-        return TRIGGER_CHAIN_MINING_KEY.get().isDown() || FtbUltimineChainKeyCompat.isChainKeyDown();
+        return TRIGGER_CHAIN_MINING_KEY.get().isDown()
+                || (ModList.get().isLoaded("ftbultimine")
+                        && FtbUltimineChainKeyCompat.isChainKeyDown());
     }
 
     // 耕地/草径模式切换（右键泥土时的优先行为）

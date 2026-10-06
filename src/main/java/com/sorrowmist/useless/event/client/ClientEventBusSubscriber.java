@@ -39,6 +39,7 @@ import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.EntityHitResult;
 import net.minecraft.world.phys.HitResult;
 import net.neoforged.api.distmarker.Dist;
+import net.neoforged.bus.api.EventPriority;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.client.event.ClientPlayerNetworkEvent;
@@ -228,14 +229,21 @@ public class ClientEventBusSubscriber {
     }
 
     /**
-     * Shift + 滚轮切换无线物流网络。
+     * Shift + 滚轮切换连锁形状 / 无线物流网络。
      *
-     * <p>只在「手持造化杖 + 开着无线物流模式 + 没开任何界面」时才吃掉这次滚动，
-     * 免得抢走其它模组的 Shift 滚轮用法（物品栏滚动之类）。</p>
+     * <p>只在「手持造化杖 + 没开任何界面」时才吃掉这次滚动，免得抢走其它模组的 Shift 滚轮用法
+     * （物品栏滚动之类）。</p>
+     *
+     * <p>优先级必须高于 FTB Ultimine：FTB 通过 Architectury 的
+     * {@code ClientRawInputEvent.MOUSE_SCROLLED} 注册了同一个 NeoForge 鼠标滚动事件，并在
+     * 「连锁键按下 + Shift + 滚轮」时以 {@code EventResult.interruptFalse()} 取消该事件。若本方法
+     * 用默认优先级，事件已被 FTB 取消，形状切换包永远不会发出，表现为「按住连锁键滚轮毫无反应」。
+     * 同理，形状分支不能依赖 {@code event.isCanceled()}：该标志在 FTB 先行处理时必然为真，
+     * 据此提前返回等于把功能再次关掉。</p>
      */
-    @SubscribeEvent
+    @SubscribeEvent(priority = EventPriority.HIGHEST)
     public static void onMouseScroll(InputEvent.MouseScrollingEvent event) {
-        if (event.isCanceled() || event.getScrollDeltaY() == 0.0) return;
+        if (event.getScrollDeltaY() == 0.0) return;
 
         Minecraft mc = Minecraft.getInstance();
         LocalPlayer player = mc.player;
@@ -254,6 +262,9 @@ public class ClientEventBusSubscriber {
             PacketDistributor.sendToServer(new ShapeSwitchPacket(delta));
             return;
         }
+
+        // 无线物流分支仍避开已被其它模组处理的滚动，保持原有克制。
+        if (event.isCanceled()) return;
 
         if (!EndlessBeafItem.isStaffLinkEnabled(mainHandItem)) return;
 

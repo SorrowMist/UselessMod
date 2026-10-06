@@ -386,7 +386,6 @@
   "gui.useless_mod.shape_label": "形状: %s（%s）",
   "gui.useless_mod.shape_hint": "按住连锁键 + Shift + 滚轮 切换形状",
   "gui.useless_mod.shape_switched": "连锁形状: %s（%s）",
-  "gui.useless_mod.shape_unsupported": "该形状（%s）暂不支持，已按原版连锁处理",
   "gui.useless_mod.mining_count_limit": "挖掘数量: %s / %s",
   "gui.useless_mod.shape.shapeless": "原版连锁",
   "gui.useless_mod.shape.shapeless.desc": "沿用相邻扩散扫描，范围与数量由配置决定",

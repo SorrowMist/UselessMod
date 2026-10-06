@@ -23,16 +23,6 @@ public class PlayerMiningData {
      * 不参与任何判定，取值 0 表示尚未同步。
      */
     private int maxBlocks = 0;
-    /**
-     * 最近一次已向玩家提示过的「无法识别形状」标识。
-     *
-     * <p>第三方经 FTB 的 RegisterShapeEvent 注册的形状映射结果恒为默认形状，无法用形状值
-     * 本身判断是否需要提示：不加去重会每次同步都重发 actionbar，只按形状值去重又会漏掉
-     * 「连续切到两个不同未知形状」的第二次提示。故按标识记录，随玩家数据一起回收。
-     *
-     * <p>仅服务端使用，不参与客户端同步：判定与提示都发生在服务端，客户端该字段恒为 null。
-     */
-    private String notifiedUnsupportedShapeId = null;
 
     public PlayerMiningData(UUID playerId) {
         this.playerId = playerId;
@@ -64,14 +54,6 @@ public class PlayerMiningData {
 
     public void setMaxBlocks(int maxBlocks) {
         this.maxBlocks = maxBlocks;
-    }
-
-    public String getNotifiedUnsupportedShapeId() {
-        return this.notifiedUnsupportedShapeId;
-    }
-
-    public void setNotifiedUnsupportedShapeId(String shapeId) {
-        this.notifiedUnsupportedShapeId = shapeId;
     }
 
     public boolean isCacheValid(BlockPos currentPos) {

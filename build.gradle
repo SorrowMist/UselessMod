@@ -329,7 +329,7 @@ dependencies {
 //    runtimeOnly "maven.modrinth:allthemodium:2.9.5"
     implementation "maven.modrinth:extendedae-plus:AtuOmKkV"
 //    runtimeOnly "maven.modrinth:omnitools:1.21.1-1.2.1"
-    implementation "curse.maven:ftb-ultimine-forge-386134:7188395"
+    implementation "curse.maven:ftb-ultimine-forge-386134:8231400"
     // 神秘农业
     implementation "curse.maven:cucumber-272335:8035802"
     implementation "curse.maven:mystical-agriculture-246640:8035819"

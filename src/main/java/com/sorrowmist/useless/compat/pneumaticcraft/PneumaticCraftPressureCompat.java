@@ -128,7 +128,9 @@ public final class PneumaticCraftPressureCompat implements PressureBridge {
 
         @Override
         public long capacity() {
-            return (long) ((double) handler.maxPressure() * (double) handler.getVolume());
+            // 用「危险压力」而不是 maxPressure()：后者在 BasicAirHandler 里恒为 10f，
+            // 对 Tier1 气阀（危险压力 5 bar）明显偏大；危险压力才是正压侧真正有意义的上限。
+            return (long) ((double) handler.getDangerPressure() * (double) handler.getVolume());
         }
 
         @Override

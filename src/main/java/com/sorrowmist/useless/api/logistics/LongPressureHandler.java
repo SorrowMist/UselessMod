@@ -28,7 +28,12 @@ public interface LongPressureHandler extends LongResourceHandler {
     /** 当前空气量（mL）。<b>可为负</b>：负值表示真空。 */
     long stored();
 
-    /** 正压侧容量（mL）；AE 网络没有上限，取 {@link Long#MAX_VALUE}。 */
+    /**
+     * 正压侧容量（mL）；AE 网络没有上限，取 {@link Long#MAX_VALUE}。
+     *
+     * <p>方块侧取的是「危险压力 × 体积」——即开始有爆炸风险的那个压力对应的空气量，
+     * 而不是实现自己报的某个常量上限（气动的 {@code maxPressure()} 恒为 10 bar，不反映真实阈值）。</p>
+     */
     long capacity();
 
     /**

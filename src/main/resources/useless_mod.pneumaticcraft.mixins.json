@@ -1,0 +1,14 @@
+{
+  "required": false,
+  "package": "com.sorrowmist.useless.mixin.pneumaticcraft",
+  "compatibilityLevel": "JAVA_21",
+  "mixins": [
+    "MachineAirHandlerMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  },
+  "overwrites": {
+    "requireAnnotations": true
+  }
+}

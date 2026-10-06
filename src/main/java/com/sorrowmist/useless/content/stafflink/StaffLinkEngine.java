@@ -287,11 +287,14 @@ public final class StaffLinkEngine {
         StaffLinkSavedData data = StaffLinkSavedData.get(server);
         // all() 本身就返回一份快照副本，不必再复制一次。
         List<StaffLinkNetwork> networks = data.all();
+        long now = server.getTickCount();
+        // 气压封堵集合必须先于下面的早退更新：网络被删空时它要能跟着清空，
+        // 否则已解绑的方块会被永久误封（mixin 只看这个集合，不看线路还在不在）。
+        PressureSealRegistry.rebuild(networks, now);
         if (networks.isEmpty()) {
             return;
         }
 
-        long now = server.getTickCount();
         if (now % LIVE_REFRESH_INTERVAL == 0) {
             // 刷新「归属者本局有成员在线的网络」；没有归属者认领的孤儿网络一律不跑。
             StaffLinkManager.refreshLiveNetworks(server);
@@ -334,6 +337,7 @@ public final class StaffLinkEngine {
         NODE_NEXT_RUN.clear();
         StaffLinkManager.clearLive();
         StaffLinkTargets.clearCapabilityHints();
+        PressureSealRegistry.clear();
     }
 
     /**
@@ -346,6 +350,9 @@ public final class StaffLinkEngine {
         if (networkId != null) {
             NODE_NEXT_RUN.remove(networkId);
             StaffLinkManager.markLive(networkId);
+            // 绑定 / 解绑 / 改配置都会走到这里：让气压封堵集合下一次 tick 就重建，
+            // 而不是等满一个重建周期（否则新绑定的气阀最多还要多漏 1 秒）。
+            PressureSealRegistry.invalidate();
         }
     }
 

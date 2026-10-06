@@ -79,6 +79,12 @@ requiredMods=["malum"]
 config="${mod_id}.create.mixins.json"
 requiredMods=["create"]
 
+# 无线物流的「气压」介质：被无线绑定的气动方块要"视同已连接"、不再向环境漏气。
+# 注入的是 PneumaticCraft 的内部空气处理器，因此只在气动工艺在场时才加载。
+[[mixins]]
+config="${mod_id}.pneumaticcraft.mixins.json"
+requiredMods=["pneumaticcraft"]
+
 # The [[accessTransformers]] block allows you to declare where your AT file is.
 # If this block is omitted, a fallback attempt will be made to load an AT from META-INF/accesstransformer.cfg
 #[[accessTransformers]]

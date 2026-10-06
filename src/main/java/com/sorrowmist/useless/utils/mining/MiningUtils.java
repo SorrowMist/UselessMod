@@ -188,9 +188,12 @@ public class MiningUtils {
     static List<ItemStack> applyExDeorumDrops(ServerLevel level, BlockState state,
                                               List<ItemStack> drops, ItemStack tool,
                                               BlockPos pos, Player player) {
-        // 门面类不引用 exdeorum 的任何类型，故可安全用于守卫；
-        // 引用外部类型的实现隔离在 ExDeorumCompatImpl，仅在确认该模组已加载后经反射调用。
-        if (!ExDeorumCompat.isLoaded()) {
+        // 守卫必须在本方法内完成，且不能触碰 ExDeorumCompat 的任何成员：该类引用了 exdeorum
+        // 的类型，链接它即须解析 HammerRecipe 等外部类型。若把守卫放进该类（原 isLoaded() 即是），
+        // 那一行本身就会触发链接，未安装模组时直接抛 NoClassDefFoundError，守卫形同虚设。
+        // 此处以纯 ModList 短路，使 ExDeorumCompat 仅在模组确已加载后才被链接，
+        // 与 FtbUltimineChainKeyCompat 采用同一策略。模组 id 用字面量，避免本行出现对该类的引用。
+        if (!ModList.get().isLoaded("exdeorum")) {
             return drops;
         }
 

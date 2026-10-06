@@ -38,6 +38,7 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.tags.FluidTags;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.entity.Entity;
@@ -210,18 +211,53 @@ public class EventHandler {
         }
     }
 
+    /**
+     * 造化杖携带者的挖掘速度补偿：把原版「离地」与「水下」两处惩罚按实际大小乘回去，
+     * 使飞行 / 泡水时的挖掘手感与陆上一致，而非再额外放大。
+     *
+     * <p>原版 {@code Player#getDigSpeed}（1.21.1 反编译确认）会对速度施加两处惩罚：</p>
+     * <ul>
+     *   <li>{@code !onGround()} ⇒ 速度 {@code / 5}（飞行与游泳都会命中）</li>
+     *   <li>{@code isEyeInFluid(WATER)} ⇒ 速度 {@code × SUBMERGED_MINING_SPEED}（默认 0.2，即 {@code / 5}）</li>
+     * </ul>
+     *
+     * <p>本事件在公式末尾触发，{@code getOriginalSpeed()} 已是惩罚后的值，
+     * 且 {@code setNewSpeed} 会整体替换返回值、原版后续不再修正，
+     * 所以此处只需把被乘进去的因子乘回来即可精确还原陆上速度。
+     * 游泳时两处叠加为 {@code / 25}，旧代码固定 {@code ×5} 只补得回其中一项，
+     * 表现为「游泳/潜水时比陆上慢 5 倍」。</p>
+     *
+     * <p>关键：离地判定必须用 {@code !player.onGround()} 对齐原版，不能用 {@code isInWater()}。
+     * 后者是「身体触碰水」（{@code wasTouchingWater}），站在浅水里即为 true，
+     * 而那种场景原版只有离地 {@code /5} 惩罚；若照旧无条件 {@code ×5}，
+     * 就会在浅水中凭空加速。</p>
+     */
     @SubscribeEvent
     public static void onBreakSpeed(PlayerEvent.BreakSpeed event) {
         Player player = event.getEntity();
         ItemStack mainHandItem = player.getMainHandItem();
         if (!(mainHandItem.getItem() instanceof EndlessBeafItem)) return;
 
-        float newSpeed = event.getOriginalSpeed();
+        // 累积「原版实际乘进速度的惩罚因子」，默认 1.0 = 无惩罚、不干预
+        float penalty = 1.0F;
 
-        if (player.getAbilities().flying || player.isInWater()) {
-            newSpeed *= 5.0F;
+        // 1) 离地惩罚：原版 `!onGround()` 时速度 /5
+        if (!player.onGround()) {
+            penalty *= 5.0F;
         }
-        event.setNewSpeed(newSpeed);
+
+        // 2) 水下惩罚：原版 `isEyeInFluid(WATER)` 时速度 × SUBMERGED_MINING_SPEED。
+        //    取其属性实际值而非写死 0.2，兼容改过该属性的整合包/附魔。
+        if (player.isEyeInFluid(FluidTags.WATER)) {
+            float submerged = (float) player.getAttributeValue(Attributes.SUBMERGED_MINING_SPEED);
+            if (submerged > 0.0F) {
+                penalty /= submerged;   // 默认 0.2 ⇒ ×5
+            }
+        }
+
+        if (penalty != 1.0F) {
+            event.setNewSpeed(event.getOriginalSpeed() * penalty);
+        }
     }
 
     private static final float DEFAULT_FLYING_SPEED = 0.05F;

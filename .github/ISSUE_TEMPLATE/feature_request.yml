@@ -6,15 +6,15 @@ body:
   - type: markdown
     attributes:
       value: |
-        请在上方标题中概括你的建议。请先搜索现有 issue 与 Discussions，避免重复提出。
-        本模板用于**功能建议**；使用疑问请走 Discussions，缺陷请用 Bug report。
+        请在上方标题中概括你的建议。提交前请先搜索现有 issue，避免重复提出。
+        本模板用于**功能建议**；使用疑问请先查阅 Wiki 或搜索已有 issue，缺陷请用 Bug report。
 
   - type: checkboxes
     id: existing-issue
     attributes:
       label: 已检查现有建议 / Checked for existing suggestions
       options:
-        - label: 我已搜索过现有 issue 与 Discussions，未发现相同建议。/ I have searched existing issues and discussions and found none.
+        - label: 我已搜索过现有 issue，未发现相同建议。/ I have searched existing issues and found none.
           required: true
 
   - type: textarea

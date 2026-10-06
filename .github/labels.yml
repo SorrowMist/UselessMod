@@ -18,7 +18,7 @@
 
 - name: question
   color: d876e3
-  description: 使用方式、配置与兼容性疑问（优先走 Discussions）
+  description: 使用方式、配置与兼容性疑问（请先查阅 Wiki 与已有 issue）
 
 - name: documentation
   color: 0075ca

@@ -426,6 +426,9 @@ public class EventHandler {
         } else {
             BEEF_PROTECTED_PLAYERS.remove(uuid);
             releaseBeefInvulnerability(player);
+            // 关掉保护的那一刻身上若还带着火，把它扑掉：源头拦截只在保护期间生效，
+            // 保护关闭后原版会继续把余火烧完，这里顺手清一次（每玩家仅一次，无每-tick 开销）。
+            player.clearFire();
         }
 
         boolean newlyStealthTracked = hasAdvancedStealth && BEEF_ADVANCED_STEALTH_PLAYERS.add(uuid);

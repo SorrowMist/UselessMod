@@ -133,7 +133,7 @@ public record StaffLinkConfigurePacket(GlobalPos anchor, int route, StaffLinkRou
     /**
      * 逐格清洗过滤器。
      *
-     * <p>一格现在有五样东西：标记、模式文本、包含/排除方向、两条控制条件。{@link StaffLinkRoute}
+     * <p>一格现在有五样东西：标记、模式文本、白名单/黑名单方向、两条控制条件。{@link StaffLinkRoute}
      * 的构造器只会把「格数」补齐到 {@code FILTER_LIMIT}，不校验格<b>内容</b>；
      * 一个被改过的客户端可以塞进来非法模式、越界的条件或跨族的控制材料。所以这里逐格重造一遍：</p>
      *

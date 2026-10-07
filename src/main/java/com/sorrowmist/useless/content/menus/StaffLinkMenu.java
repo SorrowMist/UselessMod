@@ -455,9 +455,9 @@ public final class StaffLinkMenu extends AbstractContainerMenu {
     }
 
     /**
-     * 改一个过滤器槽的「包含 / 排除」方向，标记与条件不动。
+     * 改一个过滤器槽的「白名单 / 黑名单」方向，标记与条件不动。
      *
-     * <p>排除 = 黑名单：这一格标记命中的资源<b>不搬</b>，其余照搬。</p>
+     * <p>黑名单：这一格标记命中的资源<b>不搬</b>，其余照搬。</p>
      */
     public void setFilterSlotExclude(int index, boolean exclude) {
         editFilterSlot(index, slot -> slot.withExclude(exclude));

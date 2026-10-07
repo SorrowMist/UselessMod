@@ -40,6 +40,23 @@ public class ModeTogglePacket implements CustomPacketPayload {
     public static void handle(ModeTogglePacket msg, IPayloadContext ctx) {
         ctx.enqueueWork(() -> {
             ServerPlayer player = (ServerPlayer) ctx.player();
+
+            // 杀戮光环：杖子放在副手 / 快捷栏 / 主背包里也要能开关，所以单独走「全背包」查找，
+            // 不能套用下面 findTargetToolInHands（只认手）的那道门。
+            if (msg.modeType == ModeType.BEEF_KILL_AURA) {
+                ItemStack staff = UselessItemUtils.findKillAuraToggleTarget(player);
+                if (!staff.isEmpty()) {
+                    EndlessBeafItem.setKillAuraEnabled(staff, msg.enabled);
+                    // 光环不占右键，无需接入 disable* 互斥。
+                    // 音效只发给操作者本人：这是个人 UI 反馈，不该打扰周围玩家。
+                    player.playNotifySound(
+                            (msg.enabled ? ModSounds.KILL_AURA_ON : ModSounds.KILL_AURA_OFF).get(),
+                            SoundSource.MASTER, 1.0F, 1.0F);
+                    player.containerMenu.broadcastChanges();
+                }
+                return;
+            }
+
             var toolEntry = UselessItemUtils.findTargetToolInHands(player);
             if (toolEntry.isEmpty()) return; // 没找到工具直接返回
 
@@ -216,9 +233,8 @@ public class ModeTogglePacket implements CustomPacketPayload {
                     }
                 }
                 case BEEF_AUTO_CLICK -> {
-                    if (stack.getItem() instanceof EndlessBeafItem) {
-                        EndlessBeafItem.setAutoClickEnabled(stack, msg.enabled);
-                    }
+                    // 连点开关已改为客户端会话级状态（BeefAutoClicker），不再写入物品组件。
+                    // 保留枚举值与分支只为不破坏 ModeType 的 ordinal 编码，这里不做任何事。
                 }
                 case BEEF_WIRELESS_LOGISTICS -> {
                     if (stack.getItem() instanceof EndlessBeafItem) {
@@ -234,16 +250,6 @@ public class ModeTogglePacket implements CustomPacketPayload {
                             stack.set(UComponents.ConstructionWandEnabledComponent.get(), false);
                             disableAeNetworkConnect(stack);
                         }
-                    }
-                }
-                case BEEF_KILL_AURA -> {
-                    if (stack.getItem() instanceof EndlessBeafItem) {
-                        EndlessBeafItem.setKillAuraEnabled(stack, msg.enabled);
-                        // 光环不占右键，无需接入 disable* 互斥。
-                        // 音效只发给操作者本人：这是个人 UI 反馈，不该打扰周围玩家。
-                        player.playNotifySound(
-                                (msg.enabled ? ModSounds.KILL_AURA_ON : ModSounds.KILL_AURA_OFF).get(),
-                                SoundSource.MASTER, 1.0F, 1.0F);
                     }
                 }
                 case BEEF_PROTECT_MODE -> {

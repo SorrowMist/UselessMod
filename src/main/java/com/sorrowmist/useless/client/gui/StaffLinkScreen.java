@@ -347,7 +347,7 @@ public final class StaffLinkScreen extends AbstractContainerScreen<StaffLinkMenu
     private final List<NumericSpec> numericFields = new ArrayList<>();
 
     /* ---- 过滤格的「详细编辑面板」（每格右键打开，嵌套在过滤面板之上） ----
-       面板放：标记 A、模式框、包含/排除、输出端条件（B + ≥/≤ + 数值）、输入端条件、关闭。
+       面板放：标记 A、模式框、白名单/黑名单、输出端条件（B + ≥/≤ + 数值）、输入端条件、关闭。
        这些控件只 addWidget（进 children、不进 renderables），手动 render + 手动转发事件——
        理由同过滤面板的两个按钮：进 renderables 会被 super.render() 画到底层之下。 */
     private boolean detailPanelOpen;
@@ -553,7 +553,8 @@ public final class StaffLinkScreen extends AbstractContainerScreen<StaffLinkMenu
         filterPanelOpen = open;
         if (!open) {
             // 关过滤面板时把详细面板也一起收掉（会提交它），免得留下一个看不见却有焦点的框。
-            closeDetailPanel();
+            // 强关：连过滤面板都不要了，模式非法也直接丢弃。
+            closeDetailPanel(true);
             jeiDragActive = false;
         } else {
             // 过滤格必须挂在「某个已选中的锚点 × 线路」的配置上。开面板前先保证这份配置存在，
@@ -566,7 +567,7 @@ public final class StaffLinkScreen extends AbstractContainerScreen<StaffLinkMenu
 
     /** 「清空」：把 18 格全部置空。 */
     private void clearAllFilterSlots() {
-        closeDetailPanel();
+        closeDetailPanel(true);
         for (int index = 0; index < StaffLinkRoute.FILTER_LIMIT; index++) {
             if (!currentFilterSlot(index).isEmpty()) {
                 menu.setFilterSlot(index, LinkFilterSlot.EMPTY);
@@ -639,8 +640,10 @@ public final class StaffLinkScreen extends AbstractContainerScreen<StaffLinkMenu
      * {@code visible}，收起时在别处要自己判断，否则收起的框照样会抢走点击。</p>
      */
     private void initDetailWidgets() {
+        // 不设 hint：「#标签 或通配符，例如 #c:ingots、*iron*」有三十来字，EditBox 的 hint 不裁切地
+        // 铺出去会盖到右边的「白名单/黑名单」按钮上。用法改由悬停提示承担（renderDetailTooltip）。
         detailPatternField = new EditBox(font, 0, 0, DETAIL_PATTERN_WIDTH, DETAIL_ROW_HEIGHT,
-                Component.translatable("gui.useless_mod.wireless_logistics.filter_pattern_hint"));
+                Component.empty());
         detailPatternField.setMaxLength(LinkFilterPattern.MAX_LENGTH);
         detailPatternField.setVisible(false);
         addWidget(detailPatternField);
@@ -794,12 +797,23 @@ public final class StaffLinkScreen extends AbstractContainerScreen<StaffLinkMenu
         updateDetailControls();
     }
 
-    /** 关闭详细面板（会提交它）。 */
+    /**
+     * 关闭详细面板（会提交它）。
+     *
+     * <p>「完成」按钮走这里：模式非法时**不关**，把面板留在原地让玩家改（提示已经弹了）。
+     * 强关路径（ESC / 关过滤面板 / 清空）走 {@link #closeDetailPanel(boolean)} 传 {@code true}。</p>
+     */
     private void closeDetailPanel() {
+        closeDetailPanel(false);
+    }
+
+    private void closeDetailPanel(boolean force) {
         if (!detailPanelOpen) {
             return;
         }
-        commitDetail();
+        if (!force && !commitDetail()) {
+            return;
+        }
         detailPanelOpen = false;
         detailIndex = -1;
         setFocused(null);
@@ -809,20 +823,23 @@ public final class StaffLinkScreen extends AbstractContainerScreen<StaffLinkMenu
     /**
      * 按详细面板当前控件的内容，把「镜像里的那一格」重读一遍。
      *
-     * <p>读的是<b>控件</b>而不是镜像：这样点 op / 排除按钮时，输入框里还没失焦提交的数值与模式
-     * 不会丢。标记本身仍以镜像为准（它只能通过左键 / JEI 放置）。</p>
+     * <p>读的是<b>控件</b>而不是镜像：这样点 op / 黑名单按钮时，输入框里还没失焦提交的数值与模式
+     * 不会丢。</p>
+     *
+     * <p><b>⚠️ 空格子也要读模式框</b>：详细面板是右键打开的，玩家完全可能在一个<b>还没放标记</b>的
+     * 格子里直接打 {@code #tag} —— 早先这里一看到「镜像里是空槽」就立刻返回 {@code EMPTY}，
+     * 那段模式就永远存不进去（用户实测：「输入后点完成都无法保存」）。</p>
      *
      * @return 组装好的格子；模式非法时返回 {@code null}（已弹提示）
      */
     @Nullable
     private LinkFilterSlot readDetailSlot() {
         LinkFilterSlot slot = currentFilterSlot(detailIndex);
-        if (slot.isEmpty()) {
-            return LinkFilterSlot.EMPTY;
-        }
         String text = detailPatternField.getValue().trim();
         if (!text.equals(slot.pattern() == null ? "" : slot.pattern())) {
             if (text.isEmpty()) {
+                // 模式框被清空：这一格退回「没有标记」（若原本是物品/流体标记也会一起清掉——
+                // 那正是玩家把模式删空的意图）。
                 return LinkFilterSlot.EMPTY;
             }
             LinkFilterPattern parsed = LinkFilterPattern.parse(text);
@@ -831,7 +848,12 @@ public final class StaffLinkScreen extends AbstractContainerScreen<StaffLinkMenu
                         "gui.useless_mod.wireless_logistics.filter_pattern_invalid", text));
                 return null;
             }
-            slot = slot.withMarker(LinkFilterSlot.ofPattern(parsed));
+            // 空格子 ⇒ 这一打模式就是它的标记；非空 ⇒ 换掉原标记（保留 exclude 与条件）。
+            slot = (slot.isEmpty() ? LinkFilterSlot.EMPTY : slot)
+                    .withMarker(LinkFilterSlot.ofPattern(parsed));
+        }
+        if (slot.isEmpty()) {
+            return LinkFilterSlot.EMPTY;
         }
         slot = applyDetailValue(slot, false);
         return applyDetailValue(slot, true);
@@ -853,27 +875,32 @@ public final class StaffLinkScreen extends AbstractContainerScreen<StaffLinkMenu
                 : slot.withConditions(next, slot.inCond());
     }
 
-    /** 把详细面板里未提交的编辑落成一次 {@code setFilterSlot}（只在真有变化时才发）。 */
-    private void commitDetail() {
+    /**
+     * 把详细面板里未提交的编辑落成一次 {@code setFilterSlot}（只在真有变化时才发）。
+     *
+     * @return 是否提交成功；模式非法时返回 {@code false}（已弹提示），调用方可以据此不关面板
+     */
+    private boolean commitDetail() {
         if (!detailPanelOpen || detailIndex < 0) {
-            return;
+            return true;
         }
         LinkFilterSlot slot = readDetailSlot();
         if (slot == null) {
-            return;
+            return false;
         }
         if (slot.isEmpty()) {
             if (!currentFilterSlot(detailIndex).isEmpty()) {
                 menu.setFilterSlot(detailIndex, LinkFilterSlot.EMPTY);
             }
-            return;
+            return true;
         }
         if (!slot.equals(currentFilterSlot(detailIndex))) {
             menu.setFilterSlot(detailIndex, slot);
         }
+        return true;
     }
 
-    /** 在详细面板上叠加一次改动（op / 排除），并把输入框里未提交的值一起带上。 */
+    /** 在详细面板上叠加一次改动（op / 黑名单），并把输入框里未提交的值一起带上。 */
     private void editDetail(java.util.function.UnaryOperator<LinkFilterSlot> change) {
         if (!detailPanelOpen || detailIndex < 0) {
             return;
@@ -888,7 +915,7 @@ public final class StaffLinkScreen extends AbstractContainerScreen<StaffLinkMenu
         }
     }
 
-    /** 切换这一格的「包含 / 排除」。 */
+    /** 切换这一格的「白名单 / 黑名单」。 */
     private void toggleDetailExclude() {
         editDetail(slot -> slot.withExclude(!slot.isExcluded()));
     }
@@ -916,19 +943,20 @@ public final class StaffLinkScreen extends AbstractContainerScreen<StaffLinkMenu
 
     /** 详细面板里的 A 标记槽：手持物放下，空手清空这一格。 */
     private void clickDetailMarkerSlot() {
-        LinkFilterSlot slot = readDetailSlot();
-        if (slot == null) {
-            return;
-        }
+        // 直接用镜像那一格当底子：放标记会顶掉模式，所以模式框里就算有非法文本也无所谓
+        // （换完标记 updateDetailControls 会把模式框刷成空）。
+        LinkFilterSlot slot = currentFilterSlot(detailIndex);
         ItemStack carried = menu.getCarried();
         if (carried.isEmpty()) {
             menu.setFilterSlot(detailIndex, LinkFilterSlot.EMPTY);
-            closeDetailPanel();
+            closeDetailPanel(true);
             return;
         }
         LinkFilterSlot marker = StaffLinkFilters.fromItem(menu.getSelectedMedium(), carried);
         if (marker != null) {
+            // 换标记时保留这一格原有的白名单/黑名单与条件。
             menu.setFilterSlot(detailIndex, slot.withMarker(marker));
+            updateDetailControls();
         }
     }
 
@@ -1440,7 +1468,7 @@ public final class StaffLinkScreen extends AbstractContainerScreen<StaffLinkMenu
             // JEI 拖拽悬停高亮要压在槽位底色之上，所以放这里。
             renderFilterDragHover(graphics, mouseX, mouseY);
             renderFilterItems(graphics);
-            // 角标（排除 / 有条件）画在物品之上，先入批再落地。
+            // 角标（黑名单 / 有条件）画在物品之上，先入批再落地。
             renderFilterBadges(graphics);
             graphics.flush();
         }
@@ -1477,9 +1505,9 @@ public final class StaffLinkScreen extends AbstractContainerScreen<StaffLinkMenu
     }
 
     /**
-     * 每格的状态角标：右上角红 {@code x} = 这一格是「排除」；右下角青点 = 这一格带了控制条件。
+     * 每格的状态角标：右上角红 {@code x} = 这一格是「黑名单」；右下角青点 = 这一格带了控制条件。
      *
-     * <p>角标是必要的：格子本身只画标记，光看图标分不出「包含」还是「排除」，也看不出有没有条件。</p>
+     * <p>角标是必要的：格子本身只画标记，光看图标分不出「白名单」还是「黑名单」，也看不出有没有条件。</p>
      */
     private void renderFilterBadges(GuiGraphics graphics) {
         if (!menu.isFilterActive()) {
@@ -2051,6 +2079,11 @@ public final class StaffLinkScreen extends AbstractContainerScreen<StaffLinkMenu
         if (inventorySlotAt(mouseX, mouseY) != null) {
             super.renderTooltip(graphics, mouseX, mouseY);
         }
+        // 一次性提示（比如「模式非法」）本来画在主界面标题行，被面板整个盖住了 —— 面板开着时
+        // 在这里再画一遍，否则玩家完全看不到反馈，只会觉得「输入了没反应 / 存不上」。
+        if (notice != null) {
+            graphics.drawString(font, notice, (width - font.width(notice)) / 2, 6, NOTICE_COLOR, true);
+        }
         // 光标上拿着的物品同理：vanilla 只在 super.render() 里画它（z 也低于面板），
         // 从背包拿起物品来标记时会被面板整个盖住、看不见手上是什么。这里抬到最上面重画。
         renderCarriedItem(graphics, mouseX, mouseY);
@@ -2157,7 +2190,7 @@ public final class StaffLinkScreen extends AbstractContainerScreen<StaffLinkMenu
         }
     }
 
-    /** 详细面板的悬停提示：三个槽位 + 两个按钮。 */
+    /** 详细面板的悬停提示：三个槽位 + 模式框 + 两个按钮。 */
     private void renderDetailTooltip(GuiGraphics graphics, int mouseX, int mouseY) {
         List<Component> lines = null;
         if (inDetailSlot(mouseX, mouseY, 0)) {
@@ -2168,6 +2201,10 @@ public final class StaffLinkScreen extends AbstractContainerScreen<StaffLinkMenu
             lines = List.of(Component.translatable(
                     "gui.useless_mod.wireless_logistics."
                             + (input ? "filter_cond_in_hint" : "filter_cond_out_hint")));
+        } else if (detailPatternField.visible
+                && detailPatternField.isMouseOver(mouseX, mouseY)) {
+            lines = List.of(Component.translatable(
+                    "gui.useless_mod.wireless_logistics.filter_pattern_hint"));
         } else if (detailExcludeButton.visible && detailExcludeButton.isMouseOver(mouseX, mouseY)) {
             lines = List.of(Component.translatable(
                     "gui.useless_mod.wireless_logistics.filter_exclude_hint"));
@@ -2425,7 +2462,7 @@ public final class StaffLinkScreen extends AbstractContainerScreen<StaffLinkMenu
         } else if (marker.isItem()) {
             lines.add(marker.item().getHoverName());
         }
-        // 方向：包含 / 排除。
+        // 方向：白名单 / 黑名单。
         lines.add(Component.translatable(marker.isExcluded()
                 ? "gui.useless_mod.wireless_logistics.filter_exclude_on"
                 : "gui.useless_mod.wireless_logistics.filter_exclude_off"));
@@ -2536,7 +2573,8 @@ public final class StaffLinkScreen extends AbstractContainerScreen<StaffLinkMenu
     public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
         if (keyCode == GLFW.GLFW_KEY_ESCAPE && detailPanelOpen) {
             // ESC 逐层退：先关详细面板，再关过滤面板，最后才是整个界面。
-            closeDetailPanel();
+            // 强关（ESC 是「退出」语义，模式非法也走人，提示已经弹过了）。
+            closeDetailPanel(true);
             return true;
         }
         if (keyCode == GLFW.GLFW_KEY_ESCAPE && filterPanelOpen) {
@@ -2550,9 +2588,10 @@ public final class StaffLinkScreen extends AbstractContainerScreen<StaffLinkMenu
             return true;
         }
         if ((keyCode == GLFW.GLFW_KEY_ENTER || keyCode == GLFW.GLFW_KEY_KP_ENTER) && anyFieldFocused()) {
+            // 回车 = 「打完了」：先提交全部输入框，再收面板（applyEdits 里已经提交过详细面板，
+            // 所以这里强关，免得模式非法时弹两次提示又关不掉）。
             applyEdits();
-            // 详细面板在回车时收起来：回车对玩家就是「打完了」，留在那儿会挡住下面的格子。
-            closeDetailPanel();
+            closeDetailPanel(true);
             setFocused(null);
             return true;
         }
@@ -2761,7 +2800,7 @@ public final class StaffLinkScreen extends AbstractContainerScreen<StaffLinkMenu
             return true;
         }
         if (button == GLFW.GLFW_MOUSE_BUTTON_RIGHT) {
-            // 右键：打开这一格的详细编辑面板（模式、包含/排除、两条控制条件都在里面）。
+            // 右键：打开这一格的详细编辑面板（模式、白名单/黑名单、两条控制条件都在里面）。
             openDetailPanel(filterIndex);
             return true;
         }
@@ -2776,7 +2815,7 @@ public final class StaffLinkScreen extends AbstractContainerScreen<StaffLinkMenu
         } else {
             LinkFilterSlot marker = StaffLinkFilters.fromItem(menu.getSelectedMedium(), carried);
             if (marker != null) {
-                // 换标记时保留这一格原有的包含/排除与条件。
+                // 换标记时保留这一格原有的白名单/黑名单与条件。
                 menu.setFilterSlot(filterIndex, currentFilterSlot(filterIndex).withMarker(marker));
             }
         }

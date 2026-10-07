@@ -192,25 +192,19 @@ public class ClientEventBusSubscriber {
         }
 
         if (KeyBindings.TOGGLE_AUTO_CLICK_KEY.get().consumeClick()) {
-            ItemStack mainHandItem = player.getMainHandItem();
-            if (mainHandItem.getItem() instanceof EndlessBeafItem) {
-                // 切换连点模式（开启后客户端以最快速度重复触发右键，再按一次关闭）
-                boolean currentAutoClick = EndlessBeafItem.isAutoClickEnabled(mainHandItem);
-                PacketDistributor.sendToServer(
-                        new ModeTogglePacket(ModeTogglePacket.ModeType.BEEF_AUTO_CLICK, !currentAutoClick));
-            }
+            // 连点开关是客户端会话级状态，不绑定物品：空手 / 任意物品下都能开关，
+            // 也不需要发包（真正的连点循环纯在客户端跑）。
+            BeefAutoClicker.toggle();
         }
 
         if (KeyBindings.TOGGLE_KILL_AURA_KEY.get().consumeClick()) {
-            // 主手或副手都认，与 tickKillAura / 服务端 findTargetToolInHands 的判定保持一致
-            UselessItemUtils.findTargetToolInHands(player).ifPresent(entry -> {
-                ItemStack staff = entry.getKey();
-                if (staff.getItem() instanceof EndlessBeafItem) {
-                    boolean currentAura = EndlessBeafItem.isKillAuraEnabled(staff);
-                    PacketDistributor.sendToServer(
-                            new ModeTogglePacket(ModeTogglePacket.ModeType.BEEF_KILL_AURA, !currentAura));
-                }
-            });
+            // 主手 / 副手 / 快捷栏 / 背包里任意一把杖都能开关，与服务端 findKillAuraToggleTarget 一致
+            ItemStack staff = UselessItemUtils.findKillAuraToggleTarget(player);
+            if (!staff.isEmpty()) {
+                boolean currentAura = EndlessBeafItem.isKillAuraEnabled(staff);
+                PacketDistributor.sendToServer(
+                        new ModeTogglePacket(ModeTogglePacket.ModeType.BEEF_KILL_AURA, !currentAura));
+            }
         }
 
         // 检测R键按下（触发强制破坏）
@@ -224,7 +218,7 @@ public class ClientEventBusSubscriber {
             }
         }
 
-        // 连点模式：手持造化杖时按配置速率重复触发右键（开关本身走 ModeTogglePacket）
+        // 连点模式：开关为客户端会话级状态（BeefAutoClicker），开启后按配置速率重复触发右键
         BeefAutoClicker.tick(mc);
     }
 
@@ -479,6 +473,8 @@ public class ClientEventBusSubscriber {
     @SubscribeEvent
     public static void onClientLoggingIn(ClientPlayerNetworkEvent.LoggingIn event) {
         lastTabPressed = false;
+        // 连点开关是客户端会话级状态，登录时统一置关，避免跨会话残留
+        BeefAutoClicker.reset();
     }
 
     @SubscribeEvent

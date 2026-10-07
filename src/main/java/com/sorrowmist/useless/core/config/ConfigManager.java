@@ -65,6 +65,8 @@ public class ConfigManager {
     private static final ModConfigSpec.IntValue BEEF_AOE_DAMAGE_RANGE_Y;
     private static final ModConfigSpec.IntValue BEEF_AOE_DAMAGE_RANGE_Z;
     private static final ModConfigSpec.IntValue BEEF_AOE_DAMAGE_MAX_TARGETS;
+    // 杀戮光环：每隔多少 tick 结算一次（服务端玩法行为）
+    private static final ModConfigSpec.IntValue BEEF_KILL_AURA_INTERVAL;
     // 牛排工具范围磁力吸附配置（半径）
     private static final ModConfigSpec.IntValue BEEF_MAGNET_RANGE_X;
     private static final ModConfigSpec.IntValue BEEF_MAGNET_RANGE_Y;
@@ -401,6 +403,12 @@ public class ConfigManager {
                 .comment("范围伤害单次最多命中的实体数量")
                 .translation("useless_mod.configuration.beef_aoe_damage_max_targets")
                 .defineInRange("beef_aoe_damage_max_targets", 64, 1, 1024);
+
+        BEEF_KILL_AURA_INTERVAL = SERVER_BUILDER
+                .comment("杀戮光环每隔多少 tick 结算一次（20 tick = 1 秒）",
+                        "调小 = 更快，但服务端实体查询压力会线性上升")
+                .translation("useless_mod.configuration.beef_kill_aura_interval")
+                .defineInRange("beef_kill_aura_interval", 20, 1, 1200);
 
         BEEF_MAGNET_RANGE_X = SERVER_BUILDER
                 .comment("击杀后范围磁力吸附的X轴范围半径")
@@ -878,6 +886,7 @@ public class ConfigManager {
                 "NeoForgeData.naturesaura:time_alive",
                 "NeoForgeData.BalmData",
                 "KubeJSPersistentData.senescence",
+                "KubeJSPersistentData.isSenescent",
                 "KubeJSPersistentData.original_max_health"
         );
     }
@@ -1166,6 +1175,11 @@ public class ConfigManager {
 
     public static int getBeefAoeDamageMaxTargets() {
         return getConfigValue(BEEF_AOE_DAMAGE_MAX_TARGETS);
+    }
+
+    // 杀戮光环结算间隔（tick）
+    public static int getBeefKillAuraInterval() {
+        return getConfigValue(BEEF_KILL_AURA_INTERVAL);
     }
 
     // 获取牛排工具范围磁力吸附配置

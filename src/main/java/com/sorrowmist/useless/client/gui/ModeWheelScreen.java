@@ -5,6 +5,7 @@ import com.mojang.blaze3d.systems.RenderSystem;
 import com.sorrowmist.useless.api.enums.tool.ConstructionWandCoreMode;
 import com.sorrowmist.useless.api.enums.tool.EnchantMode;
 import com.sorrowmist.useless.api.enums.tool.ToolTypeMode;
+import com.sorrowmist.useless.client.BeefAutoClicker;
 import com.sorrowmist.useless.content.menus.ChainGroupMenu;
 import com.sorrowmist.useless.core.common.KeyBindings;
 import com.sorrowmist.useless.core.component.UComponents;
@@ -612,7 +613,7 @@ public class ModeWheelScreen extends Screen {
                     bool(UComponents.BeefRitualSatchelComponent, false);
             case BeefToolModuleRegistry.BEEF_RIPEN -> bool(UComponents.BeefRipenComponent, false);
             case BeefToolModuleRegistry.BEEF_FORCE_GROW -> bool(UComponents.BeefForceGrowComponent, false);
-            case BeefToolModuleRegistry.BEEF_AUTO_CLICK -> bool(UComponents.BeefAutoClickComponent, false);
+            case BeefToolModuleRegistry.BEEF_AUTO_CLICK -> BeefAutoClicker.isEnabled();
             case BeefToolModuleRegistry.BEEF_WIRELESS_LOGISTICS ->
                     bool(UComponents.StaffLinkEnabledComponent, false);
             case BeefToolModuleRegistry.BEEF_KILL_AURA -> bool(UComponents.BeefKillAuraComponent, false);
@@ -986,8 +987,7 @@ public class ModeWheelScreen extends Screen {
                     UComponents.BeefRipenComponent, false);
             case BeefToolModuleRegistry.BEEF_FORCE_GROW -> toggle(ModeTogglePacket.ModeType.BEEF_FORCE_GROW,
                     UComponents.BeefForceGrowComponent, false);
-            case BeefToolModuleRegistry.BEEF_AUTO_CLICK -> toggle(ModeTogglePacket.ModeType.BEEF_AUTO_CLICK,
-                    UComponents.BeefAutoClickComponent, false);
+            case BeefToolModuleRegistry.BEEF_AUTO_CLICK -> BeefAutoClicker.toggle();
             case BeefToolModuleRegistry.BEEF_WIRELESS_LOGISTICS ->
                     toggle(ModeTogglePacket.ModeType.BEEF_WIRELESS_LOGISTICS,
                             UComponents.StaffLinkEnabledComponent, false);

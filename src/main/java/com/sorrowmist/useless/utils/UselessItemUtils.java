@@ -34,6 +34,7 @@ import net.minecraft.world.level.GameRules;
 import net.minecraft.world.level.Level;
 import net.neoforged.fml.ModList;
 import net.neoforged.neoforge.event.entity.living.LivingDropsEvent;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.AbstractMap.SimpleImmutableEntry;
 import java.util.ArrayList;
@@ -544,6 +545,98 @@ public class UselessItemUtils {
         return isAdvancedStealthEnabledTargetTool(player.getMainHandItem())
                 || isAdvancedStealthEnabledTargetTool(player.getOffhandItem())
                 || player.getInventory().items.stream().anyMatch(UselessItemUtils::isAdvancedStealthEnabledTargetTool);
+    }
+
+    /**
+     * 一趟「主手 → 副手 → 快捷栏 / 主背包」扫描的结果快照。
+     *
+     * <p>造化杖相关的每-tick 判定（飞行 / 无敌保护 / 高级潜行 / 杀戮光环）原本各走一趟背包，
+     * 而 {@link #isTargetTool} 对每个非空物品都要做一次 {@code BuiltInRegistries.ITEM.getKey(...)}
+     * 注册表反查。合并成一趟后，四个结果一次算出，布尔语义与原先各自的
+     * {@code hasXxxTargetToolInInventory} <b>逐个等价</b>（都是存在性判定，与遍历顺序无关）。</p>
+     *
+     * @param killAuraStaff 身上第一把「开着杀戮光环」的造化杖，没有则为 {@code null}
+     */
+    public record StaffScan(boolean anyStaff,
+                            boolean invulnerabilityEnabled,
+                            boolean advancedStealthEnabled,
+                            @Nullable ItemStack killAuraStaff) {
+        public boolean hasKillAura() {
+            return killAuraStaff != null;
+        }
+    }
+
+    /**
+     * 一次性扫描玩家身上的造化杖相关状态，供 {@code EventHandler#onPlayerTick} 的三个消费者共用，
+     * 避免每 tick 把背包走三遍。
+     *
+     * <p>遍历顺序与各个 {@code hasXxxTargetToolInInventory} 保持一致：主手 → 副手 →
+     * 快捷栏 / 主背包（{@code items[0..8]} 是快捷栏、{@code [9..35]} 是主背包，当前手持格也在其中）。</p>
+     */
+    public static StaffScan scanStaff(Player player) {
+        if (player == null || player.getInventory() == null) {
+            return new StaffScan(false, false, false, null);
+        }
+
+        boolean anyStaff = false;
+        boolean invulnerabilityEnabled = false;
+        boolean advancedStealthEnabled = false;
+        ItemStack killAuraStaff = null;
+
+        var items = player.getInventory().items;
+        // i == -2 主手、i == -1 副手、其余为主背包/快捷栏下标
+        for (int i = -2, size = items.size(); i < size; i++) {
+            ItemStack stack = i == -2 ? player.getMainHandItem()
+                    : i == -1 ? player.getOffhandItem()
+                    : items.get(i);
+            if (stack.isEmpty() || !isTargetTool(stack)) {
+                continue;
+            }
+            anyStaff = true;
+            invulnerabilityEnabled |= isInvulnerabilityEnabledTargetTool(stack);
+            advancedStealthEnabled |= isAdvancedStealthEnabledTargetTool(stack);
+            if (killAuraStaff == null
+                    && stack.getItem() instanceof EndlessBeafItem
+                    && EndlessBeafItem.isKillAuraEnabled(stack)) {
+                killAuraStaff = stack;
+            }
+        }
+
+        return new StaffScan(anyStaff, invulnerabilityEnabled, advancedStealthEnabled, killAuraStaff);
+    }
+
+    /**
+     * 找出「杀戮光环」开关要作用的那把造化杖：优先返回已经开着光环的那把（用于关闭），
+     * 否则返回身上第一把造化杖（用于开启）。
+     *
+     * <p>只认造化杖本体（omnitools 扳手模式不给光环）。开关只在按键 / 点击那一刻调用，
+     * 不在每-tick 热路径上，因此这里直接扫一趟即可，不做缓存。</p>
+     *
+     * @return 找到的杖；身上没有造化杖时返回 {@link ItemStack#EMPTY}
+     */
+    public static ItemStack findKillAuraToggleTarget(Player player) {
+        if (player == null || player.getInventory() == null) {
+            return ItemStack.EMPTY;
+        }
+
+        ItemStack firstStaff = ItemStack.EMPTY;
+        var items = player.getInventory().items;
+        for (int i = -2, size = items.size(); i < size; i++) {
+            ItemStack stack = i == -2 ? player.getMainHandItem()
+                    : i == -1 ? player.getOffhandItem()
+                    : items.get(i);
+            if (stack.isEmpty() || !(stack.getItem() instanceof EndlessBeafItem)) {
+                continue;
+            }
+            if (EndlessBeafItem.isKillAuraEnabled(stack)) {
+                // 已经开着光环：优先作用在它身上，按一次就是关闭
+                return stack;
+            }
+            if (firstStaff.isEmpty()) {
+                firstStaff = stack;
+            }
+        }
+        return firstStaff;
     }
 
     public static boolean enableInvulnerabilityForAdvancedStealth(Player player) {

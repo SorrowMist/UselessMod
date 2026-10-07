@@ -460,7 +460,7 @@ public final class StaffLinkTargets {
                 if (moved >= limit) {
                     break;
                 }
-                // 两端一起判定（包含/排除 + 两条控制条件），顺带算出这一种能搬多少。
+                // 两端一起判定（白名单/黑名单 + 两条控制条件），顺带算出这一种能搬多少。
                 Gate gate = evaluateItemGate(sourceFilter, targetFilter, from, to, template, limit - moved);
                 if (!gate.allowed) {
                     continue;
@@ -532,7 +532,7 @@ public final class StaffLinkTargets {
      * 一条线路的「门控结果」：允不允许搬，以及能搬多少。
      *
      * <p>把旧的 {@code keepFor}/{@code maxFor} 合并成一次求值：遍历过滤格时既判定
-     * 包含/排除与两条控制条件，又把「测 A 自身」的条件折算成两个搬运量上限。</p>
+     * 白名单/黑名单与两条控制条件，又把「测 A 自身」的条件折算成两个搬运量上限。</p>
      *
      * <ul>
      *   <li>{@link #movableLimit}：最多能搬走多少（来自「输出端 ≥ self」，= 源存量 − N）。</li>
@@ -572,9 +572,9 @@ public final class StaffLinkTargets {
      *
      * <p>规则（兼容旧的「无标记 = 不限制」白名单语义，并加上黑名单与条件）：</p>
      * <ol>
-     *   <li>命中任一<b>排除</b>格（标记匹配且条件成立）⇒ 直接不允许。</li>
-     *   <li>否则若这一端存在<b>包含</b>格 ⇒ 必须至少命中一个（标记匹配且条件成立）。</li>
-     *   <li>否则（没有包含格）⇒ 不限制。</li>
+     *   <li>命中任一<b>黑名单</b>格（标记匹配且条件成立）⇒ 直接不允许。</li>
+     *   <li>否则若这一端存在<b>白名单</b>格 ⇒ 必须至少命中一个（标记匹配且条件成立）。</li>
+     *   <li>否则（没有白名单格）⇒ 不限制。</li>
      * </ol>
      */
     private static boolean evalItemFilter(List<LinkFilterSlot> filter, Gate gate,
@@ -900,7 +900,7 @@ public final class StaffLinkTargets {
 
     private static void collectItemMarkers(List<ItemStack> out, List<LinkFilterSlot> filter) {
         for (LinkFilterSlot slot : filter) {
-            // 排除格不是「候选搬运对象」：它只负责挡，不负责搬。
+            // 黑名单格不是「候选搬运对象」：它只负责挡，不负责搬。
             if (!slot.isItem() || slot.exclude()) {
                 continue;
             }
@@ -1215,7 +1215,7 @@ public final class StaffLinkTargets {
 
     private static void collectFluidMarkers(List<FluidStack> out, List<LinkFilterSlot> filter) {
         for (LinkFilterSlot slot : filter) {
-            // 排除格不是「候选搬运对象」：它只负责挡，不负责搬。
+            // 黑名单格不是「候选搬运对象」：它只负责挡，不负责搬。
             if (!slot.isFluid() || slot.exclude()) {
                 continue;
             }
@@ -1392,8 +1392,8 @@ public final class StaffLinkTargets {
      * 化学品过滤：具体标记是「装有该化学品的储罐物品」，比对的是罐里装的化学品种类；
      * 模式标记按 id 通配。
      *
-     * <p>包含/排除规则与物品侧一致：命中排除格 ⇒ 不允许；否则这一端有包含格就必须命中一个；
-     * 没有包含格 ⇒ 不限制。<b>化学品不支持控制条件</b>（{@code ChemicalHandlerView} 没有存量查询），
+     * <p>白名单/黑名单规则与物品侧一致：命中黑名单格 ⇒ 不允许；否则这一端有白名单格就必须命中一个；
+     * 没有白名单格 ⇒ 不限制。<b>化学品不支持控制条件</b>（{@code ChemicalHandlerView} 没有存量查询），
      * 所以这里只看标记。</p>
      */
     private static boolean matchesChemical(List<LinkFilterSlot> filter, ChemicalStackView chemical) {

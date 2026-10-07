@@ -23,8 +23,8 @@ import org.jetbrains.annotations.Nullable;
  * <h2>三种附加信息</h2>
  *
  * <ul>
- *   <li>{@link #exclude()}：<b>这一格是「排除」而不是「包含」</b>。标记命中的资源<b>不搬</b>，
- *       其余照搬（黑名单）。同一格上「包含」与「排除」互斥——它就是这一格的方向。</li>
+ *   <li>{@link #exclude()}：<b>这一格是「黑名单」而不是「白名单」</b>。标记命中的资源<b>不搬</b>，
+ *       其余照搬。同一格上「白名单」与「黑名单」互斥——它就是这一格的方向。</li>
  *   <li>{@link #outCond()}：<b>输出端条件</b>，在源容器上测量（旧「源端保留」的推广）。</li>
  *   <li>{@link #inCond()}：<b>输入端条件</b>，在目标容器上测量（旧「接收端上限」的推广）。</li>
  * </ul>
@@ -123,7 +123,7 @@ public record LinkFilterSlot(ItemStack item, FluidStack fluid,
         return pattern != null;
     }
 
-    /** 这一格是「排除」（黑名单）而不是「包含」（白名单）。 */
+    /** 这一格是「黑名单」而不是「白名单」。 */
     public boolean isExcluded() {
         return exclude;
     }
@@ -133,7 +133,7 @@ public record LinkFilterSlot(ItemStack item, FluidStack fluid,
         return !outCond.isOff() || !inCond.isOff();
     }
 
-    /** 换掉「包含 / 排除」，其余不变。 */
+    /** 换掉「白名单 / 黑名单」，其余不变。 */
     public LinkFilterSlot withExclude(boolean newExclude) {
         return new LinkFilterSlot(item, fluid, pattern, newExclude, outCond, inCond);
     }
@@ -144,7 +144,7 @@ public record LinkFilterSlot(ItemStack item, FluidStack fluid,
     }
 
     /**
-     * 换掉标记 A，<b>保留</b>包含/排除与两条条件。
+     * 换掉标记 A，<b>保留</b>白名单/黑名单与两条条件。
      *
      * <p>标记换成空时构造器会把附加信息一起清掉（空槽不变式）。</p>
      */

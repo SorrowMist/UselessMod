@@ -331,15 +331,21 @@ public class EventHandler {
         Player player = event.getEntity();
         if (player.level().isClientSide()) return;
 
-        updateBeefToolFlight(player);
+        // 飞行 / 无敌保护 / 高级潜行 / 杀戮光环都要看「身上有没有造化杖」。
+        // 合并成一趟扫描，避免每 tick 把背包走三遍（详见 UselessItemUtils#scanStaff）。
+        UselessItemUtils.StaffScan scan = UselessItemUtils.scanStaff(player);
 
-        updateBeefInvulnerability(player);
-        
+        updateBeefToolFlight(player, scan.anyStaff());
+
+        updateBeefInvulnerability(player, false, scan);
+
         MiningDispatcher.tickCacheUpdate(player);
 
-        // 杀戮光环：按玩家自身的 tickCount 错开相位，避免全服玩家在同一 tick 集中结算
-        if (player.tickCount % 20 == 0) {
-            EndlessBeafItem.tickKillAura(player);
+        // 杀戮光环：间隔可配（服务端配置），并按玩家自身的 tickCount 错开相位，
+        // 避免全服玩家在同一 tick 集中结算
+        int killAuraInterval = ConfigManager.getBeefKillAuraInterval();
+        if (killAuraInterval > 0 && player.tickCount % killAuraInterval == 0) {
+            EndlessBeafItem.tickKillAura(player, scan.killAuraStaff());
         }
     }
 
@@ -364,8 +370,15 @@ public class EventHandler {
      * 只要有任何一项不一致、或处在游戏模式切换后的重发窗口内，就重发一次能力包。
      */
     private static void updateBeefToolFlight(Player player) {
-        boolean hasItemInInventory = ConfigManager.shouldEnableFlightEffect()
-                && UselessItemUtils.hasTargetToolInInventory(player);
+        updateBeefToolFlight(player, UselessItemUtils.hasTargetToolInInventory(player));
+    }
+
+    /**
+     * @param hasTargetTool 玩家身上（主手 / 副手 / 快捷栏 / 主背包）是否有造化杖；
+     *                      由 {@code onPlayerTick} 的合并扫描或本类的自扫提供
+     */
+    private static void updateBeefToolFlight(Player player, boolean hasTargetTool) {
+        boolean hasItemInInventory = ConfigManager.shouldEnableFlightEffect() && hasTargetTool;
 
         // 创造/旁观模式自带飞行，这份能力归原版管，模组不接管也不撤销。
         // 重发窗口故意保留到离开该模式之后才开始倒数，那才是真正需要补发能力包的时机。
@@ -445,9 +458,29 @@ public class EventHandler {
 
         migrateLegacyBeefInvulnerability(player);
 
-        boolean hasItemInInventory = UselessItemUtils.hasInvulnerabilityEnabledTargetToolInInventory(player);
-        boolean hasAdvancedStealth = UselessItemUtils.hasAdvancedStealthEnabledTargetToolInInventory(player);
+        applyBeefInvulnerability(player, forceSync, UselessItemUtils.scanStaff(player));
+    }
+
+    /**
+     * 供 {@code onPlayerTick} 使用：复用同一次 {@link UselessItemUtils#scanStaff} 的结果，
+     * 避免每 tick 重复走背包。
+     */
+    static void updateBeefInvulnerability(Player player, boolean forceSync, UselessItemUtils.StaffScan scan) {
+        if (player.level().isClientSide()) {
+            return;
+        }
+
+        migrateLegacyBeefInvulnerability(player);
+
+        applyBeefInvulnerability(player, forceSync, scan);
+    }
+
+    private static void applyBeefInvulnerability(Player player, boolean forceSync,
+                                                 UselessItemUtils.StaffScan scan) {
+        boolean hasItemInInventory = scan.invulnerabilityEnabled();
+        boolean hasAdvancedStealth = scan.advancedStealthEnabled();
         if (hasAdvancedStealth && !hasItemInInventory) {
+            // 这里会改写物品组件（把无敌开关打开），所以改完必须重新确认一次
             UselessItemUtils.enableInvulnerabilityForAdvancedStealth(player);
             hasItemInInventory = UselessItemUtils.hasInvulnerabilityEnabledTargetToolInInventory(player);
         }
@@ -667,7 +700,7 @@ public class EventHandler {
         if (event.getEntity() instanceof ServerPlayer player) {
             syncAdvancedStealthPlayersTo(player);
             GrassWandDropHandler.onPlayerLoggedIn(player);
-            resetAutoClickState(player);
+            // 连点开关已改为客户端会话级状态（BeefAutoClicker），登录时由客户端自行重置。
             // 连锁等价组是玩家个人设置，客户端要靠它做右键连锁的本地预测，
             // 因此登录时就把整份布局下发一次（没有存档的玩家不下发，等价于无等价组）。
             BeefToolLayout layout = BeefToolLayoutManager.load(player);
@@ -731,31 +764,6 @@ public class EventHandler {
         if (event.getEntity() instanceof ServerPlayer player) {
             GrassWandDropHandler.onPlayerLoggedOut(player);
         }
-    }
-
-    /**
-     * 连点模式的状态存在物品组件上，会跨会话保留；若玩家带着「开启」状态重登，
-     * 一进游戏就会立刻开始自动右键（叠加打火石等功能后果更明显）。
-     * 这里在登录时统一重置一次，保证每次进入游戏都是关闭状态。
-     */
-    private static void resetAutoClickState(ServerPlayer player) {
-        boolean changed = clearAutoClickFlag(player.getInventory().items);
-        changed |= clearAutoClickFlag(player.getInventory().offhand);
-        changed |= clearAutoClickFlag(player.getInventory().armor);
-        if (changed) {
-            player.containerMenu.broadcastChanges();
-        }
-    }
-
-    private static boolean clearAutoClickFlag(Iterable<ItemStack> stacks) {
-        boolean changed = false;
-        for (ItemStack stack : stacks) {
-            if (stack.getItem() instanceof EndlessBeafItem && EndlessBeafItem.isAutoClickEnabled(stack)) {
-                EndlessBeafItem.setAutoClickEnabled(stack, false);
-                changed = true;
-            }
-        }
-        return changed;
     }
 
     @SubscribeEvent(priority = EventPriority.HIGHEST)

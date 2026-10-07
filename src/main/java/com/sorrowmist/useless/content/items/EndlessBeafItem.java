@@ -2,6 +2,7 @@ package com.sorrowmist.useless.content.items;
 
 import com.sorrowmist.useless.api.enums.tool.EnchantMode;
 import com.sorrowmist.useless.api.enums.tool.ToolTypeMode;
+import com.sorrowmist.useless.client.BeefAutoClicker;
 import com.sorrowmist.useless.client.BeefTooltipPager;
 import com.sorrowmist.useless.client.TooltipPageState;
 import com.sorrowmist.useless.content.blocks.GlowPlasticBlock;
@@ -184,7 +185,6 @@ public class EndlessBeafItem extends TieredItem {
                 .component(UComponents.BeefRipenComponent, false)
                 .component(UComponents.BeefForceGrowComponent, false)
                 .component(UComponents.BeefEntityTimeAccelerationComponent, false)
-                .component(UComponents.BeefAutoClickComponent, false)
                 .component(UComponents.AEStoragePriorityComponent, false)
                 .component(UComponents.AeNetworkConnectComponent, false)
                 .component(UComponents.BeefRitualSatchelComponent, false)
@@ -330,20 +330,6 @@ public class EndlessBeafItem extends TieredItem {
 
     public static void setEntityTimeAccelerationEnabled(ItemStack stack, boolean enabled) {
         stack.set(UComponents.BeefEntityTimeAccelerationComponent.get(), enabled);
-    }
-
-    /**
-     * 是否启用连点模式：手持造化杖时客户端会以最快速度重复触发右键。
-     *
-     * <p>真正的连点循环在客户端 {@code BeefAutoClicker} 中执行，这里只存状态，
-     * 以便随物品持久化、在 tooltip 与模式轮盘中显示。</p>
-     */
-    public static boolean isAutoClickEnabled(ItemStack stack) {
-        return stack.getOrDefault(UComponents.BeefAutoClickComponent.get(), false);
-    }
-
-    public static void setAutoClickEnabled(ItemStack stack, boolean enabled) {
-        stack.set(UComponents.BeefAutoClickComponent.get(), enabled);
     }
 
     /**
@@ -517,6 +503,34 @@ public class EndlessBeafItem extends TieredItem {
         }
     }
 
+    /**
+     * 「以造化杖进行攻击」时应造成的伤害，供杀戮光环 / 范围伤害使用。
+     *
+     * <p><b>为什么不能直接用 {@code player.getAttributeValue(ATTACK_DAMAGE)}</b>：那个属性只反映
+     * <b>主手</b>物品 —— 造化杖的 {@code base_attack_damage} 修正挂在
+     * {@code EquipmentSlotGroup.MAINHAND} 上（见 {@code UselessMod#onItemAttributeModifiers}），
+     * 杖一旦放进副手 / 背包，属性值就退化成空手 1.0，光环打出来等于「没用杖打」。</p>
+     *
+     * <p>做法：先扣掉「当前主手武器」贡献的那份，再补上「本杖」的那份 —— 两者用的是同一个修饰符 id
+     * （{@link Item#BASE_ATTACK_DAMAGE_ID}），所以杖就在主手时两份相抵、结果与原来完全一致；
+     * 不在主手时即等效于「把这把杖当作主手武器」。玩家自身的其它修正（药水、护甲等）原样保留。</p>
+     *
+     * <p>已知边角：少数模组武器用自定义 id 施加攻击力，此时扣不掉那一份（光环会多算它的伤害）。
+     * 原版武器与造化杖本身都走 {@code base_attack_damage}，不受影响。</p>
+     */
+    public static float staffAttackDamage(Player player) {
+        double damage = player.getAttributeValue(Attributes.ATTACK_DAMAGE);
+        AttributeInstance instance = player.getAttribute(Attributes.ATTACK_DAMAGE);
+        if (instance != null) {
+            AttributeModifier mainHandWeapon = instance.getModifier(Item.BASE_ATTACK_DAMAGE_ID);
+            if (mainHandWeapon != null) {
+                damage -= mainHandWeapon.amount();
+            }
+        }
+        damage += createAttackDamageModifier().amount();
+        return (float) Math.max(0.0D, damage);
+    }
+
     @Override
     public @NotNull ItemStack getCraftingRemainingItem(ItemStack stack) {
         // 返回物品本身，使其在合成后保留在工作台中
@@ -684,7 +698,7 @@ public class EndlessBeafItem extends TieredItem {
             double rangeZ = ConfigManager.getBeefAoeDamageRangeZ();
             AABB area = AABB.ofSize(center, rangeX * 2 + 1, rangeY * 2 + 1, rangeZ * 2 + 1);
 
-            float damage = (float) player.getAttributeValue(Attributes.ATTACK_DAMAGE);
+            float damage = staffAttackDamage(player);
             DamageSource damageSource = ModDamageTypes.beefTool(level, player);
             int maxTargets = ConfigManager.getBeefAoeDamageMaxTargets();
             int hit = 0;
@@ -736,28 +750,66 @@ public class EndlessBeafItem extends TieredItem {
     }
 
     /**
-     * 杀戮光环：由 {@code EventHandler#onPlayerTick} 每 20 tick 调用一次，
+     * 杀戮光环：由 {@code EventHandler#onPlayerTick} 按「杀戮光环间隔」配置周期性调用，
      * 以玩家自身为中心结算一次范围伤害。
      *
-     * <p>必须手持（主手或副手）造化杖且光环开关为开才生效。范围沿用「范围伤害」的配置，
-     * 因此打开「强制击杀」时走强杀、「范围磁力」开启时自动吸附掉落。</p>
+     * <p>生效条件：<b>主手 / 副手 / 快捷栏 / 主背包</b> 任意一处带着一把「光环已开」的造化杖即可，
+     * 不必手持。那把杖由 {@code onPlayerTick} 的合并扫描（{@link UselessItemUtils#scanStaff}）
+     * 顺手取出并传入，因此这里不再自己走一遍背包。</p>
+     *
+     * <p><b>结算期间会把这把杖顶到主手，结算完立刻还原</b>（见 {@link #withStaffInMainHand}）——
+     * 因为「这一下是用杖打的」这件事，下游有一大票系统都只按<b>主手武器</b>解析：
+     * 原版抢夺附魔（{@code EnchantmentHelper.getSlotItems} 只查 MAINHAND 槽）、
+     * 本模组的斩首 / 捕捉 / 击杀磁力 / 掉落下游（{@code EventHandler} 里那几个
+     * {@code player.getMainHandItem()}）、以及 Malum 的精魂 mixin。不顶上去，它们全都看不到这把杖。</p>
+     *
+     * <p>范围沿用「范围伤害」的配置，因此打开「强制击杀」时走强杀、「范围磁力」开启时自动吸附掉落。</p>
+     *
+     * @param killAuraStaff 身上第一把开着光环的造化杖，没有则为 {@code null}
      */
-    public static void tickKillAura(Player player) {
+    public static void tickKillAura(Player player, @Nullable ItemStack killAuraStaff) {
+        if (killAuraStaff == null || killAuraStaff.isEmpty()) {
+            return;
+        }
         if (player.isSpectator() || player.isDeadOrDying()) {
             return;
         }
         if (!(player.level() instanceof ServerLevel level)) {
             return;
         }
-        var toolEntry = UselessItemUtils.findTargetToolInHands(player);
-        if (toolEntry.isEmpty()) {
-            return;
+        withStaffInMainHand(player, killAuraStaff,
+                () -> damageArea(killAuraStaff, player, level, player.position(), null, false));
+    }
+
+    /**
+     * 在「把这把杖当作主手武器」的前提下跑一段结算，跑完立即还原主手。
+     *
+     * <p>为什么需要：伤害本身走 {@link #staffAttackDamage} 已不依赖主手，但「附魔 / 精魂 / 捕捉 /
+     * 斩首 / 击杀磁力」这些下游一律读 {@code player.getMainHandItem()}。把杖临时顶到主手，
+     * 等于让它们看到的就是「玩家正握着这把杖挥砍」。</p>
+     *
+     * <p><b>为什么没有副作用</b>：装备同步与属性重算是每 tick 在
+     * {@code LivingEntity#detectEquipmentUpdates} 里按「与上一 tick 的差值」做的，本方法在
+     * {@code PlayerTickEvent.Post} 里同一 tick 内换上去又换回来 ⇒ 差值恒为零 ⇒
+     * 不发装备包、客户端看不到换手。{@code onEquipItem} 的装备音只在物品是 {@code Equipable}
+     * 且槽位匹配时播放（杖不是），振动事件 {@code doesEmitEquipEvent} 对玩家只在护甲槽为真，
+     * 所以两者都不会触发。</p>
+     *
+     * <p>杖已经在主手时直接执行，不做任何改动。</p>
+     */
+    private static void withStaffInMainHand(Player player, ItemStack staff, Runnable action) {
+        ItemStack previous = player.getMainHandItem();
+        boolean swapped = previous != staff;
+        if (swapped) {
+            player.setItemInHand(InteractionHand.MAIN_HAND, staff);
         }
-        ItemStack stack = toolEntry.get().getKey();
-        if (!(stack.getItem() instanceof EndlessBeafItem) || !isKillAuraEnabled(stack)) {
-            return;
+        try {
+            action.run();
+        } finally {
+            if (swapped) {
+                player.setItemInHand(InteractionHand.MAIN_HAND, previous);
+            }
         }
-        damageArea(stack, player, level, player.position(), null, false);
     }
 
     private static Entity getForceKillTarget(Entity entity) {
@@ -1843,8 +1895,8 @@ public class EndlessBeafItem extends TieredItem {
                                        .withStyle(beefForceGrow ? ChatFormatting.GOLD
                                                                 : ChatFormatting.DARK_GRAY));
 
-        // 连点：手持造化杖时以最快速度重复触发右键
-        boolean beefAutoClick = isAutoClickEnabled(stack);
+        // 连点：客户端会话级开关（不绑物品），开启后按配置速率重复触发右键
+        boolean beefAutoClick = BeefAutoClicker.isEnabled();
         tooltipComponents.add(Component.translatable("tooltip.useless_mod.beef_auto_click_mode")
                                        .append(": ")
                                        .append(Component.translatable(

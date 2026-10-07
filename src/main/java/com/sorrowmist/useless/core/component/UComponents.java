@@ -470,9 +470,11 @@ public final class UComponents {
             );
 
     /**
-     * 连点模式组件（BeefAutoClick）
-     * true = 客户端手持造化杖时以最快速度重复触发右键，再次按下绑定按键关闭。
-     * 只存状态，真正的连点循环在客户端 {@code BeefAutoClicker} 中执行。
+     * 连点模式组件（BeefAutoClick）—— <b>历史遗留，已不再读写</b>。
+     *
+     * <p>连点开关现为客户端会话级状态（{@code BeefAutoClicker}），不绑定物品。
+     * 这里保留注册仅为了让旧存档里已带该组件的物品能正常反序列化（注销会刷未知组件警告），
+     * 任何新代码都不应再读它。</p>
      */
     public static final DeferredHolder<DataComponentType<?>, DataComponentType<Boolean>> BeefAutoClickComponent =
             register("beef_auto_click", builder ->

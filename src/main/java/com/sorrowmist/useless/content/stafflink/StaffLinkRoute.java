@@ -138,7 +138,7 @@ public record StaffLinkRoute(
     private static final String TAG_KEEP_AT_SOURCE = "KeepAtSource";
     /** 接收端上限；缺省 / 0 = 不限。 */
     private static final String TAG_MAX_INTO = "MaxInto";
-    /** 这一格是「排除」；缺省 / false = 包含。 */
+    /** 这一格是「黑名单」；缺省 / false = 白名单。 */
     private static final String TAG_EXCLUDE = "Exclude";
     /** 输出端控制条件（compound，仅非 OFF 时写）。 */
     private static final String TAG_OUT_COND = "OutCond";
@@ -233,7 +233,7 @@ public record StaffLinkRoute(
         if (!filterApplies()) {
             return false;
         }
-        // 「白名单」只数**非排除**条目：排除格不构成「允许清单」。
+        // 「白名单」只数**非黑名单**条目：黑名单格不构成「允许清单」。
         return switch (medium.family()) {
             case ITEM -> hasMarker(slot -> !slot.exclude() && (slot.isItem() || slot.isPattern()));
             case FLUID -> hasMarker(slot -> !slot.exclude() && (slot.isFluid() || slot.isPattern()));
@@ -243,9 +243,9 @@ public record StaffLinkRoute(
     }
 
     /**
-     * 这条线路的过滤器里有没有<b>任何「可用于当前资源类型」的条目</b>——包含或排除都算。
+     * 这条线路的过滤器里有没有<b>任何「可用于当前资源类型」的条目</b>——白名单或黑名单都算。
      *
-     * <p>与 {@link #hasApplicableWhitelist()} 的差别就在「纯排除」这种情况：只填了一个排除格时
+     * <p>与 {@link #hasApplicableWhitelist()} 的差别就在「纯黑名单」这种情况：只填了一个黑名单格时
      * 白名单判定为 false，但这里为 true（玩家确实配置了「除了 X 都搬」）。</p>
      */
     public boolean hasApplicableFilter() {
@@ -282,7 +282,7 @@ public record StaffLinkRoute(
      * 免得能量 / 魔源线路一边能搬一边报错。</p>
      */
     public boolean blocksAeSourceWithoutWhitelist() {
-        // 判据用 hasApplicableFilter（包含或排除都算）：黑名单（纯排除）在 AE 源上是
+        // 判据用 hasApplicableFilter（白名单或黑名单都算）：黑名单（纯黑名单）在 AE 源上是
         // 「除了列出的都搬」，语义明确，不该被当成「没填过滤」而整条锁死。
         // 只有「完全没填任何本族条目」才按老规矩挡下（防误灌整网）。
         return filterApplies() && !hasApplicableFilter();
@@ -417,7 +417,7 @@ public record StaffLinkRoute(
     }
 
     /**
-     * 只读标记（物品 / 流体 / 模式），不含排除与条件。
+     * 只读标记（物品 / 流体 / 模式），不含白名单/黑名单方向与条件。
      *
      * <p>读不出标记（空键 / 非法模式 / 空栈）时返回 {@link LinkFilterSlot#EMPTY}。</p>
      */

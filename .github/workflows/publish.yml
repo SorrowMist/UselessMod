@@ -195,6 +195,10 @@ jobs:
           loaders: neoforge
           environment: client | server
           game-versions: ${{ needs.build.outputs.mc_version }}
+          # 平台侧偶发 5xx 服务端错误（如 Modrinth 的 database_error）与配置无关，
+          # 提高重试次数与间隔以降低这类瞬时故障导致的发布失败。
+          retry-attempts: 5
+          retry-delay: 20000
 
   publish-modrinth:
     name: Publish to Modrinth
@@ -230,3 +234,7 @@ jobs:
           loaders: neoforge
           environment: client | server
           game-versions: ${{ needs.build.outputs.mc_version }}
+          # 平台侧偶发 5xx 服务端错误（如 Modrinth 的 database_error）与配置无关，
+          # 提高重试次数与间隔以降低这类瞬时故障导致的发布失败。
+          retry-attempts: 5
+          retry-delay: 20000

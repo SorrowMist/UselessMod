@@ -5,6 +5,12 @@
 
 ## [Unreleased]
 
+## [2.4.5.10]
+
+### Changed / 变更
+- 生物捕捉写入刷怪蛋的 NBT 改为按附魔模式区分：精准模式保留完整身份 NBT（自定义名、装备、战利品表等），时运模式只写生物类型，同类生物的蛋 NBT 完全一致、必定可堆叠
+  - Spawn egg NBT from creature capture is now mode-dependent: precise mode keeps the full identity NBT (custom name, equipment, loot table, etc.), while fortune mode writes only the entity type, so eggs of the same creature always share identical NBT and stack reliably.
+
 ## [2.4.5.9]
 
 ### Added / 新增

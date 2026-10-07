@@ -1,0 +1,229 @@
+name: Publish
+
+# 发布触发方式：推送版本标签即自动构建、创建 GitHub Release 并同步到 CurseForge 与 Modrinth；
+# 在 GitHub 上手动发布 Release 或在 Actions 页面指定标签执行同样有效。
+# 构建与发布分离，两个平台互不影响。
+on:
+  # 推送版本标签即自动构建，并由发布步骤一并创建 GitHub Release 后同步到两个平台。
+  push:
+    tags:
+      - '1.21.1-*'
+  # 在 GitHub 上把已存在的标签发布为 Release 时同样触发，兼容手动建 Release 的流程。
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: '要发布的标签（须已存在，例如 1.21.1-2.4.5.9）'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build artifact
+    runs-on: ubuntu-latest
+
+    outputs:
+      artifact_path: ${{ steps.meta.outputs.artifact_path }}
+      mc_version: ${{ steps.meta.outputs.mc_version }}
+      mod_version: ${{ steps.meta.outputs.mod_version }}
+      changelog: ${{ steps.meta.outputs.changelog }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.release.tag_name || inputs.tag || github.ref_name }}
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Read project metadata
+        id: meta
+        env:
+          RELEASE_BODY: ${{ github.event.release.body }}
+        run: |
+          read_prop() {
+            grep -E "^$1=" gradle.properties | head -n1 | cut -d= -f2- | tr -d '[:space:]'
+          }
+          mc_version="$(read_prop minecraft_version)"
+          mod_version="$(read_prop mod_version)"
+          if [[ -z "${mc_version}" || -z "${mod_version}" ]]; then
+            echo "::error::无法从 gradle.properties 解析 minecraft_version 或 mod_version" >&2
+            exit 1
+          fi
+          artifact_path="build/libs/useless_mod-${mod_version}.jar"
+
+          # 发布说明以 CHANGELOG.md 中该版本的章节为准；章节缺失时回退到 Release 正文，
+          # 再回退到自上一个标签以来的提交标题，避免平台侧出现空 changelog。
+          # CHANGELOG.md 的版本标题不含 1.21.1- 前缀，需先去前缀再匹配。
+          cl_version="${mod_version#1.21.1-}"
+          changelog=""
+          if [[ -f CHANGELOG.md ]]; then
+            changelog="$(awk -v ver="${cl_version}" '
+              index($0, "## [" ver "]") == 1 { found = 1; next }
+              found && index($0, "## [") == 1 { exit }
+              found { lines[++n] = $0 }
+              END {
+                start = 1; while (start <= n && lines[start] ~ /^[[:space:]]*$/) start++
+                end = n; while (end >= start && lines[end] ~ /^[[:space:]]*$/) end--
+                for (i = start; i <= end; i++) print lines[i]
+              }
+            ' CHANGELOG.md)"
+          fi
+          if [[ -z "${changelog//[[:space:]]/}" ]]; then
+            changelog="${RELEASE_BODY}"
+          fi
+          if [[ -z "${changelog//[[:space:]]/}" ]]; then
+            prev_tag="$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || true)"
+            if [[ -n "${prev_tag}" ]]; then
+              changelog="$(git log --pretty=format:'- %s' "${prev_tag}..HEAD" 2>/dev/null || true)"
+            else
+              changelog="$(git log --pretty=format:'- %s' -n 20 2>/dev/null || true)"
+            fi
+          fi
+          if [[ -z "${changelog//[[:space:]]/}" ]]; then
+            changelog="Release ${mod_version}"
+          fi
+
+          echo "mc_version=${mc_version}" >> "$GITHUB_OUTPUT"
+          echo "mod_version=${mod_version}" >> "$GITHUB_OUTPUT"
+          echo "artifact_path=${artifact_path}" >> "$GITHUB_OUTPUT"
+          {
+            echo "changelog<<CHANGELOG_EOF"
+            printf '%s\n' "${changelog}"
+            echo "CHANGELOG_EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Setup JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Make Gradle wrapper executable
+        run: chmod +x ./gradlew
+
+      - name: Build with Gradle
+        run: ./gradlew build
+
+      - name: Validate built artifact
+        run: test -f "${{ steps.meta.outputs.artifact_path }}"
+
+      - name: Archive build artifact
+        run: tar -czf release-artifact.tar.gz "${{ steps.meta.outputs.artifact_path }}"
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-build
+          path: release-artifact.tar.gz
+          if-no-files-found: error
+          retention-days: 3
+
+  create-release:
+    name: Create GitHub Release
+    needs: build
+    # 仅在标签推送触发时创建 Release；由 Release 事件触发时该项已存在，跳过以免重复创建。
+    # 经 GITHUB_TOKEN 创建的 Release 不会再触发新的工作流运行，因此不会形成递归。
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: release-build
+
+      - name: Unpack build artifact
+        run: tar -xzf release-artifact.tar.gz
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG_NAME: ${{ github.ref_name }}
+          RELEASE_TITLE: Useless Mod ${{ needs.build.outputs.mod_version }}
+          RELEASE_NOTES: ${{ needs.build.outputs.changelog }}
+        run: |
+          gh release create "${TAG_NAME}" \
+            --title "${RELEASE_TITLE}" \
+            --notes "${RELEASE_NOTES}" \
+            "${{ needs.build.outputs.artifact_path }}"
+
+  publish-curseforge:
+    name: Publish to CurseForge
+    needs: build
+    # 在仓库 Settings → Environments 创建 publish 环境后可配置必需审批人；
+    # 未创建时 GitHub 自动创建且无保护规则，不影响发布。
+    environment: publish
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: release-build
+
+      - name: Unpack build artifact
+        run: tar -xzf release-artifact.tar.gz
+
+      - name: Validate artifact exists
+        run: test -f "${{ needs.build.outputs.artifact_path }}"
+
+      - name: Upload to CurseForge
+        uses: Kira-NT/mc-publish@v3.3.1
+        with:
+          name: Useless Mod ${{ needs.build.outputs.mod_version }}
+          version: ${{ needs.build.outputs.mod_version }}
+          version-type: ${{ github.event.release.prerelease && 'beta' || 'release' }}
+          changelog: ${{ needs.build.outputs.changelog }}
+          files: ${{ needs.build.outputs.artifact_path }}
+          # 项目数字 ID，可在 CurseForge 项目页或 api.cfwidget.com 查询；
+          # 如需改用仓库变量覆盖，在 Settings → Secrets and variables → Actions 新建 CURSEFORGE_PROJECT_ID。
+          curseforge-id: ${{ vars.CURSEFORGE_PROJECT_ID || 1401600 }}
+          curseforge-token: ${{ secrets.CURSEFORGE_TOKEN }}
+          loaders: neoforge
+          environment: client | server
+          game-versions: ${{ needs.build.outputs.mc_version }}
+
+  publish-modrinth:
+    name: Publish to Modrinth
+    needs: build
+    # 未在仓库变量中配置 Modrinth 项目 ID 时跳过，避免项目尚未创建就触发失败。
+    if: ${{ vars.MODRINTH_PROJECT_ID != '' }}
+    environment: publish
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: release-build
+
+      - name: Unpack build artifact
+        run: tar -xzf release-artifact.tar.gz
+
+      - name: Validate artifact exists
+        run: test -f "${{ needs.build.outputs.artifact_path }}"
+
+      - name: Upload to Modrinth
+        uses: Kira-NT/mc-publish@v3.3.1
+        with:
+          name: Useless Mod ${{ needs.build.outputs.mod_version }}
+          version: ${{ needs.build.outputs.mod_version }}
+          version-type: ${{ github.event.release.prerelease && 'beta' || 'release' }}
+          changelog: ${{ needs.build.outputs.changelog }}
+          files: ${{ needs.build.outputs.artifact_path }}
+          modrinth-id: ${{ vars.MODRINTH_PROJECT_ID }}
+          modrinth-token: ${{ secrets.MODRINTH_TOKEN }}
+          modrinth-featured: false
+          loaders: neoforge
+          environment: client | server
+          game-versions: ${{ needs.build.outputs.mc_version }}

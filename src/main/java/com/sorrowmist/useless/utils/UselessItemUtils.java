@@ -1,5 +1,6 @@
 package com.sorrowmist.useless.utils;
 
+import com.sorrowmist.useless.api.enums.tool.EnchantMode;
 import com.sorrowmist.useless.api.enums.tool.ToolTypeMode;
 import com.sorrowmist.useless.compat.productivebees.ProductiveBeesCaptureCompat;
 import com.sorrowmist.useless.content.items.EndlessBeafItem;
@@ -284,7 +285,10 @@ public class UselessItemUtils {
                 return;
             }
             spawnEggStack = new ItemStack(spawnEgg);
-            applyCapturedEntityData(spawnEggStack, killedEntity, carrier);
+            // 精准模式才写入完整 NBT；时运模式只写入生物类型（猪外壳依然靠它还原实体）
+            boolean precise = stack.getOrDefault(
+                    UComponents.EnchantModeComponent.get(), EnchantMode.FORTUNE) == EnchantMode.SILK_TOUCH;
+            applyCapturedEntityData(spawnEggStack, killedEntity, carrier, precise);
         }
 
         if (spawnEggStack.isEmpty()) {
@@ -298,33 +302,55 @@ public class UselessItemUtils {
     }
 
     /**
-     * 把生物的完整 NBT 写进刷怪蛋。
-     * 清掉「死亡瞬间状态」与「每只生物各不相同的运行时状态」，
-     * 这样同种生物（哪怕是不同的原版牛）产出的蛋 NBT 完全一致，可以正常堆叠。
+     * 把生物的 NBT 写进刷怪蛋。分两种模式（由造化杖当前的附魔模式决定）：
+     *
+     * <ul>
+     *   <li><b>精准模式（{@code SILK_TOUCH}）</b>：写入生物完整身份 NBT —— 保留自定义名、
+     *       装备、Apotheosis 战利品表等，捕捉到的生物与野生个体完全一致。
+     *       先清掉「死亡瞬间状态」与「每只生物各不相同的运行时状态」，这样同种生物产出的蛋仍可堆叠。</li>
+     *   <li><b>时运模式（{@code FORTUNE}）</b>：只写「生物类型」，不带任何身份 NBT ——
+     *       有原版刷怪蛋的生物直接产出纯净原版蛋；没有原版蛋的模组生物仍用猪刷怪蛋当外壳，
+     *       只补一个 {@code id} 让 {@code SpawnEggItem#getType} 还原成真正的实体。
+     *       此模式下同类生物的蛋 NBT 完全相同，必定可堆叠。</li>
+     * </ul>
      */
-    private static void applyCapturedEntityData(ItemStack eggStack, LivingEntity entity, boolean carrier) {
-        CompoundTag tag = entity.saveWithoutId(new CompoundTag());
-        for (String key : VOLATILE_ENTITY_KEYS) {
-            tag.remove(key);
+    private static void applyCapturedEntityData(ItemStack eggStack, LivingEntity entity, boolean carrier, boolean precise) {
+        CompoundTag tag = new CompoundTag();
+        if (precise) {
+            // 精准模式：完整身份 NBT
+            tag = entity.saveWithoutId(new CompoundTag());
+            for (String key : VOLATILE_ENTITY_KEYS) {
+                tag.remove(key);
+            }
+            canonicalizeAttributes(tag, entity.getType());
+            stripConfiguredKeys(tag);
+            stripAttachments(tag);
         }
-        canonicalizeAttributes(tag, entity.getType());
-        stripConfiguredKeys(tag);
-        stripAttachments(tag);
-        ResourceLocation id = BuiltInRegistries.ENTITY_TYPE.getKey(entity.getType());
-        if (id != null) {
-            // 决定 SpawnEggItem 生成哪种实体（猪外壳也靠它）
-            tag.putString("id", id.toString());
+        // 决定 SpawnEggItem 生成哪种实体：猪外壳必须靠它还原，精准模式也用它对齐
+        if (precise || carrier) {
+            ResourceLocation id = BuiltInRegistries.ENTITY_TYPE.getKey(entity.getType());
+            if (id != null) {
+                tag.putString("id", id.toString());
+            }
         }
-        // 用户确认：捉回来的生物不自然消失
-        tag.putBoolean("PersistenceRequired", true);
-        eggStack.set(DataComponents.ENTITY_DATA, CustomData.of(tag));
+        if (!tag.isEmpty()) {
+            eggStack.set(DataComponents.ENTITY_DATA, CustomData.of(tag));
+        }
 
         // 显示名：猪外壳绝不允许露出「猪刷怪蛋」。
-        // ① 有自定义名 → 用自定义名（普通蛋 / 猪外壳都适用）
-        // ② 否则若是猪外壳（无原版蛋的模组生物）→ 用该生物类型的本地化名
-        // ③ 否则（有原版蛋且无自定义名）→ 保留原版蛋名（如「僵尸刷怪蛋」）
-        Component name = entity.getCustomName();
-        if (name == null && carrier) {
+        Component name = null;
+        if (precise) {
+            // 精准模式：
+            // ① 有自定义名 → 用自定义名（普通蛋 / 猪外壳都适用）
+            // ② 否则若是猪外壳（无原版蛋的模组生物）→ 用该生物类型的本地化名
+            // ③ 否则（有原版蛋且无自定义名）→ 保留原版蛋名（如「僵尸刷怪蛋」）
+            name = entity.getCustomName();
+            if (name == null && carrier) {
+                name = Component.translatable(entity.getType().getDescriptionId());
+            }
+        } else if (carrier) {
+            // 时运模式：只有猪外壳需要显名（否则会露出「猪刷怪蛋」）；
+            // 有原版蛋的生物保持纯净原版蛋名，且同类蛋 NBT 完全一致、必定可堆叠。
             name = Component.translatable(entity.getType().getDescriptionId());
         }
         if (name != null) {

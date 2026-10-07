@@ -138,6 +138,20 @@ public record StaffLinkRoute(
     private static final String TAG_KEEP_AT_SOURCE = "KeepAtSource";
     /** 接收端上限；缺省 / 0 = 不限。 */
     private static final String TAG_MAX_INTO = "MaxInto";
+    /** 这一格是「排除」；缺省 / false = 包含。 */
+    private static final String TAG_EXCLUDE = "Exclude";
+    /** 输出端控制条件（compound，仅非 OFF 时写）。 */
+    private static final String TAG_OUT_COND = "OutCond";
+    /** 输入端控制条件（compound，仅非 OFF 时写）。 */
+    private static final String TAG_IN_COND = "InCond";
+    /** 条件内部：比较方向。 */
+    private static final String TAG_COND_OP = "Op";
+    /** 条件内部：控制材料物品。 */
+    private static final String TAG_COND_ITEM = "Item";
+    /** 条件内部：控制材料流体。 */
+    private static final String TAG_COND_FLUID = "Fluid";
+    /** 条件内部：阈值。 */
+    private static final String TAG_COND_VALUE = "Value";
 
     public StaffLinkRoute {
         Objects.requireNonNull(anchor, "anchor");
@@ -219,6 +233,25 @@ public record StaffLinkRoute(
         if (!filterApplies()) {
             return false;
         }
+        // 「白名单」只数**非排除**条目：排除格不构成「允许清单」。
+        return switch (medium.family()) {
+            case ITEM -> hasMarker(slot -> !slot.exclude() && (slot.isItem() || slot.isPattern()));
+            case FLUID -> hasMarker(slot -> !slot.exclude() && (slot.isFluid() || slot.isPattern()));
+            case CHEMICAL -> hasMarker(slot -> !slot.exclude() && (slot.isItem() || slot.isPattern()));
+            case ENERGY, SOURCE, STRESS, PRESSURE -> false;
+        };
+    }
+
+    /**
+     * 这条线路的过滤器里有没有<b>任何「可用于当前资源类型」的条目</b>——包含或排除都算。
+     *
+     * <p>与 {@link #hasApplicableWhitelist()} 的差别就在「纯排除」这种情况：只填了一个排除格时
+     * 白名单判定为 false，但这里为 true（玩家确实配置了「除了 X 都搬」）。</p>
+     */
+    public boolean hasApplicableFilter() {
+        if (!filterApplies()) {
+            return false;
+        }
         return switch (medium.family()) {
             case ITEM -> hasMarker(slot -> slot.isItem() || slot.isPattern());
             case FLUID -> hasMarker(slot -> slot.isFluid() || slot.isPattern());
@@ -249,7 +282,10 @@ public record StaffLinkRoute(
      * 免得能量 / 魔源线路一边能搬一边报错。</p>
      */
     public boolean blocksAeSourceWithoutWhitelist() {
-        return filterApplies() && !hasApplicableWhitelist();
+        // 判据用 hasApplicableFilter（包含或排除都算）：黑名单（纯排除）在 AE 源上是
+        // 「除了列出的都搬」，语义明确，不该被当成「没填过滤」而整条锁死。
+        // 只有「完全没填任何本族条目」才按老规矩挡下（防误灌整网）。
+        return filterApplies() && !hasApplicableFilter();
     }
 
     private boolean hasMarker(java.util.function.Predicate<LinkFilterSlot> predicate) {
@@ -288,11 +324,23 @@ public record StaffLinkRoute(
                 entry.putString(TAG_MARKER_PATTERN, slot.pattern());
             }
             // 只在非 0（= 有限制）时写，让「老格式读出来是 0」与「没限制」天然同构。
+            // 这是**向后投影**：只覆盖「输出端 ≥ self」/「输入端 ≤ self」这两种最普通的条件，
+            // 好让退回旧版本时那两种仍能读出来。
             if (slot.keepAtSource() > 0L) {
                 entry.putLong(TAG_KEEP_AT_SOURCE, slot.keepAtSource());
             }
             if (slot.maxInto() > 0L) {
                 entry.putLong(TAG_MAX_INTO, slot.maxInto());
+            }
+            if (slot.exclude()) {
+                entry.putBoolean(TAG_EXCLUDE, true);
+            }
+            // 完整条件：仅非 OFF 时写（OFF 是默认，老存档与新存档的空条件都不会有这两个键）。
+            if (!slot.outCond().isOff()) {
+                entry.put(TAG_OUT_COND, saveCondition(slot.outCond(), registries));
+            }
+            if (!slot.inCond().isOff()) {
+                entry.put(TAG_IN_COND, saveCondition(slot.inCond(), registries));
             }
             filterTag.add(entry);
         }
@@ -343,45 +391,90 @@ public record StaffLinkRoute(
      * 「有没有新格式的标记键」来区分：没有就按旧格式读，并且对流体线路顺手把桶里的流体取出来
      * ——否则升级之后玩家配好的流体过滤会整片失效（标记全成了物品，一个流体也匹配不上）。</p>
      *
-     * <p>第九轮新增的 {@code MarkerPattern} / {@code KeepAtSource} / {@code MaxInto} 也算
-     * 新格式的判据：老存档三个键都不会有，读出来就是「没有模式、两个限制都是 0」，
-     * 行为与改动前逐字节一致。</p>
+     * <p><b>条件的两级回退</b>：优先读 {@code OutCond}/{@code InCond}；没有时用旧键
+     * {@code KeepAtSource}/{@code MaxInto} 合成 {@code 输出端 ≥ self} / {@code 输入端 ≤ self}，
+     * 于是老存档读出来与改动前逐字节一致。</p>
      */
     private static LinkFilterSlot readFilterSlot(CompoundTag entry, LinkMedium medium,
                                                  HolderLookup.Provider registries) {
-        long keepAtSource = entry.getLong(TAG_KEEP_AT_SOURCE);
-        long maxInto = entry.getLong(TAG_MAX_INTO);
+        LinkFilterSlot base = readFilterMarker(entry, medium, registries);
+        if (base.isEmpty()) {
+            return LinkFilterSlot.EMPTY;
+        }
+        boolean exclude = entry.getBoolean(TAG_EXCLUDE);
+        LinkFilterCondition out = entry.contains(TAG_OUT_COND)
+                ? readCondition(entry.getCompound(TAG_OUT_COND), registries)
+                : legacyCondition(entry.getLong(TAG_KEEP_AT_SOURCE), LinkFilterCondition.Op.AT_LEAST);
+        LinkFilterCondition in = entry.contains(TAG_IN_COND)
+                ? readCondition(entry.getCompound(TAG_IN_COND), registries)
+                : legacyCondition(entry.getLong(TAG_MAX_INTO), LinkFilterCondition.Op.AT_MOST);
+        return base.withExclude(exclude).withConditions(out, in);
+    }
+
+    /** 老键（{@code KeepAtSource} / {@code MaxInto}）到条件的映射；{@code 0} 表示没有这条条件。 */
+    private static LinkFilterCondition legacyCondition(long value, LinkFilterCondition.Op op) {
+        return value > 0L ? LinkFilterCondition.self(op, value) : LinkFilterCondition.OFF;
+    }
+
+    /**
+     * 只读标记（物品 / 流体 / 模式），不含排除与条件。
+     *
+     * <p>读不出标记（空键 / 非法模式 / 空栈）时返回 {@link LinkFilterSlot#EMPTY}。</p>
+     */
+    private static LinkFilterSlot readFilterMarker(CompoundTag entry, LinkMedium medium,
+                                                   HolderLookup.Provider registries) {
         if (entry.contains(TAG_MARKER_ITEM) || entry.contains(TAG_MARKER_FLUID)
                 || entry.contains(TAG_MARKER_PATTERN)) {
             // 模式优先：三态互斥，构造器会收敛。
             if (entry.contains(TAG_MARKER_PATTERN)) {
                 LinkFilterPattern pattern = LinkFilterPattern.parse(entry.getString(TAG_MARKER_PATTERN));
-                if (pattern != null) {
-                    return LinkFilterSlot.ofPattern(pattern).withLimits(keepAtSource, maxInto);
-                }
                 // 存档里是个非法模式（改坏了 / 旧版本写进来的）：当作空槽，不猜。
-                return LinkFilterSlot.EMPTY;
+                return pattern == null ? LinkFilterSlot.EMPTY : LinkFilterSlot.ofPattern(pattern);
             }
             ItemStack item = ItemStack.parseOptional(registries, entry.getCompound(TAG_MARKER_ITEM));
             FluidStack fluid = entry.contains(TAG_MARKER_FLUID)
                     ? FluidStack.parseOptional(registries, entry.getCompound(TAG_MARKER_FLUID))
                     : FluidStack.EMPTY;
-            LinkFilterSlot base = fluid.isEmpty() ? LinkFilterSlot.ofItem(item) : LinkFilterSlot.ofFluid(fluid);
-            return base.isEmpty() ? LinkFilterSlot.EMPTY : base.withLimits(keepAtSource, maxInto);
+            return fluid.isEmpty() ? LinkFilterSlot.ofItem(item) : LinkFilterSlot.ofFluid(fluid);
         }
 
         ItemStack legacy = ItemStack.parseOptional(registries, entry);
         if (legacy.isEmpty()) {
             return LinkFilterSlot.EMPTY;
         }
-        LinkFilterSlot migrated;
         if (medium.family() == ResourceFamily.FLUID) {
             FluidStack fluid = StaffLinkFilters.fluidInItem(legacy);
-            migrated = fluid.isEmpty() ? LinkFilterSlot.EMPTY : LinkFilterSlot.ofFluid(fluid);
-        } else {
-            migrated = LinkFilterSlot.ofItem(legacy);
+            return fluid.isEmpty() ? LinkFilterSlot.EMPTY : LinkFilterSlot.ofFluid(fluid);
         }
-        return migrated.isEmpty() ? LinkFilterSlot.EMPTY : migrated.withLimits(keepAtSource, maxInto);
+        return LinkFilterSlot.ofItem(legacy);
+    }
+
+    /** 写一条控制条件；只对非 OFF 调用。 */
+    private static CompoundTag saveCondition(LinkFilterCondition cond, HolderLookup.Provider registries) {
+        CompoundTag tag = new CompoundTag();
+        tag.putString(TAG_COND_OP, cond.op().name());
+        if (!cond.item().isEmpty()) {
+            tag.put(TAG_COND_ITEM, cond.item().saveOptional(registries));
+        }
+        if (!cond.fluid().isEmpty()) {
+            tag.put(TAG_COND_FLUID, cond.fluid().save(registries));
+        }
+        tag.putLong(TAG_COND_VALUE, cond.value());
+        return tag;
+    }
+
+    /** 读一条控制条件；方向未知 / 缺失一律当 OFF（延续「未知 → 不抛」的约定）。 */
+    private static LinkFilterCondition readCondition(CompoundTag tag, HolderLookup.Provider registries) {
+        LinkFilterCondition.Op op = readEnum(LinkFilterCondition.Op.class,
+                tag.getString(TAG_COND_OP), LinkFilterCondition.Op.OFF);
+        if (op == LinkFilterCondition.Op.OFF) {
+            return LinkFilterCondition.OFF;
+        }
+        ItemStack item = tag.contains(TAG_COND_ITEM)
+                ? ItemStack.parseOptional(registries, tag.getCompound(TAG_COND_ITEM)) : ItemStack.EMPTY;
+        FluidStack fluid = tag.contains(TAG_COND_FLUID)
+                ? FluidStack.parseOptional(registries, tag.getCompound(TAG_COND_FLUID)) : FluidStack.EMPTY;
+        return new LinkFilterCondition(op, item, fluid, tag.getLong(TAG_COND_VALUE));
     }
 
     /** 读单次搬运量；老存档里存的是 TAG_Int，两种都要认，否则会读成 0。 */
@@ -414,11 +507,22 @@ public record StaffLinkRoute(
      * 编码，将来往 {@link LinkFilterSlot} 里插入一个形态就会把旧包解成别的意思。
      * 手写常量则新形态只可能是「未知值」，能显式处理。</p>
      *
-     * <p>两个数量限制用 {@code writeVarLong}：绝大多数格是 0，只占一个字节。</p>
+     * <p>旧投影的两个数量限制（{@code keep} / {@code max}）仍然写一遍，让读端能对齐；
+     * 随后才是真正的 {@code exclude} 与两条控制条件。条件里 {@code op}/{@code control}
+     * 同样手写字节，且<b>无论 OFF 与否都写满三个字段</b>——这样未知 op 也能安全跳过，
+     * 不会把后面的流读错位。</p>
      */
     private static final byte SLOT_STATE_ITEM = 0;
     private static final byte SLOT_STATE_FLUID = 1;
     private static final byte SLOT_STATE_PATTERN = 2;
+
+    private static final byte COND_OP_OFF = 0;
+    private static final byte COND_OP_AT_LEAST = 1;
+    private static final byte COND_OP_AT_MOST = 2;
+
+    private static final byte COND_CONTROL_SELF = 0;
+    private static final byte COND_CONTROL_ITEM = 1;
+    private static final byte COND_CONTROL_FLUID = 2;
 
     private static final StreamCodec<RegistryFriendlyByteBuf, LinkFilterSlot> FILTER_SLOT_CODEC =
             StreamCodec.of(
@@ -433,8 +537,12 @@ public record StaffLinkRoute(
                             buf.writeByte(SLOT_STATE_ITEM);
                             ItemStack.OPTIONAL_STREAM_CODEC.encode(buf, slot.item());
                         }
+                        // 旧投影：仅用于与旧版对齐读取，读端不采用。
                         buf.writeVarLong(slot.keepAtSource());
                         buf.writeVarLong(slot.maxInto());
+                        buf.writeBoolean(slot.exclude());
+                        writeCondition(buf, slot.outCond());
+                        writeCondition(buf, slot.inCond());
                     },
                     buf -> {
                         byte state = buf.readByte();
@@ -442,14 +550,60 @@ public record StaffLinkRoute(
                             case SLOT_STATE_PATTERN -> LinkFilterSlot.ofPattern(buf.readUtf(LinkFilterPattern.MAX_LENGTH));
                             case SLOT_STATE_FLUID -> LinkFilterSlot.ofFluid(FluidStack.STREAM_CODEC.decode(buf));
                             case SLOT_STATE_ITEM -> LinkFilterSlot.ofItem(ItemStack.OPTIONAL_STREAM_CODEC.decode(buf));
-                            // 未知状态（装了带新形态的版本又退回旧版本）：读掉两个数字后当空槽，
+                            // 未知状态（装了带新形态的版本又退回旧版本）：读掉后面的字段当空槽，
                             // 而不是抛异常——一个解不开的过滤器不该让整个界面同步失败。
                             default -> LinkFilterSlot.EMPTY;
                         };
-                        long keepAtSource = buf.readVarLong();
-                        long maxInto = buf.readVarLong();
-                        return slot.isEmpty() ? LinkFilterSlot.EMPTY : slot.withLimits(keepAtSource, maxInto);
+                        buf.readVarLong();
+                        buf.readVarLong();
+                        boolean exclude = buf.readBoolean();
+                        LinkFilterCondition out = readCondition(buf);
+                        LinkFilterCondition in = readCondition(buf);
+                        return slot.isEmpty()
+                                ? LinkFilterSlot.EMPTY
+                                : slot.withExclude(exclude).withConditions(out, in);
                     });
+
+    /** 写一条控制条件；OFF 也写满（op + control + value），保证读端能安全对齐。 */
+    private static void writeCondition(RegistryFriendlyByteBuf buf, LinkFilterCondition cond) {
+        switch (cond.op()) {
+            case OFF -> buf.writeByte(COND_OP_OFF);
+            case AT_LEAST -> buf.writeByte(COND_OP_AT_LEAST);
+            case AT_MOST -> buf.writeByte(COND_OP_AT_MOST);
+        }
+        if (cond.isFluidControl()) {
+            buf.writeByte(COND_CONTROL_FLUID);
+            FluidStack.STREAM_CODEC.encode(buf, cond.fluid());
+        } else if (cond.isItemControl()) {
+            buf.writeByte(COND_CONTROL_ITEM);
+            ItemStack.OPTIONAL_STREAM_CODEC.encode(buf, cond.item());
+        } else {
+            buf.writeByte(COND_CONTROL_SELF);
+        }
+        buf.writeVarLong(cond.value());
+    }
+
+    /** 读一条控制条件；未知 op / control 一律收敛成「不启用」，不抛。 */
+    private static LinkFilterCondition readCondition(RegistryFriendlyByteBuf buf) {
+        byte opByte = buf.readByte();
+        byte control = buf.readByte();
+        ItemStack item = ItemStack.EMPTY;
+        FluidStack fluid = FluidStack.EMPTY;
+        if (control == COND_CONTROL_ITEM) {
+            item = ItemStack.OPTIONAL_STREAM_CODEC.decode(buf);
+        } else if (control == COND_CONTROL_FLUID) {
+            fluid = FluidStack.STREAM_CODEC.decode(buf);
+        }
+        long value = buf.readVarLong();
+        LinkFilterCondition.Op op = switch (opByte) {
+            case COND_OP_AT_LEAST -> LinkFilterCondition.Op.AT_LEAST;
+            case COND_OP_AT_MOST -> LinkFilterCondition.Op.AT_MOST;
+            default -> LinkFilterCondition.Op.OFF;
+        };
+        return op == LinkFilterCondition.Op.OFF
+                ? LinkFilterCondition.OFF
+                : new LinkFilterCondition(op, item, fluid, value);
+    }
 
     private static final StreamCodec<RegistryFriendlyByteBuf, List<LinkFilterSlot>> FILTER_CODEC =
             FILTER_SLOT_CODEC.apply(ByteBufCodecs.list(FILTER_LIMIT));

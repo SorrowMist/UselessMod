@@ -2,6 +2,7 @@ package com.sorrowmist.useless.content.items;
 
 import com.sorrowmist.useless.api.entity.BeeTimerAccess;
 import com.sorrowmist.useless.api.entity.TurtleTimerAccess;
+import com.sorrowmist.useless.compat.ars.ArsCreatureTimeCompatLoader;
 import com.sorrowmist.useless.content.entities.BeefTimeAccelerationEntity;
 import com.sorrowmist.useless.core.component.UComponents;
 import net.minecraft.core.BlockPos;
@@ -135,7 +136,9 @@ public final class BeefTimeAcceleration {
      * {@code extra = 1 << min(tickSpeed, MAX_ENTITY_TICK_SPEED)}。</p>
      *
      * <p>覆盖：幼年成长与繁殖后冷却（{@code AgeableMob.age}）、鸡下蛋间隔、
-     * 羊剪毛后长毛、蜜蜂不疲倦/立刻进巢/采蜜、海龟下蛋倒计时。</p>
+     * 羊剪毛后长毛、蜜蜂不疲倦/立刻进巢/采蜜、海龟下蛋倒计时；
+     * 装了新生魔艺时还覆盖其工作生物——德格米 / 探宝蟹 / 旋风精灵（见
+     * {@link ArsCreatureTimeCompatLoader}，它们的进度多在各自的方块实体上）。</p>
      *
      * <p><b>刻意不推 {@code Animal.inLove}</b>：它是「发情窗口」（600 tick），
      * {@code BreedGoal} 靠它驱动配对，推快会让窗口瞬间归零、动物永远来不及找到配偶，
@@ -179,6 +182,10 @@ public final class BeefTimeAcceleration {
             TurtleTimerAccess accessor = (TurtleTimerAccess) turtle;
             accessor.uselessMod$setLayEggCounter(accessor.uselessMod$getLayEggCounter() + extra);
         }
+
+        // ⑥ 新生魔艺的工作生物：德格米 / 探宝蟹 / 旋风精灵（进度多在它们的方块实体上）。
+        //    同样只写数值、不跑 AI；未加载 Ars Nouveau 时反射桥为 null，本行是空操作。
+        ArsCreatureTimeCompatLoader.accelerate(target, extra);
     }
 
     public static boolean shouldBlockOtherRightClick(ItemStack stack, Player player) {

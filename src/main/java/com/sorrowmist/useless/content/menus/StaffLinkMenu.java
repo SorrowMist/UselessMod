@@ -1,6 +1,7 @@
 package com.sorrowmist.useless.content.menus;
 
 import com.sorrowmist.useless.content.stafflink.LinkFlow;
+import com.sorrowmist.useless.content.stafflink.LinkFilterCondition;
 import com.sorrowmist.useless.content.stafflink.LinkFilterSlot;
 import com.sorrowmist.useless.content.stafflink.LinkMedium;
 import com.sorrowmist.useless.content.stafflink.ResourceFamily;
@@ -454,11 +455,43 @@ public final class StaffLinkMenu extends AbstractContainerMenu {
     }
 
     /**
-     * 改一个过滤器槽的「源端保留 / 接收端上限」，标记本身不动。
+     * 改一个过滤器槽的「包含 / 排除」方向，标记与条件不动。
      *
-     * <p>给界面上下方那两个数字输入框用；{@code 0} = 不限制。</p>
+     * <p>排除 = 黑名单：这一格标记命中的资源<b>不搬</b>，其余照搬。</p>
      */
-    public void setFilterSlotLimits(int index, long keepAtSource, long maxInto) {
+    public void setFilterSlotExclude(int index, boolean exclude) {
+        editFilterSlot(index, slot -> slot.withExclude(exclude));
+    }
+
+    /**
+     * 改一个过滤器槽的一条控制条件。
+     *
+     * @param input {@code true} = 输入端条件（在目标容器上测量）；{@code false} = 输出端条件（在源容器上测量）
+     */
+    public void setFilterSlotCondition(int index, boolean input, LinkFilterCondition condition) {
+        editFilterSlot(index, slot -> input
+                ? slot.withConditions(slot.outCond(), condition)
+                : slot.withConditions(condition, slot.inCond()));
+    }
+
+    /**
+     * 改一条控制条件的「控制材料 B」。
+     *
+     * <p>传一格的标记：物品 / 流体直接当 B；空标记 = 清掉 B（回到「测 A 自身」）。方向与数值保留。
+     * 模式（{@code #tag}）不能当控制材料，忽略。</p>
+     */
+    public void setFilterSlotConditionControl(int index, boolean input, LinkFilterSlot marker) {
+        editFilterSlot(index, slot -> {
+            LinkFilterCondition current = input ? slot.inCond() : slot.outCond();
+            LinkFilterCondition updated = applyControl(current, marker);
+            return input
+                    ? slot.withConditions(slot.outCond(), updated)
+                    : slot.withConditions(updated, slot.inCond());
+        });
+    }
+
+    /** 通用：改一个过滤格；没有选中配置或该线路不用过滤器时忽略。 */
+    private void editFilterSlot(int index, java.util.function.UnaryOperator<LinkFilterSlot> change) {
         StaffLinkRoute config = getSelectedConfig();
         if (config == null || !config.filterApplies()) {
             return;
@@ -468,8 +501,23 @@ public final class StaffLinkMenu extends AbstractContainerMenu {
         }
         List<LinkFilterSlot> filter = new ArrayList<>(config.filter());
         LinkFilterSlot current = index < filter.size() ? filter.get(index) : LinkFilterSlot.EMPTY;
-        filter.set(index, current.withLimits(keepAtSource, maxInto));
+        filter.set(index, change.apply(current));
         applyRoute(config.withFilter(filter));
+    }
+
+    /** 把控制材料 B 换成一格标记里的物品 / 流体；标记为空 ⇒ 清掉 B。 */
+    private static LinkFilterCondition applyControl(LinkFilterCondition cond, LinkFilterSlot marker) {
+        if (marker == null || marker.isEmpty()) {
+            return cond.withoutControl();
+        }
+        if (marker.isFluid()) {
+            return cond.withControl(marker.fluid());
+        }
+        if (marker.isItem()) {
+            return cond.withControl(marker.item());
+        }
+        // 模式不支持当控制材料：保持原样。
+        return cond;
     }
 
     /** 该锚点的自定义名；没起过名时返回 {@code null}，界面回落到方块本名。 */

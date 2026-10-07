@@ -460,15 +460,13 @@ public final class StaffLinkTargets {
                 if (moved >= limit) {
                     break;
                 }
-                // 候选来自其中一端，另一端仍要自己判一次：两端过滤器都得通过。
-                if (!matchesItems(sourceFilter, template) || !matchesItems(targetFilter, template)) {
+                // 两端一起判定（包含/排除 + 两条控制条件），顺带算出这一种能搬多少。
+                Gate gate = evaluateItemGate(sourceFilter, targetFilter, from, to, template, limit - moved);
+                if (!gate.allowed) {
                     continue;
                 }
                 moved += moveOneItemStackByType(sourceLevel, sourcePos, from, to,
-                        limit - moved, template,
-                        keepFor(sourceFilter, targetFilter, template),
-                        maxFor(sourceFilter, targetFilter, template),
-                        skipTargetProbe);
+                        limit - moved, template, gate.movableLimit, gate.roomLimit, skipTargetProbe);
             }
             return moved;
         }
@@ -513,65 +511,164 @@ public final class StaffLinkTargets {
             if (template.isEmpty()) {
                 continue;
             }
-            if (!matchesItems(sourceFilter, template) || !matchesItems(targetFilter, template)) {
-                continue;
-            }
             // 数量顺手从刚拿到的模板上取（见 LongItemHandler#amountIn(int, ItemStack)）：
             // 通用实现里模板的 count 就是槽内真实数量，不必再把同一个槽位读第二遍。
+            // 它同时充当「源端自身存量」查询失败时的回退值，所以先取。
             long available = from.amountIn(slot, template);
+            Gate gate = evaluateItemGate(sourceFilter, targetFilter, from, to, template, available);
+            if (!gate.allowed) {
+                continue;
+            }
             moved += moveOneItemStack(sourceLevel, sourcePos, from, to, slot,
                     limit - moved, template, available,
-                    keepFor(sourceFilter, targetFilter, template),
-                    maxFor(sourceFilter, targetFilter, template),
-                    skipTargetProbe);
+                    gate.movableLimit, gate.roomLimit, skipTargetProbe);
         }
         return moved;
     }
 
+    private static final long NOT_COMPUTED = Long.MIN_VALUE;
+
     /**
-     * 该搬多少这一种——把两侧过滤器的「源端保留」取得最严的那个（取 max：保留越多越严）。
+     * 一条线路的「门控结果」：允不允许搬，以及能搬多少。
      *
-     * <p>只在真有格子写了保留量时才可能有非 0 值，因此不设保留时是一条零开销的短路。</p>
+     * <p>把旧的 {@code keepFor}/{@code maxFor} 合并成一次求值：遍历过滤格时既判定
+     * 包含/排除与两条控制条件，又把「测 A 自身」的条件折算成两个搬运量上限。</p>
+     *
+     * <ul>
+     *   <li>{@link #movableLimit}：最多能搬走多少（来自「输出端 ≥ self」，= 源存量 − N）。</li>
+     *   <li>{@link #roomLimit}：目标最多还能收多少（来自「输入端 ≤ self」，= N − 目标存量）。</li>
+     *   <li>两者默认 {@link Long#MAX_VALUE}，表示不限制——此时一次 {@code amountOf} 都不查。</li>
+     * </ul>
      */
-    private static long keepFor(List<LinkFilterSlot> sourceFilter, List<LinkFilterSlot> targetFilter,
-                                ItemStack template) {
-        return Math.max(keepOf(sourceFilter, template), keepOf(targetFilter, template));
-    }
-
-    /** 这一种在某一侧被要求保留多少。（`保留` 是「留在源端」，只有源侧语义，但我们容忍两端都写。） */
-    private static long keepOf(List<LinkFilterSlot> filter, ItemStack template) {
-        long keep = 0L;
-        for (LinkFilterSlot slot : filter) {
-            if (!slot.isEmpty() && slot.keepAtSource() > 0L && matchesSlot(slot, template)) {
-                keep = Math.max(keep, slot.keepAtSource());
-            }
-        }
-        return keep;
+    private static final class Gate {
+        boolean allowed = true;
+        long movableLimit = Long.MAX_VALUE;
+        long roomLimit = Long.MAX_VALUE;
+        /** 源端 A 自身存量；{@link #NOT_COMPUTED} 表示还没查。 */
+        long sourceSelf = NOT_COMPUTED;
+        /** 目标端 A 自身存量；{@link #NOT_COMPUTED} 表示还没查。 */
+        long targetSelf = NOT_COMPUTED;
+        /** 源端存量查询失败（返回 ≤0）时的回退值。 */
+        long sourceFallback;
     }
 
     /**
-     * 目标最多收到多少这一种——两侧取最严（取 min：上限越小越严）；两侧都没写返回 0（不限）。
+     * 物品门控：两端过滤器都判定一遍，结果合进一个 {@link Gate}。
+     *
+     * @param sourceFallback 源端自身存量查询失败时的回退值（扫描路径传槽内存量、按类型路径传请求量）
      */
-    private static long maxFor(List<LinkFilterSlot> sourceFilter, List<LinkFilterSlot> targetFilter,
-                               ItemStack template) {
-        long fromSource = maxOf(sourceFilter, template);
-        long fromTarget = maxOf(targetFilter, template);
-        if (fromSource <= 0L) {
-            return fromTarget;
-        }
-        return fromTarget <= 0L ? fromSource : Math.min(fromSource, fromTarget);
+    private static Gate evaluateItemGate(List<LinkFilterSlot> sourceFilter, List<LinkFilterSlot> targetFilter,
+                                         LongItemHandler from, LongItemHandler to, ItemStack template,
+                                         long sourceFallback) {
+        Gate gate = new Gate();
+        gate.sourceFallback = sourceFallback;
+        gate.allowed = evalItemFilter(sourceFilter, gate, from, to, template)
+                && evalItemFilter(targetFilter, gate, from, to, template);
+        return gate;
     }
 
-    private static long maxOf(List<LinkFilterSlot> filter, ItemStack template) {
-        long max = 0L;
+    /**
+     * 单侧判定：返回「这一端允不允许这种物品」。
+     *
+     * <p>规则（兼容旧的「无标记 = 不限制」白名单语义，并加上黑名单与条件）：</p>
+     * <ol>
+     *   <li>命中任一<b>排除</b>格（标记匹配且条件成立）⇒ 直接不允许。</li>
+     *   <li>否则若这一端存在<b>包含</b>格 ⇒ 必须至少命中一个（标记匹配且条件成立）。</li>
+     *   <li>否则（没有包含格）⇒ 不限制。</li>
+     * </ol>
+     */
+    private static boolean evalItemFilter(List<LinkFilterSlot> filter, Gate gate,
+                                          LongItemHandler from, LongItemHandler to, ItemStack template) {
+        boolean hasInclude = false;
+        boolean includeApplies = false;
         for (LinkFilterSlot slot : filter) {
-            if (!slot.isEmpty() && slot.maxInto() > 0L && matchesSlot(slot, template)) {
-                if (max <= 0L || slot.maxInto() < max) {
-                    max = slot.maxInto();
+            if (!slot.isItem() && !slot.isPattern()) {
+                continue;
+            }
+            if (!slot.exclude()) {
+                hasInclude = true;
+            }
+            if (!matchesSlot(slot, template)) {
+                continue;
+            }
+            if (!itemConditionsHold(slot, gate, from, to, template)) {
+                continue;
+            }
+            if (slot.exclude()) {
+                return false;
+            }
+            includeApplies = true;
+        }
+        return !hasInclude || includeApplies;
+    }
+
+    /** 这一格的两条控制条件是否都成立；成立时把「测 A 自身」的条件折算进 gate 的两个上限。 */
+    private static boolean itemConditionsHold(LinkFilterSlot slot, Gate gate,
+                                              LongItemHandler from, LongItemHandler to, ItemStack template) {
+        LinkFilterCondition out = slot.outCond();
+        if (!out.isOff()) {
+            if (out.isSelf()) {
+                long source = itemAmountAtSource(gate, from, template);
+                if (out.op() == LinkFilterCondition.Op.AT_LEAST) {
+                    if (source < out.value()) {
+                        return false;
+                    }
+                    // 保留 N 在输出端：最多搬走 源存量 − N（= 旧的「源端保留」）。
+                    gate.movableLimit = Math.min(gate.movableLimit, source - out.value());
+                } else if (source > out.value()) {
+                    return false;
                 }
+            } else if (!itemConditionHoldsOn(from, out)) {
+                return false;
             }
         }
-        return max;
+        LinkFilterCondition in = slot.inCond();
+        if (!in.isOff()) {
+            if (in.isSelf()) {
+                long target = itemAmountAtTarget(gate, to, template);
+                if (in.op() == LinkFilterCondition.Op.AT_MOST) {
+                    if (target > in.value()) {
+                        return false;
+                    }
+                    // 目标封顶 N：最多再收 N − 目标存量（= 旧的「接收端上限」）。
+                    gate.roomLimit = Math.min(gate.roomLimit, in.value() - target);
+                } else if (target < in.value()) {
+                    return false;
+                }
+            } else if (!itemConditionHoldsOn(to, in)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /** 源端 A 自身存量，惰性查询 + 缓存；查询失败时回退到调用方给的值。 */
+    private static long itemAmountAtSource(Gate gate, LongItemHandler from, ItemStack template) {
+        if (gate.sourceSelf == NOT_COMPUTED) {
+            long total = from.amountOf(template);
+            gate.sourceSelf = total > 0L ? total : gate.sourceFallback;
+        }
+        return gate.sourceSelf;
+    }
+
+    /** 目标端 A 自身存量，惰性查询 + 缓存。 */
+    private static long itemAmountAtTarget(Gate gate, LongItemHandler to, ItemStack template) {
+        if (gate.targetSelf == NOT_COMPUTED) {
+            gate.targetSelf = to.amountOf(template);
+        }
+        return gate.targetSelf;
+    }
+
+    /** 控制材料是「别的物品」时，在给定端点上量它的存量再比较。 */
+    private static boolean itemConditionHoldsOn(LongItemHandler handler, LinkFilterCondition cond) {
+        if (!cond.isItemControl()) {
+            // 控制材料不是物品（异族）：物品端点上量不了，忽略这条（服务端清洗会把它清掉）。
+            return true;
+        }
+        long amount = handler.amountOf(cond.item());
+        return cond.op() == LinkFilterCondition.Op.AT_LEAST
+                ? amount >= cond.value()
+                : amount <= cond.value();
     }
 
     /**
@@ -620,19 +717,18 @@ public final class StaffLinkTargets {
      * {@link #moveOneItemStackByType}）。</p>
      *
      * @param available 该槽位的存量；扫描路径已经连同模板一起取过，避免重复读同一个槽位
-     * @param keepAtSource 源端要保留的量（0 = 可以掏空）
-     * @param maxInto      接收端上限（0 = 不限）
+     * @param movableLimit 输出端条件折算出的搬运量上限（{@link Long#MAX_VALUE} = 不限）
+     * @param roomLimit    输入端条件折算出的目标可收量上限（{@link Long#MAX_VALUE} = 不限）
      */
     private static long moveOneItemStack(ServerLevel sourceLevel, BlockPos sourcePos,
                                          LongItemHandler from, LongItemHandler to, int slot,
                                          long want, ItemStack template, long available,
-                                         long keepAtSource, long maxInto,
+                                         long movableLimit, long roomLimit,
                                          boolean skipTargetProbe) {
         if (want <= 0L || available <= 0L) {
             return 0L;
         }
-        long request = requestAmount(sourceLevel, sourcePos, from, to, template, want,
-                available, keepAtSource, maxInto, slot);
+        long request = requestAmount(want, available, movableLimit, roomLimit);
         if (request <= 0L) {
             return 0L;
         }
@@ -721,47 +817,19 @@ public final class StaffLinkTargets {
     }
 
     /**
-     * 把「想要搬多少 / 这一槽有多少 / 源端要保留 / 目标有没有上限」收敛成一个请求量。
+     * 把「想要搬多少 / 这一槽有多少 / 两个条件折算出的上限」收敛成一个请求量。
      *
-     * <p>顺序很重要：<b>先算源端保留，再算目标上限</b>。</p>
-     *
-     * <ul>
-     *   <li>源端保留：{@code 源侧该类型总存量 - keepAtSource} 才是「可搬量」。
-     *       AE 源端点在这里要抓整网快照（{@link LongItemHandler#amountOf}），
-     *       所以 {@code keepAtSource == 0} 时<b>一次都不问</b>。</li>
-     *   <li>目标上限：{@code maxInto - 目标侧该类型现有量} 才是「还能收多少」。
-     *       同样只在 {@code maxInto > 0} 时才问。</li>
-     * </ul>
-     *
-     * @param slot 源端槽号；{@code < 0} 表示「按类型」（源侧存量用 {@code available} 近似）
+     * <p>两个上限由 {@link Gate} 在门控阶段算好：{@code movableLimit}（输出端保留折算）与
+     * {@code roomLimit}（输入端封顶折算）。两者默认 {@link Long#MAX_VALUE} = 不限制，
+     * 此时这里不做任何查询——<b>AE 端点上的 {@code amountOf} 会抓整网快照，绝不能被当成免费查询</b>。</p>
      */
-    private static long requestAmount(ServerLevel sourceLevel, BlockPos sourcePos,
-                                      LongItemHandler from, LongItemHandler to, ItemStack template,
-                                      long want, long available, long keepAtSource, long maxInto,
-                                      int slot) {
+    private static long requestAmount(long want, long available, long movableLimit, long roomLimit) {
         long request = Math.min(want, available);
-
-        if (keepAtSource > 0L) {
-            // 源侧同一类型的总存量（可能散布在多槽）。已知该槽的存量，就不必再读一次它；
-            // 但为了拿到总数还是得问一次 amountOf（它对通用实现是跨槽遍历、对 AE 是整网快照）。
-            long sourceTotal = from.amountOf(template);
-            if (sourceTotal <= 0L) {
-                sourceTotal = available;
-            }
-            long movable = sourceTotal - keepAtSource;
-            if (movable <= 0L) {
-                return 0L;
-            }
-            request = Math.min(request, movable);
+        if (movableLimit != Long.MAX_VALUE) {
+            request = Math.min(request, movableLimit);
         }
-
-        if (maxInto > 0L && request > 0L) {
-            long stored = to.amountOf(template);
-            long room = maxInto - stored;
-            if (room <= 0L) {
-                return 0L;
-            }
-            request = Math.min(request, room);
+        if (roomLimit != Long.MAX_VALUE) {
+            request = Math.min(request, roomLimit);
         }
         return Math.max(0L, request);
     }
@@ -781,15 +849,13 @@ public final class StaffLinkTargets {
     private static long moveOneItemStackByType(ServerLevel sourceLevel, BlockPos sourcePos,
                                                LongItemHandler from, LongItemHandler to,
                                                long want, ItemStack template,
-                                               long keepAtSource, long maxInto,
+                                               long movableLimit, long roomLimit,
                                                boolean skipTargetProbe) {
         if (want <= 0L) {
             return 0L;
         }
-        // 源端保留 / 目标上限都还没折算进来，先按「按类型」的形态收敛一次请求量。
-        // 这里 available 未知（= want），交给 requestAmount 用 amountOf 去问真正的存量。
-        long request = requestAmount(sourceLevel, sourcePos, from, to, template, want,
-                want, keepAtSource, maxInto, -1);
+        // 上限已在门控阶段算好；这里 available 未知（= want），只做一次取小。
+        long request = requestAmount(want, want, movableLimit, roomLimit);
         if (request <= 0L) {
             return 0L;
         }
@@ -834,7 +900,8 @@ public final class StaffLinkTargets {
 
     private static void collectItemMarkers(List<ItemStack> out, List<LinkFilterSlot> filter) {
         for (LinkFilterSlot slot : filter) {
-            if (!slot.isItem()) {
+            // 排除格不是「候选搬运对象」：它只负责挡，不负责搬。
+            if (!slot.isItem() || slot.exclude()) {
                 continue;
             }
             boolean duplicate = false;
@@ -880,13 +947,12 @@ public final class StaffLinkTargets {
         List<FluidStack> wanted = filteredFluidMarkers(sourceFilter, targetFilter);
         if (!wanted.isEmpty()) {
             for (FluidStack type : wanted) {
-                if (!matchesFluids(sourceFilter, type) || !matchesFluids(targetFilter, type)) {
+                Gate gate = evaluateFluidGate(sourceFilter, targetFilter, from, to, type, limit);
+                if (!gate.allowed) {
                     continue;
                 }
                 long moved = moveOneFluidByType(from, to, limit, type,
-                        keepForFluid(sourceFilter, targetFilter, type),
-                        maxForFluid(sourceFilter, targetFilter, type),
-                        skipTargetProbe);
+                        gate.movableLimit, gate.roomLimit, skipTargetProbe);
                 if (moved > 0L) {
                     // 一次只搬一种：搬动了就收工。
                     return moved;
@@ -913,13 +979,13 @@ public final class StaffLinkTargets {
             if (type.isEmpty()) {
                 continue;
             }
-            if (!matchesFluids(sourceFilter, type) || !matchesFluids(targetFilter, type)) {
+            Gate gate = evaluateFluidGate(sourceFilter, targetFilter, from, to, type,
+                    from.amountIn(tank));
+            if (!gate.allowed) {
                 continue;
             }
             long moved = moveOneFluid(from, to, tank, limit, type,
-                    keepForFluid(sourceFilter, targetFilter, type),
-                    maxForFluid(sourceFilter, targetFilter, type),
-                    skipTargetProbe);
+                    gate.movableLimit, gate.roomLimit, skipTargetProbe);
             if (moved > 0L) {
                 return moved;
             }
@@ -927,43 +993,105 @@ public final class StaffLinkTargets {
         return 0L;
     }
 
-    /** 流体版的「源端保留」，理由同 {@link #keepFor}。 */
-    private static long keepForFluid(List<LinkFilterSlot> sourceFilter, List<LinkFilterSlot> targetFilter,
-                                     FluidStack type) {
-        return Math.max(keepOfFluid(sourceFilter, type), keepOfFluid(targetFilter, type));
+    /** 流体门控：与 {@link #evaluateItemGate} 同构。 */
+    private static Gate evaluateFluidGate(List<LinkFilterSlot> sourceFilter, List<LinkFilterSlot> targetFilter,
+                                          LongFluidHandler from, LongFluidHandler to, FluidStack type,
+                                          long sourceFallback) {
+        Gate gate = new Gate();
+        gate.sourceFallback = sourceFallback;
+        gate.allowed = evalFluidFilter(sourceFilter, gate, from, to, type)
+                && evalFluidFilter(targetFilter, gate, from, to, type);
+        return gate;
     }
 
-    private static long keepOfFluid(List<LinkFilterSlot> filter, FluidStack type) {
-        long keep = 0L;
+    /** 单侧流体判定：规则与 {@link #evalItemFilter} 相同。 */
+    private static boolean evalFluidFilter(List<LinkFilterSlot> filter, Gate gate,
+                                           LongFluidHandler from, LongFluidHandler to, FluidStack type) {
+        boolean hasInclude = false;
+        boolean includeApplies = false;
         for (LinkFilterSlot slot : filter) {
-            if (!slot.isEmpty() && slot.keepAtSource() > 0L && matchesSlotFluid(slot, type)) {
-                keep = Math.max(keep, slot.keepAtSource());
+            if (!slot.isFluid() && !slot.isPattern()) {
+                continue;
             }
+            if (!slot.exclude()) {
+                hasInclude = true;
+            }
+            if (!matchesSlotFluid(slot, type)) {
+                continue;
+            }
+            if (!fluidConditionsHold(slot, gate, from, to, type)) {
+                continue;
+            }
+            if (slot.exclude()) {
+                return false;
+            }
+            includeApplies = true;
         }
-        return keep;
+        return !hasInclude || includeApplies;
     }
 
-    /** 流体版的「接收端上限」，理由同 {@link #maxFor}。 */
-    private static long maxForFluid(List<LinkFilterSlot> sourceFilter, List<LinkFilterSlot> targetFilter,
-                                    FluidStack type) {
-        long fromSource = maxOfFluid(sourceFilter, type);
-        long fromTarget = maxOfFluid(targetFilter, type);
-        if (fromSource <= 0L) {
-            return fromTarget;
-        }
-        return fromTarget <= 0L ? fromSource : Math.min(fromSource, fromTarget);
-    }
-
-    private static long maxOfFluid(List<LinkFilterSlot> filter, FluidStack type) {
-        long max = 0L;
-        for (LinkFilterSlot slot : filter) {
-            if (!slot.isEmpty() && slot.maxInto() > 0L && matchesSlotFluid(slot, type)) {
-                if (max <= 0L || slot.maxInto() < max) {
-                    max = slot.maxInto();
+    /** 流体版的两条控制条件判定；折算规则同 {@link #itemConditionsHold}。 */
+    private static boolean fluidConditionsHold(LinkFilterSlot slot, Gate gate,
+                                               LongFluidHandler from, LongFluidHandler to, FluidStack type) {
+        LinkFilterCondition out = slot.outCond();
+        if (!out.isOff()) {
+            if (out.isSelf()) {
+                long source = fluidAmountAtSource(gate, from, type);
+                if (out.op() == LinkFilterCondition.Op.AT_LEAST) {
+                    if (source < out.value()) {
+                        return false;
+                    }
+                    gate.movableLimit = Math.min(gate.movableLimit, source - out.value());
+                } else if (source > out.value()) {
+                    return false;
                 }
+            } else if (!fluidConditionHoldsOn(from, out)) {
+                return false;
             }
         }
-        return max;
+        LinkFilterCondition in = slot.inCond();
+        if (!in.isOff()) {
+            if (in.isSelf()) {
+                long target = fluidAmountAtTarget(gate, to, type);
+                if (in.op() == LinkFilterCondition.Op.AT_MOST) {
+                    if (target > in.value()) {
+                        return false;
+                    }
+                    gate.roomLimit = Math.min(gate.roomLimit, in.value() - target);
+                } else if (target < in.value()) {
+                    return false;
+                }
+            } else if (!fluidConditionHoldsOn(to, in)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static long fluidAmountAtSource(Gate gate, LongFluidHandler from, FluidStack type) {
+        if (gate.sourceSelf == NOT_COMPUTED) {
+            long total = from.amountOf(type);
+            gate.sourceSelf = total > 0L ? total : gate.sourceFallback;
+        }
+        return gate.sourceSelf;
+    }
+
+    private static long fluidAmountAtTarget(Gate gate, LongFluidHandler to, FluidStack type) {
+        if (gate.targetSelf == NOT_COMPUTED) {
+            gate.targetSelf = to.amountOf(type);
+        }
+        return gate.targetSelf;
+    }
+
+    private static boolean fluidConditionHoldsOn(LongFluidHandler handler, LinkFilterCondition cond) {
+        if (!cond.isFluidControl()) {
+            // 控制材料不是流体（异族）：流体端点上量不了，忽略这条。
+            return true;
+        }
+        long amount = handler.amountOf(cond.fluid());
+        return cond.op() == LinkFilterCondition.Op.AT_LEAST
+                ? amount >= cond.value()
+                : amount <= cond.value();
     }
 
     /**
@@ -990,13 +1118,12 @@ public final class StaffLinkTargets {
     /** 从指定储罐搬走最多 {@code limit} 的 {@code type}；返回实际搬走的量（0 = 没搬动）。 */
     private static long moveOneFluid(LongFluidHandler from, LongFluidHandler to, int tank,
                                      long limit, FluidStack type,
-                                     long keepAtSource, long maxInto, boolean skipTargetProbe) {
+                                     long movableLimit, long roomLimit, boolean skipTargetProbe) {
         long available = from.amountIn(tank);
         if (available <= 0L) {
             return 0L;
         }
-        long request = fluidRequest(from, to, type, Math.min(limit, available),
-                keepAtSource, maxInto);
+        long request = fluidRequest(Math.min(limit, available), movableLimit, roomLimit);
         if (request <= 0L) {
             return 0L;
         }
@@ -1025,27 +1152,18 @@ public final class StaffLinkTargets {
     }
 
     /**
-     * 把「想要搬多少 / 源端要保留 / 目标有没有上限」收敛成一个流体请求量。
+     * 把「想要搬多少 / 两个条件折算出的上限」收敛成一个流体请求量。
      *
-     * <p>语义与物品侧的 {@link #requestAmount} 完全对应（先扣源端保留、再扣目标已存），
-     * 唯一的差别是流体的存量单位是 mB 而量级通常小得多。</p>
+     * <p>与物品侧的 {@link #requestAmount} 完全对应；上限已在门控阶段算好，
+     * {@link Long#MAX_VALUE} 表示不限制。</p>
      */
-    private static long fluidRequest(LongFluidHandler from, LongFluidHandler to, FluidStack type,
-                                     long want, long keepAtSource, long maxInto) {
+    private static long fluidRequest(long want, long movableLimit, long roomLimit) {
         long request = Math.max(0L, want);
-        if (keepAtSource > 0L) {
-            long movable = from.amountOf(type) - keepAtSource;
-            if (movable <= 0L) {
-                return 0L;
-            }
-            request = Math.min(request, movable);
+        if (movableLimit != Long.MAX_VALUE) {
+            request = Math.min(request, movableLimit);
         }
-        if (maxInto > 0L && request > 0L) {
-            long room = maxInto - to.amountOf(type);
-            if (room <= 0L) {
-                return 0L;
-            }
-            request = Math.min(request, room);
+        if (roomLimit != Long.MAX_VALUE) {
+            request = Math.min(request, roomLimit);
         }
         return Math.max(0L, request);
     }
@@ -1058,8 +1176,8 @@ public final class StaffLinkTargets {
      */
     private static long moveOneFluidByType(LongFluidHandler from, LongFluidHandler to,
                                            long limit, FluidStack type,
-                                           long keepAtSource, long maxInto, boolean skipTargetProbe) {
-        long request = fluidRequest(from, to, type, limit, keepAtSource, maxInto);
+                                           long movableLimit, long roomLimit, boolean skipTargetProbe) {
+        long request = fluidRequest(limit, movableLimit, roomLimit);
         if (request <= 0L) {
             return 0L;
         }
@@ -1097,7 +1215,8 @@ public final class StaffLinkTargets {
 
     private static void collectFluidMarkers(List<FluidStack> out, List<LinkFilterSlot> filter) {
         for (LinkFilterSlot slot : filter) {
-            if (!slot.isFluid()) {
+            // 排除格不是「候选搬运对象」：它只负责挡，不负责搬。
+            if (!slot.isFluid() || slot.exclude()) {
                 continue;
             }
             boolean duplicate = false;
@@ -1270,64 +1389,35 @@ public final class StaffLinkTargets {
     }
 
     /**
-     * 物品过滤：这一端允不允许这种物品。
-     *
-     * <p><b>没有任何物品类标记（具体物品或模式）时视为「不限制」</b>——换过资源类型之后
-     * 残留的流体标记因此不会把搬运整条堵死（那种情况下过滤器一个也匹配不上，玩家还完全看不出
-     * 原因）。注意这只管「允许什么」，与 {@code transfer} 里那条「AE 源 + 无白名单 ⇒ 不搬」
-     * 的前置判定是两件事。</p>
-     */
-    private static boolean matchesItems(List<LinkFilterSlot> filter, ItemStack stack) {
-        boolean anyMarker = false;
-        for (LinkFilterSlot slot : filter) {
-            if (!slot.isItem() && !slot.isPattern()) {
-                continue;
-            }
-            anyMarker = true;
-            if (matchesSlot(slot, stack)) {
-                return true;
-            }
-        }
-        return !anyMarker;
-    }
-
-    /**
-     * 流体过滤：标记存的就是流体本身（不是装它的桶），所以这里直接比流体种类与组件，
-     * 不再去翻容器的流体能力——没有桶的流体也能标记上了。没有任何流体类标记时视为「不限制」。
-     */
-    private static boolean matchesFluids(List<LinkFilterSlot> filter, FluidStack fluid) {
-        boolean anyMarker = false;
-        for (LinkFilterSlot slot : filter) {
-            if (!slot.isFluid() && !slot.isPattern()) {
-                continue;
-            }
-            anyMarker = true;
-            if (matchesSlotFluid(slot, fluid)) {
-                return true;
-            }
-        }
-        return !anyMarker;
-    }
-
-    /**
      * 化学品过滤：具体标记是「装有该化学品的储罐物品」，比对的是罐里装的化学品种类；
-     * 模式标记按 id 通配。没有任何物品类标记时视为「不限制」。
+     * 模式标记按 id 通配。
+     *
+     * <p>包含/排除规则与物品侧一致：命中排除格 ⇒ 不允许；否则这一端有包含格就必须命中一个；
+     * 没有包含格 ⇒ 不限制。<b>化学品不支持控制条件</b>（{@code ChemicalHandlerView} 没有存量查询），
+     * 所以这里只看标记。</p>
      */
     private static boolean matchesChemical(List<LinkFilterSlot> filter, ChemicalStackView chemical) {
         ChemicalCompatProvider provider = ChemicalCompatProviders.get();
         if (!provider.isAvailable()) {
             return true;
         }
-        boolean anyMarker = false;
+        boolean hasInclude = false;
+        boolean includeApplies = false;
         for (LinkFilterSlot slot : filter) {
             if (!slot.isItem() && !slot.isPattern()) {
                 continue;
             }
-            anyMarker = true;
-            if (matchesSlotChemical(slot, chemical)) {
-                return true;
+            if (!slot.exclude()) {
+                hasInclude = true;
             }
+            if (!matchesSlotChemical(slot, chemical)) {
+                continue;
+            }
+            if (slot.exclude()) {
+                return false;
+            }
+            includeApplies = true;
         }
-        return !anyMarker;
+        return !hasInclude || includeApplies;
     }
 }

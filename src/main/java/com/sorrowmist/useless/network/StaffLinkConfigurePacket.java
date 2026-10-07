@@ -2,8 +2,10 @@ package com.sorrowmist.useless.network;
 
 import com.sorrowmist.useless.UselessMod;
 import com.sorrowmist.useless.content.menus.StaffLinkMenu;
+import com.sorrowmist.useless.content.stafflink.LinkFilterCondition;
 import com.sorrowmist.useless.content.stafflink.LinkFilterPattern;
 import com.sorrowmist.useless.content.stafflink.LinkFilterSlot;
+import com.sorrowmist.useless.content.stafflink.LinkMedium;
 import com.sorrowmist.useless.content.stafflink.ResourceFamily;
 import com.sorrowmist.useless.content.stafflink.StaffLinkEngine;
 import com.sorrowmist.useless.content.stafflink.StaffLinkRoute;
@@ -16,6 +18,8 @@ import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.item.ItemStack;
+import net.neoforged.neoforge.fluids.FluidStack;
 import net.neoforged.neoforge.network.PacketDistributor;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
 import org.jetbrains.annotations.NotNull;
@@ -79,7 +83,7 @@ public record StaffLinkConfigurePacket(GlobalPos anchor, int route, StaffLinkRou
                     sanitizeInterval(packet.config()),
                     packet.config().side(),
                     packet.config().weight(),
-                    sanitizeFilter(packet.config().filter()));
+                    sanitizeFilter(packet.config().filter(), packet.config().medium()));
 
             network.putRoute(sanitized);
             StaffLinkSavedData.get(player.server).markDirty();
@@ -129,21 +133,22 @@ public record StaffLinkConfigurePacket(GlobalPos anchor, int route, StaffLinkRou
     /**
      * 逐格清洗过滤器。
      *
-     * <p>第九轮的过滤器一格里有三样东西：标记、模式文本、两个数量限制。{@link StaffLinkRoute}
+     * <p>一格现在有五样东西：标记、模式文本、包含/排除方向、两条控制条件。{@link StaffLinkRoute}
      * 的构造器只会把「格数」补齐到 {@code FILTER_LIMIT}，不校验格<b>内容</b>；
-     * 一个被改过的客户端可以塞进来非法模式或超长的限制值。所以这里逐格重造一遍：</p>
+     * 一个被改过的客户端可以塞进来非法模式、越界的条件或跨族的控制材料。所以这里逐格重造一遍：</p>
      *
      * <ul>
      *   <li>模式文本必须能被 {@link LinkFilterPattern#parse} 接受，否则整格清空
      *       （宁可「什么都不搬」，也不要留一个语义不明的字符串在存档里）。</li>
-     *   <li>两个限制夹到非负；{@code 0} 就是不限制。</li>
+     *   <li>{@code exclude} 原样布尔。</li>
+     *   <li>两条条件：方向未知 → OFF；阈值夹非负；控制材料与线路族不符 / 该族不吃条件 → 清空。</li>
      * </ul>
      *
      * <p><b>不能跳过这一步直接把 {@code packet.config().filter()} 传下去</b>：
      * 那样等于把服务端当成客户端的镜子，任何越界值都会直接落进存档。</p>
      */
     private static java.util.List<LinkFilterSlot> sanitizeFilter(
-            java.util.List<LinkFilterSlot> received) {
+            java.util.List<LinkFilterSlot> received, LinkMedium medium) {
         java.util.List<LinkFilterSlot> cleaned =
                 new java.util.ArrayList<>(StaffLinkRoute.FILTER_LIMIT);
         for (int index = 0; index < StaffLinkRoute.FILTER_LIMIT; index++) {
@@ -153,21 +158,39 @@ public record StaffLinkConfigurePacket(GlobalPos anchor, int route, StaffLinkRou
                 cleaned.add(LinkFilterSlot.EMPTY);
                 continue;
             }
+            LinkFilterSlot base;
             if (slot.isPattern()) {
                 LinkFilterPattern pattern = LinkFilterPattern.parse(slot.pattern());
                 if (pattern == null) {
                     cleaned.add(LinkFilterSlot.EMPTY);
                     continue;
                 }
-                cleaned.add(LinkFilterSlot.ofPattern(pattern)
-                        .withLimits(slot.keepAtSource(), slot.maxInto()));
-                continue;
+                base = LinkFilterSlot.ofPattern(pattern);
+            } else {
+                // 物品 / 流体标记：构造器已经归一化（count=1、类型互斥）。
+                base = slot;
             }
-            // 物品 / 流体标记：构造器已经归一化（count=1、类型互斥），限制值再夹一次非负。
-            cleaned.add(slot.withLimits(Math.max(0L, slot.keepAtSource()),
-                    Math.max(0L, slot.maxInto())));
+            cleaned.add(base
+                    .withExclude(slot.exclude())
+                    .withConditions(sanitizeCondition(slot.outCond(), medium),
+                            sanitizeCondition(slot.inCond(), medium)));
         }
         return cleaned;
+    }
+
+    /** 清洗一条控制条件：方向未知 → OFF；阈值非负；控制材料与线路族不符 → 清空。 */
+    private static LinkFilterCondition sanitizeCondition(LinkFilterCondition cond, LinkMedium medium) {
+        if (cond == null || cond.isOff()) {
+            return LinkFilterCondition.OFF;
+        }
+        ResourceFamily family = medium.family();
+        // 条件只对物品 / 流体有意义：化学品没有存量查询，能量 / 魔源 / 应力 / 气压压根不吃过滤器。
+        if (family != ResourceFamily.ITEM && family != ResourceFamily.FLUID) {
+            return LinkFilterCondition.OFF;
+        }
+        ItemStack item = family == ResourceFamily.ITEM ? cond.item() : ItemStack.EMPTY;
+        FluidStack fluid = family == ResourceFamily.FLUID ? cond.fluid() : FluidStack.EMPTY;
+        return new LinkFilterCondition(cond.op(), item, fluid, Math.max(0L, cond.value()));
     }
 
     @Override

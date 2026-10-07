@@ -5,9 +5,9 @@ import net.neoforged.neoforge.fluids.FluidStack;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * 过滤器里的一格标记物。
+ * 过滤器里的一格。
  *
- * <p><b>一格只装一种资源</b>，有三种形态：</p>
+ * <p><b>一格只装一种标记资源 A</b>，有三种形态：</p>
  *
  * <ul>
  *   <li><b>物品</b>：装物品本身（化学品线路装的是化学品集成自己的「储罐物品」表示）。</li>
@@ -20,30 +20,29 @@ import org.jetbrains.annotations.Nullable;
  * 「流体过滤」实际是在比物品：没有桶的流体根本标记不上，把流体拖到物品线路上还会变成
  * 一个水桶物品。现在流体以 {@link FluidStack} 直接存，与物品彻底分开。</p>
  *
- * <p>化学品仍是化学品集成自己的「储罐物品」表示（{@code ChemicalCompatProvider#markerForChemical}），
- * 因此落在 {@link #item()} 上——那套抽象只提供「从物品里读出化学品」，没有可序列化的化学品栈。</p>
- *
- * <h2>两个数量限制</h2>
- *
- * <p>每格还带两个 long，让玩家把「搬多少」说得更细：</p>
+ * <h2>三种附加信息</h2>
  *
  * <ul>
- *   <li>{@link #keepAtSource()}：<b>源端保留</b>。小于等于它就不搬了，避免把源容器掏空
- *       （例如机器输入缓冲留底）。</li>
- *   <li>{@link #maxInto()}：<b>接收端最多存到</b>这个数，到量就停，避免把目标塞爆。</li>
+ *   <li>{@link #exclude()}：<b>这一格是「排除」而不是「包含」</b>。标记命中的资源<b>不搬</b>，
+ *       其余照搬（黑名单）。同一格上「包含」与「排除」互斥——它就是这一格的方向。</li>
+ *   <li>{@link #outCond()}：<b>输出端条件</b>，在源容器上测量（旧「源端保留」的推广）。</li>
+ *   <li>{@link #inCond()}：<b>输入端条件</b>，在目标容器上测量（旧「接收端上限」的推广）。</li>
  * </ul>
  *
- * <p><b>{@code 0} 表示不限制</b>（留空即此），与改动前的行为完全一致。</p>
+ * <p>两条条件<b>同时成立</b>才允许搬运这一格标记的资源；任一为 {@link LinkFilterCondition#OFF}
+ * 即视为不限制。控制材料留空时条件测的就是被搬的资源 A 自身，行为与改动前完全一致。</p>
  *
- * <p>把限制放在这里而不是平行的 {@code long[]} 数组里：平行数组会破坏 record 的自动
- * {@code equals}/{@code hashCode}，而塞进 record 后「空槽强制 0」让语义干净、
- * 「第 N 格」只有一个真值来源。</p>
+ * <p><b>空槽不变式</b>：标记为空 ⇒ {@code exclude=false} 且两条条件都是 {@code OFF}，
+ * 让「空槽」与「带信息的空槽」不可能共存，也让 {@code equals} 干净。</p>
  */
 public record LinkFilterSlot(ItemStack item, FluidStack fluid,
                              @Nullable String pattern,
-                             long keepAtSource, long maxInto) {
+                             boolean exclude,
+                             LinkFilterCondition outCond,
+                             LinkFilterCondition inCond) {
     public static final LinkFilterSlot EMPTY = new LinkFilterSlot(
-            ItemStack.EMPTY, FluidStack.EMPTY, null, 0L, 0L);
+            ItemStack.EMPTY, FluidStack.EMPTY, null, false,
+            LinkFilterCondition.OFF, LinkFilterCondition.OFF);
 
     public LinkFilterSlot {
         item = item == null || item.isEmpty() ? ItemStack.EMPTY : item.copyWithCount(1);
@@ -59,27 +58,30 @@ public record LinkFilterSlot(ItemStack item, FluidStack fluid,
             item = ItemStack.EMPTY;
         }
 
-        // 空槽不保留无意义的限制值：让「空槽」与「有限制的空槽」不可能共存，
+        outCond = outCond == null ? LinkFilterCondition.OFF : outCond;
+        inCond = inCond == null ? LinkFilterCondition.OFF : inCond;
+
+        // 空槽不保留任何无意义的附加信息：让「空槽」与「带信息的空槽」不可能共存，
         // 也让 equals 干净。
         if (pattern == null && fluid.isEmpty() && item.isEmpty()) {
-            keepAtSource = 0L;
-            maxInto = 0L;
-        } else {
-            keepAtSource = Math.max(0L, keepAtSource);
-            maxInto = Math.max(0L, maxInto);
+            exclude = false;
+            outCond = LinkFilterCondition.OFF;
+            inCond = LinkFilterCondition.OFF;
         }
     }
 
     public static LinkFilterSlot ofItem(ItemStack stack) {
         return stack == null || stack.isEmpty()
                 ? EMPTY
-                : new LinkFilterSlot(stack, FluidStack.EMPTY, null, 0L, 0L);
+                : new LinkFilterSlot(stack, FluidStack.EMPTY, null, false,
+                        LinkFilterCondition.OFF, LinkFilterCondition.OFF);
     }
 
     public static LinkFilterSlot ofFluid(FluidStack stack) {
         return stack == null || stack.isEmpty()
                 ? EMPTY
-                : new LinkFilterSlot(ItemStack.EMPTY, stack, null, 0L, 0L);
+                : new LinkFilterSlot(ItemStack.EMPTY, stack, null, false,
+                        LinkFilterCondition.OFF, LinkFilterCondition.OFF);
     }
 
     /**
@@ -90,23 +92,16 @@ public record LinkFilterSlot(ItemStack item, FluidStack fluid,
         LinkFilterPattern parsed = LinkFilterPattern.parse(raw);
         return parsed == null
                 ? EMPTY
-                : new LinkFilterSlot(ItemStack.EMPTY, FluidStack.EMPTY, parsed.text(), 0L, 0L);
+                : new LinkFilterSlot(ItemStack.EMPTY, FluidStack.EMPTY, parsed.text(), false,
+                        LinkFilterCondition.OFF, LinkFilterCondition.OFF);
     }
 
     /** 用已解析好的模式造一格。 */
     public static LinkFilterSlot ofPattern(LinkFilterPattern parsed) {
         return parsed == null
                 ? EMPTY
-                : new LinkFilterSlot(ItemStack.EMPTY, FluidStack.EMPTY, parsed.text(), 0L, 0L);
-    }
-
-    /**
-     * 换掉两个限制值，其余不变。
-     *
-     * <p>给界面的输入框用：玩家在「保留 / 上限」框里敲数字，只改这两个字段。</p>
-     */
-    public LinkFilterSlot withLimits(long newKeepAtSource, long newMaxInto) {
-        return new LinkFilterSlot(item, fluid, pattern, newKeepAtSource, newMaxInto);
+                : new LinkFilterSlot(ItemStack.EMPTY, FluidStack.EMPTY, parsed.text(), false,
+                        LinkFilterCondition.OFF, LinkFilterCondition.OFF);
     }
 
     public boolean isEmpty() {
@@ -128,23 +123,62 @@ public record LinkFilterSlot(ItemStack item, FluidStack fluid,
         return pattern != null;
     }
 
+    /** 这一格是「排除」（黑名单）而不是「包含」（白名单）。 */
+    public boolean isExcluded() {
+        return exclude;
+    }
+
+    /** 这一格有没有启用任何一条控制条件（给界面角标用）。 */
+    public boolean hasConditions() {
+        return !outCond.isOff() || !inCond.isOff();
+    }
+
+    /** 换掉「包含 / 排除」，其余不变。 */
+    public LinkFilterSlot withExclude(boolean newExclude) {
+        return new LinkFilterSlot(item, fluid, pattern, newExclude, outCond, inCond);
+    }
+
+    /** 换掉两条控制条件，其余不变。 */
+    public LinkFilterSlot withConditions(LinkFilterCondition newOut, LinkFilterCondition newIn) {
+        return new LinkFilterSlot(item, fluid, pattern, exclude, newOut, newIn);
+    }
+
     /**
-     * 这一格有没有「数量限制」。
+     * 换掉标记 A，<b>保留</b>包含/排除与两条条件。
      *
-     * <p>{@code false} 时搬运路径一次都不会去查存量——{@code LongItemHandler#amountOf}
-     * 在 AE 端点上要抓整网快照，不能被当成免费查询。</p>
+     * <p>标记换成空时构造器会把附加信息一起清掉（空槽不变式）。</p>
      */
-    public boolean hasLimits() {
-        return keepAtSource > 0L || maxInto > 0L;
+    public LinkFilterSlot withMarker(LinkFilterSlot marker) {
+        if (marker == null) {
+            return EMPTY;
+        }
+        return new LinkFilterSlot(marker.item(), marker.fluid(), marker.pattern(),
+                exclude, outCond, inCond);
     }
 
-    /** 源端保留量；{@code 0} = 不保留（可以掏空）。 */
+    /**
+     * 兼容旧语义的便捷映射：{@code keep} → 输出端 {@code ≥ self}，
+     * {@code max} → 输入端 {@code ≤ self}；{@code 0} 表示该侧条件关闭。
+     */
+    public LinkFilterSlot withLimits(long keepAtSource, long maxInto) {
+        LinkFilterCondition out = keepAtSource > 0L
+                ? LinkFilterCondition.self(LinkFilterCondition.Op.AT_LEAST, keepAtSource)
+                : LinkFilterCondition.OFF;
+        LinkFilterCondition in = maxInto > 0L
+                ? LinkFilterCondition.self(LinkFilterCondition.Op.AT_MOST, maxInto)
+                : LinkFilterCondition.OFF;
+        return new LinkFilterSlot(item, fluid, pattern, exclude, out, in);
+    }
+
+    /** 旧「源端保留」值（= 输出端 ≥ self 的阈值）；没有这类条件时返回 0。 */
     public long keepAtSource() {
-        return keepAtSource;
+        return outCond.op() == LinkFilterCondition.Op.AT_LEAST && outCond.isSelf()
+                ? outCond.value() : 0L;
     }
 
-    /** 接收端上限；{@code 0} = 不限。 */
+    /** 旧「接收端上限」值（= 输入端 ≤ self 的阈值）；没有这类条件时返回 0。 */
     public long maxInto() {
-        return maxInto;
+        return inCond.op() == LinkFilterCondition.Op.AT_MOST && inCond.isSelf()
+                ? inCond.value() : 0L;
     }
 }

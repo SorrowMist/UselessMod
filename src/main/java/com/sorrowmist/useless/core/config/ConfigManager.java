@@ -56,6 +56,10 @@ public class ConfigManager {
     private static final ModConfigSpec.ConfigValue<List<? extends String>> BEEF_TOOL_FORCE_MINING_BLACKLIST;
     private static final ModConfigSpec.ConfigValue<String> BEEF_TOOL_FORCE_KILL_BLACKLIST;
     private static final ModConfigSpec.ConfigValue<String> BEEF_TOOL_FORCE_KILL_NON_LIVING_WHITELIST;
+    // 生物捕捉：写进刷怪蛋前额外丢弃的 NBT 键路径（`容器.子键`）与数据附件命名空间。
+    // 默认只列「已知每只都不同的运行时数值」；未知条目一律保留，避免误伤其它整合包。
+    private static final ModConfigSpec.ConfigValue<List<? extends String>> BEEF_CAPTURE_STRIP_KEYS;
+    private static final ModConfigSpec.ConfigValue<List<? extends String>> BEEF_CAPTURE_STRIP_ATTACHMENT_NAMESPACES;
     // 牛排工具范围伤害配置（半径）
     private static final ModConfigSpec.IntValue BEEF_AOE_DAMAGE_RANGE_X;
     private static final ModConfigSpec.IntValue BEEF_AOE_DAMAGE_RANGE_Y;
@@ -97,6 +101,10 @@ public class ConfigManager {
             new ModConfigSpec.IntValue[10];
     private static final ModConfigSpec.DoubleValue[] CATALYST_TIER_TIME_MULTIPLIER =
             new ModConfigSpec.DoubleValue[10];
+
+    // 无线物流：空闲退避开关与倍率上限
+    private static final ModConfigSpec.BooleanValue STAFFLINK_IDLE_BACKOFF_ENABLED;
+    private static final ModConfigSpec.IntValue STAFFLINK_IDLE_BACKOFF_CAP;
 
     // 万象炉配方转换配置
     private static final ModConfigSpec.BooleanValue ENABLE_CRAFTING_RECIPE_CONVERSION;
@@ -322,6 +330,25 @@ public class ConfigManager {
                         entry -> entry instanceof String);
         SERVER_BUILDER.pop();
 
+        SERVER_BUILDER.translation("useless_mod.configuration.stafflink")
+                .push("stafflink");
+        STAFFLINK_IDLE_BACKOFF_ENABLED = SERVER_BUILDER
+                .comment("无线物流：空转的线路是否启用指数退避",
+                        "开启（默认）：某一轮搬运量为 0 时把下一轮间隔逐次翻倍，最多放大到「周期 × stafflink_idle_backoff_cap」，",
+                        "搬动一次立即恢复。这样可以避免大量空通道每 tick 白跑一遍（实测能占引擎开销的九成以上）",
+                        "关闭：无论搬动与否都严格按线路配置的周期运行，搬运响应最及时，代价是空通道持续产生开销")
+                .translation("useless_mod.configuration.stafflink_idle_backoff_enabled")
+                .define("stafflink_idle_backoff_enabled", true);
+
+        STAFFLINK_IDLE_BACKOFF_CAP = SERVER_BUILDER
+                .comment("无线物流：空转退避的倍率上限（下一轮间隔最多放大到 配置周期 × 本值）",
+                        "本值取 2 的幂（如 1/2/4/8/16/32/64）：内部按 log2 换算成翻倍次数，非 2 的幂会向下取整",
+                        "设为 1 表示不放大（等同关闭退避）。默认 32 折合约 32 分钟封顶（周期上限 1200 tick）",
+                        "仅在 stafflink_idle_backoff_enabled 开启时生效")
+                .translation("useless_mod.configuration.stafflink_idle_backoff_cap")
+                .defineInRange("stafflink_idle_backoff_cap", 32, 1, 1024);
+        SERVER_BUILDER.pop();
+
         // 牛排工具连锁挖掘配置
         // Server config: gameplay options are authoritative on the logical server.
         SERVER_BUILDER.translation("useless_mod.configuration.beef_tool").push("beef_tool");
@@ -494,6 +521,23 @@ public class ConfigManager {
                 .comment("牛排工具非生物实体强制击杀白名单, 多个实体ID用分号分隔")
                 .translation("useless_mod.configuration.beef_tool_force_kill_non_living_whitelist")
                 .define("beef_tool_force_kill_non_living_whitelist", "draconicevolution:guardian_crystal");
+
+        BEEF_CAPTURE_STRIP_KEYS = SERVER_BUILDER
+                .comment("生物捕捉：写进刷怪蛋前额外丢弃的 NBT 键路径，格式为 容器.子键（不含点则视为顶层键）",
+                        "默认只列「每只都不同」的运行时数值；未知键一律保留，避免误伤其它整合包",
+                        "例：NeoForgeData.naturesaura:time_alive  KubeJSPersistentData.senescence")
+                .translation("useless_mod.configuration.beef_capture_strip_keys")
+                .defineListAllowEmpty("beef_capture_strip_keys", defaultBeefCaptureStripKeys(), () -> "",
+                        entry -> entry instanceof String);
+
+        BEEF_CAPTURE_STRIP_ATTACHMENT_NAMESPACES = SERVER_BUILDER
+                .comment("生物捕捉：写进刷怪蛋前额外丢弃的数据附件命名空间（该命名空间下所有附件都丢）",
+                        "默认只列「已知只装运行时数值」的模组；其余（含未知模组）一律保留",
+                        "例：cold_sweat  malum")
+                .translation("useless_mod.configuration.beef_capture_strip_attachment_namespaces")
+                .defineListAllowEmpty("beef_capture_strip_attachment_namespaces",
+                        defaultBeefCaptureStripAttachmentNamespaces(), () -> "",
+                        entry -> entry instanceof String);
         SERVER_BUILDER.pop();
 
         SERVER_BUILDER.push("mekanism_upgrade");
@@ -828,6 +872,20 @@ public class ConfigManager {
         );
     }
 
+    private static List<String> defaultBeefCaptureStripKeys() {
+        return List.of(
+                "NeoForgeData.Temperature",
+                "NeoForgeData.naturesaura:time_alive",
+                "NeoForgeData.BalmData",
+                "KubeJSPersistentData.senescence",
+                "KubeJSPersistentData.original_max_health"
+        );
+    }
+
+    private static List<String> defaultBeefCaptureStripAttachmentNamespaces() {
+        return List.of("cold_sweat", "malum", "blueflame");
+    }
+
     private static boolean isValidCustomPotionEffectEntry(Object entry) {
         if (!(entry instanceof String value)) {
             return false;
@@ -1054,6 +1112,25 @@ public class ConfigManager {
 
     public static int getOreGeneratorSlots() {
         return Math.max(1, Math.min(540, getConfigValue(ORE_GENERATOR_SLOTS)));
+    }
+
+    /**
+     * 无线物流：空转的线路是否启用指数退避。
+     *
+     * <p>关闭后线路严格按配置周期运行，空通道也会持续产生开销。</p>
+     */
+    public static boolean isStaffLinkIdleBackoffEnabled() {
+        return getConfigValue(STAFFLINK_IDLE_BACKOFF_ENABLED);
+    }
+
+    /**
+     * 无线物流：空转退避的倍率上限（下一轮间隔最多放大到 {@code 周期 × 本值}）。
+     *
+     * <p>返回的是原始倍率（已夹取到 [1, 1024]）；调用方按 {@code log2} 换算成翻倍次数。
+     * 非 2 的幂由调用方向下取整，不会报错。</p>
+     */
+    public static int getStaffLinkIdleBackoffCap() {
+        return Math.max(1, Math.min(1024, getConfigValue(STAFFLINK_IDLE_BACKOFF_CAP)));
     }
 
     private static int normalizeInventorySlots(int value) {
@@ -1347,6 +1424,16 @@ public class ConfigManager {
     // 获取自定义药水效果配置列表
     public static List<String> getCustomPotionEffects() {
         return readConfigList(CUSTOM_POTION_EFFECTS);
+    }
+
+    /** 生物捕捉：额外丢弃的 NBT 键路径（`容器.子键`；不含 `.` 时视为顶层键）。 */
+    public static List<String> getBeefCaptureStripKeys() {
+        return readConfigList(BEEF_CAPTURE_STRIP_KEYS);
+    }
+
+    /** 生物捕捉：额外丢弃的数据附件命名空间。 */
+    public static List<String> getBeefCaptureStripAttachmentNamespaces() {
+        return readConfigList(BEEF_CAPTURE_STRIP_ATTACHMENT_NAMESPACES);
     }
 
     private static List<String> splitEntityIdList(String value) {

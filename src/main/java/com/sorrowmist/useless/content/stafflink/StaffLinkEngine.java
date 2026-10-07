@@ -2,6 +2,7 @@ package com.sorrowmist.useless.content.stafflink;
 
 import com.sorrowmist.useless.api.logistics.LongPressureHandler;
 import com.sorrowmist.useless.compat.create.CreateStressCompatLoader;
+import com.sorrowmist.useless.core.config.ConfigManager;
 import com.sorrowmist.useless.world.stafflink.StaffLinkManager;
 import com.sorrowmist.useless.world.stafflink.StaffLinkNetwork;
 import com.sorrowmist.useless.world.stafflink.StaffLinkSavedData;
@@ -48,7 +49,7 @@ public final class StaffLinkEngine {
     /**
      * 空转退避的倍率上限：下一轮间隔最多放大到配置周期的这个倍数。
      *
-     * <p>空转（这一轮搬运量为 0）时把间隔翻倍，直到 {@code interval × BACKOFF_CAP} 封顶。
+     * <p>空转（这一轮搬运量为 0）时把间隔翻倍，直到 {@code interval × 倍率上限} 封顶。
      * 一旦搬动就立刻恢复成配置的 {@code interval}。</p>
      *
      * <p><b>为什么需要它。</b>此前「搬不动」也按配置周期原样重排下一轮，而周期最小是 1 ——
@@ -57,20 +58,27 @@ public final class StaffLinkEngine {
      * 真正的搬运反而微不足道。参考实现（P2P Channel Network）用指数退避解决同一问题，
      * 这里对齐它的做法。</p>
      *
-     * <p><b>为什么封顶到 32。</b>间隔本身已经被 {@link StaffLinkRoute#MAX_INTERVAL} 夹在
-     * 1200 tick 以内，再乘 32 就是 38400 tick（约 32 分钟）——足以让「长期没货」的通道
-     * 基本不产生开销，又不会让「刚补货」的通道等太久才恢复。搬动一次即重置，所以恢复是
-     * 即时的：只要容器里重新有东西，最坏情况下等一个退避周期就会再次尝试并命中。</p>
+     * <p><b>倍率上限走配置。</b>{@code stafflink_idle_backoff_enabled} 控制开关，
+     * {@code stafflink_idle_backoff_cap} 给出倍率（默认 32）。倍率按 2 的幂取，
+     * 因为间隔按 {@code interval << 退避次数} 增长，「翻几次」到的倍数上限就是 log2(倍率)。
+     * 关掉开关时本类退化成「严格按配置周期」，不再有翻倍。</p>
      */
-    private static final int BACKOFF_CAP = 32;
+    private static int backoffCap() {
+        return ConfigManager.isStaffLinkIdleBackoffEnabled()
+                ? ConfigManager.getStaffLinkIdleBackoffCap()
+                : 1;
+    }
 
     /**
-     * 退避的指数上限 = {@code log2(BACKOFF_CAP)}。
+     * 退避的指数上限 = {@code log2(倍率上限)}。
      *
      * <p>间隔按 {@code interval << 退避} 增长，所以「翻几次」到的倍数上限就是 log2。
-     * 到顶之后不再增加，避免长期空转的通道把间隔推到无限。</p>
+     * 到顶之后不再增加，避免长期空转的通道把间隔推到无限。倍率非 2 的幂时向下取整
+     * （{@code 5 → 翻 2 次 → 最多 ×4}），若倍率本身就小于 2 则退化为 0 次翻倍。</p>
      */
-    private static final int BACKOFF_CAP_EXPONENT = Integer.numberOfTrailingZeros(BACKOFF_CAP);
+    private static int backoffCapExponent() {
+        return Integer.numberOfTrailingZeros(backoffCap());
+    }
 
     /**
      * 每张网络的调度表：锚点 → 各线路号的下一次可运行 tick。
@@ -239,8 +247,8 @@ public final class StaffLinkEngine {
      * 按「本轮搬动了没有」排下一轮，并维护退避次数。这是释放端的唯一排程入口。
      *
      * <p>搬动了 → 退避清零，下一轮按配置的 {@code interval}；空转 → 退避 +1，
-     * 下一轮间隔为 {@code interval << min(退避, log2(BACKOFF_CAP))}（即每次翻倍，
-     * 到 {@code interval × BACKOFF_CAP} 封顶）。见 {@link #BACKOFF_CAP}。</p>
+     * 下一轮间隔为 {@code interval << min(退避, log2(退避倍率上限))}（即每次翻倍，
+     * 到 {@code interval × 倍率上限} 封顶）。开关与倍率见 {@link #backoffCap()}。</p>
      *
      * <p><b>为什么不是「一空转就跳过一个周期」。</b>那样对「周期 1」的通道等于没退避
      * （跳过 1 tick 还是每 tick 跑）；而「周期 1200」的通道本来就难得空转，翻倍也无所谓。
@@ -262,7 +270,7 @@ public final class StaffLinkEngine {
             backoff = 0;
         } else {
             // 上限按「翻几倍」算，避免 32 次翻倍之后 long 溢出（实际 interval 最大 1200）。
-            backoff = Math.min(schedule.backoffOf(route, anchor) + 1, BACKOFF_CAP_EXPONENT);
+            backoff = Math.min(schedule.backoffOf(route, anchor) + 1, backoffCapExponent());
         }
         schedule.setBackoff(route, anchor, backoff);
         long wait = backoff == 0L

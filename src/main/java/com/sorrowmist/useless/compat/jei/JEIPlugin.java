@@ -184,6 +184,11 @@ public final class JEIPlugin implements IModPlugin {
                 screen.setJeiDragActive(true);
             }
 
+            // 详细面板开着时它压住中间，靶点切成它的三个槽（A 标记 / 输出端 B / 输入端 B）。
+            if (screen.isDetailPanelOpen()) {
+                return detailTargets(screen, marker);
+            }
+
             List<Target<I>> targets = new ArrayList<>(StaffLinkScreen.filterSlotCount());
             for (int index = 0; index < StaffLinkScreen.filterSlotCount(); index++) {
                 final int slotIndex = index;
@@ -198,6 +203,36 @@ public final class JEIPlugin implements IModPlugin {
                     @Override
                     public void accept(I value) {
                         screen.getMenu().setFilterSlot(slotIndex, marker);
+                    }
+                });
+            }
+            return targets;
+        }
+
+        /** 详细面板的三个靶点：0 = A 标记，1 = 输出端 B，2 = 输入端 B。 */
+        private <I> List<Target<I>> detailTargets(StaffLinkScreen screen, LinkFilterSlot marker) {
+            int index = screen.getDetailIndex();
+            if (index < 0 || index >= StaffLinkScreen.filterSlotCount()) {
+                return List.of();
+            }
+            List<Target<I>> targets = new ArrayList<>(3);
+            for (int which = 0; which < 3; which++) {
+                final int slot = which;
+                targets.add(new Target<>() {
+                    @Override
+                    public Rect2i getArea() {
+                        return new Rect2i(screen.detailSlotScreenX(slot), screen.detailSlotScreenY(slot),
+                                StaffLinkScreen.detailSlotSize(), StaffLinkScreen.detailSlotSize());
+                    }
+
+                    @Override
+                    public void accept(I value) {
+                        if (slot == 0) {
+                            screen.getMenu().setFilterSlot(index,
+                                    screen.getMenu().getFilterMirror().get(index).withMarker(marker));
+                        } else {
+                            screen.getMenu().setFilterSlotConditionControl(index, slot == 2, marker);
+                        }
                     }
                 });
             }

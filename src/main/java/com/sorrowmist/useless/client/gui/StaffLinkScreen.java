@@ -3,6 +3,7 @@ package com.sorrowmist.useless.client.gui;
 import com.sorrowmist.useless.client.network.ClientPacketHandlers;
 import com.sorrowmist.useless.client.stafflink.StaffLinkStressClientState;
 import com.sorrowmist.useless.content.menus.StaffLinkMenu;
+import com.sorrowmist.useless.content.stafflink.LinkFilterCondition;
 import com.sorrowmist.useless.content.stafflink.LinkFilterPattern;
 import com.sorrowmist.useless.content.stafflink.LinkFilterSlot;
 import com.sorrowmist.useless.content.stafflink.LinkFlow;
@@ -189,52 +190,62 @@ public final class StaffLinkScreen extends AbstractContainerScreen<StaffLinkMenu
     /**
      * 面板尺寸。
      *
-     * <p><b>跟一级菜单一样宽（{@link #PANEL_WIDTH} = 250）</b>——用户明确要求「保持跟一级菜单
-     * 一样尺寸」。这么窄还有一个好处：它右边必然留得下 JEI 的原料侧栏
-     * （250 的面板在 427 窗口里居中后右侧还有 88px，远超 JEI 需要的 48px），
-     * 不会再出现「面板把侧栏挤没」。</p>
+     * <p>v2 起每格只是一个 16×16 的槽位（模式框与两条条件都搬进了右键的详细面板），
+     * 所以面板整体收窄到「刚好放下标题 / 提示 + 6 列格子 + 两个按钮」。窄面板还有个好处：
+     * 右边必然留得下 JEI 的原料侧栏（{@code 427 − 2 − 138 = 287 ≥ 48}）。</p>
      *
-     * <p>高度按 6 行算出来：`8(上边距) + 12(标题) + 6×30(六行) + 6 + 16(按钮) + 6 = 228`。</p>
+     * <p>高度 = `6(上边距) + 21(标题 + 提示两行) + 3×22 − 6(三行) + 6 + 16(按钮) + 6 = 115`。</p>
      */
-    private static final int FILTER_PANEL_WIDTH = PANEL_WIDTH;
-    private static final int FILTER_PANEL_HEIGHT = 228;
-    private static final int FILTER_PANEL_PAD = 8;
-    /** 标题那一行占掉的高度，格子从这里往下排。 */
-    private static final int FILTER_PANEL_HEADER = 12;
-    /** 一格的占位：列距 = (250 - 2×8) / 3 = 78，行距 30（槽位 18 + 1 间隙 + 限制框 10 + 1）。 */
-    private static final int FILTER_CELL_COL_STEP =
-            (FILTER_PANEL_WIDTH - FILTER_PANEL_PAD * 2) / 3;
-    private static final int FILTER_CELL_ROW_STEP = 30;
-    /** 3 列 × 6 行 = 18 格，跟 {@link StaffLinkRoute#FILTER_LIMIT} 一致。 */
-    private static final int FILTER_COLUMNS = 3;
-    /** 格内槽位尺寸 = 原版槽位大小，跟一级菜单的视觉一致。 */
-    private static final int FILTER_SLOT_SIZE = 18;
+    private static final int FILTER_PANEL_WIDTH = 138;
+    private static final int FILTER_PANEL_HEIGHT = 115;
+    private static final int FILTER_PANEL_PAD = 6;
+    /** 标题行 + 提示行占掉的高度，格子从这里往下排。 */
+    private static final int FILTER_PANEL_HEADER = 21;
     /**
-     * 两个限制框：<b>并排</b>放在模式框下方（行距只有 28px，竖着摞两个放不下）。
+     * 一格 = 16×16 的槽位 + 6px 间隙。
      *
-     * <p>一格宽 78px，两个框各 34、间隔 2，合计 70，还剩 8px。</p>
+     * <p>v1 的 78×30 是给「模式框 + 两个限制框」留的位置，那两样搬进详细面板之后就不需要了，
+     * 于是间距可以收到最小。</p>
      */
-    private static final int FILTER_LIMIT_WIDTH = 34;
-    private static final int FILTER_LIMIT_HEIGHT = 10;
-    /** 两个框的横向间隔。 */
-    private static final int FILTER_LIMIT_GAP = 2;
-    /** 相对槽位左上角的纵向偏移：模式框 +1（与槽位同排）、限制框那一行 +19（槽位 18 下留 1px）。 */
-    private static final int FILTER_PATTERN_DY = 1;
-    private static final int FILTER_LIMITS_DY = 19;
+    private static final int FILTER_CELL_COL_STEP = 22;
+    private static final int FILTER_CELL_ROW_STEP = 22;
     /**
-     * 限制框的字符上限。
+     * 6 列 × 3 行 = 18 格，跟 {@link StaffLinkRoute#FILTER_LIMIT} 一致。
      *
-     * <p>不再按「最多几位数字」算：现在吃 {@code K / M / G / T / P / E} 后缀，一个缩写就能有
-     * {@code 1.5K} 四个字符，纯数字留到 {@code 9999999} 也够。8 个字符在 34px 的框里
-     * 本来就显示不全，{@link EditBox} 会自己滚动，所以放宽不会撑破界面。</p>
+     * <p>格子变成 16×16 的小方块之后，3 列会拼成一条细长的竖条、两侧留下大片空白；
+     * 改成 6 列后网格正好铺满面板宽度。</p>
+     */
+    private static final int FILTER_COLUMNS = 6;
+    /**
+     * 格内槽位尺寸。
+     *
+     * <p>取 16 = 本模组自己的标准槽位（{@link MachineScreenStyle#drawSlotBackground} 也是
+     * 16×16 + 顶部 1px 暗边），跟一级菜单的容器槽视觉一致；v1 用的 18 会让过滤格看起来比
+     * 界面里其它槽位大一整圈。</p>
+     */
+    private static final int FILTER_SLOT_SIZE = 16;
+    /** 格子网格在面板内的左上角；横向居中。 */
+    private static final int FILTER_GRID_X = FILTER_PANEL_PAD
+            + (FILTER_PANEL_WIDTH - FILTER_PANEL_PAD * 2
+            - ((FILTER_COLUMNS - 1) * FILTER_CELL_COL_STEP + FILTER_SLOT_SIZE)) / 2;
+    private static final int FILTER_GRID_Y = FILTER_PANEL_PAD + FILTER_PANEL_HEADER;
+    /** 面板在「垂直居中」基础上再上移这么多，给下方的玩家背包让位。 */
+    private static final int FILTER_PANEL_RAISE = 16;
+    /**
+     * 条件数值框 / 模式框的字符上限。
+     *
+     * <p>吃 {@code K / M / G / T / P / E} 后缀，一个缩写就能有 {@code 1.5K} 四个字符，
+     * 纯数字留到 {@code 9999999} 也够。</p>
      */
     private static final int FILTER_LIMIT_MAX_CHARS = 8;
-    /** 面板底部按钮行：高度，以及两个按钮共用的宽度。 */
+    /** 面板底部按钮行：高度、宽度与横向起点（两个按钮整体居中）。 */
     private static final int FILTER_BUTTON_HEIGHT = 16;
-    private static final int FILTER_PANEL_BUTTON_WIDTH = 70;
+    private static final int FILTER_PANEL_BUTTON_WIDTH = 48;
     private static final int FILTER_PANEL_BUTTON_GAP = 6;
-    /** 按钮行 y：格子网格底(200) + 6 间隙。 */
-    private static final int FILTER_PANEL_BUTTON_Y = 206;
+    private static final int FILTER_PANEL_BUTTON_X = (FILTER_PANEL_WIDTH
+            - FILTER_PANEL_BUTTON_WIDTH * 2 - FILTER_PANEL_BUTTON_GAP) / 2;
+    /** 按钮行 y：格子网格底(87) + 6 间隙。 */
+    private static final int FILTER_PANEL_BUTTON_Y = 93;
     /**
      * 过滤面板（覆盖层）绘制 z。
      *
@@ -245,12 +256,54 @@ public final class StaffLinkScreen extends AbstractContainerScreen<StaffLinkMenu
      */
     private static final float FILTER_PANEL_Z = 500.0F;
     /**
-     * 面板四周压暗层的不透明度。
+     * 「光标上拿着的物品」的绘制 z。
      *
-     * <p>半透明（不是纯黑不透明）：既能把底层界面压下去、突出面板，又不会像原来那样把
-     * JEI 侧栏一起涂掉，也不会在窄面板周围留一圈死黑。</p>
+     * <p>vanilla 只在 {@code super.render()} 里画它，那时两个覆盖层面板（500 / 700）都还没画，
+     * 所以从背包拿起物品来标记过滤格时，手上拿的东西会被面板整个盖住、看不见（用户实测反馈）。
+     * 这里在覆盖层最后重画一遍。</p>
+     *
+     * <p>取 750：物品自身还会再被推 150 ⇒ 实际 900，刚好压过详细面板里那些物品（700+150=850），
+     * 又不至于高到跟工具提示（700+400=1100）抢层。</p>
      */
-    private static final int FILTER_DIM_COLOR = 0x99000000;
+    private static final float CARRIED_ITEM_Z = 750.0F;
+
+    // ---- 详细编辑面板（每格右键打开）几何：独立宽度，跟过滤面板解耦
+    private static final int DETAIL_PANEL_WIDTH = 250;
+    private static final int DETAIL_PANEL_HEIGHT = 122;
+    private static final int DETAIL_PANEL_PAD = 8;
+    /**
+     * 详细面板绘制 z：压过滤面板。
+     *
+     * <p><b>⛔ 必须比 {@link #FILTER_PANEL_Z} 高 150 以上</b>：{@code GuiGraphics.renderItem}
+     * 内部会把物品再往前推 <b>150</b>（{@code pose.translate(x + 8, y + 8, 150 + …)}），
+     * 所以过滤面板里画在 z=500 的物品实际落在 650 —— 详细面板的背景若只到 600，
+     * 那些物品就会**穿透到详细面板之上**（用户实测：二级菜单的标记物品盖在三级菜单上）。
+     * 取 +200 留出余量。</p>
+     */
+    private static final float DETAIL_PANEL_Z = FILTER_PANEL_Z + 200.0F;
+    /** 面板内各行 y（面板内相对坐标）。 */
+    private static final int DETAIL_TITLE_Y = 8;
+    private static final int DETAIL_MARKER_ROW_Y = 26;
+    private static final int DETAIL_OUT_ROW_Y = 50;
+    private static final int DETAIL_IN_ROW_Y = 74;
+    private static final int DETAIL_BUTTON_Y = 98;
+    private static final int DETAIL_BUTTON_WIDTH = 70;
+    private static final int DETAIL_BUTTON_HEIGHT = 16;
+    /** 详细面板里槽位（A / B）的尺寸。 */
+    private static final int DETAIL_SLOT_SIZE = FILTER_SLOT_SIZE;
+    /** 行内控件 x（面板内相对坐标）。 */
+    private static final int DETAIL_MARKER_X = DETAIL_PANEL_PAD;                                  // 8
+    private static final int DETAIL_PATTERN_X = DETAIL_MARKER_X + DETAIL_SLOT_SIZE + 2;            // 28
+    private static final int DETAIL_PATTERN_WIDTH = 140;
+    private static final int DETAIL_EXCLUDE_X = 172;
+    private static final int DETAIL_EXCLUDE_WIDTH = 70;
+    private static final int DETAIL_LABEL_X = DETAIL_PANEL_PAD;                                    // 8
+    private static final int DETAIL_COND_SLOT_X = 44;
+    private static final int DETAIL_OP_X = DETAIL_COND_SLOT_X + DETAIL_SLOT_SIZE + 4;              // 66
+    private static final int DETAIL_OP_WIDTH = 32;
+    private static final int DETAIL_VALUE_X = DETAIL_OP_X + DETAIL_OP_WIDTH + 4;                   // 102
+    private static final int DETAIL_VALUE_WIDTH = 140;
+    private static final int DETAIL_ROW_HEIGHT = 18;
 
     private static final Direction[] SIDE_ORDER = {
             null, Direction.UP, Direction.DOWN, Direction.NORTH, Direction.SOUTH, Direction.WEST, Direction.EAST
@@ -293,24 +346,20 @@ public final class StaffLinkScreen extends AbstractContainerScreen<StaffLinkMenu
     /** 数值框 + 标签 + 取值范围；标签宽度决定框的起点，范围用来做悬停提示。 */
     private final List<NumericSpec> numericFields = new ArrayList<>();
 
-    /**
-     * 每格的「源端保留 / 接收端上限」输入框，下标与过滤格一一对应。
-     *
-     * <p>和模式框一样是<b>在 {@link #init()} 里一次建满</b>的：过滤格的读写全靠下标，
-     * 中途增删控件会让 {@code resize()} 之后所有框错位。空着 = 不限制，与改动前一致。</p>
-     */
-    private final EditBox[] filterKeepFields = new EditBox[StaffLinkRoute.FILTER_LIMIT];
-    private final EditBox[] filterMaxFields = new EditBox[StaffLinkRoute.FILTER_LIMIT];
-
-    /**
-     * 每格的「模式」输入框（{@code #tag} / 通配符）。
-     *
-     * <p>同样一次建满，平时 {@code visible=false} 收起来；右键点某一格才把它露出来并聚焦，
-     * 于是过滤区平时还是紧凑的九宫格，不会塞满一排空输入框。</p>
-     */
-    private final EditBox[] filterPatternFields = new EditBox[StaffLinkRoute.FILTER_LIMIT];
-    /** 当前露出模式框的格号；没有时 -1。 */
-    private int openPatternIndex = -1;
+    /* ---- 过滤格的「详细编辑面板」（每格右键打开，嵌套在过滤面板之上） ----
+       面板放：标记 A、模式框、包含/排除、输出端条件（B + ≥/≤ + 数值）、输入端条件、关闭。
+       这些控件只 addWidget（进 children、不进 renderables），手动 render + 手动转发事件——
+       理由同过滤面板的两个按钮：进 renderables 会被 super.render() 画到底层之下。 */
+    private boolean detailPanelOpen;
+    /** 详细面板正在编辑的格号；没打开时 -1。 */
+    private int detailIndex = -1;
+    private EditBox detailPatternField;
+    private EditBox detailOutValueField;
+    private EditBox detailInValueField;
+    private PressableAE2Button detailExcludeButton;
+    private PressableAE2Button detailOutOpButton;
+    private PressableAE2Button detailInOpButton;
+    private PressableAE2Button detailCloseButton;
 
     /**
      * 过滤面板（覆盖层）是否打开。
@@ -467,8 +516,6 @@ public final class StaffLinkScreen extends AbstractContainerScreen<StaffLinkMenu
                 leftPos + FILTER_X, topPos + FILTER_Y, FILTER_BUTTON_WIDTH, 16,
                 Component.empty(), button -> setFilterPanelOpen(!filterPanelOpen)));
 
-        initFilterFields();
-
         // 面板按钮只进 children：进 renderables 会被 super.render() 画到底层界面之下。
         closeFilterButton = addWidget(new PressableAE2Button(
                 filterPanelCloseX(), filterPanelCloseY(), FILTER_PANEL_BUTTON_WIDTH, FILTER_BUTTON_HEIGHT,
@@ -478,6 +525,7 @@ public final class StaffLinkScreen extends AbstractContainerScreen<StaffLinkMenu
                 filterPanelClearX(), filterPanelClearY(), FILTER_PANEL_BUTTON_WIDTH, FILTER_BUTTON_HEIGHT,
                 Component.translatable("gui.useless_mod.wireless_logistics.filter_clear"),
                 button -> clearAllFilterSlots()));
+        initDetailWidgets();
         syncFilterPanelButtons();
 
         // 开界面与下发快照是两个包；万一快照先到，这里把它捞回来，界面就不会空着。
@@ -503,9 +551,9 @@ public final class StaffLinkScreen extends AbstractContainerScreen<StaffLinkMenu
 
     private void setFilterPanelOpen(boolean open) {
         filterPanelOpen = open;
-        // 关面板时把还开着的模式框收起来（会提交它），免得留下一个看不见却有焦点的框。
         if (!open) {
-            closePatternEditor();
+            // 关过滤面板时把详细面板也一起收掉（会提交它），免得留下一个看不见却有焦点的框。
+            closeDetailPanel();
             jeiDragActive = false;
         } else {
             // 过滤格必须挂在「某个已选中的锚点 × 线路」的配置上。开面板前先保证这份配置存在，
@@ -514,20 +562,16 @@ public final class StaffLinkScreen extends AbstractContainerScreen<StaffLinkMenu
             ensureRouteConfig();
         }
         syncFilterPanelButtons();
-        if (open) {
-            syncFilterFields();
-        }
     }
 
     /** 「清空」：把 18 格全部置空。 */
     private void clearAllFilterSlots() {
-        closePatternEditor();
+        closeDetailPanel();
         for (int index = 0; index < StaffLinkRoute.FILTER_LIMIT; index++) {
             if (!currentFilterSlot(index).isEmpty()) {
                 menu.setFilterSlot(index, LinkFilterSlot.EMPTY);
             }
         }
-        syncFilterFields();
     }
 
     private EditBox addTextField(int x, int y, int width, Component hint, int maxLength) {
@@ -588,89 +632,130 @@ public final class StaffLinkScreen extends AbstractContainerScreen<StaffLinkMenu
     // ---- 过滤面板：18 格 + 每格两个限制框 + 右键弹出的模式框
 
     /**
-     * 建满 {@code FILTER_LIMIT} × 3 个过滤输入框。
+     * 建详细编辑面板的控件。
      *
-     * <p>位置取<b>屏幕坐标</b>而不是 {@code leftPos/topPos}：这些框属于覆盖层面板，
-     * 面板是按窗口居中的，跟主面板无关。</p>
-     *
-     * <p>模式框初始收起来（{@code visible=false}）——{@link EditBox#isMouseOver} 内部
-     * 不看 {@code visible}，所以收起时在别处要自己判断，否则收起的框照样会抢走点击。</p>
+     * <p>位置取<b>屏幕坐标</b>而不是 {@code leftPos/topPos}：它属于覆盖层面板，按窗口居中，
+     * 跟主面板无关。一律先收起（{@code visible=false}）——{@link EditBox#isMouseOver} 不看
+     * {@code visible}，收起时在别处要自己判断，否则收起的框照样会抢走点击。</p>
      */
-    private void initFilterFields() {
-        for (int index = 0; index < StaffLinkRoute.FILTER_LIMIT; index++) {
-            int limitsY = filterLimitsScreenY(index);
+    private void initDetailWidgets() {
+        detailPatternField = new EditBox(font, 0, 0, DETAIL_PATTERN_WIDTH, DETAIL_ROW_HEIGHT,
+                Component.translatable("gui.useless_mod.wireless_logistics.filter_pattern_hint"));
+        detailPatternField.setMaxLength(LinkFilterPattern.MAX_LENGTH);
+        detailPatternField.setVisible(false);
+        addWidget(detailPatternField);
+        trackEdits(detailPatternField);
 
-            filterKeepFields[index] = addLimitField(filterKeepScreenX(index), limitsY);
-            filterMaxFields[index] = addLimitField(filterMaxScreenX(index), limitsY);
+        detailOutValueField = addDetailValueField();
+        detailInValueField = addDetailValueField();
 
-            EditBox pattern = new EditBox(font, filterPatternScreenX(index),
-                    filterSlotScreenY(index) + FILTER_PATTERN_DY,
-                    filterPatternWidth(), FILTER_SLOT_SIZE,
-                    Component.translatable("gui.useless_mod.wireless_logistics.filter_pattern_hint"));
-            pattern.setMaxLength(LinkFilterPattern.MAX_LENGTH);
-            // 同样不设 hint：框只有 58px 宽，而「#标签 或通配符，例如 #c:ingots、*iron*」有三十来字，
-            // EditBox 的 hint 不裁切地铺出去，会盖到右边两列上。用法在面板标题行和 tooltip 里都有。
-            pattern.setVisible(false);
-            addRenderableWidget(pattern);
-            trackEdits(pattern);
-            filterPatternFields[index] = pattern;
-        }
-        openPatternIndex = -1;
+        detailExcludeButton = addWidget(new PressableAE2Button(0, 0, DETAIL_EXCLUDE_WIDTH, DETAIL_ROW_HEIGHT,
+                Component.empty(), button -> toggleDetailExclude()));
+        detailOutOpButton = addWidget(new PressableAE2Button(0, 0, DETAIL_OP_WIDTH, DETAIL_ROW_HEIGHT,
+                Component.empty(), button -> cycleDetailOp(false)));
+        detailInOpButton = addWidget(new PressableAE2Button(0, 0, DETAIL_OP_WIDTH, DETAIL_ROW_HEIGHT,
+                Component.empty(), button -> cycleDetailOp(true)));
+        detailCloseButton = addWidget(new PressableAE2Button(0, 0, DETAIL_BUTTON_WIDTH, DETAIL_BUTTON_HEIGHT,
+                Component.translatable("gui.useless_mod.wireless_logistics.filter_detail_done"),
+                button -> closeDetailPanel()));
+        setDetailWidgetsVisible(false);
     }
 
     /**
-     * 一个只吃数字的限制框；留空即「不限制」。
+     * 一个只吃数字的条件数值框。
      *
-     * <p><b>不再设 hint</b>：框只有 {@value #FILTER_LIMIT_WIDTH}px 宽，而「源端保留」那句提示有十几字，
-     * {@link EditBox} 的 hint 是不裁切地画在框内的，会整片溢出到隔壁格子上（玩家实测反馈）。
-     * 这个框由谁管本来就有答案：框左边画着「留 / 存」单字标签（{@link #renderFilterGlyphLabels}），
-     * 悬停还有完整 tooltip（{@link #renderLimitTooltip}）。框内留白即可。</p>
-     *
-     * <p><b>吃 {@code K / M / G / T / P / E} 后缀</b>，跟一级菜单的「数量」同一套
-     * （{@link ScaledEnergyAmount}）：搬上万的东西时不用数零。框窄，缩写正好也省地方。
-     * 数字位数上限相应放宽到 {@link #FILTER_LIMIT_MAX_CHARS} 个字符。</p>
+     * <p>吃 {@code K / M / G / T / P / E} 后缀，跟一级菜单的「数量」同一套
+     * （{@link ScaledEnergyAmount}）：搬上万的东西时不用数零。</p>
      */
-    private EditBox addLimitField(int x, int y) {
-        EditBox field = new EditBox(font, x, y, FILTER_LIMIT_WIDTH, FILTER_LIMIT_HEIGHT,
-                Component.empty());
+    private EditBox addDetailValueField() {
+        EditBox field = new EditBox(font, 0, 0, DETAIL_VALUE_WIDTH, DETAIL_ROW_HEIGHT, Component.empty());
         field.setMaxLength(FILTER_LIMIT_MAX_CHARS);
         field.setFilter(ScaledEnergyAmount::isValidInput);
-        addRenderableWidget(field);
+        field.setVisible(false);
+        addWidget(field);
         trackEdits(field);
         return field;
     }
 
+    /** 收起 / 显示详细面板的全部控件。 */
+    private void setDetailWidgetsVisible(boolean visible) {
+        detailPatternField.setVisible(visible);
+        detailOutValueField.setVisible(visible);
+        detailInValueField.setVisible(visible);
+        detailExcludeButton.visible = visible;
+        detailOutOpButton.visible = visible;
+        detailInOpButton.visible = visible;
+        detailCloseButton.visible = visible;
+    }
+
     /**
-     * 让过滤区的输入框显示值与选中线路的真值对齐。
+     * 摆位、刷新文案与显示值；每 tick 调一次（跟主界面按钮一样跟着 {@code resize()} 走）。
      *
-     * <p>和三个数值框一样<b>不覆盖正在编辑的那个框</b>：玩家敲了一半就被服务端快照刷回去，
-     * 是最恼人的一类「界面抢输入」。焦点在谁身上，谁就保持不动；提交由
-     * {@link #commitFilterFields()} 在失焦那一 tick 负责。</p>
-     *
-     * <p>限制框的<b>可见性跟着格子的空/非空走</b>：{@link EditBox} 自己会画底板，
-     * 要是让十八个空格的三十六个空框全露着，面板看着像一堆没填完的表单。空格子干脆不显示。</p>
-     *
-     * <p>所有过滤框还额外要求<b>面板是开着的</b>：关着的时候它们不该响应任何输入。</p>
+     * <p>值用 {@link #setIfUnfocused} 同步：正在编辑的框保持不动，免得打字被打断。</p>
      */
-    private void syncFilterFields() {
-        StaffLinkRoute config = menu.getSelectedConfig();
-        List<LinkFilterSlot> filter = config == null ? List.of() : config.filter();
-        if (openPatternIndex >= StaffLinkRoute.FILTER_LIMIT) {
-            openPatternIndex = -1;
+    private void updateDetailControls() {
+        if (!detailPanelOpen || detailIndex < 0) {
+            setDetailWidgetsVisible(false);
+            return;
         }
-        boolean panel = filterPanelOpen && menu.isFilterActive();
-        for (int index = 0; index < StaffLinkRoute.FILTER_LIMIT; index++) {
-            LinkFilterSlot slot = index < filter.size() ? filter.get(index) : LinkFilterSlot.EMPTY;
-            boolean filled = panel && !slot.isEmpty();
+        int px = detailPanelX();
+        int py = detailPanelY();
+        detailPatternField.setX(px + DETAIL_PATTERN_X);
+        detailPatternField.setY(py + DETAIL_MARKER_ROW_Y);
+        detailExcludeButton.setX(px + DETAIL_EXCLUDE_X);
+        detailExcludeButton.setY(py + DETAIL_MARKER_ROW_Y);
+        detailOutOpButton.setX(px + DETAIL_OP_X);
+        detailOutOpButton.setY(py + DETAIL_OUT_ROW_Y);
+        detailOutValueField.setX(px + DETAIL_VALUE_X);
+        detailOutValueField.setY(py + DETAIL_OUT_ROW_Y);
+        detailInOpButton.setX(px + DETAIL_OP_X);
+        detailInOpButton.setY(py + DETAIL_IN_ROW_Y);
+        detailInValueField.setX(px + DETAIL_VALUE_X);
+        detailInValueField.setY(py + DETAIL_IN_ROW_Y);
+        detailCloseButton.setX(px + (DETAIL_PANEL_WIDTH - DETAIL_BUTTON_WIDTH) / 2);
+        detailCloseButton.setY(py + DETAIL_BUTTON_Y);
 
-            setIfUnfocused(filterKeepFields[index], limitText(slot.keepAtSource()));
-            setIfUnfocused(filterMaxFields[index], limitText(slot.maxInto()));
-            setIfUnfocused(filterPatternFields[index], slot.pattern() == null ? "" : slot.pattern());
+        LinkFilterSlot slot = currentFilterSlot(detailIndex);
+        boolean hasMarker = !slot.isEmpty();
+        LinkFilterCondition out = slot.outCond();
+        LinkFilterCondition in = slot.inCond();
 
-            filterKeepFields[index].setVisible(filled);
-            filterMaxFields[index].setVisible(filled);
-            filterPatternFields[index].setVisible(panel && index == openPatternIndex);
-        }
+        detailPatternField.setVisible(true);
+        detailCloseButton.visible = true;
+        detailExcludeButton.visible = hasMarker;
+        detailOutOpButton.visible = hasMarker;
+        detailInOpButton.visible = hasMarker;
+        detailOutValueField.setVisible(hasMarker && !out.isOff());
+        detailInValueField.setVisible(hasMarker && !in.isOff());
+
+        detailExcludeButton.active = hasMarker;
+        detailOutOpButton.active = hasMarker;
+        detailInOpButton.active = hasMarker;
+        detailOutValueField.setEditable(hasMarker && !out.isOff());
+        detailInValueField.setEditable(hasMarker && !in.isOff());
+
+        detailExcludeButton.setMessage(Component.translatable(slot.isExcluded()
+                ? "gui.useless_mod.wireless_logistics.filter_exclude_on"
+                : "gui.useless_mod.wireless_logistics.filter_exclude_off"));
+        detailOutOpButton.setMessage(opLabel(out.op()));
+        detailInOpButton.setMessage(opLabel(in.op()));
+
+        setIfUnfocused(detailPatternField, slot.pattern() == null ? "" : slot.pattern());
+        setIfUnfocused(detailOutValueField, conditionText(out));
+        setIfUnfocused(detailInValueField, conditionText(in));
+    }
+
+    private static Component opLabel(LinkFilterCondition.Op op) {
+        return Component.translatable(switch (op) {
+            case OFF -> "gui.useless_mod.wireless_logistics.filter_cond_op_off";
+            case AT_LEAST -> "gui.useless_mod.wireless_logistics.filter_cond_op_at_least";
+            case AT_MOST -> "gui.useless_mod.wireless_logistics.filter_cond_op_at_most";
+        });
+    }
+
+    /** 条件数值的显示文本：不启用时留空。 */
+    private static String conditionText(LinkFilterCondition cond) {
+        return cond.isOff() ? "" : limitText(cond.value());
     }
 
     /**
@@ -690,109 +775,250 @@ public final class StaffLinkScreen extends AbstractContainerScreen<StaffLinkMenu
         }
     }
 
-    /**
-     * 把过滤格里被改过的限制提交上去。
-     *
-     * <p>只在真有变化时才发一次 {@code applyRoute}：这个方法是按 tick 兜底调用的，
-     * 每次都发会让网络包每 tick 飞一个。</p>
-     */
-    private void commitFilterFields() {
-        StaffLinkRoute config = menu.getSelectedConfig();
-        if (config == null) {
+    // ---- 详细编辑面板
+
+    /** 打开某一格的详细面板（会先把上一格未提交的编辑落下去）。 */
+    private void openDetailPanel(int index) {
+        if (index < 0 || index >= StaffLinkRoute.FILTER_LIMIT || !menu.isFilterActive()) {
             return;
         }
-        List<LinkFilterSlot> filter = config.filter();
-        for (int index = 0; index < StaffLinkRoute.FILTER_LIMIT; index++) {
-            LinkFilterSlot slot = index < filter.size() ? filter.get(index) : LinkFilterSlot.EMPTY;
-            long keep = Math.max(0L, parseLimit(filterKeepFields[index].getValue(), slot.keepAtSource()));
-            long max = Math.max(0L, parseLimit(filterMaxFields[index].getValue(), slot.maxInto()));
-            if (keep != slot.keepAtSource() || max != slot.maxInto()) {
-                menu.setFilterSlotLimits(index, keep, max);
+        if (detailPanelOpen && detailIndex == index) {
+            return;
+        }
+        if (detailPanelOpen) {
+            commitDetail();
+        }
+        detailPanelOpen = true;
+        detailIndex = index;
+        setFocused(null);
+        updateDetailControls();
+    }
+
+    /** 关闭详细面板（会提交它）。 */
+    private void closeDetailPanel() {
+        if (!detailPanelOpen) {
+            return;
+        }
+        commitDetail();
+        detailPanelOpen = false;
+        detailIndex = -1;
+        setFocused(null);
+        setDetailWidgetsVisible(false);
+    }
+
+    /**
+     * 按详细面板当前控件的内容，把「镜像里的那一格」重读一遍。
+     *
+     * <p>读的是<b>控件</b>而不是镜像：这样点 op / 排除按钮时，输入框里还没失焦提交的数值与模式
+     * 不会丢。标记本身仍以镜像为准（它只能通过左键 / JEI 放置）。</p>
+     *
+     * @return 组装好的格子；模式非法时返回 {@code null}（已弹提示）
+     */
+    @Nullable
+    private LinkFilterSlot readDetailSlot() {
+        LinkFilterSlot slot = currentFilterSlot(detailIndex);
+        if (slot.isEmpty()) {
+            return LinkFilterSlot.EMPTY;
+        }
+        String text = detailPatternField.getValue().trim();
+        if (!text.equals(slot.pattern() == null ? "" : slot.pattern())) {
+            if (text.isEmpty()) {
+                return LinkFilterSlot.EMPTY;
+            }
+            LinkFilterPattern parsed = LinkFilterPattern.parse(text);
+            if (parsed == null) {
+                showNotice(Component.translatable(
+                        "gui.useless_mod.wireless_logistics.filter_pattern_invalid", text));
+                return null;
+            }
+            slot = slot.withMarker(LinkFilterSlot.ofPattern(parsed));
+        }
+        slot = applyDetailValue(slot, false);
+        return applyDetailValue(slot, true);
+    }
+
+    /** 把某一条条件的数值框内容读进来（只在该条件启用时）。 */
+    private LinkFilterSlot applyDetailValue(LinkFilterSlot slot, boolean input) {
+        LinkFilterCondition cond = input ? slot.inCond() : slot.outCond();
+        if (cond.isOff()) {
+            return slot;
+        }
+        EditBox field = input ? detailInValueField : detailOutValueField;
+        long value = Math.max(0L, parseLimit(field.getValue(), cond.value()));
+        if (value == cond.value()) {
+            return slot;
+        }
+        LinkFilterCondition next = cond.withValue(value);
+        return input ? slot.withConditions(slot.outCond(), next)
+                : slot.withConditions(next, slot.inCond());
+    }
+
+    /** 把详细面板里未提交的编辑落成一次 {@code setFilterSlot}（只在真有变化时才发）。 */
+    private void commitDetail() {
+        if (!detailPanelOpen || detailIndex < 0) {
+            return;
+        }
+        LinkFilterSlot slot = readDetailSlot();
+        if (slot == null) {
+            return;
+        }
+        if (slot.isEmpty()) {
+            if (!currentFilterSlot(detailIndex).isEmpty()) {
+                menu.setFilterSlot(detailIndex, LinkFilterSlot.EMPTY);
+            }
+            return;
+        }
+        if (!slot.equals(currentFilterSlot(detailIndex))) {
+            menu.setFilterSlot(detailIndex, slot);
+        }
+    }
+
+    /** 在详细面板上叠加一次改动（op / 排除），并把输入框里未提交的值一起带上。 */
+    private void editDetail(java.util.function.UnaryOperator<LinkFilterSlot> change) {
+        if (!detailPanelOpen || detailIndex < 0) {
+            return;
+        }
+        LinkFilterSlot slot = readDetailSlot();
+        if (slot == null || slot.isEmpty()) {
+            return;
+        }
+        LinkFilterSlot updated = change.apply(slot);
+        if (!updated.equals(currentFilterSlot(detailIndex))) {
+            menu.setFilterSlot(detailIndex, updated);
+        }
+    }
+
+    /** 切换这一格的「包含 / 排除」。 */
+    private void toggleDetailExclude() {
+        editDetail(slot -> slot.withExclude(!slot.isExcluded()));
+    }
+
+    /**
+     * 循环这一格某条条件的方向：关 → ≥ → ≤ → 关。
+     *
+     * <p>从「关」启用时给一个符合直觉的默认：输出端先给 {@code ≥}（保留），输入端先给 {@code ≤}（封顶）。</p>
+     */
+    private void cycleDetailOp(boolean input) {
+        editDetail(slot -> {
+            LinkFilterCondition cond = input ? slot.inCond() : slot.outCond();
+            LinkFilterCondition.Op next = switch (cond.op()) {
+                case OFF -> input ? LinkFilterCondition.Op.AT_MOST : LinkFilterCondition.Op.AT_LEAST;
+                case AT_LEAST -> LinkFilterCondition.Op.AT_MOST;
+                case AT_MOST -> LinkFilterCondition.Op.OFF;
+            };
+            LinkFilterCondition updated = cond.withOp(next);
+            return input ? slot.withConditions(slot.outCond(), updated)
+                    : slot.withConditions(updated, slot.inCond());
+        });
+    }
+
+    // ---- 详细面板里的槽位点击
+
+    /** 详细面板里的 A 标记槽：手持物放下，空手清空这一格。 */
+    private void clickDetailMarkerSlot() {
+        LinkFilterSlot slot = readDetailSlot();
+        if (slot == null) {
+            return;
+        }
+        ItemStack carried = menu.getCarried();
+        if (carried.isEmpty()) {
+            menu.setFilterSlot(detailIndex, LinkFilterSlot.EMPTY);
+            closeDetailPanel();
+            return;
+        }
+        LinkFilterSlot marker = StaffLinkFilters.fromItem(menu.getSelectedMedium(), carried);
+        if (marker != null) {
+            menu.setFilterSlot(detailIndex, slot.withMarker(marker));
+        }
+    }
+
+    /**
+     * 详细面板里的 B 控制材料槽：手持物放下，空手清回「测 A 自身」。
+     *
+     * <p>条件没启用（OFF）时槽位是灰的，点了不生效——先点 op 按钮把它打开。</p>
+     */
+    private void clickDetailControlSlot(boolean input) {
+        LinkFilterCondition cond = input ? currentFilterSlot(detailIndex).inCond()
+                : currentFilterSlot(detailIndex).outCond();
+        if (cond.isOff()) {
+            return;
+        }
+        ItemStack carried = menu.getCarried();
+        if (carried.isEmpty()) {
+            menu.setFilterSlotConditionControl(detailIndex, input, LinkFilterSlot.EMPTY);
+            return;
+        }
+        LinkFilterSlot marker = StaffLinkFilters.fromItem(menu.getSelectedMedium(), carried);
+        if (marker != null) {
+            menu.setFilterSlotConditionControl(detailIndex, input, marker);
+        }
+    }
+
+    /** 详细面板里的点击：按钮 → 输入框 → A/B 槽 → 玩家背包 → 面板外吞掉。 */
+    private boolean handleDetailPanelClick(double mouseX, double mouseY, int button) {
+        if (detailCloseButton.mouseClicked(mouseX, mouseY, button)
+                || detailExcludeButton.mouseClicked(mouseX, mouseY, button)
+                || detailOutOpButton.mouseClicked(mouseX, mouseY, button)
+                || detailInOpButton.mouseClicked(mouseX, mouseY, button)) {
+            return true;
+        }
+        if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT) {
+            if (detailPatternField.visible && detailPatternField.isMouseOver(mouseX, mouseY)) {
+                focusDetailField(detailPatternField, mouseX, mouseY);
+                return true;
+            }
+            if (detailOutValueField.visible && detailOutValueField.isMouseOver(mouseX, mouseY)) {
+                focusDetailField(detailOutValueField, mouseX, mouseY);
+                return true;
+            }
+            if (detailInValueField.visible && detailInValueField.isMouseOver(mouseX, mouseY)) {
+                focusDetailField(detailInValueField, mouseX, mouseY);
+                return true;
+            }
+            if (inDetailSlot(mouseX, mouseY, 0)) {
+                clickDetailMarkerSlot();
+                updateDetailControls();
+                return true;
+            }
+            if (inDetailSlot(mouseX, mouseY, 1)) {
+                clickDetailControlSlot(false);
+                updateDetailControls();
+                return true;
+            }
+            if (inDetailSlot(mouseX, mouseY, 2)) {
+                clickDetailControlSlot(true);
+                updateDetailControls();
+                return true;
             }
         }
+        // 玩家背包槽：面板开着时也允许正常「拿起 / 放下」——不然只能靠 JEI 拖。
+        if (inventorySlotAt(mouseX, mouseY) != null) {
+            return super.mouseClicked(mouseX, mouseY, button);
+        }
+        // 点在面板空白处：让输入框失焦，但不关面板。
+        setFocused(null);
+        return true;
     }
 
-    // ---- 模式框的开关
-
-    /**
-     * 右键某一格时把它的模式框露出来。
-     *
-     * <p>先把上一格的编辑提交掉再切换：不提交的话，玩家改完 A 格直接去点 B 格，A 格那段文本
-     * 就留在了输入框里，下次再打开 A 格会看到一段没生效的旧内容。</p>
-     */
-    private void openPatternEditor(int index) {
-        if (index < 0 || index >= StaffLinkRoute.FILTER_LIMIT) {
-            return;
-        }
-        if (openPatternIndex == index) {
-            closePatternEditor();
-            return;
-        }
-        if (openPatternIndex >= 0) {
-            commitPatternField(openPatternIndex);
-        }
-        openPatternIndex = index;
-        EditBox pattern = filterPatternFields[index];
-        LinkFilterSlot slot = currentFilterSlot(index);
-        if (!slot.isPattern()) {
-            // 从一个具体标记切到模式：把输入框清空，让玩家从零开始打模式。
-            pattern.setValue("");
-        }
-        pattern.setVisible(true);
-        setFocused(pattern);
-        if (minecraft != null) {
-            // 光 setFocused 不会把光标放上去，得手动把光标移到末尾。
-            pattern.moveCursorToEnd(false);
-        }
-    }
-
-    /** 收起当前打开的模式框，并把内容提交掉。 */
-    private void closePatternEditor() {
-        if (openPatternIndex < 0) {
-            return;
-        }
-        int index = openPatternIndex;
-        openPatternIndex = -1;
-        commitPatternField(index);
-        filterPatternFields[index].setVisible(false);
-        if (getFocused() == filterPatternFields[index]) {
-            setFocused(null);
-        }
+    private boolean inDetailSlot(double mouseX, double mouseY, int which) {
+        int x = detailSlotScreenX(which);
+        int y = detailSlotScreenY(which);
+        return mouseX >= x && mouseX < x + DETAIL_SLOT_SIZE
+                && mouseY >= y && mouseY < y + DETAIL_SLOT_SIZE;
     }
 
     /**
-     * 把某一格的模式框内容落成过滤标记。
+     * 让详细面板里的输入框获得焦点。
      *
-     * <p>三种结果：文本为空 ⇒ 保持原样（空输入不该把格子清掉，玩家可能只是误点右键）；
-     * 文本合法 ⇒ 换成模式标记；文本非法（裸 id 之类）⇒ <b>什么都不做</b>。第三种刻意不
-     * 「退回原来那个具体标记」：那样玩家会以为打上去的就是眼前这个，而实际上根本不是。</p>
+     * <p>跟过滤面板一样：覆盖层这条路径到不了框架的 {@code mouseClicked}，得自己补
+     * {@code setFocused} + {@code field.mouseClicked}（摆光标）两步。</p>
      */
-    private void commitPatternField(int index) {
-        if (index < 0 || index >= StaffLinkRoute.FILTER_LIMIT) {
-            return;
+    private void focusDetailField(EditBox field, double mouseX, double mouseY) {
+        if (getFocused() != field) {
+            commitDetail();
         }
-        String text = filterPatternFields[index].getValue().trim();
-        LinkFilterSlot slot = currentFilterSlot(index);
-        if (text.isEmpty()) {
-            if (slot.isPattern()) {
-                // 玩家把模式删空了 = 想去掉这一格。
-                menu.setFilterSlot(index, LinkFilterSlot.EMPTY);
-            }
-            return;
-        }
-        LinkFilterPattern parsed = LinkFilterPattern.parse(text);
-        if (parsed == null) {
-            showNotice(Component.translatable(
-                    "gui.useless_mod.wireless_logistics.filter_pattern_invalid", text));
-            return;
-        }
-        if (text.equals(slot.pattern())) {
-            return;
-        }
-        // 换模式时保留这一格原有的两个限制值。
-        menu.setFilterSlot(index, LinkFilterSlot.ofPattern(parsed)
-                .withLimits(slot.keepAtSource(), slot.maxInto()));
-        syncFilterFields();
+        setFocused(field);
+        field.mouseClicked(mouseX, mouseY, GLFW.GLFW_MOUSE_BUTTON_LEFT);
     }
 
     /** 当前在镜子里的第 index 格；越界或没有选中线路时回落到 {@link LinkFilterSlot#EMPTY}。 */
@@ -839,24 +1065,14 @@ public final class StaffLinkScreen extends AbstractContainerScreen<StaffLinkMenu
         }
 
         updateControls();
-        // 显示值可能与真值脱节（切容器 / 服务端回了新配置），每 tick 对齐一次；
-        // 有焦点的那几个框保持不动。
-        syncFilterFields();
+        // 详细面板：摆位 + 显示值对齐（有焦点的框保持不动），每 tick 一次。
+        updateDetailControls();
         // resize() 会重建控件，按钮的屏幕坐标要跟着走；顺便保证可见性跟着面板状态。
         if (filterPanelOpen) {
             closeFilterButton.setX(filterPanelCloseX());
             closeFilterButton.setY(filterPanelCloseY());
             clearFilterButton.setX(filterPanelClearX());
             clearFilterButton.setY(filterPanelClearY());
-            for (int index = 0; index < StaffLinkRoute.FILTER_LIMIT; index++) {
-                int limitsY = filterLimitsScreenY(index);
-                filterKeepFields[index].setX(filterKeepScreenX(index));
-                filterKeepFields[index].setY(limitsY);
-                filterMaxFields[index].setX(filterMaxScreenX(index));
-                filterMaxFields[index].setY(limitsY);
-                filterPatternFields[index].setX(filterPatternScreenX(index));
-                filterPatternFields[index].setY(filterSlotScreenY(index) + FILTER_PATTERN_DY);
-            }
         }
         syncFilterPanelButtons();
     }
@@ -960,8 +1176,8 @@ public final class StaffLinkScreen extends AbstractContainerScreen<StaffLinkMenu
         if (weight != config.weight() || amount != config.amount() || interval != config.interval()) {
             menu.applyRoute(withNumbers(config, (int) weight, amount, (int) interval));
         }
-        // 过滤格里被改过的限制 / 模式。
-        commitFilterFields();
+        // 详细面板里被改过、还没失焦提交的条件 / 模式。
+        commitDetail();
     }
 
     private static long parsePlain(String text, long fallback, long min, long max) {
@@ -1207,45 +1423,40 @@ public final class StaffLinkScreen extends AbstractContainerScreen<StaffLinkMenu
 
         Component heading = Component.translatable("gui.useless_mod.wireless_logistics.filter_panel_title",
                 filterFilledCount());
-        graphics.drawString(font, heading, panelX + FILTER_PANEL_PAD, panelY + 7,
+        graphics.drawString(font, heading, panelX + FILTER_PANEL_PAD, panelY + 6,
                 MachineScreenStyle.TEXT_COLOR, false);
-        // 面板只有一级菜单那么宽（250），标题 + 提示放不下一行，所以提示只在**放得下**时才画；
-        // 右对齐的提示一旦会压到标题上就宁可省掉——格子的用法在悬停提示里已经讲过了。
+        // 面板只有 140 宽，标题 + 提示放不下一行，所以提示换到第二行（面板高度里已经留了位置）。
         Component hint = Component.translatable("gui.useless_mod.wireless_logistics.filter_panel_hint");
-        int hintX = panelX + FILTER_PANEL_WIDTH - FILTER_PANEL_PAD - font.width(hint);
-        if (hintX > panelX + FILTER_PANEL_PAD + font.width(heading) + 6) {
-            graphics.drawString(font, hint, hintX, panelY + 7,
-                    MachineScreenStyle.MUTED_TEXT_COLOR, false);
-        }
+        graphics.drawString(font, hint, panelX + FILTER_PANEL_PAD, panelY + 16,
+                MachineScreenStyle.MUTED_TEXT_COLOR, false);
 
         // 面板切出来时底层 UI 已经被盖掉，所以要先把面板底子落地，
         // 免得下面 fill 出来的格子背景和先前那批混在一个缓冲里被重新排序。
         graphics.flush();
 
-        renderFilterSlotBackgrounds(graphics, panelX, panelY, active);
-        // JEI 拖拽悬停高亮要压在槽位底色之上、限制框和输入框之下，所以放这里。
-        renderFilterDragHover(graphics, mouseX, mouseY);
-        renderFilterItems(graphics);
-        renderFilterGlyphLabels(graphics);
-        // 槽位里的物品（z=150）、模式字形都入批了，先落地，再画浮在上面的输入框和描边。
-        graphics.flush();
-        renderLimitBoxes(graphics, panelX, panelY, active);
-        // 覆盖层阶段不在 super.render() 的渲染序列里，过滤框得自己画——它们平时由框架负责。
-        for (int index = 0; index < StaffLinkRoute.FILTER_LIMIT; index++) {
-            filterKeepFields[index].render(graphics, mouseX, mouseY, 0.0F);
-            filterMaxFields[index].render(graphics, mouseX, mouseY, 0.0F);
-            filterPatternFields[index].render(graphics, mouseX, mouseY, 0.0F);
+        // 详细面板开着时它整片盖住了 18 格，网格不必再画（也省得物品的 z 偏移穿透上来）。
+        if (!detailPanelOpen) {
+            renderFilterSlotBackgrounds(graphics, panelX, panelY, active);
+            // JEI 拖拽悬停高亮要压在槽位底色之上，所以放这里。
+            renderFilterDragHover(graphics, mouseX, mouseY);
+            renderFilterItems(graphics);
+            // 角标（排除 / 有条件）画在物品之上，先入批再落地。
+            renderFilterBadges(graphics);
+            graphics.flush();
         }
 
         closeFilterButton.render(graphics, mouseX, mouseY, 0.0F);
         clearFilterButton.render(graphics, mouseX, mouseY, 0.0F);
 
         // 面板自己的一套悬停提示；不走 super.render()，所以得单独调。
+        // 详细面板开着时它整个压住了这两个按钮，按钮提示也别画（否则会浮在详细面板上）。
         renderFilterTooltip(graphics, mouseX, mouseY);
-        renderFilterButtonTooltip(graphics, mouseX, mouseY);
+        if (!detailPanelOpen) {
+            renderFilterButtonTooltip(graphics, mouseX, mouseY);
+        }
     }
 
-    /** 18 格的底板 + 有标记那一格的顶面高光 + 模式编辑中的描边。 */
+    /** 18 格的底板 + 有标记那一格的顶面高光 + 详细面板正在编辑的那一格描边。 */
     private void renderFilterSlotBackgrounds(GuiGraphics graphics, int panelX, int panelY, boolean active) {
         int fill = active ? MachineScreenStyle.SLOT_COLOR : 0xFF777B8D;
         for (int index = 0; index < StaffLinkRoute.FILTER_LIMIT; index++) {
@@ -1256,12 +1467,41 @@ public final class StaffLinkScreen extends AbstractContainerScreen<StaffLinkMenu
                 graphics.fill(x, y, x + FILTER_SLOT_SIZE, y + 1, MachineScreenStyle.SLOT_SHADOW_COLOR);
             }
         }
-        // 正在编辑模式的那一格描边——面板里空格子之间留白不少，不圈一下容易看错行。
-        if (openPatternIndex >= 0 && openPatternIndex < StaffLinkRoute.FILTER_LIMIT) {
-            int x = filterSlotScreenX(openPatternIndex);
-            int y = filterSlotScreenY(openPatternIndex);
+        // 详细面板正在编辑的那一格描边——面板里空格子之间留白不少，不圈一下容易看错行。
+        if (detailPanelOpen && detailIndex >= 0 && detailIndex < StaffLinkRoute.FILTER_LIMIT) {
+            int x = filterSlotScreenX(detailIndex);
+            int y = filterSlotScreenY(detailIndex);
             outline(graphics, x - 1, y - 1, FILTER_SLOT_SIZE + 2, FILTER_SLOT_SIZE + 2,
                     MULTI_SELECT_TEXT_COLOR);
+        }
+    }
+
+    /**
+     * 每格的状态角标：右上角红 {@code x} = 这一格是「排除」；右下角青点 = 这一格带了控制条件。
+     *
+     * <p>角标是必要的：格子本身只画标记，光看图标分不出「包含」还是「排除」，也看不出有没有条件。</p>
+     */
+    private void renderFilterBadges(GuiGraphics graphics) {
+        if (!menu.isFilterActive()) {
+            return;
+        }
+        List<LinkFilterSlot> mirror = menu.getFilterMirror();
+        for (int index = 0; index < StaffLinkRoute.FILTER_LIMIT; index++) {
+            LinkFilterSlot slot = index < mirror.size() ? mirror.get(index) : LinkFilterSlot.EMPTY;
+            if (slot.isEmpty()) {
+                continue;
+            }
+            int x = filterSlotScreenX(index);
+            int y = filterSlotScreenY(index);
+            if (slot.isExcluded()) {
+                graphics.drawString(font, "x", x + FILTER_SLOT_SIZE - 6, y - 1,
+                        MachineScreenStyle.ERROR_TEXT_COLOR, false);
+            }
+            if (slot.hasConditions()) {
+                graphics.fill(x + FILTER_SLOT_SIZE - 5, y + FILTER_SLOT_SIZE - 5,
+                        x + FILTER_SLOT_SIZE - 1, y + FILTER_SLOT_SIZE - 1,
+                        MULTI_SELECT_TEXT_COLOR);
+            }
         }
     }
 
@@ -1301,83 +1541,6 @@ public final class StaffLinkScreen extends AbstractContainerScreen<StaffLinkMenu
             }
         }
         return -1;
-    }
-
-    /**
-     * 画「源端保留 / 接收端上限」两个框底与它们左边的小字标签。
-     *
-     * <p>标签放框<b>左边</b>：面板里一格有 72px 宽，两个框各 32px、并排只占 64px，
-     * 右侧还剩 8px，放不下「保留」这类两字标签，放左边反而宽裕。</p>
-     *
-     * <p>一格都没标记时不画：框和标签都是跟标记走的，空面板应该看着就是空的。</p>
-     */
-    private void renderLimitBoxes(GuiGraphics graphics, int panelX, int panelY, boolean active) {
-        if (!active) {
-            return;
-        }
-        List<LinkFilterSlot> mirror = menu.getFilterMirror();
-        for (int index = 0; index < StaffLinkRoute.FILTER_LIMIT; index++) {
-            LinkFilterSlot slot = index < mirror.size() ? mirror.get(index) : LinkFilterSlot.EMPTY;
-            if (slot.isEmpty()) {
-                continue;
-            }
-            int y = filterLimitsScreenY(index);
-            drawLimitBox(graphics, filterKeepScreenX(index), y);
-            drawLimitBox(graphics, filterMaxScreenX(index), y);
-        }
-    }
-
-    /**
-     * 限制框的底板。
-     *
-     * <p>框本身是 {@link EditBox}，但它<b>焦点不在自己身上时只画 1px 的下边线</b>，
-     * 面板里一排排看着像飘着的字。这里补一层底 + 描边，让「这是个能填的框」一眼可见。</p>
-     */
-    private void drawLimitBox(GuiGraphics graphics, int x, int y) {
-        graphics.fill(x, y, x + FILTER_LIMIT_WIDTH, y + FILTER_LIMIT_HEIGHT,
-                MachineScreenStyle.FIELD_FILL_COLOR);
-        outline(graphics, x, y, FILTER_LIMIT_WIDTH, FILTER_LIMIT_HEIGHT,
-                MachineScreenStyle.FIELD_BORDER_COLOR);
-    }
-
-    /**
-     * 在限制框右边标出是「保留」还是「上限」，玩家不用悬停就知道哪个框管哪头。
-     *
-     * <p><b>靠右画、且只在这个框空着时画</b>：{@link EditBox} 有边框时文字从
-     * {@code x + 4} 起排，单字标签要是也贴在左缘就会跟玩家敲进去的数字叠在一起。
-     * 靠右对齐 + 空框才画，等于把它当占位符用：一敲字就让位，不敲字就说明这个框管什么。</p>
-     */
-    private void renderFilterGlyphLabels(GuiGraphics graphics) {
-        if (!menu.isFilterActive()) {
-            return;
-        }
-        List<LinkFilterSlot> mirror = menu.getFilterMirror();
-        Component keepLabel = Component.translatable("gui.useless_mod.wireless_logistics.filter_keep");
-        Component maxLabel = Component.translatable("gui.useless_mod.wireless_logistics.filter_max");
-        for (int index = 0; index < StaffLinkRoute.FILTER_LIMIT; index++) {
-            LinkFilterSlot slot = index < mirror.size() ? mirror.get(index) : LinkFilterSlot.EMPTY;
-            if (slot.isEmpty()) {
-                continue;
-            }
-            // 两个框各 34 宽、并排后还剩 8px 才到本列右缘，塞不下「保留」两字，
-            // 所以用单字「留 / 存」（跟一级菜单的 tooltip 用语一致）。
-            int y = filterLimitsScreenY(index) + 1;
-            drawGlyphIfBlank(graphics, filterKeepFields[index],
-                    filterKeepScreenX(index), y, keepLabel);
-            drawGlyphIfBlank(graphics, filterMaxFields[index],
-                    filterMaxScreenX(index), y, maxLabel);
-        }
-    }
-
-    /** 框里没字时（含正在编辑但还没敲的）把单字标签靠右画进去。 */
-    private void drawGlyphIfBlank(GuiGraphics graphics, EditBox field, int boxX, int y,
-                                  Component glyph) {
-        if (!field.getValue().isEmpty()) {
-            return;
-        }
-        graphics.drawString(font, glyph,
-                boxX + FILTER_LIMIT_WIDTH - 3 - font.width(glyph), y,
-                MachineScreenStyle.MUTED_TEXT_COLOR, false);
     }
 
     /** 有标记的格数，标题里用。 */
@@ -1519,8 +1682,9 @@ public final class StaffLinkScreen extends AbstractContainerScreen<StaffLinkMenu
                     index < anchors.size() - 1);
 
             // 名字前面标出「这条线路上它是发还是收」——一堆同名容器时，光看名字分不出谁在发。
+            // 箭头方向按「相对这个名字所在行」看：输出端 < 指向外侧（发出去）、输入端 > 指向名字（收进来）。
             StaffLinkRoute routeConfig = menu.getConfig(anchor, menu.getSelectedRoute());
-            String glyph = routeConfig == null ? "-" : routeConfig.flow() == LinkFlow.RELEASE ? ">" : "<";
+            String glyph = routeConfig == null ? "-" : routeConfig.flow() == LinkFlow.RELEASE ? "<" : ">";
             int glyphColor;
             if (routeConfig == null || !routeConfig.enabled()) {
                 glyphColor = MachineScreenStyle.MUTED_TEXT_COLOR;
@@ -1862,39 +2026,168 @@ public final class StaffLinkScreen extends AbstractContainerScreen<StaffLinkMenu
      *       堆叠数字在 z=200，留在 z=0 的填充比它们都远，片段会被深度测试直接丢掉。</li>
      * </ol>
      *
-     * <p>面板<b>不再铺满全屏</b>：只画面板四周一圈半透明压暗层（{@link #renderFilterDim}），
-     * 面板本身仍是 {@code drawPanel} 的不透明底。这样既突出面板，又不会把 JEI 侧栏涂掉、
-     * 也不会在窄面板周围留一圈死黑。</p>
+     * <p><b>没有压暗层</b>（v2 修）：早先会在面板四周铺一圈半透明黑，但面板只占屏幕一小块，
+     * 四块矩形与背包 / 侧栏的边界会露出一道道硬边，看着很乱（用户反馈「压暗层乱七八糟的」）。
+     * 面板本身是 {@code drawPanel} 的不透明底，不压暗也照样能看清。</p>
      */
     private void renderFilterOverlay(GuiGraphics graphics, int mouseX, int mouseY) {
         // 底层已入批的内容先落地，之后画的面板才能稳定压在上面。
         graphics.flush();
         graphics.pose().pushPose();
         graphics.pose().translate(0.0F, 0.0F, FILTER_PANEL_Z);
-        renderFilterDim(graphics);
         renderFilterPanel(graphics, mouseX, mouseY);
         graphics.pose().popPose();
+        // 详细面板再抬一层 z，压过滤面板。
+        if (detailPanelOpen) {
+            graphics.pose().pushPose();
+            graphics.pose().translate(0.0F, 0.0F, DETAIL_PANEL_Z);
+            renderDetailPanel(graphics, mouseX, mouseY);
+            graphics.pose().popPose();
+        }
         // 收尾再 flush 一次，保证面板立刻定型，不会被本帧后面的内容盖掉。
         graphics.flush();
+        // 背包槽的悬停提示：它本来由 super.render() 画，但那时还没画面板，会被盖住。
+        // 面板开着时从背包取物品是常规操作，提示必须在最上面重画一遍。
+        if (inventorySlotAt(mouseX, mouseY) != null) {
+            super.renderTooltip(graphics, mouseX, mouseY);
+        }
+        // 光标上拿着的物品同理：vanilla 只在 super.render() 里画它（z 也低于面板），
+        // 从背包拿起物品来标记时会被面板整个盖住、看不见手上是什么。这里抬到最上面重画。
+        renderCarriedItem(graphics, mouseX, mouseY);
+    }
+
+    /** 把「光标上拿着的物品」画在覆盖层最上面（含堆叠数字）。 */
+    private void renderCarriedItem(GuiGraphics graphics, int mouseX, int mouseY) {
+        ItemStack carried = menu.getCarried();
+        if (carried.isEmpty()) {
+            return;
+        }
+        int x = mouseX - 8;
+        int y = mouseY - 8;
+        graphics.pose().pushPose();
+        graphics.pose().translate(0.0F, 0.0F, CARRIED_ITEM_Z);
+        graphics.renderItem(carried, x, y);
+        graphics.renderItemDecorations(font, carried, x, y);
+        graphics.pose().popPose();
     }
 
     /**
-     * 面板四周的压暗层：把底层界面稍微压下去，突出面板，但<b>不</b>盖黑整屏。
+     * 画详细编辑面板。
      *
-     * <p>不盖黑的理由有二：一是原来那层不透明黑会把 JEI 侧栏一起涂掉（侧栏画在
-     * {@code super.render()} 里，位置在窗口右缘），二是面板只占 250 宽，剩下的地方留一片死黑
-     * 很难看，也让人以为界面坏了。</p>
+     * <p>跟过滤面板同一套约定：底板不透明、控件手动 render（它们只进了 children，
+     * 进 renderables 会被 {@code super.render()} 画到下面去）。</p>
      */
-    private void renderFilterDim(GuiGraphics graphics) {
-        int panelX = filterPanelX();
-        int panelY = filterPanelY();
-        int panelRight = panelX + FILTER_PANEL_WIDTH;
-        int panelBottom = panelY + FILTER_PANEL_HEIGHT;
-        // 面板上下左右四块，中间让开面板本身（面板自己会画不透明底）。
-        graphics.fill(0, 0, width, panelY, FILTER_DIM_COLOR);
-        graphics.fill(0, panelBottom, width, height, FILTER_DIM_COLOR);
-        graphics.fill(0, panelY, panelX, panelBottom, FILTER_DIM_COLOR);
-        graphics.fill(panelRight, panelY, width, panelBottom, FILTER_DIM_COLOR);
+    private void renderDetailPanel(GuiGraphics graphics, int mouseX, int mouseY) {
+        int panelX = detailPanelX();
+        int panelY = detailPanelY();
+        MachineScreenStyle.drawPanel(graphics, panelX, panelY, DETAIL_PANEL_WIDTH, DETAIL_PANEL_HEIGHT);
+
+        LinkFilterSlot slot = currentFilterSlot(detailIndex);
+        graphics.drawString(font, Component.translatable(
+                        "gui.useless_mod.wireless_logistics.filter_slot_title", detailIndex + 1),
+                panelX + DETAIL_PANEL_PAD, panelY + DETAIL_TITLE_Y,
+                MachineScreenStyle.TEXT_COLOR, false);
+
+        // 输出端 / 输入端 标签
+        graphics.drawString(font, Component.translatable(
+                        "gui.useless_mod.wireless_logistics.filter_cond_out_label"),
+                panelX + DETAIL_LABEL_X, panelY + DETAIL_OUT_ROW_Y + 5,
+                MachineScreenStyle.MUTED_TEXT_COLOR, false);
+        graphics.drawString(font, Component.translatable(
+                        "gui.useless_mod.wireless_logistics.filter_cond_in_label"),
+                panelX + DETAIL_LABEL_X, panelY + DETAIL_IN_ROW_Y + 5,
+                MachineScreenStyle.MUTED_TEXT_COLOR, false);
+
+        // 三个槽位（A 标记、输出端 B、输入端 B）的底板
+        for (int which = 0; which < 3; which++) {
+            int x = detailSlotScreenX(which);
+            int y = detailSlotScreenY(which);
+            graphics.fill(x, y, x + DETAIL_SLOT_SIZE, y + DETAIL_SLOT_SIZE,
+                    MachineScreenStyle.SLOT_COLOR);
+            graphics.fill(x, y, x + DETAIL_SLOT_SIZE, y + 1, MachineScreenStyle.SLOT_SHADOW_COLOR);
+        }
+        graphics.flush();
+
+        // A 槽内容 + 两个 B 槽内容
+        renderDetailMarker(graphics, detailSlotScreenX(0), detailSlotScreenY(0), slot);
+        renderDetailControl(graphics, detailSlotScreenX(1), detailSlotScreenY(1), slot.outCond());
+        renderDetailControl(graphics, detailSlotScreenX(2), detailSlotScreenY(2), slot.inCond());
+        graphics.flush();
+
+        // 控件手动 render（覆盖层阶段不在 super.render() 的渲染序列里）
+        detailPatternField.render(graphics, mouseX, mouseY, 0.0F);
+        detailOutValueField.render(graphics, mouseX, mouseY, 0.0F);
+        detailInValueField.render(graphics, mouseX, mouseY, 0.0F);
+        detailExcludeButton.render(graphics, mouseX, mouseY, 0.0F);
+        detailOutOpButton.render(graphics, mouseX, mouseY, 0.0F);
+        detailInOpButton.render(graphics, mouseX, mouseY, 0.0F);
+        detailCloseButton.render(graphics, mouseX, mouseY, 0.0F);
+
+        // 面板自己的一套悬停提示
+        renderDetailTooltip(graphics, mouseX, mouseY);
+    }
+
+    /** A 标记槽的内容：模式字形 / 流体贴图 / 物品图标。 */
+    private void renderDetailMarker(GuiGraphics graphics, int x, int y, LinkFilterSlot slot) {
+        if (slot.isEmpty()) {
+            return;
+        }
+        if (slot.isPattern()) {
+            renderPatternMarker(graphics, x, y, slot);
+        } else if (slot.isFluid()) {
+            renderFluidMarker(graphics, x, y, slot.fluid());
+        } else {
+            graphics.renderItem(slot.item(), x, y);
+        }
+    }
+
+    /** B 控制材料槽的内容：留空画「自身」，否则画物品 / 流体。 */
+    private void renderDetailControl(GuiGraphics graphics, int x, int y, LinkFilterCondition cond) {
+        if (cond.isOff()) {
+            return;
+        }
+        if (cond.isSelf()) {
+            graphics.drawString(font, Component.translatable(
+                            "gui.useless_mod.wireless_logistics.filter_cond_self"),
+                    x, y + 5, MachineScreenStyle.MUTED_TEXT_COLOR, false);
+        } else if (cond.isFluidControl()) {
+            renderFluidMarker(graphics, x, y, cond.fluid());
+        } else if (cond.isItemControl()) {
+            graphics.renderItem(cond.item(), x, y);
+        }
+    }
+
+    /** 详细面板的悬停提示：三个槽位 + 两个按钮。 */
+    private void renderDetailTooltip(GuiGraphics graphics, int mouseX, int mouseY) {
+        List<Component> lines = null;
+        if (inDetailSlot(mouseX, mouseY, 0)) {
+            lines = List.of(Component.translatable(
+                    "gui.useless_mod.wireless_logistics.filter_hint"));
+        } else if (inDetailSlot(mouseX, mouseY, 1) || inDetailSlot(mouseX, mouseY, 2)) {
+            boolean input = inDetailSlot(mouseX, mouseY, 2);
+            lines = List.of(Component.translatable(
+                    "gui.useless_mod.wireless_logistics."
+                            + (input ? "filter_cond_in_hint" : "filter_cond_out_hint")));
+        } else if (detailExcludeButton.visible && detailExcludeButton.isMouseOver(mouseX, mouseY)) {
+            lines = List.of(Component.translatable(
+                    "gui.useless_mod.wireless_logistics.filter_exclude_hint"));
+        }
+        if (lines != null) {
+            graphics.renderTooltip(font, lines, Optional.empty(), mouseX, mouseY);
+        }
+    }
+
+    /** 屏幕坐标下的玩家背包槽；没命中返回 {@code null}。 */
+    @Nullable
+    private Slot inventorySlotAt(double mouseX, double mouseY) {
+        for (Slot slot : menu.slots) {
+            int x = leftPos + slot.x;
+            int y = topPos + slot.y;
+            if (mouseX >= x && mouseX < x + 16 && mouseY >= y && mouseY < y + 16) {
+                return slot;
+            }
+        }
+        return null;
     }
 
     /**
@@ -2018,12 +2311,12 @@ public final class StaffLinkScreen extends AbstractContainerScreen<StaffLinkMenu
                 ? MachineScreenStyle.ERROR_TEXT_COLOR
                 : MachineScreenStyle.TEXT_COLOR;
         String glyph = parsed != null && parsed.isTag() ? "#" : "*";
-        // 槽位只有 18px：字形贴左上、尾巴压在下面一行（字号不缩，18px 高度塞得下两行 9px 的字体）。
-        graphics.drawString(font, glyph, x + 2, y + 1, color, false);
+        // 槽位只有 16px：字形贴左上、尾巴压在下面一行（字号不缩，16px 高度塞得下两行 9px 的字体）。
+        graphics.drawString(font, glyph, x + 1, y + 1, color, false);
         // 井号右侧再点一下模式里的关键字，不然一堆格子全是「#」根本分不出哪个是哪个。
         String tail = patternTail(text);
         if (!tail.isEmpty()) {
-            graphics.drawString(font, tail, x + 1, y + 10, color, false);
+            graphics.drawString(font, tail, x, y + 8, color, false);
         }
     }
 
@@ -2064,8 +2357,8 @@ public final class StaffLinkScreen extends AbstractContainerScreen<StaffLinkMenu
                 ((tint >> 8) & 0xFF) / 255.0F,
                 (tint & 0xFF) / 255.0F,
                 alpha == 0.0F ? 1.0F : alpha);
-        // 流体贴图是 16×16，槽位 18×18，往内缩 1px 居中。
-        graphics.blit(x + 1, y + 1, 0, 16, 16, sprite);
+        // 流体贴图是 16×16，槽位也是 16×16，直接铺满。
+        graphics.blit(x, y, 0, 16, 16, sprite);
         graphics.setColor(1.0F, 1.0F, 1.0F, 1.0F);
     }
 
@@ -2097,17 +2390,17 @@ public final class StaffLinkScreen extends AbstractContainerScreen<StaffLinkMenu
 
     /** 过滤器槽的说明：标记的是资源本身（流体就是流体、物品就是物品），得讲清楚。 */
     private void renderFilterTooltip(GuiGraphics graphics, int mouseX, int mouseY) {
-        if (!filterPanelOpen || !menu.isFilterActive()) {
+        // 详细面板开着时它压在最上面，格子提示会被它盖掉一半（玩家实测反馈）。
+        // 这时候由详细面板自己出提示，格子提示整个不画。
+        if (!filterPanelOpen || detailPanelOpen || !menu.isFilterActive()) {
             return;
         }
         int index = filterSlotAt(mouseX, mouseY);
         if (index < 0) {
-            // 不在格子上时看看是不是悬停在限制框上——那两个框也需要说明。
-            renderLimitTooltip(graphics, mouseX, mouseY);
             return;
         }
         LinkFilterSlot marker = menu.getFilterMirror().get(index);
-        List<Component> lines = new ArrayList<>(5);
+        List<Component> lines = new ArrayList<>(6);
         LinkFilterPattern pattern = marker.isPattern() ? LinkFilterPattern.parse(marker.pattern()) : null;
         if (pattern != null) {
             lines.add(Component.literal(pattern.displayName()));
@@ -2132,83 +2425,40 @@ public final class StaffLinkScreen extends AbstractContainerScreen<StaffLinkMenu
         } else if (marker.isItem()) {
             lines.add(marker.item().getHoverName());
         }
-        appendLimitLines(lines, marker);
+        // 方向：包含 / 排除。
+        lines.add(Component.translatable(marker.isExcluded()
+                ? "gui.useless_mod.wireless_logistics.filter_exclude_on"
+                : "gui.useless_mod.wireless_logistics.filter_exclude_off"));
+        appendConditionLines(lines, marker);
         lines.add(Component.translatable("gui.useless_mod.wireless_logistics.filter_hint"));
-        lines.add(Component.translatable("gui.useless_mod.wireless_logistics.filter_right_click_hint"));
-        graphics.renderTooltip(font, lines, Optional.empty(), mouseX, mouseY);
-    }
-
-    /** 悬停某一格的限制框：说清这个框管的是哪一端。 */
-    private void renderLimitTooltip(GuiGraphics graphics, int mouseX, int mouseY) {
-        int index = filterLimitAt(mouseX, mouseY);
-        if (index < 0) {
-            return;
-        }
-        boolean keep = isKeepBox(mouseX, mouseY, index);
-        List<Component> lines = new ArrayList<>(3);
-        lines.add(Component.translatable("gui.useless_mod.wireless_logistics."
-                + (keep ? "filter_keep" : "filter_max")));
-        lines.add(Component.translatable("gui.useless_mod.wireless_logistics."
-                + (keep ? "filter_keep_hint" : "filter_max_hint")));
-        lines.add(Component.translatable(
-                "gui.useless_mod.wireless_logistics.filter_limit_blank_hint"));
+        lines.add(Component.translatable("gui.useless_mod.wireless_logistics.filter_detail_hint"));
         graphics.renderTooltip(font, lines, Optional.empty(), mouseX, mouseY);
     }
 
     /**
-     * 把「保留 / 上限」两条非零限制写成 tooltip 行；都为 0 就不加。
+     * 把两条控制条件写成 tooltip 行；没启用的不加。
      *
      * <p>数值走 {@link #limitText}，跟框里显示的写法一致——不然会出现
      * 「框里写 1K、提示里蹦出 1000」这种对不上的情况，玩家会以为两边是两个数。</p>
      */
-    private static void appendLimitLines(List<Component> lines, LinkFilterSlot marker) {
-        if (marker.keepAtSource() > 0L) {
-            lines.add(Component.translatable(
-                    "gui.useless_mod.wireless_logistics.filter_keep_value",
-                    limitText(marker.keepAtSource())));
+    private static void appendConditionLines(List<Component> lines, LinkFilterSlot marker) {
+        appendConditionLine(lines, marker.outCond(), "filter_cond_out_label");
+        appendConditionLine(lines, marker.inCond(), "filter_cond_in_label");
+    }
+
+    private static void appendConditionLine(List<Component> lines, LinkFilterCondition cond, String labelKey) {
+        if (cond.isOff()) {
+            return;
         }
-        if (marker.maxInto() > 0L) {
-            lines.add(Component.translatable(
-                    "gui.useless_mod.wireless_logistics.filter_max_value",
-                    limitText(marker.maxInto())));
-        }
-    }
-
-    /**
-     * 命中的限制框：返回 {@code index}，并用 {@code keep} 区分是哪一头；没命中返回 -1。
-     *
-     * <p>两个框并排，所以 x 范围各不相同，不能只按格号判断。</p>
-     */
-    private int filterLimitAt(double screenX, double screenY) {
-        for (int index = 0; index < StaffLinkRoute.FILTER_LIMIT; index++) {
-            // 空格子的限制框是隐藏的，不该对悬停有反应。
-            if (currentFilterSlot(index).isEmpty()) {
-                continue;
-            }
-            if (!isLimitRow(screenY, index)) {
-                continue;
-            }
-            if (inBox(screenX, filterKeepScreenX(index)) || inBox(screenX, filterMaxScreenX(index))) {
-                return index;
-            }
-        }
-        return -1;
-    }
-
-    /** 指针是否落在第 index 格那一行限制框的纵向范围内。 */
-    private boolean isLimitRow(double screenY, int index) {
-        int y = filterLimitsScreenY(index);
-        return screenY >= y && screenY < y + FILTER_LIMIT_HEIGHT;
-    }
-
-    /** 指针是否落在以 {@code x} 为左缘的限制框内（宽 {@link #FILTER_LIMIT_WIDTH}）。 */
-    private static boolean inBox(double screenX, int x) {
-        return screenX >= x && screenX < x + FILTER_LIMIT_WIDTH;
-    }
-
-    /** 命中的是「源端保留」框吗（在并排的两个框里靠左那个）。 */
-    private boolean isKeepBox(double screenX, double screenY, int index) {
-        return isLimitRow(screenY, index) && inBox(screenX, filterKeepScreenX(index));
+        Component who = cond.isSelf()
+                ? Component.translatable("gui.useless_mod.wireless_logistics.filter_cond_self")
+                : (cond.isFluidControl() ? cond.fluid().getHoverName() : cond.item().getHoverName());
+        lines.add(Component.translatable("gui.useless_mod.wireless_logistics." + labelKey)
+                .append(Component.literal(": "))
+                .append(who)
+                .append(Component.literal(" "))
+                .append(opLabel(cond.op()))
+                .append(Component.literal(" " + limitText(cond.value()))));
     }
 
     /** 当前选中的线路搬的是不是化学品；判不了（没选中）时返回 false。 */
@@ -2284,6 +2534,11 @@ public final class StaffLinkScreen extends AbstractContainerScreen<StaffLinkMenu
 
     @Override
     public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+        if (keyCode == GLFW.GLFW_KEY_ESCAPE && detailPanelOpen) {
+            // ESC 逐层退：先关详细面板，再关过滤面板，最后才是整个界面。
+            closeDetailPanel();
+            return true;
+        }
         if (keyCode == GLFW.GLFW_KEY_ESCAPE && filterPanelOpen) {
             // 面板是覆盖层，ESC 先关它、别顺手把整个界面关了。
             setFilterPanelOpen(false);
@@ -2296,8 +2551,8 @@ public final class StaffLinkScreen extends AbstractContainerScreen<StaffLinkMenu
         }
         if ((keyCode == GLFW.GLFW_KEY_ENTER || keyCode == GLFW.GLFW_KEY_KP_ENTER) && anyFieldFocused()) {
             applyEdits();
-            // 模式框在回车时收起来：回车对玩家就是「打完了」，留在那儿会挡住上面那格。
-            closePatternEditor();
+            // 详细面板在回车时收起来：回车对玩家就是「打完了」，留在那儿会挡住下面的格子。
+            closeDetailPanel();
             setFocused(null);
             return true;
         }
@@ -2371,18 +2626,16 @@ public final class StaffLinkScreen extends AbstractContainerScreen<StaffLinkMenu
     }
 
     private List<EditBox> fields() {
-        List<EditBox> all = new ArrayList<>(numericFields.size() + 3 + StaffLinkRoute.FILTER_LIMIT * 3);
+        List<EditBox> all = new ArrayList<>(numericFields.size() + 6);
         all.add(networkNameField);
         all.add(searchField);
         all.add(nameField);
         for (NumericSpec spec : numericFields) {
             all.add(spec.field());
         }
-        for (int index = 0; index < StaffLinkRoute.FILTER_LIMIT; index++) {
-            all.add(filterKeepFields[index]);
-            all.add(filterMaxFields[index]);
-            all.add(filterPatternFields[index]);
-        }
+        all.add(detailPatternField);
+        all.add(detailOutValueField);
+        all.add(detailInValueField);
         return all;
     }
 
@@ -2480,48 +2733,27 @@ public final class StaffLinkScreen extends AbstractContainerScreen<StaffLinkMenu
     /**
      * 过滤面板里的点击。
      *
-     * <p>顺序有讲究：先给两个按钮（它们只进了 children，得手动转发），再处理面板外的点击
-     * 与槽位本身。</p>
+     * <p>顺序有讲究：先给详细面板（它压在最上面），再给过滤面板的两个按钮（它们只进了 children，
+     * 得手动转发），然后是玩家背包槽（要能从这里取物品来标记），最后才是 18 格。</p>
      */
     private boolean handleFilterPanelClick(double mouseX, double mouseY, int button) {
+        if (detailPanelOpen) {
+            return handleDetailPanelClick(mouseX, mouseY, button);
+        }
         if (closeFilterButton.mouseClicked(mouseX, mouseY, button)
                 || clearFilterButton.mouseClicked(mouseX, mouseY, button)) {
             return true;
         }
 
-        // 输入框优先：不先给它们，玩家就点不进限制框、也移不了光标。
-        //
-        // ⚠️ 这里**必须自己调 `setFocused`**，不能只调 `field.mouseClicked`。
-        // 焦点本来是由 `ContainerEventHandler.mouseClicked` 在分发时设的——
-        // 它对每个 child 调完 mouseClicked 后 `setFocused(child)`。但过滤面板是覆盖层，
-        // `mouseClicked` 在 `if (filterPanelOpen)` 处就转进本方法、**根本不会走到 `super.mouseClicked`**，
-        // 于是 `EditBox.onClick`（只负责摆光标）虽然触发了，`setFocused` 却没人调，
-        // 表现就是「点得进去、字打不上去」。这里把框架那一步补上。
-        // （`EditBox#isMouseOver` 要求 active && visible，所以收起来的框要自己挡掉。）
-        for (int index = 0; index < StaffLinkRoute.FILTER_LIMIT; index++) {
-            EditBox keep = filterKeepFields[index];
-            EditBox max = filterMaxFields[index];
-            EditBox pattern = filterPatternFields[index];
-            if (keep.visible && keep.isMouseOver(mouseX, mouseY)) {
-                focusFilterField(keep, mouseX, mouseY, button);
-                return true;
-            }
-            if (max.visible && max.isMouseOver(mouseX, mouseY)) {
-                focusFilterField(max, mouseX, mouseY, button);
-                return true;
-            }
-            if (pattern.visible && pattern.isMouseOver(mouseX, mouseY)) {
-                focusFilterField(pattern, mouseX, mouseY, button);
-                return true;
-            }
+        // 玩家背包槽：面板开着时也允许正常「拿起 / 放下」——不然只能靠 JEI 拖，或者先把物品
+        // 拿在手上再开面板。转发给框架走标准的槽位点击（拾取到手、放下、右键分半等）。
+        if (inventorySlotAt(mouseX, mouseY) != null) {
+            return super.mouseClicked(mouseX, mouseY, button);
         }
 
         int filterIndex = filterSlotAt(mouseX, mouseY);
         if (filterIndex < 0) {
-            // 点在面板空白处：把正在编辑的模式框收起来（会提交它）。
-            // 不顺手关面板——那样子右键开个模式框、脚本点歪一格就把面板关了，很恼人。
-            closePatternEditor();
-            // 点空白处也让输入框失焦，否则光标会一直在某个框里闪。
+            // 点在面板空白处：让输入框失焦，但不关面板。
             setFocused(null);
             return true;
         }
@@ -2529,59 +2761,27 @@ public final class StaffLinkScreen extends AbstractContainerScreen<StaffLinkMenu
             return true;
         }
         if (button == GLFW.GLFW_MOUSE_BUTTON_RIGHT) {
-            // 右键：把这一格的「模式输入框」露出来并聚焦，用来打 #tag / 通配符。
-            // 收起别的格子，保证同一时间只有一格在编辑。
-            openPatternEditor(filterIndex);
+            // 右键：打开这一格的详细编辑面板（模式、包含/排除、两条控制条件都在里面）。
+            openDetailPanel(filterIndex);
             return true;
         }
-        // 左键点在「正开着模式框的那一格」上：这一下只负责收起来，不去改标记。
-        // 否则玩家刚打完模式、想看看整片格子，顺手一点就把整格清掉了。
-        if (openPatternIndex == filterIndex) {
-            closePatternEditor();
+        if (button != GLFW.GLFW_MOUSE_BUTTON_LEFT) {
             return true;
         }
-        // 点别的格子时，先把打开的模式框收起来（提交它），再走左键原本的语义。
-        closePatternEditor();
+        // 左键：按线路资源类型解释手上的东西——流体线路从容器里取出流体本身，
+        // 解释不了就不动这一格（绝不把不匹配的东西塞进去）。空手 = 清掉这一格。
         ItemStack carried = menu.getCarried();
         if (carried.isEmpty()) {
-            // 空手点一下 = 清掉这一格（限制值一起清，构造器保证空槽不带限制）。
             menu.setFilterSlot(filterIndex, LinkFilterSlot.EMPTY);
         } else {
-            // 按线路资源类型解释手上的东西：流体线路从容器里取出流体本身，
-            // 解释不了就不动这一格——绝不把不匹配的东西塞进去。
-            LinkFilterSlot slot = StaffLinkFilters.fromItem(menu.getSelectedMedium(), carried);
-            if (slot != null) {
-                menu.setFilterSlot(filterIndex, slot);
+            LinkFilterSlot marker = StaffLinkFilters.fromItem(menu.getSelectedMedium(), carried);
+            if (marker != null) {
+                // 换标记时保留这一格原有的包含/排除与条件。
+                menu.setFilterSlot(filterIndex, currentFilterSlot(filterIndex).withMarker(marker));
             }
         }
         updateControls();
-        syncFilterFields();
         return true;
-    }
-
-    /**
-     * 让过滤面板里的某个输入框获得焦点，并把手点进去的语义做全。
-     *
-     * <p>框架原本在 {@code ContainerEventHandler.mouseClicked} 里做两步：先
-     * {@code child.mouseClicked(...)}（{@link EditBox#onClick} 负责按点下的位置摆光标），
-     * 再 {@code setFocused(child)}。覆盖层这条路径到不了框架，只能自己补——两步都要做，
-     * 少了第一步光标永远停在开头，少了第二步字打不上去。</p>
-     *
-     * <p>另外两件事：<b>右键</b>不该把焦点丢给输入框（那会让右键菜单式的操作莫名其妙开始收字），
-     * 所以右键只当没发生；切换焦点时先把上一个框的编辑提交掉，跟
-     * {@link #openPatternEditor} 一个道理——不提交，玩家改完 A 框直接点 B 框，A 框那段
-     * 没生效的内容会留在框里，下次打开看着像生效了。</p>
-     */
-    private void focusFilterField(EditBox field, double mouseX, double mouseY, int button) {
-        if (button != GLFW.GLFW_MOUSE_BUTTON_LEFT) {
-            return;
-        }
-        if (getFocused() != field) {
-            commitFilterFields();
-        }
-        setFocused(field);
-        // onClick 就是把光标摆到点击位置，框架里由 mouseClicked 顺带触发，这里手动补。
-        field.mouseClicked(mouseX, mouseY, button);
     }
 
     /**
@@ -2669,6 +2869,10 @@ public final class StaffLinkScreen extends AbstractContainerScreen<StaffLinkMenu
         if (closeFilterButton != null) {
             closeFilterButton.releaseVisualState();
             clearFilterButton.releaseVisualState();
+            detailExcludeButton.releaseVisualState();
+            detailOutOpButton.releaseVisualState();
+            detailInOpButton.releaseVisualState();
+            detailCloseButton.releaseVisualState();
             // EditBox 的 releaseVisualState 由它自己管，但松手这一刻要通知到，
             // 否则拖了一半的文本选区不会收尾。
             EditBox focused = focusedField();
@@ -2743,25 +2947,25 @@ public final class StaffLinkScreen extends AbstractContainerScreen<StaffLinkMenu
     /**
      * 面板左上角。
      *
-     * <p>面板现在跟一级菜单一样宽（250），居中即可——230 宽的窗口才可能挤到左侧，
-     * 这时贴左边；右侧一定会留出侧栏空间（250 的面板在 427 窗口里居中后右侧还有 88px，
-     * 远超 JEI 需要的 48px）。</p>
+     * <p>横向居中即可（{@link #FILTER_PANEL_WIDTH} 只有 140，右边必然留得下 JEI 侧栏）。
+     * 纵向在居中的基础上<b>上移一点</b>：面板下方紧挨着玩家背包，抬上去能给背包留出更多
+     * 可见空间（用户要求「位置也上移」）。</p>
      */
     private int filterPanelX() {
         return Math.max(2, (width - FILTER_PANEL_WIDTH) / 2);
     }
 
     private int filterPanelY() {
-        return Math.max(4, (height - FILTER_PANEL_HEIGHT) / 2);
+        return Math.max(4, (height - FILTER_PANEL_HEIGHT) / 2 - FILTER_PANEL_RAISE);
     }
 
-    /** 第 index 格槽位相对面板的偏移。 */
+    /** 第 index 格槽位相对面板的偏移（网格整体在面板内横向居中）。 */
     private static int filterSlotPanelX(int index) {
-        return FILTER_PANEL_PAD + (index % FILTER_COLUMNS) * FILTER_CELL_COL_STEP;
+        return FILTER_GRID_X + (index % FILTER_COLUMNS) * FILTER_CELL_COL_STEP;
     }
 
     private static int filterSlotPanelY(int index) {
-        return FILTER_PANEL_PAD + FILTER_PANEL_HEADER + (index / FILTER_COLUMNS) * FILTER_CELL_ROW_STEP;
+        return FILTER_GRID_Y + (index / FILTER_COLUMNS) * FILTER_CELL_ROW_STEP;
     }
 
     /**
@@ -2778,35 +2982,52 @@ public final class StaffLinkScreen extends AbstractContainerScreen<StaffLinkMenu
         return filterPanelY() + filterSlotPanelY(index);
     }
 
-    /** 模式框的屏幕 x（贴着槽位右边）与宽度。 */
-    private int filterPatternScreenX(int index) {
-        return filterSlotScreenX(index) + FILTER_SLOT_SIZE + 2;
+    // ---- 详细编辑面板几何
+
+    private int detailPanelX() {
+        return Math.max(2, (width - DETAIL_PANEL_WIDTH) / 2);
     }
 
-    /** 模式框宽度：从槽位右边一直铺到本列右缘。 */
-    private static int filterPatternWidth() {
-        return FILTER_CELL_COL_STEP - FILTER_SLOT_SIZE - 2;
+    private int detailPanelY() {
+        return Math.max(4, (height - DETAIL_PANEL_HEIGHT) / 2);
     }
 
-    /** 「源端保留」框的屏幕坐标（两个限制框并排，各占一半）。 */
-    private int filterKeepScreenX(int index) {
-        return filterSlotScreenX(index);
+    /**
+     * 详细面板里三个可放置槽的屏幕坐标。
+     *
+     * @param which {@code 0} = A 标记槽、{@code 1} = 输出端 B 槽、{@code 2} = 输入端 B 槽
+     */
+    public int detailSlotScreenX(int which) {
+        int local = (which == 1 || which == 2) ? DETAIL_COND_SLOT_X : DETAIL_MARKER_X;
+        return detailPanelX() + local;
     }
 
-    /** 「接收端上限」框的屏幕坐标（在保留框右边）。 */
-    private int filterMaxScreenX(int index) {
-        return filterSlotScreenX(index) + FILTER_LIMIT_WIDTH + FILTER_LIMIT_GAP;
+    public int detailSlotScreenY(int which) {
+        int local = switch (which) {
+            case 1 -> DETAIL_OUT_ROW_Y;
+            case 2 -> DETAIL_IN_ROW_Y;
+            default -> DETAIL_MARKER_ROW_Y;
+        };
+        return detailPanelY() + local;
     }
 
-    /** 两个限制框共用的屏幕 y。 */
-    private int filterLimitsScreenY(int index) {
-        return filterSlotScreenY(index) + FILTER_LIMITS_DY;
+    public static int detailSlotSize() {
+        return DETAIL_SLOT_SIZE;
     }
 
-    /** 面板底部「关闭」按钮的屏幕坐标。 */
+    /** 详细面板是否开着（给 JEI 拖拽切换靶点用）。 */
+    public boolean isDetailPanelOpen() {
+        return detailPanelOpen;
+    }
+
+    /** 详细面板正在编辑的格号；没打开时 -1。 */
+    public int getDetailIndex() {
+        return detailIndex;
+    }
+
+    /** 面板底部「关闭」按钮的屏幕坐标（两个按钮整体在面板内居中）。 */
     private int filterPanelCloseX() {
-        return filterPanelX() + FILTER_PANEL_WIDTH - FILTER_PANEL_PAD
-                - FILTER_PANEL_BUTTON_WIDTH * 2 - FILTER_PANEL_BUTTON_GAP;
+        return filterPanelX() + FILTER_PANEL_BUTTON_X;
     }
 
     private int filterPanelCloseY() {
@@ -2815,7 +3036,8 @@ public final class StaffLinkScreen extends AbstractContainerScreen<StaffLinkMenu
 
     /** 面板底部「清空」按钮的屏幕坐标。 */
     private int filterPanelClearX() {
-        return filterPanelX() + FILTER_PANEL_WIDTH - FILTER_PANEL_PAD - FILTER_PANEL_BUTTON_WIDTH;
+        return filterPanelX() + FILTER_PANEL_BUTTON_X
+                + FILTER_PANEL_BUTTON_WIDTH + FILTER_PANEL_BUTTON_GAP;
     }
 
     private int filterPanelClearY() {
@@ -2908,9 +3130,25 @@ public final class StaffLinkScreen extends AbstractContainerScreen<StaffLinkMenu
         List<LinkFilterSlot> kept = new ArrayList<>(filter.size());
         for (LinkFilterSlot slot : filter) {
             boolean keep = slot.isEmpty() || (fluidRoute ? slot.isFluid() : slot.isItem());
-            kept.add(keep ? slot : LinkFilterSlot.EMPTY);
+            if (!keep) {
+                kept.add(LinkFilterSlot.EMPTY);
+                continue;
+            }
+            // 标记留得下，但条件里的控制材料可能换了族：清掉（回到「测 A 自身」），
+            // 否则会留下一个永远量不到、永远不成立的条件。
+            kept.add(slot.withConditions(pruneCondition(slot.outCond(), fluidRoute),
+                    pruneCondition(slot.inCond(), fluidRoute)));
         }
         return kept;
+    }
+
+    /** 换资源类型时清掉族不匹配的控制材料（保留方向与数值）。 */
+    private static LinkFilterCondition pruneCondition(LinkFilterCondition cond, boolean fluidRoute) {
+        if (cond.isOff() || cond.isSelf()) {
+            return cond;
+        }
+        boolean compatible = fluidRoute ? cond.isFluidControl() : cond.isItemControl();
+        return compatible ? cond : cond.withoutControl();
     }
 
     private static StaffLinkRoute withEnabled(StaffLinkRoute config, boolean enabled) {

@@ -152,7 +152,10 @@ jobs:
           RELEASE_TITLE: Useless Mod ${{ needs.build.outputs.mod_version }}
           RELEASE_NOTES: ${{ needs.build.outputs.changelog }}
         run: |
+          # 该作业未 checkout 仓库，必须显式指定 --repo，否则 gh 找不到 git 上下文
+          # （报 fatal: not a git repository）。
           gh release create "${TAG_NAME}" \
+            --repo "${{ github.repository }}" \
             --title "${RELEASE_TITLE}" \
             --notes "${RELEASE_NOTES}" \
             "${{ needs.build.outputs.artifact_path }}"

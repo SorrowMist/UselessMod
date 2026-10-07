@@ -98,6 +98,7 @@ public class CompactF9BlockEntity extends ECOCraftingSystemBlockEntity
     static final String PATTERN_BUS_KEY = "useless_compact_pattern_buses";
     private static final String FLUID_INPUT_KEY = "useless_compact_f9_fluid_input";
     private static final String FLUID_OUTPUT_KEY = "useless_compact_f9_fluid_output";
+    private static final String SHADOW_HOST_KEY = "useless_compact_f9_shadow_hosts";
     /**
      * 满长建造的列数。ECO 的结构定义里 {@code expandMax = craftingSystemMaxLength - 4}，
      * 而虚拟合成判定要求「实际 FX 通道数 == 该上限」，因此此处每次都按当前上限取值，
@@ -112,7 +113,7 @@ public class CompactF9BlockEntity extends ECOCraftingSystemBlockEntity
     private final List<ECOCraftingWorkerBlockEntity> shadowWorkers = new ArrayList<>();
     private final List<ShadowNodeLink> shadowWorkerLinks = new ArrayList<>();
     private final List<ECOCraftingPatternBusBlockEntity> shadowBuses = new ArrayList<>();
-    /** F9 的冷却液输入/输出仓，作为影子成员加入真实主机所在的集群。 */
+    /** 八台主机共享的冷却液输入/输出池；每台集群都有自己的仓实体引用这两个池。 */
     private final ShadowFluidInputHatchBlockEntity fluidInputHatch;
     private final ShadowFluidOutputHatchBlockEntity fluidOutputHatch;
     private final IFluidHandler fluidHandler;
@@ -120,6 +121,7 @@ public class CompactF9BlockEntity extends ECOCraftingSystemBlockEntity
     private NECraftingNetworkCluster compactNetworkCluster;
     private long lastCompactTick = Long.MIN_VALUE;
     private int lastPatternContentRevision = Integer.MIN_VALUE;
+    private long lastPatternAuxiliaryRevision = Long.MIN_VALUE;
 
     /** 通讯接口界面（影子接口）的全部接线；普通右键仍然走主机自己的面板。 */
     private final CompactInterfaceAttachment<NECraftingCluster> compactInterface =
@@ -135,6 +137,8 @@ public class CompactF9BlockEntity extends ECOCraftingSystemBlockEntity
      */
     @Nullable
     private ListTag pendingPatternBusData;
+    @Nullable
+    private ListTag pendingShadowHostData;
     /** 本机的样板数据落点：UUID 指向外置存档，本身只占 16 字节。 */
     @Nullable
     private ExternalInventoryReference patternStoreReference;
@@ -152,6 +156,8 @@ public class CompactF9BlockEntity extends ECOCraftingSystemBlockEntity
                 NeoEcoCompactRegistry.SHADOW_FLUID_INPUT_HATCH.get(), pos, blockState);
         fluidOutputHatch = new ShadowFluidOutputHatchBlockEntity(
                 NeoEcoCompactRegistry.SHADOW_FLUID_OUTPUT_HATCH.get(), pos, blockState);
+        fluidInputHatch.tank = CompactF9FluidHandler.createFleetTank(HOSTS, this::setChanged);
+        fluidOutputHatch.tank = CompactF9FluidHandler.createFleetTank(HOSTS, this::setChanged);
         fluidHandler = new CompactF9FluidHandler(fluidInputHatch.tank, fluidOutputHatch.tank);
         getMainNode().setFlags(GridFlags.REQUIRE_CHANNEL);
         // 关键：网格服务必须挂在「本机自己」身上，而不是一个独立对象。
@@ -257,14 +263,20 @@ public class CompactF9BlockEntity extends ECOCraftingSystemBlockEntity
         if (exposedBus != null) {
             exposedBus.tick();
             int revision = exposedBus.getPatternContentRevision();
-            if (revision != lastPatternContentRevision) {
+            long auxiliaryRevision = exposedBus.getAuxiliaryRevision();
+            if (revision != lastPatternContentRevision || auxiliaryRevision != lastPatternAuxiliaryRevision) {
                 lastPatternContentRevision = revision;
+                lastPatternAuxiliaryRevision = auxiliaryRevision;
                 // 内容变了才需要回写外置存储；挂起一次写，等区块存盘/卸载时真正落盘。
                 patternStoreDirty = true;
                 setChanged();
             }
         }
         compactInterface.tick();
+        // 影子主机没有独立网格 ticker，仍由 ECO 原生冷却逻辑补充各自的内部缓冲。
+        for (int index = 1; index < fleet.size(); index++) {
+            fleet.get(index).getController().tickingRequest(null, 1);
+        }
         tickShadowWorkers();
     }
 
@@ -323,6 +335,7 @@ public class CompactF9BlockEntity extends ECOCraftingSystemBlockEntity
             fleet.add(shadow);
         }
 
+        restoreShadowHostData(level.registryAccess());
         NECraftingNetworkCluster network = new NECraftingNetworkCluster();
         List<NECraftingCluster> members = new ArrayList<>(fleet);
         network.configure(members);
@@ -344,6 +357,7 @@ public class CompactF9BlockEntity extends ECOCraftingSystemBlockEntity
         // （是否确实需要写入外置存储由 restorePatternBusData 判断，它可区分「迁移」与「数据本就在存储中」两种情况。）
         if (exposedBus != null) {
             lastPatternContentRevision = exposedBus.getPatternContentRevision();
+            lastPatternAuxiliaryRevision = exposedBus.getAuxiliaryRevision();
         }
         ICraftingProvider.requestUpdate(getMainNode());
         compactInterface.attach(level, cluster, getMainNode());
@@ -360,7 +374,41 @@ public class CompactF9BlockEntity extends ECOCraftingSystemBlockEntity
                 NeoEcoCompactRegistry.placeholderState(NeoEcoCompactRegistry.COMPACT_F9));
         host.setLevel(level);
         shadow.addBlockEntity(host);
+        ShadowFluidInputHatchBlockEntity input = new ShadowFluidInputHatchBlockEntity(
+                NeoEcoCompactRegistry.SHADOW_FLUID_INPUT_HATCH.get(), worldPosition, getBlockState());
+        ShadowFluidOutputHatchBlockEntity output = new ShadowFluidOutputHatchBlockEntity(
+                NeoEcoCompactRegistry.SHADOW_FLUID_OUTPUT_HATCH.get(), worldPosition, getBlockState());
+        input.tank = fluidInputHatch.tank;
+        output.tank = fluidOutputHatch.tank;
+        input.setLevel(level);
+        output.setLevel(level);
+        shadow.addBlockEntity(input);
+        shadow.addBlockEntity(output);
         return shadow;
+    }
+
+    private ListTag captureShadowHostData(HolderLookup.Provider registries) {
+        ListTag saved = new ListTag();
+        for (int index = 1; index < fleet.size(); index++) {
+            ECOCraftingSystemBlockEntity host = fleet.get(index).getController();
+            host.getRootStorage().requireInit();
+            CompoundTag hostData = new CompoundTag();
+            host.saveManagedPersistentData(registries, hostData, false);
+            saved.add(hostData);
+        }
+        return saved;
+    }
+
+    private void restoreShadowHostData(HolderLookup.Provider registries) {
+        if (pendingShadowHostData == null) {
+            return;
+        }
+        for (int index = 1; index < fleet.size() && index <= pendingShadowHostData.size(); index++) {
+            ECOCraftingSystemBlockEntity host = fleet.get(index).getController();
+            host.getRootStorage().requireInit();
+            host.loadManagedPersistentData(registries, pendingShadowHostData.getCompound(index - 1));
+        }
+        pendingShadowHostData = null;
     }
 
     private void installHostHardware(NECraftingCluster cluster, ServerLevel level) {
@@ -414,6 +462,9 @@ public class CompactF9BlockEntity extends ECOCraftingSystemBlockEntity
                 NeoEcoCompactRegistry.placeholderState(NeoEcoCompactRegistry.COMPACT_F9));
         bus.setLevel(level);
         bus.bind(shadowBuses, getMainNode());
+        // 新版 ECO 按主机样板域筛选总线。内部影子总线因无节点被过滤，
+        // 聚合总线若不属于集群又会被目录的域检查排除。
+        bus.joinPatternDomain(fleet.getFirst());
         exposedBus = bus;
         exposedBusLink.attach(bus.getMainNode(), level, getMainNode());
     }
@@ -549,8 +600,11 @@ public class CompactF9BlockEntity extends ECOCraftingSystemBlockEntity
     }
 
     private void disposeFleet() {
-        if (level instanceof ServerLevel) {
+        if (level instanceof ServerLevel serverLevel) {
             flushPatternStore(true);
+            if (fleet.size() > 1) {
+                pendingShadowHostData = captureShadowHostData(serverLevel.registryAccess());
+            }
         }
         compactInterface.release();
         if (exposedBus != null) {
@@ -576,6 +630,7 @@ public class CompactF9BlockEntity extends ECOCraftingSystemBlockEntity
         shadowBuses.clear();
         patternProvider.bind(List.of());
         lastPatternContentRevision = Integer.MIN_VALUE;
+        lastPatternAuxiliaryRevision = Long.MIN_VALUE;
     }
 
     @Override
@@ -683,6 +738,10 @@ public class CompactF9BlockEntity extends ECOCraftingSystemBlockEntity
         CompoundTag outputFluid = new CompoundTag();
         fluidOutputHatch.tank.writeToNBT(registries, outputFluid);
         data.put(FLUID_OUTPUT_KEY, outputFluid);
+        ListTag shadowHostData = fleet.size() > 1 ? captureShadowHostData(registries) : pendingShadowHostData;
+        if (shadowHostData != null) {
+            data.put(SHADOW_HOST_KEY, shadowHostData.copy());
+        }
         compactInterface.save(registries, data);
     }
 
@@ -696,6 +755,9 @@ public class CompactF9BlockEntity extends ECOCraftingSystemBlockEntity
         if (data.contains(FLUID_OUTPUT_KEY, Tag.TAG_COMPOUND)) {
             fluidOutputHatch.tank.readFromNBT(registries,
                     data.getCompound(FLUID_OUTPUT_KEY));
+        }
+        if (data.contains(SHADOW_HOST_KEY, Tag.TAG_LIST)) {
+            pendingShadowHostData = data.getList(SHADOW_HOST_KEY, Tag.TAG_COMPOUND).copy();
         }
         // 老存档：整份样板数据曾经直接写在这个标签里，读出来交给装配流程搬进外置存储。
         // 迁移之后本机 NBT 里不会再出现这个键（saveAdditional 不再写它）。

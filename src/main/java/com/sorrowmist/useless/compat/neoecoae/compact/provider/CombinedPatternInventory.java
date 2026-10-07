@@ -1,6 +1,8 @@
 package com.sorrowmist.useless.compat.neoecoae.compact.provider;
 
 import appeng.api.inventories.BaseInternalInventory;
+import appeng.api.inventories.InternalInventory;
+import appeng.util.inv.CombinedInternalInventory;
 import cn.dancingsnow.neoecoae.blocks.entity.crafting.ECOCraftingPatternBusBlockEntity;
 import net.minecraft.world.item.ItemStack;
 import org.jetbrains.annotations.Nullable;
@@ -9,7 +11,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * 把紧凑 F9 内部所有影子样板总线的「终端样板库存」串成一个连续库存。
+ * 把紧凑 F9 内部所有影子样板总线的真实样板槽串成一个连续库存。
  *
  * <p>对外的槽位编号是各总线顺序拼接后的绝对下标，读写一律经底层总线自己的
  * {@code setPatternDirect}，从而保证每条总线的空槽索引、内容版本与目录通知正常更新。</p>
@@ -49,7 +51,7 @@ public final class CombinedPatternInventory extends BaseInternalInventory {
     public ItemStack getStackInSlot(int slot) {
         syncOffsets();
         int part = partOf(slot);
-        return part < 0 ? ItemStack.EMPTY : bus(part).getTerminalPatternInventory().getStackInSlot(localSlot(part, slot));
+        return part < 0 ? ItemStack.EMPTY : bus(part).getPatternSlotInventory().getStackInSlot(localSlot(part, slot));
     }
 
     @Override
@@ -67,7 +69,45 @@ public final class CombinedPatternInventory extends BaseInternalInventory {
     public boolean isItemValid(int slot, ItemStack stack) {
         syncOffsets();
         int part = partOf(slot);
-        return part >= 0 && bus(part).getTerminalPatternInventory().isItemValid(localSlot(part, slot), stack);
+        return part >= 0 && bus(part).getPatternSlotInventory().isItemValid(localSlot(part, slot), stack);
+    }
+
+    @Override
+    public int getSlotLimit(int slot) {
+        syncOffsets();
+        int part = partOf(slot);
+        return part < 0 ? 0 : bus(part).getPatternSlotInventory().getSlotLimit(localSlot(part, slot));
+    }
+
+    /**
+     * 终端会在打开时固定客户端镜像的长度，因此一份会话的偏移不能随真实槽位变化。
+     * 同时必须保留底层终端的插拔协议，避免隐藏的样板磁盘被覆盖或磁盘样板被无偿取出。
+     */
+    public InternalInventory createTerminalView() {
+        InternalInventory[] views = buses.stream()
+                .map(ECOCraftingPatternBusBlockEntity::getTerminalPatternInventory)
+                .toArray(InternalInventory[]::new);
+        int[] ends = new int[views.length];
+        int running = 0;
+        for (int index = 0; index < views.length; index++) {
+            running += views[index].size();
+            ends[index] = running;
+        }
+        return new CombinedInternalInventory(views) {
+            @Override
+            public InternalInventory getSlotInv(int slot) {
+                if (slot < 0 || slot >= size()) {
+                    return InternalInventory.empty();
+                }
+                for (int index = 0; index < ends.length; index++) {
+                    if (slot < ends[index]) {
+                        int start = index == 0 ? 0 : ends[index - 1];
+                        return views[index].getSlotInv(slot - start);
+                    }
+                }
+                return InternalInventory.empty();
+            }
+        };
     }
 
     /** 合并视图里该槽位所属的底层总线；越界返回 null。 */

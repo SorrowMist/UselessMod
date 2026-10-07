@@ -8,6 +8,15 @@ import org.jetbrains.annotations.NotNull;
 /** 紧凑 F9 对外的流体接口：填充进入冷却液输入仓，抽取来自冷却副产物输出仓。 */
 public final class CompactF9FluidHandler implements IFluidHandler {
 
+    static FluidTank createFleetTank(int hosts, Runnable contentsChanged) {
+        return new FluidTank(Math.multiplyExact(16_000, hosts)) {
+            @Override
+            protected void onContentsChanged() {
+                contentsChanged.run();
+            }
+        };
+    }
+
     private final FluidTank input;
     private final FluidTank output;
 

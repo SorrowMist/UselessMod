@@ -4,6 +4,7 @@ import appeng.api.crafting.IPatternDetails;
 import appeng.api.networking.crafting.ICraftingPlan;
 import appeng.api.networking.crafting.ICraftingProvider;
 import appeng.crafting.CraftingPlan;
+import com.sorrowmist.useless.compat.neoecoae.NeoEcoPlanningCompat;
 
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -32,6 +33,12 @@ public final class SmartDoublingPlans {
             Function<IPatternDetails, Iterable<ICraftingProvider>> providerLookup) {
         Objects.requireNonNull(plan, "plan");
         Objects.requireNonNull(providerLookup, "providerLookup");
+
+        // ECO's schedule is tied to this exact confirmed task/material vector. Rebuilding the plan
+        // here would detach its dependency order and startup seeds before the CPU receives it.
+        if (NeoEcoPlanningCompat.shouldPreserveSubmissionPlan(plan)) {
+            return plan;
+        }
 
         Map<IPatternDetails, Long> rewritten = SmartDoublingPlanner.rewrite(
                 plan.patternTimes(), providerLookup);

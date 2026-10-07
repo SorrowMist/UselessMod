@@ -14,6 +14,7 @@ import cn.dancingsnow.neoecoae.api.ECOPatternInsertionResult;
 import cn.dancingsnow.neoecoae.api.ECOPreparedPattern;
 import cn.dancingsnow.neoecoae.blocks.entity.ECOMachineInterfaceBlockEntity;
 import cn.dancingsnow.neoecoae.blocks.entity.crafting.ECOCraftingPatternBusBlockEntity;
+import cn.dancingsnow.neoecoae.multiblock.cluster.NECraftingCluster;
 import com.sorrowmist.useless.compat.neoecoae.compact.NeoEcoCompactRegistry;
 import com.sorrowmist.useless.compat.neoecoae.compact.provider.CombinedPatternInventory;
 import net.minecraft.core.BlockPos;
@@ -38,16 +39,21 @@ import java.util.function.Function;
  * 不落世界也没有节点。所以这里额外实例化一条<b>有真实网格节点</b>的总线，把内部总线的
  * 样板视图整体转出去，让界面看到的是「一台八联满配 F9 的其中一个分组」。</p>
  *
- * <p><b>为什么它不会抢派单</b>：它不进任何集群，{@code cluster == null} 让父类的
- * {@code isBusy()} 恒为 true、{@code getAvailablePatterns()} 读父类自己那份空库存，
+ * <p><b>为什么它不会抢派单</b>：本类覆写两个提供者入口，让
+ * {@code isBusy()} 恒为 true、{@code getAvailablePatterns()} 始终返回空列表，
  * 于是 AE2 的样板提供者列表里它始终是个「忙且没样板」的条目；真正派单的依旧是宿主
- * {@code CompactF9BlockEntity} 上的 {@code CompactPatternProvider}。</p>
+ * {@code CompactF9BlockEntity} 上的 {@code CompactPatternProvider}。它登记在集群里只为了让
+ * 新版 ECO 的通讯接口与样板目录识别本机的样板域。</p>
  */
 public class ExposedPatternBusBlockEntity extends ECOCraftingPatternBusBlockEntity {
 
     private final CombinedPatternInventory mergedPatternInventory = new CombinedPatternInventory();
     private final List<ECOCraftingPatternBusBlockEntity> buses = new ArrayList<>();
     private int[] busRevisions = new int[0];
+    private int[] busSlotCounts = new int[0];
+    private long[] busAuxiliaryRevisions = new long[0];
+    @Nullable
+    private InternalInventory combinedTerminalInventory;
     @Nullable
     private IManagedGridNode hostNode;
 
@@ -71,10 +77,21 @@ public class ExposedPatternBusBlockEntity extends ECOCraftingPatternBusBlockEnti
         buses.addAll(source);
         mergedPatternInventory.bind(buses);
         busRevisions = new int[buses.size()];
+        busSlotCounts = new int[buses.size()];
+        busAuxiliaryRevisions = new long[buses.size()];
         for (int index = 0; index < buses.size(); index++) {
             busRevisions[index] = buses.get(index).getPatternContentRevision();
+            busSlotCounts[index] = buses.get(index).getPatternSlotCount();
+            busAuxiliaryRevisions[index] = buses.get(index).getAuxiliaryRevision();
         }
+        combinedTerminalInventory = null;
         this.hostNode = hostNode;
+    }
+
+    /** 让域过滤和样板目录认出聚合总线的归属；本类的提供者入口仍保持禁用。 */
+    public void joinPatternDomain(NECraftingCluster owner) {
+        owner.addBlockEntity(this);
+        updateCluster(owner);
     }
 
     @Override
@@ -113,19 +130,38 @@ public class ExposedPatternBusBlockEntity extends ECOCraftingPatternBusBlockEnti
      * 所以这里用轮询兜底，任何一条写入都不会漏掉。</p>
      */
     public void tick() {
-        boolean changed = false;
+        List<ECOCraftingPatternBusBlockEntity> changedBuses = new ArrayList<>();
+        boolean layoutChanged = false;
         for (int index = 0; index < buses.size(); index++) {
             ECOCraftingPatternBusBlockEntity bus = buses.get(index);
             bus.flushScheduledPatternDetails();
             int revision = bus.getPatternContentRevision();
-            if (busRevisions[index] == revision) {
+            long auxiliaryRevision = bus.getAuxiliaryRevision();
+            int slotCount = bus.getPatternSlotCount();
+            boolean resized = busSlotCounts[index] != slotCount;
+            if (busRevisions[index] == revision && busAuxiliaryRevisions[index] == auxiliaryRevision && !resized) {
                 continue;
             }
             busRevisions[index] = revision;
-            changed = true;
-            notifyInterfacesOf(bus);
+            busAuxiliaryRevisions[index] = auxiliaryRevision;
+            busSlotCounts[index] = slotCount;
+            layoutChanged |= resized;
+            changedBuses.add(bus);
         }
-        if (changed) {
+        if (!changedBuses.isEmpty()) {
+            combinedTerminalInventory = null;
+            if (layoutChanged) {
+                IGrid grid = getGrid();
+                if (grid != null) {
+                    // 一条总线的页数变化会移动后面所有槽位，即使总槽数刚好没有变化。
+                    for (ECOMachineInterfaceBlockEntity<?> machineInterface
+                            : grid.getActiveMachines(ECOMachineInterfaceBlockEntity.class)) {
+                        machineInterface.onPatternBusInventoryChanged(this);
+                    }
+                }
+            } else {
+                changedBuses.forEach(this::notifyInterfacesOf);
+            }
             // 派单由宿主节点上的样板提供者负责，样板集一变就要让它重读合并结果。
             if (hostNode != null) {
                 ICraftingProvider.requestUpdate(hostNode);
@@ -141,7 +177,10 @@ public class ExposedPatternBusBlockEntity extends ECOCraftingPatternBusBlockEnti
 
     @Override
     public InternalInventory getTerminalPatternInventory() {
-        return mergedPatternInventory;
+        if (combinedTerminalInventory == null) {
+            combinedTerminalInventory = mergedPatternInventory.createTerminalView();
+        }
+        return combinedTerminalInventory;
     }
 
     @Override
@@ -229,6 +268,12 @@ public class ExposedPatternBusBlockEntity extends ECOCraftingPatternBusBlockEnti
     @Override
     public List<IPatternDetails> getAvailablePatterns() {
         return List.of();
+    }
+
+    @Override
+    public boolean isBusy() {
+        // It belongs to the host's pattern domain for management, but dispatch stays on the host.
+        return true;
     }
 
     public void refreshAdvertisedPatterns() {

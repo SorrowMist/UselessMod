@@ -5,6 +5,24 @@
 
 ## [Unreleased]
 
+## [2.4.5.11]
+
+### Changed / 变更
+- 智能翻倍改写样板前先经 ECO 公开 API 判断，仅在同步确认作用域内且任务与材料向量匹配时原样保留确认计划；未安装 ECO 或旧版缺少该 API 时保持原有流程，且不新增或调整 `CraftingService` 的 Mixin
+  - Smart doubling now consults the ECO public API first and preserves the confirmed plan verbatim only within the synchronous confirmation scope when the task and material vectors match; the original flow is kept when ECO is absent or an older version lacks the API, and no `CraftingService` Mixin is added or changed.
+- 紧凑型 F9 的输入与输出改为八台合计的 128 B 共享流体池，各主机通过自己的影子仓引用，并保存与恢复影子主机持久状态以覆盖区块卸载与重新装配，旧存档的输入/输出流体标签继续读取
+  - The Compact F9 input and output now use a shared 128 B fluid pool for all eight machines, referenced by each host's own shadow chamber; shadow host persistent state is saved and restored across chunk unload and reassembly, and legacy input/output fluid tags are still read.
+- 紧凑型 F9 的聚合总线登记到 F9 集群以获得正确的样板域归属，管理库存读取真实样板槽，终端改用各底层总线自己的终端视图并固定单次会话的槽位布局
+  - The Compact F9 aggregate bus is now registered to the F9 cluster for correct pattern domain membership; management inventory reads the real pattern slots, and the terminal uses each underlying bus's own terminal view with a fixed slot layout per session.
+
+### Fixed / 修复
+- 修复 ECO 确认的循环合成计划提交到 Useless 机器时，智能翻倍重建 `CraftingPlan` 导致确认阶段绑定的依赖顺序、启动种子与执行诊断脱离提交计划，任务退回旧执行路径并一直等待无法取得的输入的问题
+  - Fixed ECO-confirmed cyclic crafting plans losing the dependency order, launch seed, and execution diagnostics bound during confirmation when smart doubling rebuilt the `CraftingPlan` on submission to Useless machines, which fell back to the legacy execution path and waited indefinitely for unobtainable inputs.
+- 修复紧凑型 F9 等价于八台却只有第一台集群带输入/输出仓、且两个仓都沿用单台 16 B 容量导致冷却不足的问题
+  - Fixed the Compact F9 cooling being insufficient because only the first cluster had input/output chambers and both used a single-machine 16 B capacity despite being equivalent to eight machines.
+- 修复紧凑型 F9 的管理入口不能正确看到本机样板的问题（内部影子总线没有节点、原聚合总线没有集群归属）
+  - Fixed the Compact F9 management entry not seeing local patterns correctly, since the internal shadow bus has no nodes and the original aggregate bus had no cluster membership.
+
 ## [2.4.5.10]
 
 ### Changed / 变更

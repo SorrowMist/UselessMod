@@ -135,7 +135,8 @@ public class UBlockTagsProvider extends BlockTagsProvider {
             .add(ModBlocks.ME_PATTERN_ASSEMBLY.get())
             .add(ModBlocks.OMNIVERSAL_MOLD_HUB.get())
             .add(ModBlocks.PASSIVE_CRAFTING_HATCH.get())
-            .add(ModBlocks.OMNIVERSAL_FURNACE_CASING.get());
+            .add(ModBlocks.OMNIVERSAL_FURNACE_CASING.get())
+            .add(ModBlocks.TEMPERATURE_REGULATOR.get());
 
         for (var coil : ModBlocks.USELESS_COILS.values()) {
             this.tag(BlockTags.MINEABLE_WITH_PICKAXE).add(coil.get());

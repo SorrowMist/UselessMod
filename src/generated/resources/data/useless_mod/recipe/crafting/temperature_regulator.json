@@ -1,0 +1,13 @@
+{
+    "type": "minecraft:crafting_shapeless",
+    "category": "misc",
+    "ingredients": [
+        {
+            "tag": "useless_mod:plastic_blocks"
+        }
+    ],
+    "result": {
+        "count": 1,
+        "id": "useless_mod:temperature_regulator"
+    }
+}

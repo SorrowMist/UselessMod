@@ -11,6 +11,7 @@ import com.sorrowmist.useless.content.blocks.multiblock.UselessCoilBlock;
 import com.sorrowmist.useless.content.recipe.AdvancedAlloyFurnaceRecipeBuilder;
 import com.sorrowmist.useless.init.ModBlocks;
 import com.sorrowmist.useless.init.ModItems;
+import com.sorrowmist.useless.init.ModTags;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.data.PackOutput;
 import net.minecraft.data.recipes.RecipeCategory;
@@ -47,7 +48,17 @@ public class CraftingRecipes extends RecipeProvider {
         this.addAE2GiftPackageRecipe(consumer);
         this.addPatternConverterRecipe(consumer);
         this.addPlasticRecipes(consumer);
+        this.addTemperatureRegulatorRecipe(consumer);
         this.addAdvancedAlloyFurnaceRecipes(consumer);
+    }
+
+    /** 任意塑料方块（1 个）→ 1 个温度调节器。 */
+    private void addTemperatureRegulatorRecipe(RecipeOutput consumer) {
+        ShapelessRecipeBuilder.shapeless(RecipeCategory.MISC,
+                        ModItems.TEMPERATURE_REGULATOR.get(), 1)
+                .requires(ModTags.PLASTIC_BLOCKS_ITEM)
+                .unlockedBy("has_plastic", has(ModTags.PLASTIC_BLOCKS_ITEM))
+                .save(consumer, UselessMod.id("crafting/temperature_regulator"));
     }
 
     private void addPlasticRecipes(RecipeOutput consumer) {

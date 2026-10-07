@@ -1,7 +1,7 @@
 package com.sorrowmist.useless.client.gui;
 
-import com.sorrowmist.useless.content.blockentities.PlasticThermostatBlockEntity;
-import com.sorrowmist.useless.network.PlasticThermostatSetPacket;
+import com.sorrowmist.useless.content.blockentities.ThermostatBlockEntity;
+import com.sorrowmist.useless.network.ThermostatSetPacket;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.core.BlockPos;
@@ -15,7 +15,7 @@ import java.util.List;
 import java.util.OptionalLong;
 
 /**
- * 塑料方块恒温源的配置界面。
+ * 「温度调节器」方块的配置界面。
  *
  * <p>由权杖 <b>Alt + 右键</b> 打开（见 {@code ClientEventBusSubscriber#tryThermostatGesture}）。
  * 刻意<b>不做成容器界面</b>：没有物品槽、也不需要 JEI 侧栏，普通 {@link Screen} 就够。</p>
@@ -33,9 +33,9 @@ import java.util.OptionalLong;
  * <h2>值的权威</h2>
  *
  * <p>服务端是唯一权威：界面读客户端方块实体的同步值，改动通过
- * {@link PlasticThermostatSetPacket} 提交，服务端校验后再同步回来。</p>
+ * {@link ThermostatSetPacket} 提交，服务端校验后再同步回来。</p>
  */
-public final class PlasticThermostatScreen extends Screen {
+public final class ThermostatScreen extends Screen {
 
     private static final int PANEL_WIDTH = 260;
     private static final int PANEL_HEIGHT = 136;
@@ -60,17 +60,17 @@ public final class PlasticThermostatScreen extends Screen {
     /** 输入框里的内容与同步值不一致。 */
     private boolean fieldDirty;
 
-    public PlasticThermostatScreen(BlockPos pos) {
-        super(Component.translatable("gui.useless_mod.plastic_thermostat.title"));
+    public ThermostatScreen(BlockPos pos) {
+        super(Component.translatable("gui.useless_mod.thermostat.title"));
         this.pos = pos;
     }
 
     @Nullable
-    private PlasticThermostatBlockEntity thermostat() {
+    private ThermostatBlockEntity thermostat() {
         if (minecraft == null || minecraft.level == null) {
             return null;
         }
-        return minecraft.level.getBlockEntity(pos) instanceof PlasticThermostatBlockEntity thermostat
+        return minecraft.level.getBlockEntity(pos) instanceof ThermostatBlockEntity thermostat
                 ? thermostat : null;
     }
 
@@ -83,11 +83,11 @@ public final class PlasticThermostatScreen extends Screen {
 
         temperatureField = new AE2StyleTextField(font,
                 leftPos + PANEL_WIDTH - 8 - 80, topPos + 22, 80, 14,
-                Component.translatable("gui.useless_mod.plastic_thermostat.temperature"));
+                Component.translatable("gui.useless_mod.thermostat.temperature"));
         temperatureField.setMaxLength(24);
         // 与「数量 / 产出速率」同一套：吃 K / M / G / T / P / E 后缀，1M = 1,000,000 K。
         temperatureField.setFilter(ScaledEnergyAmount::isValidInput);
-        temperatureField.setHint(Component.translatable("gui.useless_mod.plastic_thermostat.temperature"));
+        temperatureField.setHint(Component.translatable("gui.useless_mod.thermostat.temperature"));
         temperatureField.setResponder(value -> {
             if (!updatingField) {
                 fieldDirty = !value.equals(syncedTemperatureText);
@@ -110,7 +110,7 @@ public final class PlasticThermostatScreen extends Screen {
                 toggleLabel(), this::toggleEnabled);
 
         addButton(leftPos + (PANEL_WIDTH - 70) / 2, topPos + PANEL_HEIGHT - 22, 70, 16,
-                Component.translatable("gui.useless_mod.plastic_thermostat.done"), this::onClose);
+                Component.translatable("gui.useless_mod.thermostat.done"), this::onClose);
 
         syncField(true);
     }
@@ -164,14 +164,14 @@ public final class PlasticThermostatScreen extends Screen {
 
         graphics.drawString(font, title, leftPos + 8, topPos + 8,
                 MachineScreenStyle.TEXT_COLOR, false);
-        graphics.drawString(font, Component.translatable("gui.useless_mod.plastic_thermostat.kelvin"),
+        graphics.drawString(font, Component.translatable("gui.useless_mod.thermostat.kelvin"),
                 leftPos + 8, topPos + 26, MachineScreenStyle.TEXT_COLOR, false);
 
         long kelvin = parseTemperature();
-        graphics.drawString(font, Component.translatable("gui.useless_mod.plastic_thermostat.celsius",
+        graphics.drawString(font, Component.translatable("gui.useless_mod.thermostat.celsius",
                         String.format("%.2f", kelvin - 273.15D)),
                 leftPos + 8, topPos + 84, MachineScreenStyle.TEXT_COLOR, false);
-        graphics.drawString(font, Component.translatable("gui.useless_mod.plastic_thermostat.hint"),
+        graphics.drawString(font, Component.translatable("gui.useless_mod.thermostat.hint"),
                 leftPos + 8, topPos + 96, MachineScreenStyle.MUTED_TEXT_COLOR, false);
     }
 
@@ -241,18 +241,18 @@ public final class PlasticThermostatScreen extends Screen {
     }
 
     private boolean isEnabled() {
-        PlasticThermostatBlockEntity thermostat = thermostat();
+        ThermostatBlockEntity thermostat = thermostat();
         return thermostat != null && thermostat.isEnabled();
     }
 
     private void commit(long temperature, boolean enabled) {
-        PlasticThermostatBlockEntity thermostat = thermostat();
+        ThermostatBlockEntity thermostat = thermostat();
         if (thermostat != null
                 && thermostat.getTemperature() == temperature
                 && thermostat.isEnabled() == enabled) {
             return;
         }
-        PacketDistributor.sendToServer(new PlasticThermostatSetPacket(pos, temperature, enabled));
+        PacketDistributor.sendToServer(new ThermostatSetPacket(pos, temperature, enabled));
     }
 
     /**
@@ -271,14 +271,14 @@ public final class PlasticThermostatScreen extends Screen {
     }
 
     private long currentTemperature() {
-        PlasticThermostatBlockEntity thermostat = thermostat();
+        ThermostatBlockEntity thermostat = thermostat();
         return thermostat == null
-                ? PlasticThermostatBlockEntity.DEFAULT_TEMPERATURE : thermostat.getTemperature();
+                ? ThermostatBlockEntity.DEFAULT_TEMPERATURE : thermostat.getTemperature();
     }
 
     private Component toggleLabel() {
         return Component.translatable(isEnabled()
-                ? "gui.useless_mod.plastic_thermostat.enabled"
-                : "gui.useless_mod.plastic_thermostat.disabled");
+                ? "gui.useless_mod.thermostat.enabled"
+                : "gui.useless_mod.thermostat.disabled");
     }
 }

@@ -217,6 +217,11 @@ public final class ModItems {
             "teleport_block_3",
             () -> new BlockItem(ModBlocks.TELEPORT_BLOCK_3.get(), new Item.Properties())
     );
+    // 温度调节器方块物品
+    public static final DeferredItem<BlockItem> TEMPERATURE_REGULATOR = registerAndAdd(
+            "temperature_regulator",
+            () -> new BlockItem(ModBlocks.TEMPERATURE_REGULATOR.get(), new Item.Properties())
+    );
     static final DeferredItem<BlockItem> ORE_GENERATOR_BLOCK = registerAndAdd(
             "ore_generator_block",
             () -> new BlockItem(ModBlocks.ORE_GENERATOR_BLOCK.get(), new Item.Properties())

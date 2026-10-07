@@ -5,6 +5,7 @@ import com.sorrowmist.useless.content.blocks.AdvancedAlloyFurnaceBlock;
 import com.sorrowmist.useless.content.blocks.OreGeneratorBlock;
 import com.sorrowmist.useless.content.blocks.SupervisorBlock;
 import com.sorrowmist.useless.content.blocks.TeleportPadBlock;
+import com.sorrowmist.useless.content.blocks.TemperatureRegulatorBlock;
 import com.sorrowmist.useless.content.blocks.UselessGlassBlock;
 import com.sorrowmist.useless.content.blocks.multiblock.MePatternAssemblyBlock;
 import com.sorrowmist.useless.content.blocks.multiblock.MultiblockAlloyFurnaceCoreBlock;
@@ -17,6 +18,7 @@ import com.sorrowmist.useless.world.teleport.UselessDimTeleporter2;
 import com.sorrowmist.useless.world.teleport.UselessDimTeleporter3;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockBehaviour;
+import net.minecraft.world.level.material.MapColor;
 import net.neoforged.neoforge.registries.DeferredBlock;
 import net.neoforged.neoforge.registries.DeferredRegister;
 
@@ -92,6 +94,15 @@ public final class ModBlocks {
             "omniversal_furnace_casing",
             () -> new MultiblockPartBlock(BlockBehaviour.Properties.of()
                     .strength(4.0F, 1200.0F).requiresCorrectToolForDrops()));
+
+    /** 温度调节器：可配置的无限恒温源，内板按温度染色。 */
+    public static final DeferredBlock<TemperatureRegulatorBlock> TEMPERATURE_REGULATOR = BLOCKS.register(
+            "temperature_regulator",
+            () -> new TemperatureRegulatorBlock(BlockBehaviour.Properties.of()
+                    .mapColor(MapColor.METAL)
+                    .strength(5.0F, 6.0F)
+                    .lightLevel(TemperatureRegulatorBlock::lightForState)
+                    .requiresCorrectToolForDrops()));
 
     public static final Map<Integer, DeferredBlock<UselessCoilBlock>> USELESS_COILS = new LinkedHashMap<>();
 

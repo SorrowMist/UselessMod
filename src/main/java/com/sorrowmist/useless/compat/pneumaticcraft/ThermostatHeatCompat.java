@@ -1,6 +1,6 @@
 package com.sorrowmist.useless.compat.pneumaticcraft;
 
-import com.sorrowmist.useless.content.blockentities.PlasticThermostatBlockEntity;
+import com.sorrowmist.useless.content.blockentities.ThermostatBlockEntity;
 import com.sorrowmist.useless.init.ModBlockEntities;
 import me.desht.pneumaticcraft.api.PNCCapabilities;
 import me.desht.pneumaticcraft.api.heat.IHeatExchangerLogic;
@@ -13,7 +13,7 @@ import net.neoforged.neoforge.capabilities.RegisterCapabilitiesEvent;
 import java.util.function.BiPredicate;
 
 /**
- * 塑料恒温方块的气动工艺热兼容。
+ * 温度调节器方块的气动工艺热兼容。
  *
  * <p>气动工艺的热交换是<b>接收方驱动</b>：机器自己的 {@code HeatExchangerLogicTicking.tick()} 会遍历
  * 相连的热交换器并调用 {@code addHeat}，所以只要把 {@link IHeatExchangerLogic} 通过
@@ -26,7 +26,7 @@ import java.util.function.BiPredicate;
  * <p>实现照抄气动自带的 {@code HeatExchangerLogicConstant}（岩浆 / 冰用的那种）：温度恒定、
  * {@code addHeat} 空操作，于是它就是一个「无限热源 / 热汇」。</p>
  */
-public final class PlasticThermostatHeatCompat {
+public final class ThermostatHeatCompat {
 
     private static final String CACHE_KEY = "pneumaticcraft";
     private static final double THERMAL_CAPACITY = 1000.0D;
@@ -42,7 +42,7 @@ public final class PlasticThermostatHeatCompat {
     /** 关掉恒温时对外报告的温度：环境温度。 */
     private static final double AMBIENT_TEMPERATURE = 300.0D;
 
-    private PlasticThermostatHeatCompat() {
+    private ThermostatHeatCompat() {
     }
 
     public static void registerCapabilities(RegisterCapabilitiesEvent event) {
@@ -50,11 +50,11 @@ public final class PlasticThermostatHeatCompat {
         // 重新扫一遍热连接，开了恒温之后它不会重新发现我们，表现就是「设置不生效」。
         // 始终交出逻辑，由逻辑按 enabled 决定温度与热阻。
         event.registerBlockEntity(PNCCapabilities.HEAT_EXCHANGER_BLOCK,
-                ModBlockEntities.PLASTIC_THERMOSTAT.get(),
+                ModBlockEntities.TEMPERATURE_REGULATOR.get(),
                 (blockEntity, side) -> adapter(blockEntity));
     }
 
-    private static IHeatExchangerLogic adapter(PlasticThermostatBlockEntity thermostat) {
+    private static IHeatExchangerLogic adapter(ThermostatBlockEntity thermostat) {
         Object cached = thermostat.getHeatAdapter(CACHE_KEY);
         if (cached instanceof Logic logic) {
             return logic;
@@ -66,9 +66,9 @@ public final class PlasticThermostatHeatCompat {
 
     /** 恒温式热交换逻辑，语义同气动自带的 {@code HeatExchangerLogicConstant}。 */
     private static final class Logic implements IHeatExchangerLogic {
-        private final PlasticThermostatBlockEntity thermostat;
+        private final ThermostatBlockEntity thermostat;
 
-        Logic(PlasticThermostatBlockEntity thermostat) {
+        Logic(ThermostatBlockEntity thermostat) {
             this.thermostat = thermostat;
         }
 

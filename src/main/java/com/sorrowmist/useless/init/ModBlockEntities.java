@@ -3,12 +3,11 @@ package com.sorrowmist.useless.init;
 import com.sorrowmist.useless.UselessMod;
 import com.sorrowmist.useless.content.blockentities.AdvancedAlloyFurnaceBlockEntity;
 import com.sorrowmist.useless.content.blockentities.OreGeneratorBlockEntity;
-import com.sorrowmist.useless.content.blockentities.PlasticThermostatBlockEntity;
+import com.sorrowmist.useless.content.blockentities.ThermostatBlockEntity;
 import com.sorrowmist.useless.content.blockentities.multiblock.MePatternAssemblyBlockEntity;
 import com.sorrowmist.useless.content.blockentities.multiblock.MultiblockAlloyFurnaceCoreBlockEntity;
 import com.sorrowmist.useless.content.blockentities.multiblock.OmniversalMoldHubBlockEntity;
 import com.sorrowmist.useless.content.blockentities.multiblock.PassiveCraftingHatchBlockEntity;
-import com.sorrowmist.useless.content.blocks.GlowPlasticBlock;
 import com.sorrowmist.useless.compat.draconicevolution.DraconicOpStorageCompat;
 import com.sorrowmist.useless.compat.fluxnetworks.FluxNetworksEnergyCompat;
 import net.minecraft.core.registries.Registries;
@@ -96,7 +95,7 @@ public final class ModBlockEntities {
         }
         if (ModList.get().isLoaded("pneumaticcraft")) {
             invokeOptionalCapabilityLoader(
-                    "com.sorrowmist.useless.compat.pneumaticcraft.PlasticThermostatHeatCompat", event);
+                    "com.sorrowmist.useless.compat.pneumaticcraft.ThermostatHeatCompat", event);
         }
         if (ModList.get().isLoaded(FluxNetworksEnergyCompat.MOD_ID)) {
             FluxNetworksEnergyCompat.registerCapabilities(event);
@@ -149,15 +148,12 @@ public final class ModBlockEntities {
                             ModBlocks.PASSIVE_CRAFTING_HATCH.get()).build(null));
 
     /**
-     * 塑料方块的恒温源状态。
-     *
-     * <p>72 个变体（18 色 × 普通/发光/CTM）共用同一个 BE 类型，见
-     * {@link GlowPlasticBlock#allBlocks()}。</p>
+     * 「温度调节器」方块的恒温源状态。
      */
-    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<PlasticThermostatBlockEntity>> PLASTIC_THERMOSTAT =
-            BLOCK_ENTITY_TYPES.register("plastic_thermostat",
-                    () -> BlockEntityType.Builder.of(PlasticThermostatBlockEntity::new,
-                            GlowPlasticBlock.allBlocks()).build(null));
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<ThermostatBlockEntity>> TEMPERATURE_REGULATOR =
+            BLOCK_ENTITY_TYPES.register("temperature_regulator",
+                    () -> BlockEntityType.Builder.of(ThermostatBlockEntity::new,
+                            ModBlocks.TEMPERATURE_REGULATOR.get()).build(null));
 
 
 }

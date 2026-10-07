@@ -16,7 +16,9 @@ import com.sorrowmist.useless.client.gui.StaffLinkScreen;
 import com.sorrowmist.useless.client.render.ctm.CtmModelRegistrar;
 import com.sorrowmist.useless.client.render.supervisor.SupervisorModelLoader;
 import com.sorrowmist.useless.compat.jei.JEIPlugin;
+import com.sorrowmist.useless.content.blockentities.ThermostatBlockEntity;
 import com.sorrowmist.useless.content.blocks.GlowPlasticBlock;
+import com.sorrowmist.useless.content.blocks.TemperatureRegulatorBlock;
 import com.sorrowmist.useless.content.items.EndlessBeafItem;
 import com.sorrowmist.useless.content.menus.AdvancedAlloyFurnaceMenu;
 import com.sorrowmist.useless.client.gui.PatternConverterScreen;
@@ -24,6 +26,7 @@ import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.Omniver
 import com.sorrowmist.useless.content.recipe.AlloyFurnaceRecipeCatalog;
 import com.sorrowmist.useless.core.component.OmniversalPatternData;
 import com.sorrowmist.useless.core.component.UComponents;
+import com.sorrowmist.useless.utils.TemperatureColors;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
@@ -88,6 +91,11 @@ public class ClientSetup {
                         item);
             }
         }
+        // 温度调节器物品：无 BE，固定按默认温度（300K = 白色）着色。
+        event.register((stack, tintIndex) -> tintIndex == 0
+                        ? TemperatureColors.forTemperature(ThermostatBlockEntity.DEFAULT_TEMPERATURE)
+                        : 0xFFFFFFFF,
+                ModItems.TEMPERATURE_REGULATOR.get());
     }
 
     @SubscribeEvent
@@ -99,6 +107,21 @@ public class ClientSetup {
                         block);
             }
         }
+        // 温度调节器：内板（tintindex 0）按温度染色，公式移植自气动工艺压缩铁块。
+        //
+        // \u26d4 \u8fd9\u91cc\u53ea\u80fd\u8bfb BlockState\uff0c**\u4e0d\u80fd\u53bb\u67e5 BlockEntity**\uff1a
+        // \u533a\u5757\u7f51\u683c\u662f\u5728 RenderChunkRegion \u4e0a\u70d8\u7119\u7684\uff0c\u5b83\u7684 getBlockEntity \u6052\u4e3a null\uff0c
+        // \u5728\u8fd9\u91cc\u67e5 BE \u53ea\u4f1a\u6c38\u8fdc\u843d\u5230\u9ed8\u8ba4\u6e29\u5ea6\uff08\u75c7\u72b6\uff1a\u4e0d\u7ba1\u8bbe\u591a\u5c11\u5ea6\u989c\u8272\u90fd\u4e00\u6837\uff09\u3002
+        // \u6e29\u5ea6\u5df2\u7531 ThermostatBlockEntity \u91cf\u5316\u6210\u6863\u4f4d\u5199\u8fdb\u72b6\u6001\u3002
+        event.register((state, world, pos, tintIndex) -> {
+            if (tintIndex != 0 || !state.getValue(TemperatureRegulatorBlock.ENABLED)) {
+                // \u672a\u5f00\u542f\uff1a\u4e0d\u7740\u8272\uff0c\u4fdd\u7559\u8d34\u56fe\u539f\u8272\u3002
+                return 0xFFFFFFFF;
+            }
+            long kelvin = TemperatureRegulatorBlock.temperatureForLevel(
+                    state.getValue(TemperatureRegulatorBlock.TEMPERATURE_LEVEL));
+            return TemperatureColors.forTemperature(kelvin);
+        }, ModBlocks.TEMPERATURE_REGULATOR.get());
     }
 
     @SubscribeEvent

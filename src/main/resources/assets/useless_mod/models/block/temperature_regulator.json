@@ -1,0 +1,35 @@
+{
+  "parent": "block/block",
+  "render_type": "minecraft:cutout",
+  "textures": {
+    "particle": "useless_mod:block/temperature_regulator_frame",
+    "frame": "useless_mod:block/temperature_regulator_frame",
+    "panel": "useless_mod:block/temperature_regulator_panel"
+  },
+  "elements": [
+    {
+      "from": [0, 0, 0],
+      "to": [16, 16, 16],
+      "faces": {
+        "down":  { "texture": "#frame", "cullface": "down"  },
+        "up":    { "texture": "#frame", "cullface": "up"    },
+        "north": { "texture": "#frame", "cullface": "north" },
+        "south": { "texture": "#frame", "cullface": "south" },
+        "west":  { "texture": "#frame", "cullface": "west"  },
+        "east":  { "texture": "#frame", "cullface": "east"  }
+      }
+    },
+    {
+      "from": [0, 0, 0],
+      "to": [16, 16, 16],
+      "faces": {
+        "down":  { "texture": "#panel", "tintindex": 0, "cullface": "down"  },
+        "up":    { "texture": "#panel", "tintindex": 0, "cullface": "up"    },
+        "north": { "texture": "#panel", "tintindex": 0, "cullface": "north" },
+        "south": { "texture": "#panel", "tintindex": 0, "cullface": "south" },
+        "west":  { "texture": "#panel", "tintindex": 0, "cullface": "west"  },
+        "east":  { "texture": "#panel", "tintindex": 0, "cullface": "east"  }
+      }
+    }
+  ]
+}

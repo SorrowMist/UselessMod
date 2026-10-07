@@ -1,5 +1,6 @@
 package com.sorrowmist.useless.content.blockentities;
 
+import com.sorrowmist.useless.content.blocks.TemperatureRegulatorBlock;
 import com.sorrowmist.useless.init.ModBlockEntities;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.HolderLookup;
@@ -16,14 +17,14 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * 塑料方块的「恒温源」状态。
+ * 「温度调节器」方块的「恒温源」状态。
  *
- * <p>塑料方块原本是纯装饰方块；本 BE 给它加上一个可配置的温度，语义是<b>无限恒温源</b>：
+ * <p>温度调节器是一个独立的方块；本 BE 给它一个可配置的温度，语义是<b>无限恒温源</b>：
  * 温度恒定，可被无限取热 / 放热（不守恒）。</p>
  *
  * <p><b>本类刻意不引用任何 Mekanism / PneumaticCraft 类型。</b> 那两个模组的热适配器由
  * {@code compat} 层反射加载后缓存进 {@link #heatAdapters}（不透明的 {@code Object}），
- * 主动驱动则通过 {@link PlasticThermostatHeatHook} 安装，因此没装对应模组时本类照常加载。</p>
+ * 主动驱动则通过 {@link ThermostatHeatHook} 安装，因此没装对应模组时本类照常加载。</p>
  *
  * <h2>单位与范围</h2>
  *
@@ -34,7 +35,7 @@ import java.util.Map;
  * 夹在 2273 K，超过就只是饱和；而 {@code double} 在 2^53（约 9e15）以上会丢整数精度，
  * 所以超过这个量级的值只是「更大」，不再精确。</p>
  */
-public final class PlasticThermostatBlockEntity extends BlockEntity {
+public final class ThermostatBlockEntity extends BlockEntity {
 
     /** 默认温度：300 K，即 Mek 定义的「水的温度」/ 气动的环境温度。 */
     public static final long DEFAULT_TEMPERATURE = 300L;
@@ -58,8 +59,8 @@ public final class PlasticThermostatBlockEntity extends BlockEntity {
     @Nullable
     private Map<String, Object> heatAdapters;
 
-    public PlasticThermostatBlockEntity(BlockPos pos, BlockState state) {
-        super(ModBlockEntities.PLASTIC_THERMOSTAT.get(), pos, state);
+    public ThermostatBlockEntity(BlockPos pos, BlockState state) {
+        super(ModBlockEntities.TEMPERATURE_REGULATOR.get(), pos, state);
     }
 
     public long getTemperature() {
@@ -114,8 +115,17 @@ public final class PlasticThermostatBlockEntity extends BlockEntity {
         if (level == null || level.isClientSide) {
             return;
         }
-        BlockState state = getBlockState();
-        level.sendBlockUpdated(worldPosition, state, state, Block.UPDATE_ALL);
+        BlockState oldState = getBlockState();
+        BlockState newState = TemperatureRegulatorBlock.stateFor(oldState, temperature, enabled);
+        if (newState != oldState) {
+            // ⛔ 温度档位 / 开关必须真的落到 BlockState 上：染色回调跑在区块网格
+            // （RenderChunkRegion）里，那里 getBlockEntity 恒为 null，查 BE 只会永远回落到
+            // 默认温度（症状：设多少度都是同一个颜色）。这一步顺带把 BlockState 与 BE 数据
+            // （Jade 要读）一起同步给客户端。
+            level.setBlock(worldPosition, newState, Block.UPDATE_ALL);
+        } else {
+            level.sendBlockUpdated(worldPosition, oldState, oldState, Block.UPDATE_ALL);
+        }
         // 能力本身始终暴露，但数值 / 开关变化仍通知一次，让缓存里的视图重新取值。
         level.invalidateCapabilities(worldPosition);
     }

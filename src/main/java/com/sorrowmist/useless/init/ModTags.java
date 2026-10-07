@@ -31,6 +31,9 @@ public final class ModTags {
      */
     public static final TagKey<Block> PLASTIC_BLOCKS = createBlockTag("plastic_blocks");
 
+    /** 塑料方块对应的<b>物品</b>标签（与方块标签同名），供「任意塑料方块 → 温度调节器」这类配方引用。 */
+    public static final TagKey<Item> PLASTIC_BLOCKS_ITEM = createItemTag("plastic_blocks");
+
     /** 普通塑料方块（不发光、无连接纹理）。 */
     public static final TagKey<Block> PLASTIC = createBlockTag("plastic");
 

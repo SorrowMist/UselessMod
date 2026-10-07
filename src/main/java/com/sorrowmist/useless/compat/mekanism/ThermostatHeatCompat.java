@@ -1,7 +1,7 @@
 package com.sorrowmist.useless.compat.mekanism;
 
-import com.sorrowmist.useless.content.blockentities.PlasticThermostatBlockEntity;
-import com.sorrowmist.useless.content.blockentities.PlasticThermostatHeatHook;
+import com.sorrowmist.useless.content.blockentities.ThermostatBlockEntity;
+import com.sorrowmist.useless.content.blockentities.ThermostatHeatHook;
 import com.sorrowmist.useless.init.ModBlockEntities;
 import mekanism.api.heat.IHeatHandler;
 import net.minecraft.core.BlockPos;
@@ -12,7 +12,7 @@ import net.neoforged.neoforge.capabilities.BlockCapability;
 import net.neoforged.neoforge.capabilities.RegisterCapabilitiesEvent;
 
 /**
- * 塑料恒温方块的 Mekanism 热兼容。
+ * 温度调节器方块的 Mekanism 热兼容。
  *
  * <p><b>只引用纯 API（{@code mekanism.api.heat.IHeatHandler}），不碰任何 Mekanism internal 类。</b>
  * 能力对象自己声明：{@code mekanism:heat_handler} 这个 ResourceLocation 与 Mek 自己的
@@ -27,7 +27,7 @@ import net.neoforged.neoforge.capabilities.RegisterCapabilitiesEvent;
  * 的散热片」，<b>加不热机器</b>。要让恒温方块真正驱动机器，必须由方块自己当发送方，每 tick 用
  * {@link IHeatHandler#handleHeat(double)} 把热推给邻居——这段就在 {@link #drive} 里。</p>
  */
-public final class PlasticThermostatHeatCompat {
+public final class ThermostatHeatCompat {
 
     /** 与 Mek {@code Capabilities.HEAT} 同 RL ⇒ 同一个能力对象。 */
     private static final BlockCapability<IHeatHandler, Direction> HEAT = BlockCapability.createSided(
@@ -49,7 +49,7 @@ public final class PlasticThermostatHeatCompat {
     /** 低于这个温差就不再动作，省掉无意义的浮点运算。 */
     private static final double DRIVE_EPSILON = 0.001D;
 
-    private PlasticThermostatHeatCompat() {
+    private ThermostatHeatCompat() {
     }
 
     /** 关掉恒温时对外报告的温度：环境温度，与 Mek 的 {@code HeatAPI.AMBIENT_TEMP} 一致。 */
@@ -62,13 +62,13 @@ public final class PlasticThermostatHeatCompat {
         // Mek 的 CapabilityCache、气动的 IdentityHashMap 都只在方块变化时重新发现。
         // 表现就是「开了恒温、机器却毫无反应」。所以**始终交出适配器**，由适配器按 enabled
         // 决定行为：关着的时候报告 300K，配合下面的大导热系数，几乎不参与任何交换。
-        event.registerBlockEntity(HEAT, ModBlockEntities.PLASTIC_THERMOSTAT.get(),
+        event.registerBlockEntity(HEAT, ModBlockEntities.TEMPERATURE_REGULATOR.get(),
                 (blockEntity, side) -> adapter(blockEntity));
         // 安装「主动驱动」；未装 Mekanism 时这个钩子保持 null，主代码的 tick 就是空操作。
-        PlasticThermostatHeatHook.driver = PlasticThermostatHeatCompat::drive;
+        ThermostatHeatHook.driver = ThermostatHeatCompat::drive;
     }
 
-    private static IHeatHandler adapter(PlasticThermostatBlockEntity thermostat) {
+    private static IHeatHandler adapter(ThermostatBlockEntity thermostat) {
         Object cached = thermostat.getHeatAdapter(CACHE_KEY);
         if (cached instanceof Adapter adapter) {
             return adapter;
@@ -87,7 +87,7 @@ public final class PlasticThermostatHeatCompat {
      * <p><b>必须先判热容 &gt; 0</b>：Mek 的 {@code getTotalHeatCapacity()} 在「没有电容」时返回 0，
      * 拿它当乘数虽不会除零，但会传 0 热量；而真正危险的是拿它当除数（会得到 NaN）。</p>
      */
-    private static void drive(ServerLevel level, BlockPos pos, PlasticThermostatBlockEntity thermostat) {
+    private static void drive(ServerLevel level, BlockPos pos, ThermostatBlockEntity thermostat) {
         double temperature = thermostat.getTemperature();
         for (Direction side : Direction.values()) {
             IHeatHandler sink = level.getCapability(HEAT, pos.relative(side), side.getOpposite());
@@ -108,9 +108,9 @@ public final class PlasticThermostatHeatCompat {
 
     /** 恒温方块的 Mek 热处理器视角：温度恒定，收下 / 给出多少热都不变。 */
     private static final class Adapter implements IHeatHandler {
-        private final PlasticThermostatBlockEntity thermostat;
+        private final ThermostatBlockEntity thermostat;
 
-        Adapter(PlasticThermostatBlockEntity thermostat) {
+        Adapter(ThermostatBlockEntity thermostat) {
             this.thermostat = thermostat;
         }
 

@@ -21,7 +21,7 @@ import com.sorrowmist.useless.network.MiningDataSyncPacket;
 import com.sorrowmist.useless.network.ModeTogglePacket;
 import com.sorrowmist.useless.network.MultiblockAlloyFurnaceEnergyLimitPacket;
 import com.sorrowmist.useless.network.PatternPageChangePacket;
-import com.sorrowmist.useless.network.PlasticThermostatSetPacket;
+import com.sorrowmist.useless.network.ThermostatSetPacket;
 import com.sorrowmist.useless.network.ProtectEntityPacket;
 import com.sorrowmist.useless.network.PassiveCraftingSettingsPacket;
 import com.sorrowmist.useless.network.PassiveCraftingSlotMultiplierPacket;
@@ -212,8 +212,8 @@ public class ModNetwork {
         registrar.playToClient(StaffLinkStressStatusPacket.TYPE,
                                StaffLinkStressStatusPacket.STREAM_CODEC,
                                StaffLinkStressStatusPacket::handle);
-        registrar.playToServer(PlasticThermostatSetPacket.TYPE,
-                               PlasticThermostatSetPacket.STREAM_CODEC,
-                               PlasticThermostatSetPacket::handle);
+        registrar.playToServer(ThermostatSetPacket.TYPE,
+                               ThermostatSetPacket.STREAM_CODEC,
+                               ThermostatSetPacket::handle);
     }
 }

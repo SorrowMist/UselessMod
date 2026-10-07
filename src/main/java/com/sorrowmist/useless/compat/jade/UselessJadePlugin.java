@@ -2,6 +2,7 @@ package com.sorrowmist.useless.compat.jade;
 
 import com.sorrowmist.useless.content.blockentities.AdvancedAlloyFurnaceBlockEntity;
 import com.sorrowmist.useless.content.blocks.AdvancedAlloyFurnaceBlock;
+import com.sorrowmist.useless.content.blocks.TemperatureRegulatorBlock;
 import com.sorrowmist.useless.content.blocks.multiblock.MultiblockAlloyFurnaceCoreBlock;
 import snownee.jade.api.IWailaClientRegistration;
 import snownee.jade.api.IWailaCommonRegistration;
@@ -20,5 +21,7 @@ public class UselessJadePlugin implements IWailaPlugin {
         registration.registerBlockComponent(AdvancedAlloyFurnaceJadeProvider.INSTANCE, AdvancedAlloyFurnaceBlock.class);
         registration.registerBlockComponent(MultiblockAlloyFurnaceCoreJadeProvider.INSTANCE,
                 MultiblockAlloyFurnaceCoreBlock.class);
+        registration.registerBlockComponent(ThermostatJadeProvider.INSTANCE,
+                TemperatureRegulatorBlock.class);
     }
 }

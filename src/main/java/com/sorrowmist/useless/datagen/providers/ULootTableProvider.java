@@ -45,6 +45,7 @@ public class ULootTableProvider extends LootTableProvider {
             this.dropSelf(ModBlocks.OMNIVERSAL_MOLD_HUB.get());
             this.dropSelf(ModBlocks.PASSIVE_CRAFTING_HATCH.get());
             this.dropSelf(ModBlocks.OMNIVERSAL_FURNACE_CASING.get());
+            this.dropSelf(ModBlocks.TEMPERATURE_REGULATOR.get());
 
             for (var coil : ModBlocks.USELESS_COILS.values()) {
                 this.dropSelf(coil.get());
@@ -90,6 +91,7 @@ public class ULootTableProvider extends LootTableProvider {
             blocks.add(ModBlocks.OMNIVERSAL_MOLD_HUB.get());
             blocks.add(ModBlocks.PASSIVE_CRAFTING_HATCH.get());
             blocks.add(ModBlocks.OMNIVERSAL_FURNACE_CASING.get());
+            blocks.add(ModBlocks.TEMPERATURE_REGULATOR.get());
             if (net.neoforged.fml.ModList.get().isLoaded("neoecoae")) {
                 blocks.add(com.sorrowmist.useless.compat.neoecoae.compact.NeoEcoCompactRegistry
                                    .COMPACT_C9.get());

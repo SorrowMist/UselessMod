@@ -5,9 +5,9 @@ import com.sorrowmist.useless.UselessMod;
 import com.sorrowmist.useless.api.enums.tool.EnchantMode;
 import com.sorrowmist.useless.client.BeefAutoClicker;
 import com.sorrowmist.useless.client.gui.MiningStatusGui;
-import com.sorrowmist.useless.client.gui.PlasticThermostatScreen;
+import com.sorrowmist.useless.client.gui.ThermostatScreen;
 import com.sorrowmist.useless.content.blockentities.multiblock.MultiblockAlloyFurnaceCoreBlockEntity;
-import com.sorrowmist.useless.content.blocks.GlowPlasticBlock;
+import com.sorrowmist.useless.content.blocks.TemperatureRegulatorBlock;
 import com.sorrowmist.useless.content.blocks.TeleportPadBlock;
 import com.sorrowmist.useless.content.items.BeefTimeAcceleration;
 import com.sorrowmist.useless.content.items.EndlessBeafItem;
@@ -398,7 +398,7 @@ public class ClientEventBusSubscriber {
     }
 
     /**
-     * 权杖 <b>Alt + 右键</b> 塑料方块：打开恒温源配置界面。
+     * 权杖 <b>Alt + 右键</b> 温度调节器方块：打开恒温源配置界面。
      *
      * <p><b>Alt 判定用 GLFW 位域而不是 {@code InputConstants}。</b> 本版本的
      * {@code InputConstants} 只有 {@code MOD_CONTROL}，没有 {@code MOD_ALT}，所以直接读
@@ -428,10 +428,10 @@ public class ClientEventBusSubscriber {
         // 用当前帧重算准星命中，避免用到上一 tick 的旧 hitResult。
         mc.gameRenderer.pick(1.0F);
         if (!(mc.hitResult instanceof BlockHitResult hit)) return false;
-        if (!(mc.level.getBlockState(hit.getBlockPos()).getBlock() instanceof GlowPlasticBlock)) return false;
+        if (!(mc.level.getBlockState(hit.getBlockPos()).getBlock() instanceof TemperatureRegulatorBlock)) return false;
 
         event.setCanceled(true);
-        mc.setScreen(new PlasticThermostatScreen(hit.getBlockPos()));
+        mc.setScreen(new ThermostatScreen(hit.getBlockPos()));
         return true;
     }
 

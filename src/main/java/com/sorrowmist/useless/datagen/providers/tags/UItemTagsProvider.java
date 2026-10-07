@@ -2,6 +2,7 @@ package com.sorrowmist.useless.datagen.providers.tags;
 
 
 import com.sorrowmist.useless.UselessMod;
+import com.sorrowmist.useless.content.blocks.GlowPlasticBlock;
 import com.sorrowmist.useless.init.ModItems;
 import com.sorrowmist.useless.init.ModTags;
 import net.minecraft.core.HolderLookup;
@@ -36,6 +37,16 @@ public class UItemTagsProvider extends ItemTagsProvider {
     }
 
     private void addUselessModTags() {
+        // 塑料方块物品标签：供「任意塑料方块 → 温度调节器」配方引用。
+        // 注意：不能直接 copy 方块总标签——它只引用四个分类标签，而分类标签没有对应的物品标签；
+        // 这里直接把全部塑料方块物品平铺进来。
+        this.tag(ModTags.PLASTIC_BLOCKS_ITEM).replace(false);
+        for (var itemMap : GlowPlasticBlock.ALL_BLOCK_ITEM_MAPS) {
+            for (var item : itemMap.values()) {
+                this.tag(ModTags.PLASTIC_BLOCKS_ITEM).add(item.get());
+            }
+        }
+
         this.tag(this.createTagKey("useless_ingots"))
             .replace(false)
             .add(ModItems.USELESS_INGOT_TIER_1.get())

@@ -16,21 +16,21 @@ import org.jetbrains.annotations.Nullable;
  * <p>要让恒温方块真正驱动 Mek 机器，必须由方块自己当发送方，每 tick 主动把热推给邻居。
  * 那段逻辑要用 {@code mekanism.api.heat.IHeatHandler}，属于可选集成，不能出现在主代码里，
  * 因此这里只留一个<b>不依赖任何外部类型</b>的钩子：compat 层在注册能力时安装实现，
- * 没装 Mekanism 时 {@link #driver} 为 {@code null}，{@link PlasticThermostatBlockEntity} 的
+ * 没装 Mekanism 时 {@link #driver} 为 {@code null}，{@link ThermostatBlockEntity} 的
  * tick 就成了空操作。</p>
  */
-public final class PlasticThermostatHeatHook {
+public final class ThermostatHeatHook {
 
     /** 驱动实现；由可选集成层安装，未装对应模组时为 {@code null}。 */
     @Nullable
     public static volatile HeatDriver driver;
 
-    private PlasticThermostatHeatHook() {
+    private ThermostatHeatHook() {
     }
 
     /** 一次服务端 tick 的热驱动。 */
     @FunctionalInterface
     public interface HeatDriver {
-        void tick(ServerLevel level, BlockPos pos, PlasticThermostatBlockEntity thermostat);
+        void tick(ServerLevel level, BlockPos pos, ThermostatBlockEntity thermostat);
     }
 }

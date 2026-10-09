@@ -679,6 +679,18 @@ ChainMiningShapes shape, Direction face, Player player) {
      * 通过方块自身的破坏回调破坏方块，并收集本次新生成的掉落实体
      * 这样可以保留其他模组在 playerDestroy 中实现的特殊掉落逻辑，同时仍然让掉落物进入背包。
      *
+     * <p>破坏分两个阶段执行，两阶段各自都可能产出掉落：</p>
+     * <ol>
+     *   <li>回调阶段：{@code playerWillDestroy} 与 {@code playerDestroy}。后者的默认实现经
+     *       {@code getDrops} 产出掉落表物品，模组也可在此直接追加自定义掉落。</li>
+     *   <li>移除阶段：{@code removeBlock} 触发 {@code onRemove}。容器类方块通常在此掉落内容物。</li>
+     * </ol>
+     *
+     * <p>若方块既重写了 {@code getDrops} 并返回内容物，又在 {@code onRemove} 中掉落内容物，
+     * 同一批物品会被两条路径各生成一次。此处以回调阶段的掉落为基准，移除阶段中与之完全相同的条目
+     * 视为重复并丢弃，避免采集端把两份都收走；配对要求物品、组件与数量三者同时一致，
+     * 因此方块自身重复产出的同类掉落不受影响。</p>
+     *
      * @param level  世界
      * @param pos    方块位置
      * @param state  方块状态
@@ -705,23 +717,79 @@ ChainMiningShapes shape, Direction face, Player player) {
             return BreakOutcome.REFUSED;
         }
 
+        // 回调阶段：playerWillDestroy 与 playerDestroy 已由 destroyBlockWithoutDrops 执行，
+        // 此处的差集即该阶段产出的掉落。
+        Set<UUID> consumed = ConcurrentHashMap.newKeySet();
+        List<ItemStack> callbackDrops = collectNewDrops(level, area, before, consumed);
+
+        // 移除阶段：取出方块本体，触发 onRemove 中容器内容物的掉落。
+        level.removeBlock(pos, false);
+        List<ItemStack> removalDrops = collectNewDrops(level, area, before, consumed);
+
+        // 经验球统一在两个阶段结束后清理：本流程自行结算经验，两阶段新生成的经验球都不应留在世界上。
         for (ExperienceOrb experienceOrb : level.getEntitiesOfClass(ExperienceOrb.class, area)) {
             if (!experienceBefore.contains(experienceOrb.getUUID())) {
                 experienceOrb.discard();
             }
         }
 
+        return new BreakOutcome(true, mergePhaseDrops(callbackDrops, removalDrops));
+    }
+
+    /**
+     * 收集区域内自 {@code before} 之后新生成的 ItemEntity，取走其内容并移除实体。
+     *
+     * @param consumed 跨阶段累积的已收走实体 id，避免同一实体被两个阶段重复计入
+     * @return 本次新收走的掉落物列表
+     */
+    private static List<ItemStack> collectNewDrops(ServerLevel level, AABB area, Set<UUID> before,
+                                                   Set<UUID> consumed) {
         List<ItemStack> drops = new ArrayList<>();
-        level.getEntitiesOfClass(ItemEntity.class, area).stream()
-             .filter(entity -> !before.contains(entity.getUUID()))
-             .forEach(entity -> {
-                 ItemStack drop = entity.getItem().copy();
-                 if (!drop.isEmpty()) {
-                     drops.add(drop);
-                 }
-                 entity.discard();
-             });
-        return new BreakOutcome(true, drops);
+        for (ItemEntity entity : level.getEntitiesOfClass(ItemEntity.class, area)) {
+            UUID id = entity.getUUID();
+            if (before.contains(id) || !consumed.add(id)) {
+                continue;
+            }
+            ItemStack drop = entity.getItem().copy();
+            if (!drop.isEmpty()) {
+                drops.add(drop);
+            }
+            entity.discard();
+        }
+        return drops;
+    }
+
+    /**
+     * 合并回调阶段与移除阶段的掉落，剔除移除阶段中与回调阶段完全重复的条目。
+     *
+     * <p>重复来源：方块同时重写 {@code getDrops} 并返回内容物、又在 {@code onRemove} 中掉落内容物时，
+     * 同一批物品被两条路径各生成一次。仅当物品、组件与数量三者同时一致时才判定为重复，
+     * 且每个基准条目至多抵消一个候选条目。</p>
+     */
+    private static List<ItemStack> mergePhaseDrops(List<ItemStack> callbackDrops, List<ItemStack> removalDrops) {
+        List<ItemStack> remaining = new ArrayList<>(callbackDrops);
+        List<ItemStack> merged = new ArrayList<>(callbackDrops);
+        for (ItemStack candidate : removalDrops) {
+            int matched = indexOfSameStack(remaining, candidate);
+            if (matched >= 0) {
+                remaining.remove(matched);
+                continue;
+            }
+            merged.add(candidate);
+        }
+        return merged;
+    }
+
+    /** 在池中查找与候选完全一致的条目（物品、组件、数量均相同）；未命中返回 -1。 */
+    private static int indexOfSameStack(List<ItemStack> pool, ItemStack candidate) {
+        for (int i = 0; i < pool.size(); i++) {
+            ItemStack existing = pool.get(i);
+            if (existing.getCount() == candidate.getCount()
+                    && ItemStack.isSameItemSameComponents(existing, candidate)) {
+                return i;
+            }
+        }
+        return -1;
     }
 
     /**
@@ -738,7 +806,10 @@ ChainMiningShapes shape, Direction face, Player player) {
      * 否则对方需保留的样板 / 待输出内容会被静默丢弃），但将异常拦截在本层，
      * 按方块类型去重后仅上报一次，其余方块继续挖掘。</p>
      *
-     * @return {@code true} 表示方块已被移除；{@code false} 表示被方块自身的回调拒绝
+     * <p>移除动作由调用方在收集完回调阶段的掉落之后执行，使 {@code onRemove} 中产生的掉落
+     * 与回调阶段的掉落可以分别收集、分别去重。</p>
+     *
+     * @return {@code true} 表示方块自身的回调接受了这次移除；{@code false} 表示被其拒绝
      */
     static boolean destroyBlockWithoutDrops(ServerLevel level, BlockPos pos, BlockState state,
                                             Player player, ItemStack tool) {
@@ -757,11 +828,7 @@ ChainMiningShapes shape, Direction face, Player player) {
             accepted = false;
             reportRefusedRemoval(block, pos, "playerDestroy", refusal);
         }
-        if (!accepted) {
-            return false;
-        }
-        level.removeBlock(pos, false);
-        return true;
+        return accepted;
     }
 
     /** 方块自身拒绝被移除：按类型去重上报，避免一次连锁挖掘产生大量重复日志。 */

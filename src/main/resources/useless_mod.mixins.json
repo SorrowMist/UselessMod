@@ -28,6 +28,7 @@
     "ae2.PathingCalculationMixin",
     "ae2.PathingServiceMixin",
     "ae2.GridNodeMixin",
+    "ae2.PatternAccessTerminalPacketSlotLimitMixin",
     "advancedae.AdvancedCraftingCpuAccessor",
     "advancedae.CraftingCpuLogicMixin",
     "advancedae.ExecutingCraftingJobMixin",

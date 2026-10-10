@@ -100,11 +100,12 @@ public final class OmniversalBigIntegerTarget implements AlloyFurnaceBigIntegerT
             return AlloyFurnaceBigIntegerCapacity.of(requested.min(accepted));
         }
         if (original instanceof IMolecularAssemblerSupportedPattern) {
-            // 合成样板：一次装配折叠任意份数、不收能量，所以只看材料窗口与产物分段预算。
+            // 合成样板：一次装配折叠任意份数；能量闸与万象样板共用同一套催化剂口径，
+            // 有用线圈（energyMultipliesWithParallel == false）下该闸不设限。
             BigInteger accepted = AlloyFurnaceBigIntegerCrafting.maximumCraftingPatternCount(
-                    original, prototype, threads(), segmentBudget, requested);
+                    this.core, original, prototype, threads(), segmentBudget, requested);
             return accepted.signum() <= 0
-                    ? AlloyFurnaceBigIntegerCapacity.none("")
+                    ? AlloyFurnaceBigIntegerCapacity.none(CraftingTaskContext.STATUS_WAITING_ENERGY_KEY)
                     : AlloyFurnaceBigIntegerCapacity.of(requested.min(accepted));
         }
         return AlloyFurnaceBigIntegerCapacity.none("");

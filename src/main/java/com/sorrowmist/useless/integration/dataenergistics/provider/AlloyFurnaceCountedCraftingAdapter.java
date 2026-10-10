@@ -277,8 +277,10 @@ class AlloyFurnaceCountedCraftingAdapter implements CountedCraftingProviderAdapt
         int threads = machineThreads();
         long segmentBudget = segmentBudget();
         if (original instanceof IMolecularAssemblerSupportedPattern) {
+            // 能量闸需要任务上下文才能解析催化剂效果；宿主缺席时只能放过容量，
+            // 实际扣电由提交侧兜底（见 AlloyFurnaceBigIntegerCrafting#maximumCraftingPatternCount）。
             return AlloyFurnaceBigIntegerCrafting.maximumCraftingPatternCount(
-                    original, prototype, threads, segmentBudget, requestedCount);
+                    this.taskContext.get(), original, prototype, threads, segmentBudget, requestedCount);
         }
         if (original instanceof OmniversalPatternDetails omniversal) {
             CraftingTaskContext context = this.taskContext.get();

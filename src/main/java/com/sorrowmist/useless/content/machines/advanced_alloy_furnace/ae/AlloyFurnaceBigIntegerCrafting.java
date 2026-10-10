@@ -38,6 +38,27 @@ import java.util.List;
  */
 public final class AlloyFurnaceBigIntegerCrafting {
     private static final BigInteger MAX_LONG = BigInteger.valueOf(Long.MAX_VALUE);
+    /** 合成样板未绑定配方时的基础每 tick 能耗，与 {@code CraftingTask} 的配方缺失分支一致。 */
+    private static final long CRAFTING_PATTERN_ENERGY_PER_TICK = 200L;
+    /** 催化剂未改变处理时间时的基础处理时间（ticks），与 {@code CraftingTaskContext} 的缺省分支一致。 */
+    private static final long CRAFTING_PATTERN_BASE_PROCESS_TIME = 200L;
+
+    /**
+     * 合成样板的单份能耗：基础每 tick 能耗 × 当前催化剂下的处理时间。
+     *
+     * <p>合成样板不绑定合金炉配方，其能耗口径取自 {@code CraftingTask#refreshCatalystLayout} 的
+     * 配方缺失分支（每 tick 能耗 200 FE）与 {@code CraftingTaskContext#getTaskProcessTime}
+     * （配方缺失时取催化剂效果的处理时间）。二者相乘即单份能耗，使合成样板与万象样板在同一台
+     * 机器上遵循同一套催化剂计费规则；若两处口径发生偏离，同一台机器上的两类样板会出现计费不一致。</p>
+     *
+     * @param effect 当前催化剂效果；{@code null} 表示无法解析，此时按基础处理时间计
+     */
+    public static long craftingPatternUnitEnergy(@Nullable ResolvedCatalystEffect effect) {
+        long processTime = effect == null
+                ? CRAFTING_PATTERN_BASE_PROCESS_TIME
+                : Math.max(1, effect.processTime());
+        return CRAFTING_PATTERN_ENERGY_PER_TICK * processTime;
+    }
 
     private AlloyFurnaceBigIntegerCrafting() {
     }
@@ -217,19 +238,37 @@ public final class AlloyFurnaceBigIntegerCrafting {
      */
     public static @Nullable BigInteger maximumCountForEnergy(@NotNull CraftingTaskContext context,
                                                              @NotNull AdvancedAlloyFurnaceRecipe recipe) {
-        long recipeEnergy = Math.max(0L, recipe.energy());
-        if (recipeEnergy <= 0L) {
+        return maximumCountForEnergy(
+                Math.max(0L, recipe.energy()),
+                Math.max(0L, context.getEnergyManager().getEnergyStoredLong()),
+                context.resolveTaskEffect(recipe));
+    }
+
+    /**
+     * 「能量」上限的通用形式：基准能耗与催化剂效果由调用方给出。
+     *
+     * <p>合成样板没有绑定配方，无法从配方取能耗，因此需要这个重载；它与配方重载共用同一套
+     * 催化剂判定，两类样板的能量闸因此严格一致。</p>
+     *
+     * @param recipeEnergy 单份基准能耗
+     * @param available    当前可用能量
+     * @return 上限；{@code null} 表示「不设限」，{@link BigInteger#ZERO} 表示完全没能量
+     */
+    public static @Nullable BigInteger maximumCountForEnergy(long recipeEnergy,
+                                                             long available,
+                                                             @Nullable ResolvedCatalystEffect effect) {
+        long normalizedEnergy = Math.max(0L, recipeEnergy);
+        if (normalizedEnergy <= 0L) {
             return null;
         }
-        long available = Math.max(0L, context.getEnergyManager().getEnergyStoredLong());
-        ResolvedCatalystEffect effect = context.resolveTaskEffect(recipe);
+        long usableEnergy = Math.max(0L, available);
         int divisor = divisorOf(effect);
         if (multipliesWithParallel(effect)) {
-            return BigInteger.valueOf(available)
+            return BigInteger.valueOf(usableEnergy)
                     .multiply(BigInteger.valueOf(divisor))
-                    .divide(BigInteger.valueOf(recipeEnergy));
+                    .divide(BigInteger.valueOf(normalizedEnergy));
         }
-        return available >= divideRoundUp(recipeEnergy, divisor) ? null : BigInteger.ZERO;
+        return usableEnergy >= divideRoundUp(normalizedEnergy, divisor) ? null : BigInteger.ZERO;
     }
 
     /**
@@ -248,15 +287,29 @@ public final class AlloyFurnaceBigIntegerCrafting {
     public static long totalEnergy(@NotNull AdvancedAlloyFurnaceRecipe recipe,
                                    @NotNull BigInteger count,
                                    @Nullable ResolvedCatalystEffect effect) {
-        long recipeEnergy = Math.max(0L, recipe.energy());
-        if (recipeEnergy <= 0L) {
+        return totalEnergy(Math.max(0L, recipe.energy()), count, effect);
+    }
+
+    /**
+     * 按「单份基准能耗」计费的重载：合成样板不绑定合金炉配方，其基准能耗由调用方给出。
+     *
+     * <p>该重载与配方重载共用同一套催化剂口径，因此合成样板与万象样板在同一台机器上的
+     * 「是否按并行放大」判定完全一致，不会各自漂移。</p>
+     *
+     * @param recipeEnergy 单份基准能耗；合成样板传 {@link #craftingPatternUnitEnergy(ResolvedCatalystEffect)}
+     * @param count        本批的推送次数，必须为正
+     */
+    public static long totalEnergy(long recipeEnergy, @NotNull BigInteger count,
+                                   @Nullable ResolvedCatalystEffect effect) {
+        long normalizedEnergy = Math.max(0L, recipeEnergy);
+        if (normalizedEnergy <= 0L) {
             return 0L;
         }
         int divisor = divisorOf(effect);
         if (!multipliesWithParallel(effect)) {
-            return divideRoundUp(recipeEnergy, divisor);
+            return divideRoundUp(normalizedEnergy, divisor);
         }
-        BigInteger total = BigInteger.valueOf(recipeEnergy)
+        BigInteger total = BigInteger.valueOf(normalizedEnergy)
                 .multiply(count)
                 .add(BigInteger.valueOf(divisor - 1L))
                 .divide(BigInteger.valueOf(divisor));
@@ -315,14 +368,44 @@ public final class AlloyFurnaceBigIntegerCrafting {
      *
      * @param requested 调用方请求的份数（上限不会超过它）
      */
-    public static @NotNull BigInteger maximumCraftingPatternCount(@NotNull IPatternDetails pattern,
+    public static @NotNull BigInteger maximumCraftingPatternCount(@Nullable CraftingTaskContext context,
+                                                                  @NotNull IPatternDetails pattern,
                                                                   @NotNull KeyCounter @NotNull [] prototype,
                                                                   int threads,
                                                                   long segmentBudget,
                                                                   @NotNull BigInteger requested) {
         BigInteger limit = applyMaterialWindow(requested, prototype, threads);
         limit = applyDeliveryLimit(limit, pattern.getOutputs(), segmentBudget);
+        // 无任务上下文时无法解析催化剂效果，此处不施加能量闸；实际扣电仍在提交侧执行，
+        // 提交侧拒收不会让 DE 的 exact 分支卡死（容量上报侧已在有能力解析时收窄）。
+        if (context != null) {
+            BigInteger energyCap = maximumCraftingPatternCountForEnergy(context);
+            if (energyCap != null) {
+                limit = limit.min(energyCap);
+            }
+        }
         return limit.signum() <= 0 ? BigInteger.ZERO : AlloyFurnaceTickBudget.applyScale(limit);
+    }
+
+    /**
+     * 合成样板的「能量」上限。
+     *
+     * <p>合成样板不绑定合金炉配方，因此单份基准能耗取 {@link #craftingPatternUnitEnergy(ResolvedCatalystEffect)}；
+     * 催化剂效果仍从机器解析（传入 {@code null} 配方），使合成样板与万象样板在同一台机器上
+     * 遵循同一套「是否按并行放大」的判定。</p>
+     *
+     * <p>该判定是「有用线圈不按 count 翻倍计费」的实现位置：有用线圈的
+     * {@code energyMultipliesWithParallel} 为 {@code false}，此处遂返回 {@code null}
+     * （不设限），其 bigint 容量只受材料窗口与产物分段预算约束。</p>
+     *
+     * @return 上限；{@code null} 表示不设限，{@link BigInteger#ZERO} 表示完全没能量
+     */
+    public static @Nullable BigInteger maximumCraftingPatternCountForEnergy(@NotNull CraftingTaskContext context) {
+        ResolvedCatalystEffect effect = context.resolveTaskEffect(null);
+        return maximumCountForEnergy(
+                craftingPatternUnitEnergy(effect),
+                context.getEnergyManager().getEnergyStoredLong(),
+                effect);
     }
 
     /**

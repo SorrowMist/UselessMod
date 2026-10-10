@@ -35,7 +35,11 @@ import java.util.concurrent.locks.ReentrantLock;
  * CraftingTask 的上下文接口，提供对 AdvancedAlloyFurnaceBlockEntity 必要成员的访问
  */
 public interface CraftingTaskContext {
-    
+
+    /** 「等待能量」状态文案键：容量上报与任务等待共用，避免两处各自硬编码。 */
+    String STATUS_WAITING_ENERGY_KEY =
+            "gui.useless_mod.advanced_alloy_furnace.ae_task_status.waiting_energy";
+
     // 槽位常量
     int getInputSlotsStart();
     int getInputSlotsCount();

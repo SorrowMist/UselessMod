@@ -18,15 +18,15 @@ import com.sorrowmist.useless.api.crafting.bigint.cpu.AlloyFurnaceBigIntegerCpuA
 import com.sorrowmist.useless.api.crafting.bigint.cpu.AlloyFurnaceBigIntegerCpuAdapters;
 import com.sorrowmist.useless.api.crafting.bigint.cpu.AlloyFurnaceBigIntegerCpuBinding;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.catalyst.ResolvedCatalystEffect;
-import com.sorrowmist.useless.content.recipe.AdvancedAlloyFurnaceRecipe;
-import com.sorrowmist.useless.content.recipe.AlloyFurnaceRecipeCatalog;
-import com.sorrowmist.useless.energy.IEnergyManager;
-import com.sorrowmist.useless.core.config.ConfigManager;
-import com.sorrowmist.useless.integration.dataenergistics.TrinityDispatchDiagnostics;
-import com.sorrowmist.useless.network.AETaskProgressPacket;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.chemical.ChemicalStackView;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.chemical.FurnaceChemicalStorage;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.io.FurnaceOutputPort;
+import com.sorrowmist.useless.content.recipe.AdvancedAlloyFurnaceRecipe;
+import com.sorrowmist.useless.content.recipe.AlloyFurnaceRecipeCatalog;
+import com.sorrowmist.useless.core.config.ConfigManager;
+import com.sorrowmist.useless.energy.IEnergyManager;
+import com.sorrowmist.useless.integration.dataenergistics.TrinityDispatchDiagnostics;
+import com.sorrowmist.useless.network.AETaskProgressPacket;
 import it.unimi.dsi.fastutil.objects.Object2LongMap;
 import it.unimi.dsi.fastutil.objects.Object2LongOpenHashMap;
 import net.minecraft.core.HolderLookup;
@@ -44,6 +44,7 @@ import net.minecraft.world.level.Level;
 import net.neoforged.neoforge.network.PacketDistributor;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.slf4j.Logger;
 
 import java.math.BigInteger;
 import java.util.ArrayList;
@@ -60,7 +61,6 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.ReentrantLock;
-import org.slf4j.Logger;
 
 /**
  * 高级合金炉的 AE 任务调度器。
@@ -1065,6 +1065,24 @@ public final class AdvancedAlloyFurnaceAeManager {
             return false;
         }
 
+        // 能量：与万象样板、bigint 合成样板共用同一套口径。合成样板未绑定配方，单份基准能耗由
+        // craftingPatternUnitEnergy 依当前催化剂的处理时间算出；有用线圈下
+        // energyMultipliesWithParallel 为 false，整批只收一次固定能耗，与 operationsPerPush 无关。
+        //
+        // 与上面的可复用输入不同，这里的 false 是「能量不足，稍后重试」：重试条件随能量补充而变化，
+        // 不会形成每 tick 恒定拒收的死循环。
+        ResolvedCatalystEffect energyEffect = this.owner.resolveTaskEffect(null);
+        long totalEnergy = AlloyFurnaceBigIntegerCrafting.totalEnergy(
+                AlloyFurnaceBigIntegerCrafting.craftingPatternUnitEnergy(energyEffect),
+                BigInteger.valueOf(Math.max(1L, operationsPerPush)),
+                energyEffect);
+        if (totalEnergy > 0L) {
+            IEnergyManager energy = this.owner.getEnergyManager();
+            if (totalEnergy > energy.getEnergyStoredLong() || !energy.tryConsumeEnergy(totalEnergy)) {
+                return false;
+            }
+        }
+
         // 走到这里才算接收：AE2 随后会把本批预期产物写入 CPU 的 waitingFor。
         for (KeyCounter counter : inputHolder) {
             counter.clear();
@@ -1138,8 +1156,12 @@ public final class AdvancedAlloyFurnaceAeManager {
     /**
      * 合成样板的 bigint 折叠：在虚拟 3×3 工作台上装配<b>一次</b>，产物整体 ×count。
      *
-     * <p>不按 count 收能量 —— 与长版 counted 路径的合成样板分支一致（那条路同样是装配一次后按倍率
-     * 折叠，不建真实加工任务）。</p>
+     * <p>能量按「单份基准能耗 × 并行口径」计收，与万象样板共用
+     * {@link AlloyFurnaceBigIntegerCrafting#totalEnergy(long, BigInteger, ResolvedCatalystEffect)}：
+     * 合成样板未绑定配方，单份基准能耗由
+     * {@link AlloyFurnaceBigIntegerCrafting#craftingPatternUnitEnergy(ResolvedCatalystEffect)} 依当前
+     * 催化剂的处理时间算出。有用线圈下
+     * {@code energyMultipliesWithParallel} 为 {@code false}，整批只收一次固定能耗，与 count 无关。</p>
      */
     private boolean commitCraftingBatch(IMolecularAssemblerSupportedPattern craftingPattern,
                                         BigInteger count,
@@ -1154,6 +1176,7 @@ public final class AdvancedAlloyFurnaceAeManager {
             return false;
         }
 
+        // 先把产出算出来（纯计算、不改状态），再扣能量
         long useless$bigintStarted = System.nanoTime();
         KeyCounter[] working = copyCounters(unitPrototype);
         List<ItemStack> grid = emptyCraftingGrid();
@@ -1172,10 +1195,20 @@ public final class AdvancedAlloyFurnaceAeManager {
         if (produced.isEmpty()) {
             return false;
         }
+        // 能量：口径与万象样板、长版任务完全一致（与并行相关时按 count 放大）。
+        ResolvedCatalystEffect effect = this.owner.resolveTaskEffect(null);
+        long totalEnergy = AlloyFurnaceBigIntegerCrafting.totalEnergy(
+                AlloyFurnaceBigIntegerCrafting.craftingPatternUnitEnergy(effect), count, effect);
+        if (totalEnergy > 0L) {
+            IEnergyManager energy = this.owner.getEnergyManager();
+            if (totalEnergy > energy.getEnergyStoredLong() || !energy.tryConsumeEnergy(totalEnergy)) {
+                return false;
+            }
+        }
 
         // 走到这里才算接收：清空收到的单位原型（count-1 份由调用方的账本扣除），产物进回网队列。
         AlloyFurnaceBigIntegerBatchContext cpuContext = cpuBinding == null
-                ? null : buildCpuContext(craftingPattern, count, 0L, cpuBinding);
+                ? null : buildCpuContext(craftingPattern, count, totalEnergy, cpuBinding);
         PendingCraftingOutput pending = new PendingCraftingOutput(
                 level.getGameTime(),
                 produced,

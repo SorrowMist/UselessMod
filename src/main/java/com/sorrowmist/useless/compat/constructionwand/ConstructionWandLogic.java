@@ -2,6 +2,8 @@ package com.sorrowmist.useless.compat.constructionwand;
 
 import com.sorrowmist.useless.api.enums.tool.ConstructionWandCoreMode;
 import com.sorrowmist.useless.compat.AE2Compat;
+import com.sorrowmist.useless.compat.ftbchunks.BlockEditGuard;
+import com.sorrowmist.useless.compat.ftbchunks.FtbChunksProtectionLoader;
 import com.sorrowmist.useless.core.component.UComponents;
 import com.sorrowmist.useless.core.config.ConfigManager;
 import com.sorrowmist.useless.content.items.EndlessBeafItem;
@@ -45,6 +47,19 @@ public final class ConstructionWandLogic {
 
     private ConstructionWandLogic() {}
 
+    /**
+     * 判定该位置是否受方块编辑保护（FTB Chunks）。
+     *
+     * <p>未安装对应模组、保护判定不可用或玩家持有 bypass 权限时返回 {@code false}。</p>
+     *
+     * <p>判定必须逐格进行：一次建造或破坏可能横跨多个区块，各区块的归属队伍与
+     * 权限设置并不相同，只对起点判定一次会漏掉其余区块的保护。</p>
+     */
+    private static boolean isProtected(ServerPlayer player, BlockPos pos) {
+        BlockEditGuard guard = FtbChunksProtectionLoader.guard();
+        return guard != null && !guard.isEditAllowed(player, pos);
+    }
+
     public static boolean isEnabled(ItemStack stack) {
         return stack.getItem() instanceof EndlessBeafItem
                 && stack.getOrDefault(UComponents.ConstructionWandEnabledComponent.get(), false);
@@ -66,7 +81,7 @@ public final class ConstructionWandLogic {
             case ANGEL -> air
                     ? previewAngelAir(player.serverLevel(), player, tool)
                     : previewAngel(player.serverLevel(), player, hit, tool);
-            case DESTRUCTION -> air ? List.of() : previewDestroy(player.serverLevel(), hit);
+            case DESTRUCTION -> air ? List.of() : previewDestroy(player.serverLevel(), player, hit);
         };
     }
 
@@ -142,6 +157,8 @@ public final class ConstructionWandLogic {
 
             BlockPos supportPos = pos.relative(face.getOpposite());
             if (level.getBlockState(supportPos).getBlock() != targetState.getBlock()) continue;
+            // 受保护的格子不放置，也不作为扩散起点：建造链条在此中止。
+            if (isProtected(player, pos)) continue;
             if (!place(level, player, tool, pos, face, targetItem, changed)) continue;
             if (changed.size() >= limit) break;
 
@@ -181,6 +198,8 @@ public final class ConstructionWandLogic {
             if (level.getBlockState(pos.relative(face.getOpposite())).getBlock() != targetState.getBlock()) {
                 continue;
             }
+            // 预览必须与落地结果一致：受保护的格子不作为可放置位置显示。
+            if (isProtected(player, pos)) continue;
             if (getPlacementState(level, player, pos, face, targetItem, previewStack, placementHand) == null) {
                 continue;
             }
@@ -218,7 +237,9 @@ public final class ConstructionWandLogic {
         Direction step = fromAir ? angelAirStep(player) : face.getOpposite();
         BlockPos pos = start;
         for (int i = 0; i < limit; i++) {
-            if (place(level, player, tool, pos, face, targetItem, changed)) {
+            // 天使模式沿直线推进：受保护的格子只跳过放置，不中断推进。
+            if (!isProtected(player, pos)
+                    && place(level, player, tool, pos, face, targetItem, changed)) {
                 if (changed.size() >= limit) break;
             }
             pos = pos.relative(step);
@@ -246,7 +267,9 @@ public final class ConstructionWandLogic {
         BlockPos pos = hit.getBlockPos().relative(step);
         List<BlockPos> preview = new ArrayList<>(Math.min(limit, MAX_PREVIEW_BLOCKS));
         for (int i = 0; i < limit && preview.size() < MAX_PREVIEW_BLOCKS; i++) {
-            if (getPlacementState(level, player, pos, face, targetItem, previewStack, placementHand) != null) {
+            if (!isProtected(player, pos)
+                    && getPlacementState(level, player, pos, face, targetItem,
+                                         previewStack, placementHand) != null) {
                 preview.add(pos.immutable());
             }
             pos = pos.relative(step);
@@ -272,8 +295,9 @@ public final class ConstructionWandLogic {
         BlockPos pos = angelAirStart(player);
         List<BlockPos> preview = new ArrayList<>(Math.min(limit, MAX_PREVIEW_BLOCKS));
         for (int i = 0; i < limit && preview.size() < MAX_PREVIEW_BLOCKS; i++) {
-            if (getPlacementState(level, player, pos, face, targetItem,
-                                  previewStack, placementHand) != null) {
+            if (!isProtected(player, pos)
+                    && getPlacementState(level, player, pos, face, targetItem,
+                                         previewStack, placementHand) != null) {
                 preview.add(pos.immutable());
             }
             pos = pos.relative(step);
@@ -302,7 +326,8 @@ public final class ConstructionWandLogic {
 
             BlockState state = level.getBlockState(pos);
             boolean destroyed = false;
-            if (!state.isAir() && state.getBlock() == target.getBlock()) {
+            // 受保护的格子不破坏，也不作为扩散起点：破坏链条在此中止。
+            if (!state.isAir() && state.getBlock() == target.getBlock() && !isProtected(player, pos)) {
                 SavedBlock saved = SavedBlock.capture(level, pos, state, ItemStack.EMPTY, false);
                 if (level.destroyBlock(pos, false, player)) {
                     saved.afterState = level.getBlockState(pos);
@@ -318,7 +343,8 @@ public final class ConstructionWandLogic {
         return changed.isEmpty() ? null : new Operation(changed, tool.copy());
     }
 
-    private static List<BlockPos> previewDestroy(ServerLevel level, BlockHitResult hit) {
+    private static List<BlockPos> previewDestroy(ServerLevel level, ServerPlayer player,
+                                                 BlockHitResult hit) {
         BlockState target = level.getBlockState(hit.getBlockPos());
         if (target.isAir()) return List.of();
 
@@ -336,6 +362,7 @@ public final class ConstructionWandLogic {
             if (!visited.add(pos)) continue;
             BlockState state = level.getBlockState(pos);
             if (state.isAir() || state.getBlock() != target.getBlock()) continue;
+            if (isProtected(player, pos)) continue;
 
             preview.add(pos.immutable());
             for (BlockPos offset : offsets) {

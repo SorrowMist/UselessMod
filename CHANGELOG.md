@@ -5,6 +5,24 @@
 
 ## [Unreleased]
 
+## [2.4.5.12]
+
+### Fixed / 修复
+- 造化杖挖掘苍穹核心时，容器内容物不再重复掉落
+  - Fixed container contents dropping twice when the Creation Staff mines a Firmament Conversion Core.
+- 造化杖挖掘集成动力线缆时，线缆不再整块消失（[#42](https://github.com/SorrowMist/UselessMod/issues/42)）。同步修复部分挖掘问题
+  - Fixed Integrated Dynamics cables vanishing entirely when mined with the Creation Staff ([#42](https://github.com/SorrowMist/UselessMod/issues/42)). Also fixed several related mining issues.
+- 强制挖掘不再误拆已按部件拆除的组合体
+  - Fixed forced mining destroying the remaining parts of a multiblock that was already dismantled part by part.
+- 战利品大爆发不再错误放大装备、工具与容器
+  - Fixed Loot Burst incorrectly multiplying equipment, tools and containers.
+- 样板总成槽位超过 128 时，打开样板管理终端不再掉线（[#43](https://github.com/SorrowMist/UselessMod/issues/43)）
+  - Fixed a disconnect when opening the pattern access terminal with more than 128 pattern slots ([#43](https://github.com/SorrowMist/UselessMod/issues/43)).
+- 无线终端的万象样板现在可以自动上传
+  - Omniversal patterns from wireless terminals now upload automatically.
+- 合成样板现在会正确扣除能量
+  - Crafting patterns now consume energy correctly.
+
 ## [2.4.5.11]
 
 ### Changed / 变更

@@ -146,24 +146,21 @@ public class UselessItemUtils {
         sendFestiveMessage(player);
 
         Collection<ItemEntity> drops = event.getDrops();
-        List<ItemEntity> remainingDrops = new ArrayList<>(); // 保留原样掉落的（可损坏物品）
-        List<ItemStack> amplifiedDrops = new ArrayList<>();  // ×20 后的战利品
+        List<ItemEntity> remainingDrops = new ArrayList<>(); // 保留原样掉落的（装备与容器类）
+        List<ItemStack> amplifiedDrops = new ArrayList<>();  // 放大后的战利品
 
         for (ItemEntity itemEntity : drops) {
             ItemStack dropStack = itemEntity.getItem();
 
-            if (dropStack.isDamageableItem()) {
-                // 可损坏物品（如剑、弓、护甲）保持原版掉落行为
-                remainingDrops.add(itemEntity);
+            if (isFestiveAmplifiable(dropStack)) {
+                amplifiedDrops.addAll(amplifyFestiveDrop(dropStack));
             } else {
-                // 非可损坏物品：数量 ×20，交给统一的掉落通道处理
-                ItemStack amplifiedStack = dropStack.copy();
-                amplifiedStack.setCount(dropStack.getCount() * 20);
-                amplifiedDrops.add(amplifiedStack);
+                // 装备、工具、容器及其它不可堆叠物品保持原版掉落行为
+                remainingDrops.add(itemEntity);
             }
         }
 
-        // 清空原掉落物，重新添加只需掉在地上的部分（主要是可损坏物品）
+        // 清空原掉落物，重新添加需保持原版行为的装备与容器（放大后的战利品走统一掉落通道）
         drops.clear();
         drops.addAll(remainingDrops);
 
@@ -173,6 +170,69 @@ public class UselessItemUtils {
             // （AE 优先且已绑定 → 进 AE；否则磁力开 → 进背包；都没开 → 落在尸体处走原版拾取）。
             MiningUtils.handleDrops(player, amplifiedDrops, stack, killedEntity.position());
         }
+    }
+
+    /** 战利品大爆发的数量放大倍数。 */
+    private static final int FESTIVE_MULTIPLIER = 20;
+
+    /** 单个掉落物放大后允许产生的堆叠数上限，防止极端数量生成过多实体。 */
+    private static final int FESTIVE_MAX_STACKS = 16;
+
+    /**
+     * 判定某个掉落物是否参与战利品大爆发的数量放大。
+     *
+     * <p>旧实现以 {@code ItemStack#isDamageableItem()} 作为「是否属于装备」的判据，
+     * 该判据与物品实际类别并不对应。其实现为
+     * {@code has(MAX_DAMAGE) && !has(UNBREAKABLE) && has(DAMAGE)}，对以下三类掉落物均返回
+     * {@code false}，使其全部落入放大分支：</p>
+     * <ul>
+     *   <li>以 {@code UNBREAKABLE} 组件表达不可损坏的装备与工具（该组件使判定直接为假）；</li>
+     *   <li>本就不含耐久组件的模组饰品、武器与工具；</li>
+     *   <li>潜影盒、收纳袋等容器，其 {@code maxStackSize} 为 1，同样不含耐久组件。</li>
+     * </ul>
+     *
+     * <p>其中容器被放大时，{@code CONTAINER} / {@code BUNDLE_CONTENTS} 组件随物品副本一并复制，
+     * 内容物因此同步倍增。判定改为「能否自然堆叠」后，装备、工具、护甲与容器一律保持原版
+     * 掉落行为；容器组件另作显式排除，避免堆叠上限大于 1 的模组容器绕过该判定。</p>
+     *
+     * @param stack 待判定的掉落物
+     * @return 该掉落物是否应被放大
+     */
+    private static boolean isFestiveAmplifiable(ItemStack stack) {
+        if (stack.isEmpty() || stack.getMaxStackSize() <= 1) {
+            return false;
+        }
+        // 容器即便可堆叠也不放大：放大将连同内容物一并复制
+        return !stack.has(DataComponents.CONTAINER) && !stack.has(DataComponents.BUNDLE_CONTENTS);
+    }
+
+    /**
+     * 放大单个掉落物的数量，并按物品自身的堆叠上限拆分。
+     *
+     * <p>此前的实现直接写入 {@code count * 20}，未受堆叠上限约束，会构造出数量超过上限的
+     * 非法堆叠。此处改为放大后按上限拆分，并限制堆叠总数，避免极端掉落产生大量实体。</p>
+     *
+     * @param dropStack 原始掉落物
+     * @return 拆分后的掉落物列表，至少含一项
+     */
+    private static List<ItemStack> amplifyFestiveDrop(ItemStack dropStack) {
+        int maxStackSize = dropStack.getMaxStackSize();
+        int total = dropStack.getCount() * FESTIVE_MULTIPLIER;
+        int maxTotal = maxStackSize * FESTIVE_MAX_STACKS;
+        if (total > maxTotal) {
+            total = maxTotal;
+        }
+
+        List<ItemStack> amplified = new ArrayList<>();
+        int remaining = total;
+        while (remaining > 0) {
+            int size = Math.min(remaining, maxStackSize);
+            ItemStack copy = dropStack.copy();
+            copy.setCount(size);
+            amplified.add(copy);
+            remaining -= size;
+        }
+        return amplified;
     }
 
     public static void tryAddCognizantDustDrop(LivingDropsEvent event, ItemStack stack) {

@@ -11,6 +11,7 @@ import com.sorrowmist.useless.content.recipe.LongSizedFluidIngredient;
 import com.sorrowmist.useless.init.ModBlocks;
 import com.sorrowmist.useless.init.ModTags;
 import com.sorrowmist.useless.core.config.AlloyFurnaceTierRules;
+import mezz.jei.api.constants.VanillaTypes;
 import mezz.jei.api.gui.builder.IRecipeLayoutBuilder;
 import mezz.jei.api.gui.builder.ITooltipBuilder;
 import mezz.jei.api.gui.drawable.IDrawable;
@@ -227,6 +228,7 @@ public class AdvancedAlloyFurnaceRecipeCategory implements IRecipeCategory<Alloy
 
                 builder.addSlot(RecipeIngredientRole.INPUT, x, y)
                        .addIngredients(displayIngredient)
+                       .setCustomRenderer(VanillaTypes.ITEM_STACK, ItemStackCountRenderer.INSTANCE)
                        .addRichTooltipCallback((slot, tooltip) -> {
                            if (count > 1) {
                                tooltip.add(Component.translatable("jei.useless_mod.tooltip.amount", formatCount(count)).withStyle(ChatFormatting.GRAY));
@@ -295,6 +297,7 @@ public class AdvancedAlloyFurnaceRecipeCategory implements IRecipeCategory<Alloy
 
             builder.addSlot(RecipeIngredientRole.OUTPUT, x, y)
                     .addItemStack(outputStack)
+                    .setCustomRenderer(VanillaTypes.ITEM_STACK, ItemStackCountRenderer.INSTANCE)
                     .addRichTooltipCallback((slot, tooltip) -> {
                         if (count > 1) {
                             tooltip.add(Component.translatable("jei.useless_mod.tooltip.amount", formatCount(count)).withStyle(ChatFormatting.GRAY));
@@ -590,7 +593,9 @@ public class AdvancedAlloyFurnaceRecipeCategory implements IRecipeCategory<Alloy
         ItemStack displayStack = GenericStack.wrapInItemStack(
                 stack.what(), (int) Math.min(stack.amount(), Integer.MAX_VALUE));
         if (displayStack.isEmpty()) return null;
-        return builder.addSlot(role, x, y).addItemStack(displayStack);
+        return builder.addSlot(role, x, y)
+                .addItemStack(displayStack)
+                .setCustomRenderer(VanillaTypes.ITEM_STACK, ItemStackCountRenderer.INSTANCE);
     }
 
     // 判断是否是无用锭配方（根据输出物品判断）

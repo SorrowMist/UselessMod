@@ -1,10 +1,11 @@
 package com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae;
 
 import appeng.api.networking.IGrid;
+import appeng.api.networking.IGridNode;
+import appeng.api.networking.security.IActionHost;
 import appeng.api.stacks.AEItemKey;
 import appeng.crafting.pattern.AEProcessingPattern;
 import appeng.helpers.IPatternTerminalLogicHost;
-import appeng.parts.AEBasePart;
 import com.sorrowmist.useless.content.blockentities.multiblock.MePatternAssemblyBlockEntity;
 import com.sorrowmist.useless.content.blockentities.multiblock.MultiblockAlloyFurnaceCoreBlockEntity;
 import com.sorrowmist.useless.content.blockentities.multiblock.OmniversalMoldHubBlockEntity;
@@ -222,12 +223,22 @@ public final class OmniversalPatternUploader {
     }
 
     /**
-     * 编码终端部件自身持有网格节点，但 {@link IPatternTerminalLogicHost} 不暴露该节点，
-     * 因此需要向下转型到 AE2 的部件基类。无线终端等其它宿主不满足该条件时返回 {@code null}，
-     * 此时样板保留在终端内，编码流程本身不受影响。
+     * 解析编码终端所在的 AE 网格。
+     *
+     * <p>{@link IPatternTerminalLogicHost} 不暴露网格节点，因此需要向下转型到 AE2 的
+     * {@link IActionHost}。该接口是网格访问的统一入口：有线编码终端部件与无线终端宿主
+     * 都实现了它，故两种终端在此处一视同仁。早期实现只识别 {@code AEBasePart}，使无线
+     * 终端因宿主并非部件而始终解析不到网格，样板自动上传对无线终端形同失效。</p>
+     *
+     * <p>宿主未连接接入点、超出范围或未实现该接口时 {@code getActionableNode()} 返回
+     * {@code null}，此时本方法同样返回 {@code null}，样板保留在终端内，编码流程本身不受影响。</p>
      */
     private static @Nullable IGrid resolveGrid(IPatternTerminalLogicHost host) {
-        return host instanceof AEBasePart part ? part.getMainNode().getGrid() : null;
+        if (host instanceof IActionHost actionHost) {
+            IGridNode node = actionHost.getActionableNode();
+            return node == null ? null : node.getGrid();
+        }
+        return null;
     }
 
     /**

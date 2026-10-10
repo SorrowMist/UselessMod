@@ -772,10 +772,14 @@ ChainMiningShapes shape, Direction face, Player player) {
         List<ItemStack> removalDrops = collectNewDrops(level, area, before, consumed);
 
         if (!removed) {
-            // 方块未被移除：或由模组接管了本次破坏并自行产出掉落，或明确拒绝。
-            // 常规挖掘尊重该结果——方块仍留在原地，按掉落表产出物品等同于凭空生成。
-            // 强制挖掘不接受移除拒绝：补做一次整块移除，使强拆语义在重写该回调的方块上同样成立。
-            if (force && !level.getBlockState(pos).isAir()) {
+            // 方块未被移除时存在两种情形，必须区分对待：
+            // 一是模组接管了本次破坏并按自身语义完成拆除（如集成动力线缆按准星命中的部件拆除），
+            // 此时已有掉落产出，该结果即本次破坏的最终产物；
+            // 二是模组明确拒绝移除，未产出任何掉落。
+            // 仅后者属于强制挖掘不接受的范围，补做一次整块移除；对前者补做强拆会连带移除
+            // 该位置剩余部件，使组合体整块消失。
+            // 常规挖掘一律尊重该结果——方块仍留在原地，按掉落表产出物品等同于凭空生成。
+            if (hasNoValidDrops(removalDrops) && force && !level.getBlockState(pos).isAir()) {
                 try {
                     level.removeBlock(pos, false);
                     if (level.getBlockState(pos).isAir()) {

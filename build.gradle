@@ -444,6 +444,14 @@ dependencies {
     runtimeOnly "hellfirepvp.observerlib:ObserverLib:1.10.3.31"
     implementation "hellfirepvp.astralsorcery:AstralSorcery:2.0.0.14"
 
+//    // 集成动力
+//    runtimeOnly "maven.modrinth:cyclops-core:RjMKI4zG"
+//    runtimeOnly "maven.modrinth:common-capabilities:c50bCinZ"
+//    runtimeOnly "maven.modrinth:integrated-dynamics:JK4qvMtw"
+//
+//    // Refined Storage
+//    runtimeOnly "maven.modrinth:refined-storage:lHHiI26k"
+
     compileOnly fileTree(dir: 'libs', includes: ['*.jar'], excludes: [])
     compileOnly fileTree(dir: 'libs/compile', includes: ['*.jar'], excludes: [])
 }

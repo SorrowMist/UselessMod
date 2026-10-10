@@ -29,6 +29,7 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.material.FluidState;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.HitResult;
@@ -55,13 +56,18 @@ public class MiningUtils {
     }
 
     /**
-     * 一次破坏尝试的结果：方块是否真的被移除，以及本次新生成的掉落。
+     * 一次破坏尝试的结果。
      *
-     * <p>和 {@link MiningResult} 的区别：这个只描述「破坏回调 + removeBlock」这一步，
-     * 不带经验等上层语义，专门用来表达「模组拒绝了这次移除」。</p>
+     * <p>和 {@link MiningResult} 的区别：这个只描述破坏回调这一步，不带经验等上层语义。</p>
+     *
+     * <p>两个布尔量必须分开：{@code effective} 表示本次破坏产生了效果（应当消耗该位置并交付掉落），
+     * {@code blockRemoved} 表示方块确实从世界消失。二者在方块自行接管移除时并不等价——
+     * 例如集成动力线缆按准星命中的部件拆除并保留整块方块，此时 {@code effective=true} 而
+     * {@code blockRemoved=false}。依赖「方块已消失」的判定（如精准采集的回退掉落）必须读后者，
+     * 否则会在方块仍留在原地时凭空产出其本体物品。</p>
      */
-    record BreakOutcome(boolean removed, List<ItemStack> drops) {
-        private static final BreakOutcome REFUSED = new BreakOutcome(false, List.of());
+    record BreakOutcome(boolean effective, boolean blockRemoved, List<ItemStack> drops) {
+        private static final BreakOutcome REFUSED = new BreakOutcome(false, false, List.of());
     }
 
     /**
@@ -214,8 +220,8 @@ public class MiningUtils {
         }
 
         int experience = getExperience(level, pos, state, player, tool);
-        BreakOutcome outcome = destroyBlockAndCollectDrops(level, pos, state, player, tool);
-        return outcome.removed()
+        BreakOutcome outcome = destroyBlockAndCollectDrops(level, pos, state, player, tool, false);
+        return outcome.effective()
                 ? new MiningResult(outcome.drops(), experience, true)
                 : MiningResult.NOT_MINED;
     }
@@ -232,10 +238,15 @@ public class MiningUtils {
         int experience = getExperience(level, pos, state, player, tool);
         if (isSilkTouch(tool)) {
             List<ItemStack> fallbackDrops = getForcedFallbackDrops(state, level, pos);
-            // 方块自身拒绝移除时不发放回退掉落，否则等同于无中生有地生成一个核心物品。
-            return destroyBlockAndCollectDrops(level, pos, state, player, tool).removed()
-                    ? new MiningResult(fallbackDrops, 0, true)
-                    : MiningResult.NOT_MINED;
+            // 回退掉落复制的是方块本体，必须以「方块确实已从世界消失」为准：
+            // 方块自行接管移除时（如线缆按部件拆除）方块仍留在原地，此时发放本体会凭空产出物品。
+            BreakOutcome outcome = destroyBlockAndCollectDrops(level, pos, state, player, tool, true);
+            if (!outcome.blockRemoved()) {
+                return outcome.effective()
+                        ? new MiningResult(outcome.drops(), 0, true)
+                        : MiningResult.NOT_MINED;
+            }
+            return new MiningResult(fallbackDrops, 0, true);
         }
 
         BlockEntity blockEntity = level.getBlockEntity(pos);
@@ -244,11 +255,14 @@ public class MiningUtils {
         List<ItemStack> fallbackDrops = useFallback
                 ? getForcedFallbackDrops(state, level, pos)
                 : List.of();
-        BreakOutcome outcome = destroyBlockAndCollectDrops(level, pos, state, player, tool);
-        if (!outcome.removed()) {
+        BreakOutcome outcome = destroyBlockAndCollectDrops(level, pos, state, player, tool, true);
+        if (!outcome.effective()) {
             return MiningResult.NOT_MINED;
         }
-        List<ItemStack> drops = selectForcedDrops(naturalDrops, outcome.drops(), fallbackDrops);
+        // 回退掉落仅适用于方块确已消失的情形；方块被模组接管保留时只能交付实际产出的掉落。
+        List<ItemStack> drops = outcome.blockRemoved()
+                ? selectForcedDrops(naturalDrops, outcome.drops(), fallbackDrops)
+                : outcome.drops();
         return new MiningResult(drops, experience, true);
     }
 
@@ -276,16 +290,22 @@ public class MiningUtils {
         }
 
         ServerLevel serverLevel = (ServerLevel) world;
-        BlockEntity blockEntity = world.getBlockEntity(pos);
 
         // 同样要把模组回调的异常挡在事件链之外：数据能源的三位一体样板核心在状态未就绪时
         // getDrops / playerWillDestroy 都会抛，异常冒回事件总线就会打断整 tick。
         try {
-            List<ItemStack> drops = Block.getDrops(state, serverLevel, pos, blockEntity, player, tool);
-            drops = applyExDeorumDrops(serverLevel, state, drops, tool, pos, player);
-            handleDrops(player, drops, tool, Vec3.atCenterOf(pos));
+            // 破坏必须走与准星挖掘同一套回调次序，否则重写 onDestroyedByPlayer 的模组
+            // （如集成动力线缆按部件拆除）会在此被整块移除，其部件本体无从掉落。
+            // 掉落直接取该流程的收集结果：回调与移除两阶段的产出均在其中。
+            // 不可改用 Block.getDrops 重新计算——该流程已把收集到的掉落实体移除，
+            // 且掉落表结果不含移除阶段产出的内容物，重算会导致这部分掉落整体丢失。
+            BreakOutcome outcome = destroyBlockAndCollectDrops(serverLevel, pos, state, player, tool, false);
+            if (!outcome.effective()) {
+                return;
+            }
 
-            world.destroyBlock(pos, false, player);
+            List<ItemStack> drops = applyExDeorumDrops(serverLevel, state, outcome.drops(), tool, pos, player);
+            handleDrops(player, drops, tool, Vec3.atCenterOf(pos));
         } catch (Throwable failure) {
             reportBlockBreakFailure(state, pos, failure);
         }
@@ -676,30 +696,38 @@ ChainMiningShapes shape, Direction face, Player player) {
     }
 
     /**
-     * 通过方块自身的破坏回调破坏方块，并收集本次新生成的掉落实体
-     * 这样可以保留其他模组在 playerDestroy 中实现的特殊掉落逻辑，同时仍然让掉落物进入背包。
+     * 通过方块自身的破坏回调破坏方块，并收集本次新生成的掉落实体。
+     * 这样可以保留其他模组在破坏回调中实现的特殊掉落逻辑，同时仍然让掉落物进入背包。
      *
-     * <p>破坏分两个阶段执行，两阶段各自都可能产出掉落：</p>
+     * <p>破坏按原版 {@code ServerPlayerGameMode#destroyBlock} 的次序执行，三步各自都可能产出掉落：</p>
      * <ol>
-     *   <li>回调阶段：{@code playerWillDestroy} 与 {@code playerDestroy}。后者的默认实现经
-     *       {@code getDrops} 产出掉落表物品，模组也可在此直接追加自定义掉落。</li>
-     *   <li>移除阶段：{@code removeBlock} 触发 {@code onRemove}。容器类方块通常在此掉落内容物。</li>
+     *   <li>{@code playerWillDestroy}：不产出掉落，其返回值才是后续流程使用的方块状态。</li>
+     *   <li>{@code onDestroyedByPlayer}：由方块自身决定是否移除。NeoForge 的默认实现即
+     *       {@code Level#removeBlock}，因而会触发 {@code onRemove}，容器类方块通常在此掉落内容物；
+     *       重写该方法的模组可以接管本次移除并返回 {@code false}（如集成动力线缆按准星命中的部件拆除，
+     *       整块方块予以保留）。返回 {@code true} 时随之调用 {@code Block#destroy} 收尾。</li>
+     *   <li>{@code playerDestroy}：仅在方块确被移除时执行，经 {@code getDrops} 产出掉落表物品，
+     *       模组也可在此直接追加自定义掉落。</li>
      * </ol>
      *
+     * <p>缺少第 2 步时，任何依赖 {@code onDestroyedByPlayer} 决定移除方式的模组都会失效：
+     * 其接管逻辑被完全跳过，方块按整块移除处理，且不再有机会掉落自身部件。</p>
+     *
      * <p>若方块既重写了 {@code getDrops} 并返回内容物，又在 {@code onRemove} 中掉落内容物，
-     * 同一批物品会被两条路径各生成一次。此处以回调阶段的掉落为基准，移除阶段中与之完全相同的条目
-     * 视为重复并丢弃，避免采集端把两份都收走；配对要求物品、组件与数量三者同时一致，
-     * 因此方块自身重复产出的同类掉落不受影响。</p>
+     * 同一批物品会被两条路径各生成一次。此处以 {@code playerDestroy} 阶段的掉落为基准，
+     * 移除阶段中与之完全相同的条目视为重复并丢弃，避免采集端把两份都收走；
+     * 配对要求物品、组件与数量三者同时一致，因此方块自身重复产出的同类掉落不受影响。</p>
      *
      * @param level  世界
      * @param pos    方块位置
      * @param state  方块状态
      * @param player 玩家
      * @param tool   工具
-     * @return 本次破坏的结果（方块是否真的被移除 + 掉落物列表）
+     * @param force  是否为强制挖掘：为真时方块对本次移除的拒绝不成立，将补做一次整块移除
+     * @return 本次破坏的结果（是否产生了有效破坏 + 掉落物列表）
      */
     static BreakOutcome destroyBlockAndCollectDrops(ServerLevel level, BlockPos pos, BlockState state,
-                                                    Player player, ItemStack tool) {
+                                                    Player player, ItemStack tool, boolean force) {
         // 采用破坏前后 2 格膨胀范围内 ItemEntity 的差集来收集本次掉落，
         // 2 格可覆盖部分模组把掉落物生成在方块中心 1 格外的情况；before/after 差集保证不会误收邻近方块的已有掉落。
         AABB area = new AABB(pos).inflate(2.0);
@@ -712,28 +740,87 @@ ChainMiningShapes shape, Direction face, Player player) {
                                           .map(Entity::getUUID)
                                           .collect(Collectors.toSet());
 
-        if (!destroyBlockWithoutDrops(level, pos, state, player, tool)) {
-            // 方块被模组拒绝移除：这次没有产生任何东西，也就没有掉落可收。
+        Block block = state.getBlock();
+        BlockEntity blockEntity = level.getBlockEntity(pos);
+
+        // 第一步：playerWillDestroy 不产出掉落，其返回值才是后续流程使用的方块状态。
+        // 该回调抛出即视为模组拒绝这次移除，尊重它并放弃本格的后续步骤。
+        BlockState currentState;
+        try {
+            currentState = block.playerWillDestroy(level, pos, state, player);
+        } catch (Throwable refusal) {
+            reportRefusedRemoval(block, pos, "playerWillDestroy", refusal);
             return BreakOutcome.REFUSED;
         }
 
-        // 回调阶段：playerWillDestroy 与 playerDestroy 已由 destroyBlockWithoutDrops 执行，
-        // 此处的差集即该阶段产出的掉落。
-        Set<UUID> consumed = ConcurrentHashMap.newKeySet();
-        List<ItemStack> callbackDrops = collectNewDrops(level, area, before, consumed);
+        // 第二步：移除阶段交给方块自身决定。重写 onDestroyedByPlayer 的模组可在此按部件拆除
+        // 并返回 false；此时方块保留，但该模组通常已产出掉落，需一并收走。
+        boolean removed;
+        try {
+            boolean canHarvest = currentState.canHarvestBlock(level, pos, player);
+            removed = currentState.onDestroyedByPlayer(level, pos, player, canHarvest,
+                    level.getFluidState(pos));
+            if (removed) {
+                currentState.getBlock().destroy(level, pos, currentState);
+            }
+        } catch (Throwable refusal) {
+            reportRefusedRemoval(block, pos, "onDestroyedByPlayer", refusal);
+            return BreakOutcome.REFUSED;
+        }
 
-        // 移除阶段：取出方块本体，触发 onRemove 中容器内容物的掉落。
-        level.removeBlock(pos, false);
+        Set<UUID> consumed = ConcurrentHashMap.newKeySet();
         List<ItemStack> removalDrops = collectNewDrops(level, area, before, consumed);
 
+        if (!removed) {
+            // 方块未被移除：或由模组接管了本次破坏并自行产出掉落，或明确拒绝。
+            // 常规挖掘尊重该结果——方块仍留在原地，按掉落表产出物品等同于凭空生成。
+            // 强制挖掘不接受移除拒绝：补做一次整块移除，使强拆语义在重写该回调的方块上同样成立。
+            if (force && !level.getBlockState(pos).isAir()) {
+                try {
+                    level.removeBlock(pos, false);
+                    if (level.getBlockState(pos).isAir()) {
+                        currentState.getBlock().destroy(level, pos, currentState);
+                    }
+                    removalDrops.addAll(collectNewDrops(level, area, before, consumed));
+                } catch (Throwable refusal) {
+                    reportRefusedRemoval(block, pos, "forced removal", refusal);
+                }
+            }
+            if (!level.getBlockState(pos).isAir()) {
+                discardNewExperience(level, area, experienceBefore);
+                return hasNoValidDrops(removalDrops)
+                        ? BreakOutcome.REFUSED
+                        : new BreakOutcome(true, false, removalDrops);
+            }
+            removed = true;
+        }
+
+        // 第三步：方块已移除，按掉落表产出物品。该回调抛出不影响方块已被移除的事实，仅上报。
+        try {
+            currentState.getBlock().playerDestroy(level, player, pos, currentState, blockEntity, tool);
+        } catch (Throwable refusal) {
+            reportRefusedRemoval(block, pos, "playerDestroy", refusal);
+        }
+        List<ItemStack> callbackDrops = collectNewDrops(level, area, before, consumed);
+
         // 经验球统一在两个阶段结束后清理：本流程自行结算经验，两阶段新生成的经验球都不应留在世界上。
+        discardNewExperience(level, area, experienceBefore);
+
+        return new BreakOutcome(true, true, mergePhaseDrops(callbackDrops, removalDrops));
+    }
+
+    /**
+     * 清理本次破坏新生成的经验球。
+     *
+     * <p>经验由调用方按 {@code getExpDrop} 自行结算，这些经验球若留在世界上会与结算值重复，
+     * 且会被下一次差集收集误计为掉落。</p>
+     */
+    private static void discardNewExperience(ServerLevel level, AABB area, Set<UUID> experienceBefore) {
         for (ExperienceOrb experienceOrb : level.getEntitiesOfClass(ExperienceOrb.class, area)) {
             if (!experienceBefore.contains(experienceOrb.getUUID())) {
                 experienceOrb.discard();
             }
         }
-
-        return new BreakOutcome(true, mergePhaseDrops(callbackDrops, removalDrops));
     }
 
     /**
@@ -790,45 +877,6 @@ ChainMiningShapes shape, Direction face, Player player) {
             }
         }
         return -1;
-    }
-
-    /**
-     * 执行方块破坏回调并移除方块
-     * 用于集中走 playerWillDestroy 和 playerDestroy，避免直接 removeBlock 跳过模组自定义破坏逻辑。
-     *
-     * <p><b>两个回调都可能抛</b>：数据能源的三位一体样板核心在持久化状态读不出来时，
-     * {@code playerWillDestroy} / {@code getDrops} 会抛 {@link IllegalStateException}
-     * （并在其日志中写明「拒绝移除 / 拒绝给出空白核心掉落」）。此前的写法在抛出异常后，
-     * 后续 {@code removeBlock} 不会被执行 —— 方块留在原地，且异常传播至事件总线，
-     * 导致整批连锁挖掘中断。</p>
-     *
-     * <p>现在的语义是：<b>回调抛异常 = 模组拒绝这次移除，尊重它</b>（不强行 removeBlock，
-     * 否则对方需保留的样板 / 待输出内容会被静默丢弃），但将异常拦截在本层，
-     * 按方块类型去重后仅上报一次，其余方块继续挖掘。</p>
-     *
-     * <p>移除动作由调用方在收集完回调阶段的掉落之后执行，使 {@code onRemove} 中产生的掉落
-     * 与回调阶段的掉落可以分别收集、分别去重。</p>
-     *
-     * @return {@code true} 表示方块自身的回调接受了这次移除；{@code false} 表示被其拒绝
-     */
-    static boolean destroyBlockWithoutDrops(ServerLevel level, BlockPos pos, BlockState state,
-                                            Player player, ItemStack tool) {
-        BlockEntity be = level.getBlockEntity(pos);
-        Block block = state.getBlock();
-        boolean accepted = true;
-        try {
-            block.playerWillDestroy(level, pos, state, player);
-        } catch (Throwable refusal) {
-            accepted = false;
-            reportRefusedRemoval(block, pos, "playerWillDestroy", refusal);
-        }
-        try {
-            block.playerDestroy(level, player, pos, state, be, tool);
-        } catch (Throwable refusal) {
-            accepted = false;
-            reportRefusedRemoval(block, pos, "playerDestroy", refusal);
-        }
-        return accepted;
     }
 
     /** 方块自身拒绝被移除：按类型去重上报，避免一次连锁挖掘产生大量重复日志。 */

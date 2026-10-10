@@ -19,18 +19,31 @@ import java.util.List;
  *
  * <p>JEI 默认经 {@code GuiGraphics#renderItemDecorations} 绘制完整数量文本，
  * 四位以上数字的宽度超出 16 像素槽位并溢出到相邻槽位。本渲染器仅绘制物品图标，
- * 数量改为缩写后右对齐绘制，使文本宽度受控。
+ * 数量改为缩写并缩小字号后右对齐绘制，使文本宽度受控。
+ *
+ * <p>缩放与 Z 层偏移的处理方式参考 Applied Energistics 2 的
+ * {@code appeng.client.gui.me.common.StackSizeRenderer}。
  *
  * <p>提示文本与 JEI 内置物品渲染器保持一致，槽位自身的富提示回调不受影响。
  */
 public class ItemStackCountRenderer implements IIngredientRenderer<ItemStack> {
     public static final ItemStackCountRenderer INSTANCE = new ItemStackCountRenderer();
 
-    /** 数量文本右边缘相对槽位左边缘的内缩量，与槽位渲染尺寸一致。 */
-    private static final int COUNT_TEXT_RIGHT_INSET = 16;
+    /** 槽位渲染尺寸，与 Minecraft 物品槽位一致。 */
+    private static final int SLOT_SIZE = 16;
 
-    /** 数量文本基线相对槽位上边缘的偏移量。 */
-    private static final int COUNT_TEXT_BASELINE_Y = 8;
+    /** 数量文本缩放系数 */
+    private static final float COUNT_TEXT_SCALE = 0.666f;
+
+    /**
+     * 数量文本的 Z 层偏移。
+     *
+     * <p>物品模型以三维形式绘制在较高的 Z 层，文本缺少该偏移时会被模型遮挡。
+     */
+    private static final int COUNT_TEXT_Z_OFFSET = 200;
+
+    /** 数量文本基线相对槽位下边缘的距离，单位为缩放前的像素。 */
+    private static final float COUNT_TEXT_BASELINE_FROM_BOTTOM = 5.0f;
 
     @Override
     public void render(GuiGraphics guiGraphics, @Nullable ItemStack ingredient) {
@@ -48,10 +61,21 @@ public class ItemStackCountRenderer implements IIngredientRenderer<ItemStack> {
 
         int count = ingredient.getCount();
         if (count > 1) {
-            String text = formatCount(count);
             Font font = getFontRenderer(Minecraft.getInstance(), ingredient);
-            int textX = posX + COUNT_TEXT_RIGHT_INSET - font.width(text);
-            guiGraphics.drawString(font, text, textX, posY + COUNT_TEXT_BASELINE_Y, 0xFFFFFF, true);
+            String text = formatCount(count);
+
+            // 坐标在缩放后的坐标系中计算，故按缩放系数的倒数折算回缩放前的像素空间。
+            float inverseScale = 1.0f / COUNT_TEXT_SCALE;
+            float textWidth = font.width(text) * COUNT_TEXT_SCALE;
+            int textX = (int) ((posX + SLOT_SIZE - textWidth) * inverseScale);
+            int textY = (int) ((posY + SLOT_SIZE - COUNT_TEXT_BASELINE_FROM_BOTTOM * COUNT_TEXT_SCALE)
+                    * inverseScale);
+
+            guiGraphics.pose().pushPose();
+            guiGraphics.pose().translate(0.0F, 0.0F, COUNT_TEXT_Z_OFFSET);
+            guiGraphics.pose().scale(COUNT_TEXT_SCALE, COUNT_TEXT_SCALE, COUNT_TEXT_SCALE);
+            guiGraphics.drawString(font, text, textX, textY, 0xFFFFFF, true);
+            guiGraphics.pose().popPose();
         }
 
         RenderSystem.disableBlend();

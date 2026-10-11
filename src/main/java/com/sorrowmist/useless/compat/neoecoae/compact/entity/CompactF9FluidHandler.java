@@ -71,4 +71,38 @@ public final class CompactF9FluidHandler implements IFluidHandler {
     public @NotNull FluidStack drain(int maxDrain, @NotNull FluidAction action) {
         return output.drain(maxDrain, action);
     }
+
+    /** Player-only recovery view for coolant accidentally left in the input pool. */
+    public IFluidHandler inputRecoveryHandler() {
+        return new IFluidHandler() {
+            @Override
+            public int getTanks() { return 1; }
+
+            @Override
+            public @NotNull FluidStack getFluidInTank(int tank) {
+                return tank == 0 ? input.getFluid() : FluidStack.EMPTY;
+            }
+
+            @Override
+            public int getTankCapacity(int tank) {
+                return tank == 0 ? input.getCapacity() : 0;
+            }
+
+            @Override
+            public boolean isFluidValid(int tank, @NotNull FluidStack stack) { return false; }
+
+            @Override
+            public int fill(@NotNull FluidStack resource, @NotNull FluidAction action) { return 0; }
+
+            @Override
+            public @NotNull FluidStack drain(@NotNull FluidStack resource, @NotNull FluidAction action) {
+                return input.drain(resource, action);
+            }
+
+            @Override
+            public @NotNull FluidStack drain(int maxDrain, @NotNull FluidAction action) {
+                return input.drain(maxDrain, action);
+            }
+        };
+    }
 }

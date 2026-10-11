@@ -143,6 +143,15 @@ public final class CompactInterfaceAttachment<C extends NECluster<C>> {
         return true;
     }
 
+    /**
+     * Receives ECO's chunked pattern preview on the compact host position. ECO normally looks
+     * up an {@code ECOMachineInterfaceBlockEntity} in the world, but the compact interface is
+     * an in-memory shadow and therefore needs this explicit bridge.
+     */
+    public void receivePatternPreview(CompoundTag payload) {
+        shadow().getPatternPreviewSync().receive(payload);
+    }
+
     /** RPC 包体 = {@code varInt(managed 下标) + utf(方法名) + 参数}，这里只需要方法名。 */
     private static String rpcMethodName(byte[] data) {
         FriendlyByteBuf buf = new FriendlyByteBuf(Unpooled.wrappedBuffer(data));

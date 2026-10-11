@@ -26,11 +26,13 @@ import com.sorrowmist.useless.compat.neoecoae.compact.shadow.ShadowComputationDr
 import com.sorrowmist.useless.compat.neoecoae.compact.shadow.ShadowComputationHostBlockEntity;
 import com.sorrowmist.useless.compat.neoecoae.compact.shadow.ShadowComputationParallelCoreBlockEntity;
 import com.sorrowmist.useless.compat.neoecoae.compact.shadow.ShadowThreadingCoreBlockEntity;
+import com.sorrowmist.useless.compat.neoecoae.compact.ui.CompactSingleBlockUI;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.core.RegistryAccess;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.ListTag;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
@@ -72,6 +74,11 @@ public class CompactC9BlockEntity extends ECOComputationSystemBlockEntity
     }
 
     private final List<CompactComputationCluster> fleet = new ArrayList<>();
+    /** All logical CPU cores, including the first host's cores, live only in this list. */
+    private final List<ShadowThreadingCoreBlockEntity> shadowThreadingCores = new ArrayList<>();
+    private static final String SHADOW_THREADING_CORE_KEY = "useless_compact_c9_threading_cores";
+    @Nullable
+    private ListTag pendingThreadingCoreData;
     @Nullable
     private NEComputationNetworkCluster compactNetworkCluster;
     private boolean pendingCpuAnnounce;
@@ -218,6 +225,7 @@ public class CompactC9BlockEntity extends ECOComputationSystemBlockEntity
     public void installCompactComponents(NEComputationCluster cluster, ServerLevel level) {
         disposeFleet();
         fleet.clear();
+        shadowThreadingCores.clear();
 
         // 成员 #1：真实主机自己（它的影子组件补满这台主机的硬件）。
         installHostHardware(cluster, level);
@@ -228,9 +236,13 @@ public class CompactC9BlockEntity extends ECOComputationSystemBlockEntity
         for (int index = 1; index < HOSTS; index++) {
             CompactComputationCluster shadow = buildShadowHost(level);
             installHostHardware(shadow, level);
-            linkAll(shadow);
             shadow.updateFormed(true);
             fleet.add(shadow);
+        }
+
+        restoreThreadingCoreData(level.registryAccess());
+        for (CompactComputationCluster member : fleet) {
+            linkAll(member);
         }
 
         NEComputationNetworkCluster network = new NEComputationNetworkCluster();
@@ -266,6 +278,7 @@ public class CompactC9BlockEntity extends ECOComputationSystemBlockEntity
                     NeoEcoCompactRegistry.placeholderState(NeoEcoCompactRegistry.COMPACT_C9));
             core.setLevel(level);
             cluster.addBlockEntity(core);
+            shadowThreadingCores.add(core);
         }
 
         ItemStack cell = NeoEcoCompactRegistry.neoEcoStack("eco_computation_cell_l9");
@@ -299,6 +312,9 @@ public class CompactC9BlockEntity extends ECOComputationSystemBlockEntity
     }
 
     private void disposeFleet() {
+        if (level instanceof ServerLevel serverLevel && !shadowThreadingCores.isEmpty()) {
+            pendingThreadingCoreData = captureThreadingCoreData(serverLevel.registryAccess());
+        }
         compactInterface.release();
         for (CompactComputationCluster member : fleet) {
             if (member != cluster && !member.isDestroyed()) {
@@ -306,6 +322,27 @@ public class CompactC9BlockEntity extends ECOComputationSystemBlockEntity
                 member.destroy();
             }
         }
+    }
+
+    private ListTag captureThreadingCoreData(HolderLookup.Provider registries) {
+        ListTag saved = new ListTag();
+        for (ShadowThreadingCoreBlockEntity core : shadowThreadingCores) {
+            CompoundTag coreData = new CompoundTag();
+            core.saveAdditional(coreData, registries);
+            saved.add(coreData);
+        }
+        return saved;
+    }
+
+    private void restoreThreadingCoreData(HolderLookup.Provider registries) {
+        if (pendingThreadingCoreData == null) {
+            return;
+        }
+        int count = Math.min(pendingThreadingCoreData.size(), shadowThreadingCores.size());
+        for (int index = 0; index < count; index++) {
+            shadowThreadingCores.get(index).loadTag(pendingThreadingCoreData.getCompound(index), registries);
+        }
+        pendingThreadingCoreData = null;
     }
 
     /**
@@ -329,6 +366,7 @@ public class CompactC9BlockEntity extends ECOComputationSystemBlockEntity
     public void onChunkUnloaded() {
         disposeFleet();
         fleet.clear();
+        shadowThreadingCores.clear();
         compactNetworkCluster = null;
         compactInterface.dispose();
         super.onChunkUnloaded();
@@ -345,7 +383,11 @@ public class CompactC9BlockEntity extends ECOComputationSystemBlockEntity
     @Override
     public ModularUI createUI(BlockUIMenuType.BlockUIHolder holder) {
         ModularUI interfaceUI = compactInterface.createUI(holder);
-        return interfaceUI == null ? super.createUI(holder) : interfaceUI;
+        return interfaceUI == null ? CompactSingleBlockUI.create(holder.player,
+                net.minecraft.network.chat.Component.translatable("gui.useless_mod.compact.c9.title"),
+                net.minecraft.network.chat.Component.translatable("gui.useless_mod.compact.c9.overview"),
+                net.minecraft.network.chat.Component.translatable("gui.useless_mod.compact.c9.hardware"))
+                : interfaceUI;
     }
 
     @Override
@@ -365,12 +407,21 @@ public class CompactC9BlockEntity extends ECOComputationSystemBlockEntity
     @Override
     public void saveAdditional(CompoundTag data, HolderLookup.Provider registries) {
         super.saveAdditional(data, registries);
+        ListTag threadingData = shadowThreadingCores.isEmpty()
+                ? pendingThreadingCoreData : captureThreadingCoreData(registries);
+        if (threadingData != null && !threadingData.isEmpty()) {
+            data.put(SHADOW_THREADING_CORE_KEY, threadingData.copy());
+        }
         compactInterface.save(registries, data);
     }
 
     @Override
     public void loadTag(CompoundTag data, HolderLookup.Provider registries) {
         super.loadTag(data, registries);
+        if (data.contains(SHADOW_THREADING_CORE_KEY, net.minecraft.nbt.Tag.TAG_LIST)) {
+            pendingThreadingCoreData = data.getList(SHADOW_THREADING_CORE_KEY,
+                    net.minecraft.nbt.Tag.TAG_COMPOUND).copy();
+        }
         compactInterface.load(registries, data);
     }
 

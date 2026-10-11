@@ -9,6 +9,7 @@ import appeng.api.stacks.KeyCounter;
 import appeng.api.networking.ticking.TickRateModulation;
 import appeng.api.orientation.BlockOrientation;
 import cn.dancingsnow.neoecoae.api.ECOTier;
+import cn.dancingsnow.neoecoae.api.ECOPatternInsertionResult;
 import cn.dancingsnow.neoecoae.api.me.provider.ECOBatchDispatchContext;
 import cn.dancingsnow.neoecoae.api.me.provider.ECOFastPathDispatchProvider;
 import cn.dancingsnow.neoecoae.blocks.entity.NEBlockEntity;
@@ -35,6 +36,7 @@ import com.sorrowmist.useless.compat.neoecoae.compact.shadow.ShadowCraftingWorke
 import com.sorrowmist.useless.compat.neoecoae.compact.shadow.ShadowFluidInputHatchBlockEntity;
 import com.sorrowmist.useless.compat.neoecoae.compact.shadow.ShadowFluidOutputHatchBlockEntity;
 import com.sorrowmist.useless.compat.neoecoae.compact.shadow.ShadowNodeLink;
+import com.sorrowmist.useless.compat.neoecoae.compact.ui.CompactSingleBlockUI;
 import com.sorrowmist.useless.core.component.ExternalInventoryKind;
 import com.sorrowmist.useless.core.component.ExternalInventoryReference;
 import com.sorrowmist.useless.world.inventory.ExternalInventoryStore;
@@ -99,6 +101,7 @@ public class CompactF9BlockEntity extends ECOCraftingSystemBlockEntity
     private static final String FLUID_INPUT_KEY = "useless_compact_f9_fluid_input";
     private static final String FLUID_OUTPUT_KEY = "useless_compact_f9_fluid_output";
     private static final String SHADOW_HOST_KEY = "useless_compact_f9_shadow_hosts";
+    private static final String SHADOW_WORKER_KEY = "useless_compact_f9_shadow_workers";
     /**
      * 满长建造的列数。ECO 的结构定义里 {@code expandMax = craftingSystemMaxLength - 4}，
      * 而虚拟合成判定要求「实际 FX 通道数 == 该上限」，因此此处每次都按当前上限取值，
@@ -139,6 +142,8 @@ public class CompactF9BlockEntity extends ECOCraftingSystemBlockEntity
     private ListTag pendingPatternBusData;
     @Nullable
     private ListTag pendingShadowHostData;
+    @Nullable
+    private ListTag pendingShadowWorkerData;
     /** 本机的样板数据落点：UUID 指向外置存档，本身只占 16 字节。 */
     @Nullable
     private ExternalInventoryReference patternStoreReference;
@@ -330,12 +335,15 @@ public class CompactF9BlockEntity extends ECOCraftingSystemBlockEntity
         for (int index = 1; index < HOSTS; index++) {
             CompactCraftingCluster shadow = buildShadowHost(level);
             installHostHardware(shadow, level);
-            linkAll(shadow);
             shadow.updateFormed(true);
             fleet.add(shadow);
         }
 
         restoreShadowHostData(level.registryAccess());
+        restoreShadowWorkerData(level.registryAccess());
+        for (CompactCraftingCluster member : fleet) {
+            linkAll(member);
+        }
         NECraftingNetworkCluster network = new NECraftingNetworkCluster();
         List<NECraftingCluster> members = new ArrayList<>(fleet);
         network.configure(members);
@@ -399,6 +407,16 @@ public class CompactF9BlockEntity extends ECOCraftingSystemBlockEntity
         return saved;
     }
 
+    private ListTag captureShadowWorkerData(HolderLookup.Provider registries) {
+        ListTag saved = new ListTag();
+        for (ECOCraftingWorkerBlockEntity worker : shadowWorkers) {
+            CompoundTag workerData = new CompoundTag();
+            worker.saveAdditional(workerData, registries);
+            saved.add(workerData);
+        }
+        return saved;
+    }
+
     private void restoreShadowHostData(HolderLookup.Provider registries) {
         if (pendingShadowHostData == null) {
             return;
@@ -409,6 +427,17 @@ public class CompactF9BlockEntity extends ECOCraftingSystemBlockEntity
             host.loadManagedPersistentData(registries, pendingShadowHostData.getCompound(index - 1));
         }
         pendingShadowHostData = null;
+    }
+
+    private void restoreShadowWorkerData(HolderLookup.Provider registries) {
+        if (pendingShadowWorkerData == null) {
+            return;
+        }
+        int count = Math.min(pendingShadowWorkerData.size(), shadowWorkers.size());
+        for (int index = 0; index < count; index++) {
+            shadowWorkers.get(index).loadTag(pendingShadowWorkerData.getCompound(index), registries);
+        }
+        pendingShadowWorkerData = null;
     }
 
     private void installHostHardware(NECraftingCluster cluster, ServerLevel level) {
@@ -605,6 +634,9 @@ public class CompactF9BlockEntity extends ECOCraftingSystemBlockEntity
             if (fleet.size() > 1) {
                 pendingShadowHostData = captureShadowHostData(serverLevel.registryAccess());
             }
+            if (!shadowWorkers.isEmpty()) {
+                pendingShadowWorkerData = captureShadowWorkerData(serverLevel.registryAccess());
+            }
         }
         compactInterface.release();
         if (exposedBus != null) {
@@ -682,16 +714,21 @@ public class CompactF9BlockEntity extends ECOCraftingSystemBlockEntity
      * 这里只是把「单方块没有总线界面」这件事补上一个物品入口，并在成功后刷新网格上的样板缓存。</p>
      */
     public boolean insertPatternFromPlayer(ItemStack stack) {
+        return insertPatternFromPlayerWithResult(stack) == ECOPatternInsertionResult.INSERTED;
+    }
+
+    public ECOPatternInsertionResult insertPatternFromPlayerWithResult(ItemStack stack) {
         if (stack.isEmpty() || patternProvider.isEmpty()) {
-            return false;
+            return ECOPatternInsertionResult.NO_TARGET;
         }
-        if (!patternProvider.insertPattern(stack)) {
-            return false;
+        ECOPatternInsertionResult result = patternProvider.insertPatternWithResult(stack);
+        if (result != ECOPatternInsertionResult.INSERTED) {
+            return result;
         }
         // 手插的这一下可能赶在本 tick 的版本轮询之前就被拆除/卸载，直接标脏兜底。
         patternStoreDirty = true;
         refreshPatternProvider();
-        return true;
+        return result;
     }
 
     /** 合并后的样板提供者，暴露给外部集成查询样板数量。 */
@@ -704,12 +741,26 @@ public class CompactF9BlockEntity extends ECOCraftingSystemBlockEntity
         return fluidHandler;
     }
 
+    /** Used by the block interaction to recover an incorrectly inserted input coolant. */
+    public IFluidHandler getInputRecoveryHandler() {
+        return ((CompactF9FluidHandler) fluidHandler).inputRecoveryHandler();
+    }
+
+    /** Client-side bridge for ECO's chunked pattern preview transport. */
+    public void receivePatternPreview(CompoundTag payload) {
+        compactInterface.receivePatternPreview(payload);
+    }
+
     // ------------------------------------------------ 通讯接口界面（影子接口）入口
 
     @Override
     public ModularUI createUI(BlockUIMenuType.BlockUIHolder holder) {
         ModularUI interfaceUI = compactInterface.createUI(holder);
-        return interfaceUI == null ? super.createUI(holder) : interfaceUI;
+        return interfaceUI == null ? CompactSingleBlockUI.create(holder.player,
+                net.minecraft.network.chat.Component.translatable("gui.useless_mod.compact.f9.title"),
+                net.minecraft.network.chat.Component.translatable("gui.useless_mod.compact.f9.overview"),
+                net.minecraft.network.chat.Component.translatable("gui.useless_mod.compact.f9.interaction"))
+                : interfaceUI;
     }
 
     @Override
@@ -742,6 +793,11 @@ public class CompactF9BlockEntity extends ECOCraftingSystemBlockEntity
         if (shadowHostData != null) {
             data.put(SHADOW_HOST_KEY, shadowHostData.copy());
         }
+        ListTag shadowWorkerData = shadowWorkers.isEmpty()
+                ? pendingShadowWorkerData : captureShadowWorkerData(registries);
+        if (shadowWorkerData != null && !shadowWorkerData.isEmpty()) {
+            data.put(SHADOW_WORKER_KEY, shadowWorkerData.copy());
+        }
         compactInterface.save(registries, data);
     }
 
@@ -758,6 +814,9 @@ public class CompactF9BlockEntity extends ECOCraftingSystemBlockEntity
         }
         if (data.contains(SHADOW_HOST_KEY, Tag.TAG_LIST)) {
             pendingShadowHostData = data.getList(SHADOW_HOST_KEY, Tag.TAG_COMPOUND).copy();
+        }
+        if (data.contains(SHADOW_WORKER_KEY, Tag.TAG_LIST)) {
+            pendingShadowWorkerData = data.getList(SHADOW_WORKER_KEY, Tag.TAG_COMPOUND).copy();
         }
         // 老存档：整份样板数据曾经直接写在这个标签里，读出来交给装配流程搬进外置存储。
         // 迁移之后本机 NBT 里不会再出现这个键（saveAdditional 不再写它）。

@@ -52,4 +52,20 @@ class CompactF9FluidHandlerTest {
         assertEquals(before + 1, changes.get());
         assertEquals(0, input.getFluidAmount());
     }
+
+    @Test
+    void playerRecoveryViewCanDrainInputWithoutChangingPipeOutputSemantics() {
+        var changes = new AtomicInteger();
+        var input = CompactF9FluidHandler.createFleetTank(8, changes::incrementAndGet);
+        var output = CompactF9FluidHandler.createFleetTank(8, changes::incrementAndGet);
+        var handler = new CompactF9FluidHandler(input, output);
+        input.fill(new FluidStack(Fluids.WATER, 4_000), FluidAction.EXECUTE);
+
+        assertEquals(4_000, handler.inputRecoveryHandler().drain(4_000, FluidAction.SIMULATE).getAmount());
+        assertEquals(4_000, input.getFluidAmount());
+        assertEquals(4_000, handler.inputRecoveryHandler().drain(4_000, FluidAction.EXECUTE).getAmount());
+        assertEquals(0, input.getFluidAmount());
+        assertEquals(2, changes.get());
+        assertTrue(handler.drain(1_000, FluidAction.SIMULATE).isEmpty());
+    }
 }

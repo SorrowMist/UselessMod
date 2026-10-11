@@ -1,11 +1,13 @@
 package com.sorrowmist.useless.compat.neoecoae.compact.block;
 
 import appeng.api.crafting.PatternDetailsHelper;
+import cn.dancingsnow.neoecoae.api.ECOPatternInsertionResult;
 import cn.dancingsnow.neoecoae.blocks.crafting.ECOCraftingSystem;
 import com.sorrowmist.useless.compat.neoecoae.compact.entity.CompactF9BlockEntity;
 import com.sorrowmist.useless.core.component.ExternalInventoryReference;
 import com.sorrowmist.useless.core.component.UComponents;
 import net.minecraft.core.BlockPos;
+import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
@@ -20,6 +22,8 @@ import net.minecraft.world.level.block.state.StateDefinition;
 import net.minecraft.world.level.storage.loot.LootParams;
 import net.minecraft.world.level.storage.loot.parameters.LootContextParams;
 import net.minecraft.world.phys.BlockHitResult;
+import net.neoforged.neoforge.capabilities.Capabilities;
+import net.neoforged.neoforge.fluids.FluidUtil;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
@@ -74,10 +78,26 @@ public class CompactF9Block extends ECOCraftingSystem {
             if (level.isClientSide) {
                 return ItemInteractionResult.SUCCESS;
             }
-            if (compact.insertPatternFromPlayer(heldItem)) {
+            ECOPatternInsertionResult result = compact.insertPatternFromPlayerWithResult(heldItem);
+            if (result == ECOPatternInsertionResult.INSERTED) {
                 if (!player.isCreative()) {
                     heldItem.shrink(1);
                 }
+                return ItemInteractionResult.sidedSuccess(false);
+            }
+            player.displayClientMessage(Component.translatable(
+                    "gui.useless_mod.compact.f9.pattern_result." + result.name().toLowerCase()), true);
+            return ItemInteractionResult.sidedSuccess(false);
+        }
+        if (level.getBlockEntity(pos) instanceof CompactF9BlockEntity compact
+                && isFluidContainer(heldItem)) {
+            if (level.isClientSide) {
+                return ItemInteractionResult.SUCCESS;
+            }
+            // Output extraction and normal input filling use the public capability. The
+            // second pass is a player-only recovery path for fluid left in the input pool.
+            if (FluidUtil.interactWithFluidHandler(player, hand, compact.getFluidHandler())
+                    || FluidUtil.interactWithFluidHandler(player, hand, compact.getInputRecoveryHandler())) {
                 return ItemInteractionResult.sidedSuccess(false);
             }
         }
@@ -87,6 +107,12 @@ public class CompactF9Block extends ECOCraftingSystem {
     /** 客户端也要能判断，否则会在服务端吞掉右键后与客户端表现不一致。 */
     private static boolean isEncodedPattern(ItemStack stack, Level level) {
         return !stack.isEmpty() && PatternDetailsHelper.decodePattern(stack, level) != null;
+    }
+
+    private static boolean isFluidContainer(ItemStack stack) {
+        return !stack.isEmpty()
+                && (stack.getCapability(Capabilities.FluidHandler.ITEM) != null
+                || FluidUtil.getFluidContained(stack).isPresent());
     }
 
     // ------------------------------------------------ 外置样板数据的搬运

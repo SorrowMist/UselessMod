@@ -21,6 +21,7 @@ import com.sorrowmist.useless.compat.neoecoae.compact.block.CompactTicker;
 import com.sorrowmist.useless.compat.neoecoae.compact.calculator.CompactHost;
 import com.sorrowmist.useless.compat.neoecoae.compact.cluster.CompactStorageCluster;
 import com.sorrowmist.useless.compat.neoecoae.compact.shadow.CompactInterfaceAttachment;
+import com.sorrowmist.useless.compat.neoecoae.compact.ui.CompactSingleBlockUI;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.HolderLookup;
@@ -332,7 +333,11 @@ public class CompactL9BlockEntity extends ECOStorageSystemBlockEntity
     @Override
     public ModularUI createUI(BlockUIMenuType.BlockUIHolder holder) {
         ModularUI interfaceUI = compactInterface.createUI(holder);
-        return interfaceUI == null ? super.createUI(holder) : interfaceUI;
+        return interfaceUI == null ? CompactSingleBlockUI.create(holder.player,
+                net.minecraft.network.chat.Component.translatable("gui.useless_mod.compact.l9.title"),
+                net.minecraft.network.chat.Component.translatable("gui.useless_mod.compact.l9.overview"),
+                net.minecraft.network.chat.Component.translatable("gui.useless_mod.compact.l9.interaction"))
+                : interfaceUI;
     }
 
     @Override

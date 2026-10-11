@@ -9,12 +9,17 @@ import cn.dancingsnow.neoecoae.blocks.entity.ECOMachineInterfaceBlockEntity;
 import cn.dancingsnow.neoecoae.blocks.entity.crafting.ECOCraftingPatternBusBlockEntity;
 import cn.dancingsnow.neoecoae.blocks.entity.crafting.ECOCraftingSystemBlockEntity;
 import cn.dancingsnow.neoecoae.blocks.entity.storage.ECOStorageSystemBlockEntity;
+import cn.dancingsnow.neoecoae.multiblock.calculator.NEClusterCalculator;
+import cn.dancingsnow.neoecoae.multiblock.cluster.NECluster;
 import com.sorrowmist.useless.UselessMod;
 import com.sorrowmist.useless.compat.neoecoae.compact.block.CompactBlockItem;
 import com.sorrowmist.useless.compat.neoecoae.compact.block.CompactC9Block;
 import com.sorrowmist.useless.compat.neoecoae.compact.block.CompactF9Block;
 import com.sorrowmist.useless.compat.neoecoae.compact.block.CompactL9Block;
 import com.sorrowmist.useless.compat.neoecoae.compact.block.CompactTicker;
+import com.sorrowmist.useless.compat.neoecoae.compact.calculator.CompactComputationClusterCalculator;
+import com.sorrowmist.useless.compat.neoecoae.compact.calculator.CompactCraftingClusterCalculator;
+import com.sorrowmist.useless.compat.neoecoae.compact.calculator.CompactStorageClusterCalculator;
 import com.sorrowmist.useless.compat.neoecoae.compact.entity.CompactC9BlockEntity;
 import com.sorrowmist.useless.compat.neoecoae.compact.entity.CompactF9BlockEntity;
 import com.sorrowmist.useless.compat.neoecoae.compact.entity.CompactL9BlockEntity;
@@ -233,6 +238,11 @@ public final class NeoEcoCompactRegistry {
 
     private static void onCommonSetup(FMLCommonSetupEvent event) {
         event.enqueueWork(() -> {
+            // The compact host owns a single-block fleet. Registering these factories before
+            // world loading prevents ECO's delayed normal structure scan from tearing it down.
+            registerCalculatorFactory(COMPACT_C9_BE.get(), CompactComputationClusterCalculator::new);
+            registerCalculatorFactory(COMPACT_F9_BE.get(), CompactCraftingClusterCalculator::new);
+            registerCalculatorFactory(COMPACT_L9_BE.get(), CompactStorageClusterCalculator::new);
             wire(COMPACT_C9.get(), COMPACT_C9_BE.get(), CompactC9BlockEntity.class, COMPACT_C9_ITEM.get());
             wire(COMPACT_F9.get(), COMPACT_F9_BE.get(), CompactF9BlockEntity.class, COMPACT_F9_ITEM.get());
             wire(COMPACT_L9.get(), COMPACT_L9_BE.get(), CompactL9BlockEntity.class, COMPACT_L9_ITEM.get());
@@ -256,6 +266,24 @@ public final class NeoEcoCompactRegistry {
                 }
         );
         AEBaseBlockEntity.registerBlockEntityItem(type, item);
+    }
+
+    /**
+     * ECO 21.2.2 exposes calculator factories, while 21.2.0 does not. Keep the compact addon
+     * binary-compatible with the declared minimum and use the newer single-block hook when it
+     * is present at runtime.
+     */
+    private static <C extends NECluster<C>> void registerCalculatorFactory(
+            BlockEntityType<?> type, NEClusterCalculator.Factory<C> factory) {
+        try {
+            Class<?> owner = Class.forName("cn.dancingsnow.neoecoae.blocks.entity.NEBlockEntity");
+            Class<?> factoryType = Class.forName(
+                    "cn.dancingsnow.neoecoae.multiblock.calculator.NEClusterCalculator$Factory");
+            owner.getMethod("registerCalculatorFactory", BlockEntityType.class, factoryType)
+                    .invoke(null, type, factory);
+        } catch (ReflectiveOperationException ignored) {
+            // Older ECO keeps the compact host's manual lifecycle path as the fallback.
+        }
     }
 
     // ------------------------------------------------------------------ 便利

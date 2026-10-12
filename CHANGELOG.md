@@ -5,6 +5,20 @@
 
 ## [Unreleased]
 
+## [2.4.5.13]
+
+### Changed / 变更
+- 重做紧凑型 ECO 单方块交互，接入单方块计算器，并为 C9/F9/L9 补齐任务持久化、样板预览、流体恢复与总览界面
+  - Reworked the Compact ECO single-block interaction, wiring in the single-block calculators and adding task persistence, pattern preview, fluid restoration and an overview screen for the C9/F9/L9 compact machines.
+
+### Fixed / 修复
+- 建筑手杖的放置与破坏现在遵守 FTB Chunks 的区块保护，未安装该模组或桥接不可用时行为不变
+  - The Construction Wand now respects FTB Chunks claims when placing and breaking blocks; behaviour is unchanged when the mod is absent or the bridge is unavailable.
+- 合金炉配方在 JEI 中的槽位数量文本不再溢出槽位，数量经缩写后右对齐绘制
+  - Alloy furnace recipe slot counts in JEI no longer overflow the slot; the count is abbreviated and right-aligned.
+- 星辉魔法祭坛配方适配器不再引用已被移除的 `CountIngredient`，修复服务端 tick 崩溃；同时声明对星辉魔法 2.0.1.26 及以上的可选依赖
+  - The Astral Sorcery altar recipe adapter no longer references the removed `CountIngredient`, fixing a server tick crash; an optional dependency on Astral Sorcery 2.0.1.26 or newer is now declared.
+
 ## [2.4.5.12]
 
 ### Fixed / 修复

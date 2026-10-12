@@ -21,6 +21,7 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.crafting.Ingredient;
 import net.minecraft.world.item.crafting.RecipeHolder;
 import net.minecraft.world.level.Level;
+import net.neoforged.neoforge.common.crafting.SizedIngredient;
 import net.neoforged.neoforge.fluids.FluidStack;
 import org.jetbrains.annotations.Nullable;
 
@@ -194,8 +195,10 @@ public final class AltarRecipeAdapter implements IRecipeAdapter<AltarRecipe> {
         }
 
         // 附加输入以 count 声明份数，逐份展开后一并参与合并，保持数量语义。
-        for (var additional : recipe.getRequiredAdditionalInputs()) {
-            if (additional == null || additional.isEmpty()) continue;
+        // 元素类型显式写为 SizedIngredient 而非 var：var 会把推断出的旧类 CountIngredient 写进字节码，
+        // 2.0.1.26 起 AS 已移除该类，运行期即 NoClassDefFoundError。
+        for (SizedIngredient additional : recipe.getRequiredAdditionalInputs()) {
+            if (additional == null) continue;
             Ingredient ingredient = additional.ingredient();
             if (AdapterUtils.isIngredientEmpty(ingredient)) continue;
             for (int i = 0; i < additional.count(); i++) {

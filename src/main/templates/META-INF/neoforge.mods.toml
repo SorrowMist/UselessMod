@@ -193,6 +193,16 @@ requiredMods=["pneumaticcraft"]
     ordering="AFTER"
     side="BOTH"
 
+# 星辉魔法的祭坛适配器按 2.0.1.26 起的附加输入类型（NeoForge 的 SizedIngredient）编译。
+# 更早版本中附加输入的元素是 AS 内部的 CountIngredient，本模组以 SizedIngredient 访问时会在运行期
+# 抛出 ClassCastException，因此下限锁定在 2.0.1.26。
+[[dependencies.${mod_id}]]
+    modId="astralsorcery"
+    type="optional"
+    versionRange="[2.0.1.26,)"
+    ordering="AFTER"
+    side="BOTH"
+
 # Features are specific properties of the game environment, that you may want to declare you require. This example declares
 # that your mod requires GL version 3.2 or higher. Other features will be added. They are side aware so declaring this won't
 # stop your mod loading on the server for example.

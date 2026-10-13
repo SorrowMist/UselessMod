@@ -47,7 +47,7 @@ public enum PlatformStyle {
         }
     },
 
-    /** 二维度：中心 2×2 (7..8,7..8)，边框为最外一圈，多联边框 2 格厚。 */
+    /** 二维度：中心 2×2 (7..8,7..8)，边框为最外一圈，多联边框四边各 1 格。 */
     STYLE_2 {
         @Override
         public PlatformLayout.Role platformRole(int localX, int localZ) {
@@ -60,10 +60,15 @@ public enum PlatformStyle {
             return PlatformLayout.Role.BORDER;
         }
 
-        /** 二维度多联边框固定为 2 格宽。 */
+        /** 二维度多联边框四边环绕，每条边 1 格；相邻两组交界处合成 2 格宽。 */
         @Override
         public int multiBorderThickness() {
-            return 2;
+            return 1;
+        }
+
+        @Override
+        public boolean multiBorderSurrounds() {
+            return true;
         }
 
         @Override
@@ -147,6 +152,18 @@ public enum PlatformStyle {
     }
 
     /**
+     * 多联边框是否四边环绕。
+     *
+     * <p>{@code false}（默认）时只在合并组的起始列与起始行各铺一条边框带，
+     * 相邻合并组共用它，交界处只有一条边框；{@code true} 时四条边各铺一条，
+     * 相邻合并组在交界处各出一条边，合成一条两倍于
+     * {@link #multiBorderThickness()} 宽的边框带，使边框均分到交界两侧。
+     */
+    public boolean multiBorderSurrounds() {
+        return false;
+    }
+
+    /**
      * 多联合并组的中心标记判定，以填充区（合并区域去掉起始侧边框后的部分）居中。
      *
      * <p>填充区宽度为奇数时中心格唯一，取 1 格；为偶数时中心落在两格之间，
@@ -157,8 +174,11 @@ public enum PlatformStyle {
      */
     public boolean isMultiCenterMarker(int groupX, int groupZ,
                                        int widthX, int widthZ, int thickness) {
-        int innerX = Math.max(1, widthX - thickness);
-        int innerZ = Math.max(1, widthZ - thickness);
+        // 四边环绕时填充区两侧各内缩一条边框，总内缩量为两倍厚度；
+        // 默认单侧边框模式只内缩一条。
+        int inset = multiBorderSurrounds() ? thickness * 2 : thickness;
+        int innerX = Math.max(1, widthX - inset);
+        int innerZ = Math.max(1, widthZ - inset);
         int centerX = thickness + innerX / 2;
         int centerZ = thickness + innerZ / 2;
         int minX = innerX % 2 == 0 ? centerX - 1 : centerX;

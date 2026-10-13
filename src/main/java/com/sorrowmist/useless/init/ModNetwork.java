@@ -6,6 +6,7 @@ import com.sorrowmist.useless.network.AEReturnOutputTogglePacket;
 import com.sorrowmist.useless.network.AETaskProgressPacket;
 import com.sorrowmist.useless.network.AETaskProgressRequestPacket;
 import com.sorrowmist.useless.network.AeLinkPreviewPacket;
+import com.sorrowmist.useless.network.AlloyFurnaceErrorHighlightPacket;
 import com.sorrowmist.useless.network.AeLinkPreviewRequestPacket;
 import com.sorrowmist.useless.network.AutoIOChangePacket;
 import com.sorrowmist.useless.network.BeefInvulnerabilitySyncPacket;
@@ -212,6 +213,9 @@ public class ModNetwork {
         registrar.playToClient(StaffLinkStressStatusPacket.TYPE,
                                StaffLinkStressStatusPacket.STREAM_CODEC,
                                StaffLinkStressStatusPacket::handle);
+        registrar.playToClient(AlloyFurnaceErrorHighlightPacket.TYPE,
+                               AlloyFurnaceErrorHighlightPacket.STREAM_CODEC,
+                               AlloyFurnaceErrorHighlightPacket::handle);
         registrar.playToServer(ThermostatSetPacket.TYPE,
                                ThermostatSetPacket.STREAM_CODEC,
                                ThermostatSetPacket::handle);

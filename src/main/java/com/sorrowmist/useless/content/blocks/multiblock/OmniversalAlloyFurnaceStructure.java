@@ -139,6 +139,16 @@ public final class OmniversalAlloyFurnaceStructure {
         }
         boolean functionalCountsValid = isFunctionalPartCountsValid(
                 assemblyCount, moldHubCount, passiveHatchCount);
+        // 缺功能方块时外壳本身全都合法，循环里不会产生 Mismatch，结构却判定失效。
+        // 补一条指向首选位的记录，否则「未成型但没有可高亮的方块」。
+        if (assemblyCount == 0) {
+            BlockPos pos = toWorld(corePos, facing, PREFERRED_PATTERN_ASSEMBLY_POS);
+            mismatches.add(new Mismatch(pos, Part.CASING, level.getBlockState(pos)));
+        }
+        if (moldHubCount == 0) {
+            BlockPos pos = toWorld(corePos, facing, PREFERRED_MOLD_HUB_POS);
+            mismatches.add(new Mismatch(pos, Part.CASING, level.getBlockState(pos)));
+        }
         if (assemblyPos != null && isClaimedByAnotherCore(level, corePos, assemblyPos,
                 FunctionalPart.PATTERN_ASSEMBLY)) {
             mismatches.add(new Mismatch(assemblyPos, Part.CASING, level.getBlockState(assemblyPos)));

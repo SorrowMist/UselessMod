@@ -43,17 +43,21 @@ import com.sorrowmist.useless.core.component.MultiblockRecoveryData;
 import com.sorrowmist.useless.energy.EnergyManager;
 import com.sorrowmist.useless.energy.IEnergyManager;
 import com.sorrowmist.useless.init.ModBlockEntities;
+import com.sorrowmist.useless.network.AlloyFurnaceErrorHighlightPacket;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.Tag;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.ChunkPos;
 import net.neoforged.fml.ModList;
+import net.neoforged.neoforge.network.PacketDistributor;
 import net.minecraft.world.MenuProvider;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
@@ -233,6 +237,28 @@ public final class MultiblockAlloyFurnaceCoreBlockEntity extends BlockEntity imp
         }
         linkFunctionalParts();
         if (stateChanged) updatePatterns();
+        broadcastStructureError(result);
+    }
+
+    /**
+     * 把「当前该修的那一个方块」下发给追踪本区块的客户端：从下往上取世界坐标 Y 最小的 mismatch，
+     * 同 Y 时保留 ENTRIES 遍历中先出现的（遍历顺序本身即由低到高）。
+     *
+     * <p>成型时下发 {@code null} 清掉残留高亮；验证本身只在结构变化或每 40 tick 触发，天然节流。</p>
+     */
+    private void broadcastStructureError(OmniversalAlloyFurnaceStructure.ValidationResult result) {
+        if (!(level instanceof ServerLevel serverLevel)) return;
+        BlockPos lowestError = null;
+        if (!formed) {
+            for (OmniversalAlloyFurnaceStructure.Mismatch mismatch : result.mismatches()) {
+                BlockPos pos = mismatch.worldPos();
+                if (lowestError == null || pos.getY() < lowestError.getY()) {
+                    lowestError = pos;
+                }
+            }
+        }
+        PacketDistributor.sendToPlayersTrackingChunk(serverLevel, new ChunkPos(worldPosition),
+                new AlloyFurnaceErrorHighlightPacket(worldPosition, lowestError));
     }
 
     private void linkFunctionalParts() {

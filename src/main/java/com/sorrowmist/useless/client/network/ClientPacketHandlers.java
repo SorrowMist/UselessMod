@@ -4,6 +4,7 @@ import com.sorrowmist.useless.UselessMod;
 import com.sorrowmist.useless.client.gui.ChainGroupScreen;
 import com.sorrowmist.useless.client.gui.ModeWheelScreen;
 import com.sorrowmist.useless.client.gui.StaffLinkScreen;
+import com.sorrowmist.useless.client.render.AlloyFurnaceErrorHighlightRenderer;
 import com.sorrowmist.useless.client.render.StaffLinkHighlightRenderer;
 import com.sorrowmist.useless.client.stafflink.StaffLinkStressClientState;
 import com.sorrowmist.useless.content.blockentities.AdvancedAlloyFurnaceBlockEntity;
@@ -16,6 +17,7 @@ import com.sorrowmist.useless.network.AETaskProgressPacket;
 import com.sorrowmist.useless.network.BeefInvulnerabilitySyncPacket;
 import com.sorrowmist.useless.network.BeefToolLayoutResultPacket;
 import com.sorrowmist.useless.network.BeefToolLayoutSyncPacket;
+import com.sorrowmist.useless.network.AlloyFurnaceErrorHighlightPacket;
 import com.sorrowmist.useless.network.StaffLinkHighlightPacket;
 import com.sorrowmist.useless.network.StaffLinkSyncPacket;
 import com.sorrowmist.useless.network.StaffLinkStressStatusPacket;
@@ -152,6 +154,11 @@ public final class ClientPacketHandlers {
      */
     public static void handleStaffLinkHighlight(StaffLinkHighlightPacket packet) {
         StaffLinkHighlightRenderer.setHighlights(packet.release(), packet.absorb(), packet.disabled());
+    }
+
+    /** 万象合金炉：服务端下发的「未成型核心当前该高亮的最低错误方块」，转交世界渲染器。 */
+    public static void handleAlloyFurnaceErrorHighlight(AlloyFurnaceErrorHighlightPacket packet) {
+        AlloyFurnaceErrorHighlightRenderer.setError(packet.corePos(), packet.errorPos());
     }
 
     /**

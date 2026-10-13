@@ -1,6 +1,7 @@
 package com.sorrowmist.useless;
 
 import com.mojang.logging.LogUtils;
+import com.sorrowmist.useless.command.UselessCommands;
 import com.sorrowmist.useless.content.blocks.GlowPlasticBlock;
 import com.sorrowmist.useless.content.items.BeefCropHarvest;
 import com.sorrowmist.useless.content.items.EndlessBeafItem;
@@ -48,6 +49,7 @@ import net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent;
 import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.event.AddPackFindersEvent;
 import net.neoforged.neoforge.event.ItemAttributeModifierEvent;
+import net.neoforged.neoforge.event.RegisterCommandsEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent;
 import net.neoforged.neoforge.event.server.ServerStartingEvent;
 import org.slf4j.Logger;
@@ -125,6 +127,11 @@ public class UselessMod {
 
     @SubscribeEvent
     public void onServerStarting(ServerStartingEvent event) {}
+
+    @SubscribeEvent
+    public void onRegisterCommands(RegisterCommandsEvent event) {
+        UselessCommands.register(event.getDispatcher());
+    }
 
     @SubscribeEvent(priority = EventPriority.HIGHEST, receiveCanceled = true)
     public void onRightClickBlock(PlayerInteractEvent.RightClickBlock event) {

@@ -1290,5 +1290,12 @@
   "gui.useless_mod.wireless_logistics.not_bindable": "該方塊沒有可搬運的庫存",
   "gui.useless_mod.omniversal_pattern.uploaded": "萬象樣板已上傳至多方塊合金爐：%s，維度：%s（%s 格外）",
   "gui.useless_mod.omniversal_pattern.duplicate": "多方塊合金爐中已存在相同的萬象樣板，本次不再上傳，已退回空白樣板",
-  "gui.useless_mod.omniversal_pattern.uploaded.tooltip": "點擊傳送至該多方塊合金爐"
+  "gui.useless_mod.omniversal_pattern.uploaded.tooltip": "點擊傳送至該多方塊合金爐",
+  "commands.useless_mod.patterns.repair.player_only": "該指令僅玩家可執行：修復需要玩家身上已綁定的無線終端來解析網路",
+  "commands.useless_mod.patterns.repair.unbound": "背包中未找到已綁定的無線終端，無法確定要修復的 AE 網路",
+  "commands.useless_mod.patterns.repair.grid_unavailable": "已找到無線終端，但無法解析到 AE 網路（可能超出範圍或未連接接入點）",
+  "commands.useless_mod.patterns.repair.no_machines": "該網路上沒有已通電的萬象爐或 ME 樣板總成，無需修復",
+  "commands.useless_mod.patterns.repair.summary": "已掃描 %s 張萬象樣板，發現 %s 張失效；已修復 %s 張，%s 張無法修復（配方已移除或存在歧義）。",
+  "commands.useless_mod.patterns.repair.summary.preview": "已掃描 %s 張萬象樣板，發現 %s 張失效；其中 %s 張可修復，%s 張無法修復（配方已移除或存在歧義）。本次為預覽，未寫回任何槽位。",
+  "commands.useless_mod.patterns.repair.detail": "無法修復：%s，綁定配方 %s"
 }

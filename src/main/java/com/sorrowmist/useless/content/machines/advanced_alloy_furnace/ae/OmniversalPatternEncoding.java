@@ -89,6 +89,65 @@ public final class OmniversalPatternEncoding {
         return encodeProcessingPattern(sourcePattern, processing, entry, level);
     }
 
+    /**
+     * 用重新解析出的配方身份重编码一张既有的万象样板。
+     *
+     * <p>失效样板自身的 AE payload 仍然完好，失效的只是它绑定的配方身份。这里把该 payload
+     * 当作普通 {@link AEProcessingPattern} 传入 {@link #encode}，从而自然绕过「拒绝二次包装
+     * 万象样板」的守卫，而不必放宽那条守卫、影响常规调用方。</p>
+     *
+     * <p>payload 无法解析或重编码失败时返回 {@link ItemStack#EMPTY}，由调用方保留原栈。</p>
+     */
+    public static ItemStack reencodeExisting(
+            ItemStack existing, AlloyFurnaceRecipeCatalog.Entry entry, Level level) {
+        if (existing == null || existing.isEmpty() || entry == null || level == null) {
+            return ItemStack.EMPTY;
+        }
+        AEItemKey definition = AEItemKey.of(existing);
+        if (definition == null) {
+            return ItemStack.EMPTY;
+        }
+        AEProcessingPattern source;
+        try {
+            source = new AEProcessingPattern(definition);
+        } catch (RuntimeException exception) {
+            // 连 AE payload 都读不出来就没有可复用的输入，交给调用方计为无法修复。
+            return ItemStack.EMPTY;
+        }
+        return encode(existing, source, entry, level);
+    }
+
+    /**
+     * 以当前配方的输入输出为准重建一张万象样板。
+     *
+     * <p>与 {@link #reencodeExisting} 不同，本方法完全不读取旧样板的 AE payload，而是用
+     * {@code entry.recipe()} 当前的输入输出重新生成 processing payload。适用于绑定配方仍在、
+     * 但其输入（或输出）已被改动，因而旧 payload 无法再与当前配方匹配的失效样板——
+     * 这类样板用 {@link #reencodeExisting} 无法修复。</p>
+     *
+     * <p>配方无法编码为 processing 形式或重建结果无法解码时返回 {@link ItemStack#EMPTY}，
+     * 由调用方保留原栈。</p>
+     */
+    public static ItemStack reencodeFromRecipe(
+            AlloyFurnaceRecipeCatalog.Entry entry, Level level) {
+        if (entry == null || level == null || entry.recipe() == null) {
+            return ItemStack.EMPTY;
+        }
+        ItemStack processingPattern = createProcessingPattern(entry.recipe());
+        if (processingPattern.isEmpty()) {
+            OmniversalPatternDiagnostics.skip("current recipe has no encodable processing form",
+                    entry.recipe().id());
+            return ItemStack.EMPTY;
+        }
+        IPatternDetails processingDetails = PatternDetailsHelper.decodePattern(processingPattern, level);
+        if (!(processingDetails instanceof AEProcessingPattern processing)) {
+            OmniversalPatternDiagnostics.skip("rebuilt processing pattern is invalid",
+                    entry.recipe().id());
+            return ItemStack.EMPTY;
+        }
+        return encodeProcessingPattern(processingPattern, processing, entry, level);
+    }
+
     private static ItemStack encodeProcessingPattern(
             ItemStack sourcePattern, AEProcessingPattern processing,
             AlloyFurnaceRecipeCatalog.Entry entry, Level level) {

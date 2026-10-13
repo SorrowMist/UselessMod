@@ -135,8 +135,14 @@ public class AE2Compat {
         return matched.toStack(1);
     }
 
+    /**
+     * 解析物品绑定的 AE2 网络。
+     *
+     * <p>供命令等外部调用方复用：返回的 {@link LinkedGridAccess} 同时携带网格与玩家动作源。
+     * 物品未绑定、目标区块未加载或无线访问点离线时返回 {@code null}。</p>
+     */
     @Nullable
-    private static LinkedGridAccess resolveLinkedGrid(ItemStack tool, Player player) {
+    public static LinkedGridAccess resolveLinkedGrid(ItemStack tool, Player player) {
         GlobalPos linkedPos = tool.get(UComponents.WIRELESS_LINK_TARGET.get());
         MinecraftServer server = player.getServer();
         if (linkedPos == null || server == null) return null;
@@ -148,6 +154,7 @@ public class AE2Compat {
         return grid == null ? null : new LinkedGridAccess(grid, IActionSource.ofPlayer(player));
     }
 
-    private record LinkedGridAccess(IGrid grid, IActionSource source) {
+    /** 网格与玩家动作源的组合，供跨包调用方（如命令层）复用。 */
+    public record LinkedGridAccess(IGrid grid, IActionSource source) {
     }
 }

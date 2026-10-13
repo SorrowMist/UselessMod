@@ -442,7 +442,7 @@ dependencies {
 
     // 星辉魔法及其硬前置 ObserverLib
     runtimeOnly "hellfirepvp.observerlib:ObserverLib:1.10.3.31"
-    implementation "hellfirepvp.astralsorcery:AstralSorcery:2.0.1.37"
+    implementation "hellfirepvp.astralsorcery:AstralSorcery:2.0.2.40"
 
 //    // 集成动力
 //    runtimeOnly "maven.modrinth:cyclops-core:RjMKI4zG"

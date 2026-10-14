@@ -110,6 +110,13 @@ final class AlloyFurnaceBigIntegerCraftingAdapter extends AlloyFurnaceCountedCra
         }
 
         @Override
+        public long count() {
+            // 3.4.0 起 BigIntegerCraftingAdmission 把 CountedCraftingAdmission 的 count()
+            // 重新声明为抽象方法，实现必须显式给出：超过 long 时抛异常而非截断（exact 记账一律读 exactCount()）。
+            return count.longValueExact();
+        }
+
+        @Override
         public boolean hasTransferredInputOwnership() {
             return transferredInputOwnership;
         }

@@ -5,15 +5,17 @@ import appeng.api.stacks.AEItemKey;
 import appeng.api.stacks.GenericStack;
 import com.fish_dan_.data_energistics.api.crafting.dynamic.DynamicCraftingOutput;
 import com.fish_dan_.data_energistics.api.crafting.dynamic.DynamicCraftingOutputAdapter;
-import com.fish_dan_.data_energistics.api.crafting.dynamic.DynamicCraftingOutputMatchMode;
 import com.fish_dan_.data_energistics.api.crafting.dynamic.DynamicCraftingOutputSemantics;
+import com.fish_dan_.data_energistics.api.crafting.matching.ProcessingMatchMode;
 import com.sorrowmist.useless.UselessMod;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.OmniversalPatternDetails;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.SmartDoublingPatterns;
+import it.unimi.dsi.fastutil.objects.ObjectArrayList;
+import it.unimi.dsi.fastutil.objects.ObjectList;
+import it.unimi.dsi.fastutil.objects.ObjectLists;
 import net.minecraft.resources.ResourceLocation;
 import org.jetbrains.annotations.NotNull;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
@@ -24,7 +26,7 @@ import java.util.Optional;
  * 实际落进网络的是<b>配方产出</b>的键（可能带着运行时组件）。数据能源的计划会把声明键写进
  * CPU 的 {@code waitingFor}，如果实际键与模板键不等，那条等待就永远不会被满足。</p>
  *
- * <p>注册本适配器后，数据能源会把这些槽按 {@link DynamicCraftingOutputMatchMode#SAME_ITEM}
+ * <p>注册本适配器后，数据能源会把这些槽按 {@link ProcessingMatchMode#ID}
  * 处理（按注册物品匹配、忽略数据组件），并且<b>保留机器返回的完整键</b> —— 它只放宽「哪条等待可以
  * 接受这个键」，从不把返回的键改写成模板。</p>
  *
@@ -46,18 +48,20 @@ public final class OmniversalDynamicCraftingOutputAdapter implements DynamicCraf
             return Optional.empty();
         }
         List<GenericStack> outputs = original.getOutputs();
-        List<DynamicCraftingOutput> declared = new ArrayList<>();
+        ObjectList<DynamicCraftingOutput> declared = new ObjectArrayList<>();
         for (int slot = 0; slot < outputs.size(); slot++) {
             GenericStack output = outputs.get(slot);
             if (output == null || output.what() == null || output.amount() <= 0L) {
                 continue;
             }
             // 只有被标记为 id-only 的产物槽才是「模板键可能不等于实际键」；
-            // SAME_ITEM 只对物品键有意义（数据能源会在构造时拒绝非物品键）。
+            // ID 模式只对物品键有意义（数据能源会在构造时拒绝非物品键）。
             if (!omniversal.isItemIdOutput(slot) || !(output.what() instanceof AEItemKey)) {
                 continue;
             }
-            declared.add(new DynamicCraftingOutput(output, DynamicCraftingOutputMatchMode.SAME_ITEM));
+            // ID 模式不携带配方标签，标签参数必须为空（数据能源在构造时会校验）。
+            declared.add(new DynamicCraftingOutput(
+                    output, ProcessingMatchMode.ID, ObjectLists.<ResourceLocation>emptyList()));
         }
         return declared.isEmpty()
                 ? Optional.empty()

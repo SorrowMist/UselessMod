@@ -203,26 +203,6 @@ class AlloyFurnaceCountedCraftingAdapter implements CountedCraftingProviderAdapt
         return prepareAdmission(patternDetails, prototype, requestedCount);
     }
 
-    /**
-     * 长版 counted 的容量上报（3.2.2 与 3.3.0 都存在的那个入口）。
-     *
-     * <p><b>必须实现它</b>，否则旧版数据能源会落到接口的 default 实现 —— 那个 default 返回
-     * {@code CountedCraftingCapacity.aggregateUnknown()}，即「未知容量 + 保守单次派发」，
-     * 功能可用但吞吐极低。3.3.0 的调度器改走子类的 {@code captureCapacityFast}，
-     * 两者共用 {@link #capacityEntry}，口径不会漂移。</p>
-     *
-     * <p>3.3.0 里这个方法已标记 {@code @Deprecated(forRemoval)}，这里是<b>刻意保留</b>的：
-     * 它是 3.2.2 唯一可用的容量入口，删除即放弃旧版兼容。待数据能源正式移除它时，
-     * 只需要把最短支持版本抬到 3.3.0 并删掉本方法。</p>
-     */
-    @Override
-    @SuppressWarnings("removal")
-    public @NotNull List<@NotNull CountedCraftingCapacity> captureCapacity(
-            @NotNull IPatternDetails patternDetails, KeyCounter @NotNull [] prototype, long requestedCount) {
-        CountedCraftingCapacity single = capacityEntry(patternDetails, prototype, requestedCount);
-        return single == null ? List.of() : List.of(single);
-    }
-
     /** 单条容量上报；容量为 0 时返回 {@code null}（两个版本的容量入口共用）。 */
     final @Nullable CountedCraftingCapacity capacityEntry(
             @NotNull IPatternDetails patternDetails, KeyCounter @NotNull [] prototype, long requestedCount) {

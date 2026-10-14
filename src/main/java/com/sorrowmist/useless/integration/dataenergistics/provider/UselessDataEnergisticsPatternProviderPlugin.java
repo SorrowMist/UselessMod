@@ -18,6 +18,7 @@ import com.sorrowmist.useless.content.blockentities.multiblock.MePatternAssembly
 import com.sorrowmist.useless.init.ModBlockEntities;
 import com.sorrowmist.useless.init.ModBlocks;
 import com.sorrowmist.useless.integration.dataenergistics.search.OmniversalPatternMoldSearchTerms;
+import it.unimi.dsi.fastutil.objects.ObjectLists;
 import net.minecraft.resources.ResourceLocation;
 import org.jetbrains.annotations.NotNull;
 
@@ -99,11 +100,13 @@ public final class UselessDataEnergisticsPatternProviderPlugin implements DataEn
             @NotNull ResourceLocation registrationId,
             @NotNull ResourceLocation blockEntityTypeId,
             @NotNull ResourceLocation workstationItemId) {
+        // 3.4.0 起 PatternProviderMetadata 的集合参数是 FastUtil ObjectList；
+        // 用 ObjectLists.singleton 提供单元素不可变视图（构造时会自行快照与排序）。
         return new PatternProviderMetadata(
                 registrationId,
                 new ProviderIdentityDescriptor.Block(blockEntityTypeId),
-                List.of(RECIPE_CATEGORY_ID),
-                List.of(workstationItemId));
+                ObjectLists.singleton(RECIPE_CATEGORY_ID),
+                ObjectLists.singleton(workstationItemId));
     }
 
     private static @NotNull CountedCraftingProviderAdapter createAdvancedAlloyFurnaceAdapter(

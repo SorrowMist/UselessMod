@@ -25,6 +25,7 @@ import org.jetbrains.annotations.Nullable;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.IdentityHashMap;
@@ -1056,14 +1057,14 @@ public class AlloyFurnaceRecipeManager {
     ) {
         private static RecipeCacheKey from(RecipeLookupContext context) {
             LookupInputFingerprint fingerprint = LookupInputFingerprint.from(context);
-            GenericStack moldStack = context.mold() == null || context.mold().isEmpty()
+            AEItemKey moldKey = context.mold() == null || context.mold().isEmpty()
                     ? null
-                    : GenericStack.fromItemStack(context.mold());
+                    : AEItemKey.of(context.mold());
             return new RecipeCacheKey(
                     fingerprint.items(),
                     fingerprint.fluids(),
                     fingerprint.keys(),
-                    moldStack == null ? null : moldStack.what(),
+                    moldKey,
                     List.copyOf(context.expectedOutputs()),
                     context.operations(),
                     context.machineTier(),
@@ -1091,46 +1092,58 @@ public class AlloyFurnaceRecipeManager {
         }
     }
 
-    /** Builds all cache-key input maps in one pass over each supplied collection. */
+    /**
+     * Builds all cache-key input maps in one pass over each supplied collection.
+     * <p>
+     * 缓存命中也要先构建一次键，故只在有内容时才分配 map，构建完直接冻结，不再整份复制。
+     */
     private record LookupInputFingerprint(
             Map<AEKey, Long> items,
             Map<AEKey, Long> fluids,
             Map<AEKey, Long> keys
     ) {
         private static LookupInputFingerprint from(RecipeLookupContext context) {
-            Map<AEKey, Long> items = new LinkedHashMap<>();
+            Map<AEKey, Long> items = null;
             for (ItemStack stack : context.inputs()) {
                 if (stack == null || stack.isEmpty()) continue;
-                GenericStack genericStack = GenericStack.fromItemStack(stack);
-                if (genericStack != null) {
-                    items.merge(genericStack.what(), (long) stack.getCount(),
-                            AlloyFurnaceRecipeManager::saturatingAdd);
+                AEItemKey key = AEItemKey.of(stack);
+                if (key != null) {
+                    items = mergeAmount(items, key, stack.getCount());
                 }
             }
 
-            Map<AEKey, Long> fluids = new LinkedHashMap<>();
+            Map<AEKey, Long> fluids = null;
             for (FluidStack stack : context.fluidInputs()) {
                 if (stack == null || stack.isEmpty()) continue;
-                GenericStack genericStack = GenericStack.fromFluidStack(stack);
-                if (genericStack != null) {
-                    fluids.merge(genericStack.what(), (long) stack.getAmount(),
-                            AlloyFurnaceRecipeManager::saturatingAdd);
+                AEFluidKey key = AEFluidKey.of(stack);
+                if (key != null) {
+                    fluids = mergeAmount(fluids, key, stack.getAmount());
                 }
             }
 
-            Map<AEKey, Long> keys = new LinkedHashMap<>();
+            Map<AEKey, Long> keys = null;
             for (GenericStack stack : context.keyInputs()) {
                 if (stack.what() instanceof AEItemKey) {
-                    items.merge(stack.what(), stack.amount(), AlloyFurnaceRecipeManager::saturatingAdd);
+                    items = mergeAmount(items, stack.what(), stack.amount());
                 } else if (stack.what() instanceof AEFluidKey) {
-                    fluids.merge(stack.what(), stack.amount(), AlloyFurnaceRecipeManager::saturatingAdd);
+                    fluids = mergeAmount(fluids, stack.what(), stack.amount());
                 } else {
-                    keys.merge(stack.what(), stack.amount(), AlloyFurnaceRecipeManager::saturatingAdd);
+                    keys = mergeAmount(keys, stack.what(), stack.amount());
                 }
             }
 
-            return new LookupInputFingerprint(
-                    Map.copyOf(items), Map.copyOf(fluids), Map.copyOf(keys));
+            return new LookupInputFingerprint(frozen(items), frozen(fluids), frozen(keys));
+        }
+
+        private static Map<AEKey, Long> mergeAmount(
+                @Nullable Map<AEKey, Long> amounts, AEKey key, long amount) {
+            Map<AEKey, Long> target = amounts == null ? new HashMap<>() : amounts;
+            target.merge(key, amount, AlloyFurnaceRecipeManager::saturatingAdd);
+            return target;
+        }
+
+        private static Map<AEKey, Long> frozen(@Nullable Map<AEKey, Long> amounts) {
+            return amounts == null ? Map.of() : Collections.unmodifiableMap(amounts);
         }
     }
 

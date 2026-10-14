@@ -138,6 +138,8 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
     private static final int ACTIVE_COOLDOWN_TICKS = 5;
     private static final int AUTO_OUTPUT_INTERVAL = 1;
     private static final int DISPLAY_PARALLEL_CACHE_DURATION = 20;
+    // 输入未变时配方搜索的兜底重试间隔，覆盖未经变更回调的改动与配置热重载
+    private static final int RECIPE_SEARCH_RETRY_TICKS = 20;
     private final FluidTank[] inputFluidTanks = new FluidTank[FLUID_TANK_COUNT];
     private final FluidTank[] outputFluidTanks = new FluidTank[FLUID_TANK_COUNT];
     private final FurnaceChemicalStorage inputChemicalStorage;
@@ -185,6 +187,11 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
     private int autoOutputTickCounter = 0;
     private boolean isConnectedToAE = false;
     private long itemStorageRevision;
+    // 影响配方搜索结果的状态修订号：物品/流体/化学品/阶级/配方目录变化时递增
+    private long recipeInputRevision;
+    // 上次配方搜索时的修订号与游戏时间
+    private long recipeSearchRevision = -1L;
+    private long recipeSearchTick;
     // 六个面的输入输出模式（按FurnaceFace索引）
     private final FurnaceFaceMode[] faceModes = new FurnaceFaceMode[FurnaceFace.COUNT];
     private long recipeCatalogGeneration = -1L;
@@ -369,6 +376,7 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
         long currentCatalogGeneration = AlloyFurnaceRecipeCatalog.generation();
         if (entity.recipeCatalogGeneration != currentCatalogGeneration) {
             entity.recipeCatalogGeneration = currentCatalogGeneration;
+            entity.markRecipeInputsChanged();
             entity.updatePatterns();
         }
         entity.aeManager.tickPatternRefresh();
@@ -534,6 +542,7 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
     }
 
     private void onChemicalStorageChanged() {
+        this.markRecipeInputsChanged();
         this.setChanged();
         if (this.level != null && !this.level.isClientSide) {
             this.level.sendBlockUpdated(this.worldPosition, this.getBlockState(), this.getBlockState(), 3);
@@ -580,6 +589,7 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
         }
         this.furnaceTier = targetTier;
         this.updateCapacityByTier();
+        this.markRecipeInputsChanged();
         this.setChanged();
 
         // 同步数据到客户端，确保界面立即更新
@@ -626,6 +636,7 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
     public void restoreInventory(CompoundTag inventoryTag, HolderLookup.Provider registries) {
         this.itemHandler.deserializeNBT(registries, inventoryTag);
         this.itemStorageRevision++;
+        this.markRecipeInputsChanged();
         this.updateMoldState();
         this.updatePatterns();
     }
@@ -637,6 +648,8 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
      * 并行数在此处计算一次，避免 hasOutputSpace 和 startRecipeProcessing 重复计算。
      */
     private void tryStartNewRecipe() {
+        if (!this.shouldSearchRecipe()) return;
+
         Optional<AdvancedAlloyFurnaceRecipe> match = this.findMatchingRecipe();
         if (match.isEmpty()) return;
 
@@ -664,8 +677,9 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
     private void processCurrentRecipe() {
         if (this.currentRecipe == null) return;
 
-        // 每20tick检查一次配方是否切换，避免评分系统不稳定导致连续重启
-        if (this.progress % 20 == 0) {
+        // 每20tick检查一次配方是否切换，避免评分系统不稳定导致连续重启；
+        // 等能量时进度停在同一值，靠搜索节流避免逐 tick 重复检查
+        if (this.progress % 20 == 0 && this.shouldSearchRecipe()) {
             Optional<AdvancedAlloyFurnaceRecipe> bestMatch = this.findMatchingRecipe();
             if (bestMatch.isPresent() && !hasSameProcessingOutput(bestMatch.get(), this.currentRecipe)) {
                 this.startRecipeProcessing(bestMatch.get());
@@ -884,6 +898,7 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
         pendingLegacyInventory = null;
         externalInventoryLoaded = true;
         itemStorageRevision++;
+        markRecipeInputsChanged();
         updateMoldState();
         updatePatterns();
         setChanged();
@@ -1256,6 +1271,7 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
         return new FluidTank(this.fluidTankCapacity) {
             @Override
             protected void onContentsChanged() {
+                AdvancedAlloyFurnaceBlockEntity.this.markRecipeInputsChanged();
                 AdvancedAlloyFurnaceBlockEntity.this.setChanged();
                 if (AdvancedAlloyFurnaceBlockEntity.this.level != null
                         && !AdvancedAlloyFurnaceBlockEntity.this.level.isClientSide) {
@@ -1302,6 +1318,8 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
         } else {
             this.outputFluidTanks[tankIndex].setFluid(FluidStack.EMPTY);
         }
+        // setFluid 不触发 onContentsChanged，需手动标记
+        this.markRecipeInputsChanged();
         this.setChanged();
 
         if (this.level != null && !this.level.isClientSide) {
@@ -1371,6 +1389,7 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
 
         this.inputChemicalStorage.load(tag, "InputChemical", registries);
         this.outputChemicalStorage.load(tag, "OutputChemical", registries);
+        this.markRecipeInputsChanged();
 
         // 加载AE网络节点数据
         this.mainNode.loadFromNBT(tag);
@@ -1534,6 +1553,29 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
     }
 
     /**
+     * 配方搜索节流：判断本 tick 是否需要重新搜索配方，需要时记录本次搜索的修订号与时间。
+     * <p>
+     * 搜索要重建输入列表并跑材料分配求解，缺料、输出满或等能量时逐 tick 重跑代价很高。
+     * 修订号未变说明搜索结果不会变，跳过即可；但仍每 {@link #RECIPE_SEARCH_RETRY_TICKS} tick
+     * 兜底重搜一次，覆盖绕过变更回调直接改动堆叠、阶级规则配置重载等修订号追踪不到的情况。
+     */
+    private boolean shouldSearchRecipe() {
+        long gameTime = this.level.getGameTime();
+        long elapsed = gameTime - this.recipeSearchTick;
+        if (this.recipeSearchRevision == this.recipeInputRevision
+                && elapsed >= 0L && elapsed < RECIPE_SEARCH_RETRY_TICKS) {
+            return false;
+        }
+        this.recipeSearchRevision = this.recipeInputRevision;
+        this.recipeSearchTick = gameTime;
+        return true;
+    }
+
+    private void markRecipeInputsChanged() {
+        this.recipeInputRevision++;
+    }
+
+    /**
      * 检查是否有足够的输入材料支持至少一次配方
      * （用于开始新配方前的检查，委托给配方计算器）。
      */
@@ -1582,6 +1624,8 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
         this.isUselessIngotRecipe = false;
         this.targetUselessIngotTier = 0;
         this.accumulatedEnergy = 0;
+        // 配方结束或中止后立即重新搜索，保证连续加工不被搜索节流拖慢
+        this.markRecipeInputsChanged();
         this.setChanged();
     }
 
@@ -1861,6 +1905,7 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
 
     private void onItemStorageChanged() {
         this.itemStorageRevision++;
+        this.markRecipeInputsChanged();
         saveExternalInventory();
         this.setChanged();
     }

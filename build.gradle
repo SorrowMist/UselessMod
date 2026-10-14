@@ -208,56 +208,59 @@ dependencies {
     testImplementation 'org.mockito:mockito-core:5.15.2'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
     implementation "mezz.jei:jei-1.21.1-neoforge:19.56.0.438"
-    implementation "curse.maven:ae2-jei-integration-1074338:7727898"
+    compileOnly "curse.maven:ae2-jei-integration-1074338:7727898"
 
     implementation "org.appliedenergistics:appliedenergistics2:19.2.17"
-    implementation "org.appliedenergistics:guideme:21.1.17"
-    implementation "de.mari_023:ae2wtlib_api:19.2.5"
+    runtimeOnly "org.appliedenergistics:guideme:21.1.17"
+    runtimeOnly "de.mari_023:ae2wtlib_api:19.2.5"
 
     compileOnly "curse.maven:oritech-1030830:8556549"
     compileOnly "curse.maven:ufo-future-1372445:8372110"
-    implementation "curse.maven:immersive-engineering-231951:6733669"
-    implementation "curse.maven:extreme-reactors-250277:7344744"
-    implementation "curse.maven:neovitae-1404763:8690909"
+    compileOnly "curse.maven:immersive-engineering-231951:6733669"
+    compileOnly "curse.maven:extreme-reactors-250277:7344744"
+    compileOnly "curse.maven:neovitae-1404763:8690909"
 
-    implementation "curse.maven:athena-841890:8061947"
-    implementation "curse.maven:modern-industrialization-405388:8597392"
-    implementation "curse.maven:pneumaticcraft-repressurized-281849:8519226"
-    implementation "curse.maven:zerocore-247921:7344742"
+    compileOnly "curse.maven:athena-841890:8061947"
+    compileOnly "curse.maven:modern-industrialization-405388:8597392"
+    compileOnly "curse.maven:pneumaticcraft-repressurized-281849:8519226"
+    compileOnly "curse.maven:zerocore-247921:7344742"
 
-    implementation "curse.maven:sophisticated-core-618298:8838842"
-    implementation "curse.maven:sophisticated-storage-619320:8687896"
+    compileOnly "curse.maven:sophisticated-core-618298:8838842"
+    compileOnly "curse.maven:sophisticated-storage-619320:8687896"
 
     implementation "curse.maven:glodium-957920:5821676"
     implementation "curse.maven:ex-pattern-provider-892005:8025439"  // 2.2.32
     implementation "curse.maven:applied-flux-965012:5614830"
 //    implementation "curse.maven:applied-flux-965012:7429565"
-    implementation "maven.modrinth:mega:4.11.0"
+    compileOnly "maven.modrinth:mega:4.11.0"
 
     // 高级ae
-    implementation "curse.maven:geckolib-388172:8350073"
+    // geckolib 不直接 import，但 Ars Nouveau 的方块实体类型实现了其 GeoBlockEntity，
+    // 编译期需在类路径上解析；开发运行仍需加载，故 compileOnly + runtimeOnly。
+    compileOnly "curse.maven:geckolib-388172:8350073"
+    runtimeOnly "curse.maven:geckolib-388172:8350073"
     // Iron's Spells 'n Spellbooks and its required libraries
     compileOnly "maven.modrinth:irons-spells-n-spellbooks:1.21.1-3.16.3"
     compileOnly "maven.modrinth:irons-lib:1.21.1-2.1.0"
-    implementation "maven.modrinth:playeranimator:2.0.4+1.21.1-forge"
+    runtimeOnly "maven.modrinth:playeranimator:2.0.4+1.21.1-forge"
     implementation "curse.maven:advancedae-1084104:8564177"
-    implementation "curse.maven:ae2addonlib-1366135:7222312"
+    compileOnly "curse.maven:ae2addonlib-1366135:7222312"
 
 
-    implementation "curse.maven:item-obliterator-835861:6696097"
-    runtimeOnly "curse.maven:necronomicon-586157:5772683"
+    compileOnly "curse.maven:item-obliterator-835861:6696097"
+    compileOnly "curse.maven:necronomicon-586157:5772683"
 
-    implementation "curse.maven:ae2-crystal-science-1435174:8498888" // 1.21.1-1.2.1
-    implementation "maven.modrinth:ae2-lightning-tech:2.1.0-beta.5"
-    implementation "maven.modrinth:thunderbolt-core:2.0.0-beta.4"
+    compileOnly "curse.maven:ae2-crystal-science-1435174:8498888" // 1.21.1-1.2.1
+    compileOnly "maven.modrinth:ae2-lightning-tech:2.1.0-beta.5"
+    compileOnly "maven.modrinth:thunderbolt-core:2.0.0-beta.4"
     //implementation "curse.maven:data-energistics-1565514:8841396" // 1.21.1-3.2.2
     //implementation"curse.maven:not-enough-dataenergitic-and-ae2lighteningtech-1671687:8752847"
     //implementation"curse.maven:not-enough-dataenergitic-and-ae2lighteningtech-service-1671683:8752820"
     //additionalRuntimeClasspath "curse.maven:not-enough-dataenergitic-and-ae2lighteningtech-service-1671683:8752820"
 
-    implementation "curse.maven:omnitool-1401075:8272031"
+    compileOnly "curse.maven:omnitool-1401075:8272031"
 
-    implementation "curse.maven:manaitaplus-legacy-1334654:8136932"
+    compileOnly "curse.maven:manaitaplus-legacy-1334654:8136932"
 
     //powah
     compileOnly "curse.maven:powah-rearchitected-633483:8011715"
@@ -273,9 +276,9 @@ dependencies {
 
     implementation "curse.maven:jade-324717:8591319"
     //龙之研究
-    implementation "curse.maven:codechicken-lib-1-8-242818:7281427"
-    implementation "curse.maven:brandons-core-231382:7130990"
-    implementation "curse.maven:draconic-evolution-223565:7584459"
+    compileOnly "curse.maven:codechicken-lib-1-8-242818:7281427"
+    compileOnly "curse.maven:brandons-core-231382:7130990"
+    compileOnly "curse.maven:draconic-evolution-223565:7584459"
 
     
     runtimeOnly "de.mari_023:ae2wtlib:19.5.1"
@@ -284,7 +287,8 @@ dependencies {
     // Productive Bees 1.21.1-13.13.5. ProductiveLib is embedded with JarJar,
     // so expose the nested jar separately on the production compile classpath.
     add(productiveBeesApi.name, "curse.maven:productivebees-377897:8022994")
-    implementation "curse.maven:productivebees-377897:8022994"
+    compileOnly "curse.maven:productivebees-377897:8022994"
+    runtimeOnly "curse.maven:productivebees-377897:8022994"
     compileOnly productiveLibCompileFiles
 
     add(enderIoApi.name, "curse.maven:ender-io-64578:8192838")
@@ -292,20 +296,22 @@ dependencies {
 
     //eco
     compileOnly "curse.maven:neo-eco-ae-extension-1460639:8983610"
-    implementation "maven.modrinth:ldlib:mc1.21.1-2.2.40-neoforge"
+    // LDLib2 同时供本地编译（源码直接引用其 GUI/RPC 类型）与运行时使用：
+    // OmniSequence 在运行时强制要求 ldlib2 存在，缺失会导致整包加载失败。
+    compileOnly "maven.modrinth:ldlib:mc1.21.1-2.2.40-neoforge"
+    runtimeOnly "maven.modrinth:ldlib:mc1.21.1-2.2.40-neoforge"
 
     // 实用拓展
     compileOnly "maven.modrinth:actually-additions:1.3.22"
     // 工业先锋
     compileOnly "maven.modrinth:titanium:1.21-4.0.40"
-    runtimeOnly "maven.modrinth:titanium:1.21-4.0.40"
     compileOnly "curse.maven:industrial-foregoing-266515:7073719"
     compileOnly "curse.maven:mifa-1086142:6288756"
     compileOnly "curse.maven:industrial-foregoing-extra-upgrades-1161049:8428353"
     
     // 新生魔艺
-    implementation "curse.maven:ars-nouveau-401955:8152094"
-    implementation "curse.maven:ars-energistique-905641:6203425"
+    compileOnly "curse.maven:ars-nouveau-401955:8152094"
+    compileOnly "curse.maven:ars-energistique-905641:6203425"
 
     compileOnly "curse.maven:just-dire-things-1002348:7463040"
     compileOnly "curse.maven:jdte-1566414:8776309"
@@ -316,40 +322,40 @@ dependencies {
 
     implementation "mekanism:Mekanism:1.21.1-10.7.19.85"
     implementation "mekanism:Mekanism:1.21.1-10.7.19.85:generators"
-    implementation "curse.maven:applied-mekanistics-574300:7096962"
-    implementation "maven.modrinth:mekanism_extra:1.21.1-1.4.1"
-    implementation "curse.maven:flux-networks-248020:6089446"
+    compileOnly "curse.maven:applied-mekanistics-574300:7096962"
+    compileOnly "maven.modrinth:mekanism_extra:1.21.1-1.4.1"
+    compileOnly "curse.maven:flux-networks-248020:6089446"
 
-    implementation "maven.modrinth:mekanismmoremachine:1.21.1-1.4.1"
+    compileOnly "maven.modrinth:mekanismmoremachine:1.21.1-1.4.1"
 
-    implementation "curse.maven:flux-networks-248020:6089446"
+    compileOnly "curse.maven:flux-networks-248020:6089446"
 
     compileOnly "curse.maven:the-twilight-forest-227639:7797302"
 
-    implementation "curse.maven:botany-pots-353928:7115287"
-    implementation "curse.maven:create-328085:7963363"
-    implementation "curse.maven:bookshelf-228525:7115332"
-    runtimeOnly "maven.modrinth:prickle:EE1FHDyD"
+    compileOnly "curse.maven:botany-pots-353928:7115287"
+    compileOnly "curse.maven:create-328085:7963363"
+    compileOnly "curse.maven:bookshelf-228525:7115332"
+    compileOnly "maven.modrinth:prickle:EE1FHDyD"
 
-    implementation "curse.maven:allthemodium-364466:7974403"
-    implementation "curse.maven:ato-405593:7825464"
+    runtimeOnly "curse.maven:allthemodium-364466:7974403"
+    runtimeOnly "curse.maven:ato-405593:7825464"
 
 //    runtimeOnly "maven.modrinth:allthemodium:2.9.5"
     implementation "maven.modrinth:extendedae-plus:AtuOmKkV"
 //    runtimeOnly "maven.modrinth:omnitools:1.21.1-1.2.1"
     implementation "curse.maven:ftb-ultimine-forge-386134:8231400"
     // 神秘农业
-    implementation "curse.maven:cucumber-272335:8035802"
-    implementation "curse.maven:mystical-agriculture-246640:8035819"
-    implementation "curse.maven:mystical-agradditions-256247:8515974"
+    compileOnly "curse.maven:cucumber-272335:8035802"
+    compileOnly "curse.maven:mystical-agriculture-246640:8035819"
+    compileOnly "curse.maven:mystical-agradditions-256247:8515974"
 
-    implementation "maven.modrinth:hostile-neural-networks:1.21.1-6.5.1"
+    compileOnly "maven.modrinth:hostile-neural-networks:1.21.1-6.5.1"
 
-    implementation "maven.modrinth:ex-deorum:3.12"
+    compileOnly "maven.modrinth:ex-deorum:3.12"
 
     //自然灵气
-    implementation "maven.modrinth:natures-aura:41.9"
-    implementation "maven.modrinth:patchouli:1.21.1-93-neoforge"
+    compileOnly "maven.modrinth:natures-aura:41.9"
+    runtimeOnly "maven.modrinth:patchouli:1.21.1-93-neoforge"
 
     // Occultism is an optional runtime integration. Keep it off the production
     // dependency graph while exposing its API for compilation and local development.
@@ -367,8 +373,8 @@ dependencies {
 
     // kjs
     // KubeJS is optional at runtime; the plugin is discovered only when KubeJS is installed.
-    implementation "dev.latvian.mods:rhino:2101.2.7-build.77"
-    implementation "dev.latvian.mods:kubejs-neoforge:2101.7.2-build.336"
+    compileOnly "dev.latvian.mods:rhino:2101.2.7-build.77"
+    compileOnly "dev.latvian.mods:kubejs-neoforge:2101.7.2-build.336"
 
     implementation "curse.maven:ftb-library-forge-404465:8858846"
     implementation "curse.maven:architectury-api-419699:8492726"
@@ -376,10 +382,10 @@ dependencies {
     implementation "curse.maven:ftb-chunks-forge-314906:8791113"
 
     //性能
-    implementation "maven.modrinth:observable:5.4.4+neoforge"
+    runtimeOnly "maven.modrinth:observable:5.4.4+neoforge"
 
     //eio
-    implementation "curse.maven:ender-io-64578:8192838"
+    compileOnly "curse.maven:ender-io-64578:8192838"
 
     //灵灾
     compileOnly "maven.modrinth:malum:1.8.2"
@@ -387,37 +393,51 @@ dependencies {
 
     compileOnly "maven.modrinth:summoningrituals:1.21.1-3.14.2+neoforge"
 
-    implementation "maven.modrinth:re-avaritia:1.21.1-1.4.1-release"
+    compileOnly "maven.modrinth:re-avaritia:1.21.1-1.4.1-release"
 
     // 龙研
-    implementation "com.brandon3055.brandonscore:BrandonsCore:1.21.1-3.2.1.309"
-    implementation "com.brandon3055.draconicevolution:Draconic-Evolution:1.21.1-3.1.4.632"
+    compileOnly "com.brandon3055.brandonscore:BrandonsCore:1.21.1-3.2.1.309"
+    compileOnly "com.brandon3055.draconicevolution:Draconic-Evolution:1.21.1-3.1.4.632"
 
 //    compileOnly "maven.modrinth:gregtechceu-modern:mc1.21.1-7.0.1"
 
-    runtimeOnly "maven.modrinth:configuration:6Mztfq1u"
-    implementation "curse.maven:configured-457570:7276577"
+    compileOnly "maven.modrinth:configuration:6Mztfq1u"
+    runtimeOnly "curse.maven:configured-457570:7276577"
+    // Kotlin 运行时由若干 Kotlin 编写的模组（Observable、Configured 等）在运行时依赖；
+    // 本项目源码不 import 其类型，故仅需 runtimeOnly。
+    // 注意：thedarkcolour:kotlinforforge-neoforge 的 MANIFEST 为 FMLModType: LIBRARY，
+    // 它把 Kotlin 运行时与 kotlinx.serialization 放在 META-INF/jarjar 内嵌，
+    // 开发环境下这些内嵌 jar 不会展开到 classpath，必须显式声明，
+    // 否则 Observable 会因 ClassNotFoundException: kotlinx.serialization.json.JsonElement 崩溃。
     runtimeOnly "thedarkcolour:kotlinforforge-neoforge:5.11.0"
-    runtimeOnly "curse.maven:just-enough-characters-250702:8413478"
+    // 用 JVM 实构件坐标而非 KMP 元数据坐标 kotlinx-serialization-json:1.9.0：
+    // 后者的 pom 会牵引 kotlinx-serialization-bom，而该 bom 仅由 maven.neoforged.net 提供，
+    // 本机访问该仓库超时会导致解析失败。json-jvm 由 Maven Central 直接提供 pom 与 jar。
+    runtimeOnly "org.jetbrains.kotlinx:kotlinx-serialization-json-jvm:1.9.0"
+    compileOnly "curse.maven:just-enough-characters-250702:8413478"
 
-    implementation "curse.maven:apotheosis-313970:8564919"
-    implementation "curse.maven:apothic-spawners-986583:8469405"
-    implementation "curse.maven:placebo-283644:8463693"
-    implementation "curse.maven:apothic-enchanting-1063926:8682996"
-    implementation "curse.maven:apothic-attributes-898963:8502288"
+    compileOnly "curse.maven:apotheosis-313970:8564919"
+    compileOnly "curse.maven:apothic-spawners-986583:8469405"
+    compileOnly "curse.maven:placebo-283644:8463693"
+    compileOnly "curse.maven:apothic-enchanting-1063926:8682996"
+    compileOnly "curse.maven:apothic-attributes-898963:8502288"
 //    runtimeOnly "curse.maven:gateways-to-eternity-417802:6926284"
     compileOnly "curse.maven:apothic-flux-1483497:8820187"
 
     // Lychee
-    implementation "maven.modrinth:lychee:6.7.0+neoforge"
-    implementation "maven.modrinth:kiwi:15.8.7+neoforge"
+    compileOnly "maven.modrinth:lychee:6.7.0+neoforge"
+    compileOnly "maven.modrinth:kiwi:15.8.7+neoforge"
 
     implementation "curse.maven:omnisequence-transfinite-1624558:8991983"
-    implementation "curse.maven:applied-enhancements-1665696:8990232"
+    // AppliedEnhancements 同时供本地编译（源码直接引用其规划器类型）与运行时使用：
+    // OmniSequence（mod id molecularmanipulator）在运行时强制要求 appliedenhancements
+    // 存在，缺失会导致整包加载失败。
+    compileOnly "curse.maven:applied-enhancements-1665696:8990232"
+    runtimeOnly "curse.maven:applied-enhancements-1665696:8990232"
 
-    implementation "curse.maven:applied-pneumatics-1355087:8812885"
+    compileOnly "curse.maven:applied-pneumatics-1355087:8812885"
 
-    implementation "curse.maven:mystical-agriculture-omnia-1684008:8824904"
+    compileOnly "curse.maven:mystical-agriculture-omnia-1684008:8824904"
 
     // 乐事系列
     compileOnly "maven.modrinth:farmers-delight:1.21.1-1.3.3"
@@ -441,8 +461,8 @@ dependencies {
 
 
     // 星辉魔法及其硬前置 ObserverLib
-    runtimeOnly "hellfirepvp.observerlib:ObserverLib:1.10.3.31"
-    implementation "hellfirepvp.astralsorcery:AstralSorcery:2.0.2.40"
+    compileOnly "hellfirepvp.observerlib:ObserverLib:1.10.3.31"
+    compileOnly "hellfirepvp.astralsorcery:AstralSorcery:2.0.2.40"
 
 //    // 集成动力
 //    runtimeOnly "maven.modrinth:cyclops-core:RjMKI4zG"

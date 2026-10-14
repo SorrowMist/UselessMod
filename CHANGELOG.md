@@ -5,6 +5,34 @@
 
 ## [Unreleased]
 
+## [2.4.6]
+
+### Added / 新增
+- 新增 `/uselessmod patterns repair [preview]` 命令，扫描 AE 网格上已通电的单方块万象炉与多方块 ME 样板总成，按当前配方目录重新匹配并重编码其中失效的万象样板，就地写回原槽位
+  - Added the `/uselessmod patterns repair [preview]` command, which rescans powered single-block omniversal furnaces and multiblock ME pattern assemblies on the AE grid, re-matches and re-encodes their invalid omniversal patterns against the current recipe directory, and writes them back in place.
+- 万象合金炉未成型时以红色线框高亮世界中最低的错误方块，并补齐缺少样板总成或模具仓时的校验盲区
+  - The Omniversal Alloy Furnace now highlights the lowest mismatched block in the world with a persistent red wireframe while unformed, and validation gaps for missing pattern assemblies or die chambers are covered.
+
+### Fixed / 修复
+- 二维度多联边框不再只铺在起始列与起始行、挤在 x-/z- 一角呈 L 形，改为四条边各铺一格、在交界处合成一条两格宽的边框带
+  - The 2D multi-connection border no longer bunches into an L shape at the x-/z- corner with only the starting row and column filled; each of the four sides now lays one cell, forming a two-cell-wide band at the junctions.
+- 星辉魔法升级至 2.0.2.40，修复上游 jar 内部版本号恒为 2.0.1 导致前置约束校验失败、模组无法加载的问题
+  - Upgraded Astral Sorcery to 2.0.2.40, fixing a load failure where the upstream jar's internal version was always 2.0.1 and failed the dependency version check.
+- 适配数据能源 3.4.0 的 API 变更，并将其声明为可选依赖、锁定下限 3.4.0
+  - Adapted to the Data Energistics 3.4.0 API changes, and declared it an optional dependency with a 3.4.0 lower bound.
+
+### Performance / 性能
+- 配方缓存键在构造时预先算好哈希，查缓存不再重复遍历三张输入 map
+  - Recipe cache keys precompute their hash at construction, so cache lookups no longer re-traverse the three input maps.
+- 构建配方缓存键时按需分配 map 并省去整份复制，同时直接取 AEItemKey/AEFluidKey 而不再经 GenericStack 中转
+  - Building a recipe cache key now allocates maps on demand and skips the full copy, taking AEItemKey/AEFluidKey directly instead of routing through GenericStack.
+- 合金炉输入未变时跳过重复的配方搜索，加工中的配方切换检查同样受此节流
+  - The Alloy Furnace skips repeated recipe searches while its inputs are unchanged, and the in-progress recipe switch check is throttled the same way.
+- 合金炉等待状态下不再逐 tick 同步 AE 任务进度，改为状态变化时立即同步、不变时每 20 tick 补发一次
+  - The Alloy Furnace no longer syncs AE task progress every tick while waiting; it syncs immediately on state change and re-sends every 20 ticks otherwise.
+- 合金炉自动 IO 空转时扫描间隔按 1、2、4、8、16 tick 逐级退避，封顶 20 tick，本机内容变化或切换设置时立即恢复逐 tick 扫描
+  - Idle Alloy Furnace auto-IO now backs off its scan interval as 1, 2, 4, 8 and 16 ticks, capped at 20; scanning returns to every tick immediately when the local contents change or a setting is toggled.
+
 ## [2.4.5.13]
 
 ### Changed / 变更

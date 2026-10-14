@@ -1044,17 +1044,96 @@ public class AlloyFurnaceRecipeManager {
     private record OrderedItemSignature(@Nullable AEKey key, int count) {
     }
 
-    /** 只保存不可变的 AEKey/数量快照，不持有调用方可变的 ItemStack。 */
-    static record RecipeCacheKey(
-            Map<AEKey, Long> items,
-            Map<AEKey, Long> fluids,
-            Map<AEKey, Long> keys,
-            @Nullable AEKey mold,
-            List<RecipeOutputConstraint> expectedOutputs,
-            long operations,
-            int machineTier,
-            long tierRulesVersion
-    ) {
+    /**
+     * 只保存不可变的 AEKey/数量快照，不持有调用方可变的 ItemStack。
+     * <p>
+     * 这里刻意不用 record：缓存命中路径每次都要拿这个键去哈希与判等，而三张 map 各自的
+     * hashCode 都要遍历一遍。record 的 hashCode 每次重算，改成在构造时算一次存下来，
+     * 命中路径就只剩读一个 int。判等语义与字段全部不变，缓存命中率不受影响。
+     */
+    static final class RecipeCacheKey {
+        private final Map<AEKey, Long> items;
+        private final Map<AEKey, Long> fluids;
+        private final Map<AEKey, Long> keys;
+        @Nullable
+        private final AEKey mold;
+        private final List<RecipeOutputConstraint> expectedOutputs;
+        private final long operations;
+        private final int machineTier;
+        private final long tierRulesVersion;
+        /** 构造时算好的哈希值，供缓存查找反复读取。 */
+        private final int cachedHash;
+
+        private RecipeCacheKey(
+                Map<AEKey, Long> items,
+                Map<AEKey, Long> fluids,
+                Map<AEKey, Long> keys,
+                @Nullable AEKey mold,
+                List<RecipeOutputConstraint> expectedOutputs,
+                long operations,
+                int machineTier,
+                long tierRulesVersion
+        ) {
+            this.items = items;
+            this.fluids = fluids;
+            this.keys = keys;
+            this.mold = mold;
+            this.expectedOutputs = expectedOutputs;
+            this.operations = operations;
+            this.machineTier = machineTier;
+            this.tierRulesVersion = tierRulesVersion;
+            this.cachedHash = computeHash();
+        }
+
+        private int computeHash() {
+            int result = this.items.hashCode();
+            result = 31 * result + this.fluids.hashCode();
+            result = 31 * result + this.keys.hashCode();
+            result = 31 * result + Objects.hashCode(this.mold);
+            result = 31 * result + this.expectedOutputs.hashCode();
+            result = 31 * result + Long.hashCode(this.operations);
+            result = 31 * result + this.machineTier;
+            result = 31 * result + Long.hashCode(this.tierRulesVersion);
+            return result;
+        }
+
+        Map<AEKey, Long> items() {
+            return this.items;
+        }
+
+        Map<AEKey, Long> fluids() {
+            return this.fluids;
+        }
+
+        Map<AEKey, Long> keys() {
+            return this.keys;
+        }
+
+        @Nullable
+        AEKey mold() {
+            return this.mold;
+        }
+
+        @Override
+        public int hashCode() {
+            return this.cachedHash;
+        }
+
+        @Override
+        public boolean equals(Object obj) {
+            if (this == obj) return true;
+            if (!(obj instanceof RecipeCacheKey other)) return false;
+            // 先比基本类型字段，再比集合，冲突时能少走几次 map 判等
+            return this.operations == other.operations
+                    && this.machineTier == other.machineTier
+                    && this.tierRulesVersion == other.tierRulesVersion
+                    && Objects.equals(this.mold, other.mold)
+                    && this.items.equals(other.items)
+                    && this.fluids.equals(other.fluids)
+                    && this.keys.equals(other.keys)
+                    && this.expectedOutputs.equals(other.expectedOutputs);
+        }
+
         private static RecipeCacheKey from(RecipeLookupContext context) {
             LookupInputFingerprint fingerprint = LookupInputFingerprint.from(context);
             AEItemKey moldKey = context.mold() == null || context.mold().isEmpty()

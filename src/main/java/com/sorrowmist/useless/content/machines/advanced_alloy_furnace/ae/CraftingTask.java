@@ -33,6 +33,8 @@ import java.util.Set;
  */
 public class CraftingTask {
     private static final int PROGRESS_SYNC_INTERVAL = 5;
+    // 等待状态不变时的补发间隔：单方块炉打开界面时不会主动拉取进度，靠补发让新进入追踪范围的玩家看到等待原因
+    private static final int WAITING_SYNC_INTERVAL = 20;
     private static final BigInteger MAX_INT_AMOUNT = BigInteger.valueOf(Integer.MAX_VALUE);
     private static final String STATUS_PROCESSING =
             "gui.useless_mod.advanced_alloy_furnace.ae_task_status.processing";
@@ -81,6 +83,7 @@ public class CraftingTask {
     private int processTime = 200;
     private int progress = 0;
     private int progressUpdateCounter = 0;
+    private int waitingSyncCounter = 0;
     private boolean progressRegistered = false;
     private AdvancedAlloyFurnaceAeManager.AETaskProgress taskProgressRef = null;
     private String waitingStatusKey = STATUS_WAITING_CONDITIONS;
@@ -677,6 +680,9 @@ public class CraftingTask {
         if (!awaitingOutputFlush) {
             AdvancedAlloyFurnaceRecipe recipe = findTaskRecipe();
             ResolvedCatalystEffect resolvedCatalystEffect = getCatalystEffect(recipe);
+            // 下方会先把状态置回处理中、再视能量改回等待，故记下本 tick 前的状态，用来判断等待状态是否真的变化
+            String previousStatusKey = taskProgressRef == null ? null : taskProgressRef.getStatusKey();
+            String previousStatusDetail = taskProgressRef == null ? null : taskProgressRef.getStatusDetail();
 
             if (progress == 0 && accumulatedEnergy == 0L && !isRecipeValid(recipe)) {
                 updateWaitingProgress();
@@ -698,8 +704,12 @@ public class CraftingTask {
                     }
                     setWaiting(STATUS_WAITING_ENERGY, WAITING_ENERGY_DETAIL);
                     if (taskProgressRef != null) {
+                        boolean statusChanged = !waitingStatusKey.equals(previousStatusKey)
+                                || !waitingDetail.equals(previousStatusDetail);
                         taskProgressRef.setStatus(waitingStatusKey, waitingDetail);
-                        context.sendAETaskProgressToClients();
+                        if (shouldSyncWaiting(statusChanged)) {
+                            context.sendAETaskProgressToClients();
+                        }
                     }
                     return false;
                 }
@@ -785,13 +795,46 @@ public class CraftingTask {
         return true;
     }
 
+    /**
+     * 登记等待中的任务进度。配方无效或未初始化时每 tick 都会调用，
+     * 等待状态不变时复用已登记的进度对象，不再重复分配、标脏和发包。
+     */
     private void updateWaitingProgress() {
         long totalOutputCount = calculateDisplayedOutputCount();
-        taskProgressRef = new AdvancedAlloyFurnaceAeManager.AETaskProgress(getProductName(), 0, 1, displayedCraftCount, totalOutputCount,
-                waitingStatusKey, waitingDetail);
-        context.getAETaskProgressMap().put(taskId, taskProgressRef);
-        context.markChanged();
-        context.sendAETaskProgressToClients();
+        boolean changed = !isRegisteredWaitingProgress(totalOutputCount);
+        if (changed) {
+            taskProgressRef = new AdvancedAlloyFurnaceAeManager.AETaskProgress(getProductName(), 0, 1, displayedCraftCount, totalOutputCount,
+                    waitingStatusKey, waitingDetail);
+            context.getAETaskProgressMap().put(taskId, taskProgressRef);
+            context.markChanged();
+        }
+        if (shouldSyncWaiting(changed)) {
+            context.sendAETaskProgressToClients();
+        }
+    }
+
+    /** 已登记的进度对象是否与本次要登记的等待进度完全一致。 */
+    private boolean isRegisteredWaitingProgress(long totalOutputCount) {
+        AdvancedAlloyFurnaceAeManager.AETaskProgress current = taskProgressRef;
+        return current != null
+                && context.getAETaskProgressMap().get(taskId) == current
+                && current.getProgress() == 0
+                && current.getMaxProgress() == 1
+                && current.getCraftCount() == displayedCraftCount
+                && current.getTotalOutputCount() == totalOutputCount
+                && waitingStatusKey.equals(current.getStatusKey())
+                && waitingDetail.equals(current.getStatusDetail());
+    }
+
+    /**
+     * 等待状态的进度同步节流：状态变化时立即发送，不变时每 {@link #WAITING_SYNC_INTERVAL} tick 补发一次。
+     */
+    private boolean shouldSyncWaiting(boolean changed) {
+        if (changed || ++waitingSyncCounter >= WAITING_SYNC_INTERVAL) {
+            waitingSyncCounter = 0;
+            return true;
+        }
+        return false;
     }
 
     private long calculateDisplayedOutputCount() {

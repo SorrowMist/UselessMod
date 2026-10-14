@@ -222,7 +222,7 @@ jobs:
       - name: Upload to CurseForge
         # 已存在同版本时不再推送，避免平台侧重复版本报错。
         if: steps.check-curseforge.outputs.exists != 'true'
-        uses: Kira-NT/mc-publish@v3.3.4
+        uses: Kira-NT/mc-publish@v3.3.1
         with:
           name: Useless Mod ${{ needs.build.outputs.mod_version }}
           version: ${{ needs.build.outputs.mod_version }}
@@ -294,7 +294,7 @@ jobs:
       - name: Upload to Modrinth
         # 已存在同版本时不再推送，避免平台侧重复版本报错。
         if: steps.check-modrinth.outputs.exists != 'true'
-        uses: Kira-NT/mc-publish@v3.3.4
+        uses: Kira-NT/mc-publish@v3.3.1
         with:
           name: Useless Mod ${{ needs.build.outputs.mod_version }}
           version: ${{ needs.build.outputs.mod_version }}

@@ -154,11 +154,25 @@ jobs:
         run: |
           # 该作业未 checkout 仓库，必须显式指定 --repo，否则 gh 找不到 git 上下文
           # （报 fatal: not a git repository）。
-          gh release create "${TAG_NAME}" \
-            --repo "${{ github.repository }}" \
-            --title "${RELEASE_TITLE}" \
-            --notes "${RELEASE_NOTES}" \
-            "${{ needs.build.outputs.artifact_path }}"
+          #
+          # 标签重指后重跑时同名 Release 已存在，直接 create 会因重名失败；
+          # 因此先探测是否存在：已存在则改写标题与说明、覆盖上传资产，不存在才创建。
+          if gh release view "${TAG_NAME}" --repo "${{ github.repository }}" >/dev/null 2>&1; then
+            gh release edit "${TAG_NAME}" \
+              --repo "${{ github.repository }}" \
+              --title "${RELEASE_TITLE}" \
+              --notes "${RELEASE_NOTES}"
+            gh release upload "${TAG_NAME}" \
+              --repo "${{ github.repository }}" \
+              --clobber \
+              "${{ needs.build.outputs.artifact_path }}"
+          else
+            gh release create "${TAG_NAME}" \
+              --repo "${{ github.repository }}" \
+              --title "${RELEASE_TITLE}" \
+              --notes "${RELEASE_NOTES}" \
+              "${{ needs.build.outputs.artifact_path }}"
+          fi
 
   publish-curseforge:
     name: Publish to CurseForge

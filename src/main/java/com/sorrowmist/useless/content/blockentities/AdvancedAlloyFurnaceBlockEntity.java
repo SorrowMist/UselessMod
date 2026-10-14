@@ -187,7 +187,7 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
     private int autoOutputTickCounter = 0;
     private boolean isConnectedToAE = false;
     private long itemStorageRevision;
-    // 影响配方搜索结果的状态修订号：物品/流体/化学品/阶级/配方目录变化时递增
+    // 状态修订号：物品/流体/化学品/阶级/配方目录变化时递增，配方搜索节流与自动 IO 退避据此判断状态是否变化
     private long recipeInputRevision;
     // 上次配方搜索时的修订号与游戏时间
     private long recipeSearchRevision = -1L;
@@ -419,7 +419,7 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
         entity.aeManager.tickUnreturnedOutputs();
         entity.aeManager.tickQueuedCraftingOutputs();
 
-        // 每tick尝试自动输入输出物品和流体
+        // 每tick驱动自动输入输出，连续空转时由控制器内部退避
         entity.autoOutputTickCounter++;
         if (entity.autoOutputTickCounter >= AUTO_OUTPUT_INTERVAL) {
             entity.autoOutputTickCounter = 0;
@@ -929,6 +929,11 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
         return this.itemStorageRevision;
     }
 
+    @Override
+    public long getIoStateRevision() {
+        return this.recipeInputRevision;
+    }
+
     /**
      * 获取方向感知的物品处理器。
      * <p>
@@ -956,6 +961,7 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
      */
     public void setFaceMode(FurnaceFace face, FurnaceFaceMode mode) {
         this.faceModes[face.ordinal()] = mode;
+        this.autoIoController.wake();
         this.setChanged();
     }
 
@@ -972,6 +978,7 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
         FurnaceFaceMode current = this.faceModes[face.ordinal()];
         FurnaceFaceMode next = reverse ? current.previous() : current.next();
         this.faceModes[face.ordinal()] = next;
+        this.autoIoController.wake();
         this.setChanged();
         // 同步到客户端
         if (this.level != null && !this.level.isClientSide) {
@@ -1002,6 +1009,7 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
 
     public void setAutoInputEnabled(boolean enabled) {
         this.autoInputEnabled = enabled;
+        this.autoIoController.wake();
         this.setChanged();
     }
 
@@ -1011,6 +1019,7 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
 
     public void setAutoOutputEnabled(boolean enabled) {
         this.autoOutputEnabled = enabled;
+        this.autoIoController.wake();
         this.setChanged();
     }
 
@@ -1019,6 +1028,7 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
      */
     public boolean toggleAutoInput() {
         this.autoInputEnabled = !this.autoInputEnabled;
+        this.autoIoController.wake();
         this.setChanged();
         if (this.level != null && !this.level.isClientSide) {
             this.level.sendBlockUpdated(this.worldPosition, this.getBlockState(), this.getBlockState(), 3);
@@ -1031,6 +1041,7 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
      */
     public boolean toggleAutoOutput() {
         this.autoOutputEnabled = !this.autoOutputEnabled;
+        this.autoIoController.wake();
         this.setChanged();
         if (this.level != null && !this.level.isClientSide) {
             this.level.sendBlockUpdated(this.worldPosition, this.getBlockState(), this.getBlockState(), 3);

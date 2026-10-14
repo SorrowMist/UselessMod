@@ -33,6 +33,8 @@ import static com.sorrowmist.useless.content.machines.advanced_alloy_furnace.lay
 public final class FurnaceAutoIoController {
 
     private static final Direction[] ALL_DIRECTIONS = Direction.values();
+    // 自动 IO 连续空转时扫描间隔的上限（tick）
+    private static final int MAX_IDLE_BACKOFF_TICKS = 20;
     private static final int[] MATERIAL_INPUT_SLOT_CANDIDATES;
     private static final int[] CATALYST_INPUT_SLOT_CANDIDATES = {CATALYST_SLOT};
     private static final int[] MOLD_INPUT_SLOT_CANDIDATES = {MOLD_SLOT};
@@ -72,6 +74,12 @@ public final class FurnaceAutoIoController {
         }
 
         void markChanged();
+
+        /**
+         * 本机物品/流体/化学品存储的修订号，任意内容变化都必须递增。
+         * 自动 IO 闲置退避期间用它判断本机是否产出了新东西或腾出了空间，变了就立即重新扫描。
+         */
+        long getIoStateRevision();
     }
 
     private final Context context;
@@ -81,6 +89,12 @@ public final class FurnaceAutoIoController {
     private final FurnaceChemicalStorage inputChemicalStorage;
     private final FurnaceChemicalStorage outputChemicalStorage;
     private final BlockPos worldPosition;
+    // 连续无搬运的扫描轮数，用于逐级拉长扫描间隔
+    private int idleRounds = 0;
+    // 距下一次扫描还需跳过的 tick 数
+    private int idleWaitTicks = 0;
+    // 上一轮扫描后看到的内容修订号，用于判断退避期间本机内容是否变化
+    private long observedRevision;
 
     public FurnaceAutoIoController(Context context, ItemStackHandler itemHandler,
                                    FluidTank[] inputFluidTanks, FluidTank[] outputFluidTanks,
@@ -105,24 +119,64 @@ public final class FurnaceAutoIoController {
 
     /**
      * 自动输入输出物品和流体到周围的容器。
+     * <p>
+     * 一整轮扫描没有任何搬运时，扫描间隔按 1、2、4、8、16 tick 逐级拉长，封顶
+     * {@link #MAX_IDLE_BACKOFF_TICKS}，避免机器闲置（输出槽满、AE 网络满、周围容器已空）时
+     * 逐 tick 反复查询能力、遍历相邻容器槽位并向 AE 重复提交必然失败的插入。
+     * 本机内容或 IO 配置一旦变化立即恢复逐 tick 扫描：前者由修订号体现，后者由 {@link #wake()} 唤醒；
+     * 周围容器与 AE 网络的变化无从得知，最迟一个封顶间隔后被发现。
      */
     public void tick(Level level) {
         if (level.isClientSide) return;
 
+        if (this.idleWaitTicks > 0) {
+            if (this.context.getIoStateRevision() == this.observedRevision) {
+                this.idleWaitTicks--;
+                return;
+            }
+            this.idleWaitTicks = 0;
+        }
+
+        boolean moved = false;
         if (this.context.isAutoInputEnabled()) {
-            this.autoInputFromSurroundings(level);
+            moved = this.autoInputFromSurroundings(level);
         }
 
         if (this.context.isAutoOutputEnabled()) {
-            this.autoOutputToSurroundings(level);
+            moved |= this.autoOutputToSurroundings(level);
         }
+
+        this.observedRevision = this.context.getIoStateRevision();
+        if (moved) {
+            this.idleRounds = 0;
+        } else {
+            this.idleRounds = Math.min(this.idleRounds + 1, MAX_IDLE_BACKOFF_TICKS);
+            this.idleWaitTicks = idleScanInterval(this.idleRounds) - 1;
+        }
+    }
+
+    /** 连续空转 {@code idleRounds} 轮后的扫描间隔：1、2、4、8、16，之后封顶。 */
+    private static int idleScanInterval(int idleRounds) {
+        return Math.min(MAX_IDLE_BACKOFF_TICKS, 1 << Math.min(idleRounds - 1, 5));
+    }
+
+    /**
+     * 立即恢复逐 tick 自动 IO（面模式或自动输入输出开关被改动时调用）。
+     * 这类配置变化不改变本机内容，不会体现在修订号里，只能显式唤醒。
+     */
+    public void wake() {
+        this.idleRounds = 0;
+        this.idleWaitTicks = 0;
     }
 
     /**
      * 从周围容器自动输入物品和流体到机器。
      * 仅从开启了对应面模式的面进行输入。
+     *
+     * @return 本轮是否至少搬运了一份物品、流体或化学品
      */
-    private void autoInputFromSurroundings(Level level) {
+    private boolean autoInputFromSurroundings(Level level) {
+        boolean movedAny = false;
         Direction facing = this.context.getFacing();
         for (Direction dir : Direction.values()) {
             FurnaceFace face = FurnaceFace.fromDirection(dir, facing);
@@ -154,6 +208,7 @@ public final class FurnaceAutoIoController {
                         int moved = extracted.getCount() - remaining.getCount();
                         if (moved > 0) {
                             srcHandler.extractItem(srcSlot, moved, false);
+                            movedAny = true;
                             this.context.markChanged();
                         }
                     }
@@ -171,6 +226,7 @@ public final class FurnaceAutoIoController {
                         int filled = selfFluidHandler.fill(drained, IFluidHandler.FluidAction.EXECUTE);
                         if (filled > 0) {
                             srcFluidHandler.drain(filled, IFluidHandler.FluidAction.EXECUTE);
+                            movedAny = true;
                             this.context.markChanged();
                         }
                     }
@@ -191,6 +247,7 @@ public final class FurnaceAutoIoController {
                             if (actual != null && !actual.isEmpty()) {
                                 ChemicalStackView localRemainder = this.inputChemicalStorage.insertChemical(actual, false);
                                 if (acceptedAmount(actual, localRemainder) > 0L) {
+                                    movedAny = true;
                                     this.context.markChanged();
                                 }
                                 restoreChemicalRemainder(sourceChemicalHandler, actual, localRemainder);
@@ -200,6 +257,7 @@ public final class FurnaceAutoIoController {
                 }
             }
         }
+        return movedAny;
     }
 
     private static int[] getAutoInputSlotCandidates(FurnaceFaceMode mode) {
@@ -212,15 +270,22 @@ public final class FurnaceAutoIoController {
     /**
      * 自动输出物品和流体到周围容器和 AE 网络。
      * 仅输出到开启了"原材料输出"模式的面。
+     *
+     * @return 本轮是否至少搬运了一份物品、流体或化学品
      */
-    private void autoOutputToSurroundings(Level level) {
+    private boolean autoOutputToSurroundings(Level level) {
+        boolean movedAny = false;
+
         // AE网络输出不受面模式控制
         for (int slot = OUTPUT_SLOTS_START; slot < OUTPUT_SLOTS_START + OUTPUT_SLOTS_COUNT; slot++) {
             ItemStack stack = this.itemHandler.getStackInSlot(slot);
             if (stack.isEmpty()) continue;
             long inserted = this.context.tryOutputToAE(stack);
             if (inserted > 0) {
-                stack.shrink((int) inserted);
+                // 必须走 setStackInSlot：直接 shrink 不触发变更回调，状态修订号与外部库存快照都不会更新，
+                // 熔炉会以为输出槽仍满而推迟配方搜索
+                this.itemHandler.setStackInSlot(slot, remainingAfterInsert(stack, inserted));
+                movedAny = true;
                 this.context.markChanged();
             }
         }
@@ -231,6 +296,7 @@ public final class FurnaceAutoIoController {
             long inserted = this.context.tryOutputFluidToAE(fluid);
             if (inserted > 0) {
                 this.outputFluidTanks[i].drain((int) inserted, IFluidHandler.FluidAction.EXECUTE);
+                movedAny = true;
             }
         }
 
@@ -240,6 +306,7 @@ public final class FurnaceAutoIoController {
             long inserted = clampAmount(this.context.tryOutputChemicalToAE(chemical), chemical.amount());
             if (inserted > 0L) {
                 this.outputChemicalStorage.extractChemical(i, inserted, false);
+                movedAny = true;
             }
         }
 
@@ -254,6 +321,7 @@ public final class FurnaceAutoIoController {
                 if (face == null) continue;
                 if (!this.context.getFaceMode(face).allowsMaterialOutput()) continue;
                 if (this.tryOutputItemToDirection(level, slot, dir)) {
+                    movedAny = true;
                     this.context.markChanged();
                     stack = this.itemHandler.getStackInSlot(slot);
                     if (stack.isEmpty()) break;
@@ -271,6 +339,7 @@ public final class FurnaceAutoIoController {
                 if (!this.context.getFaceMode(face).allowsMaterialOutput()) continue;
                 int filled = this.tryOutputFluidToDirection(level, tankIndex, dir);
                 if (filled > 0) {
+                    movedAny = true;
                     this.context.markChanged();
                     fluid = this.outputFluidTanks[tankIndex].getFluid();
                     if (fluid.isEmpty()) break;
@@ -287,12 +356,21 @@ public final class FurnaceAutoIoController {
                 if (face == null || !this.context.getFaceMode(face).allowsMaterialOutput()) continue;
                 long moved = this.tryOutputChemicalToDirection(level, tankIndex, dir);
                 if (moved > 0L) {
+                    movedAny = true;
                     this.context.markChanged();
                     chemical = this.outputChemicalStorage.getStackInSlot(tankIndex);
                     if (chemical.isEmpty()) break;
                 }
             }
         }
+
+        return movedAny;
+    }
+
+    /** 扣除已写入 AE 的部分后的剩余栈；全部写入时返回空栈。 */
+    private static ItemStack remainingAfterInsert(ItemStack stack, long inserted) {
+        long remaining = stack.getCount() - Math.min(stack.getCount(), Math.max(0L, inserted));
+        return remaining <= 0L ? ItemStack.EMPTY : stack.copyWithCount((int) remaining);
     }
 
     /**

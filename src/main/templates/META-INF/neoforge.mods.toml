@@ -203,6 +203,20 @@ requiredMods=["pneumaticcraft"]
     ordering="AFTER"
     side="BOTH"
 
+# 数据能源集成是软加载：入口走它自己的 @DataEnergisticsEntrypoint 扫描，
+# 没装数据能源时 integration.dataenergistics 整包不会被触达，本模组照常运行，因此声明为 optional。
+#
+# 下限锁定 3.4.0-SNAPSHOT：本模组按 3.4.0 的 API 编译（ProcessingMatchMode、
+# BigIntegerCraftingAdmission.count() 抽象化、FastUtil ObjectList 参数），旧版缺这些符号。
+# 注意 Maven 语义里 3.4.0-SNAPSHOT < 3.4.0（预发布），所以下限必须写 3.4.0-SNAPSHOT，
+# 写 [3.4.0,) 会连当前使用的快照 jar 都匹配不上。
+[[dependencies.${mod_id}]]
+    modId="data_energistics"
+    type="optional"
+    versionRange="[3.4.0,)"
+    ordering="AFTER"
+    side="BOTH"
+
 # Features are specific properties of the game environment, that you may want to declare you require. This example declares
 # that your mod requires GL version 3.2 or higher. Other features will be added. They are side aware so declaring this won't
 # stop your mod loading on the server for example.

@@ -180,8 +180,49 @@ jobs:
       - name: Validate artifact exists
         run: test -f "${{ needs.build.outputs.artifact_path }}"
 
+      - name: Check existing CurseForge version
+        id: check-curseforge
+        env:
+          CURSEFORGE_TOKEN: ${{ secrets.CURSEFORGE_TOKEN }}
+          CURSEFORGE_ID: ${{ vars.CURSEFORGE_PROJECT_ID || 1401600 }}
+          MOD_VERSION: ${{ needs.build.outputs.mod_version }}
+          ARTIFACT_PATH: ${{ needs.build.outputs.artifact_path }}
+        run: |
+          # 该版本此前若已发布，重复上传会被平台拒绝并使工作流失败；
+          # 因此先逐页拉取项目已上传文件，按文件名或显示名匹配，命中即置 exists=true 跳过上传。
+          file_name="$(basename "${ARTIFACT_PATH}")"
+          display_name="Useless Mod ${MOD_VERSION}"
+          exists=false
+          index=0
+          while true; do
+            if ! response="$(curl -sS --fail \
+              -H "x-api-key: ${CURSEFORGE_TOKEN}" \
+              -H "Accept: application/json" \
+              "https://api.curseforge.com/v1/mods/${CURSEFORGE_ID}/files?pageSize=50&index=${index}")"; then
+              echo "::warning::查询 CurseForge 已发布文件失败，无法确认版本是否已存在，继续尝试上传"
+              break
+            fi
+            matched="$(printf '%s' "${response}" | jq --arg fn "${file_name}" --arg dn "${display_name}" \
+              '[.data[] | select(.fileName == $fn or .displayName == $dn)] | length')"
+            if [[ "${matched}" -gt 0 ]]; then
+              exists=true
+              break
+            fi
+            page_count="$(printf '%s' "${response}" | jq '.data | length')"
+            if [[ "${page_count}" -lt 50 ]]; then
+              break
+            fi
+            index=$((index + 50))
+          done
+          if [[ "${exists}" == true ]]; then
+            echo "CurseForge 已存在版本 ${MOD_VERSION}，跳过上传。"
+          fi
+          echo "exists=${exists}" >> "$GITHUB_OUTPUT"
+
       - name: Upload to CurseForge
-        uses: Kira-NT/mc-publish@v3.3.1
+        # 已存在同版本时不再推送，避免平台侧重复版本报错。
+        if: steps.check-curseforge.outputs.exists != 'true'
+        uses: Kira-NT/mc-publish@v3.3.4
         with:
           name: Useless Mod ${{ needs.build.outputs.mod_version }}
           version: ${{ needs.build.outputs.mod_version }}
@@ -220,8 +261,40 @@ jobs:
       - name: Validate artifact exists
         run: test -f "${{ needs.build.outputs.artifact_path }}"
 
+      - name: Check existing Modrinth version
+        id: check-modrinth
+        env:
+          MODRINTH_TOKEN: ${{ secrets.MODRINTH_TOKEN }}
+          MODRINTH_ID: ${{ vars.MODRINTH_PROJECT_ID }}
+          MOD_VERSION: ${{ needs.build.outputs.mod_version }}
+          ARTIFACT_PATH: ${{ needs.build.outputs.artifact_path }}
+        run: |
+          # 该版本此前若已发布，重复上传会被平台拒绝并使工作流失败；
+          # 因此先查询项目已上传版本，按版本号或文件名匹配，命中即置 exists=true 跳过上传。
+          file_name="$(basename "${ARTIFACT_PATH}")"
+          exists=false
+          # Modrinth API 要求请求携带可识别的 User-Agent，缺失会被拒绝。
+          if ! response="$(curl -sS --fail \
+            -H "Authorization: ${MODRINTH_TOKEN}" \
+            -H "User-Agent: useless-mod-publish-workflow" \
+            "https://api.modrinth.com/v2/project/${MODRINTH_ID}/version")"; then
+            echo "::warning::查询 Modrinth 已发布版本失败，无法确认版本是否已存在，继续尝试上传"
+          else
+            matched="$(printf '%s' "${response}" | jq --arg ver "${MOD_VERSION}" --arg fn "${file_name}" \
+              '[.[] | select(.version_number == $ver or ([.files[].filename] | index($fn) != null))] | length')"
+            if [[ "${matched}" -gt 0 ]]; then
+              exists=true
+            fi
+          fi
+          if [[ "${exists}" == true ]]; then
+            echo "Modrinth 已存在版本 ${MOD_VERSION}，跳过上传。"
+          fi
+          echo "exists=${exists}" >> "$GITHUB_OUTPUT"
+
       - name: Upload to Modrinth
-        uses: Kira-NT/mc-publish@v3.3.1
+        # 已存在同版本时不再推送，避免平台侧重复版本报错。
+        if: steps.check-modrinth.outputs.exists != 'true'
+        uses: Kira-NT/mc-publish@v3.3.4
         with:
           name: Useless Mod ${{ needs.build.outputs.mod_version }}
           version: ${{ needs.build.outputs.mod_version }}

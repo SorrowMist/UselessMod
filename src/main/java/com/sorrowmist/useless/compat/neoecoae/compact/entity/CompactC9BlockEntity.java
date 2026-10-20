@@ -26,7 +26,6 @@ import com.sorrowmist.useless.compat.neoecoae.compact.shadow.ShadowComputationDr
 import com.sorrowmist.useless.compat.neoecoae.compact.shadow.ShadowComputationHostBlockEntity;
 import com.sorrowmist.useless.compat.neoecoae.compact.shadow.ShadowComputationParallelCoreBlockEntity;
 import com.sorrowmist.useless.compat.neoecoae.compact.shadow.ShadowThreadingCoreBlockEntity;
-import com.sorrowmist.useless.compat.neoecoae.compact.ui.CompactSingleBlockUI;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.HolderLookup;
@@ -383,11 +382,8 @@ public class CompactC9BlockEntity extends ECOComputationSystemBlockEntity
     @Override
     public ModularUI createUI(BlockUIMenuType.BlockUIHolder holder) {
         ModularUI interfaceUI = compactInterface.createUI(holder);
-        return interfaceUI == null ? CompactSingleBlockUI.create(holder.player,
-                net.minecraft.network.chat.Component.translatable("gui.useless_mod.compact.c9.title"),
-                net.minecraft.network.chat.Component.translatable("gui.useless_mod.compact.c9.overview"),
-                net.minecraft.network.chat.Component.translatable("gui.useless_mod.compact.c9.hardware"))
-                : interfaceUI;
+        // 普通右键沿用 ECO C9 主机面板；只有潜行右键才切到影子通讯接口页面。
+        return interfaceUI == null ? super.createUI(holder) : interfaceUI;
     }
 
     @Override

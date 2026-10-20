@@ -4,7 +4,9 @@
   "compatibilityLevel": "JAVA_21",
   "mixins": [
     "GridMachineClassMixin",
-    "MenuDataCodecsCompactMixin"
+    "MenuDataCodecsCompactMixin",
+    "CraftingHostPanelCompactMixin",
+    "ComputationHostPanelCompactMixin"
   ],
   "injectors": {
     "defaultRequire": 1

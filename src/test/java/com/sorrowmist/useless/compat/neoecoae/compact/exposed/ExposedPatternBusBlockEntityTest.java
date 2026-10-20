@@ -1,21 +1,17 @@
 package com.sorrowmist.useless.compat.neoecoae.compact.exposed;
 
-import appeng.api.networking.GridHelper;
 import appeng.api.networking.IGrid;
 import appeng.api.networking.IGridNode;
 import appeng.api.networking.IManagedGridNode;
-import appeng.api.networking.crafting.ICraftingProvider;
-import cn.dancingsnow.neoecoae.config.NEConfig;
-import cn.dancingsnow.neoecoae.blocks.entity.ECOMachineInterfaceBlockEntity;
-import cn.dancingsnow.neoecoae.blocks.entity.crafting.ECOCraftingPatternBusBlockEntity;
+import appeng.api.networking.crafting.ICraftingService;
 import com.sorrowmist.useless.InventoryTestBootstrap;
+import com.sorrowmist.useless.compat.neoecoae.compact.provider.CombinedPatternInventory;
 import com.sorrowmist.useless.compat.neoecoae.compact.cluster.CompactCraftingCluster;
 import net.minecraft.core.BlockPos;
-import net.minecraft.world.level.block.Blocks;
-import net.minecraft.world.level.block.entity.BlockEntityType;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -46,46 +42,37 @@ class ExposedPatternBusBlockEntityTest {
     }
 
     @Test
-    void shiftingChildOffsetsInvalidatesTheWholeInterfaceEvenAtTheSameTotalSize() {
-        var node = mock(IManagedGridNode.class, RETURNS_SELF);
+    void advertisedPatternChangesRequestAHostProviderRefresh() {
+        var node = mock(IManagedGridNode.class);
         var gridNode = mock(IGridNode.class);
         var grid = mock(IGrid.class);
-        when(node.getNode()).thenReturn(gridNode);
+        var service = mock(ICraftingService.class);
         when(node.getGrid()).thenReturn(grid);
+        when(node.getNode()).thenReturn(gridNode);
         when(gridNode.getGrid()).thenReturn(grid);
-        var machineInterface = mock(ECOMachineInterfaceBlockEntity.class);
-        when(grid.getActiveMachines(ECOMachineInterfaceBlockEntity.class)).thenReturn(java.util.Set.of(machineInterface));
+        when(grid.getCraftingService()).thenReturn(service);
         var bus = createBus(node);
-        var first = mock(ECOCraftingPatternBusBlockEntity.class);
-        var second = mock(ECOCraftingPatternBusBlockEntity.class);
-        when(first.getPatternSlotCount()).thenReturn(2);
-        when(second.getPatternSlotCount()).thenReturn(3);
-        bus.bind(List.of(first, second), node);
-        assertEquals(5, bus.getPatternSlotCount());
 
-        when(first.getPatternSlotCount()).thenReturn(3);
-        when(second.getPatternSlotCount()).thenReturn(2);
-        try (var providers = mockStatic(ICraftingProvider.class)) {
-            bus.tick();
-            assertEquals(5, bus.getPatternSlotCount());
-            verify(machineInterface).onPatternBusInventoryChanged(bus);
-            verify(machineInterface, never()).onPatternBusInventoryChanged(eq(bus), any(int[].class));
-            providers.verify(() -> ICraftingProvider.requestUpdate(node));
-            clearInvocations(machineInterface);
-            bus.tick();
-            verifyNoInteractions(machineInterface);
-        }
+        bus.refreshAdvertisedPatterns();
+
+        verify(service).refreshNodeCraftingProvider(gridNode);
     }
 
     private static ExposedPatternBusBlockEntity createBus(IManagedGridNode node) {
-        try (var gridHelper = mockStatic(GridHelper.class); var config = mockStatic(NEConfig.class)) {
-            gridHelper.when(() -> GridHelper.createManagedNode(any(), any())).thenReturn(node);
-            config.when(NEConfig::getMaxCraftingPatternBusSlotCount).thenReturn(63);
-            config.when(NEConfig::getCraftingPatternBusPages).thenReturn(1);
-            var type = mock(BlockEntityType.class);
-            when(type.isValid(any())).thenReturn(true);
-            return new ExposedPatternBusBlockEntity(type, BlockPos.ZERO,
-                    Blocks.AIR.defaultBlockState());
+        var bus = mock(ExposedPatternBusBlockEntity.class, CALLS_REAL_METHODS);
+        setField(bus, "mergedPatternInventory", new CombinedPatternInventory());
+        setField(bus, "buses", new ArrayList<>());
+        bus.bind(List.of(), node);
+        return bus;
+    }
+
+    private static void setField(Object target, String name, Object value) {
+        try {
+            var field = ExposedPatternBusBlockEntity.class.getDeclaredField(name);
+            field.setAccessible(true);
+            field.set(target, value);
+        } catch (ReflectiveOperationException exception) {
+            throw new IllegalStateException(exception);
         }
     }
 }

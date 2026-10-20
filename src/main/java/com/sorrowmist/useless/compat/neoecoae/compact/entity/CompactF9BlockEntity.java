@@ -10,40 +10,32 @@ import appeng.api.networking.ticking.TickRateModulation;
 import appeng.api.orientation.BlockOrientation;
 import cn.dancingsnow.neoecoae.api.ECOTier;
 import cn.dancingsnow.neoecoae.api.ECOPatternInsertionResult;
-import cn.dancingsnow.neoecoae.api.me.provider.ECOBatchDispatchContext;
-import cn.dancingsnow.neoecoae.api.me.provider.ECOFastPathDispatchProvider;
+import cn.dancingsnow.neoecoae.api.IECOPatternStorage;
 import cn.dancingsnow.neoecoae.blocks.entity.NEBlockEntity;
 import cn.dancingsnow.neoecoae.blocks.entity.crafting.ECOCraftingPatternBusBlockEntity;
 import com.sorrowmist.useless.compat.neoecoae.compact.shadow.ShadowPatternBusBlockEntity;
 import cn.dancingsnow.neoecoae.blocks.entity.crafting.ECOCraftingSystemBlockEntity;
 import cn.dancingsnow.neoecoae.blocks.entity.crafting.ECOCraftingWorkerBlockEntity;
-import cn.dancingsnow.neoecoae.multiblock.calculator.NECraftingClusterCalculator;
 import cn.dancingsnow.neoecoae.multiblock.cluster.NECraftingCluster;
 import cn.dancingsnow.neoecoae.multiblock.cluster.NECraftingNetworkCluster;
-import com.lowdragmc.lowdraglib2.gui.factory.BlockUIMenuType;
-import com.lowdragmc.lowdraglib2.gui.ui.ModularUI;
-import com.lowdragmc.lowdraglib2.syncdata.rpc.RPCSender;
 import com.sorrowmist.useless.compat.neoecoae.compact.NeoEcoCompactRegistry;
 import com.sorrowmist.useless.compat.neoecoae.compact.block.CompactTicker;
 import com.sorrowmist.useless.compat.neoecoae.compact.calculator.CompactHost;
 import com.sorrowmist.useless.compat.neoecoae.compact.cluster.CompactCraftingCluster;
 import com.sorrowmist.useless.compat.neoecoae.compact.exposed.ExposedPatternBusBlockEntity;
 import com.sorrowmist.useless.compat.neoecoae.compact.provider.CompactPatternProvider;
-import com.sorrowmist.useless.compat.neoecoae.compact.shadow.CompactInterfaceAttachment;
 import com.sorrowmist.useless.compat.neoecoae.compact.shadow.ShadowCraftingHostBlockEntity;
 import com.sorrowmist.useless.compat.neoecoae.compact.shadow.ShadowCraftingParallelCoreBlockEntity;
 import com.sorrowmist.useless.compat.neoecoae.compact.shadow.ShadowCraftingWorkerBlockEntity;
 import com.sorrowmist.useless.compat.neoecoae.compact.shadow.ShadowFluidInputHatchBlockEntity;
 import com.sorrowmist.useless.compat.neoecoae.compact.shadow.ShadowFluidOutputHatchBlockEntity;
 import com.sorrowmist.useless.compat.neoecoae.compact.shadow.ShadowNodeLink;
-import com.sorrowmist.useless.compat.neoecoae.compact.ui.CompactSingleBlockUI;
 import com.sorrowmist.useless.core.component.ExternalInventoryKind;
 import com.sorrowmist.useless.core.component.ExternalInventoryReference;
 import com.sorrowmist.useless.world.inventory.ExternalInventoryStore;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.HolderLookup;
-import net.minecraft.core.RegistryAccess;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
@@ -56,7 +48,6 @@ import net.minecraftforge.fluids.capability.IFluidHandler;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
-import java.util.BitSet;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Set;
@@ -83,7 +74,7 @@ import java.util.Set;
  * {@link ExternalInventoryStore} 里那份 UUID 键控的外置存档中（见 {@link #PATTERN_BUS_KEY}）。</p>
  */
 public class CompactF9BlockEntity extends ECOCraftingSystemBlockEntity
-        implements CompactHost<NECraftingCluster>, CompactTicker, ICraftingProvider, ECOFastPathDispatchProvider {
+        implements CompactHost<NECraftingCluster>, CompactTicker, ICraftingProvider {
 
 
     /** 与 ECO 自己的虚拟合成判定一致：恰好 8 台。 */
@@ -122,10 +113,6 @@ public class CompactF9BlockEntity extends ECOCraftingSystemBlockEntity
     private long lastCompactTick = Long.MIN_VALUE;
     private int lastPatternContentRevision = Integer.MIN_VALUE;
     private long lastPatternAuxiliaryRevision = Long.MIN_VALUE;
-
-    /** 通讯接口界面（影子接口）的全部接线；普通右键仍然走主机自己的面板。 */
-    private final CompactInterfaceAttachment<NECraftingCluster> compactInterface =
-            new CompactInterfaceAttachment<>(this, NECraftingClusterCalculator::new);
 
     /** 对外代表 176 条影子总线的聚合总线；它的节点同样靠宿主节点显式接上网格。 */
     @Nullable
@@ -166,7 +153,8 @@ public class CompactF9BlockEntity extends ECOCraftingSystemBlockEntity
         // ECO 的样板总线就是这么做的（总线 BE 既实现 ICraftingProvider 又实现 IECOPatternStorage），
         // AE2/ECO 的各种枚举都是「拿节点 → 取服务 → 和宿主比对」，独立对象会让它们认不出来。
         getMainNode()
-                .addService(ICraftingProvider.class, this);
+                .addService(ICraftingProvider.class, this)
+                .addService(IECOPatternStorage.class, patternProvider);
     }
 
     // ------------------------------------------------------------- 成形生命周期
@@ -209,11 +197,6 @@ public class CompactF9BlockEntity extends ECOCraftingSystemBlockEntity
         linkAll(compact);
         compact.updateFormed(true);
         compact.updateStatus(true);
-    }
-
-    @Override
-    public boolean hasHighEnergyNetworkSwitch() {
-        return true;
     }
 
     @Override
@@ -265,16 +248,13 @@ public class CompactF9BlockEntity extends ECOCraftingSystemBlockEntity
         if (exposedBus != null) {
             exposedBus.tick();
             int revision = exposedBus.getPatternContentRevision();
-            long auxiliaryRevision = exposedBus.getAuxiliaryRevision();
-            if (revision != lastPatternContentRevision || auxiliaryRevision != lastPatternAuxiliaryRevision) {
+            if (revision != lastPatternContentRevision) {
                 lastPatternContentRevision = revision;
-                lastPatternAuxiliaryRevision = auxiliaryRevision;
                 // 内容变了才需要回写外置存储；挂起一次写，等区块存盘/卸载时真正落盘。
                 patternStoreDirty = true;
                 setChanged();
             }
         }
-        compactInterface.tick();
         // 影子主机没有独立网格 ticker，仍由 ECO 原生冷却逻辑补充各自的内部缓冲。
         for (int index = 1; index < fleet.size(); index++) {
             fleet.get(index).getController().tickingRequest(null, 1);
@@ -284,8 +264,8 @@ public class CompactF9BlockEntity extends ECOCraftingSystemBlockEntity
 
     /** 主机节点入网/换网后重新把合并后的样板提供者登记给 AE2（它只在收到刷新通知时才会重读）。 */
     @Override
-    protected void onMainNodeGridChanged() {
-        super.onMainNodeGridChanged();
+    public void onMainNodeStateChanged(appeng.api.networking.IGridNodeListener.State reason) {
+        super.onMainNodeStateChanged(reason);
         refreshPatternProvider();
     }
 
@@ -341,7 +321,7 @@ public class CompactF9BlockEntity extends ECOCraftingSystemBlockEntity
         for (CompactCraftingCluster member : fleet) {
             linkAll(member);
         }
-        NECraftingNetworkCluster network = new NECraftingNetworkCluster();
+        NECraftingNetworkCluster network = new NECraftingNetworkCluster(level);
         List<NECraftingCluster> members = new ArrayList<>(fleet);
         network.configure(members);
         for (CompactCraftingCluster member : fleet) {
@@ -353,19 +333,13 @@ public class CompactF9BlockEntity extends ECOCraftingSystemBlockEntity
 
         patternProvider.bind(shadowBuses);
         restorePatternBusData(level);
-        for (ECOCraftingPatternBusBlockEntity bus : shadowBuses) {
-            // 影子总线不会走 onReady，这里用 ECO 自己的刷新入口把样板索引建起来。
-            bus.flushScheduledPatternDetails();
-        }
         installExposedBus(level);
         // 刚恢复的内容不计为「变化」：将版本基准对齐到当前值，避免存档载入时立即触发一次无谓写入。
         // （是否确实需要写入外置存储由 restorePatternBusData 判断，它可区分「迁移」与「数据本就在存储中」两种情况。）
         if (exposedBus != null) {
             lastPatternContentRevision = exposedBus.getPatternContentRevision();
-            lastPatternAuxiliaryRevision = exposedBus.getAuxiliaryRevision();
         }
         ICraftingProvider.requestUpdate(getMainNode());
-        compactInterface.attach(level, cluster, getMainNode());
 
     }
 
@@ -394,9 +368,8 @@ public class CompactF9BlockEntity extends ECOCraftingSystemBlockEntity
         ListTag saved = new ListTag();
         for (int index = 1; index < fleet.size(); index++) {
             ECOCraftingSystemBlockEntity host = fleet.get(index).getController();
-            host.getRootStorage().requireInit();
             CompoundTag hostData = new CompoundTag();
-            host.saveManagedPersistentData(registries, hostData, false);
+            host.saveAdditional(hostData);
             saved.add(hostData);
         }
         return saved;
@@ -418,8 +391,7 @@ public class CompactF9BlockEntity extends ECOCraftingSystemBlockEntity
         }
         for (int index = 1; index < fleet.size() && index <= pendingShadowHostData.size(); index++) {
             ECOCraftingSystemBlockEntity host = fleet.get(index).getController();
-            host.getRootStorage().requireInit();
-            host.loadManagedPersistentData(registries, pendingShadowHostData.getCompound(index - 1));
+            host.loadTag(pendingShadowHostData.getCompound(index - 1));
         }
         pendingShadowHostData = null;
     }
@@ -430,7 +402,7 @@ public class CompactF9BlockEntity extends ECOCraftingSystemBlockEntity
         }
         int count = Math.min(pendingShadowWorkerData.size(), shadowWorkers.size());
         for (int index = 0; index < count; index++) {
-            shadowWorkers.get(index).loadTag(pendingShadowWorkerData.getCompound(index), registries);
+            shadowWorkers.get(index).loadTag(pendingShadowWorkerData.getCompound(index));
         }
         pendingShadowWorkerData = null;
     }
@@ -471,11 +443,7 @@ public class CompactF9BlockEntity extends ECOCraftingSystemBlockEntity
 
     @SuppressWarnings({"unchecked", "rawtypes"})
     private void linkAll(NECraftingCluster cluster) {
-        cluster.getBlockEntities().forEachRemaining(blockEntity -> {
-            if (blockEntity instanceof NEBlockEntity neBlockEntity) {
-                neBlockEntity.updateCluster(cluster);
-            }
-        });
+        cluster.getBlockEntities().forEachRemaining(blockEntity -> blockEntity.updateCluster(cluster));
     }
 
     /** 建出对外代表 176 条影子总线的聚合总线，并把它接上宿主节点。 */
@@ -511,13 +479,12 @@ public class CompactF9BlockEntity extends ECOCraftingSystemBlockEntity
         int count = Math.min(saved.size(), shadowBuses.size());
         for (int index = 0; index < count; index++) {
             ECOCraftingPatternBusBlockEntity bus = shadowBuses.get(index);
-            bus.getRootStorage().requireInit();
-            bus.loadManagedPersistentData(level.registryAccess(), saved.getCompound(index));
+            bus.loadTag(saved.getCompound(index));
             for (int slot = 0; slot < bus.getPatternSlotCount(); slot++) {
                 ItemStack stack = bus.getTerminalPatternInventory().getStackInSlot(slot);
                 if (!stack.isEmpty()) {
-                    bus.setPatternDirect(slot, ItemStack.EMPTY);
-                    bus.setPatternDirect(slot, stack.copy());
+                    bus.itemHandler.setStackInSlot(slot, ItemStack.EMPTY);
+                    bus.itemHandler.setStackInSlot(slot, stack.copy());
                 }
             }
         }
@@ -540,9 +507,8 @@ public class CompactF9BlockEntity extends ECOCraftingSystemBlockEntity
     private ListTag capturePatternBusData(HolderLookup.Provider registries) {
         ListTag saved = new ListTag();
         for (ECOCraftingPatternBusBlockEntity bus : shadowBuses) {
-            bus.getRootStorage().requireInit();
             CompoundTag busData = new CompoundTag();
-            bus.saveManagedPersistentData(registries, busData, false);
+            bus.saveAdditional(busData);
             saved.add(busData);
         }
         return saved;
@@ -633,7 +599,6 @@ public class CompactF9BlockEntity extends ECOCraftingSystemBlockEntity
                 pendingShadowWorkerData = captureShadowWorkerData(serverLevel.registryAccess());
             }
         }
-        compactInterface.release();
         if (exposedBus != null) {
             exposedBus.onChunkUnloaded();
         }
@@ -665,7 +630,6 @@ public class CompactF9BlockEntity extends ECOCraftingSystemBlockEntity
         disposeFleet();
         resetCollections();
         compactNetworkCluster = null;
-        compactInterface.dispose();
         super.onChunkUnloaded();
     }
 
@@ -693,11 +657,6 @@ public class CompactF9BlockEntity extends ECOCraftingSystemBlockEntity
     }
 
     @Override
-    public Preparation eco$prepareFastPath(ECOBatchDispatchContext context) {
-        return patternProvider.eco$prepareFastPath(context);
-    }
-
-    @Override
     public Set<AEKey> getEmitableItems() {
         return patternProvider.getEmitableItems();
     }
@@ -716,7 +675,7 @@ public class CompactF9BlockEntity extends ECOCraftingSystemBlockEntity
         if (stack.isEmpty() || patternProvider.isEmpty()) {
             return ECOPatternInsertionResult.NO_TARGET;
         }
-        ECOPatternInsertionResult result = patternProvider.insertPatternWithResult(stack);
+        ECOPatternInsertionResult result = patternProvider.insertPattern(stack);
         if (result != ECOPatternInsertionResult.INSERTED) {
             return result;
         }
@@ -741,37 +700,6 @@ public class CompactF9BlockEntity extends ECOCraftingSystemBlockEntity
         return ((CompactF9FluidHandler) fluidHandler).inputRecoveryHandler();
     }
 
-    /** Client-side bridge for ECO's chunked pattern preview transport. */
-    public void receivePatternPreview(CompoundTag payload) {
-        compactInterface.receivePatternPreview(payload);
-    }
-
-    // ------------------------------------------------ 通讯接口界面（影子接口）入口
-
-    @Override
-    public ModularUI createUI(BlockUIMenuType.BlockUIHolder holder) {
-        ModularUI interfaceUI = compactInterface.createUI(holder);
-        return interfaceUI == null ? CompactSingleBlockUI.create(holder.player,
-                net.minecraft.network.chat.Component.translatable("gui.useless_mod.compact.f9.title"),
-                net.minecraft.network.chat.Component.translatable("gui.useless_mod.compact.f9.overview"),
-                net.minecraft.network.chat.Component.translatable("gui.useless_mod.compact.f9.interaction"))
-                : interfaceUI;
-    }
-
-    @Override
-    public void handleRPCPacket(RPCSender sender, byte[] data) {
-        if (!compactInterface.forwardRpc(sender, data)) {
-            super.handleRPCPacket(sender, data);
-        }
-    }
-
-    @Override
-    public void handleSyncPacket(RegistryAccess access, BitSet changed, byte[] data, CompoundTag extra) {
-        if (!compactInterface.forwardSync(access, changed, data, extra)) {
-            super.handleSyncPacket(access, changed, data, extra);
-        }
-    }
-
     @Override
     public void saveAdditional(CompoundTag data) {
         HolderLookup.Provider registries = level == null ? net.minecraft.core.RegistryAccess.EMPTY : level.registryAccess();
@@ -780,10 +708,10 @@ public class CompactF9BlockEntity extends ECOCraftingSystemBlockEntity
         // 整包同步给客户端。这里只在内容真的变过之后，把数据写进 UUID 键控的外置存储。
         flushPatternStore(false);
         CompoundTag inputFluid = new CompoundTag();
-        fluidInputHatch.tank.writeToNBT(registries, inputFluid);
+        fluidInputHatch.tank.writeToNBT(inputFluid);
         data.put(FLUID_INPUT_KEY, inputFluid);
         CompoundTag outputFluid = new CompoundTag();
-        fluidOutputHatch.tank.writeToNBT(registries, outputFluid);
+        fluidOutputHatch.tank.writeToNBT(outputFluid);
         data.put(FLUID_OUTPUT_KEY, outputFluid);
         ListTag shadowHostData = fleet.size() > 1 ? captureShadowHostData(registries) : pendingShadowHostData;
         if (shadowHostData != null) {
@@ -794,7 +722,6 @@ public class CompactF9BlockEntity extends ECOCraftingSystemBlockEntity
         if (shadowWorkerData != null && !shadowWorkerData.isEmpty()) {
             data.put(SHADOW_WORKER_KEY, shadowWorkerData.copy());
         }
-        compactInterface.save(registries, data);
     }
 
     @Override
@@ -802,12 +729,10 @@ public class CompactF9BlockEntity extends ECOCraftingSystemBlockEntity
         HolderLookup.Provider registries = level == null ? net.minecraft.core.RegistryAccess.EMPTY : level.registryAccess();
         super.loadTag(data);
         if (data.contains(FLUID_INPUT_KEY, Tag.TAG_COMPOUND)) {
-            fluidInputHatch.tank.readFromNBT(registries,
-                    data.getCompound(FLUID_INPUT_KEY));
+            fluidInputHatch.tank.readFromNBT(data.getCompound(FLUID_INPUT_KEY));
         }
         if (data.contains(FLUID_OUTPUT_KEY, Tag.TAG_COMPOUND)) {
-            fluidOutputHatch.tank.readFromNBT(registries,
-                    data.getCompound(FLUID_OUTPUT_KEY));
+            fluidOutputHatch.tank.readFromNBT(data.getCompound(FLUID_OUTPUT_KEY));
         }
         if (data.contains(SHADOW_HOST_KEY, Tag.TAG_LIST)) {
             pendingShadowHostData = data.getList(SHADOW_HOST_KEY, Tag.TAG_COMPOUND).copy();
@@ -821,7 +746,6 @@ public class CompactF9BlockEntity extends ECOCraftingSystemBlockEntity
             pendingPatternBusData = data.getList(PATTERN_BUS_KEY, Tag.TAG_COMPOUND).copy();
             patternStoreDirty = true;
         }
-        compactInterface.load(registries, data);
     }
 
     @Override
@@ -829,7 +753,6 @@ public class CompactF9BlockEntity extends ECOCraftingSystemBlockEntity
         // 兜底：正常拆除走方块的 onRemove → releasePatternStore()，那时已经强制落盘过；
         // 这里只补「没走那条路就被摘掉」的情形，所以按脏标记判断，不做无谓的 MB 级重序列化。
         flushPatternStore(false);
-        compactInterface.dispose();
         super.setRemoved();
     }
 }

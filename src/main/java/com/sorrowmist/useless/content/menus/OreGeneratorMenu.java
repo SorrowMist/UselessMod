@@ -38,7 +38,7 @@ public final class OreGeneratorMenu extends PagedRecoverableMenu {
             return generator.getSamples();
         }
         return new OreGeneratorSampleHandler(ConfigManager::getOreGeneratorSlots,
-                stack -> false, () -> { });
+                OreGeneratorSampleHandler::isValidSample, () -> { });
     }
 
     public BlockPos getBlockPos() {

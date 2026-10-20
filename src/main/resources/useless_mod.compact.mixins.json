@@ -3,8 +3,7 @@
   "package": "com.sorrowmist.useless.mixin.compact",
   "compatibilityLevel": "JAVA_17",
   "mixins": [
-    "GridMachineClassMixin",
-    "MenuDataCodecsCompactMixin"
+    "GridMachineClassMixin"
   ],
   "injectors": {
     "defaultRequire": 1

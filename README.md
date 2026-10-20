@@ -10,6 +10,13 @@ Build with `./gradlew build` (Windows: `gradlew.bat build`); Python 3 is used by
 nine release-bytecode/outline regression checks. Dependencies resolve from public Maven repositories.
 The `portBridgeTest` suite also runs as part of `check` and is not shipped in the mod jar.
 
+Forge, Minecraft and AE2 are required. Every compiled mod integration declares a
+minimum and compatible version range in `src/main/resources/META-INF/mods.toml`;
+these integrations remain optional, so an absent integration does not prevent startup.
+Minimum versions follow the actual mod metadata (for example, Mekanism `10.4.15`,
+not the jar filename's build suffix). Ore Generator samples accept Forge's `ores`
+and `raw_materials` item tags, plus the equivalent `c:` datapack tags.
+
 Optional integrations without a Forge implementation are excluded explicitly in
 `gradle/forge1201-pack-profile.json`; this is not a universal backport of every
 NeoForge integration. Extended Crafting compiles against official 6.0.10; the

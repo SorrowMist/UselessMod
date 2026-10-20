@@ -1,11 +1,11 @@
 // Optional integrations without a Forge 1.20.1 implementation remain outside this build.
 def profile = new groovy.json.JsonSlurper().parse(file('gradle/forge1201-pack-profile.json'))
 sourceSets.main.java { profile.excludes.each { exclude it } }
+sourceSets.test.java {
+    exclude 'com/sorrowmist/useless/compat/neoecoae/NeoEcoPlanningCompatTest.java'
+}
 tasks.named('processResources', ProcessResources) {
     exclude 'META-INF/neoforge.mods.toml', 'META-INF/enumextensions.json'
     // These blocks are not registered without NeoEcoAE in the target profile.
     exclude 'data/useless_mod/loot_tables/blocks/useless_compact_*.json'
 }
-
-// These tests require the NeoForge-only NeoEcoAE integration excluded above.
-sourceSets.test.java.exclude 'com/sorrowmist/useless/compat/neoecoae/**'

@@ -24,16 +24,6 @@ public class ShadowCraftingHostBlockEntity extends ECOCraftingSystemBlockEntity 
     }
 
     @Override
-    public boolean hasNormalNetworkSwitch() {
-        return false;
-    }
-
-    @Override
-    public boolean hasHighEnergyNetworkSwitch() {
-        return true;
-    }
-
-    @Override
     public int getSelectedBuildLength() {
         // 紧凑主机永远是「满长」建造：虚拟合成模式判定要求实际 FX 通道数 == 满长值。
         return getMaxBuildLength();

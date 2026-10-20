@@ -24,16 +24,6 @@ public class ShadowComputationHostBlockEntity extends ECOComputationSystemBlockE
     }
 
     @Override
-    public boolean hasNormalNetworkSwitch() {
-        return false;
-    }
-
-    @Override
-    public boolean hasHighEnergyNetworkSwitch() {
-        return true;
-    }
-
-    @Override
     public int getSelectedBuildLength() {
         // 紧凑主机永远是「满长」建造：极限模式判定要求 selected == max。
         return getMaxBuildLength();

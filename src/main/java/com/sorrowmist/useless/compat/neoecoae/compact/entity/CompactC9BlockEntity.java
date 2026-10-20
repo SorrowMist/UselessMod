@@ -11,26 +11,19 @@ import appeng.api.orientation.BlockOrientation;
 import cn.dancingsnow.neoecoae.api.ECOTier;
 import cn.dancingsnow.neoecoae.blocks.entity.NEBlockEntity;
 import cn.dancingsnow.neoecoae.blocks.entity.computation.ECOComputationSystemBlockEntity;
-import cn.dancingsnow.neoecoae.multiblock.calculator.NEComputationClusterCalculator;
 import cn.dancingsnow.neoecoae.multiblock.cluster.NEComputationCluster;
 import cn.dancingsnow.neoecoae.multiblock.cluster.NEComputationNetworkCluster;
-import com.lowdragmc.lowdraglib2.gui.factory.BlockUIMenuType;
-import com.lowdragmc.lowdraglib2.gui.ui.ModularUI;
-import com.lowdragmc.lowdraglib2.syncdata.rpc.RPCSender;
 import com.sorrowmist.useless.compat.neoecoae.compact.NeoEcoCompactRegistry;
 import com.sorrowmist.useless.compat.neoecoae.compact.block.CompactTicker;
 import com.sorrowmist.useless.compat.neoecoae.compact.calculator.CompactHost;
 import com.sorrowmist.useless.compat.neoecoae.compact.cluster.CompactComputationCluster;
-import com.sorrowmist.useless.compat.neoecoae.compact.shadow.CompactInterfaceAttachment;
 import com.sorrowmist.useless.compat.neoecoae.compact.shadow.ShadowComputationDriveBlockEntity;
 import com.sorrowmist.useless.compat.neoecoae.compact.shadow.ShadowComputationHostBlockEntity;
 import com.sorrowmist.useless.compat.neoecoae.compact.shadow.ShadowComputationParallelCoreBlockEntity;
 import com.sorrowmist.useless.compat.neoecoae.compact.shadow.ShadowThreadingCoreBlockEntity;
-import com.sorrowmist.useless.compat.neoecoae.compact.ui.CompactSingleBlockUI;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.HolderLookup;
-import net.minecraft.core.RegistryAccess;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.server.level.ServerLevel;
@@ -41,7 +34,6 @@ import net.minecraft.world.level.block.state.BlockState;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
-import java.util.BitSet;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Set;
@@ -81,10 +73,6 @@ public class CompactC9BlockEntity extends ECOComputationSystemBlockEntity
     private boolean pendingCpuAnnounce;
     private int cpuAnnounceAttempts;
     private long lastCompactTick = Long.MIN_VALUE;
-
-    /** 通讯接口界面（影子接口）的全部接线；普通右键仍然走主机自己的面板。 */
-    private final CompactInterfaceAttachment<NEComputationCluster> compactInterface =
-            new CompactInterfaceAttachment<>(this, NEComputationClusterCalculator::new);
 
     public CompactC9BlockEntity(BlockEntityType<?> type, BlockPos pos, BlockState blockState) {
         super(type, pos, blockState, ECOTier.L9);
@@ -136,16 +124,6 @@ public class CompactC9BlockEntity extends ECOComputationSystemBlockEntity
     }
 
     @Override
-    public boolean hasNormalNetworkSwitch() {
-        return false;
-    }
-
-    @Override
-    public boolean hasHighEnergyNetworkSwitch() {
-        return true;
-    }
-
-    @Override
     public int getSelectedBuildLength() {
         return getMaxBuildLength();
     }
@@ -170,7 +148,7 @@ public class CompactC9BlockEntity extends ECOComputationSystemBlockEntity
 
     @Override
     public TickingRequest getTickingRequest(IGridNode node) {
-        return new TickingRequest(1, 10, false);
+        return new TickingRequest(1, 10, false, false);
     }
 
     /** AE2 网格 ticker 通道：世界 ticker 万一没跑，CPU 登记在这里兜底。 */
@@ -189,7 +167,6 @@ public class CompactC9BlockEntity extends ECOComputationSystemBlockEntity
             return;
         }
         lastCompactTick = now;
-        compactInterface.tick();
         if (!pendingCpuAnnounce) {
             return;
         }
@@ -210,8 +187,8 @@ public class CompactC9BlockEntity extends ECOComputationSystemBlockEntity
      * {@code grid.getMachines(ECOComputationSystemBlockEntity.class)} 找到主机的。</p>
      */
     @Override
-    protected void onMainNodeGridChanged() {
-        super.onMainNodeGridChanged();
+    public void onMainNodeStateChanged(appeng.api.networking.IGridNodeListener.State reason) {
+        super.onMainNodeStateChanged(reason);
         pendingCpuAnnounce = true;
         cpuAnnounceAttempts = 0;
     }
@@ -252,7 +229,6 @@ public class CompactC9BlockEntity extends ECOComputationSystemBlockEntity
 
         this.compactNetworkCluster = network;
         this.pendingCpuAnnounce = true;
-        compactInterface.attach(level, cluster, getMainNode());
     }
 
     private CompactComputationCluster buildShadowHost(ServerLevel level) {
@@ -300,18 +276,13 @@ public class CompactC9BlockEntity extends ECOComputationSystemBlockEntity
 
     @SuppressWarnings({"unchecked", "rawtypes"})
     private void linkAll(NEComputationCluster cluster) {
-        cluster.getBlockEntities().forEachRemaining(blockEntity -> {
-            if (blockEntity instanceof NEBlockEntity neBlockEntity) {
-                neBlockEntity.updateCluster(cluster);
-            }
-        });
+        cluster.getBlockEntities().forEachRemaining(blockEntity -> blockEntity.updateCluster(cluster));
     }
 
     private void disposeFleet() {
         if (level instanceof ServerLevel serverLevel && !shadowThreadingCores.isEmpty()) {
             pendingThreadingCoreData = captureThreadingCoreData(serverLevel.registryAccess());
         }
-        compactInterface.release();
         for (CompactComputationCluster member : fleet) {
             if (member != cluster && !member.isDestroyed()) {
                 member.injectCompactNetworkCluster(null);
@@ -336,7 +307,7 @@ public class CompactC9BlockEntity extends ECOComputationSystemBlockEntity
         }
         int count = Math.min(pendingThreadingCoreData.size(), shadowThreadingCores.size());
         for (int index = 0; index < count; index++) {
-            shadowThreadingCores.get(index).loadTag(pendingThreadingCoreData.getCompound(index), registries);
+            shadowThreadingCores.get(index).loadTag(pendingThreadingCoreData.getCompound(index));
         }
         pendingThreadingCoreData = null;
     }
@@ -364,7 +335,6 @@ public class CompactC9BlockEntity extends ECOComputationSystemBlockEntity
         fleet.clear();
         shadowThreadingCores.clear();
         compactNetworkCluster = null;
-        compactInterface.dispose();
         super.onChunkUnloaded();
     }
 
@@ -372,32 +342,6 @@ public class CompactC9BlockEntity extends ECOComputationSystemBlockEntity
     @Nullable
     public NEComputationNetworkCluster compactNetworkCluster() {
         return compactNetworkCluster;
-    }
-
-    // ------------------------------------------------ 通讯接口界面（影子接口）入口
-
-    @Override
-    public ModularUI createUI(BlockUIMenuType.BlockUIHolder holder) {
-        ModularUI interfaceUI = compactInterface.createUI(holder);
-        return interfaceUI == null ? CompactSingleBlockUI.create(holder.player,
-                net.minecraft.network.chat.Component.translatable("gui.useless_mod.compact.c9.title"),
-                net.minecraft.network.chat.Component.translatable("gui.useless_mod.compact.c9.overview"),
-                net.minecraft.network.chat.Component.translatable("gui.useless_mod.compact.c9.hardware"))
-                : interfaceUI;
-    }
-
-    @Override
-    public void handleRPCPacket(RPCSender sender, byte[] data) {
-        if (!compactInterface.forwardRpc(sender, data)) {
-            super.handleRPCPacket(sender, data);
-        }
-    }
-
-    @Override
-    public void handleSyncPacket(RegistryAccess access, BitSet changed, byte[] data, CompoundTag extra) {
-        if (!compactInterface.forwardSync(access, changed, data, extra)) {
-            super.handleSyncPacket(access, changed, data, extra);
-        }
     }
 
     @Override
@@ -409,7 +353,6 @@ public class CompactC9BlockEntity extends ECOComputationSystemBlockEntity
         if (threadingData != null && !threadingData.isEmpty()) {
             data.put(SHADOW_THREADING_CORE_KEY, threadingData.copy());
         }
-        compactInterface.save(registries, data);
     }
 
     @Override
@@ -420,12 +363,10 @@ public class CompactC9BlockEntity extends ECOComputationSystemBlockEntity
             pendingThreadingCoreData = data.getList(SHADOW_THREADING_CORE_KEY,
                     net.minecraft.nbt.Tag.TAG_COMPOUND).copy();
         }
-        compactInterface.load(registries, data);
     }
 
     @Override
     public void setRemoved() {
-        compactInterface.dispose();
         super.setRemoved();
     }
 }

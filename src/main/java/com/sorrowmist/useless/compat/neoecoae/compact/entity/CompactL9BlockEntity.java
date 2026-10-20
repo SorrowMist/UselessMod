@@ -13,26 +13,17 @@ import cn.dancingsnow.neoecoae.api.ECOTier;
 import cn.dancingsnow.neoecoae.blocks.entity.NEBlockEntity;
 import cn.dancingsnow.neoecoae.blocks.entity.storage.ECOStorageSystemBlockEntity;
 import cn.dancingsnow.neoecoae.impl.storage.infinite.ECOStorageHostMode;
-import cn.dancingsnow.neoecoae.multiblock.calculator.NEStorageClusterCalculator;
 import cn.dancingsnow.neoecoae.multiblock.cluster.NEStorageCluster;
-import com.lowdragmc.lowdraglib2.gui.factory.BlockUIMenuType;
-import com.lowdragmc.lowdraglib2.gui.ui.ModularUI;
-import com.lowdragmc.lowdraglib2.syncdata.rpc.RPCSender;
 import com.sorrowmist.useless.compat.neoecoae.compact.NeoEcoCompactRegistry;
 import com.sorrowmist.useless.compat.neoecoae.compact.block.CompactTicker;
 import com.sorrowmist.useless.compat.neoecoae.compact.calculator.CompactHost;
 import com.sorrowmist.useless.compat.neoecoae.compact.cluster.CompactStorageCluster;
-import com.sorrowmist.useless.compat.neoecoae.compact.shadow.CompactInterfaceAttachment;
-import com.sorrowmist.useless.compat.neoecoae.compact.ui.CompactSingleBlockUI;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.HolderLookup;
-import net.minecraft.core.RegistryAccess;
-import net.minecraft.core.component.DataComponents;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.component.CustomData;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.state.BlockState;
@@ -41,7 +32,6 @@ import org.slf4j.LoggerFactory;
 
 import java.lang.reflect.Field;
 import java.nio.charset.StandardCharsets;
-import java.util.BitSet;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Set;
@@ -78,10 +68,6 @@ public class CompactL9BlockEntity extends ECOStorageSystemBlockEntity
     private int storageAnnounceAttempts;
     private int maintainTicker;
     private long lastCompactTick = Long.MIN_VALUE;
-
-    /** 通讯接口界面（影子接口）的全部接线；普通右键仍然走主机自己的面板。 */
-    private final CompactInterfaceAttachment<NEStorageCluster> compactInterface =
-            new CompactInterfaceAttachment<>(this, NEStorageClusterCalculator::new);
 
 
     public CompactL9BlockEntity(BlockEntityType<?> type, BlockPos pos, BlockState blockState) {
@@ -132,11 +118,7 @@ public class CompactL9BlockEntity extends ECOStorageSystemBlockEntity
 
     @SuppressWarnings({"unchecked", "rawtypes"})
     private void linkAll(NEStorageCluster cluster) {
-        cluster.getBlockEntities().forEachRemaining(blockEntity -> {
-            if (blockEntity instanceof NEBlockEntity neBlockEntity) {
-                neBlockEntity.updateCluster(cluster);
-            }
-        });
+        cluster.getBlockEntities().forEachRemaining(blockEntity -> blockEntity.updateCluster(cluster));
     }
 
     // ------------------------------------------------------------------ tick
@@ -151,7 +133,7 @@ public class CompactL9BlockEntity extends ECOStorageSystemBlockEntity
 
     @Override
     public TickingRequest getTickingRequest(IGridNode node) {
-        return new TickingRequest(1, 10, false);
+        return new TickingRequest(1, 10, false, false);
     }
 
     /** AE2 网格 ticker 通道：世界 ticker 万一没跑，存储重挂与自愈在这里兜底。 */
@@ -170,7 +152,6 @@ public class CompactL9BlockEntity extends ECOStorageSystemBlockEntity
             return;
         }
         lastCompactTick = now;
-        compactInterface.tick();
         // 主机自己的 IStorageProvider 是在节点入网那一刻被 AE2 读取的，那时 formed 还是 false，
         // 无限存储会被跳过；所以入网后必须补一次「重挂存储」。
         if (pendingStorageAnnounce && storageAnnounceAttempts++ < ANNOUNCE_MAX_ATTEMPTS) {
@@ -183,8 +164,8 @@ public class CompactL9BlockEntity extends ECOStorageSystemBlockEntity
     }
 
     @Override
-    protected void onMainNodeGridChanged() {
-        super.onMainNodeGridChanged();
+    public void onMainNodeStateChanged(appeng.api.networking.IGridNodeListener.State reason) {
+        super.onMainNodeStateChanged(reason);
         // 换了网格就要重新挂存储，并重新确认无限模式。
         pendingStorageAnnounce = true;
         storageAnnounceAttempts = 0;
@@ -207,7 +188,7 @@ public class CompactL9BlockEntity extends ECOStorageSystemBlockEntity
      * {@code formed_infinite}，这里把它拉回来。
      */
     private void maintainInfiniteStorage(ServerLevel level) {
-        if (level == null || isFormedInfiniteMode()) {
+        if (level == null || isInfiniteMode()) {
             return;
         }
         primeInfiniteComponents();
@@ -224,7 +205,7 @@ public class CompactL9BlockEntity extends ECOStorageSystemBlockEntity
 
 
     @Override
-    public boolean canExtractInfiniteComponents() {
+    public boolean canTakeInfiniteStorageComponent() {
         return false;
     }
 
@@ -257,10 +238,8 @@ public class CompactL9BlockEntity extends ECOStorageSystemBlockEntity
 
     @Override
     public void installCompactComponents(NEStorageCluster cluster, ServerLevel level) {
-        compactInterface.release();
         primeInfiniteComponents();
         restoreOrCreateInfiniteDomain(level);
-        compactInterface.attach(level, cluster, getMainNode());
     }
 
     /**
@@ -316,12 +295,12 @@ public class CompactL9BlockEntity extends ECOStorageSystemBlockEntity
     private void restoreOrCreateInfiniteDomain(ServerLevel level) {
         ItemStack carrier = new ItemStack(NeoEcoCompactRegistry.COMPACT_L9_ITEM.get());
         applyInfiniteDomainToControllerDrop(carrier);
-        CompoundTag tag = carrier.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).copyTag();
+        CompoundTag tag = carrier.getOrCreateTag().copy();
         if (!tag.hasUUID(DOMAIN_TAG)) {
             tag.putUUID(DOMAIN_TAG, stableDomainId(level));
         }
         tag.putString(MODE_TAG, ECOStorageHostMode.FORMED_INFINITE.id());
-        carrier.set(DataComponents.CUSTOM_DATA, CustomData.of(tag));
+        carrier.getOrCreateTag().merge(tag);
         restoreInfiniteDomainFromItem(carrier);
     }
 
@@ -330,55 +309,25 @@ public class CompactL9BlockEntity extends ECOStorageSystemBlockEntity
         return UUID.nameUUIDFromBytes(seed.getBytes(StandardCharsets.UTF_8));
     }
 
-    // ------------------------------------------------ 通讯接口界面（影子接口）入口
-
-    @Override
-    public ModularUI createUI(BlockUIMenuType.BlockUIHolder holder) {
-        ModularUI interfaceUI = compactInterface.createUI(holder);
-        return interfaceUI == null ? CompactSingleBlockUI.create(holder.player,
-                net.minecraft.network.chat.Component.translatable("gui.useless_mod.compact.l9.title"),
-                net.minecraft.network.chat.Component.translatable("gui.useless_mod.compact.l9.overview"),
-                net.minecraft.network.chat.Component.translatable("gui.useless_mod.compact.l9.interaction"))
-                : interfaceUI;
-    }
-
-    @Override
-    public void handleRPCPacket(RPCSender sender, byte[] data) {
-        if (!compactInterface.forwardRpc(sender, data)) {
-            super.handleRPCPacket(sender, data);
-        }
-    }
-
-    @Override
-    public void handleSyncPacket(RegistryAccess access, BitSet changed, byte[] data, CompoundTag extra) {
-        if (!compactInterface.forwardSync(access, changed, data, extra)) {
-            super.handleSyncPacket(access, changed, data, extra);
-        }
-    }
-
     @Override
     public void saveAdditional(CompoundTag data) {
         HolderLookup.Provider registries = level == null ? net.minecraft.core.RegistryAccess.EMPTY : level.registryAccess();
         super.saveAdditional(data);
-        compactInterface.save(registries, data);
     }
 
     @Override
     public void loadTag(CompoundTag data) {
         HolderLookup.Provider registries = level == null ? net.minecraft.core.RegistryAccess.EMPTY : level.registryAccess();
         super.loadTag(data);
-        compactInterface.load(registries, data);
     }
 
     @Override
     public void onChunkUnloaded() {
-        compactInterface.dispose();
         super.onChunkUnloaded();
     }
 
     @Override
     public void setRemoved() {
-        compactInterface.dispose();
         super.setRemoved();
     }
 }

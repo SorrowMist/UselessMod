@@ -1,0 +1,100 @@
+package com.sorrowmist.useless.network;
+
+import com.sorrowmist.useless.UselessMod;
+import com.sorrowmist.useless.client.network.ClientPacketHandlers;
+import net.minecraft.core.BlockPos;
+import net.minecraft.network.FriendlyByteBuf;
+import com.sorrowmist.useless.compat.forge1201.network.StreamCodec;
+import com.sorrowmist.useless.compat.forge1201.network.CustomPacketPayload;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraftforge.api.distmarker.Dist;
+import net.minecraftforge.fml.loading.FMLEnvironment;
+import com.sorrowmist.useless.compat.forge1201.network.IPayloadContext;
+import org.jetbrains.annotations.NotNull;
+
+import java.util.ArrayList;
+import java.util.List;
+
+public record AETaskProgressPacket(BlockPos pos, List<AETaskProgressPacket.TaskProgressData> tasks) implements CustomPacketPayload {
+    public AETaskProgressPacket {
+        pos = pos.immutable();
+        tasks = List.copyOf(tasks);
+    }
+
+    public static class TaskProgressData {
+        public final String productName;
+        public final int progress;
+        public final int maxProgress;
+        public final long craftCount;
+        public final long totalOutputCount;
+        public final String statusKey;
+        public final String statusDetail;
+
+        public TaskProgressData(String productName, int progress, int maxProgress, long craftCount, long totalOutputCount) {
+            this(productName, progress, maxProgress, craftCount, totalOutputCount,
+                    "gui.useless_mod.advanced_alloy_furnace.ae_task_status.processing", "");
+        }
+
+        public TaskProgressData(String productName, int progress, int maxProgress, long craftCount, long totalOutputCount, String statusKey, String statusDetail) {
+            this.productName = productName;
+            this.progress = progress;
+            this.maxProgress = maxProgress;
+            this.craftCount = craftCount;
+            this.totalOutputCount = totalOutputCount;
+            this.statusKey = statusKey;
+            this.statusDetail = statusDetail;
+        }
+    }
+
+    public static final StreamCodec<FriendlyByteBuf, AETaskProgressPacket> STREAM_CODEC = StreamCodec.of(
+            (buf, pkt) -> pkt.encode(buf),
+            buf -> decode(buf)
+    );
+
+    public static final Type<AETaskProgressPacket> TYPE =
+            new Type<>(new ResourceLocation(UselessMod.MODID, "ae_task_progress"));
+
+    private void encode(FriendlyByteBuf buf) {
+        buf.writeBlockPos(pos);
+        buf.writeInt(tasks.size());
+        for (TaskProgressData task : tasks) {
+            buf.writeUtf(task.productName);
+            buf.writeInt(task.progress);
+            buf.writeInt(task.maxProgress);
+            buf.writeLong(task.craftCount);
+            buf.writeLong(task.totalOutputCount);
+            buf.writeUtf(task.statusKey);
+            buf.writeUtf(task.statusDetail);
+        }
+    }
+
+    public static AETaskProgressPacket decode(FriendlyByteBuf buf) {
+        BlockPos pos = buf.readBlockPos();
+        int size = buf.readInt();
+        List<TaskProgressData> tasks = new ArrayList<>();
+        for (int i = 0; i < size; i++) {
+            String productName = buf.readUtf();
+            int progress = buf.readInt();
+            int maxProgress = buf.readInt();
+            long craftCount = buf.readLong();
+            long totalOutputCount = buf.readLong();
+            String statusKey = buf.readUtf();
+            String statusDetail = buf.readUtf();
+            tasks.add(new TaskProgressData(productName, progress, maxProgress, craftCount, totalOutputCount, statusKey, statusDetail));
+        }
+        return new AETaskProgressPacket(pos, tasks);
+    }
+
+    public static void handle(AETaskProgressPacket msg, IPayloadContext ctx) {
+        // 客户端类型统一收敛到 ClientPacketHandlers，避免专用服务器加载类时解析到客户端类。
+        if (FMLEnvironment.dist != Dist.CLIENT) {
+            return;
+        }
+        ctx.enqueueWork(() -> ClientPacketHandlers.handleAETaskProgress(msg));
+    }
+
+    @Override
+    public @NotNull Type<? extends CustomPacketPayload> type() {
+        return TYPE;
+    }
+}

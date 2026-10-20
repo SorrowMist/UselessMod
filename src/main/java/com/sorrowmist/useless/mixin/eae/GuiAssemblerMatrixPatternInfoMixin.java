@@ -1,0 +1,17 @@
+package com.sorrowmist.useless.mixin.eae;
+
+
+import com.sorrowmist.useless.core.config.ConfigManager;
+import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.injection.Constant;
+import org.spongepowered.asm.mixin.injection.ModifyConstant;
+
+@Mixin(targets = "com.glodblock.github.extendedae.client.gui.GuiAssemblerMatrix$PatternInfo")
+public class GuiAssemblerMatrixPatternInfoMixin {
+
+    @ModifyConstant(method = "<init>", constant = @Constant(intValue = 36))
+    private int modifySlotCount(int original) {
+        int newSize = 36 * ConfigManager.getMatrixPatternCount();
+        return newSize;
+    }
+}

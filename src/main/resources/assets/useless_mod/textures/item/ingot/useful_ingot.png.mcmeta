@@ -1,5 +1,10 @@
 {
 	"animation": {
-		"frametime": 4
+		"frametime": 40,
+		"interpolate": true,
+        "frames": [
+      {"index": 0, "time": 40},
+      {"index": 1, "time": 10}
+      ]
 	}
 }

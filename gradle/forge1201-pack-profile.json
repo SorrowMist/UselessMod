@@ -1,0 +1,117 @@
+{
+  "excludes": [
+    "com/sorrowmist/useless/content/recipe/adapters/actuallyadditions/**",
+    "com/sorrowmist/useless/content/recipe/adapters/apothicflux/**",
+    "com/sorrowmist/useless/content/recipe/adapters/arsnouveau/**",
+    "com/sorrowmist/useless/content/recipe/adapters/astralsorcery/**",
+    "com/sorrowmist/useless/content/recipe/adapters/avaritia/**",
+    "com/sorrowmist/useless/content/recipe/adapters/delight/**",
+    "com/sorrowmist/useless/content/recipe/adapters/eco/**",
+    "com/sorrowmist/useless/content/recipe/adapters/extremereactors/**",
+    "com/sorrowmist/useless/content/recipe/adapters/forbiddenarcanus/**",
+    "com/sorrowmist/useless/content/recipe/adapters/immersiveengineering/**",
+    "com/sorrowmist/useless/content/recipe/adapters/ironsspellbooks/**",
+    "com/sorrowmist/useless/content/recipe/adapters/justdirethings/**",
+    "com/sorrowmist/useless/content/recipe/adapters/kaleidoscope/**",
+    "com/sorrowmist/useless/content/recipe/adapters/lychee/**",
+    "com/sorrowmist/useless/content/recipe/adapters/malum/**",
+    "com/sorrowmist/useless/content/recipe/adapters/modernindustrialization/**",
+    "com/sorrowmist/useless/content/recipe/adapters/mysticalagriculture/**",
+    "com/sorrowmist/useless/content/recipe/adapters/naturesaura/**",
+    "com/sorrowmist/useless/content/recipe/adapters/neovitae/**",
+    "com/sorrowmist/useless/content/recipe/adapters/occultism/**",
+    "com/sorrowmist/useless/content/recipe/adapters/oritech/**",
+    "com/sorrowmist/useless/content/recipe/adapters/pneumaticcraft/**",
+    "com/sorrowmist/useless/content/recipe/adapters/productivebees/**",
+    "com/sorrowmist/useless/content/recipe/adapters/ufo/**",
+    "com/sorrowmist/useless/content/recipe/adapters/ae/ae2cs/**",
+    "com/sorrowmist/useless/content/recipe/adapters/ae/ae2lt/**",
+    "com/sorrowmist/useless/content/recipe/adapters/ae/dataenergistics/**",
+    "com/sorrowmist/useless/content/recipe/adapters/mekanism/mekanismmoremachine/**",
+    "com/sorrowmist/useless/compat/apothicflux/**",
+    "com/sorrowmist/useless/compat/ars/**",
+    "com/sorrowmist/useless/compat/barbequesdelight/**",
+    "com/sorrowmist/useless/compat/brewinandchewin/**",
+    "com/sorrowmist/useless/compat/casualnessdelight/**",
+    "com/sorrowmist/useless/compat/crabbersdelight/**",
+    "com/sorrowmist/useless/compat/expandeddelight/**",
+    "com/sorrowmist/useless/compat/extradelight/**",
+    "com/sorrowmist/useless/compat/extremereactors/**",
+    "com/sorrowmist/useless/compat/farmersdelight/**",
+    "com/sorrowmist/useless/compat/forbiddenarcanus/**",
+    "com/sorrowmist/useless/compat/immersiveengineering/**",
+    "com/sorrowmist/useless/compat/ironsspellbooks/**",
+    "com/sorrowmist/useless/compat/itemobliterator/**",
+    "com/sorrowmist/useless/compat/kaleidoscope/**",
+    "com/sorrowmist/useless/compat/lychee/**",
+    "com/sorrowmist/useless/compat/mekanismmoremachine/**",
+    "com/sorrowmist/useless/compat/modernindustrialization/**",
+    "com/sorrowmist/useless/compat/neoecoae/**",
+    "com/sorrowmist/useless/compat/neovitae/**",
+    "com/sorrowmist/useless/compat/nomadsdelight/**",
+    "com/sorrowmist/useless/compat/occultism/**",
+    "com/sorrowmist/useless/compat/oritech/**",
+    "com/sorrowmist/useless/compat/pneumaticcraft/**",
+    "com/sorrowmist/useless/compat/productivebees/**",
+    "com/sorrowmist/useless/compat/ubesdelight/**",
+    "com/sorrowmist/useless/compat/ufo/**",
+    "com/sorrowmist/useless/compat/youkaishomecoming/**",
+    "com/sorrowmist/useless/integration/dataenergistics/**",
+    "com/sorrowmist/useless/mixin/malum/**",
+    "com/sorrowmist/useless/mixin/itemobliterator/**",
+    "com/sorrowmist/useless/mixin/pneumaticcraft/**",
+    "com/sorrowmist/useless/mixin/compact/**",
+    "com/sorrowmist/useless/datagen/**",
+    "com/sorrowmist/useless/content/recipe/adapters/industrialforegoing/InfuserRecipeAdapter.java",
+    "com/sorrowmist/useless/content/recipe/adapters/industrialforegoing/PrecisionShapedRecipeAdapter.java",
+    "com/sorrowmist/useless/content/recipe/adapters/industrialforegoing/PrecisionShapelessRecipeAdapter.java",
+    "com/sorrowmist/useless/content/recipe/adapters/industrialforegoing/FluidShapedRecipeAdapter.java",
+    "com/sorrowmist/useless/content/recipe/adapters/industrialforegoing/FluidShapelessRecipeAdapter.java",
+    "com/sorrowmist/useless/content/recipe/adapters/ae/extendedae/CrystalAssemblerRecipeAdapter.java",
+    "com/sorrowmist/useless/content/recipe/adapters/mekanism/RecyclerRecipeAdapter.java",
+    "com/sorrowmist/useless/content/recipe/adapters/enderio/VatFermentingRecipeAdapter.java",
+    "com/sorrowmist/useless/compat/ae/AeSourceCompat.java",
+    "com/sorrowmist/useless/compat/ae/AePressureCompat.java",
+    "com/sorrowmist/useless/compat/extendedae/ExtendedAEPlusJeiCompat.java",
+    "com/sorrowmist/useless/content/recipe/adapters/industrialforegoing/ExtraUpgradesCraftingRecipeAdapterSupport.java",
+    "com/sorrowmist/useless/mixin/mek/FuckingPrideHolidayMixin.java",
+    "com/sorrowmist/useless/mixin/ae2/PatternAccessTerminalPacketSlotLimitMixin.java"
+  ],
+  "reason": "Optional integrations not installed in the target pack are preserved as dormant source; not a universal Forge port.",
+  "absent_addon_files": {
+    "ifeu": [
+      "com/sorrowmist/useless/content/recipe/adapters/industrialforegoing/InfuserRecipeAdapter.java",
+      "com/sorrowmist/useless/content/recipe/adapters/industrialforegoing/PrecisionShapedRecipeAdapter.java",
+      "com/sorrowmist/useless/content/recipe/adapters/industrialforegoing/PrecisionShapelessRecipeAdapter.java",
+      "com/sorrowmist/useless/content/recipe/adapters/industrialforegoing/FluidShapedRecipeAdapter.java",
+      "com/sorrowmist/useless/content/recipe/adapters/industrialforegoing/FluidShapelessRecipeAdapter.java",
+      "com/sorrowmist/useless/content/recipe/adapters/industrialforegoing/ExtraUpgradesCraftingRecipeAdapterSupport.java"
+    ],
+    "mekmm": [
+      "com/sorrowmist/useless/content/recipe/adapters/mekanism/RecyclerRecipeAdapter.java"
+    ],
+    "arseng": [
+      "com/sorrowmist/useless/compat/ae/AeSourceCompat.java"
+    ],
+    "appliedpneumatics": [
+      "com/sorrowmist/useless/compat/ae/AePressureCompat.java"
+    ],
+    "extendedae_plus": [
+      "com/sorrowmist/useless/compat/extendedae/ExtendedAEPlusJeiCompat.java"
+    ]
+  },
+  "version_absent_features": {
+    "expatternprovider:1.4.6": [
+      "crystal_assembler (no block/item/recipe in installed native jar)"
+    ],
+    "enderio:6.2.13-beta": [
+      "vat (no machine or recipe classes in native installed jar)"
+    ],
+    "mekanism:10.4.15": [
+      "Pride holiday does not exist in native HolidayManager; no removal mixin needed."
+    ]
+  },
+  "native_equivalents": {
+    "com/sorrowmist/useless/mixin/ae2/PatternAccessTerminalPacketSlotLimitMixin.java": "AE2 15 packet writes a varint-sized slot map with no 128-entry codec limit; native behavior already supports the required capacity."
+  }
+}

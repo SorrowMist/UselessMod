@@ -1,292 +1,113 @@
 plugins {
-    id 'eclipse'
-    id 'idea'
+    id 'java-library'
     id 'maven-publish'
-    id 'net.minecraftforge.gradle' version '[6.0,6.2)'
-    id 'org.spongepowered.mixin' version '0.7.+'
-    id 'org.parchmentmc.librarian.forgegradle' version '1.+'
+    id 'net.neoforged.moddev.legacyforge' version '2.0.107'
+    id 'idea'
 }
-
 version = mod_version
 group = mod_group_id
-
-base {
-    archivesName = mod_id
-}
-
-
-// Mojang ships Java 17 to end users in 1.18+, so your mod should target Java 17.
+base { archivesName = mod_id }
 java.toolchain.languageVersion = JavaLanguageVersion.of(17)
-
-println "Java: ${System.getProperty 'java.version'}, JVM: ${System.getProperty 'java.vm.version'} (${System.getProperty 'java.vendor'}), Arch: ${System.getProperty 'os.arch'}"
-minecraft {
-    // The mappings can be changed at any time and must be in the following format.
-    // Channel:   Version:
-    // official   MCVersion             Official field/method names from Mojang mapping files
-    // parchment  YYYY.MM.DD-MCVersion  Open community-sourced parameter names and javadocs layered on top of official
-    //
-    // You must be aware of the Mojang license when using the 'official' or 'parchment' mappings.
-    // See more information here: https://github.com/MinecraftForge/MCPConfig/blob/master/Mojang.md
-    //
-    // Parchment is an unofficial project maintained by ParchmentMC, separate from MinecraftForge
-    // Additional setup is needed to use their mappings: https://parchmentmc.org/docs/getting-started
-    //    // Use non-default mappings at your own risk. They may not always work.
-    // Simply re-run your setup task after changing the mappings to update your workspace.
-    mappings channel: 'parchment', version: '2023.09.03-1.20.1'
-
-    // When true, this property will have all Eclipse/IntelliJ IDEA run configurations run the "prepareX" task for the given run configuration before launching the game.
-    // In most cases, it is not necessary to enable.
-    // enableEclipsePrepareRuns = true
-    // enableIdeaPrepareRuns = true
-
-    // This property allows configuring Gradle's ProcessResources task(s) to run on IDE output locations before launching the game.
-    // It is REQUIRED to be set to true for this template to function.
-    // See https://docs.gradle.org/current/dsl/org.gradle.language.jvm.tasks.ProcessResources.html
-    copyIdeResources = true
-
-    // When true, this property will add the folder name of all declared run configurations to generated IDE run configurations.
-    // The folder name can be set on a run configuration using the "folderName" property.
-    // By default, the folder name of a run configuration is the name of the Gradle project containing it.
-    // generateRunFolders = true
-
-    // This property enables access transformers for use in development.
-    // They will be applied to the Minecraft artifact.
-    // The access transformer file can be anywhere in the project.
-    // However, it must be at "META-INF/accesstransformer.cfg" in the final mod jar to be loaded by Forge.
-    // This default location is a best practice to automatically put the file in the right place in the final jar.
-    // See https://docs.minecraftforge.net/en/latest/advanced/accesstransformers/ for more information.
-    // accessTransformer = file('src/main/resources/META-INF/accesstransformer.cfg')
-
-    // Default run configurations.
-    // These can be tweaked, removed, or duplicated as needed.
-    runs {
-        // applies to all the run configs below
-        configureEach {
-            workingDirectory project.file('run')
-
-            // Recommended logging data for a userdev environment
-            // The markers can be added/remove as needed separated by commas.
-            // "SCAN": For mods scan.
-            // "REGISTRIES": For firing of registry events.
-            // "REGISTRYDUMP": For getting the contents of all registries.
-            property 'forge.logging.markers', 'REGISTRIES'
-
-            // Recommended logging level for the console
-            // You can set various levels here.
-            // Please read: https://stackoverflow.com/questions/2031163/when-to-use-the-different-log-levels
-            property 'forge.logging.console.level', 'debug'
-
-            mods {
-                "${mod_id}" {
-                    source sourceSets.main
-                }
-            }
-        }
-
-        client {
-            // Comma-separated list of namespaces to load gametests from. Empty = all namespaces.
-            property 'forge.enabledGameTestNamespaces', mod_id
-            property 'mixin.env.remapRefMap', 'true'
-            property 'mixin.env.refMapRemappingFile', "${projectDir}/build/createSrgToMcp/output.srg"
-        }
-
-        server {
-            property 'forge.enabledGameTestNamespaces', mod_id
-            args '--nogui'
-        }
-
-        // This run config launches GameTestServer and runs all registered gametests, then exits.
-        // By default, the server will crash when no gametests are provided.
-        // The gametest system is also enabled by default for other run configs under the /test command.
-        gameTestServer {
-            property 'forge.enabledGameTestNamespaces', mod_id
-        }
-
-        data {
-            // example of overriding the workingDirectory set in configureEach above
-            workingDirectory project.file('run-data')
-
-            // Specify the modid for data generation, where to output the resulting resource, and where to look for existing resources.
-            args '--mod', mod_id, '--all', '--output', file('src/generated/resources/'), '--existing', file('src/main/resources/')
-        }
-    }
-}
-
-// Include resources generated by data generators.
-sourceSets.main.resources { srcDir 'src/generated/resources' }
-
 repositories {
-    maven { url 'https://modmaven.dev/' }
-    maven {
-        url "https://cursemaven.com"
+    mavenCentral()
+    exclusiveContent {
+        forRepository { maven { url = 'https://api.modrinth.com/maven' } }
+        filter { includeGroup 'maven.modrinth' }
     }
-    maven {
-        name = "Modrinth"
-        url = "https://api.modrinth.com/maven"
+    exclusiveContent {
+        forRepository { maven { url = 'https://cursemaven.com' } }
+        filter { includeGroup 'curse.maven' }
     }
-    // Forge 官方仓库
-    maven {
-        name = "Forge"
-        url = "https://maven.minecraftforge.net"
-    }
-    // Patchouli 仓库
-    maven {
-        name = "BlameJared"
-        url = "https://maven.blamejared.com"
-    }
-
-    maven {
-        name 'Thermal Maven'
-        url 'https://maven.covers1624.net/'
-    }
-    //maven { url 'https://maven.mekanism.io/' } // Mekanism official Maven
-
-    maven {
-        url "https://maven.shedaniel.me/"
-        content {
-            includeGroup "me.shedaniel"
-            includeGroup "me.shedaniel.cloth"
-            includeGroup "dev.architectury"
-        }
-    }
+    maven { url = 'https://maven.createmod.net' }
+    maven { url = 'https://maven.tterrag.com' }
+    maven { url = 'https://maven.minecraftforge.net/' }
+    maven { url = 'https://repo.spongepowered.org/repository/maven-public/' }
 }
+legacyForge {
+    accessTransformers = files('src/main/resources/META-INF/accesstransformer.cfg')
+    version = "${minecraft_version}-${forge_version}"
+    runs {
+        client { client(); gameDirectory = file('run/port-client') }
+        server { server(); gameDirectory = file('run/port-server'); programArgument '--nogui' }
+    }
+    mods { "${mod_id}" { sourceSet sourceSets.main } }
+}
+sourceSets.main.resources { srcDir 'src/generated/resources' }
+sourceSets.test.compileClasspath += sourceSets.main.compileClasspath
+sourceSets.test.runtimeClasspath += sourceSets.main.compileClasspath
+// Integrations are compile-only; the client/modpack selects its runtime versions.
+configurations.modCompileOnly.transitive = false
 
 dependencies {
-    minecraft "net.minecraftforge:forge:${minecraft_version}-${forge_version}"
-    implementation 'org.spongepowered:mixin:0.8.5'
+    modCompileOnly 'maven.modrinth:rxYaglEe:orFPvySe' // advancedae-1.2.7-1.20.1
+    modCompileOnly 'maven.modrinth:rqFWfVlz:tT3CLYvK' // apotheosis-1.20.1-7.4.8
+    modCompileOnly 'maven.modrinth:IiATswDj:d9GM663Q' // applied-mekanistics-1.4.2
+    modCompileOnly 'maven.modrinth:XxWD5pD3:Zfyso1sP' // appliedenergistics2-forge-15.4.8
+    modCompileOnly 'curse.maven:applied-flux-965012:6755986' // appliedflux-1.20-1.3.2-forge
+    modCompileOnly 'maven.modrinth:lhGA9TYQ:1MKTLiiG' // architectury-9.2.14-forge
+    modCompileOnly 'maven.modrinth:uy4Cnpcm:tNwsir0K' // bookshelf-forge-1.20.1-20.2.13
+    modCompileOnly 'maven.modrinth:U6BUTZ7K:9bH71LWw' // botanypots-forge-1.20.1-13.0.41
+    modCompileOnly 'maven.modrinth:iFDWVIFV:qFTHdrDH' // brandonscore-1.20.1-3.2.1.302-universal
+    modCompileOnly 'maven.modrinth:LNytGWDc:JjPQsQVw' // create-1.20.1-6.0.6
+    modCompileOnly 'maven.modrinth:vvuO3ImH:IPQlZkz1' // curios-forge-5.14.1-1.20.1
+    modCompileOnly 'maven.modrinth:nBqivi8H:YR33MHbk' // draconic-evolution-1.20.1-3.1.2.621-universal
+    modCompileOnly 'maven.modrinth:49ZofO4f:1na1IiE8' // enderio-1.20.1-6.2.13-beta-all
+    modCompileOnly 'curse.maven:ex-deorum-901420:6614784' // exdeorum-1.46
+    modCompileOnly 'curse.maven:extendedae-892005:7005572' // extendedae-1.20-1.4.6-forge
+    modCompileOnly 'maven.modrinth:5JMG1gql:NtEZsGjO' // extendedcrafting-1.20.1-6.1.5u
+    modCompileOnly 'curse.maven:flux-networks-248020:5234697' // fluxnetworks-1.20.1-7.2.1.15
+    modCompileOnly 'curse.maven:ftb-chunks-314906:6431735' // ftb-chunks-forge-2001.3.6
+    modCompileOnly 'curse.maven:ftb-teams-404468:6130786' // ftb-teams-forge-2001.3.1
+    modCompileOnly 'curse.maven:ftb-ultimine-386134:6899418' // ftb-ultimine-forge-2001.1.7
+    modCompileOnly 'maven.modrinth:8BmcQJ2H:aVW7Z5da' // geckolib-forge-1.20.1-4.8.2
+    modCompileOnly 'maven.modrinth:6bLUlbZn:6ByGTKSc' // hostileneuralnetworks-1.20.1-5.3.3
+    modCompileOnly 'maven.modrinth:lWxpUd04:O8YO7ORj' // industrial-foregoing-1.20.1-3.5.19
+    modCompileOnly 'maven.modrinth:nvQzSEkH:LecuGude' // jade-1.20.1-forge-11.13.2
+    modCompileOnly 'maven.modrinth:fRiHVvU7:WtJS5tVw' // emi-1.1.22-1.20.1-forge
+    modCompileOnly 'maven.modrinth:u6dRKJwZ:zzpNSbJZ' // jei-1.20.1-forge-15.20.0.116
+    modCompileOnly 'maven.modrinth:umyGl7zF:g5igndAv' // kubejs-forge-2001.6.5-build.16
+    modCompileOnly 'maven.modrinth:Ce6I4WUE:9iboPfea' // mekanism-1.20.1-10.4.15.75
+    modCompileOnly 'maven.modrinth:OFVYKsAk:x9re7wt4' // mekanismgenerators-1.20.1-10.4.15.75
+    modCompileOnly 'maven.modrinth:tCkE8p2N:6SkuAGoz' // placebo-1.20.1-8.6.3
+    modCompileOnly 'maven.modrinth:KZO4S4DO:xDOvxyqP' // powah-5.0.11
+    modCompileOnly 'com.tterrag.registrate:Registrate:MC1.20-1.3.11' // registrate-mc1.20-1.3.11
+    modCompileOnly 'maven.modrinth:sk9knFPE:uNALdylI' // rhino-forge-2001.2.3-build.10
+    modCompileOnly 'maven.modrinth:19smZ71v:zAGXClGI' // summoningrituals-forge-1.20.1-2.0.8
+    modCompileOnly 'maven.modrinth:1Ro7m06l:8krhHkrZ' // titanium-1.20.1-3.8.32
+    modCompileOnly 'maven.modrinth:Rw1NrDzF:tHDveaxK' // cucumber-1.20.1-7.0.15
+    modCompileOnly 'maven.modrinth:UhW5uCKw:eoUaDkZf' // glodium-1.20-1.5-forge
+    modCompileOnly 'maven.modrinth:HUZkxNTQ:zzqHs32A' // mekanism_extras-1.20.1-1.4.1
+    modCompileOnly 'net.createmod.ponder:Ponder-Forge-1.20.1:1.0.80' // ponder-forge-1.20.1-1.0.80
+    modCompileOnly 'dev.engine-room.flywheel:flywheel-forge-1.20.1:1.0.4' // flywheel-forge-1.20.1-1.0.4
     annotationProcessor 'org.spongepowered:mixin:0.8.5:processor'
-    implementation fg.deobf("mekanism:Mekanism:${mekanism_version}")
-    implementation fg.deobf("mekanism:Mekanism:${mekanism_version}:additions")
-    implementation fg.deobf("mekanism:Mekanism:${mekanism_version}:generators")
-    implementation fg.deobf("mekanism:Mekanism:${mekanism_version}:tools")
-    implementation fg.deobf("curse.maven:jei-238222:7037120") // JEI-1.20.1-15.20.0.116
-    implementation fg.deobf("curse.maven:ApothicAttributes-898963:5634071") // ApothicAttributes-1.20.1-1.3.7
-    implementation fg.deobf("curse.maven:Placebo-283644:6274231") // Placebo-1.20.1-8.6.3
-    implementation fg.deobf("curse.maven:Patchouli-306770:6164575") // Patchouli-1.20.1-84.1
-    implementation fg.deobf("curse.maven:Apotheosis-313970:6461960") // Apotheosis-1.20.1-7.4.8
-    implementation fg.deobf("curse.maven:thermal_foundation-222880:5443583") // thermal_foundation-1.20.1-11.0.6.70
-    implementation fg.deobf("curse.maven:thermal_expansion-69163:5372749") // thermal_expansion-1.20.1-11.0.1.29
-    implementation fg.deobf("curse.maven:cofh_core-69162:5374122") // cofh_core-1.20.1-11.0.2.56
-    implementation fg.deobf("com.teamcofh:thermal_core:1.20.1-11.0.7.25")
-    implementation fg.deobf("curse.maven:TravelAnchors-413234:4683662") // TravelAnchors-1.20.1-5.0.1
-    implementation fg.deobf("curse.maven:LibX-412525:4947474") // LibX-1.20.1-5.0.12
-    implementation fg.deobf("curse.maven:jecharacters-250702:6680042") // jecharacters-1.20.1-forge-4.5.16
-    implementation fg.deobf("curse.maven:GregTechCEu-890405:6254458") // GregTechCEu-1.20.1-1.6.4
-    implementation fg.deobf("curse.maven:BotanyPots-353928:6348581") // BotanyPots-Forge-1.20.1-13.0.41
-    implementation fg.deobf("curse.maven:Bookshelf-228525:5423987") // Bookshelf-Forge-1.20.1-20.2.13
-    implementation fg.deobf("curse.maven:configured-457570:5180900") // configured-forge-1.20.1-2.2.3
-    implementation fg.deobf("curse.maven:extendedae_plus-1337639:7068596") // extendedae_plus-1.4.4
-    implementation fg.deobf("curse.maven:mekanism_extras-1026040:6936409") // mekanism_extras-1.20.1-1.4.6
-    implementation fg.deobf("curse.maven:ThermalMore-1078644:5704624") // ThermalMore-1.1.2-1.20.1
-    implementation fg.deobf("curse.maven:ftb-ultimine-386134:6899418") // ftb-ultimine-forge-2001.1.7
-    implementation fg.deobf("curse.maven:Architectury-API-419699:5137938") // Architectury API
-    implementation fg.deobf("curse.maven:ftb-library-API-404465:6807424") // ftb-library-forge-2001.2.10
-    //implementation fg.deobf("curse.maven:thermal_parallel-1.0.0-1350169:7013612") // thermal_parallel-1.0.0
-    implementation fg.deobf("curse.maven:spark-361579:4738952") // spark
-    implementation fg.deobf("curse.maven:Modern-UI-352491:6956345") // Modern UI
-    implementation fg.deobf("curse.maven:Observable-509575:5643037") // Observable
-    implementation fg.deobf("curse.maven:Kotlin-for-Forge-4.11.0-351264:5402061") // Kotlin for Forge 4.11.0
-    implementation fg.deobf("curse.maven:mob_grinding_utils-1.20.1-1.1.0-254241:5131447") // mob_grinding_utils-1.20.1-1.1.0
-    implementation fg.deobf("curse.maven:biggerstacks-1.20.1-1.0.4-all-564896:6458432") // biggerstacks-1.20.1-1.0.4-all
-    implementation fg.deobf("curse.maven:SkyBreaker-1.20.1-1.0.8-1109012:6645990") // SkyBreaker-1.20.1-1.0.8
-    implementation fg.deobf("curse.maven:omnitools-1.0.0-1401075:7314939") // omnitools-1.0.0
-    implementation fg.deobf("curse.maven:advancedae-1084104:7159779")//advancedae
-    implementation fg.deobf("curse.maven:geckolib-388172:7025129")//geckolib
-    // implementation fg.deobf("curse.maven:emi-580555:6420945")//emi
-    compileOnly fg.deobf("curse.maven:emi-580555:6420945")//emi
-    implementation fg.deobf("curse.maven:mega-cells-622112:6175008")//mega-cells
-    implementation fg.deobf("curse.maven:omni-cells-1359517:7169531")//omni-cells
-    implementation fg.deobf("curse.maven:applied-flux-965012:7072853")//applied-flux
-    implementation fg.deobf("curse.maven:cloth-config-348521:5729105")//cloth-config-5.1.48-forge
-    implementation fg.deobf("curse.maven:sophisticated-core-618298:7369562")//sophisticated-core-6.1.82-forge
-    implementation fg.deobf("curse.maven:sophisticated-storage-619320:7369594")//sophisticated-storage-6.1.82-forge
-    implementation fg.deobf("curse.maven:sophisticated-backpacks-422301:7369580")//sophisticated-backpacks-6.1.82-forge
-    implementation fg.deobf("curse.maven:industrial-foregoing-266515:7068937")//industrial-foregoing-1.20.1-1.1.0
-    implementation fg.deobf("curse.maven:titanium-287342:5468426")//titanium-1.20.1-1.0.0
-    implementation fg.deobf("curse.maven:blood-magic-224791:7253333")//blood-magic-1.20.1-1.0.0
-    implementation fg.deobf("curse.maven:embers-rekindled-300777:7446478")//mbersrekindled-1.20.1-1.4.7
-
-
-    //exendedae前置
-    implementation fg.deobf("curse.maven:glodium-957920:5226922")
-    //extendedAE
-    implementation fg.deobf("curse.maven:ex-pattern-provider-892005:7144417")
-    //ae2
-    implementation fg.deobf("curse.maven:applied-energistics-2-223794:7148487")
-    implementation fg.deobf("curse.maven:guideme-1173950:6679102")
-    //config
-    implementation fg.deobf("curse.maven:configured-457570:5180900")
-
-
-
+    compileOnly 'io.github.llamalad7:mixinextras-common:0.5.0'
+    annotationProcessor 'io.github.llamalad7:mixinextras-common:0.5.0'
+    testImplementation platform('org.junit:junit-bom:5.11.4')
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+    testImplementation 'org.mockito:mockito-core:5.15.2'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
-
 mixin {
-    add sourceSets.main, "useless_mod.refmap.json"
-    config "useless_mod.mixins.json"
-    debug.export = true
+    add sourceSets.main, "${mod_id}.refmap.json"
+    ["${mod_id}.mixins.json", "${mod_id}.create.mixins.json", "${mod_id}.mekanism.mixins.json", "${mod_id}.jade.mixins.json"].each { config it }
 }
-// This block of code expands all declared replace properties in the specified resource targets.
-// A missing property will result in an error. Properties are expanded using ${} Groovy notation.
-// When "copyIdeResources" is enabled, this will also run before the game launches in IDE environments.
-// See https://docs.gradle.org/current/dsl/org.gradle.language.jvm.tasks.ProcessResources.html
-tasks.named('processResources', ProcessResources).configure {
-    var replaceProperties = [
-            minecraft_version: minecraft_version, minecraft_version_range: minecraft_version_range,
-            forge_version: forge_version, forge_version_range: forge_version_range,
-            loader_version_range: loader_version_range,
-            mod_id: mod_id, mod_name: mod_name, mod_license: mod_license, mod_version: mod_version,
-            mod_authors: mod_authors, mod_description: mod_description,
-    ]
-    inputs.properties replaceProperties
-
-    filesMatching(['META-INF/mods.toml', 'pack.mcmeta']) {
-        expand replaceProperties + [project: project]
-    }
+tasks.named('jar') {
+    manifest.attributes('MixinConfigs': ["${mod_id}.mixins.json", "${mod_id}.create.mixins.json", "${mod_id}.mekanism.mixins.json", "${mod_id}.jade.mixins.json"].join(','))
 }
-
-// Example for how to get properties into the manifest for reading at runtime.
-tasks.named('jar', Jar).configure {
-    manifest {
-        attributes([
-                'Specification-Title'     : mod_id,
-                'Specification-Vendor'    : mod_authors,
-                'Specification-Version'   : '1', // We are version 1 of ourselves
-                'Implementation-Title'    : project.name,
-                'Implementation-Version'  : project.jar.archiveVersion,
-                'Implementation-Vendor'   : mod_authors,
-                'Implementation-Timestamp': new Date().format("yyyy-MM-dd'T'HH:mm:ssZ")
-        ])
-    }
-
-    // This is the preferred method to reobfuscate your jar file
-    finalizedBy 'reobfJar'
-}
-
-// However if you are in a multi-project build, dev time needs unobfed jar files, so you can delay the obfuscation until publishing by doing:
-// tasks.named('publish').configure {
-//     dependsOn 'reobfJar'
-// }
-
-// Example configuration to allow publishing using the maven-publish plugin
-publishing {
-    publications {
-        register('mavenJava', MavenPublication) {
-            artifact jar
-        }
-    }
-    repositories {
-        maven {
-            url "file://${project.projectDir}/mcmodsrepo"
-        }
-    }
-}
-
 tasks.withType(JavaCompile).configureEach {
-    options.encoding = 'UTF-8' // Use the UTF-8 charset for Java compilation
+    options.encoding = 'UTF-8'
+    options.compilerArgs += ['-Xmaxerrs', '10000']
+}
+tasks.named('test', Test) { useJUnitPlatform() }
+tasks.named('processResources', ProcessResources) {
+    inputs.property 'mod_version', mod_version
+    filesMatching('META-INF/mods.toml') {
+        expand mod_id: mod_id, mod_name: mod_name, mod_version: mod_version
+    }
 }
 
+apply from: 'gradle/port-bridge-tests.gradle'
 
-compileJava {
-    options.compilerArgs += ['-Xlint:-deprecation', '-Xlint:-removal', '-Xlint:-unchecked']
-}
+apply from: 'gradle/forge1201-pack-profile.gradle'
+
+apply from: 'gradle/bytecode-contract-tests.gradle'

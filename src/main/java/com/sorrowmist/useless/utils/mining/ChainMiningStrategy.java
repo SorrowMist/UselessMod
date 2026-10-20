@@ -1,27 +1,62 @@
 package com.sorrowmist.useless.utils.mining;
 
+import com.sorrowmist.useless.core.config.ChainEquivalence;
+import com.sorrowmist.useless.core.config.ChainGroupManager;
+import com.sorrowmist.useless.data.PlayerMiningData;
+import com.sorrowmist.useless.utils.UComponentUtils;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.event.level.BlockEvent;
 
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * 连锁挖掘策略
- * - 普通连锁：BFS相邻方块
- * - 增强连锁：扫描范围内所有相同方块
+/*
+ * The MIT License (MIT)
+ *
+ * Copyright (c) 2026 C-H716
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy of
+ * this software and associated documentation files (the "Software"), to deal in
+ * the Software without restriction, including without limitation the rights to
+ * use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of
+ * the Software, and to permit persons to whom the Software is furnished to do so,
+ * subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
+ * FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
+ * COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
+ * IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+ * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 public class ChainMiningStrategy implements MiningStrategy {
     private final boolean enhanced;
 
-    public ChainMiningStrategy(boolean enhanced) {
+    protected ChainMiningStrategy(boolean enhanced) {
         this.enhanced = enhanced;
+    }
+
+    protected boolean isForceMining(ItemStack hand) {
+        return false;
+    }
+
+    protected boolean canUseCache(ItemStack hand, boolean forceMining) {
+        return !forceMining || UComponentUtils.isForceMiningEnabled(hand);
+    }
+
+    protected String getResultTranslationKey() {
+        return this.enhanced
+                ? "gui.useless_mod.enhanced_chain_mining_result"
+                : "gui.useless_mod.chain_mining_result";
     }
 
     @Override
@@ -29,57 +64,73 @@ public class ChainMiningStrategy implements MiningStrategy {
         if (!(event.getLevel() instanceof ServerLevel level)) return;
         BlockPos pos = event.getPos();
         BlockState originState = event.getState();
-        Block originBlock = originState.getBlock();
-
-        boolean forceMining = MiningUtils.isForceMiningMode(hand);
-
-        // 查找需要破坏的方块列表
+        PlayerMiningData playerData = MiningDispatcher.getOrCreatePlayerData(player);
+        boolean forceMining = this.isForceMining(hand);
         List<BlockPos> blocksToMine;
-        if (this.enhanced) {
-            blocksToMine = MiningUtils.findBlocksToMineEnhanced(pos, originState, level, hand, forceMining);
+
+        if (this.canUseCache(hand, forceMining)
+                && playerData.getCachedPos() != null
+                && playerData.getCachedPos().equals(pos)
+                && playerData.hasCachedBlocks()) {
+            blocksToMine = playerData.getCachedBlocks();
         } else {
-            blocksToMine = MiningUtils.findBlocksToMine(pos, originState, level, hand, forceMining);
+            blocksToMine = MiningUtils.scanBlocksToMine(
+                    pos, originState, level, hand, forceMining, this.enhanced,
+                    playerData.getShape(), MiningUtils.getTargetFace(player), player);
         }
 
         if (blocksToMine.isEmpty()) {
+            playerData.clearCache();
             return;
         }
 
-        // 执行挖掘
         List<ItemStack> allDrops = new ArrayList<>();
         int actualMinedCount = 0;
+        int totalExperience = 0;
+        // 破坏前二次校验必须与扫描阶段使用同一套判定，否则等价组扩出的方块会在此被全部跳过
+        ChainEquivalence equivalence = ChainGroupManager.equivalenceFor(player, originState.getBlock());
 
         for (BlockPos targetPos : blocksToMine) {
             BlockState currentState = level.getBlockState(targetPos);
-            if (currentState.getBlock() != originBlock) continue;
 
-            List<ItemStack> fallbackDrops = forceMining
-                    ? MiningUtils.getForcedFallbackDrops(currentState, level, targetPos, hand)
-                    : List.of();
-            List<ItemStack> drops = MiningUtils.destroyBlockAndCollectDrops(level, targetPos, currentState, player, hand);
-            if (forceMining && MiningUtils.hasNoValidDrops(drops) && !MiningUtils.hasNoValidDrops(fallbackDrops)) {
-                drops = fallbackDrops;
+            if (!equivalence.matches(currentState)) {
+                continue;
             }
-            allDrops.addAll(drops);
-            actualMinedCount++;
+
+            // 单格失败不得中断整批：模组的破坏回调抛出异常（数据能源的三位一体样板核心
+            // 在状态未就绪时会抛出）或方块拒绝被移除时，仅跳过该格并继续处理其余目标。
+            try {
+                MiningUtils.MiningResult result = forceMining
+                        ? MiningUtils.forceMineBlock(level, targetPos, currentState, player, hand)
+                        : MiningUtils.mineBlock(level, targetPos, currentState, player, hand);
+                if (result.mined()) {
+                    // 逐格改写：Ex Deorum 的锤子与钩子配方均以方块为索引键，
+                    // 连锁覆盖的不同方块可能命中不同配方，故不能汇总后再统一处理。
+                    allDrops.addAll(MiningUtils.applyExDeorumDrops(
+                            level, currentState, result.drops(), hand, targetPos, player));
+                    totalExperience += result.experience();
+                    actualMinedCount++;
+                }
+            } catch (Throwable failure) {
+                MiningUtils.reportBlockBreakFailure(currentState, targetPos, failure);
+            }
         }
 
-        // 统一处理掉落物
         if (!MiningUtils.hasNoValidDrops(allDrops)) {
-            MiningUtils.handleDrops(player, MiningUtils.mergeItemStacks(allDrops), hand);
+            // 汇总后单次处理：AE 只收到一次请求；磁力关闭时统一落在连锁原点。
+            MiningUtils.handleDrops(player, MiningUtils.mergeItemStacks(allDrops), hand, Vec3.atCenterOf(pos));
         }
 
-        // 经验处理（时运模式）
-        if (!MiningUtils.isSilkTouchMode(hand)) {
-            originBlock.popExperience(level, pos, originBlock.getExpDrop(originState, level, level.random, pos, 0, 0) * actualMinedCount);
+        if (totalExperience > 0) {
+            player.giveExperiencePoints(totalExperience);
         }
 
-        // 显示结果
         if (actualMinedCount > 0) {
-            String key = this.enhanced ? "增强连锁挖掘完成：" : "连锁挖掘完成：";
-            player.displayClientMessage(Component.literal(key + "已挖掘 " + actualMinedCount + " 个方块"), true);
+            player.displayClientMessage(Component.translatable(
+                    this.getResultTranslationKey(), actualMinedCount), true);
         }
 
         event.setCanceled(true);
+        playerData.clearCache();
     }
 }

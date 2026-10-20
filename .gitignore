@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 # eclipse
 bin
 *.launch
@@ -17,33 +16,40 @@ out
 # gradle
 build
 .gradle
+.gradle-tmp
+
+# vscode
+.vscode
+
+#.dbg
+.dbg
 
 # other
 eclipse
 run
+runs
+run-data
+net
+repo
+.codegraph
+othermods
+crashreport
+.cursor
+.cache
+.codex
+# external reference code
+references/
+.crashinfo
+.dsh-drop
+.workbuddy
+.workbuddy-ai
 
-# Files from Forge MDK
-forge*changelog.txt
-=======
-.gradle
-**/build/
-!**/src/**/build/
-
-# Ignore Gradle GUI config
-gradle-app.setting
-
-# Avoid ignoring Gradle wrapper jar file (.jar files are usually ignored)
-!gradle-wrapper.jar
-
-# Avoid ignore Gradle wrappper properties
-!gradle-wrapper.properties
-
-# Cache of project
-.gradletasknamecache
-
-# Eclipse Gradle plugin generated files
-# Eclipse Core
-.project
-# JDT-specific (Eclipse Java Development Tools)
-.classpath
->>>>>>> 002d2504eea88f706742ae452f086971844209c3
+# Local builds, verification captures and one-off migration artifacts
+output/
+verification/
+libs/
+__pycache__/
+*.pyc
+*.log
+hs_err_pid*
+*.cleanup-tmp

@@ -1,0 +1,661 @@
+package com.sorrowmist.useless.compat.constructionwand;
+
+import com.sorrowmist.useless.api.enums.tool.ConstructionWandCoreMode;
+import com.sorrowmist.useless.compat.AE2Compat;
+import com.sorrowmist.useless.compat.ftbchunks.BlockEditGuard;
+import com.sorrowmist.useless.compat.ftbchunks.FtbChunksProtectionLoader;
+import com.sorrowmist.useless.core.component.UComponents;
+import com.sorrowmist.useless.core.config.ConfigManager;
+import com.sorrowmist.useless.content.items.EndlessBeafItem;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.BlockItem;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.context.BlockPlaceContext;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.world.phys.Vec3;
+import net.minecraftforge.event.entity.player.PlayerInteractEvent;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
+import appeng.api.config.Actionable;
+
+import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.Deque;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+
+/** Independent construction-wand behavior for the beef tool. */
+public final class ConstructionWandLogic {
+    private static final int MAX_UNDO_OPERATIONS = 3;
+    public static final int MAX_PREVIEW_BLOCKS = 4096;
+    private static final Map<UUID, Deque<Operation>> HISTORY = new ConcurrentHashMap<>();
+
+    private ConstructionWandLogic() {}
+
+    /**
+     * 判定该位置是否受方块编辑保护（FTB Chunks）。
+     *
+     * <p>未安装对应模组、保护判定不可用或玩家持有 bypass 权限时返回 {@code false}。</p>
+     *
+     * <p>判定必须逐格进行：一次建造或破坏可能横跨多个区块，各区块的归属队伍与
+     * 权限设置并不相同，只对起点判定一次会漏掉其余区块的保护。</p>
+     */
+    private static boolean isProtected(ServerPlayer player, BlockPos pos) {
+        BlockEditGuard guard = FtbChunksProtectionLoader.guard();
+        return guard != null && !guard.isEditAllowed(player, pos);
+    }
+
+    public static boolean isEnabled(ItemStack stack) {
+        return stack.getItem() instanceof EndlessBeafItem
+                && com.sorrowmist.useless.compat.forge1201.component.ComponentAccess.getOrDefault(stack, UComponents.ConstructionWandEnabledComponent.get(), false);
+    }
+
+    public static List<BlockPos> preview(ServerPlayer player, InteractionHand hand, BlockHitResult hit) {
+        return preview(player, hand, hit, false);
+    }
+
+    public static List<BlockPos> preview(ServerPlayer player, InteractionHand hand,
+                                         BlockHitResult hit, boolean air) {
+        ItemStack tool = player.getItemInHand(hand);
+        if (!isEnabled(tool)) return List.of();
+
+        ConstructionWandCoreMode core = com.sorrowmist.useless.compat.forge1201.component.ComponentAccess.getOrDefault(tool,
+                UComponents.ConstructionWandCoreComponent.get(), ConstructionWandCoreMode.DEFAULT);
+        return switch (core) {
+            case DEFAULT -> air ? List.of() : previewBuild(player.serverLevel(), player, hit, tool);
+            case ANGEL -> air
+                    ? previewAngelAir(player.serverLevel(), player, tool)
+                    : previewAngel(player.serverLevel(), player, hit, tool);
+            case DESTRUCTION -> air ? List.of() : previewDestroy(player.serverLevel(), player, hit);
+        };
+    }
+
+    public static boolean handleRightClickBlock(PlayerInteractEvent.RightClickBlock event) {
+        if (!isEnabled(event.getItemStack())) return false;
+
+        event.setCanceled(true);
+        event.setCancellationResult(InteractionResult.sidedSuccess(event.getLevel().isClientSide()));
+        if (!(event.getLevel() instanceof ServerLevel level)
+                || !(event.getEntity() instanceof ServerPlayer player)) {
+            return true;
+        }
+
+        BlockHitResult hit = event.getHitVec();
+        if (player.isShiftKeyDown()) {
+            undo(player, level, hit.getBlockPos());
+            return true;
+        }
+
+        ItemStack tool = event.getItemStack();
+        ConstructionWandCoreMode core = com.sorrowmist.useless.compat.forge1201.component.ComponentAccess.getOrDefault(tool,
+                UComponents.ConstructionWandCoreComponent.get(), ConstructionWandCoreMode.DEFAULT);
+        Operation operation = switch (core) {
+            case DEFAULT -> build(level, player, hit, tool);
+            case ANGEL -> angel(level, player, hit, false, tool);
+            case DESTRUCTION -> destroy(level, player, hit, tool);
+        };
+        remember(player, operation);
+        return true;
+    }
+
+    public static boolean handleRightClickItem(PlayerInteractEvent.RightClickItem event) {
+        if (!isEnabled(event.getItemStack())) return false;
+
+        event.setCanceled(true);
+        if (!(event.getLevel() instanceof ServerLevel level)
+                || !(event.getEntity() instanceof ServerPlayer player)) {
+            return true;
+        }
+
+        ItemStack tool = event.getItemStack();
+        ConstructionWandCoreMode core = com.sorrowmist.useless.compat.forge1201.component.ComponentAccess.getOrDefault(tool,
+                UComponents.ConstructionWandCoreComponent.get(), ConstructionWandCoreMode.DEFAULT);
+        if (core == ConstructionWandCoreMode.ANGEL) {
+            remember(player, angel(level, player, null, true, tool));
+        }
+        return true;
+    }
+
+    public static void clearPlayer(UUID playerId) {
+        HISTORY.remove(playerId);
+    }
+
+    private static Operation build(ServerLevel level, ServerPlayer player, BlockHitResult hit, ItemStack tool) {
+        BlockState targetState = level.getBlockState(hit.getBlockPos());
+        if (!(targetState.getBlock().asItem() instanceof BlockItem clickedItem)) return null;
+        BlockItem targetItem = placementTarget(player, clickedItem);
+
+        int limit = ConfigManager.getBeefConstructionWandBuildLimit();
+        Direction face = hit.getDirection();
+        BlockPos[] offsets = planeOffsets(face);
+        Deque<BlockPos> pending = new ArrayDeque<>();
+        Set<BlockPos> visited = new HashSet<>();
+        List<SavedBlock> changed = new ArrayList<>();
+        pending.add(hit.getBlockPos().relative(face));
+        int attempts = 0;
+        int maxAttempts = Math.max(64, Math.min(200_000, limit * 16));
+
+        while (!pending.isEmpty() && changed.size() < limit && attempts++ < maxAttempts) {
+            if (!player.isCreative() && findSupply(player, tool, targetItem).stack.isEmpty()) break;
+            BlockPos pos = pending.removeFirst();
+            if (!visited.add(pos)) continue;
+
+            BlockPos supportPos = pos.relative(face.getOpposite());
+            if (level.getBlockState(supportPos).getBlock() != targetState.getBlock()) continue;
+            // 受保护的格子不放置，也不作为扩散起点：建造链条在此中止。
+            if (isProtected(player, pos)) continue;
+            if (!place(level, player, tool, pos, face, targetItem, changed)) continue;
+            if (changed.size() >= limit) break;
+
+            for (BlockPos offset : offsets) {
+                pending.addLast(pos.offset(offset));
+            }
+        }
+        return changed.isEmpty() ? null : new Operation(changed, tool.copy());
+    }
+
+    private static List<BlockPos> previewBuild(ServerLevel level, ServerPlayer player,
+                                               BlockHitResult hit, ItemStack tool) {
+        BlockState targetState = level.getBlockState(hit.getBlockPos());
+        if (!(targetState.getBlock().asItem() instanceof BlockItem clickedItem)) return List.of();
+        BlockItem targetItem = placementTarget(player, clickedItem);
+
+        int limit = previewLimit(level, player, tool, targetItem, ConfigManager.getBeefConstructionWandBuildLimit());
+        if (limit <= 0) return List.of();
+        Supply previewSupply = findSupply(player, tool, targetItem);
+        InteractionHand placementHand = previewSupply.hand;
+        ItemStack previewStack = previewSupply.stack.isEmpty()
+                ? new ItemStack(targetItem)
+                : previewSupply.stack.copyWithCount(1);
+
+        Direction face = hit.getDirection();
+        BlockPos[] offsets = planeOffsets(face);
+        Deque<BlockPos> pending = new ArrayDeque<>();
+        Set<BlockPos> visited = new HashSet<>();
+        List<BlockPos> preview = new ArrayList<>(Math.min(limit, MAX_PREVIEW_BLOCKS));
+        pending.add(hit.getBlockPos().relative(face));
+
+        int attempts = 0;
+        int maxAttempts = Math.max(64, Math.min(200_000, limit * 16));
+        while (!pending.isEmpty() && preview.size() < limit && attempts++ < maxAttempts) {
+            BlockPos pos = pending.removeFirst();
+            if (!visited.add(pos)) continue;
+            if (level.getBlockState(pos.relative(face.getOpposite())).getBlock() != targetState.getBlock()) {
+                continue;
+            }
+            // 预览必须与落地结果一致：受保护的格子不作为可放置位置显示。
+            if (isProtected(player, pos)) continue;
+            if (getPlacementState(level, player, pos, face, targetItem, previewStack, placementHand) == null) {
+                continue;
+            }
+
+            preview.add(pos.immutable());
+            for (BlockPos offset : offsets) {
+                pending.addLast(pos.offset(offset));
+            }
+        }
+        return List.copyOf(preview);
+    }
+
+    private static Operation angel(ServerLevel level, ServerPlayer player,
+                                   BlockHitResult hit, boolean fromAir, ItemStack tool) {
+        BlockItem targetItem;
+        Direction face;
+        BlockPos start;
+
+        if (fromAir) {
+            ItemStack offhand = player.getOffhandItem();
+            if (!(offhand.getItem() instanceof BlockItem blockItem)) return null;
+            targetItem = blockItem;
+            face = Direction.UP;
+            start = angelAirStart(player);
+        } else {
+            BlockState supportingState = level.getBlockState(hit.getBlockPos());
+            if (!(supportingState.getBlock().asItem() instanceof BlockItem blockItem)) return null;
+            targetItem = placementTarget(player, blockItem);
+            face = hit.getDirection();
+            start = hit.getBlockPos().relative(face.getOpposite());
+        }
+
+        int limit = ConfigManager.getBeefConstructionWandAngelLimit();
+        List<SavedBlock> changed = new ArrayList<>();
+        Direction step = fromAir ? angelAirStep(player) : face.getOpposite();
+        BlockPos pos = start;
+        for (int i = 0; i < limit; i++) {
+            // 天使模式沿直线推进：受保护的格子只跳过放置，不中断推进。
+            if (!isProtected(player, pos)
+                    && place(level, player, tool, pos, face, targetItem, changed)) {
+                if (changed.size() >= limit) break;
+            }
+            pos = pos.relative(step);
+        }
+        return changed.isEmpty() ? null : new Operation(changed, tool.copy());
+    }
+
+    private static List<BlockPos> previewAngel(ServerLevel level, ServerPlayer player,
+                                               BlockHitResult hit, ItemStack tool) {
+        if (hit == null) return previewAngelAir(level, player, tool);
+
+        BlockState supportingState = level.getBlockState(hit.getBlockPos());
+        if (!(supportingState.getBlock().asItem() instanceof BlockItem clickedItem)) return List.of();
+        BlockItem targetItem = placementTarget(player, clickedItem);
+
+        int limit = previewLimit(level, player, tool, targetItem, ConfigManager.getBeefConstructionWandAngelLimit());
+        if (limit <= 0) return List.of();
+        Supply previewSupply = findSupply(player, tool, targetItem);
+        InteractionHand placementHand = previewSupply.hand;
+        ItemStack previewStack = previewSupply.stack.isEmpty()
+                ? new ItemStack(targetItem)
+                : previewSupply.stack.copyWithCount(1);
+        Direction face = hit.getDirection();
+        Direction step = face.getOpposite();
+        BlockPos pos = hit.getBlockPos().relative(step);
+        List<BlockPos> preview = new ArrayList<>(Math.min(limit, MAX_PREVIEW_BLOCKS));
+        for (int i = 0; i < limit && preview.size() < MAX_PREVIEW_BLOCKS; i++) {
+            if (!isProtected(player, pos)
+                    && getPlacementState(level, player, pos, face, targetItem,
+                                         previewStack, placementHand) != null) {
+                preview.add(pos.immutable());
+            }
+            pos = pos.relative(step);
+        }
+        return List.copyOf(preview);
+    }
+
+    private static List<BlockPos> previewAngelAir(ServerLevel level, ServerPlayer player, ItemStack tool) {
+        ItemStack offhand = player.getOffhandItem();
+        if (!(offhand.getItem() instanceof BlockItem targetItem)) return List.of();
+
+        int limit = previewLimit(level, player, tool, targetItem,
+                                 ConfigManager.getBeefConstructionWandAngelLimit());
+        if (limit <= 0) return List.of();
+        Supply previewSupply = findSupply(player, tool, targetItem);
+        InteractionHand placementHand = previewSupply.hand;
+        ItemStack previewStack = previewSupply.stack.isEmpty()
+                ? offhand.copyWithCount(1)
+                : previewSupply.stack.copyWithCount(1);
+
+        Direction face = Direction.UP;
+        Direction step = angelAirStep(player);
+        BlockPos pos = angelAirStart(player);
+        List<BlockPos> preview = new ArrayList<>(Math.min(limit, MAX_PREVIEW_BLOCKS));
+        for (int i = 0; i < limit && preview.size() < MAX_PREVIEW_BLOCKS; i++) {
+            if (!isProtected(player, pos)
+                    && getPlacementState(level, player, pos, face, targetItem,
+                                         previewStack, placementHand) != null) {
+                preview.add(pos.immutable());
+            }
+            pos = pos.relative(step);
+        }
+        return List.copyOf(preview);
+    }
+
+    private static Operation destroy(ServerLevel level, ServerPlayer player,
+                                     BlockHitResult hit, ItemStack tool) {
+        BlockState target = level.getBlockState(hit.getBlockPos());
+        if (target.isAir()) return null;
+
+        int limit = ConfigManager.getBeefConstructionWandDestructionLimit();
+        BlockPos[] offsets = planeOffsets(hit.getDirection());
+        Deque<BlockPos> pending = new ArrayDeque<>();
+        Set<BlockPos> visited = new HashSet<>();
+        List<SavedBlock> changed = new ArrayList<>();
+        pending.add(hit.getBlockPos());
+        int attempts = 0;
+        // 8 邻域会访问更多非目标方块，给 BFS 一个与上限成比例的尝试预算，避免在开阔区域无界扩散。
+        int maxAttempts = Math.max(64, Math.min(200_000, limit * 16));
+
+        while (!pending.isEmpty() && changed.size() < limit && attempts++ < maxAttempts) {
+            BlockPos pos = pending.removeFirst();
+            if (!visited.add(pos)) continue;
+
+            BlockState state = level.getBlockState(pos);
+            boolean destroyed = false;
+            // 受保护的格子不破坏，也不作为扩散起点：破坏链条在此中止。
+            if (!state.isAir() && state.getBlock() == target.getBlock() && !isProtected(player, pos)) {
+                SavedBlock saved = SavedBlock.capture(level, pos, state, ItemStack.EMPTY, false);
+                if (level.destroyBlock(pos, false, player)) {
+                    saved.afterState = level.getBlockState(pos);
+                    changed.add(saved);
+                    destroyed = true;
+                }
+            }
+            if (!destroyed) continue;
+            for (BlockPos offset : offsets) {
+                pending.addLast(pos.offset(offset));
+            }
+        }
+        return changed.isEmpty() ? null : new Operation(changed, tool.copy());
+    }
+
+    private static List<BlockPos> previewDestroy(ServerLevel level, ServerPlayer player,
+                                                 BlockHitResult hit) {
+        BlockState target = level.getBlockState(hit.getBlockPos());
+        if (target.isAir()) return List.of();
+
+        int limit = Math.min(ConfigManager.getBeefConstructionWandDestructionLimit(), MAX_PREVIEW_BLOCKS);
+        BlockPos[] offsets = planeOffsets(hit.getDirection());
+        Deque<BlockPos> pending = new ArrayDeque<>();
+        Set<BlockPos> visited = new HashSet<>();
+        List<BlockPos> preview = new ArrayList<>(limit);
+        pending.add(hit.getBlockPos());
+        int attempts = 0;
+        int maxAttempts = Math.max(64, Math.min(200_000, limit * 16));
+
+        while (!pending.isEmpty() && preview.size() < limit && attempts++ < maxAttempts) {
+            BlockPos pos = pending.removeFirst();
+            if (!visited.add(pos)) continue;
+            BlockState state = level.getBlockState(pos);
+            if (state.isAir() || state.getBlock() != target.getBlock()) continue;
+            if (isProtected(player, pos)) continue;
+
+            preview.add(pos.immutable());
+            for (BlockPos offset : offsets) {
+                pending.addLast(pos.offset(offset));
+            }
+        }
+        return List.copyOf(preview);
+    }
+
+    private static boolean place(ServerLevel level, ServerPlayer player, ItemStack tool,
+                                 BlockPos pos,
+                                 Direction face, BlockItem targetItem, List<SavedBlock> changed) {
+        BlockState existing = level.getBlockState(pos);
+        Supply supply = findSupply(player, tool, targetItem);
+        if (supply.stack.isEmpty() && !player.isCreative()) return false;
+        if (!existing.canBeReplaced()) return false;
+
+        ItemStack placementStack = supply.stack.isEmpty() ? new ItemStack(targetItem) : supply.stack;
+        BlockState placed = getPlacementState(level, player, pos, face, targetItem,
+                                              placementStack, supply.hand);
+        if (placed == null) return false;
+
+        // 先在消耗前留一份快照：消耗后源栈可能变成空栈，空栈上再 copyWithCount
+        // 会直接得到 ItemStack.EMPTY，物品自带的组件（NBT）就跟着丢了。
+        ItemStack consumed = placementStack.copyWithCount(1);
+
+        SavedBlock saved = SavedBlock.capture(level, pos, existing,
+                player.isCreative() ? ItemStack.EMPTY : consumed.copy(), supply.fromAe);
+        if (!level.setBlock(pos, placed, Block.UPDATE_ALL)) return false;
+        if (!player.isCreative() && supply.fromAe) {
+            long extracted = AE2Compat.tryExtractFromLinkedGrid(
+                    tool, player, consumed, Actionable.MODULATE);
+            if (extracted != 1) {
+                saved.restore(level);
+                return false;
+            }
+        } else if (!player.isCreative()) {
+            placementStack.shrink(1);
+        }
+        applyPlacedItemData(level, player, pos, placed, consumed);
+        saved.afterState = level.getBlockState(pos);
+        changed.add(saved);
+        return true;
+    }
+
+    /**
+     * 复刻 {@link BlockItem#place} 落地之后的收尾步骤，把物品自带的组件写回放下的方块：
+     * 方块状态组件、BLOCK_ENTITY_DATA（方块实体 NBT）、方块实体暴露的隐式组件，以及 setPlacedBy 回调。
+     * 手杖只做 setBlock，少了这几步，任何靠 NBT/组件承载数据的方块
+     * （箱子、潜影盒、已配置的机器、带外置存储引用的方块等）放下后都会变成默认的空方块。
+     */
+    private static void applyPlacedItemData(ServerLevel level, ServerPlayer player, BlockPos pos,
+                                            BlockState state, ItemStack stack) {
+        if (stack.isEmpty()) return;
+
+        BlockState effective = state;
+        CompoundTag stateTag = stack.getTagElement("BlockStateTag");
+        if (stateTag != null) {
+            for (String name : stateTag.getAllKeys()) {
+                var property = effective.getBlock().getStateDefinition().getProperty(name);
+                if (property != null) effective = applyStateProperty(effective, property, stateTag.getString(name));
+            }
+            if (effective != state) level.setBlock(pos, effective, Block.UPDATE_CLIENTS);
+        }
+        BlockItem.updateCustomBlockEntityTag(level, player, pos, stack);
+        BlockEntity blockEntity = level.getBlockEntity(pos);
+        if (blockEntity != null) blockEntity.setChanged();
+        effective.getBlock().setPlacedBy(level, pos, effective, player, stack);
+    }
+
+    private static <T extends Comparable<T>> BlockState applyStateProperty(BlockState state,
+            net.minecraft.world.level.block.state.properties.Property<T> property,String value) {
+        return property.getValue(value).map(parsed -> state.setValue(property,parsed)).orElse(state);
+    }
+
+    private static Supply findSupply(ServerPlayer player, ItemStack tool, BlockItem targetItem) {
+        // AE storage is consulted only while the "AE storage priority" toggle is enabled.
+        if (isAeStoragePriorityEnabled(tool)) {
+            Supply aeSupply = findAeSupply(player, tool, targetItem);
+            if (!aeSupply.stack.isEmpty()) {
+                return aeSupply;
+            }
+        }
+
+        // Prefer non-offhand items: consume the main inventory before falling back to the offhand.
+        for (ItemStack stack : player.getInventory().items) {
+            if (stack.getItem() == targetItem && !stack.isEmpty()) {
+                return new Supply(stack, false, InteractionHand.MAIN_HAND);
+            }
+        }
+
+        ItemStack offhand = player.getOffhandItem();
+        if (offhand.getItem() == targetItem && !offhand.isEmpty()) {
+            return new Supply(offhand, false, InteractionHand.OFF_HAND);
+        }
+
+        return emptySupply();
+    }
+
+    private static BlockState getPlacementState(ServerLevel level, ServerPlayer player, BlockPos pos,
+                                                Direction face, BlockItem targetItem, ItemStack stack,
+                                                InteractionHand hand) {
+        if (!level.getBlockState(pos).canBeReplaced()) return null;
+        BlockHitResult placeHit = new BlockHitResult(
+                Vec3.atCenterOf(pos), face, pos.relative(face.getOpposite()), false);
+        BlockPlaceContext context = new BlockPlaceContext(
+                level, player, hand, stack, placeHit);
+        BlockState placed = targetItem.getBlock().getStateForPlacement(context);
+        if (placed == null || !placed.canSurvive(level, pos)
+                || !level.isUnobstructed(placed, pos,
+                                         net.minecraft.world.phys.shapes.CollisionContext.of(player))) {
+            return null;
+        }
+        return placed;
+    }
+
+    private static int previewLimit(ServerLevel level, ServerPlayer player, ItemStack tool,
+                                     BlockItem targetItem, int configuredLimit) {
+        int limit = Math.min(configuredLimit, MAX_PREVIEW_BLOCKS);
+        if (player.isCreative()) return limit;
+
+        long available = countLocalSupply(player, targetItem);
+        if (isAeStoragePriorityEnabled(tool)) {
+            try {
+                available += AE2Compat.tryExtractFromLinkedGrid(
+                        tool, player, new ItemStack(targetItem, limit), Actionable.SIMULATE);
+            } catch (Throwable ignored) {
+            }
+        }
+        return (int) Math.min(limit, available);
+    }
+
+    private static long countLocalSupply(ServerPlayer player, BlockItem targetItem) {
+        long count = 0;
+        ItemStack offhand = player.getOffhandItem();
+        if (offhand.getItem() == targetItem) count += offhand.getCount();
+        for (ItemStack stack : player.getInventory().items) {
+            if (stack.getItem() == targetItem) count += stack.getCount();
+        }
+        return count;
+    }
+
+    private static Supply findAeSupply(ServerPlayer player, ItemStack tool, BlockItem targetItem) {
+        if (!isAeStoragePriorityEnabled(tool)) {
+            return emptySupply();
+        }
+
+        ItemStack requested = new ItemStack(targetItem);
+        try {
+            if (AE2Compat.tryExtractFromLinkedGrid(tool, player, requested, Actionable.SIMULATE) > 0) {
+                return new Supply(requested, true, InteractionHand.MAIN_HAND);
+            }
+        } catch (Throwable ignored) {
+        }
+        return emptySupply();
+    }
+
+    private static Supply emptySupply() {
+        return new Supply(ItemStack.EMPTY, false, InteractionHand.MAIN_HAND);
+    }
+
+    private static BlockItem placementTarget(ServerPlayer player, BlockItem fallback) {
+        ItemStack offhand = player.getOffhandItem();
+        return offhand.getItem() instanceof BlockItem blockItem ? blockItem : fallback;
+    }
+
+    public static BlockPos angelAirStart(Player player) {
+        return BlockPos.containing(player.getEyePosition().add(player.getLookAngle().scale(2.0)));
+    }
+
+    public static Direction angelAirStep(Player player) {
+        return player.getDirection();
+    }
+
+    private static boolean isAeStoragePriorityEnabled(ItemStack tool) {
+        return com.sorrowmist.useless.compat.forge1201.component.ComponentAccess.getOrDefault(tool, UComponents.AEStoragePriorityComponent.get(), false)
+                && com.sorrowmist.useless.compat.forge1201.component.ComponentAccess.has(tool, UComponents.WIRELESS_LINK_TARGET.get());
+    }
+
+    /**
+     * 与 {@code face} 垂直的平面内、相对目标方块的 8 邻域偏移（4 个轴向 + 4 个对角）。
+     * 只沿 4 个轴向扩展会漏掉仅通过角点相连的同类方块（斜向/L 形的平面），
+     * 所以这里把对角也算作相邻，建造、破坏及其预览共用同一套邻域。
+     */
+    private static BlockPos[] planeOffsets(Direction face) {
+        Direction[] axes = switch (face.getAxis()) {
+            case X -> new Direction[]{Direction.UP, Direction.NORTH};
+            case Y -> new Direction[]{Direction.NORTH, Direction.EAST};
+            case Z -> new Direction[]{Direction.UP, Direction.EAST};
+        };
+        Direction first = axes[0];
+        Direction second = axes[1];
+        List<BlockPos> offsets = new ArrayList<>(8);
+        for (Direction axis : new Direction[]{first, first.getOpposite(), second, second.getOpposite()}) {
+            offsets.add(new BlockPos(axis.getStepX(), axis.getStepY(), axis.getStepZ()));
+        }
+        for (Direction a : new Direction[]{first, first.getOpposite()}) {
+            for (Direction b : new Direction[]{second, second.getOpposite()}) {
+                offsets.add(new BlockPos(a.getStepX() + b.getStepX(),
+                        a.getStepY() + b.getStepY(),
+                        a.getStepZ() + b.getStepZ()));
+            }
+        }
+        return offsets.toArray(BlockPos[]::new);
+    }
+
+    private static void remember(ServerPlayer player, Operation operation) {
+        if (operation == null || operation.blocks.isEmpty()) return;
+        Deque<Operation> operations = HISTORY.computeIfAbsent(player.getUUID(), ignored -> new ArrayDeque<>());
+        operations.addLast(operation);
+        while (operations.size() > MAX_UNDO_OPERATIONS) operations.removeFirst();
+    }
+
+    private static void undo(ServerPlayer player, ServerLevel level, BlockPos clickedPos) {
+        Deque<Operation> operations = HISTORY.get(player.getUUID());
+        if (operations == null || operations.isEmpty()) return;
+
+        Operation operation = operations.peekLast();
+        if (operation.dimension != level.dimension() || !operation.contains(clickedPos)) return;
+
+        boolean restored = false;
+        for (SavedBlock block : operation.blocks) {
+            if (!level.getBlockState(block.pos).equals(block.afterState)) continue;
+            block.restore(level);
+            if (!block.refund.isEmpty()) {
+                ItemStack refund = block.refund.copy();
+                if (block.refundToAe) {
+                    try {
+                        long inserted = AE2Compat.tryInsertIntoLinkedGrid(
+                                operation.tool, player, refund, Actionable.MODULATE);
+                        refund.shrink((int) Math.min(Integer.MAX_VALUE, inserted));
+                    } catch (Throwable ignored) {
+                    }
+                }
+                if (!refund.isEmpty()) {
+                    player.getInventory().placeItemBackInInventory(refund);
+                }
+            }
+            restored = true;
+        }
+        if (restored) operations.removeLast();
+    }
+
+    private record Operation(List<SavedBlock> blocks,
+                             ItemStack tool,
+                             net.minecraft.resources.ResourceKey<Level> dimension) {
+        private Operation(List<SavedBlock> blocks, ItemStack tool) {
+            this(blocks, tool, blocks.get(0).dimension);
+        }
+
+        private boolean contains(BlockPos pos) {
+            return blocks.stream().anyMatch(block -> block.pos.equals(pos));
+        }
+    }
+
+    private static final class SavedBlock {
+        private final BlockPos pos;
+        private final BlockState beforeState;
+        private final CompoundTag blockEntityData;
+        private final ItemStack refund;
+        private final boolean refundToAe;
+        private BlockState afterState;
+        private final net.minecraft.resources.ResourceKey<Level> dimension;
+
+        private SavedBlock(BlockPos pos, BlockState beforeState, CompoundTag blockEntityData,
+                           ItemStack refund, boolean refundToAe,
+                           net.minecraft.resources.ResourceKey<Level> dimension) {
+            this.pos = pos.immutable();
+            this.beforeState = beforeState;
+            this.blockEntityData = blockEntityData;
+            this.refund = refund;
+            this.refundToAe = refundToAe;
+            this.dimension = dimension;
+        }
+
+        private static SavedBlock capture(ServerLevel level, BlockPos pos, BlockState state,
+                                          ItemStack refund, boolean refundToAe) {
+            BlockEntity blockEntity = level.getBlockEntity(pos);
+            CompoundTag data = blockEntity == null
+                    ? null
+                    : blockEntity.saveWithFullMetadata();
+            return new SavedBlock(pos, state, data, refund, refundToAe, level.dimension());
+        }
+
+        private void restore(ServerLevel level) {
+            level.removeBlockEntity(pos);
+            level.setBlock(pos, beforeState, Block.UPDATE_ALL);
+            if (blockEntityData != null) {
+                BlockEntity restored = BlockEntity.loadStatic(
+                        pos, beforeState, blockEntityData);
+                if (restored != null) level.setBlockEntity(restored);
+            }
+        }
+    }
+
+    private record Supply(ItemStack stack, boolean fromAe, InteractionHand hand) {
+    }
+}

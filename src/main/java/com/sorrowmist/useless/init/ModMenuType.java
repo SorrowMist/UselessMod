@@ -1,0 +1,66 @@
+package com.sorrowmist.useless.init;
+
+import com.sorrowmist.useless.UselessMod;
+import com.sorrowmist.useless.content.menus.AdvancedAlloyFurnaceMenu;
+import com.sorrowmist.useless.content.menus.ChainGroupMenu;
+import com.sorrowmist.useless.content.menus.ContainerPatternConverter;
+import com.sorrowmist.useless.content.menus.MePatternAssemblyMenu;
+import com.sorrowmist.useless.content.menus.OmniversalMoldHubMenu;
+import com.sorrowmist.useless.content.menus.MultiblockAlloyFurnaceMenu;
+import com.sorrowmist.useless.content.menus.OreGeneratorMenu;
+import com.sorrowmist.useless.content.menus.PassiveCraftingHatchMenu;
+import com.sorrowmist.useless.content.menus.StaffLinkMenu;
+import com.sorrowmist.useless.content.menus.DimensionConfigMenu;
+import net.minecraft.core.registries.Registries;
+import net.minecraft.world.inventory.MenuType;
+import net.minecraftforge.eventbus.api.IEventBus;
+import net.minecraftforge.common.extensions.IForgeMenuType;
+import com.sorrowmist.useless.compat.forge1201.registry.DeferredRegister;
+
+import java.util.function.Supplier;
+
+public final class ModMenuType {
+    private static final DeferredRegister<MenuType<?>> MENU_TYPES =
+            DeferredRegister.create(Registries.MENU, UselessMod.MODID);
+    public static final Supplier<MenuType<AdvancedAlloyFurnaceMenu>> ADVANCED_ALLOY_FURNACE_MENU =
+            MENU_TYPES.register("advanced_alloy_furnace_menu",
+                                () -> IForgeMenuType.create(AdvancedAlloyFurnaceMenu::new)
+            );
+    public static final Supplier<MenuType<MePatternAssemblyMenu>> ME_PATTERN_ASSEMBLY_MENU =
+            MENU_TYPES.register("me_pattern_assembly_menu",
+                    () -> IForgeMenuType.create(MePatternAssemblyMenu::new));
+    public static final Supplier<MenuType<OmniversalMoldHubMenu>> OMNIVERSAL_MOLD_HUB_MENU =
+            MENU_TYPES.register("omniversal_mold_hub_menu",
+                    () -> IForgeMenuType.create(OmniversalMoldHubMenu::new));
+    public static final Supplier<MenuType<MultiblockAlloyFurnaceMenu>> MULTIBLOCK_ALLOY_FURNACE_MENU =
+            MENU_TYPES.register("multiblock_alloy_furnace_menu",
+                    () -> IForgeMenuType.create(MultiblockAlloyFurnaceMenu::new));
+    public static final Supplier<MenuType<PassiveCraftingHatchMenu>> PASSIVE_CRAFTING_HATCH_MENU =
+            MENU_TYPES.register("passive_crafting_hatch_menu",
+                    () -> IForgeMenuType.create(PassiveCraftingHatchMenu::new));
+    public static final Supplier<MenuType<OreGeneratorMenu>> ORE_GENERATOR_MENU =
+            MENU_TYPES.register("ore_generator_menu",
+                    () -> IForgeMenuType.create(OreGeneratorMenu::new));
+    public static final Supplier<MenuType<DimensionConfigMenu>> DIMENSION_CONFIG_MENU =
+            MENU_TYPES.register("dimension_config_menu",
+                    () -> IForgeMenuType.create(DimensionConfigMenu::new));
+    public static final Supplier<MenuType<ContainerPatternConverter>> PATTERN_CONVERTER_MENU =
+            MENU_TYPES.register("omniversal_pattern_converter",
+                    () -> ContainerPatternConverter.TYPE);
+    public static final Supplier<MenuType<StaffLinkMenu>> STAFF_LINK_MENU =
+            MENU_TYPES.register("staff_link_menu",
+                    () -> IForgeMenuType.create(StaffLinkMenu::new));
+    /**
+     * 连锁等价组界面用的空菜单：只为让界面继承 {@code AbstractContainerScreen}
+     * （JEI / EMI 的原料侧栏只画在容器界面旁边），不承载任何数据、也不下发。
+     */
+    public static final Supplier<MenuType<ChainGroupMenu>> CHAIN_GROUP_MENU =
+            MENU_TYPES.register("chain_group_menu",
+                    () -> IForgeMenuType.create(ChainGroupMenu::new));
+
+    private ModMenuType() {}
+
+    public static void register(IEventBus eventBus) {
+        MENU_TYPES.register(eventBus);
+    }
+}

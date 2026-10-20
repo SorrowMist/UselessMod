@@ -1,0 +1,6 @@
+{
+  "variants": {
+    "active=false": { "model": "useless_mod:block/useless_coil_tier_9" },
+    "active=true": { "model": "useless_mod:block/useless_coil_tier_9_active" }
+  }
+}

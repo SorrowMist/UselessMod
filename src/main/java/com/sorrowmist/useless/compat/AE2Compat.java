@@ -1,0 +1,159 @@
+package com.sorrowmist.useless.compat;
+
+import appeng.api.config.Actionable;
+import appeng.api.networking.IGrid;
+import appeng.api.networking.security.IActionSource;
+import appeng.api.networking.storage.IStorageService;
+import appeng.api.stacks.AEItemKey;
+import appeng.blockentity.networking.WirelessAccessPointBlockEntity;
+import com.sorrowmist.useless.core.component.UComponents;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.GlobalPos;
+import net.minecraft.network.chat.Component;
+import net.minecraft.server.MinecraftServer;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.block.entity.BlockEntity;
+import org.jetbrains.annotations.Nullable;
+
+import java.util.function.Predicate;
+
+public class AE2Compat {
+
+    public static long tryExtractFromLinkedGrid(
+            ItemStack tool, Player player, ItemStack requested, Actionable mode) {
+        LinkedGridAccess access = resolveLinkedGrid(tool, player);
+        AEItemKey key = AEItemKey.of(requested);
+        if (access == null || key == null || requested.isEmpty()) return 0L;
+        return access.grid.getStorageService().getInventory().extract(
+                key, requested.getCount(), mode, access.source);
+    }
+
+    public static long tryInsertIntoLinkedGrid(
+            ItemStack tool, Player player, ItemStack stack, Actionable mode) {
+        LinkedGridAccess access = resolveLinkedGrid(tool, player);
+        AEItemKey key = AEItemKey.of(stack);
+        if (access == null || key == null || stack.isEmpty()) return 0L;
+        return access.grid.getStorageService().getInventory().insert(
+                key, stack.getCount(), mode, access.source);
+    }
+
+    /**
+     * 尝试将物品存入工具绑定的 AE2 网络
+     *
+     * @return 实际存入的数量
+     */
+    public static int tryInsertToLinkedGrid(ItemStack tool, Player player, ItemStack drop) {
+        // 1. 获取绑定坐标组件
+        GlobalPos linkedPos = com.sorrowmist.useless.compat.forge1201.component.ComponentAccess.get(tool, UComponents.WIRELESS_LINK_TARGET.get());
+        if (linkedPos == null) {
+            player.displayClientMessage(Component.translatable("gui.useless_mod.ae2.not_bound"), true);
+            return 0;
+        }
+        BlockPos pos = linkedPos.pos();
+
+        // 2. 服务器安全检查
+        MinecraftServer server = player.getServer();
+        if (server == null) return 0;
+
+        // 3. 获取目标维度世界并检查区块是否加载
+        ServerLevel targetLevel = server.getLevel(linkedPos.dimension());
+        if (targetLevel == null || !targetLevel.isLoaded(pos)) {
+            player.displayClientMessage(Component.translatable("gui.useless_mod.ae2.chunk_not_loaded"), true);
+            return 0;
+        }
+
+        // 4. 获取 BlockEntity 并验证类型
+        BlockEntity be = targetLevel.getBlockEntity(pos);
+        if (!(be instanceof WirelessAccessPointBlockEntity wap)) {
+            player.displayClientMessage(Component.translatable("gui.useless_mod.ae2.invalid_target"), true);
+            return 0;
+        }
+
+        // 5. 检查无线访问点是否在线
+        if (!wap.getMainNode().isOnline()) {
+            player.displayClientMessage(Component.translatable("gui.useless_mod.ae2.offline"), true);
+            return 0;
+        }
+
+        // 6. 获取网格及存储服务
+        IGrid grid = wap.getGrid();
+        if (grid == null) return 0;
+
+        IStorageService storage = grid.getStorageService();
+        IActionSource source = IActionSource.ofPlayer(player);
+        AEItemKey key = AEItemKey.of(drop);
+
+        if (key == null) return 0;
+
+        // 7. 执行存入操作
+        long inserted = storage.getInventory().insert(
+                key,
+                drop.getCount(),
+                Actionable.MODULATE,
+                source
+        );
+
+        return (int) inserted;
+    }
+
+    /**
+     * 从绑定网络提取一件满足条件的物品。
+     *
+     * <p>提取必须按网络中该件物品自身的 key 进行：带耐久的物品（例如 occultism 的粉笔）
+     * 其 key 包含耐久等组件，使用全新的同类物品无法匹配。返回的物品栈保留其原有耐久，
+     * 以便使用后原样放回。</p>
+     *
+     * @param matcher 判断某件物品是否可用；参数为带原始耐久的物品栈
+     * @return 提取到的物品；网络不可用或无匹配项时返回 null
+     */
+    @Nullable
+    public static ItemStack extractMatchingFromLinkedGrid(ItemStack tool, Player player,
+                                                          Predicate<ItemStack> matcher) {
+        LinkedGridAccess access = resolveLinkedGrid(tool, player);
+        if (access == null) return null;
+
+        var inventory = access.grid.getStorageService().getInventory();
+
+        // 先定位目标 key，避免在遍历库存期间修改库存
+        AEItemKey matched = null;
+        for (var entry : inventory.getAvailableStacks()) {
+            if (entry.getLongValue() <= 0L) continue;
+            if (!(entry.getKey() instanceof AEItemKey itemKey)) continue;
+
+            ItemStack candidate = itemKey.toStack(1);
+            if (candidate.isEmpty() || !matcher.test(candidate)) continue;
+
+            matched = itemKey;
+            break;
+        }
+        if (matched == null) return null;
+
+        if (inventory.extract(matched, 1L, Actionable.MODULATE, access.source) <= 0L) return null;
+        return matched.toStack(1);
+    }
+
+    /**
+     * 解析物品绑定的 AE2 网络。
+     *
+     * <p>供命令等外部调用方复用：返回的 {@link LinkedGridAccess} 同时携带网格与玩家动作源。
+     * 物品未绑定、目标区块未加载或无线访问点离线时返回 {@code null}。</p>
+     */
+    @Nullable
+    public static LinkedGridAccess resolveLinkedGrid(ItemStack tool, Player player) {
+        GlobalPos linkedPos = com.sorrowmist.useless.compat.forge1201.component.ComponentAccess.get(tool, UComponents.WIRELESS_LINK_TARGET.get());
+        MinecraftServer server = player.getServer();
+        if (linkedPos == null || server == null) return null;
+        ServerLevel targetLevel = server.getLevel(linkedPos.dimension());
+        if (targetLevel == null || !targetLevel.isLoaded(linkedPos.pos())) return null;
+        if (!(targetLevel.getBlockEntity(linkedPos.pos()) instanceof WirelessAccessPointBlockEntity accessPoint)
+                || !accessPoint.getMainNode().isOnline()) return null;
+        IGrid grid = accessPoint.getGrid();
+        return grid == null ? null : new LinkedGridAccess(grid, IActionSource.ofPlayer(player));
+    }
+
+    /** 网格与玩家动作源的组合，供跨包调用方（如命令层）复用。 */
+    public record LinkedGridAccess(IGrid grid, IActionSource source) {
+    }
+}

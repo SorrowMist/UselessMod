@@ -1,0 +1,160 @@
+package com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae;
+
+import appeng.api.crafting.IPatternDetails;
+import appeng.api.stacks.AEItemKey;
+import appeng.api.stacks.AEKey;
+import appeng.api.stacks.GenericStack;
+import appeng.api.stacks.KeyCounter;
+import com.sorrowmist.useless.content.recipe.RecipeOutputConstraint;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
+import org.jetbrains.annotations.Nullable;
+
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Set;
+
+/** Reads the local slot-level component matching policy. */
+final class AdvancedAlloyFurnacePatternPolicy {
+    private AdvancedAlloyFurnacePatternPolicy() {
+    }
+
+    static List<RecipeOutputConstraint> outputConstraints(@Nullable IPatternDetails pattern) {
+        if (pattern == null) {
+            return List.of();
+        }
+
+        IPatternDetails original = SmartDoublingPatterns.unwrap(pattern);
+        DynamicComponentPattern dynamic = dynamicDetails(original);
+        List<GenericStack> outputs = java.util.Arrays.asList(original.getOutputs());
+        List<RecipeOutputConstraint> result = new ArrayList<>(outputs.size());
+        for (int slot = 0; slot < outputs.size(); slot++) {
+            GenericStack output = outputs.get(slot);
+            if (output == null || output.what() == null) {
+                continue;
+            }
+            boolean idOnly = dynamic != null
+                    && dynamic.isItemIdOutput(slot)
+                    && output.what() instanceof AEItemKey;
+            result.add(idOnly
+                    ? RecipeOutputConstraint.itemId(output.what())
+                    : RecipeOutputConstraint.exact(output.what()));
+        }
+        return List.copyOf(result);
+    }
+
+    static boolean usesRecipeOutputs(@Nullable IPatternDetails pattern) {
+        IPatternDetails original = SmartDoublingPatterns.unwrap(pattern);
+        if (original instanceof OmniversalPatternDetails) {
+            return true;
+        }
+
+        DynamicComponentPattern dynamic = dynamicDetails(original);
+        if (dynamic == null) {
+            return false;
+        }
+        return dynamic.usesDynamicOutputs();
+    }
+
+    static Set<AEKey> componentInputKeys(
+            @Nullable IPatternDetails pattern, @Nullable KeyCounter[] inputHolder) {
+        IPatternDetails original = SmartDoublingPatterns.unwrap(pattern);
+        DynamicComponentPattern dynamic = dynamicDetails(original);
+        if (dynamic == null || inputHolder == null) {
+            return Set.of();
+        }
+
+        Set<AEKey> result = new LinkedHashSet<>();
+        IPatternDetails.IInput[] inputs = original.getInputs();
+        if (inputHolder.length == inputs.length) {
+            for (int slot = 0; slot < inputs.length; slot++) {
+                if (!dynamic.isItemIdInput(slot) || inputHolder[slot] == null) {
+                    continue;
+                }
+                for (var entry : inputHolder[slot]) {
+                    if (entry.getLongValue() > 0) {
+                        result.add(entry.getKey());
+                    }
+                }
+            }
+            return Set.copyOf(result);
+        }
+
+        Set<Item> relaxedItems = relaxedItems(original, dynamic);
+        for (KeyCounter counter : inputHolder) {
+            if (counter == null) continue;
+            for (var entry : counter) {
+                if (entry.getLongValue() > 0
+                        && entry.getKey() instanceof AEItemKey itemKey
+                        && relaxedItems.contains(itemKey.getItem())) {
+                    result.add(itemKey);
+                }
+            }
+        }
+        return Set.copyOf(result);
+    }
+
+    static Set<AEKey> componentInputKeys(
+            @Nullable IPatternDetails pattern, List<ItemStack> actualInputs) {
+        return componentInputKeys(pattern, actualInputs, List.of());
+    }
+
+    static Set<AEKey> componentInputKeys(
+            @Nullable IPatternDetails pattern,
+            List<ItemStack> actualInputs,
+            List<GenericStack> actualKeyInputs) {
+        IPatternDetails original = SmartDoublingPatterns.unwrap(pattern);
+        DynamicComponentPattern dynamic = dynamicDetails(original);
+        if (dynamic == null || (actualInputs.isEmpty() && actualKeyInputs.isEmpty())) {
+            return Set.of();
+        }
+
+        Set<Item> relaxedItems = relaxedItems(original, dynamic);
+
+        Set<AEKey> result = new LinkedHashSet<>();
+        for (ItemStack stack : actualInputs) {
+            if (stack.isEmpty() || !relaxedItems.contains(stack.getItem())) {
+                continue;
+            }
+            AEItemKey key = AEItemKey.of(stack);
+            if (key != null) {
+                result.add(key);
+            }
+        }
+        for (GenericStack stack : actualKeyInputs) {
+            if (stack.what() instanceof AEItemKey itemKey
+                    && relaxedItems.contains(itemKey.getItem())) {
+                result.add(itemKey);
+            }
+        }
+        return Set.copyOf(result);
+    }
+
+    static Set<AEKey> componentInputKeysFromGenericStacks(
+            @Nullable IPatternDetails pattern, List<GenericStack> actualInputs) {
+        return componentInputKeys(pattern, List.of(), actualInputs);
+    }
+
+    private static Set<Item> relaxedItems(
+            IPatternDetails pattern, DynamicComponentPattern dynamic) {
+        Set<Item> result = new LinkedHashSet<>();
+        IPatternDetails.IInput[] inputs = pattern.getInputs();
+        for (int slot = 0; slot < inputs.length; slot++) {
+            if (!dynamic.isItemIdInput(slot)) {
+                continue;
+            }
+            for (GenericStack possible : inputs[slot].getPossibleInputs()) {
+                if (possible != null && possible.what() instanceof AEItemKey itemKey) {
+                    result.add(itemKey.getItem());
+                }
+            }
+        }
+        return result;
+    }
+
+    @Nullable
+    private static DynamicComponentPattern dynamicDetails(@Nullable IPatternDetails pattern) {
+        return pattern instanceof DynamicComponentPattern dynamic ? dynamic : null;
+    }
+}

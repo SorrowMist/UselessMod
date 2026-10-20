@@ -1,0 +1,16 @@
+{
+  "required": false,
+  "package": "com.sorrowmist.useless.mixin.pneumaticcraft",
+  "compatibilityLevel": "JAVA_17",
+  "mixins": [
+    "MachineAirHandlerMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  },
+  "overwrites": {
+    "requireAnnotations": true
+  },
+  "refmap": "useless_mod.refmap.json",
+  "minVersion": "0.8"
+}

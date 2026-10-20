@@ -1,0 +1,632 @@
+package com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae;
+
+import appeng.api.crafting.IPatternDetails;
+import appeng.api.crafting.PatternDetailsHelper;
+import appeng.api.stacks.AEItemKey;
+import appeng.api.stacks.GenericStack;
+import appeng.crafting.pattern.AECraftingPattern;
+import appeng.crafting.pattern.AEProcessingPattern;
+import com.mojang.datafixers.util.Pair;
+import com.sorrowmist.useless.content.recipe.AdapterUtils;
+import com.sorrowmist.useless.content.recipe.AdvancedAlloyFurnaceRecipe;
+import com.sorrowmist.useless.content.recipe.AlloyFurnaceRecipeCatalog;
+import com.sorrowmist.useless.content.recipe.CountedIngredient;
+import com.sorrowmist.useless.content.recipe.LongSizedFluidIngredient;
+import com.sorrowmist.useless.core.component.OmniversalPatternData;
+import com.sorrowmist.useless.core.component.UComponents;
+import com.sorrowmist.useless.init.ModItems;
+import net.minecraft.core.Holder;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.tags.TagKey;
+import net.minecraft.world.item.crafting.Ingredient;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.material.Fluid;
+import net.minecraftforge.fluids.FluidStack;
+import com.sorrowmist.useless.compat.forge1201.fluid.FluidIngredient;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.IdentityHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.OptionalLong;
+import java.util.Set;
+import java.util.TreeSet;
+
+public final class OmniversalPatternEncoding {
+    private OmniversalPatternEncoding() {
+    }
+
+    public static ItemStack encode(ItemStack sourcePattern, AlloyFurnaceRecipeCatalog.Entry entry, Level level) {
+        if (sourcePattern == null || sourcePattern.isEmpty() || entry == null || level == null) {
+            return ItemStack.EMPTY;
+        }
+        IPatternDetails decoded = PatternDetailsHelper.decodePattern(sourcePattern, level);
+        return encode(sourcePattern, decoded, entry, level);
+    }
+
+    /** Encodes from the caller's already decoded pattern to avoid a second AE2 decode pass. */
+    public static ItemStack encode(
+            ItemStack sourcePattern, IPatternDetails decoded,
+            AlloyFurnaceRecipeCatalog.Entry entry, Level level) {
+        if (sourcePattern == null || sourcePattern.isEmpty() || decoded == null
+                || entry == null || level == null) {
+            return ItemStack.EMPTY;
+        }
+        if (decoded instanceof OmniversalPatternDetails) {
+            return ItemStack.EMPTY;
+        }
+
+        if (decoded instanceof AECraftingPattern) {
+            ItemStack processingPattern = createProcessingPattern(entry.recipe());
+            if (processingPattern.isEmpty()) {
+                return ItemStack.EMPTY;
+            }
+
+            IPatternDetails processingDetails = PatternDetailsHelper.decodePattern(
+                    processingPattern, level);
+            if (!(processingDetails instanceof AEProcessingPattern processing)) {
+                return ItemStack.EMPTY;
+            }
+            return encodeProcessingPattern(processingPattern, processing, entry, level);
+        }
+
+        if (!(decoded instanceof AEProcessingPattern processing)) {
+            return ItemStack.EMPTY;
+        }
+
+        return encodeProcessingPattern(sourcePattern, processing, entry, level);
+    }
+
+    /**
+     * 用重新解析出的配方身份重编码一张既有的万象样板。
+     *
+     * <p>失效样板自身的 AE payload 仍然完好，失效的只是它绑定的配方身份。这里把该 payload
+     * 当作普通 {@link AEProcessingPattern} 传入 {@link #encode}，从而自然绕过「拒绝二次包装
+     * 万象样板」的守卫，而不必放宽那条守卫、影响常规调用方。</p>
+     *
+     * <p>payload 无法解析或重编码失败时返回 {@link ItemStack#EMPTY}，由调用方保留原栈。</p>
+     */
+    public static ItemStack reencodeExisting(
+            ItemStack existing, AlloyFurnaceRecipeCatalog.Entry entry, Level level) {
+        if (existing == null || existing.isEmpty() || entry == null || level == null) {
+            return ItemStack.EMPTY;
+        }
+        AEItemKey definition = AEItemKey.of(existing);
+        if (definition == null) {
+            return ItemStack.EMPTY;
+        }
+        AEProcessingPattern source;
+        try {
+            source = new AEProcessingPattern(definition);
+        } catch (RuntimeException exception) {
+            // 连 AE payload 都读不出来就没有可复用的输入，交给调用方计为无法修复。
+            return ItemStack.EMPTY;
+        }
+        return encode(existing, source, entry, level);
+    }
+
+    /**
+     * 以当前配方的输入输出为准重建一张万象样板。
+     *
+     * <p>与 {@link #reencodeExisting} 不同，本方法完全不读取旧样板的 AE payload，而是用
+     * {@code entry.recipe()} 当前的输入输出重新生成 processing payload。适用于绑定配方仍在、
+     * 但其输入（或输出）已被改动，因而旧 payload 无法再与当前配方匹配的失效样板——
+     * 这类样板用 {@link #reencodeExisting} 无法修复。</p>
+     *
+     * <p>配方无法编码为 processing 形式或重建结果无法解码时返回 {@link ItemStack#EMPTY}，
+     * 由调用方保留原栈。</p>
+     */
+    public static ItemStack reencodeFromRecipe(
+            AlloyFurnaceRecipeCatalog.Entry entry, Level level) {
+        if (entry == null || level == null || entry.recipe() == null) {
+            return ItemStack.EMPTY;
+        }
+        ItemStack processingPattern = createProcessingPattern(entry.recipe());
+        if (processingPattern.isEmpty()) {
+            return ItemStack.EMPTY;
+        }
+        IPatternDetails processingDetails = PatternDetailsHelper.decodePattern(processingPattern, level);
+        if (!(processingDetails instanceof AEProcessingPattern processing)) {
+            return ItemStack.EMPTY;
+        }
+        return encodeProcessingPattern(processingPattern, processing, entry, level);
+    }
+
+    private static ItemStack encodeProcessingPattern(
+            ItemStack sourcePattern, AEProcessingPattern processing,
+            AlloyFurnaceRecipeCatalog.Entry entry, Level level) {
+        if (sourcePattern == null || processing == null || entry == null || level == null) {
+            return ItemStack.EMPTY;
+        }
+
+        AdvancedAlloyFurnaceRecipe recipe = entry.recipe();
+        OptionalLong scale = AlloyFurnaceRecipeCatalog.findPatternScale(
+                level, entry.sourceId(), recipe, processing);
+        if (scale.isEmpty()) {
+            return ItemStack.EMPTY;
+        }
+        List<GenericStack> normalizedInputs = normalizeInputs(processing, scale.getAsLong());
+        List<GenericStack> normalizedOutputs = normalizeStacks(java.util.Arrays.asList(processing.getOutputs()), scale.getAsLong());
+        if (normalizedInputs.isEmpty() || normalizedOutputs.isEmpty()) {
+            return ItemStack.EMPTY;
+        }
+
+        // A manually multiplied processing pattern is accepted for conversion, but the
+        // omniversal result always represents one base recipe operation.
+        ItemStack normalizedSource = sourcePattern.copy();
+        com.sorrowmist.useless.compat.forge1201.recipe.NativeProcessingPatterns.write(normalizedSource, normalizedInputs, normalizedOutputs);
+        if (!com.sorrowmist.useless.compat.forge1201.recipe.NativeProcessingPatterns.hasPayload(normalizedSource)) {
+            return ItemStack.EMPTY;
+        }
+
+        AEItemKey normalizedDefinition = AEItemKey.of(normalizedSource);
+        if (normalizedDefinition == null) {
+            return ItemStack.EMPTY;
+        }
+        AEProcessingPattern normalizedPattern;
+        try {
+            normalizedPattern = new AEProcessingPattern(normalizedDefinition);
+        } catch (RuntimeException exception) {
+            return ItemStack.EMPTY;
+        }
+
+        List<Integer> dynamicInputs = new ArrayList<>();
+        List<Integer> dynamicOutputs = new ArrayList<>();
+        IPatternDetails resolved = AdvancedAlloyFurnacePatternResolver.resolve(
+                normalizedPattern, level, entry.sourceId());
+        if (resolved instanceof DynamicComponentPattern dynamic) {
+            for (int slot = 0; slot < resolved.getInputs().length; slot++) {
+                if (dynamic.isItemIdInput(slot)) dynamicInputs.add(slot);
+            }
+            for (int slot = 0; slot < resolved.getOutputs().length; slot++) {
+                if (dynamic.isItemIdOutput(slot)) dynamicOutputs.add(slot);
+            }
+        }
+
+        dynamicInputs = resolveItemIdInputSlots(recipe, normalizedPattern, dynamicInputs);
+        Map<Integer, List<TagKey<Item>>> tagInputs =
+                resolveTagInputSlots(recipe, normalizedPattern);
+        Map<Integer, List<TagKey<Fluid>>> fluidTagInputs =
+                resolveFluidTagInputSlots(recipe, normalizedPattern);
+        List<OmniversalPatternData.MoldTagInputSlot> moldTagInputs =
+                resolveMoldTagInputSlots(recipe);
+        List<OmniversalPatternData.TagInputSlot> encodedTagInputs = new ArrayList<>();
+        for (Map.Entry<Integer, List<TagKey<Item>>> tagInput : tagInputs.entrySet()) {
+            for (TagKey<Item> tag : tagInput.getValue()) {
+                encodedTagInputs.add(new OmniversalPatternData.TagInputSlot(tagInput.getKey(), tag));
+            }
+        }
+        List<OmniversalPatternData.FluidTagInputSlot> encodedFluidTagInputs = new ArrayList<>();
+        for (Map.Entry<Integer, List<TagKey<Fluid>>> tagInput : fluidTagInputs.entrySet()) {
+            for (TagKey<Fluid> tag : tagInput.getValue()) {
+                encodedFluidTagInputs.add(new OmniversalPatternData.FluidTagInputSlot(tagInput.getKey(), tag));
+            }
+        }
+        List<AEItemKey> displayMolds = new ArrayList<>();
+        if (recipe.molds().size() > 1) {
+            for (Ingredient mold : recipe.molds()) {
+                ItemStack[] options = mold.getItems();
+                if (options.length > 0) {
+                    AEItemKey key = AEItemKey.of(options[0]);
+                    if (key != null) displayMolds.add(key);
+                }
+            }
+        }
+        Optional<AEItemKey> displayMold = recipe.molds().size() == 1
+                ? firstDisplayMold(recipe.molds().get(0)) : Optional.empty();
+        OmniversalPatternData data = new OmniversalPatternData(
+                OmniversalPatternData.CURRENT_VERSION,
+                entry.identity().recipeId(),
+                entry.identity().fingerprint(),
+                entry.sourceId(),
+                !recipe.molds().isEmpty(),
+                displayMold,
+                displayMolds,
+                encodedTagInputs,
+                encodedFluidTagInputs,
+                moldTagInputs,
+                dynamicInputs,
+                dynamicOutputs);
+
+        ItemStack result = new ItemStack(ModItems.OMNIVERSAL_PATTERN.get());
+        com.sorrowmist.useless.compat.forge1201.recipe.NativeProcessingPatterns.copyTo(normalizedSource, result);
+        com.sorrowmist.useless.compat.forge1201.component.ComponentAccess.set(result, UComponents.OMNIVERSAL_PATTERN_DATA.get(), data);
+        return result;
+    }
+
+    private static List<GenericStack> normalizeInputs(
+            AEProcessingPattern source, long scale) {
+        if (source == null || scale <= 0L) return List.of();
+
+        List<GenericStack> result = new ArrayList<>();
+        for (IPatternDetails.IInput input : source.getInputs()) {
+            if (input == null || input.getMultiplier() <= 0L
+                    || input.getMultiplier() % scale != 0L) {
+                return List.of();
+            }
+            GenericStack[] possible = input.getPossibleInputs();
+            if (possible == null || possible.length == 0
+                    || possible[0] == null || possible[0].what() == null) {
+                return List.of();
+            }
+            result.add(new GenericStack(
+                    possible[0].what(), input.getMultiplier() / scale));
+        }
+        return List.copyOf(result);
+    }
+
+    private static List<GenericStack> normalizeStacks(
+            List<GenericStack> source, long scale) {
+        if (source == null || source.isEmpty() || scale <= 0L) return List.of();
+
+        List<GenericStack> result = new ArrayList<>(source.size());
+        for (GenericStack stack : source) {
+            if (stack == null || stack.what() == null || stack.amount() <= 0L
+                    || stack.amount() % scale != 0L) {
+                return List.of();
+            }
+            result.add(new GenericStack(stack.what(), stack.amount() / scale));
+        }
+        return List.copyOf(result);
+    }
+
+    private static Optional<AEItemKey> firstDisplayMold(Ingredient mold) {
+        ItemStack[] options = mold.getItems();
+        return options.length == 0 ? Optional.empty() : Optional.ofNullable(AEItemKey.of(options[0]));
+    }
+
+    /**
+     * Adds the input slots whose source ingredient ignores item components.
+     *
+     * <p>AE2 processing patterns encode a concrete {@link AEItemKey}, even for a vanilla
+     * {@link Ingredient} such as {@code Ingredient.of(Items.GOAT_HORN)}. That accidentally
+     * makes the pattern require the exact horn instrument selected while encoding. The furnace
+     * recipe does not have that restriction, so its omniversal pattern must use item-id matching
+     * for those slots. Non-simple ingredients, including {@code DataComponentIngredient}, remain
+     * exact.</p>
+     *
+     * <p>The source pattern may have condensed repeated inputs. Classifying its already-condensed
+     * slots avoids relying on recipe-input positions and keeps the stored slot indices aligned with
+     * AE2's {@link AEProcessingPattern#getInputs()}.</p>
+     */
+    static List<Integer> resolveItemIdInputSlots(
+            AdvancedAlloyFurnaceRecipe recipe,
+            AEProcessingPattern source,
+            Iterable<Integer> declaredSlots) {
+        TreeSet<Integer> slots = new TreeSet<>();
+        if (declaredSlots != null) {
+            for (Integer slot : declaredSlots) {
+                if (slot != null) {
+                    slots.add(slot);
+                }
+            }
+        }
+        slots.addAll(componentAgnosticInputSlots(recipe, source));
+        return List.copyOf(slots);
+    }
+
+    static Map<Integer, List<TagKey<Item>>> resolveTagInputSlots(
+            AdvancedAlloyFurnaceRecipe recipe, AEProcessingPattern source) {
+        if (recipe == null || source == null || recipe.inputs().isEmpty()) {
+            return Map.of();
+        }
+
+        Map<Integer, List<TagKey<Item>>> result = new java.util.TreeMap<>();
+        IPatternDetails.IInput[] inputs = source.getInputs();
+        for (int slot = 0; slot < inputs.length; slot++) {
+            IPatternDetails.IInput input = inputs[slot];
+            if (input == null) continue;
+            java.util.LinkedHashSet<TagKey<Item>> tags = new java.util.LinkedHashSet<>();
+            boolean matchedRequirement = false;
+            boolean hasNonTagRequirement = false;
+            for (GenericStack possible : input.getPossibleInputs()) {
+                if (possible == null || !(possible.what() instanceof AEItemKey itemKey)) {
+                    hasNonTagRequirement = true;
+                    continue;
+                }
+                boolean matchedPossible = false;
+                for (CountedIngredient requirement : recipe.inputs()) {
+                    if (requirement == null || requirement.count() <= 0L) continue;
+                    Ingredient ingredient = requirement.ingredient();
+                    if (ingredient == null || !ingredient.test(itemKey.toStack(1))) continue;
+                    matchedPossible = true;
+                    matchedRequirement = true;
+                    Optional<TagKey<Item>> tag = directItemTag(ingredient);
+                    if (tag.isPresent()) {
+                        tags.add(tag.get());
+                    } else {
+                        // A concrete or component-sensitive requirement sharing this encoded
+                        // item must keep the slot strict; otherwise the tag branch would widen
+                        // the recipe beyond the original allocator semantics.
+                        hasNonTagRequirement = true;
+                    }
+                }
+                if (!matchedPossible) {
+                    hasNonTagRequirement = true;
+                }
+            }
+            if (matchedRequirement && !hasNonTagRequirement && !tags.isEmpty()) {
+                result.put(slot, List.copyOf(tags));
+            }
+        }
+        return Map.copyOf(result);
+    }
+
+    static Map<Integer, List<TagKey<Fluid>>> resolveFluidTagInputSlots(
+            AdvancedAlloyFurnaceRecipe recipe, AEProcessingPattern source) {
+        if (recipe == null || source == null || recipe.inputFluids().isEmpty()) return Map.of();
+
+        Map<Integer, List<TagKey<Fluid>>> result = new java.util.TreeMap<>();
+        IPatternDetails.IInput[] inputs = source.getInputs();
+        for (int slot = 0; slot < inputs.length; slot++) {
+            IPatternDetails.IInput input = inputs[slot];
+            if (input == null) continue;
+            java.util.LinkedHashSet<TagKey<Fluid>> tags = new java.util.LinkedHashSet<>();
+            boolean matchedRequirement = false;
+            boolean hasNonTagRequirement = false;
+            for (GenericStack possible : input.getPossibleInputs()) {
+                if (possible == null || !(possible.what() instanceof appeng.api.stacks.AEFluidKey fluidKey)) {
+                    hasNonTagRequirement = true;
+                    continue;
+                }
+                boolean matchedPossible = false;
+                FluidStack representative = fluidKey.toStack(1);
+                for (LongSizedFluidIngredient requirement : recipe.inputFluids()) {
+                    if (requirement == null || requirement.ingredient() == null
+                            || requirement.amount() <= 0 || !requirement.ingredient().test(representative)) continue;
+                    matchedPossible = true;
+                    matchedRequirement = true;
+                    if (!collectTagOnlyFluidIngredients(requirement.ingredient(), tags)) {
+                        hasNonTagRequirement = true;
+                    }
+                }
+                if (!matchedPossible) hasNonTagRequirement = true;
+            }
+            if (matchedRequirement && !hasNonTagRequirement && !tags.isEmpty()) {
+                result.put(slot, List.copyOf(tags));
+            }
+        }
+        return Map.copyOf(result);
+    }
+
+    /**
+     * Keeps pure tag-backed mold requirements visible on the encoded pattern. Mold requirements are
+     * deliberately not added to the AE processing inputs: they are reusable machine-side tools, not
+     * consumed network materials. The bound recipe remains authoritative at execution time.
+     */
+    public static List<OmniversalPatternData.MoldTagInputSlot> resolveMoldTagInputSlots(
+            AdvancedAlloyFurnaceRecipe recipe) {
+        if (recipe == null || recipe.molds().isEmpty()) return List.of();
+
+        List<OmniversalPatternData.MoldTagInputSlot> result = new ArrayList<>();
+        for (int moldSlot = 0; moldSlot < recipe.molds().size(); moldSlot++) {
+            Ingredient mold = recipe.molds().get(moldSlot);
+            java.util.LinkedHashSet<TagKey<Item>> tags = new java.util.LinkedHashSet<>();
+            if (!collectTagOnlyItemIngredients(mold, tags)) continue;
+            for (TagKey<Item> tag : tags) {
+                result.add(new OmniversalPatternData.MoldTagInputSlot(moldSlot, tag));
+            }
+        }
+        return List.copyOf(result);
+    }
+
+    private static boolean collectTagOnlyItemIngredients(
+            Ingredient ingredient, java.util.Set<TagKey<Item>> tags) {
+        if (ingredient == null || ingredient.isEmpty()) return false;
+        if (!ingredient.isVanilla()) {
+            return collectKnownCustomTagIngredient(ingredient, tags);
+        }
+        var nativeTags = com.sorrowmist.useless.compat.forge1201.recipe.NativeIngredients.itemTags(ingredient);
+        if (nativeTags.isEmpty()) return false;
+        tags.addAll(nativeTags.get());
+        return true;
+    }
+
+    /**
+     * Some compatibility mods expose a semantic category as a custom Ingredient so they can apply
+     * their own matching rules. The encoded pattern cannot serialize that custom predicate. An
+     * exact registered tag is faithful; when no exact tag exists, a contained category tag is used
+     * for display only while the original custom predicate remains authoritative at runtime.
+     */
+    private static boolean collectKnownCustomTagIngredient(
+            Ingredient ingredient, java.util.Set<TagKey<Item>> tags) {
+        ItemStack[] candidates;
+        try {
+            candidates = ingredient.getItems();
+        } catch (RuntimeException exception) {
+            return false;
+        }
+        if (candidates == null || candidates.length == 0) return false;
+        Set<Item> candidateItems = Collections.newSetFromMap(new IdentityHashMap<>());
+        for (ItemStack candidate : candidates) {
+            if (candidate == null || candidate.isEmpty() || candidate.getCount() <= 0
+                    || candidate.hasTag()
+                    || !candidateItems.add(candidate.getItem())
+                    || !ingredient.test(new ItemStack(candidate.getItem()))) {
+                return false;
+            }
+        }
+
+        List<ItemTagCandidate> categoryTags = new ArrayList<>();
+        boolean found = false;
+        for (Pair<TagKey<Item>, ? extends Iterable<Holder<Item>>> tag : BuiltInRegistries.ITEM.getTags().toList()) {
+            Set<Item> tagItems = Collections.newSetFromMap(new IdentityHashMap<>());
+            for (Holder<Item> holder : tag.getSecond()) {
+                tagItems.add(holder.value());
+            }
+            if (tagItems.equals(candidateItems)) {
+                tags.add(tag.getFirst());
+                found = true;
+                continue;
+            }
+
+            // Some semantic ingredients enumerate a broad item category instead of using a
+            // registered tag. A registered category tag is still useful for display when every
+            // member belongs to the ingredient; the original custom Ingredient remains the actual
+            // mold predicate at runtime. Prefer the largest such category to avoid displaying an
+            // arbitrary one-item tag for a broad ingredient.
+            // getItems() is only a display representation for custom ingredients. In particular,
+            // HoeIngredient exposes one representative hoe even though its predicate accepts every
+            // hoe. Do not require the representative list to contain the whole registered tag;
+            // probe the tag members against the custom predicate instead.
+            if (tagItems.size() >= 2
+                    && tagItems.stream().anyMatch(candidateItems::contains)) {
+                boolean acceptsAllMembers = true;
+                for (Item item : tagItems) {
+                    try {
+                        if (!ingredient.test(new ItemStack(item))) {
+                            acceptsAllMembers = false;
+                            break;
+                        }
+                    } catch (RuntimeException exception) {
+                        acceptsAllMembers = false;
+                        break;
+                    }
+                }
+                if (acceptsAllMembers) {
+                    categoryTags.add(new ItemTagCandidate(tag.getFirst(), tagItems.size()));
+                }
+            }
+        }
+        if (found || categoryTags.isEmpty()) return found;
+
+        categoryTags.sort(Comparator.comparingInt(ItemTagCandidate::size).reversed()
+                .thenComparing(candidate -> candidate.tag().location().toString()));
+        tags.add(categoryTags.get(0).tag());
+        return true;
+    }
+
+    private record ItemTagCandidate(TagKey<Item> tag, int size) {
+    }
+
+    private static boolean collectTagOnlyFluidIngredients(
+            FluidIngredient ingredient, java.util.Set<TagKey<Fluid>> tags) {
+        var nativeTags = ingredient.tagOnlyTags();
+        if (nativeTags.isEmpty()) return false;
+        tags.addAll(nativeTags.get());
+        return true;
+    }
+
+    private static Optional<TagKey<Item>> directItemTag(Ingredient ingredient) {
+        return com.sorrowmist.useless.compat.forge1201.recipe.NativeIngredients.directItemTag(ingredient);
+    }
+
+    /**
+     * Finds encoded item slots that can be matched by item id without changing source-recipe
+     * semantics. A non-simple requirement that accepts the encoded stack makes the slot strict:
+     * this handles overlapping ordinary and component-sensitive requirements conservatively.
+     */
+    static List<Integer> componentAgnosticInputSlots(
+            AdvancedAlloyFurnaceRecipe recipe, AEProcessingPattern source) {
+        if (recipe == null || source == null || recipe.inputs().isEmpty()) {
+            return List.of();
+        }
+
+        List<Integer> result = new ArrayList<>();
+        IPatternDetails.IInput[] inputs = source.getInputs();
+        for (int slot = 0; slot < inputs.length; slot++) {
+            IPatternDetails.IInput input = inputs[slot];
+            if (input == null || !isComponentAgnosticRecipeInput(recipe.inputs(), input.getPossibleInputs())) {
+                continue;
+            }
+            result.add(slot);
+        }
+        return List.copyOf(result);
+    }
+
+    private static boolean isComponentAgnosticRecipeInput(
+            List<CountedIngredient> requirements, GenericStack[] possibleInputs) {
+        if (possibleInputs == null || possibleInputs.length == 0) {
+            return false;
+        }
+
+        boolean foundItem = false;
+        for (GenericStack possible : possibleInputs) {
+            if (possible == null || !(possible.what() instanceof AEItemKey itemKey)
+                    || !isComponentAgnosticRequirement(requirements, itemKey.toStack(1))) {
+                return false;
+            }
+            foundItem = true;
+        }
+        return foundItem;
+    }
+
+    private static boolean isComponentAgnosticRequirement(
+            List<CountedIngredient> requirements, ItemStack encodedStack) {
+        boolean matched = false;
+        for (CountedIngredient requirement : requirements) {
+            if (requirement == null || requirement.count() <= 0L) {
+                continue;
+            }
+            Ingredient ingredient = requirement.ingredient();
+            if (ingredient == null || !ingredient.test(encodedStack)) {
+                continue;
+            }
+            if (!ingredient.isSimple()) {
+                return false;
+            }
+            matched = true;
+        }
+        return matched;
+    }
+
+    public static ItemStack createProcessingPattern(AdvancedAlloyFurnaceRecipe recipe) {
+        if (recipe == null) return ItemStack.EMPTY;
+        List<GenericStack> inputs = new ArrayList<>();
+        for (CountedIngredient input : recipe.inputs()) {
+            if (input == null || input.count() <= 0 || input.ingredient() == null) return ItemStack.EMPTY;
+            ItemStack representative = AdapterUtils.itemRepresentative(input.ingredient());
+            AEItemKey key = representative == null ? null : AEItemKey.of(representative);
+            if (key == null) return ItemStack.EMPTY;
+            inputs.add(new GenericStack(key, input.count()));
+        }
+        for (LongSizedFluidIngredient input : recipe.inputFluids()) {
+            if (input == null || input.ingredient() == null || input.ingredient().isEmpty()
+                    || input.amount() <= 0) return ItemStack.EMPTY;
+            FluidStack[] candidates = input.getRepresentatives();
+            FluidStack representative = candidates.length == 0
+                    ? AdapterUtils.fluidRepresentative(input.ingredient(), 1)
+                    : candidates[0];
+            if (representative == null || representative.isEmpty()) return ItemStack.EMPTY;
+            appeng.api.stacks.AEFluidKey key = appeng.api.stacks.AEFluidKey.of(representative);
+            if (key == null) return ItemStack.EMPTY;
+            GenericStack fluid = new GenericStack(key, input.amount());
+            // AE processing patterns have one concrete key per slot. Keep one representative
+            // here; omniversal metadata restores the Tag/Compound semantics on decode.
+            inputs.add(fluid);
+        }
+        for (GenericStack input : recipe.keyInputs()) {
+            if (input == null || input.what() == null || input.amount() <= 0L) return ItemStack.EMPTY;
+            inputs.add(input);
+        }
+
+        List<GenericStack> outputs = new ArrayList<>();
+        for (ItemStack output : recipe.outputs()) {
+            if (output == null || output.isEmpty() || output.getCount() <= 0) return ItemStack.EMPTY;
+            GenericStack converted = GenericStack.fromItemStack(output);
+            if (converted == null || converted.what() == null || converted.amount() <= 0L) {
+                return ItemStack.EMPTY;
+            }
+            outputs.add(converted);
+        }
+        for (FluidStack output : recipe.outputFluids()) {
+            if (output == null || output.isEmpty() || output.getAmount() <= 0) return ItemStack.EMPTY;
+            GenericStack converted = GenericStack.fromFluidStack(output);
+            if (converted == null || converted.what() == null || converted.amount() <= 0L) {
+                return ItemStack.EMPTY;
+            }
+            outputs.add(converted);
+        }
+        for (GenericStack output : recipe.keyOutputs()) {
+            if (output == null || output.what() == null || output.amount() <= 0L) return ItemStack.EMPTY;
+            outputs.add(output);
+        }
+        if (inputs.isEmpty() || outputs.isEmpty()) return ItemStack.EMPTY;
+        return PatternDetailsHelper.encodeProcessingPattern(inputs.toArray(GenericStack[]::new), outputs.toArray(GenericStack[]::new));
+    }
+}

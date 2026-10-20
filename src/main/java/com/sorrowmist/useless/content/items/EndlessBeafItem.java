@@ -1,0 +1,2070 @@
+package com.sorrowmist.useless.content.items;
+
+import com.sorrowmist.useless.api.enums.tool.EnchantMode;
+import com.sorrowmist.useless.api.enums.tool.ToolTypeMode;
+import com.sorrowmist.useless.client.BeefAutoClicker;
+import com.sorrowmist.useless.client.BeefTooltipPager;
+import com.sorrowmist.useless.client.TooltipPageState;
+import com.sorrowmist.useless.content.blocks.GlowPlasticBlock;
+import com.sorrowmist.useless.content.blocks.UselessGlassBlock;
+import com.sorrowmist.useless.compat.enderio.EnderIOTravelCompat;
+import com.sorrowmist.useless.content.recipe.AlloyFurnaceRecipeCatalog;
+import com.sorrowmist.useless.core.common.KeyBindings;
+import com.sorrowmist.useless.core.component.UComponents;
+import com.sorrowmist.useless.core.config.BeefToolProtectionManager;
+import com.sorrowmist.useless.core.config.ConfigManager;
+import com.sorrowmist.useless.init.ModDamageTypes;
+import com.sorrowmist.useless.init.ModTags;
+import com.sorrowmist.useless.utils.EnchantmentUtil;
+import com.sorrowmist.useless.utils.UselessItemUtils;
+import com.sorrowmist.useless.utils.mining.MiningUtils;
+import com.sorrowmist.useless.utils.mining.RightClickChainer;
+import net.minecraft.ChatFormatting;
+import net.minecraft.advancements.CriteriaTriggers;
+import net.minecraft.client.KeyMapping;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.core.HolderLookup;
+import net.minecraft.core.particles.BlockParticleOption;
+import net.minecraft.core.particles.ParticleTypes;
+import net.minecraft.network.chat.Component;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.sounds.SoundEvent;
+import net.minecraft.sounds.SoundEvents;
+import net.minecraft.sounds.SoundSource;
+import net.minecraft.tags.BlockTags;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.InteractionResultHolder;
+import net.minecraft.world.damagesource.DamageSource;
+import net.minecraft.world.entity.AgeableMob;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.HumanoidArm;
+import net.minecraft.world.entity.LightningBolt;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.OwnableEntity;
+import net.minecraft.world.entity.Pose;
+import net.minecraft.world.entity.ai.attributes.AttributeInstance;
+import net.minecraft.world.entity.ai.attributes.AttributeModifier;
+import net.minecraft.world.entity.ai.attributes.Attributes;
+import net.minecraft.world.entity.boss.enderdragon.EnderDragon;
+import net.minecraft.world.entity.boss.wither.WitherBoss;
+import net.minecraft.world.entity.item.ItemEntity;
+import net.minecraft.world.entity.monster.Creeper;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.entity.projectile.ProjectileUtil;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Rarity;
+import net.minecraft.world.item.TieredItem;
+import net.minecraft.world.item.Tiers;
+import net.minecraft.world.item.TooltipFlag;
+import net.minecraft.world.item.UseAnim;
+import net.minecraft.world.item.context.UseOnContext;
+import net.minecraft.world.item.enchantment.Enchantments;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.LevelReader;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.BrushableBlock;
+import net.minecraft.world.level.block.CandleCakeBlock;
+import net.minecraft.world.level.block.RenderShape;
+import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.world.level.block.entity.BrushableBlockEntity;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.gameevent.GameEvent;
+import net.minecraft.world.level.entity.EntityLookup;
+import net.minecraft.world.level.entity.LevelEntityGetter;
+import net.minecraft.world.level.entity.LevelEntityGetterAdapter;
+import net.minecraft.world.level.entity.PersistentEntitySectionManager;
+import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.world.phys.HitResult;
+import net.minecraft.world.phys.Vec3;
+import net.minecraftforge.api.distmarker.Dist;
+import net.minecraftforge.api.distmarker.OnlyIn;
+import net.minecraftforge.entity.PartEntity;
+import net.minecraftforge.fml.ModList;
+import net.minecraftforge.common.ToolActions;
+import net.minecraftforge.common.ToolAction;
+import net.minecraftforge.common.IForgeShearable;
+import net.minecraftforge.common.util.Lazy;
+import net.minecraftforge.event.entity.living.LivingDeathEvent;
+import net.minecraftforge.event.entity.living.LivingDropsEvent;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import com.sorrowmist.useless.compat.forge1201.component.ComponentDefaults;
+import com.sorrowmist.useless.compat.forge1201.component.DataComponentType;
+import java.util.stream.Collectors;
+
+public class EndlessBeafItem extends TieredItem implements ComponentDefaults {
+    private static final String AE2LT_NATURAL_LIGHTNING_TAG = "ae2lt.natural_weather_lightning";
+    private static final Map<UUID, ForceKillContext> FORCE_KILL_CONTEXTS = new ConcurrentHashMap<>();
+    // 范围伤害重入保护：避免范围内实体受伤时再次触发范围伤害
+    private static final Set<UUID> AOE_DAMAGE_CONTEXT = ConcurrentHashMap.newKeySet();
+    private static final int MAX_STANDARD_DAMAGE_ATTEMPTS = 100;
+    private static final int TELEPORT_COOLDOWN_TICKS = 5;
+    private final ToolTypeMode toolType;
+    private final boolean wrenchTagEnabled;
+
+    public EndlessBeafItem() {
+        this(ToolTypeMode.NONE_MODE, true);
+    }
+
+    public EndlessBeafItem(@Nullable ToolTypeMode toolType) {
+        this(toolType, true);
+    }
+
+    public EndlessBeafItem(@Nullable ToolTypeMode toolType, boolean wrenchTagEnabled) {
+        super(Tiers.NETHERITE, createProperties(wrenchTagEnabled));
+        this.toolType = toolType;
+        this.wrenchTagEnabled = wrenchTagEnabled;
+    }
+
+    private static Item.Properties createProperties(boolean wrenchTagEnabled) {
+        return new Item.Properties().stacksTo(1).rarity(Rarity.EPIC);
+    }
+
+    @Override
+    public Object componentDefault(DataComponentType<?> type) {
+        if (!"useless_mod".equals(type.id().getNamespace())) return null;
+        return switch (type.id().getPath()) {
+            case "enchant_mode" -> EnchantMode.FORTUNE;
+            case "tool_type" -> ToolTypeMode.NONE_MODE;
+            case "wrench_tag_enabled" -> wrenchTagEnabled;
+            case "construction_wand_core" -> com.sorrowmist.useless.api.enums.tool.ConstructionWandCoreMode.DEFAULT;
+            case "beef_invulnerability_enabled", "beef_magnet_enabled", "beef_crop_harvest",
+                    "beef_shears", "beef_flint_and_steel" -> true;
+            case "chain_mining", "force_mining", "auto_smelt", "force_kill_enabled", "beef_time_acceleration_enabled", "beef_advanced_stealth_enabled", "beef_capture_enabled", "beef_malum_spirit_enabled", "beef_mystical_agriculture_enabled", "beef_beheading_enabled", "beef_teleport_enabled", "beef_aoe_damage_enabled", "beef_kill_aura", "beef_protect_mode", "beef_farmland_mode", "beef_ripen", "beef_force_grow", "beef_entity_time_acceleration", "ae_storage_priority", "ae_network_connect", "beef_ritual_satchel", "exdeorum_crook", "exdeorum_hammer", "exdeorum_compressed_hammer", "beef_wireless_logistics", "construction_wand_enabled" -> false;
+            default -> null;
+        };
+    }
+
+    public static boolean isTeleportEnabled(ItemStack stack) {
+        return com.sorrowmist.useless.compat.forge1201.component.ComponentAccess.getOrDefault(stack, UComponents.BeefTeleportEnabledComponent.get(), false);
+    }
+
+    public static void setTeleportEnabled(ItemStack stack, boolean enabled) {
+        com.sorrowmist.useless.compat.forge1201.component.ComponentAccess.set(stack, UComponents.BeefTeleportEnabledComponent.get(), enabled);
+        if (ModList.get().isLoaded(EnderIOTravelCompat.MOD_ID)) {
+            EnderIOTravelCompat.setTravelItemEnabled(stack, enabled);
+        }
+    }
+
+    /**
+     * 右键泥土/草方块时的优先行为。
+     *
+     * <p>false（默认）= 铲子优先，泥土/草方块变成草径；true = 锄头优先，变成耕地。
+     * 造化杖同时具备铲子与锄头能力，而两条工具动作链是「谁先生效谁赢」，
+     * 所以用这个开关决定顺序。
+     */
+    public static boolean isFarmlandMode(ItemStack stack) {
+        return com.sorrowmist.useless.compat.forge1201.component.ComponentAccess.getOrDefault(stack, UComponents.BeefFarmlandModeComponent.get(), false);
+    }
+
+    public static void setFarmlandMode(ItemStack stack, boolean enabled) {
+        com.sorrowmist.useless.compat.forge1201.component.ComponentAccess.set(stack, UComponents.BeefFarmlandModeComponent.get(), enabled);
+    }
+
+    /**
+     * 「右键泥土」当前状态的文案：锄头优先（→ 耕地）或 铲子优先（→ 草径）。
+     * 物品 tooltip 与模式轮盘共用同一份文案，避免两处口径不一致。
+     */
+    public static Component farmlandStateText(ItemStack stack) {
+        boolean farmland = isFarmlandMode(stack);
+        return Component.translatable(farmland
+                ? "tooltip.useless_mod.beef_farmland_state.hoe"
+                : "tooltip.useless_mod.beef_farmland_state.shovel"
+        ).withStyle(farmland ? ChatFormatting.GREEN : ChatFormatting.YELLOW);
+    }
+
+    /**
+     * 是否由造化杖自己完成「右键收菜」：收获成熟作物并把种子留在地里。
+     *
+     * <p>用于避免部分整合包的右键收菜功能在造化杖上把作物连根拔起。
+     */
+    public static boolean isCropHarvestEnabled(ItemStack stack) {
+        return com.sorrowmist.useless.compat.forge1201.component.ComponentAccess.getOrDefault(stack, UComponents.BeefCropHarvestComponent.get(), true);
+    }
+
+    public static void setCropHarvestEnabled(ItemStack stack, boolean enabled) {
+        com.sorrowmist.useless.compat.forge1201.component.ComponentAccess.set(stack, UComponents.BeefCropHarvestComponent.get(), enabled);
+    }
+
+    /**
+     * 是否启用剪刀功能：允许对羊、哞菇等 {@link IForgeShearable} 实体剪毛/剪掉落，
+     * 并对外声明 {@code DEFAULT_SHEARS_ACTIONS} 能力。
+     */
+    public static boolean isShearsEnabled(ItemStack stack) {
+        return com.sorrowmist.useless.compat.forge1201.component.ComponentAccess.getOrDefault(stack, UComponents.BeefShearsComponent.get(), true);
+    }
+
+    public static void setShearsEnabled(ItemStack stack, boolean enabled) {
+        com.sorrowmist.useless.compat.forge1201.component.ComponentAccess.set(stack, UComponents.BeefShearsComponent.get(), enabled);
+    }
+
+    /**
+     * 是否启用打火石功能：允许点燃营火/蜡烛，或在可放置火的位置点火。
+     *
+     * <p>默认开启，与其他辅助功能（收菜、剪刀）保持一致；右键只有瞄准
+     * 营火/蜡烛或可点火位置时才会生效，不影响普通方块交互。</p>
+     */
+    public static boolean isFlintAndSteelEnabled(ItemStack stack) {
+        return com.sorrowmist.useless.compat.forge1201.component.ComponentAccess.getOrDefault(stack, UComponents.BeefFlintAndSteelComponent.get(), true);
+    }
+
+    public static void setFlintAndSteelEnabled(ItemStack stack, boolean enabled) {
+        com.sorrowmist.useless.compat.forge1201.component.ComponentAccess.set(stack, UComponents.BeefFlintAndSteelComponent.get(), enabled);
+    }
+
+    /**
+     * 是否启用催熟功能：右键可骨粉方块时一键催到成熟，右键幼年动物时直接催至成年。
+     *
+     * <p>默认关闭；潜行右键时把这次交互让给其它模组（与收菜、打火石一致）。</p>
+     */
+    public static boolean isRipenEnabled(ItemStack stack) {
+        return com.sorrowmist.useless.compat.forge1201.component.ComponentAccess.getOrDefault(stack, UComponents.BeefRipenComponent.get(), false);
+    }
+
+    public static void setRipenEnabled(ItemStack stack, boolean enabled) {
+        com.sorrowmist.useless.compat.forge1201.component.ComponentAccess.set(stack, UComponents.BeefRipenComponent.get(), enabled);
+    }
+
+    /**
+     * 是否启用「强制生长」：催熟时额外用随机刻推进方块。
+     *
+     * <p>催熟本身只走原版骨粉判定，对甘蔗、仙人掌、竹子这类<b>原版骨粉无效</b>的方块
+     * 不起作用。开启本项后会改用随机刻把它们也推起来。
+     *
+     * <p>注意它<b>不挑方块</b>：凡是会随机刻的方块都会被推，包括树叶枯萎、火蔓延、
+     * 雪冰融化、耕地退化。因此默认关闭，是否开启由玩家自行抉择。</p>
+     */
+    public static boolean isForceGrowEnabled(ItemStack stack) {
+        return com.sorrowmist.useless.compat.forge1201.component.ComponentAccess.getOrDefault(stack, UComponents.BeefForceGrowComponent.get(), false);
+    }
+
+    public static void setForceGrowEnabled(ItemStack stack, boolean enabled) {
+        com.sorrowmist.useless.compat.forge1201.component.ComponentAccess.set(stack, UComponents.BeefForceGrowComponent.get(), enabled);
+    }
+
+    /**
+     * 是否启用「生物加速」：潜行右键生物时加速其「计时器」类数值。
+     *
+     * <p>只改数值，<b>不跑 AI / 寻路 / 移动 / 物理</b>：幼年成长与繁殖后冷却走
+     * {@code AgeableMob.age}，鸡下蛋走 {@code Chicken.eggTime}，羊剪毛后长毛、
+     * 村民补货（原版门槛绑在 {@code gameTime} 上，必须直接调 {@code restock()}）、
+     * 蜜蜂采蜜、海龟下蛋。</p>
+     *
+     * <p>与「保护名单」的 Shift 手势互斥：本项开启时 Shift+右键生物被解释为加速，
+     * 保护名单手势让位（Ctrl 按种类的手势不受影响）。</p>
+     */
+    public static boolean isEntityTimeAccelerationEnabled(ItemStack stack) {
+        return com.sorrowmist.useless.compat.forge1201.component.ComponentAccess.getOrDefault(stack, UComponents.BeefEntityTimeAccelerationComponent.get(), false);
+    }
+
+    public static void setEntityTimeAccelerationEnabled(ItemStack stack, boolean enabled) {
+        com.sorrowmist.useless.compat.forge1201.component.ComponentAccess.set(stack, UComponents.BeefEntityTimeAccelerationComponent.get(), enabled);
+    }
+
+    /**
+     * 是否启用无线物流模式。
+     *
+     * <p>开启后潜行右键容器方块可把它绑进/解绑出这把杖的物流网络；网络的搬运规则在
+     * 独立界面里配置，真正的搬运由服务端引擎执行。</p>
+     */
+    public static boolean isStaffLinkEnabled(ItemStack stack) {
+        return com.sorrowmist.useless.compat.forge1201.component.ComponentAccess.getOrDefault(stack, UComponents.StaffLinkEnabledComponent.get(), false);
+    }
+
+    public static void setStaffLinkEnabled(ItemStack stack, boolean enabled) {
+        com.sorrowmist.useless.compat.forge1201.component.ComponentAccess.set(stack, UComponents.StaffLinkEnabledComponent.get(), enabled);
+    }
+
+    /**
+     * 是否启用杀戮光环。
+     *
+     * <p>开启后手持造化杖每 20 tick 对「范围伤害」配置范围内生物结算一次攻击伤害；
+     * 范围与目标上限沿用范围伤害的配置，并兼容强制击杀与范围磁力。</p>
+     */
+    public static boolean isKillAuraEnabled(ItemStack stack) {
+        return com.sorrowmist.useless.compat.forge1201.component.ComponentAccess.getOrDefault(stack, UComponents.BeefKillAuraComponent.get(), false);
+    }
+
+    public static void setKillAuraEnabled(ItemStack stack, boolean enabled) {
+        com.sorrowmist.useless.compat.forge1201.component.ComponentAccess.set(stack, UComponents.BeefKillAuraComponent.get(), enabled);
+    }
+
+    /**
+     * 是否处于「保护名单模式」。
+     *
+     * <p>开启时暂停杀戮光环与范围伤害的结算（{@link #damageArea} 直接返回），
+     * 这样玩家可以走到怪堆里从容地用 Ctrl/Shift + 右键把生物加进保护名单，
+     * 而不会出现「刚瞄准就被光环打死」的情况。</p>
+     */
+    public static boolean isProtectModeEnabled(ItemStack stack) {
+        return com.sorrowmist.useless.compat.forge1201.component.ComponentAccess.getOrDefault(stack, UComponents.BeefProtectModeComponent.get(), false);
+    }
+
+    public static void setProtectModeEnabled(ItemStack stack, boolean enabled) {
+        com.sorrowmist.useless.compat.forge1201.component.ComponentAccess.set(stack, UComponents.BeefProtectModeComponent.get(), enabled);
+    }
+
+    /** Native 1.20.1 tools use the Unbreakable NBT flag, not a zero max-damage value. */
+    private static void migrateLegacyDurability(ItemStack stack) {
+        stack.getOrCreateTag().remove("Damage");
+        stack.getOrCreateTag().putBoolean("Unbreakable", true);
+    }
+
+    /** Keeps the tool's fixed enchantments aligned with its selected mode and server config. */
+    public static void refreshEnchantments(ItemStack stack, Level level) {
+        if (stack.isEmpty() || level == null || level.isClientSide()) {
+            return;
+        }
+
+        EnchantMode mode = com.sorrowmist.useless.compat.forge1201.component.ComponentAccess.getOrDefault(stack,
+                UComponents.EnchantModeComponent.get(), EnchantMode.FORTUNE);
+        HolderLookup.Provider lookup = level.registryAccess();
+        EnchantmentUtil.applyEnchantment(
+                stack, lookup, Enchantments.SILK_TOUCH, mode == EnchantMode.SILK_TOUCH ? 1 : 0);
+        EnchantmentUtil.applyEnchantment(
+                stack, lookup, Enchantments.BLOCK_FORTUNE,
+                mode == EnchantMode.FORTUNE ? ConfigManager.getFortuneLevel() : 0);
+        EnchantmentUtil.applyEnchantment(
+                stack, lookup, Enchantments.MOB_LOOTING, ConfigManager.getLootingLevel());
+    }
+
+    /**
+     * 右键触发的传送入口。
+     *
+     * <p>短距闪现已改由独立快捷键驱动（见 {@link #performShortTeleport}），这里只剩不潜行时的
+     * Ender IO 锚点传送；潜行时直接放行，避免与快捷键重复触发同一次传送。</p>
+     */
+    public static InteractionResult tryTeleport(Level level, Player player, ItemStack stack) {
+        if (player.isShiftKeyDown()) {
+            return InteractionResult.PASS;
+        }
+        if (!isTeleportEnabled(stack) || player.getCooldowns().isOnCooldown(stack.getItem())) {
+            return InteractionResult.PASS;
+        }
+        InteractionResult result = BeefTeleportHandler.tryAnchorTeleport(
+                level,
+                player,
+                ModList.get().isLoaded(EnderIOTravelCompat.MOD_ID));
+        if (result != InteractionResult.PASS) {
+            player.getCooldowns().addCooldown(stack.getItem(), TELEPORT_COOLDOWN_TICKS);
+        }
+        return result;
+    }
+
+    /**
+     * 快捷键触发的短距闪现入口（服务端执行）。
+     *
+     * <p>按键包只上报「按下了」，落点由服务端自行计算与校验，客户端不参与目的地判定。</p>
+     */
+    public static void performShortTeleport(ServerPlayer player) {
+        ItemStack stack = player.getMainHandItem();
+        if (!(stack.getItem() instanceof EndlessBeafItem)) {
+            return;
+        }
+        tryShortTeleport(player.level(), player, stack);
+    }
+
+    /**
+     * 执行一次短距闪现，成功时套用物品冷却。
+     */
+    public static InteractionResult tryShortTeleport(Level level, Player player, ItemStack stack) {
+        if (!isTeleportEnabled(stack) || player.getCooldowns().isOnCooldown(stack.getItem())) {
+            return InteractionResult.PASS;
+        }
+        InteractionResult result = BeefTeleportHandler.tryShortTeleport(level, player);
+        if (result != InteractionResult.PASS) {
+            player.getCooldowns().addCooldown(stack.getItem(), TELEPORT_COOLDOWN_TICKS);
+        }
+        return result;
+    }
+
+    @Override
+    public @NotNull InteractionResultHolder<ItemStack> use(
+            @NotNull Level level,
+            @NotNull Player player,
+            @NotNull InteractionHand hand) {
+        ItemStack stack = player.getItemInHand(hand);
+        InteractionResult teleportResult = tryTeleport(level, player, stack);
+        if (teleportResult != InteractionResult.PASS) {
+            return InteractionResultHolder.sidedSuccess(stack, level.isClientSide());
+        }
+        return super.use(level, player, hand);
+    }
+
+    public static AttributeModifier createAttackSpeedModifier() {
+        return new AttributeModifier(Item.BASE_ATTACK_SPEED_UUID, "useless_mod_base_attack_speed",
+                2.0D, AttributeModifier.Operation.ADDITION);
+    }
+
+    public static AttributeModifier createAttackDamageModifier() {
+        return createAttackDamageModifier(AlloyFurnaceRecipeCatalog.currentRecipeCount());
+    }
+
+    static AttributeModifier createAttackDamageModifier(int recipeCount) {
+        return new AttributeModifier(
+                Item.BASE_ATTACK_DAMAGE_UUID,
+                "useless_mod_base_attack_damage",
+                recipeCount + Tiers.NETHERITE.getAttackDamageBonus(),
+                AttributeModifier.Operation.ADDITION);
+    }
+
+    public static void refreshAttackDamage(LivingEntity entity) {
+        if (!(entity.getMainHandItem().getItem() instanceof EndlessBeafItem)) return;
+
+        AttributeInstance attackDamage = entity.getAttribute(Attributes.ATTACK_DAMAGE);
+        if (attackDamage != null) {
+            AttributeModifier modifier = createAttackDamageModifier();
+            AttributeModifier existing = attackDamage.getModifier(modifier.getId());
+            if (existing == null || Double.compare(modifier.getAmount(), existing.getAmount()) != 0
+                    || modifier.getOperation() != existing.getOperation()) {
+                attackDamage.removeModifier(modifier.getId());
+                attackDamage.addTransientModifier(modifier);
+            }
+        }
+    }
+
+    /**
+     * 「以造化杖进行攻击」时应造成的伤害，供杀戮光环 / 范围伤害使用。
+     *
+     * <p><b>为什么不能直接用 {@code player.getAttributeValue(ATTACK_DAMAGE)}</b>：那个属性只反映
+     * <b>主手</b>物品 —— 造化杖的 {@code base_attack_damage} 修正挂在
+     * {@code EquipmentSlot.MAINHAND} 上（见 {@code UselessMod#onItemAttributeModifiers}），
+     * 杖一旦放进副手 / 背包，属性值就退化成空手 1.0，光环打出来等于「没用杖打」。</p>
+     *
+     * <p>做法：先扣掉「当前主手武器」贡献的那份，再补上「本杖」的那份 —— 两者用的是同一个修饰符 id
+     * （{@link Item#BASE_ATTACK_DAMAGE_UUID}），所以杖就在主手时两份相抵、结果与原来完全一致；
+     * 不在主手时即等效于「把这把杖当作主手武器」。玩家自身的其它修正（药水、护甲等）原样保留。</p>
+     *
+     * <p>已知边角：少数模组武器用自定义 id 施加攻击力，此时扣不掉那一份（光环会多算它的伤害）。
+     * 原版武器与造化杖本身都走 {@code base_attack_damage}，不受影响。</p>
+     */
+    public static float staffAttackDamage(Player player) {
+        double damage = player.getAttributeValue(Attributes.ATTACK_DAMAGE);
+        AttributeInstance instance = player.getAttribute(Attributes.ATTACK_DAMAGE);
+        if (instance != null) {
+            AttributeModifier mainHandWeapon = instance.getModifier(Item.BASE_ATTACK_DAMAGE_UUID);
+            if (mainHandWeapon != null) {
+                damage -= mainHandWeapon.getAmount();
+            }
+        }
+        damage += createAttackDamageModifier().getAmount();
+        return (float) Math.max(0.0D, damage);
+    }
+
+    @Override
+    public @NotNull ItemStack getCraftingRemainingItem(ItemStack stack) {
+        // 返回物品本身，使其在合成后保留在工作台中
+        return stack.copy();
+    }
+
+    @Override
+    public boolean hasCraftingRemainingItem(@NotNull ItemStack stack) {
+        // 确保该物品有剩余物品（即本身）
+        return true;
+    }
+
+    @Override
+    public boolean doesSneakBypassUse(@NotNull ItemStack stack,
+                                      @NotNull LevelReader level,
+                                      @NotNull BlockPos pos,
+                                      @NotNull Player player) {
+        Block block = level.getBlockState(pos).getBlock();
+        if (block instanceof GlowPlasticBlock || block instanceof UselessGlassBlock) {
+            return true;
+        }
+        return super.doesSneakBypassUse(stack, level, pos, player);
+    }
+
+    @Override
+    public void setDamage(@NotNull ItemStack stack, int damage) {
+        // 阻止任何耐久度设置
+        super.setDamage(stack, 0);
+    }
+
+    @Override
+    public boolean canPerformAction(@NotNull ItemStack stack, @NotNull ToolAction ability) {
+        // 基础工具能力（所有工具都有）
+        if (ToolActions.DEFAULT_AXE_ACTIONS.contains(ability) ||
+                ToolActions.DEFAULT_PICKAXE_ACTIONS.contains(ability) ||
+                ToolActions.DEFAULT_SHOVEL_ACTIONS.contains(ability) ||
+                ToolActions.DEFAULT_HOE_ACTIONS.contains(ability) ||
+                ability == ToolAction.get("brush_brush") ||
+                ability == ToolActions.SWORD_SWEEP) {
+            return true;
+        }
+
+        // 剪刀能力受「剪刀功能」开关控制：关掉后不再对外声明剪刀能力
+        if (ToolActions.DEFAULT_SHEARS_ACTIONS.contains(ability)) {
+            return isShearsEnabled(stack);
+        }
+
+        // 打火石能力，同样受「打火石功能」开关控制。
+        //
+        // 必须对外声明，否则依赖「物品能否点火」判断的模组不会介入交互：
+        // 以神秘学(Occultism) 为例，它的灵火(Spiritfire) 生成处理器会检查
+        // 手上物品是否具备点火能力，只有具备时才拦下这次右键、把地上的
+        // 魔鬼之梦果换成灵火；否则会落到造化杖自己的打火石逻辑上，直接在
+        // 果实所在位置放一团普通火，把果实烧掉。
+        //
+        // 注意命名：MinecraftForge 21.1 的正式能力名是 firestarter_light，而
+        // Occultism 仍在检查旧版 Forge 时代的 light_fire / light_campfire，
+        // 两者经 ToolAction.get() 得到的是不同实例，因此三个都要声明。
+        if (ability == ToolAction.get("firestarter_light")
+                || ability == ToolAction.get("light_fire")
+                || ability == ToolAction.get("light_campfire")) {
+            return isFlintAndSteelEnabled(stack);
+        }
+
+        // 根据工具类型返回特定能力
+        if (this.toolType == null) {
+            return false;
+        }
+
+        // GT部分适配
+        return switch (this.toolType) {
+            case NONE_MODE, OMNITOOL_MODE -> false;
+            case WRENCH_MODE -> ability == ToolAction.get("wrench_rotate") ||
+                    ability == ToolAction.get("wrench_configure") ||
+                    ability == ToolAction.get("wrench_configure_all") ||
+                    ability == ToolAction.get("wrench_configure_items") ||
+                    ability == ToolAction.get("wrench_configure_fluids") ||
+                    ability == ToolAction.get("wrench_dig") ||
+                    ability == ToolAction.get("wrench_dismantle") ||
+                    ability == ToolAction.get("wrench_connect");
+
+            case SCREWDRIVER_MODE -> ability == ToolAction.get("screwdriver_configure") ||
+                    ability == ToolAction.get("interact_with_cover");
+
+            case MALLET_MODE -> ability == ToolAction.get("mallet_pause") ||
+                    ability == ToolAction.get("mallet_configure") ||
+                    ability == ToolAction.get("interact_with_cover");
+
+            case CROWBAR_MODE -> ability == ToolAction.get("crowbar_rotate") ||
+                    ability == ToolAction.get("crowbar_remove_cover") ||
+                    ability == ToolAction.get("crowbar_dig");
+
+            case HAMMER_MODE -> ability == ToolAction.get("hammer_dig") ||
+                    ability == ToolAction.get("hammer_mute");
+        };
+    }
+
+    @Override
+    public int getEnchantmentValue(@NotNull ItemStack stack) {
+        return -1; // 允许被附魔
+    }
+
+    @Override
+    public boolean isDamageable(@NotNull ItemStack stack) {
+        return false; // 物品不可损坏
+    }
+
+    @Override
+    public boolean hurtEnemy(@NotNull ItemStack stack, @NotNull LivingEntity target, @NotNull LivingEntity attacker) {
+        if (attacker instanceof Player player) {
+            boolean forceKilled = forceKillLivingEntity(stack, target, player);
+            applyAoeDamage(stack, player, target);
+            if (forceKilled) {
+                return true;
+            }
+        }
+        return super.hurtEnemy(stack, target, attacker);
+    }
+
+    @Override
+    public boolean onLeftClickEntity(@NotNull ItemStack stack, @NotNull Player player, @NotNull Entity entity) {
+        Entity target = getForceKillTarget(entity);
+        if (target instanceof LivingEntity livingEntity && forceKillLivingEntity(stack, livingEntity, player)) {
+            applyAoeDamage(stack, player, target);
+            return true;
+        }
+        if (!(target instanceof LivingEntity) && forceKillNonLivingEntity(stack, target, player)) {
+            applyAoeDamage(stack, player, target);
+            return true;
+        }
+        return super.onLeftClickEntity(stack, player, entity);
+    }
+
+    /**
+     * 共享的范围结算：以 {@code center} 为中心，对范围内生物结算一次攻击伤害；命中后登记磁力吸附。
+     *
+     * <p>「范围伤害」（左键命中触发）与「杀戮光环」（每 20 tick 触发）共用本方法，
+     * 因此保护名单、强制击杀、范围磁力这三件事只需在这里接一次，两条路径同时生效。</p>
+     *
+     * @param stack          工具
+     * @param player         攻击者（同时作为重入保护键与友军判定方）
+     * @param level          服务端世界
+     * @param center         范围中心（左键=命中点；光环=玩家自身）
+     * @param excluded       需要跳过的实体（左键=直接命中的主目标，避免重复结算；光环=null）
+     * @param requireAoeFlag true=要求「范围伤害」开关为开（左键路径）；false=不门控（光环路径）
+     * @return 实际命中的目标数
+     */
+    private static int damageArea(ItemStack stack, Player player, ServerLevel level, Vec3 center,
+                                  @Nullable Entity excluded, boolean requireAoeFlag) {
+        // 保护名单模式：光环与范围伤害都停手，让玩家能从容地把生物加进名单
+        if (isProtectModeEnabled(stack)) {
+            return 0;
+        }
+        if (requireAoeFlag && !com.sorrowmist.useless.compat.forge1201.component.ComponentAccess.getOrDefault(stack, UComponents.BeefAoeDamageEnabledComponent, false)) {
+            return 0;
+        }
+        // 重入保护：左键范围伤害与杀戮光环共用同一把锁，避免同一次结算里互相嵌套
+        if (!AOE_DAMAGE_CONTEXT.add(player.getUUID())) {
+            return 0;
+        }
+
+        try {
+            double rangeX = ConfigManager.getBeefAoeDamageRangeX();
+            double rangeY = ConfigManager.getBeefAoeDamageRangeY();
+            double rangeZ = ConfigManager.getBeefAoeDamageRangeZ();
+            AABB area = AABB.ofSize(center, rangeX * 2 + 1, rangeY * 2 + 1, rangeZ * 2 + 1);
+
+            float damage = staffAttackDamage(player);
+            DamageSource damageSource = ModDamageTypes.beefTool(level, player);
+            int maxTargets = ConfigManager.getBeefAoeDamageMaxTargets();
+            int hit = 0;
+
+            for (LivingEntity victim : level.getEntitiesOfClass(LivingEntity.class, area)) {
+                if (hit >= maxTargets) {
+                    break;
+                }
+                if (victim == excluded || !victim.isAlive()) {
+                    continue;
+                }
+                // 统一的保护判定：玩家/盟友/自己的宠物与坐骑/手动维护的保护名单
+                if (isProtectedTarget(player, victim)) {
+                    continue;
+                }
+
+                hit++;
+                if (forceKillLivingEntity(stack, victim, player)) {
+                    continue;
+                }
+                victim.invulnerableTime = 0;
+                victim.hurt(damageSource, damage);
+            }
+
+            if (hit > 0) {
+                // 主动登记一次吸附：范围取「AoE 半径 + 磁力半径」，保证最外圈被打死的怪的掉落也能覆盖到。
+                // 与单体死亡事件登记合并，覆盖强杀兜底和范围内普通伤害产生的掉落。
+                BeefMagnetHandler.scheduleSweep(level, player, stack, center,
+                        rangeX + ConfigManager.getBeefMagnetRangeX(),
+                        rangeY + ConfigManager.getBeefMagnetRangeY(),
+                        rangeZ + ConfigManager.getBeefMagnetRangeZ());
+            }
+            return hit;
+        } finally {
+            AOE_DAMAGE_CONTEXT.remove(player.getUUID());
+        }
+    }
+
+    /**
+     * 左键范围伤害：以命中目标为中心结算。语义与抽出 {@link #damageArea} 之前完全一致。
+     *
+     * @param primary 直接命中的目标（作为范围中心，本身不重复结算）
+     */
+    private static void applyAoeDamage(ItemStack stack, Player player, Entity primary) {
+        if (!(player.level() instanceof ServerLevel level)) {
+            return;
+        }
+        damageArea(stack, player, level, primary.position(), primary, true);
+    }
+
+    /**
+     * 杀戮光环：由 {@code EventHandler#onPlayerTick} 按「杀戮光环间隔」配置周期性调用，
+     * 以玩家自身为中心结算一次范围伤害。
+     *
+     * <p>生效条件：<b>主手 / 副手 / 快捷栏 / 主背包</b> 任意一处带着一把「光环已开」的造化杖即可，
+     * 不必手持。那把杖由 {@code onPlayerTick} 的合并扫描（{@link UselessItemUtils#scanStaff}）
+     * 顺手取出并传入，因此这里不再自己走一遍背包。</p>
+     *
+     * <p><b>结算期间会把这把杖顶到主手，结算完立刻还原</b>（见 {@link #withStaffInMainHand}）——
+     * 因为「这一下是用杖打的」这件事，下游有一大票系统都只按<b>主手武器</b>解析：
+     * 原版抢夺附魔（{@code EnchantmentHelper.getSlotItems} 只查 MAINHAND 槽）、
+     * 本模组的斩首 / 捕捉 / 击杀磁力 / 掉落下游（{@code EventHandler} 里那几个
+     * {@code player.getMainHandItem()}）、以及 Malum 的精魂 mixin。不顶上去，它们全都看不到这把杖。</p>
+     *
+     * <p>范围沿用「范围伤害」的配置，因此打开「强制击杀」时走强杀、「范围磁力」开启时自动吸附掉落。</p>
+     *
+     * @param killAuraStaff 身上第一把开着光环的造化杖，没有则为 {@code null}
+     */
+    public static void tickKillAura(Player player, @Nullable ItemStack killAuraStaff) {
+        if (killAuraStaff == null || killAuraStaff.isEmpty()) {
+            return;
+        }
+        if (player.isSpectator() || player.isDeadOrDying()) {
+            return;
+        }
+        if (!(player.level() instanceof ServerLevel level)) {
+            return;
+        }
+        withStaffInMainHand(player, killAuraStaff,
+                () -> damageArea(killAuraStaff, player, level, player.position(), null, false));
+    }
+
+    /**
+     * 在「把这把杖当作主手武器」的前提下跑一段结算，跑完立即还原主手。
+     *
+     * <p>为什么需要：伤害本身走 {@link #staffAttackDamage} 已不依赖主手，但「附魔 / 精魂 / 捕捉 /
+     * 斩首 / 击杀磁力」这些下游一律读 {@code player.getMainHandItem()}。把杖临时顶到主手，
+     * 等于让它们看到的就是「玩家正握着这把杖挥砍」。</p>
+     *
+     * <p><b>为什么没有副作用</b>：装备同步与属性重算是每 tick 在
+     * {@code LivingEntity#detectEquipmentUpdates} 里按「与上一 tick 的差值」做的，本方法在
+     * {@code PlayerTickEvent.Post} 里同一 tick 内换上去又换回来 ⇒ 差值恒为零 ⇒
+     * 不发装备包、客户端看不到换手。{@code onEquipItem} 的装备音只在物品是 {@code Equipable}
+     * 且槽位匹配时播放（杖不是），振动事件 {@code doesEmitEquipEvent} 对玩家只在护甲槽为真，
+     * 所以两者都不会触发。</p>
+     *
+     * <p>杖已经在主手时直接执行，不做任何改动。</p>
+     */
+    private static void withStaffInMainHand(Player player, ItemStack staff, Runnable action) {
+        ItemStack previous = player.getMainHandItem();
+        boolean swapped = previous != staff;
+        if (swapped) {
+            player.setItemInHand(InteractionHand.MAIN_HAND, staff);
+        }
+        try {
+            action.run();
+        } finally {
+            if (swapped) {
+                player.setItemInHand(InteractionHand.MAIN_HAND, previous);
+            }
+        }
+    }
+
+    private static Entity getForceKillTarget(Entity entity) {
+        return unwrapPartEntity(entity);
+    }
+
+    /**
+     * 拆掉 {@link PartEntity}（末影龙之类的部位实体）取本体。
+     *
+     * <p>客户端手势与服务端解析共用：命中部位实体时要落到本体上，
+     * 否则保护名单里记的 UUID / 种类会与真正参与结算的实体对不上。</p>
+     */
+    public static Entity unwrapPartEntity(@Nullable Entity entity) {
+        if (entity instanceof PartEntity<?> partEntity) {
+            return partEntity.getParent();
+        }
+        return entity;
+    }
+
+    public static void observeForceKillDeath(LivingDeathEvent event) {
+        ForceKillContext context = FORCE_KILL_CONTEXTS.get(event.getEntity().getUUID());
+        if (context != null) {
+            context.deathEventAttempted = true;
+        }
+    }
+
+    public static boolean handleForceKillDeath(LivingDeathEvent event) {
+        ForceKillContext context = FORCE_KILL_CONTEXTS.get(event.getEntity().getUUID());
+        if (context == null) {
+            return false;
+        }
+
+        context.deathEventAttempted = true;
+        context.deathEventCanceled = event.isCanceled();
+        if (!event.isCanceled() && !context.captureHandled) {
+            UselessItemUtils.tryCaptureSpawnEgg(context.target, context.stack, context.player);
+            context.captureHandled = true;
+        }
+        return true;
+    }
+
+    public static boolean handleForceKillMagnetDeath(LivingDeathEvent event) {
+        ForceKillContext context = FORCE_KILL_CONTEXTS.get(event.getEntity().getUUID());
+        if (context == null) {
+            return false;
+        }
+
+        if (event.isCanceled()) {
+            context.deathEventCanceled = true;
+        } else if (!context.magnetScheduled) {
+            scheduleMagnetSweep(context.level, context.player, context.stack, context.deathPos);
+            context.magnetScheduled = true;
+        }
+        return true;
+    }
+
+    public static void observeForceKillDrops(LivingDropsEvent event) {
+        ForceKillContext context = FORCE_KILL_CONTEXTS.get(event.getEntity().getUUID());
+        if (context != null) {
+            context.dropsAttempted = true;
+        }
+    }
+
+    private static boolean forceKillLivingEntity(ItemStack stack, LivingEntity target, Player player) {
+        if (target.level().isClientSide || target instanceof Player || !target.isAlive()
+                || isForceKillBlacklisted(target)
+                // 保护名单与「自己的宠物/坐骑」同样拦下直接强杀：保护应当是全局语义
+                || isProtectedTarget(player, target)
+                || !com.sorrowmist.useless.compat.forge1201.component.ComponentAccess.getOrDefault(stack, UComponents.ForceKillEnabledComponent, false)) {
+            return false;
+        }
+
+        ServerLevel level = (ServerLevel) target.level();
+        DamageSource damageSource = ModDamageTypes.beefTool(level, player);
+        ForceKillContext context = new ForceKillContext(level, target, stack, player, damageSource);
+        if (FORCE_KILL_CONTEXTS.putIfAbsent(target.getUUID(), context) != null) {
+            return false;
+        }
+
+        try {
+            executeForceKill(context);
+
+            if (!isDeathCommitted(target) && !context.deathEventAttempted) {
+                rememberPositiveHealth(context);
+                target.setHealth(0.0F);
+                target.die(damageSource);
+                restoreCanceledDeathHealth(context);
+            }
+
+            if (isDeathCommitted(target)) {
+                settleForceKillEffects(context);
+                return true;
+            }
+
+            if (context.deathEventAttempted) {
+                context.deathEventCanceled = true;
+            }
+            restoreCanceledDeathHealth(context);
+            executeMaxHealthFallback(context);
+            executeFallbackDeath(context);
+            settleForceKillEffects(context);
+
+            if (!target.isRemoved()) {
+                removeEntityFromServerStorage(context.level, target);
+                context.removalCommitted = target.isRemoved();
+            }
+            return target.dead || context.removalCommitted;
+        } finally {
+            FORCE_KILL_CONTEXTS.remove(target.getUUID(), context);
+        }
+    }
+
+    /** 用配置的磁力半径登记一次吸附。 */
+    private static void scheduleMagnetSweep(ServerLevel level, Player player, ItemStack stack, Vec3 center) {
+        BeefMagnetHandler.scheduleSweep(level, player, stack, center,
+                ConfigManager.getBeefMagnetRangeX(),
+                ConfigManager.getBeefMagnetRangeY(),
+                ConfigManager.getBeefMagnetRangeZ());
+    }
+
+    private static void executeForceKill(ForceKillContext context) {
+        LivingEntity target = context.target;
+        if (target instanceof EnderDragon dragon) {
+            clearVanillaInvulnerability(target);
+            dragon.hurt(dragon.head, context.damageSource, getForceKillDamage(target));
+            if (shouldStopStandardDamage(context)) {
+                return;
+            }
+        }
+
+        for (int i = 0; i < MAX_STANDARD_DAMAGE_ATTEMPTS; i++) {
+            if (shouldStopStandardDamage(context)) {
+                break;
+            }
+            rememberPositiveHealth(context);
+            context.standardDamageAttempts++;
+            clearVanillaInvulnerability(target);
+            target.hurt(context.damageSource, getForceKillDamage(target));
+        }
+    }
+
+    private static boolean shouldStopStandardDamage(ForceKillContext context) {
+        LivingEntity target = context.target;
+        return target.isRemoved()
+                || target.dead
+                || target.isDeadOrDying()
+                || context.deathEventAttempted;
+    }
+
+    private static void clearVanillaInvulnerability(LivingEntity target) {
+        target.invulnerableTime = 0;
+        if (target instanceof WitherBoss wither) {
+            wither.setInvulnerableTicks(0);
+        }
+    }
+
+    private static boolean isDeathCommitted(LivingEntity target) {
+        return target.dead || target.isRemoved();
+    }
+
+    private static void rememberPositiveHealth(ForceKillContext context) {
+        float health = context.target.getHealth();
+        if (Float.isFinite(health) && health > 0.0F) {
+            context.lastPositiveHealth = health;
+        }
+    }
+
+    private static void restoreCanceledDeathHealth(ForceKillContext context) {
+        LivingEntity target = context.target;
+        if (target.isRemoved() || target.dead || !target.isDeadOrDying()) {
+            return;
+        }
+
+        float health = Math.min(context.lastPositiveHealth, target.getMaxHealth());
+        if (Float.isFinite(health) && health > 0.0F) {
+            target.setHealth(health);
+        }
+    }
+
+    private static void executeMaxHealthFallback(ForceKillContext context) {
+        LivingEntity target = context.target;
+        if (target.isRemoved() || target.dead) {
+            return;
+        }
+
+        AttributeInstance maxHealth = target.getAttribute(Attributes.MAX_HEALTH);
+        if (maxHealth != null) {
+            maxHealth.setBaseValue(0.0D);
+        }
+        target.setLastHurtByPlayer(context.player);
+        target.setHealth(0.0F);
+        target.die(context.damageSource);
+    }
+
+    private static void executeFallbackDeath(ForceKillContext context) {
+        LivingEntity target = context.target;
+        if (target.isRemoved() || target.dead) {
+            return;
+        }
+
+        boolean dropLoot = !context.dropsAttempted;
+        context.dropsAttempted = true;
+        if (!target.isDeadOrDying()) {
+            target.setHealth(0.0F);
+        }
+        forceDie(context.level, target, context.damageSource, dropLoot);
+    }
+
+    private static void settleForceKillEffects(ForceKillContext context) {
+        if (!context.captureHandled) {
+            UselessItemUtils.tryCaptureSpawnEgg(context.target, context.stack, context.player);
+            context.captureHandled = true;
+        }
+
+        if (!context.magnetScheduled) {
+            scheduleMagnetSweep(context.level, context.player, context.stack, context.deathPos);
+            context.magnetScheduled = true;
+        }
+    }
+
+    private static void forceDie(ServerLevel level, LivingEntity victim, DamageSource source, boolean dropLoot) {
+        if (victim.isRemoved() || victim.dead) {
+            return;
+        }
+
+        LivingEntity killer = victim.getKillCredit();
+        if (victim.deathScore >= 0 && killer != null) {
+            killer.awardKillScore(victim, victim.deathScore, source);
+        }
+        if (victim.isSleeping()) {
+            victim.stopSleeping();
+        }
+
+        victim.dead = true;
+        victim.getCombatTracker().recheckStatus();
+
+        Entity sourceEntity = source.getEntity();
+        if (sourceEntity == null || sourceEntity.killedEntity(level, victim)) {
+            victim.gameEvent(GameEvent.ENTITY_DIE);
+            if (dropLoot) {
+                victim.dropAllDeathLoot(source);
+            }
+        }
+        level.broadcastEntityEvent(victim, (byte) 3);
+        victim.setPose(Pose.DYING);
+    }
+
+    private static void removeEntityFromServerStorage(ServerLevel level, Entity target) {
+        if (target instanceof Player || target.isRemoved()) {
+            return;
+        }
+
+        PersistentEntitySectionManager<Entity> entityManager = level.entityManager;
+        EntityLookup<Entity> visibleEntities = entityManager.visibleEntityStorage;
+        visibleEntities.byId.remove(target.getId());
+        visibleEntities.byId.int2ObjectEntrySet().removeIf(entry -> entry.getValue() == target);
+        visibleEntities.byUuid.remove(target.getUUID());
+        visibleEntities.byUuid.entrySet().removeIf(entry -> entry.getValue() == target);
+        entityManager.knownUuids.remove(target.getUUID());
+
+        LevelEntityGetter<Entity> entityGetter = entityManager.entityGetter;
+        if (entityGetter instanceof LevelEntityGetterAdapter<Entity> adapter) {
+            adapter.visibleEntities.byId.remove(target.getId());
+            adapter.visibleEntities.byUuid.remove(target.getUUID());
+        }
+
+        level.entityTickList.remove(target);
+        target.setRemoved(Entity.RemovalReason.DISCARDED);
+        level.getChunkSource().removeEntity(target);
+    }
+
+    private static float getForceKillDamage(LivingEntity target) {
+        float damage = target.getHealth() + target.getAbsorptionAmount() + target.getMaxHealth() + 1.0F;
+        if (!Float.isFinite(damage)) {
+            return 1024.0F;
+        }
+        return Math.max(damage, 1024.0F);
+    }
+
+    private static boolean forceKillNonLivingEntity(ItemStack stack, Entity target, Player player) {
+        if (target.level().isClientSide || target.isRemoved() || isForceKillBlacklisted(target)
+                || !isForceKillNonLivingWhitelisted(target)
+                || !com.sorrowmist.useless.compat.forge1201.component.ComponentAccess.getOrDefault(stack, UComponents.ForceKillEnabledComponent, false)) {
+            return false;
+        }
+
+        if (target.level() instanceof ServerLevel level) {
+            Vec3 deathPos = target.position();
+            target.setRemoved(Entity.RemovalReason.DISCARDED);
+            if (!target.isRemoved()) {
+                return false;
+            }
+            scheduleMagnetSweep(level, player, stack, deathPos);
+            return true;
+        }
+        return false;
+    }
+
+    private static final class ForceKillContext {
+        private final ServerLevel level;
+        private final LivingEntity target;
+        private final ItemStack stack;
+        private final Player player;
+        private final DamageSource damageSource;
+        private final Vec3 deathPos;
+        private float lastPositiveHealth;
+        private int standardDamageAttempts;
+        private boolean deathEventAttempted;
+        private boolean deathEventCanceled;
+        private boolean dropsAttempted;
+        private boolean captureHandled;
+        private boolean magnetScheduled;
+        private boolean removalCommitted;
+
+        private ForceKillContext(ServerLevel level, LivingEntity target, ItemStack stack,
+                                 Player player, DamageSource damageSource) {
+            this.level = level;
+            this.target = target;
+            this.stack = stack;
+            this.player = player;
+            this.damageSource = damageSource;
+            this.deathPos = target.position();
+            this.lastPositiveHealth = target.getHealth();
+        }
+    }
+
+    private static boolean isForceKillBlacklisted(Entity entity) {
+        return ConfigManager.getBeefToolForceKillBlacklist().contains(getEntityId(entity));
+    }
+
+    private static boolean isForceKillNonLivingWhitelisted(Entity entity) {
+        return ConfigManager.getBeefToolForceKillNonLivingWhitelist().contains(getEntityId(entity));
+    }
+
+    /** 实体类型注册名（如 {@code minecraft:villager}），保护名单与强制击杀黑名单共用同一套 key。 */
+    public static String getEntityId(Entity entity) {
+        return entity.getType().builtInRegistryHolder().key().location().toString();
+    }
+
+    /**
+     * 「保护名单手势」是否可用：杀戮光环、范围伤害或保护名单模式至少开一个。
+     *
+     * <p>供客户端手势判定与服务端二次校验共用：只有这三个开关之一开着时，
+     * Ctrl/Shift + 右键生物才被解释为「切换保护名单」，否则完全让给原版交互。</p>
+     */
+    public static boolean isProtectGestureAvailable(ItemStack stack) {
+        return com.sorrowmist.useless.compat.forge1201.component.ComponentAccess.getOrDefault(stack, UComponents.BeefAoeDamageEnabledComponent, false)
+                || com.sorrowmist.useless.compat.forge1201.component.ComponentAccess.getOrDefault(stack, UComponents.BeefKillAuraComponent, false)
+                || isProtectModeEnabled(stack);
+    }
+
+    /**
+     * 统一的保护判定：光环、范围伤害与强制击杀都以此为准。
+     *
+     * <p>覆盖五类：玩家自己、其它玩家、同队盟友、自动保护的宠物与坐骑，
+     * 以及玩家手动维护的「种类 / 个体」保护名单。</p>
+     *
+     * <p>注意 {@code player.isAlliedTo(victim)} 保护不了自己的宠物 ——
+     * {@code TamableAnimal#isAlliedTo} 判断的是「对方是不是我的主人」（方向相反），
+     * 而 {@code AbstractHorse} 完全没有覆写，所以归属判定必须走 {@link OwnableEntity#getOwnerUUID()}。</p>
+     */
+    public static boolean isProtectedTarget(Player player, Entity victim) {
+        if (victim == player || victim instanceof Player) {
+            return true;
+        }
+        if (player.isAlliedTo(victim)) {
+            return true;
+        }
+        // 自动保护：自己驯服的宠物（狼/猫/鹦鹉/已驯服的马等）
+        if (victim instanceof OwnableEntity ownable && player.getUUID().equals(ownable.getOwnerUUID())) {
+            return true;
+        }
+        // 自动保护：当前骑乘的坐骑（未驯服的猪/船等不属于 OwnableEntity）
+        if (victim == player.getVehicle()) {
+            return true;
+        }
+
+        BeefToolProtectionManager.Protection protection = BeefToolProtectionManager.protectionFor(player);
+        if (protection.isEmpty()) {
+            return false;
+        }
+        if (protection.types().contains(getEntityId(victim))) {
+            return true;
+        }
+        return protection.entities().contains(victim.getUUID());
+    }
+
+    @Override
+    public void onUseTick(@NotNull Level level,
+                          @NotNull LivingEntity livingEntity,
+                          @NotNull ItemStack stack,
+                          int remainingUseDuration) {
+
+        if (!(livingEntity instanceof Player player) || remainingUseDuration < 0) {
+            livingEntity.releaseUsingItem();
+            return;
+        }
+
+        HitResult hitResult = ProjectileUtil.getHitResultOnViewVector(
+                player,
+                e -> !e.isSpectator() && e.isPickable(),
+                player.getBlockReach()
+        );
+
+        if (!(hitResult instanceof BlockHitResult blockHit)
+                || hitResult.getType() != HitResult.Type.BLOCK) {
+            livingEntity.releaseUsingItem();
+            return;
+        }
+
+        int i = this.getUseDuration(stack) - remainingUseDuration + 1;
+        boolean doBrushTick = i % 10 == 5;
+
+        if (!doBrushTick) {
+            return;
+        }
+
+        BlockPos blockPos = blockHit.getBlockPos();
+        BlockState blockState = level.getBlockState(blockPos);
+
+        /* ---------- 客户端：粒子 & 音效 ---------- */
+        HumanoidArm arm = livingEntity.getUsedItemHand() == InteractionHand.MAIN_HAND
+                ? player.getMainArm()
+                : player.getMainArm().getOpposite();
+
+        if (blockState.shouldSpawnParticlesOnBreak()
+                && blockState.getRenderShape() != RenderShape.INVISIBLE) {
+            this.spawnBrushParticles(
+                    level,
+                    blockHit,
+                    blockState,
+                    livingEntity.getViewVector(0.0F),
+                    arm
+            );
+        }
+
+        SoundEvent sound = blockState.getBlock() instanceof BrushableBlock brushable
+                ? brushable.getBrushSound()
+                : SoundEvents.BRUSH_GENERIC;
+
+        level.playSound(player, blockPos, sound, SoundSource.BLOCKS);
+
+        /* ---------- 服务端：正常刷取 + 战利品直收 ---------- */
+        if (!level.isClientSide) {
+            BlockEntity blockEntity = level.getBlockEntity(blockPos);
+            if (blockEntity instanceof BrushableBlockEntity brushable) {
+
+                // 刷取前记录已有掉落
+                AABB area = new AABB(blockPos).inflate(3.0);
+                Set<UUID> before = level.getEntitiesOfClass(ItemEntity.class, area)
+                                        .stream()
+                                        .map(Entity::getUUID)
+                                        .collect(Collectors.toSet());
+
+                boolean finished = brushable.brush(
+                        level.getGameTime(),
+                        player,
+                        blockHit.getDirection()
+                );
+
+                // 只有刷完那一刻才回收掉落
+                if (finished) {
+                    List<ItemStack> collected = new java.util.ArrayList<>();
+                    level.getEntitiesOfClass(ItemEntity.class, area).stream()
+                         .filter(e -> !before.contains(e.getUUID()))
+                         .forEach(entity -> {
+                             ItemStack drop = entity.getItem().copy();
+                             if (!drop.isEmpty()) {
+                                 collected.add(drop);
+                             }
+                             entity.discard();
+                         });
+                    // 产物走统一的「AE 存储优先 / 范围磁力」处理，与挖掘、杀怪保持一致
+                    MiningUtils.handleDrops(player, MiningUtils.mergeItemStacks(collected), stack,
+                            Vec3.atCenterOf(blockPos));
+                }
+            }
+        }
+    }
+
+    @Override
+    public @NotNull InteractionResult useOn(UseOnContext ctx) {
+        Level world = ctx.getLevel();
+        Player player = ctx.getPlayer();
+
+        if (player == null) return InteractionResult.PASS;
+
+        InteractionResult teleportResult = tryTeleport(world, player, ctx.getItemInHand());
+        if (teleportResult != InteractionResult.PASS) return teleportResult;
+
+        // 匠心仪式挎包模式：右键魔典预览的五芒星，从 AE 网络取出材料摆放整座仪式。
+        // 预览仅存在于客户端，因此由客户端识别目标格并将预览信息发送至服务端。
+        if (world.isClientSide && !player.isShiftKeyDown()
+                && com.sorrowmist.useless.compat.forge1201.component.ComponentAccess.getOrDefault(ctx.getItemInHand(), UComponents.BeefRitualSatchelComponent.get(), false)
+                && ModList.get().isLoaded("occultism")
+                && com.sorrowmist.useless.compat.forge1201.OptionalIntegration.call(
+                        "occultism", "com.sorrowmist.useless.compat.occultism.RitualSatchelClientCompat",
+                        "trySendPlacement", Boolean.class, false,
+                        new Class<?>[]{Level.class, Player.class, BlockPos.class}, world, player, ctx.getClickedPos())) {
+            return InteractionResult.SUCCESS;
+        }
+
+        InteractionResult lightningCollectorResult = trySummonLightningForCollector(ctx.getLevel(), ctx.getClickedPos(), ctx.getPlayer());
+        if (lightningCollectorResult != InteractionResult.PASS) return lightningCollectorResult;
+
+        InteractionResult timeAccelerationResult = BeefTimeAcceleration.tryUse(ctx);
+        if (timeAccelerationResult != InteractionResult.PASS) return timeAccelerationResult;
+
+        // ============================================================
+        // 0. 打火石功能 (点亮营火/蜡烛，或在点击面放火；潜行时让给其它模组)
+        // ============================================================
+        if (isFlintAndSteelEnabled(ctx.getItemInHand()) && !player.isShiftKeyDown()) {
+            InteractionResult flintResult = BeefFlintAndSteel.tryUse(ctx);
+            if (flintResult != InteractionResult.PASS) return flintResult;
+        }
+
+        // ============================================================
+        // 1. 刷子功能 (对 BrushableBlock 生效)
+        // ============================================================
+        HitResult hitresult = ProjectileUtil.getHitResultOnViewVector(
+                player, (p) -> !p.isSpectator() && p.isPickable(), player.getBlockReach());
+
+        if (hitresult instanceof BlockHitResult blockHit && hitresult.getType() == HitResult.Type.BLOCK) {
+            if (world.getBlockState(blockHit.getBlockPos()).getBlock() instanceof BrushableBlock) {
+                player.startUsingItem(ctx.getHand());
+                return InteractionResult.CONSUME;
+            }
+        }
+
+        // 按住连锁键（Tab）时，下面的右键操作也会连锁：
+        // 等价组 / 范围 / 数量上限与连锁挖掘完全共用（潜行时不连锁，只作用一块）。
+        ItemStack tool = ctx.getItemInHand();
+        boolean chainUse = RightClickChainer.shouldChain(player, tool);
+
+        // ============================================================
+        // 2. 顺手收菜（右键成熟作物：收获并将种子保留在地里，不连根拔除）
+        // ============================================================
+        if (isCropHarvestEnabled(tool) && !player.isShiftKeyDown()
+                && BeefCropHarvest.isHarvestable(world.getBlockState(ctx.getClickedPos()))) {
+            if (world instanceof ServerLevel serverLevel) {
+                if (chainUse) {
+                    RightClickChainer.harvestCrops(serverLevel, ctx.getClickedPos(), player, tool);
+                } else {
+                    BeefCropHarvest.harvest(serverLevel, ctx.getClickedPos(), player, tool);
+                }
+            }
+            // 两端均消费本次交互，避免客户端重复触发
+            return InteractionResult.sidedSuccess(world.isClientSide);
+        }
+
+        // ============================================================
+        // 3. 催熟 / 强制生长 (右键可骨粉方块一键催到成熟；开启强制生长后
+        //    额外用随机刻推进甘蔗、仙人掌、竹子等骨粉无效的方块；按住连锁键时整片作用)
+        // ============================================================
+        // 与上面的打火石一致，先判开关再进行为，避免连点模式下每次都白做一次方块查询
+        if ((isRipenEnabled(tool) || isForceGrowEnabled(tool)) && !player.isShiftKeyDown()) {
+            InteractionResult ripenResult = BeefRipen.tryUse(ctx);
+            if (ripenResult != InteractionResult.PASS) return ripenResult;
+        }
+
+        // ============================================================
+        // 4. 统一工具行为链 (铲子 / 锄头 顺序由耕地模式决定，随后是斧头)
+        // ============================================================
+        boolean farmlandMode = isFarmlandMode(tool);
+        ToolAction firstSoilAction = farmlandMode ? ToolActions.HOE_TILL : ToolActions.SHOVEL_FLATTEN;
+        SoundEvent firstSoilSound = farmlandMode ? SoundEvents.HOE_TILL : SoundEvents.SHOVEL_FLATTEN;
+        ToolAction secondSoilAction = farmlandMode ? ToolActions.SHOVEL_FLATTEN : ToolActions.HOE_TILL;
+        SoundEvent secondSoilSound = farmlandMode ? SoundEvents.SHOVEL_FLATTEN : SoundEvents.HOE_TILL;
+
+        // 4.1 土壤交互（耕地模式：锄头优先；草径模式：铲子优先）
+        InteractionResult res = this.tryToolAction(ctx, firstSoilAction, firstSoilSound, chainUse);
+        if (res != InteractionResult.PASS) return res;
+
+        res = this.tryToolAction(ctx, secondSoilAction, secondSoilSound, chainUse);
+        if (res != InteractionResult.PASS) return res;
+
+        // 4.2 斧头 (剥皮)
+        res = this.tryToolAction(ctx, ToolActions.AXE_STRIP, SoundEvents.AXE_STRIP, chainUse);
+        if (res != InteractionResult.PASS) return res;
+
+        // 4.3 斧头 (刮铜)
+        res = this.tryScrapeOrWaxOff(ctx, ToolActions.AXE_SCRAPE, SoundEvents.AXE_SCRAPE, 3005, chainUse);
+        if (res != InteractionResult.PASS) return res;
+
+        // 4.4 斧头 (去蜡)
+        return this.tryScrapeOrWaxOff(ctx, ToolActions.AXE_WAX_OFF, SoundEvents.AXE_WAX_OFF, 3004, chainUse);
+    }
+
+    public static InteractionResult trySummonLightningForCollector(Level level, BlockPos clickedPos, @Nullable Player player) {
+        if (!level.getBlockState(clickedPos).is(net.minecraft.world.level.block.Blocks.LIGHTNING_ROD)) {
+            return InteractionResult.PASS;
+        }
+
+        if (level instanceof ServerLevel serverLevel) {
+            LightningBolt bolt = EntityType.LIGHTNING_BOLT.create(serverLevel);
+            if (bolt == null) return InteractionResult.FAIL;
+
+            Vec3 target = Vec3.atBottomCenterOf(clickedPos.above());
+            bolt.moveTo(target.x, target.y, target.z);
+            if (player instanceof ServerPlayer serverPlayer) {
+                bolt.setCause(serverPlayer);
+            }
+            // ae2lt 存在时会读取此 NBT 键以识别自然天气闪电；不存在时该键被忽略，不影响功能
+            bolt.getPersistentData().putBoolean(AE2LT_NATURAL_LIGHTNING_TAG, true);
+            serverLevel.addFreshEntity(bolt);
+        }
+
+        return InteractionResult.sidedSuccess(level.isClientSide());
+    }
+
+    @Override
+    public @NotNull InteractionResult onItemUseFirst(@NotNull ItemStack stack, @NotNull UseOnContext ctx) {
+        InteractionResult teleportResult = tryTeleport(ctx.getLevel(), ctx.getPlayer(), stack);
+        if (teleportResult != InteractionResult.PASS) return teleportResult;
+
+        InteractionResult timeAccelerationResult = BeefTimeAcceleration.tryUse(ctx);
+        if (timeAccelerationResult != InteractionResult.PASS) return timeAccelerationResult;
+
+        // 蜡烛蛋糕的点亮必须在 useItemOn 之前处理：CandleCakeBlock.useItemOn 仅在物品为
+        // Items.FLINT_AND_STEEL 或 Items.FIRE_CHARGE 时返回 SKIP_DEFAULT_BLOCK_INTERACTION，
+        // 造化杖不属于二者，该方块会返回 PASS_TO_DEFAULT_BLOCK_INTERACTION 并转交
+        // CandleCakeBlock.useWithoutItem 处理；玩家饱食度未满时因此先吃掉一块蛋糕而非点亮蜡烛。
+        // 在此提前点亮可绕开该分支，行为与原版打火石保持一致。
+        Player player = ctx.getPlayer();
+        BlockState clickedState = ctx.getLevel().getBlockState(ctx.getClickedPos());
+        if (player != null && isFlintAndSteelEnabled(stack) && !player.isShiftKeyDown()
+                && clickedState.getBlock() instanceof CandleCakeBlock && CandleCakeBlock.canLight(clickedState)) {
+            InteractionResult flintResult = BeefFlintAndSteel.tryUse(ctx);
+            if (flintResult != InteractionResult.PASS) return flintResult;
+        }
+
+        return InteractionResult.PASS;
+    }
+
+    @Override
+    @SuppressWarnings("all")
+    public float getDestroySpeed(@NotNull ItemStack stack, @NotNull BlockState state) {
+        // 基础工具速度
+        float configSpeed = (float) ConfigManager.getBeefToolMiningSpeed();
+        float baseSpeed = configSpeed > 0 ? configSpeed : Tiers.NETHERITE.getSpeed();
+
+        float hardness = state.getDestroySpeed(null, null);
+        if (hardness < 0) {
+            // hardness == -1 是模组圈里通行的「伪不可破坏」约定：原版层面不可破坏，是否可挖
+            // 由方块自己重写的 getDestroyProgress 决定。ATM 的三种矿与 ancient_stone 系列
+            // 就是 strength(-1.0f, ...) 配一段自写进度公式（hasCorrectToolForDrops ? 250 : 1500）。
+            //
+            // 这里原来直接 return 0.0F，会让 getDigSpeed 归零，进而让那类方块的破坏进度恒为 0
+            // —— 表现就是「方块完全挖不动」，与掉落判定无关。
+            //
+            // 但只返回 baseSpeed 又会明显偏慢：普通方块走原版的「硬度 x 30」除数，而这类方块
+            // 自写的除数大得多（ATM 用 250，且额外 /2），同样的 baseSpeed 会慢十几倍。所以这里
+            // 用一个「名义硬度」替代哨兵值 -1，让 baseSpeed x 硬度 这条公式继续成立：
+            //   ATM 矿：getDigSpeed / 2 / 250 = (baseSpeed x 15) / 500 ≈ 0.30/tick（约 3.3 tick）
+            //   普通方块：baseSpeed / 30 ≈ 0.33/tick（约 3 tick）
+            // 两者的实际挖掘耗时因此基本一致。名义硬度可用 beef_tool_pseudo_hardness 调整。
+            //
+            // 原版基岩 / 屏障 / 传送门框不会因此变得可挖：BlockBehaviour.getDestroyProgress
+            // 在 destroySpeed == -1 时直接 return 0（字节码确认），不会使用此处返回的速度值。
+            return baseSpeed * (float) ConfigManager.getBeefToolPseudoHardness();
+        }
+
+        float speed = baseSpeed * hardness;
+
+        // 防止 NaN / 极端情况
+        if (speed <= 0 || Float.isNaN(speed) || Float.isInfinite(speed)) {
+            return baseSpeed;
+        }
+
+        return speed;
+    }
+
+    /**
+     * 造化杖是「无等级万能工具」：不继承任何工具等级的 incorrect_for_*_tool 限制。
+     *
+     * <p>原版 工具规则按顺序取「第一条命中的规则」，而所有新增挖掘等级的模组都会把
+     * 自己的方块并入 {@code #minecraft:incorrect_for_<tier>_tool}。若把某个等级的拒绝清单写进
+     * 规则表，就等于给造化杖挂上一份会随整合包变化的黑名单（AllTheModium 的 vibranium /
+     * unobtainium 矿即因此被误伤，表现为方块被移除但不掉落、连锁挖掘直接跳过）。
+     *
+     * <p>这里反过来声明「永远是正确工具」，任何模组、任何未来新增的挖掘等级都自动生效，
+     * 代码里不需要出现任何模组专属 ID。需要保留进度门槛时，把方块加进
+     * {@link ModTags#BEEF_TOOL_TIER_LOCKED} 即可；也可以用配置项
+     * {@code beef_tool_ignores_tool_tier} 整体回退到原版语义。
+     */
+    @Override
+    public boolean isCorrectToolForDrops(@NotNull ItemStack stack, @NotNull BlockState state) {
+        if (ConfigManager.isBeefToolIgnoresToolTier() && !state.is(ModTags.BEEF_TOOL_TIER_LOCKED)) {
+            return true;
+        }
+        // 开关关闭 / 方块在锁定标签内：回到「下界合金层级」的原版语义
+        return (state.is(BlockTags.MINEABLE_WITH_PICKAXE) || state.is(BlockTags.MINEABLE_WITH_AXE)
+                || state.is(BlockTags.MINEABLE_WITH_SHOVEL) || state.is(BlockTags.MINEABLE_WITH_HOE))
+                && net.minecraftforge.common.TierSortingRegistry.isCorrectTierForDrops(getTier(), state);
+    }
+
+    @Override
+    @SuppressWarnings("all")
+    public @NotNull InteractionResult interactLivingEntity(@NotNull ItemStack stack,
+                                                           @NotNull Player player,
+                                                           @NotNull LivingEntity entity,
+                                                           @NotNull InteractionHand hand) {
+        InteractionResult teleportResult = tryTeleport(entity.level(), player, stack);
+        if (teleportResult != InteractionResult.PASS) return teleportResult;
+
+        // 生物加速（独立模式）：潜行右键生物 → 只推它的「计时器」，不跑 AI / 寻路 / 移动。
+        // 必须排在下面「时间加速拦截」之前：两个模式可同时开启，作用对象分别是方块与生物。
+        if (isEntityTimeAccelerationEnabled(stack) && player.isShiftKeyDown()) {
+            if (entity instanceof Player) return InteractionResult.PASS;
+            return BeefTimeAcceleration.tryUseOnEntity(stack, player, entity);
+        }
+
+        if (BeefTimeAcceleration.shouldBlockOtherRightClick(stack, player)) {
+            return InteractionResult.FAIL;
+        }
+
+        // 打火石能力对苦力怕生效：原版由 Creeper.mobInteract 依据 #minecraft:creeper_igniters
+        // 物品标签处理，造化杖不属于该标签，该分支不会命中，需在物品侧补齐同等行为。
+        // 已点燃的苦力怕不再重复触发，否则引信会被反复重置而无法爆炸。
+        if (isFlintAndSteelEnabled(stack) && !player.isShiftKeyDown()
+                && entity instanceof Creeper creeper && !creeper.isIgnited()) {
+            boolean isClient = entity.level().isClientSide();
+            entity.level().playSound(player, entity.getX(), entity.getY(), entity.getZ(),
+                    SoundEvents.FLINTANDSTEEL_USE, entity.getSoundSource(), 1.0F,
+                    entity.level().getRandom().nextFloat() * 0.4F + 0.8F);
+            if (!isClient) {
+                creeper.ignite();
+            }
+            return InteractionResult.sidedSuccess(isClient);
+        }
+
+        // 催熟：右键幼年动物直接催至成年
+        if (isRipenEnabled(stack) && !player.isShiftKeyDown()
+                && entity instanceof AgeableMob ageable && ageable.isBaby()) {
+            boolean isClient = entity.level().isClientSide();
+            if (!isClient) {
+                ageable.setBaby(false);
+                if (entity.level() instanceof ServerLevel serverLevel) {
+                    serverLevel.sendParticles(
+                            ParticleTypes.HAPPY_VILLAGER,
+                            entity.getX(),
+                            entity.getY() + entity.getBbHeight() * 0.5D,
+                            entity.getZ(),
+                            12, 0.3D, 0.3D, 0.3D, 0.0D
+                    );
+                    serverLevel.playSound(null, entity.blockPosition(), SoundEvents.BONE_MEAL_USE,
+                                          SoundSource.PLAYERS, 1.0F, 1.0F);
+                }
+            }
+            return InteractionResult.sidedSuccess(isClient);
+        }
+
+        if (isShearsEnabled(stack) && entity instanceof IForgeShearable target) {
+            BlockPos pos = entity.blockPosition();
+            boolean isClient = entity.level().isClientSide();
+            if (target.isShearable(stack, entity.level(), pos)) {
+                List<ItemStack> drops = target.onSheared(player, stack, entity.level(), pos,
+                        net.minecraft.world.item.enchantment.EnchantmentHelper.getItemEnchantmentLevel(
+                                Enchantments.BLOCK_FORTUNE, stack));
+                if (!isClient) {
+                    // 产物走统一的「AE 存储优先 / 范围磁力」处理，与挖掘、杀怪保持一致
+                    MiningUtils.handleDrops(player, MiningUtils.mergeItemStacks(drops), stack, entity.position());
+                }
+                entity.gameEvent(GameEvent.SHEAR, player);
+                return InteractionResult.sidedSuccess(isClient);
+            }
+        }
+        return InteractionResult.PASS;
+    }
+
+    @Override
+    public void inventoryTick(@NotNull ItemStack pStack,
+                              @NotNull Level pLevel,
+                              @NotNull Entity pEntity,
+                              int pSlotId,
+                              boolean pIsSelected) {
+        super.inventoryTick(pStack, pLevel, pEntity, pSlotId, pIsSelected);
+        // 旧存档的杖子带着 durability(0) 留下的 MAX_DAMAGE=0 / DAMAGE=0，会在下一次
+        // 耐久结算时被直接销毁；每 tick 就地迁移一次，剥离后本判定立即不再命中。
+        if (!pLevel.isClientSide) {
+            migrateLegacyDurability(pStack);
+        }
+        // 注意不能用 getInventory().items 判断携带：那只有主背包 36 格，不含副手
+        if (pEntity instanceof Player player
+                && UselessItemUtils.hasItemInInventory(player, this)) {
+            UselessItemUtils.applyEndlessBeafEffects(player);
+        }
+    }
+
+    @Override
+    public void onCraftedBy(@NotNull ItemStack stack, @NotNull Level level, @NotNull Player player) {
+        super.onCraftedBy(stack, level, player);
+        refreshEnchantments(stack, level);
+    }
+
+    @Override
+    @OnlyIn(Dist.CLIENT)
+    public @NotNull UseAnim getUseAnimation(@NotNull ItemStack stack) {
+        Player player = Minecraft.getInstance().player;
+        Level level = Minecraft.getInstance().level;
+
+        if (player != null && level != null && player.isUsingItem()) {
+            HitResult hitResult = ProjectileUtil.getHitResultOnViewVector(
+                    player,
+                    e -> !e.isSpectator() && e.isPickable(),
+                    player.getBlockReach()
+            );
+
+            if (hitResult instanceof BlockHitResult blockHit
+                    && hitResult.getType() == HitResult.Type.BLOCK) {
+                BlockPos blockPos = blockHit.getBlockPos();
+                BlockState blockState = level.getBlockState(blockPos);
+                if (blockState.getBlock() instanceof BrushableBlock) {
+                    return UseAnim.BRUSH;
+                }
+            }
+        }
+        return super.getUseAnimation(stack);
+    }
+
+    @Override
+    public int getUseDuration(@NotNull ItemStack stack) {
+        return 20;
+    }
+
+    @Override
+    @OnlyIn(Dist.CLIENT)
+    public void appendHoverText(@NotNull ItemStack stack, @NotNull net.minecraft.world.level.Level context,
+                                @NotNull List<Component> tooltipComponents,
+                                @NotNull TooltipFlag tooltipFlag) {
+        // 提示行数已超过屏幕可用高度，原版会把超出部分裁掉。此处先把全部内容写进暂存列表，
+        // 再按当前页裁取并追加翻页指示，避免逐行改动各分支的写入目标。
+        List<Component> fullTooltip = new ArrayList<>();
+        this.buildFullTooltip(stack, context, fullTooltip, tooltipFlag);
+        // 置位可见性标记：按键事件无法得知提示框是否真的在绘制，只能由渲染路径告知
+        TooltipPageState.markTooltipVisible();
+        // 绑定本次渲染的物品栈：提示框渲染与按键事件分属两个阶段，按键处理期间只能凭
+        // 主手/副手物品重新推断被查看的物品；把引用记录在此，按键入口可直接取用，
+        // 避免提示框渲染的并非手持物品（如创造模式物品栏）时页码写到错误的键上。
+        TooltipPageState.setViewedStack(stack);
+
+        int totalPages = BeefTooltipPager.pageCount(fullTooltip.size());
+        int[] range = BeefTooltipPager.pageRange(stack, fullTooltip.size(), totalPages);
+        tooltipComponents.addAll(fullTooltip.subList(range[0], range[1]));
+        if (totalPages > 1) {
+            // 页码由 pageRange 回绕后写回，直接读取即为当前页
+            int page = BeefTooltipPager.getPage(stack);
+            tooltipComponents.add(Component.empty());
+            tooltipComponents.add(BeefTooltipPager.pageIndicator(page, totalPages)
+                                                    .withStyle(ChatFormatting.DARK_GRAY));
+        }
+
+        super.appendHoverText(stack, context, tooltipComponents, tooltipFlag);
+    }
+
+    /**
+     * 构建造化杖的完整提示内容。
+     *
+     * <p>与 {@link #appendHoverText} 分离，使分页逻辑只需处理「全部行」这一种输入。</p>
+     */
+    @OnlyIn(Dist.CLIENT)
+    private void buildFullTooltip(@NotNull ItemStack stack, @NotNull net.minecraft.world.level.Level context,
+                                  @NotNull List<Component> tooltipComponents,
+                                  @NotNull TooltipFlag tooltipFlag) {
+        if (ModList.get().isLoaded("gtceu")) {
+            ToolTypeMode currentToolType = com.sorrowmist.useless.compat.forge1201.component.ComponentAccess.getOrDefault(stack,
+                    UComponents.CurrentToolTypeComponent.get(),
+                    ToolTypeMode.NONE_MODE
+            );
+
+            tooltipComponents.add(Component.translatable("tooltip.useless_mod.current_tool_mode")
+                                           .append(": ")
+                                           .append(currentToolType.getTooltip())
+                                           .withStyle(ChatFormatting.GOLD));
+            tooltipComponents.add(Component.empty());
+        }
+
+        // 增强连锁挖矿模式
+        boolean chainMiningEnabled = com.sorrowmist.useless.compat.forge1201.component.ComponentAccess.getOrDefault(stack, UComponents.EnhancedChainMiningComponent.get(), false);
+        tooltipComponents.add(Component.translatable("tooltip.useless_mod.enhanced_chain_mining_mode")
+                                       .append(": ")
+                                       .append(Component.translatable(
+                                               chainMiningEnabled ? "tooltip.useless_mod.enable" :
+                                                       "tooltip.useless_mod.disable"
+                                       ).withStyle(chainMiningEnabled ? ChatFormatting.GREEN : ChatFormatting.GRAY))
+                                       .withStyle(ChatFormatting.GREEN));
+
+        // 强制挖掘状态
+        boolean forceMiningEnabled = com.sorrowmist.useless.compat.forge1201.component.ComponentAccess.getOrDefault(stack, UComponents.ForceMiningComponent.get(), false);
+        tooltipComponents.add(Component.translatable("tooltip.useless_mod.force_mining_mode")
+                                       .append(": ")
+                                       .append(Component.translatable(
+                                               forceMiningEnabled ? "tooltip.useless_mod.enable" :
+                                                       "tooltip.useless_mod.disable"
+                                       ).withStyle(forceMiningEnabled ? ChatFormatting.GREEN : ChatFormatting.GRAY))
+                                       .withStyle(ChatFormatting.RED));
+
+        boolean forceKillEnabled = com.sorrowmist.useless.compat.forge1201.component.ComponentAccess.getOrDefault(stack, UComponents.ForceKillEnabledComponent.get(), false);
+        tooltipComponents.add(Component.translatable("tooltip.useless_mod.force_kill_enabled_mode")
+                                       .append(": ")
+                                       .append(Component.translatable(
+                                               forceKillEnabled ? "tooltip.useless_mod.enable" :
+                                                       "tooltip.useless_mod.disable"
+                                       ).withStyle(forceKillEnabled ? ChatFormatting.GOLD : ChatFormatting.GRAY))
+                                       .withStyle(ChatFormatting.DARK_RED));
+
+        boolean beefTimeAccelerationEnabled = com.sorrowmist.useless.compat.forge1201.component.ComponentAccess.getOrDefault(stack, UComponents.BeefTimeAccelerationEnabledComponent.get(), false);
+        tooltipComponents.add(Component.translatable("tooltip.useless_mod.time_acceleration_mode")
+                                       .append(": ")
+                                       .append(Component.translatable(
+                                               beefTimeAccelerationEnabled ? "tooltip.useless_mod.enable" :
+                                                       "tooltip.useless_mod.disable"
+                                       ).withStyle(beefTimeAccelerationEnabled ? ChatFormatting.GREEN : ChatFormatting.GRAY))
+                                       .withStyle(ChatFormatting.AQUA));
+
+        boolean beefEntityTimeAccelerationEnabled = isEntityTimeAccelerationEnabled(stack);
+        tooltipComponents.add(Component.translatable("tooltip.useless_mod.beef_entity_time_acceleration_mode")
+                                       .append(": ")
+                                       .append(Component.translatable(
+                                               beefEntityTimeAccelerationEnabled ? "tooltip.useless_mod.enable" :
+                                                       "tooltip.useless_mod.disable"
+                                       ).withStyle(beefEntityTimeAccelerationEnabled ? ChatFormatting.GREEN
+                                                                                     : ChatFormatting.GRAY))
+                                       .withStyle(ChatFormatting.AQUA));
+
+        Boolean beefInvulnerabilityValue = com.sorrowmist.useless.compat.forge1201.component.ComponentAccess.get(stack, UComponents.BeefInvulnerabilityEnabledComponent.get());
+        boolean beefInvulnerabilityEnabled = beefInvulnerabilityValue != null
+                ? beefInvulnerabilityValue
+                : stack.getItem() instanceof EndlessBeafItem;
+        tooltipComponents.add(Component.translatable("tooltip.useless_mod.beef_invulnerability_mode")
+                                       .append(": ")
+                                       .append(Component.translatable(
+                                               beefInvulnerabilityEnabled ? "tooltip.useless_mod.enable" :
+                                                       "tooltip.useless_mod.disable"
+                                       ).withStyle(beefInvulnerabilityEnabled ? ChatFormatting.GREEN : ChatFormatting.GRAY))
+                                       .withStyle(ChatFormatting.DARK_PURPLE));
+
+        boolean beefAdvancedStealthEnabled = com.sorrowmist.useless.compat.forge1201.component.ComponentAccess.getOrDefault(stack,
+                UComponents.BeefAdvancedStealthEnabledComponent.get(), false);
+        tooltipComponents.add(Component.translatable("tooltip.useless_mod.beef_advanced_stealth_mode")
+                                       .append(": ")
+                                       .append(Component.translatable(
+                                               beefAdvancedStealthEnabled ? "tooltip.useless_mod.enable" :
+                                                       "tooltip.useless_mod.disable"
+                                       ).withStyle(beefAdvancedStealthEnabled ? ChatFormatting.GREEN : ChatFormatting.GRAY))
+                                       .withStyle(ChatFormatting.LIGHT_PURPLE));
+
+        boolean beefCaptureEnabled = com.sorrowmist.useless.compat.forge1201.component.ComponentAccess.getOrDefault(stack, UComponents.BeefCaptureEnabledComponent.get(), false);
+        tooltipComponents.add(Component.translatable("tooltip.useless_mod.beef_capture_mode")
+                                       .append(": ")
+                                       .append(Component.translatable(
+                                               beefCaptureEnabled ? "tooltip.useless_mod.enable" :
+                                                       "tooltip.useless_mod.disable"
+                                       ).withStyle(beefCaptureEnabled ? ChatFormatting.GREEN : ChatFormatting.GRAY))
+                                       .withStyle(ChatFormatting.DARK_GREEN));
+
+        boolean beefTeleportEnabled = isTeleportEnabled(stack);
+        tooltipComponents.add(Component.translatable("tooltip.useless_mod.beef_teleport_mode")
+                                       .append(": ")
+                                       .append(Component.translatable(
+                                               beefTeleportEnabled ? "tooltip.useless_mod.enable" :
+                                                       "tooltip.useless_mod.disable"
+                                       ).withStyle(beefTeleportEnabled ? ChatFormatting.GREEN : ChatFormatting.GRAY))
+                                       .withStyle(ChatFormatting.LIGHT_PURPLE));
+
+        boolean beefAoeDamageEnabled = com.sorrowmist.useless.compat.forge1201.component.ComponentAccess.getOrDefault(stack, UComponents.BeefAoeDamageEnabledComponent.get(), false);
+        tooltipComponents.add(Component.translatable("tooltip.useless_mod.beef_aoe_damage_mode")
+                                       .append(": ")
+                                       .append(Component.translatable(
+                                               beefAoeDamageEnabled ? "tooltip.useless_mod.enable" :
+                                                       "tooltip.useless_mod.disable"
+                                       ).withStyle(beefAoeDamageEnabled ? ChatFormatting.GREEN : ChatFormatting.GRAY))
+                                       .withStyle(ChatFormatting.RED));
+
+        boolean beefKillAuraEnabled = isKillAuraEnabled(stack);
+        tooltipComponents.add(Component.translatable("tooltip.useless_mod.beef_kill_aura_mode")
+                                       .append(": ")
+                                       .append(Component.translatable(
+                                               beefKillAuraEnabled ? "tooltip.useless_mod.enable" :
+                                                       "tooltip.useless_mod.disable"
+                                       ).withStyle(beefKillAuraEnabled ? ChatFormatting.GREEN : ChatFormatting.GRAY))
+                                       .withStyle(ChatFormatting.DARK_RED));
+
+        boolean beefProtectModeEnabled = isProtectModeEnabled(stack);
+        tooltipComponents.add(Component.translatable("tooltip.useless_mod.beef_protect_toggle_mode")
+                                       .append(": ")
+                                       .append(Component.translatable(
+                                               beefProtectModeEnabled ? "tooltip.useless_mod.enable" :
+                                                       "tooltip.useless_mod.disable"
+                                       ).withStyle(beefProtectModeEnabled ? ChatFormatting.GREEN : ChatFormatting.GRAY))
+                                       .withStyle(ChatFormatting.BLUE));
+
+        BeefToolProtectionManager.Protection protection = BeefToolProtectionManager.clientProtection();
+        tooltipComponents.add(Component.translatable("tooltip.useless_mod.beef_protect_mode")
+                                       .append(": ")
+                                       .append(Component.translatable("tooltip.useless_mod.beef_protect_count",
+                                                       protection.types().size(), protection.entities().size())
+                                               .withStyle(protection.isEmpty()
+                                                       ? ChatFormatting.GRAY : ChatFormatting.AQUA))
+                                       .withStyle(ChatFormatting.BLUE));
+
+        boolean beefMagnetEnabled = com.sorrowmist.useless.compat.forge1201.component.ComponentAccess.getOrDefault(stack, UComponents.BeefMagnetEnabledComponent.get(), true);
+        tooltipComponents.add(Component.translatable("tooltip.useless_mod.beef_magnet_mode")
+                                       .append(": ")
+                                       .append(Component.translatable(
+                                               beefMagnetEnabled ? "tooltip.useless_mod.enable" :
+                                                       "tooltip.useless_mod.disable"
+                                       ).withStyle(beefMagnetEnabled ? ChatFormatting.GREEN : ChatFormatting.GRAY))
+                                       .withStyle(ChatFormatting.YELLOW));
+
+        // AE存储优先状态（仅当AE2模组存在时）
+        if (ModList.get().isLoaded("ae2")) {
+            boolean aeStorageEnabled = com.sorrowmist.useless.compat.forge1201.component.ComponentAccess.getOrDefault(stack, UComponents.AEStoragePriorityComponent.get(), false);
+            tooltipComponents.add(Component.translatable("tooltip.useless_mod.ae_storage_priority_mode")
+                                           .append(": ")
+                                           .append(Component.translatable(
+                                                   aeStorageEnabled ? "tooltip.useless_mod.enable" :
+                                                           "tooltip.useless_mod.disable"
+                                           ).withStyle(aeStorageEnabled ? ChatFormatting.GREEN : ChatFormatting.GRAY))
+                                           .withStyle(ChatFormatting.BLUE));
+
+            // AE 连接模式：右键有 AE 节点的机器，把它并入工具绑定的那张网
+            boolean aeConnectEnabled = com.sorrowmist.useless.compat.forge1201.component.ComponentAccess.getOrDefault(stack, UComponents.AeNetworkConnectComponent.get(), false);
+            tooltipComponents.add(Component.translatable("tooltip.useless_mod.ae_network_connect_mode")
+                                           .append(": ")
+                                           .append(Component.translatable(
+                                                   aeConnectEnabled ? "tooltip.useless_mod.enable" :
+                                                           "tooltip.useless_mod.disable"
+                                           ).withStyle(aeConnectEnabled ? ChatFormatting.GREEN : ChatFormatting.GRAY))
+                                           .withStyle(ChatFormatting.BLUE));
+        }
+
+        // 剪刀功能：开启后可剪羊毛/剪掉落，并对外声明剪刀能力
+        boolean beefShears = isShearsEnabled(stack);
+        tooltipComponents.add(Component.translatable("tooltip.useless_mod.beef_shears_mode")
+                                       .append(": ")
+                                       .append(Component.translatable(
+                                               beefShears ? "tooltip.useless_mod.enable" :
+                                                       "tooltip.useless_mod.disable"
+                                       ).withStyle(beefShears ? ChatFormatting.GREEN : ChatFormatting.GRAY))
+                                       .withStyle(ChatFormatting.AQUA));
+
+        // 打火石功能：开启后右键可点亮营火/蜡烛，或在点击面放火
+        boolean beefFlintAndSteel = isFlintAndSteelEnabled(stack);
+        tooltipComponents.add(Component.translatable("tooltip.useless_mod.beef_flint_and_steel_mode")
+                                       .append(": ")
+                                       .append(Component.translatable(
+                                               beefFlintAndSteel ? "tooltip.useless_mod.enable" :
+                                                       "tooltip.useless_mod.disable"
+                                       ).withStyle(beefFlintAndSteel ? ChatFormatting.GREEN : ChatFormatting.GRAY))
+                                       .withStyle(ChatFormatting.RED));
+
+        // 右键泥土：锄头优先（变耕地）/ 铲子优先（变草径）
+        tooltipComponents.add(Component.translatable("tooltip.useless_mod.beef_farmland_mode")
+                                       .append(": ")
+                                       .append(farmlandStateText(stack))
+                                       .withStyle(ChatFormatting.GOLD));
+
+        // 顺手收菜：右键成熟作物时收获并保留种子于耕地
+        boolean beefCropHarvest = isCropHarvestEnabled(stack);
+        tooltipComponents.add(Component.translatable("tooltip.useless_mod.beef_crop_harvest_mode")
+                                       .append(": ")
+                                       .append(Component.translatable(
+                                               beefCropHarvest ? "tooltip.useless_mod.enable" :
+                                                       "tooltip.useless_mod.disable"
+                                       ).withStyle(beefCropHarvest ? ChatFormatting.GREEN : ChatFormatting.GRAY))
+                                       .withStyle(ChatFormatting.GREEN));
+
+        // 催熟：右键可骨粉方块一键催到成熟，右键幼年动物直接催至成年
+        boolean beefRipen = isRipenEnabled(stack);
+        tooltipComponents.add(Component.translatable("tooltip.useless_mod.beef_ripen_mode")
+                                       .append(": ")
+                                       .append(Component.translatable(
+                                               beefRipen ? "tooltip.useless_mod.enable" :
+                                                       "tooltip.useless_mod.disable"
+                                       ).withStyle(beefRipen ? ChatFormatting.GREEN : ChatFormatting.GRAY))
+                                       .withStyle(ChatFormatting.GOLD));
+
+        // 强制生长：催熟时额外用随机刻推进（可作用于甘蔗/仙人掌/竹子等骨粉无效的方块）
+        boolean beefForceGrow = isForceGrowEnabled(stack);
+        tooltipComponents.add(Component.translatable("tooltip.useless_mod.beef_force_grow_mode")
+                                       .append(": ")
+                                       .append(Component.translatable(
+                                               beefForceGrow ? "tooltip.useless_mod.enable" :
+                                                       "tooltip.useless_mod.disable"
+                                       ).withStyle(beefForceGrow ? ChatFormatting.GREEN : ChatFormatting.GRAY))
+                                       .withStyle(beefForceGrow ? ChatFormatting.GOLD
+                                                                : ChatFormatting.DARK_GRAY));
+
+        // 连点：客户端会话级开关（不绑物品），开启后按配置速率重复触发右键
+        boolean beefAutoClick = BeefAutoClicker.isEnabled();
+        tooltipComponents.add(Component.translatable("tooltip.useless_mod.beef_auto_click_mode")
+                                       .append(": ")
+                                       .append(Component.translatable(
+                                               beefAutoClick ? "tooltip.useless_mod.enable" :
+                                                       "tooltip.useless_mod.disable"
+                                       ).withStyle(beefAutoClick ? ChatFormatting.GREEN : ChatFormatting.GRAY))
+                                       .withStyle(beefAutoClick ? ChatFormatting.LIGHT_PURPLE
+                                                                : ChatFormatting.DARK_PURPLE));
+
+        tooltipComponents.add(Component.empty());
+
+        // 3. 动态按键提示（Shift 展开）
+        if (Screen.hasShiftDown()) {
+            // 附魔切换
+            this.addKeyTooltip(tooltipComponents, KeyBindings.SWITCH_SILK_TOUCH_KEY,
+                               "tooltip.useless_mod.key.switch_silk_touch"
+            );
+            this.addKeyTooltip(tooltipComponents, KeyBindings.SWITCH_FORTUNE_KEY,
+                               "tooltip.useless_mod.key.switch_fortune"
+            );
+
+            // 模式开关
+            this.addKeyTooltip(tooltipComponents, KeyBindings.TOGGLE_CHAIN_MODE_KEY,
+                               "tooltip.useless_mod.key.toggle_chain_mode"
+            );
+            this.addKeyTooltip(tooltipComponents, KeyBindings.SWITCH_FORCE_MINING_KEY,
+                               "tooltip.useless_mod.key.switch_force_mining"
+            );
+            this.addKeyTooltip(tooltipComponents, KeyBindings.SWITCH_FARMLAND_MODE_KEY,
+                               "tooltip.useless_mod.key.switch_farmland_mode"
+            );
+            this.addKeyTooltip(tooltipComponents, KeyBindings.TOGGLE_CROP_HARVEST_KEY,
+                               "tooltip.useless_mod.key.toggle_crop_harvest"
+            );
+            this.addKeyTooltip(tooltipComponents, KeyBindings.TOGGLE_SHEARS_KEY,
+                               "tooltip.useless_mod.key.toggle_shears"
+            );
+            this.addKeyTooltip(tooltipComponents, KeyBindings.TOGGLE_FLINT_AND_STEEL_KEY,
+                               "tooltip.useless_mod.key.toggle_flint_and_steel"
+            );
+            this.addKeyTooltip(tooltipComponents, KeyBindings.TOGGLE_AUTO_CLICK_KEY,
+                               "tooltip.useless_mod.key.toggle_auto_click"
+            );
+            this.addKeyTooltip(tooltipComponents, KeyBindings.TOGGLE_KILL_AURA_KEY,
+                               "tooltip.useless_mod.key.toggle_kill_aura"
+            );
+
+            // 触发按键
+            this.addKeyTooltip(tooltipComponents, KeyBindings.TRIGGER_CHAIN_MINING_KEY,
+                               "tooltip.useless_mod.key.trigger_chain_mining"
+            );
+            this.addKeyTooltip(tooltipComponents, KeyBindings.TRIGGER_CHAIN_MINING_KEY,
+                               "tooltip.useless_mod.key.chain_use"
+            );
+            this.addKeyTooltip(tooltipComponents, KeyBindings.TRIGGER_FORCE_MINING_KEY,
+                               "tooltip.useless_mod.key.trigger_force_mining"
+            );
+
+            // UI
+            this.addKeyTooltip(tooltipComponents, KeyBindings.SWITCH_MODE_WHEEL_KEY,
+                               "tooltip.useless_mod.key.open_mode_wheel"
+            );
+            tooltipComponents.add(Component.empty());
+        } else {
+            // 未按 Shift 时显示提示
+            tooltipComponents.add(Component.translatable("tooltip.useless_mod.press_shift_for_keys")
+                                           .withStyle(ChatFormatting.GRAY));
+        }
+
+        // 4. 其他静态功能提示
+        tooltipComponents.add(
+                Component.translatable("tooltip.useless_mod.fast_break_plastic").withStyle(ChatFormatting.GREEN));
+        if (ModList.get().isLoaded("ae2")) {
+            tooltipComponents.add(
+                    Component.translatable("tooltip.useless_mod.ae_storage_priority_bind_hint").withStyle(ChatFormatting.GREEN));
+            tooltipComponents.add(
+                    Component.translatable("tooltip.useless_mod.ae_network_connect_hint").withStyle(ChatFormatting.BLUE));
+        }
+        tooltipComponents.add(
+                Component.translatable("tooltip.useless_mod.festive_affix").withStyle(ChatFormatting.BLUE));
+        tooltipComponents.add(
+                Component.translatable("tooltip.useless_mod.auto_collect").withStyle(ChatFormatting.GREEN));
+        tooltipComponents.add(
+                Component.translatable("tooltip.useless_mod.time_acceleration_hint").withStyle(ChatFormatting.LIGHT_PURPLE));
+        tooltipComponents.add(
+                Component.translatable("tooltip.useless_mod.beef_teleport_hint").withStyle(ChatFormatting.LIGHT_PURPLE));
+        tooltipComponents.add(
+                Component.translatable("tooltip.useless_mod.beef_farmland_hint").withStyle(ChatFormatting.GOLD));
+        tooltipComponents.add(
+                Component.translatable("tooltip.useless_mod.beef_crop_harvest_hint").withStyle(ChatFormatting.GREEN));
+        tooltipComponents.add(
+                Component.translatable("tooltip.useless_mod.beef_shears_hint").withStyle(ChatFormatting.AQUA));
+        tooltipComponents.add(
+                Component.translatable("tooltip.useless_mod.beef_flint_and_steel_hint").withStyle(ChatFormatting.GOLD));
+        tooltipComponents.add(
+                Component.translatable("tooltip.useless_mod.beef_ripen_hint").withStyle(ChatFormatting.GOLD));
+        tooltipComponents.add(
+                Component.translatable("tooltip.useless_mod.beef_force_grow_hint").withStyle(ChatFormatting.RED));
+        tooltipComponents.add(
+                Component.translatable("tooltip.useless_mod.beef_auto_click_hint").withStyle(ChatFormatting.LIGHT_PURPLE));
+        tooltipComponents.add(
+                Component.translatable("tooltip.useless_mod.beef_kill_aura_hint").withStyle(ChatFormatting.DARK_RED));
+        tooltipComponents.add(
+                Component.translatable("tooltip.useless_mod.beef_protect_hint").withStyle(ChatFormatting.BLUE));
+        tooltipComponents.add(
+                Component.translatable("tooltip.useless_mod.beef_entity_time_acceleration_hint")
+                         .withStyle(ChatFormatting.LIGHT_PURPLE));
+        tooltipComponents.add(
+                Component.translatable("tooltip.useless_mod.beef_protect_toggle_hint").withStyle(ChatFormatting.BLUE));
+
+        // 可选：增强连锁说明
+        // tooltipComponents.add(Component.translatable("tooltip.useless_mod.enhanced_chain_description").withStyle(ChatFormatting.BLUE));
+
+        super.appendHoverText(stack, context, tooltipComponents, tooltipFlag);
+    }
+
+    @Override
+    @OnlyIn(Dist.CLIENT)
+    public @NotNull Component getName(@NotNull ItemStack stack) {
+        Level level = Minecraft.getInstance().level;
+        // 根据模式添加后缀
+        if (level != null
+                && level.isClientSide
+                && net.minecraft.world.item.enchantment.EnchantmentHelper.getItemEnchantmentLevel(
+                        Enchantments.BLOCK_FORTUNE, stack) != 0) {
+            return Component.translatable("item.useless_mod.endless_beaf_item.fortune");
+        } else {
+            return Component.translatable("item.useless_mod.endless_beaf_item.silk_touch");
+        }
+    }
+
+    @Override
+    public boolean isFoil(@NotNull ItemStack stack) {
+        return true; // 始终显示附魔光效
+    }
+
+    @Override
+    public boolean isEnchantable(@NotNull ItemStack stack) {
+        return true; // 允许被附魔
+    }
+
+    /**
+     * 通用工具动作逻辑
+     */
+    private InteractionResult tryToolAction(UseOnContext ctx, ToolAction ability, SoundEvent sound, boolean chain) {
+        Level world = ctx.getLevel();
+        BlockPos pos = ctx.getClickedPos();
+        BlockState modified = world.getBlockState(pos).getToolModifiedState(ctx, ability, false);
+        if (modified != null) {
+            if (chain) {
+                // 连锁：交给 RightClickChainer 按连锁范围整片处理
+                return RightClickChainer.applyToolAction(ctx, ability, sound, -1);
+            }
+            world.playSound(ctx.getPlayer(), pos, sound, SoundSource.BLOCKS, 1.0F, 1.0F);
+            if (!world.isClientSide) {
+                world.setBlock(pos, modified, 11);
+                if (ctx.getPlayer() instanceof ServerPlayer sp) {
+                    CriteriaTriggers.ITEM_USED_ON_BLOCK.trigger(sp, pos, ctx.getItemInHand());
+                }
+            }
+            return InteractionResult.sidedSuccess(world.isClientSide);
+        }
+        return InteractionResult.PASS;
+    }
+
+    /**
+     * 针对铜块刮擦和去蜡的特殊逻辑 (带 LevelEvent 粒子效果)
+     */
+    private InteractionResult tryScrapeOrWaxOff(UseOnContext ctx, ToolAction ability, SoundEvent sound,
+                                                int levelEvent, boolean chain) {
+        Level world = ctx.getLevel();
+        BlockPos pos = ctx.getClickedPos();
+        BlockState modified = world.getBlockState(pos).getToolModifiedState(ctx, ability, false);
+        if (modified != null) {
+            if (chain) {
+                // 连锁：交给 RightClickChainer 按连锁范围整片处理（粒子按块给，音效只响一次）
+                return RightClickChainer.applyToolAction(ctx, ability, sound, levelEvent);
+            }
+            world.playSound(ctx.getPlayer(), pos, sound, SoundSource.BLOCKS, 1.0F, 1.0F);
+            world.levelEvent(ctx.getPlayer(), levelEvent, pos, 0);
+            if (!world.isClientSide) {
+                world.setBlock(pos, modified, 11);
+                if (ctx.getPlayer() instanceof ServerPlayer sp) {
+                    CriteriaTriggers.ITEM_USED_ON_BLOCK.trigger(sp, pos, ctx.getItemInHand());
+                }
+            }
+            return InteractionResult.sidedSuccess(world.isClientSide);
+        }
+        return InteractionResult.PASS;
+    }
+
+    private void spawnBrushParticles(Level level,
+                                     BlockHitResult hitResult,
+                                     BlockState state,
+                                     Vec3 pos,
+                                     HumanoidArm arm) {
+        int i = arm == HumanoidArm.RIGHT ? 1 : -1;
+        int j = level.getRandom().nextInt(7, 12);
+        BlockParticleOption blockparticleoption = new BlockParticleOption(ParticleTypes.BLOCK, state);
+        Direction direction = hitResult.getDirection();
+        Vec3 vec3 = hitResult.getLocation();
+
+        for (int k = 0; k < j; ++k) {
+            level.addParticle(blockparticleoption,
+                              vec3.x - (double) (direction == Direction.WEST ? 1.0E-6F : 0.0F),
+                              vec3.y,
+                              vec3.z - (double) (direction == Direction.NORTH ? 1.0E-6F : 0.0F),
+                              (direction.getAxis() == Direction.Axis.X ? 0.0 :
+                                      direction.getStepX()) * i * 3.0 * level.getRandom().nextDouble(),
+                              0.0,
+                              (direction.getAxis() == Direction.Axis.Z ? 0.0 :
+                                      direction.getStepZ()) * i * 3.0 * level.getRandom().nextDouble()
+            );
+        }
+    }
+
+    /**
+     * 安全添加带按键名的提示行
+     */
+    private void addKeyTooltip(List<Component> tooltip, Lazy<KeyMapping> keyLazy, String translationKey) {
+        KeyMapping key = keyLazy.get();
+        String keyName = key.getTranslatedKeyMessage().getString().toUpperCase(Locale.ROOT);
+
+        // 处理冲突或未绑定情况
+        if (key.isUnbound()) {
+            keyName = "Unbound";
+        }
+
+        tooltip.add(Component.translatable(translationKey, keyName).withStyle(ChatFormatting.LIGHT_PURPLE));
+    }
+}

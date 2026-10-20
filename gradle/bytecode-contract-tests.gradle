@@ -1,0 +1,25 @@
+// Compare release mixin signatures with the pinned native AE2 and AdvancedAE bytecode.
+configurations { contractNative { transitive = false } }
+dependencies {
+    contractNative 'maven.modrinth:XxWD5pD3:Zfyso1sP'
+    contractNative 'maven.modrinth:rxYaglEe:orFPvySe'
+}
+def contractInputs = layout.buildDirectory.file('contract-inputs.json')
+tasks.register('writeContractInputs') {
+    inputs.files configurations.contractNative
+    outputs.file contractInputs
+    doLast {
+        def jars = configurations.contractNative.resolvedConfiguration.resolvedArtifacts
+        def paths = [ae2: jars.find { it.moduleVersion.id.name == 'XxWD5pD3' }.file.absolutePath,
+                     advancedae: jars.find { it.moduleVersion.id.name == 'rxYaglEe' }.file.absolutePath]
+        contractInputs.get().asFile.text = groovy.json.JsonOutput.toJson(paths)
+    }
+}
+tasks.register('bytecodeContractTest', Exec) {
+    dependsOn 'jar', 'reobfJar', 'writeContractInputs'
+    workingDir projectDir
+    commandLine providers.gradleProperty('pythonExecutable').getOrElse(
+        System.getProperty('os.name').toLowerCase().contains('windows') ? 'python' : 'python3'),
+        '-m', 'unittest', 'discover', '-s', 'src/test/python', '-v'
+}
+tasks.named('check') { dependsOn 'bytecodeContractTest' }

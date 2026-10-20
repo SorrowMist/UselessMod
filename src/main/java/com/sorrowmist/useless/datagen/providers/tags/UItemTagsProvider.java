@@ -1,0 +1,384 @@
+package com.sorrowmist.useless.datagen.providers.tags;
+
+
+import com.sorrowmist.useless.UselessMod;
+import com.sorrowmist.useless.content.blocks.GlowPlasticBlock;
+import com.sorrowmist.useless.init.ModItems;
+import com.sorrowmist.useless.init.ModTags;
+import net.minecraft.core.HolderLookup;
+import net.minecraft.data.PackOutput;
+import net.minecraft.data.tags.ItemTagsProvider;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.tags.ItemTags;
+import net.minecraft.tags.TagKey;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.level.block.Block;
+import org.jetbrains.annotations.NotNull;
+
+import java.util.concurrent.CompletableFuture;
+
+public class UItemTagsProvider extends ItemTagsProvider {
+
+    public UItemTagsProvider(PackOutput output, CompletableFuture<HolderLookup.Provider> registries, CompletableFuture<TagLookup<Block>> blockTags) {
+        super(output, registries, blockTags);
+    }
+
+    @Override
+    public @NotNull String getName() {
+        return "Tags (Item)";
+    }
+
+    @Override
+    protected void addTags(HolderLookup.@NotNull Provider provider) {
+        this.addUselessModTags();
+        this.addCTags();
+        this.addGtceuTags();
+        this.addMinecraftTags();
+    }
+
+    private void addUselessModTags() {
+        // 塑料方块物品标签：供「任意塑料方块 → 温度调节器」配方引用。
+        // 注意：不能直接 copy 方块总标签——它只引用四个分类标签，而分类标签没有对应的物品标签；
+        // 这里直接把全部塑料方块物品平铺进来。
+        this.tag(ModTags.PLASTIC_BLOCKS_ITEM).replace(false);
+        for (var itemMap : GlowPlasticBlock.ALL_BLOCK_ITEM_MAPS) {
+            for (var item : itemMap.values()) {
+                this.tag(ModTags.PLASTIC_BLOCKS_ITEM).add(item.get());
+            }
+        }
+
+        this.tag(this.createTagKey("useless_ingots"))
+            .replace(false)
+            .add(ModItems.USELESS_INGOT_TIER_1.get())
+            .add(ModItems.USELESS_INGOT_TIER_2.get())
+            .add(ModItems.USELESS_INGOT_TIER_3.get())
+            .add(ModItems.USELESS_INGOT_TIER_4.get())
+            .add(ModItems.USELESS_INGOT_TIER_5.get())
+            .add(ModItems.USELESS_INGOT_TIER_6.get())
+            .add(ModItems.USELESS_INGOT_TIER_7.get())
+            .add(ModItems.USELESS_INGOT_TIER_8.get())
+            .add(ModItems.USELESS_INGOT_TIER_9.get())
+            .add(ModItems.USEFUL_INGOT.get());
+
+        this.tag(ModTags.CATALYSTS)
+            .replace(false)
+            .add(ModItems.USELESS_INGOT_TIER_1.get())
+            .add(ModItems.USELESS_INGOT_TIER_2.get())
+            .add(ModItems.USELESS_INGOT_TIER_3.get())
+            .add(ModItems.USELESS_INGOT_TIER_4.get())
+            .add(ModItems.USELESS_INGOT_TIER_5.get())
+            .add(ModItems.USELESS_INGOT_TIER_6.get())
+            .add(ModItems.USELESS_INGOT_TIER_7.get())
+            .add(ModItems.USELESS_INGOT_TIER_8.get())
+            .add(ModItems.USELESS_INGOT_TIER_9.get())
+            .add(ModItems.USEFUL_INGOT.get());
+
+        this.tag(ModTags.MOLDS)
+            .replace(false)
+            .add(ModItems.METAL_MOLD_PLATE.get())
+            .add(ModItems.METAL_MOLD_ROD.get())
+            .add(ModItems.METAL_MOLD_GEAR.get())
+            .add(ModItems.METAL_MOLD_WIRE.get())
+            .add(ModItems.METAL_MOLD_BLOCK.get())
+            .addOptional(new ResourceLocation("powah", "energizing_orb"))
+            .addOptional(new ResourceLocation("extendedcrafting", "basic_table"))
+            .addOptional(new ResourceLocation("extendedcrafting", "advanced_table"))
+            .addOptional(new ResourceLocation("extendedcrafting", "elite_table"))
+            .addOptional(new ResourceLocation("extendedcrafting", "ultimate_table"))
+            .addOptional(new ResourceLocation("extendedcrafting", "compressor"))
+            .addOptional(new ResourceLocation("extendedcrafting", "crafting_core"))
+            .addOptional(new ResourceLocation("extendedcrafting", "ender_crafter"))
+            .addOptional(new ResourceLocation("extendedcrafting", "flux_crafter"))
+            .addOptional(new ResourceLocation("neoecoae", "integrated_working_station"))
+            .addOptional(new ResourceLocation("naturesaura", "wood_stand"))
+            .addOptional(new ResourceLocation("naturesaura", "nature_altar"))
+            .addOptional(new ResourceLocation("naturesaura", "animal_spawner"))
+            .addOptional(new ResourceLocation("naturesaura", "offering_table"))
+            .addOptional(new ResourceLocation("naturesaura", "conversion_catalyst"))
+            .addOptional(new ResourceLocation("naturesaura", "crushing_catalyst"))
+            .addOptional(new ResourceLocation("malum", "spirit_crucible"))
+            .addOptional(new ResourceLocation("malum", "spirit_altar"))
+            .addOptional(new ResourceLocation("create", "spout"))
+            .addOptional(new ResourceLocation("create", "mechanical_press"))
+            .addOptional(new ResourceLocation("create", "mechanical_mixer"))
+            .addOptional(new ResourceLocation("create", "basin"))
+            .addOptional(new ResourceLocation("create", "millstone"))
+            .addOptional(new ResourceLocation("create", "crushing_wheel"))
+            .addOptional(new ResourceLocation("create", "encased_fan"))
+            .addOptional(new ResourceLocation("create", "mechanical_crafter"))
+            .addOptional(new ResourceLocation("create", "deployer"))
+            .addOptional(new ResourceLocation("create", "mechanical_saw"))
+            .addOptional(new ResourceLocation("create", "blaze_burner"))
+            .addOptional(new ResourceLocation("useless_mod", "ritual_blueprint"));
+    }
+
+    private void addCTags() {
+        TagKey<Item> crowbar = this.createExternalTagKey("c", "tools/crowbar");
+        TagKey<Item> hammer = this.createExternalTagKey("c", "tools/hammer");
+        TagKey<Item> mallet = this.createExternalTagKey("c", "tools/mallet");
+        TagKey<Item> screwdriver = this.createExternalTagKey("c", "tools/screwdriver");
+        TagKey<Item> wrench = this.createExternalTagKey("c", "tools/wrench");
+        TagKey<Item> file = this.createExternalTagKey("c", "tools/file");
+        TagKey<Item> knife = this.createExternalTagKey("c", "tools/knife");
+        TagKey<Item> miningTool = this.createExternalTagKey("c", "tools/mining_tool");
+        TagKey<Item> mortar = this.createExternalTagKey("c", "tools/mortar");
+        TagKey<Item> saw = this.createExternalTagKey("c", "tools/saw");
+        TagKey<Item> shear = this.createExternalTagKey("c", "tools/shear");
+        TagKey<Item> tools = this.createExternalTagKey("c", "tools/tools");
+        TagKey<Item> wireCutter = this.createExternalTagKey("c", "tools/wire_cutter");
+
+        this.tag(crowbar)
+            .replace(false)
+            .add(ModItems.ENDLESS_BEAF_ITEM.get())
+            .add(ModItems.ENDLESS_BEAF_ITEM_NO_WRENCH.get())
+            .add(ModItems.ENDLESS_BEAF_CROWBAR.get());
+
+        this.tag(hammer)
+            .replace(false)
+            .add(ModItems.ENDLESS_BEAF_ITEM.get())
+            .add(ModItems.ENDLESS_BEAF_ITEM_NO_WRENCH.get())
+            .add(ModItems.ENDLESS_BEAF_HAMMER.get());
+
+        this.tag(mallet)
+            .replace(false)
+            .add(ModItems.ENDLESS_BEAF_ITEM.get())
+            .add(ModItems.ENDLESS_BEAF_ITEM_NO_WRENCH.get())
+            .add(ModItems.ENDLESS_BEAF_MALLET.get());
+
+        this.tag(screwdriver)
+            .replace(false)
+            .add(ModItems.ENDLESS_BEAF_ITEM.get())
+            .add(ModItems.ENDLESS_BEAF_ITEM_NO_WRENCH.get())
+            .add(ModItems.ENDLESS_BEAF_SCREWDRIVER.get());
+
+        this.tag(wrench)
+            .replace(false)
+            .add(ModItems.ENDLESS_BEAF_ITEM.get())
+            .add(ModItems.ENDLESS_BEAF_WRENCH.get());
+
+        this.tag(file)
+            .replace(false)
+            .add(ModItems.ENDLESS_BEAF_ITEM.get())
+            .add(ModItems.ENDLESS_BEAF_ITEM_NO_WRENCH.get())
+            .add(ModItems.ENDLESS_BEAF_WRENCH.get())
+            .add(ModItems.ENDLESS_BEAF_SCREWDRIVER.get())
+            .add(ModItems.ENDLESS_BEAF_MALLET.get())
+            .add(ModItems.ENDLESS_BEAF_CROWBAR.get())
+            .add(ModItems.ENDLESS_BEAF_HAMMER.get());
+
+        this.tag(knife)
+            .replace(false)
+            .add(ModItems.ENDLESS_BEAF_ITEM.get())
+            .add(ModItems.ENDLESS_BEAF_ITEM_NO_WRENCH.get())
+            .add(ModItems.ENDLESS_BEAF_WRENCH.get())
+            .add(ModItems.ENDLESS_BEAF_SCREWDRIVER.get())
+            .add(ModItems.ENDLESS_BEAF_MALLET.get())
+            .add(ModItems.ENDLESS_BEAF_CROWBAR.get())
+            .add(ModItems.ENDLESS_BEAF_HAMMER.get());
+
+        this.tag(miningTool)
+            .replace(false)
+            .add(ModItems.ENDLESS_BEAF_ITEM.get())
+            .add(ModItems.ENDLESS_BEAF_ITEM_NO_WRENCH.get())
+            .add(ModItems.ENDLESS_BEAF_WRENCH.get())
+            .add(ModItems.ENDLESS_BEAF_SCREWDRIVER.get())
+            .add(ModItems.ENDLESS_BEAF_MALLET.get())
+            .add(ModItems.ENDLESS_BEAF_CROWBAR.get())
+            .add(ModItems.ENDLESS_BEAF_HAMMER.get());
+
+        this.tag(mortar)
+            .replace(false)
+            .add(ModItems.ENDLESS_BEAF_ITEM.get())
+            .add(ModItems.ENDLESS_BEAF_ITEM_NO_WRENCH.get())
+            .add(ModItems.ENDLESS_BEAF_WRENCH.get())
+            .add(ModItems.ENDLESS_BEAF_SCREWDRIVER.get())
+            .add(ModItems.ENDLESS_BEAF_MALLET.get())
+            .add(ModItems.ENDLESS_BEAF_CROWBAR.get())
+            .add(ModItems.ENDLESS_BEAF_HAMMER.get());
+
+        this.tag(saw)
+            .replace(false)
+            .add(ModItems.ENDLESS_BEAF_ITEM.get())
+            .add(ModItems.ENDLESS_BEAF_ITEM_NO_WRENCH.get())
+            .add(ModItems.ENDLESS_BEAF_WRENCH.get())
+            .add(ModItems.ENDLESS_BEAF_SCREWDRIVER.get())
+            .add(ModItems.ENDLESS_BEAF_MALLET.get())
+            .add(ModItems.ENDLESS_BEAF_CROWBAR.get())
+            .add(ModItems.ENDLESS_BEAF_HAMMER.get());
+
+        this.tag(shear)
+            .replace(false)
+            .add(ModItems.ENDLESS_BEAF_ITEM.get())
+            .add(ModItems.ENDLESS_BEAF_ITEM_NO_WRENCH.get())
+            .add(ModItems.ENDLESS_BEAF_WRENCH.get())
+            .add(ModItems.ENDLESS_BEAF_SCREWDRIVER.get())
+            .add(ModItems.ENDLESS_BEAF_MALLET.get())
+            .add(ModItems.ENDLESS_BEAF_CROWBAR.get())
+            .add(ModItems.ENDLESS_BEAF_HAMMER.get());
+
+        this.tag(tools)
+            .replace(false)
+            .add(ModItems.ENDLESS_BEAF_ITEM.get())
+            .add(ModItems.ENDLESS_BEAF_ITEM_NO_WRENCH.get())
+            .add(ModItems.ENDLESS_BEAF_WRENCH.get())
+            .add(ModItems.ENDLESS_BEAF_SCREWDRIVER.get())
+            .add(ModItems.ENDLESS_BEAF_MALLET.get())
+            .add(ModItems.ENDLESS_BEAF_CROWBAR.get())
+            .add(ModItems.ENDLESS_BEAF_HAMMER.get());
+
+        this.tag(wireCutter)
+            .replace(false)
+            .add(ModItems.ENDLESS_BEAF_ITEM.get())
+            .add(ModItems.ENDLESS_BEAF_ITEM_NO_WRENCH.get())
+            .add(ModItems.ENDLESS_BEAF_WRENCH.get())
+            .add(ModItems.ENDLESS_BEAF_CROWBAR.get())
+            .add(ModItems.ENDLESS_BEAF_HAMMER.get());
+    }
+
+    private void addGtceuTags() {
+        TagKey<Item> crowbar = this.createExternalTagKey("gtceu", "crafting_tools/crowbar");
+        TagKey<Item> hammer = this.createExternalTagKey("gtceu", "crafting_tools/hammer");
+        TagKey<Item> mallet = this.createExternalTagKey("gtceu", "crafting_tools/mallet");
+        TagKey<Item> screwdriver = this.createExternalTagKey("gtceu", "crafting_tools/screwdriver");
+        TagKey<Item> wrench = this.createExternalTagKey("gtceu", "crafting_tools/wrench");
+        TagKey<Item> file = this.createExternalTagKey("gtceu", "crafting_tools/file");
+        TagKey<Item> knife = this.createExternalTagKey("gtceu", "crafting_tools/knife");
+        TagKey<Item> mortar = this.createExternalTagKey("gtceu", "crafting_tools/mortar");
+        TagKey<Item> saw = this.createExternalTagKey("gtceu", "crafting_tools/saw");
+        TagKey<Item> wireCutter = this.createExternalTagKey("gtceu", "crafting_tools/wire_cutter");
+
+        this.tag(crowbar).replace(false).add(ModItems.ENDLESS_BEAF_CROWBAR.get());
+        this.tag(hammer).replace(false).add(ModItems.ENDLESS_BEAF_HAMMER.get());
+        this.tag(mallet).replace(false).add(ModItems.ENDLESS_BEAF_MALLET.get());
+        this.tag(screwdriver).replace(false).add(ModItems.ENDLESS_BEAF_SCREWDRIVER.get());
+        this.tag(wrench).replace(false).add(ModItems.ENDLESS_BEAF_WRENCH.get());
+
+        this.tag(file)
+            .replace(false)
+            .add(ModItems.ENDLESS_BEAF_ITEM.get())
+            .add(ModItems.ENDLESS_BEAF_ITEM_NO_WRENCH.get())
+            .add(ModItems.ENDLESS_BEAF_WRENCH.get())
+            .add(ModItems.ENDLESS_BEAF_SCREWDRIVER.get())
+            .add(ModItems.ENDLESS_BEAF_MALLET.get())
+            .add(ModItems.ENDLESS_BEAF_CROWBAR.get())
+            .add(ModItems.ENDLESS_BEAF_HAMMER.get());
+
+        this.tag(knife)
+            .replace(false)
+            .add(ModItems.ENDLESS_BEAF_ITEM.get())
+            .add(ModItems.ENDLESS_BEAF_ITEM_NO_WRENCH.get())
+            .add(ModItems.ENDLESS_BEAF_WRENCH.get())
+            .add(ModItems.ENDLESS_BEAF_SCREWDRIVER.get())
+            .add(ModItems.ENDLESS_BEAF_MALLET.get())
+            .add(ModItems.ENDLESS_BEAF_CROWBAR.get())
+            .add(ModItems.ENDLESS_BEAF_HAMMER.get());
+
+        this.tag(mortar)
+            .replace(false)
+            .add(ModItems.ENDLESS_BEAF_ITEM.get())
+            .add(ModItems.ENDLESS_BEAF_ITEM_NO_WRENCH.get())
+            .add(ModItems.ENDLESS_BEAF_WRENCH.get())
+            .add(ModItems.ENDLESS_BEAF_SCREWDRIVER.get())
+            .add(ModItems.ENDLESS_BEAF_MALLET.get())
+            .add(ModItems.ENDLESS_BEAF_CROWBAR.get())
+            .add(ModItems.ENDLESS_BEAF_HAMMER.get());
+
+        this.tag(saw)
+            .replace(false)
+            .add(ModItems.ENDLESS_BEAF_ITEM.get())
+            .add(ModItems.ENDLESS_BEAF_ITEM_NO_WRENCH.get())
+            .add(ModItems.ENDLESS_BEAF_WRENCH.get())
+            .add(ModItems.ENDLESS_BEAF_SCREWDRIVER.get())
+            .add(ModItems.ENDLESS_BEAF_MALLET.get())
+            .add(ModItems.ENDLESS_BEAF_CROWBAR.get())
+            .add(ModItems.ENDLESS_BEAF_HAMMER.get());
+
+        this.tag(wireCutter)
+            .replace(false)
+            .add(ModItems.ENDLESS_BEAF_ITEM.get())
+            .add(ModItems.ENDLESS_BEAF_ITEM_NO_WRENCH.get())
+            .add(ModItems.ENDLESS_BEAF_WRENCH.get())
+            .add(ModItems.ENDLESS_BEAF_CROWBAR.get())
+            .add(ModItems.ENDLESS_BEAF_HAMMER.get());
+    }
+
+    private void addMinecraftTags() {
+        this.tag(ItemTags.AXES)
+            .replace(false)
+            .add(ModItems.ENDLESS_BEAF_ITEM.get())
+            .add(ModItems.ENDLESS_BEAF_ITEM_NO_WRENCH.get())
+            .add(ModItems.ENDLESS_BEAF_WRENCH.get())
+            .add(ModItems.ENDLESS_BEAF_SCREWDRIVER.get())
+            .add(ModItems.ENDLESS_BEAF_MALLET.get())
+            .add(ModItems.ENDLESS_BEAF_CROWBAR.get())
+            .add(ModItems.ENDLESS_BEAF_HAMMER.get());
+
+        this.tag(ItemTags.BREAKS_DECORATED_POTS)
+            .replace(false)
+            .add(ModItems.ENDLESS_BEAF_ITEM.get())
+            .add(ModItems.ENDLESS_BEAF_ITEM_NO_WRENCH.get())
+            .add(ModItems.ENDLESS_BEAF_WRENCH.get())
+            .add(ModItems.ENDLESS_BEAF_SCREWDRIVER.get())
+            .add(ModItems.ENDLESS_BEAF_MALLET.get())
+            .add(ModItems.ENDLESS_BEAF_CROWBAR.get())
+            .add(ModItems.ENDLESS_BEAF_HAMMER.get());
+
+        this.tag(ItemTags.CLUSTER_MAX_HARVESTABLES)
+            .replace(false)
+            .add(ModItems.ENDLESS_BEAF_ITEM.get())
+            .add(ModItems.ENDLESS_BEAF_ITEM_NO_WRENCH.get())
+            .add(ModItems.ENDLESS_BEAF_WRENCH.get())
+            .add(ModItems.ENDLESS_BEAF_SCREWDRIVER.get())
+            .add(ModItems.ENDLESS_BEAF_MALLET.get())
+            .add(ModItems.ENDLESS_BEAF_CROWBAR.get())
+            .add(ModItems.ENDLESS_BEAF_HAMMER.get());
+
+        this.tag(ItemTags.HOES)
+            .replace(false)
+            .add(ModItems.ENDLESS_BEAF_ITEM.get())
+            .add(ModItems.ENDLESS_BEAF_ITEM_NO_WRENCH.get())
+            .add(ModItems.ENDLESS_BEAF_WRENCH.get())
+            .add(ModItems.ENDLESS_BEAF_SCREWDRIVER.get())
+            .add(ModItems.ENDLESS_BEAF_MALLET.get())
+            .add(ModItems.ENDLESS_BEAF_CROWBAR.get())
+            .add(ModItems.ENDLESS_BEAF_HAMMER.get());
+
+        this.tag(ItemTags.PICKAXES)
+            .replace(false)
+            .add(ModItems.ENDLESS_BEAF_ITEM.get())
+            .add(ModItems.ENDLESS_BEAF_ITEM_NO_WRENCH.get())
+            .add(ModItems.ENDLESS_BEAF_WRENCH.get())
+            .add(ModItems.ENDLESS_BEAF_SCREWDRIVER.get())
+            .add(ModItems.ENDLESS_BEAF_MALLET.get())
+            .add(ModItems.ENDLESS_BEAF_CROWBAR.get())
+            .add(ModItems.ENDLESS_BEAF_HAMMER.get());
+
+        this.tag(ItemTags.SHOVELS)
+            .replace(false)
+            .add(ModItems.ENDLESS_BEAF_ITEM.get())
+            .add(ModItems.ENDLESS_BEAF_ITEM_NO_WRENCH.get())
+            .add(ModItems.ENDLESS_BEAF_WRENCH.get())
+            .add(ModItems.ENDLESS_BEAF_SCREWDRIVER.get())
+            .add(ModItems.ENDLESS_BEAF_MALLET.get())
+            .add(ModItems.ENDLESS_BEAF_CROWBAR.get())
+            .add(ModItems.ENDLESS_BEAF_HAMMER.get());
+
+        this.tag(ItemTags.SWORDS)
+            .replace(false)
+            .add(ModItems.ENDLESS_BEAF_ITEM.get())
+            .add(ModItems.ENDLESS_BEAF_ITEM_NO_WRENCH.get())
+            .add(ModItems.ENDLESS_BEAF_WRENCH.get())
+            .add(ModItems.ENDLESS_BEAF_SCREWDRIVER.get())
+            .add(ModItems.ENDLESS_BEAF_MALLET.get())
+            .add(ModItems.ENDLESS_BEAF_CROWBAR.get())
+            .add(ModItems.ENDLESS_BEAF_HAMMER.get());
+    }
+
+    private TagKey<Item> createTagKey(String path) {
+        return ItemTags.create(new ResourceLocation(UselessMod.MODID, path));
+    }
+
+    private TagKey<Item> createExternalTagKey(String namespace, String path) {
+        return ItemTags.create(new ResourceLocation(namespace, path));
+    }
+}

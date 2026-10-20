@@ -1,77 +1,43 @@
 package com.sorrowmist.useless.mixin.mek;
 
-/*
- * This file is based on Mekanism Upgrades: Reborn.
- * 
- * Copyright (c) Y_Xiao233
- * 
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- * 
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
- * 
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
- */
-
-import com.sorrowmist.useless.mixin.accessor.DelayAccessor;
 import mekanism.api.Upgrade;
 import mekanism.common.tile.machine.TileEntityDigitalMiner;
+import com.sorrowmist.useless.utils.MekTemp;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
-import org.spongepowered.asm.mixin.injection.Slice;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 @Mixin(value = TileEntityDigitalMiner.class, remap = false)
 public abstract class DigitalMinerMixin {
 
-    @Shadow
-    private int delay;
-
-    @Shadow
-    protected abstract void tryMineBlock();
-
-    @Shadow
-    public abstract void recalculateUpgrades(Upgrade upgrade);
-
-    @Shadow
-    public abstract int getDelay();
+    @Shadow private int delay;
+    @Shadow protected abstract void tryMineBlock();
+    @Shadow public abstract void recalculateUpgrades(Upgrade upgrade);
+    @Shadow public abstract int getDelay();
 
     @Inject(
             method = "onUpdateServer",
             at = @At(
                     value = "INVOKE",
                     target = "Lmekanism/common/capabilities/energy/MinerEnergyContainer;extract(Lmekanism/api/math/FloatingLong;Lmekanism/api/Action;Lmekanism/api/AutomationType;)Lmekanism/api/math/FloatingLong;",
+                    ordinal = 1,        // 第2次 extract（EXECUTE）
                     shift = At.Shift.AFTER
-            ),
-            slice = @Slice(
-                    from = @At(
-                            value = "INVOKE",
-                            target = "Lmekanism/common/tile/machine/TileEntityDigitalMiner;setActive(Z)V"
-                    )
             ),
             remap = false
     )
-    public void injected(CallbackInfo ci) {
+    private void onEnergyExtracted(CallbackInfo cir) {
         if (this.delay < 0) {
-            for(int i = this.delay - 1; i < 0; ++i) {
+            // 补足所有负 delay 的挖掘
+            int extraOperations = Math.min(-this.delay, MekTemp.MAX_EXTRA_OPERATIONS_PER_TICK);
+            for (int i = 0; i < extraOperations; i++) {
                 this.tryMineBlock();
             }
-
+            // 重新计算 Speed 升级（delay 依赖它）
             this.recalculateUpgrades(Upgrade.SPEED);
-            ((DelayAccessor)this).setDelay(this.getDelay());
+            // 重置 delay 为正确值
+            this.delay = this.getDelay();
         }
     }
 }

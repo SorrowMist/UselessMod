@@ -1,0 +1,53 @@
+package com.sorrowmist.useless.integration.dataenergistics.search;
+
+import com.fish_dan_.data_energistics.api.registry.search.TrinityPatternSearchTermContributor;
+import com.sorrowmist.useless.core.component.OmniversalPatternData;
+
+import it.unimi.dsi.fastutil.objects.ObjectArrayList;
+import it.unimi.dsi.fastutil.objects.ObjectList;
+import it.unimi.dsi.fastutil.objects.ObjectLists;
+import net.minecraft.world.item.ItemStack;
+
+import java.util.List;
+
+/**
+ * Extracts encoded internal molds as separate Trinity pattern-search candidates.
+ */
+public final class OmniversalPatternMoldSearchTerms {
+
+    private OmniversalPatternMoldSearchTerms() {}
+
+    /**
+     * 数据能源 3.3.0 的 {@code TrinityPatternSearchTermContributor} 实现。
+     *
+     * <p>3.3.0 起该接口的两个方法都是 default（新增了 FastUtil 版 {@code searchTermsFast}），
+     * 所以它<b>不再是函数接口</b>，不能再用方法引用注册，必须给出实现类型。</p>
+     */
+    public static final class Contributor implements TrinityPatternSearchTermContributor {
+        /**
+         * {@inheritDoc}
+         *
+         * <p>必须经由 {@link OmniversalPatternMoldSearchTerms#searchTerms(ItemStack)} 限定调用外层类的静态方法。
+         * 接口自带的同名 default 方法返回空列表，而继承来的实例方法在本类作用域内优先于外层类的静态方法；
+         * 若以非限定名调用，编译为虚调用并静默落入该空实现，模具名候选将恒为空。</p>
+         */
+        @Override
+        public ObjectList<String> searchTermsFast(ItemStack encodedPattern) {
+            return ObjectLists.unmodifiable(new ObjectArrayList<>(
+                    OmniversalPatternMoldSearchTerms.searchTerms(encodedPattern)));
+        }
+    }
+
+    /**
+     * Returns mold display names stored in one Omniversal Pattern, when that pattern needs molds.
+     *
+     * @param encodedPattern candidate encoded pattern stack
+     * @return independent mold-name candidates, or no candidates for every other pattern
+     */
+    public static List<String> searchTerms(ItemStack encodedPattern) {
+        return com.sorrowmist.useless.client.gui.OmniversalPatternMoldSearchTerms.searchTerms(encodedPattern);
+    }
+    static List<String> searchTerms(OmniversalPatternData data) {
+        return com.sorrowmist.useless.client.gui.OmniversalPatternMoldSearchTerms.searchTerms(data);
+    }
+}

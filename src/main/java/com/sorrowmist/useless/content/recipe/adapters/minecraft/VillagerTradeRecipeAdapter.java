@@ -1,0 +1,711 @@
+package com.sorrowmist.useless.content.recipe.adapters.minecraft;
+
+import com.sorrowmist.useless.api.enums.AlloyFurnaceMode;
+import com.sorrowmist.useless.content.recipe.AdapterUtils;
+import com.sorrowmist.useless.content.recipe.AdvancedAlloyFurnaceRecipe;
+import com.sorrowmist.useless.content.recipe.AlloyFurnaceRecipeFingerprint;
+import com.sorrowmist.useless.content.recipe.CountedIngredient;
+import com.sorrowmist.useless.content.recipe.IRecipeAdapter;
+import com.sorrowmist.useless.content.recipe.ItemIngredientAllocator;
+import com.sorrowmist.useless.init.ModItems;
+import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
+import net.minecraft.core.HolderLookup;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.util.RandomSource;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.npc.Villager;
+import net.minecraft.world.entity.npc.VillagerData;
+import net.minecraft.world.entity.npc.VillagerProfession;
+import net.minecraft.world.entity.npc.VillagerTrades;
+import net.minecraft.world.entity.npc.VillagerType;
+import net.minecraft.world.entity.npc.WanderingTrader;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
+import net.minecraft.world.item.trading.MerchantOffer;
+import net.minecraft.world.item.crafting.Ingredient;
+import com.sorrowmist.useless.compat.forge1201.recipe.RecipeHolder;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.levelgen.PositionalRandomFactory;
+import com.sorrowmist.useless.compat.forge1201.recipe.DataComponentIngredient;
+import org.jetbrains.annotations.Nullable;
+
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+
+/** Converts the active vanilla villager trade tables into alloy-furnace recipes. */
+public final class VillagerTradeRecipeAdapter
+        implements IRecipeAdapter<VillagerTradeSyntheticRecipe> {
+    private static final String RECIPE_NAMESPACE = "useless_mod";
+    private static final int MIN_VILLAGER_LEVEL = 1;
+    private static final int MAX_VILLAGER_LEVEL = 5;
+
+    private volatile Cached cached;
+
+    @Override
+    public Class<VillagerTradeSyntheticRecipe> getRecipeClass() {
+        return VillagerTradeSyntheticRecipe.class;
+    }
+
+    /** The generated villager recipes use both the spawn egg and the matching job block. */
+    @Override
+    @Nullable
+    public ItemStack getMoldItem() {
+        return null;
+    }
+
+    @Override
+    public boolean matchesMold(@Nullable ItemStack mold) {
+        if (mold == null || mold.isEmpty()) {
+            return false;
+        }
+        if (mold.is(Items.VILLAGER_SPAWN_EGG)) {
+            return true;
+        }
+        return registeredProfessions().stream()
+                .flatMap(profession -> profession.workstations().stream())
+                .anyMatch(workstation -> mold.is(workstation));
+    }
+
+    /**
+     * 职业 / 工作站配对在运行期是稳定的：POI 注册表在启动后不再变化。
+     */
+    private static volatile List<ProfessionWorkstation> professionCache;
+
+    /**
+     * Builds the profession/workstation pairs from the live registries. This also covers
+     * professions added by mods whose POI is registered after the vanilla professions.
+     *
+     * <p>结果按注册表内容缓存一次：{@link #matchesMold} 与交易表签名在每次配方查找时都会用到它，
+     * 每次都重新遍历全部 POI 类型及其匹配状态是纯浪费。</p>
+     */
+    private static List<ProfessionWorkstation> registeredProfessions() {
+        List<ProfessionWorkstation> cachedProfessions = professionCache;
+        if (cachedProfessions != null) {
+            return cachedProfessions;
+        }
+        synchronized (VillagerTradeRecipeAdapter.class) {
+            cachedProfessions = professionCache;
+            if (cachedProfessions == null) {
+                cachedProfessions = buildProfessions();
+                professionCache = cachedProfessions;
+            }
+            return cachedProfessions;
+        }
+    }
+
+    private static List<ProfessionWorkstation> buildProfessions() {
+        List<ProfessionWorkstation> professions = new ArrayList<>();
+        for (VillagerProfession profession : BuiltInRegistries.VILLAGER_PROFESSION) {
+            List<Item> workstations = BuiltInRegistries.POINT_OF_INTEREST_TYPE.holders()
+                    .filter(profession.heldJobSite())
+                    .flatMap(holder -> holder.value().matchingStates().stream())
+                    .map(state -> state.getBlock().asItem())
+                    .filter(item -> item != Items.AIR)
+                    .distinct()
+                    .sorted(Comparator.comparing(VillagerTradeRecipeAdapter::itemKey))
+                    .toList();
+            professions.add(new ProfessionWorkstation(profession, workstations));
+        }
+        professions.sort(Comparator.comparing(
+                profession -> professionKey(profession.profession())));
+        return List.copyOf(professions);
+    }
+
+    private static String professionKey(VillagerProfession profession) {
+        net.minecraft.resources.ResourceLocation id =
+                BuiltInRegistries.VILLAGER_PROFESSION.getKey(profession);
+        return id == null ? profession.toString() : id.toString();
+    }
+
+    private static String itemKey(Item item) {
+        net.minecraft.resources.ResourceLocation id = BuiltInRegistries.ITEM.getKey(item);
+        return id == null ? item.toString() : id.toString();
+    }
+
+    /** Keeps the villager spawn egg and all valid workstation blocks as two mold slots. */
+    private static List<Ingredient> villagerMolds(ProfessionWorkstation profession) {
+        Ingredient workstation = Ingredient.of(profession.workstations().stream()
+                .map(Item::getDefaultInstance));
+        return List.of(
+                AdapterUtils.toMoldIngredient(new ItemStack(Items.VILLAGER_SPAWN_EGG)),
+                workstation);
+    }
+
+    @Override
+    public List<RecipeHolder<VillagerTradeSyntheticRecipe>> getGeneratedRecipes(Level level) {
+        if (level == null) {
+            return List.of();
+        }
+
+        boolean experimental = false; // Trade rebalance was introduced after 1.20.1.
+        int tradeTableSignature = tradeTableSignature(experimental);
+        Cached snapshot = cached;
+        if (snapshot != null && snapshot.level() == level
+                && snapshot.experimental() == experimental
+                && snapshot.tradeTableSignature() == tradeTableSignature) {
+            return snapshot.recipes();
+        }
+
+        synchronized (this) {
+            snapshot = cached;
+            if (snapshot == null || snapshot.level() != level
+                    || snapshot.experimental() != experimental
+                    || snapshot.tradeTableSignature() != tradeTableSignature) {
+                snapshot = new Cached(level, experimental, tradeTableSignature,
+                        buildRecipes(level, experimental));
+                cached = snapshot;
+            }
+            return snapshot.recipes();
+        }
+    }
+
+    @Override
+    public List<AdvancedAlloyFurnaceRecipe> convertAll(
+            RecipeHolder<VillagerTradeSyntheticRecipe> holder, Level level) {
+        if (holder == null || holder.value() == null
+                || holder.value().convertedRecipe() == null) {
+            return List.of();
+        }
+        return List.of(holder.value().convertedRecipe());
+    }
+
+    @Override
+    public List<RecipeHolder<VillagerTradeSyntheticRecipe>> findMatchingRecipes(
+            Level level,
+            Map<Ingredient, Long> mergedInputs,
+            Map<net.minecraftforge.fluids.FluidStack, Long> mergedFluids,
+            @Nullable ItemStack mold) {
+        return findMatchingRecipes(level, mergedInputs, mergedFluids, Map.of(), mold, List.of());
+    }
+
+    @Override
+    public List<RecipeHolder<VillagerTradeSyntheticRecipe>> findMatchingRecipes(
+            Level level,
+            Map<Ingredient, Long> mergedInputs,
+            Map<net.minecraftforge.fluids.FluidStack, Long> mergedFluids,
+            Map<appeng.api.stacks.AEKey, Long> mergedKeys,
+            @Nullable ItemStack mold,
+            List<ItemStack> actualInputs) {
+        if (level == null || !matchesMold(mold)) {
+            return List.of();
+        }
+
+        List<RecipeHolder<VillagerTradeSyntheticRecipe>> matches = new ArrayList<>();
+        for (RecipeHolder<VillagerTradeSyntheticRecipe> holder : getGeneratedRecipes(level)) {
+            AdvancedAlloyFurnaceRecipe recipe = holder.value().convertedRecipe();
+            // A regular furnace has one mold slot. Dual-mold villager trades are exposed through
+            // the multiblock mold hub and must not be returned as single-mold matches here.
+            if (recipe == null || recipe.molds().size() != 1
+                    || !AdapterUtils.matchesMold(recipe.mold(), mold)) {
+                continue;
+            }
+
+            boolean matchesRecipe = actualInputs != null && !actualInputs.isEmpty()
+                    ? ItemIngredientAllocator.matches(recipe.inputs(), actualInputs, 1L)
+                    : matchesMergedInputs(recipe, mergedInputs);
+            if (matchesRecipe) {
+                matches.add(holder);
+            }
+        }
+        return List.copyOf(matches);
+    }
+
+    private static List<RecipeHolder<VillagerTradeSyntheticRecipe>> buildRecipes(
+            Level level, boolean experimental) {
+        Map<net.minecraft.resources.ResourceLocation,
+                RecipeHolder<VillagerTradeSyntheticRecipe>> recipes = new LinkedHashMap<>();
+
+        addSupplementalVillagerRecipe(recipes);
+
+        for (ProfessionWorkstation profession : registeredProfessions()) {
+            if (profession.workstations().isEmpty()) {
+                continue;
+            }
+            for (int villagerLevel = MIN_VILLAGER_LEVEL;
+                    villagerLevel <= MAX_VILLAGER_LEVEL; villagerLevel++) {
+                VillagerTrades.ItemListing[] listings = listingsFor(
+                        profession.profession(), villagerLevel, experimental);
+                if (listings == null) {
+                    continue;
+                }
+
+                for (int listingIndex = 0; listingIndex < listings.length; listingIndex++) {
+                    VillagerTrades.ItemListing listing = listings[listingIndex];
+                    if (listing == null) {
+                        continue;
+                    }
+
+                    for (TradeContext context : contextsFor(listing)) {
+                        try {
+                            MerchantOffer offer = createOffer(
+                                    level, profession.profession(), villagerLevel,
+                                    listing, context.villagerType());
+                            if (offer == null) {
+                                continue;
+                            }
+
+                            AdvancedAlloyFurnaceRecipe converted = convertOffer(
+                                    recipeId(profession.profession(), villagerLevel,
+                                            context.villagerType(), experimental, offer,
+                                            level.registryAccess()),
+                                    offer, villagerMolds(profession));
+                            if (converted != null) {
+                                RecipeHolder<VillagerTradeSyntheticRecipe> holder =
+                                        new RecipeHolder<>(converted.id(),
+                                                new VillagerTradeSyntheticRecipe(converted));
+                                recipes.putIfAbsent(holder.id(), holder);
+                            }
+                        } catch (RuntimeException exception) {
+                        }
+                    }
+                }
+            }
+        }
+
+        addWanderingTraderRecipes(level, experimental, recipes);
+        return List.copyOf(recipes.values());
+    }
+
+    private static void addWanderingTraderRecipes(
+            Level level,
+            boolean experimental,
+            Map<net.minecraft.resources.ResourceLocation,
+                    RecipeHolder<VillagerTradeSyntheticRecipe>> recipes) {
+        List<Int2ObjectMap.Entry<VillagerTrades.ItemListing[]>> groups =
+                new ArrayList<>(VillagerTrades.WANDERING_TRADER_TRADES.int2ObjectEntrySet());
+        groups.sort(Comparator.comparingInt(Int2ObjectMap.Entry::getIntKey));
+        for (Int2ObjectMap.Entry<VillagerTrades.ItemListing[]> group : groups) {
+            addWanderingTraderListings(level, false, group.getIntKey(),
+                    group.getValue(), recipes);
+        }
+    }
+
+    private static void addWanderingTraderListings(
+            Level level,
+            boolean experimental,
+            int groupIndex,
+            @Nullable VillagerTrades.ItemListing[] listings,
+            Map<net.minecraft.resources.ResourceLocation,
+                    RecipeHolder<VillagerTradeSyntheticRecipe>> recipes) {
+        if (listings == null) {
+            return;
+        }
+        for (int listingIndex = 0; listingIndex < listings.length; listingIndex++) {
+            VillagerTrades.ItemListing listing = listings[listingIndex];
+            if (listing == null) {
+                continue;
+            }
+            try {
+                MerchantOffer offer = createWanderingTraderOffer(level, listing);
+                if (offer == null) {
+                    continue;
+                }
+                AdvancedAlloyFurnaceRecipe converted = convertOffer(
+                        wanderingRecipeId(experimental, offer, level.registryAccess()), offer,
+                        List.of(AdapterUtils.toMoldIngredient(
+                                new ItemStack(Items.WANDERING_TRADER_SPAWN_EGG))));
+                if (converted != null) {
+                    RecipeHolder<VillagerTradeSyntheticRecipe> holder =
+                            new RecipeHolder<>(converted.id(), new VillagerTradeSyntheticRecipe(converted));
+                    recipes.putIfAbsent(holder.id(), holder);
+                }
+            } catch (RuntimeException exception) {
+            }
+        }
+    }
+
+    private static void addSupplementalVillagerRecipe(
+            Map<net.minecraft.resources.ResourceLocation,
+                    RecipeHolder<VillagerTradeSyntheticRecipe>> recipes) {
+        net.minecraft.resources.ResourceLocation id =
+                new net.minecraft.resources.ResourceLocation(
+                        RECIPE_NAMESPACE, "villager_trade/supplemental/tier_1_useless_ingot_to_dirt");
+        AdvancedAlloyFurnaceRecipe converted = new AdvancedAlloyFurnaceRecipe(
+                id,
+                List.of(new CountedIngredient(
+                        Ingredient.of(ModItems.USELESS_INGOT_TIER_1.get()), 1L)),
+                List.of(),
+                List.of(),
+                List.of(new ItemStack(Items.DIRT)),
+                List.of(),
+                List.of(),
+                AdapterUtils.DEFAULT_ENERGY,
+                AdapterUtils.DEFAULT_PROCESS_TIME,
+                Ingredient.EMPTY,
+                0,
+                List.of(AdapterUtils.toMoldIngredient(new ItemStack(Items.VILLAGER_SPAWN_EGG))),
+                AlloyFurnaceMode.NORMAL);
+        recipes.putIfAbsent(id,
+                new RecipeHolder<>(id, new VillagerTradeSyntheticRecipe(converted)));
+    }
+
+    @Nullable
+    private static VillagerTrades.ItemListing[] listingsFor(
+            VillagerProfession profession, int villagerLevel, boolean experimental) {
+        var tradeLevels = VillagerTrades.TRADES.get(profession);
+        return tradeLevels == null ? null : tradeLevels.get(villagerLevel);
+    }
+
+    private static List<TradeContext> contextsFor(VillagerTrades.ItemListing listing) {
+        if (listing.getClass().getSimpleName().equals("EmeraldsForVillagerTypeItem")) {
+            return BuiltInRegistries.VILLAGER_TYPE.stream()
+                    .sorted(Comparator.comparing(VillagerType::toString))
+                    .map(TradeContext::new)
+                    .toList();
+        }
+        return List.of(new TradeContext(null));
+    }
+
+    /**
+     * 判定交易条目是否属于地图类。
+     *
+     * <p>地图交易的报价在 {@code getOffer} 内部会执行一次结构定位（原版为
+     * {@code VillagerTrades.TreasureMapForEmeralds}，模组侧如 Supplementaries 的探险家地图），
+     * 该操作需要加载区块。目录构建运行在后台线程，而区块加载依赖服务器主线程推进，两者相互等待
+     * 会导致服务器 tick 停滞。此外结构定位结果取决于世界种子与执行侧，同一 listing 在客户端与
+     * 服务端会产出不同的配方集合，目录无法保持稳定。因此地图类交易一律不参与转换。</p>
+     *
+     * <p>除原版类型外，模组侧的地图交易无法通过类型引用判定，只能依据类名。判据刻意放宽为
+     * 「类名含有 {@code Map}」：此前按交易条目后缀（{@code Listing} / {@code Trade} /
+     * {@code Offer}）逐个列举的写法已被证明不收敛，Supplementaries 的
+     * {@code RandomAdventurerMapListing} 与 Goety 的 {@code TreasureMapForEmeralds} 先后漏网，
+     * 二者内部同样会调用 {@code findNearestMapStructure}。放宽的代价是极少数名称含
+     * {@code Map} 却无结构定位的交易被跳过，其后果仅为目录条目缺失，不影响正确性。</p>
+     */
+    private static boolean isMapTrade(VillagerTrades.ItemListing listing) {
+        if (listing.getClass().getSimpleName().equals("TreasureMapForEmeralds")) {
+            return true;
+        }
+        return listing.getClass().getSimpleName().contains("Map");
+    }
+
+    @Nullable
+    private static MerchantOffer createOffer(
+            Level level,
+            VillagerProfession profession,
+            int villagerLevel,
+            VillagerTrades.ItemListing listing,
+            @Nullable VillagerType villagerType) {
+        if (isMapTrade(listing)) {
+            return null;
+        }
+
+        Villager villager = EntityType.VILLAGER.create(level);
+        if (villager == null) {
+            return null;
+        }
+
+        VillagerType effectiveType = villagerType == null
+                ? VillagerType.PLAINS : villagerType;
+        villager.setVillagerData(new VillagerData(effectiveType, profession, villagerLevel));
+        // Vanilla listings generate some base prices from a random range. Feeding them a source
+        // that always returns the lower bound gives the minimum configured emerald cost.
+        return listing.getOffer(villager, new MinimumRandomSource());
+    }
+
+    @Nullable
+    private static MerchantOffer createWanderingTraderOffer(
+            Level level, VillagerTrades.ItemListing listing) {
+        if (isMapTrade(listing)) {
+            return null;
+        }
+
+        WanderingTrader trader = EntityType.WANDERING_TRADER.create(level);
+        return trader == null ? null : listing.getOffer(trader, new MinimumRandomSource());
+    }
+
+    private static int tradeTableSignature(boolean experimental) {
+        int signature = experimental ? 1 : 0;
+        for (ProfessionWorkstation profession : registeredProfessions()) {
+            signature = appendProfessionSignature(signature, profession);
+            for (int villagerLevel = MIN_VILLAGER_LEVEL;
+                    villagerLevel <= MAX_VILLAGER_LEVEL; villagerLevel++) {
+                VillagerTrades.ItemListing[] listings = listingsFor(
+                        profession.profession(), villagerLevel, experimental);
+                signature = 31 * signature + villagerLevel;
+                signature = appendListingSignature(signature, listings);
+            }
+        }
+
+        {
+            List<Int2ObjectMap.Entry<VillagerTrades.ItemListing[]>> groups =
+                    new ArrayList<>(VillagerTrades.WANDERING_TRADER_TRADES.int2ObjectEntrySet());
+            groups.sort(Comparator.comparingInt(Int2ObjectMap.Entry::getIntKey));
+            for (Int2ObjectMap.Entry<VillagerTrades.ItemListing[]> group : groups) {
+                signature = 31 * signature + group.getIntKey();
+                signature = appendListingSignature(signature, group.getValue());
+            }
+        }
+        return signature;
+    }
+
+    private static int appendProfessionSignature(
+            int signature, ProfessionWorkstation profession) {
+        signature = 31 * signature + professionKey(profession.profession()).hashCode();
+        for (Item workstation : profession.workstations()) {
+            signature = 31 * signature + itemKey(workstation).hashCode();
+        }
+        return signature;
+    }
+
+    private static int appendListingSignature(
+            int signature, @Nullable VillagerTrades.ItemListing[] listings) {
+        if (listings == null) {
+            return 31 * signature;
+        }
+        signature = 31 * signature + listings.length;
+        for (VillagerTrades.ItemListing listing : listings) {
+            signature = 31 * signature + System.identityHashCode(listing);
+        }
+        return signature;
+    }
+
+    @Nullable
+    private static AdvancedAlloyFurnaceRecipe convertOffer(
+            net.minecraft.resources.ResourceLocation id,
+            MerchantOffer offer,
+            List<Ingredient> moldIngredients) {
+        if (offer == null || offer.getResult() == null || offer.getResult().isEmpty()) {
+            return null;
+        }
+
+        List<CountedIngredient> inputs = offerInputs(offer);
+        if (inputs.isEmpty()) {
+            return null;
+        }
+
+        List<Ingredient> molds = new ArrayList<>();
+        if (moldIngredients != null) {
+            for (Ingredient moldIngredient : moldIngredients) {
+                if (moldIngredient != null && !moldIngredient.isEmpty()) {
+                    molds.add(moldIngredient);
+                }
+            }
+        }
+        if (molds.isEmpty()) {
+            return null;
+        }
+
+        return new AdvancedAlloyFurnaceRecipe(
+                id,
+                inputs,
+                List.of(),
+                List.of(),
+                List.of(offer.getResult().copy()),
+                List.of(),
+                List.of(),
+                AdapterUtils.DEFAULT_ENERGY,
+                AdapterUtils.DEFAULT_PROCESS_TIME,
+                Ingredient.EMPTY,
+                0,
+                molds,
+                AlloyFurnaceMode.NORMAL);
+    }
+
+    private static List<CountedIngredient> offerInputs(MerchantOffer offer) {
+        Map<Ingredient, Long> inputs = new LinkedHashMap<>();
+
+        // baseCostA is the unmodified, minimum cost. getCostA() includes demand and discounts.
+        addCost(inputs, offer.getBaseCostA());
+        addCost(inputs, offer.getCostB());
+
+        return inputs.entrySet().stream()
+                .filter(entry -> entry.getKey() != null && !entry.getKey().isEmpty()
+                        && entry.getValue() != null && entry.getValue() > 0L)
+                .map(entry -> new CountedIngredient(entry.getKey(), entry.getValue()))
+                .toList();
+    }
+
+    private static void addCost(Map<Ingredient, Long> inputs, @Nullable ItemStack cost) {
+        if (cost == null || cost.isEmpty() || cost.getCount() <= 0) {
+            return;
+        }
+        Ingredient ingredient = DataComponentIngredient.of(true, cost.copyWithCount(1));
+        AdapterUtils.mergeIngredient(inputs, ingredient, cost.getCount());
+    }
+
+    private static boolean matchesMergedInputs(
+            AdvancedAlloyFurnaceRecipe recipe, @Nullable Map<Ingredient, Long> mergedInputs) {
+        if (mergedInputs == null || mergedInputs.isEmpty()) {
+            return false;
+        }
+        Map<Ingredient, Long> required = new LinkedHashMap<>();
+        for (CountedIngredient input : recipe.inputs()) {
+            if (input != null && input.ingredient() != null && input.count() > 0L) {
+                AdapterUtils.mergeIngredient(required, input.ingredient(), input.count());
+            }
+        }
+        return ItemIngredientAllocator.matches(mergedInputs, required);
+    }
+
+    /**
+     * 由交易内容构造村民交易配方的 id。
+     *
+     * <p>id 不得包含交易条目在数组中的下标：客户端与服务端的目录各自独立构建，交易表的枚举
+     * 顺序不保证一致，位置派生的 id 会让同一个 id 在两端指向不同的交易，导致万象样板在服务端
+     * 无法解析。此处以报价的实际内容（产物与两项成本）派生后缀，职业、等级与村民类型仍作为
+     * 可读前缀保留。内容完全相同的两条报价会得到相同 id，由调用方的 {@code putIfAbsent} 合并，
+     * 与二者配方等价的事实一致。</p>
+     */
+    private static net.minecraft.resources.ResourceLocation recipeId(
+            VillagerProfession profession,
+            int villagerLevel,
+            @Nullable VillagerType villagerType,
+            boolean experimental,
+            MerchantOffer offer,
+            HolderLookup.Provider registries) {
+        net.minecraft.resources.ResourceLocation professionId =
+                net.minecraft.core.registries.BuiltInRegistries.VILLAGER_PROFESSION.getKey(profession);
+        String professionPart;
+        if (professionId == null) {
+            professionPart = profession.toString();
+        } else if ("minecraft".equals(professionId.getNamespace())) {
+            professionPart = professionId.getPath();
+        } else {
+            // Include the namespace so different mods can use the same profession path safely.
+            professionPart = professionId.getNamespace() + "_" + professionId.getPath();
+        }
+        String path = "villager_trade/"
+                + (experimental ? "experimental" : "vanilla") + "/"
+                + pathPart(professionPart) + "/level_" + villagerLevel
+                + "/trade_" + offerKey(offer, registries);
+        if (villagerType != null) {
+            path += "/type_" + pathPart(villagerType.toString());
+        }
+        path += "/mold_spawn_egg_and_workstation";
+        return new net.minecraft.resources.ResourceLocation(
+                RECIPE_NAMESPACE, path);
+    }
+
+    private static net.minecraft.resources.ResourceLocation wanderingRecipeId(
+            boolean experimental, MerchantOffer offer, HolderLookup.Provider registries) {
+        String path = "villager_trade/"
+                + (experimental ? "experimental" : "vanilla")
+                + "/wandering_trader/trade_" + offerKey(offer, registries)
+                + "/mold_spawn_egg";
+        return new net.minecraft.resources.ResourceLocation(
+                RECIPE_NAMESPACE, path);
+    }
+
+    /**
+     * 把报价内容摘要为定长片段，作为配方 id 的内容特征部分。
+     *
+     * <p>编码复用 {@link AlloyFurnaceRecipeFingerprint#safeItemStack}，它会递归规范化组件映射，
+     * 因此组件内部任何迭代顺序差异都不会影响结果。数量必须计入——成本数量是配方输入的一部分，
+     * 同物品同组件而数量不同的报价是两条不同配方。</p>
+     */
+    private static String offerKey(MerchantOffer offer, HolderLookup.Provider registries) {
+        StringBuilder value = new StringBuilder();
+        value.append(AlloyFurnaceRecipeFingerprint.safeItemStack(offer.getResult(), registries));
+        value.append('|').append(AlloyFurnaceRecipeFingerprint.safeItemStack(
+                offer.getBaseCostA(), registries));
+        if (!offer.getCostB().isEmpty()) value.append('|')
+                .append(AlloyFurnaceRecipeFingerprint.safeItemStack(offer.getCostB(), registries));
+        return AdapterUtils.stableHash(value.toString());
+    }
+
+    private static String pathPart(String value) {
+        StringBuilder result = new StringBuilder(value.length());
+        for (int index = 0; index < value.length(); index++) {
+            char character = Character.toLowerCase(value.charAt(index));
+            result.append(character >= 'a' && character <= 'z'
+                    || character >= '0' && character <= '9'
+                    || character == '_' || character == '.' || character == '-'
+                    ? character : '_');
+        }
+        return result.isEmpty() ? "unknown" : result.toString();
+    }
+
+    private record ProfessionWorkstation(VillagerProfession profession, List<Item> workstations) {
+    }
+
+    private record TradeContext(@Nullable VillagerType villagerType) {
+    }
+
+    private record Cached(
+            Level level,
+            boolean experimental,
+            int tradeTableSignature,
+            List<RecipeHolder<VillagerTradeSyntheticRecipe>> recipes) {
+    }
+
+    /** Random source used to evaluate the lower endpoint of vanilla random trade prices. */
+    private static final class MinimumRandomSource implements RandomSource {
+        @Override
+        public RandomSource fork() {
+            return new MinimumRandomSource();
+        }
+
+        @Override
+        public PositionalRandomFactory forkPositional() {
+            return new MinimumPositionalRandomFactory();
+        }
+
+        @Override
+        public void setSeed(long seed) {
+        }
+
+        @Override
+        public int nextInt() {
+            return 0;
+        }
+
+        @Override
+        public int nextInt(int bound) {
+            if (bound <= 0) {
+                throw new IllegalArgumentException("bound must be positive");
+            }
+            return 0;
+        }
+
+        @Override
+        public long nextLong() {
+            return 0L;
+        }
+
+        @Override
+        public boolean nextBoolean() {
+            return false;
+        }
+
+        @Override
+        public float nextFloat() {
+            return 0.0F;
+        }
+
+        @Override
+        public double nextDouble() {
+            return 0.0D;
+        }
+
+        @Override
+        public double nextGaussian() {
+            return 0.0D;
+        }
+    }
+
+    private static final class MinimumPositionalRandomFactory implements PositionalRandomFactory {
+        @Override
+        public RandomSource fromHashOf(String name) {
+            return new MinimumRandomSource();
+        }
+
+        public RandomSource fromSeed(long seed) {
+            return new MinimumRandomSource();
+        }
+
+        @Override
+        public RandomSource at(int x, int y, int z) {
+            return new MinimumRandomSource();
+        }
+
+        @Override
+        public void parityConfigString(StringBuilder builder) {
+            builder.append("MinimumRandomSource");
+        }
+    }
+}

@@ -1,0 +1,175 @@
+package com.sorrowmist.useless.content.recipe.adapters.industrialforegoing;
+
+import com.buuz135.industrial.module.ModuleCore;
+import com.buuz135.industrial.recipe.DissolutionChamberRecipe;
+import com.sorrowmist.useless.api.enums.AlloyFurnaceMode;
+import com.sorrowmist.useless.content.recipe.AdapterUtils;
+import com.sorrowmist.useless.content.recipe.AdvancedAlloyFurnaceRecipe;
+import com.sorrowmist.useless.content.recipe.CountedIngredient;
+import com.sorrowmist.useless.content.recipe.IRecipeAdapter;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.crafting.Ingredient;
+import com.sorrowmist.useless.compat.forge1201.recipe.RecipeHolder;
+import net.minecraft.world.item.crafting.RecipeManager;
+import net.minecraft.world.item.crafting.RecipeType;
+import net.minecraft.world.level.Level;
+import net.minecraftforge.fluids.FluidStack;
+import com.sorrowmist.useless.compat.forge1201.fluid.SizedFluidIngredient;
+import org.jetbrains.annotations.Nullable;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+
+/**
+ * Industrial Foregoing 溶解成型机配方适配器
+ * <p>
+ * 将溶解成型机配方（物品+流体→物品/流体）转换为高级合金熔炉配方
+ * 支持流体输入和流体输出
+ */
+public class DissolutionChamberRecipeAdapter implements IRecipeAdapter<DissolutionChamberRecipe> {
+
+    @Override
+    public Class<DissolutionChamberRecipe> getRecipeClass() {
+        return DissolutionChamberRecipe.class;
+    }
+
+    @Override
+    @Nullable
+    public ItemStack getMoldItem() {
+        return new ItemStack(
+                BuiltInRegistries.ITEM.get(
+                        new ResourceLocation("industrialforegoing", "dissolution_chamber")));
+    }
+
+    @Override
+    public List<AdvancedAlloyFurnaceRecipe> convertAll(RecipeHolder<DissolutionChamberRecipe> holder, Level level) {
+        List<AdvancedAlloyFurnaceRecipe> result = new ArrayList<>();
+
+        if (holder == null) return result;
+
+        DissolutionChamberRecipe originalRecipe = holder.value();
+        ResourceLocation originalId = holder.id();
+
+        // 获取输入物品列表
+        List<Ingredient> itemInputs = nativeInputs(originalRecipe.input);
+
+        // 获取输出
+        ItemStack itemOutput = originalRecipe.output == null ? ItemStack.EMPTY : originalRecipe.output;
+        FluidStack fluidOutput = originalRecipe.outputFluid == null ? FluidStack.EMPTY : originalRecipe.outputFluid;
+
+        // 如果没有物品输出且没有流体输出，则不转换
+        if (itemOutput.isEmpty() && fluidOutput.isEmpty()) {
+            return result;
+        }
+
+        // 构建物品输入列表 - 合并同类型的输入
+        List<CountedIngredient> countedIngredients = AdapterUtils.mergeIngredients(itemInputs);
+
+        SizedFluidIngredient inputFluidIngredient = originalRecipe.inputFluid == null || originalRecipe.inputFluid.isEmpty()
+                ? null : SizedFluidIngredient.of(originalRecipe.inputFluid);
+        if (inputFluidIngredient == null) {
+            return result;
+        }
+
+        if (inputFluidIngredient.ingredient().isEmpty()) {
+            return result;
+        }
+
+        // 创建溶解成型机模具要求
+        Ingredient moldIngredient = AdapterUtils.toMoldIngredient(getMoldItem());
+
+        // 计算总能量消耗 (Industrial Foregoing: 90 FE/tick * processingTime * 倍率)
+        int processingTime = originalRecipe.processingTime;
+        int totalEnergy = AdapterUtils.safeInt((long) AdapterUtils.IF_BASE_ENERGY_PER_TICK * processingTime * AdapterUtils.IF_ENERGY_MULTIPLIER);
+
+        // 构建物品输出列表
+        List<ItemStack> outputs = new ArrayList<>();
+        if (!itemOutput.isEmpty()) {
+            outputs.add(itemOutput.copy());
+        }
+
+        // 构建流体输出列表
+        List<FluidStack> outputFluids = new ArrayList<>();
+        if (!fluidOutput.isEmpty()) {
+            outputFluids.add(fluidOutput.copy());
+        }
+
+        result.add(createRecipe(originalId, countedIngredients, inputFluidIngredient, outputs,
+                outputFluids, totalEnergy, processingTime, moldIngredient));
+        return result;
+    }
+
+    private AdvancedAlloyFurnaceRecipe createRecipe(ResourceLocation originalId,
+                                                    List<CountedIngredient> countedIngredients,
+                                                    SizedFluidIngredient inputFluid,
+                                                    List<ItemStack> outputs,
+                                                    List<FluidStack> outputFluids,
+                                                    int totalEnergy,
+                                                    int processingTime,
+                                                    Ingredient moldIngredient) {
+        return new AdvancedAlloyFurnaceRecipe(
+                AdapterUtils.convertedId(originalId),
+                countedIngredients,
+                List.of(inputFluid),
+                List.of(),
+                outputs,
+                outputFluids,
+                List.of(),
+                totalEnergy,
+                processingTime,
+                Ingredient.EMPTY,
+                0,
+                List.of(moldIngredient),
+                AlloyFurnaceMode.NORMAL
+        );
+    }
+
+    @Override
+    @Nullable
+    @SuppressWarnings({"unchecked"})
+    public List<RecipeHolder<DissolutionChamberRecipe>> findMatchingRecipes(Level level, Map<Ingredient, Long> mergedInputs, Map<FluidStack, Long> mergedFluids, @Nullable ItemStack mold) {
+        if (level == null || (mergedInputs.isEmpty() && mergedFluids.isEmpty()) || !matchesMold(mold)) {
+            return List.of();
+        }
+
+        RecipeManager recipeManager = level.getRecipeManager();
+        RecipeType<DissolutionChamberRecipe> recipeType = (RecipeType<DissolutionChamberRecipe>) ModuleCore.DISSOLUTION_TYPE.get();
+
+        return com.sorrowmist.useless.compat.forge1201.recipe.RecipeManagerAccess.getAllRecipesFor(recipeManager, recipeType).stream()
+                .filter(holder -> matchesItemInputs(mergedInputs, nativeInputs(holder.value().input))
+                        && matchesFluidInput(mergedFluids, holder.value().inputFluid == null || holder.value().inputFluid.isEmpty() ? null : SizedFluidIngredient.of(holder.value().inputFluid)))
+                .toList();
+    }
+
+    @Override
+    public boolean matchesMold(@Nullable ItemStack mold) {
+        ItemStack moldItem = getMoldItem();
+        return mold != null && !mold.isEmpty() && moldItem != null && ItemStack.isSameItem(mold, moldItem);
+    }
+
+    static List<Ingredient> nativeInputs(Ingredient.Value[] values) {
+        if (values == null) throw new IllegalArgumentException("Missing dissolution inputs");
+        return java.util.Arrays.stream(values).map(value -> Ingredient.fromValues(java.util.stream.Stream.of(value))).toList();
+    }
+
+    private boolean matchesItemInputs(Map<Ingredient, Long> mergedInputs, List<Ingredient> itemInputs) {
+        Map<Ingredient, Long> requirements = new java.util.LinkedHashMap<>();
+        for (Ingredient input : itemInputs) {
+            if (input != null && !input.isEmpty()) {
+                AdapterUtils.mergeIngredient(requirements, input, 1L);
+            }
+        }
+        return AdapterUtils.matchesRequired(mergedInputs, requirements);
+    }
+
+    private boolean matchesFluidInput(Map<FluidStack, Long> mergedFluids, SizedFluidIngredient inputFluid) {
+        if (inputFluid == null) return true;
+        if (mergedFluids == null || mergedFluids.isEmpty()) return false;
+        return com.sorrowmist.useless.content.recipe.FluidIngredientAllocator.matches(
+                List.of(inputFluid), mergedFluids, 1L);
+    }
+
+}

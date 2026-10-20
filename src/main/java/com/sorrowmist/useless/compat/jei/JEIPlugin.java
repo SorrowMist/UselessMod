@@ -1,247 +1,433 @@
 package com.sorrowmist.useless.compat.jei;
 
+import com.sorrowmist.useless.utils.RateLimitedLogger;
+
+import appeng.menu.me.items.PatternEncodingTermMenu;
 import com.sorrowmist.useless.UselessMod;
-import com.sorrowmist.useless.blocks.advancedalloyfurnace.AdvancedAlloyFurnaceBlock;
-import com.sorrowmist.useless.compat.thermal.ThermalRecipeConverter;
-import com.sorrowmist.useless.recipes.ModRecipeTypes;
-import com.sorrowmist.useless.registry.ModIngots;
+import com.sorrowmist.useless.client.gui.ChainGroupScreen;
+import com.sorrowmist.useless.client.gui.DimensionConfigScreen;
+import com.sorrowmist.useless.client.gui.StaffLinkScreen;
+import com.sorrowmist.useless.content.menus.DimensionConfigMenu;
+import com.sorrowmist.useless.content.recipe.AlloyFurnaceRecipeCatalog;
+import com.sorrowmist.useless.content.recipe.AlloyFurnaceRecipeIdentity;
+import com.sorrowmist.useless.content.stafflink.LinkFilterSlot;
+import com.sorrowmist.useless.content.stafflink.StaffLinkFilters;
+import com.sorrowmist.useless.content.stafflink.StaffLinkRoute;
+import com.sorrowmist.useless.init.ModBlocks;
+import com.sorrowmist.useless.init.ModTags;
 import mezz.jei.api.IModPlugin;
 import mezz.jei.api.JeiPlugin;
+import mezz.jei.api.gui.handlers.IGhostIngredientHandler;
+import mezz.jei.api.helpers.IGuiHelper;
+import mezz.jei.api.ingredients.ITypedIngredient;
+import mezz.jei.api.registration.IGuiHandlerRegistration;
 import mezz.jei.api.registration.IRecipeCatalystRegistration;
 import mezz.jei.api.registration.IRecipeCategoryRegistration;
 import mezz.jei.api.registration.IRecipeRegistration;
+import mezz.jei.api.registration.IRecipeTransferRegistration;
+import mezz.jei.api.runtime.IJeiRuntime;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.renderer.Rect2i;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.inventory.MenuType;
+import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.crafting.RecipeManager;
+import net.minecraft.world.level.Level;
+import net.minecraftforge.fml.ModList;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.ArrayList;
-import java.util.Collection;
+import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Objects;
+import java.util.Map;
 
 @JeiPlugin
-public class JEIPlugin implements IModPlugin {
+public final class JEIPlugin implements IModPlugin {
+    private static final ResourceLocation UID = UselessMod.id("jei_plugin");
+    private static IJeiRuntime runtime;
+    private static final Map<AlloyFurnaceRecipeIdentity, AlloyFurnaceRecipeCatalog.Entry>
+            registeredAlloyFurnaceRecipes = new LinkedHashMap<>();
+
     @Override
-    public ResourceLocation getPluginUid() {
-        return ResourceLocation.fromNamespaceAndPath(UselessMod.MOD_ID, "jei_plugin");
+    public @NotNull ResourceLocation getPluginUid() {
+        return UID;
+    }
+
+    @Override
+    public void registerIngredients(mezz.jei.api.registration.IModIngredientRegistration registration) {
+        GenericStackJeiIngredientProviders.initialize();
+        AEKeyJeiIngredients.register(registration, net.minecraftforge.fml.loading.FMLPaths.CONFIGDIR.get()
+                .resolve("useless_mod/jei_ae_keys.nbt"));
     }
 
     @Override
     public void registerCategories(IRecipeCategoryRegistration registration) {
-        registration.addRecipeCategories(new AdvancedAlloyFurnaceRecipeCategory(registration.getJeiHelpers().getGuiHelper()));
-        registration.addRecipeCategories(new CatalystInfoCategory(registration.getJeiHelpers().getGuiHelper()));
+        GenericStackJeiIngredientProviders.initialize();
+        IGuiHelper guiHelper = registration.getJeiHelpers().getGuiHelper();
+        registration.addRecipeCategories(new AdvancedAlloyFurnaceRecipeCategory(guiHelper));
+        registration.addRecipeCategories(new CatalystInfoCategory(guiHelper));
     }
 
     @Override
-    public void registerRecipes(IRecipeRegistration registration) {
-        RecipeManager recipeManager = Objects.requireNonNull(Minecraft.getInstance().level).getRecipeManager();
-
-        // 获取所有高级合金炉配方
-        List<com.sorrowmist.useless.recipes.advancedalloyfurnace.AdvancedAlloyFurnaceRecipe> recipes = new ArrayList<>();
-        recipes.addAll(recipeManager.getAllRecipesFor(ModRecipeTypes.ADVANCED_ALLOY_FURNACE_TYPE.get()));
-        
-        // 添加所有原版熔炉配方，转换为高级合金炉配方格式
-        Collection<net.minecraft.world.item.crafting.SmeltingRecipe> smeltingRecipes = recipeManager.getAllRecipesFor(
-                net.minecraft.world.item.crafting.RecipeType.SMELTING
-        );
-        
-        for (net.minecraft.world.item.crafting.SmeltingRecipe recipe : smeltingRecipes) {
-            // 将原版熔炉配方转换为高级合金炉配方
-            List<net.minecraft.world.item.crafting.Ingredient> smeltingIngredients = recipe.getIngredients();
-            List<net.minecraft.world.item.crafting.Ingredient> inputIngredients = new ArrayList<>();
-            List<Integer> inputCounts = new ArrayList<>();
-            
-            for (net.minecraft.world.item.crafting.Ingredient ingredient : smeltingIngredients) {
-                inputIngredients.add(ingredient);
-                inputCounts.add(1);
-            }
-            
-            List<ItemStack> outputItems = new ArrayList<>();
-            outputItems.add(recipe.getResultItem(null));
-            
-            List<net.minecraftforge.fluids.FluidStack> emptyFluids = new ArrayList<>();
-            net.minecraft.world.item.crafting.Ingredient furnaceIngredient = net.minecraft.world.item.crafting.Ingredient.of(net.minecraft.world.item.Items.FURNACE);
-            
-            // 创建无用锭标签的催化剂，允许使用所有无用锭
-            net.minecraft.tags.TagKey<net.minecraft.world.item.Item> uselessIngotTag = 
-                    net.minecraft.tags.TagKey.create(
-                            net.minecraft.core.registries.Registries.ITEM,
-                            new net.minecraft.resources.ResourceLocation("useless_mod", "useless_ingots")
-                    );
-            net.minecraft.world.item.crafting.Ingredient uselessIngotCatalyst = net.minecraft.world.item.crafting.Ingredient.of(uselessIngotTag);
-            
-            // 将List<Integer>转换为List<Long>
-            List<Long> longInputCounts = new ArrayList<>();
-            for (Integer count : inputCounts) {
-                longInputCounts.add(count.longValue());
-            }
-            
-            // 创建临时的高级合金炉配方，使用原版熔炉作为模具
-            com.sorrowmist.useless.recipes.advancedalloyfurnace.AdvancedAlloyFurnaceRecipe convertedRecipe = new com.sorrowmist.useless.recipes.advancedalloyfurnace.AdvancedAlloyFurnaceRecipe(
-                    recipe.getId(),
-                    inputIngredients,
-                    longInputCounts,
-                    emptyFluids,
-                    outputItems,
-                    emptyFluids,
-                    1000, // 能量消耗
-                    40, // 处理时间：熔炉配方为40tick
-                    uselessIngotCatalyst, // 催化剂：无用锭标签
-                    1, // 催化剂数量
-                    furnaceIngredient // 模具：原版熔炉
-            );
-            
-            recipes.add(convertedRecipe);
+    public void registerRecipes(@NotNull IRecipeRegistration registration) {
+        Level level = Minecraft.getInstance().level;
+        // JEMI imports a snapshot of JEI immediately after registration. Returning an empty
+        // list while waiting for the client tick loses the entire category in EMI.
+        List<AlloyFurnaceRecipeCatalog.Entry> recipes = level == null
+                ? List.of()
+                : AlloyFurnaceRecipeCatalog.entries(level);
+        registeredAlloyFurnaceRecipes.clear();
+        for (AlloyFurnaceRecipeCatalog.Entry recipe : recipes) {
+            registeredAlloyFurnaceRecipes.put(recipe.identity(), recipe);
         }
-
-        // 添加热力配方转换
-        try {
-            // 直接从RecipeManager获取所有InsolatorRecipe并转换
-            List<com.sorrowmist.useless.recipes.advancedalloyfurnace.AdvancedAlloyFurnaceRecipe> convertedRecipes = 
-                    ThermalRecipeConverter.convertInsolatorRecipes(recipeManager);
-            recipes.addAll(convertedRecipes);
-            
-            // 添加热力感应炉(Smelter)配方转换
-            List<com.sorrowmist.useless.recipes.advancedalloyfurnace.AdvancedAlloyFurnaceRecipe> smelterRecipes = 
-                    ThermalRecipeConverter.convertSmelterRecipes(recipeManager);
-            recipes.addAll(smelterRecipes);
-            
-            // 添加热力多驱冲压机(Press)配方转换
-            List<com.sorrowmist.useless.recipes.advancedalloyfurnace.AdvancedAlloyFurnaceRecipe> pressRecipes = 
-                    ThermalRecipeConverter.convertPressRecipes(recipeManager);
-            recipes.addAll(pressRecipes);
-        } catch (Exception e) {
-            // 如果热力模组未加载，捕获异常以避免崩溃
-        }
-        
-        // 添加Mekanism配方转换
-        try {
-            // 添加Mekanism冶金灌注机(Metallurgic Infuser)配方转换
-            List<com.sorrowmist.useless.recipes.advancedalloyfurnace.AdvancedAlloyFurnaceRecipe> mekanismRecipes = 
-                    com.sorrowmist.useless.compat.mekanism.MekanismRecipeConverter.convertMetallurgicInfuserRecipes(recipeManager);
-            recipes.addAll(mekanismRecipes);
-            
-            // 添加Mekanism富集仓(Enrichment Chamber)配方转换
-            List<com.sorrowmist.useless.recipes.advancedalloyfurnace.AdvancedAlloyFurnaceRecipe> enrichmentRecipes = 
-                    com.sorrowmist.useless.compat.mekanism.MekanismRecipeConverter.convertEnrichmentChamberRecipes(recipeManager);
-            recipes.addAll(enrichmentRecipes);
-        } catch (Exception e) {
-            // 如果Mekanism模组未加载，捕获异常以避免崩溃
-        }
-        
-        // 添加工业先锋配方转换
-        try {
-            // 添加工业先锋化学溶解室(Dissolution Chamber)配方转换
-            List<com.sorrowmist.useless.recipes.advancedalloyfurnace.AdvancedAlloyFurnaceRecipe> dissolutionRecipes = 
-                    com.sorrowmist.useless.compat.industrialforegoing.IndustrialForegoingRecipeConverter.convertDissolutionChamberRecipes(recipeManager);
-            recipes.addAll(dissolutionRecipes);
-        } catch (Exception e) {
-            // 如果工业先锋模组未加载，捕获异常以避免崩溃
-        }
-        
-        // 添加血魔法配方转换
-        try {
-            // 添加血魔法血之祭坛(Blood Altar)配方转换
-            List<com.sorrowmist.useless.recipes.advancedalloyfurnace.AdvancedAlloyFurnaceRecipe> bloodAltarRecipes = 
-                    com.sorrowmist.useless.compat.bloodmagic.BloodMagicRecipeConverter.convertBloodAltarRecipes(recipeManager);
-            recipes.addAll(bloodAltarRecipes);
-            
-            // 添加血魔法狱火熔炉(Soul Forge)配方转换
-            List<com.sorrowmist.useless.recipes.advancedalloyfurnace.AdvancedAlloyFurnaceRecipe> soulForgeRecipes = 
-                    com.sorrowmist.useless.compat.bloodmagic.BloodMagicRecipeConverter.convertTartaricForgeRecipes(recipeManager);
-            recipes.addAll(soulForgeRecipes);
-            
-            // 添加血魔法炼金术桌(Alchemy Table)配方转换
-            List<com.sorrowmist.useless.recipes.advancedalloyfurnace.AdvancedAlloyFurnaceRecipe> alchemyTableRecipes = 
-                    com.sorrowmist.useless.compat.bloodmagic.BloodMagicRecipeConverter.convertAlchemyTableRecipes(recipeManager);
-            recipes.addAll(alchemyTableRecipes);
-        } catch (Exception e) {
-            // 如果血魔法模组未加载，捕获异常以避免崩溃
-        }
-        
-        // 添加余烬mod配方转换
-        try {
-            // 添加余烬炼金台(Alchemy Tablet)配方转换
-            List<com.sorrowmist.useless.recipes.advancedalloyfurnace.AdvancedAlloyFurnaceRecipe> embersAlchemyRecipes = 
-                    com.sorrowmist.useless.compat.embers.EmbersRecipeConverter.convertAlchemyTabletRecipes(recipeManager);
-            recipes.addAll(embersAlchemyRecipes);
-            
-            // 添加余烬地质分离器(Geologic Separator)配方转换
-            List<com.sorrowmist.useless.recipes.advancedalloyfurnace.AdvancedAlloyFurnaceRecipe> embersGeoSeparatorRecipes = 
-                    com.sorrowmist.useless.compat.embers.EmbersRecipeConverter.convertGeoSeparatorRecipes(recipeManager);
-            recipes.addAll(embersGeoSeparatorRecipes);
-            
-            // 添加余烬熔炼炉(Melter)配方转换
-            List<com.sorrowmist.useless.recipes.advancedalloyfurnace.AdvancedAlloyFurnaceRecipe> embersMelterRecipes = 
-                    com.sorrowmist.useless.compat.embers.EmbersRecipeConverter.convertMelterRecipes(recipeManager);
-            recipes.addAll(embersMelterRecipes);
-            
-            // 添加余烬压印锤(Stamper)配方转换
-            List<com.sorrowmist.useless.recipes.advancedalloyfurnace.AdvancedAlloyFurnaceRecipe> embersStampingRecipes = 
-                    com.sorrowmist.useless.compat.embers.EmbersRecipeConverter.convertStampingRecipes(recipeManager);
-            recipes.addAll(embersStampingRecipes);
-            
-            // 添加余烬混合离心器(Mixer Centrifuge)配方转换
-            List<com.sorrowmist.useless.recipes.advancedalloyfurnace.AdvancedAlloyFurnaceRecipe> embersMixingRecipes = 
-                    com.sorrowmist.useless.compat.embers.EmbersRecipeConverter.convertMixingRecipes(recipeManager);
-            recipes.addAll(embersMixingRecipes);
-        } catch (Exception e) {
-            // 如果余烬mod未加载，捕获异常以避免崩溃
-        }
-
         registration.addRecipes(AdvancedAlloyFurnaceRecipeCategory.TYPE, recipes);
+        registration.addRecipes(CatalystInfoCategory.TYPE,
+                List.of(new CatalystInfoCategory.CatalystInfo()));
+    }
 
-        // 添加催化剂信息
-        List<CatalystInfoCategory.CatalystInfo> catalystInfos = new ArrayList<>();
-        catalystInfos.add(new CatalystInfoCategory.CatalystInfo());
-        registration.addRecipes(CatalystInfoCategory.TYPE, catalystInfos);
+
+    @Override
+    public void registerRecipeTransferHandlers(IRecipeTransferRegistration registration) {
+        // Only this category encodes omniversal patterns. Every other page in a pattern encoding
+        // terminal keeps falling through to ae2jeiintegration's universal handler, which JEI consults
+        // only when no category-specific handler is registered for the open menu.
+        registration.addRecipeTransferHandler(
+                new OmniversalPatternJeiTransferHandler<>(
+                        PatternEncodingTermMenu.class,
+                        PatternEncodingTermMenu.TYPE,
+                        registration.getTransferHelper()),
+                AdvancedAlloyFurnaceRecipeCategory.TYPE);
+        registerWirelessTransferHandler(registration);
+        registerTianshuTransferHandlers(registration);
+    }
+
+    @Override
+    public void registerGuiHandlers(IGuiHandlerRegistration registration) {
+        registration.addGenericGuiContainerHandler(net.minecraft.client.gui.screens.inventory.AbstractContainerScreen.class,
+                new WrappedKeyGuiHandler(() -> runtime == null ? null : runtime.getIngredientManager()));
+        registration.addGhostIngredientHandler(DimensionConfigScreen.class,
+                new DimensionConfigGhostHandler());
+        registration.addGhostIngredientHandler(StaffLinkScreen.class,
+                new StaffLinkGhostHandler());
+        registration.addGhostIngredientHandler(ChainGroupScreen.class,
+                new ChainGroupGhostHandler());
+        // 等价组界面继承了 AbstractContainerScreen，JEI 内置的容器屏 handler 会自动接管，
+        // 不需要（也不该）再注册 IScreenHandler——两套 handler 会互相抢。
+    }
+
+    /**
+     * 连锁等价组界面接受 JEI 拖拽。
+     *
+     * <p>每个组行右端有一个拖拽槽，把方块拖进去就作为一条精确方块 ID 追加到该组。
+     * 非方块物品直接不接受——等价组判定的是方块，收一个没有方块的物品没有意义。</p>
+     */
+    private static final class ChainGroupGhostHandler
+            implements IGhostIngredientHandler<ChainGroupScreen> {
+        @Override
+        public <I> List<Target<I>> getTargetsTyped(ChainGroupScreen screen,
+                                                   ITypedIngredient<I> ingredient,
+                                                   boolean doStart) {
+            ItemStack stack = ingredient.getItemStack().orElse(ItemStack.EMPTY);
+            if (!(stack.getItem() instanceof BlockItem blockItem)) return List.of();
+            ResourceLocation blockId = BuiltInRegistries.BLOCK.getKey(blockItem.getBlock());
+
+            List<Target<I>> targets = new ArrayList<>(screen.chainGroupCount());
+            for (int index = 0; index < screen.chainGroupCount(); index++) {
+                if (!screen.isGroupRowVisible(index)) continue;
+                final int groupIndex = index;
+                targets.add(new Target<>() {
+                    @Override
+                    public Rect2i getArea() {
+                        return new Rect2i(screen.groupDropZoneScreenX(groupIndex),
+                                screen.groupDropZoneScreenY(groupIndex),
+                                screen.dropZoneSize(), screen.dropZoneSize());
+                    }
+
+                    @Override
+                    public void accept(I value) {
+                        screen.addEntryFromBlock(groupIndex, blockId);
+                    }
+                });
+            }
+            return targets;
+        }
+
+        @Override
+        public void onComplete() {
+        }
+    }
+
+    /**
+     * 无线物流的过滤槽接受 JEI 拖拽。
+     *
+     * <p>标记按线路的资源类型分流：物品线路收物品，流体线路收<b>流体本身</b>（不是装它的桶），
+     * 化学品线路收一只装满它的储罐。类型对不上的原料直接不接受——不接，比悄悄塞进一个
+     * 语义不对的东西好。</p>
+     *
+     * <p>拖进来的只能是<b>具体标记</b>。{@code #tag} / 通配符那类模式表达的是「一整类」，
+     * 从 JEI 拖某个具体物品过来时玩家要的显然是那个物品，所以这里不替玩家猜「你是不是想要
+     * 这个物品的标签」——要模式请右键格子手打。</p>
+     */
+    private static final class StaffLinkGhostHandler
+            implements IGhostIngredientHandler<StaffLinkScreen> {
+        @Override
+        public <I> List<Target<I>> getTargetsTyped(StaffLinkScreen screen,
+                                                   ITypedIngredient<I> ingredient,
+                                                   boolean doStart) {
+            // 过滤格住在覆盖层面板里。面板没开时那些坐标指向的是主界面别的地方，
+            // 拖过去会莫名其妙地落到空处（甚至落到底下某个控件上），所以直接不给目标。
+            if (!screen.isFilterPanelOpen()) {
+                screen.setJeiDragActive(false);
+                return List.of();
+            }
+            StaffLinkRoute config = screen.getMenu().getSelectedConfig();
+            if (config == null || !config.filterApplies()) {
+                screen.setJeiDragActive(false);
+                return List.of();
+            }
+            LinkFilterSlot marker = StaffLinkFilters.fromIngredient(
+                    config.medium(), ingredient.getIngredient());
+            if (marker == null) {
+                screen.setJeiDragActive(false);
+                return List.of();
+            }
+            // 真的要开始拖了（doStart=true）才点亮拖拽高亮；doStart=false 那次只是问「有没有目标」。
+            if (doStart) {
+                screen.setJeiDragActive(true);
+            }
+
+            // 详细面板开着时它压住中间，靶点切成它的三个槽（A 标记 / 输出端 B / 输入端 B）。
+            if (screen.isDetailPanelOpen()) {
+                return detailTargets(screen, marker);
+            }
+
+            List<Target<I>> targets = new ArrayList<>(StaffLinkScreen.filterSlotCount());
+            for (int index = 0; index < StaffLinkScreen.filterSlotCount(); index++) {
+                final int slotIndex = index;
+                targets.add(new Target<>() {
+                    @Override
+                    public Rect2i getArea() {
+                        return new Rect2i(screen.filterSlotScreenX(slotIndex),
+                                screen.filterSlotScreenY(slotIndex),
+                                StaffLinkScreen.filterSlotSize(), StaffLinkScreen.filterSlotSize());
+                    }
+
+                    @Override
+                    public void accept(I value) {
+                        screen.getMenu().setFilterSlot(slotIndex, marker);
+                    }
+                });
+            }
+            return targets;
+        }
+
+        /** 详细面板的三个靶点：0 = A 标记，1 = 输出端 B，2 = 输入端 B。 */
+        private <I> List<Target<I>> detailTargets(StaffLinkScreen screen, LinkFilterSlot marker) {
+            int index = screen.getDetailIndex();
+            if (index < 0 || index >= StaffLinkScreen.filterSlotCount()) {
+                return List.of();
+            }
+            List<Target<I>> targets = new ArrayList<>(3);
+            for (int which = 0; which < 3; which++) {
+                final int slot = which;
+                targets.add(new Target<>() {
+                    @Override
+                    public Rect2i getArea() {
+                        return new Rect2i(screen.detailSlotScreenX(slot), screen.detailSlotScreenY(slot),
+                                StaffLinkScreen.detailSlotSize(), StaffLinkScreen.detailSlotSize());
+                    }
+
+                    @Override
+                    public void accept(I value) {
+                        if (slot == 0) {
+                            screen.getMenu().setFilterSlot(index,
+                                    screen.getMenu().getFilterMirror().get(index).withMarker(marker));
+                        } else {
+                            screen.getMenu().setFilterSlotConditionControl(index, slot == 2, marker);
+                        }
+                    }
+                });
+            }
+            return targets;
+        }
+
+        @Override
+        public void onComplete() {
+        }
+    }
+
+    private static final class DimensionConfigGhostHandler
+            implements IGhostIngredientHandler<DimensionConfigScreen> {
+        @Override
+        public <I> List<Target<I>> getTargetsTyped(DimensionConfigScreen screen,
+                                                   ITypedIngredient<I> ingredient,
+                                                   boolean doStart) {
+            ItemStack stack = ingredient.getItemStack().orElse(ItemStack.EMPTY);
+            if (!(stack.getItem() instanceof BlockItem)) return List.of();
+
+            List<Target<I>> targets = new ArrayList<>(DimensionConfigMenu.GHOST_SLOT_COUNT);
+            for (int index = 0; index < DimensionConfigMenu.GHOST_SLOT_COUNT; index++) {
+                if (!screen.getMenu().isGhostSlotActive(index)) continue;
+                int slotIndex = index;
+                DimensionConfigMenu.GhostSlot slot = screen.getMenu().getGhostSlot(slotIndex);
+                targets.add(new Target<>() {
+                    @Override
+                    public Rect2i getArea() {
+                        return new Rect2i(screen.getGuiLeft() + slot.x,
+                                screen.getGuiTop() + slot.y, 16, 16);
+                    }
+
+                    @Override
+                    public void accept(I value) {
+                        if (value instanceof ItemStack itemStack) {
+                            screen.getMenu().setGhostSlotFromClient(slotIndex, itemStack);
+                        }
+                    }
+                });
+            }
+            return targets;
+        }
+
+        @Override
+        public void onComplete() {
+        }
+    }
+
+    /**
+     * AE2 Lightning Tech provides separate menu classes for its Tianshu terminals. JEI resolves a
+     * recipe transfer handler by the exact menu class, so its universal handler would otherwise win
+     * and encode a normal AE2 processing pattern for this category.
+     */
+    private static void registerTianshuTransferHandlers(IRecipeTransferRegistration registration) {
+        if (!ModList.get().isLoaded("ae2lt")) return;
+        registerReflectiveTransferHandler(registration,
+                "com.moakiee.ae2lt.menu.TianshuPatternEncodingTermMenu");
+        registerReflectiveTransferHandler(registration,
+                "com.moakiee.ae2lt.menu.TianshuWirelessPatternEncodingTermMenu");
+    }
+
+    @SuppressWarnings("unchecked")
+    private static void registerReflectiveTransferHandler(
+            IRecipeTransferRegistration registration, String menuClassName) {
+        try {
+            Class<?> menuClass = Class.forName(menuClassName);
+            if (!PatternEncodingTermMenu.class.isAssignableFrom(menuClass)) return;
+            var menuType = (MenuType<PatternEncodingTermMenu>) menuClass.getField("TYPE").get(null);
+            registration.addRecipeTransferHandler(
+                    new OmniversalPatternJeiTransferHandler<>(
+                            (Class<PatternEncodingTermMenu>) menuClass,
+                            menuType,
+                            registration.getTransferHelper()),
+                    AdvancedAlloyFurnaceRecipeCategory.TYPE);
+        } catch (ReflectiveOperationException | ClassCastException exception) {
+            RateLimitedLogger.warn(UselessMod.LOGGER,
+                    "Could not register the omniversal pattern transfer handler for {}.",
+                    menuClassName,
+                    exception);
+        }
+    }
+
+    /**
+     * The wireless pattern encoding terminal is a {@link PatternEncodingTermMenu} subclass, and JEI
+     * matches handlers on the menu's exact class, so it needs its own registration. ae2wtlib is only
+     * a runtime dependency here, hence the reflective lookup; without it the wireless terminal would
+     * silently fall back to ae2jeiintegration's universal handler and encode a plain pattern.
+     */
+    @SuppressWarnings("unchecked")
+    private static void registerWirelessTransferHandler(IRecipeTransferRegistration registration) {
+        if (!ModList.get().isLoaded("ae2wtlib")) return;
+        try {
+            Class<?> menuClass = Class.forName("de.mari_023.ae2wtlib.wet.WETMenu");
+            if (!PatternEncodingTermMenu.class.isAssignableFrom(menuClass)) return;
+            var menuType = (MenuType<PatternEncodingTermMenu>) menuClass.getField("TYPE").get(null);
+            registration.addRecipeTransferHandler(
+                    new OmniversalPatternJeiTransferHandler<>(
+                            (Class<PatternEncodingTermMenu>) menuClass,
+                            menuType,
+                            registration.getTransferHelper()),
+                    AdvancedAlloyFurnaceRecipeCategory.TYPE);
+        } catch (ReflectiveOperationException | ClassCastException exception) {
+            RateLimitedLogger.warn(UselessMod.LOGGER,
+                    "Could not register the omniversal pattern transfer handler for ae2wtlib's wireless "
+                            + "pattern encoding terminal; it will encode plain patterns instead.",
+                    exception);
+        }
     }
 
     @Override
     public void registerRecipeCatalysts(IRecipeCatalystRegistration registration) {
+        ItemStack singleBlockFurnace = new ItemStack(ModBlocks.ADVANCED_ALLOY_FURNACE_BLOCK.get());
+        registration.addRecipeCatalyst(singleBlockFurnace, AdvancedAlloyFurnaceRecipeCategory.TYPE);
         registration.addRecipeCatalyst(
-                new ItemStack(AdvancedAlloyFurnaceBlock.ADVANCED_ALLOY_FURNACE_BLOCK.get()),
-                AdvancedAlloyFurnaceRecipeCategory.TYPE,
-                CatalystInfoCategory.TYPE
-        );
+                new ItemStack(ModBlocks.MULTIBLOCK_ALLOY_FURNACE_CORE.get()),
+                AdvancedAlloyFurnaceRecipeCategory.TYPE);
+        registration.addRecipeCatalyst(singleBlockFurnace, CatalystInfoCategory.TYPE);
+        registration.addRecipeCatalyst(
+                new ItemStack(ModBlocks.MULTIBLOCK_ALLOY_FURNACE_CORE.get()),
+                CatalystInfoCategory.TYPE);
 
-        // 添加各个等级的催化剂作为配方催化剂
-        registration.addRecipeCatalyst(
-                new ItemStack(ModIngots.USELESS_INGOT_TIER_1.get()),
-                CatalystInfoCategory.TYPE
-        );
-        registration.addRecipeCatalyst(
-                new ItemStack(ModIngots.USELESS_INGOT_TIER_2.get()),
-                CatalystInfoCategory.TYPE
-        );
-        registration.addRecipeCatalyst(
-                new ItemStack(ModIngots.USELESS_INGOT_TIER_3.get()),
-                CatalystInfoCategory.TYPE
-        );
-        registration.addRecipeCatalyst(
-                new ItemStack(ModIngots.USELESS_INGOT_TIER_4.get()),
-                CatalystInfoCategory.TYPE
-        );
-        registration.addRecipeCatalyst(
-                new ItemStack(ModIngots.USELESS_INGOT_TIER_5.get()),
-                CatalystInfoCategory.TYPE
-        );
-        registration.addRecipeCatalyst(
-                new ItemStack(ModIngots.USELESS_INGOT_TIER_6.get()),
-                CatalystInfoCategory.TYPE
-        );
-        registration.addRecipeCatalyst(
-                new ItemStack(ModIngots.USELESS_INGOT_TIER_7.get()),
-                CatalystInfoCategory.TYPE
-        );
-        registration.addRecipeCatalyst(
-                new ItemStack(ModIngots.USELESS_INGOT_TIER_8.get()),
-                CatalystInfoCategory.TYPE
-        );
-        registration.addRecipeCatalyst(
-                new ItemStack(ModIngots.USELESS_INGOT_TIER_9.get()),
-                CatalystInfoCategory.TYPE
-        );
+        BuiltInRegistries.ITEM.getTag(ModTags.CATALYSTS).ifPresent(tag -> {
+            for (var holder : tag) {
+                registration.addRecipeCatalyst(new ItemStack(holder.value()), CatalystInfoCategory.TYPE);
+            }
+        });
     }
+
+    @Override
+    public void onRuntimeAvailable(@NotNull IJeiRuntime jeiRuntime) {
+        runtime = jeiRuntime;
+        AEKeyJeiIngredients.setRuntime(jeiRuntime.getIngredientManager());
+        refreshAlloyFurnaceRecipes();
+    }
+
+    @Override
+    public void onRuntimeUnavailable() {
+        runtime = null;
+        AEKeyJeiIngredients.setRuntime(null);
+        registeredAlloyFurnaceRecipes.clear();
+    }
+
+    /** Adds recipes generated after JEI's initial registration, such as data-driven compat data. */
+    public static void refreshAlloyFurnaceRecipes() {
+        // TagsUpdatedEvent is fired on the server thread during /reload, but JEI's recipe manager
+        // must be mutated on the client render thread. Hop back before touching JEI.
+        Minecraft minecraft = Minecraft.getInstance();
+        if (!minecraft.isSameThread()) {
+            minecraft.execute(JEIPlugin::refreshAlloyFurnaceRecipes);
+            return;
+        }
+
+        if (runtime == null) return;
+
+        Level level = minecraft.level;
+        if (level == null || !AlloyFurnaceRecipeCatalog.isReady(level)) return;
+
+        List<AlloyFurnaceRecipeCatalog.Entry> additions = new ArrayList<>();
+        for (AlloyFurnaceRecipeCatalog.Entry recipe : AlloyFurnaceRecipeCatalog.entries(level)) {
+            if (!registeredAlloyFurnaceRecipes.containsKey(recipe.identity())) {
+                registeredAlloyFurnaceRecipes.put(recipe.identity(), recipe);
+                additions.add(recipe);
+            }
+        }
+        if (!additions.isEmpty()) {
+            runtime.getRecipeManager().addRecipes(
+                    AdvancedAlloyFurnaceRecipeCategory.TYPE, additions);
+        }
+    }
+
+    public static IJeiRuntime getRuntime() {
+        return runtime;
+    }
+
+    public static void showAdvancedAlloyFurnaceRecipes() {
+        if (runtime != null) {
+            runtime.getRecipesGui().showTypes(List.of(AdvancedAlloyFurnaceRecipeCategory.TYPE));
+        }
+    }
+
+    public static boolean isAvailable() {
+        return runtime != null;
+    }
+
 }

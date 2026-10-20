@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 搜索已有 issue / Search existing issues
+    url: https://github.com/SorrowMist/UselessMod/issues?q=is%3Aissue
+    about: 提问或报告前请先搜索 open 与 closed 的 issue，避免重复提交。
+  - name: 模组 Wiki / Documentation
+    url: https://github.com/SorrowMist/UselessMod/tree/1.21/wiki
+    about: KubeJS 与数据包 API 的使用文档，提交前请先查阅。

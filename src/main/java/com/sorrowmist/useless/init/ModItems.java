@@ -1,0 +1,304 @@
+package com.sorrowmist.useless.init;
+
+
+import com.sorrowmist.useless.UselessMod;
+import com.sorrowmist.useless.api.enums.RarityExtension;
+import com.sorrowmist.useless.api.enums.tool.ToolTypeMode;
+import com.sorrowmist.useless.content.blockentities.AdvancedAlloyFurnaceBlockEntity;
+import com.sorrowmist.useless.content.blocks.multiblock.UselessCoilBlock;
+import com.sorrowmist.useless.content.items.AE2GiftPackageItem;
+import com.sorrowmist.useless.content.items.AdvancedAlloyFurnaceBlockItem;
+import com.sorrowmist.useless.content.items.EndlessBeafItem;
+import com.sorrowmist.useless.content.items.IngotItem;
+import com.sorrowmist.useless.content.items.MultiblockAlloyFurnaceCoreBlockItem;
+import com.sorrowmist.useless.content.items.OmniversalPatternConverterItem;
+import com.sorrowmist.useless.content.items.RitualBlueprintItem;
+import net.minecraft.world.item.BlockItem;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.Rarity;
+import net.minecraftforge.fml.ModList;
+import com.sorrowmist.useless.compat.forge1201.registry.DeferredItem;
+import com.sorrowmist.useless.compat.forge1201.registry.DeferredRegister;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.function.Supplier;
+
+public final class ModItems {
+    public static final DeferredRegister.Items ITEMS = DeferredRegister.createItems(UselessMod.MODID);
+    // 扳手子类物品注册
+    public static final DeferredItem<EndlessBeafItem> ENDLESS_BEAF_WRENCH = ITEMS.register(
+            "endless_beaf_wrench",
+            () -> new EndlessBeafItem(ToolTypeMode.WRENCH_MODE)
+    );
+    // 螺丝刀子类物品注册
+    public static final DeferredItem<EndlessBeafItem> ENDLESS_BEAF_SCREWDRIVER = ITEMS.register(
+            "endless_beaf_screwdriver",
+            () -> new EndlessBeafItem(ToolTypeMode.SCREWDRIVER_MODE)
+    );
+    // 软锤子类物品注册
+    public static final DeferredItem<EndlessBeafItem> ENDLESS_BEAF_MALLET = ITEMS.register(
+            "endless_beaf_mallet",
+            () -> new EndlessBeafItem(ToolTypeMode.MALLET_MODE)
+    );
+    // 撬棍子类物品注册
+    public static final DeferredItem<EndlessBeafItem> ENDLESS_BEAF_CROWBAR = ITEMS.register(
+            "endless_beaf_crowbar",
+            () -> new EndlessBeafItem(ToolTypeMode.CROWBAR_MODE)
+    );
+    // 硬锤子类物品注册
+    public static final DeferredItem<EndlessBeafItem> ENDLESS_BEAF_HAMMER = ITEMS.register(
+            "endless_beaf_hammer",
+            () -> new EndlessBeafItem(ToolTypeMode.HAMMER_MODE)
+    );
+    public static final DeferredItem<EndlessBeafItem> ENDLESS_BEAF_ITEM = ITEMS.register(
+            "endless_beaf_item",
+            () -> new EndlessBeafItem()
+    );
+    public static final DeferredItem<EndlessBeafItem> ENDLESS_BEAF_ITEM_NO_WRENCH = ITEMS.register(
+            "endless_beaf_item_no_wrench",
+            () -> new EndlessBeafItem(ToolTypeMode.NONE_MODE, false)
+    );
+
+    static final List<DeferredItem<? extends Item>> CREATIVE_MAIN_TAB_ITEMS = new ArrayList<>();
+    public static final DeferredItem<Item> USELESS_INGOT_TIER_1 = registerAndAdd(
+            "useless_ingot_tier_1",
+            () -> new IngotItem(new Item.Properties().rarity(Rarity.COMMON), 1)
+    );
+    public static final DeferredItem<Item> USELESS_INGOT_TIER_2 = registerAndAdd(
+            "useless_ingot_tier_2",
+            () -> new IngotItem(new Item.Properties().rarity(Rarity.COMMON), 2)
+    );
+    public static final DeferredItem<Item> USELESS_INGOT_TIER_3 = registerAndAdd(
+            "useless_ingot_tier_3",
+            () -> new IngotItem(new Item.Properties().rarity(Rarity.UNCOMMON), 3)
+    );
+    public static final DeferredItem<Item> USELESS_INGOT_TIER_4 = registerAndAdd(
+            "useless_ingot_tier_4",
+            () -> new IngotItem(new Item.Properties().rarity(Rarity.UNCOMMON), 4)
+    );
+    public static final DeferredItem<Item> USELESS_INGOT_TIER_5 = registerAndAdd(
+            "useless_ingot_tier_5",
+            () -> new IngotItem(new Item.Properties().rarity(Rarity.RARE), 5)
+    );
+    public static final DeferredItem<Item> USELESS_INGOT_TIER_6 = registerAndAdd(
+            "useless_ingot_tier_6",
+            () -> new IngotItem(new Item.Properties().rarity(Rarity.RARE), 6)
+    );
+    public static final DeferredItem<Item> USELESS_INGOT_TIER_7 = registerAndAdd(
+            "useless_ingot_tier_7",
+            () -> new IngotItem(new Item.Properties().rarity(Rarity.EPIC), 7)
+    );
+    public static final DeferredItem<Item> USELESS_INGOT_TIER_8 = registerAndAdd(
+            "useless_ingot_tier_8",
+            () -> new IngotItem(new Item.Properties().rarity(RarityExtension.MYTHIC.getValue()), 8)
+    );
+    public static final DeferredItem<Item> USELESS_INGOT_TIER_9 = registerAndAdd(
+            "useless_ingot_tier_9",
+            () -> new IngotItem(new Item.Properties().rarity(RarityExtension.LEGENDARY.getValue()), 9)
+    );
+    public static final DeferredItem<Item> POSSIBLE_USEFUL_INGOT = registerAndAdd(
+            "possible_useful_ingot",
+            () -> new Item(new Item.Properties().rarity(RarityExtension.LEGENDARY.getValue()))
+    );
+    public static final DeferredItem<Item> USEFUL_INGOT = registerAndAdd(
+            "useful_ingot",
+            () -> new IngotItem(
+                    new Item.Properties().rarity(RarityExtension.LEGENDARY.getValue()),
+                    AdvancedAlloyFurnaceBlockEntity.USEFUL_INGOT_FURNACE_TIER)
+    );
+    // 金属模具
+    public static final DeferredItem<Item> METAL_MOLD_PLATE = registerAndAdd(
+            "metal_mold_plate",
+            () -> new Item(new Item.Properties())
+    );
+    public static final DeferredItem<Item> METAL_MOLD_ROD = registerAndAdd(
+            "metal_mold_rod",
+            () -> new Item(new Item.Properties())
+    );
+    public static final DeferredItem<Item> METAL_MOLD_GEAR = registerAndAdd(
+            "metal_mold_gear",
+            () -> new Item(new Item.Properties())
+    );
+    public static final DeferredItem<Item> METAL_MOLD_WIRE = registerAndAdd(
+            "metal_mold_wire",
+            () -> new Item(new Item.Properties())
+    );
+    public static final DeferredItem<Item> METAL_MOLD_BLOCK = registerAndAdd(
+            "metal_mold_block",
+            () -> new Item(new Item.Properties())
+    );
+    // 无用锭对应的齿轮物品
+    public static final DeferredItem<Item> USELESS_GEAR_TIER_1 = registerAndAdd(
+            "useless_gear_tier_1",
+            () -> new Item(new Item.Properties().rarity(Rarity.COMMON))
+    );
+    public static final DeferredItem<Item> USELESS_GEAR_TIER_2 = registerAndAdd(
+            "useless_gear_tier_2",
+            () -> new Item(new Item.Properties().rarity(Rarity.COMMON))
+    );
+    public static final DeferredItem<Item> USELESS_GEAR_TIER_3 = registerAndAdd(
+            "useless_gear_tier_3",
+            () -> new Item(new Item.Properties().rarity(Rarity.UNCOMMON))
+    );
+    public static final DeferredItem<Item> USELESS_GEAR_TIER_4 = registerAndAdd(
+            "useless_gear_tier_4",
+            () -> new Item(new Item.Properties().rarity(Rarity.UNCOMMON))
+    );
+    public static final DeferredItem<Item> USELESS_GEAR_TIER_5 = registerAndAdd(
+            "useless_gear_tier_5",
+            () -> new Item(new Item.Properties().rarity(Rarity.RARE))
+    );
+    public static final DeferredItem<Item> USELESS_GEAR_TIER_6 = registerAndAdd(
+            "useless_gear_tier_6",
+            () -> new Item(new Item.Properties().rarity(Rarity.RARE))
+    );
+    public static final DeferredItem<Item> USELESS_GEAR_TIER_7 = registerAndAdd(
+            "useless_gear_tier_7",
+            () -> new Item(new Item.Properties().rarity(Rarity.EPIC))
+    );
+    public static final DeferredItem<Item> USELESS_GEAR_TIER_8 = registerAndAdd(
+            "useless_gear_tier_8",
+            () -> new Item(new Item.Properties().rarity(RarityExtension.MYTHIC.getValue()))
+    );
+    public static final DeferredItem<Item> USELESS_GEAR_TIER_9 = registerAndAdd(
+            "useless_gear_tier_9",
+            () -> new Item(new Item.Properties().rarity(RarityExtension.MYTHIC.getValue()))
+    );
+    // 无用玻璃方块物品
+    public static final DeferredItem<BlockItem> USELESS_GLASS_TIER_1 = registerAndAdd(
+            "useless_glass_tier_1",
+            () -> new BlockItem(ModBlocks.USELESS_GLASS_TIER_1.get(), new Item.Properties().rarity(Rarity.COMMON))
+    );
+    public static final DeferredItem<BlockItem> USELESS_GLASS_TIER_2 = registerAndAdd(
+            "useless_glass_tier_2",
+            () -> new BlockItem(ModBlocks.USELESS_GLASS_TIER_2.get(), new Item.Properties().rarity(Rarity.COMMON))
+    );
+    public static final DeferredItem<BlockItem> USELESS_GLASS_TIER_3 = registerAndAdd(
+            "useless_glass_tier_3",
+            () -> new BlockItem(ModBlocks.USELESS_GLASS_TIER_3.get(), new Item.Properties().rarity(Rarity.UNCOMMON))
+    );
+    public static final DeferredItem<BlockItem> USELESS_GLASS_TIER_4 = registerAndAdd(
+            "useless_glass_tier_4",
+            () -> new BlockItem(ModBlocks.USELESS_GLASS_TIER_4.get(), new Item.Properties().rarity(Rarity.UNCOMMON))
+    );
+    public static final DeferredItem<BlockItem> USELESS_GLASS_TIER_5 = registerAndAdd(
+            "useless_glass_tier_5",
+            () -> new BlockItem(ModBlocks.USELESS_GLASS_TIER_5.get(), new Item.Properties().rarity(Rarity.RARE))
+    );
+    public static final DeferredItem<BlockItem> USELESS_GLASS_TIER_6 = registerAndAdd(
+            "useless_glass_tier_6",
+            () -> new BlockItem(ModBlocks.USELESS_GLASS_TIER_6.get(), new Item.Properties().rarity(Rarity.RARE))
+    );
+    public static final DeferredItem<BlockItem> USELESS_GLASS_TIER_7 = registerAndAdd(
+            "useless_glass_tier_7",
+            () -> new BlockItem(ModBlocks.USELESS_GLASS_TIER_7.get(), new Item.Properties().rarity(Rarity.EPIC))
+    );
+    public static final DeferredItem<BlockItem> USELESS_GLASS_TIER_8 = registerAndAdd(
+            "useless_glass_tier_8",
+            () -> new BlockItem(ModBlocks.USELESS_GLASS_TIER_8.get(), new Item.Properties().rarity(RarityExtension.MYTHIC.getValue()))
+    );
+    public static final DeferredItem<BlockItem> USELESS_GLASS_TIER_9 = registerAndAdd(
+            "useless_glass_tier_9",
+            () -> new BlockItem(ModBlocks.USELESS_GLASS_TIER_9.get(), new Item.Properties().rarity(RarityExtension.LEGENDARY.getValue()))
+    );
+    static final DeferredItem<BlockItem> TELEPORT_BLOCK_ITEM = registerAndAdd(
+            "teleport_block",
+            () -> new BlockItem(ModBlocks.TELEPORT_BLOCK.get(), new Item.Properties())
+    );
+    static final DeferredItem<BlockItem> TELEPORT_BLOCK_ITEM_2 = registerAndAdd(
+            "teleport_block_2",
+            () -> new BlockItem(ModBlocks.TELEPORT_BLOCK_2.get(), new Item.Properties())
+    );
+    static final DeferredItem<BlockItem> TELEPORT_BLOCK_ITEM_3 = registerAndAdd(
+            "teleport_block_3",
+            () -> new BlockItem(ModBlocks.TELEPORT_BLOCK_3.get(), new Item.Properties())
+    );
+    // 温度调节器方块物品
+    public static final DeferredItem<BlockItem> TEMPERATURE_REGULATOR = registerAndAdd(
+            "temperature_regulator",
+            () -> new BlockItem(ModBlocks.TEMPERATURE_REGULATOR.get(), new Item.Properties())
+    );
+    static final DeferredItem<BlockItem> ORE_GENERATOR_BLOCK = registerAndAdd(
+            "ore_generator_block",
+            () -> new BlockItem(ModBlocks.ORE_GENERATOR_BLOCK.get(), new Item.Properties())
+    );
+    static final DeferredItem<BlockItem> ADVANCED_ALLOY_FURNACE_BLOCK = registerAndAdd(
+            "advanced_alloy_furnace_block",
+            () -> new AdvancedAlloyFurnaceBlockItem(ModBlocks.ADVANCED_ALLOY_FURNACE_BLOCK.get(), new Item.Properties().stacksTo(1))
+    );
+    public static final DeferredItem<BlockItem> SUPERVISOR = registerAndAdd(
+            "supervisor",
+            () -> new BlockItem(ModBlocks.SUPERVISOR.get(), new Item.Properties())
+    );
+    public static final DeferredItem<BlockItem> MULTIBLOCK_ALLOY_FURNACE_CORE = registerAndAdd(
+            "multiblock_alloy_furnace_core",
+            () -> new MultiblockAlloyFurnaceCoreBlockItem(
+                    ModBlocks.MULTIBLOCK_ALLOY_FURNACE_CORE.get(), new Item.Properties()));
+    public static final DeferredItem<BlockItem> ME_PATTERN_ASSEMBLY = registerAndAdd(
+            "me_pattern_assembly",
+            () -> new BlockItem(ModBlocks.ME_PATTERN_ASSEMBLY.get(), new Item.Properties().stacksTo(1)));
+    public static final DeferredItem<BlockItem> OMNIVERSAL_MOLD_HUB = registerAndAdd(
+            "omniversal_mold_hub",
+            () -> new BlockItem(ModBlocks.OMNIVERSAL_MOLD_HUB.get(), new Item.Properties().stacksTo(1)));
+    public static final DeferredItem<BlockItem> PASSIVE_CRAFTING_HATCH = registerAndAdd(
+            "passive_crafting_hatch",
+            () -> new BlockItem(ModBlocks.PASSIVE_CRAFTING_HATCH.get(), new Item.Properties().stacksTo(1)));
+    public static final DeferredItem<BlockItem> OMNIVERSAL_FURNACE_CASING = registerAndAdd(
+            "omniversal_furnace_casing",
+            () -> new BlockItem(ModBlocks.OMNIVERSAL_FURNACE_CASING.get(), new Item.Properties()));
+    public static final List<DeferredItem<BlockItem>> USELESS_COILS = new ArrayList<>();
+    public static final DeferredItem<Item> OMNIVERSAL_PATTERN = registerAndAdd(
+            "omniversal_pattern",
+            () -> new com.sorrowmist.useless.content.items.OmniversalPatternItem());
+    public static final DeferredItem<OmniversalPatternConverterItem> OMNIVERSAL_PATTERN_CONVERTER = registerAndAdd(
+            "omniversal_pattern_converter",
+            () -> new OmniversalPatternConverterItem());
+    static {
+        for (int tier = UselessCoilBlock.MIN_TIER; tier <= UselessCoilBlock.MAX_TIER; tier++) {
+            int capturedTier = tier;
+            USELESS_COILS.add(registerAndAdd(UselessCoilBlock.registryName(tier),
+                    () -> new BlockItem(ModBlocks.USELESS_COILS.get(capturedTier).get(), new Item.Properties())));
+        }
+    }
+
+    public static final DeferredItem<AE2GiftPackageItem> AE2_GIFT_PACKAGE;
+    public static final DeferredItem<Item> RITUAL_BLUEPRINT;
+
+    static {
+        if (ModList.get().isLoaded("ae2")) {
+            AE2_GIFT_PACKAGE = ITEMS.register(
+                    "ae2_gift_package",
+                    () -> new AE2GiftPackageItem(new Item.Properties().rarity(Rarity.EPIC).stacksTo(64))
+            );
+            CREATIVE_MAIN_TAB_ITEMS.add(AE2_GIFT_PACKAGE);
+        } else {
+            AE2_GIFT_PACKAGE = null;
+        }
+
+        if (ModList.get().isLoaded("occultism")) {
+            RITUAL_BLUEPRINT = ITEMS.register(
+                    "ritual_blueprint",
+                    OccultismItems::createRitualBlueprint
+            );
+            CREATIVE_MAIN_TAB_ITEMS.add(RITUAL_BLUEPRINT);
+        } else {
+            RITUAL_BLUEPRINT = null;
+        }
+    }
+
+    private ModItems() {}
+
+    /** Keeps the optional Occultism-backed item class out of ModItems' eager linkage. */
+    private static final class OccultismItems {
+        private static Item createRitualBlueprint() {
+            return new RitualBlueprintItem(new Item.Properties().stacksTo(1));
+        }
+    }
+
+    private static <T extends Item> DeferredItem<T> registerAndAdd(String name, Supplier<T> supplier) {
+        DeferredItem<T> deferred = ITEMS.register(name, supplier);
+        CREATIVE_MAIN_TAB_ITEMS.add(deferred);
+        return deferred;
+    }
+}

@@ -1,0 +1,108 @@
+// Compatibility regression tests for the Forge 1.20.1 bridges.
+// This source set is deliberately NOT packaged in the release jar.
+sourceSets {
+    portBridge {
+        java.srcDir 'src/main/java'
+        java.include 'com/sorrowmist/useless/compat/forge1201/**'
+        java.include 'com/sorrowmist/useless/utils/RateLimitedLogger.java'
+        java.include 'com/sorrowmist/useless/compat/kubejs/AdvancedAlloyFurnaceRecipeSchema.java'
+        java.include 'com/sorrowmist/useless/compat/kubejs/GenericStackRecipeComponent.java'
+        java.include 'com/sorrowmist/useless/compat/kubejs/NativeRecipeComponent.java'
+        java.include 'com/sorrowmist/useless/content/recipe/adapters/exdeorum/**'
+        java.include 'com/sorrowmist/useless/content/recipe/adapters/botanypots/**'
+        java.include 'com/sorrowmist/useless/compat/jei/GenericStackJeiIngredientProvider*.java'
+        java.include 'com/sorrowmist/useless/compat/jei/AEKeyJeiIngredients.java'
+        java.include 'com/sorrowmist/useless/compat/jei/WrappedKeyGuiHandler.java'
+        java.include 'com/sorrowmist/useless/compat/appmek/AppMekJeiChemicalCompat.java'
+        java.include 'com/sorrowmist/useless/client/gui/PressableAE2Button.java'
+        java.include 'com/sorrowmist/useless/energy/IEnergyManager.java'
+        java.include 'com/sorrowmist/useless/energy/EnergyManager.java'
+        java.include 'com/sorrowmist/useless/init/ModTags.java'
+        java.include 'com/sorrowmist/useless/world/inventory/ExternalInventorySavedData.java'
+        java.include 'com/sorrowmist/useless/world/ae/AeConnectLinkSavedData.java'
+        java.include 'com/sorrowmist/useless/core/component/**'
+        java.include 'com/sorrowmist/useless/api/enums/tool/**'
+        java.include 'com/sorrowmist/useless/content/recipe/AdapterUtils.java'
+        java.include 'com/sorrowmist/useless/content/recipe/ExpectedOutputScaler.java'
+        java.include 'com/sorrowmist/useless/content/recipe/adapters/create/**'
+        java.include 'com/sorrowmist/useless/content/machines/advanced_alloy_furnace/chemical/ChemicalStackView.java'
+        java.include 'com/sorrowmist/useless/content/machines/advanced_alloy_furnace/chemical/FurnaceChemicalStorage.java'
+        java.include 'com/sorrowmist/useless/compat/mekanism/MekanismChemicalStackView.java'
+        java.include 'com/sorrowmist/useless/compat/mekanism/MekanismChemicalStorage.java'
+        java.include 'com/sorrowmist/useless/content/recipe/adapters/mekanism/**'
+        java.exclude 'com/sorrowmist/useless/content/recipe/adapters/mekanism/RecyclerRecipeAdapter.java'
+        java.exclude 'com/sorrowmist/useless/content/recipe/adapters/mekanism/mekanismmoremachine/**'
+        java.include 'com/sorrowmist/useless/content/machines/advanced_alloy_furnace/chemical/ChemicalKeyProvider*.java'
+        java.include 'com/sorrowmist/useless/compat/mekanism/NativeFurnaceChemicalHandlers.java'
+        java.include 'com/sorrowmist/useless/content/machines/advanced_alloy_furnace/io/FurnaceFaceAccessor.java'
+        java.include 'com/sorrowmist/useless/api/enums/FurnaceFace*.java'
+        java.include 'com/sorrowmist/useless/content/recipe/adapters/ae/extendedae/**'
+        java.exclude 'com/sorrowmist/useless/content/recipe/adapters/ae/extendedae/CrystalAssemblerRecipeAdapter.java'
+        java.include 'com/sorrowmist/useless/content/recipe/adapters/ae/advancedae/**'
+        java.include 'com/sorrowmist/useless/content/recipe/RecipeSourceIds.java'
+        java.include 'com/sorrowmist/useless/content/recipe/AlloyFurnaceRecipeIdentity.java'
+        java.include 'com/sorrowmist/useless/content/recipe/adapters/minecraft/BrewingSyntheticRecipe.java'
+        java.include 'com/sorrowmist/useless/content/recipe/adapters/minecraft/BrewingRecipeAdapter.java'
+        java.include 'com/sorrowmist/useless/api/recipe/IRecipeAdapter.java'
+        java.include 'com/sorrowmist/useless/content/recipe/IRecipeAdapter.java'
+        java.include 'com/sorrowmist/useless/content/blockentities/HighStackItemStackHandler.java'
+        java.include 'com/sorrowmist/useless/api/enums/AlloyFurnaceMode.java'
+        java.include 'com/sorrowmist/useless/content/recipe/AdvancedAlloyFurnaceRecipe.java'
+        java.include 'com/sorrowmist/useless/content/recipe/AdvancedAlloyFurnaceRecipeSerializer.java'
+        java.include 'com/sorrowmist/useless/content/recipe/AdvancedAlloyFurnaceRecipeBuilder.java'
+        java.include 'com/sorrowmist/useless/content/recipe/CountedIngredient.java'
+        java.include 'com/sorrowmist/useless/content/recipe/LongSizedFluidIngredient.java'
+        java.include 'com/sorrowmist/useless/content/recipe/FluidIngredientAllocator.java'
+        java.include 'com/sorrowmist/useless/content/recipe/ItemIngredientAllocator.java'
+        java.include 'com/sorrowmist/useless/content/recipe/AlloyFurnaceRecipeFingerprint.java'
+        java.include 'com/sorrowmist/useless/content/recipe/adapters/extendedcrafting/**'
+        java.include 'com/sorrowmist/useless/content/recipe/adapters/enderio/NativeFireLootResults.java'
+        java.include 'com/sorrowmist/useless/content/recipe/adapters/industrialforegoing/DissolutionChamberRecipeAdapter.java'
+        java.include 'com/sorrowmist/useless/content/recipe/adapters/summoningrituals/SummoningRitualsAltarRecipeAdapter.java'
+        java.include 'com/sorrowmist/useless/content/recipe/adapters/enderio/EnderIOAdapterUtils.java'
+        java.include 'com/sorrowmist/useless/content/recipe/adapters/enderio/AlloySmeltingRecipeAdapter.java'
+        java.include 'com/sorrowmist/useless/content/recipe/adapters/enderio/SlicingRecipeAdapter.java'
+        java.include 'com/sorrowmist/useless/content/recipe/adapters/enderio/SagMillingRecipeAdapter.java'
+        java.include 'com/sorrowmist/useless/content/recipe/adapters/enderio/EnchanterRecipeAdapter.java'
+        java.include 'com/sorrowmist/useless/content/recipe/adapters/enderio/SoulVialSetIngredient.java'
+        java.include 'com/sorrowmist/useless/content/machines/advanced_alloy_furnace/ae/PatternStackView.java'
+        java.include 'com/sorrowmist/useless/content/machines/advanced_alloy_furnace/ae/DynamicComponentPattern.java'
+        java.include 'com/sorrowmist/useless/content/machines/advanced_alloy_furnace/ae/DynamicComponentPatternDetails.java'
+        java.include 'com/sorrowmist/useless/content/recipe/adapters/enderio/SoulBindingRecipeAdapter.java'
+        java.include 'com/sorrowmist/useless/content/recipe/adapters/enderio/TankRecipeAdapter.java'
+        java.include 'com/sorrowmist/useless/content/recipe/adapters/enderio/SoulVialRecipeAdapter.java'
+        java.include 'com/sorrowmist/useless/content/recipe/adapters/apotheosis/ApotheosisGemIngredient.java'
+        java.include 'com/sorrowmist/useless/content/recipe/adapters/hostilenetworks/DataModelRangeIngredient.java'
+        java.include 'com/sorrowmist/useless/content/recipe/adapters/hostilenetworks/HostileNetworksRecipeAdapter.java'
+        java.include 'com/sorrowmist/useless/content/recipe/adapters/hostilenetworks/HostileNetworksSyntheticRecipe.java'
+
+        compileClasspath += sourceSets.main.compileClasspath
+        runtimeClasspath += sourceSets.main.compileClasspath
+    }
+    portBridgeTest {
+        java.srcDir 'src/portBridgeTest/java'
+        compileClasspath += sourceSets.portBridge.output + sourceSets.portBridge.compileClasspath
+        runtimeClasspath += sourceSets.portBridge.output + sourceSets.portBridge.runtimeClasspath
+    }
+}
+configurations {
+    portBridgeTestImplementation.extendsFrom testImplementation
+    portBridgeTestRuntimeOnly.extendsFrom testRuntimeOnly
+}
+tasks.named('check') { dependsOn 'portBridgeTest' }
+
+tasks.register('portBridgeTest', Test) {
+    testClassesDirs = sourceSets.portBridgeTest.output.classesDirs
+    classpath = sourceSets.portBridgeTest.runtimeClasspath
+    useJUnitPlatform()
+    maxHeapSize = '1G'
+}
+
+// ModDev's test logging adapter requires SLF4J 2; this does not affect runtime dependencies.
+dependencies { portBridgeTestRuntimeOnly 'org.slf4j:slf4j-api:2.0.9' }
+tasks.named('portBridgeTest', Test) { classpath = classpath.filter { !it.name.startsWith('slf4j-api-1.') } }
+
+// Native bootstrap needs actual Minecraft resources; this jar is never packaged with the mods.
+tasks.named('portBridgeTest', Test) {
+    classpath += files(layout.buildDirectory.file("moddev/artifacts/client-extra-${minecraft_version}-${forge_version}.jar"))
+}

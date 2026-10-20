@@ -1,0 +1,52 @@
+{
+  "parent": "minecraft:block/block",
+  "textures": {
+    "particle": "useless_mod:block/useless_compact_c9_front",
+    "front": "useless_mod:block/useless_compact_c9_front",
+    "back": "useless_mod:block/useless_compact_c9_back",
+    "left": "useless_mod:block/useless_compact_c9_left",
+    "right": "useless_mod:block/useless_compact_c9_right",
+    "top": "useless_mod:block/useless_compact_c9_top"
+  },
+  "elements": [
+    {
+      "from": [
+        0,
+        0,
+        0
+      ],
+      "to": [
+        16,
+        16,
+        16
+      ],
+      "faces": {
+        "north": {
+          "texture": "#front",
+          "cullface": "north"
+        },
+        "south": {
+          "texture": "#back",
+          "cullface": "south"
+        },
+        "east": {
+          "texture": "#left",
+          "cullface": "east"
+        },
+        "west": {
+          "texture": "#right",
+          "cullface": "west"
+        },
+        "up": {
+          "texture": "#top",
+          "cullface": "up",
+          "rotation": 180
+        },
+        "down": {
+          "texture": "#top",
+          "cullface": "down"
+        }
+      }
+    }
+  ]
+}

@@ -36,7 +36,6 @@ import com.sorrowmist.useless.compat.neoecoae.compact.shadow.ShadowCraftingWorke
 import com.sorrowmist.useless.compat.neoecoae.compact.shadow.ShadowFluidInputHatchBlockEntity;
 import com.sorrowmist.useless.compat.neoecoae.compact.shadow.ShadowFluidOutputHatchBlockEntity;
 import com.sorrowmist.useless.compat.neoecoae.compact.shadow.ShadowNodeLink;
-import com.sorrowmist.useless.compat.neoecoae.compact.ui.CompactSingleBlockUI;
 import com.sorrowmist.useless.core.component.ExternalInventoryKind;
 import com.sorrowmist.useless.core.component.ExternalInventoryReference;
 import com.sorrowmist.useless.world.inventory.ExternalInventoryStore;
@@ -756,11 +755,8 @@ public class CompactF9BlockEntity extends ECOCraftingSystemBlockEntity
     @Override
     public ModularUI createUI(BlockUIMenuType.BlockUIHolder holder) {
         ModularUI interfaceUI = compactInterface.createUI(holder);
-        return interfaceUI == null ? CompactSingleBlockUI.create(holder.player,
-                net.minecraft.network.chat.Component.translatable("gui.useless_mod.compact.f9.title"),
-                net.minecraft.network.chat.Component.translatable("gui.useless_mod.compact.f9.overview"),
-                net.minecraft.network.chat.Component.translatable("gui.useless_mod.compact.f9.interaction"))
-                : interfaceUI;
+        // 普通右键沿用 ECO F9 主机面板；只有潜行右键才切到影子通讯接口页面。
+        return interfaceUI == null ? super.createUI(holder) : interfaceUI;
     }
 
     @Override

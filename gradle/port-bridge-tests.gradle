@@ -46,6 +46,8 @@ sourceSets {
         java.include 'com/sorrowmist/useless/api/recipe/IRecipeAdapter.java'
         java.include 'com/sorrowmist/useless/content/recipe/IRecipeAdapter.java'
         java.include 'com/sorrowmist/useless/content/blockentities/HighStackItemStackHandler.java'
+        java.include 'com/sorrowmist/useless/content/blockentities/RecoverableItemStackHandler.java'
+        java.include 'com/sorrowmist/useless/content/blockentities/OreGeneratorSampleHandler.java'
         java.include 'com/sorrowmist/useless/api/enums/AlloyFurnaceMode.java'
         java.include 'com/sorrowmist/useless/content/recipe/AdvancedAlloyFurnaceRecipe.java'
         java.include 'com/sorrowmist/useless/content/recipe/AdvancedAlloyFurnaceRecipeSerializer.java'
@@ -96,6 +98,10 @@ tasks.register('portBridgeTest', Test) {
     classpath = sourceSets.portBridgeTest.runtimeClasspath
     useJUnitPlatform()
     maxHeapSize = '1G'
+    inputs.file 'src/main/resources/META-INF/mods.toml'
+    doFirst {
+        systemProperty 'uselessMod.compileClasspath', sourceSets.main.compileClasspath.asPath
+    }
 }
 
 // ModDev's test logging adapter requires SLF4J 2; this does not affect runtime dependencies.

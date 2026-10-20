@@ -6,8 +6,6 @@ import appeng.api.stacks.AEKey;
 import appeng.api.stacks.KeyCounter;
 import cn.dancingsnow.neoecoae.api.ECOPatternInsertionResult;
 import cn.dancingsnow.neoecoae.api.IECOPatternStorage;
-import cn.dancingsnow.neoecoae.api.me.provider.ECOBatchDispatchContext;
-import cn.dancingsnow.neoecoae.api.me.provider.ECOFastPathDispatchProvider;
 import cn.dancingsnow.neoecoae.blocks.entity.crafting.ECOCraftingPatternBusBlockEntity;
 import net.minecraft.world.item.ItemStack;
 
@@ -22,8 +20,7 @@ import java.util.Set;
  * <p>AE2 与 ECO 的网格每个服务类只认一个实例，而紧凑 F9 内部有 176 条真实样板总线；
  * 这个聚合器把它们的样板集合、派单与插入接口按 ECO 原生实现逐条转发，不做任何自己的样板逻辑。</p>
  */
-public final class CompactPatternProvider implements ICraftingProvider, IECOPatternStorage,
-        ECOFastPathDispatchProvider {
+public final class CompactPatternProvider implements ICraftingProvider, IECOPatternStorage {
 
     private final List<ECOCraftingPatternBusBlockEntity> buses = new ArrayList<>();
 
@@ -84,35 +81,15 @@ public final class CompactPatternProvider implements ICraftingProvider, IECOPatt
         return union;
     }
 
-    /**
-     * 保留 ECO 样板总线的原生批量/虚拟批次派单；普通 ICraftingProvider 转发不会进入这条路径。
-     */
     @Override
-    public Preparation eco$prepareFastPath(ECOBatchDispatchContext context) {
-        Preparation best = null;
-        for (ECOCraftingPatternBusBlockEntity bus : buses) {
-            Preparation candidate = bus.eco$prepareFastPath(context);
-            if (candidate != null && (best == null || candidate.capacity() > best.capacity())) {
-                best = candidate;
-            }
-        }
-        return best;
-    }
-
-    @Override
-    public boolean insertPattern(ItemStack itemStack) {
-        return insertPatternWithResult(itemStack) == ECOPatternInsertionResult.INSERTED;
-    }
-
-    @Override
-    public ECOPatternInsertionResult insertPatternWithResult(ItemStack itemStack) {
+    public ECOPatternInsertionResult insertPattern(ItemStack itemStack) {
         if (itemStack.isEmpty() || buses.isEmpty()) {
             return ECOPatternInsertionResult.NO_TARGET;
         }
-        // 只解码一次，再交给各总线的「已知唯一」快路径，避免每条总线都重扫整个逻辑域。
+        // ECO 20.4.x exposes insertion as a result-returning operation on each native bus.
         ECOPatternInsertionResult last = ECOPatternInsertionResult.NO_TARGET;
         for (ECOCraftingPatternBusBlockEntity bus : buses) {
-            ECOPatternInsertionResult result = bus.insertPatternWithResult(itemStack);
+            ECOPatternInsertionResult result = bus.insertPattern(itemStack);
             if (result == ECOPatternInsertionResult.INSERTED) {
                 return result;
             }
@@ -121,8 +98,4 @@ public final class CompactPatternProvider implements ICraftingProvider, IECOPatt
         return last;
     }
 
-    @Override
-    public boolean checksLogicalDomainForDuplicates() {
-        return false;
-    }
 }

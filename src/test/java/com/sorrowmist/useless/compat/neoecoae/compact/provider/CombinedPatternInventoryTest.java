@@ -1,11 +1,11 @@
 package com.sorrowmist.useless.compat.neoecoae.compact.provider;
 
 import appeng.api.inventories.InternalInventory;
-import appeng.util.inv.AppEngInternalInventory;
 import cn.dancingsnow.neoecoae.blocks.entity.crafting.ECOCraftingPatternBusBlockEntity;
 import com.sorrowmist.useless.InventoryTestBootstrap;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
+import net.minecraftforge.items.ItemStackHandler;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
@@ -21,24 +21,17 @@ class CombinedPatternInventoryTest {
     }
 
     @Test
-    void managementReadsPhysicalSlotsEvenWhenTheTerminalHidesThem() {
-        var bus = mock(ECOCraftingPatternBusBlockEntity.class);
-        var raw = new AppEngInternalInventory(null, 2, 1);
+    void managementReadsAndWritesThePhysicalPatternSlots() throws ReflectiveOperationException {
+        var bus = createBus();
         ItemStack disk = new ItemStack(Items.PAPER);
-        raw.setItemDirect(0, disk);
-        var terminal = mock(InternalInventory.class);
-        when(terminal.getStackInSlot(0)).thenReturn(ItemStack.EMPTY);
-        when(bus.getPatternSlotCount()).thenReturn(2);
-        when(bus.getPatternSlotInventory()).thenReturn(raw);
-        when(bus.getTerminalPatternInventory()).thenReturn(terminal);
+        bus.itemHandler.setStackInSlot(0, disk);
         var combined = new CombinedPatternInventory();
         combined.bind(List.of(bus));
 
-        assertSame(disk, combined.getStackInSlot(0));
+        assertTrue(ItemStack.isSameItemSameTags(disk, combined.getStackInSlot(0)));
         assertEquals(1, combined.getSlotLimit(0));
         combined.setItemDirect(1, disk);
-        verify(bus).setPatternDirect(1, disk);
-        verifyNoInteractions(terminal);
+        assertTrue(ItemStack.isSameItemSameTags(disk, combined.getStackInSlot(1)));
     }
 
     @Test
@@ -70,14 +63,25 @@ class CombinedPatternInventoryTest {
         assertSame(pattern, terminal.insertItem(2, pattern, false));
         terminal.setItemDirect(3, pattern);
         verify(secondView).setItemDirect(0, pattern);
-        verify(first, never()).setPatternDirect(anyInt(), any());
-        verify(second, never()).setPatternDirect(anyInt(), any());
-
         // A real bus gaining pages must not shift the open menu's already published slot IDs.
         when(first.getPatternSlotCount()).thenReturn(4);
         assertEquals(6, combined.size());
         assertEquals(5, terminal.size());
         terminal.setItemDirect(3, ItemStack.EMPTY);
         verify(secondView).setItemDirect(0, ItemStack.EMPTY);
+    }
+
+    private static ECOCraftingPatternBusBlockEntity createBus() throws ReflectiveOperationException {
+        var bus = mock(ECOCraftingPatternBusBlockEntity.class);
+        var field = ECOCraftingPatternBusBlockEntity.class.getField("itemHandler");
+        field.setAccessible(true);
+        field.set(bus, new ItemStackHandler(4) {
+            @Override
+            public int getSlotLimit(int slot) {
+                return 1;
+            }
+        });
+        when(bus.getPatternSlotCount()).thenReturn(3);
+        return bus;
     }
 }

@@ -5,13 +5,11 @@ import appeng.api.implementations.blockentities.PatternContainerGroup;
 import appeng.api.inventories.InternalInventory;
 import appeng.api.networking.IGrid;
 import appeng.api.networking.IGridNode;
-import appeng.api.networking.IGridNodeListener;
 import appeng.api.networking.IManagedGridNode;
 import appeng.api.networking.crafting.ICraftingProvider;
 import appeng.api.orientation.BlockOrientation;
 import appeng.api.stacks.AEItemKey;
 import cn.dancingsnow.neoecoae.api.ECOPatternInsertionResult;
-import cn.dancingsnow.neoecoae.api.ECOPreparedPattern;
 import cn.dancingsnow.neoecoae.blocks.entity.ECOMachineInterfaceBlockEntity;
 import cn.dancingsnow.neoecoae.blocks.entity.crafting.ECOCraftingPatternBusBlockEntity;
 import cn.dancingsnow.neoecoae.multiblock.cluster.NECraftingCluster;
@@ -51,7 +49,6 @@ public class ExposedPatternBusBlockEntity extends ECOCraftingPatternBusBlockEnti
     private final List<ECOCraftingPatternBusBlockEntity> buses = new ArrayList<>();
     private int[] busRevisions = new int[0];
     private int[] busSlotCounts = new int[0];
-    private long[] busAuxiliaryRevisions = new long[0];
     @Nullable
     private InternalInventory combinedTerminalInventory;
     @Nullable
@@ -78,11 +75,9 @@ public class ExposedPatternBusBlockEntity extends ECOCraftingPatternBusBlockEnti
         mergedPatternInventory.bind(buses);
         busRevisions = new int[buses.size()];
         busSlotCounts = new int[buses.size()];
-        busAuxiliaryRevisions = new long[buses.size()];
         for (int index = 0; index < buses.size(); index++) {
-            busRevisions[index] = buses.get(index).getPatternContentRevision();
+            busRevisions[index] = patternContentRevision(buses.get(index));
             busSlotCounts[index] = buses.get(index).getPatternSlotCount();
-            busAuxiliaryRevisions[index] = buses.get(index).getAuxiliaryRevision();
         }
         combinedTerminalInventory = null;
         this.hostNode = hostNode;
@@ -96,20 +91,6 @@ public class ExposedPatternBusBlockEntity extends ECOCraftingPatternBusBlockEnti
 
     @Override
     public void onReady() {
-    }
-
-    @Override
-    public void onMainNodeStateChanged(IGridNodeListener.State reason) {
-        if (reason != IGridNodeListener.State.POWER && reason != IGridNodeListener.State.GRID_BOOT) {
-            return;
-        }
-        IGrid grid = getMainNode().getGrid();
-        if (grid == null) {
-            return;
-        }
-        for (ECOMachineInterfaceBlockEntity<?> machineInterface : grid.getActiveMachines(ECOMachineInterfaceBlockEntity.class)) {
-            machineInterface.onPatternBusTopologyChanged(this);
-        }
     }
 
     @Override
@@ -130,40 +111,23 @@ public class ExposedPatternBusBlockEntity extends ECOCraftingPatternBusBlockEnti
      * 所以这里用轮询兜底，任何一条写入都不会漏掉。</p>
      */
     public void tick() {
-        List<ECOCraftingPatternBusBlockEntity> changedBuses = new ArrayList<>();
-        boolean layoutChanged = false;
+        boolean changed = false;
         for (int index = 0; index < buses.size(); index++) {
             ECOCraftingPatternBusBlockEntity bus = buses.get(index);
-            bus.flushScheduledPatternDetails();
-            int revision = bus.getPatternContentRevision();
-            long auxiliaryRevision = bus.getAuxiliaryRevision();
+            int revision = patternContentRevision(bus);
             int slotCount = bus.getPatternSlotCount();
             boolean resized = busSlotCounts[index] != slotCount;
-            if (busRevisions[index] == revision && busAuxiliaryRevisions[index] == auxiliaryRevision && !resized) {
+            if (busRevisions[index] == revision && !resized) {
                 continue;
             }
             busRevisions[index] = revision;
-            busAuxiliaryRevisions[index] = auxiliaryRevision;
             busSlotCounts[index] = slotCount;
-            layoutChanged |= resized;
-            changedBuses.add(bus);
+            changed = true;
         }
-        if (!changedBuses.isEmpty()) {
+        if (changed) {
             combinedTerminalInventory = null;
-            if (layoutChanged) {
-                IGrid grid = getGrid();
-                if (grid != null) {
-                    // 一条总线的页数变化会移动后面所有槽位，即使总槽数刚好没有变化。
-                    for (ECOMachineInterfaceBlockEntity<?> machineInterface
-                            : grid.getActiveMachines(ECOMachineInterfaceBlockEntity.class)) {
-                        machineInterface.onPatternBusInventoryChanged(this);
-                    }
-                }
-            } else {
-                changedBuses.forEach(this::notifyInterfacesOf);
-            }
             // 派单由宿主节点上的样板提供者负责，样板集一变就要让它重读合并结果。
-            if (hostNode != null) {
+            if (hostNode != null && hostNode.getGrid() != null) {
                 ICraftingProvider.requestUpdate(hostNode);
             }
         }
@@ -195,52 +159,18 @@ public class ExposedPatternBusBlockEntity extends ECOCraftingPatternBusBlockEnti
         return new PatternContainerGroup(AEItemKey.of(block.asItem()), block.getName(), List.of());
     }
 
-    @Override
     public void setPatternDirect(int slot, ItemStack stack) {
         mergedPatternInventory.setItemDirect(slot, stack);
-    }
-
-    @Override
-    public void beginPatternBatch() {
-        for (ECOCraftingPatternBusBlockEntity bus : buses) {
-            bus.beginPatternBatch();
-        }
-    }
-
-    @Override
-    public void endPatternBatch() {
-        for (ECOCraftingPatternBusBlockEntity bus : buses) {
-            bus.endPatternBatch();
-        }
     }
 
     // ---------------------------------------------------------------- 样板写入
 
     @Override
-    public boolean insertPattern(ItemStack itemStack) {
-        return insertPatternWithResult(itemStack) == ECOPatternInsertionResult.INSERTED;
-    }
-
-    @Override
-    public ECOPatternInsertionResult insertPatternWithResult(ItemStack itemStack) {
-        ECOPreparedPattern prepared = preparePattern(itemStack);
-        return prepared == null ? ECOPatternInsertionResult.INCOMPATIBLE : insertPreparedPattern(prepared);
-    }
-
-    @Override
-    public ECOPatternInsertionResult insertPatternKnownUnique(ItemStack itemStack) {
-        ECOPreparedPattern prepared = preparePattern(itemStack);
-        return prepared == null ? ECOPatternInsertionResult.INCOMPATIBLE : insertPreparedPatternKnownUnique(prepared);
-    }
-
-    @Override
-    public ECOPatternInsertionResult insertPreparedPattern(ECOPreparedPattern prepared) {
-        return insertIntoBuses(bus -> bus.insertPreparedPattern(prepared));
-    }
-
-    @Override
-    public ECOPatternInsertionResult insertPreparedPatternKnownUnique(ECOPreparedPattern prepared) {
-        return insertIntoBuses(bus -> bus.insertPreparedPatternKnownUnique(prepared));
+    public ECOPatternInsertionResult insertPattern(ItemStack itemStack) {
+        if (itemStack.isEmpty()) {
+            return ECOPatternInsertionResult.INCOMPATIBLE;
+        }
+        return insertIntoBuses(bus -> bus.insertPattern(itemStack));
     }
 
     /** 紧凑机的样板仍然存在真实总线里，所以这里只是把插入转给第一条腾得出位置的总线。 */
@@ -257,12 +187,6 @@ public class ExposedPatternBusBlockEntity extends ECOCraftingPatternBusBlockEnti
         return last;
     }
 
-    /** 内部总线都各自校验自己的逻辑域，去重交给样板目录做全网检查。 */
-    @Override
-    public boolean checksLogicalDomainForDuplicates() {
-        return false;
-    }
-
     // ---------------------------------------------------------------- 目录 / 终端读路径
 
     @Override
@@ -277,59 +201,29 @@ public class ExposedPatternBusBlockEntity extends ECOCraftingPatternBusBlockEnti
     }
 
     public void refreshAdvertisedPatterns() {
-        refreshPatternDetailsForCatalog();
         if (hostNode != null && hostNode.getGrid() != null) {
             ICraftingProvider.requestUpdate(hostNode);
         }
     }
 
-    /** 内容版本取各内部总线版本的滚动哈希：任何一条变了，样板目录就会重建本视图的索引。 */
-    @Override
+    /** Content hash for the 20.4.x API, which has no pattern revision counter. */
     public int getPatternContentRevision() {
         int revision = 1;
         for (ECOCraftingPatternBusBlockEntity bus : buses) {
-            revision = revision * 31 + bus.getPatternContentRevision();
+            revision = revision * 31 + patternContentRevision(bus);
         }
         return revision;
     }
 
-    @Override
-    public void refreshPatternDetailsForCatalog() {
-        for (ECOCraftingPatternBusBlockEntity bus : buses) {
-            bus.refreshPatternDetailsForCatalog();
+    private static int patternContentRevision(ECOCraftingPatternBusBlockEntity bus) {
+        int revision = bus.getPatternSlotCount();
+        for (int slot = 0; slot < bus.getPatternSlotCount(); slot++) {
+            ItemStack stack = bus.itemHandler.getStackInSlot(slot);
+            int value = stack.isEmpty() ? 0 : 31 * (31 * stack.getItem().hashCode() + stack.getCount())
+                    + (stack.getTag() == null ? 0 : stack.getTag().hashCode());
+            revision = revision * 31 + value;
         }
-    }
-
-    @Override
-    @Nullable
-    public IPatternDetails getDecodedPatternDetails(int slot) {
-        ECOCraftingPatternBusBlockEntity bus = mergedPatternInventory.busOf(slot);
-        return bus == null ? null : bus.getDecodedPatternDetails(mergedPatternInventory.localSlotOf(slot));
-    }
-
-    @Override
-    public String getPatternSearchKeywords(int slot) {
-        ECOCraftingPatternBusBlockEntity bus = mergedPatternInventory.busOf(slot);
-        return bus == null ? "" : bus.getPatternSearchKeywords(mergedPatternInventory.localSlotOf(slot));
-    }
-
-    // ---------------------------------------------------------------- 通知
-
-    /** 把某条内部总线的整段下标标脏（具体动了哪个槽只有那条总线自己知道）。 */
-    private void notifyInterfacesOf(ECOCraftingPatternBusBlockEntity bus) {
-        int offset = mergedPatternInventory.offsetOf(bus);
-        IGrid grid = getMainNode().getGrid();
-        if (offset < 0 || grid == null) {
-            return;
-        }
-        int count = bus.getPatternSlotCount();
-        int[] slots = new int[count];
-        for (int index = 0; index < count; index++) {
-            slots[index] = offset + index;
-        }
-        for (ECOMachineInterfaceBlockEntity<?> machineInterface : grid.getActiveMachines(ECOMachineInterfaceBlockEntity.class)) {
-            machineInterface.onPatternBusInventoryChanged(this, slots);
-        }
+        return revision;
     }
 
     // ---------------------------------------------------------------- 影子卫生：绝不回写世界

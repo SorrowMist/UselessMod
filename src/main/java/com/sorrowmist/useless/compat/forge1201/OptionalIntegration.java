@@ -6,6 +6,12 @@ import net.minecraftforge.fml.ModList;
 /** Optional source boundaries: no class linkage when the corresponding mod is absent. */
 public final class OptionalIntegration {
     private OptionalIntegration() {}
+
+    public static boolean hasClass(String className) {
+        return OptionalIntegration.class.getClassLoader()
+                .getResource(className.replace('.', '/') + ".class") != null;
+    }
+
     public static <T> T call(String modId,String className,String method,Class<T> resultType,T absent,
             Class<?>[] signature,Object... arguments) {
         if (!ModList.get().isLoaded(modId)) return absent;

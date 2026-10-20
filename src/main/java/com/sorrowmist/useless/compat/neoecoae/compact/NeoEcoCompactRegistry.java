@@ -5,7 +5,6 @@ import appeng.api.networking.IInWorldGridNodeHost;
 import appeng.block.AEBaseEntityBlock;
 import appeng.blockentity.AEBaseBlockEntity;
 import cn.dancingsnow.neoecoae.blocks.entity.computation.ECOComputationSystemBlockEntity;
-import cn.dancingsnow.neoecoae.blocks.entity.ECOMachineInterfaceBlockEntity;
 import cn.dancingsnow.neoecoae.blocks.entity.crafting.ECOCraftingPatternBusBlockEntity;
 import cn.dancingsnow.neoecoae.blocks.entity.crafting.ECOCraftingSystemBlockEntity;
 import cn.dancingsnow.neoecoae.blocks.entity.storage.ECOStorageSystemBlockEntity;
@@ -32,7 +31,6 @@ import com.sorrowmist.useless.compat.neoecoae.compact.shadow.ShadowCraftingParal
 import com.sorrowmist.useless.compat.neoecoae.compact.shadow.ShadowCraftingWorkerBlockEntity;
 import com.sorrowmist.useless.compat.neoecoae.compact.shadow.ShadowFluidInputHatchBlockEntity;
 import com.sorrowmist.useless.compat.neoecoae.compact.shadow.ShadowFluidOutputHatchBlockEntity;
-import com.sorrowmist.useless.compat.neoecoae.compact.shadow.ShadowInterfaceBlockEntity;
 import com.sorrowmist.useless.compat.neoecoae.compact.shadow.ShadowPatternBusBlockEntity;
 import com.sorrowmist.useless.compat.neoecoae.compact.shadow.ShadowThreadingCoreBlockEntity;
 import net.minecraft.core.BlockPos;
@@ -208,9 +206,7 @@ public final class NeoEcoCompactRegistry {
         CompactMachineClassMap.register(CompactC9BlockEntity.class, ECOComputationSystemBlockEntity.class);
         CompactMachineClassMap.register(CompactF9BlockEntity.class, ECOCraftingSystemBlockEntity.class);
         CompactMachineClassMap.register(CompactL9BlockEntity.class, ECOStorageSystemBlockEntity.class);
-        // 影子接口与聚合总线也各自带着「假身份」的网格节点：ECO 的界面与样板终端是按
-        // ECOMachineInterfaceBlockEntity / ECOCraftingPatternBusBlockEntity 这两个类去查网格的。
-        CompactMachineClassMap.register(ShadowInterfaceBlockEntity.class, ECOMachineInterfaceBlockEntity.class);
+        // ECO queries pattern buses by their native block-entity type in the grid index.
         CompactMachineClassMap.register(ExposedPatternBusBlockEntity.class, ECOCraftingPatternBusBlockEntity.class);
 
         BLOCKS.register(modEventBus);

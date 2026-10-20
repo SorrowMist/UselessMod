@@ -433,7 +433,10 @@ public final class RecipeAdapterCompatRegistry {
     }
 
     private static void registerNeoECOAE() {
-        registerByName("com.sorrowmist.useless.content.recipe.adapters.eco.IntegratedWorkingStationRecipeAdapter");
+        String adapterClass = "com.sorrowmist.useless.content.recipe.adapters.eco.IntegratedWorkingStationRecipeAdapter";
+        if (isClassAvailable(adapterClass)) {
+            registerByName(adapterClass);
+        }
     }
 
     private static void registerNaturesAura() {

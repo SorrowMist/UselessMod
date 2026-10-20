@@ -19,10 +19,7 @@ import com.sorrowmist.useless.init.ModBlockEntities;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.HolderLookup;
-import net.minecraft.core.registries.Registries;
 import net.minecraft.nbt.CompoundTag;
-import net.minecraft.resources.ResourceLocation;
-import net.minecraft.tags.TagKey;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.Containers;
 import net.minecraft.world.MenuProvider;
@@ -31,7 +28,6 @@ import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.inventory.ContainerData;
-import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
@@ -49,15 +45,6 @@ public final class OreGeneratorBlockEntity extends BlockEntity
     public static final int MAX_SAMPLE_SLOTS = 540;
     public static final long DEFAULT_OUTPUT_RATE = 1L;
     public static final int MENU_DATA_COUNT = 7;
-
-    private static final TagKey<Item> RAW_MATERIALS = TagKey.create(
-            Registries.ITEM,
-            new ResourceLocation("c", "raw_materials")
-    );
-    private static final TagKey<Item> ORES = TagKey.create(
-            Registries.ITEM,
-            new ResourceLocation("c", "ores")
-    );
 
     private final OreGeneratorSampleHandler samples = new OreGeneratorSampleHandler(
             ConfigManager::getOreGeneratorSlots,
@@ -238,7 +225,7 @@ public final class OreGeneratorBlockEntity extends BlockEntity
     }
 
     public static boolean isValidSample(ItemStack stack) {
-        return !stack.isEmpty() && (stack.is(RAW_MATERIALS) || stack.is(ORES));
+        return OreGeneratorSampleHandler.isValidSample(stack);
     }
 
     private void samplesChanged() {

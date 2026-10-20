@@ -89,8 +89,9 @@ public class UselessMod {
 
         // 无用型紧凑 C9/F9/L9：只在 ECO 存在时注册。
         // 这里的类加载是条件性的——ECO 缺席时 NeoEcoCompactRegistry 永远不会被初始化。
-        if (ModList.get().isLoaded("neoecoae")) {
-            OptionalIntegration.call("neoecoae", "com.sorrowmist.useless.compat.neoecoae.compact.NeoEcoCompactRegistry",
+        String compactEcoRegistry = "com.sorrowmist.useless.compat.neoecoae.compact.NeoEcoCompactRegistry";
+        if (ModList.get().isLoaded("neoecoae") && OptionalIntegration.hasClass(compactEcoRegistry)) {
+            OptionalIntegration.call("neoecoae", compactEcoRegistry,
                     "init", Void.class, null, new Class<?>[]{IEventBus.class}, modEventBus);
         }
 
@@ -111,8 +112,9 @@ public class UselessMod {
 
     private void commonSetup(FMLCommonSetupEvent event) {
         RecipeAdapterCompatRegistry.init(event);
-        if (ModList.get().isLoaded("neoecoae")) {
-            OptionalIntegration.call("neoecoae", "com.sorrowmist.useless.compat.neoecoae.NeoEcoCompat",
+        String ecoCompat = "com.sorrowmist.useless.compat.neoecoae.NeoEcoCompat";
+        if (ModList.get().isLoaded("neoecoae") && OptionalIntegration.hasClass(ecoCompat)) {
+            OptionalIntegration.call("neoecoae", ecoCompat,
                     "initialize", Void.class, null, new Class<?>[]{});
         }
     }

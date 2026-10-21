@@ -155,6 +155,11 @@ sourceSets.test.runtimeClasspath += sourceSets.main.compileClasspath
 
 configurations {
     runtimeClasspath.extendsFrom localRuntime
+    // 仅用于把 JEI 追加到 runClient 的 JVM classpath，不参与 data run。
+    jeiRuntime {
+        canBeConsumed = false
+        canBeResolved = true
+    }
 }
 
 def productiveBeesApi = configurations.create('productiveBeesApi') {
@@ -207,8 +212,10 @@ dependencies {
     testImplementation 'org.junit.jupiter:junit-jupiter'
     testImplementation 'org.mockito:mockito-core:5.15.2'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
-    implementation "mezz.jei:jei-1.21.1-neoforge:19.56.0.438"
-    compileOnly "curse.maven:ae2-jei-integration-1074338:7727898"
+
+    compileOnly "mezz.jei:jei-1.21.1-neoforge:19.56.0.438"
+    jeiRuntime "mezz.jei:jei-1.21.1-neoforge:19.56.0.438"
+    implementation "curse.maven:ae2-jei-integration-1074338:7727898"
 
     implementation "org.appliedenergistics:appliedenergistics2:19.2.17"
     runtimeOnly "org.appliedenergistics:guideme:21.1.17"
@@ -520,6 +527,17 @@ publishing {
 
 tasks.withType(JavaCompile).configureEach {
     options.encoding = 'UTF-8' // Use the UTF-8 charset for Java compilation
+}
+
+// JEI 只加入客户端 run 的 JVM classpath，数据生成 run 不加载它。
+tasks.named('runClient', JavaExec) {
+    classpath += configurations.jeiRuntime
+}
+
+// runData 与 runClient 共用 sourceSets.main.runtimeClasspath，而 JEI 在数据生成阶段
+// 会因访问 Minecraft.getInstance() 而空指针，因此从数据生成任务的类路径中剔除 JEI。
+tasks.named('runData', JavaExec) {
+    classpath = classpath.filter { !it.name.startsWith('jei-') }
 }
 
 tasks.named('test', Test) {

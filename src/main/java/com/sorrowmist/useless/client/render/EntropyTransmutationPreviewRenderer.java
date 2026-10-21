@@ -94,14 +94,12 @@ public final class EntropyTransmutationPreviewRenderer {
     /**
      * 卦象三爻由外向内排布：最外一条的半径与相邻两条的间距。
      *
-     * <p>整组卦象整体推到外圈光带之外：最内一爻也落在外圈线外侧、与圈沿留出一线之隔，
-     * 另两爻依次向外排开，三爻全部清晰地铺在圈外。整组重心明显偏外，
-     * 不再有缩在环带里侧或骑在圈沿上的观感。</p>
+     * <p>整组卦象收在环带的中段偏内，三爻的径向中心大致落在环带中心，免得看起来像挂在圈外。</p>
      */
-    private static final float TRIGRAM_OUTER_RADIUS = 1.05F;
-    private static final float TRIGRAM_ROW_SPACING = 0.075F;
+    private static final float TRIGRAM_OUTER_RADIUS = 0.80F;
+    private static final float TRIGRAM_ROW_SPACING = 0.065F;
     /** 阳爻半长；阴爻从中断开，只画到距中心 {@link #TRIGRAM_GAP} 处。 */
-    private static final float TRIGRAM_HALF_LENGTH = 0.12F;
+    private static final float TRIGRAM_HALF_LENGTH = 0.115F;
     private static final float TRIGRAM_GAP = 0.05F;
     /** 爻线光条的宽度。 */
     private static final float TRIGRAM_BAR_WIDTH = 0.028F;

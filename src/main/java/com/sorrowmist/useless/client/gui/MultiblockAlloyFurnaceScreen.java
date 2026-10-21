@@ -271,9 +271,16 @@ public final class MultiblockAlloyFurnaceScreen extends AbstractContainerScreen<
         if (font.width(titleText) > 116) titleText = font.plainSubstrByWidth(titleText, 113) + "...";
         graphics.drawString(font, titleText, 8, 6, MachineScreenStyle.TEXT_COLOR, false);
         boolean structureValid = liveValidation == null ? menu.isFormed() : liveValidation.valid();
-        int stateColor = structureValid ? 0xFF2E7D32 : MachineScreenStyle.ERROR_TEXT_COLOR;
+        // 结构完整但排烟受阻时优先显示受阻原因，否则玩家只会看到「已成型」却不知道为什么不开工。
+        boolean mufflerObstructed = structureValid && menu.isMufflerObstructed();
+        int stateColor = !structureValid || mufflerObstructed
+                ? MachineScreenStyle.ERROR_TEXT_COLOR
+                : 0xFF2E7D32;
         Component stateText;
-        if (structureValid) {
+        if (mufflerObstructed) {
+            stateText = Component.translatable(
+                    "gui.useless_mod.multiblock_alloy_furnace.muffler_obstructed");
+        } else if (structureValid) {
             stateText = Component.translatable("gui.useless_mod.multiblock_alloy_furnace.formed");
         } else if (liveValidation != null && !liveValidation.mismatches().isEmpty()) {
             stateText = Component.translatable(
@@ -351,6 +358,8 @@ public final class MultiblockAlloyFurnaceScreen extends AbstractContainerScreen<
                     case PATTERN_ASSEMBLY -> 0xFF00838F;
                     case MOLD_HUB -> 0xFFF9A825;
                     case PASSIVE_HATCH -> 0xFF517497;
+                    case MAINTENANCE_HATCH -> 0xFF6D4C41;
+                    case MUFFLER_HATCH -> 0xFF546E7A;
                 };
             }
         }

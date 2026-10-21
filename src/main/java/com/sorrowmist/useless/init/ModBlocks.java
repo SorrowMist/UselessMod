@@ -7,7 +7,9 @@ import com.sorrowmist.useless.content.blocks.SupervisorBlock;
 import com.sorrowmist.useless.content.blocks.TeleportPadBlock;
 import com.sorrowmist.useless.content.blocks.TemperatureRegulatorBlock;
 import com.sorrowmist.useless.content.blocks.UselessGlassBlock;
+import com.sorrowmist.useless.content.blocks.multiblock.MaintenanceHatchBlock;
 import com.sorrowmist.useless.content.blocks.multiblock.MePatternAssemblyBlock;
+import com.sorrowmist.useless.content.blocks.multiblock.MufflerHatchBlock;
 import com.sorrowmist.useless.content.blocks.multiblock.MultiblockAlloyFurnaceCoreBlock;
 import com.sorrowmist.useless.content.blocks.multiblock.MultiblockPartBlock;
 import com.sorrowmist.useless.content.blocks.multiblock.OmniversalMoldHubBlock;
@@ -89,6 +91,14 @@ public final class ModBlocks {
     public static final DeferredBlock<PassiveCraftingHatchBlock> PASSIVE_CRAFTING_HATCH = BLOCKS.register(
             "passive_crafting_hatch",
             () -> new PassiveCraftingHatchBlock(BlockBehaviour.Properties.of()
+                    .strength(4.0F, 1200.0F).requiresCorrectToolForDrops()));
+    public static final DeferredBlock<MaintenanceHatchBlock> MAINTENANCE_HATCH = BLOCKS.register(
+            "maintenance_hatch",
+            () -> new MaintenanceHatchBlock(BlockBehaviour.Properties.of()
+                    .strength(4.0F, 1200.0F).requiresCorrectToolForDrops()));
+    public static final DeferredBlock<MufflerHatchBlock> MUFFLER_HATCH = BLOCKS.register(
+            "muffler_hatch",
+            () -> new MufflerHatchBlock(BlockBehaviour.Properties.of()
                     .strength(4.0F, 1200.0F).requiresCorrectToolForDrops()));
     public static final DeferredBlock<MultiblockPartBlock> OMNIVERSAL_FURNACE_CASING = BLOCKS.register(
             "omniversal_furnace_casing",

@@ -4,7 +4,9 @@ import com.sorrowmist.useless.UselessMod;
 import com.sorrowmist.useless.content.blockentities.AdvancedAlloyFurnaceBlockEntity;
 import com.sorrowmist.useless.content.blockentities.OreGeneratorBlockEntity;
 import com.sorrowmist.useless.content.blockentities.ThermostatBlockEntity;
+import com.sorrowmist.useless.content.blockentities.multiblock.MaintenanceHatchBlockEntity;
 import com.sorrowmist.useless.content.blockentities.multiblock.MePatternAssemblyBlockEntity;
+import com.sorrowmist.useless.content.blockentities.multiblock.MufflerHatchBlockEntity;
 import com.sorrowmist.useless.content.blockentities.multiblock.MultiblockAlloyFurnaceCoreBlockEntity;
 import com.sorrowmist.useless.content.blockentities.multiblock.OmniversalMoldHubBlockEntity;
 import com.sorrowmist.useless.content.blockentities.multiblock.PassiveCraftingHatchBlockEntity;
@@ -146,6 +148,14 @@ public final class ModBlockEntities {
             BLOCK_ENTITY_TYPES.register("passive_crafting_hatch",
                     () -> BlockEntityType.Builder.of(PassiveCraftingHatchBlockEntity::new,
                             ModBlocks.PASSIVE_CRAFTING_HATCH.get()).build(null));
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<MaintenanceHatchBlockEntity>> MAINTENANCE_HATCH =
+            BLOCK_ENTITY_TYPES.register("maintenance_hatch",
+                    () -> BlockEntityType.Builder.of(MaintenanceHatchBlockEntity::new,
+                            ModBlocks.MAINTENANCE_HATCH.get()).build(null));
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<MufflerHatchBlockEntity>> MUFFLER_HATCH =
+            BLOCK_ENTITY_TYPES.register("muffler_hatch",
+                    () -> BlockEntityType.Builder.of(MufflerHatchBlockEntity::new,
+                            ModBlocks.MUFFLER_HATCH.get()).build(null));
 
     /**
      * 「温度调节器」方块的恒温源状态。

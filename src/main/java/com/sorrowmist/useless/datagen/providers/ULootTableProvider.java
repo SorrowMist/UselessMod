@@ -44,6 +44,8 @@ public class ULootTableProvider extends LootTableProvider {
             this.dropSelf(ModBlocks.ME_PATTERN_ASSEMBLY.get());
             this.dropSelf(ModBlocks.OMNIVERSAL_MOLD_HUB.get());
             this.dropSelf(ModBlocks.PASSIVE_CRAFTING_HATCH.get());
+            this.dropSelf(ModBlocks.MAINTENANCE_HATCH.get());
+            this.dropSelf(ModBlocks.MUFFLER_HATCH.get());
             this.dropSelf(ModBlocks.OMNIVERSAL_FURNACE_CASING.get());
             this.dropSelf(ModBlocks.TEMPERATURE_REGULATOR.get());
 
@@ -90,6 +92,8 @@ public class ULootTableProvider extends LootTableProvider {
             blocks.add(ModBlocks.ME_PATTERN_ASSEMBLY.get());
             blocks.add(ModBlocks.OMNIVERSAL_MOLD_HUB.get());
             blocks.add(ModBlocks.PASSIVE_CRAFTING_HATCH.get());
+            blocks.add(ModBlocks.MAINTENANCE_HATCH.get());
+            blocks.add(ModBlocks.MUFFLER_HATCH.get());
             blocks.add(ModBlocks.OMNIVERSAL_FURNACE_CASING.get());
             blocks.add(ModBlocks.TEMPERATURE_REGULATOR.get());
             if (net.neoforged.fml.ModList.get().isLoaded("neoecoae")) {

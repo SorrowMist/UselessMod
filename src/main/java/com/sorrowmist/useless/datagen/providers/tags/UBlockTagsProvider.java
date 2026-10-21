@@ -35,7 +35,9 @@ public class UBlockTagsProvider extends BlockTagsProvider {
         this.tag(ModTags.OMNIVERSAL_FURNACE_CASINGS)
             .replace(false)
             .add(ModBlocks.OMNIVERSAL_FURNACE_CASING.get())
-            .add(ModBlocks.PASSIVE_CRAFTING_HATCH.get());
+            .add(ModBlocks.PASSIVE_CRAFTING_HATCH.get())
+            .add(ModBlocks.MAINTENANCE_HATCH.get())
+            .add(ModBlocks.MUFFLER_HATCH.get());
 
         // 造化杖「无视等级」的例外清单：默认留空，整合包往生成的 json 里加方块即可。
         this.tag(ModTags.BEEF_TOOL_TIER_LOCKED).replace(false);
@@ -135,6 +137,8 @@ public class UBlockTagsProvider extends BlockTagsProvider {
             .add(ModBlocks.ME_PATTERN_ASSEMBLY.get())
             .add(ModBlocks.OMNIVERSAL_MOLD_HUB.get())
             .add(ModBlocks.PASSIVE_CRAFTING_HATCH.get())
+            .add(ModBlocks.MAINTENANCE_HATCH.get())
+            .add(ModBlocks.MUFFLER_HATCH.get())
             .add(ModBlocks.OMNIVERSAL_FURNACE_CASING.get())
             .add(ModBlocks.TEMPERATURE_REGULATOR.get());
 

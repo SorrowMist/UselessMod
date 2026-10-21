@@ -1308,5 +1308,11 @@
   "commands.useless_mod.patterns.repair.no_machines": "This network has no powered omniversal furnaces or ME pattern assemblies, so there is nothing to repair",
   "commands.useless_mod.patterns.repair.summary": "Scanned %s omniversal patterns, found %s invalid; repaired %s, %s could not be repaired (recipe removed or ambiguous).",
   "commands.useless_mod.patterns.repair.summary.preview": "Scanned %s omniversal patterns, found %s invalid; %s are repairable and %s could not be repaired (recipe removed or ambiguous). This was a preview; nothing was written back.",
-  "commands.useless_mod.patterns.repair.detail": "Could not repair: %s, bound recipe %s"
+  "commands.useless_mod.patterns.repair.detail": "Could not repair: %s, bound recipe %s",
+  "jei.useless_mod.entropy_transmutation.title": "Entropy Transmutation",
+  "jei.useless_mod.entropy_transmutation.input": "Required in the ME chest's storage cells",
+  "jei.useless_mod.entropy_transmutation.output": "The block placed in the world",
+  "jei.useless_mod.entropy_transmutation.hint": "Sneak-right-click the ME chest with an Entropy Manipulator",
+  "jei.useless_mod.entropy_transmutation.step1": "Put the required items into the storage cells inside the ME chest (totals within the same cell count)",
+  "jei.useless_mod.entropy_transmutation.step2": "Sneak-right-click that ME chest with an Entropy Manipulator to transmute it in place"
 }

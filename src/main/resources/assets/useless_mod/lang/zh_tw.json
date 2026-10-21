@@ -1297,5 +1297,11 @@
   "commands.useless_mod.patterns.repair.no_machines": "該網路上沒有已通電的萬象爐或 ME 樣板總成，無需修復",
   "commands.useless_mod.patterns.repair.summary": "已掃描 %s 張萬象樣板，發現 %s 張失效；已修復 %s 張，%s 張無法修復（配方已移除或存在歧義）。",
   "commands.useless_mod.patterns.repair.summary.preview": "已掃描 %s 張萬象樣板，發現 %s 張失效；其中 %s 張可修復，%s 張無法修復（配方已移除或存在歧義）。本次為預覽，未寫回任何槽位。",
-  "commands.useless_mod.patterns.repair.detail": "無法修復：%s，綁定配方 %s"
+  "commands.useless_mod.patterns.repair.detail": "無法修復：%s，綁定配方 %s",
+  "jei.useless_mod.entropy_transmutation.title": "熵變轉化",
+  "jei.useless_mod.entropy_transmutation.input": "需裝在 ME 箱子儲存磁碟中",
+  "jei.useless_mod.entropy_transmutation.output": "在原地替換成的方塊",
+  "jei.useless_mod.entropy_transmutation.hint": "手持熵變機械臂潛行右鍵 ME 箱子",
+  "jei.useless_mod.entropy_transmutation.step1": "把所需物品放進 ME 箱子裡的儲存磁碟（同一磁碟內合計即可）",
+  "jei.useless_mod.entropy_transmutation.step2": "手持熵變機械臂潛行右鍵該 ME 箱子，原地變成產物"
 }

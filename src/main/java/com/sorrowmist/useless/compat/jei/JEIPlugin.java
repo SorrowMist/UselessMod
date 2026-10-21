@@ -1,5 +1,6 @@
 package com.sorrowmist.useless.compat.jei;
 
+import appeng.core.definitions.AEItems;
 import appeng.menu.me.items.PatternEncodingTermMenu;
 import com.sorrowmist.useless.UselessMod;
 import com.sorrowmist.useless.client.gui.ChainGroupScreen;
@@ -12,6 +13,7 @@ import com.sorrowmist.useless.content.stafflink.LinkFilterSlot;
 import com.sorrowmist.useless.content.stafflink.StaffLinkFilters;
 import com.sorrowmist.useless.content.stafflink.StaffLinkRoute;
 import com.sorrowmist.useless.init.ModBlocks;
+import com.sorrowmist.useless.init.ModRecipeTypes;
 import com.sorrowmist.useless.init.ModTags;
 import mezz.jei.api.IModPlugin;
 import mezz.jei.api.JeiPlugin;
@@ -58,6 +60,7 @@ public final class JEIPlugin implements IModPlugin {
         IGuiHelper guiHelper = registration.getJeiHelpers().getGuiHelper();
         registration.addRecipeCategories(new AdvancedAlloyFurnaceRecipeCategory(guiHelper));
         registration.addRecipeCategories(new CatalystInfoCategory(guiHelper));
+        registration.addRecipeCategories(new EntropyTransmutationJeiCategory(guiHelper));
     }
 
     @Override
@@ -73,6 +76,10 @@ public final class JEIPlugin implements IModPlugin {
         registration.addRecipes(AdvancedAlloyFurnaceRecipeCategory.TYPE, recipes);
         registration.addRecipes(CatalystInfoCategory.TYPE,
                 List.of(new CatalystInfoCategory.CatalystInfo()));
+        if (level != null) {
+            registration.addRecipes(EntropyTransmutationJeiCategory.TYPE,
+                    level.getRecipeManager().getAllRecipesFor(ModRecipeTypes.ENTROPY_TRANSMUTATION_TYPE.get()));
+        }
     }
 
 
@@ -353,6 +360,9 @@ public final class JEIPlugin implements IModPlugin {
         registration.addRecipeCatalyst(
                 new ItemStack(ModBlocks.MULTIBLOCK_ALLOY_FURNACE_CORE.get()),
                 CatalystInfoCategory.TYPE);
+        // 触发该配方的是熵变机械臂，故以它作为催化剂，让玩家在 JEI 里从工具反查配方。
+        registration.addRecipeCatalyst(AEItems.ENTROPY_MANIPULATOR.stack(),
+                EntropyTransmutationJeiCategory.TYPE);
 
         BuiltInRegistries.ITEM.getTag(ModTags.CATALYSTS).ifPresent(tag -> {
             for (var holder : tag) {

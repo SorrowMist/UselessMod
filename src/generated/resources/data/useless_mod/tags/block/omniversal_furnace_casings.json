@@ -1,6 +1,8 @@
 {
     "values": [
         "useless_mod:omniversal_furnace_casing",
-        "useless_mod:passive_crafting_hatch"
+        "useless_mod:passive_crafting_hatch",
+        "useless_mod:maintenance_hatch",
+        "useless_mod:muffler_hatch"
     ]
 }

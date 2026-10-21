@@ -73,7 +73,9 @@ import com.sorrowmist.useless.network.AETaskProgressPacket;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.HolderLookup;
+import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.game.ClientGamePacketListener;
@@ -819,16 +821,19 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
 
         // 如果没有足够的并行数（至少1），则无法完成配方
         if (actualParallel <= 0) {
+            this.spawnCraftEffect(false);
             this.resetProgress();
             return;
         }
 
         // 消耗材料并产出物品
         if (!this.consumeRecipeInputs(this.currentRecipe, actualParallel)) {
+            this.spawnCraftEffect(false);
             this.resetProgress();
             return;
         }
         this.produceRecipeOutputs(this.currentRecipe, actualParallel);
+        this.spawnCraftEffect(true);
 
         this.resetProgress();
     }
@@ -1623,6 +1628,30 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
                 ChemicalKeyProviders.get(),
                 this::stashUnreturnedOutput
         );
+    }
+
+    /**
+     * 配方完成时的视觉反馈特效。
+     * <p>
+     * 成功时在机器上方迸发亮色粒子，失败时喷出烟雾，方便玩家直观判断结果。
+     * 仅在服务端触发，由服务端广播给附近客户端。
+     *
+     * @param success 配方是否成功产出
+     */
+    private void spawnCraftEffect(boolean success) {
+        if (!(this.level instanceof ServerLevel serverLevel)) {
+            return;
+        }
+        double x = this.worldPosition.getX() + 0.5;
+        double y = this.worldPosition.getY() + 1.1;
+        double z = this.worldPosition.getZ() + 0.5;
+        if (success) {
+            serverLevel.sendParticles(ParticleTypes.HAPPY_VILLAGER, x, y, z, 14, 0.35, 0.3, 0.35, 0.0);
+            serverLevel.sendParticles(ParticleTypes.END_ROD, x, y, z, 8, 0.25, 0.25, 0.25, 0.02);
+        } else {
+            serverLevel.sendParticles(ParticleTypes.LARGE_SMOKE, x, y, z, 12, 0.3, 0.25, 0.3, 0.01);
+            serverLevel.sendParticles(ParticleTypes.SMOKE, x, y, z, 8, 0.3, 0.25, 0.3, 0.01);
+        }
     }
 
     private void resetProgress() {

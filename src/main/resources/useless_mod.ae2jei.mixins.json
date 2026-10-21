@@ -1,0 +1,14 @@
+{
+  "required": false,
+  "package": "com.sorrowmist.useless.mixin.ae2jei",
+  "compatibilityLevel": "JAVA_21",
+  "client": [
+    "TransformCategoryMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  },
+  "overwrites": {
+    "requireAnnotations": true
+  }
+}

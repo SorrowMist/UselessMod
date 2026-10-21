@@ -85,6 +85,12 @@ requiredMods=["create"]
 config="${mod_id}.pneumaticcraft.mixins.json"
 requiredMods=["pneumaticcraft"]
 
+# 世界交互配方的 JEI 展示：把同一材料重复书写的条目合并为一个带数量的槽位。
+# 注入的是 AE2 JEI Integration 的配方类别，因此该模组在场时才加载。
+[[mixins]]
+config="${mod_id}.ae2jei.mixins.json"
+requiredMods=["ae2jeiintegration"]
+
 # The [[accessTransformers]] block allows you to declare where your AT file is.
 # If this block is omitted, a fallback attempt will be made to load an AT from META-INF/accesstransformer.cfg
 #[[accessTransformers]]

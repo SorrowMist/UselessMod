@@ -3,6 +3,7 @@ package com.sorrowmist.useless.init;
 import com.sorrowmist.useless.UselessMod;
 import com.sorrowmist.useless.content.recipe.AdvancedAlloyFurnaceRecipeSerializer;
 import com.sorrowmist.useless.content.recipe.BeefUnbreakableRecipe;
+import com.sorrowmist.useless.content.recipe.EntropyTransmutationRecipeSerializer;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.world.item.crafting.RecipeSerializer;
 import net.minecraft.world.item.crafting.SimpleCraftingRecipeSerializer;
@@ -23,5 +24,11 @@ public class ModRecipeSerializers {
     public static final DeferredHolder<RecipeSerializer<?>, SimpleCraftingRecipeSerializer<BeefUnbreakableRecipe>> BEEF_UNBREAKABLE_SERIALIZER =
             RECIPE_SERIALIZERS.register("beef_unbreakable",
                                         () -> new SimpleCraftingRecipeSerializer<>(BeefUnbreakableRecipe::new)
+            );
+
+    /** 熵变转化（熵变机械臂潜行右键 ME 箱子）配方，由事件层驱动。 */
+    public static final DeferredHolder<RecipeSerializer<?>, EntropyTransmutationRecipeSerializer> ENTROPY_TRANSMUTATION_SERIALIZER =
+            RECIPE_SERIALIZERS.register("entropy_transmutation",
+                                        EntropyTransmutationRecipeSerializer::new
             );
 }

@@ -1,6 +1,7 @@
 package com.sorrowmist.useless.init;
 
 import com.sorrowmist.useless.UselessMod;
+import com.sorrowmist.useless.content.recipe.EnchantedItemIngredient;
 import com.sorrowmist.useless.content.recipe.RecipeSourceIds;
 import com.sorrowmist.useless.content.recipe.adapters.apotheosis.ApotheosisGemIngredient;
 import com.sorrowmist.useless.content.recipe.adapters.enderio.SoulVialSetIngredient;
@@ -19,6 +20,14 @@ public final class ModIngredientTypes {
 
     public static final DeferredHolder<IngredientType<?>, IngredientType<SoulVialSetIngredient>>
             SOUL_VIAL_SET = INGREDIENT_TYPES.register("soul_vial_set", () -> SoulVialSetIngredient.TYPE);
+
+    /**
+     * 匹配「指定物品 + 附魔达到最低等级」的原料，用于压印器等需要识别附魔工具的配方。
+     *
+     * <p>不依赖任何可选模组，注册无条件生效。</p>
+     */
+    public static final DeferredHolder<IngredientType<?>, IngredientType<EnchantedItemIngredient>>
+            ENCHANTED_ITEM = INGREDIENT_TYPES.register("enchanted_item", () -> EnchantedItemIngredient.TYPE);
 
     /**
      * 按数据区间匹配 HNN 数据模型的原料。

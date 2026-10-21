@@ -215,7 +215,10 @@ dependencies {
 
     compileOnly "mezz.jei:jei-1.21.1-neoforge:19.56.0.438"
     jeiRuntime "mezz.jei:jei-1.21.1-neoforge:19.56.0.438"
-    implementation "curse.maven:ae2-jei-integration-1074338:7727898"
+    // AE2 的 JEI 集成同样只在客户端 run 中加载：它的 mods.toml 强制依赖 JEI，
+    // 放进 runData 会因 JEI 被剔除而启动失败。代码里只通过字符串反射访问其 API。
+    compileOnly "curse.maven:ae2-jei-integration-1074338:7727898"
+    jeiRuntime "curse.maven:ae2-jei-integration-1074338:7727898"
 
     implementation "org.appliedenergistics:appliedenergistics2:19.2.17"
     runtimeOnly "org.appliedenergistics:guideme:21.1.17"

@@ -1,0 +1,103 @@
+{
+  "type": "useless_mod:advanced_alloy_furnace",
+  "energy": 500000000,
+  "id": "useless_mod:advanced_alloy/coil/useful_coil",
+  "ingredients": [
+    {
+      "count": 2,
+      "ingredient": {
+        "item": "useless_mod:omniversal_furnace_casing"
+      }
+    },
+    {
+      "ingredient": {
+        "item": "useless_mod:useless_coil_tier_9"
+      }
+    },
+    {
+      "count": 16,
+      "ingredient": {
+        "item": "ae2:dense_energy_cell"
+      }
+    },
+    {
+      "count": 8,
+      "ingredient": {
+        "item": "ae2:spatial_pylon"
+      }
+    },
+    {
+      "count": 8,
+      "ingredient": {
+        "item": "ae2:spatial_anchor"
+      }
+    },
+    {
+      "count": 8,
+      "ingredient": {
+        "item": "ae2:fluix_covered_dense_cable"
+      }
+    },
+    {
+      "count": 64,
+      "ingredient": {
+        "item": "useless_mod:useless_gear_tier_1"
+      }
+    },
+    {
+      "count": 56,
+      "ingredient": {
+        "item": "useless_mod:useless_gear_tier_2"
+      }
+    },
+    {
+      "count": 48,
+      "ingredient": {
+        "item": "useless_mod:useless_gear_tier_3"
+      }
+    },
+    {
+      "count": 40,
+      "ingredient": {
+        "item": "useless_mod:useless_gear_tier_4"
+      }
+    },
+    {
+      "count": 32,
+      "ingredient": {
+        "item": "useless_mod:useless_gear_tier_5"
+      }
+    },
+    {
+      "count": 24,
+      "ingredient": {
+        "item": "useless_mod:useless_gear_tier_6"
+      }
+    },
+    {
+      "count": 16,
+      "ingredient": {
+        "item": "useless_mod:useless_gear_tier_7"
+      }
+    },
+    {
+      "count": 8,
+      "ingredient": {
+        "item": "useless_mod:useless_gear_tier_8"
+      }
+    },
+    {
+      "count": 4,
+      "ingredient": {
+        "item": "useless_mod:useless_gear_tier_9"
+      }
+    }
+  ],
+  "outputs": [
+    {
+      "id": "useless_mod:useful_coil"
+    }
+  ],
+  "process_time": 40,
+  "tier": 9
+}

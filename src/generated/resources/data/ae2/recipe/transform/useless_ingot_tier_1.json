@@ -1,0 +1,297 @@
+{
+  "type": "ae2:transform",
+  "ingredients": [
+    {
+      "item": "minecraft:mutton"
+    },
+    {
+      "item": "minecraft:mutton"
+    },
+    {
+      "item": "minecraft:mutton"
+    },
+    {
+      "item": "minecraft:mutton"
+    },
+    {
+      "item": "minecraft:mutton"
+    },
+    {
+      "item": "minecraft:mutton"
+    },
+    {
+      "item": "minecraft:mutton"
+    },
+    {
+      "item": "minecraft:mutton"
+    },
+    {
+      "item": "minecraft:mutton"
+    },
+    {
+      "item": "minecraft:mutton"
+    },
+    {
+      "item": "minecraft:mutton"
+    },
+    {
+      "item": "minecraft:mutton"
+    },
+    {
+      "item": "minecraft:mutton"
+    },
+    {
+      "item": "minecraft:mutton"
+    },
+    {
+      "item": "minecraft:mutton"
+    },
+    {
+      "item": "minecraft:mutton"
+    },
+    {
+      "item": "minecraft:beef"
+    },
+    {
+      "item": "minecraft:beef"
+    },
+    {
+      "item": "minecraft:beef"
+    },
+    {
+      "item": "minecraft:beef"
+    },
+    {
+      "item": "minecraft:beef"
+    },
+    {
+      "item": "minecraft:beef"
+    },
+    {
+      "item": "minecraft:beef"
+    },
+    {
+      "item": "minecraft:beef"
+    },
+    {
+      "item": "minecraft:beef"
+    },
+    {
+      "item": "minecraft:beef"
+    },
+    {
+      "item": "minecraft:beef"
+    },
+    {
+      "item": "minecraft:beef"
+    },
+    {
+      "item": "minecraft:beef"
+    },
+    {
+      "item": "minecraft:beef"
+    },
+    {
+      "item": "minecraft:beef"
+    },
+    {
+      "item": "minecraft:beef"
+    },
+    {
+      "item": "minecraft:porkchop"
+    },
+    {
+      "item": "minecraft:porkchop"
+    },
+    {
+      "item": "minecraft:porkchop"
+    },
+    {
+      "item": "minecraft:porkchop"
+    },
+    {
+      "item": "minecraft:porkchop"
+    },
+    {
+      "item": "minecraft:porkchop"
+    },
+    {
+      "item": "minecraft:porkchop"
+    },
+    {
+      "item": "minecraft:porkchop"
+    },
+    {
+      "item": "minecraft:porkchop"
+    },
+    {
+      "item": "minecraft:porkchop"
+    },
+    {
+      "item": "minecraft:porkchop"
+    },
+    {
+      "item": "minecraft:porkchop"
+    },
+    {
+      "item": "minecraft:porkchop"
+    },
+    {
+      "item": "minecraft:porkchop"
+    },
+    {
+      "item": "minecraft:porkchop"
+    },
+    {
+      "item": "minecraft:porkchop"
+    },
+    {
+      "item": "minecraft:iron_ingot"
+    },
+    {
+      "item": "minecraft:iron_ingot"
+    },
+    {
+      "item": "minecraft:iron_ingot"
+    },
+    {
+      "item": "minecraft:iron_ingot"
+    },
+    {
+      "item": "minecraft:iron_ingot"
+    },
+    {
+      "item": "minecraft:iron_ingot"
+    },
+    {
+      "item": "minecraft:iron_ingot"
+    },
+    {
+      "item": "minecraft:iron_ingot"
+    },
+    {
+      "item": "minecraft:iron_ingot"
+    },
+    {
+      "item": "minecraft:iron_ingot"
+    },
+    {
+      "item": "minecraft:iron_ingot"
+    },
+    {
+      "item": "minecraft:iron_ingot"
+    },
+    {
+      "item": "minecraft:iron_ingot"
+    },
+    {
+      "item": "minecraft:iron_ingot"
+    },
+    {
+      "item": "minecraft:iron_ingot"
+    },
+    {
+      "item": "minecraft:iron_ingot"
+    },
+    {
+      "item": "minecraft:gold_ingot"
+    },
+    {
+      "item": "minecraft:gold_ingot"
+    },
+    {
+      "item": "minecraft:gold_ingot"
+    },
+    {
+      "item": "minecraft:gold_ingot"
+    },
+    {
+      "item": "minecraft:gold_ingot"
+    },
+    {
+      "item": "minecraft:gold_ingot"
+    },
+    {
+      "item": "minecraft:gold_ingot"
+    },
+    {
+      "item": "minecraft:gold_ingot"
+    },
+    {
+      "item": "minecraft:gold_ingot"
+    },
+    {
+      "item": "minecraft:gold_ingot"
+    },
+    {
+      "item": "minecraft:gold_ingot"
+    },
+    {
+      "item": "minecraft:gold_ingot"
+    },
+    {
+      "item": "minecraft:gold_ingot"
+    },
+    {
+      "item": "minecraft:gold_ingot"
+    },
+    {
+      "item": "minecraft:gold_ingot"
+    },
+    {
+      "item": "minecraft:gold_ingot"
+    },
+    {
+      "item": "minecraft:diamond"
+    },
+    {
+      "item": "minecraft:diamond"
+    },
+    {
+      "item": "minecraft:diamond"
+    },
+    {
+      "item": "minecraft:diamond"
+    },
+    {
+      "item": "minecraft:diamond"
+    },
+    {
+      "item": "minecraft:diamond"
+    },
+    {
+      "item": "minecraft:diamond"
+    },
+    {
+      "item": "minecraft:diamond"
+    },
+    {
+      "item": "minecraft:diamond"
+    },
+    {
+      "item": "minecraft:diamond"
+    },
+    {
+      "item": "minecraft:diamond"
+    },
+    {
+      "item": "minecraft:diamond"
+    },
+    {
+      "item": "minecraft:diamond"
+    },
+    {
+      "item": "minecraft:diamond"
+    },
+    {
+      "item": "minecraft:diamond"
+    },
+    {
+      "item": "minecraft:diamond"
+    }
+  ],
+  "result": {
+    "count": 1,
+    "id": "useless_mod:useless_ingot_tier_1"
+  }
+}

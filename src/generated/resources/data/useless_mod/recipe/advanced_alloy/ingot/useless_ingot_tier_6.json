@@ -1,48 +1,49 @@
 {
-    "type": "useless_mod:advanced_alloy_furnace",
-    "energy": 5000000,
-    "id": "useless_mod:advanced_alloy/ingot/useless_ingot_tier_6",
-    "ingredients": [
-        {
-            "count": 2,
-            "ingredient": {
-                "item": "minecraft:dragon_breath"
-            }
-        },
-        {
-            "count": 2,
-            "ingredient": {
-                "item": "minecraft:totem_of_undying"
-            }
-        },
-        {
-            "count": 2,
-            "ingredient": {
-                "item": "minecraft:enchanted_golden_apple"
-            }
-        },
-        {
-            "count": 2,
-            "ingredient": {
-                "item": "minecraft:gold_block"
-            }
-        },
-        {
-            "count": 2,
-            "ingredient": {
-                "item": "minecraft:diamond_block"
-            }
-        },
-        {
-            "ingredient": {
-                "item": "useless_mod:useless_ingot_tier_5"
-            }
-        }
-    ],
-    "outputs": [
-        {
-            "id": "useless_mod:useless_ingot_tier_6"
-        }
-    ],
-    "process_time": 1
+  "type": "useless_mod:advanced_alloy_furnace",
+  "energy": 12800000,
+  "id": "useless_mod:advanced_alloy/ingot/useless_ingot_tier_6",
+  "ingredients": [
+    {
+      "count": 16,
+      "ingredient": {
+        "item": "minecraft:dragon_breath"
+      }
+    },
+    {
+      "count": 8,
+      "ingredient": {
+        "item": "minecraft:totem_of_undying"
+      }
+    },
+    {
+      "count": 8,
+      "ingredient": {
+        "item": "minecraft:enchanted_golden_apple"
+      }
+    },
+    {
+      "count": 128,
+      "ingredient": {
+        "item": "ae2:fluix_dust"
+      }
+    },
+    {
+      "count": 64,
+      "ingredient": {
+        "item": "minecraft:diamond_block"
+      }
+    },
+    {
+      "ingredient": {
+        "item": "useless_mod:useless_ingot_tier_5"
+      }
+    }
+  ],
+  "outputs": [
+    {
+      "id": "useless_mod:useless_ingot_tier_6"
+    }
+  ],
+  "process_time": 1,
+  "tier": 5
 }

@@ -1,0 +1,43 @@
+{
+  "type": "useless_mod:advanced_alloy_furnace",
+  "energy": 100000000,
+  "id": "useless_mod:advanced_alloy/coil/useless_coil_tier_9",
+  "ingredients": [
+    {
+      "count": 2,
+      "ingredient": {
+        "item": "useless_mod:useless_glass_tier_9"
+      }
+    },
+    {
+      "count": 3,
+      "ingredient": {
+        "item": "useless_mod:useless_gear_tier_9"
+      }
+    },
+    {
+      "count": 2,
+      "ingredient": {
+        "item": "useless_mod:omniversal_furnace_casing"
+      }
+    },
+    {
+      "ingredient": {
+        "item": "useless_mod:useless_coil_tier_8"
+      }
+    },
+    {
+      "count": 8,
+      "ingredient": {
+        "item": "ae2:fluix_covered_dense_cable"
+      }
+    }
+  ],
+  "outputs": [
+    {
+      "id": "useless_mod:useless_coil_tier_9"
+    }
+  ],
+  "process_time": 40,
+  "tier": 8
+}

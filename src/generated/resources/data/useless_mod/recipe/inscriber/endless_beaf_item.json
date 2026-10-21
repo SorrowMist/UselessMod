@@ -1,0 +1,42 @@
+{
+  "type": "ae2:inscriber",
+  "ingredients": {
+    "bottom": {
+      "type": "useless_mod:enchanted_item",
+      "item": {
+        "components": {
+          "minecraft:enchantments": {
+            "levels": {
+              "minecraft:looting": 3,
+              "minecraft:silk_touch": 1
+            }
+          }
+        },
+        "count": 1,
+        "id": "minecraft:netherite_axe"
+      }
+    },
+    "middle": {
+      "item": "useless_mod:useless_ingot_tier_5"
+    },
+    "top": {
+      "type": "useless_mod:enchanted_item",
+      "item": {
+        "components": {
+          "minecraft:enchantments": {
+            "levels": {
+              "minecraft:fortune": 3
+            }
+          }
+        },
+        "count": 1,
+        "id": "minecraft:netherite_pickaxe"
+      }
+    }
+  },
+  "mode": "press",
+  "result": {
+    "count": 1,
+    "id": "useless_mod:endless_beaf_item"
+  }
+}

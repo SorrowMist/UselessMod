@@ -1,48 +1,43 @@
 {
-    "type": "useless_mod:advanced_alloy_furnace",
-    "energy": 50000000,
-    "id": "useless_mod:advanced_alloy/ingot/useless_ingot_tier_8",
-    "ingredients": [
-        {
-            "count": 2,
-            "ingredient": {
-                "item": "minecraft:dragon_head"
-            }
-        },
-        {
-            "count": 2,
-            "ingredient": {
-                "item": "minecraft:echo_shard"
-            }
-        },
-        {
-            "count": 2,
-            "ingredient": {
-                "item": "minecraft:conduit"
-            }
-        },
-        {
-            "count": 2,
-            "ingredient": {
-                "item": "minecraft:diamond_block"
-            }
-        },
-        {
-            "count": 2,
-            "ingredient": {
-                "item": "minecraft:netherite_ingot"
-            }
-        },
-        {
-            "ingredient": {
-                "item": "useless_mod:useless_ingot_tier_7"
-            }
-        }
-    ],
-    "outputs": [
-        {
-            "id": "useless_mod:useless_ingot_tier_8"
-        }
-    ],
-    "process_time": 1
+  "type": "useless_mod:advanced_alloy_furnace",
+  "energy": 204800000,
+  "id": "useless_mod:advanced_alloy/ingot/useless_ingot_tier_8",
+  "ingredients": [
+    {
+      "count": 8,
+      "ingredient": {
+        "item": "minecraft:turtle_helmet"
+      }
+    },
+    {
+      "count": 16,
+      "ingredient": {
+        "item": "minecraft:echo_shard"
+      }
+    },
+    {
+      "count": 16,
+      "ingredient": {
+        "item": "minecraft:conduit"
+      }
+    },
+    {
+      "count": 64,
+      "ingredient": {
+        "item": "minecraft:netherite_ingot"
+      }
+    },
+    {
+      "ingredient": {
+        "item": "useless_mod:useless_ingot_tier_7"
+      }
+    }
+  ],
+  "outputs": [
+    {
+      "id": "useless_mod:useless_ingot_tier_8"
+    }
+  ],
+  "process_time": 1,
+  "tier": 7
 }

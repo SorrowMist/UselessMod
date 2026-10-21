@@ -1,24 +1,39 @@
 {
-    "type": "minecraft:crafting_shaped",
-    "category": "building",
-    "key": {
-        "C": {
-            "item": "minecraft:chest"
-        },
-        "P": {
-            "item": "ae2:pattern_provider"
-        },
-        "R": {
-            "item": "minecraft:redstone"
-        }
-    },
-    "pattern": [
-        " R ",
-        "CPC",
-        " R "
-    ],
-    "result": {
-        "count": 1,
-        "id": "useless_mod:me_pattern_assembly"
+  "neoforge:conditions": [
+    {
+      "type": "neoforge:not",
+      "value": {
+        "type": "neoforge:mod_loaded",
+        "modid": "extendedae"
+      }
     }
+  ],
+  "type": "minecraft:crafting_shaped",
+  "category": "building",
+  "key": {
+    "A": {
+      "item": "useless_mod:omniversal_furnace_casing"
+    },
+    "B": {
+      "item": "ae2:pattern_provider"
+    },
+    "C": {
+      "item": "ae2:interface"
+    },
+    "E": {
+      "item": "ae2:io_port"
+    },
+    "F": {
+      "item": "ae2:capacity_card"
+    }
+  },
+  "pattern": [
+    "AEA",
+    "BCB",
+    "AFA"
+  ],
+  "result": {
+    "count": 1,
+    "id": "useless_mod:me_pattern_assembly"
+  }
 }

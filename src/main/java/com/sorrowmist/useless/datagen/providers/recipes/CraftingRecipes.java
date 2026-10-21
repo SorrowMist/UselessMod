@@ -1,8 +1,14 @@
 package com.sorrowmist.useless.datagen.providers.recipes;
 
+import appeng.api.util.AEColor;
+import appeng.core.AppEng;
 import appeng.core.definitions.AEBlocks;
 import appeng.core.definitions.AEItems;
 import appeng.core.definitions.AEParts;
+import appeng.recipes.handlers.InscriberProcessType;
+import appeng.recipes.handlers.InscriberRecipeBuilder;
+import appeng.recipes.transform.TransformCircumstance;
+import appeng.recipes.transform.TransformRecipeBuilder;
 import com.sorrowmist.useless.UselessMod;
 import com.sorrowmist.useless.api.enums.AlloyFurnaceMode;
 import com.sorrowmist.useless.api.enums.EnumColor;
@@ -10,34 +16,60 @@ import com.sorrowmist.useless.content.blocks.GlowPlasticBlock;
 import com.sorrowmist.useless.content.blocks.multiblock.UselessCoilBlock;
 import com.sorrowmist.useless.content.recipe.AdvancedAlloyFurnaceRecipeBuilder;
 import com.sorrowmist.useless.content.recipe.CountedIngredient;
+import com.sorrowmist.useless.content.recipe.EnchantedItemIngredient;
 import com.sorrowmist.useless.content.recipe.EntropyTransmutationRecipe;
 import com.sorrowmist.useless.init.ModBlocks;
 import com.sorrowmist.useless.init.ModItems;
 import com.sorrowmist.useless.init.ModTags;
 import net.minecraft.core.HolderLookup;
+import net.minecraft.core.component.DataComponents;
+import net.minecraft.core.registries.Registries;
 import net.minecraft.data.PackOutput;
 import net.minecraft.data.recipes.RecipeCategory;
 import net.minecraft.data.recipes.RecipeOutput;
 import net.minecraft.data.recipes.RecipeProvider;
 import net.minecraft.data.recipes.ShapedRecipeBuilder;
 import net.minecraft.data.recipes.ShapelessRecipeBuilder;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.tags.FluidTags;
 import net.minecraft.tags.ItemTags;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.item.crafting.Ingredient;
+import net.minecraft.world.item.enchantment.Enchantment;
+import net.minecraft.world.item.enchantment.Enchantments;
+import net.minecraft.world.item.enchantment.ItemEnchantments;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
-import net.minecraft.world.level.material.Fluids;
-import net.neoforged.neoforge.fluids.FluidStack;
+import net.neoforged.neoforge.common.conditions.ICondition;
+import net.neoforged.neoforge.common.conditions.ModLoadedCondition;
+import net.neoforged.neoforge.common.conditions.NotCondition;
 import org.jetbrains.annotations.NotNull;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
 public class CraftingRecipes extends RecipeProvider {
+
+    /** ExtendedAE 的模组 id；该模组提供扩展机器，安装后替换配方中的原版部件。 */
+    private static final String EXTENDEDAE = "extendedae";
+
+    /**
+     * 有用线圈各阶无用齿轮的消耗量，数组下标即阶次减一。
+     *
+     * <p>一阶六十四个、逐阶递减、九阶四个，合计二百九十二个。数量压在低阶、价值压在高阶：
+     * 一阶锭单价最低，由数量承担；高阶锭单价高，少量即可。</p>
+     */
+    private static final long[] USEFUL_COIL_GEAR_COUNTS = {64, 56, 48, 40, 32, 24, 16, 8, 4};
+
+    /** 动态注册表查找入口，用于在生成期构造带附魔组件的样板物品。 */
+    private final CompletableFuture<HolderLookup.Provider> registryLookup;
+
     public CraftingRecipes(PackOutput output, CompletableFuture<HolderLookup.Provider> registries) {
         super(output, registries);
+        this.registryLookup = registries;
     }
 
     @Override
@@ -54,6 +86,82 @@ public class CraftingRecipes extends RecipeProvider {
         this.addPlasticRecipes(consumer);
         this.addTemperatureRegulatorRecipe(consumer);
         this.addAdvancedAlloyFurnaceRecipes(consumer);
+        this.addUselessCoilRecipes(consumer);
+        this.addUsefulCoilRecipe(consumer);
+        this.addAlloyFurnaceCoreRecipe(consumer);
+        this.addWorldInteractionRecipes(consumer);
+    }
+
+    /**
+     * 无用锭一至四阶的世界交互配方。
+     * 一、二阶为浸入水中的流体条件，三、四阶为爆炸条件。
+     *
+     * <p>AE2 的转换配方对每个原料条目只消耗一个物品，配方所需数量因此以条目重复次数表达：
+     * 同一原料重复列出 N 次即消耗 N 个。</p>
+     *
+     * <p>定价原则：一至四阶是整条无用锭链的起点，基础材料自 16 个起、随阶数逐级抬升；
+     * 前置锭统一只吃 1 个，链式成本因此不由重复投料堆叠，而由基础材料与高阶稀有材料承担。
+     * 这里的数量不能与合金炉路径（五至九阶）一样放开：世界交互要玩家亲手备料、投掷、引爆，
+     * 条目重复次数直接等于手动操作量，因此基础材料以 16 为起点逐级抬升，把重压留给后期。</p>
+     */
+    private void addWorldInteractionRecipes(RecipeOutput consumer) {
+        var water = TransformCircumstance.fluid(FluidTags.WATER);
+        var explosion = TransformCircumstance.EXPLOSION;
+        var certusQuartz = Ingredient.of(ItemTags.create(
+                ResourceLocation.parse("c:gems/certus_quartz")));
+
+        // 一阶：浸入。首个条目为触发物品，投掷实体必须与之匹配。
+        var tier1 = new ArrayList<Ingredient>();
+        repeat(tier1, Ingredient.of(Items.MUTTON), 16);
+        repeat(tier1, Ingredient.of(Items.BEEF), 16);
+        repeat(tier1, Ingredient.of(Items.PORKCHOP), 16);
+        repeat(tier1, Ingredient.of(Items.IRON_INGOT), 16);
+        repeat(tier1, Ingredient.of(Items.GOLD_INGOT), 16);
+        repeat(tier1, Ingredient.of(Items.DIAMOND), 16);
+        TransformRecipeBuilder.transform(consumer, AppEng.makeId("transform/useless_ingot_tier_1"),
+                ModItems.USELESS_INGOT_TIER_1.get(), 1, water, tier1.toArray(Ingredient[]::new));
+
+        // 二阶：浸入
+        var tier2 = new ArrayList<Ingredient>();
+        repeat(tier2, Ingredient.of(Items.ROTTEN_FLESH), 16);
+        repeat(tier2, Ingredient.of(Items.GUNPOWDER), 16);
+        repeat(tier2, Ingredient.of(Items.BONE), 16);
+        repeat(tier2, Ingredient.of(AEItems.SKY_DUST), 64);
+        repeat(tier2, certusQuartz, 16);
+        repeat(tier2, Ingredient.of(ModItems.USELESS_INGOT_TIER_1.get()), 1);
+        TransformRecipeBuilder.transform(consumer, AppEng.makeId("transform/useless_ingot_tier_2"),
+                ModItems.USELESS_INGOT_TIER_2.get(), 1, water, tier2.toArray(Ingredient[]::new));
+
+        // 三阶：爆炸
+        var tier3 = new ArrayList<Ingredient>();
+        repeat(tier3, Ingredient.of(Items.RED_NETHER_BRICKS), 16);
+        repeat(tier3, Ingredient.of(Items.BLAZE_POWDER), 32);
+        repeat(tier3, Ingredient.of(Items.GLOWSTONE_DUST), 32);
+        repeat(tier3, Ingredient.of(AEItems.CERTUS_QUARTZ_DUST), 32);
+        repeat(tier3, Ingredient.of(AEItems.MATTER_BALL), 32);
+        repeat(tier3, Ingredient.of(ModItems.USELESS_INGOT_TIER_2.get()), 1);
+        TransformRecipeBuilder.transform(consumer, AppEng.makeId("transform/useless_ingot_tier_3"),
+                ModItems.USELESS_INGOT_TIER_3.get(), 1, explosion, tier3.toArray(Ingredient[]::new));
+
+        // 四阶：爆炸
+        // 前置链修正：原配方吃一阶锭与三阶锭、跳过二阶锭，链式成本出现断点；
+        // 现改为只吃紧邻的上一阶（二阶）与三阶锭，四阶正式成为三阶的下一环。
+        var tier4 = new ArrayList<Ingredient>();
+        repeat(tier4, Ingredient.of(Items.ENDER_EYE), 16);
+        repeat(tier4, Ingredient.of(Items.CHORUS_FLOWER), 16);
+        repeat(tier4, Ingredient.of(Items.PHANTOM_MEMBRANE), 32);
+        repeat(tier4, Ingredient.of(Items.GOLD_BLOCK), 16);
+        repeat(tier4, Ingredient.of(ModItems.USELESS_INGOT_TIER_2.get()), 1);
+        repeat(tier4, Ingredient.of(ModItems.USELESS_INGOT_TIER_3.get()), 1);
+        TransformRecipeBuilder.transform(consumer, AppEng.makeId("transform/useless_ingot_tier_4"),
+                ModItems.USELESS_INGOT_TIER_4.get(), 1, explosion, tier4.toArray(Ingredient[]::new));
+    }
+
+    /** 把同一原料重复加入配方条目列表；重复次数即该原料在世界交互中的消耗数量。 */
+    private static void repeat(List<Ingredient> ingredients, Ingredient ingredient, int times) {
+        for (int i = 0; i < times; i++) {
+            ingredients.add(ingredient);
+        }
     }
 
     /** 任意塑料方块（1 个）→ 1 个温度调节器。 */
@@ -217,74 +325,211 @@ public class CraftingRecipes extends RecipeProvider {
                            .save(consumer, UselessMod.id("crafting/multiblock_alloy_furnace_core"));
 
         ShapedRecipeBuilder.shaped(RecipeCategory.BUILDING_BLOCKS, ModBlocks.ME_PATTERN_ASSEMBLY.get())
-                           .pattern(" R ")
-                           .pattern("CPC")
-                           .pattern(" R ")
-                           .define('R', Items.REDSTONE)
-                           .define('C', Blocks.CHEST)
-                           .define('P', AEBlocks.PATTERN_PROVIDER)
+                           .pattern("AEA")
+                           .pattern("BCB")
+                           .pattern("AFA")
+                           .define('A', ModBlocks.OMNIVERSAL_FURNACE_CASING.get())
+                           .define('B', AEBlocks.PATTERN_PROVIDER)
+                           .define('C', AEBlocks.INTERFACE)
+                           .define('E', AEBlocks.IO_PORT)
+                           .define('F', AEItems.CAPACITY_CARD)
                            .unlockedBy("has_pattern_provider", has(AEBlocks.PATTERN_PROVIDER))
-                           .save(consumer, UselessMod.id("crafting/me_pattern_assembly"));
+                           .save(withoutExtendedAE(consumer), UselessMod.id("crafting/me_pattern_assembly"));
 
         ShapedRecipeBuilder.shaped(RecipeCategory.BUILDING_BLOCKS, ModBlocks.OMNIVERSAL_MOLD_HUB.get())
-                           .pattern(" R ")
-                           .pattern("CHR")
-                           .pattern(" R ")
-                           .define('R', Items.REDSTONE)
-                           .define('C', Blocks.CHEST)
-                           .define('H', Blocks.HOPPER)
-                           .unlockedBy("has_hopper", has(Blocks.HOPPER))
-                           .save(consumer, UselessMod.id("crafting/omniversal_mold_hub"));
+                           .pattern("ABA")
+                           .pattern("DCD")
+                           .pattern("AFA")
+                           .define('A', ModBlocks.OMNIVERSAL_FURNACE_CASING.get())
+                           .define('B', AEBlocks.ME_CHEST)
+                           .define('C', AEBlocks.MOLECULAR_ASSEMBLER)
+                           .define('D', AEBlocks.INTERFACE)
+                           .define('F', AEItems.CAPACITY_CARD)
+                           .unlockedBy("has_molecular_assembler", has(AEBlocks.MOLECULAR_ASSEMBLER))
+                           .save(withoutExtendedAE(consumer), UselessMod.id("crafting/omniversal_mold_hub"));
 
         ShapedRecipeBuilder.shaped(RecipeCategory.BUILDING_BLOCKS,
                                    ModBlocks.PASSIVE_CRAFTING_HATCH.get())
-                           .pattern(" C ")
-                           .pattern("EPE")
-                           .pattern(" R ")
+                           .pattern("ACA")
+                           .pattern("DPE")
+                           .pattern("ARA")
+                           .define('A', AEBlocks.MOLECULAR_ASSEMBLER)
                            .define('C', Items.CLOCK)
+                           .define('D', AEParts.IMPORT_BUS)
                            .define('E', AEParts.EXPORT_BUS)
                            .define('P', ModBlocks.ME_PATTERN_ASSEMBLY.get())
-                           .define('R', Items.REDSTONE)
+                           .define('R', AEItems.SINGULARITY)
                            .unlockedBy("has_pattern_assembly", has(ModBlocks.ME_PATTERN_ASSEMBLY.get()))
-                           .save(consumer, UselessMod.id("crafting/passive_crafting_hatch"));
+                           .save(withoutExtendedAE(consumer), UselessMod.id("crafting/passive_crafting_hatch"));
 
         ShapedRecipeBuilder.shaped(RecipeCategory.BUILDING_BLOCKS,
-                                   ModBlocks.OMNIVERSAL_FURNACE_CASING.get(), 8)
-                           .pattern("NNN")
-                           .pattern("NSN")
-                           .pattern("NNN")
-                           .define('N', Items.IRON_NUGGET)
-                           .define('S', Blocks.SMOOTH_STONE)
-                           .unlockedBy("has_smooth_stone", has(Blocks.SMOOTH_STONE))
+                                   ModBlocks.OMNIVERSAL_FURNACE_CASING.get(), 1)
+                           .pattern("ABA")
+                           .pattern("BCB")
+                           .pattern("ABA")
+                           .define('A', AEBlocks.FLUIX_BLOCK)
+                           .define('B', AEBlocks.SKY_STONE_BLOCK)
+                           .define('C', AEItems.COLORED_LUMEN_PAINT_BALL.item(AEColor.GREEN))
+                           .unlockedBy("has_sky_stone", has(AEBlocks.SKY_STONE_BLOCK))
                            .save(consumer, UselessMod.id("crafting/omniversal_furnace_casing"));
 
-        for (int tier = UselessCoilBlock.MIN_TIER; tier <= UselessCoilBlock.MAX_TIER; tier++) {
-            var ingot = switch (tier) {
-                case 1 -> ModItems.USELESS_INGOT_TIER_1.get();
-                case 2 -> ModItems.USELESS_INGOT_TIER_2.get();
-                case 3 -> ModItems.USELESS_INGOT_TIER_3.get();
-                case 4 -> ModItems.USELESS_INGOT_TIER_4.get();
-                case 5 -> ModItems.USELESS_INGOT_TIER_5.get();
-                case 6 -> ModItems.USELESS_INGOT_TIER_6.get();
-                case 7 -> ModItems.USELESS_INGOT_TIER_7.get();
-                case 8 -> ModItems.USELESS_INGOT_TIER_8.get();
-                case 9 -> ModItems.USELESS_INGOT_TIER_9.get();
-                case UselessCoilBlock.USEFUL_TIER -> ModItems.USEFUL_INGOT.get();
+    }
+
+    /**
+     * 为配方输出附加「未安装 ExtendedAE」条件。
+     *
+     * <p>安装 ExtendedAE 后，其扩展机器替换原版对应部件，配方由 {@code CompatRecipeProvider}
+     * 另行生成的扩展版本承载；两者条件互斥，同一时刻只有一条参与加载。</p>
+     */
+    private static RecipeOutput withoutExtendedAE(RecipeOutput consumer) {
+        return consumer.withConditions(new NotCondition(new ModLoadedCondition(EXTENDEDAE)));
+    }
+
+    /**
+     * 一至九阶无用线圈的合金炉配方。
+     *
+     * <p>每阶消耗本级无用玻璃两个、本级齿轮三个、万象炉装饰外壳两个，以及低于本级一阶的线圈一个；
+     * 一阶无下级线圈，改用石英纤维四个。线缆按阶次分段：二至四阶为玻璃线缆，五至七阶为包层线缆，
+     * 八至九阶为致密线缆，数量均为八个。</p>
+     */
+    private void addUselessCoilRecipes(RecipeOutput consumer) {
+        for (int tier = UselessCoilBlock.MIN_TIER; tier <= 9; tier++) {
+            var glass = switch (tier) {
+                case 1 -> ModItems.USELESS_GLASS_TIER_1.get();
+                case 2 -> ModItems.USELESS_GLASS_TIER_2.get();
+                case 3 -> ModItems.USELESS_GLASS_TIER_3.get();
+                case 4 -> ModItems.USELESS_GLASS_TIER_4.get();
+                case 5 -> ModItems.USELESS_GLASS_TIER_5.get();
+                case 6 -> ModItems.USELESS_GLASS_TIER_6.get();
+                case 7 -> ModItems.USELESS_GLASS_TIER_7.get();
+                case 8 -> ModItems.USELESS_GLASS_TIER_8.get();
+                case 9 -> ModItems.USELESS_GLASS_TIER_9.get();
                 default -> throw new IllegalStateException("Unexpected coil tier: " + tier);
             };
-            ShapedRecipeBuilder.shaped(RecipeCategory.BUILDING_BLOCKS,
-                                       ModBlocks.USELESS_COILS.get(tier).get(), 16)
-                               .pattern("CRC")
-                               .pattern("RIR")
-                               .pattern("CRC")
-                               .define('C', Items.COPPER_INGOT)
-                               .define('R', Items.REDSTONE)
-                               .define('I', ingot)
-                               .unlockedBy("has_tier_ingot", has(ingot))
-                               .save(consumer, UselessMod.id(
-                                       "crafting/" + UselessCoilBlock.registryName(tier)));
-        }
+            var gear = switch (tier) {
+                case 1 -> ModItems.USELESS_GEAR_TIER_1.get();
+                case 2 -> ModItems.USELESS_GEAR_TIER_2.get();
+                case 3 -> ModItems.USELESS_GEAR_TIER_3.get();
+                case 4 -> ModItems.USELESS_GEAR_TIER_4.get();
+                case 5 -> ModItems.USELESS_GEAR_TIER_5.get();
+                case 6 -> ModItems.USELESS_GEAR_TIER_6.get();
+                case 7 -> ModItems.USELESS_GEAR_TIER_7.get();
+                case 8 -> ModItems.USELESS_GEAR_TIER_8.get();
+                case 9 -> ModItems.USELESS_GEAR_TIER_9.get();
+                default -> throw new IllegalStateException("Unexpected coil tier: " + tier);
+            };
 
+            var builder = AdvancedAlloyFurnaceRecipeBuilder.create()
+                                                          .input(Ingredient.of(glass), 2)
+                                                          .input(Ingredient.of(gear), 3)
+                                                          .input(Ingredient.of(ModBlocks.OMNIVERSAL_FURNACE_CASING.get()), 2);
+
+            if (tier == 1) {
+                builder.input(Ingredient.of(AEParts.QUARTZ_FIBER), 4);
+            } else {
+                builder.input(Ingredient.of(ModBlocks.USELESS_COILS.get(tier - 1).get()), 1);
+            }
+
+            if (tier <= 4) {
+                builder.input(Ingredient.of(AEParts.GLASS_CABLE.item(AEColor.TRANSPARENT)), 8);
+            } else if (tier <= 7) {
+                builder.input(Ingredient.of(AEParts.COVERED_CABLE.item(AEColor.TRANSPARENT)), 8);
+            } else {
+                builder.input(Ingredient.of(AEParts.COVERED_DENSE_CABLE.item(AEColor.TRANSPARENT)), 8);
+            }
+
+            builder.output(ModBlocks.USELESS_COILS.get(tier).get(), 1)
+                   .energy(coilEnergy(tier))
+                   .processTime(40)
+                   .tier(tier - 1)
+                   .mode(AlloyFurnaceMode.NORMAL)
+                   .save(consumer, UselessMod.id(
+                           "advanced_alloy/coil/" + UselessCoilBlock.registryName(tier)));
+        }
+    }
+
+    /**
+     * 有用线圈的合金炉配方。
+     *
+     * <p>消耗全部九种无用齿轮，数量自一阶六十四起逐阶递减至九阶四个，合计二百九十二个。
+     * 数量压在低阶、价值压在高阶：一阶锭单价最低，靠数量承担；高阶锭单价高，靠少量即可。
+     * 早期版本自九阶起每降一阶翻倍（一阶一千零二十四个），单条线圈要三万余个一阶锭，
+     * 而一阶锭只能手动浸水获取，实际上不可完成；现按 {@link #USEFUL_COIL_GEAR_COUNTS} 编排。</p>
+     * <p>另有九阶无用线圈一个与万象炉装饰外壳两个。玻璃部分由致密能源元件十四个、空间塔六个、
+     * 空间锚一个替代，线缆为致密线缆八个。</p>
+     */
+    private void addUsefulCoilRecipe(RecipeOutput consumer) {
+        var builder = AdvancedAlloyFurnaceRecipeBuilder.create()
+                                                      .input(Ingredient.of(ModBlocks.OMNIVERSAL_FURNACE_CASING.get()), 2)
+                                                      .input(Ingredient.of(ModBlocks.USELESS_COILS.get(9).get()), 1)
+                                                      .input(Ingredient.of(AEBlocks.DENSE_ENERGY_CELL), 16)
+                                                      .input(Ingredient.of(AEBlocks.SPATIAL_PYLON), 8)
+                                                      .input(Ingredient.of(AEBlocks.SPATIAL_ANCHOR), 8)
+                                                      .input(Ingredient.of(AEParts.COVERED_DENSE_CABLE.item(AEColor.TRANSPARENT)), 8);
+        for (int tier = 1; tier <= 9; tier++) {
+            builder.input(Ingredient.of(uselessGear(tier)), USEFUL_COIL_GEAR_COUNTS[tier - 1]);
+        }
+        builder.output(ModBlocks.USELESS_COILS.get(UselessCoilBlock.USEFUL_TIER).get(), 1)
+               .energy(500000000L)
+               .processTime(40)
+               .tier(9)
+               .mode(AlloyFurnaceMode.NORMAL)
+               .save(consumer, UselessMod.id(
+                       "advanced_alloy/coil/" + UselessCoilBlock.registryName(UselessCoilBlock.USEFUL_TIER)));
+    }
+
+    /**
+     * 多方块合金炉核心的合金炉配方。
+     *
+     * <p>作为工作台配方的后期替代路径，消耗万象合金炉十六个、ME 控制器六十四个、九阶无用锭两个，
+     * 以及成型核心、破坏核心、并行处理单元各一千零二十四个。机器等级限定为九阶。</p>
+     */
+    private void addAlloyFurnaceCoreRecipe(RecipeOutput consumer) {
+        AdvancedAlloyFurnaceRecipeBuilder.create()
+                                         .input(Ingredient.of(ModBlocks.ADVANCED_ALLOY_FURNACE_BLOCK.get()), 16)
+                                         .input(Ingredient.of(AEBlocks.CONTROLLER), 64)
+                                         .input(Ingredient.of(ModItems.USELESS_INGOT_TIER_9.get()), 2)
+                                         .input(Ingredient.of(AEItems.FORMATION_CORE), 1024)
+                                         .input(Ingredient.of(AEItems.ANNIHILATION_CORE), 1024)
+                                         .input(Ingredient.of(AEBlocks.CRAFTING_ACCELERATOR), 1024)
+                                         .output(ModBlocks.MULTIBLOCK_ALLOY_FURNACE_CORE.get(), 1)
+                                         .energy(500000000L)
+                                         .processTime(100)
+                                         .tier(9)
+                                         .mode(AlloyFurnaceMode.NORMAL)
+                                         .save(consumer, UselessMod.id("advanced_alloy/alloy_furnace_core"));
+    }
+
+    /** 无用齿轮按阶次取件；阶次范围为 1 至 9。 */
+    private static Item uselessGear(int tier) {
+        return switch (tier) {
+            case 1 -> ModItems.USELESS_GEAR_TIER_1.get();
+            case 2 -> ModItems.USELESS_GEAR_TIER_2.get();
+            case 3 -> ModItems.USELESS_GEAR_TIER_3.get();
+            case 4 -> ModItems.USELESS_GEAR_TIER_4.get();
+            case 5 -> ModItems.USELESS_GEAR_TIER_5.get();
+            case 6 -> ModItems.USELESS_GEAR_TIER_6.get();
+            case 7 -> ModItems.USELESS_GEAR_TIER_7.get();
+            case 8 -> ModItems.USELESS_GEAR_TIER_8.get();
+            case 9 -> ModItems.USELESS_GEAR_TIER_9.get();
+            default -> throw new IllegalStateException("Unexpected gear tier: " + tier);
+        };
+    }
+
+    /** 线圈能耗沿用无用锭的等级序列，保持同阶产物能耗口径一致。 */
+    private static long coilEnergy(int tier) {
+        return switch (tier) {
+            case 1 -> 10000L;
+            case 2 -> 50000L;
+            case 3 -> 100000L;
+            case 4 -> 500000L;
+            case 5 -> 1000000L;
+            case 6 -> 5000000L;
+            case 7 -> 10000000L;
+            case 8 -> 50000000L;
+            case 9 -> 100000000L;
+            default -> throw new IllegalStateException("Unexpected coil tier: " + tier);
+        };
     }
 
     private void addAE2GiftPackageRecipe(RecipeOutput consumer) {
@@ -354,148 +599,111 @@ public class CraftingRecipes extends RecipeProvider {
                            .save(output, UselessMod.id("crafting/possible_useful_ingot"));
     }
 
+    /**
+     * 无用锭五至九阶与有用锭的合金炉配方。
+     *
+     * <p>一至四阶锭改由世界交互配方产出，不再提供合金炉路径。</p>
+     */
     private void addUselessIngotRecipes(RecipeOutput output) {
-        // Tier 1 - 基础合成
+        // Tier 5 - 使用4阶无用锭作为输入材料；幻翼膜替换为潜影壳，机器等级限定为 LV.4
+        // 能量卡 LV.4 容量上限：BASE_ENERGY_CAPACITY(100000) * 8 * 4 = 3200000
+        // 造价：上一阶锭 1 个，各类材料 32 个
         AdvancedAlloyFurnaceRecipeBuilder.create()
-                                         .input(Ingredient.of(Items.MUTTON), 2)
-                                         .input(Ingredient.of(Items.BEEF), 2)
-                                         .input(Ingredient.of(Items.CHICKEN), 2)
-                                         .input(Ingredient.of(Items.IRON_INGOT), 2)
-                                         .input(Ingredient.of(Items.GOLD_INGOT), 2)
-                                         .input(Ingredient.of(Items.DIAMOND), 2)
-                                         .output(ModItems.USELESS_INGOT_TIER_1.get(), 1)
-                                         .energy(10000)
-                                         .processTime(1)
-                                         .mode(AlloyFurnaceMode.NORMAL)
-                                         .save(output, UselessMod.id("advanced_alloy/ingot/useless_ingot_tier_1"));
-
-        // Tier 2 - 使用1阶无用锭作为输入材料
-        AdvancedAlloyFurnaceRecipeBuilder.create()
-                                         .input(Ingredient.of(Items.ROTTEN_FLESH), 2)
-                                         .input(Ingredient.of(Items.GUNPOWDER), 2)
-                                         .input(Ingredient.of(Items.BONE), 2)
-                                         .input(Ingredient.of(Items.GOLD_INGOT), 2)
-                                         .input(Ingredient.of(Items.DIAMOND), 2)
-                                         .input(Ingredient.of(ModItems.USELESS_INGOT_TIER_1.get()), 1)
-                                         .output(ModItems.USELESS_INGOT_TIER_2.get(), 1)
-                                         .energy(50000)
-                                         .processTime(1)
-                                         .mode(AlloyFurnaceMode.NORMAL)
-                                         .save(output, UselessMod.id("advanced_alloy/ingot/useless_ingot_tier_2"));
-
-        // Tier 3 - 使用2阶无用锭作为输入材料
-        AdvancedAlloyFurnaceRecipeBuilder.create()
-                                         .input(Ingredient.of(Items.NETHER_WART), 2)
-                                         .input(Ingredient.of(Items.BLAZE_ROD), 2)
-                                         .input(Ingredient.of(Items.NETHER_BRICK), 2)
-                                         .input(Ingredient.of(Items.GOLD_INGOT), 2)
-                                         .input(Ingredient.of(Items.DIAMOND), 2)
-                                         .input(Ingredient.of(ModItems.USELESS_INGOT_TIER_2.get()), 1)
-                                         .output(ModItems.USELESS_INGOT_TIER_3.get(), 1)
-                                         .energy(100000)
-                                         .processTime(1)
-                                         .mode(AlloyFurnaceMode.NORMAL)
-                                         .save(output, UselessMod.id("advanced_alloy/ingot/useless_ingot_tier_3"));
-
-        // Tier 4 - 使用3阶无用锭作为输入材料
-        AdvancedAlloyFurnaceRecipeBuilder.create()
-                                         .input(Ingredient.of(Items.ENDER_PEARL), 2)
-                                         .input(Ingredient.of(Items.CHORUS_FRUIT), 2)
-                                         .input(Ingredient.of(Items.SHULKER_SHELL), 2)
-                                         .input(Ingredient.of(Items.GOLD_BLOCK), 2)
-                                         .input(Ingredient.of(Items.DIAMOND_BLOCK), 2)
-                                         .input(Ingredient.of(ModItems.USELESS_INGOT_TIER_3.get()), 1)
-                                         .output(ModItems.USELESS_INGOT_TIER_4.get(), 1)
-                                         .energy(500000)
-                                         .processTime(1)
-                                         .mode(AlloyFurnaceMode.NORMAL)
-                                         .save(output, UselessMod.id("advanced_alloy/ingot/useless_ingot_tier_4"));
-
-        // Tier 5 - 使用4阶无用锭作为输入材料
-        AdvancedAlloyFurnaceRecipeBuilder.create()
-                                         .input(Ingredient.of(Items.WITHER_SKELETON_SKULL), 2)
-                                         .input(Ingredient.of(Items.PHANTOM_MEMBRANE), 2)
-                                         .input(Ingredient.of(Items.SEA_LANTERN), 2)
-                                         .input(Ingredient.of(Items.GOLD_BLOCK), 2)
-                                         .input(Ingredient.of(Items.DIAMOND_BLOCK), 2)
+                                         .input(Ingredient.of(Items.WITHER_SKELETON_SKULL), 32)
+                                         .input(Ingredient.of(Items.SHULKER_SHELL), 32)
+                                         .input(Ingredient.of(Items.SEA_LANTERN), 32)
+                                         .input(Ingredient.of(Items.GOLD_BLOCK), 32)
+                                         .input(Ingredient.of(Items.DIAMOND_BLOCK), 32)
                                          .input(Ingredient.of(ModItems.USELESS_INGOT_TIER_4.get()), 1)
                                          .output(ModItems.USELESS_INGOT_TIER_5.get(), 1)
-                                         .energy(1000000)
+                                         .energy(3200000)
                                          .processTime(1)
+                                         .tier(4)
                                          .mode(AlloyFurnaceMode.NORMAL)
                                          .save(output, UselessMod.id("advanced_alloy/ingot/useless_ingot_tier_5"));
 
-        // Tier 6 - 使用5阶无用锭作为输入材料
+        // Tier 6 - 使用5阶无用锭作为输入材料；追加福鲁伊克斯粉，机器等级限定为 LV.5
+        // 能量卡 LV.5 容量上限：BASE_ENERGY_CAPACITY(100000) * 8 * 16 = 12800000
         AdvancedAlloyFurnaceRecipeBuilder.create()
-                                         .input(Ingredient.of(Items.DRAGON_BREATH), 2)
-                                         .input(Ingredient.of(Items.TOTEM_OF_UNDYING), 2)
-                                         .input(Ingredient.of(Items.ENCHANTED_GOLDEN_APPLE), 2)
-                                         .input(Ingredient.of(Items.GOLD_BLOCK), 2)
-                                         .input(Ingredient.of(Items.DIAMOND_BLOCK), 2)
+                                         .input(Ingredient.of(Items.DRAGON_BREATH), 16)
+                                         .input(Ingredient.of(Items.TOTEM_OF_UNDYING), 8)
+                                         .input(Ingredient.of(Items.ENCHANTED_GOLDEN_APPLE), 8)
+                                         .input(Ingredient.of(AEItems.FLUIX_DUST), 128)
+                                         .input(Ingredient.of(Items.DIAMOND_BLOCK), 64)
                                          .input(Ingredient.of(ModItems.USELESS_INGOT_TIER_5.get()), 1)
                                          .output(ModItems.USELESS_INGOT_TIER_6.get(), 1)
-                                         .energy(5000000)
+                                         .energy(12800000)
                                          .processTime(1)
+                                         .tier(5)
                                          .mode(AlloyFurnaceMode.NORMAL)
                                          .save(output, UselessMod.id("advanced_alloy/ingot/useless_ingot_tier_6"));
 
-        // Tier 7 - 使用6阶无用锭作为输入材料
+        // Tier 7 - 使用6阶无用锭作为输入材料；钻石块替换为奇点，机器等级限定为 LV.6
+        // 能量卡 LV.6 容量上限：BASE_ENERGY_CAPACITY(100000) * 8 * 64 = 51200000
         AdvancedAlloyFurnaceRecipeBuilder.create()
-                                         .input(Ingredient.of(Items.NETHER_STAR), 2)
-                                         .input(Ingredient.of(Items.WITHER_ROSE), 2)
-                                         .input(Ingredient.of(Items.GHAST_TEAR), 2)
-                                         .input(Ingredient.of(Items.DIAMOND_BLOCK), 2)
-                                         .input(Ingredient.of(Items.NETHERITE_INGOT), 2)
+                                         .input(Ingredient.of(Items.NETHER_STAR), 8)
+                                         .input(Ingredient.of(Items.WITHER_ROSE), 32)
+                                         .input(Ingredient.of(Items.GHAST_TEAR), 32)
+                                         .input(Ingredient.of(AEItems.SINGULARITY), 128)
+                                         .input(Ingredient.of(Items.NETHERITE_INGOT), 32)
                                          .input(Ingredient.of(ModItems.USELESS_INGOT_TIER_6.get()), 1)
                                          .output(ModItems.USELESS_INGOT_TIER_7.get(), 1)
-                                         .energy(10000000)
+                                         .energy(51200000)
                                          .processTime(1)
+                                         .tier(6)
                                          .mode(AlloyFurnaceMode.NORMAL)
                                          .save(output, UselessMod.id("advanced_alloy/ingot/useless_ingot_tier_7"));
 
-        // Tier 8 - 使用7阶无用锭作为输入材料
+        // Tier 8 - 使用7阶无用锭作为输入材料；龙首替换为海龟壳，机器等级限定为 LV.7
+        // 能量卡 LV.7 容量上限：BASE_ENERGY_CAPACITY(100000) * 8 * 256 = 204800000
         AdvancedAlloyFurnaceRecipeBuilder.create()
-                                         .input(Ingredient.of(Items.DRAGON_HEAD), 2)
-                                         .input(Ingredient.of(Items.ECHO_SHARD), 2)
-                                         .input(Ingredient.of(Items.CONDUIT), 2)
-                                         .input(Ingredient.of(Items.DIAMOND_BLOCK), 2)
-                                         .input(Ingredient.of(Items.NETHERITE_INGOT), 2)
+                                         .input(Ingredient.of(Items.TURTLE_HELMET), 8)
+                                         .input(Ingredient.of(Items.ECHO_SHARD), 16)
+                                         .input(Ingredient.of(Items.CONDUIT), 16)
+                                         .input(Ingredient.of(Items.NETHERITE_INGOT), 64)
                                          .input(Ingredient.of(ModItems.USELESS_INGOT_TIER_7.get()), 1)
                                          .output(ModItems.USELESS_INGOT_TIER_8.get(), 1)
-                                         .energy(50000000)
+                                         .energy(204800000)
                                          .processTime(1)
+                                         .tier(7)
                                          .mode(AlloyFurnaceMode.NORMAL)
                                          .save(output, UselessMod.id("advanced_alloy/ingot/useless_ingot_tier_8"));
 
-        // Tier 9 - 使用8阶无用锭作为输入材料
+        // Tier 9 - 使用8阶无用锭作为输入材料；追加沉重核心与猪灵的头，海龟壳替换为龙首，钻石块替换为没那么神秘的方块，机器等级限定为 LV.8
+        // 能量卡 LV.8 容量上限：BASE_ENERGY_CAPACITY(100000) * 8 * 1024 = 819200000
         AdvancedAlloyFurnaceRecipeBuilder.create()
-                                         .input(Ingredient.of(Items.TURTLE_HELMET), 2)
-                                         .input(Ingredient.of(Items.GOAT_HORN), 2)
-                                         .input(Ingredient.of(Items.RABBIT_FOOT), 2)
-                                         .input(Ingredient.of(Items.DIAMOND_BLOCK), 2)
-                                         .input(Ingredient.of(Items.NETHERITE_BLOCK), 2)
+                                         .input(Ingredient.of(Items.DRAGON_HEAD), 8)
+                                         .input(Ingredient.of(Items.GOAT_HORN), 8)
+                                         .input(Ingredient.of(Items.RABBIT_FOOT), 8)
+                                         .input(Ingredient.of(AEBlocks.NOT_SO_MYSTERIOUS_CUBE), 16)
+                                         .input(Ingredient.of(Items.NETHERITE_BLOCK), 16)
+                                         .input(Ingredient.of(Items.HEAVY_CORE), 8)
+                                         .input(Ingredient.of(Items.PIGLIN_HEAD), 8)
                                          .input(Ingredient.of(ModItems.USELESS_INGOT_TIER_8.get()), 1)
                                          .output(ModItems.USELESS_INGOT_TIER_9.get(), 1)
-                                         .energy(100000000)
+                                         .energy(819200000)
                                          .processTime(1)
+                                         .tier(8)
                                          .mode(AlloyFurnaceMode.NORMAL)
                                          .save(output, UselessMod.id("advanced_alloy/ingot/useless_ingot_tier_9"));
 
         // Possible Useful Ingot - 合成配方（工作台）
         // 使用9个不同等级的无用锭合成
 
-        // Useful Ingot - 高级熔炉配方
+        // Useful Ingot - 高级熔炉配方；由可能有用锭与 AE2 高阶材料合成，机器等级限定为 LV.9
+        // 能量卡 LV.9 容量上限：BASE_ENERGY_CAPACITY(100000) * 8 * 4096 = 3276800000
         AdvancedAlloyFurnaceRecipeBuilder.create()
-                                         .input(Ingredient.of(ModItems.POSSIBLE_USEFUL_INGOT.get()), 64)
-                                         .input(Ingredient.of(Blocks.IRON_BLOCK), 1024)
-                                         .input(Ingredient.of(Blocks.GOLD_BLOCK), 1024)
-                                         .input(Ingredient.of(Blocks.DIAMOND_BLOCK), 1024)
-                                         .input(Ingredient.of(Blocks.EMERALD_BLOCK), 1024)
-                                         .input(Ingredient.of(Blocks.NETHERITE_BLOCK), 1024)
-                                         .fluidInput(new FluidStack(Fluids.LAVA, 10000000))
+                                         .input(Ingredient.of(ModItems.POSSIBLE_USEFUL_INGOT.get()), 32)
+                                         .input(Ingredient.of(AEBlocks.FLAWLESS_BUDDING_QUARTZ), 32)
+                                         .input(Ingredient.of(AEItems.CELL_COMPONENT_256K), 64)
+                                         .input(Ingredient.of(AEItems.SPATIAL_128_CELL_COMPONENT), 64)
+                                         .input(Ingredient.of(AEBlocks.DENSE_ENERGY_CELL), 64)
+                                         .input(Ingredient.of(AEItems.ENDER_DUST), 512)
+                                         .input(Ingredient.of(AEItems.SINGULARITY), 1024)
                                          .output(ModItems.USEFUL_INGOT.get(), 1)
-                                         .energy(10000000)
+                                         .energy(3276800000L)
                                          .processTime(100)
+                                         .tier(9)
                                          .mode(AlloyFurnaceMode.NORMAL)
                                          .save(output, UselessMod.id("advanced_alloy/ingot/useful_ingot"));
     }
@@ -579,22 +787,35 @@ public class CraftingRecipes extends RecipeProvider {
         }
     }
 
+    /**
+     * 造化垂青之杖：在 AE2 压印器中制作。
+     *
+     * <p>中层为五阶无用锭，上层为时运 3 的下界合金镐，下层为抢夺 3 与精准采集的下界合金斧。
+     * 采用 {@link InscriberProcessType#PRESS} 模式，三个槽位的材料都会被消耗；
+     * 附魔要求由 {@link EnchantedItemIngredient} 承载，只校验物品种类与各附魔的最低等级，
+     * 不要求工具耐久或其它组件完全一致。</p>
+     */
     private void addEndlessBeafItemRecipe(RecipeOutput consumer) {
-        ShapedRecipeBuilder.shaped(RecipeCategory.MISC, ModItems.ENDLESS_BEAF_ITEM.get(), 1)
-                           .pattern("ABC")
-                           .pattern("DEF")
-                           .pattern("IGH")
-                           .define('A', ModItems.USELESS_INGOT_TIER_5.get())
-                           .define('B', ModItems.USELESS_INGOT_TIER_4.get())
-                           .define('C', ModItems.USELESS_INGOT_TIER_3.get())
-                           .define('D', Items.DIAMOND_PICKAXE)
-                           .define('E', ModItems.USELESS_INGOT_TIER_2.get())
-                           .define('F', Items.NETHERITE_PICKAXE)
-                           .define('G', ModItems.USELESS_INGOT_TIER_1.get())
-                           .define('H', Items.GOLDEN_CARROT)
-                           .define('I', Items.GHAST_TEAR)
-                           .unlockedBy("has_ingot", has(ModItems.USELESS_INGOT_TIER_1.get()))
-                           .save(consumer);
+        HolderLookup.RegistryLookup<Enchantment> enchantments =
+                this.registryLookup.join().lookupOrThrow(Registries.ENCHANTMENT);
+
+        ItemStack fortunePickaxe = new ItemStack(Items.NETHERITE_PICKAXE);
+        ItemEnchantments.Mutable pickaxeEnchantments = new ItemEnchantments.Mutable(ItemEnchantments.EMPTY);
+        pickaxeEnchantments.set(enchantments.getOrThrow(Enchantments.FORTUNE), 3);
+        fortunePickaxe.set(DataComponents.ENCHANTMENTS, pickaxeEnchantments.toImmutable());
+
+        ItemStack lootingAxe = new ItemStack(Items.NETHERITE_AXE);
+        ItemEnchantments.Mutable axeEnchantments = new ItemEnchantments.Mutable(ItemEnchantments.EMPTY);
+        axeEnchantments.set(enchantments.getOrThrow(Enchantments.LOOTING), 3);
+        axeEnchantments.set(enchantments.getOrThrow(Enchantments.SILK_TOUCH), 1);
+        lootingAxe.set(DataComponents.ENCHANTMENTS, axeEnchantments.toImmutable());
+
+        InscriberRecipeBuilder.inscribe(Ingredient.of(ModItems.USELESS_INGOT_TIER_5.get()),
+                                        ModItems.ENDLESS_BEAF_ITEM.get(), 1)
+                               .setTop(EnchantedItemIngredient.of(fortunePickaxe))
+                               .setBottom(EnchantedItemIngredient.of(lootingAxe))
+                               .setMode(InscriberProcessType.PRESS)
+                               .save(consumer, UselessMod.id("inscriber/endless_beaf_item"));
     }
 
     private void addOreGeneratorBlockRecipe(RecipeOutput consumer) {

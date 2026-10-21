@@ -1,21 +1,24 @@
 {
-    "type": "minecraft:crafting_shaped",
-    "category": "building",
-    "key": {
-        "N": {
-            "item": "minecraft:iron_nugget"
-        },
-        "S": {
-            "item": "minecraft:smooth_stone"
-        }
+  "type": "minecraft:crafting_shaped",
+  "category": "building",
+  "key": {
+    "A": {
+      "item": "ae2:fluix_block"
     },
-    "pattern": [
-        "NNN",
-        "NSN",
-        "NNN"
-    ],
-    "result": {
-        "count": 8,
-        "id": "useless_mod:omniversal_furnace_casing"
+    "B": {
+      "item": "ae2:sky_stone_block"
+    },
+    "C": {
+      "item": "ae2:green_lumen_paint_ball"
     }
+  },
+  "pattern": [
+    "ABA",
+    "BCB",
+    "ABA"
+  ],
+  "result": {
+    "count": 1,
+    "id": "useless_mod:omniversal_furnace_casing"
+  }
 }

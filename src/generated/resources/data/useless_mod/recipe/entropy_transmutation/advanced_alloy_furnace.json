@@ -1,0 +1,50 @@
+{
+  "type": "useless_mod:entropy_transmutation",
+  "inputs": [
+    {
+      "count": 8,
+      "ingredient": {
+        "item": "useless_mod:useless_ingot_tier_1"
+      }
+    },
+    {
+      "ingredient": {
+        "item": "minecraft:furnace"
+      }
+    },
+    {
+      "ingredient": {
+        "item": "minecraft:iron_block"
+      }
+    },
+    {
+      "ingredient": {
+        "item": "minecraft:gold_block"
+      }
+    },
+    {
+      "ingredient": {
+        "item": "minecraft:lapis_block"
+      }
+    },
+    {
+      "ingredient": {
+        "item": "minecraft:diamond_block"
+      }
+    },
+    {
+      "ingredient": {
+        "item": "minecraft:emerald_block"
+      }
+    },
+    {
+      "ingredient": {
+        "item": "minecraft:netherite_block"
+      }
+    }
+  ],
+  "output": {
+    "count": 1,
+    "id": "useless_mod:advanced_alloy_furnace_block"
+  }
+}

@@ -9,6 +9,8 @@ import com.sorrowmist.useless.api.enums.EnumColor;
 import com.sorrowmist.useless.content.blocks.GlowPlasticBlock;
 import com.sorrowmist.useless.content.blocks.multiblock.UselessCoilBlock;
 import com.sorrowmist.useless.content.recipe.AdvancedAlloyFurnaceRecipeBuilder;
+import com.sorrowmist.useless.content.recipe.CountedIngredient;
+import com.sorrowmist.useless.content.recipe.EntropyTransmutationRecipe;
 import com.sorrowmist.useless.init.ModBlocks;
 import com.sorrowmist.useless.init.ModItems;
 import com.sorrowmist.useless.init.ModTags;
@@ -21,6 +23,7 @@ import net.minecraft.data.recipes.ShapedRecipeBuilder;
 import net.minecraft.data.recipes.ShapelessRecipeBuilder;
 import net.minecraft.tags.ItemTags;
 import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.item.crafting.Ingredient;
 import net.minecraft.world.level.block.Block;
@@ -29,6 +32,7 @@ import net.minecraft.world.level.material.Fluids;
 import net.neoforged.neoforge.fluids.FluidStack;
 import org.jetbrains.annotations.NotNull;
 
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
 public class CraftingRecipes extends RecipeProvider {
@@ -39,7 +43,7 @@ public class CraftingRecipes extends RecipeProvider {
     @Override
     protected void buildRecipes(@NotNull RecipeOutput consumer) {
         this.addMoldRecipes(consumer);
-        this.addAdvancedAlloyFurnaceBlockRecipe(consumer);
+        this.addAdvancedAlloyFurnaceEntropyRecipe(consumer);
         this.addOmniversalFurnaceRecipes(consumer);
         this.addEndlessBeafItemRecipe(consumer);
         this.addOreGeneratorBlockRecipe(consumer);
@@ -170,25 +174,34 @@ public class CraftingRecipes extends RecipeProvider {
                            .save(consumer, UselessMod.id("mold/metal_mold_block"));
     }
 
-    private void addAdvancedAlloyFurnaceBlockRecipe(RecipeOutput consumer) {
-        ShapedRecipeBuilder.shaped(RecipeCategory.BUILDING_BLOCKS,
-                                   ModBlocks.ADVANCED_ALLOY_FURNACE_BLOCK.get(),
-                                   1
-                           )
-                           .pattern("ABC")
-                           .pattern("DEF")
-                           .pattern("GHI")
-                           .define('A', Blocks.EMERALD_BLOCK)
-                           .define('B', Blocks.DIAMOND_BLOCK)
-                           .define('C', Blocks.LAPIS_BLOCK)
-                           .define('D', Blocks.IRON_BLOCK)
-                           .define('E', Blocks.FURNACE)
-                           .define('F', Blocks.GOLD_BLOCK)
-                           .define('G', Items.WATER_BUCKET)
-                           .define('H', Blocks.NETHERITE_BLOCK)
-                           .define('I', Items.LAVA_BUCKET)
-                           .unlockedBy("has_furnace", has(Blocks.FURNACE))
-                           .save(consumer);
+    /**
+     * 万象合金炉的「熵变转化」配方：熵变机械臂潜行右键 ME 箱子时，
+     * 若箱内磁盘装有 8 个一阶无用锭，以及熔炉、铁块、金块、青金石块、
+     * 钻石块、绿宝石块、下界合金块各 1 个（同一磁盘内合计即可），
+     * 则原地把该 ME 箱子替换为万象合金炉。
+     *
+     * <p>除 8 个一阶锭外，其余材料沿用旧工作台配方的基础资源，并<b>按稀有度由低到高</b>
+     * 排列（熔炉 → 铁块 → 金块 → 青金石块 → 钻石块 → 绿宝石块 → 下界合金块），
+     * 既保留「用一整套基础资源熔出合金炉」的仪式感，也让玩家从材料顺序读出进阶梯度。</p>
+     *
+     * <p>配方只承载数据，匹配与消耗由 {@code EventHandler} 中的事件逻辑完成。</p>
+     */
+    private void addAdvancedAlloyFurnaceEntropyRecipe(RecipeOutput consumer) {
+        List<CountedIngredient> inputs = List.of(
+                new CountedIngredient(Ingredient.of(ModItems.USELESS_INGOT_TIER_1.get()), 8),
+                new CountedIngredient(Ingredient.of(Items.FURNACE), 1),
+                new CountedIngredient(Ingredient.of(Items.IRON_BLOCK), 1),
+                new CountedIngredient(Ingredient.of(Items.GOLD_BLOCK), 1),
+                new CountedIngredient(Ingredient.of(Items.LAPIS_BLOCK), 1),
+                new CountedIngredient(Ingredient.of(Items.DIAMOND_BLOCK), 1),
+                new CountedIngredient(Ingredient.of(Items.EMERALD_BLOCK), 1),
+                new CountedIngredient(Ingredient.of(Items.NETHERITE_BLOCK), 1));
+
+        EntropyTransmutationRecipe recipe = new EntropyTransmutationRecipe(
+                inputs,
+                new ItemStack(ModBlocks.ADVANCED_ALLOY_FURNACE_BLOCK.get()));
+
+        consumer.accept(UselessMod.id("entropy_transmutation/advanced_alloy_furnace"), recipe, null);
     }
 
     private void addOmniversalFurnaceRecipes(RecipeOutput consumer) {

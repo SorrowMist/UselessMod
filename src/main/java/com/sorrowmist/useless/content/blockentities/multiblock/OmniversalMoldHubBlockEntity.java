@@ -31,6 +31,7 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 public final class OmniversalMoldHubBlockEntity extends BlockEntity implements MenuProvider {
     private final RecoverableItemStackHandler molds = new RecoverableItemStackHandler(
@@ -198,11 +199,25 @@ public final class OmniversalMoldHubBlockEntity extends BlockEntity implements M
 
     public void linkController(@Nullable BlockPos controllerPos, long generation) {
         if (unloading || isRemoved()) return;
-        if (!java.util.Objects.equals(this.controllerPos, controllerPos) || structureGeneration != generation) {
+        if (!Objects.equals(this.controllerPos, controllerPos) || structureGeneration != generation) {
             this.controllerPos = controllerPos == null ? null : controllerPos.immutable();
             this.structureGeneration = generation;
             setChanged();
         }
+    }
+
+    /** True when this hub's persisted link belongs to the given core. */
+    public boolean isLinkedToController(BlockPos controllerPos) {
+        return Objects.equals(this.controllerPos, controllerPos);
+    }
+
+    /**
+     * 模具集散中心不可共用：只要仍归属于另一个成型核心即视为被占用。
+     * 陈旧或已失效的链接不算占用，便于旧结构破坏后由新结构重新认领。
+     */
+    public boolean isClaimedByOtherController(BlockPos controllerPos) {
+        MultiblockAlloyFurnaceCoreBlockEntity controller = getController();
+        return controller != null && !controller.getBlockPos().equals(controllerPos);
     }
 
     @Nullable

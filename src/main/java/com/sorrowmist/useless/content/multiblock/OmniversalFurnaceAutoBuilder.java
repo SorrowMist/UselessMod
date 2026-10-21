@@ -2,7 +2,9 @@ package com.sorrowmist.useless.content.multiblock;
 
 import appeng.api.config.Actionable;
 import com.sorrowmist.useless.compat.AE2Compat;
+import com.sorrowmist.useless.content.blockentities.multiblock.MaintenanceHatchBlockEntity;
 import com.sorrowmist.useless.content.blockentities.multiblock.MePatternAssemblyBlockEntity;
+import com.sorrowmist.useless.content.blockentities.multiblock.MufflerHatchBlockEntity;
 import com.sorrowmist.useless.content.blockentities.multiblock.MultiblockAlloyFurnaceCoreBlockEntity;
 import com.sorrowmist.useless.content.blockentities.multiblock.PassiveCraftingHatchBlockEntity;
 import com.sorrowmist.useless.content.blocks.multiblock.MultiblockAlloyFurnaceCoreBlock;
@@ -158,6 +160,19 @@ public final class OmniversalFurnaceAutoBuilder {
             if (pos == null) return null;
             parts.put(pos, OmniversalAlloyFurnaceStructure.FunctionalPart.MOLD_HUB);
         }
+        if (!parts.containsValue(OmniversalAlloyFurnaceStructure.FunctionalPart.MAINTENANCE_HATCH)) {
+            BlockPos pos = chooseFunctionalPosition(level, corePos, facing, parts,
+                    OmniversalAlloyFurnaceStructure.PREFERRED_MAINTENANCE_HATCH_POS);
+            if (pos == null) return null;
+            parts.put(pos, OmniversalAlloyFurnaceStructure.FunctionalPart.MAINTENANCE_HATCH);
+        }
+        // 消声仓位置唯一且固定在最上层中心，没有退让余地，只能落在该槽位。
+        if (!parts.containsValue(OmniversalAlloyFurnaceStructure.FunctionalPart.MUFFLER_HATCH)) {
+            BlockPos pos = fixedFunctionalPosition(level, corePos, facing, parts,
+                    OmniversalAlloyFurnaceStructure.PREFERRED_MUFFLER_POS);
+            if (pos == null) return null;
+            parts.put(pos, OmniversalAlloyFurnaceStructure.FunctionalPart.MUFFLER_HATCH);
+        }
         return new FunctionalLayout(Map.copyOf(parts));
     }
 
@@ -171,8 +186,34 @@ public final class OmniversalFurnaceAutoBuilder {
             case PASSIVE_HATCH -> level.getBlockEntity(partPos)
                     instanceof PassiveCraftingHatchBlockEntity hatch
                     && hatch.isClaimedByOtherController(corePos);
+            case MAINTENANCE_HATCH -> level.getBlockEntity(partPos)
+                    instanceof MaintenanceHatchBlockEntity hatch
+                    && hatch.isClaimedByOtherController(corePos);
+            case MUFFLER_HATCH -> level.getBlockEntity(partPos)
+                    instanceof MufflerHatchBlockEntity hatch
+                    && hatch.isClaimedByOtherController(corePos);
             case MOLD_HUB -> false;
         };
+    }
+
+    /**
+     * 位置唯一的功能部件只能落在指定槽位，槽位被占用时返回 null。
+     * 与 {@link #chooseFunctionalPosition} 不同，此处不做任何退让，
+     * 否则自动建造会产出位置错误而无法成型的结果。
+     */
+    private static BlockPos fixedFunctionalPosition(
+            ServerLevel level, BlockPos corePos, Direction facing,
+            Map<BlockPos, OmniversalAlloyFurnaceStructure.FunctionalPart> assigned,
+            BlockPos preferredLocalPos) {
+        for (OmniversalAlloyFurnaceStructure.Entry entry : OmniversalAlloyFurnaceStructure.entries()) {
+            if (entry.part() != OmniversalAlloyFurnaceStructure.Part.CASING
+                    || !entry.localPos().equals(preferredLocalPos)) continue;
+            BlockPos pos = entry.worldPos(corePos, facing);
+            if (!assigned.containsKey(pos) && isAvailableFunctionalPosition(level, pos)) {
+                return pos.immutable();
+            }
+        }
+        return null;
     }
 
     private static BlockPos chooseFunctionalPosition(
@@ -252,10 +293,16 @@ public final class OmniversalFurnaceAutoBuilder {
                                     OmniversalAlloyFurnaceStructure.FunctionalPart functionalPart,
                                     Direction facing) {
         if (functionalPart != null) {
+            // 消声仓的放置朝向由方块自身固定为向上，此处不得覆盖。
+            if (functionalPart == OmniversalAlloyFurnaceStructure.FunctionalPart.MUFFLER_HATCH) {
+                return ModBlocks.MUFFLER_HATCH.get().defaultBlockState();
+            }
             return (switch (functionalPart) {
                 case PATTERN_ASSEMBLY -> ModBlocks.ME_PATTERN_ASSEMBLY.get().defaultBlockState();
                 case MOLD_HUB -> ModBlocks.OMNIVERSAL_MOLD_HUB.get().defaultBlockState();
                 case PASSIVE_HATCH -> ModBlocks.PASSIVE_CRAFTING_HATCH.get().defaultBlockState();
+                case MAINTENANCE_HATCH -> ModBlocks.MAINTENANCE_HATCH.get().defaultBlockState();
+                case MUFFLER_HATCH -> throw new IllegalStateException("消声仓朝向已在上方单独处理");
             }).setValue(DirectionalMultiblockPartBlock.FACING, facing);
         }
         return switch (part) {

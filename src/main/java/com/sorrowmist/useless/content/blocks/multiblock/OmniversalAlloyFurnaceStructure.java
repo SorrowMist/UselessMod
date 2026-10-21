@@ -1,7 +1,10 @@
 package com.sorrowmist.useless.content.blocks.multiblock;
 
-import com.sorrowmist.useless.content.blockentities.multiblock.MultiblockAlloyFurnaceCoreBlockEntity;
+import com.sorrowmist.useless.content.blockentities.multiblock.MaintenanceHatchBlockEntity;
 import com.sorrowmist.useless.content.blockentities.multiblock.MePatternAssemblyBlockEntity;
+import com.sorrowmist.useless.content.blockentities.multiblock.MufflerHatchBlockEntity;
+import com.sorrowmist.useless.content.blockentities.multiblock.OmniversalMoldHubBlockEntity;
+import com.sorrowmist.useless.content.blockentities.multiblock.MultiblockAlloyFurnaceCoreBlockEntity;
 import com.sorrowmist.useless.content.blockentities.multiblock.PassiveCraftingHatchBlockEntity;
 import com.sorrowmist.useless.init.ModBlocks;
 import com.sorrowmist.useless.init.ModTags;
@@ -19,11 +22,16 @@ import java.util.List;
 /** Canonical 3x4x3 template shared by validation, preview and automatic construction. */
 public final class OmniversalAlloyFurnaceStructure {
     public static final int COIL_COUNT = 16;
-    /** Normal casing blocks required after the assembly and hub occupy two shell positions. */
-    public static final int CASING_COUNT = 15;
+    /** 外壳位总数，其中四个被功能部件占据，其余为普通外壳。 */
     public static final int FUNCTIONAL_CASING_COUNT = 17;
+    /** 扣除装配仓、模具中枢、维护仓与消声仓四个功能部件后剩余的普通外壳数量。 */
+    public static final int CASING_COUNT = 13;
     public static final BlockPos PREFERRED_PATTERN_ASSEMBLY_POS = new BlockPos(-1, 0, 0);
     public static final BlockPos PREFERRED_MOLD_HUB_POS = new BlockPos(1, 0, 0);
+    /** 维护仓位置不限，此坐标仅用于缺失时给出可高亮的提示位。 */
+    public static final BlockPos PREFERRED_MAINTENANCE_HATCH_POS = new BlockPos(0, 3, 2);
+    /** 消声仓固定占据最上层中心，位置唯一且不可与其它核心共用。 */
+    public static final BlockPos PREFERRED_MUFFLER_POS = new BlockPos(0, 3, 1);
 
     private static final List<Entry> ENTRIES = createEntries();
 
@@ -40,7 +48,9 @@ public final class OmniversalAlloyFurnaceStructure {
     public enum FunctionalPart {
         PATTERN_ASSEMBLY,
         MOLD_HUB,
-        PASSIVE_HATCH
+        PASSIVE_HATCH,
+        MAINTENANCE_HATCH,
+        MUFFLER_HATCH
     }
 
     public record Entry(BlockPos localPos, Part part) {
@@ -56,11 +66,15 @@ public final class OmniversalAlloyFurnaceStructure {
                                    @Nullable BlockPos patternAssemblyPos,
                                    @Nullable BlockPos moldHubPos,
                                    @Nullable BlockPos passiveHatchPos,
+                                   @Nullable BlockPos maintenanceHatchPos,
+                                   @Nullable BlockPos mufflerHatchPos,
                                    List<Mismatch> mismatches) {
         public ValidationResult {
             patternAssemblyPos = patternAssemblyPos == null ? null : patternAssemblyPos.immutable();
             moldHubPos = moldHubPos == null ? null : moldHubPos.immutable();
             passiveHatchPos = passiveHatchPos == null ? null : passiveHatchPos.immutable();
+            maintenanceHatchPos = maintenanceHatchPos == null ? null : maintenanceHatchPos.immutable();
+            mufflerHatchPos = mufflerHatchPos == null ? null : mufflerHatchPos.immutable();
             mismatches = List.copyOf(mismatches);
         }
     }
@@ -84,14 +98,18 @@ public final class OmniversalAlloyFurnaceStructure {
         int assemblyCount = 0;
         int moldHubCount = 0;
         int passiveHatchCount = 0;
+        int maintenanceHatchCount = 0;
+        int mufflerHatchCount = 0;
         BlockPos assemblyPos = null;
         BlockPos moldHubPos = null;
         BlockPos passiveHatchPos = null;
+        BlockPos maintenanceHatchPos = null;
+        BlockPos mufflerHatchPos = null;
 
         for (Entry entry : ENTRIES) {
             BlockPos worldPos = entry.worldPos(corePos, facing);
             if (!isChunkLoaded(level, worldPos)) {
-                return new ValidationResult(false, 0, null, null, null, List.of());
+                return new ValidationResult(false, 0, null, null, null, null, null, List.of());
             }
             BlockState state = level.getBlockState(worldPos);
             if (entry.part == Part.COIL) {
@@ -130,6 +148,21 @@ public final class OmniversalAlloyFurnaceStructure {
                         if (passiveHatchCount == 1) passiveHatchPos = worldPos.immutable();
                         else mismatches.add(new Mismatch(worldPos, Part.CASING, state));
                     }
+                    case MAINTENANCE_HATCH -> {
+                        maintenanceHatchCount++;
+                        if (maintenanceHatchCount == 1) maintenanceHatchPos = worldPos.immutable();
+                        else mismatches.add(new Mismatch(worldPos, Part.CASING, state));
+                    }
+                    case MUFFLER_HATCH -> {
+                        // 消声仓只认最上层中心；摆在其它外壳位的消声仓一律记为错误方块，
+                        // 不能先到先得，否则错位的消声仓会被认领而正确位置反被标红。
+                        if (entry.localPos.equals(PREFERRED_MUFFLER_POS)) {
+                            mufflerHatchCount++;
+                            mufflerHatchPos = worldPos.immutable();
+                        } else {
+                            mismatches.add(new Mismatch(worldPos, Part.CASING, state));
+                        }
+                    }
                 }
                 continue;
             }
@@ -138,32 +171,68 @@ public final class OmniversalAlloyFurnaceStructure {
             }
         }
         boolean functionalCountsValid = isFunctionalPartCountsValid(
-                assemblyCount, moldHubCount, passiveHatchCount);
+                assemblyCount, moldHubCount, passiveHatchCount,
+                maintenanceHatchCount, mufflerHatchCount);
         // 缺功能方块时外壳本身全都合法，循环里不会产生 Mismatch，结构却判定失效。
         // 补一条指向首选位的记录，否则「未成型但没有可高亮的方块」。
+        //
+        // 这些补位记录统一插到列表最前：错位的功能部件会与它产生世界坐标 Y 相同的记录，
+        // 客户端高亮只取其中最靠前的一条，排在前面才能保证提示落在首选位（如最上层中心），
+        // 而不是落在玩家放错的那一格上。
+        //
+        // 消声仓必须位于最上层中心，与维护仓的首选提示位同在最上层、世界坐标 Y 相同。
+        // 维护仓位置不限，消声仓位置唯一，故把消声仓排在维护仓之前，顶层缺件时优先提示中心那一格。
+        List<Mismatch> missingPartMismatches = new ArrayList<>(4);
+        if (mufflerHatchCount == 0) {
+            BlockPos pos = toWorld(corePos, facing, PREFERRED_MUFFLER_POS);
+            missingPartMismatches.add(new Mismatch(pos, Part.CASING, level.getBlockState(pos)));
+        }
         if (assemblyCount == 0) {
             BlockPos pos = toWorld(corePos, facing, PREFERRED_PATTERN_ASSEMBLY_POS);
-            mismatches.add(new Mismatch(pos, Part.CASING, level.getBlockState(pos)));
+            missingPartMismatches.add(new Mismatch(pos, Part.CASING, level.getBlockState(pos)));
         }
         if (moldHubCount == 0) {
             BlockPos pos = toWorld(corePos, facing, PREFERRED_MOLD_HUB_POS);
-            mismatches.add(new Mismatch(pos, Part.CASING, level.getBlockState(pos)));
+            missingPartMismatches.add(new Mismatch(pos, Part.CASING, level.getBlockState(pos)));
         }
+        if (maintenanceHatchCount == 0) {
+            BlockPos pos = toWorld(corePos, facing, PREFERRED_MAINTENANCE_HATCH_POS);
+            missingPartMismatches.add(new Mismatch(pos, Part.CASING, level.getBlockState(pos)));
+        }
+        mismatches.addAll(0, missingPartMismatches);
         if (assemblyPos != null && isClaimedByAnotherCore(level, corePos, assemblyPos,
                 FunctionalPart.PATTERN_ASSEMBLY)) {
             mismatches.add(new Mismatch(assemblyPos, Part.CASING, level.getBlockState(assemblyPos)));
+        }
+        if (moldHubPos != null && isClaimedByAnotherCore(level, corePos, moldHubPos,
+                FunctionalPart.MOLD_HUB)) {
+            mismatches.add(new Mismatch(moldHubPos, Part.CASING, level.getBlockState(moldHubPos)));
         }
         if (passiveHatchPos != null && isClaimedByAnotherCore(level, corePos, passiveHatchPos,
                 FunctionalPart.PASSIVE_HATCH)) {
             mismatches.add(new Mismatch(passiveHatchPos, Part.CASING, level.getBlockState(passiveHatchPos)));
         }
+        if (maintenanceHatchPos != null && isClaimedByAnotherCore(level, corePos, maintenanceHatchPos,
+                FunctionalPart.MAINTENANCE_HATCH)) {
+            mismatches.add(new Mismatch(maintenanceHatchPos, Part.CASING,
+                    level.getBlockState(maintenanceHatchPos)));
+        }
+        if (mufflerHatchPos != null && isClaimedByAnotherCore(level, corePos, mufflerHatchPos,
+                FunctionalPart.MUFFLER_HATCH)) {
+            mismatches.add(new Mismatch(mufflerHatchPos, Part.CASING,
+                    level.getBlockState(mufflerHatchPos)));
+        }
         return new ValidationResult(mismatches.isEmpty() && functionalCountsValid && coilTier > 0,
-                coilTier, assemblyPos, moldHubPos, passiveHatchPos, mismatches);
+                coilTier, assemblyPos, moldHubPos, passiveHatchPos, maintenanceHatchPos,
+                mufflerHatchPos, mismatches);
     }
 
     public static boolean isFunctionalPartCountsValid(
-            int patternAssemblyCount, int moldHubCount, int passiveHatchCount) {
-        return patternAssemblyCount == 1 && moldHubCount == 1 && isPassiveHatchCountValid(passiveHatchCount);
+            int patternAssemblyCount, int moldHubCount, int passiveHatchCount,
+            int maintenanceHatchCount, int mufflerHatchCount) {
+        return patternAssemblyCount == 1 && moldHubCount == 1
+                && isPassiveHatchCountValid(passiveHatchCount)
+                && maintenanceHatchCount == 1 && mufflerHatchCount == 1;
     }
 
     static boolean isPassiveHatchCountValid(int count) {
@@ -175,6 +244,8 @@ public final class OmniversalAlloyFurnaceStructure {
         if (state.is(ModBlocks.ME_PATTERN_ASSEMBLY.get())) return FunctionalPart.PATTERN_ASSEMBLY;
         if (state.is(ModBlocks.OMNIVERSAL_MOLD_HUB.get())) return FunctionalPart.MOLD_HUB;
         if (state.is(ModBlocks.PASSIVE_CRAFTING_HATCH.get())) return FunctionalPart.PASSIVE_HATCH;
+        if (state.is(ModBlocks.MAINTENANCE_HATCH.get())) return FunctionalPart.MAINTENANCE_HATCH;
+        if (state.is(ModBlocks.MUFFLER_HATCH.get())) return FunctionalPart.MUFFLER_HATCH;
         return null;
     }
 
@@ -190,7 +261,15 @@ public final class OmniversalAlloyFurnaceStructure {
             case PASSIVE_HATCH -> actualLevel.getBlockEntity(partPos)
                     instanceof PassiveCraftingHatchBlockEntity hatch
                     && hatch.isClaimedByOtherController(corePos);
-            case MOLD_HUB -> false;
+            case MAINTENANCE_HATCH -> actualLevel.getBlockEntity(partPos)
+                    instanceof MaintenanceHatchBlockEntity hatch
+                    && hatch.isClaimedByOtherController(corePos);
+            case MUFFLER_HATCH -> actualLevel.getBlockEntity(partPos)
+                    instanceof MufflerHatchBlockEntity hatch
+                    && hatch.isClaimedByOtherController(corePos);
+            case MOLD_HUB -> actualLevel.getBlockEntity(partPos)
+                    instanceof OmniversalMoldHubBlockEntity hub
+                    && hub.isClaimedByOtherController(corePos);
         };
     }
 

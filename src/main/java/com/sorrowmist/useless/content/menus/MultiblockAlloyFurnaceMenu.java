@@ -59,6 +59,7 @@ public final class MultiblockAlloyFurnaceMenu extends AbstractContainerMenu {
     public int getRedstoneMode() { return data.get(7); }
     public int getMaxTasks() { return data.get(8); }
     public long getAutomaticEnergyLimit() { return join(data.get(9), data.get(10)); }
+    public boolean isMufflerObstructed() { return data.get(11) != 0; }
     @Nullable public MultiblockAlloyFurnaceCoreBlockEntity getCore() { return core; }
 
     public List<AETaskProgressPacket.TaskProgressData> getTaskProgress() {

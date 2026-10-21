@@ -75,6 +75,7 @@ import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.ReentrantLock;
@@ -82,7 +83,7 @@ import java.util.concurrent.locks.ReentrantLock;
 /** Controller, energy store and persistent task owner for the multiblock furnace. */
 public final class MultiblockAlloyFurnaceCoreBlockEntity extends BlockEntity implements AlloyFurnaceAeHost, MenuProvider {
     private static final int SAFETY_REVALIDATION_TICKS = 40;
-    public static final int MENU_DATA_COUNT = 11;
+    public static final int MENU_DATA_COUNT = 12;
     private static final ItemStackHandler EMPTY_ITEMS = new ItemStackHandler(0);
     private static final FluidTank[] EMPTY_TANKS = new FluidTank[0];
 
@@ -98,6 +99,12 @@ public final class MultiblockAlloyFurnaceCoreBlockEntity extends BlockEntity imp
     private BlockPos moldHubPos;
     @Nullable
     private BlockPos passiveHatchPos;
+    @Nullable
+    private BlockPos maintenanceHatchPos;
+    @Nullable
+    private BlockPos mufflerHatchPos;
+    /** 消声仓上方排烟空间是否被占据。每 tick 重新判定，不持久化。 */
+    private boolean mufflerObstructed;
     private int validationTimer;
     private long structureGeneration;
     private boolean deferredTasksLoaded;
@@ -127,6 +134,7 @@ public final class MultiblockAlloyFurnaceCoreBlockEntity extends BlockEntity imp
                 case 8 -> getMaxAETaskCount();
                 case 9 -> (int) energyLimit;
                 case 10 -> (int) (energyLimit >>> 32);
+                case 11 -> mufflerObstructed ? 1 : 0;
                 default -> 0;
             };
         }
@@ -145,6 +153,8 @@ public final class MultiblockAlloyFurnaceCoreBlockEntity extends BlockEntity imp
             validationTimer = 0;
             validateStructure();
         }
+        // 排烟空间不属于结构本身，其上方方块变化也不会触发结构重校验，故逐 tick 判定。
+        mufflerObstructed = isMufflerExhaustBlocked();
         if (!deferredTasksLoaded) {
             // 目录未就绪时保持未加载状态，下一 tick 重试；否则完好样板会被误判失效并退还材料。
             deferredTasksLoaded = aeManager.loadDeferredTasks();
@@ -176,10 +186,13 @@ public final class MultiblockAlloyFurnaceCoreBlockEntity extends BlockEntity imp
         }
         boolean hasWork = aeManager.hasWork()
                 || passiveHatch != null && passiveHatch.hasWork();
-        updateDisplayedActivity(progressed, hasWork);
+        if (updateDisplayedActivity(progressed, hasWork) == MultiblockFurnaceActivity.RUN) {
+            MufflerHatchBlockEntity muffler = getMufflerHatch();
+            if (muffler != null) muffler.emitSmokeFromController();
+        }
     }
 
-    private void updateDisplayedActivity(boolean progressed, boolean hasWork) {
+    private MultiblockFurnaceActivity updateDisplayedActivity(boolean progressed, boolean hasWork) {
         MultiblockFurnaceActivity activity =
                 MultiblockFurnaceActivity.resolve(formed, progressed, hasWork);
         BlockState state = getBlockState();
@@ -194,6 +207,7 @@ public final class MultiblockAlloyFurnaceCoreBlockEntity extends BlockEntity imp
             setCoilsActive(activity == MultiblockFurnaceActivity.RUN);
             coilActivitySynchronized = true;
         }
+        return activity;
     }
 
     public void requestStructureValidation() {
@@ -212,16 +226,22 @@ public final class MultiblockAlloyFurnaceCoreBlockEntity extends BlockEntity imp
         BlockPos validatedAssemblyPos = result.valid() ? result.patternAssemblyPos() : null;
         BlockPos validatedMoldHubPos = result.valid() ? result.moldHubPos() : null;
         BlockPos validatedHatchPos = result.valid() ? result.passiveHatchPos() : null;
+        BlockPos validatedMaintenancePos = result.valid() ? result.maintenanceHatchPos() : null;
+        BlockPos validatedMufflerPos = result.valid() ? result.mufflerHatchPos() : null;
         boolean stateChanged = formed != result.valid()
                 || coilTier != validatedCoilTier
-                || !java.util.Objects.equals(patternAssemblyPos, validatedAssemblyPos)
-                || !java.util.Objects.equals(moldHubPos, validatedMoldHubPos)
-                || !java.util.Objects.equals(passiveHatchPos, validatedHatchPos);
+                || !Objects.equals(patternAssemblyPos, validatedAssemblyPos)
+                || !Objects.equals(moldHubPos, validatedMoldHubPos)
+                || !Objects.equals(passiveHatchPos, validatedHatchPos)
+                || !Objects.equals(maintenanceHatchPos, validatedMaintenancePos)
+                || !Objects.equals(mufflerHatchPos, validatedMufflerPos);
         formed = result.valid();
         coilTier = validatedCoilTier;
         patternAssemblyPos = validatedAssemblyPos == null ? null : validatedAssemblyPos.immutable();
         moldHubPos = validatedMoldHubPos == null ? null : validatedMoldHubPos.immutable();
         passiveHatchPos = validatedHatchPos == null ? null : validatedHatchPos.immutable();
+        maintenanceHatchPos = validatedMaintenancePos == null ? null : validatedMaintenancePos.immutable();
+        mufflerHatchPos = validatedMufflerPos == null ? null : validatedMufflerPos.immutable();
         if (stateChanged) {
             structureGeneration++;
             if (formed) {
@@ -242,7 +262,8 @@ public final class MultiblockAlloyFurnaceCoreBlockEntity extends BlockEntity imp
 
     /**
      * 把「当前该修的那一个方块」下发给追踪本区块的客户端：从下往上取世界坐标 Y 最小的 mismatch，
-     * 同 Y 时保留 ENTRIES 遍历中先出现的（遍历顺序本身即由低到高）。
+     * 同 Y 时保留列表中靠前的一条，列表顺序由 {@link OmniversalAlloyFurnaceStructure#validate}
+     * 决定：缺件的补位记录被插到最前，故顶层缺件时优先提示位置唯一的那个部件。
      *
      * <p>成型时下发 {@code null} 清掉残留高亮；验证本身只在结构变化或每 40 tick 触发，天然节流。</p>
      */
@@ -276,8 +297,11 @@ public final class MultiblockAlloyFurnaceCoreBlockEntity extends BlockEntity imp
                     assembly.linkController(null, structureGeneration);
                 }
             } else if (part instanceof OmniversalMoldHubBlockEntity hub) {
-                hub.linkController(formed && pos.equals(moldHubPos)
-                        ? worldPosition : null, structureGeneration);
+                if (formed && pos.equals(moldHubPos)) {
+                    hub.linkController(worldPosition, structureGeneration);
+                } else if (hub.isLinkedToController(worldPosition)) {
+                    hub.linkController(null, structureGeneration);
+                }
             } else if (part instanceof PassiveCraftingHatchBlockEntity hatch) {
                 if (formed && pos.equals(passiveHatchPos)) {
                     hatch.linkController(worldPosition, structureGeneration);
@@ -286,8 +310,39 @@ public final class MultiblockAlloyFurnaceCoreBlockEntity extends BlockEntity imp
                     // recover buffered materials, without stealing another core's hatch.
                     hatch.linkController(worldPosition, structureGeneration);
                 }
+            } else if (part instanceof MaintenanceHatchBlockEntity hatch) {
+                // 维护仓没有实际功能，链接只用于表达归属；失效时清掉，便于旧结构拆掉后由新结构认领。
+                // 只清除属于本核心的链接，否则相邻的未成型核心会解绑其它核心正在使用的部件。
+                if (formed && pos.equals(maintenanceHatchPos)) {
+                    hatch.linkController(worldPosition, structureGeneration);
+                } else if (hatch.isLinkedToController(worldPosition)) {
+                    hatch.linkController(null, structureGeneration);
+                }
+            } else if (part instanceof MufflerHatchBlockEntity hatch) {
+                if (formed && pos.equals(mufflerHatchPos)) {
+                    hatch.linkController(worldPosition, structureGeneration);
+                } else if (hatch.isLinkedToController(worldPosition)) {
+                    hatch.linkController(null, structureGeneration);
+                }
             }
         }
+    }
+
+    @Nullable
+    private MufflerHatchBlockEntity getMufflerHatch() {
+        if (!formed || mufflerHatchPos == null || level == null || !level.isLoaded(mufflerHatchPos)) {
+            return null;
+        }
+        return level.getBlockEntity(mufflerHatchPos) instanceof MufflerHatchBlockEntity hatch ? hatch : null;
+    }
+
+    /** 结构成型时，消声仓上方的排烟空间是否被非空气方块占据。 */
+    private boolean isMufflerExhaustBlocked() {
+        if (!formed || mufflerHatchPos == null || level == null) return false;
+        BlockPos top = mufflerHatchPos.above(MufflerHatchBlockEntity.EXHAUST_HEIGHT);
+        // 排烟空间所在区块未加载时无法判定，按畅通处理，避免区块边界上的合金炉被误停。
+        if (!level.isLoaded(top)) return false;
+        return !MufflerHatchBlockEntity.isExhaustClear(level, mufflerHatchPos);
     }
 
     @Nullable
@@ -469,6 +524,21 @@ public final class MultiblockAlloyFurnaceCoreBlockEntity extends BlockEntity imp
                 && structureGeneration == generation;
     }
 
+    public boolean isMaintenanceHatchLinked(BlockPos pos, long generation) {
+        return formed && maintenanceHatchPos != null && maintenanceHatchPos.equals(pos)
+                && structureGeneration == generation;
+    }
+
+    public boolean isMufflerHatchLinked(BlockPos pos, long generation) {
+        return formed && mufflerHatchPos != null && mufflerHatchPos.equals(pos)
+                && structureGeneration == generation;
+    }
+
+    /** 消声仓排烟受阻时合金炉停止工作，界面与 Jade 据此给出提示。 */
+    public boolean isMufflerObstructed() {
+        return mufflerObstructed;
+    }
+
     public RedstoneControlMode getRedstoneControlMode() {
         return redstoneControlMode;
     }
@@ -592,6 +662,10 @@ public final class MultiblockAlloyFurnaceCoreBlockEntity extends BlockEntity imp
             return CraftingTaskContext.TaskAvailability.unavailable(
                     "gui.useless_mod.advanced_alloy_furnace.ae_task_status.waiting_structure", "");
         }
+        if (mufflerObstructed) {
+            return CraftingTaskContext.TaskAvailability.unavailable(
+                    "gui.useless_mod.advanced_alloy_furnace.ae_task_status.waiting_muffler", "");
+        }
         if (recipe == null) {
             return CraftingTaskContext.TaskAvailability.unavailable(
                     "gui.useless_mod.advanced_alloy_furnace.ae_task_status.waiting_recipe", "");
@@ -654,7 +728,7 @@ public final class MultiblockAlloyFurnaceCoreBlockEntity extends BlockEntity imp
 
     @Override
     public boolean isTaskExecutionEnabled() {
-        return formed && level != null
+        return formed && !mufflerObstructed && level != null
                 && redstoneControlMode.shouldRun(level.hasNeighborSignal(worldPosition));
     }
 
@@ -839,6 +913,10 @@ public final class MultiblockAlloyFurnaceCoreBlockEntity extends BlockEntity imp
         moldHubPos = tag.contains("MoldHub") ? BlockPos.of(tag.getLong("MoldHub")) : null;
         passiveHatchPos = tag.contains("PassiveHatch")
                 ? BlockPos.of(tag.getLong("PassiveHatch")) : null;
+        maintenanceHatchPos = tag.contains("MaintenanceHatch")
+                ? BlockPos.of(tag.getLong("MaintenanceHatch")) : null;
+        mufflerHatchPos = tag.contains("MufflerHatch")
+                ? BlockPos.of(tag.getLong("MufflerHatch")) : null;
         redstoneControlMode = RedstoneControlMode.byIndex(tag.getInt("RedstoneControlMode"));
         automaticEnergyLimit = tag.contains("AutomaticEnergyLimit", Tag.TAG_ANY_NUMERIC)
                 ? Math.max(0L, tag.getLong("AutomaticEnergyLimit"))
@@ -872,6 +950,8 @@ public final class MultiblockAlloyFurnaceCoreBlockEntity extends BlockEntity imp
         if (patternAssemblyPos != null) tag.putLong("PatternAssembly", patternAssemblyPos.asLong());
         if (moldHubPos != null) tag.putLong("MoldHub", moldHubPos.asLong());
         if (passiveHatchPos != null) tag.putLong("PassiveHatch", passiveHatchPos.asLong());
+        if (maintenanceHatchPos != null) tag.putLong("MaintenanceHatch", maintenanceHatchPos.asLong());
+        if (mufflerHatchPos != null) tag.putLong("MufflerHatch", mufflerHatchPos.asLong());
         tag.putInt("RedstoneControlMode", redstoneControlMode.ordinal());
         tag.putLong("AutomaticEnergyLimit", automaticEnergyLimit);
         tag.putInt("PatternPriority", aeManager.getPatternPriority());

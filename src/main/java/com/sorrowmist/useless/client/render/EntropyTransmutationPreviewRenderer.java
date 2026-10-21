@@ -94,12 +94,13 @@ public final class EntropyTransmutationPreviewRenderer {
     /**
      * 卦象三爻由外向内排布：最外一条的半径与相邻两条的间距。
      *
-     * <p>整组卦象收在环带的中段偏内，三爻的径向中心大致落在环带中心，免得看起来像挂在圈外。</p>
+     * <p>三爻都落在内外圈光带之间的环带上：最外一爻贴近外圈内侧，另两爻依次向内收，
+     * 整组卦象居中偏外——既不压住外圈光带，也不缩到中心太极附近。</p>
      */
-    private static final float TRIGRAM_OUTER_RADIUS = 0.80F;
-    private static final float TRIGRAM_ROW_SPACING = 0.065F;
+    private static final float TRIGRAM_OUTER_RADIUS = 0.90F;
+    private static final float TRIGRAM_ROW_SPACING = 0.075F;
     /** 阳爻半长；阴爻从中断开，只画到距中心 {@link #TRIGRAM_GAP} 处。 */
-    private static final float TRIGRAM_HALF_LENGTH = 0.115F;
+    private static final float TRIGRAM_HALF_LENGTH = 0.12F;
     private static final float TRIGRAM_GAP = 0.05F;
     /** 爻线光条的宽度。 */
     private static final float TRIGRAM_BAR_WIDTH = 0.028F;
@@ -161,7 +162,6 @@ public final class EntropyTransmutationPreviewRenderer {
     private static final float PREVIEW_ALPHA = 0.85F;
     /** 相对原方块整体放大，让幽灵方块包住本体，避免被其表面盖住、深度打架。 */
     private static final float PREVIEW_SCALE = 1.05F;
-
     /** 当前应渲染的幽灵预览；{@code state} 为 null 表示不可转化。 */
     private static BlockPos previewPos;
     private static BlockState previewState;

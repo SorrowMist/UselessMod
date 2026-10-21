@@ -16,6 +16,9 @@ import com.sorrowmist.useless.network.BeefToolLayoutResultPacket;
 import com.sorrowmist.useless.network.BeefToolLayoutSyncPacket;
 import com.sorrowmist.useless.network.BeefToolLayoutUpdatePacket;
 import com.sorrowmist.useless.network.EnchantmentSwitchPacket;
+import com.sorrowmist.useless.network.EntropyTransmutationEffectPacket;
+import com.sorrowmist.useless.network.EntropyTransmutationPreviewPacket;
+import com.sorrowmist.useless.network.EntropyTransmutationPreviewRequestPacket;
 import com.sorrowmist.useless.network.FaceModeChangePacket;
 import com.sorrowmist.useless.network.ForceBreakKeyPacket;
 import com.sorrowmist.useless.network.MiningDataSyncPacket;
@@ -219,5 +222,14 @@ public class ModNetwork {
         registrar.playToServer(ThermostatSetPacket.TYPE,
                                ThermostatSetPacket.STREAM_CODEC,
                                ThermostatSetPacket::handle);
+        registrar.playToServer(EntropyTransmutationPreviewRequestPacket.TYPE,
+                               EntropyTransmutationPreviewRequestPacket.STREAM_CODEC,
+                               EntropyTransmutationPreviewRequestPacket::handle);
+        registrar.playToClient(EntropyTransmutationPreviewPacket.TYPE,
+                               EntropyTransmutationPreviewPacket.STREAM_CODEC,
+                               EntropyTransmutationPreviewPacket::handle);
+        registrar.playToClient(EntropyTransmutationEffectPacket.TYPE,
+                               EntropyTransmutationEffectPacket.STREAM_CODEC,
+                               EntropyTransmutationEffectPacket::handle);
     }
 }

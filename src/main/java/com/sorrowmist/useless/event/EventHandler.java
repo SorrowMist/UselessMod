@@ -1,5 +1,7 @@
 package com.sorrowmist.useless.event;
 
+import appeng.api.implementations.blockentities.IMEChest;
+import appeng.items.tools.powered.EntropyManipulatorItem;
 import com.sorrowmist.useless.UselessMod;
 import com.sorrowmist.useless.client.StaffLinkClientHooks;
 import com.sorrowmist.useless.content.items.BeefCraftingHandler;
@@ -9,6 +11,7 @@ import com.sorrowmist.useless.content.items.EndlessBeafItem;
 import com.sorrowmist.useless.content.stafflink.StaffLinkEngine;
 import com.sorrowmist.useless.content.stafflink.StaffLinkTargets;
 import com.sorrowmist.useless.compat.ae.AeDeviceLinker;
+import com.sorrowmist.useless.compat.ae.AeEntropyTransmutationHandler;
 import com.sorrowmist.useless.compat.ae.AeLinkChannelBypass;
 import com.sorrowmist.useless.compat.constructionwand.ConstructionWandLogic;
 import com.sorrowmist.useless.compat.create.CreateStressCompatLoader;
@@ -26,6 +29,7 @@ import com.sorrowmist.useless.data.BeefToolLayoutManager;
 import com.sorrowmist.useless.network.BeefInvulnerabilitySyncPacket;
 import com.sorrowmist.useless.network.BeefInvulnerabilityStatePacket;
 import com.sorrowmist.useless.network.BeefToolLayoutSyncPacket;
+import com.sorrowmist.useless.network.EntropyTransmutationEffectPacket;
 import com.sorrowmist.useless.network.StaffLinkBindPacket;
 import com.sorrowmist.useless.utils.UselessItemUtils;
 import com.sorrowmist.useless.utils.mining.MiningDispatcher;
@@ -816,6 +820,35 @@ public class EventHandler {
         event.setCanceled(true);
         // 设置结果，告知系统处理已成功，停止后续传播
         event.setCancellationResult(InteractionResult.sidedSuccess(world.isClientSide));
+    }
+
+    /**
+     * 熵变机械臂潜行右键 ME 箱子：把箱内磁盘里的一至四阶无用锭各 8 个转化为万象合金炉。
+     *
+     * <p>AE2 自身的熵变配方只认方块状态与流体状态，读不到磁盘内容，所以这条转化
+     * 由 {@link AeEntropyTransmutationHandler} 单独实现；仅在确实完成转化时才拦截本次交互，
+     * 以免吃掉机械臂对其它方块的正常熵变动作。</p>
+     */
+    @SubscribeEvent(priority = EventPriority.HIGHEST)
+    public static void onEntropyManipulatorInteract(PlayerInteractEvent.RightClickBlock event) {
+        if (event.isCanceled()) return;
+
+        ItemStack stack = event.getItemStack();
+        if (!(stack.getItem() instanceof EntropyManipulatorItem)) return;
+
+        Player player = event.getEntity();
+        if (!player.isShiftKeyDown()) return;
+
+        if (!(event.getLevel() instanceof ServerLevel serverLevel)) return;
+        if (!(serverLevel.getBlockEntity(event.getPos()) instanceof IMEChest)) return;
+
+        if (AeEntropyTransmutationHandler.tryTransmute(serverLevel, event.getPos(), player)) {
+            // 成功瞬间的视觉反馈：广播给附近客户端做一次扩散淡出线框。
+            PacketDistributor.sendToPlayersTrackingEntityAndSelf(
+                    player, new EntropyTransmutationEffectPacket(event.getPos()));
+            event.setCanceled(true);
+            event.setCancellationResult(InteractionResult.SUCCESS);
+        }
     }
 
     /**

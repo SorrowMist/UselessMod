@@ -21,6 +21,7 @@ import mezz.jei.api.recipe.category.IRecipeCategory;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.navigation.ScreenPosition;
+import net.minecraft.client.gui.navigation.ScreenRectangle;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
@@ -74,9 +75,10 @@ public class EntropyTransmutationJeiCategory
     private static final int ARROW_Y = 27;
 
     /** 熵变机械臂图标相对原贴图的缩放系数，用于在箭头上方放置动作标记。 */
-    private static final float MANIPULATOR_ICON_SCALE = 0.5f;
-    /** 占位左边界取箭头中心减去半个占位宽度，使缩小后的图标在箭头上方水平居中。 */
-    private static final int MANIPULATOR_ICON_X = 103;
+    private static final float MANIPULATOR_ICON_SCALE = 0.8f;
+    /** 占位左边界取箭头中心（ARROW_X + 9）减去半个占位宽度，使缩小后的图标在箭头上方水平居中。 */
+    private static final int MANIPULATOR_ICON_X = 101;
+    /** 占位底边（101..117 处 y=28）紧贴箭头顶部，避免压住输入槽第一行。 */
     private static final int MANIPULATOR_ICON_Y = 12;
     /** 缩放后仍按 16×16 申报占位，使悬浮判定覆盖整个图标而不是缩小的实际绘制区域。 */
     private static final int MANIPULATOR_ICON_SIZE = 16;
@@ -85,7 +87,6 @@ public class EntropyTransmutationJeiCategory
     private static final int OUTPUT_Y = 27;
 
     // 机械臂图标移到箭头上方后，底部仅保留居中的步骤说明。
-    private static final int STEP2_TEXT_X = 5;
     private static final int STEP2_TEXT_Y = 58;
 
     /** 画布文字颜色；JEI 配方区域为深色背景，用白色保证可读。 */
@@ -197,19 +198,19 @@ public class EntropyTransmutationJeiCategory
 
         builder.addRecipeArrowWidget().setPosition(ARROW_X, ARROW_Y);
 
-        // 熵变机械臂图标缩至半尺寸后置于箭头上方，作为「用此工具执行」的动作标记；
+        // 熵变机械臂图标缩小后置于箭头上方，作为「用此工具执行」的动作标记；
         // IDrawable 不支持缩放，故用自定义控件在绘制时施加 PoseStack 缩放。
         builder.addWidget(new ScaledIconWidget(this.manipulatorIcon,
                 new ScreenPosition(MANIPULATOR_ICON_X, MANIPULATOR_ICON_Y),
                 MANIPULATOR_ICON_SIZE, MANIPULATOR_ICON_SCALE,
                 Component.translatable("jei.useless_mod.entropy_transmutation.step2.detail")));
 
-        // 第二步：底部提示同样精简，详细操作说明在悬停时显示。
-        builder.addText(Component.translatable("jei.useless_mod.entropy_transmutation.step2"),
-                        WIDTH - STEP2_TEXT_X, 10)
-                .setPosition(STEP2_TEXT_X, STEP2_TEXT_Y)
-                .setColor(TEXT_COLOR)
-                .setTooltip(Component.translatable("jei.useless_mod.entropy_transmutation.step2.detail"));
+        // 第二步：底部提示精简显示；详细操作说明由上方机械臂图标承载，
+        // 文本控件不再挂 tooltip，否则会和文本自身被截断时生成的悬浮提示叠成两行。
+        builder.addText(Component.translatable("jei.useless_mod.entropy_transmutation.step2"), WIDTH, 10)
+                .setPosition(0, STEP2_TEXT_Y)
+                .setTextAlignment(HorizontalAlignment.CENTER)
+                .setColor(TEXT_COLOR);
     }
 
     @Override
@@ -249,10 +250,11 @@ public class EntropyTransmutationJeiCategory
 
         @Override
         public void drawWidget(@NotNull GuiGraphics graphics, double mouseX, double mouseY) {
+            // RecipeLayout 在调用本方法前已将坐标系平移到 getPosition()，此处原点即占位区域左上角，
+            // 因此只需再平移半个收缩量，使缩小后的图标居中于原 16×16 占位。
             graphics.pose().pushPose();
-            // 先平移到占位区域左上角，再按占位区域中心为缩放原点，使缩小后的图标居中于原 16×16 位置。
-            graphics.pose().translate(this.position.x() + this.size * (1.0f - this.scale) / 2.0f,
-                    this.position.y() + this.size * (1.0f - this.scale) / 2.0f, 0.0f);
+            graphics.pose().translate(this.size * (1.0f - this.scale) / 2.0f,
+                    this.size * (1.0f - this.scale) / 2.0f, 0.0f);
             graphics.pose().scale(this.scale, this.scale, 1.0f);
             this.drawable.draw(graphics, 0, 0);
             graphics.pose().popPose();
@@ -260,6 +262,11 @@ public class EntropyTransmutationJeiCategory
 
         @Override
         public void getTooltip(@NotNull ITooltipBuilder tooltip, double mouseX, double mouseY) {
+            // JEI 会遍历调用每个控件的 getTooltip，不会代为判断鼠标是否落在控件上，必须在此自行判定。
+            // 否则鼠标停在底部步骤文本上时，图标的说明会与文本被截断时生成的提示叠成两行相同内容。
+            if (mouseX < 0 || mouseY < 0 || mouseX >= this.size || mouseY >= this.size) {
+                return;
+            }
             tooltip.add(this.tooltip);
         }
     }

@@ -232,6 +232,16 @@ public final class OmniversalAlloyFurnaceStructure {
             mismatches.add(new Mismatch(mufflerHatchPos, Part.CASING,
                     level.getBlockState(mufflerHatchPos)));
         }
+        // 相邻核心的结构可能重叠，重叠格在两边的模板里都属于外壳层，几何上无法区分归属。
+        // 功能部件若落在这种重叠格上，就是被两台核心同时纳入结构。此时不能采用
+        // 「先成型者持有」的仲裁，否则只会让后来者失效，而持有方的结构同样依赖一个争用方块。
+        List<BlockPos> functionalPartPositions = new ArrayList<>(5);
+        if (assemblyPos != null) functionalPartPositions.add(assemblyPos);
+        if (moldHubPos != null) functionalPartPositions.add(moldHubPos);
+        if (passiveHatchPos != null) functionalPartPositions.add(passiveHatchPos);
+        if (maintenanceHatchPos != null) functionalPartPositions.add(maintenanceHatchPos);
+        if (mufflerHatchPos != null) functionalPartPositions.add(mufflerHatchPos);
+        collectSharedFunctionalParts(level, corePos, functionalPartPositions, mismatches);
         return new ValidationResult(mismatches.isEmpty() && functionalCountsValid && coilTier > 0,
                 coilTier, assemblyPos, moldHubPos, passiveHatchPos, maintenanceHatchPos,
                 mufflerHatchPos, mismatches);
@@ -285,6 +295,55 @@ public final class OmniversalAlloyFurnaceStructure {
                     instanceof OmniversalMoldHubBlockEntity hub
                     && hub.isClaimedByOtherController(corePos);
         };
+    }
+
+    /**
+     * 把同时落在另一台核心结构模板外壳位上的功能部件记为错误。
+     *
+     * <p>这一检查是双向的：两台核心各自校验时都会发现同一个部件被对方模板覆盖，
+     * 因而同时判为结构失效，不会出现「一台可用、一台不可用」。</p>
+     *
+     * <p>搜索范围取核心模板的最大偏移：相邻核心若与本核心结构重叠，其核心方块必然
+     * 落在 x∈[-2,2]、y∈[-3,3]、z∈[-2,2] 之内。</p>
+     */
+    private static void collectSharedFunctionalParts(
+            LevelReader level, BlockPos corePos, List<BlockPos> partPositions, List<Mismatch> out) {
+        if (partPositions.isEmpty()) return;
+        BlockPos.MutableBlockPos cursor = new BlockPos.MutableBlockPos();
+        for (int x = -2; x <= 2; x++) {
+            for (int y = -3; y <= 3; y++) {
+                for (int z = -2; z <= 2; z++) {
+                    cursor.setWithOffset(corePos, x, y, z);
+                    if (cursor.equals(corePos) || !isChunkLoaded(level, cursor)) continue;
+                    BlockState otherState = level.getBlockState(cursor);
+                    if (!otherState.is(ModBlocks.MULTIBLOCK_ALLOY_FURNACE_CORE.get())) continue;
+                    Direction otherFacing = otherState.getValue(MultiblockAlloyFurnaceCoreBlock.FACING);
+                    BlockPos otherCorePos = cursor.immutable();
+                    for (BlockPos partPos : partPositions) {
+                        if (isTemplateCasing(otherCorePos, otherFacing, partPos)) {
+                            addSharedMismatch(out, partPos, level.getBlockState(partPos));
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /** 该世界坐标是否位于给定核心结构模板的外壳位上（核心自身除外）。 */
+    private static boolean isTemplateCasing(BlockPos corePos, Direction facing, BlockPos worldPos) {
+        for (Entry entry : ENTRIES) {
+            if (entry.part() != Part.CASING) continue;
+            if (entry.worldPos(corePos, facing).equals(worldPos)) return true;
+        }
+        return false;
+    }
+
+    /** 同一位置可能被多台相邻核心覆盖，只保留一条错误记录。 */
+    private static void addSharedMismatch(List<Mismatch> out, BlockPos pos, BlockState state) {
+        for (Mismatch existing : out) {
+            if (existing.worldPos().equals(pos)) return;
+        }
+        out.add(new Mismatch(pos, Part.CASING, state));
     }
 
     public static void notifyNearbyCores(Level level, BlockPos changedPos) {

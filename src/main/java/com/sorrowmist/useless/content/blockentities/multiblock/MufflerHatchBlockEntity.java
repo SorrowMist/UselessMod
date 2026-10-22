@@ -2,6 +2,7 @@ package com.sorrowmist.useless.content.blockentities.multiblock;
 
 import com.sorrowmist.useless.content.menus.MufflerHatchMenu;
 import com.sorrowmist.useless.init.ModBlockEntities;
+import com.sorrowmist.useless.init.ModItems;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.core.particles.ParticleTypes;
@@ -12,9 +13,7 @@ import net.minecraft.network.protocol.game.ClientGamePacketListener;
 import net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.RandomSource;
-import net.minecraft.world.Containers;
 import net.minecraft.world.MenuProvider;
-import net.minecraft.world.SimpleContainer;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
@@ -50,6 +49,8 @@ public final class MufflerHatchBlockEntity extends BlockEntity implements MenuPr
     private static final double SMOKE_RISE_SPEED = 0.07;
     /** 烟雾出生点在顶面上的水平随机范围。 */
     private static final double SMOKE_SPREAD = 0.35;
+    /** 产出 1 份灰烬所需的运行 tick 数，仅在核心处于工作状态时累加。 */
+    private static final int ASH_INTERVAL_TICKS = 100;
 
     /**
      * 消声仓的输出库存。

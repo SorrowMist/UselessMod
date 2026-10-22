@@ -110,6 +110,11 @@ public final class ModItems {
                     new Item.Properties().rarity(RarityExtension.LEGENDARY.getValue()),
                     AdvancedAlloyFurnaceBlockEntity.USEFUL_INGOT_FURNACE_TIER)
     );
+    // 灰烬：由消声仓在万象炉工作时积存，作为燃烧后的残余物
+    public static final DeferredItem<Item> ASH = registerAndAdd(
+            "ash",
+            () -> new Item(new Item.Properties())
+    );
     // 金属模具
     public static final DeferredItem<Item> METAL_MOLD_PLATE = registerAndAdd(
             "metal_mold_plate",

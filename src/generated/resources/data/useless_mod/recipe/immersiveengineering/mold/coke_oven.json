@@ -1,0 +1,30 @@
+{
+  "neoforge:conditions": [
+    {
+      "type": "neoforge:mod_loaded",
+      "modid": "immersiveengineering"
+    }
+  ],
+  "type": "minecraft:crafting_shaped",
+  "category": "building_blocks",
+  "key": {
+    "C": {
+      "item": "immersiveengineering:cokebrick"
+    },
+    "G": {
+      "item": "useless_mod:useless_glass_tier_1"
+    },
+    "I": {
+      "item": "useless_mod:useless_ingot_tier_1"
+    }
+  },
+  "pattern": [
+    "IGI",
+    "GCG",
+    "IGI"
+  ],
+  "result": {
+    "count": 1,
+    "id": "immersiveengineering:coke_oven"
+  }
+}

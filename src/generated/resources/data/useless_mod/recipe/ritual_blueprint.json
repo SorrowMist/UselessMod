@@ -1,11 +1,11 @@
 {
-  "type": "minecraft:crafting_shapeless",
   "neoforge:conditions": [
     {
       "type": "neoforge:mod_loaded",
       "modid": "occultism"
     }
   ],
+  "type": "minecraft:crafting_shapeless",
   "ingredients": [
     {
       "item": "minecraft:paper"
@@ -15,7 +15,7 @@
     }
   ],
   "result": {
-    "id": "useless_mod:ritual_blueprint",
-    "count": 1
+    "count": 1,
+    "id": "useless_mod:ritual_blueprint"
   }
 }

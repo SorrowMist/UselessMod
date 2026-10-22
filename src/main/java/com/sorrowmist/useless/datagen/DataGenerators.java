@@ -2,6 +2,7 @@ package com.sorrowmist.useless.datagen;
 
 import com.sorrowmist.useless.UselessMod;
 import com.sorrowmist.useless.datagen.providers.ULootTableProvider;
+import com.sorrowmist.useless.datagen.providers.recipes.CompatRecipeProvider;
 import com.sorrowmist.useless.datagen.providers.recipes.CraftingRecipes;
 import com.sorrowmist.useless.datagen.providers.tags.UBlockTagsProvider;
 import com.sorrowmist.useless.datagen.providers.tags.UItemTagsProvider;
@@ -29,5 +30,6 @@ public class DataGenerators {
         pack.addProvider(output -> new ULootTableProvider(output, registries));
 //        pack.addProvider(output -> new ModBiomeProvider(output, registries));
         pack.addProvider(output -> new CraftingRecipes(output, registries));
+        pack.addProvider(output -> new CompatRecipeProvider(output));
     }
 }

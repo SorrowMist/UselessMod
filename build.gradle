@@ -226,7 +226,7 @@ dependencies {
 
     compileOnly "curse.maven:oritech-1030830:8556549"
     compileOnly "curse.maven:ufo-future-1372445:8372110"
-    compileOnly "curse.maven:immersive-engineering-231951:6733669"
+    implementation "curse.maven:immersive-engineering-231951:6733669"
     compileOnly "curse.maven:extreme-reactors-250277:7344744"
     compileOnly "curse.maven:neovitae-1404763:8690909"
 
@@ -305,7 +305,7 @@ dependencies {
     compileOnly enderIoCompileFiles
 
     //eco
-    compileOnly "curse.maven:neo-eco-ae-extension-1460639:8983610"
+    implementation "curse.maven:neo-eco-ae-extension-1460639:8983610"
     // LDLib2 同时供本地编译（源码直接引用其 GUI/RPC 类型）与运行时使用：
     // OmniSequence 在运行时强制要求 ldlib2 存在，缺失会导致整包加载失败。
     compileOnly "maven.modrinth:ldlib:mc1.21.1-2.2.40-neoforge"

@@ -1,0 +1,39 @@
+{
+  "neoforge:conditions": [
+    {
+      "type": "neoforge:mod_loaded",
+      "modid": "extendedae"
+    }
+  ],
+  "type": "minecraft:crafting_shaped",
+  "category": "building",
+  "key": {
+    "A": {
+      "item": "extendedae:ex_molecular_assembler"
+    },
+    "C": {
+      "item": "minecraft:clock"
+    },
+    "D": {
+      "item": "extendedae:ex_import_bus_part"
+    },
+    "E": {
+      "item": "extendedae:ex_export_bus_part"
+    },
+    "P": {
+      "item": "useless_mod:me_pattern_assembly"
+    },
+    "R": {
+      "item": "ae2:singularity"
+    }
+  },
+  "pattern": [
+    "ACA",
+    "DPE",
+    "ARA"
+  ],
+  "result": {
+    "count": 1,
+    "id": "useless_mod:passive_crafting_hatch"
+  }
+}

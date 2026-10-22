@@ -555,10 +555,13 @@ public final class MultiblockAlloyFurnaceScreen extends AbstractContainerScreen<
 
     private Component expectedCasingName(BlockPos worldPos) {
         Component casingName = ModBlocks.OMNIVERSAL_FURNACE_CASING.get().getName();
+        // 占位符顺序须与结构校验一致：四个必需功能部件在前，可选的被动合成仓在后。
         return Component.translatable(
                 "gui.useless_mod.multiblock_alloy_furnace.preview.casing_with_functional_parts",
                 casingName, ModBlocks.ME_PATTERN_ASSEMBLY.get().getName(),
                 ModBlocks.OMNIVERSAL_MOLD_HUB.get().getName(),
+                ModBlocks.MAINTENANCE_HATCH.get().getName(),
+                ModBlocks.MUFFLER_HATCH.get().getName(),
                 ModBlocks.PASSIVE_CRAFTING_HATCH.get().getName());
     }
 

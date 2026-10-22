@@ -4,6 +4,7 @@ import com.sorrowmist.useless.UselessMod;
 import com.sorrowmist.useless.content.blockentities.AdvancedAlloyFurnaceBlockEntity;
 import com.sorrowmist.useless.content.blockentities.OreGeneratorBlockEntity;
 import com.sorrowmist.useless.content.blockentities.ThermostatBlockEntity;
+import com.sorrowmist.useless.content.blockentities.multiblock.AutoMaintenanceHatchBlockEntity;
 import com.sorrowmist.useless.content.blockentities.multiblock.MaintenanceHatchBlockEntity;
 import com.sorrowmist.useless.content.blockentities.multiblock.MePatternAssemblyBlockEntity;
 import com.sorrowmist.useless.content.blockentities.multiblock.MufflerHatchBlockEntity;
@@ -156,6 +157,10 @@ public final class ModBlockEntities {
             BLOCK_ENTITY_TYPES.register("muffler_hatch",
                     () -> BlockEntityType.Builder.of(MufflerHatchBlockEntity::new,
                             ModBlocks.MUFFLER_HATCH.get()).build(null));
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<AutoMaintenanceHatchBlockEntity>> AUTO_MAINTENANCE_HATCH =
+            BLOCK_ENTITY_TYPES.register("auto_maintenance_hatch",
+                    () -> BlockEntityType.Builder.of(AutoMaintenanceHatchBlockEntity::new,
+                            ModBlocks.AUTO_MAINTENANCE_HATCH.get()).build(null));
 
     /**
      * 「温度调节器」方块的恒温源状态。

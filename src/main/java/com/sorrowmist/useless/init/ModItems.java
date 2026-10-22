@@ -253,6 +253,9 @@ public final class ModItems {
     public static final DeferredItem<BlockItem> MUFFLER_HATCH = registerAndAdd(
             "muffler_hatch",
             () -> new BlockItem(ModBlocks.MUFFLER_HATCH.get(), new Item.Properties().stacksTo(1)));
+    public static final DeferredItem<BlockItem> AUTO_MAINTENANCE_HATCH = registerAndAdd(
+            "auto_maintenance_hatch",
+            () -> new BlockItem(ModBlocks.AUTO_MAINTENANCE_HATCH.get(), new Item.Properties().stacksTo(1)));
     public static final DeferredItem<BlockItem> OMNIVERSAL_FURNACE_CASING = registerAndAdd(
             "omniversal_furnace_casing",
             () -> new BlockItem(ModBlocks.OMNIVERSAL_FURNACE_CASING.get(), new Item.Properties()));

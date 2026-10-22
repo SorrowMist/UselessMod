@@ -359,6 +359,7 @@ public final class MultiblockAlloyFurnaceScreen extends AbstractContainerScreen<
                     case MOLD_HUB -> 0xFFF9A825;
                     case PASSIVE_HATCH -> 0xFF517497;
                     case MAINTENANCE_HATCH -> 0xFF6D4C41;
+                    case AUTO_MAINTENANCE_HATCH -> 0xFF8D6E63;
                     case MUFFLER_HATCH -> 0xFF546E7A;
                 };
             }

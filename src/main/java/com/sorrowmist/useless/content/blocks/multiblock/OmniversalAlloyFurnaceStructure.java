@@ -50,6 +50,7 @@ public final class OmniversalAlloyFurnaceStructure {
         MOLD_HUB,
         PASSIVE_HATCH,
         MAINTENANCE_HATCH,
+        AUTO_MAINTENANCE_HATCH,
         MUFFLER_HATCH
     }
 
@@ -148,7 +149,8 @@ public final class OmniversalAlloyFurnaceStructure {
                         if (passiveHatchCount == 1) passiveHatchPos = worldPos.immutable();
                         else mismatches.add(new Mismatch(worldPos, Part.CASING, state));
                     }
-                    case MAINTENANCE_HATCH -> {
+                    // 普通维护仓与自动维护仓二选一：两者共用一个名额，多放一个即判错。
+                    case MAINTENANCE_HATCH, AUTO_MAINTENANCE_HATCH -> {
                         maintenanceHatchCount++;
                         if (maintenanceHatchCount == 1) maintenanceHatchPos = worldPos.immutable();
                         else mismatches.add(new Mismatch(worldPos, Part.CASING, state));
@@ -245,6 +247,7 @@ public final class OmniversalAlloyFurnaceStructure {
         if (state.is(ModBlocks.OMNIVERSAL_MOLD_HUB.get())) return FunctionalPart.MOLD_HUB;
         if (state.is(ModBlocks.PASSIVE_CRAFTING_HATCH.get())) return FunctionalPart.PASSIVE_HATCH;
         if (state.is(ModBlocks.MAINTENANCE_HATCH.get())) return FunctionalPart.MAINTENANCE_HATCH;
+        if (state.is(ModBlocks.AUTO_MAINTENANCE_HATCH.get())) return FunctionalPart.AUTO_MAINTENANCE_HATCH;
         if (state.is(ModBlocks.MUFFLER_HATCH.get())) return FunctionalPart.MUFFLER_HATCH;
         return null;
     }
@@ -264,6 +267,8 @@ public final class OmniversalAlloyFurnaceStructure {
             case MAINTENANCE_HATCH -> actualLevel.getBlockEntity(partPos)
                     instanceof MaintenanceHatchBlockEntity hatch
                     && hatch.isClaimedByOtherController(corePos);
+            // 自动维护仓不记录归属，不会与其它核心争抢。
+            case AUTO_MAINTENANCE_HATCH -> false;
             case MUFFLER_HATCH -> actualLevel.getBlockEntity(partPos)
                     instanceof MufflerHatchBlockEntity hatch
                     && hatch.isClaimedByOtherController(corePos);

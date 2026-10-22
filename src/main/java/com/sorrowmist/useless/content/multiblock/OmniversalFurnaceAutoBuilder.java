@@ -160,7 +160,14 @@ public final class OmniversalFurnaceAutoBuilder {
             if (pos == null) return null;
             parts.put(pos, OmniversalAlloyFurnaceStructure.FunctionalPart.MOLD_HUB);
         }
-        if (!parts.containsValue(OmniversalAlloyFurnaceStructure.FunctionalPart.MAINTENANCE_HATCH)) {
+        // 普通维护仓与自动维护仓共用一个名额；两者同时存在时补位无法修正，直接判定为不可建造，
+        // 否则建造会「成功」而结构始终不通过校验。
+        if (parts.containsValue(OmniversalAlloyFurnaceStructure.FunctionalPart.MAINTENANCE_HATCH)
+                && parts.containsValue(OmniversalAlloyFurnaceStructure.FunctionalPart.AUTO_MAINTENANCE_HATCH)) {
+            return null;
+        }
+        if (!parts.containsValue(OmniversalAlloyFurnaceStructure.FunctionalPart.MAINTENANCE_HATCH)
+                && !parts.containsValue(OmniversalAlloyFurnaceStructure.FunctionalPart.AUTO_MAINTENANCE_HATCH)) {
             BlockPos pos = chooseFunctionalPosition(level, corePos, facing, parts,
                     OmniversalAlloyFurnaceStructure.PREFERRED_MAINTENANCE_HATCH_POS);
             if (pos == null) return null;
@@ -192,7 +199,8 @@ public final class OmniversalFurnaceAutoBuilder {
             case MUFFLER_HATCH -> level.getBlockEntity(partPos)
                     instanceof MufflerHatchBlockEntity hatch
                     && hatch.isClaimedByOtherController(corePos);
-            case MOLD_HUB -> false;
+            // 自动维护仓不记录归属，无需检查抢占。
+            case AUTO_MAINTENANCE_HATCH, MOLD_HUB -> false;
         };
     }
 
@@ -302,6 +310,7 @@ public final class OmniversalFurnaceAutoBuilder {
                 case MOLD_HUB -> ModBlocks.OMNIVERSAL_MOLD_HUB.get().defaultBlockState();
                 case PASSIVE_HATCH -> ModBlocks.PASSIVE_CRAFTING_HATCH.get().defaultBlockState();
                 case MAINTENANCE_HATCH -> ModBlocks.MAINTENANCE_HATCH.get().defaultBlockState();
+                case AUTO_MAINTENANCE_HATCH -> ModBlocks.AUTO_MAINTENANCE_HATCH.get().defaultBlockState();
                 case MUFFLER_HATCH -> throw new IllegalStateException("消声仓朝向已在上方单独处理");
             }).setValue(DirectionalMultiblockPartBlock.FACING, facing);
         }

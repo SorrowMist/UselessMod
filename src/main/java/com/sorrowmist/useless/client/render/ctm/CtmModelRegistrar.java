@@ -54,6 +54,8 @@ public final class CtmModelRegistrar {
                 furnaceBase, furnaceCtm);
         wrapBlock(event.getModels(), ModBlocks.MAINTENANCE_HATCH.get(),
                 furnaceBase, furnaceCtm);
+        wrapBlock(event.getModels(), ModBlocks.AUTO_MAINTENANCE_HATCH.get(),
+                furnaceBase, furnaceCtm);
         wrapBlock(event.getModels(), ModBlocks.MUFFLER_HATCH.get(),
                 furnaceBase, furnaceCtm);
 

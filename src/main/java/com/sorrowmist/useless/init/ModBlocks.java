@@ -7,6 +7,7 @@ import com.sorrowmist.useless.content.blocks.SupervisorBlock;
 import com.sorrowmist.useless.content.blocks.TeleportPadBlock;
 import com.sorrowmist.useless.content.blocks.TemperatureRegulatorBlock;
 import com.sorrowmist.useless.content.blocks.UselessGlassBlock;
+import com.sorrowmist.useless.content.blocks.multiblock.AutoMaintenanceHatchBlock;
 import com.sorrowmist.useless.content.blocks.multiblock.MaintenanceHatchBlock;
 import com.sorrowmist.useless.content.blocks.multiblock.MePatternAssemblyBlock;
 import com.sorrowmist.useless.content.blocks.multiblock.MufflerHatchBlock;
@@ -99,6 +100,10 @@ public final class ModBlocks {
     public static final DeferredBlock<MufflerHatchBlock> MUFFLER_HATCH = BLOCKS.register(
             "muffler_hatch",
             () -> new MufflerHatchBlock(BlockBehaviour.Properties.of()
+                    .strength(4.0F, 1200.0F).requiresCorrectToolForDrops()));
+    public static final DeferredBlock<AutoMaintenanceHatchBlock> AUTO_MAINTENANCE_HATCH = BLOCKS.register(
+            "auto_maintenance_hatch",
+            () -> new AutoMaintenanceHatchBlock(BlockBehaviour.Properties.of()
                     .strength(4.0F, 1200.0F).requiresCorrectToolForDrops()));
     public static final DeferredBlock<MultiblockPartBlock> OMNIVERSAL_FURNACE_CASING = BLOCKS.register(
             "omniversal_furnace_casing",

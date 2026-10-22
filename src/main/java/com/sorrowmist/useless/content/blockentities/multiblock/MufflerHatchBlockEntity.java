@@ -68,6 +68,8 @@ public final class MufflerHatchBlockEntity extends BlockEntity implements MenuPr
     @Nullable
     private BlockPos controllerPos;
     private long structureGeneration;
+    /** 灰烬产出进度，仅在核心处于工作状态时累加。 */
+    private int ashProgress;
     private boolean unloading;
 
     public MufflerHatchBlockEntity(BlockPos pos, BlockState state) {
@@ -147,11 +149,19 @@ public final class MufflerHatchBlockEntity extends BlockEntity implements MenuPr
     }
 
     /**
-     * 由核心在工作状态下逐 tick 调用，按固定间隔从顶面向上喷出烟雾。
-     * 核心只有在排烟空间畅通时才能工作，因此此处无需重复判定阻挡。
+     * 由核心在工作状态下逐 tick 调用：按固定间隔从顶面向上喷出烟雾，并累积灰烬产出进度。
+     *
+     * <p>核心只有在排烟空间畅通时才能工作，因此此处无需重复判定阻挡。灰烬进度只在工作状态下累加，
+     * 停机期间保持不变；输出槽已满时暂停累加，待玩家取走产物后继续。</p>
      */
-    public void emitSmokeFromController() {
+    public void tickFromController() {
         if (unloading || isRemoved() || !(level instanceof ServerLevel serverLevel)) return;
+        emitSmoke(serverLevel);
+        accumulateAsh();
+    }
+
+    /** 按固定间隔喷出烟雾粒子。 */
+    private void emitSmoke(ServerLevel serverLevel) {
         if (serverLevel.getGameTime() % EMIT_INTERVAL_TICKS != 0) return;
         RandomSource random = serverLevel.getRandom();
         for (int i = 0; i < PARTICLES_PER_EMIT; i++) {
@@ -161,6 +171,23 @@ public final class MufflerHatchBlockEntity extends BlockEntity implements MenuPr
             // 粒子数为 0 时偏移参数按方向向量解释、乘以速度作为初速度，以此令烟雾竖直上升。
             serverLevel.sendParticles(ParticleTypes.CAMPFIRE_COSY_SMOKE,
                     x, y, z, 0, 0.0, 1.0, 0.0, SMOKE_RISE_SPEED);
+        }
+    }
+
+    /**
+     * 累积灰烬产出进度，满 {@link #ASH_INTERVAL_TICKS} 后向输出槽放入一份灰烬。
+     *
+     * <p>输出槽已满时不累加，进度停留在满值之前，避免产物凭空丢失。</p>
+     */
+    private void accumulateAsh() {
+        if (ashProgress + 1 < ASH_INTERVAL_TICKS) {
+            ashProgress++;
+            return;
+        }
+        ItemStack remainder = output.insertItem(0, new ItemStack(ModItems.ASH.get()), false);
+        if (remainder.isEmpty()) {
+            ashProgress = 0;
+            setChanged();
         }
     }
 
@@ -179,6 +206,7 @@ public final class MufflerHatchBlockEntity extends BlockEntity implements MenuPr
         super.loadAdditional(tag, registries);
         controllerPos = tag.contains("Controller") ? BlockPos.of(tag.getLong("Controller")) : null;
         structureGeneration = tag.getLong("StructureGeneration");
+        ashProgress = tag.getInt("AshProgress");
         if (tag.contains("Output")) output.deserializeNBT(registries, tag.getCompound("Output"));
     }
 
@@ -187,6 +215,7 @@ public final class MufflerHatchBlockEntity extends BlockEntity implements MenuPr
         super.saveAdditional(tag, registries);
         if (controllerPos != null) tag.putLong("Controller", controllerPos.asLong());
         tag.putLong("StructureGeneration", structureGeneration);
+        tag.putInt("AshProgress", ashProgress);
         tag.put("Output", output.serializeNBT(registries));
     }
 

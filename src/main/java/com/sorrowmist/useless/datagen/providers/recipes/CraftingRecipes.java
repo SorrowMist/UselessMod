@@ -313,17 +313,6 @@ public class CraftingRecipes extends RecipeProvider {
     }
 
     private void addOmniversalFurnaceRecipes(RecipeOutput consumer) {
-        ShapedRecipeBuilder.shaped(RecipeCategory.BUILDING_BLOCKS,
-                                   ModBlocks.MULTIBLOCK_ALLOY_FURNACE_CORE.get())
-                           .pattern("IRI")
-                           .pattern("RFR")
-                           .pattern("IRI")
-                           .define('I', Items.IRON_INGOT)
-                           .define('R', Items.REDSTONE)
-                           .define('F', ModBlocks.ADVANCED_ALLOY_FURNACE_BLOCK.get())
-                           .unlockedBy("has_alloy_furnace", has(ModBlocks.ADVANCED_ALLOY_FURNACE_BLOCK.get()))
-                           .save(consumer, UselessMod.id("crafting/multiblock_alloy_furnace_core"));
-
         ShapedRecipeBuilder.shaped(RecipeCategory.BUILDING_BLOCKS, ModBlocks.ME_PATTERN_ASSEMBLY.get())
                            .pattern("AEA")
                            .pattern("BCB")

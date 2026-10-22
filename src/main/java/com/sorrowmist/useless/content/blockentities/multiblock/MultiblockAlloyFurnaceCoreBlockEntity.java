@@ -115,7 +115,7 @@ public final class MultiblockAlloyFurnaceCoreBlockEntity extends BlockEntity imp
      *
      * <p>损耗按整数点扣减，余数必须留存，否则每 tick 各自整除会让损耗永远停在 0。</p>
      */
-    private long maintenanceWearTickRemainder;
+    private long maintenanceTickRemainder;
     @Nullable
     private BlockPos patternAssemblyPos;
     @Nullable
@@ -210,6 +210,9 @@ public final class MultiblockAlloyFurnaceCoreBlockEntity extends BlockEntity imp
             progressed |= passiveHatch.serverTickFromController(this);
         }
         accrueRuntimeMaintenance(progressed);
+        // 结构内含自动维护仓时维护度恒为满值：先累加再复位，保证两条扣减线都被抵消，
+        // 同时让自动仓本身仍按普通方块实体存在（不额外跳过任何加工逻辑）。
+        maintainWithAutoHatch();
         boolean hasWork = aeManager.hasWork()
                 || passiveHatch != null && passiveHatch.hasWork();
         updateDisplayedActivity(progressed, hasWork);
@@ -371,6 +374,38 @@ public final class MultiblockAlloyFurnaceCoreBlockEntity extends BlockEntity imp
             return null;
         }
         return level.getBlockEntity(mufflerHatchPos) instanceof MufflerHatchBlockEntity hatch ? hatch : null;
+    }
+
+    /**
+     * 取得结构内的自动维护仓。
+     *
+     * <p>自动维护仓与普通维护仓共用同一个功能部件名额，因此位置都记录在
+     * {@code maintenanceHatchPos}，这里按方块实体类型区分。</p>
+     */
+    @Nullable
+    private AutoMaintenanceHatchBlockEntity getAutoMaintenanceHatch() {
+        if (!formed || maintenanceHatchPos == null || level == null
+                || !level.isLoaded(maintenanceHatchPos)) {
+            return null;
+        }
+        return level.getBlockEntity(maintenanceHatchPos) instanceof AutoMaintenanceHatchBlockEntity hatch
+                ? hatch : null;
+    }
+
+    /**
+     * 结构内含自动维护仓时，把维护度保持在满值。
+     *
+     * <p>先比较满值再查询方块实体：正常运行时维护度本来就满，这一路径每 tick 只做一次
+     * 长整数比较，不会产生额外的方块实体查找开销。</p>
+     */
+    private void maintainWithAutoHatch() {
+        if (maintenanceLevel == MaintenanceWearRules.MAX_MAINTENANCE
+                && maintenanceTickRemainder == 0L) {
+            return;
+        }
+        if (getAutoMaintenanceHatch() != null) {
+            restoreMaintenance();
+        }
     }
 
     /** 结构成型时，消声仓上方的排烟空间是否被非空气方块占据。 */
@@ -609,12 +644,12 @@ public final class MultiblockAlloyFurnaceCoreBlockEntity extends BlockEntity imp
         if (!progressed) {
             return;
         }
-        maintenanceWearTickRemainder++;
-        long consumed = MaintenanceWearRules.wearForTicks(maintenanceWearTickRemainder);
+        maintenanceTickRemainder++;
+        long consumed = MaintenanceWearRules.wearForTicks(maintenanceTickRemainder);
         if (consumed <= 0L) {
             return;
         }
-        maintenanceWearTickRemainder -= consumed * MaintenanceWearRules.WEAR_TICKS_PER_POINT;
+        maintenanceTickRemainder -= consumed * MaintenanceWearRules.WEAR_TICKS_PER_POINT;
         consumeMaintenance(consumed);
     }
 
@@ -656,11 +691,11 @@ public final class MultiblockAlloyFurnaceCoreBlockEntity extends BlockEntity imp
     /** 维护仓校准完成或自动维护仓工作后调用：把维护度恢复到满值。 */
     public void restoreMaintenance() {
         if (maintenanceLevel == MaintenanceWearRules.MAX_MAINTENANCE
-                && maintenanceWearTickRemainder == 0L) {
+                && maintenanceTickRemainder == 0L) {
             return;
         }
         maintenanceLevel = MaintenanceWearRules.MAX_MAINTENANCE;
-        maintenanceWearTickRemainder = 0L;
+        maintenanceTickRemainder = 0L;
         setChanged();
         if (level != null) {
             level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), 3);
@@ -1077,7 +1112,7 @@ public final class MultiblockAlloyFurnaceCoreBlockEntity extends BlockEntity imp
         maintenanceLevel = tag.contains("MaintenanceWear", Tag.TAG_ANY_NUMERIC)
                 ? MaintenanceWearRules.clamp(tag.getLong("MaintenanceWear"))
                 : MaintenanceWearRules.MAX_MAINTENANCE;
-        maintenanceWearTickRemainder = Math.max(0L, tag.getLong("MaintenanceWearTickRemainder"));
+        maintenanceTickRemainder = Math.max(0L, tag.getLong("MaintenanceWearTickRemainder"));
         automaticEnergyLimit = tag.contains("AutomaticEnergyLimit", Tag.TAG_ANY_NUMERIC)
                 ? Math.max(0L, tag.getLong("AutomaticEnergyLimit"))
                 : Long.MAX_VALUE;
@@ -1114,7 +1149,7 @@ public final class MultiblockAlloyFurnaceCoreBlockEntity extends BlockEntity imp
         if (mufflerHatchPos != null) tag.putLong("MufflerHatch", mufflerHatchPos.asLong());
         tag.putInt("RedstoneControlMode", redstoneControlMode.ordinal());
         tag.putLong("MaintenanceWear", maintenanceLevel);
-        tag.putLong("MaintenanceWearTickRemainder", maintenanceWearTickRemainder);
+        tag.putLong("MaintenanceWearTickRemainder", maintenanceTickRemainder);
         tag.putLong("AutomaticEnergyLimit", automaticEnergyLimit);
         tag.putInt("PatternPriority", aeManager.getPatternPriority());
         CompoundTag tasks = new CompoundTag();

@@ -274,8 +274,8 @@ public final class MultiblockAlloyFurnaceScreen extends AbstractContainerScreen<
         boolean structureValid = liveValidation == null ? menu.isFormed() : liveValidation.valid();
         // 结构完整但排烟受阻或维护超期时优先显示原因，否则玩家只会看到「已成型」却不知道为什么不开工。
         boolean mufflerObstructed = structureValid && menu.isMufflerObstructed();
-        long maintenanceWear = menu.getMaintenanceLevel();
-        boolean maintenanceOverdue = structureValid && MaintenanceWearRules.isOverdue(maintenanceWear);
+        long maintenanceLevel = menu.getMaintenanceLevel();
+        boolean maintenanceOverdue = structureValid && MaintenanceWearRules.isOverdue(maintenanceLevel);
         int stateColor = !structureValid || mufflerObstructed || maintenanceOverdue
                 ? MachineScreenStyle.ERROR_TEXT_COLOR
                 : 0xFF2E7D32;
@@ -299,13 +299,13 @@ public final class MultiblockAlloyFurnaceScreen extends AbstractContainerScreen<
         // 维护度只在结构正常时挤在状态行右侧：这一行以状态文案为主，出错时文案本身更长，
         // 再叠加数字会互相覆盖，因此异常状态只由状态文案表达。
         if (structureValid && !mufflerObstructed && !maintenanceOverdue) {
-            int wearColor = MaintenanceWearRules.isWarning(maintenanceWear)
+            int levelColor = MaintenanceWearRules.isWarning(maintenanceLevel)
                     ? MachineScreenStyle.ERROR_TEXT_COLOR
                     : MachineScreenStyle.MUTED_TEXT_COLOR;
             graphics.drawString(font, truncate(Component.translatable(
                             "gui.useless_mod.multiblock_alloy_furnace.maintenance",
-                            maintenanceWear, MaintenanceWearRules.MAX_MAINTENANCE), 80),
-                    88, 22, wearColor, false);
+                            maintenanceLevel, MaintenanceWearRules.MAX_MAINTENANCE), 80),
+                    88, 22, levelColor, false);
         }
         int detectedCoilTier = liveValidation == null ? menu.getCoilTier() : liveValidation.coilTier();
         graphics.drawString(font, Component.translatable(

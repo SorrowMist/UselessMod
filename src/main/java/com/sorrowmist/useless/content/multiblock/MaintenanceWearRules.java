@@ -12,11 +12,11 @@ package com.sorrowmist.useless.content.multiblock;
  * 使维护度下降。降到 {@link #WARNING_THRESHOLD} 以下进入警告段，加工开始变慢；
  * 降到 0 停机，必须由维护仓校准才能恢复。</p>
  *
- * <h2>为什么按「运行 tick + 合成批次」两条线累加磨损</h2>
+ * <h2>为什么按「运行 tick + 合成批次」两条线扣减</h2>
  *
- * <p>只按 tick 累加会让满载与轻载的磨损速度相同，机器一旦开机就按时间老化；
- * 只按处理量累加又会让长期挂在网络上等任务的机器完全不磨损。两者叠加后，
- * 「开机即老化」与「干得越多磨得越快」都能体现。</p>
+ * <p>只按 tick 扣减会让满载与轻载的损耗速度相同，机器一旦开机就按时间老化；
+ * 只按处理量扣减又会让长期挂在网络上等任务的机器完全不损耗。两者叠加后，
+ * 「开机即老化」与「干得越多掉得越快」都能体现。</p>
  *
  * <h2>分段而非线性</h2>
  *
@@ -134,13 +134,4 @@ public final class MaintenanceWearRules {
         return ticks <= 0L ? 0L : ticks / WEAR_TICKS_PER_POINT;
     }
 
-    /**
-     * 把旧存档中的「累计磨损」换算为现行「剩余维护度」。
-     *
-     * <p>旧语义下该字段从 0 起累加、数值越大越糟；现行语义从 {@link #MAX_MAINTENANCE}
-     * 起扣减、数值越小越糟。两者方向相反，直接沿用会让刚造好的旧机器被读成维护度 0 而停机。</p>
-     */
-    public static long fromLegacyWear(long legacyWear) {
-        return clamp(MAX_MAINTENANCE - legacyWear);
-    }
 }

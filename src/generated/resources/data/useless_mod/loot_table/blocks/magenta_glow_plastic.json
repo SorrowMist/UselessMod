@@ -1,21 +1,21 @@
 {
-    "type": "minecraft:block",
-    "pools": [
+  "type": "minecraft:block",
+  "pools": [
+    {
+      "bonus_rolls": 0.0,
+      "conditions": [
         {
-            "bonus_rolls": 0.0,
-            "conditions": [
-                {
-                    "condition": "minecraft:survives_explosion"
-                }
-            ],
-            "entries": [
-                {
-                    "type": "minecraft:item",
-                    "name": "useless_mod:magenta_glow_plastic"
-                }
-            ],
-            "rolls": 1.0
+          "condition": "minecraft:survives_explosion"
         }
-    ],
-    "random_sequence": "useless_mod:blocks/magenta_glow_plastic"
+      ],
+      "entries": [
+        {
+          "type": "minecraft:item",
+          "name": "useless_mod:magenta_glow_plastic"
+        }
+      ],
+      "rolls": 1.0
+    }
+  ],
+  "random_sequence": "useless_mod:blocks/magenta_glow_plastic"
 }

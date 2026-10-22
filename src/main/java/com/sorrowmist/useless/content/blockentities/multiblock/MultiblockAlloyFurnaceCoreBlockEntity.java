@@ -105,15 +105,15 @@ public final class MultiblockAlloyFurnaceCoreBlockEntity extends BlockEntity imp
     private boolean formed;
     private int coilTier;
     /**
-     * 整机维护度，取值 {@code [0, MAX_WEAR]}，由运行 tick 与合成批次两条线累加。
+     * 整机维护度，取值 {@code [0, MAX_MAINTENANCE]}，新机器为满值，由运行 tick 与合成批次两条线扣减。
      *
-     * <p>维护度是整机状态而非单个部件状态，因此由核心持有；维护仓只提供把它清零的操作入口。</p>
+     * <p>维护度是整机状态而非单个部件状态，因此由核心持有；维护仓只提供把它恢复到满值的操作入口。</p>
      */
-    private long maintenanceWear;
+    private long maintenanceLevel = MaintenanceWearRules.MAX_MAINTENANCE;
     /**
-     * 尚未折算成维护度的运行 tick 余数。
+     * 尚未折算成维护度损耗的运行 tick 余数。
      *
-     * <p>磨损按整数点累加，余数必须留存，否则每 tick 各自整除会让磨损永远停在 0。</p>
+     * <p>损耗按整数点扣减，余数必须留存，否则每 tick 各自整除会让损耗永远停在 0。</p>
      */
     private long maintenanceWearTickRemainder;
     @Nullable
@@ -158,8 +158,8 @@ public final class MultiblockAlloyFurnaceCoreBlockEntity extends BlockEntity imp
                 case 9 -> (int) energyLimit;
                 case 10 -> (int) (energyLimit >>> 32);
                 case 11 -> mufflerObstructed ? 1 : 0;
-                case 12 -> (int) maintenanceWear;
-                case 13 -> (int) (maintenanceWear >>> 32);
+                case 12 -> (int) maintenanceLevel;
+                case 13 -> (int) (maintenanceLevel >>> 32);
                 default -> 0;
             };
         }
@@ -209,13 +209,13 @@ public final class MultiblockAlloyFurnaceCoreBlockEntity extends BlockEntity imp
         if (passiveHatch != null) {
             progressed |= passiveHatch.serverTickFromController(this);
         }
-        accrueRuntimeWear(progressed);
+        accrueRuntimeMaintenance(progressed);
         boolean hasWork = aeManager.hasWork()
                 || passiveHatch != null && passiveHatch.hasWork();
-        if (updateDisplayedActivity(progressed, hasWork) == MultiblockFurnaceActivity.RUN) {
-            MufflerHatchBlockEntity muffler = getMufflerHatch();
-            if (muffler != null) muffler.emitSmokeFromController();
-        }
+        updateDisplayedActivity(progressed, hasWork);
+        // 消声仓逐 tick 驱动：只有本 tick 确实有进展时才推进产灰；停机期间残留灰烬仍会冒烟并继续散发毒性。
+        MufflerHatchBlockEntity muffler = getMufflerHatch();
+        if (muffler != null) muffler.tickFromController(progressed);
     }
 
     private MultiblockFurnaceActivity updateDisplayedActivity(boolean progressed, boolean hasWork) {
@@ -588,47 +588,59 @@ public final class MultiblockAlloyFurnaceCoreBlockEntity extends BlockEntity imp
     }
 
     /**
-     * 按「有实际进展的运行 tick」累加维护度。
+     * 消声仓灰烬是否已堆满且配置为阻塞工作。
+     *
+     * <p>仅在消声仓仍归属于本核心时判定；灰烬可随时被玩家取走，故与排烟受阻一样逐 tick 重新计算，
+     * 不写入 NBT。配置关闭时该条件恒为 false，灰烬继续堆满即停产。</p>
+     */
+    private boolean isAshOutputBlocked() {
+        if (!ConfigManager.isAshFullBlockingWork()) return false;
+        MufflerHatchBlockEntity muffler = getMufflerHatch();
+        return muffler != null && muffler.isAshFull();
+    }
+
+    /**
+     * 按「有实际进展的运行 tick」扣减维护度。
      *
      * <p>只在机器确实推进了配方时才计时，空转不磨损；余数必须留存，
      * 否则每 tick 单独整除会让累积永远停在 0。</p>
      */
-    private void accrueRuntimeWear(boolean progressed) {
+    private void accrueRuntimeMaintenance(boolean progressed) {
         if (!progressed) {
             return;
         }
         maintenanceWearTickRemainder++;
-        long gained = MaintenanceWearRules.wearForTicks(maintenanceWearTickRemainder);
-        if (gained <= 0L) {
+        long consumed = MaintenanceWearRules.wearForTicks(maintenanceWearTickRemainder);
+        if (consumed <= 0L) {
             return;
         }
-        maintenanceWearTickRemainder -= gained * MaintenanceWearRules.WEAR_TICKS_PER_POINT;
-        applyWearGain(gained);
+        maintenanceWearTickRemainder -= consumed * MaintenanceWearRules.WEAR_TICKS_PER_POINT;
+        consumeMaintenance(consumed);
     }
 
     /**
-     * 按完成量累加维护度。
+     * 按完成量扣减维护度。
      *
      * <p>由 {@link CraftingTaskContext} 在每批产物写出之后回调，因此同一任务会分批回调多次。
      * 与运行 tick 磨损叠加，体现「干得越多磨得越快」。</p>
      */
     @Override
     public void onCraftsCompleted(long crafts) {
-        applyWearGain(MaintenanceWearRules.wearForCrafts(crafts));
+        consumeMaintenance(MaintenanceWearRules.wearForCrafts(crafts));
     }
 
-    /** 维护度增长的实际入口：夹紧到上限，变化时标脏并同步界面。 */
-    private void applyWearGain(long gained) {
-        if (gained <= 0L) {
+    /** 维护度下降的实际入口：夹紧到下限，变化时标脏并同步界面。 */
+    private void consumeMaintenance(long consumed) {
+        if (consumed <= 0L) {
             return;
         }
-        long updated = MaintenanceWearRules.clamp(maintenanceWear + gained);
-        if (updated == maintenanceWear) {
+        long updated = MaintenanceWearRules.clamp(maintenanceLevel - consumed);
+        if (updated == maintenanceLevel) {
             return;
         }
-        boolean crossedOverdue = !MaintenanceWearRules.isOverdue(maintenanceWear)
+        boolean crossedOverdue = !MaintenanceWearRules.isOverdue(maintenanceLevel)
                 && MaintenanceWearRules.isOverdue(updated);
-        maintenanceWear = updated;
+        maintenanceLevel = updated;
         setChanged();
         if (crossedOverdue && level != null) {
             // 停机点跨越时同步方块更新，让 Jade / 界面立即显示维护提示。
@@ -637,16 +649,17 @@ public final class MultiblockAlloyFurnaceCoreBlockEntity extends BlockEntity imp
     }
 
     /** 当前维护度，供界面与调试读取。 */
-    public long getMaintenanceWear() {
-        return maintenanceWear;
+    public long getMaintenanceLevel() {
+        return maintenanceLevel;
     }
 
-    /** 维护仓校准完成或自动维护仓工作后调用：把维护度清零。 */
-    public void resetMaintenanceWear() {
-        if (maintenanceWear == 0L && maintenanceWearTickRemainder == 0L) {
+    /** 维护仓校准完成或自动维护仓工作后调用：把维护度恢复到满值。 */
+    public void restoreMaintenance() {
+        if (maintenanceLevel == MaintenanceWearRules.MAX_MAINTENANCE
+                && maintenanceWearTickRemainder == 0L) {
             return;
         }
-        maintenanceWear = 0L;
+        maintenanceLevel = MaintenanceWearRules.MAX_MAINTENANCE;
         maintenanceWearTickRemainder = 0L;
         setChanged();
         if (level != null) {
@@ -656,7 +669,7 @@ public final class MultiblockAlloyFurnaceCoreBlockEntity extends BlockEntity imp
 
     /** 维护度是否已到停机点。 */
     public boolean isMaintenanceOverdue() {
-        return MaintenanceWearRules.isOverdue(maintenanceWear);
+        return MaintenanceWearRules.isOverdue(maintenanceLevel);
     }
 
     /**
@@ -669,7 +682,7 @@ public final class MultiblockAlloyFurnaceCoreBlockEntity extends BlockEntity imp
     public int getTaskProcessTime(AdvancedAlloyFurnaceRecipe recipe, ResolvedCatalystEffect effect) {
         // 直接父接口是 AlloyFurnaceAeHost；CraftingTaskContext 是它的父接口，不能用 super 直接调到。
         int base = AlloyFurnaceAeHost.super.getTaskProcessTime(recipe, effect);
-        return MaintenanceWearRules.scaledProcessTime(base, maintenanceWear);
+        return MaintenanceWearRules.scaledProcessTime(base, maintenanceLevel);
     }
 
     public RedstoneControlMode getRedstoneControlMode() {
@@ -799,7 +812,11 @@ public final class MultiblockAlloyFurnaceCoreBlockEntity extends BlockEntity imp
             return CraftingTaskContext.TaskAvailability.unavailable(
                     "gui.useless_mod.advanced_alloy_furnace.ae_task_status.waiting_muffler", "");
         }
-        if (MaintenanceWearRules.isOverdue(maintenanceWear)) {
+        if (isAshOutputBlocked()) {
+            return CraftingTaskContext.TaskAvailability.unavailable(
+                    "gui.useless_mod.advanced_alloy_furnace.ae_task_status.waiting_ash_full", "");
+        }
+        if (MaintenanceWearRules.isOverdue(maintenanceLevel)) {
             return CraftingTaskContext.TaskAvailability.unavailable(
                     "gui.useless_mod.advanced_alloy_furnace.ae_task_status.waiting_maintenance", "");
         }
@@ -865,7 +882,7 @@ public final class MultiblockAlloyFurnaceCoreBlockEntity extends BlockEntity imp
 
     @Override
     public boolean isTaskExecutionEnabled() {
-        return formed && !mufflerObstructed && level != null
+        return formed && !mufflerObstructed && !isAshOutputBlocked() && level != null
                 && redstoneControlMode.shouldRun(level.hasNeighborSignal(worldPosition));
     }
 
@@ -1055,8 +1072,11 @@ public final class MultiblockAlloyFurnaceCoreBlockEntity extends BlockEntity imp
         mufflerHatchPos = tag.contains("MufflerHatch")
                 ? BlockPos.of(tag.getLong("MufflerHatch")) : null;
         redstoneControlMode = RedstoneControlMode.byIndex(tag.getInt("RedstoneControlMode"));
-        // 维护度是整机状态，必须随核心持久化；缺失字段的旧存档按 0 处理。
-        maintenanceWear = MaintenanceWearRules.clamp(tag.getLong("MaintenanceWear"));
+        // 维护度是整机状态，必须随核心持久化；缺失字段的旧存档按满值处理，
+        // 否则旧存档里的机器一加载就处于停机状态。
+        maintenanceLevel = tag.contains("MaintenanceWear", Tag.TAG_ANY_NUMERIC)
+                ? MaintenanceWearRules.clamp(tag.getLong("MaintenanceWear"))
+                : MaintenanceWearRules.MAX_MAINTENANCE;
         maintenanceWearTickRemainder = Math.max(0L, tag.getLong("MaintenanceWearTickRemainder"));
         automaticEnergyLimit = tag.contains("AutomaticEnergyLimit", Tag.TAG_ANY_NUMERIC)
                 ? Math.max(0L, tag.getLong("AutomaticEnergyLimit"))
@@ -1093,7 +1113,7 @@ public final class MultiblockAlloyFurnaceCoreBlockEntity extends BlockEntity imp
         if (maintenanceHatchPos != null) tag.putLong("MaintenanceHatch", maintenanceHatchPos.asLong());
         if (mufflerHatchPos != null) tag.putLong("MufflerHatch", mufflerHatchPos.asLong());
         tag.putInt("RedstoneControlMode", redstoneControlMode.ordinal());
-        tag.putLong("MaintenanceWear", maintenanceWear);
+        tag.putLong("MaintenanceWear", maintenanceLevel);
         tag.putLong("MaintenanceWearTickRemainder", maintenanceWearTickRemainder);
         tag.putLong("AutomaticEnergyLimit", automaticEnergyLimit);
         tag.putInt("PatternPriority", aeManager.getPatternPriority());

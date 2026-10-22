@@ -1,6 +1,7 @@
 package com.sorrowmist.useless.content.blockentities.multiblock;
 
 import com.sorrowmist.useless.content.menus.MufflerHatchMenu;
+import com.sorrowmist.useless.core.config.ConfigManager;
 import com.sorrowmist.useless.init.ModBlockEntities;
 import com.sorrowmist.useless.init.ModItems;
 import net.minecraft.core.BlockPos;
@@ -14,6 +15,9 @@ import net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.MenuProvider;
+import net.minecraft.world.effect.MobEffectInstance;
+import net.minecraft.world.effect.MobEffects;
+import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
@@ -22,6 +26,7 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.BlockGetter;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.phys.AABB;
 import net.neoforged.neoforge.items.IItemHandler;
 import net.neoforged.neoforge.items.ItemStackHandler;
 import org.jetbrains.annotations.Nullable;
@@ -49,8 +54,18 @@ public final class MufflerHatchBlockEntity extends BlockEntity implements MenuPr
     private static final double SMOKE_RISE_SPEED = 0.07;
     /** 烟雾出生点在顶面上的水平随机范围。 */
     private static final double SMOKE_SPREAD = 0.35;
-    /** 产出 1 份灰烬所需的运行 tick 数，仅在核心处于工作状态时累加。 */
-    private static final int ASH_INTERVAL_TICKS = 100;
+    /**
+     * 产出 1 份灰烬所需的运行 tick 数，仅在核心处于工作状态时累加。
+     *
+     * <p>节奏参照 GregTech Modern 的消声仓（{@code MufflerPartMachine}）：其
+     * {@code recoveryChance = max(1, tier * 10)}，每次配方完成时按该百分比判定一次，
+     * 即 LV 约 10%、UV 约 80%；按典型配方 10 秒折算，约 100 秒（LV）至 12.5 秒（UV）一份。
+     * 本模组的并行与线程数远高于 GT，同一时间完成的配方量更大，不能直接沿用其「每次配方判定」的速率，
+     * 因此改为按运行时间累积：基准周期 800 tick（40 秒）一份，再由线圈抑制按比例拉长实际周期。</p>
+     */
+    private static final int ASH_INTERVAL_TICKS = 800;
+    /** 毒性效果的判定间隔（tick），即每秒一次。 */
+    private static final int TOXIC_INTERVAL_TICKS = 20;
 
     /**
      * 消声仓的输出库存。
@@ -154,10 +169,17 @@ public final class MufflerHatchBlockEntity extends BlockEntity implements MenuPr
      * <p>核心只有在排烟空间畅通时才能工作，因此此处无需重复判定阻挡。灰烬进度只在工作状态下累加，
      * 停机期间保持不变；输出槽已满时暂停累加，待玩家取走产物后继续。</p>
      */
-    public void tickFromController() {
+    public void tickFromController(boolean furnaceWorking) {
         if (unloading || isRemoved() || !(level instanceof ServerLevel serverLevel)) return;
-        emitSmoke(serverLevel);
-        accumulateAsh();
+        // 停机期间若仍有残留灰烬，排烟与毒性效果继续存在；产灰只在核心真正工作时推进。
+        boolean ashPresent = !output.getStackInSlot(0).isEmpty();
+        if (furnaceWorking || ashPresent) {
+            emitSmoke(serverLevel);
+        }
+        if (furnaceWorking) {
+            accumulateAsh(serverLevel);
+        }
+        tickToxicEffects(serverLevel);
     }
 
     /** 按固定间隔喷出烟雾粒子。 */
@@ -179,7 +201,9 @@ public final class MufflerHatchBlockEntity extends BlockEntity implements MenuPr
      *
      * <p>输出槽已满时不累加，进度停留在满值之前，避免产物凭空丢失。</p>
      */
-    private void accumulateAsh() {
+    private void accumulateAsh(ServerLevel serverLevel) {
+        if (isAshFull()) return;
+        if (isAshProductionSuppressed(serverLevel)) return;
         if (ashProgress + 1 < ASH_INTERVAL_TICKS) {
             ashProgress++;
             return;
@@ -189,6 +213,61 @@ public final class MufflerHatchBlockEntity extends BlockEntity implements MenuPr
             ashProgress = 0;
             setChanged();
         }
+    }
+
+    /**
+     * 线圈净化：每 tick 按当前线圈的抑制百分比决定本 tick 是否推进灰烬进度。
+     *
+     * <p>抑制 100% 时完全停产灰烬，抑制 50% 时平均产出周期翻倍。未安装线圈或结构未成型时
+     * 取不到核心，按不抑制处理。</p>
+     */
+    private boolean isAshProductionSuppressed(ServerLevel serverLevel) {
+        MultiblockAlloyFurnaceCoreBlockEntity controller = getController();
+        if (controller == null) return false;
+        int suppression = ConfigManager.getOmniversalCoilAshSuppression(controller.getCoilTier());
+        if (suppression <= 0) return false;
+        if (suppression >= 100) return true;
+        return serverLevel.getRandom().nextInt(100) < suppression;
+    }
+
+    /** 输出槽中灰烬的填充比例，千分比。用于确定毒性效果的触发概率。 */
+    private int getAshFillPermille() {
+        int limit = output.getSlotLimit(0);
+        if (limit <= 0) return 0;
+        return (int) ((long) output.getStackInSlot(0).getCount() * 1000L / limit);
+    }
+
+    /**
+     * 灰烬毒性：每 {@link #TOXIC_INTERVAL_TICKS} tick 判定一次，触发概率随输出槽的灰烬填充比例
+     * 线性升高至配置的最大值；命中时对作用半径内的所有生物施加中毒与凋零。
+     */
+    private void tickToxicEffects(ServerLevel serverLevel) {
+        if (!ConfigManager.isAshToxicEnabled()) return;
+        if (serverLevel.getGameTime() % TOXIC_INTERVAL_TICKS != 0) return;
+        int maxChance = ConfigManager.getAshToxicMaxChancePermille();
+        if (maxChance <= 0) return;
+        int fillPermille = getAshFillPermille();
+        if (fillPermille <= 0) return;
+        int chance = (int) ((long) maxChance * fillPermille / 1000L);
+        if (chance <= 0 || serverLevel.getRandom().nextInt(1000) >= chance) return;
+        int duration = ConfigManager.getAshToxicDurationSeconds() * 20;
+        double radius = ConfigManager.getAshToxicRadius();
+        double centerX = worldPosition.getX() + 0.5;
+        double centerY = worldPosition.getY() + 0.5;
+        double centerZ = worldPosition.getZ() + 0.5;
+        AABB area = new AABB(
+                centerX - radius, centerY - radius, centerZ - radius,
+                centerX + radius, centerY + radius, centerZ + radius);
+        for (LivingEntity entity : serverLevel.getEntitiesOfClass(LivingEntity.class, area)) {
+            entity.addEffect(new MobEffectInstance(MobEffects.POISON, duration, 0));
+            entity.addEffect(new MobEffectInstance(MobEffects.WITHER, duration, 0));
+        }
+    }
+
+    /** 输出槽是否已被灰烬堆满。供核心在配置开启时阻塞工作。 */
+    public boolean isAshFull() {
+        int limit = output.getSlotLimit(0);
+        return limit > 0 && output.getStackInSlot(0).getCount() >= limit;
     }
 
     @Override

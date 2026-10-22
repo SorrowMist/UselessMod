@@ -333,6 +333,7 @@
   "gui.useless_mod.advanced_alloy_furnace.ae_task_status.waiting_mold": "等待模具/条件",
   "gui.useless_mod.advanced_alloy_furnace.ae_task_status.waiting_structure": "等待多方块结构",
   "gui.useless_mod.advanced_alloy_furnace.ae_task_status.waiting_muffler": "等待消声仓排烟畅通",
+  "gui.useless_mod.advanced_alloy_furnace.ae_task_status.waiting_ash_full": "等待取走消声仓中的灰烬",
   "gui.useless_mod.advanced_alloy_furnace.ae_task_status.waiting_mold_hub": "等待模具集散中心",
   "gui.useless_mod.advanced_alloy_furnace.ae_task_status.waiting_missing_mold": "缺少所需模具",
   "gui.useless_mod.advanced_alloy_furnace.ae_task_status.waiting_tier": "等待万象炉等级",
@@ -1128,7 +1129,22 @@
   ,"useless_mod.configuration.coil_tier_9_single_task_parallel": "多方块线圈 9 阶单任务并行数"
   ,"useless_mod.configuration.coil_tier_9_energy_divisor": "多方块线圈 9 阶能耗除数"
   ,"useless_mod.configuration.coil_tier_9_time_multiplier": "多方块线圈 9 阶时间倍率"
-  ,"useless_mod.configuration.useful_tier_threads": "多方块有用级线程数",
+  ,"useless_mod.configuration.useful_tier_threads": "多方块有用级线程数"
+  ,"useless_mod.configuration.coil_tier_1_ash_suppression": "多方块线圈 1 阶灰烬抑制百分比"
+  ,"useless_mod.configuration.coil_tier_2_ash_suppression": "多方块线圈 2 阶灰烬抑制百分比"
+  ,"useless_mod.configuration.coil_tier_3_ash_suppression": "多方块线圈 3 阶灰烬抑制百分比"
+  ,"useless_mod.configuration.coil_tier_4_ash_suppression": "多方块线圈 4 阶灰烬抑制百分比"
+  ,"useless_mod.configuration.coil_tier_5_ash_suppression": "多方块线圈 5 阶灰烬抑制百分比"
+  ,"useless_mod.configuration.coil_tier_6_ash_suppression": "多方块线圈 6 阶灰烬抑制百分比"
+  ,"useless_mod.configuration.coil_tier_7_ash_suppression": "多方块线圈 7 阶灰烬抑制百分比"
+  ,"useless_mod.configuration.coil_tier_8_ash_suppression": "多方块线圈 8 阶灰烬抑制百分比"
+  ,"useless_mod.configuration.coil_tier_9_ash_suppression": "多方块线圈 9 阶灰烬抑制百分比"
+  ,"useless_mod.configuration.useful_tier_ash_suppression": "多方块有用级线圈灰烬抑制百分比"
+  ,"useless_mod.configuration.ash_full_blocks_work": "消声仓灰烬满时阻塞工作"
+  ,"useless_mod.configuration.ash_toxic_enabled": "消声仓灰烬产生负面效果"
+  ,"useless_mod.configuration.ash_toxic_max_chance": "灰烬满时每秒触发负面效果的最大概率（千分比）"
+  ,"useless_mod.configuration.ash_toxic_radius": "灰烬负面效果作用半径"
+  ,"useless_mod.configuration.ash_toxic_duration": "灰烬负面效果持续时间（秒）",
   "block.useless_mod.useless_compact_c9": "无用型紧凑C9",
   "block.useless_mod.useless_compact_f9": "无用型紧凑F9",
   "block.useless_mod.useless_compact_l9": "无用型紧凑L9",

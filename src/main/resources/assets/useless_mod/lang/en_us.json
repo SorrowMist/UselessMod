@@ -331,6 +331,7 @@
   "gui.useless_mod.advanced_alloy_furnace.ae_task_status.waiting_mold": "Waiting for mold/condition",
   "gui.useless_mod.advanced_alloy_furnace.ae_task_status.waiting_structure": "Waiting for multiblock structure",
   "gui.useless_mod.advanced_alloy_furnace.ae_task_status.waiting_muffler": "Waiting for the muffler exhaust to clear",
+  "gui.useless_mod.advanced_alloy_furnace.ae_task_status.waiting_ash_full": "Waiting for ash to be removed from the muffler hatch",
   "gui.useless_mod.advanced_alloy_furnace.ae_task_status.waiting_mold_hub": "Waiting for mold hub",
   "gui.useless_mod.advanced_alloy_furnace.ae_task_status.waiting_missing_mold": "Missing required mold",
   "gui.useless_mod.advanced_alloy_furnace.ae_task_status.waiting_tier": "Waiting for required furnace/coil tier",
@@ -1128,7 +1129,22 @@
   ,"useless_mod.configuration.coil_tier_9_single_task_parallel": "Multiblock Coil Tier 9 Single-task Parallelism"
   ,"useless_mod.configuration.coil_tier_9_energy_divisor": "Multiblock Coil Tier 9 Energy Divisor"
   ,"useless_mod.configuration.coil_tier_9_time_multiplier": "Multiblock Coil Tier 9 Time Multiplier"
-  ,"useless_mod.configuration.useful_tier_threads": "Multiblock Useful Tier Thread Count",
+  ,"useless_mod.configuration.useful_tier_threads": "Multiblock Useful Tier Thread Count"
+  ,"useless_mod.configuration.coil_tier_1_ash_suppression": "Multiblock Coil Tier 1 Ash Suppression (%)"
+  ,"useless_mod.configuration.coil_tier_2_ash_suppression": "Multiblock Coil Tier 2 Ash Suppression (%)"
+  ,"useless_mod.configuration.coil_tier_3_ash_suppression": "Multiblock Coil Tier 3 Ash Suppression (%)"
+  ,"useless_mod.configuration.coil_tier_4_ash_suppression": "Multiblock Coil Tier 4 Ash Suppression (%)"
+  ,"useless_mod.configuration.coil_tier_5_ash_suppression": "Multiblock Coil Tier 5 Ash Suppression (%)"
+  ,"useless_mod.configuration.coil_tier_6_ash_suppression": "Multiblock Coil Tier 6 Ash Suppression (%)"
+  ,"useless_mod.configuration.coil_tier_7_ash_suppression": "Multiblock Coil Tier 7 Ash Suppression (%)"
+  ,"useless_mod.configuration.coil_tier_8_ash_suppression": "Multiblock Coil Tier 8 Ash Suppression (%)"
+  ,"useless_mod.configuration.coil_tier_9_ash_suppression": "Multiblock Coil Tier 9 Ash Suppression (%)"
+  ,"useless_mod.configuration.useful_tier_ash_suppression": "Multiblock Useful Tier Coil Ash Suppression (%)"
+  ,"useless_mod.configuration.ash_full_blocks_work": "Block Work When Muffler Ash Is Full"
+  ,"useless_mod.configuration.ash_toxic_enabled": "Muffler Ash Applies Negative Effects"
+  ,"useless_mod.configuration.ash_toxic_max_chance": "Max Chance per Second When Ash Is Full (permille)"
+  ,"useless_mod.configuration.ash_toxic_radius": "Ash Negative Effect Radius"
+  ,"useless_mod.configuration.ash_toxic_duration": "Ash Negative Effect Duration (seconds)",
   "block.useless_mod.useless_compact_c9": "Useless Compact C9",
   "block.useless_mod.useless_compact_f9": "Useless Compact F9",
   "block.useless_mod.useless_compact_l9": "Useless Compact L9",

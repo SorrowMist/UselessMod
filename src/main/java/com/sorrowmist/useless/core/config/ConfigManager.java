@@ -186,7 +186,15 @@ public class ConfigManager {
             new ModConfigSpec.IntValue[9];
     private static final ModConfigSpec.DoubleValue[] OMNIVERSAL_COIL_TIER_TIME_MULTIPLIER =
             new ModConfigSpec.DoubleValue[9];
+    private static final ModConfigSpec.IntValue[] OMNIVERSAL_COIL_TIER_ASH_SUPPRESSION =
+            new ModConfigSpec.IntValue[9];
     private static final ModConfigSpec.IntValue OMNIVERSAL_USEFUL_TIER_THREADS;
+    private static final ModConfigSpec.IntValue OMNIVERSAL_USEFUL_TIER_ASH_SUPPRESSION;
+    private static final ModConfigSpec.BooleanValue OMNIVERSAL_ASH_FULL_BLOCKS_WORK;
+    private static final ModConfigSpec.BooleanValue OMNIVERSAL_ASH_TOXIC_ENABLED;
+    private static final ModConfigSpec.IntValue OMNIVERSAL_ASH_TOXIC_MAX_CHANCE;
+    private static final ModConfigSpec.DoubleValue OMNIVERSAL_ASH_TOXIC_RADIUS;
+    private static final ModConfigSpec.IntValue OMNIVERSAL_ASH_TOXIC_DURATION;
     private static final ModConfigSpec.IntValue ORE_GENERATOR_SLOTS;
     private static final ModConfigSpec.ConfigValue<List<? extends String>>
             USELESS_DIMENSION_FLOOR_BLOCK_BLACKLIST;
@@ -268,10 +276,33 @@ public class ConfigManager {
                     .comment("普通线圈 " + tier + " 阶的处理时间倍率")
                     .defineInRange("coil_tier_" + tier + "_time_multiplier",
                             1.0 / (1L << tier), 0.0, 1.0);
+            OMNIVERSAL_COIL_TIER_ASH_SUPPRESSION[index] = SERVER_BUILDER
+                    .comment("普通线圈 " + tier + " 阶对消声仓灰烬产生的抑制百分比（0-100）")
+                    .defineInRange("coil_tier_" + tier + "_ash_suppression",
+                            Math.min(100, tier * 10), 0, 100);
         }
         OMNIVERSAL_USEFUL_TIER_THREADS = SERVER_BUILDER
                 .comment("有用级线圈的最大AE任务数")
                 .defineInRange("useful_tier_threads", 11, 1, Integer.MAX_VALUE);
+        OMNIVERSAL_USEFUL_TIER_ASH_SUPPRESSION = SERVER_BUILDER
+                .comment("有用级线圈对消声仓灰烬产生的抑制百分比（0-100）")
+                .defineInRange("useful_tier_ash_suppression", 100, 0, 100);
+        OMNIVERSAL_ASH_FULL_BLOCKS_WORK = SERVER_BUILDER
+                .comment("消声仓灰烬满时是否阻塞合金炉工作",
+                        "开启后灰烬堆满即停机，需玩家取走灰烬才能继续")
+                .define("ash_full_blocks_work", true);
+        OMNIVERSAL_ASH_TOXIC_ENABLED = SERVER_BUILDER
+                .comment("消声仓产生灰烬时是否向周围生物施加负面效果")
+                .define("ash_toxic_enabled", true);
+        OMNIVERSAL_ASH_TOXIC_MAX_CHANCE = SERVER_BUILDER
+                .comment("灰烬堆满时每秒触发负面效果的最大概率（千分比，1000 = 100%）")
+                .defineInRange("ash_toxic_max_chance", 300, 0, 1000);
+        OMNIVERSAL_ASH_TOXIC_RADIUS = SERVER_BUILDER
+                .comment("灰烬负面效果的作用半径（格）")
+                .defineInRange("ash_toxic_radius", 4.0, 0.5, 32.0);
+        OMNIVERSAL_ASH_TOXIC_DURATION = SERVER_BUILDER
+                .comment("灰烬负面效果的持续时间（秒）")
+                .defineInRange("ash_toxic_duration", 5, 1, 60);
         SERVER_BUILDER.pop();
 
         // 万象样板自动上传：单独成组，便于只开关上传行为，
@@ -1067,6 +1098,42 @@ public class ConfigManager {
 
     public static int getOmniversalUsefulTierThreads() {
         return getConfigValue(OMNIVERSAL_USEFUL_TIER_THREADS);
+    }
+
+    /**
+     * 线圈对灰烬产生的抑制百分比。
+     *
+     * <p>1 至 9 阶读取逐级配置；10 阶（有用级线圈）读取其独立配置；0 阶视为未安装线圈，不抑制。</p>
+     */
+    public static int getOmniversalCoilAshSuppression(int tier) {
+        if (tier <= 0) return 0;
+        if (tier >= 10) return getConfigValue(OMNIVERSAL_USEFUL_TIER_ASH_SUPPRESSION);
+        return getConfigValue(OMNIVERSAL_COIL_TIER_ASH_SUPPRESSION[tier - 1]);
+    }
+
+    /** 消声仓灰烬堆满时是否阻塞合金炉工作。 */
+    public static boolean isAshFullBlockingWork() {
+        return getConfigValue(OMNIVERSAL_ASH_FULL_BLOCKS_WORK);
+    }
+
+    /** 消声仓内有灰烬时是否向周围生物施加负面效果。 */
+    public static boolean isAshToxicEnabled() {
+        return getConfigValue(OMNIVERSAL_ASH_TOXIC_ENABLED);
+    }
+
+    /** 灰烬堆满时每秒触发负面效果的最大概率，千分比。 */
+    public static int getAshToxicMaxChancePermille() {
+        return getConfigValue(OMNIVERSAL_ASH_TOXIC_MAX_CHANCE);
+    }
+
+    /** 灰烬负面效果的作用半径（格）。 */
+    public static double getAshToxicRadius() {
+        return getConfigValue(OMNIVERSAL_ASH_TOXIC_RADIUS);
+    }
+
+    /** 灰烬负面效果的持续时间（秒）。 */
+    public static int getAshToxicDurationSeconds() {
+        return getConfigValue(OMNIVERSAL_ASH_TOXIC_DURATION);
     }
 
     public static boolean isCraftingRecipeConversionEnabled() {

@@ -751,8 +751,8 @@ public class CraftingTask {
         }
         awaitingOutputFlush = false;
 
-        // 产物已成功写出，本批合成才算真正完成；此时回调让机器按处理量累加状态
-        // （多方块核心据此累积维护度）。放在 flush 之后可避免把未交付的批次计入磨损。
+        // 产物已成功写出，本批合成才算真正完成；此时回调让机器按处理量更新状态
+        // （多方块核心据此扣减维护度）。放在 flush 之后可避免把未交付的批次计入磨损。
         context.onCraftsCompleted(craftCount);
 
         displayedCraftCount -= craftCount;

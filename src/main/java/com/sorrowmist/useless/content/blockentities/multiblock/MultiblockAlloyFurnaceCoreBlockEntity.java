@@ -49,6 +49,9 @@ import net.minecraft.core.Direction;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.Tag;
+import net.minecraft.network.protocol.Packet;
+import net.minecraft.network.protocol.game.ClientGamePacketListener;
+import net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
@@ -254,6 +257,9 @@ public final class MultiblockAlloyFurnaceCoreBlockEntity extends BlockEntity imp
                 level.setBlock(worldPosition, state.setValue(MultiblockAlloyFurnaceCoreBlock.FORMED, formed), 3);
             }
             setChanged();
+            // 部件的占用判定要反查核心的 formed 与维护仓位置，这些字段必须同步到客户端，
+            // 否则客户端结构预览里 claimsMaintenanceHatch 恒为 false，相邻双核心都会显示成型。
+            level.sendBlockUpdated(worldPosition, state, getBlockState(), 3);
         }
         linkFunctionalParts();
         if (stateChanged) updatePatterns();
@@ -984,5 +990,23 @@ public final class MultiblockAlloyFurnaceCoreBlockEntity extends BlockEntity imp
         unloading = true;
         super.setRemoved();
         aeManager.shutdown();
+    }
+
+    /**
+     * 客户端结构预览要读取成型状态与各功能部件位置（尤其是维护仓归属），
+     * 因此方块更新与区块首包都必须带上这些字段。
+     *
+     * <p>AE 任务数据体积大且客户端由 {@code AETaskProgressPacket} 单独同步，这里剥离。</p>
+     */
+    @Override
+    public CompoundTag getUpdateTag(HolderLookup.Provider registries) {
+        CompoundTag tag = saveWithoutMetadata(registries);
+        tag.remove("AeTasks");
+        return tag;
+    }
+
+    @Override
+    public Packet<ClientGamePacketListener> getUpdatePacket() {
+        return ClientboundBlockEntityDataPacket.create(this);
     }
 }

@@ -5,6 +5,9 @@ import com.sorrowmist.useless.init.ModBlockEntities;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.network.protocol.Packet;
+import net.minecraft.network.protocol.game.ClientGamePacketListener;
+import net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import org.jetbrains.annotations.Nullable;
@@ -56,7 +59,9 @@ public final class MaintenanceHatchBlockEntity extends BlockEntity {
         if (!Objects.equals(this.controllerPos, controllerPos) || structureGeneration != generation) {
             this.controllerPos = controllerPos == null ? null : controllerPos.immutable();
             this.structureGeneration = generation;
-            setChanged();
+            // 归属信息决定客户端能否判断本仓已被相邻核心占用，必须随方块更新下发；
+            // 只 setChanged() 的话客户端永远读到 null，相邻双核心会同时被画成成型。
+            markStateChanged();
         }
     }
 
@@ -216,5 +221,16 @@ public final class MaintenanceHatchBlockEntity extends BlockEntity {
     public void setRemoved() {
         unloading = true;
         super.setRemoved();
+    }
+
+    /** 客户端结构预览需要归属信息，故方块更新与区块首包都要带上完整 NBT。 */
+    @Override
+    public CompoundTag getUpdateTag(HolderLookup.Provider registries) {
+        return saveWithoutMetadata(registries);
+    }
+
+    @Override
+    public Packet<ClientGamePacketListener> getUpdatePacket() {
+        return ClientboundBlockEntityDataPacket.create(this);
     }
 }

@@ -38,6 +38,9 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.protocol.Packet;
+import net.minecraft.network.protocol.game.ClientGamePacketListener;
+import net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.MenuProvider;
 import net.minecraft.world.entity.player.Inventory;
@@ -445,6 +448,10 @@ public final class PassiveCraftingHatchBlockEntity extends BlockEntity
         clampMultiplier();
         statusDirty = true;
         setChanged();
+        // 归属变化必须下发到客户端，否则客户端结构预览无法识别本仓已被相邻核心占用。
+        if (level != null) {
+            level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), 3);
+        }
     }
 
     /** True when this hatch's raw association belongs to the given core. */
@@ -1071,6 +1078,20 @@ public final class PassiveCraftingHatchBlockEntity extends BlockEntity
     public void setRemoved() {
         unloading = true;
         super.setRemoved();
+    }
+
+    /**
+     * 方块更新与区块首包都带上完整 NBT（与父类默认行为一致），
+     * 既保证客户端能读到归属关系，也不会清掉界面正在用的样板与任务数据。
+     */
+    @Override
+    public CompoundTag getUpdateTag(HolderLookup.Provider registries) {
+        return saveWithoutMetadata(registries);
+    }
+
+    @Override
+    public Packet<ClientGamePacketListener> getUpdatePacket() {
+        return ClientboundBlockEntityDataPacket.create(this);
     }
 
     @Override

@@ -37,6 +37,9 @@ import net.minecraft.core.Direction;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.protocol.Packet;
+import net.minecraft.network.protocol.game.ClientGamePacketListener;
+import net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.MenuProvider;
 import net.minecraft.world.entity.player.Inventory;
@@ -192,6 +195,7 @@ public final class MePatternAssemblyBlockEntity extends AEBaseBlockEntity
             this.structureGeneration = generation;
             setChanged();
             if (level == null || level.isClientSide) return;
+            level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), 3);
             MultiblockAlloyFurnaceCoreBlockEntity controller = getController();
             if (controller != null) {
                 controller.updatePatterns();
@@ -501,5 +505,23 @@ public final class MePatternAssemblyBlockEntity extends AEBaseBlockEntity
         providerRefreshPending = false;
         super.onChunkUnloaded();
         mainNode.destroy();
+    }
+
+    /**
+     * 在父类（AE 方块实体）的更新包基础上补上归属字段。
+     * 不能整体替换，否则会丢掉 AE2 自己需要的同步数据。
+     */
+    @Override
+    public CompoundTag getUpdateTag(HolderLookup.Provider registries) {
+        CompoundTag tag = super.getUpdateTag(registries);
+        if (tag == null) tag = new CompoundTag();
+        if (controllerPos != null) tag.putLong("Controller", controllerPos.asLong());
+        tag.putLong("StructureGeneration", structureGeneration);
+        return tag;
+    }
+
+    @Override
+    public Packet<ClientGamePacketListener> getUpdatePacket() {
+        return ClientboundBlockEntityDataPacket.create(this);
     }
 }

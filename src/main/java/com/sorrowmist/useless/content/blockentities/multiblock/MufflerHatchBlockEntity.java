@@ -7,6 +7,9 @@ import net.minecraft.core.HolderLookup;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.protocol.Packet;
+import net.minecraft.network.protocol.game.ClientGamePacketListener;
+import net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.Containers;
@@ -76,6 +79,10 @@ public final class MufflerHatchBlockEntity extends BlockEntity implements MenuPr
             this.controllerPos = controllerPos == null ? null : controllerPos.immutable();
             this.structureGeneration = generation;
             setChanged();
+            // 归属变化必须下发到客户端，否则客户端结构预览无法识别本仓已被相邻核心占用。
+            if (level != null) {
+                level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), 3);
+            }
         }
     }
 
@@ -198,5 +205,18 @@ public final class MufflerHatchBlockEntity extends BlockEntity implements MenuPr
     public void setRemoved() {
         unloading = true;
         super.setRemoved();
+    }
+
+    /** 客户端结构预览需要归属信息，故方块更新与区块首包都要带上完整 NBT。 */
+    @Override
+    public CompoundTag getUpdateTag(HolderLookup.Provider registries) {
+        CompoundTag tag = new CompoundTag();
+        saveAdditional(tag, registries);
+        return tag;
+    }
+
+    @Override
+    public Packet<ClientGamePacketListener> getUpdatePacket() {
+        return ClientboundBlockEntityDataPacket.create(this);
     }
 }

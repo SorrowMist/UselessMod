@@ -4,6 +4,9 @@ import com.sorrowmist.useless.init.ModBlockEntities;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.network.protocol.Packet;
+import net.minecraft.network.protocol.game.ClientGamePacketListener;
+import net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import org.jetbrains.annotations.Nullable;
@@ -34,7 +37,11 @@ public final class AutoMaintenanceHatchBlockEntity extends BlockEntity {
         if (!Objects.equals(this.controllerPos, controllerPos) || structureGeneration != generation) {
             this.controllerPos = controllerPos == null ? null : controllerPos.immutable();
             this.structureGeneration = generation;
+            // 同普通维护仓：归属必须随方块更新下发，否则客户端预览无法识别占用关系。
             setChanged();
+            if (level != null) {
+                level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), 3);
+            }
         }
     }
 
@@ -92,5 +99,16 @@ public final class AutoMaintenanceHatchBlockEntity extends BlockEntity {
     public void setRemoved() {
         unloading = true;
         super.setRemoved();
+    }
+
+    /** 客户端结构预览需要归属信息，故方块更新与区块首包都要带上完整 NBT。 */
+    @Override
+    public CompoundTag getUpdateTag(HolderLookup.Provider registries) {
+        return saveWithoutMetadata(registries);
+    }
+
+    @Override
+    public Packet<ClientGamePacketListener> getUpdatePacket() {
+        return ClientboundBlockEntityDataPacket.create(this);
     }
 }

@@ -153,6 +153,12 @@ public final class MaintenanceHatchBlockEntity extends BlockEntity {
         roundsCleared++;
         if (roundsCleared >= MaintenanceCalibrationRules.ROUNDS_TOTAL) {
             calibrationPhase = MaintenanceCalibrationRules.PHASE_COMPLETED;
+            // 校准完成的唯一实际效果是清空整机维护度；维护度归核心持有，
+            // 因此这里通过归属关系找到核心再清零，维护仓自身不保存磨损。
+            MultiblockAlloyFurnaceCoreBlockEntity controller = getController();
+            if (controller != null) {
+                controller.resetMaintenanceWear();
+            }
         } else {
             beginRound();
         }

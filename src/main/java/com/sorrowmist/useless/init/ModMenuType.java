@@ -4,8 +4,10 @@ import com.sorrowmist.useless.UselessMod;
 import com.sorrowmist.useless.content.menus.AdvancedAlloyFurnaceMenu;
 import com.sorrowmist.useless.content.menus.ChainGroupMenu;
 import com.sorrowmist.useless.content.menus.ContainerPatternConverter;
+import com.sorrowmist.useless.content.menus.MaintenanceHatchMenu;
 import com.sorrowmist.useless.content.menus.MePatternAssemblyMenu;
 import com.sorrowmist.useless.content.menus.OmniversalMoldHubMenu;
+import com.sorrowmist.useless.content.menus.MufflerHatchMenu;
 import com.sorrowmist.useless.content.menus.MultiblockAlloyFurnaceMenu;
 import com.sorrowmist.useless.content.menus.OreGeneratorMenu;
 import com.sorrowmist.useless.content.menus.PassiveCraftingHatchMenu;
@@ -41,12 +43,18 @@ public final class ModMenuType {
     public static final Supplier<MenuType<OreGeneratorMenu>> ORE_GENERATOR_MENU =
             MENU_TYPES.register("ore_generator_menu",
                     () -> IMenuTypeExtension.create(OreGeneratorMenu::new));
+    public static final Supplier<MenuType<MufflerHatchMenu>> MUFFLER_HATCH_MENU =
+            MENU_TYPES.register("muffler_hatch_menu",
+                    () -> IMenuTypeExtension.create(MufflerHatchMenu::new));
     public static final Supplier<MenuType<DimensionConfigMenu>> DIMENSION_CONFIG_MENU =
             MENU_TYPES.register("dimension_config_menu",
                     () -> IMenuTypeExtension.create(DimensionConfigMenu::new));
     public static final Supplier<MenuType<ContainerPatternConverter>> PATTERN_CONVERTER_MENU =
             MENU_TYPES.register("omniversal_pattern_converter",
                     () -> ContainerPatternConverter.TYPE);
+    public static final Supplier<MenuType<MaintenanceHatchMenu>> MAINTENANCE_HATCH_MENU =
+            MENU_TYPES.register("maintenance_hatch_menu",
+                    () -> IMenuTypeExtension.create(MaintenanceHatchMenu::new));
     public static final Supplier<MenuType<StaffLinkMenu>> STAFF_LINK_MENU =
             MENU_TYPES.register("staff_link_menu",
                     () -> IMenuTypeExtension.create(StaffLinkMenu::new));

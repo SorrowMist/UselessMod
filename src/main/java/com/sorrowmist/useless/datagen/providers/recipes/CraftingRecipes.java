@@ -77,6 +77,7 @@ public class CraftingRecipes extends RecipeProvider {
         this.addMoldRecipes(consumer);
         this.addAdvancedAlloyFurnaceEntropyRecipe(consumer);
         this.addOmniversalFurnaceRecipes(consumer);
+        this.addFunctionalHatchRecipes(consumer);
         this.addEndlessBeafItemRecipe(consumer);
         this.addOreGeneratorBlockRecipe(consumer);
         this.addTeleportBlockRecipes(consumer);
@@ -362,6 +363,46 @@ public class CraftingRecipes extends RecipeProvider {
                            .unlockedBy("has_sky_stone", has(AEBlocks.SKY_STONE_BLOCK))
                            .save(consumer, UselessMod.id("crafting/omniversal_furnace_casing"));
 
+    }
+
+    /**
+     * 维护仓与消声仓的工作台配方。
+     *
+     * <p>两者都是万象炉的结构功能件，没有 ExtendedAE 提供的替代机器，因此不加模组条件。
+     * 成本档次相同，但材料与轮廓按各自的功能语义区分：一个是十字对称的检修面板，
+     * 一个是自下而上收束的烟囱剖面，不共用同一张图。</p>
+     *
+     * <p>维护仓是「检修面板」：四角各一枚逻辑处理器充当紧固件与判定电路，四条边为万象炉外壳，
+     * 中心放本模组的无尽软锤。维护仓的存在意义就是停机检修，用维护工具本身作为核心件，
+     * 比引入指南针、铁砧一类外部物品更能说明用途；校准小游戏的命中判定也由四角电路承担。</p>
+     *
+     * <p>消声仓是「烟囱剖面」：顶格为营火作烟源，中间两侧铁栏杆构成排气格栅并夹住漏斗，
+     * 底部一排万象炉外壳落在炉体上。它与消声仓固定位于结构最上层、向上排烟的实际位置一致，
+     * 烟的生成（营火）与排出（格栅、漏斗）在图案中自上而下各占一层。</p>
+     */
+    private void addFunctionalHatchRecipes(RecipeOutput consumer) {
+        ShapedRecipeBuilder.shaped(RecipeCategory.BUILDING_BLOCKS,
+                                   ModBlocks.MAINTENANCE_HATCH.get())
+                           .pattern("BAB")
+                           .pattern("ACA")
+                           .pattern("BAB")
+                           .define('A', ModBlocks.OMNIVERSAL_FURNACE_CASING.get())
+                           .define('B', AEItems.LOGIC_PROCESSOR)
+                           .define('C', ModItems.ENDLESS_BEAF_MALLET.get())
+                           .unlockedBy("has_casing", has(ModBlocks.OMNIVERSAL_FURNACE_CASING.get()))
+                           .save(consumer, UselessMod.id("crafting/maintenance_hatch"));
+
+        ShapedRecipeBuilder.shaped(RecipeCategory.BUILDING_BLOCKS,
+                                   ModBlocks.MUFFLER_HATCH.get())
+                           .pattern(" A ")
+                           .pattern("BCB")
+                           .pattern("DDD")
+                           .define('A', Blocks.CAMPFIRE)
+                           .define('B', Blocks.IRON_BARS)
+                           .define('C', Blocks.HOPPER)
+                           .define('D', ModBlocks.OMNIVERSAL_FURNACE_CASING.get())
+                           .unlockedBy("has_casing", has(ModBlocks.OMNIVERSAL_FURNACE_CASING.get()))
+                           .save(consumer, UselessMod.id("crafting/muffler_hatch"));
     }
 
     /**

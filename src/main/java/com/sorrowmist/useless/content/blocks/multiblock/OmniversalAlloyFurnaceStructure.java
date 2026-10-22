@@ -1,5 +1,6 @@
 package com.sorrowmist.useless.content.blocks.multiblock;
 
+import com.sorrowmist.useless.content.blockentities.multiblock.AutoMaintenanceHatchBlockEntity;
 import com.sorrowmist.useless.content.blockentities.multiblock.MaintenanceHatchBlockEntity;
 import com.sorrowmist.useless.content.blockentities.multiblock.MePatternAssemblyBlockEntity;
 import com.sorrowmist.useless.content.blockentities.multiblock.MufflerHatchBlockEntity;
@@ -105,6 +106,7 @@ public final class OmniversalAlloyFurnaceStructure {
         BlockPos moldHubPos = null;
         BlockPos passiveHatchPos = null;
         BlockPos maintenanceHatchPos = null;
+        FunctionalPart maintenanceHatchPart = null;
         BlockPos mufflerHatchPos = null;
 
         for (Entry entry : ENTRIES) {
@@ -152,8 +154,14 @@ public final class OmniversalAlloyFurnaceStructure {
                     // 普通维护仓与自动维护仓二选一：两者共用一个名额，多放一个即判错。
                     case MAINTENANCE_HATCH, AUTO_MAINTENANCE_HATCH -> {
                         maintenanceHatchCount++;
-                        if (maintenanceHatchCount == 1) maintenanceHatchPos = worldPos.immutable();
-                        else mismatches.add(new Mismatch(worldPos, Part.CASING, state));
+                        if (maintenanceHatchCount == 1) {
+                            maintenanceHatchPos = worldPos.immutable();
+                            // 记录实际方块类型，归属检查要按对应方块实体判断，
+                            // 否则自动维护仓会被当成普通维护仓而漏检共用。
+                            maintenanceHatchPart = functionalPart;
+                        } else {
+                            mismatches.add(new Mismatch(worldPos, Part.CASING, state));
+                        }
                     }
                     case MUFFLER_HATCH -> {
                         // 消声仓只认最上层中心；摆在其它外壳位的消声仓一律记为错误方块，
@@ -214,8 +222,8 @@ public final class OmniversalAlloyFurnaceStructure {
                 FunctionalPart.PASSIVE_HATCH)) {
             mismatches.add(new Mismatch(passiveHatchPos, Part.CASING, level.getBlockState(passiveHatchPos)));
         }
-        if (maintenanceHatchPos != null && isClaimedByAnotherCore(level, corePos, maintenanceHatchPos,
-                FunctionalPart.MAINTENANCE_HATCH)) {
+        if (maintenanceHatchPos != null && maintenanceHatchPart != null
+                && isClaimedByAnotherCore(level, corePos, maintenanceHatchPos, maintenanceHatchPart)) {
             mismatches.add(new Mismatch(maintenanceHatchPos, Part.CASING,
                     level.getBlockState(maintenanceHatchPos)));
         }
@@ -267,8 +275,9 @@ public final class OmniversalAlloyFurnaceStructure {
             case MAINTENANCE_HATCH -> actualLevel.getBlockEntity(partPos)
                     instanceof MaintenanceHatchBlockEntity hatch
                     && hatch.isClaimedByOtherController(corePos);
-            // 自动维护仓不记录归属，不会与其它核心争抢。
-            case AUTO_MAINTENANCE_HATCH -> false;
+            case AUTO_MAINTENANCE_HATCH -> actualLevel.getBlockEntity(partPos)
+                    instanceof AutoMaintenanceHatchBlockEntity hatch
+                    && hatch.isClaimedByOtherController(corePos);
             case MUFFLER_HATCH -> actualLevel.getBlockEntity(partPos)
                     instanceof MufflerHatchBlockEntity hatch
                     && hatch.isClaimedByOtherController(corePos);

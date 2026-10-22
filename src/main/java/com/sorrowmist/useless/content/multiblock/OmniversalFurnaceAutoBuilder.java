@@ -2,6 +2,7 @@ package com.sorrowmist.useless.content.multiblock;
 
 import appeng.api.config.Actionable;
 import com.sorrowmist.useless.compat.AE2Compat;
+import com.sorrowmist.useless.content.blockentities.multiblock.AutoMaintenanceHatchBlockEntity;
 import com.sorrowmist.useless.content.blockentities.multiblock.MaintenanceHatchBlockEntity;
 import com.sorrowmist.useless.content.blockentities.multiblock.MePatternAssemblyBlockEntity;
 import com.sorrowmist.useless.content.blockentities.multiblock.MufflerHatchBlockEntity;
@@ -199,8 +200,10 @@ public final class OmniversalFurnaceAutoBuilder {
             case MUFFLER_HATCH -> level.getBlockEntity(partPos)
                     instanceof MufflerHatchBlockEntity hatch
                     && hatch.isClaimedByOtherController(corePos);
-            // 自动维护仓不记录归属，无需检查抢占。
-            case AUTO_MAINTENANCE_HATCH, MOLD_HUB -> false;
+            case AUTO_MAINTENANCE_HATCH -> level.getBlockEntity(partPos)
+                    instanceof AutoMaintenanceHatchBlockEntity hatch
+                    && hatch.isClaimedByOtherController(corePos);
+            case MOLD_HUB -> false;
         };
     }
 

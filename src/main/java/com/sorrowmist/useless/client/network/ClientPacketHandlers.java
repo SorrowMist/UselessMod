@@ -3,6 +3,7 @@ package com.sorrowmist.useless.client.network;
 import com.sorrowmist.useless.UselessMod;
 import com.sorrowmist.useless.client.gui.ChainGroupScreen;
 import com.sorrowmist.useless.client.gui.ModeWheelScreen;
+import com.sorrowmist.useless.client.gui.MaintenanceHatchScreen;
 import com.sorrowmist.useless.client.gui.StaffLinkScreen;
 import com.sorrowmist.useless.client.render.AlloyFurnaceErrorHighlightRenderer;
 import com.sorrowmist.useless.client.render.StaffLinkHighlightRenderer;
@@ -18,6 +19,7 @@ import com.sorrowmist.useless.network.BeefInvulnerabilitySyncPacket;
 import com.sorrowmist.useless.network.BeefToolLayoutResultPacket;
 import com.sorrowmist.useless.network.BeefToolLayoutSyncPacket;
 import com.sorrowmist.useless.network.AlloyFurnaceErrorHighlightPacket;
+import com.sorrowmist.useless.network.MaintenanceCalibrationSyncPacket;
 import com.sorrowmist.useless.network.StaffLinkHighlightPacket;
 import com.sorrowmist.useless.network.StaffLinkSyncPacket;
 import com.sorrowmist.useless.network.StaffLinkStressStatusPacket;
@@ -159,6 +161,18 @@ public final class ClientPacketHandlers {
     /** 万象合金炉：服务端下发的「未成型核心当前该高亮的最低错误方块」，转交世界渲染器。 */
     public static void handleAlloyFurnaceErrorHighlight(AlloyFurnaceErrorHighlightPacket packet) {
         AlloyFurnaceErrorHighlightRenderer.setError(packet.corePos(), packet.errorPos());
+    }
+
+    /**
+     * 维护仓：把服务端下发的权威校准局面交给已打开的界面。
+     *
+     * <p>界面关闭时直接丢弃：小游戏的本地计时只在界面可见时才有意义，
+     * 下次打开会重新请求一份快照。</p>
+     */
+    public static void handleMaintenanceCalibrationSync(MaintenanceCalibrationSyncPacket packet) {
+        if (Minecraft.getInstance().screen instanceof MaintenanceHatchScreen screen) {
+            screen.receiveSync(packet);
+        }
     }
 
     /**

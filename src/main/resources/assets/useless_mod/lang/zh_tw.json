@@ -1313,5 +1313,21 @@
   "jei.useless_mod.entropy_transmutation.step1": "把所需物品放進 ME 箱子",
   "jei.useless_mod.entropy_transmutation.step1.detail": "把所需物品放進 ME 箱子裡的儲存磁碟（同一磁碟內合計即可）",
   "jei.useless_mod.entropy_transmutation.step2": "潛行右鍵該 ME 箱子",
-  "jei.useless_mod.entropy_transmutation.step2.detail": "手持熵變機械臂潛行右鍵該 ME 箱子，原地變成產物"
+  "jei.useless_mod.entropy_transmutation.step2.detail": "手持熵變機械臂潛行右鍵該 ME 箱子，原地變成產物",
+  "gui.useless_mod.muffler_hatch.withdraw_only": "此槽位只能取出物品",
+  "gui.useless_mod.maintenance_hatch.idle": "等待校準",
+  "gui.useless_mod.maintenance_hatch.running": "校準中",
+  "gui.useless_mod.maintenance_hatch.completed": "校準完成",
+  "gui.useless_mod.maintenance_hatch.position": "第 %s / %s 輪 · 指針 %s%%",
+  "gui.useless_mod.maintenance_hatch.target": "±%s%%",
+  "gui.useless_mod.maintenance_hatch.hit": "精準命中！",
+  "gui.useless_mod.maintenance_hatch.miss": "偏離目標，進度已重置",
+  "gui.useless_mod.maintenance_hatch.readout_idle": "共 %s 輪，全部命中即完成校準",
+  "gui.useless_mod.maintenance_hatch.readout_done": "%s 輪全部命中",
+  "gui.useless_mod.maintenance_hatch.hint": "指針進入綠色區間時按空格或點擊",
+  "gui.useless_mod.maintenance_hatch.start_hint": "按空格或點擊開始校準",
+  "gui.useless_mod.maintenance_hatch.restart_hint": "按空格或點擊重新校準",
+  "gui.useless_mod.maintenance_hatch.button.start": "開始校準",
+  "gui.useless_mod.maintenance_hatch.button.lock": "鎖定指針",
+  "gui.useless_mod.maintenance_hatch.button.restart": "重新校準"
 }

@@ -1,15 +1,27 @@
 package com.sorrowmist.useless.content.blockentities.multiblock;
 
+import com.sorrowmist.useless.content.menus.MufflerHatchMenu;
 import com.sorrowmist.useless.init.ModBlockEntities;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.RandomSource;
+import net.minecraft.world.Containers;
+import net.minecraft.world.MenuProvider;
+import net.minecraft.world.SimpleContainer;
+import net.minecraft.world.entity.item.ItemEntity;
+import net.minecraft.world.entity.player.Inventory;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.inventory.AbstractContainerMenu;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.BlockGetter;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
+import net.neoforged.neoforge.items.IItemHandler;
+import net.neoforged.neoforge.items.ItemStackHandler;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.Objects;
@@ -22,9 +34,11 @@ import java.util.Objects;
  * 受阻判定与「仅在工作时冒烟」参考 GregTech Modern 的 {@code IMufflerMachine#isFrontFaceFree}
  * 与 {@code MufflerPartMachine#clientTick}，但不引入其污染扩散与副产物回收体系。</p>
  */
-public final class MufflerHatchBlockEntity extends BlockEntity {
+public final class MufflerHatchBlockEntity extends BlockEntity implements MenuProvider {
     /** 排烟空间高度：消声仓上方须保持为空气的格数。 */
     public static final int EXHAUST_HEIGHT = 2;
+    /** 输出槽位数量：消声仓的界面只有一个槽位。 */
+    private static final int OUTPUT_SLOTS = 1;
     /** 粒子发射间隔（tick）。过密会造成无谓的网络与渲染负担。 */
     private static final int EMIT_INTERVAL_TICKS = 4;
     /** 每次发射的粒子数量。 */
@@ -33,6 +47,19 @@ public final class MufflerHatchBlockEntity extends BlockEntity {
     private static final double SMOKE_RISE_SPEED = 0.07;
     /** 烟雾出生点在顶面上的水平随机范围。 */
     private static final double SMOKE_SPREAD = 0.35;
+
+    /**
+     * 消声仓的输出库存。
+     *
+     * <p>只有界面能访问该库存，槽位在菜单层被限定为只出不进；库存变更时标记方块实体已修改，
+     * 使取走物品后的状态随存档保存。</p>
+     */
+    private final ItemStackHandler output = new ItemStackHandler(OUTPUT_SLOTS) {
+        @Override
+        protected void onContentsChanged(int slot) {
+            setChanged();
+        }
+    };
 
     @Nullable
     private BlockPos controllerPos;
@@ -90,6 +117,27 @@ public final class MufflerHatchBlockEntity extends BlockEntity {
         return true;
     }
 
+    /** 供容器菜单访问的输出库存，槽位在菜单层被限定为只出不进。 */
+    public IItemHandler getOutput() {
+        return output;
+    }
+
+    /**
+     * 把输出库存中的物品掉落到世界中，供方块被拆除时调用。
+     *
+     * <p>只在服务端执行；掉落物从方块中心生成，避免库存随方块消失。</p>
+     */
+    public void dropContents() {
+        if (level == null || level.isClientSide) return;
+        for (int slot = 0; slot < output.getSlots(); slot++) {
+            ItemStack stack = output.extractItem(slot, output.getSlotLimit(slot), false);
+            if (stack.isEmpty()) continue;
+            level.addFreshEntity(new ItemEntity(level,
+                    worldPosition.getX() + 0.5, worldPosition.getY() + 0.5, worldPosition.getZ() + 0.5,
+                    stack));
+        }
+    }
+
     /**
      * 由核心在工作状态下逐 tick 调用，按固定间隔从顶面向上喷出烟雾。
      * 核心只有在排烟空间畅通时才能工作，因此此处无需重复判定阻挡。
@@ -109,10 +157,21 @@ public final class MufflerHatchBlockEntity extends BlockEntity {
     }
 
     @Override
+    public Component getDisplayName() {
+        return Component.translatable("block.useless_mod.muffler_hatch");
+    }
+
+    @Override
+    public AbstractContainerMenu createMenu(int containerId, Inventory inventory, Player player) {
+        return new MufflerHatchMenu(containerId, inventory, worldPosition);
+    }
+
+    @Override
     protected void loadAdditional(CompoundTag tag, HolderLookup.Provider registries) {
         super.loadAdditional(tag, registries);
         controllerPos = tag.contains("Controller") ? BlockPos.of(tag.getLong("Controller")) : null;
         structureGeneration = tag.getLong("StructureGeneration");
+        if (tag.contains("Output")) output.deserializeNBT(registries, tag.getCompound("Output"));
     }
 
     @Override
@@ -120,6 +179,7 @@ public final class MufflerHatchBlockEntity extends BlockEntity {
         super.saveAdditional(tag, registries);
         if (controllerPos != null) tag.putLong("Controller", controllerPos.asLong());
         tag.putLong("StructureGeneration", structureGeneration);
+        tag.put("Output", output.serializeNBT(registries));
     }
 
     @Override

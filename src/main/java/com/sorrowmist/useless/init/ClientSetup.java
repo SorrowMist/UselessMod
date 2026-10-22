@@ -8,6 +8,8 @@ import com.sorrowmist.useless.client.gui.AdvancedAlloyFurnaceScreen;
 import com.sorrowmist.useless.client.gui.PagedRecoverableScreen;
 import com.sorrowmist.useless.client.gui.PatternAssemblyScreen;
 import com.sorrowmist.useless.client.gui.MoldHubScreen;
+import com.sorrowmist.useless.client.gui.MaintenanceHatchScreen;
+import com.sorrowmist.useless.client.gui.MufflerHatchScreen;
 import com.sorrowmist.useless.client.gui.MultiblockAlloyFurnaceScreen;
 import com.sorrowmist.useless.client.gui.PassiveCraftingHatchScreen;
 import com.sorrowmist.useless.client.gui.OreGeneratorScreen;
@@ -132,6 +134,8 @@ public class ClientSetup {
         event.register(ModMenuType.MULTIBLOCK_ALLOY_FURNACE_MENU.get(), MultiblockAlloyFurnaceScreen::new);
         event.register(ModMenuType.PASSIVE_CRAFTING_HATCH_MENU.get(), PassiveCraftingHatchScreen::new);
         event.register(ModMenuType.ORE_GENERATOR_MENU.get(), OreGeneratorScreen::new);
+        event.register(ModMenuType.MUFFLER_HATCH_MENU.get(), MufflerHatchScreen::new);
+        event.register(ModMenuType.MAINTENANCE_HATCH_MENU.get(), MaintenanceHatchScreen::new);
         event.register(ModMenuType.DIMENSION_CONFIG_MENU.get(), DimensionConfigScreen::new);
         event.register(ModMenuType.PATTERN_CONVERTER_MENU.get(), PatternConverterScreen::new);
         event.register(ModMenuType.STAFF_LINK_MENU.get(), StaffLinkScreen::new);

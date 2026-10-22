@@ -23,6 +23,8 @@ import com.sorrowmist.useless.network.FaceModeChangePacket;
 import com.sorrowmist.useless.network.ForceBreakKeyPacket;
 import com.sorrowmist.useless.network.MiningDataSyncPacket;
 import com.sorrowmist.useless.network.ModeTogglePacket;
+import com.sorrowmist.useless.network.MaintenanceCalibrationActionPacket;
+import com.sorrowmist.useless.network.MaintenanceCalibrationSyncPacket;
 import com.sorrowmist.useless.network.MultiblockAlloyFurnaceEnergyLimitPacket;
 import com.sorrowmist.useless.network.PatternPageChangePacket;
 import com.sorrowmist.useless.network.ThermostatSetPacket;
@@ -231,5 +233,11 @@ public class ModNetwork {
         registrar.playToClient(EntropyTransmutationEffectPacket.TYPE,
                                EntropyTransmutationEffectPacket.STREAM_CODEC,
                                EntropyTransmutationEffectPacket::handle);
+        registrar.playToServer(MaintenanceCalibrationActionPacket.TYPE,
+                               MaintenanceCalibrationActionPacket.STREAM_CODEC,
+                               MaintenanceCalibrationActionPacket::handle);
+        registrar.playToClient(MaintenanceCalibrationSyncPacket.TYPE,
+                               MaintenanceCalibrationSyncPacket.STREAM_CODEC,
+                               MaintenanceCalibrationSyncPacket::handle);
     }
 }

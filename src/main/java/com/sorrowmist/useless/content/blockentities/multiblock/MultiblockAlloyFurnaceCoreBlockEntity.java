@@ -318,6 +318,14 @@ public final class MultiblockAlloyFurnaceCoreBlockEntity extends BlockEntity imp
                 } else if (hatch.isLinkedToController(worldPosition)) {
                     hatch.linkController(null, structureGeneration);
                 }
+            } else if (part instanceof AutoMaintenanceHatchBlockEntity hatch) {
+                // 自动维护仓与普通维护仓共用一个名额，归属链接同样必须建立；
+                // 否则它的 isClaimedByOtherController 恒为 false，相邻核心可共用并同时成型。
+                if (formed && pos.equals(maintenanceHatchPos)) {
+                    hatch.linkController(worldPosition, structureGeneration);
+                } else if (hatch.isLinkedToController(worldPosition)) {
+                    hatch.linkController(null, structureGeneration);
+                }
             } else if (part instanceof MufflerHatchBlockEntity hatch) {
                 if (formed && pos.equals(mufflerHatchPos)) {
                     hatch.linkController(worldPosition, structureGeneration);
@@ -527,6 +535,17 @@ public final class MultiblockAlloyFurnaceCoreBlockEntity extends BlockEntity imp
     public boolean isMaintenanceHatchLinked(BlockPos pos, long generation) {
         return formed && maintenanceHatchPos != null && maintenanceHatchPos.equals(pos)
                 && structureGeneration == generation;
+    }
+
+    /**
+     * 归属判定专用的维护仓占用检查，不比较结构代次。
+     *
+     * <p>部件实体反查核心时若要求代次严格相等，代次一时不同步（例如核心刚完成一次
+     * 状态变更、部件尚未收到新代次）就会把已成型核心误判为无主，相邻核心因而可以
+     * 共用同一个维护仓并同时成型。代次只用于让部件丢弃陈旧缓存，不能作为占用与否的依据。</p>
+     */
+    public boolean claimsMaintenanceHatch(BlockPos pos) {
+        return formed && maintenanceHatchPos != null && maintenanceHatchPos.equals(pos);
     }
 
     public boolean isMufflerHatchLinked(BlockPos pos, long generation) {

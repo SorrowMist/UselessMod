@@ -1324,5 +1324,21 @@
   "jei.useless_mod.entropy_transmutation.step1": "Put the items into the ME chest",
   "jei.useless_mod.entropy_transmutation.step1.detail": "Put the required items into the storage cells inside the ME chest (totals within the same cell count)",
   "jei.useless_mod.entropy_transmutation.step2": "Sneak-right-click the ME chest",
-  "jei.useless_mod.entropy_transmutation.step2.detail": "Sneak-right-click that ME chest with an Entropy Manipulator to transmute it in place"
+  "jei.useless_mod.entropy_transmutation.step2.detail": "Sneak-right-click that ME chest with an Entropy Manipulator to transmute it in place",
+  "gui.useless_mod.muffler_hatch.withdraw_only": "This slot is output-only",
+  "gui.useless_mod.maintenance_hatch.idle": "Awaiting Calibration",
+  "gui.useless_mod.maintenance_hatch.running": "Calibrating",
+  "gui.useless_mod.maintenance_hatch.completed": "Calibration Complete",
+  "gui.useless_mod.maintenance_hatch.position": "Round %s / %s · Pointer %s%%",
+  "gui.useless_mod.maintenance_hatch.target": "±%s%%",
+  "gui.useless_mod.maintenance_hatch.hit": "Perfect hit!",
+  "gui.useless_mod.maintenance_hatch.hint": "Space / click in the green zone",
+  "gui.useless_mod.maintenance_hatch.start_hint": "Space / click to start",
+  "gui.useless_mod.maintenance_hatch.restart_hint": "Space / click to retry",
+  "gui.useless_mod.maintenance_hatch.miss": "Off target, progress reset",
+  "gui.useless_mod.maintenance_hatch.readout_idle": "%s rounds to clear the calibration",
+  "gui.useless_mod.maintenance_hatch.readout_done": "All %s rounds cleared",
+  "gui.useless_mod.maintenance_hatch.button.start": "Start Calibration",
+  "gui.useless_mod.maintenance_hatch.button.lock": "Lock Pointer",
+  "gui.useless_mod.maintenance_hatch.button.restart": "Recalibrate"
 }

@@ -16,8 +16,9 @@ import java.util.Objects;
 /**
  * 自动维护仓方块实体。
  *
- * <p>与普通维护仓一样持久化所属核心，使同一个维护仓不能被相邻的多个核心共用；
- * 自动化行为尚未实现，后续在此扩展。</p>
+ * <p>与普通维护仓一样持久化所属核心，使同一个维护仓不能被相邻的多个核心共用。
+ * 自动化行为不落在本类：维护度归核心持有，由核心每 tick 检测到本仓后直接恢复满值，
+ * 本类只承担归属与占用判定。</p>
  */
 public final class AutoMaintenanceHatchBlockEntity extends BlockEntity {
     private static final String TAG_CONTROLLER = "Controller";

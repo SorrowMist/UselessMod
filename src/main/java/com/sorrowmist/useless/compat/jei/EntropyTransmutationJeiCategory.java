@@ -5,17 +5,22 @@ import appeng.core.definitions.AEBlocks;
 import com.sorrowmist.useless.UselessMod;
 import com.sorrowmist.useless.content.recipe.CountedIngredient;
 import com.sorrowmist.useless.content.recipe.EntropyTransmutationRecipe;
+import mezz.jei.api.constants.VanillaTypes;
 import mezz.jei.api.gui.builder.IRecipeLayoutBuilder;
 import mezz.jei.api.gui.builder.IRecipeSlotBuilder;
+import mezz.jei.api.gui.builder.ITooltipBuilder;
 import mezz.jei.api.gui.drawable.IDrawable;
 import mezz.jei.api.gui.placement.HorizontalAlignment;
 import mezz.jei.api.gui.widgets.IRecipeExtrasBuilder;
+import mezz.jei.api.gui.widgets.IRecipeWidget;
 import mezz.jei.api.helpers.IGuiHelper;
 import mezz.jei.api.recipe.IFocusGroup;
 import mezz.jei.api.recipe.RecipeIngredientRole;
 import mezz.jei.api.recipe.RecipeType;
 import mezz.jei.api.recipe.category.IRecipeCategory;
 import net.minecraft.ChatFormatting;
+import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.navigation.ScreenPosition;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
@@ -53,24 +58,34 @@ public class EntropyTransmutationJeiCategory
 
     private static final int STEP1_Y = 1;
 
+    // ME 箱子与输入区两行槽位的中线对齐，避免偏居上方。
+    // 输入区占 18..54，中线为 36；图标高 16，故顶边取 36 - 8 = 28。
     private static final int ME_CHEST_X = 5;
-    private static final int ME_CHEST_Y = 18;
-    // 输入槽按每行 5 个换行排布：第一行 5 个、第二行余下若干，以容纳一阶锭加七种基础材料共 8 项。
+    private static final int ME_CHEST_Y = 28;
+    // 输入槽按每行 4 个换行排布：8 项输入正好排成 4 列 2 行。
     private static final int INPUT_START_X = 26;
     private static final int INPUT_STEP = 18;
     private static final int INPUT_ROW1_Y = 18;
     private static final int INPUT_ROW_STEP = 18;
-    private static final int MAX_SLOTS_PER_ROW = 5;
+    private static final int MAX_SLOTS_PER_ROW = 4;
 
-    private static final int ARROW_X = 118;
-    private static final int ARROW_Y = 28;
+    // 箭头左移并让出输出槽的占位，避免箭身被产物方块遮挡。
+    private static final int ARROW_X = 100;
+    private static final int ARROW_Y = 27;
 
-    private static final int OUTPUT_X = 140;
+    /** 熵变机械臂图标相对原贴图的缩放系数，用于在箭头上方放置动作标记。 */
+    private static final float MANIPULATOR_ICON_SCALE = 0.5f;
+    /** 占位左边界取箭头中心减去半个占位宽度，使缩小后的图标在箭头上方水平居中。 */
+    private static final int MANIPULATOR_ICON_X = 103;
+    private static final int MANIPULATOR_ICON_Y = 12;
+    /** 缩放后仍按 16×16 申报占位，使悬浮判定覆盖整个图标而不是缩小的实际绘制区域。 */
+    private static final int MANIPULATOR_ICON_SIZE = 16;
+
+    private static final int OUTPUT_X = 126;
     private static final int OUTPUT_Y = 27;
 
-    private static final int STEP2_ICON_X = 5;
-    private static final int STEP2_ICON_Y = 56;
-    private static final int STEP2_TEXT_X = 24;
+    // 机械臂图标移到箭头上方后，底部仅保留居中的步骤说明。
+    private static final int STEP2_TEXT_X = 5;
     private static final int STEP2_TEXT_Y = 58;
 
     /** 画布文字颜色；JEI 配方区域为深色背景，用白色保证可读。 */
@@ -146,8 +161,7 @@ public class EntropyTransmutationJeiCategory
                     displays.add(candidate.copyWithCount(displayCount));
                 }
                 slot.addItemStacks(displays)
-                        .setCustomRenderer(mezz.jei.api.constants.VanillaTypes.ITEM_STACK,
-                                ItemStackCountRenderer.INSTANCE);
+                        .setCustomRenderer(VanillaTypes.ITEM_STACK, ItemStackCountRenderer.INSTANCE);
             }
             slot.addRichTooltipCallback((view, tooltip) ->
                     tooltip.add(Component.translatable("jei.useless_mod.entropy_transmutation.input")
@@ -169,28 +183,84 @@ public class EntropyTransmutationJeiCategory
     public void createRecipeExtras(@NotNull IRecipeExtrasBuilder builder,
                                    @NotNull RecipeHolder<EntropyTransmutationRecipe> holder,
                                    @NotNull IFocusGroup focuses) {
-        // 第一步：物品须放进 ME 箱子里的存储磁盘（同一磁盘内合计即可）。
+        // 第一步：画布只留一句提示，完整说明挂在悬停文本上，避免文字挤满配方区域。
         builder.addText(Component.translatable("jei.useless_mod.entropy_transmutation.step1"), WIDTH, 10)
                 .setPosition(0, STEP1_Y)
                 .setTextAlignment(HorizontalAlignment.CENTER)
-                .setColor(TEXT_COLOR);
+                .setColor(TEXT_COLOR)
+                .setTooltip(Component.translatable("jei.useless_mod.entropy_transmutation.step1.detail"));
 
         // ME 箱子图标：点明这些物品是放进「这个」容器的磁盘里，而不是直接放进工作台。
-        builder.addDrawableWidget(this.meChestIcon).setPosition(ME_CHEST_X, ME_CHEST_Y);
+        builder.addDrawableWidget(this.meChestIcon)
+                .setPosition(ME_CHEST_X, ME_CHEST_Y)
+                .setTooltip(Component.translatable("jei.useless_mod.entropy_transmutation.step1.detail"));
 
         builder.addRecipeArrowWidget().setPosition(ARROW_X, ARROW_Y);
 
-        // 第二步：手持熵变机械臂对该 ME 箱子潜行右键，箱子原地变成产物。
-        builder.addDrawableWidget(this.manipulatorIcon).setPosition(STEP2_ICON_X, STEP2_ICON_Y);
+        // 熵变机械臂图标缩至半尺寸后置于箭头上方，作为「用此工具执行」的动作标记；
+        // IDrawable 不支持缩放，故用自定义控件在绘制时施加 PoseStack 缩放。
+        builder.addWidget(new ScaledIconWidget(this.manipulatorIcon,
+                new ScreenPosition(MANIPULATOR_ICON_X, MANIPULATOR_ICON_Y),
+                MANIPULATOR_ICON_SIZE, MANIPULATOR_ICON_SCALE,
+                Component.translatable("jei.useless_mod.entropy_transmutation.step2.detail")));
+
+        // 第二步：底部提示同样精简，详细操作说明在悬停时显示。
         builder.addText(Component.translatable("jei.useless_mod.entropy_transmutation.step2"),
                         WIDTH - STEP2_TEXT_X, 10)
                 .setPosition(STEP2_TEXT_X, STEP2_TEXT_Y)
-                .setColor(TEXT_COLOR);
+                .setColor(TEXT_COLOR)
+                .setTooltip(Component.translatable("jei.useless_mod.entropy_transmutation.step2.detail"));
     }
 
     @Override
     public @NotNull ResourceLocation getRegistryName(
             @NotNull RecipeHolder<EntropyTransmutationRecipe> holder) {
         return holder.id();
+    }
+
+    /**
+     * 按缩放系数绘制图标、并以未缩放的占位尺寸响应悬浮的配方控件。
+     *
+     * <p>JEI 的 {@link IDrawable} 只能按原始尺寸绘制，无法缩小；而缩小图标后若按实际绘制
+     * 区域申报占位，鼠标悬浮判定会小到难以命中。因此这里把图标从占位区域中心等比缩小绘制，
+     * 悬浮判定仍沿用 16×16 的原始占位。</p>
+     */
+    private static final class ScaledIconWidget implements IRecipeWidget {
+
+        private final IDrawable drawable;
+        private final ScreenPosition position;
+        private final int size;
+        private final float scale;
+        private final Component tooltip;
+
+        ScaledIconWidget(IDrawable drawable, ScreenPosition position, int size, float scale,
+                         Component tooltip) {
+            this.drawable = drawable;
+            this.position = position;
+            this.size = size;
+            this.scale = scale;
+            this.tooltip = tooltip;
+        }
+
+        @Override
+        public @NotNull ScreenPosition getPosition() {
+            return this.position;
+        }
+
+        @Override
+        public void drawWidget(@NotNull GuiGraphics graphics, double mouseX, double mouseY) {
+            graphics.pose().pushPose();
+            // 先平移到占位区域左上角，再按占位区域中心为缩放原点，使缩小后的图标居中于原 16×16 位置。
+            graphics.pose().translate(this.position.x() + this.size * (1.0f - this.scale) / 2.0f,
+                    this.position.y() + this.size * (1.0f - this.scale) / 2.0f, 0.0f);
+            graphics.pose().scale(this.scale, this.scale, 1.0f);
+            this.drawable.draw(graphics, 0, 0);
+            graphics.pose().popPose();
+        }
+
+        @Override
+        public void getTooltip(@NotNull ITooltipBuilder tooltip, double mouseX, double mouseY) {
+            tooltip.add(this.tooltip);
+        }
     }
 }

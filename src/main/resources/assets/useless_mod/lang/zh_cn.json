@@ -68,6 +68,8 @@
   "itemGroup.useless_mod.main": "Useless",
   "block.useless_mod.multiblock_alloy_furnace_core": "多方块万象合金炉核心",
   "config.jade.plugin_useless_mod.multiblock_alloy_furnace_core_name": "显示多方块万象合金炉核心名称",
+  "config.jade.plugin_useless_mod.multiblock_alloy_furnace_muffler": "消声仓排烟状态",
+  "config.jade.plugin_useless_mod.multiblock_alloy_furnace_muffler.comment": "显示万象合金炉消声仓排烟空间是否受阻",
   "tooltip.useless_mod.multiblock_alloy_furnace_core.prayer.1": "不朽的合成之神，聆听我们的祈祷。",
   "tooltip.useless_mod.multiblock_alloy_furnace_core.prayer.2": "我们是您的孩子，是行走于机械与奥术道路上的工程师。",
   "tooltip.useless_mod.multiblock_alloy_furnace_core.prayer.3": "我们珍视配方胜过一切，因为那是您赐予最永恒的礼物。",
@@ -1322,6 +1324,8 @@
   "jei.useless_mod.entropy_transmutation.input": "需装在 ME 箱子存储磁盘中",
   "jei.useless_mod.entropy_transmutation.output": "在原地替换成的方块",
   "jei.useless_mod.entropy_transmutation.hint": "手持熵变机械臂潜行右键 ME 箱子",
-  "jei.useless_mod.entropy_transmutation.step1": "把所需物品放进 ME 箱子里的存储磁盘（同一磁盘内合计即可）",
-  "jei.useless_mod.entropy_transmutation.step2": "手持熵变机械臂潜行右键该 ME 箱子，原地变成产物"
+  "jei.useless_mod.entropy_transmutation.step1": "把所需物品放进 ME 箱子",
+  "jei.useless_mod.entropy_transmutation.step1.detail": "把所需物品放进 ME 箱子里的存储磁盘（同一磁盘内合计即可）",
+  "jei.useless_mod.entropy_transmutation.step2": "潜行右键该 ME 箱子",
+  "jei.useless_mod.entropy_transmutation.step2.detail": "手持熵变机械臂潜行右键该 ME 箱子，原地变成产物"
 }

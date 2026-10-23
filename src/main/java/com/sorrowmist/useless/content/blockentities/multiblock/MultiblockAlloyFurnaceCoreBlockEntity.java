@@ -128,6 +128,13 @@ public final class MultiblockAlloyFurnaceCoreBlockEntity extends BlockEntity imp
     private BlockPos mufflerHatchPos;
     /** 消声仓上方排烟空间是否被占据。每 tick 重新判定，不持久化。 */
     private boolean mufflerObstructed;
+    /**
+     * 结构内的维护仓是否为自动维护仓。结构校验时判定一次，供维护度累加入口短路。
+     *
+     * <p>若在 {@link #maintainWithAutoHatch()} 里逐 tick 查询方块实体，机器一旦有进展，
+     * 运行 tick 余数每 tick 都会变化，导致恢复逻辑每 tick 标脏并下发方块更新。</p>
+     */
+    private boolean hasAutoMaintenanceHatch;
     private int validationTimer;
     private long structureGeneration;
     private boolean deferredTasksLoaded;

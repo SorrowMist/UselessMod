@@ -283,6 +283,10 @@ public final class MultiblockAlloyFurnaceCoreBlockEntity extends BlockEntity imp
         passiveHatchPos = validatedHatchPos == null ? null : validatedHatchPos.immutable();
         maintenanceHatchPos = validatedMaintenancePos == null ? null : validatedMaintenancePos.immutable();
         mufflerHatchPos = validatedMufflerPos == null ? null : validatedMufflerPos.immutable();
+        // 维护仓类型只在结构校验时判定一次：逐 tick 查询方块实体会让自动维护仓路径
+        // 在机器持续工作时每 tick 都走到复位逻辑。
+        hasAutoMaintenanceHatch = formed && maintenanceHatchPos != null
+                && level.getBlockEntity(maintenanceHatchPos) instanceof AutoMaintenanceHatchBlockEntity;
         if (stateChanged) {
             structureGeneration++;
             if (formed) {
@@ -389,35 +393,16 @@ public final class MultiblockAlloyFurnaceCoreBlockEntity extends BlockEntity imp
     }
 
     /**
-     * 取得结构内的自动维护仓。
-     *
-     * <p>自动维护仓与普通维护仓共用同一个功能部件名额，因此位置都记录在
-     * {@code maintenanceHatchPos}，这里按方块实体类型区分。</p>
-     */
-    @Nullable
-    private AutoMaintenanceHatchBlockEntity getAutoMaintenanceHatch() {
-        if (!formed || maintenanceHatchPos == null || level == null
-                || !level.isLoaded(maintenanceHatchPos)) {
-            return null;
-        }
-        return level.getBlockEntity(maintenanceHatchPos) instanceof AutoMaintenanceHatchBlockEntity hatch
-                ? hatch : null;
-    }
-
-    /**
      * 结构内含自动维护仓时，把维护度保持在满值。
      *
-     * <p>先比较满值再查询方块实体：正常运行时维护度本来就满，这一路径每 tick 只做一次
-     * 长整数比较，不会产生额外的方块实体查找开销。</p>
+     * <p>是否含自动维护仓由 {@link #validateStructure()} 判定并缓存，此处不再查询方块实体；
+     * 维护度未变化时 {@link #restoreMaintenance()} 自身直接返回，不会产生标脏与方块更新。</p>
      */
     private void maintainWithAutoHatch() {
-        if (maintenanceLevel == MaintenanceWearRules.MAX_MAINTENANCE
-                && maintenanceTickRemainder == 0L) {
+        if (!hasAutoMaintenanceHatch) {
             return;
         }
-        if (getAutoMaintenanceHatch() != null) {
-            restoreMaintenance();
-        }
+        restoreMaintenance();
     }
 
     /** 结构成型时，消声仓上方的排烟空间是否被非空气方块占据。 */
@@ -659,6 +644,11 @@ public final class MultiblockAlloyFurnaceCoreBlockEntity extends BlockEntity imp
      */
     private void accrueRuntimeMaintenance(boolean progressed) {
         if (!progressed) {
+            return;
+        }
+        // 结构内含自动维护仓时维护度恒为满值，累计余数没有意义：余数一旦非零，
+        // restoreMaintenance 每 tick 都会走到标脏与方块更新，故在入口直接短路。
+        if (hasAutoMaintenanceHatch) {
             return;
         }
         maintenanceTickRemainder++;

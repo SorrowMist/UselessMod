@@ -3,6 +3,7 @@ package com.sorrowmist.useless.compat.jade;
 import com.sorrowmist.useless.UselessMod;
 import com.sorrowmist.useless.content.blockentities.multiblock.MufflerHatchBlockEntity;
 import com.sorrowmist.useless.content.blockentities.multiblock.MultiblockAlloyFurnaceCoreBlockEntity;
+import com.sorrowmist.useless.core.config.ConfigManager;
 import net.minecraft.ChatFormatting;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
@@ -24,16 +25,23 @@ public enum MultiblockAlloyFurnaceMufflerJadeProvider
 
     private static final ResourceLocation UID = UselessMod.id("multiblock_alloy_furnace_muffler");
     private static final String TAG_OBSTRUCTED = "UselessModMufflerObstructed";
+    private static final String TAG_ASH_FULL = "UselessModMufflerAshFull";
 
     @Override
     public void appendTooltip(ITooltip tooltip, BlockAccessor accessor, IPluginConfig config) {
-        if (!accessor.getServerData().getBoolean(TAG_OBSTRUCTED)) {
-            return;
+        CompoundTag data = accessor.getServerData();
+        if (data.getBoolean(TAG_OBSTRUCTED)) {
+            tooltip.add(Component.translatable("gui.useless_mod.multiblock_alloy_furnace.muffler_obstructed")
+                    .withStyle(ChatFormatting.RED));
+            tooltip.add(Component.translatable("gui.useless_mod.multiblock_alloy_furnace.muffler_obstructed.desc",
+                    MufflerHatchBlockEntity.EXHAUST_HEIGHT).withStyle(ChatFormatting.GRAY));
         }
-        tooltip.add(Component.translatable("gui.useless_mod.multiblock_alloy_furnace.muffler_obstructed")
-                .withStyle(ChatFormatting.RED));
-        tooltip.add(Component.translatable("gui.useless_mod.multiblock_alloy_furnace.muffler_obstructed.desc",
-                MufflerHatchBlockEntity.EXHAUST_HEIGHT).withStyle(ChatFormatting.GRAY));
+        if (data.getBoolean(TAG_ASH_FULL)) {
+            tooltip.add(Component.translatable("gui.useless_mod.multiblock_alloy_furnace.ash_full")
+                    .withStyle(ChatFormatting.RED));
+            tooltip.add(Component.translatable("gui.useless_mod.multiblock_alloy_furnace.ash_full.desc")
+                    .withStyle(ChatFormatting.GRAY));
+        }
     }
 
     @Override
@@ -45,6 +53,15 @@ public enum MultiblockAlloyFurnaceMufflerJadeProvider
         };
         if (obstructed) {
             data.putBoolean(TAG_OBSTRUCTED, true);
+        }
+        // 灰烬满同样只在服务端判定：核心侧已含配置开关，消声仓侧需自行判断，避免配置关闭时误报停机。
+        boolean ashFull = switch (accessor.getBlockEntity()) {
+            case MultiblockAlloyFurnaceCoreBlockEntity core -> core.isFormed() && core.isAshOutputBlocked();
+            case MufflerHatchBlockEntity muffler -> ConfigManager.isAshFullBlockingWork() && muffler.isAshFull();
+            case null, default -> false;
+        };
+        if (ashFull) {
+            data.putBoolean(TAG_ASH_FULL, true);
         }
     }
 

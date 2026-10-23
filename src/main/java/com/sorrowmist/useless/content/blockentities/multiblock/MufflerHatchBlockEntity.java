@@ -226,9 +226,10 @@ public final class MufflerHatchBlockEntity extends BlockEntity implements MenuPr
         tickToxicEffects(serverLevel);
     }
 
-    /** 按固定间隔喷出烟雾粒子。 */
+    /** 按固定间隔喷出烟雾粒子；排烟空间被占据时不再生成，避免粒子从方块内部穿出。 */
     private void emitSmoke(ServerLevel serverLevel) {
         if (serverLevel.getGameTime() % EMIT_INTERVAL_TICKS != 0) return;
+        if (!isExhaustClear(serverLevel, worldPosition)) return;
         RandomSource random = serverLevel.getRandom();
         for (int i = 0; i < PARTICLES_PER_EMIT; i++) {
             double x = worldPosition.getX() + 0.5 + (random.nextDouble() - 0.5) * SMOKE_SPREAD;

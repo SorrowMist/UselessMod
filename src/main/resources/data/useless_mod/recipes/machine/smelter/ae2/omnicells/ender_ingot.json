@@ -1,0 +1,60 @@
+{
+  "type": "forge:conditional",
+  "recipes": [
+    {
+      "conditions": [
+        {
+          "type": "forge:mod_loaded",
+          "modid": "ae2omnicells"
+        },
+        {
+          "type": "forge:item_exists",
+          "item": "ae2omnicells:ender_ingot"
+        }
+      ],
+      "recipe": {
+        "type": "useless_mod:advanced_alloy_furnace",
+        "ingredients": [
+          {
+            "ingredient": {
+              "tag": "forge:dusts/ender_pearl"
+            },
+            "count": 64
+          },
+          {
+            "ingredient": [
+              {
+                "tag": "ae2:all_quartz_dust"
+              },
+              {
+                "tag": "forge:dusts/certus_quartz"
+              }
+            ],
+            "count": 64
+          },
+          {
+            "ingredient": {
+              "tag": "forge:ingots/iron"
+            },
+            "count": 64
+          }
+        ],
+        "mold": {
+          "item": "ae2:inscriber"
+        },
+        "catalyst": {
+          "tag": "useless_mod:useless_ingots"
+        },
+        "energy": 10000,
+        "process_time": 40,
+        "outputs": [
+          {
+            "item": "ae2omnicells:ender_ingot",
+            "count": 64
+          }
+        ],
+        "catalyst_uses": 1
+      }
+    }
+  ]
+}

@@ -1,0 +1,46 @@
+{
+  "type": "forge:conditional",
+  "recipes": [
+    {
+      "conditions": [
+        {
+          "type": "forge:mod_loaded",
+          "modid": "advanced_ae"
+        }
+      ],
+      "recipe": {
+        "type": "useless_mod:advanced_alloy_furnace",
+        "ingredients": [
+          {
+            "ingredient": {
+              "item": "advanced_ae:quantum_infused_dust"
+            },
+            "count": 64
+          }
+        ],
+        "mold": {
+          "item": "ae2:inscriber"
+        },
+        "catalyst": {
+          "tag": "useless_mod:useless_ingots"
+        },
+        "energy": 10000,
+        "process_time": 40,
+        "outputs": [],
+        "input_fluids": [
+          {
+            "fluid": "minecraft:water",
+            "amount": 64000
+          }
+        ],
+        "output_fluids": [
+          {
+            "fluid": "advanced_ae:quantum_infusion_source",
+            "amount": 64000
+          }
+        ],
+        "catalyst_uses": 1
+      }
+    }
+  ]
+}

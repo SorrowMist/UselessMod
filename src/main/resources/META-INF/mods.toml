@@ -326,14 +326,14 @@ side="BOTH"
 [[dependencies.useless_mod]]
 modId="thermal"
 mandatory=false
-versionRange="[11.0.7,12)"
+versionRange="[11.0.0,12)"
 ordering="AFTER"
 side="BOTH"
 
 [[dependencies.useless_mod]]
 modId="cofh_core"
 mandatory=false
-versionRange="[11.0.2,12)"
+versionRange="[11.0.0,12)"
 ordering="AFTER"
 side="BOTH"
 

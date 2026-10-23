@@ -8,15 +8,21 @@ sourceSets {
     }
 }
 
+// Verify both the oldest supported API and the exact Thermal versions in the local pack.
+def thermalTestVersions = providers.gradleProperty('thermalPackGameTest').isPresent()
+        ? [cofh_core: '11.0.2.56', thermal_core: '11.0.6.24',
+           thermal_foundation: '11.0.6.70', thermal_expansion: '11.0.1.29']
+        : [cofh_core: '11.0.0.51', thermal_core: '11.0.0.12',
+           thermal_foundation: '11.0.0.61', thermal_expansion: '11.0.0.26']
+
 dependencies {
     modRuntimeOnly 'maven.modrinth:QeB3NRC5:5muSI5qX'
     modRuntimeOnly 'curse.maven:ex-deorum-901420:6614784'
     modRuntimeOnly 'maven.modrinth:XxWD5pD3:jYgSnxye'
     modRuntimeOnly 'maven.modrinth:Ck4E7v7R:i7Tp1AHw'
-    modRuntimeOnly 'curse.maven:cofh_core-69162:5374122'
-    modRuntimeOnly 'com.teamcofh:thermal_core:1.20.1-11.0.7.25'
-    modRuntimeOnly 'curse.maven:thermal_foundation-222880:5443583'
-    modRuntimeOnly 'curse.maven:thermal_expansion-69163:5372749'
+    thermalTestVersions.each { artifact, version ->
+        modRuntimeOnly "com.teamcofh:${artifact}:1.20.1-${version}"
+    }
     modRuntimeOnly 'curse.maven:blood-magic-224791:7253333'
     modRuntimeOnly 'curse.maven:embers-rekindled-300777:7446478'
     modRuntimeOnly 'curse.maven:Patchouli-306770:6164575'

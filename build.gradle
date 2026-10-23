@@ -44,8 +44,8 @@ configurations.modCompileOnly.transitive = false
 
 dependencies {
     modCompileOnly 'maven.modrinth:QeB3NRC5:5muSI5qX' // Re-Avaritia 1.4.0 (Forge 1.20.1)
-    modCompileOnly 'curse.maven:cofh_core-69162:5374122'
-    modCompileOnly 'com.teamcofh:thermal_core:1.20.1-11.0.7.25'
+    modCompileOnly 'com.teamcofh:cofh_core:1.20.1-11.0.0.51'
+    modCompileOnly 'com.teamcofh:thermal_core:1.20.1-11.0.0.12'
     modCompileOnly 'curse.maven:blood-magic-224791:7253333'
     modCompileOnly 'curse.maven:embers-rekindled-300777:7446478'
     jarJar('io.github.llamalad7:mixinextras-forge:0.5.0') {

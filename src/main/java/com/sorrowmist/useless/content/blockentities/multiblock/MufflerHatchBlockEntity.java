@@ -61,9 +61,9 @@ public final class MufflerHatchBlockEntity extends BlockEntity implements MenuPr
      * {@code recoveryChance = max(1, tier * 10)}，每次配方完成时按该百分比判定一次，
      * 即 LV 约 10%、UV 约 80%；按典型配方 10 秒折算，约 100 秒（LV）至 12.5 秒（UV）一份。
      * 本模组的并行与线程数远高于 GT，同一时间完成的配方量更大，不能直接沿用其「每次配方判定」的速率，
-     * 因此改为按运行时间累积：基准周期 800 tick（40 秒）一份，再由线圈抑制按比例拉长实际周期。</p>
+     * 因此改为按运行时间累积：基准周期 3 分钟（3600 tick）一份，再由线圈抑制按比例拉长实际周期。</p>
      */
-    private static final int ASH_INTERVAL_TICKS = 800;
+    private static final int ASH_INTERVAL_TICKS = 3600;
     /** 毒性效果的判定间隔（tick），即每秒一次。 */
     private static final int TOXIC_INTERVAL_TICKS = 20;
 

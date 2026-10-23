@@ -81,9 +81,9 @@ class NativeAeRecipeTest {
     }
     static ReactionChamberRecipe reaction(GenericStack output,int secondCount) {
         return new ReactionChamberRecipe(ID,output,List.of(
-                new net.pedroksl.advanced_ae.recipes.IngredientStack.Item(Ingredient.of(Items.IRON_INGOT),2),
-                new net.pedroksl.advanced_ae.recipes.IngredientStack.Item(Ingredient.of(Items.IRON_INGOT),secondCount)),
-                new net.pedroksl.advanced_ae.recipes.IngredientStack.Fluid(Fluids.WATER,500),12000);
+                new net.pedroksl.ae2addonlib.recipes.IngredientStack.Item(Ingredient.of(Items.IRON_INGOT),2),
+                new net.pedroksl.ae2addonlib.recipes.IngredientStack.Item(Ingredient.of(Items.IRON_INGOT),secondCount)),
+                new net.pedroksl.ae2addonlib.recipes.IngredientStack.Fluid(Fluids.WATER,500),12000);
     }
     @Test void reactionAllocatesDuplicateInputsAndFullFluidCost() {
         var output=new GenericStack(AEItemKey.of(Items.DIAMOND),3);

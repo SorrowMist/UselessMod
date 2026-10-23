@@ -1312,5 +1312,18 @@
   "commands.useless_mod.patterns.repair.no_machines": "该网络上没有已通电的万象炉或 ME 样板总成，无需修复",
   "commands.useless_mod.patterns.repair.summary": "已扫描 %s 张万象样板，发现 %s 张失效；已修复 %s 张，%s 张无法修复（配方已移除或存在歧义）。",
   "commands.useless_mod.patterns.repair.summary.preview": "已扫描 %s 张万象样板，发现 %s 张失效；其中 %s 张可修复，%s 张无法修复（配方已移除或存在歧义）。本次为预览，未写回任何槽位。",
-  "commands.useless_mod.patterns.repair.detail": "无法修复：%s，绑定配方 %s"
+  "commands.useless_mod.patterns.repair.detail": "无法修复：%s，绑定配方 %s",
+  "item.useless_mod.useless_integral_component_tier_1": "无用整合组件 等级 1",
+  "item.useless_mod.useless_integral_component_tier_2": "无用整合组件 等级 2",
+  "item.useless_mod.useless_integral_component_tier_3": "无用整合组件 等级 3",
+  "item.useless_mod.useless_integral_component_tier_4": "无用整合组件 等级 4",
+  "item.useless_mod.useless_integral_component_tier_5": "无用整合组件 等级 5",
+  "item.useless_mod.useless_integral_component_tier_6": "无用整合组件 等级 6",
+  "item.useless_mod.useless_integral_component_tier_7": "无用整合组件 等级 7",
+  "item.useless_mod.useless_integral_component_tier_8": "无用整合组件 等级 8",
+  "item.useless_mod.useless_integral_component_tier_9": "无用整合组件 等级 9",
+  "useless_mod.augment.upgrade": "升级增强",
+  "item.useless_mod.augment_parallel_1": "并行处理增强 I",
+  "item.useless_mod.augment_parallel_2": "并行处理增强 II",
+  "item.useless_mod.augment_parallel_3": "并行处理增强 III"
 }

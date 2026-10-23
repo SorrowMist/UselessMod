@@ -10,8 +10,12 @@ import net.minecraft.world.item.crafting.Ingredient;
 
 public record CountedIngredient(
         Ingredient ingredient,
-        long count
+        long count,
+        boolean consumed
 ) {
+    public CountedIngredient(Ingredient ingredient, long count) {
+        this(ingredient, count, true);
+    }
     static final StreamCodec<FriendlyByteBuf, Ingredient> INGREDIENT_STREAM_CODEC =
             com.sorrowmist.useless.compat.forge1201.recipe.RecipeCodecs.INGREDIENT_STREAM;
 
@@ -19,10 +23,12 @@ public record CountedIngredient(
             StreamCodec.composite(
                     INGREDIENT_STREAM_CODEC, CountedIngredient::ingredient,
                     ByteBufCodecs.VAR_LONG, CountedIngredient::count,
+                    ByteBufCodecs.BOOL, CountedIngredient::consumed,
                     CountedIngredient::new
             );
     static final MapCodec<CountedIngredient> CODEC = RecordCodecBuilder.mapCodec(instance -> instance.group(
             com.sorrowmist.useless.compat.forge1201.recipe.RecipeCodecs.INGREDIENT.fieldOf("ingredient").forGetter(CountedIngredient::ingredient),
-            Codec.LONG.optionalFieldOf("count", 1L).forGetter(CountedIngredient::count)
+            Codec.LONG.optionalFieldOf("count", 1L).forGetter(CountedIngredient::count),
+            Codec.BOOL.optionalFieldOf("consumed", true).forGetter(CountedIngredient::consumed)
     ).apply(instance, CountedIngredient::new));
 }

@@ -1,0 +1,32 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    "#O#",
+    "GCG",
+    "#O#"
+  ],
+  "key": {
+    "#": {
+      "item": "useless_mod:useless_ingot_tier_3"
+    },
+    "O": {
+      "item": "useless_mod:useless_glass_tier_3"
+    },
+    "G": {
+      "item": "useless_mod:useless_gear_tier_3"
+    },
+    "C": {
+      "item": "useless_mod:useless_integral_component_tier_2"
+    }
+  },
+  "result": {
+    "item": "useless_mod:useless_integral_component_tier_3",
+    "count": 1
+  },
+  "conditions": [
+    {
+      "type": "forge:mod_loaded",
+      "modid": "thermal"
+    }
+  ]
+}

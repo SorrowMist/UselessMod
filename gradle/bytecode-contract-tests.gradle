@@ -1,8 +1,8 @@
 // Compare release mixin signatures with the pinned native AE2 and AdvancedAE bytecode.
 configurations { contractNative { transitive = false } }
 dependencies {
-    contractNative 'maven.modrinth:XxWD5pD3:Zfyso1sP'
-    contractNative 'maven.modrinth:rxYaglEe:orFPvySe'
+    contractNative 'maven.modrinth:XxWD5pD3:jYgSnxye'
+    contractNative 'maven.modrinth:rxYaglEe:d83Wdhdn'
 }
 def contractInputs = layout.buildDirectory.file('contract-inputs.json')
 tasks.register('writeContractInputs') {

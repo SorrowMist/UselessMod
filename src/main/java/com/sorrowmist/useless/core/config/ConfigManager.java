@@ -109,6 +109,10 @@ public class ConfigManager {
     private static final ForgeConfigSpec.IntValue STAFFLINK_IDLE_BACKOFF_CAP;
 
     // 万象炉配方转换配置
+    private static final ForgeConfigSpec.BooleanValue ENABLE_THERMAL_RECIPE_CONVERSION;
+    private static final ForgeConfigSpec.BooleanValue ENABLE_BLOOD_MAGIC_RECIPE_CONVERSION;
+    private static final ForgeConfigSpec.BooleanValue ENABLE_EMBERS_RECIPE_CONVERSION;
+    private static final ForgeConfigSpec.BooleanValue ENABLE_LEGACY_METALLURGIC_RECIPE_CONVERSION;
     private static final ForgeConfigSpec.BooleanValue ENABLE_CRAFTING_RECIPE_CONVERSION;
     private static final ForgeConfigSpec.BooleanValue ENABLE_SMELTING_RECIPE_CONVERSION;
     private static final ForgeConfigSpec.BooleanValue ENABLE_BREWING_RECIPE_CONVERSION;
@@ -705,6 +709,8 @@ public class ConfigManager {
                 "enable_appmek_recipe_conversion", true);
         ENABLE_MEKANISM_GENERATORS_RECIPE_CONVERSION = defineRecipeConversionOption(
                 "enable_mekanism_generators_recipe_conversion", true);
+        ENABLE_LEGACY_METALLURGIC_RECIPE_CONVERSION = defineRecipeConversionOption(
+                "enable_legacy_metallurgic_item_recipe_conversion", false);
         ENABLE_MEKANISM_RECIPE_CONVERSION = defineRecipeConversionOption(
                 "enable_mekanism_recipe_conversion", true);
         COMMON_BUILDER.pop();
@@ -761,6 +767,12 @@ public class ConfigManager {
                 "enable_hostilenetworks_recipe_conversion", true);
         ENABLE_IMMERSIVE_ENGINEERING_RECIPE_CONVERSION = defineRecipeConversionOption(
                 "enable_immersiveengineering_recipe_conversion", true);
+        ENABLE_THERMAL_RECIPE_CONVERSION = defineRecipeConversionOption(
+                "enable_thermal_recipe_conversion", true);
+        ENABLE_BLOOD_MAGIC_RECIPE_CONVERSION = defineRecipeConversionOption(
+                "enable_blood_magic_recipe_conversion", true);
+        ENABLE_EMBERS_RECIPE_CONVERSION = defineRecipeConversionOption(
+                "enable_embers_recipe_conversion", true);
         ENABLE_INDUSTRIAL_FOREGOING_RECIPE_CONVERSION = defineRecipeConversionOption(
                 "enable_industrial_foregoing_recipe_conversion", true);
         ENABLE_IRONS_SPELLBOOKS_RECIPE_CONVERSION = defineRecipeConversionOption(
@@ -792,6 +804,10 @@ public class ConfigManager {
         COMMON_BUILDER.pop();
 
         RECIPE_CONVERSION_OPTIONS = Map.ofEntries(
+                Map.entry("thermal", ENABLE_THERMAL_RECIPE_CONVERSION),
+                Map.entry("bloodmagic", ENABLE_BLOOD_MAGIC_RECIPE_CONVERSION),
+                Map.entry("embers", ENABLE_EMBERS_RECIPE_CONVERSION),
+                Map.entry("mekanism_legacy_items", ENABLE_LEGACY_METALLURGIC_RECIPE_CONVERSION),
                 Map.entry("actuallyadditions", ENABLE_ACTUALLY_ADDITIONS_RECIPE_CONVERSION),
                 Map.entry("advanced_ae", ENABLE_ADVANCED_AE_RECIPE_CONVERSION),
                 Map.entry("ae2", ENABLE_AE2_RECIPE_CONVERSION),
@@ -855,6 +871,7 @@ public class ConfigManager {
         COMMON_BUILDER.pop();
         COMMON_BUILDER.pop();
 
+        com.sorrowmist.useless.core.config.ThermalConfig.define(COMMON_BUILDER);
         COMMON_SPEC = COMMON_BUILDER.build();
         CLIENT_SPEC = CLIENT_BUILDER.build();
         SERVER_SPEC = SERVER_BUILDER.build();

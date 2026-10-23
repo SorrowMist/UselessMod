@@ -887,7 +887,12 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
     public void bindExternalInventory(@Nullable ExternalInventoryReference requested,
                                       @Nullable CompoundTag legacyInventory,
                                       HolderLookup.Provider registries) {
-        if (externalInventoryLoaded || level == null || level.isClientSide) return;
+        if (level == null || level.isClientSide) return;
+        if (externalInventoryLoaded) {
+            if (requested == null || requested.equals(inventoryReference)) return;
+            // Forge may call onLoad before setPlacedBy supplies the portable inventory reference.
+            ExternalInventoryStore.release(level, worldPosition, inventoryReference);
+        }
         inventoryReference = ExternalInventoryStore.bindAt(
                 level, ExternalInventoryKind.FURNACE, requested, worldPosition,
                 itemHandler, legacyInventory, registries);

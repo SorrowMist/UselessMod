@@ -65,7 +65,7 @@ class DependencyMetadataTest {
                 }
             }
         }
-        assertEquals(41, checked.size(), "All compiled mod metadata must be inspected");
+        assertEquals(48, checked.size(), "All compiled mod metadata must be inspected");
     }
 
     @Test void obsoleteApisAreRejectedButTheUpdatedPackVersionsRemainAllowed() throws Exception {

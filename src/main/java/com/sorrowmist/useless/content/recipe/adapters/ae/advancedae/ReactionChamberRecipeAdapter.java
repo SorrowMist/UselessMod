@@ -17,7 +17,7 @@ import net.pedroksl.advanced_ae.common.definitions.AAEBlocks;
 import net.pedroksl.advanced_ae.recipes.ReactionChamberRecipe;
 import java.util.*;
 
-/** AdvancedAE 1.2 uses its own ingredient classes; its fluid predicate ignores NBT. */
+/** AdvancedAE 1.3 uses AE2AddonLib ingredients; its fluid predicate ignores NBT. */
 public class ReactionChamberRecipeAdapter implements IRecipeAdapter<ReactionChamberRecipe> {
     @Override public Class<ReactionChamberRecipe> getRecipeClass() { return ReactionChamberRecipe.class; }
     @Override public ItemStack getMoldItem() { return new ItemStack(AAEBlocks.REACTION_CHAMBER.block()); }

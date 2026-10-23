@@ -1204,7 +1204,15 @@ public final class AdvancedAlloyFurnaceAeManager {
         if (manualOperations <= 0L) {
             return false;
         }
-        List<GenericStack> unitOutputs = AlloyFurnaceBigIntegerCrafting.unitOutputs(recipe, manualOperations);
+        List<GenericStack> prototypeKeys = new ArrayList<>();
+        for (KeyCounter counter : unitPrototype) {
+            for (var entry : counter) prototypeKeys.add(new GenericStack(entry.getKey(), entry.getLongValue()));
+        }
+        var retained = com.sorrowmist.useless.content.recipe.RetainedRecipeInputs.remainders(
+                recipe, List.of(), prototypeKeys, manualOperations);
+        if (retained == null) return false;
+        List<GenericStack> unitOutputs = new ArrayList<>(AlloyFurnaceBigIntegerCrafting.unitOutputs(recipe, manualOperations));
+        unitOutputs.addAll(retained);
         if (unitOutputs.isEmpty()) {
             return false;
         }

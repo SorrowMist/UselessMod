@@ -1,6 +1,7 @@
 package com.sorrowmist.useless.network;
 
 import com.sorrowmist.useless.UselessMod;
+import com.sorrowmist.useless.content.menus.FurnaceMenuAccess;
 import com.sorrowmist.useless.content.blockentities.AdvancedAlloyFurnaceBlockEntity;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.FriendlyByteBuf;
@@ -44,7 +45,7 @@ public class TankClearPacket implements CustomPacketPayload {
     public static void handle(TankClearPacket msg, IPayloadContext ctx) {
         ctx.enqueueWork(() -> {
             ServerPlayer player = (ServerPlayer) ctx.player();
-            if (player == null) return;
+            if (!FurnaceMenuAccess.canUse(player, msg.pos)) return;
 
             BlockEntity be = player.level().getBlockEntity(msg.pos);
             if (be instanceof AdvancedAlloyFurnaceBlockEntity furnace) {

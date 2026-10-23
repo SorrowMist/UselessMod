@@ -1,6 +1,6 @@
 package com.sorrowmist.useless.content.recipe.adapters.mekanism;
 
-import com.jerry.mekmm.api.recipes.MoreMachineRecipeTypes;
+import com.jerry.mekmm.common.recipe.MoreMachineRecipeType;
 import com.jerry.mekmm.api.recipes.RecyclerRecipe;
 import com.jerry.mekmm.common.config.MoreMachineConfig;
 import com.jerry.mekmm.common.registries.MoreMachineBlocks;
@@ -29,7 +29,7 @@ public final class RecyclerRecipeAdapter extends MekanismSyntheticRecipeAdapter 
 
     @Override
     public @Nullable ItemStack getMoldItem() {
-        return new ItemStack(MoreMachineBlocks.RECYCLER.get());
+        return new ItemStack(MoreMachineBlocks.RECYCLER.getBlock());
     }
 
     @Override
@@ -40,7 +40,7 @@ public final class RecyclerRecipeAdapter extends MekanismSyntheticRecipeAdapter 
 
         List<ItemStack> outputs = new ArrayList<>();
         for (RecipeHolder<RecyclerRecipe> holder : com.sorrowmist.useless.compat.forge1201.recipe.RecipeManagerAccess.<mekanism.api.inventory.IgnoredIInventory,RecyclerRecipe>getAllRecipesFor(level.getRecipeManager(),
-                MoreMachineRecipeTypes.TYPE_RECYCLER.value())) {
+                MoreMachineRecipeType.RECYCLING.get())) {
             RecyclerRecipe source = holder.value();
             if (source == null || source.isIncomplete() || source.getOutputChance() <= 0) {
                 continue;
@@ -79,8 +79,8 @@ public final class RecyclerRecipeAdapter extends MekanismSyntheticRecipeAdapter 
     }
 
     private static long energyCost() {
-        return MekanismChemicalRecipeSupport.saturatingMultiply(
-                MoreMachineConfig.usage.recycler.get(), PROCESS_TICKS);
+        return MekanismChemicalRecipeSupport.energyCost(
+                PROCESS_TICKS, 1, MoreMachineConfig.usage.recycler.get());
     }
 
     private static boolean containsOutput(List<ItemStack> outputs, ItemStack candidate) {

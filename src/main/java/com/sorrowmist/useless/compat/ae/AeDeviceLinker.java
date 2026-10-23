@@ -1,6 +1,5 @@
 package com.sorrowmist.useless.compat.ae;
 
-import appeng.capabilities.Capabilities;
 import appeng.api.networking.GridHelper;
 import appeng.api.networking.IGrid;
 import appeng.api.networking.IGridConnection;
@@ -60,7 +59,7 @@ public final class AeDeviceLinker {
         if (!ModList.get().isLoaded("ae2")) {
             return false;
         }
-        return com.sorrowmist.useless.compat.forge1201.capability.CapabilityAccess.get(level, appeng.capabilities.Capabilities.IN_WORLD_GRID_NODE_HOST, pos, null) != null;
+        return AeNetworks.host(level, pos) != null;
     }
 
     /**
@@ -89,8 +88,7 @@ public final class AeDeviceLinker {
         // 而且只会拆「我们自己建的那条非空间连接」：线缆连接和其它模组的无线连接都原样保留。
         if (data.contains(link)) {
             IGridNode accessNode = resolveAccessNode(level, bound);
-            IInWorldGridNodeHost host = com.sorrowmist.useless.compat.forge1201.capability.CapabilityAccess.get(level,
-                    appeng.capabilities.Capabilities.IN_WORLD_GRID_NODE_HOST, machinePos, null);
+            IInWorldGridNodeHost host = AeNetworks.host(level, machinePos);
             IGridNode machineNode = host == null ? null : resolveNode(host);
             if (accessNode != null && machineNode != null) {
                 destroyLink(accessNode, machineNode);
@@ -106,8 +104,7 @@ public final class AeDeviceLinker {
             return;
         }
 
-        IInWorldGridNodeHost host = com.sorrowmist.useless.compat.forge1201.capability.CapabilityAccess.get(level,
-                appeng.capabilities.Capabilities.IN_WORLD_GRID_NODE_HOST, machinePos, null);
+        IInWorldGridNodeHost host = AeNetworks.host(level, machinePos);
         IGridNode machineNode = host == null ? null : resolveNode(host);
         if (machineNode == null) {
             notify(player, "gui.useless_mod.ae_connect.not_ready", ChatFormatting.YELLOW);
@@ -239,8 +236,7 @@ public final class AeDeviceLinker {
                     continue;
                 }
 
-                IInWorldGridNodeHost host = com.sorrowmist.useless.compat.forge1201.capability.CapabilityAccess.get(machineLevel,
-                        appeng.capabilities.Capabilities.IN_WORLD_GRID_NODE_HOST, link.machine(), null);
+                IInWorldGridNodeHost host = AeNetworks.host(machineLevel, link.machine());
                 if (host == null) {
                     data.removeByMachine(link.machineDimension(), link.machine());
                     continue;

@@ -1,0 +1,18 @@
+{
+  "required": true,
+  "package": "com.sorrowmist.useless.mixin.thermal",
+  "plugin": "com.sorrowmist.useless.compat.thermal.ThermalMixinPlugin",
+  "compatibilityLevel": "JAVA_17",
+  "mixins": [
+    "AugmentableBlockEntityMixin",
+    "ItemStorageCoFHMixin",
+    "MachineBlockEntityMixin",
+    "Reconfigurable4WayBlockEntityMixin",
+    "ThermalAugmentRulesMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  },
+  "refmap": "useless_mod.refmap.json",
+  "minVersion": "0.8"
+}

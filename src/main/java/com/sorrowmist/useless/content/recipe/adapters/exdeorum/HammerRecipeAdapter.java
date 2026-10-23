@@ -1,6 +1,7 @@
 package com.sorrowmist.useless.content.recipe.adapters.exdeorum;
 
 import com.sorrowmist.useless.api.enums.AlloyFurnaceMode;
+import appeng.api.stacks.AEKey;
 import com.sorrowmist.useless.content.recipe.AdapterUtils;
 import com.sorrowmist.useless.content.recipe.AdvancedAlloyFurnaceRecipe;
 import com.sorrowmist.useless.content.recipe.CountedIngredient;
@@ -11,12 +12,14 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.crafting.Ingredient;
 import com.sorrowmist.useless.compat.forge1201.recipe.RecipeHolder;
 import net.minecraft.world.level.Level;
+import net.minecraftforge.fluids.FluidStack;
 import org.jetbrains.annotations.Nullable;
 import thedarkcolour.exdeorum.recipe.hammer.CompressedHammerRecipe;
 import thedarkcolour.exdeorum.recipe.hammer.HammerRecipe;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalDouble;
 
@@ -64,6 +67,25 @@ public final class HammerRecipeAdapter implements IRecipeAdapter<HammerSynthetic
     public boolean matchesMold(@Nullable ItemStack mold) {
         return ExDeorumRecipeAdapterUtils.isHammer(mold)
                 || ExDeorumRecipeAdapterUtils.isCompressedHammer(mold);
+    }
+
+    @Override
+    public List<RecipeHolder<HammerSyntheticRecipe>> findMatchingRecipes(
+            Level level, Map<Ingredient, Long> mergedInputs, Map<FluidStack, Long> mergedFluids,
+            Map<AEKey, Long> mergedKeys, @Nullable ItemStack mold) {
+        if (level == null || !matchesMold(mold)) return List.of();
+
+        List<RecipeHolder<HammerSyntheticRecipe>> matches = new ArrayList<>();
+        // Generated viewer entries also need an explicit machine lookup, like the other synthetic adapters.
+        for (RecipeHolder<HammerSyntheticRecipe> holder : getGeneratedRecipes(level)) {
+            AdvancedAlloyFurnaceRecipe recipe = holder.value().convertedRecipe();
+            if (AdapterUtils.matchesMold(recipe.mold(), mold)
+                    && ExDeorumRecipeAdapterUtils.matchesItems(recipe.inputs(), mergedInputs, null)
+                    && ExDeorumRecipeAdapterUtils.matchesFluids(recipe.inputFluids(), mergedFluids)) {
+                matches.add(holder);
+            }
+        }
+        return List.copyOf(matches);
     }
 
     @Override

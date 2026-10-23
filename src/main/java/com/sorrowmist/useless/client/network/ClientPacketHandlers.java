@@ -44,6 +44,27 @@ import org.jetbrains.annotations.Nullable;
  * 仍需加载它们。参数一律使用公共的载荷类型。
  */
 public final class ClientPacketHandlers {
+    public static void handleFurnaceMenuSync(com.sorrowmist.useless.network.FurnaceMenuSyncPacket packet) {
+        var player = Minecraft.getInstance().player;
+        if (player == null || player.containerMenu.containerId != packet.containerId()) return;
+        var menu = player.containerMenu;
+        com.sorrowmist.useless.content.menus.FurnaceMenuSynchronizer synchronizer;
+        if (menu instanceof com.sorrowmist.useless.content.menus.AdvancedAlloyFurnaceMenu furnace) {
+            synchronizer = furnace.getFurnaceSynchronizer();
+        } else if (menu instanceof MultiblockAlloyFurnaceMenu furnace) {
+            synchronizer = furnace.getFurnaceSynchronizer();
+        } else if (menu instanceof com.sorrowmist.useless.content.menus.PagedRecoverableMenu furnace) {
+            synchronizer = furnace.getFurnaceSynchronizer();
+        } else {
+            return;
+        }
+        if (!packet.slots().isEmpty() && packet.slots().size() != menu.slots.size()) return;
+        // Restore paging first so the slot snapshot is written into the selected page.
+        if (!synchronizer.applyData(packet.data())) return;
+        if (!packet.slots().isEmpty()) menu.initializeContents(packet.stateId(), packet.slots(), packet.carried());
+        else menu.setCarried(packet.carried());
+    }
+
     private ClientPacketHandlers() {}
 
     /** 同步被保护玩家的血量与状态（抑制死亡与无敌帧，维持存活表现）。 */

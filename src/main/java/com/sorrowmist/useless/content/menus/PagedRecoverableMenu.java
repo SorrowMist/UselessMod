@@ -29,6 +29,16 @@ public class PagedRecoverableMenu extends AbstractContainerMenu {
     private final RecoverableItemStackHandler inventory;
     private final BlockPos blockPos;
     private final Player player;
+    private final FurnaceMenuSynchronizer furnaceSync = new FurnaceMenuSynchronizer();
+
+    public FurnaceMenuSynchronizer getFurnaceSynchronizer() {
+        return furnaceSync;
+    }
+
+    protected void addSyncedDataSlots(ContainerData data) {
+        addDataSlots(data);
+        furnaceSync.addData(data);
+    }
     private final boolean clientSide;
     @Nullable
     private final PagedMenuPageMemory pageMemory;
@@ -119,7 +129,7 @@ public class PagedRecoverableMenu extends AbstractContainerMenu {
         for (int column = 0; column < 9; column++) {
             addSlot(new Slot(playerInventory, column, hotbarX + column * 18, hotbarY));
         }
-        addDataSlots(pageData);
+        addSyncedDataSlots(pageData);
     }
 
     public BlockPos getBlockPos() {
@@ -220,6 +230,9 @@ public class PagedRecoverableMenu extends AbstractContainerMenu {
             }
         }
         super.broadcastChanges();
+        if (player instanceof net.minecraft.server.level.ServerPlayer serverPlayer) {
+            furnaceSync.broadcast(this, serverPlayer);
+        }
     }
 
     private void rememberPage() {

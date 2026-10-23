@@ -1308,5 +1308,18 @@
   "commands.useless_mod.patterns.repair.no_machines": "This network has no powered omniversal furnaces or ME pattern assemblies, so there is nothing to repair",
   "commands.useless_mod.patterns.repair.summary": "Scanned %s omniversal patterns, found %s invalid; repaired %s, %s could not be repaired (recipe removed or ambiguous).",
   "commands.useless_mod.patterns.repair.summary.preview": "Scanned %s omniversal patterns, found %s invalid; %s are repairable and %s could not be repaired (recipe removed or ambiguous). This was a preview; nothing was written back.",
-  "commands.useless_mod.patterns.repair.detail": "Could not repair: %s, bound recipe %s"
+  "commands.useless_mod.patterns.repair.detail": "Could not repair: %s, bound recipe %s",
+  "item.useless_mod.useless_integral_component_tier_1": "Useless Integral Component Tier 1",
+  "item.useless_mod.useless_integral_component_tier_2": "Useless Integral Component Tier 2",
+  "item.useless_mod.useless_integral_component_tier_3": "Useless Integral Component Tier 3",
+  "item.useless_mod.useless_integral_component_tier_4": "Useless Integral Component Tier 4",
+  "item.useless_mod.useless_integral_component_tier_5": "Useless Integral Component Tier 5",
+  "item.useless_mod.useless_integral_component_tier_6": "Useless Integral Component Tier 6",
+  "item.useless_mod.useless_integral_component_tier_7": "Useless Integral Component Tier 7",
+  "item.useless_mod.useless_integral_component_tier_8": "Useless Integral Component Tier 8",
+  "item.useless_mod.useless_integral_component_tier_9": "Useless Integral Component Tier 9",
+  "useless_mod.augment.upgrade": "Upgrade Augment",
+  "item.useless_mod.augment_parallel_1": "Parallel Processing Augment I",
+  "item.useless_mod.augment_parallel_2": "Parallel Processing Augment II",
+  "item.useless_mod.augment_parallel_3": "Parallel Processing Augment III"
 }

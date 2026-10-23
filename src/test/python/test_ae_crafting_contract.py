@@ -51,6 +51,11 @@ def load(jar, name):
 
 
 class AeCraftingMixinContractTest(unittest.TestCase):
+    def test_pinned_library_matches_native_advancedae_bundle(self):
+        with zipfile.ZipFile(self.native['advancedae']) as archive:
+            self.assertEqual(archive.read('META-INF/jarjar/ae2addonlib-1.0.4-1.20.1.jar'),
+                             (ROOT / 'build/compat-repository/ae2addonlib-1.0.4-1.20.1.jar').read_bytes())
+
     @classmethod
     def setUpClass(cls):
         version = re.search(r'(?m)^mod_version=(.+)$', (ROOT / 'gradle.properties').read_text(encoding='utf-8'))[1].strip()

@@ -1,6 +1,7 @@
 package com.sorrowmist.useless.client.gui;
 
 import com.sorrowmist.useless.api.enums.RedstoneControlMode;
+import com.sorrowmist.useless.content.blockentities.multiblock.MufflerHatchBlockEntity;
 import com.sorrowmist.useless.content.blocks.multiblock.MultiblockAlloyFurnaceCoreBlock;
 import com.sorrowmist.useless.content.blocks.multiblock.OmniversalAlloyFurnaceStructure;
 import com.sorrowmist.useless.content.blocks.multiblock.UselessCoilBlock;
@@ -76,6 +77,10 @@ public final class MultiblockAlloyFurnaceScreen extends AbstractContainerScreen<
     private boolean energyLimitDirty;
     private boolean energyLimitFieldWasFocused;
     private int taskPage;
+    /** 状态行当前的悬停提示；状态正常时为空，此时不显示任何提示。 */
+    private List<Component> stateTooltip = List.of();
+    /** 状态行文字宽度，用于判定鼠标是否悬停在状态行上。 */
+    private int stateTooltipWidth;
     private Map<Long, OmniversalAlloyFurnaceStructure.Mismatch> liveMismatches = Map.of();
     private Direction liveFacing = Direction.NORTH;
 
@@ -276,16 +281,31 @@ public final class MultiblockAlloyFurnaceScreen extends AbstractContainerScreen<
         boolean mufflerObstructed = structureValid && menu.isMufflerObstructed();
         long maintenanceLevel = menu.getMaintenanceLevel();
         boolean maintenanceOverdue = structureValid && MaintenanceWearRules.isOverdue(maintenanceLevel);
-        int stateColor = !structureValid || mufflerObstructed || maintenanceOverdue
+        boolean ashOutputBlocked = structureValid && menu.isAshOutputBlocked();
+        int stateColor = !structureValid || mufflerObstructed || maintenanceOverdue || ashOutputBlocked
                 ? MachineScreenStyle.ERROR_TEXT_COLOR
                 : 0xFF2E7D32;
         Component stateText;
+        // 异常状态附带一行灰字说明，鼠标悬停状态行时显示，给出恢复方法。
+        stateTooltip = List.of();
         if (mufflerObstructed) {
             stateText = Component.translatable(
                     "gui.useless_mod.multiblock_alloy_furnace.muffler_obstructed");
+            stateTooltip = List.of(Component.translatable(
+                    "gui.useless_mod.multiblock_alloy_furnace.muffler_obstructed.desc",
+                    MufflerHatchBlockEntity.EXHAUST_HEIGHT).withStyle(ChatFormatting.GRAY));
         } else if (maintenanceOverdue) {
             stateText = Component.translatable(
                     "gui.useless_mod.multiblock_alloy_furnace.maintenance.overdue");
+            stateTooltip = List.of(Component.translatable(
+                    "gui.useless_mod.multiblock_alloy_furnace.maintenance.overdue.desc")
+                    .withStyle(ChatFormatting.GRAY));
+        } else if (ashOutputBlocked) {
+            stateText = Component.translatable(
+                    "gui.useless_mod.multiblock_alloy_furnace.ash_full");
+            stateTooltip = List.of(Component.translatable(
+                    "gui.useless_mod.multiblock_alloy_furnace.ash_full.desc")
+                    .withStyle(ChatFormatting.GRAY));
         } else if (structureValid) {
             stateText = Component.translatable("gui.useless_mod.multiblock_alloy_furnace.formed");
         } else if (liveValidation != null && !liveValidation.mismatches().isEmpty()) {
@@ -295,10 +315,11 @@ public final class MultiblockAlloyFurnaceScreen extends AbstractContainerScreen<
         } else {
             stateText = Component.translatable("gui.useless_mod.multiblock_alloy_furnace.invalid");
         }
+        stateTooltipWidth = font.width(stateText);
         graphics.drawString(font, stateText, 8, 22, stateColor, false);
         // 维护度只在结构正常时挤在状态行右侧：这一行以状态文案为主，出错时文案本身更长，
         // 再叠加数字会互相覆盖，因此异常状态只由状态文案表达。
-        if (structureValid && !mufflerObstructed && !maintenanceOverdue) {
+        if (structureValid && !mufflerObstructed && !maintenanceOverdue && !ashOutputBlocked) {
             int levelColor = MaintenanceWearRules.isWarning(maintenanceLevel)
                     ? MachineScreenStyle.ERROR_TEXT_COLOR
                     : MachineScreenStyle.MUTED_TEXT_COLOR;
@@ -488,6 +509,7 @@ public final class MultiblockAlloyFurnaceScreen extends AbstractContainerScreen<
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
         super.render(graphics, mouseX, mouseY, partialTick);
         renderTooltip(graphics, mouseX, mouseY);
+        renderStateHint(graphics, mouseX, mouseY);
         if (isHovering(ENERGY_BAR_X, ENERGY_BAR_Y,
                 ENERGY_BAR_WIDTH, ENERGY_BAR_HEIGHT, mouseX, mouseY)) {
             graphics.renderTooltip(font, Component.translatable(
@@ -507,6 +529,18 @@ public final class MultiblockAlloyFurnaceScreen extends AbstractContainerScreen<
         }
         renderControlTooltips(graphics, mouseX, mouseY);
         renderStructureTooltip(graphics, mouseX, mouseY);
+    }
+
+    /**
+     * 悬停状态行时显示恢复提示。
+     *
+     * <p>状态行文案只给出结论，恢复方法放在悬停提示里：{@link #stateTooltip} 在状态正常时为空，
+     * 此时不显示任何内容，避免正常运行也弹出提示。</p>
+     */
+    private void renderStateHint(GuiGraphics graphics, int mouseX, int mouseY) {
+        if (stateTooltip.isEmpty() || stateTooltipWidth <= 0) return;
+        if (!isHovering(8, 22, stateTooltipWidth, font.lineHeight, mouseX, mouseY)) return;
+        graphics.renderTooltip(font, stateTooltip, Optional.empty(), mouseX, mouseY);
     }
 
     private void renderControlTooltips(GuiGraphics graphics, int mouseX, int mouseY) {

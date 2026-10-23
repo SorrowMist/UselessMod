@@ -61,6 +61,7 @@ public final class MultiblockAlloyFurnaceMenu extends AbstractContainerMenu {
     public long getAutomaticEnergyLimit() { return join(data.get(9), data.get(10)); }
     public boolean isMufflerObstructed() { return data.get(11) != 0; }
     public long getMaintenanceLevel() { return join(data.get(12), data.get(13)); }
+    public boolean isAshOutputBlocked() { return data.get(14) != 0; }
     @Nullable public MultiblockAlloyFurnaceCoreBlockEntity getCore() { return core; }
 
     public List<AETaskProgressPacket.TaskProgressData> getTaskProgress() {

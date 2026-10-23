@@ -89,12 +89,12 @@ import java.util.concurrent.locks.ReentrantLock;
 public final class MultiblockAlloyFurnaceCoreBlockEntity extends BlockEntity implements AlloyFurnaceAeHost, MenuProvider {
     private static final int SAFETY_REVALIDATION_TICKS = 40;
     /**
-     * 同步给菜单的数据项数：原有 12 项 + 维护度的低/高 32 位。
+     * 同步给菜单的数据项数：原有 12 项 + 维护度的低/高 32 位 + 灰烬满阻塞标志。
      *
-     * <p>维护度需要显示在核心界面上，而方块实体的同步包只在方块更新时下发，
+     * <p>维护度与灰烬状态都需要显示在核心界面上，而方块实体的同步包只在方块更新时下发，
      * 因此走与能量、线圈档位相同的 {@link ContainerData} 通道。</p>
      */
-    public static final int MENU_DATA_COUNT = 14;
+    public static final int MENU_DATA_COUNT = 15;
     private static final ItemStackHandler EMPTY_ITEMS = new ItemStackHandler(0);
     private static final FluidTank[] EMPTY_TANKS = new FluidTank[0];
 
@@ -128,6 +128,8 @@ public final class MultiblockAlloyFurnaceCoreBlockEntity extends BlockEntity imp
     private BlockPos mufflerHatchPos;
     /** 消声仓上方排烟空间是否被占据。每 tick 重新判定，不持久化。 */
     private boolean mufflerObstructed;
+    /** 消声仓灰烬已堆满且配置为阻塞工作。每 tick 重新判定，不持久化。 */
+    private boolean ashOutputBlocked;
     /**
      * 结构内的维护仓是否为自动维护仓。结构校验时判定一次，供维护度累加入口短路。
      *
@@ -167,6 +169,7 @@ public final class MultiblockAlloyFurnaceCoreBlockEntity extends BlockEntity imp
                 case 11 -> mufflerObstructed ? 1 : 0;
                 case 12 -> (int) maintenanceLevel;
                 case 13 -> (int) (maintenanceLevel >>> 32);
+                case 14 -> ashOutputBlocked ? 1 : 0;
                 default -> 0;
             };
         }
@@ -187,6 +190,8 @@ public final class MultiblockAlloyFurnaceCoreBlockEntity extends BlockEntity imp
         }
         // 排烟空间不属于结构本身，其上方方块变化也不会触发结构重校验，故逐 tick 判定。
         mufflerObstructed = isMufflerExhaustBlocked();
+        // 灰烬可随时被玩家或管道取走，阻塞状态同样逐 tick 重算，并同步给界面与 Jade。
+        ashOutputBlocked = computeAshOutputBlocked();
         if (!deferredTasksLoaded) {
             // 目录未就绪时保持未加载状态，下一 tick 重试；否则完好样板会被误判失效并退还材料。
             deferredTasksLoaded = aeManager.loadDeferredTasks();
@@ -630,15 +635,20 @@ public final class MultiblockAlloyFurnaceCoreBlockEntity extends BlockEntity imp
     }
 
     /**
-     * 消声仓灰烬是否已堆满且配置为阻塞工作。
+     * 计算消声仓灰烬是否已堆满且配置为阻塞工作。
      *
-     * <p>仅在消声仓仍归属于本核心时判定；灰烬可随时被玩家取走，故与排烟受阻一样逐 tick 重新计算，
+     * <p>仅在消声仓仍归属于本核心时判定；灰烬可随时被取走，故与排烟受阻一样逐 tick 重新计算，
      * 不写入 NBT。配置关闭时该条件恒为 false，灰烬继续堆满即停产。</p>
      */
-    private boolean isAshOutputBlocked() {
+    private boolean computeAshOutputBlocked() {
         if (!ConfigManager.isAshFullBlockingWork()) return false;
         MufflerHatchBlockEntity muffler = getMufflerHatch();
         return muffler != null && muffler.isAshFull();
+    }
+
+    /** 灰烬堆满导致停机的当前状态，供任务可用性与界面读取。 */
+    public boolean isAshOutputBlocked() {
+        return ashOutputBlocked;
     }
 
     /**

@@ -1,0 +1,43 @@
+{
+  "type": "forge:conditional",
+  "recipes": [
+    {
+      "conditions": [
+        {
+          "type": "forge:mod_loaded",
+          "modid": "thermal_foundation"
+        },
+        {
+          "type": "forge:item_exists",
+          "item": "thermal:netherite_plate"
+        }
+      ],
+      "recipe": {
+        "type": "useless_mod:advanced_alloy_furnace",
+        "ingredients": [
+          {
+            "ingredient": {
+              "tag": "forge:ingots/netherite"
+            },
+            "count": 64
+          }
+        ],
+        "mold": {
+          "item": "useless_mod:metal_mold_plate"
+        },
+        "catalyst": {
+          "tag": "useless_mod:useless_ingots"
+        },
+        "energy": 64000,
+        "process_time": 40,
+        "outputs": [
+          {
+            "item": "thermal:netherite_plate",
+            "count": 64
+          }
+        ],
+        "catalyst_uses": 1
+      }
+    }
+  ]
+}

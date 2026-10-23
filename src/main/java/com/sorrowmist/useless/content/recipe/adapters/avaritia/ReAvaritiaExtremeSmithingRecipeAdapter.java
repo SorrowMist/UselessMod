@@ -10,7 +10,7 @@ import com.sorrowmist.useless.content.recipe.CountedIngredient;
 import com.sorrowmist.useless.content.recipe.IRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.RecipeSourceIds;
 import com.sorrowmist.useless.content.recipe.adapters.extendedcrafting.ExtendedCraftingAdapterUtils;
-import committee.nova.mods.avaritia.common.crafting.input.ExtremeSmithingRecipeInput;
+import net.minecraft.world.SimpleContainer;
 import committee.nova.mods.avaritia.common.crafting.recipe.ExtremeSmithingRecipe;
 import committee.nova.mods.avaritia.init.registry.ModBlocks;
 import committee.nova.mods.avaritia.init.registry.ModRecipeTypes;
@@ -71,7 +71,7 @@ public final class ReAvaritiaExtremeSmithingRecipeAdapter
         }
 
         if (actualInputs != null && !actualInputs.isEmpty()) {
-            ExtremeSmithingRecipeInput input = resolveInput(holder.value(), actualInputs);
+            SimpleContainer input = resolveInput(holder.value(), actualInputs);
             if (input == null || level == null || !holder.value().matches(input, level)) {
                 return List.of();
             }
@@ -134,7 +134,7 @@ public final class ReAvaritiaExtremeSmithingRecipeAdapter
 
         List<Ingredient> slots;
         try {
-            slots = source.getIngredients();
+            slots = List.of(source.template, source.base, source.additions, source.additions, source.additions);
         } catch (RuntimeException exception) {
             return null;
         }
@@ -164,7 +164,7 @@ public final class ReAvaritiaExtremeSmithingRecipeAdapter
     }
 
     @Nullable
-    private static ExtremeSmithingRecipeInput resolveInput(
+    private static SimpleContainer resolveInput(
             ExtremeSmithingRecipe source, List<ItemStack> actualInputs) {
         List<ItemStack> available = new ArrayList<>();
         for (ItemStack stack : actualInputs) {
@@ -187,8 +187,7 @@ public final class ReAvaritiaExtremeSmithingRecipeAdapter
         if (!assignSlot(0, slots, available, selected)) {
             return null;
         }
-        return new ExtremeSmithingRecipeInput(
-                selected[0], selected[1], selected[2], selected[3], selected[4]);
+        return new SimpleContainer(selected);
     }
 
     private static boolean assignSlot(
@@ -202,8 +201,8 @@ public final class ReAvaritiaExtremeSmithingRecipeAdapter
             if (!ingredient.test(candidate)) {
                 continue;
             }
-            candidate.shrink(1);
             selected[slot] = candidate.copyWithCount(1);
+            candidate.shrink(1);
             if (assignSlot(slot + 1, ingredients, available, selected)) {
                 return true;
             }

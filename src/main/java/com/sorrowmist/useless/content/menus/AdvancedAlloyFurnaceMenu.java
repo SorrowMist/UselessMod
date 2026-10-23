@@ -96,6 +96,20 @@ public class AdvancedAlloyFurnaceMenu extends AEBaseMenu {
 
     private final AdvancedAlloyFurnaceBlockEntity blockEntity;
     private final ContainerData data;
+    private final Player menuPlayer;
+    private final FurnaceMenuSynchronizer furnaceSync = new FurnaceMenuSynchronizer();
+
+    public FurnaceMenuSynchronizer getFurnaceSynchronizer() {
+        return furnaceSync;
+    }
+
+    @Override
+    public void broadcastChanges() {
+        super.broadcastChanges();
+        if (menuPlayer instanceof net.minecraft.server.level.ServerPlayer player) {
+            furnaceSync.broadcast(this, player);
+        }
+    }
 
     public AdvancedAlloyFurnaceMenu(int containerId, Inventory inv, FriendlyByteBuf buf) {
         this(containerId, inv, buf != null ? buf.readBlockPos() : BlockPos.ZERO);
@@ -117,8 +131,10 @@ public class AdvancedAlloyFurnaceMenu extends AEBaseMenu {
                                     ContainerData data) {
         super(ModMenuType.ADVANCED_ALLOY_FURNACE_MENU.get(), containerId, inv, entity);
         this.data = data;
+        this.menuPlayer = inv.player;
         this.blockEntity = entity;
         this.addDataSlots(data);
+        furnaceSync.addData(data);
 
         IItemHandler itemHandler = entity != null ? entity.getItemHandler() : new ItemStackHandler(AdvancedAlloyFurnaceLayout.TOTAL_SLOTS);
         this.addMachineSlots(itemHandler);

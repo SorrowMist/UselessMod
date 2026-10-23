@@ -140,7 +140,7 @@ public final class AlloyFurnaceRecipeFingerprint {
             boolean preserveTags) {
         if (input == null) return "null";
         return safeIngredient(input.ingredient(), registries, normalizeIngredientSemantics, preserveTags)
-                + "#" + input.count();
+                + "#" + input.count() + (input.consumed() ? "" : "#retained");
     }
 
     private static String safeFluidIngredient(

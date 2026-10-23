@@ -81,6 +81,8 @@ public class UselessMod {
         ModPOIs.POI_TYPES.register(modEventBus);
 
         ModCreativeTabs.CREATIVE_TAB.register(modEventBus);
+        OptionalIntegration.call("thermal", "com.sorrowmist.useless.compat.thermal.ThermalItems",
+                "register", Void.class, null, new Class<?>[]{net.minecraftforge.eventbus.api.IEventBus.class}, modEventBus);
 
         modEventBus.addListener(ModNetwork::registerPayloadHandlers);
 

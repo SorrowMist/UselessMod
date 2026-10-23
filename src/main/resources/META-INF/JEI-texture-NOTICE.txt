@@ -1,0 +1,4 @@
+textures/gui/exmachinis_recipe.png is the original JEI gui_vanilla.png from
+jei-1.20.1-forge-15.2.0.27, retained for Ex Machinis 3.0.3 compatibility.
+Source: https://github.com/mezz/JustEnoughItems
+License: MIT (see JEI-texture-LICENSE.txt in this directory).

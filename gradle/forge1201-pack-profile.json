@@ -4,7 +4,7 @@
     "com/sorrowmist/useless/content/recipe/adapters/apothicflux/**",
     "com/sorrowmist/useless/content/recipe/adapters/arsnouveau/**",
     "com/sorrowmist/useless/content/recipe/adapters/astralsorcery/**",
-    "com/sorrowmist/useless/content/recipe/adapters/avaritia/**",
+    "com/sorrowmist/useless/content/recipe/adapters/avaritia/ReAvaritiaSculkCraftingRecipeAdapter.java",
     "com/sorrowmist/useless/content/recipe/adapters/delight/**",
     "com/sorrowmist/useless/content/recipe/adapters/eco/**",
     "com/sorrowmist/useless/content/recipe/adapters/extremereactors/**",
@@ -27,7 +27,6 @@
     "com/sorrowmist/useless/content/recipe/adapters/ae/ae2cs/**",
     "com/sorrowmist/useless/content/recipe/adapters/ae/ae2lt/**",
     "com/sorrowmist/useless/content/recipe/adapters/ae/dataenergistics/**",
-    "com/sorrowmist/useless/content/recipe/adapters/mekanism/mekanismmoremachine/**",
     "com/sorrowmist/useless/compat/apothicflux/**",
     "com/sorrowmist/useless/compat/ars/**",
     "com/sorrowmist/useless/compat/barbequesdelight/**",
@@ -44,7 +43,6 @@
     "com/sorrowmist/useless/compat/itemobliterator/**",
     "com/sorrowmist/useless/compat/kaleidoscope/**",
     "com/sorrowmist/useless/compat/lychee/**",
-    "com/sorrowmist/useless/compat/mekanismmoremachine/**",
     "com/sorrowmist/useless/compat/modernindustrialization/**",
     "com/sorrowmist/useless/compat/neoecoae/NeoEcoCompat.java",
     "com/sorrowmist/useless/compat/neoecoae/NeoEcoDynamicJobAttachment.java",
@@ -70,7 +68,6 @@
     "com/sorrowmist/useless/content/recipe/adapters/industrialforegoing/FluidShapedRecipeAdapter.java",
     "com/sorrowmist/useless/content/recipe/adapters/industrialforegoing/FluidShapelessRecipeAdapter.java",
     "com/sorrowmist/useless/content/recipe/adapters/ae/extendedae/CrystalAssemblerRecipeAdapter.java",
-    "com/sorrowmist/useless/content/recipe/adapters/mekanism/RecyclerRecipeAdapter.java",
     "com/sorrowmist/useless/content/recipe/adapters/enderio/VatFermentingRecipeAdapter.java",
     "com/sorrowmist/useless/compat/ae/AeSourceCompat.java",
     "com/sorrowmist/useless/compat/ae/AePressureCompat.java",
@@ -88,9 +85,6 @@
       "com/sorrowmist/useless/content/recipe/adapters/industrialforegoing/FluidShapedRecipeAdapter.java",
       "com/sorrowmist/useless/content/recipe/adapters/industrialforegoing/FluidShapelessRecipeAdapter.java",
       "com/sorrowmist/useless/content/recipe/adapters/industrialforegoing/ExtraUpgradesCraftingRecipeAdapterSupport.java"
-    ],
-    "mekmm": [
-      "com/sorrowmist/useless/content/recipe/adapters/mekanism/RecyclerRecipeAdapter.java"
     ],
     "arseng": [
       "com/sorrowmist/useless/compat/ae/AeSourceCompat.java"

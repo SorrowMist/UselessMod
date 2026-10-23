@@ -10,6 +10,7 @@ import com.sorrowmist.useless.content.recipe.adapters.mekanism.CrusherRecipeAdap
 import com.sorrowmist.useless.content.recipe.adapters.mekanism.EnrichmentChamberRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.mekanism.FluidToFluidRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.mekanism.HeavyWaterRecipeAdapter;
+import com.sorrowmist.useless.content.recipe.adapters.mekanism.MetallurgicItemRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.mekanism.NutritionalLiquifierRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.mekanism.PrecisionSawmillRecipeAdapter;
 import com.sorrowmist.useless.core.config.ConfigManager;
@@ -29,6 +30,10 @@ public final class MekanismRecipeCompatLoader {
         manager.registerAdapter(new NutritionalLiquifierRecipeAdapter(), RecipeSourceIds.MEKANISM);
         manager.registerAdapter(new FluidToFluidRecipeAdapter(), RecipeSourceIds.MEKANISM);
         manager.registerAdapter(new HeavyWaterRecipeAdapter(), RecipeSourceIds.MEKANISM);
+        if (ConfigManager.isRecipeConversionEnabled(RecipeSourceIds.LEGACY_METALLURGIC)) {
+            manager.registerAdapter(new MetallurgicItemRecipeAdapter(),
+                    RecipeSourceIds.LEGACY_METALLURGIC);
+        }
 
         if (ModList.get().isLoaded("appmek")
                 && ConfigManager.isRecipeConversionEnabled(RecipeSourceIds.APP_MEK)) {

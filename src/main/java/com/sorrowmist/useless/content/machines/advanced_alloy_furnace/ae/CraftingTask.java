@@ -738,7 +738,16 @@ public class CraftingTask {
                 }
             }
 
+            var retained = com.sorrowmist.useless.content.recipe.RetainedRecipeInputs.remainders(
+                    recipe, taskInputItems, toGenericStacks(taskInputKeys), craftCount);
+            if (retained == null) {
+                updateWaitingProgress();
+                return false;
+            }
             generatePendingOutputs(craftCount);
+            for (GenericStack remainder : retained) {
+                pendingOutputKeys.add(new KeyAmount(remainder.what(), remainder.amount()));
+            }
             taskInputItems.clear();
             taskInputFluids.clear();
             taskInputKeys.clear();

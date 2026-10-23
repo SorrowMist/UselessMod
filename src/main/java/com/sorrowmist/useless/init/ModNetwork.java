@@ -2,6 +2,7 @@ package com.sorrowmist.useless.init;
 
 import com.sorrowmist.useless.UselessMod;
 import com.sorrowmist.useless.network.AECancelPacket;
+import com.sorrowmist.useless.network.FurnaceMenuSyncPacket;
 import com.sorrowmist.useless.network.AEReturnOutputTogglePacket;
 import com.sorrowmist.useless.network.AETaskProgressPacket;
 import com.sorrowmist.useless.network.AETaskProgressRequestPacket;
@@ -58,7 +59,9 @@ import com.sorrowmist.useless.compat.forge1201.network.RegisterPayloadHandlersEv
 
 public class ModNetwork {
     public static void registerPayloadHandlers(final RegisterPayloadHandlersEvent event) {
-        var registrar = event.registrar(UselessMod.MODID).versioned("17");
+        var registrar = event.registrar(UselessMod.MODID).versioned("17-merged-1");
+        registrar.playToClient(FurnaceMenuSyncPacket.TYPE, FurnaceMenuSyncPacket.STREAM_CODEC,
+                FurnaceMenuSyncPacket::handle);
         registrar.playToServer(BeefToolLayoutRequestPacket.TYPE,
                                BeefToolLayoutRequestPacket.STREAM_CODEC,
                                BeefToolLayoutRequestPacket::handle);

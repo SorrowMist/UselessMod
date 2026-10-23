@@ -1,6 +1,6 @@
 package com.sorrowmist.useless.compat.ae;
 
-import appeng.capabilities.Capabilities;
+import appeng.api.networking.GridHelper;
 import appeng.api.networking.IGrid;
 import appeng.api.networking.IGridNode;
 import appeng.api.networking.IInWorldGridNodeHost;
@@ -24,7 +24,7 @@ import org.jetbrains.annotations.Nullable;
  * <p>早先这里只认 {@code WirelessAccessPointBlockEntity}，于是玩家把 ME 接口、终端、
  * 总线这类方块绑进无线物流、并把资源类型选成 {@code AE_*} 时，端点永远解析成 {@code null}：
  * 方块本身明明就在、也明明挂在网上，却像不存在一样。现在判定改为
- * <b>注册了 AE2 网格节点宿主能力（{@code appeng.capabilities.Capabilities.IN_WORLD_GRID_NODE_HOST}）即可</b>，
+ * <b>由 AE2 的 {@code GridHelper.getNodeHost} 识别为网格节点宿主即可</b>，
  * 与 {@link AeDeviceLinker#isLinkTarget} 同一把尺子，无线访问点只是其中一种。</p>
  *
  * <h2>为什么判定不看「在线」</h2>
@@ -48,14 +48,16 @@ final class AeNetworks {
         return host(level, pos) != null;
     }
 
-    /** 该坐标的网格节点宿主能力；方块不是 AE 设备时为 {@code null}。 */
+    /** 同时识别直接实现宿主接口的 AE2 方块和通过 capability 暴露宿主的附属模组方块。 */
     @Nullable
     static IInWorldGridNodeHost host(Level level, BlockPos pos) {
         if (level == null || pos == null || !level.isLoaded(pos)) {
             return null;
         }
         try {
-            return com.sorrowmist.useless.compat.forge1201.capability.CapabilityAccess.get(level, appeng.capabilities.Capabilities.IN_WORLD_GRID_NODE_HOST, pos, null);
+            var entity = level.getBlockEntity(pos);
+            if (entity == null || entity.isRemoved()) return null;
+            return GridHelper.getNodeHost(level, pos);
         } catch (Throwable notReady) {
             // 能力查询本身不该抛，但方块实体可能正处于替换/卸载的中间态。当作「暂时没有」。
             return null;

@@ -3,7 +3,7 @@ package com.sorrowmist.useless.content.recipe.adapters.mekanism.mekanismmoremach
 import appeng.api.stacks.GenericStack;
 import com.jerry.mekmm.common.config.MoreMachineConfig;
 import com.jerry.mekmm.common.registries.MoreMachineBlocks;
-import com.jerry.mekmm.common.registries.MoreMachineChemicals;
+import com.jerry.mekmm.common.registries.MoreMachineGas;
 import com.sorrowmist.useless.content.recipe.AdvancedAlloyFurnaceRecipe;
 import com.sorrowmist.useless.content.recipe.adapters.mekanism.MekanismChemicalRecipeSupport;
 import com.sorrowmist.useless.content.recipe.adapters.mekanism.MekanismSyntheticRecipe;
@@ -26,7 +26,7 @@ public final class AmbientGasCollectorRecipeAdapter extends MekanismSyntheticRec
 
     @Override
     public @Nullable ItemStack getMoldItem() {
-        return new ItemStack(MoreMachineBlocks.AMBIENT_GAS_COLLECTOR.get());
+        return new ItemStack(MoreMachineBlocks.AMBIENT_GAS_COLLECTOR.getBlock());
     }
 
     @Override
@@ -41,7 +41,7 @@ public final class AmbientGasCollectorRecipeAdapter extends MekanismSyntheticRec
         }
 
         GenericStack output = MekanismChemicalRecipeSupport.key(
-                MoreMachineChemicals.UNSTABLE_DIMENSIONAL_GAS.asStack(gasAmount));
+                MoreMachineGas.UNSTABLE_DIMENSIONAL_GAS.getStack(gasAmount));
         if (output == null) {
             return List.of();
         }
@@ -54,8 +54,8 @@ public final class AmbientGasCollectorRecipeAdapter extends MekanismSyntheticRec
                 List.of(),
                 List.of(),
                 List.of(output),
-                MekanismChemicalRecipeSupport.saturatingMultiply(
-                        MoreMachineConfig.usage.ambientGasCollector.get(), PROCESS_TICKS),
+                MekanismChemicalRecipeSupport.energyCost(
+                        PROCESS_TICKS, 1, MoreMachineConfig.usage.ambientGasCollector.get()),
                 PROCESS_TICKS,
                 getMoldItem());
         return List.of(MekanismChemicalRecipeSupport.syntheticHolder(RECIPE_ID, converted));

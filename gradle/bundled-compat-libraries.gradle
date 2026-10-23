@@ -1,0 +1,36 @@
+// AdvancedAE only publishes this library inside its JarJar. Materialize a local module
+// before resolution so ModDev can remap its Minecraft members instead of using raw SRG bytecode.
+def bundledRepo = layout.buildDirectory.dir('compat-repository').get().asFile
+repositories {
+    exclusiveContent {
+        forRepository { flatDir { dirs bundledRepo } }
+        filter { includeGroup 'bundled' }
+    }
+}
+configurations { advancedAeBundle { transitive = false } }
+dependencies { advancedAeBundle 'maven.modrinth:rxYaglEe:d83Wdhdn' }
+def addonFile = new File(bundledRepo, 'ae2addonlib-1.0.4-1.20.1.jar')
+new java.util.zip.ZipFile(configurations.advancedAeBundle.singleFile).withCloseable { archive ->
+    def bytes = archive.getInputStream(archive.getEntry(
+            'META-INF/jarjar/ae2addonlib-1.0.4-1.20.1.jar')).withCloseable { it.readAllBytes() }
+    if (!addonFile.isFile() || !Arrays.equals(addonFile.bytes, bytes)) {
+        bundledRepo.mkdirs()
+        addonFile.bytes = bytes
+    }
+}
+dependencies { modCompileOnly 'bundled:ae2addonlib:1.0.4-1.20.1' }
+
+// JEI's disk bookmark regression test also exercises the bundled config serializer.
+configurations { jeiBundle { transitive = false } }
+dependencies { jeiBundle 'maven.modrinth:u6dRKJwZ:TrKZlZ0b' }
+def jeiConfig = tasks.register('extractJeiConfigLibrary', Copy) {
+    from({ zipTree(configurations.jeiBundle.singleFile) }) {
+        include 'META-INF/jarjar/mezz_config-1.20.1-forge-0.6.6.jar'
+        eachFile { path = name }
+        includeEmptyDirs = false
+    }
+    into layout.buildDirectory.dir('compat-libs/jei')
+}
+dependencies {
+    portBridgeTestImplementation files(layout.buildDirectory.file('compat-libs/jei/mezz_config-1.20.1-forge-0.6.6.jar')).builtBy(jeiConfig)
+}

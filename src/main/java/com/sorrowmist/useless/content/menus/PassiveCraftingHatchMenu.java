@@ -34,7 +34,7 @@ public final class PassiveCraftingHatchMenu extends PagedRecoverableMenu {
                 ? new SimpleContainerData(PassiveCraftingHatchBlockEntity.MENU_DATA_COUNT)
                 : hatch.getMenuData();
         data = createMenuData(inventory.player.level().isClientSide, liveData);
-        addDataSlots(data);
+        addSyncedDataSlots(data);
         for (int slot = 0; slot < slotStatuses.length; slot++) {
             slotStatuses[slot] = emptyStatus(slot);
         }

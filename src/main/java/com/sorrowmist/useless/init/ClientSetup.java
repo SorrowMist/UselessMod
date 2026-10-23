@@ -143,6 +143,7 @@ public class ClientSetup {
     @SubscribeEvent
     public static void onClientTick(ClientTickEvent event) {
         if (event.phase != net.minecraftforge.event.TickEvent.Phase.END) return;
+        com.sorrowmist.useless.client.gui.FurnaceScreenScaler.update();
         Minecraft minecraft = Minecraft.getInstance();
         Level level = minecraft.level;
         if (level != observedClientLevel) {

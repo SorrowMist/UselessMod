@@ -11,7 +11,9 @@ public final class RecipeTestBootstrap {
     public static synchronized void initialize() {
         if (initialized) return;
         SharedConstants.tryDetectVersion();
-        try (var loading = mockStatic(LoadingModList.class)) {
+        // Network event listeners require Forge's transformer, exercised by the GameTests instead.
+        try (var network = mockStatic(net.minecraftforge.network.NetworkHooks.class);
+             var loading = mockStatic(LoadingModList.class)) {
             var mods = mock(LoadingModList.class);
             when(mods.getModFiles()).thenReturn(List.of());
             loading.when(LoadingModList::get).thenReturn(mods);

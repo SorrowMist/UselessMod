@@ -10,9 +10,9 @@ import com.sorrowmist.useless.content.recipe.CountedIngredient;
 import com.sorrowmist.useless.content.recipe.IRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.RecipeSourceIds;
 import com.sorrowmist.useless.content.recipe.adapters.extendedcrafting.ExtendedCraftingAdapterUtils;
-import committee.nova.mods.avaritia.api.common.crafting.ITierCraftingRecipe;
-import committee.nova.mods.avaritia.api.common.crafting.TierInput;
-import committee.nova.mods.avaritia.common.ingredient.StackIngredient;
+import committee.nova.mods.avaritia.common.crafting.recipe.ITierCraftingRecipe;
+import net.minecraft.world.SimpleContainer;
+import net.minecraftforge.common.crafting.StrictNBTIngredient;
 import committee.nova.mods.avaritia.init.registry.ModBlocks;
 import committee.nova.mods.avaritia.init.registry.ModRecipeTypes;
 import net.minecraft.world.item.ItemStack;
@@ -20,7 +20,6 @@ import net.minecraft.world.item.crafting.Ingredient;
 import com.sorrowmist.useless.compat.forge1201.recipe.RecipeHolder;
 import net.minecraft.world.item.crafting.RecipeManager;
 import net.minecraft.world.level.Level;
-import com.sorrowmist.useless.compat.forge1201.recipe.DataComponentIngredient;
 import net.minecraftforge.fluids.FluidStack;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
@@ -143,10 +142,7 @@ public final class ReAvaritiaTableRecipeAdapter implements IRecipeAdapter<ITierC
             return null;
         }
 
-        // Ingredient.equals() does not include item components. Re-Avaritia represents
-        // singularities as the same item with a different SINGULARITY_ID component, so a normal
-        // equality-based map would collapse all of them into one requirement. The identity map is
-        // only the storage layer; equal exact stacks are still merged explicitly below.
+        // Different singularity NBT must remain separate requirements.
         Map<Ingredient, Long> requirements = new IdentityHashMap<>();
         if (!mergeTableIngredients(requirements, ingredients)) {
             return null;
@@ -166,11 +162,8 @@ public final class ReAvaritiaTableRecipeAdapter implements IRecipeAdapter<ITierC
             remainders = ExtendedCraftingAdapterUtils.deterministicRemainders(
                     ingredients,
                     Set.of(),
-                    stacks -> {
-                        int[] dimensions = ExtendedCraftingAdapterUtils.gridDimensions(source, stacks.size());
-                        return TierInput.of(dimensions[0], dimensions[1], stacks, tier);
-                    },
-                    source::getRemainingItems
+                    stacks -> new SimpleContainer(stacks.toArray(ItemStack[]::new)),
+                    (net.minecraft.world.Container input) -> source.getRemainingItems(input)
             );
         } catch (RuntimeException exception) {
             return null;
@@ -260,19 +253,16 @@ public final class ReAvaritiaTableRecipeAdapter implements IRecipeAdapter<ITierC
             return Optional.empty();
         }
 
-        if (ingredient.getCustomIngredient() instanceof StackIngredient) {
+        if (ingredient instanceof StrictNBTIngredient) {
             return singleCandidate(ingredient);
         }
-        if (ingredient.getCustomIngredient() instanceof DataComponentIngredient dataComponent) {
-            return dataComponent.isStrict() ? singleCandidate(ingredient) : Optional.empty();
-        }
-        if (ingredient.isCustom()) {
+        if (!ingredient.isVanilla()) {
             return Optional.empty();
         }
 
         try {
-            Ingredient.Value[] values = ingredient.getValues();
-            if (values.length != 1 || !(values[0] instanceof Ingredient.ItemValue)) {
+            var json = ingredient.toJson();
+            if (!json.isJsonObject() || !json.getAsJsonObject().has("item")) {
                 return Optional.empty();
             }
         } catch (RuntimeException exception) {

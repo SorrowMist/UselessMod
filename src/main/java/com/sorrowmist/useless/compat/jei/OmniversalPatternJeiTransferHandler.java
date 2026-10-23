@@ -5,7 +5,6 @@ import appeng.api.stacks.AEItemKey;
 import appeng.api.stacks.GenericStack;
 import appeng.integration.modules.jeirei.EncodingHelper;
 import appeng.menu.me.items.PatternEncodingTermMenu;
-import com.sorrowmist.useless.compat.forge1201.OptionalIntegration;
 import com.sorrowmist.useless.content.recipe.AdapterUtils;
 import com.sorrowmist.useless.content.recipe.AdvancedAlloyFurnaceRecipe;
 import com.sorrowmist.useless.content.recipe.AlloyFurnaceRecipeCatalog;
@@ -133,8 +132,7 @@ public final class OmniversalPatternJeiTransferHandler<T extends PatternEncoding
                 recipe.id(),
                 AlloyFurnaceRecipeFingerprint.create(recipe, player.level().registryAccess()),
                 entry.sourceId()));
-        OptionalIntegration.call("extendedae_plus", "com.sorrowmist.useless.compat.extendedae.ExtendedAEPlusJeiCompat",
-                "presetAlloyFurnaceSearchKey", Void.class, null, new Class<?>[]{});
+        // Forge ExtendedAE Plus has no search-preset API; it must not gate AE2 pattern transfer.
         EncodingHelper.encodeProcessingRecipe(menu, inputs, outputs);
         return null;
     }

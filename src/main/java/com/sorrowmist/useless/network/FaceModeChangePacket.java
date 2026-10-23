@@ -1,6 +1,7 @@
 package com.sorrowmist.useless.network;
 
 import com.sorrowmist.useless.UselessMod;
+import com.sorrowmist.useless.content.menus.FurnaceMenuAccess;
 import com.sorrowmist.useless.api.enums.FurnaceFace;
 import com.sorrowmist.useless.api.enums.FurnaceFaceMode;
 import com.sorrowmist.useless.content.blockentities.AdvancedAlloyFurnaceBlockEntity;
@@ -50,11 +51,12 @@ public class FaceModeChangePacket implements CustomPacketPayload {
     public static void handle(FaceModeChangePacket msg, IPayloadContext ctx) {
         ctx.enqueueWork(() -> {
             ServerPlayer player = (ServerPlayer) ctx.player();
-            if (player == null) return;
+            if (!FurnaceMenuAccess.canUse(player, msg.pos)) return;
 
             BlockEntity be = player.level().getBlockEntity(msg.pos);
             if (be instanceof AdvancedAlloyFurnaceBlockEntity furnace) {
-                FurnaceFace face = FurnaceFace.values()[msg.faceIndex % FurnaceFace.COUNT];
+                if (msg.faceIndex < 0 || msg.faceIndex >= FurnaceFace.COUNT) return;
+                FurnaceFace face = FurnaceFace.values()[msg.faceIndex];
                 FurnaceFaceMode newMode = furnace.cycleFaceMode(face, msg.reverse);
             }
         });

@@ -96,6 +96,12 @@ public final class RecipeAdapterCompatRegistry {
 
     private static final List<CompatEntry> ENTRIES = List.of(
             new CompatEntry(null, RecipeAdapterCompatRegistry::registerMinecraft),
+            new CompatEntry(RecipeSourceIds.THERMAL, () -> invokeOptionalLoader(
+                    "com.sorrowmist.useless.compat.thermal.ThermalRecipeCompatLoader")),
+            new CompatEntry(RecipeSourceIds.BLOOD_MAGIC, () -> invokeOptionalLoader(
+                    "com.sorrowmist.useless.compat.bloodmagic.BloodMagicRecipeCompatLoader")),
+            new CompatEntry(RecipeSourceIds.EMBERS, () -> invokeOptionalLoader(
+                    "com.sorrowmist.useless.compat.embers.EmbersRecipeCompatLoader")),
             new CompatEntry(FARMERS_DELIGHT, RecipeAdapterCompatRegistry::registerFarmersDelight),
             new CompatEntry(EXTRA_DELIGHT, RecipeAdapterCompatRegistry::registerExtraDelight),
             new CompatEntry(CRABBERS_DELIGHT, RecipeAdapterCompatRegistry::registerCrabbersDelight),
@@ -224,6 +230,7 @@ public final class RecipeAdapterCompatRegistry {
             register(new SmeltingRecipeAdapter(RecipeType.SMELTING, Items.FURNACE));
             register(new SmeltingRecipeAdapter(RecipeType.BLASTING, Items.BLAST_FURNACE));
             register(new SmeltingRecipeAdapter(RecipeType.SMOKING, Items.SMOKER));
+            register(new SmeltingRecipeAdapter(RecipeType.CAMPFIRE_COOKING, Items.CAMPFIRE));
         }
         if (ConfigManager.isBrewingRecipeConversionEnabled()) {
             register(new BrewingRecipeAdapter());
@@ -425,7 +432,6 @@ public final class RecipeAdapterCompatRegistry {
                     AVARITIA, RE_AVARITIA_REGISTRY_CLASS);
             return;
         }
-        registerByName("com.sorrowmist.useless.content.recipe.adapters.avaritia.ReAvaritiaSculkCraftingRecipeAdapter");
         registerByName("com.sorrowmist.useless.content.recipe.adapters.avaritia.ReAvaritiaTableRecipeAdapter");
         registerByName("com.sorrowmist.useless.content.recipe.adapters.avaritia.ReAvaritiaExtremeSmithingRecipeAdapter");
         registerByName("com.sorrowmist.useless.content.recipe.adapters.avaritia.ReAvaritiaCompressorRecipeAdapter");

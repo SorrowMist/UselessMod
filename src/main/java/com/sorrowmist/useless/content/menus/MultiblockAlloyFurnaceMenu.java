@@ -19,6 +19,20 @@ import java.util.List;
 public final class MultiblockAlloyFurnaceMenu extends AbstractContainerMenu {
     private final BlockPos blockPos;
     private final ContainerData data;
+    private final Player player;
+    private final FurnaceMenuSynchronizer furnaceSync = new FurnaceMenuSynchronizer();
+
+    public FurnaceMenuSynchronizer getFurnaceSynchronizer() {
+        return furnaceSync;
+    }
+
+    @Override
+    public void broadcastChanges() {
+        super.broadcastChanges();
+        if (player instanceof net.minecraft.server.level.ServerPlayer serverPlayer) {
+            furnaceSync.broadcast(this, serverPlayer);
+        }
+    }
     @Nullable
     private final MultiblockAlloyFurnaceCoreBlockEntity core;
     private final TaskProgressSnapshot taskProgress = new TaskProgressSnapshot();
@@ -30,6 +44,7 @@ public final class MultiblockAlloyFurnaceMenu extends AbstractContainerMenu {
     public MultiblockAlloyFurnaceMenu(int containerId, Inventory inventory, BlockPos pos) {
         super(ModMenuType.MULTIBLOCK_ALLOY_FURNACE_MENU.get(), containerId);
         blockPos = pos.immutable();
+        player = inventory.player;
         core = inventory.player.level().getBlockEntity(pos) instanceof MultiblockAlloyFurnaceCoreBlockEntity value
                 ? value : null;
         // The server's live ContainerData is read-only (its set method is a
@@ -40,6 +55,7 @@ public final class MultiblockAlloyFurnaceMenu extends AbstractContainerMenu {
         data = createMenuData(clientSide,
                 !clientSide && core != null ? core.getMenuData() : null);
         addDataSlots(data);
+        furnaceSync.addData(data);
         for (int row = 0; row < 3; row++) {
             for (int column = 0; column < 9; column++) {
                 addSlot(new Slot(inventory, column + row * 9 + 9, 8 + column * 18, 140 + row * 18));

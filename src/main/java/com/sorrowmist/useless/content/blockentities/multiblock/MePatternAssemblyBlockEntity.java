@@ -152,7 +152,12 @@ public final class MePatternAssemblyBlockEntity extends AEBaseBlockEntity
     public void bindExternalInventory(@Nullable ExternalInventoryReference requested,
                                       @Nullable CompoundTag legacyInventory,
                                       HolderLookup.Provider registries) {
-        if (externalInventoryLoaded || level == null || level.isClientSide) return;
+        if (level == null || level.isClientSide) return;
+        if (externalInventoryLoaded) {
+            if (requested == null || requested.equals(inventoryReference)) return;
+            // Match the portable-reference recovery used by the mold hub and passive hatch.
+            ExternalInventoryStore.release(level, worldPosition, inventoryReference);
+        }
         inventoryReference = ExternalInventoryStore.bindAt(
                 level, ExternalInventoryKind.PATTERN_ASSEMBLY, requested, worldPosition,
                 patterns, legacyInventory, registries);

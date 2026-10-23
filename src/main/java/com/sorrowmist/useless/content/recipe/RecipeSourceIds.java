@@ -2,6 +2,10 @@ package com.sorrowmist.useless.content.recipe;
 
 /** Stable identifiers used to partition the shared alloy-furnace recipe directory. */
 public final class RecipeSourceIds {
+    public static final String THERMAL = "thermal";
+    public static final String BLOOD_MAGIC = "bloodmagic";
+    public static final String EMBERS = "embers";
+    public static final String LEGACY_METALLURGIC = "mekanism_legacy_items";
     public static final String CORE = "core";
     public static final String UNKNOWN = "compatibility";
     public static final String MINECRAFT = "minecraft";

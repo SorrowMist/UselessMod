@@ -1,6 +1,7 @@
 package com.sorrowmist.useless.network;
 
 import com.sorrowmist.useless.UselessMod;
+import com.sorrowmist.useless.content.menus.FurnaceMenuAccess;
 import com.sorrowmist.useless.content.blockentities.AdvancedAlloyFurnaceBlockEntity;
 import com.sorrowmist.useless.content.blockentities.multiblock.MultiblockAlloyFurnaceCoreBlockEntity;
 import net.minecraft.core.BlockPos;
@@ -33,7 +34,7 @@ public class RedstoneControlPacket implements CustomPacketPayload {
     public static void handle(RedstoneControlPacket msg, IPayloadContext ctx) {
         ctx.enqueueWork(() -> {
             ServerPlayer player = (ServerPlayer) ctx.player();
-            if (player == null) return;
+            if (!FurnaceMenuAccess.canUse(player, msg.pos)) return;
 
             BlockEntity be = player.level().getBlockEntity(msg.pos);
             if (be instanceof AdvancedAlloyFurnaceBlockEntity furnace) {

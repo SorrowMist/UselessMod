@@ -31,11 +31,17 @@ public final class ItemIngredientAllocator {
     /** Matches item supplies stored as AE keys without narrowing their long amounts to stack counts. */
     public static boolean matches(List<CountedIngredient> requirements, List<ItemStack> inputs,
                                   List<GenericStack> keyInputs, long operations) {
+        return allocate(requirements, inputs, keyInputs, operations) != null;
+    }
+
+    @Nullable
+    public static Allocation allocate(List<CountedIngredient> requirements, List<ItemStack> inputs,
+                                      List<GenericStack> keyInputs, long operations) {
         List<ItemStack> safeInputs = inputs == null ? List.of() : inputs;
         List<GenericStack> safeKeyInputs = keyInputs == null ? List.of() : keyInputs;
         List<Demand> demands = createDemands(requirements, operations);
-        if (demands == null) return false;
-        if (demands.isEmpty()) return true;
+        if (demands == null) return null;
+        if (demands.isEmpty()) return new Allocation(new long[safeInputs.size() + safeKeyInputs.size()]);
 
         List<Supply> supplies = new ArrayList<>();
         for (int i = 0; i < safeInputs.size(); i++) {
@@ -53,7 +59,7 @@ public final class ItemIngredientAllocator {
         }
 
         return solve(supplies, demands,
-                safeInputs.size() + safeKeyInputs.size()) != null;
+                safeInputs.size() + safeKeyInputs.size());
     }
 
     /**
@@ -127,17 +133,18 @@ public final class ItemIngredientAllocator {
                 }
             }
             long operations = available / requirement.count();
+            if (!requirement.consumed()) return operations > 0L ? Integer.MAX_VALUE : 0;
             return operations >= Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) operations;
         }
         long demandPerOperation = 0L;
         if (requirements != null) {
             for (CountedIngredient requirement : requirements) {
-                if (requirement != null && requirement.count() > 0) {
+                if (requirement != null && requirement.count() > 0 && requirement.consumed()) {
                     demandPerOperation = saturatingAdd(demandPerOperation, requirement.count());
                 }
             }
         }
-        if (demandPerOperation == 0) return Integer.MAX_VALUE;
+        if (demandPerOperation == 0) return matches(requirements, inputs, 1L) ? Integer.MAX_VALUE : 0;
 
         long totalAvailable = 0L;
         if (inputs != null) {
@@ -181,10 +188,11 @@ public final class ItemIngredientAllocator {
         for (CountedIngredient requirement : requirements) {
             if (requirement == null || requirement.count() <= 0) continue;
             long amount;
-            try { amount = Math.multiplyExact(requirement.count(),multiplier); }
+            try { amount = Math.multiplyExact(requirement.count(),
+                    requirement.consumed() ? multiplier : multiplier > 0L ? 1L : 0L); }
             catch(ArithmeticException overflow) { return null; }
             if (amount > 0) {
-                demands.add(new Demand(requirement.ingredient(), amount));
+                demands.add(new Demand(requirement.ingredient(), amount, requirement.consumed()));
             }
         }
         return demands;
@@ -225,16 +233,19 @@ public final class ItemIngredientAllocator {
         int demandStart = supplyStart + supplies.size();
         int sink = demandStart + demands.size();
         FlowNetwork network = new FlowNetwork(sink + 1);
-        List<FlowEdge> supplyEdges = new ArrayList<>(supplies.size());
+        List<ConsumptionEdge> consumptionEdges = new ArrayList<>();
 
         for (int i = 0; i < supplies.size(); i++) {
-            supplyEdges.add(network.addEdge(source, supplyStart + i, supplies.get(i).amount()));
+            network.addEdge(source, supplyStart + i, supplies.get(i).amount());
         }
         for (int i = 0; i < supplies.size(); i++) {
             Supply supply = supplies.get(i);
             for (int j = 0; j < demands.size(); j++) {
                 if (supply.matches().test(demands.get(j).ingredient())) {
-                    network.addEdge(supplyStart + i, demandStart + j, totalDemand);
+                    FlowEdge edge = network.addEdge(supplyStart + i, demandStart + j, totalDemand);
+                    if (demands.get(j).consumed()) {
+                        consumptionEdges.add(new ConsumptionEdge(supplies.get(i).originalIndex(), edge));
+                    }
                 }
             }
         }
@@ -245,9 +256,9 @@ public final class ItemIngredientAllocator {
         if (network.maxFlow(source, sink, totalDemand) != totalDemand) return null;
 
         long[] consumed = new long[resultSize];
-        for (int i = 0; i < supplies.size(); i++) {
-            Supply supply = supplies.get(i);
-            consumed[supply.originalIndex()] = supply.amount() - supplyEdges.get(i).capacity;
+        for (ConsumptionEdge edge : consumptionEdges) {
+            consumed[edge.inputIndex()] = saturatingAdd(consumed[edge.inputIndex()],
+                    totalDemand - edge.edge().capacity);
         }
         return new Allocation(consumed);
     }
@@ -260,7 +271,7 @@ public final class ItemIngredientAllocator {
             if (remaining <= 0L || !supply.matches().test(demand.ingredient())) continue;
             long amount = Math.min(remaining, supply.amount());
             int originalIndex = supply.originalIndex();
-            consumed[originalIndex] = saturatingAdd(consumed[originalIndex], amount);
+            if (demand.consumed()) consumed[originalIndex] = saturatingAdd(consumed[originalIndex], amount);
             remaining -= amount;
         }
         return remaining > 0L ? null : new Allocation(consumed);
@@ -296,7 +307,7 @@ public final class ItemIngredientAllocator {
                 remaining[i] -= amount;
                 needed -= amount;
                 int originalIndex = supply.originalIndex();
-                consumed[originalIndex] = saturatingAdd(consumed[originalIndex], amount);
+                if (demand.consumed()) consumed[originalIndex] = saturatingAdd(consumed[originalIndex], amount);
             }
             if (needed > 0L) return null;
         }
@@ -338,7 +349,13 @@ public final class ItemIngredientAllocator {
     private record Supply(int originalIndex, long amount, Predicate<Ingredient> matches, boolean exact) {
     }
 
-    private record Demand(Ingredient ingredient, long amount) {
+    private record ConsumptionEdge(int inputIndex, FlowEdge edge) {
+    }
+
+    private record Demand(Ingredient ingredient, long amount, boolean consumed) {
+        private Demand(Ingredient ingredient, long amount) {
+            this(ingredient, amount, true);
+        }
     }
 
     private static final class FlowNetwork {

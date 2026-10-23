@@ -143,7 +143,8 @@ public final class MergedFurnaceGameTests {
     }
 
     @GameTest(template = "furnace_empty")
-    public static void thermalMachineLoadsParallelMixinAndRestoredAugments(GameTestHelper helper) {
+    public static void thermalMachineLoadsParallelMixinAndRestoredAugments(GameTestHelper helper)
+            throws ReflectiveOperationException {
         var machine = ForgeRegistries.BLOCKS.getValue(new ResourceLocation("thermal", "machine_smelter"));
         helper.assertTrue(machine != null && machine != Blocks.AIR, "Native Thermal smelter must be registered");
         var pos = new BlockPos(2, 1, 2);
@@ -160,6 +161,24 @@ public final class MergedFurnaceGameTests {
             helper.assertTrue(ForgeRegistries.ITEMS.containsKey(UselessMod.id("augment_parallel_" + index)),
                     "Restored parallel augment must be registered");
         }
+        var nativeType = cofh.thermal.lib.common.block.entity.AugmentableBlockEntity.class;
+        var install = nativeType.getDeclaredMethod("attemptAugmentInstall", ItemStack.class);
+        install.setAccessible(true);
+        var augment = ForgeRegistries.ITEMS.getValue(UselessMod.id("augment_parallel_1"));
+        helper.assertTrue((boolean) install.invoke(blockEntity, new ItemStack(augment)),
+                "The native machine must accept the parallel augment");
+        helper.assertTrue(((ThermalParallelAccess) blockEntity).useless_mod$getParallel() == 1,
+                "Native augment finalization must apply exactly one extra operation");
+        var slots = nativeType.getDeclaredField("augments");
+        slots.setAccessible(true);
+        for (var slot : (java.util.List<?>) slots.get(blockEntity)) {
+            ((cofh.lib.common.inventory.ItemStorageCoFH) slot).setItemStack(ItemStack.EMPTY);
+        }
+        var refresh = nativeType.getDeclaredMethod("updateAugmentState");
+        refresh.setAccessible(true);
+        refresh.invoke(blockEntity);
+        helper.assertTrue(((ThermalParallelAccess) blockEntity).useless_mod$getParallel() == 0,
+                "Removing the augment must clear parallel operations");
         helper.succeed();
     }
 

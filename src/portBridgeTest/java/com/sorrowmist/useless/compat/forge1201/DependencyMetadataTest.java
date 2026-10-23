@@ -84,4 +84,18 @@ class DependencyMetadataTest {
         assertTrue(requirements.get("minecraft").<Boolean>get("mandatory"));
         assertFalse(requirements.get("create").<Boolean>get("mandatory"));
     }
+
+    @Test void thermalRequirementsAllowTheOldestApiAndThePacksEmbeddedCore() throws Exception {
+        var requirements = requirements();
+        for (String id : List.of("thermal", "cofh_core")) {
+            var range = VersionRange.createFromVersionSpec(requirements.get(id).get("versionRange"));
+            assertTrue(range.containsVersion(new DefaultArtifactVersion("11.0.0")), id);
+            assertFalse(range.containsVersion(new DefaultArtifactVersion("10.3.0")), id);
+            assertFalse(range.containsVersion(new DefaultArtifactVersion("12.0.0")), id);
+        }
+        assertTrue(VersionRange.createFromVersionSpec(requirements.get("thermal").get("versionRange"))
+                .containsVersion(new DefaultArtifactVersion("11.0.6")));
+        assertTrue(VersionRange.createFromVersionSpec(requirements.get("cofh_core").get("versionRange"))
+                .containsVersion(new DefaultArtifactVersion("11.0.2")));
+    }
 }

@@ -80,6 +80,39 @@ public final class MufflerHatchBlockEntity extends BlockEntity implements MenuPr
         }
     };
 
+    /** 只读视图：允许抽取、拒绝插入，供 {@link #getAshOutput()} 使用。 */
+    private final IItemHandler ashExtractOnly = new IItemHandler() {
+        @Override
+        public int getSlots() {
+            return output.getSlots();
+        }
+
+        @Override
+        public ItemStack getStackInSlot(int slot) {
+            return output.getStackInSlot(slot);
+        }
+
+        @Override
+        public ItemStack insertItem(int slot, ItemStack stack, boolean simulate) {
+            return stack;
+        }
+
+        @Override
+        public ItemStack extractItem(int slot, int amount, boolean simulate) {
+            return output.extractItem(slot, amount, simulate);
+        }
+
+        @Override
+        public int getSlotLimit(int slot) {
+            return output.getSlotLimit(slot);
+        }
+
+        @Override
+        public boolean isItemValid(int slot, ItemStack stack) {
+            return false;
+        }
+    };
+
     @Nullable
     private BlockPos controllerPos;
     private long structureGeneration;
@@ -145,6 +178,17 @@ public final class MufflerHatchBlockEntity extends BlockEntity implements MenuPr
     /** 供容器菜单访问的输出库存，槽位在菜单层被限定为只出不进。 */
     public IItemHandler getOutput() {
         return output;
+    }
+
+    /**
+     * 对外暴露的灰烬库存，仅供自动化抽取。
+     *
+     * <p>漏斗与管道必须能取走灰烬，否则「灰烬堆满阻塞工作」会让全自动产线永久停机；
+     * 同时不允许任何外部插入，避免该槽位被当作普通容器使用。因此返回只读视图而非
+     * {@link #output} 本身，插入请求原样退回。</p>
+     */
+    public IItemHandler getAshOutput() {
+        return ashExtractOnly;
     }
 
     /**

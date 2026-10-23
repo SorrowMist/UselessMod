@@ -63,6 +63,11 @@ public final class ModBlockEntities {
                 Capabilities.ItemHandler.BLOCK,
                 PASSIVE_CRAFTING_HATCH.get(),
                 (blockEntity, side) -> blockEntity.getPatterns());
+        // 消声仓只暴露只读的灰烬槽：漏斗与管道可以抽走灰烬，避免灰烬堆满把全自动产线永久停机。
+        event.registerBlockEntity(
+                Capabilities.ItemHandler.BLOCK,
+                MUFFLER_HATCH.get(),
+                (blockEntity, side) -> blockEntity.getAshOutput());
         event.registerBlockEntity(
                 AECapabilities.IN_WORLD_GRID_NODE_HOST,
                 ORE_GENERATOR.get(),

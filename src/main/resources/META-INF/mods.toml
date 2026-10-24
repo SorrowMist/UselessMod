@@ -46,7 +46,7 @@ side="BOTH"
 [[dependencies.useless_mod]]
 modId="advanced_ae"
 mandatory=false
-versionRange="[1.3.6-1.20.1,2)"
+versionRange="[1.2.7-1.20.1,2)"
 ordering="AFTER"
 side="BOTH"
 
@@ -340,7 +340,7 @@ side="BOTH"
 [[dependencies.useless_mod]]
 modId="bloodmagic"
 mandatory=false
-versionRange="[3.3.5-47,3.4)"
+versionRange="[3.3.3-45,3.4)"
 ordering="AFTER"
 side="BOTH"
 

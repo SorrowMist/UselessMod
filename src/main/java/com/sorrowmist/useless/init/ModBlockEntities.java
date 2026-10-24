@@ -12,6 +12,7 @@ import com.sorrowmist.useless.content.blockentities.multiblock.OmniversalMoldHub
 import com.sorrowmist.useless.content.blockentities.multiblock.PassiveCraftingHatchBlockEntity;
 import com.sorrowmist.useless.compat.draconicevolution.DraconicOpStorageCompat;
 import com.sorrowmist.useless.compat.fluxnetworks.FluxNetworksEnergyCompat;
+import com.sorrowmist.useless.compat.forge1201.OptionalIntegration;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraftforge.eventbus.api.IEventBus;
@@ -109,6 +110,10 @@ public final class ModBlockEntities {
      * JVM must not resolve AppMek's capability types on a server that does not install AppMek.
      */
     private static void invokeOptionalCapabilityLoader(String className, RegisterCapabilitiesEvent event) {
+        if (!OptionalIntegration.hasClass(className)) {
+            UselessMod.LOGGER.debug("Optional capability loader {} is not present in this build", className);
+            return;
+        }
         try {
             Class<?> loader = Class.forName(className, true, ModBlockEntities.class.getClassLoader());
             loader.getMethod("registerCapabilities", RegisterCapabilitiesEvent.class).invoke(null, event);

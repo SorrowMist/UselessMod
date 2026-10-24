@@ -323,6 +323,10 @@ public final class RecipeAdapterCompatRegistry {
     }
 
     private static void registerAdvancedAE() {
+        if (!isClassAvailable("net.pedroksl.ae2addonlib.recipes.IngredientStack$Item")) {
+            LOGGER.debug("AdvancedAE 1.2.x does not expose the 1.3 addon-lib recipe API; skipping reaction chamber adapter");
+            return;
+        }
         registerByName("com.sorrowmist.useless.content.recipe.adapters.ae.advancedae.ReactionChamberRecipeAdapter");
     }
 

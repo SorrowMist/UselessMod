@@ -36,6 +36,10 @@ othermods
 crashreport
 .cursor
 .cache
+*.cache
+*.bak.png
+*.orig
+*.rej
 .codex
 # external reference code
 references/

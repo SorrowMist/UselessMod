@@ -218,7 +218,8 @@ public class ConfigManager {
                 .defineInRange("botany_pot_growth_multiplier", 1, 1, Integer.MAX_VALUE);
 
         MATRIX_PATTERN_COUNT = SERVER_BUILDER
-                .comment("矩阵样板槽位倍数 - 减少数量时请保持槽位空！否则可能会造成样板丢失")
+                .comment("矩阵样板槽位倍数 - 新放置的矩阵样板方块生效；已放置的方块保持原有容量",
+                        "减少数量时请保持槽位空！否则可能会造成样板丢失")
                 .defineInRange("matrix_pattern_count", 1, 1, 100);
         SERVER_BUILDER.pop();
 
@@ -803,6 +804,8 @@ public class ConfigManager {
                 "enable_ufo_recipe_conversion", true);
         COMMON_BUILDER.pop();
 
+        // Options for adapters excluded by gradle/forge1201-pack-profile.json stay in the
+        // spec for cross-pack config compatibility; the registry skips their absent classes.
         RECIPE_CONVERSION_OPTIONS = Map.ofEntries(
                 Map.entry("thermal", ENABLE_THERMAL_RECIPE_CONVERSION),
                 Map.entry("bloodmagic", ENABLE_BLOOD_MAGIC_RECIPE_CONVERSION),
@@ -1011,6 +1014,15 @@ public class ConfigManager {
 
     public static int getMaxUpgrade() {
         return getConfigValue(MAX_UPGRADE);
+    }
+
+    /** Returns the loaded max_upgrade, or null while the server config is not available yet. */
+    public static Integer getLoadedMaxUpgrade() {
+        try {
+            return MAX_UPGRADE.get();
+        } catch (IllegalStateException | NullPointerException ignored) {
+            return null;
+        }
     }
 
     // 万象炉AE网络抽电配置

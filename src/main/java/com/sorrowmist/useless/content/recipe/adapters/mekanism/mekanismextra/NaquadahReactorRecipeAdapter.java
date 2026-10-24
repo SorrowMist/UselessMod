@@ -2,9 +2,9 @@ package com.sorrowmist.useless.content.recipe.adapters.mekanism.mekanismextra;
 
 import appeng.api.stacks.GenericStack;
 import com.jerry.generator_extras.common.config.GenLoadConfig;
-import com.jerry.generator_extras.common.genregistry.ExtraGenBlocks;
-import com.jerry.generator_extras.common.genregistry.ExtraGenGases;
-import com.jerry.mekanism_extras.common.registry.ExtraGases;
+import com.jerry.generator_extras.common.genregistries.ExtraGenBlocks;
+import com.jerry.generator_extras.common.genregistries.ExtraGenGases;
+import com.jerry.mekanism_extras.common.registries.ExtraGases;
 import com.sorrowmist.useless.content.recipe.AdapterUtils;
 import com.sorrowmist.useless.content.recipe.AdvancedAlloyFurnaceRecipe;
 import com.sorrowmist.useless.content.recipe.adapters.mekanism.MekanismChemicalRecipeSupport;
@@ -22,7 +22,7 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
 
-/** Optional Mekanism Extras naquadah reactor recipe-viewer adapter. */
+/** Optional Mekanism Extras 1.5+ naquadah reactor recipe-viewer adapter. */
 public final class NaquadahReactorRecipeAdapter extends MekanismSyntheticRecipeAdapter {
     private static final long PROCESS_TICKS = AdapterUtils.MEKANISM_BASE_TICKS_REQUIRED;
     private static final ResourceLocation SOURCE_ID =
@@ -56,12 +56,12 @@ public final class NaquadahReactorRecipeAdapter extends MekanismSyntheticRecipeA
         }
 
         addFuelRecipe(result, pairedFuelWaterInputs,
-                List.of(ExtraGases.RICH_SILICON_LIQUID_FUEL.getStack(1),
-                        ExtraGases.RICH_URANIUM_LIQUID_FUEL.getStack(1)),
+                List.of(ExtraGases.RICH_NAQUADAH_FUEL.getStack(1),
+                        ExtraGases.RICH_URANIUM_FUEL.getStack(1)),
                 MekanismChemicalRecipeSupport.saturatingMultiply(waterPerFuel, 2L),
                 "rich_fuels_water");
         addFuelRecipe(result, singleFuelWaterInputs,
-                List.of(ExtraGases.SILICON_URANIUM_FUEL.getStack(1)),
+                List.of(ExtraGases.NAQUADAH_URANIUM_FUEL.getStack(1)),
                 waterPerFuel, "naquadah_uranium_fuel_water");
         addWaterOnlyRecipe(result);
         return result;

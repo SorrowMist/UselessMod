@@ -4,8 +4,9 @@ A Minecraft mod featuring various utilities and enhancements.
 
 ## Forge 1.20.1
 
-Version `20.2.4.6` targets Minecraft 1.20.1, Forge 47.3.10+, Java 17,
-AE2 15.4.8 and the Create 2 Mekanism: Sky Edition 2 integration profile.
+Version `20.2.4.7` targets Minecraft 1.20.1, Forge 47.3.10+, Java 17,
+AE2 15.4.8+, Mekanism 10.4.15+ (compiled against 10.4.16.80),
+Mekanism Extras 1.5.0+ and the Create 2 Mekanism: Sky Edition 2 integration profile.
 Build with `./gradlew build` (Windows: `gradlew.bat build`); Python 3 is used by
 nine release-bytecode/outline regression checks. Dependencies resolve from public Maven repositories.
 The `portBridgeTest` suite also runs as part of `check` and is not shipped in the mod jar.
@@ -13,15 +14,21 @@ The `portBridgeTest` suite also runs as part of `check` and is not shipped in th
 Forge, Minecraft and AE2 are required. Every compiled mod integration declares a
 minimum and compatible version range in `src/main/resources/META-INF/mods.toml`;
 these integrations remain optional, so an absent integration does not prevent startup.
-Minimum versions follow the actual mod metadata (for example, Mekanism `10.4.15`,
-not the jar filename's build suffix). Ore Generator samples accept Forge's `ores`
-and `raw_materials` item tags, plus the equivalent `c:` datapack tags.
+Runtime minima and compile pins are separate: for example, Mekanism accepts
+`10.4.15+` while this build compiles against `10.4.16.80`. Botany Pots is accepted
+from `13.0.0`; Mekanism Extras starts at `1.5.0` and uses its plural
+`registries`/`genregistries` API for the Naquadah reactor adapter. Ore Generator
+samples accept Forge's `ores` and `raw_materials` item tags, plus the equivalent
+`c:` datapack tags.
 
 Optional integrations without a Forge implementation are excluded explicitly in
 `gradle/forge1201-pack-profile.json`; this is not a universal backport of every
 NeoForge integration. Extended Crafting compiles against official 6.0.10; the
 pack's unofficial tier-5/11x11 extension is supported through its native recipe
 contract and registry lookup without bundling or replacing the pack's jar.
+Missing optional adapter classes are skipped quietly at debug level instead of
+failing the interaction; actual invocation failures are reported once. The
+Occultism spirit-egg handler is one such excluded adapter in this Forge build.
 
 ## Features
 

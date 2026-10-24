@@ -208,7 +208,9 @@ public class UselessMod {
     }
 
     private static InteractionResult trySpawnMarkedOccultismSpirit(PlayerInteractEvent.RightClickBlock event) {
-        if (!ModList.get().isLoaded("occultism")) {
+        if (!ModList.get().isLoaded("occultism")
+                || !OptionalIntegration.hasClass(
+                "com.sorrowmist.useless.content.recipe.adapters.occultism.OccultismSpiritEggHandler")) {
             return InteractionResult.PASS;
         }
         return OccultismCompat.trySpawnMarkedSpirit(event);

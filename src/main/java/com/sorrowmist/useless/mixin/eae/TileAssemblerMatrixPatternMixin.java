@@ -1,36 +1,23 @@
 package com.sorrowmist.useless.mixin.eae;
 
-import appeng.util.inv.AppEngInternalInventory;
-import com.glodblock.github.extendedae.common.tileentities.matrix.TileAssemblerMatrixPattern;
 import com.sorrowmist.useless.core.config.ConfigManager;
-import net.minecraft.core.BlockPos;
-import net.minecraft.world.level.block.state.BlockState;
-import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
-import org.spongepowered.asm.mixin.Mutable;
-import org.spongepowered.asm.mixin.Shadow;
-import org.spongepowered.asm.mixin.injection.At;
-import org.spongepowered.asm.mixin.injection.Inject;
-import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+import org.spongepowered.asm.mixin.injection.Constant;
+import org.spongepowered.asm.mixin.injection.ModifyConstant;
 
-@Mixin(value = TileAssemblerMatrixPattern.class,remap = false)
+@Mixin(targets = "com.glodblock.github.extendedae.common.tileentities.matrix.TileAssemblerMatrixPattern", remap = false)
 public class TileAssemblerMatrixPatternMixin {
 
-    @Mutable @Shadow @Final private AppEngInternalInventory patternInventory;
-
     /**
-     * 在构造函数完成后替换patternInventory
+     * 修改构造函数中 patternInventory 的硬编码容量。
+     * 必须在 exposedInventory 包装它之前改掉，否则两个库存容量会不一致。
      */
-    @Inject(
+    @ModifyConstant(
             method = "<init>",
-            at = @At("RETURN")
+            constant = @Constant(intValue = 36),
+            remap = false
     )
-    private void onConstructed(BlockPos pos, BlockState blockState, CallbackInfo ci) {
-        TileAssemblerMatrixPattern self = (TileAssemblerMatrixPattern) (Object) this;
-
-        // 创建新的库存实例
-        int newSize = 36 * ConfigManager.getMatrixPatternCount();
-        this.patternInventory = new AppEngInternalInventory(self, newSize, 1);
-        this.patternInventory.setFilter(new TileAssemblerMatrixPattern.Filter(self::getLevel));
+    private int useless$modifyPatternInventorySize(int original) {
+        return 36 * ConfigManager.getMatrixPatternCount();
     }
 }

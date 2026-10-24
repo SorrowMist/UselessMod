@@ -67,20 +67,4 @@ public abstract class UpgradeMixin {
         return upgrade.getMax();
     }
 
-    /**
-     * NBT saving also reads maxStack directly; without this redirect a machine
-     * with more than 16 upgrades would be clamped back to 16 on save.
-     */
-    @Redirect(
-            method = "saveMap",
-            at = @At(
-                    value = "FIELD",
-                    target = "Lmekanism/api/Upgrade;maxStack:I",
-                    opcode = Opcodes.GETFIELD
-            ),
-            remap = false
-    )
-    private static int useless$nbtSaveMax(Upgrade upgrade) {
-        return upgrade.getMax();
-    }
 }

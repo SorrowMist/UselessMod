@@ -1,0 +1,327 @@
+name: Publish
+
+# 发布触发方式：推送版本标签即自动构建、创建 GitHub Release 并同步到 CurseForge 与 Modrinth；
+# 在 GitHub 上手动发布 Release 或在 Actions 页面指定标签执行同样有效。
+# 构建与发布分离，两个平台互不影响。
+on:
+  # 推送版本标签即自动构建，并由发布步骤一并创建 GitHub Release 后同步到两个平台。
+  push:
+    tags:
+      - '20.*'
+  # 在 GitHub 上把已存在的标签发布为 Release 时同样触发，兼容手动建 Release 的流程。
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: '要发布的标签（须已存在，例如 20.2.4.6）'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build artifact
+    runs-on: ubuntu-latest
+
+    outputs:
+      artifact_path: ${{ steps.meta.outputs.artifact_path }}
+      mc_version: ${{ steps.meta.outputs.mc_version }}
+      mod_version: ${{ steps.meta.outputs.mod_version }}
+      changelog: ${{ steps.meta.outputs.changelog }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.release.tag_name || inputs.tag || github.ref_name }}
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Read project metadata
+        id: meta
+        env:
+          RELEASE_BODY: ${{ github.event.release.body }}
+        run: |
+          read_prop() {
+            grep -E "^$1=" gradle.properties | head -n1 | cut -d= -f2- | tr -d '[:space:]'
+          }
+          mc_version="$(read_prop minecraft_version)"
+          mod_version="$(read_prop mod_version)"
+          if [[ -z "${mc_version}" || -z "${mod_version}" ]]; then
+            echo "::error::无法从 gradle.properties 解析 minecraft_version 或 mod_version" >&2
+            exit 1
+          fi
+          artifact_path="build/libs/useless_mod-${mod_version}.jar"
+
+          # 发布说明以 CHANGELOG.md 中该版本的章节为准；章节缺失时回退到 Release 正文，
+          # 再回退到自上一个标签以来的提交标题，避免平台侧出现空 changelog。
+          # CHANGELOG.md 的版本标题与 mod_version 完全一致（1.20.1 线不带前缀），无需去前缀。
+          cl_version="${mod_version}"
+          changelog=""
+          if [[ -f CHANGELOG.md ]]; then
+            changelog="$(awk -v ver="${cl_version}" '
+              index($0, "## [" ver "]") == 1 { found = 1; next }
+              found && index($0, "## [") == 1 { exit }
+              found { lines[++n] = $0 }
+              END {
+                start = 1; while (start <= n && lines[start] ~ /^[[:space:]]*$/) start++
+                end = n; while (end >= start && lines[end] ~ /^[[:space:]]*$/) end--
+                for (i = start; i <= end; i++) print lines[i]
+              }
+            ' CHANGELOG.md)"
+          fi
+          if [[ -z "${changelog//[[:space:]]/}" ]]; then
+            changelog="${RELEASE_BODY}"
+          fi
+          if [[ -z "${changelog//[[:space:]]/}" ]]; then
+            prev_tag="$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || true)"
+            if [[ -n "${prev_tag}" ]]; then
+              changelog="$(git log --pretty=format:'- %s' "${prev_tag}..HEAD" 2>/dev/null || true)"
+            else
+              changelog="$(git log --pretty=format:'- %s' -n 20 2>/dev/null || true)"
+            fi
+          fi
+          if [[ -z "${changelog//[[:space:]]/}" ]]; then
+            changelog="Release ${mod_version}"
+          fi
+
+          echo "mc_version=${mc_version}" >> "$GITHUB_OUTPUT"
+          echo "mod_version=${mod_version}" >> "$GITHUB_OUTPUT"
+          echo "artifact_path=${artifact_path}" >> "$GITHUB_OUTPUT"
+          {
+            echo "changelog<<CHANGELOG_EOF"
+            printf '%s\n' "${changelog}"
+            echo "CHANGELOG_EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Setup JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Make Gradle wrapper executable
+        run: chmod +x ./gradlew
+
+      - name: Build with Gradle
+        run: ./gradlew build
+
+      - name: Validate built artifact
+        run: test -f "${{ steps.meta.outputs.artifact_path }}"
+
+      - name: Archive build artifact
+        run: tar -czf release-artifact.tar.gz "${{ steps.meta.outputs.artifact_path }}"
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-build
+          path: release-artifact.tar.gz
+          if-no-files-found: error
+          retention-days: 3
+
+  create-release:
+    name: Create GitHub Release
+    needs: build
+    # 仅在标签推送触发时创建 Release；由 Release 事件触发时该项已存在，跳过以免重复创建。
+    # 经 GITHUB_TOKEN 创建的 Release 不会再触发新的工作流运行，因此不会形成递归。
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: release-build
+
+      - name: Unpack build artifact
+        run: tar -xzf release-artifact.tar.gz
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG_NAME: ${{ github.ref_name }}
+          RELEASE_TITLE: Useless Mod ${{ needs.build.outputs.mod_version }}
+          RELEASE_NOTES: ${{ needs.build.outputs.changelog }}
+        run: |
+          # 该作业未 checkout 仓库，必须显式指定 --repo，否则 gh 找不到 git 上下文
+          # （报 fatal: not a git repository）。
+          #
+          # 标签重指后重跑时同名 Release 已存在，直接 create 会因重名失败；
+          # 因此先探测是否存在：已存在则改写标题与说明、覆盖上传资产，不存在才创建。
+          if gh release view "${TAG_NAME}" --repo "${{ github.repository }}" >/dev/null 2>&1; then
+            gh release edit "${TAG_NAME}" \
+              --repo "${{ github.repository }}" \
+              --title "${RELEASE_TITLE}" \
+              --notes "${RELEASE_NOTES}"
+            gh release upload "${TAG_NAME}" \
+              --repo "${{ github.repository }}" \
+              --clobber \
+              "${{ needs.build.outputs.artifact_path }}"
+          else
+            gh release create "${TAG_NAME}" \
+              --repo "${{ github.repository }}" \
+              --title "${RELEASE_TITLE}" \
+              --notes "${RELEASE_NOTES}" \
+              "${{ needs.build.outputs.artifact_path }}"
+          fi
+
+  publish-curseforge:
+    name: Publish to CurseForge
+    needs: build
+    # 在仓库 Settings → Environments 创建 publish 环境后可配置必需审批人；
+    # 未创建时 GitHub 自动创建且无保护规则，不影响发布。
+    environment: publish
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: release-build
+
+      - name: Unpack build artifact
+        run: tar -xzf release-artifact.tar.gz
+
+      - name: Validate artifact exists
+        run: test -f "${{ needs.build.outputs.artifact_path }}"
+
+      - name: Check existing CurseForge version
+        id: check-curseforge
+        env:
+          CURSEFORGE_TOKEN: ${{ secrets.CURSEFORGE_TOKEN }}
+          CURSEFORGE_ID: ${{ vars.CURSEFORGE_PROJECT_ID || 1401600 }}
+          MOD_VERSION: ${{ needs.build.outputs.mod_version }}
+          ARTIFACT_PATH: ${{ needs.build.outputs.artifact_path }}
+        run: |
+          # 该版本此前若已发布，重复上传会被平台拒绝并使工作流失败；
+          # 因此先逐页拉取项目已上传文件，按文件名或显示名匹配，命中即置 exists=true 跳过上传。
+          file_name="$(basename "${ARTIFACT_PATH}")"
+          display_name="Useless Mod ${MOD_VERSION}"
+          exists=false
+          index=0
+          while true; do
+            if ! response="$(curl -sS --fail \
+              -H "x-api-key: ${CURSEFORGE_TOKEN}" \
+              -H "Accept: application/json" \
+              "https://api.curseforge.com/v1/mods/${CURSEFORGE_ID}/files?pageSize=50&index=${index}")"; then
+              echo "::warning::查询 CurseForge 已发布文件失败，无法确认版本是否已存在，继续尝试上传"
+              break
+            fi
+            matched="$(printf '%s' "${response}" | jq --arg fn "${file_name}" --arg dn "${display_name}" \
+              '[.data[] | select(.fileName == $fn or .displayName == $dn)] | length')"
+            if [[ "${matched}" -gt 0 ]]; then
+              exists=true
+              break
+            fi
+            page_count="$(printf '%s' "${response}" | jq '.data | length')"
+            if [[ "${page_count}" -lt 50 ]]; then
+              break
+            fi
+            index=$((index + 50))
+          done
+          if [[ "${exists}" == true ]]; then
+            echo "CurseForge 已存在版本 ${MOD_VERSION}，跳过上传。"
+          fi
+          echo "exists=${exists}" >> "$GITHUB_OUTPUT"
+
+      - name: Upload to CurseForge
+        # 已存在同版本时不再推送，避免平台侧重复版本报错。
+        if: steps.check-curseforge.outputs.exists != 'true'
+        uses: Kira-NT/mc-publish@v3.3.1
+        with:
+          name: Useless Mod ${{ needs.build.outputs.mod_version }}
+          version: ${{ needs.build.outputs.mod_version }}
+          version-type: ${{ github.event.release.prerelease && 'beta' || 'release' }}
+          changelog: ${{ needs.build.outputs.changelog }}
+          files: ${{ needs.build.outputs.artifact_path }}
+          # 项目数字 ID，可在 CurseForge 项目页或 api.cfwidget.com 查询；
+          # 如需改用仓库变量覆盖，在 Settings → Secrets and variables → Actions 新建 CURSEFORGE_PROJECT_ID。
+          curseforge-id: ${{ vars.CURSEFORGE_PROJECT_ID || 1401600 }}
+          curseforge-token: ${{ secrets.CURSEFORGE_TOKEN }}
+          loaders: forge
+          environment: client | server
+          game-versions: ${{ needs.build.outputs.mc_version }}
+          # 平台侧偶发 5xx 服务端错误（如 Modrinth 的 database_error）与配置无关，
+          # 提高重试次数与间隔以降低这类瞬时故障导致的发布失败。
+          retry-attempts: 5
+          retry-delay: 20000
+
+  publish-modrinth:
+    name: Publish to Modrinth
+    needs: build
+    # 未在仓库变量中配置 Modrinth 项目 ID 时跳过，避免项目尚未创建就触发失败。
+    if: ${{ vars.MODRINTH_PROJECT_ID != '' }}
+    environment: publish
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: release-build
+
+      - name: Unpack build artifact
+        run: tar -xzf release-artifact.tar.gz
+
+      - name: Validate artifact exists
+        run: test -f "${{ needs.build.outputs.artifact_path }}"
+
+      - name: Check existing Modrinth version
+        id: check-modrinth
+        env:
+          MODRINTH_TOKEN: ${{ secrets.MODRINTH_TOKEN }}
+          MODRINTH_ID: ${{ vars.MODRINTH_PROJECT_ID }}
+          MOD_VERSION: ${{ needs.build.outputs.mod_version }}
+          ARTIFACT_PATH: ${{ needs.build.outputs.artifact_path }}
+        run: |
+          # 该版本此前若已发布，重复上传会被平台拒绝并使工作流失败；
+          # 因此先查询项目已上传版本，按版本号或文件名匹配，命中即置 exists=true 跳过上传。
+          file_name="$(basename "${ARTIFACT_PATH}")"
+          exists=false
+          # Modrinth API 要求请求携带可识别的 User-Agent，缺失会被拒绝。
+          if ! response="$(curl -sS --fail \
+            -H "Authorization: ${MODRINTH_TOKEN}" \
+            -H "User-Agent: useless-mod-publish-workflow" \
+            "https://api.modrinth.com/v2/project/${MODRINTH_ID}/version")"; then
+            echo "::warning::查询 Modrinth 已发布版本失败，无法确认版本是否已存在，继续尝试上传"
+          else
+            matched="$(printf '%s' "${response}" | jq --arg ver "${MOD_VERSION}" --arg fn "${file_name}" \
+              '[.[] | select(.version_number == $ver or ([.files[].filename] | index($fn) != null))] | length')"
+            if [[ "${matched}" -gt 0 ]]; then
+              exists=true
+            fi
+          fi
+          if [[ "${exists}" == true ]]; then
+            echo "Modrinth 已存在版本 ${MOD_VERSION}，跳过上传。"
+          fi
+          echo "exists=${exists}" >> "$GITHUB_OUTPUT"
+
+      - name: Upload to Modrinth
+        # 已存在同版本时不再推送，避免平台侧重复版本报错。
+        if: steps.check-modrinth.outputs.exists != 'true'
+        uses: Kira-NT/mc-publish@v3.3.1
+        with:
+          name: Useless Mod ${{ needs.build.outputs.mod_version }}
+          version: ${{ needs.build.outputs.mod_version }}
+          version-type: ${{ github.event.release.prerelease && 'beta' || 'release' }}
+          changelog: ${{ needs.build.outputs.changelog }}
+          files: ${{ needs.build.outputs.artifact_path }}
+          modrinth-id: ${{ vars.MODRINTH_PROJECT_ID }}
+          modrinth-token: ${{ secrets.MODRINTH_TOKEN }}
+          modrinth-featured: false
+          loaders: forge
+          environment: client | server
+          game-versions: ${{ needs.build.outputs.mc_version }}
+          # 平台侧偶发 5xx 服务端错误（如 Modrinth 的 database_error）与配置无关，
+          # 提高重试次数与间隔以降低这类瞬时故障导致的发布失败。
+          retry-attempts: 5
+          retry-delay: 20000

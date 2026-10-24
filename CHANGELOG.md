@@ -6,6 +6,32 @@ NeoForge 1.21.1 分支的更新记录见 `1.21` 分支的同名文件。
 
 ## [Unreleased]
 
+## [20.2.4.7]
+
+本次为 20.2.4.6 的后续修正，重点是让模组在 ATM9 这类整合包的实际模组版本下正常加载与运行。
+This is a follow-up to 20.2.4.6, focused on making the mod load and run correctly against the actual mod versions
+shipped by modpacks such as ATM9.
+
+### Changed / 变更
+
+- 可选依赖元数据与编译 pin 按整合包实际版本对齐：Mekanism / Generators 10.4.16.80、AppMek 1.4.3、Mekanism Extras 1.5.0+、Botany Pots 13.0.0-13.x
+  - Optional dependency metadata and compile pins now match the versions actually shipped by the target pack: Mekanism / Generators 10.4.16.80, AppMek 1.4.3, Mekanism Extras 1.5.0+, Botany Pots 13.0.0-13.x.
+- `mekanism_upgrade.max_upgrade` 收敛为单一配置来源，`UpgradeMixin` 同时覆盖枚举构造、`getMax()` 与 NBT 加载直接读取 `maxStack` 的路径，超过 16 的上限不再被钳制回默认值
+  - `mekanism_upgrade.max_upgrade` is now a single config source; `UpgradeMixin` covers enum construction, `getMax()` and the direct `maxStack` read used during NBT loading, so values above 16 are no longer clamped back to the default.
+- 移除未使用的贴图、遗留的 NeoForge 模板与陈旧的验证产物，减小 jar 体积
+  - Removed unused textures, legacy NeoForge templates and stale verification artifacts, reducing jar size.
+
+### Fixed / 修复
+
+- 接受 ATM9 携带的 AdvancedAE 1.2.7 与血魔法 3.3.3-45；AdvancedAE 1.3 专用的反应仓适配器在 1.2.x 上直接跳过，不再抛 `NoSuchFieldError`
+  - Accepts the AdvancedAE 1.2.7 and Blood Magic 3.3.3-45 versions shipped by ATM9; the AdvancedAE 1.3-only reaction chamber adapter is skipped on 1.2.x instead of throwing `NoSuchFieldError`.
+- 为 Mekanism Extras 1.5 的 plural registries 与 genregistries 钠 API 加上缺失字段守护，字段不存在时不再导致类加载失败
+  - Guarded the Mekanism Extras 1.5 plural registries and genregistries naquadah API so an absent field can no longer fail class loading.
+- 修复 ExtendedAE 的 `matrix_pattern_count`：在 `exposedInventory` 包装之前调整样板库存，使服务端库存、客户端跟踪与界面三者保持一致
+  - Fixed ExtendedAE `matrix_pattern_count` by resizing the pattern inventory before `exposedInventory` wraps it, keeping the server inventory, client tracker and GUI consistent.
+- 可选配方适配器与能力类在当前 Forge 环境中不存在时改为 debug 级别跳过，真实调用失败仍会警告一次
+  - Optional recipe-adapter and capability classes that are absent from this Forge profile are now skipped at debug level; real invocation failures still warn once.
+
 ## [20.2.4.6]
 
 面向 Forge 1.20.1 的首次正式发布。本版本把 1.20.1 线自 `26.6.16` 起整体对齐到 1.21 线的 `2.4.6` 特性树，

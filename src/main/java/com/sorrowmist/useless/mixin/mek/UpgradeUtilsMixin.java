@@ -16,7 +16,7 @@ import java.util.List;
 /**
  * Mixin for UpgradeUtils to modify upgrade information display
  */
-@Mixin(value = UpgradeUtils.class, remap = false)
+@Mixin(value = UpgradeUtils.class, remap = false, priority = 2000)
 public class UpgradeUtilsMixin {
 
     /**

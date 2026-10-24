@@ -2,14 +2,14 @@ package com.sorrowmist.useless.mixin.mek;
 
 import mekanism.api.Upgrade;
 import mekanism.common.tile.machine.TileEntityDigitalMiner;
-import com.sorrowmist.useless.utils.MekTemp;
+import com.sorrowmist.useless.utils.MekanismAccelerationState;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-@Mixin(value = TileEntityDigitalMiner.class, remap = false)
+@Mixin(value = TileEntityDigitalMiner.class, remap = false, priority = 2000)
 public abstract class DigitalMinerMixin {
 
     @Shadow private int delay;
@@ -28,9 +28,12 @@ public abstract class DigitalMinerMixin {
             remap = false
     )
     private void onEnergyExtracted(CallbackInfo cir) {
+        if (MekanismAccelerationState.rebornOwnsAcceleration()) {
+            return;
+        }
         if (this.delay < 0) {
             // 补足所有负 delay 的挖掘
-            int extraOperations = Math.min(-this.delay, MekTemp.MAX_EXTRA_OPERATIONS_PER_TICK);
+            int extraOperations = Math.min(-this.delay, MekanismAccelerationState.MAX_EXTRA_OPERATIONS_PER_TICK);
             for (int i = 0; i < extraOperations; i++) {
                 this.tryMineBlock();
             }

@@ -54,7 +54,7 @@ dependencies {
     modCompileOnly 'maven.modrinth:rxYaglEe:d83Wdhdn' // AdvancedAE 1.3.6-1.20.1
     modCompileOnly 'maven.modrinth:qDJXZJTz:PQ3IlR98' // Mekanism More Machine 1.2.1
     modCompileOnly 'maven.modrinth:rqFWfVlz:tT3CLYvK' // apotheosis-1.20.1-7.4.8
-    modCompileOnly 'maven.modrinth:IiATswDj:d9GM663Q' // applied-mekanistics-1.4.2
+    modCompileOnly 'maven.modrinth:IiATswDj:9n9p68Qq' // applied-mekanistics-1.4.3
     modCompileOnly 'maven.modrinth:XxWD5pD3:jYgSnxye' // appliedenergistics2-forge-15.4.11
     modCompileOnly 'maven.modrinth:udZtKfzP:Qm3GW128' // neoecoae-20.4.2-forge
     modCompileOnly 'maven.modrinth:B1CBVXHX:YSOP0G6O' // ldlib-forge-1.20.1-1.0.52.a
@@ -81,8 +81,8 @@ dependencies {
     modCompileOnly 'maven.modrinth:fRiHVvU7:WtJS5tVw' // emi-1.1.22-1.20.1-forge
     modCompileOnly 'maven.modrinth:u6dRKJwZ:TrKZlZ0b' // JEI 15.74.0.227
     modCompileOnly 'maven.modrinth:umyGl7zF:g5igndAv' // kubejs-forge-2001.6.5-build.16
-    modCompileOnly 'maven.modrinth:Ce6I4WUE:9iboPfea' // mekanism-1.20.1-10.4.15.75
-    modCompileOnly 'maven.modrinth:OFVYKsAk:x9re7wt4' // mekanismgenerators-1.20.1-10.4.15.75
+    modCompileOnly 'maven.modrinth:Ce6I4WUE:uxe1WQp4' // mekanism-1.20.1-10.4.16.80
+    modCompileOnly 'maven.modrinth:OFVYKsAk:Th4Czz4N' // mekanismgenerators-1.20.1-10.4.16.80
     modCompileOnly 'maven.modrinth:tCkE8p2N:6SkuAGoz' // placebo-1.20.1-8.6.3
     modCompileOnly 'maven.modrinth:KZO4S4DO:xDOvxyqP' // powah-5.0.11
     modCompileOnly 'com.tterrag.registrate:Registrate:MC1.20-1.3.11' // registrate-mc1.20-1.3.11
@@ -91,7 +91,7 @@ dependencies {
     modCompileOnly 'maven.modrinth:1Ro7m06l:8krhHkrZ' // titanium-1.20.1-3.8.32
     modCompileOnly 'maven.modrinth:Rw1NrDzF:tHDveaxK' // cucumber-1.20.1-7.0.15
     modCompileOnly 'maven.modrinth:UhW5uCKw:eoUaDkZf' // glodium-1.20-1.5-forge
-    modCompileOnly 'maven.modrinth:HUZkxNTQ:zzqHs32A' // mekanism_extras-1.20.1-1.4.1
+    modCompileOnly 'maven.modrinth:HUZkxNTQ:9T6CetkG' // mekanism_extras-1.20.1-1.5.0
     modCompileOnly 'net.createmod.ponder:Ponder-Forge-1.20.1:1.0.80' // ponder-forge-1.20.1-1.0.80
     modCompileOnly 'dev.engine-room.flywheel:flywheel-forge-1.20.1:1.0.4' // flywheel-forge-1.20.1-1.0.4
     annotationProcessor 'org.spongepowered:mixin:0.8.5:processor'

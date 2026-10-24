@@ -41,7 +41,7 @@ ordering="AFTER"
 side="BOTH"
 
 # Optional integrations: absence is allowed; installed versions must match the supported API line.
-# Minimums are the versions used by this Forge build, taken from each dependency's mods.toml.
+# Minimums are the lowest API lines accepted by this Forge build; compile pins live in build.gradle.
 
 [[dependencies.useless_mod]]
 modId="advanced_ae"
@@ -88,7 +88,7 @@ side="BOTH"
 [[dependencies.useless_mod]]
 modId="botanypots"
 mandatory=false
-versionRange="[13.0.41,14)"
+versionRange="[13.0.0,14)"
 ordering="AFTER"
 side="BOTH"
 
@@ -291,7 +291,7 @@ side="BOTH"
 [[dependencies.useless_mod]]
 modId="mekanism_extras"
 mandatory=false
-versionRange="[1.20.1-1.4.1,1.20.2)"
+versionRange="[1.5.0,2)"
 ordering="AFTER"
 side="BOTH"
 

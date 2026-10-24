@@ -71,12 +71,14 @@ class DependencyMetadataTest {
     @Test void obsoleteApisAreRejectedButTheUpdatedPackVersionsRemainAllowed() throws Exception {
         var requirements = requirements();
         for (var entry : Map.of("ae2", "15.4.10", "expatternprovider", "1.20-1.4.12-forge",
-                "jei", "15.48.0.177", "extendedcrafting", "6.1.5u", "mekanism", "10.4.15").entrySet()) {
+                "jei", "15.48.0.177", "extendedcrafting", "6.1.5u", "mekanism", "10.4.15",
+                "botanypots", "13.0.0", "mekanism_extras", "1.5.0").entrySet()) {
             var range = VersionRange.createFromVersionSpec(requirements.get(entry.getKey()).get("versionRange"));
             assertTrue(range.containsVersion(new DefaultArtifactVersion(entry.getValue())), entry.toString());
         }
         for (var entry : Map.of("ae2", "14.0.0", "create", "0.5.1", "mekanism", "10.3.0",
-                "jei", "15.0.0", "exdeorum", "1.0").entrySet()) {
+                "jei", "15.0.0", "exdeorum", "1.0",
+                "botanypots", "12.0.0", "mekanism_extras", "1.4.1").entrySet()) {
             var range = VersionRange.createFromVersionSpec(requirements.get(entry.getKey()).get("versionRange"));
             assertFalse(range.containsVersion(new DefaultArtifactVersion(entry.getValue())), entry.toString());
         }

@@ -6,7 +6,7 @@ import mekanism.common.util.MekanismUtils;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.*;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
-@Mixin(value=MekanismUtils.class,remap=false)
+@Mixin(value = MekanismUtils.class, remap = false, priority = 2000)
 public class MekanismUtilsMixin {
     @Inject(method="getTicks",at=@At("HEAD"),cancellable=true)
     private static void ticks(IUpgradeTile tile,int base,CallbackInfoReturnable<Integer> cir){

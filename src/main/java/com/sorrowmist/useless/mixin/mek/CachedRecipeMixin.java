@@ -1,6 +1,6 @@
 package com.sorrowmist.useless.mixin.mek;
 
-import com.sorrowmist.useless.utils.MekTemp;
+import com.sorrowmist.useless.utils.MekanismAccelerationState;
 import mekanism.api.recipes.cache.CachedRecipe;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
@@ -10,7 +10,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 import java.util.function.IntSupplier;
 
-@Mixin(value = CachedRecipe.class, remap = false)
+@Mixin(value = CachedRecipe.class, remap = false, priority = 2000)
 public abstract class CachedRecipeMixin {
 
     @Shadow
@@ -29,6 +29,6 @@ public abstract class CachedRecipeMixin {
             remap = false
     )
     private void injected(CallbackInfo ci) {
-        MekTemp.inject.accept(this.requiredTicks.getAsInt(), this::process);
+        MekanismAccelerationState.inject.accept(this.requiredTicks.getAsInt(), this::process);
     }
 }

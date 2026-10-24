@@ -200,6 +200,10 @@ public final class RecipeAdapterCompatRegistry {
     }
 
     private static void registerByName(String className) {
+        if (!isClassAvailable(className)) {
+            LOGGER.debug("Optional recipe adapter {} is not present in this build", className);
+            return;
+        }
         try {
             Class<?> type=Class.forName(className,true,RecipeAdapterCompatRegistry.class.getClassLoader());
             register((IRecipeAdapter<?>)type.getConstructor().newInstance());
@@ -209,6 +213,10 @@ public final class RecipeAdapterCompatRegistry {
     }
 
     private static void registerFactory(String className) {
+        if (!isClassAvailable(className)) {
+            LOGGER.debug("Optional recipe adapter factory {} is not present in this build", className);
+            return;
+        }
         try {
             Class<?> type=Class.forName(className,true,RecipeAdapterCompatRegistry.class.getClassLoader());
             var adapters=(java.util.List<?>)type.getMethod("createAdapters").invoke(null);
@@ -329,6 +337,10 @@ public final class RecipeAdapterCompatRegistry {
     }
 
     private static void invokeOptionalLoader(String className) {
+        if (!isClassAvailable(className)) {
+            LOGGER.debug("Optional recipe adapter loader {} is not present in this build", className);
+            return;
+        }
         try {
             Class<?> loader = Class.forName(className, true, RecipeAdapterCompatRegistry.class.getClassLoader());
             loader.getMethod("register").invoke(null);

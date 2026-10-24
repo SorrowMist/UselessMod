@@ -579,7 +579,7 @@ public final class AlloyFurnaceRecipeCatalog {
                 Map.copyOf(bySource), Map.copyOf(bySourceAndRecipeId), generation,
                 new ConcurrentHashMap<>(), new ConcurrentHashMap<>(),
                 ConcurrentHashMap.newKeySet());
-        LOGGER.info("Built alloy-furnace recipe catalog: generation={}, recipes={}, sources={}, elapsed={} ms",
+        LOGGER.debug("Built alloy-furnace recipe catalog: generation={}, recipes={}, sources={}, elapsed={} ms",
                 generation, ordered.size(), bySource.size(), (System.nanoTime() - startedAt) / 1_000_000L);
         return snapshot;
     }

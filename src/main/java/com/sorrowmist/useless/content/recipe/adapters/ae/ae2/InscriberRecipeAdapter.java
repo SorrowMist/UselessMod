@@ -29,7 +29,7 @@ import java.util.Map;
  * 将压印器配方转换为高级合金熔炉配方
  * <p>
  * 处理逻辑：
- * - 压印模板（顶部/底部）→ 模具(mold)
+ * - 压印器机器始终是第一个模具；压印模板（顶部/底部）→ 额外模具(mold)
  *   - INSCRIBE 模式：模具不消耗（正常模具行为）
  *   - PRESS 模式：模具被消耗（需要特殊处理）
  * - 中间物品 → 普通输入（总是被消耗）
@@ -51,14 +51,12 @@ public class InscriberRecipeAdapter implements IRecipeAdapter<InscriberRecipe> {
     @Override
     @Nullable
     public ItemStack getMoldItem() {
-        return null;
+        return new ItemStack(AEBlocks.INSCRIBER.asItem());
     }
 
     @Override
     public boolean matchesMold(@Nullable ItemStack mold) {
-        if (mold == null || mold.isEmpty()) return false;
-        if (ItemStack.isSameItem(mold, new ItemStack(AEBlocks.INSCRIBER.asItem()))) return true;
-        return true;
+        return mold != null && !mold.isEmpty() && mold.is(AEBlocks.INSCRIBER.asItem());
     }
 
     @Override
@@ -84,7 +82,8 @@ public class InscriberRecipeAdapter implements IRecipeAdapter<InscriberRecipe> {
 
         // 构建输入列表
         List<CountedIngredient> countedIngredients = new ArrayList<>();
-        Ingredient moldIngredient;
+        List<Ingredient> molds = new ArrayList<>();
+        molds.add(Ingredient.of(getMoldItem()));
 
         if (processType == InscriberProcessType.PRESS) {
             // PRESS 模式：所有物品（顶部、底部、中间）都放入输入栏，以 ae2:inscriber 作为模具
@@ -95,30 +94,27 @@ public class InscriberRecipeAdapter implements IRecipeAdapter<InscriberRecipe> {
             if (!isIngredientEmpty(bottomInput)) {
                 countedIngredients.add(new CountedIngredient(bottomInput, 1));
             }
-            moldIngredient = Ingredient.of(AEBlocks.INSCRIBER.asItem());
         } else {
-            // INSCRIBE 模式：以顶部或底部物品作为模具（不消耗），中间物品作为输入
+            // The machine and BOTH non-consumed plates are required (AND), not alternatives.
+            // Keeping the machine first also makes every printing recipe discoverable by inscriber.
             countedIngredients.add(new CountedIngredient(middleInput, 1));
-            if (!isIngredientEmpty(topInput)) {
-                moldIngredient = topInput;
-            } else if (!isIngredientEmpty(bottomInput)) {
-                moldIngredient = bottomInput;
-            } else {
-                moldIngredient = Ingredient.of(AEBlocks.INSCRIBER.asItem());
-            }
+            if (!isIngredientEmpty(topInput)) molds.add(topInput);
+            if (!isIngredientEmpty(bottomInput)) molds.add(bottomInput);
         }
 
         AdvancedAlloyFurnaceRecipe convertedRecipe = new AdvancedAlloyFurnaceRecipe(
                 AdapterUtils.convertedId(originalId),
                 countedIngredients,
                 List.of(),
+                List.of(),
                 List.of(output.copy()),
+                List.of(),
                 List.of(),
                 TOTAL_ENERGY,
                 AE2_PROCESS_TICKS,
                 Ingredient.EMPTY,  // 催化剂（AE2压印器配方不使用催化剂）
                 0,
-                moldIngredient,    // 模具
+                molds,             // machine + every reusable plate
                 AlloyFurnaceMode.NORMAL
         );
 
@@ -153,46 +149,16 @@ public class InscriberRecipeAdapter implements IRecipeAdapter<InscriberRecipe> {
 
         List<RecipeHolder<InscriberRecipe>> matches = new java.util.ArrayList<>();
 
-        boolean hasMold = mold != null && !mold.isEmpty();
-
+        if (!matchesMold(mold)) return List.of();
         for (RecipeHolder<InscriberRecipe> holder : recipes) {
-            InscriberRecipe recipe = holder.value();
-
-            Ingredient middleInput = recipe.getMiddleInput();
-            Ingredient topInput = recipe.getTopOptional();
-            Ingredient bottomInput = recipe.getBottomOptional();
-            InscriberProcessType processType = recipe.getProcessType();
-
-            if (middleInput == null || isIngredientEmpty(middleInput)) continue;
-
-            boolean hasTop = !isIngredientEmpty(topInput);
-            boolean hasBottom = !isIngredientEmpty(bottomInput);
-
-            if (processType == InscriberProcessType.PRESS) {
-                if (!hasMold || !ItemStack.isSameItem(mold, new ItemStack(AEBlocks.INSCRIBER.asItem()))) continue;
-
-                Map<Ingredient, Long> requiredInputs = new LinkedHashMap<>();
-                AdapterUtils.mergeIngredient(requiredInputs, middleInput, 1L);
-                if (hasTop) AdapterUtils.mergeIngredient(requiredInputs, topInput, 1L);
-                if (hasBottom) AdapterUtils.mergeIngredient(requiredInputs, bottomInput, 1L);
-                if (!AdapterUtils.matchesRequired(mergedInputs, requiredInputs)) continue;
-
-                matches.add(holder);
-            } else {
-                boolean moldMatchesTop = hasTop && hasMold && topInput.test(mold);
-                boolean moldMatchesBottom = hasBottom && hasMold && bottomInput.test(mold);
-
-                if ((hasTop || hasBottom) && (!hasMold || !moldMatchesTop && !moldMatchesBottom)) {
-                    continue;
-                }
-
-                Map<Ingredient, Long> requiredInputs = new LinkedHashMap<>();
-                AdapterUtils.mergeIngredient(requiredInputs, middleInput, 1L);
-                if (!AdapterUtils.matchesRequired(mergedInputs, requiredInputs)) continue;
-
-                matches.add(holder);
+            for (var converted : convertAll(holder, level)) {
+                Map<Ingredient, Long> required = new LinkedHashMap<>();
+                for (var input : converted.inputs()) AdapterUtils.mergeIngredient(required, input.ingredient(), input.count());
+                if (AdapterUtils.matchesRequired(mergedInputs, required)) matches.add(holder);
             }
         }
+        // Multi-mold recipes are subsequently checked by the mold hub; a single mold slot
+        // cannot satisfy the additional reusable plates.
 
         return matches;
     }

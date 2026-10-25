@@ -53,6 +53,7 @@
     "botanypots.BotanyPotRendererMixin",
     "botanypots.PhasedDisplayStateRendererMixin",
     "eae.GuiAssemblerMatrixPatternInfoMixin",
+    "emi.EmiEncodePatternHandlerMixin",
     "emi.JemiAEKeyMixin",
     "emi.JemiAEKeyRegistrationMixin"
   ],

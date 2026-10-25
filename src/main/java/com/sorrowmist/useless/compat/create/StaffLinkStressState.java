@@ -259,15 +259,6 @@ public final class StaffLinkStressState {
             capacitySum = INFINITE_POWER;
         }
 
-        // 诊断：把每个输入网络的真实构成打出来（每 20 tick 一行）。
-        //
-        // Create 6.0.x 的应力口径和直觉不一样，出问题时光看汇总数根本定位不到：
-        //   · `calculateStress()` 遍历 `members` 时**不跳过动力源**，而 `add()` 会把所有方块
-        //     （含源）都放进 `members`，取值是**加入时缓存的** `calculateStressApplied()`；
-        //   · `calculateCapacity()` 用 `sources` 里缓存的容量 × **`getGeneratedSpeed()`**；
-        //   · 两者都还要加上 `unloadedStress` / `unloadedCapacity`（区块未加载的成员残值）。
-        // 所以「谁贡献了多少」必须逐块打出来才能对上账。
-
         // 配置区状态行用<b>整条线路</b>汇总的三个数。
         //
         // 玩家想知道的是「这条无线链路总共能借出多少」。四台风车轴承各自成网时，只看单个锚点

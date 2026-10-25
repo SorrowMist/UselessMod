@@ -510,7 +510,6 @@ public final class AlloyFurnaceRecipeCatalog {
     }
 
     private static Snapshot build(Level level, long generation) {
-        long startedAt = System.nanoTime();
         List<CollectedRecipe> recipes = new ArrayList<>();
         for (RecipeHolder<AdvancedAlloyFurnaceRecipe> holder : com.sorrowmist.useless.compat.forge1201.recipe.RecipeManagerAccess.getAllRecipesFor(level.getRecipeManager(), ModRecipeTypes.ADVANCED_ALLOY_FURNACE_TYPE.get())) {
             recipes.add(new CollectedRecipe(holder.value(), RecipeSourceIds.CORE));
@@ -575,13 +574,10 @@ public final class AlloyFurnaceRecipeCatalog {
         }
         bySource.replaceAll((ignored, entries) -> List.copyOf(entries));
         bySourceAndRecipeId.replaceAll((ignored, entries) -> List.copyOf(entries));
-        Snapshot snapshot = new Snapshot(ordered, Map.copyOf(unique), Map.copyOf(byRecipeId),
+        return new Snapshot(ordered, Map.copyOf(unique), Map.copyOf(byRecipeId),
                 Map.copyOf(bySource), Map.copyOf(bySourceAndRecipeId), generation,
                 new ConcurrentHashMap<>(), new ConcurrentHashMap<>(),
                 ConcurrentHashMap.newKeySet());
-        LOGGER.debug("Built alloy-furnace recipe catalog: generation={}, recipes={}, sources={}, elapsed={} ms",
-                generation, ordered.size(), bySource.size(), (System.nanoTime() - startedAt) / 1_000_000L);
-        return snapshot;
     }
 
     /** 一个待做配方转换的 adapter 及其来源标识。 */
@@ -594,8 +590,8 @@ public final class AlloyFurnaceRecipeCatalog {
     }
 
     /**
-     * 为单条配方计算身份指纹。无法编码的配方返回 {@code null} 并只记一行日志：这是
-     * 「可预期的坏配方」而不是故障，明细放 DEBUG 的配方字段 dump，不刷整条异常栈。
+     * 为单条配方计算身份指纹。无法编码时返回 {@code null}，通过限流告警保留原因，
+     * 避免坏配方在并行扫描时刷出大量重复日志。
      *
      * <p>本方法被并行调用，因此只读取入参、不触碰任何可变共享状态。</p>
      */

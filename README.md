@@ -4,11 +4,11 @@ A Minecraft mod featuring various utilities and enhancements.
 
 ## Forge 1.20.1
 
-Version `20.2.4.7` targets Minecraft 1.20.1, Forge 47.3.10+, Java 17,
+Version `20.2.4.9` targets Minecraft 1.20.1, Forge 47.3.10+, Java 17,
 AE2 15.4.8+, Mekanism 10.4.15+ (compiled against 10.4.16.80),
 Mekanism Extras 1.5.0+ and the Create 2 Mekanism: Sky Edition 2 integration profile.
 Build with `./gradlew build` (Windows: `gradlew.bat build`); Python 3 is used by
-nine release-bytecode/outline regression checks. Dependencies resolve from public Maven repositories.
+release-bytecode and outline regression checks. Dependencies resolve from public Maven repositories.
 The `portBridgeTest` suite also runs as part of `check` and is not shipped in the mod jar.
 
 Forge, Minecraft and AE2 are required. Every compiled mod integration declares a

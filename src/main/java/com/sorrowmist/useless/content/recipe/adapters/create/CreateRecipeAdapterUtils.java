@@ -3,6 +3,8 @@ package com.sorrowmist.useless.content.recipe.adapters.create;
 import com.sorrowmist.useless.utils.RateLimitedLogger;
 
 import com.simibubi.create.content.fluids.transfer.FillingRecipe;
+import com.simibubi.create.content.fluids.transfer.EmptyingRecipe;
+import com.simibubi.create.content.kinetics.saw.CuttingRecipe;
 import com.simibubi.create.content.kinetics.millstone.MillingRecipe;
 import com.simibubi.create.content.kinetics.mixer.CompactingRecipe;
 import com.simibubi.create.content.kinetics.mixer.MixingRecipe;
@@ -45,6 +47,7 @@ import java.util.Set;
 final class CreateRecipeAdapterUtils {
     private static final Set<String> MACHINE_MOLD_PATHS = Set.of(
             "spout",
+            "item_drain",
             "mechanical_press",
             "mechanical_mixer",
             "basin",
@@ -94,6 +97,8 @@ final class CreateRecipeAdapterUtils {
 
     static boolean supportsProcessing(ProcessingRecipe<?> recipe) {
         return recipe instanceof FillingRecipe
+                || recipe instanceof EmptyingRecipe
+                || recipe instanceof CuttingRecipe
                 || recipe instanceof PressingRecipe
                 || recipe instanceof CompactingRecipe
                 || recipe instanceof MixingRecipe
@@ -107,6 +112,10 @@ final class CreateRecipeAdapterUtils {
         List<Ingredient> molds = new ArrayList<>();
         if (recipe instanceof FillingRecipe) {
             addBlockMold(molds, "spout");
+        } else if (recipe instanceof EmptyingRecipe) {
+            addBlockMold(molds, "item_drain");
+        } else if (recipe instanceof CuttingRecipe) {
+            addBlockMold(molds, "mechanical_saw");
         } else if (recipe instanceof PressingRecipe) {
             addBlockMold(molds, "mechanical_press");
         } else if (recipe instanceof CompactingRecipe) {

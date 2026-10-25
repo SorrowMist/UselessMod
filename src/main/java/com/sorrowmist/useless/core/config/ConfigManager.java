@@ -157,6 +157,7 @@ public class ConfigManager {
     private static final ForgeConfigSpec.BooleanValue ENABLE_MALUM_RECIPE_CONVERSION;
     private static final ForgeConfigSpec.BooleanValue ENABLE_ENDER_IO_RECIPE_CONVERSION;
     private static final ForgeConfigSpec.BooleanValue ENABLE_CREATE_RECIPE_CONVERSION;
+    private static final ForgeConfigSpec.BooleanValue ENABLE_TCONSTRUCT_RECIPE_CONVERSION;
     private static final ForgeConfigSpec.BooleanValue ENABLE_ORITECH_RECIPE_CONVERSION;
     private static final ForgeConfigSpec.BooleanValue ENABLE_NEOVITAE_RECIPE_CONVERSION;
     private static final ForgeConfigSpec.BooleanValue ENABLE_UFO_RECIPE_CONVERSION;
@@ -756,6 +757,8 @@ public class ConfigManager {
                 "enable_bigreactors_recipe_conversion", true);
         ENABLE_CREATE_RECIPE_CONVERSION = defineRecipeConversionOption(
                 "enable_create_recipe_conversion", true);
+        ENABLE_TCONSTRUCT_RECIPE_CONVERSION = defineRecipeConversionOption(
+                "enable_tconstruct_recipe_conversion", true);
         ENABLE_DRACONIC_EVOLUTION_RECIPE_CONVERSION = defineRecipeConversionOption(
                 "enable_draconic_evolution_recipe_conversion", true);
         ENABLE_ENDER_IO_RECIPE_CONVERSION = defineRecipeConversionOption(
@@ -830,6 +833,7 @@ public class ConfigManager {
                 Map.entry("casualnessdelight", ENABLE_CASUALNESS_DELIGHT_RECIPE_CONVERSION),
                 Map.entry("crabbersdelight", ENABLE_CRABBERS_DELIGHT_RECIPE_CONVERSION),
                 Map.entry("create", ENABLE_CREATE_RECIPE_CONVERSION),
+                Map.entry("tconstruct", ENABLE_TCONSTRUCT_RECIPE_CONVERSION),
                 Map.entry("data_energistics", ENABLE_DATA_ENERGISTICS_RECIPE_CONVERSION),
                 Map.entry("draconicevolution", ENABLE_DRACONIC_EVOLUTION_RECIPE_CONVERSION),
                 Map.entry("enderio", ENABLE_ENDER_IO_RECIPE_CONVERSION),

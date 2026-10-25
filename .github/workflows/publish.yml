@@ -56,26 +56,8 @@ jobs:
           fi
           artifact_path="build/libs/useless_mod-${mod_version}.jar"
 
-          # 发布说明以 CHANGELOG.md 中该版本的章节为准；章节缺失时回退到 Release 正文，
-          # 再回退到自上一个标签以来的提交标题，避免平台侧出现空 changelog。
-          # CHANGELOG.md 的版本标题与 mod_version 完全一致（1.20.1 线不带前缀），无需去前缀。
-          cl_version="${mod_version}"
-          changelog=""
-          if [[ -f CHANGELOG.md ]]; then
-            changelog="$(awk -v ver="${cl_version}" '
-              index($0, "## [" ver "]") == 1 { found = 1; next }
-              found && index($0, "## [") == 1 { exit }
-              found { lines[++n] = $0 }
-              END {
-                start = 1; while (start <= n && lines[start] ~ /^[[:space:]]*$/) start++
-                end = n; while (end >= start && lines[end] ~ /^[[:space:]]*$/) end--
-                for (i = start; i <= end; i++) print lines[i]
-              }
-            ' CHANGELOG.md)"
-          fi
-          if [[ -z "${changelog//[[:space:]]/}" ]]; then
-            changelog="${RELEASE_BODY}"
-          fi
+          # 使用 Release 正文；未填写时从提交记录生成平台要求的发布说明。
+          changelog="${RELEASE_BODY}"
           if [[ -z "${changelog//[[:space:]]/}" ]]; then
             prev_tag="$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || true)"
             if [[ -n "${prev_tag}" ]]; then
@@ -97,7 +79,7 @@ jobs:
             echo "CHANGELOG_EOF"
           } >> "$GITHUB_OUTPUT"
 
-      - name: Setup JDK 21
+      - name: Setup JDK 17
         uses: actions/setup-java@v4
         with:
           java-version: '17'

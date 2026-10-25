@@ -127,14 +127,20 @@ public final class OmniversalPatternJeiTransferHandler<T extends PatternEncoding
 
         // Sent before the slot contents so the pick is on record by the time the server sees the
         // encoded pattern, including when a helper mod encodes it automatically on the same tick.
-        PacketDistributor.sendToServer(new SelectOmniversalPatternRecipePacket(
-                menu.containerId,
-                recipe.id(),
-                AlloyFurnaceRecipeFingerprint.create(recipe, player.level().registryAccess()),
-                entry.sourceId()));
+        selectRecipe(menu, entry, player.level());
         // Forge ExtendedAE Plus has no search-preset API; it must not gate AE2 pattern transfer.
         EncodingHelper.encodeProcessingRecipe(menu, inputs, outputs);
         return null;
+    }
+
+    /** Records an explicit recipe-viewer selection before AE2 fills the terminal slots. */
+    public static void selectRecipe(
+            PatternEncodingTermMenu menu, AlloyFurnaceRecipeCatalog.Entry entry,
+            net.minecraft.world.level.Level level) {
+        PacketDistributor.sendToServer(new SelectOmniversalPatternRecipePacket(
+                menu.containerId, entry.recipe().id(),
+                AlloyFurnaceRecipeFingerprint.create(entry.recipe(), level.registryAccess()),
+                entry.sourceId()));
     }
 
     /**
@@ -188,8 +194,9 @@ public final class OmniversalPatternJeiTransferHandler<T extends PatternEncoding
         return inputs;
     }
 
+    /** Canonical item, fluid and AE-key outputs, also used by the native EMI encoder. */
     @Nullable
-    private static List<GenericStack> outputs(AdvancedAlloyFurnaceRecipe recipe) {
+    public static List<GenericStack> outputs(AdvancedAlloyFurnaceRecipe recipe) {
         if (recipe == null) return null;
         List<GenericStack> outputs = new ArrayList<>();
         for (ItemStack stack : recipe.outputs()) {

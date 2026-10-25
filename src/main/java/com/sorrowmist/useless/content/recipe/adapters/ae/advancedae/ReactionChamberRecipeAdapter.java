@@ -13,30 +13,41 @@ import net.minecraft.world.item.crafting.Ingredient;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.material.Fluids;
 import net.minecraftforge.fluids.FluidStack;
-import net.pedroksl.advanced_ae.common.definitions.AAEBlocks;
 import net.pedroksl.advanced_ae.recipes.ReactionChamberRecipe;
 import java.util.*;
 
-/** AdvancedAE 1.3 uses AE2AddonLib ingredients; its fluid predicate ignores NBT. */
+/** Supports both the native 1.2 ingredient classes and the 1.3 addon-lib API. */
 public class ReactionChamberRecipeAdapter implements IRecipeAdapter<ReactionChamberRecipe> {
     @Override public Class<ReactionChamberRecipe> getRecipeClass() { return ReactionChamberRecipe.class; }
-    @Override public ItemStack getMoldItem() { return new ItemStack(AAEBlocks.REACTION_CHAMBER.block()); }
+    @Override public ItemStack getMoldItem() {
+        // The block-definition class/field descriptor also changed between 1.2 and 1.3.
+        return new ItemStack(net.minecraft.core.registries.BuiltInRegistries.ITEM.get(
+                new net.minecraft.resources.ResourceLocation("advanced_ae", "reaction_chamber")));
+    }
 
     @Override public AdvancedAlloyFurnaceRecipe convert(RecipeHolder<ReactionChamberRecipe> holder,Level level) {
         if (holder == null || holder.value() == null) return null;
         var source=holder.value();
         List<CountedIngredient> items=new ArrayList<>();
         if (source.getInputs() == null) return null;
-        for (var input:source.getInputs()) {
-            if (input == null || input.getAmount() <= 0 || AdapterUtils.isIngredientEmpty(input.getIngredient())) return null;
-            items.add(new CountedIngredient(input.getIngredient(),input.getAmount()));
+        // Do not link IngredientStack or getFluid's return descriptor: both moved in 1.3.
+        for (Object input:source.getInputs()) {
+            if (input == null) return null;
+            Object value = nativeValue(input, "getIngredient");
+            int amount = ((Number) nativeValue(input, "getAmount")).intValue();
+            if (amount <= 0 || !(value instanceof Ingredient ingredient) || AdapterUtils.isIngredientEmpty(ingredient)) return null;
+            items.add(new CountedIngredient(ingredient,amount));
         }
         List<SizedFluidIngredient> fluids=new ArrayList<>();
-        var fluid=source.getFluid();
-        // Zero-amount native fluid is the explicit no-fluid sentinel.
-        if (fluid != null && fluid.getAmount() != 0) {
-            if (fluid.getAmount() < 0 || fluid.getIngredient() == null || fluid.getIngredient() == Fluids.EMPTY) return null;
-            fluids.add(new SizedFluidIngredient(FluidIngredient.single(fluid.getIngredient()),fluid.getAmount()));
+        Object fluid=nativeValue(source,"getFluid");
+        // Both native versions compare exact fluid IDs, ignoring NBT; zero is the no-fluid sentinel.
+        if (fluid != null) {
+            int amount=((Number)nativeValue(fluid,"getAmount")).intValue();
+            if (amount != 0) {
+                Object value=nativeValue(fluid,"getIngredient");
+                if (amount < 0 || !(value instanceof net.minecraft.world.level.material.Fluid liquid) || liquid == Fluids.EMPTY) return null;
+                fluids.add(new SizedFluidIngredient(FluidIngredient.single(liquid),amount));
+            }
         }
         if (items.isEmpty() && fluids.isEmpty()) return null;
         var output=source.output;
@@ -50,6 +61,14 @@ public class ReactionChamberRecipeAdapter implements IRecipeAdapter<ReactionCham
         return new AdvancedAlloyFurnaceRecipe(AdapterUtils.convertedId(holder.id()),items,fluids,outputs,outputFluids,
                 source.getEnergy(),AdapterUtils.ADVANCEDAE_REACTION_CHAMBER_PROCESS_TIME,Ingredient.EMPTY,0,
                 AdapterUtils.toMoldIngredient(getMoldItem()),AlloyFurnaceMode.NORMAL);
+    }
+
+    static Object nativeValue(Object target, String method) {
+        try {
+            return target.getClass().getMethod(method).invoke(target);
+        } catch (ReflectiveOperationException exception) {
+            throw new IllegalArgumentException("Unsupported AdvancedAE ingredient API: " + method, exception);
+        }
     }
 
     public boolean matches(AdvancedAlloyFurnaceRecipe recipe,Map<Ingredient,Long> items,Map<FluidStack,Long> fluids) {

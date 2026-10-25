@@ -140,6 +140,8 @@ public final class RecipeAdapterCompatRegistry {
             new CompatEntry(MALUM, RecipeAdapterCompatRegistry::registerMalum),
             new CompatEntry(ENDER_IO, RecipeAdapterCompatRegistry::registerEnderIO),
             new CompatEntry(CREATE, RecipeAdapterCompatRegistry::registerCreate),
+            new CompatEntry("tconstruct", () -> registerFactory(
+                    "com.sorrowmist.useless.content.recipe.adapters.tconstruct.TConstructRecipeAdapter")),
             new CompatEntry(ORITECH, RecipeAdapterCompatRegistry::registerOritech),
             new CompatEntry(NEOVITAE, RecipeAdapterCompatRegistry::registerNeoVitae),
             new CompatEntry(UFO, RecipeAdapterCompatRegistry::registerUfo),
@@ -323,10 +325,6 @@ public final class RecipeAdapterCompatRegistry {
     }
 
     private static void registerAdvancedAE() {
-        if (!isClassAvailable("net.pedroksl.ae2addonlib.recipes.IngredientStack$Item")) {
-            LOGGER.debug("AdvancedAE 1.2.x does not expose the 1.3 addon-lib recipe API; skipping reaction chamber adapter");
-            return;
-        }
         registerByName("com.sorrowmist.useless.content.recipe.adapters.ae.advancedae.ReactionChamberRecipeAdapter");
     }
 

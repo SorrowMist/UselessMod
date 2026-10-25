@@ -91,6 +91,22 @@ class CreateNativeRecipeTest {
         assertEquals(1,recipe.outputs().get(0).getCount());
     }
 
+    @Test void cuttingAndKubeJsPaintBallDrainingAreSupportedWithFullOutputs() {
+        for (var type : List.of(com.simibubi.create.content.kinetics.saw.CuttingRecipe.class,
+                com.simibubi.create.content.fluids.transfer.EmptyingRecipe.class)) {
+            var source=mock(type);
+            when(source.getIngredients()).thenReturn(NonNullList.of(Ingredient.EMPTY,Ingredient.of(Items.SLIME_BALL)));
+            when(source.getFluidIngredients()).thenReturn(NonNullList.create());
+            when(source.getRollableResults()).thenReturn(List.of(new ProcessingOutput(new ItemStack(Items.SLIME_BALL),1)));
+            when(source.getFluidResults()).thenReturn(NonNullList.of(FluidStack.EMPTY,new FluidStack(Fluids.WATER,250)));
+            assertTrue(CreateRecipeAdapterUtils.supportsProcessing(source));
+            var converted=CreateRecipeAdapterUtils.convertProcessing(new ResourceLocation("kubejs:ae2/draining_green_ball"),
+                    source,List.of(Ingredient.of(Items.HOPPER)),LoggerFactory.getLogger(CreateNativeRecipeTest.class));
+            assertNotNull(converted); assertEquals(250,converted.outputFluids().get(0).getAmount());
+            assertEquals(1,converted.inputs().get(0).count()); assertEquals(1,converted.outputs().size());
+        }
+    }
+
     private static final class AssemblyFixture extends SequencedAssemblyRecipe {
         AssemblyFixture(PressingRecipe step) {
             super(ID,null);

@@ -12,6 +12,7 @@ import com.sorrowmist.useless.init.ModBlocks;
 import com.sorrowmist.useless.init.ModTags;
 import com.sorrowmist.useless.core.config.AlloyFurnaceTierRules;
 import mezz.jei.api.constants.VanillaTypes;
+import mezz.jei.api.forge.ForgeTypes;
 import mezz.jei.api.gui.builder.IRecipeLayoutBuilder;
 import mezz.jei.api.gui.builder.ITooltipBuilder;
 import mezz.jei.api.gui.drawable.IDrawable;
@@ -356,12 +357,15 @@ public class AdvancedAlloyFurnaceRecipeCategory implements IRecipeCategory<Alloy
 
                 IRecipeSlotBuilder slot = builder.addSlot(RecipeIngredientRole.INPUT, x, FLUID_INPUT_Y)
                         .setFluidRenderer(displayAmount, false, fluidWidth, FLUID_INPUT_HEIGHT);
+                // JEI 15.74 redeclares addFluidStack with a covariant IRecipeSlotBuilder return;
+                // calling them breaks linkage on 15.48. The typed ingredient API works on both
+                // and retains the Forge stack's NBT instead of reconstructing a bare fluid.
                 if (candidates.length == 0) {
-                    slot.addFluidStack(fluid.getFluid(), displayAmount);
+                    slot.addIngredient(ForgeTypes.FLUID_STACK, new FluidStack(fluid, displayAmount));
                 } else {
                     for (FluidStack candidate : candidates) {
                         if (candidate != null && !candidate.isEmpty()) {
-                            slot.addFluidStack(candidate.getFluid(), displayAmount);
+                            slot.addIngredient(ForgeTypes.FLUID_STACK, new FluidStack(candidate, displayAmount));
                         }
                     }
                 }
@@ -384,7 +388,7 @@ public class AdvancedAlloyFurnaceRecipeCategory implements IRecipeCategory<Alloy
 
                 builder.addSlot(RecipeIngredientRole.OUTPUT, x, FLUID_OUTPUT_Y)
                        .setFluidRenderer(amount, false, fluidWidth, FLUID_OUTPUT_HEIGHT)
-                       .addFluidStack(fluid.getFluid(), amount)
+                       .addIngredient(ForgeTypes.FLUID_STACK, fluid.copy())
                        .addRichTooltipCallback((slot, tooltip) -> {
                            tooltip.add(Component.translatable("jei.useless_mod.tooltip.amount.mb", formatCount(amount)).withStyle(ChatFormatting.GRAY));
                            addRecipeIdTooltip(tooltip, recipe.id());

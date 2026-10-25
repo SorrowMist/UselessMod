@@ -135,5 +135,3 @@ apply from: 'gradle/bytecode-contract-tests.gradle'
 apply from: 'gradle/merge-game-tests.gradle'
 
 apply from: 'gradle/bundled-compat-libraries.gradle'
-
-apply from: 'gradle/config-ui-check.gradle'

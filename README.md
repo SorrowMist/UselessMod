@@ -11,6 +11,10 @@ Build with `./gradlew build` (Windows: `gradlew.bat build`); Python 3 is used by
 release-bytecode and outline regression checks. Dependencies resolve from public Maven repositories.
 The `portBridgeTest` suite also runs as part of `check` and is not shipped in the mod jar.
 
+The EMI/JEMI bridge preserves custom AE keys and long quantities when filling native
+processing patterns, including Applied Mekanistics chemicals. Native JEI types and
+current quantities are retained for chemical tooltips and ghost dragging.
+
 Forge, Minecraft and AE2 are required. Every compiled mod integration declares a
 minimum and compatible version range in `src/main/resources/META-INF/mods.toml`;
 these integrations remain optional, so an absent integration does not prevent startup.

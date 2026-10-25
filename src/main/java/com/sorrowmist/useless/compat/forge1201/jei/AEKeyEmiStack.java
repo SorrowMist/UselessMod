@@ -7,11 +7,17 @@ import dev.emi.emi.api.EmiRegistry;
 import dev.emi.emi.api.stack.*;
 import dev.emi.emi.api.stack.serializer.EmiIngredientSerializer;
 import dev.emi.emi.jemi.*;
+import mezz.jei.api.constants.VanillaTypes;
+import mezz.jei.api.forge.ForgeTypes;
+import mezz.jei.api.ingredients.IIngredientRenderer;
+import mezz.jei.api.ingredients.IIngredientType;
+import mezz.jei.api.ingredients.ITypedIngredient;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.nbt.*;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.item.*;
 import java.util.List;
+import java.util.Optional;
 
 /** Scoped JEMI bridge: native recipe identity, full AE key persistence and long quantities.
  * No EMI entrypoint: JEMI must continue importing this mod's JEI recipe categories.
@@ -21,12 +27,35 @@ public final class AEKeyEmiStack extends JemiStack<AEKeyJeiIngredients.KeyIngred
     public AEKeyEmiStack(AEKeyJeiIngredients.KeyIngredient value) {
         super(AEKeyJeiIngredients.TYPE, AEKeyJeiIngredients.HELPER, AEKeyJeiIngredients.RENDERER, value);
         var converted = GenericStackJeiIngredientProviders.resolveNative(new GenericStack(value.key(), 1));
-        nativeStack = converted == null ? null : JemiUtil.getStack(converted.type(), converted.value());
+        nativeStack = converted == null ? null : nativeStack(converted.type(), converted.value());
         amount = value.amount();
+    }
+    private static <T> EmiStack nativeStack(IIngredientType<T> type, Object value) {
+        if (type == VanillaTypes.ITEM_STACK || type == ForgeTypes.FLUID_STACK)
+            return JemiUtil.getStack(type, value);
+        if (JemiPlugin.runtime == null) return null;
+        var manager = JemiPlugin.runtime.getIngredientManager();
+        // Native custom ingredients are also bridged by JemiUtil now. Construct the identity
+        // view directly rather than recursively converting the same chemical into another AE key.
+        return new JemiStack<>(type, manager.getIngredientHelper(type), manager.getIngredientRenderer(type),
+                type.getIngredientClass().cast(value));
+    }
+    /** Preserve native JEI ghost-drag/filter semantics after EMI changes a stack's amount. */
+    public Optional<ITypedIngredient<?>> nativeTypedIngredient() {
+        if (amount <= 0 || JemiPlugin.runtime == null
+                || ingredient.key() instanceof AEItemKey || ingredient.key() instanceof AEFluidKey)
+            return Optional.empty();
+        var converted = GenericStackJeiIngredientProviders.resolveNative(new GenericStack(ingredient.key(), amount));
+        return converted == null ? Optional.empty() : nativeTypedIngredient(converted.type(), converted.value());
+    }
+    private static <T> Optional<ITypedIngredient<?>> nativeTypedIngredient(IIngredientType<T> type, Object value) {
+        return JemiPlugin.runtime.getIngredientManager()
+                .createTypedIngredient(type, type.getIngredientClass().cast(value)).map(typed -> typed);
     }
     @Override public AEKeyEmiStack copy() {
         var copy = new AEKeyEmiStack(new AEKeyJeiIngredients.KeyIngredient(ingredient.key(), Math.max(1, amount)));
         copy.amount = amount;
+        copy.renderer = renderer;
         copy.chance = chance;
         copy.comparison = comparison;
         copy.setRemainder(getRemainder());
@@ -39,15 +68,32 @@ public final class AEKeyEmiStack extends JemiStack<AEKeyJeiIngredients.KeyIngred
         return ItemStack.EMPTY;
     }
     @Override public List<Component> getTooltipText() {
-        return AEKeyJeiIngredients.RENDERER.getTooltip(
-                new AEKeyJeiIngredients.KeyIngredient(ingredient.key(), Math.max(1, amount)), TooltipFlag.NORMAL);
+        return tooltipView().getTooltipText();
     }
     @Override public List<net.minecraft.client.gui.screens.inventory.tooltip.ClientTooltipComponent> getTooltip() {
-        // JEMI renders the immutable ingredient; rebuild its view after EMI changes the amount.
-        return amount == ingredient.amount() ? originalTooltip() : copy().originalTooltip();
+        var view = tooltipView();
+        view.setAmount(amount).setChance(chance).setRemainder(getRemainder());
+        return view.getTooltip();
     }
-    private List<net.minecraft.client.gui.screens.inventory.tooltip.ClientTooltipComponent> originalTooltip() {
-        return super.getTooltip();
+    private JemiStack<?> tooltipView() {
+        var value = new AEKeyJeiIngredients.KeyIngredient(ingredient.key(), Math.max(1, amount));
+        if (renderer != AEKeyJeiIngredients.RENDERER && amount > 0 && JemiPlugin.runtime != null) {
+            // Use the same typed ingredient that JemiSlotWidget uses to select its slot renderer.
+            // A native renderer must never receive our KeyIngredient wrapper (or vice versa).
+            var typed = JemiUtil.getTyped(this).orElse(null);
+            if (typed != null) {
+                if (typed.getType() != AEKeyJeiIngredients.TYPE) return nativeTooltipView(typed);
+                return new JemiStack<>(AEKeyJeiIngredients.TYPE, AEKeyJeiIngredients.HELPER, renderer, value);
+            }
+        }
+        return new JemiStack<>(AEKeyJeiIngredients.TYPE, AEKeyJeiIngredients.HELPER,
+                AEKeyJeiIngredients.RENDERER, value);
+    }
+    @SuppressWarnings("unchecked")
+    private <T> JemiStack<T> nativeTooltipView(ITypedIngredient<T> typed) {
+        return new JemiStack<>(typed.getType(),
+                JemiPlugin.runtime.getIngredientManager().getIngredientHelper(typed.getType()),
+                (IIngredientRenderer<T>) (IIngredientRenderer<?>) renderer, typed.getIngredient());
     }
     @Override public void render(GuiGraphics gui, int x, int y, float delta, int flags) {
         if ((flags & 1) != 0) {

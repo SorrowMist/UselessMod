@@ -9,6 +9,7 @@ import appeng.integration.modules.jei.ItemIngredientConverter;
 import appeng.integration.modules.jei.FluidIngredientConverter;
 import com.mojang.logging.LogUtils;
 import mezz.jei.api.constants.VanillaTypes;
+import mezz.jei.api.ingredients.IIngredientType;
 import net.minecraft.world.item.ItemStack;
 import net.minecraftforge.fml.ModList;
 import org.jetbrains.annotations.Nullable;
@@ -63,6 +64,26 @@ public final class GenericStackJeiIngredientProviders {
             if (converted != null) return converted;
         }
         return null;
+    }
+
+    /** Read the live addon converters: AppMek installs its four types at JEI runtime creation. */
+    public static @Nullable GenericStack fromJei(IIngredientType<?> type, Object ingredient) {
+        if (type == null || ingredient == null || !type.getIngredientClass().isInstance(ingredient)) return null;
+        for (var converter : IngredientConverters.getConverters()) {
+            var stack = fromJei(type, ingredient, converter);
+            if (valid(stack)) return stack;
+        }
+        return null;
+    }
+
+    private static <T> @Nullable GenericStack fromJei(
+            IIngredientType<?> type, Object ingredient, IngredientConverter<T> converter) {
+        try {
+            if (converter.getIngredientType() != type) return null;
+            return converter.getStackFromIngredient(converter.getIngredientType().getIngredientClass().cast(ingredient));
+        } catch (RuntimeException | LinkageError exception) {
+            return null;
+        }
     }
 
     private static boolean valid(GenericStack stack) {

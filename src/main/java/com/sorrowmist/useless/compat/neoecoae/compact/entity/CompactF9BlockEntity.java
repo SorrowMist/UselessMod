@@ -160,9 +160,9 @@ public class CompactF9BlockEntity extends ECOCraftingSystemBlockEntity
                 NeoEcoCompactRegistry.SHADOW_FLUID_INPUT_HATCH.get(), pos, blockState);
         fluidOutputHatch = new ShadowFluidOutputHatchBlockEntity(
                 NeoEcoCompactRegistry.SHADOW_FLUID_OUTPUT_HATCH.get(), pos, blockState);
-        fluidInputHatch.tank = CompactF9FluidHandler.createFleetTank(HOSTS, this::setChanged);
+        fluidInputHatch.initializeSharedTank(Math.multiplyExact(16_000, HOSTS), this::setChanged);
         fluidOutputHatch.tank = CompactF9FluidHandler.createFleetTank(HOSTS, this::setChanged);
-        fluidHandler = new CompactF9FluidHandler(fluidInputHatch.tank, fluidOutputHatch.tank);
+        fluidHandler = new CompactF9FluidHandler(fluidInputHatch.sharedTank(), fluidOutputHatch.tank);
         getMainNode().setFlags(GridFlags.REQUIRE_CHANNEL);
         // 关键：网格服务必须挂在「本机自己」身上，而不是一个独立对象。
         // ECO 的样板总线就是这么做的（总线 BE 既实现 ICraftingProvider 又实现 IECOPatternStorage），
@@ -385,7 +385,7 @@ public class CompactF9BlockEntity extends ECOCraftingSystemBlockEntity
                 NeoEcoCompactRegistry.SHADOW_FLUID_INPUT_HATCH.get(), worldPosition, getBlockState());
         ShadowFluidOutputHatchBlockEntity output = new ShadowFluidOutputHatchBlockEntity(
                 NeoEcoCompactRegistry.SHADOW_FLUID_OUTPUT_HATCH.get(), worldPosition, getBlockState());
-        input.tank = fluidInputHatch.tank;
+        input.shareTankWith(fluidInputHatch);
         output.tank = fluidOutputHatch.tank;
         input.setLevel(level);
         output.setLevel(level);
@@ -780,7 +780,7 @@ public class CompactF9BlockEntity extends ECOCraftingSystemBlockEntity
         // 整包同步给客户端。这里只在内容真的变过之后，把数据写进 UUID 键控的外置存储。
         flushPatternStore(false);
         CompoundTag inputFluid = new CompoundTag();
-        fluidInputHatch.tank.writeToNBT(registries, inputFluid);
+        fluidInputHatch.sharedTank().writeToNBT(registries, inputFluid);
         data.put(FLUID_INPUT_KEY, inputFluid);
         CompoundTag outputFluid = new CompoundTag();
         fluidOutputHatch.tank.writeToNBT(registries, outputFluid);
@@ -801,7 +801,7 @@ public class CompactF9BlockEntity extends ECOCraftingSystemBlockEntity
     public void loadTag(CompoundTag data, HolderLookup.Provider registries) {
         super.loadTag(data, registries);
         if (data.contains(FLUID_INPUT_KEY, Tag.TAG_COMPOUND)) {
-            fluidInputHatch.tank.readFromNBT(registries,
+            fluidInputHatch.sharedTank().readFromNBT(registries,
                     data.getCompound(FLUID_INPUT_KEY));
         }
         if (data.contains(FLUID_OUTPUT_KEY, Tag.TAG_COMPOUND)) {

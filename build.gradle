@@ -527,6 +527,17 @@ tasks.named('test', Test) {
     maxHeapSize = '2G'
     workingDir = layout.buildDirectory.dir('test-run').get().asFile
     doFirst { workingDir.mkdirs() }
+
+    // Keep compilation on the declared ECO API while testing the same bytecode
+    // against a user's newer runtime: -PneoEcoRuntimeJar=/path/to/neoecoae.jar
+    def ecoRuntimeJar = providers.gradleProperty('neoEcoRuntimeJar')
+    if (ecoRuntimeJar.isPresent()) {
+        classpath = classpath.filter {
+            !it.name.startsWith('neo-eco-ae-extension-1460639-')
+        } + files(ecoRuntimeJar.get())
+        reports.junitXml.outputLocation = layout.buildDirectory.dir('test-results/neoecoae-runtime')
+        reports.html.outputLocation = layout.buildDirectory.dir('reports/tests/neoecoae-runtime')
+    }
 }
 
 // IDEA no longer automatically downloads sources/javadoc jars for dependencies, so we need to explicitly enable the behavior.

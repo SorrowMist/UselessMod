@@ -5,6 +5,12 @@
 
 ## [Unreleased]
 
+## [2.4.6.2]
+
+### Fixed / 修复
+- 修复 NeoECOAE 21.2.11 将冷却液输入仓改为 LongFluidTank 后，加载紧凑 F9 时出现 NoSuchFieldError 并导致存档崩溃的问题；保留旧版 ECO 兼容、八台主机共享的 128,000 mB 冷却液池及原有存档数据。
+  - Fixed Compact F9 crashing with NoSuchFieldError after NeoECOAE 21.2.11 changed its coolant input hatch to LongFluidTank; preserves older ECO compatibility, the shared 128,000 mB coolant pool, and existing saved fluid data.
+
 ## [2.4.6.1]
 
 ### Changed / 变更

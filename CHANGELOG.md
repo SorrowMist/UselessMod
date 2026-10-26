@@ -5,6 +5,20 @@
 
 ## [Unreleased]
 
+## [2.4.6.1]
+
+### Changed / 变更
+- 紧凑型 C9、F9、L9 普通右键改为复用对应 ECO 主机的原生界面，潜行右键仍打开影子通讯接口页面
+  - Right-clicking the Compact C9/F9/L9 now opens the corresponding native ECO host UI, while sneak-right-click still opens the shadow interface screen.
+- 为共用方块坐标的紧凑型 C9/F9 内置硬件补齐九级面板状态，保留镜像布局与动态仪表；面板按九级层级填充状态，并在计算主机上清空显式成员字段，使 ECO 旧版解码器选用原始 L9 图集纹理
+  - The built-in hardware of the Compact C9/F9, which shares block coordinates, now reports full level-nine panel state, keeping the mirrored layout and live gauges; the panel fills tier state at level nine and clears the explicit member fields on computation hosts so ECO's legacy decoder selects its original L9 atlas textures.
+- 新增可选 Mixin，在 ECO 主机面板状态返回处将紧凑主机的面板改写为九级状态，旧版 ECO 缺少对应方法时自动跳过
+  - Added optional Mixins that rewrite the compact hosts' panel state to level nine at the ECO host panel-state return point; they are skipped automatically when an older ECO lacks the target methods.
+
+### Fixed / 修复
+- 修复紧凑型 C9、F9、L9 打开后显示 Useless 自绘单方块界面而非 ECO 主机界面，导致硬件层级、镜像布局与动态仪表无法呈现的问题
+  - Fixed the Compact C9/F9/L9 opening Useless's self-drawn single-block screen instead of the ECO host UI, which prevented the hardware tiers, mirrored layout and live gauges from showing.
+
 ## [2.4.6]
 
 ### Added / 新增

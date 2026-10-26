@@ -31,6 +31,12 @@ public class CompactL9Block extends ECOStorageSystemBlock {
     }
 
     @Override
+    public BlockState playerWillDestroy(Level level, BlockPos pos, BlockState state, Player player) {
+        CompactMachineDrops.dropForCreativePlayer(level, pos, state, player);
+        return super.playerWillDestroy(level, pos, state, player);
+    }
+
+    @Override
     protected InteractionResult useWithoutItem(BlockState state, Level level, BlockPos pos, Player player,
                                                BlockHitResult hitResult) {
         if (!CompactInterfaceAccess.isPlayerCloseEnough(this, level, pos, player)) {

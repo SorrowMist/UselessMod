@@ -1,33 +1,34 @@
 package com.sorrowmist.useless.client.gui;
 
-import com.sorrowmist.useless.UselessMod;
 import com.sorrowmist.useless.api.enums.RedstoneControlMode;
 import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.resources.ResourceLocation;
 
 final class AlloyFurnaceControlIcons {
     static final int WIDTH = 14;
     static final int HEIGHT = 15;
 
-    private static final ResourceLocation TEXTURE = new ResourceLocation(
-            UselessMod.MODID, "textures/gui/locate_picture.png");
-    private static final int TEXTURE_WIDTH = 256;
-    private static final int TEXTURE_HEIGHT = 480;
-    private static final int REDSTONE_V = 265;
-    private static final int CANCEL_NORMAL_U = 140;
-    private static final int CANCEL_PRESSED_U = 156;
-    private static final int CANCEL_V = 283;
-
     private AlloyFurnaceControlIcons() {
     }
 
     static void drawRedstone(GuiGraphics graphics, int x, int y, RedstoneControlMode mode) {
-        graphics.blit(TEXTURE, x, y, mode.getOverlayU(), REDSTONE_V,
-                WIDTH, HEIGHT, TEXTURE_WIDTH, TEXTURE_HEIGHT);
+        // Apple 风：圆角按钮 + 红点（高电平实心 / 低电平空心 / 忽略灰色划线）
+        AppleUi.buttonSurface(graphics, x, y, WIDTH, HEIGHT, AppleUi.ButtonStyle.GRAY, false, false, true);
+        float cx = x + WIDTH / 2f, cy = y + HEIGHT / 2f;
+        switch (mode) {
+            case HIGH_ACTIVE -> AppleUi.fillRound(graphics, cx - 3.5f, cy - 3.5f, 7, 7, 3.5f, AppleUi.RED);
+            case LOW_ACTIVE -> {
+                AppleUi.fillRound(graphics, cx - 3.5f, cy - 3.5f, 7, 7, 3.5f, AppleUi.RED);
+                AppleUi.fillRound(graphics, cx - 2f, cy - 2f, 4, 4, 2f, AppleUi.CONTROL);
+            }
+            default -> {
+                AppleUi.fillRound(graphics, cx - 3.5f, cy - 3.5f, 7, 7, 3.5f, AppleUi.QUATERNARY_LABEL);
+                AppleUi.fillRound(graphics, cx - 3.5f, cy - 0.5f, 7, 1, 0.5f, AppleUi.CONTROL);
+            }
+        }
     }
 
     static void drawCancel(GuiGraphics graphics, int x, int y, boolean pressed) {
-        graphics.blit(TEXTURE, x, y, pressed ? CANCEL_PRESSED_U : CANCEL_NORMAL_U, CANCEL_V,
-                WIDTH, HEIGHT, TEXTURE_WIDTH, TEXTURE_HEIGHT);
+        AppleUi.buttonSurface(graphics, x, y, WIDTH, HEIGHT, AppleUi.ButtonStyle.DESTRUCTIVE, false, pressed, true);
+        AppleUi.icon(graphics, AppleUi.Icon.XMARK, x + 3, y + 3, 9, AppleUi.RED);
     }
 }

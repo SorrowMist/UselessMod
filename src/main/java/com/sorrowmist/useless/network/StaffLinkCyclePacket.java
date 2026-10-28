@@ -23,7 +23,8 @@ import java.util.UUID;
 /**
  * 切换当前网络：手持造化杖 Shift+滚轮，或者界面上的 {@code <} / {@code >} 按钮。
  *
- * <p>包体只有一个方向值，服务端自己验手持、自己算下一张——客户端无从指定目标。</p>
+ * <p>包体只有一个方向值。界面内验证当前菜单与网络归属，界面外仍验证手持杖和模式开关；
+ * 服务端自己算下一张，客户端无从指定目标。</p>
  *
  * <p>切的是<b>归属者</b>（玩家或队伍）名下的当前网络，与手上这把杖无关：换一把杖、
  * 把杖放进箱子，切到的那张仍然是你的。</p>
@@ -42,21 +43,19 @@ public record StaffLinkCyclePacket(int delta) implements CustomPacketPayload {
             if (!(ctx.player() instanceof ServerPlayer player)) {
                 return;
             }
-            // 服务端再验一次手持物与模式开关：包是可以伪造的。
-            var toolEntry = UselessItemUtils.findTargetToolInHands(player);
-            if (toolEntry.isEmpty()) {
-                return;
-            }
-            ItemStack staff = toolEntry.get().getKey();
-            if (!(staff.getItem() instanceof EndlessBeafItem)) {
-                return;
-            }
-            if (!EndlessBeafItem.isStaffLinkEnabled(staff)) {
-                return;
+            // 与打开界面 / 新建、改名、解散保持一致：界面操作按当前菜单和网络归属授权。
+            // 手持模式只约束界面外的 Shift+滚轮，不能让已打开的管理界面按钮静默失效。
+            if (!(player.containerMenu instanceof StaffLinkMenu)) {
+                var toolEntry = UselessItemUtils.findTargetToolInHands(player);
+                if (toolEntry.isEmpty()) return;
+                ItemStack staff = toolEntry.get().getKey();
+                if (!(staff.getItem() instanceof EndlessBeafItem) || !EndlessBeafItem.isStaffLinkEnabled(staff)) return;
             }
 
             // 先并一次队，免得刚组队时这里先给他新建一张空网络（看着像配置全丢了）。
             StaffLinkManager.mergePersonalIntoTeam(player.server, player);
+            if (player.containerMenu instanceof StaffLinkMenu menu
+                    && !StaffLinkManager.canAccess(player.server, player, menu.getNetworkId())) return;
             UUID ownerId = StaffLinkManager.ownerIdOf(player);
             if (!StaffLinkManager.cycleActive(player.server, ownerId, packet.delta())) {
                 return;

@@ -45,6 +45,7 @@
     "ServerGamePacketListenerImplMixin"
   ],
   "client": [
+    "client.SlotPosAccessor",
     "exmachinis.CompactingCategoryMixin",
     "ClientLevelMixin",
     "ClientPacketListenerMixin",

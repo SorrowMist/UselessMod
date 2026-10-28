@@ -5,6 +5,7 @@ import com.sorrowmist.useless.UselessMod;
 import com.sorrowmist.useless.api.enums.tool.EnchantMode;
 import com.sorrowmist.useless.client.BeefAutoClicker;
 import com.sorrowmist.useless.client.gui.MiningStatusGui;
+import com.sorrowmist.useless.client.gui.StaffLinkScreen;
 import com.sorrowmist.useless.client.gui.ThermostatScreen;
 import com.sorrowmist.useless.content.blockentities.multiblock.MultiblockAlloyFurnaceCoreBlockEntity;
 import com.sorrowmist.useless.content.blocks.TemperatureRegulatorBlock;
@@ -41,6 +42,7 @@ import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.eventbus.api.EventPriority;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod.EventBusSubscriber;
+import net.minecraftforge.client.event.ScreenEvent;
 import net.minecraftforge.client.event.ClientPlayerNetworkEvent;
 import net.minecraftforge.event.TickEvent.ClientTickEvent;
 import net.minecraftforge.client.event.InputEvent;
@@ -56,6 +58,13 @@ public class ClientEventBusSubscriber {
     // 跟踪Tab键的前一状态
     private static boolean lastTabPressed = false;
 
+
+    /** JEI can abandon a pre-delay ghost drag without invoking its onComplete callback. */
+    @SubscribeEvent(priority = EventPriority.LOWEST, receiveCanceled = true)
+    public static void onScreenMouseReleased(ScreenEvent.MouseButtonReleased.Pre event) {
+        if (event.getButton() == GLFW.GLFW_MOUSE_BUTTON_LEFT && event.getScreen() instanceof StaffLinkScreen screen)
+            screen.setJeiDragActive(false);
+    }
 
     @SubscribeEvent
     public static void onKeyInput(ClientTickEvent event) {

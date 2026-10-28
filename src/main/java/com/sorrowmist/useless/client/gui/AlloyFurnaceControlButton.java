@@ -49,10 +49,28 @@ final class AlloyFurnaceControlButton extends Button {
 
     @Override
     protected void renderWidget(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
+        // Apple 风：圆角按钮底 + 自绘几何图标（不再使用原贴图像素图标）
+        boolean hot = isHoveredOrFocused();
         if (cancel) {
-            AlloyFurnaceControlIcons.drawCancel(graphics, getX(), getY(), pressed);
+            AppleUi.buttonSurface(graphics, getX(), getY(), getWidth(), getHeight(),
+                    AppleUi.ButtonStyle.DESTRUCTIVE, hot, pressed, active);
+            AppleUi.icon(graphics, AppleUi.Icon.XMARK, getX() + 3, getY() + 3, 9, AppleUi.RED);
         } else {
-            AlloyFurnaceControlIcons.drawRedstone(graphics, getX(), getY(), redstoneMode.get());
+            RedstoneControlMode mode = redstoneMode.get();
+            AppleUi.buttonSurface(graphics, getX(), getY(), getWidth(), getHeight(),
+                    AppleUi.ButtonStyle.GRAY, hot, false, active);
+            float cx = getX() + getWidth() / 2f, cy = getY() + getHeight() / 2f;
+            switch (mode) {
+                case HIGH_ACTIVE -> AppleUi.fillRound(graphics, cx - 3.5f, cy - 3.5f, 7, 7, 3.5f, AppleUi.RED);
+                case LOW_ACTIVE -> {
+                    AppleUi.fillRound(graphics, cx - 3.5f, cy - 3.5f, 7, 7, 3.5f, AppleUi.RED);
+                    AppleUi.fillRound(graphics, cx - 2f, cy - 2f, 4, 4, 2f, AppleUi.CONTROL);
+                }
+                default -> {
+                    AppleUi.fillRound(graphics, cx - 3.5f, cy - 3.5f, 7, 7, 3.5f, AppleUi.QUATERNARY_LABEL);
+                    AppleUi.fillRound(graphics, cx - 3.5f, cy - 0.5f, 7, 1, 0.5f, AppleUi.CONTROL);
+                }
+            }
         }
     }
 }

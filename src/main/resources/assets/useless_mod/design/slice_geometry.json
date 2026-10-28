@@ -1,0 +1,2297 @@
+{
+  "badge_blue_64": {
+    "path": "badge/badge_blue_64",
+    "size": [
+      64,
+      24
+    ],
+    "body": [
+      0,
+      0,
+      64,
+      24
+    ],
+    "corner": 12,
+    "fixedCorners": false
+  },
+  "badge_gray_64": {
+    "path": "badge/badge_gray_64",
+    "size": [
+      64,
+      24
+    ],
+    "body": [
+      0,
+      0,
+      64,
+      24
+    ],
+    "corner": 12,
+    "fixedCorners": false
+  },
+  "badge_green_64": {
+    "path": "badge/badge_green_64",
+    "size": [
+      64,
+      24
+    ],
+    "body": [
+      0,
+      0,
+      64,
+      24
+    ],
+    "corner": 12,
+    "fixedCorners": false
+  },
+  "badge_orange_64": {
+    "path": "badge/badge_orange_64",
+    "size": [
+      64,
+      24
+    ],
+    "body": [
+      0,
+      0,
+      64,
+      24
+    ],
+    "corner": 12,
+    "fixedCorners": false
+  },
+  "badge_purple_64": {
+    "path": "badge/badge_purple_64",
+    "size": [
+      64,
+      24
+    ],
+    "body": [
+      0,
+      0,
+      64,
+      24
+    ],
+    "corner": 12,
+    "fixedCorners": false
+  },
+  "badge_red_64": {
+    "path": "badge/badge_red_64",
+    "size": [
+      64,
+      24
+    ],
+    "body": [
+      0,
+      0,
+      64,
+      24
+    ],
+    "corner": 12,
+    "fixedCorners": false
+  },
+  "badge_teal_64": {
+    "path": "badge/badge_teal_64",
+    "size": [
+      64,
+      24
+    ],
+    "body": [
+      0,
+      0,
+      64,
+      24
+    ],
+    "corner": 12,
+    "fixedCorners": false
+  },
+  "button_capsule_danger_sm_default": {
+    "path": "button/button_capsule_danger_sm_default",
+    "size": [
+      72,
+      26
+    ],
+    "body": [
+      0,
+      0,
+      72,
+      26
+    ],
+    "corner": 13,
+    "fixedCorners": false
+  },
+  "button_capsule_danger_sm_disabled": {
+    "path": "button/button_capsule_danger_sm_disabled",
+    "size": [
+      72,
+      26
+    ],
+    "body": [
+      0,
+      0,
+      72,
+      26
+    ],
+    "corner": 13,
+    "fixedCorners": false
+  },
+  "button_capsule_danger_sm_hover": {
+    "path": "button/button_capsule_danger_sm_hover",
+    "size": [
+      72,
+      26
+    ],
+    "body": [
+      0,
+      0,
+      72,
+      26
+    ],
+    "corner": 13,
+    "fixedCorners": false
+  },
+  "button_capsule_danger_sm_pressed": {
+    "path": "button/button_capsule_danger_sm_pressed",
+    "size": [
+      72,
+      26
+    ],
+    "body": [
+      0,
+      0,
+      72,
+      26
+    ],
+    "corner": 13,
+    "fixedCorners": false
+  },
+  "button_capsule_primary_sm_default": {
+    "path": "button/button_capsule_primary_sm_default",
+    "size": [
+      90,
+      46
+    ],
+    "body": [
+      9,
+      6,
+      72,
+      26
+    ],
+    "corner": 13,
+    "fixedCorners": false
+  },
+  "button_capsule_primary_sm_disabled": {
+    "path": "button/button_capsule_primary_sm_disabled",
+    "size": [
+      72,
+      26
+    ],
+    "body": [
+      0,
+      0,
+      72,
+      26
+    ],
+    "corner": 13,
+    "fixedCorners": false
+  },
+  "button_capsule_primary_sm_hover": {
+    "path": "button/button_capsule_primary_sm_hover",
+    "size": [
+      90,
+      46
+    ],
+    "body": [
+      9,
+      6,
+      72,
+      26
+    ],
+    "corner": 13,
+    "fixedCorners": false
+  },
+  "button_capsule_primary_sm_pressed": {
+    "path": "button/button_capsule_primary_sm_pressed",
+    "size": [
+      90,
+      46
+    ],
+    "body": [
+      9,
+      6,
+      72,
+      26
+    ],
+    "corner": 13,
+    "fixedCorners": false
+  },
+  "button_capsule_secondary_sm_default": {
+    "path": "button/button_capsule_secondary_sm_default",
+    "size": [
+      72,
+      26
+    ],
+    "body": [
+      0,
+      0,
+      72,
+      26
+    ],
+    "corner": 13,
+    "fixedCorners": false
+  },
+  "button_capsule_secondary_sm_disabled": {
+    "path": "button/button_capsule_secondary_sm_disabled",
+    "size": [
+      72,
+      26
+    ],
+    "body": [
+      0,
+      0,
+      72,
+      26
+    ],
+    "corner": 13,
+    "fixedCorners": false
+  },
+  "button_capsule_secondary_sm_hover": {
+    "path": "button/button_capsule_secondary_sm_hover",
+    "size": [
+      72,
+      26
+    ],
+    "body": [
+      0,
+      0,
+      72,
+      26
+    ],
+    "corner": 13,
+    "fixedCorners": false
+  },
+  "button_capsule_secondary_sm_pressed": {
+    "path": "button/button_capsule_secondary_sm_pressed",
+    "size": [
+      72,
+      26
+    ],
+    "body": [
+      0,
+      0,
+      72,
+      26
+    ],
+    "corner": 13,
+    "fixedCorners": false
+  },
+  "button_capsule_tint_sm_default": {
+    "path": "button/button_capsule_tint_sm_default",
+    "size": [
+      72,
+      26
+    ],
+    "body": [
+      0,
+      0,
+      72,
+      26
+    ],
+    "corner": 13,
+    "fixedCorners": false
+  },
+  "button_capsule_tint_sm_disabled": {
+    "path": "button/button_capsule_tint_sm_disabled",
+    "size": [
+      72,
+      26
+    ],
+    "body": [
+      0,
+      0,
+      72,
+      26
+    ],
+    "corner": 13,
+    "fixedCorners": false
+  },
+  "button_capsule_tint_sm_hover": {
+    "path": "button/button_capsule_tint_sm_hover",
+    "size": [
+      72,
+      26
+    ],
+    "body": [
+      0,
+      0,
+      72,
+      26
+    ],
+    "corner": 13,
+    "fixedCorners": false
+  },
+  "button_capsule_tint_sm_pressed": {
+    "path": "button/button_capsule_tint_sm_pressed",
+    "size": [
+      72,
+      26
+    ],
+    "body": [
+      0,
+      0,
+      72,
+      26
+    ],
+    "corner": 13,
+    "fixedCorners": false
+  },
+  "button_danger_default": {
+    "path": "button/button_danger_default",
+    "size": [
+      120,
+      32
+    ],
+    "body": [
+      0,
+      0,
+      120,
+      32
+    ],
+    "corner": 16,
+    "fixedCorners": false
+  },
+  "button_danger_disabled": {
+    "path": "button/button_danger_disabled",
+    "size": [
+      120,
+      32
+    ],
+    "body": [
+      0,
+      0,
+      120,
+      32
+    ],
+    "corner": 16,
+    "fixedCorners": false
+  },
+  "button_danger_hover": {
+    "path": "button/button_danger_hover",
+    "size": [
+      120,
+      32
+    ],
+    "body": [
+      0,
+      0,
+      120,
+      32
+    ],
+    "corner": 16,
+    "fixedCorners": false
+  },
+  "button_danger_pressed": {
+    "path": "button/button_danger_pressed",
+    "size": [
+      120,
+      32
+    ],
+    "body": [
+      0,
+      0,
+      120,
+      32
+    ],
+    "corner": 16,
+    "fixedCorners": false
+  },
+  "button_primary_default": {
+    "path": "button/button_primary_default",
+    "size": [
+      138,
+      52
+    ],
+    "body": [
+      9,
+      6,
+      120,
+      32
+    ],
+    "corner": 16,
+    "fixedCorners": false
+  },
+  "button_primary_disabled": {
+    "path": "button/button_primary_disabled",
+    "size": [
+      120,
+      32
+    ],
+    "body": [
+      0,
+      0,
+      120,
+      32
+    ],
+    "corner": 16,
+    "fixedCorners": false
+  },
+  "button_primary_hover": {
+    "path": "button/button_primary_hover",
+    "size": [
+      138,
+      52
+    ],
+    "body": [
+      9,
+      6,
+      120,
+      32
+    ],
+    "corner": 16,
+    "fixedCorners": false
+  },
+  "button_primary_pressed": {
+    "path": "button/button_primary_pressed",
+    "size": [
+      138,
+      52
+    ],
+    "body": [
+      9,
+      6,
+      120,
+      32
+    ],
+    "corner": 16,
+    "fixedCorners": false
+  },
+  "button_secondary_default": {
+    "path": "button/button_secondary_default",
+    "size": [
+      120,
+      32
+    ],
+    "body": [
+      0,
+      0,
+      120,
+      32
+    ],
+    "corner": 16,
+    "fixedCorners": false
+  },
+  "button_secondary_disabled": {
+    "path": "button/button_secondary_disabled",
+    "size": [
+      120,
+      32
+    ],
+    "body": [
+      0,
+      0,
+      120,
+      32
+    ],
+    "corner": 16,
+    "fixedCorners": false
+  },
+  "button_secondary_hover": {
+    "path": "button/button_secondary_hover",
+    "size": [
+      120,
+      32
+    ],
+    "body": [
+      0,
+      0,
+      120,
+      32
+    ],
+    "corner": 16,
+    "fixedCorners": false
+  },
+  "button_secondary_pressed": {
+    "path": "button/button_secondary_pressed",
+    "size": [
+      120,
+      32
+    ],
+    "body": [
+      0,
+      0,
+      120,
+      32
+    ],
+    "corner": 16,
+    "fixedCorners": false
+  },
+  "button_tint_default": {
+    "path": "button/button_tint_default",
+    "size": [
+      120,
+      32
+    ],
+    "body": [
+      0,
+      0,
+      120,
+      32
+    ],
+    "corner": 16,
+    "fixedCorners": false
+  },
+  "button_tint_disabled": {
+    "path": "button/button_tint_disabled",
+    "size": [
+      120,
+      32
+    ],
+    "body": [
+      0,
+      0,
+      120,
+      32
+    ],
+    "corner": 16,
+    "fixedCorners": false
+  },
+  "button_tint_hover": {
+    "path": "button/button_tint_hover",
+    "size": [
+      120,
+      32
+    ],
+    "body": [
+      0,
+      0,
+      120,
+      32
+    ],
+    "corner": 16,
+    "fixedCorners": false
+  },
+  "button_tint_pressed": {
+    "path": "button/button_tint_pressed",
+    "size": [
+      120,
+      32
+    ],
+    "body": [
+      0,
+      0,
+      120,
+      32
+    ],
+    "corner": 16,
+    "fixedCorners": false
+  },
+  "card_white_400x200": {
+    "path": "card/card_white_400x200",
+    "size": [
+      400,
+      201
+    ],
+    "body": [
+      0,
+      0,
+      400,
+      200
+    ],
+    "corner": 16,
+    "fixedCorners": true
+  },
+  "dropdown_item_selected_188x34": {
+    "path": "dropdown/dropdown_item_selected_188x34",
+    "size": [
+      188,
+      34
+    ],
+    "body": [
+      0,
+      0,
+      188,
+      34
+    ],
+    "corner": 0,
+    "fixedCorners": false
+  },
+  "field_default_200": {
+    "path": "field/field_default_200",
+    "size": [
+      200,
+      32
+    ],
+    "body": [
+      0,
+      0,
+      200,
+      32
+    ],
+    "corner": 10,
+    "fixedCorners": false
+  },
+  "field_disabled_200": {
+    "path": "field/field_disabled_200",
+    "size": [
+      200,
+      32
+    ],
+    "body": [
+      0,
+      0,
+      200,
+      32
+    ],
+    "corner": 10,
+    "fixedCorners": false
+  },
+  "field_error_200": {
+    "path": "field/field_error_200",
+    "size": [
+      206,
+      38
+    ],
+    "body": [
+      3,
+      3,
+      200,
+      32
+    ],
+    "corner": 10,
+    "fixedCorners": false
+  },
+  "field_focus_200": {
+    "path": "field/field_focus_200",
+    "size": [
+      206,
+      38
+    ],
+    "body": [
+      3,
+      3,
+      200,
+      32
+    ],
+    "corner": 10,
+    "fixedCorners": false
+  },
+  "icon_ae_24_white": {
+    "path": "icon/icon_ae_24_white",
+    "size": [
+      24,
+      24
+    ],
+    "body": [
+      0,
+      0,
+      24,
+      24
+    ],
+    "corner": 0,
+    "fixedCorners": false
+  },
+  "icon_bolt_24_white": {
+    "path": "icon/icon_bolt_24_white",
+    "size": [
+      24,
+      24
+    ],
+    "body": [
+      0,
+      0,
+      24,
+      24
+    ],
+    "corner": 0,
+    "fixedCorners": false
+  },
+  "icon_box_24_white": {
+    "path": "icon/icon_box_24_white",
+    "size": [
+      24,
+      24
+    ],
+    "body": [
+      0,
+      0,
+      24,
+      24
+    ],
+    "corner": 0,
+    "fixedCorners": false
+  },
+  "icon_chain_24_white": {
+    "path": "icon/icon_chain_24_white",
+    "size": [
+      24,
+      24
+    ],
+    "body": [
+      0,
+      0,
+      24,
+      24
+    ],
+    "corner": 0,
+    "fixedCorners": false
+  },
+  "icon_check_24_white": {
+    "path": "icon/icon_check_24_white",
+    "size": [
+      24,
+      24
+    ],
+    "body": [
+      0,
+      0,
+      24,
+      24
+    ],
+    "corner": 0,
+    "fixedCorners": false
+  },
+  "icon_convert_24_white": {
+    "path": "icon/icon_convert_24_white",
+    "size": [
+      24,
+      24
+    ],
+    "body": [
+      0,
+      0,
+      24,
+      24
+    ],
+    "corner": 0,
+    "fixedCorners": false
+  },
+  "icon_copy_24_white": {
+    "path": "icon/icon_copy_24_white",
+    "size": [
+      24,
+      24
+    ],
+    "body": [
+      0,
+      0,
+      24,
+      24
+    ],
+    "corner": 0,
+    "fixedCorners": false
+  },
+  "icon_cube_24_white": {
+    "path": "icon/icon_cube_24_white",
+    "size": [
+      24,
+      24
+    ],
+    "body": [
+      0,
+      0,
+      24,
+      24
+    ],
+    "corner": 0,
+    "fixedCorners": false
+  },
+  "icon_down_24_white": {
+    "path": "icon/icon_down_24_white",
+    "size": [
+      24,
+      24
+    ],
+    "body": [
+      0,
+      0,
+      24,
+      24
+    ],
+    "corner": 0,
+    "fixedCorners": false
+  },
+  "icon_edit_24_white": {
+    "path": "icon/icon_edit_24_white",
+    "size": [
+      24,
+      24
+    ],
+    "body": [
+      0,
+      0,
+      24,
+      24
+    ],
+    "corner": 0,
+    "fixedCorners": false
+  },
+  "icon_export_24_white": {
+    "path": "icon/icon_export_24_white",
+    "size": [
+      24,
+      24
+    ],
+    "body": [
+      0,
+      0,
+      24,
+      24
+    ],
+    "corner": 0,
+    "fixedCorners": false
+  },
+  "icon_eye_24_white": {
+    "path": "icon/icon_eye_24_white",
+    "size": [
+      24,
+      24
+    ],
+    "body": [
+      0,
+      0,
+      24,
+      24
+    ],
+    "corner": 0,
+    "fixedCorners": false
+  },
+  "icon_filter_24_white": {
+    "path": "icon/icon_filter_24_white",
+    "size": [
+      24,
+      24
+    ],
+    "body": [
+      0,
+      0,
+      24,
+      24
+    ],
+    "corner": 0,
+    "fixedCorners": false
+  },
+  "icon_flame_24_white": {
+    "path": "icon/icon_flame_24_white",
+    "size": [
+      24,
+      24
+    ],
+    "body": [
+      0,
+      0,
+      24,
+      24
+    ],
+    "corner": 0,
+    "fixedCorners": false
+  },
+  "icon_gear_24_white": {
+    "path": "icon/icon_gear_24_white",
+    "size": [
+      24,
+      24
+    ],
+    "body": [
+      0,
+      0,
+      24,
+      24
+    ],
+    "corner": 0,
+    "fixedCorners": false
+  },
+  "icon_globe_24_white": {
+    "path": "icon/icon_globe_24_white",
+    "size": [
+      24,
+      24
+    ],
+    "body": [
+      0,
+      0,
+      24,
+      24
+    ],
+    "corner": 0,
+    "fixedCorners": false
+  },
+  "icon_grid_24_white": {
+    "path": "icon/icon_grid_24_white",
+    "size": [
+      24,
+      24
+    ],
+    "body": [
+      0,
+      0,
+      24,
+      24
+    ],
+    "corner": 0,
+    "fixedCorners": false
+  },
+  "icon_grip_24_white": {
+    "path": "icon/icon_grip_24_white",
+    "size": [
+      24,
+      24
+    ],
+    "body": [
+      0,
+      0,
+      24,
+      24
+    ],
+    "corner": 0,
+    "fixedCorners": false
+  },
+  "icon_import_24_white": {
+    "path": "icon/icon_import_24_white",
+    "size": [
+      24,
+      24
+    ],
+    "body": [
+      0,
+      0,
+      24,
+      24
+    ],
+    "corner": 0,
+    "fixedCorners": false
+  },
+  "icon_in_24_white": {
+    "path": "icon/icon_in_24_white",
+    "size": [
+      24,
+      24
+    ],
+    "body": [
+      0,
+      0,
+      24,
+      24
+    ],
+    "corner": 0,
+    "fixedCorners": false
+  },
+  "icon_info_24_white": {
+    "path": "icon/icon_info_24_white",
+    "size": [
+      24,
+      24
+    ],
+    "body": [
+      0,
+      0,
+      24,
+      24
+    ],
+    "corner": 0,
+    "fixedCorners": false
+  },
+  "icon_layers_24_white": {
+    "path": "icon/icon_layers_24_white",
+    "size": [
+      24,
+      24
+    ],
+    "body": [
+      0,
+      0,
+      24,
+      24
+    ],
+    "corner": 0,
+    "fixedCorners": false
+  },
+  "icon_leaf_24_white": {
+    "path": "icon/icon_leaf_24_white",
+    "size": [
+      24,
+      24
+    ],
+    "body": [
+      0,
+      0,
+      24,
+      24
+    ],
+    "corner": 0,
+    "fixedCorners": false
+  },
+  "icon_left_24_white": {
+    "path": "icon/icon_left_24_white",
+    "size": [
+      24,
+      24
+    ],
+    "body": [
+      0,
+      0,
+      24,
+      24
+    ],
+    "corner": 0,
+    "fixedCorners": false
+  },
+  "icon_link_24_white": {
+    "path": "icon/icon_link_24_white",
+    "size": [
+      24,
+      24
+    ],
+    "body": [
+      0,
+      0,
+      24,
+      24
+    ],
+    "corner": 0,
+    "fixedCorners": false
+  },
+  "icon_lock_24_white": {
+    "path": "icon/icon_lock_24_white",
+    "size": [
+      24,
+      24
+    ],
+    "body": [
+      0,
+      0,
+      24,
+      24
+    ],
+    "corner": 0,
+    "fixedCorners": false
+  },
+  "icon_minus_24_white": {
+    "path": "icon/icon_minus_24_white",
+    "size": [
+      24,
+      24
+    ],
+    "body": [
+      0,
+      0,
+      24,
+      24
+    ],
+    "corner": 0,
+    "fixedCorners": false
+  },
+  "icon_out_24_white": {
+    "path": "icon/icon_out_24_white",
+    "size": [
+      24,
+      24
+    ],
+    "body": [
+      0,
+      0,
+      24,
+      24
+    ],
+    "corner": 0,
+    "fixedCorners": false
+  },
+  "icon_pattern_24_white": {
+    "path": "icon/icon_pattern_24_white",
+    "size": [
+      24,
+      24
+    ],
+    "body": [
+      0,
+      0,
+      24,
+      24
+    ],
+    "corner": 0,
+    "fixedCorners": false
+  },
+  "icon_pick_24_white": {
+    "path": "icon/icon_pick_24_white",
+    "size": [
+      24,
+      24
+    ],
+    "body": [
+      0,
+      0,
+      24,
+      24
+    ],
+    "corner": 0,
+    "fixedCorners": false
+  },
+  "icon_plus_24_white": {
+    "path": "icon/icon_plus_24_white",
+    "size": [
+      24,
+      24
+    ],
+    "body": [
+      0,
+      0,
+      24,
+      24
+    ],
+    "corner": 0,
+    "fixedCorners": false
+  },
+  "icon_right_24_white": {
+    "path": "icon/icon_right_24_white",
+    "size": [
+      24,
+      24
+    ],
+    "body": [
+      0,
+      0,
+      24,
+      24
+    ],
+    "corner": 0,
+    "fixedCorners": false
+  },
+  "icon_rotate_24_white": {
+    "path": "icon/icon_rotate_24_white",
+    "size": [
+      24,
+      24
+    ],
+    "body": [
+      0,
+      0,
+      24,
+      24
+    ],
+    "corner": 0,
+    "fixedCorners": false
+  },
+  "icon_search_24_white": {
+    "path": "icon/icon_search_24_white",
+    "size": [
+      24,
+      24
+    ],
+    "body": [
+      0,
+      0,
+      24,
+      24
+    ],
+    "corner": 0,
+    "fixedCorners": false
+  },
+  "icon_star_24_white": {
+    "path": "icon/icon_star_24_white",
+    "size": [
+      24,
+      24
+    ],
+    "body": [
+      0,
+      0,
+      24,
+      24
+    ],
+    "corner": 0,
+    "fixedCorners": false
+  },
+  "icon_sword_24_white": {
+    "path": "icon/icon_sword_24_white",
+    "size": [
+      24,
+      24
+    ],
+    "body": [
+      0,
+      0,
+      24,
+      24
+    ],
+    "corner": 0,
+    "fixedCorners": false
+  },
+  "icon_thermo_24_white": {
+    "path": "icon/icon_thermo_24_white",
+    "size": [
+      24,
+      24
+    ],
+    "body": [
+      0,
+      0,
+      24,
+      24
+    ],
+    "corner": 0,
+    "fixedCorners": false
+  },
+  "icon_trash_24_white": {
+    "path": "icon/icon_trash_24_white",
+    "size": [
+      24,
+      24
+    ],
+    "body": [
+      0,
+      0,
+      24,
+      24
+    ],
+    "corner": 0,
+    "fixedCorners": false
+  },
+  "icon_up_24_white": {
+    "path": "icon/icon_up_24_white",
+    "size": [
+      24,
+      24
+    ],
+    "body": [
+      0,
+      0,
+      24,
+      24
+    ],
+    "corner": 0,
+    "fixedCorners": false
+  },
+  "icon_warn_24_white": {
+    "path": "icon/icon_warn_24_white",
+    "size": [
+      24,
+      24
+    ],
+    "body": [
+      0,
+      0,
+      24,
+      24
+    ],
+    "corner": 0,
+    "fixedCorners": false
+  },
+  "icon_wheel_24_white": {
+    "path": "icon/icon_wheel_24_white",
+    "size": [
+      24,
+      24
+    ],
+    "body": [
+      0,
+      0,
+      24,
+      24
+    ],
+    "corner": 0,
+    "fixedCorners": false
+  },
+  "icon_x_24_white": {
+    "path": "icon/icon_x_24_white",
+    "size": [
+      24,
+      24
+    ],
+    "body": [
+      0,
+      0,
+      24,
+      24
+    ],
+    "corner": 0,
+    "fixedCorners": false
+  },
+  "icontile_blue_20": {
+    "path": "icontile/icontile_blue_20",
+    "size": [
+      20,
+      20
+    ],
+    "body": [
+      0,
+      0,
+      20,
+      20
+    ],
+    "corner": 6,
+    "fixedCorners": false
+  },
+  "icontile_blue_28": {
+    "path": "icontile/icontile_blue_28",
+    "size": [
+      28,
+      28
+    ],
+    "body": [
+      0,
+      0,
+      28,
+      28
+    ],
+    "corner": 8,
+    "fixedCorners": false
+  },
+  "icontile_blue_40": {
+    "path": "icontile/icontile_blue_40",
+    "size": [
+      40,
+      40
+    ],
+    "body": [
+      0,
+      0,
+      40,
+      40
+    ],
+    "corner": 11,
+    "fixedCorners": false
+  },
+  "icontile_blue_56": {
+    "path": "icontile/icontile_blue_56",
+    "size": [
+      56,
+      56
+    ],
+    "body": [
+      0,
+      0,
+      56,
+      56
+    ],
+    "corner": 14,
+    "fixedCorners": false
+  },
+  "icontile_gray_20": {
+    "path": "icontile/icontile_gray_20",
+    "size": [
+      20,
+      20
+    ],
+    "body": [
+      0,
+      0,
+      20,
+      20
+    ],
+    "corner": 6,
+    "fixedCorners": false
+  },
+  "icontile_gray_28": {
+    "path": "icontile/icontile_gray_28",
+    "size": [
+      28,
+      28
+    ],
+    "body": [
+      0,
+      0,
+      28,
+      28
+    ],
+    "corner": 8,
+    "fixedCorners": false
+  },
+  "icontile_gray_40": {
+    "path": "icontile/icontile_gray_40",
+    "size": [
+      40,
+      40
+    ],
+    "body": [
+      0,
+      0,
+      40,
+      40
+    ],
+    "corner": 11,
+    "fixedCorners": false
+  },
+  "icontile_gray_56": {
+    "path": "icontile/icontile_gray_56",
+    "size": [
+      56,
+      56
+    ],
+    "body": [
+      0,
+      0,
+      56,
+      56
+    ],
+    "corner": 14,
+    "fixedCorners": false
+  },
+  "icontile_green_20": {
+    "path": "icontile/icontile_green_20",
+    "size": [
+      20,
+      20
+    ],
+    "body": [
+      0,
+      0,
+      20,
+      20
+    ],
+    "corner": 6,
+    "fixedCorners": false
+  },
+  "icontile_green_28": {
+    "path": "icontile/icontile_green_28",
+    "size": [
+      28,
+      28
+    ],
+    "body": [
+      0,
+      0,
+      28,
+      28
+    ],
+    "corner": 8,
+    "fixedCorners": false
+  },
+  "icontile_green_40": {
+    "path": "icontile/icontile_green_40",
+    "size": [
+      40,
+      40
+    ],
+    "body": [
+      0,
+      0,
+      40,
+      40
+    ],
+    "corner": 11,
+    "fixedCorners": false
+  },
+  "icontile_green_56": {
+    "path": "icontile/icontile_green_56",
+    "size": [
+      56,
+      56
+    ],
+    "body": [
+      0,
+      0,
+      56,
+      56
+    ],
+    "corner": 14,
+    "fixedCorners": false
+  },
+  "icontile_indigo_20": {
+    "path": "icontile/icontile_indigo_20",
+    "size": [
+      20,
+      20
+    ],
+    "body": [
+      0,
+      0,
+      20,
+      20
+    ],
+    "corner": 6,
+    "fixedCorners": false
+  },
+  "icontile_indigo_28": {
+    "path": "icontile/icontile_indigo_28",
+    "size": [
+      28,
+      28
+    ],
+    "body": [
+      0,
+      0,
+      28,
+      28
+    ],
+    "corner": 8,
+    "fixedCorners": false
+  },
+  "icontile_indigo_40": {
+    "path": "icontile/icontile_indigo_40",
+    "size": [
+      40,
+      40
+    ],
+    "body": [
+      0,
+      0,
+      40,
+      40
+    ],
+    "corner": 11,
+    "fixedCorners": false
+  },
+  "icontile_indigo_56": {
+    "path": "icontile/icontile_indigo_56",
+    "size": [
+      56,
+      56
+    ],
+    "body": [
+      0,
+      0,
+      56,
+      56
+    ],
+    "corner": 14,
+    "fixedCorners": false
+  },
+  "icontile_orange_20": {
+    "path": "icontile/icontile_orange_20",
+    "size": [
+      20,
+      20
+    ],
+    "body": [
+      0,
+      0,
+      20,
+      20
+    ],
+    "corner": 6,
+    "fixedCorners": false
+  },
+  "icontile_orange_28": {
+    "path": "icontile/icontile_orange_28",
+    "size": [
+      28,
+      28
+    ],
+    "body": [
+      0,
+      0,
+      28,
+      28
+    ],
+    "corner": 8,
+    "fixedCorners": false
+  },
+  "icontile_orange_40": {
+    "path": "icontile/icontile_orange_40",
+    "size": [
+      40,
+      40
+    ],
+    "body": [
+      0,
+      0,
+      40,
+      40
+    ],
+    "corner": 11,
+    "fixedCorners": false
+  },
+  "icontile_orange_56": {
+    "path": "icontile/icontile_orange_56",
+    "size": [
+      56,
+      56
+    ],
+    "body": [
+      0,
+      0,
+      56,
+      56
+    ],
+    "corner": 14,
+    "fixedCorners": false
+  },
+  "icontile_purple_20": {
+    "path": "icontile/icontile_purple_20",
+    "size": [
+      20,
+      20
+    ],
+    "body": [
+      0,
+      0,
+      20,
+      20
+    ],
+    "corner": 6,
+    "fixedCorners": false
+  },
+  "icontile_purple_28": {
+    "path": "icontile/icontile_purple_28",
+    "size": [
+      28,
+      28
+    ],
+    "body": [
+      0,
+      0,
+      28,
+      28
+    ],
+    "corner": 8,
+    "fixedCorners": false
+  },
+  "icontile_purple_40": {
+    "path": "icontile/icontile_purple_40",
+    "size": [
+      40,
+      40
+    ],
+    "body": [
+      0,
+      0,
+      40,
+      40
+    ],
+    "corner": 11,
+    "fixedCorners": false
+  },
+  "icontile_purple_56": {
+    "path": "icontile/icontile_purple_56",
+    "size": [
+      56,
+      56
+    ],
+    "body": [
+      0,
+      0,
+      56,
+      56
+    ],
+    "corner": 14,
+    "fixedCorners": false
+  },
+  "icontile_red_20": {
+    "path": "icontile/icontile_red_20",
+    "size": [
+      20,
+      20
+    ],
+    "body": [
+      0,
+      0,
+      20,
+      20
+    ],
+    "corner": 6,
+    "fixedCorners": false
+  },
+  "icontile_red_28": {
+    "path": "icontile/icontile_red_28",
+    "size": [
+      28,
+      28
+    ],
+    "body": [
+      0,
+      0,
+      28,
+      28
+    ],
+    "corner": 8,
+    "fixedCorners": false
+  },
+  "icontile_red_40": {
+    "path": "icontile/icontile_red_40",
+    "size": [
+      40,
+      40
+    ],
+    "body": [
+      0,
+      0,
+      40,
+      40
+    ],
+    "corner": 11,
+    "fixedCorners": false
+  },
+  "icontile_red_56": {
+    "path": "icontile/icontile_red_56",
+    "size": [
+      56,
+      56
+    ],
+    "body": [
+      0,
+      0,
+      56,
+      56
+    ],
+    "corner": 14,
+    "fixedCorners": false
+  },
+  "icontile_teal_20": {
+    "path": "icontile/icontile_teal_20",
+    "size": [
+      20,
+      20
+    ],
+    "body": [
+      0,
+      0,
+      20,
+      20
+    ],
+    "corner": 6,
+    "fixedCorners": false
+  },
+  "icontile_teal_28": {
+    "path": "icontile/icontile_teal_28",
+    "size": [
+      28,
+      28
+    ],
+    "body": [
+      0,
+      0,
+      28,
+      28
+    ],
+    "corner": 8,
+    "fixedCorners": false
+  },
+  "icontile_teal_40": {
+    "path": "icontile/icontile_teal_40",
+    "size": [
+      40,
+      40
+    ],
+    "body": [
+      0,
+      0,
+      40,
+      40
+    ],
+    "corner": 11,
+    "fixedCorners": false
+  },
+  "icontile_teal_56": {
+    "path": "icontile/icontile_teal_56",
+    "size": [
+      56,
+      56
+    ],
+    "body": [
+      0,
+      0,
+      56,
+      56
+    ],
+    "corner": 14,
+    "fixedCorners": false
+  },
+  "ninepatch_popup": {
+    "path": "ninepatch/ninepatch_popup",
+    "size": [
+      288,
+      288
+    ],
+    "body": [
+      120,
+      120,
+      48,
+      48
+    ],
+    "corner": 16,
+    "fixedCorners": true
+  },
+  "ninepatch_progress_fill_blue": {
+    "path": "ninepatch/ninepatch_progress_fill_blue",
+    "size": [
+      24,
+      8
+    ],
+    "body": [
+      0,
+      0,
+      24,
+      8
+    ],
+    "corner": 4,
+    "fixedCorners": false
+  },
+  "ninepatch_progress_fill_green": {
+    "path": "ninepatch/ninepatch_progress_fill_green",
+    "size": [
+      24,
+      8
+    ],
+    "body": [
+      0,
+      0,
+      24,
+      8
+    ],
+    "corner": 4,
+    "fixedCorners": false
+  },
+  "ninepatch_progress_fill_orange": {
+    "path": "ninepatch/ninepatch_progress_fill_orange",
+    "size": [
+      24,
+      8
+    ],
+    "body": [
+      0,
+      0,
+      24,
+      8
+    ],
+    "corner": 4,
+    "fixedCorners": false
+  },
+  "ninepatch_progress_fill_purple": {
+    "path": "ninepatch/ninepatch_progress_fill_purple",
+    "size": [
+      24,
+      8
+    ],
+    "body": [
+      0,
+      0,
+      24,
+      8
+    ],
+    "corner": 4,
+    "fixedCorners": false
+  },
+  "ninepatch_progress_fill_red": {
+    "path": "ninepatch/ninepatch_progress_fill_red",
+    "size": [
+      24,
+      8
+    ],
+    "body": [
+      0,
+      0,
+      24,
+      8
+    ],
+    "corner": 4,
+    "fixedCorners": false
+  },
+  "ninepatch_progress_fill_teal": {
+    "path": "ninepatch/ninepatch_progress_fill_teal",
+    "size": [
+      24,
+      8
+    ],
+    "body": [
+      0,
+      0,
+      24,
+      8
+    ],
+    "corner": 4,
+    "fixedCorners": false
+  },
+  "ninepatch_progress_track": {
+    "path": "ninepatch/ninepatch_progress_track",
+    "size": [
+      24,
+      8
+    ],
+    "body": [
+      0,
+      0,
+      24,
+      8
+    ],
+    "corner": 4,
+    "fixedCorners": false
+  },
+  "segmented_thumb_116x28": {
+    "path": "segmented/segmented_thumb_116x28",
+    "size": [
+      128,
+      40
+    ],
+    "body": [
+      6,
+      3,
+      116,
+      28
+    ],
+    "corner": 8,
+    "fixedCorners": false
+  },
+  "segmented_track_240x32": {
+    "path": "segmented/segmented_track_240x32",
+    "size": [
+      240,
+      32
+    ],
+    "body": [
+      0,
+      0,
+      240,
+      32
+    ],
+    "corner": 10,
+    "fixedCorners": false
+  },
+  "slot_empty_18": {
+    "path": "slot/slot_empty_18",
+    "size": [
+      18,
+      18
+    ],
+    "body": [
+      0,
+      0,
+      18,
+      18
+    ],
+    "corner": 4,
+    "fixedCorners": false
+  },
+  "slot_empty_32": {
+    "path": "slot/slot_empty_32",
+    "size": [
+      32,
+      32
+    ],
+    "body": [
+      0,
+      0,
+      32,
+      32
+    ],
+    "corner": 8,
+    "fixedCorners": false
+  },
+  "slot_empty_36": {
+    "path": "slot/slot_empty_36",
+    "size": [
+      36,
+      36
+    ],
+    "body": [
+      0,
+      0,
+      36,
+      36
+    ],
+    "corner": 8,
+    "fixedCorners": false
+  },
+  "slot_empty_40": {
+    "path": "slot/slot_empty_40",
+    "size": [
+      40,
+      40
+    ],
+    "body": [
+      0,
+      0,
+      40,
+      40
+    ],
+    "corner": 8,
+    "fixedCorners": false
+  },
+  "slot_hover_18": {
+    "path": "slot/slot_hover_18",
+    "size": [
+      20,
+      20
+    ],
+    "body": [
+      1,
+      1,
+      18,
+      18
+    ],
+    "corner": 4,
+    "fixedCorners": false
+  },
+  "slot_hover_32": {
+    "path": "slot/slot_hover_32",
+    "size": [
+      34,
+      34
+    ],
+    "body": [
+      1,
+      1,
+      32,
+      32
+    ],
+    "corner": 8,
+    "fixedCorners": false
+  },
+  "slot_hover_36": {
+    "path": "slot/slot_hover_36",
+    "size": [
+      38,
+      38
+    ],
+    "body": [
+      1,
+      1,
+      36,
+      36
+    ],
+    "corner": 8,
+    "fixedCorners": false
+  },
+  "slot_hover_40": {
+    "path": "slot/slot_hover_40",
+    "size": [
+      42,
+      42
+    ],
+    "body": [
+      1,
+      1,
+      40,
+      40
+    ],
+    "corner": 8,
+    "fixedCorners": false
+  },
+  "slot_locked_18": {
+    "path": "slot/slot_locked_18",
+    "size": [
+      18,
+      18
+    ],
+    "body": [
+      0,
+      0,
+      18,
+      18
+    ],
+    "corner": 4,
+    "fixedCorners": false
+  },
+  "slot_locked_32": {
+    "path": "slot/slot_locked_32",
+    "size": [
+      32,
+      32
+    ],
+    "body": [
+      0,
+      0,
+      32,
+      32
+    ],
+    "corner": 8,
+    "fixedCorners": false
+  },
+  "slot_locked_36": {
+    "path": "slot/slot_locked_36",
+    "size": [
+      36,
+      36
+    ],
+    "body": [
+      0,
+      0,
+      36,
+      36
+    ],
+    "corner": 8,
+    "fixedCorners": false
+  },
+  "slot_locked_40": {
+    "path": "slot/slot_locked_40",
+    "size": [
+      40,
+      40
+    ],
+    "body": [
+      0,
+      0,
+      40,
+      40
+    ],
+    "corner": 8,
+    "fixedCorners": false
+  },
+  "slot_search_hit_40": {
+    "path": "slot/slot_search_hit_40",
+    "size": [
+      44,
+      44
+    ],
+    "body": [
+      2,
+      2,
+      40,
+      40
+    ],
+    "corner": 8,
+    "fixedCorners": false
+  },
+  "slot_selected_18": {
+    "path": "slot/slot_selected_18",
+    "size": [
+      22,
+      22
+    ],
+    "body": [
+      2,
+      2,
+      18,
+      18
+    ],
+    "corner": 4,
+    "fixedCorners": false
+  },
+  "stepper_72x32": {
+    "path": "stepper/stepper_72x32",
+    "size": [
+      73,
+      32
+    ],
+    "body": [
+      0,
+      0,
+      73,
+      32
+    ],
+    "corner": 10,
+    "fixedCorners": false
+  },
+  "switch_off": {
+    "path": "switch/switch_off",
+    "size": [
+      45,
+      29
+    ],
+    "body": [
+      0,
+      0,
+      44,
+      26
+    ],
+    "corner": 13,
+    "fixedCorners": false
+  },
+  "switch_off_disabled": {
+    "path": "switch/switch_off_disabled",
+    "size": [
+      44,
+      28
+    ],
+    "body": [
+      0,
+      0,
+      44,
+      26
+    ],
+    "corner": 13,
+    "fixedCorners": false
+  },
+  "switch_on": {
+    "path": "switch/switch_on",
+    "size": [
+      45,
+      29
+    ],
+    "body": [
+      0,
+      0,
+      44,
+      26
+    ],
+    "corner": 13,
+    "fixedCorners": false
+  },
+  "switch_on_disabled": {
+    "path": "switch/switch_on_disabled",
+    "size": [
+      44,
+      28
+    ],
+    "body": [
+      0,
+      0,
+      44,
+      26
+    ],
+    "corner": 13,
+    "fixedCorners": false
+  },
+  "titlebar_480": {
+    "path": "titlebar/titlebar_480",
+    "size": [
+      480,
+      56
+    ],
+    "body": [
+      0,
+      0,
+      480,
+      56
+    ],
+    "corner": 24,
+    "fixedCorners": false
+  },
+  "window_panel_640x480": {
+    "path": "window/window_panel_640x480",
+    "size": [
+      782,
+      622
+    ],
+    "body": [
+      71,
+      31,
+      640,
+      480
+    ],
+    "corner": 25,
+    "fixedCorners": true
+  },
+  "reference_endless_beaf_item": {
+    "path": "reference/endless_beaf_item",
+    "size": [
+      24,
+      24
+    ],
+    "body": [
+      0,
+      0,
+      24,
+      24
+    ],
+    "corner": 0,
+    "fixedCorners": false
+  },
+  "reference_omniversal_pattern_converter": {
+    "path": "reference/omniversal_pattern_converter",
+    "size": [
+      16,
+      16
+    ],
+    "body": [
+      0,
+      0,
+      16,
+      16
+    ],
+    "corner": 0,
+    "fixedCorners": false
+  },
+  "reference_ore_generator_block": {
+    "path": "reference/ore_generator_block",
+    "size": [
+      16,
+      16
+    ],
+    "body": [
+      0,
+      0,
+      16,
+      16
+    ],
+    "corner": 0,
+    "fixedCorners": false
+  }
+}

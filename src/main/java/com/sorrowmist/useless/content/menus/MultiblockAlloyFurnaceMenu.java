@@ -58,11 +58,11 @@ public final class MultiblockAlloyFurnaceMenu extends AbstractContainerMenu {
         furnaceSync.addData(data);
         for (int row = 0; row < 3; row++) {
             for (int column = 0; column < 9; column++) {
-                addSlot(new Slot(inventory, column + row * 9 + 9, 8 + column * 18, 140 + row * 18));
+                addSlot(new Slot(inventory, column + row * 9 + 9, 382 + column * 22, 60 + row * 22));
             }
         }
         for (int column = 0; column < 9; column++) {
-            addSlot(new Slot(inventory, column, 8 + column * 18, 198));
+            addSlot(new Slot(inventory, column, 382 + column * 22, 128));
         }
     }
 

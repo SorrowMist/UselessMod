@@ -33,6 +33,10 @@ import com.sorrowmist.useless.compat.neoecoae.compact.shadow.ShadowFluidInputHat
 import com.sorrowmist.useless.compat.neoecoae.compact.shadow.ShadowFluidOutputHatchBlockEntity;
 import com.sorrowmist.useless.compat.neoecoae.compact.shadow.ShadowPatternBusBlockEntity;
 import com.sorrowmist.useless.compat.neoecoae.compact.shadow.ShadowThreadingCoreBlockEntity;
+import com.sorrowmist.useless.init.ModCreativeTabs;
+import com.sorrowmist.useless.compat.neoecoae.compact.menu.CompactPatternAccessMenu;
+import cn.dancingsnow.neoecoae.blocks.entity.ECOMachineInterfaceBlockEntity;
+import com.sorrowmist.useless.compat.neoecoae.compact.entity.CompactCraftingInterfaceBlockEntity;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
@@ -116,6 +120,13 @@ public final class NeoEcoCompactRegistry {
                     (pos, state) -> new CompactL9BlockEntity(
                             NeoEcoCompactRegistry.COMPACT_L9_BE.get(), pos, state),
                     COMPACT_L9.get()).build(null));
+
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<CompactCraftingInterfaceBlockEntity>>
+            COMPACT_CRAFTING_INTERFACE = BLOCK_ENTITY_TYPES.register("compact_crafting_interface",
+            () -> BlockEntityType.Builder.of(
+                    (pos, state) -> new CompactCraftingInterfaceBlockEntity(
+                            NeoEcoCompactRegistry.COMPACT_CRAFTING_INTERFACE.get(), pos, state),
+                    COMPACT_F9.get()).build(null));
 
     // ------------------------------------------------------- 影子组件实体类型
     // 影子组件永远不会由世界创建，这些类型只用于手动 new 出「不落世界的 ECO 组件」。
@@ -208,10 +219,15 @@ public final class NeoEcoCompactRegistry {
         CompactMachineClassMap.register(CompactL9BlockEntity.class, ECOStorageSystemBlockEntity.class);
         // ECO queries pattern buses by their native block-entity type in the grid index.
         CompactMachineClassMap.register(ExposedPatternBusBlockEntity.class, ECOCraftingPatternBusBlockEntity.class);
+        CompactMachineClassMap.register(CompactCraftingInterfaceBlockEntity.class, ECOMachineInterfaceBlockEntity.class);
 
         BLOCKS.register(modEventBus);
         ITEMS.register(modEventBus);
         BLOCK_ENTITY_TYPES.register(modEventBus);
+        CompactPatternAccessMenu.register();
+        ModCreativeTabs.EXTRA_TAB_ITEMS.add(COMPACT_C9_ITEM);
+        ModCreativeTabs.EXTRA_TAB_ITEMS.add(COMPACT_F9_ITEM);
+        ModCreativeTabs.EXTRA_TAB_ITEMS.add(COMPACT_L9_ITEM);
         modEventBus.addListener(NeoEcoCompactRegistry::onCommonSetup);
         modEventBus.addListener(NeoEcoCompactRegistry::onRegisterCapabilities);
     }

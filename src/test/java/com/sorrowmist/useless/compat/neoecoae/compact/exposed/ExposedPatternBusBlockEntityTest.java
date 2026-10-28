@@ -1,9 +1,11 @@
 package com.sorrowmist.useless.compat.neoecoae.compact.exposed;
 
+import appeng.api.inventories.InternalInventory;
 import appeng.api.networking.IGrid;
 import appeng.api.networking.IGridNode;
 import appeng.api.networking.IManagedGridNode;
 import appeng.api.networking.crafting.ICraftingService;
+import cn.dancingsnow.neoecoae.blocks.entity.crafting.ECOCraftingPatternBusBlockEntity;
 import com.sorrowmist.useless.InventoryTestBootstrap;
 import com.sorrowmist.useless.compat.neoecoae.compact.provider.CombinedPatternInventory;
 import com.sorrowmist.useless.compat.neoecoae.compact.cluster.CompactCraftingCluster;
@@ -56,6 +58,52 @@ class ExposedPatternBusBlockEntityTest {
         bus.refreshAdvertisedPatterns();
 
         verify(service).refreshNodeCraftingProvider(gridNode);
+    }
+
+    @Test
+    void nativePreviewNotificationUsesTheOwningBusAndLocalIndexAfterResize() {
+        var first = mock(ECOCraftingPatternBusBlockEntity.class);
+        var second = mock(ECOCraftingPatternBusBlockEntity.class);
+        var firstInventory = mock(InternalInventory.class);
+        var secondInventory = mock(InternalInventory.class);
+        when(first.getPatternSlotCount()).thenReturn(504);
+        when(second.getPatternSlotCount()).thenReturn(504);
+        when(first.getPatternSlotInventory()).thenReturn(firstInventory);
+        when(second.getPatternSlotInventory()).thenReturn(secondInventory);
+        var bus = createBus(mock(IManagedGridNode.class, RETURNS_SELF));
+        bus.bind(List.of(first, second), mock(IManagedGridNode.class));
+
+        bus.onChangeInventory(bus.getPatternSlotInventory(), 504);
+        verify(second).onChangeInventory(secondInventory, 0);
+        verify(first, never()).onChangeInventory(any(), anyInt());
+
+        when(first.getPatternSlotCount()).thenReturn(630);
+        bus.onChangeInventory(bus.getPatternSlotInventory(), 629);
+        bus.onChangeInventory(bus.getPatternSlotInventory(), 637);
+        verify(first).onChangeInventory(firstInventory, 629);
+        verify(second).onChangeInventory(secondInventory, 7);
+    }
+
+    @Test
+    void wholePreviewNotificationReachesEachRealCatalogWithoutAnAggregateIndex() {
+        var first = mock(ECOCraftingPatternBusBlockEntity.class);
+        var second = mock(ECOCraftingPatternBusBlockEntity.class);
+        var firstInventory = mock(InternalInventory.class);
+        var secondInventory = mock(InternalInventory.class);
+        when(first.getPatternSlotCount()).thenReturn(504);
+        when(second.getPatternSlotCount()).thenReturn(504);
+        when(first.getPatternSlotInventory()).thenReturn(firstInventory);
+        when(second.getPatternSlotInventory()).thenReturn(secondInventory);
+        var bus = createBus(mock(IManagedGridNode.class, RETURNS_SELF));
+        bus.bind(List.of(first, second), mock(IManagedGridNode.class));
+
+        bus.onChangeInventory(bus.getPatternSlotInventory(), -1);
+        bus.onChangeInventory(bus.getPatternSlotInventory(), 1008);
+
+        verify(first).onChangeInventory(firstInventory, -1);
+        verify(second).onChangeInventory(secondInventory, -1);
+        verify(first, never()).onChangeInventory(any(), intThat(slot -> slot >= 0));
+        verify(second, never()).onChangeInventory(any(), intThat(slot -> slot >= 0));
     }
 
     private static ExposedPatternBusBlockEntity createBus(IManagedGridNode node) {

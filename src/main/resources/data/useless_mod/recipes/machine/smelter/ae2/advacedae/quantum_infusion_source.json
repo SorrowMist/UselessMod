@@ -19,7 +19,7 @@
           }
         ],
         "mold": {
-          "item": "ae2:inscriber"
+          "item": "advanced_ae:reaction_chamber"
         },
         "catalyst": {
           "tag": "useless_mod:useless_ingots"

@@ -16,7 +16,7 @@ side="BOTH"
 [[dependencies.useless_mod]]
 modId="neoecoae"
 mandatory=false
-versionRange="[20.4.2,20.5)"
+versionRange="[20.5.0,)"
 ordering="AFTER"
 side="BOTH"
 

@@ -17,34 +17,45 @@ import com.sorrowmist.useless.compat.forge1201.network.PacketDistributor;
 import com.sorrowmist.useless.compat.forge1201.network.IPayloadContext;
 import org.jetbrains.annotations.NotNull;
 
+import java.nio.charset.StandardCharsets;
+import java.util.List;
+import java.util.UUID;
+
 /**
- * 客户端请求把某个锚点挪到列表里的指定位置。
+ * 客户端请求把某个锚点挪到完整列表的指定位置。
  *
- * <p>次序影响的是<b>同权重下谁先拿</b>：引擎在同一条线路上按权重降序排，权重相同时保持列表
- * 次序，而分配时除不尽的余数留给靠前的那个。</p>
- *
- * <p>传的是<b>目标下标</b>而不是「上移/下移一格」：界面上可能开着搜索过滤，可见邻居未必是
- * 列表里的邻居。由客户端把「越过上一个可见行」翻译成目标下标，服务端夹到合法范围后照做，
- * 这样过滤状态下也是「眼睛看到的那样动」。</p>
- *
- * <p>与解绑一样，服务端只认「当前打开的那个物流界面所属的网络」，包体里不带网络 ID，
- * 玩家无法用它去动别人的网络。</p>
- *
- * @param anchor      要移动的锚点
- * @param targetIndex 目标位置（在完整锚点列表里的下标）
+ * <p>目标下标仍由客户端从过滤后的可见行换算。网络 ID 和顺序令牌只作前置条件：
+ * 服务端仍只编辑当前已打开菜单、且玩家有权访问的网络。切网或队友已重排时拒绝旧指令，
+ * 并回发当前快照，不能把旧下标应用到新顺序。令牌不是授权凭证。</p>
  */
-public record StaffLinkReorderPacket(GlobalPos anchor, int targetIndex) implements CustomPacketPayload {
+public record StaffLinkReorderPacket(UUID networkId, GlobalPos anchor, int targetIndex, UUID orderToken)
+        implements CustomPacketPayload {
 
     public static final Type<StaffLinkReorderPacket> TYPE = new Type<>(
             new ResourceLocation(UselessMod.MODID, "staff_link_reorder"));
     public static final StreamCodec<FriendlyByteBuf, StaffLinkReorderPacket> STREAM_CODEC =
             StreamCodec.of(
                     (buffer, packet) -> {
+                        buffer.writeUUID(packet.networkId());
                         StaffLinkRoute.writeAnchor(buffer, packet.anchor());
                         buffer.writeVarInt(packet.targetIndex());
+                        buffer.writeUUID(packet.orderToken());
                     },
-                    buffer -> new StaffLinkReorderPacket(
-                            StaffLinkRoute.readAnchor(buffer), buffer.readVarInt()));
+                    buffer -> new StaffLinkReorderPacket(buffer.readUUID(),
+                            StaffLinkRoute.readAnchor(buffer), buffer.readVarInt(), buffer.readUUID()));
+
+    /** Deterministic across client/server JVMs; dimension names and packed positions are unambiguous. */
+    public static UUID orderToken(List<GlobalPos> anchors) {
+        StringBuilder key = new StringBuilder();
+        for (GlobalPos anchor : anchors)
+            key.append(anchor.dimension().location()).append('@').append(anchor.pos().asLong()).append('\n');
+        return UUID.nameUUIDFromBytes(key.toString().getBytes(StandardCharsets.UTF_8));
+    }
+
+    boolean applyTo(StaffLinkNetwork network) {
+        return networkId.equals(network.id()) && orderToken.equals(orderToken(network.anchors()))
+                && network.isBound(anchor) && network.moveAnchorTo(anchor, targetIndex);
+    }
 
     public static void handle(StaffLinkReorderPacket packet, IPayloadContext ctx) {
         ctx.enqueueWork(() -> {
@@ -59,16 +70,13 @@ public record StaffLinkReorderPacket(GlobalPos anchor, int targetIndex) implemen
                 return;
             }
             StaffLinkNetwork network = StaffLinkManager.networkById(player.server, menu.getNetworkId());
-            if (network == null || !network.isBound(packet.anchor())) {
-                return;
+            if (network == null) return;
+            if (packet.applyTo(network)) {
+                StaffLinkSavedData.get(player.server).markDirty();
+                // 次序变了，立刻重跑一遍，别让玩家等上一次排定的退避。
+                StaffLinkEngine.wake(network.id());
             }
-            if (!network.moveAnchorTo(packet.anchor(), packet.targetIndex())) {
-                // 位置没变，不必回包。
-                return;
-            }
-            StaffLinkSavedData.get(player.server).markDirty();
-            // 次序变了，立刻重跑一遍，别让玩家等上一次排定的退避。
-            StaffLinkEngine.wake(network.id());
+            // Rejected stale commands and no-ops must also correct the client's snapshot.
             PacketDistributor.sendToPlayer(player, StaffLinkSyncPacket.of(
                     player.server, StaffLinkManager.ownerIdOf(player), network));
         });

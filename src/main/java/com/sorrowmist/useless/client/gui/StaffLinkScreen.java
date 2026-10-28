@@ -1,5 +1,7 @@
 package com.sorrowmist.useless.client.gui;
 
+import com.sorrowmist.useless.client.gui.apple.*;
+import com.sorrowmist.useless.compat.jei.JeiDragPreviewRenderer;
 import com.sorrowmist.useless.client.network.ClientPacketHandlers;
 import com.sorrowmist.useless.client.stafflink.StaffLinkStressClientState;
 import com.sorrowmist.useless.content.menus.StaffLinkMenu;
@@ -42,89 +44,21 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalLong;
 
+import static com.sorrowmist.useless.client.gui.StaffLinkViewLayout.*;
+
 /**
  * 无线物流配置界面。
  *
  * <p>沿用本模组机器界面的统一风格（{@link MachineScreenStyle} + {@link PressableAE2Button}）。
- * 布局分两块：上面是「网络 + 容器列表」（可搜索、可改名、Ctrl/Shift 多选后批量编辑），
- * 下面是选中线路的搬运规则，底部是玩家背包。</p>
+ * 布局分为顶部网络栏、左侧容器列表与改名区、右侧线路配置与玩家背包。
+ * 搜索、Ctrl/Shift 多选和批量编辑仍使用原有交互。</p>
  *
  * <p>容器列表本身不在这里高亮：手持杖且开着无线物流模式时，世界里的自动高亮由
  * {@code StaffLinkHighlightRenderer} 独立负责，界面关着也生效。</p>
- *
- * <p>所有控件的右边缘统一落在 {@link #CONTENT_RIGHT}，视觉上对齐成一列。</p>
  */
 public final class StaffLinkScreen extends AbstractContainerScreen<StaffLinkMenu> {
-    private static final int PANEL_WIDTH = 250;
-    /**
-     * 面板高度。
-     *
-     * <p>过滤槽<b>不画在主界面上</b>（18 格 + 每格两个限制框会撑得很高），主界面只留一个
-     * 「过滤」按钮，点开在覆盖层里编辑。所以这里维持原来的高度。</p>
-     */
-    private static final int PANEL_HEIGHT = 336;
-
-    /** 内容区左右边界；内衬比内容各外扩 2px，形成对称留白。 */
-    private static final int CONTENT_LEFT = 8;
-    private static final int CONTENT_RIGHT = 240;
-    private static final int INSET_LEFT = 6;
-    private static final int INSET_RIGHT = 242;
-    private static final int CONTENT_WIDTH = CONTENT_RIGHT - CONTENT_LEFT;
-
-    // ---- 锚点列表
-    private static final int NETWORK_ROW_Y = 19;
-    private static final int SEARCH_ROW_Y = 33;
-    private static final int NAME_ROW_Y = 47;
-    private static final int SMALL_FIELD_HEIGHT = 12;
-
-    /** 搜索框为批量按钮让出右侧空间；三个控件的右边缘仍落在 {@link #CONTENT_RIGHT}。 */
-    private static final int SEARCH_WIDTH = 142;
-    private static final int SELECT_ALL_X = 154;
-    private static final int SELECT_ALL_WIDTH = 42;
-    private static final int CLEAR_SELECTION_X = 200;
-    private static final int CLEAR_SELECTION_WIDTH = 40;
-
-    /** 网络切换按钮的宽度（`<` / `>`）。 */
-    private static final int NETWORK_SWITCH_WIDTH = 14;
-    private static final int PREV_BUTTON_X = 8;
-    private static final int NETWORK_FIELD_X = 24;
-    private static final int NETWORK_FIELD_WIDTH = 110;
-    private static final int NEXT_BUTTON_X = 136;
-    private static final int NEW_BUTTON_X = 154;
-    private static final int NEW_BUTTON_WIDTH = 30;
-
-    private static final int LIST_FIRST_ROW_Y = 61;
-    private static final int LIST_ROW_HEIGHT = 13;
-    private static final int LIST_VISIBLE_ROWS = 5;
-    private static final int LIST_TOP = 59;
-    private static final int LIST_BOTTOM = 124;
-    private static final int LIST_UNBIND_WIDTH = 12;
-    private static final int LIST_INSET_BOTTOM = 128;
-    /** 行首 ▲ / ▼ 两个按钮：宽度各 9px，从 CONTENT_LEFT 起。 */
-    private static final int LIST_MOVE_WIDTH = 9;
-    private static final int LIST_MOVE_COUNT = 2;
-    /** 行首按钮占掉的横向空间；流向字形与名字整体右移这么多，名字预算也要相应扣掉。 */
-    private static final int LIST_TEXT_SHIFT = LIST_MOVE_WIDTH * LIST_MOVE_COUNT + 2;
-    private static final int LIST_GLYPH_X = CONTENT_LEFT + 2 + LIST_TEXT_SHIFT;
-    private static final int LIST_NAME_X = CONTENT_LEFT + 10 + LIST_TEXT_SHIFT;
     /** 应力线路上容器行尾那个数字占的宽度（紧凑写法最多 4~5 个字符）。 */
     private static final int STRESS_ROW_VALUE_WIDTH = 36;
-
-    // ---- 线路配置
-    private static final int CONFIG_INSET_TOP = 130;
-    private static final int ROUTE_ROW_Y = 134;
-    private static final int ROW_SECOND_Y = 152;
-    private static final int ROW_THIRD_Y = 170;
-    private static final int ROW_FOURTH_Y = 188;
-    private static final int ROW_HEIGHT = 14;
-
-    private static final int FLOW_WIDTH = 74;
-    private static final int FLOW_MEDIUM_GAP = 5;
-    /** 资源类型按钮的左边界；下拉列表贴着它向下展开。 */
-    private static final int MEDIUM_BUTTON_X = CONTENT_LEFT + FLOW_WIDTH + FLOW_MEDIUM_GAP;
-    private static final int MEDIUM_MENU_Y = ROW_SECOND_Y + ROW_HEIGHT + 1;
-    private static final int MEDIUM_MENU_WIDTH = FLOW_WIDTH;
-    private static final int MEDIUM_MENU_ROW_HEIGHT = ROW_HEIGHT;
 
     /**
      * 下拉菜单的绘制 z。
@@ -139,12 +73,6 @@ public final class StaffLinkScreen extends AbstractContainerScreen<StaffLinkMenu
      * 所以不必迁就它）。</p>
      */
     private static final float MEDIUM_MENU_Z = 500.0F;
-    private static final int SIDE_WIDTH = 113;
-    private static final int SIDE_TRIGGER_GAP = 6;
-
-    /** 数值输入框一行的三格：起点与宽度，最后一格的右边缘正好落在 {@link #CONTENT_RIGHT}。 */
-    private static final int[] NUMERIC_CELL_X = {8, 85, 162};
-    private static final int[] NUMERIC_CELL_WIDTH = {77, 77, 78};
 
     /** 输入框停手多久后自动提交（tick）。玩家填了值却没失焦时靠它兜底。 */
     private static final int AUTO_COMMIT_TICKS = 10;
@@ -159,30 +87,14 @@ public final class StaffLinkScreen extends AbstractContainerScreen<StaffLinkMenu
      * <p>底色刻意用不透明的青，和单选那层近白（{@code HIGHLIGHT_COLOR}）以及面板底色
      * （{@code PANEL_COLOR}）都能明显区分。</p>
      */
-    private static final int MULTI_SELECT_COLOR = 0xFFB6E4E4;
-    private static final int MULTI_SELECT_TEXT_COLOR = 0xFF149E9E;
+    private static final int MULTI_SELECT_COLOR = AppleStyle.SELECTED_ROW;
+    private static final int MULTI_SELECT_TEXT_COLOR = AppleStyle.BLUE;
     /** 单选（配置区正在编辑的那台）行的左侧竖条。 */
-    private static final int SELECTED_BAR_COLOR = 0xFF413F54;
+    private static final int SELECTED_BAR_COLOR = AppleStyle.BLUE;
+    private AppleHost appleHost;
+    private static final LinkFlow[] FLOW_SEGMENTS = {LinkFlow.RELEASE, LinkFlow.ABSORB};
 
-    // ---- 过滤入口（主界面）+ 过滤面板（覆盖层）
-    private static final int FILTER_X = 8;
-    /** 主界面「过滤」按钮所在行；沿用原来过滤槽标题的位置。 */
-    private static final int FILTER_Y = 204;
-    /** 主界面「过滤」按钮 / 「应用到全部同名容器」/「解散网络」并排。 */
-    private static final int FILTER_BUTTON_WIDTH = 66;
-    private static final int APPLY_ALL_X = 82;
-    private static final int APPLY_ALL_WIDTH = 92;
-    private static final int DISSOLVE_X = 180;
-    private static final int DISSOLVE_WIDTH = CONTENT_RIGHT - DISSOLVE_X;
-
-    /**
-     * 应力运行状态两行文字的位置。
-     *
-     * <p>取在「过滤」按钮那一行（{@link #FILTER_Y} + 16 = 220）与背包标题（242）之间的空白里：
-     * 上面已经排满了四行配置，下面紧跟着背包，只有这一段是空的。</p>
-     */
-    private static final int STRESS_STATUS_Y = 224;
-    /** 状态文字用色：出问题时换成醒目的琥珀色，正常时与其它次要文字一致。 */
+    /** 应力状态文字用色：出问题时换成醒目的琥珀色，正常时与其它次要文字一致。 */
     private static final int STRESS_WARN_COLOR = 0xFFB26A00;
 
     // ---- 过滤面板（覆盖层）几何
@@ -191,12 +103,14 @@ public final class StaffLinkScreen extends AbstractContainerScreen<StaffLinkMenu
      *
      * <p>v2 起每格只是一个 16×16 的槽位（模式框与两条条件都搬进了右键的详细面板），
      * 所以面板整体收窄到「刚好放下标题 / 提示 + 6 列格子 + 两个按钮」。窄面板还有个好处：
-     * 右边必然留得下 JEI 的原料侧栏（{@code 427 − 2 − 138 = 287 ≥ 48}）。</p>
+     * 右边必然留得下 JEI 的原料侧栏（{@code 427 − 2 − 150 = 275 ≥ 48}）。</p>
      *
-     * <p>高度 = `6(上边距) + 21(标题 + 提示两行) + 3×22 − 6(三行) + 6 + 16(按钮) + 6 = 115`。</p>
+     * <p>高度 = `6(上边距) + 21(标题 + 提示两行) + 3×22 − 6(三行) + 2(说明) + 28(警告) + 8 + 16(按钮) + 6 = 176`。
+     * 底部两段说明（过滤规则 / AE 警告）是设计稿 filter_panel 状态的一部分，早先为了压缩高度
+     * 把它们省掉了，结果玩家看不到「AE 输出端不加过滤就什么都不搬」这条关键警告。</p>
      */
-    private static final int FILTER_PANEL_WIDTH = 138;
-    private static final int FILTER_PANEL_HEIGHT = 115;
+    private static final int FILTER_PANEL_WIDTH = 150;
+    private static final int FILTER_PANEL_HEIGHT = 198;
     private static final int FILTER_PANEL_PAD = 6;
     /** 标题行 + 提示行占掉的高度，格子从这里往下排。 */
     private static final int FILTER_PANEL_HEADER = 21;
@@ -243,8 +157,15 @@ public final class StaffLinkScreen extends AbstractContainerScreen<StaffLinkMenu
     private static final int FILTER_PANEL_BUTTON_GAP = 6;
     private static final int FILTER_PANEL_BUTTON_X = (FILTER_PANEL_WIDTH
             - FILTER_PANEL_BUTTON_WIDTH * 2 - FILTER_PANEL_BUTTON_GAP) / 2;
-    /** 按钮行 y：格子网格底(87) + 6 间隙。 */
-    private static final int FILTER_PANEL_BUTTON_Y = 93;
+    /** 按钮行 y：格子网格底(87) + 说明 / 警告区 + 6 间隙。 */
+    private static final int FILTER_PANEL_BUTTON_Y = 174;
+    /** 过滤规则说明与 AE 警告在面板内的 y。 */
+    private static final int FILTER_HINT_Y = 92;
+    private static final int FILTER_HINT_LINES = 4;
+    private static final int FILTER_WARNING_Y = 132;
+    private static final int FILTER_WARNING_HEIGHT = 34;
+    /** 面板内说明文字的行高（原版字体 9px）。 */
+    private static final int HINT_LINE_HEIGHT = 9;
     /**
      * 过滤面板（覆盖层）绘制 z。
      *
@@ -268,7 +189,7 @@ public final class StaffLinkScreen extends AbstractContainerScreen<StaffLinkMenu
 
     // ---- 详细编辑面板（每格右键打开）几何：独立宽度，跟过滤面板解耦
     private static final int DETAIL_PANEL_WIDTH = 250;
-    private static final int DETAIL_PANEL_HEIGHT = 122;
+    private static final int DETAIL_PANEL_HEIGHT = 232;
     private static final int DETAIL_PANEL_PAD = 8;
     /**
      * 详细面板绘制 z：压过滤面板。
@@ -282,11 +203,17 @@ public final class StaffLinkScreen extends AbstractContainerScreen<StaffLinkMenu
     private static final float DETAIL_PANEL_Z = FILTER_PANEL_Z + 200.0F;
     /** 面板内各行 y（面板内相对坐标）。 */
     private static final int DETAIL_TITLE_Y = 8;
-    private static final int DETAIL_MARKER_ROW_Y = 26;
-    private static final int DETAIL_OUT_ROW_Y = 50;
-    private static final int DETAIL_IN_ROW_Y = 74;
-    private static final int DETAIL_BUTTON_Y = 98;
-    private static final int DETAIL_BUTTON_WIDTH = 70;
+    private static final int DETAIL_MARKER_ROW_Y = 28;
+    private static final int DETAIL_PATTERN_HINT_Y = 47;
+    private static final int DETAIL_EXCLUDE_ROW_Y = 70;
+    private static final int DETAIL_EXCLUDE_HINT_Y = 90;
+    private static final int DETAIL_OUT_ROW_Y = 108;
+    private static final int DETAIL_OUT_HINT_Y = 128;
+    private static final int DETAIL_IN_ROW_Y = 140;
+    private static final int DETAIL_IN_HINT_Y = 160;
+    private static final int DETAIL_VALUE_HINT_Y = 174;
+    private static final int DETAIL_BUTTON_Y = 6;
+    private static final int DETAIL_BUTTON_WIDTH = 44;
     private static final int DETAIL_BUTTON_HEIGHT = 16;
     /** 详细面板里槽位（A / B）的尺寸。 */
     private static final int DETAIL_SLOT_SIZE = FILTER_SLOT_SIZE;
@@ -294,8 +221,10 @@ public final class StaffLinkScreen extends AbstractContainerScreen<StaffLinkMenu
     private static final int DETAIL_MARKER_X = DETAIL_PANEL_PAD;                                  // 8
     private static final int DETAIL_PATTERN_X = DETAIL_MARKER_X + DETAIL_SLOT_SIZE + 2;            // 28
     private static final int DETAIL_PATTERN_WIDTH = 140;
-    private static final int DETAIL_EXCLUDE_X = 172;
-    private static final int DETAIL_EXCLUDE_WIDTH = 70;
+    /** 白名单 / 黑名单：两个按钮并排，占满面板内容宽度。 */
+    private static final int DETAIL_EXCLUDE_X = DETAIL_PANEL_PAD;                                  // 8
+    private static final int DETAIL_EXCLUDE_WIDTH = 114;
+    private static final int DETAIL_BLACKLIST_X = DETAIL_EXCLUDE_X + DETAIL_EXCLUDE_WIDTH + 6;      // 128
     private static final int DETAIL_LABEL_X = DETAIL_PANEL_PAD;                                    // 8
     private static final int DETAIL_COND_SLOT_X = 44;
     private static final int DETAIL_OP_X = DETAIL_COND_SLOT_X + DETAIL_SLOT_SIZE + 4;              // 66
@@ -303,6 +232,10 @@ public final class StaffLinkScreen extends AbstractContainerScreen<StaffLinkMenu
     private static final int DETAIL_VALUE_X = DETAIL_OP_X + DETAIL_OP_WIDTH + 4;                   // 102
     private static final int DETAIL_VALUE_WIDTH = 140;
     private static final int DETAIL_ROW_HEIGHT = 18;
+    /** 详细面板底部的模式错误 / 条件说明区（设计稿 filter_detail 的红色错误块）。 */
+    private static final int DETAIL_ERROR_Y = 188;
+    private static final int DETAIL_ERROR_HEIGHT = 28;
+    private static final int DETAIL_HELP_Y = 220;
 
     private static final Direction[] SIDE_ORDER = {
             null, Direction.UP, Direction.DOWN, Direction.NORTH, Direction.SOUTH, Direction.WEST, Direction.EAST
@@ -339,10 +272,11 @@ public final class StaffLinkScreen extends AbstractContainerScreen<StaffLinkMenu
     private EditBox networkNameField;
     private EditBox searchField;
     private EditBox nameField;
+    private PressableAE2Button saveNameButton;
     private EditBox weightField;
     private EditBox amountField;
     private EditBox intervalField;
-    /** 数值框 + 标签 + 取值范围；标签宽度决定框的起点，范围用来做悬停提示。 */
+    /** 数值框 + 标签 + 取值范围；标签在左列，范围用来做悬停提示。 */
     private final List<NumericSpec> numericFields = new ArrayList<>();
 
     /* ---- 过滤格的「详细编辑面板」（每格右键打开，嵌套在过滤面板之上） ----
@@ -352,10 +286,20 @@ public final class StaffLinkScreen extends AbstractContainerScreen<StaffLinkMenu
     private boolean detailPanelOpen;
     /** 详细面板正在编辑的格号；没打开时 -1。 */
     private int detailIndex = -1;
+    /**
+     * 详细面板里最近一次模式解析失败的原因。
+     *
+     * <p>早先只在界面顶部闪一条 notice（50 tick 后消失，且被覆盖层挡住），玩家改坏模式后
+     * 既看不到错误在哪、也不知道面板为什么关不掉。这里把它留在面板里，直到模式改对或
+     * 面板关闭 —— 对应设计稿 filter_detail 的红色错误块。</p>
+     */
+    @Nullable
+    private Component detailError;
     private EditBox detailPatternField;
     private EditBox detailOutValueField;
     private EditBox detailInValueField;
-    private PressableAE2Button detailExcludeButton;
+    private PressableAE2Button detailWhitelistButton;
+    private PressableAE2Button detailBlacklistButton;
     private PressableAE2Button detailOutOpButton;
     private PressableAE2Button detailInOpButton;
     private PressableAE2Button detailCloseButton;
@@ -392,6 +336,14 @@ public final class StaffLinkScreen extends AbstractContainerScreen<StaffLinkMenu
     private PressableAE2Button stressDirectionButton;
 
     private int scrollOffset;
+    private final StaffLinkAnchorDrag anchorDrag = new StaffLinkAnchorDrag();
+    private enum PointerOwner { MANUAL, HOSTED, TEXT, INVENTORY }
+    private record PointerGesture(PointerOwner owner, @Nullable EditBox field) {}
+    /** Keep the entire gesture with its press owner, even if a popup closes or a drag is cancelled. */
+    private final Map<Integer, PointerGesture> pointerGestures = new HashMap<>();
+    private int anchorDragScrollTicks;
+    private record AnchorAppearance(ItemStack icon, String blockName) {}
+    private final Map<GlobalPos, AnchorAppearance> anchorAppearances = new HashMap<>();
     private String controlSignature = "";
     /** 上一 tick 有焦点的输入框，用来捕捉「焦点离开」这一刻。 */
     private EditBox focusedField;
@@ -422,49 +374,64 @@ public final class StaffLinkScreen extends AbstractContainerScreen<StaffLinkMenu
         imageWidth = PANEL_WIDTH;
         imageHeight = PANEL_HEIGHT;
         titleLabelX = 8;
-        titleLabelY = 7;
-        inventoryLabelX = 44;
-        inventoryLabelY = 242;
+        titleLabelY = 9;
+        inventoryLabelX = INVENTORY_LABEL_X;
+        inventoryLabelY = INVENTORY_LABEL_Y;
     }
 
     @Override
     protected void init() {
         super.init();
+        anchorDrag.cancel();
+        pointerGestures.clear();
+        invalidateJeiDrag();
+        for (int i = 0; i < 36 && i < menu.slots.size(); i++)
+            com.sorrowmist.useless.client.gui.ldl.api.SlotsNode.moveSlot(menu.slots.get(i),
+                    PLAYER_INVENTORY_X + i % 9 * SLOT_STEP,
+                    i < 27 ? PLAYER_INVENTORY_Y + i / 9 * SLOT_STEP : PLAYER_HOTBAR_Y);
 
         mediumOptions = LinkMedium.supported();
         mediumMenuOpen = false;
+        // 窗口适配会重建控件，不能继续保留旧输入框及其标签。
+        numericFields.clear();
+        focusedField = null;
+        controlSignature = "";
 
         for (int route = 0; route < routeButtons.length; route++) {
             final int index = route;
-            routeButtons[route] = addRenderableWidget(new PressableAE2Button(
-                    leftPos + CONTENT_LEFT + route * 26, topPos + ROUTE_ROW_Y, 24, ROW_HEIGHT,
+            routeButtons[route] = model(new PressableAE2Button(
+                    leftPos + routeButtonX(route, routeButtons.length), topPos + ROUTE_ROW_Y,
+                    ROUTE_BUTTON_WIDTH, ROW_HEIGHT,
                     Component.literal(String.valueOf(route)), button -> selectRoute(index)));
         }
 
-        flowButton = addRenderableWidget(new PressableAE2Button(
-                leftPos + CONTENT_LEFT, topPos + ROW_SECOND_Y, FLOW_WIDTH, ROW_HEIGHT, Component.empty(),
+        flowButton = model(new PressableAE2Button(
+                leftPos + CONFIG_LEFT, topPos + FLOW_ROW_Y, CONFIG_WIDTH, ROW_HEIGHT, Component.empty(),
                 button -> edit(config -> withFlow(config, config.flow().next()))));
-        mediumButton = addRenderableWidget(new PressableAE2Button(
-                leftPos + MEDIUM_BUTTON_X, topPos + ROW_SECOND_Y,
-                FLOW_WIDTH, ROW_HEIGHT, Component.empty(),
+        mediumButton = model(new PressableAE2Button(
+                leftPos + MEDIUM_BUTTON_X, topPos + MEDIUM_ROW_Y,
+                CONFIG_WIDTH, ROW_HEIGHT, Component.empty(),
                 button -> mediumMenuOpen = !mediumMenuOpen));
-        enabledButton = addRenderableWidget(new PressableAE2Button(
-                leftPos + CONTENT_RIGHT - FLOW_WIDTH, topPos + ROW_SECOND_Y, FLOW_WIDTH, ROW_HEIGHT,
+        enabledButton = model(new PressableAE2Button(
+                leftPos + CONFIG_LEFT, topPos + ENABLED_ROW_Y, CONFIG_WIDTH, ROW_HEIGHT,
                 Component.empty(), button -> edit(config -> withEnabled(config, !config.enabled()))));
 
-        sideButton = addRenderableWidget(new PressableAE2Button(
-                leftPos + CONTENT_LEFT, topPos + ROW_THIRD_Y, SIDE_WIDTH, ROW_HEIGHT, Component.empty(),
+        sideButton = model(new PressableAE2Button(
+                leftPos + CONFIG_LEFT, topPos + SIDE_ROW_Y, CONFIG_WIDTH, ROW_HEIGHT, Component.empty(),
                 button -> edit(config -> withSide(config, nextSide(config.side())))));
 
         networkNameField = addTextField(NETWORK_FIELD_X, NETWORK_ROW_Y, NETWORK_FIELD_WIDTH,
                 Component.translatable("gui.useless_mod.wireless_logistics.network_name_hint"),
                 StaffLinkNetwork.MAX_NAME);
-        searchField = addTextField(CONTENT_LEFT, SEARCH_ROW_Y, SEARCH_WIDTH,
+        searchField = addTextField(CONTENT_LEFT, SEARCH_ROW_Y, LEFT_WIDTH,
                 Component.translatable("gui.useless_mod.wireless_logistics.search_hint"),
                 StaffLinkNetwork.MAX_ANCHOR_NAME);
-        nameField = addTextField(CONTENT_LEFT, NAME_ROW_Y, CONTENT_WIDTH,
+        nameField = addTextField(NAME_FIELD_X, NAME_ROW_Y - 2, NAME_FIELD_WIDTH,
                 Component.translatable("gui.useless_mod.wireless_logistics.rename"),
                 StaffLinkNetwork.MAX_ANCHOR_NAME);
+        saveNameButton = model(new PressableAE2Button(
+                leftPos + NAME_SAVE_X, topPos + NAME_ROW_Y - 2, NAME_SAVE_WIDTH, SMALL_FIELD_HEIGHT,
+                k("save_name"), button -> saveAnchorName()));
 
         weightField = addNumericField(0, "weight_label",
                 StaffLinkRoute.MIN_WEIGHT, StaffLinkRoute.MAX_WEIGHT, true, false);
@@ -475,7 +442,7 @@ public final class StaffLinkScreen extends AbstractContainerScreen<StaffLinkMenu
 
         // 应力线路上这一格放的是旋转方向，用按钮比让人输 1 / 2 直观。
         // 它与周期输入框共用同一格位置，靠 visible 互斥显示。
-        stressDirectionButton = addRenderableWidget(new PressableAE2Button(
+        stressDirectionButton = model(new PressableAE2Button(
                 intervalField.getX(), intervalField.getY(),
                 intervalField.getWidth(), intervalField.getHeight(),
                 Component.empty(),
@@ -483,36 +450,36 @@ public final class StaffLinkScreen extends AbstractContainerScreen<StaffLinkMenu
                         nextStressDirection(config.interval())))));
         stressDirectionButton.visible = false;
 
-        newNetworkButton = addRenderableWidget(new PressableAE2Button(
+        newNetworkButton = model(new PressableAE2Button(
                 leftPos + NEW_BUTTON_X, topPos + NETWORK_ROW_Y, NEW_BUTTON_WIDTH, SMALL_FIELD_HEIGHT,
                 Component.translatable("gui.useless_mod.wireless_logistics.network_new"),
                 button -> newNetwork()));
-        prevNetworkButton = addRenderableWidget(new PressableAE2Button(
+        prevNetworkButton = model(new PressableAE2Button(
                 leftPos + PREV_BUTTON_X, topPos + NETWORK_ROW_Y, NETWORK_SWITCH_WIDTH, SMALL_FIELD_HEIGHT,
                 Component.literal("<"), button -> cycleNetwork(-1)));
-        nextNetworkButton = addRenderableWidget(new PressableAE2Button(
+        nextNetworkButton = model(new PressableAE2Button(
                 leftPos + NEXT_BUTTON_X, topPos + NETWORK_ROW_Y, NETWORK_SWITCH_WIDTH, SMALL_FIELD_HEIGHT,
                 Component.literal(">"), button -> cycleNetwork(1)));
-        dissolveButton = addRenderableWidget(new PressableAE2Button(
-                leftPos + DISSOLVE_X, topPos + FILTER_Y, DISSOLVE_WIDTH, 16,
+        dissolveButton = model(new PressableAE2Button(
+                leftPos + DISSOLVE_X, topPos + ACTION_ROW_Y, DISSOLVE_WIDTH, ACTION_HEIGHT,
                 Component.translatable("gui.useless_mod.wireless_logistics.dissolve"),
                 button -> dissolveNetwork()));
 
-        selectAllButton = addRenderableWidget(new PressableAE2Button(
-                leftPos + SELECT_ALL_X, topPos + SEARCH_ROW_Y, SELECT_ALL_WIDTH, SMALL_FIELD_HEIGHT,
+        selectAllButton = model(new PressableAE2Button(
+                leftPos + SELECT_ALL_X, topPos + LIST_ACTION_Y - 4, SELECT_ALL_WIDTH, 16,
                 Component.translatable("gui.useless_mod.wireless_logistics.select_all"),
                 button -> selectAllVisible()));
-        clearSelectionButton = addRenderableWidget(new PressableAE2Button(
-                leftPos + CLEAR_SELECTION_X, topPos + SEARCH_ROW_Y, CLEAR_SELECTION_WIDTH, SMALL_FIELD_HEIGHT,
+        clearSelectionButton = model(new PressableAE2Button(
+                leftPos + CLEAR_SELECTION_X, topPos + LIST_ACTION_Y - 4, CLEAR_SELECTION_WIDTH, 16,
                 Component.translatable("gui.useless_mod.wireless_logistics.clear_selection"),
                 button -> clearSelection()));
         // 「应用到全部」明确只作用于<b>同名</b>容器：同名按界面显示的那个名字算。
-        applyAllButton = addRenderableWidget(new PressableAE2Button(
-                leftPos + APPLY_ALL_X, topPos + FILTER_Y, APPLY_ALL_WIDTH, 16,
+        applyAllButton = model(new PressableAE2Button(
+                leftPos + APPLY_ALL_X, topPos + ACTION_ROW_Y, APPLY_ALL_WIDTH, ACTION_HEIGHT,
                 Component.translatable("gui.useless_mod.wireless_logistics.apply_all_same_name"),
                 button -> applyAllSameName()));
-        filterButton = addRenderableWidget(new PressableAE2Button(
-                leftPos + FILTER_X, topPos + FILTER_Y, FILTER_BUTTON_WIDTH, 16,
+        filterButton = model(new PressableAE2Button(
+                leftPos + FILTER_X, topPos + FILTER_Y, FILTER_BUTTON_WIDTH, ACTION_HEIGHT,
                 Component.empty(), button -> setFilterPanelOpen(!filterPanelOpen)));
 
         // 面板按钮只进 children：进 renderables 会被 super.render() 画到底层界面之下。
@@ -540,6 +507,215 @@ public final class StaffLinkScreen extends AbstractContainerScreen<StaffLinkMenu
         pressureFields = false;
         numericOverrides.clear();
         updateControls();
+        buildAppleUi();
+        syncFilterPanelButtons();
+        updateDetailControls();
+    }
+
+    private static Component k(String key, Object... args) {
+        return Component.translatable("gui.useless_mod.wireless_logistics." + key, args);
+    }
+
+    /** 原按钮仅保留 active/message/onPress 状态；Apple 控件负责绘制和命中。 */
+    private static PressableAE2Button model(PressableAE2Button button) {
+        return button;
+    }
+
+    /** All client controls and manual hit tests use the measured view geometry. */
+    private void buildAppleUi() {
+        AppleHost h = new AppleHost(PANEL_WIDTH, imageHeight);
+        appleHost = h;
+        h.add(new AppleWindow(PANEL_WIDTH, imageHeight, () -> title).referenceIcon("endless_beaf_item"));
+        // 设计稿标题栏右侧的两个状态胶囊：当前网络名 + 当前列表的容器数。
+        // 用一块自绘 Canvas 而不是两个 AppleBadge：两者宽度都随文字变化，从右往左排
+        // 需要先量出前一个的宽度，用固定坐标的控件做不到。
+        h.add(new AppleCanvas(PANEL_WIDTH - 228, 6, 208, 16, (g, mx, my, x, y, w, hh) ->
+                drawWindowBadges(g, x, y, w, hh)));
+        h.add(new AppleCard(12, 40, 168, 46));
+        h.add(new AppleTextField(NETWORK_FIELD_X, NETWORK_ROW_Y, NETWORK_FIELD_WIDTH,
+                SMALL_FIELD_HEIGHT, networkNameField));
+        appleButton(h, prevNetworkButton, ApplePushButton.Kind.PLAIN).icon(AppleUi.Icon.CHEVRON_LEFT);
+        appleButton(h, nextNetworkButton, ApplePushButton.Kind.PLAIN).icon(AppleUi.Icon.CHEVRON_RIGHT);
+        appleButton(h, newNetworkButton, ApplePushButton.Kind.PRIMARY);
+
+        h.add(new AppleTextField(CONTENT_LEFT, SEARCH_ROW_Y, LEFT_WIDTH, SMALL_FIELD_HEIGHT,
+                searchField, 16).icon(AppleUi.Icon.SEARCH));
+        h.add(new AppleLabel(CONTENT_LEFT + 2, LIST_ACTION_Y, SELECT_ALL_X - CONTENT_LEFT - 4,
+                AppleLabel.Kind.CAPTION, () -> k("apple.containers", visibleAnchors().size())));
+        appleButton(h, selectAllButton, ApplePushButton.Kind.TINTED);
+        appleButton(h, clearSelectionButton, ApplePushButton.Kind.SECONDARY);
+        h.add(new AppleCard(CONTENT_LEFT, LIST_TOP, LEFT_WIDTH, LIST_BOTTOM - LIST_TOP));
+        // 列表底部的一句话提示（多选操作 / ▲▼ 排序），对应设计稿列表下方那行 footnote。
+        h.add(new AppleLabel(CONTENT_LEFT + 2, SELECTION_COUNT_Y, LEFT_WIDTH - 4, AppleLabel.Kind.FOOTNOTE,
+                this::listHintText).lines(3));
+        h.add(new AppleCard(CONFIG_LEFT, 82, CONFIG_WIDTH, 52));
+        h.add(new AppleLabel(CONFIG_LEFT + 8, NAME_LABEL_Y, CONFIG_WIDTH - 16, AppleLabel.Kind.CAPTION, () -> k("apple.name")));
+        h.add(new AppleTextField(NAME_FIELD_X, NAME_ROW_Y - 2, NAME_FIELD_WIDTH, 16, nameField)
+                .grayWhenDisabled().id("anchor_name"));
+        appleButton(h, saveNameButton, ApplePushButton.Kind.PRIMARY).id("save_anchor_name");
+        h.add(new AppleLabel(CONFIG_LEFT + 8, NAME_ROW_Y + 15, CONFIG_WIDTH - 16,
+                AppleLabel.Kind.FOOTNOTE, this::nameHintText));
+
+        h.add(new AppleLabel(CONFIG_LEFT, 40, 90, AppleLabel.Kind.TITLE,
+                () -> {
+                    int count = menu.getMultiSelection().size();
+                    return count > 0 ? k("multi_select_count", count) : k("route_label", menu.getSelectedRoute());
+                }));
+        h.add(new AppleBadge(CONFIG_LEFT + 56, 40, 92, () -> k("multi_select_active"),
+                () -> AppleStyle.BLUE).shownWhen(() -> menu.getMultiSelection().size() > 1));
+        h.add(new AppleLabel(CONFIG_LEFT + 94, 41, CONFIG_RIGHT - CONFIG_LEFT - 94,
+                AppleLabel.Kind.FOOTNOTE, this::routeHintText)
+                .right().shownWhen(() -> menu.getMultiSelection().isEmpty()));
+        int routeX = routeButtonX(0, routeButtons.length);
+        h.add(new AppleSegmented(routeX, ROUTE_ROW_Y, CONFIG_RIGHT - routeX, ROW_HEIGHT, () -> {
+            List<Component> labels = new ArrayList<>();
+            for (int i = 0; i < routeButtons.length; i++) labels.add(Component.literal(String.valueOf(i)));
+            return labels;
+        }, menu::getSelectedRoute, i -> routeButtons[i].onPress()));
+        h.add(new AppleCard(CONFIG_LEFT, CONFIG_INSET_TOP, CONFIG_WIDTH, CONFIG_INSET_BOTTOM - CONFIG_INSET_TOP));
+        h.add(new AppleSettingRow(CONFIG_LEFT, FLOW_ROW_Y, CONFIG_WIDTH, ROW_HEIGHT,
+                () -> k("apple.flow"), null, null).leading(AppleUi.Icon.ARROW_OUT, AppleStyle.GREEN).enabledWhen(() -> flowButton.active));
+        h.add(new AppleSegmented(CONFIG_RIGHT - 60, FLOW_ROW_Y + 3, 52, 16,
+                () -> List.of(FLOW_SEGMENTS[0].displayName(), FLOW_SEGMENTS[1].displayName()),
+                () -> {
+                    StaffLinkRoute c = menu.getSelectedConfig();
+                    return c == null ? -1 : (c.flow() == FLOW_SEGMENTS[0] ? 0 : 1);
+                }, i -> edit(c -> withFlow(c, FLOW_SEGMENTS[i]))).enabledWhen(() -> flowButton.active));
+        h.add(new AppleSettingRow(CONFIG_LEFT, MEDIUM_ROW_Y, CONFIG_WIDTH, ROW_HEIGHT,
+                () -> k("apple.medium"), null, null).leading(AppleUi.Icon.BOX, AppleStyle.BLUE).enabledWhen(() -> mediumButton.active));
+        h.add(new AppleDropdown(h, CONFIG_LEFT + 76, MEDIUM_ROW_Y, CONFIG_WIDTH - 82, ROW_HEIGHT,
+                () -> mediumOptions.stream().map(LinkMedium::displayName).toList(),
+                () -> mediumOptionIndex(mediumOptions, menu.getSelectedMedium()),
+                i -> edit(c -> withMedium(c, mediumOptions.get(i))))
+                .plain().rightAlign().enabledWhen(() -> mediumButton.active));
+        h.add(new AppleSettingRow(CONFIG_LEFT, ENABLED_ROW_Y, CONFIG_WIDTH, ROW_HEIGHT,
+                () -> k("apple.enabled"), null, null).leading(AppleUi.Icon.CHECK, AppleStyle.GREEN).enabledWhen(() -> enabledButton.active));
+        h.add(new AppleSwitch(CONFIG_RIGHT - 30, ENABLED_ROW_Y + 4, 22, 13,
+                () -> menu.getSelectedConfig() != null && menu.getSelectedConfig().enabled(),
+                () -> enabledButton.onPress()).enabledWhen(() -> enabledButton.active));
+        h.add(new AppleSettingRow(CONFIG_LEFT, SIDE_ROW_Y, CONFIG_WIDTH, ROW_HEIGHT,
+                () -> k("apple.side"), null, null).leading(AppleUi.Icon.CUBE, AppleStyle.PURPLE).enabledWhen(() -> sideButton.active));
+        h.add(new AppleDropdown(h, CONFIG_LEFT + 76, SIDE_ROW_Y, CONFIG_WIDTH - 82, ROW_HEIGHT,
+                () -> java.util.Arrays.stream(SIDE_ORDER).map(side -> k(side == null ? "side.null" : "side." + side.getName())).toList(),
+                () -> menu.getSelectedConfig() == null ? -1 : java.util.Arrays.asList(SIDE_ORDER).indexOf(menu.getSelectedConfig().side()),
+                i -> edit(c -> withSide(c, SIDE_ORDER[i])))
+                .plain().rightAlign().enabledWhen(() -> sideButton.active));
+
+        h.add(new AppleCard(CONFIG_LEFT, NUMERIC_INSET_TOP, CONFIG_WIDTH, NUMERIC_INSET_BOTTOM - NUMERIC_INSET_TOP));
+        h.add(new AppleLabel(CONFIG_LEFT + 10, NUMERIC_INSET_TOP + 7, CONFIG_WIDTH - 20,
+                AppleLabel.Kind.CAPTION, () -> k("apple.values")));
+        for (int i = 0; i < numericFields.size(); i++) {
+            NumericSpec spec = numericFields.get(i);
+            final int row = i;
+            AppleSettingRow setting = new AppleSettingRow(CONFIG_LEFT + 2, numericRowY(i), 32, 16,
+                    () -> row == 2 && stressFields ? k("stress.direction_label") : numericLabel(spec), null, null);
+            setting.noSeparator();
+            h.add(setting);
+            h.add(new AppleStepper(NUMERIC_FIELD_X, numericRowY(i), NUMERIC_FIELD_WIDTH,
+                    16, spec.field(), () -> adjustNumeric(spec, -1), () -> adjustNumeric(spec, 1))
+                    .trailingButtons().grayWhenDisabled().<AppleStepper>shownWhen(() -> spec.field().visible).enabledWhen(() -> spec.field().active));
+            h.add(new AppleLabel(NUMERIC_FIELD_X, numericRowY(i) + 19, NUMERIC_FIELD_WIDTH,
+                    AppleLabel.Kind.FOOTNOTE, () -> numericHint(spec)).lines(2));
+        }
+        h.add(new AppleLabel(CONFIG_LEFT + 8, 403, CONFIG_WIDTH - 16, AppleLabel.Kind.FOOTNOTE,
+                () -> k("release_only_hint")).lines(2).shownWhen(() -> {
+                    var config = menu.getSelectedConfig();
+                    return config != null && config.flow() == LinkFlow.ABSORB && !stressFields;
+                }));
+        appleButton(h, stressDirectionButton, ApplePushButton.Kind.TINTED);
+        h.add(new AppleSettingRow(FILTER_X, FILTER_Y, FILTER_BUTTON_WIDTH, 22,
+                filterButton::getMessage, null, filterButton::onPress).leading(AppleUi.Icon.FILTER, AppleStyle.ORANGE)
+                .noSeparator().enabledWhen(() -> filterButton.active));
+        appleButton(h, applyAllButton, ApplePushButton.Kind.PRIMARY).icon(AppleUi.Icon.CHECK);
+        appleButton(h, dissolveButton, ApplePushButton.Kind.DANGER).icon(AppleUi.Icon.TRASH);
+        h.add(new AppleCard(INVENTORY_LEFT, INVENTORY_INSET_TOP, INVENTORY_CARD_WIDTH,
+                INVENTORY_INSET_BOTTOM - INVENTORY_INSET_TOP));
+        h.add(new AppleLabel(INVENTORY_LABEL_X, INVENTORY_LABEL_Y, INVENTORY_CARD_WIDTH - 16,
+                AppleLabel.Kind.CAPTION, () -> playerInventoryTitle));
+        h.add(new AppleSlotGrid(menu, () -> leftPos, () -> topPos, slot -> true).cellSize(20));
+        h.layout(width, height, leftPos, topPos);
+    }
+
+    /** 标题栏右侧两个状态胶囊（从右往左排，宽度随文字）。 */
+    private void drawWindowBadges(GuiGraphics graphics, int x, int y, int width, int height) {
+        int right = x + width;
+        int badgeHeight = 14, badgeY = y + (height - badgeHeight) / 2;
+        float scale = .8f;
+        Component bound = k("anchors", menu.getAnchors().size());
+        int boundWidth = Math.min(width / 2, Math.round(font.width(bound) * scale) + 12);
+        int boundX = right - boundWidth;
+        AppleUi2.round(graphics, boundX, badgeY, boundWidth, badgeHeight, 7, AppleStyle.GRAY_TINT);
+        float textY = badgeY + (badgeHeight - font.lineHeight * scale) / 2;
+        AppleTextLayout.draw(graphics, font, bound, boundX + 6, textY, boundWidth - 12,
+                scale, AppleStyle.SECONDARY, false);
+
+        String network = menu.getNetworkName();
+        Component label = network == null || network.isEmpty() ? k("network_unnamed") : Component.literal(network);
+        int networkWidth = Math.min(width - boundWidth - 4, Math.round(font.width(label) * scale) + 12);
+        int networkX = boundX - 4 - networkWidth;
+        AppleUi2.round(graphics, networkX, badgeY, networkWidth, badgeHeight, 7, AppleStyle.BLUE_TINT);
+        AppleTextLayout.draw(graphics, font, label, networkX + 6, textY, networkWidth - 12,
+                scale, AppleStyle.BLUE, false);
+    }
+
+    /** 列表下方的一句话提示：多选时讲批量操作，否则讲 ▲▼ 的排序语义。 */
+    private Component listHintText() {
+        return menu.getMultiSelection().isEmpty() ? k("anchor_order_hint") : k("multi_select_hint");
+    }
+
+    /** 容器名输入框下方的说明；与设计稿的「改名对该容器的所有线路生效」一致。 */
+    private Component nameHintText() {
+        return Component.literal(font.plainSubstrByWidth(
+                k("apple.name_hint").getString(), CONFIG_WIDTH - 16));
+    }
+
+    /** 「线路 2 · Ctrl+C 复制配置 / Ctrl+V 粘贴配置」，窄面板里按可用宽度截断。 */
+    private Component routeHintText() {
+        return Component.literal(font.plainSubstrByWidth(
+                k("config_copy_hint", menu.getSelectedRoute()).getString(),
+                CONFIG_RIGHT - CONFIG_LEFT - 94));
+    }
+
+    /**
+     * 源端是 AE、这条线路又没有任何可用过滤条目时，界面必须给出警告。
+     *
+     * <p>抽成静态方法是为了让主界面左栏与过滤面板共用同一判据，也方便单测。
+     * 具体的「哪些资源族需要白名单」由 {@link StaffLinkRoute#blocksAeSourceWithoutWhitelist()}
+     * 负责，这里只补「源端是不是 AE」。</p>
+     */
+    static boolean shouldWarnAeWithoutWhitelist(@Nullable StaffLinkRoute config) {
+        return config != null && config.medium().isAe() && config.blocksAeSourceWithoutWhitelist();
+    }
+
+    /** 标题为「已选 N 台」、且选中多台时，容器名不再代表某一个容器，改名框应锁住。 */
+    static boolean canRenameAnchor(boolean hasAnchor, int multiSelectionCount) {
+        return hasAnchor && multiSelectionCount <= 1;
+    }
+
+    private void adjustNumeric(NumericSpec spec, int delta) {
+        if (!spec.field().active) return;
+        long value;
+        try { value = Long.parseLong(spec.field().getValue()); }
+        catch (NumberFormatException ignored) {
+            value = ScaledEnergyAmount.parse(spec.field().getValue(), spec.max()).orElse(spec.min());
+        }
+        long next = delta > 0 ? (value == Long.MAX_VALUE ? value : value + 1)
+                : (value == Long.MIN_VALUE ? value : value - 1);
+        next = Math.max(spec.min(), Math.min(spec.max(), next));
+        spec.field().setValue(Long.toString(next));
+        applyEdits();
+    }
+
+    /** 未选中容器 / 配置尚未同步时显示占位符，不能把 null 交给 List.copyOf 的 indexOf。 */
+    static int mediumOptionIndex(List<LinkMedium> options, @Nullable LinkMedium selectedMedium) {
+        return selectedMedium == null ? -1 : options.indexOf(selectedMedium);
+    }
+
+    private ApplePushButton appleButton(AppleHost h, PressableAE2Button button, ApplePushButton.Kind kind) {
+        return h.add(new ApplePushButton(button.getX() - leftPos, button.getY() - topPos,
+                button.getWidth(), button.getHeight(), kind,
+                button == prevNetworkButton || button == nextNetworkButton ? Component::empty : button::getMessage,
+                button::onPress).<ApplePushButton>enabledWhen(() -> button.active).shownWhen(() -> button.visible));
     }
 
     /** 面板按钮的 visible 同时决定是否响应点击，每次开关面板都要同步。 */
@@ -549,6 +725,9 @@ public final class StaffLinkScreen extends AbstractContainerScreen<StaffLinkMenu
     }
 
     private void setFilterPanelOpen(boolean open) {
+        if (filterPanelOpen != open) invalidateJeiDrag();
+        anchorDrag.cancel();
+        if (appleHost != null) appleHost.closePopover();
         filterPanelOpen = open;
         if (!open) {
             // 关过滤面板时把详细面板也一起收掉（会提交它），免得留下一个看不见却有焦点的框。
@@ -575,9 +754,10 @@ public final class StaffLinkScreen extends AbstractContainerScreen<StaffLinkMenu
     }
 
     private EditBox addTextField(int x, int y, int width, Component hint, int maxLength) {
-        EditBox field = new EditBox(font, leftPos + x, topPos + y, width, SMALL_FIELD_HEIGHT, hint);
+        EditBox field = new AppleEditBox(font, leftPos + x, topPos + y, width, SMALL_FIELD_HEIGHT, hint);
         field.setMaxLength(maxLength);
-        field.setHint(hint);
+        // EditBox 不会裁切占位文字；左栏变窄后按框内可用宽度排版，完整提示仍用于朗读。
+        field.setHint(Component.literal(font.plainSubstrByWidth(hint.getString(), Math.max(0, width - 8))));
         addRenderableWidget(field);
         trackEdits(field);
         return field;
@@ -597,21 +777,12 @@ public final class StaffLinkScreen extends AbstractContainerScreen<StaffLinkMenu
         });
     }
 
-    /**
-     * 一行放三个数值输入框：每个占一格，标签画在框左边，框右对齐到本格右边缘。
-     *
-     * <p>框的起点按当前语言下标签的实际宽度算，所以中英文都不会把标签压在框上；
-     * 英文标签用的是短名，完整含义与取值范围看悬停提示。</p>
-     */
-    private EditBox addNumericField(int cell, String labelKey, long min, long max,
+    /** 三项数值纵向排列：标签左对齐，输入框统一靠右，继续沿用原来的输入规则。 */
+    private EditBox addNumericField(int row, String labelKey, long min, long max,
                                     boolean allowNegative, boolean scaled) {
         Component label = Component.translatable("gui.useless_mod.wireless_logistics." + labelKey);
-        int cellWidth = NUMERIC_CELL_WIDTH[cell];
-        int fieldWidth = Math.max(34, cellWidth - font.width(label) - 4);
-        int fieldX = NUMERIC_CELL_X[cell] + cellWidth - fieldWidth;
-
-        EditBox field = new EditBox(font, leftPos + fieldX, topPos + ROW_FOURTH_Y, fieldWidth,
-                ROW_HEIGHT, label);
+        EditBox field = new AppleEditBox(font, leftPos + NUMERIC_FIELD_X, topPos + numericRowY(row),
+                NUMERIC_FIELD_WIDTH, ROW_HEIGHT, label);
         if (scaled) {
             // 「数量」没有上限，允许 K / M / G / T / P / E 输入——和矿石生成器的能量输入同一套。
             field.setMaxLength(24);
@@ -639,9 +810,9 @@ public final class StaffLinkScreen extends AbstractContainerScreen<StaffLinkMenu
      * {@code visible}，收起时在别处要自己判断，否则收起的框照样会抢走点击。</p>
      */
     private void initDetailWidgets() {
-        // 不设 hint：「#标签 或通配符，例如 #c:ingots、*iron*」有三十来字，EditBox 的 hint 不裁切地
-        // 铺出去会盖到右边的「白名单/黑名单」按钮上。用法改由悬停提示承担（renderDetailTooltip）。
-        detailPatternField = new EditBox(font, 0, 0, DETAIL_PATTERN_WIDTH, DETAIL_ROW_HEIGHT,
+        // 不设 hint：用法改由面板里的说明行与悬停提示承担。EditBox 的 hint 不会被裁切，
+        // 铺出去会盖到右侧的控件。
+        detailPatternField = new AppleEditBox(font, 0, 0, DETAIL_PATTERN_WIDTH, DETAIL_ROW_HEIGHT,
                 Component.empty());
         detailPatternField.setMaxLength(LinkFilterPattern.MAX_LENGTH);
         detailPatternField.setVisible(false);
@@ -651,8 +822,16 @@ public final class StaffLinkScreen extends AbstractContainerScreen<StaffLinkMenu
         detailOutValueField = addDetailValueField();
         detailInValueField = addDetailValueField();
 
-        detailExcludeButton = addWidget(new PressableAE2Button(0, 0, DETAIL_EXCLUDE_WIDTH, DETAIL_ROW_HEIGHT,
-                Component.empty(), button -> toggleDetailExclude()));
+        // 白名单 / 黑名单不再做成一个需要反复点的开关：设计稿里两个选项是并排的，
+        // 当前方向用一圈蓝色描边标出来（见 renderDetailPanel）。
+        detailWhitelistButton = addWidget(new PressableAE2Button(
+                0, 0, DETAIL_EXCLUDE_WIDTH, DETAIL_ROW_HEIGHT,
+                Component.translatable("gui.useless_mod.wireless_logistics.filter_exclude_off"),
+                button -> setDetailExclude(false)));
+        detailBlacklistButton = addWidget(new PressableAE2Button(
+                0, 0, DETAIL_EXCLUDE_WIDTH, DETAIL_ROW_HEIGHT,
+                Component.translatable("gui.useless_mod.wireless_logistics.filter_exclude_on"),
+                button -> setDetailExclude(true)));
         detailOutOpButton = addWidget(new PressableAE2Button(0, 0, DETAIL_OP_WIDTH, DETAIL_ROW_HEIGHT,
                 Component.empty(), button -> cycleDetailOp(false)));
         detailInOpButton = addWidget(new PressableAE2Button(0, 0, DETAIL_OP_WIDTH, DETAIL_ROW_HEIGHT,
@@ -670,7 +849,7 @@ public final class StaffLinkScreen extends AbstractContainerScreen<StaffLinkMenu
      * （{@link ScaledEnergyAmount}）：搬上万的东西时不用数零。</p>
      */
     private EditBox addDetailValueField() {
-        EditBox field = new EditBox(font, 0, 0, DETAIL_VALUE_WIDTH, DETAIL_ROW_HEIGHT, Component.empty());
+        EditBox field = new AppleEditBox(font, 0, 0, DETAIL_VALUE_WIDTH, DETAIL_ROW_HEIGHT, Component.empty());
         field.setMaxLength(FILTER_LIMIT_MAX_CHARS);
         field.setFilter(ScaledEnergyAmount::isValidInput);
         field.setVisible(false);
@@ -679,15 +858,19 @@ public final class StaffLinkScreen extends AbstractContainerScreen<StaffLinkMenu
         return field;
     }
 
-    /** 收起 / 显示详细面板的全部控件。 */
+    /** 收起 / 显示详细面板的全部控件；收起的输入框必须同时失焦，否则不可见的框还会吃掉按键。 */
     private void setDetailWidgetsVisible(boolean visible) {
         detailPatternField.setVisible(visible);
         detailOutValueField.setVisible(visible);
         detailInValueField.setVisible(visible);
-        detailExcludeButton.visible = visible;
+        detailWhitelistButton.visible = visible;
+        detailBlacklistButton.visible = visible;
         detailOutOpButton.visible = visible;
         detailInOpButton.visible = visible;
         detailCloseButton.visible = visible;
+        clearFocusIfHidden(detailPatternField);
+        clearFocusIfHidden(detailOutValueField);
+        clearFocusIfHidden(detailInValueField);
     }
 
     /**
@@ -704,8 +887,10 @@ public final class StaffLinkScreen extends AbstractContainerScreen<StaffLinkMenu
         int py = detailPanelY();
         detailPatternField.setX(px + DETAIL_PATTERN_X);
         detailPatternField.setY(py + DETAIL_MARKER_ROW_Y);
-        detailExcludeButton.setX(px + DETAIL_EXCLUDE_X);
-        detailExcludeButton.setY(py + DETAIL_MARKER_ROW_Y);
+        detailWhitelistButton.setX(px + DETAIL_EXCLUDE_X);
+        detailWhitelistButton.setY(py + DETAIL_EXCLUDE_ROW_Y);
+        detailBlacklistButton.setX(px + DETAIL_BLACKLIST_X);
+        detailBlacklistButton.setY(py + DETAIL_EXCLUDE_ROW_Y);
         detailOutOpButton.setX(px + DETAIL_OP_X);
         detailOutOpButton.setY(py + DETAIL_OUT_ROW_Y);
         detailOutValueField.setX(px + DETAIL_VALUE_X);
@@ -714,7 +899,7 @@ public final class StaffLinkScreen extends AbstractContainerScreen<StaffLinkMenu
         detailInOpButton.setY(py + DETAIL_IN_ROW_Y);
         detailInValueField.setX(px + DETAIL_VALUE_X);
         detailInValueField.setY(py + DETAIL_IN_ROW_Y);
-        detailCloseButton.setX(px + (DETAIL_PANEL_WIDTH - DETAIL_BUTTON_WIDTH) / 2);
+        detailCloseButton.setX(px + DETAIL_PANEL_WIDTH - DETAIL_PANEL_PAD - DETAIL_BUTTON_WIDTH);
         detailCloseButton.setY(py + DETAIL_BUTTON_Y);
 
         LinkFilterSlot slot = currentFilterSlot(detailIndex);
@@ -724,27 +909,36 @@ public final class StaffLinkScreen extends AbstractContainerScreen<StaffLinkMenu
 
         detailPatternField.setVisible(true);
         detailCloseButton.visible = true;
-        detailExcludeButton.visible = hasMarker;
+        detailWhitelistButton.visible = hasMarker;
+        detailBlacklistButton.visible = hasMarker;
         detailOutOpButton.visible = hasMarker;
         detailInOpButton.visible = hasMarker;
         detailOutValueField.setVisible(hasMarker && !out.isOff());
         detailInValueField.setVisible(hasMarker && !in.isOff());
 
-        detailExcludeButton.active = hasMarker;
+        detailWhitelistButton.active = hasMarker;
+        detailBlacklistButton.active = hasMarker;
         detailOutOpButton.active = hasMarker;
         detailInOpButton.active = hasMarker;
         detailOutValueField.setEditable(hasMarker && !out.isOff());
         detailInValueField.setEditable(hasMarker && !in.isOff());
+        clearFocusIfHidden(detailOutValueField);
+        clearFocusIfHidden(detailInValueField);
 
-        detailExcludeButton.setMessage(Component.translatable(slot.isExcluded()
-                ? "gui.useless_mod.wireless_logistics.filter_exclude_on"
-                : "gui.useless_mod.wireless_logistics.filter_exclude_off"));
         detailOutOpButton.setMessage(opLabel(out.op()));
         detailInOpButton.setMessage(opLabel(in.op()));
 
         setIfUnfocused(detailPatternField, slot.pattern() == null ? "" : slot.pattern());
         setIfUnfocused(detailOutValueField, conditionText(out));
         setIfUnfocused(detailInValueField, conditionText(in));
+    }
+
+    /** 输入框被隐藏时立刻交出焦点，避免键盘输入落到看不见的框里。 */
+    private void clearFocusIfHidden(EditBox field) {
+        if (field != null && (!field.visible || !field.active)) {
+            field.setFocused(false);
+            if (getFocused() == field) setFocused(null);
+        }
     }
 
     private static Component opLabel(LinkFilterCondition.Op op) {
@@ -790,7 +984,9 @@ public final class StaffLinkScreen extends AbstractContainerScreen<StaffLinkMenu
         if (detailPanelOpen) {
             commitDetail();
         }
+        invalidateJeiDrag();
         detailPanelOpen = true;
+        detailError = null;
         detailIndex = index;
         setFocused(null);
         updateDetailControls();
@@ -813,7 +1009,9 @@ public final class StaffLinkScreen extends AbstractContainerScreen<StaffLinkMenu
         if (!force && !commitDetail()) {
             return;
         }
+        invalidateJeiDrag();
         detailPanelOpen = false;
+        detailError = null;
         detailIndex = -1;
         setFocused(null);
         setDetailWidgetsVisible(false);
@@ -834,6 +1032,7 @@ public final class StaffLinkScreen extends AbstractContainerScreen<StaffLinkMenu
     @Nullable
     private LinkFilterSlot readDetailSlot() {
         LinkFilterSlot slot = currentFilterSlot(detailIndex);
+        detailError = null;
         String text = detailPatternField.getValue().trim();
         if (!text.equals(slot.pattern() == null ? "" : slot.pattern())) {
             if (text.isEmpty()) {
@@ -843,8 +1042,9 @@ public final class StaffLinkScreen extends AbstractContainerScreen<StaffLinkMenu
             }
             LinkFilterPattern parsed = LinkFilterPattern.parse(text);
             if (parsed == null) {
-                showNotice(Component.translatable(
-                        "gui.useless_mod.wireless_logistics.filter_pattern_invalid", text));
+                detailError = Component.translatable(
+                        "gui.useless_mod.wireless_logistics.filter_pattern_invalid", text);
+                showNotice(detailError);
                 return null;
             }
             // 空格子 ⇒ 这一打模式就是它的标记；非空 ⇒ 换掉原标记（保留 exclude 与条件）。
@@ -914,9 +1114,10 @@ public final class StaffLinkScreen extends AbstractContainerScreen<StaffLinkMenu
         }
     }
 
-    /** 切换这一格的「白名单 / 黑名单」。 */
-    private void toggleDetailExclude() {
-        editDetail(slot -> slot.withExclude(!slot.isExcluded()));
+    /** 两个独立选项直接设定状态，重复点击当前项不会意外翻转。 */
+    private void setDetailExclude(boolean excluded) {
+        editDetail(slot -> slot.withExclude(excluded));
+        updateDetailControls();
     }
 
     /**
@@ -984,7 +1185,8 @@ public final class StaffLinkScreen extends AbstractContainerScreen<StaffLinkMenu
     /** 详细面板里的点击：按钮 → 输入框 → A/B 槽 → 玩家背包 → 面板外吞掉。 */
     private boolean handleDetailPanelClick(double mouseX, double mouseY, int button) {
         if (detailCloseButton.mouseClicked(mouseX, mouseY, button)
-                || detailExcludeButton.mouseClicked(mouseX, mouseY, button)
+                || detailWhitelistButton.mouseClicked(mouseX, mouseY, button)
+                || detailBlacklistButton.mouseClicked(mouseX, mouseY, button)
                 || detailOutOpButton.mouseClicked(mouseX, mouseY, button)
                 || detailInOpButton.mouseClicked(mouseX, mouseY, button)) {
             return true;
@@ -1020,7 +1222,7 @@ public final class StaffLinkScreen extends AbstractContainerScreen<StaffLinkMenu
         }
         // 玩家背包槽：面板开着时也允许正常「拿起 / 放下」——不然只能靠 JEI 拖。
         if (inventorySlotAt(mouseX, mouseY) != null) {
-            return super.mouseClicked(mouseX, mouseY, button);
+            return clickNative(mouseX, mouseY, button);
         }
         // 点在面板空白处：让输入框失焦，但不关面板。
         setFocused(null);
@@ -1046,6 +1248,7 @@ public final class StaffLinkScreen extends AbstractContainerScreen<StaffLinkMenu
         }
         setFocused(field);
         field.mouseClicked(mouseX, mouseY, GLFW.GLFW_MOUSE_BUTTON_LEFT);
+        pointerGestures.put(GLFW.GLFW_MOUSE_BUTTON_LEFT, new PointerGesture(PointerOwner.TEXT, field));
     }
 
     /** 当前在镜子里的第 index 格；越界或没有选中线路时回落到 {@link LinkFilterSlot#EMPTY}。 */
@@ -1071,6 +1274,7 @@ public final class StaffLinkScreen extends AbstractContainerScreen<StaffLinkMenu
     @Override
     protected void containerTick() {
         super.containerTick();
+        appleHost.tick();
         // 焦点离开输入框时把这次编辑提交掉，否则下一 tick 的同步会把它覆盖回去。
         EditBox focused = focusedField();
         if (focusedField != null && focused != focusedField) {
@@ -1102,17 +1306,52 @@ public final class StaffLinkScreen extends AbstractContainerScreen<StaffLinkMenu
             clearFilterButton.setY(filterPanelClearY());
         }
         syncFilterPanelButtons();
+        tickAnchorDrag();
+    }
+
+    private void tickAnchorDrag() {
+        if (!anchorDrag.pending()) return;
+        List<GlobalPos> visible = visibleAnchors();
+        if (filterPanelOpen || appleHost.isPopoverOpen()
+                || !anchorDrag.valid(menu.getNetworkId(), menu.getAnchors(), visible)) {
+            anchorDrag.cancel();
+            return;
+        }
+        if (++anchorDragScrollTicks >= 4) {
+            anchorDragScrollTicks = 0;
+            scrollOffset = Mth.clamp(scrollOffset + anchorDrag.scrollDirection(), 0,
+                    Math.max(0, visible.size() - LIST_VISIBLE_ROWS));
+        }
     }
 
     /** 界面收到服务端快照。 */
     public void receiveSync(StaffLinkSyncPacket packet) {
+        boolean changedNetwork = !menu.getNetworkId().equals(packet.network().id());
+        if (changedNetwork || !menu.getAnchors().equals(packet.network().anchors())) anchorDrag.cancel();
         menu.receiveSync(packet.network(), packet.index(), packet.count());
+        if (changedNetwork) {
+            invalidateJeiDrag();
+            // A field focused in A must not submit its old text after the menu starts showing B.
+            for (EditBox field : fields()) field.setFocused(false);
+            setFocused(null);
+            focusedField = null;
+            detailPanelOpen = false;
+            detailIndex = -1;
+            filterPanelOpen = false;
+            mediumMenuOpen = false;
+            appleHost.closePopover();
+            menu.clearMultiSelection();
+            anchorDrag.cancel();
+            anchorAppearances.clear();
+        }
+        anchorAppearances.keySet().retainAll(menu.getAnchors());
         clampScroll();
         updateControls();
     }
 
     @Override
     public void onClose() {
+        invalidateJeiDrag();
         applyEdits();
         // 应力状态是服务端按「谁开着界面」推下来的，关掉就该忘掉，
         // 免得下次打开界面先闪一屏上一次的旧数字。
@@ -1138,6 +1377,7 @@ public final class StaffLinkScreen extends AbstractContainerScreen<StaffLinkMenu
     }
 
     private void newNetwork() {
+        anchorDrag.cancel();
         // 先把当前网络名提交掉，再让输入框失焦——否则新网络的空名字会被旧名字覆盖回去。
         applyEdits();
         setFocused(null);
@@ -1147,6 +1387,7 @@ public final class StaffLinkScreen extends AbstractContainerScreen<StaffLinkMenu
 
     /** 切到相邻的一张网络；先把当前编辑提交掉，免得刚改的值丢了。 */
     private void cycleNetwork(int delta) {
+        anchorDrag.cancel();
         applyEdits();
         setFocused(null);
         menu.cycleNetwork(delta);
@@ -1154,6 +1395,7 @@ public final class StaffLinkScreen extends AbstractContainerScreen<StaffLinkMenu
     }
 
     private void dissolveNetwork() {
+        anchorDrag.cancel();
         applyEdits();
         setFocused(null);
         menu.dissolveNetwork();
@@ -1180,31 +1422,46 @@ public final class StaffLinkScreen extends AbstractContainerScreen<StaffLinkMenu
             menu.renameNetwork(requestedNetwork);
         }
 
-        GlobalPos anchor = menu.getSelectedAnchor();
-        if (anchor != null && menu.isAnchorBound(anchor)) {
-            String requested = nameField.getValue().trim();
-            String current = menu.getAnchorName(anchor);
-            if (!requested.equals(current == null ? "" : current)) {
-                menu.renameAnchor(anchor, requested);
-            }
-        }
+        saveAnchorName(false);
 
         StaffLinkRoute config = menu.getSelectedConfig();
         if (config == null) {
             return;
         }
-        long weight = parsePlain(weightField.getValue(), config.weight(),
-                StaffLinkRoute.MIN_WEIGHT, StaffLinkRoute.MAX_WEIGHT);
-        long amount = config.medium().family() == ResourceFamily.PRESSURE
-                ? parsePressureMbar(amountField.getValue(), config.amount())
-                : parseScaled(amountField.getValue(), config.amount(), StaffLinkRoute.MIN_AMOUNT);
-        long interval = parsePlain(intervalField.getValue(), config.interval(),
-                StaffLinkRoute.MIN_INTERVAL, StaffLinkRoute.MAX_INTERVAL);
+        // Disabled controls can retain text from the previous route; never submit those stale values.
+        long weight = weightField.active ? parsePlain(weightField.getValue(), config.weight(),
+                StaffLinkRoute.MIN_WEIGHT, StaffLinkRoute.MAX_WEIGHT) : config.weight();
+        long amount = !amountField.active ? config.amount()
+                : config.medium().family() == ResourceFamily.PRESSURE
+                        ? parsePressureMbar(amountField.getValue(), config.amount())
+                        : parseScaled(amountField.getValue(), config.amount(), StaffLinkRoute.MIN_AMOUNT);
+        long interval = intervalField.active && intervalField.visible
+                ? parsePlain(intervalField.getValue(), config.interval(),
+                        StaffLinkRoute.MIN_INTERVAL, StaffLinkRoute.MAX_INTERVAL) : config.interval();
         if (weight != config.weight() || amount != config.amount() || interval != config.interval()) {
             menu.applyRoute(withNumbers(config, (int) weight, amount, (int) interval));
         }
         // 详细面板里被改过、还没失焦提交的条件 / 模式。
         commitDetail();
+    }
+
+    private void saveAnchorName() {
+        if (saveAnchorName(true)) {
+            nameField.setFocused(false);
+            if (getFocused() == nameField) setFocused(null);
+            updateControls();
+        }
+    }
+
+    private boolean saveAnchorName(boolean notify) {
+        GlobalPos anchor = menu.getSelectedAnchor();
+        if (nameField == null || !nameField.active
+                || !canRenameAnchor(anchor != null && menu.isAnchorBound(anchor), menu.getMultiSelection().size())) return false;
+        String requested = nameField.getValue().trim();
+        String current = menu.getAnchorName(anchor);
+        if (!requested.equals(current == null ? "" : current)) menu.renameAnchor(anchor, requested);
+        if (notify) showNotice(k("name_submitted"));
+        return true;
     }
 
     private static long parsePlain(String text, long fallback, long min, long max) {
@@ -1263,6 +1520,7 @@ public final class StaffLinkScreen extends AbstractContainerScreen<StaffLinkMenu
     }
 
     private void updateControls() {
+        clampScroll();
         StaffLinkRoute config = menu.getSelectedConfig();
         boolean hasConfig = config != null;
         GlobalPos anchor = menu.getSelectedAnchor();
@@ -1295,7 +1553,11 @@ public final class StaffLinkScreen extends AbstractContainerScreen<StaffLinkMenu
                         : "gui.useless_mod.wireless_logistics.filter_button_none",
                 filterFilledCount()));
         networkNameField.setEditable(true);
-        nameField.setEditable(hasAnchor);
+        boolean renameable = canRenameAnchor(hasAnchor, menu.getMultiSelection().size());
+        nameField.active = renameable;
+        nameField.setEditable(renameable);
+        saveNameButton.active = renameable;
+        clearFocusIfHidden(nameField);
         // 一般介质是「释放端发起搬运」，所以「数量 / 周期」只在释放端可编辑，吸收端的禁掉以免误解。
         // 应力<b>正好相反</b>：它的目标转速与旋转方向是每个输出端各自的事（同一条线路上
         // 不同机器可以转不同的速度），所以这两个框配在吸收端。
@@ -1312,6 +1574,9 @@ public final class StaffLinkScreen extends AbstractContainerScreen<StaffLinkMenu
         weightField.setEditable(hasConfig);
         amountField.setEditable(numbersEditable);
         intervalField.setEditable(numbersEditable && !stress);
+        clearFocusIfHidden(weightField);
+        clearFocusIfHidden(amountField);
+        clearFocusIfHidden(intervalField);
         applyNumericSemantics(stress, pressure);
         if (stressDirectionButton != null) {
             stressDirectionButton.visible = stress && hasConfig;
@@ -1420,16 +1685,8 @@ public final class StaffLinkScreen extends AbstractContainerScreen<StaffLinkMenu
 
     @Override
     protected void renderBg(GuiGraphics graphics, float partialTick, int mouseX, int mouseY) {
-        MachineScreenStyle.drawPanel(graphics, leftPos, topPos, imageWidth, imageHeight);
-        MachineScreenStyle.drawInset(graphics, leftPos + INSET_LEFT, topPos + 18,
-                leftPos + INSET_RIGHT, topPos + LIST_INSET_BOTTOM);
-        MachineScreenStyle.drawInset(graphics, leftPos + INSET_LEFT, topPos + CONFIG_INSET_TOP,
-                leftPos + INSET_RIGHT, topPos + 238);
-        MachineScreenStyle.drawSlotGroup(graphics, leftPos, topPos, 44, 254, 9, 3);
-        MachineScreenStyle.drawSlotGroup(graphics, leftPos, topPos, 44, 312, 9, 1);
-        for (Slot slot : menu.slots) {
-            MachineScreenStyle.drawSlotBackground(graphics, leftPos, topPos, slot);
-        }
+        appleHost.layout(width, height, leftPos, topPos);
+        appleHost.render(graphics, mouseX, mouseY, partialTick);
     }
 
     /**
@@ -1446,7 +1703,10 @@ public final class StaffLinkScreen extends AbstractContainerScreen<StaffLinkMenu
         int panelY = filterPanelY();
         boolean active = menu.isFilterActive();
 
-        MachineScreenStyle.drawPanel(graphics, panelX, panelY, FILTER_PANEL_WIDTH, FILTER_PANEL_HEIGHT);
+        AppleStyle.shadow(AppleStyle.SH_POPOVER).draw(graphics, mouseX, mouseY,
+                panelX, panelY, FILTER_PANEL_WIDTH, FILTER_PANEL_HEIGHT);
+        new AppleTex.Stroked(0xFFFFFFFF, 0x1A000000, AppleStyle.R_CARD).draw(graphics, mouseX, mouseY,
+                panelX, panelY, FILTER_PANEL_WIDTH, FILTER_PANEL_HEIGHT);
 
         Component heading = Component.translatable("gui.useless_mod.wireless_logistics.filter_panel_title",
                 filterFilledCount());
@@ -1485,14 +1745,11 @@ public final class StaffLinkScreen extends AbstractContainerScreen<StaffLinkMenu
 
     /** 18 格的底板 + 有标记那一格的顶面高光 + 详细面板正在编辑的那一格描边。 */
     private void renderFilterSlotBackgrounds(GuiGraphics graphics, int panelX, int panelY, boolean active) {
-        int fill = active ? MachineScreenStyle.SLOT_COLOR : 0xFF777B8D;
         for (int index = 0; index < StaffLinkRoute.FILTER_LIMIT; index++) {
             int x = filterSlotScreenX(index);
             int y = filterSlotScreenY(index);
-            graphics.fill(x, y, x + FILTER_SLOT_SIZE, y + FILTER_SLOT_SIZE, fill);
-            if (active) {
-                graphics.fill(x, y, x + FILTER_SLOT_SIZE, y + 1, MachineScreenStyle.SLOT_SHADOW_COLOR);
-            }
+            if (active) AppleUi.slot(graphics, x, y, false, !currentFilterSlot(index).isEmpty());
+            else AppleUi2.round(graphics, x, y, FILTER_SLOT_SIZE, FILTER_SLOT_SIZE, 3, AppleStyle.TRACK);
         }
         // 详细面板正在编辑的那一格描边——面板里空格子之间留白不少，不圈一下容易看错行。
         if (detailPanelOpen && detailIndex >= 0 && detailIndex < StaffLinkRoute.FILTER_LIMIT) {
@@ -1598,23 +1855,18 @@ public final class StaffLinkScreen extends AbstractContainerScreen<StaffLinkMenu
 
     @Override
     protected void renderLabels(GuiGraphics graphics, int mouseX, int mouseY) {
-        graphics.drawString(font, title, titleLabelX, titleLabelY, MachineScreenStyle.TEXT_COLOR, false);
-        graphics.drawString(font, playerInventoryTitle, inventoryLabelX, inventoryLabelY,
-                MachineScreenStyle.TEXT_COLOR, false);
         renderNetworkLabel(graphics);
         renderAnchorList(graphics);
-        renderNumericLabels(graphics);
         renderStressStatus(graphics);
         renderAeWhitelistWarning(graphics);
-        renderSelectionCount(graphics);
         renderNotice(graphics);
     }
 
     /**
      * Req3 的界面警告：源端是 AE、目标端又没有白名单时，这条线路一个物品都不会搬。
      *
-     * <p>这条规则不看就完全看不出原因（线路是启用的、类型也对得上），所以必须在按钮那一行上方
-     * 明说，否则玩家只会觉得「这机器坏了」。</p>
+     * <p>这条规则不看就完全看不出原因（线路是启用的、类型也对得上），所以在左栏改名框下方
+     * 保留完整警告，避免覆盖右栏配置。</p>
      */
     private void renderAeWhitelistWarning(GuiGraphics graphics) {
         StaffLinkRoute config = menu.getSelectedConfig();
@@ -1627,21 +1879,33 @@ public final class StaffLinkScreen extends AbstractContainerScreen<StaffLinkMenu
         if (config.medium().isAe() && config.blocksAeSourceWithoutWhitelist()) {
             Component text = Component.translatable(
                     "gui.useless_mod.wireless_logistics.ae_whitelist_warning");
-            graphics.drawString(font, text, CONTENT_LEFT, FILTER_Y - 11,
-                    MachineScreenStyle.ERROR_TEXT_COLOR, false);
+            drawLeftMessage(graphics, text, STATUS_Y, MachineScreenStyle.ERROR_TEXT_COLOR);
         }
     }
 
-    /** 标题行右侧的一次性提示（复制/粘贴等）；{@link #NOTICE_TICKS} tick 后自己消失。 */
+    /** 一次性提示放在左栏底部，不与顶部网络操作重叠。 */
     private void renderNotice(GuiGraphics graphics) {
-        if (notice == null) {
-            return;
+        if (notice != null) {
+            drawLeftMessage(graphics, notice, NOTICE_Y, NOTICE_COLOR);
         }
-        graphics.drawString(font, notice, CONTENT_RIGHT - font.width(notice), titleLabelY,
-                NOTICE_COLOR, false);
     }
 
-    /** 批量编辑计数：多选非空时在按钮行上方右对齐提示选了几台。 */
+    /** 左栏长提示自动换行，不越过中间留白覆盖配置控件。 */
+    private int drawLeftMessage(GuiGraphics graphics, Component text, int y, int color) {
+        float scale = .75f;
+        for (var line : font.split(text, (int) (LEFT_WIDTH / scale))) {
+            if (y + 8 > imageHeight - 8) break;
+            graphics.pose().pushPose();
+            graphics.pose().translate(CONTENT_LEFT, y, 0);
+            graphics.pose().scale(scale, scale, 1);
+            graphics.drawString(font, line, 0, 0, color, false);
+            graphics.pose().popPose();
+            y += 8;
+        }
+        return y;
+    }
+
+    /** 批量编辑计数放在列表下方，与改名标签分开。 */
     private void renderSelectionCount(GuiGraphics graphics) {
         int count = menu.getMultiSelection().size();
         if (count <= 0) {
@@ -1649,17 +1913,16 @@ public final class StaffLinkScreen extends AbstractContainerScreen<StaffLinkMenu
         }
         Component text = Component.translatable(
                 "gui.useless_mod.wireless_logistics.multi_select_count", count);
-        // 和 Req3 警告同一行：一个左对齐、一个右对齐，互不打架。
-        graphics.drawString(font, text, CONTENT_RIGHT - font.width(text), FILTER_Y - 11,
+        graphics.drawString(font, text, LEFT_RIGHT - font.width(text), SELECTION_COUNT_Y,
                 MULTI_SELECT_TEXT_COLOR, false);
     }
 
-    /** 第一行右侧：「网络 2/3」，右对齐到面板右边。 */
+    /** 顶部网络计数，紧靠网络切换控件左边。 */
     private void renderNetworkLabel(GuiGraphics graphics) {
         int[] position = staffNetworkPosition();
         Component text = Component.translatable("gui.useless_mod.wireless_logistics.network_position",
                 position[0] + 1, position[1]);
-        graphics.drawString(font, text, CONTENT_RIGHT - font.width(text), NETWORK_ROW_Y + 3,
+        AppleTextLayout.draw(graphics, font, text, 21, 69, 151, .75f,
                 MachineScreenStyle.MUTED_TEXT_COLOR, false);
     }
 
@@ -1669,8 +1932,16 @@ public final class StaffLinkScreen extends AbstractContainerScreen<StaffLinkMenu
             Component hint = menu.getAnchors().isEmpty()
                     ? Component.translatable("gui.useless_mod.wireless_logistics.empty")
                     : Component.translatable("gui.useless_mod.wireless_logistics.search_no_match");
-            graphics.drawString(font, hint, CONTENT_LEFT + 2, LIST_FIRST_ROW_Y,
-                    MachineScreenStyle.MUTED_TEXT_COLOR, false);
+            var lines = font.split(hint, (int) (LEFT_WIDTH / .85f));
+            int y = LIST_TOP + (LIST_BOTTOM - LIST_TOP - lines.size() * 9) / 2;
+            for (var line : lines) {
+                graphics.pose().pushPose();
+                graphics.pose().translate(CONTENT_LEFT + (LEFT_WIDTH - font.width(line) * .85f) / 2, y, 0);
+                graphics.pose().scale(.85f, .85f, 1);
+                graphics.drawString(font, line, 0, 0, AppleStyle.TERTIARY, false);
+                graphics.pose().popPose();
+                y += 9;
+            }
             return;
         }
 
@@ -1680,109 +1951,74 @@ public final class StaffLinkScreen extends AbstractContainerScreen<StaffLinkMenu
                 break;
             }
             GlobalPos anchor = anchors.get(index);
-            int y = LIST_FIRST_ROW_Y + row * LIST_ROW_HEIGHT;
+            int rowTop = anchorRowY(row);
+            int textY = rowTop + 3;
+            int centerY = rowTop + LIST_ROW_HEIGHT / 2;
 
-            // 选中态用「底色 + 左侧竖条 + 行尾 ✓」三重标记：只靠一层底色太淡，
-            // 一堆同名容器时根本看不出哪些进了批量编辑。
             boolean isSelected = anchor.equals(menu.getSelectedAnchor());
             boolean isMulti = menu.isMultiSelected(anchor);
-            if (isMulti) {
-                graphics.fill(CONTENT_LEFT - 2, y - 2, CONTENT_RIGHT, y + 9, MULTI_SELECT_COLOR);
-            } else if (isSelected) {
-                graphics.fill(CONTENT_LEFT - 2, y - 2, CONTENT_RIGHT, y + 9,
-                        MachineScreenStyle.HIGHLIGHT_COLOR);
+            if (isMulti || isSelected || anchorDrag.moved() && anchor.equals(anchorDrag.anchor())) {
+                AppleUi2.round(graphics, CONTENT_LEFT + 2, rowTop, LEFT_WIDTH - 4, LIST_ROW_HEIGHT,
+                        4, MULTI_SELECT_COLOR);
             }
-            if (isMulti) {
-                graphics.fill(CONTENT_LEFT - 2, y - 2, CONTENT_LEFT, y + 9, MULTI_SELECT_TEXT_COLOR);
-            } else if (isSelected) {
-                graphics.fill(CONTENT_LEFT - 2, y - 2, CONTENT_LEFT, y + 9, SELECTED_BAR_COLOR);
+            if (isMulti || isSelected) {
+                graphics.fill(CONTENT_LEFT, rowTop + 2, CONTENT_LEFT + 2, rowTop + LIST_ROW_HEIGHT - 2,
+                        isMulti ? MULTI_SELECT_TEXT_COLOR : SELECTED_BAR_COLOR);
             }
-            if (isSelected && isMulti) {
-                // 既是批量目标、又是配置区正在编辑的那台：加一圈描边区分出来。
-                outline(graphics, CONTENT_LEFT - 2, y - 2, CONTENT_WIDTH + 2, 11, SELECTED_BAR_COLOR);
-            }
-            // 行首 ▲ / ▼：调整这个容器在列表里的次序（权重相同时，靠前的先拿）。
-            // 能不能点看的是「可见列表里有没有上一行 / 下一行」——搜索过滤开着时，玩家期望的
-            // 就是「跟上面那一行换位」，而不是跟列表里某个看不见的邻居换。
-            drawMoveButton(graphics, CONTENT_LEFT + 1, y, true, index > 0);
-            drawMoveButton(graphics, CONTENT_LEFT + 1 + LIST_MOVE_WIDTH, y, false,
+            AppleUi.icon(graphics, AppleUi.Icon.GRIP, LIST_GRIP_X, centerY - 4, 6, AppleStyle.TERTIARY);
+            drawMoveButton(graphics, LIST_MOVE_X, centerY - 4, true, index > 0);
+            drawMoveButton(graphics, LIST_MOVE_X + LIST_MOVE_WIDTH, centerY - 4, false,
                     index < anchors.size() - 1);
 
-            // 名字前面标出「这条线路上它是发还是收」——一堆同名容器时，光看名字分不出谁在发。
-            // 箭头方向按「相对这个名字所在行」看：输出端 < 指向外侧（发出去）、输入端 > 指向名字（收进来）。
             StaffLinkRoute routeConfig = menu.getConfig(anchor, menu.getSelectedRoute());
-            String glyph = routeConfig == null ? "-" : routeConfig.flow() == LinkFlow.RELEASE ? "<" : ">";
-            int glyphColor;
-            if (routeConfig == null || !routeConfig.enabled()) {
-                glyphColor = MachineScreenStyle.MUTED_TEXT_COLOR;
-            } else if (routeConfig.flow() == LinkFlow.RELEASE) {
-                glyphColor = 0xFF2E7D32;
+            int glyphColor = routeConfig == null || !routeConfig.enabled() ? AppleStyle.TERTIARY
+                    : routeConfig.flow() == LinkFlow.RELEASE ? AppleStyle.GREEN : AppleStyle.BLUE;
+            AppleUi2.round(graphics, LIST_GLYPH_X - 2, centerY - 10, 20, 20, 4, AppleStyle.FILL);
+            AnchorAppearance appearance = anchorAppearance(anchor);
+            if (appearance != null && !appearance.icon().isEmpty()) {
+                graphics.renderItem(appearance.icon(), LIST_GLYPH_X, centerY - 8);
             } else {
-                glyphColor = 0xFF3B6EA5;
+                // Unknown/unloaded is not a different container. Do not invent a medium-specific cube.
+                AppleUi.icon(graphics, AppleUi.Icon.INFO, LIST_GLYPH_X + 4, centerY - 4, 8, AppleStyle.TERTIARY);
             }
-            graphics.drawString(font, glyph, LIST_GLYPH_X, y, glyphColor, false);
+            if (routeConfig != null) {
+                AppleUi.icon(graphics, routeConfig.flow() == LinkFlow.RELEASE ? AppleUi.Icon.ARROW_OUT : AppleUi.Icon.ARROW_IN,
+                        LIST_NAME_X, rowTop + 13, 6, glyphColor);
+                AppleTextLayout.draw(graphics, font, routeConfig.medium().displayName(), LIST_NAME_X + 9, rowTop + 13,
+                        LIST_VALUE_RIGHT - LIST_NAME_X - 9, .65f, glyphColor, false);
+            }
 
-            // 应力线路上行尾还要放一个「这一台自己」的应力量，名字预算里先给它留出位置。
-            // 用紧凑写法（8.2k）—— 13px 高的行放不下长数字。
             StaffLinkStressStatusPacket.Entry stress = null;
             int valueWidth = 0;
             if (routeConfig != null && routeConfig.medium().family() == ResourceFamily.STRESS) {
-                stress = StaffLinkStressClientState.find(
-                        menu.getNetworkId(), anchor, menu.getSelectedRoute());
+                stress = StaffLinkStressClientState.find(menu.getNetworkId(), anchor, menu.getSelectedRoute());
                 valueWidth = STRESS_ROW_VALUE_WIDTH;
             }
-
-            // 名字后面缀上坐标：多个同名容器（都叫「箱子」）光看名字根本分不出来。
-            // 额外预留 8px 给行尾的批量 ✓，无条件预留，免得勾选/取消时名字左右跳。
-            String coord = anchor.pos().toShortString();
-            int nameBudget = Math.max(24,
-                    CONTENT_WIDTH - LIST_TEXT_SHIFT - LIST_UNBIND_WIDTH - 16 - 8 - valueWidth
-                            - font.width(coord));
-            String name = font.plainSubstrByWidth(anchorDisplayName(anchor).getString(), nameBudget);
-            graphics.drawString(font, name, LIST_NAME_X, y, MachineScreenStyle.TEXT_COLOR, false);
-            graphics.drawString(font, coord, LIST_NAME_X + font.width(name) + 4, y,
-                    MachineScreenStyle.MUTED_TEXT_COLOR, false);
+            int nameBudget = LIST_VALUE_RIGHT - LIST_NAME_X - valueWidth;
+            AppleTextLayout.draw(graphics, font, anchorDisplayName(anchor), LIST_NAME_X,
+                    routeConfig == null ? centerY - 4 : textY,
+                    Math.max(0, nameBudget), .8f, MachineScreenStyle.TEXT_COLOR, false);
             if (stress != null) {
-                // 一行一台、各看各的：源看「这一台提供了多少」，目标看「这一台需要多少」。
-                // 整条线路的合计在配置区的状态行里，两处分工不同。
-                String value = formatStressCompact(stress.local().supplied());
-                graphics.drawString(font, value,
-                        CONTENT_RIGHT - LIST_UNBIND_WIDTH - 8 - 4 - font.width(value), y,
-                        MachineScreenStyle.MUTED_TEXT_COLOR, false);
+                AppleTextLayout.draw(graphics, font, Component.literal(formatStressCompact(stress.local().supplied())),
+                        LIST_VALUE_RIGHT - valueWidth, textY, valueWidth, .75f, AppleStyle.TERTIARY, true);
             }
-            if (isMulti) {
-                graphics.drawString(font, "✓", CONTENT_RIGHT - LIST_UNBIND_WIDTH - 8, y,
-                        MULTI_SELECT_TEXT_COLOR, false);
-            }
-            graphics.drawString(font, "x", CONTENT_RIGHT - LIST_UNBIND_WIDTH + 3, y,
-                    MachineScreenStyle.ERROR_TEXT_COLOR, false);
+            if (isMulti) AppleUi.icon(graphics, AppleUi.Icon.CHECK, LIST_CHECK_X, centerY - 4, 7, MULTI_SELECT_TEXT_COLOR);
+            AppleUi.icon(graphics, AppleUi.Icon.XMARK, LIST_UNBIND_X + 2, centerY - 4, 8, AppleStyle.RED);
+        }
+        var drop = anchorDrag.drop(menu.getNetworkId(), menu.getAnchors(), anchors, scrollOffset);
+        if (drop != null) {
+            graphics.fill(CONTENT_LEFT + 4, drop.lineY() - 1, LEFT_RIGHT - 4, drop.lineY() + 1, AppleStyle.BLUE);
         }
     }
 
     /**
-     * 画一个行首的「上移 / 下移」小按钮。
+     * 画一个行尾的「上移 / 下移」小按钮。
      *
      * <p>用 ▲ / ▼ 文字字形而不是自绘三角：默认字体带了 unicode 回退，行尾的批量 ✓ 就是这么画的。</p>
      */
     private void drawMoveButton(GuiGraphics graphics, int x, int y, boolean up, boolean enabled) {
-        graphics.drawString(font, up ? "▲" : "▼", x, y,
-                enabled ? MachineScreenStyle.TEXT_COLOR : MachineScreenStyle.MUTED_TEXT_COLOR, false);
-    }
-
-    /**
-     * 判断点击落在行首的哪个移动按钮上。
-     *
-     * @return -1 上移按钮、+1 下移按钮、0 没点到按钮
-     */
-    private int moveButtonAt(double localX) {
-        int left = CONTENT_LEFT + 1;
-        if (localX >= left && localX < left + LIST_MOVE_WIDTH) {
-            return -1;
-        }
-        if (localX >= left + LIST_MOVE_WIDTH && localX < left + LIST_MOVE_WIDTH * LIST_MOVE_COUNT) {
-            return 1;
-        }
-        return 0;
+        AppleUi.icon(graphics, up ? AppleUi.Icon.ARROW_UP : AppleUi.Icon.ARROW_DOWN,
+                x, y, 8, enabled ? AppleStyle.SECONDARY : AppleStyle.QUATERNARY);
     }
 
     /**
@@ -1815,14 +2051,22 @@ public final class StaffLinkScreen extends AbstractContainerScreen<StaffLinkMenu
         return blockName != null ? Component.literal(blockName) : Component.literal(anchor.pos().toShortString());
     }
 
-    /** 该坐标上方块的本名；维度不匹配或区块未加载时返回 {@code null}。 */
+    /** Use the actual block item, not a resource-medium symbol. Retain known appearances after chunk unload. */
+    private AnchorAppearance anchorAppearance(GlobalPos anchor) {
+        Level level = minecraft == null ? null : minecraft.level;
+        if (level != null && anchor.dimension().equals(level.dimension()) && level.isLoaded(anchor.pos())) {
+            var state = level.getBlockState(anchor.pos());
+            if (state.isAir()) anchorAppearances.remove(anchor);
+            else anchorAppearances.put(anchor, new AnchorAppearance(new ItemStack(state.getBlock()),
+                    state.getBlock().getName().getString()));
+        }
+        return anchorAppearances.get(anchor);
+    }
+
     @Nullable
     private String blockNameOf(GlobalPos anchor) {
-        Level level = minecraft == null ? null : minecraft.level;
-        if (level == null || !anchor.dimension().equals(level.dimension()) || !level.isLoaded(anchor.pos())) {
-            return null;
-        }
-        return level.getBlockState(anchor.pos()).getBlock().getName().getString();
+        AnchorAppearance appearance = anchorAppearance(anchor);
+        return appearance == null ? null : appearance.blockName();
     }
 
     /**
@@ -1886,15 +2130,14 @@ public final class StaffLinkScreen extends AbstractContainerScreen<StaffLinkMenu
             if (!spec.field().visible) {
                 continue;
             }
-            Component label = numericLabel(spec);
-            int labelX = spec.field().getX() - leftPos - font.width(label) - 4;
-            graphics.drawString(font, label, labelX, ROW_FOURTH_Y + 4,
+            int fieldX = spec.field().getX() - leftPos;
+            int fieldY = spec.field().getY() - topPos;
+            graphics.drawString(font, numericLabel(spec), CONFIG_LEFT, fieldY + 4,
                     MachineScreenStyle.MUTED_TEXT_COLOR, false);
             if (!spec.field().active) {
-                // 不生效的输入框压一层暗色，一眼能看出来它不可编辑。
-                graphics.fill(spec.field().getX(), spec.field().getY(),
-                        spec.field().getX() + spec.field().getWidth(),
-                        spec.field().getY() + spec.field().getHeight(), 0x66000000);
+                // renderLabels 的绘制原点已经移到面板左上角，遮罩同样使用面板内坐标。
+                graphics.fill(fieldX, fieldY, fieldX + spec.field().getWidth(),
+                        fieldY + spec.field().getHeight(), 0x66000000);
             }
         }
         // 应力时周期框被方向按钮顶掉，它的标签在这里单独补一次：按钮上写的是当前方向，
@@ -1902,8 +2145,7 @@ public final class StaffLinkScreen extends AbstractContainerScreen<StaffLinkMenu
         if (stressFields && stressDirectionButton != null && stressDirectionButton.visible) {
             Component direction = Component.translatable(
                     "gui.useless_mod.wireless_logistics.stress.direction_label");
-            int labelX = stressDirectionButton.getX() - leftPos - font.width(direction) - 4;
-            graphics.drawString(font, direction, labelX, ROW_FOURTH_Y + 4,
+            graphics.drawString(font, direction, CONFIG_LEFT, stressDirectionButton.getY() - topPos + 4,
                     MachineScreenStyle.MUTED_TEXT_COLOR, false);
         }
     }
@@ -1928,11 +2170,11 @@ public final class StaffLinkScreen extends AbstractContainerScreen<StaffLinkMenu
             // 线路关着的时候服务端根本不会为它记状态（桥只跑已启用的线路），快照里自然没有它。
             // 这时补一句「已关闭」——否则玩家看到一片空白，很容易以为功能坏了。
             if (!config.enabled()) {
-                graphics.drawString(font, Component.translatable(
+                drawLeftMessage(graphics, Component.translatable(
                                 "gui.useless_mod.wireless_logistics.stress.status",
                                 Component.translatable(
                                         "gui.useless_mod.wireless_logistics.stress.state.disabled")),
-                        CONTENT_LEFT, STRESS_STATUS_Y, MachineScreenStyle.MUTED_TEXT_COLOR, false);
+                        STATUS_Y, MachineScreenStyle.MUTED_TEXT_COLOR);
             }
             return;
         }
@@ -1947,13 +2189,12 @@ public final class StaffLinkScreen extends AbstractContainerScreen<StaffLinkMenu
                 formatStress(entry.local().supplied()),
                 formatStress(entry.line().supplied()),
                 formatStress(entry.line().extra()));
-        graphics.drawString(font, numbers, CONTENT_LEFT, STRESS_STATUS_Y,
-                MachineScreenStyle.MUTED_TEXT_COLOR, false);
+        int stateY = drawLeftMessage(graphics, numbers, STATUS_Y, MachineScreenStyle.MUTED_TEXT_COLOR);
 
         Component state = Component.translatable("gui.useless_mod.wireless_logistics.stress.status",
                 stressStateName(entry.state()));
-        graphics.drawString(font, state, CONTENT_LEFT, STRESS_STATUS_Y + 9,
-                isStressWarning(entry.state()) ? STRESS_WARN_COLOR : MachineScreenStyle.MUTED_TEXT_COLOR, false);
+        drawLeftMessage(graphics, state, stateY,
+                isStressWarning(entry.state()) ? STRESS_WARN_COLOR : MachineScreenStyle.MUTED_TEXT_COLOR);
     }
 
     /**
@@ -1982,7 +2223,7 @@ public final class StaffLinkScreen extends AbstractContainerScreen<StaffLinkMenu
         return String.format("%.1f", value);
     }
 
-    /** 容器列表行尾的应力量：紧凑写法（8.2k / 1.5M），一行只有 13px 高，放不下长数字。 */
+    /** 容器列表行尾的应力量：紧凑写法（8.2k / 1.5M），为名称和操作留出空间。 */
     private static String formatStressCompact(float value) {
         if (value >= 1.0E9F) {
             return "\u221e";
@@ -2005,6 +2246,8 @@ public final class StaffLinkScreen extends AbstractContainerScreen<StaffLinkMenu
 
     @Override
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
+        // Draw the native world dimmer once, beneath the container and JEI overlays.
+        renderBackground(graphics);
         if (filterPanelOpen) {
             // 先骨架渲染：super.render() 里除了底层界面，还负责触发 JEI 的
             // ContainerScreenEvent.Render.Background / Foreground —— JEI 的原料侧栏就在那两处画。
@@ -2017,10 +2260,10 @@ public final class StaffLinkScreen extends AbstractContainerScreen<StaffLinkMenu
         // 过滤格住在覆盖层面板里，`filterSlotScreenX/Y` 给的是**屏幕坐标**，面板关着时那些
         // 坐标指向的是主界面别的控件。所以这里**不能**再画过滤格物品——否则关掉面板后，
         // 标记会孤零零地停在一级菜单的容器列表上（用户实测反馈过）。
-        PressableAE2Button selected = routeButtons[menu.getSelectedRoute()];
-        if (menu.getSelectedAnchor() != null) {
-            outline(graphics, selected.getX() - 1, selected.getY() - 1,
-                    selected.getWidth() + 2, selected.getHeight() + 2, MachineScreenStyle.TEXT_COLOR);
+        if (appleHost.isPopoverOpen()) {
+            graphics.flush();
+            appleHost.renderOverlay(graphics, mouseX, mouseY, partialTick);
+            return;
         }
         if (mediumMenuOpen) {
             // 下拉盖住了下面的控件：这时候再弹它们的悬停提示只会互相打架。
@@ -2028,6 +2271,7 @@ public final class StaffLinkScreen extends AbstractContainerScreen<StaffLinkMenu
             renderMediumMenu(graphics, mouseX, mouseY);
             return;
         }
+        if (anchorDrag.moved()) return;
         renderAnchorTooltip(graphics, mouseX, mouseY);
         renderFilterTooltip(graphics, mouseX, mouseY);
         renderNumericTooltip(graphics, mouseX, mouseY);
@@ -2086,6 +2330,15 @@ public final class StaffLinkScreen extends AbstractContainerScreen<StaffLinkMenu
         // 光标上拿着的物品同理：vanilla 只在 super.render() 里画它（z 也低于面板），
         // 从背包拿起物品来标记时会被面板整个盖住、看不见手上是什么。这里抬到最上面重画。
         renderCarriedItem(graphics, mouseX, mouseY);
+        graphics.flush();
+        graphics.pose().pushPose();
+        try {
+            graphics.pose().translate(0.0F, 0.0F, CARRIED_ITEM_Z);
+            JeiDragPreviewRenderer.drawActivePreview(graphics, mouseX, mouseY);
+        } finally {
+            graphics.pose().popPose();
+        }
+        graphics.flush();
     }
 
     /** 把「光标上拿着的物品」画在覆盖层最上面（含堆叠数字）。 */
@@ -2112,7 +2365,10 @@ public final class StaffLinkScreen extends AbstractContainerScreen<StaffLinkMenu
     private void renderDetailPanel(GuiGraphics graphics, int mouseX, int mouseY) {
         int panelX = detailPanelX();
         int panelY = detailPanelY();
-        MachineScreenStyle.drawPanel(graphics, panelX, panelY, DETAIL_PANEL_WIDTH, DETAIL_PANEL_HEIGHT);
+        AppleStyle.shadow(AppleStyle.SH_POPOVER).draw(graphics, mouseX, mouseY,
+                panelX, panelY, DETAIL_PANEL_WIDTH, DETAIL_PANEL_HEIGHT);
+        new AppleTex.Stroked(0xFFFFFFFF, 0x1A000000, AppleStyle.R_CARD).draw(graphics, mouseX, mouseY,
+                panelX, panelY, DETAIL_PANEL_WIDTH, DETAIL_PANEL_HEIGHT);
 
         LinkFilterSlot slot = currentFilterSlot(detailIndex);
         graphics.drawString(font, Component.translatable(
@@ -2134,9 +2390,7 @@ public final class StaffLinkScreen extends AbstractContainerScreen<StaffLinkMenu
         for (int which = 0; which < 3; which++) {
             int x = detailSlotScreenX(which);
             int y = detailSlotScreenY(which);
-            graphics.fill(x, y, x + DETAIL_SLOT_SIZE, y + DETAIL_SLOT_SIZE,
-                    MachineScreenStyle.SLOT_COLOR);
-            graphics.fill(x, y, x + DETAIL_SLOT_SIZE, y + 1, MachineScreenStyle.SLOT_SHADOW_COLOR);
+            AppleUi.slot(graphics, x, y, false, false);
         }
         graphics.flush();
 
@@ -2146,11 +2400,35 @@ public final class StaffLinkScreen extends AbstractContainerScreen<StaffLinkMenu
         renderDetailControl(graphics, detailSlotScreenX(2), detailSlotScreenY(2), slot.inCond());
         graphics.flush();
 
+        // Keep the same usage text visible as the design, rather than hiding it only in tooltips.
+        String[] hintKeys = {"filter_pattern_hint", "filter_exclude_hint", "filter_cond_out_hint",
+                "filter_cond_in_hint", "filter_cond_value_hint"};
+        int[] hintY = {DETAIL_PATTERN_HINT_Y, DETAIL_EXCLUDE_HINT_Y, DETAIL_OUT_HINT_Y,
+                DETAIL_IN_HINT_Y, DETAIL_VALUE_HINT_Y};
+        for (int i = 0; i < hintKeys.length; i++) {
+            Component hint = Component.translatable("gui.useless_mod.wireless_logistics." + hintKeys[i]);
+            graphics.drawString(font, font.plainSubstrByWidth(hint.getString(), DETAIL_PANEL_WIDTH - DETAIL_PANEL_PAD * 2),
+                    panelX + DETAIL_PANEL_PAD, panelY + hintY[i], AppleStyle.TERTIARY, false);
+        }
+        if (detailError != null) {
+            graphics.drawWordWrap(font, detailError, panelX + DETAIL_PANEL_PAD, panelY + DETAIL_ERROR_Y,
+                    DETAIL_PANEL_WIDTH - DETAIL_PANEL_PAD * 2, AppleStyle.RED);
+            AppleUi.strokedRound(graphics, detailPatternField.getX() - 1, detailPatternField.getY() - 1,
+                    detailPatternField.getWidth() + 2, detailPatternField.getHeight() + 2, 5,
+                    0xFFFFFFFF, AppleStyle.RED);
+        }
         // 控件手动 render（覆盖层阶段不在 super.render() 的渲染序列里）
         detailPatternField.render(graphics, mouseX, mouseY, 0.0F);
         detailOutValueField.render(graphics, mouseX, mouseY, 0.0F);
         detailInValueField.render(graphics, mouseX, mouseY, 0.0F);
-        detailExcludeButton.render(graphics, mouseX, mouseY, 0.0F);
+        PressableAE2Button selectedMode = slot.isExcluded() ? detailBlacklistButton : detailWhitelistButton;
+        if (selectedMode.visible) {
+            AppleUi.strokedRound(graphics, selectedMode.getX() - 1, selectedMode.getY() - 1,
+                    selectedMode.getWidth() + 2, selectedMode.getHeight() + 2, 6,
+                    AppleStyle.FILL, AppleStyle.BLUE);
+        }
+        detailWhitelistButton.render(graphics, mouseX, mouseY, 0.0F);
+        detailBlacklistButton.render(graphics, mouseX, mouseY, 0.0F);
         detailOutOpButton.render(graphics, mouseX, mouseY, 0.0F);
         detailInOpButton.render(graphics, mouseX, mouseY, 0.0F);
         detailCloseButton.render(graphics, mouseX, mouseY, 0.0F);
@@ -2204,7 +2482,8 @@ public final class StaffLinkScreen extends AbstractContainerScreen<StaffLinkMenu
                 && detailPatternField.isMouseOver(mouseX, mouseY)) {
             lines = List.of(Component.translatable(
                     "gui.useless_mod.wireless_logistics.filter_pattern_hint"));
-        } else if (detailExcludeButton.visible && detailExcludeButton.isMouseOver(mouseX, mouseY)) {
+        } else if ((detailWhitelistButton.visible && detailWhitelistButton.isMouseOver(mouseX, mouseY))
+                || (detailBlacklistButton.visible && detailBlacklistButton.isMouseOver(mouseX, mouseY))) {
             lines = List.of(Component.translatable(
                     "gui.useless_mod.wireless_logistics.filter_exclude_hint"));
         }
@@ -2295,7 +2574,7 @@ public final class StaffLinkScreen extends AbstractContainerScreen<StaffLinkMenu
         double localX = mouseX - leftPos;
         double localY = mouseY - topPos;
         if (localY < ROUTE_ROW_Y || localY > ROUTE_ROW_Y + ROW_HEIGHT
-                || localX < CONTENT_LEFT || localX > CONTENT_RIGHT) {
+                || localX < CONFIG_LEFT || localX > CONFIG_RIGHT) {
             return;
         }
         graphics.renderTooltip(font,
@@ -2570,6 +2849,15 @@ public final class StaffLinkScreen extends AbstractContainerScreen<StaffLinkMenu
 
     @Override
     public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+        if (keyCode == GLFW.GLFW_KEY_ESCAPE && anchorDrag.pending()) {
+            anchorDrag.cancel();
+            setDragging(false);
+            return true;
+        }
+        if (keyCode == GLFW.GLFW_KEY_ESCAPE && appleHost.isPopoverOpen()) {
+            appleHost.closePopover();
+            return true;
+        }
         if (keyCode == GLFW.GLFW_KEY_ESCAPE && detailPanelOpen) {
             // ESC 逐层退：先关详细面板，再关过滤面板，最后才是整个界面。
             // 强关（ESC 是「退出」语义，模式非法也走人，提示已经弹过了）。
@@ -2703,9 +2991,16 @@ public final class StaffLinkScreen extends AbstractContainerScreen<StaffLinkMenu
 
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
+        pointerGestures.put(button, new PointerGesture(PointerOwner.MANUAL, null));
         // 面板占满整个窗口，打开时它最优先：底层界面一个控件也不该收到这一下。
         if (filterPanelOpen) {
             return handleFilterPanelClick(mouseX, mouseY, button);
+        }
+
+        // 弹出菜单必须先于列表和背包命中，不能点透到其后的控件。
+        if (appleHost.isPopoverOpen()) {
+            pointerGestures.put(button, new PointerGesture(PointerOwner.HOSTED, null));
+            return appleHost.mouseClicked(mouseX, mouseY, button);
         }
 
         double localX = mouseX - leftPos;
@@ -2725,11 +3020,14 @@ public final class StaffLinkScreen extends AbstractContainerScreen<StaffLinkMenu
 
         int row = anchorRowAt(localX, localY);
         if (row >= 0) {
+            if (button != GLFW.GLFW_MOUSE_BUTTON_LEFT) return true;
+            if (anyFieldFocused()) applyEdits();
+            setFocused(null);
             List<GlobalPos> anchors = visibleAnchors();
             int index = scrollOffset + row;
             if (index < anchors.size()) {
                 GlobalPos anchor = anchors.get(index);
-                // 行首 ▲ / ▼：把这一台挪到「上一个 / 下一个可见行」的位置。
+                // 行尾 ▲ / ▼：把这一台挪到「上一个 / 下一个可见行」的位置。
                 int moveDirection = moveButtonAt(localX);
                 if (moveDirection != 0) {
                     int target = moveTargetIndex(anchors, anchor, moveDirection);
@@ -2739,7 +3037,7 @@ public final class StaffLinkScreen extends AbstractContainerScreen<StaffLinkMenu
                     return true;
                 }
                 // 优先级：解绑(x) > Shift 范围 > Ctrl 加减 > 普通单选。
-                if (localX >= CONTENT_RIGHT - LIST_UNBIND_WIDTH) {
+                if (localX >= LIST_UNBIND_X) {
                     menu.detach(anchor);
                     clampScroll();
                 } else if (Screen.hasShiftDown() && lastClickedAnchor != null) {
@@ -2749,11 +3047,15 @@ public final class StaffLinkScreen extends AbstractContainerScreen<StaffLinkMenu
                     menu.toggleMultiSelection(anchor);
                     menu.setSelection(anchor, menu.getSelectedRoute());
                     ensureRouteConfig();
+                } else if (menu.getCarried().isEmpty()) {
+                    // Delay ordinary selection until release: reordering must not create a default route
+                    // or clear a batch selection, including when the gesture is cancelled.
+                    anchorDrag.begin(menu.getNetworkId(), anchor, localX, localY);
+                    anchorDragScrollTicks = 0;
+                    setDragging(true);
+                    return true;
                 } else {
-                    // 普通点击是「重新单选」：顺手清掉上一次的批量选择，语义才不粘。
-                    menu.clearMultiSelection();
-                    menu.setSelection(anchor, menu.getSelectedRoute());
-                    ensureRouteConfig();
+                    selectAnchor(anchor);
                 }
                 lastClickedAnchor = anchor;
                 updateControls();
@@ -2765,6 +3067,27 @@ public final class StaffLinkScreen extends AbstractContainerScreen<StaffLinkMenu
         if (!isOverAnyField(mouseX, mouseY) && anyFieldFocused()) {
             applyEdits();
         }
+        if (appleHost.mouseClicked(mouseX, mouseY, button)) {
+            pointerGestures.put(button, new PointerGesture(PointerOwner.HOSTED, null));
+            setFocused(null);
+            return true;
+        }
+        return clickNative(mouseX, mouseY, button);
+    }
+
+    private void selectAnchor(GlobalPos anchor) {
+        menu.clearMultiSelection();
+        menu.setSelection(anchor, menu.getSelectedRoute());
+        ensureRouteConfig();
+        lastClickedAnchor = anchor;
+        updateControls();
+    }
+
+    private boolean clickNative(double mouseX, double mouseY, int button) {
+        // ContainerScreen handles slots itself; focused text needs its own drag/release dispatch.
+        EditBox field = button == GLFW.GLFW_MOUSE_BUTTON_LEFT ? fields().stream()
+                .filter(f -> f.visible && f.active && f.isMouseOver(mouseX, mouseY)).findFirst().orElse(null) : null;
+        pointerGestures.put(button, new PointerGesture(field == null ? PointerOwner.INVENTORY : PointerOwner.TEXT, field));
         return super.mouseClicked(mouseX, mouseY, button);
     }
 
@@ -2786,7 +3109,7 @@ public final class StaffLinkScreen extends AbstractContainerScreen<StaffLinkMenu
         // 玩家背包槽：面板开着时也允许正常「拿起 / 放下」——不然只能靠 JEI 拖，或者先把物品
         // 拿在手上再开面板。转发给框架走标准的槽位点击（拾取到手、放下、右键分半等）。
         if (inventorySlotAt(mouseX, mouseY) != null) {
-            return super.mouseClicked(mouseX, mouseY, button);
+            return clickNative(mouseX, mouseY, button);
         }
 
         int filterIndex = filterSlotAt(mouseX, mouseY);
@@ -2890,34 +3213,57 @@ public final class StaffLinkScreen extends AbstractContainerScreen<StaffLinkMenu
 
     @Override
     public boolean mouseDragged(double mouseX, double mouseY, int button, double dragX, double dragY) {
-        // 面板开着时框选文本全靠这里：跳过 super，就得自己转发，否则框里的选区永远拖不出来。
-        if (filterPanelOpen) {
-            EditBox focused = focusedField();
-            if (focused != null && focused.canConsumeInput()) {
-                return focused.mouseDragged(mouseX, mouseY, button, dragX, dragY);
-            }
+        if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT && anchorDrag.pending()) {
+            anchorDrag.update(mouseX - leftPos, mouseY - topPos);
             return true;
         }
-        return super.mouseDragged(mouseX, mouseY, button, dragX, dragY);
+        PointerGesture gesture = pointerGestures.get(button);
+        if (gesture == null) return false;
+        return switch (gesture.owner()) {
+            case INVENTORY -> super.mouseDragged(mouseX, mouseY, button, dragX, dragY);
+            case TEXT -> {
+                EditBox field = gesture.field();
+                if (field != null && field.visible && field.active && field.canConsumeInput())
+                    field.mouseDragged(mouseX, mouseY, button, dragX, dragY);
+                yield true;
+            }
+            case HOSTED -> {
+                appleHost.mouseDragged(mouseX, mouseY, button, dragX, dragY);
+                yield true;
+            }
+            case MANUAL -> true;
+        };
     }
 
     @Override
     public boolean mouseReleased(double mouseX, double mouseY, int button) {
+        PointerGesture gesture = pointerGestures.remove(button);
+        if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT && anchorDrag.pending()) {
+            anchorDrag.update(mouseX - leftPos, mouseY - topPos);
+            List<GlobalPos> visible = visibleAnchors();
+            boolean click = !anchorDrag.moved() && anchorDrag.valid(menu.getNetworkId(), menu.getAnchors(), visible);
+            var drop = anchorDrag.drop(menu.getNetworkId(), menu.getAnchors(), visible, scrollOffset);
+            GlobalPos anchor = anchorDrag.anchor();
+            anchorDrag.cancel();
+            setDragging(false);
+            if (drop != null && drop.targetIndex() != menu.getAnchors().indexOf(anchor))
+                menu.moveAnchorTo(anchor, drop.targetIndex()); // One server-validated command, only on release.
+            else if (click) selectAnchor(anchor);
+            return true;
+        }
         // 面板按钮只进了 children，事件得手动转发，不然按下去会一直停在「按下」的视觉状态。
         if (closeFilterButton != null) {
             closeFilterButton.releaseVisualState();
             clearFilterButton.releaseVisualState();
-            detailExcludeButton.releaseVisualState();
+            detailWhitelistButton.releaseVisualState();
+            detailBlacklistButton.releaseVisualState();
             detailOutOpButton.releaseVisualState();
             detailInOpButton.releaseVisualState();
             detailCloseButton.releaseVisualState();
-            // EditBox 的 releaseVisualState 由它自己管，但松手这一刻要通知到，
-            // 否则拖了一半的文本选区不会收尾。
-            EditBox focused = focusedField();
-            if (filterPanelOpen && focused != null) {
-                focused.mouseReleased(mouseX, mouseY, button);
-            }
         }
+        boolean hosted = appleHost.mouseReleased(mouseX, mouseY, button);
+        if (gesture != null && gesture.owner() == PointerOwner.TEXT && gesture.field() != null)
+            gesture.field().mouseReleased(mouseX, mouseY, button);
         flowButton.releaseVisualState();
         mediumButton.releaseVisualState();
         enabledButton.releaseVisualState();
@@ -2929,8 +3275,13 @@ public final class StaffLinkScreen extends AbstractContainerScreen<StaffLinkMenu
         selectAllButton.releaseVisualState();
         clearSelectionButton.releaseVisualState();
         applyAllButton.releaseVisualState();
+        saveNameButton.releaseVisualState();
         for (PressableAE2Button routeButton : routeButtons) {
             routeButton.releaseVisualState();
+        }
+        if (hosted || gesture == null || gesture.owner() != PointerOwner.INVENTORY) {
+            setDragging(false);
+            return hosted || gesture != null;
         }
         return super.mouseReleased(mouseX, mouseY, button);
     }
@@ -2941,25 +3292,18 @@ public final class StaffLinkScreen extends AbstractContainerScreen<StaffLinkMenu
             // 面板是覆盖层，滚动轮不该偷偷滚下面的锚点列表。
             return true;
         }
+        if (appleHost.isPopoverOpen()) {
+            appleHost.mouseScrolled(mouseX, mouseY, scrollY);
+            return true;
+        }
         double localX = mouseX - leftPos;
         double localY = mouseY - topPos;
-        if (localY >= LIST_TOP && localY <= LIST_BOTTOM && localX >= CONTENT_LEFT && localX <= CONTENT_RIGHT) {
+        if (anchorRowAt(localX, localY) >= 0) {
             int maxScroll = Math.max(0, visibleAnchors().size() - LIST_VISIBLE_ROWS);
             scrollOffset = Mth.clamp(scrollOffset + (scrollY > 0 ? -1 : 1), 0, maxScroll);
             return true;
         }
         return super.mouseScrolled(mouseX, mouseY, scrollY);
-    }
-
-    private int anchorRowAt(double localX, double localY) {
-        if (localX < CONTENT_LEFT || localX > CONTENT_RIGHT) {
-            return -1;
-        }
-        if (localY < LIST_TOP || localY > LIST_BOTTOM) {
-            return -1;
-        }
-        int row = (int) ((localY - LIST_TOP) / LIST_ROW_HEIGHT);
-        return row >= 0 && row < LIST_VISIBLE_ROWS ? row : -1;
     }
 
     /** 命中的过滤格（参数是<b>屏幕</b>坐标，面板是居中的覆盖层）；没命中返回 -1。 */
@@ -3107,6 +3451,40 @@ public final class StaffLinkScreen extends AbstractContainerScreen<StaffLinkMenu
      * <p>只有它为真时才画拖拽悬停高亮 —— 否则平时鼠标划过格子也变色，玩家会以为「这里能放」。</p>
      */
     private boolean jeiDragActive;
+    private long jeiTargetRevision;
+
+    private void invalidateJeiDrag() {
+        jeiDragActive = false;
+        jeiTargetRevision++;
+    }
+
+    /** Retained JEI targets belong to the original network, edit targets, route, medium and overlay. */
+    public java.util.function.BooleanSupplier jeiDropGuard() {
+        long revision = jeiTargetRevision;
+        var network = menu.getNetworkId();
+        var anchor = menu.getSelectedAnchor();
+        int route = menu.getSelectedRoute();
+        var targets = menu.getEditTargets();
+        var medium = menu.getSelectedMedium();
+        boolean details = detailPanelOpen;
+        int index = detailIndex;
+        return () -> revision == jeiTargetRevision && filterPanelOpen && menu.isFilterActive()
+                && network.equals(menu.getNetworkId()) && java.util.Objects.equals(anchor, menu.getSelectedAnchor())
+                && route == menu.getSelectedRoute() && targets.equals(menu.getEditTargets())
+                && medium == menu.getSelectedMedium() && details == detailPanelOpen && index == detailIndex
+                && !appleHost.isPopoverOpen();
+    }
+
+    /** A concrete JEI marker supersedes even focused/pending pattern text, never the conditions. */
+    public void setFilterMarkerFromJei(int index, LinkFilterSlot marker) {
+        if (index < 0 || index >= filterSlotCount() || marker == null || marker.isEmpty()) return;
+        StaffLinkMenu targetMenu = getMenu();
+        targetMenu.setFilterSlot(index, targetMenu.getFilterMirror().get(index).withMarker(marker));
+        if (detailPanelOpen && detailIndex == index) {
+            detailError = null;
+            detailPatternField.setValue(marker.pattern() == null ? "" : marker.pattern());
+        }
+    }
 
     public void setJeiDragActive(boolean active) {
         this.jeiDragActive = active;

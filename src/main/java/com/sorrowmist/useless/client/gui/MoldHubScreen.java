@@ -18,6 +18,12 @@ public final class MoldHubScreen extends PagedRecoverableScreen<OmniversalMoldHu
     }
 
     @Override
+    protected AppleUi.Icon windowIcon() { return AppleUi.Icon.CUBE; }
+
+    @Override
+    protected int windowAccent() { return com.sorrowmist.useless.client.gui.apple.AppleStyle.PURPLE; }
+
+    @Override
     protected boolean matchesSearch(int menuSlot) {
         Slot slot = menu.getSlot(menuSlot);
         return PatternSearchMatcher.matchesMold(slot.getItem(), normalizedQuery(),

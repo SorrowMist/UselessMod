@@ -35,7 +35,10 @@ final class IndustrialForegoingRecipeAdapterUtils {
 
     static boolean isValidRawMaterialTag(ResourceLocation id) {
         return id != null
-                && "c".equals(id.getNamespace())
+                // IF 3.x derives forge:dusts/<material> by replacing this exact prefix.
+                // Passing NeoForge's c:raw_materials tags leaves a second colon and
+                // aborts generation for every fermentation recipe in the catalog.
+                && "forge".equals(id.getNamespace())
                 && id.getPath().startsWith("raw_materials/")
                 && OreTitaniumFluidType.isValid(id);
     }

@@ -5,6 +5,9 @@
   "mixins": [
     "GridMachineClassMixin"
   ],
+  "client": [
+    "CompactPatternPreviewPacketMixin"
+  ],
   "injectors": {
     "defaultRequire": 1
   },

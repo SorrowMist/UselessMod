@@ -121,7 +121,7 @@ public class AdvancedAlloyFurnaceRecipeCategory implements IRecipeCategory<Alloy
 
     AdvancedAlloyFurnaceRecipeCategory(IGuiHelper guiHelper) {
         this.width = DISPLAY_WIDTH;
-        this.height = DISPLAY_HEIGHT;
+        this.height = DISPLAY_HEIGHT + 20; // Room for the HNN exact-data selector.
 
         // 创建背景，使用JEI贴图
         this.background = guiHelper.createDrawable(
@@ -173,6 +173,7 @@ public class AdvancedAlloyFurnaceRecipeCategory implements IRecipeCategory<Alloy
     public void setRecipe(@NotNull IRecipeLayoutBuilder builder,
                           @NotNull AlloyFurnaceRecipeCatalog.Entry entry,
                           @NotNull IFocusGroup focuses) {
+        if (HostileNetworksJeiRecipes.setRecipe(builder, entry)) return;
         AdvancedAlloyFurnaceRecipe recipe = entry.recipe();
         // 计算配方相关的并行数信息
         int targetTier = getTargetUselessIngotTier(recipe);
@@ -434,15 +435,30 @@ public class AdvancedAlloyFurnaceRecipeCategory implements IRecipeCategory<Alloy
         List<Ingredient> molds = recipe.molds();
         for (int index = 0; index < molds.size(); index++) {
             builder.addSlot(RecipeIngredientRole.CATALYST, moldSlotX(molds.size(), index), MOLD_SLOT_Y)
-                   .addIngredients(molds.get(index));
+                   .addIngredients(molds.get(index))
+                   .addRichTooltipCallback((slot, tooltip) -> HostileNetworksJeiRecipes.addDetails(tooltip, entry));
         }
+    }
+
+    @Override
+    public void createRecipeExtras(mezz.jei.api.gui.widgets.IRecipeExtrasBuilder builder,
+                                   AlloyFurnaceRecipeCatalog.Entry entry, IFocusGroup focuses) {
+        HostileNetworksJeiRecipes.createExtras(builder, entry, focuses);
+    }
+
+    @Override
+    public void onDisplayedIngredientsUpdate(AlloyFurnaceRecipeCatalog.Entry entry,
+                                            List<mezz.jei.api.gui.ingredient.IRecipeSlotDrawable> slots,
+                                            IFocusGroup focuses) {
+        HostileNetworksJeiRecipes.refreshDisplay(entry, slots);
     }
 
     @Override
     public void draw(@NotNull AlloyFurnaceRecipeCatalog.Entry entry,
                      @NotNull IRecipeSlotsView recipeSlotsView,
                      @NotNull GuiGraphics guiGraphics, double mouseX, double mouseY) {
-        AdvancedAlloyFurnaceRecipe recipe = entry.recipe();
+        AlloyFurnaceRecipeCatalog.Entry displayed = HostileNetworksJeiRecipes.selected(entry, recipeSlotsView);
+        AdvancedAlloyFurnaceRecipe recipe = displayed == null ? entry.recipe() : displayed.recipe();
         // 绘制背景
         this.background.draw(guiGraphics);
 
@@ -512,7 +528,9 @@ public class AdvancedAlloyFurnaceRecipeCategory implements IRecipeCategory<Alloy
                            @NotNull AlloyFurnaceRecipeCatalog.Entry entry,
                            @NotNull IRecipeSlotsView recipeSlotsView,
                            double mouseX, double mouseY) {
-        AdvancedAlloyFurnaceRecipe recipe = entry.recipe();
+        AlloyFurnaceRecipeCatalog.Entry displayed = HostileNetworksJeiRecipes.selected(entry, recipeSlotsView);
+        AdvancedAlloyFurnaceRecipe recipe = displayed == null ? entry.recipe() : displayed.recipe();
+        if (displayed != null && mouseY >= 74) HostileNetworksJeiRecipes.addDetails(tooltip, displayed);
         // 能量和时间显示的悬停提示
         if (mouseX >= ENERGY_DISPLAY_X && mouseX <= ENERGY_DISPLAY_X + ENERGY_DISPLAY_WIDTH &&
                 mouseY >= ENERGY_DISPLAY_Y && mouseY <= ENERGY_DISPLAY_Y + ENERGY_DISPLAY_HEIGHT) {

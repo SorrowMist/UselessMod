@@ -1,7 +1,5 @@
 package com.sorrowmist.useless.compat.ae;
 
-import com.sorrowmist.useless.utils.RateLimitedLogger;
-
 import appeng.capabilities.Capabilities;
 import appeng.api.behaviors.GenericInternalInventory;
 import appeng.api.config.Actionable;
@@ -9,7 +7,6 @@ import appeng.api.stacks.AEFluidKey;
 import appeng.api.stacks.AEItemKey;
 import appeng.api.stacks.AEKey;
 import appeng.api.stacks.AEKeyType;
-import com.sorrowmist.useless.UselessMod;
 import com.sorrowmist.useless.api.logistics.LongFluidHandler;
 import com.sorrowmist.useless.api.logistics.LongItemHandler;
 import net.minecraft.core.BlockPos;
@@ -18,8 +15,6 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraftforge.fluids.FluidStack;
 import org.jetbrains.annotations.Nullable;
-
-import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * {@link AeGenericInvBridge} 的 AE2 实现。
@@ -57,25 +52,6 @@ import java.util.concurrent.atomic.AtomicLong;
 public final class AeGenericInvCompat implements AeGenericInvBridge {
 
     /**
-     * 写入被拒时的限流警告：每 {@link #WARN_INTERVAL_MS} 毫秒最多一条。
-     *
-     * <p>独立于 {@link AeLogisticsCompat} 里的那份（那边是「网络不收」，这边是「本地槽不收」，
-     * 原因不同，混在一起会互相盖掉）。</p>
-     */
-    private static final long WARN_INTERVAL_MS = 5000L;
-    private static final AtomicLong LAST_WARN_AT = new AtomicLong();
-
-    private static void warnRejected(BlockPos pos, String resource, String reason) {
-        long now = System.currentTimeMillis();
-        long last = LAST_WARN_AT.get();
-        if (now - last < WARN_INTERVAL_MS || !LAST_WARN_AT.compareAndSet(last, now)) {
-            return;
-        }
-        RateLimitedLogger.warn(UselessMod.LOGGER,
-                "无线物流：AE 本地库存 {} 无法接收{}——{}", pos.toShortString(), resource, reason);
-    }
-
-    /**
      * 取该坐标的局部通用库存；不是这种方块、或正处于替换的中间态时返回 {@code null}。
      *
      * <p>{@code side} 直接透传。AE2 的注册 lambda 忽略 context，所以任何面拿到的都是同一个
@@ -107,14 +83,14 @@ public final class AeGenericInvCompat implements AeGenericInvBridge {
         GenericInternalInventory inv = inventory(level, pos, side);
         // 只接「已挂上网格」的方块：节点未 create 时 getStorage() 会是 null，
         // 这里自然就退回了。附带的过滤是 isSupportedType，见端点里的说明。
-        return inv == null ? null : new GenericInvItemEndpoint(inv, pos);
+        return inv == null ? null : new GenericInvItemEndpoint(inv);
     }
 
     @Override
     @Nullable
     public LongFluidHandler fluidEndpoint(Level level, BlockPos pos, @Nullable Direction side) {
         GenericInternalInventory inv = inventory(level, pos, side);
-        return inv == null ? null : new GenericInvFluidEndpoint(inv, pos);
+        return inv == null ? null : new GenericInvFluidEndpoint(inv);
     }
 
     // ------------------------------------------------------------------ 物品端点
@@ -127,13 +103,11 @@ public final class AeGenericInvCompat implements AeGenericInvBridge {
      */
     private static final class GenericInvItemEndpoint implements LongItemHandler {
         private final GenericInternalInventory inv;
-        private final BlockPos pos;
         /** 本次端点寿命内「这个库存支持物品」的判定结果；一次调用里不会变。 */
         private final boolean supported;
 
-        GenericInvItemEndpoint(GenericInternalInventory inv, BlockPos pos) {
+        GenericInvItemEndpoint(GenericInternalInventory inv) {
             this.inv = inv;
-            this.pos = pos;
             this.supported = safeSupportedType(AEKeyType.items());
         }
 
@@ -340,7 +314,6 @@ public final class AeGenericInvCompat implements AeGenericInvBridge {
                 return 0L;
             }
             if (!supported) {
-                warnRejected(pos, "物品", "这个接口的本地库存不接受物品类型（配置里可能只允许流体等）");
                 return 0L;
             }
             long remaining = amount;
@@ -373,10 +346,6 @@ public final class AeGenericInvCompat implements AeGenericInvBridge {
                     inv.endBatch();
                 }
             }
-            if (inserted <= 0L && !simulate) {
-                warnRejected(pos, "物品", "本地库存没有收下它：可能是这 9 个槽都满了、"
-                        + "或配置/过滤卡不允许这种物品进任何槽");
-            }
             return inserted;
         }
     }
@@ -386,11 +355,9 @@ public final class AeGenericInvCompat implements AeGenericInvBridge {
     /** 局部通用库存的流体视角；与物品端点严格对称，说明见那边。 */
     private static final class GenericInvFluidEndpoint implements LongFluidHandler {
         private final GenericInternalInventory inv;
-        private final BlockPos pos;
 
-        GenericInvFluidEndpoint(GenericInternalInventory inv, BlockPos pos) {
+        GenericInvFluidEndpoint(GenericInternalInventory inv) {
             this.inv = inv;
-            this.pos = pos;
         }
 
         @Nullable
@@ -550,7 +517,6 @@ public final class AeGenericInvCompat implements AeGenericInvBridge {
             }
             AEFluidKey key = AEFluidKey.of(type);
             if (key == null) {
-                warnRejected(pos, "流体", "这种流体无法转成 AE 的资源键（多半是未正确注册的流体）");
                 return 0L;
             }
             long remaining = amount;
@@ -579,10 +545,6 @@ public final class AeGenericInvCompat implements AeGenericInvBridge {
                 if (batch) {
                     inv.endBatch();
                 }
-            }
-            if (filled <= 0L && !simulate) {
-                warnRejected(pos, "流体", "本地库存没有收下它：可能是这 9 个槽都满了、"
-                        + "或配置/过滤卡不允许这种流体进任何槽");
             }
             return filled;
         }

@@ -1,9 +1,10 @@
 package com.sorrowmist.useless.client.gui;
 
+import com.sorrowmist.useless.client.gui.apple.*;
 import com.sorrowmist.useless.content.menus.PagedRecoverableMenu;
-import net.minecraft.Util;
+import com.sorrowmist.useless.client.gui.ldl.api.SlotsNode;
 import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
+import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.network.chat.Component;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.player.Inventory;
@@ -11,61 +12,54 @@ import net.minecraft.world.inventory.Slot;
 import org.jetbrains.annotations.Nullable;
 import org.lwjgl.glfw.GLFW;
 
+import java.util.Arrays;
+
 /**
  * 带分页、只读恢复页与搜索框的容器界面基类。
  *
  * <p>搜索在客户端完成：屏幕遍历当前页同步过来的槽位内容，按子类给出的匹配规则筛出命中项，
  * 并在这些槽位上叠加高亮标记。槽位位置与交互始终由原版按真实坐标处理，高亮只增加视觉标注，
  * 不改变槽位排布，因此未命中项仍在原位可见，拾取与快速移动也无需额外换算。</p>
+ *
+ * <p>半尺寸布局（456×304）：标题栏 28 + 内边距 12，左右两栏各 212、栏距 8。
+ * 左栏是 9×10 存储网格卡（节距 22 = 20px 底格 + 2px 间隙，物品 16px 居中于底格 +2，卡内边距 8），
+ * 右栏是搜索卡与 9×3 + 快捷栏物品栏卡；两栏底部对齐于 y=292。
+ * 卡片几何直接对应 {@link PagedRecoverableMenu} 里的槽位原点，界面只按同一套坐标画底格，
+ * 槽位顺序 / 序号 / 网络逻辑完全不变。</p>
  */
-public class PagedRecoverableScreen<T extends PagedRecoverableMenu> extends AbstractContainerScreen<T> {
+public class PagedRecoverableScreen<T extends PagedRecoverableMenu> extends AppleContainerScreen<T> {
     /** 命中槽位的高亮边框颜色，带透明度以免遮挡槽位内容。 */
     protected static final int HIGHLIGHT_COLOR = 0xCC55FF55;
 
-    /**
-     * 搜索框左缘，与下方样板槽位对齐。
-     *
-     * <p>槽位由菜单以 {@code storageX = 8} 为起点排布，槽位实体左缘即 {@code leftPos + 8}。
-     * 搜索框与该左缘取齐，使输入区与槽位内容收于同一条左侧竖线；槽位底板另有 1 像素内缩边框，
-     * 属底板自身装饰，不作为对齐基准。</p>
-     */
-    private static final int SEARCH_FIELD_X = 8;
-    /** 搜索框占据标题下方的独立一行，避免与标题和页码指示重叠。 */
-    private static final int SEARCH_FIELD_Y = 17;
-    /**
-     * 搜索区右缘，与下一页按钮的右缘对齐。
-     *
-     * <p>下一页按钮位于 {@code leftPos + 152}、宽 18，右缘为 170。搜索区整体以此为右边界，
-     * 使翻页按钮与搜索范围切换按钮在视觉上收束于同一条竖线。</p>
-     */
-    private static final int SEARCH_AREA_RIGHT = 152 + 18;
-    /** 搜索框与范围切换按钮之间的间隔。 */
-    private static final int SEARCH_MODE_GAP = 2;
-    /** 搜索范围切换按钮宽度，与输入框高度一致以保持等宽比例。 */
-    private static final int SEARCH_MODE_WIDTH = 26;
-    /**
-     * 搜索框宽度。
-     *
-     * <p>由搜索区右缘反推：右缘减去按钮宽度与间隔，即为输入框的右边界；再减去左起点得到宽度。
-     * 该推导保证按钮右缘始终与下一页按钮对齐，调整按钮宽度或右缘时无需另行手算。</p>
-     */
-    private static final int SEARCH_FIELD_WIDTH =
-            SEARCH_AREA_RIGHT - SEARCH_MODE_WIDTH - SEARCH_MODE_GAP - SEARCH_FIELD_X;
-    /** 搜索框高度，与范围切换按钮及 AE 文本框贴图的行高保持协调。 */
-    private static final int SEARCH_FIELD_HEIGHT = 14;
-    /** 搜索范围切换按钮紧随搜索框右侧。 */
-    private static final int SEARCH_MODE_X = SEARCH_FIELD_X + SEARCH_FIELD_WIDTH + SEARCH_MODE_GAP;
-    /** 槽位网格在搜索框之下的纵向起点，与菜单槽位坐标保持一致。 */
-    private static final int SLOT_GRID_Y = 32;
+    // ---- 半尺寸布局：所有坐标都相对面板左上角，与菜单槽位坐标使用同一坐标系 ----
+    private static final int PANEL_W = 456;
+    private static final int PANEL_H = 309;
+    private static final int PAD = 12;
+    /** 标题栏 28 + 内边距 12。 */
+    private static final int CONTENT_Y = 40;
+    private static final int COL_W = 212;
+    private static final int LEFT_X = PAD;
+    private static final int RIGHT_X = PAD + COL_W + 8;
+    /** 存储网格卡：8 + 说明行 14 + 4 + 网格 218 + 8。 */
+    private static final int CARD_H = 256;
+    private static final int PAGER_W = 74, PAGER_H = 17;
+    private static final int PAGER_X = LEFT_X + COL_W - 8 - PAGER_W;
+    private static final int PAGER_Y = CONTENT_Y + 8;
+    private int searchCardHeight() { return supportsSearchMode() ? 69 : 47; }
+    private int inventoryY() { return CONTENT_Y + searchCardHeight() + 8; }
+    private static final int INV_H = 117;
+    private static final int FIELD_X = RIGHT_X + 8;
+    private static final int FIELD_Y = CONTENT_Y + 8;
+    private static final int FIELD_W = COL_W - 16;
+    private static final int FIELD_H = 16;
+    private static final int SEG_Y = FIELD_Y + FIELD_H + 6;
+    private static final int SEG_H = 16;
+
+    private static final PatternSearchMode[] SEG_MODES = {
+            PatternSearchMode.ALL, PatternSearchMode.IN, PatternSearchMode.OUT, PatternSearchMode.MOLD};
 
     @Nullable
-    private PressableAE2Button previousPageButton;
-    @Nullable
-    private PressableAE2Button nextPageButton;
-    @Nullable
-    private AE2StyleTextField searchField;
-    @Nullable
-    private PressableAE2Button searchModeButton;
+    private EditBox searchField;
 
     private String searchQuery = "";
     private PatternSearchMode searchMode = PatternSearchMode.ALL;
@@ -74,24 +68,31 @@ public class PagedRecoverableScreen<T extends PagedRecoverableMenu> extends Abst
 
     public PagedRecoverableScreen(T menu, Inventory inventory, Component title) {
         super(menu, inventory, title);
-        imageWidth = 176;
-        imageHeight = 306;
-        inventoryLabelY = 213;
+        imageWidth = PANEL_W;
+        imageHeight = PANEL_H;
+    }
+
+    private boolean layoutRecovery;
+
+    @Override
+    protected void preInit() { imageHeight = PANEL_H + (menu.isRecoveryPage() ? 24 : 0); }
+
+    private void moveReferenceSlots() {
+        int extra = menu.isRecoveryPage() ? 24 : 0;
+        for (int i = 0; i < Math.min(90, menu.slots.size()); i++)
+            SlotsNode.moveSlot(menu.slots.get(i), 23 + i % 9 * 22, 72 + extra + i / 9 * 22);
+        for (int i = 0; i < 36 && 90 + i < menu.slots.size(); i++)
+            SlotsNode.moveSlot(menu.slots.get(90 + i), 243 + i % 9 * 22,
+                    inventoryY() + (i < 27 ? 23 + i / 9 * 22 : 91));
     }
 
     @Override
-    protected void init() {
-        super.init();
-        previousPageButton = addRenderableWidget(new PressableAE2Button(
-                leftPos + 132, topPos + 4, 18, 12,
-                Component.literal("<"), button -> page(PagedRecoverableMenu.PREVIOUS_PAGE)));
-        nextPageButton = addRenderableWidget(new PressableAE2Button(
-                leftPos + 152, topPos + 4, 18, 12,
-                Component.literal(">"), button -> page(PagedRecoverableMenu.NEXT_PAGE)));
-
-        searchField = new AE2StyleTextField(font,
-                leftPos + SEARCH_FIELD_X, topPos + SEARCH_FIELD_Y,
-                SEARCH_FIELD_WIDTH, SEARCH_FIELD_HEIGHT,
+    protected void initControls() {
+        // Display coordinates only; keep Menu slot ownership/indexes and quick-move intact.
+        moveReferenceSlots();
+        searchField = new AppleEditBox(font,
+                leftPos + FIELD_X + 14, topPos + FIELD_Y + 3,
+                FIELD_W - 28, FIELD_H - 4,
                 Component.translatable("gui.useless_mod.paged.search"));
         searchField.setMaxLength(64);
         searchField.setHint(searchHint());
@@ -102,14 +103,110 @@ public class PagedRecoverableScreen<T extends PagedRecoverableMenu> extends Abst
         });
         addRenderableWidget(searchField);
 
-        if (supportsSearchMode()) {
-            searchModeButton = addRenderableWidget(new PressableAE2Button(
-                    leftPos + SEARCH_MODE_X, topPos + SEARCH_FIELD_Y, SEARCH_MODE_WIDTH, SEARCH_FIELD_HEIGHT,
-                    searchModeLabel(), button -> cycleSearchMode()));
-        }
-
         filterableSlots = computeFilterableSlots();
         applyFilter();
+    }
+
+    /**
+     * 布局（456×304）：左栏 存储网格卡（说明行 + 翻页胶囊 + 9×10 网格）；
+     * 右栏 搜索卡（搜索框 / 范围分段 / 提示 / 命中徽标 / 统计行）+ 物品栏卡。
+     * 所有卡片与槽位底格共用菜单的真实槽位坐标。
+     */
+    @Override
+    protected void buildApple(AppleHost h) {
+        AppleWindow window = new AppleWindow(imageWidth, imageHeight, () -> title);
+        window.icon(windowIcon(), windowAccent());
+        h.add(window);
+
+        AppleBadge headerBadge = new AppleBadge(imageWidth - PAD - 96, 8, 96, this::headerBadge, this::headerBadgeColor);
+        headerBadge.right();
+        headerBadge.id("count");
+        h.add(headerBadge);
+
+        // 左栏：存储网格卡
+        layoutRecovery = menu.isRecoveryPage();
+        h.add(new AppleCard(LEFT_X, CONTENT_Y, COL_W, CARD_H + (layoutRecovery ? 24 : 0)));
+        if (layoutRecovery) h.add(new AppleCanvas(LEFT_X + 8, CONTENT_Y + 28, COL_W - 16, 16,
+                (g, mx, my, x, y, w, hh) -> {
+                    AppleUi.fillRound(g, x, y, w, hh, 4, AppleStyle.ORANGE_TINT);
+                    AppleUi.icon(g, AppleUi.Icon.WARNING, x + 4, y + 4, 8, AppleStyle.ORANGE_TEXT);
+                    AppleTextLayout.draw(g, font, Component.translatable("gui.useless_mod.apple.recovery_page"),
+                            x + 17, y + 4, w - 21, .8f, AppleStyle.ORANGE_TEXT, false);
+                }));
+        h.add(new AppleLabel(LEFT_X + 8, CONTENT_Y + 8, 130, AppleLabel.Kind.CAPTION, this::storageCaption));
+        h.add(new ApplePageTabs(PAGER_X, PAGER_Y, PAGER_W, PAGER_H,
+                menu::getPage, menu::getPageCount, menu::getActivePageCount, this::selectPage).id("pager"));
+        AppleSlotGrid grid = slotGrid();
+        grid.cellSize(20);
+        grid.disabledWhen(sl -> menu.isRecoverySlot(menu.slots.indexOf(sl)));
+        h.add(grid);
+
+        // 右栏：搜索卡
+        h.add(new AppleCard(RIGHT_X, CONTENT_Y, COL_W, searchCardHeight()));
+        h.add(new AppleTextField(FIELD_X, FIELD_Y, FIELD_W, FIELD_H, searchField, 14)
+                .icon(AppleUi.Icon.SEARCH).id("search"));
+        if (supportsSearchMode()) {
+            h.add(new AppleSegmented(FIELD_X, SEG_Y, FIELD_W, SEG_H,
+                    () -> Arrays.stream(SEG_MODES).map(PagedRecoverableScreen::searchModeLabel).toList(),
+                    () -> Arrays.asList(SEG_MODES).indexOf(searchMode),
+                    i -> setSearchMode(SEG_MODES[i])).id("seg"));
+        }
+        h.add(new AppleLabel(FIELD_X, hintY(), FIELD_W, AppleLabel.Kind.FOOTNOTE,
+                () -> menu.isFiltered() ? matchBadge() : headerBadge()));
+
+        // The reference inventory follows the compact search card, not the storage bottom.
+        h.add(new AppleCard(RIGHT_X, inventoryY(), COL_W, INV_H));
+        h.add(new AppleLabel(RIGHT_X + 10, inventoryY() + 8, COL_W - 18, AppleLabel.Kind.CAPTION, () -> playerInventoryTitle));
+    }
+
+    /** 标题栏窗口图标：样板类界面默认用样板图标，子类可换成更贴切的语义图标。 */
+    protected AppleUi.Icon windowIcon() {
+        return AppleUi.Icon.PATTERN;
+    }
+
+    protected int windowAccent() { return AppleStyle.BLUE; }
+
+    /** 存储卡左上角的说明文字（存储 / 恢复页）。 */
+    protected Component storageCaption() {
+        return Component.translatable(menu.isRecoveryPage()
+                ? "gui.useless_mod.apple.recovery" : "gui.useless_mod.apple.storage");
+    }
+
+    private Component headerBadge() {
+        return menu.isRecoveryPage()
+                ? Component.translatable("gui.useless_mod.apple.recovery")
+                : Component.translatable("gui.useless_mod.apple.stored_count", menu.getActiveSlotCount());
+    }
+
+    private int headerBadgeColor() {
+        return menu.isRecoveryPage() ? AppleStyle.RED : AppleStyle.SECONDARY;
+    }
+
+    /** 提示行位置：带范围分段时下移一行，让分段控件与提示互不重叠。 */
+    private int hintY() {
+        return supportsSearchMode() ? SEG_Y + SEG_H + 6 : SEG_Y;
+    }
+
+    private Component matchBadge() {
+        return Component.translatable("gui.useless_mod.apple.matches", Math.max(0, countMatches()));
+    }
+
+    private int matchBadgeColor() {
+        return countMatches() > 0 ? AppleStyle.BLUE : AppleStyle.SECONDARY;
+    }
+
+    @Override
+    protected void tickControls() {
+        int f = computeFilterableSlots();
+        if (f != filterableSlots) filterableSlots = f;
+        if (layoutRecovery != menu.isRecoveryPage()) {
+            preInit();
+            topPos = (height - imageHeight) / 2;
+            moveReferenceSlots();
+            host = new AppleHost(imageWidth, imageHeight);
+            buildApple(host);
+            host.layout(width, height, leftPos, topPos);
+        }
     }
 
     /**
@@ -127,11 +224,8 @@ public class PagedRecoverableScreen<T extends PagedRecoverableMenu> extends Abst
         return searchMode;
     }
 
-    private void cycleSearchMode() {
-        searchMode = searchMode.next();
-        if (searchModeButton != null) {
-            searchModeButton.setMessage(searchModeLabel());
-        }
+    private void setSearchMode(PatternSearchMode mode) {
+        searchMode = mode;
         if (searchField != null) {
             searchField.setHint(searchHint());
         }
@@ -158,8 +252,8 @@ public class PagedRecoverableScreen<T extends PagedRecoverableMenu> extends Abst
     }
 
     /** 搜索范围按钮的短标签，用于在有限宽度内指示当前范围。 */
-    private Component searchModeLabel() {
-        String key = switch (searchMode) {
+    private static Component searchModeLabel(PatternSearchMode mode) {
+        String key = switch (mode) {
             case OUT -> "gui.useless_mod.paged.search_mode.out";
             case IN -> "gui.useless_mod.paged.search_mode.in";
             case MOLD -> "gui.useless_mod.paged.search_mode.mold";
@@ -218,29 +312,12 @@ public class PagedRecoverableScreen<T extends PagedRecoverableMenu> extends Abst
 
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
-        // 点击落在搜索框之外时清除其焦点。原版 AbstractContainerScreen 覆写的 mouseClicked
-        // 不处理组件焦点，缺少该判定时输入框会保持聚焦底纹，视觉上等同于一直处于按下状态。
+        // 点击落在搜索框之外时清除其焦点，避免输入框一直保持聚焦底纹。
         if (searchField != null && !searchField.isMouseOver(mouseX, mouseY)) {
             setFocused(null);
+            searchField.setFocused(false);
         }
         return super.mouseClicked(mouseX, mouseY, button);
-    }
-
-    @Override
-    public boolean mouseReleased(double mouseX, double mouseY, int button) {
-        // 逐个复位所有可按下按钮。若只复位部分按钮，未复位者会停留在按下态；
-        // 该复位无法由原版完成，因为 pressed 是本项目按钮自行维护的显示状态。
-        releaseButtonVisuals(previousPageButton, nextPageButton, searchModeButton);
-        return super.mouseReleased(mouseX, mouseY, button);
-    }
-
-    /** 复位给定按钮的按下显示状态，忽略空引用。 */
-    private static void releaseButtonVisuals(PressableAE2Button... buttons) {
-        for (PressableAE2Button button : buttons) {
-            if (button != null) {
-                button.releaseVisualState();
-            }
-        }
     }
 
     private void page(int id) {
@@ -249,22 +326,18 @@ public class PagedRecoverableScreen<T extends PagedRecoverableMenu> extends Abst
         }
     }
 
-    @Override
-    protected void renderBg(GuiGraphics graphics, float partialTick, int mouseX, int mouseY) {
-        MachineScreenStyle.drawPanel(graphics, leftPos, topPos, imageWidth, imageHeight);
-        MachineScreenStyle.drawSlotGroup(graphics, leftPos, topPos, 8, SLOT_GRID_Y, 9, 10);
-        MachineScreenStyle.drawSlotGroup(graphics, leftPos, topPos, 8, 225, 9, 3);
-        MachineScreenStyle.drawSlotGroup(graphics, leftPos, topPos, 8, 283, 9, 1);
-        // 槽位序号取自菜单槽位而非 Slot.index：玩家背包槽位的 index 同样落在存储区范围内，
-        // 按 index 判定会把背包槽位误画成恢复槽位。
-        for (int index = 0; index < menu.slots.size(); index++) {
-            Slot slot = menu.getSlot(index);
-            if (menu.isRecoverySlot(index)) {
-                MachineScreenStyle.drawDisabledSlotBackground(graphics, leftPos, topPos, slot);
-            } else {
-                MachineScreenStyle.drawSlotBackground(graphics, leftPos, topPos, slot);
-            }
-        }
+    private void selectPage(int target) {
+        int delta = target - menu.getPage();
+        for (int i = 0; i < Math.abs(delta); i++)
+            page(delta > 0 ? PagedRecoverableMenu.NEXT_PAGE : PagedRecoverableMenu.PREVIOUS_PAGE);
+    }
+
+    private int countMatches() {
+        if (!menu.isFiltered() || menu.isRecoveryPage()) return -1;
+        int limit = Math.min(filterableSlots, menu.slots.size()), n = 0;
+        for (int i = 0; i < limit; i++)
+            if (!menu.getSlot(i).getItem().isEmpty() && matchesSearch(i)) n++;
+        return n;
     }
 
     /**
@@ -284,32 +357,10 @@ public class PagedRecoverableScreen<T extends PagedRecoverableMenu> extends Abst
     }
 
     @Override
-    protected void renderLabels(GuiGraphics graphics, int mouseX, int mouseY) {
-        String titleText = title.getString();
-        if (font.width(titleText) > 88) {
-            titleText = font.plainSubstrByWidth(titleText, 85) + "...";
-        }
-        graphics.drawString(font, titleText, 8, 6, MachineScreenStyle.TEXT_COLOR, false);
-        String page = (menu.getPage() + 1) + "/" + menu.getPageCount();
-        graphics.drawString(font, page, 128 - font.width(page), 6,
-                menu.isRecoveryPage()
-                        ? MachineScreenStyle.ERROR_TEXT_COLOR
-                        : MachineScreenStyle.MUTED_TEXT_COLOR,
-                false);
-        graphics.drawString(font, playerInventoryTitle, 8, inventoryLabelY,
-                MachineScreenStyle.MUTED_TEXT_COLOR, false);
-    }
-
-    @Override
-    public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
-        super.render(graphics, mouseX, mouseY, partialTick);
-        // 物品与提示框均由原版在 super.render 中绘制，先提交其批次再绘制高亮，
-        // 否则同批次内的绘制顺序无法保证高亮位于物品之上。
-        // 注意 flush 只解决「谁后画」，深度测试还得靠 SEARCH_HIGHLIGHT_Z 抬 z，
-        // 两件事缺一不可。
+    protected void renderAboveSlots(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
+        // 物品由原版在 super.render 中绘制，先 flush 再画高亮，并用 SEARCH_HIGHLIGHT_Z 抬 z。
         graphics.flush();
         renderSearchHighlights(graphics, partialTick);
-        renderTooltip(graphics, mouseX, mouseY);
     }
 
     /**
@@ -359,30 +410,6 @@ public class PagedRecoverableScreen<T extends PagedRecoverableMenu> extends Abst
      * @param order 命中项在当前页内的顺序，用于制造相邻槽位之间的色相梯度
      */
     protected void highlightSlot(GuiGraphics graphics, Slot slot, int order, float partialTick) {
-        int color = rainbowColor(order, partialTick);
-        int x1 = leftPos + slot.x;
-        int y1 = topPos + slot.y;
-        int x2 = x1 + 16;
-        int y2 = y1 + 16;
-        graphics.fill(x1, y1, x2, y1 + 1, color);
-        graphics.fill(x1, y2 - 1, x2, y2, color);
-        graphics.fill(x1, y1, x1 + 1, y2, color);
-        graphics.fill(x2 - 1, y1, x2, y2, color);
-    }
-
-    /**
-     * 计算彩虹流转颜色。
-     *
-     * <p>色相由命中项顺序与游戏运行时间共同决定：顺序项产生固定的相邻梯度，时间项使整体色相持续
-     * 推移，两者叠加即得到沿搜索命中序列流动的彩虹。返回值按 ARGB 组装，透明度沿用
-     * {@link #HIGHLIGHT_COLOR} 的高位，避免高亮遮挡槽位内容。</p>
-     */
-    private static int rainbowColor(int order, float partialTick) {
-        long millis = Util.getMillis();
-        // 每 16 毫秒一帧的基准下，相位每约 3 秒循环一周。
-        float phase = (millis % 3000L) / 3000.0F;
-        float hue = (phase + order * 0.07F) % 1.0F;
-        int rgb = Mth.hsvToRgb(hue, 0.85F, 1.0F);
-        return (HIGHLIGHT_COLOR & 0xFF000000) | (rgb & 0x00FFFFFF);
+        DesignAssets.draw(graphics, "slot_search_hit_40", leftPos + slot.x - 2, topPos + slot.y - 2, 20, 20);
     }
 }

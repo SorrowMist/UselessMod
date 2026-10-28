@@ -13,7 +13,7 @@ import com.sorrowmist.useless.network.RedstoneControlPacket;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.EditBox;
-import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
+import com.sorrowmist.useless.client.gui.apple.*;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.network.chat.Component;
@@ -32,41 +32,35 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 
-public final class MultiblockAlloyFurnaceScreen extends AbstractContainerScreen<MultiblockAlloyFurnaceMenu> {
-    private static final int PREVIEW_ORIGIN_X = 88;
-    private static final int PREVIEW_ORIGIN_Y = 32;
-    private static final int PREVIEW_CELL_SIZE = 6;
-    private static final int PREVIEW_LAYER_STRIDE = 21;
-    private static final int REDSTONE_BUTTON_X = 142;
-    private static final int CANCEL_BUTTON_X = 158;
-    private static final int CONTROL_BUTTON_Y = 3;
-    private static final int ENERGY_BAR_X = 11;
-    private static final int ENERGY_BAR_Y = 74;
-    private static final int ENERGY_BAR_WIDTH = 154;
+public final class MultiblockAlloyFurnaceScreen extends AppleContainerScreen<MultiblockAlloyFurnaceMenu> {
+    private static final int W = 596;
+    /** Content-driven height; editing help adds 33 GUI pixels without recreating the EditBox. */
+    record Geometry(int height, int taskCardY, int taskCardHeight, int taskListY, int controlsY) {}
+    static Geometry referenceGeometry(boolean hasTasks, boolean editing) {
+        int extra = editing ? 33 : 0;
+        return new Geometry((hasTasks ? 336 : 318) + extra, 188 + extra,
+                hasTasks ? 112 : 94, 216 + extra, (hasTasks ? 308 : 290) + extra);
+    }
+    private Geometry geometry = referenceGeometry(false, false);
+    /** 等轴测结构草图：方块半宽（像素），原点为最上层顶面后角。 */
+    private static final int ISO_S = 12;
+    private static final int ISO_OX = 94;
+    private static final int ISO_OY = 70;
+    private static final int ENERGY_BAR_X = 195;
+    private static final int ENERGY_BAR_Y = 141;
+    private static final int ENERGY_BAR_WIDTH = 160;
     private static final int ENERGY_BAR_HEIGHT = 6;
-    private static final int TASK_LIST_X = 11;
-    private static final int TASK_LIST_Y = 84;
-    private static final int TASK_LIST_WIDTH = 154;
-    private static final int TASK_LIST_MAX_LINES = 5;
-    private static final int TASK_LIST_LINE_HEIGHT = 9;
-    private static final float TASK_LIST_TEXT_SCALE = 0.75F;
-    private static final int TASK_PAGE_PREVIOUS_X = 124;
-    private static final int TASK_PAGE_NEXT_X = 154;
-    private static final int TASK_PAGE_BUTTON_Y = 118;
-    private static final int TASK_PAGE_BUTTON_WIDTH = 12;
-    private static final int TASK_PAGE_BUTTON_HEIGHT = 10;
-    private static final int ENERGY_LIMIT_FIELD_X = 88;
-    private static final int ENERGY_LIMIT_FIELD_Y = 60;
-    private static final int ENERGY_LIMIT_FIELD_WIDTH = 80;
+    private static final int TASK_ROWS_PER_PAGE = 3;
+    private static final int TASK_ROW_H = 26;
+    private static final int TASK_WIDTH = 177;
+    private static final int ENERGY_LIMIT_FIELD_X = 281;
+    private static final int ENERGY_LIMIT_FIELD_Y = 155;
+    private static final int ENERGY_LIMIT_FIELD_WIDTH = 74;
+    private static final int INV_X = 382;
+    private static final int INV_Y = 64;
 
     @Nullable
     private OmniversalAlloyFurnaceStructure.ValidationResult liveValidation;
-    @Nullable
-    private AlloyFurnaceControlButton cancelButton;
-    @Nullable
-    private PressableAE2Button previousTaskPageButton;
-    @Nullable
-    private PressableAE2Button nextTaskPageButton;
     @Nullable
     private EditBox energyLimitField;
     private long lastSyncedEnergyLimit = Long.MIN_VALUE;
@@ -80,26 +74,25 @@ public final class MultiblockAlloyFurnaceScreen extends AbstractContainerScreen<
 
     public MultiblockAlloyFurnaceScreen(MultiblockAlloyFurnaceMenu menu, Inventory inventory, Component title) {
         super(menu, inventory, title);
-        imageWidth = 176;
-        imageHeight = 222;
-        inventoryLabelY = 130;
+        imageWidth = W;
+        imageHeight = geometry.height();
+        inventoryLabelY = INV_Y - 11;
     }
 
     @Override
-    protected void init() {
-        super.init();
-        addRenderableWidget(AlloyFurnaceControlButton.redstone(
-                leftPos + REDSTONE_BUTTON_X, topPos + CONTROL_BUTTON_Y,
-                () -> RedstoneControlMode.byIndex(menu.getRedstoneMode()),
-                button -> PacketDistributor.sendToServer(
-                        new RedstoneControlPacket(menu.getBlockPos()))));
-        cancelButton = addRenderableWidget(AlloyFurnaceControlButton.cancel(
-                leftPos + CANCEL_BUTTON_X, topPos + CONTROL_BUTTON_Y,
-                button -> PacketDistributor.sendToServer(
-                        new AECancelPacket(menu.getBlockPos()))));
-        energyLimitField = new EditBox(font,
-                leftPos + ENERGY_LIMIT_FIELD_X, topPos + ENERGY_LIMIT_FIELD_Y,
-                ENERGY_LIMIT_FIELD_WIDTH, 14,
+    protected void preInit() {
+        geometry = referenceGeometry(!menu.getTaskProgress().isEmpty(), false);
+        imageHeight = geometry.height();
+    }
+
+    @Override
+    protected void initControls() {
+        for (int i = 0; i < 36 && i < menu.slots.size(); i++)
+            com.sorrowmist.useless.client.gui.ldl.api.SlotsNode.moveSlot(menu.slots.get(i),
+                    INV_X + i % 9 * 22, i < 27 ? INV_Y + i / 9 * 22 : 132);
+        energyLimitField = new AppleEditBox(font,
+                leftPos + ENERGY_LIMIT_FIELD_X + 4, topPos + ENERGY_LIMIT_FIELD_Y + 3,
+                ENERGY_LIMIT_FIELD_WIDTH - 6, 10,
                 Component.translatable("gui.useless_mod.multiblock_alloy_furnace.energy_limit"));
         energyLimitField.setMaxLength(24);
         energyLimitField.setFilter(ScaledEnergyAmount::isValidInput);
@@ -109,18 +102,111 @@ public final class MultiblockAlloyFurnaceScreen extends AbstractContainerScreen<
             }
         });
         addRenderableWidget(energyLimitField);
-        previousTaskPageButton = addRenderableWidget(new PressableAE2Button(
-                leftPos + TASK_PAGE_PREVIOUS_X, topPos + TASK_PAGE_BUTTON_Y,
-                TASK_PAGE_BUTTON_WIDTH, TASK_PAGE_BUTTON_HEIGHT,
-                Component.literal("<"), button -> changeTaskPage(-1)));
-        nextTaskPageButton = addRenderableWidget(new PressableAE2Button(
-                leftPos + TASK_PAGE_NEXT_X, topPos + TASK_PAGE_BUTTON_Y,
-                TASK_PAGE_BUTTON_WIDTH, TASK_PAGE_BUTTON_HEIGHT,
-                Component.literal(">"), button -> changeTaskPage(1)));
         syncEnergyLimitField(true);
         refreshStructurePreview();
         PacketDistributor.sendToServer(new AETaskProgressRequestPacket(
                 menu.containerId, menu.getBlockPos()));
+    }
+
+    @Override
+    protected void buildApple(AppleHost h) {
+        h.add(new AppleWindow(W, imageHeight, () -> title).icon(AppleUi.Icon.CUBE, AppleStyle.ORANGE));
+        h.add(new AppleBadge(W - 120, 7, 108,
+                () -> Component.translatable(menu.getTaskProgress().stream().anyMatch(t -> t.progress > 0)
+                        ? "gui.useless_mod.apple.running" : "gui.useless_mod.apple.idle"),
+                () -> menu.getActiveTasks() > 0 ? AppleStyle.GREEN : AppleStyle.TERTIARY).right());
+        h.add(new ApplePushButton(186, geometry.controlsY(), 52, 16, ApplePushButton.Kind.SECONDARY,
+                () -> Component.translatable("gui.useless_mod.advanced_alloy_furnace.redstone_control"),
+                () -> PacketDistributor.sendToServer(new RedstoneControlPacket(menu.getBlockPos())))
+                .icon(AppleUi.Icon.GEAR).id("redstone"));
+        h.add(new ApplePushButton(290, geometry.controlsY(), 74, 16, ApplePushButton.Kind.DANGER,
+                () -> Component.translatable("gui.useless_mod.advanced_alloy_furnace.cancel_ae_tasks"),
+                () -> PacketDistributor.sendToServer(new AECancelPacket(menu.getBlockPos())))
+                .icon(AppleUi.Icon.XMARK).id("cancel"));
+
+        h.add(new AppleCard(186, 40, 178, 66));
+        h.add(new AppleSettingRow(186, 40, 178, 22,
+                () -> Component.translatable("gui.useless_mod.apple.structure"), null, null)
+                .leading(AppleUi.Icon.CUBE, AppleStyle.ORANGE));
+        h.add(new AppleBadge(250, 44, 106, this::stateText,
+                () -> structureValid() ? AppleStyle.GREEN : AppleStyle.RED).right());
+        h.add(new AppleSettingRow(186, 62, 178, 22,
+                () -> Component.translatable("gui.useless_mod.apple.part.coil"),
+                () -> Component.literal(structureValid() ? Integer.toString(detectedCoilTier()) : "—"), null)
+                .leading(AppleUi.Icon.LAYERS, AppleStyle.PURPLE));
+        h.add(new AppleSettingRow(186, 84, 178, 22,
+                () -> Component.translatable("gui.useless_mod.advanced_alloy_furnace.redstone_control"),
+                this::redstoneText, () -> PacketDistributor.sendToServer(new RedstoneControlPacket(menu.getBlockPos())))
+                .leading(AppleUi.Icon.BOLT, AppleStyle.RED).noSeparator());
+
+        h.add(new AppleCard(186, 114, 178, geometry.taskCardY() - 122));
+        h.add(new AppleCanvas(195, 123, 160, 24, (g, mx, my, x, y, w, hh) -> {
+            AppleUi.icon(g, AppleUi.Icon.BOLT, x, y + 2, 10, AppleStyle.RED);
+            AppleTextLayout.draw(g, font, Component.translatable("gui.useless_mod.apple.energy"), x + 18, y + 2, 42, .9f, AppleStyle.LABEL, false);
+            AppleTextLayout.draw(g, font, Component.literal(ScaledEnergyAmount.format(menu.getEnergy()) + " / "
+                    + ScaledEnergyAmount.format(menu.getCapacity()) + " FE"), x + 60, y + 2, 100, .75f, AppleStyle.SECONDARY, true);
+            AppleUi.progress(g, x, y + 18, w, 6, menu.getCapacity() <= 0 ? 0 : (float) ((double) menu.getEnergy() / menu.getCapacity()), AppleStyle.RED);
+        }));
+        h.add(new AppleLabel(195, 158, 82, AppleLabel.Kind.BODY,
+                () -> Component.translatable("gui.useless_mod.multiblock_alloy_furnace.energy_limit")));
+        h.add(new AppleTextField(ENERGY_LIMIT_FIELD_X, ENERGY_LIMIT_FIELD_Y, ENERGY_LIMIT_FIELD_WIDTH, 16, energyLimitField)
+                .rightAlign().id("limit"));
+        if (geometry.height() > referenceGeometry(!menu.getTaskProgress().isEmpty(), false).height()) {
+            h.add(new AppleLabel(195, 175, 160, AppleLabel.Kind.FOOTNOTE,
+                    () -> Component.translatable("gui.useless_mod.multiblock_alloy_furnace.energy_limit.desc")).lines(3));
+            h.add(new AppleLabel(195, 199, 160, AppleLabel.Kind.FOOTNOTE,
+                    () -> Component.translatable("gui.useless_mod.multiblock_alloy_furnace.energy_limit.units")).lines(2));
+        }
+        h.add(new AppleCard(12, 40, 166, 191));
+        h.add(new AppleLabel(23, 49, 96, AppleLabel.Kind.CAPTION,
+                () -> Component.translatable("gui.useless_mod.apple.structure")));
+        h.add(new AppleLabel(119, 49, 51, AppleLabel.Kind.FOOTNOTE,
+                () -> Component.translatable("gui.useless_mod.apple.dims")).right());
+        h.add(new AppleCanvas(21, 64, 148, 159, (g, mx, my, x, y, w, hh) -> {
+            renderIsoStructure(g, leftPos, topPos);
+            drawLegend(g, leftPos + 25, topPos + 213);
+        }));
+
+        h.add(new AppleCard(186, geometry.taskCardY(), 178, geometry.taskCardHeight()));
+        h.add(new AppleLabel(197, geometry.taskCardY() + 9, 98, AppleLabel.Kind.CAPTION,
+                () -> Component.translatable("gui.useless_mod.multiblock_alloy_furnace.tasks", menu.getActiveTasks(), menu.getMaxTasks())));
+        h.add(new ApplePager(299, geometry.taskCardY() + 8, 56, 13,
+                () -> Component.literal((taskPage + 1) + " / " + taskPages().size()),
+                () -> taskPage > 0, () -> changeTaskPage(-1),
+                () -> taskPage < taskPages().size() - 1, () -> changeTaskPage(1)).id("tpager"));
+        h.add(new AppleCanvas(186, geometry.taskListY(), TASK_WIDTH, geometry.taskCardHeight() - 36,
+                (g, mx, my, x, y, w, hh) -> {
+                    g.pose().pushPose();
+                    g.pose().translate(leftPos + 186, topPos, 0);
+                    renderTaskList(g);
+                    g.pose().popPose();
+                }));
+        h.add(new AppleCard(371, 40, 212, 117));
+        h.add(new AppleLabel(INV_X, 49, 194, AppleLabel.Kind.CAPTION, () -> playerInventoryTitle));
+        h.add(slotGrid().cellSize(20));
+    }
+
+    private boolean structureValid() {
+        return liveValidation == null ? menu.isFormed() : liveValidation.valid();
+    }
+
+    private int detectedCoilTier() {
+        return liveValidation == null ? menu.getCoilTier() : liveValidation.coilTier();
+    }
+
+    private Component stateText() {
+        if (structureValid()) return Component.translatable("gui.useless_mod.multiblock_alloy_furnace.formed");
+        if (liveValidation != null && !liveValidation.mismatches().isEmpty())
+            return Component.translatable("gui.useless_mod.multiblock_alloy_furnace.invalid_count",
+                    liveValidation.mismatches().size());
+        return Component.translatable("gui.useless_mod.multiblock_alloy_furnace.invalid");
+    }
+
+    private Component redstoneText() {
+        RedstoneControlMode redstoneMode = RedstoneControlMode.byIndex(menu.getRedstoneMode());
+        return Component.translatable("gui.useless_mod.multiblock_alloy_furnace.redstone",
+                Component.translatable("gui.useless_mod.advanced_alloy_furnace.redstone_control."
+                        + redstoneMode.name().toLowerCase(Locale.ROOT)));
     }
 
     @Override
@@ -135,35 +221,29 @@ public final class MultiblockAlloyFurnaceScreen extends AbstractContainerScreen<
     }
 
     @Override
-    public boolean mouseReleased(double mouseX, double mouseY, int button) {
-        if (cancelButton != null) {
-            cancelButton.releaseVisualState();
-        }
-        if (previousTaskPageButton != null) {
-            previousTaskPageButton.releaseVisualState();
-        }
-        if (nextTaskPageButton != null) {
-            nextTaskPageButton.releaseVisualState();
-        }
-        return super.mouseReleased(mouseX, mouseY, button);
-    }
-
-    @Override
-    protected void containerTick() {
-        super.containerTick();
+    protected void tickControls() {
         boolean focused = energyLimitField != null && energyLimitField.isFocused();
         if (energyLimitFieldWasFocused && !focused) commitEnergyLimit();
         energyLimitFieldWasFocused = focused;
         syncEnergyLimitField(false);
         refreshStructurePreview();
         updateTaskPageControls();
+        Geometry next = referenceGeometry(!menu.getTaskProgress().isEmpty(), focused);
+        if (!next.equals(geometry)) {
+            geometry = next;
+            imageHeight = next.height();
+            topPos = (height - imageHeight) / 2;
+            host = new AppleHost(imageWidth, imageHeight);
+            buildApple(host);
+            host.layout(width, height, leftPos, topPos);
+        }
     }
 
     private void syncEnergyLimitField(boolean force) {
         if (energyLimitField == null) return;
         long limit = menu.getAutomaticEnergyLimit();
-        if ((force || (!energyLimitField.isFocused() && !energyLimitDirty))
-                && limit != lastSyncedEnergyLimit) {
+        if (force || (!energyLimitField.isFocused() && !energyLimitDirty
+                && limit != lastSyncedEnergyLimit)) {
             setEnergyLimitFieldValue(limit);
             lastSyncedEnergyLimit = limit;
         }
@@ -243,69 +323,15 @@ public final class MultiblockAlloyFurnaceScreen extends AbstractContainerScreen<
         liveMismatches = Map.copyOf(mismatches);
     }
 
-    @Override
-    protected void renderBg(GuiGraphics graphics, float partialTick, int mouseX, int mouseY) {
-        updateTaskPageControls();
-        MachineScreenStyle.drawPanel(graphics, leftPos, topPos, imageWidth, imageHeight);
-        MachineScreenStyle.drawInset(graphics,
-                leftPos + 4, topPos + 20, leftPos + imageWidth - 4, topPos + 128);
-        MachineScreenStyle.drawSlotGroup(graphics, leftPos, topPos, 8, 140, 9, 3);
-        MachineScreenStyle.drawSlotGroup(graphics, leftPos, topPos, 8, 198, 9, 1);
-        for (var slot : menu.slots) {
-            MachineScreenStyle.drawSlotBackground(graphics, leftPos, topPos, slot);
+    /** Compact live structure legend; no extra dimension row below the reference card. */
+    private void drawLegend(GuiGraphics g, int x, int y) {
+        String[] keys = {"core", "coil", "casing"};
+        int[] colors = {AppleStyle.ORANGE, AppleStyle.PURPLE, AppleStyle.TERTIARY};
+        for (int i = 0; i < 3; i++) {
+            AppleUi.fillRound(g, x + i * 43, y + 1, 6, 6, 1.5f, colors[i]);
+            AppleTextLayout.draw(g, font, Component.translatable("gui.useless_mod.apple.part." + keys[i]),
+                    x + i * 43 + 8, y, 34, .75f, AppleStyle.SECONDARY, false);
         }
-        long capacity = menu.getCapacity();
-        int width = capacity <= 0 ? 0 : (int) Math.round(
-                Math.min(1.0D, (double) menu.getEnergy() / (double) capacity) * ENERGY_BAR_WIDTH);
-        graphics.fill(leftPos + ENERGY_BAR_X, topPos + ENERGY_BAR_Y,
-                leftPos + ENERGY_BAR_X + ENERGY_BAR_WIDTH,
-                topPos + ENERGY_BAR_Y + ENERGY_BAR_HEIGHT, 0xFF272727);
-        graphics.fill(leftPos + ENERGY_BAR_X, topPos + ENERGY_BAR_Y,
-                leftPos + ENERGY_BAR_X + width,
-                topPos + ENERGY_BAR_Y + ENERGY_BAR_HEIGHT, 0xFF4CAF50);
-    }
-
-    @Override
-    protected void renderLabels(GuiGraphics graphics, int mouseX, int mouseY) {
-        String titleText = title.getString();
-        if (font.width(titleText) > 116) titleText = font.plainSubstrByWidth(titleText, 113) + "...";
-        graphics.drawString(font, titleText, 8, 6, MachineScreenStyle.TEXT_COLOR, false);
-        boolean structureValid = liveValidation == null ? menu.isFormed() : liveValidation.valid();
-        int stateColor = structureValid ? 0xFF2E7D32 : MachineScreenStyle.ERROR_TEXT_COLOR;
-        Component stateText;
-        if (structureValid) {
-            stateText = Component.translatable("gui.useless_mod.multiblock_alloy_furnace.formed");
-        } else if (liveValidation != null && !liveValidation.mismatches().isEmpty()) {
-            stateText = Component.translatable(
-                    "gui.useless_mod.multiblock_alloy_furnace.invalid_count",
-                    liveValidation.mismatches().size());
-        } else {
-            stateText = Component.translatable("gui.useless_mod.multiblock_alloy_furnace.invalid");
-        }
-        graphics.drawString(font, stateText, 8, 22, stateColor, false);
-        int detectedCoilTier = liveValidation == null ? menu.getCoilTier() : liveValidation.coilTier();
-        graphics.drawString(font, Component.translatable(
-                "gui.useless_mod.multiblock_alloy_furnace.coil", detectedCoilTier),
-                8, 34, MachineScreenStyle.MUTED_TEXT_COLOR, false);
-        RedstoneControlMode redstoneMode = RedstoneControlMode.byIndex(menu.getRedstoneMode());
-        Component redstoneText = Component.translatable(
-                "gui.useless_mod.multiblock_alloy_furnace.redstone",
-                Component.translatable("gui.useless_mod.advanced_alloy_furnace.redstone_control."
-                        + redstoneMode.name().toLowerCase(Locale.ROOT)));
-        graphics.drawString(font, truncate(redstoneText, 76),
-                8, 52, MachineScreenStyle.TEXT_COLOR, false);
-        graphics.drawString(font, truncate(Component.translatable(
-                        "gui.useless_mod.multiblock_alloy_furnace.energy_limit"), 80),
-                ENERGY_LIMIT_FIELD_X, 50, MachineScreenStyle.MUTED_TEXT_COLOR, false);
-        Component tasksText = Component.translatable(
-                "gui.useless_mod.multiblock_alloy_furnace.tasks",
-                menu.getActiveTasks(), menu.getMaxTasks());
-        graphics.drawString(font, truncate(tasksText, 76),
-                8, 63, MachineScreenStyle.MUTED_TEXT_COLOR, false);
-        renderStructurePreview(graphics);
-        renderTaskList(graphics);
-        graphics.drawString(font, playerInventoryTitle, 8, inventoryLabelY,
-                MachineScreenStyle.MUTED_TEXT_COLOR, false);
     }
 
     private Component truncate(Component text, int maxWidth) {
@@ -316,29 +342,46 @@ public final class MultiblockAlloyFurnaceScreen extends AbstractContainerScreen<
                         value, maxWidth - font.width("...")) + "...");
     }
 
-    private void renderStructurePreview(GuiGraphics graphics) {
-        for (int layer = 0; layer < 4; layer++) {
-            int layerX = PREVIEW_ORIGIN_X + layer * PREVIEW_LAYER_STRIDE;
-            for (var entry : OmniversalAlloyFurnaceStructure.entries()) {
-                if (entry.localPos().getY() != layer) continue;
-                int x = layerX + (entry.localPos().getX() + 1) * PREVIEW_CELL_SIZE;
-                int y = PREVIEW_ORIGIN_Y + entry.localPos().getZ() * PREVIEW_CELL_SIZE;
-                BlockPos worldPos = entry.worldPos(menu.getBlockPos(), liveFacing);
-                boolean mismatch = liveMismatches.containsKey(worldPos.asLong());
-                if (liveValidation == null) {
-                    graphics.fill(x, y, x + PREVIEW_CELL_SIZE - 1,
-                            y + PREVIEW_CELL_SIZE - 1, MachineScreenStyle.MUTED_TEXT_COLOR);
-                } else if (mismatch) {
-                    graphics.fill(x, y, x + PREVIEW_CELL_SIZE - 1,
-                            y + PREVIEW_CELL_SIZE - 1, MachineScreenStyle.ERROR_TEXT_COLOR);
-                    graphics.fill(x + 1, y + 1, x + PREVIEW_CELL_SIZE - 2,
-                            y + PREVIEW_CELL_SIZE - 2, partColor(entry, worldPos));
-                } else {
-                    graphics.fill(x, y, x + PREVIEW_CELL_SIZE - 1,
-                            y + PREVIEW_CELL_SIZE - 1, partColor(entry, worldPos));
-                }
-            }
+    /** 等轴测屏幕坐标：返回方块顶面中心。bx/bz ∈ 0..2，by ∈ 0..3。 */
+    private static int isoX(int bx, int bz) { return ISO_OX + (bx - bz) * ISO_S; }
+    private static int isoY(int bx, int by, int bz) { return ISO_OY + (bx + bz) * ISO_S / 2 + (3 - by) * 32; }
+
+    private List<OmniversalAlloyFurnaceStructure.Entry> isoOrder() {
+        List<OmniversalAlloyFurnaceStructure.Entry> list = new ArrayList<>(OmniversalAlloyFurnaceStructure.entries());
+        list.removeIf(e -> e.part() == OmniversalAlloyFurnaceStructure.Part.AIR);
+        list.sort(Comparator.comparingInt((OmniversalAlloyFurnaceStructure.Entry e) -> e.localPos().getY())
+                .thenComparingInt(e -> e.localPos().getX() + 1 + e.localPos().getZ()));
+        return list;
+    }
+
+    private void renderIsoStructure(GuiGraphics g, int l, int tp) {
+        for (var entry : isoOrder()) {
+            int bx = entry.localPos().getX() + 1, by = entry.localPos().getY(), bz = entry.localPos().getZ();
+            BlockPos worldPos = entry.worldPos(menu.getBlockPos(), liveFacing);
+            int c = liveValidation == null ? 0xFFC7C7CC
+                    : liveMismatches.containsKey(worldPos.asLong()) ? AppleUi.RED : partColor(entry, worldPos);
+            drawIsoBlock(g, l + isoX(bx, bz), tp + isoY(bx, by, bz), c);
         }
+    }
+
+    private static int shade(int c, float f) {
+        int r = (int) (((c >> 16) & 0xFF) * f), gg = (int) (((c >> 8) & 0xFF) * f), b = (int) ((c & 0xFF) * f);
+        return (c & 0xFF000000) | (r << 16) | (gg << 8) | b;
+    }
+
+    /** 画一个等轴测方块（顶面菱形 + 左右两个侧面），(cx, cy) 为顶面中心。 */
+    private static void drawIsoBlock(GuiGraphics g, int cx, int cy, int color) {
+        int s = ISO_S, h = ISO_S / 2;
+        int top = color, left = shade(color, 0.86f), right = shade(color, 0.72f);
+        for (int dx = -s; dx < s; dx++) {
+            int half = (int) Math.ceil((s - Math.abs(dx + 0.5f)) * h / (float) s);
+            g.fill(cx + dx, cy - half, cx + dx + 1, cy + half, top);
+            int edge = cy + half;
+            g.fill(cx + dx, edge, cx + dx + 1, edge + s, dx < 0 ? left : right);
+        }
+        // 细白描边，让方块之间有接缝
+        g.fill(cx - s, cy, cx - s + 1, cy + s, 0x66FFFFFF);
+        g.fill(cx, cy + h, cx + 1, cy + h + s, 0x66FFFFFF);
     }
 
     private int partColor(OmniversalAlloyFurnaceStructure.Entry entry, BlockPos worldPos) {
@@ -348,69 +391,49 @@ public final class MultiblockAlloyFurnaceScreen extends AbstractContainerScreen<
                     OmniversalAlloyFurnaceStructure.functionalPart(minecraft.level.getBlockState(worldPos));
             if (functionalPart != null) {
                 return switch (functionalPart) {
-                    case PATTERN_ASSEMBLY -> 0xFF00838F;
-                    case MOLD_HUB -> 0xFFF9A825;
-                    case PASSIVE_HATCH -> 0xFF517497;
+                    case PATTERN_ASSEMBLY -> 0xFF30B0C7;
+                    case MOLD_HUB -> 0xFFFFCC00;
+                    case PASSIVE_HATCH -> 0xFF5AC8FA;
                 };
             }
         }
         return switch (entry.part()) {
-            case CORE -> 0xFFD84315;
-            case CASING -> 0xFF757575;
-            case COIL -> 0xFF6A1B9A;
-            case AIR -> 0xFF212121;
+            case CORE -> 0xFFFF9500;
+            case CASING -> 0xFFAEAEB2;
+            case COIL -> 0xFFAF52DE;
+            case AIR -> 0xFFE5E5EA;
         };
     }
 
     private void renderTaskList(GuiGraphics graphics) {
         List<List<com.sorrowmist.useless.network.AETaskProgressPacket.TaskProgressData>> pages = taskPages();
         taskPage = net.minecraft.util.Mth.clamp(taskPage, 0, pages.size() - 1);
-        List<String> lines = new ArrayList<>();
-        for (var task : pages.get(taskPage)) {
-            lines.addAll(taskLines(task));
+        var page = pages.get(taskPage);
+        int taskListY = geometry.taskListY();
+        if (page.isEmpty()) {
+            AppleTextLayout.drawCentered(graphics, font, Component.translatable("gui.useless_mod.apple.no_tasks"),
+                    8, taskListY, TASK_WIDTH - 16, geometry.taskCardHeight() - 36, 4, 4, null, AppleStyle.SECONDARY);
         }
-        graphics.pose().pushPose();
-        graphics.pose().translate(TASK_LIST_X, TASK_LIST_Y, 0);
-        graphics.pose().scale(TASK_LIST_TEXT_SCALE, TASK_LIST_TEXT_SCALE, 1.0F);
-        for (int line = 0; line < lines.size(); line++) {
-            graphics.drawString(font, lines.get(line), 0, line * TASK_LIST_LINE_HEIGHT,
-                    MachineScreenStyle.MUTED_TEXT_COLOR, false);
+        for (int i = 0; i < page.size(); i++) {
+            var task = page.get(i);
+            int y = taskListY + i * TASK_ROW_H;
+            AppleIconTile.draw(graphics, 9, y, 20, AppleUi.Icon.PATTERN, AppleStyle.ORANGE, false);
+            String product = task.productName + " \u00d7" + task.totalOutputCount;
+            AppleTextLayout.draw(graphics, font, Component.literal(product), 33, y + 2, 96, .8f, AppleStyle.LABEL, false);
+            if (task.progress > 0 && task.maxProgress > 0) {
+                float r = Math.min(1f, task.progress / (float) task.maxProgress);
+                String p = Math.round(r * 100) + "%";
+                AppleUi.progress(graphics, 30, y + 17, 106, 3, r, AppleUi.ORANGE);
+                graphics.drawString(font, p, TASK_WIDTH - 10 - font.width(p), y + 14, AppleUi.BLUE_TEXT, false);
+            } else {
+                String detail = task.statusDetail == null || task.statusDetail.isBlank() ? ""
+                        : task.statusDetail.startsWith("gui.useless_mod.")
+                        ? Component.translatable(task.statusDetail).getString() : task.statusDetail;
+                String st = Component.translatable(task.statusKey).getString() + (detail.isEmpty() ? "" : ": " + detail);
+                st = font.plainSubstrByWidth(st, 140);
+                graphics.drawString(font, st, 30, y + 14, MachineScreenStyle.MUTED_TEXT_COLOR, false);
+            }
         }
-        graphics.pose().popPose();
-
-        if (pages.size() > 1) {
-            String pageText = (taskPage + 1) + "/" + pages.size();
-            graphics.drawString(font, pageText,
-                    TASK_PAGE_NEXT_X - 2 - font.width(pageText), TASK_PAGE_BUTTON_Y + 1,
-                    MachineScreenStyle.SUBTLE_TEXT_COLOR, false);
-        }
-    }
-
-    private String fitTaskLine(String text) {
-        int scaledWidth = (int) (TASK_LIST_WIDTH / TASK_LIST_TEXT_SCALE);
-        if (font.width(text) <= scaledWidth) return text;
-        return font.plainSubstrByWidth(text, scaledWidth - font.width("...")) + "...";
-    }
-
-    private List<String> taskLines(
-            com.sorrowmist.useless.network.AETaskProgressPacket.TaskProgressData task) {
-        String status = task.progress > 0 && task.maxProgress > 0
-                ? task.progress + "/" + task.maxProgress
-                : Component.translatable(task.statusKey).getString();
-        String detail = task.statusDetail == null || task.statusDetail.isBlank() ? ""
-                : task.statusDetail.startsWith("gui.useless_mod.")
-                ? Component.translatable(task.statusDetail).getString()
-                : task.statusDetail;
-        String state = detail.isEmpty() ? status : status + ": " + detail;
-        String product = task.productName + " x" + task.totalOutputCount;
-        String combined = product + "  " + state;
-        if (font.width(combined) <= (int) (TASK_LIST_WIDTH / TASK_LIST_TEXT_SCALE)) {
-            return List.of(combined);
-        }
-        if (detail.isEmpty() || font.width(state) <= (int) (TASK_LIST_WIDTH / TASK_LIST_TEXT_SCALE)) {
-            return List.of(fitTaskLine(product), fitTaskLine(state));
-        }
-        return List.of(fitTaskLine(product), fitTaskLine(status), fitTaskLine(detail));
     }
 
     private List<List<com.sorrowmist.useless.network.AETaskProgressPacket.TaskProgressData>> taskPages() {
@@ -420,35 +443,15 @@ public final class MultiblockAlloyFurnaceScreen extends AbstractContainerScreen<
                         -> task.productName)
                 .thenComparingInt(task -> task.progress));
         List<List<com.sorrowmist.useless.network.AETaskProgressPacket.TaskProgressData>> pages = new ArrayList<>();
-        List<com.sorrowmist.useless.network.AETaskProgressPacket.TaskProgressData> page = new ArrayList<>();
-        int usedLines = 0;
-        for (var task : tasks) {
-            int requiredLines = taskLines(task).size();
-            if (!page.isEmpty() && usedLines + requiredLines > TASK_LIST_MAX_LINES) {
-                pages.add(List.copyOf(page));
-                page.clear();
-                usedLines = 0;
-            }
-            page.add(task);
-            usedLines += requiredLines;
-        }
-        if (!page.isEmpty() || pages.isEmpty()) {
-            pages.add(List.copyOf(page));
-        }
+        for (int i = 0; i < tasks.size(); i += TASK_ROWS_PER_PAGE)
+            pages.add(List.copyOf(tasks.subList(i, Math.min(tasks.size(), i + TASK_ROWS_PER_PAGE))));
+        if (pages.isEmpty()) pages.add(List.of());
         return pages;
     }
 
     private void updateTaskPageControls() {
         int pageCount = taskPages().size();
         taskPage = net.minecraft.util.Mth.clamp(taskPage, 0, pageCount - 1);
-        if (previousTaskPageButton != null) {
-            previousTaskPageButton.visible = pageCount > 1;
-            previousTaskPageButton.active = taskPage > 0;
-        }
-        if (nextTaskPageButton != null) {
-            nextTaskPageButton.visible = pageCount > 1;
-            nextTaskPageButton.active = taskPage < pageCount - 1;
-        }
     }
 
     private void changeTaskPage(int delta) {
@@ -458,9 +461,7 @@ public final class MultiblockAlloyFurnaceScreen extends AbstractContainerScreen<
     }
 
     @Override
-    public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
-        super.render(graphics, mouseX, mouseY, partialTick);
-        renderTooltip(graphics, mouseX, mouseY);
+    protected void renderExtraTooltips(GuiGraphics graphics, int mouseX, int mouseY) {
         if (isHovering(ENERGY_BAR_X, ENERGY_BAR_Y,
                 ENERGY_BAR_WIDTH, ENERGY_BAR_HEIGHT, mouseX, mouseY)) {
             graphics.renderTooltip(font, Component.translatable(
@@ -483,8 +484,8 @@ public final class MultiblockAlloyFurnaceScreen extends AbstractContainerScreen<
     }
 
     private void renderControlTooltips(GuiGraphics graphics, int mouseX, int mouseY) {
-        if (isHovering(REDSTONE_BUTTON_X, CONTROL_BUTTON_Y,
-                AlloyFurnaceControlIcons.WIDTH, AlloyFurnaceControlIcons.HEIGHT,
+        if (isHovering(186, geometry.controlsY(),
+                52, 16,
                 mouseX, mouseY)) {
             RedstoneControlMode mode = RedstoneControlMode.byIndex(menu.getRedstoneMode());
             graphics.renderTooltip(font, List.of(
@@ -494,8 +495,8 @@ public final class MultiblockAlloyFurnaceScreen extends AbstractContainerScreen<
                             "gui.useless_mod.advanced_alloy_furnace.redstone_control."
                                     + mode.name().toLowerCase(Locale.ROOT))),
                     Optional.empty(), mouseX, mouseY);
-        } else if (isHovering(CANCEL_BUTTON_X, CONTROL_BUTTON_Y,
-                AlloyFurnaceControlIcons.WIDTH, AlloyFurnaceControlIcons.HEIGHT,
+        } else if (isHovering(290, geometry.controlsY(),
+                74, 16,
                 mouseX, mouseY)) {
             graphics.renderTooltip(font, List.of(
                     Component.translatable(
@@ -565,17 +566,18 @@ public final class MultiblockAlloyFurnaceScreen extends AbstractContainerScreen<
 
     @Nullable
     private OmniversalAlloyFurnaceStructure.Entry findHoveredPreviewEntry(int mouseX, int mouseY) {
-        int relativeX = mouseX - leftPos;
-        int relativeY = mouseY - topPos;
-        for (var entry : OmniversalAlloyFurnaceStructure.entries()) {
-            int layerX = PREVIEW_ORIGIN_X
-                    + entry.localPos().getY() * PREVIEW_LAYER_STRIDE;
-            int x = layerX + (entry.localPos().getX() + 1) * PREVIEW_CELL_SIZE;
-            int y = PREVIEW_ORIGIN_Y + entry.localPos().getZ() * PREVIEW_CELL_SIZE;
-            if (relativeX >= x && relativeX < x + PREVIEW_CELL_SIZE - 1
-                    && relativeY >= y && relativeY < y + PREVIEW_CELL_SIZE - 1) {
-                return entry;
-            }
+        int rx = mouseX - leftPos, ry = mouseY - topPos;
+        List<OmniversalAlloyFurnaceStructure.Entry> order = isoOrder();
+        // 逆绘制顺序：最上层/最前方的方块优先命中
+        for (int i = order.size() - 1; i >= 0; i--) {
+            var e = order.get(i);
+            int bx = e.localPos().getX() + 1, by = e.localPos().getY(), bz = e.localPos().getZ();
+            int cx = isoX(bx, bz), cy = isoY(bx, by, bz);
+            int dx = Math.abs(rx - cx);
+            if (dx >= ISO_S) continue;
+            int topEdge = cy - (ISO_S - dx) / 2;
+            int bottomEdge = cy + (ISO_S - dx) / 2 + ISO_S;
+            if (ry >= topEdge && ry < bottomEdge) return e;
         }
         return null;
     }

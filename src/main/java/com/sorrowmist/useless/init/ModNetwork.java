@@ -59,7 +59,7 @@ import com.sorrowmist.useless.compat.forge1201.network.RegisterPayloadHandlersEv
 
 public class ModNetwork {
     public static void registerPayloadHandlers(final RegisterPayloadHandlersEvent event) {
-        var registrar = event.registrar(UselessMod.MODID).versioned("17-merged-1");
+        var registrar = event.registrar(UselessMod.MODID).versioned("17-merged-2");
         registrar.playToClient(FurnaceMenuSyncPacket.TYPE, FurnaceMenuSyncPacket.STREAM_CODEC,
                 FurnaceMenuSyncPacket::handle);
         registrar.playToServer(BeefToolLayoutRequestPacket.TYPE,

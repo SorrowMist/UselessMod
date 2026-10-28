@@ -6,6 +6,10 @@ import net.minecraft.network.chat.Component;
 
 final class PressableAE2Button extends PortButton {
     private boolean pressed;
+    /** 右侧为内嵌图标预留的宽度（Apple 风：避免图标压住文字）。 */
+    private int reservedRight;
+
+    void setReservedRight(int px) { reservedRight = px; }
 
     PressableAE2Button(int x, int y, int width, int height,
                        Component message, OnPress onPress) {
@@ -39,8 +43,10 @@ final class PressableAE2Button extends PortButton {
 
     @Override
     protected void renderWidget(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
-        renderSurface(graphics,pressed || isHoveredOrFocused());
-        renderLabel(graphics,!active?0x888894:pressed?0xAED4ED:0xF2F2F2);
+        AppleUi.ButtonStyle style = AppleButton.autoStyle(getMessage().getString());
+        AppleUi.buttonSurface(graphics, getX(), getY(), getWidth(), getHeight(), style,
+                isHoveredOrFocused(), pressed, active);
+        AppleButton.drawLabel(graphics, this, AppleUi.buttonTextColor(style, active), reservedRight);
     }
 
     @Override public boolean mouseReleased(double mouseX,double mouseY,int button) {

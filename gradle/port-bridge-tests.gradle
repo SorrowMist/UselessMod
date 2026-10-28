@@ -16,7 +16,8 @@ sourceSets {
         java.include 'com/sorrowmist/useless/compat/jei/AEKeyJeiIngredients.java'
         java.include 'com/sorrowmist/useless/compat/jei/WrappedKeyGuiHandler.java'
         java.include 'com/sorrowmist/useless/compat/appmek/AppMekJeiChemicalCompat.java'
-        java.include 'com/sorrowmist/useless/client/gui/PressableAE2Button.java'
+        // GUI renderers depend on the Apple toolkit and are compiled/tested with main.
+        // Keep this source set limited to the isolated Forge bridges and their fixtures.
         java.include 'com/sorrowmist/useless/energy/IEnergyManager.java'
         java.include 'com/sorrowmist/useless/energy/EnergyManager.java'
         java.include 'com/sorrowmist/useless/init/ModTags.java'
@@ -46,6 +47,9 @@ sourceSets {
         java.include 'com/sorrowmist/useless/content/recipe/AlloyFurnaceRecipeIdentity.java'
         java.include 'com/sorrowmist/useless/content/recipe/adapters/minecraft/BrewingSyntheticRecipe.java'
         java.include 'com/sorrowmist/useless/content/recipe/adapters/minecraft/BrewingRecipeAdapter.java'
+        java.include 'com/sorrowmist/useless/content/recipe/adapters/minecraft/TradeOfferRandom.java'
+        java.include 'com/sorrowmist/useless/content/recipe/adapters/minecraft/FishingLootRecipeAdapter.java'
+        java.include 'com/sorrowmist/useless/content/recipe/adapters/minecraft/FishingLootSyntheticRecipe.java'
         java.include 'com/sorrowmist/useless/api/recipe/IRecipeAdapter.java'
         java.include 'com/sorrowmist/useless/content/recipe/IRecipeAdapter.java'
         java.include 'com/sorrowmist/useless/content/blockentities/HighStackItemStackHandler.java'
@@ -63,6 +67,8 @@ sourceSets {
         java.include 'com/sorrowmist/useless/content/recipe/adapters/extendedcrafting/**'
         java.include 'com/sorrowmist/useless/content/recipe/adapters/enderio/NativeFireLootResults.java'
         java.include 'com/sorrowmist/useless/content/recipe/adapters/industrialforegoing/DissolutionChamberRecipeAdapter.java'
+        java.include 'com/sorrowmist/useless/content/recipe/adapters/industrialforegoing/IndustrialForegoingRecipeAdapterUtils.java'
+        java.include 'com/sorrowmist/useless/content/recipe/adapters/industrialforegoing/IndustrialForegoingSyntheticRecipe.java'
         java.include 'com/sorrowmist/useless/content/recipe/adapters/summoningrituals/SummoningRitualsAltarRecipeAdapter.java'
         java.include 'com/sorrowmist/useless/content/recipe/adapters/enderio/EnderIOAdapterUtils.java'
         java.include 'com/sorrowmist/useless/content/recipe/adapters/enderio/AlloySmeltingRecipeAdapter.java'

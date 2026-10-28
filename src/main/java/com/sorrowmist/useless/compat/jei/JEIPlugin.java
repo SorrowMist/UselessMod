@@ -8,6 +8,7 @@ import com.sorrowmist.useless.client.gui.ChainGroupScreen;
 import com.sorrowmist.useless.client.gui.DimensionConfigScreen;
 import com.sorrowmist.useless.client.gui.StaffLinkScreen;
 import com.sorrowmist.useless.content.menus.DimensionConfigMenu;
+import com.sorrowmist.useless.world.dimension.DimensionGenerationConfig;
 import com.sorrowmist.useless.content.recipe.AlloyFurnaceRecipeCatalog;
 import com.sorrowmist.useless.content.recipe.AlloyFurnaceRecipeIdentity;
 import com.sorrowmist.useless.content.stafflink.LinkFilterSlot;
@@ -76,7 +77,8 @@ public final class JEIPlugin implements IModPlugin {
         // list while waiting for the client tick loses the entire category in EMI.
         List<AlloyFurnaceRecipeCatalog.Entry> recipes = level == null
                 ? List.of()
-                : AlloyFurnaceRecipeCatalog.entries(level);
+                : HostileNetworksJeiRecipes.prepare(AlloyFurnaceRecipeCatalog.entries(level),
+                        !ModList.get().isLoaded("emi"));
         registeredAlloyFurnaceRecipes.clear();
         for (AlloyFurnaceRecipeCatalog.Entry recipe : recipes) {
             registeredAlloyFurnaceRecipes.put(recipe.identity(), recipe);
@@ -106,6 +108,15 @@ public final class JEIPlugin implements IModPlugin {
     public void registerGuiHandlers(IGuiHandlerRegistration registration) {
         registration.addGenericGuiContainerHandler(net.minecraft.client.gui.screens.inventory.AbstractContainerScreen.class,
                 new WrappedKeyGuiHandler(() -> runtime == null ? null : runtime.getIngredientManager()));
+        // Declarative Apple screens expose popovers outside the container bounds to JEI.
+        registration.addGenericGuiContainerHandler(com.sorrowmist.useless.client.gui.ldl.api.AppleScreen.class,
+                new mezz.jei.api.gui.handlers.IGuiContainerHandler<com.sorrowmist.useless.client.gui.ldl.api.AppleScreen<?>>() {
+                    @Override
+                    public List<net.minecraft.client.renderer.Rect2i> getGuiExtraAreas(
+                            com.sorrowmist.useless.client.gui.ldl.api.AppleScreen<?> screen) {
+                        return screen.appleExclusionAreas();
+                    }
+                });
         registration.addGhostIngredientHandler(DimensionConfigScreen.class,
                 new DimensionConfigGhostHandler());
         registration.addGhostIngredientHandler(StaffLinkScreen.class,
@@ -132,23 +143,19 @@ public final class JEIPlugin implements IModPlugin {
             if (!(stack.getItem() instanceof BlockItem blockItem)) return List.of();
             ResourceLocation blockId = BuiltInRegistries.BLOCK.getKey(blockItem.getBlock());
 
-            List<Target<I>> targets = new ArrayList<>(screen.chainGroupCount());
+            List<Target<I>> targets = new ArrayList<>(screen.chainGroupCount() + 1);
+            int selected = screen.selectedGroupIndex();
+            if (selected >= 0 && selected < screen.chainGroupCount()) {
+                targets.add(JeiGhostTarget.guarded(screen, screen::selectedGroupDropArea,
+                        screen.jeiDropGuard(selected, true), value -> screen.addEntryFromBlock(selected, blockId)));
+            }
             for (int index = 0; index < screen.chainGroupCount(); index++) {
                 if (!screen.isGroupRowVisible(index)) continue;
                 final int groupIndex = index;
-                targets.add(new Target<>() {
-                    @Override
-                    public Rect2i getArea() {
-                        return new Rect2i(screen.groupDropZoneScreenX(groupIndex),
-                                screen.groupDropZoneScreenY(groupIndex),
-                                screen.dropZoneSize(), screen.dropZoneSize());
-                    }
-
-                    @Override
-                    public void accept(I value) {
-                        screen.addEntryFromBlock(groupIndex, blockId);
-                    }
-                });
+                targets.add(JeiGhostTarget.guarded(screen,
+                        () -> new Rect2i(screen.groupDropZoneScreenX(groupIndex), screen.groupDropZoneScreenY(groupIndex),
+                                screen.dropZoneSize(), screen.dropZoneSize()),
+                        screen.jeiDropGuard(groupIndex, false), value -> screen.addEntryFromBlock(groupIndex, blockId)));
             }
             return targets;
         }
@@ -171,6 +178,8 @@ public final class JEIPlugin implements IModPlugin {
      */
     private static final class StaffLinkGhostHandler
             implements IGhostIngredientHandler<StaffLinkScreen> {
+        private StaffLinkScreen draggingScreen;
+
         @Override
         public <I> List<Target<I>> getTargetsTyped(StaffLinkScreen screen,
                                                    ITypedIngredient<I> ingredient,
@@ -194,6 +203,8 @@ public final class JEIPlugin implements IModPlugin {
             }
             // 真的要开始拖了（doStart=true）才点亮拖拽高亮；doStart=false 那次只是问「有没有目标」。
             if (doStart) {
+                onComplete();
+                draggingScreen = screen;
                 screen.setJeiDragActive(true);
             }
 
@@ -202,22 +213,14 @@ public final class JEIPlugin implements IModPlugin {
                 return detailTargets(screen, marker);
             }
 
+            var context = screen.jeiDropGuard();
             List<Target<I>> targets = new ArrayList<>(StaffLinkScreen.filterSlotCount());
             for (int index = 0; index < StaffLinkScreen.filterSlotCount(); index++) {
                 final int slotIndex = index;
-                targets.add(new Target<>() {
-                    @Override
-                    public Rect2i getArea() {
-                        return new Rect2i(screen.filterSlotScreenX(slotIndex),
-                                screen.filterSlotScreenY(slotIndex),
-                                StaffLinkScreen.filterSlotSize(), StaffLinkScreen.filterSlotSize());
-                    }
-
-                    @Override
-                    public void accept(I value) {
-                        screen.getMenu().setFilterSlot(slotIndex, marker);
-                    }
-                });
+                targets.add(JeiGhostTarget.guarded(screen,
+                        () -> new Rect2i(screen.filterSlotScreenX(slotIndex), screen.filterSlotScreenY(slotIndex),
+                                StaffLinkScreen.filterSlotSize(), StaffLinkScreen.filterSlotSize()),
+                        context, value -> screen.setFilterMarkerFromJei(slotIndex, marker)));
             }
             return targets;
         }
@@ -228,32 +231,37 @@ public final class JEIPlugin implements IModPlugin {
             if (index < 0 || index >= StaffLinkScreen.filterSlotCount()) {
                 return List.of();
             }
+            var context = screen.jeiDropGuard();
             List<Target<I>> targets = new ArrayList<>(3);
             for (int which = 0; which < 3; which++) {
                 final int slot = which;
-                targets.add(new Target<>() {
-                    @Override
-                    public Rect2i getArea() {
-                        return new Rect2i(screen.detailSlotScreenX(slot), screen.detailSlotScreenY(slot),
-                                StaffLinkScreen.detailSlotSize(), StaffLinkScreen.detailSlotSize());
-                    }
-
-                    @Override
-                    public void accept(I value) {
-                        if (slot == 0) {
-                            screen.getMenu().setFilterSlot(index,
-                                    screen.getMenu().getFilterMirror().get(index).withMarker(marker));
-                        } else {
-                            screen.getMenu().setFilterSlotConditionControl(index, slot == 2, marker);
-                        }
-                    }
-                });
+                if (slot > 0 && !acceptsControl(screen, index, slot)) continue;
+                targets.add(JeiGhostTarget.guarded(screen,
+                        () -> new Rect2i(screen.detailSlotScreenX(slot), screen.detailSlotScreenY(slot),
+                                StaffLinkScreen.detailSlotSize(), StaffLinkScreen.detailSlotSize()),
+                        () -> context.getAsBoolean() && (slot == 0 || acceptsControl(screen, index, slot)), value -> {
+                            if (slot == 0) {
+                                screen.setFilterMarkerFromJei(index, marker);
+                            } else {
+                                screen.getMenu().setFilterSlotConditionControl(index, slot == 2, marker);
+                            }
+                        }));
             }
             return targets;
         }
 
+        private boolean acceptsControl(StaffLinkScreen screen, int index, int slot) {
+            var medium = screen.getMenu().getSelectedMedium();
+            if (medium == null || (medium.family() != com.sorrowmist.useless.content.stafflink.ResourceFamily.ITEM
+                    && medium.family() != com.sorrowmist.useless.content.stafflink.ResourceFamily.FLUID)) return false;
+            var filter = screen.getMenu().getFilterMirror().get(index);
+            return !filter.isEmpty() && !(slot == 1 ? filter.outCond() : filter.inCond()).isOff();
+        }
+
         @Override
         public void onComplete() {
+            if (draggingScreen != null) draggingScreen.setJeiDragActive(false);
+            draggingScreen = null;
         }
     }
 
@@ -264,27 +272,25 @@ public final class JEIPlugin implements IModPlugin {
                                                    ITypedIngredient<I> ingredient,
                                                    boolean doStart) {
             ItemStack stack = ingredient.getItemStack().orElse(ItemStack.EMPTY);
-            if (!(stack.getItem() instanceof BlockItem)) return List.of();
+            if (!screen.acceptsGhostIngredients() || !(stack.getItem() instanceof BlockItem block)
+                    || !DimensionGenerationConfig.isAllowedBlockId(BuiltInRegistries.BLOCK.getKey(block.getBlock())))
+                return List.of();
+            var host = screen.appleHost();
+            var mode = screen.getMenu().getMode();
 
             List<Target<I>> targets = new ArrayList<>(DimensionConfigMenu.GHOST_SLOT_COUNT);
             for (int index = 0; index < DimensionConfigMenu.GHOST_SLOT_COUNT; index++) {
                 if (!screen.getMenu().isGhostSlotActive(index)) continue;
                 int slotIndex = index;
                 DimensionConfigMenu.GhostSlot slot = screen.getMenu().getGhostSlot(slotIndex);
-                targets.add(new Target<>() {
-                    @Override
-                    public Rect2i getArea() {
-                        return new Rect2i(screen.getGuiLeft() + slot.x,
-                                screen.getGuiTop() + slot.y, 16, 16);
-                    }
-
-                    @Override
-                    public void accept(I value) {
-                        if (value instanceof ItemStack itemStack) {
-                            screen.getMenu().setGhostSlotFromClient(slotIndex, itemStack);
-                        }
-                    }
-                });
+                targets.add(JeiGhostTarget.guarded(screen,
+                        () -> new Rect2i(screen.getGuiLeft() + slot.x, screen.getGuiTop() + slot.y, 16, 16),
+                        () -> screen.acceptsGhostIngredients() && screen.appleHost() == host
+                                && screen.getMenu().getMode() == mode && screen.getMenu().isGhostSlotActive(slotIndex),
+                        value -> {
+                            if (value instanceof ItemStack itemStack)
+                                screen.getMenu().setGhostSlotFromClient(slotIndex, itemStack);
+                        }));
             }
             return targets;
         }
@@ -384,6 +390,7 @@ public final class JEIPlugin implements IModPlugin {
     @Override
     public void onRuntimeUnavailable() {
         runtime = null;
+        HostileNetworksJeiRecipes.clear();
         AEKeyJeiIngredients.setRuntime(null);
         registeredAlloyFurnaceRecipes.clear();
     }
@@ -404,7 +411,8 @@ public final class JEIPlugin implements IModPlugin {
         if (level == null || !AlloyFurnaceRecipeCatalog.isReady(level)) return;
 
         List<AlloyFurnaceRecipeCatalog.Entry> additions = new ArrayList<>();
-        for (AlloyFurnaceRecipeCatalog.Entry recipe : AlloyFurnaceRecipeCatalog.entries(level)) {
+        for (AlloyFurnaceRecipeCatalog.Entry recipe : HostileNetworksJeiRecipes.prepare(
+                AlloyFurnaceRecipeCatalog.entries(level), !ModList.get().isLoaded("emi"))) {
             if (!registeredAlloyFurnaceRecipes.containsKey(recipe.identity())) {
                 registeredAlloyFurnaceRecipes.put(recipe.identity(), recipe);
                 additions.add(recipe);

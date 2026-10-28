@@ -21,6 +21,7 @@ import com.sorrowmist.useless.compat.neoecoae.compact.shadow.ShadowComputationDr
 import com.sorrowmist.useless.compat.neoecoae.compact.shadow.ShadowComputationHostBlockEntity;
 import com.sorrowmist.useless.compat.neoecoae.compact.shadow.ShadowComputationParallelCoreBlockEntity;
 import com.sorrowmist.useless.compat.neoecoae.compact.shadow.ShadowThreadingCoreBlockEntity;
+import com.sorrowmist.useless.compat.neoecoae.compact.shadow.ShadowNodeLink;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.HolderLookup;
@@ -63,6 +64,7 @@ public class CompactC9BlockEntity extends ECOComputationSystemBlockEntity
     }
 
     private final List<CompactComputationCluster> fleet = new ArrayList<>();
+    private final List<ShadowNodeLink> shadowHostLinks = new ArrayList<>();
     /** All logical CPU cores, including the first host's cores, live only in this list. */
     private final List<ShadowThreadingCoreBlockEntity> shadowThreadingCores = new ArrayList<>();
     private static final String SHADOW_THREADING_CORE_KEY = "useless_compact_c9_threading_cores";
@@ -123,6 +125,17 @@ public class CompactC9BlockEntity extends ECOComputationSystemBlockEntity
         compact.updateStatus(true);
     }
 
+    /** The compact shell includes a high-energy switch on each logical host. */
+    @Override
+    public boolean hasHighEnergyNetworkSwitch() {
+        return true;
+    }
+
+    @Override
+    public boolean hasNormalNetworkSwitch() {
+        return false;
+    }
+
     @Override
     public int getSelectedBuildLength() {
         return getMaxBuildLength();
@@ -167,6 +180,9 @@ public class CompactC9BlockEntity extends ECOComputationSystemBlockEntity
             return;
         }
         lastCompactTick = now;
+        for (ShadowNodeLink link : shadowHostLinks) {
+            link.tick();
+        }
         if (!pendingCpuAnnounce) {
             return;
         }
@@ -214,11 +230,6 @@ public class CompactC9BlockEntity extends ECOComputationSystemBlockEntity
             fleet.add(shadow);
         }
 
-        restoreThreadingCoreData(level.registryAccess());
-        for (CompactComputationCluster member : fleet) {
-            linkAll(member);
-        }
-
         NEComputationNetworkCluster network = new NEComputationNetworkCluster();
         List<NEComputationCluster> members = new ArrayList<>(fleet);
         network.configure(members);
@@ -228,6 +239,16 @@ public class CompactC9BlockEntity extends ECOComputationSystemBlockEntity
         }
 
         this.compactNetworkCluster = network;
+        // Restored CPUs also resolve crafting links through their controller's grid node.
+        for (ShadowNodeLink link : shadowHostLinks) {
+            link.tick();
+        }
+        // updateCluster restores deferred CPU jobs and immediately reserves their storage.
+        // Attach the complete network first so a valid endgame reservation sees its full capacity.
+        restoreThreadingCoreData(level.registryAccess());
+        for (CompactComputationCluster member : fleet) {
+            linkAll(member);
+        }
         this.pendingCpuAnnounce = true;
     }
 
@@ -239,6 +260,9 @@ public class CompactC9BlockEntity extends ECOComputationSystemBlockEntity
                 NeoEcoCompactRegistry.placeholderState(NeoEcoCompactRegistry.COMPACT_C9));
         host.setLevel(level);
         shadow.addBlockEntity(host);
+        ShadowNodeLink link = new ShadowNodeLink(this);
+        link.attach(host.getMainNode(), level, getMainNode());
+        shadowHostLinks.add(link);
         return shadow;
     }
 
@@ -276,13 +300,21 @@ public class CompactC9BlockEntity extends ECOComputationSystemBlockEntity
 
     @SuppressWarnings({"unchecked", "rawtypes"})
     private void linkAll(NEComputationCluster cluster) {
-        cluster.getBlockEntities().forEachRemaining(blockEntity -> blockEntity.updateCluster(cluster));
+        cluster.getBlockEntities().forEachRemaining(blockEntity -> {
+            if (blockEntity instanceof NEBlockEntity ecoEntity) {
+                ecoEntity.updateCluster(cluster);
+            }
+        });
     }
 
     private void disposeFleet() {
         if (level instanceof ServerLevel serverLevel && !shadowThreadingCores.isEmpty()) {
             pendingThreadingCoreData = captureThreadingCoreData(serverLevel.registryAccess());
         }
+        for (ShadowNodeLink link : shadowHostLinks) {
+            link.detach();
+        }
+        shadowHostLinks.clear();
         for (CompactComputationCluster member : fleet) {
             if (member != cluster && !member.isDestroyed()) {
                 member.injectCompactNetworkCluster(null);
@@ -367,6 +399,10 @@ public class CompactC9BlockEntity extends ECOComputationSystemBlockEntity
 
     @Override
     public void setRemoved() {
+        disposeFleet();
+        fleet.clear();
+        shadowThreadingCores.clear();
+        compactNetworkCluster = null;
         super.setRemoved();
     }
 }

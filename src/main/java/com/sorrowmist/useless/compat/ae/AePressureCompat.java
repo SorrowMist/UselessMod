@@ -1,19 +1,14 @@
 package com.sorrowmist.useless.compat.ae;
 
-import com.sorrowmist.useless.utils.RateLimitedLogger;
-
 import appeng.api.config.Actionable;
 import appeng.api.networking.security.IActionSource;
 import appeng.api.stacks.AEKey;
 import appeng.api.storage.MEStorage;
-import com.sorrowmist.useless.UselessMod;
 import com.sorrowmist.useless.api.logistics.LongPressureHandler;
 import com.wintercogs.appliedpneumatics.common.me.keys.AirKey;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.Level;
 import org.jetbrains.annotations.Nullable;
-
-import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * {@link AePressureBridge} 的 Applied Pneumatics 实现。
@@ -56,19 +51,6 @@ public final class AePressureCompat implements AePressureBridge {
         return isEndpoint(level, pos) ? new AirEndpoint(level, pos) : null;
     }
 
-    /** 写入被拒时的限流警告：每 {@link #WARN_INTERVAL_MS} 毫秒最多一条。 */
-    private static final long WARN_INTERVAL_MS = 5000L;
-    private static final AtomicLong LAST_WARN_AT = new AtomicLong();
-
-    private static void warnRejected(BlockPos pos, String reason) {
-        long now = System.currentTimeMillis();
-        long last = LAST_WARN_AT.get();
-        if (now - last < WARN_INTERVAL_MS || !LAST_WARN_AT.compareAndSet(last, now)) {
-            return;
-        }
-        RateLimitedLogger.warn(UselessMod.LOGGER, "无线物流：AE 气压端点 {} 无法接收空气——{}", pos.toShortString(), reason);
-    }
-
     /** ME 网络里空气（Applied Pneumatics 的 AirKey）的视角。 */
     private static final class AirEndpoint implements LongPressureHandler {
         private final Level level;
@@ -104,15 +86,10 @@ public final class AePressureCompat implements AePressureBridge {
             }
             MEStorage storage = AeNetworks.storage(level, pos);
             if (storage == null) {
-                warnRejected(pos, "该方块当前取不到 ME 网络（没有挂上网格，或节点尚未就绪）");
                 return 0L;
             }
             long inserted = storage.insert(airKey(), amount,
                     simulate ? Actionable.SIMULATE : Actionable.MODULATE, source());
-            if (inserted <= 0L) {
-                warnRejected(pos, "ME 网络没有收下这些空气：网里没有空气存储"
-                        + "（需要 Applied Pneumatics 的气体存储元件），或者已经存满了");
-            }
             return Math.max(0L, inserted);
         }
 

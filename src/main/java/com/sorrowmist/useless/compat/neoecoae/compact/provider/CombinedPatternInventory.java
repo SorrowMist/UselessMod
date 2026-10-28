@@ -51,7 +51,7 @@ public final class CombinedPatternInventory extends BaseInternalInventory {
     public ItemStack getStackInSlot(int slot) {
         syncOffsets();
         int part = partOf(slot);
-        return part < 0 ? ItemStack.EMPTY : bus(part).itemHandler.getStackInSlot(localSlot(part, slot));
+        return part < 0 ? ItemStack.EMPTY : bus(part).getPatternSlotInventory().getStackInSlot(localSlot(part, slot));
     }
 
     @Override
@@ -61,7 +61,7 @@ public final class CombinedPatternInventory extends BaseInternalInventory {
         if (part < 0) {
             return;
         }
-        bus(part).itemHandler.setStackInSlot(localSlot(part, slot), stack);
+        bus(part).setPatternDirect(localSlot(part, slot), stack);
         syncOffsets();
     }
 
@@ -69,14 +69,14 @@ public final class CombinedPatternInventory extends BaseInternalInventory {
     public boolean isItemValid(int slot, ItemStack stack) {
         syncOffsets();
         int part = partOf(slot);
-        return part >= 0 && bus(part).itemHandler.isItemValid(localSlot(part, slot), stack);
+        return part >= 0 && bus(part).getPatternSlotInventory().isItemValid(localSlot(part, slot), stack);
     }
 
     @Override
     public int getSlotLimit(int slot) {
         syncOffsets();
         int part = partOf(slot);
-        return part < 0 ? 0 : bus(part).itemHandler.getSlotLimit(localSlot(part, slot));
+        return part < 0 ? 0 : bus(part).getPatternSlotInventory().getSlotLimit(localSlot(part, slot));
     }
 
     /**

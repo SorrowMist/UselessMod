@@ -32,29 +32,33 @@ import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.item.ItemStack;
 import com.sorrowmist.useless.compat.forge1201.network.PacketDistributor;
 import org.lwjgl.glfw.GLFW;
+import com.sorrowmist.useless.client.gui.apple.*;
 
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 
 public class ModeWheelScreen extends Screen {
-    private static final int PANEL_MAX_WIDTH = 480;
-    private static final int PANEL_MARGIN = 6;
-    private static final int HEADER_HEIGHT = 42;
-    private static final int NORMAL_FOOTER_HEIGHT = 20;
-    private static final int EDITOR_FOOTER_HEIGHT = 38;
-    private static final int CONTENT_PADDING = 4;
-    private static final int CARD_GAP = 5;
+    private static final int PANEL_MAX_WIDTH = 526;
+    /** v3：左侧圆形轮盘预览栏宽度。 */
+    private static final int WHEEL_W = 228;
+    private static final int PANEL_MARGIN = 12;
+    private static final int HEADER_HEIGHT = 92;
+    private static final int NORMAL_FOOTER_HEIGHT = 24;
+    private static final int EDITOR_FOOTER_HEIGHT = 24;
+    private static final int CONTENT_PADDING = 8;
+    private static final int CARD_GAP = 8;
     private static final int CARD_HEADER_HEIGHT = 18;
     private static final int CARD_BOTTOM_PADDING = 6;
-    private static final int MODULE_HEIGHT = 18;
-    private static final int MODULE_GAP = 2;
+    private static final int MODULE_HEIGHT = 14;
+    private static final int MODULE_GAP = 3;
     /** 连锁等价组齿轮图标的边长（画在连锁挖掘模块按钮右端）。 */
     private static final int GEAR_SIZE = 12;
-    private static final int PAGE_TAB_HEIGHT = 15;
-    private static final int PAGE_TAB_WIDTH = 82;
+    private static final int PAGE_TAB_HEIGHT = 14;
+    private static final int PAGE_TAB_WIDTH = 48;
     private static final int DRAG_THRESHOLD = 4;
-    private static final int DESIGN_HEIGHT = 320;
+    private static final int DESIGN_HEIGHT = 298;
+    private static final int EDITOR_DESIGN_HEIGHT = 335;
 
     private final List<PressableAE2Button> toolbarButtons = new ArrayList<>();
     private final List<ModeButton> modeButtons = new ArrayList<>();
@@ -66,6 +70,9 @@ public class ModeWheelScreen extends Screen {
     private ItemStack targetItem;
     private BeefToolLayout layout = BeefToolModuleRegistry.defaultLayout();
     private EditBox pageNameField;
+    private boolean pageNameWasFocused;
+    private record WheelChoice(String id, Rect rect) {}
+    private final List<WheelChoice> wheelChoices = new ArrayList<>();
     private DragState drag;
     private String lastAvailabilitySignature = "";
     private String statusKey;
@@ -85,6 +92,10 @@ public class ModeWheelScreen extends Screen {
     private int panelLeft;
     private int panelTop;
     private int panelWidth;
+    /** LDLib Apple 窗口外壳（AppleWindow）；在 UI 坐标系内渲染，随面板尺寸重建。 */
+    private AppleHost chrome;
+    private int chromeW = -1, chromeH = -1;
+    public AppleHost appleHost() { return chrome; }
     private int panelHeight;
     private int uiWidth;
     private int uiHeight;
@@ -103,12 +114,14 @@ public class ModeWheelScreen extends Screen {
         toolbarButtons.clear();
         modeButtons.clear();
         groupNameFields.clear();
+        wheelChoices.clear();
+        pageNameWasFocused = false;
         pageNameField = null;
 
         calculatePanelBounds();
         calculateGeometry();
         createToolbarWidgets();
-        if (!awaitingLayout && editing) {
+        if (!awaitingLayout) {
             createEditorNameFields();
         }
         if (!awaitingLayout && !editing) {
@@ -125,24 +138,23 @@ public class ModeWheelScreen extends Screen {
         calculateUiScale();
         int availableWidth = Math.max(1, uiWidth - PANEL_MARGIN * 2);
         int availableHeight = Math.max(1, uiHeight - PANEL_MARGIN * 2);
-        int desiredWidth = desiredContentWidth() + PANEL_MARGIN * 2;
-        int desiredHeight = HEADER_HEIGHT + desiredContentHeight()
-                + (editing ? EDITOR_FOOTER_HEIGHT : NORMAL_FOOTER_HEIGHT);
+        int desiredWidth = PANEL_MAX_WIDTH;
+        int desiredHeight = editing ? EDITOR_DESIGN_HEIGHT : DESIGN_HEIGHT;
         panelWidth = Math.max(1, Math.min(PANEL_MAX_WIDTH, Math.min(availableWidth, desiredWidth)));
-        panelHeight = Math.max(1, Math.min(DESIGN_HEIGHT, Math.min(availableHeight, desiredHeight)));
+        panelHeight = Math.max(1, Math.min(availableHeight, desiredHeight));
         panelLeft = (uiWidth - panelWidth) / 2;
         panelTop = Math.max(PANEL_MARGIN, (uiHeight - panelHeight) / 2);
 
-        contentLeft = panelLeft + PANEL_MARGIN;
-        contentRight = panelLeft + panelWidth - PANEL_MARGIN;
-        contentTop = panelTop + HEADER_HEIGHT;
+        contentLeft = panelLeft + PANEL_MARGIN + WHEEL_W;
+        contentRight = panelLeft + panelWidth - 22;
+        contentTop = panelTop + (editing ? HEADER_HEIGHT : 66);
         int footerHeight = editing ? EDITOR_FOOTER_HEIGHT : NORMAL_FOOTER_HEIGHT;
         contentBottom = Math.max(contentTop + 1, panelTop + panelHeight - footerHeight);
     }
 
     private void calculateUiScale() {
         float widthScale = Math.max(0.1F, (width - PANEL_MARGIN * 2.0F) / PANEL_MAX_WIDTH);
-        float heightScale = Math.max(0.1F, (height - PANEL_MARGIN * 2.0F) / DESIGN_HEIGHT);
+        float heightScale = Math.max(0.1F, (height - PANEL_MARGIN * 2.0F) / (editing ? EDITOR_DESIGN_HEIGHT : DESIGN_HEIGHT));
         uiScale = Math.min(1.0F, Math.min(widthScale, heightScale));
         uiWidth = Math.max(1, Math.round(width / uiScale));
         uiHeight = Math.max(1, Math.round(height / uiScale));
@@ -163,7 +175,7 @@ public class ModeWheelScreen extends Screen {
     }
 
     private int editorFooterWidth() {
-        return 54 + 4 + 54 + 4 + 58 + 4 + 58 + 4 + 58;
+        return 54 + 4 + 54 + 12 + 58 + 12 + 58 + 4 + 58;
     }
 
     private int minimumContentWidth() {
@@ -184,7 +196,7 @@ public class ModeWheelScreen extends Screen {
         for (BeefToolLayout.Group group : page.groups()) {
             if (BeefToolModuleRegistry.isGroupHidden(group)) continue;
             List<String> modules = visibleModules(group.modules());
-            int column = bottoms[0] <= bottoms[1] ? 0 : 1;
+            int column = 0;
             bottoms[column] += cardHeight(1, modules.size(), moduleColumns(modules.size())) + CARD_GAP;
         }
         return Math.max(rawY, Math.max(bottoms[0], bottoms[1])) + CONTENT_PADDING;
@@ -271,18 +283,19 @@ public class ModeWheelScreen extends Screen {
 
     private void createToolbarWidgets() {
         int right = panelLeft + panelWidth - PANEL_MARGIN;
-        int y = panelTop + 4;
-        int actionWidth = editing ? 50 : 70;
+        int y = panelTop + 26;
+        int actionWidth = 64;
         int actionX = right - actionWidth;
         int nextX = actionX - 22;
         int previousX = nextX - 22;
+        int navY = panelTop + panelHeight - 19;
 
         PressableAE2Button previous = addToolbarButton(new PressableAE2Button(
-                previousX, y, 18, 14, Component.literal("<"), ignored -> changePage(-1)));
+                previousX, navY, 18, 14, Component.literal("<"), ignored -> changePage(-1)));
         PressableAE2Button next = addToolbarButton(new PressableAE2Button(
-                nextX, y, 18, 14, Component.literal(">"), ignored -> changePage(1)));
+                nextX, navY, 18, 14, Component.literal(">"), ignored -> changePage(1)));
         PressableAE2Button action = addToolbarButton(new PressableAE2Button(
-                actionX, y, actionWidth, 14,
+                actionX, panelTop + 7, actionWidth, 16,
                 Component.translatable(editing
                         ? "gui.useless_mod.mode_config.done"
                         : "gui.useless_mod.mode_config.edit"),
@@ -292,15 +305,15 @@ public class ModeWheelScreen extends Screen {
                 }));
 
         boolean ready = !awaitingLayout;
-        previous.visible = ready && layout.pages().size() > 1;
-        next.visible = ready && layout.pages().size() > 1;
+        previous.visible = ready && !editing && layout.pages().size() > 1;
+        next.visible = ready && !editing && layout.pages().size() > 1;
         previous.active = ready && currentPage() > 0;
         next.active = ready && currentPage() + 1 < layout.pages().size();
         action.active = ready;
 
         if (!editing || !ready) return;
 
-        int footerY = panelTop + panelHeight - 18;
+        int footerY = panelTop + 66;
         int footerX = panelLeft + PANEL_MARGIN;
         addToolbarButton(new PressableAE2Button(
                 footerX, footerY, 54, 14,
@@ -309,11 +322,11 @@ public class ModeWheelScreen extends Screen {
         addToolbarButton(new PressableAE2Button(
                 footerX, footerY, 54, 14,
                 Component.translatable("gui.useless_mod.mode_config.delete_page"), ignored -> deletePage()));
-        footerX += 58;
+        footerX += 66; // v3：分组之间留 12px 间隔（页 | 分组 | 导入导出）
         addToolbarButton(new PressableAE2Button(
                 footerX, footerY, 58, 14,
                 Component.translatable("gui.useless_mod.mode_config.add_group"), ignored -> addGroup()));
-        footerX += 62;
+        footerX = right - 58 - 4 - 58;
         addToolbarButton(new PressableAE2Button(
                 footerX, footerY, 58, 14,
                 Component.translatable("gui.useless_mod.mode_config.export"), ignored -> exportLayout()));
@@ -333,6 +346,7 @@ public class ModeWheelScreen extends Screen {
             PressableAE2Button button = addRenderableWidget(new PressableAE2Button(
                     module.rect().left(), module.rect().top(), module.rect().width(), module.rect().height(),
                     buttonMessage(module.id()), ignored -> onModeSelected(module.id())));
+            if (BeefToolModuleRegistry.ENHANCED_CHAIN_MINING.equals(module.id())) button.setReservedRight(GEAR_SIZE + 2);
             modeButtons.add(new ModeButton(module.id(), button));
         }
         positionModeButtons();
@@ -340,19 +354,20 @@ public class ModeWheelScreen extends Screen {
 
     private void createEditorNameFields() {
         BeefToolLayout.Page page = currentPageObject();
-        int pageFieldX = panelLeft + PANEL_MARGIN + font.width(title) + 10;
-        int pageFieldWidth = Math.min(150, Math.max(64, pageNavigationLeft() - pageFieldX - 8));
-        pageNameField = new EditBox(font, pageFieldX, panelTop + 4, pageFieldWidth, 14,
+        int pageFieldWidth = 80;
+        int pageFieldX = panelLeft + panelWidth - PANEL_MARGIN - pageFieldWidth;
+        pageNameField = new AppleEditBox(font, pageFieldX, panelTop + 40, pageFieldWidth, 16,
                 Component.translatable("gui.useless_mod.mode_config.page_name"));
         configureNameField(pageNameField);
         pageNameField.setValue(page.name());
         addRenderableWidget(pageNameField);
+        if (!editing) return;
 
         for (CardLayout card : cardLayouts) {
             if (card.unassigned() || card.groupIndex() < 0) continue;
             BeefToolLayout.Group group = groupAt(card.pageIndex(), card.groupIndex());
             if (group == null) continue;
-            EditBox field = new EditBox(font, card.left() + 10, card.top() + 2,
+            EditBox field = new AppleEditBox(font, card.left() + 10, card.top() + 2,
                     Math.max(20, card.width() - 31), 14,
                     Component.translatable("gui.useless_mod.mode_config.group_name"));
             configureNameField(field);
@@ -379,26 +394,26 @@ public class ModeWheelScreen extends Screen {
         }
 
         List<RawCard> rawCards = new ArrayList<>();
-        int rawY = contentTop + CONTENT_PADDING;
+        int rawY = contentTop;
         if (editing) {
             List<String> unassigned = visibleModules(layout.unassignedModules());
-            int height = cardHeight(contentRight - contentLeft, unassigned.size(), moduleColumns(unassigned.size()));
+            int height = chipCardHeight(contentRight - contentLeft, unassigned);
             rawCards.add(new RawCard(-1, -1, contentLeft, rawY,
                     contentRight - contentLeft, height, true, unassigned));
             rawY += height + CARD_GAP;
         }
 
         BeefToolLayout.Page page = currentPageObject();
-        int[] columnWidths = fitColumnWidths(sumGroupColumnWidths(page), contentRight - contentLeft);
+        int[] columnWidths = {contentRight - contentLeft, 0};
         int[] columnBottoms = {rawY, rawY};
         for (int groupIndex = 0; groupIndex < page.groups().size(); groupIndex++) {
             BeefToolLayout.Group group = page.groups().get(groupIndex);
             if (BeefToolModuleRegistry.isGroupHidden(group)) continue;
             List<String> visibleModules = visibleModules(group.modules());
-            int column = columnBottoms[0] <= columnBottoms[1] ? 0 : 1;
+            int column = 0;
             int left = contentLeft + (column == 0 ? 0 : columnWidths[0] + CARD_GAP);
             int cardWidth = columnWidths[column];
-            int height = cardHeight(cardWidth, visibleModules.size(), moduleColumns(visibleModules.size()));
+            int height = chipCardHeight(cardWidth, visibleModules);
             int top = columnBottoms[column];
             rawCards.add(new RawCard(currentPage(), groupIndex, left, top,
                     cardWidth, height, false, visibleModules));
@@ -441,19 +456,28 @@ public class ModeWheelScreen extends Screen {
                 + Math.max(0, rows - 1) * MODULE_GAP + CARD_BOTTOM_PADDING;
     }
 
+    private List<Rect> chipRects(int width, List<String> modules) {
+        List<Rect> result = new ArrayList<>();
+        int x = 7, y = CARD_HEADER_HEIGHT;
+        for (String id : modules) {
+            int reserve = BeefToolModuleRegistry.ENHANCED_CHAIN_MINING.equals(id) ? GEAR_SIZE + 2 : 0;
+            int w = Math.min(width - 14, Math.max(30, Math.round(font.width(buttonMessage(id)) * .8f) + 12 + reserve));
+            if (x > 7 && x + w > width - 7) { x = 7; y += MODULE_HEIGHT + MODULE_GAP; }
+            result.add(new Rect(x, y, w, MODULE_HEIGHT));
+            x += w + MODULE_GAP;
+        }
+        return result;
+    }
+
+    private int chipCardHeight(int width, List<String> modules) {
+        List<Rect> chips = chipRects(width, modules);
+        return chips.isEmpty() ? CARD_HEADER_HEIGHT + MODULE_HEIGHT + CARD_BOTTOM_PADDING
+                : chips.get(chips.size() - 1).bottom() + CARD_BOTTOM_PADDING;
+    }
+
     private Rect moduleRect(CardLayout card, int index) {
-        int columns = moduleColumns(card.modules().size());
-        List<String> sourceModules = card.unassigned()
-                ? layout.unassignedModules()
-                : groupAt(card.pageIndex(), card.groupIndex()).modules();
-        int buttonWidth = visibleModules(sourceModules).size() == 1
-                ? moduleButtonWidth(sourceModules)
-                : commonModuleWidth(currentPageObject());
-        int column = index % columns;
-        int row = index / columns;
-        return new Rect(card.left() + 5 + column * (buttonWidth + MODULE_GAP),
-                card.top() + CARD_HEADER_HEIGHT + row * (MODULE_HEIGHT + MODULE_GAP),
-                buttonWidth, MODULE_HEIGHT);
+        Rect chip = chipRects(card.width(), card.modules()).get(index);
+        return new Rect(card.left() + chip.left(), card.top() + chip.top(), chip.width(), chip.height());
     }
 
     private List<String> visibleModules(List<String> moduleIds) {
@@ -480,7 +504,7 @@ public class ModeWheelScreen extends Screen {
 
     private void updateEditorFieldPositions() {
         if (pageNameField != null) {
-            pageNameField.visible = editing && !awaitingLayout;
+            pageNameField.visible = !awaitingLayout;
             if (!pageNameField.isFocused() && !pageNameField.getValue().equals(currentPageObject().name())) {
                 pageNameField.setValue(currentPageObject().name());
             }
@@ -553,6 +577,74 @@ public class ModeWheelScreen extends Screen {
         return Component.translatable(isActive(id)
                 ? "tooltip.useless_mod.enable"
                 : "tooltip.useless_mod.disable");
+    }
+
+    /** v3：左侧轮盘预览——中心为当前（悬停或首个已启用）模块，四周为本页各模块的系统色图标块。 */
+    private void drawWheelPreview(GuiGraphics g, int mouseX, int mouseY) {
+        int x0 = panelLeft + PANEL_MARGIN, y0 = contentTop;
+        int size = WHEEL_W - 8;
+        wheelChoices.clear();
+        AppleUi.softShadow(g, x0, y0, size, size, 8, 4, size / 2f, 0x22000000);
+        AppleUi.fillRound(g, x0, y0, size, size, size / 2f, 0xD9FFFFFF);
+        List<String> ids = new ArrayList<>();
+        for (BeefToolLayout.Group group : currentPageObject().groups()) {
+            if (BeefToolModuleRegistry.isGroupHidden(group)) continue;
+            ids.addAll(visibleModules(group.modules()));
+        }
+        int cx = x0 + size / 2, cy = y0 + size / 2, outer = size / 2 - 6;
+        AppleUi.fillRound(g, cx - outer, cy - outer, outer * 2, outer * 2, outer, 0x12DCE6F2);
+        int inner = 38;
+        AppleUi.fillRound(g, cx - inner, cy - inner, inner * 2, inner * 2, inner, AppleStyle.CARD);
+        String current = null;
+        int active = 0;
+        for (ModuleLayout m : moduleLayouts) {
+            if (m.rect().contains(mouseX, mouseY)) current = m.id();
+        }
+        for (String id : ids) {
+            if (isActive(id)) { active++; if (current == null) current = id; }
+        }
+        int n = ids.size();
+        boolean two = n > 16;
+        int outerCount = two ? (n + 1) / 2 : n;
+        for (int i = 0; i < n; i++) {
+            String id = ids.get(i);
+            boolean outerRing = !two || i < outerCount;
+            int k = outerRing ? i : i - outerCount, cnt = outerRing ? outerCount : n - outerCount;
+            int ring = outerRing ? outer - 14 : outer - 40;
+            double a = -Math.PI / 2 + 2 * Math.PI * (k + (outerRing ? 0 : 0.5)) / Math.max(1, cnt);
+            int tx = cx + (int) Math.round(Math.cos(a) * ring) - 7;
+            int ty = cy + (int) Math.round(Math.sin(a) * ring) - 7;
+            Rect hit = new Rect(tx - 3, ty - 3, 20, 20);
+            wheelChoices.add(new WheelChoice(id, hit));
+            if (hit.contains(mouseX, mouseY)) current = id;
+            boolean on = isActive(id);
+            int col = on ? moduleAccent(id) : AppleStyle.TRACK;
+            if (id.equals(current)) AppleUi.fillRound(g, tx - 1, ty - 1, 16, 16, 8, AppleStyle.BLUE_TINT);
+            AppleUi.fillRound(g, tx, ty, 14, 14, 7, col);
+            if (on) AppleUi.icon(g, AppleUi.Icon.CHECK, tx + 3, ty + 3, 8, AppleStyle.ON_ACCENT);
+            else AppleUi.icon(g, AppleUi.Icon.MINUS, tx + 3, ty + 3, 8, AppleStyle.TERTIARY);
+            if (!two || outerRing) {
+                String label = font.plainSubstrByWidth(BeefToolModuleRegistry.name(id).getString(), 64);
+                g.pose().pushPose();
+                g.pose().translate(tx + 7, ty + 16, 0);
+                g.pose().scale(0.55f, 0.55f, 1);
+                AppleUi.centered(g, font, label, 0, 0, AppleStyle.SECONDARY);
+                g.pose().popPose();
+            }
+        }
+        if (current != null) {
+            String name = font.plainSubstrByWidth(BeefToolModuleRegistry.name(current).getString(), inner * 2 - 4);
+            AppleUi.centered(g, font, name, cx, cy - 2, moduleAccent(current));
+        }
+        AppleUi.centered(g, font, Component.translatable("gui.useless_mod.mode_config.wheel_current").getString(), cx, cy - 16, AppleStyle.TERTIARY);
+        AppleUi.centered(g, font, active + "/" + n, cx, cy + 12, AppleStyle.TERTIARY);
+    }
+
+    private int moduleAccent(String id) {
+        int[] colors = {AppleStyle.BLUE, AppleStyle.ORANGE, AppleStyle.RED, AppleStyle.TEAL, AppleStyle.PURPLE};
+        var groups = currentPageObject().groups();
+        for (int i = 0; i < groups.size(); i++) if (groups.get(i).modules().contains(id)) return colors[i % colors.length];
+        return AppleStyle.BLUE;
     }
 
     private boolean isActive(String id) {
@@ -646,6 +738,10 @@ public class ModeWheelScreen extends Screen {
             statusTicks--;
             if (statusTicks == 0) statusKey = null;
         }
+        boolean focused = pageNameField != null && pageNameField.isFocused();
+        if (pageNameWasFocused && !focused && commitNameFields()) sendLayout();
+        pageNameWasFocused = focused;
+        if (chrome != null) chrome.tick();
         refreshTargetAndModes();
     }
 
@@ -711,7 +807,7 @@ public class ModeWheelScreen extends Screen {
 
     private void changePage(int delta) {
         if (awaitingLayout || drag != null) return;
-        boolean changed = editing && commitNameFields();
+        boolean changed = commitNameFields();
         int oldPage = currentPage();
         int next = Mth.clamp(oldPage + delta, 0, layout.pages().size() - 1);
         if (next == oldPage) {
@@ -726,7 +822,7 @@ public class ModeWheelScreen extends Screen {
 
     private void selectPage(int page, boolean persist, boolean rebuild) {
         if (page < 0 || page >= layout.pages().size()) return;
-        if (editing && drag == null) commitNameFields();
+        if (drag == null) commitNameFields();
         layout.setSelectedPage(page);
         scrollOffset = 0;
         ensurePageTabVisible();
@@ -1038,15 +1134,22 @@ public class ModeWheelScreen extends Screen {
         graphics.pose().scale(uiScale, uiScale, 1.0F);
         mouseX = (int) toUiX(mouseX);
         mouseY = (int) toUiY(mouseY);
-        MachineScreenStyle.drawPanel(graphics, panelLeft, panelTop, panelWidth, panelHeight);
-        graphics.drawString(font, title, panelLeft + PANEL_MARGIN, panelTop + 7,
-                MachineScreenStyle.TEXT_COLOR, false);
+        if (chrome == null || chromeW != panelWidth || chromeH != panelHeight) {
+            chromeW = panelWidth; chromeH = panelHeight;
+            chrome = new AppleHost(panelWidth, panelHeight);
+            chrome.add(new AppleWindow(panelWidth, panelHeight, () -> title).referenceIcon("endless_beaf_item"));
+        }
+        chrome.layout(uiWidth, uiHeight, panelLeft, panelTop);
+        chrome.render(graphics, mouseX, mouseY, partialTick);
         drawPageTabs(graphics);
+        int footerTop = contentBottom;
+        graphics.fill(panelLeft + 10, footerTop, panelLeft + panelWidth - 10, footerTop + 1, AppleStyle.SEPARATOR);
 
         if (awaitingLayout) {
             graphics.drawString(font, Component.translatable("gui.useless_mod.mode_config.loading"),
-                    panelLeft + PANEL_MARGIN, contentTop + 8, MachineScreenStyle.MUTED_TEXT_COLOR, false);
+                    panelLeft + PANEL_MARGIN, contentTop + 8, AppleStyle.TERTIARY, false);
         } else {
+            drawWheelPreview(graphics, mouseX, mouseY);
             enableContentScissor(graphics);
             try {
                 drawCards(graphics, mouseX, mouseY);
@@ -1057,7 +1160,7 @@ public class ModeWheelScreen extends Screen {
                     }
                 } else {
                     for (ModeButton modeButton : modeButtons) {
-                        if (modeButton.button().visible) modeButton.button().render(graphics, mouseX, mouseY, partialTick);
+                        if (modeButton.button().visible) drawModeChip(graphics, modeButton, mouseX, mouseY);
                     }
                     drawChainGroupGear(graphics, mouseX, mouseY);
                 }
@@ -1071,6 +1174,9 @@ public class ModeWheelScreen extends Screen {
         drawModeButtonTooltips(graphics, mouseX, mouseY);
 
         if (pageNameField != null && pageNameField.visible) {
+            String label = Component.translatable("gui.useless_mod.mode_config.page_name").getString();
+            graphics.drawString(font, label, pageNameField.getX() - font.width(label) - 6,
+                    panelTop + 44, AppleStyle.TERTIARY, false);
             pageNameField.render(graphics, mouseX, mouseY, partialTick);
         }
         for (Renderable button : toolbarButtons) {
@@ -1101,43 +1207,54 @@ public class ModeWheelScreen extends Screen {
     private void drawCards(GuiGraphics graphics, int mouseX, int mouseY) {
         for (CardLayout card : cardLayouts) {
             if (!intersectsContent(card.rect())) continue;
-            MachineScreenStyle.drawInset(graphics, card.left(), card.top(),
-                    card.left() + card.width(), card.top() + card.height());
+            AppleTex.card(AppleStyle.R_CARD).draw(graphics, mouseX, mouseY, card.left(), card.top(), card.width(), card.height());
+            // 卡片标题区：只用分隔线 + 粗体/灰阶区分层级（不再有彩色强调条）。
+            graphics.fill(card.left() + 6, card.top() + CARD_HEADER_HEIGHT - 2,
+                    card.left() + card.width() - 6, card.top() + CARD_HEADER_HEIGHT - 1, AppleStyle.SEPARATOR);
             if (card.unassigned()) {
                 graphics.drawString(font,
-                        Component.translatable("gui.useless_mod.mode_config.unassigned"),
-                        card.left() + 6, card.top() + 4, MachineScreenStyle.TEXT_COLOR, false);
+                        Component.translatable("gui.useless_mod.mode_config.unassigned").withStyle(net.minecraft.ChatFormatting.BOLD),
+                        card.left() + 6, card.top() + 4, AppleStyle.SECONDARY, false);
             } else if (!editing) {
-                graphics.drawString(font, groupAt(card.pageIndex(), card.groupIndex()).name(),
-                        card.left() + 6, card.top() + 4, MachineScreenStyle.TEXT_COLOR, false);
+                Component gname = Component.literal(groupAt(card.pageIndex(), card.groupIndex()).name())
+                        .withStyle(net.minecraft.ChatFormatting.BOLD);
+                graphics.drawString(font, gname, card.left() + 6, card.top() + 4, AppleStyle.LABEL, false);
+                graphics.drawString(font, Component.translatable("gui.useless_mod.mode_config.module_count", card.modules().size()),
+                        card.left() + 12 + font.width(gname), card.top() + 4, AppleStyle.TERTIARY, false);
             } else {
-                graphics.drawString(font, Component.literal("::"),
-                        card.left() + 2, card.top() + 4, MachineScreenStyle.MUTED_TEXT_COLOR, false);
-                graphics.drawString(font, Component.literal("X"),
-                        card.left() + card.width() - 14, card.top() + 4,
-                        MachineScreenStyle.ERROR_TEXT_COLOR, false);
+                AppleUi.icon(graphics, AppleUi.Icon.GRIP, card.left() + 2, card.top() + 5, 7, AppleStyle.TERTIARY);
+                AppleUi.icon(graphics, AppleUi.Icon.XMARK, card.left() + card.width() - 14, card.top() + 5, 7, AppleStyle.TERTIARY);
             }
             if (card.modules().isEmpty()) {
                 graphics.drawString(font,
                         Component.translatable("gui.useless_mod.mode_config.empty"),
                         card.left() + 6, card.top() + CARD_HEADER_HEIGHT + 4,
-                        MachineScreenStyle.MUTED_TEXT_COLOR, false);
+                        AppleStyle.TERTIARY, false);
             }
         }
+    }
+
+    private void drawModeChip(GuiGraphics g, ModeButton mode, int mx, int my) {
+        var b = mode.button();
+        boolean on = isActive(mode.id());
+        int accent = moduleAccent(mode.id());
+        AppleUi.fillRound(g, b.getX(), b.getY(), b.getWidth(), b.getHeight(), 7,
+                on ? AppleStyle.tintOf(accent) : b.isMouseOver(mx, my) ? AppleStyle.FILL_HOVER : AppleStyle.FILL);
+        int reserve = BeefToolModuleRegistry.ENHANCED_CHAIN_MINING.equals(mode.id()) ? GEAR_SIZE + 2 : 0;
+        AppleTextLayout.drawCentered(g, font, AppleButton.appleTint(buttonMessage(mode.id())),
+                b.getX(), b.getY(), b.getWidth() - reserve, b.getHeight(), 5, 3, null,
+                on ? 0xFF000000 | AppleUi.readable(accent) : AppleStyle.SECONDARY);
     }
 
     private void drawEditorModules(GuiGraphics graphics, int mouseX, int mouseY) {
         for (ModuleLayout module : moduleLayouts) {
             if (!intersectsContent(module.rect())) continue;
             boolean hovered = module.rect().contains(mouseX, mouseY);
-            int color = hovered ? MachineScreenStyle.HIGHLIGHT_COLOR : MachineScreenStyle.PANEL_COLOR;
-            graphics.fill(module.rect().left(), module.rect().top(),
-                    module.rect().right(), module.rect().bottom(), color);
-            graphics.fill(module.rect().left(), module.rect().top(),
-                    module.rect().right(), module.rect().top() + 1, MachineScreenStyle.SLOT_SHADOW_COLOR);
+            AppleUi2.round(graphics, module.rect().left(), module.rect().top(), module.rect().width(), module.rect().height(),
+                    AppleStyle.R_CONTROL, hovered ? AppleStyle.FILL_HOVER : AppleStyle.FILL);
             Component message = buttonMessage(module.id());
             String text = font.plainSubstrByWidth(message.getString(), Math.max(1, module.rect().width() - 6));
-            int textColor = hovered ? MachineScreenStyle.TEXT_COLOR : MachineScreenStyle.SUBTLE_TEXT_COLOR;
+            int textColor = hovered ? AppleStyle.LABEL : AppleStyle.SECONDARY;
             graphics.drawString(font, text, module.rect().left() + 3,
                     module.rect().top() + 5, textColor, false);
         }
@@ -1148,9 +1265,10 @@ public class ModeWheelScreen extends Screen {
             int ghostWidth = Math.min(150, font.width(text) + 8);
             int left = Mth.clamp((int) (drag.mouseX - ghostWidth / 2), 0, Math.max(0, uiWidth - ghostWidth));
             int top = Mth.clamp((int) (drag.mouseY - 10), 0, Math.max(0, uiHeight - 20));
-            graphics.fill(left, top, left + ghostWidth, top + 18, 0xEE20242C);
+            AppleTex.card(AppleStyle.R_CONTROL).draw(graphics, 0, 0, left, top, ghostWidth, 18);
+            AppleUi2.round(graphics, left, top, ghostWidth, 18, AppleStyle.R_CONTROL, AppleStyle.SELECTED_ROW);
             graphics.drawString(font, font.plainSubstrByWidth(text, ghostWidth - 6), left + 3, top + 5,
-                    0xFFFFFFFF, false);
+                    AppleStyle.LABEL, false);
         }
     }
 
@@ -1158,42 +1276,52 @@ public class ModeWheelScreen extends Screen {
         pageTabRects.clear();
         if (layout.pages().isEmpty()) return;
         ensurePageTabVisible();
+        int visibleCount = tabVisibleCount();
+        int shown = Math.min(layout.pages().size() - pageTabOffset, visibleCount);
         int left = panelLeft + PANEL_MARGIN;
-        int right = panelLeft + panelWidth - PANEL_MARGIN;
-        int y = panelTop + 24;
-        int visibleCount = Math.max(1, (right - left) / PAGE_TAB_WIDTH);
+        int y = panelTop + 40;
+        // 分段控件轨道
+        AppleUi2.round(graphics, left - 1, y - 1, shown * PAGE_TAB_WIDTH, PAGE_TAB_HEIGHT + 2, AppleStyle.R_CONTROL, AppleStyle.TRACK);
         for (int index = pageTabOffset;
              index < Math.min(layout.pages().size(), pageTabOffset + visibleCount); index++) {
             int x = left + (index - pageTabOffset) * PAGE_TAB_WIDTH;
             Rect rect = new Rect(x, y, PAGE_TAB_WIDTH - 2, PAGE_TAB_HEIGHT);
             pageTabRects.add(rect);
             boolean selected = index == currentPage();
-            MachineScreenStyle.drawInset(graphics, rect.left(), rect.top(), rect.right(), rect.bottom());
             if (selected) {
-                graphics.fill(rect.left() + 2, rect.top() + 2, rect.right() - 2, rect.bottom() - 2,
-                        MachineScreenStyle.HIGHLIGHT_COLOR);
+                AppleTex.card(AppleStyle.R_CONTROL - 1).draw(graphics, 0, 0, rect.left(), rect.top(), rect.width(), rect.height());
+            } else if (index > pageTabOffset && index - 1 != currentPage()) {
+                graphics.fill(rect.left() - 1, rect.top() + 3, rect.left(), rect.bottom() - 3, AppleStyle.SEPARATOR);
             }
             String name = font.plainSubstrByWidth(layout.pages().get(index).name(), rect.width() - 6);
-            graphics.drawString(font, name, rect.left() + 3, rect.top() + 4,
-                    selected ? MachineScreenStyle.TEXT_COLOR : MachineScreenStyle.MUTED_TEXT_COLOR, false);
+            graphics.drawString(font, name, rect.left() + (rect.width() - font.width(name)) / 2, rect.top() + 3,
+                    selected ? AppleStyle.LABEL : AppleStyle.SECONDARY, false);
         }
     }
 
     private void ensurePageTabVisible() {
-        int visibleCount = Math.max(1, (panelWidth - PANEL_MARGIN * 2) / PAGE_TAB_WIDTH);
+        int visibleCount = tabVisibleCount();
         int selected = currentPage();
         if (selected < pageTabOffset) pageTabOffset = selected;
         if (selected >= pageTabOffset + visibleCount) pageTabOffset = selected - visibleCount + 1;
         pageTabOffset = Mth.clamp(pageTabOffset, 0, Math.max(0, layout.pages().size() - visibleCount));
     }
 
+    private int tabVisibleCount() {
+        return Mth.clamp((WHEEL_W - 8) / PAGE_TAB_WIDTH, 1, 4);
+    }
+
     private void drawStatus(GuiGraphics graphics) {
-        if (statusKey == null) return;
-        int y = editing ? panelTop + panelHeight - 34 : panelTop + panelHeight - 15;
+        if (statusKey == null) {
+            if (editing && !awaitingLayout) graphics.drawString(font,
+                    Component.translatable("gui.useless_mod.mode_config.hint"),
+                    panelLeft + PANEL_MARGIN, panelTop + panelHeight - 16, AppleStyle.TERTIARY, false);
+            return;
+        }
+        int y = panelTop + panelHeight - 16;
         Component status = Component.translatable(statusKey);
-        String text = font.plainSubstrByWidth(status.getString(), Math.max(1, panelWidth - 12));
-        graphics.drawString(font, text, panelLeft + PANEL_MARGIN, y,
-                MachineScreenStyle.MUTED_TEXT_COLOR, false);
+        String text = font.plainSubstrByWidth(status.getString(), Math.max(1, panelWidth - 90));
+        graphics.drawString(font, text, panelLeft + PANEL_MARGIN, y, AppleStyle.SECONDARY, false);
     }
 
     private void drawImportConfirmation(GuiGraphics graphics, int mouseX, int mouseY) {
@@ -1201,15 +1329,16 @@ public class ModeWheelScreen extends Screen {
         int modalHeight = 82;
         int left = (uiWidth - modalWidth) / 2;
         int top = (uiHeight - modalHeight) / 2;
-        graphics.fill(0, 0, uiWidth, uiHeight, 0x99000000);
-        MachineScreenStyle.drawPanel(graphics, left, top, modalWidth, modalHeight);
+        graphics.fill(0, 0, uiWidth, uiHeight, AppleStyle.SCRIM);
+        AppleStyle.shadow(AppleStyle.SH_CARD).draw(graphics, mouseX, mouseY, left, top, modalWidth, modalHeight);
+        AppleTex.card(AppleStyle.R_WINDOW).draw(graphics, mouseX, mouseY, left, top, modalWidth, modalHeight);
         graphics.drawString(font,
                 font.plainSubstrByWidth(
                         Component.translatable("gui.useless_mod.mode_config.import_confirm").getString(),
                         modalWidth - 16),
-                left + 8, top + 10, MachineScreenStyle.TEXT_COLOR, false);
+                left + 10, top + 12, AppleStyle.LABEL, false);
         drawManualButton(graphics, left + 10, top + 48, 110, 18,
-                Component.translatable("gui.useless_mod.mode_config.confirm"),
+                Component.translatable("gui.useless_mod.mode_config.confirm").withStyle(s0 -> s0.withInsertion("primary")),
                 new Rect(left + 10, top + 48, 110, 18), mouseX, mouseY);
         drawManualButton(graphics, left + modalWidth - 120, top + 48, 110, 18,
                 Component.translatable("gui.useless_mod.mode_config.cancel"),
@@ -1218,11 +1347,11 @@ public class ModeWheelScreen extends Screen {
 
     private void drawManualButton(GuiGraphics graphics, int x, int y, int width, int height,
                                   Component message, Rect rect, int mouseX, int mouseY) {
-        int color = rect.contains(mouseX, mouseY)
-                ? MachineScreenStyle.HIGHLIGHT_COLOR : MachineScreenStyle.PANEL_COLOR;
-        graphics.fill(x, y, x + width, y + height, color);
-        graphics.drawString(font, font.plainSubstrByWidth(message.getString(), width - 6),
-                x + 3, y + 5, MachineScreenStyle.TEXT_COLOR, false);
+        boolean primary = "primary".equals(message.getStyle().getInsertion());
+        AppleUi.ButtonStyle st = primary ? AppleUi.ButtonStyle.PRIMARY : AppleUi.ButtonStyle.GRAY;
+        AppleUi.buttonSurface(graphics, x, y, width, height, st, rect.contains(mouseX, mouseY), false, true);
+        String t = font.plainSubstrByWidth(message.getString(), width - 6);
+        graphics.drawString(font, t, x + (width - font.width(t)) / 2, y + 5, AppleUi.buttonTextColor(st, true), false);
     }
 
     @Override
@@ -1245,6 +1374,19 @@ public class ModeWheelScreen extends Screen {
             return true;
         }
         if (awaitingLayout) return true;
+        if (pageNameField != null && pageNameField.isFocused() && !pageNameField.isMouseOver(mouseX, mouseY)) {
+            if (commitNameFields()) sendLayout();
+            pageNameField.setFocused(false);
+            setFocused(null);
+        }
+        if (!editing && button == GLFW.GLFW_MOUSE_BUTTON_LEFT) {
+            for (WheelChoice choice : wheelChoices) {
+                if (choice.rect().contains(mouseX, mouseY)) {
+                    onModeSelected(choice.id());
+                    return true;
+                }
+            }
+        }
 
         // 连锁挖掘模块右端的齿轮：进入「连锁等价组」编辑子界面。
         // 必须在 super.mouseClicked 之前拦截，否则点击会被模块按钮先吃掉。
@@ -1290,6 +1432,20 @@ public class ModeWheelScreen extends Screen {
                 drag = DragState.module(module.id(), mouseX, mouseY);
                 return true;
             }
+        }
+        if (!editing && (mouseX < contentLeft || mouseX >= contentRight
+                || mouseY < contentTop || mouseY >= contentBottom)) {
+            for (var toolbar : toolbarButtons) {
+                if (toolbar.mouseClicked(mouseX, mouseY, button)) {
+                    setFocused(toolbar);
+                    return true;
+                }
+            }
+            if (pageNameField != null && pageNameField.mouseClicked(mouseX, mouseY, button)) {
+                setFocused(pageNameField);
+                return true;
+            }
+            return false;
         }
         return super.mouseClicked(mouseX, mouseY, button);
     }
@@ -1367,7 +1523,7 @@ public class ModeWheelScreen extends Screen {
             }
             return true;
         }
-        if (mouseY >= panelTop + 22 && mouseY <= panelTop + 22 + PAGE_TAB_HEIGHT) {
+        if (mouseY >= panelTop + 40 && mouseY <= panelTop + 40 + PAGE_TAB_HEIGHT) {
             pageTabOffset = Mth.clamp(pageTabOffset - (int) Math.signum(deltaY),
                     0, Math.max(0, layout.pages().size() - 1));
             return true;
@@ -1514,16 +1670,15 @@ public class ModeWheelScreen extends Screen {
         }
         Rect gear = chainGroupGearRect(module);
         int color = gear.contains(mouseX, mouseY)
-                ? MachineScreenStyle.TEXT_COLOR
-                : MachineScreenStyle.SUBTLE_TEXT_COLOR;
+                ? AppleStyle.LABEL
+                : AppleStyle.SECONDARY;
 
-        int cx = gear.left() + GEAR_SIZE / 2;
-        int cy = gear.top() + GEAR_SIZE / 2;
-        graphics.fill(cx - 2, cy - 2, cx + 2, cy + 2, color);
-        graphics.fill(cx - 1, gear.top(), cx + 1, cy - 2, color);
-        graphics.fill(cx - 1, cy + 2, cx + 1, gear.bottom(), color);
-        graphics.fill(gear.left(), cy - 1, cx - 2, cy + 1, color);
-        graphics.fill(cx + 2, cy - 1, gear.right(), cy + 1, color);
+        // Apple 风：浅蓝圆底 + 自绘齿轮图标；按钮标签已为其预留右侧空间，不再与文字重叠
+        boolean hot = gear.contains(mouseX, mouseY);
+        AppleUi.fillRound(graphics, gear.left(), gear.top(), GEAR_SIZE, GEAR_SIZE, GEAR_SIZE / 2f,
+                hot ? 0x33007AFF : 0x1A007AFF);
+        AppleUi.icon(graphics, AppleUi.Icon.GEAR, gear.left() + 2, gear.top() + 2, GEAR_SIZE - 4,
+                hot ? AppleUi.BLUE_TEXT : AppleUi.BLUE);
     }
 
     /** 齿轮的悬停提示画在裁剪区之外，免得提示框被内容区裁掉。 */
@@ -1617,7 +1772,7 @@ public class ModeWheelScreen extends Screen {
     }
 
     private int pageAt(double mouseX, double mouseY) {
-        if (mouseY < panelTop + 22 || mouseY > panelTop + 22 + PAGE_TAB_HEIGHT) return -1;
+        if (mouseY < panelTop + 40 || mouseY > panelTop + 40 + PAGE_TAB_HEIGHT) return -1;
         for (int index = 0; index < pageTabRects.size(); index++) {
             if (pageTabRects.get(index).contains(mouseX, mouseY)) {
                 return pageTabOffset + index;
@@ -1636,7 +1791,8 @@ public class ModeWheelScreen extends Screen {
             onClose();
             return true;
         }
-        if (keyCode == GLFW.GLFW_KEY_ENTER && editing
+        if (confirmImport) return true;
+        if (keyCode == GLFW.GLFW_KEY_ENTER
                 && (pageNameField != null && pageNameField.isFocused()
                 || groupNameFields.stream().anyMatch(field -> field.field().isFocused()))) {
             if (commitNameFields()) sendLayout();
@@ -1647,8 +1803,13 @@ public class ModeWheelScreen extends Screen {
     }
 
     @Override
+    public boolean charTyped(char codePoint, int modifiers) {
+        return confirmImport || super.charTyped(codePoint, modifiers);
+    }
+
+    @Override
     public void onClose() {
-        if (editing && commitNameFields()) sendLayout();
+        if (commitNameFields()) sendLayout();
         super.onClose();
     }
 

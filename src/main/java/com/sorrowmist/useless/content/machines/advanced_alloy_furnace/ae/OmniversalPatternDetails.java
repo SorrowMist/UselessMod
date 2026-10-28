@@ -21,7 +21,6 @@ import java.util.WeakHashMap;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicLong;
 import org.jetbrains.annotations.Nullable;
 
 public final class OmniversalPatternDetails extends DynamicComponentPatternDetails {
@@ -64,11 +63,9 @@ public final class OmniversalPatternDetails extends DynamicComponentPatternDetai
 
             CachedDecode cached = cache.get(definition);
             if (cached != null) {
-                cache.hits.incrementAndGet();
                 if (generation != AlloyFurnaceRecipeCatalog.generation()) continue;
                 return cached.valueOrThrow();
             }
-            cache.misses.incrementAndGet();
 
             CompletableFuture<CachedDecode> ownerFuture = new CompletableFuture<>();
             InFlightDecode owner = new InFlightDecode(generation, ownerFuture);
@@ -90,7 +87,6 @@ public final class OmniversalPatternDetails extends DynamicComponentPatternDetai
 
             CachedDecode result;
             try {
-                cache.actualDecodes.incrementAndGet();
                 try {
                     result = CachedDecode.success(decodeUncached(definition, level));
                 } catch (RuntimeException exception) {
@@ -171,17 +167,11 @@ public final class OmniversalPatternDetails extends DynamicComponentPatternDetai
         private final Object lock = new Object();
         private final ConcurrentHashMap<AEItemKey, InFlightDecode> inFlight =
                 new ConcurrentHashMap<>();
-        private final AtomicLong hits = new AtomicLong();
-        private final AtomicLong misses = new AtomicLong();
-        private final AtomicLong evictions = new AtomicLong();
-        private final AtomicLong actualDecodes = new AtomicLong();
         private final LinkedHashMap<AEItemKey, CachedDecode> entries =
                 new LinkedHashMap<>(64, 0.75F, true) {
                     @Override
                     protected boolean removeEldestEntry(Map.Entry<AEItemKey, CachedDecode> eldest) {
-                        boolean remove = size() > capacity();
-                        if (remove) evictions.incrementAndGet();
-                        return remove;
+                        return size() > capacity();
                     }
                 };
 
@@ -243,19 +233,6 @@ public final class OmniversalPatternDetails extends DynamicComponentPatternDetai
             if (failure != null) throw failure;
             if (details == null) throw new IllegalStateException("Cached omniversal pattern has no result");
             return details;
-        }
-    }
-
-    public record DecodeCacheStats(long hits, long misses, long evictions, long actualDecodes) {
-    }
-
-    public static DecodeCacheStats stats(Level level) {
-        if (level == null) return new DecodeCacheStats(0L, 0L, 0L, 0L);
-        synchronized (DECODE_CACHE_LOCK) {
-            LevelDecodeCache cache = DECODE_CACHES.get(level);
-            return cache == null ? new DecodeCacheStats(0L, 0L, 0L, 0L)
-                    : new DecodeCacheStats(cache.hits.get(), cache.misses.get(),
-                    cache.evictions.get(), cache.actualDecodes.get());
         }
     }
 

@@ -13,6 +13,7 @@ import cn.dancingsnow.neoecoae.api.ECOTier;
 import cn.dancingsnow.neoecoae.blocks.entity.NEBlockEntity;
 import cn.dancingsnow.neoecoae.blocks.entity.storage.ECOStorageSystemBlockEntity;
 import cn.dancingsnow.neoecoae.impl.storage.infinite.ECOStorageHostMode;
+import cn.dancingsnow.neoecoae.impl.storage.infinite.ECOInfiniteStorageDomains;
 import cn.dancingsnow.neoecoae.multiblock.cluster.NEStorageCluster;
 import com.sorrowmist.useless.compat.neoecoae.compact.NeoEcoCompactRegistry;
 import com.sorrowmist.useless.compat.neoecoae.compact.block.CompactTicker;
@@ -31,7 +32,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.lang.reflect.Field;
-import java.nio.charset.StandardCharsets;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Set;
@@ -118,7 +118,11 @@ public class CompactL9BlockEntity extends ECOStorageSystemBlockEntity
 
     @SuppressWarnings({"unchecked", "rawtypes"})
     private void linkAll(NEStorageCluster cluster) {
-        cluster.getBlockEntities().forEachRemaining(blockEntity -> blockEntity.updateCluster(cluster));
+        cluster.getBlockEntities().forEachRemaining(blockEntity -> {
+            if (blockEntity instanceof NEBlockEntity ecoEntity) {
+                ecoEntity.updateCluster(cluster);
+            }
+        });
     }
 
     // ------------------------------------------------------------------ tick
@@ -205,7 +209,7 @@ public class CompactL9BlockEntity extends ECOStorageSystemBlockEntity
 
 
     @Override
-    public boolean canTakeInfiniteStorageComponent() {
+    public boolean canExtractInfiniteComponents() {
         return false;
     }
 
@@ -289,24 +293,30 @@ public class CompactL9BlockEntity extends ECOStorageSystemBlockEntity
     }
 
     /**
-     * 若方块掉落物里已经带着一个无限域（ECO 的 {@code applyInfiniteDomainToControllerDrop} 写的），就沿用它；
-     * 否则用「维度 + 坐标」推导出一个稳定 UUID 作为新域。
+     * Existing controller identities retain their native recovery rules. A new block
+     * gets a fresh domain, created durably before the controller enters infinite mode.
+     * Coordinates are not an identity: replacing a block must not reopen an old domain.
      */
     private void restoreOrCreateInfiniteDomain(ServerLevel level) {
         ItemStack carrier = new ItemStack(NeoEcoCompactRegistry.COMPACT_L9_ITEM.get());
         applyInfiniteDomainToControllerDrop(carrier);
         CompoundTag tag = carrier.getOrCreateTag().copy();
         if (!tag.hasUUID(DOMAIN_TAG)) {
-            tag.putUUID(DOMAIN_TAG, stableDomainId(level));
+            UUID domainId = UUID.randomUUID();
+            var engine = ECOInfiniteStorageDomains.acquire(level, domainId);
+            try {
+                if (!engine.isHealthy() || !engine.commit().successful()) {
+                    RateLimitedLogger.warn(LOGGER, "Compact L9 at {} could not create its infinite domain", worldPosition);
+                    return;
+                }
+                tag.putUUID(DOMAIN_TAG, domainId);
+            } finally {
+                ECOInfiniteStorageDomains.release(level.getServer(), domainId);
+            }
         }
         tag.putString(MODE_TAG, ECOStorageHostMode.FORMED_INFINITE.id());
         carrier.getOrCreateTag().merge(tag);
         restoreInfiniteDomainFromItem(carrier);
-    }
-
-    private UUID stableDomainId(ServerLevel level) {
-        String seed = "useless_mod:compact_l9:" + level.dimension().location() + ':' + worldPosition.asLong();
-        return UUID.nameUUIDFromBytes(seed.getBytes(StandardCharsets.UTF_8));
     }
 
     @Override

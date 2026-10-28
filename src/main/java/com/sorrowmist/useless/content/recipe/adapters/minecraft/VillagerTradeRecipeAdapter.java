@@ -11,7 +11,6 @@ import com.sorrowmist.useless.init.ModItems;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.core.registries.BuiltInRegistries;
-import net.minecraft.util.RandomSource;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.npc.Villager;
 import net.minecraft.world.entity.npc.VillagerData;
@@ -26,7 +25,6 @@ import net.minecraft.world.item.trading.MerchantOffer;
 import net.minecraft.world.item.crafting.Ingredient;
 import com.sorrowmist.useless.compat.forge1201.recipe.RecipeHolder;
 import net.minecraft.world.level.Level;
-import net.minecraft.world.level.levelgen.PositionalRandomFactory;
 import com.sorrowmist.useless.compat.forge1201.recipe.DataComponentIngredient;
 import org.jetbrains.annotations.Nullable;
 
@@ -402,9 +400,10 @@ public final class VillagerTradeRecipeAdapter
         VillagerType effectiveType = villagerType == null
                 ? VillagerType.PLAINS : villagerType;
         villager.setVillagerData(new VillagerData(effectiveType, profession, villagerLevel));
-        // Vanilla listings generate some base prices from a random range. Feeding them a source
-        // that always returns the lower bound gives the minimum configured emerald cost.
-        return listing.getOffer(villager, new MinimumRandomSource());
+        // Listings may also use this source for enchantment selection and rejection loops.
+        // A constant lower-bound source can make those loops run forever (issue #51).
+        // Sample deterministically on both sides; do not claim this is the minimum price.
+        return listing.getOffer(villager, TradeOfferRandom.create());
     }
 
     @Nullable
@@ -415,7 +414,7 @@ public final class VillagerTradeRecipeAdapter
         }
 
         WanderingTrader trader = EntityType.WANDERING_TRADER.create(level);
-        return trader == null ? null : listing.getOffer(trader, new MinimumRandomSource());
+        return trader == null ? null : listing.getOffer(trader, TradeOfferRandom.create());
     }
 
     private static int tradeTableSignature(boolean experimental) {
@@ -633,79 +632,4 @@ public final class VillagerTradeRecipeAdapter
             List<RecipeHolder<VillagerTradeSyntheticRecipe>> recipes) {
     }
 
-    /** Random source used to evaluate the lower endpoint of vanilla random trade prices. */
-    private static final class MinimumRandomSource implements RandomSource {
-        @Override
-        public RandomSource fork() {
-            return new MinimumRandomSource();
-        }
-
-        @Override
-        public PositionalRandomFactory forkPositional() {
-            return new MinimumPositionalRandomFactory();
-        }
-
-        @Override
-        public void setSeed(long seed) {
-        }
-
-        @Override
-        public int nextInt() {
-            return 0;
-        }
-
-        @Override
-        public int nextInt(int bound) {
-            if (bound <= 0) {
-                throw new IllegalArgumentException("bound must be positive");
-            }
-            return 0;
-        }
-
-        @Override
-        public long nextLong() {
-            return 0L;
-        }
-
-        @Override
-        public boolean nextBoolean() {
-            return false;
-        }
-
-        @Override
-        public float nextFloat() {
-            return 0.0F;
-        }
-
-        @Override
-        public double nextDouble() {
-            return 0.0D;
-        }
-
-        @Override
-        public double nextGaussian() {
-            return 0.0D;
-        }
-    }
-
-    private static final class MinimumPositionalRandomFactory implements PositionalRandomFactory {
-        @Override
-        public RandomSource fromHashOf(String name) {
-            return new MinimumRandomSource();
-        }
-
-        public RandomSource fromSeed(long seed) {
-            return new MinimumRandomSource();
-        }
-
-        @Override
-        public RandomSource at(int x, int y, int z) {
-            return new MinimumRandomSource();
-        }
-
-        @Override
-        public void parityConfigString(StringBuilder builder) {
-            builder.append("MinimumRandomSource");
-        }
-    }
 }

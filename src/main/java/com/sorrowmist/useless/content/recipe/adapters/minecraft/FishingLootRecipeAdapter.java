@@ -54,7 +54,7 @@ import java.util.Set;
  * 消耗水，并以钓鱼竿作为模具。配方 id 只由产物内容决定，不依赖集合迭代顺序。</p>
  */
 public final class FishingLootRecipeAdapter implements IRecipeAdapter<FishingLootSyntheticRecipe> {
-    /** 原版钓鱼战利品表：data/minecraft/loot_table/gameplay/fishing.json。 */
+    /** 原版钓鱼战利品表：data/minecraft/loot_tables/gameplay/fishing.json。 */
     private static final ResourceLocation FISHING_TABLE_ID =
             new ResourceLocation("gameplay/fishing");
     private static final int WATER_PER_OUTPUT = 1_000;
@@ -182,7 +182,7 @@ public final class FishingLootRecipeAdapter implements IRecipeAdapter<FishingLoo
         Map<ResourceLocation, JsonObject> candidates = new LinkedHashMap<>();
         try {
             Map<ResourceLocation, Resource> found = resourceManager.listResources(
-                    "loot_table/gameplay/fishing",
+                    "loot_tables/gameplay/fishing",
                     id -> !id.getNamespace().equals("minecraft")
                             && id.getPath().endsWith(".json"));
             for (ResourceLocation resourceId : found.keySet()) {
@@ -218,11 +218,11 @@ public final class FishingLootRecipeAdapter implements IRecipeAdapter<FishingLoo
         }
     }
 
-    /** 把 {@code aquaculture:loot_table/gameplay/fishing/fish.json} 还原成表 id。 */
+    /** 把 {@code aquaculture:loot_tables/gameplay/fishing/fish.json} 还原成表 id。 */
     @Nullable
     private static ResourceLocation toTableId(ResourceLocation resourceId) {
         String path = resourceId.getPath();
-        String prefix = "loot_table/";
+        String prefix = "loot_tables/";
         String suffix = ".json";
         if (!path.startsWith(prefix) || !path.endsWith(suffix)) {
             return null;
@@ -596,7 +596,7 @@ public final class FishingLootRecipeAdapter implements IRecipeAdapter<FishingLoo
     private static JsonObject readLootTable(ResourceManager resourceManager,
                                             ResourceLocation tableId) {
         ResourceLocation resourceId = new ResourceLocation(
-                tableId.getNamespace(), "loot_table/" + tableId.getPath() + ".json");
+                tableId.getNamespace(), "loot_tables/" + tableId.getPath() + ".json");
         Optional<Resource> resource = resourceManager.getResource(resourceId);
         if (resource.isEmpty()) {
             return null;

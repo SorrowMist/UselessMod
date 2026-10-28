@@ -32,9 +32,9 @@ import java.util.Optional;
 import java.util.UUID;
 
 public final class DimensionConfigMenu extends AbstractContainerMenu {
-    private static final int PLAYER_INVENTORY_X = 16;
-    private static final int PLAYER_INVENTORY_Y = 254;
-    private static final int PLAYER_HOTBAR_Y = 312;
+    private static final int PLAYER_INVENTORY_X = 22;
+    private static final int PLAYER_INVENTORY_Y = 248;
+    private static final int PLAYER_HOTBAR_Y = 316;
 
     public static final int BORDER_SLOT = 0;
     public static final int FILL_SLOT = 1;
@@ -109,15 +109,15 @@ public final class DimensionConfigMenu extends AbstractContainerMenu {
         this.generateBedrock = config.generateBedrock();
         this.bedrockAtBottom = config.bedrockAtBottom();
 
-        ghostSlots[BORDER_SLOT] = new GhostSlot(config.borderBlockId(), 16, 34);
-        ghostSlots[FILL_SLOT] = new GhostSlot(config.fillBlockId(), 16, 52);
-        ghostSlots[CENTER_SLOT] = new GhostSlot(config.centerBlockId(), 16, 70);
-        ghostSlots[BOUNDARY_A_SLOT] = new GhostSlot(config.boundaryBlockAId(), 16, 100);
-        ghostSlots[BOUNDARY_B_SLOT] = new GhostSlot(config.boundaryBlockBId(), 16, 118);
-        ghostSlots[ROAD_A_SLOT] = new GhostSlot(config.roadBlockAId(), 16, 148);
-        ghostSlots[ROAD_B_SLOT] = new GhostSlot(config.roadBlockBId(), 16, 165);
-        ghostSlots[ROAD_C_SLOT] = new GhostSlot(config.roadBlockCId(), 16, 182);
-        ghostSlots[CENTER_MARKER_SLOT] = new GhostSlot(config.centerMarkerBlockId(), 16, 212);
+        ghostSlots[BORDER_SLOT] = new GhostSlot(config.borderBlockId(), 42, 66);
+        ghostSlots[FILL_SLOT] = new GhostSlot(config.fillBlockId(), 110, 66);
+        ghostSlots[CENTER_SLOT] = new GhostSlot(config.centerBlockId(), 178, 66);
+        ghostSlots[BOUNDARY_A_SLOT] = new GhostSlot(config.boundaryBlockAId(), 42, 122);
+        ghostSlots[BOUNDARY_B_SLOT] = new GhostSlot(config.boundaryBlockBId(), 110, 122);
+        ghostSlots[ROAD_A_SLOT] = new GhostSlot(config.roadBlockAId(), 178, 122);
+        ghostSlots[ROAD_B_SLOT] = new GhostSlot(config.roadBlockBId(), 42, 178);
+        ghostSlots[ROAD_C_SLOT] = new GhostSlot(config.roadBlockCId(), 110, 178);
+        ghostSlots[CENTER_MARKER_SLOT] = new GhostSlot(config.centerMarkerBlockId(), 178, 178);
         for (GhostSlot slot : ghostSlots) addSlot(slot);
         updateSlotVisibility();
         addPlayerInventory(inventory);
@@ -127,11 +127,11 @@ public final class DimensionConfigMenu extends AbstractContainerMenu {
         for (int row = 0; row < 3; row++) {
             for (int column = 0; column < 9; column++) {
                 addSlot(new Slot(inventory, column + row * 9 + 9,
-                        PLAYER_INVENTORY_X + column * 18, PLAYER_INVENTORY_Y + row * 18));
+                        PLAYER_INVENTORY_X + column * 22, PLAYER_INVENTORY_Y + row * 22));
             }
         }
         for (int column = 0; column < 9; column++) {
-            addSlot(new Slot(inventory, column, PLAYER_INVENTORY_X + column * 18,
+            addSlot(new Slot(inventory, column, PLAYER_INVENTORY_X + column * 22,
                     PLAYER_HOTBAR_Y));
         }
     }
@@ -260,10 +260,12 @@ public final class DimensionConfigMenu extends AbstractContainerMenu {
 
     public void setBoundaryIntervalX(int value) {
         boundaryIntervalX = value;
+        updateSlotVisibility();
     }
 
     public void setBoundaryIntervalZ(int value) {
         boundaryIntervalZ = value;
+        updateSlotVisibility();
     }
 
     public void setRoadWidth(int value) {
@@ -385,15 +387,19 @@ public final class DimensionConfigMenu extends AbstractContainerMenu {
     public void setGhostSlotFromClient(int index, ItemStack stack) {
         if (!isGhostSlotActive(index)) return;
         ResourceLocation id = DimensionGenerationConfig.blockId(stack);
-        if (id == null || !DimensionGenerationConfig.isValidBlockId(id)) return;
+        if (id == null || !DimensionGenerationConfig.isAllowedBlockId(id)) return;
         GhostSlot slot = getGhostSlot(index);
         if (slot == null) return;
         slot.setBlockId(id);
         PacketDistributor.sendToServer(new DimensionConfigGhostSlotPacket(containerId, index, id));
     }
 
+    /**
+     * Update the server's pending ghost mirror, not the saved world configuration.
+     * Mode/interval edits are client-local until Apply, so server-side visibility can be stale.
+     * Bounds and allowed-block validation remain authoritative; the client checks active slots.
+     */
     public boolean setGhostBlockId(int index, @Nullable ResourceLocation id) {
-        if (!isGhostSlotActive(index)) return false;
         GhostSlot slot = getGhostSlot(index);
         if (slot == null) return false;
         if (id != null && !DimensionGenerationConfig.isAllowedBlockId(id)) return false;
@@ -469,6 +475,7 @@ public final class DimensionConfigMenu extends AbstractContainerMenu {
     @Override
     public void clicked(int slotId, int button, @NotNull ClickType clickType, @NotNull Player player) {
         if (slotId >= 0 && slotId < GHOST_SLOT_COUNT) {
+            if (player.level().isClientSide && !isGhostSlotActive(slotId)) return;
             ItemStack carried = getCarried();
             setGhostBlockId(slotId,
                     !carried.isEmpty() && carried.getItem() instanceof BlockItem

@@ -4,13 +4,13 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.OptionalLong;
 
-final class ScaledEnergyAmount {
+public final class ScaledEnergyAmount {
     private static final String[] SUFFIXES = {"", "K", "M", "G", "T", "P", "E"};
 
     private ScaledEnergyAmount() {
     }
 
-    static String format(long amount) {
+    public static String format(long amount) {
         BigDecimal value = BigDecimal.valueOf(Math.max(0L, amount));
         int suffix = 0;
         while (suffix < SUFFIXES.length - 1
@@ -23,7 +23,7 @@ final class ScaledEnergyAmount {
                 .toPlainString() + SUFFIXES[suffix];
     }
 
-    static OptionalLong parse(String text, long maximum) {
+    public static OptionalLong parse(String text, long maximum) {
         if (text == null) return OptionalLong.empty();
         String value = text.trim();
         if (value.isEmpty()) return OptionalLong.empty();
@@ -45,7 +45,7 @@ final class ScaledEnergyAmount {
         }
     }
 
-    static boolean isValidInput(String text) {
+    public static boolean isValidInput(String text) {
         if (text.isEmpty()) return true;
         int end = suffixIndex(text.charAt(text.length() - 1)) == 0
                 ? text.length() : text.length() - 1;

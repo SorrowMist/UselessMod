@@ -107,7 +107,11 @@ public final class OmniversalPatternJeiTransferHandler<T extends PatternEncoding
             boolean maxTransfer,
             boolean doTransfer,
             IRecipeTransferHandlerHelper helper) {
-        AdvancedAlloyFurnaceRecipe recipe = entry.recipe();
+        AlloyFurnaceRecipeCatalog.Entry selected = HostileNetworksJeiRecipes.selected(entry, recipeSlots);
+        if (selected == null) {
+            return helper.createUserErrorWithTooltip(Component.translatable("jei.useless_mod.hnn.invalid_selection"));
+        }
+        AdvancedAlloyFurnaceRecipe recipe = selected.recipe();
         List<List<GenericStack>> inputs = inputOptions(recipe);
         List<GenericStack> outputs = outputs(recipe);
         if (inputs == null || outputs == null || inputs.isEmpty() || outputs.isEmpty()) {
@@ -127,7 +131,7 @@ public final class OmniversalPatternJeiTransferHandler<T extends PatternEncoding
 
         // Sent before the slot contents so the pick is on record by the time the server sees the
         // encoded pattern, including when a helper mod encodes it automatically on the same tick.
-        selectRecipe(menu, entry, player.level());
+        selectRecipe(menu, selected, player.level());
         // Forge ExtendedAE Plus has no search-preset API; it must not gate AE2 pattern transfer.
         EncodingHelper.encodeProcessingRecipe(menu, inputs, outputs);
         return null;

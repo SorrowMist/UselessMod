@@ -6,6 +6,7 @@ import appeng.api.orientation.BlockOrientation;
 import cn.dancingsnow.neoecoae.blocks.entity.crafting.ECOCraftingPatternBusBlockEntity;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.state.BlockState;
 import org.jetbrains.annotations.Nullable;
@@ -24,6 +25,8 @@ public class ShadowPatternBusBlockEntity extends ECOCraftingPatternBusBlockEntit
 
     public ShadowPatternBusBlockEntity(BlockEntityType<?> type, BlockPos pos, BlockState blockState) {
         super(type, pos, blockState);
+        getMainNode().setFlags();
+        getMainNode().setInWorldNode(false);
     }
 
     @Override
@@ -31,6 +34,18 @@ public class ShadowPatternBusBlockEntity extends ECOCraftingPatternBusBlockEntit
     public IGrid getGrid() {
         IGridNode node = getGridNode();
         return node == null ? null : node.getGrid();
+    }
+
+    public void initializeShadowNode(ServerLevel level) {
+        if (!getMainNode().isReady()) {
+            getMainNode().create(level, worldPosition);
+        }
+    }
+
+    public void releaseShadowNode() {
+        if (getMainNode().isReady()) {
+            getMainNode().destroy();
+        }
     }
 
     @Override

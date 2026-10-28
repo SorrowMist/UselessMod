@@ -16,24 +16,34 @@ import com.sorrowmist.useless.compat.forge1201.network.PacketDistributor;
 import com.sorrowmist.useless.compat.forge1201.network.IPayloadContext;
 import org.jetbrains.annotations.NotNull;
 
+import java.util.UUID;
+
 /**
  * 客户端给某个已绑定锚点改名（空串表示恢复成方块本名）。
  *
- * <p>与其它无线物流包一样，服务端只认「当前打开的那个界面所属的网络」，包体里不带网络 ID。</p>
+ * <p>networkId 仅用于拒绝切网前发出的旧指令，不能指定编辑另一张网络。
+ * 服务端仍验证当前菜单的网络及归属权限。</p>
  */
-public record StaffLinkRenamePacket(GlobalPos anchor, String name) implements CustomPacketPayload {
+public record StaffLinkRenamePacket(UUID networkId, GlobalPos anchor, String name) implements CustomPacketPayload {
 
     public static final Type<StaffLinkRenamePacket> TYPE = new Type<>(
             new ResourceLocation(UselessMod.MODID, "staff_link_rename"));
     public static final StreamCodec<FriendlyByteBuf, StaffLinkRenamePacket> STREAM_CODEC =
             StreamCodec.of(
                     (buffer, packet) -> {
+                        buffer.writeUUID(packet.networkId());
                         StaffLinkRoute.writeAnchor(buffer, packet.anchor());
                         buffer.writeUtf(packet.name(), StaffLinkNetwork.MAX_ANCHOR_NAME);
                     },
-                    buffer -> new StaffLinkRenamePacket(
+                    buffer -> new StaffLinkRenamePacket(buffer.readUUID(),
                             StaffLinkRoute.readAnchor(buffer),
                             buffer.readUtf(StaffLinkNetwork.MAX_ANCHOR_NAME)));
+
+    boolean applyTo(StaffLinkNetwork network) {
+        if (!networkId.equals(network.id()) || !network.isBound(anchor)) return false;
+        network.setAnchorName(anchor, name);
+        return true;
+    }
 
     public static void handle(StaffLinkRenamePacket packet, IPayloadContext ctx) {
         ctx.enqueueWork(() -> {
@@ -48,11 +58,8 @@ public record StaffLinkRenamePacket(GlobalPos anchor, String name) implements Cu
                 return;
             }
             StaffLinkNetwork network = StaffLinkManager.networkById(player.server, menu.getNetworkId());
-            if (network == null || !network.isBound(packet.anchor())) {
-                return;
-            }
-            network.setAnchorName(packet.anchor(), packet.name());
-            StaffLinkSavedData.get(player.server).markDirty();
+            if (network == null) return;
+            if (packet.applyTo(network)) StaffLinkSavedData.get(player.server).markDirty();
             PacketDistributor.sendToPlayer(player, StaffLinkSyncPacket.of(
                     player.server, StaffLinkManager.ownerIdOf(player), network));
         });

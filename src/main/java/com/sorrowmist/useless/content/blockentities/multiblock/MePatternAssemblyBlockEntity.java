@@ -26,7 +26,6 @@ import com.sorrowmist.useless.api.crafting.bigint.AlloyFurnaceBigIntegerProvider
 import com.sorrowmist.useless.api.crafting.bigint.AlloyFurnaceBigIntegerTarget;
 import com.sorrowmist.useless.content.blockentities.PagedMenuPageMemory;
 import com.sorrowmist.useless.content.blockentities.RecoverableItemStackHandler;
-import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.OmniversalPatternWarnings;
 import com.sorrowmist.useless.core.config.ConfigManager;
 import com.sorrowmist.useless.core.component.ExternalInventoryKind;
 import com.sorrowmist.useless.core.component.ExternalInventoryReference;
@@ -250,8 +249,6 @@ public final class MePatternAssemblyBlockEntity extends AEBaseBlockEntity
             // The snapshot only looks empty because the link to the controller is not resolvable
             // yet.  Publishing it would index this provider as unable to craft anything, so stay
             // dirty and publish on a later tick instead.
-            OmniversalPatternWarnings.notPublished("me_pattern_assembly@" + worldPosition, "<all>",
-                    "the controller link is not resolvable yet");
             return;
         }
 
@@ -259,13 +256,6 @@ public final class MePatternAssemblyBlockEntity extends AEBaseBlockEntity
         try {
             ICraftingProvider.requestUpdate(mainNode);
             publishedPatternCount = available.size();
-            for (IPatternDetails pattern : available) {
-                var output = pattern.getPrimaryOutput();
-                if (!node.getGrid().getCraftingService().getCraftingFor(output.what()).contains(pattern)) {
-                    RateLimitedLogger.warn(LOGGER, "AE grid did not index multiblock alloy furnace pattern at {} (output={})",
-                            worldPosition, output);
-                }
-            }
         } catch (RuntimeException exception) {
             RateLimitedLogger.warn(LOGGER, "Failed to refresh multiblock pattern provider at {}", worldPosition, exception);
             // Keep the bit set so the next server tick retries after a
@@ -275,8 +265,6 @@ public final class MePatternAssemblyBlockEntity extends AEBaseBlockEntity
         if (controllerUnresolvable) {
             // A previous snapshot had to be cleared because the controller link went away; keep
             // retrying so the node is not left indexed as an unlinked provider.
-            OmniversalPatternWarnings.notPublished("me_pattern_assembly@" + worldPosition, "<all>",
-                    "cleared the published patterns because the controller link is gone");
             providerRefreshPending = true;
         }
     }

@@ -1,266 +1,144 @@
 package com.sorrowmist.useless.client.gui;
 
+import com.sorrowmist.useless.client.gui.apple.*;
+import com.sorrowmist.useless.client.gui.ldl.api.*;
 import com.sorrowmist.useless.content.menus.OreGeneratorMenu;
 import com.sorrowmist.useless.network.OreGeneratorOutputTogglePacket;
 import com.sorrowmist.useless.network.OreGeneratorSettingsPacket;
 import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.gui.components.EditBox;
-import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.inventory.Slot;
-import com.sorrowmist.useless.compat.forge1201.network.PacketDistributor;
-import org.lwjgl.glfw.GLFW;
 
 import java.util.List;
 import java.util.Optional;
 
-public final class OreGeneratorScreen extends AbstractContainerScreen<OreGeneratorMenu> {
-    private static final int PANEL_WIDTH = 250;
-    private static final int PANEL_HEIGHT = 336;
+import static com.sorrowmist.useless.client.gui.ldl.api.Ui.*;
 
-    private EditBox rateField;
-    private PressableAE2Button rateDown;
-    private PressableAE2Button rateUp;
-    private PressableAE2Button applyButton;
-    private PressableAE2Button aeButton;
-    private PressableAE2Button previousPageButton;
-    private PressableAE2Button nextPageButton;
-    private long lastSyncedRate = Long.MIN_VALUE;
-    private String syncedRateText = "";
-    private boolean updatingRateField;
-    private boolean rateDirty;
+/**
+ * 矿物生成器的声明式 API 界面，按 HTML 的 456×323 几何排布。
+ * 只移动客户端显示坐标；数字同步、步进、回车和关闭提交由共享 API 处理。
+ */
+public final class OreGeneratorScreen extends AppleScreen<OreGeneratorMenu> {
+    private final NumberField rate = numberField(() -> menu.getOutputRate(),
+            value -> AppleNet.send(new OreGeneratorSettingsPacket(menu.containerId, menu.getBlockPos(), value)))
+            .min(1).boxHeight(12).editableWhen(this::editable);
 
     public OreGeneratorScreen(OreGeneratorMenu menu, Inventory inventory, Component title) {
-        super(menu, inventory, title);
-        imageWidth = PANEL_WIDTH;
-        imageHeight = PANEL_HEIGHT;
-        inventoryLabelX = 44;
-        inventoryLabelY = 242;
-        titleLabelX = 8;
-        titleLabelY = 7;
+        super(menu, inventory, title, 456, 323);
+    }
+
+    private boolean layoutRecovery;
+
+    private boolean editable() { return !menu.isRecoveryPage(); }
+    @Override protected void preInit() {
+        super.preInit();
+        imageHeight = menu.isRecoveryPage() ? 347 : 323;
+    }
+    @Override protected void tickControls() {
+        super.tickControls();
+        if (layoutRecovery != menu.isRecoveryPage()) rebuildLayout();
+    }
+    @Override protected int bodyX() { return 12; }
+    @Override protected int bodyY() { return 40; }
+    @Override protected AppleWindow createWindow() { return super.createWindow().referenceIcon("ore_generator_block"); }
+    @Override protected AppleSlotGrid slotGrid() { return super.slotGrid().cellSize(20); }
+
+    @Override
+    protected UiNode titleAccessory() {
+        return statusPill(() -> Component.translatable(menu.isRecoveryPage() ? "gui.useless_mod.apple.recovery"
+                        : menu.getActiveSlots() > 0 ? "gui.useless_mod.apple.running" : "gui.useless_mod.apple.idle"),
+                () -> menu.isRecoveryPage() ? AppleStyle.RED : menu.getActiveSlots() > 0 ? AppleStyle.GREEN : AppleStyle.SECONDARY)
+                .size(68, 12).nudge(-6, 0);
     }
 
     @Override
-    protected void init() {
-        super.init();
-        previousPageButton = addRenderableWidget(new PressableAE2Button(
-                leftPos + 128, topPos + 4, 18, 12,
-                Component.literal("<"), button -> changePage(-1)));
-        nextPageButton = addRenderableWidget(new PressableAE2Button(
-                leftPos + 148, topPos + 4, 18, 12,
-                Component.literal(">"), button -> changePage(1)));
-
-        rateField = new EditBox(font, leftPos + 177, topPos + 35, 62, 14,
-                Component.translatable("gui.useless_mod.ore_generator.rate"));
-        rateField.setMaxLength(24);
-        rateField.setFilter(ScaledEnergyAmount::isValidInput);
-        rateField.setResponder(value -> {
-            if (!updatingRateField) rateDirty = !value.equals(syncedRateText);
-        });
-        addRenderableWidget(rateField);
-
-        rateDown = addRenderableWidget(new PressableAE2Button(
-                leftPos + 177, topPos + 52, 28, 14,
-                Component.literal("-"), button -> adjustRate(-1)));
-        rateUp = addRenderableWidget(new PressableAE2Button(
-                leftPos + 211, topPos + 52, 28, 14,
-                Component.literal("+"), button -> adjustRate(1)));
-        applyButton = addRenderableWidget(new PressableAE2Button(
-                leftPos + 177, topPos + 73, 62, 18,
-                Component.translatable("gui.useless_mod.ore_generator.apply"),
-                button -> sendRate()));
-        aeButton = addRenderableWidget(new PressableAE2Button(
-                leftPos + 177, topPos + 112, 62, 18,
-                Component.translatable("gui.useless_mod.ore_generator.ae_toggle"),
-                button -> toggleAeOutput()));
-        syncRateField(true);
-        updateControls();
+    protected UiNode body() {
+        int extra = menu.isRecoveryPage() ? 24 : 0;
+        Absolute content = absolute(432, 270 + extra)
+                .at(0, 0, 212, 270 + extra, card())
+                .at(10, 12, 114, 9, caption(either(menu::isRecoveryPage,
+                        "gui.useless_mod.apple.recovery", "gui.useless_mod.apple.samples")))
+                .at(130, 8, 74, 17, new Leaf(74, 17, (x, y, w, h) ->
+                        new ApplePageTabs(x, y, w, h, menu::getPage, menu::getPageCount,
+                                menu::getActivePageCount, this::selectPage)).id("pager"))
+                .at(220, 0, 212, 66, card())
+                .at(362, 5, 38, 12, statusPill(either(menu::isAeOnline,
+                                "gui.useless_mod.ore_generator.ae_online", "gui.useless_mod.ore_generator.ae_offline"),
+                        () -> menu.isAeOnline() ? AppleStyle.GREEN : AppleStyle.RED).id("ae_status"))
+                .at(402, 5, 22, 13, toggle(menu::isOutputToAe, () -> AppleNet.send(
+                        new OreGeneratorOutputTogglePacket(menu.containerId, menu.getBlockPos())))
+                        .bindEnabled(this::editable).id("ae"))
+                .at(314, 28, 110, 9, Ui.body(() -> Component.literal(menu.getCountdownTicks() + " tick")).right())
+                .at(314, 50, 110, 9, Ui.body(() -> Component.literal(menu.getActiveSlots() + " / " + menu.getConfiguredSlots())).right())
+                .at(220, 74, 212, 57, card())
+                .at(230, 82, 194, 9, caption(tr("gui.useless_mod.ore_generator.rate")))
+                .at(228, 95, 162, 16, new Leaf(162, 16, (x, y, w, h) ->
+                        new AppleStepper(x, y, w, h, rate.box(), () -> rate.add(-1), () -> rate.add(1)).trailingButtons())
+                        .bindEnabled(this::editable).id("rate"))
+                .at(395, 95, 29, 16, button(tr("gui.useless_mod.ore_generator.apply"), rate::submit)
+                        .primary().bindEnabled(this::editable).id("apply"))
+                .at(228, 119, 196, 4, progress(
+                        () -> menu.getActiveSlots() / (double) Math.max(1, menu.getConfiguredSlots())).color(AppleStyle.GREEN))
+                .at(220, 139, 212, 117, card())
+                .at(230, 147, 194, 9, caption(() -> playerInventoryTitle));
+        String[] labels = {"gui.useless_mod.ore_generator.ae_toggle", "gui.useless_mod.apple.next_output", "gui.useless_mod.apple.slots"};
+        AppleUi.Icon[] icons = {AppleUi.Icon.AE, AppleUi.Icon.ROTATE, AppleUi.Icon.GRID};
+        int[] colors = {AppleStyle.TEAL, AppleStyle.ORANGE, AppleStyle.BLUE};
+        for (int i = 0; i < 3; i++) {
+            final int row = i;
+            content.at(228, 4 + i * 22, 14, 14, new Leaf(14, 14, (x, y, w, h) ->
+                    new AppleIconTile(x, y, 14, () -> icons[row], () -> colors[row]).filled()));
+            content.at(248, 6 + i * 22, 70, 9, Ui.body(tr(labels[i])));
+            if (i > 0) content.at(248, i * 22, 184, 1, new Leaf(184, 1, (x, y, w, h) ->
+                    new AppleCanvas(x, y, w, h, (g, mx, my, xx, yy, ww, hh) -> AppleUi.separator(g, xx, yy, ww))));
+        }
+        if (extra > 0) content.at(8, 28, 196, 16, new Leaf(196, 16, (x, y, w, h) ->
+                new AppleCanvas(x, y, w, h, (g, mx, my, xx, yy, ww, hh) -> {
+                    AppleUi.fillRound(g, xx, yy, ww, hh, 4, AppleStyle.ORANGE_TINT);
+                    AppleUi.icon(g, AppleUi.Icon.WARNING, xx + 4, yy + 4, 8, AppleStyle.ORANGE_TEXT);
+                    AppleTextLayout.draw(g, font, Component.translatable("gui.useless_mod.apple.recovery_page"), xx + 17, yy + 4,
+                            ww - 21, .8f, AppleStyle.ORANGE_TEXT, false);
+                })));
+        String[] legends = {"legend_sample", "legend_locked", "legend_recovery"};
+        for (int i = 0; i < 3; i++) {
+            final int n = i;
+            content.at(8 + i * 64, 254 + extra, 8, 8, new Leaf(8, 8, (x, y, w, h) ->
+                    new AppleCanvas(x, y, w, h, (g, mx, my, xx, yy, ww, hh) ->
+                            DesignAssets.draw(g, n == 1 ? "slot_locked_40" : "slot_empty_40", xx, yy, ww, hh))));
+            content.at(19 + i * 64, 254 + extra, 49, 9, footnote(tr("gui.useless_mod.apple." + legends[i])));
+        }
+        return content;
     }
 
     @Override
-    protected void containerTick() {
-        super.containerTick();
-        syncRateField(false);
-        updateControls();
+    protected void afterLayout(AppleHost h) {
+        layoutRecovery = menu.isRecoveryPage();
+        int extra = layoutRecovery ? 24 : 0;
+        for (int i = 0; i < 90 && i < menu.slots.size(); i++)
+            SlotsNode.moveSlot(menu.slots.get(i), 23 + i % 9 * 22, 72 + extra + i / 9 * 22);
+        for (int i = 0; i < 36 && 90 + i < menu.slots.size(); i++)
+            SlotsNode.moveSlot(menu.slots.get(90 + i), 243 + i % 9 * 22, i < 27 ? 202 + i / 9 * 22 : 270);
     }
 
-    private void syncRateField(boolean force) {
-        if (rateField == null) return;
-        long rate = Math.max(1L, menu.getOutputRate());
-        if ((force || (!rateField.isFocused() && !rateDirty)) && rate != lastSyncedRate) {
-            setRateFieldValue(rate);
-            lastSyncedRate = rate;
-        }
-    }
-
-    private void setRateFieldValue(long rate) {
-        syncedRateText = ScaledEnergyAmount.format(rate);
-        lastSyncedRate = Math.max(0L, rate);
-        updatingRateField = true;
-        rateField.setValue(syncedRateText);
-        updatingRateField = false;
-        rateDirty = false;
-    }
-
-    private void sendRate() {
-        long rate = readRateField();
-        rate = Math.max(1L, rate);
-        setRateFieldValue(rate);
-        lastSyncedRate = rate;
-        PacketDistributor.sendToServer(new OreGeneratorSettingsPacket(
-                menu.containerId, menu.getBlockPos(), rate));
-    }
-
-    private void adjustRate(long delta) {
-        long current = readRateField();
-        long adjusted;
-        if (delta > 0) {
-            adjusted = current == Long.MAX_VALUE ? Long.MAX_VALUE : current + 1L;
-        } else {
-            adjusted = Math.max(1L, current - 1L);
-        }
-        setRateFieldValue(Math.max(1L, adjusted));
-        sendRate();
-    }
-
-    private long readRateField() {
-        if (!rateDirty && rateField.getValue().equals(syncedRateText)
-                && lastSyncedRate >= 1L) {
-            return lastSyncedRate;
-        }
-        return ScaledEnergyAmount.parse(rateField.getValue(), Long.MAX_VALUE)
-                .orElse(menu.getOutputRate());
-    }
-
-    private void toggleAeOutput() {
-        PacketDistributor.sendToServer(new OreGeneratorOutputTogglePacket(
-                menu.containerId, menu.getBlockPos()));
-    }
-
-    private void changePage(int delta) {
-        if (minecraft == null || minecraft.gameMode == null) return;
-        int pageCount = Math.max(1, menu.getPageCount());
-        int target = Math.floorMod(menu.getPage() + delta, pageCount);
-        if (target != menu.getPage()) {
-            minecraft.gameMode.handleInventoryButtonClick(menu.containerId,
-                    delta > 0 ? OreGeneratorMenu.NEXT_PAGE : OreGeneratorMenu.PREVIOUS_PAGE);
-        }
-    }
-
-    private void updateControls() {
-        if (rateField == null) return;
-        boolean editable = !menu.isRecoveryPage();
-        rateField.setEditable(editable);
-        rateDown.active = editable;
-        rateUp.active = editable;
-        applyButton.active = editable;
-        aeButton.active = true;
-        previousPageButton.visible = menu.getPageCount() > 1;
-        nextPageButton.visible = menu.getPageCount() > 1;
-        previousPageButton.active = menu.getPage() > 0;
-        nextPageButton.active = menu.getPage() + 1 < menu.getPageCount();
-    }
-
-    @Override
-    public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
-        if ((keyCode == GLFW.GLFW_KEY_ENTER || keyCode == GLFW.GLFW_KEY_KP_ENTER)
-                && rateField != null && rateField.isFocused()) {
-            sendRate();
-            setFocused(null);
-            return true;
-        }
-        if (keyCode != GLFW.GLFW_KEY_ESCAPE && rateField != null
-                && (rateField.keyPressed(keyCode, scanCode, modifiers) || rateField.canConsumeInput())) {
-            return true;
-        }
-        return super.keyPressed(keyCode, scanCode, modifiers);
-    }
-
-    @Override
-    public void onClose() {
-        if (rateDirty) sendRate();
-        super.onClose();
-    }
-
-    @Override
-    public boolean mouseReleased(double mouseX, double mouseY, int button) {
-        previousPageButton.releaseVisualState();
-        nextPageButton.releaseVisualState();
-        rateDown.releaseVisualState();
-        rateUp.releaseVisualState();
-        applyButton.releaseVisualState();
-        aeButton.releaseVisualState();
-        return super.mouseReleased(mouseX, mouseY, button);
+    private void selectPage(int target) {
+        int delta = target - menu.getPage();
+        for (int i = 0; i < Math.abs(delta); i++) net.button(delta > 0 ? OreGeneratorMenu.NEXT_PAGE : OreGeneratorMenu.PREVIOUS_PAGE);
     }
 
     @Override
     protected void renderSlot(GuiGraphics graphics, Slot slot) {
         super.renderSlot(graphics, slot);
         int sampleSlot = menu.getSampleSlotIndex(slot);
-        if (sampleSlot < 0 || sampleSlot < menu.getActiveSlots()) return;
-
-        graphics.fill(slot.x, slot.y, slot.x + 16, slot.y + 16, 0x66000000);
-        graphics.fill(slot.x + 11, slot.y + 2, slot.x + 15, slot.y + 7, 0xFFF2F2F2);
-        graphics.fill(slot.x + 12, slot.y + 1, slot.x + 14, slot.y + 3, 0xFFF2F2F2);
+        if (sampleSlot >= 0 && sampleSlot >= menu.getActiveSlots())
+            DesignAssets.draw(graphics, "slot_locked_40", slot.x - 2, slot.y - 2, 20, 20);
     }
 
     @Override
-    protected void renderBg(GuiGraphics graphics, float partialTick, int mouseX, int mouseY) {
-        MachineScreenStyle.drawPanel(graphics, leftPos, topPos, imageWidth, imageHeight);
-        MachineScreenStyle.drawInset(graphics,
-                leftPos + 172, topPos + 18, leftPos + 246, topPos + 142);
-        MachineScreenStyle.drawSlotGroup(graphics, leftPos, topPos, 8, 22, 9, 10);
-        MachineScreenStyle.drawSlotGroup(graphics, leftPos, topPos, 44, 254, 9, 3);
-        MachineScreenStyle.drawSlotGroup(graphics, leftPos, topPos, 44, 312, 9, 1);
-        for (Slot slot : menu.slots) {
-            MachineScreenStyle.drawSlotBackground(graphics, leftPos, topPos, slot);
-        }
-    }
-
-    @Override
-    protected void renderLabels(GuiGraphics graphics, int mouseX, int mouseY) {
-        graphics.drawString(font, title, titleLabelX, titleLabelY,
-                MachineScreenStyle.TEXT_COLOR, false);
-        String page = (menu.getPage() + 1) + "/" + menu.getPageCount();
-        graphics.drawString(font, page, 126 - font.width(page), 6,
-                menu.isRecoveryPage() ? MachineScreenStyle.ERROR_TEXT_COLOR
-                        : MachineScreenStyle.MUTED_TEXT_COLOR, false);
-        graphics.drawString(font, playerInventoryTitle, inventoryLabelX, inventoryLabelY,
-                MachineScreenStyle.TEXT_COLOR, false);
-
-        graphics.drawString(font, Component.translatable("gui.useless_mod.ore_generator.rate"),
-                177, 22, MachineScreenStyle.TEXT_COLOR, false);
-        graphics.drawString(font, Component.translatable("gui.useless_mod.ore_generator.rate_unit"),
-                177, 94, MachineScreenStyle.MUTED_TEXT_COLOR, false);
-        Component aeState = Component.translatable(menu.isAeOnline()
-                ? "gui.useless_mod.ore_generator.ae_online"
-                : "gui.useless_mod.ore_generator.ae_offline");
-        graphics.drawString(font, aeState, 177, 101,
-                menu.isAeOnline() ? 0xFF2E7D32 : MachineScreenStyle.ERROR_TEXT_COLOR, false);
-        graphics.drawString(font, Component.translatable(
-                        "gui.useless_mod.ore_generator.countdown", menu.getCountdownTicks()),
-                8, 204, MachineScreenStyle.MUTED_TEXT_COLOR, false);
-        graphics.drawString(font, Component.translatable(
-                        "gui.useless_mod.ore_generator.active_slots",
-                        menu.getActiveSlots(), menu.getConfiguredSlots()),
-                8, 215, MachineScreenStyle.MUTED_TEXT_COLOR, false);
-        graphics.drawString(font, Component.translatable(
-                        menu.isOutputToAe() ? "gui.useless_mod.ore_generator.ae_enabled"
-                                : "gui.useless_mod.ore_generator.ae_disabled"),
-                177, 136, MachineScreenStyle.TEXT_COLOR, false);
-    }
-
-    @Override
-    public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
-        super.render(graphics, mouseX, mouseY, partialTick);
-        renderTooltip(graphics, mouseX, mouseY);
+    protected void renderExtraTooltips(GuiGraphics graphics, int mouseX, int mouseY) {
         int sampleSlot = menu.getSampleSlotIndex(hoveredSlot);
-        if (hoveredSlot != null && sampleSlot >= menu.getActiveSlots()
-                && hoveredSlot.getItem().isEmpty()) {
-            graphics.renderTooltip(font,
-                    List.of(Component.translatable("gui.useless_mod.ore_generator.locked_slot")),
+        if (hoveredSlot != null && sampleSlot >= menu.getActiveSlots() && hoveredSlot.getItem().isEmpty())
+            graphics.renderTooltip(font, List.of(Component.translatable("gui.useless_mod.ore_generator.locked_slot")),
                     Optional.empty(), mouseX, mouseY);
-        }
     }
 }

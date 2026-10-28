@@ -9,7 +9,7 @@ import com.sorrowmist.useless.network.PassiveCraftingSlotMultiplierPacket;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.EditBox;
-import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
+import com.sorrowmist.useless.client.gui.apple.*;
 import net.minecraft.network.chat.Component;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.player.Inventory;
@@ -37,7 +37,7 @@ import java.util.Optional;
  * the value it will actually run at (amber while pinned, grey while following the global value).
  */
 public final class PassiveCraftingHatchScreen
-        extends AbstractContainerScreen<PassiveCraftingHatchMenu> {
+        extends AppleContainerScreen<PassiveCraftingHatchMenu> {
     /** Multiplier edits are optimistic on the client until the next server status snapshot. */
     private static final int PENDING_TICKS = 40;
     /**
@@ -46,24 +46,15 @@ public final class PassiveCraftingHatchScreen
     private static final float BADGE_Z = 400.0F;
     private static final int MULTIPLIER_CUSTOM_COLOR = 0xFFFFC65C;
     private static final int MULTIPLIER_INHERITED_COLOR = 0xFFFFFFFF;
-    private static final int SELECTION_COLOR = 0xFFCC7A00;
+    private static final int SELECTION_COLOR = AppleStyle.BLUE;
     /** Widest text the right-hand readout can hold without spilling out of its inset. */
-    private static final int READOUT_WIDTH = 70;
-    private static final int READOUT_X = 174;
-    private static final int READOUT_TOP = 151;
+    private static final int READOUT_WIDTH = 196;
+    private static final int READOUT_X = 240;
+    private static final int READOUT_TOP = 204;
     private static final int READOUT_ROW_HEIGHT = 12;
 
     private EditBox intervalField;
     private EditBox multiplierField;
-    private PressableAE2Button intervalDown;
-    private PressableAE2Button intervalUp;
-    private PressableAE2Button multiplierDown;
-    private PressableAE2Button multiplierUp;
-    private PressableAE2Button applyButton;
-    private PressableAE2Button applySlotGlobalButton;
-    private PressableAE2Button applyAllButton;
-    private PressableAE2Button previousPageButton;
-    private PressableAE2Button nextPageButton;
     private int lastSyncedInterval = Integer.MIN_VALUE;
     private long lastSyncedMultiplier = Long.MIN_VALUE;
     private String syncedMultiplierText = "";
@@ -81,72 +72,164 @@ public final class PassiveCraftingHatchScreen
     /** Pattern slot -> {pending value, remaining ticks}; a local echo of an in-flight edit. */
     private final Map<Integer, long[]> pendingSlotMultipliers = new HashMap<>();
     private int pendingGlobalResetTicks;
+    private boolean layoutSlotEdit;
 
     public PassiveCraftingHatchScreen(
             PassiveCraftingHatchMenu menu, Inventory inventory, Component title) {
         super(menu, inventory, title);
-        imageWidth = 250;
-        imageHeight = 336;
-        inventoryLabelX = 44;
-        inventoryLabelY = 242;
-        titleLabelX = 8;
+        imageWidth = 456;
+        imageHeight = 356;
+        inventoryLabelX = 242;
+        inventoryLabelY = 224;
+        titleLabelX = 9;
         titleLabelY = 7;
     }
 
     @Override
-    protected void init() {
-        super.init();
-        previousPageButton = addRenderableWidget(new PressableAE2Button(
-                leftPos + 128, topPos + 4, 18, 12,
-                Component.literal("<"), button -> page(PagedRecoverableMenu.PREVIOUS_PAGE)));
-        nextPageButton = addRenderableWidget(new PressableAE2Button(
-                leftPos + 148, topPos + 4, 18, 12,
-                Component.literal(">"), button -> page(PagedRecoverableMenu.NEXT_PAGE)));
+    protected void preInit() { imageHeight = selectedPatternSlot >= 0 ? 374 : 356; }
 
-        intervalField = numericField(177, 34, 62,
+    @Override
+    protected void initControls() {
+        moveReferenceSlots();
+        intervalField = numericField(244, 135, 104,
                 Component.translatable("gui.useless_mod.passive_crafting.interval"));
-        multiplierField = scaledAmountField(177, 78, 62,
+        multiplierField = scaledAmountField(244, 175, 144,
                 Component.translatable("gui.useless_mod.passive_crafting.multiplier"));
         addRenderableWidget(intervalField);
         addRenderableWidget(multiplierField);
-
-        intervalDown = addRenderableWidget(new PressableAE2Button(
-                leftPos + 177, topPos + 51, 28, 14,
-                Component.literal("-"), button -> adjustInterval(-20)));
-        intervalUp = addRenderableWidget(new PressableAE2Button(
-                leftPos + 211, topPos + 51, 28, 14,
-                Component.literal("+"), button -> adjustInterval(20)));
-        multiplierDown = addRenderableWidget(new PressableAE2Button(
-                leftPos + 177, topPos + 95, 28, 14,
-                Component.literal("-"), button -> adjustMultiplier(-1)));
-        multiplierUp = addRenderableWidget(new PressableAE2Button(
-                leftPos + 211, topPos + 95, 28, 14,
-                Component.literal("+"), button -> adjustMultiplier(1)));
-        applyButton = addRenderableWidget(new PressableAE2Button(
-                leftPos + 177, topPos + 116, 62, 18,
-                Component.translatable("gui.useless_mod.passive_crafting.apply"),
-                button -> sendSettings()));
-        applySlotGlobalButton = addRenderableWidget(new PressableAE2Button(
-                leftPos + 175, topPos + 186, 68, 16,
-                Component.translatable("gui.useless_mod.passive_crafting.apply_slot"),
-                button -> clearSlotMultiplier(selectedPatternSlot)));
-        applyAllButton = addRenderableWidget(new PressableAE2Button(
-                leftPos + 175, topPos + 204, 68, 16,
-                Component.translatable("gui.useless_mod.passive_crafting.apply_all"),
-                button -> clearSlotMultipliers()));
         syncFields(true);
         updatePageControls();
     }
 
+    /** Design 03: paged patterns and legend left, live state/editor/inventory right. */
+    @Override
+    protected void buildApple(AppleHost h) {
+        h.add(new AppleWindow(imageWidth, imageHeight, () -> title).icon(AppleUi.Icon.GRID, AppleStyle.BLUE));
+        h.add(new AppleBadge(364, 8, 80, () -> Component.literal(statValue(0)),
+                () -> menu.isFormed() ? AppleStyle.GREEN : AppleStyle.ORANGE));
+        h.add(new AppleCard(12, 40, 212, 304));
+        h.add(new AppleLabel(20, 48, 100, AppleLabel.Kind.CAPTION,
+                () -> Component.translatable("gui.useless_mod.apple.patterns")));
+        h.add(new ApplePager(150, 44, 66, 16,
+                () -> Component.literal((menu.getPage() + 1) + " / " + menu.getPageCount()),
+                () -> menu.getPage() > 0, () -> page(PagedRecoverableMenu.PREVIOUS_PAGE),
+                () -> menu.getPage() + 1 < menu.getPageCount(), () -> page(PagedRecoverableMenu.NEXT_PAGE)).id("pager"));
+        var legend = new PassiveCraftingHatchBlockEntity.SlotState[]{
+                PassiveCraftingHatchBlockEntity.SlotState.RUNNING, PassiveCraftingHatchBlockEntity.SlotState.READY,
+                PassiveCraftingHatchBlockEntity.SlotState.PAUSED, PassiveCraftingHatchBlockEntity.SlotState.MISSING_INPUT,
+                PassiveCraftingHatchBlockEntity.SlotState.AE_OFFLINE, PassiveCraftingHatchBlockEntity.SlotState.INVALID_PATTERN,
+                PassiveCraftingHatchBlockEntity.SlotState.WAITING_OUTPUT, PassiveCraftingHatchBlockEntity.SlotState.EMPTY};
+        for (int i = 0; i < legend.length; i++) {
+            var state = legend[i];
+            final boolean locked = i == 7;
+            int x = 20 + (i % 2) * 100, y = 290 + (i / 2) * 12;
+            h.add(new AppleCanvas(x, y, 96, 10, (g, mx, my, cx, cy, w, hh) -> {
+                if (locked) AppleUi.icon(g, AppleUi.Icon.LOCK, cx, cy, 8, AppleStyle.TERTIARY);
+                else AppleUi.fillRound(g, cx, cy + 1, 7, 7, 2, statusColor(state));
+                Component label = Component.translatable(locked ? "gui.useless_mod.passive_crafting.locked_slot"
+                        : "gui.useless_mod.passive_crafting.status." + state.name().toLowerCase(Locale.ROOT));
+                g.drawString(font, font.plainSubstrByWidth(label.getString(), 85), cx + 10, cy, AppleStyle.SECONDARY, false);
+            }));
+        }
+
+        h.add(new AppleCard(232, 40, 212, 66));
+        String[] statKeys = {"structure", "slots", "next_run"};
+        AppleUi.Icon[] statIcons = {AppleUi.Icon.LINK, AppleUi.Icon.GRID, AppleUi.Icon.ROTATE};
+        int[] accents = {AppleStyle.GREEN, AppleStyle.BLUE, AppleStyle.ORANGE};
+        for (int i = 0; i < 3; i++) {
+            int idx = i, y = 44 + i * 22;
+            h.add(new AppleIconTile(240, y, 14, () -> statIcons[idx], () -> accents[idx]).filled());
+            h.add(new AppleLabel(260, y + 2, 66, AppleLabel.Kind.BODY,
+                    () -> Component.translatable("gui.useless_mod.apple." + statKeys[idx])));
+            h.add(new AppleLabel(330, y + 2, 106, AppleLabel.Kind.BODY,
+                    () -> Component.literal(statValue(idx))).right());
+        }
+        boolean editingSlot = selectedPatternSlot >= 0;
+        intervalField.visible = !editingSlot;
+        h.add(new AppleCard(232, 114, 212, editingSlot ? 122 : 94));
+        if (!editingSlot) {
+            h.add(new AppleLabel(242, 122, 194, AppleLabel.Kind.CAPTION,
+                    () -> Component.translatable("gui.useless_mod.passive_crafting.interval")));
+            h.add(new AppleStepper(240, 135, 162, 16, intervalField, () -> adjustInterval(-20), () -> adjustInterval(20))
+                    .trailingButtons().<AppleStepper>enabledWhen(menu::isFormed).id("interval"));
+            h.add(new ApplePushButton(407, 135, 29, 16, ApplePushButton.Kind.PRIMARY,
+                    () -> Component.translatable("gui.useless_mod.passive_crafting.apply"), this::sendSettings)
+                    .<ApplePushButton>enabledWhen(menu::isFormed).id("apply"));
+            h.add(new AppleLabel(242, 158, 194, AppleLabel.Kind.CAPTION,
+                    () -> Component.translatable("gui.useless_mod.passive_crafting.multiplier")));
+        } else {
+            h.add(new AppleLabel(242, 123, 194, AppleLabel.Kind.HEADLINE,
+                    () -> Component.translatable("gui.useless_mod.passive_crafting.slot_label_selected", selectedPatternSlot)));
+            h.add(new AppleLabel(242, 137, 194, AppleLabel.Kind.FOOTNOTE,
+                    () -> Component.translatable("gui.useless_mod.passive_crafting.slot_select_hint")));
+            h.add(new AppleLabel(242, 155, 194, AppleLabel.Kind.CAPTION,
+                    () -> Component.translatable("gui.useless_mod.passive_crafting.multiplier")));
+        }
+        h.add(new AppleStepper(240, 171, 196, 16, multiplierField, () -> adjustMultiplier(-1), () -> adjustMultiplier(1))
+                .trailingButtons().<AppleStepper>enabledWhen(menu::isFormed).id("mult"));
+        h.add(new AppleLabel(240, editingSlot ? 219 : 191, 196, AppleLabel.Kind.FOOTNOTE,
+                () -> Component.translatable(editingSlot ? "gui.useless_mod.passive_crafting.slot_wheel_hint"
+                                : "gui.useless_mod.passive_crafting.max_multiplier",
+                        ScaledEnergyAmount.format(menu.getMaxMultiplier()))));
+        if (editingSlot) {
+            h.add(new ApplePushButton(240, 195, 94, 16, ApplePushButton.Kind.TINTED,
+                    () -> Component.translatable("gui.useless_mod.passive_crafting.apply_slot"),
+                    () -> clearSlotMultiplier(selectedPatternSlot))
+                    .<ApplePushButton>enabledWhen(menu::isFormed).id("slotglobal"));
+            h.add(new ApplePushButton(342, 195, 94, 16, ApplePushButton.Kind.SECONDARY,
+                    () -> Component.translatable("gui.useless_mod.passive_crafting.apply_all"), this::clearSlotMultipliers)
+                    .<ApplePushButton>enabledWhen(menu::isFormed).id("all"));
+        }
+        int invY = editingSlot ? 244 : 216;
+        h.add(new AppleCard(232, invY, 212, 117));
+        h.add(new AppleLabel(242, invY + 8, 194, AppleLabel.Kind.CAPTION, () -> playerInventoryTitle));
+        h.add(slotGrid().cellSize(20));
+        layoutSlotEdit = editingSlot;
+    }
+
+    private void moveReferenceSlots() {
+        int invY = selectedPatternSlot >= 0 ? 244 : 216;
+        for (int i = 0; i < 90 && i < menu.slots.size(); i++)
+            com.sorrowmist.useless.client.gui.ldl.api.SlotsNode.moveSlot(menu.slots.get(i), 23 + i % 9 * 22, 68 + i / 9 * 22);
+        for (int i = 0; i < 36 && 90 + i < menu.slots.size(); i++)
+            com.sorrowmist.useless.client.gui.ldl.api.SlotsNode.moveSlot(menu.slots.get(90 + i), 243 + i % 9 * 22,
+                    invY + (i < 27 ? 23 + i / 9 * 22 : 91));
+    }
+
+    private void refreshReferenceLayout() {
+        if (host == null || layoutSlotEdit == (selectedPatternSlot >= 0)) return;
+        imageHeight = selectedPatternSlot >= 0 ? 374 : 356;
+        topPos = Math.max(0, (height - imageHeight) / 2);
+        moveReferenceSlots();
+        host = new AppleHost(imageWidth, imageHeight);
+        buildApple(host);
+        host.layout(width, height, leftPos, topPos);
+    }
+
+    private String statValue(int i) {
+        return switch (i) {
+            case 0 -> Component.translatable(menu.isFormed() ? "gui.useless_mod.passive_crafting.connected"
+                    : "gui.useless_mod.passive_crafting.unformed").getString();
+            case 1 -> menu.getActivePatternSlots() + " / " + menu.getConfiguredPatternSlots();
+            case 2 -> menu.getCountdownTicks() + " tick";
+            default -> "\u00d7" + ScaledEnergyAmount.format(menu.getMaxMultiplier());
+        };
+    }
+
+    private int statColor(int i) {
+        if (i == 0) return menu.isFormed() ? AppleStyle.GREEN_TEXT : AppleStyle.ORANGE_TEXT;
+        return AppleStyle.LABEL;
+    }
+
     private EditBox numericField(int x, int y, int width, Component narration) {
-        EditBox field = new EditBox(font, leftPos + x, topPos + y, width, 14, narration);
+        EditBox field = new AppleEditBox(font, leftPos + x, topPos + y, width, 14, narration);
         field.setMaxLength(19);
         field.setFilter(value -> value.isEmpty() || value.chars().allMatch(Character::isDigit));
         return field;
     }
 
     private EditBox scaledAmountField(int x, int y, int width, Component narration) {
-        EditBox field = new EditBox(font, leftPos + x, topPos + y, width, 14, narration);
+        EditBox field = new AppleEditBox(font, leftPos + x, topPos + y, width, 14, narration);
         field.setMaxLength(24);
         field.setFilter(ScaledEnergyAmount::isValidInput);
         field.setResponder(value -> {
@@ -183,16 +266,8 @@ public final class PassiveCraftingHatchScreen
         boolean editable = menu.isFormed();
         intervalField.setEditable(editable);
         multiplierField.setEditable(editable);
-        intervalDown.active = editable;
-        intervalUp.active = editable;
-        multiplierDown.active = editable;
-        multiplierUp.active = editable;
-        applyButton.active = editable;
-        // Only meaningful while a slot is bound to the multiplier field.
-        applySlotGlobalButton.visible = selectedPatternSlot >= 0;
-        applySlotGlobalButton.active = editable;
-        applyAllButton.active = editable;
         updatePageControls();
+        refreshReferenceLayout();
     }
 
     private void clearSelection() {
@@ -201,14 +276,11 @@ public final class PassiveCraftingHatchScreen
         }
         selectedPatternSlot = -1;
         syncFields(true);
+        refreshReferenceLayout();
     }
 
     private void updatePageControls() {
-        int pageCount = menu.getPageCount();
-        previousPageButton.visible = pageCount > 1;
-        previousPageButton.active = menu.getPage() > 0;
-        nextPageButton.visible = pageCount > 1;
-        nextPageButton.active = menu.getPage() < pageCount - 1;
+        // 翻页胶囊由 ApplePager 自行根据页码启用/禁用。
     }
 
     private void page(int id) {
@@ -229,11 +301,11 @@ public final class PassiveCraftingHatchScreen
         int interval = Math.max(PassiveCraftingHatchBlockEntity.MIN_INTERVAL_TICKS,
                 menu.getIntervalTicks());
         long multiplier = fieldTargetMultiplier();
-        if ((force || !intervalField.isFocused()) && interval != lastSyncedInterval) {
+        if (force || (!intervalField.isFocused() && interval != lastSyncedInterval)) {
             intervalField.setValue(Integer.toString(interval));
             lastSyncedInterval = interval;
         }
-        if ((force || !multiplierField.isFocused()) && multiplier != lastSyncedMultiplier) {
+        if (force || (!multiplierField.isFocused() && multiplier != lastSyncedMultiplier)) {
             setMultiplierFieldValue(multiplier);
             lastSyncedMultiplier = multiplier;
         }
@@ -314,6 +386,7 @@ public final class PassiveCraftingHatchScreen
         }
         selectedPatternSlot = selectedPatternSlot == patternSlot ? -1 : patternSlot;
         syncFields(true);
+        refreshReferenceLayout();
     }
 
     /** Sends one slot's new batch size and echoes it locally until the next status snapshot. */
@@ -495,39 +568,9 @@ public final class PassiveCraftingHatchScreen
         super.onClose();
     }
 
-    @Override
-    public boolean mouseReleased(double mouseX, double mouseY, int button) {
-        previousPageButton.releaseVisualState();
-        nextPageButton.releaseVisualState();
-        intervalDown.releaseVisualState();
-        intervalUp.releaseVisualState();
-        multiplierDown.releaseVisualState();
-        multiplierUp.releaseVisualState();
-        applyButton.releaseVisualState();
-        applySlotGlobalButton.releaseVisualState();
-        applyAllButton.releaseVisualState();
-        return super.mouseReleased(mouseX, mouseY, button);
-    }
-
     // ------------------------------------------------------------------
     // Rendering
     // ------------------------------------------------------------------
-
-    @Override
-    protected void renderBg(GuiGraphics graphics, float partialTick, int mouseX, int mouseY) {
-        MachineScreenStyle.drawPanel(graphics, leftPos, topPos, imageWidth, imageHeight);
-        MachineScreenStyle.drawInset(graphics,
-                leftPos + 172, topPos + 18, leftPos + 246, topPos + 142);
-        MachineScreenStyle.drawInset(graphics,
-                leftPos + 172, topPos + 146, leftPos + 246, topPos + 226);
-        MachineScreenStyle.drawSlotGroup(graphics, leftPos, topPos, 8, 22, 9, 10);
-        MachineScreenStyle.drawSlotGroup(graphics, leftPos, topPos, 44, 254, 9, 3);
-        MachineScreenStyle.drawSlotGroup(graphics, leftPos, topPos, 44, 312, 9, 1);
-
-        for (Slot slot : menu.slots) {
-            MachineScreenStyle.drawSlotBackground(graphics, leftPos, topPos, slot);
-        }
-    }
 
     @Override
     protected void renderSlot(GuiGraphics graphics, Slot slot) {
@@ -550,9 +593,7 @@ public final class PassiveCraftingHatchScreen
             }
         } else {
             renderSlotProgress(graphics, slot, status);
-            graphics.fill(slot.x, slot.y, slot.x + 16, slot.y + 16, 0x66000000);
-            graphics.fill(slot.x + 11, slot.y + 2, slot.x + 15, slot.y + 7, 0xFFF2F2F2);
-            graphics.fill(slot.x + 12, slot.y + 1, slot.x + 14, slot.y + 3, 0xFFF2F2F2);
+            DesignAssets.draw(graphics, "slot_locked_40", slot.x - 2, slot.y - 2, 20, 20);
         }
     }
 
@@ -586,8 +627,9 @@ public final class PassiveCraftingHatchScreen
         if (text.isEmpty()) {
             return;
         }
-        float scale = Math.min(0.75F, 14.0F / Math.max(1, font.width(text)));
-        int textWidth = Math.max(1, Math.round(font.width(text) * scale));
+        // 正常字号（与原版物品数量一致），不缩小。
+        float scale = 1.0F;
+        int textWidth = font.width(text);
         var pose = graphics.pose();
         pose.pushPose();
         pose.translate(0.0F, 0.0F, BADGE_Z);
@@ -608,58 +650,6 @@ public final class PassiveCraftingHatchScreen
         graphics.fill(left, bottom - 1, right, bottom, SELECTION_COLOR);
         graphics.fill(left, top, left + 1, bottom, SELECTION_COLOR);
         graphics.fill(right - 1, top, right, bottom, SELECTION_COLOR);
-    }
-
-    @Override
-    protected void renderLabels(GuiGraphics graphics, int mouseX, int mouseY) {
-        graphics.drawString(font, title, titleLabelX, titleLabelY,
-                MachineScreenStyle.TEXT_COLOR, false);
-        String page = (menu.getPage() + 1) + "/" + menu.getPageCount();
-        graphics.drawString(font, page, 126 - font.width(page), 6,
-                menu.isRecoveryPage() ? MachineScreenStyle.ERROR_TEXT_COLOR : MachineScreenStyle.MUTED_TEXT_COLOR,
-                false);
-        graphics.drawString(font, playerInventoryTitle,
-                inventoryLabelX, inventoryLabelY, MachineScreenStyle.TEXT_COLOR, false);
-        graphics.drawString(font,
-                Component.translatable("gui.useless_mod.passive_crafting.interval"),
-                177, 22, MachineScreenStyle.TEXT_COLOR, false);
-        graphics.drawString(font,
-                Component.translatable("gui.useless_mod.passive_crafting.multiplier"),
-                177, 66, MachineScreenStyle.TEXT_COLOR, false);
-        graphics.drawString(font,
-                Component.translatable("gui.useless_mod.passive_crafting.max_multiplier",
-                        ScaledEnergyAmount.format(menu.getMaxMultiplier())),
-                8, 204, MachineScreenStyle.MUTED_TEXT_COLOR, false);
-        graphics.drawString(font,
-                Component.translatable("gui.useless_mod.passive_crafting.countdown",
-                        menu.getCountdownTicks()),
-                8, 215, MachineScreenStyle.MUTED_TEXT_COLOR, false);
-
-        renderSlotMultiplierReadout(graphics);
-
-        int patternSlot = menu.getPatternSlotIndex(hoveredSlot);
-        if (patternSlot >= 0) {
-            var status = menu.getSlotStatus(patternSlot);
-            Component statusText = statusComponent(status);
-            graphics.drawString(font, font.split(statusText, 156).get(0),
-                    8, 227, statusColor(status.state()), false);
-            if (status.maxProgress() > 0) {
-                graphics.drawString(font,
-                        Component.translatable("gui.useless_mod.passive_crafting.progress",
-                                status.progress(), status.maxProgress()),
-                        8, 239, MachineScreenStyle.MUTED_TEXT_COLOR, false);
-            }
-        } else {
-            Component state = Component.translatable(menu.isFormed()
-                    ? "gui.useless_mod.passive_crafting.connected"
-                    : "gui.useless_mod.passive_crafting.unformed");
-            graphics.drawString(font, state, 8, 227,
-                    menu.isFormed() ? 0xFF2E7D32 : 0xFFA66A00, false);
-            graphics.drawString(font,
-                    Component.translatable("gui.useless_mod.passive_crafting.active_slots",
-                            menu.getActivePatternSlots(), menu.getConfiguredPatternSlots()),
-                    8, 239, MachineScreenStyle.MUTED_TEXT_COLOR, false);
-        }
     }
 
     /**
@@ -735,12 +725,13 @@ public final class PassiveCraftingHatchScreen
     private static int statusColor(PassiveCraftingHatchBlockEntity.SlotState state) {
         return switch (state) {
             case EMPTY -> MachineScreenStyle.MUTED_TEXT_COLOR;
-            case READY -> 0xFF517497;
-            case RUNNING -> 0xFF2E7D32;
-            case PAUSED -> 0xFFA66A00;
-            case WAITING_OUTPUT -> 0xFF7B4EA3;
-            case MISSING_INPUT, MISSING_MOLD, AE_OFFLINE, INVALID_PATTERN ->
-                    MachineScreenStyle.ERROR_TEXT_COLOR;
+            case READY -> AppleStyle.BLUE;
+            case RUNNING -> AppleStyle.GREEN;
+            case PAUSED -> AppleStyle.TERTIARY;
+            case WAITING_OUTPUT -> AppleStyle.TEAL;
+            case MISSING_INPUT, MISSING_MOLD -> AppleStyle.ORANGE;
+            case AE_OFFLINE -> AppleStyle.RED;
+            case INVALID_PATTERN -> AppleStyle.PURPLE;
         };
     }
 
@@ -748,7 +739,10 @@ public final class PassiveCraftingHatchScreen
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
         updateMultiplierHover(mouseX, mouseY);
         super.render(graphics, mouseX, mouseY, partialTick);
-        renderTooltip(graphics, mouseX, mouseY);
+    }
+
+    @Override
+    protected void renderExtraTooltips(GuiGraphics graphics, int mouseX, int mouseY) {
         int patternSlot = menu.getPatternSlotIndex(hoveredSlot);
         if (hoveredSlot != null && patternSlot >= 0 && hoveredSlot.getItem().isEmpty()) {
             var status = menu.getSlotStatus(patternSlot);

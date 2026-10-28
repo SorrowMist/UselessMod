@@ -21,6 +21,19 @@ public class ShadowComputationHostBlockEntity extends ECOComputationSystemBlockE
 
     public ShadowComputationHostBlockEntity(BlockEntityType<?> type, BlockPos pos, BlockState blockState) {
         super(type, pos, blockState, ECOTier.L9);
+        getMainNode().setFlags();
+        getMainNode().setInWorldNode(false);
+    }
+
+    /** Built-in hardware is independent of the placeholder block's visual state. */
+    @Override
+    public boolean hasHighEnergyNetworkSwitch() {
+        return true;
+    }
+
+    @Override
+    public boolean hasNormalNetworkSwitch() {
+        return false;
     }
 
     @Override

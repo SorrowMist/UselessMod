@@ -1,20 +1,15 @@
 package com.sorrowmist.useless.compat.ae;
 
-import com.sorrowmist.useless.utils.RateLimitedLogger;
-
 import appeng.api.config.Actionable;
 import appeng.api.networking.security.IActionSource;
 import appeng.api.stacks.AEKey;
 import appeng.api.storage.MEStorage;
 import com.glodblock.github.appflux.common.me.key.FluxKey;
 import com.glodblock.github.appflux.common.me.key.type.EnergyType;
-import com.sorrowmist.useless.UselessMod;
 import com.sorrowmist.useless.api.logistics.LongEnergyHandler;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.Level;
 import org.jetbrains.annotations.Nullable;
-
-import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * {@link AeEnergyBridge} 的 AppliedFlux 实现。
@@ -57,25 +52,6 @@ public final class AeEnergyCompat implements AeEnergyBridge {
         return isEndpoint(level, pos) ? new FluxEndpoint(level, pos) : null;
     }
 
-    /**
-     * 写入被拒时的限流警告：每 {@link #WARN_INTERVAL_MS} 毫秒最多一条。
-     *
-     * <p>「接受不了」最常见的原因是网络里压根没有通量存储——FE 不是 AE2 自带的资源，
-     * 得靠 AppliedFlux 的通量元件。这跟「网络取不到」是两回事，所以要写进日志。
-     * 搬运每秒都在重试，不限流会把日志刷爆。</p>
-     */
-    private static final long WARN_INTERVAL_MS = 5000L;
-    private static final AtomicLong LAST_WARN_AT = new AtomicLong();
-
-    private static void warnRejected(BlockPos pos, String reason) {
-        long now = System.currentTimeMillis();
-        long last = LAST_WARN_AT.get();
-        if (now - last < WARN_INTERVAL_MS || !LAST_WARN_AT.compareAndSet(last, now)) {
-            return;
-        }
-        RateLimitedLogger.warn(UselessMod.LOGGER, "无线物流：AE 能量端点 {} 无法接收 FE——{}", pos.toShortString(), reason);
-    }
-
     /** ME 网络的 FE（AppliedFlux 通量）视角。 */
     private static final class FluxEndpoint implements LongEnergyHandler {
         private final Level level;
@@ -112,15 +88,10 @@ public final class AeEnergyCompat implements AeEnergyBridge {
             }
             MEStorage storage = AeNetworks.storage(level, pos);
             if (storage == null) {
-                warnRejected(pos, "该方块当前取不到 ME 网络（没有挂上网格，或节点尚未就绪）");
                 return 0L;
             }
             long inserted = storage.insert(fluxKey(), amount,
                     simulate ? Actionable.SIMULATE : Actionable.MODULATE, source());
-            if (inserted <= 0L) {
-                warnRejected(pos, "ME 网络没有收下这些 FE：网里没有通量存储"
-                        + "（需要 AppliedFlux 的通量元件放进 ME 驱动器），或者已经存满了");
-            }
             return Math.max(0L, inserted);
         }
 

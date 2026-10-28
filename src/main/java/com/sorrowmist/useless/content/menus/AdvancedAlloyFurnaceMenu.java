@@ -48,37 +48,13 @@ class HighStackSlotItemHandler extends SlotItemHandler {
 
 public class AdvancedAlloyFurnaceMenu extends AEBaseMenu {
 
-    // 物品输入槽：起点75,16，横向排布9个，每个16*16，横向间隔2像素
-    private static final int INPUT_SLOTS_X = 75;
-    private static final int INPUT_SLOTS_Y = 16;
-    private static final int SLOT_SIZE = 16;
-    private static final int SLOT_SPACING = 2;
+    // 槽位坐标全部来自 AdvancedAlloyFurnaceLayout：菜单与界面热区共用同一套几何。
+    // 物品输入 9 格（3x3）、输出 9 格（3x3）、催化剂 / 模具、样板 9x3、玩家背包 9x3 + 快捷栏。
+    private static final int PATTERN_SLOTS_COLS = AdvancedAlloyFurnaceLayout.PATTERN_GRID_COLUMNS;
+    private static final int PATTERN_SLOTS_ROWS = AdvancedAlloyFurnaceLayout.PATTERN_GRID_ROWS;
 
-    // 物品输出槽：起点75,93，横向排布9个，每个16*16，横向间隔2像素
-    private static final int OUTPUT_SLOTS_X = 75;
-    private static final int OUTPUT_SLOTS_Y = 93;
-
-    // 催化剂槽：起点78,154，16*16
-    private static final int CATALYST_SLOT_X = 78;
-    private static final int CATALYST_SLOT_Y = 154;
-
-    // 模具槽：起点128,154，16*16
-    private static final int MOLD_SLOT_X = 128;
-    private static final int MOLD_SLOT_Y = 154;
-
-    // 样板槽：起点8,5，每个16*16，横向3个纵向9个，间隔2像素
-    private static final int PATTERN_SLOTS_X = 8;
-    private static final int PATTERN_SLOTS_Y = 5;
-    private static final int PATTERN_SLOTS_COLS = 3;
-    private static final int PATTERN_SLOTS_ROWS = 9;
-
-    // 玩家背包位置：起点75,178
-    private static final int PLAYER_INVENTORY_X = 75;
-    private static final int PLAYER_INVENTORY_Y = 178;
-    private static final int PLAYER_HOTBAR_Y = 236;
-
-    // 样板每页27个（3x9）
-    private static final int PATTERN_SLOTS_PER_PAGE = 27;
+    // 样板每页 27 个（9x3）
+    private static final int PATTERN_SLOTS_PER_PAGE = AdvancedAlloyFurnaceLayout.PATTERN_SLOTS_PER_PAGE;
     private int patternPage = 0;
 
     private static final int MACHINE_INPUT_START = AdvancedAlloyFurnaceLayout.INPUT_SLOTS_START;
@@ -139,7 +115,8 @@ public class AdvancedAlloyFurnaceMenu extends AEBaseMenu {
         IItemHandler itemHandler = entity != null ? entity.getItemHandler() : new ItemStackHandler(AdvancedAlloyFurnaceLayout.TOTAL_SLOTS);
         this.addMachineSlots(itemHandler);
 
-        this.createPlayerInventorySlots(inv, PLAYER_INVENTORY_X, PLAYER_INVENTORY_Y, PLAYER_HOTBAR_Y);
+        this.createPlayerInventorySlots(inv, AdvancedAlloyFurnaceLayout.PLAYER_INVENTORY_X,
+                AdvancedAlloyFurnaceLayout.PLAYER_INVENTORY_Y, AdvancedAlloyFurnaceLayout.PLAYER_HOTBAR_Y);
     }
 
     /**
@@ -148,20 +125,20 @@ public class AdvancedAlloyFurnaceMenu extends AEBaseMenu {
      * @param itemHandler 物品处理器
      */
     private void addMachineSlots(IItemHandler itemHandler) {
-        // 添加9个输入槽位（横向排布）
-        for (int col = 0; col < 9; col++) {
-            int slotIndex = col;
-            int x = INPUT_SLOTS_X + col * (SLOT_SIZE + SLOT_SPACING);
-            int y = INPUT_SLOTS_Y;
+        // 添加9个输入槽位（3x3，阅读顺序）
+        for (int i = 0; i < AdvancedAlloyFurnaceLayout.INPUT_SLOTS_COUNT; i++) {
+            int slotIndex = AdvancedAlloyFurnaceLayout.INPUT_SLOTS_START + i;
+            int x = AdvancedAlloyFurnaceLayout.inputSlotX(i);
+            int y = AdvancedAlloyFurnaceLayout.inputSlotY(i);
             this.addSlot(new HighStackSlotItemHandler(itemHandler, slotIndex, x, y),
                     SlotSemantics.MACHINE_INPUT);
         }
 
-        // 添加9个输出槽位（横向排布），不允许放入物品
-        for (int col = 0; col < 9; col++) {
-            int slotIndex = 9 + col;
-            int x = OUTPUT_SLOTS_X + col * (SLOT_SIZE + SLOT_SPACING);
-            int y = OUTPUT_SLOTS_Y;
+        // 添加9个输出槽位（3x3，阅读顺序），不允许放入物品
+        for (int i = 0; i < AdvancedAlloyFurnaceLayout.OUTPUT_SLOTS_COUNT; i++) {
+            int slotIndex = AdvancedAlloyFurnaceLayout.OUTPUT_SLOTS_START + i;
+            int x = AdvancedAlloyFurnaceLayout.outputSlotX(i);
+            int y = AdvancedAlloyFurnaceLayout.outputSlotY(i);
             this.addSlot(new HighStackSlotItemHandler(itemHandler, slotIndex, x, y) {
                 @Override
                 public boolean mayPlace(@NotNull ItemStack stack) {
@@ -171,24 +148,28 @@ public class AdvancedAlloyFurnaceMenu extends AEBaseMenu {
         }
 
         // 添加催化剂槽位
-        this.addSlot(new HighStackSlotItemHandler(itemHandler, CATALYST_SLOT, CATALYST_SLOT_X, CATALYST_SLOT_Y),
+        this.addSlot(new HighStackSlotItemHandler(itemHandler, CATALYST_SLOT,
+                        AdvancedAlloyFurnaceLayout.CATALYST_SLOT_X, AdvancedAlloyFurnaceLayout.CATALYST_SLOT_Y),
                 SlotSemantics.CONFIG);
 
         // 添加模具槽位
-        this.addSlot(new HighStackSlotItemHandler(itemHandler, MOLD_SLOT, MOLD_SLOT_X, MOLD_SLOT_Y) {
+        this.addSlot(new HighStackSlotItemHandler(itemHandler, MOLD_SLOT,
+                        AdvancedAlloyFurnaceLayout.MOLD_SLOT_X, AdvancedAlloyFurnaceLayout.MOLD_SLOT_Y) {
             @Override
             public int getMaxStackSize() {
                 return 1;
             }
         }, SlotSemantics.CONFIG);
 
-        // 添加108个样板槽位（4页 × 3x9），使用自定义的PatternSlotItemHandler实现背景图案
+        // 添加108个样板槽位（4页 × 9x3），使用自定义的PatternSlotItemHandler实现背景图案
+        // 界面按 9 列 3 行铺开（设计稿顺序），槽位索引按阅读顺序递增，翻页时整页替换。
         for (int page = 0; page < 4; page++) {
             for (int row = 0; row < PATTERN_SLOTS_ROWS; row++) {
                 for (int col = 0; col < PATTERN_SLOTS_COLS; col++) {
-                    int slotIndex = PATTERN_SLOTS_START + page * PATTERN_SLOTS_PER_PAGE + row * PATTERN_SLOTS_COLS + col;
-                    int x = PATTERN_SLOTS_X + col * (SLOT_SIZE + SLOT_SPACING);
-                    int y = PATTERN_SLOTS_Y + row * (SLOT_SIZE + SLOT_SPACING);
+                    int pageIndex = row * PATTERN_SLOTS_COLS + col;
+                    int slotIndex = PATTERN_SLOTS_START + page * PATTERN_SLOTS_PER_PAGE + pageIndex;
+                    int x = AdvancedAlloyFurnaceLayout.patternSlotX(pageIndex);
+                    int y = AdvancedAlloyFurnaceLayout.patternSlotY(pageIndex);
                     PatternSlotItemHandler patternSlot = new PatternSlotItemHandler(itemHandler, slotIndex, x, y);
                     patternSlot.setIcon(Icon.BACKGROUND_BLANK_PATTERN);
                     patternSlot.setActive(page == 0);
@@ -396,17 +377,17 @@ public class AdvancedAlloyFurnaceMenu extends AEBaseMenu {
     }
 
     private void createPlayerInventorySlots(Inventory playerInventory, int inventoryX, int inventoryY, int hotbarY) {
-        for (int row = 0; row < 3; row++) {
-            for (int col = 0; col < 9; col++) {
-                int slotIndex = row * 9 + col;
-                int x = inventoryX + col * (SLOT_SIZE + SLOT_SPACING);
-                int y = inventoryY + row * (SLOT_SIZE + SLOT_SPACING);
+        for (int row = 0; row < AdvancedAlloyFurnaceLayout.INVENTORY_ROWS; row++) {
+            for (int col = 0; col < AdvancedAlloyFurnaceLayout.INVENTORY_COLUMNS; col++) {
+                int slotIndex = row * AdvancedAlloyFurnaceLayout.INVENTORY_COLUMNS + col;
+                int x = inventoryX + col * AdvancedAlloyFurnaceLayout.SLOT_PITCH;
+                int y = inventoryY + row * AdvancedAlloyFurnaceLayout.SLOT_PITCH;
                 this.addSlot(new Slot(playerInventory, slotIndex + 9, x, y), SlotSemantics.PLAYER_INVENTORY);
             }
         }
 
-        for (int col = 0; col < 9; col++) {
-            int x = inventoryX + col * (SLOT_SIZE + SLOT_SPACING);
+        for (int col = 0; col < AdvancedAlloyFurnaceLayout.INVENTORY_COLUMNS; col++) {
+            int x = inventoryX + col * AdvancedAlloyFurnaceLayout.SLOT_PITCH;
             this.addSlot(new Slot(playerInventory, col, x, hotbarY), SlotSemantics.PLAYER_HOTBAR);
         }
     }

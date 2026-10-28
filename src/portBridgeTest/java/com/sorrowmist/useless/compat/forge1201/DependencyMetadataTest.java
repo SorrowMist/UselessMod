@@ -33,7 +33,7 @@ class DependencyMetadataTest {
         return result;
     }
 
-    @Test void everyCompiledForgeModHasABoundedCompatibleRuntimeRequirement() throws Exception {
+    @Test void everyCompiledForgeModHasACompatibleRuntimeRequirement() throws Exception {
         var requirements = requirements();
         Set<String> checked = new HashSet<>();
         for (String entry : System.getProperty("uselessMod.compileClasspath").split(File.pathSeparator)) {
@@ -58,8 +58,14 @@ class DependencyMetadataTest {
                     String spec = requirement.get("versionRange");
                     var range = VersionRange.createFromVersionSpec(spec);
                     assertTrue(range.containsVersion(new DefaultArtifactVersion(version)), id + " " + version + " outside " + spec);
-                    assertTrue(range.getRestrictions().stream().allMatch(r -> r.getLowerBound() != null
-                            && r.getUpperBound() != null), "Unbounded API line: " + id);
+                    assertTrue(range.getRestrictions().stream().allMatch(r -> r.getLowerBound() != null),
+                            "Missing minimum version: " + id);
+                    if (id.equals("neoecoae")) {
+                        assertEquals("[20.5.0,)", spec, "NeoECO accepts 20.5.0 and later versions");
+                    } else {
+                        assertTrue(range.getRestrictions().stream().allMatch(r -> r.getUpperBound() != null),
+                                "Unbounded API line: " + id);
+                    }
                     assertEquals(id.equals("ae2"), requirement.<Boolean>get("mandatory"), id);
                     checked.add(id);
                 }
@@ -85,6 +91,16 @@ class DependencyMetadataTest {
         assertTrue(requirements.get("forge").<Boolean>get("mandatory"));
         assertTrue(requirements.get("minecraft").<Boolean>get("mandatory"));
         assertFalse(requirements.get("create").<Boolean>get("mandatory"));
+    }
+
+    @Test void neoEcoRequires2050AndAllowsLaterVersions() throws Exception {
+        var range = VersionRange.createFromVersionSpec(requirements().get("neoecoae").get("versionRange"));
+        for (String version : List.of("20.5.0", "20.5.1", "20.6.0", "21.0.0")) {
+            assertTrue(range.containsVersion(new DefaultArtifactVersion(version)), version);
+        }
+        for (String version : List.of("20.4.2", "20.4.99", "20.5.0-beta.1")) {
+            assertFalse(range.containsVersion(new DefaultArtifactVersion(version)), version);
+        }
     }
 
     @Test void thermalRequirementsAllowTheOldestApiAndThePacksEmbeddedCore() throws Exception {

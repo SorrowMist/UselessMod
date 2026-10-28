@@ -5,7 +5,7 @@ import cn.dancingsnow.neoecoae.blocks.entity.crafting.ECOCraftingPatternBusBlock
 import com.sorrowmist.useless.InventoryTestBootstrap;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
-import net.minecraftforge.items.ItemStackHandler;
+import appeng.util.inv.AppEngInternalInventory;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
@@ -21,10 +21,17 @@ class CombinedPatternInventoryTest {
     }
 
     @Test
-    void managementReadsAndWritesThePhysicalPatternSlots() throws ReflectiveOperationException {
-        var bus = createBus();
+    void managementReadsAndWritesThePhysicalPatternSlots() {
+        var bus = mock(ECOCraftingPatternBusBlockEntity.class);
+        var slots = new AppEngInternalInventory(null, 3, 1);
+        when(bus.getPatternSlotCount()).thenReturn(3);
+        when(bus.getPatternSlotInventory()).thenReturn(slots);
+        doAnswer(call -> {
+            slots.setItemDirect(call.getArgument(0), call.getArgument(1));
+            return null;
+        }).when(bus).setPatternDirect(anyInt(), any(ItemStack.class));
         ItemStack disk = new ItemStack(Items.PAPER);
-        bus.itemHandler.setStackInSlot(0, disk);
+        slots.setItemDirect(0, disk);
         var combined = new CombinedPatternInventory();
         combined.bind(List.of(bus));
 
@@ -32,6 +39,7 @@ class CombinedPatternInventoryTest {
         assertEquals(1, combined.getSlotLimit(0));
         combined.setItemDirect(1, disk);
         assertTrue(ItemStack.isSameItemSameTags(disk, combined.getStackInSlot(1)));
+        verify(bus).setPatternDirect(1, disk);
     }
 
     @Test
@@ -69,19 +77,5 @@ class CombinedPatternInventoryTest {
         assertEquals(5, terminal.size());
         terminal.setItemDirect(3, ItemStack.EMPTY);
         verify(secondView).setItemDirect(0, ItemStack.EMPTY);
-    }
-
-    private static ECOCraftingPatternBusBlockEntity createBus() throws ReflectiveOperationException {
-        var bus = mock(ECOCraftingPatternBusBlockEntity.class);
-        var field = ECOCraftingPatternBusBlockEntity.class.getField("itemHandler");
-        field.setAccessible(true);
-        field.set(bus, new ItemStackHandler(4) {
-            @Override
-            public int getSlotLimit(int slot) {
-                return 1;
-            }
-        });
-        when(bus.getPatternSlotCount()).thenReturn(3);
-        return bus;
     }
 }

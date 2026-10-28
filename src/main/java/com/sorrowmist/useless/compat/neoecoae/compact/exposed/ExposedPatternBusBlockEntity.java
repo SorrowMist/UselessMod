@@ -10,9 +10,12 @@ import appeng.api.networking.crafting.ICraftingProvider;
 import appeng.api.orientation.BlockOrientation;
 import appeng.api.stacks.AEItemKey;
 import cn.dancingsnow.neoecoae.api.ECOPatternInsertionResult;
+import cn.dancingsnow.neoecoae.api.ECOPreparedPattern;
+import appeng.api.stacks.KeyCounter;
 import cn.dancingsnow.neoecoae.blocks.entity.ECOMachineInterfaceBlockEntity;
 import cn.dancingsnow.neoecoae.blocks.entity.crafting.ECOCraftingPatternBusBlockEntity;
 import cn.dancingsnow.neoecoae.multiblock.cluster.NECraftingCluster;
+import cn.dancingsnow.neoecoae.util.PatternSearchKeywords;
 import com.sorrowmist.useless.compat.neoecoae.compact.NeoEcoCompactRegistry;
 import com.sorrowmist.useless.compat.neoecoae.compact.provider.CombinedPatternInventory;
 import net.minecraft.core.BlockPos;
@@ -26,6 +29,8 @@ import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Set;
+import java.util.UUID;
+import java.util.function.BiConsumer;
 import java.util.function.Function;
 
 /**
@@ -49,6 +54,7 @@ public class ExposedPatternBusBlockEntity extends ECOCraftingPatternBusBlockEnti
     private final List<ECOCraftingPatternBusBlockEntity> buses = new ArrayList<>();
     private int[] busRevisions = new int[0];
     private int[] busSlotCounts = new int[0];
+    private long[] busAuxiliaryRevisions = new long[0];
     @Nullable
     private InternalInventory combinedTerminalInventory;
     @Nullable
@@ -75,9 +81,11 @@ public class ExposedPatternBusBlockEntity extends ECOCraftingPatternBusBlockEnti
         mergedPatternInventory.bind(buses);
         busRevisions = new int[buses.size()];
         busSlotCounts = new int[buses.size()];
+        busAuxiliaryRevisions = new long[buses.size()];
         for (int index = 0; index < buses.size(); index++) {
-            busRevisions[index] = patternContentRevision(buses.get(index));
+            busRevisions[index] = buses.get(index).getPatternContentRevision();
             busSlotCounts[index] = buses.get(index).getPatternSlotCount();
+            busAuxiliaryRevisions[index] = buses.get(index).getAuxiliaryRevision();
         }
         combinedTerminalInventory = null;
         this.hostNode = hostNode;
@@ -111,17 +119,29 @@ public class ExposedPatternBusBlockEntity extends ECOCraftingPatternBusBlockEnti
      * 所以这里用轮询兜底，任何一条写入都不会漏掉。</p>
      */
     public void tick() {
+        tick((firstSlot, count) -> {});
+    }
+
+    /** Reports only changed bus ranges to the native preview, including auxiliary changes. */
+    public void tick(BiConsumer<Integer, Integer> changedRange) {
         boolean changed = false;
+        int offset = 0;
         for (int index = 0; index < buses.size(); index++) {
             ECOCraftingPatternBusBlockEntity bus = buses.get(index);
-            int revision = patternContentRevision(bus);
+            int revision = bus.getPatternContentRevision();
             int slotCount = bus.getPatternSlotCount();
+            long auxiliaryRevision = bus.getAuxiliaryRevision();
             boolean resized = busSlotCounts[index] != slotCount;
-            if (busRevisions[index] == revision && !resized) {
+            int firstSlot = offset;
+            offset += slotCount;
+            if (busRevisions[index] == revision && !resized
+                    && busAuxiliaryRevisions[index] == auxiliaryRevision) {
                 continue;
             }
             busRevisions[index] = revision;
             busSlotCounts[index] = slotCount;
+            busAuxiliaryRevisions[index] = auxiliaryRevision;
+            changedRange.accept(firstSlot, slotCount);
             changed = true;
         }
         if (changed) {
@@ -159,18 +179,73 @@ public class ExposedPatternBusBlockEntity extends ECOCraftingPatternBusBlockEnti
         return new PatternContainerGroup(AEItemKey.of(block.asItem()), block.getName(), List.of());
     }
 
+    @Override
     public void setPatternDirect(int slot, ItemStack stack) {
         mergedPatternInventory.setItemDirect(slot, stack);
+    }
+
+    @Override
+    public void onChangeInventory(InternalInventory inventory, int slot) {
+        // The native preview also notifies after changing a live stack. The inherited catalog
+        // covers only one bus; aggregate indexes must reach the owning bus's own catalog.
+        if (slot < 0) {
+            for (ECOCraftingPatternBusBlockEntity bus : buses) {
+                bus.onChangeInventory(bus.getPatternSlotInventory(), -1);
+            }
+            return;
+        }
+        ECOCraftingPatternBusBlockEntity bus = mergedPatternInventory.busOf(slot);
+        if (bus != null) {
+            bus.onChangeInventory(bus.getPatternSlotInventory(), mergedPatternInventory.localSlotOf(slot));
+        }
+    }
+
+    @Override
+    public void beginPatternBatch() {
+        buses.forEach(ECOCraftingPatternBusBlockEntity::beginPatternBatch);
+    }
+
+    @Override
+    public void endPatternBatch() {
+        buses.forEach(ECOCraftingPatternBusBlockEntity::endPatternBatch);
     }
 
     // ---------------------------------------------------------------- 样板写入
 
     @Override
-    public ECOPatternInsertionResult insertPattern(ItemStack itemStack) {
-        if (itemStack.isEmpty()) {
-            return ECOPatternInsertionResult.INCOMPATIBLE;
-        }
-        return insertIntoBuses(bus -> bus.insertPattern(itemStack));
+    public boolean insertPattern(ItemStack itemStack) {
+        return insertPatternWithResult(itemStack) == ECOPatternInsertionResult.INSERTED;
+    }
+
+    @Override
+    public ECOPatternInsertionResult insertPatternWithResult(ItemStack itemStack) {
+        return insertIntoBuses(bus -> bus.insertPatternWithResult(itemStack));
+    }
+
+    @Override
+    public ECOPatternInsertionResult insertPatternKnownUnique(ItemStack itemStack) {
+        return insertIntoBuses(bus -> bus.insertPatternKnownUnique(itemStack));
+    }
+
+    @Override
+    public ECOPatternInsertionResult insertPreparedPattern(ECOPreparedPattern prepared) {
+        return insertIntoBuses(bus -> bus.insertPreparedPattern(prepared));
+    }
+
+    @Override
+    public ECOPatternInsertionResult insertPreparedPatternKnownUnique(ECOPreparedPattern prepared) {
+        return insertIntoBuses(bus -> bus.insertPreparedPatternKnownUnique(prepared));
+    }
+
+    @Override
+    public boolean canAcceptIntoAuxiliary(ItemStack stack) {
+        return buses.stream().anyMatch(bus -> bus.canAcceptIntoAuxiliary(stack));
+    }
+
+    @Override
+    public ECOPatternInsertionResult insertIntoAuxiliary(ItemStack stack, @Nullable ECOPreparedPattern prepared) {
+        return insertIntoBuses(bus -> bus.canAcceptIntoAuxiliary(stack)
+                ? bus.insertIntoAuxiliary(stack, prepared) : ECOPatternInsertionResult.NO_TARGET);
     }
 
     /** 紧凑机的样板仍然存在真实总线里，所以这里只是把插入转给第一条腾得出位置的总线。 */
@@ -179,10 +254,13 @@ public class ExposedPatternBusBlockEntity extends ECOCraftingPatternBusBlockEnti
         ECOPatternInsertionResult last = ECOPatternInsertionResult.NO_TARGET;
         for (ECOCraftingPatternBusBlockEntity bus : buses) {
             ECOPatternInsertionResult result = action.apply(bus);
-            if (result == ECOPatternInsertionResult.INSERTED) {
+            if (result == ECOPatternInsertionResult.INSERTED
+                    || result == ECOPatternInsertionResult.ALREADY_PRESENT) {
                 return result;
             }
-            last = result;
+            if (result == ECOPatternInsertionResult.NO_SPACE || last != ECOPatternInsertionResult.NO_SPACE) {
+                last = result;
+            }
         }
         return last;
     }
@@ -206,22 +284,75 @@ public class ExposedPatternBusBlockEntity extends ECOCraftingPatternBusBlockEnti
         }
     }
 
-    /** Content hash for the 20.4.x API, which has no pattern revision counter. */
-    public int getPatternContentRevision() {
-        int revision = 1;
+    @Override
+    public boolean pushPattern(IPatternDetails details, KeyCounter[] inputs) {
+        return false;
+    }
+
+    @Override
+    public boolean pushPattern(IPatternDetails details, KeyCounter[] inputs, @Nullable UUID jobId) {
+        return false;
+    }
+
+    @Override
+    public void refreshPatternDetailsForCatalog() {
+        buses.forEach(ECOCraftingPatternBusBlockEntity::refreshPatternDetailsForCatalog);
+    }
+
+    @Override
+    @Nullable
+    public IPatternDetails getDecodedPatternDetails(int slot) {
+        ECOCraftingPatternBusBlockEntity bus = mergedPatternInventory.busOf(slot);
+        return bus == null ? null : bus.getDecodedPatternDetails(mergedPatternInventory.localSlotOf(slot));
+    }
+
+    @Override
+    public String getPatternSearchKeywords(int slot) {
+        ECOCraftingPatternBusBlockEntity bus = mergedPatternInventory.busOf(slot);
+        return bus == null ? "" : bus.getPatternSearchKeywords(mergedPatternInventory.localSlotOf(slot));
+    }
+
+    @Override
+    public boolean ownsAuxiliary(ItemStack stack) {
+        return buses.stream().anyMatch(bus -> bus.ownsAuxiliary(stack));
+    }
+
+    @Override
+    public boolean hasAuxiliaryRoom() {
+        return buses.stream().anyMatch(ECOCraftingPatternBusBlockEntity::hasAuxiliaryRoom);
+    }
+
+    @Override
+    public List<ItemStack> getAuxiliaryEncodedPatterns() {
+        return buses.stream().flatMap(bus -> bus.getAuxiliaryEncodedPatterns().stream()).toList();
+    }
+
+    @Override
+    public List<String> getAuxiliarySearchKeywords() {
+        return buses.stream().flatMap(bus -> bus.getAuxiliarySearchKeywords().stream()).toList();
+    }
+
+    @Override
+    public List<PatternSearchKeywords.Directions> getAuxiliaryPatternSearchDirections() {
+        return buses.stream().flatMap(bus -> bus.getAuxiliaryPatternSearchDirections().stream()).toList();
+    }
+
+    @Override
+    public long getAuxiliaryRevision() {
+        long revision = 1;
         for (ECOCraftingPatternBusBlockEntity bus : buses) {
-            revision = revision * 31 + patternContentRevision(bus);
+            revision = revision * 31 + bus.getAuxiliaryRevision();
         }
         return revision;
     }
 
-    private static int patternContentRevision(ECOCraftingPatternBusBlockEntity bus) {
-        int revision = bus.getPatternSlotCount();
-        for (int slot = 0; slot < bus.getPatternSlotCount(); slot++) {
-            ItemStack stack = bus.itemHandler.getStackInSlot(slot);
-            int value = stack.isEmpty() ? 0 : 31 * (31 * stack.getItem().hashCode() + stack.getCount())
-                    + (stack.getTag() == null ? 0 : stack.getTag().hashCode());
-            revision = revision * 31 + value;
+    /** Native revision tokens keep polling proportional to the number of buses. */
+    @Override
+    public int getPatternContentRevision() {
+        int revision = 1;
+        for (ECOCraftingPatternBusBlockEntity bus : buses) {
+            revision = revision * 31 + bus.getPatternContentRevision();
+            revision = revision * 31 + bus.getPatternSlotCount();
         }
         return revision;
     }

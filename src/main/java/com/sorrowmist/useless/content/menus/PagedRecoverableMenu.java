@@ -25,6 +25,18 @@ public class PagedRecoverableMenu extends AbstractContainerMenu {
     public static final int SLOTS_PER_PAGE = 90;
     public static final int PREVIOUS_PAGE = 0;
     public static final int NEXT_PAGE = 1;
+    /**
+     * 半尺寸设计的槽位节距：20px 底格 + 2px 间隙。
+     *
+     * <p>界面按同一条节距绘制底格（物品 16px 居中于底格 +2），因此菜单坐标本身就是
+     * 物品坐标，点击 / 拖拽 / Shift / JEI 全部沿用原版按真实坐标的处理，无需任何换算。</p>
+     */
+    public static final int SLOT_PITCH = 22;
+
+    // 半尺寸布局（456×304）里左右两栏的实际槽位原点，与各屏幕的卡片几何一一对应。
+    private static final int STORAGE_X = 22, STORAGE_Y = 68;
+    private static final int PLAYER_INVENTORY_X = 242, PLAYER_INVENTORY_Y = 198;
+    private static final int HOTBAR_X = 242, HOTBAR_Y = 266;
 
     private final RecoverableItemStackHandler inventory;
     private final BlockPos blockPos;
@@ -72,14 +84,16 @@ public class PagedRecoverableMenu extends AbstractContainerMenu {
     protected PagedRecoverableMenu(MenuType<?> type, int containerId, Inventory playerInventory,
                                    RecoverableItemStackHandler inventory, BlockPos blockPos) {
         this(type, containerId, playerInventory, inventory, blockPos,
-                8, 32, 8, 225, 8, 283, null);
+                STORAGE_X, STORAGE_Y, PLAYER_INVENTORY_X, PLAYER_INVENTORY_Y,
+                HOTBAR_X, HOTBAR_Y, null);
     }
 
     protected PagedRecoverableMenu(MenuType<?> type, int containerId, Inventory playerInventory,
                                    RecoverableItemStackHandler inventory, BlockPos blockPos,
                                    @Nullable PagedMenuPageMemory pageMemory) {
         this(type, containerId, playerInventory, inventory, blockPos,
-                8, 32, 8, 225, 8, 283, pageMemory);
+                STORAGE_X, STORAGE_Y, PLAYER_INVENTORY_X, PLAYER_INVENTORY_Y,
+                HOTBAR_X, HOTBAR_Y, pageMemory);
     }
 
     protected PagedRecoverableMenu(MenuType<?> type, int containerId, Inventory playerInventory,
@@ -117,17 +131,17 @@ public class PagedRecoverableMenu extends AbstractContainerMenu {
         for (int row = 0; row < 10; row++) {
             for (int column = 0; column < 9; column++) {
                 addSlot(new SlotItemHandler(pageView, column + row * 9,
-                        storageX + column * 18, storageY + row * 18));
+                        storageX + column * SLOT_PITCH, storageY + row * SLOT_PITCH));
             }
         }
         for (int row = 0; row < 3; row++) {
             for (int column = 0; column < 9; column++) {
                 addSlot(new Slot(playerInventory, column + row * 9 + 9,
-                        playerInventoryX + column * 18, playerInventoryY + row * 18));
+                        playerInventoryX + column * SLOT_PITCH, playerInventoryY + row * SLOT_PITCH));
             }
         }
         for (int column = 0; column < 9; column++) {
-            addSlot(new Slot(playerInventory, column, hotbarX + column * 18, hotbarY));
+            addSlot(new Slot(playerInventory, column, hotbarX + column * SLOT_PITCH, hotbarY));
         }
         addSyncedDataSlots(pageData);
     }

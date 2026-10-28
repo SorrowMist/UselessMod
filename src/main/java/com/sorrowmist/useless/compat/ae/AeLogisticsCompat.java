@@ -1,14 +1,11 @@
 package com.sorrowmist.useless.compat.ae;
 
-import com.sorrowmist.useless.utils.RateLimitedLogger;
-
 import appeng.api.config.Actionable;
 import appeng.api.networking.security.IActionSource;
 import appeng.api.stacks.AEFluidKey;
 import appeng.api.stacks.AEItemKey;
 import appeng.api.stacks.AEKey;
 import appeng.api.storage.MEStorage;
-import com.sorrowmist.useless.UselessMod;
 import com.sorrowmist.useless.api.logistics.LongFluidHandler;
 import com.sorrowmist.useless.api.logistics.LongItemHandler;
 import net.minecraft.core.BlockPos;
@@ -19,7 +16,6 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * {@link AeLogisticsBridge} 的 AE2 实现。
@@ -96,30 +92,6 @@ public final class AeLogisticsCompat implements AeLogisticsBridge {
     @Nullable
     public LongFluidHandler fluidEndpoint(Level level, BlockPos pos) {
         return isEndpoint(level, pos) ? new FluidEndpoint(level, pos) : null;
-    }
-
-    /**
-     * 写入被拒时的限流警告：每 {@link #WARN_INTERVAL_MS} 毫秒最多一条。
-     *
-     * <p>AE 端点「接受不了」有两类完全不同的原因，而界面上的 {@code TARGET_REJECTED}
-     * 分不出来：一是<b>网络根本取不到</b>（端点没挂上网 / 节点尚未就绪），二是
-     * <b>网络取到了但不收</b>——最常见的是 ME 网络里压根没有能存这种资源的存储
-     * （AE2 的物品与流体各有各的存储元件，只放物品元件的话流体无处可去）。
-     * 这两类的处理方式完全不同，所以这里把具体原因写进日志。</p>
-     *
-     * <p>限流是必须的：搬运每秒都在重试，不限流会把日志刷爆。</p>
-     */
-    private static final long WARN_INTERVAL_MS = 5000L;
-    private static final AtomicLong LAST_WARN_AT = new AtomicLong();
-
-    private static void warnRejected(BlockPos pos, String resource, String reason) {
-        long now = System.currentTimeMillis();
-        long last = LAST_WARN_AT.get();
-        if (now - last < WARN_INTERVAL_MS || !LAST_WARN_AT.compareAndSet(last, now)) {
-            return;
-        }
-        RateLimitedLogger.warn(UselessMod.LOGGER,
-                "无线物流：AE 端点 {} 无法接收{}——{}", pos.toShortString(), resource, reason);
     }
 
     /** 一次搬运期间固定的「网络里有什么」快照条目。 */
@@ -333,20 +305,14 @@ public final class AeLogisticsCompat implements AeLogisticsBridge {
             }
             AEItemKey key = AEItemKey.of(template);
             if (key == null) {
-                warnRejected(pos, "物品", "这个物品无法转成 AE 的资源键");
                 return 0L;
             }
             MEStorage storage = storage();
             if (storage == null) {
-                warnRejected(pos, "物品", "该方块当前取不到 ME 网络（没有挂上网格，或节点尚未就绪）");
                 return 0L;
             }
             long inserted = storage.insert(key, amount,
                     simulate ? Actionable.SIMULATE : Actionable.MODULATE, source());
-            if (inserted <= 0L) {
-                warnRejected(pos, "物品", "ME 网络没有收下它：要么网里没有物品存储"
-                        + "（物品存储元件，或用存储总线接入的容器），要么这些存储已经满了");
-            }
             // 刻意<b>不</b>在这里作废快照：无过滤器的扫描路径正靠「一次搬运沿用同一份快照」
             // 保证 slot 在遍历途中始终指向同一个 key（见类注释）。作废它会让扫描循环每插一次
             // 就重抓一遍整网。多出来的存量下次搬运自然可见。
@@ -524,21 +490,14 @@ public final class AeLogisticsCompat implements AeLogisticsBridge {
             }
             AEFluidKey key = AEFluidKey.of(type);
             if (key == null) {
-                warnRejected(pos, "流体", "这种流体无法转成 AE 的资源键（多半是未正确注册的流体）");
                 return 0L;
             }
             MEStorage storage = storage();
             if (storage == null) {
-                warnRejected(pos, "流体", "该方块当前取不到 ME 网络（没有挂上网格，或节点尚未就绪）");
                 return 0L;
             }
             long inserted = storage.insert(key, amount,
                     simulate ? Actionable.SIMULATE : Actionable.MODULATE, source());
-            if (inserted <= 0L) {
-                warnRejected(pos, "流体", "ME 网络没有收下它：要么网里没有流体存储（AE2 的物品与"
-                        + "流体存储是分开的，需要流体存储元件放进 ME 驱动器，或用存储总线接入一个"
-                        + "流体容器），要么这些存储已经满了");
-            }
             // 理由同 ItemEndpoint.insert：刻意不作废快照。
             return Math.max(0L, inserted);
         }

@@ -23,7 +23,9 @@ public final class OreGeneratorMenu extends PagedRecoverableMenu {
 
     public OreGeneratorMenu(int containerId, Inventory inventory, BlockPos pos) {
         super(ModMenuType.ORE_GENERATOR_MENU.get(), containerId, inventory,
-                handler(inventory, pos), pos, 8, 22, 44, 254, 44, 312);
+                handler(inventory, pos), pos,
+                // 半尺寸布局（456×304）：左栏 9×10 样本槽，右栏 9×3 + 快捷栏物品栏。
+                22, 68, 242, 198, 242, 266);
         blockPos = pos.immutable();
         generator = inventory.player.level().getBlockEntity(pos) instanceof OreGeneratorBlockEntity value
                 ? value : null;

@@ -33,9 +33,9 @@ final class AE2StyleTextField extends EditBox {
     /** 文本相对输入框左缘的水平内缩。 */
     private static final int PADDING = 4;
     /** 提示文本颜色。 */
-    private static final int HINT_COLOR = 0x808080;
+    private static final int HINT_COLOR = 0x8E8E93;
     /** 正文颜色。 */
-    private static final int TEXT_COLOR = 0xE0E0E0;
+    private static final int TEXT_COLOR = 0x1D1D1F;
 
     /** 绘制用字体，父类字段私有，此处另行保存。 */
     private final Font textFont;
@@ -63,29 +63,10 @@ final class AE2StyleTextField extends EditBox {
     public void renderWidget(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
         if (!isVisible()) return;
 
-        // 贴图纵向三行依次为普通、聚焦、只读：第 0 行为未聚焦底纹，第 1 行为聚焦高亮底纹。
-        // 本类不用于只读展示，因此不涉及第 2 行。
-        int sourceY = (isFocused() ? 1 : 0) * ROW_HEIGHT;
+        // Apple 风 v2：白底圆角输入框，聚焦蓝色描边（不再使用 AE2 text_field 贴图）。
         int x = getX();
         int y = getY();
-        int right = x + getWidth();
-        // 目标高度取控件实际高度：贴图源行高固定为 ROW_HEIGHT，纵向按需缩放以铺满控件，
-        // 避免控件高度大于贴图行高时底部露出空隙。
-        int height = getHeight();
-
-        // 左端盖。
-        graphics.blit(TEXTURE, x, y, 0, sourceY, 1, height, TEXTURE_SIZE, TEXTURE_SIZE);
-        // 中段按中段宽度为步长平铺，末段按剩余宽度裁剪，避免贴图被拉伸。
-        int bodyX = x + 1;
-        while (bodyX < right - 1) {
-            int piece = Math.min(SOURCE_BODY_WIDTH, right - 1 - bodyX);
-            graphics.blit(TEXTURE, bodyX, y, SOURCE_BODY_X, sourceY, piece, height,
-                    TEXTURE_SIZE, TEXTURE_SIZE);
-            bodyX += piece;
-        }
-        // 右端盖。
-        graphics.blit(TEXTURE, right - 1, y, 127, sourceY, 1, height, TEXTURE_SIZE, TEXTURE_SIZE);
-
+        AppleUi.field(graphics, x, y, getWidth(), getHeight(), isFocused());
         int textY = y + (getHeight() - 8) / 2;
         int maxTextWidth = getWidth() - PADDING * 2;
         String value = getValue();
@@ -103,7 +84,7 @@ final class AE2StyleTextField extends EditBox {
         // 光标仅在聚焦时绘制，位置紧随已显示文本。
         if (isFocused() && (Util.getMillis() / 500L) % 2L == 0L) {
             int cursorX = x + PADDING + textFont.width(visible);
-            graphics.fill(cursorX, textY - 1, cursorX + 1, textY + 9, 0xFFD0D0D0);
+            graphics.fill(cursorX, textY - 1, cursorX + 1, textY + 9, 0xFF007AFF);
         }
     }
 }

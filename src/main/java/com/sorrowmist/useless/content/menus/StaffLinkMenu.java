@@ -32,6 +32,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
+import static com.sorrowmist.useless.content.menus.StaffLinkLayout.*;
+
 /**
  * 无线物流的配置界面容器。
  *
@@ -44,15 +46,6 @@ import java.util.UUID;
  * 不需要参与物品搬运。</p>
  */
 public final class StaffLinkMenu extends AbstractContainerMenu {
-    private static final int PLAYER_INVENTORY_X = 44;
-    /**
-     * 背包第一行的 y。
-     *
-     * <p>过滤槽不画在主界面上（改成覆盖层里的面板），所以面板高度维持原值，
-     * 背包位置也就不必下移。</p>
-     */
-    private static final int PLAYER_INVENTORY_Y = 254;
-    private static final int PLAYER_HOTBAR_Y = 312;
 
     private UUID networkId;
     private final boolean clientSide;
@@ -92,14 +85,14 @@ public final class StaffLinkMenu extends AbstractContainerMenu {
     }
 
     private void addPlayerInventory(Inventory inventory) {
-        for (int row = 0; row < 3; row++) {
-            for (int column = 0; column < 9; column++) {
-                addSlot(new Slot(inventory, column + row * 9 + 9,
-                        PLAYER_INVENTORY_X + column * 18, PLAYER_INVENTORY_Y + row * 18));
+        for (int row = 0; row < INVENTORY_ROWS; row++) {
+            for (int column = 0; column < INVENTORY_COLUMNS; column++) {
+                addSlot(new Slot(inventory, column + row * INVENTORY_COLUMNS + INVENTORY_COLUMNS,
+                        PLAYER_INVENTORY_X + column * SLOT_STEP, PLAYER_INVENTORY_Y + row * SLOT_STEP));
             }
         }
-        for (int column = 0; column < 9; column++) {
-            addSlot(new Slot(inventory, column, PLAYER_INVENTORY_X + column * 18, PLAYER_HOTBAR_Y));
+        for (int column = 0; column < INVENTORY_COLUMNS; column++) {
+            addSlot(new Slot(inventory, column, PLAYER_INVENTORY_X + column * SLOT_STEP, PLAYER_HOTBAR_Y));
         }
     }
 
@@ -531,7 +524,7 @@ public final class StaffLinkMenu extends AbstractContainerMenu {
             snapshot.setAnchorName(anchor, name);
         }
         if (clientSide) {
-            PacketDistributor.sendToServer(new StaffLinkRenamePacket(anchor, name == null ? "" : name));
+            PacketDistributor.sendToServer(new StaffLinkRenamePacket(networkId, anchor, name == null ? "" : name));
         }
     }
 
@@ -560,7 +553,8 @@ public final class StaffLinkMenu extends AbstractContainerMenu {
      */
     public void moveAnchorTo(GlobalPos anchor, int targetIndex) {
         if (clientSide) {
-            PacketDistributor.sendToServer(new StaffLinkReorderPacket(anchor, targetIndex));
+            PacketDistributor.sendToServer(new StaffLinkReorderPacket(networkId, anchor, targetIndex,
+                    StaffLinkReorderPacket.orderToken(getAnchors())));
         }
     }
 

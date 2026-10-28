@@ -3,6 +3,8 @@ package com.sorrowmist.useless.compat.neoecoae.compact.block;
 import appeng.api.crafting.PatternDetailsHelper;
 import cn.dancingsnow.neoecoae.api.ECOPatternInsertionResult;
 import cn.dancingsnow.neoecoae.blocks.crafting.ECOCraftingSystem;
+import com.sorrowmist.useless.compat.neoecoae.compact.menu.CompactPatternAccessMenu;
+import net.minecraft.server.level.ServerPlayer;
 import com.sorrowmist.useless.compat.neoecoae.compact.entity.CompactF9BlockEntity;
 import com.sorrowmist.useless.core.component.ExternalInventoryReference;
 import com.sorrowmist.useless.core.component.UComponents;
@@ -46,6 +48,14 @@ public class CompactF9Block extends ECOCraftingSystem {
     public InteractionResult use(BlockState state, Level level, BlockPos pos, Player player,
                                  InteractionHand hand, BlockHitResult hit) {
         ItemStack heldItem = player.getItemInHand(hand);
+        if (hand == InteractionHand.MAIN_HAND && heldItem.isEmpty() && player.getOffhandItem().isEmpty()
+                && player.isShiftKeyDown()
+                && level.getBlockEntity(pos) instanceof CompactF9BlockEntity compact) {
+            if (player instanceof ServerPlayer serverPlayer) {
+                CompactPatternAccessMenu.open(serverPlayer, compact);
+            }
+            return InteractionResult.sidedSuccess(level.isClientSide);
+        }
         if (isEncodedPattern(heldItem, level)
                 && level.getBlockEntity(pos) instanceof CompactF9BlockEntity compact) {
             if (level.isClientSide) {

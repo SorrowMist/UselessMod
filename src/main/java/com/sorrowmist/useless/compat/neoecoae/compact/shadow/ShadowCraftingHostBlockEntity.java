@@ -1,6 +1,8 @@
 package com.sorrowmist.useless.compat.neoecoae.compact.shadow;
 
 import appeng.api.orientation.BlockOrientation;
+import appeng.api.networking.IGridNode;
+import appeng.api.networking.ticking.TickRateModulation;
 import cn.dancingsnow.neoecoae.api.ECOTier;
 import cn.dancingsnow.neoecoae.blocks.entity.crafting.ECOCraftingSystemBlockEntity;
 import net.minecraft.core.BlockPos;
@@ -21,6 +23,24 @@ public class ShadowCraftingHostBlockEntity extends ECOCraftingSystemBlockEntity 
 
     public ShadowCraftingHostBlockEntity(BlockEntityType<?> type, BlockPos pos, BlockState blockState) {
         super(type, pos, blockState, ECOTier.L9);
+        getMainNode().setFlags();
+        getMainNode().setInWorldNode(false);
+    }
+
+    @Override
+    public TickRateModulation tickingRequest(IGridNode node, int ticksSinceLastCall) {
+        // The compact owner advances cooling once per tick; the grid node supplies connectivity only.
+        return node == null ? super.tickingRequest(null, ticksSinceLastCall) : TickRateModulation.IDLE;
+    }
+
+    @Override
+    public boolean hasHighEnergyNetworkSwitch() {
+        return true;
+    }
+
+    @Override
+    public boolean hasNormalNetworkSwitch() {
+        return false;
     }
 
     @Override

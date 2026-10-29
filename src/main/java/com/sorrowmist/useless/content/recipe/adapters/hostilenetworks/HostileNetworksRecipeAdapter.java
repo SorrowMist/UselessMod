@@ -208,10 +208,7 @@ public final class HostileNetworksRecipeAdapter
     }
 
     /**
-     * The target pack enables HNN 5's continuous accuracy. Every intermediate data value
-     * therefore has its own rate; a tier-wide predicate with the tier's base rate is wrong.
-     * Generate exact-data variants below the final tier, retaining an unbounded final tier.
-     * The immutable generation snapshot is reused until models/tier rates/config reload.
+     * 生成每个品级一条推理配方。连续准确率仍按品级起始值计算，模型输入则覆盖整个品级区间。
      */
     private static void addInferenceRecipes(
             List<RecipeHolder<HostileNetworksSyntheticRecipe>> result, DataModel model) {
@@ -222,17 +219,8 @@ public final class HostileNetworksRecipeAdapter
             if (tier == ModelTier.FAULTY) continue;
             Ingredient ingredient = DataModelRangeIngredient.of(model, tier);
             if (!(ingredient instanceof DataModelRangeIngredient range)) continue;
-            if (HostileConfig.continuousAccuracy && tier.next() != tier) {
-                for (long data = range.minData(); data <= range.maxData(); data++) {
-                    int exact = (int) data;
-                    addInferenceRecipe(result, model, tier, matrix,
-                            new DataModelRangeIngredient(range.modelId(), exact, exact),
-                            accuracyAt(model, tier, exact), tier.name + "/data_" + exact);
-                }
-            } else {
-                addInferenceRecipe(result, model, tier, matrix, range,
-                        accuracyAt(model, tier, range.minData()), tier.name);
-            }
+            addInferenceRecipe(result, model, matrix, range,
+                    accuracyAt(model, tier, range.minData()), tier.name);
         }
     }
 
@@ -253,7 +241,7 @@ public final class HostileNetworksRecipeAdapter
 
     private static void addInferenceRecipe(
             List<RecipeHolder<HostileNetworksSyntheticRecipe>> result,
-            DataModel model, ModelTier tier, Ingredient matrix, Ingredient mold,
+            DataModel model, Ingredient matrix, Ingredient mold,
             float accuracy, String suffix) {
         if (!Float.isFinite(accuracy) || accuracy < 0F) return;
 
@@ -325,9 +313,8 @@ public final class HostileNetworksRecipeAdapter
     }
 
     /**
-     * Calculates the smallest deterministic inference batch with the same expected outputs as
-     * the Simulation Chamber. A base drop is guaranteed for each operation; prediction drops
-     * use native per-data accuracy, clamped to one prediction per operation.
+     * Calculates a deterministic inference batch using the tier's base accuracy. Every model
+     * value in the tier range shares this recipe and its representative output rate.
      */
     private static Optional<ExpectedOutputScaler.ScaledOutputs> inferenceOutputs(
             DataModel model, float accuracy) {

@@ -208,7 +208,9 @@ public class ClientSetup {
 
     /** 目录已就绪：在客户端线程刷新依赖它的 JEI 展示与物品属性。 */
     private static void onRecipeCatalogReady() {
-        JEIPlugin.refreshAlloyFurnaceRecipes();
+        if (net.minecraftforge.fml.ModList.get().isLoaded("jei")) {
+            JEIPlugin.refreshAlloyFurnaceRecipes();
+        }
         if (Minecraft.getInstance().player != null) {
             EndlessBeafItem.refreshAttackDamage(Minecraft.getInstance().player);
         }

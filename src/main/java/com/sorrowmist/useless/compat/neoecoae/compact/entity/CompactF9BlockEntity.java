@@ -159,9 +159,9 @@ public class CompactF9BlockEntity extends ECOCraftingSystemBlockEntity
                 NeoEcoCompactRegistry.SHADOW_FLUID_INPUT_HATCH.get(), pos, blockState);
         fluidOutputHatch = new ShadowFluidOutputHatchBlockEntity(
                 NeoEcoCompactRegistry.SHADOW_FLUID_OUTPUT_HATCH.get(), pos, blockState);
-        fluidInputHatch.tank = CompactF9FluidHandler.createFleetTank(HOSTS, this::setChanged);
+        fluidInputHatch.initializeSharedTank(Math.multiplyExact(16_000, HOSTS), this::setChanged);
         fluidOutputHatch.tank = CompactF9FluidHandler.createFleetTank(HOSTS, this::setChanged);
-        fluidHandler = new CompactF9FluidHandler(fluidInputHatch.tank, fluidOutputHatch.tank);
+        fluidHandler = new CompactF9FluidHandler(fluidInputHatch.sharedTank(), fluidOutputHatch.tank);
         getMainNode().setFlags(GridFlags.REQUIRE_CHANNEL);
         // 关键：网格服务必须挂在「本机自己」身上，而不是一个独立对象。
         // ECO 的样板总线就是这么做的（总线 BE 既实现 ICraftingProvider 又实现 IECOPatternStorage），
@@ -404,7 +404,7 @@ public class CompactF9BlockEntity extends ECOCraftingSystemBlockEntity
                 NeoEcoCompactRegistry.SHADOW_FLUID_INPUT_HATCH.get(), worldPosition, getBlockState());
         ShadowFluidOutputHatchBlockEntity output = new ShadowFluidOutputHatchBlockEntity(
                 NeoEcoCompactRegistry.SHADOW_FLUID_OUTPUT_HATCH.get(), worldPosition, getBlockState());
-        input.tank = fluidInputHatch.tank;
+        input.shareTankWith(fluidInputHatch);
         output.tank = fluidOutputHatch.tank;
         input.setLevel(level);
         output.setLevel(level);
@@ -440,7 +440,8 @@ public class CompactF9BlockEntity extends ECOCraftingSystemBlockEntity
         }
         for (int index = 1; index < fleet.size() && index <= pendingShadowHostData.size(); index++) {
             ECOCraftingSystemBlockEntity host = fleet.get(index).getController();
-            host.loadTag(pendingShadowHostData.getCompound(index - 1));
+            // LDLib restores managed fields from BlockEntity.load, before AE2's loadTag hook.
+            host.load(pendingShadowHostData.getCompound(index - 1));
         }
         pendingShadowHostData = null;
     }
@@ -451,7 +452,7 @@ public class CompactF9BlockEntity extends ECOCraftingSystemBlockEntity
         }
         int count = Math.min(pendingShadowWorkerData.size(), shadowWorkers.size());
         for (int index = 0; index < count; index++) {
-            shadowWorkers.get(index).loadTag(pendingShadowWorkerData.getCompound(index));
+            shadowWorkers.get(index).load(pendingShadowWorkerData.getCompound(index));
         }
         pendingShadowWorkerData = null;
     }
@@ -534,7 +535,7 @@ public class CompactF9BlockEntity extends ECOCraftingSystemBlockEntity
         for (int index = 0; index < count; index++) {
             ECOCraftingPatternBusBlockEntity bus = shadowBuses.get(index);
             CompoundTag busData = saved.getCompound(index);
-            bus.loadTag(busData);
+            bus.load(busData);
             CompactPatternBusPersistence.readSlots(bus, busData);
             bus.refreshPatternDetailsForCatalog();
         }
@@ -815,7 +816,7 @@ public class CompactF9BlockEntity extends ECOCraftingSystemBlockEntity
         // 整包同步给客户端。这里只在内容真的变过之后，把数据写进 UUID 键控的外置存储。
         flushPatternStore(false);
         CompoundTag inputFluid = new CompoundTag();
-        fluidInputHatch.tank.writeToNBT(inputFluid);
+        fluidInputHatch.sharedTank().writeToNBT(inputFluid);
         data.put(FLUID_INPUT_KEY, inputFluid);
         CompoundTag outputFluid = new CompoundTag();
         fluidOutputHatch.tank.writeToNBT(outputFluid);
@@ -836,7 +837,7 @@ public class CompactF9BlockEntity extends ECOCraftingSystemBlockEntity
         HolderLookup.Provider registries = level == null ? net.minecraft.core.RegistryAccess.EMPTY : level.registryAccess();
         super.loadTag(data);
         if (data.contains(FLUID_INPUT_KEY, Tag.TAG_COMPOUND)) {
-            fluidInputHatch.tank.readFromNBT(data.getCompound(FLUID_INPUT_KEY));
+            fluidInputHatch.sharedTank().readFromNBT(data.getCompound(FLUID_INPUT_KEY));
         }
         if (data.contains(FLUID_OUTPUT_KEY, Tag.TAG_COMPOUND)) {
             fluidOutputHatch.tank.readFromNBT(data.getCompound(FLUID_OUTPUT_KEY));

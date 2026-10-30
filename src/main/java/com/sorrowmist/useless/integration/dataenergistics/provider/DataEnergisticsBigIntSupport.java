@@ -1,8 +1,5 @@
 package com.sorrowmist.useless.integration.dataenergistics.provider;
 
-import com.mojang.logging.LogUtils;
-import org.slf4j.Logger;
-
 /**
  * 「数据能源的 bigint API 到底在不在」的能力探针。
  *
@@ -34,26 +31,14 @@ import org.slf4j.Logger;
  */
 final class DataEnergisticsBigIntSupport {
 
-    private static final Logger LOGGER = LogUtils.getLogger();
-
     /** 3.3.0 才引入的接口；它的存在与否就是「原生 bigint 派发可用吗」的唯一判据。 */
     private static final String BIGINT_ADAPTER_TYPE =
             "com.fish_dan_.data_energistics.api.crafting.dispatch.BigIntegerCraftingProviderAdapter";
 
     /** 数据能源是否提供 3.3.0 的 bigint 派发 API（进程内只求值一次）。 */
-    static final boolean AVAILABLE = probe();
+    static final boolean AVAILABLE = classFilePresent() && typeResolvable();
 
     private DataEnergisticsBigIntSupport() {
-    }
-
-    private static boolean probe() {
-        boolean available = classFilePresent() && typeResolvable();
-        if (available) {
-            LOGGER.info("DataEnergistics bigint API detected: native bigint dispatch enabled");
-        } else {
-            LOGGER.info("DataEnergistics bigint API absent (pre-3.3.0): long-window counted dispatch only");
-        }
-        return available;
     }
 
     /** 只查 jar 里的 class 文件，不触发加载/链接。 */

@@ -3,7 +3,9 @@
   "package": "com.sorrowmist.useless.mixin.compact",
   "compatibilityLevel": "JAVA_17",
   "mixins": [
-    "GridMachineClassMixin"
+    "GridMachineClassMixin",
+    "ComputationHostPanelCompactMixin",
+    "CraftingHostPanelCompactMixin"
   ],
   "client": [
     "CompactPatternPreviewPacketMixin"

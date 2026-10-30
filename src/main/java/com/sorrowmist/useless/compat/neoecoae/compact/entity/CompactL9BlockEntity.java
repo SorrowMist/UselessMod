@@ -12,8 +12,6 @@ import appeng.util.inv.AppEngInternalInventory;
 import cn.dancingsnow.neoecoae.api.ECOTier;
 import cn.dancingsnow.neoecoae.blocks.entity.NEBlockEntity;
 import cn.dancingsnow.neoecoae.blocks.entity.storage.ECOStorageSystemBlockEntity;
-import cn.dancingsnow.neoecoae.impl.storage.infinite.ECOStorageHostMode;
-import cn.dancingsnow.neoecoae.impl.storage.infinite.ECOInfiniteStorageDomains;
 import cn.dancingsnow.neoecoae.multiblock.cluster.NEStorageCluster;
 import com.sorrowmist.useless.compat.neoecoae.compact.NeoEcoCompactRegistry;
 import com.sorrowmist.useless.compat.neoecoae.compact.block.CompactTicker;
@@ -303,18 +301,13 @@ public class CompactL9BlockEntity extends ECOStorageSystemBlockEntity
         CompoundTag tag = carrier.getOrCreateTag().copy();
         if (!tag.hasUUID(DOMAIN_TAG)) {
             UUID domainId = UUID.randomUUID();
-            var engine = ECOInfiniteStorageDomains.acquire(level, domainId);
-            try {
-                if (!engine.isHealthy() || !engine.commit().successful()) {
-                    RateLimitedLogger.warn(LOGGER, "Compact L9 at {} could not create its infinite domain", worldPosition);
-                    return;
-                }
-                tag.putUUID(DOMAIN_TAG, domainId);
-            } finally {
-                ECOInfiniteStorageDomains.release(level.getServer(), domainId);
+            if (!CompactInfiniteStorageDomains.create(level, domainId)) {
+                RateLimitedLogger.warn(LOGGER, "Compact L9 at {} could not create its infinite domain", worldPosition);
+                return;
             }
+            tag.putUUID(DOMAIN_TAG, domainId);
         }
-        tag.putString(MODE_TAG, ECOStorageHostMode.FORMED_INFINITE.id());
+        tag.putString(MODE_TAG, "formed_infinite");
         carrier.getOrCreateTag().merge(tag);
         restoreInfiniteDomainFromItem(carrier);
     }

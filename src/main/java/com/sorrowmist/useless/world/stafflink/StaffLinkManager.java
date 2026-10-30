@@ -1,6 +1,5 @@
 package com.sorrowmist.useless.world.stafflink;
 
-import com.sorrowmist.useless.UselessMod;
 import com.sorrowmist.useless.compat.teams.TeamOwners;
 import com.sorrowmist.useless.core.component.UComponents;
 import net.minecraft.server.MinecraftServer;
@@ -156,11 +155,9 @@ public final class StaffLinkManager {
 
         List<UUID> merged = new ArrayList<>(networkIds(server, ownerId));
         boolean teamAlreadyHad = !merged.isEmpty();
-        int moved = 0;
         for (UUID id : personal.networks()) {
             if (data.get(id) != null && !merged.contains(id)) {
                 merged.add(id);
-                moved++;
             }
         }
         if (!merged.isEmpty()) {
@@ -172,11 +169,6 @@ public final class StaffLinkManager {
         }
         data.setOwnerNetworks(personalId, List.of(), 0);
         data.dropOwnerIfEmpty(personalId);
-
-        if (moved > 0) {
-            UselessMod.LOGGER.info("无线物流：把 {} 名下的 {} 张网络并入队伍 {}",
-                    player.getGameProfile().getName(), moved, ownerId);
-        }
     }
 
     // ------------------------------------------------------------------ 归属登记读写

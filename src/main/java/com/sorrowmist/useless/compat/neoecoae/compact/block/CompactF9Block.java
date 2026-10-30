@@ -45,6 +45,12 @@ public class CompactF9Block extends ECOCraftingSystem {
     }
 
     @Override
+    public void playerWillDestroy(Level level, BlockPos pos, BlockState state, Player player) {
+        CompactMachineDrops.dropForCreativePlayer(level, pos, state, player);
+        super.playerWillDestroy(level, pos, state, player);
+    }
+
+    @Override
     public InteractionResult use(BlockState state, Level level, BlockPos pos, Player player,
                                  InteractionHand hand, BlockHitResult hit) {
         ItemStack heldItem = player.getItemInHand(hand);

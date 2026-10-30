@@ -49,7 +49,6 @@ import net.minecraftforge.event.AddPackFindersEvent;
 import net.minecraftforge.event.ItemAttributeModifierEvent;
 import net.minecraftforge.event.RegisterCommandsEvent;
 import net.minecraftforge.event.entity.player.PlayerInteractEvent;
-import net.minecraftforge.event.server.ServerStartingEvent;
 import org.slf4j.Logger;
 
 @Mod(UselessMod.MODID)
@@ -133,9 +132,6 @@ public class UselessMod {
             if (pack != null) consumer.accept(pack);
         });
     }
-
-    @SubscribeEvent
-    public void onServerStarting(ServerStartingEvent event) {}
 
     @SubscribeEvent
     public void onRegisterCommands(RegisterCommandsEvent event) {

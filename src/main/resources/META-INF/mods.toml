@@ -5,6 +5,7 @@ license="MIT"
 modId="useless_mod"
 version="${mod_version}"
 displayName="Useless Mod"
+authors="C-H716、水幕忘忧、Yang120231"
 description="Utilities, tools, logistics and omniversal alloy-furnace recipe integrations for Forge 1.20.1."
 [[dependencies.useless_mod]]
 modId="forge"

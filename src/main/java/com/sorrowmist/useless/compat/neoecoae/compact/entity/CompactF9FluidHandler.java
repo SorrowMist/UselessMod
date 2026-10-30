@@ -59,7 +59,16 @@ public final class CompactF9FluidHandler implements IFluidHandler {
 
     @Override
     public int fill(@NotNull FluidStack resource, @NotNull FluidAction action) {
-        return input.fill(resource, action);
+        // Native long tanks can accept more than their int capacity; keep the fleet's
+        // original bounded pool of eight 16,000 mB input hatches.
+        int remaining = Math.max(0, input.getCapacity() - input.getFluidAmount());
+        int accepted = Math.min(resource.getAmount(), remaining);
+        if (accepted <= 0) {
+            return 0;
+        }
+        FluidStack limited = resource.copy();
+        limited.setAmount(accepted);
+        return input.fill(limited, action);
     }
 
     @Override

@@ -4,7 +4,7 @@ A Minecraft mod featuring various utilities and enhancements.
 
 ## Forge 1.20.1
 
-Version `20.2.4.10` targets Minecraft 1.20.1, Forge 47.3.10+, Java 17,
+Version `20.2.4.11` targets Minecraft 1.20.1, Forge 47.3.10+, Java 17,
 AE2 15.4.8+, Mekanism 10.4.15+ (compiled against 10.4.16.80),
 Mekanism Extras 1.5.0+ and the Create 2 Mekanism: Sky Edition 2 integration profile.
 Build with `./gradlew build` (Windows: `gradlew.bat build`); Python 3 is used by
@@ -14,6 +14,12 @@ The `portBridgeTest` suite also runs as part of `check` and is not shipped in th
 The EMI/JEMI bridge preserves custom AE keys and long quantities when filling native
 processing patterns, including Applied Mekanistics chemicals. Native JEI types and
 current quantities are retained for chemical tooltips and ghost dragging.
+
+Compact C9/F9 host panels report their built-in level-nine hardware through the
+native ECO artwork. Creative-mode breaking preserves compact C9/F9/L9 machine
+data through the normal loot path. Compact F9 shares ECO's native coolant input
+tank across all eight hosts while retaining the 128,000 mB input limit and existing
+fluid NBT.
 
 Forge, Minecraft and AE2 are required. Every compiled mod integration declares a
 minimum and compatible version range in `src/main/resources/META-INF/mods.toml`;

@@ -120,6 +120,7 @@ tasks.named('test', Test) {
     classpath += files(layout.buildDirectory.file("moddev/artifacts/client-extra-${minecraft_version}-${forge_version}.jar"))
 }
 tasks.named('processResources', ProcessResources) {
+    filteringCharset = 'UTF-8'
     inputs.property 'mod_version', mod_version
     filesMatching('META-INF/mods.toml') {
         expand mod_id: mod_id, mod_name: mod_name, mod_version: mod_version

@@ -339,7 +339,8 @@ public class CompactC9BlockEntity extends ECOComputationSystemBlockEntity
         }
         int count = Math.min(pendingThreadingCoreData.size(), shadowThreadingCores.size());
         for (int index = 0; index < count; index++) {
-            shadowThreadingCores.get(index).loadTag(pendingThreadingCoreData.getCompound(index));
+            // Include LDLib's managed fields as well as AE2's loadTag data.
+            shadowThreadingCores.get(index).load(pendingThreadingCoreData.getCompound(index));
         }
         pendingThreadingCoreData = null;
     }

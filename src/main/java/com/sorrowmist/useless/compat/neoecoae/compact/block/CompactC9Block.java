@@ -1,6 +1,10 @@
 package com.sorrowmist.useless.compat.neoecoae.compact.block;
 
 import cn.dancingsnow.neoecoae.blocks.computation.ECOComputationSystem;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.state.BlockState;
 
 /**
  * 无用型紧凑 C9 的方块形态。
@@ -11,5 +15,11 @@ public class CompactC9Block extends ECOComputationSystem {
 
     public CompactC9Block(Properties properties) {
         super(properties);
+    }
+
+    @Override
+    public void playerWillDestroy(Level level, BlockPos pos, BlockState state, Player player) {
+        CompactMachineDrops.dropForCreativePlayer(level, pos, state, player);
+        super.playerWillDestroy(level, pos, state, player);
     }
 }

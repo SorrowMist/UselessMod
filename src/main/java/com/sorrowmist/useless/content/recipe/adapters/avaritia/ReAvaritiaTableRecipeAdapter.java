@@ -13,6 +13,7 @@ import committee.nova.mods.avaritia.api.common.crafting.TierInput;
 import committee.nova.mods.avaritia.common.ingredient.StackIngredient;
 import committee.nova.mods.avaritia.init.registry.ModBlocks;
 import committee.nova.mods.avaritia.init.registry.ModRecipeTypes;
+import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.crafting.Ingredient;
 import net.minecraft.world.item.crafting.RecipeHolder;
@@ -24,6 +25,8 @@ import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
@@ -146,7 +149,7 @@ public final class ReAvaritiaTableRecipeAdapter implements IRecipeAdapter<ITierC
         // equality-based map would collapse all of them into one requirement. The identity map is
         // only the storage layer; equal exact stacks are still merged explicitly below.
         Map<Ingredient, Long> requirements = new IdentityHashMap<>();
-        if (!mergeTableIngredients(requirements, ingredients)) {
+        if (!mergeTableIngredients(requirements, normalizeComponentSensitive(ingredients))) {
             return null;
         }
         List<CountedIngredient> inputs = ExtendedCraftingAdapterUtils.countedIngredients(requirements);
@@ -192,6 +195,59 @@ public final class ReAvaritiaTableRecipeAdapter implements IRecipeAdapter<ITierC
                 outputs,
                 requirements,
                 tableMold(tier));
+    }
+
+    /**
+     * 把同一物品、不同组件形式出现的需求收紧为组件敏感需求。
+     *
+     * <p>Re-Avaritia 的终焉工作台用同一物品加上不同的 SINGULARITY_ID 组件表示各类奇点，
+     * 而 {@code getIngredients()} 返回的是原版 {@link Ingredient}，其匹配只比较物品、忽略组件。
+     * 若沿用它，万象样板编码时会把每个奇点槽都放宽成按物品 ID 匹配，任意一种奇点即可填满全部
+     * 槽位；配方自身的匹配逻辑（例如 EternalSingularityCraftRecipe#matches）却是按
+     * {@link ItemStack#isSameItemSameComponents} 严格比较的。因此这里只在同一物品出现多个
+     * 不同组件时改用组件敏感需求，其余需求保持原有语义。</p>
+     */
+    private static List<Ingredient> normalizeComponentSensitive(List<Ingredient> ingredients) {
+        Set<Item> componentSensitiveItems = findComponentSensitiveItems(ingredients);
+        if (componentSensitiveItems.isEmpty()) {
+            return ingredients;
+        }
+
+        List<Ingredient> normalized = new ArrayList<>(ingredients.size());
+        for (Ingredient ingredient : ingredients) {
+            Optional<ItemStack> stack = exactStack(ingredient);
+            if (stack.isPresent() && componentSensitiveItems.contains(stack.get().getItem())) {
+                normalized.add(DataComponentIngredient.of(true, stack.get()));
+            } else {
+                normalized.add(ingredient);
+            }
+        }
+        return normalized;
+    }
+
+    /** 找出在配方中以同一物品、不同组件形式多次出现的物品。 */
+    private static Set<Item> findComponentSensitiveItems(List<Ingredient> ingredients) {
+        Map<Item, List<ItemStack>> stacksByItem = new HashMap<>();
+        for (Ingredient ingredient : ingredients) {
+            Optional<ItemStack> stack = exactStack(ingredient);
+            if (stack.isEmpty()) {
+                continue;
+            }
+            stacksByItem.computeIfAbsent(stack.get().getItem(), key -> new ArrayList<>()).add(stack.get());
+        }
+
+        Set<Item> result = new HashSet<>();
+        for (Map.Entry<Item, List<ItemStack>> entry : stacksByItem.entrySet()) {
+            List<ItemStack> stacks = entry.getValue();
+            for (int first = 0; first < stacks.size(); first++) {
+                for (int second = first + 1; second < stacks.size(); second++) {
+                    if (!ItemStack.isSameItemSameComponents(stacks.get(first), stacks.get(second))) {
+                        result.add(entry.getKey());
+                    }
+                }
+            }
+        }
+        return result;
     }
 
     private static boolean mergeTableIngredients(

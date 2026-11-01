@@ -18,6 +18,7 @@ import com.sorrowmist.useless.core.component.UComponents;
 import com.sorrowmist.useless.init.ModItems;
 import net.minecraft.core.Holder;
 import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.tags.TagKey;
@@ -35,6 +36,7 @@ import java.util.Comparator;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalLong;
 import java.util.Set;
@@ -115,6 +117,104 @@ public final class OmniversalPatternEncoding {
             return ItemStack.EMPTY;
         }
         return encode(existing, source, entry, level);
+    }
+
+    /**
+     * 判定一张既有万象样板的 payload 是否仍与它绑定的当前配方一致。
+     *
+     * <p>解码成功只说明样板仍能绑定到配方，不说明其输入槽语义与当前配方一致：早期编码器会把
+     * 「同一物品、不同数据组件」的多个需求放宽成按物品 ID 匹配，这类样板依旧可以解码，却允许
+     * 任意一种组件填满全部槽位。这里以当前配方重建一张样板，比较 AE payload 与 item-id 输入
+     * 槽位，任一不同即判定为需要重建。</p>
+     *
+     * <p>按 {@code recipeId} 与按旧 payload 指纹都定位不到当前配方时返回 {@code false}：此时无法
+     * 判定样板是否失真，交给解码校验决定，避免把暂时取不到配方的样板误报为失效。当前配方本身
+     * 不可编码时同样返回 {@code false}，不把一个无法重建的配方算作可修复。</p>
+     */
+    public static boolean isStale(ItemStack stack, Level level) {
+        if (stack == null || stack.isEmpty() || level == null) {
+            return false;
+        }
+        AEItemKey definition = AEItemKey.of(stack);
+        if (definition == null) {
+            return false;
+        }
+        OmniversalPatternData data = definition.get(UComponents.OMNIVERSAL_PATTERN_DATA.get());
+        if (data == null) {
+            return false;
+        }
+
+        // 优先按 recipeId 定位当前配方：样板记录的 identity 出自它自身的 payload，而 payload
+        // 恰恰可能已被放宽，用同一份指纹反查会绕回旧语义。recipeId 是稳定的外部键。
+        AlloyFurnaceRecipeCatalog.Entry current = resolveCurrentEntry(level, data).orElse(null);
+        if (current == null) {
+            AEProcessingPattern source;
+            try {
+                source = new AEProcessingPattern(definition);
+            } catch (RuntimeException exception) {
+                return true;
+            }
+            Optional<AlloyFurnaceRecipeCatalog.Entry> resolved =
+                    data.version() < OmniversalPatternData.TAG_INPUT_VERSION
+                            ? AlloyFurnaceRecipeCatalog.resolveLegacyPattern(
+                                    level, data.sourceId(), data.identity(), source, data.version())
+                            : AlloyFurnaceRecipeCatalog.resolvePattern(
+                                    level, data.sourceId(), data.identity(), source);
+            if (resolved.isEmpty()) {
+                return false;
+            }
+            current = resolved.get();
+        }
+
+        ItemStack rebuilt = reencodeFromRecipe(current, level);
+        if (rebuilt.isEmpty()) {
+            return false;
+        }
+        AEItemKey rebuiltDefinition = AEItemKey.of(rebuilt);
+        if (rebuiltDefinition == null
+                || rebuiltDefinition.get(UComponents.OMNIVERSAL_PATTERN_DATA.get()) == null) {
+            return false;
+        }
+        if (!Objects.equals(definition.get(AEComponents.ENCODED_PROCESSING_PATTERN),
+                rebuiltDefinition.get(AEComponents.ENCODED_PROCESSING_PATTERN))) {
+            return true;
+        }
+        return !normalizedSlots(data.itemIdInputSlots())
+                .equals(normalizedSlots(
+                        rebuiltDefinition.get(UComponents.OMNIVERSAL_PATTERN_DATA.get())
+                                .itemIdInputSlots()));
+    }
+
+    private static List<Integer> normalizedSlots(List<Integer> slots) {
+        if (slots == null || slots.isEmpty()) {
+            return List.of();
+        }
+        List<Integer> copy = new ArrayList<>(slots);
+        copy.sort(null);
+        return copy;
+    }
+
+    /** 仅按 {@code recipeId} 在当前目录中定位配方，命中数不为 1 时返回空。 */
+    private static Optional<AlloyFurnaceRecipeCatalog.Entry> resolveCurrentEntry(
+            Level level, OmniversalPatternData data) {
+        ResourceLocation recipeId = data.recipeId();
+        if (recipeId == null) {
+            return Optional.empty();
+        }
+        List<AlloyFurnaceRecipeCatalog.Entry> matched = new ArrayList<>();
+        for (AlloyFurnaceRecipeCatalog.Entry entry : AlloyFurnaceRecipeCatalog.entries(level, data.sourceId())) {
+            if (recipeId.equals(entry.identity().recipeId())) {
+                matched.add(entry);
+            }
+        }
+        if (matched.isEmpty()) {
+            for (AlloyFurnaceRecipeCatalog.Entry entry : AlloyFurnaceRecipeCatalog.entries(level)) {
+                if (recipeId.equals(entry.identity().recipeId())) {
+                    matched.add(entry);
+                }
+            }
+        }
+        return matched.size() == 1 ? Optional.of(matched.getFirst()) : Optional.empty();
     }
 
     /**

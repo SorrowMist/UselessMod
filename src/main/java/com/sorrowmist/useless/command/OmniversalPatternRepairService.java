@@ -42,6 +42,11 @@ import java.util.Set;
  * 结果不是 {@link OmniversalPatternDetails}（含返回 {@code null} 或抛异常）。判定为失效的
  * 样板会按当前配方目录重新匹配配方并重编码，然后就地写回原槽位。</p>
  *
+ * <p>此外，仍能正常解码、但记录指纹与当前配方指纹不一致的样板也会参与重建：样板记录的指纹
+ * 在编码时写入，覆盖配方输入；指纹变化意味着该配方内容已被修正（例如把合并过度的同物品
+ * 不同组件槽位拆回独立槽位），旧样板表达的含义已失真，仅靠解码校验发现不了。重建结果与
+ * 旧栈完全一致时不做写回，因此误判只会多一次计算，不会改写样板。</p>
+ *
  * <p>只覆盖 AE 网络上已通电的机器：单方块高级合金炉与多方块 ME 样板总成。玩家背包与终端
  * 内尚未上传的样板不在扫描范围内。</p>
  */
@@ -120,7 +125,7 @@ public final class OmniversalPatternRepairService {
                 }
 
                 scanned++;
-                if (isValid(stack, level)) continue;
+                if (isValid(stack, level) && !OmniversalPatternEncoding.isStale(stack, level)) continue;
                 invalid++;
 
                 ItemStack replacement = reencode(stack, data, level);

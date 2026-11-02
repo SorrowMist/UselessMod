@@ -751,9 +751,21 @@ public class EventHandler {
 
         MutableComponent message = Component.translatable(
                 "message.useless_mod.recipe.incompatible",
+                Component.translatableWithFallback("useless_mod.name", currentModDisplayName()),
                 String.join(", ", modNames),
                 Component.translatable("message.useless_mod.recipe.incompatible.issue").setStyle(linkStyle));
         player.displayClientMessage(message, false);
+    }
+
+    /** 本模组的展示名，用于提示中明确指代；元数据缺失时退回 modid。 */
+    private static String currentModDisplayName() {
+        try {
+            return ModList.get().getModContainerById(UselessMod.MODID)
+                    .map(container -> container.getModInfo().getDisplayName())
+                    .orElse(UselessMod.MODID);
+        } catch (RuntimeException | LinkageError exception) {
+            return UselessMod.MODID;
+        }
     }
 
     /**

@@ -100,6 +100,8 @@ public class EventHandler {
     private static volatile boolean RECIPE_INCOMPATIBILITY_NOTICE_SENT = false;
     /** 配方适配问题的 issue 新建页；具体参数由 {@link #buildIncompatibilityIssueUrl(List)} 拼接。 */
     private static final String ISSUE_NEW_URL = "https://github.com/SorrowMist/UselessMod/issues/new";
+    /** Bug 报告表单的文件名，需与 {@code .github/ISSUE_TEMPLATE/} 下的文件保持一致。 */
+    private static final String ISSUE_TEMPLATE_FILE = "bug_report.yml";
 
     @SubscribeEvent(priority = EventPriority.HIGHEST)
     public static void onLivingIncomingDamage(LivingIncomingDamageEvent event) {
@@ -755,28 +757,29 @@ public class EventHandler {
     }
 
     /**
-     * 构造预填了不兼容模组与本模组版本的 issue 新建链接。
+     * 构造指向 Bug 报告表单的 issue 新建链接，并预填现场信息。
      *
-     * <p>玩家只需补充日志链接即可提交，避免因缺少环境信息而来回询问。</p>
+     * <p>必须带上 {@code template} 参数：仓库关闭了空白 issue，只有走表单才符合模板要求。
+     * 表单中只有 input / textarea 类型支持 URL 预填，下拉框与复选框会被忽略，因此这里只填
+     * {@code mod-version} 与 {@code other-mods} 两个文本字段；不兼容模组列表与本模组、游戏、
+     * 加载器的版本都放进 {@code other-mods}，玩家只需补日志链接。</p>
      */
     private static String buildIncompatibilityIssueUrl(List<String> modIds) {
-        StringBuilder body = new StringBuilder();
-        body.append("### 不兼容的模组\n");
+        StringBuilder otherMods = new StringBuilder();
         for (String modId : modIds) {
-            body.append("- ").append(modId).append(' ').append(modVersion(modId)).append('\n');
+            otherMods.append("- ").append(modId).append(' ').append(modVersion(modId)).append('\n');
         }
-        body.append("\n### 运行环境\n");
-        body.append("- Minecraft：").append(modVersion("minecraft")).append('\n');
-        body.append("- UselessMod：").append(modVersion(UselessMod.MODID)).append('\n');
-        body.append("- NeoForge：").append(modVersion("neoforge")).append('\n');
-        body.append("\n### 请补充\n");
-        body.append("- 上述模组的确切版本（若与上方不一致）\n");
-        body.append("- 完整日志链接（Gist 或 pastebin）\n");
+        otherMods.append('\n')
+                .append("Minecraft ").append(modVersion("minecraft"))
+                .append(" / UselessMod ").append(modVersion(UselessMod.MODID))
+                .append(" / NeoForge ").append(modVersion("neoforge"));
 
-        String title = "[配方兼容] 配方适配器不兼容的模组：" + String.join(", ", modIds);
+        String title = "[Bug] 配方适配器不兼容：" + String.join(", ", modIds);
         return ISSUE_NEW_URL
-                + "?labels=bug&title=" + URLEncoder.encode(title, StandardCharsets.UTF_8)
-                + "&body=" + URLEncoder.encode(body.toString(), StandardCharsets.UTF_8);
+                + "?template=" + ISSUE_TEMPLATE_FILE
+                + "&title=" + URLEncoder.encode(title, StandardCharsets.UTF_8)
+                + "&mod-version=" + URLEncoder.encode(modVersion(UselessMod.MODID), StandardCharsets.UTF_8)
+                + "&other-mods=" + URLEncoder.encode(otherMods.toString(), StandardCharsets.UTF_8);
     }
 
     /** 取模组版本号；模组缺失或元数据异常时返回占位文本，不影响提示发送。 */

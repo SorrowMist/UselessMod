@@ -1,5 +1,6 @@
 package com.sorrowmist.useless.compat.ae;
 
+import com.sorrowmist.useless.content.recipe.AdapterGuards;
 import com.sorrowmist.useless.UselessMod;
 import com.sorrowmist.useless.api.logistics.LongPressureHandler;
 import net.minecraft.core.BlockPos;
@@ -40,7 +41,7 @@ public final class AePressureCompatLoader {
                             IMPLEMENTATION, true, AePressureCompatLoader.class.getClassLoader());
                     bridge = (AePressureBridge) implementation.getDeclaredConstructor().newInstance();
                 } catch (ReflectiveOperationException | LinkageError exception) {
-                    UselessMod.LOGGER.error("Failed to initialise the Applied Pneumatics bridge", exception);
+                    UselessMod.LOGGER.error("Failed to initialise the Applied Pneumatics bridge; Cause: {}", AdapterGuards.describe(exception));
                 }
             }
         }

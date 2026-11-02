@@ -1,5 +1,6 @@
 package com.sorrowmist.useless.compat.ae;
 
+import com.sorrowmist.useless.content.recipe.AdapterGuards;
 import com.sorrowmist.useless.UselessMod;
 import com.sorrowmist.useless.content.stafflink.SourceHandlerView;
 import net.minecraft.core.BlockPos;
@@ -35,7 +36,7 @@ public final class AeSourceCompatLoader {
                             IMPLEMENTATION, true, AeSourceCompatLoader.class.getClassLoader());
                     bridge = (AeSourceBridge) implementation.getDeclaredConstructor().newInstance();
                 } catch (ReflectiveOperationException | LinkageError exception) {
-                    UselessMod.LOGGER.error("Failed to initialise the AE source bridge", exception);
+                    UselessMod.LOGGER.error("Failed to initialise the AE source bridge; Cause: {}", AdapterGuards.describe(exception));
                 }
             }
         }

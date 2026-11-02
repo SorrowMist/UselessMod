@@ -1,5 +1,6 @@
 package com.sorrowmist.useless.compat.create;
 
+import com.sorrowmist.useless.content.recipe.AdapterGuards;
 import com.sorrowmist.useless.UselessMod;
 import com.sorrowmist.useless.content.stafflink.StaffLinkRoute;
 import com.sorrowmist.useless.content.stafflink.StaffLinkStressBridge;
@@ -45,7 +46,7 @@ public final class CreateStressCompatLoader {
                             IMPLEMENTATION, true, CreateStressCompatLoader.class.getClassLoader());
                     bridge = (StaffLinkStressBridge) implementation.getDeclaredConstructor().newInstance();
                 } catch (ReflectiveOperationException | LinkageError exception) {
-                    UselessMod.LOGGER.error("Failed to initialise the kinetic stress bridge", exception);
+                    UselessMod.LOGGER.error("Failed to initialise the kinetic stress bridge; Cause: {}", AdapterGuards.describe(exception));
                 }
             }
         }

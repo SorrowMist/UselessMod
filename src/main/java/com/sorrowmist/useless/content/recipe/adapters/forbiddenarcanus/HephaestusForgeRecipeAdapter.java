@@ -2,6 +2,7 @@ package com.sorrowmist.useless.content.recipe.adapters.forbiddenarcanus;
 
 import com.mojang.logging.LogUtils;
 import com.sorrowmist.useless.api.enums.AlloyFurnaceMode;
+import com.sorrowmist.useless.content.recipe.AdapterGuards;
 import com.sorrowmist.useless.content.recipe.AdapterUtils;
 import com.sorrowmist.useless.content.recipe.AdvancedAlloyFurnaceRecipe;
 import com.sorrowmist.useless.content.recipe.CountedIngredient;
@@ -148,7 +149,8 @@ public final class HephaestusForgeRecipeAdapter implements IRecipeAdapter<Forbid
                 output = ritual.result().getResultItem(main.copy()).copy();
             } catch (RuntimeException exception) {
                 warn(sourceId, "failed to resolve its result");
-                LOGGER.debug("Failed to resolve Forbidden Arcanus ritual result {}", sourceId, exception);
+                LOGGER.debug("Failed to resolve Forbidden Arcanus ritual result {}; Cause: {}",
+                        sourceId, AdapterGuards.describe(exception));
                 return List.of();
             }
             if (output.isEmpty() || output.getCount() <= 0) {
@@ -192,8 +194,8 @@ public final class HephaestusForgeRecipeAdapter implements IRecipeAdapter<Forbid
             multiplier = saturatingAdd(multiplier, Math.max(0, essences.experience()));
             return saturatingMultiply(AdapterUtils.DEFAULT_ENERGY, Math.max(1L, multiplier));
         } catch (RuntimeException exception) {
-            LOGGER.debug("Failed to read Forbidden Arcanus ritual energy requirements {}; using default energy",
-                    sourceId, exception);
+            LOGGER.debug("Failed to read Forbidden Arcanus ritual energy requirements {}; using default energy; Cause: {}",
+                    sourceId, AdapterGuards.describe(exception));
             return AdapterUtils.DEFAULT_ENERGY;
         }
     }

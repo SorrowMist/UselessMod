@@ -1,5 +1,6 @@
 package com.sorrowmist.useless.compat.ae;
 
+import com.sorrowmist.useless.content.recipe.AdapterGuards;
 import com.sorrowmist.useless.UselessMod;
 import com.sorrowmist.useless.api.logistics.LongFluidHandler;
 import com.sorrowmist.useless.api.logistics.LongItemHandler;
@@ -49,7 +50,7 @@ public final class AeGenericInvCompatLoader {
                             IMPLEMENTATION, true, AeGenericInvCompatLoader.class.getClassLoader());
                     bridge = (AeGenericInvBridge) implementation.getDeclaredConstructor().newInstance();
                 } catch (ReflectiveOperationException | LinkageError exception) {
-                    UselessMod.LOGGER.error("Failed to initialise the AE2 generic-inventory bridge", exception);
+                    UselessMod.LOGGER.error("Failed to initialise the AE2 generic-inventory bridge; Cause: {}", AdapterGuards.describe(exception));
                 }
             }
         }

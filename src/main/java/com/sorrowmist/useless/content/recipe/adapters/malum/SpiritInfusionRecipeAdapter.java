@@ -7,6 +7,7 @@ import com.sammy.malum.common.recipe.SpiritInfusionRecipe;
 import com.sammy.malum.registry.common.recipe.MalumRecipeTypes;
 import com.sorrowmist.useless.api.enums.AlloyFurnaceMode;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.PatternStackView;
+import com.sorrowmist.useless.content.recipe.AdapterGuards;
 import com.sorrowmist.useless.content.recipe.AdapterUtils;
 import com.sorrowmist.useless.content.recipe.AdvancedAlloyFurnaceRecipe;
 import com.sorrowmist.useless.content.recipe.CountedIngredient;
@@ -190,7 +191,8 @@ public final class SpiritInfusionRecipeAdapter implements IRecipeAdapter<SpiritI
             try {
                 output = source.getOutput(serverLevel, actualPrimary.copy());
             } catch (RuntimeException exception) {
-                LOGGER.warn("Failed to create component-carrying Malum infusion output", exception);
+                LOGGER.warn("Failed to create component-carrying Malum infusion output; Cause: {}",
+                        AdapterGuards.describe(exception));
                 return null;
             }
         }

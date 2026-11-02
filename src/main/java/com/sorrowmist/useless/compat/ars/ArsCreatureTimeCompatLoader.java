@@ -1,5 +1,6 @@
 package com.sorrowmist.useless.compat.ars;
 
+import com.sorrowmist.useless.content.recipe.AdapterGuards;
 import com.sorrowmist.useless.UselessMod;
 import net.minecraft.world.entity.LivingEntity;
 import net.neoforged.fml.ModList;
@@ -33,7 +34,7 @@ public final class ArsCreatureTimeCompatLoader {
                             IMPLEMENTATION, true, ArsCreatureTimeCompatLoader.class.getClassLoader());
                     bridge = (ArsCreatureTimeBridge) implementation.getDeclaredConstructor().newInstance();
                 } catch (ReflectiveOperationException | LinkageError exception) {
-                    UselessMod.LOGGER.error("Failed to initialise the Ars Nouveau creature time bridge", exception);
+                    UselessMod.LOGGER.error("Failed to initialise the Ars Nouveau creature time bridge; Cause: {}", AdapterGuards.describe(exception));
                 }
             }
         }
@@ -59,7 +60,8 @@ public final class ArsCreatureTimeCompatLoader {
             // 会刷爆日志，所以记一次就永久停用桥。
             bridge = null;
             UselessMod.LOGGER.error(
-                    "Disabling the Ars Nouveau creature time bridge after a linkage failure", error);
+                    "Disabling the Ars Nouveau creature time bridge after a linkage failure; Cause: {}",
+                    AdapterGuards.describe(error));
         }
     }
 }

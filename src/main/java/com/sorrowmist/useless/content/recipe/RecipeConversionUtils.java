@@ -50,16 +50,15 @@ public final class RecipeConversionUtils {
             return List.of();
         }
 
-        try {
-            com.sorrowmist.useless.api.recipe.IRecipeAdapter rawAdapter = adapter;
+        com.sorrowmist.useless.api.recipe.IRecipeAdapter rawAdapter = adapter;
+        // 兼容模组的版本错配会抛 NoClassDefFoundError / NoSuchMethodError（LinkageError），
+        // 它不是 RuntimeException，此前会一路冒泡终止服务器 tick。这里统一交给守卫降级：
+        // 单条配方转换失败只跳过该条，链接错误则停用整个适配器的转换动作。
+        return AdapterGuards.callEach(adapter, "convertAll", () -> {
             List<AdvancedAlloyFurnaceRecipe> converted = useActualInputs
                     ? rawAdapter.convertAll((RecipeHolder) holder, level, actualInputs)
                     : rawAdapter.convertAll((RecipeHolder) holder, level);
-            return converted == null ? List.of() : converted;
-        } catch (RuntimeException exception) {
-            LOGGER.warn("Skipping failed recipe conversion: adapter={}, recipe={}",
-                    adapter.getClass().getName(), holder.id(), exception);
-            return List.of();
-        }
+            return converted == null ? List.of() : List.copyOf(converted);
+        }, List.of());
     }
 }

@@ -1,5 +1,6 @@
 package com.sorrowmist.useless.compat.mekanism;
 
+import com.sorrowmist.useless.content.recipe.AdapterGuards;
 import com.sorrowmist.useless.UselessMod;
 import com.sorrowmist.useless.content.recipe.AlloyFurnaceRecipeManager;
 import com.sorrowmist.useless.content.recipe.RecipeSourceIds;
@@ -45,7 +46,7 @@ public final class MekanismRecipeCompatLoader {
                     true, MekanismRecipeCompatLoader.class.getClassLoader());
             loader.getMethod("register").invoke(null);
         } catch (ReflectiveOperationException | LinkageError exception) {
-            UselessMod.LOGGER.error("Failed to register Mekanism More Machine recipe adapters", exception);
+            UselessMod.LOGGER.error("Failed to register Mekanism More Machine recipe adapters; Cause: {}", AdapterGuards.describe(exception));
         }
     }
 
@@ -56,7 +57,7 @@ public final class MekanismRecipeCompatLoader {
                     MekanismRecipeCompatLoader.class.getClassLoader());
             loader.getMethod("register").invoke(null);
         } catch (ReflectiveOperationException | LinkageError exception) {
-            UselessMod.LOGGER.error("Failed to register AppMek-backed Mekanism recipe adapters", exception);
+            UselessMod.LOGGER.error("Failed to register AppMek-backed Mekanism recipe adapters; Cause: {}", AdapterGuards.describe(exception));
         }
     }
 }

@@ -4,6 +4,7 @@ import com.mojang.logging.LogUtils;
 import com.simibubi.create.content.kinetics.deployer.ItemApplicationRecipe;
 import com.simibubi.create.content.processing.recipe.ProcessingOutput;
 import com.sorrowmist.useless.api.enums.AlloyFurnaceMode;
+import com.sorrowmist.useless.content.recipe.AdapterGuards;
 import com.sorrowmist.useless.content.recipe.AdapterUtils;
 import com.sorrowmist.useless.content.recipe.AdvancedAlloyFurnaceRecipe;
 import com.sorrowmist.useless.content.recipe.CountedIngredient;
@@ -69,7 +70,8 @@ public final class CreateItemApplicationRecipeAdapter
         try {
             return build(originalId, source, level);
         } catch (RuntimeException exception) {
-            LOGGER.warn("Skipping malformed Create item application recipe {}", originalId, exception);
+            LOGGER.warn("Skipping malformed Create item application recipe {}; Cause: {}",
+                    originalId, AdapterGuards.describe(exception));
             return null;
         }
     }

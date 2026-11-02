@@ -1,5 +1,6 @@
 package com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae;
 
+import com.sorrowmist.useless.content.recipe.AdapterGuards;
 import appeng.api.crafting.IPatternDetails;
 import appeng.api.crafting.PatternDetailsHelper;
 import appeng.api.stacks.AEItemKey;
@@ -67,10 +68,10 @@ public final class AdvancedAlloyFurnacePatternResolver {
             try {
                 return OmniversalPatternDetails.decode(definition, level);
             } catch (RuntimeException exception) {
-                LOGGER.warn("Ignoring invalid omniversal pattern (recipe={}, fingerprint={})",
+                LOGGER.warn("Ignoring invalid omniversal pattern (recipe={}, fingerprint={}); Cause: {}",
                         data == null ? "<missing>" : data.recipeId(),
                         data == null ? "<missing>" : data.recipeFingerprint(),
-                        exception);
+                        AdapterGuards.describe(exception));
                 return null;
             }
         }
@@ -131,8 +132,8 @@ public final class AdvancedAlloyFurnacePatternResolver {
             }
             return processingPattern;
         } catch (RuntimeException exception) {
-            LOGGER.warn("Failed to create a component-aware AE view for pattern {}",
-                    pattern.getDefinition(), exception);
+            LOGGER.warn("Failed to create a component-aware AE view for pattern {}; Cause: {}",
+                    pattern.getDefinition(), AdapterGuards.describe(exception));
             return pattern;
         }
     }
@@ -263,7 +264,8 @@ public final class AdvancedAlloyFurnacePatternResolver {
         } catch (ClassNotFoundException | LinkageError ignored) {
             // Neo Vitae is optional and has no support class when it is absent.
         } catch (ReflectiveOperationException | RuntimeException exception) {
-            LOGGER.debug("Neo Vitae dynamic pattern support is unavailable", exception);
+            LOGGER.debug("Neo Vitae dynamic pattern support is unavailable; Cause: {}",
+                    AdapterGuards.describe(exception));
         }
         return Optional.empty();
     }

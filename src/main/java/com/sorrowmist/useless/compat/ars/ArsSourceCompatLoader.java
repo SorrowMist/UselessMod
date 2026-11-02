@@ -1,5 +1,6 @@
 package com.sorrowmist.useless.compat.ars;
 
+import com.sorrowmist.useless.content.recipe.AdapterGuards;
 import com.sorrowmist.useless.UselessMod;
 import com.sorrowmist.useless.content.stafflink.SourceHandlerView;
 import net.minecraft.core.BlockPos;
@@ -36,7 +37,7 @@ public final class ArsSourceCompatLoader {
                             IMPLEMENTATION, true, ArsSourceCompatLoader.class.getClassLoader());
                     bridge = (SourceBridge) implementation.getDeclaredConstructor().newInstance();
                 } catch (ReflectiveOperationException | LinkageError exception) {
-                    UselessMod.LOGGER.error("Failed to initialise the Ars Nouveau source bridge", exception);
+                    UselessMod.LOGGER.error("Failed to initialise the Ars Nouveau source bridge; Cause: {}", AdapterGuards.describe(exception));
                 }
             }
         }

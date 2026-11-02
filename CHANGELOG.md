@@ -5,7 +5,17 @@
 
 ## [Unreleased]
 
+### Changed / 变更
+- 配方适配器与可选兼容模组的失败日志改为单行诊断：只输出异常类型、消息与根因链（最多四层），不再把完整堆栈写进日志文件；同一「适配器 + 动作」的失败只记录一次
+  - Failure logs from recipe adapters and optional compatibility mods now emit a single-line diagnosis with the exception type, message and up to four cause levels instead of a full stack trace; repeated failures of the same adapter action are logged once.
+
 ### Fixed / 修复
+- 配方适配器统一加容错守卫，版本错配抛出的 `LinkageError`（`NoClassDefFoundError`、`NoSuchMethodError` 等）不再沿调用栈冒泡终止服务器 tick；结构性调用失败即停用该动作，逐条配方转换失败只跳过当前条目
+  - Recipe adapters now share a fault-tolerance guard, so `LinkageError`s raised by incompatible optional mod versions (`NoClassDefFoundError`, `NoSuchMethodError`, ...) no longer bubble up and kill the server tick loop; structural calls disable that action, while per-recipe conversion failures skip only the current entry.
+- 配方索引构建、配方目录构建与按输入查找配方等整表流程失败时降级为空结果并记录诊断，不再中断加载
+  - Whole-table flows such as recipe index building, catalog building and input-based recipe lookup now fall back to empty results with a diagnostic log instead of aborting the load.
+- 进入世界时若兼容模组的配方适配器因版本错配被停用，会向玩家提示具体模组名并说明已关闭其配方转换；每轮服务器只提示一次
+  - When a compatibility mod's recipe adapters were disabled by a version mismatch, players are now told which mods were affected and that their recipe conversion is disabled; the notice is sent once per server session.
 - 转换 Re-Avaritia 工作台配方时，同一物品、不同数据组件的多个输入（如终焉工作台「永恒奇点」所需的多种矿物奇点）不再被合并为单个按物品 ID 匹配的槽位，避免万象样板坍缩成「任一种奇点填满全部槽位」即可合成
   - Converting Re-Avaritia table recipes no longer merges multiple inputs that share an item but differ in data components (such as the various mineral singularities required by the Endgame Table's Eternal Singularity), preventing omniversal patterns from collapsing into a single item-ID slot that any one singularity can fill.
 - `/uselessmod patterns repair` 现在也会识别仍能正常解码、但输入槽语义已与当前配方不符的旧万象样板，按当前配方重建并写回，无需手动删除重写；重建结果与旧样板一致时不写回

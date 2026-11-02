@@ -1,5 +1,6 @@
 package com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae;
 
+import com.sorrowmist.useless.content.recipe.AdapterGuards;
 import appeng.api.crafting.IPatternDetails;
 import appeng.api.networking.IManagedGridNode;
 import appeng.api.stacks.AEFluidKey;
@@ -557,7 +558,8 @@ public final class AdvancedAlloyFurnaceAeManager {
                     CraftingTask.returnSavedMaterials(taskTag, this.owner, registries);
                 }
             } catch (RuntimeException exception) {
-                LOGGER.error("Failed to restore an Advanced Alloy Furnace AE task; returning its saved materials", exception);
+                LOGGER.error("Failed to restore an Advanced Alloy Furnace AE task; returning its saved materials. Cause: {}",
+                        AdapterGuards.describe(exception));
                 CraftingTask.returnSavedMaterials(taskTag, this.owner, registries);
             }
         }
@@ -575,7 +577,8 @@ public final class AdvancedAlloyFurnaceAeManager {
                         returnSavedBatchMaterials(batchTag, registries);
                     }
                 } catch (RuntimeException exception) {
-                    LOGGER.error("Failed to restore an Advanced Alloy Furnace AE batch; returning its saved materials", exception);
+                    LOGGER.error("Failed to restore an Advanced Alloy Furnace AE batch; returning its saved materials. Cause: {}",
+                        AdapterGuards.describe(exception));
                     returnSavedBatchMaterials(batchTag, registries);
                 }
             }
@@ -1410,7 +1413,8 @@ public final class AdvancedAlloyFurnaceAeManager {
             BigInteger accepted = taken.get(key);
             return accepted == null || accepted.signum() <= 0 ? BigInteger.ZERO : accepted;
         } catch (RuntimeException exception) {
-            LOGGER.error("BigInteger crafting CPU adapter {} threw in claimOutputs", adapter.id(), exception);
+            LOGGER.error("BigInteger crafting CPU adapter {} threw in claimOutputs; Cause: {}",
+                    adapter.id(), AdapterGuards.describe(exception));
             return BigInteger.ZERO;
         }
     }
@@ -1419,7 +1423,8 @@ public final class AdvancedAlloyFurnaceAeManager {
         try {
             callback.run();
         } catch (RuntimeException exception) {
-            LOGGER.error("BigInteger crafting CPU adapter {} threw in {}", adapterId, name, exception);
+            LOGGER.error("BigInteger crafting CPU adapter {} threw in {}; Cause: {}",
+                    adapterId, name, AdapterGuards.describe(exception));
         }
     }
 
@@ -1486,7 +1491,8 @@ public final class AdvancedAlloyFurnaceAeManager {
             CraftingEvent.fireAutoCraftingEvent(level, pattern, output, container);
             remainders = pattern.getRemainingItems(craftingInput);
         } catch (RuntimeException exception) {
-            LOGGER.warn("Failed to self-assemble a crafting pattern at {}", this.owner.getBlockPos(), exception);
+            LOGGER.warn("Failed to self-assemble a crafting pattern at {}; Cause: {}",
+                    this.owner.getBlockPos(), AdapterGuards.describe(exception));
             return null;
         }
 
@@ -2079,7 +2085,8 @@ public final class AdvancedAlloyFurnaceAeManager {
         try {
             this.owner.onPatternsRebuilt();
         } catch (RuntimeException exception) {
-            LOGGER.warn("Failed to publish alloy furnace patterns at {}", this.owner.getBlockPos(), exception);
+            LOGGER.warn("Failed to publish alloy furnace patterns at {}; Cause: {}",
+                    this.owner.getBlockPos(), AdapterGuards.describe(exception));
             return;
         }
         this.patternRefreshPending = false;
@@ -2130,8 +2137,8 @@ public final class AdvancedAlloyFurnaceAeManager {
                 } catch (RuntimeException exception) {
                     // A malformed pattern must not prevent the remaining
                     // slots from being published to AE2.
-                    LOGGER.warn("Failed to decode alloy furnace pattern at {} (item={})",
-                            this.owner.getBlockPos(), stack.getItem(), exception);
+                    LOGGER.warn("Failed to decode alloy furnace pattern at {} (item={}); Cause: {}",
+                            this.owner.getBlockPos(), stack.getItem(), AdapterGuards.describe(exception));
                 }
             }
         }

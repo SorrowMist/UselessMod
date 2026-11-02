@@ -2,6 +2,7 @@ package com.sorrowmist.useless.content.recipe.adapters.productivebees;
 
 import com.mojang.logging.LogUtils;
 import com.sorrowmist.useless.api.enums.AlloyFurnaceMode;
+import com.sorrowmist.useless.content.recipe.AdapterGuards;
 import com.sorrowmist.useless.content.recipe.AdapterUtils;
 import com.sorrowmist.useless.content.recipe.AdvancedAlloyFurnaceRecipe;
 import com.sorrowmist.useless.content.recipe.CountedIngredient;
@@ -55,8 +56,8 @@ public final class BeeBreedingRecipeAdapter implements IRecipeAdapter<BeeBreedin
                 generated.add(new RecipeHolder<>(recipeId,
                         new BeeBreedingRecipe(() -> bee, () -> bee, () -> bee, 0f)));
             } catch (RuntimeException exception) {
-                LOGGER.debug("Skipping generated Productive Bees self-breeding recipe: {}",
-                        entry.getKey(), exception);
+                LOGGER.debug("Skipping generated Productive Bees self-breeding recipe: {}; Cause: {}",
+                        entry.getKey(), AdapterGuards.describe(exception));
             }
         }
         return List.copyOf(generated);

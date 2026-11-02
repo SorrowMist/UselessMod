@@ -1,7 +1,7 @@
 package com.sorrowmist.useless.content.recipe.adapters;
 
-import com.sorrowmist.useless.content.recipe.AlloyFurnaceRecipeManager;
-import com.sorrowmist.useless.content.recipe.IRecipeAdapter;
+import com.sorrowmist.useless.content.recipe.AdapterGuards;
+import com.sorrowmist.useless.content.recipe.AlloyFurnaceRecipeManager;import com.sorrowmist.useless.content.recipe.IRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.RecipeSourceIds;
 import com.sorrowmist.useless.content.recipe.adapters.actuallyadditions.EmpowererRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.actuallyadditions.LaserRecipeAdapter;
@@ -265,8 +265,16 @@ public final class RecipeAdapterCompatRegistry {
         event.enqueueWork(() -> {
             try {
                 registerAction.run();
-            } catch (Exception e) {
-                LOGGER.error("Failed to register recipe adapters for mod: {}", modId, e);
+            } catch (LinkageError error) {
+                // 注册动作会实例化适配器并解析其引用的兼容模组类。版本错配时抛出的
+                // NoClassDefFoundError / NoSuchMethodError 不是 Exception，此前会直接终止启动流程。
+                // 这里只跳过该模组的全部适配器，其余模组不受影响。
+                AdapterGuards.recordModFailure(modId);
+                LOGGER.error("Recipe adapters for mod {} are incompatible with the installed version "
+                        + "and were skipped. Cause: {}", modId, AdapterGuards.describe(error));
+            } catch (Exception exception) {
+                LOGGER.error("Failed to register recipe adapters for mod: {}; Cause: {}",
+                        modId, AdapterGuards.describe(exception));
             }
         });
     }
@@ -385,7 +393,8 @@ public final class RecipeAdapterCompatRegistry {
             Class<?> loader = Class.forName(className, true, RecipeAdapterCompatRegistry.class.getClassLoader());
             loader.getMethod("register").invoke(null);
         } catch (ReflectiveOperationException | LinkageError exception) {
-            LOGGER.error("Failed to register optional recipe adapters from {}", className, exception);
+            LOGGER.error("Failed to register optional recipe adapters from {}; Cause: {}",
+                    className, AdapterGuards.describe(exception));
         }
     }
 

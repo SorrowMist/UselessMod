@@ -1,8 +1,8 @@
 package com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae;
 
 import com.mojang.logging.LogUtils;
-import com.sorrowmist.useless.content.recipe.AlloyFurnaceRecipeIdentity;
-import com.sorrowmist.useless.core.component.OmniversalPatternData;
+import com.sorrowmist.useless.content.recipe.AdapterGuards;
+import com.sorrowmist.useless.content.recipe.AlloyFurnaceRecipeIdentity;import com.sorrowmist.useless.core.component.OmniversalPatternData;
 import org.slf4j.Logger;
 
 import java.util.List;
@@ -81,7 +81,7 @@ public final class OmniversalPatternDiagnostics {
     public static void wrapFailed(String kind, Object definition, Exception exception) {
         if (warnLimited("wrap|" + kind + "|" + definition)) {
             LOGGER.warn("omniversal {} pattern wrapping failed for {}, keeping the plain pattern: {}",
-                    kind, definition, exception.toString());
+                    kind, definition, AdapterGuards.describe(exception));
         }
     }
 
@@ -92,7 +92,7 @@ public final class OmniversalPatternDiagnostics {
                     definition,
                     data == null ? "<no data>" : data.recipeId(),
                     data == null ? "<no data>" : data.recipeFingerprint(),
-                    exception.toString());
+                    AdapterGuards.describe(exception));
         }
     }
 

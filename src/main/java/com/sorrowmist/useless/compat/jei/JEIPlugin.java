@@ -1,5 +1,6 @@
 package com.sorrowmist.useless.compat.jei;
 
+import com.sorrowmist.useless.content.recipe.AdapterGuards;
 import appeng.menu.me.items.PatternEncodingTermMenu;
 import com.sorrowmist.useless.UselessMod;
 import com.sorrowmist.useless.client.gui.ChainGroupScreen;
@@ -309,9 +310,9 @@ public final class JEIPlugin implements IModPlugin {
                     AdvancedAlloyFurnaceRecipeCategory.TYPE);
         } catch (ReflectiveOperationException | ClassCastException exception) {
             UselessMod.LOGGER.warn(
-                    "Could not register the omniversal pattern transfer handler for {}.",
+                    "Could not register the omniversal pattern transfer handler for {}; Cause: {}.",
                     menuClassName,
-                    exception);
+                    AdapterGuards.describe(exception));
         }
     }
 
@@ -337,8 +338,8 @@ public final class JEIPlugin implements IModPlugin {
         } catch (ReflectiveOperationException | ClassCastException exception) {
             UselessMod.LOGGER.warn(
                     "Could not register the omniversal pattern transfer handler for ae2wtlib's wireless "
-                            + "pattern encoding terminal; it will encode plain patterns instead.",
-                    exception);
+                            + "pattern encoding terminal; it will encode plain patterns instead. Cause: {}",
+                    AdapterGuards.describe(exception));
         }
     }
 

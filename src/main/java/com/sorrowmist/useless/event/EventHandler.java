@@ -14,6 +14,7 @@ import com.sorrowmist.useless.compat.constructionwand.ConstructionWandLogic;
 import com.sorrowmist.useless.compat.create.CreateStressCompatLoader;
 import com.sorrowmist.useless.content.recipe.AlloyFurnaceRecipeManager;
 import com.sorrowmist.useless.content.recipe.AlloyFurnaceRecipeCatalog;
+import com.sorrowmist.useless.content.recipe.AdapterGuards;
 import com.sorrowmist.useless.content.multiblock.OmniversalFurnaceAutoBuilder;
 import com.sorrowmist.useless.content.blockentities.multiblock.MultiblockAlloyFurnaceCoreBlockEntity;
 import com.sorrowmist.useless.core.common.FlyEffectedHolder;
@@ -75,6 +76,7 @@ import net.neoforged.neoforge.network.PacketDistributor;
 import net.neoforged.neoforge.server.ServerLifecycleHooks;
 
 import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -86,6 +88,8 @@ public class EventHandler {
     private static final Set<UUID> BEEF_ADVANCED_STEALTH_PLAYERS = Collections.newSetFromMap(new ConcurrentHashMap<>());
     private static final Set<Integer> CLIENT_BEEF_ADVANCED_STEALTH_ENTITY_IDS = Collections.newSetFromMap(new ConcurrentHashMap<>());
     private static final Set<UUID> RESTORING_BEEF_PROTECTED_PLAYERS = ConcurrentHashMap.newKeySet();
+    /** 本轮服务器是否已发送过配方适配器不兼容提示；服务器停止时随失败记录一起复位。 */
+    private static volatile boolean RECIPE_INCOMPATIBILITY_NOTICE_SENT = false;
 
     @SubscribeEvent(priority = EventPriority.HIGHEST)
     public static void onLivingIncomingDamage(LivingIncomingDamageEvent event) {
@@ -707,7 +711,24 @@ public class EventHandler {
             if (layout != null) {
                 PacketDistributor.sendToPlayer(player, new BeefToolLayoutSyncPacket(layout.toJson()));
             }
+            notifyIncompatibleRecipeMods(player);
         }
+    }
+
+    /**
+     * 把本轮因版本错配被停用的兼容模组告知玩家。
+     *
+     * <p>只在服务器本轮第一次有玩家登录时发送一次：这类问题来自模组组合，与玩家个人无关，
+     * 每个玩家登录都刷一遍只会造成重复提示。服务器停止时 {@link AdapterGuards#clearFailures()}
+     * 会清空记录，因此下一局若问题已解决不会再提示。</p>
+     */
+    private static void notifyIncompatibleRecipeMods(ServerPlayer player) {
+        if (RECIPE_INCOMPATIBILITY_NOTICE_SENT) return;
+        RECIPE_INCOMPATIBILITY_NOTICE_SENT = true;
+        List<String> modNames = AdapterGuards.disabledModNames();
+        if (modNames.isEmpty()) return;
+        player.displayClientMessage(
+                Component.translatable("message.useless_mod.recipe.incompatible", String.join("、", modNames)), false);
     }
 
     @SubscribeEvent
@@ -944,6 +965,10 @@ public class EventHandler {
         ChainGroupManager.clearAll();
         // 生物保护名单的解析缓存与客户端镜像同理。
         BeefToolProtectionManager.clearAll();
+        // 适配器停用记录与登录提示标记都按「本轮服务器」计量：下一局启动时重新探测，
+        // 问题已修复就不会再提示。
+        AdapterGuards.clearFailures();
+        RECIPE_INCOMPATIBILITY_NOTICE_SENT = false;
     }
 
     /**

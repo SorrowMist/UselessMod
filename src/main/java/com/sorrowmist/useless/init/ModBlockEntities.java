@@ -1,5 +1,6 @@
 package com.sorrowmist.useless.init;
 
+import com.sorrowmist.useless.content.recipe.AdapterGuards;
 import com.sorrowmist.useless.UselessMod;
 import com.sorrowmist.useless.content.blockentities.AdvancedAlloyFurnaceBlockEntity;
 import com.sorrowmist.useless.content.blockentities.OreGeneratorBlockEntity;
@@ -111,7 +112,8 @@ public final class ModBlockEntities {
             Class<?> loader = Class.forName(className, true, ModBlockEntities.class.getClassLoader());
             loader.getMethod("registerCapabilities", RegisterCapabilitiesEvent.class).invoke(null, event);
         } catch (ReflectiveOperationException | LinkageError exception) {
-            UselessMod.LOGGER.error("Failed to register optional capabilities from {}", className, exception);
+            UselessMod.LOGGER.error("Failed to register optional capabilities from {}; Cause: {}",
+                    className, AdapterGuards.describe(exception));
         }
     }
 

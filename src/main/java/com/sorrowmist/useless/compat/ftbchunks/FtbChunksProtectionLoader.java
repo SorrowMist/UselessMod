@@ -1,5 +1,6 @@
 package com.sorrowmist.useless.compat.ftbchunks;
 
+import com.sorrowmist.useless.content.recipe.AdapterGuards;
 import com.sorrowmist.useless.UselessMod;
 import net.neoforged.fml.ModList;
 import org.jetbrains.annotations.Nullable;
@@ -34,7 +35,7 @@ public final class FtbChunksProtectionLoader {
                             IMPLEMENTATION, true, FtbChunksProtectionLoader.class.getClassLoader());
                     guard = (BlockEditGuard) implementation.getDeclaredConstructor().newInstance();
                 } catch (ReflectiveOperationException | LinkageError exception) {
-                    UselessMod.LOGGER.error("Failed to initialise the FTB Chunks protection bridge", exception);
+                    UselessMod.LOGGER.error("Failed to initialise the FTB Chunks protection bridge; Cause: {}", AdapterGuards.describe(exception));
                 }
             }
         }

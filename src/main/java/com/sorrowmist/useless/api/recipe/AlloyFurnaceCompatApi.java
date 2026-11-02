@@ -1,5 +1,6 @@
 package com.sorrowmist.useless.api.recipe;
 
+import com.sorrowmist.useless.content.recipe.AdapterGuards;
 import com.mojang.logging.LogUtils;
 import com.sorrowmist.useless.content.recipe.AlloyFurnaceRecipeManager;
 import com.sorrowmist.useless.content.recipe.RecipeSourceIds;
@@ -48,8 +49,8 @@ public final class AlloyFurnaceCompatApi {
         try {
             isEnabled = enabled.getAsBoolean();
         } catch (RuntimeException exception) {
-            LOGGER.error("Failed to evaluate alloy-furnace compatibility switch: source={}",
-                    sourceId, exception);
+            LOGGER.error("Failed to evaluate alloy-furnace compatibility switch: source={}; Cause: {}",
+                    sourceId, AdapterGuards.describe(exception));
             return;
         }
         if (!isEnabled) {
@@ -66,8 +67,8 @@ public final class AlloyFurnaceCompatApi {
             try {
                 manager.registerAdapter(adapter, normalizedSource);
             } catch (RuntimeException | LinkageError exception) {
-                LOGGER.error("Failed to register alloy-furnace compatibility adapter: source={}, adapter={}",
-                        normalizedSource, adapter.getClass().getName(), exception);
+                LOGGER.error("Failed to register alloy-furnace compatibility adapter: source={}, adapter={}; Cause: {}",
+                        normalizedSource, adapter.getClass().getName(), AdapterGuards.describe(exception));
             }
         }
     }

@@ -1,5 +1,6 @@
 package com.sorrowmist.useless.compat.teams;
 
+import com.sorrowmist.useless.content.recipe.AdapterGuards;
 import com.sorrowmist.useless.UselessMod;
 import net.neoforged.fml.ModList;
 import org.jetbrains.annotations.Nullable;
@@ -36,7 +37,7 @@ public final class FtbTeamsCompatLoader {
                             IMPLEMENTATION, true, FtbTeamsCompatLoader.class.getClassLoader());
                     bridge = (SharedOwnerBridge) implementation.getDeclaredConstructor().newInstance();
                 } catch (ReflectiveOperationException | LinkageError exception) {
-                    UselessMod.LOGGER.error("Failed to initialise the FTB Teams bridge", exception);
+                    UselessMod.LOGGER.error("Failed to initialise the FTB Teams bridge; Cause: {}", AdapterGuards.describe(exception));
                 }
             }
         }

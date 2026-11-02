@@ -13,6 +13,7 @@ import com.brandon3055.draconicevolution.init.DEContent;
 import com.mojang.logging.LogUtils;
 import com.sorrowmist.useless.api.enums.AlloyFurnaceMode;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.PatternStackView;
+import com.sorrowmist.useless.content.recipe.AdapterGuards;
 import com.sorrowmist.useless.content.recipe.AdapterUtils;
 import com.sorrowmist.useless.content.recipe.AdvancedAlloyFurnaceRecipe;
 import com.sorrowmist.useless.content.recipe.CountedIngredient;
@@ -103,7 +104,8 @@ public final class DraconicFusionRecipeAdapter implements IRecipeAdapter<IFusion
                 FusionInventorySnapshot inventory = new FusionInventorySnapshot(catalyst, source.getRecipeTier());
                 assembled = source.assemble(inventory, level == null ? null : level.registryAccess()).copy();
             } catch (RuntimeException exception) {
-                LOGGER.warn("Failed to assemble dynamic Draconic Evolution fusion recipe {}", holder.id(), exception);
+                LOGGER.warn("Failed to assemble dynamic Draconic Evolution fusion recipe {}; Cause: {}",
+                        holder.id(), AdapterGuards.describe(exception));
                 continue;
             }
             if (assembled.isEmpty()) {

@@ -18,6 +18,7 @@ import com.mojang.logging.LogUtils;
 import com.sorrowmist.useless.api.enums.AlloyFurnaceMode;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.DynamicComponentPatternDetails;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.PatternStackView;
+import com.sorrowmist.useless.content.recipe.AdapterGuards;
 import com.sorrowmist.useless.content.recipe.AdapterUtils;
 import com.sorrowmist.useless.content.recipe.AdvancedAlloyFurnaceRecipe;
 import com.sorrowmist.useless.content.recipe.CountedIngredient;
@@ -202,7 +203,8 @@ public final class SoulBindingRecipeAdapter implements IRecipeAdapter<SoulBindin
         } catch (RuntimeException exception) {
             // Keep catalogue construction resilient during very early optional-mod setup. The
             // public filled-vial list is still a useful display fallback in that phase.
-            LOGGER.warn("Failed to create Ender IO's filled soul-vial ingredient", exception);
+            LOGGER.warn("Failed to create Ender IO's filled soul-vial ingredient; Cause: {}",
+                    AdapterGuards.describe(exception));
             return vialIngredient(SoulVialItem.getAllFilled());
         }
     }
@@ -236,8 +238,8 @@ public final class SoulBindingRecipeAdapter implements IRecipeAdapter<SoulBindin
                         .map(SoulVialItem::forSoul)
                         .forEach(vial -> addVial(candidates, vial));
             } catch (RuntimeException exception) {
-                LOGGER.warn("Failed to enumerate Ender IO soul-data vials for {}",
-                        source.soulData().get(), exception);
+                LOGGER.warn("Failed to enumerate Ender IO soul-data vials for {}; Cause: {}",
+                        source.soulData().get(), AdapterGuards.describe(exception));
             }
         } else {
             List<ItemStack> filled = SoulVialItem.getAllFilled();
@@ -562,7 +564,8 @@ public final class SoulBindingRecipeAdapter implements IRecipeAdapter<SoulBindin
         try {
             return source.matches(input, level);
         } catch (RuntimeException exception) {
-            LOGGER.warn("Failed to evaluate Ender IO soul-binding recipe {}", holder.id(), exception);
+            LOGGER.warn("Failed to evaluate Ender IO soul-binding recipe {}; Cause: {}",
+                    holder.id(), AdapterGuards.describe(exception));
             return false;
         }
     }
@@ -597,7 +600,8 @@ public final class SoulBindingRecipeAdapter implements IRecipeAdapter<SoulBindin
             }
             return new ConvertedOutputs(List.copyOf(items), List.copyOf(fluids));
         } catch (RuntimeException exception) {
-            LOGGER.warn("Failed to craft dynamic Ender IO soul-binding recipe {}", holder.id(), exception);
+            LOGGER.warn("Failed to craft dynamic Ender IO soul-binding recipe {}; Cause: {}",
+                    holder.id(), AdapterGuards.describe(exception));
             return null;
         }
     }

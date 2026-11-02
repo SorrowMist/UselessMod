@@ -1,5 +1,6 @@
 package com.sorrowmist.useless.compat.jei;
 
+import com.sorrowmist.useless.content.recipe.AdapterGuards;
 import appeng.api.stacks.GenericStack;
 import com.sorrowmist.useless.UselessMod;
 import mezz.jei.api.ingredients.IIngredientType;
@@ -93,7 +94,8 @@ public final class GenericStackJeiIngredientProviders {
                     : GenericStackJeiIngredientProvider.NONE;
         } catch (ClassNotFoundException | NoSuchMethodException | IllegalAccessException |
                  InvocationTargetException | LinkageError exception) {
-            UselessMod.LOGGER.warn("Could not enable native Mekanism chemical JEI rendering", exception);
+            UselessMod.LOGGER.warn("Could not enable native Mekanism chemical JEI rendering; Cause: {}",
+                    AdapterGuards.describe(exception));
             return GenericStackJeiIngredientProvider.NONE;
         }
     }

@@ -1,5 +1,6 @@
 package com.sorrowmist.useless.compat.modernindustrialization;
 
+import com.sorrowmist.useless.content.recipe.AdapterGuards;
 import com.sorrowmist.useless.UselessMod;
 import com.sorrowmist.useless.api.logistics.LongEnergyHandler;
 import net.minecraft.core.BlockPos;
@@ -38,8 +39,8 @@ public final class MiEnergyCompatLoader {
                             IMPLEMENTATION, true, MiEnergyCompatLoader.class.getClassLoader());
                     bridge = (MiEnergyBridge) implementation.getDeclaredConstructor().newInstance();
                 } catch (ReflectiveOperationException | LinkageError exception) {
-                    UselessMod.LOGGER.error("Failed to initialise the Modern Industrialization energy bridge",
-                            exception);
+                    UselessMod.LOGGER.error("Failed to initialise the Modern Industrialization energy bridge; Cause: {}",
+                            AdapterGuards.describe(exception));
                 }
             }
         }

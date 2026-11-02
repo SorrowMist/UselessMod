@@ -1,5 +1,6 @@
 package com.sorrowmist.useless.compat.mekanism;
 
+import com.sorrowmist.useless.content.recipe.AdapterGuards;
 import com.sorrowmist.useless.UselessMod;
 import net.neoforged.fml.ModList;
 import net.neoforged.neoforge.capabilities.RegisterCapabilitiesEvent;
@@ -26,7 +27,7 @@ public final class MekanismCompatLoader {
                     MekanismCompatLoader.class.getClassLoader());
             compat.getMethod("register", RegisterCapabilitiesEvent.class).invoke(null, event);
         } catch (ReflectiveOperationException | LinkageError exception) {
-            UselessMod.LOGGER.error("Failed to register AppMek chemical capabilities", exception);
+            UselessMod.LOGGER.error("Failed to register AppMek chemical capabilities; Cause: {}", AdapterGuards.describe(exception));
         }
     }
 }

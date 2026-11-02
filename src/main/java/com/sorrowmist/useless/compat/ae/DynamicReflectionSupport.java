@@ -1,5 +1,6 @@
 package com.sorrowmist.useless.compat.ae;
 
+import com.sorrowmist.useless.content.recipe.AdapterGuards;
 import com.mojang.logging.LogUtils;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
@@ -107,7 +108,8 @@ public final class DynamicReflectionSupport {
 
     private static void logOnce(String action, Throwable exception) {
         if (LOGGED_FAILURES.add(action)) {
-            LOGGER.warn("Useless Mod optional CPU reflection failed while trying to {}.", action, exception);
+            LOGGER.warn("Useless Mod optional CPU reflection failed while trying to {}; Cause: {}.",
+                    action, AdapterGuards.describe(exception));
         }
     }
 }

@@ -1,5 +1,6 @@
 package com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae;
 
+import com.sorrowmist.useless.content.recipe.AdapterGuards;
 import appeng.api.crafting.IPatternDetails;
 import appeng.api.networking.IGrid;
 import appeng.api.networking.IGridNode;
@@ -64,8 +65,8 @@ public final class SmartDoublingPatterns {
             IGridNode pivot = grid == null ? null : grid.getPivot();
             return pivot == null ? null : pivot.getLevel();
         } catch (RuntimeException exception) {
-            LOGGER.debug("Unable to resolve the crafting grid level for reusable-input detection",
-                    exception);
+            LOGGER.debug("Unable to resolve the crafting grid level for reusable-input detection; Cause: {}",
+                    AdapterGuards.describe(exception));
             return null;
         }
     }

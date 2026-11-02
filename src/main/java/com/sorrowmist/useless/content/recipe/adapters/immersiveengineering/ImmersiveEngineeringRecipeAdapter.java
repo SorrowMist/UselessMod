@@ -23,6 +23,7 @@ import blusunrize.immersiveengineering.api.crafting.TagOutputList;
 import blusunrize.immersiveengineering.common.config.IEServerConfig;
 import com.mojang.logging.LogUtils;
 import com.sorrowmist.useless.api.enums.AlloyFurnaceMode;
+import com.sorrowmist.useless.content.recipe.AdapterGuards;
 import com.sorrowmist.useless.content.recipe.AdapterUtils;
 import com.sorrowmist.useless.content.recipe.AdvancedAlloyFurnaceRecipe;
 import com.sorrowmist.useless.content.recipe.CountedIngredient;
@@ -106,7 +107,8 @@ public final class ImmersiveEngineeringRecipeAdapter
             AdvancedAlloyFurnaceRecipe converted = convert(holder, holder.value());
             return converted == null ? List.of() : List.of(converted);
         } catch (RuntimeException exception) {
-            LOGGER.warn("Skipping Immersive Engineering recipe conversion: {}", holder.id(), exception);
+            LOGGER.warn("Skipping Immersive Engineering recipe conversion: {}; Cause: {}",
+                    holder.id(), AdapterGuards.describe(exception));
             return List.of();
         }
     }

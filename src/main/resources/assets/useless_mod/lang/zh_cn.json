@@ -1312,5 +1312,6 @@
   "commands.useless_mod.patterns.repair.no_machines": "该网络上没有已通电的万象炉或 ME 样板总成，无需修复",
   "commands.useless_mod.patterns.repair.summary": "已扫描 %s 张万象样板，发现 %s 张失效；已修复 %s 张，%s 张无法修复（配方已移除或存在歧义）。",
   "commands.useless_mod.patterns.repair.summary.preview": "已扫描 %s 张万象样板，发现 %s 张失效；其中 %s 张可修复，%s 张无法修复（配方已移除或存在歧义）。本次为预览，未写回任何槽位。",
-  "commands.useless_mod.patterns.repair.detail": "无法修复：%s，绑定配方 %s"
+  "commands.useless_mod.patterns.repair.detail": "无法修复：%s，绑定配方 %s",
+  "message.useless_mod.recipe.incompatible": "以下模组与本模组的配方适配不兼容，已关闭它们的配方转换：%s。请检查这些模组的版本是否与兼容说明一致。"
 }

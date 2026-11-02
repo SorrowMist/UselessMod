@@ -13,8 +13,8 @@ import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.Omniver
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.PatternUploadNotice;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.PendingOmniversalPatternHolder;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.ProcessingPatternRecipeHolder;
-import com.sorrowmist.useless.content.recipe.AlloyFurnaceRecipeCatalog;
-import com.sorrowmist.useless.content.recipe.AlloyFurnaceRecipeIdentity;
+import com.sorrowmist.useless.content.recipe.AdapterGuards;
+import com.sorrowmist.useless.content.recipe.AlloyFurnaceRecipeCatalog;import com.sorrowmist.useless.content.recipe.AlloyFurnaceRecipeIdentity;
 import com.sorrowmist.useless.content.recipe.RecipeSourceIds;
 import com.sorrowmist.useless.core.config.ConfigManager;
 import net.minecraft.server.level.ServerPlayer;
@@ -133,7 +133,8 @@ public class PatternEncodingLogicMixin implements PendingOmniversalPatternHolder
         try {
             details = PatternDetailsHelper.decodePattern(pattern, level);
         } catch (RuntimeException exception) {
-            OmniversalPatternDiagnostics.skip("pattern failed to decode", exception.getMessage());
+            OmniversalPatternDiagnostics.skip("pattern failed to decode",
+                    AdapterGuards.describe(exception));
             return;
         }
         if (details == null) {
@@ -160,7 +161,7 @@ public class PatternEncodingLogicMixin implements PendingOmniversalPatternHolder
         try {
             entry = AlloyFurnaceRecipeCatalog.resolvePattern(level, sourceId, pending, details);
         } catch (RuntimeException exception) {
-            OmniversalPatternDiagnostics.blocked("resolvePattern threw", exception.toString());
+            OmniversalPatternDiagnostics.blocked("resolvePattern threw", AdapterGuards.describe(exception));
             return;
         }
         if (entry.isEmpty()) {
@@ -175,7 +176,7 @@ public class PatternEncodingLogicMixin implements PendingOmniversalPatternHolder
                 return;
             }
         } catch (RuntimeException exception) {
-            OmniversalPatternDiagnostics.blocked("matchesRecipe threw", exception.toString());
+            OmniversalPatternDiagnostics.blocked("matchesRecipe threw", AdapterGuards.describe(exception));
             return;
         }
 
@@ -187,7 +188,7 @@ public class PatternEncodingLogicMixin implements PendingOmniversalPatternHolder
         try {
             omniversal = OmniversalPatternEncoding.encode(pattern, details, entry.get(), level);
         } catch (RuntimeException exception) {
-            OmniversalPatternDiagnostics.blocked("encoder threw", exception.toString());
+            OmniversalPatternDiagnostics.blocked("encoder threw", AdapterGuards.describe(exception));
             return;
         }
         if (omniversal.isEmpty()) {

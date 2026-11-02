@@ -1,5 +1,6 @@
 package com.sorrowmist.useless.compat.pneumaticcraft;
 
+import com.sorrowmist.useless.content.recipe.AdapterGuards;
 import com.sorrowmist.useless.UselessMod;
 import com.sorrowmist.useless.api.logistics.LongPressureHandler;
 import net.minecraft.core.BlockPos;
@@ -38,7 +39,7 @@ public final class PneumaticCraftPressureCompatLoader {
                             IMPLEMENTATION, true, PneumaticCraftPressureCompatLoader.class.getClassLoader());
                     bridge = (PressureBridge) implementation.getDeclaredConstructor().newInstance();
                 } catch (ReflectiveOperationException | LinkageError exception) {
-                    UselessMod.LOGGER.error("Failed to initialise the PneumaticCraft pressure bridge", exception);
+                    UselessMod.LOGGER.error("Failed to initialise the PneumaticCraft pressure bridge; Cause: {}", AdapterGuards.describe(exception));
                 }
             }
         }

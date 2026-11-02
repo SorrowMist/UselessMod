@@ -1,5 +1,6 @@
 package com.sorrowmist.useless.compat.ae;
 
+import com.sorrowmist.useless.content.recipe.AdapterGuards;
 import com.sorrowmist.useless.UselessMod;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.chemical.ChemicalHandlerView;
 import net.minecraft.core.BlockPos;
@@ -36,7 +37,7 @@ public final class AeChemicalCompatLoader {
                             IMPLEMENTATION, true, AeChemicalCompatLoader.class.getClassLoader());
                     bridge = (AeChemicalBridge) implementation.getDeclaredConstructor().newInstance();
                 } catch (ReflectiveOperationException | LinkageError exception) {
-                    UselessMod.LOGGER.error("Failed to initialise the AE chemical bridge", exception);
+                    UselessMod.LOGGER.error("Failed to initialise the AE chemical bridge; Cause: {}", AdapterGuards.describe(exception));
                 }
             }
         }

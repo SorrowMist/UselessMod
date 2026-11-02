@@ -6,6 +6,7 @@ import aztech.modern_industrialization.thirdparty.fabrictransfer.api.fluid.Fluid
 import aztech.modern_industrialization.thirdparty.fabrictransfer.api.item.ItemVariant;
 import com.mojang.logging.LogUtils;
 import com.sorrowmist.useless.api.enums.AlloyFurnaceMode;
+import com.sorrowmist.useless.content.recipe.AdapterGuards;
 import com.sorrowmist.useless.content.recipe.AdapterUtils;
 import com.sorrowmist.useless.content.recipe.AdvancedAlloyFurnaceRecipe;
 import com.sorrowmist.useless.content.recipe.CountedIngredient;
@@ -82,8 +83,8 @@ public final class NuclearAbsorptionRecipeAdapter
             try {
                 converted = convertItem(absorbable, item);
             } catch (RuntimeException exception) {
-                LOGGER.warn("Skipping Modern Industrialization nuclear item conversion: {}",
-                        BuiltInRegistries.ITEM.getKey(item), exception);
+                LOGGER.warn("Skipping Modern Industrialization nuclear item conversion: {}; Cause: {}",
+                        BuiltInRegistries.ITEM.getKey(item), AdapterGuards.describe(exception));
                 continue;
             }
             if (converted != null) {
@@ -96,8 +97,8 @@ public final class NuclearAbsorptionRecipeAdapter
             try {
                 converted = convertFluid(fluid);
             } catch (RuntimeException exception) {
-                LOGGER.warn("Skipping Modern Industrialization nuclear fluid conversion: {}",
-                        BuiltInRegistries.FLUID.getKey(fluid), exception);
+                LOGGER.warn("Skipping Modern Industrialization nuclear fluid conversion: {}; Cause: {}",
+                        BuiltInRegistries.FLUID.getKey(fluid), AdapterGuards.describe(exception));
                 continue;
             }
             if (converted != null) {

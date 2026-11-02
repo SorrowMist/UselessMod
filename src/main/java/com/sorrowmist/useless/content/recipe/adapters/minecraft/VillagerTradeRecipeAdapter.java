@@ -2,6 +2,7 @@ package com.sorrowmist.useless.content.recipe.adapters.minecraft;
 
 import com.mojang.logging.LogUtils;
 import com.sorrowmist.useless.api.enums.AlloyFurnaceMode;
+import com.sorrowmist.useless.content.recipe.AdapterGuards;
 import com.sorrowmist.useless.content.recipe.AdapterUtils;
 import com.sorrowmist.useless.content.recipe.AdvancedAlloyFurnaceRecipe;
 import com.sorrowmist.useless.content.recipe.AlloyFurnaceRecipeFingerprint;
@@ -266,8 +267,9 @@ public final class VillagerTradeRecipeAdapter
                                 recipes.putIfAbsent(holder.id(), holder);
                             }
                         } catch (RuntimeException exception) {
-                            LOGGER.debug("Skipping villager trade: profession={}, level={}, index={}",
-                                    profession.profession(), villagerLevel, listingIndex, exception);
+                            LOGGER.debug("Skipping villager trade: profession={}, level={}, index={}; Cause: {}",
+                                    profession.profession(), villagerLevel, listingIndex,
+                                    AdapterGuards.describe(exception));
                         }
                     }
                 }
@@ -332,8 +334,9 @@ public final class VillagerTradeRecipeAdapter
                     recipes.putIfAbsent(holder.id(), holder);
                 }
             } catch (RuntimeException exception) {
-                LOGGER.debug("Skipping wandering trader trade: group={}, index={}, listing={}",
-                        groupIndex, listingIndex, listing.getClass().getName(), exception);
+                LOGGER.debug("Skipping wandering trader trade: group={}, index={}, listing={}; Cause: {}",
+                        groupIndex, listingIndex, listing.getClass().getName(),
+                        AdapterGuards.describe(exception));
             }
         }
     }

@@ -1,5 +1,6 @@
 package com.sorrowmist.useless.compat.ae;
 
+import com.sorrowmist.useless.content.recipe.AdapterGuards;
 import com.sorrowmist.useless.UselessMod;
 import com.sorrowmist.useless.api.logistics.LongEnergyHandler;
 import net.minecraft.core.BlockPos;
@@ -40,7 +41,7 @@ public final class AeEnergyCompatLoader {
                             IMPLEMENTATION, true, AeEnergyCompatLoader.class.getClassLoader());
                     bridge = (AeEnergyBridge) implementation.getDeclaredConstructor().newInstance();
                 } catch (ReflectiveOperationException | LinkageError exception) {
-                    UselessMod.LOGGER.error("Failed to initialise the AppliedFlux energy bridge", exception);
+                    UselessMod.LOGGER.error("Failed to initialise the AppliedFlux energy bridge; Cause: {}", AdapterGuards.describe(exception));
                 }
             }
         }

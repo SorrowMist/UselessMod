@@ -7,6 +7,7 @@ import com.simibubi.create.content.processing.sequenced.IAssemblyRecipe;
 import com.simibubi.create.content.processing.sequenced.SequencedAssemblyRecipe;
 import com.simibubi.create.content.processing.sequenced.SequencedRecipe;
 import com.sorrowmist.useless.api.enums.AlloyFurnaceMode;
+import com.sorrowmist.useless.content.recipe.AdapterGuards;
 import com.sorrowmist.useless.content.recipe.AdapterUtils;
 import com.sorrowmist.useless.content.recipe.AdvancedAlloyFurnaceRecipe;
 import com.sorrowmist.useless.content.recipe.CountedIngredient;
@@ -168,7 +169,8 @@ public final class CreateSequencedAssemblyRecipeAdapter
                 totalEnergy = newTotalEnergy;
                 validSteps++;
             } catch (RuntimeException exception) {
-                LOGGER.warn("Skipping unsupported Create assembly step in {}", originalId, exception);
+                LOGGER.warn("Skipping unsupported Create assembly step in {}; Cause: {}",
+                        originalId, AdapterGuards.describe(exception));
             }
         }
 

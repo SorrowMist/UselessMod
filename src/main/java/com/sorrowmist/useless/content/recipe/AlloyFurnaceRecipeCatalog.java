@@ -36,6 +36,7 @@ import java.util.WeakHashMap;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.Supplier;
 import org.slf4j.Logger;
 
 /** Server/client recipe directory used by JEI, the encoder and pattern validation. */
@@ -480,7 +481,13 @@ public final class AlloyFurnaceRecipeCatalog {
                         return cached;
                     }
                 }
-                Snapshot built = build(level, generation);
+                // 构建过程会间接触达所有已注册适配器及其兼容模组的类。任何一个适配器在
+                // 版本错配下抛出的 LinkageError 若冒泡，会在服务器启动或数据重载时终止 tick。
+                // 此处整段兜底：失败时发布一份空目录，模具识别与 JEI 展示暂时降级，
+                // 但服务器与其它配方来源仍可正常工作。
+                long buildGeneration = generation;
+                Snapshot built = AdapterGuards.guard("alloy-furnace recipe catalog build",
+                        () -> build(level, buildGeneration), emptySnapshot(buildGeneration));
                 synchronized (CACHE) {
                     if (currentGenerationLocked(cacheKey) != generation) continue;
                     cached = CACHE.get(cacheKey);
@@ -512,6 +519,19 @@ public final class AlloyFurnaceRecipeCatalog {
         return GENERATIONS.computeIfAbsent(cacheKey, ignored -> 0L);
     }
 
+    /**
+     * 构建失败时发布空目录。
+     *
+     * <p>仍带上当前世代号，使这份空快照被正常缓存：失败通常源自兼容模组版本错配，
+     * 同一世代内重试不会得到不同结果，反复重建只会拖慢每次查询。世代在配方重载后
+     * 自增，届时会重新尝试构建。</p>
+     */
+    private static Snapshot emptySnapshot(long generation) {
+        return new Snapshot(List.of(), Map.of(), Map.of(), Map.of(), Map.of(), generation,
+                new ConcurrentHashMap<>(), new ConcurrentHashMap<>(),
+                ConcurrentHashMap.newKeySet());
+    }
+
     private static Object buildLock(Object cacheKey) {
         synchronized (BUILD_LOCKS) {
             return BUILD_LOCKS.computeIfAbsent(cacheKey, ignored -> new Object());
@@ -531,12 +551,14 @@ public final class AlloyFurnaceRecipeCatalog {
         for (com.sorrowmist.useless.api.recipe.IRecipeAdapter<?> adapter : AlloyFurnaceRecipeManager.getInstance().getRegisteredAdapters()) {
             if (adapter.getClass().getPackageName().contains(".ae.ae2lt")) continue;
             String sourceId = AlloyFurnaceRecipeManager.getInstance().getAdapterSourceId(adapter);
+            // 合成型适配器直接枚举结果，不经过 convertAll；同样可能因兼容模组版本错配抛
+            // LinkageError，统一走守卫降级为空列表。
             if (adapter instanceof SeedEssenceRecipeAdapter synthetic) {
-                synthetic.getAllRecipes().forEach(recipe -> recipes.add(new CollectedRecipe(recipe, sourceId)));
+                collectSynthetic(adapter, sourceId, synthetic::getAllRecipes, recipes);
                 continue;
             }
             if (adapter instanceof CrystalGrowthRecipeAdapter synthetic) {
-                synthetic.getAllRecipes().forEach(recipe -> recipes.add(new CollectedRecipe(recipe, sourceId)));
+                collectSynthetic(adapter, sourceId, synthetic::getAllRecipes, recipes);
                 continue;
             }
             collectGenerated(adapter, sourceId, level, recipes);
@@ -545,8 +567,13 @@ public final class AlloyFurnaceRecipeCatalog {
 
         collectConverted(converting, level.getRecipeManager().getRecipes(), level, recipes);
         if (RecipeAdapterCompatRegistry.isLoaded(RecipeAdapterCompatRegistry.AE2LT)) {
-            AELightningTechCompatLoader.getJeiRecipes(level.getRecipeManager(), level)
-                    .forEach(recipe -> recipes.add(new CollectedRecipe(recipe, RecipeSourceIds.AE2LT)));
+            // 该加载器把反射调用中的 LinkageError 包装成 IllegalStateException，只影响 AE2LT
+            // 一个来源。此处单独降级，避免它拖垮整张目录。
+            List<AdvancedAlloyFurnaceRecipe> ae2ltRecipes = AdapterGuards.guard(
+                    "AE2LT JEI recipes",
+                    () -> AELightningTechCompatLoader.getJeiRecipes(level.getRecipeManager(), level),
+                    List.of());
+            ae2ltRecipes.forEach(recipe -> recipes.add(new CollectedRecipe(recipe, RecipeSourceIds.AE2LT)));
         }
         // 指纹计算是纯 CPU 密集操作（codec 整条编码 + 成分规范化 + canonicalize + SHA-256），
         // 数万条配方时它占据了目录构建剩余耗时的绝大部分。这里并行计算指纹，再按原有先后
@@ -613,7 +640,7 @@ public final class AlloyFurnaceRecipeCatalog {
             return new FingerprintedRecipe(identity, recipe, collected.sourceId());
         } catch (RuntimeException exception) {
             LOGGER.warn("Skipping alloy-furnace recipe with an unencodable identity: {} ({})",
-                    recipe.id(), exception.getMessage());
+                    recipe.id(), AdapterGuards.describe(exception));
             if (LOGGER.isDebugEnabled()) {
                 LOGGER.debug("Unencodable alloy-furnace recipe contents: {}", recipe);
             }
@@ -654,7 +681,10 @@ public final class AlloyFurnaceRecipeCatalog {
     private static List<AdapterSource> resolveAdapters(List<AdapterSource> sources, Class<?> recipeClass) {
         List<AdapterSource> matched = new ArrayList<>();
         for (AdapterSource source : sources) {
-            Class<?> declared = source.adapter().getRecipeClass();
+            // getRecipeClass 会解析兼容模组的配方类。版本错配时抛 LinkageError，此处不拦截会让
+            // 整个配方目录构建失败、服务器 tick 中断，因此统一交给守卫降级为该适配器不参与分派。
+            Class<?> declared = AdapterGuards.call(source.adapter(), "getRecipeClass",
+                    source.adapter()::getRecipeClass, null);
             // adapter 声明的源配方类可能是抽象基类，实际配方是其子类，所以要按可赋值方向判断。
             if (declared != null && declared.isAssignableFrom(recipeClass)) {
                 matched.add(source);
@@ -671,15 +701,31 @@ public final class AlloyFurnaceRecipeCatalog {
         }
     }
 
+    /**
+     * 收集由适配器直接枚举结果的合成型配方。
+     *
+     * <p>这类适配器不经过 {@code convertAll}，但枚举过程同样会触达兼容模组的类与静态字段；
+     * 版本错配抛出的 {@link LinkageError} 若冒泡会中断整次目录构建。统一交给守卫降级为空列表，
+     * 代价只是该来源的配方暂时缺席。</p>
+     */
+    private static void collectSynthetic(
+            com.sorrowmist.useless.api.recipe.IRecipeAdapter<?> adapter, String sourceId,
+            Supplier<List<AdvancedAlloyFurnaceRecipe>> supplier,
+            List<CollectedRecipe> output) {
+        List<AdvancedAlloyFurnaceRecipe> collected = AdapterGuards.call(
+                adapter, "getAllRecipes", supplier, null);
+        if (collected == null) return;
+        for (AdvancedAlloyFurnaceRecipe recipe : collected) {
+            if (recipe != null) output.add(new CollectedRecipe(recipe, sourceId));
+        }
+    }
+
     private static void collectGenerated(com.sorrowmist.useless.api.recipe.IRecipeAdapter<?> adapter, String sourceId, Level level,
                                          List<CollectedRecipe> output) {
-        List<? extends RecipeHolder<?>> generated;
-        try {
-            generated = adapter.getGeneratedRecipes(level);
-        } catch (RuntimeException exception) {
-            LOGGER.warn("Skipping generated recipes: adapter={}", adapter.getClass().getName(), exception);
-            return;
-        }
+        // 合成配方枚举同样会触达兼容模组的类与方法；版本错配抛 LinkageError 时降级为空列表，
+        // 不中断整次目录构建。
+        List<? extends RecipeHolder<?>> generated = AdapterGuards.call(adapter, "getGeneratedRecipes",
+                () -> adapter.getGeneratedRecipes(level), null);
         if (generated == null) return;
         for (RecipeHolder<?> holder : generated) {
             RecipeConversionUtils.convertAll(adapter, holder, level)

@@ -1,5 +1,6 @@
 package com.sorrowmist.useless.content.blockentities.multiblock;
 
+import com.sorrowmist.useless.content.recipe.AdapterGuards;
 import appeng.api.crafting.IPatternDetails;
 import appeng.api.implementations.blockentities.PatternContainerGroup;
 import appeng.api.inventories.InternalInventory;
@@ -297,7 +298,8 @@ public final class MePatternAssemblyBlockEntity extends AEBaseBlockEntity
             // Keep the bit set so the next server tick retries after a
             // transient grid/pathing update.
             providerRefreshPending = true;
-            LOGGER.debug("Deferred multiblock alloy furnace provider refresh at {}", worldPosition, exception);
+            LOGGER.debug("Deferred multiblock alloy furnace provider refresh at {}; Cause: {}",
+                    worldPosition, AdapterGuards.describe(exception));
         }
         if (controllerUnresolvable) {
             // A previous snapshot had to be cleared because the controller link went away; keep

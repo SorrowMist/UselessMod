@@ -1,7 +1,7 @@
 package com.sorrowmist.useless.client.gui;
 
 import com.sorrowmist.useless.UselessMod;
-import net.neoforged.fml.ModList;
+import com.sorrowmist.useless.content.recipe.AdapterGuards;import net.neoforged.fml.ModList;
 import org.jetbrains.annotations.Nullable;
 
 import java.lang.reflect.Method;
@@ -62,7 +62,8 @@ final class PinyinSearch {
         } catch (ReflectiveOperationException | LinkageError exception) {
             UselessMod.LOGGER.warn(
                     "Just Enough Characters is installed but its Match API is unavailable; "
-                            + "falling back to plain substring search", exception);
+                            + "falling back to plain substring search. Cause: {}",
+                    AdapterGuards.describe(exception));
         }
     }
 }

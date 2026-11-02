@@ -5,6 +5,14 @@
 
 ## [Unreleased]
 
+### Fixed / 修复
+- 转换 Re-Avaritia 工作台配方时，同一物品、不同数据组件的多个输入（如终焉工作台「永恒奇点」所需的多种矿物奇点）不再被合并为单个按物品 ID 匹配的槽位，避免万象样板坍缩成「任一种奇点填满全部槽位」即可合成
+  - Converting Re-Avaritia table recipes no longer merges multiple inputs that share an item but differ in data components (such as the various mineral singularities required by the Endgame Table's Eternal Singularity), preventing omniversal patterns from collapsing into a single item-ID slot that any one singularity can fill.
+- `/uselessmod patterns repair` 现在也会识别仍能正常解码、但输入槽语义已与当前配方不符的旧万象样板，按当前配方重建并写回，无需手动删除重写；重建结果与旧样板一致时不写回
+  - `/uselessmod patterns repair` now also detects old omniversal patterns that still decode but whose input slot semantics no longer match the current recipe, rebuilding and writing them back in place instead of requiring manual deletion and re-encoding; patterns whose rebuilt form matches the original are left untouched.
+- 单方块万象炉与多方块 ME 样板总成在样板随存档或外部库存载入后，会自动按当前配方目录重建一次失真样板，无需玩家手动执行修复命令；配方目录尚未构建完成时保持待修状态，由后续 tick 重试
+  - Single-block omniversal furnaces and multiblock ME pattern assemblies now rebuild their stale omniversal patterns once automatically against the current recipe directory after patterns are loaded from the save or the external inventory, so no manual repair command is needed; while the recipe directory is still being built, the repair stays pending and is retried on later ticks.
+
 ## [2.4.6.2]
 
 ### Fixed / 修复

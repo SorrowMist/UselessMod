@@ -1,19 +1,13 @@
 package com.sorrowmist.useless.command;
 
-import appeng.api.crafting.IPatternDetails;
-import appeng.api.crafting.PatternDetailsHelper;
 import appeng.api.inventories.InternalInventory;
 import appeng.api.networking.IGrid;
-import appeng.api.stacks.AEItemKey;
-import appeng.crafting.pattern.AEProcessingPattern;
 import appeng.helpers.patternprovider.PatternContainer;
 import appeng.items.tools.powered.WirelessTerminalItem;
 import com.sorrowmist.useless.compat.AE2Compat;
 import com.sorrowmist.useless.content.blockentities.AdvancedAlloyFurnaceBlockEntity;
 import com.sorrowmist.useless.content.blockentities.multiblock.MePatternAssemblyBlockEntity;
-import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.OmniversalPatternDetails;
-import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.OmniversalPatternEncoding;
-import com.sorrowmist.useless.content.recipe.AlloyFurnaceRecipeCatalog;
+import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.OmniversalPatternRepair;
 import com.sorrowmist.useless.core.component.OmniversalPatternData;
 import com.sorrowmist.useless.core.component.UComponents;
 import com.sorrowmist.useless.init.ModItems;
@@ -32,23 +26,18 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Optional;
 import java.util.Set;
 
 /**
  * 扫描并修复 AE 网格上失效的万象样板。
  *
- * <p>失效的权威判定与样板 tooltip 红字同源：{@link PatternDetailsHelper#decodePattern} 的
- * 结果不是 {@link OmniversalPatternDetails}（含返回 {@code null} 或抛异常）。判定为失效的
- * 样板会按当前配方目录重新匹配配方并重编码，然后就地写回原槽位。</p>
+ * <p>失效判定与重建都委托给 {@link OmniversalPatternRepair}：无法解码的样板、以及仍能解码
+ * 但输入槽语义已与当前配方不符的样板都会按当前配方重建，然后就地写回原槽位。</p>
  *
- * <p>此外，仍能正常解码、但记录指纹与当前配方指纹不一致的样板也会参与重建：样板记录的指纹
- * 在编码时写入，覆盖配方输入；指纹变化意味着该配方内容已被修正（例如把合并过度的同物品
- * 不同组件槽位拆回独立槽位），旧样板表达的含义已失真，仅靠解码校验发现不了。重建结果与
- * 旧栈完全一致时不做写回，因此误判只会多一次计算，不会改写样板。</p>
- *
- * <p>只覆盖 AE 网络上已通电的机器：单方块高级合金炉与多方块 ME 样板总成。玩家背包与终端
- * 内尚未上传的样板不在扫描范围内。</p>
+ * <p>机器自身在样板随存档载入后会各自修复一次，见
+ * {@link AdvancedAlloyFurnaceBlockEntity} 与 {@link MePatternAssemblyBlockEntity}；本类是为
+ * 玩家提供的跨机器手动入口，只覆盖 AE 网络上已通电的机器。玩家背包与终端内尚未上传的
+ * 样板不在扫描范围内。</p>
  */
 public final class OmniversalPatternRepairService {
     private static final int MAX_DETAILS = 3;
@@ -125,10 +114,10 @@ public final class OmniversalPatternRepairService {
                 }
 
                 scanned++;
-                if (isValid(stack, level) && !OmniversalPatternEncoding.isStale(stack, level)) continue;
+                if (!OmniversalPatternRepair.needsRepair(stack, level)) continue;
                 invalid++;
 
-                ItemStack replacement = reencode(stack, data, level);
+                ItemStack replacement = OmniversalPatternRepair.rebuild(stack, level);
                 if (replacement.isEmpty()) {
                     unresolved++;
                     if (details.size() < MAX_DETAILS) {
@@ -158,114 +147,6 @@ public final class OmniversalPatternRepairService {
 
         return RepairResult.success(
                 new RepairReport(scanned, invalid, repaired, unresolved, skipped), details);
-    }
-
-    /** 判定一张万象样板当前是否可正常解码。 */
-    private static boolean isValid(ItemStack stack, Level level) {
-        try {
-            IPatternDetails decoded = PatternDetailsHelper.decodePattern(stack, level);
-            return decoded instanceof OmniversalPatternDetails;
-        } catch (RuntimeException exception) {
-            return false;
-        }
-    }
-
-    /**
-     * 按当前配方目录重解析并重编码；任一步失败返回 {@link ItemStack#EMPTY}。
-     *
-     * <p>绑定配方若仍能由 {@code recipeId} 唯一定位，就以该配方**当前的输入输出**重建
-     * payload——配方被改动（输入变化）而失效的样板只能这样修复。只有 recipeId 无法唯一
-     * 定位时才退回用旧 payload 做内容匹配，复用旧 payload 重编码。</p>
-     */
-    private static ItemStack reencode(ItemStack stack, OmniversalPatternData data, Level level) {
-        Optional<AlloyFurnaceRecipeCatalog.Entry> byRecipeId = resolveEntryByRecipeId(data, level);
-        if (byRecipeId.isPresent()) {
-            ItemStack rebuilt = OmniversalPatternEncoding.reencodeFromRecipe(byRecipeId.get(), level);
-            if (!rebuilt.isEmpty()) return rebuilt;
-        }
-
-        AEItemKey definition = AEItemKey.of(stack);
-        if (definition == null) return ItemStack.EMPTY;
-
-        AEProcessingPattern source;
-        try {
-            source = new AEProcessingPattern(definition);
-        } catch (RuntimeException exception) {
-            return ItemStack.EMPTY;
-        }
-
-        Optional<AlloyFurnaceRecipeCatalog.Entry> entry = resolveEntry(data, source, level);
-        return entry.map(value -> OmniversalPatternEncoding.reencodeExisting(stack, value, level))
-                .orElse(ItemStack.EMPTY);
-    }
-
-    /**
-     * 仅按 {@code recipeId} 定位当前配方：忽略指纹与旧 payload，返回唯一匹配项。
-     *
-     * <p>优先在样板记录的 {@code sourceId} 范围内查找，找不到再退到全目录；命中数不为 1
-     * （无匹配或存在歧义）时返回空，交由内容匹配回退处理。</p>
-     */
-    private static Optional<AlloyFurnaceRecipeCatalog.Entry> resolveEntryByRecipeId(
-            OmniversalPatternData data, Level level) {
-        var recipeId = data.recipeId();
-        if (recipeId == null) return Optional.empty();
-
-        List<AlloyFurnaceRecipeCatalog.Entry> matched = new ArrayList<>();
-        for (AlloyFurnaceRecipeCatalog.Entry entry : AlloyFurnaceRecipeCatalog.entries(level, data.sourceId())) {
-            if (recipeId.equals(entry.identity().recipeId())) matched.add(entry);
-        }
-        if (matched.isEmpty()) {
-            for (AlloyFurnaceRecipeCatalog.Entry entry : AlloyFurnaceRecipeCatalog.entries(level)) {
-                if (recipeId.equals(entry.identity().recipeId())) matched.add(entry);
-            }
-        }
-        return matched.size() == 1 ? Optional.of(matched.getFirst()) : Optional.empty();
-    }
-
-    /**
-     * 按稳健性递减的顺序回查当前配方目录。
-     *
-     * <p>首选按 {@code sourceId + identity} 精确匹配（旧版样板必须走 legacy 指纹算法）；
-     * 其次退到不带画像的身份匹配；最后按样板内容模糊匹配候选，并以确定性评分取首个。</p>
-     */
-    private static Optional<AlloyFurnaceRecipeCatalog.Entry> resolveEntry(
-            OmniversalPatternData data, AEProcessingPattern source, Level level) {
-        Optional<AlloyFurnaceRecipeCatalog.Entry> entry =
-                data.version() < OmniversalPatternData.TAG_INPUT_VERSION
-                        ? AlloyFurnaceRecipeCatalog.resolveLegacyPattern(
-                                level, data.sourceId(), data.identity(), source, data.version())
-                        : AlloyFurnaceRecipeCatalog.resolvePattern(
-                                level, data.sourceId(), data.identity(), source);
-        if (entry.isPresent()) return entry;
-
-        entry = AlloyFurnaceRecipeCatalog.resolve(level, data.sourceId(), data.identity());
-        if (entry.isPresent()) return entry;
-
-        entry = AlloyFurnaceRecipeCatalog.resolve(level, data.identity());
-        if (entry.isPresent()) return entry;
-
-        // allowMissingOutputs=true 是该目录为 omniversal converter 预留的内容匹配模式。
-        return selectBest(AlloyFurnaceRecipeCatalog.findPatternCandidates(level, source, true));
-    }
-
-    /** 模具数多者优先，其次按 recipeId 字符串序，保证多次运行结果稳定。 */
-    private static Optional<AlloyFurnaceRecipeCatalog.Entry> selectBest(
-            List<AlloyFurnaceRecipeCatalog.Entry> candidates) {
-        AlloyFurnaceRecipeCatalog.Entry best = null;
-        for (AlloyFurnaceRecipeCatalog.Entry candidate : candidates) {
-            if (candidate == null || candidate.recipe() == null) continue;
-            if (best == null || compareEntries(candidate, best) < 0) best = candidate;
-        }
-        return Optional.ofNullable(best);
-    }
-
-    private static int compareEntries(AlloyFurnaceRecipeCatalog.Entry left,
-                                      AlloyFurnaceRecipeCatalog.Entry right) {
-        int moldComparison = Integer.compare(
-                right.recipe().molds().size(), left.recipe().molds().size());
-        if (moldComparison != 0) return moldComparison;
-        return left.identity().recipeId().toString()
-                .compareTo(right.identity().recipeId().toString());
     }
 
     /** 收集网格上已通电的两类目标机器，并按终端排序值升序排列以保证报告可复现。 */

@@ -25,6 +25,8 @@ import com.sorrowmist.useless.api.crafting.bigint.AlloyFurnaceBigIntegerTarget;
 import com.sorrowmist.useless.content.blockentities.PagedMenuPageMemory;
 import com.sorrowmist.useless.content.blockentities.RecoverableItemStackHandler;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.OmniversalPatternDiagnostics;
+import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.OmniversalPatternRepair;
+import com.sorrowmist.useless.content.recipe.AlloyFurnaceRecipeCatalog;
 import com.sorrowmist.useless.core.config.ConfigManager;
 import com.sorrowmist.useless.core.component.ExternalInventoryKind;
 import com.sorrowmist.useless.core.component.ExternalInventoryReference;
@@ -86,6 +88,8 @@ public final class MePatternAssemblyBlockEntity extends AEBaseBlockEntity
     @Nullable
     private CompoundTag pendingLegacyInventory;
     private boolean externalInventoryLoaded;
+    /** 进存档后是否还需按当前配方目录校验并重建样板；配方目录未就绪时保持 true。 */
+    private boolean patternAutoRepairPending;
 
     public MePatternAssemblyBlockEntity(BlockPos pos, BlockState state) {
         super(ModBlockEntities.ME_PATTERN_ASSEMBLY.get(), pos, state);
@@ -157,7 +161,35 @@ public final class MePatternAssemblyBlockEntity extends AEBaseBlockEntity
         ExternalInventoryStore.setReference(this, inventoryReference);
         pendingLegacyInventory = null;
         externalInventoryLoaded = true;
+        // 样板刚随外部库存载入，尚未按当前配方目录校验过，交由核心在目录就绪后修复一次。
+        patternAutoRepairPending = true;
         inventoryChanged();
+    }
+
+    /**
+     * 按当前配方目录校验并重建本总成样板槽中的失真样板。
+     *
+     * <p>由多方块核心每 tick 调用：配方目录由后台线程构建，未就绪时重建取不到当前配方，
+     * 故保持待修状态等待下一 tick。批量写回经 {@link RecoverableItemStackHandler#withChangeBatch}
+     * 合并成一次变更回调，避免逐槽保存外部库存并重复重建样板快照。</p>
+     */
+    public void repairPatternsIfPending() {
+        if (!patternAutoRepairPending || unloading || isRemoved()
+                || level == null || level.isClientSide) {
+            return;
+        }
+        if (!AlloyFurnaceRecipeCatalog.isReady(level)) return;
+        patternAutoRepairPending = false;
+
+        int[] repaired = {0};
+        patterns.withChangeBatch(() -> repaired[0] = OmniversalPatternRepair.repairSlots(
+                patterns.getActiveSlots(),
+                patterns::getStackInSlot,
+                patterns::setStackInSlot,
+                level));
+        if (repaired[0] > 0) {
+            LOGGER.info("Rebuilt {} stale omniversal patterns at {}", repaired[0], worldPosition);
+        }
     }
 
     private void ensureExternalInventory() {
@@ -478,6 +510,8 @@ public final class MePatternAssemblyBlockEntity extends AEBaseBlockEntity
             blockEntity.mainNode.create(getLevel(), getBlockPos());
             blockEntity.requestProviderRefresh();
             blockEntity.inventoryChanged();
+            // 区块重新加载后也要校验一次，覆盖样板在离线期间随配方目录变更而失真的情况。
+            blockEntity.patternAutoRepairPending = true;
         });
     }
 

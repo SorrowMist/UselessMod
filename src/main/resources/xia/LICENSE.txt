@@ -1,0 +1,6 @@
+Useless Mod 内置材质包 - 保留所有权利
+
+本资源包为 Useless Mod 的组成部分，贴图与模型保留所有权利，不随模组代码一同以 MIT 授权。
+素材外观基于 AE2 与 Mekanism，部分二改 by 虾比事李跌，其余版权归各自原作者。
+
+完整条款见仓库根目录的 LICENSES/Assets-All-Rights-Reserved.txt。

@@ -1,0 +1,64 @@
+Useless Mod - Artwork and Media Assets
+All Rights Reserved / 保留所有权利
+
+Copyright (c) 2025-2026 C-H716 and the credited artists.
+
+1. Scope
+
+This notice applies to every file under the following paths of the Useless Mod
+repository, including but not limited to:
+
+- src/main/resources/assets/** — textures, models, blockstates, sounds,
+  language files and any other client-side resource;
+- src/main/resources/xia/** — the bundled resource pack, including its
+  pack.mcmeta;
+- any other artwork, icon or media file added in the future.
+
+The Java source code, Gradle build scripts and behavior-defining data files
+under src/main/resources/data/ are licensed separately under the MIT License;
+see the LICENSE file at the repository root.
+
+2. Reservation of rights
+
+All rights to the assets described in section 1 are reserved by their
+respective authors. No permission is granted to copy, modify, adapt,
+redistribute, sublicense, sell, or republish these assets, in whole or in
+part, except as described in section 3.
+
+3. Permitted use
+
+You may:
+
+- download and use the official builds of Useless Mod, in single-player
+  worlds and on servers, without additional permission;
+- redistribute the unmodified mod JAR as published by the authors, including
+  bundling it in a modpack, provided the mod is not charged for separately
+  and this notice is kept intact;
+- show the assets in videos, streams, screenshots and reviews of the mod.
+
+You may not:
+
+- extract assets from the mod JAR and reuse them in your own mod, resource
+  pack, datapack, server, advertisement or product;
+- recolor, crop, retexture or otherwise create derivative works from these
+  assets and distribute them;
+- redistribute modified builds of the mod without written permission.
+
+4. Third-party assets
+
+Some assets are derived from, or contributed by, third parties and remain
+under their own terms:
+
+- Material appearance in the bundled resource pack under
+  src/main/resources/xia/ is based on AE2 and Mekanism, with partial
+  modifications by 虾比事李跌. See the description inside that pack's
+  pack.mcmeta.
+- Artwork credited in neoforge.mods.toml was created by 虾比 and 麦淇淋.
+
+If you are a rights holder and believe an asset is used without proper
+permission, please open an issue and it will be addressed.
+
+5. Contact
+
+For permission requests beyond the terms above, contact the project
+maintainer (C-H716) through the repository issue tracker.

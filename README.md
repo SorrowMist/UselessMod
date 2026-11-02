@@ -18,8 +18,18 @@ A Minecraft mod featuring various utilities and enhancements.
 
 ## License
 
-The original Useless Mod code is licensed under the MIT License. Third-party
-adaptations remain under their respective licenses described below.
+Useless Mod uses split licensing:
+
+- **Code** — the Java sources, Gradle build scripts and behavior-defining data
+  (recipes, tags, loot tables) are licensed under the **MIT License**; see
+  [`LICENSE`](LICENSE).
+- **Assets** — textures, models, sounds and the bundled resource pack under
+  `src/main/resources/assets/` and `src/main/resources/xia/` are
+  **All Rights Reserved**. You may redistribute unmodified mod jars and show
+  the art in videos or streams, but you may not extract or reuse the assets in
+  other mods or resource packs. See
+  [`LICENSES/Assets-All-Rights-Reserved.txt`](LICENSES/Assets-All-Rights-Reserved.txt).
+- **Third-party content** — remains under its own license, described below.
 
 ### Third-party Code
 

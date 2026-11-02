@@ -1,0 +1,10 @@
+Useless Mod - Artwork and Media Assets
+All Rights Reserved / 保留所有权利
+
+Copyright (c) 2025-2026 C-H716 and the credited artists.
+
+本目录（assets/useless_mod/）下的全部文件——贴图、模型、方块状态、音效、语言文件等——保留所有权利，不随模组代码一同以 MIT 授权。
+允许：使用官方发布的模组本体、以未修改形式随整合包分发、在视频与直播中展示。
+禁止：从模组包中提取资源再用于其它模组或资源包、二次修改后分发。
+
+完整条款见仓库根目录的 LICENSES/Assets-All-Rights-Reserved.txt。

@@ -506,6 +506,15 @@ neoForge.ideSyncTask generateModMetadata
 neoForge.ideSyncTask extractProductiveLib
 neoForge.ideSyncTask extractEnderIoApi
 
+// 分发包内一并带上许可证全文：根目录 LICENSE（代码 MIT）与 LICENSES/ 下的
+// 资源 ARR 声明及第三方许可证。assets/ 与 xia/ 内的 LICENSE.txt 由 processResources 自动打包。
+tasks.named('jar', Jar).configure {
+    from('LICENSE')
+    from('LICENSES') {
+        into 'LICENSES'
+    }
+}
+
 // Example configuration to allow publishing using the maven-publish plugin
 publishing {
     publications {

@@ -32,10 +32,15 @@ import com.sorrowmist.useless.utils.UselessItemUtils;
 import com.sorrowmist.useless.utils.mining.MiningDispatcher;
 import com.sorrowmist.useless.world.dimension.UselessDimensionConfigManager;
 import com.sorrowmist.useless.world.dimension.UselessDimensions;
+import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.GlobalPos;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.network.chat.ClickEvent;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.HoverEvent;
+import net.minecraft.network.chat.MutableComponent;
+import net.minecraft.network.chat.Style;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.level.ServerLevel;
@@ -55,6 +60,7 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.neoforged.bus.api.EventPriority;
 import net.neoforged.bus.api.SubscribeEvent;
+import net.neoforged.fml.ModList;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.AddReloadListenerEvent;
 import net.neoforged.neoforge.event.entity.living.LivingDamageEvent;
@@ -75,6 +81,8 @@ import net.neoforged.neoforge.event.tick.ServerTickEvent;
 import net.neoforged.neoforge.network.PacketDistributor;
 import net.neoforged.neoforge.server.ServerLifecycleHooks;
 
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -90,6 +98,8 @@ public class EventHandler {
     private static final Set<UUID> RESTORING_BEEF_PROTECTED_PLAYERS = ConcurrentHashMap.newKeySet();
     /** 本轮服务器是否已发送过配方适配器不兼容提示；服务器停止时随失败记录一起复位。 */
     private static volatile boolean RECIPE_INCOMPATIBILITY_NOTICE_SENT = false;
+    /** 配方适配问题的 issue 新建页；具体参数由 {@link #buildIncompatibilityIssueUrl(List)} 拼接。 */
+    private static final String ISSUE_NEW_URL = "https://github.com/SorrowMist/UselessMod/issues/new";
 
     @SubscribeEvent(priority = EventPriority.HIGHEST)
     public static void onLivingIncomingDamage(LivingIncomingDamageEvent event) {
@@ -727,8 +737,57 @@ public class EventHandler {
         RECIPE_INCOMPATIBILITY_NOTICE_SENT = true;
         List<String> modNames = AdapterGuards.disabledModNames();
         if (modNames.isEmpty()) return;
-        player.displayClientMessage(
-                Component.translatable("message.useless_mod.recipe.incompatible", String.join("、", modNames)), false);
+
+        // 兼容说明只能约束已知版本，玩家装到未覆盖的版本时仍需人工反馈，因此附上预填好现场信息的 issue 入口。
+        Style linkStyle = Style.EMPTY
+                .withClickEvent(new ClickEvent(ClickEvent.Action.OPEN_URL,
+                        buildIncompatibilityIssueUrl(AdapterGuards.disabledMods())))
+                .withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT,
+                        Component.translatable("message.useless_mod.recipe.incompatible.issue.hover")))
+                .applyFormat(ChatFormatting.UNDERLINE)
+                .applyFormat(ChatFormatting.GREEN);
+
+        MutableComponent message = Component.translatable(
+                "message.useless_mod.recipe.incompatible",
+                String.join(", ", modNames),
+                Component.translatable("message.useless_mod.recipe.incompatible.issue").setStyle(linkStyle));
+        player.displayClientMessage(message, false);
+    }
+
+    /**
+     * 构造预填了不兼容模组与本模组版本的 issue 新建链接。
+     *
+     * <p>玩家只需补充日志链接即可提交，避免因缺少环境信息而来回询问。</p>
+     */
+    private static String buildIncompatibilityIssueUrl(List<String> modIds) {
+        StringBuilder body = new StringBuilder();
+        body.append("### 不兼容的模组\n");
+        for (String modId : modIds) {
+            body.append("- ").append(modId).append(' ').append(modVersion(modId)).append('\n');
+        }
+        body.append("\n### 运行环境\n");
+        body.append("- Minecraft：").append(modVersion("minecraft")).append('\n');
+        body.append("- UselessMod：").append(modVersion(UselessMod.MODID)).append('\n');
+        body.append("- NeoForge：").append(modVersion("neoforge")).append('\n');
+        body.append("\n### 请补充\n");
+        body.append("- 上述模组的确切版本（若与上方不一致）\n");
+        body.append("- 完整日志链接（Gist 或 pastebin）\n");
+
+        String title = "[配方兼容] 配方适配器不兼容的模组：" + String.join(", ", modIds);
+        return ISSUE_NEW_URL
+                + "?labels=bug&title=" + URLEncoder.encode(title, StandardCharsets.UTF_8)
+                + "&body=" + URLEncoder.encode(body.toString(), StandardCharsets.UTF_8);
+    }
+
+    /** 取模组版本号；模组缺失或元数据异常时返回占位文本，不影响提示发送。 */
+    private static String modVersion(String modId) {
+        try {
+            return ModList.get().getModContainerById(modId)
+                    .map(container -> container.getModInfo().getVersion().toString())
+                    .orElse("未知");
+        } catch (RuntimeException | LinkageError exception) {
+            return "未知";
+        }
     }
 
     @SubscribeEvent

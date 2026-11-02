@@ -3,25 +3,23 @@
 本文件记录 UselessMod 的全部版本变更，格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，
 每个条目附英文对照，分类固定为「新增 / 变更 / 修复 / 性能」四类。
 
-## [Unreleased]
+## [2.4.6.3]
 
 ### Changed / 变更
-- 配方适配器与可选兼容模组的失败日志改为单行诊断：只输出异常类型、消息与根因链（最多四层），不再把完整堆栈写进日志文件；同一「适配器 + 动作」的失败只记录一次
-  - Failure logs from recipe adapters and optional compatibility mods now emit a single-line diagnosis with the exception type, message and up to four cause levels instead of a full stack trace; repeated failures of the same adapter action are logged once.
+- 兼容模组发生异常时，日志仅保留一条摘要，注明涉及的模组与失败原因，不再输出完整报错信息；同一问题只记录一次。
+  - When a compatibility mod fails, the log keeps a single summary naming the mod and the cause instead of a full error dump; each problem is recorded only once.
 
 ### Fixed / 修复
-- 配方适配器统一加容错守卫，版本错配抛出的 `LinkageError`（`NoClassDefFoundError`、`NoSuchMethodError` 等）不再沿调用栈冒泡终止服务器 tick；结构性调用失败即停用该动作，逐条配方转换失败只跳过当前条目
-  - Recipe adapters now share a fault-tolerance guard, so `LinkageError`s raised by incompatible optional mod versions (`NoClassDefFoundError`, `NoSuchMethodError`, ...) no longer bubble up and kill the server tick loop; structural calls disable that action, while per-recipe conversion failures skip only the current entry.
-- 配方索引构建、配方目录构建与按输入查找配方等整表流程失败时降级为空结果并记录诊断，不再中断加载
-  - Whole-table flows such as recipe index building, catalog building and input-based recipe lookup now fall back to empty results with a diagnostic log instead of aborting the load.
-- 进入世界时若兼容模组的配方适配器因版本错配被停用，会以本模组的显示名开头提示具体不兼容模组，并说明已关闭其配方转换；提示附带可点击的反馈入口，直接打开已载入的 Bug 报告表单，并预填标题、模组版本与不兼容模组列表（含 Minecraft / Useless Mod / NeoForge 版本），便于上报兼容说明未覆盖的版本；每轮服务器只提示一次
-  - When a compatibility mod's recipe adapters were disabled by a version mismatch, the notice now starts with this mod's display name, names the affected mods and states that their recipe conversion is disabled; it carries a clickable feedback link that opens the Bug report form with the title, mod version and incompatible mod list (including Minecraft / Useless Mod / NeoForge versions) pre-filled, so versions outside the documented range can be reported; the notice is sent once per server session.
-- 转换 Re-Avaritia 工作台配方时，同一物品、不同数据组件的多个输入（如终焉工作台「永恒奇点」所需的多种矿物奇点）不再被合并为单个按物品 ID 匹配的槽位，避免万象样板坍缩成「任一种奇点填满全部槽位」即可合成
-  - Converting Re-Avaritia table recipes no longer merges multiple inputs that share an item but differ in data components (such as the various mineral singularities required by the Endgame Table's Eternal Singularity), preventing omniversal patterns from collapsing into a single item-ID slot that any one singularity can fill.
-- `/uselessmod patterns repair` 现在也会识别仍能正常解码、但输入槽语义已与当前配方不符的旧万象样板，按当前配方重建并写回，无需手动删除重写；重建结果与旧样板一致时不写回
-  - `/uselessmod patterns repair` now also detects old omniversal patterns that still decode but whose input slot semantics no longer match the current recipe, rebuilding and writing them back in place instead of requiring manual deletion and re-encoding; patterns whose rebuilt form matches the original are left untouched.
-- 单方块万象炉与多方块 ME 样板总成在样板随存档或外部库存载入后，会自动按当前配方目录重建一次失真样板，无需玩家手动执行修复命令；配方目录尚未构建完成时保持待修状态，由后续 tick 重试
-  - Single-block omniversal furnaces and multiblock ME pattern assemblies now rebuild their stale omniversal patterns once automatically against the current recipe directory after patterns are loaded from the save or the external inventory, so no manual repair command is needed; while the recipe directory is still being built, the repair stays pending and is retried on later ticks.
+- 兼容模组版本不匹配时，服务器不再出现无响应或崩溃，仅停用该模组的配方转换；相关配方暂时无法用于万象合成，其余功能不受影响。
+  - A mismatched compatibility mod version no longer causes the server to stop responding or crash; only that mod's recipe conversion is disabled, leaving its recipes temporarily unusable for omniversal crafting while other features remain unaffected.
+- 进入世界时检查兼容模组版本。版本不匹配时，提示会指明具体模组、说明其配方转换已停用，并附反馈入口，可打开已预填版本信息的 Bug 报告表单；每个服务器会话仅提示一次。
+  - Compatibility mod versions are checked when entering a world. On a mismatch, the notice names the mod, states that its recipe conversion is disabled, and includes a feedback link to the Bug report form with version details pre-filled; the notice appears once per server session.
+- 转换 Re-Avaritia 工作台配方时，终焉工作台「永恒奇点」等需要多种不同奇点的配方，不再被合并为任意一种奇点即可填满全部输入槽的单一条目。
+  - When converting Re-Avaritia table recipes, recipes requiring several distinct singularities — such as the Endgame Table's Eternal Singularity — are no longer merged into a single entry that any one singularity can fill every input slot with.
+- `/uselessmod patterns repair` 现可修复仍能读取、但输入槽与当前配方不符的旧万象样板：按当前配方重建并原地写回，无需手动删除后重新编码；原本正确的样板不受影响。
+  - `/uselessmod patterns repair` now repairs old omniversal patterns that still load but whose input slots no longer match the current recipe, rebuilding them against the current recipe and writing them back in place without manual deletion and re-encoding; patterns that are already correct are left untouched.
+- 从旧存档或外部存储载入的万象样板若已过时，单方块万象炉与多方块 ME 样板总成会在载入后自动重建一次；配方尚未加载完成时，修复保持待处理状态，待加载完成后重试。
+  - If omniversal patterns loaded from an old save or external storage are out of date, single-block omniversal furnaces and multiblock ME pattern assemblies rebuild them once automatically after loading; while recipes are not yet loaded, the repair stays pending and is retried afterwards.
 
 ## [2.4.6.2]
 

@@ -4,7 +4,7 @@
 
 | 范围 | 路径 | 授权 |
 | --- | --- | --- |
-| 代码与行为性数据 | `src/main/java/`、`build.gradle`、`settings.gradle`、`gradle.properties`、`src/main/resources/data/` | MIT，见根目录 `LICENSE` |
+| 代码与行为性数据 | `src/main/java/`、`build.gradle`、`settings.gradle`、`gradle.properties`、`src/main/resources/data/`、`src/main/resources/` 根目录下的配置与元数据（`*.mixins.json`、`pack.mcmeta`、`kubejs.plugins.txt`、`META-INF/`） | MIT，见根目录 `LICENSE` |
 | 美术资源与内置资源包 | `src/main/resources/assets/`、`src/main/resources/xia/` | All Rights Reserved，见 `Assets-All-Rights-Reserved.txt` |
 | 第三方代码 | 见各文件内注释 | 各自原许可证，见下表 |
 

@@ -44,16 +44,31 @@ You may not:
   assets and distribute them;
 - redistribute modified builds of the mod without written permission.
 
-4. Third-party assets
+4. Attribution
 
-Some assets are derived from, or contributed by, third parties and remain
-under their own terms:
+4.1 Assets of this mod
 
-- Material appearance in the bundled resource pack under
-  src/main/resources/xia/ is based on AE2 and Mekanism, with partial
-  modifications by 虾比事李跌. See the description inside that pack's
-  pack.mcmeta.
-- Artwork credited in neoforge.mods.toml was created by 虾比 and 麦淇淋.
+The textures, models, sounds and other media under
+src/main/resources/assets/useless_mod/ were created by artists credited in
+the mod metadata (the credits field of neoforge.mods.toml). Individual
+artists are not listed in this notice.
+
+If you need to know which artist is responsible for a specific asset, or
+wish to request permission beyond section 3, contact the project
+maintainer (C-H716) through the repository issue tracker; the request will
+be forwarded to the relevant artist.
+
+4.2 Bundled resource pack
+
+The resource pack bundled under src/main/resources/xia/ was produced by
+虾比 (also credited as 虾比事李跌). Its material appearance is based on AE2
+and Mekanism; no files from those projects are copied verbatim.
+
+4.3 Third-party material
+
+Some behavior-defining data and code are adapted from third parties and
+remain under their own terms; see the notices in the affected source files
+and the other files in this LICENSES directory.
 
 If you are a rights holder and believe an asset is used without proper
 permission, please open an issue and it will be addressed.

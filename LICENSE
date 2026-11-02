@@ -27,7 +27,10 @@ Scope of this license
 This MIT License applies to the source code of Useless Mod only: Java sources
 under `src/`, Gradle build scripts, and data files that are generated or
 hand-written recipes, tags, loot tables and other behavior-defining JSON under
-`src/main/resources/data/`.
+`src/main/resources/data/`. It also covers the configuration and metadata files
+directly under `src/main/resources/` that are not artwork — such as the
+`*.mixins.json` files, `pack.mcmeta` and `kubejs.plugins.txt` — together with
+generated mod metadata under `META-INF/`.
 
 Artwork and other media assets are NOT covered by this license. See
 `LICENSES/Assets-All-Rights-Reserved.txt` for the terms that apply to textures,

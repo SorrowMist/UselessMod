@@ -6,6 +6,7 @@ import com.sorrowmist.useless.api.enums.tool.EnchantMode;
 import com.sorrowmist.useless.client.BeefAutoClicker;
 import com.sorrowmist.useless.client.gui.MiningStatusGui;
 import com.sorrowmist.useless.client.gui.ThermostatScreen;
+import com.sorrowmist.useless.client.update.ModUpdateChecker;
 import com.sorrowmist.useless.content.blockentities.multiblock.MultiblockAlloyFurnaceCoreBlockEntity;
 import com.sorrowmist.useless.content.blocks.TemperatureRegulatorBlock;
 import com.sorrowmist.useless.content.blocks.TeleportPadBlock;
@@ -475,6 +476,8 @@ public class ClientEventBusSubscriber {
         lastTabPressed = false;
         // 连点开关是客户端会话级状态，登录时统一置关，避免跨会话残留
         BeefAutoClicker.reset();
+        // 进入世界后异步检查模组更新，发现新版本时在聊天栏提示
+        ModUpdateChecker.checkOnLogin(event.getPlayer());
     }
 
     @SubscribeEvent

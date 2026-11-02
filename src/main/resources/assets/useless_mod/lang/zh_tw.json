@@ -1297,5 +1297,12 @@
   "commands.useless_mod.patterns.repair.no_machines": "該網路上沒有已通電的萬象爐或 ME 樣板總成，無需修復",
   "commands.useless_mod.patterns.repair.summary": "已掃描 %s 張萬象樣板，發現 %s 張失效；已修復 %s 張，%s 張無法修復（配方已移除或存在歧義）。",
   "commands.useless_mod.patterns.repair.summary.preview": "已掃描 %s 張萬象樣板，發現 %s 張失效；其中 %s 張可修復，%s 張無法修復（配方已移除或存在歧義）。本次為預覽，未寫回任何槽位。",
-  "commands.useless_mod.patterns.repair.detail": "無法修復：%s，綁定配方 %s"
+  "commands.useless_mod.patterns.repair.detail": "無法修復：%s，綁定配方 %s",
+  "useless_mod.configuration.update_check": "模組更新檢查",
+  "useless_mod.configuration.update_check_enabled": "進入世界時檢查更新",
+  "useless_mod.configuration.update_check_enabled.comment": "進入世界時檢查 CurseForge 上是否有新版本，有則在聊天欄提示",
+  "useless_mod.configuration.update_check_enabled.tooltip": "進入世界時檢查 CurseForge 上是否有新版本，有則在聊天欄提示",
+  "message.useless_mod.update.available": "【%s】發現新版本：%s，可前往 %s 下載。",
+  "message.useless_mod.update.link": "CurseForge",
+  "message.useless_mod.update.hover": "在瀏覽器中開啟 CurseForge 專案頁"
 }

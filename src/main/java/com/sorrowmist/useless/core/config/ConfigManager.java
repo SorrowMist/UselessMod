@@ -21,6 +21,8 @@ public class ConfigManager {
     private static final ModConfigSpec.BooleanValue ENABLE_BOTANY_POT_RENDERING;
     // 造化杖连点模式：每个客户端 tick 触发多少次右键（客户端行为，放 CLIENT 配置）
     private static final ModConfigSpec.IntValue BEEF_AUTOCLICK_CLICKS_PER_TICK;
+    // 模组更新检查：进入世界时查询 CurseForge 上的最新版本（仅客户端）
+    private static final ModConfigSpec.BooleanValue UPDATE_CHECK_ENABLED;
 
     // 矩阵样板数量配置
     private static final ModConfigSpec.IntValue MATRIX_PATTERN_COUNT;
@@ -232,6 +234,16 @@ public class ConfigManager {
                         "仅在客户端生效，无需服务端同意")
                 .translation("useless_mod.configuration.beef_autoclick_clicks_per_tick")
                 .defineInRange("beef_autoclick_clicks_per_tick", 4, 1, 20);
+        CLIENT_BUILDER.pop();
+
+        // 更新检查只影响客户端提示与一次出站请求，放在客户端配置中，不参与服务端行为。
+        CLIENT_BUILDER.translation("useless_mod.configuration.update_check")
+                .push("update_check");
+        UPDATE_CHECK_ENABLED = CLIENT_BUILDER
+                .comment("进入世界时检查 CurseForge 上是否有新版本，有则在聊天栏提示",
+                        "仅客户端生效；结果缓存 6 小时，每次进入世界都会提示")
+                .translation("useless_mod.configuration.update_check_enabled")
+                .define("update_check_enabled", true);
         CLIENT_BUILDER.pop();
 
         SERVER_BUILDER.translation("useless_mod.configuration.omniversal_multiblock_alloy_furnace")
@@ -970,6 +982,10 @@ public class ConfigManager {
 
     public static boolean shouldEnableBotanyPotRendering() {
         return getConfigValue(ENABLE_BOTANY_POT_RENDERING);
+    }
+
+    public static boolean isUpdateCheckEnabled() {
+        return getConfigValue(UPDATE_CHECK_ENABLED);
     }
 
     public static int getMatrixPatternCount() {

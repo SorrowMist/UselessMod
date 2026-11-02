@@ -1309,5 +1309,12 @@
   "commands.useless_mod.patterns.repair.summary": "Scanned %s omniversal patterns, found %s invalid; repaired %s, %s could not be repaired (recipe removed or ambiguous).",
   "commands.useless_mod.patterns.repair.summary.preview": "Scanned %s omniversal patterns, found %s invalid; %s are repairable and %s could not be repaired (recipe removed or ambiguous). This was a preview; nothing was written back.",
   "commands.useless_mod.patterns.repair.detail": "Could not repair: %s, bound recipe %s",
-  "message.useless_mod.recipe.incompatible": "These mods are incompatible with this mod's recipe adapters, so their recipe conversion has been disabled: %s. Check that their versions match the compatibility notes."
+  "message.useless_mod.recipe.incompatible": "These mods are incompatible with this mod's recipe adapters, so their recipe conversion has been disabled: %s. Check that their versions match the compatibility notes.",
+  "useless_mod.configuration.update_check": "Mod Update Check",
+  "useless_mod.configuration.update_check_enabled": "Check for Updates on World Join",
+  "useless_mod.configuration.update_check_enabled.comment": "Check CurseForge for a newer version when joining a world, and show it in chat if found",
+  "useless_mod.configuration.update_check_enabled.tooltip": "Check CurseForge for a newer version when joining a world, and show it in chat if found",
+  "message.useless_mod.update.available": "A new version of %s is available: %s. Download it on %s.",
+  "message.useless_mod.update.link": "CurseForge",
+  "message.useless_mod.update.hover": "Open the CurseForge project page in your browser"
 }

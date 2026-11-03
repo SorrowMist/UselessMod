@@ -6,6 +6,7 @@ import com.sorrowmist.useless.content.recipe.AdapterUtils;
 import com.sorrowmist.useless.content.recipe.AdvancedAlloyFurnaceRecipe;
 import com.sorrowmist.useless.content.recipe.CountedIngredient;
 import com.sorrowmist.useless.content.recipe.IRecipeAdapter;
+import com.sorrowmist.useless.content.recipe.LongSizedFluidIngredient;
 import com.sorrowmist.useless.content.recipe.RecipeSourceIds;
 import com.sorrowmist.useless.content.recipe.adapters.delight.DelightRecipeAdapterUtils;
 import net.minecraft.core.registries.BuiltInRegistries;
@@ -79,7 +80,7 @@ public final class ChillerRecipeAdapter implements IRecipeAdapter<ChillerRecipe>
             ChillerRecipe source = holder.value();
             List<CountedIngredient> requirements = AdapterUtils.mergeIngredients(
                     itemInputs(source));
-            List<com.sorrowmist.useless.content.recipe.LongSizedFluidIngredient> fluids =
+            List<LongSizedFluidIngredient> fluids =
                     ExtraDelightRecipeAdapterUtils.fluid(source.getFluid());
             if ((requirements.isEmpty() && fluids.isEmpty())
                     || !DelightRecipeAdapterUtils.matchesItems(requirements, mergedInputs, List.of())

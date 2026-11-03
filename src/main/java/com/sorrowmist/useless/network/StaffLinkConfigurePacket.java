@@ -23,6 +23,8 @@ import net.neoforged.neoforge.fluids.FluidStack;
 import net.neoforged.neoforge.network.PacketDistributor;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
 import org.jetbrains.annotations.NotNull;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * 客户端提交一条线路配置。
@@ -147,10 +149,10 @@ public record StaffLinkConfigurePacket(GlobalPos anchor, int route, StaffLinkRou
      * <p><b>不能跳过这一步直接把 {@code packet.config().filter()} 传下去</b>：
      * 那样等于把服务端当成客户端的镜子，任何越界值都会直接落进存档。</p>
      */
-    private static java.util.List<LinkFilterSlot> sanitizeFilter(
-            java.util.List<LinkFilterSlot> received, LinkMedium medium) {
-        java.util.List<LinkFilterSlot> cleaned =
-                new java.util.ArrayList<>(StaffLinkRoute.FILTER_LIMIT);
+    private static List<LinkFilterSlot> sanitizeFilter(
+            List<LinkFilterSlot> received, LinkMedium medium) {
+        List<LinkFilterSlot> cleaned =
+                new ArrayList<>(StaffLinkRoute.FILTER_LIMIT);
         for (int index = 0; index < StaffLinkRoute.FILTER_LIMIT; index++) {
             LinkFilterSlot slot = received != null && index < received.size()
                     ? received.get(index) : null;

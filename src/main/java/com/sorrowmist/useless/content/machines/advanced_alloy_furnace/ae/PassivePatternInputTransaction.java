@@ -4,6 +4,7 @@ import appeng.api.config.Actionable;
 import appeng.api.config.FuzzyMode;
 import appeng.api.crafting.IPatternDetails;
 import appeng.api.networking.security.IActionSource;
+import appeng.api.stacks.AEFluidKey;
 import appeng.api.stacks.AEKey;
 import appeng.api.stacks.AEItemKey;
 import appeng.api.stacks.GenericStack;
@@ -491,7 +492,7 @@ public final class PassivePatternInputTransaction {
             if (allFluidVariants == null) {
                 List<AEKey> variants = new ArrayList<>();
                 for (var entry : cachedInventory()) {
-                    if (entry.getLongValue() > 0L && entry.getKey() instanceof appeng.api.stacks.AEFluidKey) {
+                    if (entry.getLongValue() > 0L && entry.getKey() instanceof AEFluidKey) {
                         variants.add(entry.getKey());
                     }
                 }

@@ -8,6 +8,7 @@ import com.sorrowmist.useless.init.ModMenuType;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.world.entity.player.Inventory;
+import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.ContainerData;
 import net.minecraft.world.inventory.SimpleContainerData;
 import net.minecraft.world.inventory.Slot;
@@ -84,7 +85,7 @@ public final class OreGeneratorMenu extends PagedRecoverableMenu {
     }
 
     @Override
-    public boolean stillValid(net.minecraft.world.entity.player.Player player) {
+    public boolean stillValid(Player player) {
         return generator != null && player.level().getBlockEntity(blockPos) == generator
                 && player.distanceToSqr(blockPos.getX() + 0.5D, blockPos.getY() + 0.5D,
                 blockPos.getZ() + 0.5D) <= 64.0D;

@@ -1,5 +1,8 @@
 package com.sorrowmist.useless.content.recipe;
 
+import java.util.Locale;
+
+
 /** Stable identifiers used to partition the shared alloy-furnace recipe directory. */
 public final class RecipeSourceIds {
     public static final String CORE = "core";
@@ -77,7 +80,7 @@ public final class RecipeSourceIds {
 
     public static String normalize(String sourceId) {
         if (sourceId == null || sourceId.isBlank()) return UNKNOWN;
-        return sourceId.trim().toLowerCase(java.util.Locale.ROOT);
+        return sourceId.trim().toLowerCase(Locale.ROOT);
     }
 
     /** Best-effort stable source for adapters that do not explicitly provide one. */

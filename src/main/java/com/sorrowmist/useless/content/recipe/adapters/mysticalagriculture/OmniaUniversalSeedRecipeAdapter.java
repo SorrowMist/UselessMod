@@ -1,11 +1,13 @@
 package com.sorrowmist.useless.content.recipe.adapters.mysticalagriculture;
 
+import appeng.api.stacks.AEKey;
 import com.omnia.omnia.registry.ModItems;
 import com.omnia.omnia.util.TargetHelper;
 import com.sorrowmist.useless.api.enums.AlloyFurnaceMode;
 import com.sorrowmist.useless.content.recipe.AdvancedAlloyFurnaceRecipe;
 import com.sorrowmist.useless.content.recipe.IRecipeAdapter;
 import net.minecraft.core.HolderLookup;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
@@ -30,8 +32,8 @@ public final class OmniaUniversalSeedRecipeAdapter
     private static final int WATER_AMOUNT = 1;
     private static final int ENERGY = 1000;
     private static final int PROCESS_TIME = 60;
-    private static final net.minecraft.resources.ResourceLocation RECIPE_ID =
-            net.minecraft.resources.ResourceLocation.fromNamespaceAndPath(
+    private static final ResourceLocation RECIPE_ID =
+            ResourceLocation.fromNamespaceAndPath(
                     "omnia", "universal_crop_seed_essence");
 
     @Override
@@ -70,7 +72,7 @@ public final class OmniaUniversalSeedRecipeAdapter
             Level level,
             Map<Ingredient, Long> mergedInputs,
             Map<FluidStack, Long> mergedFluids,
-            Map<appeng.api.stacks.AEKey, Long> mergedKeys,
+            Map<AEKey, Long> mergedKeys,
             @Nullable ItemStack mold,
             List<ItemStack> actualInputs) {
         if (level == null) return List.of();

@@ -5,6 +5,7 @@ import appeng.api.stacks.AEFluidKey;
 import appeng.api.stacks.AEItemKey;
 import appeng.api.stacks.AEKey;
 import appeng.api.stacks.GenericStack;
+import com.sorrowmist.useless.api.recipe.IRecipeAdapter;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.AdvancedAlloyFurnacePatternResolver;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.DynamicComponentPattern;
 import com.sorrowmist.useless.core.component.OmniversalPatternData;
@@ -21,7 +22,9 @@ import net.minecraft.world.level.Level;
 import net.neoforged.neoforge.fluids.FluidStack;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -42,8 +45,8 @@ import org.slf4j.Logger;
 /** Server/client recipe directory used by JEI, the encoder and pattern validation. */
 public final class AlloyFurnaceRecipeCatalog {
     private static final Logger LOGGER = LogUtils.getLogger();
-    private static final Map<Object, Snapshot> CACHE = java.util.Collections.synchronizedMap(new WeakHashMap<>());
-    private static final Map<Object, Object> BUILD_LOCKS = java.util.Collections.synchronizedMap(new WeakHashMap<>());
+    private static final Map<Object, Snapshot> CACHE = Collections.synchronizedMap(new WeakHashMap<>());
+    private static final Map<Object, Object> BUILD_LOCKS = Collections.synchronizedMap(new WeakHashMap<>());
     /**
      * Client and integrated-server levels live in the same JVM but have different recipe managers.
      * Their cache generations must therefore be independent: a client recipe update must not make
@@ -548,7 +551,7 @@ public final class AlloyFurnaceRecipeCatalog {
         // 先把 adapter 分成「合成配方」与「转换配方」两类。转换类只在这里登记，稍后对全表做单次遍历，
         // 避免每个 adapter 都把整张配方表扫一遍（adapter 数量 × 全服配方数）。
         List<AdapterSource> converting = new ArrayList<>();
-        for (com.sorrowmist.useless.api.recipe.IRecipeAdapter<?> adapter : AlloyFurnaceRecipeManager.getInstance().getRegisteredAdapters()) {
+        for (IRecipeAdapter<?> adapter : AlloyFurnaceRecipeManager.getInstance().getRegisteredAdapters()) {
             if (adapter.getClass().getPackageName().contains(".ae.ae2lt")) continue;
             String sourceId = AlloyFurnaceRecipeManager.getInstance().getAdapterSourceId(adapter);
             // 合成型适配器直接枚举结果，不经过 convertAll；同样可能因兼容模组版本错配抛
@@ -617,7 +620,7 @@ public final class AlloyFurnaceRecipeCatalog {
     }
 
     /** 一个待做配方转换的 adapter 及其来源标识。 */
-    private record AdapterSource(com.sorrowmist.useless.api.recipe.IRecipeAdapter<?> adapter, String sourceId) {
+    private record AdapterSource(IRecipeAdapter<?> adapter, String sourceId) {
     }
 
     /** 已完成指纹计算的配方，用于在并行计算后按原顺序合并。 */
@@ -709,7 +712,7 @@ public final class AlloyFurnaceRecipeCatalog {
      * 代价只是该来源的配方暂时缺席。</p>
      */
     private static void collectSynthetic(
-            com.sorrowmist.useless.api.recipe.IRecipeAdapter<?> adapter, String sourceId,
+            IRecipeAdapter<?> adapter, String sourceId,
             Supplier<List<AdvancedAlloyFurnaceRecipe>> supplier,
             List<CollectedRecipe> output) {
         List<AdvancedAlloyFurnaceRecipe> collected = AdapterGuards.call(
@@ -720,7 +723,7 @@ public final class AlloyFurnaceRecipeCatalog {
         }
     }
 
-    private static void collectGenerated(com.sorrowmist.useless.api.recipe.IRecipeAdapter<?> adapter, String sourceId, Level level,
+    private static void collectGenerated(IRecipeAdapter<?> adapter, String sourceId, Level level,
                                          List<CollectedRecipe> output) {
         // 合成配方枚举同样会触达兼容模组的类与方法；版本错配抛 LinkageError 时降级为空列表，
         // 不中断整次目录构建。
@@ -1192,7 +1195,7 @@ public final class AlloyFurnaceRecipeCatalog {
                     continue;
                 }
 
-                GenericStack first = java.util.Arrays.stream(possible)
+                GenericStack first = Arrays.stream(possible)
                         .filter(candidate -> candidate != null && candidate.what() != null)
                         .findFirst().orElse(null);
                 if (first == null) return null;

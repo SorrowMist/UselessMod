@@ -1,5 +1,6 @@
 package com.sorrowmist.useless.content.recipe.adapters.mekanism;
 
+import appeng.api.stacks.AEKey;
 import com.sorrowmist.useless.content.recipe.AdapterUtils;
 import com.sorrowmist.useless.content.recipe.AdvancedAlloyFurnaceRecipe;
 import com.sorrowmist.useless.content.recipe.IRecipeAdapter;
@@ -7,12 +8,14 @@ import mekanism.api.recipes.FluidToFluidRecipe;
 import mekanism.api.recipes.MekanismRecipeTypes;
 import mekanism.api.recipes.ingredients.FluidStackIngredient;
 import mekanism.common.registries.MekanismBlocks;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.crafting.Ingredient;
 import net.minecraft.world.item.crafting.RecipeHolder;
 import net.minecraft.world.item.crafting.RecipeManager;
 import net.minecraft.world.level.Level;
 import net.neoforged.neoforge.fluids.FluidStack;
+import net.neoforged.neoforge.fluids.crafting.SizedFluidIngredient;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
@@ -43,7 +46,7 @@ public final class FluidToFluidRecipeAdapter implements IRecipeAdapter<FluidToFl
         if (input == null || input.hasNoMatchingInstances()) return List.of();
 
         List<AdvancedAlloyFurnaceRecipe> result = new ArrayList<>();
-        List<net.neoforged.neoforge.fluids.crafting.SizedFluidIngredient> fluidInputs =
+        List<SizedFluidIngredient> fluidInputs =
                 MekanismChemicalRecipeSupport.fluidIngredients(input);
         for (FluidStack output : holder.value().getOutputDefinition()) {
             if (output.isEmpty()) continue;
@@ -59,7 +62,7 @@ public final class FluidToFluidRecipeAdapter implements IRecipeAdapter<FluidToFl
     @Override
     public List<RecipeHolder<FluidToFluidRecipe>> findMatchingRecipes(
             Level level, Map<Ingredient, Long> mergedInputs, Map<FluidStack, Long> mergedFluids,
-            Map<appeng.api.stacks.AEKey, Long> mergedKeys, @Nullable ItemStack mold) {
+            Map<AEKey, Long> mergedKeys, @Nullable ItemStack mold) {
         if (level == null || mergedFluids.isEmpty() || !matchesMold(mold)) return List.of();
         RecipeManager manager = level.getRecipeManager();
         List<RecipeHolder<FluidToFluidRecipe>> result = new ArrayList<>();
@@ -73,7 +76,7 @@ public final class FluidToFluidRecipeAdapter implements IRecipeAdapter<FluidToFl
     }
 
     private static String fluidId(FluidStack stack) {
-        var id = net.minecraft.core.registries.BuiltInRegistries.FLUID.getKey(stack.getFluid());
+        var id = BuiltInRegistries.FLUID.getKey(stack.getFluid());
         return id.getNamespace() + "_" + id.getPath().replace('/', '_');
     }
 }

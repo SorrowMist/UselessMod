@@ -8,6 +8,7 @@ import net.minecraft.core.HolderLookup;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.item.CreativeModeTab;
+import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.enchantment.Enchantments;
 import net.neoforged.neoforge.registries.DeferredHolder;
@@ -26,7 +27,7 @@ public class ModCreativeTabs {
      * 由条件加载的兼容模块（例如 ECO 已安装时的紧凑方块）追加的创造栏条目。
      * 这些物品只在对应前置存在时才会被注册，因此这里必须允许运行时追加。
      */
-    public static final List<DeferredItem<? extends net.minecraft.world.item.Item>> EXTRA_TAB_ITEMS =
+    public static final List<DeferredItem<? extends Item>> EXTRA_TAB_ITEMS =
             new ArrayList<>();
 
     public static final DeferredHolder<CreativeModeTab, CreativeModeTab> MAIN = CREATIVE_TAB.register(

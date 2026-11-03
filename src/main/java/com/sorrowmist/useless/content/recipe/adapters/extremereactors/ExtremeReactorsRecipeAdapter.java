@@ -1,5 +1,6 @@
 package com.sorrowmist.useless.content.recipe.adapters.extremereactors;
 
+import appeng.api.stacks.AEKey;
 import com.mojang.logging.LogUtils;
 import com.sorrowmist.useless.api.enums.AlloyFurnaceMode;
 import com.sorrowmist.useless.content.recipe.AdapterUtils;
@@ -46,7 +47,6 @@ import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 
 /** Converts Extreme Reactors recipes and fuel reactions to alloy-furnace recipes. */
 public final class ExtremeReactorsRecipeAdapter implements IRecipeAdapter<ModRecipe> {
@@ -137,7 +137,7 @@ public final class ExtremeReactorsRecipeAdapter implements IRecipeAdapter<ModRec
     public List<RecipeHolder<ModRecipe>> findMatchingRecipes(
             Level level, Map<Ingredient, Long> mergedInputs,
             Map<FluidStack, Long> mergedFluids,
-            Map<appeng.api.stacks.AEKey, Long> mergedKeys,
+            Map<AEKey, Long> mergedKeys,
             @Nullable ItemStack mold, List<ItemStack> actualInputs) {
         if (level == null || !matchesMold(mold)) return List.of();
 

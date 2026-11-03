@@ -6,6 +6,7 @@ import com.sorrowmist.useless.api.enums.AlloyFurnaceMode;
 import com.sorrowmist.useless.content.recipe.AdapterUtils;
 import com.sorrowmist.useless.content.recipe.AdvancedAlloyFurnaceRecipe;
 import com.sorrowmist.useless.content.recipe.CountedIngredient;
+import com.sorrowmist.useless.content.recipe.FluidIngredientAllocator;
 import com.sorrowmist.useless.content.recipe.IRecipeAdapter;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.core.registries.BuiltInRegistries;
@@ -20,6 +21,7 @@ import net.neoforged.neoforge.fluids.crafting.SizedFluidIngredient;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -150,7 +152,7 @@ public class DissolutionChamberRecipeAdapter implements IRecipeAdapter<Dissoluti
     }
 
     private boolean matchesItemInputs(Map<Ingredient, Long> mergedInputs, List<Ingredient> itemInputs) {
-        Map<Ingredient, Long> requirements = new java.util.LinkedHashMap<>();
+        Map<Ingredient, Long> requirements = new LinkedHashMap<>();
         for (Ingredient input : itemInputs) {
             if (input != null && !input.isEmpty()) {
                 AdapterUtils.mergeIngredient(requirements, input, 1L);
@@ -162,7 +164,7 @@ public class DissolutionChamberRecipeAdapter implements IRecipeAdapter<Dissoluti
     private boolean matchesFluidInput(Map<FluidStack, Long> mergedFluids, SizedFluidIngredient inputFluid) {
         if (inputFluid == null) return true;
         if (mergedFluids == null || mergedFluids.isEmpty()) return false;
-        return com.sorrowmist.useless.content.recipe.FluidIngredientAllocator.matches(
+        return FluidIngredientAllocator.matches(
                 List.of(inputFluid), mergedFluids, 1L);
     }
 

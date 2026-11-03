@@ -5,6 +5,7 @@ import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.resources.ResourceLocation;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.List;
@@ -59,7 +60,7 @@ public record RitualBlueprintPentacles(List<ResourceLocation> pentacles) {
         if (size < 0 || size > MAX_PENTACLES) {
             throw new IllegalArgumentException("Invalid ritual blueprint pentacle count: " + size);
         }
-        java.util.ArrayList<ResourceLocation> pentacles = new java.util.ArrayList<>(size);
+        ArrayList<ResourceLocation> pentacles = new ArrayList<>(size);
         for (int i = 0; i < size; i++) {
             pentacles.add(buffer.readResourceLocation());
         }

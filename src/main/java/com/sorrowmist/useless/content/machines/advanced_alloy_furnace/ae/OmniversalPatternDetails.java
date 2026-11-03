@@ -9,7 +9,10 @@ import com.sorrowmist.useless.content.recipe.adapters.enderio.SoulBindingRecipeA
 import com.sorrowmist.useless.core.component.OmniversalPatternData;
 import com.sorrowmist.useless.core.component.UComponents;
 import com.sorrowmist.useless.core.config.ConfigManager;
+import net.minecraft.tags.TagKey;
+import net.minecraft.world.item.Item;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.material.Fluid;
 import net.neoforged.fml.ModList;
 
 import java.util.ArrayList;
@@ -267,46 +270,46 @@ public final class OmniversalPatternDetails extends DynamicComponentPatternDetai
         return recipe;
     }
 
-    private static java.util.Map<Integer, DynamicComponentPatternDetails.InputMatcher>
+    private static Map<Integer, DynamicComponentPatternDetails.InputMatcher>
             dynamicInputMatchers(Decoded decoded) {
         PatternStackView view = PatternStackView.fromPattern(decoded.source);
-        if (view == null) return java.util.Map.of();
+        if (view == null) return Map.of();
         String sourceId = RecipeSourceIds.normalize(decoded.data.sourceId());
         if (RecipeSourceIds.NEOVITAE.equals(sourceId)) {
-            if (!ModList.get().isLoaded("neovitae")) return java.util.Map.of();
+            if (!ModList.get().isLoaded("neovitae")) return Map.of();
             return AdvancedAlloyFurnacePatternResolver.findNeoVitaeDynamicPatternProfile(
                             decoded.level, view)
                     .map(DynamicPatternProfile::inputMatchers)
-                    .orElseGet(java.util.Map::of);
+                    .orElseGet(Map::of);
         }
         if (!ModList.get().isLoaded("enderio")) {
-            return java.util.Map.of();
+            return Map.of();
         }
         return SoulBindingRecipeAdapter.findDynamicPatternProfileLong(
                         decoded.data.sourceId().isBlank() ? "enderio" : decoded.data.sourceId(),
                         decoded.level,
                         view)
                 .map(SoulBindingRecipeAdapter.DynamicPatternProfile::inputMatchers)
-                .orElseGet(java.util.Map::of);
+                .orElseGet(Map::of);
     }
 
-    private static Map<Integer, List<net.minecraft.tags.TagKey<net.minecraft.world.item.Item>>>
+    private static Map<Integer, List<TagKey<Item>>>
             tagInputTags(OmniversalPatternData data) {
         if (data.version() < OmniversalPatternData.TAG_INPUT_VERSION) return Map.of();
-        Map<Integer, List<net.minecraft.tags.TagKey<net.minecraft.world.item.Item>>> result = new LinkedHashMap<>();
+        Map<Integer, List<TagKey<Item>>> result = new LinkedHashMap<>();
         for (OmniversalPatternData.TagInputSlot slot : data.tagInputSlots()) {
-            result.computeIfAbsent(slot.slot(), ignored -> new java.util.ArrayList<>()).add(slot.tag());
+            result.computeIfAbsent(slot.slot(), ignored -> new ArrayList<>()).add(slot.tag());
         }
         return result;
     }
 
-    private static Map<Integer, List<net.minecraft.tags.TagKey<net.minecraft.world.level.material.Fluid>>>
+    private static Map<Integer, List<TagKey<Fluid>>>
             fluidTagInputTags(OmniversalPatternData data) {
         if (data.version() < OmniversalPatternData.FLUID_TAG_INPUT_VERSION) return Map.of();
-        Map<Integer, List<net.minecraft.tags.TagKey<net.minecraft.world.level.material.Fluid>>> result =
+        Map<Integer, List<TagKey<Fluid>>> result =
                 new LinkedHashMap<>();
         for (OmniversalPatternData.FluidTagInputSlot slot : data.fluidTagInputSlots()) {
-            result.computeIfAbsent(slot.slot(), ignored -> new java.util.ArrayList<>()).add(slot.tag());
+            result.computeIfAbsent(slot.slot(), ignored -> new ArrayList<>()).add(slot.tag());
         }
         return result;
     }

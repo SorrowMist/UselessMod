@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalInt;
+import java.util.Set;
 
 /** Converts Flux Crafter recipes while preserving their power rate/time ratio. */
 public class ExtendedCraftingFluxCrafterRecipeAdapter implements IRecipeAdapter<IFluxCrafterRecipe> {
@@ -113,7 +114,7 @@ public class ExtendedCraftingFluxCrafterRecipeAdapter implements IRecipeAdapter<
 
         Optional<List<ItemStack>> remainders = ExtendedCraftingAdapterUtils.deterministicRemainders(
                 ingredients,
-                java.util.Set.of(),
+                Set.of(),
                 stacks -> {
                     int[] dimensions = ExtendedCraftingAdapterUtils.gridDimensions(source, stacks.size());
                     return CraftingInput.of(dimensions[0], dimensions[1], stacks);

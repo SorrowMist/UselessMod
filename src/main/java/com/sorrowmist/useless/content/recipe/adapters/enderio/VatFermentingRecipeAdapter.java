@@ -9,6 +9,7 @@ import com.sorrowmist.useless.content.recipe.AdapterUtils;
 import com.sorrowmist.useless.content.recipe.AdvancedAlloyFurnaceRecipe;
 import com.sorrowmist.useless.content.recipe.CountedIngredient;
 import com.sorrowmist.useless.content.recipe.IRecipeAdapter;
+import net.minecraft.resources.ResourceLocation;
 import net.neoforged.neoforge.fluids.crafting.SizedFluidIngredient;
 import net.neoforged.neoforge.common.crafting.DataComponentIngredient;
 import net.minecraft.tags.TagKey;
@@ -128,17 +129,17 @@ public final class VatFermentingRecipeAdapter implements IRecipeAdapter<Fermenti
     }
 
     private static AdvancedAlloyFurnaceRecipe createRecipe(
-            net.minecraft.resources.ResourceLocation id, FermentingRecipe source,
+            ResourceLocation id, FermentingRecipe source,
             CountedIngredient first, CountedIngredient second, FluidStack inputFluid,
-            FluidStack output, net.minecraft.resources.ResourceLocation recipeId) {
+            FluidStack output, ResourceLocation recipeId) {
         return createRecipe(id, source, first, second,
                 SizedFluidIngredient.of(inputFluid.copy()), output, recipeId);
     }
 
     private static AdvancedAlloyFurnaceRecipe createRecipe(
-            net.minecraft.resources.ResourceLocation id, FermentingRecipe source,
+            ResourceLocation id, FermentingRecipe source,
             CountedIngredient first, CountedIngredient second, SizedFluidIngredient inputFluid,
-            FluidStack output, net.minecraft.resources.ResourceLocation recipeId) {
+            FluidStack output, ResourceLocation recipeId) {
         return new AdvancedAlloyFurnaceRecipe(
                 recipeId, List.of(first, second), List.of(inputFluid), List.of(),
                 List.of(), List.of(output.copy()), List.of(), 0L,
@@ -200,12 +201,12 @@ public final class VatFermentingRecipeAdapter implements IRecipeAdapter<Fermenti
         return DataComponentIngredient.of(true, stack.copyWithCount(1));
     }
 
-    private static net.minecraft.resources.ResourceLocation variantId(
-            net.minecraft.resources.ResourceLocation original, int fluidIndex, int variantIndex) {
+    private static ResourceLocation variantId(
+            ResourceLocation original, int fluidIndex, int variantIndex) {
         if (fluidIndex == 0 && variantIndex == 0) {
             return AdapterUtils.convertedId(original);
         }
-        return net.minecraft.resources.ResourceLocation.fromNamespaceAndPath(
+        return ResourceLocation.fromNamespaceAndPath(
                 original.getNamespace(), original.getPath() + "_fluid_" + fluidIndex
                         + "_multiplier_" + variantIndex + "_converted");
     }

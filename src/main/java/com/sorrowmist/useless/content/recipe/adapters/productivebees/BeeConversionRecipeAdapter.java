@@ -21,6 +21,7 @@ import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -119,7 +120,7 @@ public final class BeeConversionRecipeAdapter implements IRecipeAdapter<BeeConve
 
     private static boolean matchesInputs(
             AdvancedAlloyFurnaceRecipe recipe, Map<Ingredient, Long> mergedInputs) {
-        java.util.LinkedHashMap<Ingredient, Long> required = new java.util.LinkedHashMap<>();
+        LinkedHashMap<Ingredient, Long> required = new LinkedHashMap<>();
         for (CountedIngredient input : recipe.inputs()) {
             AdapterUtils.mergeIngredient(required, input.ingredient(), input.count());
         }

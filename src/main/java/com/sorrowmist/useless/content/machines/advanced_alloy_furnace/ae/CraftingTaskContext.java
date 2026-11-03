@@ -1,5 +1,6 @@
 package com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae;
 
+import appeng.api.stacks.AEFluidKey;
 import appeng.api.stacks.AEKey;
 import appeng.api.crafting.IPatternDetails;
 import appeng.api.stacks.GenericStack;
@@ -17,6 +18,8 @@ import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.chemical.C
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.chemical.FurnaceChemicalStorage;
 import com.sorrowmist.useless.energy.IEnergyManager;
 import appeng.api.networking.IGrid;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.Containers;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.crafting.Ingredient;
 import net.minecraft.world.level.Level;
@@ -51,7 +54,7 @@ public interface CraftingTaskContext {
     
     // 基础访问
     Level getLevel();
-    net.minecraft.core.BlockPos getBlockPos();
+    BlockPos getBlockPos();
     ItemStackHandler getItemHandler();
     IEnergyManager getEnergyManager();
 
@@ -72,7 +75,7 @@ public interface CraftingTaskContext {
     int getCatalystMaxParallel();
     
     // AE网络输出
-    long tryOutputToAE(net.minecraft.world.item.ItemStack stack);
+    long tryOutputToAE(ItemStack stack);
     long tryOutputFluidToAE(FluidStack stack);
     long tryOutputKeyToAE(AEKey key, long amount);
 
@@ -290,13 +293,13 @@ public interface CraftingTaskContext {
     default void handleUnreturnedItem(ItemStack stack) {
         if (stack == null || stack.isEmpty() || getLevel() == null) return;
         var pos = getBlockPos();
-        net.minecraft.world.Containers.dropItemStack(
+        Containers.dropItemStack(
                 getLevel(), pos.getX() + 0.5D, pos.getY() + 1.0D, pos.getZ() + 0.5D, stack);
     }
 
     default void handleUnreturnedFluid(FluidStack stack) {
         if (stack == null || stack.isEmpty()) return;
-        var key = appeng.api.stacks.AEFluidKey.of(stack);
+        var key = AEFluidKey.of(stack);
         if (key != null) stashUnreturnedInput(key, stack.getAmount());
     }
 }

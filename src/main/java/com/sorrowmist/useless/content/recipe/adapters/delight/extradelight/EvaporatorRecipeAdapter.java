@@ -5,6 +5,7 @@ import com.sorrowmist.useless.api.enums.AlloyFurnaceMode;
 import com.sorrowmist.useless.content.recipe.AdapterUtils;
 import com.sorrowmist.useless.content.recipe.AdvancedAlloyFurnaceRecipe;
 import com.sorrowmist.useless.content.recipe.IRecipeAdapter;
+import com.sorrowmist.useless.content.recipe.LongSizedFluidIngredient;
 import com.sorrowmist.useless.content.recipe.RecipeSourceIds;
 import com.sorrowmist.useless.content.recipe.adapters.delight.DelightRecipeAdapterUtils;
 import net.minecraft.resources.ResourceLocation;
@@ -55,7 +56,7 @@ public final class EvaporatorRecipeAdapter implements IRecipeAdapter<EvaporatorR
         int time = ExtraDelightRecipeAdapterUtils.processTime(source.getCookTime());
         return List.of(new AdvancedAlloyFurnaceRecipe(
                 AdapterUtils.convertedId(holder.id()), List.of(),
-                List.of(com.sorrowmist.useless.content.recipe.LongSizedFluidIngredient.from(
+                List.of(LongSizedFluidIngredient.from(
                         source.getFluid())), List.of(), List.of(output.copy()), List.of(), List.of(),
                 ExtraDelightRecipeAdapterUtils.energy(time), time, Ingredient.EMPTY, 0,
                 List.of(AdapterUtils.toMoldIngredient(getMoldItem())), AlloyFurnaceMode.NORMAL));
@@ -75,7 +76,7 @@ public final class EvaporatorRecipeAdapter implements IRecipeAdapter<EvaporatorR
             if (hasFluid(source.getFluid())
                     && source.getResultItem() != null && !source.getResultItem().isEmpty()
                     && DelightRecipeAdapterUtils.matchesFluids(
-                    List.of(com.sorrowmist.useless.content.recipe.LongSizedFluidIngredient.from(
+                    List.of(LongSizedFluidIngredient.from(
                             source.getFluid())), mergedFluids)) {
                 matches.add(holder);
             }

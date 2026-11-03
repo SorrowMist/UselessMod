@@ -17,6 +17,7 @@ import net.minecraft.world.item.crafting.RecipeHolder;
 import net.minecraft.world.level.Level;
 
 import java.math.BigInteger;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -101,7 +102,7 @@ public final class OmniversalPatternRecipeSelector {
         List<ItemStack> encodedInputs = encoded.inputs();
         if (encodedInputs == null || encodedInputs.size() > 9) return false;
 
-        List<ItemStack> grid = new java.util.ArrayList<>(9);
+        List<ItemStack> grid = new ArrayList<>(9);
         for (ItemStack input : encodedInputs) {
             if (input == null) return false;
             grid.add(input.copy());

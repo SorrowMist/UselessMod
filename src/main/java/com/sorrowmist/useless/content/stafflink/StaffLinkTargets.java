@@ -4,7 +4,6 @@ import com.sorrowmist.useless.UselessMod;
 import com.sorrowmist.useless.api.logistics.LongEnergyHandler;
 import com.sorrowmist.useless.api.logistics.LongFluidHandler;
 import com.sorrowmist.useless.api.logistics.LongItemHandler;
-import com.sorrowmist.useless.api.logistics.LongPressureHandler;
 import com.sorrowmist.useless.compat.ae.AeChemicalCompatLoader;
 import com.sorrowmist.useless.compat.ae.AeEnergyCompatLoader;
 import com.sorrowmist.useless.compat.ae.AeGenericInvCompatLoader;
@@ -33,6 +32,8 @@ import net.neoforged.neoforge.capabilities.BlockCapability;
 import net.neoforged.neoforge.capabilities.Capabilities;
 import net.neoforged.neoforge.energy.IEnergyStorage;
 import net.neoforged.neoforge.fluids.FluidStack;
+import net.neoforged.neoforge.fluids.capability.IFluidHandler;
+import net.neoforged.neoforge.items.IItemHandler;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
@@ -173,12 +174,12 @@ public final class StaffLinkTargets {
     }
 
     @Nullable
-    private static LongItemHandler items(@Nullable net.neoforged.neoforge.items.IItemHandler handler) {
+    private static LongItemHandler items(@Nullable IItemHandler handler) {
         return handler == null ? null : LongResourceAdapters.items(handler);
     }
 
     @Nullable
-    private static LongFluidHandler fluids(@Nullable net.neoforged.neoforge.fluids.capability.IFluidHandler handler) {
+    private static LongFluidHandler fluids(@Nullable IFluidHandler handler) {
         return handler == null ? null : LongResourceAdapters.fluids(handler);
     }
 

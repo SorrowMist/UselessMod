@@ -121,7 +121,7 @@ public class EnchantingApparatusRecipeAdapter implements IRecipeAdapter<Enchanti
                 RecipeRegistry.APPARATUS_TYPE.get()
         );
 
-        List<RecipeHolder<EnchantingApparatusRecipe>> matches = new java.util.ArrayList<>();
+        List<RecipeHolder<EnchantingApparatusRecipe>> matches = new ArrayList<>();
         for (RecipeHolder<EnchantingApparatusRecipe> holder : recipes) {
             EnchantingApparatusRecipe recipe = holder.value();
 

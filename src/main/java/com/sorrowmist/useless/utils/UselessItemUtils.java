@@ -357,7 +357,7 @@ public class UselessItemUtils {
 
         // 只按「范围磁力」决定去留，刻意绕过「AE 存储优先」：
         // 刷怪蛋是玩家想立刻拿在手上的东西，不该被吸进 AE 网络。
-        MiningUtils.handleDrops(player, java.util.List.of(spawnEggStack), stack,
+        MiningUtils.handleDrops(player, List.of(spawnEggStack), stack,
                 killedEntity.position(), false);
     }
 

@@ -9,6 +9,7 @@ import com.sorrowmist.useless.content.recipe.ExpectedOutputScaler;
 import com.sorrowmist.useless.content.recipe.IRecipeAdapter;
 import cy.jdkdigital.productivebees.common.recipe.CentrifugeRecipe;
 import cy.jdkdigital.productivebees.init.ModBlocks;
+import cy.jdkdigital.productivebees.init.ModRecipeTypes;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.crafting.Ingredient;
 import net.minecraft.world.item.crafting.RecipeHolder;
@@ -104,7 +105,7 @@ public final class CentrifugeRecipeAdapter implements IRecipeAdapter<CentrifugeR
         RecipeManager recipeManager = level.getRecipeManager();
         List<RecipeHolder<CentrifugeRecipe>> matches = new ArrayList<>();
         for (RecipeHolder<CentrifugeRecipe> holder : recipeManager.getAllRecipesFor(
-                cy.jdkdigital.productivebees.init.ModRecipeTypes.CENTRIFUGE_TYPE.get())) {
+                ModRecipeTypes.CENTRIFUGE_TYPE.get())) {
             CentrifugeRecipe source = holder.value();
             if (source.ingredient == null || source.ingredient.isEmpty()) {
                 continue;

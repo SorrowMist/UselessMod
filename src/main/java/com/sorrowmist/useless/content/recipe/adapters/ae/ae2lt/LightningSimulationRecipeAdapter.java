@@ -118,7 +118,7 @@ public class LightningSimulationRecipeAdapter implements IRecipeAdapter<Lightnin
         }
 
         RecipeManager recipeManager = level.getRecipeManager();
-        List<RecipeHolder<LightningSimulationRecipe>> matches = new java.util.ArrayList<>();
+        List<RecipeHolder<LightningSimulationRecipe>> matches = new ArrayList<>();
         for (RecipeHolder<LightningSimulationRecipe> holder : recipeManager.getAllRecipesFor(ModRecipeTypes.LIGHTNING_SIMULATION_TYPE.get())) {
             LightningSimulationRecipe recipe = holder.value();
             List<LightningSimulationIngredient> recipeInputs = recipe.inputs();

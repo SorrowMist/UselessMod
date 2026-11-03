@@ -376,7 +376,7 @@ public class AdapterUtils {
     /** Expands an aggregated fluid map into non-mutating supplies for the common allocator. */
     public static List<FluidStack> fluidSupplies(@Nullable Map<FluidStack, Long> mergedFluids) {
         if (mergedFluids == null || mergedFluids.isEmpty()) return List.of();
-        List<FluidStack> supplies = new java.util.ArrayList<>(mergedFluids.size());
+        List<FluidStack> supplies = new ArrayList<>(mergedFluids.size());
         for (Map.Entry<FluidStack, Long> entry : mergedFluids.entrySet()) {
             FluidStack stack = entry.getKey();
             long amount = entry.getValue() == null ? 0L : entry.getValue();

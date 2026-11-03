@@ -49,6 +49,9 @@ import java.util.concurrent.CopyOnWriteArrayList;
  * 物品+流体+模具 > 物品+模具 > 流体+模具 > 物品+流体 > 物品 > 流体
  */
 public class AlloyFurnaceRecipeManager {
+    // 本包内的 IRecipeAdapter 是保留给第三方适配器的旧桥接接口，与新 API 接口同名。
+    // 新接口的引用只能写全限定名：同包同名类型优先于 import，简名会解析为旧接口，
+    // 并与下方 deprecated 重载产生签名冲突。
     private static final AlloyFurnaceRecipeManager INSTANCE = new AlloyFurnaceRecipeManager();
 
     /** 按模具物品直接查找 adapter（getMoldItem() != null 的注册到这里） */

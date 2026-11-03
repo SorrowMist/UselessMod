@@ -11,6 +11,7 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.crafting.Ingredient;
 import net.minecraft.world.item.crafting.RecipeHolder;
 import net.minecraft.world.level.Level;
+import net.neoforged.neoforge.fluids.FluidStack;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 
@@ -79,7 +80,7 @@ public final class CreateMechanicalCraftingRecipeAdapter
     @SuppressWarnings("unchecked")
     public List<RecipeHolder<MechanicalCraftingRecipe>> findMatchingRecipes(
             Level level, Map<Ingredient, Long> mergedInputs,
-            Map<net.neoforged.neoforge.fluids.FluidStack, Long> mergedFluids,
+            Map<FluidStack, Long> mergedFluids,
             @Nullable ItemStack mold) {
         if (level == null || !matchesMold(mold)) return List.of();
         List<RecipeHolder<MechanicalCraftingRecipe>> result = new ArrayList<>();

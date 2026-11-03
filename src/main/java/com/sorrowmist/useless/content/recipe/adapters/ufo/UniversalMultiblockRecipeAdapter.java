@@ -1,5 +1,6 @@
 package com.sorrowmist.useless.content.recipe.adapters.ufo;
 
+import appeng.api.stacks.GenericStack;
 import com.raishxn.ufo.block.MultiblockBlocks;
 import com.raishxn.ufo.init.ModRecipes;
 import com.raishxn.ufo.recipe.UniversalMultiblockMachineKind;
@@ -14,6 +15,7 @@ import net.minecraft.world.item.crafting.RecipeHolder;
 import net.minecraft.world.item.crafting.RecipeType;
 import net.minecraft.world.level.Level;
 import net.neoforged.neoforge.fluids.FluidStack;
+import net.neoforged.neoforge.fluids.crafting.SizedFluidIngredient;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
@@ -67,14 +69,14 @@ public final class UniversalMultiblockRecipeAdapter
         List<CountedIngredient> items = UfoRecipeAdapterSupport.itemInputs(
                 source.getItemInputs(), UniversalMultiblockRecipe.ItemRequirement::ingredient,
                 UniversalMultiblockRecipe.ItemRequirement::amount);
-        List<net.neoforged.neoforge.fluids.crafting.SizedFluidIngredient> fluids =
+        List<SizedFluidIngredient> fluids =
                 UfoRecipeAdapterSupport.concreteFluidInputs(
                         source.getFluidInputs(), UniversalMultiblockRecipe.FluidRequirement::fluid,
                         UniversalMultiblockRecipe.FluidRequirement::amount);
         if (fluids == null) {
             return List.of();
         }
-        List<appeng.api.stacks.GenericStack> chemicals = UfoRecipeAdapterSupport.chemicalInputs(
+        List<GenericStack> chemicals = UfoRecipeAdapterSupport.chemicalInputs(
                 source.getChemicalInputs(), UniversalMultiblockRecipe.ChemicalRequirement::chemicalId,
                 UniversalMultiblockRecipe.ChemicalRequirement::amount);
         if (chemicals == null) {
@@ -83,7 +85,7 @@ public final class UniversalMultiblockRecipeAdapter
 
         List<ItemStack> outputs = new ArrayList<>();
         List<FluidStack> outputFluids = new ArrayList<>();
-        List<appeng.api.stacks.GenericStack> keyOutputs = new ArrayList<>();
+        List<GenericStack> keyOutputs = new ArrayList<>();
         UfoRecipeAdapterSupport.addItemOutput(outputs, keyOutputs, source.getItemOutput(),
                 source.getItemOutputAmount());
         UfoRecipeAdapterSupport.addFluidOutput(outputFluids, keyOutputs, source.getFluidOutput(),

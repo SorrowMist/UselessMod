@@ -3,6 +3,7 @@ package com.sorrowmist.useless.content.recipe.adapters.mekanism;
 import appeng.api.stacks.GenericStack;
 import com.sorrowmist.useless.content.recipe.AdapterUtils;
 import com.sorrowmist.useless.content.recipe.AdvancedAlloyFurnaceRecipe;
+import mekanism.api.chemical.ChemicalStack;
 import mekanism.api.recipes.ingredients.ChemicalStackIngredient;
 import mekanism.api.recipes.ingredients.creator.IngredientCreatorAccess;
 import mekanism.common.Mekanism;
@@ -52,7 +53,7 @@ public final class SpsRecipeAdapter extends MekanismSyntheticRecipeAdapter {
         return result;
     }
 
-    private static String id(mekanism.api.chemical.ChemicalStack stack) {
+    private static String id(ChemicalStack stack) {
         var id = stack.getChemicalHolder().getKey().location();
         return id.getNamespace() + "_" + id.getPath().replace('/', '_');
     }

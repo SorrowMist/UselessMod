@@ -93,7 +93,7 @@ public class CircuitCutterRecipeAdapter implements IRecipeAdapter<CircuitCutterR
         RecipeManager recipeManager = level.getRecipeManager();
         List<RecipeHolder<CircuitCutterRecipe>> recipes = recipeManager.getAllRecipesFor(CircuitCutterRecipe.TYPE);
 
-        List<RecipeHolder<CircuitCutterRecipe>> matches = new java.util.ArrayList<>();
+        List<RecipeHolder<CircuitCutterRecipe>> matches = new ArrayList<>();
         for (RecipeHolder<CircuitCutterRecipe> holder : recipes) {
             CircuitCutterRecipe recipe = holder.value();
             IngredientStack.Item inputStack = recipe.getInput();

@@ -3,6 +3,7 @@ package com.sorrowmist.useless.content.recipe;
 import appeng.api.stacks.AEFluidKey;
 import appeng.api.stacks.GenericStack;
 import net.neoforged.neoforge.fluids.FluidStack;
+import net.neoforged.neoforge.fluids.crafting.FluidIngredient;
 import net.neoforged.neoforge.fluids.crafting.SizedFluidIngredient;
 import net.neoforged.neoforge.fluids.capability.templates.FluidTank;
 import org.jetbrains.annotations.Nullable;
@@ -327,7 +328,7 @@ public final class FluidIngredientAllocator {
         for (int i = 0; i < supplies.size(); i++) {
             Supply supply = supplies.get(i);
             for (int j = 0; j < demands.size(); j++) {
-                net.neoforged.neoforge.fluids.crafting.FluidIngredient ingredient = demands.get(j).ingredient();
+                FluidIngredient ingredient = demands.get(j).ingredient();
                 if (ingredient != null && !ingredient.isEmpty() && ingredient.test(supply.stack())) {
                     network.addEdge(supplyStart + i, demandStart + j, totalDemand);
                 }
@@ -400,7 +401,7 @@ public final class FluidIngredientAllocator {
     private record Supply(int originalIndex, long amount, FluidStack stack) {
     }
 
-    private record Demand(net.neoforged.neoforge.fluids.crafting.FluidIngredient ingredient, long amount) {
+    private record Demand(FluidIngredient ingredient, long amount) {
     }
 
     private static final class FlowNetwork {

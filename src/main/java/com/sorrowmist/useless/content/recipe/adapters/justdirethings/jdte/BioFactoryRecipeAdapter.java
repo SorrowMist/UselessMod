@@ -29,6 +29,7 @@ import net.neoforged.neoforge.fluids.crafting.FluidIngredient;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -246,7 +247,7 @@ public final class BioFactoryRecipeAdapter implements IRecipeAdapter<BioFactoryR
     }
 
     private static Map<Ingredient, Long> requiredInputs(AdvancedAlloyFurnaceRecipe recipe) {
-        java.util.LinkedHashMap<Ingredient, Long> required = new java.util.LinkedHashMap<>();
+        LinkedHashMap<Ingredient, Long> required = new LinkedHashMap<>();
         for (CountedIngredient input : recipe.inputs()) {
             if (input != null && input.ingredient() != null && input.count() > 0) {
                 AdapterUtils.mergeIngredient(required, input.ingredient(), input.count());

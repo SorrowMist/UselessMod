@@ -42,9 +42,11 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.SoundType;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.state.BlockBehaviour;
+import net.minecraft.world.level.block.state.BlockState;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent;
 import net.neoforged.neoforge.capabilities.Capabilities;
@@ -299,8 +301,8 @@ public final class NeoEcoCompactRegistry {
     }
 
     /** 影子组件用的方块状态：紧凑方块自己的默认状态（影子组件从不写入世界，状态只用于占位）。 */
-    public static net.minecraft.world.level.block.state.BlockState placeholderState(
-            DeferredBlock<? extends net.minecraft.world.level.block.Block> block) {
+    public static BlockState placeholderState(
+            DeferredBlock<? extends Block> block) {
         return block.get().defaultBlockState();
     }
 

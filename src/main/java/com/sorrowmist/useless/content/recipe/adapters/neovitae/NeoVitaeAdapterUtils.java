@@ -4,13 +4,13 @@ import com.sorrowmist.useless.api.enums.AlloyFurnaceMode;
 import com.sorrowmist.useless.content.recipe.AdapterUtils;
 import com.sorrowmist.useless.content.recipe.AdvancedAlloyFurnaceRecipe;
 import com.sorrowmist.useless.content.recipe.CountedIngredient;
+import com.sorrowmist.useless.content.recipe.FluidIngredientAllocator;
 import com.sorrowmist.useless.content.recipe.ItemIngredientAllocator;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.crafting.Ingredient;
-import net.minecraft.world.level.material.Fluid;
 import net.neoforged.neoforge.fluids.FluidStack;
-import net.neoforged.neoforge.fluids.crafting.FluidIngredient;
 import net.neoforged.neoforge.fluids.crafting.SizedFluidIngredient;
 import net.neoforged.neoforge.common.crafting.DataComponentIngredient;
 import org.jetbrains.annotations.Nullable;
@@ -104,7 +104,7 @@ final class NeoVitaeAdapterUtils {
     static boolean matchesFluids(@Nullable Map<FluidStack, Long> available,
                                  @Nullable SizedFluidIngredient requirement) {
         if (requirement == null) return true;
-        return com.sorrowmist.useless.content.recipe.FluidIngredientAllocator.matches(
+        return FluidIngredientAllocator.matches(
                 List.of(requirement), available, 1L);
     }
 
@@ -170,7 +170,7 @@ final class NeoVitaeAdapterUtils {
         if (stacks != null) {
             for (ItemStack stack : stacks) {
                 if (stack == null || stack.isEmpty()) continue;
-                ResourceLocation itemId = net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(stack.getItem());
+                ResourceLocation itemId = BuiltInRegistries.ITEM.getKey(stack.getItem());
                 suffix.append('_').append(itemId.getNamespace()).append('_')
                         .append(itemId.getPath().replace('/', '_'));
             }

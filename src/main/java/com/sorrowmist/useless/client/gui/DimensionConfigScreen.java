@@ -16,6 +16,8 @@ import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.level.block.state.BlockState;
 import net.neoforged.neoforge.network.PacketDistributor;
 import org.lwjgl.glfw.GLFW;
+import java.nio.charset.StandardCharsets;
+import java.util.function.IntConsumer;
 
 public final class DimensionConfigScreen extends AbstractContainerScreen<DimensionConfigMenu> {
     private static final int PANEL_WIDTH = 420;
@@ -246,7 +248,7 @@ public final class DimensionConfigScreen extends AbstractContainerScreen<Dimensi
     }
 
     private EditBox createNumberField(int x, int y, int width, Component message,
-                                      int initialValue, java.util.function.IntConsumer setter,
+                                      int initialValue, IntConsumer setter,
                                       boolean signed) {
         EditBox field = new EditBox(font, leftPos + x, topPos + y, width, 14, message);
         field.setMaxLength(4);
@@ -340,7 +342,7 @@ public final class DimensionConfigScreen extends AbstractContainerScreen<Dimensi
             return;
         }
         String text = config.toPresetJson();
-        if (text.getBytes(java.nio.charset.StandardCharsets.UTF_8).length
+        if (text.getBytes(StandardCharsets.UTF_8).length
                 > DimensionGenerationConfig.MAX_PRESET_BYTES) {
             setStatus("gui.useless_mod.dimension_config.error.limit");
             return;

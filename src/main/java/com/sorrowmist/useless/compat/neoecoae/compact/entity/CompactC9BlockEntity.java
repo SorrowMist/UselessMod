@@ -32,6 +32,7 @@ import net.minecraft.core.HolderLookup;
 import net.minecraft.core.RegistryAccess;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
+import net.minecraft.nbt.Tag;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
@@ -414,9 +415,9 @@ public class CompactC9BlockEntity extends ECOComputationSystemBlockEntity
     @Override
     public void loadTag(CompoundTag data, HolderLookup.Provider registries) {
         super.loadTag(data, registries);
-        if (data.contains(SHADOW_THREADING_CORE_KEY, net.minecraft.nbt.Tag.TAG_LIST)) {
+        if (data.contains(SHADOW_THREADING_CORE_KEY, Tag.TAG_LIST)) {
             pendingThreadingCoreData = data.getList(SHADOW_THREADING_CORE_KEY,
-                    net.minecraft.nbt.Tag.TAG_COMPOUND).copy();
+                    Tag.TAG_COMPOUND).copy();
         }
         compactInterface.load(registries, data);
     }

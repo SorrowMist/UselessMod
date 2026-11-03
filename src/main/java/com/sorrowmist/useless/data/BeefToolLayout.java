@@ -496,7 +496,7 @@ public final class BeefToolLayout {
     private static List<String> readStringList(ListTag list) throws LayoutException {
         List<String> values = new ArrayList<>();
         for (int i = 0; i < list.size(); i++) {
-            if (!(list.get(i) instanceof net.minecraft.nbt.StringTag)) {
+            if (!(list.get(i) instanceof StringTag)) {
                 throw new LayoutException(Error.INVALID_STRUCTURE);
             }
             values.add(list.getString(i));

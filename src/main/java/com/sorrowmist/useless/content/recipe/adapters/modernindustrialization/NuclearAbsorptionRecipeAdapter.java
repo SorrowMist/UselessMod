@@ -1,5 +1,6 @@
 package com.sorrowmist.useless.content.recipe.adapters.modernindustrialization;
 
+import appeng.api.stacks.AEKey;
 import aztech.modern_industrialization.nuclear.FluidNuclearComponent;
 import aztech.modern_industrialization.nuclear.NuclearAbsorbable;
 import aztech.modern_industrialization.thirdparty.fabrictransfer.api.fluid.FluidVariant;
@@ -129,7 +130,7 @@ public final class NuclearAbsorptionRecipeAdapter
     public List<RecipeHolder<NuclearAbsorptionSyntheticRecipe>> findMatchingRecipes(
             Level level, Map<Ingredient, Long> mergedInputs,
             Map<FluidStack, Long> mergedFluids,
-            Map<appeng.api.stacks.AEKey, Long> mergedKeys,
+            Map<AEKey, Long> mergedKeys,
             @Nullable ItemStack mold, List<ItemStack> actualInputs) {
         if (level == null || !matchesMold(mold)) return List.of();
 

@@ -11,6 +11,7 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.crafting.Ingredient;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.material.Fluids;
 import net.neoforged.neoforge.fluids.FluidStack;
 import net.neoforged.neoforge.fluids.crafting.FluidIngredient;
 
@@ -43,7 +44,7 @@ public final class TeapotRecipeAdapter extends AbstractCookeryRecipeAdapter<Teap
         }
 
         var fluid = BuiltInRegistries.FLUID.getOptional(source.teaFluid()).orElse(null);
-        if (fluid == null || fluid == net.minecraft.world.level.material.Fluids.EMPTY) {
+        if (fluid == null || fluid == Fluids.EMPTY) {
             return null;
         }
 

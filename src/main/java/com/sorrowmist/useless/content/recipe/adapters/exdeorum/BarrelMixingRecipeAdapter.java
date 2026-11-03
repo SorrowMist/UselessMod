@@ -1,5 +1,6 @@
 package com.sorrowmist.useless.content.recipe.adapters.exdeorum;
 
+import appeng.api.stacks.AEKey;
 import com.sorrowmist.useless.api.enums.AlloyFurnaceMode;
 import com.sorrowmist.useless.content.recipe.AdapterUtils;
 import com.sorrowmist.useless.content.recipe.AdvancedAlloyFurnaceRecipe;
@@ -57,7 +58,7 @@ public final class BarrelMixingRecipeAdapter implements IRecipeAdapter<BarrelMix
     @Override
     public List<RecipeHolder<BarrelMixingRecipe>> findMatchingRecipes(
             Level level, Map<Ingredient, Long> mergedInputs, Map<FluidStack, Long> mergedFluids,
-            Map<appeng.api.stacks.AEKey, Long> mergedKeys, @Nullable ItemStack mold) {
+            Map<AEKey, Long> mergedKeys, @Nullable ItemStack mold) {
         if (level == null || !matchesMold(mold) || mergedInputs == null || mergedInputs.isEmpty()) {
             return List.of();
         }

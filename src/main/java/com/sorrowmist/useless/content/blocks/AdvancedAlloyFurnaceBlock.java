@@ -16,7 +16,6 @@ import com.sorrowmist.useless.core.component.ExternalInventoryKind;
 import com.sorrowmist.useless.core.component.ExternalInventoryReference;
 import com.sorrowmist.useless.core.component.UComponents;
 import com.sorrowmist.useless.core.constants.NBTConstants;
-import com.sorrowmist.useless.init.ModMenuType;
 import com.sorrowmist.useless.world.inventory.ExternalInventoryStore;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -27,6 +26,7 @@ import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.ItemInteractionResult;
 import net.minecraft.world.MenuProvider;
+import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.context.BlockPlaceContext;
@@ -404,7 +404,7 @@ public class AdvancedAlloyFurnaceBlock extends Block implements EntityBlock {
      */
     @Override
     public void setPlacedBy(@NotNull Level level, @NotNull BlockPos pos, @NotNull BlockState state, 
-                            @Nullable net.minecraft.world.entity.LivingEntity placer, @NotNull ItemStack stack) {
+                            @Nullable LivingEntity placer, @NotNull ItemStack stack) {
         super.setPlacedBy(level, pos, state, placer, stack);
         
         if (level.isClientSide) return;

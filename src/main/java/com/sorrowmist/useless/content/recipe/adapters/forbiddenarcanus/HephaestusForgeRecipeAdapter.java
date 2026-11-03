@@ -17,11 +17,13 @@ import com.stal111.forbidden_arcanus.core.init.ModBlocks;
 import com.stal111.forbidden_arcanus.core.registry.FARegistries;
 import net.minecraft.core.Holder;
 import net.minecraft.core.Registry;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.crafting.Ingredient;
 import net.minecraft.world.item.crafting.RecipeHolder;
 import net.minecraft.world.level.Level;
+import net.neoforged.neoforge.fluids.FluidStack;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 
@@ -77,7 +79,7 @@ public final class HephaestusForgeRecipeAdapter implements IRecipeAdapter<Forbid
 
     @Override
     public List<RecipeHolder<ForbiddenArcanusSyntheticRecipe>> findMatchingRecipes(
-            Level level, Map<Ingredient, Long> mergedInputs, Map<net.neoforged.neoforge.fluids.FluidStack, Long> mergedFluids,
+            Level level, Map<Ingredient, Long> mergedInputs, Map<FluidStack, Long> mergedFluids,
             @Nullable ItemStack mold) {
         if (level == null || !matchesMold(mold) || mergedInputs == null || mergedInputs.isEmpty()) {
             return List.of();
@@ -226,7 +228,7 @@ public final class HephaestusForgeRecipeAdapter implements IRecipeAdapter<Forbid
     }
 
     private static ResourceLocation variantId(ResourceLocation sourceId, ItemStack main, int index) {
-        ResourceLocation itemId = net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(main.getItem());
+        ResourceLocation itemId = BuiltInRegistries.ITEM.getKey(main.getItem());
         String itemSuffix = itemId == null ? "unknown" : itemId.getNamespace() + "_" + itemId.getPath();
         return ResourceLocation.fromNamespaceAndPath(
                 sourceId.getNamespace(),

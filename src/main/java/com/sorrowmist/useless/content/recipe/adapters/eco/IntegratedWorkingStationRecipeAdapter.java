@@ -7,6 +7,7 @@ import com.sorrowmist.useless.api.enums.AlloyFurnaceMode;
 import com.sorrowmist.useless.content.recipe.AdapterUtils;
 import com.sorrowmist.useless.content.recipe.AdvancedAlloyFurnaceRecipe;
 import com.sorrowmist.useless.content.recipe.CountedIngredient;
+import com.sorrowmist.useless.content.recipe.FluidIngredientAllocator;
 import com.sorrowmist.useless.content.recipe.IRecipeAdapter;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceLocation;
@@ -167,7 +168,7 @@ public final class IntegratedWorkingStationRecipeAdapter
         if (required.isEmpty()) {
             return true;
         }
-        return com.sorrowmist.useless.content.recipe.FluidIngredientAllocator.matches(
+        return FluidIngredientAllocator.matches(
                 required, mergedFluids, 1L);
     }
 

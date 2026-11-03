@@ -1,5 +1,6 @@
 package com.sorrowmist.useless.content.recipe.adapters.ufo;
 
+import appeng.api.stacks.GenericStack;
 import com.raishxn.ufo.init.ModRecipes;
 import com.raishxn.ufo.recipe.QMFRecipe;
 import com.sorrowmist.useless.api.enums.AlloyFurnaceMode;
@@ -13,6 +14,7 @@ import net.minecraft.world.item.crafting.RecipeHolder;
 import net.minecraft.world.item.crafting.RecipeType;
 import net.minecraft.world.level.Level;
 import net.neoforged.neoforge.fluids.FluidStack;
+import net.neoforged.neoforge.fluids.crafting.SizedFluidIngredient;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
@@ -50,14 +52,14 @@ public final class QMFRecipeAdapter extends UfoRecipeAdapter<QMFRecipe> {
         List<CountedIngredient> items = UfoRecipeAdapterSupport.itemInputs(
                 source.getItemInputs(), QMFRecipe.QMFRecipeIngredient::ingredient,
                 QMFRecipe.QMFRecipeIngredient::amount);
-        List<net.neoforged.neoforge.fluids.crafting.SizedFluidIngredient> fluids =
+        List<SizedFluidIngredient> fluids =
                 UfoRecipeAdapterSupport.concreteFluidInputs(
                         source.getFluidInputs(), QMFRecipe.QMFFluidIngredient::fluid,
                         QMFRecipe.QMFFluidIngredient::amount);
         if (fluids == null) {
             return List.of();
         }
-        List<appeng.api.stacks.GenericStack> chemicals = UfoRecipeAdapterSupport.chemicalInputs(
+        List<GenericStack> chemicals = UfoRecipeAdapterSupport.chemicalInputs(
                 source.getChemicalInputs(), QMFRecipe.QMFChemicalIngredient::chemicalId,
                 QMFRecipe.QMFChemicalIngredient::amount);
         if (chemicals == null) {
@@ -66,7 +68,7 @@ public final class QMFRecipeAdapter extends UfoRecipeAdapter<QMFRecipe> {
 
         List<ItemStack> outputs = new ArrayList<>();
         List<FluidStack> outputFluids = new ArrayList<>();
-        List<appeng.api.stacks.GenericStack> keyOutputs = new ArrayList<>();
+        List<GenericStack> keyOutputs = new ArrayList<>();
         ItemStack output = source.getResultItem();
         UfoRecipeAdapterSupport.addItemOutput(outputs, keyOutputs, output,
                 output == null ? 0L : output.getCount());

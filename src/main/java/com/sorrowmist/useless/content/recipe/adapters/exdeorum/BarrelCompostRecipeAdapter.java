@@ -1,5 +1,6 @@
 package com.sorrowmist.useless.content.recipe.adapters.exdeorum;
 
+import appeng.api.stacks.AEKey;
 import com.sorrowmist.useless.api.enums.AlloyFurnaceMode;
 import com.sorrowmist.useless.content.recipe.AdapterUtils;
 import com.sorrowmist.useless.content.recipe.AdvancedAlloyFurnaceRecipe;
@@ -11,10 +12,13 @@ import net.minecraft.world.item.Items;
 import net.minecraft.world.item.crafting.Ingredient;
 import net.minecraft.world.item.crafting.RecipeHolder;
 import net.minecraft.world.level.Level;
+import net.neoforged.neoforge.fluids.FluidStack;
 import org.jetbrains.annotations.Nullable;
 import thedarkcolour.exdeorum.recipe.barrel.BarrelCompostRecipe;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 /**
  * 把 Ex Deorum 桶的堆肥配方转换为合金炉配方。
@@ -52,14 +56,14 @@ public final class BarrelCompostRecipeAdapter implements IRecipeAdapter<BarrelCo
 
     @Override
     public List<RecipeHolder<BarrelCompostRecipe>> findMatchingRecipes(
-            Level level, java.util.Map<Ingredient, Long> mergedInputs,
-            java.util.Map<net.neoforged.neoforge.fluids.FluidStack, Long> mergedFluids,
-            java.util.Map<appeng.api.stacks.AEKey, Long> mergedKeys, @Nullable ItemStack mold) {
+            Level level, Map<Ingredient, Long> mergedInputs,
+            Map<FluidStack, Long> mergedFluids,
+            Map<AEKey, Long> mergedKeys, @Nullable ItemStack mold) {
         if (level == null || !matchesMold(mold) || mergedInputs == null || mergedInputs.isEmpty()) {
             return List.of();
         }
 
-        List<RecipeHolder<BarrelCompostRecipe>> matches = new java.util.ArrayList<>();
+        List<RecipeHolder<BarrelCompostRecipe>> matches = new ArrayList<>();
         for (RecipeHolder<BarrelCompostRecipe> holder : ExDeorumRecipeAdapterUtils.allOf(
                 level.getRecipeManager(), BarrelCompostRecipe.class)) {
             BarrelCompostRecipe recipe = holder.value();

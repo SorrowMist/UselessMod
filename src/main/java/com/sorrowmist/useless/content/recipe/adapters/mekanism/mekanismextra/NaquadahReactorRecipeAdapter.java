@@ -21,6 +21,7 @@ import net.minecraft.world.item.crafting.RecipeHolder;
 import net.minecraft.world.level.Level;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /** Optional Mekanism Extras naquadah reactor recipe-viewer adapter. */
@@ -36,7 +37,7 @@ public final class NaquadahReactorRecipeAdapter extends MekanismSyntheticRecipeA
 
     @Override
     protected List<RecipeHolder<MekanismSyntheticRecipe>> createGeneratedRecipes(Level level) {
-        List<RecipeHolder<MekanismSyntheticRecipe>> result = new java.util.ArrayList<>(3);
+        List<RecipeHolder<MekanismSyntheticRecipe>> result = new ArrayList<>(3);
 
         long energyPerFuel = GeneratorsExtraConfig.extraGenerators.energyPerReactorFuel.get();
         long waterPerFuel = Math.round(energyPerFuel * HeatUtils.getSteamEnergyEfficiency()
@@ -71,7 +72,7 @@ public final class NaquadahReactorRecipeAdapter extends MekanismSyntheticRecipeA
     private void addFuelRecipe(List<RecipeHolder<MekanismSyntheticRecipe>> result,
                                List<?> waterInputs, List<ChemicalStack> fuels,
                                long steamAmount, String suffix) {
-        List<GenericStack> fuelKeys = new java.util.ArrayList<>(fuels.size());
+        List<GenericStack> fuelKeys = new ArrayList<>(fuels.size());
         for (ChemicalStack fuel : fuels) {
             GenericStack fuelKey = MekanismChemicalRecipeSupport.key(fuel);
             if (fuelKey == null) {

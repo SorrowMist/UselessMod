@@ -1,5 +1,6 @@
 package com.sorrowmist.useless.content.recipe.adapters.industrialforegoing;
 
+import appeng.api.stacks.AEKey;
 import com.buuz135.industrial.block.generator.tile.BioReactorTile;
 import com.buuz135.industrial.config.machine.generator.BioReactorConfig;
 import com.buuz135.industrial.module.ModuleCore;
@@ -25,6 +26,7 @@ import net.neoforged.neoforge.fluids.crafting.FluidIngredient;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -87,7 +89,7 @@ public final class BioReactorRecipeAdapter
     public List<RecipeHolder<IndustrialForegoingSyntheticRecipe>> findMatchingRecipes(
             Level level, Map<Ingredient, Long> mergedInputs,
             Map<FluidStack, Long> mergedFluids,
-            Map<appeng.api.stacks.AEKey, Long> mergedKeys,
+            Map<AEKey, Long> mergedKeys,
             @Nullable ItemStack mold, List<ItemStack> actualInputs) {
         if (level == null || !matchesMold(mold)) return List.of();
 
@@ -105,7 +107,7 @@ public final class BioReactorRecipeAdapter
                                          Map<Ingredient, Long> mergedInputs,
                                          Map<FluidStack, Long> mergedFluids) {
         if (recipe == null || recipe.inputs().isEmpty()) return false;
-        Map<Ingredient, Long> requiredInputs = new java.util.LinkedHashMap<>();
+        Map<Ingredient, Long> requiredInputs = new LinkedHashMap<>();
         for (CountedIngredient input : recipe.inputs()) {
             AdapterUtils.mergeIngredient(requiredInputs, input.ingredient(), input.count());
         }

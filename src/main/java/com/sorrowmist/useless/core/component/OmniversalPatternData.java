@@ -14,6 +14,7 @@ import net.minecraft.tags.TagKey;
 import net.minecraft.world.level.material.Fluid;
 import net.minecraft.world.item.Item;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
@@ -275,7 +276,7 @@ public record OmniversalPatternData(
         if (size < 0 || size > 256) {
             throw new DecoderException("Omniversal pattern mold list exceeds 256 entries");
         }
-        java.util.ArrayList<AEItemKey> result = new java.util.ArrayList<>(size);
+        ArrayList<AEItemKey> result = new ArrayList<>(size);
         for (int i = 0; i < size; i++) result.add(AEItemKey.fromPacket(buffer));
         return List.copyOf(result);
     }
@@ -290,7 +291,7 @@ public record OmniversalPatternData(
         if (size < 0 || size > 256) {
             throw new DecoderException("Omniversal pattern tag input list exceeds 256 entries");
         }
-        java.util.ArrayList<TagInputSlot> result = new java.util.ArrayList<>(size);
+        ArrayList<TagInputSlot> result = new ArrayList<>(size);
         for (int i = 0; i < size; i++) result.add(TagInputSlot.STREAM_CODEC.decode(buffer));
         return List.copyOf(result);
     }
@@ -305,7 +306,7 @@ public record OmniversalPatternData(
         if (size < 0 || size > 256) {
             throw new DecoderException("Omniversal pattern fluid tag input list exceeds 256 entries");
         }
-        java.util.ArrayList<FluidTagInputSlot> result = new java.util.ArrayList<>(size);
+        ArrayList<FluidTagInputSlot> result = new ArrayList<>(size);
         for (int i = 0; i < size; i++) result.add(FluidTagInputSlot.STREAM_CODEC.decode(buffer));
         return List.copyOf(result);
     }
@@ -320,7 +321,7 @@ public record OmniversalPatternData(
         if (size < 0 || size > 256) {
             throw new DecoderException("Omniversal pattern mold tag list exceeds 256 entries");
         }
-        java.util.ArrayList<MoldTagInputSlot> result = new java.util.ArrayList<>(size);
+        ArrayList<MoldTagInputSlot> result = new ArrayList<>(size);
         for (int i = 0; i < size; i++) result.add(MoldTagInputSlot.STREAM_CODEC.decode(buffer));
         return List.copyOf(result);
     }
@@ -335,7 +336,7 @@ public record OmniversalPatternData(
         if (size < 0 || size > 256) {
             throw new DecoderException("Omniversal pattern slot list exceeds 256 entries");
         }
-        java.util.ArrayList<Integer> result = new java.util.ArrayList<>(size);
+        ArrayList<Integer> result = new ArrayList<>(size);
         for (int i = 0; i < size; i++) result.add(buffer.readVarInt());
         return List.copyOf(result);
     }

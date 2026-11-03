@@ -25,6 +25,7 @@ import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -188,7 +189,7 @@ public class ExtendedCraftingCompressorRecipeAdapter implements IRecipeAdapter<I
         if (candidates.length == 0) {
             return null;
         }
-        Ingredient[] componentCandidates = java.util.Arrays.stream(candidates)
+        Ingredient[] componentCandidates = Arrays.stream(candidates)
                 .map(stack -> stack.isComponentsPatchEmpty()
                         ? Ingredient.of(stack.getItem())
                         : DataComponentIngredient.of(true, stack))

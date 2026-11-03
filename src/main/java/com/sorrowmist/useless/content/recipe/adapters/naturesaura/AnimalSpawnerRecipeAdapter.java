@@ -8,6 +8,7 @@ import com.sorrowmist.useless.content.recipe.CountedIngredient;
 import com.sorrowmist.useless.content.recipe.IRecipeAdapter;
 import de.ellpeck.naturesaura.Helper;
 import de.ellpeck.naturesaura.recipes.AnimalSpawnerRecipe;
+import de.ellpeck.naturesaura.recipes.ModRecipes;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.SpawnEggItem;
 import net.minecraft.world.item.crafting.Ingredient;
@@ -60,7 +61,7 @@ public final class AnimalSpawnerRecipeAdapter implements IRecipeAdapter<AnimalSp
         RecipeManager recipeManager = level.getRecipeManager();
         List<RecipeHolder<AnimalSpawnerRecipe>> matches = new ArrayList<>();
         for (RecipeHolder<AnimalSpawnerRecipe> holder : recipeManager.getAllRecipesFor(
-                de.ellpeck.naturesaura.recipes.ModRecipes.ANIMAL_SPAWNER_TYPE)) {
+                ModRecipes.ANIMAL_SPAWNER_TYPE)) {
             Converted converted = convertData(holder.value());
             if (converted != null && AdapterUtils.matchesRequired(mergedInputs, converted.requirements())) {
                 matches.add(holder);

@@ -5,6 +5,7 @@ import com.sorrowmist.useless.content.recipe.AdapterUtils;
 import com.sorrowmist.useless.content.recipe.AdvancedAlloyFurnaceRecipe;
 import com.sorrowmist.useless.content.recipe.CountedIngredient;
 import com.sorrowmist.useless.content.recipe.IRecipeAdapter;
+import com.sorrowmist.useless.content.recipe.ItemIngredientAllocator;
 import com.sorrowmist.useless.content.recipe.RecipeSourceIds;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.crafting.Ingredient;
@@ -96,7 +97,7 @@ public final class DeepFryingRecipeAdapter implements IRecipeAdapter<DeepFryingR
             if (ingredient != null && !ingredient.isEmpty()) {
                 Map<Ingredient, Long> requirements = new LinkedHashMap<>();
                 AdapterUtils.mergeIngredient(requirements, ingredient, 1L);
-                if (com.sorrowmist.useless.content.recipe.ItemIngredientAllocator
+                if (ItemIngredientAllocator
                         .matches(mergedInputs, requirements)) {
                     matches.add(holder);
                 }

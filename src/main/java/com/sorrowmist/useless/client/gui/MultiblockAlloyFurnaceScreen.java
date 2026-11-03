@@ -7,6 +7,7 @@ import com.sorrowmist.useless.content.blocks.multiblock.UselessCoilBlock;
 import com.sorrowmist.useless.content.menus.MultiblockAlloyFurnaceMenu;
 import com.sorrowmist.useless.init.ModBlocks;
 import com.sorrowmist.useless.network.AECancelPacket;
+import com.sorrowmist.useless.network.AETaskProgressPacket;
 import com.sorrowmist.useless.network.AETaskProgressRequestPacket;
 import com.sorrowmist.useless.network.MultiblockAlloyFurnaceEnergyLimitPacket;
 import com.sorrowmist.useless.network.RedstoneControlPacket;
@@ -363,7 +364,7 @@ public final class MultiblockAlloyFurnaceScreen extends AbstractContainerScreen<
     }
 
     private void renderTaskList(GuiGraphics graphics) {
-        List<List<com.sorrowmist.useless.network.AETaskProgressPacket.TaskProgressData>> pages = taskPages();
+        List<List<AETaskProgressPacket.TaskProgressData>> pages = taskPages();
         taskPage = Math.clamp(taskPage, 0, pages.size() - 1);
         List<String> lines = new ArrayList<>();
         for (var task : pages.get(taskPage)) {
@@ -393,7 +394,7 @@ public final class MultiblockAlloyFurnaceScreen extends AbstractContainerScreen<
     }
 
     private List<String> taskLines(
-            com.sorrowmist.useless.network.AETaskProgressPacket.TaskProgressData task) {
+            AETaskProgressPacket.TaskProgressData task) {
         String status = task.progress > 0 && task.maxProgress > 0
                 ? task.progress + "/" + task.maxProgress
                 : Component.translatable(task.statusKey).getString();
@@ -413,14 +414,14 @@ public final class MultiblockAlloyFurnaceScreen extends AbstractContainerScreen<
         return List.of(fitTaskLine(product), fitTaskLine(status), fitTaskLine(detail));
     }
 
-    private List<List<com.sorrowmist.useless.network.AETaskProgressPacket.TaskProgressData>> taskPages() {
+    private List<List<AETaskProgressPacket.TaskProgressData>> taskPages() {
         var tasks = new ArrayList<>(menu.getTaskProgress());
         tasks.sort(Comparator
-                .comparing((com.sorrowmist.useless.network.AETaskProgressPacket.TaskProgressData task)
+                .comparing((AETaskProgressPacket.TaskProgressData task)
                         -> task.productName)
                 .thenComparingInt(task -> task.progress));
-        List<List<com.sorrowmist.useless.network.AETaskProgressPacket.TaskProgressData>> pages = new ArrayList<>();
-        List<com.sorrowmist.useless.network.AETaskProgressPacket.TaskProgressData> page = new ArrayList<>();
+        List<List<AETaskProgressPacket.TaskProgressData>> pages = new ArrayList<>();
+        List<AETaskProgressPacket.TaskProgressData> page = new ArrayList<>();
         int usedLines = 0;
         for (var task : tasks) {
             int requiredLines = taskLines(task).size();

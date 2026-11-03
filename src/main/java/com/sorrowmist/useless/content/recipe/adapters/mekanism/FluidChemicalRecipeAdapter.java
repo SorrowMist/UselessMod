@@ -18,6 +18,7 @@ import net.minecraft.world.item.crafting.RecipeHolder;
 import net.minecraft.world.item.crafting.RecipeManager;
 import net.minecraft.world.level.Level;
 import net.neoforged.neoforge.fluids.FluidStack;
+import net.neoforged.neoforge.fluids.crafting.SizedFluidIngredient;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
@@ -52,7 +53,7 @@ public final class FluidChemicalRecipeAdapter implements IRecipeAdapter<FluidChe
                 || chemicalInput.hasNoMatchingInstances()) return List.of();
 
         List<AdvancedAlloyFurnaceRecipe> result = new ArrayList<>();
-        List<net.neoforged.neoforge.fluids.crafting.SizedFluidIngredient> fluidInputs =
+        List<SizedFluidIngredient> fluidInputs =
                 MekanismChemicalRecipeSupport.fluidIngredients(fluidInput);
         for (ChemicalStack chemical : chemicalInput.getRepresentations()) {
             GenericStack chemicalKey = MekanismChemicalRecipeSupport.key(chemical);

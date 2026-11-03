@@ -1,6 +1,7 @@
 package com.sorrowmist.useless.core.component;
 
 import com.mojang.serialization.Codec;
+import io.netty.buffer.ByteBuf;
 import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
 
@@ -18,7 +19,7 @@ public enum ExternalInventoryKind {
     public static final Codec<ExternalInventoryKind> CODEC = Codec.STRING.xmap(
             ExternalInventoryKind::fromName,
             ExternalInventoryKind::serializedName);
-    public static final StreamCodec<io.netty.buffer.ByteBuf, ExternalInventoryKind> STREAM_CODEC =
+    public static final StreamCodec<ByteBuf, ExternalInventoryKind> STREAM_CODEC =
             ByteBufCodecs.VAR_INT.map(ExternalInventoryKind::fromId, ExternalInventoryKind::networkId);
 
     private final int networkId;

@@ -17,7 +17,9 @@ import net.minecraft.world.item.crafting.Ingredient;
 import net.minecraft.world.item.crafting.Recipe;
 import net.minecraft.world.item.crafting.RecipeHolder;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.material.Fluids;
 import net.neoforged.neoforge.fluids.FluidStack;
+import net.neoforged.neoforge.fluids.crafting.FluidIngredient;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
@@ -182,9 +184,9 @@ abstract class AbstractCookeryRecipeAdapter<T extends Recipe<?>> implements IRec
 
         List<LongSizedFluidIngredient> inputFluids = new ArrayList<>();
         var fluid = BuiltInRegistries.FLUID.getOptional(soupBase).orElse(null);
-        if (fluid != null && fluid != net.minecraft.world.level.material.Fluids.EMPTY) {
+        if (fluid != null && fluid != Fluids.EMPTY) {
             inputFluids.add(new LongSizedFluidIngredient(
-                    net.neoforged.neoforge.fluids.crafting.FluidIngredient.single(
+                    FluidIngredient.single(
                             new FluidStack(fluid, 1_000)),
                     1_000));
         } else {

@@ -30,8 +30,8 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Objects;
 import java.util.UUID;
+import java.util.function.UnaryOperator;
 
 /**
  * 无线物流的配置界面容器。
@@ -491,7 +491,7 @@ public final class StaffLinkMenu extends AbstractContainerMenu {
     }
 
     /** 通用：改一个过滤格；没有选中配置或该线路不用过滤器时忽略。 */
-    private void editFilterSlot(int index, java.util.function.UnaryOperator<LinkFilterSlot> change) {
+    private void editFilterSlot(int index, UnaryOperator<LinkFilterSlot> change) {
         StaffLinkRoute config = getSelectedConfig();
         if (config == null || !config.filterApplies()) {
             return;

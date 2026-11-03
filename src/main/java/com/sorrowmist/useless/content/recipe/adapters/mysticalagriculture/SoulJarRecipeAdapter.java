@@ -1,5 +1,6 @@
 package com.sorrowmist.useless.content.recipe.adapters.mysticalagriculture;
 
+import appeng.api.stacks.AEKey;
 import com.blakebr0.mysticalagriculture.api.soul.MobSoulType;
 import com.blakebr0.mysticalagriculture.api.util.MobSoulUtils;
 import com.blakebr0.mysticalagriculture.init.ModItems;
@@ -143,7 +144,7 @@ public class SoulJarRecipeAdapter implements IRecipeAdapter<SoulJarRecipeAdapter
             Level level,
             Map<Ingredient, Long> mergedInputs,
             Map<FluidStack, Long> mergedFluids,
-            Map<appeng.api.stacks.AEKey, Long> mergedKeys,
+            Map<AEKey, Long> mergedKeys,
             @Nullable ItemStack mold,
             List<ItemStack> actualInputs) {
         if (!matchesMold(mold) || !matchesEmptyJar(mergedInputs, actualInputs)) {

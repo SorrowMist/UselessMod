@@ -11,6 +11,7 @@ import cy.jdkdigital.productivebees.ProductiveBees;
 import cy.jdkdigital.productivebees.ProductiveBeesConfig;
 import cy.jdkdigital.productivebees.common.crafting.ingredient.BeeIngredient;
 import cy.jdkdigital.productivebees.common.crafting.ingredient.BeeIngredientFactory;
+import cy.jdkdigital.productivebees.common.crafting.ingredient.ComponentIngredient;
 import cy.jdkdigital.productivebees.common.entity.bee.ProductiveBee;
 import cy.jdkdigital.productivebees.common.recipe.BeeBreedingRecipe;
 import cy.jdkdigital.productivebees.init.ModBlocks;
@@ -117,8 +118,8 @@ public final class BeeBreedingRecipeAdapter implements IRecipeAdapter<BeeBreedin
 
         List<Ingredient> molds = List.of(
                 AdapterUtils.toMoldIngredient(getMoldItem()),
-                cy.jdkdigital.productivebees.common.crafting.ingredient.ComponentIngredient.of(parentEgg1),
-                cy.jdkdigital.productivebees.common.crafting.ingredient.ComponentIngredient.of(parentEgg2));
+                ComponentIngredient.of(parentEgg1),
+                ComponentIngredient.of(parentEgg2));
         int processTime = Math.max(1, source.getProcessingTime());
 
         return List.of(new AdvancedAlloyFurnaceRecipe(

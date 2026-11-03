@@ -16,6 +16,7 @@ import net.minecraft.world.level.Level;
 import net.neoforged.neoforge.fluids.FluidStack;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -102,7 +103,7 @@ public class ImbuementRecipeAdapter implements IRecipeAdapter<ImbuementRecipe> {
                 RecipeRegistry.IMBUEMENT_TYPE.get()
         );
 
-        List<RecipeHolder<ImbuementRecipe>> matches = new java.util.ArrayList<>();
+        List<RecipeHolder<ImbuementRecipe>> matches = new ArrayList<>();
         for (RecipeHolder<ImbuementRecipe> holder : recipes) {
             ImbuementRecipe recipe = holder.value();
 

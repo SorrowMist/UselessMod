@@ -5,10 +5,10 @@ import com.breakinblocks.neovitae.common.recipe.NVRecipes;
 import com.breakinblocks.neovitae.api.recipe.AraVitaeInput;
 import com.breakinblocks.neovitae.api.recipe.AraVitaeRecipe;
 import com.sorrowmist.useless.api.enums.AlloyFurnaceMode;
-import com.sorrowmist.useless.content.recipe.AdapterUtils;
 import com.sorrowmist.useless.content.recipe.AdvancedAlloyFurnaceRecipe;
 import com.sorrowmist.useless.content.recipe.CountedIngredient;
 import com.sorrowmist.useless.content.recipe.IRecipeAdapter;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.crafting.Ingredient;
 import net.minecraft.world.item.crafting.RecipeHolder;
@@ -85,13 +85,13 @@ public final class AraVitaeRecipeAdapter implements IRecipeAdapter<AraVitaeRecip
     }
 
     private static AdvancedAlloyFurnaceRecipe convert(
-            net.minecraft.resources.ResourceLocation id, AraVitaeRecipe source,
+            ResourceLocation id, AraVitaeRecipe source,
             ItemStack output) {
         return convert(id, source, output, null);
     }
 
     private static AdvancedAlloyFurnaceRecipe convert(
-            net.minecraft.resources.ResourceLocation id, AraVitaeRecipe source,
+            ResourceLocation id, AraVitaeRecipe source,
             ItemStack output, @Nullable ItemStack actualInput) {
         List<CountedIngredient> inputs = actualInput == null
                 ? List.of(new CountedIngredient(source.getInput(), 1L))

@@ -2,9 +2,11 @@ package com.sorrowmist.useless.content.items;
 
 import appeng.api.ids.AEComponents;
 import com.sorrowmist.useless.core.config.ConfigManager;
+import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.core.NonNullList;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResultHolder;
 import net.minecraft.world.entity.player.Player;
@@ -46,9 +48,9 @@ public class AE2GiftPackageItem extends Item {
             stack.shrink(1);
             
             if (ModList.get().isLoaded("ae2")
-                    && player instanceof net.minecraft.server.level.ServerPlayer serverPlayer
+                    && player instanceof ServerPlayer serverPlayer
                     && serverPlayer.getServer() != null) {
-                net.minecraft.commands.CommandSourceStack source = serverPlayer.createCommandSourceStack();
+                CommandSourceStack source = serverPlayer.createCommandSourceStack();
                 serverPlayer.getServer().getCommands().performPrefixedCommand(source, "ae2 channelmode infinite");
             }
         }

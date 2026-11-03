@@ -91,7 +91,7 @@ public class CrystalPulverizerRecipeAdapter implements IRecipeAdapter<CrystalPul
         if (!CircuitEtcherRecipeAdapter.checkMold(mold, "crystal_pulverizer")) return List.of();
 
         RecipeManager recipeManager = level.getRecipeManager();
-        List<RecipeHolder<CrystalPulverizerRecipe>> matches = new java.util.ArrayList<>();
+        List<RecipeHolder<CrystalPulverizerRecipe>> matches = new ArrayList<>();
         for (RecipeHolder<CrystalPulverizerRecipe> holder : (List<RecipeHolder<CrystalPulverizerRecipe>>) (List<?>)
                 recipeManager.getAllRecipesFor(AECSRecipeTypes.CRYSTAL_PULVERIZER.get())) {
             CrystalPulverizerRecipe recipe = holder.value();

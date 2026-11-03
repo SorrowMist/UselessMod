@@ -7,6 +7,7 @@ import com.sorrowmist.useless.content.recipe.AdvancedAlloyFurnaceRecipe;
 import com.sorrowmist.useless.content.recipe.CountedIngredient;
 import com.sorrowmist.useless.content.recipe.IRecipeAdapter;
 import de.ellpeck.naturesaura.Helper;
+import de.ellpeck.naturesaura.recipes.ModRecipes;
 import de.ellpeck.naturesaura.recipes.OfferingRecipe;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.crafting.Ingredient;
@@ -60,7 +61,7 @@ public final class OfferingRecipeAdapter implements IRecipeAdapter<OfferingRecip
         RecipeManager recipeManager = level.getRecipeManager();
         List<RecipeHolder<OfferingRecipe>> matches = new ArrayList<>();
         for (RecipeHolder<OfferingRecipe> holder : recipeManager.getAllRecipesFor(
-                de.ellpeck.naturesaura.recipes.ModRecipes.OFFERING_TYPE)) {
+                ModRecipes.OFFERING_TYPE)) {
             Converted converted = convertData(holder.value());
             if (converted != null && AdapterUtils.matchesRequired(mergedInputs, converted.requirements())) {
                 matches.add(holder);

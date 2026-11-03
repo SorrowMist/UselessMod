@@ -2,6 +2,7 @@ package com.sorrowmist.useless.content.machines.advanced_alloy_furnace.chemical;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BlockEntity;
@@ -65,7 +66,7 @@ public interface ChemicalCompatProvider {
      * 通用 TagKey，界面会明确提示这一点。</p>
      */
     @Nullable
-    default net.minecraft.resources.ResourceLocation chemicalIdOf(Object typeKey) {
+    default ResourceLocation chemicalIdOf(Object typeKey) {
         return null;
     }
 

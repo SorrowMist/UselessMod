@@ -2,6 +2,7 @@ package com.sorrowmist.useless.content.recipe.adapters.enderio;
 
 import com.enderio.enderio.content.enchanter.EnchanterRecipe;
 import com.enderio.enderio.init.EIOBlocks;
+import com.enderio.enderio.init.EIORecipes;
 import com.mojang.logging.LogUtils;
 import com.sorrowmist.useless.api.enums.AlloyFurnaceMode;
 import com.sorrowmist.useless.content.recipe.AdapterUtils;
@@ -86,7 +87,7 @@ public final class EnchanterRecipeAdapter implements IRecipeAdapter<EnchanterRec
         List<RecipeHolder<EnchanterRecipe>> matches = new ArrayList<>();
         RecipeManager manager = level.getRecipeManager();
         for (RecipeHolder<EnchanterRecipe> holder : manager.getAllRecipesFor(
-                com.enderio.enderio.init.EIORecipes.ENCHANTING.type().get())) {
+                EIORecipes.ENCHANTING.type().get())) {
             EnchanterRecipe source = holder.value();
             CountedIngredient catalyst = EnderIOAdapterUtils.counted(source.input());
             if (catalyst == null) {

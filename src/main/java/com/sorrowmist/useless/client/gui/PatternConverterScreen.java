@@ -3,12 +3,13 @@ package com.sorrowmist.useless.client.gui;
 import com.sorrowmist.useless.content.menus.ContainerPatternConverter;
 import com.sorrowmist.useless.inventory.slot.PatternSlotItemHandler;
 import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.inventory.Slot;
 
 /** Inventory screen for loading patterns and starting a batch conversion. */
-public final class PatternConverterScreen extends net.minecraft.client.gui.screens.inventory.AbstractContainerScreen<ContainerPatternConverter> {
+public final class PatternConverterScreen extends AbstractContainerScreen<ContainerPatternConverter> {
     private static final int CONVERT_BUTTON_WIDTH = 54;
     private PressableAE2Button convertButton;
 

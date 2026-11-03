@@ -11,6 +11,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.resources.ResourceKey;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.player.Player;
@@ -24,6 +25,7 @@ import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.Vec3;
+import net.minecraft.world.phys.shapes.CollisionContext;
 import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -471,7 +473,7 @@ public final class ConstructionWandLogic {
         BlockState placed = targetItem.getBlock().getStateForPlacement(context);
         if (placed == null || !placed.canSurvive(level, pos)
                 || !level.isUnobstructed(placed, pos,
-                                         net.minecraft.world.phys.shapes.CollisionContext.of(player))) {
+                                         CollisionContext.of(player))) {
             return null;
         }
         return placed;
@@ -606,7 +608,7 @@ public final class ConstructionWandLogic {
 
     private record Operation(List<SavedBlock> blocks,
                              ItemStack tool,
-                             net.minecraft.resources.ResourceKey<Level> dimension) {
+                             ResourceKey<Level> dimension) {
         private Operation(List<SavedBlock> blocks, ItemStack tool) {
             this(blocks, tool, blocks.getFirst().dimension);
         }
@@ -623,11 +625,11 @@ public final class ConstructionWandLogic {
         private final ItemStack refund;
         private final boolean refundToAe;
         private BlockState afterState;
-        private final net.minecraft.resources.ResourceKey<Level> dimension;
+        private final ResourceKey<Level> dimension;
 
         private SavedBlock(BlockPos pos, BlockState beforeState, CompoundTag blockEntityData,
                            ItemStack refund, boolean refundToAe,
-                           net.minecraft.resources.ResourceKey<Level> dimension) {
+                           ResourceKey<Level> dimension) {
             this.pos = pos.immutable();
             this.beforeState = beforeState;
             this.blockEntityData = blockEntityData;

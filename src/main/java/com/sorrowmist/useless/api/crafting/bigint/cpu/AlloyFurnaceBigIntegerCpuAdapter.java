@@ -1,10 +1,13 @@
 package com.sorrowmist.useless.api.crafting.bigint.cpu;
 
+import appeng.api.stacks.AEKey;
 import com.sorrowmist.useless.api.crafting.bigint.AlloyFurnaceBigIntegerOutput;
 import net.minecraft.resources.ResourceLocation;
 import org.jetbrains.annotations.NotNull;
 
+import java.math.BigInteger;
 import java.util.List;
+import java.util.Map;
 
 /**
  * CPU 侧的产物回执通道：实现它并在 mod 初始化阶段注册，即可收到大数批次的产物与终局通知。
@@ -96,9 +99,9 @@ public interface AlloyFurnaceBigIntegerCpuAdapter {
      * @param outputs 本次<b>准备写回网络</b>的产物；可只收其中一部分（返回量 ≤ 这里的量）
      * @return 你实际收下的量，按 key 计；未列出的 key 视为不收
      */
-    default @NotNull java.util.Map<appeng.api.stacks.AEKey, java.math.BigInteger> claimOutputs(
+    default @NotNull Map<AEKey, BigInteger> claimOutputs(
             @NotNull AlloyFurnaceBigIntegerBatchContext context,
-            @NotNull java.util.List<AlloyFurnaceBigIntegerOutput> outputs) {
-        return java.util.Map.of();
+            @NotNull List<AlloyFurnaceBigIntegerOutput> outputs) {
+        return Map.of();
     }
 }

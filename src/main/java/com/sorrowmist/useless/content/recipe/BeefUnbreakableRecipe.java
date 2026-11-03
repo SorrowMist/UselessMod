@@ -1,6 +1,7 @@
 package com.sorrowmist.useless.content.recipe;
 
 import com.sorrowmist.useless.content.items.EndlessBeafItem;
+import com.sorrowmist.useless.init.ModRecipeSerializers;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.world.item.ItemStack;
@@ -55,7 +56,7 @@ public class BeefUnbreakableRecipe extends CustomRecipe {
 
     @Override
     public RecipeSerializer<?> getSerializer() {
-        return com.sorrowmist.useless.init.ModRecipeSerializers.BEEF_UNBREAKABLE_SERIALIZER.get();
+        return ModRecipeSerializers.BEEF_UNBREAKABLE_SERIALIZER.get();
     }
 
     /**

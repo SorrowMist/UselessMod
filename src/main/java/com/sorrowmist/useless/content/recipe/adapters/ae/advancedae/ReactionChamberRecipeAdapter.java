@@ -126,7 +126,7 @@ public class ReactionChamberRecipeAdapter implements IRecipeAdapter<ReactionCham
         RecipeManager recipeManager = level.getRecipeManager();
         List<RecipeHolder<ReactionChamberRecipe>> recipes = recipeManager.getAllRecipesFor(ReactionChamberRecipe.TYPE);
 
-        List<RecipeHolder<ReactionChamberRecipe>> matches = new java.util.ArrayList<>();
+        List<RecipeHolder<ReactionChamberRecipe>> matches = new ArrayList<>();
         for (RecipeHolder<ReactionChamberRecipe> holder : recipes) {
             ReactionChamberRecipe recipe = holder.value();
             List<IngredientStack.Item> recipeInputs = recipe.getInputs();

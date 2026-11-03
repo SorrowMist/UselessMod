@@ -3,6 +3,7 @@ package com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae;
 import appeng.api.crafting.IPatternDetails;
 import appeng.api.crafting.PatternDetailsHelper;
 import appeng.api.ids.AEComponents;
+import appeng.api.stacks.AEFluidKey;
 import appeng.api.stacks.AEItemKey;
 import appeng.api.stacks.GenericStack;
 import appeng.crafting.pattern.AECraftingPattern;
@@ -34,12 +35,14 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.IdentityHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalLong;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.TreeSet;
 
 public final class OmniversalPatternEncoding {
@@ -433,12 +436,12 @@ public final class OmniversalPatternEncoding {
             return Map.of();
         }
 
-        Map<Integer, List<TagKey<Item>>> result = new java.util.TreeMap<>();
+        Map<Integer, List<TagKey<Item>>> result = new TreeMap<>();
         IPatternDetails.IInput[] inputs = source.getInputs();
         for (int slot = 0; slot < inputs.length; slot++) {
             IPatternDetails.IInput input = inputs[slot];
             if (input == null) continue;
-            java.util.LinkedHashSet<TagKey<Item>> tags = new java.util.LinkedHashSet<>();
+            LinkedHashSet<TagKey<Item>> tags = new LinkedHashSet<>();
             boolean matchedRequirement = false;
             boolean hasNonTagRequirement = false;
             for (GenericStack possible : input.getPossibleInputs()) {
@@ -478,16 +481,16 @@ public final class OmniversalPatternEncoding {
             AdvancedAlloyFurnaceRecipe recipe, AEProcessingPattern source) {
         if (recipe == null || source == null || recipe.inputFluids().isEmpty()) return Map.of();
 
-        Map<Integer, List<TagKey<Fluid>>> result = new java.util.TreeMap<>();
+        Map<Integer, List<TagKey<Fluid>>> result = new TreeMap<>();
         IPatternDetails.IInput[] inputs = source.getInputs();
         for (int slot = 0; slot < inputs.length; slot++) {
             IPatternDetails.IInput input = inputs[slot];
             if (input == null) continue;
-            java.util.LinkedHashSet<TagKey<Fluid>> tags = new java.util.LinkedHashSet<>();
+            LinkedHashSet<TagKey<Fluid>> tags = new LinkedHashSet<>();
             boolean matchedRequirement = false;
             boolean hasNonTagRequirement = false;
             for (GenericStack possible : input.getPossibleInputs()) {
-                if (possible == null || !(possible.what() instanceof appeng.api.stacks.AEFluidKey fluidKey)) {
+                if (possible == null || !(possible.what() instanceof AEFluidKey fluidKey)) {
                     hasNonTagRequirement = true;
                     continue;
                 }
@@ -523,7 +526,7 @@ public final class OmniversalPatternEncoding {
         List<OmniversalPatternData.MoldTagInputSlot> result = new ArrayList<>();
         for (int moldSlot = 0; moldSlot < recipe.molds().size(); moldSlot++) {
             Ingredient mold = recipe.molds().get(moldSlot);
-            java.util.LinkedHashSet<TagKey<Item>> tags = new java.util.LinkedHashSet<>();
+            LinkedHashSet<TagKey<Item>> tags = new LinkedHashSet<>();
             if (!collectTagOnlyItemIngredients(mold, tags)) continue;
             for (TagKey<Item> tag : tags) {
                 result.add(new OmniversalPatternData.MoldTagInputSlot(moldSlot, tag));
@@ -533,7 +536,7 @@ public final class OmniversalPatternEncoding {
     }
 
     private static boolean collectTagOnlyItemIngredients(
-            Ingredient ingredient, java.util.Set<TagKey<Item>> tags) {
+            Ingredient ingredient, Set<TagKey<Item>> tags) {
         if (ingredient == null || ingredient.isEmpty()) return false;
         if (ingredient.isCustom()) {
             return collectKnownCustomTagIngredient(ingredient, tags);
@@ -554,7 +557,7 @@ public final class OmniversalPatternEncoding {
      * for display only while the original custom predicate remains authoritative at runtime.
      */
     private static boolean collectKnownCustomTagIngredient(
-            Ingredient ingredient, java.util.Set<TagKey<Item>> tags) {
+            Ingredient ingredient, Set<TagKey<Item>> tags) {
         ItemStack[] candidates;
         try {
             candidates = ingredient.getItems();
@@ -625,7 +628,7 @@ public final class OmniversalPatternEncoding {
     }
 
     private static boolean collectTagOnlyFluidIngredients(
-            FluidIngredient ingredient, java.util.Set<TagKey<Fluid>> tags) {
+            FluidIngredient ingredient, Set<TagKey<Fluid>> tags) {
         if (ingredient instanceof TagFluidIngredient tag) {
             tags.add(tag.tag());
             return true;
@@ -726,7 +729,7 @@ public final class OmniversalPatternEncoding {
                     ? AdapterUtils.fluidRepresentative(input.ingredient(), 1)
                     : candidates[0];
             if (representative == null || representative.isEmpty()) return ItemStack.EMPTY;
-            appeng.api.stacks.AEFluidKey key = appeng.api.stacks.AEFluidKey.of(representative);
+            AEFluidKey key = AEFluidKey.of(representative);
             if (key == null) return ItemStack.EMPTY;
             GenericStack fluid = new GenericStack(key, input.amount());
             // AE processing patterns have one concrete key per slot. Keep one representative

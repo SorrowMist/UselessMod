@@ -1,5 +1,6 @@
 package com.sorrowmist.useless.content.recipe.adapters.minecraft;
 
+import appeng.api.stacks.AEKey;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
@@ -27,6 +28,7 @@ import net.minecraft.world.item.crafting.Ingredient;
 import net.minecraft.world.item.crafting.RecipeHolder;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.material.Fluids;
+import net.neoforged.neoforge.fluids.FluidStack;
 import net.neoforged.neoforge.fluids.crafting.FluidIngredient;
 import org.jetbrains.annotations.Nullable;
 
@@ -274,7 +276,7 @@ public final class FishingLootRecipeAdapter implements IRecipeAdapter<FishingLoo
     @Override
     public List<RecipeHolder<FishingLootSyntheticRecipe>> findMatchingRecipes(
             Level level, Map<Ingredient, Long> mergedInputs,
-            Map<net.neoforged.neoforge.fluids.FluidStack, Long> mergedFluids,
+            Map<FluidStack, Long> mergedFluids,
             @Nullable ItemStack mold) {
         return findMatchingRecipes(level, mergedInputs, mergedFluids, Map.of(), mold, List.of());
     }
@@ -282,8 +284,8 @@ public final class FishingLootRecipeAdapter implements IRecipeAdapter<FishingLoo
     @Override
     public List<RecipeHolder<FishingLootSyntheticRecipe>> findMatchingRecipes(
             Level level, Map<Ingredient, Long> mergedInputs,
-            Map<net.neoforged.neoforge.fluids.FluidStack, Long> mergedFluids,
-            Map<appeng.api.stacks.AEKey, Long> mergedKeys,
+            Map<FluidStack, Long> mergedFluids,
+            Map<AEKey, Long> mergedKeys,
             @Nullable ItemStack mold, List<ItemStack> actualInputs) {
         if (level == null || !matchesMold(mold)) {
             return List.of();

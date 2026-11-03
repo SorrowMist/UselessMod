@@ -1,5 +1,7 @@
 package com.sorrowmist.useless.content.recipe.adapters.hostilenetworks;
 
+import appeng.api.stacks.AEKey;
+import appeng.api.stacks.GenericStack;
 import com.sorrowmist.useless.api.enums.AlloyFurnaceMode;
 import com.sorrowmist.useless.content.recipe.AdapterUtils;
 import com.sorrowmist.useless.content.recipe.AdvancedAlloyFurnaceRecipe;
@@ -22,6 +24,7 @@ import net.minecraft.world.item.crafting.Ingredient;
 import net.minecraft.world.item.crafting.RecipeHolder;
 import net.minecraft.world.level.Level;
 import net.neoforged.neoforge.common.crafting.DataComponentIngredient;
+import net.neoforged.neoforge.fluids.FluidStack;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
@@ -90,7 +93,7 @@ public final class HostileNetworksRecipeAdapter
     @Override
     public List<RecipeHolder<HostileNetworksSyntheticRecipe>> findMatchingRecipes(
             Level level, Map<Ingredient, Long> mergedInputs,
-            Map<net.neoforged.neoforge.fluids.FluidStack, Long> mergedFluids,
+            Map<FluidStack, Long> mergedFluids,
             @Nullable ItemStack mold) {
         return findMatchingRecipes(level, mergedInputs, mergedFluids, Map.of(), mold, List.of());
     }
@@ -98,8 +101,8 @@ public final class HostileNetworksRecipeAdapter
     @Override
     public List<RecipeHolder<HostileNetworksSyntheticRecipe>> findMatchingRecipes(
             Level level, Map<Ingredient, Long> mergedInputs,
-            Map<net.neoforged.neoforge.fluids.FluidStack, Long> mergedFluids,
-            Map<appeng.api.stacks.AEKey, Long> mergedKeys,
+            Map<FluidStack, Long> mergedFluids,
+            Map<AEKey, Long> mergedKeys,
             @Nullable ItemStack mold, List<ItemStack> actualInputs) {
         if (level == null || !matchesMold(mold)) return List.of();
 
@@ -399,13 +402,13 @@ public final class HostileNetworksRecipeAdapter
         return ItemIngredientAllocator.matches(available, required);
     }
 
-    private static List<appeng.api.stacks.GenericStack> mergedKeyInputs(
-            Map<appeng.api.stacks.AEKey, Long> mergedKeys) {
+    private static List<GenericStack> mergedKeyInputs(
+            Map<AEKey, Long> mergedKeys) {
         if (mergedKeys == null || mergedKeys.isEmpty()) return List.of();
-        List<appeng.api.stacks.GenericStack> result = new ArrayList<>();
-        for (Map.Entry<appeng.api.stacks.AEKey, Long> entry : mergedKeys.entrySet()) {
+        List<GenericStack> result = new ArrayList<>();
+        for (Map.Entry<AEKey, Long> entry : mergedKeys.entrySet()) {
             long amount = Math.max(0L, entry.getValue());
-            if (amount > 0L) result.add(new appeng.api.stacks.GenericStack(entry.getKey(), amount));
+            if (amount > 0L) result.add(new GenericStack(entry.getKey(), amount));
         }
         return result;
     }

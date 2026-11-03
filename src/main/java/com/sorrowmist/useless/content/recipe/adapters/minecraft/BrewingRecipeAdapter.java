@@ -1,8 +1,10 @@
 package com.sorrowmist.useless.content.recipe.adapters.minecraft;
 
+import appeng.api.stacks.AEKey;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
+import com.mojang.serialization.JsonOps;
 import com.sorrowmist.useless.api.enums.AlloyFurnaceMode;
 import com.sorrowmist.useless.content.recipe.AdapterUtils;
 import com.sorrowmist.useless.content.recipe.AdvancedAlloyFurnaceRecipe;
@@ -141,7 +143,7 @@ public final class BrewingRecipeAdapter implements IRecipeAdapter<BrewingSynthet
             Level level,
             Map<Ingredient, Long> mergedInputs,
             Map<FluidStack, Long> mergedFluids,
-            Map<appeng.api.stacks.AEKey, Long> mergedKeys,
+            Map<AEKey, Long> mergedKeys,
             @Nullable ItemStack mold,
             List<ItemStack> actualInputs) {
         if (level == null || !matchesMold(mold)) {
@@ -411,7 +413,7 @@ public final class BrewingRecipeAdapter implements IRecipeAdapter<BrewingSynthet
     private static String encodeIngredient(RegistryAccess registryAccess, Ingredient ingredient) {
         try {
             JsonElement encoded = Ingredient.CODEC
-                    .encodeStart(registryAccess.createSerializationContext(com.mojang.serialization.JsonOps.INSTANCE), ingredient)
+                    .encodeStart(registryAccess.createSerializationContext(JsonOps.INSTANCE), ingredient)
                     .getOrThrow();
             return canonicalize(encoded).toString();
         } catch (RuntimeException exception) {
@@ -422,11 +424,11 @@ public final class BrewingRecipeAdapter implements IRecipeAdapter<BrewingSynthet
     private static String encodeStack(RegistryAccess registryAccess, ItemStack stack) {
         try {
             JsonElement encoded = ItemStack.CODEC
-                    .encodeStart(registryAccess.createSerializationContext(com.mojang.serialization.JsonOps.INSTANCE), stack)
+                    .encodeStart(registryAccess.createSerializationContext(JsonOps.INSTANCE), stack)
                     .getOrThrow();
             return canonicalize(encoded).toString();
         } catch (RuntimeException exception) {
-            ResourceLocation itemId = net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(stack.getItem());
+            ResourceLocation itemId = BuiltInRegistries.ITEM.getKey(stack.getItem());
             return (itemId == null ? "unknown" : itemId.toString()) + "|" + stack.getComponents();
         }
     }

@@ -10,6 +10,7 @@ import com.sorrowmist.useless.UselessMod;
 import com.sorrowmist.useless.api.enums.FurnaceFace;
 import com.sorrowmist.useless.api.enums.FurnaceFaceMode;
 import com.sorrowmist.useless.api.enums.RedstoneControlMode;
+import com.sorrowmist.useless.compat.jei.JEIPlugin;
 import com.sorrowmist.useless.content.blockentities.AdvancedAlloyFurnaceBlockEntity;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.layout.AdvancedAlloyFurnaceLayout;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.chemical.ChemicalStackView;
@@ -49,8 +50,8 @@ import appeng.api.stacks.GenericStack;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
+import org.joml.Matrix4f;
 
 public class AdvancedAlloyFurnaceScreen extends AbstractContainerScreen<AdvancedAlloyFurnaceMenu> {
 
@@ -418,7 +419,7 @@ public class AdvancedAlloyFurnaceScreen extends AbstractContainerScreen<Advanced
         guiGraphics.pose().popPose();
     }
 
-    private void renderSizeLabel(org.joml.Matrix4f matrix, Font font, float xPos, float yPos, String text) {
+    private void renderSizeLabel(Matrix4f matrix, Font font, float xPos, float yPos, String text) {
         final float scaleFactor = 0.666f;
         final float inverseScaleFactor = 1.0f / scaleFactor;
         final int offset = -1;
@@ -907,7 +908,7 @@ public class AdvancedAlloyFurnaceScreen extends AbstractContainerScreen<Advanced
         }
 
         if (ModList.get().isLoaded("jei")) {
-            com.sorrowmist.useless.compat.jei.JEIPlugin.showAdvancedAlloyFurnaceRecipes();
+            JEIPlugin.showAdvancedAlloyFurnaceRecipes();
         }
         return true;
     }
@@ -1058,7 +1059,7 @@ public class AdvancedAlloyFurnaceScreen extends AbstractContainerScreen<Advanced
         int end = Math.min(base + slotsPerPage, AdvancedAlloyFurnaceLayout.PATTERN_SLOTS_COUNT);
 
         for (Slot slot : this.menu.slots) {
-            if (slot instanceof com.sorrowmist.useless.inventory.slot.PatternSlotItemHandler patternSlot) {
+            if (slot instanceof PatternSlotItemHandler patternSlot) {
                 int slotIndex = slot.getSlotIndex();
                 int relativeIndex = slotIndex - AdvancedAlloyFurnaceLayout.PATTERN_SLOTS_START;
                 boolean isActive = relativeIndex >= base && relativeIndex < end;

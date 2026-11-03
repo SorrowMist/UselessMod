@@ -14,6 +14,7 @@ import com.sorrowmist.useless.content.recipe.FluidIngredientAllocator;
 import com.sorrowmist.useless.content.recipe.IRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.ItemIngredientAllocator;
 import com.sorrowmist.useless.content.recipe.adapters.extendedcrafting.ExtendedCraftingAdapterUtils;
+import net.minecraft.core.HolderLookup;
 import net.minecraft.world.item.BucketItem;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
@@ -243,7 +244,7 @@ public final class CraftingRecipeAdapter implements IRecipeAdapter<CraftingRecip
         try {
             return source.getClass()
                     .getMethod("assemble", CraftingInput.class,
-                            net.minecraft.core.HolderLookup.Provider.class)
+                            HolderLookup.Provider.class)
                     .getDeclaringClass() == baseClass;
         } catch (ReflectiveOperationException | RuntimeException exception) {
             return false;

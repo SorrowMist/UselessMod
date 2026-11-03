@@ -31,6 +31,7 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 public final class OmniversalMoldHubBlockEntity extends BlockEntity implements MenuProvider {
     private final RecoverableItemStackHandler molds = new RecoverableItemStackHandler(
@@ -198,7 +199,7 @@ public final class OmniversalMoldHubBlockEntity extends BlockEntity implements M
 
     public void linkController(@Nullable BlockPos controllerPos, long generation) {
         if (unloading || isRemoved()) return;
-        if (!java.util.Objects.equals(this.controllerPos, controllerPos) || structureGeneration != generation) {
+        if (!Objects.equals(this.controllerPos, controllerPos) || structureGeneration != generation) {
             this.controllerPos = controllerPos == null ? null : controllerPos.immutable();
             this.structureGeneration = generation;
             setChanged();

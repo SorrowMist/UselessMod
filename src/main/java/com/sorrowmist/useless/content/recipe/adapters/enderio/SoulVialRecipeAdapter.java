@@ -1,5 +1,6 @@
 package com.sorrowmist.useless.content.recipe.adapters.enderio;
 
+import appeng.api.stacks.AEKey;
 import com.enderio.enderio.api.soul.Soul;
 import com.enderio.enderio.api.soul.SoulBoundUtils;
 import com.enderio.enderio.content.machines.powered_spawner.MobSpawnMode;
@@ -111,7 +112,7 @@ public final class SoulVialRecipeAdapter implements IRecipeAdapter<SoulVialRecip
     public List<RecipeHolder<SoulVialDummyRecipe>> findMatchingRecipes(
             Level level, Map<Ingredient, Long> mergedInputs,
             Map<FluidStack, Long> mergedFluids,
-            Map<appeng.api.stacks.AEKey, Long> mergedKeys,
+            Map<AEKey, Long> mergedKeys,
             @Nullable ItemStack mold, List<ItemStack> actualInputs) {
         if (level == null || !matchesMold(mold) || !matchesEmptySoulVial(mergedInputs, actualInputs)) {
             return List.of();

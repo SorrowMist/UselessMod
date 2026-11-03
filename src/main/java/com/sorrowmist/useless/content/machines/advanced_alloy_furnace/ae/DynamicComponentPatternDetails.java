@@ -2,6 +2,7 @@ package com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae;
 
 import appeng.api.crafting.IPatternDetails;
 import appeng.api.crafting.PatternDetailsTooltip;
+import appeng.api.stacks.AEFluidKey;
 import appeng.api.stacks.AEItemKey;
 import appeng.api.stacks.AEKey;
 import appeng.api.stacks.GenericStack;
@@ -28,6 +29,7 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HexFormat;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -500,13 +502,13 @@ public class DynamicComponentPatternDetails extends AEProcessingPattern implemen
     private static Map<Integer, List<TagKey<Item>>> normalizeTagInputTags(
             Map<Integer, ? extends Iterable<TagKey<Item>>> source, int inputCount) {
         if (source == null || source.isEmpty()) return Map.of();
-        Map<Integer, List<TagKey<Item>>> result = new java.util.TreeMap<>();
+        Map<Integer, List<TagKey<Item>>> result = new TreeMap<>();
         for (Map.Entry<Integer, ? extends Iterable<TagKey<Item>>> entry : source.entrySet()) {
             Integer slot = entry.getKey();
             if (slot == null || slot < 0 || slot >= inputCount) {
                 throw new IllegalArgumentException("Tag input slot is outside the processing pattern: " + slot);
             }
-            java.util.LinkedHashSet<TagKey<Item>> tags = new java.util.LinkedHashSet<>();
+            LinkedHashSet<TagKey<Item>> tags = new LinkedHashSet<>();
             Iterable<TagKey<Item>> values = entry.getValue();
             if (values != null) {
                 for (TagKey<Item> tag : values) {
@@ -521,13 +523,13 @@ public class DynamicComponentPatternDetails extends AEProcessingPattern implemen
     private static Map<Integer, List<TagKey<Fluid>>> normalizeFluidTagInputTags(
             Map<Integer, ? extends Iterable<TagKey<Fluid>>> source, int inputCount) {
         if (source == null || source.isEmpty()) return Map.of();
-        Map<Integer, List<TagKey<Fluid>>> result = new java.util.TreeMap<>();
+        Map<Integer, List<TagKey<Fluid>>> result = new TreeMap<>();
         for (Map.Entry<Integer, ? extends Iterable<TagKey<Fluid>>> entry : source.entrySet()) {
             Integer slot = entry.getKey();
             if (slot == null || slot < 0 || slot >= inputCount) {
                 throw new IllegalArgumentException("Fluid tag input slot is outside the processing pattern: " + slot);
             }
-            java.util.LinkedHashSet<TagKey<Fluid>> tags = new java.util.LinkedHashSet<>();
+            LinkedHashSet<TagKey<Fluid>> tags = new LinkedHashSet<>();
             Iterable<TagKey<Fluid>> values = entry.getValue();
             if (values != null) {
                 for (TagKey<Fluid> tag : values) {
@@ -674,7 +676,7 @@ public class DynamicComponentPatternDetails extends AEProcessingPattern implemen
 
         @Override
         public boolean isValid(AEKey input, Level level) {
-            if (!(input instanceof appeng.api.stacks.AEFluidKey fluidKey)) return false;
+            if (!(input instanceof AEFluidKey fluidKey)) return false;
             FluidStack stack = fluidKey.toStack(1);
             if (tags.stream().noneMatch(stack::is)) return false;
             return matcher == null || matcher.test(input);
@@ -693,7 +695,7 @@ public class DynamicComponentPatternDetails extends AEProcessingPattern implemen
             AEKey uniform = null;
             boolean found = false;
             for (GenericStack possible : possibleInputs) {
-                if (possible == null || !(possible.what() instanceof appeng.api.stacks.AEFluidKey)) {
+                if (possible == null || !(possible.what() instanceof AEFluidKey)) {
                     continue;
                 }
                 AEKey remaining = source.getRemainingKey(possible.what());

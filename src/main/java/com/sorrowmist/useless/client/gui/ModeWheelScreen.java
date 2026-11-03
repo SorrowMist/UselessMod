@@ -23,14 +23,17 @@ import com.sorrowmist.useless.network.ToolTypeModeSwitchPacket;
 import com.sorrowmist.useless.utils.UselessItemUtils;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.components.Renderable;
 import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.core.component.DataComponentType;
 import net.minecraft.network.chat.Component;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.item.ItemStack;
 import net.neoforged.neoforge.network.PacketDistributor;
+import net.neoforged.neoforge.registries.DeferredHolder;
 import org.lwjgl.glfw.GLFW;
 
 import java.nio.charset.StandardCharsets;
@@ -597,7 +600,7 @@ public class ModeWheelScreen extends Screen {
                     bool(UComponents.BeefTimeAccelerationEnabledComponent, false);
             case BeefToolModuleRegistry.BEEF_INVULNERABILITY ->
                     targetItem.getOrDefault(UComponents.BeefInvulnerabilityEnabledComponent,
-                            targetItem.getItem() instanceof com.sorrowmist.useless.content.items.EndlessBeafItem);
+                            targetItem.getItem() instanceof EndlessBeafItem);
             case BeefToolModuleRegistry.BEEF_ADVANCED_STEALTH ->
                     bool(UComponents.BeefAdvancedStealthEnabledComponent, false);
             case BeefToolModuleRegistry.BEEF_CAPTURE -> bool(UComponents.BeefCaptureEnabledComponent, false);
@@ -628,13 +631,13 @@ public class ModeWheelScreen extends Screen {
         return targetItem.getOrDefault(UComponents.CurrentToolTypeComponent, ToolTypeMode.NONE_MODE);
     }
 
-    private boolean bool(net.minecraft.core.component.DataComponentType<Boolean> type, boolean fallback) {
+    private boolean bool(DataComponentType<Boolean> type, boolean fallback) {
         return targetItem.getOrDefault(type, fallback);
     }
 
     private boolean bool(
-            net.neoforged.neoforge.registries.DeferredHolder<net.minecraft.core.component.DataComponentType<?>,
-                    net.minecraft.core.component.DataComponentType<Boolean>> holder,
+            DeferredHolder<DataComponentType<?>,
+                    DataComponentType<Boolean>> holder,
             boolean fallback) {
         return bool(holder.get(), fallback);
     }
@@ -960,7 +963,7 @@ public class ModeWheelScreen extends Screen {
                     UComponents.BeefTimeAccelerationEnabledComponent, false);
             case BeefToolModuleRegistry.BEEF_INVULNERABILITY -> toggle(ModeTogglePacket.ModeType.BEEF_INVULNERABILITY,
                     UComponents.BeefInvulnerabilityEnabledComponent,
-                    targetItem.getItem() instanceof com.sorrowmist.useless.content.items.EndlessBeafItem);
+                    targetItem.getItem() instanceof EndlessBeafItem);
             case BeefToolModuleRegistry.BEEF_ADVANCED_STEALTH -> toggle(ModeTogglePacket.ModeType.BEEF_ADVANCED_STEALTH,
                     UComponents.BeefAdvancedStealthEnabledComponent, false);
             case BeefToolModuleRegistry.BEEF_CAPTURE -> toggle(ModeTogglePacket.ModeType.BEEF_CAPTURE,
@@ -1010,15 +1013,15 @@ public class ModeWheelScreen extends Screen {
     }
 
     private void toggle(ModeTogglePacket.ModeType type,
-                        net.minecraft.core.component.DataComponentType<Boolean> component,
+                        DataComponentType<Boolean> component,
                         boolean fallback) {
         PacketDistributor.sendToServer(new ModeTogglePacket(type, !bool(component, fallback)));
     }
 
     private void toggle(
             ModeTogglePacket.ModeType type,
-            net.neoforged.neoforge.registries.DeferredHolder<net.minecraft.core.component.DataComponentType<?>,
-                    net.minecraft.core.component.DataComponentType<Boolean>> component,
+            DeferredHolder<DataComponentType<?>,
+                    DataComponentType<Boolean>> component,
             boolean fallback) {
         toggle(type, component.get(), fallback);
     }
@@ -1074,7 +1077,7 @@ public class ModeWheelScreen extends Screen {
             pageNameField.render(graphics, mouseX, mouseY, partialTick);
         }
         for (Renderable button : toolbarButtons) {
-            if (button instanceof net.minecraft.client.gui.components.AbstractWidget widget && widget.visible) {
+            if (button instanceof AbstractWidget widget && widget.visible) {
                 widget.render(graphics, mouseX, mouseY, partialTick);
             }
         }

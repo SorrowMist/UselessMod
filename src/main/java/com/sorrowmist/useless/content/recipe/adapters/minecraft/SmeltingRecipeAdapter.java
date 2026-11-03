@@ -19,6 +19,7 @@ import net.minecraft.world.level.Level;
 import net.neoforged.neoforge.fluids.FluidStack;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -122,7 +123,7 @@ public class SmeltingRecipeAdapter implements IRecipeAdapter<AbstractCookingReci
             Map<Ingredient, Long> mergedInputs
     ) {
         List<RecipeHolder<T>> recipes = recipeManager.getAllRecipesFor(recipeType);
-        List<RecipeHolder<T>> matches = new java.util.ArrayList<>();
+        List<RecipeHolder<T>> matches = new ArrayList<>();
         for (RecipeHolder<T> holder : recipes) {
             T recipe = holder.value();
             NonNullList<Ingredient> ingredients = recipe.getIngredients();

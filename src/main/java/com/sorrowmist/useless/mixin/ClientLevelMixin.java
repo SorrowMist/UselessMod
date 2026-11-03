@@ -3,6 +3,7 @@ package com.sorrowmist.useless.mixin;
 import com.sorrowmist.useless.event.EventHandler;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.player.Player;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -22,7 +23,7 @@ public class ClientLevelMixin {
 
         Iterable<Entity> entities = cir.getReturnValue();
         cir.setReturnValue(() -> StreamSupport.stream(entities.spliterator(), false)
-                .filter(entity -> !(entity instanceof net.minecraft.world.entity.player.Player player
+                .filter(entity -> !(entity instanceof Player player
                         && EventHandler.hasBeefAdvancedStealthItem(player)))
                 .iterator());
     }

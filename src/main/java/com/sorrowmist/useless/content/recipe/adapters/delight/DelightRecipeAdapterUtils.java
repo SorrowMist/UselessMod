@@ -2,6 +2,9 @@ package com.sorrowmist.useless.content.recipe.adapters.delight;
 
 import com.sorrowmist.useless.content.recipe.AdapterUtils;
 import com.sorrowmist.useless.content.recipe.CountedIngredient;
+import com.sorrowmist.useless.content.recipe.FluidIngredientAllocator;
+import com.sorrowmist.useless.content.recipe.ItemIngredientAllocator;
+import com.sorrowmist.useless.content.recipe.LongSizedFluidIngredient;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceLocation;
@@ -12,6 +15,7 @@ import net.minecraft.world.item.crafting.Ingredient;
 import net.minecraft.world.item.crafting.Recipe;
 import net.minecraft.world.item.crafting.RecipeHolder;
 import net.minecraft.world.item.crafting.RecipeManager;
+import net.neoforged.neoforge.fluids.FluidStack;
 import vectorwing.farmersdelight.common.crafting.CookingPotRecipe;
 import org.jetbrains.annotations.Nullable;
 
@@ -111,7 +115,7 @@ public final class DelightRecipeAdapterUtils {
             return !hasActualInputs && !hasMergedInputs;
         }
         if (hasActualInputs) {
-            return com.sorrowmist.useless.content.recipe.ItemIngredientAllocator.matches(
+            return ItemIngredientAllocator.matches(
                     requirements, actualInputs, 1L);
         }
         return hasMergedInputs && AdapterUtils.matchesRequired(
@@ -119,13 +123,13 @@ public final class DelightRecipeAdapterUtils {
     }
 
     public static boolean matchesFluids(
-            List<com.sorrowmist.useless.content.recipe.LongSizedFluidIngredient> requirements,
-            @Nullable Map<net.neoforged.neoforge.fluids.FluidStack, Long> mergedFluids) {
+            List<LongSizedFluidIngredient> requirements,
+            @Nullable Map<FluidStack, Long> mergedFluids) {
         boolean hasFluids = mergedFluids != null && !mergedFluids.isEmpty();
         if (requirements == null || requirements.isEmpty()) {
             return !hasFluids;
         }
-        return hasFluids && com.sorrowmist.useless.content.recipe.FluidIngredientAllocator
+        return hasFluids && FluidIngredientAllocator
                 .matchesLong(requirements, mergedFluids, 1L);
     }
 

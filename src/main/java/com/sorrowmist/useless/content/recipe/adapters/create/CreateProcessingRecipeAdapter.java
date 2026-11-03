@@ -4,6 +4,7 @@ import com.mojang.logging.LogUtils;
 import com.simibubi.create.content.processing.recipe.ProcessingRecipe;
 import com.sorrowmist.useless.content.recipe.AdvancedAlloyFurnaceRecipe;
 import com.sorrowmist.useless.content.recipe.IRecipeAdapter;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.crafting.RecipeHolder;
 import net.minecraft.world.item.crafting.Ingredient;
@@ -47,7 +48,7 @@ public final class CreateProcessingRecipeAdapter implements IRecipeAdapter<Proce
     }
 
     static List<AdvancedAlloyFurnaceRecipe> converted(
-            net.minecraft.resources.ResourceLocation id, ProcessingRecipe<?, ?> source) {
+            ResourceLocation id, ProcessingRecipe<?, ?> source) {
         AdvancedAlloyFurnaceRecipe converted = CreateRecipeAdapterUtils.convertProcessing(
                 id, source, CreateRecipeAdapterUtils.processingMolds(source), LOGGER);
         return converted == null ? List.of() : List.of(converted);

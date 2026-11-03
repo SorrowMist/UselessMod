@@ -7,6 +7,7 @@ import com.sorrowmist.useless.content.recipe.CountedIngredient;
 import com.sorrowmist.useless.content.recipe.ExpectedOutputScaler;
 import com.sorrowmist.useless.content.recipe.FluidIngredientAllocator;
 import com.sorrowmist.useless.content.recipe.LongSizedFluidIngredient;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.crafting.Ingredient;
 import net.neoforged.neoforge.fluids.FluidStack;
@@ -29,7 +30,7 @@ final class ExtraUpgradesCraftingRecipeAdapterSupport {
 
     @Nullable
     static AdvancedAlloyFurnaceRecipe precisionRecipe(
-            net.minecraft.resources.ResourceLocation id, List<Ingredient> sourceInputs,
+            ResourceLocation id, List<Ingredient> sourceInputs,
             ItemStack sourceOutput, float chance, ItemStack table) {
         if (sourceInputs == null || sourceOutput == null || sourceOutput.isEmpty()
                 || sourceOutput.getCount() <= 0 || !Float.isFinite(chance) || chance <= 0.0F) {
@@ -73,7 +74,7 @@ final class ExtraUpgradesCraftingRecipeAdapterSupport {
 
     @Nullable
     static AdvancedAlloyFurnaceRecipe fluidRecipe(
-            net.minecraft.resources.ResourceLocation id, List<Ingredient> sourceInputs,
+            ResourceLocation id, List<Ingredient> sourceInputs,
             FluidStack sourceFluid, ItemStack sourceOutput, ItemStack table) {
         if (sourceFluid == null || sourceFluid.isEmpty() || sourceFluid.getAmount() <= 0
                 || sourceOutput == null || sourceOutput.isEmpty() || sourceOutput.getCount() <= 0) {

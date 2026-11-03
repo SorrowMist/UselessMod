@@ -23,6 +23,7 @@ import net.minecraft.world.level.material.Fluids;
 import net.neoforged.neoforge.fluids.FluidStack;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -122,7 +123,7 @@ public class SteakLightningRecipeAdapter implements IRecipeAdapter<SteakLightnin
         if (!matchesMold(mold)) return List.of();
         if (mergedFluids == null || mergedFluids.isEmpty()) return List.of();
 
-        List<RecipeHolder<SteakLightningDummyRecipe>> matches = new java.util.ArrayList<>();
+        List<RecipeHolder<SteakLightningDummyRecipe>> matches = new ArrayList<>();
         if (hasFluid(mergedFluids, Fluids.WATER)) {
             matches.add(new RecipeHolder<>(waterRecipe.id(), new SteakLightningDummyRecipe(waterRecipe)));
         }

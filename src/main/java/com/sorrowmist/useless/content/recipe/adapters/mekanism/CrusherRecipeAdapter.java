@@ -18,6 +18,7 @@ import net.neoforged.neoforge.fluids.FluidStack;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -89,7 +90,7 @@ public class CrusherRecipeAdapter implements IRecipeAdapter<ItemStackToItemStack
                 MekanismRecipeTypes.TYPE_CRUSHING.value()
         );
 
-        List<RecipeHolder<ItemStackToItemStackRecipe>> matches = new java.util.ArrayList<>();
+        List<RecipeHolder<ItemStackToItemStackRecipe>> matches = new ArrayList<>();
         for (RecipeHolder<ItemStackToItemStackRecipe> holder : recipes) {
             ItemStackToItemStackRecipe recipe = holder.value();
             ItemStackIngredient input = recipe.getInput();
@@ -113,7 +114,7 @@ public class CrusherRecipeAdapter implements IRecipeAdapter<ItemStackToItemStack
         }
         CountedIngredient counted = MekanismChemicalRecipeSupport.item(required);
         if (counted == null) return false;
-        Map<Ingredient, Long> requiredCounts = new java.util.LinkedHashMap<>();
+        Map<Ingredient, Long> requiredCounts = new LinkedHashMap<>();
         AdapterUtils.mergeIngredient(requiredCounts, counted.ingredient(), counted.count());
         return AdapterUtils.matchesRequired(mergedInputs, requiredCounts);
     }

@@ -8,6 +8,7 @@ import com.sorrowmist.useless.api.enums.AlloyFurnaceMode;
 import com.sorrowmist.useless.content.recipe.AdapterUtils;
 import com.sorrowmist.useless.content.recipe.AdvancedAlloyFurnaceRecipe;
 import com.sorrowmist.useless.content.recipe.CountedIngredient;
+import com.sorrowmist.useless.content.recipe.FluidIngredientAllocator;
 import com.sorrowmist.useless.content.recipe.IRecipeAdapter;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceLocation;
@@ -138,7 +139,7 @@ public class OverloadProcessingRecipeAdapter implements IRecipeAdapter<OverloadP
         }
 
         RecipeManager recipeManager = level.getRecipeManager();
-        List<RecipeHolder<OverloadProcessingRecipe>> matches = new java.util.ArrayList<>();
+        List<RecipeHolder<OverloadProcessingRecipe>> matches = new ArrayList<>();
         for (RecipeHolder<OverloadProcessingRecipe> holder : recipeManager.getAllRecipesFor(ModRecipeTypes.OVERLOAD_PROCESSING_TYPE.get())) {
             OverloadProcessingRecipe recipe = holder.value();
 
@@ -158,7 +159,7 @@ public class OverloadProcessingRecipeAdapter implements IRecipeAdapter<OverloadP
             // 检查流体输入匹配（使用已合并的流体数据）
             boolean fluidsMatch = recipeFluidInput.isEmpty()
                     || (AdapterUtils.toSizedFluidIngredient(recipeFluidInput) != null
-                    && com.sorrowmist.useless.content.recipe.FluidIngredientAllocator.matches(
+                    && FluidIngredientAllocator.matches(
                     List.of(AdapterUtils.toSizedFluidIngredient(recipeFluidInput)),
                     mergedFluids, 1L));
 

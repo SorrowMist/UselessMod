@@ -1,6 +1,7 @@
 package com.sorrowmist.useless.network;
 
 import com.sorrowmist.useless.UselessMod;
+import com.sorrowmist.useless.compat.occultism.RitualSatchelCompat;
 import com.sorrowmist.useless.content.items.EndlessBeafItem;
 import com.sorrowmist.useless.core.component.UComponents;
 import com.sorrowmist.useless.utils.UselessItemUtils;
@@ -61,7 +62,7 @@ public class RitualSatchelPlacePacket implements CustomPacketPayload {
             if (!stack.getOrDefault(UComponents.BeefRitualSatchelComponent.get(), false)) return;
             if (!(player.level() instanceof ServerLevel serverLevel)) return;
 
-            com.sorrowmist.useless.compat.occultism.RitualSatchelCompat.placeFromAe(
+            RitualSatchelCompat.placeFromAe(
                     serverLevel, player, stack, msg.multiblockId, msg.anchor, msg.facing);
 
             player.containerMenu.broadcastChanges();

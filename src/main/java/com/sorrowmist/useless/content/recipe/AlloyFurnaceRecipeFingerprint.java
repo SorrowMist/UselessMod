@@ -7,6 +7,7 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.mojang.serialization.Codec;
+import com.mojang.serialization.DynamicOps;
 import com.mojang.serialization.JsonOps;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.core.component.DataComponentPatch;
@@ -28,6 +29,9 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.TreeMap;
+import java.util.function.Function;
+import java.util.function.LongSupplier;
+import net.neoforged.neoforge.fluids.crafting.FluidIngredient;
 
 public final class AlloyFurnaceRecipeFingerprint {
     private AlloyFurnaceRecipeFingerprint() {
@@ -202,7 +206,7 @@ public final class AlloyFurnaceRecipeFingerprint {
     }
 
     private static String safeFluidIngredientValue(
-            net.neoforged.neoforge.fluids.crafting.FluidIngredient ingredient,
+            FluidIngredient ingredient,
             HolderLookup.Provider registries) {
         if (ingredient == null) return "empty";
         try {
@@ -213,7 +217,7 @@ public final class AlloyFurnaceRecipeFingerprint {
         }
         try {
             var context = registries.createSerializationContext(JsonOps.INSTANCE);
-            var encoded = net.neoforged.neoforge.fluids.crafting.FluidIngredient.CODEC
+            var encoded = FluidIngredient.CODEC
                     .encodeStart(context, ingredient);
             if (encoded.result().isPresent()) return canonicalize(encoded.result().get()).toString();
         } catch (RuntimeException ignored) {
@@ -251,7 +255,7 @@ public final class AlloyFurnaceRecipeFingerprint {
         String components;
         try {
             var context = registries.createSerializationContext(JsonOps.INSTANCE);
-            var encoded = net.minecraft.core.component.DataComponentPatch.CODEC
+            var encoded = DataComponentPatch.CODEC
                     .encodeStart(context, stack.getComponentsPatch());
             components = encoded.result().map(AlloyFurnaceRecipeFingerprint::canonicalize)
                     .map(JsonElement::toString)
@@ -402,7 +406,7 @@ public final class AlloyFurnaceRecipeFingerprint {
         return "value_type=" + (value == null ? "null" : value.getClass().getName());
     }
 
-    private static String safeLong(java.util.function.LongSupplier supplier) {
+    private static String safeLong(LongSupplier supplier) {
         try {
             return Long.toString(supplier.getAsLong());
         } catch (RuntimeException exception) {
@@ -418,7 +422,7 @@ public final class AlloyFurnaceRecipeFingerprint {
 
     private static <T> void append(
             StringBuilder value, String name, List<T> fields,
-            java.util.function.Function<T, String> encoder) {
+            Function<T, String> encoder) {
         value.append(name).append('[');
         if (fields != null) {
             int index = 0;
@@ -491,7 +495,7 @@ public final class AlloyFurnaceRecipeFingerprint {
     private static void normalizeIngredients(
             AdvancedAlloyFurnaceRecipe recipe,
             JsonObject encoded,
-            com.mojang.serialization.DynamicOps<JsonElement> context,
+            DynamicOps<JsonElement> context,
             boolean preserveTags) {
         JsonArray inputs = new JsonArray();
         for (CountedIngredient input : recipe.inputs()) {
@@ -517,7 +521,7 @@ public final class AlloyFurnaceRecipeFingerprint {
             }
             // Mold requirements are a set-like collection for identity purposes, but repeated
             // entries remain significant. Sorting the encoded elements makes list order irrelevant.
-            moldElements.sort(java.util.Comparator.comparing(element -> canonicalize(element).toString()));
+            moldElements.sort(Comparator.comparing(element -> canonicalize(element).toString()));
             JsonArray molds = new JsonArray();
             moldElements.forEach(molds::add);
             encoded.add("molds", molds);
@@ -528,7 +532,7 @@ public final class AlloyFurnaceRecipeFingerprint {
     private static void encodeLegacyFluidInputs(
             AdvancedAlloyFurnaceRecipe recipe,
             JsonObject encoded,
-            com.mojang.serialization.DynamicOps<JsonElement> context) {
+            DynamicOps<JsonElement> context) {
         JsonArray fluids = new JsonArray();
         for (LongSizedFluidIngredient ingredient : recipe.inputFluids()) {
             if (ingredient == null || ingredient.ingredient() == null || ingredient.amount() <= 0) continue;
@@ -542,7 +546,7 @@ public final class AlloyFurnaceRecipeFingerprint {
 
     private static JsonElement encodeSemanticIngredient(
             Ingredient ingredient,
-            com.mojang.serialization.DynamicOps<JsonElement> context,
+            DynamicOps<JsonElement> context,
             boolean preserveTags) {
         if (preserveTags && hasDirectTag(ingredient)) {
             return Ingredient.CODEC.encodeStart(context, ingredient).getOrThrow();
@@ -584,9 +588,9 @@ public final class AlloyFurnaceRecipeFingerprint {
      * single-item AE key and the independent count.
      */
     private static JsonElement encodeExactOutput(
-            net.minecraft.world.item.ItemStack output,
-            com.mojang.serialization.DynamicOps<JsonElement> context) {
-        var encoded = net.minecraft.world.item.ItemStack.CODEC.encodeStart(context, output);
+            ItemStack output,
+            DynamicOps<JsonElement> context) {
+        var encoded = ItemStack.CODEC.encodeStart(context, output);
         var result = encoded.result();
         if (result.isPresent()) {
             return result.get();

@@ -137,7 +137,7 @@ public class AwakeningRecipeAdapter implements IRecipeAdapter<IAwakeningRecipe> 
                 ModRecipeTypes.AWAKENING.get()
         );
 
-        List<RecipeHolder<IAwakeningRecipe>> matches = new java.util.ArrayList<>();
+        List<RecipeHolder<IAwakeningRecipe>> matches = new ArrayList<>();
         for (RecipeHolder<IAwakeningRecipe> holder : recipes) {
             IAwakeningRecipe recipe = holder.value();
 

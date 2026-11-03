@@ -163,7 +163,7 @@ public final class ReAvaritiaCompressorRecipeAdapter
 
     private static ResourceLocation variantId(
             RecipeHolder<ICompressorRecipe> holder, CompressorTier tier) {
-        return net.minecraft.resources.ResourceLocation.fromNamespaceAndPath(
+        return ResourceLocation.fromNamespaceAndPath(
                 holder.id().getNamespace(),
                 holder.id().getPath() + "_" + tier.name + "_converted");
     }

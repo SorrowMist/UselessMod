@@ -9,6 +9,7 @@ import com.sorrowmist.useless.content.recipe.IRecipeAdapter;
 import cy.jdkdigital.productivebees.common.crafting.ingredient.BeeIngredient;
 import cy.jdkdigital.productivebees.common.crafting.ingredient.ComponentIngredient;
 import cy.jdkdigital.productivebees.common.recipe.AdvancedBeehiveRecipe;
+import cy.jdkdigital.productivebees.init.ModRecipeTypes;
 import cy.jdkdigital.productivebees.util.BeeCreator;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.SpawnEggItem;
@@ -102,7 +103,7 @@ public final class BeeProduceRecipeAdapter implements IRecipeAdapter<AdvancedBee
         RecipeManager recipeManager = level.getRecipeManager();
         List<RecipeHolder<AdvancedBeehiveRecipe>> matches = new ArrayList<>();
         for (RecipeHolder<AdvancedBeehiveRecipe> holder : recipeManager.getAllRecipesFor(
-                cy.jdkdigital.productivebees.init.ModRecipeTypes.ADVANCED_BEEHIVE_TYPE.get())) {
+                ModRecipeTypes.ADVANCED_BEEHIVE_TYPE.get())) {
             AdvancedBeehiveRecipe source = holder.value();
             BeeIngredient bee = source.ingredient.get();
             if (bee == null) {

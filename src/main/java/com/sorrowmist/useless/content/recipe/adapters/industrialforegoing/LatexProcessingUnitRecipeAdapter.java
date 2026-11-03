@@ -17,6 +17,7 @@ import net.neoforged.neoforge.fluids.FluidStack;
 import net.neoforged.neoforge.fluids.crafting.FluidIngredient;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -76,7 +77,7 @@ public final class LatexProcessingUnitRecipeAdapter
             Level level, Map<Ingredient, Long> mergedInputs,
             Map<FluidStack, Long> mergedFluids, @Nullable ItemStack mold) {
         if (level == null || !matchesMold(mold)) return List.of();
-        List<RecipeHolder<IndustrialForegoingSyntheticRecipe>> matches = new java.util.ArrayList<>();
+        List<RecipeHolder<IndustrialForegoingSyntheticRecipe>> matches = new ArrayList<>();
         for (RecipeHolder<IndustrialForegoingSyntheticRecipe> holder : getGeneratedRecipes(level)) {
             if (IndustrialForegoingRecipeAdapterUtils.matches(
                     holder.value().convertedRecipe(), mergedInputs, mergedFluids)) {

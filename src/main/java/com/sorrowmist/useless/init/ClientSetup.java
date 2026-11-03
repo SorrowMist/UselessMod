@@ -5,7 +5,6 @@ import appeng.crafting.pattern.AEProcessingPattern;
 import com.sorrowmist.useless.UselessMod;
 import com.sorrowmist.useless.api.enums.EnumColor;
 import com.sorrowmist.useless.client.gui.AdvancedAlloyFurnaceScreen;
-import com.sorrowmist.useless.client.gui.PagedRecoverableScreen;
 import com.sorrowmist.useless.client.gui.PatternAssemblyScreen;
 import com.sorrowmist.useless.client.gui.MoldHubScreen;
 import com.sorrowmist.useless.client.gui.MultiblockAlloyFurnaceScreen;
@@ -20,7 +19,6 @@ import com.sorrowmist.useless.content.blockentities.ThermostatBlockEntity;
 import com.sorrowmist.useless.content.blocks.GlowPlasticBlock;
 import com.sorrowmist.useless.content.blocks.TemperatureRegulatorBlock;
 import com.sorrowmist.useless.content.items.EndlessBeafItem;
-import com.sorrowmist.useless.content.menus.AdvancedAlloyFurnaceMenu;
 import com.sorrowmist.useless.client.gui.PatternConverterScreen;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.OmniversalPatternEncoding;
 import com.sorrowmist.useless.content.recipe.AlloyFurnaceRecipeCatalog;
@@ -46,6 +44,7 @@ import net.minecraft.world.level.Level;
 
 import java.util.HashSet;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 
 @EventBusSubscriber(modid = UselessMod.MODID, value = Dist.CLIENT)
@@ -308,7 +307,7 @@ public class ClientSetup {
                                 .filter(candidate -> candidate.identity().recipeId().equals(data.recipeId()))
                                 .toList();
                 if (byId.size() == 1) {
-                    entry = java.util.Optional.of(byId.getFirst());
+                    entry = Optional.of(byId.getFirst());
                 }
             }
             return entry.map(candidate ->

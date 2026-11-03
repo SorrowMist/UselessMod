@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalInt;
+import java.util.Set;
 
 /** Converts Ender Crafter recipes; source crafting time is expressed in seconds. */
 public class ExtendedCraftingEnderCrafterRecipeAdapter implements IRecipeAdapter<IEnderCrafterRecipe> {
@@ -118,7 +119,7 @@ public class ExtendedCraftingEnderCrafterRecipeAdapter implements IRecipeAdapter
 
         Optional<List<ItemStack>> remainders = ExtendedCraftingAdapterUtils.deterministicRemainders(
                 ingredients,
-                java.util.Set.of(),
+                Set.of(),
                 stacks -> {
                     int[] dimensions = ExtendedCraftingAdapterUtils.gridDimensions(source, stacks.size());
                     return CraftingInput.of(dimensions[0], dimensions[1], stacks);

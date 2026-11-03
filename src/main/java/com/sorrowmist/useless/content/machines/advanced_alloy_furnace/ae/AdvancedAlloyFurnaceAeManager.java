@@ -41,6 +41,7 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.inventory.TransientCraftingContainer;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.crafting.CraftingInput;
+import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
 import net.neoforged.neoforge.network.PacketDistributor;
 import org.jetbrains.annotations.NotNull;
@@ -667,7 +668,7 @@ public final class AdvancedAlloyFurnaceAeManager {
 
         var packet = createTaskProgressPacket();
         PacketDistributor.sendToPlayersTrackingChunk(serverLevel,
-                new net.minecraft.world.level.ChunkPos(this.owner.getBlockPos()), packet);
+                new ChunkPos(this.owner.getBlockPos()), packet);
     }
 
     public void sendAETaskProgressToPlayer(ServerPlayer player) {
@@ -2632,7 +2633,7 @@ public final class AdvancedAlloyFurnaceAeManager {
 
         @Nullable
         static PendingAEBatch load(CompoundTag tag, Level level, HolderLookup.Provider registries) {
-            appeng.api.stacks.AEItemKey definition = appeng.api.stacks.AEItemKey.fromTag(registries, tag.getCompound("Pattern"));
+            AEItemKey definition = AEItemKey.fromTag(registries, tag.getCompound("Pattern"));
             if (definition == null) {
                 return null;
             }

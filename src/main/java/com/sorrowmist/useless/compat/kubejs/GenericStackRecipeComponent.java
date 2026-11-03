@@ -2,6 +2,7 @@ package com.sorrowmist.useless.compat.kubejs;
 
 import appeng.api.stacks.GenericStack;
 import com.google.gson.JsonElement;
+import com.mojang.serialization.Codec;
 import dev.latvian.mods.kubejs.KubeJS;
 import dev.latvian.mods.kubejs.recipe.RecipeScriptContext;
 import dev.latvian.mods.kubejs.recipe.component.RecipeComponent;
@@ -9,6 +10,7 @@ import dev.latvian.mods.kubejs.recipe.component.RecipeComponentType;
 import dev.latvian.mods.kubejs.recipe.filter.RecipeMatchContext;
 import dev.latvian.mods.kubejs.util.JsonUtils;
 import dev.latvian.mods.rhino.type.TypeInfo;
+import java.util.Map;
 
 /** Converts a KubeJS object into an AE2 GenericStack using its registry-aware codec. */
 public final class GenericStackRecipeComponent implements RecipeComponent<GenericStack> {
@@ -27,7 +29,7 @@ public final class GenericStackRecipeComponent implements RecipeComponent<Generi
     }
 
     @Override
-    public com.mojang.serialization.Codec<GenericStack> codec() {
+    public Codec<GenericStack> codec() {
         return GenericStack.CODEC;
     }
 
@@ -48,7 +50,7 @@ public final class GenericStackRecipeComponent implements RecipeComponent<Generi
 
     @Override
     public boolean hasPriority(RecipeMatchContext cx, Object from) {
-        return from instanceof java.util.Map<?, ?> || from instanceof JsonElement;
+        return from instanceof Map<?, ?> || from instanceof JsonElement;
     }
 
     @Override

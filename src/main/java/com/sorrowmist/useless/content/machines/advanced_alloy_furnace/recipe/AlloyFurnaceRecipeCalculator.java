@@ -1,5 +1,6 @@
 package com.sorrowmist.useless.content.machines.advanced_alloy_furnace.recipe;
 
+import appeng.api.stacks.GenericStack;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.catalyst.CatalystEffectResolver;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.catalyst.ResolvedCatalystEffect;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.io.FurnaceInputPort;
@@ -98,7 +99,7 @@ public final class AlloyFurnaceRecipeCalculator {
             }
         }
 
-        List<appeng.api.stacks.GenericStack> currentChemicals = new ArrayList<>();
+        List<GenericStack> currentChemicals = new ArrayList<>();
         ChemicalKeyProvider provider = currentChemicalKeyProvider();
         for (int i = 0; i < this.inputChemicalStorage.size(); i++) {
             var generic = provider.toGenericStack(this.inputChemicalStorage.getStackInSlot(i));

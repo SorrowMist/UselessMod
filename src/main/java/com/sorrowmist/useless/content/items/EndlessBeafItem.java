@@ -1,10 +1,12 @@
 package com.sorrowmist.useless.content.items;
 
+import com.sorrowmist.useless.api.enums.tool.ConstructionWandCoreMode;
 import com.sorrowmist.useless.api.enums.tool.EnchantMode;
 import com.sorrowmist.useless.api.enums.tool.ToolTypeMode;
 import com.sorrowmist.useless.client.BeefAutoClicker;
 import com.sorrowmist.useless.client.BeefTooltipPager;
 import com.sorrowmist.useless.client.TooltipPageState;
+import com.sorrowmist.useless.compat.occultism.RitualSatchelClientCompat;
 import com.sorrowmist.useless.content.blocks.GlowPlasticBlock;
 import com.sorrowmist.useless.content.blocks.UselessGlassBlock;
 import com.sorrowmist.useless.compat.enderio.EnderIOTravelCompat;
@@ -47,7 +49,6 @@ import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.HumanoidArm;
 import net.minecraft.world.entity.LightningBolt;
 import net.minecraft.world.entity.LivingEntity;
-import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.OwnableEntity;
 import net.minecraft.world.entity.Pose;
 import net.minecraft.world.entity.ai.attributes.AttributeInstance;
@@ -75,6 +76,7 @@ import net.minecraft.world.item.enchantment.Enchantments;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.LevelReader;
 import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.BrushableBlock;
 import net.minecraft.world.level.block.CandleCakeBlock;
 import net.minecraft.world.level.block.RenderShape;
@@ -195,7 +197,7 @@ public class EndlessBeafItem extends TieredItem {
                 .component(UComponents.WrenchTagEnabledComponent, wrenchTagEnabled)
                 .component(UComponents.ConstructionWandEnabledComponent, false)
                 .component(UComponents.ConstructionWandCoreComponent,
-                           com.sorrowmist.useless.api.enums.tool.ConstructionWandCoreMode.DEFAULT)
+                           ConstructionWandCoreMode.DEFAULT)
                 .component(UComponents.CurrentToolTypeComponent, ToolTypeMode.NONE_MODE)
                 // 自定义模型数据与附魔模式一一对应：0 = 时运（默认），1 = 精准采集
                 .component(DataComponents.CUSTOM_MODEL_DATA, new CustomModelData(0));
@@ -1272,7 +1274,7 @@ public class EndlessBeafItem extends TieredItem {
 
                 // 只有刷完那一刻才回收掉落
                 if (finished) {
-                    List<ItemStack> collected = new java.util.ArrayList<>();
+                    List<ItemStack> collected = new ArrayList<>();
                     level.getEntitiesOfClass(ItemEntity.class, area).stream()
                          .filter(e -> !before.contains(e.getUUID()))
                          .forEach(entity -> {
@@ -1305,7 +1307,7 @@ public class EndlessBeafItem extends TieredItem {
         if (world.isClientSide && !player.isShiftKeyDown()
                 && ctx.getItemInHand().getOrDefault(UComponents.BeefRitualSatchelComponent.get(), false)
                 && ModList.get().isLoaded("occultism")
-                && com.sorrowmist.useless.compat.occultism.RitualSatchelClientCompat
+                && RitualSatchelClientCompat
                         .trySendPlacement(world, player, ctx.getClickedPos())) {
             return InteractionResult.SUCCESS;
         }
@@ -1397,7 +1399,7 @@ public class EndlessBeafItem extends TieredItem {
     }
 
     public static InteractionResult trySummonLightningForCollector(Level level, BlockPos clickedPos, @Nullable Player player) {
-        if (!level.getBlockState(clickedPos).is(net.minecraft.world.level.block.Blocks.LIGHTNING_ROD)) {
+        if (!level.getBlockState(clickedPos).is(Blocks.LIGHTNING_ROD)) {
             return InteractionResult.PASS;
         }
 

@@ -2,12 +2,14 @@ package com.sorrowmist.useless.data;
 
 import com.sorrowmist.useless.core.config.BeefToolProtectionManager;
 import com.sorrowmist.useless.core.config.ChainGroupManager;
+import com.sorrowmist.useless.utils.UselessItemUtils;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.Tag;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 
+import java.util.AbstractMap;
 import java.util.List;
 
 /** Loads and stores the beef tool layout in a player's persistent save data. */
@@ -173,8 +175,8 @@ public final class BeefToolLayoutManager {
     }
 
     private static ItemStack findTarget(ServerPlayer player) {
-        return com.sorrowmist.useless.utils.UselessItemUtils.findTargetToolInHands(player)
-                .map(java.util.AbstractMap.SimpleImmutableEntry::getKey)
+        return UselessItemUtils.findTargetToolInHands(player)
+                .map(AbstractMap.SimpleImmutableEntry::getKey)
                 .orElse(ItemStack.EMPTY);
     }
 }

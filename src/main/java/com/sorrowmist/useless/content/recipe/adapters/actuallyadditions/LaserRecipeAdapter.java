@@ -6,6 +6,7 @@ import com.sorrowmist.useless.content.recipe.AdvancedAlloyFurnaceRecipe;
 import com.sorrowmist.useless.content.recipe.CountedIngredient;
 import com.sorrowmist.useless.content.recipe.IRecipeAdapter;
 import de.ellpeck.actuallyadditions.mod.blocks.ActuallyBlocks;
+import de.ellpeck.actuallyadditions.mod.crafting.ActuallyRecipes;
 import de.ellpeck.actuallyadditions.mod.crafting.LaserRecipe;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
@@ -91,7 +92,7 @@ public class LaserRecipeAdapter implements IRecipeAdapter<LaserRecipe> {
         if (mergedInputs.isEmpty() || level == null) return List.of();
 
         RecipeManager recipeManager = level.getRecipeManager();
-        List<RecipeHolder<LaserRecipe>> recipes = recipeManager.getAllRecipesFor(de.ellpeck.actuallyadditions.mod.crafting.ActuallyRecipes.Types.LASER.get());
+        List<RecipeHolder<LaserRecipe>> recipes = recipeManager.getAllRecipesFor(ActuallyRecipes.Types.LASER.get());
 
         return recipes.stream().filter(holder -> {
             Ingredient input = holder.value().getInput();

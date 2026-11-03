@@ -11,6 +11,7 @@ import mekanism.api.recipes.RotaryRecipe;
 import mekanism.api.recipes.ingredients.ChemicalStackIngredient;
 import mekanism.api.recipes.ingredients.FluidStackIngredient;
 import mekanism.common.registries.MekanismBlocks;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.crafting.Ingredient;
@@ -18,6 +19,7 @@ import net.minecraft.world.item.crafting.RecipeHolder;
 import net.minecraft.world.item.crafting.RecipeManager;
 import net.minecraft.world.level.Level;
 import net.neoforged.neoforge.fluids.FluidStack;
+import net.neoforged.neoforge.fluids.crafting.SizedFluidIngredient;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
@@ -50,7 +52,7 @@ public final class RotaryRecipeAdapter implements IRecipeAdapter<RotaryRecipe> {
         if (original.hasFluidToChemical()) {
             FluidStackIngredient fluidInput = original.getFluidInput();
             if (fluidInput != null && !fluidInput.hasNoMatchingInstances()) {
-                List<net.neoforged.neoforge.fluids.crafting.SizedFluidIngredient> fluidInputs =
+                List<SizedFluidIngredient> fluidInputs =
                         MekanismChemicalRecipeSupport.fluidIngredients(fluidInput);
                 for (ChemicalStack chemical : original.getChemicalOutputDefinition()) {
                     GenericStack output = MekanismChemicalRecipeSupport.key(chemical);
@@ -109,7 +111,7 @@ public final class RotaryRecipeAdapter implements IRecipeAdapter<RotaryRecipe> {
     }
 
     private static String fluidId(FluidStack stack) {
-        ResourceLocation id = net.minecraft.core.registries.BuiltInRegistries.FLUID.getKey(stack.getFluid());
+        ResourceLocation id = BuiltInRegistries.FLUID.getKey(stack.getFluid());
         return id.getNamespace() + "_" + id.getPath().replace('/', '_');
     }
 }

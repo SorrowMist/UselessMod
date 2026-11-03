@@ -30,7 +30,6 @@ import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.GridOut
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.CraftingTaskContext;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.OmniversalBigIntegerTarget;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.OmniversalPatternDetails;
-import com.sorrowmist.useless.compat.neoecoae.NeoEcoDynamicOutputCompat;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.SmartDoublingPatterns;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.catalyst.ResolvedCatalystEffect;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.parallel.AlloyFurnaceParallelCalculator;
@@ -43,6 +42,7 @@ import com.sorrowmist.useless.core.component.MultiblockRecoveryData;
 import com.sorrowmist.useless.energy.EnergyManager;
 import com.sorrowmist.useless.energy.IEnergyManager;
 import com.sorrowmist.useless.init.ModBlockEntities;
+import com.sorrowmist.useless.network.AETaskProgressPacket;
 import com.sorrowmist.useless.network.AlloyFurnaceErrorHighlightPacket;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -56,7 +56,6 @@ import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.ChunkPos;
-import net.neoforged.fml.ModList;
 import net.neoforged.neoforge.network.PacketDistributor;
 import net.minecraft.world.MenuProvider;
 import net.minecraft.world.entity.player.Inventory;
@@ -75,6 +74,7 @@ import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.ReentrantLock;
@@ -218,9 +218,9 @@ public final class MultiblockAlloyFurnaceCoreBlockEntity extends BlockEntity imp
         BlockPos validatedHatchPos = result.valid() ? result.passiveHatchPos() : null;
         boolean stateChanged = formed != result.valid()
                 || coilTier != validatedCoilTier
-                || !java.util.Objects.equals(patternAssemblyPos, validatedAssemblyPos)
-                || !java.util.Objects.equals(moldHubPos, validatedMoldHubPos)
-                || !java.util.Objects.equals(passiveHatchPos, validatedHatchPos);
+                || !Objects.equals(patternAssemblyPos, validatedAssemblyPos)
+                || !Objects.equals(moldHubPos, validatedMoldHubPos)
+                || !Objects.equals(passiveHatchPos, validatedHatchPos);
         formed = result.valid();
         coilTier = validatedCoilTier;
         patternAssemblyPos = validatedAssemblyPos == null ? null : validatedAssemblyPos.immutable();
@@ -428,7 +428,7 @@ public final class MultiblockAlloyFurnaceCoreBlockEntity extends BlockEntity imp
         return aeManager.getAETaskProgressList();
     }
 
-    public void updateClientTaskProgress(List<com.sorrowmist.useless.network.AETaskProgressPacket.TaskProgressData> tasks) {
+    public void updateClientTaskProgress(List<AETaskProgressPacket.TaskProgressData> tasks) {
         aeManager.updateClientTaskProgress(tasks);
     }
 

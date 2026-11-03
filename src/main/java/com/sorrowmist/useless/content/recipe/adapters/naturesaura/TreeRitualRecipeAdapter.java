@@ -6,6 +6,7 @@ import com.sorrowmist.useless.content.recipe.AdapterUtils;
 import com.sorrowmist.useless.content.recipe.AdvancedAlloyFurnaceRecipe;
 import com.sorrowmist.useless.content.recipe.CountedIngredient;
 import com.sorrowmist.useless.content.recipe.IRecipeAdapter;
+import de.ellpeck.naturesaura.recipes.ModRecipes;
 import de.ellpeck.naturesaura.recipes.TreeRitualRecipe;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.crafting.Ingredient;
@@ -59,7 +60,7 @@ public final class TreeRitualRecipeAdapter implements IRecipeAdapter<TreeRitualR
         RecipeManager recipeManager = level.getRecipeManager();
         List<RecipeHolder<TreeRitualRecipe>> matches = new ArrayList<>();
         for (RecipeHolder<TreeRitualRecipe> holder : recipeManager.getAllRecipesFor(
-                de.ellpeck.naturesaura.recipes.ModRecipes.TREE_RITUAL_TYPE)) {
+                ModRecipes.TREE_RITUAL_TYPE)) {
             Converted converted = convertData(holder.value());
             if (converted != null && AdapterUtils.matchesRequired(mergedInputs, converted.requirements())) {
                 matches.add(holder);

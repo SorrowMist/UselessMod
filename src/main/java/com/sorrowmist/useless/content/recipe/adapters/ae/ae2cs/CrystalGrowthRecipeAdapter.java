@@ -151,7 +151,7 @@ public class CrystalGrowthRecipeAdapter implements IRecipeAdapter<CrystalGrowthR
         if (level == null || mergedInputs.isEmpty()) return List.of();
         if (!matchesMold(mold)) return List.of();
 
-        List<RecipeHolder<GrowthDummyRecipe>> matches = new java.util.ArrayList<>();
+        List<RecipeHolder<GrowthDummyRecipe>> matches = new ArrayList<>();
         for (Ingredient input : mergedInputs.keySet()) {
             for (ItemStack stack : input.getItems()) {
                 Item item = stack.getItem();

@@ -1,6 +1,7 @@
 package com.sorrowmist.useless.content.recipe.adapters.ae.ae2lt;
 
 import appeng.api.stacks.AEKey;
+import appeng.api.stacks.GenericStack;
 import com.moakiee.ae2lt.machine.crystalcatalyzer.recipe.CrystalCatalyzerOutput;
 import com.moakiee.ae2lt.machine.crystalcatalyzer.recipe.CrystalCatalyzerRecipe;
 import com.moakiee.ae2lt.machine.crystalcatalyzer.recipe.Mode;
@@ -120,7 +121,7 @@ public class CrystalCatalyzerRecipeAdapter implements IRecipeAdapter<CrystalCata
             ResourceLocation id,
             ItemStack output,
             FluidStack waterInput,
-            List<appeng.api.stacks.GenericStack> keyInputs,
+            List<GenericStack> keyInputs,
             List<Ingredient> molds,
             CrystalCatalyzerRecipe source) {
         return new AdvancedAlloyFurnaceRecipe(

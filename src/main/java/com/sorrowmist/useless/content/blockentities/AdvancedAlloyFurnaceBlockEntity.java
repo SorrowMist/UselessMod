@@ -22,6 +22,7 @@ import appeng.api.networking.storage.IStorageService;
 import appeng.api.stacks.AEFluidKey;
 import appeng.api.stacks.AEItemKey;
 import appeng.api.stacks.AEKey;
+import appeng.api.stacks.GenericStack;
 import appeng.api.stacks.KeyCounter;
 import appeng.api.storage.MEStorage;
 import appeng.api.util.AECableType;
@@ -41,7 +42,6 @@ import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.AlloyFu
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.CraftingAeOutputTarget;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.GridOutputTarget;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.OmniversalPatternRepair;
-import com.sorrowmist.useless.compat.neoecoae.NeoEcoDynamicOutputCompat;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.chemical.ChemicalHandlerView;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.chemical.ChemicalCompatProviders;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.chemical.ChemicalKeyProvider;
@@ -80,6 +80,8 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.game.ClientGamePacketListener;
 import net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.tags.ItemTags;
 import net.minecraft.world.MenuProvider;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
@@ -90,8 +92,7 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import com.sorrowmist.useless.world.inventory.ExternalInventoryStore;
-import net.neoforged.fml.ModList;
-import net.neoforged.neoforge.capabilities.Capabilities;
+import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.neoforged.neoforge.energy.IEnergyStorage;
 import net.neoforged.neoforge.fluids.FluidStack;
 import net.neoforged.neoforge.fluids.capability.IFluidHandler;
@@ -103,6 +104,7 @@ import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 
 import java.math.BigInteger;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
@@ -368,8 +370,8 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
      * 检查物品是否是扳手
      */
     public static boolean isWrench(ItemStack stack) {
-        return stack.is(net.minecraft.tags.ItemTags.create(
-                net.minecraft.resources.ResourceLocation.fromNamespaceAndPath("c", "tools/wrench")));
+        return stack.is(ItemTags.create(
+                ResourceLocation.fromNamespaceAndPath("c", "tools/wrench")));
     }
 
     /**
@@ -399,7 +401,7 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
         entity.aeManager.tickPatternRefresh();
 
         boolean wasActive = entity.getBlockState().getValue(
-                com.sorrowmist.useless.content.blocks.AdvancedAlloyFurnaceBlock.getActiveProperty());
+                AdvancedAlloyFurnaceBlock.getActiveProperty());
 
         // 红石控制：被阻止时跳过所有操作
         boolean blocked = entity.isRedstoneBlocked();
@@ -1017,7 +1019,7 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
      * 获取方块的水平朝向。
      */
     public Direction getFacing() {
-        return this.getBlockState().getValue(net.minecraft.world.level.block.state.properties.BlockStateProperties.HORIZONTAL_FACING);
+        return this.getBlockState().getValue(BlockStateProperties.HORIZONTAL_FACING);
     }
 
     // ==================== 自动输入输出开关 ====================
@@ -1809,14 +1811,14 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
     public long tryOutputChemicalToAE(ChemicalStackView stack) {
         if (stack == null || stack.isEmpty()) return 0L;
         ChemicalKeyProvider provider = ChemicalKeyProviders.get();
-        appeng.api.stacks.GenericStack generic = provider.toGenericStack(stack);
+        GenericStack generic = provider.toGenericStack(stack);
         return generic == null ? 0L : this.tryOutputKeyToAE(generic.what(), generic.amount());
     }
 
     @Override
     public void handleUnreturnedChemical(ChemicalStackView stack) {
         if (stack == null || stack.isEmpty()) return;
-        appeng.api.stacks.GenericStack generic = ChemicalKeyProviders.get().toGenericStack(stack);
+        GenericStack generic = ChemicalKeyProviders.get().toGenericStack(stack);
         if (generic != null) {
             this.aeManager.stashUnreturnedInput(generic.what(), generic.amount());
         }
@@ -1854,7 +1856,7 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
 
     @Override
     public Iterable<ItemStack> getPatternStacks() {
-        List<ItemStack> result = new java.util.ArrayList<>(PATTERN_SLOTS_COUNT);
+        List<ItemStack> result = new ArrayList<>(PATTERN_SLOTS_COUNT);
         for (int slot = PATTERN_SLOTS_START; slot <= PATTERN_SLOTS_END; slot++) {
             result.add(itemHandler.getStackInSlot(slot));
         }

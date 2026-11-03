@@ -18,6 +18,7 @@ import net.neoforged.neoforge.fluids.FluidStack;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -109,7 +110,7 @@ public class PrecisionSawmillRecipeAdapter implements IRecipeAdapter<SawmillReci
                 MekanismRecipeTypes.TYPE_SAWING.value()
         );
 
-        List<RecipeHolder<SawmillRecipe>> matches = new java.util.ArrayList<>();
+        List<RecipeHolder<SawmillRecipe>> matches = new ArrayList<>();
         for (RecipeHolder<SawmillRecipe> holder : recipes) {
             SawmillRecipe recipe = holder.value();
             ItemStackIngredient input = recipe.getInput();
@@ -159,7 +160,7 @@ public class PrecisionSawmillRecipeAdapter implements IRecipeAdapter<SawmillReci
         }
         CountedIngredient counted = MekanismChemicalRecipeSupport.item(required);
         if (counted == null) return false;
-        Map<Ingredient, Long> requiredCounts = new java.util.LinkedHashMap<>();
+        Map<Ingredient, Long> requiredCounts = new LinkedHashMap<>();
         AdapterUtils.mergeIngredient(requiredCounts, counted.ingredient(), counted.count());
         return AdapterUtils.matchesRequired(mergedInputs, requiredCounts);
     }

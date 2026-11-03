@@ -2,6 +2,7 @@ package com.sorrowmist.useless.core.component;
 
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
+import io.netty.buffer.ByteBuf;
 import net.minecraft.core.UUIDUtil;
 import net.minecraft.network.codec.StreamCodec;
 
@@ -14,7 +15,7 @@ public record ExternalInventoryReference(ExternalInventoryKind kind, UUID id) {
             UUIDUtil.CODEC.fieldOf("id").forGetter(ExternalInventoryReference::id)
     ).apply(instance, ExternalInventoryReference::new));
 
-    public static final StreamCodec<io.netty.buffer.ByteBuf, ExternalInventoryReference> STREAM_CODEC =
+    public static final StreamCodec<ByteBuf, ExternalInventoryReference> STREAM_CODEC =
             StreamCodec.composite(
                     ExternalInventoryKind.STREAM_CODEC,
                     ExternalInventoryReference::kind,

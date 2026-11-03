@@ -6,6 +6,7 @@ import com.sorrowmist.useless.content.blocks.GlowPlasticBlock;
 import com.sorrowmist.useless.content.items.BeefCropHarvest;
 import com.sorrowmist.useless.content.items.EndlessBeafItem;
 import com.sorrowmist.useless.content.items.BeefTimeAcceleration;
+import com.sorrowmist.useless.content.recipe.adapters.occultism.OccultismSpiritEggHandler;
 import com.sorrowmist.useless.utils.mining.RightClickChainer;
 import com.sorrowmist.useless.compat.constructionwand.ConstructionWandLogic;
 import com.sorrowmist.useless.compat.neoecoae.NeoEcoCompat;
@@ -208,7 +209,7 @@ public class UselessMod {
     /** Isolates the optional Occultism class reference from the main mod entrypoint. */
     private static final class OccultismCompat {
         private static InteractionResult trySpawnMarkedSpirit(PlayerInteractEvent.RightClickBlock event) {
-            return com.sorrowmist.useless.content.recipe.adapters.occultism.OccultismSpiritEggHandler
+            return OccultismSpiritEggHandler
                     .trySpawn(event);
         }
     }

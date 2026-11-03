@@ -20,6 +20,7 @@ import net.minecraft.world.level.block.state.properties.Property;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.Vec3;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -107,7 +108,7 @@ public final class BeefCropHarvest {
      * @return 是否真的收获成功（非成熟作物或不受支持的方块返回 false）
      */
     public static boolean harvest(ServerLevel level, BlockPos pos, Player player, ItemStack tool) {
-        List<ItemStack> drops = new java.util.ArrayList<>();
+        List<ItemStack> drops = new ArrayList<>();
         if (!harvestAndCollect(level, pos, player, tool, drops)) {
             return false;
         }

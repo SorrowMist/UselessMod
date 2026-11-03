@@ -1,5 +1,6 @@
 package com.sorrowmist.useless.content.menus;
 
+import appeng.api.crafting.PatternDetailsHelper;
 import appeng.client.gui.Icon;
 import appeng.menu.AEBaseMenu;
 import appeng.menu.SlotSemantics;
@@ -24,6 +25,8 @@ import net.neoforged.neoforge.items.IItemHandler;
 import net.neoforged.neoforge.items.ItemStackHandler;
 import net.neoforged.neoforge.items.SlotItemHandler;
 import org.jetbrains.annotations.NotNull;
+import java.util.Collection;
+import java.util.Collections;
 
 /**
  * 支持高堆叠数量的槽位处理器
@@ -249,7 +252,7 @@ public class AdvancedAlloyFurnaceMenu extends AEBaseMenu {
      */
     private boolean tryMoveToMachine(ItemStack stack) {
         // 优先检查是否是样板，如果是则优先放入样板槽
-        if (appeng.api.crafting.PatternDetailsHelper.isEncodedPattern(stack)) {
+        if (PatternDetailsHelper.isEncodedPattern(stack)) {
             if (this.moveItemStackTo(stack, PATTERN_SLOTS_START, PATTERN_SLOTS_END + 1, false)) {
                 return true;
             }
@@ -372,11 +375,11 @@ public class AdvancedAlloyFurnaceMenu extends AEBaseMenu {
     }
 
     // 获取所有AE任务进度信息
-    public java.util.Collection<AdvancedAlloyFurnaceAeManager.AETaskProgress> getAETaskProgressList() {
+    public Collection<AdvancedAlloyFurnaceAeManager.AETaskProgress> getAETaskProgressList() {
         if (this.blockEntity != null) {
             return this.blockEntity.getAETaskProgressList();
         }
-        return java.util.Collections.emptyList();
+        return Collections.emptyList();
     }
 
     private void createPlayerInventorySlots(Inventory playerInventory, int inventoryX, int inventoryY, int hotbarY) {
@@ -429,7 +432,7 @@ public class AdvancedAlloyFurnaceMenu extends AEBaseMenu {
         int end = Math.min(base + slotsPerPage, AdvancedAlloyFurnaceLayout.PATTERN_SLOTS_COUNT);
 
         for (Slot slot : this.slots) {
-            if (slot instanceof com.sorrowmist.useless.inventory.slot.PatternSlotItemHandler patternSlot) {
+            if (slot instanceof PatternSlotItemHandler patternSlot) {
                 int slotIndex = slot.getSlotIndex();
                 int relativeIndex = slotIndex - AdvancedAlloyFurnaceLayout.PATTERN_SLOTS_START;
                 patternSlot.setActive(relativeIndex >= base && relativeIndex < end);

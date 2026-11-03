@@ -2,12 +2,12 @@ package com.sorrowmist.useless.content.menus;
 
 import com.sorrowmist.useless.init.ModMenuType;
 import com.sorrowmist.useless.network.DimensionConfigGhostSlotPacket;
-import com.sorrowmist.useless.network.DimensionConfigSubmitPacket;
 import com.sorrowmist.useless.world.dimension.DimensionGenerationConfig;
 import com.sorrowmist.useless.world.dimension.UselessDimensionConfigManager;
 import com.sorrowmist.useless.world.dimension.UselessDimensions;
 import com.sorrowmist.useless.world.teleport.AbstractDimensionTeleporter;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.chat.Component;
@@ -533,7 +533,7 @@ public final class DimensionConfigMenu extends AbstractContainerMenu {
 
         private static ItemStack stackFor(@Nullable ResourceLocation id) {
             if (id == null || !DimensionGenerationConfig.isValidBlockId(id)) return ItemStack.EMPTY;
-            return new ItemStack(net.minecraft.core.registries.BuiltInRegistries.BLOCK.get(id).asItem());
+            return new ItemStack(BuiltInRegistries.BLOCK.get(id).asItem());
         }
 
         private void setBlockId(@Nullable ResourceLocation id) {

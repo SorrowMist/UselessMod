@@ -1,5 +1,6 @@
 package com.sorrowmist.useless.content.blocks;
 
+import com.sorrowmist.useless.content.menus.DimensionConfigMenu;
 import com.sorrowmist.useless.world.teleport.AbstractDimensionTeleporter;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerPlayer;
@@ -54,7 +55,7 @@ public class TeleportPadBlock extends Block {
             Objects.requireNonNull(level.getServer()).execute(() -> {
                 AbstractDimensionTeleporter teleporter = teleporterSupplier.get();
                 if (editConfiguration) {
-                    com.sorrowmist.useless.content.menus.DimensionConfigMenu.openForEdit(
+                    DimensionConfigMenu.openForEdit(
                             serverPlayer, teleporter, pos);
                 } else {
                     teleporter.handleTeleport(serverPlayer, pos);

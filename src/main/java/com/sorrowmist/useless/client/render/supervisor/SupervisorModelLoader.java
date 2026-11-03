@@ -1,6 +1,7 @@
 package com.sorrowmist.useless.client.render.supervisor;
 
 import com.google.gson.JsonArray;
+import com.google.gson.JsonDeserializationContext;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParseException;
@@ -43,7 +44,7 @@ public final class SupervisorModelLoader implements IGeometryLoader<SupervisorGe
     }
 
     @Override
-    public SupervisorGeometry read(JsonObject jsonObject, com.google.gson.JsonDeserializationContext context) {
+    public SupervisorGeometry read(JsonObject jsonObject, JsonDeserializationContext context) {
         return SupervisorGeometry.read(GsonHelper.getAsJsonObject(jsonObject, "supervisor_model"));
     }
 }

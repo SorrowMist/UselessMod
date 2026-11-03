@@ -27,6 +27,7 @@ import net.minecraft.world.item.Items;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 
+import java.nio.charset.StandardCharsets;
 import java.util.Objects;
 
 /** Settings used by all three Useless Dimension chunk generators. */
@@ -535,7 +536,7 @@ public record DimensionGenerationConfig(
         if (text == null || text.isBlank()) {
             throw new PresetException(PresetError.INVALID_TEXT);
         }
-        if (text.getBytes(java.nio.charset.StandardCharsets.UTF_8).length > MAX_PRESET_BYTES) {
+        if (text.getBytes(StandardCharsets.UTF_8).length > MAX_PRESET_BYTES) {
             throw new PresetException(PresetError.LIMIT);
         }
         try {

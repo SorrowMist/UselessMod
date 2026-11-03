@@ -27,10 +27,10 @@ import me.desht.pneumaticcraft.common.recipes.machine.PressureEnchantingRecipe;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.crafting.Ingredient;
-import net.minecraft.world.item.crafting.Recipe;
 import net.minecraft.world.item.crafting.RecipeHolder;
 import net.minecraft.world.level.Level;
 import net.neoforged.neoforge.common.crafting.DataComponentIngredient;
+import net.neoforged.neoforge.common.crafting.SizedIngredient;
 import net.neoforged.neoforge.fluids.FluidStack;
 import net.neoforged.neoforge.fluids.crafting.SizedFluidIngredient;
 import org.jetbrains.annotations.Nullable;
@@ -396,10 +396,10 @@ public final class PneumaticCraftRecipeAdapter<T extends PneumaticCraftRecipe>
     }
 
     private static List<CountedIngredient> countedInputs(
-            List<net.neoforged.neoforge.common.crafting.SizedIngredient> inputs) {
+            List<SizedIngredient> inputs) {
         List<CountedIngredient> result = new ArrayList<>();
         if (inputs == null) return result;
-        for (net.neoforged.neoforge.common.crafting.SizedIngredient input : inputs) {
+        for (SizedIngredient input : inputs) {
             if (input != null && input.ingredient() != null && !input.ingredient().isEmpty()
                     && input.count() > 0) {
                 result.add(new CountedIngredient(input.ingredient(), input.count()));

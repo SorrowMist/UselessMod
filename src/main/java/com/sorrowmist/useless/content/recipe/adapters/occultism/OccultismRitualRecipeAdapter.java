@@ -26,6 +26,7 @@ import net.minecraft.core.component.DataComponentMap;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.item.ItemStack;
@@ -761,7 +762,7 @@ public final class OccultismRitualRecipeAdapter implements IRecipeAdapter<Ritual
                     entry.is(Enchantments.UNBREAKING) || entry.is(Enchantments.MENDING)));
         }
         output.set(DataComponents.RARITY, Rarity.EPIC);
-        output.set(DataComponents.CUSTOM_NAME, net.minecraft.network.chat.Component.empty()
+        output.set(DataComponents.CUSTOM_NAME, Component.empty()
                 .append(ChatFormatting.OBFUSCATED + "nice   " + ChatFormatting.RESET)
                 .append(output.getHoverName())
                 .append(ChatFormatting.OBFUSCATED + "   ecin" + ChatFormatting.RESET));
@@ -963,7 +964,7 @@ public final class OccultismRitualRecipeAdapter implements IRecipeAdapter<Ritual
     private static ResourceLocation variantId(ResourceLocation source, ItemStack... stacks) {
         StringBuilder suffix = new StringBuilder();
         for (ItemStack stack : stacks) {
-            ResourceLocation key = net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(stack.getItem());
+            ResourceLocation key = BuiltInRegistries.ITEM.getKey(stack.getItem());
             suffix.append('_').append(key.getNamespace()).append('_').append(key.getPath().replace('/', '_'));
         }
         return ResourceLocation.fromNamespaceAndPath(source.getNamespace(), source.getPath() + "_converted" + suffix);

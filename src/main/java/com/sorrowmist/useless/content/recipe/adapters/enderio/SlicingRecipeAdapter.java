@@ -19,8 +19,10 @@ import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 /** Converts Ender IO Slice and Splice recipes to the alloy furnace. */
 public final class SlicingRecipeAdapter implements IRecipeAdapter<SlicingRecipe> {
@@ -82,10 +84,10 @@ public final class SlicingRecipeAdapter implements IRecipeAdapter<SlicingRecipe>
         }
         return source.stream()
                 .filter(ingredient -> ingredient != null && !ingredient.isEmpty())
-                .collect(java.util.stream.Collectors.groupingBy(
+                .collect(Collectors.groupingBy(
                         ingredient -> ingredient,
-                        java.util.LinkedHashMap::new,
-                        java.util.stream.Collectors.counting()))
+                        LinkedHashMap::new,
+                        Collectors.counting()))
                 .entrySet().stream()
                 .map(entry -> new CountedIngredient(entry.getKey(), entry.getValue()))
                 .toList();

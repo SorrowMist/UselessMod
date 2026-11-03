@@ -7,6 +7,7 @@ import com.sorrowmist.useless.content.recipe.AdvancedAlloyFurnaceRecipe;
 import com.sorrowmist.useless.content.recipe.CountedIngredient;
 import com.sorrowmist.useless.content.recipe.IRecipeAdapter;
 import de.ellpeck.naturesaura.recipes.AltarRecipe;
+import de.ellpeck.naturesaura.recipes.ModRecipes;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.crafting.Ingredient;
 import net.minecraft.world.item.crafting.RecipeHolder;
@@ -66,7 +67,7 @@ public final class NatureAltarRecipeAdapter implements IRecipeAdapter<AltarRecip
         RecipeManager recipeManager = level.getRecipeManager();
         List<RecipeHolder<AltarRecipe>> matches = new ArrayList<>();
         for (RecipeHolder<AltarRecipe> holder : recipeManager.getAllRecipesFor(
-                de.ellpeck.naturesaura.recipes.ModRecipes.ALTAR_TYPE)) {
+                ModRecipes.ALTAR_TYPE)) {
             Converted converted = convertData(holder.value());
             if (converted != null && converted.mold().test(mold)
                     && AdapterUtils.matchesRequired(mergedInputs, converted.requirements())) {

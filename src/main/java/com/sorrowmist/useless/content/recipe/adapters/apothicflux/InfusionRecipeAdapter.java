@@ -28,6 +28,7 @@ import org.jetbrains.annotations.Nullable;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 /** Converts Apothic Enchanting infusion recipes using configured Flux bookshelves as molds. */
 public final class InfusionRecipeAdapter implements IRecipeAdapter<InfusionRecipe> {
@@ -40,7 +41,7 @@ public final class InfusionRecipeAdapter implements IRecipeAdapter<InfusionRecip
             new ShelfDefinition("flux_stats_bookshelf_tier_4", Tier.TIER_4));
 
     private static final Map<ResourceLocation, ShelfDefinition> SHELF_BY_ID = SHELVES.stream()
-            .collect(java.util.stream.Collectors.toUnmodifiableMap(
+            .collect(Collectors.toUnmodifiableMap(
                     definition -> definition.id(), definition -> definition));
 
     @Override

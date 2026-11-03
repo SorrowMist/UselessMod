@@ -94,7 +94,7 @@ public class CircuitEtcherRecipeAdapter implements IRecipeAdapter<CircuitEtcherR
         if (!checkMold(mold, "circuit_etcher")) return List.of();
 
         RecipeManager recipeManager = level.getRecipeManager();
-        List<RecipeHolder<CircuitEtcherRecipe>> matches = new java.util.ArrayList<>();
+        List<RecipeHolder<CircuitEtcherRecipe>> matches = new ArrayList<>();
         for (RecipeHolder<CircuitEtcherRecipe> holder : (List<RecipeHolder<CircuitEtcherRecipe>>) (List<?>)
                 recipeManager.getAllRecipesFor(AECSRecipeTypes.CIRCUIT_ETCHER.get())) {
             CircuitEtcherRecipe recipe = holder.value();

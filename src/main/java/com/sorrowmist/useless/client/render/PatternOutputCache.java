@@ -8,13 +8,14 @@ import org.jetbrains.annotations.Nullable;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
+import java.util.WeakHashMap;
 import java.util.function.Supplier;
 
 /** Caches the output used to paint encoded patterns in inventory screens. */
 final class PatternOutputCache {
     private static final int MAX_ENTRIES_PER_LEVEL = 512;
     private static final Object LOCK = new Object();
-    private static final Map<Level, LevelCache> LEVEL_CACHES = new java.util.WeakHashMap<>();
+    private static final Map<Level, LevelCache> LEVEL_CACHES = new WeakHashMap<>();
     private static final Map<AEItemKey, Optional<GenericStack>> LEVEL_INDEPENDENT_CACHE =
             new LinkedHashMap<>(64, 0.75F, true) {
                 @Override

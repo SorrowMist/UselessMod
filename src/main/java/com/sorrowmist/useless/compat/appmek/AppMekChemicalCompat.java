@@ -6,6 +6,7 @@ import com.sorrowmist.useless.compat.mekanism.MekanismChemicalCompat;
 import com.sorrowmist.useless.compat.mekanism.MekanismChemicalStackView;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.chemical.ChemicalKeyProvider;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.chemical.ChemicalKeyProviders;
+import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.chemical.ChemicalStackView;
 import com.sorrowmist.useless.init.ModBlockEntities;
 import me.ramidzkh.mekae2.MekCapabilities;
 import me.ramidzkh.mekae2.ae2.MekanismKey;
@@ -49,7 +50,7 @@ public final class AppMekChemicalCompat {
 
     private static final class Provider implements ChemicalKeyProvider {
         @Override
-        public @Nullable GenericStack toGenericStack(com.sorrowmist.useless.content.machines.advanced_alloy_furnace.chemical.ChemicalStackView stack) {
+        public @Nullable GenericStack toGenericStack(ChemicalStackView stack) {
             if (!(stack instanceof MekanismChemicalStackView mek) || mek.isEmpty() || mek.amount() <= 0L) {
                 return null;
             }
@@ -57,7 +58,7 @@ public final class AppMekChemicalCompat {
         }
 
         @Override
-        public @Nullable com.sorrowmist.useless.content.machines.advanced_alloy_furnace.chemical.ChemicalStackView fromGenericStack(GenericStack stack) {
+        public @Nullable ChemicalStackView fromGenericStack(GenericStack stack) {
             if (stack == null || stack.amount() <= 0L || !(stack.what() instanceof MekanismKey key)) {
                 return null;
             }

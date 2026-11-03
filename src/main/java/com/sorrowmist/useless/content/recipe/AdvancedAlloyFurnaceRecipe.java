@@ -1,6 +1,7 @@
 package com.sorrowmist.useless.content.recipe;
 
 import appeng.api.stacks.GenericStack;
+import com.mojang.datafixers.util.Either;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.MapCodec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
@@ -54,7 +55,7 @@ public record AdvancedAlloyFurnaceRecipe(
             .xmap(either -> either.map(
                             list -> list,
                             list -> list.stream().map(LongSizedFluidIngredient::from).toList()),
-                    list -> com.mojang.datafixers.util.Either.left(list));
+                    list -> Either.left(list));
 
     public AdvancedAlloyFurnaceRecipe {
         if (tier < NO_EXPLICIT_TIER || tier > MAX_TIER) {

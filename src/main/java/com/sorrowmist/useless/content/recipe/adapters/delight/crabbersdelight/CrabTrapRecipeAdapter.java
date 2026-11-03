@@ -1,5 +1,6 @@
 package com.sorrowmist.useless.content.recipe.adapters.delight.crabbersdelight;
 
+import appeng.api.stacks.AEKey;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
@@ -12,6 +13,7 @@ import com.sorrowmist.useless.content.recipe.IRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.ItemIngredientAllocator;
 import com.sorrowmist.useless.content.recipe.LongSizedFluidIngredient;
 import com.sorrowmist.useless.content.recipe.RecipeSourceIds;
+import net.minecraft.core.Holder;
 import net.minecraft.core.Registry;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
@@ -28,6 +30,7 @@ import net.minecraft.world.item.crafting.Ingredient;
 import net.minecraft.world.item.crafting.RecipeHolder;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.material.Fluids;
+import net.neoforged.neoforge.fluids.FluidStack;
 import net.neoforged.neoforge.fluids.crafting.FluidIngredient;
 import org.jetbrains.annotations.Nullable;
 
@@ -122,7 +125,7 @@ public final class CrabTrapRecipeAdapter implements IRecipeAdapter<CrabTrapSynth
     @Override
     public List<RecipeHolder<CrabTrapSyntheticRecipe>> findMatchingRecipes(
             Level level, Map<Ingredient, Long> mergedInputs,
-            Map<net.neoforged.neoforge.fluids.FluidStack, Long> mergedFluids,
+            Map<FluidStack, Long> mergedFluids,
             @Nullable ItemStack mold) {
         return findMatchingRecipes(level, mergedInputs, mergedFluids, Map.of(), mold, List.of());
     }
@@ -130,8 +133,8 @@ public final class CrabTrapRecipeAdapter implements IRecipeAdapter<CrabTrapSynth
     @Override
     public List<RecipeHolder<CrabTrapSyntheticRecipe>> findMatchingRecipes(
             Level level, Map<Ingredient, Long> mergedInputs,
-            Map<net.neoforged.neoforge.fluids.FluidStack, Long> mergedFluids,
-            Map<appeng.api.stacks.AEKey, Long> mergedKeys,
+            Map<FluidStack, Long> mergedFluids,
+            Map<AEKey, Long> mergedKeys,
             @Nullable ItemStack mold, List<ItemStack> actualInputs) {
         if (level == null || !matchesMold(mold)) {
             return List.of();
@@ -167,7 +170,7 @@ public final class CrabTrapRecipeAdapter implements IRecipeAdapter<CrabTrapSynth
         List<Item> items = new ArrayList<>();
         // The source tag contains AIR for the trap's no-bait mode. Keep it so that mode is
         // represented by a water-only converted recipe.
-        for (net.minecraft.core.Holder<Item> holder : itemRegistry.getTagOrEmpty(tag)) {
+        for (Holder<Item> holder : itemRegistry.getTagOrEmpty(tag)) {
             Item item = holder.value();
             if (item != null) {
                 items.add(item);

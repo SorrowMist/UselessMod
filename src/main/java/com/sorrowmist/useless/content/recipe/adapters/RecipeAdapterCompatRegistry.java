@@ -35,6 +35,13 @@ import com.sorrowmist.useless.content.recipe.adapters.enderio.SlicingRecipeAdapt
 import com.sorrowmist.useless.content.recipe.adapters.enderio.SoulBindingRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.enderio.SoulVialRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.enderio.VatFermentingRecipeAdapter;
+import com.sorrowmist.useless.content.recipe.adapters.exdeorum.BarrelCompostRecipeAdapter;
+import com.sorrowmist.useless.content.recipe.adapters.exdeorum.BarrelFluidMixingRecipeAdapter;
+import com.sorrowmist.useless.content.recipe.adapters.exdeorum.BarrelMixingRecipeAdapter;
+import com.sorrowmist.useless.content.recipe.adapters.exdeorum.CrucibleRecipeAdapter;
+import com.sorrowmist.useless.content.recipe.adapters.exdeorum.FluidTransformationRecipeAdapter;
+import com.sorrowmist.useless.content.recipe.adapters.exdeorum.HammerRecipeAdapter;
+import com.sorrowmist.useless.content.recipe.adapters.exdeorum.SieveRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.extendedcrafting.ExtendedCraftingCombinationRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.extendedcrafting.ExtendedCraftingCompressorRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.extendedcrafting.ExtendedCraftingEnderCrafterRecipeAdapter;
@@ -638,13 +645,13 @@ public final class RecipeAdapterCompatRegistry {
      * 钻石压缩锤。该适配器以生成配方方式提供结果，必须在此登记，否则其配方不会进入合金炉配方目录。</p>
      */
     private static void registerExDeorum() {
-        register(new com.sorrowmist.useless.content.recipe.adapters.exdeorum.BarrelCompostRecipeAdapter());
-        register(new com.sorrowmist.useless.content.recipe.adapters.exdeorum.BarrelMixingRecipeAdapter());
-        register(new com.sorrowmist.useless.content.recipe.adapters.exdeorum.BarrelFluidMixingRecipeAdapter());
-        register(new com.sorrowmist.useless.content.recipe.adapters.exdeorum.FluidTransformationRecipeAdapter());
-        register(new com.sorrowmist.useless.content.recipe.adapters.exdeorum.CrucibleRecipeAdapter());
-        register(new com.sorrowmist.useless.content.recipe.adapters.exdeorum.SieveRecipeAdapter());
-        register(new com.sorrowmist.useless.content.recipe.adapters.exdeorum.HammerRecipeAdapter());
+        register(new BarrelCompostRecipeAdapter());
+        register(new BarrelMixingRecipeAdapter());
+        register(new BarrelFluidMixingRecipeAdapter());
+        register(new FluidTransformationRecipeAdapter());
+        register(new CrucibleRecipeAdapter());
+        register(new SieveRecipeAdapter());
+        register(new HammerRecipeAdapter());
     }
 
     private record CompatEntry(@Nullable String modId, Runnable registerAction) {}

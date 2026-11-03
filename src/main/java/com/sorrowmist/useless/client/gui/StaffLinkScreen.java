@@ -15,7 +15,6 @@ import com.sorrowmist.useless.network.StaffLinkSyncPacket;
 import com.sorrowmist.useless.network.StaffLinkStressStatusPacket;
 import com.sorrowmist.useless.world.stafflink.StaffLinkNetwork;
 import net.minecraft.ChatFormatting;
-import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
@@ -42,6 +41,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalLong;
+import java.util.function.UnaryOperator;
 
 /**
  * 无线物流配置界面。
@@ -901,7 +901,7 @@ public final class StaffLinkScreen extends AbstractContainerScreen<StaffLinkMenu
     }
 
     /** 在详细面板上叠加一次改动（op / 黑名单），并把输入框里未提交的值一起带上。 */
-    private void editDetail(java.util.function.UnaryOperator<LinkFilterSlot> change) {
+    private void editDetail(UnaryOperator<LinkFilterSlot> change) {
         if (!detailPanelOpen || detailIndex < 0) {
             return;
         }

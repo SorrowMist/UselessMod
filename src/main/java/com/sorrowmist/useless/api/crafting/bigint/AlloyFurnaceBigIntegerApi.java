@@ -6,6 +6,7 @@ import appeng.core.definitions.AEItems;
 import com.sorrowmist.useless.init.ModItems;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.item.Item;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -106,7 +107,7 @@ public final class AlloyFurnaceBigIntegerApi {
     }
 
     /** 注册表未就绪时 {@code getKey} 可能返回 null，这里静默跳过而不是把 null 放进集合。 */
-    private static void addKey(Set<ResourceLocation> kinds, @Nullable net.minecraft.world.item.Item item) {
+    private static void addKey(Set<ResourceLocation> kinds, @Nullable Item item) {
         if (item == null) {
             return;
         }

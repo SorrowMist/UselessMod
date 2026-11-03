@@ -1,21 +1,21 @@
 package com.sorrowmist.useless.content.recipe.adapters.mekanism;
 
+import appeng.api.stacks.AEKey;
 import appeng.api.stacks.GenericStack;
 import com.sorrowmist.useless.content.recipe.AdapterUtils;
 import com.sorrowmist.useless.content.recipe.AdvancedAlloyFurnaceRecipe;
 import com.sorrowmist.useless.content.recipe.IRecipeAdapter;
-import mekanism.api.chemical.ChemicalStack;
 import mekanism.api.recipes.ElectrolysisRecipe;
 import mekanism.api.recipes.MekanismRecipeTypes;
 import mekanism.api.recipes.ingredients.FluidStackIngredient;
 import mekanism.common.registries.MekanismBlocks;
-import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.crafting.Ingredient;
 import net.minecraft.world.item.crafting.RecipeHolder;
 import net.minecraft.world.item.crafting.RecipeManager;
 import net.minecraft.world.level.Level;
 import net.neoforged.neoforge.fluids.FluidStack;
+import net.neoforged.neoforge.fluids.crafting.SizedFluidIngredient;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
@@ -47,7 +47,7 @@ public final class ElectrolysisRecipeAdapter implements IRecipeAdapter<Electroly
         if (input == null || input.hasNoMatchingInstances()) return List.of();
 
         List<AdvancedAlloyFurnaceRecipe> result = new ArrayList<>();
-        List<net.neoforged.neoforge.fluids.crafting.SizedFluidIngredient> fluidInputs =
+        List<SizedFluidIngredient> fluidInputs =
                 MekanismChemicalRecipeSupport.fluidIngredients(input);
         for (ElectrolysisRecipe.ElectrolysisRecipeOutput output : original.getOutputDefinition()) {
             GenericStack left = MekanismChemicalRecipeSupport.key(output.left());
@@ -66,7 +66,7 @@ public final class ElectrolysisRecipeAdapter implements IRecipeAdapter<Electroly
     @Override
     public List<RecipeHolder<ElectrolysisRecipe>> findMatchingRecipes(
             Level level, Map<Ingredient, Long> mergedInputs, Map<FluidStack, Long> mergedFluids,
-            Map<appeng.api.stacks.AEKey, Long> mergedKeys, @Nullable ItemStack mold) {
+            Map<AEKey, Long> mergedKeys, @Nullable ItemStack mold) {
         if (level == null || mergedFluids.isEmpty() || !matchesMold(mold)) return List.of();
         RecipeManager manager = level.getRecipeManager();
         List<RecipeHolder<ElectrolysisRecipe>> result = new ArrayList<>();

@@ -111,7 +111,7 @@ public class CrystalAssemblerRecipeAdapter implements IRecipeAdapter<CrystalAsse
         RecipeManager recipeManager = level.getRecipeManager();
         List<RecipeHolder<CrystalAssemblerRecipe>> recipes = recipeManager.getAllRecipesFor(CrystalAssemblerRecipe.TYPE);
 
-        List<RecipeHolder<CrystalAssemblerRecipe>> matches = new java.util.ArrayList<>();
+        List<RecipeHolder<CrystalAssemblerRecipe>> matches = new ArrayList<>();
         for (RecipeHolder<CrystalAssemblerRecipe> holder : recipes) {
             CrystalAssemblerRecipe recipe = holder.value();
             // 使用全类名

@@ -4,9 +4,7 @@ import com.breakinblocks.neovitae.common.block.NVBlocks;
 import com.breakinblocks.neovitae.common.recipe.NVRecipes;
 import com.breakinblocks.neovitae.common.recipe.tabulavitae.TabulaVitaeRecipe;
 import com.sorrowmist.useless.api.enums.AlloyFurnaceMode;
-import com.sorrowmist.useless.content.recipe.AdapterUtils;
 import com.sorrowmist.useless.content.recipe.AdvancedAlloyFurnaceRecipe;
-import com.sorrowmist.useless.content.recipe.CountedIngredient;
 import com.sorrowmist.useless.content.recipe.IRecipeAdapter;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.crafting.Ingredient;
@@ -15,6 +13,7 @@ import net.minecraft.world.level.Level;
 import net.neoforged.neoforge.fluids.FluidStack;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -62,7 +61,7 @@ public final class TabulaVitaeRecipeAdapter implements IRecipeAdapter<TabulaVita
             Map<FluidStack, Long> mergedFluids, @Nullable ItemStack mold) {
         if (level == null || !matchesMold(mold)) return List.of();
 
-        List<RecipeHolder<TabulaVitaeRecipe>> matches = new java.util.ArrayList<>();
+        List<RecipeHolder<TabulaVitaeRecipe>> matches = new ArrayList<>();
         for (RecipeHolder<TabulaVitaeRecipe> holder : level.getRecipeManager()
                 .getAllRecipesFor(NVRecipes.TABULA_VITAE_TYPE.get())) {
             TabulaVitaeRecipe source = holder.value();

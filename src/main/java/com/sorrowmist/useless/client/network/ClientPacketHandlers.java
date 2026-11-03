@@ -21,12 +21,12 @@ import com.sorrowmist.useless.network.AlloyFurnaceErrorHighlightPacket;
 import com.sorrowmist.useless.network.StaffLinkHighlightPacket;
 import com.sorrowmist.useless.network.StaffLinkSyncPacket;
 import com.sorrowmist.useless.network.StaffLinkStressStatusPacket;
-import com.sorrowmist.useless.world.stafflink.StaffLinkNetwork;
 import net.minecraft.client.Minecraft;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.Pose;
 import net.minecraft.world.entity.player.Player;
 import org.jetbrains.annotations.Nullable;
+import java.util.UUID;
 
 /**
  * 客户端专用的载荷（Packet）处理逻辑。
@@ -168,7 +168,7 @@ public final class ClientPacketHandlers {
      * 界面尚未创建的那一瞬——否则界面会一直空着直到下一次同步。</p>
      */
     @Nullable
-    public static StaffLinkSyncPacket consumePendingStaffLinkSync(java.util.UUID networkId) {
+    public static StaffLinkSyncPacket consumePendingStaffLinkSync(UUID networkId) {
         StaffLinkSyncPacket pending = lastStaffLinkSync;
         if (pending == null || !pending.network().id().equals(networkId)) {
             return null;

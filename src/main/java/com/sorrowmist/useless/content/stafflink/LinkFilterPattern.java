@@ -1,5 +1,6 @@
 package com.sorrowmist.useless.content.stafflink;
 
+import net.minecraft.core.Registry;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceLocation;
@@ -219,7 +220,7 @@ public record LinkFilterPattern(Kind kind, String text, @Nullable TagKey<Item> i
 
     // ------------------------------------------------------------------ 内部
 
-    private static <T> boolean matchesTag(net.minecraft.core.Registry<T> registry,
+    private static <T> boolean matchesTag(Registry<T> registry,
                                           @Nullable TagKey<T> tag, T value) {
         if (tag == null || value == null) {
             return false;

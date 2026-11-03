@@ -86,7 +86,7 @@ public class CrystalAggregatorRecipeAdapter implements IRecipeAdapter<CrystalAgg
         if (!CircuitEtcherRecipeAdapter.checkMold(mold, "crystal_aggregator")) return List.of();
 
         RecipeManager recipeManager = level.getRecipeManager();
-        List<RecipeHolder<CrystalAggregatorRecipe>> matches = new java.util.ArrayList<>();
+        List<RecipeHolder<CrystalAggregatorRecipe>> matches = new ArrayList<>();
         for (RecipeHolder<CrystalAggregatorRecipe> holder : (List<RecipeHolder<CrystalAggregatorRecipe>>) (List<?>)
                 recipeManager.getAllRecipesFor(AECSRecipeTypes.CRYSTAL_AGGREGATOR.get())) {
             CrystalAggregatorRecipe recipe = holder.value();

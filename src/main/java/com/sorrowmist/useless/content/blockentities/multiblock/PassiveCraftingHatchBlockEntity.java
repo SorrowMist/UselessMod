@@ -55,11 +55,13 @@ import net.neoforged.neoforge.network.PacketDistributor;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.TreeMap;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.ReentrantLock;
@@ -288,12 +290,12 @@ public final class PassiveCraftingHatchBlockEntity extends BlockEntity
         if (configured <= statusCapacity) return;
         int oldCapacity = statusCapacity;
         statusCapacity = configured;
-        idleStates = java.util.Arrays.copyOf(idleStates, statusCapacity);
-        idleDetails = java.util.Arrays.copyOf(idleDetails, statusCapacity);
-        decodedPatterns = java.util.Arrays.copyOf(decodedPatterns, statusCapacity);
-        patternDecodeCached = java.util.Arrays.copyOf(patternDecodeCached, statusCapacity);
-        java.util.Arrays.fill(idleStates, oldCapacity, statusCapacity, SlotState.EMPTY);
-        java.util.Arrays.fill(idleDetails, oldCapacity, statusCapacity, "");
+        idleStates = Arrays.copyOf(idleStates, statusCapacity);
+        idleDetails = Arrays.copyOf(idleDetails, statusCapacity);
+        decodedPatterns = Arrays.copyOf(decodedPatterns, statusCapacity);
+        patternDecodeCached = Arrays.copyOf(patternDecodeCached, statusCapacity);
+        Arrays.fill(idleStates, oldCapacity, statusCapacity, SlotState.EMPTY);
+        Arrays.fill(idleDetails, oldCapacity, statusCapacity, "");
     }
 
     public ContainerData getMenuData() {
@@ -334,7 +336,7 @@ public final class PassiveCraftingHatchBlockEntity extends BlockEntity
     /** Sorted snapshot used for item data, so drops stay byte-for-byte stable. */
     public List<PassiveHatchSettings.SlotMultiplier> slotMultiplierSettings() {
         List<PassiveHatchSettings.SlotMultiplier> result = new ArrayList<>(slotMultiplierOverrides.size());
-        for (Map.Entry<Integer, Long> entry : new java.util.TreeMap<>(slotMultiplierOverrides).entrySet()) {
+        for (Map.Entry<Integer, Long> entry : new TreeMap<>(slotMultiplierOverrides).entrySet()) {
             long value = entry.getValue() == null ? 0L : entry.getValue();
             if (value > 0L) {
                 result.add(new PassiveHatchSettings.SlotMultiplier(entry.getKey(), value));
@@ -816,8 +818,8 @@ public final class PassiveCraftingHatchBlockEntity extends BlockEntity
     }
 
     private void clearPatternDecodeCache() {
-        java.util.Arrays.fill(decodedPatterns, null);
-        java.util.Arrays.fill(patternDecodeCached, false);
+        Arrays.fill(decodedPatterns, null);
+        Arrays.fill(patternDecodeCached, false);
     }
 
     private void resetIdleStates() {
@@ -1019,7 +1021,7 @@ public final class PassiveCraftingHatchBlockEntity extends BlockEntity
         tag.putLong("Multiplier", multiplier);
         ListTag slotMultipliers = new ListTag();
         if (!slotMultiplierOverrides.isEmpty()) {
-            for (Map.Entry<Integer, Long> entry : new java.util.TreeMap<>(slotMultiplierOverrides).entrySet()) {
+            for (Map.Entry<Integer, Long> entry : new TreeMap<>(slotMultiplierOverrides).entrySet()) {
                 long value = entry.getValue() == null ? 0L : entry.getValue();
                 if (value <= 0L) {
                     continue;

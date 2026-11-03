@@ -1,5 +1,6 @@
 package com.sorrowmist.useless.content.recipe.adapters.ufo;
 
+import appeng.api.stacks.AEKey;
 import com.sorrowmist.useless.content.recipe.AdvancedAlloyFurnaceRecipe;
 import com.sorrowmist.useless.content.recipe.IRecipeAdapter;
 import net.minecraft.world.item.ItemStack;
@@ -27,7 +28,7 @@ abstract class UfoRecipeAdapter<T extends Recipe<?>> implements IRecipeAdapter<T
     @SuppressWarnings({"unchecked", "rawtypes"})
     public List<RecipeHolder<T>> findMatchingRecipes(
             Level level, Map<Ingredient, Long> mergedInputs,
-            Map<FluidStack, Long> mergedFluids, Map<appeng.api.stacks.AEKey, Long> mergedKeys,
+            Map<FluidStack, Long> mergedFluids, Map<AEKey, Long> mergedKeys,
             @Nullable ItemStack mold) {
         if (level == null || !matchesMold(mold)) {
             return List.of();

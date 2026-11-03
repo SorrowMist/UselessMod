@@ -2,10 +2,10 @@ package com.sorrowmist.useless.compat.mekanism;
 
 import com.sorrowmist.useless.api.enums.FurnaceFace;
 import com.sorrowmist.useless.api.enums.FurnaceFaceMode;
-import com.sorrowmist.useless.content.blockentities.AdvancedAlloyFurnaceBlockEntity;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.chemical.ChemicalHandlerView;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.chemical.ChemicalCompatProvider;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.chemical.ChemicalCompatProviders;
+import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.chemical.ChemicalKeyProviders;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.chemical.ChemicalStackView;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.chemical.FurnaceChemicalStorage;
 import appeng.api.stacks.GenericStack;
@@ -44,7 +44,7 @@ public final class MekanismChemicalCompat {
     /** Converts through the currently registered optional key provider. */
     public static @Nullable GenericStack toGenericStack(ChemicalStack stack) {
         if (stack == null || stack.isEmpty() || stack.getAmount() <= 0L) return null;
-        return com.sorrowmist.useless.content.machines.advanced_alloy_furnace.chemical.ChemicalKeyProviders
+        return ChemicalKeyProviders
                 .get().toGenericStack(new MekanismChemicalStackView(stack));
     }
 

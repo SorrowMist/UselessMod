@@ -6,6 +6,7 @@ import com.sorrowmist.useless.content.recipe.AdvancedAlloyFurnaceRecipe;
 import com.sorrowmist.useless.content.recipe.CountedIngredient;
 import com.sorrowmist.useless.content.recipe.FluidIngredientAllocator;
 import com.sorrowmist.useless.content.recipe.IRecipeAdapter;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.crafting.Ingredient;
@@ -168,6 +169,7 @@ public final class OritechRecipeAdapter implements IRecipeAdapter<OritechRecipe>
     }
 
     @Nullable
+    // Oritech 的 FluidIngredient 与 NeoForge 同名，此处必须使用全限定名以避免简名冲突。
     private static List<SizedFluidIngredient> convertInputFluid(
             @Nullable rearth.oritech.util.FluidIngredient source) {
         if (source == null || source.amount() <= 0) {
@@ -210,6 +212,7 @@ public final class OritechRecipeAdapter implements IRecipeAdapter<OritechRecipe>
 
     private static List<FluidStack> convertFluidOutputs(OritechRecipe source, int multiplier) {
         List<FluidStack> outputs = new ArrayList<>();
+        // Oritech 输出使用 Architectury 的 FluidStack，与 NeoForge 同名，此处必须使用全限定名以避免简名冲突。
         for (dev.architectury.fluid.FluidStack output : source.getFluidOutputs()) {
             if (output == null || output.isEmpty()) {
                 continue;
@@ -243,9 +246,9 @@ public final class OritechRecipeAdapter implements IRecipeAdapter<OritechRecipe>
         return types;
     }
 
-    private static net.minecraft.resources.ResourceLocation variantId(
-            net.minecraft.resources.ResourceLocation original, String suffix) {
-        return net.minecraft.resources.ResourceLocation.fromNamespaceAndPath(
+    private static ResourceLocation variantId(
+            ResourceLocation original, String suffix) {
+        return ResourceLocation.fromNamespaceAndPath(
                 original.getNamespace(), original.getPath() + "_" + suffix);
     }
 }

@@ -6,13 +6,13 @@ import com.breakinblocks.neovitae.common.recipe.NVRecipes;
 import com.breakinblocks.neovitae.common.recipe.athanor.AthanorPotionRecipe;
 import com.breakinblocks.neovitae.common.recipe.athanor.AthanorRecipe;
 import com.mojang.datafixers.util.Pair;
-import com.sorrowmist.useless.api.enums.AlloyFurnaceMode;
 import com.sorrowmist.useless.content.recipe.AdapterUtils;
 import com.sorrowmist.useless.content.recipe.AdvancedAlloyFurnaceRecipe;
 import com.sorrowmist.useless.content.recipe.CountedIngredient;
 import com.sorrowmist.useless.content.recipe.FluidIngredientAllocator;
 import com.sorrowmist.useless.content.recipe.IRecipeAdapter;
 import net.minecraft.core.component.DataComponents;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.alchemy.PotionContents;
@@ -106,7 +106,7 @@ public final class AthanorRecipeAdapter implements IRecipeAdapter<AthanorRecipe>
     }
 
     private static AdvancedAlloyFurnaceRecipe convert(
-            net.minecraft.resources.ResourceLocation id, AthanorRecipe source,
+            ResourceLocation id, AthanorRecipe source,
             @Nullable ItemStack potionInput) {
         List<Ingredient> molds = new ArrayList<>();
         molds.add(Ingredient.of(MOLD));

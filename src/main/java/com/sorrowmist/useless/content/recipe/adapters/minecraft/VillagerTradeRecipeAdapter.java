@@ -1,5 +1,6 @@
 package com.sorrowmist.useless.content.recipe.adapters.minecraft;
 
+import appeng.api.stacks.AEKey;
 import com.mojang.logging.LogUtils;
 import com.sorrowmist.useless.api.enums.AlloyFurnaceMode;
 import com.sorrowmist.useless.content.recipe.AdapterGuards;
@@ -13,6 +14,7 @@ import com.sorrowmist.useless.init.ModItems;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.npc.Villager;
@@ -21,6 +23,7 @@ import net.minecraft.world.entity.npc.VillagerProfession;
 import net.minecraft.world.entity.npc.VillagerTrades;
 import net.minecraft.world.entity.npc.VillagerType;
 import net.minecraft.world.entity.npc.WanderingTrader;
+import net.minecraft.world.flag.FeatureFlags;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
@@ -31,6 +34,7 @@ import net.minecraft.world.item.crafting.RecipeHolder;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.levelgen.PositionalRandomFactory;
 import net.neoforged.neoforge.common.crafting.DataComponentIngredient;
+import net.neoforged.neoforge.fluids.FluidStack;
 import org.apache.commons.lang3.tuple.Pair;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
@@ -40,6 +44,7 @@ import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 /** Converts the active vanilla villager trade tables into alloy-furnace recipes. */
 public final class VillagerTradeRecipeAdapter
@@ -122,13 +127,13 @@ public final class VillagerTradeRecipeAdapter
     }
 
     private static String professionKey(VillagerProfession profession) {
-        net.minecraft.resources.ResourceLocation id =
+        ResourceLocation id =
                 BuiltInRegistries.VILLAGER_PROFESSION.getKey(profession);
         return id == null ? profession.toString() : id.toString();
     }
 
     private static String itemKey(Item item) {
-        net.minecraft.resources.ResourceLocation id = BuiltInRegistries.ITEM.getKey(item);
+        ResourceLocation id = BuiltInRegistries.ITEM.getKey(item);
         return id == null ? item.toString() : id.toString();
     }
 
@@ -148,7 +153,7 @@ public final class VillagerTradeRecipeAdapter
         }
 
         boolean experimental = level.enabledFeatures()
-                .contains(net.minecraft.world.flag.FeatureFlags.TRADE_REBALANCE);
+                .contains(FeatureFlags.TRADE_REBALANCE);
         int tradeTableSignature = tradeTableSignature(experimental);
         Cached snapshot = cached;
         if (snapshot != null && snapshot.level() == level
@@ -184,7 +189,7 @@ public final class VillagerTradeRecipeAdapter
     public List<RecipeHolder<VillagerTradeSyntheticRecipe>> findMatchingRecipes(
             Level level,
             Map<Ingredient, Long> mergedInputs,
-            Map<net.neoforged.neoforge.fluids.FluidStack, Long> mergedFluids,
+            Map<FluidStack, Long> mergedFluids,
             @Nullable ItemStack mold) {
         return findMatchingRecipes(level, mergedInputs, mergedFluids, Map.of(), mold, List.of());
     }
@@ -193,8 +198,8 @@ public final class VillagerTradeRecipeAdapter
     public List<RecipeHolder<VillagerTradeSyntheticRecipe>> findMatchingRecipes(
             Level level,
             Map<Ingredient, Long> mergedInputs,
-            Map<net.neoforged.neoforge.fluids.FluidStack, Long> mergedFluids,
-            Map<appeng.api.stacks.AEKey, Long> mergedKeys,
+            Map<FluidStack, Long> mergedFluids,
+            Map<AEKey, Long> mergedKeys,
             @Nullable ItemStack mold,
             List<ItemStack> actualInputs) {
         if (level == null || !matchesMold(mold)) {
@@ -223,7 +228,7 @@ public final class VillagerTradeRecipeAdapter
 
     private static List<RecipeHolder<VillagerTradeSyntheticRecipe>> buildRecipes(
             Level level, boolean experimental) {
-        Map<net.minecraft.resources.ResourceLocation,
+        Map<ResourceLocation,
                 RecipeHolder<VillagerTradeSyntheticRecipe>> recipes = new LinkedHashMap<>();
 
         addSupplementalVillagerRecipe(recipes);
@@ -283,7 +288,7 @@ public final class VillagerTradeRecipeAdapter
     private static void addWanderingTraderRecipes(
             Level level,
             boolean experimental,
-            Map<net.minecraft.resources.ResourceLocation,
+            Map<ResourceLocation,
                     RecipeHolder<VillagerTradeSyntheticRecipe>> recipes) {
         if (experimental) {
             int groupIndex = 0;
@@ -309,7 +314,7 @@ public final class VillagerTradeRecipeAdapter
             boolean experimental,
             int groupIndex,
             @Nullable VillagerTrades.ItemListing[] listings,
-            Map<net.minecraft.resources.ResourceLocation,
+            Map<ResourceLocation,
                     RecipeHolder<VillagerTradeSyntheticRecipe>> recipes) {
         if (listings == null) {
             return;
@@ -342,10 +347,10 @@ public final class VillagerTradeRecipeAdapter
     }
 
     private static void addSupplementalVillagerRecipe(
-            Map<net.minecraft.resources.ResourceLocation,
+            Map<ResourceLocation,
                     RecipeHolder<VillagerTradeSyntheticRecipe>> recipes) {
-        net.minecraft.resources.ResourceLocation id =
-                net.minecraft.resources.ResourceLocation.fromNamespaceAndPath(
+        ResourceLocation id =
+                ResourceLocation.fromNamespaceAndPath(
                         RECIPE_NAMESPACE, "villager_trade/supplemental/tier_1_useless_ingot_to_dirt");
         AdvancedAlloyFurnaceRecipe converted = new AdvancedAlloyFurnaceRecipe(
                 id,
@@ -381,7 +386,7 @@ public final class VillagerTradeRecipeAdapter
     private static List<TradeContext> contextsFor(VillagerTrades.ItemListing listing) {
         if (listing instanceof VillagerTrades.TypeSpecificTrade typeSpecific) {
             return typeSpecific.trades().keySet().stream()
-                    .filter(java.util.Objects::nonNull)
+                    .filter(Objects::nonNull)
                     .sorted(Comparator.comparing(VillagerType::toString))
                     .map(TradeContext::new)
                     .toList();
@@ -509,7 +514,7 @@ public final class VillagerTradeRecipeAdapter
 
     @Nullable
     private static AdvancedAlloyFurnaceRecipe convertOffer(
-            net.minecraft.resources.ResourceLocation id,
+            ResourceLocation id,
             MerchantOffer offer,
             List<Ingredient> moldIngredients) {
         if (offer == null || offer.getResult() == null || offer.getResult().isEmpty()) {
@@ -595,15 +600,15 @@ public final class VillagerTradeRecipeAdapter
      * 可读前缀保留。内容完全相同的两条报价会得到相同 id，由调用方的 {@code putIfAbsent} 合并，
      * 与二者配方等价的事实一致。</p>
      */
-    private static net.minecraft.resources.ResourceLocation recipeId(
+    private static ResourceLocation recipeId(
             VillagerProfession profession,
             int villagerLevel,
             @Nullable VillagerType villagerType,
             boolean experimental,
             MerchantOffer offer,
             HolderLookup.Provider registries) {
-        net.minecraft.resources.ResourceLocation professionId =
-                net.minecraft.core.registries.BuiltInRegistries.VILLAGER_PROFESSION.getKey(profession);
+        ResourceLocation professionId =
+                BuiltInRegistries.VILLAGER_PROFESSION.getKey(profession);
         String professionPart;
         if (professionId == null) {
             professionPart = profession.toString();
@@ -621,17 +626,17 @@ public final class VillagerTradeRecipeAdapter
             path += "/type_" + pathPart(villagerType.toString());
         }
         path += "/mold_spawn_egg_and_workstation";
-        return net.minecraft.resources.ResourceLocation.fromNamespaceAndPath(
+        return ResourceLocation.fromNamespaceAndPath(
                 RECIPE_NAMESPACE, path);
     }
 
-    private static net.minecraft.resources.ResourceLocation wanderingRecipeId(
+    private static ResourceLocation wanderingRecipeId(
             boolean experimental, MerchantOffer offer, HolderLookup.Provider registries) {
         String path = "villager_trade/"
                 + (experimental ? "experimental" : "vanilla")
                 + "/wandering_trader/trade_" + offerKey(offer, registries)
                 + "/mold_spawn_egg";
-        return net.minecraft.resources.ResourceLocation.fromNamespaceAndPath(
+        return ResourceLocation.fromNamespaceAndPath(
                 RECIPE_NAMESPACE, path);
     }
 

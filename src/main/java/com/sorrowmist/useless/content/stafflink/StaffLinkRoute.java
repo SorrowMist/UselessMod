@@ -16,13 +16,13 @@ import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.Mth;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.level.Level;
 import net.neoforged.neoforge.fluids.FluidStack;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.function.Predicate;
 
 /**
  * 一条「锚点 × 线路」的搬运配置。
@@ -288,7 +288,7 @@ public record StaffLinkRoute(
         return filterApplies() && !hasApplicableFilter();
     }
 
-    private boolean hasMarker(java.util.function.Predicate<LinkFilterSlot> predicate) {
+    private boolean hasMarker(Predicate<LinkFilterSlot> predicate) {
         for (LinkFilterSlot slot : filter) {
             if (!slot.isEmpty() && predicate.test(slot)) {
                 return true;

@@ -5,6 +5,7 @@ import com.sorrowmist.useless.world.dimension.UselessDimensionConfigManager;
 import com.sorrowmist.useless.world.dimension.UselessDimensions;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.core.Holder;
 import net.minecraft.core.Vec3i;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.level.ServerLevel;
@@ -48,7 +49,7 @@ public abstract class AbstractDimensionTeleporter {
 
     protected abstract Supplier<Block> getTeleportBlock();
 
-    protected abstract net.minecraft.core.Holder<PoiType> getPOI();
+    protected abstract Holder<PoiType> getPOI();
 
     public final ResourceKey<Level> dimensionKey() {
         return getDimensionKey();

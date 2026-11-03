@@ -25,6 +25,7 @@ import com.sorrowmist.useless.content.recipe.CountedIngredient;
 import com.sorrowmist.useless.content.recipe.IRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.ItemIngredientAllocator;
 import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.crafting.Ingredient;
 import net.minecraft.world.item.crafting.RecipeHolder;
@@ -476,14 +477,14 @@ public final class SoulBindingRecipeAdapter implements IRecipeAdapter<SoulBindin
     private static AdvancedAlloyFurnaceRecipe createRecipe(
             RecipeHolder<SoulBindingRecipe> holder, SoulBindingRecipe source,
             List<CountedIngredient> inputs, List<ItemStack> outputs,
-            net.minecraft.resources.ResourceLocation id) {
+            ResourceLocation id) {
         return createRecipe(holder, source, inputs, outputs, List.of(), id);
     }
 
     private static AdvancedAlloyFurnaceRecipe createRecipe(
             RecipeHolder<SoulBindingRecipe> holder, SoulBindingRecipe source,
             List<CountedIngredient> inputs, List<ItemStack> outputs, List<FluidStack> outputFluids,
-            net.minecraft.resources.ResourceLocation id) {
+            ResourceLocation id) {
         FluidStack xp = EnderIOAdapterUtils.experienceFluid(source.experience());
         return new AdvancedAlloyFurnaceRecipe(
                 id, inputs, xp == null ? List.of() : List.of(xp), outputs, outputFluids,
@@ -715,32 +716,32 @@ public final class SoulBindingRecipeAdapter implements IRecipeAdapter<SoulBindin
         return result;
     }
 
-    private static net.minecraft.resources.ResourceLocation variantId(
-            net.minecraft.resources.ResourceLocation source, ItemStack vial, @Nullable ItemStack target) {
+    private static ResourceLocation variantId(
+            ResourceLocation source, ItemStack vial, @Nullable ItemStack target) {
         StringBuilder suffix = new StringBuilder("_converted_soul_");
         appendFingerprint(suffix, vial);
         if (target != null) {
             suffix.append("_target_");
             appendFingerprint(suffix, target);
         }
-        return net.minecraft.resources.ResourceLocation.fromNamespaceAndPath(
+        return ResourceLocation.fromNamespaceAndPath(
                 source.getNamespace(), source.getPath() + suffix);
     }
 
-    private static net.minecraft.resources.ResourceLocation staticVariantId(
-            net.minecraft.resources.ResourceLocation source) {
-        return net.minecraft.resources.ResourceLocation.fromNamespaceAndPath(
+    private static ResourceLocation staticVariantId(
+            ResourceLocation source) {
+        return ResourceLocation.fromNamespaceAndPath(
                 source.getNamespace(), source.getPath() + "_converted_soul_static");
     }
 
     private static void appendFingerprint(StringBuilder result, ItemStack stack) {
-        net.minecraft.resources.ResourceLocation item = BuiltInRegistries.ITEM.getKey(stack.getItem());
+        ResourceLocation item = BuiltInRegistries.ITEM.getKey(stack.getItem());
         result.append(item == null ? "unknown" : item.getNamespace() + "_" + item.getPath().replace('/', '_'))
                 .append('_').append(componentFingerprint(stack));
     }
 
     private static String componentFingerprint(ItemStack stack) {
-        net.minecraft.resources.ResourceLocation item = BuiltInRegistries.ITEM.getKey(stack.getItem());
+        ResourceLocation item = BuiltInRegistries.ITEM.getKey(stack.getItem());
         String value = (item == null ? "unknown" : item.toString()) + "|" + stack.getComponents();
         try {
             return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256")

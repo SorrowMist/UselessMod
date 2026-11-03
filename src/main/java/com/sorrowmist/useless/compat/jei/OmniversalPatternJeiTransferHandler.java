@@ -14,6 +14,7 @@ import com.sorrowmist.useless.content.recipe.CountedIngredient;
 import com.sorrowmist.useless.content.recipe.LongSizedFluidIngredient;
 import com.sorrowmist.useless.network.SelectOmniversalPatternRecipePacket;
 import mezz.jei.api.gui.ingredient.IRecipeSlotsView;
+import mezz.jei.api.recipe.RecipeType;
 import mezz.jei.api.recipe.transfer.IRecipeTransferContext;
 import mezz.jei.api.recipe.transfer.IRecipeTransferError;
 import mezz.jei.api.recipe.transfer.IRecipeTransferHandler;
@@ -74,7 +75,7 @@ public final class OmniversalPatternJeiTransferHandler<T extends PatternEncoding
     }
 
     @Override
-    public mezz.jei.api.recipe.RecipeType<AlloyFurnaceRecipeCatalog.Entry> getRecipeType() {
+    public RecipeType<AlloyFurnaceRecipeCatalog.Entry> getRecipeType() {
         return AdvancedAlloyFurnaceRecipeCategory.TYPE;
     }
 

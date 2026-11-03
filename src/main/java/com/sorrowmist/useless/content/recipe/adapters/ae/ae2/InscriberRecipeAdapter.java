@@ -151,7 +151,7 @@ public class InscriberRecipeAdapter implements IRecipeAdapter<InscriberRecipe> {
                 AERecipeTypes.INSCRIBER
         );
 
-        List<RecipeHolder<InscriberRecipe>> matches = new java.util.ArrayList<>();
+        List<RecipeHolder<InscriberRecipe>> matches = new ArrayList<>();
 
         boolean hasMold = mold != null && !mold.isEmpty();
 

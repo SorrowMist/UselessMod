@@ -30,6 +30,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 
 /** Converts Brewin And Chewin keg fermentation recipes. */
@@ -202,7 +203,7 @@ public final class KegFermentingRecipeAdapter implements IRecipeAdapter<KegFerme
                     return new BottledResult(container.copyWithCount(1),
                             output.copyWithCount((int) outputCount), (int) operations);
                 })
-                .filter(java.util.Objects::nonNull)
+                .filter(Objects::nonNull)
                 .findFirst()
                 .orElse(null);
     }

@@ -17,6 +17,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -54,7 +55,7 @@ class ExposedPatternBusBlockEntityTest {
         when(node.getGrid()).thenReturn(grid);
         when(gridNode.getGrid()).thenReturn(grid);
         var machineInterface = mock(ECOMachineInterfaceBlockEntity.class);
-        when(grid.getActiveMachines(ECOMachineInterfaceBlockEntity.class)).thenReturn(java.util.Set.of(machineInterface));
+        when(grid.getActiveMachines(ECOMachineInterfaceBlockEntity.class)).thenReturn(Set.of(machineInterface));
         var bus = createBus(node);
         var first = mock(ECOCraftingPatternBusBlockEntity.class);
         var second = mock(ECOCraftingPatternBusBlockEntity.class);

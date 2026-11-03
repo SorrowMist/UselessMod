@@ -1,5 +1,7 @@
 package com.sorrowmist.useless.content.recipe.adapters.fluxnetworks;
 
+import appeng.api.stacks.AEKey;
+import appeng.api.stacks.GenericStack;
 import com.sorrowmist.useless.api.enums.AlloyFurnaceMode;
 import com.sorrowmist.useless.content.recipe.AdapterUtils;
 import com.sorrowmist.useless.content.recipe.AdvancedAlloyFurnaceRecipe;
@@ -88,7 +90,7 @@ public final class FluxNetworksRecipeAdapter
     public List<RecipeHolder<FluxNetworksSyntheticRecipe>> findMatchingRecipes(
             Level level, Map<Ingredient, Long> mergedInputs,
             Map<FluidStack, Long> mergedFluids,
-            Map<appeng.api.stacks.AEKey, Long> mergedKeys,
+            Map<AEKey, Long> mergedKeys,
             @Nullable ItemStack mold, List<ItemStack> actualInputs) {
         if (level == null || !matchesMold(mold)) return List.of();
 
@@ -148,13 +150,13 @@ public final class FluxNetworksRecipeAdapter
         return ItemIngredientAllocator.matches(available, required);
     }
 
-    private static List<appeng.api.stacks.GenericStack> mergedKeyInputs(
-            Map<appeng.api.stacks.AEKey, Long> mergedKeys) {
+    private static List<GenericStack> mergedKeyInputs(
+            Map<AEKey, Long> mergedKeys) {
         if (mergedKeys == null || mergedKeys.isEmpty()) return List.of();
-        List<appeng.api.stacks.GenericStack> result = new ArrayList<>();
-        for (Map.Entry<appeng.api.stacks.AEKey, Long> entry : mergedKeys.entrySet()) {
+        List<GenericStack> result = new ArrayList<>();
+        for (Map.Entry<AEKey, Long> entry : mergedKeys.entrySet()) {
             long amount = Math.max(0L, entry.getValue());
-            if (amount > 0L) result.add(new appeng.api.stacks.GenericStack(entry.getKey(), amount));
+            if (amount > 0L) result.add(new GenericStack(entry.getKey(), amount));
         }
         return result;
     }

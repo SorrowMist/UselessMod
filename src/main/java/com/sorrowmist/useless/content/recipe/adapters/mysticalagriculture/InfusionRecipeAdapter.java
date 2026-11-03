@@ -118,7 +118,7 @@ public class InfusionRecipeAdapter implements IRecipeAdapter<IInfusionRecipe> {
                 ModRecipeTypes.INFUSION.get()
         );
 
-        List<RecipeHolder<IInfusionRecipe>> matches = new java.util.ArrayList<>();
+        List<RecipeHolder<IInfusionRecipe>> matches = new ArrayList<>();
         for (RecipeHolder<IInfusionRecipe> holder : recipes) {
             IInfusionRecipe recipe = holder.value();
 

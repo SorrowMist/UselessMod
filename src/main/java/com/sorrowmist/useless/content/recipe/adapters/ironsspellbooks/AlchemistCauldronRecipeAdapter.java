@@ -27,6 +27,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 /** Converts Iron's Spells 'n Spellbooks alchemist-cauldron brews into item-only recipes. */
 public final class AlchemistCauldronRecipeAdapter implements IRecipeAdapter<BrewAlchemistCauldronRecipe> {
@@ -182,7 +183,7 @@ public final class AlchemistCauldronRecipeAdapter implements IRecipeAdapter<Brew
     }
 
     private static List<List<ItemStack>> outputVariants(
-            List<FluidStack> fluids, java.util.Optional<ItemStack> byproduct,
+            List<FluidStack> fluids, Optional<ItemStack> byproduct,
             RecipeManager recipeManager) {
         List<List<ItemStack>> variants = new ArrayList<>();
         variants.add(new ArrayList<>());

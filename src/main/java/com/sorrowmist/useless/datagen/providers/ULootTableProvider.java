@@ -1,5 +1,6 @@
 package com.sorrowmist.useless.datagen.providers;
 
+import com.sorrowmist.useless.compat.neoecoae.compact.NeoEcoCompactRegistry;
 import com.sorrowmist.useless.content.blocks.GlowPlasticBlock;
 import com.sorrowmist.useless.init.ModBlocks;
 import net.minecraft.core.HolderLookup;
@@ -9,6 +10,7 @@ import net.minecraft.data.loot.LootTableProvider;
 import net.minecraft.world.flag.FeatureFlags;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.storage.loot.parameters.LootContextParamSets;
+import net.neoforged.fml.ModList;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.List;
@@ -62,12 +64,12 @@ public class ULootTableProvider extends LootTableProvider {
             }
 
             // ECO 已安装时才有「无用型紧凑 C9/F9/L9」
-            if (net.neoforged.fml.ModList.get().isLoaded("neoecoae")) {
-                this.dropSelf(com.sorrowmist.useless.compat.neoecoae.compact.NeoEcoCompactRegistry
+            if (ModList.get().isLoaded("neoecoae")) {
+                this.dropSelf(NeoEcoCompactRegistry
                                       .COMPACT_C9.get());
-                this.dropSelf(com.sorrowmist.useless.compat.neoecoae.compact.NeoEcoCompactRegistry
+                this.dropSelf(NeoEcoCompactRegistry
                                       .COMPACT_F9.get());
-                this.dropSelf(com.sorrowmist.useless.compat.neoecoae.compact.NeoEcoCompactRegistry
+                this.dropSelf(NeoEcoCompactRegistry
                                       .COMPACT_L9.get());
             }
         }
@@ -92,12 +94,12 @@ public class ULootTableProvider extends LootTableProvider {
             blocks.add(ModBlocks.PASSIVE_CRAFTING_HATCH.get());
             blocks.add(ModBlocks.OMNIVERSAL_FURNACE_CASING.get());
             blocks.add(ModBlocks.TEMPERATURE_REGULATOR.get());
-            if (net.neoforged.fml.ModList.get().isLoaded("neoecoae")) {
-                blocks.add(com.sorrowmist.useless.compat.neoecoae.compact.NeoEcoCompactRegistry
+            if (ModList.get().isLoaded("neoecoae")) {
+                blocks.add(NeoEcoCompactRegistry
                                    .COMPACT_C9.get());
-                blocks.add(com.sorrowmist.useless.compat.neoecoae.compact.NeoEcoCompactRegistry
+                blocks.add(NeoEcoCompactRegistry
                                    .COMPACT_F9.get());
-                blocks.add(com.sorrowmist.useless.compat.neoecoae.compact.NeoEcoCompactRegistry
+                blocks.add(NeoEcoCompactRegistry
                                    .COMPACT_L9.get());
             }
             return blocks.build().toList();

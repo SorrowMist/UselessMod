@@ -40,6 +40,7 @@ import net.neoforged.neoforge.fluids.crafting.FluidIngredient;
 import org.jetbrains.annotations.Nullable;
 
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -818,7 +819,7 @@ public final class BotanyPotsRecipeAdapter implements IRecipeAdapter<BotanyPotsC
             if (stream == null) {
                 return null;
             }
-            try (var reader = new java.io.InputStreamReader(stream, StandardCharsets.UTF_8)) {
+            try (var reader = new InputStreamReader(stream, StandardCharsets.UTF_8)) {
                 return GsonHelper.parse(reader);
             }
         }

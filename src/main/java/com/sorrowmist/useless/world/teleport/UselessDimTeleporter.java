@@ -5,6 +5,7 @@ import com.sorrowmist.useless.init.ModBlocks;
 import com.sorrowmist.useless.init.ModPOIs;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Holder;
+import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
@@ -17,7 +18,7 @@ import java.util.function.Supplier;
 public class UselessDimTeleporter extends AbstractDimensionTeleporter {
 
     private static final ResourceKey<Level> DIMENSION_KEY =
-            ResourceKey.create(net.minecraft.core.registries.Registries.DIMENSION,
+            ResourceKey.create(Registries.DIMENSION,
                                ResourceLocation.fromNamespaceAndPath(UselessMod.MODID, "uselessdim")
             );
 

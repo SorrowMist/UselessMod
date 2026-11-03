@@ -12,6 +12,8 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.tags.TagKey;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.crafting.Ingredient;
+import net.minecraft.world.level.material.Fluid;
+import net.minecraft.world.level.material.Fluids;
 import net.neoforged.neoforge.fluids.FluidStack;
 import net.neoforged.neoforge.fluids.crafting.FluidIngredient;
 import net.neoforged.neoforge.fluids.crafting.SizedFluidIngredient;
@@ -27,7 +29,7 @@ import java.util.function.ToLongFunction;
 final class UfoRecipeAdapterSupport {
     private static final ResourceLocation COOLANTS_ID =
             ResourceLocation.fromNamespaceAndPath("c", "coolants");
-    private static final TagKey<net.minecraft.world.level.material.Fluid> COOLANTS =
+    private static final TagKey<Fluid> COOLANTS =
             TagKey.create(Registries.FLUID, COOLANTS_ID);
 
     private UfoRecipeAdapterSupport() {
@@ -135,7 +137,7 @@ final class UfoRecipeAdapterSupport {
             return null;
         }
         var fluid = BuiltInRegistries.FLUID.getOptional(location).orElse(null);
-        if (fluid == null || fluid == net.minecraft.world.level.material.Fluids.EMPTY) {
+        if (fluid == null || fluid == Fluids.EMPTY) {
             return null;
         }
         return new SizedFluidIngredient(FluidIngredient.single(fluid), (int) amount);
@@ -213,7 +215,7 @@ final class UfoRecipeAdapterSupport {
 
     static boolean matches(AdvancedAlloyFurnaceRecipe recipe,
                            @Nullable Map<Ingredient, Long> mergedInputs,
-                           @Nullable Map<net.neoforged.neoforge.fluids.FluidStack, Long> mergedFluids,
+                           @Nullable Map<FluidStack, Long> mergedFluids,
                            @Nullable Map<AEKey, Long> mergedKeys) {
         if (recipe == null) {
             return false;

@@ -10,6 +10,8 @@ import java.util.List;
 
 /** Isolates failures from individual external-recipe conversions. */
 public final class RecipeConversionUtils {
+    // 本包内的 IRecipeAdapter 是旧桥接接口，与新 API 接口同名。新接口的引用只能写全限定名，
+    // 否则简名会解析为旧接口，并与下方 deprecated 重载产生签名冲突。
     private static final Logger LOGGER = LogUtils.getLogger();
 
     private RecipeConversionUtils() {

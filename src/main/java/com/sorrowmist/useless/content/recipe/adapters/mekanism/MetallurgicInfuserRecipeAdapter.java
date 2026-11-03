@@ -1,5 +1,6 @@
 package com.sorrowmist.useless.content.recipe.adapters.mekanism;
 
+import appeng.api.stacks.AEKey;
 import appeng.api.stacks.GenericStack;
 import com.sorrowmist.useless.content.recipe.AdapterUtils;
 import com.sorrowmist.useless.content.recipe.AdvancedAlloyFurnaceRecipe;
@@ -86,7 +87,7 @@ public class MetallurgicInfuserRecipeAdapter implements IRecipeAdapter<ItemStack
     @Nullable
     public List<RecipeHolder<ItemStackChemicalToItemStackRecipe>> findMatchingRecipes(
             Level level, Map<Ingredient, Long> mergedInputs, Map<FluidStack, Long> mergedFluids,
-            Map<appeng.api.stacks.AEKey, Long> mergedKeys, @Nullable ItemStack mold) {
+            Map<AEKey, Long> mergedKeys, @Nullable ItemStack mold) {
         if (level == null || mergedInputs.isEmpty() || mergedKeys.isEmpty() || !matchesMold(mold)) {
             return List.of();
         }

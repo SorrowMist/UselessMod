@@ -6,8 +6,6 @@
 ## [2.4.6.5]
 
 ### Fixed / 修复
-- 修复更新提示未写明模组名称、玩家无法分辨提示来源的问题；提示现在会带上模组名，点击其中链接可打开 CurseForge 项目页。
-  - Fixed the update notice not naming the mod, which left players unable to tell where it came from; the notice now includes the mod name, and clicking its link opens the CurseForge project page.
 - 修复更新检查在本地已是最新版本时仍提示更新的问题：本地版本号带 Minecraft 版本前缀（形如 1.21.1-2.4.6.4），与 CurseForge 展示的版本号格式不一致，比较时被误判为旧版本；现统一剥离前缀后再比较。
   - Fixed the update check reporting an update even when the installed version was the latest: the local version carried a Minecraft prefix (such as 1.21.1-2.4.6.4) that did not match the format shown on CurseForge and was compared as older; the prefix is now stripped from both sides before comparing.
 

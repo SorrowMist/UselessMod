@@ -341,7 +341,7 @@ dependencies {
     runtimeOnly "curse.maven:ato-405593:7825464"
 
 //    runtimeOnly "maven.modrinth:allthemodium:2.9.5"
-    implementation "maven.modrinth:extendedae-plus:AtuOmKkV"
+    implementation "maven.modrinth:extendedae-plus:1.6.4"
 //    runtimeOnly "maven.modrinth:omnitools:1.21.1-1.2.1"
     implementation "curse.maven:ftb-ultimine-forge-386134:8231400"
     // 神秘农业

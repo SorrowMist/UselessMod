@@ -203,6 +203,16 @@ requiredMods=["pneumaticcraft"]
     ordering="NONE"
     side="BOTH"
 
+# ExtendedAE-Plus 的兼容层在 JEI 传输时预置供应器搜索关键字。
+# 1.6.4 起该入口由 ExtendedAEPatternUploadUtil 迁至 RecipeTypeNameConfig，1.6.3 及更早
+# 仅有旧类；旧版与新版互斥，无共存的访问方式，因此下限锁定 1.6.4。
+[[dependencies.${mod_id}]]
+    modId="extendedae_plus"
+    type="optional"
+    versionRange="[1.6.4,)"
+    ordering="NONE"
+    side="BOTH"
+
 # 数据能源集成是软加载：入口走它自己的 @DataEnergisticsEntrypoint 扫描，
 # 没装数据能源时 integration.dataenergistics 整包不会被触达，本模组照常运行，因此声明为 optional。
 #

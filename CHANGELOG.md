@@ -3,6 +3,12 @@
 本文件记录 UselessMod 的全部版本变更，格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，
 每个条目附英文对照，分类固定为「新增 / 变更 / 修复 / 性能」四类。
 
+## [2.4.6.4]
+
+### Fixed / 修复
+- 修复通用机械的机器装入速度升级后耗电不增加的问题。速度升级现在会按原版规则抬高耗电，权重为能量升级的两倍；能量升级的节电效果改为装满上限数量才达到最大，与原版「装满即满效果」保持一致。
+  - Fixed Mekanism machines not consuming more energy after speed upgrades were installed. Speed upgrades now raise energy usage following vanilla's rules, weighted twice as heavily as energy upgrades; energy upgrades now reach their full savings only when filled to the upgrade cap, matching vanilla's "full means full effect" behavior.
+
 ## [2.4.6.3]
 
 ### Changed / 变更

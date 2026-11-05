@@ -35,19 +35,37 @@ public class MekUtils {
         config.close();
     }
 
+    /**
+     * 已安装升级占该类型上限的比例，口径与 MekanismUtils.fractionUpgrades 一致。
+     *
+     * @param tile 升级宿主
+     * @param type 升级类型
+     * @return 0 到 1 之间的比例；宿主不支持该类型时返回 0
+     */
+    private static double fraction(IUpgradeTile tile, Upgrade type) {
+        if (tile.supportsUpgrade(type)) {
+            return (double) tile.getComponent().getUpgrades(type) / (double) type.getMax();
+        }
+        return 0;
+    }
+
     public static double time(IUpgradeTile tile) {
-        double multiplier = Math.pow((double)(MekanismConfig.general.maxUpgradeMultiplier.get() * ConfigManager.getTimeMultiplier()), (double)tile.getComponent().getUpgrades(Upgrade.SPEED) / (double)-8.0F);
+        double multiplier = Math.pow((double)(MekanismConfig.general.maxUpgradeMultiplier.get() * ConfigManager.getTimeMultiplier()), -fraction(tile, Upgrade.SPEED));
         // 仅防御 NaN/Infinity 异常值，不再硬截断有效倍数，避免限制高倍率增强
         return Double.isFinite(multiplier) ? multiplier : 1.0;
     }
 
     public static double electricity(IUpgradeTile tile) {
-        // 简化公式：每8个能量升级降低10倍能耗
-        return Math.pow((double)(MekanismConfig.general.maxUpgradeMultiplier.get() * ConfigManager.getElectricityMultiplier()), (double)tile.getComponent().getUpgrades(Upgrade.ENERGY) / (double)-8.0F);
+        // 照搬 Mekanism 原版 MekanismUtils.getEnergyPerTick：速度升级按两倍权重抬高能耗，能量升级按一倍权重压低能耗。
+        // 节电配置倍率只作用于能量项，默认 1.0 时与原版逐位一致。
+        double base = MekanismConfig.general.maxUpgradeMultiplier.get();
+        double multiplier = Math.pow(base, 2.0 * fraction(tile, Upgrade.SPEED))
+                * Math.pow(base * ConfigManager.getElectricityMultiplier(), -fraction(tile, Upgrade.ENERGY));
+        return Double.isFinite(multiplier) ? multiplier : 1.0;
     }
 
     public static double capacity(IUpgradeTile tile) {
-        return Math.pow((double)(MekanismConfig.general.maxUpgradeMultiplier.get() * ConfigManager.getCapacityMultiplier()), (double)tile.getComponent().getUpgrades(Upgrade.ENERGY) / (double)8.0F);
+        return Math.pow((double)(MekanismConfig.general.maxUpgradeMultiplier.get() * ConfigManager.getCapacityMultiplier()), fraction(tile, Upgrade.ENERGY));
     }
 
     public static String exponential(double d) {

@@ -475,7 +475,7 @@ dependencies {
     compileOnly fileTree(dir: 'libs', includes: ['*.jar'], excludes: [])
     compileOnly fileTree(dir: 'libs/compile', includes: ['*.jar'], excludes: [])
     // 仅用于开发环境实机测试的兼容模组：不参与编译，编译期类型仍来自 libs/compile。
-//    runtimeOnly fileTree(dir: 'libs/runtime', includes: ['*.jar'], excludes: [])
+    runtimeOnly fileTree(dir: 'libs/runtime', includes: ['*.jar'], excludes: [])
 }
 
 // This block of code expands all declared replace properties in the specified resource targets.

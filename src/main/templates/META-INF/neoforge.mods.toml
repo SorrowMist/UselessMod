@@ -139,7 +139,7 @@ requiredMods=["pneumaticcraft"]
     modId="jdte"
     type="optional"
     versionRange="[0.6.0,)"
-    ordering="AFTER"
+    ordering="NONE"
     side="BOTH"
 
 # 兼容层引用 1.4.0 起提供的模糊配方类型（FlexPotRecipe / FlexStockpotRecipe）。
@@ -147,7 +147,7 @@ requiredMods=["pneumaticcraft"]
     modId="kaleidoscope_cookery"
     type="optional"
     versionRange="[1.4.0,)"
-    ordering="AFTER"
+    ordering="NONE"
     side="BOTH"
 
 # Ex Deorum 兼容层引用 3.12 起提供的实例缓存 API（RecipeUtil.getCaches 返回 RecipeCaches）。
@@ -156,14 +156,14 @@ requiredMods=["pneumaticcraft"]
     modId="exdeorum"
     type="optional"
     versionRange="[3.12,)"
-    ordering="AFTER"
+    ordering="NONE"
     side="BOTH"
 
 [[dependencies.${mod_id}]]
     modId="botanypots"
     type="optional"
     versionRange="[21.1.34,)"
-    ordering="AFTER"
+    ordering="NONE"
     side="BOTH"
 
 # 无线物流的「应力」介质：转速与应力容量都靠动力学方块实体之间的传播机制承载。
@@ -172,7 +172,7 @@ requiredMods=["pneumaticcraft"]
     modId="create"
     type="optional"
     versionRange="[6.0.0,6.1.0)"
-    ordering="AFTER"
+    ordering="NONE"
     side="BOTH"
 
 # 无线物流的「气压」介质：方块侧走气动工艺的空气处理器（IAirHandlerMachine）。
@@ -181,7 +181,7 @@ requiredMods=["pneumaticcraft"]
     modId="pneumaticcraft"
     type="optional"
     versionRange="[8.2.0,)"
-    ordering="AFTER"
+    ordering="NONE"
     side="BOTH"
 
 # 无线物流的「AE 气压」介质：空气要进 ME 网络得靠 Applied Pneumatics 的 AirKey。
@@ -190,7 +190,7 @@ requiredMods=["pneumaticcraft"]
     modId="appliedpneumatics"
     type="optional"
     versionRange="[1.0.0,)"
-    ordering="AFTER"
+    ordering="NONE"
     side="BOTH"
 
 # 星辉魔法的祭坛适配器按 2.0.1.26 起的附加输入类型（NeoForge 的 SizedIngredient）编译。
@@ -200,19 +200,20 @@ requiredMods=["pneumaticcraft"]
     modId="astralsorcery"
     type="optional"
     versionRange="[2.0.1.26,)"
-    ordering="AFTER"
+    ordering="NONE"
     side="BOTH"
 
 # 数据能源集成是软加载：入口走它自己的 @DataEnergisticsEntrypoint 扫描，
 # 没装数据能源时 integration.dataenergistics 整包不会被触达，本模组照常运行，因此声明为 optional。
 #
-# 下限锁定 3.3.4：本模组按数据能源 3.3.4 的 API 编译（ProcessingMatchMode、
-# BigIntegerCraftingAdmission.count() 抽象化、FastUtil ObjectList 参数），旧版缺这些符号。
+# 下限锁定 3.4.0：本模组按数据能源 3.4.0 正式版的 API 编译，该版本将配方重组器、
+# DERecipes/DEMenus 与通用样板编码终端迁至 api. / common. 下的新包路径；3.3.x 仍是旧路径，
+# 在此版本组合下会在运行期抛 NoClassDefFoundError。
 [[dependencies.${mod_id}]]
     modId="data_energistics"
     type="optional"
-    versionRange="[3.3.4,)"
-    ordering="AFTER"
+    versionRange="[3.4.0,)"
+    ordering="NONE"
     side="BOTH"
 
 # Features are specific properties of the game environment, that you may want to declare you require. This example declares

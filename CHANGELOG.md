@@ -8,6 +8,8 @@
 ### Fixed / 修复
 - 修复通用机械的机器装入速度升级后耗电不增加的问题。速度升级现在会按原版规则抬高耗电，权重为能量升级的两倍；能量升级的节电效果改为装满上限数量才达到最大，与原版「装满即满效果」保持一致。
   - Fixed Mekanism machines not consuming more energy after speed upgrades were installed. Speed upgrades now raise energy usage following vanilla's rules, weighted twice as heavily as energy upgrades; energy upgrades now reach their full savings only when filled to the upgrade cap, matching vanilla's "full means full effect" behavior.
+- 数据能源（Data Energistics）联动升级至 3.4.0 正式版：本模组的配方重组器与通用样板编码终端兼容层同步适配其新版 API 与包路径，需搭配数据能源 3.4.0 及以上版本使用。
+  - Data Energistics upgraded in tandem to the 3.4.0 release: the recipe reassembler and universal pattern encoding terminal compatibility layers are adapted to its new API and package layout, and require Data Energistics 3.4.0 or newer.
 
 ## [2.4.6.3]
 

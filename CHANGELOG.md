@@ -6,10 +6,12 @@
 ## [2.4.6.4]
 
 ### Fixed / 修复
-- 修复通用机械的机器装入速度升级后耗电不增加的问题。速度升级现在会按原版规则抬高耗电，权重为能量升级的两倍；能量升级的节电效果改为装满上限数量才达到最大，与原版「装满即满效果」保持一致。
-  - Fixed Mekanism machines not consuming more energy after speed upgrades were installed. Speed upgrades now raise energy usage following vanilla's rules, weighted twice as heavily as energy upgrades; energy upgrades now reach their full savings only when filled to the upgrade cap, matching vanilla's "full means full effect" behavior.
-- 数据能源（Data Energistics）联动升级至 3.4.0 正式版：本模组的配方重组器与通用样板编码终端兼容层同步适配其新版 API 与包路径，需搭配数据能源 3.4.0 及以上版本使用。
-  - Data Energistics upgraded in tandem to the 3.4.0 release: the recipe reassembler and universal pattern encoding terminal compatibility layers are adapted to its new API and package layout, and require Data Energistics 3.4.0 or newer.
+- 修复通用机械机器装入速度升级后耗电不增加的问题。速度升级现在按原版规则提高耗电，提高幅度为能量升级的两倍；能量升级则需装满升级槽，节电效果才会达到最大，同样与原版一致。
+  - Fixed Mekanism machines not consuming extra energy after speed upgrades were installed. Speed upgrades now raise energy usage per vanilla rules, at twice the increase of energy upgrades; energy upgrades reach their full savings only when the upgrade slots are filled, also matching vanilla.
+- 兼容数据能源（Data Energistics）3.4.0：配方重组器与通用样板编码终端可正常使用，请将数据能源更新至 3.4.0 或更高版本。
+  - Compatible with Data Energistics 3.4.0: the recipe reassembler and universal pattern encoding terminal work as expected; please update Data Energistics to 3.4.0 or newer.
+- 兼容ExtendedAE-Plus1.6.4：样板供应器内的关键字搜索恢复正常，与 JEI 之间的样板传输也重新可用。
+  - Compatible with ExtendedAE-Plus 1.6.4: keyword search inside pattern providers works again, and pattern transfer with JEI is restored.
 
 ## [2.4.6.3]
 

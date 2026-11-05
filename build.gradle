@@ -207,10 +207,10 @@ dependencies {
     testImplementation 'org.junit.jupiter:junit-jupiter'
     testImplementation 'org.mockito:mockito-core:5.15.2'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
-    implementation "mezz.jei:jei-1.21.1-neoforge:19.56.0.438"
+    implementation "mezz.jei:jei-1.21.1-neoforge:19.70.0.460"
     compileOnly "curse.maven:ae2-jei-integration-1074338:7727898"
 
-    implementation "org.appliedenergistics:appliedenergistics2:19.2.17"
+    implementation "org.appliedenergistics:appliedenergistics2:19.2.18"
     runtimeOnly "org.appliedenergistics:guideme:21.1.17"
     runtimeOnly "de.mari_023:ae2wtlib_api:19.2.5"
 
@@ -298,8 +298,8 @@ dependencies {
     compileOnly "curse.maven:neo-eco-ae-extension-1460639:8983610"
     // LDLib2 同时供本地编译（源码直接引用其 GUI/RPC 类型）与运行时使用：
     // OmniSequence 在运行时强制要求 ldlib2 存在，缺失会导致整包加载失败。
-    compileOnly "maven.modrinth:ldlib:mc1.21.1-2.2.40-neoforge"
-    runtimeOnly "maven.modrinth:ldlib:mc1.21.1-2.2.40-neoforge"
+    compileOnly "maven.modrinth:ldlib:mc1.21.1-2.2.44-neoforge"
+    runtimeOnly "maven.modrinth:ldlib:mc1.21.1-2.2.44-neoforge"
 
     // 实用拓展
     compileOnly "maven.modrinth:actually-additions:1.3.22"
@@ -414,7 +414,7 @@ dependencies {
     // 后者的 pom 会牵引 kotlinx-serialization-bom，而该 bom 仅由 maven.neoforged.net 提供，
     // 本机访问该仓库超时会导致解析失败。json-jvm 由 Maven Central 直接提供 pom 与 jar。
     runtimeOnly "org.jetbrains.kotlinx:kotlinx-serialization-json-jvm:1.9.0"
-    compileOnly "curse.maven:just-enough-characters-250702:8413478"
+    implementation "curse.maven:just-enough-characters-250702:8413478"
 
     compileOnly "curse.maven:apotheosis-313970:8564919"
     compileOnly "curse.maven:apothic-spawners-986583:8469405"

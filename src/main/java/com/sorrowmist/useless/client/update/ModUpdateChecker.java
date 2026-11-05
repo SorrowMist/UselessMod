@@ -283,13 +283,20 @@ public final class ModUpdateChecker {
      * 字符串比较，避免 2.4.10 与 2.4.9 这类位数不同的版本被判错。</p>
      */
     private static void notifyIfOutdated(LocalPlayer player, String currentVersion, String latestVersion) {
+        // 最新版本号来自 CurseForge 的展示名，已由 normalizeVersion 剥离 Minecraft 版本前缀；
+        // 当前版本取自模组元数据，通常是 1.21.1-2.4.6.4 这种带前缀的形式。
+        // 两侧必须用同一口径比较，否则 1.21.1-2.4.6.4 会被判为低于 2.4.6.4，导致永远提示更新。
+        String normalizedCurrent = normalizeVersion(currentVersion);
+        if (normalizedCurrent == null) {
+            return;
+        }
         DefaultArtifactVersion current;
         DefaultArtifactVersion latest;
         try {
-            current = new DefaultArtifactVersion(currentVersion);
+            current = new DefaultArtifactVersion(normalizedCurrent);
             latest = new DefaultArtifactVersion(latestVersion);
         } catch (Exception e) {
-            UselessMod.LOGGER.debug("Unparsable version: current={}, latest={}", currentVersion, latestVersion);
+            UselessMod.LOGGER.debug("Unparsable version: current={}, latest={}", normalizedCurrent, latestVersion);
             return;
         }
         if (latest.compareTo(current) <= 0) {

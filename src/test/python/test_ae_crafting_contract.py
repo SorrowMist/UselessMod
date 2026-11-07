@@ -99,6 +99,15 @@ class AeCraftingMixinContractTest(unittest.TestCase):
         self.assertIn('Lcom/llamalad7/mixinextras/injector/wrapoperation/WrapOperation;', strings)
         self.assertIn('appeng/crafting/CraftingTreeNode', strings)
 
+    def test_emi_tianshu_hook_matches_native_craft_entry(self):
+        handlers, strings = load(self.jar, 'com.sorrowmist.useless.mixin.emi.EmiEncodePatternHandlerMixin')
+        native, _ = load(self.native['ae2'], 'appeng.integration.modules.emi.EmiEncodePatternHandler')
+        descriptor = handlers['useless$transferTianshuOmniversalRecipe'][0].replace(
+            'Lorg/spongepowered/asm/mixin/injection/callback/CallbackInfoReturnable;', '')
+        descriptor = descriptor.replace(')V', ')Z')
+        self.assertIn(descriptor, native['craft'])
+        self.assertIn('craft' + descriptor, strings)
+
     def test_registry_free_state_storage(self):
         methods, _ = load(self.jar, 'com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.DynamicPatternCpuStateManager')
         self.assertIn('(Ljava/lang/Object;)Lnet/minecraft/nbt/CompoundTag;', methods['writeToTag'])

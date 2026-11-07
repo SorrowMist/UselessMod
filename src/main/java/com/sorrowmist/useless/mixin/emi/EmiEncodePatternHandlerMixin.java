@@ -3,15 +3,19 @@ package com.sorrowmist.useless.mixin.emi;
 import appeng.api.stacks.GenericStack;
 import appeng.integration.modules.jeirei.EncodingHelper;
 import appeng.menu.me.items.PatternEncodingTermMenu;
+import com.sorrowmist.useless.compat.ae.TianshuPatternEmiCompat;
 import com.sorrowmist.useless.compat.jei.OmniversalEmiSelection;
 import com.sorrowmist.useless.compat.jei.OmniversalPatternJeiTransferHandler;
 import dev.emi.emi.api.recipe.EmiRecipe;
+import dev.emi.emi.api.recipe.handler.EmiCraftContext;
 import net.minecraft.client.Minecraft;
 import net.minecraft.world.item.crafting.Recipe;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Pseudo;
 import org.spongepowered.asm.mixin.injection.At;
+import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.Redirect;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 import java.util.List;
 
@@ -19,6 +23,22 @@ import java.util.List;
 @Pseudo
 @Mixin(targets = "appeng.integration.modules.emi.EmiEncodePatternHandler", remap = false)
 public abstract class EmiEncodePatternHandlerMixin {
+    @Inject(method = "craft(Ldev/emi/emi/api/recipe/EmiRecipe;Ldev/emi/emi/api/recipe/handler/EmiCraftContext;)Z",
+            at = @At("HEAD"), cancellable = true)
+    private void useless$transferTianshuOmniversalRecipe(
+            EmiRecipe recipe, EmiCraftContext<PatternEncodingTermMenu> context,
+            CallbackInfoReturnable<Boolean> cir) {
+        var entry = OmniversalEmiSelection.recipe(recipe);
+        if (entry == null) return;
+        // Enter Tianshu's dedicated page before native processing slot checks and the
+        // processing-transfer hooks that reset (or restore) the terminal's current mode.
+        var result = TianshuPatternEmiCompat.transferRecipe(context.getScreenHandler(), entry);
+        if (result != null) {
+            if (result) Minecraft.getInstance().setScreen(context.getScreen());
+            cir.setReturnValue(result);
+        }
+    }
+
     @Redirect(method = "transferRecipe(Lappeng/menu/me/items/PatternEncodingTermMenu;Lnet/minecraft/world/item/crafting/Recipe;Ldev/emi/emi/api/recipe/EmiRecipe;Z)Lappeng/integration/modules/emi/AbstractRecipeHandler$Result;",
             at = @At(value = "INVOKE", target = "Lappeng/integration/modules/jeirei/EncodingHelper;encodeProcessingRecipe(Lappeng/menu/me/items/PatternEncodingTermMenu;Ljava/util/List;Ljava/util/List;)V"))
     private void useless$encodeOmniversalRecipe(

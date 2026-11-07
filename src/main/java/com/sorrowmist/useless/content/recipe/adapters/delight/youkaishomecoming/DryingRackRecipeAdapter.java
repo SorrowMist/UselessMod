@@ -23,7 +23,7 @@ import java.util.Map;
 /** Converts Youkai's Homecoming drying-rack recipes. */
 public final class DryingRackRecipeAdapter implements IRecipeAdapter<DryingRackRecipe> {
     private static final ResourceLocation RACK_ID =
-            new ResourceLocation("youkaisfeasts", "drying_rack");
+            new ResourceLocation("youkaishomecoming", "drying_rack");
 
     @Override
     public String sourceId() {

@@ -1,23 +1,28 @@
 package com.sorrowmist.useless.content.recipe.adapters.occultism;
 
-import com.klikli_dev.occultism.common.entity.spirit.SpiritEntity;
+import com.klikli_dev.occultism.common.entity.familiar.FamiliarEntity;
 import com.klikli_dev.occultism.common.entity.job.SpiritJob;
 import com.klikli_dev.occultism.common.entity.job.SpiritJobFactory;
+import com.klikli_dev.occultism.common.entity.spirit.SpiritEntity;
 import com.klikli_dev.occultism.registry.OccultismSpiritJobs;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
-import net.minecraft.core.component.DataComponents;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.TamableAnimal;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.SpawnEggItem;
-import net.minecraft.world.item.component.CustomData;
 import net.minecraftforge.event.entity.player.PlayerInteractEvent;
+import org.jetbrains.annotations.Nullable;
 
-/** Runtime-only handling for the component-bearing Occultism job spirit eggs. */
+/**
+ * Runtime-only handling for the NBT-bearing Occultism job-spirit spawn eggs produced by the
+ * alloy furnace. Forge 1.20.1 spawn eggs read entity data from the root {@code EntityTag}
+ * compound; there is no custom-data component in this version.
+ */
 public final class OccultismSpiritEggHandler {
     private OccultismSpiritEggHandler() {
     }
@@ -27,31 +32,38 @@ public final class OccultismSpiritEggHandler {
         if (!(stack.getItem() instanceof SpawnEggItem egg)) {
             return InteractionResult.PASS;
         }
-        CustomData marker = stack.get(DataComponents.CUSTOM_DATA);
-        if (marker == null || !marker.copyTag().getBoolean(OccultismRitualRecipeAdapter.AUTO_TAME_MARKER)) {
+        CompoundTag stackTag = stack.getTag();
+        if (stackTag == null
+                || !stackTag.getBoolean(OccultismRitualRecipeAdapter.AUTO_TAME_MARKER)) {
             return InteractionResult.PASS;
         }
         if (event.getLevel().isClientSide) {
             return InteractionResult.SUCCESS;
         }
 
-        Entity entity = egg.getType(stack).create(event.getLevel());
-        CustomData entityComponent = stack.get(DataComponents.ENTITY_DATA);
+        EntityType<?> entityType = egg.getType(stackTag);
+        Entity entity = entityType == null ? null : entityType.create(event.getLevel());
         if (entity == null) {
             return InteractionResult.FAIL;
         }
 
         CompoundTag jobData = new CompoundTag();
-        if (entityComponent != null) {
-            CompoundTag entityData = entityComponent.copyTag();
-            if (entityData.contains("spiritJob")) {
-                jobData = entityData.getCompound("spiritJob").copy();
-                entityData.remove("spiritJob");
+        CompoundTag entityData = stackTag.getCompound("EntityTag");
+        if (!entityData.isEmpty()) {
+            CompoundTag loaded = entityData.copy();
+            if (loaded.contains("spiritJob", CompoundTag.TAG_COMPOUND)) {
+                jobData = loaded.getCompound("spiritJob").copy();
+                loaded.remove("spiritJob");
             }
-            entity.load(entityData);
+            entity.load(loaded);
         }
+
         if (entity instanceof TamableAnimal tamable) {
             tamable.tame(event.getEntity());
+        }
+        if (entity instanceof FamiliarEntity familiar) {
+            // FamiliarRitual uses its own owner field instead of TamableAnimal#tame.
+            familiar.setFamiliarOwner(event.getEntity());
         }
 
         BlockPos pos = event.getPos();
@@ -59,10 +71,13 @@ public final class OccultismSpiritEggHandler {
         if (!event.getLevel().getBlockState(pos).getCollisionShape(event.getLevel(), pos).isEmpty()) {
             pos = pos.relative(face);
         }
-        entity.moveTo(pos.getX() + 0.5D, pos.getY() + 0.0D, pos.getZ() + 0.5D,
+        entity.moveTo(pos.getX() + 0.5D, pos.getY(), pos.getZ() + 0.5D,
                 event.getEntity().getYRot(), 0.0F);
 
         if (entity instanceof SpiritEntity spirit) {
+            // SpiritEntity#readAdditionalSaveData would try to rebuild the job through the
+            // registry without the brain. Restore it explicitly after loading the rest of the
+            // entity so a generated egg only needs the native factoryId shape.
             restoreSpiritJob(spirit, jobData);
             spirit.init();
         }
@@ -82,18 +97,30 @@ public final class OccultismSpiritEggHandler {
             return;
         }
 
-        SpiritJobFactory factory = OccultismSpiritJobs.REGISTRY.get(new ResourceLocation(factoryIdValue));
+        SpiritJobFactory factory = spiritJobFactory(new ResourceLocation(factoryIdValue));
         if (factory == null) {
             return;
         }
 
         SpiritJob job = factory.create(spirit);
-        // A generated egg intentionally stores only factoryId. Recreating the job from
-        // its factory preserves configured defaults such as TraderJob's operation count.
-        // Full saved job state is still restored when additional fields are present.
+        // A generated egg intentionally stores only factoryId. Recreating the job from its
+        // factory preserves configured defaults such as TraderJob's operation count. Full saved
+        // job state is still restored when additional fields are present.
         if (jobData.size() > 1) {
-            job.deserializeNBT(spirit.level().registryAccess(), jobData);
+            job.deserializeNBT(jobData);
         }
         spirit.setJob(job);
+    }
+
+    @Nullable
+    private static SpiritJobFactory spiritJobFactory(ResourceLocation id) {
+        try {
+            var registry = OccultismSpiritJobs.REGISTRY.get();
+            return registry == null ? null : registry.getValue(id);
+        } catch (RuntimeException exception) {
+            // The registry is unavailable outside a live Forge game; leave the spirit job-less
+            // rather than letting a malformed/unknown factory id break entity spawning.
+            return null;
+        }
     }
 }

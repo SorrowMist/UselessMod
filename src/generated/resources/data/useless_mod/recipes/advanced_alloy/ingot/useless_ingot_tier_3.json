@@ -1,48 +1,447 @@
 {
-  "type": "useless_mod:advanced_alloy_furnace",
-  "energy": 100000,
-  "id": "useless_mod:advanced_alloy/ingot/useless_ingot_tier_3",
+  "type": "ae2:transform",
+  "circumstance": {
+    "type": "explosion"
+  },
   "ingredients": [
     {
-      "count": 2,
-      "ingredient": {
-        "item": "minecraft:nether_wart"
-      }
+      "item": "minecraft:red_nether_bricks"
     },
     {
-      "count": 2,
-      "ingredient": {
-        "item": "minecraft:blaze_rod"
-      }
+      "item": "minecraft:red_nether_bricks"
     },
     {
-      "count": 2,
-      "ingredient": {
-        "item": "minecraft:nether_brick"
-      }
+      "item": "minecraft:red_nether_bricks"
     },
     {
-      "count": 2,
-      "ingredient": {
-        "item": "minecraft:gold_ingot"
-      }
+      "item": "minecraft:red_nether_bricks"
     },
     {
-      "count": 2,
-      "ingredient": {
-        "item": "minecraft:diamond"
-      }
+      "item": "minecraft:red_nether_bricks"
     },
     {
-      "ingredient": {
-        "item": "useless_mod:useless_ingot_tier_2"
-      }
+      "item": "minecraft:red_nether_bricks"
+    },
+    {
+      "item": "minecraft:red_nether_bricks"
+    },
+    {
+      "item": "minecraft:red_nether_bricks"
+    },
+    {
+      "item": "minecraft:red_nether_bricks"
+    },
+    {
+      "item": "minecraft:red_nether_bricks"
+    },
+    {
+      "item": "minecraft:red_nether_bricks"
+    },
+    {
+      "item": "minecraft:red_nether_bricks"
+    },
+    {
+      "item": "minecraft:red_nether_bricks"
+    },
+    {
+      "item": "minecraft:red_nether_bricks"
+    },
+    {
+      "item": "minecraft:red_nether_bricks"
+    },
+    {
+      "item": "minecraft:red_nether_bricks"
+    },
+    {
+      "item": "minecraft:blaze_powder"
+    },
+    {
+      "item": "minecraft:blaze_powder"
+    },
+    {
+      "item": "minecraft:blaze_powder"
+    },
+    {
+      "item": "minecraft:blaze_powder"
+    },
+    {
+      "item": "minecraft:blaze_powder"
+    },
+    {
+      "item": "minecraft:blaze_powder"
+    },
+    {
+      "item": "minecraft:blaze_powder"
+    },
+    {
+      "item": "minecraft:blaze_powder"
+    },
+    {
+      "item": "minecraft:blaze_powder"
+    },
+    {
+      "item": "minecraft:blaze_powder"
+    },
+    {
+      "item": "minecraft:blaze_powder"
+    },
+    {
+      "item": "minecraft:blaze_powder"
+    },
+    {
+      "item": "minecraft:blaze_powder"
+    },
+    {
+      "item": "minecraft:blaze_powder"
+    },
+    {
+      "item": "minecraft:blaze_powder"
+    },
+    {
+      "item": "minecraft:blaze_powder"
+    },
+    {
+      "item": "minecraft:blaze_powder"
+    },
+    {
+      "item": "minecraft:blaze_powder"
+    },
+    {
+      "item": "minecraft:blaze_powder"
+    },
+    {
+      "item": "minecraft:blaze_powder"
+    },
+    {
+      "item": "minecraft:blaze_powder"
+    },
+    {
+      "item": "minecraft:blaze_powder"
+    },
+    {
+      "item": "minecraft:blaze_powder"
+    },
+    {
+      "item": "minecraft:blaze_powder"
+    },
+    {
+      "item": "minecraft:blaze_powder"
+    },
+    {
+      "item": "minecraft:blaze_powder"
+    },
+    {
+      "item": "minecraft:blaze_powder"
+    },
+    {
+      "item": "minecraft:blaze_powder"
+    },
+    {
+      "item": "minecraft:blaze_powder"
+    },
+    {
+      "item": "minecraft:blaze_powder"
+    },
+    {
+      "item": "minecraft:blaze_powder"
+    },
+    {
+      "item": "minecraft:blaze_powder"
+    },
+    {
+      "item": "minecraft:glowstone_dust"
+    },
+    {
+      "item": "minecraft:glowstone_dust"
+    },
+    {
+      "item": "minecraft:glowstone_dust"
+    },
+    {
+      "item": "minecraft:glowstone_dust"
+    },
+    {
+      "item": "minecraft:glowstone_dust"
+    },
+    {
+      "item": "minecraft:glowstone_dust"
+    },
+    {
+      "item": "minecraft:glowstone_dust"
+    },
+    {
+      "item": "minecraft:glowstone_dust"
+    },
+    {
+      "item": "minecraft:glowstone_dust"
+    },
+    {
+      "item": "minecraft:glowstone_dust"
+    },
+    {
+      "item": "minecraft:glowstone_dust"
+    },
+    {
+      "item": "minecraft:glowstone_dust"
+    },
+    {
+      "item": "minecraft:glowstone_dust"
+    },
+    {
+      "item": "minecraft:glowstone_dust"
+    },
+    {
+      "item": "minecraft:glowstone_dust"
+    },
+    {
+      "item": "minecraft:glowstone_dust"
+    },
+    {
+      "item": "minecraft:glowstone_dust"
+    },
+    {
+      "item": "minecraft:glowstone_dust"
+    },
+    {
+      "item": "minecraft:glowstone_dust"
+    },
+    {
+      "item": "minecraft:glowstone_dust"
+    },
+    {
+      "item": "minecraft:glowstone_dust"
+    },
+    {
+      "item": "minecraft:glowstone_dust"
+    },
+    {
+      "item": "minecraft:glowstone_dust"
+    },
+    {
+      "item": "minecraft:glowstone_dust"
+    },
+    {
+      "item": "minecraft:glowstone_dust"
+    },
+    {
+      "item": "minecraft:glowstone_dust"
+    },
+    {
+      "item": "minecraft:glowstone_dust"
+    },
+    {
+      "item": "minecraft:glowstone_dust"
+    },
+    {
+      "item": "minecraft:glowstone_dust"
+    },
+    {
+      "item": "minecraft:glowstone_dust"
+    },
+    {
+      "item": "minecraft:glowstone_dust"
+    },
+    {
+      "item": "minecraft:glowstone_dust"
+    },
+    {
+      "item": "ae2:certus_quartz_dust"
+    },
+    {
+      "item": "ae2:certus_quartz_dust"
+    },
+    {
+      "item": "ae2:certus_quartz_dust"
+    },
+    {
+      "item": "ae2:certus_quartz_dust"
+    },
+    {
+      "item": "ae2:certus_quartz_dust"
+    },
+    {
+      "item": "ae2:certus_quartz_dust"
+    },
+    {
+      "item": "ae2:certus_quartz_dust"
+    },
+    {
+      "item": "ae2:certus_quartz_dust"
+    },
+    {
+      "item": "ae2:certus_quartz_dust"
+    },
+    {
+      "item": "ae2:certus_quartz_dust"
+    },
+    {
+      "item": "ae2:certus_quartz_dust"
+    },
+    {
+      "item": "ae2:certus_quartz_dust"
+    },
+    {
+      "item": "ae2:certus_quartz_dust"
+    },
+    {
+      "item": "ae2:certus_quartz_dust"
+    },
+    {
+      "item": "ae2:certus_quartz_dust"
+    },
+    {
+      "item": "ae2:certus_quartz_dust"
+    },
+    {
+      "item": "ae2:certus_quartz_dust"
+    },
+    {
+      "item": "ae2:certus_quartz_dust"
+    },
+    {
+      "item": "ae2:certus_quartz_dust"
+    },
+    {
+      "item": "ae2:certus_quartz_dust"
+    },
+    {
+      "item": "ae2:certus_quartz_dust"
+    },
+    {
+      "item": "ae2:certus_quartz_dust"
+    },
+    {
+      "item": "ae2:certus_quartz_dust"
+    },
+    {
+      "item": "ae2:certus_quartz_dust"
+    },
+    {
+      "item": "ae2:certus_quartz_dust"
+    },
+    {
+      "item": "ae2:certus_quartz_dust"
+    },
+    {
+      "item": "ae2:certus_quartz_dust"
+    },
+    {
+      "item": "ae2:certus_quartz_dust"
+    },
+    {
+      "item": "ae2:certus_quartz_dust"
+    },
+    {
+      "item": "ae2:certus_quartz_dust"
+    },
+    {
+      "item": "ae2:certus_quartz_dust"
+    },
+    {
+      "item": "ae2:certus_quartz_dust"
+    },
+    {
+      "item": "ae2:matter_ball"
+    },
+    {
+      "item": "ae2:matter_ball"
+    },
+    {
+      "item": "ae2:matter_ball"
+    },
+    {
+      "item": "ae2:matter_ball"
+    },
+    {
+      "item": "ae2:matter_ball"
+    },
+    {
+      "item": "ae2:matter_ball"
+    },
+    {
+      "item": "ae2:matter_ball"
+    },
+    {
+      "item": "ae2:matter_ball"
+    },
+    {
+      "item": "ae2:matter_ball"
+    },
+    {
+      "item": "ae2:matter_ball"
+    },
+    {
+      "item": "ae2:matter_ball"
+    },
+    {
+      "item": "ae2:matter_ball"
+    },
+    {
+      "item": "ae2:matter_ball"
+    },
+    {
+      "item": "ae2:matter_ball"
+    },
+    {
+      "item": "ae2:matter_ball"
+    },
+    {
+      "item": "ae2:matter_ball"
+    },
+    {
+      "item": "ae2:matter_ball"
+    },
+    {
+      "item": "ae2:matter_ball"
+    },
+    {
+      "item": "ae2:matter_ball"
+    },
+    {
+      "item": "ae2:matter_ball"
+    },
+    {
+      "item": "ae2:matter_ball"
+    },
+    {
+      "item": "ae2:matter_ball"
+    },
+    {
+      "item": "ae2:matter_ball"
+    },
+    {
+      "item": "ae2:matter_ball"
+    },
+    {
+      "item": "ae2:matter_ball"
+    },
+    {
+      "item": "ae2:matter_ball"
+    },
+    {
+      "item": "ae2:matter_ball"
+    },
+    {
+      "item": "ae2:matter_ball"
+    },
+    {
+      "item": "ae2:matter_ball"
+    },
+    {
+      "item": "ae2:matter_ball"
+    },
+    {
+      "item": "ae2:matter_ball"
+    },
+    {
+      "item": "ae2:matter_ball"
+    },
+    {
+      "item": "useless_mod:useless_ingot_tier_2"
     }
   ],
-  "outputs": [
-    {
-      "id": "useless_mod:useless_ingot_tier_3"
-    }
-  ],
-  "process_time": 1
+  "result": {
+    "count": 1,
+    "item": "useless_mod:useless_ingot_tier_3"
+  }
 }

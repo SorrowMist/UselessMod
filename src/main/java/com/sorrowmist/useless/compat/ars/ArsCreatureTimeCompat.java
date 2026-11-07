@@ -2,7 +2,6 @@ package com.sorrowmist.useless.compat.ars;
 
 import com.hollingsworth.arsnouveau.common.block.tile.DrygmyTile;
 import com.hollingsworth.arsnouveau.common.block.tile.WhirlisprigTile;
-import com.hollingsworth.arsnouveau.common.entity.Alakarkinos;
 import com.hollingsworth.arsnouveau.common.entity.EntityDrygmy;
 import com.hollingsworth.arsnouveau.common.entity.Whirlisprig;
 import com.hollingsworth.arsnouveau.setup.config.Config;
@@ -15,14 +14,12 @@ import net.minecraft.world.entity.LivingEntity;
  * {@code ArsSourceCompat} 是另一处、面向魔源搬运）。只有 Ars Nouveau 加载时，
  * {@link ArsCreatureTimeCompatLoader} 才会通过 {@code Class.forName} 把本类载入 JVM。</p>
  *
- * <h2>三只工作生物为什么各自推不同的东西</h2>
+ * <h2>Forge 4.x 中工作生物的进度</h2>
+ * <p>4.12.7 没有 Alakarkinos（探宝蟹），因此不加载新版探宝蟹冷却桥。</p>
  * <ul>
  *   <li><b>德格米</b>：工作进度不在实体上，而在「家」方块实体 {@link DrygmyTile} 的
  *       {@code progress} 字段上。原版节奏是「引导 100 tick + 冷却 100 tick = 200 tick 才 +1 点，
  *       默认 20 点约 4000 tick 产一批」，所以直接把 {@code progress} 推满即可。</li>
- *   <li><b>探宝蟹</b>：由状态机驱动，主节流是实体字段 {@code findBlockCooldown}
- *       （一轮成功转换后设 1200 tick，搜索失败设 100~200 tick），只压这个冷却。
- *       状态机内部的 {@code waitTicks} 与寻路<b>刻意不动</b>——驱动它们等于额外跑 AI。</li>
  *   <li><b>旋风精灵</b>：与德格米同构，进度在 {@link WhirlisprigTile} 的 {@code progress} 上，
  *       但原版每次 {@code addProgress()} 加的是 {@code moodScore / 30}（林地心情），
  *       所以按同一比例放大，而不是按 1 加。</li>
@@ -42,8 +39,6 @@ public final class ArsCreatureTimeCompat implements ArsCreatureTimeBridge {
         }
         if (target instanceof EntityDrygmy drygmy) {
             accelerateDrygmy(drygmy, extra);
-        } else if (target instanceof Alakarkinos alakarkinos) {
-            accelerateAlakarkinos(alakarkinos, extra);
         } else if (target instanceof Whirlisprig whirlisprig) {
             accelerateWhirlisprig(whirlisprig, extra);
         }
@@ -68,19 +63,6 @@ public final class ArsCreatureTimeCompat implements ArsCreatureTimeBridge {
         // 等价于循环调用 giveProgress()，但只发一次方块更新包（giveProgress 每次都 updateBlock）。
         home.progress = Math.min(max, home.progress + extra);
         home.updateBlock();
-    }
-
-    /**
-     * 探宝蟹：只缩短「找方块」冷却。
-     *
-     * <p>未绑定容器（{@code getHome() == null}）时状态机在 {@code DecideCrabActionState} 里直接空转，
-     * 压冷却不会有任何可观察效果，故跳过。冷却已经是 0 时也没什么可推的。</p>
-     */
-    private void accelerateAlakarkinos(Alakarkinos alakarkinos, int extra) {
-        if (alakarkinos.getHome() == null || alakarkinos.findBlockCooldown <= 0) {
-            return;
-        }
-        alakarkinos.findBlockCooldown = Math.max(0, alakarkinos.findBlockCooldown - extra);
     }
 
     /**

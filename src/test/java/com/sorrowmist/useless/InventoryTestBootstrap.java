@@ -33,4 +33,30 @@ public final class InventoryTestBootstrap {
                 cofh.lib.util.crafting.IngredientWithCount.Serializer.INSTANCE);
         initialized = true;
     }
+
+    /** Creates a registered native fixture, restoring the normal frozen item registry afterwards. */
+    public static synchronized <T extends net.minecraft.world.item.Item> T registerItem(
+            String name, java.util.function.Supplier<T> factory) {
+        return registerItem(new net.minecraft.resources.ResourceLocation("useless_mod_test", name), factory);
+    }
+
+    public static synchronized <T extends net.minecraft.world.item.Item> T registerItem(
+            net.minecraft.resources.ResourceLocation id, java.util.function.Supplier<T> factory) {
+        initialize();
+        var registry = (net.minecraftforge.registries.ForgeRegistry<net.minecraft.world.item.Item>)
+                net.minecraftforge.registries.ForgeRegistries.ITEMS;
+        var wrapper = (net.minecraft.core.MappedRegistry<net.minecraft.world.item.Item>)
+                net.minecraft.core.registries.BuiltInRegistries.ITEM;
+        boolean locked = registry.isLocked();
+        registry.unfreeze();
+        wrapper.unfreeze();
+        try {
+            T item = factory.get();
+            registry.register(id, item);
+            return item;
+        } finally {
+            wrapper.freeze();
+            if (locked) registry.freeze();
+        }
+    }
 }

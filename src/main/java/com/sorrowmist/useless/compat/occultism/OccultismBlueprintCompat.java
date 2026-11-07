@@ -33,7 +33,7 @@ public final class OccultismBlueprintCompat {
         Set<ResourceLocation> matches = new LinkedHashSet<>();
         for (var holder : com.sorrowmist.useless.compat.forge1201.recipe.RecipeManagerAccess.getAllRecipesFor(level.getRecipeManager(), OccultismRecipes.RITUAL_TYPE.get())) {
             RitualRecipe recipe = holder.value();
-            if (recipe == null || recipe.getPentacle() == null
+            if (recipe == null || recipe.getPentacleId() == null || recipe.getPentacle() == null
                     || recipe.getPentacle().validate(level, context.getClickedPos()) == null) {
                 continue;
             }

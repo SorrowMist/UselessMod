@@ -33,7 +33,7 @@ public final class CuisineRecipeAdapter implements IRecipeAdapter<DelightSynthet
             "dev.xkmc.youkaishomecoming.content.pot.table.recipe.UnorderedCuisineRecipe"
     );
     private static final ResourceLocation CUISINE_BOARD_ID =
-            new ResourceLocation("youkaisfeasts", "cuisine_board");
+            new ResourceLocation("youkaishomecoming", "cuisine_board");
 
     @Override
     public String sourceId() {

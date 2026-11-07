@@ -1,6 +1,7 @@
 package com.sorrowmist.useless.compat.neoecoae;
 
 import appeng.api.config.Actionable;
+import appeng.api.networking.IGrid;
 import appeng.api.stacks.AEItemKey;
 import appeng.api.stacks.AEKey;
 import cn.dancingsnow.neoecoae.api.me.ECOCraftingCPU;
@@ -9,12 +10,13 @@ import cn.dancingsnow.neoecoae.api.me.output.ECOCraftingOutputClaimResult;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.DynamicPatternCpuStateManager;
 import org.jetbrains.annotations.Nullable;
 
-/** Routes dynamic item outputs through P16's atomic output-claim API. */
+/** Routes native-NBT item outputs through ECO 20.5.0's atomic output-claim API. */
 public final class NeoEcoDynamicOutputCompat {
     private NeoEcoDynamicOutputCompat() {
     }
 
-    public static long claim(@Nullable Object grid, AEKey actualKey, long amount) {
+    // Keep IGrid in this signature: GridOutputTarget resolves it with getMethod(IGrid, AEKey, long).
+    public static long claim(@Nullable IGrid grid, AEKey actualKey, long amount) {
         if (grid == null || !(actualKey instanceof AEItemKey itemKey) || amount <= 0L) {
             return 0L;
         }
@@ -31,7 +33,7 @@ public final class NeoEcoDynamicOutputCompat {
                             candidate.craftingId(),
                             candidate.exactExpectedKey(),
                             actualKey,
-                            amount,
+                            Math.min(amount, candidate.remainingAmount()),
                             Actionable.SIMULATE));
             if (!preview.accepted() || preview.claimedAmount() <= 0L) {
                 continue;
@@ -57,8 +59,10 @@ public final class NeoEcoDynamicOutputCompat {
         if (!committed.accepted() || committed.claimedAmount() <= 0L) {
             return 0L;
         }
-        DynamicPatternCpuStateManager.INSTANCE.claimEcoExact(
+        manager.claimEcoExact(
                 match.craftingId(), match.exactExpectedKey(), committed.claimedAmount());
+        // Persist partial claims too; the lifecycle only marks a finished job dirty itself.
+        cpu.markDirty();
         return committed.claimedAmount();
     }
 }

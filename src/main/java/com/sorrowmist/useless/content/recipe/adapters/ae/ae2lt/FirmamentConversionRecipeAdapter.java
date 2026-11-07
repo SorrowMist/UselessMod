@@ -81,7 +81,7 @@ public class FirmamentConversionRecipeAdapter implements IRecipeAdapter<Firmamen
                 outputs.stream().map(ItemStack::copy).toList(),
                 List.of(),
                 List.of(),
-                Math.max(1, recipe.processTime() * ENERGY_PER_TICK),
+                Math.max(1L, (long) recipe.processTime() * ENERGY_PER_TICK),
                 recipe.processTime(),
                 Ingredient.EMPTY,
                 0,

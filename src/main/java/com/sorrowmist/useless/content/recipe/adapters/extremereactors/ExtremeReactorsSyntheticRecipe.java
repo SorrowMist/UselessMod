@@ -8,6 +8,9 @@ public final class ExtremeReactorsSyntheticRecipe extends ModRecipe {
     private final AdvancedAlloyFurnaceRecipe convertedRecipe;
 
     public ExtremeReactorsSyntheticRecipe(AdvancedAlloyFurnaceRecipe convertedRecipe) {
+        // ZeroCore 1.20.1 ModRecipe has no no-arg constructor. Its native recipe ID must
+        // agree with the holder ID so runtime lookups and encoded patterns stay stable.
+        super(java.util.Objects.requireNonNull(convertedRecipe, "convertedRecipe").id());
         this.convertedRecipe = convertedRecipe;
     }
 

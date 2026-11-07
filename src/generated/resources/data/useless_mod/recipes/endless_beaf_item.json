@@ -1,40 +1,27 @@
 {
-  "type": "minecraft:crafting_shaped",
-  "category": "misc",
-  "key": {
-    "A": {
+  "type": "ae2:inscriber",
+  "ingredients": {
+    "bottom": {
+      "type": "useless_mod:enchanted_item",
+      "item": {
+        "count": 1,
+        "nbt": "{Enchantments:[{id:\"minecraft:looting\",lvl:3s},{id:\"minecraft:silk_touch\",lvl:1s}]}",
+        "item": "minecraft:netherite_axe"
+      }
+    },
+    "middle": {
       "item": "useless_mod:useless_ingot_tier_5"
     },
-    "B": {
-      "item": "useless_mod:useless_ingot_tier_4"
-    },
-    "C": {
-      "item": "useless_mod:useless_ingot_tier_3"
-    },
-    "D": {
-      "item": "minecraft:diamond_pickaxe"
-    },
-    "E": {
-      "item": "useless_mod:useless_ingot_tier_2"
-    },
-    "F": {
-      "item": "minecraft:netherite_pickaxe"
-    },
-    "G": {
-      "item": "useless_mod:useless_ingot_tier_1"
-    },
-    "H": {
-      "item": "minecraft:golden_carrot"
-    },
-    "I": {
-      "item": "minecraft:ghast_tear"
+    "top": {
+      "type": "useless_mod:enchanted_item",
+      "item": {
+        "count": 1,
+        "nbt": "{Enchantments:[{id:\"minecraft:fortune\",lvl:3s}]}",
+        "item": "minecraft:netherite_pickaxe"
+      }
     }
   },
-  "pattern": [
-    "ABC",
-    "DEF",
-    "IGH"
-  ],
+  "mode": "press",
   "result": {
     "count": 1,
     "item": "useless_mod:endless_beaf_item"

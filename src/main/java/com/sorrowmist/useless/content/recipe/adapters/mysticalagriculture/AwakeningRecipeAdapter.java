@@ -3,6 +3,8 @@ package com.sorrowmist.useless.content.recipe.adapters.mysticalagriculture;
 import com.blakebr0.mysticalagriculture.api.crafting.IAwakeningRecipe;
 import com.blakebr0.mysticalagriculture.init.ModRecipeTypes;
 import com.sorrowmist.useless.api.enums.AlloyFurnaceMode;
+import com.sorrowmist.useless.compat.forge1201.recipe.RecipeHolder;
+import com.sorrowmist.useless.compat.forge1201.recipe.RecipeManagerAccess;
 import com.sorrowmist.useless.content.recipe.AdapterUtils;
 import com.sorrowmist.useless.content.recipe.AdvancedAlloyFurnaceRecipe;
 import com.sorrowmist.useless.content.recipe.CountedIngredient;
@@ -11,28 +13,28 @@ import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.crafting.Ingredient;
-import com.sorrowmist.useless.compat.forge1201.recipe.RecipeHolder;
 import net.minecraft.world.item.crafting.RecipeManager;
 import net.minecraft.world.level.Level;
 import net.minecraftforge.fluids.FluidStack;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
 /**
- * Mystical Agriculture 觉醒祭坛配方适配器
- * <p>
- * 将觉醒祭坛配方转换为高级合金熔炉配方
- * <p>
- * 处理逻辑：
- * - 祭坛物品(input) + 基座物品(ingredients) + 精华(essences，含数量) → 普通输入（合并相同物品，全部消耗）
- * - 产物(result) → 输出
- * - mysticalagriculture:awakening_altar → 模具（不消耗）
+ * Converts Mystical Agriculture 7.0.24 awakening-altar recipes.
+ *
+ * <p>1.20.1's {@link IAwakeningRecipe} does not expose a separate altar-ingredient accessor. The
+ * native recipe exposes nine interleaved ingredient entries: index 0 is the altar input, indexes
+ * 2, 4, 6 and 8 are the four pedestal items, and indexes 1, 3, 5 and 7 are one-item views of the
+ * essence stacks. The exact essence quantities live in {@link IAwakeningRecipe#getEssences()}, so
+ * those stacks are used instead of the one-item ingredient views.</p>
  */
-public class AwakeningRecipeAdapter implements IRecipeAdapter<IAwakeningRecipe> {
+public final class AwakeningRecipeAdapter implements IRecipeAdapter<IAwakeningRecipe> {
+    private static final ResourceLocation ALTAR_ID =
+            ResourceLocation.fromNamespaceAndPath("mysticalagriculture", "awakening_altar");
+    private static final int ENERGY = 5000;
 
     @Override
     public Class<IAwakeningRecipe> getRecipeClass() {
@@ -42,135 +44,136 @@ public class AwakeningRecipeAdapter implements IRecipeAdapter<IAwakeningRecipe> 
     @Nullable
     @Override
     public ItemStack getMoldItem() {
-        return new ItemStack(
-                BuiltInRegistries.ITEM.get(
-                        new ResourceLocation("mysticalagriculture", "awakening_altar")));
+        return MysticalAgricultureAdapterUtils.item(ALTAR_ID.getPath());
     }
 
     @Override
     public boolean matchesMold(@Nullable ItemStack mold) {
         return mold != null
-                && BuiltInRegistries.ITEM.getKey(mold.getItem()).equals(
-                        new ResourceLocation("mysticalagriculture", "awakening_altar"));
+                && !mold.isEmpty()
+                && BuiltInRegistries.ITEM.getKey(mold.getItem()).equals(ALTAR_ID);
     }
 
     @Override
-    public List<AdvancedAlloyFurnaceRecipe> convertAll(RecipeHolder<IAwakeningRecipe> holder, Level level) {
-        if (holder == null) return List.of();
-
-        IAwakeningRecipe recipe = holder.value();
-        ResourceLocation originalId = holder.id();
-
-        Ingredient altarIngredient = recipe.getAltarIngredient();
-        List<Ingredient> allIngredients = recipe.getIngredients();
-        List<ItemStack> essences = recipe.getEssences();
-        ItemStack output = recipe.getResultItem(null);
-
-        if (output.isEmpty()) {
+    public List<AdvancedAlloyFurnaceRecipe> convertAll(
+            RecipeHolder<IAwakeningRecipe> holder, Level level) {
+        if (holder == null || holder.value() == null) {
             return List.of();
         }
-
-        // 合并所有输入（祭坛物品 + 基座物品 + 精华）
-        Map<Ingredient, Long> ingredientCounts = new LinkedHashMap<>();
-
-        if (!altarIngredient.isEmpty()) {
-            AdapterUtils.mergeIngredient(ingredientCounts, altarIngredient, 1L);
-        }
-
-        // 基座物品在 getIngredients() 中位于奇数索引 (1,3,5,7)
-        for (int i = 1; i < allIngredients.size(); i += 2) {
-            Ingredient ing = allIngredients.get(i);
-            if (!ing.isEmpty()) {
-                AdapterUtils.mergeIngredient(ingredientCounts, ing, 1L);
-            }
-        }
-
-        // 精华物品（附带数量）
-        for (ItemStack essence : essences) {
-            if (!essence.isEmpty()) {
-                AdapterUtils.mergeIngredient(ingredientCounts, Ingredient.of(essence), (long) essence.getCount());
-            }
-        }
-
-        if (ingredientCounts.isEmpty()) {
+        Converted converted = convertData(holder.value(), level);
+        if (converted == null) {
             return List.of();
         }
-
-        List<CountedIngredient> countedIngredients = new ArrayList<>();
-        for (Map.Entry<Ingredient, Long> entry : ingredientCounts.entrySet()) {
-            countedIngredients.add(new CountedIngredient(entry.getKey(), entry.getValue()));
-        }
-
-        int processTime = AdapterUtils.DEFAULT_PROCESS_TIME + (allIngredients.size() / 2 + essences.size()) * 15;
-
-        AdvancedAlloyFurnaceRecipe convertedRecipe = new AdvancedAlloyFurnaceRecipe(
-                AdapterUtils.convertedId(originalId),
-                countedIngredients,
-                List.of(),
-                List.of(output.copy()),
-                List.of(),
-                5000,
-                processTime,
-                Ingredient.EMPTY,
-                0,
-                AdapterUtils.toMoldIngredient(getMoldItem()),
-                AlloyFurnaceMode.NORMAL
-        );
-
-        return List.of(convertedRecipe);
+        return List.of(createRecipe(holder.id(), converted));
     }
 
     @Override
     @Nullable
-    @SuppressWarnings("unchecked")
-    public List<RecipeHolder<IAwakeningRecipe>> findMatchingRecipes(Level level, Map<Ingredient, Long> mergedInputs, Map<FluidStack, Long> mergedFluids, @Nullable ItemStack mold) {
-        if (level == null || mergedInputs.isEmpty()) {
-            return List.of();
-        }
-
-        if (!matchesMold(mold)) {
+    public List<RecipeHolder<IAwakeningRecipe>> findMatchingRecipes(
+            Level level,
+            Map<Ingredient, Long> mergedInputs,
+            Map<FluidStack, Long> mergedFluids,
+            @Nullable ItemStack mold) {
+        if (level == null || mergedInputs == null || mergedInputs.isEmpty() || !matchesMold(mold)) {
             return List.of();
         }
 
         RecipeManager recipeManager = level.getRecipeManager();
-        List<RecipeHolder<IAwakeningRecipe>> recipes = (List<RecipeHolder<IAwakeningRecipe>>) (List<?>) com.sorrowmist.useless.compat.forge1201.recipe.RecipeManagerAccess.getAllRecipesFor(recipeManager,
-                ModRecipeTypes.AWAKENING.get()
-        );
-
-        List<RecipeHolder<IAwakeningRecipe>> matches = new java.util.ArrayList<>();
+        List<RecipeHolder<IAwakeningRecipe>> recipes = RecipeManagerAccess.getAllRecipesFor(
+                recipeManager, ModRecipeTypes.AWAKENING.get());
+        List<RecipeHolder<IAwakeningRecipe>> matches = new ArrayList<>();
         for (RecipeHolder<IAwakeningRecipe> holder : recipes) {
-            IAwakeningRecipe recipe = holder.value();
-
-            Ingredient altarIngredient = recipe.getAltarIngredient();
-            List<Ingredient> allIngredients = recipe.getIngredients();
-            List<ItemStack> essences = recipe.getEssences();
-            ItemStack output = recipe.getResultItem(null);
-
-            if (output.isEmpty()) continue;
-
-            // 合并所有需要的配料
-            Map<Ingredient, Long> requiredCounts = new LinkedHashMap<>();
-            if (!altarIngredient.isEmpty()) {
-                AdapterUtils.mergeIngredient(requiredCounts, altarIngredient, 1L);
-            }
-            for (int i = 1; i < allIngredients.size(); i += 2) {
-                Ingredient ing = allIngredients.get(i);
-                if (!ing.isEmpty()) {
-                    AdapterUtils.mergeIngredient(requiredCounts, ing, 1L);
-                }
-            }
-            for (ItemStack essence : essences) {
-                if (!essence.isEmpty()) {
-                    AdapterUtils.mergeIngredient(requiredCounts, Ingredient.of(essence), (long) essence.getCount());
-                }
-            }
-
-            if (requiredCounts.isEmpty()) continue;
-
-            if (AdapterUtils.matchesRequired(mergedInputs, requiredCounts)) {
+            Converted converted = convertData(holder.value(), level);
+            if (converted != null
+                    && AdapterUtils.matchesRequired(mergedInputs, converted.requirements())) {
                 matches.add(holder);
             }
         }
         return matches;
+    }
+
+    /**
+     * 1.20.1 layout: altar input at 0, pedestal items at 2/4/6/8, and essence stacks exposed by
+     * {@link IAwakeningRecipe#getEssences()} with their real counts. Essence NBT is retained with
+     * a strict-NBT ingredient so component-sensitive recipes keep their exact predicate.
+     */
+    @Nullable
+    private static Converted convertData(@Nullable IAwakeningRecipe source, @Nullable Level level) {
+        if (source == null || !MysticalAgricultureAdapterUtils.isStaticOutputRecipe(source)) {
+            return null;
+        }
+
+        ItemStack output = source.getResultItem(level == null ? null : level.registryAccess());
+        if (output == null || output.isEmpty() || output.getCount() <= 0) {
+            return null;
+        }
+
+        List<Ingredient> allIngredients = source.getIngredients();
+        if (allIngredients == null || allIngredients.isEmpty()) {
+            return null;
+        }
+
+        Map<Ingredient, Long> requirements = MysticalAgricultureAdapterUtils.requirements();
+        int pedestals = 0;
+
+        Ingredient altarIngredient = allIngredients.get(0);
+        if (altarIngredient != null && !altarIngredient.isEmpty()) {
+            MysticalAgricultureAdapterUtils.addIngredient(requirements, altarIngredient, 1L);
+        }
+        for (int index = 2; index < allIngredients.size(); index += 2) {
+            Ingredient pedestal = allIngredients.get(index);
+            if (pedestal == null || pedestal.isEmpty()) {
+                continue;
+            }
+            MysticalAgricultureAdapterUtils.addIngredient(requirements, pedestal, 1L);
+            pedestals++;
+        }
+
+        int essenceSlots = 0;
+        List<ItemStack> essences = source.getEssences();
+        if (essences != null) {
+            for (ItemStack essence : essences) {
+                if (essence == null || essence.isEmpty() || essence.getCount() <= 0) {
+                    continue;
+                }
+                MysticalAgricultureAdapterUtils.addIngredient(
+                        requirements,
+                        MysticalAgricultureAdapterUtils.exactStack(essence),
+                        essence.getCount());
+                essenceSlots++;
+            }
+        }
+
+        List<CountedIngredient> inputs = MysticalAgricultureAdapterUtils.counted(requirements);
+        if (inputs.isEmpty()) {
+            return null;
+        }
+
+        int processTime = AdapterUtils.DEFAULT_PROCESS_TIME
+                + (pedestals + essenceSlots) * 15;
+        return new Converted(inputs, requirements, output.copy(), processTime);
+    }
+
+    private static AdvancedAlloyFurnaceRecipe createRecipe(ResourceLocation sourceId, Converted converted) {
+        return new AdvancedAlloyFurnaceRecipe(
+                AdapterUtils.convertedId(sourceId),
+                converted.inputs(),
+                List.of(),
+                List.of(converted.output().copy()),
+                List.of(),
+                ENERGY,
+                converted.processTime(),
+                Ingredient.EMPTY,
+                0,
+                AdapterUtils.toMoldIngredient(MysticalAgricultureAdapterUtils.item(ALTAR_ID.getPath())),
+                AlloyFurnaceMode.NORMAL
+        );
+    }
+
+    private record Converted(
+            List<CountedIngredient> inputs,
+            Map<Ingredient, Long> requirements,
+            ItemStack output,
+            int processTime) {
     }
 }

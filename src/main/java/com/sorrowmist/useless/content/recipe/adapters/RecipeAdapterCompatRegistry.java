@@ -3,7 +3,7 @@ package com.sorrowmist.useless.content.recipe.adapters;
 import com.sorrowmist.useless.utils.RateLimitedLogger;
 
 import com.sorrowmist.useless.content.recipe.AlloyFurnaceRecipeManager;
-import com.sorrowmist.useless.content.recipe.IRecipeAdapter;
+import com.sorrowmist.useless.api.recipe.IRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.RecipeSourceIds;
 import com.sorrowmist.useless.content.recipe.adapters.minecraft.BrewingRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.minecraft.CraftingRecipeAdapter;
@@ -111,7 +111,7 @@ public final class RecipeAdapterCompatRegistry {
             new CompatEntry(NOMADS_DELIGHT, RecipeAdapterCompatRegistry::registerNomadsDelight),
             new CompatEntry(UBES_DELIGHT, RecipeAdapterCompatRegistry::registerUbesDelight),
             new CompatEntry(BARBEQUES_DELIGHT, RecipeAdapterCompatRegistry::registerBarbequesDelight),
-            new CompatEntry(YOUKAIS_FEASTS, RecipeAdapterCompatRegistry::registerYoukaisHomecoming),
+            new CompatEntry(YOUKAI_HOMECOMING, RecipeAdapterCompatRegistry::registerYoukaisHomecoming),
             new CompatEntry(KALEIDOSCOPE_COOKERY, RecipeAdapterCompatRegistry::registerKaleidoscopeCookery),
             new CompatEntry(KALEIDOSCOPE_GRILLING, RecipeAdapterCompatRegistry::registerKaleidoscopeGrilling),
             new CompatEntry(KALEIDOSCOPE_TAVERN, RecipeAdapterCompatRegistry::registerKaleidoscopeTavern),
@@ -126,7 +126,6 @@ public final class RecipeAdapterCompatRegistry {
             new CompatEntry(ARS_NOUVEAU, RecipeAdapterCompatRegistry::registerArsNouveau),
             new CompatEntry(MYSTICAL_AGRICULTURE, RecipeAdapterCompatRegistry::registerMysticalAgriculture),
             new CompatEntry(AE2LT, RecipeAdapterCompatRegistry::registerAELightningTech),
-            new CompatEntry(DATA_ENERGISTICS, RecipeAdapterCompatRegistry::registerDataEnergistics),
             new CompatEntry(PRODUCTIVE_BEES, RecipeAdapterCompatRegistry::registerProductiveBees),
             new CompatEntry(DRACONIC_EVOLUTION, RecipeAdapterCompatRegistry::registerDraconicEvolution),
             new CompatEntry(POWAH, RecipeAdapterCompatRegistry::registerPowah),
@@ -195,14 +194,20 @@ public final class RecipeAdapterCompatRegistry {
         event.enqueueWork(() -> {
             try {
                 registerAction.run();
-            } catch (Exception e) {
+            } catch (Exception | LinkageError e) {
+                com.sorrowmist.useless.content.recipe.AdapterGuards.recordModFailure(modId);
                 RateLimitedLogger.error(LOGGER, "Failed to register recipe adapters for mod: {}", modId, e);
             }
         });
     }
 
+    private static boolean isIncludedInBuild(String className) {
+        return RecipeAdapterCompatRegistry.class.getClassLoader()
+                .getResource(className.replace('.', '/') + ".class") != null;
+    }
+
     private static void registerByName(String className) {
-        if (!isClassAvailable(className)) {
+        if (!isIncludedInBuild(className)) {
             LOGGER.debug("Optional recipe adapter {} is not present in this build", className);
             return;
         }
@@ -215,7 +220,7 @@ public final class RecipeAdapterCompatRegistry {
     }
 
     private static void registerFactory(String className) {
-        if (!isClassAvailable(className)) {
+        if (!isIncludedInBuild(className)) {
             LOGGER.debug("Optional recipe adapter factory {} is not present in this build", className);
             return;
         }
@@ -339,7 +344,7 @@ public final class RecipeAdapterCompatRegistry {
     }
 
     private static void invokeOptionalLoader(String className) {
-        if (!isClassAvailable(className)) {
+        if (!isIncludedInBuild(className)) {
             LOGGER.debug("Optional recipe adapter loader {} is not present in this build", className);
             return;
         }
@@ -347,7 +352,8 @@ public final class RecipeAdapterCompatRegistry {
             Class<?> loader = Class.forName(className, true, RecipeAdapterCompatRegistry.class.getClassLoader());
             loader.getMethod("register").invoke(null);
         } catch (ReflectiveOperationException | LinkageError exception) {
-            RateLimitedLogger.error(LOGGER, "Failed to register optional recipe adapters from {}", className, exception);
+            // The outer CompatEntry owns the source ID and the player's failure notice.
+            throw new IllegalStateException("Installed mod adapter loader unavailable: " + className, exception);
         }
     }
 
@@ -413,11 +419,8 @@ public final class RecipeAdapterCompatRegistry {
     }
 
     private static void registerProductiveBees() {
-        registerByName("com.sorrowmist.useless.content.recipe.adapters.productivebees.BeeProduceRecipeAdapter");
+        // Entity genetics, habitat and world conditions have no static furnace equivalent.
         registerByName("com.sorrowmist.useless.content.recipe.adapters.productivebees.CentrifugeRecipeAdapter");
-        registerByName("com.sorrowmist.useless.content.recipe.adapters.productivebees.BeeBreedingRecipeAdapter");
-        registerByName("com.sorrowmist.useless.content.recipe.adapters.productivebees.BeeConversionRecipeAdapter");
-        registerByName("com.sorrowmist.useless.content.recipe.adapters.productivebees.BeeFishingRecipeAdapter");
     }
 
     private static void registerDraconicEvolution() {
@@ -447,13 +450,14 @@ public final class RecipeAdapterCompatRegistry {
             return;
         }
         registerByName("com.sorrowmist.useless.content.recipe.adapters.avaritia.ReAvaritiaTableRecipeAdapter");
+        registerByName("com.sorrowmist.useless.content.recipe.adapters.avaritia.ReAvaritiaSculkCraftingRecipeAdapter");
         registerByName("com.sorrowmist.useless.content.recipe.adapters.avaritia.ReAvaritiaExtremeSmithingRecipeAdapter");
         registerByName("com.sorrowmist.useless.content.recipe.adapters.avaritia.ReAvaritiaCompressorRecipeAdapter");
         registerByName("com.sorrowmist.useless.content.recipe.adapters.avaritia.ReAvaritiaCollectorRecipeAdapter");
     }
 
     private static void registerNeoECOAE() {
-        String adapterClass = "com.sorrowmist.useless.content.recipe.adapters.eco.IntegratedWorkingStationRecipeAdapter";
+        String adapterClass = "com.sorrowmist.useless.compat.neoecoae.NeoEcoWorkstationRecipeAdapter";
         if (isClassAvailable(adapterClass)) {
             registerByName(adapterClass);
         }

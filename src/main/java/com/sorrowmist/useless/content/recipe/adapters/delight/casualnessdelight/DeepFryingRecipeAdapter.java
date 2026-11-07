@@ -13,9 +13,9 @@ import net.minecraft.world.item.crafting.RecipeManager;
 import net.minecraft.world.level.Level;
 import net.minecraftforge.fluids.FluidStack;
 import org.jetbrains.annotations.Nullable;
-import top.tobitobi.casualnessdelight.common.crafting.DeepFryingRecipe;
-import top.tobitobi.casualnessdelight.common.registry.ModItems;
-import top.tobitobi.casualnessdelight.common.registry.ModRecipeTypes;
+import com.va11halla.casualness_delight.recipe.DeepFryingRecipe;
+import com.va11halla.casualness_delight.registry.ItemRegistry;
+import com.sorrowmist.useless.content.recipe.adapters.delight.DelightRecipeAdapterUtils;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -38,7 +38,7 @@ public final class DeepFryingRecipeAdapter implements IRecipeAdapter<DeepFryingR
 
     @Override
     public ItemStack getMoldItem() {
-        return ModItems.DEEP_FRYING_PAN.get().getDefaultInstance();
+        return ItemRegistry.DeepFryingPan.get().getDefaultInstance();
     }
 
     @Override
@@ -89,8 +89,8 @@ public final class DeepFryingRecipeAdapter implements IRecipeAdapter<DeepFryingR
 
         RecipeManager recipeManager = level.getRecipeManager();
         List<RecipeHolder<DeepFryingRecipe>> matches = new ArrayList<>();
-        for (RecipeHolder<DeepFryingRecipe> holder : com.sorrowmist.useless.compat.forge1201.recipe.RecipeManagerAccess.getAllRecipesFor(recipeManager,
-                ModRecipeTypes.DEEP_FRYING.get())) {
+        for (RecipeHolder<DeepFryingRecipe> holder : DelightRecipeAdapterUtils.allOf(
+                recipeManager, DeepFryingRecipe.class)) {
             Ingredient ingredient = holder.value().getIngredients().isEmpty()
                     ? Ingredient.EMPTY : holder.value().getIngredients().get(0);
             if (ingredient != null && !ingredient.isEmpty()) {

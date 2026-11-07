@@ -57,14 +57,7 @@ public final class AeSourceCompat implements AeSourceBridge {
             if (storage == null) {
                 return 0L;
             }
-            long total = 0L;
-            for (var entry : storage.getAvailableStacks()) {
-                AEKey key = entry.getKey();
-                if (key == SourceKey.KEY) {
-                    total += Math.max(0L, entry.getLongValue());
-                }
-            }
-            return total;
+            return Math.max(0L, storage.getAvailableStacks().get(SourceKey.KEY));
         }
 
         @Override
@@ -74,8 +67,9 @@ public final class AeSourceCompat implements AeSourceBridge {
 
         @Override
         public int capacity() {
-            // ME 网络对魔源不设「罐容量」，用 SourceKey 自己的上限表示。
-            return SourceKey.MAX_SOURCE;
+            // Ars Énergistique 1.2.0 has no MAX_SOURCE field. The ME store is long-based;
+            // this view is bounded only by SourceHandlerView's native int contract.
+            return Integer.MAX_VALUE;
         }
 
         @Override

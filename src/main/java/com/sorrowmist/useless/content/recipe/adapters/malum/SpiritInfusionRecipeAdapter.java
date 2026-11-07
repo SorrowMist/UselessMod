@@ -1,41 +1,48 @@
 package com.sorrowmist.useless.content.recipe.adapters.malum;
 
-import com.sorrowmist.useless.utils.RateLimitedLogger;
-
 import appeng.api.stacks.AEItemKey;
 import appeng.api.stacks.GenericStack;
 import com.mojang.logging.LogUtils;
 import com.sammy.malum.common.recipe.SpiritInfusionRecipe;
-import com.sammy.malum.registry.common.recipe.MalumRecipeTypes;
+import com.sammy.malum.registry.common.recipe.RecipeTypeRegistry;
 import com.sorrowmist.useless.api.enums.AlloyFurnaceMode;
+import com.sorrowmist.useless.compat.forge1201.recipe.DataComponentIngredient;
+import com.sorrowmist.useless.compat.forge1201.recipe.RecipeHolder;
+import com.sorrowmist.useless.compat.forge1201.recipe.RecipeManagerAccess;
+import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.DynamicPatternProfile;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.PatternStackView;
 import com.sorrowmist.useless.content.recipe.AdapterUtils;
 import com.sorrowmist.useless.content.recipe.AdvancedAlloyFurnaceRecipe;
 import com.sorrowmist.useless.content.recipe.CountedIngredient;
 import com.sorrowmist.useless.content.recipe.IRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.ItemIngredientAllocator;
-import net.minecraft.core.registries.BuiltInRegistries;
+import com.sorrowmist.useless.utils.RateLimitedLogger;
 import net.minecraft.resources.ResourceLocation;
-import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.crafting.Ingredient;
-import com.sorrowmist.useless.compat.forge1201.recipe.RecipeHolder;
 import net.minecraft.world.item.crafting.RecipeManager;
 import net.minecraft.world.level.Level;
-import com.sorrowmist.useless.compat.forge1201.recipe.DataComponentIngredient;
-import net.minecraftforge.common.crafting.SizedIngredient;
 import net.minecraftforge.fluids.FluidStack;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
+import team.lodestar.lodestone.systems.recipe.IngredientWithCount;
 
 import java.util.ArrayList;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
-/** Converts Malum spirit-altar recipes, including component-carrying infusion results. */
+/**
+ * Converts Malum 1.6.7 spirit-altar recipes ({@code malum:spirit_infusion}).
+ *
+ * <p>The native recipe consumes the central {@link IngredientWithCount input} and every
+ * {@code extra_items} entry exactly once per operation, plus the listed spirit shards. The altar's
+ * base crafting time is 300 ticks. When {@code useNbtFromInput} is true (the default in native
+ * data), the altar replaces the result's NBT with the primary input's NBT. Static catalogue
+ * recipes therefore carry the recipe's own output; runtime conversion with the concrete primary
+ * input produces the exact component-carrying output.</p>
+ */
 public final class SpiritInfusionRecipeAdapter implements IRecipeAdapter<SpiritInfusionRecipe> {
     private static final Logger LOGGER = LogUtils.getLogger();
     private static final int PROCESS_TIME = 300;
@@ -51,11 +58,12 @@ public final class SpiritInfusionRecipeAdapter implements IRecipeAdapter<SpiritI
     }
 
     @Override
-    public List<AdvancedAlloyFurnaceRecipe> convertAll(RecipeHolder<SpiritInfusionRecipe> holder, Level level) {
+    public List<AdvancedAlloyFurnaceRecipe> convertAll(
+            RecipeHolder<SpiritInfusionRecipe> holder, Level level) {
         if (holder == null || holder.value() == null) {
             return List.of();
         }
-        Converted converted = convertData(holder.value(), null, null);
+        Converted converted = convertData(holder.value(), null);
         if (converted == null) {
             RateLimitedLogger.warn(LOGGER, "Skipping invalid Malum spirit infusion recipe: {}", holder.id());
             return List.of();
@@ -66,23 +74,25 @@ public final class SpiritInfusionRecipeAdapter implements IRecipeAdapter<SpiritI
     @Override
     public List<AdvancedAlloyFurnaceRecipe> convertAll(
             RecipeHolder<SpiritInfusionRecipe> holder, Level level, List<ItemStack> actualInputs) {
-        if (holder == null || holder.value() == null || !holder.value().carryOverComponentData) {
-            return convertAll(holder, level);
-        }
-
-        SpiritInfusionRecipe source = holder.value();
-        if (!hasValidPrimaryInput(source)) {
+        if (holder == null || holder.value() == null) {
             return List.of();
         }
-        ServerLevel serverLevel = level instanceof ServerLevel server ? server : null;
+        SpiritInfusionRecipe source = holder.value();
+        if (!source.useNbtFromInput || actualInputs == null || actualInputs.isEmpty()) {
+            return convertAll(holder, level);
+        }
+        if (!hasValidPrimaryInput(source) || source.extraItems == null) {
+            return List.of();
+        }
+
         List<AdvancedAlloyFurnaceRecipe> converted = new ArrayList<>();
-        for (ItemStack primary : MalumAdapterUtils.distinctMatches(actualInputs, source.input.ingredient())) {
-            Converted data = convertData(source, primary, serverLevel);
+        for (ItemStack primary : MalumAdapterUtils.distinctMatches(actualInputs, source.input.ingredient)) {
+            Converted data = convertData(source, primary);
             if (data != null) {
                 converted.add(createRecipe(variantId(holder.id(), primary), data));
             }
         }
-        return converted;
+        return converted.isEmpty() ? List.of() : List.copyOf(converted);
     }
 
     @Override
@@ -93,19 +103,23 @@ public final class SpiritInfusionRecipeAdapter implements IRecipeAdapter<SpiritI
             return List.of();
         }
 
-        List<RecipeHolder<SpiritInfusionRecipe>> matches = new ArrayList<>();
         RecipeManager recipeManager = level.getRecipeManager();
-        for (RecipeHolder<SpiritInfusionRecipe> holder : com.sorrowmist.useless.compat.forge1201.recipe.RecipeManagerAccess.getAllRecipesFor(recipeManager,
-                MalumRecipeTypes.SPIRIT_INFUSION.get())) {
-            Converted converted = convertData(holder.value(), null, null);
-            if (converted != null && AdapterUtils.matchesRequired(mergedInputs, converted.requirements())) {
+        List<RecipeHolder<SpiritInfusionRecipe>> matches = new ArrayList<>();
+        for (RecipeHolder<SpiritInfusionRecipe> holder :
+                RecipeManagerAccess.getAllRecipesFor(recipeManager, RecipeTypeRegistry.SPIRIT_INFUSION.get())) {
+            Map<Ingredient, Long> requirements = matchingRequirements(holder.value());
+            if (requirements != null && AdapterUtils.matchesRequired(mergedInputs, requirements)) {
                 matches.add(holder);
             }
         }
         return matches;
     }
 
-    /** Identifies carry-over altar patterns whose primary input and output are component-dynamic. */
+    /**
+     * Identifies altar patterns whose primary input and output are component-dynamic. The alloy
+     * furnace must resolve the concrete primary input at execution time because Malum copies its
+     * NBT onto the result.
+     */
     public static Optional<DynamicPatternProfile> findDynamicPatternProfile(
             @Nullable Level level, List<ItemStack> patternInputs, List<ItemStack> patternOutputs) {
         return findDynamicPatternProfileLong(level, PatternStackView.fromLegacy(patternInputs, patternOutputs));
@@ -117,15 +131,16 @@ public final class SpiritInfusionRecipeAdapter implements IRecipeAdapter<SpiritI
             return Optional.empty();
         }
         return findDynamicPatternProfileLong(
-                com.sorrowmist.useless.compat.forge1201.recipe.RecipeManagerAccess.getAllRecipesFor(level.getRecipeManager(), MalumRecipeTypes.SPIRIT_INFUSION.get()),
+                RecipeManagerAccess.getAllRecipesFor(
+                        level.getRecipeManager(), RecipeTypeRegistry.SPIRIT_INFUSION.get()),
                 pattern);
     }
 
     static Optional<DynamicPatternProfile> findDynamicPatternProfile(
             Iterable<RecipeHolder<SpiritInfusionRecipe>> recipes,
             List<ItemStack> patternInputs, List<ItemStack> patternOutputs) {
-        return findDynamicPatternProfileLong(recipes,
-                PatternStackView.fromLegacy(patternInputs, patternOutputs));
+        return findDynamicPatternProfileLong(
+                recipes, PatternStackView.fromLegacy(patternInputs, patternOutputs));
     }
 
     static Optional<DynamicPatternProfile> findDynamicPatternProfileLong(
@@ -138,22 +153,11 @@ public final class SpiritInfusionRecipeAdapter implements IRecipeAdapter<SpiritI
         List<DynamicPatternProfile> matches = new ArrayList<>();
         for (RecipeHolder<SpiritInfusionRecipe> holder : recipes) {
             SpiritInfusionRecipe source = holder == null ? null : holder.value();
-            if (source == null || !source.carryOverComponentData || !hasValidPrimaryInput(source)
-                    || source.input.ingredient().getCustomIngredient() != null) {
+            DynamicPatternProfile profile = dynamicProfile(source, pattern);
+            if (profile == null) {
                 continue;
             }
-
-            Converted converted = convertData(source, null, null);
-            if (converted == null || !matchesStaticOutput(converted.output(), pattern.outputs().get(0))
-                    || !matchesPatternInputs(converted.inputs(), pattern)) {
-                continue;
-            }
-
-            int primarySlot = uniquePrimarySlot(source.input.ingredient(), pattern.inputRepresentatives());
-            if (primarySlot < 0) {
-                continue;
-            }
-            matches.add(new DynamicPatternProfile(Set.of(primarySlot), Set.of(0)));
+            matches.add(profile);
             if (matches.size() > 1) {
                 return Optional.empty();
             }
@@ -162,24 +166,56 @@ public final class SpiritInfusionRecipeAdapter implements IRecipeAdapter<SpiritI
     }
 
     @Nullable
+    private static DynamicPatternProfile dynamicProfile(
+            @Nullable SpiritInfusionRecipe source, PatternStackView pattern) {
+        if (source == null || !source.useNbtFromInput || !hasValidPrimaryInput(source)
+                || source.extraItems == null || source.spirits == null || source.spirits.isEmpty()
+                || source.output == null
+                || source.output.isEmpty() || source.output.getCount() <= 0) {
+            return null;
+        }
+        // Marking a custom ingredient as item-id-only would discard its component predicate.
+        if (!source.input.ingredient.isVanilla()) {
+            return null;
+        }
+
+        Map<Ingredient, Long> requirements = matchingRequirements(source);
+        if (requirements == null || !matchesPatternInputs(requirements, pattern)
+                || !matchesPatternOutput(source, pattern)) {
+            return null;
+        }
+
+        int primarySlot = uniquePrimarySlot(source.input.ingredient, pattern.inputRepresentatives());
+        if (primarySlot < 0) {
+            return null;
+        }
+        ItemStack primary = pattern.inputRepresentatives().get(primarySlot);
+        ItemStack expected = MalumAdapterUtils.altarOutput(source.output, true, primary);
+        if (expected == null || !matchesOutput(expected, pattern.outputs().get(0))) {
+            return null;
+        }
+        return new DynamicPatternProfile(Set.of(primarySlot), Set.of(0));
+    }
+
+    @Nullable
     private static Converted convertData(
-            @Nullable SpiritInfusionRecipe source, @Nullable ItemStack actualPrimary,
-            @Nullable ServerLevel serverLevel) {
-        if (!hasValidPrimaryInput(source) || source.result == null || source.result.isEmpty()
-                || source.result.getCount() <= 0 || source.extraInputs == null) {
+            @Nullable SpiritInfusionRecipe source, @Nullable ItemStack actualPrimary) {
+        if (!hasValidPrimaryInput(source) || source.output == null || source.output.isEmpty()
+                || source.output.getCount() <= 0 || source.extraItems == null || source.spirits == null
+                || source.spirits.isEmpty()) {
             return null;
         }
 
         Map<Ingredient, Long> requirements = MalumAdapterUtils.requirements();
         Ingredient primaryRequirement = actualPrimary == null
-                ? source.input.ingredient()
+                ? source.input.ingredient
                 : DataComponentIngredient.of(true, actualPrimary.copyWithCount(1));
-        if (!MalumAdapterUtils.addIngredient(requirements, primaryRequirement, source.input.count())) {
+        if (!MalumAdapterUtils.addIngredient(requirements, primaryRequirement, source.input.count)) {
             return null;
         }
-        for (SizedIngredient extra : source.extraInputs) {
-            if (extra == null || extra.ingredient() == null
-                    || !MalumAdapterUtils.addIngredient(requirements, extra.ingredient(), extra.count())) {
+        for (IngredientWithCount extra : source.extraItems) {
+            if (extra == null || extra.ingredient == null || extra.ingredient.isEmpty()
+                    || !MalumAdapterUtils.addIngredient(requirements, extra.ingredient, extra.count)) {
                 return null;
             }
         }
@@ -187,16 +223,9 @@ public final class SpiritInfusionRecipeAdapter implements IRecipeAdapter<SpiritI
             return null;
         }
 
-        ItemStack output = source.result.copy();
-        if (source.carryOverComponentData && actualPrimary != null && serverLevel != null) {
-            try {
-                output = source.getOutput(serverLevel, actualPrimary.copy());
-            } catch (RuntimeException exception) {
-                RateLimitedLogger.warn(LOGGER, "Failed to create component-carrying Malum infusion output", exception);
-                return null;
-            }
-        }
-        if (output == null || output.isEmpty() || output.getCount() <= 0) {
+        ItemStack output = MalumAdapterUtils.altarOutput(
+                source.output, source.useNbtFromInput, actualPrimary);
+        if (output == null) {
             return null;
         }
 
@@ -204,7 +233,30 @@ public final class SpiritInfusionRecipeAdapter implements IRecipeAdapter<SpiritI
         if (inputs == null) {
             return null;
         }
-        return new Converted(inputs, requirements, output.copy());
+        return new Converted(inputs, requirements, output);
+    }
+
+    @Nullable
+    private static Map<Ingredient, Long> matchingRequirements(@Nullable SpiritInfusionRecipe source) {
+        if (!hasValidPrimaryInput(source) || source.output == null || source.output.isEmpty()
+                || source.output.getCount() <= 0 || source.extraItems == null || source.spirits == null
+                || source.spirits.isEmpty()) {
+            return null;
+        }
+        Map<Ingredient, Long> requirements = MalumAdapterUtils.requirements();
+        if (!MalumAdapterUtils.addIngredient(requirements, source.input.ingredient, source.input.count)) {
+            return null;
+        }
+        for (IngredientWithCount extra : source.extraItems) {
+            if (extra == null || extra.ingredient == null || extra.ingredient.isEmpty()
+                    || !MalumAdapterUtils.addIngredient(requirements, extra.ingredient, extra.count)) {
+                return null;
+            }
+        }
+        if (!MalumAdapterUtils.addSpirits(requirements, source.spirits)) {
+            return null;
+        }
+        return requirements;
     }
 
     private AdvancedAlloyFurnaceRecipe createRecipe(ResourceLocation id, Converted converted) {
@@ -224,17 +276,28 @@ public final class SpiritInfusionRecipeAdapter implements IRecipeAdapter<SpiritI
     }
 
     private static boolean hasValidPrimaryInput(@Nullable SpiritInfusionRecipe source) {
-        return source != null && source.input != null && source.input.ingredient() != null
-                && !source.input.ingredient().isEmpty() && source.input.count() > 0;
+        return source != null && source.input != null && source.input.ingredient != null
+                && !source.input.ingredient.isEmpty() && source.input.count > 0;
     }
 
     private static boolean matchesPatternInputs(
-            List<CountedIngredient> requirements, PatternStackView pattern) {
-        return totalRequiredItems(requirements) == totalPatternItems(pattern.inputs())
-                && ItemIngredientAllocator.matches(requirements, List.of(), pattern.inputs(), 1L);
+            Map<Ingredient, Long> requirements, PatternStackView pattern) {
+        return totalRequiredItems(requirements.values()) == totalPatternItems(pattern.inputs())
+                && ItemIngredientAllocator.matches(
+                        countedRequirements(requirements), List.of(), pattern.inputs(), 1L);
     }
 
-    private static boolean matchesStaticOutput(ItemStack expected, GenericStack actual) {
+    private static boolean matchesPatternOutput(SpiritInfusionRecipe source, PatternStackView pattern) {
+        if (pattern.outputs().size() != 1) {
+            return false;
+        }
+        GenericStack output = pattern.outputs().get(0);
+        return output != null && output.amount() == source.output.getCount()
+                && output.what() instanceof AEItemKey itemKey
+                && itemKey.getItem() == source.output.getItem();
+    }
+
+    private static boolean matchesOutput(ItemStack expected, GenericStack actual) {
         if (expected == null || expected.isEmpty() || actual == null || actual.amount() <= 0L
                 || actual.amount() != expected.getCount() || !(actual.what() instanceof AEItemKey itemKey)) {
             return false;
@@ -257,16 +320,24 @@ public final class SpiritInfusionRecipeAdapter implements IRecipeAdapter<SpiritI
         return result;
     }
 
-    private static long totalRequiredItems(List<CountedIngredient> inputs) {
+    private static List<CountedIngredient> countedRequirements(Map<Ingredient, Long> requirements) {
+        List<CountedIngredient> result = new ArrayList<>(requirements.size());
+        for (Map.Entry<Ingredient, Long> entry : requirements.entrySet()) {
+            result.add(new CountedIngredient(entry.getKey(), entry.getValue()));
+        }
+        return List.copyOf(result);
+    }
+
+    private static long totalRequiredItems(Iterable<Long> counts) {
         long result = 0L;
-        for (CountedIngredient input : inputs) {
-            if (input == null || input.count() <= 0L) {
+        for (Long count : counts) {
+            if (count == null || count <= 0L) {
                 continue;
             }
-            if (result > Long.MAX_VALUE - input.count()) {
+            if (result > Long.MAX_VALUE - count) {
                 return Long.MAX_VALUE;
             }
-            result += input.count();
+            result += count;
         }
         return result;
     }
@@ -293,23 +364,16 @@ public final class SpiritInfusionRecipeAdapter implements IRecipeAdapter<SpiritI
     }
 
     private static ResourceLocation variantId(ResourceLocation source, ItemStack primary) {
-        ResourceLocation itemId = BuiltInRegistries.ITEM.getKey(primary.getItem());
+        String key = MalumAdapterUtils.itemKey(primary.getItem()) + "|"
+                + (primary.hasTag() ? primary.getTag() : "");
         return new ResourceLocation(
                 source.getNamespace(),
-                source.getPath() + "_converted_" + itemId.getNamespace() + "_"
-                        + itemId.getPath().replace('/', '_'));
+                source.getPath() + "_converted_" + AdapterUtils.stableHash(key));
     }
 
     private record Converted(
             List<CountedIngredient> inputs,
             Map<Ingredient, Long> requirements,
             ItemStack output) {
-    }
-
-    public record DynamicPatternProfile(Set<Integer> idOnlyInputSlots, Set<Integer> idOnlyOutputSlots) {
-        public DynamicPatternProfile {
-            idOnlyInputSlots = Set.copyOf(new LinkedHashSet<>(idOnlyInputSlots));
-            idOnlyOutputSlots = Set.copyOf(new LinkedHashSet<>(idOnlyOutputSlots));
-        }
     }
 }

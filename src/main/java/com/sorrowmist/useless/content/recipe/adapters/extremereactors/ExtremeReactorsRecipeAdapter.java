@@ -1,6 +1,15 @@
 package com.sorrowmist.useless.content.recipe.adapters.extremereactors;
 
+import appeng.api.stacks.AEFluidKey;
+import appeng.api.stacks.AEItemKey;
+import appeng.api.stacks.AEKey;
+import com.mojang.logging.LogUtils;
 import com.sorrowmist.useless.api.enums.AlloyFurnaceMode;
+import com.sorrowmist.useless.compat.forge1201.fluid.FluidIngredient;
+import com.sorrowmist.useless.compat.forge1201.fluid.SizedFluidIngredient;
+import com.sorrowmist.useless.compat.forge1201.recipe.DataComponentIngredient;
+import com.sorrowmist.useless.compat.forge1201.recipe.RecipeHolder;
+import com.sorrowmist.useless.compat.forge1201.recipe.RecipeManagerAccess;
 import com.sorrowmist.useless.content.recipe.AdapterUtils;
 import com.sorrowmist.useless.content.recipe.AdvancedAlloyFurnaceRecipe;
 import com.sorrowmist.useless.content.recipe.CountedIngredient;
@@ -8,10 +17,10 @@ import com.sorrowmist.useless.content.recipe.FluidIngredientAllocator;
 import com.sorrowmist.useless.content.recipe.IRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.ItemIngredientAllocator;
 import com.sorrowmist.useless.content.recipe.RecipeSourceIds;
+import com.sorrowmist.useless.utils.RateLimitedLogger;
 import it.zerono.mods.extremereactors.api.IMapping;
 import it.zerono.mods.extremereactors.api.reactor.Reactant;
 import it.zerono.mods.extremereactors.api.reactor.ReactantMappingsRegistry;
-import it.zerono.mods.extremereactors.api.reactor.ReactantType;
 import it.zerono.mods.extremereactors.api.reactor.Reaction;
 import it.zerono.mods.extremereactors.api.reactor.ReactionsRegistry;
 import it.zerono.mods.extremereactors.config.Config;
@@ -21,23 +30,20 @@ import it.zerono.mods.extremereactors.gamecontent.multiblock.fluidizer.recipe.Fl
 import it.zerono.mods.extremereactors.gamecontent.multiblock.fluidizer.recipe.IFluidizerRecipe;
 import it.zerono.mods.extremereactors.gamecontent.multiblock.reprocessor.recipe.ReprocessorRecipe;
 import it.zerono.mods.zerocore.lib.recipe.ModRecipe;
-import it.zerono.mods.zerocore.lib.recipe.ingredient.FluidStackRecipeIngredient;
-import it.zerono.mods.zerocore.lib.recipe.ingredient.ItemStackRecipeIngredient;
 import it.zerono.mods.zerocore.lib.recipe.result.FluidStackRecipeResult;
 import it.zerono.mods.zerocore.lib.recipe.result.ItemStackRecipeResult;
 import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.tags.TagKey;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.crafting.Ingredient;
-import com.sorrowmist.useless.compat.forge1201.recipe.RecipeHolder;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.material.Fluid;
 import net.minecraftforge.fluids.FluidStack;
-import com.sorrowmist.useless.compat.forge1201.fluid.FluidIngredient;
-import com.sorrowmist.useless.compat.forge1201.fluid.SizedFluidIngredient;
 import org.jetbrains.annotations.Nullable;
+import org.slf4j.Logger;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -47,6 +53,7 @@ import java.util.Map;
 
 /** Converts Extreme Reactors recipes and fuel reactions to alloy-furnace recipes. */
 public final class ExtremeReactorsRecipeAdapter implements IRecipeAdapter<ModRecipe> {
+    private static final Logger LOGGER = LogUtils.getLogger();
     private static final String MOD_ID = "bigreactors";
     private static final int FLUIDIZER_TICK_INTERVAL = 10;
     private static final int REPROCESSOR_TICK_INTERVAL = 5;
@@ -57,7 +64,6 @@ public final class ExtremeReactorsRecipeAdapter implements IRecipeAdapter<ModRec
             "reprocessorcontroller",
             "basic_reactorcontroller",
             "reinforced_reactorcontroller");
-    private volatile List<RecipeHolder<ModRecipe>> generatedRecipes;
 
     @Override
     public String sourceId() {
@@ -87,14 +93,9 @@ public final class ExtremeReactorsRecipeAdapter implements IRecipeAdapter<ModRec
 
     @Override
     public List<RecipeHolder<ModRecipe>> getGeneratedRecipes(Level level) {
-        List<RecipeHolder<ModRecipe>> cached = generatedRecipes;
-        if (cached != null) return cached;
-        synchronized (this) {
-            if (generatedRecipes == null) {
-                generatedRecipes = createGeneratedRecipes();
-            }
-            return generatedRecipes;
-        }
+        // A first call can precede native IMC registration or tag binding. Never retain that
+        // empty result (or old tag outputs) for the lifetime of the adapter/server process.
+        return createGeneratedRecipes();
     }
 
     @Override
@@ -104,20 +105,28 @@ public final class ExtremeReactorsRecipeAdapter implements IRecipeAdapter<ModRec
 
         ModRecipe source = holder.value();
         if (source instanceof ExtremeReactorsSyntheticRecipe synthetic) {
-            return synthetic.convertedRecipe() == null
-                    ? List.of() : List.of(synthetic.convertedRecipe());
+            return singleton(synthetic.convertedRecipe());
         }
-        if (source instanceof FluidizerSolidRecipe recipe) {
-            return singleton(convertSolidFluidizer(holder, recipe));
+        if (!isSupportedSource(source)) {
+            reject(holder.id(), "Unsupported native recipe class (including dynamic subclasses): "
+                    + source.getClass().getName());
+            return List.of();
         }
-        if (source instanceof FluidizerSolidMixingRecipe recipe) {
-            return singleton(convertSolidMixingFluidizer(holder, recipe));
-        }
-        if (source instanceof FluidizerFluidMixingRecipe recipe) {
-            return singleton(convertFluidMixingFluidizer(holder, recipe));
-        }
-        if (source instanceof ReprocessorRecipe recipe) {
-            return singleton(convertReprocessor(holder, recipe));
+        try {
+            if (source instanceof FluidizerSolidRecipe recipe) {
+                return singleton(convertSolidFluidizer(holder, recipe));
+            }
+            if (source instanceof FluidizerSolidMixingRecipe recipe) {
+                return singleton(convertSolidMixingFluidizer(holder, recipe));
+            }
+            if (source instanceof FluidizerFluidMixingRecipe recipe) {
+                return singleton(convertFluidMixingFluidizer(holder, recipe));
+            }
+            if (source instanceof ReprocessorRecipe recipe) {
+                return singleton(convertReprocessor(holder, recipe));
+            }
+        } catch (RuntimeException exception) {
+            reject(holder.id(), exception.getClass().getSimpleName() + ": " + exception.getMessage());
         }
         return List.of();
     }
@@ -132,13 +141,26 @@ public final class ExtremeReactorsRecipeAdapter implements IRecipeAdapter<ModRec
     @Override
     public List<RecipeHolder<ModRecipe>> findMatchingRecipes(
             Level level, Map<Ingredient, Long> mergedInputs,
-            Map<FluidStack, Long> mergedFluids,
-            Map<appeng.api.stacks.AEKey, Long> mergedKeys,
+            Map<FluidStack, Long> mergedFluids, Map<AEKey, Long> mergedKeys,
+            @Nullable ItemStack mold) {
+        return findMatchingRecipes(level, mergedInputs, mergedFluids, mergedKeys, mold, List.of());
+    }
+
+    @Override
+    public List<RecipeHolder<ModRecipe>> findMatchingRecipes(
+            Level level, Map<Ingredient, Long> mergedInputs,
+            Map<FluidStack, Long> mergedFluids, Map<AEKey, Long> mergedKeys,
             @Nullable ItemStack mold, List<ItemStack> actualInputs) {
         if (level == null || !matchesMold(mold)) return List.of();
 
+        // Normal manager calls already contain AE supplies. Empty maps also support direct
+        // API callers with only actual stacks/AE keys, without adding those supplies twice.
+        Map<Ingredient, Long> items = mergedInputs == null || mergedInputs.isEmpty()
+                ? fallbackItems(actualInputs, mergedKeys) : mergedInputs;
+        Map<FluidStack, Long> fluids = mergedFluids == null || mergedFluids.isEmpty()
+                ? fallbackFluids(mergedKeys) : mergedFluids;
         List<RecipeHolder<ModRecipe>> matches = new ArrayList<>();
-        for (RecipeHolder<?> rawHolder : com.sorrowmist.useless.compat.forge1201.recipe.RecipeManagerAccess.getRecipes(level.getRecipeManager())) {
+        for (RecipeHolder<?> rawHolder : RecipeManagerAccess.getRecipes(level.getRecipeManager())) {
             if (!(rawHolder.value() instanceof ModRecipe source)
                     || source instanceof ExtremeReactorsSyntheticRecipe
                     || !isSupportedSource(source)) {
@@ -146,33 +168,61 @@ public final class ExtremeReactorsRecipeAdapter implements IRecipeAdapter<ModRec
             }
             @SuppressWarnings("unchecked")
             RecipeHolder<ModRecipe> holder = (RecipeHolder<ModRecipe>) rawHolder;
-            if (matchesConverted(holder, level, mergedInputs, mergedFluids, mold, actualInputs)) {
+            if (matchesConverted(holder, level, items, fluids, mold)) {
                 matches.add(holder);
             }
         }
         for (RecipeHolder<ModRecipe> holder : getGeneratedRecipes(level)) {
-            if (matchesConverted(holder, level, mergedInputs, mergedFluids, mold, actualInputs)) {
+            if (matchesConverted(holder, level, items, fluids, mold)) {
                 matches.add(holder);
             }
         }
         return matches;
     }
 
+    private static Map<Ingredient, Long> fallbackItems(List<ItemStack> actualInputs, Map<AEKey, Long> keys) {
+        Map<Ingredient, Long> result = AdapterUtils.mergeInputs(actualInputs);
+        if (keys != null) {
+            keys.forEach((key, amount) -> {
+                if (key instanceof AEItemKey item && amount != null && amount > 0L) {
+                    // Keep long amounts; do not expand them into int-sized stack counts.
+                    result.merge(DataComponentIngredient.of(true, item.toStack(1)), amount,
+                            (left, right) -> left > Long.MAX_VALUE - right ? Long.MAX_VALUE : left + right);
+                }
+            });
+        }
+        return result;
+    }
+
+    private static Map<FluidStack, Long> fallbackFluids(Map<AEKey, Long> keys) {
+        Map<FluidStack, Long> result = new LinkedHashMap<>();
+        if (keys != null) {
+            keys.forEach((key, amount) -> {
+                if (key instanceof AEFluidKey fluid && amount != null && amount > 0L) {
+                    result.put(fluid.toStack(1), amount);
+                }
+            });
+        }
+        return result;
+    }
+
     private static boolean isSupportedSource(ModRecipe source) {
-        return source instanceof FluidizerSolidRecipe
-                || source instanceof FluidizerSolidMixingRecipe
-                || source instanceof FluidizerFluidMixingRecipe
-                || source instanceof ReprocessorRecipe;
+        Class<?> type = source.getClass();
+        return type == FluidizerSolidRecipe.class
+                || type == FluidizerSolidMixingRecipe.class
+                || type == FluidizerFluidMixingRecipe.class
+                || type == ReprocessorRecipe.class;
     }
 
     private boolean matchesConverted(
             RecipeHolder<ModRecipe> holder, Level level,
             Map<Ingredient, Long> mergedInputs, Map<FluidStack, Long> mergedFluids,
-            @Nullable ItemStack mold, List<ItemStack> actualInputs) {
+            @Nullable ItemStack mold) {
         for (AdvancedAlloyFurnaceRecipe recipe : convertAll(holder, level)) {
-            boolean itemMatch = actualInputs != null && !actualInputs.isEmpty()
-                    ? ItemIngredientAllocator.matches(recipe.inputs(), actualInputs, 1L)
-                    : matchesMergedItems(recipe.inputs(), mergedInputs);
+            // The manager already merges physical stacks AND AE item/fluid keys into these
+            // NBT-sensitive maps. Switching to actualInputs discards AE supplies, while adding
+            // mergedKeys again double-counts them. Keep the authoritative long maps intact.
+            boolean itemMatch = matchesMergedItems(recipe.inputs(), mergedInputs);
             if (itemMatch
                     && FluidIngredientAllocator.matchesLong(recipe.inputFluids(), mergedFluids, 1L)
                     && recipe.molds().size() == 1
@@ -196,51 +246,51 @@ public final class ExtremeReactorsRecipeAdapter implements IRecipeAdapter<ModRec
     @Nullable
     private static AdvancedAlloyFurnaceRecipe convertSolidFluidizer(
             RecipeHolder<ModRecipe> holder, FluidizerSolidRecipe source) {
-        CountedIngredient input = itemInput(source.getIngredient());
+        CountedIngredient input = ExtremeReactorsIngredients.item(source.getIngredient());
         FluidStackRecipeResult result = source.getResult();
         FluidStack output = result == null ? FluidStack.EMPTY : result.getResult();
-        if (input == null || output == null || output.isEmpty()) return null;
-        return createRecipe(holder.id(), List.of(input), List.of(), List.of(), List.of(output),
-                source, fluidizerMold(), fluidizerEnergy(source), fluidizerProcessTime(source));
+        requireOutput(output);
+        return createRecipe(holder.id(), List.of(input), List.of(), List.of(), List.of(output.copy()),
+                fluidizerMold(), fluidizerEnergy(source), fluidizerProcessTime(source));
     }
 
     @Nullable
     private static AdvancedAlloyFurnaceRecipe convertSolidMixingFluidizer(
             RecipeHolder<ModRecipe> holder, FluidizerSolidMixingRecipe source) {
-        CountedIngredient first = itemInput(source.getIngredient1());
-        CountedIngredient second = itemInput(source.getIngredient2());
+        CountedIngredient first = ExtremeReactorsIngredients.item(source.getIngredient1());
+        CountedIngredient second = ExtremeReactorsIngredients.item(source.getIngredient2());
         FluidStackRecipeResult result = source.getResult();
         FluidStack output = result == null ? FluidStack.EMPTY : result.getResult();
-        if (first == null || second == null || output == null || output.isEmpty()) return null;
-        return createRecipe(holder.id(), List.of(first, second), List.of(), List.of(), List.of(output),
-                source, fluidizerMold(), fluidizerEnergy(source), fluidizerProcessTime(source));
+        requireOutput(output);
+        return createRecipe(holder.id(), List.of(first, second), List.of(), List.of(), List.of(output.copy()),
+                fluidizerMold(), fluidizerEnergy(source), fluidizerProcessTime(source));
     }
 
     @Nullable
     private static AdvancedAlloyFurnaceRecipe convertFluidMixingFluidizer(
             RecipeHolder<ModRecipe> holder, FluidizerFluidMixingRecipe source) {
-        SizedFluidIngredient first = fluidInput(source.getIngredient1());
-        SizedFluidIngredient second = fluidInput(source.getIngredient2());
+        SizedFluidIngredient first = ExtremeReactorsIngredients.fluid(source.getIngredient1());
+        SizedFluidIngredient second = ExtremeReactorsIngredients.fluid(source.getIngredient2());
         FluidStackRecipeResult result = source.getResult();
         FluidStack output = result == null ? FluidStack.EMPTY : result.getResult();
-        if (first == null || second == null || output == null || output.isEmpty()) return null;
-        return createRecipe(holder.id(), List.of(), List.of(first, second), List.of(), List.of(output),
-                source, fluidizerMold(), fluidizerEnergy(source), fluidizerProcessTime(source));
+        requireOutput(output);
+        return createRecipe(holder.id(), List.of(), List.of(first, second), List.of(), List.of(output.copy()),
+                fluidizerMold(), fluidizerEnergy(source), fluidizerProcessTime(source));
     }
 
     @Nullable
     private static AdvancedAlloyFurnaceRecipe convertReprocessor(
             RecipeHolder<ModRecipe> holder, ReprocessorRecipe source) {
-        CountedIngredient waste = itemInput(source.getIngredient1());
-        SizedFluidIngredient fluid = fluidInput(source.getIngredient2());
+        CountedIngredient waste = ExtremeReactorsIngredients.item(source.getIngredient1());
+        SizedFluidIngredient fluid = ExtremeReactorsIngredients.fluid(source.getIngredient2());
         ItemStackRecipeResult result = source.getResult();
         ItemStack output = result == null ? ItemStack.EMPTY : result.getResult();
-        if (waste == null || fluid == null || output == null || output.isEmpty()) return null;
+        if (output == null || output.isEmpty()) throw new IllegalArgumentException("Empty native item output");
 
         long energy = (long) REPROCESSOR_ENERGY_PER_TICK * REPROCESSOR_REQUIRED_TICKS;
         int processTime = REPROCESSOR_TICK_INTERVAL * REPROCESSOR_REQUIRED_TICKS;
-        return createRecipe(holder.id(), List.of(waste), List.of(fluid), List.of(output), List.of(),
-                null, reprocessorMold(), energy, processTime);
+        return createRecipe(holder.id(), List.of(waste), List.of(fluid), List.of(output.copy()), List.of(),
+                reprocessorMold(), energy, processTime);
     }
 
     private static AdvancedAlloyFurnaceRecipe createRecipe(
@@ -249,11 +299,12 @@ public final class ExtremeReactorsRecipeAdapter implements IRecipeAdapter<ModRec
             List<SizedFluidIngredient> inputFluids,
             List<ItemStack> outputs,
             List<FluidStack> outputFluids,
-            @Nullable IFluidizerRecipe fluidizerSource,
             Ingredient mold,
             long energy,
             int processTime) {
-        if (mold == null || mold.isEmpty() || energy < 0 || processTime <= 0) return null;
+        if (mold == null || mold.isEmpty() || energy <= 0 || processTime <= 0) {
+            throw new IllegalArgumentException("Missing machine mold or invalid native energy/time");
+        }
         return new AdvancedAlloyFurnaceRecipe(
                 AdapterUtils.convertedId(sourceId), inputs, inputFluids, List.of(), outputs,
                 outputFluids, List.of(), energy, processTime, Ingredient.EMPTY, 0,
@@ -263,9 +314,10 @@ public final class ExtremeReactorsRecipeAdapter implements IRecipeAdapter<ModRec
     private static long fluidizerEnergy(IFluidizerRecipe source) {
         try {
             long perTick = Config.COMMON.fluidizer.energyPerRecipeTick.get();
-            return Math.multiplyExact(
-                    Math.multiplyExact(perTick, source.getEnergyUsageMultiplier()),
-                    source.getRecipeType().getTicks());
+            int multiplier = source.getEnergyUsageMultiplier();
+            int ticks = source.getRecipeType().getTicks();
+            if (perTick <= 0L || multiplier <= 0 || ticks <= 0) return -1L;
+            return Math.multiplyExact(Math.multiplyExact(perTick, multiplier), ticks);
         } catch (ArithmeticException exception) {
             return -1L;
         }
@@ -276,20 +328,12 @@ public final class ExtremeReactorsRecipeAdapter implements IRecipeAdapter<ModRec
         return processTime > 0 && processTime <= Integer.MAX_VALUE ? (int) processTime : -1;
     }
 
-    @Nullable
-    private static CountedIngredient itemInput(ItemStackRecipeIngredient source) {
-        if (source == null || source.isEmpty() || source.asVanillaIngredients().isEmpty()) return null;
-        List<ItemStack> matching = source.getMatchingElements();
-        if (matching.isEmpty()) return null;
-        long amount = matching.get(0).getCount();
-        return amount > 0 ? new CountedIngredient(source.asVanillaIngredients().get(0), amount) : null;
+    private static void requireOutput(@Nullable FluidStack output) {
+        if (output == null || output.isEmpty()) throw new IllegalArgumentException("Empty native fluid output");
     }
 
-    @Nullable
-    private static SizedFluidIngredient fluidInput(FluidStackRecipeIngredient source) {
-        if (source == null || source.isEmpty()) return null;
-        List<FluidStack> matching = source.getMatchingElements();
-        return matching.isEmpty() ? null : AdapterUtils.toSizedFluidIngredient(matching.get(0));
+    private static void reject(ResourceLocation id, String reason) {
+        RateLimitedLogger.warn(LOGGER, "Skipping unrepresentable Extreme Reactors recipe {}: {}", id, reason);
     }
 
     private static Ingredient fluidizerMold() {
@@ -349,11 +393,13 @@ public final class ExtremeReactorsRecipeAdapter implements IRecipeAdapter<ModRec
                             MOD_ID, "reactor/" + slug(fuel.getName()) + "_to_"
                                     + slug(waste.getName()) + "/" + inputIndex + "_" + outputIndex
                                     + "_" + reactionIndex);
-                    AdvancedAlloyFurnaceRecipe converted = convertReaction(
-                            recipeId, reaction, inputs.get(inputIndex), outputs.get(outputIndex));
-                    if (converted != null) {
+                    try {
+                        AdvancedAlloyFurnaceRecipe converted = convertReaction(
+                                recipeId, reaction, inputs.get(inputIndex), outputs.get(outputIndex));
                         result.add(new RecipeHolder<>(recipeId,
                                 new ExtremeReactorsSyntheticRecipe(converted)));
+                    } catch (RuntimeException exception) {
+                        reject(recipeId, exception.getClass().getSimpleName() + ": " + exception.getMessage());
                     }
                 }
             }
@@ -370,33 +416,48 @@ public final class ExtremeReactorsRecipeAdapter implements IRecipeAdapter<ModRec
                 .ifPresent(mappings -> mappings.forEach(mapping -> result.add(new PhysicalMapping(true, mapping))));
         // 映射列表按数据包注册顺序追加，同一集合在不同会话中的先后并不保证一致；而配方 id 里
         // 编入了该列表的下标，所以必须先按 tag 位置排序，下标才是稳定的。
-        result.sort(Comparator.comparing(PhysicalMapping::sortKey));
+        result.sort(Comparator.comparing(PhysicalMapping::sortKey)
+                .thenComparingInt(value -> value.mapping() == null ? 0 : value.mapping().getSourceAmount())
+                .thenComparingInt(value -> value.mapping() == null ? 0 : value.mapping().getProductAmount()));
         return result;
     }
 
-    /** 排序键：只依赖固/液类型与 tag 位置，与注册顺序无关。 */
+    /** Reaction order depends on reactant names, never enum identity hashes. */
     private static String reactionKey(Reaction reaction) {
         Reactant fuel = reaction == null ? null : reaction.getSource();
         Reactant waste = reaction == null ? null : reaction.getProduct();
         return (fuel == null ? "" : fuel.getName()) + "->" + (waste == null ? "" : waste.getName());
     }
 
-    @Nullable
     private static AdvancedAlloyFurnaceRecipe convertReaction(
             ResourceLocation recipeId, Reaction reaction,
             PhysicalMapping input, PhysicalMapping output) {
-        Batch batch = calculateBatch(reaction, input, output);
-        if (batch == null) return null;
+        if (reaction.getClass() != Reaction.class
+                || reaction.getSourceAmount() != 1 || reaction.getProductAmount() != 1
+                || !Float.isFinite(reaction.getReactivity()) || reaction.getReactivity() <= 0.0F
+                || !Float.isFinite(reaction.getFissionRate()) || reaction.getFissionRate() <= 0.0F) {
+            throw new IllegalArgumentException("Unknown or inactive native reactor reaction");
+        }
+        if (!reaction.getSource().equals(input.mapping().getSource())
+                || !reaction.getProduct().equals(output.mapping().getSource())) {
+            throw new IllegalArgumentException("Physical mapping refers to a different reactant");
+        }
+        Batch batch = calculateBatch(input, output);
+        validateFuelMapping(reaction.getSource(), input, batch);
 
         List<CountedIngredient> itemInputs = new ArrayList<>();
         List<SizedFluidIngredient> fluidInputs = new ArrayList<>();
         if (input.fluid()) {
             TagKey<Fluid> tag = fluidTag(input);
-            if (tag == null) return null;
+            if (tag == null || !tag.isFor(Registries.FLUID)) {
+                throw new IllegalArgumentException("Invalid native fuel fluid tag");
+            }
             fluidInputs.add(new SizedFluidIngredient(FluidIngredient.tag(tag), batch.inputAmount()));
         } else {
             TagKey<Item> tag = itemTag(input);
-            if (tag == null) return null;
+            if (tag == null || !tag.isFor(Registries.ITEM)) {
+                throw new IllegalArgumentException("Invalid native fuel item tag");
+            }
             itemInputs.add(new CountedIngredient(Ingredient.of(tag), batch.inputAmount()));
         }
 
@@ -404,45 +465,86 @@ public final class ExtremeReactorsRecipeAdapter implements IRecipeAdapter<ModRec
         List<FluidStack> fluidOutputs = new ArrayList<>();
         if (output.fluid()) {
             FluidStack stack = ReactantMappingsRegistry.getFluidStackFrom(fluidMapping(output), batch.outputAmount());
-            if (stack == null || stack.isEmpty()) return null;
-            fluidOutputs.add(stack);
+            if (stack == null || stack.isEmpty() || stack.getAmount() != batch.outputAmount()) {
+                throw new IllegalArgumentException("Unresolved native waste fluid output");
+            }
+            fluidOutputs.add(stack.copy());
         } else {
             ItemStack stack = ReactantMappingsRegistry.getSolidStackFrom(itemMapping(output), batch.outputAmount());
-            if (stack == null || stack.isEmpty()) return null;
-            itemOutputs.add(stack);
+            if (stack == null || stack.isEmpty() || stack.getCount() != batch.outputAmount()) {
+                throw new IllegalArgumentException("Unresolved native waste item output");
+            }
+            itemOutputs.add(stack.copy());
         }
 
         Ingredient mold = reactorMold();
-        if (mold.isEmpty()) return null;
+        if (mold.isEmpty()) throw new IllegalArgumentException("Missing native reactor controller mold");
         return new AdvancedAlloyFurnaceRecipe(
                 recipeId, itemInputs, fluidInputs, List.of(), itemOutputs, fluidOutputs, List.of(),
                 AdapterUtils.DEFAULT_ENERGY, AdapterUtils.DEFAULT_PROCESS_TIME,
                 Ingredient.EMPTY, 0, List.of(mold), AlloyFurnaceMode.NORMAL);
     }
 
-    @Nullable
-    private static Batch calculateBatch(Reaction reaction, PhysicalMapping input, PhysicalMapping output) {
-        int reactionSource = reaction.getSourceAmount();
-        int inputSource = input.mapping().getSourceAmount();
-        int outputSource = output.mapping().getSourceAmount();
-        if (reactionSource <= 0 || inputSource <= 0 || outputSource <= 0) return null;
-
-        long batch = lcm(reactionSource, inputSource);
-        for (int attempt = 0; attempt < 4; attempt++) {
-            if (batch <= 0 || batch > Integer.MAX_VALUE) return null;
-            int wasteUnits = reaction.getProductAmount((int) batch);
-            if (wasteUnits > 0 && wasteUnits % outputSource == 0) {
-                int inputAmount = input.mapping().getProductAmount((int) batch);
-                int outputAmount = output.mapping().getProductAmount(wasteUnits);
-                if (inputAmount > 0 && outputAmount > 0) {
-                    return new Batch(inputAmount, outputAmount);
-                }
-            }
-            long next = lcm(batch, outputSource);
-            if (next == batch) return null;
-            batch = next;
+    private static Batch calculateBatch(PhysicalMapping input, PhysicalMapping output) {
+        IMapping<?, ?> from = input.mapping();
+        IMapping<?, ?> to = output.mapping();
+        if (!nativeMapping(from) || !nativeMapping(to)) {
+            throw new IllegalArgumentException("Unknown or nonpositive native physical mapping");
         }
-        return null;
+        // ER 2.0.84 Reaction is one reactant unit -> one waste unit. ManyToMany divides
+        // BEFORE multiplying, so choose a whole batch instead of rounding down its yield.
+        long units = lcm(from.getSourceAmount(), to.getSourceAmount());
+        if (units <= 0L || units > Integer.MAX_VALUE) {
+            throw new IllegalArgumentException("Reactant batch exceeds the native int mapping API");
+        }
+        int inputAmount = Math.toIntExact(Math.multiplyExact(
+                units / from.getSourceAmount(), from.getProductAmount()));
+        int outputAmount = Math.toIntExact(Math.multiplyExact(
+                units / to.getSourceAmount(), to.getProductAmount()));
+        if (inputAmount <= 0 || outputAmount <= 0
+                || from.getProductAmount((int) units) != inputAmount
+                || to.getProductAmount((int) units) != outputAmount) {
+            throw new IllegalArgumentException("Native physical mapping yield is not an exact positive batch");
+        }
+        return new Batch(inputAmount, outputAmount, (int) units);
+    }
+
+    private static boolean nativeMapping(@Nullable IMapping<?, ?> mapping) {
+        return mapping != null && mapping.getSourceAmount() > 0 && mapping.getProductAmount() > 0
+                && (mapping.getClass() == IMapping.ManyToMany.class
+                || mapping.getClass() == IMapping.OneToOne.class
+                && mapping.getSourceAmount() == mapping.getProductAmount());
+    }
+
+    private static void validateFuelMapping(Reactant fuel, PhysicalMapping input, Batch batch) {
+        boolean resolved = false;
+        if (input.fluid()) {
+            TagKey<Fluid> tag = fluidTag(input);
+            if (tag == null) throw new IllegalArgumentException("Missing fuel fluid tag");
+            for (var member : BuiltInRegistries.FLUID.getTagOrEmpty(tag)) {
+                resolved = true;
+                validateForwardMapping(fuel, ReactantMappingsRegistry.getFromFluid(
+                        new FluidStack(member.value(), 1)).orElse(null), batch);
+            }
+        } else {
+            TagKey<Item> tag = itemTag(input);
+            if (tag == null) throw new IllegalArgumentException("Missing fuel item tag");
+            for (var member : BuiltInRegistries.ITEM.getTagOrEmpty(tag)) {
+                resolved = true;
+                validateForwardMapping(fuel, ReactantMappingsRegistry.getFromSolid(
+                        member.value().getDefaultInstance()).orElse(null), batch);
+            }
+        }
+        if (!resolved) throw new IllegalArgumentException("Fuel tag is not bound yet; retry after native tag loading");
+    }
+
+    private static void validateForwardMapping(Reactant fuel, @Nullable IMapping<?, Reactant> mapping, Batch batch) {
+        // Overlapping tags (or re-registration) can make the native lookup select a different
+        // reactant/rate than this inverse mapping. Never turn that stale inverse into free waste.
+        if (!nativeMapping(mapping) || !fuel.equals(mapping.getProduct())
+                || mapping.getProductAmount(batch.inputAmount()) != batch.reactantUnits()) {
+            throw new IllegalArgumentException("Fuel tag has an ambiguous or stale native reactant mapping");
+        }
     }
 
     @SuppressWarnings("unchecked")
@@ -486,7 +588,7 @@ public final class ExtremeReactorsRecipeAdapter implements IRecipeAdapter<ModRec
         if (value != null) {
             for (int i = 0; i < value.length(); i++) {
                 char character = Character.toLowerCase(value.charAt(i));
-                result.append(Character.isLetterOrDigit(character)
+                result.append(character >= 'a' && character <= 'z' || character >= '0' && character <= '9'
                         || character == '_' || character == '-' || character == '.' ? character : '_');
             }
         }
@@ -506,6 +608,6 @@ public final class ExtremeReactorsRecipeAdapter implements IRecipeAdapter<ModRec
         }
     }
 
-    private record Batch(int inputAmount, int outputAmount) {
+    private record Batch(int inputAmount, int outputAmount, int reactantUnits) {
     }
 }

@@ -47,6 +47,7 @@ public class CrystalPulverizerRecipeAdapter implements IRecipeAdapter<CrystalPul
         if (holder == null) return result;
 
         CrystalPulverizerRecipe recipe = holder.value();
+        if (recipe.getClass() != CrystalPulverizerRecipe.class) return result;
         ResourceLocation originalId = holder.id();
 
         ItemStack output = recipe.result();
@@ -95,7 +96,7 @@ public class CrystalPulverizerRecipeAdapter implements IRecipeAdapter<CrystalPul
         for (RecipeHolder<CrystalPulverizerRecipe> holder : (List<RecipeHolder<CrystalPulverizerRecipe>>) (List<?>)
                 com.sorrowmist.useless.compat.forge1201.recipe.RecipeManagerAccess.getAllRecipesFor(recipeManager, AECSRecipeTypes.CRYSTAL_PULVERIZER.get())) {
             CrystalPulverizerRecipe recipe = holder.value();
-            if (recipe.result().isEmpty()) continue;
+            if (recipe.getClass() != CrystalPulverizerRecipe.class || recipe.result().isEmpty()) continue;
 
             Map<Ingredient, Long> required = new LinkedHashMap<>();
             CircuitEtcherRecipeAdapter.addSizedIngredient(required, recipe.input());

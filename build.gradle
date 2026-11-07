@@ -37,6 +37,8 @@ legacyForge {
     mods { "${mod_id}" { sourceSet sourceSets.main } }
 }
 sourceSets.main.resources { srcDir 'src/generated/resources' }
+// Native constructor regressions participate in the normal test/build lifecycle too.
+sourceSets.test.java.srcDir 'src/nativeAdapterTest/java'
 sourceSets.test.compileClasspath += sourceSets.main.compileClasspath
 sourceSets.test.runtimeClasspath += sourceSets.main.compileClasspath
 // Integrations are compile-only; the client/modpack selects its runtime versions.
@@ -57,6 +59,7 @@ dependencies {
     modCompileOnly 'maven.modrinth:IiATswDj:9n9p68Qq' // applied-mekanistics-1.4.3
     modCompileOnly 'maven.modrinth:XxWD5pD3:jYgSnxye' // appliedenergistics2-forge-15.4.11
     modCompileOnly 'maven.modrinth:udZtKfzP:KpkyvkND' // neoecoae-20.5.0-forge
+    modCompileOnly 'maven.modrinth:xr109llC:auasuDQR' // ExtendedAE-Plus 1.6.4 (Forge 1.20.1)
     modCompileOnly 'maven.modrinth:B1CBVXHX:YSOP0G6O' // ldlib-forge-1.20.1-1.0.52.a
     modCompileOnly 'curse.maven:applied-flux-965012:6755986' // appliedflux-1.20-1.3.2-forge
     modCompileOnly 'maven.modrinth:lhGA9TYQ:1MKTLiiG' // architectury-9.2.14-forge
@@ -79,7 +82,7 @@ dependencies {
     modCompileOnly 'maven.modrinth:lWxpUd04:O8YO7ORj' // industrial-foregoing-1.20.1-3.5.19
     modCompileOnly 'maven.modrinth:nvQzSEkH:LecuGude' // jade-1.20.1-forge-11.13.2
     modCompileOnly 'maven.modrinth:fRiHVvU7:WtJS5tVw' // emi-1.1.22-1.20.1-forge
-    modCompileOnly 'maven.modrinth:u6dRKJwZ:TrKZlZ0b' // JEI 15.74.0.227
+    modCompileOnly 'maven.modrinth:u6dRKJwZ:hH9lasoK' // JEI 15.74.0.232 (EAEP 1.6.4 API baseline)
     modCompileOnly 'maven.modrinth:umyGl7zF:g5igndAv' // kubejs-forge-2001.6.5-build.16
     modCompileOnly 'maven.modrinth:Ce6I4WUE:uxe1WQp4' // mekanism-1.20.1-10.4.16.80
     modCompileOnly 'maven.modrinth:OFVYKsAk:Th4Czz4N' // mekanismgenerators-1.20.1-10.4.16.80
@@ -94,6 +97,42 @@ dependencies {
     modCompileOnly 'maven.modrinth:HUZkxNTQ:9T6CetkG' // mekanism_extras-1.20.1-1.5.0
     modCompileOnly 'net.createmod.ponder:Ponder-Forge-1.20.1:1.0.80' // ponder-forge-1.20.1-1.0.80
     modCompileOnly 'dev.engine-room.flywheel:flywheel-forge-1.20.1:1.0.4' // flywheel-forge-1.20.1-1.0.4
+    // Published Forge 1.20.1 recipe APIs; optional at runtime, never bundled in this mod.
+    modCompileOnly 'maven.modrinth:R2OftAxM:SiIpcZzM' // Farmer's Delight 1.3.4
+    modCompileOnly 'maven.modrinth:lYXiU4qR:FIDe7Yid' // Extra Delight unofficial Forge port 1.0.1
+    modCompileOnly 'maven.modrinth:zYuGPZIx:p6Z5Qd84' // Casualness Delight 0.4n
+    modCompileOnly 'maven.modrinth:hIu9KJTT:9myDFPCD' // Brewin' and Chewin' 3.2.1
+    modCompileOnly 'maven.modrinth:PYjpoAys:FOEkFTgl' // Ube's Delight 0.4.15
+    modCompileOnly 'maven.modrinth:rtu7uERF:LsvcmS2n' // Barbeque's Delight 1.0.6
+    modCompileOnly 'maven.modrinth:uJT3ahxz:MjBWc5wO' // Youkai's Homecoming 2.7.2
+    modCompileOnly 'maven.modrinth:v17FatAc:Ghp0qCKY' // Kaleidoscope Cookery 1.6.0
+    modCompileOnly 'maven.modrinth:LPZkep5R:dwwwzjdV' // Kaleidoscope Grilling 1.1.1
+    modCompileOnly 'maven.modrinth:r9RZvhiJ:mUnU2u9e' // Kaleidoscope Tavern 1.2.0
+    modCompileOnly 'maven.modrinth:TKB6INcv:Hw2aD01e' // Ars Nouveau 4.12.7
+    modCompileOnly 'maven.modrinth:C95ReXie:EEilTecF' // Mystical Agriculture 7.0.24
+    modCompileOnly 'maven.modrinth:4cJkN3aF:8UiPp0gC' // Nature's Aura 39.4
+    modCompileOnly 'maven.modrinth:tIm2nV03:WUzj4tgJ' // Immersive Engineering 10.2.0-183
+    modCompileOnly 'maven.modrinth:ncAcdgk7:ohRZqkHb' // PneumaticCraft 6.0.23+mc1.20.1
+    modCompileOnly 'maven.modrinth:s4OWxYQQ:hZaEegS9' // Iron's Spells 'n Spellbooks 3.16.3
+    modCompileOnly 'maven.modrinth:sbJh4AZw:hs5pHmiU' // Occultism 1.158.0
+    modCompileOnly 'maven.modrinth:692GClaE:J0YtwRxM' // Modonomicon 1.79.3 (Occultism native pentacles)
+    modCompileOnly 'maven.modrinth:PuyPazRT:YkeJNm33' // SmartBrainLib 1.15 (Occultism native spirits)
+    modCompileOnly 'maven.modrinth:jgzwYsAN:U88VbrNU' // Malum 1.6.7
+    modCompileOnly 'maven.modrinth:bN3xUWdo:dRIycWqx' // Lodestone 1.6.4.1 (Malum native recipe API)
+    modCompileOnly 'maven.modrinth:IJI3QuK8:xpgyRm6m' // Ars Energistique 1.2.0
+    modCompileOnly 'maven.modrinth:tca1XWFk:QH8D7GGN' // Applied Pneumatics 1.0.8
+    modCompileOnly 'maven.modrinth:uJ9afomy:VGhHOKsP' // AE2 Crystal Science 1.2.0 (Forge 1.20.1)
+    modCompileOnly 'maven.modrinth:ArHeh5Fz:vj0850og' // AE2 Lightning Tech 2.1.3 (Forge 1.20.1)
+    modCompileOnly 'maven.modrinth:gBGdVBJy:9NT9IkSs' // Crabber's Delight 1.2.3 (Forge 1.20.1)
+    modCompileOnly 'maven.modrinth:jH6iiqkd:mywVOObd' // Productive Bees 12.6.0
+    modCompileOnly 'maven.modrinth:idkvShUy:5A5jbWkI' // Extreme Reactors 2.0.84
+    modCompileOnly 'maven.modrinth:rHpb85Mf:OIzaNrPI' // ZeroCore 2.1.45
+    modCompileOnly 'maven.modrinth:MdlnLS7Q:1GswR5qC' // Forbidden & Arcanus 2.2.6
+    modCompileOnly 'maven.modrinth:HsdNFinx:eP3L8E7C' // Valhelsia Core 1.1.2
+    modCompileOnly 'maven.modrinth:TdN6LxjM:xRmDtY9h' // Lychee 5.2.1
+    modCompileOnly 'curse.maven:industrial-foregoing-extra-upgrades-1161049:7638327' // IFEU 1.20.1-2.5.000
+    modCompileOnly 'curse.maven:item-obliterator-835861:5479898' // Forge release 2.3.1, native metadata 2.3.0
+    modCompileOnly 'maven.modrinth:P1Kv5EAO:AomMq7HP' // Necronomicon API 1.6.0+1.20.1
     annotationProcessor 'org.spongepowered:mixin:0.8.5:processor'
     compileOnly 'io.github.llamalad7:mixinextras-common:0.5.0'
     annotationProcessor 'io.github.llamalad7:mixinextras-common:0.5.0'
@@ -134,5 +173,7 @@ apply from: 'gradle/forge1201-pack-profile.gradle'
 apply from: 'gradle/bytecode-contract-tests.gradle'
 
 apply from: 'gradle/merge-game-tests.gradle'
+
+apply from: 'gradle/migration-data.gradle'
 
 apply from: 'gradle/bundled-compat-libraries.gradle'

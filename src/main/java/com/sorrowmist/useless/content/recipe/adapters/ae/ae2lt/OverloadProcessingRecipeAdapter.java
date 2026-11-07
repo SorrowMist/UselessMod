@@ -64,6 +64,8 @@ public class OverloadProcessingRecipeAdapter implements IRecipeAdapter<OverloadP
 
         List<OverloadProcessingIngredient> itemInputs = recipe.itemInputs();
         FluidStack fluidInput = recipe.fluidInput();
+        // Borrowed recipes carry a separate live fluid predicate, not this display stack.
+        if (recipe.inputFluidAmount() != fluidInput.getAmount()) return result;
         List<ItemStack> itemResults = recipe.itemResults();
         FluidStack fluidResult = recipe.fluidResult();
 
@@ -89,16 +91,15 @@ public class OverloadProcessingRecipeAdapter implements IRecipeAdapter<OverloadP
         for (Map.Entry<Ingredient, Long> entry : ingredientCounts.entrySet()) {
             countedIngredients.add(new CountedIngredient(entry.getKey(), entry.getValue()));
         }
-        var keyInputs = List.of(AELightningIngredientHelper.createLightningKeyInput(recipe.lightningTier(), recipe.lightningCost()));
+        var keyInputs = AELightningIngredientHelper.lightningInputs(recipe.lightningTier(), recipe.lightningCost());
 
-        var sizedFluid = hasFluidInput ? AdapterUtils.toSizedFluidIngredient(fluidInput) : null;
+        var sizedFluid = hasFluidInput ? AELightningIngredientHelper.exactFluidInput(fluidInput) : null;
         List<?> inputFluids = sizedFluid == null ? List.of() : List.of(sizedFluid);
         List<ItemStack> outputs = hasItemOutputs ? itemResults.stream().map(ItemStack::copy).toList() : List.of();
         List<FluidStack> outputFluids = hasFluidOutput ? List.of(fluidResult.copy()) : List.of();
 
         int processTime = BASE_PROCESS_TIME;
         long energy = recipe.totalEnergy();
-        int scaledEnergy = energy > Integer.MAX_VALUE ? 10000 : (int) energy;
 
         Ingredient moldIngredient = Ingredient.of(new ItemStack(
                 BuiltInRegistries.ITEM.get(
@@ -114,7 +115,7 @@ public class OverloadProcessingRecipeAdapter implements IRecipeAdapter<OverloadP
                 outputs,
                 outputFluids,
                 List.of(),
-                scaledEnergy,
+                energy,
                 processTime,
                 Ingredient.EMPTY,
                 0,
@@ -144,6 +145,7 @@ public class OverloadProcessingRecipeAdapter implements IRecipeAdapter<OverloadP
 
             List<OverloadProcessingIngredient> recipeItemInputs = recipe.itemInputs();
             FluidStack recipeFluidInput = recipe.fluidInput();
+            if (recipe.inputFluidAmount() != recipeFluidInput.getAmount()) continue;
 
             // 检查物品输入匹配
             boolean itemsMatch = true;
@@ -157,14 +159,14 @@ public class OverloadProcessingRecipeAdapter implements IRecipeAdapter<OverloadP
 
             // 检查流体输入匹配（使用已合并的流体数据）
             boolean fluidsMatch = recipeFluidInput.isEmpty()
-                    || (AdapterUtils.toSizedFluidIngredient(recipeFluidInput) != null
+                    || (AELightningIngredientHelper.exactFluidInput(recipeFluidInput) != null
                     && com.sorrowmist.useless.content.recipe.FluidIngredientAllocator.matches(
-                    List.of(AdapterUtils.toSizedFluidIngredient(recipeFluidInput)),
+                    List.of(AELightningIngredientHelper.exactFluidInput(recipeFluidInput)),
                     mergedFluids, 1L));
 
             if ((recipeItemInputs.isEmpty() || itemsMatch)
                     && (recipeFluidInput.isEmpty() || fluidsMatch)
-                    && AELightningIngredientHelper.matchesOverloadLightning(mergedInputs, mergedKeys, recipe.lightningTier(), recipe.lightningCost())) {
+                    && AELightningIngredientHelper.matchesLightning(mergedKeys, recipe.lightningTier(), recipe.lightningCost())) {
                 matches.add(holder);
             }
         }

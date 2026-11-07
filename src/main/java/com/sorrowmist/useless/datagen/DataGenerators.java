@@ -10,14 +10,14 @@ import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod.EventBusSubscriber;
 import net.minecraftforge.data.event.GatherDataEvent;
 
-@EventBusSubscriber(modid = UselessMod.MODID)
+@EventBusSubscriber(modid = UselessMod.MODID, bus = EventBusSubscriber.Bus.MOD)
 public class DataGenerators {
 
     @SubscribeEvent
     public static void onGatherData(GatherDataEvent event) {
         DataGenerator generator = event.getGenerator();
         var registries = event.getLookupProvider();
-        var pack = generator.getVanillaPack(true);
+        var pack = generator.getVanillaPack(event.includeServer());
         var existingFileHelper = event.getExistingFileHelper();
 
         var blockTagsProvider = pack.addProvider(
@@ -26,8 +26,7 @@ public class DataGenerators {
                                                          registries,
                                                          blockTagsProvider.contentsGetter()
         ));
-        pack.addProvider(output -> new ULootTableProvider(output, registries));
-//        pack.addProvider(output -> new ModBiomeProvider(output, registries));
-        pack.addProvider(output -> new CraftingRecipes(output, registries));
+        pack.addProvider(ULootTableProvider::new);
+        pack.addProvider(CraftingRecipes::new);
     }
 }

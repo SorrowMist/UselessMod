@@ -22,14 +22,14 @@ public class ULootTableProvider extends LootTableProvider {
             new SubProviderEntry(BlockLootProvider::new, LootContextParamSets.BLOCK)
     );
 
-    public ULootTableProvider(PackOutput output, CompletableFuture<HolderLookup.Provider> registries) {
-        super(output, Set.of(), SUB_PROVIDERS, registries);
+    public ULootTableProvider(PackOutput output) {
+        super(output, Set.of(), SUB_PROVIDERS);
     }
 
     private static class BlockLootProvider extends BlockLootSubProvider {
 
-        BlockLootProvider(HolderLookup.Provider registries) {
-            super(Set.of(), FeatureFlags.REGISTRY.allFlags(), registries);
+        BlockLootProvider() {
+            super(Set.of(), FeatureFlags.REGISTRY.allFlags());
         }
 
         @Override

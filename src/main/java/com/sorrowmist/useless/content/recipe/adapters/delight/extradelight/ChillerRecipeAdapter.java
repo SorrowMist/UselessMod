@@ -1,6 +1,6 @@
 package com.sorrowmist.useless.content.recipe.adapters.delight.extradelight;
 
-import com.lance5057.extradelight.workstations.chiller.ChillerRecipe;
+import com.vomiter.extradelight.common.complex.workstations.chiller.ChillerRecipe;
 import com.sorrowmist.useless.api.enums.AlloyFurnaceMode;
 import com.sorrowmist.useless.content.recipe.AdapterUtils;
 import com.sorrowmist.useless.content.recipe.AdvancedAlloyFurnaceRecipe;
@@ -8,7 +8,6 @@ import com.sorrowmist.useless.content.recipe.CountedIngredient;
 import com.sorrowmist.useless.content.recipe.IRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.RecipeSourceIds;
 import com.sorrowmist.useless.content.recipe.adapters.delight.DelightRecipeAdapterUtils;
-import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.crafting.Ingredient;
@@ -25,8 +24,6 @@ import java.util.Map;
 public final class ChillerRecipeAdapter implements IRecipeAdapter<ChillerRecipe> {
     private static final ResourceLocation MOLD_ID =
             new ResourceLocation("extradelight", "chiller");
-    private static final ResourceLocation BAR_MOLD_ID =
-            new ResourceLocation("extradelight", "bar_mold");
 
     @Override
     public String sourceId() {
@@ -50,7 +47,7 @@ public final class ChillerRecipeAdapter implements IRecipeAdapter<ChillerRecipe>
             return List.of();
         }
         ChillerRecipe source = holder.value();
-        List<CountedIngredient> inputs = AdapterUtils.mergeIngredients(itemInputs(source));
+        List<CountedIngredient> inputs = itemInputs(source);
         FluidStack inputFluid = source.getFluid();
         ItemStack output = source.getResultItem(level == null ? null : level.registryAccess());
         if ((inputs.isEmpty() && (inputFluid == null || inputFluid.isEmpty()))
@@ -77,8 +74,7 @@ public final class ChillerRecipeAdapter implements IRecipeAdapter<ChillerRecipe>
         for (RecipeHolder<ChillerRecipe> holder : DelightRecipeAdapterUtils.allOf(
                 level.getRecipeManager(), ChillerRecipe.class)) {
             ChillerRecipe source = holder.value();
-            List<CountedIngredient> requirements = AdapterUtils.mergeIngredients(
-                    itemInputs(source));
+            List<CountedIngredient> requirements = itemInputs(source);
             List<com.sorrowmist.useless.content.recipe.LongSizedFluidIngredient> fluids =
                     ExtraDelightRecipeAdapterUtils.fluid(source.getFluid());
             if ((requirements.isEmpty() && fluids.isEmpty())
@@ -91,14 +87,9 @@ public final class ChillerRecipeAdapter implements IRecipeAdapter<ChillerRecipe>
         return List.copyOf(matches);
     }
 
-    private static List<Ingredient> itemInputs(ChillerRecipe source) {
-        if (source == null) {
-            return List.of();
-        }
-        ItemStack container = source.getOutputContainer();
-        return isSecondaryMold(container)
-                ? source.getIngredients()
-                : ExtraDelightRecipeAdapterUtils.withContainer(source.getIngredients(), container);
+    private static List<CountedIngredient> itemInputs(ChillerRecipe source) {
+        return source == null ? List.of() : DelightRecipeAdapterUtils.withContainerInputs(
+                source.getIngredients(), source.getOutputContainer(), source.shouldConsumeContainer());
     }
 
     private static List<Ingredient> molds(ChillerRecipe source) {
@@ -110,10 +101,8 @@ public final class ChillerRecipeAdapter implements IRecipeAdapter<ChillerRecipe>
 
         if (source != null) {
             ItemStack container = source.getOutputContainer();
-            if (isSecondaryMold(container)) {
-                for (int i = 0; i < container.getCount(); i++) {
-                    molds.add(Ingredient.of(container.copyWithCount(1)));
-                }
+            if (!source.shouldConsumeContainer() && container != null && !container.isEmpty()) {
+                molds.add(DelightRecipeAdapterUtils.exactStack(container));
             }
         }
         return List.copyOf(molds);
@@ -124,14 +113,4 @@ public final class ChillerRecipeAdapter implements IRecipeAdapter<ChillerRecipe>
         return mold == null ? ItemStack.EMPTY : mold;
     }
 
-    private static boolean isSecondaryMold(ItemStack stack) {
-        if (stack == null || stack.isEmpty()) {
-            return false;
-        }
-        if (DelightRecipeAdapterUtils.isBakingTray(stack)) {
-            return true;
-        }
-        ResourceLocation id = BuiltInRegistries.ITEM.getKey(stack.getItem());
-        return BAR_MOLD_ID.equals(id);
-    }
 }

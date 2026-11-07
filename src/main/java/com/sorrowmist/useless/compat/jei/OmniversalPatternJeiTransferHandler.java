@@ -132,7 +132,7 @@ public final class OmniversalPatternJeiTransferHandler<T extends PatternEncoding
         // Sent before the slot contents so the pick is on record by the time the server sees the
         // encoded pattern, including when a helper mod encodes it automatically on the same tick.
         selectRecipe(menu, selected, player.level());
-        // Forge ExtendedAE Plus has no search-preset API; it must not gate AE2 pattern transfer.
+        com.sorrowmist.useless.compat.eaep.ExtendedAEPlusJeiCompat.presetAlloyFurnaceSearchKey();
         EncodingHelper.encodeProcessingRecipe(menu, inputs, outputs);
         return null;
     }

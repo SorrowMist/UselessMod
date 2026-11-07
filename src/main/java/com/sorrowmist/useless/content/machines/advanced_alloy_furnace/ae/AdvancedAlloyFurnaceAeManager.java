@@ -2001,9 +2001,7 @@ public final class AdvancedAlloyFurnaceAeManager {
             return;
         }
         if (!AlloyFurnaceRecipeCatalog.isReady(level)) {
-            // 目录仍在后台构建（服务器启动阶段实测耗时 30 秒以上）。此时解码无法取得配方，
-            // 会将完好的样板误判为「missing or has changed」并直接丢弃——实测启动阶段有 6 条
-            // 样板因此失效。应保持请求挂起，待目录就绪后的 tick 再重建。
+            // 目录异步构建完成前不要解码，避免把暂时不可用的配方误判为失效样板。
             return;
         }
         rebuildPatterns();
@@ -2038,18 +2036,14 @@ public final class AdvancedAlloyFurnaceAeManager {
             return;
         }
 
-        int seen = 0;
-        int decoded = 0;
         int slot = -1;
         for (ItemStack stack : this.owner.getPatternStacks()) {
             slot++;
             if (!stack.isEmpty()) {
-                seen++;
                 try {
                     IPatternDetails pattern = AdvancedAlloyFurnacePatternResolver.decode(stack, level);
                     if (pattern != null && this.owner.acceptsPattern(pattern)) {
                         this.patterns.add(pattern);
-                        decoded++;
                     } else {
                         OmniversalPatternWarnings.notPublished("alloy furnace " + this.owner.getBlockPos(),
                                 slot, pattern == null

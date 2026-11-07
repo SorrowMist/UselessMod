@@ -1,24 +1,44 @@
 {
-  "type": "minecraft:crafting_shaped",
-  "category": "building",
-  "key": {
-    "C": {
-      "item": "minecraft:copper_ingot"
+  "type": "useless_mod:advanced_alloy_furnace",
+  "energy": 10000,
+  "id": "useless_mod:crafting/useless_coil_tier_1",
+  "ingredients": [
+    {
+      "count": 2,
+      "ingredient": {
+        "item": "useless_mod:useless_glass_tier_1"
+      }
     },
-    "I": {
-      "item": "useless_mod:useless_ingot_tier_1"
+    {
+      "count": 3,
+      "ingredient": {
+        "item": "useless_mod:useless_gear_tier_1"
+      }
     },
-    "R": {
-      "item": "minecraft:redstone"
+    {
+      "count": 2,
+      "ingredient": {
+        "item": "useless_mod:omniversal_furnace_casing"
+      }
+    },
+    {
+      "count": 4,
+      "ingredient": {
+        "item": "ae2:quartz_fiber"
+      }
+    },
+    {
+      "count": 8,
+      "ingredient": {
+        "item": "ae2:fluix_glass_cable"
+      }
     }
-  },
-  "pattern": [
-    "CRC",
-    "RIR",
-    "CRC"
   ],
-  "result": {
-    "count": 16,
-    "item": "useless_mod:useless_coil_tier_1"
-  }
+  "outputs": [
+    {
+      "item": "useless_mod:useless_coil_tier_1"
+    }
+  ],
+  "process_time": 40,
+  "tier": 0
 }

@@ -35,13 +35,16 @@ public class UBlockTagsProvider extends BlockTagsProvider {
         this.tag(ModTags.OMNIVERSAL_FURNACE_CASINGS)
             .replace(false)
             .add(ModBlocks.OMNIVERSAL_FURNACE_CASING.get())
-            .add(ModBlocks.PASSIVE_CRAFTING_HATCH.get());
+            .add(ModBlocks.PASSIVE_CRAFTING_HATCH.get())
+            .add(ModBlocks.MAINTENANCE_HATCH.get())
+            .add(ModBlocks.AUTO_MAINTENANCE_HATCH.get())
+            .add(ModBlocks.MUFFLER_HATCH.get());
 
         // 造化杖「无视等级」的例外清单：默认留空，整合包往生成的 json 里加方块即可。
         this.tag(ModTags.BEEF_TOOL_TIER_LOCKED).replace(false);
 
         this.addPlasticTags();
-        this.addNeoForgeTags();
+        this.addCommonColorTags();
     }
 
     /**
@@ -80,18 +83,19 @@ public class UBlockTagsProvider extends BlockTagsProvider {
     }
 
     /**
-     * 将四类塑料方块纳入 MinecraftForge 的约定方块标签。
+     * 保留现有塑料方块的 c:dyed 标签，Forge 1.20.1 没有对应的 Tags.Blocks 常量。
      *
      * <p>塑料方块以颜色为唯一区分维度，因此全部归入 {@code c:dyed} 总标签，
      * 并依颜色的染料映射归入对应的 {@code c:dyed/<color>} 子标签。
      * {@code dark_red} 与 {@code aqua} 不存在对应的 {@link DyeColor}，
      * 仅纳入总标签，不参与子标签归类。
      */
-    private void addNeoForgeTags() {
+    private void addCommonColorTags() {
         for (var blockMap : GlowPlasticBlock.ALL_BLOCK_MAPS) {
             for (var entry : blockMap.entrySet()) {
                 Block block = entry.getValue().get();
-                this.tag(Tags.Blocks.DYED).add(block);
+                this.tag(TagKey.create(net.minecraft.core.registries.Registries.BLOCK,
+                        new net.minecraft.resources.ResourceLocation("c", "dyed"))).add(block);
 
                 DyeColor dyeColor = entry.getKey().getDyeColor();
                 if (dyeColor != null) {
@@ -103,24 +107,8 @@ public class UBlockTagsProvider extends BlockTagsProvider {
 
     /** 将染料颜色映射到 MinecraftForge 的 {@code c:dyed/<color>} 方块标签。 */
     private static TagKey<Block> dyedTag(DyeColor color) {
-        return switch (color) {
-            case WHITE -> Tags.Blocks.DYED_WHITE;
-            case ORANGE -> Tags.Blocks.DYED_ORANGE;
-            case MAGENTA -> Tags.Blocks.DYED_MAGENTA;
-            case LIGHT_BLUE -> Tags.Blocks.DYED_LIGHT_BLUE;
-            case YELLOW -> Tags.Blocks.DYED_YELLOW;
-            case LIME -> Tags.Blocks.DYED_LIME;
-            case PINK -> Tags.Blocks.DYED_PINK;
-            case GRAY -> Tags.Blocks.DYED_GRAY;
-            case LIGHT_GRAY -> Tags.Blocks.DYED_LIGHT_GRAY;
-            case CYAN -> Tags.Blocks.DYED_CYAN;
-            case PURPLE -> Tags.Blocks.DYED_PURPLE;
-            case BLUE -> Tags.Blocks.DYED_BLUE;
-            case BROWN -> Tags.Blocks.DYED_BROWN;
-            case GREEN -> Tags.Blocks.DYED_GREEN;
-            case RED -> Tags.Blocks.DYED_RED;
-            case BLACK -> Tags.Blocks.DYED_BLACK;
-        };
+        return TagKey.create(net.minecraft.core.registries.Registries.BLOCK,
+                new net.minecraft.resources.ResourceLocation("c", "dyed/" + color.getName()));
     }
 
     private void addMinecraftTags() {
@@ -135,6 +123,9 @@ public class UBlockTagsProvider extends BlockTagsProvider {
             .add(ModBlocks.ME_PATTERN_ASSEMBLY.get())
             .add(ModBlocks.OMNIVERSAL_MOLD_HUB.get())
             .add(ModBlocks.PASSIVE_CRAFTING_HATCH.get())
+            .add(ModBlocks.MAINTENANCE_HATCH.get())
+            .add(ModBlocks.AUTO_MAINTENANCE_HATCH.get())
+            .add(ModBlocks.MUFFLER_HATCH.get())
             .add(ModBlocks.OMNIVERSAL_FURNACE_CASING.get())
             .add(ModBlocks.TEMPERATURE_REGULATOR.get());
 

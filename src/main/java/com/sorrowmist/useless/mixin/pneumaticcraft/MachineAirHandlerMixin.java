@@ -2,10 +2,10 @@ package com.sorrowmist.useless.mixin.pneumaticcraft;
 
 import com.sorrowmist.useless.content.stafflink.PressureSealRegistry;
 import me.desht.pneumaticcraft.api.tileentity.IAirHandlerMachine;
-import me.desht.pneumaticcraft.common.capabilities.MachineAirHandler;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.Pseudo;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
@@ -37,10 +37,11 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
  * 爆炸判定 {@code doOverpressureChecks} 也不看它；{@code disperseAir}（向真正相邻的空气处理器扩散）
  * 同样不受影响。所以<b>超压仍会泄压 / 爆炸，与真正相邻的方块仍会正常交换空气</b>。</p>
  */
-@Mixin(MachineAirHandler.class)
+@Pseudo
+@Mixin(targets = "me.desht.pneumaticcraft.common.capabilities.MachineAirHandler", remap = false)
 public abstract class MachineAirHandlerMixin {
 
-    @Inject(method = "tick", at = @At("HEAD"))
+    @Inject(method = "tick(Lnet/minecraft/world/level/block/entity/BlockEntity;)V", at = @At("HEAD"), remap = false)
     private void uselessmod$sealWirelessLink(BlockEntity ownerTE, CallbackInfo ci) {
         Level level = ownerTE.getLevel();
         // 顺序要紧：先按侧别早退，保证客户端线程永远不碰服务端集合（单人存档下两者不同线程）。

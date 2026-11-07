@@ -73,7 +73,7 @@ public final class TreeRitualRecipeAdapter implements IRecipeAdapter<TreeRitualR
     @Nullable
     private static Converted convertData(@Nullable TreeRitualRecipe source) {
         if (source == null || source.time <= 0 || source.saplingType == null || source.saplingType.isEmpty()
-                || source.output == null || source.output.isEmpty() || source.output.getCount() <= 0
+                || source.result == null || source.result.isEmpty() || source.result.getCount() <= 0
                 || source.ingredients == null) {
             return null;
         }
@@ -98,7 +98,7 @@ public final class TreeRitualRecipeAdapter implements IRecipeAdapter<TreeRitualR
         if (inputs.isEmpty()) {
             return null;
         }
-        return new Converted(inputs, requirements, source.output.copy(), source.time);
+        return new Converted(inputs, requirements, source.result.copy(), source.time);
     }
 
     private AdvancedAlloyFurnaceRecipe createRecipe(RecipeHolder<TreeRitualRecipe> holder, Converted converted) {

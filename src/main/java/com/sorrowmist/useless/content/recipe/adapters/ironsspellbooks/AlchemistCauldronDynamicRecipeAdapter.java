@@ -24,7 +24,8 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.item.alchemy.Potion;
 import net.minecraft.world.item.alchemy.PotionBrewing;
-import net.minecraft.world.item.alchemy.PotionContents;
+import io.redspace.ironsspellbooks.api.backwards_compat.FluidHelper;
+import net.minecraft.world.item.crafting.RecipeManager;
 import net.minecraft.world.item.alchemy.Potions;
 import net.minecraft.world.item.crafting.Ingredient;
 import net.minecraft.world.item.crafting.Recipe;
@@ -57,7 +58,7 @@ public final class AlchemistCauldronDynamicRecipeAdapter
     /** 单次构建在遇到并发修改时的最大重试次数。 */
     private static final int MAX_BUILD_ATTEMPTS = 32;
 
-    private volatile PotionBrewing cachedBrewing;
+    private volatile RecipeManager cachedRecipeManager;
     private volatile boolean cachedCauldronBrewing;
     private volatile List<RecipeHolder<DynamicRecipe>> cachedRecipes = List.of();
 
@@ -82,16 +83,16 @@ public final class AlchemistCauldronDynamicRecipeAdapter
             return List.of();
         }
 
-        PotionBrewing brewing = level.potionBrewing();
+        RecipeManager manager = level.getRecipeManager();
         boolean allowCauldronBrewing = ServerConfigs.ALLOW_CAULDRON_BREWING.get();
-        if (cachedBrewing == brewing && cachedCauldronBrewing == allowCauldronBrewing) {
+        if (cachedRecipeManager == manager && cachedCauldronBrewing == allowCauldronBrewing) {
             return cachedRecipes;
         }
 
         synchronized (this) {
-            if (cachedBrewing != brewing || cachedCauldronBrewing != allowCauldronBrewing) {
-                cachedRecipes = buildRecipesWithRetry(brewing, allowCauldronBrewing);
-                cachedBrewing = brewing;
+            if (cachedRecipeManager != manager || cachedCauldronBrewing != allowCauldronBrewing) {
+                cachedRecipes = buildRecipesWithRetry(level, allowCauldronBrewing);
+                cachedRecipeManager = manager;
                 cachedCauldronBrewing = allowCauldronBrewing;
             }
             return cachedRecipes;
@@ -109,10 +110,10 @@ public final class AlchemistCauldronDynamicRecipeAdapter
      * @throws ConcurrentModificationException 重试耗尽后仍处于并发修改状态
      */
     private static List<RecipeHolder<DynamicRecipe>> buildRecipesWithRetry(
-            @Nullable PotionBrewing brewing, boolean allowCauldronBrewing) {
+            Level level, boolean allowCauldronBrewing) {
         for (int attempt = 0; ; attempt++) {
             try {
-                return createRecipes(brewing, allowCauldronBrewing);
+                return createRecipes(level, allowCauldronBrewing);
             } catch (ConcurrentModificationException exception) {
                 if (attempt >= MAX_BUILD_ATTEMPTS - 1) {
                     throw exception;
@@ -172,11 +173,11 @@ public final class AlchemistCauldronDynamicRecipeAdapter
     }
 
     private static List<RecipeHolder<DynamicRecipe>> createRecipes(
-            @Nullable PotionBrewing brewing, boolean allowCauldronBrewing) {
+            Level level, boolean allowCauldronBrewing) {
         Map<ResourceLocation, RecipeHolder<DynamicRecipe>> recipes = new LinkedHashMap<>();
         addScrollRecipes(recipes);
-        if (allowCauldronBrewing && brewing != null) {
-            addPotionRecipes(recipes, brewing);
+        if (allowCauldronBrewing) {
+            addPotionRecipes(recipes, level);
         }
         return List.copyOf(recipes.values());
     }
@@ -212,36 +213,25 @@ public final class AlchemistCauldronDynamicRecipeAdapter
 
     private static void addPotionRecipes(
             Map<ResourceLocation, RecipeHolder<DynamicRecipe>> recipes,
-            PotionBrewing brewing) {
-        List<Item> reagents = AdapterUtils.reagentCandidates(brewing);
+            Level level) {
+        List<Item> reagents = new ArrayList<>();
+        for (Item item : BuiltInRegistries.ITEM) {
+            if (FluidHelper.isBrewingIngredient(item.getDefaultInstance(), level)) reagents.add(item);
+        }
         List<Holder<Potion>> potions = potionHolders();
         for (Item container : POTION_CONTAINERS) {
             for (Holder<Potion> potion : potions) {
-                ItemStack input = PotionContents.createItemStack(container, potion);
+                ItemStack input = FluidHelper.createItemStack(container, potion);
                 if (PotionFluid.from(input).isEmpty()) {
                     continue;
                 }
 
                 for (Item reagent : reagents) {
                     ItemStack reagentStack = reagent.getDefaultInstance();
-                    boolean hasPotionMix;
-                    try {
-                        hasPotionMix = brewing.hasPotionMix(input, reagentStack)
-                                || brewing.hasContainerMix(input, reagentStack);
-                    } catch (ConcurrentModificationException exception) {
-                        // 并发注册窗口内的读取失败不能按「该组合无配方」处理，否则条目会静默缺失；
-                        // 交由外层重试，读到完整列表后重新判定。
-                        throw exception;
-                    } catch (RuntimeException ignored) {
-                        continue;
-                    }
-                    if (!hasPotionMix) {
-                        continue;
-                    }
-
                     ItemStack result;
                     try {
-                        result = brewing.mix(reagentStack, input);
+                        // Same Forge registry and argument order as the native cauldron.
+                        result = FluidHelper.getNonDestructiveBrewingResult(input, reagentStack, level);
                     } catch (ConcurrentModificationException exception) {
                         // 同上：并发修改不是「无配方」，交由外层重试。
                         throw exception;
@@ -281,7 +271,7 @@ public final class AlchemistCauldronDynamicRecipeAdapter
     private static ItemStack waterBottle() {
         ItemStack water = PotionFluid.from(new FluidStack(Fluids.WATER, POTION_AMOUNT));
         return water.isEmpty()
-                ? PotionContents.createItemStack(Items.POTION, Potions.WATER)
+                ? net.minecraft.world.item.alchemy.PotionUtils.setPotion(new ItemStack(Items.POTION), Potions.WATER)
                 : water;
     }
 

@@ -100,7 +100,8 @@ public class AlloyFurnaceRecipeManager {
     }
 
     public void registerAdapter(com.sorrowmist.useless.api.recipe.IRecipeAdapter<?> adapter) {
-        registerAdapter(adapter, adapter == null ? RecipeSourceIds.UNKNOWN : adapter.sourceId());
+        registerAdapter(adapter, adapter == null ? RecipeSourceIds.UNKNOWN
+                : AdapterGuards.call(adapter, "sourceId", adapter::sourceId, RecipeSourceIds.UNKNOWN));
     }
 
     /** @deprecated Use the public API adapter type. */
@@ -111,9 +112,18 @@ public class AlloyFurnaceRecipeManager {
 
     public void registerAdapter(com.sorrowmist.useless.api.recipe.IRecipeAdapter<?> adapter, String sourceId) {
         if (adapter == null) return;
-        ItemStack moldItem = adapter.getMoldItem();
-
         String normalizedSource = RecipeSourceIds.normalize(sourceId);
+        // 先登记来源、再触碰可能抛链接错误的适配器方法：否则首次失败时守卫不知道它属于哪个模组，
+        // 登录提示只能报出适配器类名。
+        AdapterGuards.rememberSource(adapter, normalizedSource);
+        // 版本错配可能在取模具这一步就抛 LinkageError。此时该适配器整体不可用，直接跳过注册，
+        // 否则它进入候选列表后会在每次查找配方时重复失败。
+        ItemStack moldItem = AdapterGuards.call(adapter, "getMoldItem", adapter::getMoldItem, null);
+        if (AdapterGuards.isDisabled(adapter, "getMoldItem")) {
+            AdapterGuards.recordModFailure(normalizedSource);
+            return;
+        }
+
         allAdapters.add(adapter);
         adapterSourceIds.put(adapter, normalizedSource);
         if (moldItem != null && !moldItem.isEmpty()) {
@@ -138,7 +148,10 @@ public class AlloyFurnaceRecipeManager {
 
     public String getAdapterSourceId(com.sorrowmist.useless.api.recipe.IRecipeAdapter<?> adapter) {
         if (adapter == null) return RecipeSourceIds.UNKNOWN;
-        return adapterSourceIds.getOrDefault(adapter, RecipeSourceIds.normalize(adapter.sourceId()));
+        String registeredSource = adapterSourceIds.get(adapter);
+        if (registeredSource != null) return registeredSource;
+        return RecipeSourceIds.normalize(
+                AdapterGuards.call(adapter, "sourceId", adapter::sourceId, RecipeSourceIds.UNKNOWN));
     }
 
     /** @deprecated Use the public API adapter type. */
@@ -170,6 +183,16 @@ public class AlloyFurnaceRecipeManager {
     private RecipeIndex rebuildIndex(RecipeManager recipeManager) {
         recipeIndexes.remove(recipeManager);
 
+        // 索引只覆盖本模组自己的配方类型，但仍会读取配方里的 Ingredient 与数据组件，
+        // 这些对象可能来自兼容模组。构建失败时发布空索引：适配器来源的配方仍可经
+        // findAdaptedRecipes 查到，只是本模组原生配方暂时不参与候选。
+        RecipeIndex index = AdapterGuards.guard("alloy-furnace recipe index build",
+                () -> buildIndex(recipeManager), emptyRecipeIndex());
+        recipeIndexes.put(recipeManager, index);
+        return index;
+    }
+
+    private RecipeIndex buildIndex(RecipeManager recipeManager) {
         RecipeIndexBuilder builder = new RecipeIndexBuilder();
         List<RecipeHolder<AdvancedAlloyFurnaceRecipe>> recipes = com.sorrowmist.useless.compat.forge1201.recipe.RecipeManagerAccess.getAllRecipesFor(recipeManager, ModRecipeTypes.ADVANCED_ALLOY_FURNACE_TYPE.get());
         for (RecipeHolder<AdvancedAlloyFurnaceRecipe> holder : recipes) {
@@ -177,9 +200,14 @@ public class AlloyFurnaceRecipeManager {
         }
 
         // Publish only after every map/list has been frozen.
-        RecipeIndex index = builder.build();
-        recipeIndexes.put(recipeManager, index);
-        return index;
+        return builder.build();
+    }
+
+    /** 索引构建失败时的降级结果：不含任何候选，但查询流程可以继续走适配器来源。 */
+    private static RecipeIndex emptyRecipeIndex() {
+        return new RecipeIndex(new LinkedHashMap<>(), new LinkedHashMap<>(),
+                new LinkedHashMap<>(), new LinkedHashMap<>(),
+                List.of(), List.of(), List.of());
     }
 
     /** 按当前机器输入查找最具体的可运行配方。 */
@@ -587,7 +615,7 @@ public class AlloyFurnaceRecipeManager {
         }
 
         for (com.sorrowmist.useless.api.recipe.IRecipeAdapter<?> adapter : fallbackAdapters) {
-            if (adapter.matchesMold(mold)) {
+            if (matchesAdapterMold(adapter, mold)) {
                 collectAdapterRecipes(adapter, level, context.inputs(), mergedInputs, mergedFluids,
                         mergedKeys, mold, cacheKey, candidates);
             }
@@ -624,8 +652,12 @@ public class AlloyFurnaceRecipeManager {
             return (List<RecipeHolder<T>>) (List<?>) cached;
         }
 
-        List<RecipeHolder<T>> matches = adapter.findMatchingRecipes(
-                level, mergedInputs, mergedFluids, mergedKeys, mold, actualInputs);
+        // 查找配方位于机器 tick 的热路径上，兼容模组版本错配抛出的 LinkageError 若冒泡会直接
+        // 终止服务器 tick。守卫在首次失败后停用该适配器的查找动作，后续不再重复尝试。
+        List<RecipeHolder<T>> matches = AdapterGuards.call(adapter, "findMatchingRecipes",
+                () -> adapter.findMatchingRecipes(
+                        level, mergedInputs, mergedFluids, mergedKeys, mold, actualInputs),
+                null);
         if (matches == null || matches.isEmpty()) {
             adapterMatchCache.put(lookupKey, List.of());
             return List.of();
@@ -652,7 +684,8 @@ public class AlloyFurnaceRecipeManager {
         return conversionCache.computeIfAbsent(key, ignored -> {
             List<AdvancedAlloyFurnaceRecipe> converted = RecipeConversionUtils.convertAll(
                     adapter, holder, level);
-            return converted == null || converted.isEmpty() ? List.of() : List.copyOf(converted);
+            // convertAll 已返回不可变列表并过滤空元素，此处不再重新拷贝。
+            return converted;
         });
     }
 
@@ -669,6 +702,18 @@ public class AlloyFurnaceRecipeManager {
                 return true;
             }
         });
+    }
+
+    /**
+     * 判断无固定模具的适配器能否处理当前模具。
+     *
+     * <p>{@code matchesMold} 由各适配器自行实现，可能触达兼容模组的类；版本错配抛出的
+     * {@link LinkageError} 若不拦截会终止服务器 tick。守卫在首次失败后停用该适配器的
+     * 模具判断动作，后续视为不匹配。</p>
+     */
+    private boolean matchesAdapterMold(
+            com.sorrowmist.useless.api.recipe.IRecipeAdapter<?> adapter, @Nullable ItemStack mold) {
+        return AdapterGuards.call(adapter, "matchesMold", () -> adapter.matchesMold(mold), false);
     }
 
     private boolean matchesMold(AdvancedAlloyFurnaceRecipe recipe, @Nullable ItemStack mold) {

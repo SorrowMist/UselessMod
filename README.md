@@ -4,7 +4,7 @@ A Minecraft mod featuring various utilities and enhancements.
 
 ## Forge 1.20.1
 
-Version `20.2.4.11` targets Minecraft 1.20.1, Forge 47.3.10+, Java 17,
+Version `20.2.5.0` targets Minecraft 1.20.1, Forge 47.3.10+ (compiled against 47.4.10), Java 17,
 AE2 15.4.8+, Mekanism 10.4.15+ (compiled against 10.4.16.80),
 Mekanism Extras 1.5.0+ and the Create 2 Mekanism: Sky Edition 2 integration profile.
 Build with `./gradlew build` (Windows: `gradlew.bat build`); Python 3 is used by
@@ -36,9 +36,24 @@ Optional integrations without a Forge implementation are excluded explicitly in
 NeoForge integration. Extended Crafting compiles against official 6.0.10; the
 pack's unofficial tier-5/11x11 extension is supported through its native recipe
 contract and registry lookup without bundling or replacing the pack's jar.
-Missing optional adapter classes are skipped quietly at debug level instead of
-failing the interaction; actual invocation failures are reported once. The
-Occultism spirit-egg handler is one such excluded adapter in this Forge build.
+Missing optional adapter classes are skipped quietly at debug level. Bad recipe
+rows are isolated; structural adapter failures disable only the affected operation
+and are reported at login with an issue link. Occultism ritual recipes, spirit eggs
+and the ritual-satchel tool bridge are now included for the audited native release.
+
+### Upgrading and resource generation
+
+Back up saves before upgrading: existing multiblocks need maintenance and muffler
+parts. Both sides must use the same build (`17-migration-3` network protocol).
+
+Productive Bees supports static centrifuge recipes only. Extra Delight uses an
+**unofficial Forge port**. Data Energistics and integrations without a compatible
+Forge release or native machine remain excluded. Runtime dependencies are selected
+by the modpack, not bundled or installed by this mod.
+
+Generate resources with `./gradlew runData -PmigrationData --console=plain`.
+Output is staged in `build/migration-datagen/resources`; review and adopt changes
+selectively rather than overwriting published resources.
 
 ## Features
 

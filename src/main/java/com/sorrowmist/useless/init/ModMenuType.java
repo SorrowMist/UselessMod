@@ -5,6 +5,8 @@ import com.sorrowmist.useless.content.menus.AdvancedAlloyFurnaceMenu;
 import com.sorrowmist.useless.content.menus.ChainGroupMenu;
 import com.sorrowmist.useless.content.menus.ContainerPatternConverter;
 import com.sorrowmist.useless.content.menus.MePatternAssemblyMenu;
+import com.sorrowmist.useless.content.menus.MaintenanceHatchMenu;
+import com.sorrowmist.useless.content.menus.MufflerHatchMenu;
 import com.sorrowmist.useless.content.menus.OmniversalMoldHubMenu;
 import com.sorrowmist.useless.content.menus.MultiblockAlloyFurnaceMenu;
 import com.sorrowmist.useless.content.menus.OreGeneratorMenu;
@@ -38,6 +40,12 @@ public final class ModMenuType {
     public static final Supplier<MenuType<PassiveCraftingHatchMenu>> PASSIVE_CRAFTING_HATCH_MENU =
             MENU_TYPES.register("passive_crafting_hatch_menu",
                     () -> IForgeMenuType.create(PassiveCraftingHatchMenu::new));
+    public static final Supplier<MenuType<MaintenanceHatchMenu>> MAINTENANCE_HATCH_MENU =
+            MENU_TYPES.register("maintenance_hatch_menu",
+                    () -> IForgeMenuType.create(MaintenanceHatchMenu::new));
+    public static final Supplier<MenuType<MufflerHatchMenu>> MUFFLER_HATCH_MENU =
+            MENU_TYPES.register("muffler_hatch_menu",
+                    () -> IForgeMenuType.create(MufflerHatchMenu::new));
     public static final Supplier<MenuType<OreGeneratorMenu>> ORE_GENERATOR_MENU =
             MENU_TYPES.register("ore_generator_menu",
                     () -> IForgeMenuType.create(OreGeneratorMenu::new));

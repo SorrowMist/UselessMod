@@ -1,6 +1,6 @@
 package com.sorrowmist.useless.content.recipe.adapters.delight.extradelight;
 
-import com.lance5057.extradelight.workstations.evaporator.recipes.EvaporatorRecipe;
+import com.vomiter.extradelight.common.complex.workstations.evaporator.recipes.EvaporatorRecipe;
 import com.sorrowmist.useless.api.enums.AlloyFurnaceMode;
 import com.sorrowmist.useless.content.recipe.AdapterUtils;
 import com.sorrowmist.useless.content.recipe.AdvancedAlloyFurnaceRecipe;
@@ -13,7 +13,7 @@ import net.minecraft.world.item.crafting.Ingredient;
 import com.sorrowmist.useless.compat.forge1201.recipe.RecipeHolder;
 import net.minecraft.world.level.Level;
 import net.minecraftforge.fluids.FluidStack;
-import com.sorrowmist.useless.compat.forge1201.fluid.SizedFluidIngredient;
+import com.vomiter.extradelight.common.recipes.ingredients.SizedFluidIngredient;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
@@ -55,8 +55,8 @@ public final class EvaporatorRecipeAdapter implements IRecipeAdapter<EvaporatorR
         int time = ExtraDelightRecipeAdapterUtils.processTime(source.getCookTime());
         return List.of(new AdvancedAlloyFurnaceRecipe(
                 AdapterUtils.convertedId(holder.id()), List.of(),
-                List.of(com.sorrowmist.useless.content.recipe.LongSizedFluidIngredient.from(
-                        source.getFluid())), List.of(), List.of(output.copy()), List.of(), List.of(),
+                List.of(ExtraDelightRecipeAdapterUtils.nativeFluid(source.getFluid())),
+                List.of(), List.of(output.copy()), List.of(), List.of(),
                 ExtraDelightRecipeAdapterUtils.energy(time), time, Ingredient.EMPTY, 0,
                 List.of(AdapterUtils.toMoldIngredient(getMoldItem())), AlloyFurnaceMode.NORMAL));
     }
@@ -75,8 +75,7 @@ public final class EvaporatorRecipeAdapter implements IRecipeAdapter<EvaporatorR
             if (hasFluid(source.getFluid())
                     && source.getResultItem() != null && !source.getResultItem().isEmpty()
                     && DelightRecipeAdapterUtils.matchesFluids(
-                    List.of(com.sorrowmist.useless.content.recipe.LongSizedFluidIngredient.from(
-                            source.getFluid())), mergedFluids)) {
+                    List.of(ExtraDelightRecipeAdapterUtils.nativeFluid(source.getFluid())), mergedFluids)) {
                 matches.add(holder);
             }
         }
@@ -84,7 +83,6 @@ public final class EvaporatorRecipeAdapter implements IRecipeAdapter<EvaporatorR
     }
 
     private static boolean hasFluid(@Nullable SizedFluidIngredient fluid) {
-        return fluid != null && fluid.amount() > 0 && fluid.ingredient() != null
-                && !fluid.ingredient().isEmpty();
+        return fluid != null && fluid.getAmount() > 0;
     }
 }

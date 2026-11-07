@@ -7,13 +7,9 @@ import com.sorrowmist.useless.content.recipe.RecipeSourceIds;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.crafting.Ingredient;
 import com.sorrowmist.useless.compat.forge1201.recipe.RecipeHolder;
-import net.minecraft.world.item.crafting.RecipeManager;
-import net.minecraft.world.item.crafting.RecipeType;
 import net.minecraft.world.level.Level;
 import net.minecraftforge.fluids.FluidStack;
 import net.yxiao233.ifeu.common.recipe.ShapelessRecipe;
-import net.yxiao233.ifeu.common.registry.IFEUBlocks;
-import net.yxiao233.ifeu.common.registry.IFEURecipes;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
@@ -34,16 +30,17 @@ public final class FluidShapelessRecipeAdapter implements IRecipeAdapter<Shapele
 
     @Override
     public ItemStack getMoldItem() {
-        return new ItemStack(IFEUBlocks.FLUID_CRAFTING_TABLE.getBlock());
+        return ExtraUpgradesCraftingRecipeAdapterSupport.mold("fluid_crafting_table");
     }
 
     @Override
     public List<AdvancedAlloyFurnaceRecipe> convertAll(
             RecipeHolder<ShapelessRecipe> holder, Level level) {
-        if (holder == null || holder.value() == null) return List.of();
+        if (holder == null || holder.value() == null
+                || holder.value().getClass() != ShapelessRecipe.class) return List.of();
         ShapelessRecipe source = holder.value();
         AdvancedAlloyFurnaceRecipe converted = ExtraUpgradesCraftingRecipeAdapterSupport.fluidRecipe(
-                AdapterUtils.convertedId(holder.id()), source.inputs, source.inputFluid,
+                AdapterUtils.convertedId(holder.id()), source.inputs, false, source.inputFluid,
                 source.output, getMoldItem());
         return converted == null ? List.of() : List.of(converted);
     }
@@ -53,11 +50,9 @@ public final class FluidShapelessRecipeAdapter implements IRecipeAdapter<Shapele
             Level level, Map<Ingredient, Long> mergedInputs,
             Map<FluidStack, Long> mergedFluids, @Nullable ItemStack mold) {
         if (level == null || !matchesMold(mold)) return List.of();
-        RecipeType<ShapelessRecipe> type = recipeType();
-        if (type == null) return List.of();
-        RecipeManager manager = level.getRecipeManager();
         List<RecipeHolder<ShapelessRecipe>> matches = new ArrayList<>();
-        for (RecipeHolder<ShapelessRecipe> holder : com.sorrowmist.useless.compat.forge1201.recipe.RecipeManagerAccess.getAllRecipesFor(manager, type)) {
+        for (RecipeHolder<ShapelessRecipe> holder :
+                ExtraUpgradesCraftingRecipeAdapterSupport.recipes(level, ShapelessRecipe.class)) {
             List<AdvancedAlloyFurnaceRecipe> converted = convertAll(holder, level);
             if (!converted.isEmpty()
                     && ExtraUpgradesCraftingRecipeAdapterSupport.matches(
@@ -68,11 +63,4 @@ public final class FluidShapelessRecipeAdapter implements IRecipeAdapter<Shapele
         return List.copyOf(matches);
     }
 
-    @SuppressWarnings("unchecked")
-    @Nullable
-    private static RecipeType<ShapelessRecipe> recipeType() {
-        if (IFEURecipes.SHAPELESS_TYPE == null
-                || IFEURecipes.SHAPELESS_TYPE.get() == null) return null;
-        return (RecipeType<ShapelessRecipe>) (RecipeType<?>) IFEURecipes.SHAPELESS_TYPE.get();
-    }
 }

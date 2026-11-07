@@ -45,25 +45,39 @@ public final class DelightRecipeAdapterUtils {
         return List.copyOf(result);
     }
 
-    /** Farmer's Delight stores the serving container separately from the item ingredients. */
-    public static List<Ingredient> cookingIngredients(CookingPotRecipe recipe) {
-        if (recipe == null) {
-            return List.of();
-        }
-
-        List<Ingredient> ingredients = new ArrayList<>(recipe.getIngredients());
-        ItemStack container = recipe.getOutputContainer();
-        if (!isBakingTray(container) && container != null && !container.isEmpty()
-                && container.getCount() > 0) {
-            for (int i = 0; i < container.getCount(); i++) {
-                ingredients.add(Ingredient.of(container.copyWithCount(1)));
-            }
-        }
-        return List.copyOf(ingredients);
+    /** Concrete stacks must not pass through vanilla Ingredient.of, which discards NBT. */
+    public static Ingredient exactStack(ItemStack stack) {
+        return stack == null || stack.isEmpty() ? Ingredient.EMPTY
+                : com.sorrowmist.useless.compat.forge1201.recipe.DataComponentIngredient.of(true, stack);
     }
 
+    /** Keep container counts as longs instead of expanding one Ingredient per serving. */
+    public static List<CountedIngredient> withContainerInputs(
+            List<Ingredient> ingredients, @Nullable ItemStack container) {
+        return withContainerInputs(ingredients, container, !isBakingTray(container));
+    }
+
+    public static List<CountedIngredient> withContainerInputs(
+            List<Ingredient> ingredients, @Nullable ItemStack container, boolean consume) {
+        List<CountedIngredient> inputs = new ArrayList<>(AdapterUtils.mergeIngredients(ingredients));
+        if (consume && container != null && !container.isEmpty() && container.getCount() > 0) {
+            inputs.add(new CountedIngredient(exactStack(container), (long) container.getCount()));
+        }
+        return List.copyOf(inputs);
+    }
+
+    /** Farmer's Delight stores one container per output serving, separately from ingredients. */
     public static List<CountedIngredient> cookingInputs(CookingPotRecipe recipe) {
-        return AdapterUtils.mergeIngredients(cookingIngredients(recipe));
+        if (recipe == null) return List.of();
+        List<CountedIngredient> inputs = new ArrayList<>(AdapterUtils.mergeIngredients(recipe.getIngredients()));
+        ItemStack container = recipe.getOutputContainer();
+        ItemStack result = recipe.getResultItem(null);
+        if (!isBakingTray(container) && container != null && !container.isEmpty()
+                && result != null && !result.isEmpty()) {
+            long count = Math.multiplyExact((long) container.getCount(), (long) result.getCount());
+            if (count > 0) inputs.add(new CountedIngredient(exactStack(container), count));
+        }
+        return List.copyOf(inputs);
     }
 
     public static boolean isBakingTray(@Nullable ItemStack stack) {
@@ -76,7 +90,7 @@ public final class DelightRecipeAdapterUtils {
         }
         List<Ingredient> molds = new ArrayList<>(stack.getCount());
         for (int i = 0; i < stack.getCount(); i++) {
-            molds.add(Ingredient.of(stack.copyWithCount(1)));
+            molds.add(exactStack(stack));
         }
         return List.copyOf(molds);
     }

@@ -8,7 +8,6 @@ import com.sorrowmist.useless.content.recipe.AdapterUtils;
 import com.sorrowmist.useless.content.recipe.AdvancedAlloyFurnaceRecipe;
 import com.sorrowmist.useless.content.recipe.CountedIngredient;
 import com.sorrowmist.useless.content.recipe.IRecipeAdapter;
-import de.ellpeck.naturesaura.Helper;
 import de.ellpeck.naturesaura.recipes.AnimalSpawnerRecipe;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.SpawnEggItem;
@@ -74,7 +73,7 @@ public final class AnimalSpawnerRecipeAdapter implements IRecipeAdapter<AnimalSp
     @Nullable
     private static Converted convertData(@Nullable AnimalSpawnerRecipe source) {
         if (source == null || source.aura < 0 || source.time <= 0 || source.entity == null
-                || source.ingredients == null || source.ingredients.isEmpty()) {
+                || source.ingredients == null || source.ingredients.length == 0) {
             return null;
         }
 
@@ -85,7 +84,7 @@ public final class AnimalSpawnerRecipeAdapter implements IRecipeAdapter<AnimalSp
 
         Map<Ingredient, Long> requirements = NaturesAuraAdapterUtils.requirements();
         for (Ingredient ingredient : source.ingredients) {
-            int amount = ingredient == null ? 0 : Helper.getIngredientAmount(ingredient);
+            int amount = NaturesAuraAdapterUtils.ingredientAmount(ingredient);
             if (!NaturesAuraAdapterUtils.addIngredient(requirements, ingredient, amount)) {
                 return null;
             }

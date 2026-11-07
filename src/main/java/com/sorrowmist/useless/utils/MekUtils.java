@@ -68,24 +68,32 @@ public class MekUtils {
         return DEFAULT_MAX_UPGRADE;
     }
 
+    /** Uses the effective per-type cap, including dynamic caps supplied by other mods. */
+    private static double fraction(IUpgradeTile tile, Upgrade type) {
+        if (tile.supportsUpgrade(type)) {
+            return (double) tile.getComponent().getUpgrades(type) / type.getMax();
+        }
+        return 0.0;
+    }
+
     public static double time(IUpgradeTile tile) {
-        double multiplier = Math.pow((double)(MekanismConfig.general.maxUpgradeMultiplier.get() * ConfigManager.getTimeMultiplier()), (double)tile.getComponent().getUpgrades(Upgrade.SPEED) / (double)-8.0F);
+        double multiplier = Math.pow(MekanismConfig.general.maxUpgradeMultiplier.get()
+                * ConfigManager.getTimeMultiplier(), -fraction(tile, Upgrade.SPEED));
         // 仅防御 NaN/Infinity 异常值，不再硬截断有效倍数，避免限制高倍率增强
         return Double.isFinite(multiplier) ? multiplier : 1.0;
     }
 
     public static double electricity(IUpgradeTile tile) {
-        // 简化公式：每8个能量升级降低10倍能耗
-        double multiplier = Math.pow((double)(MekanismConfig.general.maxUpgradeMultiplier.get()
-                * ConfigManager.getElectricityMultiplier()),
-                (double)tile.getComponent().getUpgrades(Upgrade.ENERGY) / (double)-8.0F);
+        // Mekanism weights speed twice and energy once. The saving config only affects energy.
+        double base = MekanismConfig.general.maxUpgradeMultiplier.get();
+        double multiplier = Math.pow(base, 2.0 * fraction(tile, Upgrade.SPEED))
+                * Math.pow(base * ConfigManager.getElectricityMultiplier(), -fraction(tile, Upgrade.ENERGY));
         return Double.isFinite(multiplier) ? multiplier : 1.0;
     }
 
     public static double capacity(IUpgradeTile tile) {
-        double multiplier = Math.pow((double)(MekanismConfig.general.maxUpgradeMultiplier.get()
-                * ConfigManager.getCapacityMultiplier()),
-                (double)tile.getComponent().getUpgrades(Upgrade.ENERGY) / (double)8.0F);
+        double multiplier = Math.pow(MekanismConfig.general.maxUpgradeMultiplier.get()
+                * ConfigManager.getCapacityMultiplier(), fraction(tile, Upgrade.ENERGY));
         return Double.isFinite(multiplier) ? multiplier : 1.0;
     }
 

@@ -1,48 +1,396 @@
 {
-  "type": "useless_mod:advanced_alloy_furnace",
-  "energy": 50000,
-  "id": "useless_mod:advanced_alloy/ingot/useless_ingot_tier_2",
+  "type": "ae2:transform",
   "ingredients": [
     {
-      "count": 2,
-      "ingredient": {
-        "item": "minecraft:rotten_flesh"
-      }
+      "item": "minecraft:rotten_flesh"
     },
     {
-      "count": 2,
-      "ingredient": {
-        "item": "minecraft:gunpowder"
-      }
+      "item": "minecraft:rotten_flesh"
     },
     {
-      "count": 2,
-      "ingredient": {
-        "item": "minecraft:bone"
-      }
+      "item": "minecraft:rotten_flesh"
     },
     {
-      "count": 2,
-      "ingredient": {
-        "item": "minecraft:gold_ingot"
-      }
+      "item": "minecraft:rotten_flesh"
     },
     {
-      "count": 2,
-      "ingredient": {
-        "item": "minecraft:diamond"
-      }
+      "item": "minecraft:rotten_flesh"
     },
     {
-      "ingredient": {
-        "item": "useless_mod:useless_ingot_tier_1"
-      }
+      "item": "minecraft:rotten_flesh"
+    },
+    {
+      "item": "minecraft:rotten_flesh"
+    },
+    {
+      "item": "minecraft:rotten_flesh"
+    },
+    {
+      "item": "minecraft:rotten_flesh"
+    },
+    {
+      "item": "minecraft:rotten_flesh"
+    },
+    {
+      "item": "minecraft:rotten_flesh"
+    },
+    {
+      "item": "minecraft:rotten_flesh"
+    },
+    {
+      "item": "minecraft:rotten_flesh"
+    },
+    {
+      "item": "minecraft:rotten_flesh"
+    },
+    {
+      "item": "minecraft:rotten_flesh"
+    },
+    {
+      "item": "minecraft:rotten_flesh"
+    },
+    {
+      "item": "minecraft:gunpowder"
+    },
+    {
+      "item": "minecraft:gunpowder"
+    },
+    {
+      "item": "minecraft:gunpowder"
+    },
+    {
+      "item": "minecraft:gunpowder"
+    },
+    {
+      "item": "minecraft:gunpowder"
+    },
+    {
+      "item": "minecraft:gunpowder"
+    },
+    {
+      "item": "minecraft:gunpowder"
+    },
+    {
+      "item": "minecraft:gunpowder"
+    },
+    {
+      "item": "minecraft:gunpowder"
+    },
+    {
+      "item": "minecraft:gunpowder"
+    },
+    {
+      "item": "minecraft:gunpowder"
+    },
+    {
+      "item": "minecraft:gunpowder"
+    },
+    {
+      "item": "minecraft:gunpowder"
+    },
+    {
+      "item": "minecraft:gunpowder"
+    },
+    {
+      "item": "minecraft:gunpowder"
+    },
+    {
+      "item": "minecraft:gunpowder"
+    },
+    {
+      "item": "minecraft:bone"
+    },
+    {
+      "item": "minecraft:bone"
+    },
+    {
+      "item": "minecraft:bone"
+    },
+    {
+      "item": "minecraft:bone"
+    },
+    {
+      "item": "minecraft:bone"
+    },
+    {
+      "item": "minecraft:bone"
+    },
+    {
+      "item": "minecraft:bone"
+    },
+    {
+      "item": "minecraft:bone"
+    },
+    {
+      "item": "minecraft:bone"
+    },
+    {
+      "item": "minecraft:bone"
+    },
+    {
+      "item": "minecraft:bone"
+    },
+    {
+      "item": "minecraft:bone"
+    },
+    {
+      "item": "minecraft:bone"
+    },
+    {
+      "item": "minecraft:bone"
+    },
+    {
+      "item": "minecraft:bone"
+    },
+    {
+      "item": "minecraft:bone"
+    },
+    {
+      "item": "ae2:sky_dust"
+    },
+    {
+      "item": "ae2:sky_dust"
+    },
+    {
+      "item": "ae2:sky_dust"
+    },
+    {
+      "item": "ae2:sky_dust"
+    },
+    {
+      "item": "ae2:sky_dust"
+    },
+    {
+      "item": "ae2:sky_dust"
+    },
+    {
+      "item": "ae2:sky_dust"
+    },
+    {
+      "item": "ae2:sky_dust"
+    },
+    {
+      "item": "ae2:sky_dust"
+    },
+    {
+      "item": "ae2:sky_dust"
+    },
+    {
+      "item": "ae2:sky_dust"
+    },
+    {
+      "item": "ae2:sky_dust"
+    },
+    {
+      "item": "ae2:sky_dust"
+    },
+    {
+      "item": "ae2:sky_dust"
+    },
+    {
+      "item": "ae2:sky_dust"
+    },
+    {
+      "item": "ae2:sky_dust"
+    },
+    {
+      "item": "ae2:sky_dust"
+    },
+    {
+      "item": "ae2:sky_dust"
+    },
+    {
+      "item": "ae2:sky_dust"
+    },
+    {
+      "item": "ae2:sky_dust"
+    },
+    {
+      "item": "ae2:sky_dust"
+    },
+    {
+      "item": "ae2:sky_dust"
+    },
+    {
+      "item": "ae2:sky_dust"
+    },
+    {
+      "item": "ae2:sky_dust"
+    },
+    {
+      "item": "ae2:sky_dust"
+    },
+    {
+      "item": "ae2:sky_dust"
+    },
+    {
+      "item": "ae2:sky_dust"
+    },
+    {
+      "item": "ae2:sky_dust"
+    },
+    {
+      "item": "ae2:sky_dust"
+    },
+    {
+      "item": "ae2:sky_dust"
+    },
+    {
+      "item": "ae2:sky_dust"
+    },
+    {
+      "item": "ae2:sky_dust"
+    },
+    {
+      "item": "ae2:sky_dust"
+    },
+    {
+      "item": "ae2:sky_dust"
+    },
+    {
+      "item": "ae2:sky_dust"
+    },
+    {
+      "item": "ae2:sky_dust"
+    },
+    {
+      "item": "ae2:sky_dust"
+    },
+    {
+      "item": "ae2:sky_dust"
+    },
+    {
+      "item": "ae2:sky_dust"
+    },
+    {
+      "item": "ae2:sky_dust"
+    },
+    {
+      "item": "ae2:sky_dust"
+    },
+    {
+      "item": "ae2:sky_dust"
+    },
+    {
+      "item": "ae2:sky_dust"
+    },
+    {
+      "item": "ae2:sky_dust"
+    },
+    {
+      "item": "ae2:sky_dust"
+    },
+    {
+      "item": "ae2:sky_dust"
+    },
+    {
+      "item": "ae2:sky_dust"
+    },
+    {
+      "item": "ae2:sky_dust"
+    },
+    {
+      "item": "ae2:sky_dust"
+    },
+    {
+      "item": "ae2:sky_dust"
+    },
+    {
+      "item": "ae2:sky_dust"
+    },
+    {
+      "item": "ae2:sky_dust"
+    },
+    {
+      "item": "ae2:sky_dust"
+    },
+    {
+      "item": "ae2:sky_dust"
+    },
+    {
+      "item": "ae2:sky_dust"
+    },
+    {
+      "item": "ae2:sky_dust"
+    },
+    {
+      "item": "ae2:sky_dust"
+    },
+    {
+      "item": "ae2:sky_dust"
+    },
+    {
+      "item": "ae2:sky_dust"
+    },
+    {
+      "item": "ae2:sky_dust"
+    },
+    {
+      "item": "ae2:sky_dust"
+    },
+    {
+      "item": "ae2:sky_dust"
+    },
+    {
+      "item": "ae2:sky_dust"
+    },
+    {
+      "item": "ae2:sky_dust"
+    },
+    {
+      "tag": "forge:gems/certus_quartz"
+    },
+    {
+      "tag": "forge:gems/certus_quartz"
+    },
+    {
+      "tag": "forge:gems/certus_quartz"
+    },
+    {
+      "tag": "forge:gems/certus_quartz"
+    },
+    {
+      "tag": "forge:gems/certus_quartz"
+    },
+    {
+      "tag": "forge:gems/certus_quartz"
+    },
+    {
+      "tag": "forge:gems/certus_quartz"
+    },
+    {
+      "tag": "forge:gems/certus_quartz"
+    },
+    {
+      "tag": "forge:gems/certus_quartz"
+    },
+    {
+      "tag": "forge:gems/certus_quartz"
+    },
+    {
+      "tag": "forge:gems/certus_quartz"
+    },
+    {
+      "tag": "forge:gems/certus_quartz"
+    },
+    {
+      "tag": "forge:gems/certus_quartz"
+    },
+    {
+      "tag": "forge:gems/certus_quartz"
+    },
+    {
+      "tag": "forge:gems/certus_quartz"
+    },
+    {
+      "tag": "forge:gems/certus_quartz"
+    },
+    {
+      "item": "useless_mod:useless_ingot_tier_1"
     }
   ],
-  "outputs": [
-    {
-      "id": "useless_mod:useless_ingot_tier_2"
-    }
-  ],
-  "process_time": 1
+  "result": {
+    "count": 1,
+    "item": "useless_mod:useless_ingot_tier_2"
+  }
 }

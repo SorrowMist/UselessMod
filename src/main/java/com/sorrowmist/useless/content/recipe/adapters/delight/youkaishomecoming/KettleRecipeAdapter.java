@@ -29,7 +29,7 @@ public final class KettleRecipeAdapter implements IRecipeAdapter<DelightSyntheti
     private static final String SOURCE_CLASS =
             "dev.xkmc.youkaishomecoming.content.pot.kettle.KettleRecipe";
     private static final ResourceLocation KETTLE_ID =
-            new ResourceLocation("youkaisfeasts", "kettle");
+            new ResourceLocation("youkaishomecoming", "kettle");
     private static final long WATER_AMOUNT = 1_000L;
 
     @Override

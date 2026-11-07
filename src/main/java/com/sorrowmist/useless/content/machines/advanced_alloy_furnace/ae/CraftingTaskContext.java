@@ -242,6 +242,10 @@ public interface CraftingTaskContext {
                 : AlloyFurnaceParallelCalculator.calculateAeTaskParallel(recipe, effect);
     }
 
+    /** Called once per completed sub-batch, only after its buffered outputs have been delivered. */
+    default void onCraftsCompleted(long crafts) {
+    }
+
     /** Maximum number of crafting-pattern operations one furnace thread may accept in one push. */
     default long getCraftingPatternCapacity() {
         return 1L;

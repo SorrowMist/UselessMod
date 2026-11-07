@@ -15,6 +15,7 @@ import net.minecraft.world.SimpleContainer;
 import net.minecraftforge.common.crafting.StrictNBTIngredient;
 import committee.nova.mods.avaritia.init.registry.ModBlocks;
 import committee.nova.mods.avaritia.init.registry.ModRecipeTypes;
+import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.crafting.Ingredient;
 import com.sorrowmist.useless.compat.forge1201.recipe.RecipeHolder;
@@ -25,6 +26,8 @@ import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
@@ -144,7 +147,7 @@ public final class ReAvaritiaTableRecipeAdapter implements IRecipeAdapter<ITierC
 
         // Different singularity NBT must remain separate requirements.
         Map<Ingredient, Long> requirements = new IdentityHashMap<>();
-        if (!mergeTableIngredients(requirements, ingredients)) {
+        if (!mergeTableIngredients(requirements, normalizeNbtSensitive(ingredients))) {
             return null;
         }
         List<CountedIngredient> inputs = ExtendedCraftingAdapterUtils.countedIngredients(requirements);
@@ -187,6 +190,37 @@ public final class ReAvaritiaTableRecipeAdapter implements IRecipeAdapter<ITierC
                 outputs,
                 requirements,
                 tableMold(tier));
+    }
+
+    /**
+     * Tightens only concrete same-item requirements whose NBT differs within this recipe.
+     * Vanilla ingredients ignore NBT; keeping them simple would let any one singularity subtype
+     * satisfy every slot. Tags, alternatives and opaque custom predicates keep their own semantics.
+     */
+    private static List<Ingredient> normalizeNbtSensitive(List<Ingredient> ingredients) {
+        Map<Item, ItemStack> firstByItem = new HashMap<>();
+        Set<Item> nbtSensitiveItems = new HashSet<>();
+        for (Ingredient ingredient : ingredients) {
+            Optional<ItemStack> exact = exactStack(ingredient);
+            if (exact.isEmpty()) continue;
+            ItemStack stack = exact.get();
+            ItemStack first = firstByItem.putIfAbsent(stack.getItem(), stack);
+            if (first != null && !ItemStack.isSameItemSameTags(first, stack)) {
+                nbtSensitiveItems.add(stack.getItem());
+            }
+        }
+        if (nbtSensitiveItems.isEmpty()) return ingredients;
+
+        List<Ingredient> normalized = new ArrayList<>(ingredients.size());
+        for (Ingredient ingredient : ingredients) {
+            Optional<ItemStack> exact = exactStack(ingredient);
+            if (exact.isPresent() && nbtSensitiveItems.contains(exact.get().getItem())) {
+                normalized.add(StrictNBTIngredient.of(exact.get()));
+            } else {
+                normalized.add(ingredient);
+            }
+        }
+        return normalized;
     }
 
     private static boolean mergeTableIngredients(

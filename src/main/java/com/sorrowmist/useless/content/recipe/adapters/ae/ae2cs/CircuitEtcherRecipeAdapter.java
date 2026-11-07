@@ -14,7 +14,7 @@ import net.minecraft.world.item.crafting.Ingredient;
 import com.sorrowmist.useless.compat.forge1201.recipe.RecipeHolder;
 import net.minecraft.world.item.crafting.RecipeManager;
 import net.minecraft.world.level.Level;
-import net.minecraftforge.common.crafting.SizedIngredient;
+import io.github.lounode.ae2cs.common.recipe.SizedIngredient;
 import net.minecraftforge.fluids.FluidStack;
 import org.jetbrains.annotations.Nullable;
 
@@ -48,6 +48,7 @@ public class CircuitEtcherRecipeAdapter implements IRecipeAdapter<CircuitEtcherR
         if (holder == null) return result;
 
         CircuitEtcherRecipe recipe = holder.value();
+        if (recipe.getClass() != CircuitEtcherRecipe.class) return result;
         ResourceLocation originalId = holder.id();
 
         ItemStack output = recipe.result();
@@ -98,7 +99,7 @@ public class CircuitEtcherRecipeAdapter implements IRecipeAdapter<CircuitEtcherR
         for (RecipeHolder<CircuitEtcherRecipe> holder : (List<RecipeHolder<CircuitEtcherRecipe>>) (List<?>)
                 com.sorrowmist.useless.compat.forge1201.recipe.RecipeManagerAccess.getAllRecipesFor(recipeManager, AECSRecipeTypes.CIRCUIT_ETCHER.get())) {
             CircuitEtcherRecipe recipe = holder.value();
-            if (recipe.result().isEmpty()) continue;
+            if (recipe.getClass() != CircuitEtcherRecipe.class || recipe.result().isEmpty()) continue;
 
             Map<Ingredient, Long> required = new LinkedHashMap<>();
             addSizedIngredient(required, recipe.inputA());

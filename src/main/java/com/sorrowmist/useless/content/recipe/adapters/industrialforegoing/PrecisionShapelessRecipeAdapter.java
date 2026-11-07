@@ -6,12 +6,8 @@ import com.sorrowmist.useless.content.recipe.RecipeSourceIds;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.crafting.Ingredient;
 import com.sorrowmist.useless.compat.forge1201.recipe.RecipeHolder;
-import net.minecraft.world.item.crafting.RecipeManager;
-import net.minecraft.world.item.crafting.RecipeType;
 import net.minecraft.world.level.Level;
 import net.yxiao233.ifeu.common.recipe.PrecisionShapelessRecipe;
-import net.yxiao233.ifeu.common.registry.IFEUBlocks;
-import net.yxiao233.ifeu.common.registry.IFEURecipes;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
@@ -33,17 +29,18 @@ public final class PrecisionShapelessRecipeAdapter
 
     @Override
     public ItemStack getMoldItem() {
-        return new ItemStack(IFEUBlocks.PRECISION_CRAFTING_TABLE.getBlock());
+        return ExtraUpgradesCraftingRecipeAdapterSupport.mold("precision_crafting_table");
     }
 
     @Override
     public List<AdvancedAlloyFurnaceRecipe> convertAll(
             RecipeHolder<PrecisionShapelessRecipe> holder, Level level) {
-        if (holder == null || holder.value() == null) return List.of();
+        if (holder == null || holder.value() == null
+                || holder.value().getClass() != PrecisionShapelessRecipe.class) return List.of();
         PrecisionShapelessRecipe source = holder.value();
         AdvancedAlloyFurnaceRecipe converted = ExtraUpgradesCraftingRecipeAdapterSupport.precisionRecipe(
                 com.sorrowmist.useless.content.recipe.AdapterUtils.convertedId(holder.id()),
-                source.inputs, source.output, source.chance, getMoldItem());
+                source.inputs, false, source.output, source.chance, getMoldItem());
         return converted == null ? List.of() : List.of(converted);
     }
 
@@ -53,11 +50,9 @@ public final class PrecisionShapelessRecipeAdapter
             Map<net.minecraftforge.fluids.FluidStack, Long> mergedFluids,
             @Nullable ItemStack mold) {
         if (level == null || !matchesMold(mold)) return List.of();
-        RecipeType<PrecisionShapelessRecipe> type = recipeType();
-        if (type == null) return List.of();
-        RecipeManager manager = level.getRecipeManager();
         List<RecipeHolder<PrecisionShapelessRecipe>> matches = new ArrayList<>();
-        for (RecipeHolder<PrecisionShapelessRecipe> holder : com.sorrowmist.useless.compat.forge1201.recipe.RecipeManagerAccess.getAllRecipesFor(manager, type)) {
+        for (RecipeHolder<PrecisionShapelessRecipe> holder :
+                ExtraUpgradesCraftingRecipeAdapterSupport.recipes(level, PrecisionShapelessRecipe.class)) {
             List<AdvancedAlloyFurnaceRecipe> converted = convertAll(holder, level);
             if (!converted.isEmpty()
                     && ExtraUpgradesCraftingRecipeAdapterSupport.matches(
@@ -68,12 +63,4 @@ public final class PrecisionShapelessRecipeAdapter
         return List.copyOf(matches);
     }
 
-    @SuppressWarnings("unchecked")
-    @Nullable
-    private static RecipeType<PrecisionShapelessRecipe> recipeType() {
-        if (IFEURecipes.PRECISION_SHAPELESS_TYPE == null
-                || IFEURecipes.PRECISION_SHAPELESS_TYPE.get() == null) return null;
-        return (RecipeType<PrecisionShapelessRecipe>) (RecipeType<?>)
-                IFEURecipes.PRECISION_SHAPELESS_TYPE.get();
-    }
 }

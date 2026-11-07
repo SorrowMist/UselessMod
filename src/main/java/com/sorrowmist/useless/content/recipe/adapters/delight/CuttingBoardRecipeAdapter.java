@@ -60,13 +60,14 @@ public final class CuttingBoardRecipeAdapter implements IRecipeAdapter<CuttingBo
 
         List<ExpectedOutputScaler.WeightedItemOutput> weightedOutputs = new ArrayList<>();
         for (ChanceResult result : source.getRollableResults()) {
-            if (result == null || result.stack() == null || result.stack().isEmpty()
-                    || result.stack().getCount() <= 0 || !Float.isFinite(result.chance())) {
+            // Forge 1.20.1 ChanceResult is a class, not the 1.21 record.
+            if (result == null || result.getStack() == null || result.getStack().isEmpty()
+                    || result.getStack().getCount() <= 0 || !Float.isFinite(result.getChance())) {
                 continue;
             }
-            ItemStack stack = result.stack();
+            ItemStack stack = result.getStack();
             weightedOutputs.add(new ExpectedOutputScaler.WeightedItemOutput(
-                    stack.copy(), stack.getCount(), stack.getCount(), result.chance()));
+                    stack.copy(), stack.getCount(), stack.getCount(), result.getChance()));
         }
 
         var scaled = ExpectedOutputScaler.scale(weightedOutputs);

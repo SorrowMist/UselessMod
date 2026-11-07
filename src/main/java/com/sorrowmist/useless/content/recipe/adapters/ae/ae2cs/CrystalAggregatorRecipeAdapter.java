@@ -47,6 +47,7 @@ public class CrystalAggregatorRecipeAdapter implements IRecipeAdapter<CrystalAgg
         if (holder == null) return result;
 
         CrystalAggregatorRecipe recipe = holder.value();
+        if (recipe.getClass() != CrystalAggregatorRecipe.class) return result;
         ResourceLocation originalId = holder.id();
 
         ItemStack output = recipe.result();
@@ -90,7 +91,7 @@ public class CrystalAggregatorRecipeAdapter implements IRecipeAdapter<CrystalAgg
         for (RecipeHolder<CrystalAggregatorRecipe> holder : (List<RecipeHolder<CrystalAggregatorRecipe>>) (List<?>)
                 com.sorrowmist.useless.compat.forge1201.recipe.RecipeManagerAccess.getAllRecipesFor(recipeManager, AECSRecipeTypes.CRYSTAL_AGGREGATOR.get())) {
             CrystalAggregatorRecipe recipe = holder.value();
-            if (recipe.result().isEmpty()) continue;
+            if (recipe.getClass() != CrystalAggregatorRecipe.class || recipe.result().isEmpty()) continue;
 
             Map<Ingredient, Long> required = new LinkedHashMap<>();
             CircuitEtcherRecipeAdapter.addSizedIngredient(required, recipe.inputA());

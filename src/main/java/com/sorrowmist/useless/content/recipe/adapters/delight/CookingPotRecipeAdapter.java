@@ -46,7 +46,7 @@ public final class CookingPotRecipeAdapter implements IRecipeAdapter<CookingPotR
         if (!isFarmersDelightRecipe(source)) {
             return List.of();
         }
-        List<CountedIngredient> inputs = AdapterUtils.mergeIngredients(sourceIngredients(source));
+        List<CountedIngredient> inputs = DelightRecipeAdapterUtils.cookingInputs(source);
         if (inputs.isEmpty()) {
             return List.of();
         }
@@ -111,29 +111,7 @@ public final class CookingPotRecipeAdapter implements IRecipeAdapter<CookingPotR
         if (recipe == null) {
             return requirements;
         }
-        for (Ingredient ingredient : sourceIngredients(recipe)) {
-            if (!AdapterUtils.isIngredientEmpty(ingredient)) {
-                AdapterUtils.mergeIngredient(requirements, ingredient, 1L);
-            }
-        }
-        return requirements;
-    }
-
-    /** The cooking pot consumes its serving container while producing the meal. */
-    private static List<Ingredient> sourceIngredients(CookingPotRecipe recipe) {
-        if (recipe == null) {
-            return List.of();
-        }
-
-        List<Ingredient> ingredients = new ArrayList<>(recipe.getIngredients());
-        ItemStack container = recipe.getOutputContainer();
-        if (!DelightRecipeAdapterUtils.isBakingTray(container)
-                && container != null && !container.isEmpty() && container.getCount() > 0) {
-            for (int i = 0; i < container.getCount(); i++) {
-                ingredients.add(Ingredient.of(container.copyWithCount(1)));
-            }
-        }
-        return ingredients;
+        return DelightRecipeAdapterUtils.requirements(DelightRecipeAdapterUtils.cookingInputs(recipe));
     }
 
     private static List<Ingredient> molds(CookingPotRecipe recipe) {

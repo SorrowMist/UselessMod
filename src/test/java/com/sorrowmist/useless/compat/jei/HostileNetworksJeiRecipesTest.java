@@ -217,7 +217,8 @@ class HostileNetworksJeiRecipesTest {
         var helper = mock(IRecipeTransferHandlerHelper.class);
         var error = mock(IRecipeTransferError.class);
         when(helper.createUserErrorWithTooltip(any())).thenReturn(error);
-        try (var packets = mockStatic(PacketDistributor.class); var encoding = mockStatic(EncodingHelper.class)) {
+        try (var packets = mockStatic(PacketDistributor.class); var encoding = mockStatic(EncodingHelper.class);
+             var search = mockStatic(com.sorrowmist.useless.compat.eaep.ExtendedAEPlusJeiCompat.class)) {
             assertNull(OmniversalPatternJeiTransferHandler.transferOmniversalRecipe(menu, first, display.view,
                     player, false, true, helper));
             var sent = ArgumentCaptor.forClass(CustomPacketPayload[].class);

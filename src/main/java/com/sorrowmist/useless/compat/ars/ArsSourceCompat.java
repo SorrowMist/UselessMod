@@ -29,7 +29,7 @@ public final class ArsSourceCompat implements SourceBridge {
         return entity instanceof ISourceTile tile ? new TileEndpoint(tile) : null;
     }
 
-    private record TileEndpoint(ISourceTile tile) implements SourceHandlerView {
+    record TileEndpoint(ISourceTile tile) implements SourceHandlerView {
 
         @Override
         public int amount() {
@@ -43,7 +43,8 @@ public final class ArsSourceCompat implements SourceBridge {
 
         @Override
         public int extract(int amount, boolean simulate) {
-            if (amount <= 0 || !this.tile.canProvideSource()) {
+            // Ars 4.x has no canProvideSource flag; native transfers query the stored amount.
+            if (amount <= 0) {
                 return 0;
             }
             int available = amount();
@@ -85,8 +86,7 @@ public final class ArsSourceCompat implements SourceBridge {
         }
 
         private int rate() {
-            int rate = this.tile.getTransferRate();
-            return rate <= 0 ? Integer.MAX_VALUE : rate;
+            return Math.max(0, this.tile.getTransferRate());
         }
     }
 }

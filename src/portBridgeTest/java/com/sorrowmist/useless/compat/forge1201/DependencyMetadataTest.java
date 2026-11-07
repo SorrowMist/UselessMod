@@ -71,7 +71,10 @@ class DependencyMetadataTest {
                 }
             }
         }
-        assertEquals(48, checked.size(), "All compiled mod metadata must be inspected");
+        assertTrue(checked.size() >= 48, "The complete baseline compile classpath must be inspected");
+        assertTrue(checked.containsAll(Set.of("ae2", "extendedae_plus", "farmersdelight",
+                "youkaishomecoming", "ars_nouveau", "mysticalagriculture")),
+                "New native integrations must also be present in the metadata audit");
     }
 
     @Test void obsoleteApisAreRejectedButTheUpdatedPackVersionsRemainAllowed() throws Exception {

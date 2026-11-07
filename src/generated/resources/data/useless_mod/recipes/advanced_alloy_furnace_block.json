@@ -1,41 +1,49 @@
 {
-  "type": "minecraft:crafting_shaped",
-  "category": "building",
-  "key": {
-    "A": {
-      "item": "minecraft:emerald_block"
+  "type": "useless_mod:entropy_transmutation",
+  "inputs": [
+    {
+      "count": 8,
+      "ingredient": {
+        "item": "useless_mod:useless_ingot_tier_1"
+      }
     },
-    "B": {
-      "item": "minecraft:diamond_block"
+    {
+      "ingredient": {
+        "item": "minecraft:furnace"
+      }
     },
-    "C": {
-      "item": "minecraft:lapis_block"
+    {
+      "ingredient": {
+        "item": "minecraft:iron_block"
+      }
     },
-    "D": {
-      "item": "minecraft:iron_block"
+    {
+      "ingredient": {
+        "item": "minecraft:gold_block"
+      }
     },
-    "E": {
-      "item": "minecraft:furnace"
+    {
+      "ingredient": {
+        "item": "minecraft:lapis_block"
+      }
     },
-    "F": {
-      "item": "minecraft:gold_block"
+    {
+      "ingredient": {
+        "item": "minecraft:diamond_block"
+      }
     },
-    "G": {
-      "item": "minecraft:water_bucket"
+    {
+      "ingredient": {
+        "item": "minecraft:emerald_block"
+      }
     },
-    "H": {
-      "item": "minecraft:netherite_block"
-    },
-    "I": {
-      "item": "minecraft:lava_bucket"
+    {
+      "ingredient": {
+        "item": "minecraft:netherite_block"
+      }
     }
-  },
-  "pattern": [
-    "ABC",
-    "DEF",
-    "GHI"
   ],
-  "result": {
+  "output": {
     "count": 1,
     "item": "useless_mod:advanced_alloy_furnace_block"
   }

@@ -29,7 +29,7 @@ import java.util.Map;
  * <p>
  * 根据种子与精华的对应关系自动生成配方：
  * - 模具：种子
- * - 输入流体：100mb 水
+ * - 输入流体：1mb 水
  * - 输出：2x 对应精华
  */
 public class SeedEssenceRecipeAdapter implements IRecipeAdapter<SeedEssenceRecipeAdapter.SeedEssenceDummyRecipe> {
@@ -53,14 +53,14 @@ public class SeedEssenceRecipeAdapter implements IRecipeAdapter<SeedEssenceRecip
             if (seedItem == null || essenceItem == null) continue;
             if (seedItem == essenceItem) continue;
 
-            ResourceLocation id = new ResourceLocation(
+            ResourceLocation id = ResourceLocation.fromNamespaceAndPath(
                     "mysticalagriculture",
                     "seed_essence_" + crop.getName()
             );
 
             FluidStack waterInput = new FluidStack(
                     BuiltInRegistries.FLUID.get(
-                            new ResourceLocation("water")
+                            ResourceLocation.withDefaultNamespace("water")
                     ),
                     WATER_AMOUNT
             );
@@ -68,7 +68,7 @@ public class SeedEssenceRecipeAdapter implements IRecipeAdapter<SeedEssenceRecip
             AdvancedAlloyFurnaceRecipe recipe = new AdvancedAlloyFurnaceRecipe(
                     id,
                     List.of(),                         // 无物品输入
-                    List.of(waterInput),               // 100mb 水
+                    List.of(waterInput),               // 1mb 水
                     List.of(new ItemStack(essenceItem, 2)),  // 2x 精华
                     List.of(),                         // 无流体输出
                     1000,                              // 能量

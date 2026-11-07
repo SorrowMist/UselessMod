@@ -5,6 +5,7 @@ import com.sorrowmist.useless.content.blocks.multiblock.MultiblockAlloyFurnaceCo
 import com.sorrowmist.useless.content.blocks.multiblock.OmniversalAlloyFurnaceStructure;
 import com.sorrowmist.useless.content.blocks.multiblock.UselessCoilBlock;
 import com.sorrowmist.useless.content.menus.MultiblockAlloyFurnaceMenu;
+import com.sorrowmist.useless.content.multiblock.MaintenanceWearRules;
 import com.sorrowmist.useless.init.ModBlocks;
 import com.sorrowmist.useless.network.AECancelPacket;
 import com.sorrowmist.useless.network.AETaskProgressRequestPacket;
@@ -129,7 +130,7 @@ public final class MultiblockAlloyFurnaceScreen extends AppleContainerScreen<Mul
                 () -> Component.translatable("gui.useless_mod.apple.structure"), null, null)
                 .leading(AppleUi.Icon.CUBE, AppleStyle.ORANGE));
         h.add(new AppleBadge(250, 44, 106, this::stateText,
-                () -> structureValid() ? AppleStyle.GREEN : AppleStyle.RED).right());
+                this::stateColor).right());
         h.add(new AppleSettingRow(186, 62, 178, 22,
                 () -> Component.translatable("gui.useless_mod.apple.part.coil"),
                 () -> Component.literal(structureValid() ? Integer.toString(detectedCoilTier()) : "—"), null)
@@ -184,6 +185,38 @@ public final class MultiblockAlloyFurnaceScreen extends AppleContainerScreen<Mul
         h.add(new AppleCard(371, 40, 212, 117));
         h.add(new AppleLabel(INV_X, 49, 194, AppleLabel.Kind.CAPTION, () -> playerInventoryTitle));
         h.add(slotGrid().cellSize(20));
+        h.add(new AppleCard(371, 166, 212, 112));
+        h.add(new AppleLabel(382, 175, 104, AppleLabel.Kind.CAPTION,
+                () -> Component.translatable("gui.useless_mod.multiblock_alloy_furnace.maintenance")));
+        h.add(new AppleBadge(490, 174, 82,
+                () -> Component.literal(menu.getMaintenanceLevel() + " / " + MaintenanceWearRules.MAX_MAINTENANCE),
+                this::maintenanceColor).right());
+        h.add(new AppleCanvas(382, 194, 190, 6, (g, mx, my, x, y, w, hh) ->
+                AppleUi.progress(g, x, y, w, hh, (float) menu.getMaintenanceLevel()
+                        / MaintenanceWearRules.MAX_MAINTENANCE, maintenanceColor())));
+        h.add(new AppleLabel(382, 208, 190, AppleLabel.Kind.FOOTNOTE,
+                () -> Component.translatable("gui.useless_mod.multiblock_alloy_furnace.maintenance_efficiency",
+                        MaintenanceWearRules.efficiencyPermille(menu.getMaintenanceLevel()) / 10.0)));
+        h.add(new AppleLabel(382, 230, 190, AppleLabel.Kind.FOOTNOTE, this::operatingHint).lines(4));
+    }
+
+    private int maintenanceColor() {
+        return menu.getMaintenanceLevel() <= 0 ? AppleStyle.RED
+                : MaintenanceWearRules.isWarning(menu.getMaintenanceLevel()) ? AppleStyle.ORANGE : AppleStyle.GREEN;
+    }
+
+    private int stateColor() {
+        return !structureValid() || menu.isMufflerObstructed() || menu.isAshOutputBlocked()
+                || menu.getMaintenanceLevel() <= 0 ? AppleStyle.RED : AppleStyle.GREEN;
+    }
+
+    private Component operatingHint() {
+        String key = menu.isMufflerObstructed() ? "muffler_obstructed.desc"
+                : menu.isAshOutputBlocked() ? "ash_full.desc"
+                : menu.getMaintenanceLevel() <= 0 ? "maintenance_overdue"
+                : MaintenanceWearRules.isWarning(menu.getMaintenanceLevel()) ? "maintenance_warning"
+                : "maintenance.desc";
+        return Component.translatable("gui.useless_mod.multiblock_alloy_furnace." + key, 2);
     }
 
     private boolean structureValid() {
@@ -195,7 +228,12 @@ public final class MultiblockAlloyFurnaceScreen extends AppleContainerScreen<Mul
     }
 
     private Component stateText() {
-        if (structureValid()) return Component.translatable("gui.useless_mod.multiblock_alloy_furnace.formed");
+        if (structureValid()) {
+            String key = menu.isMufflerObstructed() ? "muffler_obstructed"
+                    : menu.isAshOutputBlocked() ? "ash_full"
+                    : menu.getMaintenanceLevel() <= 0 ? "maintenance_overdue" : "formed";
+            return Component.translatable("gui.useless_mod.multiblock_alloy_furnace." + key);
+        }
         if (liveValidation != null && !liveValidation.mismatches().isEmpty())
             return Component.translatable("gui.useless_mod.multiblock_alloy_furnace.invalid_count",
                     liveValidation.mismatches().size());
@@ -394,6 +432,9 @@ public final class MultiblockAlloyFurnaceScreen extends AppleContainerScreen<Mul
                     case PATTERN_ASSEMBLY -> 0xFF30B0C7;
                     case MOLD_HUB -> 0xFFFFCC00;
                     case PASSIVE_HATCH -> 0xFF5AC8FA;
+                    case MAINTENANCE_HATCH -> AppleStyle.GREEN;
+                    case AUTO_MAINTENANCE_HATCH -> AppleStyle.INDIGO;
+                    case MUFFLER_HATCH -> AppleStyle.TEAL;
                 };
             }
         }
@@ -546,12 +587,17 @@ public final class MultiblockAlloyFurnaceScreen extends AppleContainerScreen<Mul
     }
 
     private Component expectedCasingName(BlockPos worldPos) {
+        if (worldPos.equals(OmniversalAlloyFurnaceStructure.toWorld(menu.getBlockPos(), liveFacing,
+                OmniversalAlloyFurnaceStructure.PREFERRED_MUFFLER_POS))) return ModBlocks.MUFFLER_HATCH.get().getName();
         Component casingName = ModBlocks.OMNIVERSAL_FURNACE_CASING.get().getName();
         return Component.translatable(
                 "gui.useless_mod.multiblock_alloy_furnace.preview.casing_with_functional_parts",
                 casingName, ModBlocks.ME_PATTERN_ASSEMBLY.get().getName(),
                 ModBlocks.OMNIVERSAL_MOLD_HUB.get().getName(),
-                ModBlocks.PASSIVE_CRAFTING_HATCH.get().getName());
+                ModBlocks.PASSIVE_CRAFTING_HATCH.get().getName(),
+                ModBlocks.MAINTENANCE_HATCH.get().getName(),
+                ModBlocks.AUTO_MAINTENANCE_HATCH.get().getName(),
+                ModBlocks.MUFFLER_HATCH.get().getName());
     }
 
     private Component expectedCoilName() {

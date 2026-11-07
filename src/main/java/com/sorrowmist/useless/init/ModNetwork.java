@@ -2,6 +2,11 @@ package com.sorrowmist.useless.init;
 
 import com.sorrowmist.useless.UselessMod;
 import com.sorrowmist.useless.network.AECancelPacket;
+import com.sorrowmist.useless.network.MaintenanceCalibrationActionPacket;
+import com.sorrowmist.useless.network.MaintenanceCalibrationSyncPacket;
+import com.sorrowmist.useless.network.EntropyTransmutationPreviewRequestPacket;
+import com.sorrowmist.useless.network.EntropyTransmutationPreviewPacket;
+import com.sorrowmist.useless.network.EntropyTransmutationEffectPacket;
 import com.sorrowmist.useless.network.FurnaceMenuSyncPacket;
 import com.sorrowmist.useless.network.AEReturnOutputTogglePacket;
 import com.sorrowmist.useless.network.AETaskProgressPacket;
@@ -59,7 +64,17 @@ import com.sorrowmist.useless.compat.forge1201.network.RegisterPayloadHandlersEv
 
 public class ModNetwork {
     public static void registerPayloadHandlers(final RegisterPayloadHandlersEvent event) {
-        var registrar = event.registrar(UselessMod.MODID).versioned("17-merged-2");
+        var registrar = event.registrar(UselessMod.MODID).versioned("17-migration-3");
+        registrar.playToServer(MaintenanceCalibrationActionPacket.TYPE, MaintenanceCalibrationActionPacket.STREAM_CODEC,
+                MaintenanceCalibrationActionPacket::handle);
+        registrar.playToClient(MaintenanceCalibrationSyncPacket.TYPE, MaintenanceCalibrationSyncPacket.STREAM_CODEC,
+                MaintenanceCalibrationSyncPacket::handle);
+        registrar.playToServer(EntropyTransmutationPreviewRequestPacket.TYPE, EntropyTransmutationPreviewRequestPacket.STREAM_CODEC,
+                EntropyTransmutationPreviewRequestPacket::handle);
+        registrar.playToClient(EntropyTransmutationPreviewPacket.TYPE, EntropyTransmutationPreviewPacket.STREAM_CODEC,
+                EntropyTransmutationPreviewPacket::handle);
+        registrar.playToClient(EntropyTransmutationEffectPacket.TYPE, EntropyTransmutationEffectPacket.STREAM_CODEC,
+                EntropyTransmutationEffectPacket::handle);
         registrar.playToClient(FurnaceMenuSyncPacket.TYPE, FurnaceMenuSyncPacket.STREAM_CODEC,
                 FurnaceMenuSyncPacket::handle);
         registrar.playToServer(BeefToolLayoutRequestPacket.TYPE,

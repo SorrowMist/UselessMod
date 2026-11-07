@@ -7,6 +7,8 @@ import appeng.api.stacks.GenericStack;
 import appeng.crafting.pattern.AECraftingPattern;
 import appeng.crafting.pattern.AEProcessingPattern;
 import com.mojang.datafixers.util.Pair;
+import com.sorrowmist.useless.compat.forge1201.component.ComponentAccess;
+import com.sorrowmist.useless.compat.forge1201.recipe.NativeProcessingPatterns;
 import com.sorrowmist.useless.content.recipe.AdapterUtils;
 import com.sorrowmist.useless.content.recipe.AdvancedAlloyFurnaceRecipe;
 import com.sorrowmist.useless.content.recipe.AlloyFurnaceRecipeCatalog;
@@ -17,6 +19,7 @@ import com.sorrowmist.useless.core.component.UComponents;
 import com.sorrowmist.useless.init.ModItems;
 import net.minecraft.core.Holder;
 import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.tags.TagKey;
@@ -32,6 +35,7 @@ import java.util.Comparator;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalLong;
 import java.util.Set;
@@ -108,6 +112,85 @@ public final class OmniversalPatternEncoding {
             return ItemStack.EMPTY;
         }
         return encode(existing, source, entry, level);
+    }
+
+    /**
+     * Detects decodable patterns whose payload or item-id input semantics no longer match the
+     * current recipe. Prefer the stable recipe id: the old fingerprint/payload may itself have
+     * been widened. Missing, ambiguous or unencodable recipes are left to decode validation.
+     */
+    public static boolean isStale(ItemStack stack, Level level) {
+        if (stack == null || stack.isEmpty() || level == null) return false;
+        AEItemKey definition = AEItemKey.of(stack);
+        if (definition == null) return false;
+        OmniversalPatternData data = ComponentAccess.get(definition, UComponents.OMNIVERSAL_PATTERN_DATA.get());
+        if (data == null) return false;
+
+        AlloyFurnaceRecipeCatalog.Entry current = resolveCurrentEntry(level, data).orElse(null);
+        if (current == null) {
+            AEProcessingPattern source;
+            try {
+                source = new AEProcessingPattern(definition);
+            } catch (RuntimeException exception) {
+                return true;
+            }
+            Optional<AlloyFurnaceRecipeCatalog.Entry> resolved =
+                    data.version() < OmniversalPatternData.TAG_INPUT_VERSION
+                            ? AlloyFurnaceRecipeCatalog.resolveLegacyPattern(
+                                    level, data.sourceId(), data.identity(), source, data.version())
+                            : AlloyFurnaceRecipeCatalog.resolvePattern(
+                                    level, data.sourceId(), data.identity(), source);
+            if (resolved.isEmpty()) return false;
+            current = resolved.get();
+        }
+
+        ItemStack rebuilt;
+        try {
+            rebuilt = reencodeFromRecipe(current, level);
+        } catch (RuntimeException exception) {
+            // A recipe beyond native AE2's encoding limits is not automatically repairable.
+            return false;
+        }
+        return !rebuilt.isEmpty() && !hasSameSemantics(stack, rebuilt);
+    }
+
+    /** Compare only native AE2 payload and id-only inputs, not unrelated item NBT or fingerprints. */
+    static boolean hasSameSemantics(ItemStack existing, ItemStack rebuilt) {
+        if (!NativeProcessingPatterns.hasPayload(existing) || !NativeProcessingPatterns.hasPayload(rebuilt)) {
+            return false;
+        }
+        OmniversalPatternData oldData = ComponentAccess.get(existing, UComponents.OMNIVERSAL_PATTERN_DATA.get());
+        OmniversalPatternData newData = ComponentAccess.get(rebuilt, UComponents.OMNIVERSAL_PATTERN_DATA.get());
+        if (oldData == null || newData == null) return false;
+
+        // Compare NBT directly: never round-trip long chemical/key amounts through int ItemStacks.
+        return Objects.equals(existing.getTag().get("in"), rebuilt.getTag().get("in"))
+                && Objects.equals(existing.getTag().get("out"), rebuilt.getTag().get("out"))
+                && normalizedSlots(oldData.itemIdInputSlots()).equals(normalizedSlots(newData.itemIdInputSlots()));
+    }
+
+    private static List<Integer> normalizedSlots(List<Integer> slots) {
+        if (slots == null || slots.isEmpty()) return List.of();
+        List<Integer> copy = new ArrayList<>(slots);
+        copy.sort(null);
+        return copy;
+    }
+
+    /** Resolve by recipe id within the recorded source first, then uniquely across the catalog. */
+    private static Optional<AlloyFurnaceRecipeCatalog.Entry> resolveCurrentEntry(
+            Level level, OmniversalPatternData data) {
+        ResourceLocation recipeId = data.recipeId();
+        if (recipeId == null) return Optional.empty();
+        List<AlloyFurnaceRecipeCatalog.Entry> matched = new ArrayList<>();
+        for (AlloyFurnaceRecipeCatalog.Entry entry : AlloyFurnaceRecipeCatalog.entries(level, data.sourceId())) {
+            if (recipeId.equals(entry.identity().recipeId())) matched.add(entry);
+        }
+        if (matched.isEmpty()) {
+            for (AlloyFurnaceRecipeCatalog.Entry entry : AlloyFurnaceRecipeCatalog.entries(level)) {
+                if (recipeId.equals(entry.identity().recipeId())) matched.add(entry);
+            }
+        }
+        return matched.size() == 1 ? Optional.of(matched.get(0)) : Optional.empty();
     }
 
     /**

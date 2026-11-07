@@ -34,6 +34,8 @@ import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.SmartDo
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.catalyst.ResolvedCatalystEffect;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.parallel.AlloyFurnaceParallelCalculator;
 import com.sorrowmist.useless.content.multiblock.OmniversalCoilStats;
+import com.sorrowmist.useless.content.multiblock.MaintenanceWearRules;
+import net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket;
 import com.sorrowmist.useless.content.recipe.AdvancedAlloyFurnaceRecipe;
 import com.sorrowmist.useless.content.recipe.AlloyFurnaceRecipeCatalog;
 import com.sorrowmist.useless.core.config.AlloyFurnaceTierRules;
@@ -80,7 +82,7 @@ import java.util.concurrent.locks.ReentrantLock;
 /** Controller, energy store and persistent task owner for the multiblock furnace. */
 public final class MultiblockAlloyFurnaceCoreBlockEntity extends BlockEntity implements AlloyFurnaceAeHost, MenuProvider {
     private static final int SAFETY_REVALIDATION_TICKS = 40;
-    public static final int MENU_DATA_COUNT = 11;
+    public static final int MENU_DATA_COUNT = 15;
     private static final ItemStackHandler EMPTY_ITEMS = new ItemStackHandler(0);
     private static final FluidTank[] EMPTY_TANKS = new FluidTank[0];
 
@@ -90,6 +92,15 @@ public final class MultiblockAlloyFurnaceCoreBlockEntity extends BlockEntity imp
     private boolean structureDirty = true;
     private boolean formed;
     private int coilTier;
+    private long maintenanceLevel = MaintenanceWearRules.MAX_MAINTENANCE;
+    private long maintenanceTickRemainder;
+    private boolean hasAutoMaintenanceHatch;
+    private boolean mufflerObstructed;
+    private boolean ashOutputBlocked;
+    @Nullable
+    private BlockPos maintenanceHatchPos;
+    @Nullable
+    private BlockPos mufflerHatchPos;
     @Nullable
     private BlockPos patternAssemblyPos;
     @Nullable
@@ -125,6 +136,10 @@ public final class MultiblockAlloyFurnaceCoreBlockEntity extends BlockEntity imp
                 case 8 -> getMaxAETaskCount();
                 case 9 -> (int) energyLimit;
                 case 10 -> (int) (energyLimit >>> 32);
+                case 11 -> mufflerObstructed ? 1 : 0;
+                case 12 -> (int) maintenanceLevel;
+                case 13 -> (int) (maintenanceLevel >>> 32);
+                case 14 -> ashOutputBlocked ? 1 : 0;
                 default -> 0;
             };
         }
@@ -143,6 +158,10 @@ public final class MultiblockAlloyFurnaceCoreBlockEntity extends BlockEntity imp
             validationTimer = 0;
             validateStructure();
         }
+        // Exhaust and extraction are outside the template, so refresh these gates every tick.
+        mufflerObstructed = isMufflerExhaustBlocked();
+        ashOutputBlocked = computeAshOutputBlocked();
+        maintainWithAutoHatch(); // An exhausted machine must be able to resume with an automatic hatch.
         if (!deferredTasksLoaded) {
             // 目录未就绪时保持未加载状态，下一 tick 重试；否则完好样板会被误判失效并退还材料。
             deferredTasksLoaded = aeManager.loadDeferredTasks();
@@ -157,7 +176,10 @@ public final class MultiblockAlloyFurnaceCoreBlockEntity extends BlockEntity imp
         // after every validation/load transition without rebuilding patterns.
         aeManager.tickPatternRefresh();
         MePatternAssemblyBlockEntity assembly = getAssembly();
-        if (assembly != null) assembly.refreshProviderIfReady();
+        if (assembly != null) {
+            assembly.repairPatternsIfPending();
+            assembly.refreshProviderIfReady();
+        }
         boolean progressed = false;
         if (isTaskExecutionEnabled()) {
             drawEnergyFromAeNetwork();
@@ -172,9 +194,14 @@ public final class MultiblockAlloyFurnaceCoreBlockEntity extends BlockEntity imp
         if (passiveHatch != null) {
             progressed |= passiveHatch.serverTickFromController(this);
         }
+        accrueRuntimeMaintenance(progressed);
+        maintainWithAutoHatch();
         boolean hasWork = aeManager.hasWork()
                 || passiveHatch != null && passiveHatch.hasWork();
         updateDisplayedActivity(progressed, hasWork);
+        MufflerHatchBlockEntity muffler = getMufflerHatch();
+        if (muffler != null) muffler.tickFromController(progressed);
+        ashOutputBlocked = computeAshOutputBlocked();
     }
 
     private void updateDisplayedActivity(boolean progressed, boolean hasWork) {
@@ -210,16 +237,24 @@ public final class MultiblockAlloyFurnaceCoreBlockEntity extends BlockEntity imp
         BlockPos validatedAssemblyPos = result.valid() ? result.patternAssemblyPos() : null;
         BlockPos validatedMoldHubPos = result.valid() ? result.moldHubPos() : null;
         BlockPos validatedHatchPos = result.valid() ? result.passiveHatchPos() : null;
+        BlockPos validatedMaintenancePos = result.valid() ? result.maintenanceHatchPos() : null;
+        BlockPos validatedMufflerPos = result.valid() ? result.mufflerHatchPos() : null;
         boolean stateChanged = formed != result.valid()
                 || coilTier != validatedCoilTier
                 || !java.util.Objects.equals(patternAssemblyPos, validatedAssemblyPos)
                 || !java.util.Objects.equals(moldHubPos, validatedMoldHubPos)
-                || !java.util.Objects.equals(passiveHatchPos, validatedHatchPos);
+                || !java.util.Objects.equals(passiveHatchPos, validatedHatchPos)
+                || !java.util.Objects.equals(maintenanceHatchPos, validatedMaintenancePos)
+                || !java.util.Objects.equals(mufflerHatchPos, validatedMufflerPos);
         formed = result.valid();
         coilTier = validatedCoilTier;
         patternAssemblyPos = validatedAssemblyPos == null ? null : validatedAssemblyPos.immutable();
         moldHubPos = validatedMoldHubPos == null ? null : validatedMoldHubPos.immutable();
         passiveHatchPos = validatedHatchPos == null ? null : validatedHatchPos.immutable();
+        maintenanceHatchPos = validatedMaintenancePos == null ? null : validatedMaintenancePos.immutable();
+        mufflerHatchPos = validatedMufflerPos == null ? null : validatedMufflerPos.immutable();
+        hasAutoMaintenanceHatch = formed && maintenanceHatchPos != null
+                && level.getBlockEntity(maintenanceHatchPos) instanceof AutoMaintenanceHatchBlockEntity;
         if (stateChanged) {
             structureGeneration++;
             if (formed) {
@@ -232,6 +267,7 @@ public final class MultiblockAlloyFurnaceCoreBlockEntity extends BlockEntity imp
                 level.setBlock(worldPosition, state.setValue(MultiblockAlloyFurnaceCoreBlock.FORMED, formed), 3);
             }
             setChanged();
+            level.sendBlockUpdated(worldPosition, state, getBlockState(), Block.UPDATE_CLIENTS);
         }
         linkFunctionalParts();
         if (stateChanged) updatePatterns();
@@ -274,8 +310,11 @@ public final class MultiblockAlloyFurnaceCoreBlockEntity extends BlockEntity imp
                     assembly.linkController(null, structureGeneration);
                 }
             } else if (part instanceof OmniversalMoldHubBlockEntity hub) {
-                hub.linkController(formed && pos.equals(moldHubPos)
-                        ? worldPosition : null, structureGeneration);
+                if (formed && pos.equals(moldHubPos)) {
+                    hub.linkController(worldPosition, structureGeneration);
+                } else if (hub.isLinkedToController(worldPosition)) {
+                    hub.linkController(null, structureGeneration);
+                }
             } else if (part instanceof PassiveCraftingHatchBlockEntity hatch) {
                 if (formed && pos.equals(passiveHatchPos)) {
                     hatch.linkController(worldPosition, structureGeneration);
@@ -284,8 +323,34 @@ public final class MultiblockAlloyFurnaceCoreBlockEntity extends BlockEntity imp
                     // recover buffered materials, without stealing another core's hatch.
                     hatch.linkController(worldPosition, structureGeneration);
                 }
+            } else if (part instanceof OwnedFurnacePartBlockEntity hatch) {
+                boolean selected = formed && (pos.equals(maintenanceHatchPos) || pos.equals(mufflerHatchPos));
+                if (selected) hatch.linkController(worldPosition, structureGeneration);
+                else if (hatch.isLinkedToController(worldPosition)) hatch.linkController(null, structureGeneration);
             }
         }
+    }
+
+    @Nullable
+    private MufflerHatchBlockEntity getMufflerHatch() {
+        if (!formed || mufflerHatchPos == null || level == null || !level.isLoaded(mufflerHatchPos)) return null;
+        return level.getBlockEntity(mufflerHatchPos) instanceof MufflerHatchBlockEntity hatch
+                && hatch.isLinkedToController(worldPosition) ? hatch : null;
+    }
+
+    private boolean isMufflerExhaustBlocked() {
+        if (!formed || mufflerHatchPos == null || level == null) return false;
+        if (!level.isLoaded(mufflerHatchPos)) return true;
+        return !MufflerHatchBlockEntity.isExhaustClear(level, mufflerHatchPos);
+    }
+
+    private boolean computeAshOutputBlocked() {
+        MufflerHatchBlockEntity muffler = getMufflerHatch();
+        return ConfigManager.isAshFullBlockingWork() && muffler != null && muffler.isAshFull();
+    }
+
+    private void maintainWithAutoHatch() {
+        if (hasAutoMaintenanceHatch) restoreMaintenance();
     }
 
     @Nullable
@@ -467,6 +532,73 @@ public final class MultiblockAlloyFurnaceCoreBlockEntity extends BlockEntity imp
                 && structureGeneration == generation;
     }
 
+    public boolean isMaintenanceHatchLinked(BlockPos pos, long generation) {
+        return claimsMaintenanceHatch(pos) && structureGeneration == generation;
+    }
+
+    public boolean claimsMaintenanceHatch(BlockPos pos) {
+        return formed && maintenanceHatchPos != null && maintenanceHatchPos.equals(pos);
+    }
+
+    public boolean isMufflerHatchLinked(BlockPos pos, long generation) {
+        return claimsMufflerHatch(pos) && structureGeneration == generation;
+    }
+
+    public boolean claimsMufflerHatch(BlockPos pos) {
+        return formed && mufflerHatchPos != null && mufflerHatchPos.equals(pos);
+    }
+
+    /** Ownership cannot depend on the short window between controller and part generation updates. */
+    public boolean claimsFunctionalPart(BlockPos pos) {
+        return formed && (pos.equals(patternAssemblyPos) || pos.equals(moldHubPos)
+                || pos.equals(passiveHatchPos) || pos.equals(maintenanceHatchPos) || pos.equals(mufflerHatchPos));
+    }
+
+    public boolean isMufflerObstructed() { return mufflerObstructed; }
+    public boolean isAshOutputBlocked() { return ashOutputBlocked; }
+    public long getMaintenanceLevel() { return maintenanceLevel; }
+    public boolean isMaintenanceOverdue() { return MaintenanceWearRules.isOverdue(maintenanceLevel); }
+
+    private void accrueRuntimeMaintenance(boolean progressed) {
+        if (!progressed || hasAutoMaintenanceHatch) return;
+        maintenanceTickRemainder++;
+        long wear = MaintenanceWearRules.wearForTicks(maintenanceTickRemainder);
+        maintenanceTickRemainder %= MaintenanceWearRules.WEAR_TICKS_PER_POINT;
+        consumeMaintenance(wear);
+        setChanged(); // The fractional runtime is persistent even before a whole point is lost.
+    }
+
+    @Override public void onCraftsCompleted(long crafts) {
+        consumeMaintenance(MaintenanceWearRules.wearForCrafts(crafts));
+    }
+
+    private void consumeMaintenance(long wear) {
+        if (wear <= 0L || hasAutoMaintenanceHatch) return;
+        long updated = MaintenanceWearRules.clamp(maintenanceLevel - wear);
+        if (updated == maintenanceLevel) return;
+        boolean overdueChanged = MaintenanceWearRules.isOverdue(updated) != isMaintenanceOverdue();
+        maintenanceLevel = updated;
+        setChanged();
+        if (overdueChanged && level != null && !level.isClientSide) {
+            level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), Block.UPDATE_CLIENTS);
+        }
+    }
+
+    public void restoreMaintenance() {
+        if (maintenanceLevel == MaintenanceWearRules.MAX_MAINTENANCE && maintenanceTickRemainder == 0L) return;
+        maintenanceLevel = MaintenanceWearRules.MAX_MAINTENANCE;
+        maintenanceTickRemainder = 0L;
+        setChanged();
+        if (level != null && !level.isClientSide) {
+            level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), Block.UPDATE_CLIENTS);
+        }
+    }
+
+    @Override public int getTaskProcessTime(AdvancedAlloyFurnaceRecipe recipe, ResolvedCatalystEffect effect) {
+        return MaintenanceWearRules.scaledProcessTime(
+                AlloyFurnaceAeHost.super.getTaskProcessTime(recipe, effect), maintenanceLevel);
+    }
+
     public RedstoneControlMode getRedstoneControlMode() {
         return redstoneControlMode;
     }
@@ -590,6 +722,18 @@ public final class MultiblockAlloyFurnaceCoreBlockEntity extends BlockEntity imp
             return CraftingTaskContext.TaskAvailability.unavailable(
                     "gui.useless_mod.advanced_alloy_furnace.ae_task_status.waiting_structure", "");
         }
+        if (mufflerObstructed) {
+            return CraftingTaskContext.TaskAvailability.unavailable(
+                    "gui.useless_mod.advanced_alloy_furnace.ae_task_status.waiting_muffler", "");
+        }
+        if (ashOutputBlocked) {
+            return CraftingTaskContext.TaskAvailability.unavailable(
+                    "gui.useless_mod.advanced_alloy_furnace.ae_task_status.waiting_ash_full", "");
+        }
+        if (isMaintenanceOverdue()) {
+            return CraftingTaskContext.TaskAvailability.unavailable(
+                    "gui.useless_mod.advanced_alloy_furnace.ae_task_status.waiting_maintenance", "");
+        }
         if (recipe == null) {
             return CraftingTaskContext.TaskAvailability.unavailable(
                     "gui.useless_mod.advanced_alloy_furnace.ae_task_status.waiting_recipe", "");
@@ -652,7 +796,7 @@ public final class MultiblockAlloyFurnaceCoreBlockEntity extends BlockEntity imp
 
     @Override
     public boolean isTaskExecutionEnabled() {
-        return formed && level != null
+        return formed && !mufflerObstructed && !ashOutputBlocked && !isMaintenanceOverdue() && level != null
                 && redstoneControlMode.shouldRun(level.hasNeighborSignal(worldPosition));
     }
 
@@ -838,6 +982,12 @@ public final class MultiblockAlloyFurnaceCoreBlockEntity extends BlockEntity imp
         moldHubPos = tag.contains("MoldHub") ? BlockPos.of(tag.getLong("MoldHub")) : null;
         passiveHatchPos = tag.contains("PassiveHatch")
                 ? BlockPos.of(tag.getLong("PassiveHatch")) : null;
+        maintenanceHatchPos = tag.contains("MaintenanceHatch") ? BlockPos.of(tag.getLong("MaintenanceHatch")) : null;
+        mufflerHatchPos = tag.contains("MufflerHatch") ? BlockPos.of(tag.getLong("MufflerHatch")) : null;
+        maintenanceLevel = tag.contains("MaintenanceWear", Tag.TAG_ANY_NUMERIC)
+                ? MaintenanceWearRules.clamp(tag.getLong("MaintenanceWear")) : MaintenanceWearRules.MAX_MAINTENANCE;
+        maintenanceTickRemainder = Math.max(0L, tag.getLong("MaintenanceWearTickRemainder"))
+                % MaintenanceWearRules.WEAR_TICKS_PER_POINT;
         redstoneControlMode = RedstoneControlMode.byIndex(tag.getInt("RedstoneControlMode"));
         automaticEnergyLimit = tag.contains("AutomaticEnergyLimit", Tag.TAG_ANY_NUMERIC)
                 ? Math.max(0L, tag.getLong("AutomaticEnergyLimit"))
@@ -872,6 +1022,10 @@ public final class MultiblockAlloyFurnaceCoreBlockEntity extends BlockEntity imp
         if (patternAssemblyPos != null) tag.putLong("PatternAssembly", patternAssemblyPos.asLong());
         if (moldHubPos != null) tag.putLong("MoldHub", moldHubPos.asLong());
         if (passiveHatchPos != null) tag.putLong("PassiveHatch", passiveHatchPos.asLong());
+        if (maintenanceHatchPos != null) tag.putLong("MaintenanceHatch", maintenanceHatchPos.asLong());
+        if (mufflerHatchPos != null) tag.putLong("MufflerHatch", mufflerHatchPos.asLong());
+        tag.putLong("MaintenanceWear", maintenanceLevel);
+        tag.putLong("MaintenanceWearTickRemainder", maintenanceTickRemainder);
         tag.putInt("RedstoneControlMode", redstoneControlMode.ordinal());
         tag.putLong("AutomaticEnergyLimit", automaticEnergyLimit);
         tag.putInt("PatternPriority", aeManager.getPatternPriority());
@@ -885,5 +1039,42 @@ public final class MultiblockAlloyFurnaceCoreBlockEntity extends BlockEntity imp
         unloading = true;
         super.setRemoved();
         aeManager.shutdown();
+    }
+
+    /** Send only lightweight ownership state, never serialized AE jobs or their buffered inputs. */
+    @Override public CompoundTag getUpdateTag() {
+        CompoundTag tag = new CompoundTag();
+        tag.putBoolean("Formed", formed);
+        tag.putInt("CoilTier", coilTier);
+        tag.putLong("StructureGeneration", structureGeneration);
+        if (patternAssemblyPos != null) tag.putLong("PatternAssembly", patternAssemblyPos.asLong());
+        if (moldHubPos != null) tag.putLong("MoldHub", moldHubPos.asLong());
+        if (passiveHatchPos != null) tag.putLong("PassiveHatch", passiveHatchPos.asLong());
+        if (maintenanceHatchPos != null) tag.putLong("MaintenanceHatch", maintenanceHatchPos.asLong());
+        if (mufflerHatchPos != null) tag.putLong("MufflerHatch", mufflerHatchPos.asLong());
+        tag.putLong("MaintenanceWear", maintenanceLevel);
+        return tag;
+    }
+
+    @Override public void handleUpdateTag(CompoundTag tag) {
+        formed = tag.getBoolean("Formed");
+        coilTier = tag.getInt("CoilTier");
+        structureGeneration = tag.getLong("StructureGeneration");
+        patternAssemblyPos = tag.contains("PatternAssembly") ? BlockPos.of(tag.getLong("PatternAssembly")) : null;
+        moldHubPos = tag.contains("MoldHub") ? BlockPos.of(tag.getLong("MoldHub")) : null;
+        passiveHatchPos = tag.contains("PassiveHatch") ? BlockPos.of(tag.getLong("PassiveHatch")) : null;
+        maintenanceHatchPos = tag.contains("MaintenanceHatch") ? BlockPos.of(tag.getLong("MaintenanceHatch")) : null;
+        mufflerHatchPos = tag.contains("MufflerHatch") ? BlockPos.of(tag.getLong("MufflerHatch")) : null;
+        maintenanceLevel = tag.contains("MaintenanceWear")
+                ? MaintenanceWearRules.clamp(tag.getLong("MaintenanceWear")) : MaintenanceWearRules.MAX_MAINTENANCE;
+    }
+
+    @Override public void onDataPacket(net.minecraft.network.Connection connection,
+                                       ClientboundBlockEntityDataPacket packet) {
+        if (packet.getTag() != null) handleUpdateTag(packet.getTag());
+    }
+
+    @Override public ClientboundBlockEntityDataPacket getUpdatePacket() {
+        return ClientboundBlockEntityDataPacket.create(this);
     }
 }

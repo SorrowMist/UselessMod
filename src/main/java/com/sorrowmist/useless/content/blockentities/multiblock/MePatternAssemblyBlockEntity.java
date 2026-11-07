@@ -87,6 +87,7 @@ public final class MePatternAssemblyBlockEntity extends AEBaseBlockEntity
     @Nullable
     private CompoundTag pendingLegacyInventory;
     private boolean externalInventoryLoaded;
+    private boolean patternAutoRepairPending;
 
     public MePatternAssemblyBlockEntity(BlockPos pos, BlockState state) {
         super(ModBlockEntities.ME_PATTERN_ASSEMBLY.get(), pos, state);
@@ -163,7 +164,18 @@ public final class MePatternAssemblyBlockEntity extends AEBaseBlockEntity
         ExternalInventoryStore.setReference(this, inventoryReference);
         pendingLegacyInventory = null;
         externalInventoryLoaded = true;
+        patternAutoRepairPending = true;
         inventoryChanged();
+    }
+
+    /** Called by the formed controller only after the recipe catalog has loaded. */
+    public void repairPatternsIfPending() {
+        if (!patternAutoRepairPending || unloading || isRemoved() || !externalInventoryLoaded
+                || level == null || level.isClientSide
+                || !com.sorrowmist.useless.content.recipe.AlloyFurnaceRecipeCatalog.isReady(level)) return;
+        patterns.withChangeBatch(() -> com.sorrowmist.useless.command.OmniversalPatternRepairService.repairSlots(
+                patterns.getActiveSlots(), patterns::getStackInSlot, patterns::setStackInSlot, level));
+        patternAutoRepairPending = false;
     }
 
     private void ensureExternalInventory() {
@@ -198,6 +210,7 @@ public final class MePatternAssemblyBlockEntity extends AEBaseBlockEntity
             this.structureGeneration = generation;
             setChanged();
             if (level == null || level.isClientSide) return;
+            level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), 3);
             MultiblockAlloyFurnaceCoreBlockEntity controller = getController();
             if (controller != null) {
                 controller.updatePatterns();
@@ -217,9 +230,11 @@ public final class MePatternAssemblyBlockEntity extends AEBaseBlockEntity
      * controller is deliberately not considered an owner, allowing a newly
      * valid structure to claim the part after the old structure breaks.
      */
-    public boolean isClaimedByOtherController(BlockPos controllerPos) {
-        MultiblockAlloyFurnaceCoreBlockEntity controller = getController();
-        return controller != null && !controller.getBlockPos().equals(controllerPos);
+    public boolean isClaimedByOtherController(BlockPos pos) {
+        return !unloading && !isRemoved() && level != null && controllerPos != null
+                && !controllerPos.equals(pos) && level.isLoaded(controllerPos)
+                && level.getBlockEntity(controllerPos) instanceof MultiblockAlloyFurnaceCoreBlockEntity core
+                && core.claimsFunctionalPart(worldPosition);
     }
 
     /** Marks the AE provider cache stale for the controller's next server tick. */
@@ -473,6 +488,7 @@ public final class MePatternAssemblyBlockEntity extends AEBaseBlockEntity
             blockEntity.mainNode.create(getLevel(), getBlockPos());
             blockEntity.requestProviderRefresh();
             blockEntity.inventoryChanged();
+            blockEntity.patternAutoRepairPending = true;
         });
     }
 
@@ -496,5 +512,29 @@ public final class MePatternAssemblyBlockEntity extends AEBaseBlockEntity
         providerRefreshPending = false;
         super.onChunkUnloaded();
         mainNode.destroy();
+    }
+
+    @Override public CompoundTag getUpdateTag() {
+        CompoundTag tag = super.getUpdateTag();
+        if (controllerPos != null) tag.putLong("Controller", controllerPos.asLong());
+        tag.putLong("StructureGeneration", structureGeneration);
+        return tag;
+    }
+
+    @Override public void handleUpdateTag(CompoundTag tag) {
+        // AE2 15.x only recognizes its stream packet when #upd is the SOLE key.
+        // Strip our extension before delegating, otherwise AEBaseBlockEntity.load calls loadTag
+        // and resets the grid node / external inventory instead of applying AE's visual stream.
+        CompoundTag aeTag = tag.copy();
+        aeTag.remove("Controller");
+        aeTag.remove("StructureGeneration");
+        super.handleUpdateTag(aeTag);
+        controllerPos = tag.contains("Controller") ? BlockPos.of(tag.getLong("Controller")) : null;
+        structureGeneration = tag.getLong("StructureGeneration");
+    }
+
+    @Override public void onDataPacket(net.minecraft.network.Connection connection,
+                                       net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket packet) {
+        if (packet.getTag() != null) handleUpdateTag(packet.getTag());
     }
 }

@@ -9,6 +9,7 @@ import appeng.crafting.pattern.AEProcessingPattern;
 import appeng.helpers.patternprovider.PatternContainer;
 import appeng.items.tools.powered.WirelessTerminalItem;
 import com.sorrowmist.useless.compat.AE2Compat;
+import com.sorrowmist.useless.compat.forge1201.component.ComponentAccess;
 import com.sorrowmist.useless.content.blockentities.AdvancedAlloyFurnaceBlockEntity;
 import com.sorrowmist.useless.content.blockentities.multiblock.MePatternAssemblyBlockEntity;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.OmniversalPatternDetails;
@@ -33,16 +34,20 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.BiConsumer;
+import java.util.function.IntFunction;
 
 /**
  * 扫描并修复 AE 网格上失效的万象样板。
  *
  * <p>失效的权威判定与样板 tooltip 红字同源：{@link PatternDetailsHelper#decodePattern} 的
  * 结果不是 {@link OmniversalPatternDetails}（含返回 {@code null} 或抛异常）。判定为失效的
- * 样板会按当前配方目录重新匹配配方并重编码，然后就地写回原槽位。</p>
+ * 样板会按当前配方目录重新匹配配方并重编码，然后就地写回原槽位。仍可解码但 payload 或
+ * item-id 输入槽语义已失真的样板同样参与修复；重建结果一致时不写回。</p>
  *
- * <p>只覆盖 AE 网络上已通电的机器：单方块高级合金炉与多方块 ME 样板总成。玩家背包与终端
- * 内尚未上传的样板不在扫描范围内。</p>
+ * <p>命令只覆盖 AE 网络上已通电的机器：单方块高级合金炉与多方块 ME 样板总成。玩家背包
+ * 与终端内尚未上传的样板不在扫描范围内。机器载入时可直接调用与网格无关的
+ * {@link #repairSlots}，复用相同的判定与重建逻辑。</p>
  */
 public final class OmniversalPatternRepairService {
     private static final int MAX_DETAILS = 3;
@@ -112,17 +117,17 @@ public final class OmniversalPatternRepairService {
                 ItemStack stack = inventory.getStackInSlot(slot);
                 if (stack.isEmpty() || !stack.is(ModItems.OMNIVERSAL_PATTERN.get())) continue;
 
-                OmniversalPatternData data = com.sorrowmist.useless.compat.forge1201.component.ComponentAccess.get(stack, UComponents.OMNIVERSAL_PATTERN_DATA.get());
+                OmniversalPatternData data = ComponentAccess.get(stack, UComponents.OMNIVERSAL_PATTERN_DATA.get());
                 if (data == null) {
                     skipped++;
                     continue;
                 }
 
                 scanned++;
-                if (isValid(stack, level)) continue;
+                if (!needsRepair(stack, level)) continue;
                 invalid++;
 
-                ItemStack replacement = reencode(stack, data, level);
+                ItemStack replacement = rebuild(stack, level);
                 if (replacement.isEmpty()) {
                     unresolved++;
                     if (details.size() < MAX_DETAILS) {
@@ -152,6 +157,63 @@ public final class OmniversalPatternRepairService {
 
         return RepairResult.success(
                 new RepairReport(scanned, invalid, repaired, unresolved, skipped), details);
+    }
+
+    /** Shared by the grid command and machine-load repair; never treats ordinary patterns as stale. */
+    public static boolean needsRepair(ItemStack stack, Level level) {
+        if (stack == null || stack.isEmpty() || level == null
+                || !stack.is(ModItems.OMNIVERSAL_PATTERN.get())) {
+            return false;
+        }
+        return !isValid(stack, level) || OmniversalPatternEncoding.isStale(stack, level);
+    }
+
+    /** Rebuild against the current recipe, preserving the original stack when reconstruction fails. */
+    public static ItemStack rebuild(ItemStack stack, Level level) {
+        if (stack == null || stack.isEmpty() || level == null
+                || !stack.is(ModItems.OMNIVERSAL_PATTERN.get())) {
+            return ItemStack.EMPTY;
+        }
+        OmniversalPatternData data = ComponentAccess.get(stack, UComponents.OMNIVERSAL_PATTERN_DATA.get());
+        if (data == null) return ItemStack.EMPTY;
+        try {
+            ItemStack rebuilt = reencode(stack, data, level);
+            if (!rebuilt.isEmpty()) rebuilt.setCount(stack.getCount());
+            return rebuilt;
+        } catch (RuntimeException exception) {
+            // Malformed payloads and recipes beyond native AE2 limits must not abort a load tick.
+            return ItemStack.EMPTY;
+        }
+    }
+
+    /**
+     * Repairs active pattern slots in place and returns the number actually written, without any
+     * grid/power requirement. Null, non-pattern, unresolved and byte-identical stacks are untouched.
+     *
+     * <p>Call once on the server after NBT/external inventory binding and after
+     * {@link AlloyFurnaceRecipeCatalog#isReady(Level)} becomes true. Keep the caller's pending flag
+     * set and retry on subsequent ticks while the catalog is not ready; zero does not mean the
+     * catalog was ready. Re-arm on chunk reload or external inventory replacement. Scan only active
+     * pattern slots, not recovery slots. Batch/suppress per-slot storage and pattern callbacks, then
+     * persist and refresh once if the returned count is positive. The single-block source runs this
+     * after deferred task loading; the multiblock source runs it before provider refresh/execution.</p>
+     */
+    public static int repairSlots(int slotCount, IntFunction<ItemStack> getter,
+                                  BiConsumer<Integer, ItemStack> setter, Level level) {
+        if (slotCount <= 0 || getter == null || setter == null || level == null
+                || level.isClientSide || !AlloyFurnaceRecipeCatalog.isReady(level)) {
+            return 0;
+        }
+        int repaired = 0;
+        for (int slot = 0; slot < slotCount; slot++) {
+            ItemStack stack = getter.apply(slot);
+            if (!needsRepair(stack, level)) continue;
+            ItemStack replacement = rebuild(stack, level);
+            if (replacement.isEmpty() || ItemStack.isSameItemSameTags(stack, replacement)) continue;
+            setter.accept(slot, replacement);
+            repaired++;
+        }
+        return repaired;
     }
 
     /** 判定一张万象样板当前是否可正常解码。 */

@@ -17,6 +17,7 @@ import net.minecraft.world.item.crafting.Ingredient;
 import com.sorrowmist.useless.compat.forge1201.recipe.RecipeHolder;
 import net.minecraft.world.item.crafting.RecipeManager;
 import net.minecraft.world.item.crafting.RecipeType;
+import net.minecraft.world.item.crafting.ShapedRecipe;
 import net.minecraft.world.level.Level;
 import net.minecraftforge.fluids.FluidStack;
 import org.jetbrains.annotations.Nullable;
@@ -100,7 +101,8 @@ public final class ReAvaritiaSculkCraftingRecipeAdapter implements IRecipeAdapte
     }
 
     private static boolean isSculkTableRecipe(@Nullable CraftingRecipe recipe) {
-        return recipe != null
+        // Only the native static shaped recipe is known to have this output and remainder behavior.
+        return recipe != null && recipe.getClass() == ShapedRecipe.class
                 && ExtendedCraftingAdapterUtils.copyResult(recipe).is(ModBlocks.sculk_crafting_table.get().asItem());
     }
 

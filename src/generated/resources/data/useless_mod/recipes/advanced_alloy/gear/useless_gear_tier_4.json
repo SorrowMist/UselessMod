@@ -15,7 +15,8 @@
   },
   "outputs": [
     {
-      "id": "useless_mod:useless_gear_tier_4"
+      "item": "useless_mod:useless_gear_tier_4",
+      "count": 1
     }
   ],
   "process_time": 40

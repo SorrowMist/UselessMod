@@ -10,7 +10,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 @Pseudo
 @Mixin(
-        targets = "elocindev.item_obliterator.neoforge.utils.Utils",
+        targets = "elocindev.item_obliterator.forge.utils.Utils",
         remap = false,
         priority = 11000)
 public abstract class ItemObliteratorUtilsMixin {

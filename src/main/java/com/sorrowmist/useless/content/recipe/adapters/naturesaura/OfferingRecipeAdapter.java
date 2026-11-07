@@ -8,7 +8,6 @@ import com.sorrowmist.useless.content.recipe.AdapterUtils;
 import com.sorrowmist.useless.content.recipe.AdvancedAlloyFurnaceRecipe;
 import com.sorrowmist.useless.content.recipe.CountedIngredient;
 import com.sorrowmist.useless.content.recipe.IRecipeAdapter;
-import de.ellpeck.naturesaura.Helper;
 import de.ellpeck.naturesaura.recipes.OfferingRecipe;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.crafting.Ingredient;
@@ -79,7 +78,7 @@ public final class OfferingRecipeAdapter implements IRecipeAdapter<OfferingRecip
         }
 
         ItemStack output = NaturesAuraAdapterUtils.multipliedOutput(source.output, OFFERING_BATCH_SIZE);
-        int sourceInputCount = Helper.getIngredientAmount(source.input);
+        int sourceInputCount = NaturesAuraAdapterUtils.ingredientAmount(source.input);
         if (output == null || sourceInputCount <= 0) {
             return null;
         }

@@ -3,6 +3,7 @@ package com.sorrowmist.useless.compat.pneumaticcraft;
 import com.sorrowmist.useless.api.logistics.LongPressureHandler;
 import me.desht.pneumaticcraft.api.PNCCapabilities;
 import me.desht.pneumaticcraft.api.tileentity.IAirHandlerMachine;
+import me.desht.pneumaticcraft.api.tileentity.IAirHandler;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.world.level.Level;
@@ -50,16 +51,16 @@ public final class PneumaticCraftPressureCompat implements PressureBridge {
             return null;
         }
         if (side != null) {
-            return com.sorrowmist.useless.compat.forge1201.capability.CapabilityAccess.get(level, PNCCapabilities.AIR_HANDLER_MACHINE, pos, side);
+            return com.sorrowmist.useless.compat.forge1201.capability.CapabilityAccess.get(level, PNCCapabilities.AIR_HANDLER_MACHINE_CAPABILITY, pos, side);
         }
         IAirHandlerMachine unspecified =
-                com.sorrowmist.useless.compat.forge1201.capability.CapabilityAccess.get(level, PNCCapabilities.AIR_HANDLER_MACHINE, pos, null);
+                com.sorrowmist.useless.compat.forge1201.capability.CapabilityAccess.get(level, PNCCapabilities.AIR_HANDLER_MACHINE_CAPABILITY, pos, null);
         if (unspecified != null) {
             return unspecified;
         }
         for (Direction direction : DIRECTIONS) {
             IAirHandlerMachine found =
-                    com.sorrowmist.useless.compat.forge1201.capability.CapabilityAccess.get(level, PNCCapabilities.AIR_HANDLER_MACHINE, pos, direction);
+                    com.sorrowmist.useless.compat.forge1201.capability.CapabilityAccess.get(level, PNCCapabilities.AIR_HANDLER_MACHINE_CAPABILITY, pos, direction);
             if (found != null) {
                 return found;
             }
@@ -99,7 +100,8 @@ public final class PneumaticCraftPressureCompat implements PressureBridge {
             }
             // 刻意不按 maxPressure 夹取：气动方块的 addAir 本身没有上限，超压由爆炸机制处理。
             // 真正的限值由调用方（目标气压伺服）算好再传进来。
-            long take = Math.min(amount, Integer.MAX_VALUE);
+            long take = Math.min(amount, Math.min((long) Integer.MAX_VALUE,
+                    (long) Integer.MAX_VALUE - handler.getAir()));
             if (!simulate) {
                 handler.addAir((int) take);
             }
@@ -110,13 +112,13 @@ public final class PneumaticCraftPressureCompat implements PressureBridge {
         public long setAirTo(long targetAir, boolean simulate) {
             int before = handler.getAir();
             long floor = -(long) handler.getVolume();   // -1 bar：硬真空
-            long clamped = Math.max(targetAir, floor);
-            long delta = clamped - before;
+            long clamped = Math.max(floor, Math.min(targetAir, Integer.MAX_VALUE));
+            long delta = Math.max(Integer.MIN_VALUE, Math.min(Integer.MAX_VALUE, clamped - before));
             if (delta == 0L) {
                 return 0L;
             }
             if (!simulate) {
-                handler.addAir((int) Math.max(Math.min(delta, Integer.MAX_VALUE), Integer.MIN_VALUE));
+                handler.addAir((int) delta);
             }
             return delta;
         }

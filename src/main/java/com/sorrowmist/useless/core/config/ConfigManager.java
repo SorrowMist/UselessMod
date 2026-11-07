@@ -21,6 +21,7 @@ public class ConfigManager {
     private static final ForgeConfigSpec.BooleanValue ENABLE_BOTANY_POT_RENDERING;
     // 造化杖连点模式：每个客户端 tick 触发多少次右键（客户端行为，放 CLIENT 配置）
     private static final ForgeConfigSpec.IntValue BEEF_AUTOCLICK_CLICKS_PER_TICK;
+    private static final ForgeConfigSpec.BooleanValue ENABLE_UPDATE_CHECKER;
 
     // 矩阵样板数量配置
     private static final ForgeConfigSpec.IntValue MATRIX_PATTERN_COUNT;
@@ -192,6 +193,14 @@ public class ConfigManager {
     private static final ForgeConfigSpec.DoubleValue[] OMNIVERSAL_COIL_TIER_TIME_MULTIPLIER =
             new ForgeConfigSpec.DoubleValue[9];
     private static final ForgeConfigSpec.IntValue OMNIVERSAL_USEFUL_TIER_THREADS;
+    private static final ForgeConfigSpec.IntValue[] OMNIVERSAL_COIL_TIER_ASH_SUPPRESSION =
+            new ForgeConfigSpec.IntValue[9];
+    private static final ForgeConfigSpec.IntValue OMNIVERSAL_USEFUL_TIER_ASH_SUPPRESSION;
+    private static final ForgeConfigSpec.BooleanValue OMNIVERSAL_ASH_FULL_BLOCKS_WORK;
+    private static final ForgeConfigSpec.BooleanValue OMNIVERSAL_ASH_TOXIC_ENABLED;
+    private static final ForgeConfigSpec.IntValue OMNIVERSAL_ASH_TOXIC_MAX_CHANCE;
+    private static final ForgeConfigSpec.DoubleValue OMNIVERSAL_ASH_TOXIC_RADIUS;
+    private static final ForgeConfigSpec.IntValue OMNIVERSAL_ASH_TOXIC_DURATION;
     private static final ForgeConfigSpec.IntValue ORE_GENERATOR_SLOTS;
     private static final ForgeConfigSpec.ConfigValue<List<? extends String>>
             USELESS_DIMENSION_FLOOR_BLOCK_BLACKLIST;
@@ -231,6 +240,12 @@ public class ConfigManager {
                 .define("enable_botany_pot_rendering", true);
         CLIENT_BUILDER.pop();
 
+        CLIENT_BUILDER.push("updates");
+        ENABLE_UPDATE_CHECKER = CLIENT_BUILDER
+                .comment("Check CurseForge for compatible Minecraft 1.20.1 Forge releases after joining a world")
+                .translation("useless_mod.configuration.enable_update_checker")
+                .define("enable_update_checker", true);
+        CLIENT_BUILDER.pop();
         CLIENT_BUILDER.push("beef_tool");
         BEEF_AUTOCLICK_CLICKS_PER_TICK = CLIENT_BUILDER
                 .comment("造化杖连点模式每个客户端 tick 触发多少次右键",
@@ -274,10 +289,30 @@ public class ConfigManager {
                     .comment("普通线圈 " + tier + " 阶的处理时间倍率")
                     .defineInRange("coil_tier_" + tier + "_time_multiplier",
                             1.0 / (1L << tier), 0.0, 1.0);
+            OMNIVERSAL_COIL_TIER_ASH_SUPPRESSION[index] = SERVER_BUILDER
+                    .comment("Coil tier " + tier + " ash suppression percentage")
+                    .defineInRange("coil_tier_" + tier + "_ash_suppression", tier * 10, 0, 100);
         }
         OMNIVERSAL_USEFUL_TIER_THREADS = SERVER_BUILDER
                 .comment("有用级线圈的最大AE任务数")
                 .defineInRange("useful_tier_threads", 11, 1, Integer.MAX_VALUE);
+        OMNIVERSAL_USEFUL_TIER_ASH_SUPPRESSION = SERVER_BUILDER
+                .comment("Useful coil ash suppression percentage")
+                .defineInRange("useful_tier_ash_suppression", 100, 0, 100);
+        OMNIVERSAL_ASH_FULL_BLOCKS_WORK = SERVER_BUILDER
+                .comment("Stop processing until a full muffler ash slot is emptied")
+                .define("ash_full_blocks_work", true);
+        OMNIVERSAL_ASH_TOXIC_ENABLED = SERVER_BUILDER
+                .comment("Accumulated ash can apply negative effects to nearby living entities")
+                .define("ash_toxic_enabled", true);
+        OMNIVERSAL_ASH_TOXIC_MAX_CHANCE = SERVER_BUILDER
+                .comment("Maximum per-second effect chance at full ash (1000 = 100%)")
+                .defineInRange("ash_toxic_max_chance", 300, 0, 1000);
+        OMNIVERSAL_ASH_TOXIC_RADIUS = SERVER_BUILDER
+                .defineInRange("ash_toxic_radius", 4.0, 0.5, 32.0);
+        OMNIVERSAL_ASH_TOXIC_DURATION = SERVER_BUILDER
+                .comment("Ash effect duration in seconds")
+                .defineInRange("ash_toxic_duration", 5, 1, 60);
         SERVER_BUILDER.pop();
 
         // 万象样板自动上传：单独成组，便于只开关上传行为，
@@ -831,6 +866,7 @@ public class ConfigManager {
                 Map.entry("exdeorum", ENABLE_EX_DEORUM_RECIPE_CONVERSION),
                 Map.entry("brewinandchewin", ENABLE_BREWIN_AND_CHEWIN_RECIPE_CONVERSION),
                 Map.entry("casualnessdelight", ENABLE_CASUALNESS_DELIGHT_RECIPE_CONVERSION),
+                Map.entry("casualness_delight", ENABLE_CASUALNESS_DELIGHT_RECIPE_CONVERSION),
                 Map.entry("crabbersdelight", ENABLE_CRABBERS_DELIGHT_RECIPE_CONVERSION),
                 Map.entry("create", ENABLE_CREATE_RECIPE_CONVERSION),
                 Map.entry("tconstruct", ENABLE_TCONSTRUCT_RECIPE_CONVERSION),
@@ -1097,6 +1133,19 @@ public class ConfigManager {
     public static double getOmniversalCoilTimeMultiplier(int tier) {
         return getConfigValue(OMNIVERSAL_COIL_TIER_TIME_MULTIPLIER[Math.max(1, Math.min(9, tier)) - 1]);
     }
+
+    public static boolean isUpdateCheckerEnabled() { return getConfigValue(ENABLE_UPDATE_CHECKER); }
+
+    public static int getOmniversalCoilAshSuppression(int tier) {
+        return tier >= 10 ? getConfigValue(OMNIVERSAL_USEFUL_TIER_ASH_SUPPRESSION)
+                : getConfigValue(OMNIVERSAL_COIL_TIER_ASH_SUPPRESSION[Math.max(1, tier) - 1]);
+    }
+
+    public static boolean isAshFullBlockingWork() { return getConfigValue(OMNIVERSAL_ASH_FULL_BLOCKS_WORK); }
+    public static boolean isAshToxicEnabled() { return getConfigValue(OMNIVERSAL_ASH_TOXIC_ENABLED); }
+    public static int getAshToxicMaxChancePermille() { return getConfigValue(OMNIVERSAL_ASH_TOXIC_MAX_CHANCE); }
+    public static double getAshToxicRadius() { return getConfigValue(OMNIVERSAL_ASH_TOXIC_RADIUS); }
+    public static int getAshToxicDurationSeconds() { return getConfigValue(OMNIVERSAL_ASH_TOXIC_DURATION); }
 
     public static int getOmniversalUsefulTierThreads() {
         return getConfigValue(OMNIVERSAL_USEFUL_TIER_THREADS);

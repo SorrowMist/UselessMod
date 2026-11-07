@@ -1,6 +1,6 @@
 package com.sorrowmist.useless.content.recipe.adapters.delight.extradelight;
 
-import com.lance5057.extradelight.workstations.mixingbowl.recipes.MixingBowlRecipe;
+import com.vomiter.extradelight.common.complex.workstations.mixingbowl.recipes.MixingBowlRecipe;
 import com.sorrowmist.useless.api.enums.AlloyFurnaceMode;
 import com.sorrowmist.useless.content.recipe.AdapterUtils;
 import com.sorrowmist.useless.content.recipe.AdvancedAlloyFurnaceRecipe;
@@ -47,8 +47,8 @@ public final class MixingBowlRecipeAdapter implements IRecipeAdapter<MixingBowlR
             return List.of();
         }
         MixingBowlRecipe source = holder.value();
-        List<CountedIngredient> inputs = AdapterUtils.mergeIngredients(
-                ExtraDelightRecipeAdapterUtils.withContainer(source.getIngredients(), source.getContainer()));
+        List<CountedIngredient> inputs = DelightRecipeAdapterUtils.withContainerInputs(
+                source.getIngredients(), source.getContainer());
         List<Ingredient> molds = new ArrayList<>();
         Ingredient mixingBowl = AdapterUtils.toMoldIngredient(getMoldItem());
         if (!mixingBowl.isEmpty()) {
@@ -79,8 +79,8 @@ public final class MixingBowlRecipeAdapter implements IRecipeAdapter<MixingBowlR
         for (RecipeHolder<MixingBowlRecipe> holder : DelightRecipeAdapterUtils.allOf(
                 level.getRecipeManager(), MixingBowlRecipe.class)) {
             MixingBowlRecipe source = holder.value();
-            List<CountedIngredient> requirements = AdapterUtils.mergeIngredients(
-                    ExtraDelightRecipeAdapterUtils.withContainer(source.getIngredients(), source.getContainer()));
+            List<CountedIngredient> requirements = DelightRecipeAdapterUtils.withContainerInputs(
+                    source.getIngredients(), source.getContainer());
             List<LongSizedFluidIngredient> fluids = ExtraDelightRecipeAdapterUtils.fluids(source.getFluids());
             if ((requirements.isEmpty() && fluids.isEmpty())
                     || !DelightRecipeAdapterUtils.matchesItems(requirements, mergedInputs, List.of())

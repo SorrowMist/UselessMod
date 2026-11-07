@@ -20,7 +20,8 @@
   },
   "outputs": [
     {
-      "id": "useless_mod:useless_glass_tier_3"
+      "item": "useless_mod:useless_glass_tier_3",
+      "count": 1
     }
   ],
   "process_time": 40

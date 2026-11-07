@@ -1,6 +1,6 @@
 package com.sorrowmist.useless.content.recipe.adapters.delight.extradelight;
 
-import com.lance5057.extradelight.workstations.doughshaping.recipes.DoughShapingRecipe;
+import com.vomiter.extradelight.common.complex.workstations.doughshaping.recipes.DoughShapingRecipe;
 import com.sorrowmist.useless.api.enums.AlloyFurnaceMode;
 import com.sorrowmist.useless.content.recipe.AdapterUtils;
 import com.sorrowmist.useless.content.recipe.AdvancedAlloyFurnaceRecipe;

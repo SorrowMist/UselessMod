@@ -54,34 +54,40 @@ class UsefulIngotJeiTest {
         assertEquals("useless_mod:advanced_alloy_furnace", json.get("type").getAsString());
         assertEquals(ID.toString(), json.get("id").getAsString());
         var inputs = json.getAsJsonArray("ingredients");
-        assertEquals(6, inputs.size());
+        assertEquals(7, inputs.size());
         assertEquals("useless_mod:possible_useful_ingot", inputs.get(0).getAsJsonObject()
                 .getAsJsonObject("ingredient").get("item").getAsString());
         assertEquals("useless_mod:useful_ingot", json.getAsJsonArray("outputs").get(0)
-                .getAsJsonObject().get("id").getAsString());
-        // Plain JUnit has no mod registry events. Only these two mod items use vanilla stand-ins;
-        // all counts, block ingredients, fluid JSON and serializer code remain the shipped data.
-        inputs.get(0).getAsJsonObject().getAsJsonObject("ingredient").addProperty("item", "minecraft:copper_ingot");
-        json.getAsJsonArray("outputs").get(0).getAsJsonObject().addProperty("id", "minecraft:netherite_ingot");
+                .getAsJsonObject().get("item").getAsString());
+        assertEquals(List.of("useless_mod:possible_useful_ingot", "ae2:flawless_budding_quartz",
+                        "ae2:cell_component_256k", "ae2:spatial_cell_component_128", "ae2:dense_energy_cell",
+                        "ae2:ender_dust", "ae2:singularity"),
+                java.util.stream.StreamSupport.stream(inputs.spliterator(), false)
+                        .map(value -> value.getAsJsonObject().getAsJsonObject("ingredient").get("item").getAsString()).toList());
+        // Plain JUnit has no mod registry events. Substitute only item identities, never quantities.
+        var substitutes = List.of("copper_ingot", "iron_block", "gold_block", "diamond_block",
+                "emerald_block", "netherite_block", "obsidian");
+        for (int i = 0; i < inputs.size(); i++) inputs.get(i).getAsJsonObject().getAsJsonObject("ingredient")
+                .addProperty("item", "minecraft:" + substitutes.get(i));
+        json.getAsJsonArray("outputs").get(0).getAsJsonObject().addProperty("item", "minecraft:netherite_ingot");
         return AdvancedAlloyFurnaceRecipeSerializer.INSTANCE.fromJson(ID, json);
     }
 
     @Test void shippedUsefulIngotRecipeLoadsAndSynchronizesWithoutLosingQuantities() throws Exception {
         var recipe = generatedRecipe();
-        assertEquals(List.of(64L, 1024L, 1024L, 1024L, 1024L, 1024L),
+        assertEquals(List.of(32L, 32L, 64L, 64L, 64L, 512L, 1024L),
                 recipe.inputs().stream().map(input -> input.count()).toList());
         var blocks = List.of(Items.IRON_BLOCK, Items.GOLD_BLOCK, Items.DIAMOND_BLOCK,
-                Items.EMERALD_BLOCK, Items.NETHERITE_BLOCK);
+                Items.EMERALD_BLOCK, Items.NETHERITE_BLOCK, Items.OBSIDIAN);
         for (int i = 0; i < blocks.size(); i++) {
             assertTrue(recipe.inputs().get(i + 1).ingredient().test(blocks.get(i).getDefaultInstance()));
         }
         assertEquals(1, recipe.outputs().size());
         assertTrue(recipe.outputs().get(0).is(Items.NETHERITE_INGOT));
         assertEquals(1, recipe.outputs().get(0).getCount());
-        assertEquals(1, recipe.inputFluids().size());
-        assertEquals(10_000_000L, recipe.inputFluids().get(0).amount());
-        assertTrue(recipe.inputFluids().get(0).ingredient().test(new FluidStack(Fluids.LAVA, 1)));
-        assertEquals(10_000_000L, recipe.energy());
+        assertTrue(recipe.inputFluids().isEmpty());
+        assertEquals(3_276_800_000L, recipe.energy());
+        assertEquals(9, recipe.tier());
         assertEquals(100, recipe.processTime());
         assertEquals(AlloyFurnaceMode.NORMAL, recipe.mode());
         FriendlyByteBuf buffer = new FriendlyByteBuf(Unpooled.buffer());
@@ -100,7 +106,13 @@ class UsefulIngotJeiTest {
     }
 
     @Test void usefulIngotLayoutRetainsOutputAndTenMillionMbLava() throws Exception {
-        var recipe = generatedRecipe();
+        var shipped = generatedRecipe();
+        // Keep the former route's 10-million-mB display regression as a datapack recipe fixture.
+        var recipe = new AdvancedAlloyFurnaceRecipe(ID, shipped.inputs().subList(0, 6),
+                List.of(new LongSizedFluidIngredient(FluidIngredient.single(Fluids.LAVA), 10_000_000L)),
+                List.of(), shipped.outputs(), List.of(), List.of(), shipped.energy(), 100,
+                Ingredient.EMPTY, 0, List.of(), AlloyFurnaceMode.NORMAL,
+                AdvancedAlloyFurnaceRecipe.NO_EXPLICIT_TIER);
         var slots = layout(recipe);
         var lava = slots.stream().filter(slot -> slot.y == 55 && slot.role == RecipeIngredientRole.INPUT)
                 .findFirst().orElseThrow().builder;

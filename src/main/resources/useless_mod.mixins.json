@@ -12,6 +12,7 @@
     "LevelMixin",
     "ServerPlayerGameModeMixin",
     "ServerGamePacketListenerImplFlightMixin",
+    "ae2.TransformCategoryMergeMixin$NativeTransformCountWireMixin",
     "ae2.CraftingCpuLogicAccessor",
     "ae2.CraftingCalculationSmartDoublingMixin",
     "ae2.CraftingSimulationStateAccessor",
@@ -39,13 +40,19 @@
     "eae.TileAssemblerMatrixPatternMixin",
     "accessor.BeeAccessor",
     "accessor.TurtleAccessor",
-    "enderio.EnderIOTravelHandlerMixin"
+    "enderio.EnderIOTravelHandlerMixin",
+    "malum.SoulHarvestDropMixin",
+    "malum.SoulHarvestHandlerMixin",
+    "pneumaticcraft.MachineAirHandlerMixin",
+    "itemobliterator.ItemObliteratorContainerMixin",
+    "itemobliterator.ItemObliteratorUtilsMixin"
   ],
   "server": [
     "ServerGamePacketListenerImplMixin"
   ],
   "client": [
     "client.SlotPosAccessor",
+    "ae2.TransformCategoryMergeMixin",
     "exmachinis.CompactingCategoryMixin",
     "ClientLevelMixin",
     "ClientPacketListenerMixin",

@@ -1,6 +1,6 @@
 package com.sorrowmist.useless.content.recipe.adapters.delight.extradelight;
 
-import com.lance5057.extradelight.workstations.oven.recipes.OvenRecipe;
+import com.vomiter.extradelight.common.complex.workstations.oven.recipes.OvenRecipe;
 import com.sorrowmist.useless.api.enums.AlloyFurnaceMode;
 import com.sorrowmist.useless.content.recipe.AdapterUtils;
 import com.sorrowmist.useless.content.recipe.AdvancedAlloyFurnaceRecipe;
@@ -46,14 +46,16 @@ public final class OvenRecipeAdapter implements IRecipeAdapter<OvenRecipe> {
             return List.of();
         }
         OvenRecipe source = holder.value();
-        List<CountedIngredient> inputs = AdapterUtils.mergeIngredients(
-                ExtraDelightRecipeAdapterUtils.withContainer(source.getIngredients(), source.getOutputContainer()));
+        List<CountedIngredient> inputs = DelightRecipeAdapterUtils.withContainerInputs(
+                source.getIngredients(), source.getOutputContainer(), source.shouldConsumeContainer());
         List<Ingredient> molds = new ArrayList<>();
         Ingredient oven = AdapterUtils.toMoldIngredient(getMoldItem());
         if (!oven.isEmpty()) {
             molds.add(oven);
         }
-        molds.addAll(DelightRecipeAdapterUtils.bakingTrayMolds(source.getOutputContainer()));
+        if (!source.shouldConsumeContainer() && !source.getOutputContainer().isEmpty()) {
+            molds.add(DelightRecipeAdapterUtils.exactStack(source.getOutputContainer()));
+        }
         ItemStack output = source.getResultItem(level == null ? null : level.registryAccess());
         if (inputs.isEmpty() || output == null || output.isEmpty()) {
             return List.of();
@@ -76,9 +78,9 @@ public final class OvenRecipeAdapter implements IRecipeAdapter<OvenRecipe> {
         List<RecipeHolder<OvenRecipe>> matches = new ArrayList<>();
         for (RecipeHolder<OvenRecipe> holder : DelightRecipeAdapterUtils.allOf(
                 level.getRecipeManager(), OvenRecipe.class)) {
-            List<CountedIngredient> requirements = AdapterUtils.mergeIngredients(
-                    ExtraDelightRecipeAdapterUtils.withContainer(holder.value().getIngredients(),
-                            holder.value().getOutputContainer()));
+            List<CountedIngredient> requirements = DelightRecipeAdapterUtils.withContainerInputs(
+                    holder.value().getIngredients(), holder.value().getOutputContainer(),
+                    holder.value().shouldConsumeContainer());
             if (!requirements.isEmpty() && DelightRecipeAdapterUtils.matchesItems(
                     requirements, mergedInputs, List.of())) {
                 matches.add(holder);

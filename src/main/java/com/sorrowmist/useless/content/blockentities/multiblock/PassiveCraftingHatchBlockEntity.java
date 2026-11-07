@@ -445,6 +445,7 @@ public final class PassiveCraftingHatchBlockEntity extends BlockEntity
         clampMultiplier();
         statusDirty = true;
         setChanged();
+        if (level != null && !level.isClientSide) level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), 3);
     }
 
     /** True when this hatch's raw association belongs to the given core. */
@@ -453,9 +454,11 @@ public final class PassiveCraftingHatchBlockEntity extends BlockEntity
     }
 
     /** Passive hatches can only execute work for one formed controller. */
-    public boolean isClaimedByOtherController(BlockPos controllerPos) {
-        MultiblockAlloyFurnaceCoreBlockEntity controller = getController();
-        return controller != null && !controller.getBlockPos().equals(controllerPos);
+    public boolean isClaimedByOtherController(BlockPos pos) {
+        return !unloading && !isRemoved() && level != null && controllerPos != null
+                && !controllerPos.equals(pos) && level.isLoaded(controllerPos)
+                && level.getBlockEntity(controllerPos) instanceof MultiblockAlloyFurnaceCoreBlockEntity core
+                && core.claimsFunctionalPart(worldPosition);
     }
 
     @Nullable
@@ -1075,6 +1078,27 @@ public final class PassiveCraftingHatchBlockEntity extends BlockEntity
         super.setRemoved();
     }
 
+    @Override public CompoundTag getUpdateTag() {
+        CompoundTag tag = new CompoundTag();
+        if (controllerPos != null) tag.putLong("Controller", controllerPos.asLong());
+        tag.putLong("StructureGeneration", structureGeneration);
+        return tag;
+    }
+
+    @Override public void handleUpdateTag(CompoundTag tag) {
+        controllerPos = tag.contains("Controller") ? BlockPos.of(tag.getLong("Controller")) : null;
+        structureGeneration = tag.getLong("StructureGeneration");
+    }
+
+    @Override public net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket getUpdatePacket() {
+        return net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket.create(this);
+    }
+
+    @Override public void onDataPacket(net.minecraft.network.Connection connection,
+                                       net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket packet) {
+        if (packet.getTag() != null) handleUpdateTag(packet.getTag());
+    }
+
     @Override
     public int getInputSlotsStart() {
         return 0;
@@ -1244,6 +1268,17 @@ public final class PassiveCraftingHatchBlockEntity extends BlockEntity
         return controller == null
                 ? CraftingTaskContext.super.resolveTaskEffect(recipe)
                 : controller.resolveTaskEffect(recipe);
+    }
+
+    @Override public int getTaskProcessTime(AdvancedAlloyFurnaceRecipe recipe, ResolvedCatalystEffect effect) {
+        var controller = getRawController();
+        return controller == null ? CraftingTaskContext.super.getTaskProcessTime(recipe, effect)
+                : controller.getTaskProcessTime(recipe, effect);
+    }
+
+    @Override public void onCraftsCompleted(long crafts) {
+        var controller = getController();
+        if (controller != null) controller.onCraftsCompleted(crafts);
     }
 
     @Override

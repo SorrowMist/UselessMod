@@ -1,0 +1,23 @@
+// Full Forge lifecycle datagen, opt-in so release builds retain compile-only optional integrations.
+// Staging output keeps generated differences reviewable before touching published resources.
+if (!providers.gradleProperty('migrationData').isPresent()) return
+
+dependencies {
+    modRuntimeOnly 'maven.modrinth:XxWD5pD3:jYgSnxye' // AE2 15.4.11
+    modRuntimeOnly 'maven.modrinth:Ck4E7v7R:i7Tp1AHw' // GuideME, required by native AE2
+    modRuntimeOnly 'maven.modrinth:Ce6I4WUE:uxe1WQp4' // Mekanism 10.4.16.80
+    modRuntimeOnly 'io.github.llamalad7:mixinextras-forge:0.5.0'
+}
+
+legacyForge {
+    runs {
+        data {
+            type = 'data'
+            gameDirectory = file('run/migration-data')
+            programArguments.addAll '--mod', mod_id, '--all',
+                    '--output', layout.buildDirectory.dir('migration-datagen/resources').get().asFile.absolutePath,
+                    '--existing', file('src/main/resources').absolutePath,
+                    '--existing', file('src/generated/resources').absolutePath
+        }
+    }
+}

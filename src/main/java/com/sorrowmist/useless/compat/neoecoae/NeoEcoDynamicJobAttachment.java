@@ -4,7 +4,7 @@ import cn.dancingsnow.neoecoae.api.me.attachment.ECOCraftingJobAttachment;
 import cn.dancingsnow.neoecoae.api.me.lifecycle.ECOCraftingJobContext;
 import cn.dancingsnow.neoecoae.api.me.lifecycle.ECOCraftingJobResult;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.DynamicPatternCpuStateManager;
-import net.minecraft.core.HolderLookup;
+import net.minecraft.core.RegistryAccess;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.resources.ResourceLocation;
 
@@ -29,19 +29,18 @@ public final class NeoEcoDynamicJobAttachment implements ECOCraftingJobAttachmen
     }
 
     @Override
-    public CompoundTag save(HolderLookup.Provider registries) {
-        CompoundTag tag = DynamicPatternCpuStateManager.INSTANCE.writeEcoJob(craftingJobId, registries);
+    public CompoundTag save() {
+        // ECO 20.5.0 and AE2 15 persist native NBT without a registry lookup. The shared
+        // state manager retains its cross-version parameter but does not use it on Forge.
+        CompoundTag tag = DynamicPatternCpuStateManager.INSTANCE.writeEcoJob(craftingJobId, RegistryAccess.EMPTY);
         return tag == null ? new CompoundTag() : tag;
     }
 
     @Override
-    public void load(CompoundTag tag, HolderLookup.Provider registries) {
-        if (tag.isEmpty()) {
-            DynamicPatternCpuStateManager.INSTANCE.ensureEcoJob(craftingJobId, cpu, grid);
-        } else {
-            DynamicPatternCpuStateManager.INSTANCE.readEcoJob(
-                    craftingJobId, cpu, grid, tag, registries);
-        }
+    public void load(CompoundTag tag) {
+        // Replace, including an empty attachment: ensureEcoJob alone would retain stale claims.
+        DynamicPatternCpuStateManager.INSTANCE.readEcoJob(
+                craftingJobId, cpu, grid, tag, RegistryAccess.EMPTY);
     }
 
     @Override

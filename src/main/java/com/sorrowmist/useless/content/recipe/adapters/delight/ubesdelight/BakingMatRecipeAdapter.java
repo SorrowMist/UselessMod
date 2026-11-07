@@ -1,6 +1,6 @@
 package com.sorrowmist.useless.content.recipe.adapters.delight.ubesdelight;
 
-import com.chefmooon.ubesdelight.common.crafting.neoforge.BakingMatRecipeImpl;
+import com.chefmooon.ubesdelight.common.crafting.forge.BakingMatRecipeImpl;
 import com.chefmooon.ubesdelight.common.crafting.ingredient.ChanceResult;
 import com.chefmooon.ubesdelight.common.tag.CommonTags;
 import com.sorrowmist.useless.api.enums.AlloyFurnaceMode;
@@ -177,13 +177,12 @@ public final class BakingMatRecipeAdapter implements IRecipeAdapter<BakingMatRec
         }
 
         try {
-            for (Ingredient.Value value : tool.getValues()) {
-                if (value instanceof Ingredient.TagValue tagValue
-                        && tagValue.tag().equals(CommonTags.C_TOOLS_ROLLING_PIN)) {
-                    return true;
-                }
+            // Keep the tag identity even before datapack tags have been bound.
+            if (com.sorrowmist.useless.compat.forge1201.recipe.NativeIngredients.directItemTag(tool).filter(
+                    CommonTags.C_TOOLS_ROLLING_PINS::equals).isPresent()) {
+                return true;
             }
-            for (ItemStack rollingPin : Ingredient.of(CommonTags.C_TOOLS_ROLLING_PIN).getItems()) {
+            for (ItemStack rollingPin : Ingredient.of(CommonTags.C_TOOLS_ROLLING_PINS).getItems()) {
                 if (!rollingPin.isEmpty() && tool.test(rollingPin)) {
                     return true;
                 }

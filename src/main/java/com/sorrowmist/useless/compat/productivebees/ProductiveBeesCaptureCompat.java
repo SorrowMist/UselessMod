@@ -21,7 +21,18 @@ public final class ProductiveBeesCaptureCompat {
             return null;
         }
 
-        ResourceLocation beeType = productiveBee.getBeeType();
-        return beeType == null ? ItemStack.EMPTY : BeeCreator.getSpawnEgg(beeType);
+        // 12.6.0 uses a String for both methods (BeeIngredient's type is a ResourceLocation,
+        // ProductiveBee's is not). Retain the native configured egg's EntityTag/type unchanged.
+        String beeType = productiveBee.getBeeType();
+        if (beeType == null || beeType.isBlank() || ResourceLocation.tryParse(beeType) == null) {
+            return ItemStack.EMPTY;
+        }
+        try {
+            ItemStack egg = BeeCreator.getSpawnEgg(beeType);
+            return egg == null || egg.isEmpty() ? ItemStack.EMPTY : egg.copy();
+        } catch (RuntimeException exception) {
+            // A missing native egg must not fall through to a generic/free species replacement.
+            return ItemStack.EMPTY;
+        }
     }
 }

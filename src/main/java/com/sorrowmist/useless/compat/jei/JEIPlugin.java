@@ -11,6 +11,7 @@ import com.sorrowmist.useless.content.menus.DimensionConfigMenu;
 import com.sorrowmist.useless.world.dimension.DimensionGenerationConfig;
 import com.sorrowmist.useless.content.recipe.AlloyFurnaceRecipeCatalog;
 import com.sorrowmist.useless.content.recipe.AlloyFurnaceRecipeIdentity;
+import com.sorrowmist.useless.content.recipe.EntropyTransmutationRecipe;
 import com.sorrowmist.useless.content.stafflink.LinkFilterSlot;
 import com.sorrowmist.useless.content.stafflink.StaffLinkFilters;
 import com.sorrowmist.useless.content.stafflink.StaffLinkRoute;
@@ -49,6 +50,7 @@ public final class JEIPlugin implements IModPlugin {
     private static IJeiRuntime runtime;
     private static final Map<AlloyFurnaceRecipeIdentity, AlloyFurnaceRecipeCatalog.Entry>
             registeredAlloyFurnaceRecipes = new LinkedHashMap<>();
+    private static List<EntropyTransmutationRecipe> registeredEntropyRecipes = List.of();
 
     @Override
     public @NotNull ResourceLocation getPluginUid() {
@@ -68,6 +70,7 @@ public final class JEIPlugin implements IModPlugin {
         IGuiHelper guiHelper = registration.getJeiHelpers().getGuiHelper();
         registration.addRecipeCategories(new AdvancedAlloyFurnaceRecipeCategory(guiHelper));
         registration.addRecipeCategories(new CatalystInfoCategory(guiHelper));
+        registration.addRecipeCategories(new EntropyTransmutationJeiCategory(guiHelper));
     }
 
     @Override
@@ -84,6 +87,9 @@ public final class JEIPlugin implements IModPlugin {
             registeredAlloyFurnaceRecipes.put(recipe.identity(), recipe);
         }
         registration.addRecipes(AdvancedAlloyFurnaceRecipeCategory.TYPE, recipes);
+        registeredEntropyRecipes = level == null ? List.of()
+                : List.copyOf(level.getRecipeManager().getAllRecipesFor(EntropyTransmutationRecipe.TYPE));
+        registration.addRecipes(EntropyTransmutationJeiCategory.TYPE, registeredEntropyRecipes);
         registration.addRecipes(CatalystInfoCategory.TYPE,
                 List.of(new CatalystInfoCategory.CatalystInfo()));
     }
@@ -363,6 +369,8 @@ public final class JEIPlugin implements IModPlugin {
 
     @Override
     public void registerRecipeCatalysts(IRecipeCatalystRegistration registration) {
+        registration.addRecipeCatalyst(appeng.core.definitions.AEItems.ENTROPY_MANIPULATOR.stack(),
+                EntropyTransmutationJeiCategory.TYPE);
         ItemStack singleBlockFurnace = new ItemStack(ModBlocks.ADVANCED_ALLOY_FURNACE_BLOCK.get());
         registration.addRecipeCatalyst(singleBlockFurnace, AdvancedAlloyFurnaceRecipeCategory.TYPE);
         registration.addRecipeCatalyst(
@@ -393,6 +401,7 @@ public final class JEIPlugin implements IModPlugin {
         HostileNetworksJeiRecipes.clear();
         AEKeyJeiIngredients.setRuntime(null);
         registeredAlloyFurnaceRecipes.clear();
+        registeredEntropyRecipes = List.of();
     }
 
     /** Adds recipes generated after JEI's initial registration, such as data-driven compat data. */
@@ -409,6 +418,13 @@ public final class JEIPlugin implements IModPlugin {
 
         Level level = minecraft.level;
         if (level == null || !AlloyFurnaceRecipeCatalog.isReady(level)) return;
+        List<EntropyTransmutationRecipe> entropyRecipes = List.copyOf(
+                level.getRecipeManager().getAllRecipesFor(EntropyTransmutationRecipe.TYPE));
+        if (!entropyRecipes.equals(registeredEntropyRecipes)) {
+            runtime.getRecipeManager().hideRecipes(EntropyTransmutationJeiCategory.TYPE, registeredEntropyRecipes);
+            runtime.getRecipeManager().addRecipes(EntropyTransmutationJeiCategory.TYPE, entropyRecipes);
+            registeredEntropyRecipes = entropyRecipes;
+        }
 
         List<AlloyFurnaceRecipeCatalog.Entry> additions = new ArrayList<>();
         for (AlloyFurnaceRecipeCatalog.Entry recipe : HostileNetworksJeiRecipes.prepare(

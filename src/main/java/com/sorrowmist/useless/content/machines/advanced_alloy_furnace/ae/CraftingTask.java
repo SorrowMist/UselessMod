@@ -690,6 +690,18 @@ public class CraftingTask {
             } else if (taskProgressRef != null && !STATUS_WAITING_ENERGY.equals(waitingStatusKey)) {
                 taskProgressRef.setStatus(STATUS_PROCESSING, "");
             }
+            if (progress == 0 && accumulatedEnergy == 0L) {
+                // A queued sub-batch may have been selected just as maintenance ran out.
+                // Re-evaluate its duration after repair, rather than retaining MAX_VALUE forever.
+                int previousTime = processTime;
+                refreshCatalystLayout();
+                recalculateBatchLayout();
+                if (previousTime != processTime) {
+                    if (progressRegistered) context.getTotalAEMaxProgressAtomic().addAndGet(processTime - previousTime);
+                    if (taskProgressRef != null) taskProgressRef.setMaxProgress(processTime);
+                    context.markChanged();
+                }
+            }
 
             if (progress < processTime) {
                 ProgressEnergyStep energyStep = getProgressEnergyStep(recipe, resolvedCatalystEffect);
@@ -759,6 +771,7 @@ public class CraftingTask {
             return false;
         }
         awaitingOutputFlush = false;
+        context.onCraftsCompleted(craftCount);
 
         displayedCraftCount -= craftCount;
         updateTaskProgressTotals();

@@ -56,21 +56,22 @@ public class ImbuementRecipeAdapter implements IRecipeAdapter<ImbuementRecipe> {
         if (holder == null) return List.of();
 
         ImbuementRecipe originalRecipe = holder.value();
+        if (originalRecipe.getClass() != ImbuementRecipe.class) return List.of();
         ResourceLocation originalId = holder.id();
 
-        Ingredient input = originalRecipe.getInput();
-        ItemStack output = originalRecipe.getOutput();
-        int source = originalRecipe.getSource();
+        Ingredient input = originalRecipe.input;
+        ItemStack output = originalRecipe.output;
+        int source = originalRecipe.source;
 
         if (input.isEmpty() || output.isEmpty()) {
             return List.of();
         }
 
-        int energy = Math.max(source * 10, 500);
+        long energy = Math.max((long) source * 10L, 500L);
         int processTime = AdapterUtils.DEFAULT_PROCESS_TIME;
 
         // 产物作为模具
-        Ingredient moldIngredient = Ingredient.of(output.copy());
+        Ingredient moldIngredient = com.sorrowmist.useless.compat.forge1201.recipe.DataComponentIngredient.of(true, output);
 
         AdvancedAlloyFurnaceRecipe convertedRecipe = new AdvancedAlloyFurnaceRecipe(
                 AdapterUtils.convertedId(originalId),
@@ -105,9 +106,10 @@ public class ImbuementRecipeAdapter implements IRecipeAdapter<ImbuementRecipe> {
         List<RecipeHolder<ImbuementRecipe>> matches = new java.util.ArrayList<>();
         for (RecipeHolder<ImbuementRecipe> holder : recipes) {
             ImbuementRecipe recipe = holder.value();
+            if (recipe.getClass() != ImbuementRecipe.class) continue;
 
-            Ingredient input = recipe.getInput();
-            ItemStack output = recipe.getOutput();
+            Ingredient input = recipe.input;
+            ItemStack output = recipe.output;
 
             if (input.isEmpty() || output.isEmpty()) continue;
             if (!AdapterUtils.hasMatchingIngredient(mergedInputs, input)) continue;

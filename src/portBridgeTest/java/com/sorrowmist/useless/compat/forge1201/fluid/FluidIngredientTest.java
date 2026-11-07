@@ -60,6 +60,33 @@ class FluidIngredientTest {
         assertSame(Fluids.LAVA,ingredient.getStacks()[0].getFluid());
     }
 
+    @Test void liveFluidTagAndNbtBothSurviveJsonNetworkAndTagReload() {
+        TagKey<Fluid> tag=TagKey.create(Registries.FLUID,new ResourceLocation("useless_port_test:nbt_fluid"));
+        var expected=water("pure");
+        var ingredient=FluidIngredient.nbtTag(true,tag,expected.getTag());
+        var extra=water("pure"); extra.getOrCreateTag().putInt("extra",1);
+        BuiltInRegistries.FLUID.bindTags(Map.of(tag,List.of(BuiltInRegistries.FLUID.wrapAsHolder(Fluids.WATER))));
+        assertTrue(ingredient.test(water("pure")));
+        assertFalse(ingredient.test(water("dirty")));
+        assertFalse(ingredient.test(extra));
+        assertFalse(ingredient.test(new FluidStack(Fluids.LAVA,1000)));
+        assertFalse(ingredient.isSimple());
+        assertTrue(ingredient.tagOnlyTags().isEmpty());
+        assertEquals(ingredient,FluidIngredient.fromJson(ingredient.toJson()));
+        FriendlyByteBuf buf=new FriendlyByteBuf(Unpooled.buffer());
+        try {
+            FluidIngredient.STREAM_CODEC.encode(buf,ingredient);
+            assertEquals(ingredient,FluidIngredient.STREAM_CODEC.decode(buf));
+            assertEquals(0,buf.readableBytes());
+        } finally { buf.release(); }
+        assertEquals("pure",ingredient.getStacks()[0].getTag().getString("grade"));
+        BuiltInRegistries.FLUID.bindTags(Map.of(tag,List.of(BuiltInRegistries.FLUID.wrapAsHolder(Fluids.LAVA))));
+        assertFalse(ingredient.test(water("pure")));
+        var lava=new FluidStack(Fluids.LAVA,1000); lava.setTag(expected.getTag().copy());
+        assertTrue(ingredient.test(lava));
+        assertTrue(FluidIngredient.nbtTag(false,tag,expected.getTag()).test(lava));
+    }
+
     @Test void invalidOrUnknownPredicatesAreNotAcceptedAsOrdinaryFluid() {
         for(String json:List.of("{\"fluid\":\"missing:fluid\"}","{\"type\":\"unknown:predicate\",\"fluid\":\"minecraft:water\"}",
                 "{\"fluid\":\"minecraft:water\",\"components\":{\"other:state\":1}}"))

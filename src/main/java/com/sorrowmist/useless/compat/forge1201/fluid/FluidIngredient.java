@@ -24,7 +24,7 @@ public final class FluidIngredient implements Predicate<FluidStack> {
     public static final StreamCodec<FriendlyByteBuf,FluidIngredient> STREAM_CODEC = StreamCodec.of(
             (buf,value) -> buf.writeUtf(value.toJson().toString(),1_048_576),
             buf -> fromJson(JsonParser.parseString(buf.readUtf(1_048_576))));
-    private enum Kind { FLUID, TAG, SAME_FLUID, SAME_TAG, NBT, MERGE_NBT, ANY }
+    private enum Kind { FLUID, TAG, SAME_FLUID, SAME_TAG, NBT, TAG_NBT, MERGE_NBT, ANY }
     private final Kind kind;
     private final ResourceLocation id;
     private final CompoundTag nbt;
@@ -46,6 +46,11 @@ public final class FluidIngredient implements Predicate<FluidStack> {
         if (!tag.isFor(Registries.FLUID)) throw new IllegalArgumentException("Not a fluid tag");
         return new FluidIngredient(Kind.TAG,tag.location(),null,false,List.of());
     }
+    /** Live fluid tag AND native NBT, used by Forge IE FluidTagInput. */
+    public static FluidIngredient nbtTag(boolean strict, TagKey<Fluid> tag, CompoundTag nbt) {
+        if (!tag.isFor(Registries.FLUID)) throw new IllegalArgumentException("Not a fluid tag");
+        return new FluidIngredient(Kind.TAG_NBT, tag.location(), nbt, strict, List.of());
+    }
     public static FluidIngredient nbt(boolean strict, FluidStack stack) {
         if (stack.isEmpty()) throw new IllegalArgumentException("Empty NBT fluid ingredient");
         return new FluidIngredient(Kind.NBT,BuiltInRegistries.FLUID.getKey(stack.getFluid()),stack.getTag(),strict,List.of());
@@ -66,6 +71,8 @@ public final class FluidIngredient implements Predicate<FluidStack> {
                 yield matched;
             }
             case TAG -> stack.getFluid().builtInRegistryHolder().is(TagKey.create(Registries.FLUID,id));
+            case TAG_NBT -> stack.getFluid().builtInRegistryHolder().is(TagKey.create(Registries.FLUID,id))
+                    && (strict ? Objects.equals(nbt,stack.getTag()) : NbtUtils.compareNbt(nbt,stack.getTag(),true));
             case NBT -> id.equals(BuiltInRegistries.FLUID.getKey(stack.getFluid()))
                     && (strict ? Objects.equals(nbt,stack.getTag()) : NbtUtils.compareNbt(nbt,stack.getTag(),true));
             case MERGE_NBT -> id.equals(BuiltInRegistries.FLUID.getKey(stack.getFluid()))
@@ -86,10 +93,14 @@ public final class FluidIngredient implements Predicate<FluidStack> {
     }
     public FluidStack[] getStacks() {
         if(kind==Kind.ANY) return children.stream().flatMap(c -> Arrays.stream(c.getStacks())).toArray(FluidStack[]::new);
-        if(kind==Kind.TAG || kind==Kind.SAME_TAG) {
+        if(kind==Kind.TAG || kind==Kind.SAME_TAG || kind==Kind.TAG_NBT) {
             List<FluidStack> result=new ArrayList<>();
-            for(var holder:BuiltInRegistries.FLUID.getTagOrEmpty(TagKey.create(Registries.FLUID,id)))
-                if(holder.value()!=Fluids.EMPTY) result.add(new FluidStack(holder.value(),1));
+            for(var holder:BuiltInRegistries.FLUID.getTagOrEmpty(TagKey.create(Registries.FLUID,id))) {
+                if(holder.value()==Fluids.EMPTY) continue;
+                FluidStack stack=new FluidStack(holder.value(),1);
+                if(nbt!=null) stack.setTag(nbt.copy());
+                result.add(stack);
+            }
             return result.toArray(FluidStack[]::new);
         }
         FluidStack stack=new FluidStack(BuiltInRegistries.FLUID.get(id),1);
@@ -101,9 +112,9 @@ public final class FluidIngredient implements Predicate<FluidStack> {
             JsonArray array=new JsonArray(); children.forEach(child -> array.add(child.toJson())); return array;
         }
         JsonObject json=new JsonObject();
-        json.addProperty((kind==Kind.TAG || kind==Kind.SAME_TAG)?"tag":"fluid",id.toString());
-        if(kind==Kind.NBT || kind==Kind.MERGE_NBT) {
-            json.addProperty("type",kind==Kind.MERGE_NBT?"useless_mod:merge_nbt_fluid":"useless_mod:nbt_fluid"); json.addProperty("strict",strict);
+        json.addProperty((kind==Kind.TAG || kind==Kind.SAME_TAG || kind==Kind.TAG_NBT)?"tag":"fluid",id.toString());
+        if(kind==Kind.NBT || kind==Kind.MERGE_NBT || kind==Kind.TAG_NBT) {
+            json.addProperty("type",kind==Kind.TAG_NBT?"useless_mod:nbt_fluid_tag":kind==Kind.MERGE_NBT?"useless_mod:merge_nbt_fluid":"useless_mod:nbt_fluid"); json.addProperty("strict",strict);
             if(nbt!=null) json.addProperty("nbt",com.sorrowmist.useless.compat.forge1201.recipe.NbtCanonical.snbt(nbt));
         }
         if(kind==Kind.SAME_FLUID || kind==Kind.SAME_TAG)
@@ -126,14 +137,21 @@ public final class FluidIngredient implements Predicate<FluidStack> {
         String type=json.has("type")?json.get("type").getAsString():"";
         if(type.equals("neoforge:compound") || type.equals("useless_mod:compound_fluid"))
             return parse(json.get("children"),depth+1);
-        if(!type.isEmpty() && !type.equals("useless_mod:nbt_fluid") && !type.equals("useless_mod:merge_nbt_fluid") && !type.equals("useless_mod:same_fluid") && !type.equals("useless_mod:same_fluid_tag"))
+        if(!type.isEmpty() && !type.equals("useless_mod:nbt_fluid") && !type.equals("useless_mod:nbt_fluid_tag") && !type.equals("useless_mod:merge_nbt_fluid") && !type.equals("useless_mod:same_fluid") && !type.equals("useless_mod:same_fluid_tag"))
             throw new JsonSyntaxException("Unsupported fluid predicate type: "+type);
         if(json.has("tag")) {
+            if(type.equals("useless_mod:nbt_fluid_tag")) {
+                if(json.has("fluid")) throw new JsonSyntaxException("Ambiguous fluid tag predicate");
+                return nbtTag(!json.has("strict") || json.get("strict").getAsBoolean(),
+                        TagKey.create(Registries.FLUID,new ResourceLocation(json.get("tag").getAsString())),
+                        json.has("nbt")?CraftingHelper.getNBT(json.get("nbt")):null);
+            }
             if(json.has("fluid") || json.has("nbt")) throw new JsonSyntaxException("Ambiguous fluid tag predicate");
             if(type.equals("useless_mod:same_fluid_tag"))
                 return new FluidIngredient(Kind.SAME_TAG,new ResourceLocation(json.get("tag").getAsString()),null,false,List.of());
             return tag(TagKey.create(Registries.FLUID,new ResourceLocation(json.get("tag").getAsString())));
         }
+        if(type.equals("useless_mod:nbt_fluid_tag")) throw new JsonSyntaxException("NBT fluid tag requires a tag");
         ResourceLocation id=new ResourceLocation(json.get("fluid").getAsString());
         if(!BuiltInRegistries.FLUID.containsKey(id) || BuiltInRegistries.FLUID.get(id)==Fluids.EMPTY)
             throw new JsonSyntaxException("Unknown fluid ingredient: "+id);

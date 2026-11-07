@@ -80,7 +80,7 @@ public class SoulJarRecipeAdapter implements IRecipeAdapter<SoulJarRecipeAdapter
     }
 
     private static ResourceLocation recipeId(ResourceLocation soulTypeId, ResourceLocation entityId) {
-        return new ResourceLocation(
+        return ResourceLocation.fromNamespaceAndPath(
                 "mysticalagriculture",
                 "soul_jar_" + idPart(soulTypeId) + "_" + idPart(entityId));
     }

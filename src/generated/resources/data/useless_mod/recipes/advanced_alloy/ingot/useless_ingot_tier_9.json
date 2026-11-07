@@ -1,36 +1,48 @@
 {
   "type": "useless_mod:advanced_alloy_furnace",
-  "energy": 100000000,
+  "energy": 819200000,
   "id": "useless_mod:advanced_alloy/ingot/useless_ingot_tier_9",
   "ingredients": [
     {
-      "count": 2,
+      "count": 8,
       "ingredient": {
-        "item": "minecraft:turtle_helmet"
+        "item": "minecraft:dragon_head"
       }
     },
     {
-      "count": 2,
+      "count": 8,
       "ingredient": {
         "item": "minecraft:goat_horn"
       }
     },
     {
-      "count": 2,
+      "count": 8,
       "ingredient": {
         "item": "minecraft:rabbit_foot"
       }
     },
     {
-      "count": 2,
+      "count": 16,
       "ingredient": {
-        "item": "minecraft:diamond_block"
+        "item": "ae2:not_so_mysterious_cube"
       }
     },
     {
-      "count": 2,
+      "count": 16,
       "ingredient": {
         "item": "minecraft:netherite_block"
+      }
+    },
+    {
+      "count": 8,
+      "ingredient": {
+        "item": "minecraft:turtle_helmet"
+      }
+    },
+    {
+      "count": 8,
+      "ingredient": {
+        "item": "minecraft:piglin_head"
       }
     },
     {
@@ -41,8 +53,9 @@
   ],
   "outputs": [
     {
-      "id": "useless_mod:useless_ingot_tier_9"
+      "item": "useless_mod:useless_ingot_tier_9"
     }
   ],
-  "process_time": 1
+  "process_time": 1,
+  "tier": 8
 }

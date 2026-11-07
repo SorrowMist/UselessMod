@@ -1,7 +1,6 @@
 package com.sorrowmist.useless.content.recipe.adapters.pneumaticcraft;
 
 import appeng.api.stacks.AEKey;
-import com.mojang.datafixers.util.Either;
 import com.sorrowmist.useless.api.enums.AlloyFurnaceMode;
 import com.sorrowmist.useless.content.recipe.AdapterUtils;
 import com.sorrowmist.useless.content.recipe.AdvancedAlloyFurnaceRecipe;
@@ -10,7 +9,8 @@ import com.sorrowmist.useless.content.recipe.FluidIngredientAllocator;
 import com.sorrowmist.useless.content.recipe.IRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.RecipeSourceIds;
 import me.desht.pneumaticcraft.api.crafting.AmadronTradeResource;
-import me.desht.pneumaticcraft.api.crafting.ingredient.FluidContainerIngredient;
+import me.desht.pneumaticcraft.api.crafting.ingredient.FluidIngredient;
+import me.desht.pneumaticcraft.api.crafting.ingredient.StackedIngredient;
 import me.desht.pneumaticcraft.api.crafting.recipe.AmadronRecipe;
 import me.desht.pneumaticcraft.api.crafting.recipe.AssemblyRecipe;
 import me.desht.pneumaticcraft.api.crafting.recipe.FluidMixerRecipe;
@@ -19,11 +19,13 @@ import me.desht.pneumaticcraft.api.crafting.recipe.PneumaticCraftRecipe;
 import me.desht.pneumaticcraft.api.crafting.recipe.PressureChamberRecipe;
 import me.desht.pneumaticcraft.api.crafting.recipe.RefineryRecipe;
 import me.desht.pneumaticcraft.api.crafting.recipe.ThermoPlantRecipe;
-import me.desht.pneumaticcraft.common.registry.ModBlocks;
-import me.desht.pneumaticcraft.common.registry.ModItems;
-import me.desht.pneumaticcraft.common.registry.ModRecipeTypes;
-import me.desht.pneumaticcraft.common.recipes.machine.PressureDisenchantingRecipe;
-import me.desht.pneumaticcraft.common.recipes.machine.PressureEnchantingRecipe;
+import me.desht.pneumaticcraft.common.core.ModBlocks;
+import me.desht.pneumaticcraft.common.core.ModItems;
+import me.desht.pneumaticcraft.common.core.ModRecipeTypes;
+import me.desht.pneumaticcraft.common.recipes.PneumaticCraftRecipeType;
+import me.desht.pneumaticcraft.common.recipes.machine.PressureChamberRecipeImpl;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.crafting.Ingredient;
@@ -40,6 +42,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
+import java.util.function.Supplier;
 
 /** Converts PneumaticCraft's static machine recipes into alloy-furnace recipes. */
 public final class PneumaticCraftRecipeAdapter<T extends PneumaticCraftRecipe>
@@ -79,37 +82,37 @@ public final class PneumaticCraftRecipeAdapter<T extends PneumaticCraftRecipe>
 
     public static PneumaticCraftRecipeAdapter<FluidMixerRecipe> fluidMixer() {
         return fixed(FluidMixerRecipe.class, Kind.FLUID_MIXER,
-                level -> ModRecipeTypes.getRecipes(level, ModRecipeTypes.FLUID_MIXER),
+                level -> recipes(level, ModRecipeTypes.FLUID_MIXER),
                 new ItemStack(ModBlocks.FLUID_MIXER.get()));
     }
 
     public static PneumaticCraftRecipeAdapter<HeatFrameCoolingRecipe> heatFrameCooling() {
         return fixed(HeatFrameCoolingRecipe.class, Kind.HEAT_FRAME_COOLING,
-                level -> ModRecipeTypes.getRecipes(level, ModRecipeTypes.HEAT_FRAME_COOLING),
+                level -> recipes(level, ModRecipeTypes.HEAT_FRAME_COOLING),
                 new ItemStack(ModItems.HEAT_FRAME.get()));
     }
 
     public static PneumaticCraftRecipeAdapter<PressureChamberRecipe> pressureChamber() {
         return fixed(PressureChamberRecipe.class, Kind.PRESSURE_CHAMBER,
-                level -> ModRecipeTypes.getRecipes(level, ModRecipeTypes.PRESSURE_CHAMBER),
+                level -> recipes(level, ModRecipeTypes.PRESSURE_CHAMBER),
                 new ItemStack(ModBlocks.PRESSURE_CHAMBER_VALVE.get()));
     }
 
     public static PneumaticCraftRecipeAdapter<RefineryRecipe> refinery() {
         return fixed(RefineryRecipe.class, Kind.REFINERY,
-                level -> ModRecipeTypes.getRecipes(level, ModRecipeTypes.REFINERY),
+                level -> recipes(level, ModRecipeTypes.REFINERY),
                 new ItemStack(ModBlocks.REFINERY.get()));
     }
 
     public static PneumaticCraftRecipeAdapter<ThermoPlantRecipe> thermoPlant() {
         return fixed(ThermoPlantRecipe.class, Kind.THERMO_PLANT,
-                level -> ModRecipeTypes.getRecipes(level, ModRecipeTypes.THERMO_PLANT),
+                level -> recipes(level, ModRecipeTypes.THERMO_PLANT),
                 new ItemStack(ModBlocks.THERMOPNEUMATIC_PROCESSING_PLANT.get()));
     }
 
     public static PneumaticCraftRecipeAdapter<AmadronRecipe> amadron() {
         return fixed(AmadronRecipe.class, Kind.AMADRON,
-                level -> ModRecipeTypes.getRecipes(level, ModRecipeTypes.AMADRON),
+                level -> recipes(level, ModRecipeTypes.AMADRON),
                 new ItemStack(ModItems.AMADRON_TABLET.get()));
     }
 
@@ -123,10 +126,15 @@ public final class PneumaticCraftRecipeAdapter<T extends PneumaticCraftRecipe>
 
     private static Collection<RecipeHolder<AssemblyRecipe>> assemblyRecipes(Level level) {
         List<RecipeHolder<AssemblyRecipe>> result = new ArrayList<>();
-        result.addAll(ModRecipeTypes.getRecipes(level, ModRecipeTypes.ASSEMBLY_DRILL));
-        result.addAll(ModRecipeTypes.getRecipes(level, ModRecipeTypes.ASSEMBLY_LASER));
-        result.addAll(ModRecipeTypes.getRecipes(level, ModRecipeTypes.ASSEMBLY_DRILL_LASER));
+        result.addAll(recipes(level, ModRecipeTypes.ASSEMBLY_DRILL));
+        result.addAll(recipes(level, ModRecipeTypes.ASSEMBLY_LASER));
+        result.addAll(recipes(level, ModRecipeTypes.ASSEMBLY_DRILL_LASER));
         return result;
+    }
+
+    private static <R extends PneumaticCraftRecipe> List<RecipeHolder<R>> recipes(
+            Level level, Supplier<PneumaticCraftRecipeType<R>> type) {
+        return ModRecipeTypes.getRecipes(level, type).stream().map(RecipeHolder::of).toList();
     }
 
     @Override
@@ -150,7 +158,7 @@ public final class PneumaticCraftRecipeAdapter<T extends PneumaticCraftRecipe>
         if (level == null || kind != Kind.ASSEMBLY) return List.of();
 
         Collection<RecipeHolder<AssemblyRecipe>> generated =
-                ModRecipeTypes.getRecipes(level, ModRecipeTypes.ASSEMBLY_DRILL_LASER);
+                recipes(level, ModRecipeTypes.ASSEMBLY_DRILL_LASER);
         return (List<RecipeHolder<T>>) (List<?>) List.copyOf(generated);
     }
 
@@ -196,15 +204,16 @@ public final class PneumaticCraftRecipeAdapter<T extends PneumaticCraftRecipe>
         Map<FluidStack, Long> safeFluids = mergedFluids == null ? Map.of() : mergedFluids;
         List<RecipeHolder<T>> matches = new ArrayList<>();
         for (RecipeHolder<T> holder : recipeProvider.apply(level)) {
-            if (kind == Kind.HEAT_FRAME_COOLING
-                    && !matchesHeatFrameInput((HeatFrameCoolingRecipe) holder.value(), actualInputs)) {
-                continue;
-            }
-
-            List<AdvancedAlloyFurnaceRecipe> converted = convertAll(holder, level);
-            if (converted.stream().anyMatch(recipe -> matchesConverted(recipe, safeInputs, safeFluids))) {
-                matches.add(holder);
-            }
+            boolean matched = com.sorrowmist.useless.content.recipe.AdapterGuards.callEach(
+                    this, "matchRecipe", () -> holder.id().toString(), () -> {
+                        if (kind == Kind.HEAT_FRAME_COOLING
+                                && !matchesHeatFrameInput((HeatFrameCoolingRecipe) holder.value(), actualInputs)) {
+                            return false;
+                        }
+                        return convertAll(holder, level).stream()
+                                .anyMatch(recipe -> matchesConverted(recipe, safeInputs, safeFluids));
+                    }, false);
+            if (matched) matches.add(holder);
         }
         return matches;
     }
@@ -224,21 +233,15 @@ public final class PneumaticCraftRecipeAdapter<T extends PneumaticCraftRecipe>
     private boolean matchesHeatFrameInput(
             HeatFrameCoolingRecipe recipe, List<ItemStack> actualInputs) {
         if (actualInputs == null || actualInputs.isEmpty()) return true;
-        Either<Ingredient, FluidContainerIngredient> input = recipe.getInput();
-        if (input == null) return false;
-        if (input.left().isPresent()) {
-            Ingredient ingredient = input.left().get();
-            return actualInputs.stream().anyMatch(ingredient::test);
-        }
-        return input.right().map(container ->
-                actualInputs.stream().anyMatch(container::test)).orElse(false);
+        Ingredient input = recipe.getInput();
+        return input != null && actualInputs.stream().anyMatch(input::test);
     }
 
     @Nullable
-    private static AdvancedAlloyFurnaceRecipe convertAssembly(
+    private AdvancedAlloyFurnaceRecipe convertAssembly(
             ResourceLocation id, AssemblyRecipe source) {
-        if (source.getInput() == null || source.getInput().ingredient().isEmpty()
-                || source.getInput().count() <= 0 || source.getOutput().isEmpty()) {
+        if (source.getInput() == null || source.getInput().isEmpty()
+                || source.getInputAmount() <= 0 || source.getOutput().isEmpty()) {
             return null;
         }
 
@@ -248,31 +251,31 @@ public final class PneumaticCraftRecipeAdapter<T extends PneumaticCraftRecipe>
             case DRILL_LASER -> new ItemStack(ModItems.ASSEMBLY_PROGRAM_DRILL_LASER.get());
         };
         return build(id,
-                List.of(new CountedIngredient(source.getInput().ingredient(), source.getInput().count())),
+                List.of(new CountedIngredient(itemPredicate(source.getInput()), source.getInputAmount())),
                 List.of(),
                 List.of(source.getOutput().copy()),
-                List.of(Ingredient.of(new ItemStack(ModBlocks.ASSEMBLY_PLATFORM.get())),
-                        Ingredient.of(program)),
+                List.of(Ingredient.of(getMoldItem()), Ingredient.of(program)),
                 AdapterUtils.DEFAULT_PROCESS_TIME);
     }
 
     @Nullable
-    private static AdvancedAlloyFurnaceRecipe convertPressureChamber(
+    private AdvancedAlloyFurnaceRecipe convertPressureChamber(
             ResourceLocation id, PressureChamberRecipe source) {
-        if (source instanceof PressureEnchantingRecipe
-                || source instanceof PressureDisenchantingRecipe) {
-            return null;
+        // Enchanting/disenchanting and third-party subclasses compute their outputs from inventory.
+        if (source.getClass() != PressureChamberRecipeImpl.class) return null;
+        List<CountedIngredient> inputs = countedInputs(source.getInputsForDisplay());
+        List<ItemStack> outputs = new ArrayList<>();
+        for (List<ItemStack> slot : source.getResultsForDisplay()) {
+            if (slot.size() != 1) return null; // display alternatives are not simultaneous outputs
+            outputs.add(slot.get(0).copy());
         }
-        List<CountedIngredient> inputs = countedInputs(source.getInputs());
-        List<ItemStack> outputs = copiedItems(source.getOutputs());
         if (inputs.isEmpty() || outputs.isEmpty()) return null;
         return build(id, inputs, List.of(), outputs,
-                List.of(Ingredient.of(new ItemStack(ModBlocks.PRESSURE_CHAMBER_VALVE.get()))),
-                AdapterUtils.DEFAULT_PROCESS_TIME);
+                List.of(Ingredient.of(getMoldItem())), AdapterUtils.DEFAULT_PROCESS_TIME);
     }
 
     @Nullable
-    private static AdvancedAlloyFurnaceRecipe convertFluidMixer(
+    private AdvancedAlloyFurnaceRecipe convertFluidMixer(
             ResourceLocation id, FluidMixerRecipe source) {
         List<SizedFluidIngredient> inputs = sizedFluids(source.getInput1(), source.getInput2());
         List<ItemStack> outputs = source.getOutputItem().isEmpty()
@@ -283,47 +286,41 @@ public final class PneumaticCraftRecipeAdapter<T extends PneumaticCraftRecipe>
         int time = source.getProcessingTime() > 0
                 ? source.getProcessingTime() : AdapterUtils.DEFAULT_PROCESS_TIME;
         return build(id, List.of(), inputs, outputs,
-                List.of(Ingredient.of(new ItemStack(ModBlocks.FLUID_MIXER.get()))), time, outputFluids);
+                List.of(Ingredient.of(getMoldItem())), time, outputFluids);
     }
 
     @Nullable
-    private static AdvancedAlloyFurnaceRecipe convertHeatFrameCooling(
+    private AdvancedAlloyFurnaceRecipe convertHeatFrameCooling(
             ResourceLocation id, HeatFrameCoolingRecipe source) {
-        Ingredient input = source.getInput().map(
-                ingredient -> ingredient,
-                container -> Ingredient.of(container.getItems()));
+        Ingredient input = source.getInput();
         if (input == null || input.isEmpty() || source.getOutput().isEmpty()) return null;
-
-        int outputCount = maximumHeatFrameOutput(source);
-        ItemStack output = source.getOutput().copyWithCount(outputCount);
-        return build(id,
-                List.of(new CountedIngredient(input, 1L)),
-                List.of(),
-                List.of(output),
-                List.of(Ingredient.of(new ItemStack(ModItems.HEAT_FRAME.get()))),
-                AdapterUtils.DEFAULT_PROCESS_TIME);
+        // Native bonuses use temperature-dependent stochastic rounding. A fixed maximum is not
+        // an equivalent recipe; only the deterministic (no bonus) case can be flattened.
+        if (source.getBonusMultiplier() > 0 && source.getBonusLimit() > 0) return null;
+        // FluidIngredient tests container capabilities; it is not an ordinary item predicate.
+        if (input instanceof FluidIngredient) return null;
+        return build(id, countedInputs(List.of(input)), List.of(), List.of(source.getOutput().copy()),
+                List.of(Ingredient.of(getMoldItem())), AdapterUtils.DEFAULT_PROCESS_TIME);
     }
 
     @Nullable
-    private static AdvancedAlloyFurnaceRecipe convertRefinery(
+    private AdvancedAlloyFurnaceRecipe convertRefinery(
             ResourceLocation id, RefineryRecipe source) {
         List<SizedFluidIngredient> inputs = sizedFluids(source.getInput());
         List<FluidStack> outputs = copiedFluids(source.getOutputs());
         if (inputs.isEmpty() || outputs.isEmpty()) return null;
         return build(id, List.of(), inputs, List.of(),
-                List.of(Ingredient.of(new ItemStack(ModBlocks.REFINERY.get()))),
+                List.of(Ingredient.of(getMoldItem())),
                 AdapterUtils.DEFAULT_PROCESS_TIME, outputs);
     }
 
     @Nullable
-    private static AdvancedAlloyFurnaceRecipe convertThermoPlant(
+    private AdvancedAlloyFurnaceRecipe convertThermoPlant(
             ResourceLocation id, ThermoPlantRecipe source) {
-        List<CountedIngredient> inputs = new ArrayList<>();
-        source.getInputItem().filter(ingredient -> !ingredient.isEmpty())
-                .ifPresent(ingredient -> inputs.add(new CountedIngredient(ingredient, 1L)));
-        List<SizedFluidIngredient> fluids = source.getInputFluid()
-                .filter(PneumaticCraftRecipeAdapter::validFluid)
-                .map(List::of).orElse(List.of());
+        Ingredient input = source.getInputItem();
+        List<CountedIngredient> inputs = input == null || input.isEmpty()
+                ? List.of() : countedInputs(List.of(input));
+        List<SizedFluidIngredient> fluids = sizedFluids(source.getInputFluid());
 
         List<ItemStack> outputs = source.getOutputItem().isEmpty()
                 ? List.of() : List.of(source.getOutputItem().copy());
@@ -333,13 +330,15 @@ public final class PneumaticCraftRecipeAdapter<T extends PneumaticCraftRecipe>
             return null;
         }
         return build(id, inputs, fluids, outputs,
-                List.of(Ingredient.of(new ItemStack(ModBlocks.THERMOPNEUMATIC_PROCESSING_PLANT.get()))),
+                List.of(Ingredient.of(getMoldItem())),
                 AdapterUtils.DEFAULT_PROCESS_TIME, outputFluids);
     }
 
     @Nullable
-    private static AdvancedAlloyFurnaceRecipe convertAmadron(
+    private AdvancedAlloyFurnaceRecipe convertAmadron(
             ResourceLocation id, AmadronRecipe source) {
+        // Player offers, limited stock and location restrictions cannot become infinite trades.
+        if (!source.isStaticOffer() || source.isLocationLimited() || source.getMaxStock() > 0) return null;
         AmadronTradeResource input = source.getInput();
         AmadronTradeResource output = source.getOutput();
         if (input == null || output == null || input.isEmpty() || output.isEmpty()) return null;
@@ -366,7 +365,7 @@ public final class PneumaticCraftRecipeAdapter<T extends PneumaticCraftRecipe>
             return null;
         }
         return build(id, inputs, fluids, outputs,
-                List.of(Ingredient.of(new ItemStack(ModItems.AMADRON_TABLET.get()))),
+                List.of(Ingredient.of(getMoldItem())),
                 AdapterUtils.DEFAULT_PROCESS_TIME, outputFluids);
     }
 
@@ -394,32 +393,66 @@ public final class PneumaticCraftRecipeAdapter<T extends PneumaticCraftRecipe>
                 Math.max(1, processTime), Ingredient.EMPTY, 0, molds, AlloyFurnaceMode.NORMAL);
     }
 
-    private static List<CountedIngredient> countedInputs(
-            List<net.minecraftforge.common.crafting.SizedIngredient> inputs) {
+    private static List<CountedIngredient> countedInputs(List<Ingredient> inputs) {
         List<CountedIngredient> result = new ArrayList<>();
-        if (inputs == null) return result;
-        for (net.minecraftforge.common.crafting.SizedIngredient input : inputs) {
-            if (input != null && input.ingredient() != null && !input.ingredient().isEmpty()
-                    && input.count() > 0) {
-                result.add(new CountedIngredient(input.ingredient(), input.count()));
-            }
+        for (Ingredient input : inputs) {
+            if (input == null || input.isEmpty()) throw new IllegalArgumentException("Empty PNC input");
+            // 6.0.23 consumes getItems()[0].getCount(), not a newer SizedIngredient.
+            ItemStack[] examples = input.getItems();
+            if (examples.length == 0) throw new IllegalArgumentException("PNC input has no examples");
+            int count = examples[0].getCount();
+            for (ItemStack example : examples) if (example.getCount() != count)
+                throw new IllegalArgumentException("PNC input alternatives have different counts");
+            result.add(new CountedIngredient(itemPredicate(input), count));
         }
         return List.copyOf(result);
     }
 
-    private static List<SizedFluidIngredient> sizedFluids(SizedFluidIngredient... inputs) {
+    private static Ingredient itemPredicate(Ingredient input) {
+        if (input instanceof FluidIngredient) throw new IllegalArgumentException("PNC container predicate");
+        if (!(input instanceof StackedIngredient)) return input;
+        JsonElement json = input.toJson().deepCopy();
+        Iterable<JsonElement> entries = json.isJsonArray() ? json.getAsJsonArray() : List.of(json);
+        for (JsonElement entry : entries) {
+            entry.getAsJsonObject().remove("type");
+            entry.getAsJsonObject().remove("count");
+        }
+        return Ingredient.fromJson(json); // native stacked ingredient tests item/tag, not stack NBT
+    }
+
+    private static List<SizedFluidIngredient> sizedFluids(FluidIngredient... inputs) {
         List<SizedFluidIngredient> result = new ArrayList<>();
-        if (inputs != null) {
-            for (SizedFluidIngredient input : inputs) {
-                if (validFluid(input)) result.add(input);
+        for (FluidIngredient input : inputs) {
+            if (input == null || input == FluidIngredient.EMPTY) continue;
+            // CompoundFluidIngredient's stream/amount semantics are not a static sized union.
+            if (input.getClass() != FluidIngredient.class || input.getAmount() <= 0)
+                throw new IllegalArgumentException("Unsupported PNC fluid ingredient");
+            JsonObject json = input.toJson().getAsJsonObject().deepCopy();
+            json.remove("type");
+            com.sorrowmist.useless.compat.forge1201.fluid.FluidIngredient predicate;
+            if (json.has("tag")) {
+                if (json.has("nbt")) {
+                    json.addProperty("type", "useless_mod:nbt_fluid_tag");
+                    json.addProperty("strict", false); // both native fuzzy modes use compareNbt(..., true)
+                }
+                predicate = com.sorrowmist.useless.compat.forge1201.fluid.FluidIngredient.fromJson(json);
+            } else {
+                // Native JSON writes only the first literal fluid, while getFluidStacks() drops
+                // NBT entirely. Combine the full ID list with the serialized NBT predicate.
+                var requiredNbt = json.has("nbt")
+                        ? net.minecraftforge.common.crafting.CraftingHelper.getNBT(json.get("nbt")) : null;
+                predicate = com.sorrowmist.useless.compat.forge1201.fluid.FluidIngredient.any(
+                        input.getFluidStacks().stream().map(stack -> {
+                            if (requiredNbt == null)
+                                return com.sorrowmist.useless.compat.forge1201.fluid.FluidIngredient.single(stack);
+                            var exact = new FluidStack(stack.getFluid(), stack.getAmount(), requiredNbt);
+                            return com.sorrowmist.useless.compat.forge1201.fluid.FluidIngredient.nbt(false, exact);
+                        }).toList());
             }
+            if (predicate.isEmpty()) throw new IllegalArgumentException("Empty PNC fluid predicate");
+            result.add(new SizedFluidIngredient(predicate, input.getAmount()));
         }
         return List.copyOf(result);
-    }
-
-    private static boolean validFluid(SizedFluidIngredient input) {
-        return input != null && input.ingredient() != null && !input.ingredient().isEmpty()
-                && input.amount() > 0;
     }
 
     private static List<ItemStack> copiedItems(List<ItemStack> stacks) {
@@ -444,15 +477,9 @@ public final class PneumaticCraftRecipeAdapter<T extends PneumaticCraftRecipe>
 
     private static Ingredient itemIngredient(ItemStack stack) {
         ItemStack representative = stack.copyWithCount(1);
-        return representative.getComponents().isEmpty()
+        return !representative.hasTag()
                 ? Ingredient.of(representative)
                 : DataComponentIngredient.of(true, representative);
     }
 
-    private static int maximumHeatFrameOutput(HeatFrameCoolingRecipe recipe) {
-        if (recipe.getBonusMultiplier() <= 0.0f) return 1;
-        double maximum = 1.0 + Math.max(0.0, recipe.getBonusLimit());
-        if (maximum >= Integer.MAX_VALUE) return Integer.MAX_VALUE;
-        return Math.max(1, (int) Math.ceil(maximum));
-    }
 }

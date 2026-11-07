@@ -3,6 +3,10 @@ package com.sorrowmist.useless.content.multiblock;
 import appeng.api.config.Actionable;
 import com.sorrowmist.useless.compat.AE2Compat;
 import com.sorrowmist.useless.content.blockentities.multiblock.MePatternAssemblyBlockEntity;
+import com.sorrowmist.useless.content.blockentities.multiblock.MaintenanceHatchBlockEntity;
+import com.sorrowmist.useless.content.blockentities.multiblock.AutoMaintenanceHatchBlockEntity;
+import com.sorrowmist.useless.content.blockentities.multiblock.MufflerHatchBlockEntity;
+import com.sorrowmist.useless.content.blockentities.multiblock.OmniversalMoldHubBlockEntity;
 import com.sorrowmist.useless.content.blockentities.multiblock.MultiblockAlloyFurnaceCoreBlockEntity;
 import com.sorrowmist.useless.content.blockentities.multiblock.PassiveCraftingHatchBlockEntity;
 import com.sorrowmist.useless.content.blocks.multiblock.MultiblockAlloyFurnaceCoreBlock;
@@ -43,6 +47,16 @@ public final class OmniversalFurnaceAutoBuilder {
         }
         Direction facing = coreState.getValue(MultiblockAlloyFurnaceCoreBlock.FACING);
 
+        for (var entry : OmniversalAlloyFurnaceStructure.entries()) {
+            if (!level.isLoaded(entry.worldPos(corePos, facing))) {
+                return failure("gui.useless_mod.multiblock_builder.blocked", entry.worldPos(corePos, facing).toShortString());
+            }
+        }
+        BlockPos mufflerPos = OmniversalAlloyFurnaceStructure.toWorld(corePos, facing,
+                OmniversalAlloyFurnaceStructure.PREFERRED_MUFFLER_POS);
+        if (!MufflerHatchBlockEntity.isExhaustClear(level, mufflerPos)) {
+            return failure("gui.useless_mod.multiblock_builder.blocked", mufflerPos.above().toShortString());
+        }
         int existingTier = 0;
         for (OmniversalAlloyFurnaceStructure.Entry entry : OmniversalAlloyFurnaceStructure.entries()) {
             if (entry.part() != OmniversalAlloyFurnaceStructure.Part.COIL) continue;
@@ -132,7 +146,7 @@ public final class OmniversalFurnaceAutoBuilder {
                 "gui.useless_mod.multiblock_builder.success", coilTier));
     }
 
-    private static FunctionalLayout resolveFunctionalLayout(
+    static FunctionalLayout resolveFunctionalLayout(
             ServerLevel level, BlockPos corePos, Direction facing) {
         Map<BlockPos, OmniversalAlloyFurnaceStructure.FunctionalPart> parts = new LinkedHashMap<>();
         for (OmniversalAlloyFurnaceStructure.Entry entry : OmniversalAlloyFurnaceStructure.entries()) {
@@ -142,10 +156,23 @@ public final class OmniversalFurnaceAutoBuilder {
                     OmniversalAlloyFurnaceStructure.functionalPart(level.getBlockState(pos));
             if (functionalPart == null) continue;
             if (parts.containsValue(functionalPart)) return null;
-            if (isExclusivePartClaimedByAnotherCore(level, corePos, pos, functionalPart)) return null;
+            if (functionalPart == OmniversalAlloyFurnaceStructure.FunctionalPart.MUFFLER_HATCH
+                    && !entry.localPos().equals(OmniversalAlloyFurnaceStructure.PREFERRED_MUFFLER_POS)) return null;
+            if (isExclusivePartClaimedByAnotherCore(level, corePos, pos, functionalPart)
+                    || OmniversalAlloyFurnaceStructure.isSharedFunctionalPosition(level, corePos, pos)) return null;
             parts.put(pos.immutable(), functionalPart);
         }
 
+        // Reserve the fixed slot first so fallback placement cannot consume the exhaust position.
+        if (!parts.containsValue(OmniversalAlloyFurnaceStructure.FunctionalPart.MUFFLER_HATCH)) {
+            BlockPos pos = OmniversalAlloyFurnaceStructure.toWorld(corePos, facing,
+                    OmniversalAlloyFurnaceStructure.PREFERRED_MUFFLER_POS);
+            if (parts.containsKey(pos) || !isAvailableFunctionalPosition(level, pos)
+                    || OmniversalAlloyFurnaceStructure.isSharedFunctionalPosition(level, corePos, pos)) return null;
+            parts.put(pos, OmniversalAlloyFurnaceStructure.FunctionalPart.MUFFLER_HATCH);
+        }
+        if (parts.containsValue(OmniversalAlloyFurnaceStructure.FunctionalPart.MAINTENANCE_HATCH)
+                && parts.containsValue(OmniversalAlloyFurnaceStructure.FunctionalPart.AUTO_MAINTENANCE_HATCH)) return null;
         if (!parts.containsValue(OmniversalAlloyFurnaceStructure.FunctionalPart.PATTERN_ASSEMBLY)) {
             BlockPos pos = chooseFunctionalPosition(level, corePos, facing, parts,
                     OmniversalAlloyFurnaceStructure.PREFERRED_PATTERN_ASSEMBLY_POS);
@@ -157,6 +184,13 @@ public final class OmniversalFurnaceAutoBuilder {
                     OmniversalAlloyFurnaceStructure.PREFERRED_MOLD_HUB_POS);
             if (pos == null) return null;
             parts.put(pos, OmniversalAlloyFurnaceStructure.FunctionalPart.MOLD_HUB);
+        }
+        if (!parts.containsValue(OmniversalAlloyFurnaceStructure.FunctionalPart.MAINTENANCE_HATCH)
+                && !parts.containsValue(OmniversalAlloyFurnaceStructure.FunctionalPart.AUTO_MAINTENANCE_HATCH)) {
+            BlockPos pos = chooseFunctionalPosition(level, corePos, facing, parts,
+                    OmniversalAlloyFurnaceStructure.PREFERRED_MAINTENANCE_HATCH_POS);
+            if (pos == null) return null;
+            parts.put(pos, OmniversalAlloyFurnaceStructure.FunctionalPart.MAINTENANCE_HATCH);
         }
         return new FunctionalLayout(Map.copyOf(parts));
     }
@@ -171,7 +205,14 @@ public final class OmniversalFurnaceAutoBuilder {
             case PASSIVE_HATCH -> level.getBlockEntity(partPos)
                     instanceof PassiveCraftingHatchBlockEntity hatch
                     && hatch.isClaimedByOtherController(corePos);
-            case MOLD_HUB -> false;
+            case MOLD_HUB -> level.getBlockEntity(partPos)
+                    instanceof OmniversalMoldHubBlockEntity hub && hub.isClaimedByOtherController(corePos);
+            case MAINTENANCE_HATCH -> level.getBlockEntity(partPos)
+                    instanceof MaintenanceHatchBlockEntity hatch && hatch.isClaimedByOtherController(corePos);
+            case AUTO_MAINTENANCE_HATCH -> level.getBlockEntity(partPos)
+                    instanceof AutoMaintenanceHatchBlockEntity hatch && hatch.isClaimedByOtherController(corePos);
+            case MUFFLER_HATCH -> level.getBlockEntity(partPos)
+                    instanceof MufflerHatchBlockEntity hatch && hatch.isClaimedByOtherController(corePos);
         };
     }
 
@@ -179,22 +220,20 @@ public final class OmniversalFurnaceAutoBuilder {
             ServerLevel level, BlockPos corePos, Direction facing,
             Map<BlockPos, OmniversalAlloyFurnaceStructure.FunctionalPart> assigned,
             BlockPos preferredLocalPos) {
-        for (OmniversalAlloyFurnaceStructure.Entry entry : OmniversalAlloyFurnaceStructure.entries()) {
-            if (entry.part() != OmniversalAlloyFurnaceStructure.Part.CASING
-                    || !entry.localPos().equals(preferredLocalPos)) continue;
-            BlockPos pos = entry.worldPos(corePos, facing);
-            if (!assigned.containsKey(pos) && isAvailableFunctionalPosition(level, pos)) {
-                return pos.immutable();
-            }
-        }
-        for (OmniversalAlloyFurnaceStructure.Entry entry : OmniversalAlloyFurnaceStructure.entries()) {
+        BlockPos preferred = OmniversalAlloyFurnaceStructure.toWorld(corePos, facing, preferredLocalPos);
+        if (canAssign(level, corePos, preferred, assigned)) return preferred;
+        for (var entry : OmniversalAlloyFurnaceStructure.entries()) {
             if (entry.part() != OmniversalAlloyFurnaceStructure.Part.CASING) continue;
             BlockPos pos = entry.worldPos(corePos, facing);
-            if (!assigned.containsKey(pos) && isAvailableFunctionalPosition(level, pos)) {
-                return pos.immutable();
-            }
+            if (canAssign(level, corePos, pos, assigned)) return pos.immutable();
         }
         return null;
+    }
+
+    private static boolean canAssign(ServerLevel level, BlockPos corePos, BlockPos pos,
+                                     Map<BlockPos, OmniversalAlloyFurnaceStructure.FunctionalPart> assigned) {
+        return !assigned.containsKey(pos) && isAvailableFunctionalPosition(level, pos)
+                && !OmniversalAlloyFurnaceStructure.isSharedFunctionalPosition(level, corePos, pos);
     }
 
     private static boolean isAvailableFunctionalPosition(ServerLevel level, BlockPos pos) {
@@ -231,7 +270,9 @@ public final class OmniversalFurnaceAutoBuilder {
     private static boolean matches(OmniversalAlloyFurnaceStructure.Part part, BlockState state, int coilTier,
                                    OmniversalAlloyFurnaceStructure.FunctionalPart functionalPart) {
         if (functionalPart != null) {
-            return OmniversalAlloyFurnaceStructure.functionalPart(state) == functionalPart;
+            return OmniversalAlloyFurnaceStructure.functionalPart(state) == functionalPart
+                    && (functionalPart != OmniversalAlloyFurnaceStructure.FunctionalPart.MUFFLER_HATCH
+                    || state.getValue(DirectionalMultiblockPartBlock.FACING) == Direction.UP);
         }
         return switch (part) {
             case CORE -> state.is(ModBlocks.MULTIBLOCK_ALLOY_FURNACE_CORE.get());
@@ -252,10 +293,16 @@ public final class OmniversalFurnaceAutoBuilder {
                                     OmniversalAlloyFurnaceStructure.FunctionalPart functionalPart,
                                     Direction facing) {
         if (functionalPart != null) {
+            if (functionalPart == OmniversalAlloyFurnaceStructure.FunctionalPart.MUFFLER_HATCH) {
+                return ModBlocks.MUFFLER_HATCH.get().defaultBlockState();
+            }
             return (switch (functionalPart) {
                 case PATTERN_ASSEMBLY -> ModBlocks.ME_PATTERN_ASSEMBLY.get().defaultBlockState();
                 case MOLD_HUB -> ModBlocks.OMNIVERSAL_MOLD_HUB.get().defaultBlockState();
                 case PASSIVE_HATCH -> ModBlocks.PASSIVE_CRAFTING_HATCH.get().defaultBlockState();
+                case MAINTENANCE_HATCH -> ModBlocks.MAINTENANCE_HATCH.get().defaultBlockState();
+                case AUTO_MAINTENANCE_HATCH -> ModBlocks.AUTO_MAINTENANCE_HATCH.get().defaultBlockState();
+                case MUFFLER_HATCH -> throw new IllegalStateException("Muffler facing handled above");
             }).setValue(DirectionalMultiblockPartBlock.FACING, facing);
         }
         return switch (part) {
@@ -282,7 +329,7 @@ public final class OmniversalFurnaceAutoBuilder {
     private record Placement(BlockPos pos, BlockState original, BlockState expected) {
     }
 
-    private record FunctionalLayout(
+    record FunctionalLayout(
             Map<BlockPos, OmniversalAlloyFurnaceStructure.FunctionalPart> parts) {
     }
 

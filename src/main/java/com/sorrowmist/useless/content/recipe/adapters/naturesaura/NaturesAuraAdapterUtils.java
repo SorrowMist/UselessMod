@@ -4,7 +4,6 @@ import com.sorrowmist.useless.content.recipe.AdapterUtils;
 import com.sorrowmist.useless.content.recipe.CountedIngredient;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceLocation;
-import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.item.crafting.Ingredient;
@@ -23,8 +22,23 @@ final class NaturesAuraAdapterUtils {
     }
 
     static ItemStack item(String path) {
-        Item item = BuiltInRegistries.ITEM.get(new ResourceLocation(MOD_ID, path));
-        return item == Items.AIR ? ItemStack.EMPTY : new ItemStack(item);
+        ItemStack stack = BuiltInRegistries.ITEM.getOptional(ResourceLocation.fromNamespaceAndPath(MOD_ID, path))
+                .map(ItemStack::new)
+                .orElse(ItemStack.EMPTY);
+        return stack.is(Items.AIR) ? ItemStack.EMPTY : stack;
+    }
+
+    static int ingredientAmount(@Nullable Ingredient ingredient) {
+        if (ingredient == null || ingredient.isEmpty()) {
+            return 0;
+        }
+        int amount = 0;
+        for (ItemStack stack : ingredient.getItems()) {
+            if (stack != null && stack.getCount() > amount) {
+                amount = stack.getCount();
+            }
+        }
+        return amount;
     }
 
     static boolean addIngredient(Map<Ingredient, Long> target, @Nullable Ingredient ingredient, long count) {

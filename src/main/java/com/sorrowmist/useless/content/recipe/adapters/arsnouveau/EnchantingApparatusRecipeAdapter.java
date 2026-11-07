@@ -1,6 +1,6 @@
 package com.sorrowmist.useless.content.recipe.adapters.arsnouveau;
 
-import com.hollingsworth.arsnouveau.common.crafting.recipes.EnchantingApparatusRecipe;
+import com.hollingsworth.arsnouveau.api.enchanting_apparatus.EnchantingApparatusRecipe;
 import com.hollingsworth.arsnouveau.setup.registry.RecipeRegistry;
 import com.sorrowmist.useless.api.enums.AlloyFurnaceMode;
 import com.sorrowmist.useless.content.recipe.AdapterUtils;
@@ -61,10 +61,13 @@ public class EnchantingApparatusRecipeAdapter implements IRecipeAdapter<Enchanti
         EnchantingApparatusRecipe originalRecipe = holder.value();
         ResourceLocation originalId = holder.id();
 
-        Ingredient reagent = originalRecipe.reagent();
-        List<Ingredient> pedestalItems = originalRecipe.pedestalItems();
-        ItemStack output = originalRecipe.result();
-        int sourceCost = originalRecipe.sourceCost();
+        // Forge 4.x exposes fields, not the NeoForge 5.x record accessors.
+        // NBT-transfer apparatus recipes cannot be represented by a static furnace result.
+        if (originalRecipe.keepNbtOfReagent || originalRecipe.getClass() != EnchantingApparatusRecipe.class) return List.of();
+        Ingredient reagent = originalRecipe.reagent;
+        List<Ingredient> pedestalItems = originalRecipe.pedestalItems;
+        ItemStack output = originalRecipe.result;
+        int sourceCost = originalRecipe.getSourceCost();
 
         if (output.isEmpty()) {
             return List.of();
@@ -84,7 +87,7 @@ public class EnchantingApparatusRecipeAdapter implements IRecipeAdapter<Enchanti
         }
 
         // 魔力消耗转换为能量（1 source = 10 FE）
-        int energy = Math.max(sourceCost * 10, 1000);
+        long energy = Math.max((long) sourceCost * 10L, 1000L);
         int processTime = AdapterUtils.DEFAULT_PROCESS_TIME + pedestalItems.size() * 20;
 
         AdvancedAlloyFurnaceRecipe convertedRecipe = new AdvancedAlloyFurnaceRecipe(
@@ -125,9 +128,10 @@ public class EnchantingApparatusRecipeAdapter implements IRecipeAdapter<Enchanti
         for (RecipeHolder<EnchantingApparatusRecipe> holder : recipes) {
             EnchantingApparatusRecipe recipe = holder.value();
 
-            Ingredient reagent = recipe.reagent();
-            List<Ingredient> pedestalItems = recipe.pedestalItems();
-            ItemStack output = recipe.result();
+            if (recipe.keepNbtOfReagent || recipe.getClass() != EnchantingApparatusRecipe.class) continue;
+            Ingredient reagent = recipe.reagent;
+            List<Ingredient> pedestalItems = recipe.pedestalItems;
+            ItemStack output = recipe.result;
 
             if (output.isEmpty()) continue;
 

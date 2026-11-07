@@ -1,0 +1,20 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "building",
+  "pattern": [
+    "EAE",
+    "LML",
+    "ECE"
+  ],
+  "key": {
+    "E": { "item": "ae2:engineering_processor" },
+    "A": { "item": "ae2:annihilation_core" },
+    "L": { "item": "ae2:logic_processor" },
+    "M": { "item": "useless_mod:maintenance_hatch" },
+    "C": { "item": "ae2:formation_core" }
+  },
+  "result": {
+    "item": "useless_mod:auto_maintenance_hatch",
+    "count": 1
+  }
+}

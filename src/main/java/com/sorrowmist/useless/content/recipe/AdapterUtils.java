@@ -249,8 +249,8 @@ public class AdapterUtils {
      * @param originalEnergy 原配方 energy_cost
      * @return 转换后的 FE 消耗
      */
-    public static int ae2csEnergyCost(int originalEnergy) {
-        return Math.max(originalEnergy * AE_TO_FE_CONVERSION, AE2CS_MIN_ENERGY);
+    public static long ae2csEnergyCost(int originalEnergy) {
+        return Math.max((long) originalEnergy * AE_TO_FE_CONVERSION, AE2CS_MIN_ENERGY);
     }
 
     public static int mekanismEnrichmentChamberEnergyCost(long operations) {

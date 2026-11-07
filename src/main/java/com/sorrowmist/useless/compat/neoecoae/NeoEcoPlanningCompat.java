@@ -4,13 +4,13 @@ import appeng.api.networking.crafting.ICraftingPlan;
 import cn.dancingsnow.neoecoae.api.me.planning.ECOPlanningResultRegistry;
 import net.minecraftforge.fml.ModList;
 
-/** Keeps ECO's confirmed execution vector intact without linking ECO on the ordinary AE2 path. */
+/** ECO 20.5.0 confirmation-scope guard; ordinary AE2 plans never acquire ECO ownership here. */
 public final class NeoEcoPlanningCompat {
     private NeoEcoPlanningCompat() {
     }
 
     public static boolean shouldPreserveSubmissionPlan(ICraftingPlan plan) {
-        if (!ModList.get().isLoaded("neoecoae")) {
+        if (plan == null || !ModList.get().isLoaded("neoecoae")) {
             return false;
         }
         try {

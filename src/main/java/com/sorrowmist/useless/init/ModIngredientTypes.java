@@ -12,12 +12,16 @@ import net.minecraftforge.fml.ModList;
 public final class ModIngredientTypes {
     private ModIngredientTypes() {}
     public static void register() {
+        CraftingHelper.register(new ResourceLocation("useless_mod:enchanted_item"),
+                com.sorrowmist.useless.content.recipe.EnchantedItemIngredient.TYPE);
         CraftingHelper.register(new ResourceLocation("useless_mod:top_level_nbt"),com.sorrowmist.useless.compat.forge1201.recipe.TopLevelNbtIngredient.TYPE);
         CraftingHelper.register(new ResourceLocation("useless_mod:soul_vial_set"),SoulVialSetIngredient.TYPE);
         if(ModList.get().isLoaded("enderio"))
             CraftingHelper.register(new ResourceLocation("useless_mod:filled_soul"),com.sorrowmist.useless.compat.forge1201.enderio.FilledSoulIngredient.TYPE);
         if(ModList.get().isLoaded(RecipeSourceIds.HOSTILE_NETWORKS))
             CraftingHelper.register(new ResourceLocation("useless_mod:data_model_range"),DataModelRangeIngredient.TYPE);
+        if(ModList.get().isLoaded(RecipeSourceIds.PRODUCTIVE_BEES))
+            com.sorrowmist.useless.compat.productivebees.ProductiveBeesCentrifugeIngredient.register();
         if(ModList.get().isLoaded(RecipeSourceIds.APOTHEOSIS))
             CraftingHelper.register(new ResourceLocation("useless_mod:apotheosis_gem"),ApotheosisGemIngredient.TYPE);
     }

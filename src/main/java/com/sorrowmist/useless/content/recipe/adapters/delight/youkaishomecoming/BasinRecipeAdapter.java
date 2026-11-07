@@ -26,7 +26,7 @@ public final class BasinRecipeAdapter implements IRecipeAdapter<DelightSynthetic
     private static final String SOURCE_CLASS =
             "dev.xkmc.youkaishomecoming.content.pot.basin.SimpleBasinRecipe";
     private static final ResourceLocation BASIN_ID =
-            new ResourceLocation("youkaisfeasts", "wood_basin");
+            new ResourceLocation("youkaishomecoming", "wood_basin");
 
     @Override
     public String sourceId() {

@@ -20,6 +20,53 @@ new java.util.zip.ZipFile(configurations.advancedAeBundle.singleFile).withClosea
 }
 dependencies { modCompileOnly 'bundled:ae2addonlib:1.0.4-1.20.1' }
 
+// Homecoming publishes its native recipe base classes only as JarJar libraries.
+// Resolve/remap the exact bundled APIs for compilation; do not ship a second copy.
+configurations { homecomingBundle { transitive = false } }
+dependencies { homecomingBundle 'maven.modrinth:uJT3ahxz:MjBWc5wO' }
+def homecomingLibraries = [
+        l2library: '2.4.25-slim', l2serial: '1.2.4', l2modularblock: '1.1.0',
+        l2harvester: '0.1.2', l2damagetracker: '0.3.7'
+]
+new java.util.zip.ZipFile(configurations.homecomingBundle.singleFile).withCloseable { archive ->
+    homecomingLibraries.each { name, libraryVersion ->
+        def target = new File(bundledRepo, "${name}-${libraryVersion}.jar")
+        def bytes = archive.getInputStream(archive.getEntry("META-INF/jarjar/${target.name}"))
+                .withCloseable { it.readAllBytes() }
+        if (!target.isFile() || !Arrays.equals(target.bytes, bytes)) {
+            bundledRepo.mkdirs()
+            target.bytes = bytes
+        }
+    }
+}
+homecomingLibraries.each { name, libraryVersion ->
+    dependencies.add('modCompileOnly', "bundled:${name}:${libraryVersion}")
+}
+
+// Productive Bees ships the base TagOutput/ingredient classes in its own JarJar library.
+configurations { productiveBeesBundle { transitive = false } }
+dependencies { productiveBeesBundle 'maven.modrinth:jH6iiqkd:mywVOObd' }
+def productiveLib = new File(bundledRepo, 'productivelib-1.20.1-0.0.4.jar')
+def productiveBeeAt = layout.buildDirectory.file('compat-libs/productivebees-accesstransformer.cfg').get().asFile
+new java.util.zip.ZipFile(configurations.productiveBeesBundle.singleFile).withCloseable { archive ->
+    def bytes = archive.getInputStream(archive.getEntry("META-INF/jarjar/${productiveLib.name}"))
+            .withCloseable { it.readAllBytes() }
+    if (!productiveLib.isFile() || !Arrays.equals(productiveLib.bytes, bytes)) {
+        bundledRepo.mkdirs()
+        productiveLib.bytes = bytes
+    }
+    // Plain JUnit does not run dependency ATs. Apply the published AT to the dev game too,
+    // so ProductiveBee's native AI subclasses can link exactly as they do under Forge.
+    def atBytes = archive.getInputStream(archive.getEntry('META-INF/accesstransformer.cfg'))
+            .withCloseable { it.readAllBytes() }
+    if (!productiveBeeAt.isFile() || !Arrays.equals(productiveBeeAt.bytes, atBytes)) {
+        productiveBeeAt.parentFile.mkdirs()
+        productiveBeeAt.bytes = atBytes
+    }
+}
+legacyForge.accessTransformers.from(productiveBeeAt)
+dependencies { modCompileOnly 'bundled:productivelib:1.20.1-0.0.4' }
+
 // JEI's disk bookmark regression test also exercises the bundled config serializer.
 configurations { jeiBundle { transitive = false } }
 dependencies { jeiBundle 'maven.modrinth:u6dRKJwZ:TrKZlZ0b' }

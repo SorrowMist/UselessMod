@@ -17,7 +17,7 @@ import java.util.function.BiPredicate;
  *
  * <p>气动工艺的热交换是<b>接收方驱动</b>：机器自己的 {@code HeatExchangerLogicTicking.tick()} 会遍历
  * 相连的热交换器并调用 {@code addHeat}，所以只要把 {@link IHeatExchangerLogic} 通过
- * {@code PNCCapabilities.HEAT_EXCHANGER_BLOCK} 暴露出去，机器就会自动向我们收敛——不需要我们 tick。</p>
+ * {@code PNCCapabilities.HEAT_EXCHANGER_CAPABILITY} 暴露出去，机器就会自动向我们收敛——不需要我们 tick。</p>
  *
  * <p><b>注意：气动工艺要求方块有 BlockEntity 才看得到热能力。</b>
  * {@code HeatExchangerManager.getLogic} 走的是 {@code IOHelper.getCap(te, ...)}，而它在
@@ -49,7 +49,7 @@ public final class ThermostatHeatCompat {
         // ⚠️ 刻意<b>不</b>按 enabled 返回 null：气动的机器只在 onLoad / neighborChanged 时
         // 重新扫一遍热连接，开了恒温之后它不会重新发现我们，表现就是「设置不生效」。
         // 始终交出逻辑，由逻辑按 enabled 决定温度与热阻。
-        event.registerBlockEntity(PNCCapabilities.HEAT_EXCHANGER_BLOCK,
+        event.registerBlockEntity(PNCCapabilities.HEAT_EXCHANGER_CAPABILITY,
                 ModBlockEntities.TEMPERATURE_REGULATOR.get(),
                 (blockEntity, side) -> adapter(blockEntity));
     }

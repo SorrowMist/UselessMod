@@ -72,6 +72,8 @@ import com.sorrowmist.useless.network.AETaskProgressPacket;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.HolderLookup;
+import net.minecraft.core.particles.ParticleTypes;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.protocol.Packet;
@@ -208,6 +210,9 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
     private boolean externalInventoryLoaded;
     /** 延迟任务数据是否已处理完毕；配方目录未就绪时保持 false，由 tick 逐 tick 重试。 */
     private boolean deferredTasksLoaded;
+    private boolean patternAutoRepairPending = true;
+    private boolean suppressPatternRefresh;
+    private boolean suppressStorageChange;
 
     public AdvancedAlloyFurnaceBlockEntity(BlockPos pos, BlockState state) {
         super(ModBlockEntities.ADVANCED_ALLOY_FURNACE.get(), pos, state);
@@ -224,7 +229,7 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
                 this::onItemStorageChanged,
                 slot -> this.updateMoldState(),
                 null,
-                slot -> this.updatePatterns()
+                slot -> { if (!suppressPatternRefresh) updatePatterns(); }
         );
 
         // AE2 Integration - 创建动作源
@@ -370,6 +375,7 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
             entity.deferredTasksLoaded = entity.aeManager.loadDeferredTasks();
         }
 
+        entity.repairPatternsIfPending();
         long currentCatalogGeneration = AlloyFurnaceRecipeCatalog.generation();
         if (entity.recipeCatalogGeneration != currentCatalogGeneration) {
             entity.recipeCatalogGeneration = currentCatalogGeneration;
@@ -816,16 +822,19 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
 
         // 如果没有足够的并行数（至少1），则无法完成配方
         if (actualParallel <= 0) {
+            this.spawnCraftEffect(false);
             this.resetProgress();
             return;
         }
 
         // 消耗材料并产出物品
         if (!this.consumeRecipeInputs(this.currentRecipe, actualParallel)) {
+            this.spawnCraftEffect(false);
             this.resetProgress();
             return;
         }
         this.produceRecipeOutputs(this.currentRecipe, actualParallel);
+        this.spawnCraftEffect(true);
 
         this.resetProgress();
     }
@@ -899,6 +908,7 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
         ExternalInventoryStore.setReference(this, inventoryReference);
         pendingLegacyInventory = null;
         externalInventoryLoaded = true;
+        patternAutoRepairPending = true;
         itemStorageRevision++;
         markRecipeInputsChanged();
         updateMoldState();
@@ -1534,6 +1544,7 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
                                    be.updatePatterns();
                                    // level 已可用，加载持久化的 AE 合成任务；目录未就绪时由 tick 重试
                                    be.deferredTasksLoaded = be.aeManager.loadDeferredTasks();
+                                   be.patternAutoRepairPending = true;
                                }
         );
     }
@@ -1628,6 +1639,21 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
                 ChemicalKeyProviders.get(),
                 this::stashUnreturnedOutput
         );
+    }
+
+    /** Server-only completion feedback, once per batch rather than once per parallel item. */
+    private void spawnCraftEffect(boolean success) {
+        if (!(this.level instanceof ServerLevel serverLevel)) return;
+        double x = this.worldPosition.getX() + 0.5;
+        double y = this.worldPosition.getY() + 1.1;
+        double z = this.worldPosition.getZ() + 0.5;
+        if (success) {
+            serverLevel.sendParticles(ParticleTypes.HAPPY_VILLAGER, x, y, z, 14, 0.35, 0.3, 0.35, 0.0);
+            serverLevel.sendParticles(ParticleTypes.END_ROD, x, y, z, 8, 0.25, 0.25, 0.25, 0.02);
+        } else {
+            serverLevel.sendParticles(ParticleTypes.LARGE_SMOKE, x, y, z, 12, 0.3, 0.25, 0.3, 0.01);
+            serverLevel.sendParticles(ParticleTypes.SMOKE, x, y, z, 8, 0.3, 0.25, 0.3, 0.01);
+        }
     }
 
     private void resetProgress() {
@@ -1919,7 +1945,30 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
         this.aeManager.updatePatterns();
     }
 
+    private void repairPatternsIfPending() {
+        if (!patternAutoRepairPending || !externalInventoryLoaded || level == null || level.isClientSide
+                || !AlloyFurnaceRecipeCatalog.isReady(level)) return;
+        suppressPatternRefresh = true;
+        suppressStorageChange = true;
+        int repaired;
+        try {
+            repaired = com.sorrowmist.useless.command.OmniversalPatternRepairService.repairSlots(
+                    PATTERN_SLOTS_COUNT,
+                    slot -> itemHandler.getStackInSlot(PATTERN_SLOTS_START + slot),
+                    (slot, stack) -> itemHandler.setStackInSlot(PATTERN_SLOTS_START + slot, stack), level);
+            patternAutoRepairPending = false;
+        } finally {
+            suppressPatternRefresh = false;
+            suppressStorageChange = false;
+        }
+        if (repaired > 0) {
+            onItemStorageChanged();
+            updatePatterns();
+        }
+    }
+
     private void onItemStorageChanged() {
+        if (suppressStorageChange) return;
         this.itemStorageRevision++;
         this.markRecipeInputsChanged();
         saveExternalInventory();

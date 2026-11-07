@@ -1,6 +1,6 @@
 package com.sorrowmist.useless.content.recipe.adapters.delight.extradelight;
 
-import com.lance5057.extradelight.workstations.vat.recipes.VatRecipe;
+import com.vomiter.extradelight.common.complex.workstations.vat.recipes.VatRecipe;
 import com.sorrowmist.useless.api.enums.AlloyFurnaceMode;
 import com.sorrowmist.useless.content.recipe.AdapterUtils;
 import com.sorrowmist.useless.content.recipe.AdvancedAlloyFurnaceRecipe;
@@ -56,11 +56,11 @@ public final class VatRecipeAdapter implements IRecipeAdapter<VatRecipe> {
             if (stage.ingredient != null && !stage.ingredient.isEmpty()) {
                 sourceIngredients.add(stage.ingredient);
             }
-            totalTime = Math.min(Integer.MAX_VALUE, totalTime + Math.max(0, (long) stage.time));
+            totalTime = Math.addExact(totalTime, Math.max(0, (long) stage.time));
         }
-        sourceIngredients = new ArrayList<>(ExtraDelightRecipeAdapterUtils.withContainer(
-                sourceIngredients, source.getUsedItem()));
-        List<CountedIngredient> inputs = AdapterUtils.mergeIngredients(sourceIngredients);
+        if (totalTime > Integer.MAX_VALUE) return List.of();
+        List<CountedIngredient> inputs = DelightRecipeAdapterUtils.withContainerInputs(
+                sourceIngredients, source.getUsedItem());
         List<LongSizedFluidIngredient> fluids = source.getFluid() == null
                 ? List.of() : ExtraDelightRecipeAdapterUtils.fluids(List.of(source.getFluid()));
         ItemStack output = source.getResultItem(level == null ? null : level.registryAccess());
@@ -93,8 +93,8 @@ public final class VatRecipeAdapter implements IRecipeAdapter<VatRecipe> {
                     sourceIngredients.add(stage.ingredient);
                 }
             }
-            List<CountedIngredient> requirements = AdapterUtils.mergeIngredients(
-                    ExtraDelightRecipeAdapterUtils.withContainer(sourceIngredients, source.getUsedItem()));
+            List<CountedIngredient> requirements = DelightRecipeAdapterUtils.withContainerInputs(
+                    sourceIngredients, source.getUsedItem());
             List<LongSizedFluidIngredient> fluids = source.getFluid() == null
                     ? List.of() : ExtraDelightRecipeAdapterUtils.fluids(List.of(source.getFluid()));
             if ((requirements.isEmpty() && fluids.isEmpty())

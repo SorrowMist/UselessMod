@@ -76,7 +76,7 @@ public class LightningSimulationRecipeAdapter implements IRecipeAdapter<Lightnin
         for (Map.Entry<Ingredient, Long> entry : ingredientCounts.entrySet()) {
             countedIngredients.add(new CountedIngredient(entry.getKey(), entry.getValue()));
         }
-        var keyInputs = List.of(AELightningIngredientHelper.createLightningKeyInput(recipe.lightningTier(), recipe.lightningCost()));
+        var keyInputs = AELightningIngredientHelper.lightningInputs(recipe.lightningTier(), recipe.lightningCost());
 
         int processTime = BASE_PROCESS_TIME + inputs.size() * 20;
 
@@ -94,7 +94,7 @@ public class LightningSimulationRecipeAdapter implements IRecipeAdapter<Lightnin
                 List.of(output.copy()),
                 List.of(),
                 List.of(),
-                2000,
+                recipe.totalEnergy(),
                 processTime,
                 Ingredient.EMPTY,
                 0,
@@ -131,7 +131,7 @@ public class LightningSimulationRecipeAdapter implements IRecipeAdapter<Lightnin
             }
 
             if (AdapterUtils.matchesRequired(mergedInputs, requiredCounts)
-                    && AELightningIngredientHelper.matchesSimulationOrAssemblyLightning(mergedInputs, mergedKeys, recipe.lightningTier(), recipe.lightningCost())) {
+                    && AELightningIngredientHelper.matchesLightning(mergedKeys, recipe.lightningTier(), recipe.lightningCost())) {
                 matches.add(holder);
             }
         }

@@ -55,5 +55,6 @@ libs/
 __pycache__/
 *.pyc
 *.log
+logs/
 hs_err_pid*
 *.cleanup-tmp

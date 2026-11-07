@@ -202,7 +202,19 @@ public final class OmniversalMoldHubBlockEntity extends BlockEntity implements M
             this.controllerPos = controllerPos == null ? null : controllerPos.immutable();
             this.structureGeneration = generation;
             setChanged();
+            if (level != null && !level.isClientSide) level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), 3);
         }
+    }
+
+    public boolean isLinkedToController(BlockPos pos) {
+        return java.util.Objects.equals(controllerPos, pos);
+    }
+
+    public boolean isClaimedByOtherController(BlockPos pos) {
+        return !unloading && !isRemoved() && level != null && controllerPos != null
+                && !controllerPos.equals(pos) && level.isLoaded(controllerPos)
+                && level.getBlockEntity(controllerPos) instanceof MultiblockAlloyFurnaceCoreBlockEntity core
+                && core.claimsFunctionalPart(worldPosition);
     }
 
     @Nullable
@@ -278,5 +290,26 @@ public final class OmniversalMoldHubBlockEntity extends BlockEntity implements M
     public void setRemoved() {
         unloading = true;
         super.setRemoved();
+    }
+
+    @Override public CompoundTag getUpdateTag() {
+        CompoundTag tag = new CompoundTag();
+        if (controllerPos != null) tag.putLong("Controller", controllerPos.asLong());
+        tag.putLong("StructureGeneration", structureGeneration);
+        return tag;
+    }
+
+    @Override public void handleUpdateTag(CompoundTag tag) {
+        controllerPos = tag.contains("Controller") ? BlockPos.of(tag.getLong("Controller")) : null;
+        structureGeneration = tag.getLong("StructureGeneration");
+    }
+
+    @Override public net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket getUpdatePacket() {
+        return net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket.create(this);
+    }
+
+    @Override public void onDataPacket(net.minecraft.network.Connection connection,
+                                       net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket packet) {
+        if (packet.getTag() != null) handleUpdateTag(packet.getTag());
     }
 }

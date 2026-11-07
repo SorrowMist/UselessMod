@@ -7,6 +7,9 @@ import com.sorrowmist.useless.content.blockentities.AdvancedAlloyFurnaceBlockEnt
 import com.sorrowmist.useless.content.blockentities.OreGeneratorBlockEntity;
 import com.sorrowmist.useless.content.blockentities.ThermostatBlockEntity;
 import com.sorrowmist.useless.content.blockentities.multiblock.MePatternAssemblyBlockEntity;
+import com.sorrowmist.useless.content.blockentities.multiblock.MaintenanceHatchBlockEntity;
+import com.sorrowmist.useless.content.blockentities.multiblock.AutoMaintenanceHatchBlockEntity;
+import com.sorrowmist.useless.content.blockentities.multiblock.MufflerHatchBlockEntity;
 import com.sorrowmist.useless.content.blockentities.multiblock.MultiblockAlloyFurnaceCoreBlockEntity;
 import com.sorrowmist.useless.content.blockentities.multiblock.OmniversalMoldHubBlockEntity;
 import com.sorrowmist.useless.content.blockentities.multiblock.PassiveCraftingHatchBlockEntity;
@@ -59,6 +62,10 @@ public final class ModBlockEntities {
                 ForgeCapabilities.ITEM_HANDLER,
                 OMNIVERSAL_MOLD_HUB.get(),
                 (blockEntity, side) -> blockEntity.getMolds());
+        event.registerBlockEntity(
+                ForgeCapabilities.ITEM_HANDLER,
+                MUFFLER_HATCH.get(),
+                (blockEntity, side) -> blockEntity.getAshOutput());
         event.registerBlockEntity(
                 ForgeCapabilities.ITEM_HANDLER,
                 PASSIVE_CRAFTING_HATCH.get(),
@@ -153,6 +160,19 @@ public final class ModBlockEntities {
             BLOCK_ENTITY_TYPES.register("passive_crafting_hatch",
                     () -> BlockEntityType.Builder.of(PassiveCraftingHatchBlockEntity::new,
                             ModBlocks.PASSIVE_CRAFTING_HATCH.get()).build(null));
+
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<MaintenanceHatchBlockEntity>> MAINTENANCE_HATCH =
+            BLOCK_ENTITY_TYPES.register("maintenance_hatch",
+                    () -> BlockEntityType.Builder.of(MaintenanceHatchBlockEntity::new,
+                            ModBlocks.MAINTENANCE_HATCH.get()).build(null));
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<AutoMaintenanceHatchBlockEntity>> AUTO_MAINTENANCE_HATCH =
+            BLOCK_ENTITY_TYPES.register("auto_maintenance_hatch",
+                    () -> BlockEntityType.Builder.of(AutoMaintenanceHatchBlockEntity::new,
+                            ModBlocks.AUTO_MAINTENANCE_HATCH.get()).build(null));
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<MufflerHatchBlockEntity>> MUFFLER_HATCH =
+            BLOCK_ENTITY_TYPES.register("muffler_hatch",
+                    () -> BlockEntityType.Builder.of(MufflerHatchBlockEntity::new,
+                            ModBlocks.MUFFLER_HATCH.get()).build(null));
 
     /**
      * 「温度调节器」方块的恒温源状态。

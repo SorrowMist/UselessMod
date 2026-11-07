@@ -14,7 +14,7 @@ public final class RecipeSourceIds {
     public static final String FARMERS_DELIGHT = "farmersdelight";
     public static final String EXTRA_DELIGHT = "extradelight";
     public static final String CRABBERS_DELIGHT = "crabbersdelight";
-    public static final String CASUALNESS_DELIGHT = "casualnessdelight";
+    public static final String CASUALNESS_DELIGHT = "casualness_delight";
     public static final String EXPANDED_DELIGHT = "expandeddelight";
     public static final String BREWIN_AND_CHEWIN = "brewinandchewin";
     public static final String NOMADS_DELIGHT = "nomads_delight";

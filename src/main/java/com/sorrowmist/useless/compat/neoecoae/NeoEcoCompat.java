@@ -1,5 +1,6 @@
 package com.sorrowmist.useless.compat.neoecoae;
 
+import appeng.api.networking.IGrid;
 import appeng.api.networking.crafting.ICraftingProvider;
 import cn.dancingsnow.neoecoae.api.me.ECOCraftingCPU;
 import cn.dancingsnow.neoecoae.api.me.dispatch.ECOCraftingCpuContext;
@@ -18,7 +19,7 @@ import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.Dynamic
 import net.minecraft.resources.ResourceLocation;
 import org.jetbrains.annotations.Nullable;
 
-/** P16 public-API integration for dynamic Useless Mod outputs. */
+/** Forge ECO 20.5.0 public job/dispatch integration for dynamic native-NBT outputs. */
 public final class NeoEcoCompat {
     public static final ResourceLocation DYNAMIC_OUTPUT_ATTACHMENT =
             new ResourceLocation("useless_mod", "dynamic_component_outputs");
@@ -42,7 +43,7 @@ public final class NeoEcoCompat {
     }
 
     @Nullable
-    static Object grid(ECOCraftingJobContext context) {
+    static IGrid grid(ECOCraftingJobContext context) {
         return context.cpu() instanceof ECOCraftingCPU cpu ? cpu.getGrid() : null;
     }
 
@@ -65,7 +66,9 @@ public final class NeoEcoCompat {
             if (resolved == null || !isUselessProvider(event.provider())) {
                 return;
             }
-            long copies = Math.multiplyExact(resolved.copies(), event.dispatchedCrafts());
+            // The furnace's dynamic reservation ledger is long-based. Never use ECO's
+            // saturated dispatchedCrafts view for a BigInteger dispatch outside that range.
+            long copies = Math.multiplyExact(resolved.copies(), event.exactDispatchedCrafts().longValueExact());
             DynamicPatternCpuStateManager.INSTANCE.bindEcoDispatch(
                     event.job().craftingJobId(),
                     event.job().cpu(),
@@ -73,6 +76,9 @@ public final class NeoEcoCompat {
                     resolved.pattern(),
                     event.job().finalOutput() == null ? null : event.job().finalOutput().what(),
                     copies);
+            if (event.job().cpu() instanceof ECOCraftingCPU cpu) {
+                cpu.markDirty();
+            }
         }
 
         @Override
@@ -82,6 +88,18 @@ public final class NeoEcoCompat {
     }
 
     private static final class DispatchPolicy implements ECOCraftingDispatchPolicy {
+        @Override
+        public boolean mayTick(ECOCraftingCpuContext context) {
+            // Attachments can load before a CPU joins its grid. A restored job does not
+            // emit onJobStarted again in ECO 20.5.0; refresh its binding at the public tick hook.
+            if (context.active() && context.craftingJobId() != null
+                    && context.cpu() instanceof ECOCraftingCPU cpu) {
+                DynamicPatternCpuStateManager.INSTANCE.ensureEcoJob(
+                        context.craftingJobId(), cpu, cpu.getGrid());
+            }
+            return true;
+        }
+
         @Override
         public boolean isProviderAvailable(ECOCraftingCpuContext context, ICraftingProvider provider) {
             if (!isUselessProvider(provider)) {

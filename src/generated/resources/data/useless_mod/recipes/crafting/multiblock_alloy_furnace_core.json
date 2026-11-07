@@ -1,24 +1,50 @@
 {
-  "type": "minecraft:crafting_shaped",
-  "category": "building",
-  "key": {
-    "F": {
-      "item": "useless_mod:advanced_alloy_furnace_block"
+  "type": "useless_mod:advanced_alloy_furnace",
+  "energy": 500000000,
+  "id": "useless_mod:crafting/multiblock_alloy_furnace_core",
+  "ingredients": [
+    {
+      "count": 16,
+      "ingredient": {
+        "item": "useless_mod:advanced_alloy_furnace_block"
+      }
     },
-    "I": {
-      "item": "minecraft:iron_ingot"
+    {
+      "count": 64,
+      "ingredient": {
+        "item": "ae2:controller"
+      }
     },
-    "R": {
-      "item": "minecraft:redstone"
+    {
+      "count": 2,
+      "ingredient": {
+        "item": "useless_mod:useless_ingot_tier_9"
+      }
+    },
+    {
+      "count": 1024,
+      "ingredient": {
+        "item": "ae2:formation_core"
+      }
+    },
+    {
+      "count": 1024,
+      "ingredient": {
+        "item": "ae2:annihilation_core"
+      }
+    },
+    {
+      "count": 1024,
+      "ingredient": {
+        "item": "ae2:crafting_accelerator"
+      }
     }
-  },
-  "pattern": [
-    "IRI",
-    "RFR",
-    "IRI"
   ],
-  "result": {
-    "count": 1,
-    "item": "useless_mod:multiblock_alloy_furnace_core"
-  }
+  "outputs": [
+    {
+      "item": "useless_mod:multiblock_alloy_furnace_core"
+    }
+  ],
+  "process_time": 100,
+  "tier": 9
 }

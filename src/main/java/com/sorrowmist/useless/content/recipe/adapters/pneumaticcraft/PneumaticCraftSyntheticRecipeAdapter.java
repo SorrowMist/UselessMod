@@ -6,9 +6,10 @@ import com.sorrowmist.useless.content.recipe.AdvancedAlloyFurnaceRecipe;
 import com.sorrowmist.useless.content.recipe.CountedIngredient;
 import com.sorrowmist.useless.content.recipe.IRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.RecipeSourceIds;
-import me.desht.pneumaticcraft.common.block.entity.processing.UVLightBoxBlockEntity;
+import me.desht.pneumaticcraft.common.block.entity.UVLightBoxBlockEntity;
 import me.desht.pneumaticcraft.common.item.EmptyPCBItem;
-import me.desht.pneumaticcraft.common.registry.ModBlocks;
+import me.desht.pneumaticcraft.common.core.ModBlocks;
+import com.sorrowmist.useless.compat.forge1201.recipe.DataComponentIngredient;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.Item;
@@ -112,7 +113,8 @@ public final class PneumaticCraftSyntheticRecipeAdapter
 
     @Nullable
     private AdvancedAlloyFurnaceRecipe etchingRecipe(EmptyPCBItem pcb, Item item) {
-        ItemStack input = new ItemStack(item);
+        // Only a fully exposed PCB has a deterministic successful etching result.
+        ItemStack input = UVLightBoxBlockEntity.setExposureProgress(new ItemStack(item), 100);
         FluidStack acid = EmptyPCBItem.getEtchingFluid();
         SizedFluidIngredient fluid = AdapterUtils.toSizedFluidIngredient(acid);
         if (fluid == null) return null;
@@ -134,7 +136,7 @@ public final class PneumaticCraftSyntheticRecipeAdapter
             ItemStack output) {
         return new AdvancedAlloyFurnaceRecipe(
                 id,
-                List.of(new CountedIngredient(Ingredient.of(input.copyWithCount(1)), 1L)),
+                List.of(new CountedIngredient(DataComponentIngredient.of(true, input.copyWithCount(1)), 1L)),
                 fluids,
                 List.of(),
                 List.of(output),

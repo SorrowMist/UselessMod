@@ -20,8 +20,10 @@ import blusunrize.immersiveengineering.api.crafting.RefineryRecipe;
 import blusunrize.immersiveengineering.api.crafting.SawmillRecipe;
 import blusunrize.immersiveengineering.api.crafting.SqueezerRecipe;
 import blusunrize.immersiveengineering.api.crafting.StackWithChance;
-import blusunrize.immersiveengineering.api.crafting.TagOutput;
-import blusunrize.immersiveengineering.api.crafting.TagOutputList;
+import blusunrize.immersiveengineering.api.crafting.FluidTagInput;
+import com.sorrowmist.useless.compat.forge1201.fluid.FluidIngredient;
+import net.minecraftforge.common.util.Lazy;
+import net.minecraft.tags.FluidTags;
 import blusunrize.immersiveengineering.common.config.IEServerConfig;
 import com.mojang.logging.LogUtils;
 import com.sorrowmist.useless.api.enums.AlloyFurnaceMode;
@@ -144,6 +146,13 @@ public final class ImmersiveEngineeringRecipeAdapter
     }
 
     private static boolean isSupported(IESerializableRecipe recipe) {
+        // Recycling/container-packing subclasses compute outputs from the actual stack.
+        // Do not turn their display output into a static recipe.
+        if (recipe instanceof ArcFurnaceRecipe && recipe.getClass() != ArcFurnaceRecipe.class
+                || recipe instanceof MetalPressRecipe && recipe.getClass() != MetalPressRecipe.class
+                || recipe instanceof BottlingMachineRecipe && recipe.getClass() != BottlingMachineRecipe.class
+                || recipe instanceof MixerRecipe && recipe.getClass() != MixerRecipe.class
+                || recipe instanceof ClocheRecipe && recipe.getClass() != ClocheRecipe.class) return false;
         return recipe instanceof AlloyRecipe
                 || recipe instanceof ArcFurnaceRecipe
                 || recipe instanceof BlastFurnaceRecipe
@@ -287,17 +296,17 @@ public final class ImmersiveEngineeringRecipeAdapter
             ResourceLocation id, ClocheRecipe source) {
         List<SizedFluidIngredient> inputFluids = new ArrayList<>();
         int fluidAmount = IEServerConfig.getOrDefault(IEServerConfig.MACHINES.cloche_fluid);
-        if (source.requiredFluid != null && !source.requiredFluid.isEmpty()) {
-            if (fluidAmount <= 0) return null;
-            inputFluids.add(new SizedFluidIngredient(source.requiredFluid, fluidAmount));
-        }
+        // IE 10.2's cloche tank accepts the native minecraft:water tag; there is
+        // no per-recipe requiredFluid field and the outputs are deterministic.
+        if (fluidAmount <= 0) return null;
+        inputFluids.add(new SizedFluidIngredient(FluidIngredient.tag(FluidTags.WATER), fluidAmount));
 
         long energyPerTick = IEServerConfig.getOrDefault(IEServerConfig.MACHINES.cloche_consumption);
         return build(id,
                 List.of(),
                 inputFluids,
+                itemStacks(source.outputs.stream().map(Lazy::get).toList()),
                 List.of(),
-                weightedOutputs(source.outputs),
                 List.of(),
                 Math.multiplyExact(energyPerTick, (long) source.time),
                 source.time,
@@ -497,19 +506,11 @@ public final class ImmersiveEngineeringRecipeAdapter
     }
 
     private static long processEnergy(MultiblockRecipe recipe) {
-        try {
-            return recipe.getTotalProcessEnergy();
-        } catch (RuntimeException exception) {
-            return recipe.getBaseEnergy();
-        }
+        return recipe.getTotalProcessEnergy();
     }
 
     private static int processTime(MultiblockRecipe recipe) {
-        try {
-            return recipe.getTotalProcessTime();
-        } catch (RuntimeException exception) {
-            return recipe.getBaseTime();
-        }
+        return recipe.getTotalProcessTime();
     }
 
     private static List<CountedIngredient> countedInputs(IngredientWithSize... inputs) {
@@ -533,16 +534,29 @@ public final class ImmersiveEngineeringRecipeAdapter
         return countedInputs(inputs == null ? null : inputs.toArray(IngredientWithSize[]::new));
     }
 
-    private static List<SizedFluidIngredient> fluidInputs(
-            @Nullable SizedFluidIngredient... inputs) {
+    private static List<SizedFluidIngredient> fluidInputs(@Nullable FluidTagInput... inputs) {
         List<SizedFluidIngredient> result = new ArrayList<>();
-        if (inputs != null) {
-            for (SizedFluidIngredient input : inputs) {
-                if (input != null && input.ingredient() != null
-                        && !input.ingredient().isEmpty() && input.amount() > 0) {
-                    result.add(input);
+        for (FluidTagInput input : inputs) {
+            if (input == null) continue;
+            if (input.getAmount() <= 0) throw new IllegalArgumentException("Invalid IE fluid amount");
+            FluidIngredient ingredient;
+            try {
+                var json = input.serialize().getAsJsonObject();
+                if (json.has("nbt")) {
+                    json.addProperty("type", "useless_mod:nbt_fluid_tag");
+                    json.addProperty("strict", true);
                 }
+                ingredient = FluidIngredient.fromJson(json);
+            } catch (RuntimeException syncedIdList) {
+                // IE's client-side Either.Right cannot serialize a tag: Either.orThrow()
+                // throws RuntimeException (not IllegalStateException) for the synced ID list.
+                // Its native examples retain the required NBT; never flatten to IDs only.
+                ingredient = FluidIngredient.any(input.getMatchingFluidStacks().stream()
+                        .map(stack -> stack.getTag() == null ? FluidIngredient.single(stack)
+                                : FluidIngredient.nbt(true, stack)).toList());
             }
+            if (ingredient.isEmpty()) throw new IllegalArgumentException("Empty IE fluid predicate");
+            result.add(new SizedFluidIngredient(ingredient, input.getAmount()));
         }
         return List.copyOf(result);
     }
@@ -634,12 +648,12 @@ public final class ImmersiveEngineeringRecipeAdapter
         return true;
     }
 
-    private static List<ItemStack> tagOutputs(TagOutputList outputs) {
+    private static List<ItemStack> tagOutputs(Lazy<? extends List<ItemStack>> outputs) {
         if (outputs == null) return List.of();
         return itemStacks(outputs.get());
     }
 
-    private static List<ItemStack> tagOutput(TagOutput output) {
+    private static List<ItemStack> tagOutput(Lazy<ItemStack> output) {
         return output == null ? List.of() : itemStacks(List.of(output.get()));
     }
 
@@ -657,11 +671,6 @@ public final class ImmersiveEngineeringRecipeAdapter
         return output == null || output.isEmpty() || output.getAmount() <= 0
                 ? List.of()
                 : List.of(output.copy());
-    }
-
-    private static List<SizedFluidIngredient> fluidInputs(
-            @Nullable SizedFluidIngredient first, @Nullable SizedFluidIngredient second) {
-        return fluidInputs(new SizedFluidIngredient[]{first, second});
     }
 
     private static List<ExpectedOutputScaler.WeightedItemOutput> weightedOutputs(

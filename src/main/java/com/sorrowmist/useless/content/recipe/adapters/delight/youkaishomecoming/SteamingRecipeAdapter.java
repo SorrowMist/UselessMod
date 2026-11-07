@@ -24,7 +24,7 @@ import java.util.Map;
 /** Converts Youkai's steamer recipes. */
 public final class SteamingRecipeAdapter implements IRecipeAdapter<SteamingRecipe> {
     private static final ResourceLocation STEAMER_POT_ID =
-            new ResourceLocation("youkaisfeasts", "steamer_pot");
+            new ResourceLocation("youkaishomecoming", "steamer_pot");
 
     @Override
     public String sourceId() {

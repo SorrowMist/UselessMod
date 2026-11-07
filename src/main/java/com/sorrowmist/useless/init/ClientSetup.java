@@ -6,6 +6,8 @@ import com.sorrowmist.useless.UselessMod;
 import com.sorrowmist.useless.api.enums.EnumColor;
 import com.sorrowmist.useless.client.gui.AdvancedAlloyFurnaceScreen;
 import com.sorrowmist.useless.client.gui.PatternAssemblyScreen;
+import com.sorrowmist.useless.client.gui.MaintenanceHatchScreen;
+import com.sorrowmist.useless.client.gui.MufflerHatchScreen;
 import com.sorrowmist.useless.client.gui.MoldHubScreen;
 import com.sorrowmist.useless.client.gui.MultiblockAlloyFurnaceScreen;
 import com.sorrowmist.useless.client.gui.PassiveCraftingHatchScreen;
@@ -126,6 +128,8 @@ public class ClientSetup {
         MenuScreens.register(ModMenuType.OMNIVERSAL_MOLD_HUB_MENU.get(), MoldHubScreen::new);
         MenuScreens.register(ModMenuType.MULTIBLOCK_ALLOY_FURNACE_MENU.get(), MultiblockAlloyFurnaceScreen::new);
         MenuScreens.register(ModMenuType.PASSIVE_CRAFTING_HATCH_MENU.get(), PassiveCraftingHatchScreen::new);
+        MenuScreens.register(ModMenuType.MAINTENANCE_HATCH_MENU.get(), MaintenanceHatchScreen::new);
+        MenuScreens.register(ModMenuType.MUFFLER_HATCH_MENU.get(), MufflerHatchScreen::new);
         MenuScreens.register(ModMenuType.ORE_GENERATOR_MENU.get(), OreGeneratorScreen::new);
         MenuScreens.register(ModMenuType.DIMENSION_CONFIG_MENU.get(), DimensionConfigScreen::new);
         MenuScreens.register(ModMenuType.PATTERN_CONVERTER_MENU.get(), PatternConverterScreen::new);

@@ -20,7 +20,6 @@ import net.minecraft.world.item.crafting.RecipeSerializer;
 import net.minecraft.world.item.crafting.RecipeType;
 import net.minecraft.world.level.Level;
 import net.minecraftforge.fluids.FluidStack;
-import com.sorrowmist.useless.compat.forge1201.registry.DeferredItem;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
@@ -52,22 +51,24 @@ public class CrystalGrowthRecipeAdapter implements IRecipeAdapter<CrystalGrowthR
     private final List<AdvancedAlloyFurnaceRecipe> allRecipes = new ArrayList<>();
 
     public CrystalGrowthRecipeAdapter() {
-        buildRecipes();
+        this(AECSItems.getCrystalSeeds().stream().map(java.util.function.Supplier::get).toList());
     }
 
-    private void buildRecipes() {
-        List<DeferredItem<CrystalSeedItem>> seeds = AECSItems.getCrystalSeeds();
+    CrystalGrowthRecipeAdapter(List<CrystalSeedItem> seeds) {
+        buildRecipes(seeds);
+    }
 
-        for (DeferredItem<CrystalSeedItem> seedRef : seeds) {
-            CrystalSeedItem seedItem = seedRef.get();
-            Item seed = seedRef.asItem();
+    private void buildRecipes(List<CrystalSeedItem> seeds) {
+        for (CrystalSeedItem seedItem : seeds) {
+            if (seedItem.getClass() != CrystalSeedItem.class) continue;
+            Item seed = seedItem;
             Item crystal = seedItem.getGrowTo();
 
             if (crystal == null) continue;
 
             String seedPath = BuiltInRegistries.ITEM.getKey(seed).getPath();
 
-            int energy = Math.max(seedItem.getOvergrowTick() * 5, 1000);
+            long energy = Math.max((long) seedItem.getOvergrowTick() * 5, 1000L);
             int processTime = Math.max(seedItem.getOvergrowTick() / 10, 60);
 
             // 生长腔版本保留原始 id：配方身份含 id，改动会让既有万象样板失配
@@ -89,7 +90,7 @@ public class CrystalGrowthRecipeAdapter implements IRecipeAdapter<CrystalGrowthR
 
     /** 按同一输入输出、仅模具不同的方式构造一条生长配方 */
     private static AdvancedAlloyFurnaceRecipe createRecipe(
-            ResourceLocation id, Item seed, Item crystal, int energy, int processTime,
+            ResourceLocation id, Item seed, Item crystal, long energy, int processTime,
             Ingredient mold) {
         return new AdvancedAlloyFurnaceRecipe(
                 id,

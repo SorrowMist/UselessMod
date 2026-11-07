@@ -28,7 +28,7 @@ public final class SimpleFermentationRecipeAdapter
     private static final String SOURCE_CLASS =
             "dev.xkmc.youkaishomecoming.content.pot.ferment.SimpleFermentationRecipe";
     private static final ResourceLocation FERMENTATION_TANK_ID =
-            new ResourceLocation("youkaisfeasts", "fermentation_tank");
+            new ResourceLocation("youkaishomecoming", "fermentation_tank");
 
     @Override
     public String sourceId() {

@@ -3,6 +3,18 @@
 本文件记录 UselessMod 的全部版本变更，格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，
 每个条目附英文对照，分类固定为「新增 / 变更 / 修复 / 性能」四类。
 
+## [2.4.6.6]
+
+### Changed / 变更
+- 万象样板的自动修复不再在进入世界时静默执行，统一由 `/uselessmod patterns repair [preview]` 命令触发；已编码的样板在载入时保持原样，不会被改写。
+  - Omniversal pattern repair no longer runs silently when entering the world and is now triggered only by the `/uselessmod patterns repair [preview]` command; encoded patterns stay untouched on load.
+
+### Fixed / 修复
+- 修复重新编码后的万象样板主产物被替换为配方目录中静态代表值的问题：敌对神经网络预测产物样板不再从玩家指定的预测产物退化为通用预测产物。修复命令现在优先复用样板原有载荷重编码，保留编码时绑定的具体产物组件，仅在原有载荷无法重编码时才按当前配方的输入输出重建。
+  - Fixed re-encoded omniversal patterns having their main output replaced by the recipe directory's static representative value: Hostile Neural Networks prediction patterns no longer degrade from the chosen prediction product to the generic one. The repair command now re-encodes from the pattern's existing payload first, preserving the concrete output components bound at encoding time, and only rebuilds from the current recipe's inputs and outputs when that fails.
+- 万象样板的失效判定不再比较输出载荷，只比较输入槽语义（允许整张样板按同一倍数放大）。输出组件带有随重载变化的动态引用的样板不再被误判为失效而重建。
+  - Staleness detection for omniversal patterns no longer compares output payloads and now compares only input slot semantics, allowing the whole pattern to be scaled by the same factor. Patterns whose output components carry dynamic references that change across reloads are no longer wrongly flagged as stale and rebuilt.
+
 ## [2.4.6.5]
 
 ### Fixed / 修复

@@ -14,6 +14,7 @@ import com.sorrowmist.useless.content.recipe.AdvancedAlloyFurnaceRecipe;
 import com.sorrowmist.useless.content.recipe.AlloyFurnaceRecipeCatalog;
 import com.sorrowmist.useless.content.recipe.CountedIngredient;
 import com.sorrowmist.useless.content.recipe.LongSizedFluidIngredient;
+import com.sorrowmist.useless.content.recipe.RecipeSourceIds;
 import com.sorrowmist.useless.core.component.OmniversalPatternData;
 import com.sorrowmist.useless.core.component.UComponents;
 import com.sorrowmist.useless.init.ModItems;
@@ -127,8 +128,9 @@ public final class OmniversalPatternEncoding {
      *
      * <p>解码成功只说明样板仍能绑定到配方，不说明其输入槽语义与当前配方一致：早期编码器会把
      * 「同一物品、不同数据组件」的多个需求放宽成按物品 ID 匹配，这类样板依旧可以解码，却允许
-     * 任意一种组件填满全部槽位。这里以当前配方重建一张样板，比较 AE payload 与 item-id 输入
-     * 槽位，任一不同即判定为需要重建。</p>
+     * 任意一种组件填满全部槽位。这里以当前配方重建一张样板：普通来源比较完整 AE payload，
+     * HNN 来源仅比较输入 payload，因为其预测产物组件引用动态数据模型注册表；输出表示变化不应
+     * 覆盖样板中已绑定的具体预测产物。所有来源仍会比较 item-id 输入槽语义。</p>
      *
      * <p>按 {@code recipeId} 与按旧 payload 指纹都定位不到当前配方时返回 {@code false}：此时无法
      * 判定样板是否失真，交给解码校验决定，避免把暂时取不到配方的样板误报为失效。当前配方本身
@@ -178,14 +180,27 @@ public final class OmniversalPatternEncoding {
                 || rebuiltDefinition.get(UComponents.OMNIVERSAL_PATTERN_DATA.get()) == null) {
             return false;
         }
-        if (!Objects.equals(definition.get(AEComponents.ENCODED_PROCESSING_PATTERN),
-                rebuiltDefinition.get(AEComponents.ENCODED_PROCESSING_PATTERN))) {
+        var storedPattern = definition.get(AEComponents.ENCODED_PROCESSING_PATTERN);
+        var rebuiltPattern = rebuiltDefinition.get(AEComponents.ENCODED_PROCESSING_PATTERN);
+        if (isHostileNetworksPattern(data)) {
+            // HNN 的预测产物包含指向动态数据模型注册表的组件。重载后输出键表示可能变化，
+            // 修复只应根据输入是否变化判定，避免覆盖已编码的具体预测产物。
+            if (storedPattern == null || rebuiltPattern == null
+                    || !Objects.equals(storedPattern.sparseInputs(), rebuiltPattern.sparseInputs())) {
+                return true;
+            }
+        } else if (!Objects.equals(storedPattern, rebuiltPattern)) {
             return true;
         }
         return !normalizedSlots(data.itemIdInputSlots())
                 .equals(normalizedSlots(
                         rebuiltDefinition.get(UComponents.OMNIVERSAL_PATTERN_DATA.get())
                                 .itemIdInputSlots()));
+    }
+
+    private static boolean isHostileNetworksPattern(OmniversalPatternData data) {
+        return data != null
+                && RecipeSourceIds.HOSTILE_NETWORKS.equals(RecipeSourceIds.normalize(data.sourceId()));
     }
 
     private static List<Integer> normalizedSlots(List<Integer> slots) {

@@ -7,20 +7,18 @@ import appeng.crafting.pattern.AEProcessingPattern;
 import com.sorrowmist.useless.content.recipe.AlloyFurnaceRecipeCatalog;
 import com.sorrowmist.useless.core.component.OmniversalPatternData;
 import com.sorrowmist.useless.core.component.UComponents;
-import com.sorrowmist.useless.init.ModItems;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
-import java.util.function.BiConsumer;
-import java.util.function.IntFunction;
 
 /**
  * 单张万象样板的失效判定与重建。
  *
- * <p>与网格无关，供机器在自身样板槽上就地修复，也供命令扫描网格时复用。判定分两层：
+ * <p>不主动触发：只在玩家执行修复命令（{@code OmniversalPatternRepairService}）时
+ * 逐张判定与重建，避免机器在每次载入存档时改动已编码的样板。判定分两层：
  * 无法解码为 {@link OmniversalPatternDetails}，或 payload 仍可解码但输入槽语义已与当前
  * 配方不符（见 {@link OmniversalPatternEncoding#isStale}）。</p>
  */
@@ -74,40 +72,6 @@ public final class OmniversalPatternRepair {
         Optional<AlloyFurnaceRecipeCatalog.Entry> entry = resolveEntry(data, source, level);
         return entry.map(value -> OmniversalPatternEncoding.reencodeExisting(stack, value, level))
                 .orElse(ItemStack.EMPTY);
-    }
-
-    /**
-     * 就地修复一段样板槽中全部失真的万象样板，返回实际写回的槽数。
-     *
-     * <p>供机器在区块加载、样板栏加载完成后自动执行一次，使旧样板无需玩家手动执行命令。
-     * 调用方须先确认配方目录已就绪（{@link AlloyFurnaceRecipeCatalog#isReady}），否则
-     * 失效判定会因取不到当前配方而失效，只能空跑一轮。</p>
-     *
-     * @param slotCount 要扫描的槽位数（不含总成的恢复槽）
-     * @param getter    按槽位读取物品栈
-     * @param setter    按槽位写回物品栈，应触发调用方的样板刷新回调
-     */
-    public static int repairSlots(int slotCount, IntFunction<ItemStack> getter,
-                                  BiConsumer<Integer, ItemStack> setter, Level level) {
-        if (slotCount <= 0 || getter == null || setter == null || level == null) {
-            return 0;
-        }
-        int repaired = 0;
-        for (int slot = 0; slot < slotCount; slot++) {
-            ItemStack stack = getter.apply(slot);
-            if (stack == null || stack.isEmpty() || !stack.is(ModItems.OMNIVERSAL_PATTERN.get())) {
-                continue;
-            }
-            if (!needsRepair(stack, level)) continue;
-
-            ItemStack replacement = rebuild(stack, level);
-            if (replacement.isEmpty()) continue;
-            if (ItemStack.isSameItemSameComponents(stack, replacement)) continue;
-
-            setter.accept(slot, replacement);
-            repaired++;
-        }
-        return repaired;
     }
 
     private static boolean isDecodable(ItemStack stack, Level level) {

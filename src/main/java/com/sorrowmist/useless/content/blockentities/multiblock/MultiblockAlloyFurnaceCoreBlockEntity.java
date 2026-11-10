@@ -160,8 +160,6 @@ public final class MultiblockAlloyFurnaceCoreBlockEntity extends BlockEntity imp
         aeManager.tickPatternRefresh();
         MePatternAssemblyBlockEntity assembly = getAssembly();
         if (assembly != null) {
-            // 样板随外部库存载入或区块重载后，按当前配方目录重建一次失真样板。
-            assembly.repairPatternsIfPending();
             assembly.refreshProviderIfReady();
         }
         boolean progressed = false;

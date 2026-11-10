@@ -34,10 +34,8 @@ import java.util.Set;
  * <p>失效判定与重建都委托给 {@link OmniversalPatternRepair}：无法解码的样板、以及仍能解码
  * 但输入槽语义已与当前配方不符的样板都会按当前配方重建，然后就地写回原槽位。</p>
  *
- * <p>机器自身在样板随存档载入后会各自修复一次，见
- * {@link AdvancedAlloyFurnaceBlockEntity} 与 {@link MePatternAssemblyBlockEntity}；本类是为
- * 玩家提供的跨机器手动入口，只覆盖 AE 网络上已通电的机器。玩家背包与终端内尚未上传的
- * 样板不在扫描范围内。</p>
+ * <p>这是样板修复的唯一入口：机器在载入存档时不再自动重建样板，需要玩家主动执行命令。
+ * 扫描覆盖 AE 网络上已通电的机器；玩家背包与终端内尚未上传的样板不在扫描范围内。</p>
  */
 public final class OmniversalPatternRepairService {
     private static final int MAX_DETAILS = 3;

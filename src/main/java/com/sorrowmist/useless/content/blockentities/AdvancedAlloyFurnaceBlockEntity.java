@@ -41,7 +41,6 @@ import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.Craftin
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.AlloyFurnaceAeHost;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.CraftingAeOutputTarget;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.GridOutputTarget;
-import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.OmniversalPatternRepair;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.chemical.ChemicalHandlerView;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.chemical.ChemicalCompatProviders;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.chemical.ChemicalKeyProvider;
@@ -217,17 +216,6 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
     private boolean externalInventoryLoaded;
     /** 延迟任务数据是否已处理完毕；配方目录未就绪时保持 false，由 tick 逐 tick 重试。 */
     private boolean deferredTasksLoaded;
-    /**
-     * 进存档后是否还需按当前配方目录校验并重建样板。
-     *
-     * <p>初值为 {@code true}：样板随方块实体的 NBT 或外部库存载入，两种情况都要在首次
-     * 服务端 tick 且配方目录就绪后校验一次；目录未就绪时保持该值由 tick 重试。</p>
-     */
-    private boolean patternAutoRepairPending = true;
-    /** 批量写回样板期间抑制逐槽重建样板快照，由批量结束后的显式刷新代替。 */
-    private boolean suppressPatternRefresh;
-    /** 批量写回样板期间抑制逐槽的库存变更回调，由批量结束后的统一回调代替。 */
-    private boolean suppressStorageChange;
 
     public AdvancedAlloyFurnaceBlockEntity(BlockPos pos, BlockState state) {
         super(ModBlockEntities.ADVANCED_ALLOY_FURNACE.get(), pos, state);
@@ -389,9 +377,6 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
             // 配方目录由后台线程构建，未就绪时解码会把完好样板判为失效并退还材料，故在此重试。
             entity.deferredTasksLoaded = entity.aeManager.loadDeferredTasks();
         }
-        // 进存档后按当前配方目录修复一次失真样板；目录未就绪时保持待修状态，下一 tick 重试。
-        entity.repairPatternsIfPending();
-
         long currentCatalogGeneration = AlloyFurnaceRecipeCatalog.generation();
         if (entity.recipeCatalogGeneration != currentCatalogGeneration) {
             entity.recipeCatalogGeneration = currentCatalogGeneration;
@@ -916,8 +901,6 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
         ExternalInventoryStore.setReference(this, inventoryReference);
         pendingLegacyInventory = null;
         externalInventoryLoaded = true;
-        // 样板刚随外部库存载入，尚未按当前配方目录校验过，交由 tick 在目录就绪后修复一次。
-        patternAutoRepairPending = true;
         itemStorageRevision++;
         markRecipeInputsChanged();
         updateMoldState();
@@ -1550,8 +1533,6 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
                                    be.updatePatterns();
                                    // level 已可用，加载持久化的 AE 合成任务；目录未就绪时由 tick 重试
                                    be.deferredTasksLoaded = be.aeManager.loadDeferredTasks();
-                                   // 区块重新加载后也要校验一次，覆盖样板在离线期间随配方目录变更而失真的情况。
-                                   be.patternAutoRepairPending = true;
                                }
         );
     }
@@ -1937,49 +1918,12 @@ public class AdvancedAlloyFurnaceBlockEntity extends AEBaseBlockEntity implement
         this.aeManager.updatePatterns();
     }
 
-    /** 样板槽变化回调：批量写回期间只挂起刷新，由批量结束后的显式刷新代替。 */
+    /** 样板槽变化回调。 */
     private void onPatternSlotChanged(int slot) {
-        if (this.suppressPatternRefresh) return;
         this.updatePatterns();
     }
 
-    /**
-     * 读档后按当前配方目录校验并重建失真样板。
-     *
-     * <p>配方目录由后台线程构建，未就绪时重建会取不到当前配方而空跑，故保持待修状态由 tick
-     * 重试。批量写回期间挂起逐槽的样板刷新，结束后统一刷新一次；外部库存也只在确有写回时
-     * 落盘一次，避免逐槽保存。</p>
-     */
-    private void repairPatternsIfPending() {
-        if (!this.patternAutoRepairPending) return;
-        if (this.level == null || this.level.isClientSide) return;
-        if (!AlloyFurnaceRecipeCatalog.isReady(this.level)) return;
-        this.patternAutoRepairPending = false;
-
-        this.suppressPatternRefresh = true;
-        this.suppressStorageChange = true;
-        int repaired;
-        try {
-            repaired = OmniversalPatternRepair.repairSlots(
-                    PATTERN_SLOTS_COUNT,
-                    slot -> this.itemHandler.getStackInSlot(PATTERN_SLOTS_START + slot),
-                    (slot, stack) -> this.itemHandler.setStackInSlot(PATTERN_SLOTS_START + slot, stack),
-                    this.level);
-        } finally {
-            this.suppressPatternRefresh = false;
-            this.suppressStorageChange = false;
-        }
-
-        if (repaired > 0) {
-            LOGGER.info("Rebuilt {} stale omniversal patterns at {}", repaired, this.worldPosition);
-            // 写回期间挂起了逐槽回调，这里统一补一次：刷新配方输入并落盘外部库存。
-            this.onItemStorageChanged();
-            this.updatePatterns();
-        }
-    }
-
     private void onItemStorageChanged() {
-        if (this.suppressStorageChange) return;
         this.itemStorageRevision++;
         this.markRecipeInputsChanged();
         saveExternalInventory();

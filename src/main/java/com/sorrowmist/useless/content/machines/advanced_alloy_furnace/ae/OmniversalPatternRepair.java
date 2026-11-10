@@ -40,9 +40,10 @@ public final class OmniversalPatternRepair {
     /**
      * 按当前配方目录重建一张万象样板；无法重建时返回 {@link ItemStack#EMPTY}。
      *
-     * <p>绑定配方若仍能由 {@code recipeId} 唯一定位，就以该配方**当前的输入输出**重建
-     * payload——配方被改动（输入变化）而失效的样板只能这样修复。只有 recipeId 无法唯一
-     * 定位时才退回用旧 payload 做内容匹配，复用旧 payload 重编码。</p>
+     * <p>绑定配方若仍能由 {@code recipeId} 唯一定位，先用旧 payload 重编码：旧 payload 里的
+     * 输出带着玩家编码时绑定的具体组件（药水效果、附魔、灵名等），可以原样保留；只有旧
+     * payload 无法重编码（例如输入已随配方改动而不再匹配）时，才退到用该配方**当前的输入
+     * 输出**重建。recipeId 无法唯一定位时，退回用旧 payload 做内容匹配。</p>
      */
     public static ItemStack rebuild(ItemStack stack, Level level) {
         if (stack == null || stack.isEmpty() || level == null) {
@@ -55,7 +56,10 @@ public final class OmniversalPatternRepair {
 
         Optional<AlloyFurnaceRecipeCatalog.Entry> byRecipeId = resolveEntryByRecipeId(data, level);
         if (byRecipeId.isPresent()) {
-            ItemStack rebuilt = OmniversalPatternEncoding.reencodeFromRecipe(byRecipeId.get(), level);
+            // 优先复用旧 payload：它保留了玩家编码时绑定的具体产物组件。
+            ItemStack rebuilt = OmniversalPatternEncoding.reencodeExisting(stack, byRecipeId.get(), level);
+            if (!rebuilt.isEmpty()) return rebuilt;
+            rebuilt = OmniversalPatternEncoding.reencodeFromRecipe(byRecipeId.get(), level);
             if (!rebuilt.isEmpty()) return rebuilt;
         }
 

@@ -204,12 +204,11 @@ requiredMods=["pneumaticcraft"]
     side="BOTH"
 
 # ExtendedAE-Plus 的兼容层在 JEI 传输时预置供应器搜索关键字。
-# 1.6.4 起该入口由 ExtendedAEPatternUploadUtil 迁至 RecipeTypeNameConfig，1.6.3 及更早
-# 仅有旧类；旧版与新版互斥，无共存的访问方式，因此下限锁定 1.6.4。
+# 1.6.4 起入口迁至 RecipeTypeNameConfig；兼容层按类是否存在选择 1.6.3 与新版入口。
 [[dependencies.${mod_id}]]
     modId="extendedae_plus"
     type="optional"
-    versionRange="[1.6.4,)"
+    versionRange="[1.6.3,)"
     ordering="NONE"
     side="BOTH"
 

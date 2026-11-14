@@ -6,6 +6,7 @@ import com.sorrowmist.useless.api.enums.tool.ToolTypeMode;
 import com.sorrowmist.useless.client.BeefAutoClicker;
 import com.sorrowmist.useless.client.BeefTooltipPager;
 import com.sorrowmist.useless.client.TooltipPageState;
+import com.sorrowmist.useless.compat.ars.ArsCreatureTimeCompatLoader;
 import com.sorrowmist.useless.compat.occultism.RitualSatchelClientCompat;
 import com.sorrowmist.useless.content.blocks.GlowPlasticBlock;
 import com.sorrowmist.useless.content.blocks.UselessGlassBlock;
@@ -892,6 +893,10 @@ public class EndlessBeafItem extends TieredItem {
         }
 
         try {
+            if (ModList.get().isLoaded(ArsCreatureTimeCompatLoader.MOD_ID)) {
+                ArsCreatureTimeCompatLoader.prepareForForceKill(target);
+            }
+
             executeForceKill(context);
 
             if (!isDeathCommitted(target) && !context.deathEventAttempted) {

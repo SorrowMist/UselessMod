@@ -5,6 +5,7 @@ import com.hollingsworth.arsnouveau.common.block.tile.WhirlisprigTile;
 import com.hollingsworth.arsnouveau.common.entity.Alakarkinos;
 import com.hollingsworth.arsnouveau.common.entity.EntityDrygmy;
 import com.hollingsworth.arsnouveau.common.entity.Whirlisprig;
+import com.hollingsworth.arsnouveau.common.entity.WildenChimera;
 import com.hollingsworth.arsnouveau.setup.config.Config;
 import net.minecraft.world.entity.LivingEntity;
 
@@ -46,6 +47,22 @@ public final class ArsCreatureTimeCompat implements ArsCreatureTimeBridge {
             accelerateAlakarkinos(alakarkinos, extra);
         } else if (target instanceof Whirlisprig whirlisprig) {
             accelerateWhirlisprig(whirlisprig, extra);
+        }
+    }
+
+    /**
+     * 将荒野奇美拉设为最终阶段，使造化杖的致命伤害走 Ars 原生死亡流程。
+     *
+     * <p>项目使用的 Ars Nouveau 1.21.1-5.11.6 仅在阶段小于 3 时执行阶段切换；
+     * 切换期间伤害会被拒绝。依据：
+     * <a href="https://www.curseforge.com/minecraft/mc-mods/ars-nouveau/files/8152094">WildenChimera</a>。</p>
+     */
+    @Override
+    public void prepareForForceKill(LivingEntity target) {
+        if (target instanceof WildenChimera chimera) {
+            chimera.setPhase(3);
+            chimera.setPhaseSwapping(false);
+            chimera.swapTicks = 0;
         }
     }
 

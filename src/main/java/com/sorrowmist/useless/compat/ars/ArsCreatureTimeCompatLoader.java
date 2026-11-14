@@ -24,7 +24,7 @@ public final class ArsCreatureTimeCompatLoader {
     private ArsCreatureTimeCompatLoader() {
     }
 
-    /** 生物加速桥；未加载 Ars Nouveau 或初始化失败时为 {@code null}。 */
+    /** Ars Nouveau 兼容桥；未加载该模组或初始化失败时为 {@code null}。 */
     private static ArsCreatureTimeBridge bridge() {
         if (!initialized) {
             initialized = true;
@@ -64,4 +64,21 @@ public final class ArsCreatureTimeCompatLoader {
                     AdapterGuards.describe(error));
         }
     }
+
+    public static void prepareForForceKill(LivingEntity target) {
+        ArsCreatureTimeBridge resolved = bridge();
+        if (resolved == null) {
+            return;
+        }
+
+        try {
+            resolved.prepareForForceKill(target);
+        } catch (LinkageError | ClassCastException exception) {
+            bridge = null;
+            UselessMod.LOGGER.error(
+                    "Disabling the Ars Nouveau compatibility bridge after a force-kill compatibility failure; Cause: {}",
+                    AdapterGuards.describe(exception));
+        }
+    }
+
 }

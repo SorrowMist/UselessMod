@@ -8,6 +8,7 @@ import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.client.event.ClientTickEvent;
+import net.neoforged.neoforge.event.tick.PlayerTickEvent;
 
 /**
  * 造化杖飞行的客户端侧兜底与状态记录。
@@ -63,5 +64,26 @@ public final class BeefToolFlightClient {
                 && UselessItemUtils.hasTargetToolInInventory(player)) {
             abilities.mayfly = true;
         }
+    }
+
+    /**
+     * 造化杖飞行时抑制无水平输入后的速度残留。
+     *
+     * <p>参考 GTLCore 1.20.1 的 {@code ForgeCommonEventListener#onPlayerTickEvent}，在客户端玩家 tick
+     * 末端按比例衰减水平速度，并保留竖直速度。本处理仅作用于本地玩家、携带造化杖且正在飞行的情况。</p>
+     */
+    @SubscribeEvent
+    public static void onPlayerTick(PlayerTickEvent.Post event) {
+        LocalPlayer player = Minecraft.getInstance().player;
+        if (player == null
+                || event.getEntity() != player
+                || !player.getAbilities().flying
+                || player.xxa != 0.0F
+                || player.zza != 0.0F
+                || !UselessItemUtils.hasTargetToolInInventory(player)) {
+            return;
+        }
+
+        player.setDeltaMovement(player.getDeltaMovement().multiply(0.5, 1.0, 0.5));
     }
 }

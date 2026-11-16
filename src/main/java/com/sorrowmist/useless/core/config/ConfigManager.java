@@ -21,6 +21,7 @@ public class ConfigManager {
     private static final ModConfigSpec.BooleanValue ENABLE_BOTANY_POT_RENDERING;
     // 造化杖连点模式：每个客户端 tick 触发多少次右键（客户端行为，放 CLIENT 配置）
     private static final ModConfigSpec.IntValue BEEF_AUTOCLICK_CLICKS_PER_TICK;
+    private static final ModConfigSpec.BooleanValue BEEF_CANCEL_FLIGHT_INERTIA;
     // 模组更新检查：进入世界时查询 CurseForge 上的最新版本（仅客户端）
     private static final ModConfigSpec.BooleanValue UPDATE_CHECK_ENABLED;
 
@@ -227,13 +228,19 @@ public class ConfigManager {
                 .define("enable_botany_pot_rendering", true);
         CLIENT_BUILDER.pop();
 
-        CLIENT_BUILDER.push("beef_tool");
+        CLIENT_BUILDER.translation("useless_mod.configuration.beef_tool").push("beef_tool");
         BEEF_AUTOCLICK_CLICKS_PER_TICK = CLIENT_BUILDER
                 .comment("造化杖连点模式每个客户端 tick 触发多少次右键",
                         "调大 = 更快（默认 4 约等于 80 次/秒），调小 = 降低服务端压力",
                         "仅在客户端生效，无需服务端同意")
                 .translation("useless_mod.configuration.beef_autoclick_clicks_per_tick")
                 .defineInRange("beef_autoclick_clicks_per_tick", 4, 1, 20);
+
+        BEEF_CANCEL_FLIGHT_INERTIA = CLIENT_BUILDER
+                .comment("携带造化杖或兼容扳手飞行时，在没有水平移动输入的情况下衰减水平速度",
+                        "该设置仅对当前客户端生效，适用于所有世界")
+                .translation("useless_mod.configuration.beef_cancel_flight_inertia")
+                .define("cancel_flight_inertia", true);
         CLIENT_BUILDER.pop();
 
         // 更新检查只影响客户端提示与一次出站请求，放在客户端配置中，不参与服务端行为。
@@ -1255,6 +1262,15 @@ public class ConfigManager {
     // 造化杖连点模式：每个客户端 tick 触发多少次右键
     public static int getBeefAutoClickClicksPerTick() {
         return getConfigValue(BEEF_AUTOCLICK_CLICKS_PER_TICK);
+    }
+
+    public static boolean isBeefFlightInertiaCancellationEnabled() {
+        return getConfigValue(BEEF_CANCEL_FLIGHT_INERTIA);
+    }
+
+    public static void setBeefFlightInertiaCancellationEnabled(boolean enabled) {
+        BEEF_CANCEL_FLIGHT_INERTIA.set(enabled);
+        CLIENT_SPEC.save();
     }
 
     public static double getBeefToolEntityInteractionRange() {

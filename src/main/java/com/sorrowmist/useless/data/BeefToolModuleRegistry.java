@@ -54,6 +54,7 @@ public final class BeefToolModuleRegistry {
     public static final String BEEF_RIPEN = "mode.beef_ripen";
     public static final String BEEF_FORCE_GROW = "mode.beef_force_grow";
     public static final String BEEF_AUTO_CLICK = "mode.beef_auto_click";
+    public static final String BEEF_CANCEL_FLIGHT_INERTIA = "mode.beef_cancel_flight_inertia";
     public static final String BEEF_WIRELESS_LOGISTICS = "mode.beef_wireless_logistics";
     public static final String BEEF_KILL_AURA = "mode.beef_kill_aura";
     public static final String BEEF_PROTECT_MODE = "mode.beef_protect_mode";
@@ -147,6 +148,9 @@ public final class BeefToolModuleRegistry {
                     GroupKind.VANILLA, Availability.ALWAYS, false),
             new Definition(BEEF_AUTO_CLICK, ModeTypeEnum.BEEF_AUTO_CLICK_ENABLED.getTooltip(),
                     GroupKind.AUXILIARY, Availability.ALWAYS, false),
+            new Definition(BEEF_CANCEL_FLIGHT_INERTIA,
+                    Component.translatable("useless_mod.configuration.beef_cancel_flight_inertia"),
+                    GroupKind.AUXILIARY, Availability.ALWAYS, false),
             new Definition(BEEF_WIRELESS_LOGISTICS, ModeTypeEnum.BEEF_WIRELESS_LOGISTICS_ENABLED.getTooltip(),
                     GroupKind.AUXILIARY, Availability.ENDLESS, false),
             new Definition(BEEF_KILL_AURA, ModeTypeEnum.BEEF_KILL_AURA_ENABLED.getTooltip(),
@@ -163,6 +167,7 @@ public final class BeefToolModuleRegistry {
     /** 新增的辅助类模块：老存档的布局里没有它们，进游戏时自动补进「辅助」分组。 */
     private static final List<String> AUTO_AUXILIARY_MODULES = List.of(
             BEEF_AUTO_CLICK,
+            BEEF_CANCEL_FLIGHT_INERTIA,
             BEEF_WIRELESS_LOGISTICS,
             BEEF_ENTITY_TIME_ACCELERATION);
     /** 「原版」分组的模块：承载原版工具动作（右键、剪羊毛、点火、催熟等），老存档自动补组。 */

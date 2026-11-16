@@ -1,5 +1,6 @@
 package com.sorrowmist.useless.event.client;
 
+import com.sorrowmist.useless.core.config.ConfigManager;
 import com.sorrowmist.useless.utils.UselessItemUtils;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.player.LocalPlayer;
@@ -78,6 +79,7 @@ public final class BeefToolFlightClient {
         if (player == null
                 || event.getEntity() != player
                 || !player.getAbilities().flying
+                || !ConfigManager.isBeefFlightInertiaCancellationEnabled()
                 || player.xxa != 0.0F
                 || player.zza != 0.0F
                 || !UselessItemUtils.hasTargetToolInInventory(player)) {

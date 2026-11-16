@@ -11,6 +11,7 @@ import com.sorrowmist.useless.core.common.KeyBindings;
 import com.sorrowmist.useless.core.component.UComponents;
 import com.sorrowmist.useless.core.config.BeefToolProtectionManager;
 import com.sorrowmist.useless.core.config.ChainGroupManager;
+import com.sorrowmist.useless.core.config.ConfigManager;
 import com.sorrowmist.useless.content.items.EndlessBeafItem;
 import com.sorrowmist.useless.data.BeefToolLayout;
 import com.sorrowmist.useless.data.BeefToolModuleRegistry;
@@ -617,6 +618,8 @@ public class ModeWheelScreen extends Screen {
             case BeefToolModuleRegistry.BEEF_RIPEN -> bool(UComponents.BeefRipenComponent, false);
             case BeefToolModuleRegistry.BEEF_FORCE_GROW -> bool(UComponents.BeefForceGrowComponent, false);
             case BeefToolModuleRegistry.BEEF_AUTO_CLICK -> BeefAutoClicker.isEnabled();
+            case BeefToolModuleRegistry.BEEF_CANCEL_FLIGHT_INERTIA ->
+                    ConfigManager.isBeefFlightInertiaCancellationEnabled();
             case BeefToolModuleRegistry.BEEF_WIRELESS_LOGISTICS ->
                     bool(UComponents.StaffLinkEnabledComponent, false);
             case BeefToolModuleRegistry.BEEF_KILL_AURA -> bool(UComponents.BeefKillAuraComponent, false);
@@ -991,6 +994,9 @@ public class ModeWheelScreen extends Screen {
             case BeefToolModuleRegistry.BEEF_FORCE_GROW -> toggle(ModeTogglePacket.ModeType.BEEF_FORCE_GROW,
                     UComponents.BeefForceGrowComponent, false);
             case BeefToolModuleRegistry.BEEF_AUTO_CLICK -> BeefAutoClicker.toggle();
+            case BeefToolModuleRegistry.BEEF_CANCEL_FLIGHT_INERTIA ->
+                    ConfigManager.setBeefFlightInertiaCancellationEnabled(
+                            !ConfigManager.isBeefFlightInertiaCancellationEnabled());
             case BeefToolModuleRegistry.BEEF_WIRELESS_LOGISTICS ->
                     toggle(ModeTogglePacket.ModeType.BEEF_WIRELESS_LOGISTICS,
                             UComponents.StaffLinkEnabledComponent, false);
@@ -1583,6 +1589,9 @@ public class ModeWheelScreen extends Screen {
                     Component.translatable("gui.useless_mod.mode_config.wireless_logistics.title"),
                     Component.translatable("gui.useless_mod.mode_config.wireless_logistics.key",
                             KeyBindings.OPEN_WIRELESS_LOGISTICS_KEY.get().getTranslatedKeyMessage()));
+            case BeefToolModuleRegistry.BEEF_CANCEL_FLIGHT_INERTIA -> List.of(
+                    Component.translatable("useless_mod.configuration.beef_cancel_flight_inertia.tooltip"),
+                    Component.translatable("gui.useless_mod.mode_config.flight_inertia.scope"));
             default -> null;
         };
     }

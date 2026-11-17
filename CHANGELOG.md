@@ -3,6 +3,20 @@
 本文件记录 UselessMod 的全部版本变更，格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，
 每个条目附英文对照，分类固定为「新增 / 变更 / 修复 / 性能」四类。
 
+## [2.4.6.7]
+
+### Added / 新增
+- 牛排工具新增飞行惯性开关，可从模式轮或客户端设置中切换；默认开启，设置保存在本机并适用于所有世界。
+  - Added a flight inertia toggle to the Beef Tool mode wheel and client settings. It is enabled by default, saved on this client, and applies to all worlds.
+- 新增铁砧工艺可选配方兼容，支持四维与普通多方块合成、多方块转换、方块和物品压合/粉碎、物品冲压/解包/压入方块、方块涂抹、充能、快速烹饪、流体反应、浮霜与多合一锻造、珠宝加工、质量注入、过筛、压榨及序列加工（含高温熔炼与中子辐照）；概率产物按期望值转换，无法可靠映射的特殊配方保持隔离。普通配方按处理时长以 100 FE/t 为基准计算能耗，碰撞配方按 32、128、256 速度档线性换算为 100、400、800 FE/t。
+  - Added optional AnvilCraft recipe compatibility for 4D and regular multiblock crafting/conversion; block and item compression/crushing; item stamping, unpacking and injection; block smearing; charging; fast cooking; fluid reactions; Frost and multiple smithing; jewel crafting; mass injection; sieving; squeezing; and procedural processing, including high-temperature smelting and neutron irradiation. Probabilistic outputs use expected values, and recipes with unsupported semantics remain isolated. Regular recipes use a 100 FE/t baseline scaled by processing time; collision energy scales linearly with speed tiers 32, 128 and 256 to 100, 400 and 800 FE/t.
+
+### Fixed / 修复
+- 修复使用造化杖秒杀新生魔艺的荒野奇美拉时，奇美拉可能进入假死状态、无法正常结算死亡的问题。
+  - Fixed Ars Nouveau's Wilden Chimera potentially entering a stuck death state instead of completing its death sequence when instantly killed with the Creation Staff.
+- 修复 ExtendedAE-Plus 1.6.3 的兼容问题：通过 JEI 传输万象合金炉配方时可正常预设供应器搜索关键字，同时保留对 1.6.4 及更高版本的支持。
+  - Fixed compatibility with ExtendedAE-Plus 1.6.3: transferring an Omniversal Alloy Furnace recipe through JEI can now preset the provider search keyword, while retaining support for version 1.6.4 and later.
+
 ## [2.4.6.6]
 
 ### Changed / 变更

@@ -31,12 +31,22 @@ public final class OmniversalAlloyFurnaceStructure {
 
     public enum Part { CORE, CASING, COIL, AIR }
     public enum FunctionalPart {
-        PATTERN_ASSEMBLY, MOLD_HUB, PASSIVE_HATCH, MAINTENANCE_HATCH, AUTO_MAINTENANCE_HATCH, MUFFLER_HATCH
+        PATTERN_ASSEMBLY, MOLD_HUB, PASSIVE_HATCH, MAINTENANCE_HATCH, AUTO_MAINTENANCE_HATCH, MUFFLER_HATCH;
+
+        public boolean isShareable() { return this == MOLD_HUB; }
+    }
+    public enum MismatchReason {
+        BLOCK, COIL_TIER, MISSING_PART, NO_AVAILABLE_POSITION, DUPLICATE_PART, SHARED_PART, MUFFLER_POSITION, MUFFLER_FACING
     }
     public record Entry(BlockPos localPos, Part part) {
         public BlockPos worldPos(BlockPos corePos, Direction facing) { return toWorld(corePos, facing, localPos); }
     }
-    public record Mismatch(BlockPos worldPos, Part expected, BlockState actual) {}
+    public record Mismatch(BlockPos worldPos, Part expected, BlockState actual,
+                           MismatchReason reason, @Nullable FunctionalPart functionalPart) {
+        public Mismatch(BlockPos worldPos, Part expected, BlockState actual) {
+            this(worldPos, expected, actual, MismatchReason.BLOCK, null);
+        }
+    }
     public record ValidationResult(boolean valid, int coilTier,
                                    @Nullable BlockPos patternAssemblyPos, @Nullable BlockPos moldHubPos,
                                    @Nullable BlockPos passiveHatchPos, @Nullable BlockPos maintenanceHatchPos,
@@ -71,7 +81,8 @@ public final class OmniversalAlloyFurnaceStructure {
             BlockState state = level.getBlockState(pos);
             if (entry.part() == Part.COIL) {
                 if (!(state.getBlock() instanceof UselessCoilBlock coil)) errors.add(new Mismatch(pos, Part.COIL, state));
-                else if (tier != 0 && tier != coil.tier()) errors.add(new Mismatch(pos, Part.COIL, state));
+                else if (tier != 0 && tier != coil.tier()) errors.add(new Mismatch(
+                        pos, Part.COIL, state, MismatchReason.COIL_TIER, null));
                 else tier = coil.tier();
             } else if (entry.part() == Part.CASING) {
                 FunctionalPart functional = functionalPart(state);
@@ -79,10 +90,14 @@ public final class OmniversalAlloyFurnaceStructure {
                     if (!state.is(ModTags.OMNIVERSAL_FURNACE_CASINGS)) errors.add(new Mismatch(pos, Part.CASING, state));
                     continue;
                 }
-                if (functional == FunctionalPart.MUFFLER_HATCH && (!entry.localPos().equals(PREFERRED_MUFFLER_POS)
-                        || state.getValue(DirectionalMultiblockPartBlock.FACING) != Direction.UP)) {
-                    errors.add(new Mismatch(pos, Part.CASING, state));
-                    continue; // A misplaced muffler cannot steal the canonical muffler's slot.
+                if (functional == FunctionalPart.MUFFLER_HATCH) {
+                    if (!entry.localPos().equals(PREFERRED_MUFFLER_POS)) {
+                        errors.add(new Mismatch(pos, Part.CASING, state, MismatchReason.MUFFLER_POSITION, functional));
+                        continue;
+                    }
+                    if (state.getValue(DirectionalMultiblockPartBlock.FACING) != Direction.UP) {
+                        errors.add(new Mismatch(pos, Part.CASING, state, MismatchReason.MUFFLER_FACING, functional));
+                    }
                 }
                 int count = counts.merge(functional, 1, Integer::sum);
                 positions.putIfAbsent(functional, pos.immutable());
@@ -90,10 +105,10 @@ public final class OmniversalAlloyFurnaceStructure {
                         && counts.getOrDefault(FunctionalPart.MAINTENANCE_HATCH, 0) > 0
                         || functional == FunctionalPart.MAINTENANCE_HATCH
                         && counts.getOrDefault(FunctionalPart.AUTO_MAINTENANCE_HATCH, 0) > 0) {
-                    errors.add(new Mismatch(pos, Part.CASING, state));
+                    errors.add(new Mismatch(pos, Part.CASING, state, MismatchReason.DUPLICATE_PART, functional));
                 }
-                if (isClaimedByAnotherCore(level, corePos, pos, functional)
-                        || isSharedFunctionalPosition(level, corePos, pos)) addMismatch(errors, pos, state);
+                if (!functional.isShareable() && (isClaimedByAnotherCore(level, corePos, pos, functional)
+                        || isSharedFunctionalPosition(level, corePos, pos))) addMismatch(errors, pos, state, functional);
             } else if (entry.part() == Part.CORE ? !(state.getBlock() instanceof MultiblockAlloyFurnaceCoreBlock) : !state.isAir()) {
                 errors.add(new Mismatch(pos, entry.part(), state));
             }
@@ -102,10 +117,14 @@ public final class OmniversalAlloyFurnaceStructure {
                 + counts.getOrDefault(FunctionalPart.AUTO_MAINTENANCE_HATCH, 0);
         List<Mismatch> missing = new ArrayList<>();
         // Missing fixed-position exhaust takes priority over a misplaced same-height hatch.
-        addMissing(level, corePos, facing, missing, counts.getOrDefault(FunctionalPart.MUFFLER_HATCH, 0), PREFERRED_MUFFLER_POS);
-        addMissing(level, corePos, facing, missing, counts.getOrDefault(FunctionalPart.PATTERN_ASSEMBLY, 0), PREFERRED_PATTERN_ASSEMBLY_POS);
-        addMissing(level, corePos, facing, missing, counts.getOrDefault(FunctionalPart.MOLD_HUB, 0), PREFERRED_MOLD_HUB_POS);
-        addMissing(level, corePos, facing, missing, maintenanceCount, PREFERRED_MAINTENANCE_HATCH_POS);
+        addMissing(level, corePos, facing, missing, counts.getOrDefault(FunctionalPart.MUFFLER_HATCH, 0),
+                FunctionalPart.MUFFLER_HATCH, PREFERRED_MUFFLER_POS);
+        addMissing(level, corePos, facing, missing, counts.getOrDefault(FunctionalPart.PATTERN_ASSEMBLY, 0),
+                FunctionalPart.PATTERN_ASSEMBLY, PREFERRED_PATTERN_ASSEMBLY_POS);
+        addMissing(level, corePos, facing, missing, counts.getOrDefault(FunctionalPart.MOLD_HUB, 0),
+                FunctionalPart.MOLD_HUB, PREFERRED_MOLD_HUB_POS);
+        addMissing(level, corePos, facing, missing, maintenanceCount,
+                FunctionalPart.MAINTENANCE_HATCH, PREFERRED_MAINTENANCE_HATCH_POS);
         errors.addAll(0, missing);
         boolean validCounts = isFunctionalPartCountsValid(counts.getOrDefault(FunctionalPart.PATTERN_ASSEMBLY, 0),
                 counts.getOrDefault(FunctionalPart.MOLD_HUB, 0), counts.getOrDefault(FunctionalPart.PASSIVE_HATCH, 0),
@@ -118,10 +137,34 @@ public final class OmniversalAlloyFurnaceStructure {
     }
 
     private static void addMissing(LevelReader level, BlockPos corePos, Direction facing,
-                                   List<Mismatch> errors, int count, BlockPos preferred) {
+                                   List<Mismatch> errors, int count, FunctionalPart functional, BlockPos preferred) {
         if (count != 0) return;
         BlockPos pos = toWorld(corePos, facing, preferred);
-        errors.add(new Mismatch(pos, Part.CASING, level.getBlockState(pos)));
+        MismatchReason reason = MismatchReason.MISSING_PART;
+        if (functional != FunctionalPart.MUFFLER_HATCH
+                && !canSuggestFunctionalPosition(level, corePos, facing, pos, functional, errors)) {
+            reason = MismatchReason.NO_AVAILABLE_POSITION;
+            for (Entry entry : ENTRIES) {
+                if (entry.part() != Part.CASING) continue;
+                BlockPos candidate = entry.worldPos(corePos, facing);
+                if (canSuggestFunctionalPosition(level, corePos, facing, candidate, functional, errors)) {
+                    pos = candidate;
+                    reason = MismatchReason.MISSING_PART;
+                    break;
+                }
+            }
+        }
+        errors.add(new Mismatch(pos, Part.CASING, level.getBlockState(pos), reason, functional));
+    }
+
+    private static boolean canSuggestFunctionalPosition(LevelReader level, BlockPos corePos, Direction facing,
+                                                        BlockPos pos, FunctionalPart functional, List<Mismatch> errors) {
+        if (pos.equals(toWorld(corePos, facing, PREFERRED_MUFFLER_POS))
+                || errors.stream().anyMatch(error -> error.worldPos().equals(pos))) return false;
+        BlockState state = level.getBlockState(pos);
+        return functionalPart(state) == null
+                && (state.is(ModTags.OMNIVERSAL_FURNACE_CASINGS) || state.canBeReplaced())
+                && (functional.isShareable() || !isSharedFunctionalPosition(level, corePos, pos));
     }
 
     public static boolean isFunctionalPartCountsValid(int assembly, int hub, int passive, int maintenance, int muffler) {
@@ -144,7 +187,7 @@ public final class OmniversalAlloyFurnaceStructure {
         var entity = level.getBlockEntity(pos);
         return switch (part) {
             case PATTERN_ASSEMBLY -> entity instanceof MePatternAssemblyBlockEntity assembly && assembly.isClaimedByOtherController(core);
-            case MOLD_HUB -> entity instanceof OmniversalMoldHubBlockEntity hub && hub.isClaimedByOtherController(core);
+            case MOLD_HUB -> false;
             case PASSIVE_HATCH -> entity instanceof PassiveCraftingHatchBlockEntity hatch && hatch.isClaimedByOtherController(core);
             case MAINTENANCE_HATCH -> entity instanceof MaintenanceHatchBlockEntity hatch && hatch.isClaimedByOtherController(core);
             case AUTO_MAINTENANCE_HATCH -> entity instanceof AutoMaintenanceHatchBlockEntity hatch && hatch.isClaimedByOtherController(core);
@@ -171,8 +214,10 @@ public final class OmniversalAlloyFurnaceStructure {
         return false;
     }
 
-    private static void addMismatch(List<Mismatch> errors, BlockPos pos, BlockState state) {
-        if (errors.stream().noneMatch(e -> e.worldPos().equals(pos))) errors.add(new Mismatch(pos, Part.CASING, state));
+    private static void addMismatch(List<Mismatch> errors, BlockPos pos, BlockState state, FunctionalPart functional) {
+        if (errors.stream().noneMatch(error -> error.worldPos().equals(pos))) {
+            errors.add(new Mismatch(pos, Part.CASING, state, MismatchReason.SHARED_PART, functional));
+        }
     }
 
     public static void notifyNearbyCores(Level level, BlockPos changedPos) {

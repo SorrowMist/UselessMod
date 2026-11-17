@@ -312,8 +312,8 @@ public final class MultiblockAlloyFurnaceCoreBlockEntity extends BlockEntity imp
             } else if (part instanceof OmniversalMoldHubBlockEntity hub) {
                 if (formed && pos.equals(moldHubPos)) {
                     hub.linkController(worldPosition, structureGeneration);
-                } else if (hub.isLinkedToController(worldPosition)) {
-                    hub.linkController(null, structureGeneration);
+                } else {
+                    hub.unlinkController(worldPosition);
                 }
             } else if (part instanceof PassiveCraftingHatchBlockEntity hatch) {
                 if (formed && pos.equals(passiveHatchPos)) {
@@ -382,7 +382,7 @@ public final class MultiblockAlloyFurnaceCoreBlockEntity extends BlockEntity imp
     public OmniversalMoldHubBlockEntity getLinkedMoldHub() {
         if (!formed) return null;
         OmniversalMoldHubBlockEntity hub = getMoldHub();
-        return hub != null && hub.getController() == this ? hub : null;
+        return hub != null && hub.isLinkedToController(worldPosition, structureGeneration) ? hub : null;
     }
 
     public void onAeGridChanged() {
@@ -523,7 +523,7 @@ public final class MultiblockAlloyFurnaceCoreBlockEntity extends BlockEntity imp
     }
 
     public boolean isMoldHubLinked(BlockPos pos, long generation) {
-        return formed && moldHubPos != null && moldHubPos.equals(pos)
+        return !unloading && !isRemoved() && formed && moldHubPos != null && moldHubPos.equals(pos)
                 && structureGeneration == generation;
     }
 

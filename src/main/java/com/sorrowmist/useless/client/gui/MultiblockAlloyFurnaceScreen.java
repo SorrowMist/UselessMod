@@ -18,6 +18,7 @@ import com.sorrowmist.useless.client.gui.apple.*;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.network.chat.Component;
+import net.minecraft.util.FormattedCharSequence;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
@@ -356,7 +357,7 @@ public final class MultiblockAlloyFurnaceScreen extends AppleContainerScreen<Mul
                 minecraft.level, corePos, liveFacing);
         Map<Long, OmniversalAlloyFurnaceStructure.Mismatch> mismatches = new HashMap<>();
         for (var mismatch : liveValidation.mismatches()) {
-            mismatches.put(mismatch.worldPos().asLong(), mismatch);
+            mismatches.putIfAbsent(mismatch.worldPos().asLong(), mismatch);
         }
         liveMismatches = Map.copyOf(mismatches);
     }
@@ -555,16 +556,23 @@ public final class MultiblockAlloyFurnaceScreen extends AppleContainerScreen<Mul
         BlockPos worldPos = entry.worldPos(menu.getBlockPos(), liveFacing);
         BlockState actual = minecraft.level.getBlockState(worldPos);
         boolean known = liveValidation != null;
-        boolean mismatch = known && liveMismatches.containsKey(worldPos.asLong());
-        List<Component> lines = new ArrayList<>(4);
+        OmniversalAlloyFurnaceStructure.Mismatch mismatch = liveMismatches.get(worldPos.asLong());
+        List<Component> lines = new ArrayList<>();
         lines.add(Component.translatable(known
-                        ? mismatch
+                        ? mismatch != null
                                 ? "gui.useless_mod.multiblock_alloy_furnace.preview.incorrect"
                                 : "gui.useless_mod.multiblock_alloy_furnace.preview.correct"
                         : "gui.useless_mod.multiblock_alloy_furnace.preview.unavailable")
                 .withStyle(!known ? ChatFormatting.GRAY
-                        : mismatch ? ChatFormatting.RED : ChatFormatting.GREEN));
+                        : mismatch != null ? ChatFormatting.RED : ChatFormatting.GREEN));
+        if (mismatch != null) lines.add(mismatchDescription(mismatch));
         Component expected = expectedPartName(entry, worldPos);
+        if (mismatch != null && mismatch.functionalPart() != null) {
+            expected = switch (mismatch.reason()) {
+                case MISSING_PART, NO_AVAILABLE_POSITION, MUFFLER_FACING -> functionalPartName(mismatch.functionalPart());
+                default -> expected;
+            };
+        }
         lines.add(Component.translatable(
                 "gui.useless_mod.multiblock_alloy_furnace.preview.expected", expected));
         lines.add(Component.translatable(
@@ -573,7 +581,56 @@ public final class MultiblockAlloyFurnaceScreen extends AppleContainerScreen<Mul
         lines.add(Component.translatable(
                 "gui.useless_mod.multiblock_alloy_furnace.preview.position",
                 worldPos.getX(), worldPos.getY(), worldPos.getZ()));
-        graphics.renderTooltip(font, lines, Optional.empty(), mouseX, mouseY);
+        if (entry.part() == OmniversalAlloyFurnaceStructure.Part.CASING
+                || entry.part() == OmniversalAlloyFurnaceStructure.Part.CORE) {
+            lines.add(Component.translatable(
+                    "gui.useless_mod.multiblock_alloy_furnace.preview.casing_with_functional_parts",
+                    ModBlocks.ME_PATTERN_ASSEMBLY.get().getName(), ModBlocks.OMNIVERSAL_MOLD_HUB.get().getName(),
+                    ModBlocks.PASSIVE_CRAFTING_HATCH.get().getName(),
+                    ModBlocks.OMNIVERSAL_FURNACE_CASING.get().getName()).withStyle(ChatFormatting.GRAY));
+            lines.add(Component.translatable(
+                    "gui.useless_mod.multiblock_alloy_furnace.preview.maintenance_required",
+                    ModBlocks.MAINTENANCE_HATCH.get().getName(), ModBlocks.AUTO_MAINTENANCE_HATCH.get().getName())
+                    .withStyle(ChatFormatting.GRAY));
+            lines.add(Component.translatable(
+                    "gui.useless_mod.multiblock_alloy_furnace.preview.muffler_required",
+                    ModBlocks.MUFFLER_HATCH.get().getName()).withStyle(ChatFormatting.GRAY));
+            lines.add(Component.translatable("gui.useless_mod.multiblock_alloy_furnace.preview.sharing")
+                    .withStyle(ChatFormatting.GRAY));
+        }
+        List<FormattedCharSequence> wrappedLines = new ArrayList<>();
+        for (Component line : lines) wrappedLines.addAll(font.split(line, Math.min(320, width - 24)));
+        graphics.renderTooltip(font, wrappedLines, mouseX, mouseY);
+    }
+
+    private Component mismatchDescription(OmniversalAlloyFurnaceStructure.Mismatch mismatch) {
+        String prefix = "gui.useless_mod.multiblock_alloy_furnace.preview.error.";
+        return switch (mismatch.reason()) {
+            case BLOCK -> Component.translatable(prefix + "block");
+            case COIL_TIER -> Component.translatable(prefix + "coil_tier");
+            case MISSING_PART -> Component.translatable(prefix + "missing_part", functionalPartName(mismatch.functionalPart()));
+            case NO_AVAILABLE_POSITION -> Component.translatable(prefix + "no_available_position", functionalPartName(mismatch.functionalPart()));
+            case DUPLICATE_PART -> Component.translatable(prefix + "duplicate_part", functionalPartName(mismatch.functionalPart()));
+            case SHARED_PART -> Component.translatable(prefix + "shared_part", functionalPartName(mismatch.functionalPart()));
+            case MUFFLER_FACING -> Component.translatable(prefix + "muffler_facing");
+            case MUFFLER_POSITION -> {
+                BlockPos pos = OmniversalAlloyFurnaceStructure.toWorld(menu.getBlockPos(), liveFacing,
+                        OmniversalAlloyFurnaceStructure.PREFERRED_MUFFLER_POS);
+                yield Component.translatable(prefix + "muffler_position", pos.getX(), pos.getY(), pos.getZ());
+            }
+        };
+    }
+
+    private Component functionalPartName(OmniversalAlloyFurnaceStructure.FunctionalPart functional) {
+        return switch (functional) {
+            case PATTERN_ASSEMBLY -> ModBlocks.ME_PATTERN_ASSEMBLY.get().getName();
+            case MOLD_HUB -> ModBlocks.OMNIVERSAL_MOLD_HUB.get().getName();
+            case PASSIVE_HATCH -> ModBlocks.PASSIVE_CRAFTING_HATCH.get().getName();
+            case MAINTENANCE_HATCH, AUTO_MAINTENANCE_HATCH -> Component.translatable(
+                    "gui.useless_mod.multiblock_alloy_furnace.preview.maintenance_choice",
+                    ModBlocks.MAINTENANCE_HATCH.get().getName(), ModBlocks.AUTO_MAINTENANCE_HATCH.get().getName());
+            case MUFFLER_HATCH -> ModBlocks.MUFFLER_HATCH.get().getName();
+        };
     }
 
     private Component expectedPartName(
@@ -589,15 +646,7 @@ public final class MultiblockAlloyFurnaceScreen extends AppleContainerScreen<Mul
     private Component expectedCasingName(BlockPos worldPos) {
         if (worldPos.equals(OmniversalAlloyFurnaceStructure.toWorld(menu.getBlockPos(), liveFacing,
                 OmniversalAlloyFurnaceStructure.PREFERRED_MUFFLER_POS))) return ModBlocks.MUFFLER_HATCH.get().getName();
-        Component casingName = ModBlocks.OMNIVERSAL_FURNACE_CASING.get().getName();
-        return Component.translatable(
-                "gui.useless_mod.multiblock_alloy_furnace.preview.casing_with_functional_parts",
-                casingName, ModBlocks.ME_PATTERN_ASSEMBLY.get().getName(),
-                ModBlocks.OMNIVERSAL_MOLD_HUB.get().getName(),
-                ModBlocks.PASSIVE_CRAFTING_HATCH.get().getName(),
-                ModBlocks.MAINTENANCE_HATCH.get().getName(),
-                ModBlocks.AUTO_MAINTENANCE_HATCH.get().getName(),
-                ModBlocks.MUFFLER_HATCH.get().getName());
+        return ModBlocks.OMNIVERSAL_FURNACE_CASING.get().getName();
     }
 
     private Component expectedCoilName() {

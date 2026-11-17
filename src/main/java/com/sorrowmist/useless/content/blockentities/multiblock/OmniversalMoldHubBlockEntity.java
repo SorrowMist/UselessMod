@@ -12,6 +12,8 @@ import com.sorrowmist.useless.init.ModTags;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.ListTag;
+import net.minecraft.nbt.Tag;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.crafting.Ingredient;
 import net.minecraft.world.level.block.entity.BlockEntity;
@@ -45,9 +47,7 @@ public final class OmniversalMoldHubBlockEntity extends BlockEntity implements M
     private MoldMatcher.PreparedMolds cachedPreparedMolds;
     private int cachedActiveSlots = -1;
     private long cachedRecipeCatalogGeneration = -1L;
-    @Nullable
-    private BlockPos controllerPos;
-    private long structureGeneration;
+    private final Map<BlockPos, Long> controllers = new LinkedHashMap<>();
     private boolean unloading;
     @Nullable
     private ExternalInventoryReference inventoryReference;
@@ -196,36 +196,58 @@ public final class OmniversalMoldHubBlockEntity extends BlockEntity implements M
         setChanged();
     }
 
-    public void linkController(@Nullable BlockPos controllerPos, long generation) {
+    public void linkController(BlockPos controllerPos, long generation) {
         if (unloading || isRemoved()) return;
-        if (!java.util.Objects.equals(this.controllerPos, controllerPos) || structureGeneration != generation) {
-            this.controllerPos = controllerPos == null ? null : controllerPos.immutable();
-            this.structureGeneration = generation;
-            setChanged();
-            if (level != null && !level.isClientSide) level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), 3);
-        }
+        Long previous = controllers.put(controllerPos.immutable(), generation);
+        if (previous == null || previous != generation) syncControllers();
     }
 
-    public boolean isLinkedToController(BlockPos pos) {
-        return java.util.Objects.equals(controllerPos, pos);
+    public void unlinkController(BlockPos controllerPos) {
+        if (unloading || isRemoved()) return;
+        if (controllers.remove(controllerPos) != null) syncControllers();
     }
 
-    public boolean isClaimedByOtherController(BlockPos pos) {
-        return !unloading && !isRemoved() && level != null && controllerPos != null
-                && !controllerPos.equals(pos) && level.isLoaded(controllerPos)
-                && level.getBlockEntity(controllerPos) instanceof MultiblockAlloyFurnaceCoreBlockEntity core
-                && core.claimsFunctionalPart(worldPosition);
+    public boolean isLinkedToController(BlockPos pos, long generation) {
+        return !unloading && !isRemoved() && Long.valueOf(generation).equals(controllers.get(pos));
+    }
+
+    private void syncControllers() {
+        setChanged();
+        if (level != null && !level.isClientSide) level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), 3);
     }
 
     @Nullable
     public MultiblockAlloyFurnaceCoreBlockEntity getController() {
-        if (unloading || isRemoved() || level == null || controllerPos == null
-                || !level.isLoaded(controllerPos)) return null;
-        if (level.getBlockEntity(controllerPos) instanceof MultiblockAlloyFurnaceCoreBlockEntity core
-                && core.isMoldHubLinked(worldPosition, structureGeneration)) {
-            return core;
+        if (unloading || isRemoved() || level == null) return null;
+        for (var entry : controllers.entrySet()) {
+            if (!level.isLoaded(entry.getKey())) continue;
+            if (level.getBlockEntity(entry.getKey()) instanceof MultiblockAlloyFurnaceCoreBlockEntity core
+                    && core.isMoldHubLinked(worldPosition, entry.getValue())) return core;
         }
         return null;
+    }
+
+    private void loadControllers(CompoundTag tag) {
+        controllers.clear();
+        if (tag.contains("Controllers", Tag.TAG_LIST)) {
+            for (Tag controllerTag : tag.getList("Controllers", Tag.TAG_COMPOUND)) {
+                CompoundTag controller = (CompoundTag) controllerTag;
+                controllers.put(BlockPos.of(controller.getLong("Controller")), controller.getLong("StructureGeneration"));
+            }
+        } else if (tag.contains("Controller")) {
+            controllers.put(BlockPos.of(tag.getLong("Controller")), tag.getLong("StructureGeneration"));
+        }
+    }
+
+    private void saveControllers(CompoundTag tag) {
+        ListTag controllerTags = new ListTag();
+        controllers.forEach((controllerPos, generation) -> {
+            CompoundTag controller = new CompoundTag();
+            controller.putLong("Controller", controllerPos.asLong());
+            controller.putLong("StructureGeneration", generation);
+            controllerTags.add(controller);
+        });
+        tag.put("Controllers", controllerTags);
     }
 
     @Override
@@ -249,8 +271,7 @@ public final class OmniversalMoldHubBlockEntity extends BlockEntity implements M
         cachedPreparedMolds = null;
         cachedActiveSlots = -1;
         cachedRecipeCatalogGeneration = -1L;
-        controllerPos = tag.contains("Controller") ? BlockPos.of(tag.getLong("Controller")) : null;
-        structureGeneration = tag.getLong("StructureGeneration");
+        loadControllers(tag);
         pageMemory.load(tag);
     }
 
@@ -258,8 +279,7 @@ public final class OmniversalMoldHubBlockEntity extends BlockEntity implements M
     protected void saveAdditional(CompoundTag tag) {
         HolderLookup.Provider registries = level == null ? net.minecraft.core.RegistryAccess.EMPTY : level.registryAccess();
         super.saveAdditional(tag);
-        if (controllerPos != null) tag.putLong("Controller", controllerPos.asLong());
-        tag.putLong("StructureGeneration", structureGeneration);
+        saveControllers(tag);
         pageMemory.save(tag);
     }
 
@@ -294,14 +314,12 @@ public final class OmniversalMoldHubBlockEntity extends BlockEntity implements M
 
     @Override public CompoundTag getUpdateTag() {
         CompoundTag tag = new CompoundTag();
-        if (controllerPos != null) tag.putLong("Controller", controllerPos.asLong());
-        tag.putLong("StructureGeneration", structureGeneration);
+        saveControllers(tag);
         return tag;
     }
 
     @Override public void handleUpdateTag(CompoundTag tag) {
-        controllerPos = tag.contains("Controller") ? BlockPos.of(tag.getLong("Controller")) : null;
-        structureGeneration = tag.getLong("StructureGeneration");
+        loadControllers(tag);
     }
 
     @Override public net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket getUpdatePacket() {

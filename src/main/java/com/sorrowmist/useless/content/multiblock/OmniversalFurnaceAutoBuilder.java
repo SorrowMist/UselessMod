@@ -6,7 +6,6 @@ import com.sorrowmist.useless.content.blockentities.multiblock.MePatternAssembly
 import com.sorrowmist.useless.content.blockentities.multiblock.MaintenanceHatchBlockEntity;
 import com.sorrowmist.useless.content.blockentities.multiblock.AutoMaintenanceHatchBlockEntity;
 import com.sorrowmist.useless.content.blockentities.multiblock.MufflerHatchBlockEntity;
-import com.sorrowmist.useless.content.blockentities.multiblock.OmniversalMoldHubBlockEntity;
 import com.sorrowmist.useless.content.blockentities.multiblock.MultiblockAlloyFurnaceCoreBlockEntity;
 import com.sorrowmist.useless.content.blockentities.multiblock.PassiveCraftingHatchBlockEntity;
 import com.sorrowmist.useless.content.blocks.multiblock.MultiblockAlloyFurnaceCoreBlock;
@@ -158,8 +157,8 @@ public final class OmniversalFurnaceAutoBuilder {
             if (parts.containsValue(functionalPart)) return null;
             if (functionalPart == OmniversalAlloyFurnaceStructure.FunctionalPart.MUFFLER_HATCH
                     && !entry.localPos().equals(OmniversalAlloyFurnaceStructure.PREFERRED_MUFFLER_POS)) return null;
-            if (isExclusivePartClaimedByAnotherCore(level, corePos, pos, functionalPart)
-                    || OmniversalAlloyFurnaceStructure.isSharedFunctionalPosition(level, corePos, pos)) return null;
+            if (!functionalPart.isShareable() && (isExclusivePartClaimedByAnotherCore(level, corePos, pos, functionalPart)
+                    || OmniversalAlloyFurnaceStructure.isSharedFunctionalPosition(level, corePos, pos))) return null;
             parts.put(pos.immutable(), functionalPart);
         }
 
@@ -175,20 +174,23 @@ public final class OmniversalFurnaceAutoBuilder {
                 && parts.containsValue(OmniversalAlloyFurnaceStructure.FunctionalPart.AUTO_MAINTENANCE_HATCH)) return null;
         if (!parts.containsValue(OmniversalAlloyFurnaceStructure.FunctionalPart.PATTERN_ASSEMBLY)) {
             BlockPos pos = chooseFunctionalPosition(level, corePos, facing, parts,
-                    OmniversalAlloyFurnaceStructure.PREFERRED_PATTERN_ASSEMBLY_POS);
+                    OmniversalAlloyFurnaceStructure.PREFERRED_PATTERN_ASSEMBLY_POS,
+                    OmniversalAlloyFurnaceStructure.FunctionalPart.PATTERN_ASSEMBLY);
             if (pos == null) return null;
             parts.put(pos, OmniversalAlloyFurnaceStructure.FunctionalPart.PATTERN_ASSEMBLY);
         }
         if (!parts.containsValue(OmniversalAlloyFurnaceStructure.FunctionalPart.MOLD_HUB)) {
             BlockPos pos = chooseFunctionalPosition(level, corePos, facing, parts,
-                    OmniversalAlloyFurnaceStructure.PREFERRED_MOLD_HUB_POS);
+                    OmniversalAlloyFurnaceStructure.PREFERRED_MOLD_HUB_POS,
+                    OmniversalAlloyFurnaceStructure.FunctionalPart.MOLD_HUB);
             if (pos == null) return null;
             parts.put(pos, OmniversalAlloyFurnaceStructure.FunctionalPart.MOLD_HUB);
         }
         if (!parts.containsValue(OmniversalAlloyFurnaceStructure.FunctionalPart.MAINTENANCE_HATCH)
                 && !parts.containsValue(OmniversalAlloyFurnaceStructure.FunctionalPart.AUTO_MAINTENANCE_HATCH)) {
             BlockPos pos = chooseFunctionalPosition(level, corePos, facing, parts,
-                    OmniversalAlloyFurnaceStructure.PREFERRED_MAINTENANCE_HATCH_POS);
+                    OmniversalAlloyFurnaceStructure.PREFERRED_MAINTENANCE_HATCH_POS,
+                    OmniversalAlloyFurnaceStructure.FunctionalPart.MAINTENANCE_HATCH);
             if (pos == null) return null;
             parts.put(pos, OmniversalAlloyFurnaceStructure.FunctionalPart.MAINTENANCE_HATCH);
         }
@@ -205,8 +207,7 @@ public final class OmniversalFurnaceAutoBuilder {
             case PASSIVE_HATCH -> level.getBlockEntity(partPos)
                     instanceof PassiveCraftingHatchBlockEntity hatch
                     && hatch.isClaimedByOtherController(corePos);
-            case MOLD_HUB -> level.getBlockEntity(partPos)
-                    instanceof OmniversalMoldHubBlockEntity hub && hub.isClaimedByOtherController(corePos);
+            case MOLD_HUB -> false;
             case MAINTENANCE_HATCH -> level.getBlockEntity(partPos)
                     instanceof MaintenanceHatchBlockEntity hatch && hatch.isClaimedByOtherController(corePos);
             case AUTO_MAINTENANCE_HATCH -> level.getBlockEntity(partPos)
@@ -219,21 +220,23 @@ public final class OmniversalFurnaceAutoBuilder {
     private static BlockPos chooseFunctionalPosition(
             ServerLevel level, BlockPos corePos, Direction facing,
             Map<BlockPos, OmniversalAlloyFurnaceStructure.FunctionalPart> assigned,
-            BlockPos preferredLocalPos) {
+            BlockPos preferredLocalPos, OmniversalAlloyFurnaceStructure.FunctionalPart functionalPart) {
         BlockPos preferred = OmniversalAlloyFurnaceStructure.toWorld(corePos, facing, preferredLocalPos);
-        if (canAssign(level, corePos, preferred, assigned)) return preferred;
+        if (canAssign(level, corePos, preferred, assigned, functionalPart)) return preferred;
         for (var entry : OmniversalAlloyFurnaceStructure.entries()) {
             if (entry.part() != OmniversalAlloyFurnaceStructure.Part.CASING) continue;
             BlockPos pos = entry.worldPos(corePos, facing);
-            if (canAssign(level, corePos, pos, assigned)) return pos.immutable();
+            if (canAssign(level, corePos, pos, assigned, functionalPart)) return pos.immutable();
         }
         return null;
     }
 
     private static boolean canAssign(ServerLevel level, BlockPos corePos, BlockPos pos,
-                                     Map<BlockPos, OmniversalAlloyFurnaceStructure.FunctionalPart> assigned) {
+                                     Map<BlockPos, OmniversalAlloyFurnaceStructure.FunctionalPart> assigned,
+                                     OmniversalAlloyFurnaceStructure.FunctionalPart functionalPart) {
         return !assigned.containsKey(pos) && isAvailableFunctionalPosition(level, pos)
-                && !OmniversalAlloyFurnaceStructure.isSharedFunctionalPosition(level, corePos, pos);
+                && (functionalPart.isShareable()
+                || !OmniversalAlloyFurnaceStructure.isSharedFunctionalPosition(level, corePos, pos));
     }
 
     private static boolean isAvailableFunctionalPosition(ServerLevel level, BlockPos pos) {

@@ -82,6 +82,15 @@ base {
 // Mojang ships Java 21 to end users in 1.21.1, so mods should target Java 21.
 java.toolchain.languageVersion = JavaLanguageVersion.of(21)
 
+sourceSets {
+    gameTest {
+        runtimeClasspath = sourceSets.test.runtimeClasspath.filter { file ->
+            !file.name.startsWith('ae2-lightning-tech-') && !file.name.startsWith('thunderbolt-core-')
+        }
+        runtimeClasspath += configurations.gameTestRuntimeClasspath
+    }
+}
+
 neoForge {
     // Specify the version of NeoForge to use.
     version = project.neo_version
@@ -92,6 +101,9 @@ neoForge {
     }
 
     accessTransformers = project.files('src/main/resources/META-INF/accesstransformer.cfg')
+
+    addModdingDependenciesTo(sourceSets.test)
+    addModdingDependenciesTo(sourceSets.gameTest)
 
     // Default run configurations.
     // These can be tweaked, removed, or duplicated as needed.
@@ -119,6 +131,14 @@ neoForge {
             programArguments.addAll '--mod', project.mod_id, '--all', '--output', file('src/generated/resources/').getAbsolutePath(), '--existing', file('src/main/resources/').getAbsolutePath()
         }
 
+        gameTestServer {
+            type = 'gameTestServer'
+            sourceSet = sourceSets.gameTest
+            gameDirectory = project.file('run/anvilcraft-gametest')
+            systemProperty 'neoforge.enabledGameTestNamespaces', project.mod_id
+            jvmArguments.addAll '-Xmx2G', '-Xms512M'
+        }
+
         // applies to all the run configs above
         configureEach {
             // Recommended logging data for a userdev environment
@@ -131,7 +151,7 @@ neoForge {
             // Recommended logging level for the console
             // You can set various levels here.
             // Please read: https://stackoverflow.com/questions/2031163/when-to-use-the-different-log-levels
-            logLevel = org.slf4j.event.Level.DEBUG
+            logLevel = name == 'gameTestServer' ? org.slf4j.event.Level.INFO : org.slf4j.event.Level.DEBUG
         }
     }
 
@@ -142,6 +162,14 @@ neoForge {
         "${mod_id}" {
             sourceSet(sourceSets.main)
         }
+        "${mod_id}_gametest" {
+            sourceSet(sourceSets.main)
+            sourceSet(sourceSets.test)
+        }
+    }
+
+    runs.configureEach {
+        loadedMods = [mods.getByName(name == 'gameTestServer' ? "${project.mod_id}_gametest" : project.mod_id)]
     }
 
 }
@@ -201,6 +229,32 @@ def enderIoCompileFiles = files(
         layout.buildDirectory.file('generated/enderio-api/GraphLib3-3.0.5.jar'),
         layout.buildDirectory.file('generated/enderio-api/com.enderio.enderio-modded-conduits-8.2.11-beta.jar')
 ).builtBy(extractEnderIoApi)
+
+// 铁砧工艺通过两层 Jar-in-Jar 提供砧库；编译期需单独暴露其配方与多方块 API。
+def anvilCraftApi = configurations.create('anvilCraftApi') {
+    canBeConsumed = false
+    canBeResolved = true
+    transitive = false
+}
+def anvilLibArchive = layout.buildDirectory.file('generated/anvilcraft-api/anvillib.jar')
+def extractAnvilLib = tasks.register('extractAnvilLib', Copy) {
+    from { anvilCraftApi.collect { zipTree(it) } }
+    include 'META-INF/jarjar/anvillib-neoforge-*.jar'
+    eachFile { details -> details.path = 'anvillib.jar' }
+    includeEmptyDirs = false
+    into anvilLibArchive.map { it.asFile.parentFile }
+}
+def anvilLibModules = layout.buildDirectory.dir('generated/anvilcraft-api/modules')
+def extractAnvilLibModules = tasks.register('extractAnvilLibModules', Copy) {
+    dependsOn extractAnvilLib
+    from { zipTree(anvilLibArchive.get().asFile) }
+    include 'META-INF/jarjar/*.jar'
+    eachFile { details -> details.path = details.name }
+    includeEmptyDirs = false
+    into anvilLibModules
+}
+def anvilLibCompileFiles = files({ fileTree(anvilLibModules).matching { include '*.jar' } })
+        .builtBy(extractAnvilLibModules)
 
 dependencies {
     testImplementation platform('org.junit:junit-bom:5.11.4')
@@ -356,6 +410,16 @@ dependencies {
     //自然灵气
     compileOnly "maven.modrinth:natures-aura:41.9"
     runtimeOnly "maven.modrinth:patchouli:1.21.1-93-neoforge"
+
+    // 铁砧工艺仅用于可选兼容；发布包不携带该模组，开发运行时按需加载。
+    def anvilCraft = "maven.modrinth:anvilcraft:1.21.1-1.6.0+snapshot.2917"
+    compileOnly anvilCraft
+    if (!project.hasProperty('withoutAnvilCraft')) {
+        localRuntime anvilCraft
+    }
+    gameTestRuntimeOnly anvilCraft
+    add(anvilCraftApi.name, "maven.modrinth:anvilcraft:1.21.1-1.6.0+snapshot.2917")
+    compileOnly anvilLibCompileFiles
 
     // Occultism is an optional runtime integration. Keep it off the production
     // dependency graph while exposing its API for compilation and local development.

@@ -178,6 +178,7 @@ public final class RecipeAdapterCompatRegistry {
     public static final String ASTRAL_SORCERY = RecipeSourceIds.ASTRAL_SORCERY;
     public static final String BOTANY_POTS = RecipeSourceIds.BOTANY_POTS;
     public static final String EX_DEORUM = RecipeSourceIds.EX_DEORUM;
+    public static final String ANVILCRAFT = RecipeSourceIds.ANVILCRAFT;
 
     private static final List<CompatEntry> ENTRIES = List.of(
             new CompatEntry(null, RecipeAdapterCompatRegistry::registerMinecraft),
@@ -235,7 +236,8 @@ public final class RecipeAdapterCompatRegistry {
             new CompatEntry(LYCHEE, RecipeAdapterCompatRegistry::registerLychee),
             new CompatEntry(ASTRAL_SORCERY, RecipeAdapterCompatRegistry::registerAstralSorcery),
             new CompatEntry(BOTANY_POTS, RecipeAdapterCompatRegistry::registerBotanyPots),
-            new CompatEntry(EX_DEORUM, RecipeAdapterCompatRegistry::registerExDeorum)
+            new CompatEntry(EX_DEORUM, RecipeAdapterCompatRegistry::registerExDeorum),
+            new CompatEntry(ANVILCRAFT, RecipeAdapterCompatRegistry::registerAnvilCraft)
     );
 
     private RecipeAdapterCompatRegistry() {}
@@ -313,6 +315,10 @@ public final class RecipeAdapterCompatRegistry {
     private static void registerFarmersDelight() {
         invokeOptionalLoader(
                 "com.sorrowmist.useless.compat.farmersdelight.FarmersDelightRecipeCompatLoader");
+    }
+
+    private static void registerAnvilCraft() {
+        invokeOptionalLoader("com.sorrowmist.useless.compat.anvilcraft.AnvilCraftRecipeCompatLoader");
     }
 
     private static void registerExtraDelight() {

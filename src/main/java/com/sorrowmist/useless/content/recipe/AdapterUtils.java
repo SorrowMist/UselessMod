@@ -42,6 +42,14 @@ public class AdapterUtils {
     public static final int DEFAULT_PROCESS_TIME = 20;
     /** 默认基础能量消耗（FE） */
     public static final int DEFAULT_ENERGY = 2000;
+    /** 默认平均功率（FE/t）。 */
+    public static final int DEFAULT_ENERGY_PER_TICK = DEFAULT_ENERGY / DEFAULT_PROCESS_TIME;
+
+    /** 根据处理时长按默认功率计算配方总能耗（FE）。 */
+    public static long energyForProcessTime(long processTime) {
+        if (processTime <= 0) throw new IllegalArgumentException("处理时长必须为正数");
+        return Math.multiplyExact(processTime, (long) DEFAULT_ENERGY_PER_TICK);
+    }
 
     public static final int MEKANISM_BASE_TICKS_REQUIRED = 200;
     public static final int MEKANISM_ENRICHMENT_CHAMBER_TICKS_REQUIRED = MEKANISM_BASE_TICKS_REQUIRED;

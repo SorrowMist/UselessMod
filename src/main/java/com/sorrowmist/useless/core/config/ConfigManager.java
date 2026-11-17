@@ -172,6 +172,7 @@ public class ConfigManager {
     private static final ModConfigSpec.BooleanValue ENABLE_ASTRAL_SORCERY_RECIPE_CONVERSION;
     private static final ModConfigSpec.BooleanValue ENABLE_BOTANY_POTS_RECIPE_CONVERSION;
     private static final ModConfigSpec.BooleanValue ENABLE_EX_DEORUM_RECIPE_CONVERSION;
+    private static final ModConfigSpec.BooleanValue ENABLE_ANVILCRAFT_RECIPE_CONVERSION;
     private static final ModConfigSpec.BooleanValue ENABLE_JUSTDIRETHINGS_RECIPE_CONVERSION;
     private static final ModConfigSpec.BooleanValue ENABLE_JDTE_RECIPE_CONVERSION;
     private static final Map<String, ModConfigSpec.BooleanValue> RECIPE_CONVERSION_OPTIONS;
@@ -762,6 +763,8 @@ public class ConfigManager {
                 "enable_botany_pots_recipe_conversion", true);
         ENABLE_EX_DEORUM_RECIPE_CONVERSION = defineRecipeConversionOption(
                 "enable_exdeorum_recipe_conversion", true);
+        ENABLE_ANVILCRAFT_RECIPE_CONVERSION = defineRecipeConversionOption(
+                "enable_anvilcraft_recipe_conversion", true);
         ENABLE_AVARITIA_RECIPE_CONVERSION = defineRecipeConversionOption(
                 "enable_avaritia_recipe_conversion", true);
         ENABLE_BIG_REACTORS_RECIPE_CONVERSION = defineRecipeConversionOption(
@@ -826,6 +829,7 @@ public class ConfigManager {
                 Map.entry("bigreactors", ENABLE_BIG_REACTORS_RECIPE_CONVERSION),
                 Map.entry("botanypots", ENABLE_BOTANY_POTS_RECIPE_CONVERSION),
                 Map.entry("exdeorum", ENABLE_EX_DEORUM_RECIPE_CONVERSION),
+                Map.entry("anvilcraft", ENABLE_ANVILCRAFT_RECIPE_CONVERSION),
                 Map.entry("brewinandchewin", ENABLE_BREWIN_AND_CHEWIN_RECIPE_CONVERSION),
                 Map.entry("casualnessdelight", ENABLE_CASUALNESS_DELIGHT_RECIPE_CONVERSION),
                 Map.entry("crabbersdelight", ENABLE_CRABBERS_DELIGHT_RECIPE_CONVERSION),

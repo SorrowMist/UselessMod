@@ -74,6 +74,7 @@ public final class RecipeSourceIds {
     public static final String BOTANY_POTS = "botanypots";
     /** Ex Deorum 的桶堆肥、桶混合、流体转化与坩埚熔化配方。 */
     public static final String EX_DEORUM = "exdeorum";
+    public static final String ANVILCRAFT = "anvilcraft";
 
     private RecipeSourceIds() {
     }

@@ -1,0 +1,9 @@
+{
+  "values": [
+    "minecraft:grindstone",
+    {"id": "anvilcraft:ember_grindstone", "required": false},
+    {"id": "anvilcraft:frost_grindstone", "required": false},
+    {"id": "anvilcraft:royal_grindstone", "required": false},
+    {"id": "anvilcraft:transcendence_grindstone", "required": false}
+  ]
+}

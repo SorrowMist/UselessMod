@@ -13,7 +13,7 @@ public final class MekanismCompatLoader {
     public static void registerCapabilities(RegisterCapabilitiesEvent event) {
         MekanismEnergyCompat.registerCapabilities(event);
         MekanismChemicalCompat.registerCapabilities(event);
-        // 温度调节器方块的热能力，并安装「主动驱动」钩子（Mek 传热是发送方驱动，见该类注释）。
+        // 注册温度调节器的 Mekanism 热能力和对应驱动。
         ThermostatHeatCompat.registerCapabilities(event);
         if (ModList.get().isLoaded("appmek")) {
             invokeAppMekCapabilities(event);

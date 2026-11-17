@@ -40,9 +40,8 @@ import org.jetbrains.annotations.Nullable;
  *
  * <h2>传热</h2>
  *
- * <p>气动工艺是接收方驱动（机器自己会向我们收敛），只需暴露热能力；Mekanism 是发送方驱动，
- * 必须由本方块每 tick 主动推热——见 {@link ThermostatHeatHook}。未开启（{@code enabled == false}）
- * 时 tick 首行即返回，几乎零开销。</p>
+ * <p>不同热系统的传递模式可能要求恒温源主动驱动；兼容层通过 {@link ThermostatHeatHook} 注册
+ * 对应实现。未开启（{@code enabled == false}）时 tick 首行即返回，几乎零开销。</p>
  */
 public class TemperatureRegulatorBlock extends Block implements EntityBlock {
 
@@ -144,9 +143,8 @@ public class TemperatureRegulatorBlock extends Block implements EntityBlock {
             if (!(blockEntity instanceof ThermostatBlockEntity thermostat) || !thermostat.isEnabled()) {
                 return;
             }
-            ThermostatHeatHook.HeatDriver driver = ThermostatHeatHook.driver;
-            if (driver != null && tickLevel instanceof ServerLevel serverLevel) {
-                driver.tick(serverLevel, pos, thermostat);
+            if (tickLevel instanceof ServerLevel serverLevel) {
+                ThermostatHeatHook.tick(serverLevel, pos, thermostat);
             }
         };
     }

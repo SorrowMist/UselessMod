@@ -22,9 +22,9 @@ import java.util.Map;
  * <p>温度调节器是一个独立的方块；本 BE 给它一个可配置的温度，语义是<b>无限恒温源</b>：
  * 温度恒定，可被无限取热 / 放热（不守恒）。</p>
  *
- * <p><b>本类刻意不引用任何 Mekanism / PneumaticCraft 类型。</b> 那两个模组的热适配器由
- * {@code compat} 层反射加载后缓存进 {@link #heatAdapters}（不透明的 {@code Object}），
- * 主动驱动则通过 {@link ThermostatHeatHook} 安装，因此没装对应模组时本类照常加载。</p>
+ * <p><b>本类刻意不引用任何可选热系统类型。</b>热适配器由 {@code compat} 层按需加载后缓存进
+ * {@link #heatAdapters}（不透明的 {@code Object}），主动驱动则通过 {@link ThermostatHeatHook}
+ * 注册，因此未加载对应可选模组时本类照常加载。</p>
  *
  * <h2>单位与范围</h2>
  *

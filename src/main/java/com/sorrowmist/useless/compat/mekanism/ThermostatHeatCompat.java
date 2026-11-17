@@ -65,7 +65,7 @@ public final class ThermostatHeatCompat {
         event.registerBlockEntity(HEAT, ModBlockEntities.TEMPERATURE_REGULATOR.get(),
                 (blockEntity, side) -> adapter(blockEntity));
         // 安装「主动驱动」；未装 Mekanism 时这个钩子保持 null，主代码的 tick 就是空操作。
-        ThermostatHeatHook.driver = ThermostatHeatCompat::drive;
+        ThermostatHeatHook.registerDriver("mekanism", ThermostatHeatCompat::drive);
     }
 
     private static IHeatHandler adapter(ThermostatBlockEntity thermostat) {

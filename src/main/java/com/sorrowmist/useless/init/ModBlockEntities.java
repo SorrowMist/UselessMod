@@ -9,6 +9,7 @@ import com.sorrowmist.useless.content.blockentities.multiblock.MePatternAssembly
 import com.sorrowmist.useless.content.blockentities.multiblock.MultiblockAlloyFurnaceCoreBlockEntity;
 import com.sorrowmist.useless.content.blockentities.multiblock.OmniversalMoldHubBlockEntity;
 import com.sorrowmist.useless.content.blockentities.multiblock.PassiveCraftingHatchBlockEntity;
+import com.sorrowmist.useless.compat.anvilcraft.AnvilCraftThermostatCompat;
 import com.sorrowmist.useless.compat.draconicevolution.DraconicOpStorageCompat;
 import com.sorrowmist.useless.compat.fluxnetworks.FluxNetworksEnergyCompat;
 import net.minecraft.core.registries.Registries;
@@ -97,6 +98,14 @@ public final class ModBlockEntities {
         if (ModList.get().isLoaded("pneumaticcraft")) {
             invokeOptionalCapabilityLoader(
                     "com.sorrowmist.useless.compat.pneumaticcraft.ThermostatHeatCompat", event);
+        }
+        if (ModList.get().isLoaded(AnvilCraftThermostatCompat.MOD_ID)) {
+            try {
+                AnvilCraftThermostatCompat.register();
+            } catch (LinkageError | RuntimeException exception) {
+                UselessMod.LOGGER.error("Failed to register AnvilCraft thermostat heat compatibility; Cause: {}",
+                        AdapterGuards.describe(exception));
+            }
         }
         if (ModList.get().isLoaded(FluxNetworksEnergyCompat.MOD_ID)) {
             FluxNetworksEnergyCompat.registerCapabilities(event);

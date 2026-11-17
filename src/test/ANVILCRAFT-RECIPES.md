@@ -6,9 +6,9 @@
 .\gradlew.bat runGameTestServer
 ```
 
-测试运行在 `run/anvilcraft-gametest`，通过实际配方管理器和万象合金炉目录对照当前加载的数据包；过筛和珠宝加工还包含铁砧工艺运行期生成的配方。已知隔离的配方 ID 在测试中逐条登记，其他原配方缺少转换时测试失败；完整缺失清单和分类数量记录在 `run/anvilcraft-gametest/logs/latest.log`。当前登记的隔离项包括放电、皇家钢额外产物、方块实体数据、输入组件复制、特殊物品子谓词及不同物品冲压。
+测试运行在 `run/anvilcraft-gametest`，通过实际配方管理器和万象合金炉目录对照当前加载的数据包；过筛和珠宝加工还包含铁砧工艺运行期生成的配方。已知隔离的配方 ID 在测试中逐条登记，其他原配方缺少转换时测试失败；完整缺失清单和分类数量记录在 `run/anvilcraft-gametest/logs/latest.log`。当前登记的隔离项包括放电、方块实体数据、输入组件复制、特殊物品子谓词及不同物品冲压。皇家钢高温熔炼的固定产物已转换，但依赖世界偏好和炼药锅周围物品的皇家偏好奖励仍无法静态表达。
 
-字段级检查覆盖多方块合成的材料和产物、四种水基固液反应、过筛配方的材料和概率期望产出，以及浮霜锻造与多合一锻造的部分默认组件变体。铁砧碰撞新增以下检查：
+字段级检查覆盖多方块合成的材料和产物、四种水基固液反应、过筛配方的材料和概率期望产出、皇家钢高温熔炼的固定产物与铁砧模具，以及浮霜锻造与多合一锻造的部分默认组件变体。铁砧碰撞新增以下检查：
 
 - 当前 18 条原配方转换 16 条，生成 29 个速度变体；铀块和钚块的两条过热方块数据配方必须完全隔离。
 - 每个碰撞变体的铁砧消耗、撞击方块消耗或碰撞免疫模具、周围方块满批投入及全部产物期望数量对照原配方。
@@ -18,6 +18,6 @@
 
 其他类型目前检查目录中是否存在转换条目，并未逐字段核验。测试不覆盖客户端按钮点击、完整多方块搭建或完整 AE 网络加工流程。
 
-2026-11-17 验证环境：Minecraft 1.21.1、NeoForge 21.1.249、AnvilCraft 1.6.0+snapshot.2917、JDK 21。`test runGameTestServer -x createMinecraftArtifacts --console plain` 成功，8 项 GameTest 全部通过。覆盖统计包含 30 类原配方，18 条已知隔离项均已逐条登记。
+2026-11-17 验证环境：Minecraft 1.21.1、NeoForge 21.1.249、AnvilCraft 1.6.0+snapshot.2917、JDK 21。`test runGameTestServer -x createMinecraftArtifacts --console plain` 成功，10 项 GameTest 全部通过。覆盖统计包含 30 类原配方，12 条已知隔离项均已逐条登记。
 
 测试服务器排除与 Data Energistics 存在加载冲突的 AE2 Lightning Tech 和 Thunderbolt；其他运行时模组及数据包仍可能影响配方、标签与统计数量。GameTest 的空结构模板取自 AE2 Lightning Tech 的 `src/jdb/resources/data/ae2lt_anvil/structure/empty.nbt`。

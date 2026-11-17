@@ -3,12 +3,14 @@ package com.sorrowmist.useless.content.recipe.adapters.anvilcraft;
 import com.sorrowmist.useless.content.recipe.AdvancedAlloyFurnaceRecipe;
 import com.sorrowmist.useless.content.recipe.AdapterUtils;
 import com.sorrowmist.useless.content.recipe.AlloyFurnaceRecipeCatalog;
+import com.sorrowmist.useless.content.recipe.ExpectedOutputScaler;
 import com.sorrowmist.useless.content.recipe.RecipeSourceIds;
 import com.mojang.logging.LogUtils;
 import dev.anvilcraft.lib.v2.multiblock.dynamic.definition.DefinitionSerialization;
 import dev.dubhe.anvilcraft.api.block.BlockPlacementRules;
 import dev.dubhe.anvilcraft.recipe.anvil.wrap.SolidLiquidRecipe;
 import dev.dubhe.anvilcraft.recipe.anvil.wrap.MeshRecipe;
+import dev.dubhe.anvilcraft.recipe.anvil.wrap.SuperHeatingRecipe;
 import dev.dubhe.anvilcraft.recipe.generate.JewelCraftingRecipeGeneratingCache;
 import dev.dubhe.anvilcraft.recipe.generate.MeshRecipeGeneratingCache;
 import dev.dubhe.anvilcraft.recipe.frost.CustomFrostMaterialPredicate;
@@ -45,6 +47,7 @@ import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
@@ -71,12 +74,6 @@ public final class AnvilCraftRecipeGameTest {
             "StampingUniqueItemsRecipe anvilcraft:stamping_unique_items/eight_to_one_smithing_template",
             "StampingUniqueItemsRecipe anvilcraft:stamping_unique_items/four_to_one_smithing_template",
             "StampingUniqueItemsRecipe anvilcraft:stamping_unique_items/two_to_one_smithing_template",
-            "SuperHeatingRecipe anvilcraft:super_heating/royal_steel_block_base",
-            "SuperHeatingRecipe anvilcraft:super_heating/royal_steel_block_bonus_1",
-            "SuperHeatingRecipe anvilcraft:super_heating/royal_steel_block_bonus_2",
-            "SuperHeatingRecipe anvilcraft:super_heating/royal_steel_ingot_base",
-            "SuperHeatingRecipe anvilcraft:super_heating/royal_steel_ingot_bonus_1",
-            "SuperHeatingRecipe anvilcraft:super_heating/royal_steel_ingot_bonus_2",
             "TimeWarpRecipe anvilcraft:time_warp/amber_block",
             "UnpackRecipe anvilcraft:unpack/fluid_tank_minecart",
             "AnvilCollisionCraftRecipe anvilcraft:anvil_collision/anvil_tier_2_and_uranium_block_256",
@@ -128,6 +125,52 @@ public final class AnvilCraftRecipeGameTest {
         if (checked == 0 || !failures.isEmpty()) {
             throw new AssertionError("普通铁砧工艺配方未保持统一功率：检查数 " + checked + "；异常 " + failures);
         }
+        helper.succeed();
+    }
+
+    @GameTest(template = "empty", timeoutTicks = 1200)
+    public static void royalSteelSuperHeatingRetainsStaticResultsAndAnvilMold(GameTestHelper helper) {
+        Level level = helper.getLevel();
+        List<AdvancedAlloyFurnaceRecipe> converted = AlloyFurnaceRecipeCatalog.entries(level, RecipeSourceIds.ANVILCRAFT)
+                .stream().map(AlloyFurnaceRecipeCatalog.Entry::recipe).toList();
+        List<String> sourcePaths = List.of(
+                "royal_steel_ingot_base", "royal_steel_ingot_bonus_1", "royal_steel_ingot_bonus_2",
+                "royal_steel_block_base", "royal_steel_block_bonus_1", "royal_steel_block_bonus_2");
+        List<String> failures = new ArrayList<>();
+        for (String path : sourcePaths) {
+            ResourceLocation id = ResourceLocation.fromNamespaceAndPath("anvilcraft", "super_heating/" + path);
+            RecipeHolder<?> sourceHolder = level.getRecipeManager().getRecipes().stream()
+                    .filter(holder -> holder.id().equals(id)).findFirst().orElse(null);
+            if (sourceHolder == null || !(sourceHolder.value() instanceof SuperHeatingRecipe source)) {
+                failures.add(id + "：原配方缺失");
+                continue;
+            }
+            List<AdvancedAlloyFurnaceRecipe> matches = find(converted, id);
+            if (matches.size() != 1) {
+                failures.add(id + "：转换数量 " + matches.size());
+                continue;
+            }
+            List<ExpectedOutputScaler.WeightedItemOutput> weighted = new ArrayList<>();
+            boolean supported = true;
+            for (var result : source.getResultItems()) {
+                if (result.stack().isEmpty() || !AnvilItemRecipeAdapter.addOutput(weighted, result)) {
+                    supported = false;
+                    break;
+                }
+            }
+            Optional<ExpectedOutputScaler.ScaledOutputs> expected = supported
+                    ? ExpectedOutputScaler.scale(weighted) : Optional.empty();
+            AdvancedAlloyFurnaceRecipe recipe = matches.getFirst();
+            boolean outputsMatch = expected.isPresent()
+                    && recipe.processTime() == AdapterUtils.DEFAULT_PROCESS_TIME * expected.get().operations()
+                    && expected.get().outputs().size() == recipe.outputs().size()
+                    && expected.get().outputs().stream().allMatch(output -> recipe.outputs().stream()
+                    .anyMatch(actual -> ItemStack.matches(output, actual)));
+            boolean hasAnvilMold = recipe.molds().stream()
+                    .anyMatch(mold -> mold.test(Items.ANVIL.getDefaultInstance()));
+            if (!outputsMatch || !hasAnvilMold) failures.add(id + "：固定产物或铁砧模具不一致");
+        }
+        if (!failures.isEmpty()) throw new AssertionError("皇家钢高温熔炼转换不一致：" + failures);
         helper.succeed();
     }
 

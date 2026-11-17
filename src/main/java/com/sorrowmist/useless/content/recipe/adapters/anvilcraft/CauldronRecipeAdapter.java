@@ -81,11 +81,9 @@ public final class CauldronRecipeAdapter implements IRecipeAdapter<AbstractProce
             AdapterUtils.mergeIngredient(materials, ingredient, predicate.count());
         }
         List<ExpectedOutputScaler.WeightedItemOutput> weighted = new ArrayList<>();
+        // 仅转换配方声明的固定产物；RoyalPreferenceOutcome 根据世界偏好和炼药锅周围物品追加的奖励无法由静态配方表达。
         for (ChanceItemStack result : source.getResultItems()) {
             if (result.stack().isEmpty() || !AnvilItemRecipeAdapter.addOutput(weighted, result)) return List.of();
-            // 上游 RoyalPreferenceOutcome 根据世界宝石偏好和周围物品追加产物，无法静态确定产量。
-            if (source instanceof SuperHeatingRecipe && (Multiblock4DRecipeAdapter.mold("royal_steel_ingot").test(result.stack())
-                    || Multiblock4DRecipeAdapter.mold("royal_steel_block").test(result.stack()))) return List.of();
         }
         var scaled = ExpectedOutputScaler.scale(weighted);
         if (scaled.isEmpty()) return List.of();

@@ -3,6 +3,16 @@
 本文件记录 UselessMod 的全部版本变更，格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，
 每个条目附英文对照，分类固定为「新增 / 变更 / 修复 / 性能」四类。
 
+## [2.4.6.8]
+
+### Added / 新增
+- 温度调节器新增铁砧工艺加热兼容，开启后按设定温度映射热等级，并加热正上方的可加热方块。
+  - Added AnvilCraft heating compatibility to the Temperature Regulator. When enabled, its setpoint maps to an AnvilCraft heat tier and heats the heatable block directly above it.
+
+### Fixed / 修复
+- 修复皇家钢高温熔炼配方未转换的问题，恢复皇家钢锭和方块固定产物的转换并保留铁砧模具；依赖世界偏好和周围物品触发的皇家偏好奖励不包含在转换配方中。
+  - Fixed Royal Steel super-heating recipes being omitted from conversion. Fixed ingot and block outputs are now converted with the anvil mold; the Royal Preference bonus conditioned on world preference and nearby items is not included.
+
 ## [2.4.6.7]
 
 ### Added / 新增

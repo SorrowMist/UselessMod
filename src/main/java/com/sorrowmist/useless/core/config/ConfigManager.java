@@ -571,7 +571,7 @@ public class ConfigManager {
         SERVER_BUILDER.push("mekanism_upgrade");
         TIME_MULTIPLIER = SERVER_BUILDER
                 .comment("速度升级增强倍率")
-                .defineInRange("time_multiplier", 1, 1, Integer.MAX_VALUE);
+                .defineInRange("time_multiplier", 10, 1, Integer.MAX_VALUE);
 
         ELECTRICITY_MULTIPLIER = SERVER_BUILDER
                 .comment("能量升级节电增强倍率")

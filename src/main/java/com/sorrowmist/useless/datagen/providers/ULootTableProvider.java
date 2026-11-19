@@ -42,6 +42,7 @@ public class ULootTableProvider extends LootTableProvider {
             this.dropSelf(ModBlocks.TELEPORT_BLOCK_3.get());
             this.dropSelf(ModBlocks.ADVANCED_ALLOY_FURNACE_BLOCK.get());
             this.dropSelf(ModBlocks.SUPERVISOR.get());
+            this.dropSelf(ModBlocks.CREATOR_DOLL_BLOCK.get());
             this.dropSelf(ModBlocks.MULTIBLOCK_ALLOY_FURNACE_CORE.get());
             this.dropSelf(ModBlocks.ME_PATTERN_ASSEMBLY.get());
             this.dropSelf(ModBlocks.OMNIVERSAL_MOLD_HUB.get());
@@ -88,6 +89,7 @@ public class ULootTableProvider extends LootTableProvider {
             blocks.add(ModBlocks.TELEPORT_BLOCK_3.get());
             blocks.add(ModBlocks.ADVANCED_ALLOY_FURNACE_BLOCK.get());
             blocks.add(ModBlocks.SUPERVISOR.get());
+            blocks.add(ModBlocks.CREATOR_DOLL_BLOCK.get());
             blocks.add(ModBlocks.MULTIBLOCK_ALLOY_FURNACE_CORE.get());
             blocks.add(ModBlocks.ME_PATTERN_ASSEMBLY.get());
             blocks.add(ModBlocks.OMNIVERSAL_MOLD_HUB.get());

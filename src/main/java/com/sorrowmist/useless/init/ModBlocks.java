@@ -2,6 +2,7 @@ package com.sorrowmist.useless.init;
 
 import com.sorrowmist.useless.UselessMod;
 import com.sorrowmist.useless.content.blocks.AdvancedAlloyFurnaceBlock;
+import com.sorrowmist.useless.content.blocks.CreatorDollBlock;
 import com.sorrowmist.useless.content.blocks.OreGeneratorBlock;
 import com.sorrowmist.useless.content.blocks.SupervisorBlock;
 import com.sorrowmist.useless.content.blocks.TeleportPadBlock;
@@ -17,6 +18,7 @@ import com.sorrowmist.useless.world.teleport.UselessDimTeleporter;
 import com.sorrowmist.useless.world.teleport.UselessDimTeleporter2;
 import com.sorrowmist.useless.world.teleport.UselessDimTeleporter3;
 import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockBehaviour;
 import net.minecraft.world.level.material.MapColor;
 import net.neoforged.neoforge.registries.DeferredBlock;
@@ -72,6 +74,11 @@ public final class ModBlocks {
             () -> new SupervisorBlock(BlockBehaviour.Properties.of()
                     .noOcclusion()
                     .strength(2.0F))
+    );
+
+    public static final DeferredBlock<CreatorDollBlock> CREATOR_DOLL_BLOCK = BLOCKS.register(
+            "creator_doll_block",
+            () -> new CreatorDollBlock(BlockBehaviour.Properties.ofFullCopy(Blocks.WHITE_WOOL).noOcclusion())
     );
 
     public static final DeferredBlock<MultiblockAlloyFurnaceCoreBlock> MULTIBLOCK_ALLOY_FURNACE_CORE = BLOCKS.register(

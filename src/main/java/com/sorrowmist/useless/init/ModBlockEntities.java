@@ -3,6 +3,7 @@ package com.sorrowmist.useless.init;
 import com.sorrowmist.useless.content.recipe.AdapterGuards;
 import com.sorrowmist.useless.UselessMod;
 import com.sorrowmist.useless.content.blockentities.AdvancedAlloyFurnaceBlockEntity;
+import com.sorrowmist.useless.content.blockentities.CreatorDollBlockEntity;
 import com.sorrowmist.useless.content.blockentities.OreGeneratorBlockEntity;
 import com.sorrowmist.useless.content.blockentities.ThermostatBlockEntity;
 import com.sorrowmist.useless.content.blockentities.multiblock.MePatternAssemblyBlockEntity;
@@ -166,5 +167,9 @@ public final class ModBlockEntities {
                     () -> BlockEntityType.Builder.of(ThermostatBlockEntity::new,
                             ModBlocks.TEMPERATURE_REGULATOR.get()).build(null));
 
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<CreatorDollBlockEntity>> CREATOR_DOLL =
+            BLOCK_ENTITY_TYPES.register("creator_doll",
+                    () -> BlockEntityType.Builder.of(CreatorDollBlockEntity::new,
+                            ModBlocks.CREATOR_DOLL_BLOCK.get()).build(null));
 
 }

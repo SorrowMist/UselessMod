@@ -234,6 +234,10 @@ public final class ModItems {
             "supervisor",
             () -> new BlockItem(ModBlocks.SUPERVISOR.get(), new Item.Properties())
     );
+    public static final DeferredItem<BlockItem> CREATOR_DOLL_BLOCK = registerAndAdd(
+            "creator_doll_block",
+            () -> new BlockItem(ModBlocks.CREATOR_DOLL_BLOCK.get(), new Item.Properties())
+    );
     public static final DeferredItem<BlockItem> MULTIBLOCK_ALLOY_FURNACE_CORE = registerAndAdd(
             "multiblock_alloy_furnace_core",
             () -> new MultiblockAlloyFurnaceCoreBlockItem(

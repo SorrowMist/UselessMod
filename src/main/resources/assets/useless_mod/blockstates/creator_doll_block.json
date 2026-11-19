@@ -1,7 +1,9 @@
 {
-  "variants": {
-    "": {
-      "model": "useless_mod:block/creator_doll_block"
+  "multipart": [
+    {
+      "apply": {
+        "model": "useless_mod:block/creator_doll_block"
+      }
     }
-  }
+  ]
 }

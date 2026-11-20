@@ -95,6 +95,7 @@
   "block.useless_mod.passive_crafting_hatch": "Passive Crafting Hatch",
   "block.useless_mod.omniversal_furnace_casing": "Omniversal Furnace Casing",
   "block.useless_mod.temperature_regulator": "Temperature Regulator",
+  "tooltip.useless_mod.temperature_regulator": "While holding the staff, press Alt and right-click the Temperature Regulator to open its configuration.",
   "block.useless_mod.useless_coil_tier_1": "Useless Coil Tier 1",
   "block.useless_mod.useless_coil_tier_2": "Useless Coil Tier 2",
   "block.useless_mod.useless_coil_tier_3": "Useless Coil Tier 3",

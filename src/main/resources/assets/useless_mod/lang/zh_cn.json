@@ -95,6 +95,7 @@
   "block.useless_mod.passive_crafting_hatch": "被动合成仓",
   "block.useless_mod.omniversal_furnace_casing": "万象炉装饰外壳",
   "block.useless_mod.temperature_regulator": "温度调节器",
+  "tooltip.useless_mod.temperature_regulator": "手持造化杖，按住 Alt 并右键温度调节器以打开配置界面。",
   "block.useless_mod.useless_coil_tier_1": "一阶无用线圈",
   "block.useless_mod.useless_coil_tier_2": "二阶无用线圈",
   "block.useless_mod.useless_coil_tier_3": "三阶无用线圈",

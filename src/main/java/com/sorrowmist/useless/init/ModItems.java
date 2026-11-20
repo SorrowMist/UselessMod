@@ -16,9 +16,12 @@ import com.sorrowmist.useless.content.items.RitualBlueprintItem;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.OmniversalPatternDetails;
 import appeng.api.crafting.PatternDetailsHelper;
 import appeng.crafting.pattern.AEProcessingPattern;
+import net.minecraft.network.chat.Component;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Rarity;
+import net.minecraft.world.item.TooltipFlag;
 import net.neoforged.fml.ModList;
 import net.neoforged.neoforge.registries.DeferredItem;
 import net.neoforged.neoforge.registries.DeferredRegister;
@@ -220,7 +223,14 @@ public final class ModItems {
     // 温度调节器方块物品
     public static final DeferredItem<BlockItem> TEMPERATURE_REGULATOR = registerAndAdd(
             "temperature_regulator",
-            () -> new BlockItem(ModBlocks.TEMPERATURE_REGULATOR.get(), new Item.Properties())
+            () -> new BlockItem(ModBlocks.TEMPERATURE_REGULATOR.get(), new Item.Properties()) {
+                @Override
+                public void appendHoverText(ItemStack stack, Item.TooltipContext context,
+                                            List<Component> tooltip, TooltipFlag flag) {
+                    super.appendHoverText(stack, context, tooltip, flag);
+                    tooltip.add(Component.translatable("tooltip.useless_mod.temperature_regulator"));
+                }
+            }
     );
     static final DeferredItem<BlockItem> ORE_GENERATOR_BLOCK = registerAndAdd(
             "ore_generator_block",

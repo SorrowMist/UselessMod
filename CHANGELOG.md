@@ -3,6 +3,22 @@
 本文件记录 UselessMod 的全部版本变更，格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，
 每个条目附英文对照，分类固定为「新增 / 变更 / 修复 / 性能」四类。
 
+## [2.4.6.9]
+
+### Added / 新增
+- 制作者皮肤玩偶新增空手右键触发的单次弹跳动画。
+  - Added a single-bounce animation triggered by right-clicking the Creator Doll with an empty hand.
+
+### Fixed / 修复
+- 修复通用机械速度升级增强倍率的默认配置，默认值由 1 调整为 10。
+  - Fixed the default Mekanism speed upgrade multiplier configuration, changing its default value from 1 to 10.
+- 修复铁砧工艺序列加工中子辐照配方的模具映射：按辐照类型要求对应的砧子辐照器 6 个，并保留普通中子辐照器模具。
+  - Fixed mold mapping for AnvilCraft procedural neutron irradiation recipes: they now require six anvilon irradiators matching the irradiation type, while retaining the regular neutron irradiator mold.
+- 模具仓现在按物品堆叠数量匹配模具需求；JEI 与多方块控制器会合并显示重复模具及其数量，较长的控制器详情会自动换行。
+  - Mold hubs now match mold requirements by stack count. JEI and the multiblock controller group repeated molds and show their required counts, and long controller details now wrap onto multiple lines.
+- 铁砧工艺的四维多方块合成、多方块合成与多方块转换现在要求 9 个通透工作台作为模具。
+  - AnvilCraft 4D multiblock crafting, multiblock crafting, and multiblock conversion recipes now require nine transparent crafting tables as molds.
+
 ## [2.4.6.8]
 
 ### Added / 新增

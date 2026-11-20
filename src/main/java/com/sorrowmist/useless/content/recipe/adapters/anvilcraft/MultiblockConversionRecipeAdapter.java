@@ -98,8 +98,7 @@ public final class MultiblockConversionRecipeAdapter implements IRecipeAdapter<M
                 }
             }
         }
-        List<Ingredient> molds = List.of(Multiblock4DRecipeAdapter.mold("giant_anvil"),
-                Multiblock4DRecipeAdapter.mold("transparent_crafting_table"));
+        List<Ingredient> molds = Multiblock4DRecipeAdapter.multiblockMolds();
         if (materials.isEmpty() || results.isEmpty() || molds.stream().anyMatch(Ingredient::isEmpty)) return List.of();
         return List.of(new AdvancedAlloyFurnaceRecipe(AdapterUtils.convertedId(holder.id()),
                 materials.entrySet().stream().map(entry -> new CountedIngredient(entry.getKey(), entry.getValue())).toList(),

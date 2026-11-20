@@ -52,9 +52,7 @@ public final class MultiblockRecipeAdapter implements IRecipeAdapter<MultiblockR
                 }
             }
         }
-        List<Ingredient> molds = List.of(Multiblock4DRecipeAdapter.mold("giant_anvil"),
-                Multiblock4DRecipeAdapter.mold("transparent_crafting_table"),
-                Multiblock4DRecipeAdapter.mold("space_overcompressor"));
+        List<Ingredient> molds = Multiblock4DRecipeAdapter.multiblockMolds("space_overcompressor");
         if (materials.isEmpty() || molds.stream().anyMatch(Ingredient::isEmpty)) return List.of();
         List<CountedIngredient> inputs = materials.entrySet().stream()
                 .map(entry -> new CountedIngredient(entry.getKey(), entry.getValue())).toList();

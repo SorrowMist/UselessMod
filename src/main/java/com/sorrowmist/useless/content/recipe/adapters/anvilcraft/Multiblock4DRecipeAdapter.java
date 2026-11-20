@@ -32,6 +32,8 @@ import java.util.Map;
 
 /** 将四维多方块合成的各阶段材料合并为一次加工。 */
 public final class Multiblock4DRecipeAdapter implements IRecipeAdapter<Multiblock4DRecipe> {
+    static final int TRANSPARENT_CRAFTING_TABLE_MOLD_COUNT = 9;
+
     @Override
     public String sourceId() {
         return RecipeSourceIds.ANVILCRAFT;
@@ -68,8 +70,7 @@ public final class Multiblock4DRecipeAdapter implements IRecipeAdapter<Multibloc
                 }
             }
         }
-        List<Ingredient> molds = List.of(mold("giant_anvil"), mold("transparent_crafting_table"),
-                mold("spacetime_supercomputer"));
+        List<Ingredient> molds = multiblockMolds("spacetime_supercomputer");
         if (materials.isEmpty() || molds.stream().anyMatch(Ingredient::isEmpty)) return List.of();
         List<CountedIngredient> inputs = materials.entrySet().stream()
                 .map(entry -> new CountedIngredient(entry.getKey(), entry.getValue()))
@@ -85,6 +86,16 @@ public final class Multiblock4DRecipeAdapter implements IRecipeAdapter<Multibloc
     static Ingredient mold(String path) {
         Item item = BuiltInRegistries.ITEM.get(ResourceLocation.fromNamespaceAndPath("anvilcraft", path));
         return item == Items.AIR ? Ingredient.EMPTY : Ingredient.of(item);
+    }
+
+    static List<Ingredient> multiblockMolds(String... additionalMolds) {
+        List<Ingredient> molds = new ArrayList<>(List.of(mold("giant_anvil")));
+        Ingredient craftingTable = mold("transparent_crafting_table");
+        for (int count = 0; count < TRANSPARENT_CRAFTING_TABLE_MOLD_COUNT; count++) {
+            molds.add(craftingTable);
+        }
+        for (String path : additionalMolds) molds.add(mold(path));
+        return List.copyOf(molds);
     }
 
     static Ingredient blockIngredient(@Nullable BlockStatePredicate predicate) {

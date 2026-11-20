@@ -30,7 +30,9 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.ReentrantLock;
 
@@ -207,12 +209,17 @@ public interface CraftingTaskContext {
 
     static String describeRequiredMolds(List<Ingredient> ingredients) {
         if (ingredients == null || ingredients.isEmpty()) return "";
-        List<String> descriptions = new ArrayList<>();
+        Map<Ingredient, Integer> counts = new LinkedHashMap<>();
         for (Ingredient ingredient : ingredients) {
-            String description = describeRequiredMold(ingredient);
-            if (!description.isEmpty()) descriptions.add(description);
+            if (!describeRequiredMold(ingredient).isEmpty()) counts.merge(ingredient, 1, Integer::sum);
         }
-        return String.join(", ", descriptions);
+        List<String> descriptions = new ArrayList<>();
+        for (Map.Entry<Ingredient, Integer> entry : counts.entrySet()) {
+            String description = describeRequiredMold(entry.getKey());
+            if (entry.getValue() > 1) description += " x" + entry.getValue();
+            descriptions.add(description);
+        }
+        return String.join("、", descriptions);
     }
 
     record TaskAvailability(boolean available, String statusKey, String statusDetail) {

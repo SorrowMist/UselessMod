@@ -364,12 +364,9 @@ public final class MultiblockAlloyFurnaceScreen extends AbstractContainerScreen<
     }
 
     private void renderTaskList(GuiGraphics graphics) {
-        List<List<AETaskProgressPacket.TaskProgressData>> pages = taskPages();
+        List<List<String>> pages = taskPages();
         taskPage = Math.clamp(taskPage, 0, pages.size() - 1);
-        List<String> lines = new ArrayList<>();
-        for (var task : pages.get(taskPage)) {
-            lines.addAll(taskLines(task));
-        }
+        List<String> lines = pages.get(taskPage);
         graphics.pose().pushPose();
         graphics.pose().translate(TASK_LIST_X, TASK_LIST_Y, 0);
         graphics.pose().scale(TASK_LIST_TEXT_SCALE, TASK_LIST_TEXT_SCALE, 1.0F);
@@ -387,10 +384,19 @@ public final class MultiblockAlloyFurnaceScreen extends AbstractContainerScreen<
         }
     }
 
-    private String fitTaskLine(String text) {
+    private List<String> wrapTaskLine(String text) {
         int scaledWidth = (int) (TASK_LIST_WIDTH / TASK_LIST_TEXT_SCALE);
-        if (font.width(text) <= scaledWidth) return text;
-        return font.plainSubstrByWidth(text, scaledWidth - font.width("...")) + "...";
+        if (text.isEmpty()) return List.of("");
+        List<String> lines = new ArrayList<>();
+        String remaining = text;
+        while (font.width(remaining) > scaledWidth) {
+            String line = font.plainSubstrByWidth(remaining, scaledWidth);
+            if (line.isEmpty()) break;
+            lines.add(line);
+            remaining = remaining.substring(line.length());
+        }
+        if (!remaining.isEmpty()) lines.add(remaining);
+        return List.copyOf(lines);
     }
 
     private List<String> taskLines(
@@ -405,33 +411,44 @@ public final class MultiblockAlloyFurnaceScreen extends AbstractContainerScreen<
         String state = detail.isEmpty() ? status : status + ": " + detail;
         String product = task.productName + " x" + task.totalOutputCount;
         String combined = product + "  " + state;
-        if (font.width(combined) <= (int) (TASK_LIST_WIDTH / TASK_LIST_TEXT_SCALE)) {
+        int scaledWidth = (int) (TASK_LIST_WIDTH / TASK_LIST_TEXT_SCALE);
+        if (font.width(combined) <= scaledWidth) {
             return List.of(combined);
         }
-        if (detail.isEmpty() || font.width(state) <= (int) (TASK_LIST_WIDTH / TASK_LIST_TEXT_SCALE)) {
-            return List.of(fitTaskLine(product), fitTaskLine(state));
+        List<String> lines = new ArrayList<>(wrapTaskLine(product));
+        if (detail.isEmpty() || font.width(state) <= scaledWidth) {
+            lines.addAll(wrapTaskLine(state));
+        } else {
+            lines.addAll(wrapTaskLine(status));
+            lines.addAll(wrapTaskLine(detail));
         }
-        return List.of(fitTaskLine(product), fitTaskLine(status), fitTaskLine(detail));
+        return List.copyOf(lines);
     }
 
-    private List<List<AETaskProgressPacket.TaskProgressData>> taskPages() {
+    private List<List<String>> taskPages() {
         var tasks = new ArrayList<>(menu.getTaskProgress());
         tasks.sort(Comparator
                 .comparing((AETaskProgressPacket.TaskProgressData task)
                         -> task.productName)
                 .thenComparingInt(task -> task.progress));
-        List<List<AETaskProgressPacket.TaskProgressData>> pages = new ArrayList<>();
-        List<AETaskProgressPacket.TaskProgressData> page = new ArrayList<>();
-        int usedLines = 0;
+        List<List<String>> pages = new ArrayList<>();
+        List<String> page = new ArrayList<>();
         for (var task : tasks) {
-            int requiredLines = taskLines(task).size();
-            if (!page.isEmpty() && usedLines + requiredLines > TASK_LIST_MAX_LINES) {
+            List<String> lines = taskLines(task);
+            if (!page.isEmpty() && page.size() + lines.size() > TASK_LIST_MAX_LINES) {
                 pages.add(List.copyOf(page));
                 page.clear();
-                usedLines = 0;
             }
-            page.add(task);
-            usedLines += requiredLines;
+            int offset = 0;
+            while (offset < lines.size()) {
+                int lineCount = Math.min(TASK_LIST_MAX_LINES - page.size(), lines.size() - offset);
+                page.addAll(lines.subList(offset, offset + lineCount));
+                offset += lineCount;
+                if (page.size() == TASK_LIST_MAX_LINES) {
+                    pages.add(List.copyOf(page));
+                    page.clear();
+                }
+            }
         }
         if (!page.isEmpty() || pages.isEmpty()) {
             pages.add(List.copyOf(page));

@@ -1,7 +1,7 @@
 package com.sorrowmist.useless.content.recipe;
 
-import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.crafting.Ingredient;
 
 import java.util.ArrayList;
@@ -14,7 +14,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-/** Matches independent mold requirements against the mold slots of a hub. */
+/** 将模具需求按物品数量与枢纽库存进行匹配。 */
 public final class MoldMatcher {
     private MoldMatcher() {
     }
@@ -23,17 +23,15 @@ public final class MoldMatcher {
         return matches(requirements, sparseSlots(available));
     }
 
-    /** Matches against a sparse, physical-slot-indexed mold map. */
+    /** 在按物理槽位索引的稀疏模具库存中匹配需求。 */
     public static boolean matches(
             List<Ingredient> requirements, Map<Integer, ItemStack> available) {
         return prepare(available).matches(requirements);
     }
 
     /**
-     * Builds a reusable matcher for one immutable mold-inventory snapshot. The prepared index is
-     * useful when many patterns are checked against the same hub: concrete ingredients only visit
-     * slots containing one of their possible items, and each ingredient's matching slots are
-     * cached for the lifetime of this matcher.
+     * 为一份不可变模具库存快照构建可复用的匹配器。
+     * 常见成分只检查包含候选物品的槽位，并在匹配器生命周期内缓存匹配结果。
      */
     public static PreparedMolds prepare(Map<Integer, ItemStack> available) {
         return new PreparedMolds(available);
@@ -71,11 +69,11 @@ public final class MoldMatcher {
         public boolean matches(List<Ingredient> requirements) {
             List<Ingredient> normalized = normalizeRequirements(requirements);
             if (normalized.isEmpty()) return true;
-            if (occupiedSlots.isEmpty() || normalized.size() > occupiedSlots.size()) return false;
+            if (occupiedSlots.isEmpty()) return false;
 
-            Map<Integer, Integer> requirementBySlot = new HashMap<>();
+            Map<Integer, List<Integer>> requirementsBySlot = new HashMap<>();
             for (int requirement = 0; requirement < normalized.size(); requirement++) {
-                if (!augment(normalized, requirement, requirementBySlot, new HashSet<>())) {
+                if (!augment(normalized, requirement, requirementsBySlot, new HashSet<>())) {
                     return false;
                 }
             }
@@ -84,13 +82,23 @@ public final class MoldMatcher {
 
         private boolean augment(
                 List<Ingredient> requirements, int requirement,
-                Map<Integer, Integer> requirementBySlot, Set<Integer> visited) {
+                Map<Integer, List<Integer>> requirementsBySlot, Set<Integer> visited) {
             for (int slot : matchingSlots(requirements.get(requirement))) {
                 if (!visited.add(slot)) continue;
-                int previous = requirementBySlot.getOrDefault(slot, -1);
-                if (previous < 0 || augment(requirements, previous, requirementBySlot, visited)) {
-                    requirementBySlot.put(slot, requirement);
+                List<Integer> assigned = requirementsBySlot.computeIfAbsent(
+                        slot, ignored -> new ArrayList<>());
+                int capacity = Math.min(requirements.size(), available.get(slot).getCount());
+                if (assigned.size() < capacity) {
+                    assigned.add(requirement);
                     return true;
+                }
+                for (int index = 0; index < assigned.size(); index++) {
+                    int previous = assigned.remove(index);
+                    if (augment(requirements, previous, requirementsBySlot, visited)) {
+                        assigned.add(requirement);
+                        return true;
+                    }
+                    assigned.add(index, previous);
                 }
             }
             return false;
@@ -102,8 +110,7 @@ public final class MoldMatcher {
         }
 
         private List<Integer> findMatchingSlots(Ingredient requirement) {
-            // Custom ingredients can accept items that are not present in getItems(), so their
-            // predicate must retain the complete sparse-slot scan for correctness.
+            // 自定义成分可能接受 getItems() 未列出的物品，因此必须扫描全部非空槽位以保持匹配语义。
             if (requirement.isCustom()) return scanAll(requirement);
 
             ItemStack[] representatives;
@@ -140,27 +147,20 @@ public final class MoldMatcher {
         }
     }
 
-    /**
-     * Returns true when a complete assignment exists that uses {@code availableSlot} for one of
-     * the requirements. This is what makes the hub's physical slot order meaningful when several
-     * recipes have identical processing inputs and outputs.
-     */
+    /** 检查完整匹配是否能将 {@code availableSlot} 中的一个物品分配给任一需求。 */
     public static boolean matchesWithAnchor(
             List<Ingredient> requirements, List<ItemStack> available, int availableSlot) {
         return matchesWithAnchor(requirements, sparseSlots(available), availableSlot);
     }
 
-    /**
-     * Matches while reserving one physical mold slot for a requirement. The map is sparse, so empty
-     * slots never enter the assignment search.
-     */
+    /** 匹配时为一个需求预留指定槽位中的一个物品。 */
     public static boolean matchesWithAnchor(
             List<Ingredient> requirements, Map<Integer, ItemStack> available, int availableSlot) {
         List<Ingredient> normalized = normalizeRequirements(requirements);
         if (normalized.isEmpty()) return false;
         if (available == null || availableSlot < 0 || !available.containsKey(availableSlot)
                 || available.get(availableSlot) == null || available.get(availableSlot).isEmpty()
-                || normalized.size() > available.size()) {
+                || available.get(availableSlot).getCount() <= 0) {
             return false;
         }
 
@@ -168,44 +168,21 @@ public final class MoldMatcher {
             if (!AdapterUtils.matchesMold(normalized.get(anchoredRequirement), available.get(availableSlot))) {
                 continue;
             }
-
-            Map<Integer, Integer> requirementBySlot = new HashMap<>();
-            requirementBySlot.put(availableSlot, anchoredRequirement);
-            boolean complete = true;
-            for (int requirement = 0; requirement < normalized.size(); requirement++) {
-                if (requirement == anchoredRequirement) continue;
-                Set<Integer> visited = new HashSet<>();
-                visited.add(availableSlot);
-                if (!augment(normalized, available, requirement, requirementBySlot, visited)) {
-                    complete = false;
-                    break;
-                }
+            List<Ingredient> remainingRequirements = new ArrayList<>(normalized);
+            remainingRequirements.remove(anchoredRequirement);
+            Map<Integer, ItemStack> remainingMolds = new LinkedHashMap<>(available);
+            ItemStack anchoredStack = available.get(availableSlot);
+            if (anchoredStack.getCount() == 1) {
+                remainingMolds.remove(availableSlot);
+            } else {
+                remainingMolds.put(availableSlot, anchoredStack.copyWithCount(anchoredStack.getCount() - 1));
             }
-            if (complete) return true;
+            if (matches(remainingRequirements, remainingMolds)) return true;
         }
         return false;
     }
 
-    private static boolean augment(
-            List<Ingredient> requirements, Map<Integer, ItemStack> available,
-            int requirement, Map<Integer, Integer> requirementBySlot, Set<Integer> visited) {
-        Ingredient needed = requirements.get(requirement);
-        for (Map.Entry<Integer, ItemStack> entry : available.entrySet()) {
-            Integer slot = entry.getKey();
-            ItemStack mold = entry.getValue();
-            if (slot == null || visited.contains(slot) || mold == null || mold.isEmpty()
-                    || !AdapterUtils.matchesMold(needed, mold)) continue;
-            visited.add(slot);
-            int previous = requirementBySlot.getOrDefault(slot, -1);
-            if (previous < 0 || augment(requirements, available, previous, requirementBySlot, visited)) {
-                requirementBySlot.put(slot, requirement);
-                return true;
-            }
-        }
-        return false;
-    }
-
-    /** Creates an insertion-ordered map containing only non-empty physical mold slots. */
+    /** 按插入顺序创建仅包含非空模具槽位的映射。 */
     public static Map<Integer, ItemStack> sparseSlots(List<ItemStack> available) {
         if (available == null || available.isEmpty()) return Map.of();
         Map<Integer, ItemStack> result = new LinkedHashMap<>();

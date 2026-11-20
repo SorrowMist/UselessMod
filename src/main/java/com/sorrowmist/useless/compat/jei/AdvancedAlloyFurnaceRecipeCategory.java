@@ -35,7 +35,9 @@ import mezz.jei.api.gui.builder.IRecipeSlotBuilder;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 public class AdvancedAlloyFurnaceRecipeCategory implements IRecipeCategory<AlloyFurnaceRecipeCatalog.Entry> {
     public static final RecipeType<AlloyFurnaceRecipeCatalog.Entry> TYPE =
@@ -416,11 +418,28 @@ public class AdvancedAlloyFurnaceRecipeCategory implements IRecipeCategory<Alloy
                    });
         }
 
-        // Each independent mold requirement gets its own mandatory JEI slot.
-        List<Ingredient> molds = recipe.molds();
-        for (int index = 0; index < molds.size(); index++) {
-            builder.addSlot(RecipeIngredientRole.CATALYST, moldSlotX(molds.size(), index), MOLD_SLOT_Y)
-                   .addIngredients(molds.get(index));
+        // 将相同模具条件汇总显示数量，不同模具条件分别显示为必需槽位。
+        Map<Ingredient, Integer> moldCounts = new LinkedHashMap<>();
+        for (Ingredient mold : recipe.molds()) moldCounts.merge(mold, 1, Integer::sum);
+        int moldIndex = 0;
+        for (Map.Entry<Ingredient, Integer> moldEntry : moldCounts.entrySet()) {
+            Ingredient mold = moldEntry.getKey();
+            int count = moldEntry.getValue();
+            ItemStack[] matchingStacks = mold.getItems();
+            if (matchingStacks.length == 0) {
+                ItemStack representative = AdapterUtils.itemRepresentative(mold);
+                matchingStacks = representative == null || representative.isEmpty()
+                        ? new ItemStack[0] : new ItemStack[] {representative};
+            }
+            IRecipeSlotBuilder slot = builder.addSlot(
+                            RecipeIngredientRole.CATALYST, moldSlotX(moldCounts.size(), moldIndex++), MOLD_SLOT_Y)
+                    .addIngredients(matchingStacks.length == 0 ? mold : countedMoldDisplay(matchingStacks, count))
+                    .setCustomRenderer(VanillaTypes.ITEM_STACK, ItemStackCountRenderer.INSTANCE);
+            if (count > 1) {
+                slot.addRichTooltipCallback((slotView, tooltip) -> tooltip.add(
+                        Component.translatable("jei.useless_mod.tooltip.amount", formatCount(count))
+                                .withStyle(ChatFormatting.GRAY)));
+            }
         }
     }
 
@@ -575,6 +594,14 @@ public class AdvancedAlloyFurnaceRecipeCategory implements IRecipeCategory<Alloy
         float spacing = Math.min(MOLD_SLOT_SPACING,
                 (MOLD_SLOT_END_X - MOLD_SLOT_START_X) / (float) (count - 1));
         return Math.round(MOLD_SLOT_START_X + index * spacing);
+    }
+
+    private static Ingredient countedMoldDisplay(ItemStack[] matchingStacks, int count) {
+        ItemStack[] displayStacks = new ItemStack[matchingStacks.length];
+        for (int index = 0; index < matchingStacks.length; index++) {
+            displayStacks[index] = matchingStacks[index].copyWithCount(count);
+        }
+        return Ingredient.of(displayStacks);
     }
 
     private static IRecipeSlotBuilder addKeyStack(IRecipeLayoutBuilder builder,

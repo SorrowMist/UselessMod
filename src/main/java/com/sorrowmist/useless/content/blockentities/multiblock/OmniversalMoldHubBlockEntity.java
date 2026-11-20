@@ -162,10 +162,7 @@ public final class OmniversalMoldHubBlockEntity extends BlockEntity implements M
         return cachedPreparedMolds;
     }
 
-    /**
-     * Tests the one-to-one assignment independently of inventory storage. Each available stack is
-     * one device slot, regardless of its item count; augmenting paths handle overlapping ingredients.
-     */
+    /** 按堆叠数量检查模具需求，并处理可匹配多个需求的重叠成分。 */
     public static boolean matchesMolds(List<Ingredient> requirements, List<ItemStack> available) {
         return MoldMatcher.matches(requirements, available);
     }

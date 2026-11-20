@@ -5,9 +5,14 @@ import com.sorrowmist.useless.content.recipe.AdapterUtils;
 import com.sorrowmist.useless.content.recipe.AlloyFurnaceRecipeCatalog;
 import com.sorrowmist.useless.content.recipe.ExpectedOutputScaler;
 import com.sorrowmist.useless.content.recipe.RecipeSourceIds;
+import com.sorrowmist.useless.content.blockentities.multiblock.OmniversalMoldHubBlockEntity;
 import com.mojang.logging.LogUtils;
 import dev.anvilcraft.lib.v2.multiblock.dynamic.definition.DefinitionSerialization;
+import dev.anvilcraft.lib.v2.util.predicate.BlockStatePredicate;
 import dev.dubhe.anvilcraft.api.block.BlockPlacementRules;
+import dev.dubhe.anvilcraft.recipe.anvil.procedural.ProceduralProcessRecipe;
+import dev.dubhe.anvilcraft.recipe.anvil.procedural.ProceduralProcessStep;
+import dev.dubhe.anvilcraft.recipe.anvil.wrap.BlockProcessingRecipe;
 import dev.dubhe.anvilcraft.recipe.anvil.wrap.SolidLiquidRecipe;
 import dev.dubhe.anvilcraft.recipe.anvil.wrap.MeshRecipe;
 import dev.dubhe.anvilcraft.recipe.anvil.wrap.SuperHeatingRecipe;
@@ -104,6 +109,95 @@ public final class AnvilCraftRecipeGameTest {
         unexpected.removeAll(ISOLATED_SOURCES);
         if (!unexpected.isEmpty()) throw new AssertionError("出现未登记的缺失配方：" + unexpected);
         helper.succeed();
+    }
+
+    @GameTest(template = "empty", timeoutTicks = 1200)
+    public static void proceduralNeutronIrradiationUsesAnvilonMolds(GameTestHelper helper) {
+        Level level = helper.getLevel();
+        List<AdvancedAlloyFurnaceRecipe> converted = AlloyFurnaceRecipeCatalog.entries(level, RecipeSourceIds.ANVILCRAFT)
+                .stream().map(AlloyFurnaceRecipeCatalog.Entry::recipe).toList();
+        Map<String, Map<String, Integer>> expectedMolds = Map.of(
+                "heavy_iron_block", Map.of("minecraft:anvil", 1, "anvilcraft:neutron_irradiator", 1,
+                        "anvilcraft:confined_mass_anvilon", 6),
+                "mass_energy_inverter_energy_first", Map.of("minecraft:anvil", 1, "anvilcraft:neutron_irradiator", 1,
+                        "anvilcraft:confined_energy_anvilon", 6, "anvilcraft:confined_mass_anvilon", 6),
+                "mass_energy_inverter_mass_first", Map.of("minecraft:anvil", 1, "anvilcraft:neutron_irradiator", 1,
+                        "anvilcraft:confined_energy_anvilon", 6, "anvilcraft:confined_mass_anvilon", 6),
+                "spacetime_supercomputer_from_advanced_comparator", Map.of("minecraft:anvil", 1,
+                        "anvilcraft:neutron_irradiator", 1,
+                        "anvilcraft:confined_space_anvilon", 6, "anvilcraft:confined_time_anvilon", 6),
+                "spacetime_supercomputer_from_advanced_comparator_2", Map.of("minecraft:anvil", 1,
+                        "anvilcraft:neutron_irradiator", 1,
+                        "anvilcraft:confined_space_anvilon", 6, "anvilcraft:confined_time_anvilon", 6));
+        List<String> failures = new ArrayList<>();
+        for (var entry : expectedMolds.entrySet()) {
+            ResourceLocation id = ResourceLocation.fromNamespaceAndPath("anvilcraft", "procedural_process/" + entry.getKey());
+            List<AdvancedAlloyFurnaceRecipe> matches = find(converted, id);
+            if (matches.size() != 1) {
+                failures.add(id + "：转换数量 " + matches.size());
+                continue;
+            }
+            Map<String, Integer> actualMolds = new TreeMap<>();
+            for (Ingredient mold : matches.getFirst().molds()) {
+                for (ItemStack stack : mold.getItems()) {
+                    actualMolds.merge(BuiltInRegistries.ITEM.getKey(stack.getItem()).toString(), 1, Integer::sum);
+                }
+            }
+            if (!actualMolds.equals(entry.getValue())) failures.add(id + "：模具 " + actualMolds);
+            for (var requiredMold : entry.getValue().entrySet()) {
+                if (requiredMold.getValue() != 6) continue;
+                Item item = BuiltInRegistries.ITEM.get(ResourceLocation.parse(requiredMold.getKey()));
+                if (item == Items.AIR || !hasRequiredMoldCount(item, requiredMold.getValue())) {
+                    failures.add(id + "：模具堆叠数量检查未按 " + requiredMold.getValue() + " 个生效：" + requiredMold.getKey());
+                }
+            }
+        }
+        Item neutronIrradiator = BuiltInRegistries.ITEM.get(
+                ResourceLocation.fromNamespaceAndPath("anvilcraft", "neutron_irradiator"));
+        int neutronIrradiatorRecipes = 0;
+        for (RecipeHolder<?> source : level.getRecipeManager().getRecipes()) {
+            if (!(source.value() instanceof ProceduralProcessRecipe procedural)
+                    || !usesNeutronIrradiator(procedural)) continue;
+            neutronIrradiatorRecipes++;
+            List<AdvancedAlloyFurnaceRecipe> matches = find(converted, source.id());
+            if (matches.size() != 1 || neutronIrradiator == Items.AIR
+                    || matches.getFirst().molds().stream().noneMatch(mold -> mold.test(new ItemStack(neutronIrradiator)))) {
+                failures.add(source.id() + "：缺少普通中子辐照器模具");
+            }
+        }
+        if (neutronIrradiatorRecipes == 0) failures.add("未发现中子辐照器序列加工配方");
+        if (!failures.isEmpty()) throw new AssertionError("序列加工砧子辐照器模具不一致：" + failures);
+        helper.succeed();
+    }
+
+    private static boolean usesNeutronIrradiator(ProceduralProcessRecipe recipe) {
+        if (recipe.getSteps().stream().anyMatch(AnvilCraftRecipeGameTest::usesNeutronIrradiator)) return true;
+        return recipe.getMultiLoopFirstStep().map(AnvilCraftRecipeGameTest::usesNeutronIrradiator)
+                .orElse(false);
+    }
+
+    private static boolean usesNeutronIrradiator(ProceduralProcessStep wrapper) {
+        if (!(wrapper.getContent() instanceof BlockProcessingRecipe step)) return false;
+        List<BlockStatePredicate> inputs = step.getInputBlocks();
+        if (inputs.size() != 2) return false;
+        ResourceLocation neutronIrradiator = ResourceLocation.fromNamespaceAndPath("anvilcraft", "neutron_irradiator");
+        return inputs.get(1).getBlocks().stream().anyMatch(block ->
+                neutronIrradiator.equals(BuiltInRegistries.BLOCK.getKey(block.value())));
+    }
+
+    private static boolean hasRequiredMoldCount(Item item, int count) {
+        if (count <= 1) return false;
+        Ingredient requirement = Ingredient.of(item);
+        List<Ingredient> requirements = new ArrayList<>();
+        for (int i = 0; i < count; i++) requirements.add(requirement);
+        if (new ItemStack(item).getMaxStackSize() < count) return false;
+        List<ItemStack> exactCount = List.of(new ItemStack(item, count));
+        List<ItemStack> oneShort = List.of(new ItemStack(item, count - 1));
+        List<ItemStack> splitStacks = List.of(new ItemStack(item, count / 2),
+                new ItemStack(item, count - count / 2));
+        return OmniversalMoldHubBlockEntity.matchesMolds(requirements, exactCount)
+                && !OmniversalMoldHubBlockEntity.matchesMolds(requirements, oneShort)
+                && OmniversalMoldHubBlockEntity.matchesMolds(requirements, splitStacks);
     }
 
     @GameTest(template = "empty", timeoutTicks = 1200)

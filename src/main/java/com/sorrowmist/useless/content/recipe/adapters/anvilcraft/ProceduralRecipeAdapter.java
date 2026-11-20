@@ -39,6 +39,7 @@ import java.util.Set;
 /** 将可静态验证的序列加工步骤合并为完整配方。 */
 public final class ProceduralRecipeAdapter implements IRecipeAdapter<ProceduralProcessRecipe> {
     private static final Set<String> PROCESSORS = Set.of("heater", "burning_heater", "corrupted_beacon", "neutron_irradiator");
+    private static final int ANVILON_NEUTRON_IRRADIATOR_MOLD_COUNT = 6;
 
     @Override
     public String sourceId() {
@@ -76,6 +77,7 @@ public final class ProceduralRecipeAdapter implements IRecipeAdapter<ProceduralP
         List<Ingredient> molds = new ArrayList<>();
         molds.add(Ingredient.of(Items.ANVIL));
         Set<List<Item>> seenProcessors = new HashSet<>();
+        Set<Item> seenSingleMolds = new HashSet<>();
         int stepCount = 0;
         for (int loop = 0; loop < source.getLoop(); loop++) {
             for (int index = 0; index < source.getSteps().size(); index++) {
@@ -99,15 +101,34 @@ public final class ProceduralRecipeAdapter implements IRecipeAdapter<ProceduralP
                     BlockStatePredicate processor = blocks.get(1);
                     if (processor.requiresBlockEntity() || processor.getBlocks().size() == 0) return List.of();
                     List<Item> options = new ArrayList<>();
+                    int moldCount = -1;
+                    Item additionalMold = null;
                     for (Holder<Block> block : processor.getBlocks()) {
                         ResourceLocation id = BuiltInRegistries.BLOCK.getKey(block.value());
-                        if (id == null || !id.getNamespace().equals("anvilcraft") || !PROCESSORS.contains(id.getPath())
-                                || block.value().asItem() == Items.AIR) return List.of();
-                        options.add(block.value().asItem());
+                        if (id == null || !id.getNamespace().equals("anvilcraft") || !PROCESSORS.contains(id.getPath())) {
+                            return List.of();
+                        }
+                        ProcessorMold mold = processorMold(processor, block.value());
+                        if (mold == null || moldCount >= 0 && moldCount != mold.count()
+                                || additionalMold != null && mold.additionalMold() != null
+                                && additionalMold != mold.additionalMold()) return List.of();
+                        options.add(mold.item());
+                        moldCount = mold.count();
+                        if (mold.additionalMold() != null) additionalMold = mold.additionalMold();
                     }
                     List<Item> key = options.stream().distinct().sorted((a, b) -> BuiltInRegistries.ITEM.getKey(a)
                             .compareTo(BuiltInRegistries.ITEM.getKey(b))).toList();
-                    if (seenProcessors.add(key)) molds.add(Ingredient.of(key.toArray(Item[]::new)));
+                    if (seenProcessors.add(key)) {
+                        if (additionalMold != null && seenSingleMolds.add(additionalMold)) {
+                            molds.add(Ingredient.of(additionalMold));
+                        }
+                        Ingredient mold = Ingredient.of(key.toArray(Item[]::new));
+                        if (moldCount == 1 && key.size() == 1) {
+                            if (seenSingleMolds.add(key.getFirst())) molds.add(mold);
+                        } else {
+                            for (int i = 0; i < moldCount; i++) molds.add(mold);
+                        }
+                    }
                 } else if (step instanceof BlockCompressRecipe) {
                     for (int i = 0; i < blocks.size(); i++) {
                         if (i == currentIndex) continue;
@@ -151,6 +172,35 @@ public final class ProceduralRecipeAdapter implements IRecipeAdapter<ProceduralP
         } catch (ArithmeticException exception) {
             return List.of();
         }
+    }
+
+    @Nullable
+    private static ProcessorMold processorMold(BlockStatePredicate processor, Block block) {
+        Item item = block.asItem();
+        if (item == Items.AIR) return null;
+        ResourceLocation id = BuiltInRegistries.BLOCK.getKey(block);
+        if (id == null || !id.getPath().equals("neutron_irradiator")) return new ProcessorMold(item, 1, null);
+        if (processor.getProperties().isEmpty()) return new ProcessorMold(item, 1, null);
+        if (processor.getProperties().size() != 1) return null;
+        List<BlockStatePredicate.PropertyMatcher> properties = processor.getProperties().getFirst();
+        if (properties.size() != 1) return null;
+        BlockStatePredicate.PropertyMatcher property = properties.getFirst();
+        if (!property.name().equals("type")
+                || !(property.valueMatcher() instanceof BlockStatePredicate.ExactMatcher exact)) return null;
+        String moldPath = switch (exact.value()) {
+            case "energy" -> "confined_energy_anvilon";
+            case "mass" -> "confined_mass_anvilon";
+            case "space" -> "confined_space_anvilon";
+            case "time" -> "confined_time_anvilon";
+            default -> null;
+        };
+        if (moldPath == null) return null;
+        Item anvilon = BuiltInRegistries.ITEM.get(ResourceLocation.fromNamespaceAndPath("anvilcraft", moldPath));
+        return anvilon == Items.AIR ? null
+                : new ProcessorMold(anvilon, ANVILON_NEUTRON_IRRADIATOR_MOLD_COUNT, item);
+    }
+
+    private record ProcessorMold(Item item, int count, @Nullable Item additionalMold) {
     }
 
     private static boolean certain(ChanceBlockState result) {

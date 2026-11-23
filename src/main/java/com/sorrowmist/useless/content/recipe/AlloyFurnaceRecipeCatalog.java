@@ -18,6 +18,7 @@ import com.mojang.logging.LogUtils;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.crafting.RecipeHolder;
+import net.minecraft.world.item.crafting.RecipeManager;
 import net.minecraft.world.level.Level;
 import net.neoforged.neoforge.fluids.FluidStack;
 
@@ -448,13 +449,17 @@ public final class AlloyFurnaceRecipeCatalog {
             return;
         }
 
-        Object cacheKey = level.getRecipeManager();
-        synchronized (CACHE) {
-            GENERATIONS.put(cacheKey, currentGenerationLocked(cacheKey) + 1L);
-            CACHE.remove(cacheKey);
-        }
+        discardSnapshot(level.getRecipeManager());
         CURRENT_RECIPE_COUNT.set(0);
         GENERATION.incrementAndGet();
+    }
+
+    /** 清理指定配方管理器的目录快照，仅推进该管理器的缓存世代。 */
+    public static void discardSnapshot(RecipeManager recipeManager) {
+        synchronized (CACHE) {
+            GENERATIONS.put(recipeManager, currentGenerationLocked(recipeManager) + 1L);
+            CACHE.remove(recipeManager);
+        }
     }
 
     /** Returns the global invalidation count retained for diagnostics and compatibility. */

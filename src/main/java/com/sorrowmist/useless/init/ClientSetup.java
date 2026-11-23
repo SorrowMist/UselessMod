@@ -40,6 +40,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.crafting.RecipeManager;
 import net.minecraft.world.level.Level;
 
 import java.util.HashSet;
@@ -50,6 +51,7 @@ import java.util.Set;
 @EventBusSubscriber(modid = UselessMod.MODID, value = Dist.CLIENT)
 public class ClientSetup {
     private static final ClientRecipeCatalogState RECIPE_CATALOG_STATE = new ClientRecipeCatalogState();
+    private static RecipeManager observedClientRecipeManager;
 
     @SubscribeEvent
     public static void modifyBakedModels(ModelEvent.ModifyBakingResult event) {
@@ -127,12 +129,15 @@ public class ClientSetup {
     public static void onClientTick(ClientTickEvent.Post event) {
         Minecraft minecraft = Minecraft.getInstance();
         Level level = minecraft.level;
-        // 维度切换会替换 ClientLevel，但同一连接共享 RecipeManager；目录仅在世界连接边界处理。
-        ClientRecipeCatalogState.WorldTransition transition =
-                RECIPE_CATALOG_STATE.observeWorld(level != null);
-        if (transition == ClientRecipeCatalogState.WorldTransition.LEFT) {
-            AlloyFurnaceRecipeCatalog.invalidate();
+        // 同一连接内切换维度时沿用配方管理器。连接退出或更换时仅清理原客户端目录。
+        RecipeManager recipeManager = level == null ? null : level.getRecipeManager();
+        if (observedClientRecipeManager != recipeManager) {
+            if (observedClientRecipeManager != null) {
+                AlloyFurnaceRecipeCatalog.discardSnapshot(observedClientRecipeManager);
+            }
+            observedClientRecipeManager = recipeManager;
         }
+        RECIPE_CATALOG_STATE.observeWorld(level != null);
 
         if (level == null) {
             return;

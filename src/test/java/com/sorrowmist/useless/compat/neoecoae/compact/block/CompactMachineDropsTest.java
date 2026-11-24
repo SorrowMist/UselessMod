@@ -4,7 +4,6 @@ import appeng.api.networking.GridHelper;
 import appeng.api.networking.IManagedGridNode;
 import cn.dancingsnow.neoecoae.api.storage.ECOStorageCells;
 import cn.dancingsnow.neoecoae.blocks.entity.storage.ECODriveBlockEntity;
-import cn.dancingsnow.neoecoae.storage.infinite.ECOInfiniteStorageMember;
 import com.sorrowmist.useless.InventoryTestBootstrap;
 import com.sorrowmist.useless.compat.neoecoae.compact.entity.CompactL9BlockEntity;
 import com.sorrowmist.useless.compat.neoecoae.compact.shadow.ShadowStorageDriveBlockEntity;
@@ -69,16 +68,17 @@ class CompactMachineDropsTest {
     void builtInL9MemberCannotBeReplacedExtractedOrDropped() {
         var member = new ItemStack(Items.PAPER);
         UUID domain = UUID.randomUUID();
-        ECOInfiniteStorageMember.markMember(member, domain);
         try (var grid = mockStatic(GridHelper.class); var cells = mockStatic(ECOStorageCells.class)) {
             grid.when(() -> GridHelper.createManagedNode(any(), any()))
                     .thenReturn(mock(IManagedGridNode.class, RETURNS_SELF));
             cells.when(() -> ECOStorageCells.isCellHandled(member)).thenReturn(true);
             BlockEntityType<ECODriveBlockEntity> type = mock(BlockEntityType.class);
             when(type.isValid(any())).thenReturn(true);
-            var drive = new ShadowStorageDriveBlockEntity(type, BlockPos.ZERO, Blocks.AIR.defaultBlockState(), member);
+            var drive = new ShadowStorageDriveBlockEntity(type, BlockPos.ZERO, Blocks.AIR.defaultBlockState(), member, domain);
 
-            assertTrue(ECOInfiniteStorageMember.isMemberOf(drive.getCellStack(), domain));
+            CompoundTag tag = drive.getCellStack().getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).copyTag();
+            assertTrue(tag.getBoolean("neoecoae_infinite_member"));
+            assertEquals(domain, tag.getUUID("neoecoae_infinite_domain"));
             assertFalse(drive.canExtractCell());
             assertTrue(drive.HANDLER.extractItem(0, 1, true).isEmpty());
             assertTrue(drive.HANDLER.extractItem(0, 1, false).isEmpty());

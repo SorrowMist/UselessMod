@@ -8,14 +8,12 @@ import appeng.api.networking.ticking.TickingRequest;
 import appeng.api.storage.IStorageProvider;
 import appeng.util.inv.AppEngInternalInventory;
 import cn.dancingsnow.neoecoae.api.ECOTier;
-import cn.dancingsnow.neoecoae.api.storage.IECOConfigurableCellDrive;
 import cn.dancingsnow.neoecoae.blocks.entity.NEBlockEntity;
 import cn.dancingsnow.neoecoae.blocks.entity.storage.ECODriveBlockEntity;
 import cn.dancingsnow.neoecoae.blocks.entity.storage.ECOStorageSystemBlockEntity;
 import cn.dancingsnow.neoecoae.blocks.storage.ECODriveBlock;
 import cn.dancingsnow.neoecoae.multiblock.calculator.NEStorageClusterCalculator;
 import cn.dancingsnow.neoecoae.multiblock.cluster.NEStorageCluster;
-import cn.dancingsnow.neoecoae.storage.infinite.ECOInfiniteStorageMember;
 import com.lowdragmc.lowdraglib2.gui.factory.BlockUIMenuType;
 import com.lowdragmc.lowdraglib2.gui.ui.ModularUI;
 import com.lowdragmc.lowdraglib2.syncdata.rpc.RPCSender;
@@ -250,13 +248,11 @@ public class CompactL9BlockEntity extends ECOStorageSystemBlockEntity
         // 紧凑方块没有「建造长度」概念，固定为结构上限。
     }
 
-    @Override
     public List<ECODriveBlockEntity> getStorageUiDrives() {
         return formed && cluster != null ? List.copyOf(cluster.getDrives()) : List.of();
     }
 
-    @Override
-    public List<? extends IECOConfigurableCellDrive> getConfigurableCellDrives() {
+    public List<ECODriveBlockEntity> getConfigurableCellDrives() {
         return List.of();
     }
 
@@ -286,10 +282,8 @@ public class CompactL9BlockEntity extends ECOStorageSystemBlockEntity
         ItemStack cell = NeoEcoCompactRegistry.neoEcoStack("eco_item_storage_cell_256m");
         for (int row = 0; row < DRIVE_ROWS; row++) {
             for (int column = 0; column < DRIVE_COLUMNS; column++) {
-                ItemStack member = cell.copy();
-                ECOInfiniteStorageMember.markMember(member, domain);
                 cluster.addBlockEntity(new ShadowStorageDriveBlockEntity(block.getBlockEntityType(),
-                        worldPosition.offset(column + 2, 1 - row, 0), block.defaultBlockState(), member));
+                        worldPosition.offset(column + 2, 1 - row, 0), block.defaultBlockState(), cell.copy(), domain));
             }
         }
     }

@@ -1,6 +1,5 @@
 package com.sorrowmist.useless.mixin.compact;
 
-import cn.dancingsnow.neoecoae.api.storage.ICellHost;
 import cn.dancingsnow.neoecoae.blocks.entity.NEBlockEntity;
 import com.llamalad7.mixinextras.injector.ModifyReturnValue;
 import com.sorrowmist.useless.compat.neoecoae.compact.shadow.ShadowComputationDriveBlockEntity;
@@ -19,11 +18,14 @@ public abstract class HostDiskSlotCompactMixin {
 
     @ModifyReturnValue(method = "getItem", at = @At("RETURN"), remap = false)
     private ItemStack uselessMod$displayBuiltInCell(ItemStack original) {
-        if ((drive instanceof ShadowComputationDriveBlockEntity || drive instanceof ShadowStorageDriveBlockEntity)
-                && !drive.isRemoved() && drive.getCluster() != null && !drive.getCluster().isDestroyed()) {
-            ItemStack cell = ((ICellHost) drive).getCellStack();
-            if (cell != null) return cell;
+        if (drive == null || drive.isRemoved() || drive.getCluster() == null || drive.getCluster().isDestroyed()) {
+            return original;
         }
-        return original;
+        ItemStack cell = switch (drive) {
+            case ShadowComputationDriveBlockEntity computationDrive -> computationDrive.getCellStack();
+            case ShadowStorageDriveBlockEntity storageDrive -> storageDrive.getCellStack();
+            default -> null;
+        };
+        return cell == null ? original : cell;
     }
 }

@@ -5,6 +5,7 @@ import appeng.api.stacks.AEFluidKey;
 import appeng.api.stacks.AEItemKey;
 import appeng.api.stacks.AEKey;
 import appeng.api.stacks.GenericStack;
+import com.google.common.base.Stopwatch;
 import com.sorrowmist.useless.api.recipe.IRecipeAdapter;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.AdvancedAlloyFurnacePatternResolver;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.DynamicComponentPattern;
@@ -39,6 +40,7 @@ import java.util.OptionalLong;
 import java.util.Set;
 import java.util.WeakHashMap;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Supplier;
@@ -549,34 +551,38 @@ public final class AlloyFurnaceRecipeCatalog {
 
     private static Snapshot build(Level level, long generation) {
         long startedAt = System.nanoTime();
+        Map<String, Stopwatch> sourceTimers = new HashMap<>();
         List<CollectedRecipe> recipes = new ArrayList<>();
+        Stopwatch coreTimer = Stopwatch.createStarted();
         for (RecipeHolder<AdvancedAlloyFurnaceRecipe> holder : level.getRecipeManager()
                 .getAllRecipesFor(ModRecipeTypes.ADVANCED_ALLOY_FURNACE_TYPE.get())) {
             recipes.add(new CollectedRecipe(holder.value(), RecipeSourceIds.CORE));
         }
+        sourceTimers.put(RecipeSourceIds.CORE, coreTimer.stop());
         // 先把 adapter 分成「合成配方」与「转换配方」两类。转换类只在这里登记，稍后对全表做单次遍历，
         // 避免每个 adapter 都把整张配方表扫一遍（adapter 数量 × 全服配方数）。
         List<AdapterSource> converting = new ArrayList<>();
         for (IRecipeAdapter<?> adapter : AlloyFurnaceRecipeManager.getInstance().getRegisteredAdapters()) {
             if (adapter.getClass().getPackageName().contains(".ae.ae2lt")) continue;
             String sourceId = AlloyFurnaceRecipeManager.getInstance().getAdapterSourceId(adapter);
+            Stopwatch timer = sourceTimers.computeIfAbsent(sourceId, ignored -> Stopwatch.createUnstarted()).start();
             // 合成型适配器直接枚举结果，不经过 convertAll；同样可能因兼容模组版本错配抛
             // LinkageError，统一走守卫降级为空列表。
             if (adapter instanceof SeedEssenceRecipeAdapter synthetic) {
                 collectSynthetic(adapter, sourceId, synthetic::getAllRecipes, recipes);
-                continue;
-            }
-            if (adapter instanceof CrystalGrowthRecipeAdapter synthetic) {
+            } else if (adapter instanceof CrystalGrowthRecipeAdapter synthetic) {
                 collectSynthetic(adapter, sourceId, synthetic::getAllRecipes, recipes);
-                continue;
+            } else {
+                collectGenerated(adapter, sourceId, level, recipes);
+                converting.add(new AdapterSource(adapter, sourceId, timer));
             }
-            collectGenerated(adapter, sourceId, level, recipes);
-            converting.add(new AdapterSource(adapter, sourceId));
+            timer.stop();
         }
 
         collectConverted(converting, level.getRecipeManager().getRecipes(), level, recipes);
         if (RecipeAdapterCompatRegistry.isLoaded(RecipeAdapterCompatRegistry.AE2LT)
                 && ConfigManager.isRecipeConversionEnabled(RecipeSourceIds.AE2LT)) {
+            Stopwatch timer = sourceTimers.computeIfAbsent(RecipeSourceIds.AE2LT, ignored -> Stopwatch.createUnstarted()).start();
             // 该加载器把反射调用中的 LinkageError 包装成 IllegalStateException，只影响 AE2LT
             // 一个来源。此处单独降级，避免它拖垮整张目录。
             List<AdvancedAlloyFurnaceRecipe> ae2ltRecipes = AdapterGuards.guard(
@@ -584,15 +590,18 @@ public final class AlloyFurnaceRecipeCatalog {
                     () -> AELightningTechCompatLoader.getJeiRecipes(level.getRecipeManager(), level),
                     List.of());
             ae2ltRecipes.forEach(recipe -> recipes.add(new CollectedRecipe(recipe, RecipeSourceIds.AE2LT)));
+            timer.stop();
         }
         // 指纹计算是纯 CPU 密集操作（codec 整条编码 + 成分规范化 + canonicalize + SHA-256），
         // 数万条配方时它占据了目录构建剩余耗时的绝大部分。这里并行计算指纹，再按原有先后
         // 顺序合并：putIfAbsent 的次序与串行版本完全一致，去重结果因此保持不变。
         // 每条配方各自创建序列化上下文（create 内部完成），故并行不存在共享可变状态。
+        long collectedAt = System.nanoTime();
         List<FingerprintedRecipe> fingerprinted = recipes.parallelStream()
                 .map(collected -> fingerprint(collected, level))
                 .filter(Objects::nonNull)
                 .toList();
+        long fingerprintedAt = System.nanoTime();
         Map<AlloyFurnaceRecipeIdentity, Entry> unique = new LinkedHashMap<>();
         for (FingerprintedRecipe item : fingerprinted) {
             unique.putIfAbsent(item.identity(), new Entry(item.identity(), item.recipe(), item.sourceId()));
@@ -621,13 +630,33 @@ public final class AlloyFurnaceRecipeCatalog {
                 Map.copyOf(bySource), Map.copyOf(bySourceAndRecipeId), generation,
                 new ConcurrentHashMap<>(), new ConcurrentHashMap<>(),
                 ConcurrentHashMap.newKeySet());
-        LOGGER.info("Built alloy-furnace recipe catalog: generation={}, recipes={}, sources={}, elapsed={} ms",
-                generation, ordered.size(), bySource.size(), (System.nanoTime() - startedAt) / 1_000_000L);
+        long indexedAt = System.nanoTime();
+        long collectNanos = collectedAt - startedAt;
+        long sourceNanos = sourceTimers.values().stream().mapToLong(timer -> timer.elapsed(TimeUnit.NANOSECONDS)).sum();
+        List<String> largestSources = bySource.entrySet().stream()
+                .sorted(Comparator.<Map.Entry<String, List<Entry>>>comparingInt(entry -> entry.getValue().size())
+                        .reversed().thenComparing(Map.Entry::getKey))
+                .limit(5)
+                .map(entry -> entry.getKey() + "=" + entry.getValue().size())
+                .toList();
+        List<String> slowestSources = sourceTimers.entrySet().stream()
+                .sorted(Map.Entry.<String, Stopwatch>comparingByValue(Comparator.comparingLong(
+                        timer -> timer.elapsed(TimeUnit.NANOSECONDS))).reversed().thenComparing(Map.Entry::getKey))
+                .limit(5)
+                .map(entry -> entry.getKey() + "=" + entry.getValue().elapsed(TimeUnit.MILLISECONDS) + " ms")
+                .toList();
+        LOGGER.info("Built alloy-furnace recipe catalog: generation={}, recipes={}, sources={}, elapsed={} ms, "
+                        + "candidates={}, collect={} ms (shared={} ms), fingerprint={} ms, index={} ms, "
+                        + "largestSources={}, slowestCollectionSources={}",
+                generation, ordered.size(), bySource.size(), (indexedAt - startedAt) / 1_000_000L,
+                recipes.size(), collectNanos / 1_000_000L, (collectNanos - sourceNanos) / 1_000_000L,
+                (fingerprintedAt - collectedAt) / 1_000_000L, (indexedAt - fingerprintedAt) / 1_000_000L,
+                largestSources, slowestSources);
         return snapshot;
     }
 
     /** 一个待做配方转换的 adapter 及其来源标识。 */
-    private record AdapterSource(IRecipeAdapter<?> adapter, String sourceId) {
+    private record AdapterSource(IRecipeAdapter<?> adapter, String sourceId, Stopwatch timer) {
     }
 
     /** 已完成指纹计算的配方，用于在并行计算后按原顺序合并。 */
@@ -706,8 +735,10 @@ public final class AlloyFurnaceRecipeCatalog {
     private static void convertWith(List<AdapterSource> sources, RecipeHolder<?> holder, Level level,
                                     List<CollectedRecipe> output) {
         for (AdapterSource source : sources) {
+            source.timer().start();
             RecipeConversionUtils.convertAll(source.adapter(), holder, level)
                     .forEach(recipe -> output.add(new CollectedRecipe(recipe, source.sourceId())));
+            source.timer().stop();
         }
     }
 

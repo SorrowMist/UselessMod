@@ -6,7 +6,11 @@
     "GridMachineClassMixin",
     "MenuDataCodecsCompactMixin",
     "CraftingHostPanelCompactMixin",
-    "ComputationHostPanelCompactMixin"
+    "ComputationHostPanelCompactMixin",
+    "CraftingPatternMenuCompactMixin",
+    "CraftingPatternMenuHolderCompactMixin",
+    "HostDiskSlotCompactMixin",
+    "InfiniteComponentHandlerCompactMixin"
   ],
   "injectors": {
     "defaultRequire": 1

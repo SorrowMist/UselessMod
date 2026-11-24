@@ -47,8 +47,10 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.state.BlockState;
 import net.neoforged.neoforge.fluids.capability.IFluidHandler;
@@ -751,6 +753,18 @@ public class CompactF9BlockEntity extends ECOCraftingSystemBlockEntity
     }
 
     // ------------------------------------------------ 通讯接口界面（影子接口）入口
+
+    public boolean openCraftingInterface(ServerPlayer player) {
+        return compactInterface.openCraftingMenu(player);
+    }
+
+    public static @Nullable BlockEntity resolveCraftingInterface(@Nullable BlockEntity entity) {
+        return entity instanceof CompactF9BlockEntity compact ? compact.compactInterface.shadow() : entity;
+    }
+
+    public @Nullable ExposedPatternBusBlockEntity getExposedPatternBus() {
+        return exposedBus;
+    }
 
     @Override
     public ModularUI createUI(BlockUIMenuType.BlockUIHolder holder) {

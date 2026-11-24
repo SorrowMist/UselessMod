@@ -73,9 +73,14 @@ class CombinedPatternInventoryTest {
         verify(first, never()).setPatternDirect(anyInt(), any());
         verify(second, never()).setPatternDirect(anyInt(), any());
 
-        // A real bus gaining pages must not shift the open menu's already published slot IDs.
+        long oldLayout = combined.layoutRevision();
+        when(first.getPatternSlotCount()).thenReturn(3);
+        when(second.getPatternSlotCount()).thenReturn(1);
+        assertEquals(4, combined.size());
+        assertNotEquals(oldLayout, combined.layoutRevision());
+
         when(first.getPatternSlotCount()).thenReturn(4);
-        assertEquals(6, combined.size());
+        assertEquals(5, combined.size());
         assertEquals(5, terminal.size());
         terminal.setItemDirect(3, ItemStack.EMPTY);
         verify(secondView).setItemDirect(0, ItemStack.EMPTY);

@@ -40,17 +40,12 @@ public final class CompactInterfaceAccess {
 
     /** 服务端调用：用伪装状态自建 holder 并打开菜单。 */
     public static void open(BlockUIMenuType.BlockUI blockUI, BlockState state, BlockPos pos, ServerPlayer player) {
-        open(blockUI, state, pos, player, true);
+        player.openMenu(new BlockUIMenuType.BlockUIHolder(blockUI, player, pos,
+                state.setValue(INTERFACE, true)));
     }
 
     /** 服务端调用：显式打开普通主机面板，避免旧世界残留的伪装状态污染菜单分支。 */
     public static void openMain(BlockUIMenuType.BlockUI blockUI, BlockState state, BlockPos pos, ServerPlayer player) {
-        open(blockUI, state, pos, player, false);
-    }
-
-    private static void open(BlockUIMenuType.BlockUI blockUI, BlockState state, BlockPos pos,
-                             ServerPlayer player, boolean interfaceMode) {
-        player.openMenu(new BlockUIMenuType.BlockUIHolder(blockUI, player, pos,
-                state.setValue(INTERFACE, interfaceMode)));
+        player.openMenu(blockUI.createUIHolder(player, pos, state.setValue(INTERFACE, false)));
     }
 }

@@ -1130,6 +1130,8 @@
   "tooltip.useless_mod.useless_compact_c9": "Single block equivalent to eight fully configured C9 computation hosts (endgame mode).",
   "tooltip.useless_mod.useless_compact_f9": "Single block equivalent to eight fully extended F9 crafting hosts (virtual crafting).",
   "tooltip.useless_mod.useless_compact_l9": "Single block L9 storage host running ECO infinite storage.",
+  "tooltip.useless_mod.compact.l9.domain": "Infinite storage domain UUID: %s",
+  "tooltip.useless_mod.compact.l9.built_in_cell": "Built-in L9 item cell; cannot be removed",
   "gui.useless_mod.compact.c9.title": "Compact C9 Overview",
   "gui.useless_mod.compact.c9.overview": "Fixed eight-host computation network; CPU, threads, and storage are provided by built-in shadow cores.",
   "gui.useless_mod.compact.c9.hardware": "Built-in hardware cannot be removed; sneak-right-click opens the ECO interface manager.",

@@ -21,9 +21,11 @@ public final class CombinedPatternInventory extends BaseInternalInventory {
     private final List<ECOCraftingPatternBusBlockEntity> buses = new ArrayList<>();
     private final List<Integer> offsets = new ArrayList<>();
     private int total;
+    private long layoutRevision;
 
     /** 绑定（或重新绑定）底层总线；对外的槽位编号是各总线顺序拼接后的绝对下标。 */
     public void bind(List<ECOCraftingPatternBusBlockEntity> source) {
+        layoutRevision++;
         buses.clear();
         offsets.clear();
         total = 0;
@@ -45,6 +47,11 @@ public final class CombinedPatternInventory extends BaseInternalInventory {
     public int size() {
         syncOffsets();
         return total;
+    }
+
+    public long layoutRevision() {
+        syncOffsets();
+        return layoutRevision;
     }
 
     @Override
@@ -138,13 +145,16 @@ public final class CombinedPatternInventory extends BaseInternalInventory {
      */
     private void syncOffsets() {
         int running = 0;
+        boolean changed = false;
         for (int index = 0; index < buses.size(); index++) {
             int next = running + bus(index).getPatternSlotCount();
             if (offsets.get(index) != running) {
                 offsets.set(index, running);
+                changed = true;
             }
             running = next;
         }
+        if (changed || total != running) layoutRevision++;
         total = running;
     }
 

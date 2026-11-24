@@ -8,11 +8,14 @@ import appeng.api.networking.ticking.TickingRequest;
 import appeng.api.storage.IStorageProvider;
 import appeng.util.inv.AppEngInternalInventory;
 import cn.dancingsnow.neoecoae.api.ECOTier;
+import cn.dancingsnow.neoecoae.api.storage.IECOConfigurableCellDrive;
 import cn.dancingsnow.neoecoae.blocks.entity.NEBlockEntity;
+import cn.dancingsnow.neoecoae.blocks.entity.storage.ECODriveBlockEntity;
 import cn.dancingsnow.neoecoae.blocks.entity.storage.ECOStorageSystemBlockEntity;
-import cn.dancingsnow.neoecoae.impl.storage.infinite.ECOStorageHostMode;
+import cn.dancingsnow.neoecoae.blocks.storage.ECODriveBlock;
 import cn.dancingsnow.neoecoae.multiblock.calculator.NEStorageClusterCalculator;
 import cn.dancingsnow.neoecoae.multiblock.cluster.NEStorageCluster;
+import cn.dancingsnow.neoecoae.storage.infinite.ECOInfiniteStorageMember;
 import com.lowdragmc.lowdraglib2.gui.factory.BlockUIMenuType;
 import com.lowdragmc.lowdraglib2.gui.ui.ModularUI;
 import com.lowdragmc.lowdraglib2.syncdata.rpc.RPCSender;
@@ -21,23 +24,28 @@ import com.sorrowmist.useless.compat.neoecoae.compact.block.CompactTicker;
 import com.sorrowmist.useless.compat.neoecoae.compact.calculator.CompactHost;
 import com.sorrowmist.useless.compat.neoecoae.compact.cluster.CompactStorageCluster;
 import com.sorrowmist.useless.compat.neoecoae.compact.shadow.CompactInterfaceAttachment;
+import com.sorrowmist.useless.compat.neoecoae.compact.shadow.ShadowStorageDriveBlockEntity;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.core.RegistryAccess;
 import net.minecraft.core.component.DataComponents;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.component.CustomData;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.state.BlockState;
+import net.neoforged.neoforge.items.IItemHandlerModifiable;
+import net.neoforged.neoforge.items.wrapper.RangedWrapper;
+import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.lang.reflect.Field;
-import java.nio.charset.StandardCharsets;
 import java.util.BitSet;
 import java.util.EnumSet;
 import java.util.List;
@@ -64,16 +72,15 @@ public class CompactL9BlockEntity extends ECOStorageSystemBlockEntity
     /** 与 ECO 控制器掉落物里使用的同一个 NBT 键。 */
     private static final String DOMAIN_TAG = "neoecoae_infinite_controller_domain";
     private static final String MODE_TAG = "neoecoae_infinite_controller_mode";
+    private static final int DRIVE_COLUMNS = 11;
+    private static final int DRIVE_ROWS = 3;
     /** ECO 的 INFINITE_COMPONENT_REQUIRED。 */
     private static final int INFINITE_COMPONENTS = 64;
-    /** 自愈检查周期（tick）。 */
-    private static final int MAINTAIN_INTERVAL = 20;
     /** 等待网格就绪的最大重试次数。 */
     private static final int ANNOUNCE_MAX_ATTEMPTS = 100;
 
     private boolean pendingStorageAnnounce = true;
     private int storageAnnounceAttempts;
-    private int maintainTicker;
     private long lastCompactTick = Long.MIN_VALUE;
 
     /** 通讯接口界面（影子接口）的全部接线；普通右键仍然走主机自己的面板。 */
@@ -112,7 +119,7 @@ public class CompactL9BlockEntity extends ECOStorageSystemBlockEntity
     }
 
     private void formCompactStructure() {
-        if (!(level instanceof ServerLevel serverLevel)) {
+        if (!(level instanceof ServerLevel serverLevel) || !getMainNode().isReady()) {
             return;
         }
         if (cluster != null && !cluster.isDestroyed() && formed) {
@@ -151,7 +158,7 @@ public class CompactL9BlockEntity extends ECOStorageSystemBlockEntity
         return new TickingRequest(1, 10, false);
     }
 
-    /** AE2 网格 ticker 通道：世界 ticker 万一没跑，存储重挂与自愈在这里兜底。 */
+    /** AE2 网格 ticker 通道负责补充驱动影子接口和存储挂载。 */
     @Override
     public TickRateModulation tickingRequest(IGridNode node, int ticksSinceLastCall) {
         if (level instanceof ServerLevel serverLevel) {
@@ -173,19 +180,13 @@ public class CompactL9BlockEntity extends ECOStorageSystemBlockEntity
         if (pendingStorageAnnounce && storageAnnounceAttempts++ < ANNOUNCE_MAX_ATTEMPTS) {
             pendingStorageAnnounce = !requestStorageUpdate();
         }
-        if (++maintainTicker >= MAINTAIN_INTERVAL) {
-            maintainTicker = 0;
-            maintainInfiniteStorage(serverLevel);
-        }
     }
 
     @Override
     protected void onMainNodeGridChanged() {
         super.onMainNodeGridChanged();
-        // 换了网格就要重新挂存储，并重新确认无限模式。
         pendingStorageAnnounce = true;
         storageAnnounceAttempts = 0;
-        maintainInfiniteStorage(getLevel() instanceof ServerLevel serverLevel ? serverLevel : null);
     }
 
     private boolean requestStorageUpdate() {
@@ -196,20 +197,6 @@ public class CompactL9BlockEntity extends ECOStorageSystemBlockEntity
         }
         IStorageProvider.requestUpdate(getMainNode());
         return true;
-    }
-
-    /**
-     * 自愈：只要方块中仍保留内建的 64 个无限组件（取出通道已由 {@link #canExtractInfiniteComponents()} 封禁），
-     * 这台方块就<b>定义上</b>是无限存储主机；ECO 的状态机若被外部因素推离
-     * {@code formed_infinite}，这里把它拉回来。
-     */
-    private void maintainInfiniteStorage(ServerLevel level) {
-        if (level == null || isFormedInfiniteMode()) {
-            return;
-        }
-        primeInfiniteComponents();
-        restoreOrCreateInfiniteDomain(level);
-        requestStorageUpdate();
     }
 
     /**
@@ -225,6 +212,29 @@ public class CompactL9BlockEntity extends ECOStorageSystemBlockEntity
         return false;
     }
 
+    public static IItemHandlerModifiable lockBuiltInComponents(IItemHandlerModifiable handler) {
+        return new RangedWrapper(handler, 0, handler.getSlots()) {
+            @Override
+            public void setStackInSlot(int slot, ItemStack stack) {
+            }
+
+            @Override
+            public ItemStack insertItem(int slot, ItemStack stack, boolean simulate) {
+                return stack;
+            }
+
+            @Override
+            public ItemStack extractItem(int slot, int amount, boolean simulate) {
+                return ItemStack.EMPTY;
+            }
+
+            @Override
+            public boolean isItemValid(int slot, ItemStack stack) {
+                return false;
+            }
+        };
+    }
+
     @Override
     public Set<Direction> getGridConnectableSides(BlockOrientation orientation) {
         return formed ? EnumSet.allOf(Direction.class) : EnumSet.noneOf(Direction.class);
@@ -238,6 +248,16 @@ public class CompactL9BlockEntity extends ECOStorageSystemBlockEntity
     @Override
     public void setSelectedBuildLength(int length) {
         // 紧凑方块没有「建造长度」概念，固定为结构上限。
+    }
+
+    @Override
+    public List<ECODriveBlockEntity> getStorageUiDrives() {
+        return formed && cluster != null ? List.copyOf(cluster.getDrives()) : List.of();
+    }
+
+    @Override
+    public List<? extends IECOConfigurableCellDrive> getConfigurableCellDrives() {
+        return List.of();
     }
 
     /**
@@ -256,8 +276,22 @@ public class CompactL9BlockEntity extends ECOStorageSystemBlockEntity
     public void installCompactComponents(NEStorageCluster cluster, ServerLevel level) {
         compactInterface.release();
         primeInfiniteComponents();
-        restoreOrCreateInfiniteDomain(level);
+        installBuiltInDrives(cluster, initializeInfiniteDomain());
         compactInterface.attach(level, cluster, getMainNode());
+    }
+
+    private void installBuiltInDrives(NEStorageCluster cluster, UUID domain) {
+        var block = (ECODriveBlock) BuiltInRegistries.BLOCK.get(
+                ResourceLocation.fromNamespaceAndPath("neoecoae", "eco_drive"));
+        ItemStack cell = NeoEcoCompactRegistry.neoEcoStack("eco_item_storage_cell_256m");
+        for (int row = 0; row < DRIVE_ROWS; row++) {
+            for (int column = 0; column < DRIVE_COLUMNS; column++) {
+                ItemStack member = cell.copy();
+                ECOInfiniteStorageMember.markMember(member, domain);
+                cluster.addBlockEntity(new ShadowStorageDriveBlockEntity(block.getBlockEntityType(),
+                        worldPosition.offset(column + 2, 1 - row, 0), block.defaultBlockState(), member));
+            }
+        }
     }
 
     /**
@@ -306,25 +340,25 @@ public class CompactL9BlockEntity extends ECOStorageSystemBlockEntity
         return null;
     }
 
-    /**
-     * 若方块掉落物里已经带着一个无限域（ECO 的 {@code applyInfiniteDomainToControllerDrop} 写的），就沿用它；
-     * 否则用「维度 + 坐标」推导出一个稳定 UUID 作为新域。
-     */
-    private void restoreOrCreateInfiniteDomain(ServerLevel level) {
+    /** 只给新主机分配域。已有域由 ECO 按原状态恢复，不能重置未完成的认领。 */
+    private UUID initializeInfiniteDomain() {
         ItemStack carrier = new ItemStack(NeoEcoCompactRegistry.COMPACT_L9_ITEM.get());
         applyInfiniteDomainToControllerDrop(carrier);
         CompoundTag tag = carrier.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).copyTag();
-        if (!tag.hasUUID(DOMAIN_TAG)) {
-            tag.putUUID(DOMAIN_TAG, stableDomainId(level));
-        }
-        tag.putString(MODE_TAG, ECOStorageHostMode.FORMED_INFINITE.id());
+        if (tag.hasUUID(DOMAIN_TAG)) return tag.getUUID(DOMAIN_TAG);
+        UUID domain = UUID.randomUUID();
+        tag.putUUID(DOMAIN_TAG, domain);
+        tag.putString(MODE_TAG, "formed_infinite");
         carrier.set(DataComponents.CUSTOM_DATA, CustomData.of(tag));
         restoreInfiniteDomainFromItem(carrier);
+        return domain;
     }
 
-    private UUID stableDomainId(ServerLevel level) {
-        String seed = "useless_mod:compact_l9:" + level.dimension().location() + ':' + worldPosition.asLong();
-        return UUID.nameUUIDFromBytes(seed.getBytes(StandardCharsets.UTF_8));
+    public static @Nullable UUID readDroppedDomain(ItemStack stack) {
+        var data = stack.get(DataComponents.CUSTOM_DATA);
+        if (data == null) return null;
+        CompoundTag tag = data.copyTag();
+        return tag.hasUUID(DOMAIN_TAG) ? tag.getUUID(DOMAIN_TAG) : null;
     }
 
     // ------------------------------------------------ 通讯接口界面（影子接口）入口

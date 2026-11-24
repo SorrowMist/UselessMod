@@ -1,6 +1,7 @@
 package com.sorrowmist.useless.compat.neoecoae.compact.shadow;
 
 import appeng.api.networking.IManagedGridNode;
+import cn.dancingsnow.neoecoae.blocks.entity.ECOMachineInterfaceBlockEntity;
 import cn.dancingsnow.neoecoae.multiblock.calculator.NEClusterCalculator;
 import cn.dancingsnow.neoecoae.multiblock.cluster.NECluster;
 import com.lowdragmc.lowdraglib2.gui.factory.BlockUIMenuType;
@@ -14,9 +15,11 @@ import net.minecraft.core.RegistryAccess;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import org.jetbrains.annotations.Nullable;
 
+import java.lang.reflect.Method;
 import java.util.BitSet;
 
 /**
@@ -64,6 +67,32 @@ public final class CompactInterfaceAttachment<C extends NECluster<C>> {
         }
         ShadowInterfaceBlockEntity<C> target = shadow();
         return target.supportsInterfaceUi() ? target.createUI(holder) : null;
+    }
+
+    public boolean openCraftingMenu(ServerPlayer player) {
+        Method open = CraftingMenu.OPEN;
+        if (open == null) return false;
+        try {
+            open.invoke(null, player, shadow());
+            return true;
+        } catch (ReflectiveOperationException failure) {
+            throw new IllegalStateException("Could not open the ECO crafting pattern menu", failure);
+        }
+    }
+
+    private static final class CraftingMenu {
+        private static final @Nullable Method OPEN = findOpenMethod();
+
+        private static @Nullable Method findOpenMethod() {
+            try {
+                return Class.forName("cn.dancingsnow.neoecoae.gui.crafting.CraftingPatternMenu")
+                        .getMethod("openInterface", ServerPlayer.class, ECOMachineInterfaceBlockEntity.class);
+            } catch (ClassNotFoundException legacyEco) {
+                return null;
+            } catch (NoSuchMethodException incompatibleEco) {
+                throw new IllegalStateException(incompatibleEco);
+            }
+        }
     }
 
     // ---------------------------------------------------------------- 成形 / 拆除
@@ -192,7 +221,7 @@ public final class CompactInterfaceAttachment<C extends NECluster<C>> {
      * 双端都按需建同构的影子对象：服务端在成形时建（之后由 attach 认集群、tick 建节点），
      * 客户端在收到第一包或第一次开界面时建。
      */
-    private ShadowInterfaceBlockEntity<C> shadow() {
+    public ShadowInterfaceBlockEntity<C> shadow() {
         if (shadow == null) {
             shadow = new ShadowInterfaceBlockEntity<>(host.getType(), host.getBlockPos(),
                     host.getBlockState(), calculator);

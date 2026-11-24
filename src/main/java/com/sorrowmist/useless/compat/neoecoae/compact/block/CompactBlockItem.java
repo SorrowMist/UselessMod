@@ -1,5 +1,6 @@
 package com.sorrowmist.useless.compat.neoecoae.compact.block;
 
+import com.sorrowmist.useless.compat.neoecoae.compact.entity.CompactL9BlockEntity;
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.item.BlockItem;
@@ -25,5 +26,12 @@ public class CompactBlockItem extends BlockItem {
         super.appendHoverText(stack, context, tooltip, flag);
         String key = getDescriptionId().replaceFirst("^block\\.", "tooltip.");
         tooltip.add(Component.translatable(key).withStyle(ChatFormatting.GRAY));
+        if (getBlock() instanceof CompactL9Block) {
+            var domain = CompactL9BlockEntity.readDroppedDomain(stack);
+            if (domain != null) {
+                tooltip.add(Component.translatable("tooltip.useless_mod.compact.l9.domain", domain.toString())
+                        .withStyle(ChatFormatting.AQUA));
+            }
+        }
     }
 }

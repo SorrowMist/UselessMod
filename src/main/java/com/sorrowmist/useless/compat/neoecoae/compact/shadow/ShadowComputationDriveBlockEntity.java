@@ -23,6 +23,11 @@ public class ShadowComputationDriveBlockEntity extends ECOComputationDriveBlockE
     }
 
     @Override
+    public boolean canExtractCell() {
+        return false;
+    }
+
+    @Override
     public void updateState(boolean updateExposed) {
     }
 

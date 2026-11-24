@@ -106,6 +106,9 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
 
+      - name: Build NeoECOAE dependency
+        uses: ./.github/actions/build-neoecoae
+
       - name: Make Gradle wrapper executable
         run: chmod +x ./gradlew
 

@@ -32,6 +32,7 @@ import net.neoforged.neoforge.client.event.RegisterColorHandlersEvent;
 import net.neoforged.neoforge.client.event.RegisterMenuScreensEvent;
 import net.neoforged.neoforge.client.event.ModelEvent;
 import net.neoforged.neoforge.client.event.ClientTickEvent;
+import net.neoforged.neoforge.client.event.ClientPlayerNetworkEvent;
 import net.neoforged.neoforge.client.event.RecipesUpdatedEvent;
 import net.neoforged.neoforge.event.TagsUpdatedEvent;
 import net.neoforged.neoforge.event.entity.player.ItemTooltipEvent;
@@ -122,7 +123,12 @@ public class ClientSetup {
     public static void onRecipesUpdated(RecipesUpdatedEvent event) {
         // 只登记待刷新，不在此处直接重建：登录路径中本事件、标签包事件与首次进入世界会在极短时间内
         // 连续触发；若分别执行重建，会重复完整构建同一份目录。
-        RECIPE_CATALOG_STATE.markDirty();
+        RECIPE_CATALOG_STATE.onClientRecipesReceived();
+    }
+
+    @SubscribeEvent
+    public static void onClientLoggingOut(ClientPlayerNetworkEvent.LoggingOut event) {
+        RECIPE_CATALOG_STATE.resetConnection();
     }
 
     @SubscribeEvent
@@ -250,7 +256,7 @@ public class ClientSetup {
             return data.moldTagInputSlots();
         }
         var level = Minecraft.getInstance().level;
-        if (level == null) return List.of();
+        if (!AlloyFurnaceRecipeCatalog.isReady(level)) return List.of();
         try {
             var entry = AlloyFurnaceRecipeCatalog.resolve(level, data.identity());
             if (entry.isEmpty() && pattern != null && !pattern.isEmpty()) {

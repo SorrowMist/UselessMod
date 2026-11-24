@@ -12,6 +12,7 @@ class ClientRecipeCatalogStateTest {
         ClientRecipeCatalogState state = new ClientRecipeCatalogState();
 
         assertEquals(ClientRecipeCatalogState.WorldTransition.ENTERED, state.observeWorld(true));
+        state.onClientRecipesReceived();
         state.onClientTagsReceived();
         assertTrue(state.beginRebuildWhenReady());
         state.finishCatalogRefresh();
@@ -22,7 +23,7 @@ class ClientRecipeCatalogStateTest {
         }
         assertFalse(state.isAwaitingCatalogRefresh());
 
-        state.markDirty();
+        state.onClientRecipesReceived();
         assertTrue(state.beginRebuildWhenReady());
     }
 
@@ -30,12 +31,14 @@ class ClientRecipeCatalogStateTest {
     void leavingAndRejoiningWaitsForTheNewSessionTagPacket() {
         ClientRecipeCatalogState state = new ClientRecipeCatalogState();
         state.observeWorld(true);
+        state.onClientRecipesReceived();
         state.onClientTagsReceived();
         assertTrue(state.beginRebuildWhenReady());
         state.finishCatalogRefresh();
 
         assertEquals(ClientRecipeCatalogState.WorldTransition.LEFT, state.observeWorld(false));
         assertEquals(ClientRecipeCatalogState.WorldTransition.ENTERED, state.observeWorld(true));
+        state.onClientRecipesReceived();
         assertFalse(state.beginRebuildWhenReady());
 
         state.onClientTagsReceived();
@@ -45,6 +48,7 @@ class ClientRecipeCatalogStateTest {
     @Test
     void missingTagsUseTheBoundedWaitBeforeBuilding() {
         ClientRecipeCatalogState state = new ClientRecipeCatalogState();
+        state.onClientRecipesReceived();
         state.observeWorld(true);
 
         for (int tick = 1; tick < ClientRecipeCatalogState.TAG_WAIT_TICKS; tick++) {
@@ -52,5 +56,35 @@ class ClientRecipeCatalogStateTest {
         }
         assertTrue(state.beginRebuildWhenReady());
         assertFalse(state.beginRebuildWhenReady());
+    }
+
+    @Test
+    void disconnectBeforeTheFirstWorldTickDiscardsEarlyPackets() {
+        ClientRecipeCatalogState state = new ClientRecipeCatalogState();
+        state.onClientRecipesReceived();
+        state.onClientTagsReceived();
+        state.resetConnection();
+
+        state.observeWorld(true);
+        state.onClientTagsReceived();
+        assertFalse(state.beginRebuildWhenReady());
+        state.onClientRecipesReceived();
+        assertTrue(state.beginRebuildWhenReady());
+    }
+
+    @Test
+    void earlyTagsCannotBuildUntilThisSessionsRecipesArrive() {
+        ClientRecipeCatalogState state = new ClientRecipeCatalogState();
+        for (int session = 0; session < 2; session++) {
+            state.onClientTagsReceived();
+            state.observeWorld(true);
+            for (int tick = 0; tick <= ClientRecipeCatalogState.TAG_WAIT_TICKS; tick++) {
+                assertFalse(state.beginRebuildWhenReady());
+            }
+            state.onClientRecipesReceived();
+            assertTrue(state.beginRebuildWhenReady());
+            assertFalse(state.beginRebuildWhenReady());
+            state.observeWorld(false);
+        }
     }
 }

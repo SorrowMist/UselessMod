@@ -11,6 +11,7 @@ final class ClientRecipeCatalogState {
 
     private boolean worldPresent;
     private boolean recipeCatalogDirty;
+    private boolean clientRecipesReceived;
     private boolean clientTagsReceived;
     private int dirtyTicks;
     private boolean awaitingCatalogRefresh;
@@ -21,11 +22,7 @@ final class ClientRecipeCatalogState {
                 dirtyTicks = 0;
                 return WorldTransition.NONE;
             }
-            worldPresent = false;
-            recipeCatalogDirty = false;
-            clientTagsReceived = false;
-            dirtyTicks = 0;
-            awaitingCatalogRefresh = false;
+            resetConnection();
             return WorldTransition.LEFT;
         }
 
@@ -35,7 +32,17 @@ final class ClientRecipeCatalogState {
         return WorldTransition.ENTERED;
     }
 
-    synchronized void markDirty() {
+    synchronized void resetConnection() {
+        worldPresent = false;
+        recipeCatalogDirty = false;
+        clientRecipesReceived = false;
+        clientTagsReceived = false;
+        dirtyTicks = 0;
+        awaitingCatalogRefresh = false;
+    }
+
+    synchronized void onClientRecipesReceived() {
+        clientRecipesReceived = true;
         recipeCatalogDirty = true;
     }
 
@@ -45,7 +52,7 @@ final class ClientRecipeCatalogState {
     }
 
     synchronized boolean beginRebuildWhenReady() {
-        if (!worldPresent || !recipeCatalogDirty) return false;
+        if (!worldPresent || !clientRecipesReceived || !recipeCatalogDirty) return false;
         if (!clientTagsReceived && ++dirtyTicks < TAG_WAIT_TICKS) return false;
 
         recipeCatalogDirty = false;

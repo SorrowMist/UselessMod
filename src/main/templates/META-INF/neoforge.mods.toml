@@ -53,9 +53,6 @@ enumExtensions = "META-INF/enumextensions.json"
 config="${mod_id}.mixins.json"
 
 [[mixins]]
-config="${mod_id}.compact.mixins.json"
-
-[[mixins]]
 config="${mod_id}.mekanism.mixins.json"
 requiredMods=["mekanism"]
 

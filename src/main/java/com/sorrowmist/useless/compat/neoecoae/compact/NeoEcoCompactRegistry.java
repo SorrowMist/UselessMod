@@ -4,11 +4,6 @@ import appeng.api.AECapabilities;
 import appeng.api.networking.IInWorldGridNodeHost;
 import appeng.block.AEBaseEntityBlock;
 import appeng.blockentity.AEBaseBlockEntity;
-import cn.dancingsnow.neoecoae.blocks.entity.computation.ECOComputationSystemBlockEntity;
-import cn.dancingsnow.neoecoae.blocks.entity.ECOMachineInterfaceBlockEntity;
-import cn.dancingsnow.neoecoae.blocks.entity.crafting.ECOCraftingPatternBusBlockEntity;
-import cn.dancingsnow.neoecoae.blocks.entity.crafting.ECOCraftingSystemBlockEntity;
-import cn.dancingsnow.neoecoae.blocks.entity.storage.ECOStorageSystemBlockEntity;
 import cn.dancingsnow.neoecoae.multiblock.calculator.NEClusterCalculator;
 import cn.dancingsnow.neoecoae.multiblock.cluster.NECluster;
 import com.sorrowmist.useless.UselessMod;
@@ -205,16 +200,6 @@ public final class NeoEcoCompactRegistry {
     // ---------------------------------------------------------------- 生命周期
 
     public static void init(IEventBus modEventBus) {
-        // AE2 按宿主的「精确运行时类」建机器索引，而 ECO 用父类去查主机；
-        // 先把「紧凑主机 → ECO 主机类」登记好，Grid 的 mixin 会据此改写索引 key。
-        CompactMachineClassMap.register(CompactC9BlockEntity.class, ECOComputationSystemBlockEntity.class);
-        CompactMachineClassMap.register(CompactF9BlockEntity.class, ECOCraftingSystemBlockEntity.class);
-        CompactMachineClassMap.register(CompactL9BlockEntity.class, ECOStorageSystemBlockEntity.class);
-        // 影子接口与聚合总线也各自带着「假身份」的网格节点：ECO 的界面与样板终端是按
-        // ECOMachineInterfaceBlockEntity / ECOCraftingPatternBusBlockEntity 这两个类去查网格的。
-        CompactMachineClassMap.register(ShadowInterfaceBlockEntity.class, ECOMachineInterfaceBlockEntity.class);
-        CompactMachineClassMap.register(ExposedPatternBusBlockEntity.class, ECOCraftingPatternBusBlockEntity.class);
-
         BLOCKS.register(modEventBus);
         ITEMS.register(modEventBus);
         BLOCK_ENTITY_TYPES.register(modEventBus);

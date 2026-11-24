@@ -22,6 +22,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.WeakHashMap;
+import java.util.function.Supplier;
 
 /** CPU-side state for outputs whose components are determined at execution time. */
 public final class DynamicPatternCpuStateManager {
@@ -136,7 +137,7 @@ public final class DynamicPatternCpuStateManager {
     }
 
     /** Creates or refreshes the public-API state for one ECO job. */
-    public synchronized void ensureEcoJob(UUID craftingId, Object cpu, Object grid) {
+    public synchronized void ensureEcoJob(UUID craftingId, Object cpu, Supplier<?> grid) {
         Objects.requireNonNull(craftingId, "craftingId");
         EcoState state = ecoStates.get(craftingId);
         if (state == null) {
@@ -148,9 +149,13 @@ public final class DynamicPatternCpuStateManager {
         }
     }
 
+    public synchronized boolean hasEcoJob(@Nullable UUID craftingId) {
+        return craftingId != null && ecoStates.containsKey(craftingId);
+    }
+
     /** Restores one ECO job attachment without exposing ECO's CPU internals. */
     public synchronized void readEcoJob(
-            UUID craftingId, Object cpu, Object grid, CompoundTag tag, HolderLookup.Provider registries) {
+            UUID craftingId, Object cpu, Supplier<?> grid, CompoundTag tag, HolderLookup.Provider registries) {
         Objects.requireNonNull(craftingId, "craftingId");
         Objects.requireNonNull(tag, "tag");
         Objects.requireNonNull(registries, "registries");
@@ -180,7 +185,7 @@ public final class DynamicPatternCpuStateManager {
     public synchronized void bindEcoDispatch(
             UUID craftingId,
             Object cpu,
-            Object grid,
+            Supplier<?> grid,
             DynamicComponentPattern pattern,
             @Nullable AEKey finalOutputKey,
             long pushedCopies) {
@@ -221,7 +226,7 @@ public final class DynamicPatternCpuStateManager {
             return false;
         }
         for (EcoState state : ecoStates.values()) {
-            if (state.grid == grid && !state.pending.isEmpty()) {
+            if (!state.pending.isEmpty() && state.grid.get() == grid) {
                 return true;
             }
         }
@@ -236,7 +241,7 @@ public final class DynamicPatternCpuStateManager {
         }
         List<EcoCandidate> result = new ArrayList<>();
         for (EcoState state : ecoStates.values()) {
-            if (state.grid != grid) {
+            if (state.pending.isEmpty() || state.grid.get() != grid) {
                 continue;
             }
             for (PendingSnapshot pending : state.pending.snapshots()) {
@@ -610,11 +615,11 @@ public final class DynamicPatternCpuStateManager {
     private static final class EcoState {
         private final UUID craftingId;
         private Object cpu;
-        private Object grid;
+        private Supplier<?> grid;
         private CpuState pending;
         private boolean wasStaged;
 
-        private EcoState(UUID craftingId, Object cpu, Object grid, CpuState pending) {
+        private EcoState(UUID craftingId, Object cpu, Supplier<?> grid, CpuState pending) {
             this.craftingId = craftingId;
             this.cpu = cpu;
             this.grid = grid;

@@ -1,5 +1,6 @@
 package com.sorrowmist.useless.compat.neoecoae;
 
+import appeng.api.networking.IGrid;
 import cn.dancingsnow.neoecoae.api.me.attachment.ECOCraftingJobAttachment;
 import cn.dancingsnow.neoecoae.api.me.lifecycle.ECOCraftingJobContext;
 import cn.dancingsnow.neoecoae.api.me.lifecycle.ECOCraftingJobResult;
@@ -7,14 +8,16 @@ import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.Dynamic
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.resources.ResourceLocation;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.UUID;
+import java.util.function.Supplier;
 
 /** Persists dynamic-output reservations through NeoECOAE's public job attachment API. */
 public final class NeoEcoDynamicJobAttachment implements ECOCraftingJobAttachment {
     private final UUID craftingJobId;
     private final Object cpu;
-    private final Object grid;
+    private final Supplier<@Nullable IGrid> grid;
 
     public NeoEcoDynamicJobAttachment(ECOCraftingJobContext context) {
         this.craftingJobId = context.craftingJobId();

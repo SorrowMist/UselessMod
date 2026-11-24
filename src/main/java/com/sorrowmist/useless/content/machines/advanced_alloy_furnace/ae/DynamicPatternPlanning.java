@@ -16,18 +16,18 @@ public final class DynamicPatternPlanning {
             int slot,
             AEKey encodedKey,
             ICraftingService craftingService) {
-        if (!(pattern instanceof DynamicComponentPattern dynamic)
-                || !dynamic.isItemIdInput(slot)
+        if (!(SmartDoublingPatterns.unwrap(pattern) instanceof DynamicComponentPattern dynamic)
                 || craftingService == null) {
             return encodedKey;
         }
 
         IPatternDetails.IInput[] inputs = pattern.getInputs();
-        if (slot < 0 || slot >= inputs.length || inputs[slot] == null) {
+        if (slot < 0 || slot >= inputs.length || inputs[slot] == null || !dynamic.isItemIdInput(slot)) {
             return encodedKey;
         }
 
-        GenericStack[] candidates = inputs[slot].getPossibleInputs();
+        IPatternDetails.IInput input = inputs[slot];
+        GenericStack[] candidates = input.getPossibleInputs();
         if (candidates == null || candidates.length == 0 || candidates[0] == null) {
             return encodedKey;
         }
@@ -37,7 +37,7 @@ public final class DynamicPatternPlanning {
             if (candidate == null || candidate.what() == null || candidate.amount() != primaryAmount) {
                 continue;
             }
-            if (!craftingService.getCraftingFor(candidate.what()).isEmpty()) {
+            if (input.isValid(candidate.what(), null) && !craftingService.getCraftingFor(candidate.what()).isEmpty()) {
                 return candidate.what();
             }
         }
@@ -49,7 +49,7 @@ public final class DynamicPatternPlanning {
             }
             AEKey fuzzy = craftingService.getFuzzyCraftable(candidate.what(), craftable ->
                     craftable instanceof AEItemKey craftableItem
-                            && craftableItem.getItem() == expectedItem.getItem());
+                            && craftableItem.getItem() == expectedItem.getItem() && input.isValid(craftable, null));
             if (fuzzy != null) {
                 return fuzzy;
             }

@@ -31,7 +31,7 @@ public final class NeoEcoDynamicOutputCompat {
                             candidate.craftingId(),
                             candidate.exactExpectedKey(),
                             actualKey,
-                            amount,
+                            Math.min(amount, candidate.remainingAmount()),
                             Actionable.SIMULATE));
             if (!preview.accepted() || preview.claimedAmount() <= 0L) {
                 continue;

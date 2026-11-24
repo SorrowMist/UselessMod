@@ -1,6 +1,10 @@
 package com.sorrowmist.useless.compat.neoecoae;
 
+import appeng.api.networking.IGrid;
 import appeng.api.networking.crafting.ICraftingProvider;
+import cn.dancingsnow.neoecoae.api.me.pattern.ECOPatternSemanticsRegistry;
+import cn.dancingsnow.neoecoae.api.me.provider.ECOFastPathDispatchProvider;
+import cn.dancingsnow.neoecoae.api.me.provider.ECOParallelCraftingProviders;
 import cn.dancingsnow.neoecoae.api.me.ECOCraftingCPU;
 import cn.dancingsnow.neoecoae.api.me.dispatch.ECOCraftingCpuContext;
 import cn.dancingsnow.neoecoae.api.me.dispatch.ECOCraftingDispatchPolicy;
@@ -17,6 +21,11 @@ import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.Dynamic
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.DynamicPatternExecution;
 import net.minecraft.resources.ResourceLocation;
 import org.jetbrains.annotations.Nullable;
+
+import java.lang.invoke.MethodHandles;
+import java.lang.invoke.MethodType;
+import java.util.function.Function;
+import java.util.function.Supplier;
 
 /** P16 public-API integration for dynamic Useless Mod outputs. */
 public final class NeoEcoCompat {
@@ -38,12 +47,30 @@ public final class NeoEcoCompat {
                 DYNAMIC_OUTPUT_ATTACHMENT, NeoEcoDynamicJobAttachment::new);
         ECOCraftingLifecycle.register(LIFECYCLE);
         ECOCraftingDispatchPolicyRegistry.register(POLICY);
+        registerPatternDispatch();
         initialized = true;
     }
 
-    @Nullable
-    static Object grid(ECOCraftingJobContext context) {
-        return context.cpu() instanceof ECOCraftingCPU cpu ? cpu.getGrid() : null;
+    private static void registerPatternDispatch() {
+        try {
+            var register = MethodHandles.publicLookup().findStatic(ECOParallelCraftingProviders.class, "registerFastPath",
+                    MethodType.methodType(void.class, Class.class, Function.class));
+            Function<ICraftingProvider, ECOFastPathDispatchProvider> adapter = NeoEcoAlloyFurnaceDispatch::new;
+            register.invokeExact((Class<?>) AdvancedAlloyFurnaceBlockEntity.class, (Function<?, ?>) adapter);
+            register.invokeExact((Class<?>) MePatternAssemblyBlockEntity.class, (Function<?, ?>) adapter);
+        } catch (NoSuchMethodException unavailable) {
+            return;
+        } catch (RuntimeException | Error failure) {
+            throw failure;
+        } catch (Throwable failure) {
+            throw new IllegalStateException("Could not register Useless Mod FastPath providers", failure);
+        }
+        ECOPatternSemanticsRegistry.register(ResourceLocation.fromNamespaceAndPath("useless_mod", "dynamic_pattern"),
+                100, new NeoEcoPatternSemantics());
+    }
+
+    static Supplier<@Nullable IGrid> grid(ECOCraftingJobContext context) {
+        return context.cpu() instanceof ECOCraftingCPU cpu ? cpu::getGrid : () -> null;
     }
 
     private static boolean isUselessProvider(ICraftingProvider provider) {
@@ -60,12 +87,13 @@ public final class NeoEcoCompat {
 
         @Override
         public void onPatternDispatched(ECOCraftingDispatchEvent event) {
+            if (!isUselessProvider(event.provider())) return;
             DynamicPatternExecution.Resolved resolved =
                     DynamicPatternExecution.resolve(event.pattern());
-            if (resolved == null || !isUselessProvider(event.provider())) {
+            if (resolved == null || !resolved.pattern().usesDynamicOutputs()) {
                 return;
             }
-            long copies = Math.multiplyExact(resolved.copies(), event.dispatchedCrafts());
+            long copies = Math.multiplyExact(resolved.copies(), event.exactDispatchedCrafts().longValueExact());
             DynamicPatternCpuStateManager.INSTANCE.bindEcoDispatch(
                     event.job().craftingJobId(),
                     event.job().cpu(),

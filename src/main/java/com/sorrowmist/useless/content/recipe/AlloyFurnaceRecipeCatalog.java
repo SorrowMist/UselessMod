@@ -9,6 +9,7 @@ import com.sorrowmist.useless.api.recipe.IRecipeAdapter;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.AdvancedAlloyFurnacePatternResolver;
 import com.sorrowmist.useless.content.machines.advanced_alloy_furnace.ae.DynamicComponentPattern;
 import com.sorrowmist.useless.core.component.OmniversalPatternData;
+import com.sorrowmist.useless.core.config.ConfigManager;
 import com.sorrowmist.useless.content.recipe.adapters.RecipeAdapterCompatRegistry;
 import com.sorrowmist.useless.content.recipe.adapters.ae.ae2cs.CrystalGrowthRecipeAdapter;
 import com.sorrowmist.useless.content.recipe.adapters.ae.ae2lt.AELightningTechCompatLoader;
@@ -574,7 +575,8 @@ public final class AlloyFurnaceRecipeCatalog {
         }
 
         collectConverted(converting, level.getRecipeManager().getRecipes(), level, recipes);
-        if (RecipeAdapterCompatRegistry.isLoaded(RecipeAdapterCompatRegistry.AE2LT)) {
+        if (RecipeAdapterCompatRegistry.isLoaded(RecipeAdapterCompatRegistry.AE2LT)
+                && ConfigManager.isRecipeConversionEnabled(RecipeSourceIds.AE2LT)) {
             // 该加载器把反射调用中的 LinkageError 包装成 IllegalStateException，只影响 AE2LT
             // 一个来源。此处单独降级，避免它拖垮整张目录。
             List<AdvancedAlloyFurnaceRecipe> ae2ltRecipes = AdapterGuards.guard(

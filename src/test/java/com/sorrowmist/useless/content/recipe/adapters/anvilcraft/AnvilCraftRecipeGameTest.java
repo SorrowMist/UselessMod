@@ -19,6 +19,7 @@ import dev.dubhe.anvilcraft.recipe.anvil.wrap.SuperHeatingRecipe;
 import dev.dubhe.anvilcraft.recipe.generate.JewelCraftingRecipeGeneratingCache;
 import dev.dubhe.anvilcraft.recipe.generate.MeshRecipeGeneratingCache;
 import dev.dubhe.anvilcraft.recipe.frost.CustomFrostMaterialPredicate;
+import dev.dubhe.anvilcraft.recipe.frost.DeformationRecipe;
 import dev.dubhe.anvilcraft.recipe.frost.FrostSmithingRecipeInput;
 import dev.dubhe.anvilcraft.recipe.frost.PermutationRecipe;
 import dev.dubhe.anvilcraft.recipe.multiple.BaseMultipleToOneSmithingRecipe;
@@ -476,6 +477,47 @@ public final class AnvilCraftRecipeGameTest {
             multiChecked++;
         }
         if (multiChecked == 0) throw new AssertionError("未检查多合一锻造变体");
+        helper.succeed();
+    }
+
+    @GameTest(template = "empty", timeoutTicks = 1200)
+    public static void frostRepairMaterialOptionsRetainTheirOutputsAndCosts(GameTestHelper helper) {
+        Level level = helper.getLevel();
+        ResourceLocation sourceId = ResourceLocation.parse("anvilcraft:deformation/iron_armors");
+        DeformationRecipe source = (DeformationRecipe) level.getRecipeManager().byKey(sourceId).orElseThrow().value();
+        ItemStack equipment = new ItemStack(Items.IRON_HELMET);
+        ItemStack template = source.template().getItems()[0];
+        ItemStack frostTable = Multiblock4DRecipeAdapter.mold("frost_smithing_table").getItems()[0];
+        ItemStack transcendenceTable = Multiblock4DRecipeAdapter.mold("transcendence_smithing_table").getItems()[0];
+        Item universal = BuiltInRegistries.ITEM.getOptional(ResourceLocation.parse("anvilcraft:frost_metal_ingot")).orElseThrow();
+        List<AdvancedAlloyFurnaceRecipe> variants = find(AlloyFurnaceRecipeCatalog.entries(level, RecipeSourceIds.ANVILCRAFT)
+                .stream().map(AlloyFurnaceRecipeCatalog.Entry::recipe).toList(), sourceId);
+
+        for (Item candidate : List.of(Items.IRON_INGOT, universal, Items.DIRT)) {
+            ItemStack material = new ItemStack(candidate, 64);
+            FrostSmithingRecipeInput input = new FrostSmithingRecipeInput(template, equipment, material);
+            List<AdvancedAlloyFurnaceRecipe> matching = variants.stream().filter(recipe -> recipe.inputs().size() == 2
+                    && recipe.inputs().getFirst().ingredient().test(equipment)
+                    && recipe.inputs().get(1).ingredient().test(material)).toList();
+            int options = source.options(input).size();
+            if (matching.size() != 2 * options || (candidate != Items.DIRT && options < 2)) {
+                throw new AssertionError("浮霜锻造修复材料的模具或产物变体数量不一致：" + candidate);
+            }
+            for (int index = 0; index < options; index++) {
+                ItemStack result = source.assemble(index, input, level);
+                int cost = source.materialCost(input, index);
+                var outputs = matching.stream().filter(recipe -> recipe.inputs().get(1).count() == cost
+                        && ItemStack.matches(result, recipe.outputs().getFirst())).toList();
+                boolean hasFrost = outputs.stream().anyMatch(recipe -> recipe.molds().size() == 2
+                        && recipe.molds().stream().anyMatch(mold -> mold.test(frostTable))
+                        && recipe.molds().stream().anyMatch(mold -> mold.test(template)));
+                boolean hasTranscendence = outputs.stream().anyMatch(recipe -> recipe.molds().size() == 1
+                        && recipe.molds().getFirst().test(transcendenceTable));
+                if (outputs.size() != 2 || !hasFrost || !hasTranscendence) {
+                    throw new AssertionError("浮霜锻造的材料消耗、产物或工作台不一致：" + candidate);
+                }
+            }
+        }
         helper.succeed();
     }
 

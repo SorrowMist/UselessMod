@@ -32,6 +32,7 @@ import net.neoforged.neoforge.fluids.FluidStack;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -67,17 +68,21 @@ public final class FrostSmithingRecipeAdapter implements IRecipeAdapter<IFrostSm
         ItemIngredientPredicate template = source instanceof DeformationRecipe deformation ? deformation.template()
                 : source instanceof PermutationRecipe permutation ? permutation.template() : null;
         if (template == null || template.items().isEmpty() || !template.components().alwaysMatches()
-                || !template.subPredicates().isEmpty() || template.count() != 1 || template.getItems().length == 0) {
+                || !template.subPredicates().isEmpty() || template.count() != 1) {
             return List.of();
         }
+        ItemStack[] templateItems = template.getItems();
+        if (templateItems.length == 0) return List.of();
+        ItemStack templateStack = templateItems[0];
         Ingredient templateMold = template.items().get().unwrapKey().map(Ingredient::of)
-                .orElseGet(() -> Ingredient.of(template.getItems()));
+                .orElseGet(() -> Ingredient.of(templateItems));
         Ingredient frostTable = Multiblock4DRecipeAdapter.mold("frost_smithing_table");
         Ingredient transcendenceTable = Multiblock4DRecipeAdapter.mold("transcendence_smithing_table");
         if (frostTable.isEmpty() || transcendenceTable.isEmpty()) return List.of();
         Map<ResourceLocation, AdvancedAlloyFurnaceRecipe> converted = new LinkedHashMap<>();
         for (ItemStack equipment : source.possibleInputs()) {
             if (equipment.isEmpty() || !equipment.isComponentsPatchEmpty() || !source.isInput(equipment)) continue;
+            Map<RepairMaterialFrostMaterialPredicate, List<Item>> repairMaterials = new HashMap<>();
             for (FrostSmithingOption option : source.options(equipment)) {
                 // 按上游 IFrostSmithingRecipe.assemble 计算默认组件产物，仅接受确定性修饰。
                 if (option.result().modifiers().stream().anyMatch(modifier ->
@@ -93,15 +98,16 @@ public final class FrostSmithingRecipeAdapter implements IRecipeAdapter<IFrostSm
                     if (predicate.items().isEmpty() || !predicate.components().alwaysMatches()
                             || !predicate.subPredicates().isEmpty() || predicate.count() <= 0) continue;
                     for (ItemStack stack : predicate.getItems()) candidates.add(stack.copyWithCount(predicate.count()));
-                } else if (option.material() instanceof RepairMaterialFrostMaterialPredicate) {
-                    for (Item item : BuiltInRegistries.ITEM) {
-                        if (item != Items.AIR) candidates.add(new ItemStack(item, 64));
+                } else if (option.material() instanceof RepairMaterialFrostMaterialPredicate repair) {
+                    for (Item item : repairMaterials.computeIfAbsent(repair,
+                            predicate -> findRepairMaterials(source, predicate, templateStack, equipment))) {
+                        candidates.add(new ItemStack(item, 64));
                     }
                 } else {
                     continue;
                 }
                 for (ItemStack material : candidates) {
-                    FrostSmithingRecipeInput input = new FrostSmithingRecipeInput(template.getItems()[0], equipment, material);
+                    FrostSmithingRecipeInput input = new FrostSmithingRecipeInput(templateStack, equipment, material);
                     if (!option.material().test(source, input)) continue;
                     List<FrostSmithingOption> available = source.options(input);
                     int index = available.indexOf(option);
@@ -128,6 +134,17 @@ public final class FrostSmithingRecipeAdapter implements IRecipeAdapter<IFrostSm
             }
         }
         return List.copyOf(converted.values());
+    }
+
+    private static List<Item> findRepairMaterials(IFrostSmithingRecipe source, RepairMaterialFrostMaterialPredicate predicate,
+            ItemStack template, ItemStack equipment) {
+        List<Item> matches = new ArrayList<>();
+        for (Item item : BuiltInRegistries.ITEM) {
+            if (item == Items.AIR) continue;
+            ItemStack material = new ItemStack(item, 64);
+            if (predicate.test(source, new FrostSmithingRecipeInput(template, equipment, material))) matches.add(item);
+        }
+        return matches;
     }
 
     private static AdvancedAlloyFurnaceRecipe recipe(ResourceLocation id, List<CountedIngredient> inputs,

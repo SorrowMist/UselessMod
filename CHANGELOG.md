@@ -3,6 +3,32 @@
 本文件记录 UselessMod 的全部版本变更，格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，
 每个条目附英文对照，分类固定为「新增 / 变更 / 修复 / 性能」四类。
 
+## [Unreleased]
+
+## [2.4.6.10]
+
+### Added / 新增
+- 温度调节器的物品提示现在会说明，手持造化杖，按住 Alt 并右键温度调节器可打开配置界面。
+  - The Temperature Regulator item tooltip now explains that holding the Creation Staff and Alt-right-clicking the regulator opens its configuration screen.
+- 合金炉配方目录的加载日志新增耗时统计，便于排查加载缓慢的配方来源。
+  - Added timing information to the Alloy Furnace recipe catalog log to help identify slow recipe sources.
+
+### Fixed / 修复
+- 修复同一连接内切换维度时合金炉配方目录重复构建，导致客户端长时间卡顿的问题（[#61](https://github.com/SorrowMist/UselessMod/issues/61)）。
+  - Fixed lengthy client freezes caused by rebuilding the Alloy Furnace recipe catalog when changing dimensions within the same connection ([#61](https://github.com/SorrowMist/UselessMod/issues/61)).
+- 修复退出单人世界时客户端清理配方目录影响服务端目录的问题。
+  - Fixed clearing the client recipe catalog on leaving a single-player world also affecting the server catalog.
+- 修复进入或重连世界时客户端过早构建合金炉配方目录，可能导致配方缺失或重复加载的问题；旧万象样板的模具标签提示会在目录就绪后再尝试解析。
+  - Fixed the client building the Alloy Furnace recipe catalog too early when joining or reconnecting, potentially causing missing recipes or repeated loading; the tooltip tries to resolve mold tags on older Omniversal Patterns only after the catalog is ready.
+- 修复关闭 AE2 Lightning Tech 配方转换后仍加载该来源配方的问题。
+  - Fixed AE2 Lightning Tech recipes still being loaded after their recipe conversion was disabled.
+
+### Performance / 性能
+- 优化铁砧工艺浮霜锻造配方转换，降低配方转换耗时。
+  - Optimized AnvilCraft Frost Smithing recipe conversion to reduce conversion time.
+- 优化合金炉配方目录的加载流程，减少进入世界时的重复构建，缩短兼容模组较多时的等待时间。
+  - Optimized Alloy Furnace recipe catalog loading to avoid repeated builds when entering a world, reducing waiting time with many compatible mods.
+
 ## [2.4.6.9]
 
 ### Added / 新增

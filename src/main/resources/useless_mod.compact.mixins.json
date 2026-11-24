@@ -3,14 +3,7 @@
   "package": "com.sorrowmist.useless.mixin.compact",
   "compatibilityLevel": "JAVA_21",
   "mixins": [
-    "GridMachineClassMixin",
-    "MenuDataCodecsCompactMixin",
-    "CraftingHostPanelCompactMixin",
-    "ComputationHostPanelCompactMixin",
-    "CraftingPatternMenuCompactMixin",
-    "CraftingPatternMenuHolderCompactMixin",
-    "HostDiskSlotCompactMixin",
-    "InfiniteComponentHandlerCompactMixin"
+    "GridMachineClassMixin"
   ],
   "injectors": {
     "defaultRequire": 1

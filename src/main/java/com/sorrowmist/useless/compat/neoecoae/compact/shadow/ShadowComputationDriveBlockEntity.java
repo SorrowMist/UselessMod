@@ -4,6 +4,7 @@ import appeng.api.orientation.BlockOrientation;
 import cn.dancingsnow.neoecoae.blocks.entity.computation.ECOComputationDriveBlockEntity;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.state.BlockState;
 
@@ -20,6 +21,11 @@ public class ShadowComputationDriveBlockEntity extends ECOComputationDriveBlockE
 
     public ShadowComputationDriveBlockEntity(BlockEntityType<?> type, BlockPos pos, BlockState blockState) {
         super(type, pos, blockState);
+    }
+
+    @Override
+    public ItemStack getBuiltInCellForDisplay() {
+        return getCellStack();
     }
 
     @Override

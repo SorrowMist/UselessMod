@@ -4,6 +4,7 @@ import appeng.api.networking.GridHelper;
 import appeng.api.networking.IManagedGridNode;
 import cn.dancingsnow.neoecoae.api.storage.ECOStorageCells;
 import cn.dancingsnow.neoecoae.blocks.entity.storage.ECODriveBlockEntity;
+import cn.dancingsnow.neoecoae.blocks.entity.storage.ECOStorageSystemBlockEntity;
 import com.sorrowmist.useless.InventoryTestBootstrap;
 import com.sorrowmist.useless.compat.neoecoae.compact.entity.CompactL9BlockEntity;
 import com.sorrowmist.useless.compat.neoecoae.compact.shadow.ShadowStorageDriveBlockEntity;
@@ -24,6 +25,7 @@ import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.state.BlockState;
+import net.neoforged.neoforge.items.IItemHandlerModifiable;
 import net.neoforged.neoforge.items.ItemStackHandler;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -93,12 +95,19 @@ class CompactMachineDropsTest {
     }
 
     @Test
-    void compactL9ComponentSlotDisplaysItsContentsButRejectsHandlerMutations() {
+    void compactL9ComponentSlotDisplaysItsContentsButRejectsHandlerMutations() throws ReflectiveOperationException {
+        var host = mock(CompactL9BlockEntity.class, CALLS_REAL_METHODS);
+        var restoreType = Class.forName(ECOStorageSystemBlockEntity.class.getPackageName() + ".ECOStorageInfiniteRestore");
+        var constructor = restoreType.getDeclaredConstructor(ECOStorageSystemBlockEntity.class);
+        constructor.setAccessible(true);
+        var factory = restoreType.getDeclaredMethod("componentItemHandler", IItemHandlerModifiable.class);
+        factory.setAccessible(true);
         var delegate = new ItemStackHandler(1);
         delegate.setStackInSlot(0, new ItemStack(Items.PAPER, 64));
-        var slot = CompactL9BlockEntity.lockBuiltInComponents(delegate);
+        var slot = (IItemHandlerModifiable) factory.invoke(constructor.newInstance(host), delegate);
 
         assertEquals(64, slot.getStackInSlot(0).getCount());
+        assertFalse(host.canExtractInfiniteComponents());
         assertTrue(slot.extractItem(0, 64, true).isEmpty());
         assertTrue(slot.extractItem(0, 64, false).isEmpty());
         assertSame(Items.PAPER, slot.getStackInSlot(0).getItem());

@@ -1,7 +1,6 @@
 package com.sorrowmist.useless.compat.neoecoae.compact.shadow;
 
 import appeng.api.networking.IManagedGridNode;
-import cn.dancingsnow.neoecoae.blocks.entity.ECOMachineInterfaceBlockEntity;
 import cn.dancingsnow.neoecoae.multiblock.calculator.NEClusterCalculator;
 import cn.dancingsnow.neoecoae.multiblock.cluster.NECluster;
 import com.lowdragmc.lowdraglib2.gui.factory.BlockUIMenuType;
@@ -15,11 +14,9 @@ import net.minecraft.core.RegistryAccess;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.server.level.ServerLevel;
-import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import org.jetbrains.annotations.Nullable;
 
-import java.lang.reflect.Method;
 import java.util.BitSet;
 
 /**
@@ -67,32 +64,6 @@ public final class CompactInterfaceAttachment<C extends NECluster<C>> {
         }
         ShadowInterfaceBlockEntity<C> target = shadow();
         return target.supportsInterfaceUi() ? target.createUI(holder) : null;
-    }
-
-    public boolean openCraftingMenu(ServerPlayer player) {
-        Method open = CraftingMenu.OPEN;
-        if (open == null) return false;
-        try {
-            open.invoke(null, player, shadow());
-            return true;
-        } catch (ReflectiveOperationException failure) {
-            throw new IllegalStateException("Could not open the ECO crafting pattern menu", failure);
-        }
-    }
-
-    private static final class CraftingMenu {
-        private static final @Nullable Method OPEN = findOpenMethod();
-
-        private static @Nullable Method findOpenMethod() {
-            try {
-                return Class.forName("cn.dancingsnow.neoecoae.gui.crafting.CraftingPatternMenu")
-                        .getMethod("openInterface", ServerPlayer.class, ECOMachineInterfaceBlockEntity.class);
-            } catch (ClassNotFoundException legacyEco) {
-                return null;
-            } catch (NoSuchMethodException incompatibleEco) {
-                throw new IllegalStateException(incompatibleEco);
-            }
-        }
     }
 
     // ---------------------------------------------------------------- 成形 / 拆除
@@ -170,15 +141,6 @@ public final class CompactInterfaceAttachment<C extends NECluster<C>> {
         }
         shadow().handleSyncPacket(access, changed, data, extra);
         return true;
-    }
-
-    /**
-     * Receives ECO's chunked pattern preview on the compact host position. ECO normally looks
-     * up an {@code ECOMachineInterfaceBlockEntity} in the world, but the compact interface is
-     * an in-memory shadow and therefore needs this explicit bridge.
-     */
-    public void receivePatternPreview(CompoundTag payload) {
-        shadow().getPatternPreviewSync().receive(payload);
     }
 
     /** RPC 包体 = {@code varInt(managed 下标) + utf(方法名) + 参数}，这里只需要方法名。 */

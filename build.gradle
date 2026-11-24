@@ -350,8 +350,8 @@ dependencies {
 
     //eco
     def neoEcoCompileJar = providers.gradleProperty('neoEcoCompileJar')
-    compileOnly(neoEcoCompileJar.isPresent()
-            ? files(neoEcoCompileJar.get()) : "maven.modrinth:neoecoae:VvYa1k4B")
+            .orElse('../NeoECOAEExtension-1.21.1/build/libs/neoecoae-21.2.19.jar')
+    compileOnly files(neoEcoCompileJar)
     // LDLib2 同时供本地编译（源码直接引用其 GUI/RPC 类型）与运行时使用：
     // OmniSequence 在运行时强制要求 ldlib2 存在，缺失会导致整包加载失败。
     compileOnly "maven.modrinth:ldlib:mc1.21.1-2.2.44-neoforge"

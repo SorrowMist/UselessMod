@@ -9,7 +9,9 @@ import appeng.api.stacks.KeyCounter;
 import appeng.api.networking.ticking.TickRateModulation;
 import appeng.api.orientation.BlockOrientation;
 import cn.dancingsnow.neoecoae.api.ECOTier;
+import cn.dancingsnow.neoecoae.api.CraftingPatternMenuHost;
 import cn.dancingsnow.neoecoae.api.ECOPatternInsertionResult;
+import cn.dancingsnow.neoecoae.api.me.network.CraftingCapabilitySnapshot;
 import cn.dancingsnow.neoecoae.api.me.provider.ECOBatchDispatchContext;
 import cn.dancingsnow.neoecoae.api.me.provider.ECOFastPathDispatchProvider;
 import cn.dancingsnow.neoecoae.blocks.entity.NEBlockEntity;
@@ -17,6 +19,8 @@ import cn.dancingsnow.neoecoae.blocks.entity.crafting.ECOCraftingPatternBusBlock
 import com.sorrowmist.useless.compat.neoecoae.compact.shadow.ShadowPatternBusBlockEntity;
 import cn.dancingsnow.neoecoae.blocks.entity.crafting.ECOCraftingSystemBlockEntity;
 import cn.dancingsnow.neoecoae.blocks.entity.crafting.ECOCraftingWorkerBlockEntity;
+import cn.dancingsnow.neoecoae.gui.crafting.CraftingControllerPanelState;
+import cn.dancingsnow.neoecoae.gui.crafting.CraftingPatternMenu;
 import cn.dancingsnow.neoecoae.multiblock.calculator.NECraftingClusterCalculator;
 import cn.dancingsnow.neoecoae.multiblock.cluster.NECraftingCluster;
 import cn.dancingsnow.neoecoae.multiblock.cluster.NECraftingNetworkCluster;
@@ -36,6 +40,8 @@ import com.sorrowmist.useless.compat.neoecoae.compact.shadow.ShadowCraftingWorke
 import com.sorrowmist.useless.compat.neoecoae.compact.shadow.ShadowFluidInputHatchBlockEntity;
 import com.sorrowmist.useless.compat.neoecoae.compact.shadow.ShadowFluidOutputHatchBlockEntity;
 import com.sorrowmist.useless.compat.neoecoae.compact.shadow.ShadowNodeLink;
+import com.sorrowmist.useless.compat.neoecoae.compact.shadow.ShadowInterfaceBlockEntity;
+import com.sorrowmist.useless.compat.neoecoae.compact.ui.CompactHostPanelState;
 import com.sorrowmist.useless.core.component.ExternalInventoryKind;
 import com.sorrowmist.useless.core.component.ExternalInventoryReference;
 import com.sorrowmist.useless.world.inventory.ExternalInventoryStore;
@@ -46,11 +52,11 @@ import net.minecraft.core.RegistryAccess;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
+import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
-import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.state.BlockState;
 import net.neoforged.neoforge.fluids.capability.IFluidHandler;
@@ -86,7 +92,8 @@ import java.util.Set;
  * {@link ExternalInventoryStore} 里那份 UUID 键控的外置存档中（见 {@link #PATTERN_BUS_KEY}）。</p>
  */
 public class CompactF9BlockEntity extends ECOCraftingSystemBlockEntity
-        implements CompactHost<NECraftingCluster>, CompactTicker, ICraftingProvider, ECOFastPathDispatchProvider {
+        implements CompactHost<NECraftingCluster>, CompactTicker, ICraftingProvider, ECOFastPathDispatchProvider,
+        CraftingPatternMenuHost {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(CompactF9BlockEntity.class);
 
@@ -697,6 +704,24 @@ public class CompactF9BlockEntity extends ECOCraftingSystemBlockEntity
         return false;
     }
 
+    @Override
+    protected boolean isCraftingPanelVirtualMode(CraftingCapabilitySnapshot snapshot) {
+        return super.isCraftingPanelVirtualMode(snapshot) && hasBufferedVirtualCraftingCoolant();
+    }
+
+    @Override
+    protected Component getVirtualCraftingBlockedNotice() {
+        if (getCapabilitySnapshot().virtualMode() && !hasBufferedVirtualCraftingCoolant()) {
+            return Component.translatable("gui.neoecoae.crafting.virtual_blocked.coolant");
+        }
+        return super.getVirtualCraftingBlockedNotice();
+    }
+
+    @Override
+    public CraftingControllerPanelState getCraftingControllerPanelState() {
+        return CompactHostPanelState.levelNine(super.getCraftingControllerPanelState());
+    }
+
     // ------------------------------------------------ 网格服务：样板提供者 / 样板存储
 
     @Override
@@ -763,20 +788,25 @@ public class CompactF9BlockEntity extends ECOCraftingSystemBlockEntity
         return ((CompactF9FluidHandler) fluidHandler).inputRecoveryHandler();
     }
 
-    /** Client-side bridge for ECO's chunked pattern preview transport. */
-    public void receivePatternPreview(CompoundTag payload) {
-        compactInterface.receivePatternPreview(payload);
-    }
-
     // ------------------------------------------------ 通讯接口界面（影子接口）入口
 
-    public boolean openCraftingInterface(ServerPlayer player) {
-        return compactInterface.openCraftingMenu(player);
+    public void openCraftingInterface(ServerPlayer player) {
+        var target = getCraftingPatternMenuInterface();
+        if (target != null) CraftingPatternMenu.openInterface(player, target);
     }
 
-    public static @Nullable BlockEntity resolveCraftingInterface(@Nullable BlockEntity entity) {
-        return entity instanceof CompactF9BlockEntity compact ? compact.compactInterface.shadow() : entity;
+    @Override
+    public @Nullable ShadowInterfaceBlockEntity<NECraftingCluster> getCraftingPatternMenuInterface() {
+        return level != null && (level.isClientSide || exposedBus != null) ? compactInterface.shadow() : null;
     }
+
+    @Override
+    public @Nullable Object getCraftingPatternMenuLayoutKey() {
+        var bus = getExposedPatternBus();
+        return bus == null ? null : new PatternMenuLayout(bus, bus.getPatternSlotInventory().layoutRevision());
+    }
+
+    private record PatternMenuLayout(ExposedPatternBusBlockEntity bus, long revision) {}
 
     public @Nullable ExposedPatternBusBlockEntity getExposedPatternBus() {
         return exposedBus;

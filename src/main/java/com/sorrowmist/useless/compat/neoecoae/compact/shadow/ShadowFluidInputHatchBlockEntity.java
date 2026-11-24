@@ -70,6 +70,11 @@ public class ShadowFluidInputHatchBlockEntity extends ECOFluidInputHatchBlockEnt
     }
 
     @Override
+    public boolean hasNetworkPullCard() {
+        return false;
+    }
+
+    @Override
     public void tick(Level level, BlockPos pos, BlockState state) {
         // The compact host exposes the tank through its own block capability.
     }

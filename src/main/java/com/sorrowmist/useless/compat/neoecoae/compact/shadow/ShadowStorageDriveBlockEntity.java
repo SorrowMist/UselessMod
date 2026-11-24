@@ -49,6 +49,11 @@ public final class ShadowStorageDriveBlockEntity extends ECODriveBlockEntity {
     }
 
     @Override
+    public ItemStack getBuiltInCellForDisplay() {
+        return getCellStack();
+    }
+
+    @Override
     public boolean canExtractCell() {
         return installing;
     }

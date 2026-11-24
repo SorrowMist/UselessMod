@@ -65,9 +65,8 @@ public class CompactF9Block extends ECOCraftingSystem {
         }
         if (player.isShiftKeyDown()) {
             if (player instanceof ServerPlayer serverPlayer) {
-                if (level.getBlockEntity(pos) instanceof CompactF9BlockEntity compact
-                        && !compact.openCraftingInterface(serverPlayer)) {
-                    CompactInterfaceAccess.open(this, state, pos, serverPlayer);
+                if (level.getBlockEntity(pos) instanceof CompactF9BlockEntity compact) {
+                    compact.openCraftingInterface(serverPlayer);
                 }
             }
             return InteractionResult.sidedSuccess(level.isClientSide);

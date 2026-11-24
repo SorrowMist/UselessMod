@@ -11,6 +11,8 @@ import appeng.api.orientation.BlockOrientation;
 import cn.dancingsnow.neoecoae.api.ECOTier;
 import cn.dancingsnow.neoecoae.blocks.entity.NEBlockEntity;
 import cn.dancingsnow.neoecoae.blocks.entity.computation.ECOComputationSystemBlockEntity;
+import cn.dancingsnow.neoecoae.gui.computation.ComputationControllerPanelState;
+import com.sorrowmist.useless.compat.neoecoae.compact.ui.CompactHostPanelState;
 import cn.dancingsnow.neoecoae.multiblock.calculator.NEComputationClusterCalculator;
 import cn.dancingsnow.neoecoae.multiblock.cluster.NEComputationCluster;
 import cn.dancingsnow.neoecoae.multiblock.cluster.NEComputationNetworkCluster;
@@ -210,7 +212,7 @@ public class CompactC9BlockEntity extends ECOComputationSystemBlockEntity
      *
      * <p>AE2 只在收到 {@code GridCraftingCpuChange} 时才会刷新它的 CPU 集群集合
      * （{@code CraftingService.updateList}），而 ECO 是靠在那个刷新点里
-     * {@code grid.getMachines(ECOComputationSystemBlockEntity.class)} 找到主机的。</p>
+     * {@code NEMachineLookup} 找到主机的。</p>
      */
     @Override
     protected void onMainNodeGridChanged() {
@@ -379,6 +381,11 @@ public class CompactC9BlockEntity extends ECOComputationSystemBlockEntity
     }
 
     // ------------------------------------------------ 通讯接口界面（影子接口）入口
+
+    @Override
+    public ComputationControllerPanelState getComputationControllerPanelState() {
+        return CompactHostPanelState.levelNine(super.getComputationControllerPanelState());
+    }
 
     @Override
     public ModularUI createUI(BlockUIMenuType.BlockUIHolder holder) {

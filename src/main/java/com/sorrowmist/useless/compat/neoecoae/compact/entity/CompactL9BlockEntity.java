@@ -37,8 +37,6 @@ import net.minecraft.world.item.component.CustomData;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.state.BlockState;
-import net.neoforged.neoforge.items.IItemHandlerModifiable;
-import net.neoforged.neoforge.items.wrapper.RangedWrapper;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -206,31 +204,8 @@ public class CompactL9BlockEntity extends ECOStorageSystemBlockEntity
 
 
     @Override
-    public boolean canExtractInfiniteComponents() {
-        return false;
-    }
-
-    public static IItemHandlerModifiable lockBuiltInComponents(IItemHandlerModifiable handler) {
-        return new RangedWrapper(handler, 0, handler.getSlots()) {
-            @Override
-            public void setStackInSlot(int slot, ItemStack stack) {
-            }
-
-            @Override
-            public ItemStack insertItem(int slot, ItemStack stack, boolean simulate) {
-                return stack;
-            }
-
-            @Override
-            public ItemStack extractItem(int slot, int amount, boolean simulate) {
-                return ItemStack.EMPTY;
-            }
-
-            @Override
-            public boolean isItemValid(int slot, ItemStack stack) {
-                return false;
-            }
-        };
+    protected boolean hasBuiltInInfiniteComponents() {
+        return true;
     }
 
     @Override

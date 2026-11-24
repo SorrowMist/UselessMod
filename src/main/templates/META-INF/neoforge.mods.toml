@@ -52,8 +52,6 @@ enumExtensions = "META-INF/enumextensions.json"
 [[mixins]]
 config="${mod_id}.mixins.json"
 
-# 承载「紧凑方块接入 AE2 网格」的关键混入：这里故意设成 required=true，
-# 一旦混入失效直接启动报错，避免又出现「看起来正常其实没生效」。
 [[mixins]]
 config="${mod_id}.compact.mixins.json"
 
@@ -131,7 +129,7 @@ requiredMods=["pneumaticcraft"]
 [[dependencies.${mod_id}]]
     modId="neoecoae"
     type="optional"
-    versionRange="[21.2.0,)"
+    versionRange="[21.2.19,)"
     ordering="NONE"
     side="BOTH"
 

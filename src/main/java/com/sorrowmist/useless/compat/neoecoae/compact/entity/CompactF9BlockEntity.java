@@ -681,6 +681,22 @@ public class CompactF9BlockEntity extends ECOCraftingSystemBlockEntity
         return compactNetworkCluster;
     }
 
+    public boolean hasBufferedVirtualCraftingCoolant() {
+        int remaining = VIRTUAL_COOLANT_PER_LANE_TICK;
+        for (CompactCraftingCluster member : fleet) {
+            ECOCraftingSystemBlockEntity host = member.getController();
+            int coolant = host.getCoolant();
+            if (coolant > 0 && host.getCoolantMaxOverclock() >= MAX_OVERCLOCK_TIMES
+                    && host.hasLocalVirtualCraftingCoolant()) {
+                remaining -= coolant;
+                if (remaining <= 0) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
     // ------------------------------------------------ 网格服务：样板提供者 / 样板存储
 
     @Override

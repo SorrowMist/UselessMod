@@ -26,6 +26,7 @@ public class CompactBlockItem extends BlockItem {
         super.appendHoverText(stack, context, tooltip, flag);
         String key = getDescriptionId().replaceFirst("^block\\.", "tooltip.");
         tooltip.add(Component.translatable(key).withStyle(ChatFormatting.GRAY));
+        tooltip.add(Component.translatable(key + ".sneak_use").withStyle(ChatFormatting.GRAY));
         if (getBlock() instanceof CompactL9Block) {
             var domain = CompactL9BlockEntity.readDroppedDomain(stack);
             if (domain != null) {

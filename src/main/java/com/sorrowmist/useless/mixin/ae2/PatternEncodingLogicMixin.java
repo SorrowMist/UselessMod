@@ -204,19 +204,13 @@ public class PatternEncodingLogicMixin implements PendingOmniversalPatternHolder
         uselessMod$pendingOmniversalRecipe = null;
         uselessMod$pendingOmniversalSourceId = null;
 
-        // 样板生成后立即移交同网格的多方块合金炉样板总成，玩家无需再手动搬运。
-        // 移交成功后清空终端槽位，使终端保持「已上传」的语义；不存在可接收的总成或
-        // 全部总成已满时保留样板，玩家仍可按原有方式自行取出。此处仍处于
-        // onChangeInventory 回调内，AppEngInternalInventory.notifyingChanges 已为 true，
-        // 因此回写槽位与写入总成均不会再次触发本回调。
-        // 提示在槽位清空之后发送：玩家看到的顺序应为「样板已进入多方块合金炉」，
-        // 而不是先收到提示、再看到槽位被清空。
-        // 上传总开关：关闭时样板留在编码终端内，由玩家自行取出，
-        // 与引入自动上传之前的行为完全一致。此处样板已写入槽位、pending 已清空，
-        // 因此直接返回即可，不需要额外的回滚。
-        // 天枢终端须在该回调结束后读取并路由样板，因此不能在此提前清空结果槽。
-        if (uselessMod$isTianshuPatternTerminal(host)
-                || !ConfigManager.isOmniversalPatternAutoUploadEnabled()) {
+        // 编码完成后按配置尝试写入当前网络中的多方块合金炉样板总成。
+        // 成功写入或确认重复样板后清除结果槽；没有可接收目标或目标容量不足时保留结果。
+        // 当前仍处于 onChangeInventory 回调，AppEngInternalInventory.notifyingChanges 已启用，
+        // 因此更新结果槽或写入样板总成都不会递归触发该回调。
+        // 上传提示在结果槽更新后发送，确保提示与界面状态一致。
+        // 关闭自动上传时保留结果，由终端自身的后续逻辑处理。
+        if (!ConfigManager.isOmniversalPatternAutoUploadEnabled()) {
             return;
         }
 
@@ -227,34 +221,17 @@ public class PatternEncodingLogicMixin implements PendingOmniversalPatternHolder
             PatternUploadNotice.notifyUploaded(player, result.target());
             return;
         }
-        // 网络中已有等价样板：本次编码不再写入，同时把这次消耗的空白样板还给玩家。
-        // 找不到玩家时无法退还，此时保留样板，避免玩家在无提示的情况下净亏一个空白样板。
+        // 当前网络已有等价样板时不重复写入；玩家可用时清除结果并退还本次消耗的空白样板。
+        // 无法取得玩家对象时保留结果，避免未退还空白样板而造成资源损失。
         if (result.outcome() == OmniversalPatternUploader.Outcome.DUPLICATE && player != null) {
             encodedPatternInv.setItemDirect(0, ItemStack.EMPTY);
-            // 空白样板优先回到终端自带的空白样板槽：那里本就是玩家放置空白样板的位置，
-            // 刚被本次编码消耗掉一个，通常正好空出来。该槽被占用或放不下时再退背包。
+            // 空白样板优先退回终端空白样板槽；该槽被占用或容量不足时再退回玩家背包。
             ItemStack refund = AEItems.BLANK_PATTERN.stack(1);
             ItemStack remain = blankPatternInv.addItems(refund);
             if (!remain.isEmpty()) {
                 player.getInventory().placeItemBackInInventory(remain, false);
             }
             PatternUploadNotice.notifyDuplicate(player);
-        }
-    }
-
-    @Unique
-    private static boolean uselessMod$isTianshuPatternTerminal(IPatternTerminalLogicHost host) {
-        if (!host.getClass().getName().startsWith("com.moakiee.ae2lt.")) {
-            return false;
-        }
-        try {
-            Class<?> terminalHost = Class.forName(
-                    "com.moakiee.ae2lt.logic.tianshu.terminal.TianshuPatternTerminalHost",
-                    false,
-                    host.getClass().getClassLoader());
-            return terminalHost.isInstance(host);
-        } catch (ReflectiveOperationException | LinkageError ignored) {
-            return false;
         }
     }
 

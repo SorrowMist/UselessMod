@@ -45,7 +45,9 @@ import net.minecraft.world.item.crafting.RecipeManager;
 import net.minecraft.world.level.Level;
 
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
@@ -214,34 +216,42 @@ public class ClientSetup {
             for (var moldTag : moldTags) {
                 tagMoldSlots.add(moldTag.moldSlot());
             }
+            Map<AEItemKey, Integer> moldCounts = new LinkedHashMap<>();
             for (int moldSlot = 0; moldSlot < data.displayMolds().size(); moldSlot++) {
                 // Older metadata stored one representative item for every mold slot. A tag-backed
                 // mold must be shown by its tag instead of that arbitrary representative.
                 if (tagMoldSlots.contains(moldSlot)) continue;
-                var mold = data.displayMolds().get(moldSlot);
-                event.getToolTip().add(Component.translatable(
-                        "tooltip.useless_mod.omniversal_pattern.mold",
-                        mold.getDisplayName()).withStyle(ChatFormatting.GOLD));
+                moldCounts.merge(data.displayMolds().get(moldSlot), 1, Integer::sum);
             }
+            moldCounts.forEach((mold, count) ->
+                    event.getToolTip().add(createMoldTooltip(mold.getDisplayName(), count)));
             appendMoldTagTooltips(event, moldTags);
         } else if (!moldTags.isEmpty()) {
             appendMoldTagTooltips(event, moldTags);
         } else {
             Component mold = data.displayMold().<Component>map(key -> key.getDisplayName())
                     .orElseGet(() -> Component.translatable("tooltip.useless_mod.omniversal_pattern.unknown_mold"));
-            event.getToolTip().add(Component.translatable(
-                    "tooltip.useless_mod.omniversal_pattern.mold", mold).withStyle(ChatFormatting.GOLD));
+            event.getToolTip().add(createMoldTooltip(mold, 1));
         }
     }
 
     private static void appendMoldTagTooltips(
             ItemTooltipEvent event, List<OmniversalPatternData.MoldTagInputSlot> moldTags) {
+        Map<ResourceLocation, Integer> tagCounts = new LinkedHashMap<>();
         for (var moldTag : moldTags) {
-            event.getToolTip().add(Component.translatable(
-                    "tooltip.useless_mod.omniversal_pattern.mold",
-                    Component.literal("#" + moldTag.tag().location()))
-                    .withStyle(ChatFormatting.GOLD));
+            tagCounts.merge(moldTag.tag().location(), 1, Integer::sum);
         }
+        tagCounts.forEach((tag, count) -> event.getToolTip().add(
+                createMoldTooltip(Component.literal("#" + tag), count)));
+    }
+
+    private static Component createMoldTooltip(Component mold, int count) {
+        String translationKey = count > 1
+                ? "tooltip.useless_mod.omniversal_pattern.mold_count"
+                : "tooltip.useless_mod.omniversal_pattern.mold";
+        return count > 1
+                ? Component.translatable(translationKey, mold, count).withStyle(ChatFormatting.GOLD)
+                : Component.translatable(translationKey, mold).withStyle(ChatFormatting.GOLD);
     }
 
     /**

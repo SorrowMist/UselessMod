@@ -114,6 +114,7 @@
   "item.useless_mod.omniversal_pattern": "萬象樣板",
   "tooltip.useless_mod.omniversal_pattern.recipe": "綁定配方：%s",
   "tooltip.useless_mod.omniversal_pattern.mold": "模具標記：%s",
+  "tooltip.useless_mod.omniversal_pattern.mold_count": "模具標記：%s × %s",
   "tooltip.useless_mod.omniversal_pattern.no_mold": "無需模具",
   "tooltip.useless_mod.omniversal_pattern.unknown_mold": "由配方定義的模具",
   "gui.useless_mod.multiblock_alloy_furnace.formed": "結構已成型",

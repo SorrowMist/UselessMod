@@ -111,6 +111,7 @@
   "item.useless_mod.omniversal_pattern": "Omniversal Pattern",
   "tooltip.useless_mod.omniversal_pattern.recipe": "Bound recipe: %s",
   "tooltip.useless_mod.omniversal_pattern.mold": "Mold marker: %s",
+  "tooltip.useless_mod.omniversal_pattern.mold_count": "Mold marker: %s × %s",
   "tooltip.useless_mod.omniversal_pattern.no_mold": "No mold required",
   "tooltip.useless_mod.omniversal_pattern.unknown_mold": "Recipe-defined mold",
   "gui.useless_mod.multiblock_alloy_furnace.formed": "Structure formed",

@@ -5,9 +5,15 @@
 
 ## [Unreleased]
 
+### Added / 新增
+- 万象样板编码现已支持天枢终端。
+  - Omniversal Pattern encoding is now supported in Tianshu terminals.
+
 ### Fixed / 修复
 - 修复紧凑 F9 添加或移除样板后，潜行右键打开的通讯接口仍显示旧样板列表的问题。
   - Fixed the Compact F9 interface opened by sneak-right-click showing stale patterns after additions or removals.
+- 万象样板中的重复模具标记现在会合并显示，并标注数量。
+  - Repeated mold markers on Omniversal Patterns are now grouped and display their counts.
 
 ## [2.4.6.10]
 

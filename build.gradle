@@ -262,7 +262,7 @@ dependencies {
     testImplementation 'org.mockito:mockito-core:5.15.2'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
     implementation "mezz.jei:jei-1.21.1-neoforge:19.70.0.460"
-    compileOnly "curse.maven:ae2-jei-integration-1074338:7727898"
+    implementation "curse.maven:ae2-jei-integration-1074338:7727898"
 
     implementation "org.appliedenergistics:appliedenergistics2:19.2.18"
     runtimeOnly "org.appliedenergistics:guideme:21.1.17"

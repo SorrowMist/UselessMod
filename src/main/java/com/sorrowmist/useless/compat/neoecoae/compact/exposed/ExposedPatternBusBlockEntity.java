@@ -12,11 +12,14 @@ import appeng.api.orientation.BlockOrientation;
 import appeng.api.stacks.AEItemKey;
 import cn.dancingsnow.neoecoae.api.ECOPatternInsertionResult;
 import cn.dancingsnow.neoecoae.api.ECOPreparedPattern;
+import cn.dancingsnow.neoecoae.api.IECOPatternStorageService;
 import cn.dancingsnow.neoecoae.blocks.entity.ECOMachineInterfaceBlockEntity;
 import cn.dancingsnow.neoecoae.blocks.entity.crafting.ECOCraftingPatternBusBlockEntity;
+import cn.dancingsnow.neoecoae.grid.NEMachineLookup;
 import cn.dancingsnow.neoecoae.multiblock.cluster.NECraftingCluster;
 import com.sorrowmist.useless.compat.neoecoae.compact.NeoEcoCompactRegistry;
 import com.sorrowmist.useless.compat.neoecoae.compact.provider.CombinedPatternInventory;
+import it.unimi.dsi.fastutil.ints.IntArrayList;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.world.item.ItemStack;
@@ -52,6 +55,7 @@ public class ExposedPatternBusBlockEntity extends ECOCraftingPatternBusBlockEnti
     private int[] busRevisions = new int[0];
     private int[] busSlotCounts = new int[0];
     private long[] busAuxiliaryRevisions = new long[0];
+    private int observedPatternRevision;
     @Nullable
     private InternalInventory combinedTerminalInventory;
     @Nullable
@@ -85,6 +89,7 @@ public class ExposedPatternBusBlockEntity extends ECOCraftingPatternBusBlockEnti
             busAuxiliaryRevisions[index] = buses.get(index).getAuxiliaryRevision();
         }
         combinedTerminalInventory = null;
+        observedPatternRevision = getPatternContentRevision();
         this.hostNode = hostNode;
     }
 
@@ -107,8 +112,8 @@ public class ExposedPatternBusBlockEntity extends ECOCraftingPatternBusBlockEnti
         if (grid == null) {
             return;
         }
-        for (ECOMachineInterfaceBlockEntity<?> machineInterface : grid.getActiveMachines(ECOMachineInterfaceBlockEntity.class)) {
-            machineInterface.onPatternBusTopologyChanged(this);
+        for (var machineInterface : NEMachineLookup.getMachines(grid, ECOMachineInterfaceBlockEntity.class)) {
+            if (machineInterface.mayMapPatternBus(this)) machineInterface.onPatternBusTopologyChanged(this);
         }
     }
 
@@ -150,17 +155,23 @@ public class ExposedPatternBusBlockEntity extends ECOCraftingPatternBusBlockEnti
         }
         if (!changedBuses.isEmpty()) {
             combinedTerminalInventory = null;
-            if (layoutChanged) {
-                IGrid grid = getGrid();
-                if (grid != null) {
-                    // 一条总线的页数变化会移动后面所有槽位，即使总槽数刚好没有变化。
-                    for (ECOMachineInterfaceBlockEntity<?> machineInterface
-                            : grid.getActiveMachines(ECOMachineInterfaceBlockEntity.class)) {
+            int previousRevision = observedPatternRevision;
+            observedPatternRevision = getPatternContentRevision();
+            IGrid grid = getGrid();
+            if (grid != null) {
+                int[] slots = layoutChanged ? new int[] { -1 } : changedSlots(changedBuses);
+                var catalog = grid.getService(IECOPatternStorageService.class);
+                if (catalog != null) {
+                    catalog.onPatternSlotsChanged(this, previousRevision, slots);
+                }
+                for (var machineInterface : NEMachineLookup.getMachines(grid, ECOMachineInterfaceBlockEntity.class)) {
+                    if (!machineInterface.mayMapPatternBus(this)) continue;
+                    if (layoutChanged) {
                         machineInterface.onPatternBusInventoryChanged(this);
+                    } else {
+                        machineInterface.onPatternBusInventoryChanged(this, slots);
                     }
                 }
-            } else {
-                changedBuses.forEach(this::notifyInterfacesOf);
             }
             // 派单由宿主节点上的样板提供者负责，样板集一变就要让它重读合并结果。
             if (hostNode != null) {
@@ -316,21 +327,17 @@ public class ExposedPatternBusBlockEntity extends ECOCraftingPatternBusBlockEnti
 
     // ---------------------------------------------------------------- 通知
 
-    /** 把某条内部总线的整段下标标脏（具体动了哪个槽只有那条总线自己知道）。 */
-    private void notifyInterfacesOf(ECOCraftingPatternBusBlockEntity bus) {
-        int offset = mergedPatternInventory.offsetOf(bus);
-        IGrid grid = getMainNode().getGrid();
-        if (offset < 0 || grid == null) {
-            return;
+    private int[] changedSlots(List<ECOCraftingPatternBusBlockEntity> changedBuses) {
+        var slots = new IntArrayList();
+        for (var bus : changedBuses) {
+            int offset = mergedPatternInventory.offsetOf(bus);
+            if (offset < 0) continue;
+            int count = bus.getPatternSlotCount();
+            for (int index = 0; index < count; index++) {
+                slots.add(offset + index);
+            }
         }
-        int count = bus.getPatternSlotCount();
-        int[] slots = new int[count];
-        for (int index = 0; index < count; index++) {
-            slots[index] = offset + index;
-        }
-        for (ECOMachineInterfaceBlockEntity<?> machineInterface : grid.getActiveMachines(ECOMachineInterfaceBlockEntity.class)) {
-            machineInterface.onPatternBusInventoryChanged(this, slots);
-        }
+        return slots.toIntArray();
     }
 
     // ---------------------------------------------------------------- 影子卫生：绝不回写世界

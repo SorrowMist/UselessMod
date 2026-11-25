@@ -5,6 +5,10 @@
 
 ## [Unreleased]
 
+### Fixed / 修复
+- 修复紧凑 F9 添加或移除样板后，潜行右键打开的通讯接口仍显示旧样板列表的问题。
+  - Fixed the Compact F9 interface opened by sneak-right-click showing stale patterns after additions or removals.
+
 ## [2.4.6.10]
 
 ### Added / 新增

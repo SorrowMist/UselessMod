@@ -214,7 +214,9 @@ public class PatternEncodingLogicMixin implements PendingOmniversalPatternHolder
         // 上传总开关：关闭时样板留在编码终端内，由玩家自行取出，
         // 与引入自动上传之前的行为完全一致。此处样板已写入槽位、pending 已清空，
         // 因此直接返回即可，不需要额外的回滚。
-        if (!ConfigManager.isOmniversalPatternAutoUploadEnabled()) {
+        // 天枢终端须在该回调结束后读取并路由样板，因此不能在此提前清空结果槽。
+        if (uselessMod$isTianshuPatternTerminal(host)
+                || !ConfigManager.isOmniversalPatternAutoUploadEnabled()) {
             return;
         }
 
@@ -237,6 +239,22 @@ public class PatternEncodingLogicMixin implements PendingOmniversalPatternHolder
                 player.getInventory().placeItemBackInInventory(remain, false);
             }
             PatternUploadNotice.notifyDuplicate(player);
+        }
+    }
+
+    @Unique
+    private static boolean uselessMod$isTianshuPatternTerminal(IPatternTerminalLogicHost host) {
+        if (!host.getClass().getName().startsWith("com.moakiee.ae2lt.")) {
+            return false;
+        }
+        try {
+            Class<?> terminalHost = Class.forName(
+                    "com.moakiee.ae2lt.logic.tianshu.terminal.TianshuPatternTerminalHost",
+                    false,
+                    host.getClass().getClassLoader());
+            return terminalHost.isInstance(host);
+        } catch (ReflectiveOperationException | LinkageError ignored) {
+            return false;
         }
     }
 

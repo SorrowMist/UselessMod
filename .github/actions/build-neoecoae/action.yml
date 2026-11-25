@@ -7,7 +7,7 @@ runs:
       uses: actions/checkout@v4
       with:
         repository: DancingSnow0517/NeoECOAEExtension
-        ref: eac45b4d3178a0abc01ac7d63dadc2e99552dada
+        ref: 593f063be1b450a33acf5d04390160d9cd3367fa
         path: .ci/NeoECOAEExtension
         persist-credentials: false
 

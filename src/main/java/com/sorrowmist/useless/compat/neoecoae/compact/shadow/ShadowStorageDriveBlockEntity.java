@@ -4,7 +4,6 @@ import cn.dancingsnow.neoecoae.api.storage.IECOStorageCell;
 import cn.dancingsnow.neoecoae.blocks.entity.storage.ECODriveBlockEntity;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
-import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BlockEntityType;
@@ -17,11 +16,10 @@ public final class ShadowStorageDriveBlockEntity extends ECODriveBlockEntity {
     private boolean installing = true;
 
     public ShadowStorageDriveBlockEntity(BlockEntityType<ECODriveBlockEntity> type, BlockPos pos,
-                                         BlockState state, ItemStack cell, ServerLevel level) {
+                                         BlockState state, ItemStack cell) {
         super(type, pos, state);
         super.setCellStack(cell);
         installing = false;
-        setLevel(level);
     }
 
     @Override
@@ -29,8 +27,8 @@ public final class ShadowStorageDriveBlockEntity extends ECODriveBlockEntity {
     }
 
     @Override
-    public ItemStack getBuiltInCellForDisplay() {
-        return getCellStack();
+    public @Nullable ItemStack getBuiltInCellForDisplay() {
+        return getInstalledCellStack();
     }
 
     @Override

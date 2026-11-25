@@ -229,11 +229,11 @@ public class CompactL9BlockEntity extends ECOStorageSystemBlockEntity
     @Override
     public void installCompactComponents(NEStorageCluster cluster, ServerLevel level) {
         compactInterface.release();
-        installBuiltInDrives(cluster, level);
+        installBuiltInDrives(cluster);
         compactInterface.attach(level, cluster, getMainNode());
     }
 
-    private void installBuiltInDrives(NEStorageCluster cluster, ServerLevel level) {
+    private void installBuiltInDrives(NEStorageCluster cluster) {
         var block = (ECODriveBlock) BuiltInRegistries.BLOCK.get(
                 ResourceLocation.fromNamespaceAndPath("neoecoae", "eco_drive"));
         ItemStack cell = NeoEcoCompactRegistry.neoEcoStack("eco_item_storage_cell_256m");
@@ -241,7 +241,7 @@ public class CompactL9BlockEntity extends ECOStorageSystemBlockEntity
         for (int row = 0; row < DRIVE_ROWS; row++) {
             for (int column = 0; column < DRIVE_COLUMNS; column++) {
                 cluster.addBlockEntity(new ShadowStorageDriveBlockEntity(block.getBlockEntityType(),
-                        chunk.getBlockAt(column, worldPosition.getY(), row), block.defaultBlockState(), cell.copy(), level));
+                        chunk.getBlockAt(column, worldPosition.getY(), row), block.defaultBlockState(), cell.copy()));
             }
         }
     }

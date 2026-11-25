@@ -74,9 +74,9 @@ class CompactMachineDropsTest {
             cells.when(() -> ECOStorageCells.isCellHandled(member)).thenReturn(true);
             BlockEntityType<ECODriveBlockEntity> type = mock(BlockEntityType.class);
             when(type.isValid(any())).thenReturn(true);
-            var drive = new ShadowStorageDriveBlockEntity(type, BlockPos.ZERO, Blocks.AIR.defaultBlockState(), member, level);
+            var drive = new ShadowStorageDriveBlockEntity(type, BlockPos.ZERO, Blocks.AIR.defaultBlockState(), member);
 
-            assertSame(level, drive.getLevel());
+            assertNull(drive.getLevel());
             assertNull(member.get(DataComponents.CUSTOM_DATA));
             assertSame(member, drive.getBuiltInCellForDisplay());
             assertFalse(drive.canExtractCell());

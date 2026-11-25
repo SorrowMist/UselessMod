@@ -6,7 +6,6 @@ import appeng.api.networking.ticking.IGridTickable;
 import appeng.api.networking.ticking.TickRateModulation;
 import appeng.api.networking.ticking.TickingRequest;
 import appeng.api.storage.IStorageProvider;
-import appeng.util.inv.AppEngInternalInventory;
 import cn.dancingsnow.neoecoae.api.ECOTier;
 import cn.dancingsnow.neoecoae.blocks.entity.NEBlockEntity;
 import cn.dancingsnow.neoecoae.blocks.entity.storage.ECODriveBlockEntity;
@@ -34,14 +33,12 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.component.CustomData;
+import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.state.BlockState;
 import org.jetbrains.annotations.Nullable;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
-import java.lang.reflect.Field;
 import java.util.BitSet;
 import java.util.EnumSet;
 import java.util.List;
@@ -49,7 +46,7 @@ import java.util.Set;
 import java.util.UUID;
 
 /**
- * 无用型紧凑 L9 —— 等价于一台「无限存储模式已迁移完成」的 L9 存储子系统。
+ * 无用型紧凑 L9，内置无限存储所需的组件和空盘，由 ECO 管理存储域。
  *
  * <p>自己不实现任何存储逻辑：容量、编解码、注入抽取全部来自 ECO 的
  * {@code ECOInfiniteStorageEngine} / {@code ECOInfiniteStorage}。</p>
@@ -63,11 +60,8 @@ import java.util.UUID;
 public class CompactL9BlockEntity extends ECOStorageSystemBlockEntity
         implements CompactHost<NEStorageCluster>, CompactTicker, IGridTickable {
 
-    private static final Logger LOGGER = LoggerFactory.getLogger(CompactL9BlockEntity.class);
-
     /** 与 ECO 控制器掉落物里使用的同一个 NBT 键。 */
     private static final String DOMAIN_TAG = "neoecoae_infinite_controller_domain";
-    private static final String MODE_TAG = "neoecoae_infinite_controller_mode";
     private static final int DRIVE_COLUMNS = 11;
     private static final int DRIVE_ROWS = 3;
     /** ECO 的 INFINITE_COMPONENT_REQUIRED。 */
@@ -195,17 +189,9 @@ public class CompactL9BlockEntity extends ECOStorageSystemBlockEntity
         return true;
     }
 
-    /**
-     * 内建的 64 个无限组件不允许被玩家取出。
-     *
-     * <p>否则「取出 64 个 → 下一 tick 自动补满」将构成无限复制；
-     * 且紧凑 L9 的设计定位是「始终处于无限存储」，不应支持退回普通模式。</p>
-     */
-
-
     @Override
-    protected boolean hasBuiltInInfiniteComponents() {
-        return true;
+    protected int getBuiltInInfiniteComponentCount() {
+        return INFINITE_COMPONENTS;
     }
 
     @Override
@@ -233,9 +219,6 @@ public class CompactL9BlockEntity extends ECOStorageSystemBlockEntity
 
     /**
      * 内建的 64 个无限组件属于方块本体，不能作为掉落物被复制出去。
-     *
-     * <p>域本身通过 ECO 原生的 {@code applyInfiniteDomainToControllerDrop} 写进方块物品，
-     * 放回来时由 {@code ECOStorageSystemBlock#setPlacedBy} 恢复，所以这里不产生额外掉落是安全的。</p>
      */
     @Override
     public void addAdditionalDrops(Level level, BlockPos pos, List<ItemStack> drops) {
@@ -246,81 +229,21 @@ public class CompactL9BlockEntity extends ECOStorageSystemBlockEntity
     @Override
     public void installCompactComponents(NEStorageCluster cluster, ServerLevel level) {
         compactInterface.release();
-        primeInfiniteComponents();
-        installBuiltInDrives(cluster, initializeInfiniteDomain());
+        installBuiltInDrives(cluster, level);
         compactInterface.attach(level, cluster, getMainNode());
     }
 
-    private void installBuiltInDrives(NEStorageCluster cluster, UUID domain) {
+    private void installBuiltInDrives(NEStorageCluster cluster, ServerLevel level) {
         var block = (ECODriveBlock) BuiltInRegistries.BLOCK.get(
                 ResourceLocation.fromNamespaceAndPath("neoecoae", "eco_drive"));
         ItemStack cell = NeoEcoCompactRegistry.neoEcoStack("eco_item_storage_cell_256m");
+        ChunkPos chunk = new ChunkPos(worldPosition);
         for (int row = 0; row < DRIVE_ROWS; row++) {
             for (int column = 0; column < DRIVE_COLUMNS; column++) {
                 cluster.addBlockEntity(new ShadowStorageDriveBlockEntity(block.getBlockEntityType(),
-                        worldPosition.offset(column + 2, 1 - row, 0), block.defaultBlockState(), cell.copy(), domain));
+                        chunk.getBlockAt(column, worldPosition.getY(), row), block.defaultBlockState(), cell.copy(), level));
             }
         }
-    }
-
-    /**
-     * 把 64 个无限存储组件放进主机自己那唯一的组件槽。
-     *
-     * <p>该槽位在 ECO 里是私有的，这里通过反射写入，语义与玩家在主机界面里手动放入 64 个组件一致；
-     * 写入走 {@code setItemDirect}，它会回调 {@code onChangeInventory} 把 {@code infiniteComponentsDirty} 置位。</p>
-     */
-    private void primeInfiniteComponents() {
-        ItemStack current = readComponentSlot();
-        if (current != null && !current.isEmpty() && current.getCount() >= INFINITE_COMPONENTS) {
-            return;
-        }
-        ItemStack stack = NeoEcoCompactRegistry.neoEcoStack("eco_infinite_cell_component");
-        stack.setCount(INFINITE_COMPONENTS);
-        if (!writeComponentSlot(stack)) {
-            LOGGER.warn("Compact L9 at {} could not preload ECO infinite components", worldPosition);
-        }
-    }
-
-    private ItemStack readComponentSlot() {
-        AppEngInternalInventory inventory = componentInventory();
-        return inventory == null ? null : inventory.getStackInSlot(0);
-    }
-
-    private boolean writeComponentSlot(ItemStack stack) {
-        AppEngInternalInventory inventory = componentInventory();
-        if (inventory == null) {
-            return false;
-        }
-        inventory.setItemDirect(0, stack);
-        return true;
-    }
-
-    private AppEngInternalInventory componentInventory() {
-        try {
-            Field field = ECOStorageSystemBlockEntity.class.getDeclaredField("infiniteComponentInventory");
-            field.setAccessible(true);
-            Object value = field.get(this);
-            if (value instanceof AppEngInternalInventory inventory) {
-                return inventory;
-            }
-        } catch (ReflectiveOperationException ignored) {
-            // 落到下面返回 null，由调用方给出警告。
-        }
-        return null;
-    }
-
-    /** 只给新主机分配域。已有域由 ECO 按原状态恢复，不能重置未完成的认领。 */
-    private UUID initializeInfiniteDomain() {
-        ItemStack carrier = new ItemStack(NeoEcoCompactRegistry.COMPACT_L9_ITEM.get());
-        applyInfiniteDomainToControllerDrop(carrier);
-        CompoundTag tag = carrier.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).copyTag();
-        if (tag.hasUUID(DOMAIN_TAG)) return tag.getUUID(DOMAIN_TAG);
-        UUID domain = UUID.randomUUID();
-        tag.putUUID(DOMAIN_TAG, domain);
-        tag.putString(MODE_TAG, "formed_infinite");
-        carrier.set(DataComponents.CUSTOM_DATA, CustomData.of(tag));
-        restoreInfiniteDomainFromItem(carrier);
-        return domain;
     }
 
     public static @Nullable UUID readDroppedDomain(ItemStack stack) {

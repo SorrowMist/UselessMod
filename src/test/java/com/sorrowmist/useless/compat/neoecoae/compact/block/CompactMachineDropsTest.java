@@ -4,7 +4,6 @@ import appeng.api.networking.GridHelper;
 import appeng.api.networking.IManagedGridNode;
 import cn.dancingsnow.neoecoae.api.storage.ECOStorageCells;
 import cn.dancingsnow.neoecoae.blocks.entity.storage.ECODriveBlockEntity;
-import cn.dancingsnow.neoecoae.blocks.entity.storage.ECOStorageSystemBlockEntity;
 import com.sorrowmist.useless.InventoryTestBootstrap;
 import com.sorrowmist.useless.compat.neoecoae.compact.entity.CompactL9BlockEntity;
 import com.sorrowmist.useless.compat.neoecoae.compact.shadow.ShadowStorageDriveBlockEntity;
@@ -13,6 +12,7 @@ import net.minecraft.core.component.DataComponents;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.contents.TranslatableContents;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
@@ -25,8 +25,6 @@ import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.state.BlockState;
-import net.neoforged.neoforge.items.IItemHandlerModifiable;
-import net.neoforged.neoforge.items.ItemStackHandler;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
@@ -69,18 +67,18 @@ class CompactMachineDropsTest {
     @SuppressWarnings("unchecked")
     void builtInL9MemberCannotBeReplacedExtractedOrDropped() {
         var member = new ItemStack(Items.PAPER);
-        UUID domain = UUID.randomUUID();
+        var level = mock(ServerLevel.class);
         try (var grid = mockStatic(GridHelper.class); var cells = mockStatic(ECOStorageCells.class)) {
             grid.when(() -> GridHelper.createManagedNode(any(), any()))
                     .thenReturn(mock(IManagedGridNode.class, RETURNS_SELF));
             cells.when(() -> ECOStorageCells.isCellHandled(member)).thenReturn(true);
             BlockEntityType<ECODriveBlockEntity> type = mock(BlockEntityType.class);
             when(type.isValid(any())).thenReturn(true);
-            var drive = new ShadowStorageDriveBlockEntity(type, BlockPos.ZERO, Blocks.AIR.defaultBlockState(), member, domain);
+            var drive = new ShadowStorageDriveBlockEntity(type, BlockPos.ZERO, Blocks.AIR.defaultBlockState(), member, level);
 
-            CompoundTag tag = drive.getCellStack().getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).copyTag();
-            assertTrue(tag.getBoolean("neoecoae_infinite_member"));
-            assertEquals(domain, tag.getUUID("neoecoae_infinite_domain"));
+            assertSame(level, drive.getLevel());
+            assertNull(member.get(DataComponents.CUSTOM_DATA));
+            assertSame(member, drive.getBuiltInCellForDisplay());
             assertFalse(drive.canExtractCell());
             assertTrue(drive.HANDLER.extractItem(0, 1, true).isEmpty());
             assertTrue(drive.HANDLER.extractItem(0, 1, false).isEmpty());
@@ -89,34 +87,19 @@ class CompactMachineDropsTest {
             assertNull(drive.getCellInventory());
 
             var drops = new ArrayList<ItemStack>();
-            drive.addAdditionalDrops(null, BlockPos.ZERO, drops);
+            drive.addAdditionalDrops(level, BlockPos.ZERO, drops);
             assertTrue(drops.isEmpty());
+            drive.markForUpdate();
+            drive.setChanged();
+            verifyNoInteractions(level);
         }
     }
 
     @Test
-    void compactL9ComponentSlotDisplaysItsContentsButRejectsHandlerMutations() throws ReflectiveOperationException {
+    void compactL9UsesTheNativeReadOnlyComponentSlotPolicy() {
         var host = mock(CompactL9BlockEntity.class, CALLS_REAL_METHODS);
-        var restoreType = Class.forName(ECOStorageSystemBlockEntity.class.getPackageName() + ".ECOStorageInfiniteRestore");
-        var constructor = restoreType.getDeclaredConstructor(ECOStorageSystemBlockEntity.class);
-        constructor.setAccessible(true);
-        var factory = restoreType.getDeclaredMethod("componentItemHandler", IItemHandlerModifiable.class);
-        factory.setAccessible(true);
-        var delegate = new ItemStackHandler(1);
-        delegate.setStackInSlot(0, new ItemStack(Items.PAPER, 64));
-        var slot = (IItemHandlerModifiable) factory.invoke(constructor.newInstance(host), delegate);
 
-        assertEquals(64, slot.getStackInSlot(0).getCount());
         assertFalse(host.canExtractInfiniteComponents());
-        assertTrue(slot.extractItem(0, 64, true).isEmpty());
-        assertTrue(slot.extractItem(0, 64, false).isEmpty());
-        assertSame(Items.PAPER, slot.getStackInSlot(0).getItem());
-        slot.setStackInSlot(0, ItemStack.EMPTY);
-        assertEquals(64, delegate.getStackInSlot(0).getCount());
-        delegate.setStackInSlot(0, ItemStack.EMPTY);
-        var replacement = new ItemStack(Items.PAPER);
-        assertSame(replacement, slot.insertItem(0, replacement, false));
-        assertTrue(delegate.getStackInSlot(0).isEmpty());
     }
 
     @Test

@@ -14,8 +14,7 @@ import net.minecraft.world.phys.BlockHitResult;
 /**
  * 无用型紧凑 L9 的方块形态。
  *
- * <p>直接继承 ECO 的存储系统主机方块，因此「拆掉时把无限域写进掉落物、放回去时恢复」
- * 这条 ECO 原生链路对紧凑方块同样生效。</p>
+ * <p>无限域的认领和恢复由 ECO 存储系统主机处理。</p>
  */
 public class CompactL9Block extends ECOStorageSystemBlock {
 

@@ -12,8 +12,10 @@ import cn.dancingsnow.neoecoae.blocks.entity.crafting.ECOCraftingPatternBusBlock
 import net.minecraft.world.item.ItemStack;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 /**
@@ -26,10 +28,12 @@ public final class CompactPatternProvider implements ICraftingProvider, IECOPatt
         ECOFastPathDispatchProvider {
 
     private final List<ECOCraftingPatternBusBlockEntity> buses = new ArrayList<>();
+    private Map<IPatternDetails, ECOCraftingPatternBusBlockEntity> patternOwners = Map.of();
 
     public void bind(List<ECOCraftingPatternBusBlockEntity> newBuses) {
         buses.clear();
         buses.addAll(newBuses);
+        patternOwners = Map.of();
     }
 
     public boolean isEmpty() {
@@ -43,12 +47,18 @@ public final class CompactPatternProvider implements ICraftingProvider, IECOPatt
     @Override
     public List<IPatternDetails> getAvailablePatterns() {
         if (buses.isEmpty()) {
+            patternOwners = Map.of();
             return List.of();
         }
         Set<IPatternDetails> union = new LinkedHashSet<>();
+        Map<IPatternDetails, ECOCraftingPatternBusBlockEntity> owners = new HashMap<>();
         for (ECOCraftingPatternBusBlockEntity bus : buses) {
-            union.addAll(bus.getAvailablePatterns());
+            for (IPatternDetails pattern : bus.getAvailablePatterns()) {
+                union.add(pattern);
+                owners.putIfAbsent(pattern, bus);
+            }
         }
+        patternOwners = Map.copyOf(owners);
         return List.copyOf(union);
     }
 
@@ -89,14 +99,8 @@ public final class CompactPatternProvider implements ICraftingProvider, IECOPatt
      */
     @Override
     public Preparation eco$prepareFastPath(ECOBatchDispatchContext context) {
-        Preparation best = null;
-        for (ECOCraftingPatternBusBlockEntity bus : buses) {
-            Preparation candidate = bus.eco$prepareFastPath(context);
-            if (candidate != null && (best == null || candidate.capacity() > best.capacity())) {
-                best = candidate;
-            }
-        }
-        return best;
+        ECOCraftingPatternBusBlockEntity owner = patternOwners.get(context.pattern());
+        return owner == null ? null : owner.eco$prepareFastPath(context);
     }
 
     @Override

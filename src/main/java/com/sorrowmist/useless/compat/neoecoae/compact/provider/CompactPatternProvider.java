@@ -1,22 +1,25 @@
 package com.sorrowmist.useless.compat.neoecoae.compact.provider;
 
 import appeng.api.crafting.IPatternDetails;
-import appeng.api.networking.crafting.ICraftingProvider;
 import appeng.api.stacks.AEKey;
 import appeng.api.stacks.KeyCounter;
 import cn.dancingsnow.neoecoae.api.ECOPatternInsertionResult;
 import cn.dancingsnow.neoecoae.api.IECOPatternStorage;
 import cn.dancingsnow.neoecoae.api.me.provider.ECOBatchDispatchContext;
 import cn.dancingsnow.neoecoae.api.me.provider.ECOFastPathDispatchProvider;
+import cn.dancingsnow.neoecoae.api.me.provider.ECOJobAwareCraftingProvider;
 import cn.dancingsnow.neoecoae.blocks.entity.crafting.ECOCraftingPatternBusBlockEntity;
 import net.minecraft.world.item.ItemStack;
+import org.jetbrains.annotations.Nullable;
 
+import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 
 /**
  * 把一整个紧凑 F9 里所有影子样板总线聚合成的单一网格服务。
@@ -24,7 +27,7 @@ import java.util.Set;
  * <p>AE2 与 ECO 的网格每个服务类只认一个实例，而紧凑 F9 内部有 176 条真实样板总线；
  * 这个聚合器把它们的样板集合、派单与插入接口按 ECO 原生实现逐条转发，不做任何自己的样板逻辑。</p>
  */
-public final class CompactPatternProvider implements ICraftingProvider, IECOPatternStorage,
+public final class CompactPatternProvider implements ECOJobAwareCraftingProvider, IECOPatternStorage,
         ECOFastPathDispatchProvider {
 
     private final List<ECOCraftingPatternBusBlockEntity> buses = new ArrayList<>();
@@ -64,8 +67,13 @@ public final class CompactPatternProvider implements ICraftingProvider, IECOPatt
 
     @Override
     public boolean pushPattern(IPatternDetails patternDetails, KeyCounter[] inputHolder) {
+        return pushPattern(patternDetails, inputHolder, null);
+    }
+
+    @Override
+    public boolean pushPattern(IPatternDetails patternDetails, KeyCounter[] inputHolder, @Nullable UUID craftingJobId) {
         for (ECOCraftingPatternBusBlockEntity bus : buses) {
-            if (bus.pushPattern(patternDetails, inputHolder)) {
+            if (bus.pushPattern(patternDetails, inputHolder, craftingJobId)) {
                 return true;
             }
         }
@@ -101,6 +109,12 @@ public final class CompactPatternProvider implements ICraftingProvider, IECOPatt
     public Preparation eco$prepareFastPath(ECOBatchDispatchContext context) {
         ECOCraftingPatternBusBlockEntity owner = patternOwners.get(context.pattern());
         return owner == null ? null : owner.eco$prepareFastPath(context);
+    }
+
+    @Override
+    public @Nullable ExactPreparation eco$prepareExactFastPath(ECOBatchDispatchContext context, BigInteger requested) {
+        ECOCraftingPatternBusBlockEntity owner = patternOwners.get(context.pattern());
+        return owner == null ? null : owner.eco$prepareExactFastPath(context, requested);
     }
 
     @Override

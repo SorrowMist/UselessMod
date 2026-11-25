@@ -10,7 +10,7 @@ import cn.dancingsnow.neoecoae.api.IECOPatternStorage;
 import cn.dancingsnow.neoecoae.api.IECOPatternStorageService;
 import cn.dancingsnow.neoecoae.blocks.entity.crafting.ECOCraftingPatternBusBlockEntity;
 import cn.dancingsnow.neoecoae.config.NEConfig;
-import cn.dancingsnow.neoecoae.grid.PatternCatalog;
+import cn.dancingsnow.neoecoae.grid.pattern.PatternCatalog;
 import com.sorrowmist.useless.InventoryTestBootstrap;
 import com.sorrowmist.useless.compat.neoecoae.compact.cluster.CompactCraftingCluster;
 import com.sorrowmist.useless.compat.neoecoae.compact.shadow.ShadowInterfaceBlockEntity;

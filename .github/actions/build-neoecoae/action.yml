@@ -7,7 +7,7 @@ runs:
       uses: actions/checkout@v4
       with:
         repository: DancingSnow0517/NeoECOAEExtension
-        ref: 106e78e944fde00293946b4704b422b1b224e10c
+        ref: refs/tags/21.3.0
         path: .ci/NeoECOAEExtension
         persist-credentials: false
 
@@ -16,6 +16,6 @@ runs:
       working-directory: .ci/NeoECOAEExtension
       run: |
         bash ./gradlew jar --console=plain
-        eco_jar="$PWD/build/libs/neoecoae-21.2.19.jar"
+        eco_jar="$PWD/build/libs/neoecoae-21.3.0.jar"
         test -f "$eco_jar"
         printf 'ORG_GRADLE_PROJECT_neoEcoCompileJar=%s\n' "$eco_jar" >> "$GITHUB_ENV"

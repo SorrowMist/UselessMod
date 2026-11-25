@@ -15,7 +15,7 @@ import cn.dancingsnow.neoecoae.api.ECOPreparedPattern;
 import cn.dancingsnow.neoecoae.api.IECOPatternStorageService;
 import cn.dancingsnow.neoecoae.blocks.entity.ECOMachineInterfaceBlockEntity;
 import cn.dancingsnow.neoecoae.blocks.entity.crafting.ECOCraftingPatternBusBlockEntity;
-import cn.dancingsnow.neoecoae.grid.NEMachineLookup;
+import cn.dancingsnow.neoecoae.integration.ae2.ECOGridMachineFinder;
 import cn.dancingsnow.neoecoae.multiblock.cluster.NECraftingCluster;
 import com.sorrowmist.useless.compat.neoecoae.compact.NeoEcoCompactRegistry;
 import com.sorrowmist.useless.compat.neoecoae.compact.provider.CombinedPatternInventory;
@@ -112,7 +112,7 @@ public class ExposedPatternBusBlockEntity extends ECOCraftingPatternBusBlockEnti
         if (grid == null) {
             return;
         }
-        for (var machineInterface : NEMachineLookup.getMachines(grid, ECOMachineInterfaceBlockEntity.class)) {
+        for (var machineInterface : ECOGridMachineFinder.getMachines(grid, ECOMachineInterfaceBlockEntity.class)) {
             if (machineInterface.mayMapPatternBus(this)) machineInterface.onPatternBusTopologyChanged(this);
         }
     }
@@ -164,7 +164,7 @@ public class ExposedPatternBusBlockEntity extends ECOCraftingPatternBusBlockEnti
                 if (catalog != null) {
                     catalog.onPatternSlotsChanged(this, previousRevision, slots);
                 }
-                for (var machineInterface : NEMachineLookup.getMachines(grid, ECOMachineInterfaceBlockEntity.class)) {
+                for (var machineInterface : ECOGridMachineFinder.getMachines(grid, ECOMachineInterfaceBlockEntity.class)) {
                     if (!machineInterface.mayMapPatternBus(this)) continue;
                     if (layoutChanged) {
                         machineInterface.onPatternBusInventoryChanged(this);

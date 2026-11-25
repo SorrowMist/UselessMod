@@ -126,7 +126,7 @@ requiredMods=["pneumaticcraft"]
 [[dependencies.${mod_id}]]
     modId="neoecoae"
     type="optional"
-    versionRange="[21.2.19,)"
+    versionRange="[21.3.0,)"
     ordering="NONE"
     side="BOTH"
 

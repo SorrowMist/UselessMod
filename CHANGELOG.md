@@ -5,17 +5,33 @@
 
 ## [Unreleased]
 
+## [2.4.6.11]
+
 ### Added / 新增
-- 万象样板编码现已支持天枢终端。
-  - Omniversal Pattern encoding is now supported in Tianshu terminals.
+- 天枢终端现已支持编码万象样板；成功自动上传后不再打开供应器选择界面。
+  - Tianshu terminals can now encode Omniversal Patterns and skip the provider selection screen after a successful automatic upload.
 - 新增 Mekanism 速度/能量升级数量修改开关，默认开启；关闭后使用 Mekanism 原生上限。
   - Added an enabled-by-default toggle for changing Mekanism speed and energy upgrade limits; disabling it restores Mekanism's defaults.
+- 紧凑 C9、F9 和 L9 的物品提示现在会说明潜行右键打开哪个界面。
+  - Compact C9, F9, and L9 tooltips now explain which screen opens on sneak-right-click.
+
+### Changed / 变更
+- 紧凑主机改用 NeoECOAE 的原生接入接口。NeoECOAE 仍为可选依赖；安装时需使用 [21.3.0](https://github.com/DancingSnow0517/NeoECOAEExtension/releases/tag/21.3.0) 或更新版本。
+  - Compact hosts now use native NeoECOAE APIs. NeoECOAE remains optional, but requires [21.3.0](https://github.com/DancingSnow0517/NeoECOAEExtension/releases/tag/21.3.0) or later when installed.
 
 ### Fixed / 修复
 - 修复紧凑 F9 添加或移除样板后，潜行右键打开的通讯接口仍显示旧样板列表的问题。
   - Fixed the Compact F9 interface opened by sneak-right-click showing stale patterns after additions or removals.
+- 修复紧凑 F9 缺少冷却液时仍显示无限容量的问题，以及紧凑 L9 内置组件和空盘未正确计入无限存储的问题。
+  - Fixed Compact F9 showing infinite capacity without coolant and Compact L9's built-in components and empty cells not being counted correctly toward infinite storage.
+- 紧凑 F9 在常规派单时保留合成订单标识，并支持精确批量快速派单。
+  - Compact F9 now preserves crafting job IDs during regular dispatch and supports exact-batch fast-path dispatch.
 - 万象样板中的重复模具标记现在会合并显示，并标注数量。
   - Repeated mold markers on Omniversal Patterns are now grouped and display their counts.
+
+### Performance / 性能
+- 紧凑 F9 快速派单直接定位持有该样板的总线，不再逐条扫描内部总线。
+  - Compact F9 fast-path dispatch now goes directly to the bus that holds the pattern instead of scanning every internal bus.
 
 ## [2.4.6.10]
 

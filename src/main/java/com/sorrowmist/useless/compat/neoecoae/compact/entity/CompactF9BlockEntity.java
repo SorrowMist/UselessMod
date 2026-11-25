@@ -14,6 +14,7 @@ import cn.dancingsnow.neoecoae.api.ECOPatternInsertionResult;
 import cn.dancingsnow.neoecoae.api.me.network.CraftingCapabilitySnapshot;
 import cn.dancingsnow.neoecoae.api.me.provider.ECOBatchDispatchContext;
 import cn.dancingsnow.neoecoae.api.me.provider.ECOFastPathDispatchProvider;
+import cn.dancingsnow.neoecoae.api.me.provider.ECOJobAwareCraftingProvider;
 import cn.dancingsnow.neoecoae.blocks.entity.NEBlockEntity;
 import cn.dancingsnow.neoecoae.blocks.entity.crafting.ECOCraftingPatternBusBlockEntity;
 import com.sorrowmist.useless.compat.neoecoae.compact.shadow.ShadowPatternBusBlockEntity;
@@ -69,6 +70,7 @@ import java.util.BitSet;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Set;
+import java.util.UUID;
 
 /**
  * 无用型紧凑 F9 —— 等价于「八联满配 F9」：8 台满长 F9 主机，每台装高能网络交换模块，
@@ -92,7 +94,7 @@ import java.util.Set;
  * {@link ExternalInventoryStore} 里那份 UUID 键控的外置存档中（见 {@link #PATTERN_BUS_KEY}）。</p>
  */
 public class CompactF9BlockEntity extends ECOCraftingSystemBlockEntity
-        implements CompactHost<NECraftingCluster>, CompactTicker, ICraftingProvider, ECOFastPathDispatchProvider,
+        implements CompactHost<NECraftingCluster>, CompactTicker, ECOJobAwareCraftingProvider, ECOFastPathDispatchProvider,
         CraftingPatternMenuHost {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(CompactF9BlockEntity.class);
@@ -735,6 +737,11 @@ public class CompactF9BlockEntity extends ECOCraftingSystemBlockEntity
     }
 
     @Override
+    public boolean pushPattern(IPatternDetails patternDetails, KeyCounter[] inputHolder, @Nullable UUID craftingJobId) {
+        return patternProvider.pushPattern(patternDetails, inputHolder, craftingJobId);
+    }
+
+    @Override
     public boolean isBusy() {
         return patternProvider.isBusy();
     }
@@ -742,6 +749,11 @@ public class CompactF9BlockEntity extends ECOCraftingSystemBlockEntity
     @Override
     public Preparation eco$prepareFastPath(ECOBatchDispatchContext context) {
         return patternProvider.eco$prepareFastPath(context);
+    }
+
+    @Override
+    public @Nullable ExactPreparation eco$prepareExactFastPath(ECOBatchDispatchContext context, java.math.BigInteger requested) {
+        return patternProvider.eco$prepareExactFastPath(context, requested);
     }
 
     @Override

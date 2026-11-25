@@ -212,7 +212,7 @@ public class CompactC9BlockEntity extends ECOComputationSystemBlockEntity
      *
      * <p>AE2 只在收到 {@code GridCraftingCpuChange} 时才会刷新它的 CPU 集群集合
      * （{@code CraftingService.updateList}），而 ECO 是靠在那个刷新点里
-     * {@code NEMachineLookup} 找到主机的。</p>
+     * {@code ECOGridMachineFinder} 找到主机的。</p>
      */
     @Override
     protected void onMainNodeGridChanged() {

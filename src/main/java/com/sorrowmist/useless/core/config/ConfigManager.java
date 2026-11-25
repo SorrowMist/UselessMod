@@ -86,6 +86,7 @@ public class ConfigManager {
     private static final ModConfigSpec.IntValue TIME_MULTIPLIER;
     private static final ModConfigSpec.IntValue ELECTRICITY_MULTIPLIER;
     private static final ModConfigSpec.IntValue CAPACITY_MULTIPLIER;
+    private static final ModConfigSpec.BooleanValue ENABLE_UPGRADE_COUNT_MODIFICATION;
     private static final ModConfigSpec.IntValue MAX_UPGRADE;
 
     // 万象炉从AE网络抽取能量配置
@@ -581,8 +582,13 @@ public class ConfigManager {
                 .comment("能量升级储电增强倍率")
                 .defineInRange("capacity_multiplier", 1, 1, Integer.MAX_VALUE);
 
+        ENABLE_UPGRADE_COUNT_MODIFICATION = SERVER_BUILDER
+                .comment("是否将速度/能量升级可安装数量上限调整为配置值；修改后重启游戏生效")
+                .translation("useless_mod.configuration.enable_upgrade_count_modification")
+                .define("enable_upgrade_count_modification", true);
+
         MAX_UPGRADE = SERVER_BUILDER
-                .comment("机器可接受的最大速度/能量升级数量, 重启游戏生效")
+                .comment("机器可接受的最大速度/能量升级数量，仅在启用数量修改时生效；修改后重启游戏生效")
                 .defineInRange("max_upgrade", 16, 1, 64);
         SERVER_BUILDER.pop();
 

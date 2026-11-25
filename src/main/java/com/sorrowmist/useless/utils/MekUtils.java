@@ -13,6 +13,7 @@ import java.io.File;
 public class MekUtils {
 
     public static int MAX_UPGRADE = 16;
+    public static boolean ENABLE_UPGRADE_COUNT_MODIFICATION = true;
 
     static {
         File file = FMLPaths.CONFIGDIR.get().resolve("useless_mod-server.toml").toFile();
@@ -27,8 +28,13 @@ public class MekUtils {
                 max = 16;
             }
             MAX_UPGRADE = max;
+            if (mekanism.get("enable_upgrade_count_modification") instanceof Boolean enabled) {
+                ENABLE_UPGRADE_COUNT_MODIFICATION = enabled;
+            }
         } else {
             config.set("mekanism_upgrade.max_upgrade", MAX_UPGRADE);
+            config.set("mekanism_upgrade.enable_upgrade_count_modification",
+                    ENABLE_UPGRADE_COUNT_MODIFICATION);
             config.save();
         }
 

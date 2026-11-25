@@ -30,6 +30,10 @@ public abstract class UpgradeMixin {
             argsOnly = true
     )
     private static int toFullStack(int i) {
-        return !MekTemp.name.equals("speed") && !MekTemp.name.equals("energy") ? i : MekUtils.MAX_UPGRADE;
+        if (MekUtils.ENABLE_UPGRADE_COUNT_MODIFICATION
+                && (MekTemp.name.equals("speed") || MekTemp.name.equals("energy"))) {
+            return MekUtils.MAX_UPGRADE;
+        }
+        return i;
     }
 }

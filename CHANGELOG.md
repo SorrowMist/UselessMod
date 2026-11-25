@@ -8,6 +8,8 @@
 ### Added / 新增
 - 万象样板编码现已支持天枢终端。
   - Omniversal Pattern encoding is now supported in Tianshu terminals.
+- 新增 Mekanism 速度/能量升级数量修改开关，默认开启；关闭后使用 Mekanism 原生上限。
+  - Added an enabled-by-default toggle for changing Mekanism speed and energy upgrade limits; disabling it restores Mekanism's defaults.
 
 ### Fixed / 修复
 - 修复紧凑 F9 添加或移除样板后，潜行右键打开的通讯接口仍显示旧样板列表的问题。
